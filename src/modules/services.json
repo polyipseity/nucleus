@@ -6,7 +6,9 @@
     "logging": {
       "capture": "all",
       "dirs": {
-        "system": ["caddy"],
+        "system": [
+          "caddy"
+        ],
         "user": []
       }
     },
@@ -40,8 +42,12 @@
     "logging": {
       "capture": "all",
       "dirs": {
-        "system": ["camilladsp"],
-        "user": ["camilladsp"]
+        "system": [
+          "camilladsp"
+        ],
+        "user": [
+          "camilladsp"
+        ]
       }
     },
     "network": {
@@ -100,8 +106,12 @@
     "logging": {
       "capture": "all",
       "dirs": {
-        "system": ["camillagui-backend"],
-        "user": ["camillagui-backend"]
+        "system": [
+          "camillagui-backend"
+        ],
+        "user": [
+          "camillagui-backend"
+        ]
       }
     },
     "network": {
@@ -203,7 +213,10 @@
     "logging": {
       "capture": "all",
       "dirs": {
-        "system": ["jellyfin", "jellyfin-app"],
+        "system": [
+          "jellyfin",
+          "jellyfin-app"
+        ],
         "user": []
       },
       "eventLog": {
@@ -246,7 +259,9 @@
     "logging": {
       "capture": "all",
       "dirs": {
-        "system": ["linux-builder"],
+        "system": [
+          "linux-builder"
+        ],
         "user": []
       }
     },
@@ -279,7 +294,9 @@
     "logging": {
       "capture": "all",
       "dirs": {
-        "system": ["litellm"],
+        "system": [
+          "litellm"
+        ],
         "user": []
       },
       "level": "WARNING"
@@ -316,7 +333,9 @@
     "logging": {
       "capture": "all",
       "dirs": {
-        "system": ["ollama"],
+        "system": [
+          "ollama"
+        ],
         "user": []
       },
       "eventLog": {
@@ -385,7 +404,9 @@
     "logging": {
       "capture": "all",
       "dirs": {
-        "system": ["service-watchdog"],
+        "system": [
+          "service-watchdog"
+        ],
         "user": []
       }
     },
@@ -413,7 +434,9 @@
       "capture": "all",
       "dirs": {
         "system": [],
-        "user": ["service-watchdog"]
+        "user": [
+          "service-watchdog"
+        ]
       }
     },
     "platforms": {
@@ -424,12 +447,12 @@
         "type": "launchctl"
       },
       "nixos": {
-        "type": "omitted",
-        "justification": "User-scope watchdog not needed on NixOS — the system watchdog covers both scopes via systemctl --user"
+        "justification": "User-scope watchdog not needed on NixOS — the system watchdog covers both scopes via systemctl --user",
+        "type": "omitted"
       },
       "windows": {
-        "type": "omitted",
-        "justification": "User-scope watchdog not needed on Windows — scheduled task runs with system scope"
+        "justification": "User-scope watchdog not needed on Windows — scheduled task runs with system scope",
+        "type": "omitted"
       }
     }
   },
