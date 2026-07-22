@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+# shellcheck shell=bash # uses process substitution and read -d for safe null-delimited find output
 # Remove stale `result` and `result-*` symlinks left by `nix build`,
 # `nix run ... -o result`, or `nixos-generators`.
 #
@@ -29,23 +29,30 @@ done
 
 _cnba_found=false
 
-for _cnba_pattern in result result-*; do
-  for _cnba_path in "$REPO_ROOT"/$_cnba_pattern; do
-    [ -e "$_cnba_path" ] || [ -L "$_cnba_path" ] || continue
-    if [ -L "$_cnba_path" ]; then
-      _cnba_target="$(readlink "$_cnba_path")"
-      if $_cnba_dry_run; then
-        dry_run "would remove stale Nix build symlink: $_cnba_path -> $_cnba_target"
-      else
-        rm "$_cnba_path"
-        say "removed stale Nix build symlink: $_cnba_path -> $_cnba_target"
-      fi
-      _cnba_found=true
+# Recursively scan for result and result-* symlinks without following symlinks
+# (find default behavior — no -L flag) to avoid traversing into Nix store or
+# other large trees.
+while IFS= read -r -d '' _cnba_path; do
+  if [ -L "$_cnba_path" ]; then
+    _cnba_target="$(readlink "$_cnba_path")"
+    if $_cnba_dry_run; then
+      dry_run "would remove stale Nix build symlink: $_cnba_path -> $_cnba_target"
     else
-      warn "found non-symlink at $_cnba_path — skipping (not a Nix build artifact)"
+      rm "$_cnba_path"
+      say "removed stale Nix build symlink: $_cnba_path -> $_cnba_target"
     fi
-  done
-done
+    _cnba_found=true
+  else
+    warn "found non-symlink at $_cnba_path — skipping (not a Nix build artifact)"
+  fi
+done < <(
+  find "$REPO_ROOT" \
+    -path "$REPO_ROOT/.git" -prune -o \
+    -path "$REPO_ROOT/.direnv" -prune -o \
+    -path "$REPO_ROOT/vendor" -prune -o \
+    \( -name result -o -name 'result-*' \) \
+    -print0 2>/dev/null || true
+)
 
 if $_cnba_dry_run && ! $_cnba_found; then
   say "no stale Nix build artifacts found."
