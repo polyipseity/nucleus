@@ -3,6 +3,8 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
 _mqi_awk_bin="$1"
 _mqi_darwin_commands="$2"
 _mqi_linux_primary_commands="$3"
@@ -21,7 +23,7 @@ _update_qtpass_ini_value() {
 
   if [ -f "$_conf" ]; then
     _tmp="$(mktemp "$_conf.XXXXXX")"
-    "$_mqi_awk_bin" -f "$(dirname "$0")/merge-qtpass-ini.awk" -v key="$_key" -v value="$_value" "$_conf" > "$_tmp"
+    "$_mqi_awk_bin" -f "$SCRIPT_DIR/merge-qtpass-ini.awk" -v key="$_key" -v value="$_value" "$_conf" > "$_tmp"
     mv "$_tmp" "$_conf"
   else
     cat > "$_conf" <<EOF

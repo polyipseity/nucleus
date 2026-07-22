@@ -3,6 +3,8 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+
 _mpi_awk_bin="$1"
 _mpi_picard_defaults_ini="$2"
 _mpi_picard_override_commands="$3"
@@ -23,7 +25,7 @@ _upsert_ini_key() {
     # literally in Picard's @Variant(…) serialized Qt values.
     # AWK -v treats the argument as a string constant and processes
     # backslash escapes; ENVIRON reads the raw bytes unchanged.
-    _UPSERT_VALUE="$_value" "$_mpi_awk_bin" -f "$(dirname "$0")/merge-picard-ini.awk" -v section="$_section" -v key="$_key" "$_conf" > "$_tmp"
+    _UPSERT_VALUE="$_value" "$_mpi_awk_bin" -f "$SCRIPT_DIR/merge-picard-ini.awk" -v section="$_section" -v key="$_key" "$_conf" > "$_tmp"
     mv "$_tmp" "$_conf"
   else
     cat > "$_conf" <<EOF
