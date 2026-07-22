@@ -340,6 +340,7 @@ __marimo__/
 # }
 
 # self {
+!/src/modules/configs/direnv/lib/
 !/src/modules/env/
 !/src/modules/lib/
 !/src/scripts/lib/
