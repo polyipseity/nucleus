@@ -436,6 +436,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-PicardConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-QtPassConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ShellProfile.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-NextestConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-StarshipConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-UserPath.ps1")
 # editors/: VS Code configuration and workspace management.
@@ -804,6 +805,7 @@ if ($null -eq $EnableDevReposParity) {
 # secret/key ordering across macOS, NixOS, and Windows.
 Sync-DevRepo -Enabled:$EnableDevReposParity -Repositories $devRepositories
 Sync-ShellProfile -Enabled:$EnableShellParity
+Sync-NextestConfig -Enabled:$EnableShellParity
 Sync-StarshipConfig -Enabled:$EnableShellParity
 if ($EnableCloudDrivesParity) {
   foreach ($userRecord in $selectedUserRecords) {
