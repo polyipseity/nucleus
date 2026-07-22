@@ -106,6 +106,14 @@ in
 
 **Why it's important:** Catches circular dependencies and typos in module paths before CI fails.
 
+### Test troubleshooting patterns
+
+These patterns have been learned from fixing real test failures:
+
+- **macOS regex incompatibility**: libc++ `std::regex` treats `\(` as a capturing group, not a literal parenthesis. Use character classes like `[(]` instead of `\(` in Nix test assertions evaluated on macOS.
+- **Cascading assertion failures**: `builtins.throw` in assertion helpers (e.g., `assert'`) only reveals the first failure per eval run. To find all failures at once, temporarily replace `assert'` with a no-op version that records rather than throws.
+- **Template refactoring ripple**: When code refactors from inline Nix strings to external template files (`builtins.readFile`), tests that previously checked the Nix source file must be updated to read the template file instead. Every assertion that references the old inline source is a latent failure.
+
 ---
 
 ## Windows Testing Strategy (Pester)
