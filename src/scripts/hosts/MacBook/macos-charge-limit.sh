@@ -1,26 +1,30 @@
 #!/usr/bin/env bash
-    # Keep charge capped at 80 % to reduce long-term battery wear on a mostly
-    # docked development machine.
-    #
-    # On macOS 15+, bclm no longer works due kernel entitlement enforcement.
-    # Prefer the maintained `battery` CLI (installed by the `battery` cask) and
-    # run it as the active console user so user-scoped launch-agent state stays
-    # in that user's home directory.
-    #
-    # bclm is retained as a fallback only for older macOS versions.
-    macos_major="$(/usr/bin/sw_vers -productVersion 2>/dev/null | /usr/bin/awk -F. '{print $1}')"
+# Keep charge capped at 80 % to reduce long-term battery wear on a mostly
+# docked development machine.
+#
+# On macOS 15+, bclm no longer works due kernel entitlement enforcement.
+# Prefer the maintained `battery` CLI (installed by the `battery` cask) and
+# run it as the active console user so user-scoped launch-agent state stays
+# in that user's home directory.
+#
+# bclm is retained as a fallback only for older macOS versions.
 
-    battery_app="/Applications/battery.app"
-    battery_cli=""
-    for candidate in /usr/local/bin/battery /usr/local/co.palokaj.battery/battery; do
-      if [ -x "$candidate" ]; then
-        battery_cli="$candidate"
-        break
-      fi
-    done
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../lib/macos-console-user-lib.sh
+. "$SCRIPT_DIR/../../lib/macos-console-user-lib.sh"
 
-    if [ -n "$battery_cli" ] && _nucleus_resolve_console_user; then
-      # shellcheck disable=SC2154 # reason: set by _nucleus_resolve_console_user from Nix-prepended macos-console-user-lib.sh
+macos_major="$(/usr/bin/sw_vers -productVersion 2>/dev/null | /usr/bin/awk -F. '{print $1}')"
+
+battery_app="/Applications/battery.app"
+battery_cli=""
+for candidate in /usr/local/bin/battery /usr/local/co.palokaj.battery/battery; do
+  if [ -x "$candidate" ]; then
+    battery_cli="$candidate"
+    break
+  fi
+done
+
+if [ -n "$battery_cli" ] && _nucleus_resolve_console_user; then
       # -H sets HOME to the target user's home directory.  Without it, sudo
       # inherits HOME=/var/root from the root activation context, causing
       # battery to write its state files to /var/root/.battery/ which the

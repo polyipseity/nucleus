@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
-    # Set MiddleClick gesture recognition to 4 fingers and ensure it starts at
-    # login using the native macOS Login Items mechanism (not LaunchAgent).
-    # WHY 4 fingers: TFD uses 3 fingers; using 4 for middle-click prevents both
-    # the TFD conflict and the phantom left-click issue described at
-    # https://github.com/artginzburg/MiddleClick/blob/main/docs/three-finger-drag.md
-    # WHY native login item: MiddleClick upstream manages startup through macOS
-    # Login Items APIs (ServiceManagement), so declarative convergence should
-    # target that same system surface instead of maintaining a parallel
-    # LaunchAgent path.
-    if _nucleus_resolve_console_user; then
-      # shellcheck disable=SC2154 # reason: set by _nucleus_resolve_console_user from Nix-prepended macos-console-user-lib.sh
+# Set MiddleClick gesture recognition to 4 fingers and ensure it starts at
+# login using the native macOS Login Items mechanism (not LaunchAgent).
+# WHY 4 fingers: TFD uses 3 fingers; using 4 for middle-click prevents both
+# the TFD conflict and the phantom left-click issue described at
+# https://github.com/artginzburg/MiddleClick/blob/main/docs/three-finger-drag.md
+# WHY native login item: MiddleClick upstream manages startup through macOS
+# Login Items APIs (ServiceManagement), so declarative convergence should
+# target that same system surface instead of maintaining a parallel
+# LaunchAgent path.
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../lib/macos-console-user-lib.sh
+. "$SCRIPT_DIR/../../lib/macos-console-user-lib.sh"
+
+if _nucleus_resolve_console_user; then
       if [ -d "/Applications/MiddleClick.app" ]; then
         if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
           /usr/bin/defaults write art.ginzburg.MiddleClick fingers -int 4; then

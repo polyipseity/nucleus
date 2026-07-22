@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # macos-symlink-farm.sh — Manage /usr/local/bin symlink farm for nixpkgs tools.
 #
-# Environment variables (set by Nix wrapper in activation.nix):
-#   __nucleus_symlink_farm  — space-separated "target->name" pairs
-#   LOG_FILE                — path to verbose log (default: systemLogDir/symlink-farm.log)
-#   NUCLEUS_VERBOSE         — set to non-empty for per-file echoes on stdout
+# Positional arguments:
+#   $1  — space-separated "target->name" pairs (symlink farm entries)
+#   $2  — path to verbose log (default: systemLogDir/symlink-farm.log)
 #
 # For each pair, create the symlink if it doesn't match.
 # Remove any symlink in /usr/local/bin/ that points to a Nix store path
@@ -21,7 +20,7 @@ FARM_MARKER=".nucleus-symlink-farm"
 
 # Log file location.
 NUCLEUS_SYSTEM_LOG_DIR="${NUCLEUS_SYSTEM_LOG_DIR:-/Users/Shared/nucleus/logs}"
-LOG_FILE="${LOG_FILE:-$NUCLEUS_SYSTEM_LOG_DIR/symlink-farm.log}"
+LOG_FILE="${2:-$NUCLEUS_SYSTEM_LOG_DIR/symlink-farm.log}"
 /bin/mkdir -p "$(dirname "$LOG_FILE")"
 
 # Verbose mode: when set, detail echoes go to stdout too.
@@ -59,8 +58,7 @@ fi
 # Parse current farm entries into an associative array.
 # Bash <4 doesn't support declare -A, but macOS 26 ships Bash 5+.
 declare -A active_symlinks
-# shellcheck disable=SC2154 # reason: __nucleus_symlink_farm is set by the Nix activation wrapper (MacBook/activation.nix)
-IFS=' ' read -r -a entries <<< "$__nucleus_symlink_farm"
+IFS=' ' read -r -a entries <<< "$1"
 
 _created=0
 for entry in "${entries[@]}"; do

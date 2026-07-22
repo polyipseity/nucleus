@@ -118,9 +118,6 @@ in
   #   disableSpotlight                 — disable all Spotlight hotkeys + service
   # ---------------------------------------------------------------------------
   system.activationScripts.postActivation.text = lib.mkBefore ''
-    # ---- sharedConsoleUserLib --------------------------------------------------
-    ${builtins.readFile ../../scripts/lib/macos-console-user-lib.sh}
-
     # ---- configureXcodeSelect --------------------------------------------------
     # Point the system developer directory at the Nix apple-sdk store path so
     # xcrun (invoked by rustc/cargo for SDK discovery) works without Xcode CLT
@@ -138,16 +135,15 @@ in
     # Create/update symlinks in /usr/local/bin for tools that GUI apps resolve
     # via PATH directly (without xcrun).  Only operates on Nix store symlinks
     # and leaves regular files and non-Nix symlinks untouched.
-    __nucleus_symlink_farm="${symlinkFarmEntries}"
-    LOG_FILE="${config.nucleus.logging.systemLogDir}/symlink-farm.log"
-    export LOG_FILE
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-symlink-farm.sh}
+    "${activationBundle}/hosts/MacBook/macos-symlink-farm.sh" \
+      "${symlinkFarmEntries}" \
+      "${config.nucleus.logging.systemLogDir}/symlink-farm.log"
 
     # ---- configureBatteryPolicy ------------------------------------------------
     ${builtins.readFile ../../scripts/hosts/MacBook/macos-configure-battery-policy.sh}
 
     # ---- configureChargeLimit --------------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-charge-limit.sh}
+    "${activationBundle}/hosts/MacBook/macos-charge-limit.sh"
 
     # ---- configureSshAccess -----------------------------------------------------
     # Allow all users to connect via SSH by removing the macOS access-control
@@ -162,17 +158,17 @@ in
     fi
 
     # ---- configureMiddleClick -------------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-enable-middle-click.sh}
+    "${activationBundle}/hosts/MacBook/macos-enable-middle-click.sh"
 
     # ---- configureMountyLoginItem ---------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-register-mounty-login-item.sh}
+    "${activationBundle}/hosts/MacBook/macos-register-mounty-login-item.sh"
     # ---- configureLinearMousePreferences --------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-set-linearmouse-prefs.sh}
+    "${activationBundle}/hosts/MacBook/macos-set-linearmouse-prefs.sh"
     # ---- configureGimpScrollSensitivity ---------------------------------------
-    ${builtins.readFile ../../scripts/configs/configure-gimp-scroll-sensitivity.sh}
+    "${activationBundle}/configs/configure-gimp-scroll-sensitivity.sh"
 
     # ---- configureMissionControlSpansDisplays ----------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-configure-mission-control.sh}
+    "${activationBundle}/hosts/MacBook/macos-configure-mission-control.sh"
 
     # ---- configureMonitorColorProfile ------------------------------------------
     # Clears the ColorSync device-profile cache so that newly connected monitors
@@ -190,10 +186,10 @@ in
     fi
 
     # ---- clearFinderCache -------------------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-clear-finder-cache.sh}
+    "${activationBundle}/hosts/MacBook/macos-clear-finder-cache.sh"
 
     # ---- disableSpotlight -------------------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-disable-spotlight.sh}
+    "${activationBundle}/hosts/MacBook/macos-disable-spotlight.sh"
 
     # ---- nvimLauncher -----------------------------------------------------------
     # Pass empty arg to trigger runtime resolution from /dev/console (macOS).
@@ -225,7 +221,7 @@ in
     }) || true  # undoc-supp: warning-only version check; must not abort activation even if script errors.
 
     # ---- disableSteamAutoStartup ------------------------------------------------
-    ${builtins.readFile ../../scripts/configs/disable-steam-autostart.sh}
+    "${activationBundle}/configs/disable-steam-autostart.sh"
 
     # ---- jellyfin-sync -----------------------------------------------------------
     # Converge Jellyfin accounts and libraries declared in src/modules/users.json

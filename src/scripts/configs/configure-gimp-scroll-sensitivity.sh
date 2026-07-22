@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
-    # Reduce GIMP zoom sensitivity to 25% of upstream default by setting the
-    # drag-zoom-speed token in the active user gimprc to 25.0 (default 100.0).
-    #
-    # Why this token: GIMP upstream exposes drag-zoom-speed as a persisted
-    # display config token.  Mouse-wheel zoom on macOS uses native scroll
-    # deltas and does not have an equivalent persisted sensitivity token.
-    # This hook therefore converges the closest supported persistent control.
-    #
-    # Version tracking rule: always target the major.minor branch of the GIMP
-    # app provisioned by Nucleus (/Applications/GIMP.app), rather than using a
-    # hardcoded version list, so new app upgrades keep working automatically.
-    if _nucleus_resolve_console_user; then
-      # shellcheck disable=SC2154 # reason: set by _nucleus_resolve_console_user from Nix-prepended macos-console-user-lib.sh
+# Reduce GIMP zoom sensitivity to 25% of upstream default by setting the
+# drag-zoom-speed token in the active user gimprc to 25.0 (default 100.0).
+#
+# Why this token: GIMP upstream exposes drag-zoom-speed as a persisted
+# display config token.  Mouse-wheel zoom on macOS uses native scroll
+# deltas and does not have an equivalent persisted sensitivity token.
+# This hook therefore converges the closest supported persistent control.
+#
+# Version tracking rule: always target the major.minor branch of the GIMP
+# app provisioned by Nucleus (/Applications/GIMP.app), rather than using a
+# hardcoded version list, so new app upgrades keep working automatically.
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/macos-console-user-lib.sh
+. "$SCRIPT_DIR/../lib/macos-console-user-lib.sh"
+
+if _nucleus_resolve_console_user; then
       console_home="$(/usr/bin/dscl . -read "/Users/$_nucleus_console_user" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}')"
       if [ -z "$console_home" ]; then
         console_home="/Users/$_nucleus_console_user"

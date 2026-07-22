@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
-    # Disable Spotlight so Cmd+Space can be reused by alternate launchers such as
-    # Raycast.  Each layer independently covers a vector:
-    #   1) disable hotkeys 61/64/65 as the console user,
-    #   2) force immediate hotkey reload with activateSettings -u,
-    #   3) disable indexing with mdutil,
-    #   4) clear stale /.Spotlight-V100 cache.
-    #
-    # This must stay in root system activation (not user activation) because
-    # mdutil/launchctl service control are privileged operations.
+# Disable Spotlight so Cmd+Space can be reused by alternate launchers such as
+# Raycast.  Each layer independently covers a vector:
+#   1) disable hotkeys 61/64/65 as the console user,
+#   2) force immediate hotkey reload with activateSettings -u,
+#   3) disable indexing with mdutil,
+#   4) clear stale /.Spotlight-V100 cache.
+#
+# This must stay in root system activation (not user activation) because
+# mdutil/launchctl service control are privileged operations.
 
-    echo "spotlight: disabling..."
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../lib/macos-console-user-lib.sh
+. "$SCRIPT_DIR/../../lib/macos-console-user-lib.sh"
 
-    if _nucleus_resolve_console_user; then
-      # shellcheck disable=SC2154 # reason: set by _nucleus_resolve_console_user from Nix-prepended macos-console-user-lib.sh
+echo "spotlight: disabling..."
+
+if _nucleus_resolve_console_user; then
       for hotkey in 61 64 65; do
         if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
           /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add "$hotkey" \
