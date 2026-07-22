@@ -46,7 +46,7 @@ Non-host subdirectories follow a two-track convention:
 | `secrets/`              |             `<verb>-<target>.sh` | What action?     |
 | `services/`             |             `<entity>-<role>.sh` | Which component? |
 | `shell/`                | `init.*` or `<verb>-<target>.sh` | Varies           |
-| `hosts/<Host>/`         |   `<prefix>-<verb>-<target>.<ext>` | What action?     |
+| `hosts/<Host>/`         | `<prefix>-<verb>-<target>.<ext>` | What action?     |
 
 `<prefix>` is `macos-` for MacBook, `nixos-` for NixOS, etc.
 
@@ -65,6 +65,16 @@ The `scripts/` directory is the exception: helper scripts there keep the paired 
 For reusable Windows modules under `src/hosts/Windows/modules/`, keep the file name aligned with the exported function name and prefer a single exported `Verb-Noun` function per file. If a module is renamed, update the dot-sourcing paths in `src/hosts/Windows/apply.ps1` in the same change.
 
 If a PowerShell file exports multiple functions or none, keep it in `src/hosts/Windows/modules/` as a utility module and give the filename a scope that describes the shared purpose of the file.
+
+### PowerShell here-string extraction
+
+When extracting inline PowerShell here-strings from `src/hosts/Windows/modules/` into standalone scripts:
+
+- Extract the script body to `src/hosts/Windows/modules/scripts/<name>.ps1`.
+- In the caller, read it with: `Get-Content -Raw (Join-Path -Path $PSScriptRoot -ChildPath "..\scripts\<name>.ps1")`
+- From any module subdirectory (`user/`, `system/`, `editors/`), `..\scripts\` resolves to `modules/scripts/`.
+- For double-quote here-strings (`@"..."@`) with expanded variables, use token replacement: `$content = (Get-Content -Raw ...) -replace '__TOKEN__', $value`.
+- Single-quote here-strings (`@'...'@`) can be read directly with no replacement needed.
 
 ## CLI option and variable naming
 
