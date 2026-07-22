@@ -31,6 +31,7 @@ let
   envCatalogText = builtins.readFile ../../src/modules/lib/env-catalog.nix;
   windowsUserEnvText = builtins.readFile ../../src/hosts/Windows/user/env.dsc.yml;
   windowsSyncNextestConfigText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-NextestConfig.ps1;
+  vscodeSettingsText = builtins.readFile ../../src/modules/configs/vscode/settings.json;
 
   inherit (import ../lib.nix) assert';
 
@@ -247,6 +248,10 @@ let
   # (home.file).
   test_posix_symlink_has_nextest_config = assert' (lib.hasInfix "nextest/config.toml" posixShellText) "shell.nix must deploy nextest config.toml via home.file writable symlink";
 
+  # Verify that VS Code settings declare rust-analyzer.runnables.test.overrideCommand so
+  # inline Run Test buttons use cargo-nextest instead of cargo test.
+  test_vscode_settings_has_nextest_override = assert' (lib.hasInfix "runnables.test.overrideCommand" vscodeSettingsText) "VS Code settings.json must configure rust-analyzer.runnables.test.overrideCommand for nextest";
+
   # Verify that apply.ps1 wires Sync-NextestConfig for Windows hosts.
   test_windows_apply_wires_sync_nextest_config = assert' (
     (lib.hasInfix "Sync-NextestConfig.ps1" applyScriptText)
@@ -286,6 +291,7 @@ let
     test_env_catalog_has_nextest_test_threads
     test_windows_user_env_has_nextest_test_threads
     test_posix_symlink_has_nextest_config
+    test_vscode_settings_has_nextest_override
     test_windows_apply_wires_sync_nextest_config
   ];
 in
