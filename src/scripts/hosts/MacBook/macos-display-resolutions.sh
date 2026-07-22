@@ -16,6 +16,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../../lib/macos-console-user-lib.sh"
 
 DP_BIN="/opt/homebrew/bin/displayplacer"
 

@@ -328,8 +328,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # No-op if displayplacer is not installed.
     # -------------------------------------------------------------------------
     display-resolutions = lib.hm.dag.entryAfter [ "macos-headless-display" ] ''
-      ${builtins.readFile ../scripts/lib/macos-console-user-lib.sh}
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-display-resolutions.sh}
+      "${activationBundle}/hosts/MacBook/macos-display-resolutions.sh"
     '';
 
     # -------------------------------------------------------------------------
@@ -432,8 +431,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # Source: https://github.com/smudge/nightlight
     # -------------------------------------------------------------------------
     nightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      ${builtins.readFile ../scripts/lib/macos-console-user-lib.sh}
-      ${builtins.readFile ../scripts/hosts/MacBook/macos-install-nightlight.sh}
+      "${activationBundle}/hosts/MacBook/macos-install-nightlight.sh"
     '';
 
     # -------------------------------------------------------------------------
