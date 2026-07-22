@@ -67,6 +67,9 @@ function Invoke-CargoBinstallSetup {
     # attempts nix package lookup because `nix` is never in PATH; the
     # nix-locate code path is simply never reached.
     [pscustomobject]@{ CrateName = 'pay-respects'; BinaryName = 'pay-respects' }
+    # cargo-nextest — next-generation Rust test runner (cross-platform).
+    # Installed via cargo-binstall because no WinGet/Scoop package exists.
+    [pscustomobject]@{ CrateName = 'cargo-nextest'; BinaryName = 'cargo-nextest' }
   )
 
   # cargo-binstall and `cargo uninstall` both operate on this directory.
