@@ -24,6 +24,16 @@ When reducing parity debt (especially Windows vs macOS/NixOS), evaluate existing
 
 When reviewing desktop/UI behavior, apply a minimal-chrome parity lens: prefer reducing persistent chrome (menu extras, taskbar buttons, recents, always-visible docks/panels) when equivalent keyboard/command workflows remain available. At the same time, preserve high-signal visibility defaults (hidden files, file extensions, status/path bars, and explicit metadata) unless there is a concrete host constraint.
 
+### Host-specific lib/ pattern for per-host config differences
+
+When a config file's application has a native extension-point mechanism that auto-loads override scripts (e.g., direnv's `~/.config/direnv/lib/*.sh`), the preferred pattern for handling per-host differences is:
+
+1. Keep the base config file at `src/modules/configs/<name>/` cross-platform.
+2. Move host-specific overrides into `lib/` subdirectory files that the application auto-loads.
+3. Deploy the lib files only on relevant hosts; deploy the base file on all hosts.
+
+This avoids `if-else` branches in module logic and avoids deploying dead platform-specific code. See `app-config-policy.instructions.md` (Host-specific lib/ subdirectory convention) for full rules.
+
 ## Where to implement
 
 - **POSIX shared behavior** (macOS and NixOS): centralize in `src/modules/*.nix`.

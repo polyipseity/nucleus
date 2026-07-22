@@ -55,3 +55,19 @@ No deployment. The script reads the config directly from the repo tree at runtim
 4. Method 4 is for nucleus-owned infrastructure configs only.
 5. Any deviation from Method 1 must have a code comment citing the specific technical reason why Method 1 is unsuitable (e.g., "app overwrites this file on startup — using merge instead of symlink to preserve managed settings"). "No user writes it", "system-level path", and "read-only by convention" are not valid reasons.
 6. Every config must have equivalent deployment on all applicable hosts (macOS, NixOS, Windows). If a host has no equivalent application, document as N/A.
+
+### Host-specific lib/ subdirectory convention
+
+Configs under `src/modules/configs/<name>/` may contain a `lib/` subdirectory for host-specific override scripts that the target application auto-loads. This applies when:
+
+- The application has a native extension-point mechanism (e.g., direnv's `~/.config/direnv/lib/*.sh` auto-sourcing) designed for reusable override modules.
+- The override content is platform-specific (macOS apple-sdk vars, Linux-specific hardening, etc.) and deploying it to other hosts would be dead code.
+
+Rules:
+
+1. The base config file at `src/modules/configs/<name>/<config-file>` must contain content valid on all hosts where the file is deployed.
+2. Host-specific override scripts in `lib/` are deployed only on the hosts where they are needed. If the override is harmless on other platforms, it MAY be deployed via a shared module with a comment noting the rationale.
+3. The convention MUST be documented in the lib file's header comment and in the deployment module's comment block.
+4. When a host does not deploy the application at all (e.g., no direnv on a host), document as N/A per the cross-host parity policy.
+
+Example: `src/modules/configs/direnv/lib/apple-sdk-override.sh` — a macOS-specific `_nix()` override auto-sourced by direnv. Deployed on POSIX hosts via the shared `shell.nix`; Windows deploys only the base `direnvrc`.
