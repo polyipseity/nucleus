@@ -28,6 +28,7 @@ Default operating mode for all agent interactions.
 - See `.agents/instructions/execution-details.instructions.md` for multi-edit fallback and tool-retry discipline.
 - **Strict scope adherence. When the user says "only do X", "only fix X", or otherwise scopes the task to a specific pass, phase, file, or rule, do exactly that scope and nothing else. Do not fix related issues, do not improve surrounding code, do not pre-emptively address future passes, or re-organize or refactor outside the stated scope. The user will explicitly ask for follow-up work if needed.
 - **Enumerate subagent opportunities before starting.** Before executing any task, explicitly list which subproblems could be delegated to subagents. Write this list into session memory (`/memories/session/`) if the task is complex. Do not skip this step.
+- **Capture animated CLIs/TUIs with asciinema/PowerSession for LLM context.** When a task involves demonstrating, debugging, or documenting an animated CLI or TUI, record the terminal session using `asciinema rec <file>.cast` (POSIX) or `PowerSession.exe rec <file>.cast` (Windows). Convert to plain text with `asciinema convert <file>.cast <file>.txt` (POSIX) or `PowerSession.exe convert <file>.cast <file>.txt` (Windows) — this strips ANSI codes and resolves screen overwrites via the embedded `avt` virtual terminal library. Include the resulting `.txt` file in context when the task requires analysis or documentation of the recorded behavior.
 
 ## Git commit safety
 
