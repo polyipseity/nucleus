@@ -80,6 +80,7 @@ let
         (videoModel vm)
         (virtiofsDev vm)
       ]
+      # Method 4 (runtime direct read — builtins.readFile embeds at eval time)
       (builtins.readFile ../../modules/configs/vms/nixos-domain.xml);
 in
 {

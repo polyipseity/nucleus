@@ -107,6 +107,7 @@ let
         (if qemuHypervisor vm then "<true/>" else "<false/>")
         (if qemuUefiBoot vm then "<true/>" else "<false/>")
       ]
+      # Method 4 (runtime direct read — builtins.readFile embeds at eval time)
       (builtins.readFile ../../modules/configs/vms/utm-config.plist.xml);
 in
 {
