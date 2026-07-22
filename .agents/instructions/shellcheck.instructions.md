@@ -29,20 +29,16 @@ applyTo: "**"
 When evaluating whether to suppress or rewrite, use this priority to assess risk:
 
 - **SC2086 (word splitting) — highest priority to eliminate.** Suppress only when the variable is intentionally passed to a command that requires word-split arguments (rclone flags, glob patterns, find type lists). Quote every argument that should stay atomic.
-
 - **SC2064 (trap with variable expansion) — acceptable when PID/tmpfile intent is explicit.** The expansion at trap time is intentional. Suppress with reason.
-
-- **SC2016 (literal `$` in single quotes) — acceptable when the string is an awk/jq/sed script body, regex pattern, or PowerShell code passed to another interpreter. Suppress with reason.
-
-- **SC2154/SC2034 (referenced but not assigned / unused) — acceptable when variables are set by sourced libs, framework code, or infrastructure. Prefer adding `# shellcheck source=` to let shellcheck follow the source and see the assignment. If the source cannot be statically resolved, suppress with reason.
-
-- **SC2194 (constant in loop) — acceptable only for template placeholders that are substituted at instantiation time.
+- **SC2016 (literal `$` in single quotes) — acceptable when the string is an awk/jq/sed script body, regex pattern, or PowerShell code passed to another interpreter.** Suppress with reason.
+- **SC2154/SC2034 (referenced but not assigned / unused) — acceptable when variables are set by sourced libs, framework code, or infrastructure.** Prefer adding `# shellcheck source=` to let shellcheck follow the source and see the assignment. If the source cannot be statically resolved, suppress with reason.
+- **SC2194 (constant in loop) — acceptable only for template placeholders that are substituted at instantiation time.**
 
 ## Shellcheck invocation
 
 All shell scripts are checked with `check-sh.sh`, which invokes:
 
-```
+```shell
 shellcheck --source-path=SCRIPTDIR -x <files>
 ```
 
