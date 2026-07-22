@@ -44,11 +44,11 @@ if [ "$#" -gt 0 ]; then
   printf '%s\0' "$@" | xargs -0 -P "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" shellcheck --source-path=SCRIPTDIR -x  # DO NOT add --severity — both style and info issues must be caught; see commit cab5661a for why this was erroneously restricted
   count="$#"
 else
-  if ! files="$(git ls-files '*.sh')" || [ -z "$files" ]; then
+  if ! files="$(git ls-files '*.sh' ':(exclude)vendor/')" || [ -z "$files" ]; then
     say 'no shell scripts to check.'
     exit 0
   fi
-  git ls-files -z '*.sh' | xargs -0 -P "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" shellcheck --source-path=SCRIPTDIR -x  # DO NOT add --severity — both style and info issues must be caught; see commit cab5661a for why this was erroneously restricted
+  git ls-files -z '*.sh' ':(exclude)vendor/' | xargs -0 -P "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" shellcheck --source-path=SCRIPTDIR -x  # DO NOT add --severity — both style and info issues must be caught; see commit cab5661a for why this was erroneously restricted
   count=$(printf '%s\n' "$files" | awk 'NF { c += 1 } END { print c + 0 }')
 fi
 
