@@ -487,8 +487,6 @@
             pkgs.powershell
             pkgs.yq-go
           ];
-          # SC2016: false positive — $schema in yq expressions is intentional.
-          excludeShellChecks = [ "SC2016" ];
         };
 
       # Does NOT inject nixpkgs `pkgs.nix` into PATH — scripts/test.sh uses
@@ -672,8 +670,6 @@
             pkgs.yamllint
             pkgs.yq-go
           ];
-          # SC2016: false positive — $schema in yq expressions is intentional.
-          excludeShellChecks = [ "SC2016" ];
         };
         nucleus-check-packer = mkNucleusPackage pkgs {
           name = "check-packer";

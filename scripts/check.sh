@@ -597,6 +597,7 @@ else
   done < <(find src -name '*.json' -not -path '*/vendor/*' -not -name '*.schema.json' -print0)
   # YAML files with inline $schema — auto-discover and validate
   while IFS= read -r -d '' _yaml_file; do
+    # shellcheck disable=SC2016 # .$schema is a yq expression, not shell variable expansion
     _schema=$(yq eval '.$schema // ""' "$_yaml_file" 2>/dev/null)
     if [ -n "$_schema" ]; then
       case "$_schema" in
