@@ -44,25 +44,41 @@ for ($_i = 0; $_i -lt $args.Count; $_i++) {
 
 $_found = $false
 
-# Check result and result-* patterns at the repo root.
-foreach ($_pattern in @('result', 'result-*')) {
-  # undoc-supp: probe — result symlinks may not exist; ForEach-Object handles absent results gracefully.
-  $_paths = Get-ChildItem -Path $RepoRoot -Filter $_pattern -Force -ErrorAction SilentlyContinue | ForEach-Object {
-    if ($_item.LinkType -eq 'SymbolicLink') {
-      $_target = $_item.Target
-      if ($WhatIf) {
-        Write-Output "cleanup-nix: [dry-run] would remove stale Nix build symlink: $($_item.FullName) -> $_target"
-      } else {
-        Remove-Item -LiteralPath $_item.FullName -Force
-        Write-Output "cleanup-nix: removed stale Nix build symlink: $($_item.FullName) -> $_target"
-      }
-      $_found = $true
-    } elseif ($_item.PSIsContainer -or (-not $_item.LinkType)) {
-      if ($Verbose) {
-        Write-Output "cleanup-nix: found non-symlink at $($_item.FullName) — skipping (not a Nix build artifact)"
+# Recursively scan for result and result-* symlinks without following symlinks.
+# Manual directory walk avoids Get-ChildItem -Recurse which follows reparse points.
+# Use an index cursor to avoid range-operator edge cases with single-element arrays.
+$_dirIndex = 0
+$_directories = @($RepoRoot)
+
+while ($_dirIndex -lt $_directories.Count) {
+  $_dir = $_directories[$_dirIndex]
+  $_dirIndex++
+
+  foreach ($_pattern in @('result', 'result-*')) {
+    # undoc-supp: probe — result symlinks may not exist; ForEach-Object handles absent results gracefully.
+    Get-ChildItem -Path $_dir -Filter $_pattern -Force -ErrorAction SilentlyContinue | ForEach-Object {
+      if ($_.LinkType -eq 'SymbolicLink') {
+        $_target = $_.Target
+        if ($WhatIf) {
+          Write-Output "cleanup-nix: [dry-run] would remove stale Nix build symlink: $($_.FullName) -> $_target"
+        } else {
+          Remove-Item -LiteralPath $_.FullName -Force
+          Write-Output "cleanup-nix: removed stale Nix build symlink: $($_.FullName) -> $_target"
+        }
+        $_found = $true
+      } elseif ($_.PSIsContainer -or (-not $_.LinkType)) {
+        if ($Verbose) {
+          Write-Output "cleanup-nix: found non-symlink at $($_.FullName) — skipping (not a Nix build artifact)"
+        }
       }
     }
   }
+
+  # Enqueue subdirectories, skipping reparse points (symlinks/junctions)
+  # to avoid following symlinks into Nix store or other large trees.
+  Get-ChildItem -Path $_dir -Directory -Force -ErrorAction SilentlyContinue |
+    Where-Object { -not ($_.Attributes -band [System.IO.FileAttributes]::ReparsePoint) } |
+    ForEach-Object { $_directories += $_.FullName }
 }
 
 if (-not $_found) {
