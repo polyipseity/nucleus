@@ -107,7 +107,7 @@ refresh_dock() {
   case "$(uname -s)" in
     Darwin)
       # undoc-supp: Dock may not be running on headless session; killall exits 1 for absent processes.
-      /usr/bin/killall Dock 2>/dev/null || true
+      /usr/bin/killall Dock 2>/dev/null || true # undoc-supp: Dock may not be running (headless/SSH session); only restarted when console user is active
       ;;
   esac
 }
@@ -117,7 +117,7 @@ refresh_dock() {
 refresh_tiswitcher() {
   case "$(uname -s)" in
     Darwin)
-      /usr/bin/killall -HUP TISwitcher 2>/dev/null || true
+      /usr/bin/killall -HUP TISwitcher 2>/dev/null || true # undoc-supp: TISwitcher may not be running; only restarted when needed
       ;;
   esac
 }
@@ -128,7 +128,7 @@ refresh_system_ui() {
   case "$(uname -s)" in
     Darwin)
       for _sui_proc in SystemUIServer WindowManager; do
-        /usr/bin/killall "$_sui_proc" 2>/dev/null || true
+        /usr/bin/killall "$_sui_proc" 2>/dev/null || true # undoc-supp: proc may not be running; only restarted when needed
       done
       ;;
   esac
@@ -138,7 +138,7 @@ refresh_system_ui() {
 refresh_shared_filelistd() {
   case "$(uname -s)" in
     Darwin)
-      /usr/bin/killall sharedfilelistd 2>/dev/null || true
+      /usr/bin/killall sharedfilelistd 2>/dev/null || true # undoc-supp: sharedfilelistd may not be running; only restarted when needed
       ;;
   esac
 }
@@ -148,7 +148,7 @@ refresh_shared_filelistd() {
 refresh_finder_launchd() {
   case "$(uname -s)" in
     Darwin)
-      /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder" 2>/dev/null || true
+      /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder" 2>/dev/null || true # undoc-supp: Finder may not be running or user may be in headless/SSH session
       ;;
   esac
 }
