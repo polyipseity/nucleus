@@ -3,7 +3,6 @@
 # Called by home-manager activation vsCodeSymlinks.
 # Provides: ensure_file_symlink, ensure_dir_symlink (from symlink-hardening-lib.sh)
 
-# shellcheck disable=SC2016 # reason: single quotes intentional — jq filter body must not be expanded by shell
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -40,6 +39,7 @@ for _vsym_base_dir in "$_vsym_stable_base" "$_vsym_insiders_base"; do
     rm "$_chat_lm_path"
   fi
   if [ -s "$_chat_lm_path" ] 2>/dev/null; then
+    # shellcheck disable=SC2016 # reason: jq filter body must not be expanded by shell
     if ! "$_vsym_jq_bin" -s \
       '.[0] as $existing | reduce .[1][] as $item ($existing; (map(.name) | index($item.name)) as $idx | if $idx then .[$idx] = $item else . + [$item] end)' \
       "$_chat_lm_path" "$_chat_lm_repo" > "$_chat_lm_path.tmp" 2>"$_chat_lm_path.jqerr"; then

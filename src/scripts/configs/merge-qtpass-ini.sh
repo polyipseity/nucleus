@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # QtPass INI merge shell helpers.
 
-# shellcheck disable=SC2016 # reason: single quotes intentional — awk script body must not be expanded by shell
 set -euo pipefail
 
 _mqi_awk_bin="$1"
@@ -22,48 +21,7 @@ _update_qtpass_ini_value() {
 
   if [ -f "$_conf" ]; then
     _tmp="$(mktemp "$_conf.XXXXXX")"
-    "$_mqi_awk_bin" -v key="$_key" -v value="$_value" '
-      BEGIN { in_general = 0; wrote = 0 }
-      {
-        if ($0 ~ /^\[General\]$/) {
-          if (in_general && wrote == 0) {
-            print key "=" value
-            wrote = 1
-          }
-          in_general = 1
-          print
-          next
-        }
-
-        if ($0 ~ /^\[/ && $0 !~ /^\[General\]$/) {
-          if (in_general && wrote == 0) {
-            print key "=" value
-            wrote = 1
-          }
-          in_general = 0
-          print
-          next
-        }
-
-        if (in_general && $0 ~ ("^" key "=")) {
-          if (wrote == 0) {
-            print key "=" value
-            wrote = 1
-          }
-          next
-        }
-
-        print
-      }
-      END {
-        if (wrote == 0) {
-          if (in_general == 0) {
-            print "[General]"
-          }
-          print key "=" value
-        }
-      }
-    ' "$_conf" > "$_tmp"
+    "$_mqi_awk_bin" -f "$(dirname "$0")/merge-qtpass-ini.awk" -v key="$_key" -v value="$_value" "$_conf" > "$_tmp"
     mv "$_tmp" "$_conf"
   else
     cat > "$_conf" <<EOF

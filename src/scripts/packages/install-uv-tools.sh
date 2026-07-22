@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Managed uv tool convergence (install + zap).
 # Consumes tool paths and desired tools JSON at activation time.
-# shellcheck disable=SC2016 # reason: single quotes intentional — awk script body must not be expanded by shell
 set -euo pipefail
 
 _iut_uv_bin="$1"
@@ -17,6 +16,7 @@ printf '%s\n' "$_iut_desired_json" | "$_iut_jq_bin" -r 'to_entries[] | "\(.key) 
 
 # Build name-only list for comparison (strip version column).
 _iut_desired_names="$(mktemp)"
+# shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
 "$_iut_gawk_bin" '{print $1}' "$_iut_desired" > "$_iut_desired_names"
 
 # Install required Python versions before attempting tool installs.
@@ -35,8 +35,8 @@ done < "$_iut_desired"
 # "name vX.Y.Z" shape so separator/header lines (for example "-")
 # cannot be misparsed as package names.
 _iut_installed="$(mktemp)"
-# undoc-supp: uv tool list may fail if no tool environment is initialised yet; treating the installed set as empty is correct — nothing to remove.
-"$_iut_uv_bin" tool list 2>/dev/null | "$_iut_gawk_bin" '/^[A-Za-z0-9][A-Za-z0-9._-]*[[:space:]]+v[0-9]/{print $1}' > "$_iut_installed" || true
+# shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
+"$_iut_uv_bin" tool list 2>/dev/null | "$_iut_gawk_bin" '/^[A-Za-z0-9][A-Za-z0-9._-]*[[:space:]]+v[0-9]/{print $1}' > "$_iut_installed" || true  # undoc-supp: uv tool list may fail if no tool env initialised
 
 # Tools installed but not desired: zap-style removal.
 _iut_to_remove="$(mktemp)"
@@ -76,7 +76,8 @@ while IFS= read -r _iut_tool; do
   fi
 
   # Look up the Python version for this tool from the desired list.
-  _iut_python="$("$_iut_gawk_bin" -v tool="$_iut_tool" '$1 == tool { print $2; exit }' "$_iut_desired")"
+  # shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
+  _iut_python="$(\"$_iut_gawk_bin\" -v tool=\"$_iut_tool\" '$1 == tool { print $2; exit }' \"$_iut_desired\")"
 
   if [ -n "$_iut_python" ]; then
     echo "uv: installing tool '$_iut_tool' with Python $_iut_python"

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Picard INI merge orchestration.
 
-# shellcheck disable=SC2016 # reason: single quotes intentional — awk script body must not be expanded by shell
 set -euo pipefail
 
 _mpi_awk_bin="$1"
@@ -24,52 +23,7 @@ _upsert_ini_key() {
     # literally in Picard's @Variant(…) serialized Qt values.
     # AWK -v treats the argument as a string constant and processes
     # backslash escapes; ENVIRON reads the raw bytes unchanged.
-    _UPSERT_VALUE="$_value" "$_mpi_awk_bin" -v section="$_section" -v key="$_key" '
-      function write_pair() {
-        if (wrote == 0) {
-          print key "=" value
-          wrote = 1
-        }
-      }
-      BEGIN {
-        in_target = 0
-        section_seen = 0
-        value = ENVIRON["_UPSERT_VALUE"]
-        wrote = 0
-      }
-      {
-        if ($0 ~ /^\[/) {
-          if (in_target) {
-            write_pair()
-            in_target = 0
-          }
-          if ($0 == "[" section "]") {
-            section_seen = 1
-            in_target = 1
-          }
-          print
-          next
-        }
-
-        if (in_target && $0 ~ ("^" key "=")) {
-          if (wrote == 0) {
-            print key "=" value
-            wrote = 1
-          }
-          next
-        }
-
-        print
-      }
-      END {
-        if (section_seen == 0) {
-          print "[" section "]"
-        }
-        if (wrote == 0) {
-          print key "=" value
-        }
-      }
-    ' "$_conf" > "$_tmp"
+    _UPSERT_VALUE="$_value" "$_mpi_awk_bin" -f "$(dirname "$0")/merge-picard-ini.awk" -v section="$_section" -v key="$_key" "$_conf" > "$_tmp"
     mv "$_tmp" "$_conf"
   else
     cat > "$_conf" <<EOF

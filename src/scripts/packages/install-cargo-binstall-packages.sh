@@ -6,7 +6,6 @@
 # Runtime path probing (~/.cargo/bin) is prohibited.
 #
 # Install priority: nixpkgs > cargo binstall > cargo > bun > uv.
-# shellcheck disable=SC2016 # reason: single quotes intentional — awk script body must not be expanded by shell
 set -euo pipefail
 
 # SC2094 avoidance: trap-based cleanup eliminates read/write-same-file
@@ -36,8 +35,8 @@ printf '%s\n' "$_icp_desired_crates_json" | "$_icp_jq_bin" -r '.[]' > "$_icp_des
 # Output format: "crate-name vX.Y.Z:" on header lines; extract the
 # crate name (first field) from lines matching that pattern.
 _icp_installed="$(mktemp)"
-# undoc-supp: cargo install --list may fail if ~/.cargo is uninitialised; empty installed set is correct — nothing to remove.
-cargo install --list 2>/dev/null | "$_icp_gawk_bin" '/^[a-zA-Z0-9_-]+ v/{print $1}' > "$_icp_installed" || true
+# shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
+cargo install --list 2>/dev/null | "$_icp_gawk_bin" '/^[a-zA-Z0-9_-]+ v/{print $1}' > "$_icp_installed" || true  # undoc-supp: cargo install --list may fail if ~/.cargo uninitialised
 
 # Crates installed but not desired: zap-style removal.
 _icp_to_remove="$(mktemp)"
