@@ -17,6 +17,7 @@ _icp_to_install=""
 _cleanup_icp() { rm -f "$_icp_desired" "$_icp_installed" "$_icp_to_remove" "$_icp_to_install"; }
 trap _cleanup_icp EXIT
 
+# shellcheck disable=SC2016 # reason: single quotes intentional — awk script body must not be expanded by shell
 _icp_jq_bin="$1"
 _icp_gawk_bin="$2"
 _icp_desired_crates_json="$3"

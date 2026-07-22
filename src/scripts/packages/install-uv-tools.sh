@@ -3,6 +3,8 @@
 # Consumes tool paths and desired tools JSON at activation time.
 set -euo pipefail
 
+# shellcheck disable=SC2016 # reason: single quotes intentional — awk script body must not be expanded by shell
+
 _iut_uv_bin="$1"
 _iut_gawk_bin="$2"
 _iut_grep_bin="$3"

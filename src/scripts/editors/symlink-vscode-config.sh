@@ -5,6 +5,8 @@
 
 set -euo pipefail
 
+# shellcheck disable=SC2016 # reason: single quotes intentional — jq filter body must not be expanded by shell
+
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
 

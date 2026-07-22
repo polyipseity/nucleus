@@ -3,6 +3,7 @@
 
 set -euo pipefail
 
+# shellcheck disable=SC2016 # reason: single quotes intentional — awk script body must not be expanded by shell
 
 _mpi_awk_bin="$1"
 _mpi_picard_defaults_ini="$2"
