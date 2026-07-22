@@ -589,9 +589,6 @@
         mkApp pkgs {
           name = "vm-setup";
           runtimeInputs = [ pkgs.jq ];
-          extraBin = {
-            "vm-setup-lib.sh" = ./scripts/lib/vm-setup-lib.sh;
-          };
         };
 
       mkBootstrapApp =
