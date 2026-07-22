@@ -419,6 +419,7 @@
     "platforms": {
       "macos": {
         "domain": "user",
+        "justification": "User-scope watchdog monitors user-domain launchd agents (launchctl gui/<uid>); must run in user context to access user-scope services.",
         "service": "local.service-watchdog-user",
         "type": "launchctl"
       },
