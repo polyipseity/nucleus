@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing activation scripts in Nix modules. Covers the activation bundle architecture, inline activation rules, standalone script patterns (for launchd/systemd), prohibited patterns, and conventions."
 name: "Activation Script Conventions"
-applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/**/services/*.nix"
+applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/**/services/*.nix, src/scripts/**/*.sh"
 ---
 
 All activation blocks in this repo must use the **activation bundle subprocess pattern**: scripts live in `src/scripts/`, are assembled into a single Nix derivation (`src/modules/lib/activation-bundle.nix`), and are invoked as subprocesses from activation blocks.

@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or changing capabilities across hosts (macOS, NixOS, Windows), managing GC/retention timings, or creating provisioned symlinks. Enforces cross-host parity-first design, explicit rationale for platform-specific exceptions, and consistent infrastructure conventions."
 name: "Cross-Host Feature Parity"
-applyTo: "src/**/*.nix, src/**/*.ps1, scripts/gc.*, src/hosts/Windows/**/*.yml"
+applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/Windows/**/*.yml, scripts/gc.*"
 ---
 
 ## Goal

@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or modifying application settings and configurations. Covers storage location selection, per-user override patterns, cross-platform parity, and testing requirements."
 name: "App Configuration Management"
-applyTo: "src/modules/**/*.nix, src/modules/configs/**, src/hosts/Windows/modules/**/*.ps1, src/flake.nix, src/hosts/Windows/users.json, tests/modules/*-tests.nix, tests/integration/*-tests.nix, tests/hosts/**/*-tests.nix"
+applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/modules/configs/**, src/hosts/Windows/modules/**/*.ps1, src/flake.nix, src/hosts/Windows/users.json, tests/modules/*-tests.nix, tests/integration/*-tests.nix, tests/hosts/**/*-tests.nix"
 ---
 
 ## Storage location rule

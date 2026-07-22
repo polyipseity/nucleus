@@ -1,7 +1,7 @@
 ---
-description: "Use when enforcing or reviewing library purity across scripts/ and modules/. Covers no-top-level-side-effects, no-build-time-inlining, no-token-substitution-in-libs, and function-parameter-only data flow."
+description: "Use when enforcing or reviewing library purity in shell library scripts and PowerShell helper modules. Covers no-top-level-side-effects, no-build-time-inlining, no-token-substitution-in-libs, and function-parameter-only data flow."
 name: "Library Purity"
-applyTo: "src/scripts/lib/**"
+applyTo: "src/scripts/lib/**, src/hosts/Windows/modules/scripts/**"
 ---
 
 ## Core rules

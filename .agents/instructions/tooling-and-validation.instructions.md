@@ -1,7 +1,7 @@
 ---
 description: "Use when creating or updating repository tooling, build commands, CI workflows, validation hooks, or authoring instructions about them. Also covers detecting the repository's languages, frameworks, runtimes, and package managers from concrete files."
 name: "Tooling and Validation"
-applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/settings.json, .github/workflows/**/*.yml, .github/dependabot.yml, .editorconfig, .gitattributes, prek.toml, scripts/check.sh, scripts/prek-hooks.py"
+applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/settings.json, .github/workflows/**/*.yml, .github/dependabot.yml, .editorconfig, .gitattributes, prek.toml, scripts/check.sh, scripts/check.ps1, scripts/prek-hooks.py"
 ---
 
 # Tooling and Validation Detection

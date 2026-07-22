@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing agents configuration, skill management, or ClawHub provisioning. Covers ~/.agents directory layout, bundled vs. fetched skill licensing rules, permission patterns, and the installBunPackages/syncClawHubSkills activation DAG."
 name: "Agents and Skills"
-applyTo: "src/modules/agents.nix, src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1, src/hosts/Windows/modules/user/Sync-AgentsClawHubSkill.ps1, src/hosts/Windows/modules/setup/Invoke-BunSetup.ps1, src/modules/configs/agents/**"
+applyTo: "src/modules/agents.nix, src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1, src/hosts/Windows/modules/user/Sync-AgentsClawHubSkill.ps1, src/hosts/Windows/modules/setup/Invoke-BunSetup.ps1, src/modules/configs/agents/**, src/scripts/agents/**/*.sh"
 ---
 
 # Agents and Skills

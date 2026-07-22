@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing virtual machine provisioning across hosts, VM manifests, or VM test files."
 name: "VM Management"
-applyTo: "scripts/vm-setup.*, src/hosts/*/vms.nix, src/modules/VMs.json, src/modules/users.json, src/hosts/Windows/users.json, src/secrets/users-*.yml, tests/modules/vm-setup-tests.nix, src/vms/**"
+applyTo: "scripts/vm-setup.*, src/hosts/*/vms.nix, src/modules/VMs.json, src/secrets/users-*.yml, tests/modules/vm-setup-tests.nix, src/vms/**"
 ---
 
 # VM Management
