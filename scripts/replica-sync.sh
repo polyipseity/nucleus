@@ -408,8 +408,7 @@ failures=0
 replica_lines_file="$(mktemp)"
 printf '%s\n' "$replica_lines" > "$replica_lines_file"
 
-# shellcheck disable=SC2162  # deliberate tab-split of jq @tsv rows
-while IFS="$(printf '\t')" read id direction local_path remote_path provider icloud_service filters_file read_write display_name; do
+while IFS="$(printf '\t')" read -r id direction local_path remote_path provider icloud_service filters_file read_write display_name; do
   if [ -n "$replica_id_filter" ] && [ "$id" != "$replica_id_filter" ]; then
     continue
   fi

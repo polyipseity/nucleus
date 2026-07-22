@@ -129,8 +129,7 @@ restart_cloud_mount_services() {
       _rcms_uid="$(id -u)"
       say "restarting managed macOS cloud mount services..."
 
-      # shellcheck disable=SC2162  # deliberate tab-split of jq @tsv rows
-      while IFS="$(printf '\t')" read mount_id remote_name; do
+      while IFS="$(printf '\t')" read -r mount_id remote_name; do
         if [ -z "$mount_id" ]; then
           continue
         fi
@@ -169,8 +168,8 @@ EOF
 
       say "restarting managed Linux cloud mount services..."
 
-      # shellcheck disable=SC2162  # deliberate tab-split of jq @tsv rows
-      while IFS="$(printf '\t')" read mount_id remote_name; do
+      # Line 172 — deliberate tab-split of jq @tsv rows
+      while IFS="$(printf '\t')" read -r mount_id remote_name; do
         if [ -z "$mount_id" ]; then
           continue
         fi
@@ -416,8 +415,7 @@ if [ -f "$USERS_JSON" ] && command -v jq >/dev/null 2>&1; then
   } 2>/dev/null || true)"
 
   if [ -n "$_display_names" ]; then
-    # shellcheck disable=SC2162  # deliberate tab-split of jq @tsv rows
-    while IFS="$(printf '\t')" read remote_name display_name; do
+    while IFS="$(printf '\t')" read -r remote_name display_name; do
       if [ -z "$remote_name" ] || [ -z "$display_name" ]; then
         continue
       fi
