@@ -198,27 +198,36 @@ in
   };
 
   # ---------------------------------------------------------------------------
-  # nix-direnv _nix override: filter apple-sdk vars from print-dev-env output
+  # Direnv: cross-platform base config + host-specific lib overrides
   # ---------------------------------------------------------------------------
+  # The base direnvrc is cross-platform content deployed on all hosts. The apple-sdk
+  # _nix() override has been moved to a lib/ file (auto-sourced by direnv before
+  # direnvrc) so that Windows can deploy only the base config without dead code.
+  #
   # apple-sdk's nix-support/setup-hook exports DEVELOPER_DIR, SDKROOT, and
   # NIX_APPLE_SDK_VERSION during nix print-dev-env evaluation.  These vars enter
   # direnv's managed environment set via the profile.rc that nix-direnv caches.
   # When you leave a direnv-managed directory, direnv strips all managed vars,
   # breaking xcrun until the next login shell re-sources hm-session-vars.
   #
-  # This direnvrc overrides _nix() to filter those three variables from the
-  # print-dev-env stdout before nix-direnv caches them.  They never enter the
-  # managed set, so they survive directory transitions (either from hm-session-vars
-  # or not at all, depending on the shell startup path).
+  # The lib/apple-sdk-override.sh _nix() override filters those three variables
+  # from the print-dev-env stdout before nix-direnv caches them.  They never enter
+  # the managed set, so they survive directory transitions.
   #
   # direnv auto-sources ~/.config/direnv/lib/*.sh before ~/.config/direnv/direnvrc
   # and before the .envrc.  Since nix-direnv defines _nix in lib/hm-nix-direnv.sh,
-  # our override in direnvrc takes effect before the .envrc calls use_flake.
+  # our override in lib/ takes effect before the .envrc calls use_flake.
   # The _nix_direnv_nix variable is set by nix-direnv's _nix_direnv_preflight()
   # at the start of use_flake, so referencing it from the override is safe.
   home.file.".config/direnv/direnvrc" = {
-    # Method 1 (writable symlink): repo changes take effect without rebuild.
+    # Method 1 (writable symlink): cross-platform base config.
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/direnv/direnvrc";
+  };
+
+  # Host-specific apple-sdk _nix() override, auto-sourced by direnv before direnvrc.
+  home.file.".config/direnv/lib/apple-sdk-override.sh" = {
+    # Method 1 (writable symlink): POSIX-only; Windows deploys only the base config.
+    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/direnv/lib/apple-sdk-override.sh";
   };
 
   # Global uv configuration: exact pinning and supply-chain hardening.

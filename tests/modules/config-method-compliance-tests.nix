@@ -55,6 +55,7 @@ assert containsRegex "profile-base\\.ps1" pwshText;
 assert containsRegex "bunfig\\.toml" shellText;
 assert containsRegex "config\\.toml" shellText;
 assert containsRegex "direnvrc" shellText;
+assert containsRegex "lib/apple-sdk-override\.sh" shellText;
 assert containsRegex "uv\\.toml" shellText;
 assert containsRegex "nextest/config\\.toml" shellText;
 assert containsRegex "mkOutOfStoreSymlink.*NUCLEUS_REPO_ROOT" shellText;

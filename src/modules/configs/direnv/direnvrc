@@ -1,15 +1,4 @@
-_nix() {
-  local _has_pe=0
-  for _arg in "$@"; do
-    if [[ "$_arg" == "print-dev-env" ]]; then
-      _has_pe=1
-      break
-    fi
-  done
-  if [[ $_has_pe -eq 1 ]]; then
-    "${_nix_direnv_nix}" --no-warn-dirty --extra-experimental-features "nix-command flakes" "$@" \
-      | command grep -v -E '^(DEVELOPER_DIR=|SDKROOT=|NIX_APPLE_SDK_VERSION=)|^export (DEVELOPER_DIR|SDKROOT|NIX_APPLE_SDK_VERSION)$|^unset (DEVELOPER_DIR|SDKROOT|NIX_APPLE_SDK_VERSION)$'
-  else
-    "${_nix_direnv_nix}" --no-warn-dirty --extra-experimental-features "nix-command flakes" "$@"
-  fi
-}
+# Direnv base configuration (cross-platform).
+# Host-specific overrides go in ~/.config/direnv/lib/*.sh — they are auto-sourced
+# before this file by direnv's lib loading mechanism.
+# See: src/modules/configs/direnv/lib/apple-sdk-override.sh (POSIX only)
