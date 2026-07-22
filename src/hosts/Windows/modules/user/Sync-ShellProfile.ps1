@@ -84,23 +84,6 @@ function Sync-ShellProfile {
     'if (Get-Command direnv -ErrorAction SilentlyContinue) {'
     '  (& direnv hook pwsh) | Out-String | Invoke-Expression'
     '}'
-    # Configure uv supply-chain defaults via uv.toml.
-    # Mirrors the uv.toml created by shell.nix on POSIX hosts.
-    # Source: https://docs.astral.sh/uv/reference/settings/#add-bounds
-    # Source: https://docs.astral.sh/uv/reference/settings/#exclude-newer
-    '$uvConfigDir = Join-Path $env:APPDATA "uv"'
-    '$uvConfigFile = Join-Path $uvConfigDir "uv.toml"'
-    'if (-not (Test-Path -Path $uvConfigFile -PathType Leaf)) {'
-    '  New-Item -Path $uvConfigDir -ItemType Directory -Force | Out-Null'
-    '  Set-Content -Path $uvConfigFile -Value "add-bounds = \"exact\"`nexclude-newer = \"P5D\"" -Encoding UTF8'
-    '}'
-    # Configure bun supply-chain defaults via .bunfig.toml.
-    # Mirrors the .bunfig.toml created by shell.nix on POSIX hosts.
-    # Source: https://bun.sh/docs/runtime/bunfig#install
-    '$bunConfigFile = Join-Path $env:USERPROFILE ".bunfig.toml"'
-    'if (-not (Test-Path -Path $bunConfigFile -PathType Leaf)) {'
-    '  Set-Content -Path $bunConfigFile -Value "[install]`nexact = true`nlinker = \"isolated\"`nminimumReleaseAge = 432000" -Encoding UTF8'
-    '}'
     # Load rclone config passphrase from materialized secret for automatic config
     # file encryption in interactive and scripted rclone invocations.
     # WHY conditional: secret file may be absent before apply has materialized it.

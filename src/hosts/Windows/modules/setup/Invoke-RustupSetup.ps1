@@ -134,81 +134,22 @@ function Invoke-RustupSetup {
   }
   Write-Output "rustup: global default toolchain set to none"
 
-  Write-CargoConfig
-}
-
-function Write-CargoConfig {
-  <#
-  .SYNOPSIS
-    Writes per-platform Cargo linker configuration to ~\.cargo\config.toml.
-
-  .DESCRIPTION
-    Creates ~\.cargo\config.toml with the same cfg(target_os)-based linker
-    selection as the POSIX shell module.  On Windows rust-lld (bundled with
-    the Rust toolchain) is used, matching the Windows section of the config.
-
-    The file is written unconditionally: Cargo ignores non-matching sections
-    and home-manager already manages the same file on POSIX hosts, so this is
-    the Windows-only equivalent.
-
-  .EXAMPLE
-    Write-CargoConfig
-
-  .NOTES
-    Environment variables: (none)
-    Exit codes: 0 on success; non-zero on failure.
-  #>
-  [CmdletBinding()]
-  param()
-
-  $configDir = "$env:USERPROFILE\.cargo"
-  $configPath = "$configDir\config.toml"
-
-  # Ensure ~\.cargo exists.
-  if (-not (Test-Path $configDir)) {
-    $null = New-Item -ItemType Directory -Path $configDir -Force
+  # Method 1 (writable symlink): cargo config symlinked to repo file.
+  # Mirrors the POSIX shell.nix deployment of cargo/config.toml.
+  $cargoConfigRelPath = 'src\modules\configs\cargo\config.toml'
+  $cargoConfigDir = "$env:USERPROFILE\.cargo"
+  $cargoConfigPath = "$cargoConfigDir\config.toml"
+  if (-not (Test-Path -Path $cargoConfigDir)) {
+    $null = New-Item -ItemType Directory -Path $cargoConfigDir -Force
   }
-
-  $configContent = @'
-# ── Build concurrency ──────────────────────────────────────────────────────
-[build]
-jobs = 8
-
-# ── Test concurrency ───────────────────────────────────────────────────────
-[env]
-RUST_TEST_THREADS = "4"
-
-# ── Dev profile: memory-efficient debugging ────────────────────────────────
-[profile.dev]
-debug = "line-tables-only"
-codegen-units = 16
-
-# ── Dev profile: strip external dependency debug info ──────────────────────
-[profile.dev.package."*"]
-debug = false
-
-# ── Linux: mold via Clang ──────────────────────────────────────────────────
-# mold is the fastest linker available. clang is used as the driver because
-# it correctly passes -fuse-ld=mold to the linker invocation.
-[target.'cfg(target_os = "linux")']
-linker = "clang"
-rustflags = ["-C", "link-arg=-fuse-ld=mold"]
-
-# ── macOS: native Apple ld64 via system C compiler ────────────────────────
-# Apple's ld64 is well-optimised for mach-o binaries.  cc resolves to the
-# Nix-managed clang, which invokes /usr/bin/ld (Apple ld64) for the final
-# link step.
-[target.'cfg(target_os = "macos")']
-linker = "cc"
-
-# ── Windows: LLVM linker bundled with Rust toolchain ──────────────────────
-# lld-link is a drop-in replacement for MSVC link.exe and requires no
-# additional installation.
-[target.'cfg(target_os = "windows")']
-linker = "rust-lld"
-'@
-
-  Write-Output "cargo-config: writing linker config to $configPath"
-  Set-Content -Path $configPath -Value $configContent -NoNewline
-  Write-Output "cargo-config: $configPath written"
+  $cargoSourcePath = Join-Path $repoRoot $cargoConfigRelPath
+  if (-not (Test-Path -Path $cargoSourcePath -PathType Leaf)) {
+    Write-Error "cargo-config: source config not found at $cargoSourcePath"
+    return
+  }
+  if (Test-Path -Path $cargoConfigPath) {
+    Remove-Item -Path $cargoConfigPath -Force
+  }
+  New-Item -Path $cargoConfigPath -ItemType SymbolicLink -Target $cargoSourcePath -Force | Out-Null
+  Write-Output "cargo-config: symlinked $cargoConfigPath"
 }

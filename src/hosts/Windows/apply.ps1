@@ -435,6 +435,8 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ObsidianConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-PicardConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-QtPassConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-BunConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-UvConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ShellProfile.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-NextestConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-StarshipConfig.ps1")
@@ -805,6 +807,9 @@ if ($null -eq $EnableDevReposParity) {
 # secret/key ordering across macOS, NixOS, and Windows.
 Sync-DevRepo -Enabled:$EnableDevReposParity -Repositories $devRepositories
 Sync-ShellProfile -Enabled:$EnableShellParity
+# Method 1 (writable symlink): bun and uv configs symlinked to repo files.
+Sync-BunConfig -Enabled:$EnableShellParity
+Sync-UvConfig -Enabled:$EnableShellParity
 Sync-NextestConfig -Enabled:$EnableShellParity
 Sync-StarshipConfig -Enabled:$EnableShellParity
 if ($EnableCloudDrivesParity) {
