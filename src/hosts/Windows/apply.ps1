@@ -439,6 +439,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-UvConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ShellProfile.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-NextestConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-DirenvConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-StarshipConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-UserPath.ps1")
 # editors/: VS Code configuration and workspace management.
@@ -811,6 +812,8 @@ Sync-ShellProfile -Enabled:$EnableShellParity
 Sync-BunConfig -Enabled:$EnableShellParity
 Sync-UvConfig -Enabled:$EnableShellParity
 Sync-NextestConfig -Enabled:$EnableShellParity
+# Method 1 (writable symlink): direnvrc cross-platform base config.
+Sync-DirenvConfig -Enabled:$EnableShellParity
 Sync-StarshipConfig -Enabled:$EnableShellParity
 if ($EnableCloudDrivesParity) {
   foreach ($userRecord in $selectedUserRecords) {
