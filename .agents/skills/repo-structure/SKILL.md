@@ -5,7 +5,9 @@ description: Cached knowledge of the nucleus repository architecture, key files,
 
 <!-- Maintainer note: orientation material, not authoring rules. Check AGENTS.md for overlapping content. Use directory listings as authoritative — explicit file lists here go stale.
 
-The module table, host structure, and DSC sections are the core value. Other sections were removed (duplicate AGENTS.md or out-of-scope for structure). -->
+The module table, host structure, and DSC sections are the core value. Other sections were removed (duplicate AGENTS.md or out-of-scope for structure).
+
+Load this skill via `skill: "repo-structure"` when exploring the repository layout, adding new modules, or modifying host configurations. -->
 
 # Nucleus Repository Structure
 
@@ -31,9 +33,23 @@ The module table, host structure, and DSC sections are the core value. Other sec
 | Files & media | `cloud-drives.nix`, `fonts.nix`, `wallpapers.nix` |
 | AI agents | `agents.nix`, `agent-env-vars.nix`, `agent-host-shell.nix` |
 | Env var catalog | `lib/env-catalog.nix` (catalog + resolution), `lib/managed-paths.nix` (PATH components) |
+| Terminal & shell | `terminal-activations.nix` |
 | Other | `custom-provision-symlinks.nix` |
 
 Note: `services.json` in `src/modules/` is a data file (service registry), not a Nix module. Host-specific modules (`ntfs-3g.nix`, `camilladsp.nix`, `jellyfin.nix`) live under their host directory.
+
+### Module subdirectories
+
+Additional module files live under these subdirectories:
+
+- `ai/` — AI model selection, litellm config (`default.nix`, `litellm-config.yml`, `models.json`)
+- `completions/` — Shell completion files
+- `configs/` — Per-application declarative configs (agents, autocorrect, bun, camilladsp, camillagui-backend, cargo, cloud, direnv, discord-music-rpc, git, iterm2, linearmouse, nextest, nix, obsidian, picard, plasma, pwsh, qtpass, ssh, starship, uv, vms, vscode)
+- `env/` — Env var catalog introspection module (`default.nix`)
+- `lib/` — Support functions (activation-bundle, activation-dag, config-utils, env-catalog, managed-paths, apple-sdk-*)
+- `macos/` — macOS-specific activation helpers (finder-sidebar, preference-gc)
+- `shell/` — Shell aliases (`aliases.nix`)
+- `users/` — User data helpers (`default.nix`)
 
 ## Hosts
 
@@ -45,6 +61,13 @@ Note: `services.json` in `src/modules/` is a data file (service registry), not a
 - `services.nix` — macOS Services (.app bundles for right-click menus). Self-pruning via home.activation. Relies on `macos/daemon-refresh.nix`.
 - `homebrew.nix` — Homebrew packages and taps.
 - `cloud-drives.nix` — Cloud drive mount NFS paths.
+- `base.nix` — Common config shared with NixOS.
+- `linux-builder.nix` — Remote macOS builder.
+- `manual-installations.nix` — Manual install setup instructions.
+- `ntfs-3g.nix` — NTFS-3G mount support.
+- `patches/` — Patches directory.
+- `services/` — Launchd service wrappers.
+- `raycast-manual-config.md` — Raycast manual config notes.
 - `ai.nix`, `sops.nix`, `security.nix`, `networking.nix`, `camilladsp.nix`, `camillagui-backend.nix`, `jellyfin.nix`, `https-proxy.nix`, `service-watchdog.nix`, `vms.nix` — host-specific configs.
 
 ### NixOS (`src/hosts/NixOS/`)
@@ -53,14 +76,18 @@ Note: `services.json` in `src/modules/` is a data file (service registry), not a
 - `services.nix` — NixOS systemd services.
 - `desktop.nix` — Desktop environment config.
 - `hardware/` — Hardware-specific configs.
+- `activation.nix` — nix-darwin-aligned activation hooks.
+- `users.nix` — User definitions.
+- `base.nix` — Common config shared with MacBook.
 - `ai.nix`, `sops.nix`, `security.nix`, `networking.nix`, `camilladsp.nix`, `camillagui-backend.nix`, `jellyfin.nix`, `https-proxy.nix`, `vms.nix` — host-specific configs.
 
 ### Windows (`src/hosts/Windows/`)
 
 - `apply.ps1` — orchestration entry point. Dot-sources `modules/*.ps1`, applies WinGet DSC YAML.
-- `modules/` — reusable PowerShell logic (Sync-*, Invoke-* functions, Format-NucleusOutput).
+- `modules/` — reusable PowerShell logic: `setup/` (bootstrap installers), `system/` (daemon services, scheduled tasks), `user/` (Sync-* profile/config scripts), `editors/` (editor configs), `scripts/` (shared scripts), `secrets/` (secret provisioning), `wallpapers/` (wallpaper assets).
 - `system/*.dsc.yml` — DSC configs applied system-wide.
 - `user/*.dsc.yml` — Per-user DSC configs listed in `users.json`.
+- `source-builds.json` — Source build definitions for packages not available via WinGet.
 
 ## DSC architecture
 
