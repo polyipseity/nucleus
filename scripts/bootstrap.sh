@@ -169,7 +169,7 @@ bootstrap_nix_if_missing() {
 
   if [ -f "$HOME/.nix-profile/etc/profile.d/nix.sh" ]; then
     # Not available in Nix build sandbox — only at runtime after Nix install.
-    # shellcheck disable=SC1091 # file doesn't exist at shellcheck analysis time (created by Nix installer at bootstrap runtime)
+    # shellcheck disable=SC1091 # reason: file doesn't exist at shellcheck analysis time (created by Nix installer at bootstrap runtime)
     . "$HOME/.nix-profile/etc/profile.d/nix.sh"
   elif [ -f "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh" ]; then
     . "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh"
@@ -272,7 +272,7 @@ if [ "$apply" = true ]; then
     set -- "$@" --target-user "$target_user"
   fi
   if [ -n "$_apply_args" ]; then
-    # shellcheck disable=SC2086  # word splitting is intentional for passthrough
+    # shellcheck disable=SC2086 # reason: word splitting is intentional for passthrough
     set -- "$@" $_apply_args
   fi
 

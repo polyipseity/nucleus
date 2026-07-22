@@ -89,7 +89,7 @@ test_no_dangerous_patterns() {
     local dangerous=0
 
     # Check for unquoted variables in potentially dangerous contexts
-    # shellcheck disable=SC2016  # $ chars are literal regex metacharacters, not shell expansions.
+    # shellcheck disable=SC2016 # reason: $ chars are literal regex metacharacters, not shell expansions.
     if grep -E '\$[A-Za-z_][A-Za-z0-9_]*\s+(&&|;|\||>)' "$script" | grep -v '\$([^)]*' | grep -v '${' >/dev/null 2>&1; then
         dangerous=$((dangerous + 1))
         echo -e "${YELLOW}⚠${NC}  Potential unquoted variable: $(basename "$script")"
@@ -110,13 +110,13 @@ test_no_dangerous_patterns() {
 test_bootstrap_direnv_scope() {
     local script="$1"
 
-    # shellcheck disable=SC2016  # Match literal "$REPO_ROOT" text in script source.
+    # shellcheck disable=SC2016 # reason: Match literal "$REPO_ROOT" text in script source.
     if ! grep -Fq 'direnv allow "$REPO_ROOT"' "$script"; then
         assert_fail "Bootstrap direnv scope: $(basename "$script")" "Missing repo-root direnv allow invocation"
         return
     fi
 
-    # shellcheck disable=SC2016  # Match literal "$REPO_ROOT" text in script source.
+    # shellcheck disable=SC2016 # reason: Match literal "$REPO_ROOT" text in script source.
     if ! grep -Fq 'basename -- "$REPO_ROOT"' "$script" || ! grep -Fq '"nucleus"' "$script"; then
         assert_fail "Bootstrap direnv scope: $(basename "$script")" "Missing nucleus-only scope guard"
         return
@@ -520,7 +520,7 @@ if [[ -f "$SVC_SH" ]]; then
 fi
 
 # jq unit test: do_log_config filter resolves fields correctly (Fix 1 regression)
-# shellcheck disable=SC2016 # $svc/$platform are jq variables, not shell variables
+# shellcheck disable=SC2016 # reason: $svc/$platform are jq variables, not shell variables
 JQ_FILTER='{
   capture: (.[$svc].platforms[$platform].logging.capture // .[$svc].logging.capture // "all"),
   maxSize: (.[$svc].platforms[$platform].logging.maxSize // .[$svc].logging.maxSize // 10000000),

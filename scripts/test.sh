@@ -56,7 +56,7 @@ section "$((_step += 1))" "Nix test suite"
 tmp_failed=$(mktemp) || { error "failed to create temp file"; }
 if [ "$quiet_mode" = true ]; then
   # Quiet: suppress Testing: / PASS: lines and nix output on success.
-  # shellcheck disable=SC2016 # $f/$2/$tmp are literal in sh -c string, not expanded here
+  # shellcheck disable=SC2016 # reason: $f/$2/$tmp are literal in sh -c string, not expanded here
   find tests -name '*.nix' -type f ! -name 'lib.nix' | sort \
     | xargs -P "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" -I{} sh -c '
         f="$1"; tmp="$2"
@@ -70,7 +70,7 @@ if [ "$quiet_mode" = true ]; then
       ' _ {} "$tmp_failed"
 else
   # Normal: show Testing: / PASS: lines and nix output for all tests.
-  # shellcheck disable=SC2016 # $f/$2 are literal in sh -c string, not expanded here
+  # shellcheck disable=SC2016 # reason: $f/$2 are literal in sh -c string, not expanded here
   find tests -name '*.nix' -type f ! -name 'lib.nix' | sort \
     | xargs -P "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" -I{} sh -c 'f="$1"; echo "Testing: $f" >&2; if ! nix-instantiate --eval --strict "$f"; then echo "FAIL: $f" >&2; echo "$f" >> "$2"; else echo "PASS: $f" >&2; fi' _ {} "$tmp_failed"
 fi

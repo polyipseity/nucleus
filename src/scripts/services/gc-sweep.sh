@@ -5,7 +5,7 @@ set -eu
 # require_repo_root() is provided via repo-root-lib.sh (prepended at build time).
 require_repo_root gc
 
-# shellcheck disable=SC2154 # _repo_root is set by require_repo_root above.
+# shellcheck disable=SC2154 # reason: _repo_root is set by require_repo_root above.
 if [ ! -f "$_repo_root/scripts/gc.sh" ]; then
   echo "gc: scripts/gc.sh not found at $_repo_root; skipping weekly GC"
   exit 1

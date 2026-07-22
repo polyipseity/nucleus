@@ -53,7 +53,7 @@ _nucleus_converge_symlinks() {
   _ncs_conflict_test="$5"
   _ncs_conflict_msg_suffix="$6"
   _ncs_skips="${7:-}"
-  # shellcheck disable=SC2086 # $_ncs_find_type is a space-separated find type flag list, word splitting intentional
+  # shellcheck disable=SC2086 # reason: $_ncs_find_type is a space-separated find type flag list, word splitting intentional
   find "$_ncs_source" -mindepth 1 -maxdepth 1 $_ncs_find_type | while IFS= read -r _ncs_entry; do
     _ncs_name="$(basename "$_ncs_entry")"
     for _ncs_skip in $_ncs_skips; do

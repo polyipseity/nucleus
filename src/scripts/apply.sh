@@ -126,7 +126,7 @@ start_sudo_keepalive() {
   } </dev/null >/dev/null 2>&1 &
   SUDO_KEEPALIVE_PID=$!
 
-  # shellcheck disable=SC2064  # intentional: expand PID now, not at trap time
+  # shellcheck disable=SC2064 # reason: intentional: expand PID now, not at trap time
   # undoc-supp: trap cleanup for sudo keepalive; subprocess may have already exited.
   trap "kill $SUDO_KEEPALIVE_PID 2>/dev/null || true" EXIT INT TERM
 }

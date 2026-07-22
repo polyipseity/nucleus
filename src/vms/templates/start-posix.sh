@@ -7,7 +7,7 @@ set -eu
 
 VM_DIR="{{VM_DIR}}"
 
-# shellcheck disable=SC2194 # {{HOST_KIND}} is a template placeholder substituted at instantiation, not a constant
+# shellcheck disable=SC2194 # reason: {{HOST_KIND}} is a template placeholder substituted at instantiation, not a constant
 case "{{HOST_KIND}}" in
   darwin-tart)
     exec tart run "{{VM_NAME}}"

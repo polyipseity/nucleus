@@ -7,7 +7,7 @@
 #   dry_run, windows_iso, windows_iso_source, windows_iso_retries,
 #   windows_headless, accelerator, vm_secret_owner, vm_guest_username,
 #   vm_guest_password, vm_guest_credentials_fingerprint
-# shellcheck disable=SC2154 # all listed variables are set by the sourcing script (vm-setup.sh), not directly assigned here
+# shellcheck disable=SC2154 # reason: all listed variables are set by the sourcing script (vm-setup.sh), not directly assigned here
 #
 # Usage:
 #   . "$SCRIPT_DIR/vm-setup/lib.sh"
@@ -33,7 +33,7 @@ write_vm_directory_readme() {
     warn "README template not found at $TEMPLATES_DIR/README.md; writing minimal guide"
     {
       printf '# virtual machines\n\n'
-      # shellcheck disable=SC2016 # single quotes intentional — backticks must not expand
+      # shellcheck disable=SC2016 # reason: single quotes intentional — backticks must not expand
       printf 'This directory stores VM artifacts managed by `nucleus-vm-setup`.\n'
     } >"$_wvdr_readme"
   fi
@@ -743,7 +743,7 @@ setup_utm_vm() {
 # Libvirt VM setup callback for for_each_vm
 
 setup_libvirt_vm() {
-  # shellcheck disable=SC2034 # vm_hosts is part of the callback protocol
+  # shellcheck disable=SC2034 # reason: vm_hosts is part of the callback protocol
   local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display disk_path disk_credential_marker _prebuilt
 

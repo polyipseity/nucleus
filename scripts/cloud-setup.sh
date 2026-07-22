@@ -295,7 +295,7 @@ if [ -n "$missing_remotes" ]; then
     if [ -n "$_create_args" ]; then
       # Word splitting is intentional here: helper output is a whitespace-
       # separated flag list for rclone, not arbitrary user input.
-      # shellcheck disable=SC2086 # word splitting intentional for rclone flag passthrough
+      # shellcheck disable=SC2086 # reason: word splitting intentional for rclone flag passthrough
       rclone config create "$_remote" "$_type" $_create_args
     else
       rclone config create "$_remote" "$_type"
@@ -346,7 +346,7 @@ if [ -n "$_stale_remotes" ]; then
     if [ -n "$_create_args" ]; then
       # Word splitting is intentional here: helper output is a whitespace-
       # separated flag list for rclone, not arbitrary user input.
-      # shellcheck disable=SC2086 # word splitting intentional for rclone flag passthrough
+      # shellcheck disable=SC2086 # reason: word splitting intentional for rclone flag passthrough
       rclone config create "$_remote" "$_type" $_create_args
     else
       rclone config create "$_remote" "$_type"
