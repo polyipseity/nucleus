@@ -88,7 +88,7 @@ while IFS= read -r _item; do
           :
         else
           while IFS= read -r _matchedPath; do
-            clone_directory_submodules "$_matchedPath" "$_recursive" "${_matchedPath#$HOME/}"
+            clone_directory_submodules "$_matchedPath" "$_recursive" "${_matchedPath#"$HOME"/}"
           done <<< "$_expandedPaths"
         fi
       else

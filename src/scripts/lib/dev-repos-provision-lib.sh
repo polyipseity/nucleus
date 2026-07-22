@@ -61,6 +61,7 @@ expand_glob_paths() {
 
   # Use shell globbing with set -f/+f to safely expand patterns
   if [ -d "$baseDir" ]; then
+    # shellcheck disable=SC2086 # reason: word splitting intentional for shell glob expansion
     cd "$baseDir" && ls -1d $pattern 2>/dev/null
   fi
 }

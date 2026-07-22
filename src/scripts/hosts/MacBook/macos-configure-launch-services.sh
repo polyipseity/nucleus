@@ -22,6 +22,7 @@ if command -v jq >/dev/null 2>&1; then
   while [ "$_i" -lt "$_handler_count" ]; do
     _bundle_id=$(jq -r ".[$_i].bundle_id" "$_handlers_tmp")
     _utis=$(jq -r ".[$_i].utis[]" "$_handlers_tmp" | tr '\n' ' ')
+    # shellcheck disable=SC2086 # reason: word splitting intentional for UTI passthrough
     register_handler "$_duti_bin" "$_bundle_id" $_utis
     _i=$((_i + 1))
   done
