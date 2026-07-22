@@ -85,7 +85,8 @@
 ### Rust
 
 - `cargo-nextest` is the managed Rust test runner. See
-  `src/modules/configs/nextest/nextest-limitations.md` for known limitations.
+  `src/modules/configs/nextest/config.toml` (limitations section at top) for known
+  limitations.
 
 - Discover commands from the repository itself; never assume a default stack.
 - Validate changed files before finishing work:

@@ -1,5 +1,26 @@
 # ── cargo-nextest user config ─────────────────────────────────────────
-# Limitations: see nextest-limitations.md in this directory.
+#
+# ── Known limitations ───────────────────────────────────────────
+#
+# nextest deliberately skips doctests (/// examples).
+# Fix: run `cargo test --doc` alongside `cargo nextest run`.
+#
+# Custom test harnesses (harness = false in Cargo.toml) are incompatible.
+# nextest requires --list/--exact CLI flags that custom harnesses do not
+# implement unless they use a compat library like libtest-mimic.
+# Fix: run `cargo test` for harness = false crates, or migrate to libtest-mimic.
+#
+# Code coverage: use `cargo llvm-cov nextest`.
+# Install cargo-llvm-cov via `cargo install cargo-llvm-cov`.
+# See https://nexte.st/docs/integrations/test-coverage/ for CI integration.
+#
+# IDE test runner: editors default to `cargo test`.  Configure:
+# - VS Code: managed via rust-analyzer.runnables.test.overrideCommand in
+#   src/modules/configs/vscode/settings.json
+# - RustRover: Settings -> Build Tools -> Cargo -> Test Runner -> cargo-nextest
+# - Zed: add "nextest": true to project .zed/settings.json
+#
+# See nextest docs for details: https://nexte.st/
 #
 # ── UI/UX ──────────────────────────────────────────────────────────────
 [ui]
