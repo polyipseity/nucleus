@@ -24,13 +24,17 @@ applyTo: "**"
 
 - **Suppressions in vendored third-party code** (`vendor/`) are exempt from this policy. The repo's shellcheck invocations skip vendor directories.
 
+- **No whole-file suppressions.** Every `# shellcheck disable=` must be scoped to the smallest possible range: inline on the same line as the triggered code, or wrapped in a `disable`/`enable` pair around a multi-line expression. Whole-file suppression (placing a disable directive at the top of a file before any commands) is prohibited. The sole exception is when every statement in the file genuinely triggers the same code, which must be explicitly justified in the reason comment.
+
+- **Review whole-file suppressions especially hard.** A whole-file suppression is almost always wrong — the file contains many lines that do NOT trigger the warning. Scoping to the specific line proves the suppression is targeted and prevents future drift.
+
 ### Priority guidance
 
 When evaluating whether to suppress or rewrite, use this priority to assess risk:
 
 - **SC2086 (word splitting) — highest priority to eliminate.** Suppress only when the variable is intentionally passed to a command that requires word-split arguments (rclone flags, glob patterns, find type lists). Quote every argument that should stay atomic.
 - **SC2064 (trap with variable expansion) — acceptable when PID/tmpfile intent is explicit.** The expansion at trap time is intentional. Suppress with reason.
-- **SC2016 (literal `$` in single quotes) — acceptable when the string is an awk/jq/sed script body, regex pattern, or PowerShell code passed to another interpreter.** Suppress with reason.
+- **SC2016 (literal `$` in single quotes) — restructure first: for awk scripts longer than ~10 lines, extract to a `.awk` file referenced via `-f`. This eliminates the suppression entirely. For small awk one-liners, jq filters, sed scripts, and other tool-specific strings where `$` is not shell expansion, use a line-scoped suppression with reason. Acceptable contexts include: awk script bodies, jq filter variables (`$var`), `sh -c` child-shell parameter expansion, tool expression strings (yq paths, PowerShell redirection patterns, regex metacharacters), and literal text matching with `grep -F`. Suppress with reason.
 - **SC2154/SC2034 (referenced but not assigned / unused) — acceptable when variables are set by sourced libs, framework code, or infrastructure.** Prefer adding `# shellcheck source=` to let shellcheck follow the source and see the assignment. If the source cannot be statically resolved, suppress with reason.
 - **SC2194 (constant in loop) — acceptable only for template placeholders that are substituted at instantiation time.**
 
