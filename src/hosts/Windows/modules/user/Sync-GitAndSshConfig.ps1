@@ -89,15 +89,11 @@ function Sync-GitAndSshConfig {
     }
 
     $sshConfigPath = Join-Path -Path $sshDir -ChildPath 'config'
-    $managedBlockStart = "# >>> config managed github ssh [$User] >>>"
-    $managedBlockEnd = "# <<< config managed github ssh [$User] <<<"
-    $managedSshBlock = @(
-      $managedBlockStart
+    $desiredSshBlock = @(
       'Host github.com'
       '  HostName github.com'
       "  IdentityFile ~/.ssh/ssh_personal_$User"
       '  AddKeysToAgent yes'
-      $managedBlockEnd
     )
 
     $existingSshLines = @()
@@ -105,32 +101,98 @@ function Sync-GitAndSshConfig {
       $existingSshLines = @(Get-Content -Path $sshConfigPath)
     }
 
+    # Find the Host github.com section by parsing SSH config structure.
+    # A section starts at a `Host <pattern>` line and spans contiguous lines
+    # until the next `Host` directive or EOF. We replace its directives while
+    # preserving the Host line itself.
+    $githubSectionStart = -1
+    $githubSectionEnd = -1
+    for ($i = 0; $i -lt $existingSshLines.Count; $i++) {
+      $line = $existingSshLines[$i]
+      if ($line -match '^Host\s+github\.com(\s|$)') {
+        $githubSectionStart = $i
+        $githubSectionEnd = $i + 1
+        # Scan forward to find the end of this section (next Host or EOF).
+        for ($j = $i + 1; $j -lt $existingSshLines.Count; $j++) {
+          if ($existingSshLines[$j] -match '^\s*Host\s+') {
+            break
+          }
+          # Skip blank lines before the section end (trailing blank lines belong
+          # to the section separator, not the section body).
+          if ([string]::IsNullOrWhiteSpace($existingSshLines[$j])) {
+            continue
+          }
+          $githubSectionEnd = $j + 1
+        }
+        break
+      }
+    }
+
     $outputSshLines = @()
-    $insideManagedBlock = $false
-    foreach ($line in $existingSshLines) {
-      if ($line -eq $managedBlockStart) {
-        $insideManagedBlock = $true
-        continue
-      }
-
-      if ($line -eq $managedBlockEnd) {
-        $insideManagedBlock = $false
-        continue
-      }
-
-      if (-not $insideManagedBlock) {
-        $outputSshLines += $line
-      }
-    }
-
     if ($Enabled) {
-      if ($outputSshLines.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace($outputSshLines[-1])) {
-        $outputSshLines += ''
+      if ($githubSectionStart -ge 0) {
+        # Replace the found section: keep lines before, inject managed block, skip old body.
+        for ($i = 0; $i -lt $githubSectionStart; $i++) {
+          $outputSshLines += $existingSshLines[$i]
+        }
+        # Remove trailing blank lines from preceding section for clean output.
+        while ($outputSshLines.Count -gt 0 -and [string]::IsNullOrWhiteSpace($outputSshLines[-1])) {
+          $outputSshLines = $outputSshLines[0..($outputSshLines.Count - 2)]
+        }
+        if ($outputSshLines.Count -gt 0) {
+          $outputSshLines += ''
+        }
+        $outputSshLines += $desiredSshBlock
+        # Append all lines after the old section end.
+        for ($i = $githubSectionEnd; $i -lt $existingSshLines.Count; $i++) {
+          $outputSshLines += $existingSshLines[$i]
+        }
+      }
+      else {
+        # No existing Host github.com — append managed block at end.
+        $outputSshLines = @($existingSshLines)
+        # Ensure leading blank line separator.
+        if ($outputSshLines.Count -gt 0 -and -not [string]::IsNullOrWhiteSpace($outputSshLines[-1])) {
+          $outputSshLines += ''
+        }
+        $outputSshLines += $desiredSshBlock
       }
 
-      $outputSshLines += $managedSshBlock
+      # Validate that all required directives are present in the deployed block.
+      $requiredDirectives = @('HostName', 'IdentityFile', 'AddKeysToAgent')
+      $deployedText = $outputSshLines -join "`n"
+      foreach ($directive in $requiredDirectives) {
+        if ($deployedText -notmatch "(?m)^\s+$directive\s+") {
+          Write-Warning "Sync-GitAndSshConfig: managed Host github.com block missing required directive '$directive'"
+        }
+      }
+    }
+    else {
+      # Disabled: remove the managed Host github.com section if present.
+      if ($githubSectionStart -ge 0) {
+        for ($i = 0; $i -lt $githubSectionStart; $i++) {
+          $outputSshLines += $existingSshLines[$i]
+        }
+        for ($i = $githubSectionEnd; $i -lt $existingSshLines.Count; $i++) {
+          $outputSshLines += $existingSshLines[$i]
+        }
+        # Clean up any doubled blank lines from the removal.
+        $cleaned = @()
+        $prevBlank = $false
+        foreach ($line in $outputSshLines) {
+          $isBlank = [string]::IsNullOrWhiteSpace($line)
+          if ($isBlank -and $prevBlank) { continue }
+          $cleaned += $line
+          $prevBlank = $isBlank
+        }
+        $outputSshLines = $cleaned
+      }
+      else {
+        $outputSshLines = @($existingSshLines)
+      }
     }
 
+    # Write SSH config, removing file if no content remains.
     $hasNonWhitespaceLines = ($outputSshLines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0
     if ($hasNonWhitespaceLines) {
       [System.IO.File]::WriteAllLines($sshConfigPath, $outputSshLines, [System.Text.UTF8Encoding]::new($false))
