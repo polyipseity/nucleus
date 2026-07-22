@@ -17,7 +17,6 @@
 # Use: import ./lib/env-catalog.nix { inherit config pkgs lib username; }
 # Returns: { catalog, allVars, systemVars, macOSAllVars, resolveValue, ... }
 {
-  config,
   pkgs,
   lib,
   username,
@@ -25,7 +24,6 @@
 }:
 let
   managedPaths = import ./managed-paths.nix { inherit pkgs; };
-  appleSdkTools = import ./apple-sdk-tools.nix { inherit pkgs; };
   appleSdkEnhanced = import ./apple-sdk-enhanced.nix { inherit pkgs lib; };
 
   # ── Shared values used by multiple catalog entries ──────────────────

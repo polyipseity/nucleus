@@ -7,12 +7,7 @@
 #
 # Sources:
 # - https://jellyfin.org/docs/general/post-install/networking/reverse-proxy/
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}:
+{ lib, pkgs, ... }:
 let
   jellyfinHttpPort = 8096;
 in

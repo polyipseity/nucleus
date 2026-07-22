@@ -50,7 +50,7 @@ in
   # sourcePath: path relative to src/modules, e.g. ./configs/foo/bar
   # targetRelPath: path relative to $HOME
   # ---------------------------------------------------------------------------
-  deployReadonly = name: sourcePath: targetRelPath: {
+  deployReadonly = _: sourcePath: targetRelPath: {
     xdg.configFile."${targetRelPath}".source = sourcePath;
   };
 

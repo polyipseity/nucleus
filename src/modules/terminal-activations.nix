@@ -27,12 +27,7 @@
 # from a text file) and bypass the declarative Nix model — each use erodes
 # reproducibility.
 # ─────────────────────────────────────────────────────────────────────────────
-{
-  config,
-  lib,
-  pkgs,
-  ...
-}:
+{ config, lib, ... }:
 
 let
   cfg = config.nucleus.terminalActivations;

@@ -12,11 +12,10 @@
 let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   linuxServices = lib.filterAttrs (
-    name: svc:
-    svc ? platforms.nixos && svc.platforms.nixos ? type && svc.platforms.nixos.type != "omitted"
+    _: svc: svc ? platforms.nixos && svc.platforms.nixos ? type && svc.platforms.nixos.type != "omitted"
   ) servicesJSON;
   linuxSystemLogDirs = lib.unique (
-    lib.flatten (lib.mapAttrsToList (name: svc: svc.logging.dirs.system or [ ]) linuxServices)
+    lib.flatten (lib.mapAttrsToList (_: svc: svc.logging.dirs.system or [ ]) linuxServices)
   );
   # Bundle services.json into the nix store so the systemd watchdog can
   # read it without needing NUCLEUS_REPO_ROOT.  Same approach as the

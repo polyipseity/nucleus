@@ -64,12 +64,6 @@ let
     map (entry: entry.linkAbsolutePath) selectedSymlinksResolved
   );
 
-  # Resolve NUCLEUS_REPO_ROOT at eval time (set by apply.sh). Used for
-  # runtime sourcing of lib scripts in activation blocks. Cannot use a
-  # runtime env var because darwin-rebuild/nixos-rebuild use sudo, which
-  # strips NUCLEUS_REPO_ROOT from the activation environment.
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
-
   activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
 in
 {

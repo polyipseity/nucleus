@@ -22,22 +22,21 @@ let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
 
   macosServices = lib.filterAttrs (
-    name: svc:
-    svc ? platforms.macos && svc.platforms.macos ? type && svc.platforms.macos.type != "omitted"
+    _: svc: svc ? platforms.macos && svc.platforms.macos ? type && svc.platforms.macos.type != "omitted"
   ) servicesJSON;
 
   systemLogDirs = lib.unique (
-    lib.flatten (lib.mapAttrsToList (name: svc: svc.logging.dirs.system or [ ]) macosServices)
+    lib.flatten (lib.mapAttrsToList (_: svc: svc.logging.dirs.system or [ ]) macosServices)
   );
 
   userLogDirs = lib.unique (
-    lib.flatten (lib.mapAttrsToList (name: svc: svc.logging.dirs.user or [ ]) macosServices)
+    lib.flatten (lib.mapAttrsToList (_: svc: svc.logging.dirs.user or [ ]) macosServices)
   );
 
   chownLogDirs = lib.unique (
     lib.flatten (
       lib.mapAttrsToList (
-        name: svc: if svc.platforms.macos.runAsUser or false then svc.logging.dirs.system or [ ] else [ ]
+        _: svc: if svc.platforms.macos.runAsUser or false then svc.logging.dirs.system or [ ] else [ ]
       ) macosServices
     )
   );

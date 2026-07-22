@@ -88,12 +88,6 @@ let
   obsidianManagedSettings = managedAppSettings "obsidian" obsidianDefaultSettings;
   obsidianManagedSettingsJson = builtins.toJSON obsidianManagedSettings;
 
-  # Resolve NUCLEUS_REPO_ROOT at eval time (set by apply.sh). Used for
-  # runtime sourcing of lib scripts in activation blocks. Cannot use a
-  # runtime env var because darwin-rebuild/nixos-rebuild use sudo, which
-  # strips NUCLEUS_REPO_ROOT from the activation environment.
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
-
   # Out-of-store symlink paths protected across activation cycles.
   # Expanded from $HOME to resolvedHomeDirectory at eval time so the JSON
   # token carries absolute paths and no shell expansion is needed at runtime.

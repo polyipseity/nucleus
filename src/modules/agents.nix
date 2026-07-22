@@ -19,7 +19,6 @@ let
   # Keep path fragments centralized so activation entries reference one source
   # of truth for the repo-hosted agents configuration tree.
   agentsConfigRelativePath = "src/modules/configs/agents";
-  agentsSkillsRelativePath = "${agentsConfigRelativePath}/skills";
   clawhubManifestRelativePath = "${agentsConfigRelativePath}/clawhub-skills.json";
 
   managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };

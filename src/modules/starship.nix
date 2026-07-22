@@ -1,11 +1,5 @@
 # Starship cross-shell prompt — shared config for all hosts.
-{
-  lib,
-  pkgs,
-  config,
-  ...
-}:
-{
+{ pkgs, config, ... }: {
   home.packages = [ pkgs.starship ];
 
   home.file.".config/starship.toml".source =

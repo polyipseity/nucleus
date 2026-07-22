@@ -3,12 +3,7 @@
 # Runs as the primary user so the daemon can access user-level config at
 # ~/.config/camilladsp/. Config is deployed by Home Manager in
 # modules/home.nix.
-{
-  config,
-  pkgs,
-  username,
-  ...
-}:
+{ pkgs, username, ... }:
 
 let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
@@ -26,8 +21,8 @@ let
         wsPort
       ]
       (
-        (builtins.readFile ./../../scripts/lib/require-command-lib.sh) +
-        (builtins.readFile ./../../scripts/services/camilladsp-daemon.sh)
+        (builtins.readFile ./../../scripts/lib/require-command-lib.sh)
+        + (builtins.readFile ./../../scripts/services/camilladsp-daemon.sh)
       )
   );
 
@@ -42,8 +37,8 @@ let
         wsPort
       ]
       (
-        (builtins.readFile ./../../scripts/lib/require-command-lib.sh) +
-        (builtins.readFile ./../../scripts/services/camilladsp-heartbeat.sh)
+        (builtins.readFile ./../../scripts/lib/require-command-lib.sh)
+        + (builtins.readFile ./../../scripts/services/camilladsp-heartbeat.sh)
       )
   );
 in
