@@ -23,6 +23,8 @@ usage() {
   cat <<'EOF'
   list                              List all known services with status.
   status [service...]               Show status of specified services (all if omitted).
+  --user                            Show only user-domain services (no sudo needed).
+  --system                          Show only system-domain services (requires sudo).
   start <service>                   Start a service.
   stop <service>                    Stop a service.
   restart <service>                 Restart a service.
@@ -49,6 +51,12 @@ case "$HOST" in
   NixOS)   PLATFORM="nixos" ;;
   *)       error "unsupported host '$HOST'" ;;
 esac
+
+# Detect sudo availability for system-domain service access.
+HAS_SUDO=false
+if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
+  HAS_SUDO=true
+fi
 
 # Helpers
 
@@ -550,6 +558,11 @@ do_list() {
     local first=true
     while IFS=$'\t' read -r key display svc_json json_key; do
       if echo "$key" | grep -q '^ERROR:'; then has_error=true; continue; fi
+      local _d_entry_domain
+      _d_entry_domain=$(echo "$svc_json" | jq -r '.domain // .scope // "system"')
+      if [ "$domain_filter" = "user" ] && [ "$_d_entry_domain" != "user" ]; then continue; fi
+      if [ "$domain_filter" = "system" ] && [ "$_d_entry_domain" != "system" ]; then continue; fi
+      if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && ! $HAS_SUDO; then continue; fi
       local status_json
       status_json=$(svc_status "$key" "$svc_json")
       $first || printf ','
@@ -567,6 +580,11 @@ do_list() {
         has_error=true
         continue
       fi
+      local _d_entry_domain
+      _d_entry_domain=$(echo "$svc_json" | jq -r '.domain // .scope // "system"')
+      if [ "$domain_filter" = "user" ] && [ "$_d_entry_domain" != "user" ]; then continue; fi
+      if [ "$domain_filter" = "system" ] && [ "$_d_entry_domain" != "system" ]; then continue; fi
+      if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && ! $HAS_SUDO; then continue; fi
       local status_json
       status_json=$(svc_status "$key" "$svc_json")
       local status running pid exit_code
@@ -603,6 +621,11 @@ do_status() {
       any_error=true
       continue
     fi
+    local _d_entry_domain
+    _d_entry_domain=$(echo "$svc_json" | jq -r '.domain // .scope // "system"')
+    if [ "$domain_filter" = "user" ] && [ "$_d_entry_domain" != "user" ]; then continue; fi
+    if [ "$domain_filter" = "system" ] && [ "$_d_entry_domain" != "system" ]; then continue; fi
+    if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && ! $HAS_SUDO; then continue; fi
     local status_json
     status_json=$(svc_status "$key" "$svc_json")
     local status running pid exit_code
@@ -947,6 +970,7 @@ do_log_config() {
 
 json_output=false
 verbose_mode=false
+domain_filter=""
 action=""
 service_names=()
 
@@ -955,6 +979,8 @@ while [ "$#" -gt 0 ]; do
     -h|--help) usage; exit 0 ;;
     --json) json_output=true; shift ;;
     --verbose) verbose_mode=true; shift ;;
+    --user) domain_filter="user"; shift ;;
+    --system) domain_filter="system"; shift ;;
     endpoint|logs|log-paths|log-config|verify)
       action="$1"; shift
       service_names=("$@")
@@ -976,11 +1002,38 @@ for arg in "${service_names[@]}"; do
     json_output=true
   elif [ "$arg" = "--verbose" ]; then
     verbose_mode=true
+  elif [ "$arg" = "--user" ]; then
+    domain_filter="user"
+  elif [ "$arg" = "--system" ]; then
+    domain_filter="system"
   else
     filtered_service_names+=("$arg")
   fi
 done
 service_names=("${filtered_service_names[@]}")
+
+# Domain filter: CLI --user/--system overrides SVC_DOMAIN_FILTER env var.
+: "${SVC_DOMAIN_FILTER:=all}"
+case "$SVC_DOMAIN_FILTER" in
+  user|system|all) ;;
+  *) error "SVC_DOMAIN_FILTER=$SVC_DOMAIN_FILTER: must be user, system, or all" ; exit 1 ;;
+esac
+domain_filter="${domain_filter:-$SVC_DOMAIN_FILTER}"
+
+# --system requires passwordless sudo
+if [ "$domain_filter" = "system" ] && ! $HAS_SUDO; then
+  error "--system requires passwordless sudo"
+  exit 1
+fi
+
+# Emit domain filter info/warning
+if [ "$domain_filter" = "user" ]; then
+  warn "listing user-domain services only"
+elif [ "$domain_filter" = "system" ]; then
+  warn "listing system-domain services only"
+elif [ "$domain_filter" = "all" ] && ! $HAS_SUDO; then
+  warn "sudo not available — skipping system-domain services (use --user or --system)"
+fi
 
 [ -z "$action" ] && { error "missing action (list, status, start, stop, restart, enable, disable, verify, endpoint, logs, log-paths, log-config)" ; usage >&2 ; exit 1; }
 
