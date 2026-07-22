@@ -90,6 +90,8 @@ $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { Split-
 $exitCode = 0
 $FAIL_FAST = $false
 $VERIFY = $false
+$SCOPED = $false
+$FULL = $false
 $positionalArgs = @()
 
 # Output helpers — structured prefix pattern matching check.sh's lib.sh.
@@ -99,17 +101,22 @@ $positionalArgs = @()
 function say { Write-Output "check: $args" }
 function warn { Write-Output "check: warning: $args" }
 
-# Process -h|--help and --verify
+# Process flags
 foreach ($_arg in $args) {
   if ($_arg -eq '-h' -or $_arg -eq '--help') {
-    Write-Output "Usage: check.ps1 [--fail-fast] [--verify] [path ...]"
+    Write-Output "Usage: check.ps1 [--fail-fast] [--scoped|--full] [--verify] [path ...]"
     Write-Output "  Run all Windows-compatible repository validation checks in sequence."
-    Write-Output "  With arguments, passes paths through to supporting checkers."
+    Write-Output "  Use --scoped to skip whole-repo checks (path-scoped mode), --full to force"
+    Write-Output "  whole-repo checks even with paths. Default: scoped if paths given, full if not."
     Write-Output "  --fail-fast  Exit immediately on first failure (default: accumulate all)."
     Write-Output "  --verify     Additionally run online determinism checks (requires network)."
     exit 0
   } elseif ($_arg -eq '--fail-fast') {
     $FAIL_FAST = $true
+  } elseif ($_arg -eq '--scoped') {
+    $SCOPED = $true
+  } elseif ($_arg -eq '--full') {
+    $FULL = $true
   } elseif ($_arg -eq '--verify') {
     $VERIFY = $true
   } else {
@@ -117,7 +124,15 @@ foreach ($_arg in $args) {
   }
 }
 
+# Validate mutual exclusivity: --scoped and --full cannot be combined.
+if ($SCOPED -and $FULL) {
+  Write-Output "check: error: cannot specify both --scoped and --full"
+  exit 1
+}
+
 $HAS_ARGS = $positionalArgs.Count -gt 0
+if ($SCOPED) { $HAS_ARGS = $true }
+if ($FULL)   { $HAS_ARGS = $false }
 
 # Group paths by extension — each sub-checker receives only files it understands.
 $SH_FILES = @()

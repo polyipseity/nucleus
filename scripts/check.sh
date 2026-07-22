@@ -113,9 +113,11 @@ cd "$REPO_ROOT" || exit
 
 FORMAT_NIX=false
 VERIFY=false
+SCOPED=false
+FULL=false
 
 usage() {
-  usage_std "check.sh" "[--format] [--fail-fast] [--verify] [path ...]" "Run all repository validation checks in sequence. With arguments, passes paths through to supporting checkers and skips whole-repo checks (deadnix, script validation). Use --format to enable in-place Nix formatting (instead of just --verify). Use --fail-fast to exit immediately on first failure (default: accumulate all failures). Use --verify to additionally run online determinism checks (requires network)."
+  usage_std "check.sh" "[--format] [--fail-fast] [--scoped|--full] [--verify] [path ...]" "Run all repository validation checks in sequence. Use --scoped to skip whole-repo checks (path-scoped mode), --full to force whole-repo checks even with paths. Default: scoped if paths given, full otherwise. With arguments, passes paths through to supporting checkers. Use --format to enable in-place Nix formatting. Use --fail-fast to exit immediately on first failure. Use --verify to additionally run online determinism checks (requires network)."
 }
 
 while [ "$#" -gt 0 ]; do
@@ -130,6 +132,14 @@ while [ "$#" -gt 0 ]; do
       ;;
     --fail-fast)
       FAIL_FAST=true
+      shift
+      ;;
+    --scoped)
+      SCOPED=true
+      shift
+      ;;
+    --full)
+      FULL=true
       shift
       ;;
     --verify)
@@ -147,8 +157,22 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+# Validate mutual exclusivity: --scoped and --full cannot be combined.
+if $SCOPED && $FULL; then
+  error "cannot specify both --scoped and --full"
+  usage >&2
+  exit 1
+fi
+
+# Determine HAS_ARGS based on paths and mode flags.
 HAS_ARGS=false
 [ "$#" -gt 0 ] && HAS_ARGS=true
+if $SCOPED; then
+  HAS_ARGS=true
+fi
+if $FULL; then
+  HAS_ARGS=false
+fi
 
 # When paths are provided, group them by extension so each sub-checker
 # receives only the files it understands. This allows prek (or other
