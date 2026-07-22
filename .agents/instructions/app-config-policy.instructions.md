@@ -53,7 +53,7 @@ No deployment. The script reads the config directly from the repo tree at runtim
 2. If Method 1 is unsuitable, use Method 2.
 3. If Method 2 is unsuitable, use Method 3.
 4. Method 4 is for nucleus-owned infrastructure configs only.
-5. Any deviation from Method 1 must have a code comment citing the specific technical reason why Method 1 is unsuitable (e.g., "app overwrites this file on startup — using merge instead of symlink to preserve managed settings"). "No user writes it", "system-level path", and "read-only by convention" are not valid reasons.
+5. Any deviation from Method 1 must have a code comment citing the specific technical reason why Method 1 is unsuitable (e.g., "app overwrites this file on startup — using merge instead of symlink to preserve managed settings"). See Method 2 for invalid reasons.
 6. Every config must have equivalent deployment on all applicable hosts (macOS, NixOS, Windows). If a host has no equivalent application, document as N/A.
 
 ### Host-specific lib/ subdirectory convention

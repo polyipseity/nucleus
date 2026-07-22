@@ -26,13 +26,7 @@ When reviewing desktop/UI behavior, apply a minimal-chrome parity lens: prefer r
 
 ### Host-specific lib/ pattern for per-host config differences
 
-When a config file's application has a native extension-point mechanism that auto-loads override scripts (e.g., direnv's `~/.config/direnv/lib/*.sh`), the preferred pattern for handling per-host differences is:
-
-1. Keep the base config file at `src/modules/configs/<name>/` cross-platform.
-2. Move host-specific overrides into `lib/` subdirectory files that the application auto-loads.
-3. Deploy the lib files only on relevant hosts; deploy the base file on all hosts.
-
-This avoids `if-else` branches in module logic and avoids deploying dead platform-specific code. See `app-config-policy.instructions.md` (Host-specific lib/ subdirectory convention) for full rules.
+When a config file's application has a native extension-point mechanism that auto-loads override scripts (e.g., direnv's `~/.config/direnv/lib/*.sh`), use the Host-specific lib/ subdirectory convention documented in `app-config-policy.instructions.md`. This avoids `if-else` branches in module logic and avoids deploying dead platform-specific code.
 
 ## Where to implement
 
@@ -110,7 +104,7 @@ All nucleus-managed services use persistent-daemon semantics by default: auto-st
 
 ### Explicit recovery settings removed
 
-Service configurations do not set explicit rate-limiting or restart-interval settings (`ThrottleInterval` on macOS, `RestartSec` on NixOS, `RestartCount`/`RestartInterval` on Windows). Instead, each platform's default values are used. These defaults are sufficient because the internal loop pattern keeps the process alive with its own pacing — the service manager only needs crash recovery. Platform defaults for rate-limiting are adequate for the crash-recovery-only use case (launchd's default throttle is shorter than the explicit 30 s; systemd's default `RestartSec` is 100 ms; Windows scheduled tasks do not restart automatically by default — the internal loop handles keepalive).
+Service configurations do not set explicit rate-limiting or restart-interval settings (`ThrottleInterval` on macOS, `RestartSec` on NixOS, `RestartCount`/`RestartInterval` on Windows). Platform defaults are sufficient because the internal loop pattern handles keepalive pacing — the service manager only needs crash recovery (launchd's default throttle is shorter than the explicit 30 s; systemd's default `RestartSec` is 100 ms; Windows scheduled tasks do not restart automatically — the internal loop handles keepalive).
 
 ### Internal loop pattern (heartbeat and watchdog)
 
@@ -202,7 +196,7 @@ All hosts use the OS-native SSH agent and server, with no custom service definit
 
 ## Cloud-drive parity
 
-Treat cloud-drive capabilities as parity-first across all hosts for both mounts and replicas. Mounts are live/bidirectional access surfaces; replicas are pull-only read-only mirrors (remote -> local) for automation. Do not add push/bisync execution paths for replicas. Preserve stable provider identity keys (`id`, `remoteName`) while allowing host-appropriate presentation labels. Keep managed mount/replica local paths as real directories on every host unless a documented platform exception applies. The current documented exception is macOS-only: `~/clouds/iCloudReplica` may be a symlink to `~/Library/Mobile Documents` to avoid duplicating native iCloud storage. When implementing or changing a cloud-drive exception, document WHY in code and add/update tests proving the exception is scoped to the intended host.
+See `cloud-drives-and-finder.instructions.md` for the full cloud-drive policy. Key parity requirements: treat mounts/replicas parity-first across all hosts, keep managed paths as real directories on all hosts (see cloud-drives-and-finder for the macOS-only iCloud exception), and do not add push/bisync execution paths for replicas.
 
 ## Cross-platform script deduplication
 
