@@ -2,6 +2,15 @@
 # Idempotently converges the declarative bun global package set.
 set -euo pipefail
 
+# SC2094 avoidance: trap-based cleanup eliminates read/write-same-file
+# pipeline warnings — temp files are cleaned on EXIT instead of inline.
+_ibp_desired=""
+_ibp_installed=""
+_ibp_to_remove=""
+_ibp_to_install=""
+_cleanup_ibp() { rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"; }
+trap _cleanup_ibp EXIT
+
 _jq_bin="$1"
 _bun_bin="$2"
 
@@ -68,7 +77,6 @@ while IFS= read -r _ibp_pkg; do
   echo "bun: removing $_ibp_pkg"
   if ! "$_bun_bin" remove -g "$_ibp_pkg"; then
     echo "bun: '$_bun_bin remove -g $_ibp_pkg' failed" >&2
-    rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"
     exit 1
   fi
 done < "$_ibp_to_remove"
@@ -79,17 +87,13 @@ while IFS= read -r _ibp_pkg; do
   echo "bun: installing $_ibp_pkg"
   if ! "$_bun_bin" install -g --ignore-scripts "$_ibp_pkg"; then
     echo "bun: '$_bun_bin install -g $_ibp_pkg' failed" >&2
-    rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"
     exit 1
   fi
   _ibp_bin="${_ibp_pkg##*/}"
   if [ ! -f "$HOME/.bun/bin/$_ibp_bin" ] && \
      [ ! -f "$HOME/.bun/bin/$_ibp_bin.cmd" ]; then
     echo "bun: $_ibp_pkg installed but binary '$_ibp_bin' not found in '$HOME/.bun/bin'" >&2
-    rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"
     exit 1
   fi
   echo "bun: $_ibp_pkg installed successfully"
 done < "$_ibp_to_install"
-
-rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"

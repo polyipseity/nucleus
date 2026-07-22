@@ -8,6 +8,15 @@
 # Install priority: nixpkgs > cargo binstall > cargo > bun > uv.
 set -euo pipefail
 
+# SC2094 avoidance: trap-based cleanup eliminates read/write-same-file
+# pipeline warnings — temp files are cleaned on EXIT instead of inline.
+_icp_desired=""
+_icp_installed=""
+_icp_to_remove=""
+_icp_to_install=""
+_cleanup_icp() { rm -f "$_icp_desired" "$_icp_installed" "$_icp_to_remove" "$_icp_to_install"; }
+trap _cleanup_icp EXIT
+
 _icp_jq_bin="$1"
 _icp_gawk_bin="$2"
 _icp_desired_crates_json="$3"
@@ -53,7 +62,6 @@ while IFS= read -r _icp_crate; do
   echo "cargo-binstall: removing $_icp_crate"
   if ! cargo uninstall "$_icp_crate"; then
     echo "cargo-binstall: 'cargo uninstall $_icp_crate' failed" >&2
-    rm -f "$_icp_desired" "$_icp_installed" "$_icp_to_remove" "$_icp_to_install"
     exit 1
   fi
   echo "cargo-binstall: '$_icp_crate' removed"
@@ -65,7 +73,6 @@ while IFS= read -r _icp_crate; do
   echo "cargo-binstall: installing $_icp_crate"
   if ! cargo-binstall --no-confirm "$_icp_crate"; then
     echo "cargo-binstall: 'cargo-binstall $_icp_crate' failed" >&2
-    rm -f "$_icp_desired" "$_icp_installed" "$_icp_to_remove" "$_icp_to_install"
     exit 1
   fi
   echo "cargo-binstall: '$_icp_crate' installed"
@@ -74,5 +81,3 @@ done < "$_icp_to_install"
 if [ ! -s "$_icp_to_remove" ] && [ ! -s "$_icp_to_install" ]; then
   echo "cargo-binstall: all managed packages already converged — skipping"
 fi
-
-rm -f "$_icp_desired" "$_icp_installed" "$_icp_to_remove" "$_icp_to_install"
