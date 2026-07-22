@@ -3,7 +3,6 @@
 # CLI args: pinentry_mac_bin
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _cga_pinentry_mac_bin="$1"
 

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Source this file (conceptually; in Nix it is inlined via builtins.readFile) to
 # make macOS LaunchServices/launchctl helper functions available in
 # home-manager activation scripts.  All functions are no-ops on non-macOS.

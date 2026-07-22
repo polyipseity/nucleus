@@ -1,8 +1,8 @@
+#!/usr/bin/env bash
 # Secret decryption health verification (5 checks).
 # Consumes SOPS file manifest, secret paths, and tool paths at activation time.
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _vsd_jq_bin="$1"
 _vsd_gnupg_bin="$2"

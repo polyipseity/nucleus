@@ -1,8 +1,8 @@
+#!/usr/bin/env bash
 # Install/update a PowerShell module to a pinned version.
 # CLI args: pwsh_bin module_name module_version
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _ipm_pwsh="$1"
 _ipm_module="$2"

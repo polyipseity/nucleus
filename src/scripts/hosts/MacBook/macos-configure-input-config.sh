@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Configure input method settings and refresh TISwitcher.
 # Replaces the input-config inline activation block.
 #

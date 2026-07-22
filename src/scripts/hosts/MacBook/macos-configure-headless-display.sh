@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Maintain exactly one BetterDisplay virtual screen named "HeadlessDisplay"
 # and keep it connected for clamshell remote-desktop fallback.
 #
@@ -16,7 +17,6 @@
 # No-op if BetterDisplay is not installed.
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 BD_BIN="/Applications/BetterDisplay.app/Contents/MacOS/BetterDisplay"
 BD_APP="/Applications/BetterDisplay.app"

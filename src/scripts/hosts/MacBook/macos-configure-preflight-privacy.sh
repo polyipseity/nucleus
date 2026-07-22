@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Preflight macOS privacy permissions before defaults writes.
 # Full Disk Access privacy preflight. Runs FDA checks before defaults writes.
 set -euo pipefail

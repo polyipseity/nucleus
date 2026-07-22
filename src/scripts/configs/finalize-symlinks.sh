@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Finalize custom-provision-symlinks: protect each managed symlink and persist
 # the manifest.
 

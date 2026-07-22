@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Idempotent dev repo clone/symlink helpers.
 # Requires env vars: HOME, PATH (with git), GIT_SSH_COMMAND.
 # Agent helpers (_nucleus_protect_symlink, _nucleus_unprotect_symlink) must

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # ---- buildNtfs3g ----------------------------------------------------------
 # Build polyipseity/ext.ntfs-3g from source.
 # Expects env vars set by the Nix wrapper in ntfs-3g.nix:

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Configure Safari preferences via defaults.
 # These are applied from user activation because Safari is sandboxed and stores
 # preferences in a containerized domain.

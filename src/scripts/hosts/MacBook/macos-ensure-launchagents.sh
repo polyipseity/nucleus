@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Verify all home-manager-managed launchd agents are registered with launchd
 # after setupLaunchAgents runs.  On macOS 26, launchctl bootstrap can
 # spuriously return "Bootstrap failed: 5: Input/output error" -- HM detects
@@ -6,7 +7,6 @@
 # Uses $newGenPath (set by Home Manager activation).
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 # Provide local fallbacks for HM functions when running as a bundle subprocess.
 verboseEcho() { echo "verbose: $*" >&2; }

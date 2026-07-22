@@ -4,7 +4,6 @@
 # CLI args: bat_bin bun_bin fd_bin gh_bin opencode_bin ruff_bin rustup_bin typst_bin uv_bin zsh_completions_src
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _izc_bat_bin="$1"
 _izc_bun_bin="$2"

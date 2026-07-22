@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Register macOS default application handlers via duti.
 # Replaces the macos-launch-services inline activation block.
 #

@@ -4,7 +4,6 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _wss_sentinel="$1"
 _wss_deadline=30

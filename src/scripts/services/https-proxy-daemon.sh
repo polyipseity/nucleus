@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # HTTPS proxy daemon — runs Caddy for all configured virtual hosts.
 # Binaries and config path provided via Nix substitution at build time.
 set -eu

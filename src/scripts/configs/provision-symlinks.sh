@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Self-executing preparation of custom provision symlinks.
 # Unprotects managed symlinks before linkGeneration.
 set -euo pipefail

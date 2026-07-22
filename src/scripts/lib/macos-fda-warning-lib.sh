@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Full Disk Access (FDA) warning printer function.
 #
 # Source this file in activation blocks that need FDA access.

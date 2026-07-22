@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 set -eu
 
 # Verify the rclone remote is configured; exit 0 (no restart) if not.

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Daily .DS_Store cleanup for ~/dev.
 set -eu
 

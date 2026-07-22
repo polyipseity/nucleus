@@ -1,9 +1,9 @@
+#!/usr/bin/env bash
 # Cloud drive directory structure setup.
 # Tokens (described below) are substituted at build time by Nix.
 set -eu
 
 # Source library helpers
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 # Replace a legacy symlink mountpoint (e.g. old /Volumes indirection from
 # an earlier provisioning scheme) with a managed real directory so that

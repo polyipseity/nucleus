@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Reload Dock preference state.
 # Replaces the reloadDockPreferenceState inline activation block.
 #

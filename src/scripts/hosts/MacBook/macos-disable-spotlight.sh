@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
     # Disable Spotlight so Cmd+Space can be reused by alternate launchers such as
     # Raycast.  Each layer independently covers a vector:
     #   1) disable hotkeys 61/64/65 as the console user,

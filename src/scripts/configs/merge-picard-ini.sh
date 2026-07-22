@@ -1,8 +1,8 @@
+#!/usr/bin/env bash
 # Picard INI merge orchestration.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _mpi_awk_bin="$1"
 _mpi_picard_defaults_ini="$2"

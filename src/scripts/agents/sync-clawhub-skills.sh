@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # ClawHub fetched skill convergence (install + stale cleanup).
 # Consumes tool paths, PATH guards, repo root, and manifest path at
 # activation time.

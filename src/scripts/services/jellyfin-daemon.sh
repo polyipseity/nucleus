@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Jellyfin media server daemon.
 # State root, log dir, and binary path provided via Nix substitution at build time.
 set -eu

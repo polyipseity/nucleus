@@ -1,9 +1,9 @@
+#!/usr/bin/env bash
 # Create system log directories for all nucleus systemd/launchd services before
 # they start, so journald/stderr redirect targets exist on disk.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _sys_log_dir="$1"
 _log_subdirs="$2"

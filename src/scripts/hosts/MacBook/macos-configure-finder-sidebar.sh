@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Configure Finder sidebar favorites via mysides.
 # Replaces the configureFinderSidebar inline activation block.
 #

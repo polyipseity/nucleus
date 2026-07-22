@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Unified protect/unprotect symlink wrapper for activation scripts.
 # Replaces ~10+ near-identical inline wrappers across the codebase.
 #

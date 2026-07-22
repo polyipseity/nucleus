@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
     # Clears Finder's saved application state cache so that desktop visibility
     # settings (ShowExternalHardDrivesOnDesktop, ShowHardDrivesOnDesktop,
     # ShowMountedServersOnDesktop, ShowRemovableMediaOnDesktop) take effect

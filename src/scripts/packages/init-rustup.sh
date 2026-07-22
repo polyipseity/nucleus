@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Rustup initialisation for POSIX hosts.
 # Consumes rustup store path at activation time.
 set -euo pipefail

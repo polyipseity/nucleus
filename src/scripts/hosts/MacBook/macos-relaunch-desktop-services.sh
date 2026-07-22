@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Restart desktop services (Finder + SystemUIServer + WindowManager) and
 # reconcile sidebar favorites after restart.
 # Replaces the relaunchDesktopServices inline activation block.

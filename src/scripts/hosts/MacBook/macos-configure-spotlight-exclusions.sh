@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Daily Spotlight exclusion refresh for the mutable ~/dev tree.
 # Uses a Nix-generated find predicate expression that is substituted at eval time.
 set -eu

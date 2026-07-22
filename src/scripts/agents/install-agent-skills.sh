@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Creates ~/.agents/skills/ as a real directory then populates it with
 # per-skill symlinks for every skill subdirectory committed to
 # src/modules/configs/agents/skills/.

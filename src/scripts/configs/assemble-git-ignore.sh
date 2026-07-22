@@ -1,9 +1,8 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Assemble the effective gitignore from the managed global baseline and a
 # user-writable overlay.  Run after linkGeneration so symlinks are ready.
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _git_ignore_global="$HOME/.config/git/ignore-global"
 _git_ignore_user="$HOME/.config/git/ignore-user"

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Strip stale managed entries from PATH, then prepend + append managed dirs.
 set -eu
 

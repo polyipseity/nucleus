@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # VS Code extension bridge activation.
 # Called by home-manager activation vsCodeExtensionBridge.
 # Provides: _nucleus_protect_symlink, _nucleus_unprotect_symlink (from symlink-hardening-lib.sh)

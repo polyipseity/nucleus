@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 set -eu
 
 # require_repo_root() is provided via repo-root-lib.sh (prepended at build time).

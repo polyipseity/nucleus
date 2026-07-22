@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Sets up ~/.agents/ with per-entry symlinks into
 # src/modules/configs/agents/.
 set -euo pipefail

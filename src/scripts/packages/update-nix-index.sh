@@ -3,7 +3,6 @@
 # CLI args: nix_index_bin max_age_days
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _uni_nix_index_bin="$1"
 _uni_max_age_days="$2"

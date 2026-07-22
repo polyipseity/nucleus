@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
     # Forces Mission Control to span desktops across displays for the currently
     # logged-in console user.  Applying this from system activation ensures the
     # preference is re-asserted after migrations and major macOS updates that

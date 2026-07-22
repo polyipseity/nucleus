@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # iCloud exclusion convergence for directories matching configured names.
 # Called by activation hook and daily launchd agent.
 #

@@ -1,8 +1,8 @@
+#!/usr/bin/env bash
 # Self-contained wallpaper provisioning script.
 # CLI args: is_darwin pictures_dir desktoppr_bin coreutils_bin wallpapers_dir current_user sops_symlink_path wallpaper_items_json jq_bin
 set -eu
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _is_darwin="$1"
 _pictures_dir="$2"

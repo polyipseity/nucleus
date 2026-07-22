@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Configure iCloud exclusion markers on matching directories.
 # Replaces the configureICloudExclusions inline activation block.
 #

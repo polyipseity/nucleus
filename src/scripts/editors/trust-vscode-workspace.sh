@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # VS Code workspace trust injector.
 # Inserts a workspace trust entry for ~/dev into VS Code's SQLite state DB.
 set -euo pipefail

@@ -1,9 +1,9 @@
+#!/usr/bin/env bash
 # Propagate NUCLEUS_REPO_ROOT to the GUI launchd domain.
 # Set during activation; the gui-env LaunchAgent covers login-time before first activation.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _mge_prepend="$1"
 _mge_append="$2"

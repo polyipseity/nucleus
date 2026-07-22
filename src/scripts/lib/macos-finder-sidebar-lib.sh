@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Finder sidebar favorites library functions.
 #
 # All functions take their required data as function parameters. The caller

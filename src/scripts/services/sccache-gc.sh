@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Daily sccache cache clearing service.
 set -eu
 

@@ -1,9 +1,9 @@
+#!/usr/bin/env bash
 # Imports the managed GPG private key from SOPS into the keyring and
 # enforces ultimate ownertrust on the managed primary fingerprint.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _gnupghome="$1"
 _gpg_bin="$2"

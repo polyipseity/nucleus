@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Managed macOS preference domain GC.
 # Expects env vars: NIX_STORE_BIN, MANAGED_PREF_DOMAINS
 set -eu

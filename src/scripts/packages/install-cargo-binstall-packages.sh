@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Managed cargo-binstall package convergence (install + zap).
 # Consumes crate-description tokens at activation time.
 #

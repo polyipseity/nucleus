@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # BetterDisplay virtual screen heartbeat.  Polls the HeadlessDisplay every 30
 # seconds and reconnects it if BetterDisplay marks it as disconnected.
 #

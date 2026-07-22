@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Configure and activate Night Shift via the nightlight CLI tool.
 # No-op if nightlight is not installed.
 #

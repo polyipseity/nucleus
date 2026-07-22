@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
     # Ensure Mounty (NTFS auto-mounter) starts at login using the native macOS
     # Login Items mechanism.  Mounty has no built-in launch-at-login preference;
     # this keeps the declarative converge path consistent with other apps.

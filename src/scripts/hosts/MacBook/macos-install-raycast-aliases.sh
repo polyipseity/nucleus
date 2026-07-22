@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Create English-named .app symlink aliases for Raycast compatibility
 # on non-English macOS installations.
 #

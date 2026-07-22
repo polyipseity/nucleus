@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # ---- enableScreenSharing ---------------------------------------------------
 # Enable macOS Screen Sharing (VNC/ARD protocol) as the remote-desktop server
 # for this host.  macOS does not ship a native RDP server; Screen Sharing is

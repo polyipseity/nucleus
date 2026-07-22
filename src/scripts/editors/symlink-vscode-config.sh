@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # VS Code config symlinks activation.
 # Called by home-manager activation vsCodeSymlinks.
 # Provides: ensure_file_symlink, ensure_dir_symlink (from symlink-hardening-lib.sh)

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Managed uv tool convergence (install + zap).
 # Consumes tool paths and desired tools JSON at activation time.
 set -euo pipefail

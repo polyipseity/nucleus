@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
     # Keep charge capped at 80 % to reduce long-term battery wear on a mostly
     # docked development machine.
     #

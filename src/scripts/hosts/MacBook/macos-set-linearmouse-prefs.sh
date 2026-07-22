@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
     # Keep LinearMouse update checks and auto-update disabled declaratively.
     # These are Sparkle preferences in the app's defaults domain.
     if _nucleus_resolve_console_user; then

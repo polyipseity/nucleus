@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Configure external display resolutions to match the built-in MacBook display.
 # Uses displayplacer to match all external monitors to the built-in screen's
 # current mode so remote-desktop clients see a consistent resolution.

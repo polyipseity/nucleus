@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Manage out-of-store symlinks (protect/unprotect) using a JSON path manifest.
 # Handles the inline logic from home.nix unprotectOutOfStoreSymlinks /
 # protectOutOfStoreSymlinks activation blocks.

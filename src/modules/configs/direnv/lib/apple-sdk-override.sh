@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # ---------------------------------------------------------------------------
 # apple-sdk _nix() override: filter DEVELOPER_DIR, SDKROOT, NIX_APPLE_SDK_VERSION
 # from nix print-dev-env output before nix-direnv caches them.

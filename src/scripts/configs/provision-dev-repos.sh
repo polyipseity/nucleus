@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Dev repos provisioning activation.
 # Called by home-manager activation devReposProvision.
 #

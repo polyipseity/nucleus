@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Configure Accessibility preferences via defaults.
 # These are user/session scoped and applied from user activation to keep
 # accessibility intent without system errors.

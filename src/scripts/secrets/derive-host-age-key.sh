@@ -1,9 +1,8 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Derive age secret identity from SSH host key and write to /etc/sops/age/machine.txt.
 # Invoked from system activation (runs as root).
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _dha_ssh_to_age_bin="$1"
 _dha_username="$2"

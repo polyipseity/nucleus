@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
     # Enforce pmset values directly for AC and battery because newer macOS
     # releases can ignore or partially override higher-level power options.
     #

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
     # Set MiddleClick gesture recognition to 4 fingers and ensure it starts at
     # login using the native macOS Login Items mechanism (not LaunchAgent).
     # WHY 4 fingers: TFD uses 3 fingers; using 4 for middle-click prevents both

@@ -1,9 +1,8 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Verify archiving stack: 7z CLI and Keka.app registration.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _p7zip_bin="$1"
 

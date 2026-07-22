@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # Weekly garbage collection for Nix VM artifacts, build outputs, and caches.
 set -eu
 

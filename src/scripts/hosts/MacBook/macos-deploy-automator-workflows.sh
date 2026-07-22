@@ -1,8 +1,8 @@
+#!/usr/bin/env bash
 # Deploy and prune macOS Automator workflow bundles.
 # Consumes jq binary and workflow JSON arrays at activation time.
 set -eu
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _vsd_jq_bin="$1"
 _vsd_current_workflows_json="$2"

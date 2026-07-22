@@ -1,8 +1,8 @@
+#!/usr/bin/env bash
 # Deploy and prune macOS app bundles via LaunchServices.
 # Tokens are substituted at build time by Nix.
 set -eu
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 # LSREGISTER path: /usr/bin/lsregister does not exist on macOS; the binary
 # lives inside the LaunchServices framework bundle.

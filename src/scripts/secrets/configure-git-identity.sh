@@ -1,8 +1,8 @@
+#!/usr/bin/env bash
 # Reads identity from SOPS decrypted secret and writes to ~/.config/git/identity.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _git_secret_path="$1"
 _git_bin="$2"

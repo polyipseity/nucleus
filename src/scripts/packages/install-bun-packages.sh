@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Idempotently converges the declarative bun global package set.
 set -euo pipefail
 

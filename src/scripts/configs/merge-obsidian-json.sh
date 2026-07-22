@@ -1,4 +1,4 @@
-# shellcheck shell=sh
+#!/usr/bin/env bash
 # Obsidian settings merge: merges managed advanced-setting keys into
 # obsidian.json while preserving app-owned vault metadata.
 

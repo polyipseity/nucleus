@@ -3,7 +3,6 @@
 # When the arg is empty, resolve at runtime from /dev/console (macOS).
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _nvim_path="$1"
 

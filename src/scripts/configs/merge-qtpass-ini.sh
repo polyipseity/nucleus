@@ -1,8 +1,8 @@
+#!/usr/bin/env bash
 # QtPass INI merge shell helpers.
 
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _mqi_awk_bin="$1"
 _mqi_darwin_commands="$2"
