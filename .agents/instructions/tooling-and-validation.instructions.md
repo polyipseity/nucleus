@@ -40,6 +40,7 @@ applyTo: "AGENTS.md, .agents/instructions/**/*.md, opencode.jsonc, .vscode/setti
 ## Skill vs instruction vs AGENTS.md boundary
 
 Choose the right vehicle:
+
 - **AGENTS.md**: durable project-wide conventions. Keep short (~30 lines max per section).
 - **`.agents/instructions/*.instructions.md`**: file-type-scoped authoring rules with a narrow `applyTo` glob. Loaded automatically when editing matching files. Must be lean and targeted.
 - **`.agents/skills/<skill>/SKILL.md`**: on-demand reference. Use for content too broad for an instruction file. Avoid duplicating AGENTS.md.
@@ -65,6 +66,8 @@ Choose the right vehicle:
 
 - For every detected stack, document what to run and where commands are defined.
 - **Nix check-and-format (pre-commit hook)**: `check.sh` accepts `--format` to auto-fix Nix files (nixfmt). The flag is passed by `prek-hooks.py` when `args = ["--format"]` in `prek.toml`. `nixfmt` is bundled in `mkCheckApp` runtimeInputs in `src/flake.nix` to avoid expensive nixpkgs eval. No separate `format-nix` hook exists.
+- **Commit message validation**: commitlint (via `prek.toml` commit-msg hook) enforces conventional commit types. Valid types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`. Do not use `maintain` — use `refactor` for cleanup without behavior change or `chore` for config/tooling maintenance.
+- **prek hook stashing**: prek hooks stash unstaged changes during commit execution, run checks, then restore them. Stashing output during commits is normal, not an error.
 - **CI policy**: Do not add new checks or tests to `ci.yml`. Route new validation into repo checks (`scripts/check.sh` / `scripts/check.ps1`) or repo tests (`tests/`). Decouples checks from CI runners so they work locally too.
   - what files act as the source of truth
   - what should be avoided when the stack is only partially initialized
