@@ -478,6 +478,7 @@
           name = "check";
           runtimeInputs = [
             pkgs.bash
+            pkgs.check-jsonschema
             pkgs.deadnix
             pkgs.git
             pkgs.jq
@@ -485,6 +486,7 @@
             pkgs.nixfmt
             pkgs.packer
             pkgs.powershell
+            pkgs.yamllint
             pkgs.yq-go
           ];
         };
