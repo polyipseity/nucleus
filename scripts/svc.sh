@@ -802,7 +802,7 @@ show_file_logs() {
   [ -z "$files" ] && return 1
   local sanitize_cmd="log_sanitize"
   $raw && sanitize_cmd="cat"
-  # shellcheck disable=SC2086
+  # shellcheck disable=SC2086 # $files is a space-separated list from service_log_files, word splitting intentional
   tail -n "$lines" $files | "$sanitize_cmd"
 }
 

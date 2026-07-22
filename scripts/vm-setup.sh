@@ -22,11 +22,11 @@ VMS_DIR="$REPO_ROOT/src/vms"
 TEMPLATES_DIR="$VMS_DIR/templates"
 
 dry_run=false
-# shellcheck disable=SC2034 # consumed by vm-setup-lib.sh
+# shellcheck disable=SC2034 # consumed by vm-setup-lib.sh (shellcheck can't follow sourced file)
 windows_iso=''
 windows_iso_source='auto'
 windows_iso_retries='0'
-# shellcheck disable=SC2034 # consumed by vm-setup-lib.sh
+# shellcheck disable=SC2034 # consumed by vm-setup-lib.sh (shellcheck can't follow sourced file)
 windows_headless='true'
 accelerator=''
 gc=false

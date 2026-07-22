@@ -438,7 +438,7 @@ fi
 
 # Atomic write
 tmpfile=$(mktemp "$LOCKFILE_ABS.tmp.XXXXXX")
-# shellcheck disable=SC2064
+# shellcheck disable=SC2064 # intentional: expand $tmpfile now, not at trap time
 trap "rm -f '$tmpfile'" EXIT
 
 printf '%s\n' "$data" > "$tmpfile"

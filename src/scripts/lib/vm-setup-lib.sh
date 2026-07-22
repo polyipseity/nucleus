@@ -7,7 +7,7 @@
 #   dry_run, windows_iso, windows_iso_source, windows_iso_retries,
 #   windows_headless, accelerator, vm_secret_owner, vm_guest_username,
 #   vm_guest_password, vm_guest_credentials_fingerprint
-# shellcheck disable=SC2154
+# shellcheck disable=SC2154 # all listed variables are set by the sourcing script (vm-setup.sh), not directly assigned here
 #
 # Usage:
 #   . "$SCRIPT_DIR/vm-setup/lib.sh"
