@@ -57,10 +57,28 @@ if [ -x "$DP_BIN" ]; then
     ')
   fi
 
+  # Check if mode 4 is already the current mode on the primary display.
+  # displayplacer apply needs WindowServer context (GUI session); skip when
+  # already at the target mode to avoid spurious errors during headless
+  # activation.
+  MODE4_CURRENT=$(echo "$FULL_LIST" | /usr/bin/awk -v id="$PRIMARY_ID" '
+    $0 ~ id { found=1 }
+    found && /mode 4:.*<-- current mode/ { print "yes"; exit }
+  ')
+
   # Apply the target mode on the primary display and refresh the list.
-  if [ -n "$MODE4_STR" ]; then
-    if ! "$DP_BIN" "id:$PRIMARY_ID $MODE4_STR"; then
-      echo "macos: failed to apply primary display mode with displayplacer." >&2
+  # Run via launchctl asuser when a GUI session is available (displayplacer
+  # needs CoreGraphics/WindowServer context); fall back to direct invocation
+  # otherwise so the command still works under test or headless apply.
+  if [ -n "$MODE4_STR" ] && [ "$MODE4_CURRENT" != "yes" ]; then
+    if _nucleus_resolve_console_user; then
+      if ! /bin/launchctl asuser "$_nucleus_console_uid" "$DP_BIN" "id:$PRIMARY_ID $MODE4_STR"; then
+        echo "macos: failed to apply primary display mode with displayplacer." >&2
+      fi
+    else
+      if ! "$DP_BIN" "id:$PRIMARY_ID $MODE4_STR"; then
+        echo "macos: failed to apply primary display mode with displayplacer." >&2
+      fi
     fi
     /bin/sleep 1
     FULL_LIST=$("$DP_BIN" list)
@@ -103,8 +121,14 @@ if [ -x "$DP_BIN" ]; then
     BEST_MODE=$(echo "$MODES" | /usr/bin/awk -v tw="$T_W" -v th="$T_H" '{ w=substr($0,index($0,"res:")+4); gsub(/[^0-9].*/,"",w); h=substr($0,index($0,"x")+1); gsub(/[^0-9].*/,"",h); if (w+0>=tw+0 && h+0<=th+0 && h+0>0) print w+0, h+0, $0 }' | /usr/bin/sort -n | /usr/bin/head -n 1 | /usr/bin/cut -d' ' -f3- | /usr/bin/sed 's/ <-- current mode$//')
 
     if [ -n "$BEST_MODE" ]; then
-      if ! "$DP_BIN" "id:$ID $BEST_MODE"; then
-        echo "macos: failed to apply mode '$BEST_MODE' to display id $ID." >&2
+      if _nucleus_resolve_console_user; then
+        if ! /bin/launchctl asuser "$_nucleus_console_uid" "$DP_BIN" "id:$ID $BEST_MODE"; then
+          echo "macos: failed to apply mode '$BEST_MODE' to display id $ID." >&2
+        fi
+      else
+        if ! "$DP_BIN" "id:$ID $BEST_MODE"; then
+          echo "macos: failed to apply mode '$BEST_MODE' to display id $ID." >&2
+        fi
       fi
     fi
   done
