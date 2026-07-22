@@ -123,6 +123,15 @@ let
       why = "Normalise home-directory prefix in sccache cache keys so the same project checked out under different parent paths produces cache hits. Set per-user because the value depends on the logged-in user's home directory.";
     };
 
+    # ── Rust test runner (nextest) ────────────────────────────────
+    NEXTEST_TEST_THREADS = {
+      values = {
+        default = "4";
+        Windows = "4";
+      };
+      why = "Limit cargo-nextest test runner concurrency to 4 parallel test threads across all hosts. Set all-process (not just shell) so IDE/debugger integrations also respect the cap.";
+    };
+
     # ── macOS-specific developer toolchain ───────────────────────────
     DEVELOPER_DIR = {
       values = {

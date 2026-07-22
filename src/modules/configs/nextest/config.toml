@@ -1,0 +1,7 @@
+# ── UI/UX ──────────────────────────────────────────────────────────────
+[ui]
+show-progress = "bar"
+max-progress-running = 4
+
+# ── Partitioning ───────────────────────────────────────────────────────
+# None (local project-level config handles partition count / test groups)

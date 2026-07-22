@@ -19,6 +19,7 @@ let
     pkgs.camillagui-backend
     pkgs.cargo-binstall
     pkgs.cargo-cache
+    pkgs.cargo-nextest
     pkgs.check-jsonschema
     pkgs.deadnix
     pkgs.direnv

@@ -191,6 +191,12 @@ in
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/cargo/config.toml";
   };
 
+  # Global nextest configuration: test runner UI settings.
+  home.file.".config/nextest/config.toml" = {
+    # Method 1 (writable symlink): repo changes take effect without rebuild.
+    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/nextest/config.toml";
+  };
+
   # ---------------------------------------------------------------------------
   # nix-direnv _nix override: filter apple-sdk vars from print-dev-env output
   # ---------------------------------------------------------------------------
