@@ -15,4 +15,5 @@
 
 pkgs.runCommand "nucleus-activation-bundle" { preferLocalBuild = true; } ''
   cp -r "${../../../src/scripts}/." "$out/"
+  chmod -R +x "$out"
 ''
