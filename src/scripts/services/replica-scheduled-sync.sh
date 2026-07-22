@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -eu
 
-# require_repo_root() is provided via repo-root-lib.sh (prepended at build time).
-require_repo_root cloud-drives
+NUCLEUS_REPO_ROOT="${NUCLEUS_REPO_ROOT:?NUCLEUS_REPO_ROOT not set — set in launchd/service environment}"
 
+# CURRENT_USER_HOME and REPLICA_ID are build-time tokens substituted by
+# cloud-drives.nix's mkReplicaScheduledSyncScript.
 _nucleus_replica_cmd="__CURRENT_USER_HOME__/.nix-profile/bin/nucleus-replica-sync"
 if [ ! -x "$_nucleus_replica_cmd" ]; then
   echo "cloud-drives: nucleus replica command not found at $_nucleus_replica_cmd" >&2

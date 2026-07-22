@@ -260,18 +260,10 @@ let
     builtins.readFile ../scripts/services/ds-store-gc.sh
   );
 
-  gcWeekly = pkgs.writeShellScript "gc-weekly" (
-    builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
-      (builtins.readFile ../scripts/lib/repo-root-lib.sh)
-      + (builtins.readFile ../scripts/services/gc-sweep.sh)
-    )
-  );
+  gcWeekly = pkgs.writeShellScript "gc-weekly" (builtins.readFile ../scripts/services/gc-sweep.sh);
 
   sccacheGc = pkgs.writeShellScript "sccache-gc" (
-    builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
-      (builtins.readFile ../scripts/lib/repo-root-lib.sh)
-      + (builtins.readFile ../scripts/services/sccache-gc.sh)
-    )
+    builtins.readFile ../scripts/services/sccache-gc.sh
   );
 
   guiEnvAgent = pkgs.writeShellScript "gui-env" (
@@ -561,6 +553,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
     config = {
       Label = "local.gc-weekly";
       ProgramArguments = [ "${gcWeekly}" ];
+      EnvironmentVariables = {
+        NUCLEUS_REPO_ROOT = repoRoot;
+      };
       # Do not run on every agent reload during apply/bootstrap apply; weekly
       # Sunday maintenance at noon is sufficient for accumulated artifact cleanup.
       RunAtLoad = false;

@@ -241,18 +241,17 @@ let
     # undoc-supp: unmounting a mount that may not exist; cleanup-only operation that must not fail (e.g. on retry after partial mount failure).
     mountPoint: "/bin/sh -c 'fusermount3 -u ${lib.escapeShellArg mountPoint} || true'";
 
-  # Build a scheduled replica-sync runner that resolves the repository root at
-  # runtime and invokes scripts/replica-sync.sh for one replica id.
+  # Build a scheduled replica-sync runner that invokes
+  # scripts/replica-sync.sh for one replica id. NUCLEUS_REPO_ROOT is set by
+  # the launchd/systemd service environment. __CURRENT_USER_HOME__ and
+  # __REPLICA_ID__ are substituted at build time.
   mkReplicaScheduledSyncScript =
     replica:
     pkgs.writeShellScript "cloud-replica-scheduled-sync-${replica.id}" (
       builtins.replaceStrings
-        [ "__REPO_ROOT__" "__CURRENT_USER_HOME__" "__REPLICA_ID__" ]
-        [ repoRoot currentUserHome (lib.escapeShellArg replica.id) ]
-        (
-          (builtins.readFile ../scripts/lib/repo-root-lib.sh)
-          + (builtins.readFile ../scripts/services/replica-scheduled-sync.sh)
-        )
+        [ "__CURRENT_USER_HOME__" "__REPLICA_ID__" ]
+        [ currentUserHome (lib.escapeShellArg replica.id) ]
+        (builtins.readFile ../scripts/services/replica-scheduled-sync.sh)
     );
 
   # Canonical scheduled-sync timer mapping. Repository policy mandates 12:00 slots.
@@ -468,6 +467,9 @@ in
               config = {
                 Label = "local.cloud-replica-scheduled-sync.${replica.id}";
                 ProgramArguments = [ "${mkReplicaScheduledSyncScript replica}" ];
+                EnvironmentVariables = {
+                  NUCLEUS_REPO_ROOT = repoRoot;
+                };
                 StartCalendarInterval = mkScheduledSyncLaunchdCalendar replica.fallbackTimer.interval;
                 # Keep scheduled sync runs on schedule boundaries only.
                 RunAtLoad = false;
@@ -497,6 +499,7 @@ in
               Service = {
                 Type = "oneshot";
                 ExecStart = "${mkReplicaScheduledSyncScript replica}";
+                Environment = "NUCLEUS_REPO_ROOT=${repoRoot}";
               };
               Install = {
                 WantedBy = [ "default.target" ];

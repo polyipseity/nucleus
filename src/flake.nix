@@ -302,6 +302,7 @@
           name,
           scriptName ? name,
           runtimeInputs ? [ ],
+          extraEnv ? { },
           bundleDefault ? true,
           meta ? { },
         }:
@@ -337,7 +338,11 @@
             #!${pkgs.runtimeShell}
             set -euo pipefail
             export PATH="${lib.makeBinPath runtimeInputs}:$PATH"
-            for _d in scripts src/scripts; do
+            ${
+              lib.concatStringsSep "\n" (
+                lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") extraEnv
+              )
+            }for _d in scripts src/scripts; do
               _script="$(CDPATH="" cd -- "$(dirname -- "$0")/../$_d" && pwd -P)/${scriptName}.sh"
               if [ -f "$_script" ]; then
                 exec "$_script" "$@"
