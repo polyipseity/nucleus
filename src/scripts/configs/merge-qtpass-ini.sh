@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # QtPass INI merge shell helpers.
 
-set -euo pipefail
-
 # shellcheck disable=SC2016 # reason: single quotes intentional — awk script body must not be expanded by shell
+set -euo pipefail
 
 _mqi_awk_bin="$1"
 _mqi_darwin_commands="$2"

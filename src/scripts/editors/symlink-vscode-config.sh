@@ -3,9 +3,8 @@
 # Called by home-manager activation vsCodeSymlinks.
 # Provides: ensure_file_symlink, ensure_dir_symlink (from symlink-hardening-lib.sh)
 
-set -euo pipefail
-
 # shellcheck disable=SC2016 # reason: single quotes intentional — jq filter body must not be expanded by shell
+set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"

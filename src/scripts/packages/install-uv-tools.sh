@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # Managed uv tool convergence (install + zap).
 # Consumes tool paths and desired tools JSON at activation time.
-set -euo pipefail
-
 # shellcheck disable=SC2016 # reason: single quotes intentional — awk script body must not be expanded by shell
+set -euo pipefail
 
 _iut_uv_bin="$1"
 _iut_gawk_bin="$2"
