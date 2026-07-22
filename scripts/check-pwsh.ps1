@@ -8,8 +8,8 @@
   without executing scripts.
 
   Phase 2 — Lint: if PSScriptAnalyzer is available in the current session,
-  runs `Invoke-ScriptAnalyzer` sequentially in-process at Error severity
-  with excluded rules that trigger false positives.  If the module is
+  runs `Invoke-ScriptAnalyzer` sequentially in-process at Error and Warning
+  severity with excluded rules that trigger false positives.  If the module is
   absent, a warning is printed and the lint phase is skipped so CI can run on
   machines that do not have PSScriptAnalyzer installed (syntax validation
   still passes).
@@ -104,7 +104,7 @@ else {
 
   $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
   $excludeRules = @('PSUseBOMForUnicodeEncodedFile')
-  $settings = @{ Severity = @('Error') }
+  $settings = @{ Severity = @('Error', 'Warning') }  # DO NOT drop Warning — both Error and Warning are required; see commit ac7a2aba for why this was erroneously restricted
 
   $lintResults = @($files | ForEach-Object {
     Invoke-ScriptAnalyzer -Path $_ -Settings $settings -ExcludeRule $excludeRules
