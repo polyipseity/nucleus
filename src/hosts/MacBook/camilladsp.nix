@@ -31,8 +31,8 @@ let
         wsPort
       ]
       (
-        (builtins.readFile ./../../scripts/lib/require-command-lib.sh) +
-        (builtins.readFile ./../../scripts/services/camilladsp-daemon.sh)
+        (builtins.readFile ./../../scripts/lib/require-command-lib.sh)
+        + (builtins.readFile ./../../scripts/services/camilladsp-daemon.sh)
       )
   );
 
@@ -47,8 +47,8 @@ let
         wsPort
       ]
       (
-        (builtins.readFile ./../../scripts/lib/require-command-lib.sh) +
-        (builtins.readFile ./../../scripts/services/camilladsp-heartbeat.sh)
+        (builtins.readFile ./../../scripts/lib/require-command-lib.sh)
+        + (builtins.readFile ./../../scripts/services/camilladsp-heartbeat.sh)
       )
   );
 
@@ -73,6 +73,9 @@ in
       # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
       # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
       # passes SIP gate. See .agents/instructions/macos-launchd-sip.instructions.md.
+      # Upstream <https://github.com/nix-darwin/nix-darwin/issues/1219> tracks
+      # making launchd services show descriptive names; do not revisit until
+      # that issue is resolved.
       ProgramArguments = [
         "/bin/sh"
         "-c"
@@ -94,6 +97,9 @@ in
       # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
       # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
       # passes SIP gate. See .agents/instructions/macos-launchd-sip.instructions.md.
+      # Upstream <https://github.com/nix-darwin/nix-darwin/issues/1219> tracks
+      # making launchd services show descriptive names; do not revisit until
+      # that issue is resolved.
       ProgramArguments = [
         "/bin/sh"
         "-c"

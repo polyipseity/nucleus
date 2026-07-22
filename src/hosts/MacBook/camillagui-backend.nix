@@ -34,6 +34,9 @@ in
       # NOTE: This /bin/sh wrapper predates the macOS 26+ SIP restriction and
       # served as the reference pattern for fixing other daemons. See
       # .agents/instructions/macos-launchd-sip.instructions.md.
+      # Upstream <https://github.com/nix-darwin/nix-darwin/issues/1219> tracks
+      # making launchd services show descriptive names; do not revisit until
+      # that issue is resolved.
       ProgramArguments = [
         "/bin/sh"
         "-c"
