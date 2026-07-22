@@ -57,13 +57,19 @@ derive_repo_root() {
     printf '%s\n' "$NUCLEUS_REPO_ROOT"
     return 0
   fi
-  for _drr_offset in ".." "../.." "../../.."; do
-    _drr_candidate="$(CDPATH='' cd -- "${SCRIPT_DIR:?}/${_drr_offset}" && pwd -P 2>/dev/null)" || continue
-    if [ -f "$_drr_candidate/src/flake.nix" ]; then
-      printf '%s\n' "$_drr_candidate"
-      return 0
-    fi
-  done
+  # Resolve SCRIPT_DIR to the physical path before traversal so symlink chains
+  # (e.g. /Users -> /System/Volumes/Data/Users, iCloud Drive) do not interfere
+  # with directory climbing.
+  _drr_base="$(CDPATH='' cd -P -- "${SCRIPT_DIR:?}" 2>/dev/null && pwd)" || true # undoc-supp: SCRIPT_DIR may not exist or be unset; fall through to git fallback.
+  if [ -n "$_drr_base" ]; then
+    for _drr_offset in ".." "../.." "../../.."; do
+      _drr_candidate="$(CDPATH='' cd -P -- "${_drr_base}/${_drr_offset}" 2>/dev/null && pwd)" || continue
+      if [ -f "$_drr_candidate/src/flake.nix" ]; then
+        printf '%s\n' "$_drr_candidate"
+        return 0
+      fi
+    done
+  fi
   if command -v git >/dev/null 2>&1; then
     _drr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || true # undoc-supp: git rev-parse may fail outside a git repo; fallback continues with error message.
     if [ -n "${_drr_git_root:-}" ] && [ -f "$_drr_git_root/src/flake.nix" ]; then
