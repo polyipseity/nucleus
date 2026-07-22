@@ -43,42 +43,21 @@ See `src/scripts/services/jellyfin-sync.sh` for an example.
 
 ## No library sourcing in activation blocks
 
-Libraries under `src/scripts/lib/` must never be sourced directly inside Nix
-activation blocks. The `REPO_ROOT="${repoRoot}"` +
-`. "$REPO_ROOT/src/scripts/..."` pattern couples activation timing to library
-file-system layout and makes activation scripts opaque to shell analysis tools.
+Libraries under `src/scripts/lib/` must never be sourced directly inside Nix activation blocks. The `REPO_ROOT="${repoRoot}"` + `. "$REPO_ROOT/src/scripts/..."` pattern couples activation timing to library file-system layout and makes activation scripts opaque to shell analysis tools.
 
-Instead, create a small import wrapper script under `src/scripts/lib/` that
-sources the library (using `SCRIPT_DIR`-based path resolution). Activation
-blocks use `builtins.readFile` of the import wrapper only.
+Instead, create a small import wrapper script under `src/scripts/lib/` that sources the library (using `SCRIPT_DIR`-based path resolution). Activation blocks use `builtins.readFile` of the import wrapper only.
 
 See `src/scripts/lib/import-symlink-hardening.sh` for the canonical pattern.
 
-The only exception is standalone scripts under `src/scripts/` that are not
-libraries (e.g. scripts executed for their side effects, like
-`src/scripts/hosts/MacBook/macos-configure-preflight-privacy.sh`). These may be run
-directly via `builtins.readFile` without an import wrapper.
+The only exception is standalone scripts under `src/scripts/` that are not libraries (e.g. scripts executed for their side effects, like `src/scripts/hosts/MacBook/macos-configure-preflight-privacy.sh`). These may be run directly via `builtins.readFile` without an import wrapper.
 
-A second exception covers **thin library wrappers** (scripts that only source a
-library and call functions, with no loops or conditionals): embed the library
-via `${builtins.readFile <lib-path>}` in the activation block and call the
-functions inline. This is already practiced in `macos.nix`, `home.nix`, and
-`config-utils.nix` (see `scripts-and-permissions.instructions.md` — "When a
-script needs its own file" for the full policy).
+A second exception covers **thin library wrappers** (scripts that only source a library and call functions, with no loops or conditionals): embed the library via `${builtins.readFile <lib-path>}` in the activation block and call the functions inline. This is already practiced in `macos.nix`, `home.nix`, and `config-utils.nix` (see `scripts-and-permissions.instructions.md` — "When a script needs its own file" for the full policy).
 
 ## Activation script value injection
 
-When injecting Nix-evaluated values (store paths, JSON, repo root) into
-activation scripts embedded via `builtins.readFile`, use
-`builtins.replaceStrings` to substitute `__UPPERCASE_WITH_DOUBLE_UNDERSCORES__`
-tokens in the script source. Do NOT use shell-level variable exports (`PATH=...;
-export PATH`, `VAR="..."; export VAR`) before the script invocation — this is
-fragile, bypasses PATH isolation, and mixes compile-time and runtime concerns.
+When injecting Nix-evaluated values (store paths, JSON, repo root) into activation scripts embedded via `builtins.readFile`, use `builtins.replaceStrings` to substitute `__UPPERCASE_WITH_DOUBLE_UNDERSCORES__` tokens in the script source. Do NOT use shell-level variable exports (`PATH=...; export PATH`, `VAR="..."; export VAR`) before the script invocation — this is fragile, bypasses PATH isolation, and mixes compile-time and runtime concerns.
 
-The script file declares token placeholders as variable values only (not variable
-names, since `builtins.replaceStrings` replaces all occurrences including
-names). A distinct prefix on the token value enables fallback detection via
-`case`:
+The script file declares token placeholders as variable values only (not variable names, since `builtins.replaceStrings` replaces all occurrences including names). A distinct prefix on the token value enables fallback detection via `case`:
 
 ```bash
 VAR='__NUCLEUS_UNIQUE_TOKEN__'
@@ -88,8 +67,7 @@ case "$VAR" in __NUCLEUS_*)
 esac
 ```
 
-Then in the Nix activation block, replace each token with its Nix-evaluated
-value:
+Then in the Nix activation block, replace each token with its Nix-evaluated value:
 
 ```nix
 builtins.replaceStrings
@@ -98,9 +76,7 @@ builtins.replaceStrings
   (builtins.readFile ./script.sh)
 ```
 
-For tool paths, prefer prepending a token-replaced bin directory to `PATH`
-inside the script (after fallback detection), which resolves all bare commands
-without touching every invocation:
+For tool paths, prefer prepending a token-replaced bin directory to `PATH` inside the script (after fallback detection), which resolves all bare commands without touching every invocation:
 
 ```bash
 _path_prepend='__NUCLEUS_PATH_PREPEND__'
@@ -113,14 +89,9 @@ if [ -n "$_path_prepend" ]; then
 fi
 ```
 
-See `src/scripts/services/jellyfin-sync.sh` and its callers
-(`src/hosts/MacBook/activation.nix`, `src/hosts/NixOS/jellyfin.nix`) for the
-canonical implementation.
+See `src/scripts/services/jellyfin-sync.sh` and its callers (`src/hosts/MacBook/activation.nix`, `src/hosts/NixOS/jellyfin.nix`) for the canonical implementation.
 
-**Comments must never contain token placeholder strings.** Since
-`builtins.replaceStrings` replaces all occurrences, any token string
-(e.g. `__NUCLEUS_REPO_ROOT__`) appearing in a comment will also be
-substituted, leaving meaningless text.
+**Comments must never contain token placeholder strings.** Since `builtins.replaceStrings` replaces all occurrences, any token string (e.g. `__NUCLEUS_REPO_ROOT__`) appearing in a comment will also be substituted, leaving meaningless text.
 
 ## Module conventions
 
@@ -199,13 +170,9 @@ nix-darwin refactored the launchd module. The old flat `config` attrset and `ena
 
 ### nix-darwin launchd.daemons label naming
 
-nix-darwin auto-generates the launchd `Label` from the `launchd.daemons.<name>`
-key. For system daemons (via `launchd.daemons`), the label becomes
-`org.nixos.<key>`. For user agents (via `launchd.agents` via Home Manager),
-the label becomes the key as-is.
+nix-darwin auto-generates the launchd `Label` from the `launchd.daemons.<name>` key. For system daemons (via `launchd.daemons`), the label becomes `org.nixos.<key>`. For user agents (via `launchd.agents` via Home Manager), the label becomes the key as-is.
 
-To produce a specific label (e.g. `local.camilladsp` for `services.json`
-compatibility), **always set `Label` explicitly** in the `serviceConfig`:
+To produce a specific label (e.g. `local.camilladsp` for `services.json` compatibility), **always set `Label` explicitly** in the `serviceConfig`:
 
 ```nix
 launchd.daemons."myservice" = {
@@ -216,15 +183,11 @@ launchd.daemons."myservice" = {
 };
 ```
 
-Do not rely on the auto-generated label — nix-darwin may change its naming
-convention across versions, silently breaking `nucleus-svc list`
-discovery. All working services in this repo (`camilladsp`,
-`camilladsp-heartbeat`, `camillagui-backend`, `service-watchdog`) follow
-this pattern.
+Do not rely on the auto-generated label — nix-darwin may change its naming convention across versions, silently breaking `nucleus-svc list` discovery. All working services in this repo (`camilladsp`, `camilladsp-heartbeat`, `camillagui-backend`, `service-watchdog`) follow this pattern.
 
 launchd EX_CONFIG (exit 78)
 
-launchd permanently blacklists services that exit with code 78. `bootout`/`bootstrap` alone does not clear it — run `disable` + `enable` or kill the process. Never silence launchd stderr with `2>/dev/null || true`; always log failures to enable debugging.
+Launchd permanently blacklists services that exit with code 78. See `macos-launchd-sip.instructions.md` for full details on exit 78 behavior, penalty-box recovery, and the `/bin/sh` wrapper workaround. Never silence launchd stderr with `2>/dev/null || true`; always log failures to enable debugging.
 
 ### Root processes and iCloud Drive
 
@@ -396,3 +359,5 @@ Examples with their extracted helpers:
 - `macos-set-gui-env-path` PATH dedup → `gui-env-agent.sh` + `macos-set-gui-env-path.sh`
 
 **Rule**: when adding a new split-pattern inline script, extract the pure-shell body to `src/scripts/` first, then wrap it in Nix with environment variable injection or `builtins.replaceStrings` for Nix-evaluated values.
+
+See `scripts-and-permissions.instructions.md` ("When a script needs its own file") for the complementary policy on when extracted scripts should remain separate files vs. be inlined directly.

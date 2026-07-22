@@ -171,47 +171,29 @@ Adding a new toggle: add a default entry to the `DEFAULTS`/`$Defaults` map in bo
 
 ## Centralized daemon/service refresh
 
-All program/daemon/service killing, refresh, and restart operations must go
-through centralized library functions:
+All program/daemon/service killing, refresh, and restart operations must go through centralized library functions:
 
 - **macOS**: `src/scripts/lib/macos-launch-services-lib.sh` (`refresh_*` functions)
 - **Windows**: `src/hosts/Windows/modules/Set-NucleusService.ps1`
 
-Do not inline killall/Stop-Service commands in activation blocks or individual
-scripts. This ensures a single point of control per OS and prevents redundant
-kills in the same activation run.
+Do not inline killall/Stop-Service commands in activation blocks or individual scripts. This ensures a single point of control per OS and prevents redundant kills in the same activation run.
 
-For macOS activation blocks that need daemon refresh, use wrapper scripts under
-`src/scripts/hosts/MacBook/` that source the library and call the appropriate
-`refresh_*` function. Activate them via `builtins.readFile`.
+For macOS activation blocks that need daemon refresh, use wrapper scripts under `src/scripts/hosts/MacBook/` that source the library and call the appropriate `refresh_*` function. Activate them via `builtins.readFile`.
 
 ## When a script needs its own file
 
-A script under `src/scripts/` earns its own file when it falls into one of
-these categories. Otherwise, inline its content directly in the Nix activation
-block that calls it.
+A script under `src/scripts/` earns its own file when it falls into one of these categories. Otherwise, inline its content directly in the Nix activation block that calls it.
 
 **Keep as a separate file when:**
 
-1. **Substantial logic** — loops, conditionals, data processing, error handling,
-   or multi-step algorithms that would bloat the Nix activation string.
-2. **Exec dispatch** — script validates prerequisites then `exec`s another
-   command (e.g., `gc-sweep.sh`). The validation+dispatch pattern is a clear
-   seam that keeps activation blocks focused.
-3. **Thin dispatcher** — script calls another tool/script with argument setup
-   (e.g., `merge-obsidian-json.sh`). The argument preparation and error
-   handling justify separation.
-4. **Persistent daemon/service** — long-running process with lifecycle
-   management.
+1. **Substantial logic** — loops, conditionals, data processing, error handling, or multi-step algorithms that would bloat the Nix activation string.
+2. **Exec dispatch** — script validates prerequisites then `exec`s another command (e.g., `gc-sweep.sh`). The validation+dispatch pattern keeps activation blocks focused.
+3. **Thin dispatcher** — script calls another tool/script with argument setup (e.g., `merge-obsidian-json.sh`). The argument preparation and error handling justify separation.
+4. **Persistent daemon/service** — long-running process with lifecycle management.
 
 **Inline directly in the Nix activation block when:**
 
-1. **Thin library wrapper** — script only sources a library (from
-   `src/scripts/lib/`) and calls functions from it, with no additional logic.
-   No loops over data, no conditionals on runtime state, no data
-   transformation. Embed the library via `${builtins.readFile <lib-path>}` in
-   the activation block and call the functions directly. Wrappers that iterate
-   over data entries (loops) still justify a separate file.
-2. **Trivial one-command** — script whose entire logic is a single command or
-   a few simple commands with minimal/no control flow (no loops, no
-   conditionals on runtime state, no data transformation).
+1. **Thin library wrapper** — script only sources a library (from `src/scripts/lib/`) and calls functions from it, with no additional logic. No loops over data, no conditionals on runtime state, no data transformation. Embed the library via `${builtins.readFile <lib-path>}` in the activation block and call the functions directly. Wrappers that iterate over data entries (loops) still justify a separate file.
+2. **Trivial one-command** — script whose entire logic is a single command or a few simple commands with minimal/no control flow (no loops, no conditionals on runtime state, no data transformation).
+
+See `nix-authoring.instructions.md` ("Inline code extraction boundaries") for the complementary Nix-side policy on what stays inline.

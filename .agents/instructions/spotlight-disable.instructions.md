@@ -31,7 +31,7 @@ done
 
 ### Stage 2: Invoke activateSettings -u immediately
 
-Call `activateSettings -u` as the console user immediately after the hotkey writes. Without this, the disable applies only to the next login session and Cmd+Space still works until logout. It forces the loginwindow daemon to re-read hotkey settings immediately, making the disable user-visible in the current session. Must run as the console user (not root) because it operates on the user's session context.
+Call `activateSettings -u` as the console user immediately after the hotkey writes. Without this, the disable applies only to the next login session — Cmd+Space still works until logout. This forces loginwindow to re-read hotkey settings immediately, making the disable user-visible in the current session. Must run as the console user (not root) because it operates on the user's session context.
 
 **Implementation**:
 
@@ -52,7 +52,7 @@ Disable the `com.apple.Spotlight` launchd service. Even if hotkeys and indexing 
 
 ### Stage 4: launchctl bootout — stop running instance immediately
 
-Boot out (immediately stop) the running `com.apple.Spotlight` service. `launchctl disable` prevents re-launch but does not stop an already-running process. `launchctl bootout` terminates it now, preventing any in-flight re-enable or listener activity.
+Boot out (immediately stop) the running `com.apple.Spotlight` service. `launchctl disable` prevents re-launch but does not stop an already-running process, so `bootout` terminates it now to prevent any in-flight re-enable or listener activity.
 
 **Implementation**:
 
@@ -88,7 +88,7 @@ fi
 
 ## Why this must run in system.activationScripts (not home.activation)
 
-The entire strategy must run in `system.activationScripts.postActivation.text` (as root via `darwin-rebuild switch`), not in `home.activation` (logged-in user context). Three operations require root privilege unavailable in user context even with `sudo`: (1) `mdutil -i off /`, (2) `launchctl bootout`, (3) `launchctl disable`.
+The entire strategy must run in `system.activationScripts.postActivation.text` (as root via `darwin-rebuild switch`), not `home.activation` (logged-in user context). Three operations require root privilege unavailable with `sudo` in user context: (1) `mdutil -i off /`, (2) `launchctl bootout`, (3) `launchctl disable`.
 
 ## Testing and verification
 
