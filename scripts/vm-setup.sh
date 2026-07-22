@@ -18,15 +18,12 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 REPO_ROOT="$(derive_repo_root)"
 MANIFEST="$REPO_ROOT/src/modules/VMs.json"
 VMS_DIR="$REPO_ROOT/src/vms"
-# shellcheck disable=SC2034 # reason: consumed by vm-setup-lib.sh (shellcheck can't follow sourced file)
 TEMPLATES_DIR="$VMS_DIR/templates"
 
 dry_run=false
-# shellcheck disable=SC2034 # reason: consumed by vm-setup-lib.sh (shellcheck can't follow sourced file)
 windows_iso=''
 windows_iso_source='auto'
 windows_iso_retries='0'
-# shellcheck disable=SC2034 # reason: consumed by vm-setup-lib.sh (shellcheck can't follow sourced file)
 windows_headless='true'
 accelerator=''
 gc=false
@@ -48,7 +45,6 @@ usage() {
 EOF
 }
 
-# shellcheck disable=SC2034 # reason: consumed by vm-setup-lib.sh (shellcheck can't follow sourced file)
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -h|--help)
@@ -221,8 +217,6 @@ if ! resolve_vm_guest_credentials; then
   exit 0
 fi
 
-# shellcheck disable=SC2034 # reason: consumed by vm-setup-lib.sh below
-# shellcheck disable=SC2034 # reason: consumed by vm-setup-lib.sh below
 if ! vm_guest_credentials_fingerprint="$(vm_guest_credentials_hash)"; then
   exit 0
 fi
@@ -233,7 +227,13 @@ export NUCLEUS_VM_GUEST_PASSWORD="$vm_guest_password"
 
 # Source shared VM setup library (function definitions).
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck source=../src/scripts/lib/vm-setup-lib.sh
 . "$SCRIPT_DIR/../src/scripts/lib/vm-setup-lib.sh"
+vm_setup_init "$REPO_ROOT" "$VM_DIR" "$IMAGES_DIR" "$TEMPLATES_DIR" \
+  "$dry_run" "$windows_iso" "$windows_iso_source" "$windows_iso_retries" \
+  "$windows_headless" "$accelerator" "$vm_secret_owner" "$vm_guest_username" \
+  "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
+  "${NUCLEUS_MIDO_PATCH_FILE:-}" "${NUCLEUS_MIDO_SCRIPT:-}"
 
 # ---------------------------------------------------------------------------
 # Main

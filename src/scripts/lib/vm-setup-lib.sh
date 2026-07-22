@@ -1,16 +1,32 @@
 # shellcheck shell=bash
-# Source this file from the vm-setup dispatcher after setting shared variables
-# (REPO_ROOT, VM_DIR, IMAGES_DIR, TEMPLATES_DIR, dry_run, vm_guest_username,
-# vm_guest_password, vm_guest_credentials_fingerprint, etc.).
-#
-# Shared variables defined by the sourcing script:
-#   dry_run, windows_iso, windows_iso_source, windows_iso_retries,
-#   windows_headless, accelerator, vm_secret_owner, vm_guest_username,
-#   vm_guest_password, vm_guest_credentials_fingerprint
-# shellcheck disable=SC2154 # reason: all listed variables are set by the sourcing script (vm-setup.sh), not directly assigned here
-#
-# Usage:
+# Source this file from the vm-setup dispatcher, then call vm_setup_init with
+# all config values as positional parameters to make data flow explicit.
+# Example:
 #   . "$SCRIPT_DIR/vm-setup/lib.sh"
+#   vm_setup_init "$REPO_ROOT" "$VM_DIR" ...
+
+# vm_setup_init — Initialize all shared config variables from explicit
+# positional parameters. Called after sourcing so shellcheck can trace every
+# variable assignment through the function call.
+vm_setup_init() {
+  REPO_ROOT="$1"
+  VM_DIR="$2"
+  IMAGES_DIR="$3"
+  TEMPLATES_DIR="$4"
+  dry_run="$5"
+  windows_iso="$6"
+  windows_iso_source="$7"
+  windows_iso_retries="$8"
+  windows_headless="$9"
+  accelerator="${10}"
+  vm_secret_owner="${11}"
+  vm_guest_username="${12}"
+  vm_guest_password="${13}"
+  vm_guest_credentials_fingerprint="${14}"
+  NUCLEUS_MIDO_PATCH_FILE="${15}"
+  NUCLEUS_MIDO_SCRIPT="${16}"
+}
+
 # write_vm_directory_readme
 #   Writes a cross-host usage guide into the managed VM directory so operators
 #   can transfer VM artifacts between hosts and run guest-specific converge
@@ -314,11 +330,11 @@ write_start_script() {
 
   # Render .sh from template.
   if [ -f "$TEMPLATES_DIR/start-posix.sh" ]; then
-    sed -e "s|{{VM_NAME}}|$_wss_name|g" \
-        -e "s|{{VM_DISPLAY}}|$_wss_display|g" \
-        -e "s|{{VM_TYPE}}|$_wss_type|g" \
-        -e "s|{{HOST_KIND}}|$_wss_host_kind|g" \
-        -e "s|{{VM_DIR}}|$VM_DIR|g" \
+    sed -e "s|__VM_NAME__|$_wss_name|g" \
+        -e "s|__VM_DISPLAY__|$_wss_display|g" \
+        -e "s|__VM_TYPE__|$_wss_type|g" \
+        -e "s|__HOST_KIND__|$_wss_host_kind|g" \
+        -e "s|__VM_DIR__|$VM_DIR|g" \
         "$TEMPLATES_DIR/start-posix.sh" >"$_wss_path_sh"
   else
     warn "start-posix.sh template not found at $TEMPLATES_DIR/start-posix.sh"
@@ -743,7 +759,6 @@ setup_utm_vm() {
 # Libvirt VM setup callback for for_each_vm
 
 setup_libvirt_vm() {
-  # shellcheck disable=SC2034 # reason: vm_hosts is part of the callback protocol
   local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display disk_path disk_credential_marker _prebuilt
 
@@ -752,7 +767,7 @@ setup_libvirt_vm() {
   disk_path="$VM_DIR/${vm_name}.qcow2"
   disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_name" "$disk_path")"
 
-  say "configuring libvirt VM '$vm_display'..."
+  say "configuring libvirt VM '$vm_display' (hosts: $vm_hosts)..."
 
   # Require a pre-built image (built in phase 1).
   _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
