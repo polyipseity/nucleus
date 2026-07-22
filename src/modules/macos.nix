@@ -329,7 +329,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     display-resolutions = lib.hm.dag.entryAfter [ "macos-headless-display" ] ''
       ${builtins.readFile ../scripts/lib/macos-console-user-lib.sh}
-      "${activationBundle}/hosts/MacBook/macos-display-resolutions.sh"
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-display-resolutions.sh}
     '';
 
     # -------------------------------------------------------------------------
@@ -433,7 +433,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # -------------------------------------------------------------------------
     nightlight = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       ${builtins.readFile ../scripts/lib/macos-console-user-lib.sh}
-      "${activationBundle}/hosts/MacBook/macos-install-nightlight.sh"
+      ${builtins.readFile ../scripts/hosts/MacBook/macos-install-nightlight.sh}
     '';
 
     # -------------------------------------------------------------------------
