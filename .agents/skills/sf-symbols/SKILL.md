@@ -54,9 +54,7 @@ rm symbols_raw_a.txt symbols_raw_b.txt
 
 ## Policy reference
 
-The icon convention policy for this project's Automator workflows is documented
-in `src/hosts/MacBook/services/automator-workflows.nix` (header comment section
-"SF Symbol icon policy").
+The icon convention policy for this project's Automator workflows is documented in `src/hosts/MacBook/services/automator-workflows.nix` (header comment section "SF Symbol icon policy").
 
 ## macOS version floor
 
