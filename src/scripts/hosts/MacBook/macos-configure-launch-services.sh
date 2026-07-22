@@ -7,7 +7,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../lib/macos-launch-services-lib.sh"
+. "$SCRIPT_DIR/../../lib/macos-launch-services-lib.sh"
 
 _duti_bin="$1"
 _handlers_json="$2"
