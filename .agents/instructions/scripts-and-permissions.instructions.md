@@ -56,6 +56,28 @@ Non-host subdirectories follow a two-track convention:
 - `src/scripts/services/caddy-trust.sh` historically uses `NUCLEUS_REPO_ROOT` (an environment variable) for backward compatibility. New scripts must use positional arguments instead.
 - **Helper scripts in `src/scripts/` (e.g. `register-host-age-key.sh`, `install-prek-hooks.sh`) use `--repo-root <path>` flags, not bare positional args.** Call sites in `src/scripts/apply.sh` must use the flag form. This prevents recurring bugs where a bare path is passed to a script that expects `--repo-root`.
 
+## Relative pathing convention
+
+All scripts that source other files (libraries, configs, etc.) MUST derive their
+own directory via SCRIPT_DIR and source via SCRIPT_DIR-relative paths. This
+ensures scripts work from any cwd, prevents `CDPATH` interference, and resolves
+symlinks to physical paths (matching nix store resolution).
+
+Standard form:
+
+```sh
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/relative/path"
+```
+
+- Use `pwd -P` to resolve symlinks to physical paths.
+- Use `CDPATH=''` to prevent the `CDPATH` environment variable from
+  interfering with `cd`.
+- Never use bare `$(dirname "$0")` in a source line; always pair with a
+  SCRIPT_DIR assignment at the top of the script.
+- For scripts in `scripts/` that resolve via `$_self` (symlink-safe), use
+  `dirname -- "$_self"` instead of `dirname -- "$0"`.
+
 ## PowerShell file naming
 
 When adding or renaming standalone PowerShell entry points, use PascalCase and an approved `Verb-Noun` form for the filename, for example `Get-SystemInventory.ps1` or `Backup-Database.ps1`.
