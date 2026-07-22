@@ -427,28 +427,21 @@ if [[ -f "$SVC_SH" ]]; then
     test_usage_std_present "$SVC_SH"
     test_help_handler "$SVC_SH"
 
-    # Override sudo with a wrapper using -n (non-interactive) so that
-    # svc_status does not hang on stdin for system-domain launchd services.
-    SUDO_WRAPPER_DIR=$(mktemp -d)
-    cat > "$SUDO_WRAPPER_DIR/sudo" << 'SUDO_WRAPPER'
-#!/usr/bin/env bash
-exec /usr/bin/sudo -n "$@"
-SUDO_WRAPPER
-    chmod +x "$SUDO_WRAPPER_DIR/sudo"
-    PATH="$PATH:$SUDO_WRAPPER_DIR"
-
-    SVC_LIST_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" list 2>&1 || true)  # undoc-supp: test probe — capturing output regardless of exit code for assertion below
+    # svc list / list --json with SVC_DOMAIN_FILTER=user avoids sudo entirely.
+    # Assertions use ssh-agent and discord-music-rpc, which are user-domain on
+    # all platforms (unlike ollama/litellm/jellyfin which are system-domain on NixOS).
+    SVC_LIST_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" SVC_DOMAIN_FILTER=user "$SVC_SH" list 2>&1 || true)  # undoc-supp: test probe — capturing output regardless of exit code for assertion below
     if echo "$SVC_LIST_OUTPUT" | grep -q "ID.*Name.*Status.*Running.*PID"; then
         assert_pass "svc list: table headers present"
     else
         assert_fail "svc list: table headers present" "Missing expected table header line"
     fi
-    if echo "$SVC_LIST_OUTPUT" | grep -qE "^ollama +Ollama"; then
+    if echo "$SVC_LIST_OUTPUT" | grep -qE "^ssh-agent +SSH Agent"; then
         assert_pass "svc list: ID and Name columns show service key and display name"
     else
-        assert_fail "svc list: ID and Name columns show service key and display name" "Expected 'ollama  Ollama' pattern in output"
+        assert_fail "svc list: ID and Name columns show service key and display name" "Expected 'ssh-agent  SSH Agent' pattern in output"
     fi
-    if echo "$SVC_LIST_OUTPUT" | grep -qE "Ollama|LiteLLM|Jellyfin"; then
+    if echo "$SVC_LIST_OUTPUT" | grep -qE "ssh-agent|discord-music-rpc"; then
         assert_pass "svc list: known services listed"
     else
         {
@@ -464,7 +457,7 @@ SUDO_WRAPPER
         assert_fail "svc list: no unknown services" "Output contains 'unknown' (likely jq parse failure)"
     fi
 
-    SVC_JSON_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" list --json 2>&1 || true)  # undoc-supp: test probe — capturing output regardless of exit code for assertion below
+    SVC_JSON_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" SVC_DOMAIN_FILTER=user "$SVC_SH" list --json 2>/dev/null || true)  # undoc-supp: test probe — discard stderr (domain-filter info) to keep JSON parseable
     if echo "$SVC_JSON_OUTPUT" | jq -e '.version == "1"' >/dev/null 2>&1; then
         assert_pass "svc list --json: valid JSON with version"
     else
@@ -496,7 +489,7 @@ SUDO_WRAPPER
         assert_fail "svc log-config: all services have capture=all" "No capture=all found in output"
     fi
 
-    SVC_LOG_CONFIG_JSON=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" log-config --json 2>&1 || true)  # undoc-supp: test probe — capturing output regardless of exit code for assertion below
+    SVC_LOG_CONFIG_JSON=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" log-config --json 2>/dev/null || true)  # undoc-supp: test probe — discard stderr (domain-filter warning) to keep JSON parseable
     if echo "$SVC_LOG_CONFIG_JSON" | jq -e --slurp 'all(.[]; .[].capture == "all")' >/dev/null 2>&1; then
         assert_pass "svc log-config --json: all capture=all via jq"
     else
@@ -510,6 +503,8 @@ SUDO_WRAPPER
 
     # Regression: logs listing shows all services with capture=all (Fix 2 + Fix 4)
     SVC_LOGS_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" logs 2>&1 || true)  # undoc-supp: test probe — capturing output regardless of exit code for assertion below
+    # Strip domain-filter warning from start of output to keep grep clean.
+    SVC_LOGS_OUTPUT=$(echo "$SVC_LOGS_OUTPUT" | grep -v '^svc: warning:' || true)  # undoc-supp: filter may produce empty output if all lines are warnings
     if echo "$SVC_LOGS_OUTPUT" | grep -q "capture=all"; then
         assert_pass "svc logs: listing shows capture=all"
     else
@@ -523,8 +518,6 @@ SUDO_WRAPPER
         fi
     done
 fi
-# Clean up sudo wrapper used by svc tests above.
-rm -rf "${SUDO_WRAPPER_DIR:-}" 2>/dev/null || true  # undoc-supp: cleanup trap — dir may already have been cleaned up on test failure
 
 # jq unit test: do_log_config filter resolves fields correctly (Fix 1 regression)
 # shellcheck disable=SC2016 # $svc/$platform are jq variables, not shell variables

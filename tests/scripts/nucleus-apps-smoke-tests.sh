@@ -204,8 +204,8 @@ test_app_noop() {
 # config list: reads ~/.local/state/nucleus/config.json (or defaults).
 test_app_noop config list
 
-# svc list --json: triggers sudo for system-domain services, hangs in CI.
-assert_skip "svc list --json" "triggers sudo for system-domain services (non-interactive CI)"
+# svc list --json --user: only user-domain services, no sudo needed.
+SVC_DOMAIN_FILTER=user test_app_noop svc list --json
 
 # --- Tier 4: completion syntax validation -----------------------------------
 
