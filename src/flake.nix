@@ -300,87 +300,71 @@
         pkgs:
         {
           name,
-          script ? null,
+          scriptName ? name,
           runtimeInputs ? [ ],
-          extraBin ? { },
-          extraSourcedFiles ? { },
-          excludeShellChecks ? [ ],
-          extraShellCheckFlags ? [ ],
           bundleDefault ? true,
+          meta ? { },
         }:
         let
           inherit (pkgs) lib;
 
-          # Auto-detect the main script file.
-          resolvedScript =
-            if script != null then
-              script
-            else if builtins.pathExists (../scripts + "/${name}.sh") then
-              ../scripts + "/${name}.sh"
-            else if builtins.pathExists (./scripts + "/${name}.sh") then
-              ./scripts + "/${name}.sh"
-            else
-              abort "runNucleusShellApp: cannot find script for '${name}'";
-
-          # Determine whether the resolved script lives in scripts/ or
-          # src/scripts/ by comparing store paths.
-          resolvedScriptStr = builtins.toString resolvedScript;
-          scriptsDirStr = builtins.toString ../scripts;
-          srcScriptsDirStr = builtins.toString ./scripts;
-          mirrorSubdir = if lib.hasPrefix scriptsDirStr resolvedScriptStr then "scripts" else "src/scripts";
-
-          shellcheckArgs =
-            lib.optionals (excludeShellChecks != [ ]) [
-              "--exclude"
-              (lib.concatStringsSep "," excludeShellChecks)
-            ]
-            ++ extraShellCheckFlags;
+          # Harden against bundleDefault = false with no fallback.
+          assertAssertMsg = lib.assertMsg;
         in
-        pkgs.runCommand "${name}-nucleus-app" { nativeBuildInputs = [ pkgs.shellcheck ]; } ''
-          mkdir -p "$out/bin" "$out/scripts" "$out/src/scripts"
+        assert assertAssertMsg
+          (
+            bundleDefault
+            || builtins.pathExists (../scripts + "/${name}.sh")
+            || builtins.pathExists (./scripts + "/${name}.sh")
+          )
+          "runNucleusShellApp: bundleDefault is false but script '${name}.sh' not found in scripts/ or src/scripts/";
+        pkgs.runCommand "${name}-nucleus-app"
+          {
+            strictDeps = true; # hermetic build
+            nativeBuildInputs = [ pkgs.shellcheck ];
+          }
+          ''
+            mkdir -p "$out/bin" "$out/scripts" "$out/src/scripts"
 
-          ${lib.optionalString bundleDefault ''
-            # Mirror all scripts with exact repo structure.
-            cp -r ${../scripts}/. "$out/scripts/"
-            chmod -R +w "$out/scripts/"
-            cp -r ${./scripts}/. "$out/src/scripts/"
-            chmod -R +w "$out/src/scripts/"
-          ''}
+            ${lib.optionalString bundleDefault ''
+              # Mirror all scripts with exact repo structure.
+              cp -r --no-preserve=mode ${../scripts}/. "$out/scripts/"
+              cp -r --no-preserve=mode ${./scripts}/. "$out/src/scripts/"
+            ''}
 
-          # Extra bin files.
-          ${lib.concatStringsSep "\n" (
-            lib.mapAttrsToList (target: src: ''
-              mkdir -p "$(dirname "$out/bin/${target}")"
-              cp "${src}" "$out/bin/${target}"
-              chmod +x "$out/bin/${target}"
-            '') extraBin
-          )}
+            # Create thin wrapper with runtime subdirectory detection.
+            cat > "$out/bin/nucleus-${name}" << 'WRAPPER'
+            #!${pkgs.runtimeShell}
+            set -euo pipefail
+            export PATH="${lib.makeBinPath runtimeInputs}:$PATH"
+            for _d in scripts src/scripts; do
+              _script="$(CDPATH="" cd -- "$(dirname -- "$0")/../$_d" && pwd -P)/${scriptName}.sh"
+              if [ -f "$_script" ]; then
+                exec "$_script" "$@"
+              fi
+            done
+            echo "error: ${scriptName}.sh not found under scripts/ or src/scripts/" >&2
+            exit 1
+            WRAPPER
+            chmod +x "$out/bin/nucleus-${name}"
 
-          # Extra sourced files.
-          ${lib.concatStringsSep "\n" (
-            lib.mapAttrsToList (target: src: ''
-              mkdir -p "$(dirname "$out/src/scripts/${target}")"
-              cp "${src}" "$out/src/scripts/${target}"
-              chmod +x "$out/src/scripts/${target}"
-            '') extraSourcedFiles
-          )}
+            # Shellcheck wrapper — single file, no subdirectory dependency.
+            shellcheck --source-path="$out" --source-path="$out/scripts" --source-path="$out/src/scripts" -x "$out/bin/nucleus-${name}"
 
-          # Create thin wrapper.
-          cat > "$out/bin/nucleus-${name}" << 'WRAPPER'
-          #!${pkgs.runtimeShell}
-          set -euo pipefail
-          export PATH="${lib.makeBinPath runtimeInputs}:$PATH"
-          exec "$(unset CDPATH; cd -- "$(dirname -- "$0")/../${mirrorSubdir}" && pwd -P)/${name}.sh" "$@"
-          WRAPPER
-          chmod +x "$out/bin/nucleus-${name}"
-
-          # Shellcheck the wrapper and the real script.
-          real_script="$out/${mirrorSubdir}/${name}.sh"
-          shellcheck ${lib.escapeShellArgs shellcheckArgs} --source-path="$out" --source-path="$out/scripts" --source-path="$out/src/scripts" -x "$out/bin/nucleus-${name}"
-          if [ -f "$real_script" ]; then
-            shellcheck ${lib.escapeShellArgs shellcheckArgs} --source-path="$out" --source-path="$out/scripts" --source-path="$out/src/scripts" -x "$real_script"
-          fi
-        '';
+            # Shellcheck real script — hard fail if missing to catch config errors.
+            _real_script="$out/scripts/${scriptName}.sh"
+            if [ ! -f "$_real_script" ]; then
+              _real_script="$out/src/scripts/${scriptName}.sh"
+            fi
+            if [ ! -f "$_real_script" ]; then
+              echo "error: ${scriptName}.sh not found in mirror tree" >&2
+              exit 1
+            fi
+            shellcheck --source-path="$out" --source-path="$out/scripts" --source-path="$out/src/scripts" -x "$_real_script"
+          ''
+        // {
+          inherit meta;
+        };
 
       # Helper for `nix run .#<name>` apps. Delegates to runNucleusShellApp.
       mkApp =
