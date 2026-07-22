@@ -8,6 +8,7 @@
 }:
 let
   baseSharedPackages = [
+    pkgs.asciinema
     pkgs.bat
     pkgs.bottom
     pkgs.bun
