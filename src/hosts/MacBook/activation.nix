@@ -232,17 +232,16 @@ in
     # Converge Jellyfin accounts and libraries declared in src/modules/users.json
     # with a running Jellyfin server.
     #
-    # WHY embedded via readFile with NUCLEUS_REPO_ROOT token (not runtime sh):
-    # the script is self-contained when NUCLEUS_REPO_ROOT is set at build time,
-    # eliminating the runtime file-system dependency on the repo checkout path.
-    # The sync logic performs runtime imperative operations (SOPS decryption,
-    # API polling, token auth, diff-and-converge) that Nix's declarative model
-    # cannot express.
-    ${builtins.replaceStrings
-      [ "__NUCLEUS_REPO_ROOT__" "__NUCLEUS_PATH_PREPEND__" "__SOPS_AGE_KEY_FILE__" ]
-      [ repoRoot "${pkgs.jq}/bin:${pkgs.sops}/bin" "/etc/sops/age/machine.txt" ]
-      (builtins.readFile ../../scripts/services/jellyfin-sync.sh)
-    }
+    # WHY subprocess invocation (not readFile + replaceStrings): the activation
+    # bundle already contains the full scripts/ tree.  NUCLEUS_REPO_ROOT and PATH
+    # are set in the environment so the script resolves the repo root at runtime
+    # via derive_repo_root (or falls back to derive_repo_root / NUCLEUS_REPO_ROOT).
+    # SOPS_AGE_KEY_FILE defaults to /etc/sops/age/machine.txt.
+    ${
+      lib.optionalString (repoRoot != "") "export NUCLEUS_REPO_ROOT=${lib.escapeShellArg repoRoot}
+    "
+    }export PATH="${pkgs.jq}/bin:${pkgs.sops}/bin:$PATH"
+    "${activationBundle}/services/jellyfin-sync.sh"
 
     # ---- verifyNucleusServices ---------------------------------------------------
     # Warn-only verification that all managed services are running.

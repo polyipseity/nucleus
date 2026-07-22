@@ -5,58 +5,15 @@
 
 set -euo pipefail
 
-# Inlined from src/scripts/lib/lib.sh: avoid sourcing lib.sh which triggers
-# SC1091 during nix-darwin activation build (builder runs shellcheck without
-# -x, cannot follow external sources).
-usage_std() {
-  _us_name="$1"
-  _us_opts="${2:-}"
-  shift 2 2>/dev/null
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+. "$SCRIPT_DIR/../lib/lib.sh"
 
-  printf 'usage: %s %s\n' "$_us_name" "$_us_opts"
-  if [ "$#" -gt 0 ]; then
-    printf '  %s\n' "$1"
-  fi
-}
-
-# Variables below are substituted via Nix replaceStrings at build time.
-REPO_ROOT='__NUCLEUS_REPO_ROOT__'
-_path_prepend='__NUCLEUS_PATH_PREPEND__'
-_sops_age_key_file='__SOPS_AGE_KEY_FILE__'
-
-# Fallback when run outside activation context (tokens not substituted).
-case "$REPO_ROOT" in __NUCLEUS_*)
-  if [ -n "${NUCLEUS_REPO_ROOT:-}" ]; then
-    REPO_ROOT="$NUCLEUS_REPO_ROOT"
-  else
-    # Last resort: try git rev-parse. The derive_repo_root function (from
-    # lib.sh) is not available here because sourcing lib.sh triggers SC1091
-    # during nix-darwin shellcheck (builder runs without -x). This branch is
-    # almost never reached: activation context substitutes tokens, and apply.sh
-    # always sets NUCLEUS_REPO_ROOT.
-    SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
-    REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR" && git rev-parse --show-toplevel 2>/dev/null)" || {
-      printf '%s\n' "jellyfin-sync: cannot determine nucleus repository root — set NUCLEUS_REPO_ROOT" >&2
-      exit 1
-    }
-  fi
-  _path_prepend=''
-  ;;
-esac
-
-if [ -n "$_path_prepend" ]; then
-  export PATH="$_path_prepend:$PATH"
+REPO_ROOT="${NUCLEUS_REPO_ROOT:-}"
+if [ -z "$REPO_ROOT" ]; then
+  REPO_ROOT="$(derive_repo_root)"
 fi
 
-# Export machine age key path for sops decryption during system activation.
-# Works in both activation mode (token substituted → $_sops_age_key_file) and
-# standalone mode (file at the same known path on disk).
-_sops_age_key_file_fallback='/etc/sops/age/machine.txt'
-if [ -f "$_sops_age_key_file" ]; then
-  export SOPS_AGE_KEY_FILE="$_sops_age_key_file"
-elif [ "$_sops_age_key_file" = '__SOPS_AGE_KEY_FILE__' ] && [ -f "$_sops_age_key_file_fallback" ]; then
-  export SOPS_AGE_KEY_FILE="$_sops_age_key_file_fallback"
-fi
+export SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-/etc/sops/age/machine.txt}"
 
 usage() {
   usage_std "$(basename "$0")" "[options]"
