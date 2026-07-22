@@ -1,3 +1,6 @@
+# ── cargo-nextest user config ─────────────────────────────────────────
+# Limitations: see nextest-limitations.md in this directory.
+#
 # ── UI/UX ──────────────────────────────────────────────────────────────
 [ui]
 show-progress = "bar"

@@ -82,6 +82,11 @@
 
 ## Build and Validation
 
+### Rust
+
+- `cargo-nextest` is the managed Rust test runner. See
+  `src/modules/configs/nextest/nextest-limitations.md` for known limitations.
+
 - Discover commands from the repository itself; never assume a default stack.
 - Validate changed files before finishing work:
   - Nix syntax/eval: `nix-instantiate --parse <file.nix>` or `nix flake check` from `src/`
