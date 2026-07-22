@@ -37,6 +37,7 @@ _apply_picard_defaults_from_file() {
   _defaults="$1"
   _conf="$2"
 
+  # shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
   "$_mpi_awk_bin" '
     BEGIN { section = "" }
 

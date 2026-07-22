@@ -77,7 +77,7 @@ while IFS= read -r _iut_tool; do
 
   # Look up the Python version for this tool from the desired list.
   # shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
-  _iut_python="$(\"$_iut_gawk_bin\" -v tool=\"$_iut_tool\" '$1 == tool { print $2; exit }' \"$_iut_desired\")"
+  _iut_python="$("$_iut_gawk_bin" -v tool="$_iut_tool" '$1 == tool { print $2; exit }' "$_iut_desired")"
 
   if [ -n "$_iut_python" ]; then
     echo "uv: installing tool '$_iut_tool' with Python $_iut_python"
