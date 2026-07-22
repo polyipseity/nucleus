@@ -11,6 +11,7 @@
     "nickel-lang-lsp": "1.16.0",
     "pay-respects": "0.8.8"
   },
+  "sccache": "0.9.1",
   "homebrew": {
     "brews": {
       "cirruslabs/cli/tart": "2.32.1",

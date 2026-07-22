@@ -77,6 +77,52 @@ let
       why = "Nix LD for native builds \u2014 all-process on all hosts. On Windows, resolved from PATH by Machine-scope DSC.";
     };
 
+    # ── Compiler caching (sccache) ──────────────────────────────────
+    CMAKE_C_COMPILER_LAUNCHER = {
+      values = {
+        default = "${pkgs.sccache}/bin/sccache";
+        Windows = "sccache";
+      };
+      why = "Wrap CMake C compilation through sccache for cross-host C/C++ compiler caching. On Windows, resolved from PATH via Machine-scope DSC.";
+    };
+    CMAKE_CXX_COMPILER_LAUNCHER = {
+      values = {
+        default = "${pkgs.sccache}/bin/sccache";
+        Windows = "sccache";
+      };
+      why = "Wrap CMake C++ compilation through sccache for cross-host C/C++ compiler caching. On Windows, resolved from PATH via Machine-scope DSC.";
+    };
+    SCCACHE_CACHE_SIZE = {
+      values = {
+        default = "10000000000";
+        Windows = "10000000000";
+      };
+      why = "10 GB sccache cache cap across all hosts. Value is exactly 10 * 10^9 bytes (10 GB). On Windows, set via Machine-scope DSC.";
+    };
+    SCCACHE_IDLE_TIMEOUT = {
+      values = {
+        default = "600";
+        Windows = "600";
+      };
+      why = "sccache server idle timeout: 10 minutes. Server auto-exits after this idle period. On Windows, set via Machine-scope DSC.";
+    };
+    SCCACHE_IGNORE_SERVER_IO_ERROR = {
+      values = {
+        default = "0";
+        Windows = "0";
+      };
+      why = "Hard-fail on sccache server I/O errors (default). Explicitly set to 0 to ensure builds fail fast when sccache is broken, preventing silent cache misses.";
+    };
+    SCCACHE_BASEDIRS = {
+      values = {
+        default = "/Users/${username}";
+        NixOS = "/home/${username}";
+        Windows = "%USERPROFILE%";
+      };
+      userSpecific = true;
+      why = "Normalise home-directory prefix in sccache cache keys so the same project checked out under different parent paths produces cache hits. Set per-user because the value depends on the logged-in user's home directory.";
+    };
+
     # ── macOS-specific developer toolchain ───────────────────────────
     DEVELOPER_DIR = {
       values = {

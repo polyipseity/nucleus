@@ -57,6 +57,7 @@ let
     pkgs.python3
     pkgs.ripgrep
     pkgs.ruff
+    pkgs.sccache
     pkgs.rustup
     pkgs.shellcheck
     pkgs.sops

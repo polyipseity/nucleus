@@ -574,3 +574,10 @@ properties:
       settings:
         id: Zoom.Zoom
         source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure sccache is installed for Rust/C/C++ compiler caching (cross-host parity with pkgs.sccache on macOS and NixOS)
+      settings:
+        id: Mozilla.sccache
+        source: winget

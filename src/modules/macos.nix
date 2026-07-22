@@ -267,6 +267,13 @@ let
     )
   );
 
+  sccacheGc = pkgs.writeShellScript "sccache-gc" (
+    builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
+      (builtins.readFile ../scripts/lib/repo-root-lib.sh)
+      + (builtins.readFile ../scripts/services/sccache-gc.sh)
+    )
+  );
+
   guiEnvAgent = pkgs.writeShellScript "gui-env" (
     builtins.replaceStrings
       [ "__NUCLEUS_PREPEND__" "__NUCLEUS_APPEND__" "__NUCLEUS_MANAGED_SET__" "__MACOS_ALL_VARS__" ]
@@ -562,6 +569,26 @@ lib.mkIf pkgs.stdenv.isDarwin {
           Hour = 12;
           Minute = 0;
           Weekday = 0; # Sunday (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+        }
+      ];
+    };
+  };
+
+  # --------------------------------------------------------------------------
+  # Daily sccache cache clearing LaunchAgent
+  # Clears the sccache compilation cache every day at 12:00 to prevent
+  # unbounded cache growth between weekly GC runs. Cross-host parity with
+  # NixOS systemd timer and Windows scheduled task.
+  launchd.agents."sccache-gc" = {
+    enable = true;
+    config = {
+      Label = "local.sccache-gc";
+      ProgramArguments = [ "${sccacheGc}" ];
+      RunAtLoad = false;
+      StartCalendarInterval = [
+        {
+          Hour = 12;
+          Minute = 0;
         }
       ];
     };

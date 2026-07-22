@@ -98,7 +98,7 @@
   .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus" -NoToolCacheGc
 
 .NOTES
-  Environment variables: NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NO_NIX, NUCLEUS_GC_NO_HM, NUCLEUS_GC_NO_TOOL_CACHE_GC, NUCLEUS_GC_NO_GIT_TEMPLATE_GC, NUCLEUS_GC_NO_GIT_CACHE_GC, NUCLEUS_GC_NO_OLLAMA_GC, NUCLEUS_GC_NO_SCOOP_GC, NUCLEUS_GC_NO_WALLPAPER_GC, NUCLEUS_GC_NO_VM_GC, NUCLEUS_GC_EXPIRY, NUCLEUS_GC_HM_EXPIRY, NUCLEUS_GC_NIX_EXPIRY, NUCLEUS_REPO_ROOT.
+  Environment variables: NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NO_NIX, NUCLEUS_GC_NO_HM, NUCLEUS_GC_NO_TOOL_CACHE_GC, NUCLEUS_GC_NO_GIT_TEMPLATE_GC, NUCLEUS_GC_NO_GIT_CACHE_GC, NUCLEUS_GC_NO_OLLAMA_GC, NUCLEUS_GC_NO_SCOOP_GC, NUCLEUS_GC_NO_SCCACHE_GC, NUCLEUS_GC_NO_WALLPAPER_GC, NUCLEUS_GC_NO_VM_GC, NUCLEUS_GC_EXPIRY, NUCLEUS_GC_HM_EXPIRY, NUCLEUS_GC_NIX_EXPIRY, NUCLEUS_REPO_ROOT.
   Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
@@ -111,6 +111,7 @@ param(
   [switch]$NoGitCacheGc = { $env:NUCLEUS_GC_NO_GIT_CACHE_GC -eq 'true' }.Invoke(),
   [switch]$NoOllamaGc = { $env:NUCLEUS_GC_NO_OLLAMA_GC -eq 'true' }.Invoke(),
   [switch]$NoScoopGc = { $env:NUCLEUS_GC_NO_SCOOP_GC -eq 'true' }.Invoke(),
+  [switch]$NoSccacheGc = { $env:NUCLEUS_GC_NO_SCCACHE_GC -eq 'true' }.Invoke(),
   [switch]$NoWallpaperGc = { $env:NUCLEUS_GC_NO_WALLPAPER_GC -eq 'true' }.Invoke(),
   [switch]$NoVMGc = { $env:NUCLEUS_GC_NO_VM_GC -eq 'true' }.Invoke(),
   [switch]$NoLogGc = { $env:NUCLEUS_GC_NO_LOG_GC -eq 'true' }.Invoke(),
@@ -471,6 +472,18 @@ if (-not $NoOllamaGc) {
     Write-NucleusInfo "ollama not installed; skipping ollama model gc"
   } else {
     Invoke-AISync -GcOnly -RepoRoot $resolvedRepoRoot -ServerReadyTimeoutSeconds 0
+  }
+}
+
+# ---- Step 7b: sccache cache clearing ----------------------------------------
+if (-not $NoSccacheGc) {
+  # undoc-supp: probe whether tool is installed; Get-Command throws when absent.
+  $sccacheCmd = Get-Command -Name "sccache" -ErrorAction SilentlyContinue
+  if ($null -eq $sccacheCmd) {
+    Write-NucleusInfo "sccache not installed; skipping sccache cache gc"
+  } else {
+    Write-NucleusInfo "sccache: clearing cache"
+    & $sccacheCmd --clear
   }
 }
 

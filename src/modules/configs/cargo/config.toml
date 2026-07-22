@@ -1,6 +1,7 @@
 # ── Build concurrency ──────────────────────────────────────────────────
 [build]
 jobs = 4
+rustc-wrapper = "sccache"
 
 # ── Test concurrency ───────────────────────────────────────────────────
 [env]

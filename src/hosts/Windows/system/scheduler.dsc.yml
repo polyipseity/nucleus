@@ -61,3 +61,21 @@ properties:
         RunWithHighestPrivileges: true
         RunOnlyWhenNetworkAvailable: false
         RunOnlyIfLoggedOn: false
+
+    - resource: Microsoft.Windows.Settings/TaskScheduler
+      directives:
+        description: >-
+          Daily sccache cache clearing at 12:00 local time. Mirrors macOS
+          launchd agent and NixOS systemd timer for cross-host gc parity.
+        settings:
+          TaskPath: \nucleus\
+          TaskName: sccache-gc
+          TaskDescriptionLiteral: Daily sccache compilation cache clearing
+          Action: |
+            sccache --clear
+          Trigger: Daily
+          AtTime: 12:00
+          DaysInterval: 1
+          Enabled: true
+          RunWithHighestPrivileges: false
+          RunOnlyIfLoggedOn: true

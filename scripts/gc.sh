@@ -26,6 +26,7 @@ usage() {
   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
   --nix-gc|--no-nix-gc                      Control nix-collect-garbage (default: --nix-gc).
   --ollama-gc|--no-ollama-gc          Control stale Ollama model removal (default: --ollama-gc).
+  --sccache-gc|--no-sccache-gc        Control sccache cache clearing (default: --sccache-gc).
   --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper gc (default: --wallpaper-gc).
   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
   --log-gc|--no-log-gc                Control log rotation (default: --log-gc).
@@ -48,6 +49,7 @@ git_cache_gc="${NUCLEUS_GC_GIT_CACHE_GC:-true}"
 hm_gc=true
 nix_gc=true
 ollama_gc=true
+sccache_gc=true
 wallpaper_gc=true
 vm_gc=true
 log_gc=true
@@ -98,6 +100,12 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-ollama-gc)
       ollama_gc=false
+      ;;
+    --sccache-gc)
+      sccache_gc=true
+      ;;
+    --no-sccache-gc)
+      sccache_gc=false
       ;;
     --wallpaper-gc)
       wallpaper_gc=true
@@ -472,6 +480,19 @@ gc_ollama_models_if_available() {
   NUCLEUS_AI_SYNC_TIMEOUT=0 "$REPO_ROOT/scripts/ai-sync.sh" --gc-only
 }
 
+gc_sccache_cache_if_available() {
+  if ! command -v sccache >/dev/null 2>&1; then
+    say "sccache unavailable; skipping sccache cache gc"
+    return 0
+  fi
+  say "sccache: clearing cache"
+  if [ "$dry_run" = true ]; then
+    dry_run "would run 'sccache --clear'"
+  elif ! sccache --clear; then
+    warn "sccache --clear failed; continuing GC workflow"
+  fi
+}
+
 gc_vm_artifacts_if_present() {
   # Remove stale VM artifacts from ~/virtual machines that accumulate across
   # provisioning cycles. This includes temporary Packer build directories and
@@ -636,6 +657,15 @@ if [ "$ollama_gc" = true ]; then
     dry_run "would gc stale Ollama models"
   else
     gc_ollama_models_if_available
+  fi
+fi
+
+# Step 7b: clear sccache compilation cache.
+if [ "$sccache_gc" = true ]; then
+  if [ "$dry_run" = true ]; then
+    dry_run "would clear sccache cache"
+  else
+    gc_sccache_cache_if_available
   fi
 fi
 

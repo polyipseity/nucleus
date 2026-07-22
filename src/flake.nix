@@ -1005,6 +1005,11 @@
               # (ld: library not found for -liconv). It is included in glibc on Linux
               # so no equivalent addition is needed in the Linux devShell.
               buildInputs = [ pkgsDevMac.libiconv ];
+              # sccache-wrapped C/C++ compilers for non-CMake projects that
+              # read CC/CXX directly. CMake projects use CMAKE_C_COMPILER_LAUNCHER
+              # (set globally via env-catalog) instead.
+              CC = "${pkgsDevMac.sccache}/bin/sccache ${pkgsDevMac.llvmPackages.clang}/bin/clang";
+              CXX = "${pkgsDevMac.sccache}/bin/sccache ${pkgsDevMac.llvmPackages.clang}/bin/clang++";
               # Ensure EDITOR/VISUAL are always set to nvim inside the devShell.
               # When nix-direnv activates via `use flake`, its `nix print-dev-env`
               # does not inherit the parent shell's variables. If the parent shell
@@ -1042,6 +1047,11 @@
                 rustToolchain
                 pkgsDevLinux.uv
               ];
+              # sccache-wrapped C/C++ compilers for non-CMake projects that
+              # read CC/CXX directly. CMake projects use CMAKE_C_COMPILER_LAUNCHER
+              # (set globally via env-catalog) instead.
+              CC = "${pkgsDevLinux.sccache}/bin/sccache ${pkgsDevLinux.llvmPackages.clang}/bin/clang";
+              CXX = "${pkgsDevLinux.sccache}/bin/sccache ${pkgsDevLinux.llvmPackages.clang}/bin/clang++";
               # Same rationale as the macOS devShell: force a correct EDITOR/VISUAL
               # so that nix-direnv activation does not inherit stale values from
               # the parent shell (e.g. nix-darwin's /etc/zshenv default).

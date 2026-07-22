@@ -21,6 +21,13 @@ let
     )
   );
 
+  sccacheGc = pkgs.writeShellScript "sccache-gc" (
+    builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
+      (builtins.readFile ../scripts/lib/repo-root-lib.sh)
+      + (builtins.readFile ../scripts/services/sccache-gc.sh)
+    )
+  );
+
   activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
 in
 lib.mkIf pkgs.stdenv.isLinux {
@@ -262,6 +269,37 @@ lib.mkIf pkgs.stdenv.isLinux {
       OnCalendar = "Sun *-*-* 12:00:00";
       Persistent = true;
       Unit = "gc-weekly.service";
+    };
+    Install = {
+      WantedBy = [ "timers.target" ];
+    };
+  };
+
+  # --------------------------------------------------------------------------
+  # Daily sccache cache clearing
+  # Clears the sccache compilation cache every day at 12:00. Cross-host parity
+  # with macOS launchd agent and Windows scheduled task.
+  systemd.user.services."sccache-gc" = {
+    Unit = {
+      Description = "Daily sccache cache clearing";
+    };
+    Service = {
+      Type = "oneshot";
+      ExecStart = "${sccacheGc}";
+    };
+  };
+
+  systemd.user.timers."sccache-gc" = {
+    Unit = {
+      Description = "Daily sccache cache clearing timer";
+    };
+    Timer = {
+      # Fire daily at 12:00 local time. Persistent=true ensures the timer
+      # catches up on the next login when the machine was off at the scheduled
+      # time, preventing unbounded cache growth on intermittently used machines.
+      OnCalendar = "12:00:00";
+      Persistent = true;
+      Unit = "sccache-gc.service";
     };
     Install = {
       WantedBy = [ "timers.target" ];
