@@ -37,7 +37,7 @@ if ! [ -x /usr/local/bin/ntfs-3g ] \
   trap 'rm -rf "$BUILD_DIR"' EXIT
   cp -r "$NTFS3G_SRC" "$BUILD_DIR/ntfs-3g"
   chmod -R u+w "$BUILD_DIR/ntfs-3g"
-  cd "$BUILD_DIR/ntfs-3g"
+  cd "$BUILD_DIR/ntfs-3g" || exit
 
   /bin/mkdir -p "$(dirname "$LOG_FILE")"
   {

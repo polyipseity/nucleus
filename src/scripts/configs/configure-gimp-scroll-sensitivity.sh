@@ -11,6 +11,7 @@
     # app provisioned by Nucleus (/Applications/GIMP.app), rather than using a
     # hardcoded version list, so new app upgrades keep working automatically.
     if _nucleus_resolve_console_user; then
+      # shellcheck disable=SC2154 # reason: set by _nucleus_resolve_console_user from Nix-prepended macos-console-user-lib.sh
       console_home="$(/usr/bin/dscl . -read "/Users/$_nucleus_console_user" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}')"
       if [ -z "$console_home" ]; then
         console_home="/Users/$_nucleus_console_user"

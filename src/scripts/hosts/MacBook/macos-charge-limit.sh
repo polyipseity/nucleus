@@ -20,6 +20,7 @@
     done
 
     if [ -n "$battery_cli" ] && _nucleus_resolve_console_user; then
+      # shellcheck disable=SC2154 # reason: set by _nucleus_resolve_console_user from Nix-prepended macos-console-user-lib.sh
       # -H sets HOME to the target user's home directory.  Without it, sudo
       # inherits HOME=/var/root from the root activation context, causing
       # battery to write its state files to /var/root/.battery/ which the

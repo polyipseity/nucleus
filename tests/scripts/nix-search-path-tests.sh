@@ -14,6 +14,7 @@ set -euo pipefail
 
 . "$SCRIPT_DIR/test-lib.sh"
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 # shellcheck source=../../src/scripts/lib.sh
 . "$REPO_ROOT/src/scripts/lib.sh"
@@ -98,6 +99,7 @@ test_merge_nix_config_no_nix_path() {
 # ---------------------------------------------------------------------------
 test_merge_nix_config_respects_external() {
     local config
+    # shellcheck disable=SC2034 # reason: NIX_CONFIG is set as environment prefix for merge_nix_config subprocess
     NIX_CONFIG="extra-sandbox-paths = /some/path" config="$(merge_nix_config)"
 
     if echo "$config" | grep -q "extra-sandbox-paths"; then

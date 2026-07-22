@@ -12,6 +12,7 @@
     echo "spotlight: disabling..."
 
     if _nucleus_resolve_console_user; then
+      # shellcheck disable=SC2154 # reason: set by _nucleus_resolve_console_user from Nix-prepended macos-console-user-lib.sh
       for hotkey in 61 64 65; do
         if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
           /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add "$hotkey" \

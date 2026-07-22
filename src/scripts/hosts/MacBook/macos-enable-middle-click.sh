@@ -9,6 +9,7 @@
     # target that same system surface instead of maintaining a parallel
     # LaunchAgent path.
     if _nucleus_resolve_console_user; then
+      # shellcheck disable=SC2154 # reason: set by _nucleus_resolve_console_user from Nix-prepended macos-console-user-lib.sh
       if [ -d "/Applications/MiddleClick.app" ]; then
         if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
           /usr/bin/defaults write art.ginzburg.MiddleClick fingers -int 4; then

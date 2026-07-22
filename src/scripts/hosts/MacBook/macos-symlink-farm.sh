@@ -59,6 +59,7 @@ fi
 # Parse current farm entries into an associative array.
 # Bash <4 doesn't support declare -A, but macOS 26 ships Bash 5+.
 declare -A active_symlinks
+# shellcheck disable=SC2154 # reason: __nucleus_symlink_farm is set by the Nix activation wrapper (MacBook/activation.nix)
 IFS=' ' read -r -a entries <<< "$__nucleus_symlink_farm"
 
 _created=0

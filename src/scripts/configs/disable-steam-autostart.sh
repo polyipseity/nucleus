@@ -12,6 +12,7 @@ case "$(uname)" in
     # The shared console-user resolution function is provided by the
     # activation context (MacBook/activation.nix inlines the lib).
     if _nucleus_resolve_console_user && [ -d "/Applications/Steam.app" ]; then
+      # shellcheck disable=SC2154 # reason: set by _nucleus_resolve_console_user from Nix-prepended macos-console-user-lib.sh
       if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
         /usr/bin/osascript \
           -e 'tell application "System Events"' \

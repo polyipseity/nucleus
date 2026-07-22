@@ -3,6 +3,7 @@
     # Login Items mechanism.  Mounty has no built-in launch-at-login preference;
     # this keeps the declarative converge path consistent with other apps.
     if _nucleus_resolve_console_user; then
+      # shellcheck disable=SC2154 # reason: set by _nucleus_resolve_console_user from Nix-prepended macos-console-user-lib.sh
       if [ -d "/Applications/Mounty.app" ]; then
         if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
           /usr/bin/osascript \

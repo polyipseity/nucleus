@@ -11,6 +11,7 @@
     # live system state matches declared configuration without requiring manual
     # user intervention (Cmd+Opt+Esc, cache deletion, etc.).
     if _nucleus_resolve_console_user; then
+      # shellcheck disable=SC2154 # reason: set by _nucleus_resolve_console_user from Nix-prepended macos-console-user-lib.sh
       finder_cache_dir="/Users/$_nucleus_console_user/Library/Saved Application State/com.apple.finder.savedState"
       if [ -d "$finder_cache_dir" ]; then
         if /bin/rm -rf "$finder_cache_dir"; then
