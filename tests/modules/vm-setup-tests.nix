@@ -390,6 +390,7 @@ let
   # aarch64-linux derivations (required for nixos-generators NixOS guest image
   # builds) can be compiled on macOS via the Virtualization.framework VM.
   linux_builder_nix_text = builtins.readFile ../../src/hosts/MacBook/linux-builder.nix;
+  linuxBuilderSshConfigText = builtins.readFile ../../src/modules/configs/ssh/ssh_config.d/100-linux-builder.conf;
   test_macbook_linux_builder_enabled = assert' (lib.hasInfix "launchd.daemons.linux-builder" linux_builder_nix_text) "MacBook linux-builder.nix must configure the linux-builder launchd daemon";
   test_macbook_linux_builder_machines_file = assert' (lib.hasInfix "environment.etc.\"nix/machines\".text" linux_builder_nix_text) "MacBook linux-builder.nix must materialize /etc/nix/machines so Determinate Nix can see the remote builder";
   test_macbook_linux_builder_uses_ssh_protocol =
@@ -410,29 +411,33 @@ let
   test_macbook_linux_builder_ssh_match_blocks =
     assert'
       (
-        (lib.hasInfix "IdentitiesOnly yes" linux_builder_nix_text)
-        && (lib.hasInfix "Match originalhost linux-builder localuser root" linux_builder_nix_text)
-        && (lib.hasInfix "Match originalhost linux-builder localuser \${username}" linux_builder_nix_text)
+        (lib.hasInfix "IdentitiesOnly yes" linuxBuilderSshConfigText)
+        && (lib.hasInfix "Match originalhost linux-builder localuser root" linuxBuilderSshConfigText)
+        && (lib.hasInfix "Match originalhost linux-builder localuser __USERNAME__" linuxBuilderSshConfigText)
       )
       "MacBook linux-builder.nix must route root and the primary user to separate builder identity files without falling back to unrelated SSH agent keys";
 
   # The MacBook base.nix must point the Nix daemon at /etc/nix/machines so the
   # linux-builder registration written by nix-darwin is actually used.
   base_nix_text = builtins.readFile ../../src/hosts/MacBook/base.nix;
-  test_macbook_builders_machines = assert' (lib.hasInfix "builders = @/etc/nix/machines" base_nix_text) "MacBook base.nix must set builders = @/etc/nix/machines in nix.extraOptions";
+  nixCustomConfText = builtins.readFile ../../src/modules/configs/nix/nix.custom.conf;
+  test_macbook_builders_machines = assert' (lib.hasInfix "builders = @/etc/nix/machines" nixCustomConfText) "MacBook base.nix must set builders = @/etc/nix/machines in nix.extraOptions";
 
   # vm-setup.sh must capture the Packer exit code for the macOS Tart build so
   # a failed packer invocation does not falsely report success.
   # Combined text: vm-setup-lib.sh is sourced by vm-setup.sh, so patterns from both files
   # belong to the same script.  Checking only vm-setup.sh misses patterns
   # that were extracted to vm-setup-lib.sh during refactoring.
-  vm_setup_sh_text = builtins.readFile ../../scripts/vm-setup.sh + builtins.readFile ../../src/scripts/lib/vm-setup-lib.sh;
+  vm_setup_sh_text =
+    builtins.readFile ../../scripts/vm-setup.sh
+    + builtins.readFile ../../src/scripts/lib/vm-setup-lib.sh;
   windows_vm_setup_ps1_text = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-VMSetup.ps1;
   windows_vm_setup_wrapper_ps1_text = builtins.readFile ../../scripts/vm-setup.ps1;
   readmeTemplateText = builtins.readFile ../../src/vms/templates/README.md;
   startPosixTemplateText = builtins.readFile ../../src/vms/templates/start-posix.sh;
   startWindowsTemplateText = builtins.readFile ../../src/vms/templates/start-windows.ps1;
   macbook_vms_nix_text = builtins.readFile ../../src/hosts/MacBook/vms.nix;
+  utmConfigPlistText = builtins.readFile ../../src/modules/configs/vms/utm-config.plist.xml;
   vms_json_text = builtins.readFile ../../src/modules/VMs.json;
   users_json_text = builtins.readFile ../../src/modules/users.json;
   windows_users_json_text = builtins.readFile ../../src/hosts/Windows/users.json;
@@ -695,47 +700,43 @@ let
   test_macbook_utm_schema_keys =
     assert'
       (
-        (lib.hasInfix "<key>Drive</key>" macbook_vms_nix_text)
-        && (lib.hasInfix "<key>ImageName</key>" macbook_vms_nix_text)
-        && (lib.hasInfix "<key>QEMU</key>" macbook_vms_nix_text)
-        && (lib.hasInfix "<key>Input</key>" macbook_vms_nix_text)
+        (lib.hasInfix "<key>Drive</key>" utmConfigPlistText)
+        && (lib.hasInfix "<key>ImageName</key>" utmConfigPlistText)
+        && (lib.hasInfix "<key>QEMU</key>" utmConfigPlistText)
+        && (lib.hasInfix "<key>Input</key>" utmConfigPlistText)
       )
-      "src/hosts/MacBook/vms.nix must include core UTM schema keys (Drive/ImageName/QEMU/Input) for reliable imports";
+      "src/modules/configs/vms/utm-config.plist.xml must include core UTM schema keys (Drive/ImageName/QEMU/Input) for reliable imports";
   # The Backend value must be exactly "QEMU" (uppercase) — UTM's Swift enum
   # performs a case-sensitive match and throws invalidBackend on any other value.
   # Keep generated templates schema-complete so UTM can decode/import bundles
   # without requiring app-side defaults for missing keys.
   test_macbook_utm_plist_correctness = assert' (
-    (lib.hasInfix "<string>QEMU</string>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>IconCustom</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>Sound</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>DirectoryShareMode</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>ClipboardSharing</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>DirectoryShareReadOnly</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>DownscalingFilter</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>UpscalingFilter</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>NativeResolution</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>MacAddress</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>IsolateFromHost</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>PortForward</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<string>VirtIO</string>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>Hypervisor</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>AdditionalArguments</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>BalloonDevice</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>DebugLog</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>PS2Controller</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>RNGDevice</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>RTCLocalTime</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>TPMDevice</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>UEFIBoot</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>MaximumUsbShare</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>UsbBusSupport</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>UsbSharing</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>CPUFlagsAdd</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>CPUFlagsRemove</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>ForceMulticore</key>" macbook_vms_nix_text)
-    && (lib.hasInfix "<key>JITCacheSize</key>" macbook_vms_nix_text)
-  ) "src/hosts/MacBook/vms.nix plist must include a schema-complete UTM configuration";
+    (lib.hasInfix "<string>QEMU</string>" utmConfigPlistText)
+    && (lib.hasInfix "<key>IconCustom</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>Sound</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>DirectoryShareMode</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>ClipboardSharing</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>DirectoryShareReadOnly</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>DownscalingFilter</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>UpscalingFilter</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>NativeResolution</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>MacAddress</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>IsolateFromHost</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>PortForward</key>" utmConfigPlistText)
+    && (lib.hasInfix "<string>VirtIO</string>" utmConfigPlistText)
+    && (lib.hasInfix "<key>Hypervisor</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>AdditionalArguments</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>BalloonDevice</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>DebugLog</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>PS2Controller</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>RNGDevice</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>RTCLocalTime</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>TPMDevice</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>UEFIBoot</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>MaximumUsbShare</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>UsbBusSupport</key>" utmConfigPlistText)
+    && (lib.hasInfix "<key>UsbSharing</key>" utmConfigPlistText)
+  ) "src/modules/configs/vms/utm-config.plist.xml must include a schema-complete UTM configuration";
   test_macbook_utm_display_card_validity = assert' (
     (lib.hasInfix "displayCard = vm: if vm.type == \"Windows\" then \"virtio-vga\" else \"virtio-gpu-pci\";" macbook_vms_nix_text)
     && !(lib.hasInfix "virtio-ramfb" macbook_vms_nix_text)
@@ -884,9 +885,7 @@ let
     && (lib.hasInfix "function Test-VMEnabled" windows_vm_setup_ps1_text)
     && (lib.hasInfix "$Vm.enabled -isnot [bool]" windows_vm_setup_ps1_text)
     && (lib.hasInfix "enabledVms = builtins.filter (" macbook_vms_nix_text)
-    && (lib.hasInfix "enabledVms = builtins.filter (" (
-      builtins.readFile ../../src/hosts/NixOS/vms.nix
-    ))
+    && (lib.hasInfix "enabledVms = builtins.filter (" (builtins.readFile ../../src/hosts/NixOS/vms.nix))
   ) "VM enable/disable policy must be wired in manifest, setup scripts, and host template generation";
   test_macbook_tart_storage_link =
     assert'
