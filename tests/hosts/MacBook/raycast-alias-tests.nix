@@ -9,9 +9,9 @@ let
 in
 assert containsRegex "raycast-aliases = lib.hm.dag.entryAfter" macosText;
 assert containsRegex "Nucleus App Aliases" macosText;
-assert containsRegex "Books \(English\)\.app" raycastAliasesScriptText;
-assert containsRegex "Messages \(English\)\.app" raycastAliasesScriptText;
-assert containsRegex "Weather \(English\)\.app" raycastAliasesScriptText;
+assert containsRegex "Books [(]English[)]\\.app" raycastAliasesScriptText;
+assert containsRegex "Messages [(]English[)]\\.app" raycastAliasesScriptText;
+assert containsRegex "Weather [(]English[)]\\.app" raycastAliasesScriptText;
 assert containsRegex ''"com\.raycast\.macos"'' macbookDefaultsText;
 assert !containsRegex "NSUserKeyEquivalents" macbookDefaultsText;
 assert containsRegex "Clipboard History hotkey" macbookManualText;
