@@ -28,6 +28,9 @@ let
   rustupSetupText = builtins.readFile ../../src/hosts/Windows/modules/setup/Invoke-RustupSetup.ps1;
   uvSetupText = builtins.readFile ../../src/hosts/Windows/modules/setup/Invoke-UvSetup.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
+  envCatalogText = builtins.readFile ../../src/modules/lib/env-catalog.nix;
+  windowsUserEnvText = builtins.readFile ../../src/hosts/Windows/user/env.dsc.yml;
+  windowsSyncNextestConfigText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-NextestConfig.ps1;
 
   inherit (import ../lib.nix) assert';
 
@@ -223,6 +226,33 @@ let
     assert' ((lib.hasInfix "pkgs.nickel" coreNixText) && (lib.hasInfix "pkgs.nls" coreNixText))
       "core.nix must include pkgs.nickel and pkgs.nls in baseSharedPackages for Nickel language support";
 
+  # ── cargo-nextest integration ──────────────────────────────────
+  # Verify that pkgs.cargo-nextest is declared in core.nix baseSharedPackages
+  # so the test runner is available on POSIX hosts.
+  test_core_nix_has_cargo_nextest = assert' (lib.hasInfix "pkgs.cargo-nextest" coreNixText) "core.nix must include pkgs.cargo-nextest in baseSharedPackages";
+
+  # Verify that cargo-nextest is listed in the declarative cargo-binstall
+  # package set for Windows hosts.
+  test_cargo_binstall_setup_has_nextest = assert' (lib.hasInfix "cargo-nextest" cargoBinstallSetupText) "Invoke-CargoBinstallSetup.ps1 must list cargo-nextest in desired packages";
+
+  # Verify that the centralized env catalog defines NEXTEST_TEST_THREADS
+  # for all hosts.
+  test_env_catalog_has_nextest_test_threads = assert' (lib.hasInfix "NEXTEST_TEST_THREADS" envCatalogText) "env-catalog.nix must define NEXTEST_TEST_THREADS";
+
+  # Verify that the Windows DSC env.dsc.yml declares NEXTEST_TEST_THREADS
+  # at User scope, mirroring the POSIX env catalog.
+  test_windows_user_env_has_nextest_test_threads = assert' (lib.hasInfix "NEXTEST_TEST_THREADS" windowsUserEnvText) "Windows user/env.dsc.yml must declare NEXTEST_TEST_THREADS at User scope";
+
+  # Verify that shell.nix deploys the nextest config.toml via writable symlink
+  # (home.file).
+  test_posix_symlink_has_nextest_config = assert' (lib.hasInfix "nextest/config.toml" posixShellText) "shell.nix must deploy nextest config.toml via home.file writable symlink";
+
+  # Verify that apply.ps1 wires Sync-NextestConfig for Windows hosts.
+  test_windows_apply_wires_sync_nextest_config = assert' (
+    (lib.hasInfix "Sync-NextestConfig.ps1" applyScriptText)
+    && (lib.hasInfix "Sync-NextestConfig -Enabled:" applyScriptText)
+  ) "Windows apply.ps1 must dot-source and call Sync-NextestConfig";
+
   allTests = [
     test_posix_shell_exports_fallback_bundle
     test_posix_pwsh_uses_fallback_bundle
@@ -250,6 +280,13 @@ let
     test_posix_pwsh_rust_toolchain_toml_check
     test_windows_shell_rust_toolchain_toml_check
     test_core_nickel_lsp_in_shared_packages
+    # cargo-nextest integration
+    test_core_nix_has_cargo_nextest
+    test_cargo_binstall_setup_has_nextest
+    test_env_catalog_has_nextest_test_threads
+    test_windows_user_env_has_nextest_test_threads
+    test_posix_symlink_has_nextest_config
+    test_windows_apply_wires_sync_nextest_config
   ];
 in
 builtins.seq (builtins.deepSeq allTests) {
