@@ -207,6 +207,7 @@ require_command deadnix
 require_command nixf-tidy
 require_command nix
 require_command packer
+require_command shellcheck
 require_command check-jsonschema
 require_command yamllint
 

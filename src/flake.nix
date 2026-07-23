@@ -491,6 +491,7 @@
             pkgs.nixfmt
             pkgs.packer
             pkgs.powershell
+            pkgs.shellcheck
             pkgs.yamllint
             pkgs.yq-go
           ];

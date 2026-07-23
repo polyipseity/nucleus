@@ -159,6 +159,8 @@ Ensure-Tool -Name 'powershell-yaml' -Type 'Module' -InstallCommand "Install-Modu
 Ensure-Tool -Name 'packer' -Type 'Command' -InstallCommand "winget install Hashicorp.Packer"
 Ensure-Tool -Name 'yamllint' -Type 'Command' -InstallCommand 'pip install yamllint'
 Ensure-Tool -Name 'check-jsonschema' -Type 'Command' -InstallCommand 'pip install check-jsonschema'
+# shellcheck is POSIX-native and not available on Windows.
+# Use check.sh on WSL/Linux for shell script linting.
 
 # ---------------------------------------------------------------------------
 # 1. PowerShell syntax validation
