@@ -323,7 +323,8 @@ do_setup() {
     "$windows_headless" "$accelerator" "$vm_secret_owner" "$vm_guest_username" \
     "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
     "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
-    "$accept_gsi_license" "false" "false"
+    "$accept_gsi_license" "false" "false" \
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST"
 
   mkdir -p "$VM_DIR" "$IMAGES_DIR" "$VM_DIR/scripts"
   write_vm_directory_readme
@@ -521,7 +522,8 @@ do_upgrade() {
     "$windows_headless" "$accelerator" "$vm_secret_owner" "$vm_guest_username" \
     "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
     "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
-    "$accept_gsi_license" "true" "false"
+    "$accept_gsi_license" "true" "false" \
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST"
 
   vm_build_android "$vm_name" "$vm_index" "$accept_gsi_license" "true" "false"
   say "upgrade complete for '$vm_name'"
@@ -565,7 +567,8 @@ do_reset() {
     "$windows_headless" "$accelerator" "$vm_secret_owner" "$vm_guest_username" \
     "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
     "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
-    "$accept_gsi_license" "false" "true"
+    "$accept_gsi_license" "false" "true" \
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST"
 
   vm_build_android "$vm_name" "$vm_index" "$accept_gsi_license" "false" "true"
   say "reset complete for '$vm_name'"

@@ -4,6 +4,14 @@
 # Example:
 #   . "$SCRIPT_DIR/vm-lib.sh"
 #   vm_init "$REPO_ROOT" "$VM_DIR" ...
+#
+# HARD PROHIBITION: ALL variables used by this library MUST be initialized
+# via vm_init(). Do NOT rely on variables set by the sourcing script — that
+# is implicit data passing. It produces untraceable, unscoped dependencies
+# that shellcheck cannot verify. If SC2153 fires, it means a variable was
+# used without being declared in vm_init(). The ONLY correct fix is to add
+# it to vm_init() and pass it from the caller. Suppressing SC2153 is
+# FORBIDDEN — it hides the violation.
 
 # vm_init — Initialize all shared config variables from explicit
 # positional parameters. Called after sourcing so shellcheck can trace every
@@ -28,6 +36,9 @@ vm_init() {
   accept_gsi_license="${17}"
   upgrade_android="${18}"
   reset_userdata="${19}"
+  VMS_DIR="${20}"
+  MANIFEST="${21}"
+  NUCLEUS_HOST="${22}"
 }
 
 # write_vm_directory_readme
@@ -1051,7 +1062,6 @@ vm_build_nixos() {
     fi
   fi
 
-  # shellcheck disable=SC2153 # reason: VMS_DIR is assigned in vm.sh which sources this file
   _guest_nix="$VMS_DIR/nixos/guest.nix"
   if [ ! -f "$_guest_nix" ]; then
     error "nixos guest config not found: $_guest_nix"
