@@ -54,7 +54,7 @@ if (Test-NucleusAgentSession) {
 # its interactive prompt with no user to respond.
 # check-suppress:suppression_doc: tool-availability guard -- pay-respects may not be installed
 if ([Environment]::UserInteractive -and -not (Test-NucleusAgentSession) -and (Get-Command pay-respects -ErrorAction SilentlyContinue)) {
-  iex (& pay-respects pwsh --alias | Out-String)
+  Invoke-Expression (& pay-respects pwsh --alias | Out-String)
 }
 
 # prek: install repository-local Git hooks automatically the first time a
