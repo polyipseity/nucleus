@@ -12,7 +12,7 @@
   - `cleanup-nix-build-artifacts.sh`, `install-prek-hooks.sh`, `provision-wallpaper.sh` — ungrouped root scripts
   - `services/` — persistent daemon/service scripts (camilladsp-daemon, camilladsp-heartbeat,
     caddy-trust, cloud-drives-setup, gc-weekly, jellyfin-sync, rclone-mount,
-    replica-scheduled-sync)
+    replica-scheduled-sync, service-watchdog)
   - `lib/` — shared library scripts for symlink hardening, cloud drive setup, dev repo
     provisioning, iCloud exclusions, VM setup, app bundle variables, LaunchServices
     handler registration, and the shared lib.sh
