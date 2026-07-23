@@ -76,6 +76,6 @@ in
       NIX_STORE_BIN = "${pkgs.nix}/bin/nix";
       MANAGED_PREF_DOMAINS = builtins.concatStringsSep " " resetUserPreferenceDomains;
     };
-    scriptName = "hosts/MacBook/macos-gc-preferences";
+    scriptName = "src/scripts/hosts/MacBook/macos-gc-preferences";
   };
 }

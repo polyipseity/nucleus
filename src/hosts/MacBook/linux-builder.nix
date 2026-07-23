@@ -46,7 +46,7 @@ let
   linuxBuilderDaemon = pkgs.writeNucleusShellApplication {
     name = "linux-builder-daemon";
     runtimeInputs = [ pkg ];
-    scriptName = "hosts/MacBook/macos-daemonize-linux-builder";
+    scriptName = "src/scripts/hosts/MacBook/macos-daemonize-linux-builder";
   };
 in
 {

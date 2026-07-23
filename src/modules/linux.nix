@@ -17,13 +17,13 @@ let
   gcWeekly = pkgs.writeNucleusShellApplication {
     name = "gc-weekly";
     runtimeInputs = [ ];
-    scriptName = "services/gc-sweep";
+    scriptName = "src/scripts/services/gc-sweep";
   };
 
   sccacheGc = pkgs.writeNucleusShellApplication {
     name = "sccache-gc";
     runtimeInputs = [ pkgs.sccache ];
-    scriptName = "services/sccache-gc";
+    scriptName = "src/scripts/services/sccache-gc";
   };
 
   activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
@@ -184,7 +184,7 @@ lib.mkIf pkgs.stdenv.isLinux {
     # subsequent provision run serve as implicit follow-up checks.
     # -----------------------------------------------------------------------
     buildNixIndex = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      "${activationBundle}/packages/update-nix-index.sh" \
+      "${activationBundle}/src/scripts/packages/update-nix-index.sh" \
         "${pkgs.nix-index}/bin/nix-index" \
         ""
     '';

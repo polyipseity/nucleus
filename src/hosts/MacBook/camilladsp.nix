@@ -21,7 +21,7 @@ let
 
   camilladspDaemon = pkgs.writeNucleusShellApplication {
     name = "camilladsp-daemon";
-    scriptName = "services/camilladsp-daemon";
+    scriptName = "src/scripts/services/camilladsp-daemon";
     runtimeInputs = [
       pkgs.camilladsp
       pkgs.websocat
@@ -31,7 +31,7 @@ let
 
   camilladspHeartbeat = pkgs.writeNucleusShellApplication {
     name = "camilladsp-heartbeat";
-    scriptName = "services/camilladsp-heartbeat";
+    scriptName = "src/scripts/services/camilladsp-heartbeat";
     runtimeInputs = [
       pkgs.websocat
       pkgs.jq
