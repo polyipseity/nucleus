@@ -517,6 +517,92 @@ resize_and_mark_image() {
   printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_rmi_marker"
 }
 
+# android (qemu/lineageos) image build
+
+build_android_image() {
+  _bai_vm_name="$1"
+  _bai_vm_index="$2"
+  _bai_gsi_version="$(jq -r ".VMs[$_bai_vm_index].androidGsiVersion // \"\"" "$MANIFEST")"
+  _bai_system_img="$IMAGES_DIR/android-system.qcow2"
+  _bai_userdata_img="$IMAGES_DIR/android-userdata.qcow2"
+  _bai_gsi_img="$IMAGES_DIR/android-gsi.img"
+
+  # Step 1: Download and extract LineageOS base system image
+  if [ ! -f "$_bai_system_img" ]; then
+    say "downloading LineageOS base image for '$_bai_vm_name'..."
+    run_with_backoff "download LineageOS release metadata" \
+      curl -fsSL -o "$IMAGES_DIR/android-lineage-release.json" \
+      "https://api.github.com/repos/jqssun/android-lineage-qemu/releases/latest" \
+      || { error "failed to fetch latest LineageOS release info"; return 1; }
+    _bai_dl_url="$(jq -r '.assets[] | select(.name | test("UTM-VM-lineage-arm64only-.*\\.zip")) | .browser_download_url' "$IMAGES_DIR/android-lineage-release.json" | head -1)"
+    if [ -z "$_bai_dl_url" ] || [ "$_bai_dl_url" = "null" ]; then
+      error "no LineageOS UTM zip found in latest release assets"
+      return 1
+    fi
+    run_with_backoff "download LineageOS zip" \
+      curl -fL -o "$IMAGES_DIR/android-lineage.zip" "$_bai_dl_url" \
+      || { error "failed to download LineageOS zip"; return 1; }
+    say "extracting LineageOS system image..."
+    _bai_extract_dir="$IMAGES_DIR/android-lineage-extract"
+    rm -rf "$_bai_extract_dir"
+    mkdir -p "$_bai_extract_dir"
+    run_cmd unzip -q "$IMAGES_DIR/android-lineage.zip" -d "$_bai_extract_dir"
+    _bai_qcow2="$(find "$_bai_extract_dir" -path '*/LineageOS_on_*.utm/Data/vda.qcow2' -type f | head -1)"
+    if [ -z "$_bai_qcow2" ]; then
+      error "vda.qcow2 not found inside extracted LineageOS bundle"
+      return 1
+    fi
+    run_cmd cp "$_bai_qcow2" "$_bai_system_img"
+    rm -rf "$_bai_extract_dir" "$IMAGES_DIR/android-lineage.zip" "$IMAGES_DIR/android-lineage-release.json"
+    validate_qcow2_image "$_bai_system_img" "Android system image for $_bai_vm_name" || return 1
+    say "system image ready: $_bai_system_img"
+  else
+    say "system image already exists: $_bai_system_img"
+  fi
+
+  # Step 2: Create userdata disk (skip if exists)
+  if [ ! -f "$_bai_userdata_img" ]; then
+    say "creating userdata disk (8 GiB)..."
+    run_cmd qemu-img create -f qcow2 "$_bai_userdata_img" 8G
+    validate_qcow2_image "$_bai_userdata_img" "Android userdata disk for $_bai_vm_name" || return 1
+    say "userdata disk ready: $_bai_userdata_img"
+  else
+    say "userdata disk already exists: $_bai_userdata_img"
+  fi
+
+  # Step 3: GSI system image (optional, when androidGsiVersion is set)
+  if [ -n "$_bai_gsi_version" ] && [ "$_bai_gsi_version" != "null" ]; then
+    # shellcheck disable=SC2154 # reason: accept_gsi_license is set by vm-setup.sh caller (Phase 7)
+    if [ "$accept_gsi_license" != "true" ]; then
+      error "GSI license not accepted for '$_bai_vm_name'; see https://developer.android.com/license"
+      exit 1
+    fi
+    say "GSI license: https://developer.android.com/license"
+    if [ ! -f "$_bai_gsi_img" ]; then
+      say "downloading GSI system image v$_bai_gsi_version..."
+      _bai_gsi_zip="$IMAGES_DIR/android-gsi-${_bai_gsi_version}.zip"
+      run_with_backoff "download GSI zip" \
+        curl -fL -o "$_bai_gsi_zip" "https://developer.android.com/topic/generic-system-image/release/gsi_gms_arm64-${_bai_gsi_version}.zip" \
+        || { error "failed to download GSI zip for v$_bai_gsi_version"; return 1; }
+      say "extracting GSI system.img..."
+      run_cmd unzip -q -o "$_bai_gsi_zip" system.img -d "$(dirname "$_bai_gsi_img")"
+      run_cmd mv "$(dirname "$_bai_gsi_img")/system.img" "$_bai_gsi_img"
+      rm -f "$_bai_gsi_zip"
+      if [ ! -f "$_bai_gsi_img" ]; then
+        error "GSI system.img not found after extraction"
+        return 1
+      fi
+      say "GSI system image ready: $_bai_gsi_img"
+    else
+      say "GSI system image already exists: $_bai_gsi_img"
+    fi
+  else
+    say "no GSI version set; using built-in LineageOS GSI"
+  fi
+
+  say "Android image build complete for '$_bai_vm_name'"
+}
+
 # Image build callback for for_each_vm
 
 build_one_image() {
@@ -551,6 +637,11 @@ build_one_image() {
       # undoc-supp: best-effort — see NixOS branch above.
       build_macos_image "$_vm_name" "$_vm_disk_gib" "$_vm_ram_mib" "$_vm_cpus" "$_vm_macos_ver" \
         || say "macOS image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
+      ;;
+    Android)
+      # undoc-supp: best-effort — see NixOS branch above.
+      build_android_image "$_vm_name" "$_vm_index" \
+        || say "Android image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
       ;;
     *)
       say "skipping build for '$_vm_name' (unsupported type: $_vm_type)"
