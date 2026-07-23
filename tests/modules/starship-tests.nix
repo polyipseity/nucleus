@@ -3,6 +3,7 @@
 let
   lib = import <nixpkgs/lib>;
   pkgs = import <nixpkgs> { };
+  testLib = import ../lib.nix;
 
   # Module imports cleanly (will throw if it doesn't).
   module = import ../../src/modules/starship.nix {
@@ -47,6 +48,7 @@ let
 
 in
 rec {
+  assert_all_pass = testLib.assert' all_tests_pass "starship-tests: all_tests_pass is false";
   module_imports_cleanly = builtins.isAttrs module;
   starship_configured = packagesNonEmpty;
   config_file_nonempty = configNonEmpty;

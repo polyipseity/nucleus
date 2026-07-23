@@ -840,10 +840,10 @@ let
   ) "src/vms/templates/README.md must contain all expected documentation sections and placeholders";
 
   test_vm_start_posix_template_content = assert' (
-    (lib.hasInfix "{{VM_NAME}}" startPosixTemplateText)
-    && (lib.hasInfix "{{VM_DISPLAY}}" startPosixTemplateText)
-    && (lib.hasInfix "{{HOST_KIND}}" startPosixTemplateText)
-    && (lib.hasInfix "{{VM_DIR}}" startPosixTemplateText)
+    (lib.hasInfix "__VM_NAME__" startPosixTemplateText)
+    && (lib.hasInfix "__VM_DISPLAY__" startPosixTemplateText)
+    && (lib.hasInfix "__HOST_KIND__" startPosixTemplateText)
+    && (lib.hasInfix "__VM_DIR__" startPosixTemplateText)
     && (lib.hasInfix "darwin-tart" startPosixTemplateText)
     && (lib.hasInfix "darwin-utm" startPosixTemplateText)
     && (lib.hasInfix "nixos-libvirt" startPosixTemplateText)
