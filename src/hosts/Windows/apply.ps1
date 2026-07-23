@@ -592,7 +592,7 @@ $existingRoot = [Environment]::GetEnvironmentVariable("NUCLEUS_REPO_ROOT", "Mach
 if ($existingRoot -ne $repoRoot) {
   [Environment]::SetEnvironmentVariable("NUCLEUS_REPO_ROOT", $repoRoot, "Machine")
   Write-Output "apply: set NUCLEUS_REPO_ROOT=$repoRoot (Machine scope)"
-  if ([Environment]::GetEnvironmentVariable("NUCLEUS_REPO_ROOT", "User") -ne $null) {
+  if ($null -ne [Environment]::GetEnvironmentVariable("NUCLEUS_REPO_ROOT", "User")) {
     [Environment]::SetEnvironmentVariable("NUCLEUS_REPO_ROOT", $null, "User")
   }
 }

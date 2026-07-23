@@ -65,7 +65,6 @@ while ($_dirIndex -lt $_directories.Count) {
           Remove-Item -LiteralPath $_.FullName -Force
           Write-Output "cleanup-nix: removed stale Nix build symlink: $($_.FullName) -> $_target"
         }
-        $_found = $true
       } elseif ($_.PSIsContainer -or (-not $_.LinkType)) {
         if ($Verbose) {
           Write-Output "cleanup-nix: found non-symlink at $($_.FullName) — skipping (not a Nix build artifact)"
