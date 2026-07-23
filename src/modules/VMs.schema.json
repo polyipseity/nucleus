@@ -12,6 +12,17 @@
       "items": {
         "additionalProperties": false,
         "properties": {
+          "androidGsiVersion": {
+            "description": "GSI system image version (e.g. 14.0). Only for type: Android. Null means use built-in LineageOS.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "cpus": {
             "description": "Number of CPU cores.",
             "minimum": 1,
@@ -63,19 +74,13 @@
           },
           "type": {
             "description": "Guest operating system type.",
-            "enum": ["Android", "macOS", "NixOS", "Windows"],
+            "enum": [
+              "Android",
+              "macOS",
+              "NixOS",
+              "Windows"
+            ],
             "type": "string"
-          },
-          "androidGsiVersion": {
-            "description": "GSI system image version (e.g. 14.0). Only for type: Android. Null means use built-in LineageOS.",
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "windowsEdition": {
             "description": "Windows edition. Only for type: Windows.",
@@ -97,6 +102,8 @@
       "type": "array"
     }
   },
-  "required": ["VMs"],
+  "required": [
+    "VMs"
+  ],
   "type": "object"
 }
