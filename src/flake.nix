@@ -291,9 +291,6 @@
       vsCodeMarketplaceMac = nix-vscode-extensions.extensions.${systems.mac}.vscode-marketplace;
       vsCodeMarketplaceLinux = nix-vscode-extensions.extensions.${systems.linux}.vscode-marketplace;
 
-      # Shared script tree derivation — single source for src/scripts/.
-      scriptTree = pkgs.callPackage ./modules/lib/script-tree.nix { };
-
       # Unified shell app builder. Uses scriptTree for src/scripts/ and
       # copies scripts/ (user CLIs) separately. Creates a thin wrapper at
       # $out/bin/nucleus-${name} that sets PATH from runtimeInputs and execs
