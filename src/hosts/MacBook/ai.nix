@@ -50,13 +50,6 @@ let
   litellmDaemon = pkgs.writeNucleusShellApplication {
     name = "litellm-daemon";
     runtimeInputs = [ pkgs.litellm ];
-    extraEnv = {
-      LITELLM_CONFIG = litellmConfig;
-      LITELLM_EVAL_TIMEOUT = "60";
-      LITELLM_OPENROUTER_API_KEY_PATH = config.sops.secrets."ai_openrouter_api_key".path;
-      LITELLM_OPENGODE_GO_API_KEY_PATH = config.sops.secrets."ai_opencode_go_api_key".path;
-      LITELLM_OPENGODE_ZEN_API_KEY_PATH = config.sops.secrets."ai_opencode_zen_api_key".path;
-    };
   };
 in
 {
@@ -74,7 +67,11 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${litellmDaemon}/bin/nucleus-litellm-daemon"
+        "exec ${litellmDaemon}/bin/nucleus-litellm-daemon '${litellmConfig}' '60' '${
+          config.sops.secrets."ai_openrouter_api_key".path
+        }' '${config.sops.secrets."ai_opencode_go_api_key".path}' '${
+          config.sops.secrets."ai_opencode_zen_api_key".path
+        }'"
       ];
       KeepAlive = true;
       RunAtLoad = true;

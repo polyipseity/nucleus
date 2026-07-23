@@ -20,13 +20,6 @@ let
   litellmDaemon = pkgs.writeNucleusShellApplication {
     name = "litellm-daemon";
     runtimeInputs = [ pkgs.litellm ];
-    extraEnv = {
-      LITELLM_CONFIG = litellmConfig;
-      LITELLM_EVAL_TIMEOUT = "0";
-      LITELLM_OPENROUTER_API_KEY_PATH = config.sops.secrets."ai_openrouter_api_key".path;
-      LITELLM_OPENGODE_GO_API_KEY_PATH = config.sops.secrets."ai_opencode_go_api_key".path;
-      LITELLM_OPENGODE_ZEN_API_KEY_PATH = config.sops.secrets."ai_opencode_zen_api_key".path;
-    };
   };
 in
 {
@@ -45,7 +38,11 @@ in
     path = [ pkgs.litellm ];
     serviceConfig = {
       Type = "simple";
-      ExecStart = "${litellmDaemon}/bin/nucleus-litellm-daemon";
+      ExecStart = "${litellmDaemon}/bin/nucleus-litellm-daemon '${litellmConfig}' '0' '${
+        config.sops.secrets."ai_openrouter_api_key".path
+      }' '${config.sops.secrets."ai_opencode_go_api_key".path}' '${
+        config.sops.secrets."ai_opencode_zen_api_key".path
+      }'";
       Restart = "always";
       User = "litellm";
       # Protect against resource exhaustion and information leaks.
