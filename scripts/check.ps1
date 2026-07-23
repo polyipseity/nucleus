@@ -60,8 +60,9 @@
 # patterns). Hard-coded file paths in validation steps are not allowed.
 #
 # Tests (Nix test suite) are run separately via scripts/test.ps1.
-# Steps 3-6, 8-11 are stubs (require Nix or bash — not available on Windows).
-# Step 20 only runs with the --verify flag.
+# Step 1 is a POSIX-only stub (shellcheck not available on Windows).
+# Steps 4-7, 9-12 are stubs (require Nix or bash — not available on Windows).
+# Step 21 only runs with the --verify flag.
 #
 # Prerequisites:
 #   - check-jsonschema (pip install check-jsonschema) for schema validation
@@ -163,11 +164,17 @@ Ensure-Tool -Name 'check-jsonschema' -Type 'Command' -InstallCommand 'pip instal
 # Use check.sh on WSL/Linux for shell script linting.
 
 # ---------------------------------------------------------------------------
-# 1. PowerShell syntax validation
+# 1. Shell script linting (shellcheck) — POSIX only (stub on Windows)
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Shell script linting (shellcheck) ===" -f (++$_step))
+say "skipping (requires POSIX shellcheck — not available natively on Windows; use WSL or check.sh)."
+
+# ---------------------------------------------------------------------------
+# 2. PowerShell syntax validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] PowerShell syntax validation ===" -f (++$_step))
 if ($PS1_FILES.Count -gt 0) {
-  & "$RepoRoot\scripts\check-pwsh.ps1" -SyntaxOnly $PS1_FILES
+  & "$RepoRoot\scripts\check-pwsh.ps1" -SyntaxOnly -Scoped $PS1_FILES
 } elseif (-not $HAS_ARGS) {
   & "$RepoRoot\scripts\check-pwsh.ps1" -SyntaxOnly
 } else {
@@ -177,7 +184,7 @@ if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
 if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 
 # ---------------------------------------------------------------------------
-# 2. Packer template validation
+# 3. Packer template validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Packer template validation ===" -f (++$_step))
 if ($PKR_FILES.Count -gt 0) {
@@ -191,31 +198,31 @@ if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
 if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 
 # ---------------------------------------------------------------------------
-# 3. Dead Nix code
+# 4. Dead Nix code
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Dead Nix code ===" -f (++$_step))
 say "skipping (requires Nix toolchain — not available on Windows)."
 
 # ---------------------------------------------------------------------------
-# 4. Nix flake evaluation
+# 5. Nix flake evaluation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Nix flake evaluation ===" -f (++$_step))
 say "skipping (requires Nix toolchain — not available on Windows)."
 
 # ---------------------------------------------------------------------------
-# 5. Nix formatting (nixfmt)
+# 6. Nix formatting (nixfmt)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Nix formatting (nixfmt) ===" -f (++$_step))
 say "skipping (requires Nix toolchain — not available on Windows)."
 
 # ---------------------------------------------------------------------------
-# 6. Nix lint (nixf-tidy)
+# 7. Nix lint (nixf-tidy)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Nix lint (nixf-tidy) ===" -f (++$_step))
 say "skipping (requires Nix toolchain — not available on Windows)."
 
 # ---------------------------------------------------------------------------
-# 7. Stale Nix build artifact check
+# 8. Stale Nix build artifact check
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Stale Nix build artifact check ===" -f (++$_step))
 if (-not $HAS_ARGS) {
@@ -234,31 +241,31 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 7. Shell script validation tests
+# 9. Shell script validation tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Shell script validation tests ===" -f (++$_step))
 say "skipping (bash-based test scripts — not available on Windows)."
 
 # ---------------------------------------------------------------------------
-# 8. CWD-independence tests
+# 10. CWD-independence tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] CWD-independence tests ===" -f (++$_step))
 say "skipping (bash-based test scripts — not available on Windows)."
 
 # ---------------------------------------------------------------------------
-# 9. Nix search path tests
+# 11. Nix search path tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Nix search path tests ===" -f (++$_step))
 say "skipping (bash-based test scripts — not available on Windows)."
 
 # ---------------------------------------------------------------------------
-# 10. Port utility function tests
+# 12. Port utility function tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Port utility function tests ===" -f (++$_step))
 say "skipping (bash-based test scripts — not available on Windows)."
 
 # ---------------------------------------------------------------------------
-# 11. Lockfile validation
+# 13. Lockfile validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Lockfile validation ===" -f (++$_step))
 
@@ -442,7 +449,7 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 13. Locked DSC validation
+# 14. Locked DSC validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Locked DSC validation ===" -f (++$_step))
 # Platform parallel: check.sh uses yq+jq pipeline (POSIX-native equivalent).
@@ -585,7 +592,7 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 14. Schema validation (JSON/YAML)
+# 15. Schema validation (JSON/YAML)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Schema validation (JSON/YAML) ===" -f (++$_step))
 $_jsonschemaErrors = 0
@@ -643,7 +650,7 @@ if ($_jsonschemaErrors -gt 0) {
 say "schema validation passed."
 
 # ---------------------------------------------------------------------------
-# 15. Service registry validation
+# 16. Service registry validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Service registry validation ===" -f (++$_step))
 if (-not $HAS_ARGS) {
@@ -763,7 +770,7 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 15. YAML validation
+# 17. YAML validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] YAML validation ===" -f (++$_step))
 $_yamlErrors = 0
@@ -792,7 +799,7 @@ if ($_yamlErrors -gt 0) {
 say "YAML validation passed."
 
 # ---------------------------------------------------------------------------
-# 17. YAML linting (yamllint)
+# 18. YAML linting (yamllint)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] YAML linting (yamllint) ===" -f (++$_step))
 $_yamlLintErrors = 0
@@ -819,7 +826,7 @@ if ($_yamlLintErrors -gt 0) {
 say "YAML linting passed."
 
 # ---------------------------------------------------------------------------
-# 18. Package manager usage enforcement
+# 19. Package manager usage enforcement
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Package manager usage enforcement ===" -f (++$_step))
 if (-not $HAS_ARGS) {
@@ -858,7 +865,7 @@ if (-not $HAS_ARGS) {
 }
 
 # ---------------------------------------------------------------------------
-# 19. Undocumented error suppression check
+# 20. Undocumented error suppression check
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Undocumented error suppression check ===" -f (++$_step))
 
@@ -932,7 +939,7 @@ if ($_undocSuppViolations.Count -gt 0) {
 if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 
 # ---------------------------------------------------------------------------
-# 20. Online determinism checks (--verify mode only)
+# 21. Online determinism checks (--verify mode only)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Online determinism checks (--verify) ===" -f (++$_step))
 if ($VERIFY) {
@@ -947,7 +954,7 @@ if ($VERIFY) {
 }
 
 # ---------------------------------------------------------------------------
-# 21. Config method compliance
+# 22. Config method compliance
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Config method compliance ===" -f (++$_step))
 $_cfgDir = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs"
@@ -1022,7 +1029,7 @@ if ($_cfgErrors -gt 0) {
 if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 
 # ---------------------------------------------------------------------------
-# 22. Activation script token placeholder in comment check
+# 23. Activation script token placeholder in comment check
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Activation script token placeholder in comment check ===" -f (++$_step))
 $_actPattern = '^\s*#.*__[A-Z][A-Z_]*__'

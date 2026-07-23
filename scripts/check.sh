@@ -211,11 +211,26 @@ require_command shellcheck
 require_command check-jsonschema
 require_command yamllint
 
+# Shell script linting (shellcheck)
+section "$((_step += 1))" "Shell script linting (shellcheck)"
+_sc_exit=0
+if [ "${#SH_FILES[@]}" -gt 0 ]; then
+  # Scoped mode: delegate to check-sh.sh with --scoped and paths
+  bash scripts/check-sh.sh --scoped "${SH_FILES[@]}" || _sc_exit=$?
+elif ! $HAS_ARGS; then
+  # Full mode: delegate to check-sh.sh (single source of truth for shellcheck invocation)
+  bash scripts/check-sh.sh || _sc_exit=$?
+else
+  say "skipping (no shell scripts to check)."
+fi
+if [ $_sc_exit -ne 0 ]; then exit_code=$_sc_exit; fi
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+
 # PowerShell syntax validation (parser only, no PSScriptAnalyzer)
 section "$((_step += 1))" "PowerShell syntax validation"
 _ps_exit=0
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly "${PS1_FILES[@]}" || _ps_exit=$?
+  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly -Scoped "${PS1_FILES[@]}" || _ps_exit=$?
 elif ! $HAS_ARGS; then
   pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly || _ps_exit=$?
 else
