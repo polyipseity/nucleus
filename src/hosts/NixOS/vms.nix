@@ -29,9 +29,19 @@ let
   ) vmsData.VMs;
 
   isArm = pkgs.stdenv.hostPlatform.isAarch64;
-  arch = if isArm then "aarch64" else "x86_64";
-  machine = if isArm then "virt" else "q35";
-  emulator = "${pkgs.qemu_kvm}/bin/qemu-system-${arch}";
+
+  vmArch =
+    vm:
+    if vm.type == "Android" then
+      "aarch64"
+    else if isArm then
+      "aarch64"
+    else
+      "x86_64";
+
+  vmMachine = vm: if vmArch vm == "x86_64" then "q35" else "virt";
+
+  vmEmulator = vm: "${pkgs.qemu_kvm}/bin/qemu-system-${vmArch vm}";
   homeDir = "/home/${username}";
   vmDir = "${homeDir}/virtual machines";
 
@@ -51,6 +61,58 @@ let
       + "\n      <target dir='dev'/>"
       + "\n    </filesystem>";
 
+  # Android-specific disk attachments for GSI-based Android VM images.
+  # Three disks: system (read-only), userdata (writable qcow2), and GSI
+  # image.  Only included for Android-type VMs.
+  androidDisks =
+    vm:
+    if vm.type != "Android" then
+      ""
+    else
+      "<disk type='file' device='disk'>\n"
+      + "      <driver name='qemu' type='qcow2'/>\n"
+      + "      <source file='${vmDir}/android-system.qcow2'/>\n"
+      + "      <target dev='vda' bus='virtio'/>\n"
+      + "    </disk>\n"
+      + "    <disk type='file' device='disk'>\n"
+      + "      <driver name='qemu' type='qcow2'/>\n"
+      + "      <source file='${vmDir}/android-userdata.qcow2'/>\n"
+      + "      <target dev='vdb' bus='virtio'/>\n"
+      + "    </disk>\n"
+      + "    <disk type='file' device='disk'>\n"
+      + "      <driver name='qemu' type='raw'/>\n"
+      + "      <source file='${vmDir}/android-gsi.img'/>\n"
+      + "      <target dev='vdc' bus='virtio'/>\n"
+      + "      <readonly/>\n"
+      + "    </disk>";
+
+  # Firmware block selecting UEFI (Android) or legacy BIOS (non-Android).
+  # Android requires AArch64 UEFI via AAVMF for GSI boot; non-Android VMs
+  # use the standard hvm type with the host-appropriate arch/machine baked
+  # in.
+  vmFirmware =
+    vm:
+    if vm.type == "Android" then
+      "<os firmware='efi'>\n"
+      + "    <type arch='aarch64' machine='virt'>hvm</type>\n"
+      + "    <loader type='pflash' readonly='yes' secure='no'>/usr/share/AAVMF/AAVMF_CODE.secboot.fd</loader>\n"
+      + "    <nvram>/usr/share/AAVMF/AAVMF_VARS.fd</nvram>\n"
+      + "    <boot dev='hd'/>\n"
+      + "  </os>"
+    else
+      "<os>\n"
+      + "    <type arch='${vmArch vm}' machine='${vmMachine vm}'>hvm</type>\n"
+      + "    <boot dev='hd'/>\n"
+      + "  </os>";
+
+  # USB tablet input device for precise pointer tracking in Android.
+  # Android's default emulated mouse is imprecise; a USB tablet provides
+  # absolute coordinates matching the display.
+  androidInput = vm: if vm.type != "Android" then "" else "<input type='tablet' bus='usb'/>";
+
+  # AC97 sound device for Android VM audio output.
+  androidSound = vm: if vm.type != "Android" then "" else "<sound model='ac97'/>";
+
   # Libvirt domain XML template.  Indented strings in Nix strip the common
   # leading whitespace (6 spaces here), producing a 0-based XML document.
   mkDomainXml =
@@ -61,24 +123,28 @@ let
         "__VM_DISPLAY__"
         "__VM_RAM_MB__"
         "__VM_CPUS__"
-        "__VM_ARCH__"
-        "__VM_MACHINE__"
         "__VM_EMULATOR__"
         "__VM_DIR__"
         "__VM_VIDEO_MODEL__"
         "__VM_VIRTIOFS_DEV__"
+        "__VM_FIRMWARE__"
+        "__VM_ANDROID_DISKS__"
+        "__VM_ANDROID_INPUT__"
+        "__VM_ANDROID_SOUND__"
       ]
       [
         vm.name
         vm.display
         (toString (vm.ramBytes / 1000000))
         (toString vm.cpus)
-        arch
-        machine
-        emulator
+        (vmEmulator vm)
         vmDir
         (videoModel vm)
         (virtiofsDev vm)
+        (vmFirmware vm)
+        (androidDisks vm)
+        (androidInput vm)
+        (androidSound vm)
       ]
       # Method 4 (runtime direct read — builtins.readFile embeds at eval time)
       (builtins.readFile ../../modules/configs/vms/nixos-domain.xml);

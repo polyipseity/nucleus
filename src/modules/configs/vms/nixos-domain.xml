@@ -3,10 +3,7 @@
   <title>__VM_DISPLAY__</title>
   <memory unit='MB'>__VM_RAM_MB__</memory>
   <vcpu>__VM_CPUS__</vcpu>
-  <os>
-    <type arch='__VM_ARCH__' machine='__VM_MACHINE__'>hvm</type>
-    <boot dev='hd'/>
-  </os>
+  __VM_FIRMWARE__
   <cpu mode='host-passthrough'/>
   <features>
     <acpi/>
@@ -19,6 +16,7 @@
       <source file='__VM_DIR__/__VM_NAME__.qcow2'/>
       <target dev='vda' bus='virtio'/>
     </disk>
+    __VM_ANDROID_DISKS__
     <interface type='network'>
       <source network='default'/>
       <model type='virtio'/>
@@ -30,6 +28,7 @@
       <listen type='address'/>
       <image compression='off'/>
     </graphics>
+    __VM_ANDROID_SOUND__
     <channel type='spicevmc'>
       <target type='virtio' name='com.redhat.spice.0'/>
     </channel>
@@ -41,5 +40,6 @@
     <rng model='virtio'>
       <backend model='random'>/dev/urandom</backend>
     </rng>
+    __VM_ANDROID_INPUT__
   </devices>
 </domain>
