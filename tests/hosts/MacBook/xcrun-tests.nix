@@ -53,8 +53,8 @@ assert lib.hasInfix "active_symlinks" symlinkFarmSh;
 
 # ntfs-3g.nix
 assert lib.hasInfix "llvmPackages.clang" ntfs3gText;
-assert lib.hasInfix ''export CC="'' ntfs3gText;
-assert lib.hasInfix ''export CXX="'' ntfs3gText;
+assert lib.hasInfix "clangBin" ntfs3gText;
+assert lib.hasInfix "clangxxBin" ntfs3gText;
 
 {
   success = true;
