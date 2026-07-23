@@ -58,7 +58,7 @@ param(
 
   [switch]$DryRun,
   [switch]$GcOnly,
-  [string]$Profile,
+  [string]$AiProfile,
   [switch]$Json,
   [Alias("h")]
   [switch]$Help
@@ -111,13 +111,13 @@ function Invoke-AiList {
   $manifest = Get-Content -Raw -Path $ModelsJson | ConvertFrom-Json
   $allModels = $manifest.models
 
-  if ($Profile) {
-    if (-not ($allModels.PSObject.Properties.Name -contains $Profile)) {
-      Write-NucleusError "profile '$Profile' not found in models.json"
+  if ($AiProfile) {
+    if (-not ($allModels.PSObject.Properties.Name -contains $AiProfile)) {
+      Write-NucleusError "profile '$AiProfile' not found in models.json"
       exit 1
     }
     $filtered = [ordered]@{}
-    $filtered[$Profile] = $allModels.$Profile
+    $filtered[$AiProfile] = $allModels.$AiProfile
     $allModels = $filtered
   }
 

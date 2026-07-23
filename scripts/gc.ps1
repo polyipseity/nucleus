@@ -235,7 +235,7 @@ function Remove-VMGcItem {
   }
 }
 
-function Clear-GitTemplateFiles {
+function Clear-GitTemplateFile {
   [CmdletBinding(SupportsShouldProcess = $true)]
   param(
     [Parameter(Mandatory = $true)]
@@ -271,7 +271,7 @@ function Clear-GitTemplateFiles {
   }
 }
 
-function Clear-GitCacheFiles {
+function Clear-GitCacheFile {
   [CmdletBinding(SupportsShouldProcess = $true)]
   param(
     [Parameter(Mandatory = $true)]
@@ -439,13 +439,13 @@ if (-not $NoToolCacheGc) {
 # ---- Step 3: remove stale .git boilerplate from ~/dev -----------------------
 if (-not $NoGitTemplateGc) {
   $devRoot = Join-Path $HOME 'dev'
-  Clear-GitTemplateFiles -DevRoot $devRoot
+  Clear-GitTemplateFile -DevRoot $devRoot
 }
 
 # ---- Step 4: remove stale .git cache/state files from ~/dev -----------------
 if (-not $NoGitCacheGc) {
   $devRoot = Join-Path $HOME 'dev'
-  Clear-GitCacheFiles -DevRoot $devRoot
+  Clear-GitCacheFile -DevRoot $devRoot
 }
 
 # ---- Step 5: Scoop cache and old-version cleanup ----------------------------

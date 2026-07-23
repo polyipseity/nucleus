@@ -903,7 +903,7 @@ Write-Output ("`n=== [{0}] Undocumented error suppression check ===" -f (++$_ste
 
 $_undocSuppViolations = @()
 
-function Is-Suppressed {
+function Test-Suppressed {
   param([string]$CheckId, [string]$Path, [int]$LineNumber)
   $line = Get-Content -Path $Path | Select-Object -Index ($LineNumber - 1)
   if ($line -match "# check-suppress:$CheckId[\s:]") { return $true }
@@ -928,7 +928,7 @@ function Get-UndocSuppViolation {
       # Skip lines with inline # undoc-supp: comment (deprecated format)
       if ($_um.Line -match '# undoc-supp:') { continue }
       # Skip lines with # check-suppress:suppression_doc: inline (new format)
-      if (Is-Suppressed -CheckId 'suppression_doc' -Path $_um.Path -LineNumber $_um.LineNumber) { continue }
+      if (Test-Suppressed -CheckId 'suppression_doc' -Path $_um.Path -LineNumber $_um.LineNumber) { continue }
       # Skip if preceding line has suppression comment (old or new format)
       if ($_um.LineNumber -gt 1) {
         $_uPrevLine = Get-Content -Path $_um.Path | Select-Object -Index ($_um.LineNumber - 2)
