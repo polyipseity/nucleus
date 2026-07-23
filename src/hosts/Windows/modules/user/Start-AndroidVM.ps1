@@ -114,8 +114,8 @@ $qemuArgs.AddRange(@(
 ))
 
 # --- Launch QEMU ---
-Write-Host "Starting Android VM: $($qemu.Source)"
-Write-Host "  CPUs: 4  RAM: 4096 MB  Accel: tcg"
-Write-Host "  ADB:   localhost:5555 -> guest:5555 (emulator) / localhost:5554 -> guest:5554 (console)"
+Write-Output "Starting Android VM: $($qemu.Source)"
+Write-Output "  CPUs: 4  RAM: 4096 MB  Accel: tcg"
+Write-Output "  ADB:   localhost:5555 -> guest:5555 (emulator) / localhost:5554 -> guest:5554 (console)"
 
 Start-Process -FilePath $qemu.Source -ArgumentList $qemuArgs -Wait -NoNewWindow
