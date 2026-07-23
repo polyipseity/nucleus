@@ -63,12 +63,22 @@ full convention.
 
 ## Shellcheck invocation
 
-All shell scripts are checked with `check-sh.sh`, which invokes:
+Shell scripts are checked in three places:
 
-```shell
-shellcheck --source-path=SCRIPTDIR -x <files>
-```
+1. **`scripts/check.sh`** (pre-commit, via `prek-hooks.py`): delegates to `check-sh.sh` in
+   both scoped and full modes. Single source of truth for shellcheck invocation in CI.
+2. **`scripts/check-sh.sh`** (standalone): the canonical shellcheck runner, invoked directly:
 
-The Nix build system uses `--source-path=$out` against the bundled mirror tree so `# shellcheck source=` directives resolve identically to the source tree.
+   ```shell
+   shellcheck --source-path=SCRIPTDIR -x <files>
+   ```
+3. **Nix build** (`src/flake.nix`): runs on wrapper+real script in the nix store at build
+   time using `--source-path=$out` against the bundled mirror tree. Catches wrapper-level
+   issues that source-level checks cannot reach.
 
-When adding new shell scripts, ensure they pass shellcheck with these flags. Do not add new scripts with pre-existing suppression warnings unless documented per the rules above.
+The `--source-path` values differ between source and Nix build but both resolve the same
+`# shellcheck source=` directives because the SCRIPT_DIR-relative path structure is
+identical in both contexts.
+
+When adding new shell scripts, ensure they pass shellcheck with these flags. Do not add
+new scripts with pre-existing suppression warnings unless documented per the rules above.
