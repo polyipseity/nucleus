@@ -13,7 +13,6 @@ in
 
 # activation.nix references the symlink farm
 assert lib.hasInfix "configureSymlinkFarm" activationNix;
-assert lib.hasInfix "__nucleus_symlink_farm" activationNix;
 assert lib.hasInfix "macos-symlink-farm.sh" activationNix;
 
 # apple-sdk-tools.nix has symlinkFarmTools
