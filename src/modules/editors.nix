@@ -348,7 +348,7 @@ in
     # darwin-rebuild / nixos-rebuild and forwarded through sudo).
     # -------------------------------------------------------------------------
     vsCodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      "${activationBundle}/editors/symlink-vscode-config.sh" \
+      "${activationBundle}/src/scripts/editors/symlink-vscode-config.sh" \
         "${repoRoot}" \
         "${stableBaseDir}" \
         "${insidersBaseDir}" \
@@ -371,7 +371,7 @@ in
     # writable directory and populate it with per-extension symlinks.
     # -----------------------------------------------------------------------
     vsCodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      "${activationBundle}/editors/bridge-vscode-extensions.sh" "${extensionStore}"
+      "${activationBundle}/src/scripts/editors/bridge-vscode-extensions.sh" "${extensionStore}"
     '';
 
     # -----------------------------------------------------------------------
@@ -395,7 +395,7 @@ in
     # first-run race before provisionDevDirectory completes).
     # -----------------------------------------------------------------------
     vsCodeWorkspaceTrust = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      "${activationBundle}/editors/trust-vscode-workspace.sh" "${pkgs.python3}/bin/python3"
+      "${activationBundle}/src/scripts/editors/trust-vscode-workspace.sh" "${pkgs.python3}/bin/python3"
     '';
   };
 }

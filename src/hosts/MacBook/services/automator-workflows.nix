@@ -221,7 +221,7 @@ in
   };
 
   home.activation.deployNucleusAutomatorWorkflows = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    "${activationBundle}/hosts/MacBook/macos-deploy-automator-workflows.sh" \
+    "${activationBundle}/src/scripts/hosts/MacBook/macos-deploy-automator-workflows.sh" \
       "${pkgs.jq}/bin/jq" \
       '${
         builtins.toJSON (

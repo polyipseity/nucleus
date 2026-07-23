@@ -18,7 +18,7 @@ in
   };
 
   home.activation.gitIgnoreAssemble = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    "${activationBundle}/configs/assemble-git-ignore.sh"
+    "${activationBundle}/src/scripts/configs/assemble-git-ignore.sh"
   '';
 
   home.activation.gitEmptyTemplate = lib.hm.dag.entryAfter [ "linkGeneration" ] ''

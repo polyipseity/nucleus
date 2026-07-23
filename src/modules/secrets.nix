@@ -169,7 +169,7 @@ lib.mkIf isPrimaryUser {
   # immediately with no added latency.
   # --------------------------------------------------------------------------
   home.activation.waitForSopsSecrets = lib.hm.dag.entryAfter [ "sops-nix" ] ''
-    "${activationBundle}/secrets/wait-for-sops-secrets.sh" "${
+    "${activationBundle}/src/scripts/secrets/wait-for-sops-secrets.sh" "${
       config.sops.secrets.${gitIdentitySecretName}.path
     }"
   '';
@@ -196,7 +196,7 @@ lib.mkIf isPrimaryUser {
   #      idempotently on repeated activation runs.
   # --------------------------------------------------------------------------
   home.activation."git-identity" = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
-    "${activationBundle}/secrets/configure-git-identity.sh" "${
+    "${activationBundle}/src/scripts/secrets/configure-git-identity.sh" "${
       config.sops.secrets.${gitIdentitySecretName}.path
     }" "${pkgs.git}/bin/git"
   '';
@@ -238,7 +238,7 @@ lib.mkIf isPrimaryUser {
   # a non-batch import invocation to ensure a successful secret-key import.
   # --------------------------------------------------------------------------
   home.activation."gpg-import" = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
-    "${activationBundle}/secrets/import-gpg-key.sh" \
+    "${activationBundle}/src/scripts/secrets/import-gpg-key.sh" \
       "${config.home.homeDirectory}/.gnupg" \
       "${pkgs.gnupg}/bin/gpg" \
       "${config.sops.secrets.${gpgSecretName}.path}"
@@ -270,7 +270,7 @@ lib.mkIf isPrimaryUser {
   #   5. Write the current fingerprint to the manifest.
   # --------------------------------------------------------------------------
   home.activation."ssh-key-adopt" = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
-    "${activationBundle}/secrets/adopt-ssh-key.sh" "${sshPublicKeyPath}" "${pkgs.openssh}/bin/ssh-keygen" "${pkgs.openssh}/bin/ssh-add"
+    "${activationBundle}/src/scripts/secrets/adopt-ssh-key.sh" "${sshPublicKeyPath}" "${pkgs.openssh}/bin/ssh-keygen" "${pkgs.openssh}/bin/ssh-add"
   '';
 
   # --------------------------------------------------------------------------
@@ -392,7 +392,7 @@ lib.mkIf isPrimaryUser {
       };
     in
     lib.hm.dag.entryAfter [ "git-identity" "gpg-import" "ssh-key-adopt" ] ''
-      "${activationBundle}/secrets/verify-secret-decryption.sh" \
+      "${activationBundle}/src/scripts/secrets/verify-secret-decryption.sh" \
         "${pkgs.jq}/bin/jq" \
         "${pkgs.gnupg}/bin/gpg" \
         "${pkgs.ssh-to-age}/bin/ssh-to-age" \

@@ -88,7 +88,7 @@ in
     # ---- ensureLogDirs -----------------------------------------------------------
     # Create system log dirs (all hosts) and macOS-specific user log dirs (console
     # user + chown). Shared with NixOS via ensure-log-dirs.sh.
-    "${activationBundle}/services/log-dirs-init.sh" \
+    "${activationBundle}/src/scripts/services/log-dirs-init.sh" \
       "${config.nucleus.logging.systemLogDir}" \
       "${builtins.toString systemLogDirs}" \
       "${builtins.toString userLogDirs}" \
@@ -135,15 +135,15 @@ in
     # Create/update symlinks in /usr/local/bin for tools that GUI apps resolve
     # via PATH directly (without xcrun).  Only operates on Nix store symlinks
     # and leaves regular files and non-Nix symlinks untouched.
-    "${activationBundle}/hosts/MacBook/macos-symlink-farm.sh" \
+    "${activationBundle}/src/scripts/hosts/MacBook/macos-symlink-farm.sh" \
       "${symlinkFarmEntries}" \
       "${config.nucleus.logging.systemLogDir}/symlink-farm.log"
 
     # ---- configureBatteryPolicy ------------------------------------------------
-    "${activationBundle}/hosts/MacBook/macos-configure-battery-policy.sh"
+    "${activationBundle}/src/scripts/hosts/MacBook/macos-configure-battery-policy.sh"
 
     # ---- configureChargeLimit --------------------------------------------------
-    "${activationBundle}/hosts/MacBook/macos-charge-limit.sh"
+    "${activationBundle}/src/scripts/hosts/MacBook/macos-charge-limit.sh"
 
     # ---- configureSshAccess -----------------------------------------------------
     # Allow all users to connect via SSH by removing the macOS access-control
@@ -158,17 +158,17 @@ in
     fi
 
     # ---- configureMiddleClick -------------------------------------------------
-    "${activationBundle}/hosts/MacBook/macos-enable-middle-click.sh"
+    "${activationBundle}/src/scripts/hosts/MacBook/macos-enable-middle-click.sh"
 
     # ---- configureMountyLoginItem ---------------------------------------------
-    "${activationBundle}/hosts/MacBook/macos-register-mounty-login-item.sh"
+    "${activationBundle}/src/scripts/hosts/MacBook/macos-register-mounty-login-item.sh"
     # ---- configureLinearMousePreferences --------------------------------------
-    "${activationBundle}/hosts/MacBook/macos-set-linearmouse-prefs.sh"
+    "${activationBundle}/src/scripts/hosts/MacBook/macos-set-linearmouse-prefs.sh"
     # ---- configureGimpScrollSensitivity ---------------------------------------
-    "${activationBundle}/configs/configure-gimp-scroll-sensitivity.sh"
+    "${activationBundle}/src/scripts/configs/configure-gimp-scroll-sensitivity.sh"
 
     # ---- configureMissionControlSpansDisplays ----------------------------------
-    "${activationBundle}/hosts/MacBook/macos-configure-mission-control.sh"
+    "${activationBundle}/src/scripts/hosts/MacBook/macos-configure-mission-control.sh"
 
     # ---- configureMonitorColorProfile ------------------------------------------
     # Clears the ColorSync device-profile cache so that newly connected monitors
@@ -186,19 +186,19 @@ in
     fi
 
     # ---- clearFinderCache -------------------------------------------------------
-    "${activationBundle}/hosts/MacBook/macos-clear-finder-cache.sh"
+    "${activationBundle}/src/scripts/hosts/MacBook/macos-clear-finder-cache.sh"
 
     # ---- disableSpotlight -------------------------------------------------------
-    "${activationBundle}/hosts/MacBook/macos-disable-spotlight.sh"
+    "${activationBundle}/src/scripts/hosts/MacBook/macos-disable-spotlight.sh"
 
     # ---- nvimLauncher -----------------------------------------------------------
     # Pass empty arg to trigger runtime resolution from /dev/console (macOS).
-    "${activationBundle}/editors/launch-nvim.sh" ""
+    "${activationBundle}/src/scripts/editors/launch-nvim.sh" ""
 
     # ---- ensureLogDirs (repeated from extraActivation) --------------------------
     # Also ensure log directories exist during postActivation (belt-and-suspenders
     # in case systemLogDir was reconfigured at activation time).
-    "${activationBundle}/services/log-dirs-init.sh" \
+    "${activationBundle}/src/scripts/services/log-dirs-init.sh" \
       "${config.nucleus.logging.systemLogDir}" \
       "${builtins.toString systemLogDirs}" \
       "${builtins.toString userLogDirs}" \
@@ -212,10 +212,10 @@ in
     # ---- homebrew-pin-verify ----------------------------------------------
     # Warning-only check that installed Homebrew versions match lockfile.
     # Never fails activation.
-    "${activationBundle}/hosts/MacBook/macos-verify-homebrew-pin.sh" "${repoRoot}"
+    "${activationBundle}/src/scripts/hosts/MacBook/macos-verify-homebrew-pin.sh" "${repoRoot}"
 
     # ---- disableSteamAutoStartup ------------------------------------------------
-    "${activationBundle}/configs/disable-steam-autostart.sh"
+    "${activationBundle}/src/scripts/configs/disable-steam-autostart.sh"
 
     # ---- jellyfin-sync -----------------------------------------------------------
     # Converge Jellyfin accounts and libraries declared in src/modules/users.json
@@ -226,7 +226,7 @@ in
     # as a CLI arg.  jq and sops are pinned via --jq-path/--sops-path so the
     # script does not depend on the activation environment's PATH.
     # SOPS_AGE_KEY_FILE defaults to /etc/sops/age/machine.txt.
-    "${activationBundle}/services/jellyfin-sync.sh" \
+    "${activationBundle}/src/scripts/services/jellyfin-sync.sh" \
       ${
         lib.optionalString (repoRoot != "") "--repo-root ${lib.escapeShellArg repoRoot} \
       "

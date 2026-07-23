@@ -65,7 +65,7 @@ in
   # consuming workflow lives).
 
   home.activation."macos-app-bundle-lib" = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    "${activationBundle}/hosts/MacBook/macos-deploy-app-bundles.sh" \
+    "${activationBundle}/src/scripts/hosts/MacBook/macos-deploy-app-bundles.sh" \
       "${pkgs.jq}/bin/jq" \
       '${
         builtins.toJSON (

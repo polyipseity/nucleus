@@ -121,7 +121,7 @@ in
     home.activation.ensureCustomProvisionSymlinkTargets =
       lib.hm.dag.entryBefore [ "prepareCustomProvisionSymlinks" ]
         ''
-          "${activationBundle}/configs/ensure-symlink-targets.sh" \
+          "${activationBundle}/src/scripts/configs/ensure-symlink-targets.sh" \
             "${managedSymlinkManifestPath}" \
             '${
               builtins.toJSON (
@@ -134,13 +134,13 @@ in
         '';
 
     home.activation.prepareCustomProvisionSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-      "${activationBundle}/configs/provision-symlinks.sh" \
+      "${activationBundle}/src/scripts/configs/provision-symlinks.sh" \
         "${managedSymlinkManifestPath}" \
         "${pkgs.jq}/bin/jq"
     '';
 
     home.activation.finalizeCustomProvisionSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      "${activationBundle}/configs/finalize-symlinks.sh" \
+      "${activationBundle}/src/scripts/configs/finalize-symlinks.sh" \
         "${managedSymlinkManifestPath}" \
         "${pkgs.jq}/bin/jq" \
         '${builtins.toJSON (map (entry: entry.linkAbsolutePath) selectedSymlinksResolved)}' \

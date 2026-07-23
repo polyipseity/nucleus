@@ -34,11 +34,11 @@ in
       config.lib.file.mkOutOfStoreSymlink "${repoRoot}/${repoRelPath}";
 
     home.activation."unprotectSymlink_${name}" = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-      "${activationBundle}/configs/managed-symlink.sh" "unprotect" ${lib.escapeShellArg name} "$HOME/${targetRelPath}"
+      "${activationBundle}/src/scripts/configs/managed-symlink.sh" "unprotect" ${lib.escapeShellArg name} "$HOME/${targetRelPath}"
     '';
 
     home.activation."protectSymlink_${name}" = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      "${activationBundle}/configs/managed-symlink.sh" "protect" ${lib.escapeShellArg name} "$HOME/${targetRelPath}"
+      "${activationBundle}/src/scripts/configs/managed-symlink.sh" "protect" ${lib.escapeShellArg name} "$HOME/${targetRelPath}"
     '';
   };
 

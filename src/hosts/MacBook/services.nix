@@ -52,6 +52,6 @@ in
         # process memory. Finder is intentionally excluded here —
         # relaunchDesktopServices (DAG-ordered after writeBoundary) restarts it
         # via launchctl kickstart to preserve window state.
-        "${activationBundle}/services/refresh-services-menu.sh"
+        "${activationBundle}/src/scripts/services/refresh-services-menu.sh"
       '';
 }
