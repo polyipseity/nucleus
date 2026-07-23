@@ -3,6 +3,18 @@
   "VMs": [
     {
       "cpus": 4,
+      "diskBytes": 20000000000,
+      "display": "Android",
+      "enabled": true,
+      "hosts": null,
+      "name": "Android",
+      "ramBytes": 4000000000,
+      "shareDevDir": false,
+      "type": "Android",
+      "androidGsiVersion": null
+    },
+    {
+      "cpus": 4,
       "diskBytes": 128000000000,
       "display": "MacBook",
       "enabled": false,
