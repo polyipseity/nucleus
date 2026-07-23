@@ -379,6 +379,70 @@ if (Get-Command virt-viewer -ErrorAction SilentlyContinue) {
 }
 EOF
       ;;
+    windows-qemu)
+      cat >"$_wss_path_ps1" <<EOF
+# start-$_wss_name.ps1 — Start VM '$_wss_name' on Windows via QEMU (TCG).
+#Requires -Version 7.4
+
+`$ErrorActionPreference = 'Stop'
+
+`$qemu = Get-Command 'qemu-system-aarch64.exe' -ErrorAction Stop
+
+`$imagesDir   = Join-Path `$env:USERPROFILE 'virtual machines\images'
+`$firmwareDir = Split-Path `$qemu.Source -Parent
+
+`$diskSystem   = Join-Path `$imagesDir 'android-system.qcow2'
+`$diskUserdata = Join-Path `$imagesDir 'android-userdata.qcow2'
+`$diskGsi      = Join-Path `$imagesDir 'android-gsi.img'
+`$uefiCode     = Join-Path `$firmwareDir 'edk2-aarch64-code.fd'
+`$uefiVars     = Join-Path `$firmwareDir 'edk2-arm-vars.fd'
+
+foreach (`$d in @(`$diskSystem, `$diskUserdata)) {
+  if (-not (Test-Path -LiteralPath `$d -PathType Leaf)) {
+    Write-Error "Required disk image not found: `$d"
+    exit 1
+  }
+}
+
+`$qemuArgs = [System.Collections.Generic.List[string]]::new()
+`$qemuArgs.AddRange(@(
+  '-machine', 'virt',
+  '-accel', 'tcg',
+  '-cpu', 'max',
+  '-smp', '4',
+  '-m', '4096',
+  '-drive', "if=pflash,format=raw,readonly=on,file=`$uefiCode",
+  '-drive', "if=pflash,format=raw,file=`$uefiVars",
+  '-drive', "file=`$diskSystem,format=qcow2,if=none,id=drive-system",
+  '-device', 'virtio-blk-pci,drive=drive-system',
+  '-drive', "file=`$diskUserdata,format=qcow2,if=none,id=drive-userdata",
+  '-device', 'virtio-blk-pci,drive=drive-userdata'
+))
+
+if (Test-Path -LiteralPath `$diskGsi -PathType Leaf) {
+  `$qemuArgs.AddRange(@(
+    '-drive', "file=`$diskGsi,format=raw,if=none,id=drive-gsi",
+    '-device', 'virtio-blk-pci,drive=drive-gsi'
+  ))
+}
+
+`$qemuArgs.AddRange(@(
+  '-netdev', 'user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=tcp::5554-:5554',
+  '-device', 'virtio-net-pci,netdev=net0',
+  '-device', 'virtio-gpu-pci',
+  '-display', 'gtk',
+  '-device', 'usb-tablet',
+  '-device', 'qemu-xhci',
+  '-append', 'androidboot.hardware=android_x86_64 androidboot.selinux=permissive'
+))
+
+Write-Host "Starting Android VM: `$(`$qemu.Source)"
+Write-Host "  CPUs: 4  RAM: 4096 MB  Accel: tcg"
+Write-Host "  ADB:   localhost:5555 -> guest:5555 (emulator) / localhost:5554 -> guest:5554 (console)"
+
+Start-Process -FilePath `$qemu.Source -ArgumentList `$qemuArgs -Wait -NoNewWindow
+EOF
+      ;;
     *)
       error "unknown start-script host kind: $_wss_host_kind"
       return 1
