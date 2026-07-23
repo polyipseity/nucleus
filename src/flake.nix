@@ -291,17 +291,18 @@
       vsCodeMarketplaceMac = nix-vscode-extensions.extensions.${systems.mac}.vscode-marketplace;
       vsCodeMarketplaceLinux = nix-vscode-extensions.extensions.${systems.linux}.vscode-marketplace;
 
-      # Unified shell app builder. Bundles all scripts/ and src/scripts/ into
-      # $out/scripts/ and $out/src/scripts/ with the exact repo directory
-      # structure. Creates a thin wrapper at $out/bin/nucleus-${name} that sets
-      # PATH from runtimeInputs and execs the real script from the mirror tree.
-      # This guarantees that $SCRIPT_DIR resolves identically in both source and
-      # build contexts.
+      # Shared script tree derivation — single source for src/scripts/.
+      scriptTree = pkgs.callPackage ./modules/lib/script-tree.nix { };
+
+      # Unified shell app builder. Uses scriptTree for src/scripts/ and
+      # copies scripts/ (user CLIs) separately. Creates a thin wrapper at
+      # $out/bin/nucleus-${name} that sets PATH from runtimeInputs and execs
+      # the real script via repo-root-relative path resolution.
       writeNucleusShellApplication =
         pkgs:
         {
           name,
-          scriptName ? name,
+          scriptName ? "scripts/${name}",
           runtimeInputs ? [ ],
           extraEnv ? { },
           bundleDefault ? true,
@@ -310,32 +311,23 @@
         }:
         let
           inherit (pkgs) lib;
-
-          # Harden against bundleDefault = false with no fallback.
-          assertAssertMsg = lib.assertMsg;
+          thisScriptTree = pkgs.callPackage ./modules/lib/script-tree.nix { };
         in
-        assert assertAssertMsg
-          (
-            text != null
-            || bundleDefault
-            || builtins.pathExists (../scripts + "/${name}.sh")
-            || builtins.pathExists (./scripts + "/${name}.sh")
-          )
-          "writeNucleusShellApplication: bundleDefault is false and text is null but script '${name}.sh' not found in scripts/ or src/scripts/";
         pkgs.runCommand "${name}-nucleus-app"
           {
             strictDeps = true; # hermetic build
             nativeBuildInputs = [ pkgs.shellcheck ];
           }
           ''
-            mkdir -p "$out/bin" "$out/scripts" "$out/src/scripts"
+            mkdir -p "$out/bin" "$out/scripts"
 
             ${lib.optionalString bundleDefault ''
-              # Mirror all scripts with exact repo structure.
+              # Mirror user-facing CLIs from scripts/.
               cp -r --no-preserve=mode ${../scripts}/. "$out/scripts/"
-              cp -r --no-preserve=mode ${./scripts}/. "$out/src/scripts/"
-              # Make scripts executable so the wrapper can exec them.
-              chmod -R +x "$out/scripts/" "$out/src/scripts/"
+              chmod -R +x "$out/scripts/"
+
+              # Reuse pre-built + shellchecked script tree (src/scripts/).
+              cp -r --no-preserve=mode ${thisScriptTree}/. "$out/"
             ''}
 
             ${
@@ -357,7 +349,7 @@
                 ''
               else
                 ''
-                  # Create thin wrapper with runtime subdirectory detection.
+                  # Create thin wrapper with repo-root-relative script path.
                   cat > "$out/bin/nucleus-${name}" << 'WRAPPER'
                   #!${pkgs.runtimeShell}
                   set -euo pipefail
@@ -366,30 +358,11 @@
                     lib.concatStringsSep "\n" (
                       lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") extraEnv
                     )
-                  }for _d in scripts src/scripts; do
-                  _script="$(CDPATH="" cd -- "$(dirname -- "$0")/../$_d" && pwd -P)/${scriptName}.sh"
-                  if [ -f "$_script" ]; then
-                    exec "$_script" "$@"
-                  fi
-                  done
-                  echo "error: ${scriptName}.sh not found under scripts/ or src/scripts/" >&2
-                  exit 1
+                  }_script="$(CDPATH="" cd -- "$(dirname -- "$0")/.." && pwd -P)/${scriptName}.sh"
+                  exec "$_script" "$@"
                   WRAPPER
                   chmod +x "$out/bin/nucleus-${name}"
-
-                  # Shellcheck wrapper — single file, no subdirectory dependency.
-                  shellcheck --source-path="$out" --source-path="$out/scripts" --source-path="$out/src/scripts" -x "$out/bin/nucleus-${name}"
-
-                  # Shellcheck real script — hard fail if missing to catch config errors.
-                  _real_script="$out/scripts/${scriptName}.sh"
-                  if [ ! -f "$_real_script" ]; then
-                    _real_script="$out/src/scripts/${scriptName}.sh"
-                  fi
-                  if [ ! -f "$_real_script" ]; then
-                    echo "error: ${scriptName}.sh not found in mirror tree" >&2
-                    exit 1
-                  fi
-                  shellcheck --source-path="$out" --source-path="$out/scripts" --source-path="$out/src/scripts" -x "$_real_script"
+                  shellcheck -x "$out/bin/nucleus-${name}"
                 ''
             }
           ''
