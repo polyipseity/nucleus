@@ -17,18 +17,17 @@
 }:
 let
   litellmConfig = "${config.users.users.${username}.home}/.config/nucleus/litellm-config.yml";
-  litellmDaemon = pkgs.writeShellApplication {
+  litellmDaemon = pkgs.writeNucleusShellApplication {
     name = "litellm-daemon";
     runtimeInputs = [ pkgs.litellm ];
-    text = ''
-      exec ${../../scripts/services/litellm-daemon.sh} \
-        "${lib.escapeShellArg litellmConfig}" \
-        "0" \
-        "${lib.escapeShellArg config.sops.secrets."ai_openrouter_api_key".path}" \
-        "${lib.escapeShellArg config.sops.secrets."ai_opencode_go_api_key".path}" \
-        "${lib.escapeShellArg config.sops.secrets."ai_opencode_zen_api_key".path}" \
-        "$@"
-    '';
+    extraEnv = {
+      LITELLM_CONFIG = litellmConfig;
+      LITELLM_EVAL_TIMEOUT = "0";
+      LITELLM_OPENROUTER_API_KEY_PATH = config.sops.secrets."ai_openrouter_api_key".path;
+      LITELLM_OPENGODE_GO_API_KEY_PATH = config.sops.secrets."ai_opencode_go_api_key".path;
+      LITELLM_OPENGODE_ZEN_API_KEY_PATH = config.sops.secrets."ai_opencode_zen_api_key".path;
+    };
+    bundleDefault = true;
   };
 in
 {
@@ -47,7 +46,7 @@ in
     path = [ pkgs.litellm ];
     serviceConfig = {
       Type = "simple";
-      ExecStart = "${litellmDaemon}/bin/litellm-daemon";
+      ExecStart = "${litellmDaemon}/bin/nucleus-litellm-daemon";
       Restart = "always";
       User = "litellm";
       # Protect against resource exhaustion and information leaks.

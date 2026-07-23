@@ -10,14 +10,14 @@
   ...
 }:
 let
-  openManualScript = pkgs.writeShellApplication {
-    name = "nucleus-open-manual";
+  openManualScript = pkgs.writeNucleusShellApplication {
+    name = "open-manual";
     runtimeInputs = [ pkgs.xdg-utils ];
-    text = ''
-      exec ${../../scripts/integrations/open-host-manual.sh} \
-        "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/hosts/NixOS/MANUAL.md" \
-        "$@"
-    '';
+    extraEnv = {
+      NUCLEUS_MANUAL_PATH = "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/hosts/NixOS/MANUAL.md";
+    };
+    bundleDefault = true;
+    scriptName = "integrations/open-host-manual";
   };
 
   # Ghostscript PDF optimization presets (quality descending).
@@ -31,18 +31,15 @@ let
     "screen"
   ];
 
-  # Per-preset Nautilus script with MIME-type guard (Nautilus scripts have no built-in MIME filtering).
-  mkGSPdfOptNautilus =
-    preset:
-    pkgs.writeShellApplication {
-      name = "nucleus-gs-pdf-opt-nautilus-${preset}";
-      runtimeInputs = [ pkgs.file ];
-      text = ''
-        exec ${../../scripts/integrations/configure-file-manager-pdf-opt.sh} \
-          "${preset}" \
-          "$@"
-      '';
+  mkGSPdfOptNautilus = preset: pkgs.writeNucleusShellApplication {
+    name = "gs-pdf-opt-nautilus-${preset}";
+    runtimeInputs = [ pkgs.file ];
+    extraEnv = {
+      PDF_OPT_PRESET = preset;
     };
+    bundleDefault = true;
+    scriptName = "integrations/configure-file-manager-pdf-opt";
+  };
 
   gsPdfOptNautilusScripts = builtins.listToAttrs (
     map (p: {

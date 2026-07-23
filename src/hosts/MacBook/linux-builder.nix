@@ -43,14 +43,13 @@ let
   # default /tmp is auto-cleaned by macOS after 3 days of inactivity, silently
   # breaking the builder after a long sleep.  Use a dedicated /run path that
   # we own and clean ourselves instead.
-  linuxBuilderDaemon = pkgs.writeShellApplication {
+  linuxBuilderDaemon = pkgs.writeNucleusShellApplication {
     name = "linux-builder-daemon";
     runtimeInputs = [ pkg ];
-    text = ''
-      exec ${../../scripts/hosts/MacBook/macos-daemonize-linux-builder.sh} \
-        "${workDir}" \
-        "$@"
-    '';
+    extraEnv = {
+      LINUX_BUILDER_WORK_DIR = workDir;
+    };
+    bundleDefault = true;
   };
 in
 {
@@ -126,7 +125,7 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${linuxBuilderDaemon}/bin/linux-builder-daemon"
+        "exec ${linuxBuilderDaemon}/bin/nucleus-linux-builder-daemon"
       ];
       KeepAlive = true;
       RunAtLoad = true;

@@ -39,14 +39,13 @@ let
     globalConfig + "\n" + builtins.concatStringsSep "\n" virtualHostConfigs
   );
 
-  proxyDaemon = pkgs.writeShellApplication {
+  proxyDaemon = pkgs.writeNucleusShellApplication {
     name = "https-proxy-daemon";
     runtimeInputs = [ pkgs.caddy ];
-    text = ''
-      exec ${../../scripts/services/https-proxy-daemon.sh} \
-        "${caddyfile}" \
-        "$@"
-    '';
+    extraEnv = {
+      CADDYFILE_PATH = caddyfile;
+    };
+    bundleDefault = true;
   };
 
   systemLogDir = config.nucleus.logging.systemLogDir;
@@ -77,7 +76,7 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${proxyDaemon}/bin/https-proxy-daemon"
+        "exec ${proxyDaemon}/bin/nucleus-https-proxy-daemon"
       ];
       KeepAlive = true;
       RunAtLoad = true;
