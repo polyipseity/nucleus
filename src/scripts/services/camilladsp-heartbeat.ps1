@@ -60,6 +60,7 @@ while ($true) {
     }
   } catch {
     # Can't connect — will retry with backoff.
+    $null = $_
   }
 
   if (-not $success) {
@@ -75,6 +76,7 @@ while ($true) {
         $success = $true
       } catch {
         # Device may be gone — retry with backoff.
+        $null = $_
       }
     }
   }

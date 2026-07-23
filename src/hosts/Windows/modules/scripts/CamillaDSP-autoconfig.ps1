@@ -73,6 +73,7 @@ for ($i = 0; $i -lt 30; $i++) {
     break
   } catch {
     # Port not ready or connection failed — retry.
+    $null = $_
   }
 }
 
@@ -118,6 +119,7 @@ $heartbeatTimer = [System.Threading.Timer]::new({
     $ws.CloseAsync([CloseStatus]::NormalClosure, "done", $ct).Wait()
   } catch {
     # Device may be gone — retry on next heartbeat.
+    $null = $_
   }
 }, ($ConfigFile, $Port, $nucleusCfgFile), 5000, 5000)
 
