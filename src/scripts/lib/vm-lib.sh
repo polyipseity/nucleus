@@ -383,7 +383,7 @@ if (Get-Command virt-viewer -ErrorAction SilentlyContinue) {
 EOF
       ;;
     windows-qemu)
-      cat >"$_wss_path_ps1" <<EOF
+      cat >"$_wss_path_ps1" <<'EOF'
 # start-$_wss_name.ps1 — Start VM '$_wss_name' on Windows via QEMU (TCG).
 #Requires -Version 7.4
 
@@ -1051,6 +1051,7 @@ vm_build_nixos() {
     fi
   fi
 
+  # shellcheck disable=SC2153 # reason: VMS_DIR is assigned in vm.sh which sources this file
   _guest_nix="$VMS_DIR/nixos/guest.nix"
   if [ ! -f "$_guest_nix" ]; then
     error "nixos guest config not found: $_guest_nix"
