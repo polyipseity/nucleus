@@ -5,7 +5,7 @@
 .DESCRIPTION
   Manages the CamillaDSP heartbeat lifecycle:
     1. Creates or removes a logon scheduled task that runs
-       scripts/camilladsp-heartbeat.ps1 (persistent-loop daemon with
+       src/scripts/services/camilladsp-heartbeat.ps1 (persistent-loop daemon with
        exponential backoff).
 
   The heartbeat re-applies the config when CamillaDSP restarts after the
@@ -78,7 +78,7 @@ function Sync-CamillaDSPHeartbeatService {
   }
 
   # Resolve path to the shared heartbeat script.
-  $heartbeatScript = Join-Path $PSScriptRoot "..\..\..\..\..\scripts\camilladsp-heartbeat.ps1"
+  $heartbeatScript = Join-Path $PSScriptRoot "..\..\..\..\..\src\scripts\services\camilladsp-heartbeat.ps1"
 
   $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -File `"$heartbeatScript`" -Port $CamillaDSPPort -ConfigFile `"$ConfigFile`""
   $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
