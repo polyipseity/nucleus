@@ -55,7 +55,7 @@ case "$_arch" in
 esac
 
 # Read NixOS ISO digest from lockfile for the current arch.
-_nixos_digest="$(jq -r --arg arch "$_nix_arch" '(.vm-setup.nixos-iso // {})[$arch].digest // "none"' "$REPO_ROOT/src/lockfiles/lockfile.json")"
+_nixos_digest="$(jq -r --arg arch "$_nix_arch" '(."vm-setup"."nixos-iso" // {})[$arch].digest // "none"' "$REPO_ROOT/src/lockfiles/lockfile.json")"
 
 # Check formatting
 if [ "$#" -gt 0 ]; then
