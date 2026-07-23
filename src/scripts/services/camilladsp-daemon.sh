@@ -20,7 +20,7 @@ nucleus_log_dir() {
 }
 
 # --- Argument parsing ---
-ws_port=1234
+ws_port="${WS_PORT:-1234}"
 state_file="$HOME/.local/state/camilladsp/statefile.yml"
 config_file="$HOME/.config/camilladsp/configs/config.yml"
 log_file=""

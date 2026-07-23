@@ -9,27 +9,29 @@ let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   wsPort = toString servicesJSON.camilladsp.network.websocket.port;
 
-  camilladspDaemon = pkgs.writeShellApplication {
+  camilladspDaemon = pkgs.writeNucleusShellApplication {
     name = "camilladsp-daemon";
     runtimeInputs = [
       pkgs.camilladsp
       pkgs.websocat
       pkgs.jq
     ];
-    text = ''
-      exec ${../../scripts/services/camilladsp-daemon.sh} --port "${wsPort}" "$@"
-    '';
+    extraEnv = {
+      WS_PORT = toString wsPort;
+    };
+    bundleDefault = true;
   };
 
-  camilladspHeartbeat = pkgs.writeShellApplication {
+  camilladspHeartbeat = pkgs.writeNucleusShellApplication {
     name = "camilladsp-heartbeat";
     runtimeInputs = [
       pkgs.websocat
       pkgs.jq
     ];
-    text = ''
-      exec ${../../scripts/services/camilladsp-heartbeat.sh} --port "${wsPort}" "$@"
-    '';
+    extraEnv = {
+      WS_PORT = toString wsPort;
+    };
+    bundleDefault = true;
   };
 in
 {
@@ -49,7 +51,7 @@ in
     serviceConfig = {
       Type = "simple";
       User = username;
-      ExecStart = "${camilladspDaemon}/bin/camilladsp-daemon";
+      ExecStart = "${camilladspDaemon}/bin/nucleus-camilladsp-daemon";
       Restart = "always";
       WorkingDirectory = "%h";
     };
@@ -64,7 +66,7 @@ in
       Type = "simple";
       User = username;
       Restart = "always";
-      ExecStart = "${camilladspHeartbeat}/bin/camilladsp-heartbeat";
+      ExecStart = "${camilladspHeartbeat}/bin/nucleus-camilladsp-heartbeat";
     };
     wantedBy = [ "default.target" ];
   };

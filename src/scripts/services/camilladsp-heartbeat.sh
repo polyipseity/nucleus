@@ -13,7 +13,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/require-command-lib.sh"
 
 # --- Argument parsing ---
-ws_port=1234
+ws_port="${WS_PORT:-1234}"
 config_file="$HOME/.config/camilladsp/configs/config.yml"
 
 while [ $# -gt 0 ]; do

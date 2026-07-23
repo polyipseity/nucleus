@@ -19,27 +19,29 @@ let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   wsPort = toString servicesJSON.camilladsp.network.websocket.port;
 
-  camilladspDaemon = pkgs.writeShellApplication {
+  camilladspDaemon = pkgs.writeNucleusShellApplication {
     name = "camilladsp-daemon";
     runtimeInputs = [
       pkgs.camilladsp
       pkgs.websocat
       pkgs.jq
     ];
-    text = ''
-      exec ${../../scripts/services/camilladsp-daemon.sh} --port "${wsPort}" "$@"
-    '';
+    extraEnv = {
+      WS_PORT = toString wsPort;
+    };
+    bundleDefault = true;
   };
 
-  camilladspHeartbeat = pkgs.writeShellApplication {
+  camilladspHeartbeat = pkgs.writeNucleusShellApplication {
     name = "camilladsp-heartbeat";
     runtimeInputs = [
       pkgs.websocat
       pkgs.jq
     ];
-    text = ''
-      exec ${../../scripts/services/camilladsp-heartbeat.sh} --port "${wsPort}" "$@"
-    '';
+    extraEnv = {
+      WS_PORT = toString wsPort;
+    };
+    bundleDefault = true;
   };
 
   envVars = import ../../modules/lib/env-catalog.nix {
@@ -69,7 +71,7 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${camilladspDaemon}/bin/camilladsp-daemon"
+        "exec ${camilladspDaemon}/bin/nucleus-camilladsp-daemon"
       ];
       UserName = username;
       EnvironmentVariables = daemonEnv;
@@ -93,7 +95,7 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${camilladspHeartbeat}/bin/camilladsp-heartbeat"
+        "exec ${camilladspHeartbeat}/bin/nucleus-camilladsp-heartbeat"
       ];
       UserName = username;
       EnvironmentVariables = daemonEnv;

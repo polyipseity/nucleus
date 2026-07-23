@@ -65,13 +65,12 @@ in
   # This is intentionally a user-invoked command instead of an automatic
   # activation phase so destructive purge operations cannot race with
   # writeBoundary defaults application.
-  managedPreferencesGcScript = pkgs.writeShellApplication {
+  managedPreferencesGcScript = pkgs.writeNucleusShellApplication {
     name = "gc-managed-user-preferences";
     runtimeInputs = [ pkgs.nix ];
-    text = ''
-      exec ${../../scripts/services/gc-managed-preferences.sh} \
-        "${builtins.concatStringsSep " " resetUserPreferenceDomains}" \
-        "$@"
-    '';
+    extraEnv = {
+      MANAGED_PREF_DOMAINS = builtins.concatStringsSep " " resetUserPreferenceDomains;
+    };
+    bundleDefault = true;
   };
 }
