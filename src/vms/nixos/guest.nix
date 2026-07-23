@@ -2,7 +2,7 @@
 #
 # Builds a development-ready NixOS system suitable for use as a QEMU/KVM or UTM
 # VM guest, with full parity to the NixOS host configuration (excluding AI models
-# and hypervisor infrastructure).  Used by scripts/vm-setup.sh on macOS and NixOS
+# and hypervisor infrastructure).  Used by scripts/vm.sh on macOS and NixOS
 # hosts via:
 #
 #   nix run github:nix-community/nixos-generators -- \

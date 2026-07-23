@@ -3,7 +3,7 @@
 # Generates UTM 4.x QEMU-backend config.plist templates for each VM declared in
 # src/modules/VMs.json.  Templates are written to
 # ~/.local/share/nucleus/vms/<name>-config.plist at Home Manager activation time
-# and consumed by scripts/vm-setup.sh (nucleus-vm-setup) to create UTM bundles
+# and consumed by scripts/vm.sh (nucleus-vm setup) to create UTM bundles
 # without PlistBuddy invocations.
 #
 # The UUID for each VM is derived deterministically from the VM name via SHA-256
@@ -178,7 +178,7 @@ let
 in
 {
   # Write a UTM config.plist template for each VM declared in VMs.json.
-  # vm-setup.sh copies the appropriate template into the UTM bundle at
+  # vm.sh copies the appropriate template into the UTM bundle at
   # provisioning time so PlistBuddy is no longer needed at runtime.
   home.file = builtins.listToAttrs (
     builtins.map (vm: {

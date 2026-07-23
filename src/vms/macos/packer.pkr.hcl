@@ -17,7 +17,7 @@
 #   - Apple Silicon Mac (Tart requires Virtualization.framework)
 #
 # The resulting VM is stored in ~/virtual machines/.tart/vms/<vm_name>/
-# (via the ~/.tart symlink created by nucleus-vm-setup).
+# (via the ~/.tart symlink created by nucleus-vm setup).
 # Start with: tart run <vm_name> [--no-graphics]
 #
 # Source: https://github.com/cirruslabs/packer-plugin-tart
