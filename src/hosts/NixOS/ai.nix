@@ -17,29 +17,18 @@
 }:
 let
   litellmConfig = "${config.users.users.${username}.home}/.config/nucleus/litellm-config.yml";
-  # litellmDaemon — keep-as-is: SOPS secret paths and config file paths are
-  # Nix-computed values that must be baked in at build time (systemd
-  # ExecStart fixed path, no args).  CLI arg passing is not viable here.
   litellmDaemon = pkgs.writeShellApplication {
     name = "litellm-daemon";
     runtimeInputs = [ pkgs.litellm ];
-    text =
-      builtins.replaceStrings
-        [
-          "__OPENROUTER_API_KEY_PATH__"
-          "__OPENCODE_GO_API_KEY_PATH__"
-          "__OPENCODE_ZEN_API_KEY_PATH__"
-          "__LITELLM_CONFIG__"
-          "__LITELLM_POLL_TIMEOUT__"
-        ]
-        [
-          config.sops.secrets."ai_openrouter_api_key".path
-          config.sops.secrets."ai_opencode_go_api_key".path
-          config.sops.secrets."ai_opencode_zen_api_key".path
-          litellmConfig
-          "0"
-        ]
-        (builtins.readFile ../../scripts/services/litellm-daemon.sh);
+    text = ''
+      exec ${../../scripts/services/litellm-daemon.sh} \
+        "${lib.escapeShellArg litellmConfig}" \
+        "0" \
+        "${lib.escapeShellArg config.sops.secrets."ai_openrouter_api_key".path}" \
+        "${lib.escapeShellArg config.sops.secrets."ai_opencode_go_api_key".path}" \
+        "${lib.escapeShellArg config.sops.secrets."ai_opencode_zen_api_key".path}" \
+        "$@"
+    '';
   };
 in
 {
