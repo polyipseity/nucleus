@@ -13,6 +13,7 @@ macOS 26+ (Sequoia) SIP blocks **system launchd daemons** that have a non-root `
 This restriction only affects the **system domain** (`launchd.daemons`). User domain agents (`launchd.agents`) are not affected because they start after login when the user session is established.
 
 Common symptoms:
+
 - `launchctl print system/<label>` shows `last exit code = 78: EX_CONFIG` and `penalty box` in properties
 - Zero stdout/stderr output (the binary never starts)
 - `bootout + bootstrap` (via `nucleus-svc restart`) works after login
@@ -40,6 +41,7 @@ Apply this to **every** `launchd.daemons` entry with a non-root `UserName`, rega
 ## Recovery from penalty box
 
 When a daemon is stuck in penalty box (EX_CONFIG):
+
 1. `sudo launchctl bootout system/<label>` — clears exit memory
 2. `sudo launchctl bootstrap system /Library/LaunchDaemons/<label>.plist` — reloads
 
