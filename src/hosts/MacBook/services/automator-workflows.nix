@@ -208,7 +208,6 @@ let
     extraEnv = {
       NUCLEUS_MANUAL_PATH = "${repoRoot}/src/hosts/MacBook/MANUAL.md";
     };
-    bundleDefault = true;
     scriptName = "integrations/open-host-manual";
   };
 in

@@ -49,7 +49,6 @@ let
     extraEnv = {
       LINUX_BUILDER_WORK_DIR = workDir;
     };
-    bundleDefault = true;
   };
 in
 {

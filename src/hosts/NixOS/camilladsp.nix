@@ -19,7 +19,6 @@ let
     extraEnv = {
       WS_PORT = toString wsPort;
     };
-    bundleDefault = true;
   };
 
   camilladspHeartbeat = pkgs.writeNucleusShellApplication {
@@ -31,7 +30,6 @@ let
     extraEnv = {
       WS_PORT = toString wsPort;
     };
-    bundleDefault = true;
   };
 in
 {

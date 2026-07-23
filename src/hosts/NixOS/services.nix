@@ -16,7 +16,6 @@ let
     extraEnv = {
       NUCLEUS_MANUAL_PATH = "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/hosts/NixOS/MANUAL.md";
     };
-    bundleDefault = true;
     scriptName = "integrations/open-host-manual";
   };
 
@@ -31,15 +30,16 @@ let
     "screen"
   ];
 
-  mkGSPdfOptNautilus = preset: pkgs.writeNucleusShellApplication {
-    name = "gs-pdf-opt-nautilus-${preset}";
-    runtimeInputs = [ pkgs.file ];
-    extraEnv = {
-      PDF_OPT_PRESET = preset;
+  mkGSPdfOptNautilus =
+    preset:
+    pkgs.writeNucleusShellApplication {
+      name = "gs-pdf-opt-nautilus-${preset}";
+      runtimeInputs = [ pkgs.file ];
+      extraEnv = {
+        PDF_OPT_PRESET = preset;
+      };
+      scriptName = "integrations/configure-file-manager-pdf-opt";
     };
-    bundleDefault = true;
-    scriptName = "integrations/configure-file-manager-pdf-opt";
-  };
 
   gsPdfOptNautilusScripts = builtins.listToAttrs (
     map (p: {

@@ -41,7 +41,6 @@ let
       JELLYFIN_LOG_DIR = "${config.nucleus.logging.systemLogDir}/jellyfin-app";
       JELLYFIN_BIN = "${pkgs.jellyfin}/bin/jellyfin";
     };
-    bundleDefault = true;
   };
 in
 {

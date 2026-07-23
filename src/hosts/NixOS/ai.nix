@@ -27,7 +27,6 @@ let
       LITELLM_OPENGODE_GO_API_KEY_PATH = config.sops.secrets."ai_opencode_go_api_key".path;
       LITELLM_OPENGODE_ZEN_API_KEY_PATH = config.sops.secrets."ai_opencode_zen_api_key".path;
     };
-    bundleDefault = true;
   };
 in
 {

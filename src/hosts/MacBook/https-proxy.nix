@@ -45,7 +45,6 @@ let
     extraEnv = {
       CADDYFILE_PATH = caddyfile;
     };
-    bundleDefault = true;
   };
 
   systemLogDir = config.nucleus.logging.systemLogDir;
