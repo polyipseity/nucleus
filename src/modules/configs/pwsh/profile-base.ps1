@@ -517,13 +517,14 @@ function npx {
   Write-Host "         Use bun x <cmd> for one-shot package execution instead." -ForegroundColor Yellow
   return 1
 }
-function node {
+function Invoke-NucleusNode {
   Write-Host "shell: system-wide Node.js is not used in this environment." -ForegroundColor Yellow
   Write-Host "         Use bun as the JavaScript runtime instead:" -ForegroundColor Yellow
   Write-Host "         - bun <script>   (run a script)" -ForegroundColor Yellow
   Write-Host "         - bun run        (run package.json scripts)" -ForegroundColor Yellow
   return 1
 }
+Set-Alias -Name node -Value Invoke-NucleusNode
 function corepack {
   Write-Host "shell: corepack is not used in this environment." -ForegroundColor Yellow
   Write-Host "         Use bun for package management instead." -ForegroundColor Yellow
