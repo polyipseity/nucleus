@@ -9,7 +9,8 @@
 # Usage: camilladsp-heartbeat.sh [--port PORT] [--config FILE]
 set -euo pipefail
 
-# require_command() is provided via require-command-lib.sh (prepended at build time).
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/require-command-lib.sh"
 
 # --- Argument parsing ---
 ws_port=1234

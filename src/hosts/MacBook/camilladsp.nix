@@ -27,7 +27,6 @@ let
       pkgs.jq
     ];
     text = ''
-      ${builtins.readFile ./../../scripts/lib/require-command-lib.sh}
       exec ${../../scripts/services/camilladsp-daemon.sh} --port "${wsPort}" "$@"
     '';
   };
@@ -39,7 +38,6 @@ let
       pkgs.jq
     ];
     text = ''
-      ${builtins.readFile ./../../scripts/lib/require-command-lib.sh}
       exec ${../../scripts/services/camilladsp-heartbeat.sh} --port "${wsPort}" "$@"
     '';
   };
