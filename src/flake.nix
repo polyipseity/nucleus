@@ -599,11 +599,11 @@
           runtimeInputs = [ pkgs.jq ];
         };
 
-      # Build VM setup app for POSIX hosts.
-      mkVMSetupApp =
+      # Build unified VM management app for POSIX hosts.
+      mkVmApp =
         pkgs:
         mkApp pkgs {
-          name = "vm-setup";
+          name = "vm";
           runtimeInputs = [ pkgs.jq ];
         };
 
@@ -774,8 +774,8 @@
             pkgs.sops
           ];
         };
-        nucleus-vm-setup = writeNucleusShellApplication pkgs {
-          name = "vm-setup";
+        nucleus-vm = writeNucleusShellApplication pkgs {
+          name = "vm";
           runtimeInputs = [ pkgs.jq ];
         };
       };
@@ -817,7 +817,7 @@
           replica-sync = mkReplicaSyncApp pkgsMac;
           update = mkUpdateApp pkgsMac;
           svc = mkSvcApp pkgsMac;
-          vm-setup = mkVMSetupApp pkgsMac;
+          vm = mkVmApp pkgsMac;
         };
         "${systems.linux}" = {
           ai-sync = mkAiSyncApp pkgsLinux;
@@ -846,7 +846,7 @@
           replica-sync = mkReplicaSyncApp pkgsLinux;
           update = mkUpdateApp pkgsLinux;
           svc = mkSvcApp pkgsLinux;
-          vm-setup = mkVMSetupApp pkgsLinux;
+          vm = mkVmApp pkgsLinux;
         };
       };
 
