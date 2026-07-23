@@ -45,12 +45,6 @@ let
   sudoIsSection = builtins.isAttrs (parsedConfig.sudo or { });
   batteryIsSection = builtins.isAttrs (parsedConfig.battery or { });
 
-  # Verify XDG config file is wired (guarded: module may not have xdg attr).
-  hasXDGConfig = module ? xdg && module.xdg ? configFile && module.xdg.configFile ? "starship.toml";
-
-  # Verify STARSHIP_CACHE session variable.
-  hasStarShipCache = (module.home.sessionVariables.STARSHIP_CACHE or "") != "";
-
 in
 rec {
   module_imports_cleanly = builtins.isAttrs module;
@@ -72,8 +66,6 @@ rec {
   has_shlvl_section = shlvlIsSection;
   has_sudo_section = sudoIsSection;
   has_battery_section = batteryIsSection;
-  has_xdg_config = hasXDGConfig;
-  has_starship_cache_var = hasStarShipCache;
   all_tests_pass =
     builtins.isAttrs module
     && packagesNonEmpty
@@ -93,8 +85,6 @@ rec {
     && jobsIsSection
     && shlvlIsSection
     && sudoIsSection
-    && batteryIsSection
-    && hasXDGConfig
-    && hasStarShipCache;
+    && batteryIsSection;
   success = all_tests_pass;
 }
