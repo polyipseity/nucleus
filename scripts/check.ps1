@@ -8,37 +8,60 @@
 # DSC validation). New checks should be inserted at their alphabetical position
 # within the appropriate group, respecting any dependency constraints.
 #
-# Toolchain checks (1-2):
-#   1. PowerShell syntax validation
-#   2. Packer template validation
+# Toolchain checks (1-3):
+#   1. Shell script linting (shellcheck) (stub on Windows)
+#   2. PowerShell syntax validation
+#   3. Packer template validation
 #
-# Nix checks (3-7, stubs on Windows):
-#   3. Dead Nix code (stub)
-#   4. Nix flake evaluation (stub)
-#   5. Nix formatting (nixfmt) (stub)
-#   6. Nix lint (nixf-tidy) (stub)
-#   7. Stale Nix build artifact check
+# Nix checks (4-8, stubs on Windows):
+#   4. Dead Nix code (stub)
+#   5. Nix flake evaluation (stub)
+#   6. Nix formatting (nixfmt) (stub)
+#   7. Nix lint (nixf-tidy) (stub)
+#   8. Stale Nix build artifact check
 #
-# Test suites (8-11, stubs on Windows):
-#   8. Shell script validation tests (stub)
-#   9. CWD-independence tests (stub)
-#  10. Nix search path tests (stub)
-#  11. Port utility function tests (stub)
+# Test suites (9-12, stubs on Windows):
+#   9. Shell script validation tests (stub)
+#  10. CWD-independence tests (stub)
+#  11. Nix search path tests (stub)
+#  12. Port utility function tests (stub)
 #
-# Data integrity (12-17):
-#  12. Lockfile validation
-#  13. Locked DSC validation
-#  14. Schema validation (JSON/YAML)
-#  15. Service registry validation
-#  16. YAML validation
-#  17. YAML linting (yamllint)
+# Data integrity (13-18):
+#  13. Lockfile validation
+#  14. Locked DSC validation
+#  15. Schema validation (JSON/YAML)
+#  16. Service registry validation
+#  17. YAML validation
+#  18. YAML linting (yamllint)
 #
-# Policy/verification (18-22):
-#  18. Package manager usage enforcement
-#  19. Undocumented error suppression check
-#  20. Online determinism checks (--verify mode only)
-#  21. Config method compliance
-#  22. Activation script token placeholder in comment check
+# Policy/verification (19-23):
+#  19. Package manager usage enforcement
+#  20. Undocumented error suppression check
+#  21. Online determinism checks (--verify mode only)
+#  22. Config method compliance
+#  23. Activation script token placeholder in comment check
+#
+# Always-run checks:
+# Some checks require full-repo context and skip when path-scoped (--scoped
+# or paths given). These are marked "skipping (path-scoped mode)" in output:
+#   - Dead Nix code detection (deadnix)               (step 4, stub)
+#   - Nix flake evaluation                            (step 5, stub)
+#   - Stale Nix build artifact check                  (step 8)
+#   - All test suites (steps 9-12, stubs)
+#   - Lockfile section validation (but overlap + lifecycle checks always run)
+#   - Locked DSC validation
+#   - Schema validation
+#   - Service registry validation
+#   - Package manager usage enforcement               (step 19)
+#   - Config method compliance                        (step 22)
+#   - Activation script token placeholder check       (step 23)
+# Checks that accept path filtering run in both modes, scoped to the
+# provided files:
+#   - Shell script linting (shellcheck) (stub)        (step 1)
+#   - PowerShell syntax validation                   (step 2)
+#   - Packer template validation                     (step 3)
+#   - YAML validation/linting                        (steps 17-18)
+#   - Undocumented error suppression                 (step 20)
 #
 # Output conventions:
 #   All messages (info, success, skip, warning) go to stdout.
