@@ -231,7 +231,7 @@ require_command shellcheck
 require_command check-jsonschema
 require_command yamllint
 
-# Shell script linting (shellcheck)
+# sh_lint — Shell script linting (shellcheck)
 section "$((_step += 1))" "Shell script linting (shellcheck)"
 _sc_exit=0
 if [ "${#SH_FILES[@]}" -gt 0 ]; then
@@ -246,7 +246,7 @@ fi
 if [ $_sc_exit -ne 0 ]; then exit_code=$_sc_exit; fi
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
-# PowerShell syntax validation (parser only, no PSScriptAnalyzer)
+# powershell_syntax — PowerShell syntax validation (parser only, no PSScriptAnalyzer)
 section "$((_step += 1))" "PowerShell syntax validation"
 _ps_exit=0
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
@@ -259,7 +259,7 @@ fi
 if [ $_ps_exit -ne 0 ]; then exit_code=$_ps_exit; fi
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Packer template validation
+# packer_validate — Packer template validation
 section "$((_step += 1))" "Packer template validation"
 if [ "${#PKR_FILES[@]}" -gt 0 ]; then
   bash scripts/check-packer.sh "${PKR_FILES[@]}" || exit_code=$?
@@ -270,7 +270,7 @@ else
 fi
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Dead Nix code detection
+# dead_nix — Dead Nix code detection
 section "$((_step += 1))" "Dead Nix code"
 if [ ${#NIX_FILES[@]} -gt 0 ]; then
   if ! deadnix --fail "${NIX_FILES[@]}"; then
@@ -290,7 +290,7 @@ else
   say "skipping deadnix (path-scoped mode)."
 fi
 
-# Always-run: Nix flake evaluation
+# nix_flake_eval — Always-run: Nix flake evaluation
 section "$((_step += 1))" "Nix flake evaluation"
 sys=$(nix eval --impure --expr 'builtins.currentSystem' --raw 2>/dev/null || echo 'aarch64-darwin')
 if ! nix eval --impure "path:./src#packages.$sys" >/dev/null; then
@@ -300,7 +300,7 @@ else
 fi
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Nix formatting check
+# nix_format — Nix formatting (nixfmt)
 section "$((_step += 1))" "Nix formatting (nixfmt)"
 if [ "${#NIX_FILES[@]}" -gt 0 ]; then
   if $FORMAT_NIX; then
@@ -321,7 +321,7 @@ else
   say "skipping nixfmt (no Nix files to check)."
 fi
 
-# Nix lint check (nixf-tidy)
+# nix_lint — Nix lint check (nixf-tidy)
 section "$((_step += 1))" "Nix lint (nixf-tidy)"
 _nixf_errors=0
 if [ "${#NIX_FILES[@]}" -gt 0 ]; then
@@ -365,7 +365,7 @@ else
 fi
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Always-run: Stale Nix build artifact check
+# stale_nix_artifact — Always-run: Stale Nix build artifact check
 section "$((_step += 1))" "Stale Nix build artifact check"
 _cnba_output="$("$SCRIPT_DIR/cleanup-nix.sh" --dry-run 2>&1)"
 if echo "$_cnba_output" | grep -q "would remove stale Nix build symlink"; then
@@ -379,27 +379,27 @@ else
 fi
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Always-run: Shell script validation tests
+# shell_validation_test — Always-run: Shell script validation tests
 section "$((_step += 1))" "Shell script validation tests"
 bash tests/scripts/script-validation-tests.sh || exit_code=$?
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Always-run: CWD-independence tests
+# cwd_independence_test — Always-run: CWD-independence tests
 section "$((_step += 1))" "CWD-independence tests"
 bash tests/scripts/cwd-independence-tests.sh || exit_code=$?
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Always-run: Nix search path tests
+# nix_search_path_test — Always-run: Nix search path tests
 section "$((_step += 1))" "Nix search path tests"
 bash tests/scripts/nix-search-path-tests.sh || exit_code=$?
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Always-run: Port utility function tests
+# port_util_test — Always-run: Port utility function tests
 section "$((_step += 1))" "Port utility function tests"
 bash tests/scripts/lib-port-functions-tests.sh || exit_code=$?
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Lockfile validation
+# lockfile_validation — Lockfile validation
 section "$((_step += 1))" "Lockfile validation"
 
 # Consistency and overlap checks (always run, even in path-scoped mode):
@@ -564,7 +564,7 @@ if [ -f "$_lfpath" ]; then
     "$FAIL_FAST" && exit $exit_code
   fi
 
-# Always-run: Locked DSC validation
+# locked_dsc_validation — Always-run: Locked DSC validation
 section "$((_step += 1))" "Locked DSC validation"
 # Platform parallel: check.ps1 uses powershell-yaml with normalization helpers (Windows-native equivalent).
 _dsc_system_dir="src/hosts/Windows/system"
@@ -613,7 +613,7 @@ _dsc_system_dir="src/hosts/Windows/system"
   fi
   say "locked DSC validation passed"
 
-# Schema validation (JSON/YAML) — path-scopable
+# schema_validation — Schema validation (JSON/YAML) — path-scopable
 section "$((_step += 1))" "Schema validation (JSON/YAML)"
 _jsonschema_errors=0
 if $HAS_ARGS; then
@@ -681,7 +681,7 @@ fi
 say "schema validation passed."
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Always-run: Service registry validation
+# service_registry_validation — Always-run: Service registry validation
 section "$((_step += 1))" "Service registry validation"
   _svc_json="src/modules/services.json"
   _svc_errors=0
@@ -811,7 +811,7 @@ section "$((_step += 1))" "Service registry validation"
   fi
   say "services.json validation passed"
 
-# YAML validation
+# yaml_validation — YAML validation
 section "$((_step += 1))" "YAML validation"
 _yaml_errors=0
 if $HAS_ARGS; then
@@ -842,7 +842,7 @@ fi
 say "YAML validation passed."
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
-# YAML linting (yamllint)
+# yaml_lint — YAML linting (yamllint)
 section "$((_step += 1))" "YAML linting (yamllint)"
 _yaml_lint_errors=0
 if $HAS_ARGS; then
@@ -872,7 +872,7 @@ fi
 say "YAML linting passed."
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Always-run: Package manager usage enforcement
+# package_manager_enforcement — Always-run: Package manager usage enforcement
 section "$((_step += 1))" "Package manager usage enforcement"
 # Ban bare `pip install` and `npm install` — these bypass the lockfile and
 # produce non-reproducible environments.  `uv pip install` is allowed (uv
@@ -901,7 +901,7 @@ if [ "$_violations" -gt 0 ]; then
 fi
 say "no package manager violations found."
 
-# Undocumented error suppression check
+# suppression_doc — Undocumented error suppression check
 section "$((_step += 1))" "Undocumented error suppression"
 _undoc_supp_out="$(mktemp)" || { warn "failed to create temp file"; exit_code=1; "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code; }
 
@@ -969,7 +969,7 @@ else
 fi
 rm -f "$_undoc_supp_out"
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
-# Online determinism checks (--verify mode only)
+# online_determinism — Online determinism checks (--verify mode only)
 section "$((_step += 1))" "Online determinism checks (--verify)"
 if $VERIFY; then
   bash "$SCRIPT_DIR/bump-lockfile.sh" --verify || exit_code=$?
@@ -981,7 +981,7 @@ else
   say "skipping (use --verify to run online determinism checks)."
 fi
 
-# Always-run: Config method compliance
+# config_method_compliance — Always-run: Config method compliance
 section "$((_step += 1))" "Config method compliance"
 _cfg_dir="src/modules/configs"
 _cfg_errors=0
@@ -1038,7 +1038,7 @@ fi
 say "config method compliance passed."
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Activation script token placeholder in comment check
+# activation_token_placeholder — Activation script token placeholder in comment check
 section "$((_step += 1))" "Activation script token placeholder in comment check"
 _act_temp="$(mktemp)" || { warn "failed to create temp file"; exit_code=1; "$FAIL_FAST" && exit $exit_code; }
 
