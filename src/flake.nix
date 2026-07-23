@@ -296,7 +296,7 @@
       # PATH from runtimeInputs and execs the real script from the mirror tree.
       # This guarantees that $SCRIPT_DIR resolves identically in both source and
       # build contexts.
-      runNucleusShellApp =
+      writeNucleusShellApplication =
         pkgs:
         {
           name,
@@ -304,6 +304,7 @@
           runtimeInputs ? [ ],
           extraEnv ? { },
           bundleDefault ? true,
+          text ? null,
           meta ? { },
         }:
         let
@@ -314,11 +315,12 @@
         in
         assert assertAssertMsg
           (
-            bundleDefault
+            text != null
+            || bundleDefault
             || builtins.pathExists (../scripts + "/${name}.sh")
             || builtins.pathExists (./scripts + "/${name}.sh")
           )
-          "runNucleusShellApp: bundleDefault is false but script '${name}.sh' not found in scripts/ or src/scripts/";
+          "writeNucleusShellApplication: bundleDefault is false and text is null but script '${name}.sh' not found in scripts/ or src/scripts/";
         pkgs.runCommand "${name}-nucleus-app"
           {
             strictDeps = true; # hermetic build
@@ -327,55 +329,76 @@
           ''
             mkdir -p "$out/bin" "$out/scripts" "$out/src/scripts"
 
-            ${lib.optionalString bundleDefault ''
+            ${lib.optionalString (bundleDefault && text == null) ''
               # Mirror all scripts with exact repo structure.
               cp -r --no-preserve=mode ${../scripts}/. "$out/scripts/"
               cp -r --no-preserve=mode ${./scripts}/. "$out/src/scripts/"
             ''}
 
-            # Create thin wrapper with runtime subdirectory detection.
-            cat > "$out/bin/nucleus-${name}" << 'WRAPPER'
-            #!${pkgs.runtimeShell}
-            set -euo pipefail
-            export PATH="${lib.makeBinPath runtimeInputs}:$PATH"
             ${
-              lib.concatStringsSep "\n" (
-                lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") extraEnv
-              )
-            }for _d in scripts src/scripts; do
-              _script="$(CDPATH="" cd -- "$(dirname -- "$0")/../$_d" && pwd -P)/${scriptName}.sh"
-              if [ -f "$_script" ]; then
-                exec "$_script" "$@"
-              fi
-            done
-            echo "error: ${scriptName}.sh not found under scripts/ or src/scripts/" >&2
-            exit 1
-            WRAPPER
-            chmod +x "$out/bin/nucleus-${name}"
+              if text != null then
+                ''
+                  # Write script directly from text parameter — no mirror tree or exec-discovery.
+                  cat > "$out/bin/nucleus-${name}" << 'WRAPPER'
+                  #!${pkgs.runtimeShell}
+                  set -euo pipefail
+                  export PATH="${lib.makeBinPath runtimeInputs}:$PATH"
+                  ${
+                    lib.concatStringsSep "\n" (
+                      lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") extraEnv
+                    )
+                  }${text}
+                  WRAPPER
+                  chmod +x "$out/bin/nucleus-${name}"
+                  shellcheck -x "$out/bin/nucleus-${name}"
+                ''
+              else
+                ''
+                    # Create thin wrapper with runtime subdirectory detection.
+                    cat > "$out/bin/nucleus-${name}" << 'WRAPPER'
+                    #!${pkgs.runtimeShell}
+                    set -euo pipefail
+                    export PATH="${lib.makeBinPath runtimeInputs}:$PATH"
+                    ${
+                      lib.concatStringsSep "\n" (
+                        lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") extraEnv
+                      )
+                    }for _d in scripts src/scripts; do
+                    _script="$(CDPATH="" cd -- "$(dirname -- "$0")/../$_d" && pwd -P)/${scriptName}.sh"
+                    if [ -f "$_script" ]; then
+                      exec "$_script" "$@"
+                    fi
+                  done
+                  echo "error: ${scriptName}.sh not found under scripts/ or src/scripts/" >&2
+                  exit 1
+                  WRAPPER
+                  chmod +x "$out/bin/nucleus-${name}"
 
-            # Shellcheck wrapper — single file, no subdirectory dependency.
-            shellcheck --source-path="$out" --source-path="$out/scripts" --source-path="$out/src/scripts" -x "$out/bin/nucleus-${name}"
+                  # Shellcheck wrapper — single file, no subdirectory dependency.
+                  shellcheck --source-path="$out" --source-path="$out/scripts" --source-path="$out/src/scripts" -x "$out/bin/nucleus-${name}"
 
-            # Shellcheck real script — hard fail if missing to catch config errors.
-            _real_script="$out/scripts/${scriptName}.sh"
-            if [ ! -f "$_real_script" ]; then
-              _real_script="$out/src/scripts/${scriptName}.sh"
-            fi
-            if [ ! -f "$_real_script" ]; then
-              echo "error: ${scriptName}.sh not found in mirror tree" >&2
-              exit 1
-            fi
-            shellcheck --source-path="$out" --source-path="$out/scripts" --source-path="$out/src/scripts" -x "$_real_script"
+                  # Shellcheck real script — hard fail if missing to catch config errors.
+                  _real_script="$out/scripts/${scriptName}.sh"
+                  if [ ! -f "$_real_script" ]; then
+                    _real_script="$out/src/scripts/${scriptName}.sh"
+                  fi
+                  if [ ! -f "$_real_script" ]; then
+                    echo "error: ${scriptName}.sh not found in mirror tree" >&2
+                    exit 1
+                  fi
+                  shellcheck --source-path="$out" --source-path="$out/scripts" --source-path="$out/src/scripts" -x "$_real_script"
+                ''
+            }
           ''
         // {
           inherit meta;
         };
 
-      # Helper for `nix run .#<name>` apps. Delegates to runNucleusShellApp.
+      # Helper for `nix run .#<name>` apps. Delegates to writeNucleusShellApplication.
       mkApp =
         pkgs: args:
         let
-          pkg = runNucleusShellApp pkgs args;
+          pkg = writeNucleusShellApplication pkgs args;
         in
         {
           type = "app";
@@ -383,13 +406,13 @@
         };
 
       # App wrapper for `nix run .#apply`. Sibling scripts (secrets/*,
-      # install-prek-hooks) are bundled automatically by runNucleusShellApp's
+      # install-prek-hooks) are bundled automatically by writeNucleusShellApplication's
       # default mirror, so apply.sh resolves them via $_ash_script_dir as
       # before.
       mkApplyApp = pkgs: {
         type = "app";
         program = "${
-          runNucleusShellApp pkgs {
+          writeNucleusShellApplication pkgs {
             name = "apply";
             runtimeInputs = [
               pkgs.curl
@@ -407,8 +430,8 @@
       # PowerShell syntax validation (bundled deps so CI doesn't need system packages).
       mkCheckPwshPackage =
         pkgs:
-        pkgs.writeShellApplication {
-          name = "nucleus-check-pwsh";
+        writeNucleusShellApplication pkgs {
+          name = "check-pwsh";
           runtimeInputs = [
             pkgs.git
             pkgs.powershell
@@ -613,7 +636,7 @@
       # Build the full set of nucleus app packages for a given package set.
       # Used by home-manager (home.packages) and flake packages output.
       mkNucleusApps = pkgs: {
-        nucleus-apply = runNucleusShellApp pkgs {
+        nucleus-apply = writeNucleusShellApplication pkgs {
           name = "apply";
           runtimeInputs = [
             pkgs.curl
@@ -625,19 +648,19 @@
             pkgs.ssh-to-age
           ];
         };
-        nucleus-ai-sync = runNucleusShellApp pkgs {
+        nucleus-ai-sync = writeNucleusShellApplication pkgs {
           name = "ai-sync";
           runtimeInputs = [ pkgs.jq ];
         };
-        nucleus-bootstrap = runNucleusShellApp pkgs {
+        nucleus-bootstrap = writeNucleusShellApplication pkgs {
           name = "bootstrap";
           runtimeInputs = [ ];
         };
-        nucleus-bump-lockfile = runNucleusShellApp pkgs {
+        nucleus-bump-lockfile = writeNucleusShellApplication pkgs {
           name = "bump-lockfile";
           runtimeInputs = [ pkgs.jq ];
         };
-        nucleus-check = runNucleusShellApp pkgs {
+        nucleus-check = writeNucleusShellApplication pkgs {
           name = "check";
           runtimeInputs = [
             pkgs.bash
@@ -653,7 +676,7 @@
             pkgs.yq-go
           ];
         };
-        nucleus-check-packer = runNucleusShellApp pkgs {
+        nucleus-check-packer = writeNucleusShellApplication pkgs {
           name = "check-packer";
           runtimeInputs = [
             pkgs.bash
@@ -661,7 +684,7 @@
           ];
         };
         nucleus-check-pwsh = mkCheckPwshPackage pkgs;
-        nucleus-check-sh = runNucleusShellApp pkgs {
+        nucleus-check-sh = writeNucleusShellApplication pkgs {
           name = "check-sh";
           runtimeInputs = [
             pkgs.bash
@@ -669,11 +692,11 @@
             pkgs.shellcheck
           ];
         };
-        nucleus-cleanup-nix = runNucleusShellApp pkgs {
+        nucleus-cleanup-nix = writeNucleusShellApplication pkgs {
           name = "cleanup-nix";
           runtimeInputs = [ pkgs.bash ];
         };
-        nucleus-cloud-setup = runNucleusShellApp pkgs {
+        nucleus-cloud-setup = writeNucleusShellApplication pkgs {
           name = "cloud-setup";
           runtimeInputs = [
             pkgs.git
@@ -681,15 +704,15 @@
             pkgs.rclone
           ];
         };
-        nucleus-config = runNucleusShellApp pkgs {
+        nucleus-config = writeNucleusShellApplication pkgs {
           name = "config";
           runtimeInputs = [ pkgs.jq ];
         };
-        nucleus-gs-pdf-opt = runNucleusShellApp pkgs {
+        nucleus-gs-pdf-opt = writeNucleusShellApplication pkgs {
           name = "gs-pdf-opt";
           runtimeInputs = [ pkgs.ghostscript ];
         };
-        nucleus-gc = runNucleusShellApp pkgs {
+        nucleus-gc = writeNucleusShellApplication pkgs {
           name = "gc";
           runtimeInputs = [
             pkgs.jq
@@ -697,7 +720,7 @@
             pkgs.home-manager
           ];
         };
-        nucleus-health-check = runNucleusShellApp pkgs {
+        nucleus-health-check = writeNucleusShellApplication pkgs {
           name = "health-check";
           runtimeInputs = [
             pkgs.curl
@@ -706,14 +729,14 @@
             pkgs.sops
           ];
         };
-        nucleus-replica-reset = runNucleusShellApp pkgs {
+        nucleus-replica-reset = writeNucleusShellApplication pkgs {
           name = "replica-reset";
           runtimeInputs = [
             pkgs.git
             pkgs.jq
           ];
         };
-        nucleus-replica-sync = runNucleusShellApp pkgs {
+        nucleus-replica-sync = writeNucleusShellApplication pkgs {
           name = "replica-sync";
           runtimeInputs = [
             pkgs.git
@@ -721,15 +744,15 @@
             pkgs.rclone
           ];
         };
-        nucleus-svc = runNucleusShellApp pkgs {
+        nucleus-svc = writeNucleusShellApplication pkgs {
           name = "svc";
           runtimeInputs = [ pkgs.jq ];
         };
-        nucleus-service-watchdog = runNucleusShellApp pkgs {
+        nucleus-service-watchdog = writeNucleusShellApplication pkgs {
           name = "service-watchdog";
           runtimeInputs = [ pkgs.jq ];
         };
-        nucleus-test = runNucleusShellApp pkgs {
+        nucleus-test = writeNucleusShellApplication pkgs {
           name = "test";
           runtimeInputs = [
             pkgs.bash
@@ -739,14 +762,14 @@
             pkgs.shellcheck
           ];
         };
-        nucleus-update = runNucleusShellApp pkgs {
+        nucleus-update = writeNucleusShellApplication pkgs {
           name = "update";
           runtimeInputs = [
             pkgs.gnupg
             pkgs.sops
           ];
         };
-        nucleus-vm-setup = runNucleusShellApp pkgs {
+        nucleus-vm-setup = writeNucleusShellApplication pkgs {
           name = "vm-setup";
           runtimeInputs = [ pkgs.jq ];
         };
