@@ -63,8 +63,8 @@ if ([Environment]::UserInteractive -and -not (Test-NucleusAgentSession) -and (Ge
 # The hook first checks for the canonical generated shims so already-
 # provisioned repos stay quiet across new shell sessions, then falls back
 # to a per-session cache to avoid repeated installs after the first run.
-$global:__nucleusPrekCheckedRepos = @{}
-$global:__nucleusPrekInstallInProgress = $false
+$script:__nucleusPrekCheckedRepos = @{}
+$script:__nucleusPrekInstallInProgress = $false
 function Test-PrekHooksInstalled {
   param(
     [Parameter(Mandatory = $true)]
@@ -126,19 +126,19 @@ function Invoke-PrekHookInstallIfNeeded {
   if (-not (Test-Path -Path $prekConfigPath -PathType Leaf)) {
     return
   }
-  if ($global:__nucleusPrekInstallInProgress) {
+  if ($script:__nucleusPrekInstallInProgress) {
     return
   }
-  if ($global:__nucleusPrekCheckedRepos.ContainsKey($repoRoot)) {
+  if ($script:__nucleusPrekCheckedRepos.ContainsKey($repoRoot)) {
     return
   }
   if (Test-PrekHooksInstalled -RepositoryRoot $repoRoot) {
-    $global:__nucleusPrekCheckedRepos[$repoRoot] = $true
+    $script:__nucleusPrekCheckedRepos[$repoRoot] = $true
     return
   }
 
-  $global:__nucleusPrekInstallInProgress = $true
-  Write-Host "prek: installing hooks in $repoRoot" -ForegroundColor Cyan
+  $script:__nucleusPrekInstallInProgress = $true
+  Write-Output "prek: installing hooks in $repoRoot"
   Push-Location $repoRoot
   try {
     & prek install
@@ -146,19 +146,19 @@ function Invoke-PrekHookInstallIfNeeded {
       throw "prek install failed with exit code $LASTEXITCODE"
     }
 
-    $global:__nucleusPrekCheckedRepos[$repoRoot] = $true
+    $script:__nucleusPrekCheckedRepos[$repoRoot] = $true
   }
   catch {
     Write-Warning "prek: failed to install hooks in $repoRoot — $($_.Exception.Message)"
   }
   finally {
-    $global:__nucleusPrekInstallInProgress = $false
+    $script:__nucleusPrekInstallInProgress = $false
     Pop-Location
   }
 }
 
-if (-not $global:__nucleusPrekPromptWrapped) {
-  $global:__nucleusPrekPromptWrapped = $true
+if (-not $script:__nucleusPrekPromptWrapped) {
+  $script:__nucleusPrekPromptWrapped = $true
   $global:__nucleusPrekPreviousPrompt = if (Test-Path Function:\prompt) {
     (Get-Command prompt -CommandType Function).ScriptBlock
   } else {
@@ -458,7 +458,7 @@ function Invoke-NucleusManagedDevTool {
 # pass through to the rustup shim.  Otherwise, fall back to the managed
 # default toolchain installed by apply.
 function bun {
-  if (Invoke-NucleusManagedDevTool -ToolName "bun" -FallbackBinDirectory "${global:NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
+  if (Invoke-NucleusManagedDevTool -ToolName "bun" -FallbackBinDirectory "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
     return
   }
   Write-Host "shell: managed bun is unavailable right now." -ForegroundColor Yellow
@@ -469,7 +469,7 @@ function bun {
   return 1
 }
 function cargo {
-  if (Invoke-NucleusManagedDevTool -ToolName "cargo" -FallbackBinDirectory "${global:NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
+  if (Invoke-NucleusManagedDevTool -ToolName "cargo" -FallbackBinDirectory "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
     return
   }
   Write-Host "shell: managed cargo is unavailable right now." -ForegroundColor Yellow
@@ -479,7 +479,7 @@ function cargo {
   return 1
 }
 function rustc {
-  if (Invoke-NucleusManagedDevTool -ToolName "rustc" -FallbackBinDirectory "${global:NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
+  if (Invoke-NucleusManagedDevTool -ToolName "rustc" -FallbackBinDirectory "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
     return
   }
   Write-Host "shell: managed rustc is unavailable right now." -ForegroundColor Yellow
@@ -489,7 +489,7 @@ function rustc {
   return 1
 }
 function uv {
-  if (Invoke-NucleusManagedDevTool -ToolName "uv" -FallbackBinDirectory "${global:NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
+  if (Invoke-NucleusManagedDevTool -ToolName "uv" -FallbackBinDirectory "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
     return
   }
   Write-Host "shell: managed uv is unavailable right now." -ForegroundColor Yellow

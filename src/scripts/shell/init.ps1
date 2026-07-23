@@ -2,7 +2,6 @@
 # Manual edits will be overwritten on the next `nix run .#apply`.
 
 
-
 # Managed PATH: prepend dirs (before system default).
 __MANAGED_PREPEND_PATH__
 
@@ -19,7 +18,7 @@ $env:CXX = "__ENV_CXX__"
 $env:LD = "__ENV_LD__"
 
 # Managed default dev tools path for profile functions.
-$global:NUCLEUS_DEFAULT_DEV_TOOLS = "__DEFAULT_DEV_TOOLS_PATH__"
+$script:NUCLEUS_DEFAULT_DEV_TOOLS = "__DEFAULT_DEV_TOOLS_PATH__"
 
 # ---------------------------------------------------------------
 # AI agent session detection
