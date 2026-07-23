@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Build/update nix-index file database.
 # CLI args: nix_index_bin max_age_days
+# Env var fallbacks: NIX_INDEX_NAME, NIX_INDEX_MAX_AGE_DAYS
 set -euo pipefail
 
-
-_uni_nix_index_bin="$1"
-_uni_max_age_days="$2"
+_uni_nix_index_bin="${NIX_INDEX_NAME:-${1:?usage: update-nix-index.sh <nix_index_bin> [max_age_days]}}"
+_uni_max_age_days="${NIX_INDEX_MAX_AGE_DAYS:-${2:-}}"
 
 _db_file="$HOME/.cache/nix-index/files"
 

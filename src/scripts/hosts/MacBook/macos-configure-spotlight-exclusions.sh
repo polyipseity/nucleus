@@ -14,7 +14,7 @@ mkdir -p "$DEV_ROOT"
 # Names are Nix-controlled ASCII without special characters.
 _find_args=()
 # shellcheck disable=SC2086 # reason: word splitting intentional for space-separated names from Nix
-for _name in ${1:?usage: macos-configure-spotlight-exclusions.sh '<name> [name ...]>'}; do
+for _name in ${SPOTLIGHT_EXCLUDED_DIR_NAMES:-${1:?usage: macos-configure-spotlight-exclusions.sh '<name> [name ...]>'}}; do
   _find_args+=(-name "$_name" -o)
 done
 # Remove trailing -o

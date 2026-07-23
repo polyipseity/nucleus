@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Nautilus right-click script for PDF optimization.
 # MIME guard: only process application/pdf files.
-# Preset name provided as optional first positional arg.
+# Preset name provided via PDF_OPT_PRESET env var or first positional arg.
 set -eu
 
-preset="${1:-default}"
+preset="${PDF_OPT_PRESET:-${1:-default}}"
 shift 2>/dev/null || true
 
 pdfs=()

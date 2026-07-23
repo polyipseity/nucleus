@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Open host documentation via the OS-default URL handler.
-# Path provided as first positional arg (Nix build) or resolved at runtime
-# via NUCLEUS_REPO_ROOT (writable-symlink mode).
+# Path provided via NUCLEUS_MANUAL_PATH env var or first positional arg (Nix build)
+# or resolved at runtime via NUCLEUS_REPO_ROOT (writable-symlink mode).
 set -eu
 
-_path="${1:-}"
+_path="${NUCLEUS_MANUAL_PATH:-${1:-}}"
 if [ -z "$_path" ]; then
   # Writable-symlink mode (no positional arg).
   _path="${NUCLEUS_REPO_ROOT:?NUCLEUS_REPO_ROOT not set}/src/hosts/NixOS/MANUAL.md"

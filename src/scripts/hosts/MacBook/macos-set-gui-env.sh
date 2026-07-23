@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 # Strip stale managed entries from PATH, then prepend + append managed dirs.
-# All values passed as CLI args:
-#   $1 = prepend PATH fragment  (colon-separated, may be empty)
-#   $2 = append PATH fragment  (colon-separated)
-#   $3 = managed dedup set     (colon-separated absolute paths)
-#   $4 = env var commands      (multi-line shell code for launchctl setenv)
+# All values can be passed via env vars or CLI args:
+#   GUI_ENV_PREPEND_PATH  / $1 = prepend PATH fragment  (colon-separated, may be empty)
+#   GUI_ENV_APPEND_PATH   / $2 = append PATH fragment  (colon-separated)
+#   GUI_ENV_DEDUP_SET_HOME / $3 = managed dedup set     (colon-separated absolute paths)
+#   GUI_ENV_MACOS_ALL_VARS / $4 = env var commands      (multi-line shell code for launchctl setenv)
 set -eu
 
-__nucleus_prepend="${1:?}"
-__nucleus_append="${2:?}"
-__nucleus_managed_set="${3:?}"
-__all_vars="${4:-}"
+__nucleus_prepend="${GUI_ENV_PREPEND_PATH:-${1:?}}"
+__nucleus_append="${GUI_ENV_APPEND_PATH:-${2:?}}"
+__nucleus_managed_set="${GUI_ENV_DEDUP_SET_HOME:-${3:?}}"
+__all_vars="${GUI_ENV_MACOS_ALL_VARS:-${4:-}}"
 
 __nucleus_cleaned=""
 old_IFS="$IFS"

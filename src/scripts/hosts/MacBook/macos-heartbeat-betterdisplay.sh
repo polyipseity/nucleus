@@ -7,6 +7,8 @@
 #   BD_APP  — path to BetterDisplay .app bundle
 #   DISPLAY_NAME — virtual display name to monitor
 
+# shellcheck disable=SC2034 # reason: reserved for future lib sourcing
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 set +e  # heartbeat is fully soft-fail; never abort on individual check failure
 
 : "${BD_BIN:=/Applications/BetterDisplay.app/Contents/MacOS/BetterDisplay}" \

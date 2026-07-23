@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # HTTPS proxy daemon — runs Caddy for all configured virtual hosts.
-# Config path provided as first positional arg. Caddy resolved from PATH.
-# Usage: https-proxy-daemon.sh <caddyfile>
+# Config path provided as env var CADDYFILE_PATH or first positional arg.
+# Caddy resolved from PATH.
+# Usage: https-proxy-daemon.sh [caddyfile]
 set -eu
 
 state_root="/Users/Shared/https-proxy"
@@ -15,6 +16,6 @@ mkdir -p "$caddy_config_dir" "$caddy_data_dir" "$log_dir"
 export XDG_CONFIG_HOME="$caddy_config_dir"
 export XDG_DATA_HOME="$caddy_data_dir"
 
-caddyfile="${1:-}"
+caddyfile="${CADDYFILE_PATH:-${1:-}}"
 
 exec caddy run --config "$caddyfile" --adapter caddyfile
