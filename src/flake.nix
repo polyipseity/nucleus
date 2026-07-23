@@ -330,7 +330,7 @@
           ''
             mkdir -p "$out/bin" "$out/scripts" "$out/src/scripts"
 
-            ${lib.optionalString (bundleDefault && text == null) ''
+            ${lib.optionalString bundleDefault ''
               # Mirror all scripts with exact repo structure.
               cp -r --no-preserve=mode ${../scripts}/. "$out/scripts/"
               cp -r --no-preserve=mode ${./scripts}/. "$out/src/scripts/"
