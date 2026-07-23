@@ -12,7 +12,9 @@ This eliminates `builtins.readFile` embedding, `__TOKEN__` placeholders, and `+`
 
 ## Activation bundle architecture
 
-`src/modules/lib/activation-bundle.nix` builds a `nucleus-activation-bundle` derivation containing `$out/bin/` (executable scripts) and `$out/lib/` (shared libraries). Every script in `bin/`:
+`src/modules/lib/activation-bundle.nix` (thin wrapper around `src/modules/lib/script-tree.nix`) builds a `nucleus-activation-bundle` derivation. All scripts from `src/scripts/` are bundled into `$out/src/scripts/` with the same subtree structure, making `$out/` the repo root.
+
+Every script in the bundle:
 
 1. Sets `SCRIPT_DIR` from `$0`
 2. Sources libs via `"$SCRIPT_DIR/../lib/<name>.sh"`
@@ -23,8 +25,8 @@ This eliminates `builtins.readFile` embedding, `__TOKEN__` placeholders, and `+`
 
 1. Create the script in `src/scripts/` (cross-platform) or `src/scripts/hosts/<Host>/` (host-specific).
 2. Follow the SCRIPT_DIR + lib sourcing pattern (see below).
-3. Register it in `activation-bundle.nix` under `p.bin.<name>`.
-4. Invoke from Nix as `"${activationBundle}/bin/<name>" <pos-arg1> <pos-arg2>`.
+3. It is automatically included — no manual registration needed.
+4. Invoke from Nix as `"${activationBundle}/src/scripts/<path>.sh" <pos-arg1> <pos-arg2>`.
 
 ---
 
@@ -43,26 +45,26 @@ home.activation.provisionDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" 
 
 # Standard: subprocess invocation with Nix-valued args
 home.activation.some-step = lib.hm.dag.entryAfter [ "dependency" ] ''
-  "${activationBundle}/bin/script-name" \
+  "${activationBundle}/src/scripts/configs/script-name.sh" \
     "${pkgs.tool}/bin/tool" \
     '${builtins.toJSON nixValue}'
 '';
 
 # Thin wrapper: managed-symlink (protect/unprotect a single path)
 home.activation.protectFoo = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-  "${activationBundle}/bin/managed-symlink" "protect" "moduleName" "$HOME/.config/foo"
+  "${activationBundle}/src/scripts/configs/managed-symlink.sh" "protect" "moduleName" "$HOME/.config/foo"
 '';
 
 # Out-of-store symlinks bulk: manage-out-of-store-symlinks
 home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-  "${activationBundle}/bin/manage-out-of-store-symlinks" "protect" "home.nix" '${builtins.toJSON paths}' "${pkgs.jq}/bin/jq"
+  "${activationBundle}/src/scripts/configs/manage-out-of-store-symlinks.sh" "protect" "home.nix" '${builtins.toJSON paths}' "${pkgs.jq}/bin/jq"
 '';
 ```
 
 Rules:
 
 - **Always use `activationBundle` from `pkgs.callPackage ./lib/activation-bundle.nix { }`** — never hardcode a store path.
-- **Use `"${activationBundle}/bin/<name>"`** — the leading `"` makes Nix expand the store path.
+- **Use `"${activationBundle}/src/scripts/<path>.sh"`** — the leading `"` makes Nix expand the store path.
 - **Positional CLI args for all per-user values.** No `__TOKEN__` placeholders.
 - **Use `lib.escapeShellArg` for values going into shell single-quoted context** (prevents injection).
 - **Use `builtins.toJSON` for structured data** (lists, attrsets) and pass as a single quoted argument.
