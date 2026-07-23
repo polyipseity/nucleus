@@ -903,6 +903,17 @@ Write-Output ("`n=== [{0}] Undocumented error suppression check ===" -f (++$_ste
 
 $_undocSuppViolations = @()
 
+function Is-Suppressed {
+  param([string]$CheckId, [string]$Path, [int]$LineNumber)
+  $line = Get-Content -Path $Path | Select-Object -Index ($LineNumber - 1)
+  if ($line -match "# check-suppress:$CheckId[\s:]") { return $true }
+  if ($LineNumber -gt 1) {
+    $prevLine = Get-Content -Path $Path | Select-Object -Index ($LineNumber - 2)
+    if ($prevLine -match "# check-suppress:$CheckId[\s:]") { return $true }
+  }
+  return $false
+}
+
 function Get-UndocSuppViolation {
   param([string]$_uPattern, [string]$_uLabel, [switch]$_uIsRegex, [string[]]$_uFiles)
   $_uResult = @()
@@ -914,12 +925,14 @@ function Get-UndocSuppViolation {
     foreach ($_um in $_uMatches) {
       # Skip comment-only lines (PowerShell #, bash #, Nix #)
       if ($_um.Line -match '^\s*#') { continue }
-      # Skip lines with inline # undoc-supp: comment
+      # Skip lines with inline # undoc-supp: comment (deprecated format)
       if ($_um.Line -match '# undoc-supp:') { continue }
-      # Skip if preceding line has # undoc-supp: comment
+      # Skip lines with # check-suppress:suppression_doc: inline (new format)
+      if (Is-Suppressed -CheckId 'suppression_doc' -Path $_um.Path -LineNumber $_um.LineNumber) { continue }
+      # Skip if preceding line has suppression comment (old or new format)
       if ($_um.LineNumber -gt 1) {
         $_uPrevLine = Get-Content -Path $_um.Path | Select-Object -Index ($_um.LineNumber - 2)
-        if ($_uPrevLine -match '# undoc-supp:') { continue }
+        if ($_uPrevLine -match '# undoc-supp:|# check-suppress:suppression_doc[\s:]') { continue }
       }
       $_uResult += "$($_um.Path):$($_um.LineNumber) ($_uLabel)"
     }
@@ -931,11 +944,11 @@ function Get-UndocSuppViolation {
 
 if ($HAS_ARGS) {
   $_undocSuppViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files ($SH_FILES + $NIX_FILES)
-  # undoc-supp: string argument specifying the suppression pattern for the check function, not a real suppression operator.
+  # check-suppress:suppression_doc: string argument specifying the suppression pattern for the check function, not a real suppression operator.
   $_undocSuppViolations += Get-UndocSuppViolation -Pattern '2>$null' -Label '2>$null' -Files $PS1_FILES
-  # undoc-supp: string argument specifying the suppression pattern for the check function, not a real suppression operator.
+  # check-suppress:suppression_doc: string argument specifying the suppression pattern for the check function, not a real suppression operator.
   $_undocSuppViolations += Get-UndocSuppViolation -Pattern '-ErrorAction SilentlyContinue' -Label '-ErrorAction SilentlyContinue' -Files $PS1_FILES
-  # undoc-supp: string argument specifying the suppression pattern for the check function, not a real suppression operator.
+  # check-suppress:suppression_doc: string argument specifying the suppression pattern for the check function, not a real suppression operator.
   $_undocSuppViolations += Get-UndocSuppViolation -Pattern 'catch\s*\{\s*\}' -Label 'empty catch {}' -IsRegex -Files $PS1_FILES
 } else {
   $_uAllShNix = @(
@@ -949,11 +962,11 @@ if ($HAS_ARGS) {
       ForEach-Object { $_.FullName }
   )
   $_undocSuppViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files $_uAllShNix
-  # undoc-supp: string argument specifying the suppression pattern for the check function, not a real suppression operator.
+  # check-suppress:suppression_doc: string argument specifying the suppression pattern for the check function, not a real suppression operator.
   $_undocSuppViolations += Get-UndocSuppViolation -Pattern '2>$null' -Label '2>$null' -Files $_uAllPs1
-  # undoc-supp: string argument specifying the suppression pattern for the check function, not a real suppression operator.
+  # check-suppress:suppression_doc: string argument specifying the suppression pattern for the check function, not a real suppression operator.
   $_undocSuppViolations += Get-UndocSuppViolation -Pattern '-ErrorAction SilentlyContinue' -Label '-ErrorAction SilentlyContinue' -Files $_uAllPs1
-  # undoc-supp: string argument specifying the suppression pattern for the check function, not a real suppression operator.
+  # check-suppress:suppression_doc: string argument specifying the suppression pattern for the check function, not a real suppression operator.
   $_undocSuppViolations += Get-UndocSuppViolation -Pattern 'catch\s*\{\s*\}' -Label 'empty catch {}' -IsRegex -Files $_uAllPs1
 }
 
@@ -962,7 +975,7 @@ if ($_undocSuppViolations.Count -gt 0) {
     warn $_uv
   }
   warn ("undocumented error suppression check failed with {0} violation(s)" -f $_undocSuppViolations.Count)
-  say "  add '# undoc-supp: reason' comment to explain intentional suppressions."
+  say "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
   $exitCode = 1
   if ($FAIL_FAST) { exit $exitCode }
 } else {

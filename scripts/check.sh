@@ -905,6 +905,18 @@ say "no package manager violations found."
 section "$((_step += 1))" "Undocumented error suppression"
 _undoc_supp_out="$(mktemp)" || { warn "failed to create temp file"; exit_code=1; $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code; }
 
+# _is_suppressed check_id file line
+# Returns 0 if the given line (or its preceding line) has a
+# # check-suppress:<check_id>: comment.
+_is_suppressed() {
+  local _check_id="$1" _file="$2" _line="$3"
+  # Check the target line
+  sed -n "${_line}p" "$_file" | grep -qE "# check-suppress:${_check_id}[\s:]" && return 0
+  # Check the preceding line
+  [ "$_line" -gt 1 ] && sed -n "$((_line - 1))p" "$_file" | grep -qE "# check-suppress:${_check_id}[\s:]" && return 0
+  return 1
+}
+
 _check_undoc_supp() {
   local _grep_flags="$1" _pattern="$2" _label="$3"
   shift 3
@@ -912,19 +924,21 @@ _check_undoc_supp() {
   grep -Hrn "$_grep_flags" -- "$_pattern" "$@" 2>/dev/null | while IFS=: read -r _f _ln _rest; do
     # Skip comment-only lines (pattern in a comment, not code)
     [[ "$_rest" =~ ^[[:space:]]*# ]] && continue
-    # Skip lines with # undoc-supp: inline
+    # Skip lines with # undoc-supp: inline (deprecated format)
     case "$_rest" in *'# undoc-supp:'*) continue ;; esac
-    # Skip lines with # undoc-supp: on the immediately preceding line
-    [ "$_ln" -gt 1 ] && sed -n "$((_ln - 1))p" "$_f" | grep -q '# undoc-supp:' && continue
+    # Skip lines with # check-suppress:suppression_doc: inline (new format)
+    _is_suppressed "suppression_doc" "$_f" "$_ln" && continue
+    # Skip lines with suppression comment on the immediately preceding line
+    [ "$_ln" -gt 1 ] && { sed -n "$((_ln - 1))p" "$_f" | grep -qE '# undoc-supp:|# check-suppress:suppression_doc[\s:]' && continue; }
     echo "$_f:$_ln ($_label)"
   done >> "$_undoc_supp_out"
 }
 
 if $HAS_ARGS; then
   # Path-scoped mode: check only provided files
-  # undoc-supp: string argument specifying the suppression pattern for the check function, not a real || true operator.
+  # check-suppress:suppression_doc: string argument specifying the suppression pattern for the check function, not a real || true operator.
   [ ${#SH_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '|| true' '|| true' "${SH_FILES[@]}"
-  # undoc-supp: string argument specifying the suppression pattern for the check function, not a real || true operator.
+  # check-suppress:suppression_doc: string argument specifying the suppression pattern for the check function, not a real || true operator.
   [ ${#NIX_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '|| true' '|| true' "${NIX_FILES[@]}"
   # shellcheck disable=SC2016 # reason: PowerShell redirection literal, not shell expansion
   [ ${#PS1_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '2>$null' '2>$null' "${PS1_FILES[@]}"
@@ -935,7 +949,7 @@ else
   # Use readarray to avoid SC2046 word-splitting warnings from unquoted $(find).
   readarray -t _nix_sh_files < <(find . -path ./vendor -prune -o \( -name '*.nix' -print \) -o \( -name '*.sh' -print \))
   readarray -t _ps1_files < <(find . -path ./vendor -prune -o -name '*.ps1' -print)
-  # undoc-supp: string argument specifying the suppression pattern for the check function, not a real || true operator.
+  # check-suppress:suppression_doc: string argument specifying the suppression pattern for the check function, not a real || true operator.
   _check_undoc_supp '-F' '|| true' '|| true' "${_nix_sh_files[@]}"
   # shellcheck disable=SC2016 # reason: PowerShell redirection literal, not shell expansion
   _check_undoc_supp '-F' '2>$null' '2>$null' "${_ps1_files[@]}"
@@ -948,7 +962,7 @@ if [ -s "$_undoc_supp_out" ]; then
   sort -u "$_undoc_supp_out" | while IFS= read -r _line; do
     warn "  $_line"
   done
-  say "  add '# undoc-supp: reason' comment to explain intentional suppressions."
+  say "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
   exit_code=1
 else
   say "no undocumented error suppressions found."
@@ -986,12 +1000,12 @@ while IFS= read -r -d '' _cfg_file; do
   _refs_output=$(grep -rn --include='*.nix' --include='*.ps1' --include='*.sh' \
     -F "$_relpath" \
     src/ --exclude-dir='vendor' --exclude-dir='configs' \
-    2>/dev/null || true)  # undoc-supp: grep returns non-zero when no matches — valid case (no references).
+    2>/dev/null || true)  # check-suppress:suppression_doc: grep returns non-zero when no matches — valid case (no references).
   if [ -z "$_refs_output" ]; then
     _refs_output=$(grep -rn --include='*.nix' --include='*.ps1' --include='*.sh' \
       -F "$_basename" \
       src/ --exclude-dir='vendor' --exclude-dir='configs' \
-      2>/dev/null || true)  # undoc-supp: same rationale as relative-path search above.
+      2>/dev/null || true)  # check-suppress:suppression_doc: same rationale as relative-path search above.
   fi
   _refs_lines=0
   _method_lines=0
@@ -1005,7 +1019,7 @@ while IFS= read -r -d '' _cfg_file; do
       elif [ "$_ln" -gt 1 ]; then
         sed -n "$((_ln - 1))p" "$_f" | grep -q '# Method' && _method_lines=$((_method_lines + 1))
       fi
-    # undoc-supp: here-string with empty/malformed output should not abort the check.
+    # check-suppress:suppression_doc: here-string with empty/malformed output should not abort the check.
     done <<< "$_refs_output" 2>/dev/null || true
   fi
   if [ "$_refs_lines" -eq 0 ]; then
@@ -1031,12 +1045,12 @@ _act_temp="$(mktemp)" || { warn "failed to create temp file"; exit_code=1; $FAIL
 if $HAS_ARGS; then
   for _f in "$@"; do
     case "$_f" in
-      *.sh|*.zsh) grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' "$_f" 2>/dev/null >> "$_act_temp" || true  # undoc-supp: grep returns 1 when no matches found
+      *.sh|*.zsh) grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' "$_f" 2>/dev/null >> "$_act_temp" || true  # check-suppress:suppression_doc: grep returns 1 when no matches found
     esac
   done
 else
   while IFS= read -r -d '' _f; do
-    grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' "$_f" 2>/dev/null >> "$_act_temp" || true  # undoc-supp: grep returns 1 when no matches found
+    grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' "$_f" 2>/dev/null >> "$_act_temp" || true  # check-suppress:suppression_doc: grep returns 1 when no matches found
   done < <(find src/scripts -type f \( -name '*.sh' -o -name '*.zsh' \) -print0)
 fi
 
