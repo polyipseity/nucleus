@@ -100,24 +100,50 @@ Always use `pkgs.writeNucleusShellApplication` instead of `pkgs.writeShellApplic
 `writeNucleusShellApplication` provides:
 
 - `bundleDefault = true` — mirrors the full `scripts/` tree into the derivation, enabling `SCRIPT_DIR`-based relative sourcing of libraries under `src/scripts/lib/` at runtime.
-- `extraEnv` — passes Nix-computed values as environment variables to the wrapper script. Values are automatically shell-escaped.
-- `scriptName` — references a script by its subdirectory path (e.g., `"services/jellyfin-daemon"` resolves to `src/scripts/services/jellyfin-daemon.sh`).
+- `scriptName` — references a script by its subdirectory path (e.g., `"services/jellyfin-daemon"` resolves to `src/scripts/services/jellyfin-daemon.sh`). The script receives `$@` from the wrapper; pass values as positional args at the call site.
+- `text` — inline the script body directly instead of referencing an external file. Skips the script mirror (no bundle), sets up `PATH` from `runtimeInputs`, and appends the text content to the wrapper. Use when the script body is trivial or when a shared script cannot be reused due to host-specific values.
+- `extraEnv` — **deprecated for new code**. Use positional args (via ProgramArguments for launchd agents, via `text` for CLI scripts without a natural caller) instead of env vars. Environment variables are opaque to shellcheck, bypass PATH isolation, and cannot be forwarded through exec wrappers. Existing uses should migrate to args as encountered during maintenance.
 
-`writeShellApplication` (from nixpkgs) does not support `bundleDefault` or `extraEnv`. Scripts built with it cannot source sibling libraries via `SCRIPT_DIR`-relative paths, leading to silent breakage when a script evolves to need library access.
+`writeShellApplication` (from nixpkgs) does not support `bundleDefault`, `extraEnv`, or `text`. Scripts built with it cannot source sibling libraries via `SCRIPT_DIR`-relative paths, leading to silent breakage when a script evolves to need library access.
 
 The only exception is when technical constraints prevent using `writeNucleusShellApplication` (e.g., dynamic names in function context as in `cloud-drives.nix`). In that case, add a `# WHY` comment explaining the constraint.
 
-Env-var fallback pattern for scripts using `extraEnv`:
+### CLI-arg-first pattern
+
+Prefer passing Nix-computed values as positional CLI arguments over environment variables. This applies to:
+
+- **Launchd agents**: add extra elements to `ProgramArguments` array instead of `extraEnv`. The script receives them as `$1`, `$2`, etc. This keeps the agent invocation self-documenting and makes the script independently testable.
+- **Activation hooks**: pass values as script arguments in the activation string (already standard practice; avoid `export` before script calls).
+- **`home.file` wrappers**: when a binary from `writeNucleusShellApplication` is deployed as a CLI command (via `source`), and the caller cannot pass arguments, wrap it in a `text` entry that hardcodes the values:
+
+  ```nix
+  home.file."my-command" = {
+    executable = true;
+    text = ''
+      exec '${pkg}/bin/nucleus-my-command' 'hardcoded-value' "$@"
+    '';
+  };
+  ```
+
+  This avoids `extraEnv` while keeping the shared script reusable for other callers.
+
+### Env-var fallback pattern for scripts with callers that use positional args
+
+Scripts that accept positional args should also support the corresponding env var as a fallback, enabling both launchd-agent usage (args from ProgramArguments) and direct invocation during development:
 
 ```bash
-VAR='${__NUCLEUS_VAR_NAME__}'
-case "$VAR" in __NUCLEUS_*)
-  VAR='default_value'
-  ;;
-esac
+VAR="${ENV_VAR_NAME:-${1:-default_value}}"
 ```
 
-This ensures scripts work both when built via `writeNucleusShellApplication` (with Nix-injected values via `extraEnv`) and when run directly from the source tree during development.
+This pattern is used by `open-host-manual.sh`, `macos-set-gui-env.sh`, and `configure-file-manager-pdf-opt.sh`.
+
+### Sites that cannot use the CLI-arg pattern
+
+Some scripts embed Nix-computed values via `builtins.readFile` into activation blocks or `writeTextFile` derivations. These are **Category 3** sites where the content is either:
+- A library function definition (not a script body) that must be sourced by multiple callers.
+- A token-replaced template that uses `builtins.replaceStrings` (the established token-injection pattern).
+
+These sites are not candidates for the CLI-arg conversion. Examples: `macos-icloud-exclusions-lib.sh` (sourced by both activation hook and launchd agent), `macos-fda-warning-lib.sh` (library with no script entry point). Do not attempt to convert these unless an alternative dispatch mechanism is introduced.
 
 ## Module conventions
 
