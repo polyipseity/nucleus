@@ -41,27 +41,23 @@
 #  22. Config method compliance
 #  23. Activation script token placeholder in comment check
 #
-# Always-run checks:
-# Some checks require full-repo context and skip when path-scoped (--scoped
-# or paths given). These are marked "skipping (path-scoped mode)" in output:
-#   - Dead Nix code detection (deadnix)               (step 4, stub)
-#   - Nix flake evaluation                            (step 5, stub)
-#   - Stale Nix build artifact check                  (step 8)
-#   - All test suites (steps 9-12, stubs)
-#   - Lockfile section validation (but overlap + lifecycle checks always run)
-#   - Locked DSC validation
-#   - Schema validation
-#   - Service registry validation
-#   - Package manager usage enforcement               (step 19)
-#   - Config method compliance                        (step 22)
-#   - Activation script token placeholder check       (step 23)
-# Checks that accept path filtering run in both modes, scoped to the
-# provided files:
-#   - Shell script linting (shellcheck) (stub)        (step 1)
-#   - PowerShell syntax validation                   (step 2)
-#   - Packer template validation                     (step 3)
-#   - YAML validation/linting                        (steps 17-18)
-#   - Undocumented error suppression                 (step 20)
+# Mode taxonomy:
+#   Always-run (no HAS_ARGS guard — run in both --full and --scoped):
+#     - Stale Nix build artifact check        (step 8)
+#     - Lockfile section validation           (step 13)
+#     - Locked DSC validation                 (step 14)
+#     - Service registry validation           (step 16)
+#     - Package manager usage enforcement     (step 19)
+#     - Config method compliance              (step 22)
+#   Path-scopable (accept file filtering in both modes):
+#     - PowerShell syntax validation          (step 2)
+#     - Packer template validation            (step 3)
+#     - Schema validation                     (step 15)
+#     - YAML validation/linting               (steps 17-18)
+#     - Undocumented error suppression        (step 20)
+#     - Activation script token placeholder   (step 23)
+#
+# Note: Steps 1, 4-7, 9-12 are stubs on Windows (POSIX/Nix toolchain not available).
 #
 # Output conventions:
 #   All messages (info, success, skip, warning) go to stdout.

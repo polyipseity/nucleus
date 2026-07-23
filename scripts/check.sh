@@ -42,28 +42,26 @@
 #  22. Config method compliance
 #  23. Activation script token placeholder in comment check
 #
-# Always-run checks:
-# Some checks require full-repo context and skip when path-scoped (--scoped
-# or paths given). These are marked "skipping (path-scoped mode)" in output:
-#   - Dead Nix code detection (deadnix)               (step 4)
-#   - Nix flake evaluation                            (step 5)
-#   - Stale Nix build artifact check                  (step 8)
-#   - All test suites (steps 9-12)
-#   - Lockfile section validation (but overlap + lifecycle checks always run)
-#   - Locked DSC validation
-#   - Schema validation
-#   - Service registry validation
-#   - Package manager usage enforcement               (step 19)
-#   - Config method compliance                        (step 22)
-#   - Activation script token placeholder check       (step 23)
-# Checks that accept path filtering run in both modes, scoped to the
-# provided files:
-#   - Shell script linting (shellcheck)               (step 1)
-#   - PowerShell syntax validation                   (step 2)
-#   - Packer template validation                     (step 3)
-#   - Nix formatting/lint                            (steps 6-7)
-#   - YAML validation/linting                        (steps 17-18)
-#   - Undocumented error suppression                 (step 20)
+# Mode taxonomy:
+#   Always-run (no HAS_ARGS guard — run in both --full and --scoped):
+#     - Nix flake evaluation                  (step 5)
+#     - Stale Nix build artifact check        (step 8)
+#     - All test suites                       (steps 9-12)
+#     - Lockfile section validation           (step 13)
+#     - Locked DSC validation                 (step 14)
+#     - Service registry validation           (step 16)
+#     - Package manager usage enforcement     (step 19)
+#     - Config method compliance              (step 22)
+#   Path-scopable (accept file filtering in both modes):
+#     - Shell script linting (shellcheck)     (step 1)
+#     - PowerShell syntax validation          (step 2)
+#     - Packer template validation            (step 3)
+#     - Dead Nix code (deadnix)               (step 4)
+#     - Nix formatting/lint                   (steps 6-7)
+#     - Schema validation                     (step 15)
+#     - YAML validation/linting               (steps 17-18)
+#     - Undocumented error suppression        (step 20)
+#     - Activation script token placeholder   (step 23)
 #
 # Output conventions:
 #   Warnings (warn) and errors (error) go to stderr; info/success/skip
@@ -72,9 +70,8 @@
 #   Use check.ps1's header comment as the cross-reference source of truth
 #   for the Windows-side convention.
 #
-# With arguments, passes them through to individual checkers that support
-# path filtering (check-pwsh.ps1, check-packer.sh, nixfmt) and skips
-# whole-repo checks (deadnix, script validation, lockfile/locked DSC).
+# Always-run checks execute unconditionally in both modes (no HAS_ARGS guard).
+# Path-scopable checks use the provided file arguments to filter their scope.
 #
 # Dependencies policy:
 # Every external tool required by any check in this script MUST be declared in

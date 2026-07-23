@@ -65,6 +65,17 @@ Choose the right vehicle:
 - Tool provisioning is handled by `nucleus-apply` (POSIX: `home.packages` in `src/modules/core.nix`; Windows: WinGet DSC). The pre-flight block is a safety net only — `nix profile install` and similar ad-hoc provisioning are banned.
 - When adding new tools to the check suite, add them to both: (a) the pre-flight block, and (b) `src/modules/core.nix` (POSIX) or WinGet DSC (Windows).
 
+### Check mode taxonomy
+
+Checks in both `scripts/check.sh` and `scripts/check.ps1` are classified into two categories:
+
+- **Always-run checks**: These cannot meaningfully accept path filtering — they validate whole-repo invariants. They execute unconditionally in both `--full` and `--scoped` modes, with no `$HAS_ARGS` guard. Examples: Nix flake evaluation (step 5), stale Nix build artifacts (step 8), test suites (steps 9-12), lockfile section validation (step 13), locked DSC validation (step 14), service registry validation (step 16), package manager enforcement (step 19), config method compliance (step 22).
+- **Path-scopable checks**: These operate per-file or per-file-type and accept path filtering in `--scoped` mode. They produce valid results when given only the changed file subset. Examples: shellcheck (step 1), PowerShell syntax (step 2), Packer validation (step 3), deadnix (step 4), Nix formatting (step 6), Nix lint (step 7), schema validation (step 15), YAML validation (step 17), YAML linting (step 18), undocumented error suppression (step 20), activation token placeholder (step 23).
+
+**Rule**: Always-run checks must NOT be gated behind `$HAS_ARGS`. They execute the same code path in both modes. There is no third category — every check is either always-run or path-scopable.
+
+**Source of truth**: The header docstrings in `check.sh` and `check.ps1` are the canonical step-by-step reference. Update both when changing the taxonomy.
+
 - For every detected stack, document what to run and where commands are defined.
 - **Nix check-and-format (pre-commit hook)**: `check.sh` accepts `--format` to auto-fix Nix files (nixfmt). The flag is passed by `prek-hooks.py` when `args = ["--format"]` in `prek.toml`. `nixfmt` is bundled in `mkCheckApp` runtimeInputs in `src/flake.nix` to avoid expensive nixpkgs eval. No separate `format-nix` hook exists.
 - **Commit message validation**: commitlint (via `prek.toml` commit-msg hook) enforces conventional commit types. Valid types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`. Do not use `maintain` — use `refactor` for cleanup without behavior change or `chore` for config/tooling maintenance.
