@@ -214,10 +214,6 @@ let
   nixIndexUpdate = pkgs.writeNucleusShellApplication {
     name = "nix-index-update";
     runtimeInputs = [ pkgs.nix-index ];
-    extraEnv = {
-      NIX_INDEX_NAME = "nix-index";
-      NIX_INDEX_MAX_AGE_DAYS = "6";
-    };
     scriptName = "packages/update-nix-index";
   };
 
@@ -247,9 +243,6 @@ let
   devSpotlightExclusions = pkgs.writeNucleusShellApplication {
     name = "spotlight-exclusions";
     runtimeInputs = [ ];
-    extraEnv = {
-      SPOTLIGHT_EXCLUDED_DIR_NAMES = builtins.concatStringsSep " " devSpotlightExcludedDirectoryNames;
-    };
     scriptName = "hosts/MacBook/macos-configure-spotlight-exclusions";
   };
 
@@ -280,12 +273,6 @@ let
   guiEnvAgent = pkgs.writeNucleusShellApplication {
     name = "gui-env";
     runtimeInputs = [ ];
-    extraEnv = {
-      GUI_ENV_PREPEND_PATH = managedPaths.toShellPrependPath;
-      GUI_ENV_APPEND_PATH = managedPaths.toShellAppendPath;
-      GUI_ENV_DEDUP_SET_HOME = mkManagedDedupSet "$HOME";
-      GUI_ENV_MACOS_ALL_VARS = envVars.macOSAllVars;
-    };
     scriptName = "hosts/MacBook/macos-set-gui-env";
   };
 
@@ -659,7 +646,10 @@ lib.mkIf pkgs.stdenv.isDarwin {
     enable = true;
     config = {
       Label = "local.spotlight-exclusions";
-      ProgramArguments = [ "${devSpotlightExclusions}/bin/nucleus-spotlight-exclusions" ];
+      ProgramArguments = [
+        "${devSpotlightExclusions}/bin/nucleus-spotlight-exclusions"
+        (builtins.concatStringsSep " " devSpotlightExcludedDirectoryNames)
+      ];
       # Do not run on every agent reload during apply/bootstrap apply; daily
       # noon maintenance is sufficient for dev-tree indexing hygiene.
       RunAtLoad = false;
@@ -694,7 +684,11 @@ lib.mkIf pkgs.stdenv.isDarwin {
     enable = true;
     config = {
       Label = "local.nix-index-update";
-      ProgramArguments = [ "${nixIndexUpdate}/bin/nucleus-nix-index-update" ];
+      ProgramArguments = [
+        "${nixIndexUpdate}/bin/nucleus-nix-index-update"
+        "nix-index"
+        "6"
+      ];
       # Run once at load so a freshly provisioned machine or a machine whose
       # DB is absent or stale gets an immediate rebuild rather than waiting
       # for the next daily calendar window.
@@ -839,7 +833,13 @@ lib.mkIf pkgs.stdenv.isDarwin {
     enable = true;
     config = {
       Label = "local.gui-env";
-      ProgramArguments = [ "${guiEnvAgent}/bin/nucleus-gui-env" ];
+      ProgramArguments = [
+        "${guiEnvAgent}/bin/nucleus-gui-env"
+        managedPaths.toShellPrependPath
+        managedPaths.toShellAppendPath
+        (mkManagedDedupSet "$HOME")
+        envVars.macOSAllVars
+      ];
       # One-shot at login; gui-env-path activation step covers subsequent applies.
       RunAtLoad = true;
     };
