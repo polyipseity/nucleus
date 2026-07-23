@@ -14,11 +14,8 @@
   Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/check-exit-code.Tests.ps1 -Passthru"
 #>
 
-BeforeAll {
-  $checkPs1Path = Join-Path $PSScriptRoot '../../../scripts/check.ps1'
-  $checkPs1Content = Get-Content -Path $checkPs1Path -Raw
-  $ensureToolPath = Join-Path $PSScriptRoot '../../../src/hosts/Windows/modules/Ensure-Tool.psm1'
-}
+$checkPs1Path = Join-Path $PSScriptRoot '../../../scripts/check.ps1'
+$checkPs1Content = Get-Content -Path $checkPs1Path -Raw
 
 Describe 'Pre-flight — Ensure-Tool module import' {
   It 'imports Ensure-Tool.psm1 in the pre-flight block' {

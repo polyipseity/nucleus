@@ -16,89 +16,77 @@
     Exit codes: 0 on success; 1 on failure
 #>
 
+$ErrorActionPreference = "Stop"
+$WarningPreference = "SilentlyContinue"
+
+# Paths
+$RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
+$UserDscFile = Join-Path $RepoRoot "src\hosts\Windows\user\env.dsc.yml"
+$SystemDscFile = Join-Path $RepoRoot "src\hosts\Windows\system\env.dsc.yml"
+$ManifestFile = Join-Path $RepoRoot "result\env-parity-manifest.json"
+# $CatalogNixFile intentionally omitted; unused
+
+# ---- Helpers ----
+
+# Parse DSC YAML and return all Environment resource names.
+function Get-DscEnvVarName {
+  param ([string]$DscPath)
+  if (-not (Test-Path $DscPath)) {
+    throw "DSC file not found: $DscPath"
+  }
+  $yaml = Get-Content -Raw -Path $DscPath
+  # Minimal YAML parser: extract name from Microsoft.Windows.Environment/Variable resources.
+  $resources = [regex]::Matches($yaml, '(?s)resource:\s*Microsoft\.Windows\.Environment/Variable.*?settings:\s*\n(.*?)(?=\n    - resource|\n    #|$)')
+  $names = @()
+  foreach ($match in $resources) {
+    $settingsBlock = $match.Groups[1].Value
+    $nameMatch = [regex]::Match($settingsBlock, 'name:\s*(.+)')
+    if ($nameMatch.Success) {
+      $names += $nameMatch.Groups[1].Value.Trim()
+    }
+  }
+  return $names
+}
+
+# Evaluate the Nix catalog JSON manifest.
+# Uses pre-built result if available, otherwise runs nix eval.
+function Get-NixCatalogManifest {
+  param ([string]$ManifestPath)
+  if (Test-Path $ManifestPath) {
+    return Get-Content -Raw -Path $ManifestPath | ConvertFrom-Json
+  }
+  # Fall back to nix eval
+  $nixTestFile = Join-Path $RepoRoot "tests\integration\env-parity-tests.nix"
+  $evalExpr = "(import ""$nixTestFile"").manifest"
+  # check-suppress:suppression_doc: nix eval prints progress to stderr; WHY: progress info on stderr is expected noise, not an error.
+  $json = & nix eval --impure --expr $evalExpr --json 2>$null
+  if ($LASTEXITCODE -ne 0) {
+    throw "nix eval failed. Ensure nix is available and the expression is correct."
+  }
+  return $json | ConvertFrom-Json
+}
+
+# Extract profile-only vars (CC, CXX, LD) from Sync-ShellProfile.ps1.
+function Get-ProfileEnvVarName {
+  $profilePath = Join-Path $RepoRoot "src\hosts\Windows\modules\user\Sync-ShellProfile.ps1"
+  $content = Get-Content -Raw -Path $profilePath
+  $names = @()
+  # Match $env:VARNAME patterns in the PowerShell heredoc
+  $found = [regex]::Matches($content, '\$env:(\w+)\s*=')
+  foreach ($m in $found) {
+    $names += $m.Groups[1].Value
+  }
+  return $names | Select-Object -Unique
+}
+
+# Read apply.ps1 content (used by multiple tests).
+function Get-ApplyPs1Content {
+  $applyPath = Join-Path $RepoRoot "src\hosts\Windows\apply.ps1"
+  return Get-Content -Raw -Path $applyPath
+}
+
 BeforeAll {
-  $ErrorActionPreference = "Stop"
-  $WarningPreference = "SilentlyContinue"
-
-  # Paths
-  $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
-  $UserDscFile = Join-Path $RepoRoot "src\hosts\Windows\user\env.dsc.yml"
-  $SystemDscFile = Join-Path $RepoRoot "src\hosts\Windows\system\env.dsc.yml"
-  $ManifestFile = Join-Path $RepoRoot "result\env-parity-manifest.json"
-  $CatalogNixFile = Join-Path $RepoRoot "src\modules\lib\env-catalog.nix"
-
-  # ---- Helpers ----
-
-  # Parse DSC YAML and return all Environment resource names.
-  function Get-DscEnvVarNames {
-    param ([string]$DscPath)
-    if (-not (Test-Path $DscPath)) {
-      throw "DSC file not found: $DscPath"
-    }
-    $yaml = Get-Content -Raw -Path $DscPath
-    # Minimal YAML parser: extract name from Microsoft.Windows.Environment/Variable resources.
-    $resources = [regex]::Matches($yaml, '(?s)resource:\s*Microsoft\.Windows\.Environment/Variable.*?settings:\s*\n(.*?)(?=\n    - resource|\n    #|$)')
-    $names = @()
-    foreach ($match in $resources) {
-      $settingsBlock = $match.Groups[1].Value
-      $nameMatch = [regex]::Match($settingsBlock, 'name:\s*(.+)')
-      if ($nameMatch.Success) {
-        $names += $nameMatch.Groups[1].Value.Trim()
-      }
-    }
-    return $names
-  }
-
-  # Evaluate the Nix catalog JSON manifest.
-  # Uses pre-built result if available, otherwise runs nix eval.
-  function Get-NixCatalogManifest {
-    param ([string]$ManifestPath)
-    if (Test-Path $ManifestPath) {
-      return Get-Content -Raw -Path $ManifestPath | ConvertFrom-Json
-    }
-    # Fall back to nix eval
-    $nixTestFile = Join-Path $RepoRoot "tests\integration\env-parity-tests.nix"
-    $evalExpr = "(import ""$nixTestFile"").manifest"
-    # check-suppress:suppression_doc: nix eval prints progress to stderr; WHY: progress info on stderr is expected noise, not an error.
-    $json = & nix eval --impure --expr $evalExpr --json 2>$null
-    if ($LASTEXITCODE -ne 0) {
-      throw "nix eval failed. Ensure nix is available and the expression is correct."
-    }
-    return $json | ConvertFrom-Json
-  }
-
-  # Extract profile-only vars (CC, CXX, LD) from Sync-ShellProfile.ps1.
-  function Get-ProfileEnvVarNames {
-    $profilePath = Join-Path $RepoRoot "src\hosts\Windows\modules\user\Sync-ShellProfile.ps1"
-    $content = Get-Content -Raw -Path $profilePath
-    $names = @()
-    # Match $env:VARNAME patterns in the PowerShell heredoc
-    $matches = [regex]::Matches($content, '\$env:(\w+)\s*=')
-    foreach ($m in $matches) {
-      $names += $m.Groups[1].Value
-    }
-    return $names | Select-Object -Unique
-  }
-
-  # Build expected Windows var name list from the catalog manifest.
-  # Uses hasWindowsEntry (true if the entry has a Windows-specific value or
-  # applies via default) to determine Windows relevance.
-  function Get-ExpectedWindowsVarNames {
-    param ($Manifest)
-    $expected = @()
-    foreach ($entry in $Manifest) {
-      if ($entry.hasWindowsEntry) {
-        $expected += $entry.name
-      }
-    }
-    return $expected
-  }
-
-  # Read apply.ps1 content (used by multiple tests).
-  function Get-ApplyPs1Content {
-    $applyPath = Join-Path $RepoRoot "src\hosts\Windows\apply.ps1"
-    return Get-Content -Raw -Path $applyPath
-  }
+  # No variable assignments here; all vars are at script scope for PSScriptAnalyzer visibility.
 }
 
 Describe "Windows env var parity with Nix catalog" {
@@ -113,7 +101,7 @@ Describe "Windows env var parity with Nix catalog" {
     }
 
     It "every user-specific catalog var has a User-scope DSC entry" {
-      $dscVars = Get-DscEnvVarNames -DscPath $UserDscFile
+      $dscVars = Get-DscEnvVarName -DscPath $UserDscFile
       $userSpecificVars = @($script:Manifest | Where-Object { $_.userSpecific -and $_.hasWindowsEntry } | ForEach-Object { $_.name })
 
       $missing = $userSpecificVars | Where-Object { $_ -notin $dscVars }
@@ -124,7 +112,7 @@ Describe "Windows env var parity with Nix catalog" {
     }
 
     It "every User-scope DSC Env resource has a Nix catalog counterpart" {
-      $dscVars = Get-DscEnvVarNames -DscPath $UserDscFile
+      $dscVars = Get-DscEnvVarName -DscPath $UserDscFile
       $catalogNames = $script:Manifest | ForEach-Object { $_.name }
 
       $extra = $dscVars | Where-Object { $_ -notin $catalogNames }
@@ -141,7 +129,7 @@ Describe "Windows env var parity with Nix catalog" {
     }
 
     It "every non-user-specific catalog var has a Machine-scope DSC entry" {
-      $dscVars = Get-DscEnvVarNames -DscPath $SystemDscFile
+      $dscVars = Get-DscEnvVarName -DscPath $SystemDscFile
       $machineSpecificVars = @($script:Manifest | Where-Object { -not $_.userSpecific -and $_.hasWindowsEntry } | ForEach-Object { $_.name })
 
       $missing = $machineSpecificVars | Where-Object { $_ -notin $dscVars }
@@ -152,7 +140,7 @@ Describe "Windows env var parity with Nix catalog" {
     }
 
     It "every Machine-scope DSC Env resource has a Nix catalog counterpart" {
-      $dscVars = Get-DscEnvVarNames -DscPath $SystemDscFile
+      $dscVars = Get-DscEnvVarName -DscPath $SystemDscFile
       $catalogNames = $script:Manifest | ForEach-Object { $_.name }
 
       $extra = $dscVars | Where-Object { $_ -notin $catalogNames }
@@ -165,14 +153,14 @@ Describe "Windows env var parity with Nix catalog" {
 
   Context "Shell profile parity" {
     It "Sync-ShellProfile.ps1 no longer sets CC, CXX, LD (moved to Machine-scope DSC)" {
-      $profileVars = Get-ProfileEnvVarNames
+      $profileVars = Get-ProfileEnvVarName
       $profileVars | Should -Not -Contain "CC"
       $profileVars | Should -Not -Contain "CXX"
       $profileVars | Should -Not -Contain "LD"
     }
 
     It "CC, CXX, LD are in system/env.dsc.yml at Machine scope" {
-      $dscVars = Get-DscEnvVarNames -DscPath $SystemDscFile
+      $dscVars = Get-DscEnvVarName -DscPath $SystemDscFile
       $dscVars | Should -Contain "CC"
       $dscVars | Should -Contain "CXX"
       $dscVars | Should -Contain "LD"

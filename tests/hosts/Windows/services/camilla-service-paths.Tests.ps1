@@ -11,13 +11,11 @@
     Exit codes: 0 on success; 1 on failure
 #>
 
-BeforeAll {
-  $ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
-  $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
-  $CamillaDspService = Join-Path $RepoRoot "src\hosts\Windows\modules\user\Sync-CamillaDSPService.ps1"
-  $CamillaGuiService = Join-Path $RepoRoot "src\hosts\Windows\modules\user\Sync-CamillaGUIService.ps1"
-}
+$RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
+$CamillaDspService = Join-Path $RepoRoot "src\hosts\Windows\modules\user\Sync-CamillaDSPService.ps1"
+$CamillaGuiService = Join-Path $RepoRoot "src\hosts\Windows\modules\user\Sync-CamillaGUIService.ps1"
 
 Describe "CamillaDSP service script binary path resolution" {
   It "uses deterministic path from Join-Path $HOME" {

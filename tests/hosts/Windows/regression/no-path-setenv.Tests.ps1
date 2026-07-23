@@ -13,13 +13,11 @@
     Exit codes: 0 on success; 1 on failure
 #>
 
-BeforeAll {
-  $ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Stop"
 
-  $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
-  $WindowsModulesDir = Join-Path $RepoRoot "src\hosts\Windows\modules"
-  $WindowsScriptsDir = Join-Path $RepoRoot "src\hosts\Windows"
-}
+$RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
+$WindowsModulesDir = Join-Path $RepoRoot "src\hosts\Windows\modules"
+$WindowsScriptsDir = Join-Path $RepoRoot "src\hosts\Windows"
 
 Describe "No PATH SetEnvironmentVariable calls remain" {
   It "no [Environment]::SetEnvironmentVariable('PATH' in Windows modules" {
