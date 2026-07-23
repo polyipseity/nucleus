@@ -140,7 +140,7 @@ in
       "${config.nucleus.logging.systemLogDir}/symlink-farm.log"
 
     # ---- configureBatteryPolicy ------------------------------------------------
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-configure-battery-policy.sh}
+    "${activationBundle}/hosts/MacBook/macos-configure-battery-policy.sh"
 
     # ---- configureChargeLimit --------------------------------------------------
     "${activationBundle}/hosts/MacBook/macos-charge-limit.sh"

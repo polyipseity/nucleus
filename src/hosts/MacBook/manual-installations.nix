@@ -8,7 +8,11 @@
 #   scripts into the activate binary; custom names are silently ignored.
 #   postActivation is the correct extension point for scripts that must run
 #   after openssh.  lib.mkBefore prepends before the HM activation call.
-{ lib, ... }: {
+{ lib, pkgs, ... }:
+let
+  activationBundle = pkgs.callPackage ../../modules/lib/activation-bundle.nix { };
+in
+{
   # ---------------------------------------------------------------------------
   # configureRosetta (postActivation fragment)
   # Installs Rosetta 2 once on Apple Silicon hosts if it is not already
@@ -30,7 +34,5 @@
   # Declarative Nix daemon support for x86_64-darwin is configured separately
   # in base.nix via `nix.extraOptions` / `extra-platforms`.
   # ---------------------------------------------------------------------------
-  system.activationScripts.postActivation.text = lib.mkBefore (
-    builtins.readFile ../../scripts/hosts/MacBook/macos-install-rosetta.sh
-  );
+  system.activationScripts.postActivation.text = lib.mkBefore ''"${activationBundle}/hosts/MacBook/macos-install-rosetta.sh"'';
 }
