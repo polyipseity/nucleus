@@ -603,8 +603,8 @@ else
     assert_fail "jq do_log_config: compress defaults to true" "got '$result'"
 fi
 
-# Test scripts/service-watchdog.sh (macOS/NixOS: launchctl/systemctl watchdog)
-WATCHDOG_SH="scripts/service-watchdog.sh"
+# Test src/scripts/services/service-watchdog.sh (macOS/NixOS: launchctl/systemctl watchdog)
+WATCHDOG_SH="src/scripts/services/service-watchdog.sh"
 if [[ -f "$WATCHDOG_SH" ]]; then
     test_bash_syntax "$WATCHDOG_SH"
     test_has_shebang "$WATCHDOG_SH"
@@ -618,8 +618,8 @@ if [[ -f "$WATCHDOG_SH" ]]; then
     test_help_handler "$WATCHDOG_SH"
 fi
 
-# Test scripts/service-watchdog.ps1 (Windows: scheduled task watchdog)
-WATCHDOG_PS1="scripts/service-watchdog.ps1"
+# Test src/scripts/services/service-watchdog.ps1 (Windows: scheduled task watchdog)
+WATCHDOG_PS1="src/scripts/services/service-watchdog.ps1"
 if [[ -f "$WATCHDOG_PS1" ]]; then
     if pwsh -NoProfile -Command "& { if (!(Test-Path '$WATCHDOG_PS1')) { exit 1 }; \$null = Get-Command '$WATCHDOG_PS1' -Syntax; exit 0 }" 2>/dev/null; then
         assert_pass "PowerShell syntax: service-watchdog.ps1"

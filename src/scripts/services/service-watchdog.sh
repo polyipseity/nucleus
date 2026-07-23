@@ -36,8 +36,10 @@ if [ -h "$_self" ]; then
   esac
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
-. "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
-. "$SCRIPT_DIR/../src/scripts/lib/macos-launch-services-lib.sh"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
+# shellcheck source=../lib/macos-launch-services-lib.sh
+. "$SCRIPT_DIR/../lib/macos-launch-services-lib.sh"
 
 usage() {
   usage_std "$(basename "$0")" "[options]"

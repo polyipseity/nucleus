@@ -754,6 +754,7 @@
         };
         nucleus-service-watchdog = writeNucleusShellApplication pkgs {
           name = "service-watchdog";
+          scriptName = "services/service-watchdog";
           runtimeInputs = [ pkgs.jq ];
         };
         nucleus-test = writeNucleusShellApplication pkgs {

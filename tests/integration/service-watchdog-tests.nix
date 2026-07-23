@@ -3,8 +3,8 @@
 let
   inherit (import ../lib.nix) containsRegex flatten;
 
-  watchdogShText = builtins.readFile ../../scripts/service-watchdog.sh;
-  watchdogPs1Text = builtins.readFile ../../scripts/service-watchdog.ps1;
+  watchdogShText = builtins.readFile ../../src/scripts/services/service-watchdog.sh;
+  watchdogPs1Text = builtins.readFile ../../src/scripts/services/service-watchdog.ps1;
   flakeText = builtins.readFile ../../src/flake.nix;
   macosWatchdogNixText = builtins.readFile ../../src/hosts/MacBook/service-watchdog.nix;
   nixosActivationText = builtins.readFile ../../src/hosts/NixOS/activation.nix;
