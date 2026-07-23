@@ -188,11 +188,13 @@ When executing a plan with multiple phases:
 
 ### Finding the active plan file
 
+Plan files are named `plan-<datetime>.md` in session memory — never `active-plan.md`. Use the find-latest-plan pattern (glob `plan-*.md`, sort by name descending, take the first).
+
 When the user says "refer back to the plan", "verify the plan", "check the plan", or any equivalent phrase:
 
-1. Call `resolve_memory_file_uri("/memories/session/active-plan.md")` to locate the plan.
-2. Read the file at the resolved path — it contains the plan with a frontmatter header.
-3. Check the frontmatter: `status: completed` means the plan was fully executed; `status: in-progress` means execution was interrupted. The `current-step` field shows which workflow step was last reached. The `committed` field tracks atomic commit progress: `no` (no commits made), `partial` (some commits made), `yes` (all commits done).
-4. Present the plan and its frontmatter status to the user or act as instructed.
-
-If the session memory file is empty or missing, report that no plan is currently tracked. Do not guess or reconstruct.
+1. Call `resolve_memory_file_uri("/memories/session/")` to get the base session memory path.
+2. Run `ls -1 <base-path>/plan-*.md 2>/dev/null | sort -r | head -1` in a terminal to find the latest file.
+3. If no files match, report that no active plan is found. Do not reconstruct or guess — stop.
+4. Otherwise, read the file at the returned path.
+5. Check the frontmatter: `status: completed` means the plan was fully executed; `status: in-progress` means execution was interrupted. The `current-step` field shows which workflow step was last reached. The `committed` field tracks atomic commit progress: `no` (no commits made), `partial` (some commits made), `yes` (all commits done).
+6. Present the plan and its frontmatter status to the user or act as instructed.

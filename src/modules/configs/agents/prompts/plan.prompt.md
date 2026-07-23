@@ -92,11 +92,21 @@ Present the final plan in your response and stop. Do NOT proceed to implementati
 
 ## Create a new plan file
 
+> **CRITICAL: two most common plan-creation failures. Do not fall for either:**
+>
+> 1. **Wrong filename**: The file MUST be named `plan-<datetime>.md`. NEVER use `active-plan.md` — that was the legacy name and no longer exists.
+> 2. **Wrong location**: The file MUST be written to the URI returned by `resolve_memory_file_uri`, NOT to the literal string `/memories/session/plan-<datetime>.md`. Passing the literal path to `create_file` will silently create the file in the wrong place on disk (e.g. inside the repo's `memories/` directory if one exists). Always use the resolved URI.
+
+Steps:
+
 1. Generate an ISO datetime in UTC: run `date -u +%Y-%m-%dT%H%M%S` (produces e.g. `2026-07-20T212315`).
-2. Construct the path: `/memories/session/plan-<datetime>.md`.
-3. Call `resolve_memory_file_uri` on that path to get the resolved URI.
-4. Write the plan file there using `create_file`.
-5. Verify with `read_file` — confirm content is nonempty and substantive.
+2. Construct the memory path: `/memories/session/plan-<datetime>.md`.
+3. Call `resolve_memory_file_uri` on that path to get the resolved filesystem URI. **This is the real path you must use for `create_file`.**
+4. Write the plan file using `create_file` with the resolved URI as `filePath`.
+5. Verify the file was created in the correct place:
+   - Confirm the resolved URI path is NOT under the workspace/repo directory. A resolved path under `/Users/.../GitHub.copilot-chat/memory-tool/` or equivalent is correct.
+   - Read the file with `read_file` — confirm content is nonempty and substantive (not just whitespace, "TODO", or a title with no body).
+   - If the file is empty, insubstantial, or in the wrong location, delete the bad file and redo from step 1.
 
 ## Find the latest plan file
 
