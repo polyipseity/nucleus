@@ -43,7 +43,6 @@ if (Test-NucleusAgentSession) {
   # check-suppress:suppression_doc: module may not be loaded in non-interactive sessions
   Remove-Module PSReadLine -ErrorAction SilentlyContinue
   $ConfirmPreference = 'None'
-  $WarningActionPreference = 'SilentlyContinue'
   function prompt { "PS> " }
 }
 
