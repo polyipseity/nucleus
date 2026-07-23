@@ -26,7 +26,9 @@ let
   # import x86_64 guest bundles as aarch64 virtual machines.
   vmArch =
     vm:
-    if vm.type == "Windows" then
+    if vm.type == "Android" then
+      "aarch64"
+    else if vm.type == "Windows" then
       "x86_64"
     else if isArm then
       "aarch64"
@@ -74,6 +76,66 @@ let
   # - NixOS images are qcow-efi on aarch64 and qcow (BIOS) on x86_64.
   qemuUefiBoot = vm: vm.type != "Windows" && vmArch vm == "aarch64";
 
+  androidDrives =
+    vm:
+    if vm.type != "Android" then
+      ""
+    else
+      ''
+        <dict>
+            <key>Identifier</key>
+            <string>${vm.name}-disk-userdata</string>
+            <key>ImageName</key>
+            <string>android-userdata.qcow2</string>
+            <key>ImageType</key>
+            <string>Disk</string>
+            <key>Interface</key>
+            <string>VirtIO</string>
+            <key>InterfaceVersion</key>
+            <integer>1</integer>
+            <key>ReadOnly</key>
+            <false/>
+        </dict>
+        <dict>
+            <key>Identifier</key>
+            <string>${vm.name}-disk-gsi</string>
+            <key>ImageName</key>
+            <string>android-gsi.img</string>
+            <key>ImageType</key>
+            <string>Disk</string>
+            <key>Interface</key>
+            <string>VirtIO</string>
+            <key>InterfaceVersion</key>
+            <integer>1</integer>
+            <key>ReadOnly</key>
+            <true/>
+        </dict>
+      '';
+
+  additionalPortForwards =
+    vm:
+    if vm.type != "Android" then
+      ""
+    else
+      ''
+        <dict>
+            <key>Protocol</key>
+            <string>TCP</string>
+            <key>GuestPort</key>
+            <integer>5555</integer>
+            <key>HostPort</key>
+            <integer>5555</integer>
+        </dict>
+        <dict>
+            <key>Protocol</key>
+            <string>TCP</string>
+            <key>GuestPort</key>
+            <integer>5554</integer>
+            <key>HostPort</key>
+            <integer>5554</integer>
+        </dict>
+      '';
+
   # UTM 4.x QEMU-backend plist template.  Indented strings in Nix strip the
   # common leading whitespace (6 spaces here), producing a 0-based document.
   mkConfigPlist =
@@ -92,6 +154,8 @@ let
         "__VM_MACHINE__"
         "__VM_HYPERVISOR__"
         "__VM_UEFI_BOOT__"
+        "__VM_ANDROID_DRIVES__"
+        "__VM_ADDITIONAL_PORT_FORWARDS__"
       ]
       [
         vm.name
@@ -106,6 +170,8 @@ let
         (vmMachine vm)
         (if qemuHypervisor vm then "<true/>" else "<false/>")
         (if qemuUefiBoot vm then "<true/>" else "<false/>")
+        (androidDrives vm)
+        (additionalPortForwards vm)
       ]
       # Method 4 (runtime direct read — builtins.readFile embeds at eval time)
       (builtins.readFile ../../modules/configs/vms/utm-config.plist.xml);

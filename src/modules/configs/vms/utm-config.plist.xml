@@ -23,6 +23,7 @@
             <false/>
         </dict>
     </array>
+    __VM_ANDROID_DRIVES__
     <key>Display</key>
     <array>
         <dict>
@@ -75,6 +76,7 @@
                     <key>HostPort</key>
                     <integer>2222</integer>
                 </dict>
+                __VM_ADDITIONAL_PORT_FORWARDS__
             </array>
         </dict>
     </array>
