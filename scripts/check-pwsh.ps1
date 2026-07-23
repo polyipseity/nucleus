@@ -25,6 +25,10 @@
   If specified, skip Phase 2 (PSScriptAnalyzer). Used by check.sh for fast
   pre-commit validation; full lint runs in test.sh.
 
+.PARAMETER Scoped
+  If specified and no paths are given, skip Git discovery (no files to check).
+  Used by check.sh/check.ps1 in scoped mode to skip whole-repo discovery.
+
 .PARAMETER Paths
   Optional file paths to check. When omitted, all tracked `*.ps1` files from
   `git ls-files` are checked (default: none; all tracked .ps1 files).
@@ -45,6 +49,7 @@
 [CmdletBinding()]
 param(
   [switch]$SyntaxOnly,
+  [switch]$Scoped,
 
   [Parameter(ValueFromRemainingArguments = $true)]
   [string[]]$Paths = @($env:NUCLEUS_CHECK_PATHS -split ';' | Where-Object { $_ })
@@ -54,6 +59,10 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 if (-not $Paths -or $Paths.Count -eq 0) {
+  if ($Scoped) {
+    Write-Output 'No PowerShell files to check (scoped mode).'
+    exit 0
+  }
   $Paths = @(git ls-files '*.ps1')
 }
 
