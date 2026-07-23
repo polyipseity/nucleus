@@ -49,6 +49,7 @@ let
     extraEnv = {
       LINUX_BUILDER_WORK_DIR = workDir;
     };
+    scriptName = "hosts/MacBook/macos-daemonize-linux-builder";
   };
 in
 {

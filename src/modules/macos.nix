@@ -218,6 +218,7 @@ let
       NIX_INDEX_NAME = "nix-index";
       NIX_INDEX_MAX_AGE_DAYS = "6";
     };
+    scriptName = "packages/update-nix-index";
   };
 
   # Directory names inside ~/dev whose contents should stay out of Spotlight.
@@ -249,6 +250,7 @@ let
     extraEnv = {
       SPOTLIGHT_EXCLUDED_DIR_NAMES = builtins.concatStringsSep " " devSpotlightExcludedDirectoryNames;
     };
+    scriptName = "hosts/MacBook/macos-configure-spotlight-exclusions";
   };
 
   # Daily .DS_Store cleanup for ~/dev.
@@ -284,6 +286,7 @@ let
       GUI_ENV_DEDUP_SET_HOME = mkManagedDedupSet "$HOME";
       GUI_ENV_MACOS_ALL_VARS = envVars.macOSAllVars;
     };
+    scriptName = "hosts/MacBook/macos-set-gui-env";
   };
 
   activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
