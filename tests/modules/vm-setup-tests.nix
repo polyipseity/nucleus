@@ -73,6 +73,7 @@ let
 
   # VM types must be one of the known values.
   validTypes = [
+    "Android"
     "Linux"
     "macOS"
     "NixOS"
@@ -141,6 +142,32 @@ let
     assert' (badEditions == [ ])
       "windowsEdition must be a string for all VMs that declare it; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badEditions)
+      }";
+
+  # androidGsiVersion must be a string or null when present; the field is optional (Android guests only).
+  test_android_gsi_version_type =
+    let
+      badGsiVersions = builtins.filter (
+        vm:
+        builtins.hasAttr "androidGsiVersion" vm
+        && !(builtins.isString vm.androidGsiVersion || builtins.isNull vm.androidGsiVersion)
+      ) manifest.VMs;
+    in
+    assert' (badGsiVersions == [ ])
+      "androidGsiVersion must be a string or null for all VMs that declare it; bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badGsiVersions)
+      }";
+
+  # androidGsiVersion must only appear on VMs with type Android.
+  test_android_gsi_version_only_on_android =
+    let
+      badGsiVersionVms = builtins.filter (
+        vm: builtins.hasAttr "androidGsiVersion" vm && vm.type != "Android"
+      ) manifest.VMs;
+    in
+    assert' (badGsiVersionVms == [ ])
+      "androidGsiVersion must only appear on VMs of type Android; bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badGsiVersionVms)
       }";
 
   # hosts must be absent, null, or a non-empty array of valid host names
