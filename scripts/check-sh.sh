@@ -31,7 +31,6 @@ while [ "$#" -gt 0 ]; do
       ;;
     --scoped)
       _SCOPED=true
-      shift
       ;;
     -*)
       error "unsupported argument '$1'"
