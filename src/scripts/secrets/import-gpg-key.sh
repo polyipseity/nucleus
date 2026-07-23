@@ -20,10 +20,10 @@ fi
 # Extract the primary fingerprint from the managed secret without importing.
 # The `exit` in awk stops at the first fpr record, giving the primary key
 # fingerprint rather than a subkey fingerprint.
-# undoc-supp: GPG may emit non-zero exit for malformed/dry-run key material during
+# check-suppress:suppression_doc: GPG may emit non-zero exit for malformed/dry-run key material during
 # import-options dry-run; the [ -z ] guard below catches and reports
 # an empty result explicitly.
-first_key_fingerprint="$("$_gpg_bin" --batch --import-options show-only --dry-run --with-colons --import "$_gpg_secret_path" | /usr/bin/awk -F: '$1 == "fpr" { print $10; exit }')" || true  # undoc-supp: GPG may exit non-zero on dry-run parse issues; [ -z ] guard below catches empty result explicitly.
+first_key_fingerprint="$("$_gpg_bin" --batch --import-options show-only --dry-run --with-colons --import "$_gpg_secret_path" | /usr/bin/awk -F: '$1 == "fpr" { print $10; exit }')" || true  # check-suppress:suppression_doc: GPG may exit non-zero on dry-run parse issues; [ -z ] guard below catches empty result explicitly.
 
 # Remove stale managed keys: those we imported previously (per manifest)
 # that are no longer the current managed key.  Guard on a non-empty

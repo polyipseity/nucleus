@@ -16,7 +16,7 @@ NUCLEUS_REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 test_extract_ports_basic() {
     local entry='{"network":{"ws":{"host":"127.0.0.1","port":1234,"protocol":"tcp"}}}'
     local result
-    result=$(extract_ports "$entry" 2>/dev/null) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
+    result=$(extract_ports "$entry" 2>/dev/null) || true  # check-suppress:suppression_doc: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if [[ "$result" == *"127.0.0.1"* && "$result" == *"1234"* ]]; then
         assert_pass "extract_ports: basic entry returns host and port"
     else
@@ -28,7 +28,7 @@ test_extract_ports_basic() {
 test_extract_ports_multi() {
     local entry='{"network":{"default":{"host":"127.0.0.1","port":5005,"protocol":"http"},"https":{"host":"localhost","port":5006,"protocol":"https"}}}'
     local result
-    result=$(extract_ports "$entry" 2>/dev/null) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
+    result=$(extract_ports "$entry" 2>/dev/null) || true  # check-suppress:suppression_doc: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if [[ "$result" == *"5005"* && "$result" == *"5006"* ]]; then
         assert_pass "extract_ports: multiple endpoints return all ports"
     else
@@ -40,7 +40,7 @@ test_extract_ports_multi() {
 test_extract_ports_no_network() {
     local entry='{"description":"no ports"}'
     local result
-    result=$(extract_ports "$entry" 2>/dev/null) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
+    result=$(extract_ports "$entry" 2>/dev/null) || true  # check-suppress:suppression_doc: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if [[ -z "$result" ]]; then
         assert_pass "extract_ports: no network block returns empty"
     else
@@ -52,7 +52,7 @@ test_extract_ports_no_network() {
 test_extract_ports_empty_network() {
     local entry='{"network":{}}'
     local result
-    result=$(extract_ports "$entry" 2>/dev/null) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
+    result=$(extract_ports "$entry" 2>/dev/null) || true  # check-suppress:suppression_doc: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if [[ -z "$result" ]]; then
         assert_pass "extract_ports: empty network block returns empty"
     else
@@ -64,7 +64,7 @@ test_extract_ports_empty_network() {
 test_extract_ports_camilladsp() {
     local entry='{"network":{"websocket":{"host":"127.0.0.1","port":1234,"protocol":"tcp"}}}'
     local result
-    result=$(extract_ports "$entry" 2>/dev/null) || true  # undoc-supp: test probe — capturing output; exit code is discarded so set -e doesn't abort test
+    result=$(extract_ports "$entry" 2>/dev/null) || true  # check-suppress:suppression_doc: test probe — capturing output; exit code is discarded so set -e doesn't abort test
     if echo "$result" | grep -qE "^127\.0\.0\.1 +1234$"; then
         assert_pass "extract_ports: camilladsp entry produces correct output format"
     else

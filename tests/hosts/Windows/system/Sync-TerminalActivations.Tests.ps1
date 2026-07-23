@@ -30,7 +30,7 @@ Describe 'Sync-TerminalActivations behavior' {
     AfterEach {
         $env:USERPROFILE = $script:originalUserProfile
         if ($script:testRoot -and (Test-Path -LiteralPath $script:testRoot)) {
-            # undoc-supp: cleanup in test teardown — failure is acceptable
+            # check-suppress:suppression_doc: cleanup in test teardown — failure is acceptable
             Remove-Item -LiteralPath $script:testRoot -Recurse -Force -ErrorAction SilentlyContinue
         }
     }

@@ -80,7 +80,7 @@ function Sync-ShellProfile {
   }
 
   $managedBlock = @($managedBlockStart) + $prependLines + $appendLines + @(
-    # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
+    # check-suppress:suppression_doc: presence probe — tool may be absent; conditional branch handles the result immediately.
     'if (Get-Command direnv -ErrorAction SilentlyContinue) {'
     '  (& direnv hook pwsh) | Out-String | Invoke-Expression'
     '}'
@@ -89,9 +89,9 @@ function Sync-ShellProfile {
     # WHY conditional: secret file may be absent before apply has materialized it.
     '$_rclonePassFile = Join-Path $HOME ".config\nucleus\secrets\rclone-config-pass"'
     'if (Test-Path -Path $_rclonePassFile -PathType Leaf) {'
-    # undoc-supp: file may not exist yet (first provision); absence is expected and handled downstream.
+    # check-suppress:suppression_doc: file may not exist yet (first provision); absence is expected and handled downstream.
     '  $env:RCLONE_CONFIG_PASS = (Get-Content -Path $_rclonePassFile -Raw -ErrorAction SilentlyContinue).Trim()'
-    # undoc-supp: resource may already be released; idempotent cleanup, not error swallowing.
+    # check-suppress:suppression_doc: resource may already be released; idempotent cleanup, not error swallowing.
     '  Remove-Variable -Name _rclonePassFile -ErrorAction SilentlyContinue'
     '}'
     # PSReadLine: predictive history completion + menu-style tab expansion.
@@ -108,25 +108,25 @@ function Sync-ShellProfile {
     '  }'
     '}'
     # zoxide: smart directory navigation learned from visit history.
-    # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
+    # check-suppress:suppression_doc: presence probe — tool may be absent; conditional branch handles the result immediately.
     'if (Get-Command zoxide -ErrorAction SilentlyContinue) {'
     '  Invoke-Expression (& zoxide init powershell | Out-String)'
     '}'
     # Starship prompt: cross-shell prompt with git/nix/status info.
-    # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
+    # check-suppress:suppression_doc: presence probe — tool may be absent; conditional branch handles the result immediately.
     'if (Get-Command starship -ErrorAction SilentlyContinue) {'
     '  Invoke-Expression (& starship init powershell | Out-String)'
     '}'
     # fzf: fuzzy history search on Ctrl+R via a PSReadLine key handler.
     # Reads the PSReadLine history file directly so all sessions are searchable.
-    # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
+    # check-suppress:suppression_doc: presence probe — tool may be absent; conditional branch handles the result immediately.
     'if ((Get-Command fzf -ErrorAction SilentlyContinue) -and (Get-Module -ListAvailable -Name PSReadLine)) {'
     '  Set-PSReadLineKeyHandler -Key "Ctrl+r" -ScriptBlock {'
     '    $line = $null'
     '    $cursor = $null'
     '    [Microsoft.PowerShell.PSConsoleReadLine]::GetBufferState([ref]$line, [ref]$cursor)'
     '    $histFile = (Get-PSReadLineOption).HistorySavePath'
-    # undoc-supp: file may not exist yet (first provision); absence is expected and handled downstream.
+    # check-suppress:suppression_doc: file may not exist yet (first provision); absence is expected and handled downstream.
     '    $selected = Get-Content -Path $histFile -ErrorAction SilentlyContinue |'
     '      Where-Object { $_ } | Sort-Object -Unique |'
     '      & fzf --tac --no-sort --height 40% --query $line'
@@ -164,7 +164,7 @@ function Sync-ShellProfile {
     # Interactive-feature suppression in AI agent sessions:
     # disable PSReadLine, flatten prompt, suppress confirm/warn prompts.
     'if (Test-NucleusAgentSession) {'
-    # undoc-supp: resource may already be released; idempotent cleanup, not error swallowing.
+    # check-suppress:suppression_doc: resource may already be released; idempotent cleanup, not error swallowing.
     '  Remove-Module PSReadLine -ErrorAction SilentlyContinue'
     '  $ConfirmPreference = ''None'''
     '  $WarningActionPreference = ''SilentlyContinue'''
@@ -183,7 +183,7 @@ function Sync-ShellProfile {
     # lookup, so the `f` function defined by pay-respects --alias is not
     # shadowed by any alias of the same name (unlike zsh where aliases shadow
     # functions).
-    # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
+    # check-suppress:suppression_doc: presence probe — tool may be absent; conditional branch handles the result immediately.
     'if ([Environment]::UserInteractive -and -not (Test-NucleusAgentSession) -and (Get-Command pay-respects -ErrorAction SilentlyContinue)) {'
     '  iex (& pay-respects pwsh --alias | Out-String)'
     '}'
@@ -199,7 +199,7 @@ function Sync-ShellProfile {
     '    [Parameter(Mandatory = $true)]'
     '    [string]$RepositoryRoot'
     '  )'
-    # undoc-supp: expected stderr from git rev-parse probe outside git repos; branch handles the non-repo case.
+    # check-suppress:suppression_doc: expected stderr from git rev-parse probe outside git repos; branch handles the non-repo case.
     '  $gitDirOutput = & git -C $RepositoryRoot rev-parse --git-dir 2>$null'
     '  if (-not $gitDirOutput) {'
     '    return $false'
@@ -222,17 +222,17 @@ function Sync-ShellProfile {
     'function Invoke-PrekHookInstallIfNeeded {'
     '  # Get-Command is a presence probe here; absence is expected on unmanaged'
     '  # shells, and the function returns immediately after the check.'
-    # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
+    # check-suppress:suppression_doc: presence probe — tool may be absent; conditional branch handles the result immediately.
     '  if (-not (Get-Command git -ErrorAction SilentlyContinue)) {'
     '    return'
     '  }'
-    # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
+    # check-suppress:suppression_doc: presence probe — tool may be absent; conditional branch handles the result immediately.
     '  if (-not (Get-Command prek -ErrorAction SilentlyContinue)) {'
     '    return'
     '  }'
     '  # git rev-parse is a repo-membership probe here; suppress the expected'
     '  # stderr from non-repository directories and branch on the result.'
-    # undoc-supp: expected stderr from git rev-parse probe outside git repos; branch handles the non-repo case.
+    # check-suppress:suppression_doc: expected stderr from git rev-parse probe outside git repos; branch handles the non-repo case.
     '  $repoRootOutput = & git -C (Get-Location).Path rev-parse --show-toplevel 2>$null'
     '  if ($null -eq $repoRootOutput) {'
     '    return'
@@ -372,11 +372,11 @@ function Sync-ShellProfile {
     'function -gtl { & git tag --list @Args }'
     # --- Ghostscript PDF optimization aliases ---
     'function Invoke-NucleusGhostscript {'
-    # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
+    # check-suppress:suppression_doc: presence probe — tool may be absent; conditional branch handles the result immediately.
     '  if (Get-Command gs -ErrorAction SilentlyContinue) { & gs @Args; return }'
-    # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
+    # check-suppress:suppression_doc: presence probe — tool may be absent; conditional branch handles the result immediately.
     '  if (Get-Command gswin64c -ErrorAction SilentlyContinue) { & gswin64c @Args; return }'
-    # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
+    # check-suppress:suppression_doc: presence probe — tool may be absent; conditional branch handles the result immediately.
     '  if (Get-Command gswin32c -ErrorAction SilentlyContinue) { & gswin32c @Args; return }'
     '  throw "Ghostscript CLI not found. Expected one of: gs, gswin64c, gswin32c"'
     '}'
@@ -389,7 +389,7 @@ function Sync-ShellProfile {
     'function -gs-pdf-opt-screen   { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen   -dNOPAUSE -dQUIET -dBATCH @Args }'
     # la/ll: prefer eza for colour, icons, and extended metadata; fall back to
     # Get-ChildItem when eza is absent so the profile loads on unmanaged machines.
-    # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
+    # check-suppress:suppression_doc: presence probe — tool may be absent; conditional branch handles the result immediately.
     'if (Get-Command eza -ErrorAction SilentlyContinue) {'
     '  function -la { & eza --long --all @Args }'
     '  function -ll { & eza --long --all @Args }'
@@ -399,7 +399,7 @@ function Sync-ShellProfile {
     '}'
     # bun shortcuts: mirrors -ni/-nr/-nx aliases in shell/aliases.nix on POSIX hosts.
     # Guarded so the profile loads safely on machines where bun is not yet installed.
-    # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
+    # check-suppress:suppression_doc: presence probe — tool may be absent; conditional branch handles the result immediately.
     'if (Get-Command bun -ErrorAction SilentlyContinue) {'
     '  function -ni { & bun install @Args }'
     '  function -nr { & bun run @Args }'
@@ -655,7 +655,7 @@ function Sync-ShellProfile {
     '  if (-not (Test-NucleusPythonScopeActive)) {'
     '    return $false'
     '  }'
-    # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
+    # check-suppress:suppression_doc: presence probe — tool may be absent; conditional branch handles the result immediately.
     '  $application = Get-Command -Name $ToolName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1'
     '  if ($null -eq $application) {'
     '    return $false'
@@ -738,7 +738,7 @@ function Sync-ShellProfile {
     '    [Parameter(ValueFromRemainingArguments = $true)]'
     '    [object[]]$ToolArguments'
     '  )'
-    # undoc-supp: presence probe — tool may be absent; conditional branch handles the result immediately.
+    # check-suppress:suppression_doc: presence probe — tool may be absent; conditional branch handles the result immediately.
     '  $application = Get-Command -Name $ToolName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1'
     '  if ($null -eq $application) {'
     '    return $false'
@@ -761,7 +761,7 @@ function Sync-ShellProfile {
     # When a rust-toolchain.toml exists in the current directory, cargo/rustc
     # pass through to the rustup shim.  Otherwise, use the managed default
     # shell environment so plain repos still have a safe baseline toolchain.
-    # undoc-supp: Windows does not have a separate nix-direnv-backed fallback store
+    # check-suppress:suppression_doc: Windows does not have a separate nix-direnv-backed fallback store
     # path in this workflow yet, so parity uses the user-scoped managed PATH
     # instead of a second binary install root.
     'function bun {'

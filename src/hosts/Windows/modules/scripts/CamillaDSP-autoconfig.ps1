@@ -85,7 +85,7 @@ $heartbeatTimer = [System.Threading.Timer]::new({
   $cf, $p, $ncf = $s
   # Check runtime toggle on every tick.
   if (Test-Path $ncf) {
-    # undoc-supp: probe — no-config file may not exist; $null check below handles absence
+    # check-suppress:suppression_doc: probe — no-config file may not exist; $null check below handles absence
     $nc = Get-Content -Raw $ncf -ErrorAction SilentlyContinue | ConvertFrom-Json
     if ($null -ne $nc.camilladsp.heartbeat -and -not $nc.camilladsp.heartbeat) { return }
   }

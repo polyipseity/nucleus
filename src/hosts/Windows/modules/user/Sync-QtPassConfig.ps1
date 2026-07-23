@@ -171,7 +171,7 @@ function Sync-QtPassConfig {
     }
 
     foreach ($settingName in $SettingNames) {
-      # undoc-supp: each setting may already be absent from a previous cleanup pass.
+      # check-suppress:suppression_doc: each setting may already be absent from a previous cleanup pass.
       Remove-ItemProperty -LiteralPath $QtPassRegistryPath -Name $settingName -ErrorAction SilentlyContinue
     }
 

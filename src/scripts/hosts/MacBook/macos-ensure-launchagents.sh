@@ -33,7 +33,7 @@ for _plist in "$_gen_launchagents"/*.plist; do
 
   warnEcho "Agent '$_gui_domain/$_label' is NOT registered -- bootstrapping..."
 
-  /bin/launchctl bootout "$_gui_domain/$_label" 2>/dev/null || true  # undoc-supp: agent may not be registered (that's why we're here), bootout expected to fail
+  /bin/launchctl bootout "$_gui_domain/$_label" 2>/dev/null || true  # check-suppress:suppression_doc: agent may not be registered (that's why we're here), bootout expected to fail
   sleep 1
 
   if /bin/launchctl bootstrap "$_gui_domain" "$_plist"; then

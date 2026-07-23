@@ -41,7 +41,7 @@ function Sync-ReplicaSyncScheduledTask {
   $taskName = "NucleusReplicaSyncDaily"
 
   if (-not $Enabled) {
-    # undoc-supp: probe — task may not exist; $null check handles missing task.
+    # check-suppress:suppression_doc: probe — task may not exist; $null check handles missing task.
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($null -ne $existingTask) {
       Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
@@ -56,7 +56,7 @@ function Sync-ReplicaSyncScheduledTask {
     throw "replica-sync: scheduled task script not found at '$scriptPath'."
   }
 
-  # undoc-supp: probe — pwsh may not be installed; throw handles absence.
+  # check-suppress:suppression_doc: probe — pwsh may not be installed; throw handles absence.
   $pwshPath = (Get-Command -Name "pwsh" -ErrorAction SilentlyContinue | Select-Object -First 1).Source
   if ([string]::IsNullOrWhiteSpace($pwshPath)) {
     throw "replica-sync: pwsh not found; cannot register scheduled task '$taskName'."

@@ -98,7 +98,7 @@ public static class User32 {
   );
 }
 '@
-  Add-Type -TypeDefinition $sendMessageTimeoutSource -ErrorAction SilentlyContinue  # undoc-supp: type may already be loaded; Add-Type errors on redefinition so silently continue
+  Add-Type -TypeDefinition $sendMessageTimeoutSource -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: type may already be loaded; Add-Type errors on redefinition so silently continue
   $null = [User32]::SendMessageTimeout(
     [IntPtr]$HWND_BROADCAST,
     $WM_SETTINGCHANGE,

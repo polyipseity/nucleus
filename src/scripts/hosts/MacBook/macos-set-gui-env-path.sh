@@ -18,7 +18,7 @@ fi
 # Strip stale managed entries from launchctl PATH, then prepend + append
 # managed dirs for the GUI launchd domain.
 
-CURRENT_PATH="$(/bin/launchctl getenv PATH 2>/dev/null || true)"  # undoc-supp: launchctl may not be available (early boot, non-GUI session); fall back to $PATH
+CURRENT_PATH="$(/bin/launchctl getenv PATH 2>/dev/null || true)"  # check-suppress:suppression_doc: launchctl may not be available (early boot, non-GUI session); fall back to $PATH
 if [ -z "$CURRENT_PATH" ]; then
   CURRENT_PATH="$PATH"
 fi
@@ -47,7 +47,7 @@ eval "$_mge_all_vars_block"
 # Uses user.plist (not system.plist) because the PATH contains user-specific
 # directories.
 _mge_desired_path="$_mge_launchctl_config_path"
-_mge_current_path="$(/usr/libexec/PlistBuddy -c 'Print PathEnvironmentVariable' /private/var/db/com.apple.xpc.launchd/config/user.plist 2>/dev/null || true)"  # undoc-supp: user.plist may not exist before first launchctl config write; read fails gracefully
+_mge_current_path="$(/usr/libexec/PlistBuddy -c 'Print PathEnvironmentVariable' /private/var/db/com.apple.xpc.launchd/config/user.plist 2>/dev/null || true)"  # check-suppress:suppression_doc: user.plist may not exist before first launchctl config write; read fails gracefully
 
 if [ "$_mge_current_path" != "$_mge_desired_path" ]; then
   echo "launchd: updating user PATH (current differs from desired)."

@@ -203,7 +203,7 @@ function Invoke-VMSetup {
         param([string[]] $ExpectedNames)
         $dirs = @($vmDir, $imagesDir) | Where-Object { Test-Path $_ -PathType Container }
         foreach ($dir in $dirs) {
-            # undoc-supp: probe — no disk images may exist; foreach handles empty result.
+            # check-suppress:suppression_doc: probe — no disk images may exist; foreach handles empty result.
             foreach ($disk in Get-ChildItem "$dir\*.qcow2" -ErrorAction SilentlyContinue) {
                 $name = [System.IO.Path]::GetFileNameWithoutExtension($disk.Name)
                 if ($name -notin $ExpectedNames) {
@@ -219,7 +219,7 @@ function Invoke-VMSetup {
     function Invoke-GcOrphanMarker {
         $dirs = @($vmDir, $imagesDir) | Where-Object { Test-Path $_ -PathType Container }
         foreach ($dir in $dirs) {
-            # undoc-supp: probe — no credential markers may exist; foreach handles empty result.
+            # check-suppress:suppression_doc: probe — no credential markers may exist; foreach handles empty result.
             foreach ($marker in Get-ChildItem "$dir\*.vm-guest-credentials-sha256" -ErrorAction SilentlyContinue) {
                 $basePath = $marker.FullName -replace '\.vm-guest-credentials-sha256$'
                 if (-not (Test-Path $basePath -PathType Leaf)) {
@@ -309,10 +309,10 @@ function Invoke-VMSetup {
             throw "vm-setup: per-user VM secret file not found: $secretFile"
         }
 
-        # undoc-supp: probe whether sops is on PATH; Get-Command throws when absent.
+        # check-suppress:suppression_doc: probe whether sops is on PATH; Get-Command throws when absent.
         $sopsCommand = Get-Command -Name 'sops.exe' -ErrorAction SilentlyContinue
         if (-not $sopsCommand) {
-            # undoc-supp: fallback probe without .exe suffix.
+            # check-suppress:suppression_doc: fallback probe without .exe suffix.
             $sopsCommand = Get-Command -Name 'sops' -ErrorAction SilentlyContinue
         }
         if (-not $sopsCommand) {
@@ -457,7 +457,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
 
     # Prune orphaned dot-prefixed Packer build temp dirs from the images dir.
     if (Test-Path -LiteralPath $imagesDir -PathType Container) {
-        # undoc-supp: probe — no stale temp directories may exist; Where-Object handles empty result.
+        # check-suppress:suppression_doc: probe — no stale temp directories may exist; Where-Object handles empty result.
         Get-ChildItem -LiteralPath $imagesDir -Directory -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -like '.*' } |
             ForEach-Object {
@@ -526,7 +526,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     $scoopQemuDir = Join-Path $env:USERPROFILE 'scoop\apps\qemu\current'
     $qemuImg = Join-Path $scoopQemuDir 'qemu-img.exe'
     if (-not (Test-Path $qemuImg)) {
-        # undoc-supp: probe whether qemu-img is on PATH; Get-Command throws when absent.
+        # check-suppress:suppression_doc: probe whether qemu-img is on PATH; Get-Command throws when absent.
     $qemuImgInPath = Get-Command qemu-img -ErrorAction SilentlyContinue
         if ($qemuImgInPath) {
             $qemuImg = $qemuImgInPath.Source
@@ -764,20 +764,20 @@ function Test-Qcow2Image {
         return $false
     }
 
-    # undoc-supp: probe — image file may be unreadable; $null check handles absence.
+    # check-suppress:suppression_doc: probe — image file may be unreadable; $null check handles absence.
     $item = Get-Item $ImagePath -ErrorAction SilentlyContinue
     if (-not $item -or $item.Length -le 0) {
         Write-Warning "vm-setup: $ImageLabel is empty or unreadable: $ImagePath"
         return $false
     }
 
-    # undoc-supp: probe whether qemu-img is on PATH; Get-Command throws when absent.
+    # check-suppress:suppression_doc: probe whether qemu-img is on PATH; Get-Command throws when absent.
     $qemuImg = Get-Command qemu-img -ErrorAction SilentlyContinue
     if (-not $qemuImg) {
         return $true
     }
 
-    $infoJson = & $qemuImg.Source info --output=json $ImagePath 2>$null  # undoc-supp: probe — image file may not exist or be corrupt; $LASTEXITCODE checked below
+    $infoJson = & $qemuImg.Source info --output=json $ImagePath 2>$null  # check-suppress:suppression_doc: probe — image file may not exist or be corrupt; $LASTEXITCODE checked below
     if ($LASTEXITCODE -ne 0 -or -not $infoJson) {
         Write-Warning "vm-setup: qemu-img could not read ${ImageLabel}: $ImagePath"
         return $false
@@ -842,7 +842,7 @@ function Invoke-BuildNixosImage {
         }
     }
 
-    # undoc-supp: probe whether packer is installed; Get-Command throws when absent.
+    # check-suppress:suppression_doc: probe whether packer is installed; Get-Command throws when absent.
     if (-not (Get-Command packer -ErrorAction SilentlyContinue)) {
         Write-Warning 'vm-setup: packer not found; install via WinGet (HashiCorp.Packer)'
         return
@@ -859,7 +859,7 @@ function Invoke-BuildNixosImage {
         return
     }
 
-    # undoc-supp: Packer qemu builder requires output_directory to not already exist.
+    # check-suppress:suppression_doc: Packer qemu builder requires output_directory to not already exist.
     if (Test-Path $tmpOutput) {
         Remove-Item $tmpOutput -Recurse -Force
     }
@@ -994,7 +994,7 @@ function Invoke-FidoWindowsIso {
         Write-Information "vm-setup: Windows ISO downloaded: $cachedIso"
         return $cachedIso
     } finally {
-        # undoc-supp: cleanup-after-failure in finally block; temp-dir removal is best-effort.
+        # check-suppress:suppression_doc: cleanup-after-failure in finally block; temp-dir removal is best-effort.
         Remove-Item $tmpDir -Recurse -Force -ErrorAction Ignore
     }
 }
@@ -1067,7 +1067,7 @@ function Invoke-BuildWindowsImage {
             # Use curl.exe (available on Windows 10 1803+) for large ISO downloads;
             # Invoke-WebRequest buffers the full file in memory before writing to disk.
             # Source: https://curl.se/docs/manpage.html
-            # undoc-supp: probe whether curl.exe is available; Get-Command throws when absent.
+            # check-suppress:suppression_doc: probe whether curl.exe is available; Get-Command throws when absent.
             if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) {
                 Write-Warning 'vm-setup: curl.exe not found; Windows 10 1803+ includes it in system32'
                 return
@@ -1133,7 +1133,7 @@ function Invoke-BuildWindowsImage {
         return
     }
 
-    # undoc-supp: probe whether packer is installed; Get-Command throws when absent.
+    # check-suppress:suppression_doc: probe whether packer is installed; Get-Command throws when absent.
     if (-not (Get-Command packer -ErrorAction SilentlyContinue)) {
         Write-Warning 'vm-setup: packer not found; install via WinGet (HashiCorp.Packer)'
         return
@@ -1142,7 +1142,7 @@ function Invoke-BuildWindowsImage {
     $packerDir = Join-Path $VmsDir 'windows'
     $tmpOutput = Join-Path $ImagesDir "${VmName}-build"
 
-    # undoc-supp: This repository currently standardizes Windows guest runtime on BIOS
+    # check-suppress:suppression_doc: This repository currently standardizes Windows guest runtime on BIOS
     # (for example src/hosts/MacBook/vms.nix keeps UEFIBoot=false and
     # Autounattend.xml uses BIOS partitioning). Keep build attempts BIOS-only by
     # default to avoid EFI shell loops.
@@ -1157,7 +1157,7 @@ function Invoke-BuildWindowsImage {
     $efiCode = $efiCodeCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
     $efiVars = $efiVarsCandidates | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
 
-    # undoc-supp: Software emulation (tcg) runs at 2-5% native speed, so Windows PE
+    # check-suppress:suppression_doc: Software emulation (tcg) runs at 2-5% native speed, so Windows PE
     # load + installation + OOBE can take 10-30 real hours.  Use much longer
     # SSH timeouts for tcg compared to hardware-accelerated (whpx) builds.
     # These match the shell script vm.sh build strategy matrix.
@@ -1183,12 +1183,12 @@ function Invoke-BuildWindowsImage {
         Write-Information 'vm-setup: EFI firmware not detected; using BIOS-only build attempts'
     }
 
-    # undoc-supp: Packer HCL bool vars are easiest to pass as explicit true/false
+    # check-suppress:suppression_doc: Packer HCL bool vars are easiest to pass as explicit true/false
     # strings from wrapper scripts for cross-shell consistency.
     $packerHeadless = if ($Headful) { 'false' } else { 'true' }
     $packerDisplayBackend = ''
     if ($Headful) {
-        # undoc-supp: Packer defaults to gtk for headful builds, but not every QEMU
+        # check-suppress:suppression_doc: Packer defaults to gtk for headful builds, but not every QEMU
         # package includes gtk support. Select from backends QEMU advertises.
         try {
             $qemuCommand = Get-Command qemu-system-x86_64 -ErrorAction Stop
@@ -1251,7 +1251,7 @@ function Invoke-BuildWindowsImage {
         foreach ($attempt in $buildAttempts) {
             Write-Information "vm-setup: Windows Packer attempt using firmware_mode=$($attempt.Firmware) boot_strategy=$($attempt.Boot) (ssh_timeout=$($attempt.Timeout))..."
 
-            # undoc-supp: Packer qemu builder requires output_directory to not already exist.
+            # check-suppress:suppression_doc: Packer qemu builder requires output_directory to not already exist.
             # Use a fresh temp tree per attempt so a failed try cannot poison the
             # next firmware/boot-strategy combination.
             $attemptTempDir = Join-Path $ImagesDir ('.{0}.{1}.{2}.{3}' -f $VmName, $attempt.Firmware, $attempt.Boot, ([guid]::NewGuid().ToString('N')))
@@ -1349,7 +1349,7 @@ function Invoke-BuildWindowsImage {
 
             if ($LASTEXITCODE -in 130, 143) {
                 Write-Warning "vm-setup: Windows Packer attempt cancelled (exit $LASTEXITCODE); aborting retry matrix"
-                # undoc-supp: cleanup-after-failure; temp dir may not exist if cancelled early.
+                # check-suppress:suppression_doc: cleanup-after-failure; temp dir may not exist if cancelled early.
                 Remove-Item $attemptTempDir -Recurse -Force -ErrorAction Ignore
                 return
             }

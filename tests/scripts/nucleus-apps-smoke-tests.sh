@@ -246,7 +246,7 @@ if command -v pwsh >/dev/null 2>&1; then
       /Register-ArgumentCompleter/ { printing=1 }
       printing { print }
       printing && /^  '\'\'';?$|^        '\'\'';?$/ { printing=0 }
-    ' "$_pwsh_nix_file" > "$_temp_pwsh_check" 2>/dev/null || true  # undoc-supp: probe — file may not contain completions yet; handled by [ -s ] guard below
+    ' "$_pwsh_nix_file" > "$_temp_pwsh_check" 2>/dev/null || true  # check-suppress:suppression_doc: probe — file may not contain completions yet; handled by [ -s ] guard below
     if [ -s "$_temp_pwsh_check" ]; then
       if pwsh -NoProfile -NonInteractive -Command "
         \$errors = @()
@@ -270,7 +270,7 @@ if command -v pwsh >/dev/null 2>&1; then
   _win_profile_file="$REPO_ROOT/src/hosts/Windows/modules/user/Sync-ShellProfile.ps1"
   if [ -f "$_win_profile_file" ]; then
     _temp_win_check="$(mktemp)"
-    grep "^[[:space:]]*'Register-ArgumentCompleter" "$_win_profile_file" > "$_temp_win_check" 2>/dev/null || true  # undoc-supp: probe — file may not contain completions yet; handled by [ -s ] guard below
+    grep "^[[:space:]]*'Register-ArgumentCompleter" "$_win_profile_file" > "$_temp_win_check" 2>/dev/null || true  # check-suppress:suppression_doc: probe — file may not contain completions yet; handled by [ -s ] guard below
     if [ -s "$_temp_win_check" ]; then
       if pwsh -NoProfile -NonInteractive -Command "
         \$errors = @()

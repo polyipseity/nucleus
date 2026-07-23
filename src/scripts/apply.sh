@@ -126,7 +126,7 @@ start_sudo_keepalive() {
   } </dev/null >/dev/null 2>&1 &
   SUDO_KEEPALIVE_PID=$!
 
-  # undoc-supp: trap cleanup for sudo keepalive; subprocess may have already exited.
+  # check-suppress:suppression_doc: trap cleanup for sudo keepalive; subprocess may have already exited.
   trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true' EXIT INT TERM
 }
 
@@ -251,7 +251,7 @@ run_terminal_activations() {
     return
   fi
 
-  # undoc-supp: grep returns exit code 1 when no lines match; set -e would abort.
+  # check-suppress:suppression_doc: grep returns exit code 1 when no lines match; set -e would abort.
   printf '%s\n' "terminal-activations: running $(grep -c '^[^#]' "$_rta_manifest" || true) terminal-context activation(s)..."
   while IFS= read -r _rta_line; do
     case "$_rta_line" in

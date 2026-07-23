@@ -104,8 +104,8 @@ function Sync-VSCodeConfig {
   if ($Enabled) {
     $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     $devModeKey = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock"
-    # undoc-supp: probe whether Developer Mode is already enabled; Get-ItemProperty throws when value is absent.
-    $devModeProp = Get-ItemProperty -Path $devModeKey -Name "AllowDevelopmentWithoutDevLicense" -ErrorAction SilentlyContinue  # undoc-supp: probe — registry value may not exist; $null check below handles absence
+    # check-suppress:suppression_doc: probe whether Developer Mode is already enabled; Get-ItemProperty throws when value is absent.
+    $devModeProp = Get-ItemProperty -Path $devModeKey -Name "AllowDevelopmentWithoutDevLicense" -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe — registry value may not exist; $null check below handles absence
     $devModeEnabled = $null -ne $devModeProp -and $devModeProp.AllowDevelopmentWithoutDevLicense -eq 1
     if (-not $isAdmin -and -not $devModeEnabled) {
       throw "Sync-VSCodeConfig requires Developer Mode or an elevated session to create symlinks.  Enable Developer Mode in Settings -> System -> For Developers."
@@ -171,7 +171,7 @@ function Sync-VSCodeConfig {
     $repoContent = Get-Content -LiteralPath $RepoFile -Raw | ConvertFrom-Json
     $existingContent = @()
     if (Test-Path -LiteralPath $DestFile -PathType Leaf) {
-      $raw = Get-Content -LiteralPath $DestFile -Raw -ErrorAction SilentlyContinue  # undoc-supp: probe — guarded by Test-Path above; race-condition guard for file deleted between check and read
+      $raw = Get-Content -LiteralPath $DestFile -Raw -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe — guarded by Test-Path above; race-condition guard for file deleted between check and read
       if (-not [string]::IsNullOrWhiteSpace($raw)) {
         $existingContent = $raw | ConvertFrom-Json
       }
@@ -239,7 +239,7 @@ function Sync-VSCodeConfig {
           # not silently discarded on first activation.
           $repoContent = $null
           if (Test-Path -LiteralPath $repoTarget) {
-            $repoContent = Get-Content -LiteralPath $repoTarget -Raw -ErrorAction SilentlyContinue  # undoc-supp: probe — guarded by Test-Path above; race-condition guard for file deleted between check and read
+            $repoContent = Get-Content -LiteralPath $repoTarget -Raw -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe — guarded by Test-Path above; race-condition guard for file deleted between check and read
           }
           if ([string]::IsNullOrEmpty($repoContent)) {
             Copy-Item -LiteralPath $linkPath -Destination $repoTarget -Force
@@ -289,7 +289,7 @@ function Sync-VSCodeConfig {
         } else {
           # Real directory: copy each top-level file to the repo dir without
           # overwriting existing repo content; repo is the source of truth.
-          # undoc-supp: probe — directory may be empty or inaccessible; ForEach-Object handles absent results gracefully
+          # check-suppress:suppression_doc: probe — directory may be empty or inaccessible; ForEach-Object handles absent results gracefully
           Get-ChildItem -LiteralPath $linkPath -File -ErrorAction SilentlyContinue |
             ForEach-Object {
             $destFile = Join-Path -Path $repoTarget -ChildPath $_.Name
@@ -322,7 +322,7 @@ function Sync-VSCodeConfig {
         $item = Get-Item -LiteralPath $chatLmPath
         $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
         if ($isSymlink) {
-          Remove-ManagedSymlinkDeleteProtection -Context "vscode-config" -Path $chatLmPath -ErrorAction SilentlyContinue  # undoc-supp: cleanup — symlink may already be removed or never existed; best-effort cleanup before recreation
+          Remove-ManagedSymlinkDeleteProtection -Context "vscode-config" -Path $chatLmPath -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: cleanup — symlink may already be removed or never existed; best-effort cleanup before recreation
           Remove-Item -LiteralPath $chatLmPath -Force
         }
       }

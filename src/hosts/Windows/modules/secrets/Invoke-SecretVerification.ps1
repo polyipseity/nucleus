@@ -121,7 +121,7 @@ function Invoke-SecretVerification {
     (Join-Path -Path $SecretsDir -ChildPath "ssh-personal.yml")
   )
   if (Test-Path -Path $WallpaperAssetsDir) {
-    $wallpaperSopsFiles = Get-ChildItem -Path $WallpaperAssetsDir -Filter "*.sops" -File -ErrorAction SilentlyContinue  # undoc-supp: probe — wallpaper dir may have no .sops files; null check below handles absence
+    $wallpaperSopsFiles = Get-ChildItem -Path $WallpaperAssetsDir -Filter "*.sops" -File -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe — wallpaper dir may have no .sops files; null check below handles absence
     if ($null -ne $wallpaperSopsFiles) {
       $wallpaperSopsFiles = $wallpaperSopsFiles | Select-Object -ExpandProperty FullName
       $sopsTestFiles += $wallpaperSopsFiles
@@ -200,7 +200,7 @@ function Invoke-SecretVerification {
   $sshAgePub = ConvertFrom-SshEd25519PublicKeyToAgePubKey -SshPublicKeyLine $sshPubKeyLine
   $sshFailures = @()
   foreach ($sopsFile in $sopsTestFiles) {
-    $hasSshRecipient = Select-String -Path $sopsFile -Pattern $sshAgePub -SimpleMatch -Quiet -ErrorAction SilentlyContinue  # undoc-supp: probe — SOPS file may not contain this recipient; returns $false when absent
+    $hasSshRecipient = Select-String -Path $sopsFile -Pattern $sshAgePub -SimpleMatch -Quiet -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe — SOPS file may not contain this recipient; returns $false when absent
     if (-not $hasSshRecipient) {
       $sshFailures += [System.IO.Path]::GetFileName($sopsFile)
     }

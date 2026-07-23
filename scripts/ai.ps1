@@ -138,7 +138,7 @@ function Invoke-AiList {
 
 function Invoke-AiStatus {
   # Check ollama binary availability
-  $ollamaCmd = Get-Command "ollama" -ErrorAction SilentlyContinue  # undoc-supp: probe — expected on fresh systems
+  $ollamaCmd = Get-Command "ollama" -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe — expected on fresh systems
   $ollamaAvailable = $null -ne $ollamaCmd
 
   # Check ollama service

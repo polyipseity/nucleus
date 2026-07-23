@@ -277,7 +277,7 @@ function Invoke-RepositoryDirenvAllowIfAvailable {
   [CmdletBinding()]
   param()
 
-  # undoc-supp: probe whether tool is installed; Get-Command throws when absent.
+  # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
   if (-not (Get-Command -Name direnv -ErrorAction SilentlyContinue)) {
     return
   }
@@ -298,7 +298,7 @@ function Invoke-RepositoryDirenvAllowIfAvailable {
   }
 }
 
-# undoc-supp: probe whether tool is installed; Get-Command throws when absent.
+# check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
 if (-not (Get-Command -Name winget -ErrorAction SilentlyContinue)) {
   throw "winget is required but was not found in PATH."
 }

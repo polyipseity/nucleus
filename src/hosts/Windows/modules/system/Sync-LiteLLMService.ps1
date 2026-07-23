@@ -60,7 +60,7 @@ function Sync-LiteLLMService {
   $serviceName = 'nucleus-litellm'
   $oldTaskName = 'NucleusLiteLLM'
 
-  # undoc-supp: probe — legacy task may not exist; $null check handles missing task.
+  # check-suppress:suppression_doc: probe — legacy task may not exist; $null check handles missing task.
   $existingTask = Get-ScheduledTask -TaskName $oldTaskName -ErrorAction SilentlyContinue
   if ($null -ne $existingTask) {
     Unregister-ScheduledTask -TaskName $oldTaskName -Confirm:$false
@@ -68,7 +68,7 @@ function Sync-LiteLLMService {
   }
 
   if (-not $Enabled) {
-    # undoc-supp: probe whether service exists; Get-Service throws when absent.
+    # check-suppress:suppression_doc: probe whether service exists; Get-Service throws when absent.
     $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
     if ($null -ne $existingService) {
       Remove-NucleusService -Name $serviceName
@@ -81,7 +81,7 @@ function Sync-LiteLLMService {
   # uv tool install places binaries in ~\.local\bin by default.
   $litellmBin = Join-Path -Path $HOME -ChildPath ".local\bin\litellm.exe"
   if (-not (Test-Path -Path $litellmBin -PathType Leaf)) {
-    # undoc-supp: probe whether the binary is on PATH; Get-Command throws when absent.
+    # check-suppress:suppression_doc: probe whether the binary is on PATH; Get-Command throws when absent.
     $litellmCmd = Get-Command -Name "litellm" -ErrorAction SilentlyContinue
     if ($null -eq $litellmCmd) {
       Write-Output "litellm: binary not found; ensure Invoke-UvSetup has installed 'litellm[proxy]'"
@@ -116,7 +116,7 @@ function Sync-LiteLLMService {
   $opencodeZenKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_opencode_zen_api_key"
 
   $litellmEndpoint = & {
-    # undoc-supp: probe — services.json may not exist yet; $null check handles absence.
+    # check-suppress:suppression_doc: probe — services.json may not exist yet; $null check handles absence.
     $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
     if ($svc.litellm.network.default) { $svc.litellm.network.default } else { @{ host = '127.0.0.1'; port = 4000 } }
   }
@@ -137,7 +137,7 @@ function Sync-LiteLLMService {
     -replace '__OPENCODE_ZEN_KEY_FILE__', $opencodeZenKeyFile
   [System.IO.File]::WriteAllText($wrapperScript, $wrapperContent, [System.Text.UTF8Encoding]::new($false))
 
-  # undoc-supp: probe whether service already exists; Get-Service throws when absent.
+  # check-suppress:suppression_doc: probe whether service already exists; Get-Service throws when absent.
   $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
   if ($null -eq $existingService) {
     Set-NucleusService -Name $serviceName -BinaryPath "pwsh.exe -NoLogo -ExecutionPolicy Bypass -File `"$wrapperScript`"" -DisplayName "nucleus LiteLLM AI gateway proxy" -Description "Managed LiteLLM proxy for unified AI model access (http://$($litellmEndpoint.host):$($litellmEndpoint.port))"

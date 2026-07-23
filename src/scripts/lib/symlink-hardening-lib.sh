@@ -60,12 +60,12 @@ _nucleus_resolve_repo_root() {
   if [ -n "${NUCLEUS_REPO_ROOT:-}" ]; then
     # Resolve symlinks so downstream symlink creation (dev-repos.nix) does not
     # self-loop when NUCLEUS_REPO_ROOT points at a symlink.
-    # undoc-supp: fallback path may not be valid; cd/pwd probe expected to fail.
+    # check-suppress:suppression_doc: fallback path may not be valid; cd/pwd probe expected to fail.
     NUCLEUS_REPO_ROOT="$(CDPATH='' cd -- "$NUCLEUS_REPO_ROOT" && pwd -P 2>/dev/null)" || true
     printf '%s\n' "$NUCLEUS_REPO_ROOT"
   elif [ -n "$_nrr_fallback" ] && [ -d "$_nrr_fallback" ]; then
     # Also resolve fallback path for the same self-loop prevention.
-    # undoc-supp: fallback path may not be valid; cd/pwd probe expected to fail.
+    # check-suppress:suppression_doc: fallback path may not be valid; cd/pwd probe expected to fail.
     _nrr_resolved="$(CDPATH='' cd -- "$_nrr_fallback" && pwd -P 2>/dev/null)" || true
     printf '%s\n' "${_nrr_resolved:-$_nrr_fallback}"
   else

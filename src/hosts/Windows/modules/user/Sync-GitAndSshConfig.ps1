@@ -47,7 +47,7 @@ function Sync-GitAndSshConfig {
 
   foreach ($User in $Users) {
     # Resolve the target profile path explicitly from the managed username.
-    # undoc-supp: `git config --global` always targets the current process user, so
+    # check-suppress:suppression_doc: `git config --global` always targets the current process user, so
     # we need deterministic per-user paths to converge each managed profile.
     $userHome = Join-Path -Path $env:SystemDrive -ChildPath "Users\$User"
     if (-not (Test-Path -Path $userHome)) {
@@ -202,7 +202,7 @@ function Sync-GitAndSshConfig {
     }
 
     if ($Enabled) {
-      # undoc-supp: probe — git may not be installed; throw handles absence.
+      # check-suppress:suppression_doc: probe — git may not be installed; throw handles absence.
       $gitExecutable = Get-Command -Name 'git.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
       if ([string]::IsNullOrWhiteSpace($gitExecutable)) {
         throw 'git.exe is required for managed Git parity but was not found in PATH.'
@@ -293,7 +293,7 @@ function Sync-GitAndSshConfig {
       }
     }
     else {
-      # undoc-supp: probe — git may not be installed; condition handles absence.
+      # check-suppress:suppression_doc: probe — git may not be installed; condition handles absence.
       $gitExecutable = Get-Command -Name 'git.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
       if (-not [string]::IsNullOrWhiteSpace($gitExecutable)) {
         $managedGitSettings = [ordered]@{
@@ -323,7 +323,7 @@ function Sync-GitAndSshConfig {
   }
 
   if ($Enabled) {
-    # undoc-supp: probe whether ssh-agent is installed; Get-Service throws when absent.
+    # check-suppress:suppression_doc: probe whether ssh-agent is installed; Get-Service throws when absent.
     $sshAgentService = Get-Service -Name 'ssh-agent' -ErrorAction SilentlyContinue
     if ($null -ne $sshAgentService) {
       Set-Service -Name 'ssh-agent' -StartupType Automatic

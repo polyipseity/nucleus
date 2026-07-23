@@ -203,7 +203,7 @@ in
       "${builtins.toString systemLogDirs}" \
       "${builtins.toString userLogDirs}" \
       "${builtins.toString chownLogDirs}"
-    # undoc-supp: /dev/console may not exist; guards below handle empty/root.
+    # check-suppress:suppression_doc: /dev/console may not exist; guards below handle empty/root.
     _camilladsp_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     if [ -n "$_camilladsp_user" ] && [ "$_camilladsp_user" != "/Users/root" ]; then
       /bin/mkdir -p "$_camilladsp_user/Library/Logs/nucleus/camilladsp"

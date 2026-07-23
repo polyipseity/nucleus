@@ -120,12 +120,12 @@ function Test-SecretTooling {
   .EXAMPLE
     Test-SecretTooling
   #>
-  # undoc-supp: probe whether tool is installed; Get-Command throws when absent.
+  # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
   if (-not (Get-Command -Name 'sops.exe' -ErrorAction SilentlyContinue)) {
     throw 'nucleus: sops.exe not found in PATH.'
   }
 
-  # undoc-supp: probe whether tool is installed; Get-Command throws when absent.
+  # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
   if (-not (Get-Command -Name 'gpg.exe' -ErrorAction SilentlyContinue)) {
     throw 'nucleus: gpg.exe not found in PATH.'
   }
@@ -143,7 +143,7 @@ function Test-LogHealth {
     Test-LogHealth
   #>
 
-  # undoc-supp: probe whether tool is installed; Get-Command throws when absent.
+  # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
   if (-not (Get-Command -Name 'jq.exe' -ErrorAction SilentlyContinue)) {
     throw 'nucleus: jq.exe not found in PATH (required for --LogHealth).'
   }
@@ -185,7 +185,7 @@ function Test-LogHealth {
 
     foreach ($dir in @($userDir, $systemDir)) {
       $logGlob = Join-Path -Path (Join-Path -Path $dir -ChildPath $svc) -ChildPath '*.log'
-      # undoc-supp: probe — log files may not exist; foreach handles empty result.
+      # check-suppress:suppression_doc: probe — log files may not exist; foreach handles empty result.
       foreach ($logFile in Get-ChildItem -Path $logGlob -ErrorAction SilentlyContinue) {
         # Check file size against rotation threshold
         $size = $logFile.Length

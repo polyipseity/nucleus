@@ -21,13 +21,13 @@ if _nucleus_resolve_console_user; then
         console_home="/Users/$_nucleus_console_user"
       fi
 
-      # undoc-supp: id -gn may fail if console session ended; empty group is handled by downstream chown guards.
+      # check-suppress:suppression_doc: id -gn may fail if console session ended; empty group is handled by downstream chown guards.
       console_group="$(/usr/bin/id -gn "$_nucleus_console_user" 2>/dev/null || true)"
 
       gimp_app_info="/Applications/GIMP.app/Contents/Info"
       gimp_version_raw=""
       if [ -d "/Applications/GIMP.app" ]; then
-        # undoc-supp: GIMP may not be deployed yet; version probe expected to fail.
+        # check-suppress:suppression_doc: GIMP may not be deployed yet; version probe expected to fail.
         gimp_version_raw="$(/usr/bin/defaults read "$gimp_app_info" CFBundleShortVersionString 2>/dev/null || true)"
       fi
 

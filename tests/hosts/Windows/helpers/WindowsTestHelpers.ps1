@@ -49,7 +49,7 @@ function Test-NucleusWingetPackageInstalled {
         [string]$Id
     )
 
-    # undoc-supp: probe — package may not be installed; WHY: winget list returns empty output when package is absent; Should assertions handle null.
+    # check-suppress:suppression_doc: probe — package may not be installed; WHY: winget list returns empty output when package is absent; Should assertions handle null.
     $pkg = winget list --exact -q $Id 2>$null | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     return @($pkg).Count -gt 0
 }

@@ -72,10 +72,10 @@ function Sync-CaddyService {
     throw "RepoRoot does not exist: $RepoRoot"
   }
 
-  # undoc-supp: probe whether caddy binary is installed; Get-Command throws when absent.
+  # check-suppress:suppression_doc: probe whether caddy binary is installed; Get-Command throws when absent.
   $caddyCommand = Get-Command -Name 'caddy.exe' -ErrorAction SilentlyContinue
   if ($null -eq $caddyCommand) {
-    # undoc-supp: fallback probe without .exe suffix for non-Windows or WSL scenarios.
+    # check-suppress:suppression_doc: fallback probe without .exe suffix for non-Windows or WSL scenarios.
     $caddyCommand = Get-Command -Name 'caddy' -ErrorAction SilentlyContinue
   }
 
@@ -97,7 +97,7 @@ function Sync-CaddyService {
     New-Item -Path $caddyConfigDir -ItemType Directory -Force | Out-Null
     New-Item -Path $caddyDataDir -ItemType Directory -Force | Out-Null
 
-    # undoc-supp: probe — services.json may not exist yet; $null check handles absence.
+    # check-suppress:suppression_doc: probe — services.json may not exist yet; $null check handles absence.
     $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
     if ($null -eq $svc) {
       Write-Warning 'caddy-service: failed to read services.json; skipping Caddy service convergence.'

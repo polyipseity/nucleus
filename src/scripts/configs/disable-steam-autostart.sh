@@ -26,7 +26,7 @@ case "$(uname)" in
     ;;
   Linux)
     # Remove Steam autostart .desktop file if present.
-    # undoc-supp: steam autostart entry may not exist on first install; best-effort cleanup that should not abort activation.
+    # check-suppress:suppression_doc: steam autostart entry may not exist on first install; best-effort cleanup that should not abort activation.
     find /home -maxdepth 3 -path '*/autostart/steam.desktop' -delete 2>/dev/null || true
     ;;
 esac

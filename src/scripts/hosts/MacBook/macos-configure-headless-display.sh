@@ -24,7 +24,7 @@ DISPLAY_NAME="HeadlessDisplay"
 
 # _bd_cli args... -- Execute BetterDisplay CLI command, soft-fail on error.
 _bd_cli() {
-  # undoc-supp: BetterDisplay may be unresponsive during app startup/update, or Pro-only features may be unavailable in the free-tier build. Neither condition should abort activation or mark the LaunchAgent as failed.
+  # check-suppress:suppression_doc: BetterDisplay may be unresponsive during app startup/update, or Pro-only features may be unavailable in the free-tier build. Neither condition should abort activation or mark the LaunchAgent as failed.
   "$BD_BIN" "$@" || true
 }
 

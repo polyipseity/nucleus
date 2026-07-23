@@ -15,13 +15,13 @@ while IFS= read -r _vsd_entry; do
   [ -z "$_vsd_entry" ] && continue
   _vsd_key="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.enablementKey')"
   /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"$_vsd_key\"" \
-    ~/Library/Preferences/pbs.plist 2>/dev/null || true  # undoc-supp: key may not exist on first apply
+    ~/Library/Preferences/pbs.plist 2>/dev/null || true  # check-suppress:suppression_doc: key may not exist on first apply
   # Second pass: remove workflow dirs for entries that have one.
   _vsd_dir="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.dir // empty')"
   if [ -n "$_vsd_dir" ]; then
     _vsd_wf_path="$_vsd_services_dir/$_vsd_dir"
     if [ -d "$_vsd_wf_path" ]; then
-      chmod -R +w "$_vsd_wf_path" 2>/dev/null || true  # undoc-supp: dir may not exist on first apply
+      chmod -R +w "$_vsd_wf_path" 2>/dev/null || true  # check-suppress:suppression_doc: dir may not exist on first apply
       rm -rf "$_vsd_wf_path"
     fi
   fi
@@ -37,7 +37,7 @@ while IFS= read -r _vsd_entry; do
 
   _vsd_wf_dir="$_vsd_services_dir/$_vsd_dir"
   mkdir -p "$_vsd_services_dir"
-  chmod -R +w "$_vsd_wf_dir" 2>/dev/null || true  # undoc-supp: dir may not exist on first apply
+  chmod -R +w "$_vsd_wf_dir" 2>/dev/null || true  # check-suppress:suppression_doc: dir may not exist on first apply
   rm -rf "$_vsd_wf_dir"
   cp -R "$_vsd_store_path" "$_vsd_services_dir/"
 

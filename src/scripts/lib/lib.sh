@@ -60,7 +60,7 @@ derive_repo_root() {
   # Resolve SCRIPT_DIR to the physical path before traversal so symlink chains
   # (e.g. /Users -> /System/Volumes/Data/Users, iCloud Drive) do not interfere
   # with directory climbing.
-  _drr_base="$(CDPATH='' cd -P -- "${SCRIPT_DIR:?}" 2>/dev/null && pwd)" || true # undoc-supp: SCRIPT_DIR may not exist or be unset; fall through to git fallback.
+  _drr_base="$(CDPATH='' cd -P -- "${SCRIPT_DIR:?}" 2>/dev/null && pwd)" || true # check-suppress:suppression_doc: SCRIPT_DIR may not exist or be unset; fall through to git fallback.
   if [ -n "$_drr_base" ]; then
     for _drr_offset in ".." "../.." "../../.."; do
       _drr_candidate="$(CDPATH='' cd -P -- "${_drr_base}/${_drr_offset}" 2>/dev/null && pwd)" || continue
@@ -71,7 +71,7 @@ derive_repo_root() {
     done
   fi
   if command -v git >/dev/null 2>&1; then
-    _drr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || true # undoc-supp: git rev-parse may fail outside a git repo; fallback continues with error message.
+    _drr_git_root="$(git rev-parse --show-toplevel 2>/dev/null)" || true # check-suppress:suppression_doc: git rev-parse may fail outside a git repo; fallback continues with error message.
     if [ -n "${_drr_git_root:-}" ] && [ -f "$_drr_git_root/src/flake.nix" ]; then
       printf '%s\n' "$_drr_git_root"
       return 0
@@ -210,7 +210,7 @@ rotate_log_file() {
 
     # Compress the newest archive if requested
     if [ "$_rlf_compress" = "true" ]; then
-      # undoc-supp: archived log may not exist yet on first rotation; gzip -f exits 1 for missing files.
+      # check-suppress:suppression_doc: archived log may not exist yet on first rotation; gzip -f exits 1 for missing files.
       gzip -f "$_rlf_logfile.1" 2>/dev/null || true
     fi
   else
@@ -243,18 +243,18 @@ kill_processes_on_port() {
 
   require_command lsof
 
-  # undoc-supp: no process may be listening on this port; empty result is expected.
+  # check-suppress:suppression_doc: no process may be listening on this port; empty result is expected.
   _klp_pids="$(lsof -ti :"$_klp_port" 2>/dev/null)" || true
   [ -z "$_klp_pids" ] && return 0
 
   # SIGTERM
-  # undoc-supp: process may have already exited before SIGTERM arrives.
+  # check-suppress:suppression_doc: process may have already exited before SIGTERM arrives.
   printf '%s\n' "$_klp_pids" | xargs kill -TERM 2>/dev/null || true
 
   # Wait up to 2s (4 x 0.5s)
   _klp_i=0
   while [ "$_klp_i" -lt 4 ]; do
-    # undoc-supp: no process may be listening on this port; empty result is expected.
+    # check-suppress:suppression_doc: no process may be listening on this port; empty result is expected.
     _klp_pids="$(lsof -ti :"$_klp_port" 2>/dev/null)" || true
     [ -z "$_klp_pids" ] && return 0
     sleep 0.5
@@ -262,11 +262,11 @@ kill_processes_on_port() {
   done
 
   # SIGKILL survivors
-  # undoc-supp: process may have already exited before SIGKILL arrives.
+  # check-suppress:suppression_doc: process may have already exited before SIGKILL arrives.
   printf '%s\n' "$_klp_pids" | xargs kill -KILL 2>/dev/null || true
   sleep 0.5
 
-  # undoc-supp: no process may be listening on this port; empty result is expected.
+  # check-suppress:suppression_doc: no process may be listening on this port; empty result is expected.
   _klp_pids="$(lsof -ti :"$_klp_port" 2>/dev/null)" || true
   [ -z "$_klp_pids" ] && return 0
   return 1
@@ -306,5 +306,5 @@ extract_ports() {
 
   printf '%s\n' "$_ep_json" | jq -r '
     .network // empty | to_entries[] | "\(.value.host // "0.0.0.0") \(.value.port)"
-  ' 2>/dev/null || true # undoc-supp: service entry may not have a network block; jq returns empty, not an error.
+  ' 2>/dev/null || true # check-suppress:suppression_doc: service entry may not have a network block; jq returns empty, not an error.
 }

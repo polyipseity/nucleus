@@ -28,10 +28,10 @@ function Disable-SteamAutoStartup {
   # Remove registry value for auto-login.
   $steamRegPath = "HKCU:\Software\Valve\Steam"
   if (Test-Path -Path $steamRegPath) {
-    # undoc-supp: probe whether AutoLoginUser value exists (key exists but value may be absent).
+    # check-suppress:suppression_doc: probe whether AutoLoginUser value exists (key exists but value may be absent).
     $autoLoginUser = Get-ItemProperty -Path $steamRegPath -Name "AutoLoginUser" -ErrorAction SilentlyContinue
     if ($null -ne $autoLoginUser) {
-      # undoc-supp: best-effort removal (value was confirmed above but may have been removed concurrently).
+      # check-suppress:suppression_doc: best-effort removal (value was confirmed above but may have been removed concurrently).
       Remove-ItemProperty -Path $steamRegPath -Name "AutoLoginUser" -ErrorAction SilentlyContinue
       Write-Output "steam: removed AutoLoginUser registry value"
     }

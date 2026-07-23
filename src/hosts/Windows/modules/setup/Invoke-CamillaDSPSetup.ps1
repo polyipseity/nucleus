@@ -40,7 +40,7 @@ function Invoke-CamillaDSPSetup {
   $alreadyConverged = $false
   if (Test-Path $binaryPath) {
     try {
-      $installedVersion = & $binaryPath --version 2>$null  # undoc-supp: probe — binary may not be installed yet; $LASTEXITCODE checked below
+      $installedVersion = & $binaryPath --version 2>$null  # check-suppress:suppression_doc: probe — binary may not be installed yet; $LASTEXITCODE checked below
       if ($LASTEXITCODE -eq 0 -and $installedVersion -match "CamillaDSP (\S+)") {
         $installedVersion = $matches[1]
         if ($installedVersion -eq $desiredVersion) {
@@ -71,7 +71,7 @@ function Invoke-CamillaDSPSetup {
     New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
 
     Write-Output "camilladsp-setup: downloading v${desiredVersion} from GitHub releases"
-    # undoc-supp: probe — download may fail; Test-Path check handles failure downstream.
+    # check-suppress:suppression_doc: probe — download may fail; Test-Path check handles failure downstream.
     Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -ErrorAction SilentlyContinue
     if (-not (Test-Path $zipPath)) {
       Write-Error "camilladsp-setup: download failed from $zipUrl"

@@ -25,7 +25,7 @@ _iut_desired_names="$(mktemp)"
 # functionality.  Real failures surface at tool-install time below.
 while IFS=' ' read -r _iut_tool _iut_python; do
   [ -z "$_iut_tool" ] && continue
-  # undoc-supp: uv python install may fail if the Python version is already installed or unavailable on this platform; that's fine — a real failure surfaces at tool-install time.
+  # check-suppress:suppression_doc: uv python install may fail if the Python version is already installed or unavailable on this platform; that's fine — a real failure surfaces at tool-install time.
   [ -n "$_iut_python" ] && "$_iut_uv_bin" python install "$_iut_python" 2>/dev/null || true
 done < "$_iut_desired"
 
@@ -36,7 +36,7 @@ done < "$_iut_desired"
 # cannot be misparsed as package names.
 _iut_installed="$(mktemp)"
 # shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
-"$_iut_uv_bin" tool list 2>/dev/null | "$_iut_gawk_bin" '/^[A-Za-z0-9][A-Za-z0-9._-]*[[:space:]]+v[0-9]/{print $1}' > "$_iut_installed" || true  # undoc-supp: uv tool list may fail if no tool env initialised
+"$_iut_uv_bin" tool list 2>/dev/null | "$_iut_gawk_bin" '/^[A-Za-z0-9][A-Za-z0-9._-]*[[:space:]]+v[0-9]/{print $1}' > "$_iut_installed" || true  # check-suppress:suppression_doc: uv tool list may fail if no tool env initialised
 
 # Tools installed but not desired: zap-style removal.
 _iut_to_remove="$(mktemp)"

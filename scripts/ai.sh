@@ -167,9 +167,9 @@ do_sync() {
           [ "$_model_tag" = "$model" ] && _model_tag="latest"
           # shellcheck disable=SC2016 # reason: jq filter variables use $p, $n, $t — not shell expansion
           _expected_digest=$(jq -r --arg p "$profile" --arg n "$_model_name" --arg t "$_model_tag" '
-            .ollama[$p][] | select(.name == $n and .tag == $t) | .digest // empty' "$LOCKFILE" 2>/dev/null || true) # undoc-supp: model may not be pulled yet; digest probe expected to fail.
+            .ollama[$p][] | select(.name == $n and .tag == $t) | .digest // empty' "$LOCKFILE" 2>/dev/null || true) # check-suppress:suppression_doc: model may not be pulled yet; digest probe expected to fail.
           if [ -n "$_expected_digest" ]; then
-            _actual_digest=$(OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama show --format json "$model" 2>/dev/null | jq -r '.digest // empty' 2>/dev/null || true) # undoc-supp: model may not be pulled yet; digest probe expected to fail.
+            _actual_digest=$(OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama show --format json "$model" 2>/dev/null | jq -r '.digest // empty' 2>/dev/null || true) # check-suppress:suppression_doc: model may not be pulled yet; digest probe expected to fail.
             if [ -n "$_actual_digest" ] && [ "$_actual_digest" != "$_expected_digest" ]; then
               warn "digest mismatch for $model (expected $_expected_digest, got $_actual_digest)"
             elif [ -n "$_actual_digest" ]; then
@@ -453,7 +453,7 @@ action="${1:-help}"
 case "$action" in
   -h|--help|help) usage; exit 0 ;;
 esac
-shift 2>/dev/null || true # undoc-supp: shift fails when no args remain (subcommand-only invocation); ignored intentionally
+shift 2>/dev/null || true # check-suppress:suppression_doc: shift fails when no args remain (subcommand-only invocation); ignored intentionally
 
 case "$action" in
   sync)     do_sync "$@" ;;

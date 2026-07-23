@@ -47,7 +47,7 @@ function Clear-NixBuildArtifact {
   $_count = 0
 
   foreach ($_pattern in @('result', 'result-*')) {
-    # undoc-supp: probe — Nix build symlinks may not exist; foreach handles empty result.
+    # check-suppress:suppression_doc: probe — Nix build symlinks may not exist; foreach handles empty result.
     $_paths = Get-ChildItem -Path $RepoRoot -Filter $_pattern -Force -ErrorAction SilentlyContinue
     foreach ($_item in $_paths) {
       if ($_item.LinkType -eq 'SymbolicLink') {

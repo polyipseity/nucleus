@@ -41,9 +41,9 @@ _vsd_managed_fpr="$(head -n1 "$_vsd_gpg_manifest")"
 # machine-readable non-interactive output; --no-autostart prevents GPG from
 # launching a new agent daemon (which deadlocks on macOS when the agent
 # socket directory is not yet ready during non-interactive activation).
-# undoc-supp: GnuPG may fail if GNUPGHOME doesn't exist yet on first activation; the subsequent grep check handles empty output.
+# check-suppress:suppression_doc: GnuPG may fail if GNUPGHOME doesn't exist yet on first activation; the subsequent grep check handles empty output.
 _vsd_gpg_all_secret_fprs="$(GNUPGHOME="$_vsd_gpg_home" \
-  "$_vsd_gnupg_bin" --with-colons --no-autostart --list-secret-keys)" || true  # undoc-supp: GnuPG may fail on first activation
+  "$_vsd_gnupg_bin" --with-colons --no-autostart --list-secret-keys)" || true  # check-suppress:suppression_doc: GnuPG may fail on first activation
 if ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_managed_fpr"; then
   echo "secrets: ERROR — managed GPG key $_vsd_managed_fpr not in keyring after gpg-import." >&2
   exit 1
@@ -70,7 +70,7 @@ while IFS= read -r _vsd_entry; do
   # Binary SOPS files use JSON format ("fp": "HEX") while YAML SOPS files
   # use "    fp: HEX".  The combined -E pattern matches both; the second
   # grep -oE extracts the hex fingerprint directly, avoiding the need for
-  # undoc-supp: grep may find no match; soft-fail prevents silent set -e exit, allowing [ -z ] below to report cleanly.
+  # check-suppress:suppression_doc: grep may find no match; soft-fail prevents silent set -e exit, allowing [ -z ] below to report cleanly.
   _vsd_sops_gpg_fp="$(/usr/bin/grep -m1 -E '[[:space:]]fp: |"fp": ' "$_vsd_path" | /usr/bin/grep -oE '[0-9A-Fa-f]{40,}')" || true
   if [ -z "$_vsd_sops_gpg_fp" ] || \
       ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_sops_gpg_fp"; then
@@ -94,7 +94,7 @@ fi
 # No private key material is accessed.
 _vsd_ssh_age_pub=""
 _vsd_ssh_failures=""
-# undoc-supp: ssh-to-age may fail if the SSH public key hasn't been materialized yet (first bootstrap); empty result is handled below.
+# check-suppress:suppression_doc: ssh-to-age may fail if the SSH public key hasn't been materialized yet (first bootstrap); empty result is handled below.
 _vsd_ssh_age_pub="$("$_vsd_ssh_to_age_bin" -i "$_vsd_ssh_pubkey_path")" || true
 if [ -z "$_vsd_ssh_age_pub" ]; then
   echo "secrets: ERROR — personal SSH key age-backend SOPS decryption check failed for: <ssh-to-age pubkey derivation failed>; ensure $_vsd_ssh_pubkey_path is a valid Ed25519 public key." >&2

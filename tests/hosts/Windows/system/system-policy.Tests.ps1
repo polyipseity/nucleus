@@ -30,7 +30,7 @@ Describe "Windows System Policy Parity" {
         }
 
         It "Should keep all Windows Firewall profiles enabled" {
-            # undoc-supp: probe — firewall may not be available in test container; WHY: Get-NetFirewallProfile returns null when cmdlet is unavailable.
+            # check-suppress:suppression_doc: probe — firewall may not be available in test container; WHY: Get-NetFirewallProfile returns null when cmdlet is unavailable.
             $firewallProfiles = Get-NetFirewallProfile -ErrorAction SilentlyContinue
             $firewallProfiles | Should -Not -BeNullOrEmpty
             foreach ($firewallProfile in $firewallProfiles) {

@@ -7,7 +7,7 @@ set -euo pipefail
 _cga_pinentry_mac_bin="$1"
 
 # /dev/console may not exist (headless/SSH session); empty result means no console user, handled downstream.
-_console_home="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)" # undoc-supp: /dev/console inaccessible in headless/SSH session; empty string handled downstream
+_console_home="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)" # check-suppress:suppression_doc: /dev/console inaccessible in headless/SSH session; empty string handled downstream
 if [ -n "$_console_home" ] && [ "$_console_home" != "/Users/root" ]; then
   /bin/mkdir -p "$_console_home/.gnupg"
   /bin/chmod 700 "$_console_home/.gnupg"

@@ -135,8 +135,8 @@ function Sync-VSCodeExtension {
   )
 
   foreach ($channel in $channels) {
-    # undoc-supp: probe whether the VS Code CLI is installed; Get-Command throws when absent.
-    $cliPath = Get-Command -Name $channel.Command -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source  # undoc-supp: probe — CLI may not be in PATH; null check below handles absence
+    # check-suppress:suppression_doc: probe whether the VS Code CLI is installed; Get-Command throws when absent.
+    $cliPath = Get-Command -Name $channel.Command -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source  # check-suppress:suppression_doc: probe — CLI may not be in PATH; null check below handles absence
     if ([string]::IsNullOrWhiteSpace($cliPath)) {
       Write-Output "Skipping VS Code $($channel.Name) extension sync: '$($channel.Command)' not found in PATH."
       continue
@@ -192,7 +192,7 @@ function Sync-VSCodeExtension {
       # extensions.json is a derived manifest VS Code writes on startup; a stale
       # one hides newly added managed extensions on the next launch.  Remove it
       # unconditionally so VS Code rescans the directory from the actual contents.
-      # undoc-supp: file may not exist before first VS Code launch; best-effort cleanup.
+      # check-suppress:suppression_doc: file may not exist before first VS Code launch; best-effort cleanup.
       Remove-Item -Path (Join-Path $channel.ExtDir 'extensions.json') -Force -ErrorAction Ignore
 
       # .obsolete is VS Code's deferred-deletion marker; remove it so the bridge

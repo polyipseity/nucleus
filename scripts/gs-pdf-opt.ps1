@@ -32,14 +32,14 @@ Import-Module $modulePath -Force -DisableNameChecking
 
 # Import ghostscript invocation helper.
 # Sync-ShellProfile defines Invoke-NucleusGhostscript; define inline as fallback.
-# undoc-supp: probe whether function is already defined; Get-Command throws when absent.
+# check-suppress:suppression_doc: probe whether function is already defined; Get-Command throws when absent.
 if (-not (Get-Command Invoke-NucleusGhostscript -ErrorAction SilentlyContinue)) {
   function Invoke-NucleusGhostscript {
-    # undoc-supp: probe whether tool is installed; Get-Command throws when absent.
+    # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
     if (Get-Command gs -ErrorAction SilentlyContinue) { & gs @Args; return }
-    # undoc-supp: probe whether tool is installed; Get-Command throws when absent.
+    # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
     if (Get-Command gswin64c -ErrorAction SilentlyContinue) { & gswin64c @Args; return }
-    # undoc-supp: probe whether tool is installed; Get-Command throws when absent.
+    # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
     if (Get-Command gswin32c -ErrorAction SilentlyContinue) { & gswin32c @Args; return }
     throw "Ghostscript CLI not found. Expected one of: gs, gswin64c, gswin32c"
   }

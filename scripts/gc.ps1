@@ -139,12 +139,12 @@ if ($Help) {
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
   $env:NUCLEUS_REPO_ROOT
 } else {
-  # undoc-supp: probe — path may not exist; $null check handles absence.
+  # check-suppress:suppression_doc: probe — path may not exist; $null check handles absence.
   $candidate = Resolve-Path "$PSScriptRoot\.." -ErrorAction SilentlyContinue
   if ($candidate -and (Test-Path "$candidate\src\flake.nix")) {
     $candidate
   } else {
-    # undoc-supp: probe — may not be in a git repo; $null check below handles absence.
+    # check-suppress:suppression_doc: probe — may not be in a git repo; $null check below handles absence.
     $gitRoot = & git -C (Get-Location).Path rev-parse --show-toplevel 2>$null | Out-String
     $gitRoot = $gitRoot.Trim()
     if (-not [string]::IsNullOrWhiteSpace($gitRoot) -and (Test-Path -Path $gitRoot -PathType Container)) {
@@ -246,7 +246,7 @@ function Clear-GitTemplateFiles {
     return
   }
 
-  # undoc-supp: ~/dev may not exist or contain .git dirs; silent skip is intentional
+  # check-suppress:suppression_doc: ~/dev may not exist or contain .git dirs; silent skip is intentional
   $gitDirs = Get-ChildItem -LiteralPath $DevRoot -Directory -Recurse -Filter '.git' -Force -ErrorAction SilentlyContinue
   foreach ($gitDir in $gitDirs) {
     $hooksDir = Join-Path -Path $gitDir.FullName -ChildPath 'hooks'
@@ -282,7 +282,7 @@ function Clear-GitCacheFiles {
     return
   }
 
-  # undoc-supp: ~/dev may not exist or contain .git dirs; silent skip is intentional
+  # check-suppress:suppression_doc: ~/dev may not exist or contain .git dirs; silent skip is intentional
   $gitDirs = Get-ChildItem -LiteralPath $DevRoot -Directory -Recurse -Filter '.git' -Force -ErrorAction SilentlyContinue
   foreach ($gitDir in $gitDirs) {
     $repoRoot = $gitDir.Parent.FullName
@@ -300,12 +300,12 @@ function Clear-GitCacheFiles {
       )
       foreach ($marker in $activeMarkers) {
         $markerPath = Join-Path $gitDir.FullName $marker
-        # undoc-supp: probe — marker may not exist; silent skip is intentional
+        # check-suppress:suppression_doc: probe — marker may not exist; silent skip is intentional
         if (Test-Path -LiteralPath $markerPath -PathType Container -ErrorAction SilentlyContinue) {
           $activeOp = $true
           break
         }
-        # undoc-supp: probe — marker may not exist; silent skip is intentional
+        # check-suppress:suppression_doc: probe — marker may not exist; silent skip is intentional
         if (Test-Path -LiteralPath $markerPath -PathType Leaf -ErrorAction SilentlyContinue) {
           $activeOp = $true
           break
@@ -325,7 +325,7 @@ function Clear-GitCacheFiles {
       }
 
       # Remove lock files except index.lock.
-      # undoc-supp: probe — lock files may not exist; empty result is handled
+      # check-suppress:suppression_doc: probe — lock files may not exist; empty result is handled
       $lockFiles = Get-ChildItem -LiteralPath $gitDir.FullName -Filter '*.lock' -File -Force -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -ne 'index.lock' }
       foreach ($lockFile in $lockFiles) {
@@ -352,7 +352,7 @@ function Clear-GitCacheFiles {
       foreach ($depDir in $depDirs) {
         $depPath = Join-Path $gitDir.FullName $depDir
         if (Test-Path -LiteralPath $depPath -PathType Container) {
-          # undoc-supp: probe — dir may already be empty; empty result is handled
+          # check-suppress:suppression_doc: probe — dir may already be empty; empty result is handled
           $depChildren = Get-ChildItem -LiteralPath $depPath -Force -ErrorAction SilentlyContinue
           if ($null -eq $depChildren -or $depChildren.Count -eq 0) {
             Remove-Item -LiteralPath $depPath -Force -ErrorAction Stop
@@ -361,19 +361,19 @@ function Clear-GitCacheFiles {
       }
 
       # Remove refs/original/ via git update-ref (handles packed-refs).
-      # undoc-supp: refs/original/ may not exist; empty/null result is handled
+      # check-suppress:suppression_doc: refs/original/ may not exist; empty/null result is handled
       $originalRefs = & git -C $repoRoot for-each-ref --format='%(refname)' refs/original/ 2>$null
       if ($originalRefs) {
         $originalRefs.Trim() -split "`n" | ForEach-Object {
           $ref = $_.Trim()
           if ($ref) {
-            # undoc-supp: ref may have been deleted by concurrent gc
+            # check-suppress:suppression_doc: ref may have been deleted by concurrent gc
             & git -C $repoRoot update-ref -d $ref 2>$null
           }
         }
         $originalDir = Join-Path $gitDir.FullName 'refs\original'
         if (Test-Path -LiteralPath $originalDir -PathType Container) {
-          # undoc-supp: probe — dir may not exist or may have leftover refs
+          # check-suppress:suppression_doc: probe — dir may not exist or may have leftover refs
           $originalChildren = Get-ChildItem -LiteralPath $originalDir -Force -ErrorAction SilentlyContinue
           if ($null -eq $originalChildren -or $originalChildren.Count -eq 0) {
             Remove-Item -LiteralPath $originalDir -Force -ErrorAction Stop
@@ -382,7 +382,7 @@ function Clear-GitCacheFiles {
       }
 
       # Run git gc --auto (delegates object pruning, reflog expiry, etc. to Git).
-      # undoc-supp: some repos may fail during gc; best-effort
+      # check-suppress:suppression_doc: some repos may fail during gc; best-effort
       & git -C $repoRoot gc --auto 2>$null
     }
     catch {
@@ -416,7 +416,7 @@ if (-not $NoToolCacheGc) {
   Clear-DirectoryContentsIfPresent -Path $cargoBinstallCacheDir -Label "cargo-binstall cache"
   Clear-DirectoryContentsIfPresent -Path $rustupTmpDir -Label "rustup temporary cache"
 
-  # undoc-supp: probe whether tool is installed; Get-Command throws when absent.
+  # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
   $cargoCacheCmd = Get-Command -Name "cargo-cache" -ErrorAction SilentlyContinue
   if ($null -eq $cargoCacheCmd) {
     Write-NucleusInfo "cargo-cache unavailable; skipping cargo cache gc"
@@ -466,7 +466,7 @@ if (-not $NoScoopGc) {
 
 # ---- Step 6: Ollama orphaned model gc --------------------------------------
 if (-not $NoOllamaGc) {
-  # undoc-supp: probe whether tool is installed; Get-Command throws when absent.
+  # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaCmd) {
     Write-NucleusInfo "ollama not installed; skipping ollama model gc"
@@ -477,7 +477,7 @@ if (-not $NoOllamaGc) {
 
 # ---- Step 7b: sccache cache clearing ----------------------------------------
 if (-not $NoSccacheGc) {
-  # undoc-supp: probe whether tool is installed; Get-Command throws when absent.
+  # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
   $sccacheCmd = Get-Command -Name "sccache" -ErrorAction SilentlyContinue
   if ($null -eq $sccacheCmd) {
     Write-NucleusInfo "sccache not installed; skipping sccache cache gc"
@@ -511,21 +511,21 @@ if (-not $NoVMGc) {
 
     if (Test-Path -LiteralPath $imagesDir -PathType Container) {
       # Remove temporary Packer build directories.
-      # undoc-supp: probe — temporary build directories may not exist; ForEach-Object handles empty result.
+      # check-suppress:suppression_doc: probe — temporary build directories may not exist; ForEach-Object handles empty result.
       Get-ChildItem -LiteralPath $imagesDir -Filter "*-build" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
         Remove-VMGcItem -Item $_ -Label "temporary VM build directory" -Recurse
       }
 
       # Remove leftover Packer temporary build directories (dot-prefixed, from interrupted runs).
       if (Test-Path -LiteralPath $imagesDir -PathType Container) {
-        # undoc-supp: probe — stale temporary directories may not exist; Where-Object handles empty result.
+        # check-suppress:suppression_doc: probe — stale temporary directories may not exist; Where-Object handles empty result.
         Get-ChildItem -LiteralPath $imagesDir -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^\..+' } | ForEach-Object {
           Remove-VMGcItem -Item $_ -Label "stale Packer temporary build directory" -Recurse
         }
       }
 
       # Remove stale VM disk images (qcow2) for VMs not declared in the manifest.
-      # undoc-supp: probe — stale disk images may not exist; ForEach-Object handles empty result.
+      # check-suppress:suppression_doc: probe — stale disk images may not exist; ForEach-Object handles empty result.
       Get-ChildItem -LiteralPath $imagesDir -Filter "*.qcow2" -File -ErrorAction SilentlyContinue | ForEach-Object {
         $imageName = $_.BaseName
         if ($imageName -notin $declaredVMNames) {
@@ -536,7 +536,7 @@ if (-not $NoVMGc) {
       # GC stale VM scripts from scripts/ subfolder.
       $scriptsDir = Join-Path $vmDir 'scripts'
       if (Test-Path -LiteralPath $scriptsDir -PathType Container) {
-        # undoc-supp: probe — VM scripts may not exist; foreach handles empty result.
+        # check-suppress:suppression_doc: probe — VM scripts may not exist; foreach handles empty result.
         $scripts = Get-ChildItem -LiteralPath $scriptsDir -Include '*.sh', '*.ps1' -File -ErrorAction SilentlyContinue
         foreach ($script in $scripts) {
           $isDeclared = $false

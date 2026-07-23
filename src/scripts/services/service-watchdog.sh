@@ -140,9 +140,9 @@ recover_launchctl() {
   else
     plist="${HOME:-}/Library/LaunchAgents/$svc_id.plist"
   fi
-  # undoc-supp: service may not be loaded or may fail transiently during recovery.
+  # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
   $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
-  # undoc-supp: service may not be loaded or may fail transiently during recovery.
+  # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
   $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null || true
 }
 
@@ -160,7 +160,7 @@ check_service_macos() {
   local target
   target=$(launchctl_target "$domain" "$svc_id")
   local print_out
-  # undoc-supp: service may not be loaded or may fail transiently during recovery.
+  # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
   print_out=$($sudo_prefix launchctl print "$target" 2>/dev/null || true)
 
   case "$print_out" in
@@ -191,7 +191,7 @@ check_service_macos() {
         plist="${HOME:-}/Library/LaunchAgents/$svc_id.plist"
       fi
       if [ -f "$plist" ]; then
-        # undoc-supp: service may not be loaded or may fail transiently during recovery.
+        # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
         $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null || true
         log_restart "$svc_id" "not found — bootstrap"
       fi
@@ -211,7 +211,7 @@ check_service_nixos() {
   [ "$scope" = "user" ] && scope_flag="--user"
 
   local is_active
-  # undoc-supp: service may not be loaded or may fail transiently during recovery.
+  # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
   is_active=$(systemctl $scope_flag is-active "$svc_id" 2>/dev/null || true)
 
   case "$is_active" in
@@ -221,9 +221,9 @@ check_service_nixos() {
       ;;
     inactive|dead|failed|not-found|"")
       # Stuck or missing — reset limits and restart.
-      # undoc-supp: service may not be loaded or may fail transiently during recovery.
+      # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
       systemctl $scope_flag reset-failed "$svc_id" 2>/dev/null || true
-      # undoc-supp: service may not be loaded or may fail transiently during recovery.
+      # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
       systemctl $scope_flag restart "$svc_id" 2>/dev/null || true
       log_restart "$svc_id" "state=$is_active"
       ;;

@@ -143,7 +143,7 @@ test_rotate_directory() {
 # ---------------------------------------------------------------------------
 test_rotate_missing_dir() {
     local result
-    result=$(rotate_logs_in_directory "$TEST_DIR/nonexistent" 10 2 false 2>&1) || true  # undoc-supp: expected failure — testing error handling for nonexistent path
+    result=$(rotate_logs_in_directory "$TEST_DIR/nonexistent" 10 2 false 2>&1) || true  # check-suppress:suppression_doc: expected failure — testing error handling for nonexistent path
     if [ -z "$result" ]; then
         assert_pass "rotate_logs_in_directory: no-op on missing directory"
     else
@@ -156,7 +156,7 @@ test_rotate_missing_dir() {
 # ---------------------------------------------------------------------------
 test_missing_file_noop() {
     local result
-    result=$(rotate_log_file "$TEST_DIR/nonexistent.log" 10 2 false 2>&1) || true  # undoc-supp: expected failure — testing error handling for nonexistent path
+    result=$(rotate_log_file "$TEST_DIR/nonexistent.log" 10 2 false 2>&1) || true  # check-suppress:suppression_doc: expected failure — testing error handling for nonexistent path
     if [ -z "$result" ] && [ ! -f "$TEST_DIR/nonexistent.log.1" ]; then
         assert_pass "rotate_log_file: no-op on missing file"
     else

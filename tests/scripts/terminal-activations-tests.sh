@@ -21,7 +21,7 @@ run_terminal_activations() {
     return
   fi
 
-  # undoc-supp: grep returns exit code 1 when no lines match; set -e would abort.
+  # check-suppress:suppression_doc: grep returns exit code 1 when no lines match; set -e would abort.
   printf '%s\n' "terminal-activations: running $(grep -c '^[^#]' "$manifest" || true) terminal-context activation(s)..."
   while IFS= read -r line; do
     case "$line" in
@@ -54,7 +54,7 @@ test_no_manifest() {
   setup
   rm -f "$MANIFEST"
   local output
-  # undoc-supp: run_terminal_activations may return non-zero; manual assertion follows
+  # check-suppress:suppression_doc: run_terminal_activations may return non-zero; manual assertion follows
   output=$(run_terminal_activations 2>&1 || true)
   if [ -z "$output" ]; then
     assert_pass "No manifest file: no-op (empty output)"
@@ -69,7 +69,7 @@ test_empty_manifest() {
   setup
   : > "$MANIFEST"
   local output
-  # undoc-supp: run_terminal_activations may return non-zero; manual assertion follows
+  # check-suppress:suppression_doc: run_terminal_activations may return non-zero; manual assertion follows
   output=$(run_terminal_activations 2>&1 || true)
   if [ -z "$output" ] && [ ! -f "$MANIFEST" ]; then
     assert_pass "Empty manifest: no-op and file deleted"
@@ -84,7 +84,7 @@ test_single_command() {
   setup
   printf 'touch %s/marker-single\n' "$TESTDIR" > "$MANIFEST"
   local output
-  # undoc-supp: run_terminal_activations may return non-zero; manual assertion follows
+  # check-suppress:suppression_doc: run_terminal_activations may return non-zero; manual assertion follows
   output=$(run_terminal_activations 2>&1 || true)
   if [ -f "$TESTDIR/marker-single" ] && [ ! -f "$MANIFEST" ]; then
     assert_pass "Single command: executes and deletes manifest"
@@ -103,7 +103,7 @@ test_multiple_commands_ordered() {
     printf 'touch %s/marker-3\n' "$TESTDIR"
   } > "$MANIFEST"
   local output
-  # undoc-supp: run_terminal_activations may return non-zero; manual assertion follows
+  # check-suppress:suppression_doc: run_terminal_activations may return non-zero; manual assertion follows
   output=$(run_terminal_activations 2>&1 || true)
   if [ -f "$TESTDIR/marker-1" ] && [ -f "$TESTDIR/marker-2" ] && [ -f "$TESTDIR/marker-3" ]; then
     assert_pass "Multiple commands: all executed"
@@ -125,7 +125,7 @@ test_comments_skipped() {
     printf 'touch %s/marker-comment2\n' "$TESTDIR"
   } > "$MANIFEST"
   local output
-  # undoc-supp: run_terminal_activations may return non-zero; manual assertion follows
+  # check-suppress:suppression_doc: run_terminal_activations may return non-zero; manual assertion follows
   output=$(run_terminal_activations 2>&1 || true)
   if [ -f "$TESTDIR/marker-comment" ] && [ -f "$TESTDIR/marker-comment2" ]; then
     assert_pass "Comment lines: skipped, commands still execute"
@@ -143,7 +143,7 @@ test_command_failure_continues() {
     printf 'touch %s/marker-after-fail\n' "$TESTDIR"
   } > "$MANIFEST"
   local output
-  # undoc-supp: run_terminal_activations may return non-zero; manual assertion follows
+  # check-suppress:suppression_doc: run_terminal_activations may return non-zero; manual assertion follows
   output=$(run_terminal_activations 2>&1 || true)
   if [ -f "$TESTDIR/marker-after-fail" ]; then
     assert_pass "Command failure: continues to subsequent commands"
@@ -163,7 +163,7 @@ test_name_header_lines() {
     printf 'touch %s/marker-universal\n' "$TESTDIR"
   } > "$MANIFEST"
   local output
-  # undoc-supp: run_terminal_activations may return non-zero; manual assertion follows
+  # check-suppress:suppression_doc: run_terminal_activations may return non-zero; manual assertion follows
   output=$(run_terminal_activations 2>&1 || true)
   if [ -f "$TESTDIR/marker-safari" ] && [ -f "$TESTDIR/marker-universal" ]; then
     assert_pass "Name header lines: commands after # headers execute correctly"

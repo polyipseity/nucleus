@@ -23,12 +23,12 @@ while IFS= read -r _vsd_entry; do
 
   # Delete NSServicesStatus key unconditionally.
   /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"$_vsd_bundle_id - $_vsd_menu_item - $_vsd_message\"" \
-    ~/Library/Preferences/pbs.plist 2>/dev/null || true  # undoc-supp: key may not exist on first apply
+    ~/Library/Preferences/pbs.plist 2>/dev/null || true  # check-suppress:suppression_doc: key may not exist on first apply
 
   _vsd_app_path="$APP_DIR/$_vsd_app_dir"
   if [ -d "$_vsd_app_path" ]; then
-    "$LSREGISTER" -u "$_vsd_app_path" 2>/dev/null || true  # undoc-supp: app may not be deployed yet
-    chmod -R +w "$_vsd_app_path" 2>/dev/null || true  # undoc-supp: dir may not exist on first apply
+    "$LSREGISTER" -u "$_vsd_app_path" 2>/dev/null || true  # check-suppress:suppression_doc: app may not be deployed yet
+    chmod -R +w "$_vsd_app_path" 2>/dev/null || true  # check-suppress:suppression_doc: dir may not exist on first apply
     rm -rf "$_vsd_app_path"
   fi
 done < <(printf '%s\n' "$_vsd_removed_bundles_json" | "$_vsd_jq_bin" -r -c '.[]')
@@ -47,11 +47,11 @@ while IFS= read -r _vsd_entry; do
   mkdir -p "$APP_DIR"
   # Nix store outputs are read-only; strip that before deletion to avoid
   # Permission denied on the next generation switch.
-  chmod -R +w "$_vsd_app_path" 2>/dev/null || true  # undoc-supp: dir may not exist on first apply
+  chmod -R +w "$_vsd_app_path" 2>/dev/null || true  # check-suppress:suppression_doc: dir may not exist on first apply
   rm -rf "$_vsd_app_path"
   cp -R "$_vsd_store_path" "$APP_DIR/"
 
-  "$LSREGISTER" -R -f "$_vsd_app_path" || true  # undoc-supp: LaunchServices may reject unsigned bundles; not fatal
+  "$LSREGISTER" -R -f "$_vsd_app_path" || true  # check-suppress:suppression_doc: LaunchServices may reject unsigned bundles; not fatal
 
   # Enable the service in NSServicesStatus so it appears in the Services
   # menu and right-click context menu without manual toggling in

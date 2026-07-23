@@ -230,7 +230,7 @@ let
 
   # Build a systemd ExecStop unmount command (NixOS only).
   mkFusermountUnmount =
-    # undoc-supp: unmounting a mount that may not exist; cleanup-only operation that must not fail (e.g. on retry after partial mount failure).
+    # check-suppress:suppression_doc: unmounting a mount that may not exist; cleanup-only operation that must not fail (e.g. on retry after partial mount failure).
     mountPoint: "/bin/sh -c 'fusermount3 -u ${lib.escapeShellArg mountPoint} || true'";
 
   # Build a scheduled replica-sync runner that invokes

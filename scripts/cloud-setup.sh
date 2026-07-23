@@ -110,7 +110,7 @@ collect_configured_mount_service_ids() {
       | [.id, .remoteName]
       | @tsv
     ' \
-    # undoc-supp: users.json may be empty or malformed; empty result is handled.
+    # check-suppress:suppression_doc: users.json may be empty or malformed; empty result is handled.
     "$_ccmsi_users_json" 2>/dev/null || true
 }
 
@@ -379,7 +379,7 @@ say "all credentials valid."
 if rclone listremotes | grep -Fxq 'GoogleDrive:'; then
   _current_abuse="$({
     rclone config dump | jq -r '.GoogleDrive.acknowledge_abuse // "false"'
-  } 2>/dev/null || true)" # undoc-supp: token/URL may not be resolvable; best-effort extraction with downstream guards.
+  } 2>/dev/null || true)" # check-suppress:suppression_doc: token/URL may not be resolvable; best-effort extraction with downstream guards.
   if [ "$_current_abuse" != "true" ]; then
     if rclone config update GoogleDrive acknowledge_abuse true; then
       say "enabled acknowledge_abuse on GoogleDrive"
@@ -411,7 +411,7 @@ if [ -f "$USERS_JSON" ] && command -v jq >/dev/null 2>&1; then
         | @tsv
       ' \
       "$USERS_JSON"
-  # undoc-supp: token/URL may not be resolvable; best-effort extraction with downstream guards.
+  # check-suppress:suppression_doc: token/URL may not be resolvable; best-effort extraction with downstream guards.
   } 2>/dev/null || true)"
 
   if [ -n "$_display_names" ]; then
@@ -429,7 +429,7 @@ if [ -f "$USERS_JSON" ] && command -v jq >/dev/null 2>&1; then
       # WHY: some backends can launch OAuth/device auth flows on config update.
       _current_description="$({
         rclone config dump | jq -r --arg remote "$remote_name" '.[$remote].description // empty'
-      } 2>/dev/null || true)" # undoc-supp: token/URL may not be resolvable; best-effort extraction with downstream guards.
+      } 2>/dev/null || true)" # check-suppress:suppression_doc: token/URL may not be resolvable; best-effort extraction with downstream guards.
       if [ "$_current_description" = "$display_name" ]; then
         continue
       fi

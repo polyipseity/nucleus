@@ -103,7 +103,7 @@ function Sync-AgentsClawHubSkill {
   # does not attempt a fallback install — if ClawHub is absent, Invoke-BunSetup
   # failed and the operator should investigate.
   $bunBinDir = Get-NucleusManagedBinDir "bun"
-  # undoc-supp: probe — clawhub may not be installed; $null check handles absence.
+  # check-suppress:suppression_doc: probe — clawhub may not be installed; $null check handles absence.
   $clawhubExe = Get-Command -Name "clawhub" -ErrorAction SilentlyContinue |
     Select-Object -First 1 -ExpandProperty Source
   if ([string]::IsNullOrEmpty($clawhubExe)) {
@@ -139,7 +139,7 @@ function Sync-AgentsClawHubSkill {
       }
       # Unlock an existing fetched skill directory before updating so ClawHub can
       # overwrite files that were locked ReadOnly on a previous install.
-      # undoc-supp: probe — path may not exist or have no child items; pipeline handles empty.
+      # check-suppress:suppression_doc: probe — path may not exist or have no child items; pipeline handles empty.
       Get-ChildItem -LiteralPath $skillPath -Recurse -Force -ErrorAction SilentlyContinue |
         ForEach-Object {
           if ($_.Attributes -band [System.IO.FileAttributes]::ReadOnly) {
@@ -157,7 +157,7 @@ function Sync-AgentsClawHubSkill {
     } elseif (Test-Path -LiteralPath $skillPath -PathType Container) {
       # Lock installed skill files to prevent modification outside a managed apply
       # run.  Mirrors POSIX chmod -R a-w after install.  The unlock above
-      # undoc-supp: probe — path may not exist or have no child items; pipeline handles empty.
+      # check-suppress:suppression_doc: probe — path may not exist or have no child items; pipeline handles empty.
       Get-ChildItem -LiteralPath $skillPath -Recurse -Force -ErrorAction SilentlyContinue |
         ForEach-Object { $_.Attributes = $_.Attributes -bor [System.IO.FileAttributes]::ReadOnly }
     }

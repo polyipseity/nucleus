@@ -19,7 +19,7 @@ function Set-NucleusService {
     [string]$StartType = 'Automatic'
   )
 
-  # undoc-supp: probe whether the service already exists; Get-Service throws when absent.
+  # check-suppress:suppression_doc: probe whether the service already exists; Get-Service throws when absent.
   $existingService = Get-Service -Name $Name -ErrorAction SilentlyContinue
   if ($null -eq $existingService) {
     if ($PSCmdlet.ShouldProcess($Name, 'Create service')) {
@@ -50,7 +50,7 @@ function Remove-NucleusService {
     [string]$Name
   )
 
-  # undoc-supp: probe whether the service exists; Get-Service throws when absent.
+  # check-suppress:suppression_doc: probe whether the service exists; Get-Service throws when absent.
   $existingService = Get-Service -Name $Name -ErrorAction SilentlyContinue
   if ($null -ne $existingService) {
     if ($PSCmdlet.ShouldProcess($Name, 'Remove service')) {

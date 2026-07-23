@@ -19,7 +19,7 @@ if [ -x "/opt/homebrew/bin/nightlight" ]; then
   # Read current temperature; skip setting if already at target value.
   # When the console user has a GUI session, run via launchctl asuser so
   # the CoreBrightness XPC service (needs WindowServer) is reachable.
-  current_temp=$("$NL_BIN" temp 2>/dev/null || true) # undoc-supp: nightlight temp can fail in headless activation (no GUI XPC); idempotency path must not abort
+  current_temp=$("$NL_BIN" temp 2>/dev/null || true) # check-suppress:suppression_doc: nightlight temp can fail in headless activation (no GUI XPC); idempotency path must not abort
   if [ "$current_temp" != "50" ]; then
     if _nucleus_resolve_console_user; then
       if ! /bin/launchctl asuser "$_nucleus_console_uid" "$NL_BIN" temp 50; then

@@ -101,7 +101,7 @@ function Sync-JellyfinAccount {
   )
 
   if ([string]::IsNullOrEmpty($BaseUrl)) {
-    # undoc-supp: probe — services.json may not exist yet; $null check handles absence.
+    # check-suppress:suppression_doc: probe — services.json may not exist yet; $null check handles absence.
     $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
     $BaseUrl = if ($svc.jellyfin.network.http) { "http://$($svc.jellyfin.network.http.host):$($svc.jellyfin.network.http.port)" } else { 'http://127.0.0.1:8096' }
   }

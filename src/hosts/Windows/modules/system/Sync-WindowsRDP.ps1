@@ -59,7 +59,7 @@ function Sync-WindowsRDP {
     [bool]$Enabled
   )
 
-  # undoc-supp: probe whether RDP service is installed; Get-Service throws when absent.
+  # check-suppress:suppression_doc: probe whether RDP service is installed; Get-Service throws when absent.
   $rdpService = Get-Service -Name 'TermService' -ErrorAction SilentlyContinue
   if ($null -eq $rdpService) {
     Write-Output "$($PSStyle.Formatting.Warning)Remote Desktop service (TermService) not found; skipping RDP convergence.$($PSStyle.Reset)"

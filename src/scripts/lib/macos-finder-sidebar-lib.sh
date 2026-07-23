@@ -47,16 +47,16 @@ finder_pre_remove() {
   _pr_tmp=$(mktemp)
   printf '%s\n' "$favorites_json" | "$jq_bin" -r '.[] | .name' > "$_pr_tmp"
   while IFS= read -r _name; do
-    # undoc-supp: mysides is known to segfault on corrupted bookmarks; soft-fail prevents activation abort.
+    # check-suppress:suppression_doc: mysides is known to segfault on corrupted bookmarks; soft-fail prevents activation abort.
     "$mysides_bin" remove "$_name" >/dev/null 2>&1 || true
   done < "$_pr_tmp"
   rm -f "$_pr_tmp"
   # Default extras that reappear after daemon restarts
-  # undoc-supp: see finder_pre_remove — mysides segfaults.
+  # check-suppress:suppression_doc: see finder_pre_remove — mysides segfaults.
   "$mysides_bin" remove "/" >/dev/null 2>&1 || true
-  # undoc-supp: see finder_pre_remove.
+  # check-suppress:suppression_doc: see finder_pre_remove.
   "$mysides_bin" remove "$(id -un)" >/dev/null 2>&1 || true
-  # undoc-supp: see finder_pre_remove.
+  # check-suppress:suppression_doc: see finder_pre_remove.
   "$mysides_bin" remove ".Trash" >/dev/null 2>&1 || true
   unset _pr_tmp
 }
@@ -69,12 +69,12 @@ finder_pre_remove() {
 finder_clear_all() {
   local mysides_bin="$1"
   _clear_tmp=$(mktemp)
-  # undoc-supp: mysides list may segfault on corrupted bookmarks; soft-fail prevents activation abort.
+  # check-suppress:suppression_doc: mysides list may segfault on corrupted bookmarks; soft-fail prevents activation abort.
   "$mysides_bin" list 2>/dev/null > "$_clear_tmp" || true
   while IFS= read -r _line; do
     _name="${_line%% -> *}"
     [ -n "$_name" ] || continue
-    # undoc-supp: mysides remove may segfault; soft-fail prevents activation abort.
+    # check-suppress:suppression_doc: mysides remove may segfault; soft-fail prevents activation abort.
     "$mysides_bin" remove "$_name" >/dev/null 2>&1 || true
   done < "$_clear_tmp"
   rm -f "$_clear_tmp"
@@ -122,7 +122,7 @@ finder_add_managed_best_effort() {
     _jq() { printf '%s\n' "$_item" | base64 -d | "$jq_bin" -r "$1"; }
     _name=$(_jq '.name')
     _url=$(_jq '.url')
-    # undoc-supp: mysides add may segfault; best-effort add must not abort activation.
+    # check-suppress:suppression_doc: mysides add may segfault; best-effort add must not abort activation.
     "$mysides_bin" add "$_name" "$_url" >/dev/null 2>&1 || true
   done < "$_add_tmp"
   rm -f "$_add_tmp"
@@ -134,11 +134,11 @@ finder_add_managed_best_effort() {
 # ---------------------------------------------------------------------------
 finder_remove_default_extras() {
   local mysides_bin="$1"
-  # undoc-supp: mysides is known to segfault on corrupted bookmarks; soft-fail prevents activation abort.
+  # check-suppress:suppression_doc: mysides is known to segfault on corrupted bookmarks; soft-fail prevents activation abort.
   "$mysides_bin" remove "/" >/dev/null 2>&1 || true
-  # undoc-supp: see finder_remove_default_extras — mysides segfaults.
+  # check-suppress:suppression_doc: see finder_remove_default_extras — mysides segfaults.
   "$mysides_bin" remove "$(id -un)" >/dev/null 2>&1 || true
-  # undoc-supp: see finder_remove_default_extras.
+  # check-suppress:suppression_doc: see finder_remove_default_extras.
   "$mysides_bin" remove ".Trash" >/dev/null 2>&1 || true
 }
 
@@ -193,7 +193,7 @@ finder_configure_sidebar() {
   finder_ensure_directories "$favorites_json" "$jq_bin"
   finder_reconcile_strict "$favorites_json" "$jq_bin" "$mysides_bin" || _finder_sidebar_failed=1
 
-  # undoc-supp: mysides list may fail (segfault on corrupted bookmarks); best-effort probe.
+  # check-suppress:suppression_doc: mysides list may fail (segfault on corrupted bookmarks); best-effort probe.
   _finder_list_output=$("$mysides_bin" list 2>/dev/null || true)
   _finder_actual_order="$(echo "$_finder_list_output" | /usr/bin/awk -F' -> ' 'NF >= 1 && $1 != "" { print $1 }' | /usr/bin/head -n "$managed_count" | /usr/bin/paste -sd'|' -)"
   if [ "$_finder_actual_order" != "$expected_order" ]; then
@@ -202,9 +202,9 @@ finder_configure_sidebar() {
   fi
 
   # Refresh finder-related daemons in-session
-  # undoc-supp: daemon may not be running; killall exits 1, activation must not abort.
+  # check-suppress:suppression_doc: daemon may not be running; killall exits 1, activation must not abort.
   /usr/bin/killall sharedfilelistd 2>/dev/null || true
-  # undoc-supp: see killall sharedfilelistd — daemon may not be running.
+  # check-suppress:suppression_doc: see killall sharedfilelistd — daemon may not be running.
   /usr/bin/killall -KILL cfprefsd 2>/dev/null || true
 
   if [ "$_finder_sidebar_failed" -eq 1 ]; then

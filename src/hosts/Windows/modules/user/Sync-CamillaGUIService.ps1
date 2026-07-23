@@ -40,7 +40,7 @@ function Sync-CamillaGUIService {
   $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
 
   if (-not $Enabled) {
-    # undoc-supp: probe — task may not exist; $null check handles missing task.
+    # check-suppress:suppression_doc: probe — task may not exist; $null check handles missing task.
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($null -ne $existingTask) {
       Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
@@ -68,7 +68,7 @@ function Sync-CamillaGUIService {
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
   $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
 
-  # undoc-supp: probe — task may not exist; $null check handles missing task.
+  # check-suppress:suppression_doc: probe — task may not exist; $null check handles missing task.
   $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
   if ($null -ne $existingTask) {
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false

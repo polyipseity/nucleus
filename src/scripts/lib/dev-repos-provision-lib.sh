@@ -204,10 +204,10 @@ resolve_submodule_branch() {
 
   # submodule.<name>.branch is optional in .gitmodules; absence means
   # "follow remote HEAD".
-  # undoc-supp: git config --get exits 1 when the key does not exist.
+  # check-suppress:suppression_doc: git config --get exits 1 when the key does not exist.
   branchName="$(cd "$repoPath" && git config --file .gitmodules --get "submodule.$submoduleName.branch" || true)"
   if [ "$branchName" = "." ] || [ -z "$branchName" ]; then
-    # undoc-supp: remote HEAD may not exist for detached submodules; git symbolic-ref exits 1 on detached HEAD (fallback below extracts branch name).
+    # check-suppress:suppression_doc: remote HEAD may not exist for detached submodules; git symbolic-ref exits 1 on detached HEAD (fallback below extracts branch name).
     originHeadRef="$(cd "$repoPath/$submodulePath" && git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || true)"
     branchName="${originHeadRef#origin/}"
   fi

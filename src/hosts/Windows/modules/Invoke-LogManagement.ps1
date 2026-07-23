@@ -165,7 +165,7 @@ function Invoke-LogRotation {
     Move-Item -LiteralPath $file.FullName -Destination $archivePath -Force
 
     if ($Compress) {
-      $null = & "gzip" @("$archivePath") 2>$null  # undoc-supp: archive may fail to compress if already corrupted or missing; $? checked below
+      $null = & "gzip" @("$archivePath") 2>$null  # check-suppress:suppression_doc: archive may fail to compress if already corrupted or missing; $? checked below
       if (-not $?) {
         Write-Warning "log-rotation: gzip failed for $archivePath; keeping uncompressed."
       }

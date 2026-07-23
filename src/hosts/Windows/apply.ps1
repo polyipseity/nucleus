@@ -354,12 +354,12 @@ if (-not $Elevated) {
   $psi.UseShellExecute = $true
   $proc = [System.Diagnostics.Process]::Start($psi)
   if ($null -eq $proc) {
-    Remove-Item $paramsJsonPath -Force -ErrorAction SilentlyContinue  # undoc-supp: cleanup of temp file; failure is harmless (OS will eventually clean %TEMP%)
+    Remove-Item $paramsJsonPath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: cleanup of temp file; failure is harmless (OS will eventually clean %TEMP%)
     throw "User cancelled the elevation prompt (UAC). nucleus-apply requires elevation for system configuration."
   }
   $proc.WaitForExit()
   $exitCode = $proc.ExitCode
-  Remove-Item $paramsJsonPath -Force -ErrorAction SilentlyContinue  # undoc-supp: same — temp file in %TEMP%; child may have already cleaned up
+  Remove-Item $paramsJsonPath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: same — temp file in %TEMP%; child may have already cleaned up
   exit $exitCode
 }
 
@@ -507,7 +507,7 @@ $machineSshHostKeyPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_ho
 $primarySshKeyPath = Join-Path -Path $HOME -ChildPath ".ssh\ssh_personal_$PrimaryUsername"
 
 # Resolve managed executables before running any decryption/materialization.
-# undoc-supp: probe — SOPS WinGet package directory may not exist; $null check handles absence.
+# check-suppress:suppression_doc: probe — SOPS WinGet package directory may not exist; $null check handles absence.
 $sopsPackageDir = Get-ChildItem -Path (Join-Path -Path $env:LOCALAPPDATA -ChildPath "Microsoft\WinGet\Packages\SecretsOPerationS.SOPS_*") -Directory -ErrorAction SilentlyContinue |
   Sort-Object -Property Name -Descending |
   Select-Object -First 1
@@ -519,24 +519,24 @@ if ($null -ne $sopsPackageDir) {
 
 $sopsCandidates = @(
   $sopsExecutableFromWinget,
-  # undoc-supp: probe whether sops is on PATH; Get-Command throws when absent.
+  # check-suppress:suppression_doc: probe whether sops is on PATH; Get-Command throws when absent.
   (Get-Command -Name "sops.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
 ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
 $gpgCandidates = @(
   (Join-Path -Path $env:ProgramFiles -ChildPath "GnuPG\bin\gpg.exe"),
-  # undoc-supp: probe whether gpg is on PATH; Get-Command throws when absent.
+  # check-suppress:suppression_doc: probe whether gpg is on PATH; Get-Command throws when absent.
   (Get-Command -Name "gpg.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
 ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
-# undoc-supp: probe — prek WinGet package directory may not exist; $null check handles absence.
+# check-suppress:suppression_doc: probe — prek WinGet package directory may not exist; $null check handles absence.
 $prekPackageDir = Get-ChildItem -Path (Join-Path -Path $env:LOCALAPPDATA -ChildPath "Microsoft\WinGet\Packages\j178.Prek_*") -Directory -ErrorAction SilentlyContinue |
   Sort-Object -Property Name -Descending |
   Select-Object -First 1
 
 $prekExecutableFromWinget = $null
 if ($null -ne $prekPackageDir) {
-  # undoc-supp: probe — prek executable may not be in expected location; $null check handles absence.
+  # check-suppress:suppression_doc: probe — prek executable may not be in expected location; $null check handles absence.
   $prekExecutableFromWinget = Get-ChildItem -Path $prekPackageDir.FullName -Filter "prek*.exe" -File -Recurse -ErrorAction SilentlyContinue |
     Sort-Object -Property FullName |
     Select-Object -First 1 -ExpandProperty FullName
@@ -544,9 +544,9 @@ if ($null -ne $prekPackageDir) {
 
 $prekCandidates = @(
   $prekExecutableFromWinget,
-  # undoc-supp: probe whether prek is on PATH; Get-Command throws when absent.
+  # check-suppress:suppression_doc: probe whether prek is on PATH; Get-Command throws when absent.
   (Get-Command -Name "prek.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source),
-  # undoc-supp: fallback probe without .exe suffix.
+  # check-suppress:suppression_doc: fallback probe without .exe suffix.
   (Get-Command -Name "prek" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
 ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
@@ -716,7 +716,7 @@ foreach ($configFile in $effectiveConfigFiles) {
 
 # Set Windows Application Event Log max size to 200 MB.
 # No declarative DSC resource exists for this; wevtutil is the canonical tool.
-wevtutil sl Application /ms:209715200 2>$null  # undoc-supp: may already be at desired size; wevtutil exits non-zero but this is harmless
+wevtutil sl Application /ms:209715200 2>$null  # check-suppress:suppression_doc: may already be at desired size; wevtutil exits non-zero but this is harmless
 
 # Scoop bucket and app provisioning must run after DSC installs Scoop.Scoop.
 # scoop shims are written to a user-local directory that is not on PATH in
@@ -889,7 +889,7 @@ Test-ArchivingStack | Out-Null
 if ($NoAISync) {
   Write-Output "ai: -NoAISync set; skipping post-apply model sync"
 } else {
-  # undoc-supp: probe whether ollama is installed (may not be on first-provision hosts).
+  # check-suppress:suppression_doc: probe whether ollama is installed (may not be on first-provision hosts).
   $ollamaOnPath = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaOnPath) {
     Write-Output "ai: ollama not found in PATH; skipping post-apply model sync"
@@ -906,7 +906,7 @@ if ($NoAISync) {
 if (-not $ReplicaSync) {
   Write-Output "replica-sync: skipping post-apply replica sync (default; pass -ReplicaSync to run now)"
 } else {
-  # undoc-supp: probe — rclone may be absent on first-provision hosts.
+  # check-suppress:suppression_doc: probe — rclone may be absent on first-provision hosts.
   $rcloneOnPath = Get-Command -Name "rclone" -ErrorAction SilentlyContinue
   if ($null -eq $rcloneOnPath) {
     Write-Output "replica-sync: rclone not found in PATH; skipping post-apply replica sync"

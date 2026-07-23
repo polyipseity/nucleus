@@ -63,7 +63,7 @@ done
 # .agents/instructions/macos-launchd-sip.instructions.md.
 if [ "$_ct_mode" = "sudo" ]; then
   printf '%s\n' "caddy-trust: attempting launchd service recovery via bootout/bootstrap..." >&2
-  # undoc-supp: HTTPS proxy service may not be loaded; bootout on absent service exits 1.
+  # check-suppress:suppression_doc: HTTPS proxy service may not be loaded; bootout on absent service exits 1.
   sudo launchctl bootout system/org.nixos.httpsProxy 2>/dev/null || true
   sleep 1
   if sudo launchctl bootstrap system /Library/LaunchDaemons/org.nixos.httpsProxy.plist 2>/dev/null; then

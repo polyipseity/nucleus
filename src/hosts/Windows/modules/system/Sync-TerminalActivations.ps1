@@ -28,7 +28,7 @@ function Sync-TerminalActivations {
 
   $lines = Get-Content -LiteralPath $manifestPath | Where-Object { $_ -and $_ -notmatch '^\s*#' }
   if ($lines.Count -eq 0) {
-    # undoc-supp: best-effort cleanup of empty manifest — file may already be gone.
+    # check-suppress:suppression_doc: best-effort cleanup of empty manifest — file may already be gone.
     Remove-Item -LiteralPath $manifestPath -Force -ErrorAction SilentlyContinue
     return
   }
@@ -39,12 +39,12 @@ function Sync-TerminalActivations {
     if (-not $line) { continue }
     Write-Output "terminal-activations: $line"
     try {
-      # undoc-supp: child process errors are non-fatal for apply.
+      # check-suppress:suppression_doc: child process errors are non-fatal for apply.
       Invoke-Expression -Command $line -ErrorAction Stop
     } catch {
       Write-Warning "terminal-activations: command exited with error (continuing): $_"
     }
   }
-  # undoc-supp: best-effort cleanup — file may already be deleted by earlier steps or locked.
+  # check-suppress:suppression_doc: best-effort cleanup — file may already be deleted by earlier steps or locked.
   Remove-Item -LiteralPath $manifestPath -Force -ErrorAction SilentlyContinue
 }

@@ -40,7 +40,7 @@ function Sync-CamillaDSPService {
   $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
 
   if (-not $Enabled) {
-    $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue  # undoc-supp: probe — task may not be registered yet; $null check below handles absence
+    $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe — task may not be registered yet; $null check below handles absence
     if ($null -ne $existingTask) {
       Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
       Write-Output "camilladsp: removed scheduled task '$taskName' (disabled)"
@@ -57,7 +57,7 @@ function Sync-CamillaDSPService {
 
   # Read port from services.json (single source of truth).
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
-  # undoc-supp: probe — services.json may not exist yet on first provision; fallback to default port
+  # check-suppress:suppression_doc: probe — services.json may not exist yet on first provision; fallback to default port
   $svc = Get-Content -Raw (Join-Path $repoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
   $wsPort = if ($svc.camilladsp.network.websocket.port) { $svc.camilladsp.network.websocket.port } else { 1234 }
 
@@ -83,7 +83,7 @@ function Sync-CamillaDSPService {
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
   $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
 
-  $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue  # undoc-supp: probe — task may not be registered yet; $null check below handles absence
+  $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe — task may not be registered yet; $null check below handles absence
   if ($null -ne $existingTask) {
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
   }

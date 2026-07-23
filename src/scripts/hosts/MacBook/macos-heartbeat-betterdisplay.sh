@@ -17,7 +17,7 @@ set +e  # heartbeat is fully soft-fail; never abort on individual check failure
 
 # _bd_cli args... — Execute BetterDisplay CLI command, soft-fail on error.
 _bd_cli() {
-  # undoc-supp: BetterDisplay may be unresponsive during app startup/update, or Pro-only features may be unavailable in the free-tier build. Neither condition should abort activation or mark the LaunchAgent as failed.
+  # check-suppress:suppression_doc: BetterDisplay may be unresponsive during app startup/update, or Pro-only features may be unavailable in the free-tier build. Neither condition should abort activation or mark the LaunchAgent as failed.
   "$BD_BIN" "$@" || true
 }
 
@@ -31,7 +31,7 @@ while true; do
 
   # Ensure BetterDisplay is running before issuing CLI commands.
   if ! /usr/bin/pgrep -xq "BetterDisplay" 2>/dev/null; then
-    # undoc-supp: BetterDisplay may not be installed yet; best-effort launch.
+    # check-suppress:suppression_doc: BetterDisplay may not be installed yet; best-effort launch.
     /usr/bin/open -g -a "$BD_APP" || true
     /bin/sleep 5
   fi

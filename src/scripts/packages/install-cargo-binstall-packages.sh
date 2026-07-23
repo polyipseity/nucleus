@@ -36,7 +36,7 @@ printf '%s\n' "$_icp_desired_crates_json" | "$_icp_jq_bin" -r '.[]' > "$_icp_des
 # crate name (first field) from lines matching that pattern.
 _icp_installed="$(mktemp)"
 # shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
-cargo install --list 2>/dev/null | "$_icp_gawk_bin" '/^[a-zA-Z0-9_-]+ v/{print $1}' > "$_icp_installed" || true  # undoc-supp: cargo install --list may fail if ~/.cargo uninitialised
+cargo install --list 2>/dev/null | "$_icp_gawk_bin" '/^[a-zA-Z0-9_-]+ v/{print $1}' > "$_icp_installed" || true  # check-suppress:suppression_doc: cargo install --list may fail if ~/.cargo uninitialised
 
 # Crates installed but not desired: zap-style removal.
 _icp_to_remove="$(mktemp)"

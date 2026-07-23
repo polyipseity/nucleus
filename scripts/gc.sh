@@ -329,9 +329,9 @@ gc_git_templates_if_present() {
   fi
 
   while IFS= read -r -d '' gitdir; do
-    # undoc-supp: glob may match nothing; rm -f errors are non-fatal
+    # check-suppress:suppression_doc: glob may match nothing; rm -f errors are non-fatal
     rm -f "$gitdir/hooks/"*.sample 2>/dev/null || true
-    # undoc-supp: description may already be absent; rm -f errors are non-fatal
+    # check-suppress:suppression_doc: description may already be absent; rm -f errors are non-fatal
     rm -f "$gitdir/description" 2>/dev/null || true
   done < <(find "$dev_root" -name ".git" -type d -print0 2>/dev/null)
 }
@@ -421,7 +421,7 @@ gc_git_cache_if_present() {
             if [ "$dry_run" = true ]; then
               dry_run "would remove empty deprecated directory '$_dep_dir' in '$repo_dir'"
             else
-              # undoc-supp: race — directory may no longer be empty between check and removal
+              # check-suppress:suppression_doc: race — directory may no longer be empty between check and removal
               rmdir "$_dep_dir" 2>/dev/null || true
             fi
           fi
@@ -434,10 +434,10 @@ gc_git_cache_if_present() {
           dry_run "would remove refs/original/ in '$repo_dir'"
         else
           git for-each-ref --format='%(refname)' refs/original/ 2>/dev/null | while IFS= read -r _ref; do
-            # undoc-supp: ref may have been deleted by concurrent gc
+            # check-suppress:suppression_doc: ref may have been deleted by concurrent gc
             git update-ref -d "$_ref" 2>/dev/null || true
           done
-          # undoc-supp: directory may not exist or may not be empty
+          # check-suppress:suppression_doc: directory may not exist or may not be empty
           rmdir ".git/refs/original" 2>/dev/null || true
         fi
       fi
@@ -447,7 +447,7 @@ gc_git_cache_if_present() {
       if [ "$dry_run" = true ]; then
         dry_run "would run 'git gc --auto' in '$repo_dir'"
       else
-        # undoc-supp: some repos may have errors during gc
+        # check-suppress:suppression_doc: some repos may have errors during gc
         git gc --auto 2>/dev/null || true
       fi
     )
@@ -724,7 +724,7 @@ gc_journald_if_available() {
   fi
 
   _jv_expiry="${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}"
-  # undoc-supp: journal may not exist on non-systemd systems; best-effort vacuum.
+  # check-suppress:suppression_doc: journal may not exist on non-systemd systems; best-effort vacuum.
   journalctl --vacuum-time="$_jv_expiry" 2>/dev/null || true
 }
 

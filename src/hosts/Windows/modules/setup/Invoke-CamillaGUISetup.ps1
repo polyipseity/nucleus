@@ -62,7 +62,7 @@ function Invoke-CamillaGUISetup {
     New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
 
     Write-Output "camillagui-backend-setup: downloading v${desiredVersion} from GitHub releases"
-    # undoc-supp: probe — download may fail; Test-Path check handles failure downstream.
+    # check-suppress:suppression_doc: probe — download may fail; Test-Path check handles failure downstream.
     Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -ErrorAction SilentlyContinue
     if (-not (Test-Path $zipPath)) {
       Write-Error "camillagui-backend-setup: download failed from $zipUrl"

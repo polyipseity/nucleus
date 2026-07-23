@@ -77,17 +77,17 @@ function Sync-PowerPolicy {
 
     Set-ItemProperty -Path $tcpParamsPath -Name 'KeepAliveTime' -Value 60000 -Type DWord
 
-    # undoc-supp: probe — no physical adapters on headless/system.
+    # check-suppress:suppression_doc: probe — no physical adapters on headless/system.
     $physicalAdapters = Get-NetAdapter -Physical -ErrorAction SilentlyContinue
     foreach ($adapter in $physicalAdapters) {
-      # undoc-supp: probe — adapter may not support power management.
+      # check-suppress:suppression_doc: probe — adapter may not support power management.
       $pm = $adapter | Get-NetAdapterPowerManagement -ErrorAction SilentlyContinue
       if ($null -eq $pm) {
         Write-Warning "power: could not read power management for adapter '$($adapter.Name)'; skipping WoL."
         continue
       }
       if ($pm.WakeOnMagicPacket -ne 'Enabled') {
-        # undoc-supp: best-effort — adapter may not support power management.
+        # check-suppress:suppression_doc: best-effort — adapter may not support power management.
         $adapter | Set-NetAdapterPowerManagement -WakeOnMagicPacket Enabled -ErrorAction SilentlyContinue
         if ($?) {
           Write-Verbose "power: enabled Wake-on-LAN for adapter '$($adapter.Name)'."
@@ -109,7 +109,7 @@ function Sync-PowerPolicy {
     Invoke-PowerCfgChecked -Arguments @('/change', 'disk-timeout-dc', '10') -FailureMessage 'Failed to restore battery disk timeout.'
     Invoke-PowerCfgChecked -Arguments @('/setactive', $activeSchemeGuid) -FailureMessage 'Failed to reactivate the current power scheme after restoring defaults.'
 
-    # undoc-supp: probe whether KeepAliveTime exists before removing; Get-ItemProperty throws when absent.
+    # check-suppress:suppression_doc: probe whether KeepAliveTime exists before removing; Get-ItemProperty throws when absent.
     if (Get-ItemProperty -Path $tcpParamsPath -Name 'KeepAliveTime' -ErrorAction SilentlyContinue) {
       Remove-ItemProperty -Path $tcpParamsPath -Name 'KeepAliveTime'
     }
