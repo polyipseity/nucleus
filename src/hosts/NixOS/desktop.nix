@@ -206,13 +206,16 @@
   # when the user toggles "Start Steam on login" inside the application.
   # This activation script removes the file on every rebuild so the declarative
   # config overrides that runtime preference.
+  # Inlined (not the shared disable-steam-autostart.sh) because the shared
+  # script sources macos-console-user-lib.sh for macOS login-item removal,
+  # which is unused on Linux and would fail from SCRIPT_DIR resolution.
   # Cross-platform parity:
   #   macOS   — login item removal in MacBook/activation.nix (osascript)
   #   NixOS   — this activation script
   #   Windows — Disable-SteamAutoStartup module + apply.ps1
-  system.activationScripts."nixos-disable-steam-autostart" = lib.mkAfter (
-    builtins.readFile ../../scripts/configs/disable-steam-autostart.sh
-  );
+  system.activationScripts."nixos-disable-steam-autostart" = lib.mkAfter ''
+    find /home -maxdepth 3 -path '*/autostart/steam.desktop' -delete 2>/dev/null || true  # undoc-supp: steam autostart entry may not exist; find exits 1 when no match, harmless
+  '';
 
   # EasyEffects: graphical PipeWire audio processing GUI with plugin-based
   # limiter, compressor, equalizer, and other DSP effects.

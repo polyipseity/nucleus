@@ -211,14 +211,8 @@ in
 
     # ---- homebrew-pin-verify ----------------------------------------------
     # Warning-only check that installed Homebrew versions match lockfile.
-    # Embedded via readFile + replaceStrings at build time so the script
-    # does not depend on NUCLEUS_REPO_ROOT at activation time.
     # Never fails activation.
-    (${
-      builtins.replaceStrings [ "__REPO_ROOT__" ] [ repoRoot ] (
-        builtins.readFile ../../scripts/hosts/MacBook/macos-verify-homebrew-pin.sh
-      )
-    }) || true  # undoc-supp: warning-only version check; must not abort activation even if script errors.
+    "${activationBundle}/hosts/MacBook/macos-verify-homebrew-pin.sh" "${repoRoot}" || true  # undoc-supp: warning-only version check; must not abort activation even if script errors.
 
     # ---- disableSteamAutoStartup ------------------------------------------------
     "${activationBundle}/configs/disable-steam-autostart.sh"

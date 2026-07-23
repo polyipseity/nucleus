@@ -27,20 +27,22 @@ in
   # Jellyfin service is running.  Mirrors the Darwin postActivation fragment but
   # uses a named script (nixos-specific option).
   #
-  # WHY embedded via readFile with NUCLEUS_REPO_ROOT token (not runtime sh):
-  # see the rationale in activation.nix (MacBook) — the script is
-  # self-contained when NUCLEUS_REPO_ROOT is set at build time, eliminating
-  # the runtime file-system dependency on the repo checkout path.
+  # Runs via a bundled script tree so the script can resolve its lib/
+  # dependencies at runtime via SCRIPT_DIR.
   system.activationScripts.jellyfin-sync = lib.mkAfter (
     let
-      repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+      # Bundle the script + lib dependencies so SCRIPT_DIR-relative sourcing works.
+      scriptsBundle = pkgs.runCommand "nucleus-jellyfin-scripts" { preferLocalBuild = true; } ''
+        mkdir -p "$out/services" "$out/lib"
+        cp ${../../scripts/services/jellyfin-sync.sh} "$out/services/jellyfin-sync.sh"
+        cp ${../../scripts/lib/lib.sh} "$out/lib/lib.sh"
+        chmod +x "$out/services/jellyfin-sync.sh"
+      '';
     in
     ''
-      ${builtins.replaceStrings
-        [ "__NUCLEUS_REPO_ROOT__" "__NUCLEUS_PATH_PREPEND__" "__SOPS_AGE_KEY_FILE__" ]
-        [ repoRoot "${pkgs.jq}/bin:${pkgs.sops}/bin" "/etc/sops/age/machine.txt" ]
-        (builtins.readFile ../../scripts/services/jellyfin-sync.sh)
-      }
+      export NUCLEUS_REPO_ROOT="${lib.escapeShellArg (builtins.getEnv "NUCLEUS_REPO_ROOT")}"
+      export PATH="${pkgs.jq}/bin:${pkgs.sops}/bin:$PATH"
+      ${scriptsBundle}/services/jellyfin-sync.sh
     ''
   );
 }

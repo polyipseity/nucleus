@@ -1,11 +1,11 @@
 #!/usr/bin/env sh
 # Warn-only check that installed Homebrew versions match lockfile.
 # Silent when all versions match.
-# REPO_ROOT is substituted at build time via Nix replaceStrings.
+# Takes repo root path as $1.
 
 set -eu
 
-LOCKFILE="__REPO_ROOT__/src/lockfiles/lockfile.json"
+LOCKFILE="${1:?repo root required}/src/lockfiles/lockfile.json"
 
 if [ ! -f "$LOCKFILE" ]; then
   # Lockfile not present — nothing to verify.
