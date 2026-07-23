@@ -26,9 +26,6 @@ let
       pkgs.websocat
       pkgs.jq
     ];
-    extraEnv = {
-      WS_PORT = toString wsPort;
-    };
   };
 
   camilladspHeartbeat = pkgs.writeNucleusShellApplication {
@@ -37,9 +34,6 @@ let
       pkgs.websocat
       pkgs.jq
     ];
-    extraEnv = {
-      WS_PORT = toString wsPort;
-    };
   };
 
   envVars = import ../../modules/lib/env-catalog.nix {
@@ -69,7 +63,7 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${camilladspDaemon}/bin/nucleus-camilladsp-daemon"
+        "exec ${camilladspDaemon}/bin/nucleus-camilladsp-daemon --port ${toString wsPort}"
       ];
       UserName = username;
       EnvironmentVariables = daemonEnv;
@@ -93,7 +87,7 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${camilladspHeartbeat}/bin/nucleus-camilladsp-heartbeat"
+        "exec ${camilladspHeartbeat}/bin/nucleus-camilladsp-heartbeat --port ${toString wsPort}"
       ];
       UserName = username;
       EnvironmentVariables = daemonEnv;

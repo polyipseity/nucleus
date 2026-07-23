@@ -16,9 +16,6 @@ let
       pkgs.websocat
       pkgs.jq
     ];
-    extraEnv = {
-      WS_PORT = toString wsPort;
-    };
   };
 
   camilladspHeartbeat = pkgs.writeNucleusShellApplication {
@@ -27,9 +24,6 @@ let
       pkgs.websocat
       pkgs.jq
     ];
-    extraEnv = {
-      WS_PORT = toString wsPort;
-    };
   };
 in
 {
@@ -49,7 +43,7 @@ in
     serviceConfig = {
       Type = "simple";
       User = username;
-      ExecStart = "${camilladspDaemon}/bin/nucleus-camilladsp-daemon";
+      ExecStart = "${camilladspDaemon}/bin/nucleus-camilladsp-daemon --port ${toString wsPort}";
       Restart = "always";
       WorkingDirectory = "%h";
     };
@@ -64,7 +58,7 @@ in
       Type = "simple";
       User = username;
       Restart = "always";
-      ExecStart = "${camilladspHeartbeat}/bin/nucleus-camilladsp-heartbeat";
+      ExecStart = "${camilladspHeartbeat}/bin/nucleus-camilladsp-heartbeat --port ${toString wsPort}";
     };
     wantedBy = [ "default.target" ];
   };
