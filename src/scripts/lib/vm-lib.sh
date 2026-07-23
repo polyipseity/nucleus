@@ -1,14 +1,14 @@
 # shellcheck shell=bash
-# Source this file from the vm-setup dispatcher, then call vm_setup_init with
+# Source this file from the vm-setup dispatcher, then call vm_init with
 # all config values as positional parameters to make data flow explicit.
 # Example:
-#   . "$SCRIPT_DIR/vm-setup/lib.sh"
-#   vm_setup_init "$REPO_ROOT" "$VM_DIR" ...
+#   . "$SCRIPT_DIR/vm-lib.sh"
+#   vm_init "$REPO_ROOT" "$VM_DIR" ...
 
-# vm_setup_init — Initialize all shared config variables from explicit
+# vm_init — Initialize all shared config variables from explicit
 # positional parameters. Called after sourcing so shellcheck can trace every
 # variable assignment through the function call.
-vm_setup_init() {
+vm_init() {
   REPO_ROOT="$1"
   VM_DIR="$2"
   IMAGES_DIR="$3"
@@ -53,7 +53,7 @@ write_vm_directory_readme() {
     {
       printf '# virtual machines\n\n'
       # shellcheck disable=SC2016 # reason: single quotes intentional — backticks must not expand
-      printf 'This directory stores VM artifacts managed by `nucleus-vm-setup`.\n'
+      printf 'This directory stores VM artifacts managed by `nucleus-vm`.\n'
     } >"$_wvdr_readme"
   fi
 }
@@ -274,7 +274,7 @@ run_with_backoff() {
 
 # Wait for a guest to become reachable via QEMU GA or SSH.
 # Returns 0 if guest is ready, 1 on timeout.
-wait_for_guest() {
+vm_wait_for_guest() {
   _wg_name="$1"
   _wg_type="$2"
   _wg_timeout="${3:-150}"
@@ -310,14 +310,14 @@ wait_for_guest() {
   return 1
 }
 
-# write_start_script NAME DISPLAY TYPE HOST_KIND
+# vm_write_start_script NAME DISPLAY TYPE HOST_KIND
 # Args:
 #   $1 — VM machine name (manifest .name)
 #   $2 — VM display name (manifest .display)
 #   $3 — VM type (macOS/NixOS/Windows/...)
 #   $4 — host runtime kind (darwin-utm|darwin-tart|nixos-libvirt)
 # Writes a host-side helper script to start the VM runtime from ~/virtual machines.
-write_start_script() {
+vm_write_start_script() {
   _wss_name="$1"
   _wss_display="$2"
   _wss_type="$3"
@@ -359,7 +359,7 @@ EOF
 if (Test-Path '/Applications/UTM.app/Contents/MacOS/utmctl') {
   & '/Applications/UTM.app/Contents/MacOS/utmctl' start '$_wss_name'
   if (\$LASTEXITCODE -ne 0) {
-    Write-Warning "vm-setup: utmctl start failed for $_wss_name; opening bundle instead"
+    Write-Warning "nucleus-vm: utmctl start failed for $_wss_name; opening bundle instead"
     Start-Process -FilePath open -ArgumentList '$VM_DIR/$_wss_name.utm' | Out-Null
   }
 } else {
@@ -372,13 +372,13 @@ EOF
 # start-$_wss_name.ps1 — Start VM '$_wss_name' with libvirt.
 & virsh start '$_wss_name' | Out-Null
 if (\$LASTEXITCODE -ne 0) {
-  Write-Warning "vm-setup: virsh start failed (or VM already running): $_wss_name"
+  Write-Warning "nucleus-vm: virsh start failed (or VM already running): $_wss_name"
 }
 if (Get-Command virt-viewer -ErrorAction SilentlyContinue) {
   & virt-viewer --connect qemu:///system '$_wss_name'
 } else {
-  Write-Host "vm-setup: VM started: $_wss_name"
-  Write-Host 'vm-setup: install virt-viewer to open a console automatically'
+  Write-Host "nucleus-vm: VM started: $_wss_name"
+  Write-Host 'nucleus-vm: install virt-viewer to open a console automatically'
 }
 EOF
       ;;
@@ -458,11 +458,11 @@ EOF
 
 # VM iteration helper
 
-# for_each_vm CALLBACK [ARGS...]
+# vm_for_each CALLBACK [ARGS...]
 #   Iterates VMs in MANIFEST, skipping disabled or host-mismatched entries.
 #   For each enabled VM, calls CALLBACK with positional args:
 #     vm_name vm_type vm_hosts vm_index [ARGS...]
-for_each_vm() {
+vm_for_each() {
   local _callback="$1"
   shift
   local _count _i _vm_name _vm_type _vm_enabled _vm_hosts
@@ -500,11 +500,11 @@ for_each_vm() {
   done
 }
 
-# get_expected_vm_names
+# vm_get_expected_vm_names
 #   Prints a newline-separated list of VM names from the manifest that are
 #   enabled and match the current host.  Reuses the same filter logic as
-#   for_each_vm but without the callback dispatch.
-get_expected_vm_names() {
+#   vm_for_each but without the callback dispatch.
+vm_get_expected_vm_names() {
   jq -r --arg host "$NUCLEUS_HOST" '
     .VMs[] |
     select(.enabled == true) |
@@ -586,7 +586,7 @@ resize_and_mark_image() {
 
 # android (qemu/lineageos) image build
 
-build_android_image() {
+vm_build_android() {
   _bai_vm_name="$1"
   _bai_vm_index="$2"
   _bai_accept_gsi_license="$3"
@@ -688,9 +688,9 @@ build_android_image() {
   say "Android image build complete for '$_bai_vm_name'"
 }
 
-# Image build callback for for_each_vm
+# Image build callback for vm_for_each
 
-build_one_image() {
+vm_build_one_image() {
   local _vm_name="$1" _vm_type="$2" _vm_hosts="$3" _vm_index="$4"
   local _vm_disk_bytes _vm_disk_gib
   _vm_disk_bytes="$(jq ".VMs[$_vm_index].diskBytes" "$MANIFEST")"
@@ -703,13 +703,13 @@ build_one_image() {
       # undoc-supp: best-effort — a prerequisite-missing or build failure for one
       # VM type must not abort builds for the remaining VMs; the build
       # function prints a specific error before returning non-zero.
-      build_nixos_image "$_vm_name" "$_vm_disk_gib" \
+      vm_build_nixos "$_vm_name" "$_vm_disk_gib" \
         || say "NixOS image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
       ;;
     Windows)
       _vm_edition="$(jq -r ".VMs[$_vm_index].windowsEdition // \"Pro\"" "$MANIFEST")"
       # undoc-supp: best-effort — see NixOS branch above.
-      build_windows_image "$_vm_name" "$_vm_disk_gib" "$_vm_edition" \
+      vm_build_windows "$_vm_name" "$_vm_disk_gib" "$_vm_edition" \
         || say "Windows image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
       ;;
     macOS)
@@ -720,12 +720,12 @@ build_one_image() {
       _vm_ram_mib="$(( (_vm_ram_bytes + 524288) / 1048576 ))"
       _vm_cpus="$(jq -r ".VMs[$_vm_index].cpus" "$MANIFEST")"
       # undoc-supp: best-effort — see NixOS branch above.
-      build_macos_image "$_vm_name" "$_vm_disk_gib" "$_vm_ram_mib" "$_vm_cpus" "$_vm_macos_ver" \
+      vm_build_macos "$_vm_name" "$_vm_disk_gib" "$_vm_ram_mib" "$_vm_cpus" "$_vm_macos_ver" \
         || say "macOS image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
       ;;
     Android)
       # undoc-supp: best-effort — see NixOS branch above.
-      build_android_image "$_vm_name" "$_vm_index" \
+      vm_build_android "$_vm_name" "$_vm_index" \
         "$accept_gsi_license" "$upgrade_android" "$reset_userdata" \
         || say "Android image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
       ;;
@@ -735,9 +735,9 @@ build_one_image() {
   esac
 }
 
-# Tart VM setup callback for for_each_vm
+# Tart VM setup callback for vm_for_each
 
-setup_tart_vm() {
+vm_setup_tart() {
   local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
 
   if [ "$vm_type" != "macOS" ]; then
@@ -752,15 +752,15 @@ setup_tart_vm() {
 
   if [ "$dry_run" = false ]; then
     say "tart VM ready: $vm_name (start with: tart run $vm_name)"
-    write_start_script "$vm_name" "$vm_name" "$vm_type" 'darwin-tart'
+    vm_write_start_script "$vm_name" "$vm_name" "$vm_type" 'darwin-tart'
   else
     dry_run "verify tart VM registration: $vm_name"
   fi
 }
 
-# UTM VM setup callback for for_each_vm
+# UTM VM setup callback for vm_for_each
 
-setup_utm_vm() {
+vm_setup_utm() {
   local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display bundle data_dir disk_file
   local disk_credential_marker config_plist bundle_exists legacy_display_config
@@ -768,7 +768,7 @@ setup_utm_vm() {
 
   vm_display=$(jq -r ".VMs[$vm_index].display" "$MANIFEST")
 
-  # macOS guests are provisioned via tart (setup_tart_vms), not UTM.
+  # macOS guests are provisioned via tart (vm_setup_tart_vms), not UTM.
   if [ "$vm_type" = "macOS" ]; then
     say "macOS guest '$vm_name' stays on Tart runtime; skipping UTM bundle provisioning for this VM"
     return
@@ -872,7 +872,7 @@ setup_utm_vm() {
     fi
   fi
 
-  write_start_script "$vm_name" "$vm_display" "$vm_type" 'darwin-utm'
+  vm_write_start_script "$vm_name" "$vm_display" "$vm_type" 'darwin-utm'
 
   if [ "$dry_run" = false ]; then
     mkdir -p "$data_dir"
@@ -933,9 +933,9 @@ setup_utm_vm() {
   fi
 }
 
-# Libvirt VM setup callback for for_each_vm
+# Libvirt VM setup callback for vm_for_each
 
-setup_libvirt_vm() {
+vm_setup_libvirt() {
   local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display disk_path disk_credential_marker _prebuilt
 
@@ -994,7 +994,7 @@ setup_libvirt_vm() {
   if [ "$dry_run" = false ]; then
     if virsh define "$_xml_file"; then
       say "VM '$vm_name' defined/updated in libvirt"
-      write_start_script "$vm_name" "$vm_display" "$vm_type" 'nixos-libvirt'
+      vm_write_start_script "$vm_name" "$vm_display" "$vm_type" 'nixos-libvirt'
     else
       warn "virsh define failed for '$vm_name'; check libvirtd status"
     fi
@@ -1019,7 +1019,7 @@ case "$(uname -m)" in
     ;;
 esac
 
-# build_nixos_image NAME DISK_GIB
+# vm_build_nixos NAME DISK_GIB
 #   Builds the NixOS guest image via nixos-generators (pinned as a flake
 #   input in src/flake.nix).  On macOS this requires an aarch64-linux builder;
 #   enable nix.linux-builder.enable in the macOS host config so the Nix daemon
@@ -1027,7 +1027,7 @@ esac
 #   VM created by nix-darwin.  Most derivations are fetched from the binary
 #   cache; hostname-specific ones (e.g. etc-hostname) are configuration-specific
 #   and cannot be cached.
-build_nixos_image() {
+vm_build_nixos() {
   _name="$1"
   _disk_gib="$2"
   _out="$IMAGES_DIR/${_name}.qcow2"
@@ -1366,10 +1366,10 @@ download_windows_iso_fido_url_nonwindows() {
   return 0
 }
 
-# build_windows_image NAME DISK_GIB
+# vm_build_windows NAME DISK_GIB
 #   Builds the Windows 11 guest image using Packer and the Autounattend.xml
 #   answer file at src/vms/windows/Autounattend.xml.
-build_windows_image() {
+vm_build_windows() {
   _name="$1"
   _disk_gib="$2"
   _edition="${3:-Pro}"
@@ -1735,14 +1735,14 @@ EOF
   say "Windows 11 image ready: $_out"
 }
 
-# build_macos_image NAME DISK_GIB RAM_MIB CPUS MACOS_VERSION
+# vm_build_macos NAME DISK_GIB RAM_MIB CPUS MACOS_VERSION
 #   Builds the macOS guest VM using the Packer Tart plugin.  Requires tart
 #   and packer to be installed; only runs on Darwin hosts (Tart uses Apple
 #   Virtualization.framework which is not available on other platforms).
 #   The resulting VM is stored in ~/virtual machines/.tart/vms/<name>/ (via
 #   the ~/.tart symlink created by ensure_tart_vm_dir).
 #   Source: https://github.com/cirruslabs/packer-plugin-tart
-build_macos_image() {
+vm_build_macos() {
   _name="$1"
   _disk_gib="$2"
   _ram_mib="$3"
@@ -1835,42 +1835,42 @@ prune_stale_build_dirs() {
   done
 }
 
-build_images() {
+vm_build_images() {
   prune_stale_build_dirs
-  for_each_vm build_one_image
+  vm_for_each vm_build_one_image
 }
 
 # macOS / Tart (macOS guests)
 
-# setup_tart_vms — Phase 2 provisioning checks for macOS-type VM guests.
+# vm_setup_tart_vms — Phase 2 provisioning checks for macOS-type VM guests.
 #   The Packer Tart build already registered the VM in tart's store; this
 #   function validates registration and reports runtime entry points.
 #   Source: https://github.com/cirruslabs/tart
-setup_tart_vms() {
+vm_setup_tart_vms() {
   if ! command -v tart >/dev/null 2>&1; then
     say "tart not found; skipping macOS VM start-script generation"
     return
   fi
 
-  for_each_vm setup_tart_vm
+  vm_for_each vm_setup_tart
 }
 
 # macOS / UTM (NixOS and Windows guests on macOS host)
 
-setup_utm_vms() {
+vm_setup_utm_vms() {
   if [ ! -d /Applications/UTM.app ]; then
     say "UTM not found at /Applications/UTM.app; skipping macOS VM provisioning"
     return
   fi
 
-  for_each_vm setup_utm_vm
+  vm_for_each vm_setup_utm
 
   say "macOS VM setup complete"
 }
 
 # NixOS / libvirt
 
-setup_libvirt_vms() {
+vm_setup_libvirt_vms() {
   if ! command -v virsh >/dev/null 2>&1; then
     say "virsh not found in PATH; libvirtd may not be enabled yet"
     say "apply the NixOS configuration first so vms.nix activates libvirtd"
@@ -1890,16 +1890,16 @@ setup_libvirt_vms() {
     fi
   fi
 
-  for_each_vm setup_libvirt_vm
+  vm_for_each vm_setup_libvirt
 
   say "NixOS VM setup complete; use the generated start-<name> helpers (or virt-manager) to start VMs"
 }
 
 # Windows / QEMU
 
-# setup_windows_qemu_vm — Callback for for_each_vm on Windows. Writes a QEMU
+# vm_setup_windows_qemu — Callback for vm_for_each on Windows. Writes a QEMU
 #   start script for Android VMs on the Windows host.
-setup_windows_qemu_vm() {
+vm_setup_windows_qemu() {
   local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display
 
@@ -1908,7 +1908,7 @@ setup_windows_qemu_vm() {
   case "$vm_type" in
     Android)
       say "configuring QEMU start script for '$vm_display' on Windows..."
-      write_start_script "$vm_name" "$vm_display" "$vm_type" 'windows-qemu'
+      vm_write_start_script "$vm_name" "$vm_display" "$vm_type" 'windows-qemu'
       ;;
     *)
       say "skipping script generation for '$vm_display' on Windows (type $vm_type not supported via QEMU)"
@@ -1916,19 +1916,19 @@ setup_windows_qemu_vm() {
   esac
 }
 
-setup_windows_qemu_vms() {
-  for_each_vm setup_windows_qemu_vm
+vm_setup_windows_qemu_vms() {
+  vm_for_each vm_setup_windows_qemu
   say "Windows VM setup complete; use the generated start-<name> scripts to start VMs"
 }
 
 # Garbage collection for non-provisioned VM artifacts
 
-# gc_vms — Top-level GC dispatcher.  Called from the vm-setup.sh main flow
+# vm_gc_vms — Top-level GC dispatcher.  Called from the vm.sh main flow
 #   when --gc is passed.  Removes VM artifacts (Tart VMs, UTM bundles,
 #   libvirt domains, disk images, credential markers) for VMs that are not
 #   in the enabled-and-host-matched set.
-gc_vms() {
-  _gcv_expected="$(get_expected_vm_names)" || return
+vm_gc_vms() {
+  _gcv_expected="$(vm_get_expected_vm_names)" || return
 
   say "GC — scanning for non-provisioned VM artifacts..."
   if [ "$dry_run" = true ]; then
@@ -1947,8 +1947,8 @@ gc_vms() {
       ;;
   esac
 
-  gc_orphan_disks "$_gcv_expected"
-  gc_orphan_markers "$_gcv_expected"
+  vm_gc_orphan_disks "$_gcv_expected"
+  vm_gc_orphan_markers "$_gcv_expected"
 
   say "GC — done"
 }
@@ -2003,8 +2003,8 @@ gc_libvirt_vms() {
   done
 }
 
-# gc_orphan_disks EXPECTED_NAMES — Remove disk images not in the expected set.
-gc_orphan_disks() {
+# vm_gc_orphan_disks EXPECTED_NAMES — Remove disk images not in the expected set.
+vm_gc_orphan_disks() {
   _gcod_expected="$1"
 
   for _gcod_dir in "$VM_DIR" "$IMAGES_DIR"; do
@@ -2022,9 +2022,9 @@ gc_orphan_disks() {
   done
 }
 
-# gc_orphan_markers EXPECTED_NAMES — Remove credential markers whose disk
+# vm_gc_orphan_markers EXPECTED_NAMES — Remove credential markers whose disk
 #   image no longer exists.
-gc_orphan_markers() {
+vm_gc_orphan_markers() {
   _gcom_expected="$1"
 
   for _gcom_dir in "$VM_DIR" "$IMAGES_DIR"; do
