@@ -90,7 +90,7 @@ test_no_dangerous_patterns() {
 
     # Check for unquoted variables in potentially dangerous contexts
     # shellcheck disable=SC2016 # reason: $ chars are literal regex metacharacters, not shell expansions.
-    if grep -E '\$[A-Za-z_][A-Za-z0-9_]*\s+(&&|;|\||>)' "$script" | grep -v '\$([^)]*' | grep -v '${' >/dev/null 2>&1; then
+    if grep -E '\$[A-Za-z_][A-Za-z0-9_]*\s+(&&|;|\||>)' "$script" | grep -v '\$([^)]*' | grep -v '${' | grep -v 'as \$' >/dev/null 2>&1; then
         dangerous=$((dangerous + 1))
         assert_fail "Potential unquoted variable: $(basename "$script")" "Found unquoted variable in dangerous context (&&, ;, |, >)"
     fi

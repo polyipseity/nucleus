@@ -110,7 +110,7 @@ gs_pdf_opt() {
     if "$gs_cmd" -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 \
       "-dPDFSETTINGS=/$preset" -dNOPAUSE -dQUIET -dBATCH \
       -sOutputFile="$f" "$bak"; then
-      $rm_bak && rm -f "$bak"
+      "$rm_bak" && rm -f "$bak"
       say "optimized: $f (preset: $preset)"
     else
       mv "$bak" "$f"

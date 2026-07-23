@@ -565,7 +565,7 @@ do_list() {
       if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && ! $HAS_SUDO; then continue; fi
       local status_json
       status_json=$(svc_status "$key" "$svc_json")
-      $first || printf ','
+      "$first" || printf ','
       first=false
       printf '"%s":%s' "$json_key" "$status_json"
     done <<< "$entries"
@@ -599,7 +599,7 @@ do_list() {
       printf '%-20s %-24s %-10s %-8s %s\n' "$json_key" "$display" "$status" "$running" "$pid"
     done <<< "$entries"
   fi
-  $has_error && return 1 || return 0
+  "$has_error" && return 1 || return 0
 }
 
 do_status() {
@@ -639,7 +639,7 @@ do_status() {
     fi
     printf '%-20s %-24s %-10s %-8s %s\n' "$json_key" "$display" "$status" "$running" "$pid"
   done <<< "$entries"
-  $any_error && return 1 || return 0
+  "$any_error" && return 1 || return 0
 }
 
 do_action() {
@@ -672,7 +672,7 @@ do_action() {
       warn "$svc_name — action $action failed"
       overall_exit=1
     fi
-    if $verbose_mode && [ "$action" = "start" ] || [ "$action" = "restart" ]; then
+    if "$verbose_mode" && [ "$action" = "start" ] || [ "$action" = "restart" ]; then
       local _v_status
       _v_status=$(svc_status "$svc_name" "$(echo "$entry" | jq '.platform')")
       local _v_running _v_pid
@@ -824,7 +824,7 @@ show_file_logs() {
   files="$(service_log_files "$svc")"
   [ -z "$files" ] && return 1
   local sanitize_cmd="log_sanitize"
-  $raw && sanitize_cmd="cat"
+  "$raw" && sanitize_cmd="cat"
   # shellcheck disable=SC2086 # reason: $files is a space-separated list from service_log_files, word splitting intentional
   tail -n "$lines" $files | "$sanitize_cmd"
 }
@@ -838,7 +838,7 @@ show_journald_logs() {
   local since_arg=()
   [ -n "$since" ] && since_arg=(--since "$since")
   local sanitize_cmd="log_sanitize"
-  $raw && sanitize_cmd="cat"
+  "$raw" && sanitize_cmd="cat"
   journalctl -u "$unit" -n "$lines" --no-pager -o cat "${since_arg[@]}" | "$sanitize_cmd"
 }
 
@@ -867,7 +867,7 @@ do_logs() {
       printf '['
       local first=true
       while IFS= read -r svc; do
-        $first || printf ',',
+        "$first" || printf ',',
         first=false
         printf '  "%s"' "$svc"
       done <<< "$(get_platform_services)"

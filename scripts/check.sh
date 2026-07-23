@@ -178,7 +178,7 @@ while [ "$#" -gt 0 ]; do
 done
 
 # Validate mutual exclusivity: --scoped and --full cannot be combined.
-if $SCOPED && $FULL; then
+if "$SCOPED" && "$FULL"; then
   error "cannot specify both --scoped and --full"
   usage >&2
   exit 1
@@ -244,7 +244,7 @@ else
   say "skipping (no shell scripts to check)."
 fi
 if [ $_sc_exit -ne 0 ]; then exit_code=$_sc_exit; fi
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # PowerShell syntax validation (parser only, no PSScriptAnalyzer)
 section "$((_step += 1))" "PowerShell syntax validation"
@@ -257,7 +257,7 @@ else
   say "skipping (no PowerShell scripts to check)."
 fi
 if [ $_ps_exit -ne 0 ]; then exit_code=$_ps_exit; fi
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Packer template validation
 section "$((_step += 1))" "Packer template validation"
@@ -268,7 +268,7 @@ elif ! $HAS_ARGS; then
 else
   say "skipping (no Packer templates to check)."
 fi
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Dead Nix code detection
 section "$((_step += 1))" "Dead Nix code"
@@ -278,14 +278,14 @@ if [ ${#NIX_FILES[@]} -gt 0 ]; then
   else
     say "no dead Nix code found."
   fi
-  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+  "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 elif ! $HAS_ARGS; then
   if ! deadnix --fail src/; then
     exit_code=$?
   else
     say "no dead Nix code found."
   fi
-  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+  "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 else
   say "skipping deadnix (path-scoped mode)."
 fi
@@ -298,7 +298,7 @@ if ! nix eval --impure "path:./src#packages.$sys" >/dev/null; then
 else
   say "nix flake evaluation passed."
 fi
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Nix formatting check
 section "$((_step += 1))" "Nix formatting (nixfmt)"
@@ -316,7 +316,7 @@ if [ "${#NIX_FILES[@]}" -gt 0 ]; then
       exit_code=$?
     fi
   fi
-  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+  "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 else
   say "skipping nixfmt (no Nix files to check)."
 fi
@@ -338,7 +338,7 @@ if [ "${#NIX_FILES[@]}" -gt 0 ]; then
   done
   if [ "$_nixf_errors" -gt 0 ]; then
     exit_code=1
-    $FAIL_FAST && exit $exit_code
+    "$FAIL_FAST" && exit $exit_code
   else
     say "nixf-tidy lint passed."
   fi
@@ -356,14 +356,14 @@ elif ! $HAS_ARGS; then
   done < <(find . -path ./vendor -prune -o -name '*.nix' -print0)
   if [ "$_nixf_errors" -gt 0 ]; then
     exit_code=1
-    $FAIL_FAST && exit $exit_code
+    "$FAIL_FAST" && exit $exit_code
   else
     say "nixf-tidy lint passed."
   fi
 else
   say "skipping nixf-tidy (no Nix files to check)."
 fi
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Always-run: Stale Nix build artifact check
 section "$((_step += 1))" "Stale Nix build artifact check"
@@ -377,27 +377,27 @@ if echo "$_cnba_output" | grep -q "would remove stale Nix build symlink"; then
 else
   say "no stale Nix build artifacts found."
 fi
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Always-run: Shell script validation tests
 section "$((_step += 1))" "Shell script validation tests"
 bash tests/scripts/script-validation-tests.sh || exit_code=$?
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Always-run: CWD-independence tests
 section "$((_step += 1))" "CWD-independence tests"
 bash tests/scripts/cwd-independence-tests.sh || exit_code=$?
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Always-run: Nix search path tests
 section "$((_step += 1))" "Nix search path tests"
 bash tests/scripts/nix-search-path-tests.sh || exit_code=$?
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Always-run: Port utility function tests
 section "$((_step += 1))" "Port utility function tests"
 bash tests/scripts/lib-port-functions-tests.sh || exit_code=$?
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Lockfile validation
 section "$((_step += 1))" "Lockfile validation"
@@ -435,7 +435,7 @@ fi
 if [ "$_lf_overlap_issues" -gt 0 ]; then
   warn "lockfile.json has $_lf_overlap_issues overlapping package(s) across sections"
   exit_code=1
-  $FAIL_FAST && exit $exit_code
+  "$FAIL_FAST" && exit $exit_code
 else
   say "lockfile.json consistency: no overlapping packages across sections"
 fi
@@ -469,7 +469,7 @@ fi
 if [ "$_lf_al_errors" -gt 0 ]; then
   warn "lifecycle-allowlist.json validation failed with $_lf_al_errors error(s)"
   exit_code=1
-  $FAIL_FAST && exit $exit_code
+  "$FAIL_FAST" && exit $exit_code
 else
   _lf_al_count=$(jq 'length' "$_lf_al_path" 2>/dev/null || echo 0)
   say "lifecycle-allowlist.json: valid (entry count: $_lf_al_count)"
@@ -555,13 +555,13 @@ if [ -f "$_lfpath" ]; then
     if [ "$_lf_errors" -gt 0 ]; then
       warn "lockfile.json validation failed with $_lf_errors error(s)"
       exit_code=1
-      $FAIL_FAST && exit $exit_code
+      "$FAIL_FAST" && exit $exit_code
     fi
     say "lockfile.json validation passed"
   else
     warn "lockfile.json not found — skipping section validation"
     exit_code=1
-    $FAIL_FAST && exit $exit_code
+    "$FAIL_FAST" && exit $exit_code
   fi
 
 # Always-run: Locked DSC validation
@@ -609,7 +609,7 @@ _dsc_system_dir="src/hosts/Windows/system"
   if [ "$_lf_errors" -gt 0 ]; then
     warn "locked DSC validation failed with $_lf_errors error(s)"
     exit_code=1
-    $FAIL_FAST && exit $exit_code
+    "$FAIL_FAST" && exit $exit_code
   fi
   say "locked DSC validation passed"
 
@@ -676,10 +676,10 @@ check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml 2>/de
 if [ "$_jsonschema_errors" -gt 0 ]; then
   warn "schema validation failed with $_jsonschema_errors error(s)"
   exit_code=1
-  $FAIL_FAST && exit $exit_code
+  "$FAIL_FAST" && exit $exit_code
 fi
 say "schema validation passed."
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Always-run: Service registry validation
 section "$((_step += 1))" "Service registry validation"
@@ -749,7 +749,7 @@ section "$((_step += 1))" "Service registry validation"
   if [ "$_svc_errors" -gt 0 ]; then
     warn "services.json validation failed with $_svc_errors error(s)"
     exit_code=1
-    $FAIL_FAST && exit $exit_code
+    "$FAIL_FAST" && exit $exit_code
   fi
   # No premature "passed" — verdict is after sub-checks below.
 
@@ -807,7 +807,7 @@ section "$((_step += 1))" "Service registry validation"
   if [ "$_svc_errors" -gt 0 ]; then
     warn "services.json validation failed with $_svc_errors error(s)"
     exit_code=1
-    $FAIL_FAST && exit $exit_code
+    "$FAIL_FAST" && exit $exit_code
   fi
   say "services.json validation passed"
 
@@ -837,10 +837,10 @@ fi
 if [ "$_yaml_errors" -gt 0 ]; then
   warn "YAML validation failed with $_yaml_errors error(s)"
   exit_code=1
-  $FAIL_FAST && exit $exit_code
+  "$FAIL_FAST" && exit $exit_code
 fi
 say "YAML validation passed."
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # YAML linting (yamllint)
 section "$((_step += 1))" "YAML linting (yamllint)"
@@ -867,10 +867,10 @@ fi
 if [ "$_yaml_lint_errors" -gt 0 ]; then
   warn "YAML linting failed with $_yaml_lint_errors error(s)"
   exit_code=1
-  $FAIL_FAST && exit $exit_code
+  "$FAIL_FAST" && exit $exit_code
 fi
 say "YAML linting passed."
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Always-run: Package manager usage enforcement
 section "$((_step += 1))" "Package manager usage enforcement"
@@ -897,13 +897,13 @@ if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
 fi
 if [ "$_violations" -gt 0 ]; then
   exit_code=1
-  $FAIL_FAST && exit $exit_code
+  "$FAIL_FAST" && exit $exit_code
 fi
 say "no package manager violations found."
 
 # Undocumented error suppression check
 section "$((_step += 1))" "Undocumented error suppression"
-_undoc_supp_out="$(mktemp)" || { warn "failed to create temp file"; exit_code=1; $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code; }
+_undoc_supp_out="$(mktemp)" || { warn "failed to create temp file"; exit_code=1; "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code; }
 
 # _is_suppressed check_id file line
 # Returns 0 if the given line (or its preceding line) has a
@@ -968,7 +968,7 @@ else
   say "no undocumented error suppressions found."
 fi
 rm -f "$_undoc_supp_out"
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 # Online determinism checks (--verify mode only)
 section "$((_step += 1))" "Online determinism checks (--verify)"
 if $VERIFY; then
@@ -976,7 +976,7 @@ if $VERIFY; then
   if [ $exit_code -eq 0 ]; then
     say "online determinism checks passed."
   fi
-  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+  "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 else
   say "skipping (use --verify to run online determinism checks)."
 fi
@@ -1033,14 +1033,14 @@ done < <(find "$_cfg_dir" -type f -print0)
 if [ "$_cfg_errors" -gt 0 ]; then
   warn "config method compliance check failed with $_cfg_errors error(s)"
   exit_code=1
-  $FAIL_FAST && exit $exit_code
+  "$FAIL_FAST" && exit $exit_code
 fi
 say "config method compliance passed."
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Activation script token placeholder in comment check
 section "$((_step += 1))" "Activation script token placeholder in comment check"
-_act_temp="$(mktemp)" || { warn "failed to create temp file"; exit_code=1; $FAIL_FAST && exit $exit_code; }
+_act_temp="$(mktemp)" || { warn "failed to create temp file"; exit_code=1; "$FAIL_FAST" && exit $exit_code; }
 
 if $HAS_ARGS; then
   for _f in "$@"; do
@@ -1064,7 +1064,7 @@ else
   say "no token placeholder strings in script comments."
 fi
 rm -f "$_act_temp"
-$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 if [ $exit_code -ne 0 ]; then
   warn "some checks failed with exit code $exit_code"

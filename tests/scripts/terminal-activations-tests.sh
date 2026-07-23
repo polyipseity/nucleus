@@ -46,7 +46,7 @@ setup() {
 }
 
 teardown() {
-  rm -rf "$TESTDIR"
+  rm -rf -- "$TESTDIR"
 }
 
 # ── Test: no manifest file → no-op ────────────────────────────────────────
