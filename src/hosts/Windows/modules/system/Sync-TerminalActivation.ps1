@@ -1,4 +1,4 @@
-function Sync-TerminalActivations {
+function Sync-TerminalActivation {
   <#
   .SYNOPSIS
     Run activation commands that require user terminal context.

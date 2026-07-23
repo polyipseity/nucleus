@@ -628,13 +628,13 @@ if [[ -f "$WATCHDOG_PS1" ]]; then
     fi
 fi
 
-# Test src/hosts/Windows/modules/system/Sync-TerminalActivations.ps1
-SYNC_TERMINAL_PS1="src/hosts/Windows/modules/system/Sync-TerminalActivations.ps1"
+# Test src/hosts/Windows/modules/system/Sync-TerminalActivation.ps1
+SYNC_TERMINAL_PS1="src/hosts/Windows/modules/system/Sync-TerminalActivation.ps1"
 if [[ -f "$SYNC_TERMINAL_PS1" ]]; then
     if pwsh -NoProfile -Command "& { if (!(Test-Path '$SYNC_TERMINAL_PS1')) { exit 1 }; \$null = Get-Command '$SYNC_TERMINAL_PS1' -Syntax; exit 0 }" 2>/dev/null; then
-        assert_pass "PowerShell syntax: Sync-TerminalActivations.ps1"
+        assert_pass "PowerShell syntax: Sync-TerminalActivation.ps1"
     else
-        assert_fail "PowerShell syntax: Sync-TerminalActivations.ps1" "Parse error detected by pwsh"
+        assert_fail "PowerShell syntax: Sync-TerminalActivation.ps1" "Parse error detected by pwsh"
     fi
 fi
 
@@ -650,13 +650,13 @@ if [[ -f "$TERMINAL_TEST_SH" ]]; then
     test_strict_shell_mode "$TERMINAL_TEST_SH"
 fi
 
-# Test tests/hosts/Windows/system/Sync-TerminalActivations.Tests.ps1
-TERMINAL_PESTER_PS1="tests/hosts/Windows/system/Sync-TerminalActivations.Tests.ps1"
+# Test tests/hosts/Windows/system/Sync-TerminalActivation.Tests.ps1
+TERMINAL_PESTER_PS1="tests/hosts/Windows/system/Sync-TerminalActivation.Tests.ps1"
 if [[ -f "$TERMINAL_PESTER_PS1" ]]; then
     if pwsh -NoProfile -Command "& { if (!(Test-Path '$TERMINAL_PESTER_PS1')) { exit 1 }; \$null = Get-Command '$TERMINAL_PESTER_PS1' -Syntax; exit 0 }" 2>/dev/null; then
-        assert_pass "PowerShell syntax: Sync-TerminalActivations.Tests.ps1"
+        assert_pass "PowerShell syntax: Sync-TerminalActivation.Tests.ps1"
     else
-        assert_fail "PowerShell syntax: Sync-TerminalActivations.Tests.ps1" "Parse error detected by pwsh"
+        assert_fail "PowerShell syntax: Sync-TerminalActivation.Tests.ps1" "Parse error detected by pwsh"
     fi
 fi
 
