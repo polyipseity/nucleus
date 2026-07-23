@@ -104,7 +104,7 @@ Steps:
 3. Call `resolve_memory_file_uri` on that path to get the resolved filesystem URI. **This is the real path you must use for `create_file`.**
 4. Write the plan file using `create_file` with the resolved URI as `filePath`.
 5. Verify the file was created in the correct place:
-   - Confirm the resolved URI path is NOT under the workspace/repo directory. A resolved path under `/Users/.../GitHub.copilot-chat/memory-tool/` or equivalent is correct.
+   - Confirm the resolved URI path is NOT under the workspace/repo directory. A resolved path under `/Users/.../GitHub.copilot-chat/memory-tool/` or equivalent is correct. A path containing your repo name or workspace folder (e.g. `/Users/.../nucleus/`) means you used a literal path instead of `resolve_memory_file_uri` — delete the bad file and redo.
    - Read the file with `read_file` — confirm content is nonempty and substantive (not just whitespace, "TODO", or a title with no body).
    - If the file is empty, insubstantial, or in the wrong location, delete the bad file and redo from step 1.
 

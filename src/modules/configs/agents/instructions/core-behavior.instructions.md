@@ -157,6 +157,7 @@ runSubagent(
   - NEVER `cd` into `.agents/skills/` or any skill subfolder. Always run commands from the repo root. Running inside a skill folder creates `.venv/`/`uv.lock` trash there and fails.
   - NEVER suggest or run `uv run -m init generate` — content generation is automatic. This instruction applies to ALL content in this repo.
   - NEVER suggest or run `uv run -m init generate -C`.
+  - ALWAYS use `resolve_memory_file_uri` to resolve paths under `/memories/`. Passing a literal path like `/memories/session/plan.md` or a manually constructed absolute path to `create_file` will silently write into a workspace-local `memories/` directory if one exists. Only the URI returned by `resolve_memory_file_uri` points to the real session memory store.
 
 ## Premise integrity
 
@@ -185,6 +186,17 @@ When executing a plan with multiple phases:
 - If a phase description is ambiguous, re-read the original source of the plan rather than guessing intent.
 - Do not skip phases unless the plan explicitly marks them as optional.
 - **Review subagent usage.** Did you delegate separable subproblems to subagents? If not, would delegation have improved context management or reduced risk of forgetting earlier requirements? Record the reasoning in session memory.
+
+### Creating a plan file
+
+1. Generate an ISO datetime in UTC: run `date -u +%Y-%m-%dT%H%M%S`.
+2. Construct the session memory path: `/memories/session/plan-<datetime>.md`.
+3. Call `resolve_memory_file_uri` on that path to get the real filesystem URI.
+4. Write the plan using `create_file` with the resolved URI. NEVER pass a literal `/memories/` path or a manually constructed absolute path to `create_file`.
+5. Verify the file was created in the correct place:
+   - Read it with `read_file`.
+   - Confirm the resolved path is NOT under any workspace/repo root directory (e.g. no `/Users/.../<reponame>/memories/`).
+   - If it is, delete the bad file and redo from step 1.
 
 ### Finding the active plan file
 
