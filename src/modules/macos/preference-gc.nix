@@ -69,13 +69,9 @@ in
     name = "gc-managed-user-preferences";
     runtimeInputs = [ pkgs.nix ];
     text = ''
-      MANAGED_PREF_DOMAINS="${builtins.concatStringsSep " " resetUserPreferenceDomains}"
-      ${builtins.readFile ../../scripts/hosts/MacBook/macos-gc-preferences.sh}
-      ${builtins.readFile ../../scripts/lib/macos-launch-services-lib.sh}
-      refresh_cfprefsd
-      wait_for_daemons
-
-      echo "Managed preference domains purged. Run your apply flow to re-assert declarative defaults."
+      exec ${../../scripts/services/gc-managed-preferences.sh} \
+        "${builtins.concatStringsSep " " resetUserPreferenceDomains}" \
+        "$@"
     '';
   };
 }
