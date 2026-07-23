@@ -214,9 +214,10 @@ let
       ++ readOnlyFlag
       ++ extraArgsList;
     in
-    pkgs.writeShellApplication {
+    pkgs.writeNucleusShellApplication {
       name = "cloud-mount-${mount.id}";
       runtimeInputs = [ pkgs.rclone ];
+      bundleDefault = false;
       text = ''
         exec ${../scripts/services/rclone-mount.sh} \
           "${mount.remoteName}" \
@@ -238,9 +239,10 @@ let
   # passed as positional args.
   mkReplicaScheduledSyncScript =
     replica:
-    pkgs.writeShellApplication {
+    pkgs.writeNucleusShellApplication {
       name = "cloud-replica-scheduled-sync-${replica.id}";
       runtimeInputs = [ ];
+      bundleDefault = false;
       text = ''
         exec ${../scripts/services/replica-scheduled-sync.sh} \
           "${lib.escapeShellArg replica.id}" \
@@ -364,7 +366,7 @@ in
               enable = mount.enable;
               config = {
                 Label = "local.cloud-mount.${mount.id}";
-                ProgramArguments = [ "${mkRcloneMountScript mount}/bin/cloud-mount-${mount.id}" ];
+                ProgramArguments = [ "${mkRcloneMountScript mount}/bin/nucleus-cloud-mount-${mount.id}" ];
                 RunAtLoad = true;
                 # Keep the mount alive; if the remote is not yet configured the
                 # wrapper script exits 0, which suppresses the SuccessfulExit
@@ -462,7 +464,7 @@ in
               config = {
                 Label = "local.cloud-replica-scheduled-sync.${replica.id}";
                 ProgramArguments = [
-                  "${mkReplicaScheduledSyncScript replica}/bin/cloud-replica-scheduled-sync-${replica.id}"
+                  "${mkReplicaScheduledSyncScript replica}/bin/nucleus-cloud-replica-scheduled-sync-${replica.id}"
                 ];
                 EnvironmentVariables = {
                   NUCLEUS_REPO_ROOT = repoRoot;
@@ -495,7 +497,7 @@ in
               };
               Service = {
                 Type = "oneshot";
-                ExecStart = "${mkReplicaScheduledSyncScript replica}/bin/cloud-replica-scheduled-sync-${replica.id}";
+                ExecStart = "${mkReplicaScheduledSyncScript replica}/bin/nucleus-cloud-replica-scheduled-sync-${replica.id}";
                 Environment = "NUCLEUS_REPO_ROOT=${repoRoot}";
               };
               Install = {
