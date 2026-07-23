@@ -9,38 +9,30 @@ let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   wsPort = toString servicesJSON.camilladsp.network.websocket.port;
 
-  camilladspDaemon = pkgs.writeShellScript "camilladsp-daemon" (
-    builtins.replaceStrings
-      [ "__CAMILLADSP_DAEMON_PATH__" "__CAMILLADSP_WS_PORT__" ]
-      [
-        (pkgs.lib.makeBinPath [
-          pkgs.camilladsp
-          pkgs.websocat
-          pkgs.jq
-        ])
-        wsPort
-      ]
-      (
-        (builtins.readFile ./../../scripts/lib/require-command-lib.sh)
-        + (builtins.readFile ./../../scripts/services/camilladsp-daemon.sh)
-      )
-  );
+  camilladspDaemon = pkgs.writeShellApplication {
+    name = "camilladsp-daemon";
+    runtimeInputs = [
+      pkgs.camilladsp
+      pkgs.websocat
+      pkgs.jq
+    ];
+    text = ''
+      ${builtins.readFile ./../../scripts/lib/require-command-lib.sh}
+      exec ${../../scripts/services/camilladsp-daemon.sh} --port "${wsPort}" "$@"
+    '';
+  };
 
-  camilladspHeartbeat = pkgs.writeShellScript "camilladsp-heartbeat" (
-    builtins.replaceStrings
-      [ "__CAMILLADSP_HEARTBEAT_PATH__" "__CAMILLADSP_WS_PORT__" ]
-      [
-        (pkgs.lib.makeBinPath [
-          pkgs.websocat
-          pkgs.jq
-        ])
-        wsPort
-      ]
-      (
-        (builtins.readFile ./../../scripts/lib/require-command-lib.sh)
-        + (builtins.readFile ./../../scripts/services/camilladsp-heartbeat.sh)
-      )
-  );
+  camilladspHeartbeat = pkgs.writeShellApplication {
+    name = "camilladsp-heartbeat";
+    runtimeInputs = [
+      pkgs.websocat
+      pkgs.jq
+    ];
+    text = ''
+      ${builtins.readFile ./../../scripts/lib/require-command-lib.sh}
+      exec ${../../scripts/services/camilladsp-heartbeat.sh} --port "${wsPort}" "$@"
+    '';
+  };
 in
 {
   systemd.services.camilladsp = {
@@ -59,7 +51,7 @@ in
     serviceConfig = {
       Type = "simple";
       User = username;
-      ExecStart = "${camilladspDaemon}";
+      ExecStart = "${camilladspDaemon}/bin/camilladsp-daemon";
       Restart = "always";
       WorkingDirectory = "%h";
     };
@@ -74,7 +66,7 @@ in
       Type = "simple";
       User = username;
       Restart = "always";
-      ExecStart = "${camilladspHeartbeat}";
+      ExecStart = "${camilladspHeartbeat}/bin/camilladsp-heartbeat";
     };
     wantedBy = [ "default.target" ];
   };

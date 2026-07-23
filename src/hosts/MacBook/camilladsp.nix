@@ -19,38 +19,30 @@ let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   wsPort = toString servicesJSON.camilladsp.network.websocket.port;
 
-  camilladspDaemon = pkgs.writeShellScript "camilladsp-daemon" (
-    builtins.replaceStrings
-      [ "__CAMILLADSP_DAEMON_PATH__" "__CAMILLADSP_WS_PORT__" ]
-      [
-        (pkgs.lib.makeBinPath [
-          pkgs.camilladsp
-          pkgs.websocat
-          pkgs.jq
-        ])
-        wsPort
-      ]
-      (
-        (builtins.readFile ./../../scripts/lib/require-command-lib.sh)
-        + (builtins.readFile ./../../scripts/services/camilladsp-daemon.sh)
-      )
-  );
+  camilladspDaemon = pkgs.writeShellApplication {
+    name = "camilladsp-daemon";
+    runtimeInputs = [
+      pkgs.camilladsp
+      pkgs.websocat
+      pkgs.jq
+    ];
+    text = ''
+      ${builtins.readFile ./../../scripts/lib/require-command-lib.sh}
+      exec ${../../scripts/services/camilladsp-daemon.sh} --port "${wsPort}" "$@"
+    '';
+  };
 
-  camilladspHeartbeat = pkgs.writeShellScript "camilladsp-heartbeat" (
-    builtins.replaceStrings
-      [ "__CAMILLADSP_HEARTBEAT_PATH__" "__CAMILLADSP_WS_PORT__" ]
-      [
-        (pkgs.lib.makeBinPath [
-          pkgs.websocat
-          pkgs.jq
-        ])
-        wsPort
-      ]
-      (
-        (builtins.readFile ./../../scripts/lib/require-command-lib.sh)
-        + (builtins.readFile ./../../scripts/services/camilladsp-heartbeat.sh)
-      )
-  );
+  camilladspHeartbeat = pkgs.writeShellApplication {
+    name = "camilladsp-heartbeat";
+    runtimeInputs = [
+      pkgs.websocat
+      pkgs.jq
+    ];
+    text = ''
+      ${builtins.readFile ./../../scripts/lib/require-command-lib.sh}
+      exec ${../../scripts/services/camilladsp-heartbeat.sh} --port "${wsPort}" "$@"
+    '';
+  };
 
   envVars = import ../../modules/lib/env-catalog.nix {
     inherit
@@ -79,7 +71,7 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${camilladspDaemon}"
+        "exec ${camilladspDaemon}/bin/camilladsp-daemon"
       ];
       UserName = username;
       EnvironmentVariables = daemonEnv;
@@ -103,7 +95,7 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${camilladspHeartbeat}"
+        "exec ${camilladspHeartbeat}/bin/camilladsp-heartbeat"
       ];
       UserName = username;
       EnvironmentVariables = daemonEnv;

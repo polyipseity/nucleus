@@ -201,19 +201,24 @@ let
   ];
   activationBundle = pkgs.callPackage ../../../modules/lib/activation-bundle.nix { };
 
+  # Nix-built open-manual script that takes the manual path as positional arg.
+  openManualScript = pkgs.writeShellApplication {
+    name = "nucleus-open-manual";
+    runtimeInputs = [ ];
+    text = ''
+      exec ${../../../scripts/integrations/open-host-manual.sh} \
+        "${repoRoot}/src/hosts/MacBook/MANUAL.md" \
+        "$@"
+    '';
+  };
 in
 {
   home.file.".local/share/nucleus/manual.md".source = ../MANUAL.md;
 
-  # CLI entry: `nucleus-open-manual` on PATH. Uses shared script with token
-  # substitution so the script works without NUCLEUS_REPO_ROOT at runtime.
+  # CLI entry: `nucleus-open-manual` in ~/.local/lib/nucleus/open-manual.
+  # Uses the shared open-host-manual.sh with the manual path as positional arg.
   home.file.".local/lib/nucleus/open-manual" = {
-    source = pkgs.writeShellScript "nucleus-open-manual" (
-      builtins.replaceStrings
-        [ "__MANUAL_OPENER__" "__HOST_MANUAL_PATH__" ]
-        [ "/usr/bin/open" "${repoRoot}/src/hosts/MacBook/MANUAL.md" ]
-        (builtins.readFile ../../../scripts/integrations/open-host-manual.sh)
-    );
+    source = "${openManualScript}/bin/nucleus-open-manual";
     executable = true;
   };
 

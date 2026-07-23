@@ -10,15 +10,15 @@
   ...
 }:
 let
-  openManualScript = pkgs.writeShellScript "nucleus-open-manual" (
-    builtins.replaceStrings
-      [ "__MANUAL_OPENER__" "__HOST_MANUAL_PATH__" ]
-      [
-        "${pkgs.xdg-utils}/bin/xdg-open"
-        "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/hosts/NixOS/MANUAL.md"
-      ]
-      (builtins.readFile ./../../scripts/integrations/open-host-manual.sh)
-  );
+  openManualScript = pkgs.writeShellApplication {
+    name = "nucleus-open-manual";
+    runtimeInputs = [ pkgs.xdg-utils ];
+    text = ''
+      exec ${../../scripts/integrations/open-host-manual.sh} \
+        "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/hosts/NixOS/MANUAL.md" \
+        "$@"
+    '';
+  };
 
   # Ghostscript PDF optimization presets (quality descending).
   # Sorting policy: manually maintained in quality-descending order.
@@ -34,17 +34,20 @@ let
   # Per-preset Nautilus script with MIME-type guard (Nautilus scripts have no built-in MIME filtering).
   mkGSPdfOptNautilus =
     preset:
-    pkgs.writeShellScript "nucleus-gs-pdf-opt-nautilus-${preset}" (
-      builtins.replaceStrings
-        [ "__FILE_BIN__" "__GS_PDF_OPT_PRESET__" ]
-        [ "${pkgs.file}/bin/file" preset ]
-        (builtins.readFile ./../../scripts/integrations/configure-file-manager-pdf-opt.sh)
-    );
+    pkgs.writeShellApplication {
+      name = "nucleus-gs-pdf-opt-nautilus-${preset}";
+      runtimeInputs = [ pkgs.file ];
+      text = ''
+        exec ${../../scripts/integrations/configure-file-manager-pdf-opt.sh} \
+          "${preset}" \
+          "$@"
+      '';
+    };
 
   gsPdfOptNautilusScripts = builtins.listToAttrs (
     map (p: {
       name = p;
-      value = mkGSPdfOptNautilus p;
+      value = "${mkGSPdfOptNautilus p}/bin/nucleus-gs-pdf-opt-nautilus-${p}";
     }) gsPdfOptPresets
   );
 in
@@ -59,7 +62,7 @@ lib.mkIf pkgs.stdenv.isLinux {
 
     # Nautilus: right-click → Scripts → open nucleus manual
     ".local/share/nautilus/scripts/open nucleus manual" = {
-      source = openManualScript;
+      source = "${openManualScript}/bin/nucleus-open-manual";
       executable = true;
     };
 

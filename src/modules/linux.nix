@@ -14,11 +14,17 @@ let
   # Wrapper that resolves the nucleus repo root at runtime so the systemd unit
   # works regardless of the checkout location. Uses eval-time fallback for
   # contexts where NUCLEUS_REPO_ROOT may not be inherited.
-  gcWeekly = pkgs.writeShellScript "gc-weekly" (builtins.readFile ../scripts/services/gc-sweep.sh);
+  gcWeekly = pkgs.writeShellApplication {
+    name = "gc-weekly";
+    runtimeInputs = [ ];
+    text = builtins.readFile ../scripts/services/gc-sweep.sh;
+  };
 
-  sccacheGc = pkgs.writeShellScript "sccache-gc" (
-    builtins.readFile ../scripts/services/sccache-gc.sh
-  );
+  sccacheGc = pkgs.writeShellApplication {
+    name = "sccache-gc";
+    runtimeInputs = [ pkgs.sccache ];
+    text = builtins.readFile ../scripts/services/sccache-gc.sh;
+  };
 
   activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
 in
@@ -246,7 +252,7 @@ lib.mkIf pkgs.stdenv.isLinux {
     };
     Service = {
       Type = "oneshot";
-      ExecStart = "${gcWeekly}";
+      ExecStart = "${gcWeekly}/bin/gc-weekly";
       Environment = "NUCLEUS_REPO_ROOT=${repoRoot}";
     };
   };
@@ -278,7 +284,7 @@ lib.mkIf pkgs.stdenv.isLinux {
     };
     Service = {
       Type = "oneshot";
-      ExecStart = "${sccacheGc}";
+      ExecStart = "${sccacheGc}/bin/sccache-gc";
     };
   };
 

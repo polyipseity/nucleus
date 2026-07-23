@@ -37,6 +37,21 @@ let
     NIX_SSL_CERT_FILE = resolveValue "NIX_SSL_CERT_FILE";
     NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";
   };
+
+  # Launchd daemon that keeps the builder VM running.
+  # create-builder uses TMPDIR to share TLS certificates with the VM; the
+  # default /tmp is auto-cleaned by macOS after 3 days of inactivity, silently
+  # breaking the builder after a long sleep.  Use a dedicated /run path that
+  # we own and clean ourselves instead.
+  linuxBuilderDaemon = pkgs.writeShellApplication {
+    name = "linux-builder-daemon";
+    runtimeInputs = [ pkg ];
+    text = ''
+      exec ${../../scripts/hosts/MacBook/macos-daemonize-linux-builder.sh} \
+        "${workDir}" \
+        "$@"
+    '';
+  };
 in
 {
   # Register the builder VM so the Nix daemon routes aarch64-linux builds to it.
@@ -108,26 +123,10 @@ in
       # Upstream <https://github.com/nix-darwin/nix-darwin/issues/1219> tracks
       # making launchd services show descriptive names; do not revisit until
       # that issue is resolved.
-      #
-      # WHY pkgs.writeShellScript (Style J) instead of inline readFile:
-      #   launchd's ProgramArguments requires an executable file path, not
-      #   inline shell code.  pkgs.writeShellScript creates a derivation (a
-      #   Nix store executable) at build time, which is then referenced by
-      #   store path inside the exec wrapper.  The inner replaceStrings +
-      #   readFile pattern is purely for token substitution — the outer
-      #   writeShellScript is the only way to produce a launchd-compatible
-      #   executable from the tokenized script content.
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${
-          pkgs.writeShellScript "linux-builder-daemon" (
-            builtins.replaceStrings
-              [ "__WORK_DIR__" "__CREATE_BUILDER_BIN__" ]
-              [ workDir "${pkg}/bin/create-builder" ]
-              (builtins.readFile ../../scripts/hosts/MacBook/macos-daemonize-linux-builder.sh)
-          )
-        }"
+        "exec ${linuxBuilderDaemon}/bin/linux-builder-daemon"
       ];
       KeepAlive = true;
       RunAtLoad = true;

@@ -4,17 +4,15 @@
 # backoff.  Designed as a persistent daemon (KeepAlive / Restart=always /
 # scheduled task AtLogOn) — not a timer-driven oneshot.
 #
-# Dependencies: websocat, jq (PATH is set via Nix replaceStrings at build time)
+# Dependencies: websocat, jq (PATH managed via writeShellApplication runtimeInputs)
 #
 # Usage: camilladsp-heartbeat.sh [--port PORT] [--config FILE]
 set -euo pipefail
 
-export PATH="__CAMILLADSP_HEARTBEAT_PATH__:$PATH"
-
 # require_command() is provided via require-command-lib.sh (prepended at build time).
 
 # --- Argument parsing ---
-ws_port=__CAMILLADSP_WS_PORT__
+ws_port=1234
 config_file="$HOME/.config/camilladsp/configs/config.yml"
 
 while [ $# -gt 0 ]; do

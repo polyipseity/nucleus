@@ -15,6 +15,33 @@
   username,
   ...
 }:
+let
+  litellmConfig = "${config.users.users.${username}.home}/.config/nucleus/litellm-config.yml";
+  # litellmDaemon — keep-as-is: SOPS secret paths and config file paths are
+  # Nix-computed values that must be baked in at build time (systemd
+  # ExecStart fixed path, no args).  CLI arg passing is not viable here.
+  litellmDaemon = pkgs.writeShellApplication {
+    name = "litellm-daemon";
+    runtimeInputs = [ pkgs.litellm ];
+    text =
+      builtins.replaceStrings
+        [
+          "__OPENROUTER_API_KEY_PATH__"
+          "__OPENCODE_GO_API_KEY_PATH__"
+          "__OPENCODE_ZEN_API_KEY_PATH__"
+          "__LITELLM_CONFIG__"
+          "__LITELLM_POLL_TIMEOUT__"
+        ]
+        [
+          config.sops.secrets."ai_openrouter_api_key".path
+          config.sops.secrets."ai_opencode_go_api_key".path
+          config.sops.secrets."ai_opencode_zen_api_key".path
+          litellmConfig
+          "0"
+        ]
+        (builtins.readFile ../../scripts/services/litellm-daemon.sh);
+  };
+in
 {
   # LiteLLM AI gateway — systemd service on 127.0.0.1:4000.
   # Since nixpkgs has no services.litellm module yet, we define the service
@@ -31,26 +58,7 @@
     path = [ pkgs.litellm ];
     serviceConfig = {
       Type = "simple";
-      ExecStart = "${pkgs.writeShellScript "litellm-wrapper" (
-        builtins.replaceStrings
-          [
-            "__OPENROUTER_API_KEY_PATH__"
-            "__OPENCODE_GO_API_KEY_PATH__"
-            "__OPENCODE_ZEN_API_KEY_PATH__"
-            "__LITELLM_BIN__"
-            "__LITELLM_CONFIG__"
-            "__LITELLM_POLL_TIMEOUT__"
-          ]
-          [
-            config.sops.secrets."ai_openrouter_api_key".path
-            config.sops.secrets."ai_opencode_go_api_key".path
-            config.sops.secrets."ai_opencode_zen_api_key".path
-            "${pkgs.litellm}/bin/litellm"
-            "${config.users.users.${username}.home}/.config/nucleus/litellm-config.yml"
-            "0"
-          ]
-          (builtins.readFile ../../scripts/services/litellm-daemon.sh)
-      )}";
+      ExecStart = "${litellmDaemon}/bin/litellm-daemon";
       Restart = "always";
       User = "litellm";
       # Protect against resource exhaustion and information leaks.

@@ -39,12 +39,15 @@ let
     globalConfig + "\n" + builtins.concatStringsSep "\n" virtualHostConfigs
   );
 
-  proxyDaemon = pkgs.writeShellScript "https-proxy-daemon" (
-    builtins.replaceStrings
-      [ "__CADDY_BIN__" "__CADDYFILE__" ]
-      [ "${pkgs.caddy}/bin/caddy" "${caddyfile}" ]
-      (builtins.readFile ../../scripts/services/https-proxy-daemon.sh)
-  );
+  proxyDaemon = pkgs.writeShellApplication {
+    name = "https-proxy-daemon";
+    runtimeInputs = [ pkgs.caddy ];
+    text = ''
+      exec ${../../scripts/services/https-proxy-daemon.sh} \
+        "${caddyfile}" \
+        "$@"
+    '';
+  };
 
   systemLogDir = config.nucleus.logging.systemLogDir;
 
@@ -74,7 +77,7 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${proxyDaemon}"
+        "exec ${proxyDaemon}/bin/https-proxy-daemon"
       ];
       KeepAlive = true;
       RunAtLoad = true;

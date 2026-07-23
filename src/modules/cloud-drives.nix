@@ -199,42 +199,33 @@ let
       ];
       extraArgsList =
         iCloudServiceArgs ++ fsKitBackendArgs ++ volumeNameArgs ++ rclonePasswordArgs ++ mount.extraArgs;
+      fullArgsList = [
+        "--vfs-cache-mode"
+        "full"
+        "--vfs-cache-max-age"
+        "1h"
+        "--dir-cache-time"
+        "5m"
+        "--poll-interval"
+        "1m"
+        "--log-level"
+        "ERROR"
+      ]
+      ++ readOnlyFlag
+      ++ extraArgsList;
     in
-    pkgs.writeShellScript "cloud-mount-${mount.id}" (
-      builtins.replaceStrings
-        [
-          "__RCLONE_BIN__"
-          "__RCLONE_REMOTE_NAME__"
-          "__RCLONE_REMOTE__"
-          "__RCLONE_MOUNT_POINT__"
-          "__RCLONE_ARGS__"
-        ]
-        [
-          "${pkgs.rclone}/bin/rclone"
-          mount.remoteName
-          (lib.escapeShellArg rcloneRemote)
-          (lib.escapeShellArg mountPoint)
-          (lib.concatStringsSep " \\\n    " (
-            map lib.escapeShellArg (
-              [
-                "--vfs-cache-mode"
-                "full"
-                "--vfs-cache-max-age"
-                "1h"
-                "--dir-cache-time"
-                "5m"
-                "--poll-interval"
-                "1m"
-                "--log-level"
-                "ERROR"
-              ]
-              ++ readOnlyFlag
-              ++ extraArgsList
-            )
-          ))
-        ]
-        (builtins.readFile ../scripts/services/rclone-mount.sh)
-    );
+    pkgs.writeShellApplication {
+      name = "cloud-mount-${mount.id}";
+      runtimeInputs = [ pkgs.rclone ];
+      text = ''
+        exec ${../scripts/services/rclone-mount.sh} \
+          "${mount.remoteName}" \
+          "${lib.escapeShellArg rcloneRemote}" \
+          "${lib.escapeShellArg mountPoint}" \
+          ${lib.escapeShellArgs fullArgsList} \
+          "$@"
+      '';
+    };
 
   # Build a systemd ExecStop unmount command (NixOS only).
   mkFusermountUnmount =
@@ -243,16 +234,20 @@ let
 
   # Build a scheduled replica-sync runner that invokes
   # scripts/replica-sync.sh for one replica id. NUCLEUS_REPO_ROOT is set by
-  # the launchd/systemd service environment. __CURRENT_USER_HOME__ and
-  # __REPLICA_ID__ are substituted at build time.
+  # the launchd/systemd service environment. replica_id and user_home are
+  # passed as positional args.
   mkReplicaScheduledSyncScript =
     replica:
-    pkgs.writeShellScript "cloud-replica-scheduled-sync-${replica.id}" (
-      builtins.replaceStrings
-        [ "__CURRENT_USER_HOME__" "__REPLICA_ID__" ]
-        [ currentUserHome (lib.escapeShellArg replica.id) ]
-        (builtins.readFile ../scripts/services/replica-scheduled-sync.sh)
-    );
+    pkgs.writeShellApplication {
+      name = "cloud-replica-scheduled-sync-${replica.id}";
+      runtimeInputs = [ ];
+      text = ''
+        exec ${../scripts/services/replica-scheduled-sync.sh} \
+          "${lib.escapeShellArg replica.id}" \
+          "${currentUserHome}" \
+          "$@"
+      '';
+    };
 
   # Canonical scheduled-sync timer mapping. Repository policy mandates 12:00 slots.
   mkScheduledSyncLaunchdCalendar =
@@ -369,7 +364,7 @@ in
               enable = mount.enable;
               config = {
                 Label = "local.cloud-mount.${mount.id}";
-                ProgramArguments = [ "${mkRcloneMountScript mount}" ];
+                ProgramArguments = [ "${mkRcloneMountScript mount}/bin/cloud-mount-${mount.id}" ];
                 RunAtLoad = true;
                 # Keep the mount alive; if the remote is not yet configured the
                 # wrapper script exits 0, which suppresses the SuccessfulExit
@@ -466,7 +461,9 @@ in
               enable = replica.enable;
               config = {
                 Label = "local.cloud-replica-scheduled-sync.${replica.id}";
-                ProgramArguments = [ "${mkReplicaScheduledSyncScript replica}" ];
+                ProgramArguments = [
+                  "${mkReplicaScheduledSyncScript replica}/bin/cloud-replica-scheduled-sync-${replica.id}"
+                ];
                 EnvironmentVariables = {
                   NUCLEUS_REPO_ROOT = repoRoot;
                 };
@@ -498,7 +495,7 @@ in
               };
               Service = {
                 Type = "oneshot";
-                ExecStart = "${mkReplicaScheduledSyncScript replica}";
+                ExecStart = "${mkReplicaScheduledSyncScript replica}/bin/cloud-replica-scheduled-sync-${replica.id}";
                 Environment = "NUCLEUS_REPO_ROOT=${repoRoot}";
               };
               Install = {

@@ -196,9 +196,11 @@ let
     '';
   };
 
-  betterdisplayHeartbeat = pkgs.writeShellScript "betterdisplay-heartbeat" (
-    builtins.readFile ../scripts/hosts/MacBook/macos-heartbeat-betterdisplay.sh
-  );
+  betterdisplayHeartbeat = pkgs.writeShellApplication {
+    name = "betterdisplay-heartbeat";
+    runtimeInputs = [ ];
+    text = builtins.readFile ../scripts/hosts/MacBook/macos-heartbeat-betterdisplay.sh;
+  };
 
   # Wrapper script for the nix-index daily database rebuild LaunchAgent.
   # Lives in the Nix store so the ProgramArguments path is stable across
@@ -209,12 +211,16 @@ let
   # Nix store derivation path (which changes per generation).  Skipping the
   # rebuild when the DB was updated within the past 6 days keeps normal
   # apply runs fast.
-  nixIndexUpdate = pkgs.writeShellScript "nix-index-update" (
-    builtins.replaceStrings
-      [ "__NIX_INDEX_BIN__" "__NIX_INDEX_MAX_AGE_DAYS__" ]
-      [ "${pkgs.nix-index}/bin/nix-index" "6" ]
-      (builtins.readFile ../scripts/packages/update-nix-index.sh)
-  );
+  nixIndexUpdate = pkgs.writeShellApplication {
+    name = "nix-index-update";
+    runtimeInputs = [ pkgs.nix-index ];
+    text = ''
+      exec ${../scripts/packages/update-nix-index.sh} \
+        "nix-index" \
+        "6" \
+        "$@"
+    '';
+  };
 
   # Directory names inside ~/dev whose contents should stay out of Spotlight.
   # This is intentionally macOS-only because `.metadata_never_index` is a
@@ -245,38 +251,61 @@ let
   # Daily Spotlight exclusion refresh for the mutable ~/dev tree.
   # Kept out of Home Manager activation because large worktrees can make a full
   # scan slow enough to noticeably delay `nix run .#apply` and bootstrap apply.
-  devSpotlightExclusions = pkgs.writeShellScript "spotlight-exclusions" (
-    builtins.replaceStrings
-      [ "__DEV_SPOTLIGHT_FIND_EXPRESSION__" ]
-      [ "${devSpotlightExcludedDirectoryFindExpression}" ]
-      (builtins.readFile ../scripts/hosts/MacBook/macos-configure-spotlight-exclusions.sh)
-  );
+  # devSpotlightExclusions — keep-as-is: the find expression is Nix-computed
+  # (devSpotlightExcludedDirectoryFindExpression), a multi-line shell construct
+  # unsuitable for CLI arg passing.  The script is a launchd ProgramArguments
+  # target (fixed array, no args), so builtins.replaceStrings is the correct
+  # approach here.
+  devSpotlightExclusions = pkgs.writeShellApplication {
+    name = "spotlight-exclusions";
+    runtimeInputs = [ ];
+    text =
+      builtins.replaceStrings
+        [ "__DEV_SPOTLIGHT_FIND_EXPRESSION__" ]
+        [ devSpotlightExcludedDirectoryFindExpression ]
+        (builtins.readFile ../scripts/hosts/MacBook/macos-configure-spotlight-exclusions.sh);
+  };
 
   # Daily .DS_Store cleanup for ~/dev.
   # Kept out of Home Manager activation for the same reason as Spotlight marker
   # maintenance: deleting stale .DS_Store files can take noticeable time on a
   # large checkout and should not slow synchronous apply/bootstrap flows.
-  devDsStoreGc = pkgs.writeShellScript "ds-store-gc" (
-    builtins.readFile ../scripts/services/ds-store-gc.sh
-  );
+  devDsStoreGc = pkgs.writeShellApplication {
+    name = "ds-store-gc";
+    runtimeInputs = [ ];
+    text = builtins.readFile ../scripts/services/ds-store-gc.sh;
+  };
 
-  gcWeekly = pkgs.writeShellScript "gc-weekly" (builtins.readFile ../scripts/services/gc-sweep.sh);
+  gcWeekly = pkgs.writeShellApplication {
+    name = "gc-weekly";
+    runtimeInputs = [ ];
+    text = builtins.readFile ../scripts/services/gc-sweep.sh;
+  };
 
-  sccacheGc = pkgs.writeShellScript "sccache-gc" (
-    builtins.readFile ../scripts/services/sccache-gc.sh
-  );
+  sccacheGc = pkgs.writeShellApplication {
+    name = "sccache-gc";
+    runtimeInputs = [ pkgs.sccache ];
+    text = builtins.readFile ../scripts/services/sccache-gc.sh;
+  };
 
-  guiEnvAgent = pkgs.writeShellScript "gui-env" (
-    builtins.replaceStrings
-      [ "__NUCLEUS_PREPEND__" "__NUCLEUS_APPEND__" "__NUCLEUS_MANAGED_SET__" "__MACOS_ALL_VARS__" ]
-      [
-        managedPaths.toShellPrependPath
-        managedPaths.toShellAppendPath
-        (mkManagedDedupSet "$HOME")
-        envVars.macOSAllVars
-      ]
-      (builtins.readFile ../scripts/hosts/MacBook/macos-set-gui-env.sh)
-  );
+  # guiEnvAgent — keep-as-is: the substituted values (managedPaths and
+  # envVars.macOSAllVars) are multi-line shell prepend/append expressions from
+  # Nix, not feasible as CLI args.  The script runs as a launchd agent
+  # (ProgramArguments fixed array, no args).
+  guiEnvAgent = pkgs.writeShellApplication {
+    name = "gui-env";
+    runtimeInputs = [ ];
+    text =
+      builtins.replaceStrings
+        [ "__NUCLEUS_PREPEND__" "__NUCLEUS_APPEND__" "__NUCLEUS_MANAGED_SET__" "__MACOS_ALL_VARS__" ]
+        [
+          managedPaths.toShellPrependPath
+          managedPaths.toShellAppendPath
+          (mkManagedDedupSet "$HOME")
+          envVars.macOSAllVars
+        ]
+        (builtins.readFile ../scripts/hosts/MacBook/macos-set-gui-env.sh);
+  };
 
   activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
 in
@@ -552,7 +581,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     enable = true;
     config = {
       Label = "local.gc-weekly";
-      ProgramArguments = [ "${gcWeekly}" ];
+      ProgramArguments = [ "${gcWeekly}/bin/gc-weekly" ];
       EnvironmentVariables = {
         NUCLEUS_REPO_ROOT = repoRoot;
       };
@@ -578,7 +607,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     enable = true;
     config = {
       Label = "local.sccache-gc";
-      ProgramArguments = [ "${sccacheGc}" ];
+      ProgramArguments = [ "${sccacheGc}/bin/sccache-gc" ];
       RunAtLoad = false;
       StartCalendarInterval = [
         {
@@ -609,7 +638,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     enable = true;
     config = {
       Label = "local.betterdisplay-heartbeat";
-      ProgramArguments = [ "${betterdisplayHeartbeat}" ];
+      ProgramArguments = [ "${betterdisplayHeartbeat}/bin/betterdisplay-heartbeat" ];
       # Start at login and stay alive; internal loop handles the 30 s interval.
       RunAtLoad = true;
       KeepAlive = true;
@@ -631,7 +660,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     enable = true;
     config = {
       Label = "local.ds-store-gc";
-      ProgramArguments = [ "${devDsStoreGc}" ];
+      ProgramArguments = [ "${devDsStoreGc}/bin/ds-store-gc" ];
       # Do not run on every agent reload during apply/bootstrap apply; daily
       # noon maintenance is sufficient for repository hygiene.
       RunAtLoad = false;
@@ -648,7 +677,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     enable = true;
     config = {
       Label = "local.spotlight-exclusions";
-      ProgramArguments = [ "${devSpotlightExclusions}" ];
+      ProgramArguments = [ "${devSpotlightExclusions}/bin/spotlight-exclusions" ];
       # Do not run on every agent reload during apply/bootstrap apply; daily
       # noon maintenance is sufficient for dev-tree indexing hygiene.
       RunAtLoad = false;
@@ -683,7 +712,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     enable = true;
     config = {
       Label = "local.nix-index-update";
-      ProgramArguments = [ "${nixIndexUpdate}" ];
+      ProgramArguments = [ "${nixIndexUpdate}/bin/nix-index-update" ];
       # Run once at load so a freshly provisioned machine or a machine whose
       # DB is absent or stale gets an immediate rebuild rather than waiting
       # for the next daily calendar window.
@@ -828,7 +857,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     enable = true;
     config = {
       Label = "local.gui-env";
-      ProgramArguments = [ "${guiEnvAgent}" ];
+      ProgramArguments = [ "${guiEnvAgent}/bin/gui-env" ];
       # One-shot at login; gui-env-path activation step covers subsequent applies.
       RunAtLoad = true;
     };

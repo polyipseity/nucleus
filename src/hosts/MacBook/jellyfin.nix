@@ -33,16 +33,17 @@ let
     NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";
   };
 
-  jellyfinDaemon = pkgs.writeShellScript "jellyfin-daemon" (
-    builtins.replaceStrings
-      [ "__JELLYFIN_STATE_ROOT__" "__JELLYFIN_LOG_DIR__" "__JELLYFIN_BIN__" ]
-      [
-        jellyfinStateRoot
-        "${config.nucleus.logging.systemLogDir}/jellyfin-app"
-        "${pkgs.jellyfin}/bin/jellyfin"
-      ]
-      (builtins.readFile ../../scripts/services/jellyfin-daemon.sh)
-  );
+  jellyfinDaemon = pkgs.writeShellApplication {
+    name = "jellyfin-daemon";
+    runtimeInputs = [ pkgs.jellyfin ];
+    text = ''
+      exec ${../../scripts/services/jellyfin-daemon.sh} \
+        "${jellyfinStateRoot}" \
+        "${config.nucleus.logging.systemLogDir}/jellyfin-app" \
+        "${pkgs.jellyfin}/bin/jellyfin" \
+        "$@"
+    '';
+  };
 in
 {
   launchd.daemons.jellyfin = {
@@ -56,7 +57,7 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${jellyfinDaemon}"
+        "exec ${jellyfinDaemon}/bin/jellyfin-daemon"
       ];
       KeepAlive = true;
       RunAtLoad = true;

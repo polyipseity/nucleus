@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
 # Jellyfin media server daemon.
-# State root, log dir, and binary path provided via Nix substitution at build time.
+# State root, log dir, and binary path provided as positional args.
+# Usage: jellyfin-daemon.sh [state_root] [log_dir] [jellyfin_bin]
 set -eu
 
-state_root="__JELLYFIN_STATE_ROOT__"
+state_root="${1:-/Users/Shared/Jellyfin}"
+log_dir="${2:-${HOME}/.local/state/nucleus/log/jellyfin}"
+jellyfin_bin="${3:-jellyfin}"
+shift 3 2>/dev/null || true
+
 config_dir="$state_root/config"
 data_dir="$state_root/data"
 cache_dir="$state_root/cache"
-log_dir="__JELLYFIN_LOG_DIR__"
 
 mkdir -p "$config_dir" "$data_dir" "$cache_dir" "$log_dir"
 
-exec __JELLYFIN_BIN__ \
+exec "$jellyfin_bin" \
   --configdir "$config_dir" \
   --datadir "$data_dir" \
   --cachedir "$cache_dir" \

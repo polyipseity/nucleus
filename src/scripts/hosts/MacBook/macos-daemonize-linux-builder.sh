@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 # Linux builder VM daemon — keeps the NixOS builder running via
 # Apple Virtualization.framework.
-# Variables below are substituted via Nix replaceStrings at build time.
+# Work directory passed as first positional arg.  create-binary resolved from PATH.
+# Usage: macos-daemonize-linux-builder.sh [work_dir]
+set -euo pipefail
+
 export TMPDIR=/run/org.nixos.linux-builder USE_TMPDIR=1
 rm -rf "$TMPDIR"
 mkdir -p "$TMPDIR"
-mkdir -p "__WORK_DIR__"
+
+work_dir="${1:-/var/lib/linux-builder}"
+mkdir -p "$work_dir"
 trap 'rm -rf '"$TMPDIR" EXIT
-exec __CREATE_BUILDER_BIN__
+exec create-builder
