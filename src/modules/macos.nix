@@ -242,28 +242,17 @@ let
     "venv"
   ];
 
-  # Single-pass find predicate for low-signal build/cache directories in ~/dev.
-  # Precompute the expression in Nix so the launchd job shell stays readable.
-  devSpotlightExcludedDirectoryFindExpression = builtins.concatStringsSep " -o " (
-    map (directoryName: "-name ${lib.escapeShellArg directoryName}") devSpotlightExcludedDirectoryNames
-  );
-
   # Daily Spotlight exclusion refresh for the mutable ~/dev tree.
   # Kept out of Home Manager activation because large worktrees can make a full
   # scan slow enough to noticeably delay `nix run .#apply` and bootstrap apply.
-  # devSpotlightExclusions — keep-as-is: the find expression is Nix-computed
-  # (devSpotlightExcludedDirectoryFindExpression), a multi-line shell construct
-  # unsuitable for CLI arg passing.  The script is a launchd ProgramArguments
-  # target (fixed array, no args), so builtins.replaceStrings is the correct
-  # approach here.
   devSpotlightExclusions = pkgs.writeShellApplication {
     name = "spotlight-exclusions";
     runtimeInputs = [ ];
-    text =
-      builtins.replaceStrings
-        [ "__DEV_SPOTLIGHT_FIND_EXPRESSION__" ]
-        [ devSpotlightExcludedDirectoryFindExpression ]
-        (builtins.readFile ../scripts/hosts/MacBook/macos-configure-spotlight-exclusions.sh);
+    text = ''
+      exec ${../scripts/hosts/MacBook/macos-configure-spotlight-exclusions.sh} \
+        "${builtins.concatStringsSep " " devSpotlightExcludedDirectoryNames}" \
+        "$@"
+    '';
   };
 
   # Daily .DS_Store cleanup for ~/dev.
