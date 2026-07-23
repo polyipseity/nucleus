@@ -2,10 +2,12 @@
 # Warn-only check that installed Homebrew versions match lockfile.
 # Silent when all versions match.
 # Takes repo root path as $1.
+# Always exits 0 — this is a warning-only check that must not abort activation.
 
 set -eu
 
-LOCKFILE="${1:?repo root required}/src/lockfiles/lockfile.json"
+_main() {
+  LOCKFILE="${1:?repo root required}/src/lockfiles/lockfile.json"
 
 if [ ! -f "$LOCKFILE" ]; then
   # Lockfile not present — nothing to verify.
@@ -72,7 +74,10 @@ $MAS_KEYS
 KEYEOF
 fi
 
-if [ -n "$WARNINGS" ]; then
-  echo "homebrew: package version(s) differ from lockfile (nix-homebrew may be out of sync):" >&2
-  printf '%s' "$WARNINGS" >&2
-fi
+  if [ -n "$WARNINGS" ]; then
+    echo "homebrew: package version(s) differ from lockfile (nix-homebrew may be out of sync):" >&2
+    printf '%s' "$WARNINGS" >&2
+  fi
+}
+
+_main "$@" || true  # undoc-supp: warning-only check; must not abort activation

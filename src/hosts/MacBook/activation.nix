@@ -212,7 +212,7 @@ in
     # ---- homebrew-pin-verify ----------------------------------------------
     # Warning-only check that installed Homebrew versions match lockfile.
     # Never fails activation.
-    "${activationBundle}/hosts/MacBook/macos-verify-homebrew-pin.sh" "${repoRoot}" || true  # undoc-supp: warning-only version check; must not abort activation even if script errors.
+    "${activationBundle}/hosts/MacBook/macos-verify-homebrew-pin.sh" "${repoRoot}"
 
     # ---- disableSteamAutoStartup ------------------------------------------------
     "${activationBundle}/configs/disable-steam-autostart.sh"
