@@ -155,21 +155,21 @@ run_ai_sync() {
 }
 
 run_vm_setup() {
-  # Call scripts/vm-setup.sh to provision virtual machine disk images and
+  # Call nucleus-vm setup to provision virtual machine disk images and
   # register VMs after the system configuration has been applied.
   if [ "$vm_setup" = false ]; then
-    printf '%s\n' "vm-setup: --vm-setup not set; skipping post-apply VM provisioning"
+    printf '%s\n' "nucleus-vm: --vm-setup not set; skipping post-apply VM provisioning"
     return
   fi
 
-  if ! command -v nucleus-vm-setup >/dev/null 2>&1; then
-    printf '%s\n' "vm-setup: nucleus-vm-setup not found in PATH; skipping VM setup"
+  if ! command -v nucleus-vm >/dev/null 2>&1; then
+    printf '%s\n' "nucleus-vm: nucleus-vm not found in PATH; skipping VM setup"
     return
   fi
 
-  printf '%s\n' "vm-setup: running post-apply VM provisioning..."
-  if ! nucleus-vm-setup --accept-gsi-license; then
-    printf '%s\n' "vm-setup: nucleus-vm-setup exited with an error; VM setup incomplete (system apply succeeded)" >&2
+  printf '%s\n' "nucleus-vm: running post-apply VM provisioning..."
+  if ! nucleus-vm setup --accept-gsi-license; then
+    printf '%s\n' "nucleus-vm: nucleus-vm setup exited with an error; VM setup incomplete (system apply succeeded)" >&2
   fi
 }
 
