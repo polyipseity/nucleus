@@ -597,6 +597,13 @@ build_android_image() {
   _bai_userdata_img="$IMAGES_DIR/android-userdata.qcow2"
   _bai_gsi_img="$IMAGES_DIR/android-gsi.img"
 
+  # shareDevDir is unsupported on Android (no host filesystem sharing via QEMU).
+  _bai_share_dev_dir="$(jq -r ".VMs[$_bai_vm_index].shareDevDir // false" "$MANIFEST")"
+  if [ "$_bai_share_dev_dir" = "true" ]; then
+    error "shareDevDir is not supported for Android VM '$_bai_vm_name'; Android does not support host filesystem sharing via QEMU"
+    exit 1
+  fi
+
   # Step 1: Download and extract LineageOS base system image
   if [ ! -f "$_bai_system_img" ] || [ "$_bai_upgrade_android" = "true" ]; then
     if [ "$_bai_upgrade_android" = "true" ] && [ -f "$_bai_system_img" ]; then
