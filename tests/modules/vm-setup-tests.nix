@@ -285,7 +285,7 @@ let
   # ---------------------------------------------------------------------------
 
   # Packer templates and the nixos-generators guest config must exist.
-  # Ensures that nucleus-vm-setup has all its required input files.
+  # Ensures that nucleus-vm has all its required input files.
   test_packer_templates_exist =
     let
       checks = [
@@ -341,12 +341,12 @@ let
     let
       checks = [
         {
-          cond = builtins.pathExists ../../scripts/vm-setup.sh;
-          msg = "scripts/vm-setup.sh must exist";
+          cond = builtins.pathExists ../../scripts/vm.sh;
+          msg = "scripts/vm.sh must exist";
         }
         {
-          cond = builtins.pathExists ../../scripts/vm-setup.ps1;
-          msg = "scripts/vm-setup.ps1 must exist";
+          cond = builtins.pathExists ../../scripts/vm.ps1;
+          msg = "scripts/vm.ps1 must exist";
         }
       ];
       results = builtins.map (c: assert' c.cond c.msg) checks;
@@ -450,16 +450,15 @@ let
   nixCustomConfText = builtins.readFile ../../src/modules/configs/nix/nix.custom.conf;
   test_macbook_builders_machines = assert' (lib.hasInfix "builders = @/etc/nix/machines" nixCustomConfText) "MacBook base.nix must set builders = @/etc/nix/machines in nix.extraOptions";
 
-  # vm-setup.sh must capture the Packer exit code for the macOS Tart build so
+  # vm.sh must capture the Packer exit code for the macOS Tart build so
   # a failed packer invocation does not falsely report success.
-  # Combined text: vm-setup-lib.sh is sourced by vm-setup.sh, so patterns from both files
-  # belong to the same script.  Checking only vm-setup.sh misses patterns
-  # that were extracted to vm-setup-lib.sh during refactoring.
+  # Combined text: vm-lib.sh is sourced by vm.sh, so patterns from both files
+  # belong to the same script.  Checking only vm.sh misses patterns
+  # that were extracted to vm-lib.sh during refactoring.
   vm_setup_sh_text =
-    builtins.readFile ../../scripts/vm-setup.sh
-    + builtins.readFile ../../src/scripts/lib/vm-setup-lib.sh;
+    builtins.readFile ../../scripts/vm.sh + builtins.readFile ../../src/scripts/lib/vm-lib.sh;
   windows_vm_setup_ps1_text = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-VMSetup.ps1;
-  windows_vm_setup_wrapper_ps1_text = builtins.readFile ../../scripts/vm-setup.ps1;
+  windows_vm_wrapper_ps1_text = builtins.readFile ../../scripts/vm.ps1;
   readmeTemplateText = builtins.readFile ../../src/vms/templates/README.md;
   startPosixTemplateText = builtins.readFile ../../src/vms/templates/start-posix.sh;
   startWindowsTemplateText = builtins.readFile ../../src/vms/templates/start-windows.ps1;
@@ -472,7 +471,7 @@ let
   vms_windows_packer_text = builtins.readFile ../../src/vms/windows/packer.pkr.hcl;
   vms_windows_autounattend_text = builtins.readFile ../../src/vms/windows/Autounattend.xml;
   vms_macos_packer_text = builtins.readFile ../../src/vms/macos/packer.pkr.hcl;
-  test_macos_packer_exit_check = assert' (lib.hasInfix "_packer_status=0" vm_setup_sh_text) "scripts/vm-setup.sh must capture packer exit status (_packer_status=0)";
+  test_macos_packer_exit_check = assert' (lib.hasInfix "_packer_status=0" vm_setup_sh_text) "scripts/vm.sh must capture packer exit status (_packer_status=0)";
 
   # nixos-generators' -o flag expects a non-existent symlink path, not a
   # pre-created directory. The script must therefore use a child output link and
@@ -484,7 +483,7 @@ let
         && (lib.hasInfix "readlink \"$_out_link\"" vm_setup_sh_text)
         && (lib.hasInfix "find -L \"$_out_link\"" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must give nixos-generators a non-existent output link path and resolve the resulting symlink";
+      "scripts/vm.sh must give nixos-generators a non-existent output link path and resolve the resulting symlink";
 
   # nixos-generators produces a small default qcow2 unless resized explicitly.
   # vm-setup must resize NixOS images to manifest disk size so provisioning
@@ -492,14 +491,14 @@ let
   test_nixos_image_resize_to_manifest_disk = assert' (
     (lib.hasInfix "build_nixos_image NAME DISK_GIB" vm_setup_sh_text)
     && (lib.hasInfix "resize_and_mark_image \"$_out\" \"$_marker\" \"$_disk_gib\"" vm_setup_sh_text)
-  ) "scripts/vm-setup.sh must resize generated NixOS qcow2 images to the manifest disk size";
+  ) "scripts/vm.sh must resize generated NixOS qcow2 images to the manifest disk size";
 
   # The Packer failure branch for the macOS build must print a human-readable
   # error and return the captured exit code.
-  test_macos_packer_failure_message = assert' (lib.hasInfix "Packer build for macOS VM" vm_setup_sh_text) "scripts/vm-setup.sh must print a failure message for a failed macOS Packer build";
+  test_macos_packer_failure_message = assert' (lib.hasInfix "Packer build for macOS VM" vm_setup_sh_text) "scripts/vm.sh must print a failure message for a failed macOS Packer build";
 
   # The Packer failure branch for the Windows build must also surface the error.
-  test_windows_packer_failure_message = assert' (lib.hasInfix "Packer build for Windows VM" vm_setup_sh_text) "scripts/vm-setup.sh must print a failure message for a failed Windows Packer build";
+  test_windows_packer_failure_message = assert' (lib.hasInfix "Packer build for Windows VM" vm_setup_sh_text) "scripts/vm.sh must print a failure message for a failed Windows Packer build";
 
   # Windows QEMU builds must:
   # 1. Use SSH communicator with explicit port forward (not random NAT mapping)
@@ -581,7 +580,7 @@ let
         && (lib.hasInfix "NUCLEUS_VM_GUEST_USERNAME" vm_setup_sh_text)
         && (lib.hasInfix "NUCLEUS_VM_GUEST_PASSWORD" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must resolve guest credentials from per-user SOPS secrets and export/pass them to guest builders";
+      "scripts/vm.sh must resolve guest credentials from per-user SOPS secrets and export/pass them to guest builders";
 
   test_nixos_generators_uses_exported_env_credentials =
     assert'
@@ -591,7 +590,7 @@ let
         && !(lib.hasInfix "--argstr guestUsername" vm_setup_sh_text)
         && !(lib.hasInfix "--argstr guestPassword" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must let nixos-generators consume exported guest credentials directly instead of passing unsupported --argstr flags";
+      "scripts/vm.sh must let nixos-generators consume exported guest credentials directly instead of passing unsupported --argstr flags";
 
   test_guest_credentials_policy_in_windows_vm_setup_ps1 =
     assert'
@@ -686,7 +685,7 @@ let
         (lib.hasInfix "_prebuilt_valid=false" vm_setup_sh_text)
         && (lib.hasInfix "cannot replace the $vm_name runtime disk because no valid pre-built image is available" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must refuse to replace UTM runtime disks when the rebuild step did not produce a valid pre-built qcow2";
+      "scripts/vm.sh must refuse to replace UTM runtime disks when the rebuild step did not produce a valid pre-built qcow2";
 
   test_libvirt_runtime_validation_parity =
     assert'
@@ -697,7 +696,7 @@ let
         && (lib.hasInfix "validate_qcow2_image \"$disk_path\" \"existing libvirt runtime disk for \${vm_name}\"" vm_setup_sh_text)
         && (lib.hasInfix "existing libvirt runtime disk is invalid" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must validate libvirt prebuilt/runtime disks and surface default-network recovery failures";
+      "scripts/vm.sh must validate libvirt prebuilt/runtime disks and surface default-network recovery failures";
 
   # Local Mido compatibility adjustments must be applied at runtime from a
   # repository-owned patch file, not by editing the vendored submodule files.
@@ -709,11 +708,11 @@ let
         && (lib.hasInfix "src/vms/windows/patches/mido-iso-link.patch" vm_setup_sh_text)
         && (lib.hasInfix "patch -s" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must patch a temporary Mido copy at runtime instead of editing vendored submodule files";
+      "scripts/vm.sh must patch a temporary Mido copy at runtime instead of editing vendored submodule files";
   test_windows_iso_mido_patch_failure_is_fatal = assert' (
     (lib.hasInfix "runtime Mido patch failed to apply" vm_setup_sh_text)
     && (lib.hasInfix "install patch and retry" vm_setup_sh_text)
-  ) "scripts/vm-setup.sh must fail fast when runtime Mido patching is unavailable or out-of-date";
+  ) "scripts/vm.sh must fail fast when runtime Mido patching is unavailable or out-of-date";
 
   # UTM on Apple Silicon must keep Windows guests on x86_64/q35 while allowing
   # NixOS guests to follow host-native aarch64/virt when applicable.
@@ -782,7 +781,7 @@ let
         (lib.hasInfix "data_dir=\"$bundle/Data\"" vm_setup_sh_text)
         && (lib.hasInfix "disk_file=\"$data_dir/disk-main.qcow2\"" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must place UTM disk-main.qcow2 under bundle Data/ to match ImageName-based UTM drive resolution";
+      "scripts/vm.sh must place UTM disk-main.qcow2 under bundle Data/ to match ImageName-based UTM drive resolution";
   test_macbook_utm_uses_direct_bundle_open =
     assert'
       (
@@ -791,25 +790,25 @@ let
         && !(lib.hasInfix "import new virtual machine from POSIX file" vm_setup_sh_text)
         && (lib.hasInfix "opening UTM bundle in place" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must open the managed .utm bundle directly instead of importing it into a copied UTM storage tree";
+      "scripts/vm.sh must open the managed .utm bundle directly instead of importing it into a copied UTM storage tree";
   test_macbook_utm_refreshes_existing_bundle =
     assert'
       (
         (lib.hasInfix "refreshing config.plist" vm_setup_sh_text)
         && !(lib.hasInfix "UTM bundle already exists: %s; skipping" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must refresh config.plist for existing UTM bundles so schema fixes apply without deleting bundles";
+      "scripts/vm.sh must refresh config.plist for existing UTM bundles so schema fixes apply without deleting bundles";
   test_macbook_utm_stale_template_guard = assert' (
     (lib.hasInfix "stale UTM template detected" vm_setup_sh_text)
     && (lib.hasInfix "run home-manager switch (or nucleus apply) before vm-setup" vm_setup_sh_text)
-  ) "scripts/vm-setup.sh must fail fast on stale UTM templates and print the recovery action";
+  ) "scripts/vm.sh must fail fast on stale UTM templates and print the recovery action";
   test_macbook_utm_required_key_guard = assert' (
     (lib.hasInfix "_required_utm_keys" vm_setup_sh_text)
     && (lib.hasInfix "_missing_utm_keys" vm_setup_sh_text)
     && (lib.hasInfix "stale or incomplete UTM template detected" vm_setup_sh_text)
     && (lib.hasInfix "<key>IconCustom</key>" vm_setup_sh_text)
     && (lib.hasInfix "<key>UsbBusSupport</key>" vm_setup_sh_text)
-  ) "scripts/vm-setup.sh must block incomplete UTM templates missing required keys";
+  ) "scripts/vm.sh must block incomplete UTM templates missing required keys";
   test_macbook_utm_legacy_display_reregistration =
     assert'
       (
@@ -820,9 +819,9 @@ let
         && (lib.hasInfix "cmp -s \"$_plist_template\" \"$config_plist\"" vm_setup_sh_text)
         && (lib.hasInfix "repairing stale UTM runtime registration" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must re-register UTM VMs when legacy display configs or template drift are detected so refreshed config.plist values take effect";
+      "scripts/vm.sh must re-register UTM VMs when legacy display configs or template drift are detected so refreshed config.plist values take effect";
   test_vm_readme_template_content = assert' (
-    (lib.hasInfix "nucleus-vm-setup" readmeTemplateText)
+    (lib.hasInfix "nucleus-vm setup" readmeTemplateText)
     && (lib.hasInfix "## Layout" readmeTemplateText)
     && (lib.hasInfix "<name>-build/" readmeTemplateText)
     && (lib.hasInfix "<name>-installer.iso" readmeTemplateText)
@@ -882,28 +881,25 @@ let
         && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
         && (lib.hasInfix "UTM bundle" readmeTemplateText)
       )
-      "scripts/vm-setup.sh must write ~/virtual machines/README.md using the cross-host README template with placeholder substitution";
+      "scripts/vm.sh must write ~/virtual machines/README.md using the cross-host README template with placeholder substitution";
   test_windows_vm_directory_readme_generation =
     assert'
       (
         (lib.hasInfix "$vmReadmePath = Join-Path $vmDir 'README.md'" windows_vm_setup_ps1_text)
         && (lib.hasInfix "VM directory guide written" windows_vm_setup_ps1_text)
         && (lib.hasInfix "templatesDir" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "nucleus-vm-setup" readmeTemplateText)
+        && (lib.hasInfix "nucleus-vm setup" readmeTemplateText)
         && (lib.hasInfix "## Start commands" readmeTemplateText)
         && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
         && (lib.hasInfix "UTM bundle" readmeTemplateText)
       )
       "Invoke-VMSetup.ps1 must write %USERPROFILE%\\virtual machines\\README.md using the cross-host README template with placeholder substitution";
   test_vm_setup_generates_helper_scripts = assert' (lib.hasInfix "write_start_script" vm_setup_sh_text) "VM setup flows must generate discoverable start helper scripts";
-  test_macbook_utm_default_location_link =
-    assert'
-      (
-        (lib.hasInfix "ensure_utm_default_vm_location" vm_setup_sh_text)
-        && (lib.hasInfix "$HOME/Library/Containers/com.utmapp.UTM/Data/Documents" vm_setup_sh_text)
-        && (lib.hasInfix "linked UTM default VM location" vm_setup_sh_text)
-      )
-      "scripts/vm-setup.sh must best-effort wire UTM's sandboxed document location to ~/virtual machines";
+  test_macbook_utm_default_location_link = assert' (
+    (lib.hasInfix "ensure_utm_default_vm_location" vm_setup_sh_text)
+    && (lib.hasInfix "$HOME/Library/Containers/com.utmapp.UTM/Data/Documents" vm_setup_sh_text)
+    && (lib.hasInfix "linked UTM default VM location" vm_setup_sh_text)
+  ) "scripts/vm.sh must best-effort wire UTM's sandboxed document location to ~/virtual machines";
 
   test_vm_enabled_policy_wiring = assert' (
     (lib.hasInfix "\"enabled\"" vms_json_text)
@@ -922,7 +918,7 @@ let
         && (lib.hasInfix "linked tart storage" vm_setup_sh_text)
         && (lib.hasInfix "rsync" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must link ~/.tart -> ~/virtual machines/.tart so Tart artifacts co-locate with UTM bundles for backup";
+      "scripts/vm.sh must link ~/.tart -> ~/virtual machines/.tart so Tart artifacts co-locate with UTM bundles for backup";
 
   test_macbook_macos_version_tahoe =
     assert'
@@ -933,7 +929,7 @@ let
         && (lib.hasInfix "macOS version to provision (tahoe, sequoia, sonoma, ventura, etc.)" vms_macos_packer_text)
         && (lib.hasInfix "tahoe" vm_setup_sh_text)
       )
-      "MacBook macOS guest version must default to Tahoe across VMs.json, vm-setup.sh, and the macOS Packer template";
+      "MacBook macOS guest version must default to Tahoe across VMs.json, vm.sh, and the macOS Packer template";
 
   # On non-Windows hosts, after Mido failure the script should try a pwsh/Fido
   # URL resolver fallback before requiring manual ISO input.
@@ -947,7 +943,7 @@ let
         && (lib.hasInfix "--windows-iso-retries" vm_setup_sh_text)
         && (lib.hasInfix "run_with_backoff" vm_setup_sh_text)
       )
-      "scripts/vm-setup.sh must attempt a non-Windows Fido URL fallback first on Darwin/Linux, with Mido as secondary fallback and retry support";
+      "scripts/vm.sh must attempt a non-Windows Fido URL fallback first on Darwin/Linux, with Mido as secondary fallback and retry support";
 
   # Force evaluation of all tests when `summary` is requested so callers
   # cannot accidentally read a static summary string without executing

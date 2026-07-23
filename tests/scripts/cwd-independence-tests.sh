@@ -118,7 +118,7 @@ test_script_help_from_outside() {
         "$REPO_ROOT/scripts/health-check.sh" \
         "$REPO_ROOT/scripts/test.sh" \
         "$REPO_ROOT/scripts/svc.sh" \
-        "$REPO_ROOT/scripts/vm-setup.sh" \
+        "$REPO_ROOT/scripts/vm.sh" \
         "$REPO_ROOT/scripts/update.sh" \
         "$REPO_ROOT/scripts/ai-sync.sh" \
         "$REPO_ROOT/scripts/bootstrap.sh"; do

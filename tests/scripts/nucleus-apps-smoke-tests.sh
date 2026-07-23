@@ -38,7 +38,7 @@ declare -a BATCH_PACKAGES=(
 	nucleus-check nucleus-test nucleus-check-packer nucleus-check-pwsh
 	nucleus-check-sh nucleus-cloud-setup nucleus-config nucleus-gc
 	nucleus-gs-pdf-opt nucleus-health-check nucleus-replica-reset
-	nucleus-replica-sync nucleus-svc nucleus-update nucleus-vm-setup
+	nucleus-replica-sync nucleus-svc nucleus-update nucleus-vm
 )
 
 echo "Building ${#BATCH_PACKAGES[@]} nucleus packages..."
@@ -92,7 +92,7 @@ declare -A APP_TO_PKG=(
 	[replica-sync]=nucleus-replica-sync
 	[svc]=nucleus-svc
 	[update]=nucleus-update
-	[vm-setup]=nucleus-vm-setup
+	[vm]=nucleus-vm
 )
 
 test_app_help() {
@@ -116,7 +116,7 @@ test_app_help() {
 APP_COMMANDS=(
 	apply ai-sync bootstrap bump-lockfile check test
 	check-packer check-sh cloud-setup config
-	gc health-check replica-reset replica-sync update svc vm-setup
+	gc health-check replica-reset replica-sync update svc vm
 )
 
 echo ""
@@ -154,7 +154,7 @@ declare -A DRY_RUN_APPS=(
 	[gc]=nucleus-gc
 	[replica-sync]=nucleus-replica-sync
 	[replica-reset]=nucleus-replica-reset
-	[vm-setup]=nucleus-vm-setup
+	[vm]=nucleus-vm
 )
 
 test_app_dry_run() {
@@ -178,7 +178,7 @@ NUCLEUS_AI_SYNC_TIMEOUT=0 test_app_dry_run ai-sync
 test_app_dry_run gc
 test_app_dry_run replica-sync
 test_app_dry_run replica-reset
-test_app_dry_run vm-setup
+test_app_dry_run vm
 
 # --- Tier 3: safe no-op read-only commands --------------------------------
 # Commands that perform read-only operations against local files.

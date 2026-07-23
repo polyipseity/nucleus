@@ -31,7 +31,7 @@ let
     "nucleus-service-watchdog"
     "nucleus-test"
     "nucleus-update"
-    "nucleus-vm-setup"
+    "nucleus-vm"
   ];
 
   # Map command name to zsh completion file name (prepends _ to the full command name)

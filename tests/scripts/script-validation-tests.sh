@@ -161,8 +161,8 @@ test_help_handler() {
 echo "Testing shell scripts for correctness and best practices..."
 echo ""
 
-# Test scripts/vm-setup.sh
-VM_SETUP_SH="scripts/vm-setup.sh"
+# Test scripts/vm.sh
+VM_SETUP_SH="scripts/vm.sh"
 if [[ -f "$VM_SETUP_SH" ]]; then
     test_bash_syntax "$VM_SETUP_SH"
     test_has_shebang "$VM_SETUP_SH"
