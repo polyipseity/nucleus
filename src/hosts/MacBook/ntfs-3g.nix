@@ -19,6 +19,7 @@
 #   build on modern macOS.
 { lib, pkgs, ... }:
 let
+  activationBundle = pkgs.callPackage ../../modules/lib/activation-bundle.nix { };
   # Pinned source for the polyipseity/ext.ntfs-3g fork (edge branch).
   ntfs3gSrc = pkgs.fetchFromGitHub {
     owner = "polyipseity";
@@ -74,18 +75,18 @@ let
 in
 {
   system.activationScripts.postActivation.text = lib.mkBefore ''
-    CURRENT_FINGERPRINT="${buildFingerprint}"
-    BUILD_TOOLS_PATH="${buildToolsPath}"
-    ACLOCAL_PATH_VALUE="${aclocalPath}"
-    NTFS3G_SRC="${ntfs3gSrc}"
-    export CC="${clangBin}"
-    export CXX="${clangxxBin}"
-    export CPPFLAGS="${cppFlags}"
-    export LDFLAGS="${ldFlags}"
-    CONFIGURE_FLAGS="${configureFlags}"
-    CRYPTO_PATCH_PATH="${cryptoPatchPath}"
-    ROOTBINDIR_PATCH_PATH="${rootbindirPatchPath}"
-    INSTALL_HOOK_PATCH_PATH="${installHookPatchPath}"
-    ${builtins.readFile ../../scripts/hosts/MacBook/macos-build-ntfs3g.sh}
+    "${activationBundle}/hosts/MacBook/macos-build-ntfs3g.sh" \
+      "${buildFingerprint}" \
+      "${buildToolsPath}" \
+      "${aclocalPath}" \
+      "${ntfs3gSrc}" \
+      "${clangBin}" \
+      "${clangxxBin}" \
+      "${cppFlags}" \
+      "${ldFlags}" \
+      "${configureFlags}" \
+      "${cryptoPatchPath}" \
+      "${rootbindirPatchPath}" \
+      "${installHookPatchPath}"
   '';
 }

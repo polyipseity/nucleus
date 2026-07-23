@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # ---- buildNtfs3g ----------------------------------------------------------
 # Build polyipseity/ext.ntfs-3g from source.
-# Expects env vars set by the Nix wrapper in ntfs-3g.nix:
-#   CURRENT_FINGERPRINT, BUILD_TOOLS_PATH, ACLOCAL_PATH_VALUE, NTFS3G_SRC,
-#   CC, CXX, CPPFLAGS, LDFLAGS, CONFIGURE_FLAGS, CRYPTO_PATCH_PATH,
-#   ROOTBINDIR_PATCH_PATH, INSTALL_HOOK_PATCH_PATH
+# Arguments: fingerprint buildToolsPath aclocalPath ntfs3gSrc cc cxx cppFlags
+#            ldFlags configureFlags cryptoPatchPath rootbindirPatchPath
+#            installHookPatchPath
+#
+# Previously these were passed as env vars from the Nix activation block.
+# CC/CXX/CPPFLAGS/LDFLAGS are exported here so ./configure and make resolve
+# them from the environment.
 #
 # WHY build from source, not nixpkgs:
 #   The polyipseity fork of ntfs-3g (commit f0e5cb0) links against fuse-t, a
@@ -23,6 +26,21 @@
 #   requires a kernel extension.  fuse-t is a modern FSKit-based alternative
 #   that works without kext approval, so the polyipseity fork is the preferred
 #   build on modern macOS.
+
+CURRENT_FINGERPRINT="${1:?ntfs-3g build: missing fingerprint arg}"
+BUILD_TOOLS_PATH="${2:?ntfs-3g build: missing buildToolsPath arg}"
+ACLOCAL_PATH_VALUE="${3:?ntfs-3g build: missing aclocalPath arg}"
+NTFS3G_SRC="${4:?ntfs-3g build: missing ntfs3gSrc arg}"
+CC="${5:?ntfs-3g build: missing cc arg}"
+CXX="${6:?ntfs-3g build: missing cxx arg}"
+CPPFLAGS="${7:?ntfs-3g build: missing cppFlags arg}"
+LDFLAGS="${8:?ntfs-3g build: missing ldFlags arg}"
+CONFIGURE_FLAGS="${9:?ntfs-3g build: missing configureFlags arg}"
+CRYPTO_PATCH_PATH="${10:?ntfs-3g build: missing cryptoPatchPath arg}"
+ROOTBINDIR_PATCH_PATH="${11:?ntfs-3g build: missing rootbindirPatchPath arg}"
+INSTALL_HOOK_PATCH_PATH="${12:?ntfs-3g build: missing installHookPatchPath arg}"
+
+export CC CXX CPPFLAGS LDFLAGS
 
 FINGERPRINT_FILE="/usr/local/share/ntfs-3g/.build-fingerprint"
 LOG_FILE="/Users/Shared/nucleus/logs/ntfs-3g-build.log"
