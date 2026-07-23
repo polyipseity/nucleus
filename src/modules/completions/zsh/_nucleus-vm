@@ -1,0 +1,53 @@
+#compdef nucleus-vm
+
+local state line
+local -a subcmds
+
+subcmds=(
+  'setup:Provision and configure VMs'
+  'list:List managed VMs'
+  'status:Show VM status'
+  'start:Start a VM'
+  'stop:Stop a VM'
+  'upgrade:Upgrade a VM'
+  'reset:Reset a VM'
+  'gc:Clean up VM resources'
+)
+
+_arguments \
+  '(-h --help)'{--help,-h}'[Show usage]' \
+  '--json[Machine-readable JSON output]' \
+  '1: :->subcmd' \
+  '*: :->args'
+
+case $state in
+  subcmd)
+    _describe -t subcommands 'subcommand' subcmds
+    ;;
+  args)
+    case $words[1] in
+      setup)
+        _arguments \
+          '(-h --help)'{--help,-h}'[Show usage]' \
+          '--dry-run[Print what would be done without doing it]' \
+          '--gc[Run GC after VM setup]' \
+          '--no-gc[Skip GC after VM setup]' \
+          '--mido-patch-file:Path to mido patch file:_files' \
+          '--mido-script:Path to mido script:_files' \
+          '--windows-iso:Path to Windows ISO:_files' \
+          '--no-windows-iso[Skip Windows ISO]' \
+          '--windows-iso-source:Windows ISO download source' \
+          '--no-windows-iso-source[Skip Windows ISO source]' \
+          '--windows-iso-retries:Windows ISO download retry count' \
+          '--headful[Enable graphical VM console]' \
+          '--no-headful[Disable graphical VM console (headless)]' \
+          '--vm-dir-override:Override VM directory:_files -/' \
+          '--repo-root:Repository root path:_files -/' \
+          '--accelerator:VM accelerator type'
+        ;;
+      *)
+        _describe -t subcommands 'subcommand' subcmds
+        ;;
+    esac
+    ;;
+esac

@@ -468,8 +468,8 @@ function Sync-ShellProfile {
     'function nucleus-bootstrap {'
     '  Invoke-NucleusRepoScript ''scripts\bootstrap.ps1'' @Args'
     '}'
-    'function nucleus-vm-setup {'
-    '  Invoke-NucleusRepoScript ''scripts\vm-setup.ps1'' @Args'
+    'function nucleus-vm {'
+    '  Invoke-NucleusRepoScript ''scripts\vm.ps1'' @Args'
     '}'
     'function nucleus-bump-lockfile {'
     '  Invoke-NucleusRepoScript ''scripts\bump-lockfile.ps1'' @Args'
@@ -575,16 +575,27 @@ function Sync-ShellProfile {
     '  @(''--help'', ''--apply'', ''--no-apply'') | Where-Object { $_ -like "$wordToComplete*" }'
     '}'
     ''
-    'Register-ArgumentCompleter -CommandName nucleus-vm-setup -ScriptBlock {'
+    '$nucleusVmCommands = @(''setup'', ''list'', ''status'', ''start'', ''stop'', ''upgrade'', ''reset'', ''gc'')'
+    '$nucleusVmSetupFlags = @(''--help'', ''--dry-run'', ''--gc'', ''--no-gc'',
+    ''--mido-patch-file'', ''--mido-script'',
+    ''--windows-iso'', ''--no-windows-iso'',
+    ''--windows-iso-source'', ''--no-windows-iso-source'',
+    ''--windows-iso-retries'',
+    ''--headful'', ''--no-headful'',
+    ''--vm-dir-override'', ''--repo-root'',
+    ''--accelerator'')'
+
+    ''
+    'Register-ArgumentCompleter -CommandName nucleus-vm -ScriptBlock {'
     '  param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)'
-    '  @(''--help'', ''--dry-run'', ''--gc'', ''--no-gc'', '
-    '    ''--mido-patch-file'', ''--mido-script'', '
-    '    ''--windows-iso'', ''--no-windows-iso'', '
-    '    ''--windows-iso-source'', ''--no-windows-iso-source'', '
-    '    ''--windows-iso-retries'', '
-    '    ''--headful'', ''--no-headful'', '
-    '    ''--vm-dir-override'', ''--repo-root'', '
-    '    ''--accelerator'') | Where-Object { $_ -like "$wordToComplete*" }'
+    '  $nucleusVmCommands | Where-Object { $_ -like "$wordToComplete*" }'
+    '  if ($commandAst.CommandElements.Count -ge 2) {'
+    '    $subcommand = $commandAst.CommandElements[1].Value'
+    '    if ($subcommand -eq ''setup'') {'
+    '      $nucleusVmSetupFlags | Where-Object { $_ -like "$wordToComplete*" }'
+    '    }'
+    '  }'
+    '  @(''--help'', ''--json'') | Where-Object { $_ -like "$wordToComplete*" }'
     '}'
     ''
     'Register-ArgumentCompleter -CommandName nucleus-apply -ScriptBlock {'
