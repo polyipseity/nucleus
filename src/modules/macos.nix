@@ -199,7 +199,6 @@ let
   betterdisplayHeartbeat = pkgs.writeNucleusShellApplication {
     name = "betterdisplay-heartbeat";
     runtimeInputs = [ ];
-    bundleDefault = true;
     scriptName = "hosts/MacBook/macos-heartbeat-betterdisplay";
   };
 
@@ -219,7 +218,6 @@ let
       NIX_INDEX_NAME = "nix-index";
       NIX_INDEX_MAX_AGE_DAYS = "6";
     };
-    bundleDefault = true;
   };
 
   # Directory names inside ~/dev whose contents should stay out of Spotlight.
@@ -251,7 +249,6 @@ let
     extraEnv = {
       SPOTLIGHT_EXCLUDED_DIR_NAMES = builtins.concatStringsSep " " devSpotlightExcludedDirectoryNames;
     };
-    bundleDefault = true;
   };
 
   # Daily .DS_Store cleanup for ~/dev.
@@ -261,21 +258,18 @@ let
   devDsStoreGc = pkgs.writeNucleusShellApplication {
     name = "ds-store-gc";
     runtimeInputs = [ ];
-    bundleDefault = true;
     scriptName = "services/ds-store-gc";
   };
 
   gcWeekly = pkgs.writeNucleusShellApplication {
     name = "gc-weekly";
     runtimeInputs = [ ];
-    bundleDefault = true;
     scriptName = "services/gc-sweep";
   };
 
   sccacheGc = pkgs.writeNucleusShellApplication {
     name = "sccache-gc";
     runtimeInputs = [ pkgs.sccache ];
-    bundleDefault = true;
     scriptName = "services/sccache-gc";
   };
 
@@ -290,7 +284,6 @@ let
       GUI_ENV_DEDUP_SET_HOME = mkManagedDedupSet "$HOME";
       GUI_ENV_MACOS_ALL_VARS = envVars.macOSAllVars;
     };
-    bundleDefault = true;
   };
 
   activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };

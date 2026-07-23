@@ -17,14 +17,12 @@ let
   gcWeekly = pkgs.writeNucleusShellApplication {
     name = "gc-weekly";
     runtimeInputs = [ ];
-    bundleDefault = true;
     scriptName = "services/gc-sweep";
   };
 
   sccacheGc = pkgs.writeNucleusShellApplication {
     name = "sccache-gc";
     runtimeInputs = [ pkgs.sccache ];
-    bundleDefault = true;
     scriptName = "services/sccache-gc";
   };
 

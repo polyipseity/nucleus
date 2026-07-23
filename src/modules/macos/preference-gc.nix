@@ -71,6 +71,5 @@ in
     extraEnv = {
       MANAGED_PREF_DOMAINS = builtins.concatStringsSep " " resetUserPreferenceDomains;
     };
-    bundleDefault = true;
   };
 }
