@@ -439,6 +439,7 @@
             pkgs.git
             pkgs.powershell
           ];
+          bundleDefault = false;
           text = ''
             exec pwsh -NoLogo -NoProfile -NonInteractive -File "${../scripts + "/check-pwsh.ps1"}" "$@"
           '';
