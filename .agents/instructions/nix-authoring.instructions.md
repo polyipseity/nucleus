@@ -93,6 +93,32 @@ See `src/scripts/services/jellyfin-sync.sh` and its callers (`src/hosts/MacBook/
 
 **Comments must never contain token placeholder strings.** Since `builtins.replaceStrings` replaces all occurrences, any token string (e.g. `__NUCLEUS_REPO_ROOT__`) appearing in a comment will also be substituted, leaving meaningless text.
 
+## Script builders: `writeNucleusShellApplication` over `writeShellApplication`
+
+Always use `pkgs.writeNucleusShellApplication` instead of `pkgs.writeShellApplication` for creating shell scripts from Nix. `writeNucleusShellApplication` is the repo's custom wrapper available via the `pkgs` overlay.
+
+`writeNucleusShellApplication` provides:
+
+- `bundleDefault = true` — mirrors the full `scripts/` tree into the derivation, enabling `SCRIPT_DIR`-based relative sourcing of libraries under `src/scripts/lib/` at runtime.
+- `extraEnv` — passes Nix-computed values as environment variables to the wrapper script. Values are automatically shell-escaped.
+- `scriptName` — references a script by its subdirectory path (e.g., `"services/jellyfin-daemon"` resolves to `src/scripts/services/jellyfin-daemon.sh`).
+
+`writeShellApplication` (from nixpkgs) does not support `bundleDefault` or `extraEnv`. Scripts built with it cannot source sibling libraries via `SCRIPT_DIR`-relative paths, leading to silent breakage when a script evolves to need library access.
+
+The only exception is when technical constraints prevent using `writeNucleusShellApplication` (e.g., dynamic names in function context as in `cloud-drives.nix`). In that case, add a `# WHY` comment explaining the constraint.
+
+Env-var fallback pattern for scripts using `extraEnv`:
+
+```bash
+VAR='${__NUCLEUS_VAR_NAME__}'
+case "$VAR" in __NUCLEUS_*)
+  VAR='default_value'
+  ;;
+esac
+```
+
+This ensures scripts work both when built via `writeNucleusShellApplication` (with Nix-injected values via `extraEnv`) and when run directly from the source tree during development.
+
 ## Module conventions
 
 - Shared modules must guard NixOS-only options with `lib.mkIf` checks on `options ? environment` or equivalent; Home Manager modules must likewise guard `home.*` options.
