@@ -140,6 +140,7 @@ scriptName = "hosts/MacBook/macos-gc-preferences";
 ```
 
 This avoids:
+
 - Dual-parsing `$1` vs env-var fallbacks in the shared body (the env var is the natural interface).
 - A `text` wrapper that duplicates the `extraEnv` mechanism and bypasses `writeNucleusShellApplication`'s PATH setup.
 - Breaking the `source`-based caller if the wrapper were changed to pass args instead.
