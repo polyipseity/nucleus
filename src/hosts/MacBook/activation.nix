@@ -222,15 +222,16 @@ in
     # with a running Jellyfin server.
     #
     # WHY subprocess invocation (not readFile + replaceStrings): the activation
-    # bundle already contains the full scripts/ tree.  NUCLEUS_REPO_ROOT and PATH
-    # are set in the environment so the script resolves the repo root at runtime
-    # via derive_repo_root (or falls back to derive_repo_root / NUCLEUS_REPO_ROOT).
+    # bundle already contains the full scripts/ tree.  The repo root is passed
+    # as a CLI arg.  jq and sops are pinned via --jq-path/--sops-path so the
+    # script does not depend on the activation environment's PATH.
     # SOPS_AGE_KEY_FILE defaults to /etc/sops/age/machine.txt.
-    ${
-      lib.optionalString (repoRoot != "") "export NUCLEUS_REPO_ROOT=${lib.escapeShellArg repoRoot}
-    "
-    }export PATH="${pkgs.jq}/bin:${pkgs.sops}/bin:$PATH"
-    "${activationBundle}/services/jellyfin-sync.sh"
+    "${activationBundle}/services/jellyfin-sync.sh" \
+      ${
+        lib.optionalString (repoRoot != "") "--repo-root ${lib.escapeShellArg repoRoot} \
+      "
+      }--jq-path "${pkgs.jq}/bin/jq" \
+      --sops-path "${pkgs.sops}/bin/sops"
 
     # ---- verifyNucleusServices ---------------------------------------------------
     # Warn-only verification that all managed services are running.

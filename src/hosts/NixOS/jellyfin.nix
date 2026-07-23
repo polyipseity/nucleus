@@ -40,9 +40,10 @@ in
       '';
     in
     ''
-      export NUCLEUS_REPO_ROOT="${lib.escapeShellArg (builtins.getEnv "NUCLEUS_REPO_ROOT")}"
-      export PATH="${pkgs.jq}/bin:${pkgs.sops}/bin:$PATH"
-      ${scriptsBundle}/services/jellyfin-sync.sh
+      ${scriptsBundle}/services/jellyfin-sync.sh \
+        --repo-root ${lib.escapeShellArg (builtins.getEnv "NUCLEUS_REPO_ROOT")} \
+        --jq-path "${pkgs.jq}/bin/jq" \
+        --sops-path "${pkgs.sops}/bin/sops"
     ''
   );
 }

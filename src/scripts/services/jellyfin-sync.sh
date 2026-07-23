@@ -20,6 +20,8 @@ usage() {
   cat <<'EOF'
   --repo-root <path>           Override the detected repository root path.
   --jellyfin-base-url <url>    Jellyfin server base URL (default: read from services.json).
+  --jq-path <path>             Explicit path to jq binary (default: resolve via PATH).
+  --sops-path <path>           Explicit path to sops binary (default: resolve via PATH).
   -h, --help                   Show this help message and exit
 EOF
 }
@@ -38,6 +40,14 @@ while [[ $# -gt 0 ]]; do
       JELLYFIN_BASE_URL="$2"
       shift 2
       ;;
+    --jq-path)
+      _JFS_JQ_PATH="$2"
+      shift 2
+      ;;
+    --sops-path)
+      _JFS_SOPS_PATH="$2"
+      shift 2
+      ;;
     *)
       printf '%s: unknown argument: %s\n' "$(basename "$0")" "$1" >&2
       usage >&2
@@ -45,6 +55,16 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# If explicit tool paths were provided, define shell function wrappers so all
+# bare jq/sops invocations resolve to the pinned binary without changing every
+# call site.
+if [ -n "${_JFS_JQ_PATH:-}" ]; then
+  jq() { "$_JFS_JQ_PATH" "$@"; }
+fi
+if [ -n "${_JFS_SOPS_PATH:-}" ]; then
+  sops() { "$_JFS_SOPS_PATH" "$@"; }
+fi
 
 if ! command -v curl >/dev/null 2>&1; then
   printf '%s\n' "jellyfin-sync: curl is not available; skipping sync"
