@@ -13,10 +13,9 @@ let
   openManualScript = pkgs.writeNucleusShellApplication {
     name = "open-manual";
     runtimeInputs = [ pkgs.xdg-utils ];
-    extraEnv = {
-      NUCLEUS_MANUAL_PATH = "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/hosts/NixOS/MANUAL.md";
-    };
-    scriptName = "integrations/open-host-manual";
+    text = ''
+      exec '${../../scripts/integrations/open-host-manual.sh}' '${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/hosts/NixOS/MANUAL.md' "$@"
+    '';
   };
 
   # Ghostscript PDF optimization presets (quality descending).
@@ -35,10 +34,9 @@ let
     pkgs.writeNucleusShellApplication {
       name = "gs-pdf-opt-nautilus-${preset}";
       runtimeInputs = [ pkgs.file ];
-      extraEnv = {
-        PDF_OPT_PRESET = preset;
-      };
-      scriptName = "integrations/configure-file-manager-pdf-opt";
+      text = ''
+        exec '${../../scripts/integrations/configure-file-manager-pdf-opt.sh}' '${preset}' "$@"
+      '';
     };
 
   gsPdfOptNautilusScripts = builtins.listToAttrs (
