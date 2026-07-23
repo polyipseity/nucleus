@@ -277,23 +277,19 @@ let
     text = builtins.readFile ../scripts/services/sccache-gc.sh;
   };
 
-  # guiEnvAgent — keep-as-is: the substituted values (managedPaths and
-  # envVars.macOSAllVars) are multi-line shell prepend/append expressions from
-  # Nix, not feasible as CLI args.  The script runs as a launchd agent
-  # (ProgramArguments fixed array, no args).
+  # guiEnvAgent — launchd login agent that manages GUI-environment PATH and
+  # env vars.  All Nix-computed values are passed as CLI args to the script.
   guiEnvAgent = pkgs.writeShellApplication {
     name = "gui-env";
     runtimeInputs = [ ];
-    text =
-      builtins.replaceStrings
-        [ "__NUCLEUS_PREPEND__" "__NUCLEUS_APPEND__" "__NUCLEUS_MANAGED_SET__" "__MACOS_ALL_VARS__" ]
-        [
-          managedPaths.toShellPrependPath
-          managedPaths.toShellAppendPath
-          (mkManagedDedupSet "$HOME")
-          envVars.macOSAllVars
-        ]
-        (builtins.readFile ../scripts/hosts/MacBook/macos-set-gui-env.sh);
+    text = ''
+      exec ${../scripts/hosts/MacBook/macos-set-gui-env.sh} \
+        "${lib.escapeShellArg managedPaths.toShellPrependPath}" \
+        "${lib.escapeShellArg managedPaths.toShellAppendPath}" \
+        "${lib.escapeShellArg (mkManagedDedupSet "$HOME")}" \
+        "${lib.escapeShellArg envVars.macOSAllVars}" \
+        "$@"
+    '';
   };
 
   activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
