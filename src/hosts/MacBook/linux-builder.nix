@@ -46,9 +46,6 @@ let
   linuxBuilderDaemon = pkgs.writeNucleusShellApplication {
     name = "linux-builder-daemon";
     runtimeInputs = [ pkg ];
-    extraEnv = {
-      LINUX_BUILDER_WORK_DIR = workDir;
-    };
     scriptName = "hosts/MacBook/macos-daemonize-linux-builder";
   };
 in
@@ -125,7 +122,7 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${linuxBuilderDaemon}/bin/nucleus-linux-builder-daemon"
+        "exec ${linuxBuilderDaemon}/bin/nucleus-linux-builder-daemon '${workDir}'"
       ];
       KeepAlive = true;
       RunAtLoad = true;

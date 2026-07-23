@@ -36,11 +36,6 @@ let
   jellyfinDaemon = pkgs.writeNucleusShellApplication {
     name = "jellyfin-daemon";
     runtimeInputs = [ pkgs.jellyfin ];
-    extraEnv = {
-      JELLYFIN_STATE_ROOT = jellyfinStateRoot;
-      JELLYFIN_LOG_DIR = "${config.nucleus.logging.systemLogDir}/jellyfin-app";
-      JELLYFIN_BIN = "${pkgs.jellyfin}/bin/jellyfin";
-    };
   };
 in
 {
@@ -55,7 +50,7 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${jellyfinDaemon}/bin/nucleus-jellyfin-daemon"
+        "exec ${jellyfinDaemon}/bin/nucleus-jellyfin-daemon '${jellyfinStateRoot}' '${config.nucleus.logging.systemLogDir}/jellyfin-app' '${pkgs.jellyfin}/bin/jellyfin'"
       ];
       KeepAlive = true;
       RunAtLoad = true;
