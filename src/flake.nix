@@ -267,6 +267,9 @@
                 gnupg24 = gnupg25_pinned;
               }
             )
+            # Expose writeNucleusShellApplication via pkgs so all module and
+            # host files can use it without importing from flake.nix.
+            (final: _prev: { writeNucleusShellApplication = writeNucleusShellApplication final; })
           ];
         };
 
