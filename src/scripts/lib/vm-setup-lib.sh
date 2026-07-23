@@ -589,15 +589,17 @@ resize_and_mark_image() {
 build_android_image() {
   _bai_vm_name="$1"
   _bai_vm_index="$2"
+  _bai_accept_gsi_license="$3"
+  _bai_upgrade_android="$4"
+  _bai_reset_userdata="$5"
   _bai_gsi_version="$(jq -r ".VMs[$_bai_vm_index].androidGsiVersion // \"\"" "$MANIFEST")"
   _bai_system_img="$IMAGES_DIR/android-system.qcow2"
   _bai_userdata_img="$IMAGES_DIR/android-userdata.qcow2"
   _bai_gsi_img="$IMAGES_DIR/android-gsi.img"
 
   # Step 1: Download and extract LineageOS base system image
-  # shellcheck disable=SC2154 # reason: upgrade_android is set by vm-setup.sh caller (Phase 8)
-  if [ ! -f "$_bai_system_img" ] || [ "$upgrade_android" = "true" ]; then
-    if [ "$upgrade_android" = "true" ] && [ -f "$_bai_system_img" ]; then
+  if [ ! -f "$_bai_system_img" ] || [ "$_bai_upgrade_android" = "true" ]; then
+    if [ "$_bai_upgrade_android" = "true" ] && [ -f "$_bai_system_img" ]; then
       say "upgrading Android system image for '$_bai_vm_name' (re-downloading)..."
       rm -f "$_bai_system_img"
     else
@@ -634,9 +636,8 @@ build_android_image() {
   fi
 
   # Step 2: Create userdata disk (skip if exists, unless reset requested)
-  # shellcheck disable=SC2154 # reason: reset_userdata is set by vm-setup.sh caller (Phase 8)
-  if [ ! -f "$_bai_userdata_img" ] || [ "$reset_userdata" = "true" ]; then
-    if [ "$reset_userdata" = "true" ] && [ -f "$_bai_userdata_img" ]; then
+  if [ ! -f "$_bai_userdata_img" ] || [ "$_bai_reset_userdata" = "true" ]; then
+    if [ "$_bai_reset_userdata" = "true" ] && [ -f "$_bai_userdata_img" ]; then
       say "resetting Android userdata disk..."
       rm -f "$_bai_userdata_img"
     fi
@@ -650,8 +651,7 @@ build_android_image() {
 
   # Step 3: GSI system image (optional, when androidGsiVersion is set)
   if [ -n "$_bai_gsi_version" ] && [ "$_bai_gsi_version" != "null" ]; then
-    # shellcheck disable=SC2154 # reason: accept_gsi_license is set by vm-setup.sh caller (Phase 7)
-    if [ "$accept_gsi_license" != "true" ]; then
+    if [ "$_bai_accept_gsi_license" != "true" ]; then
       error "GSI license not accepted for '$_bai_vm_name'; see https://developer.android.com/license"
       exit 1
     fi
@@ -719,6 +719,7 @@ build_one_image() {
     Android)
       # undoc-supp: best-effort — see NixOS branch above.
       build_android_image "$_vm_name" "$_vm_index" \
+        "$accept_gsi_license" "$upgrade_android" "$reset_userdata" \
         || say "Android image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
       ;;
     *)
