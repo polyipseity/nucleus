@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # shellcheck shell=bash # uses process substitution and read -d for safe null-delimited find output
 # Remove stale `result` and `result-*` symlinks left by `nix build`,
 # `nix run ... -o result`, or `nixos-generators`.
@@ -51,7 +52,7 @@ done < <(
     -path "$REPO_ROOT/.direnv" -prune -o \
     -path "$REPO_ROOT/vendor" -prune -o \
     \( -name result -o -name 'result-*' \) \
-    -print0 2>/dev/null || true
+    -print0 2>/dev/null || true # undoc-supp: find returns non-zero when -prune skips dirs; || true prevents set -e abort
 )
 
 if $_cnba_dry_run && ! $_cnba_found; then

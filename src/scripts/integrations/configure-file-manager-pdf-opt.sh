@@ -5,7 +5,7 @@
 set -eu
 
 preset="${PDF_OPT_PRESET:-${1:-default}}"
-shift 2>/dev/null || true
+shift 2>/dev/null || true # undoc-supp: expected failure when fewer args than shift count
 
 pdfs=()
 for f in "$@"; do

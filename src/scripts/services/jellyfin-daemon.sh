@@ -10,7 +10,7 @@ set -eu
 state_root="${JELLYFIN_STATE_ROOT:-${1:-/Users/Shared/Jellyfin}}"
 log_dir="${JELLYFIN_LOG_DIR:-${2:-${HOME}/.local/state/nucleus/log/jellyfin}}"
 jellyfin_bin="${JELLYFIN_BIN:-${3:-jellyfin}}"
-shift 3 2>/dev/null || true
+shift 3 2>/dev/null || true # undoc-supp: expected failure when defaulting all positional args
 
 config_dir="$state_root/config"
 data_dir="$state_root/data"
