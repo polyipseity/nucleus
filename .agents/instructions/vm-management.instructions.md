@@ -148,8 +148,8 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 | `src/vms/nixos/packer.pkr.hcl`                        | Packer template for NixOS guest on Windows hosts               |
 | `src/vms/windows/packer.pkr.hcl`                      | Packer template for Windows 11 guest on all hosts              |
 | `src/vms/windows/Autounattend.xml`                    | Windows 11 answer file (unattended install, TPM bypass, WinRM) |
-| `scripts/vm.sh`                                        | Unified build+provision script for macOS and NixOS hosts       |
-| `scripts/vm.ps1`                                    | Windows wrapper calling `Invoke-VMSetup.ps1`                   |
+| `scripts/vm.sh`                                       | Unified build+provision script for macOS and NixOS hosts       |
+| `scripts/vm.ps1`                                      | Windows wrapper calling `Invoke-VMSetup.ps1`                   |
 | `src/hosts/Windows/modules/system/Invoke-VMSetup.ps1` | Build + provision logic for Windows hosts                      |
 
 ### Build strategies
