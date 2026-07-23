@@ -388,7 +388,7 @@ if [[ -f "$GS_PDF_OPT_SH" ]]; then
 fi
 
 # Test src/scripts/camilladsp-daemon.sh
-CAMILLADSP_DAEMON_SH="src/scripts/camilladsp-daemon.sh"
+CAMILLADSP_DAEMON_SH="src/scripts/services/camilladsp-daemon.sh"
 if [[ -f "$CAMILLADSP_DAEMON_SH" ]]; then
     test_bash_syntax "$CAMILLADSP_DAEMON_SH"
     test_has_shebang "$CAMILLADSP_DAEMON_SH"
@@ -400,8 +400,8 @@ if [[ -f "$CAMILLADSP_DAEMON_SH" ]]; then
     test_strict_shell_mode "$CAMILLADSP_DAEMON_SH"
 fi
 
-# Test src/scripts/camilladsp-heartbeat.sh
-CAMILLADSP_HEARTBEAT_SH="src/scripts/camilladsp-heartbeat.sh"
+# Test src/scripts/services/camilladsp-heartbeat.sh
+CAMILLADSP_HEARTBEAT_SH="src/scripts/services/camilladsp-heartbeat.sh"
 if [[ -f "$CAMILLADSP_HEARTBEAT_SH" ]]; then
     test_bash_syntax "$CAMILLADSP_HEARTBEAT_SH"
     test_has_shebang "$CAMILLADSP_HEARTBEAT_SH"
