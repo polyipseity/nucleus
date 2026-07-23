@@ -102,13 +102,13 @@ Always use `pkgs.writeNucleusShellApplication` instead of `pkgs.writeShellApplic
 - `bundleDefault = true` — mirrors the full `scripts/` tree into the derivation, enabling `SCRIPT_DIR`-based relative sourcing of libraries under `src/scripts/lib/` at runtime.
 - `scriptName` — references a script by its subdirectory path (e.g., `"services/jellyfin-daemon"` resolves to `src/scripts/services/jellyfin-daemon.sh`). The script receives `$@` from the wrapper; pass values as positional args at the call site.
 - `text` — inline the script body directly instead of referencing an external file. Skips the script mirror (no bundle), sets up `PATH` from `runtimeInputs`, and appends the text content to the wrapper. Use when the script body is trivial or when a shared script cannot be reused due to host-specific values.
-- `extraEnv` — **deprecated for new code**. Use positional args (via ProgramArguments for launchd agents, via `text` for CLI scripts without a natural caller) instead of env vars. Environment variables are opaque to shellcheck, bypass PATH isolation, and cannot be forwarded through exec wrappers. Existing uses should migrate to args as encountered during maintenance.
+- `extraEnv` — injects Nix-computed values as environment variables into the wrapper script. Values are automatically shell-escaped. **Prefer positional args for standalone scripts** (see "CLI-arg-first pattern" below). Use `extraEnv` when the script body is a **shared body sourced by multiple callers** (see "Shared script body pattern" below) — the env var contract stays uniform across callers, avoiding dual-parsing of `$1` and env-var fallbacks in the shared code. Environment variables are opaque to shellcheck, bypass PATH isolation, and cannot be forwarded through exec wrappers; these drawbacks are acceptable for shared bodies where args are not the natural interface.
 
 `writeShellApplication` (from nixpkgs) does not support `bundleDefault`, `extraEnv`, or `text`. Scripts built with it cannot source sibling libraries via `SCRIPT_DIR`-relative paths, leading to silent breakage when a script evolves to need library access.
 
 The only exception is when technical constraints prevent using `writeNucleusShellApplication` (e.g., dynamic names in function context as in `cloud-drives.nix`). In that case, add a `# WHY` comment explaining the constraint.
 
-### CLI-arg-first pattern
+### CLI-arg-first pattern (standalone scripts)
 
 Prefer passing Nix-computed values as positional CLI arguments over environment variables. This applies to:
 
@@ -127,6 +127,25 @@ Prefer passing Nix-computed values as positional CLI arguments over environment 
 
   This avoids `extraEnv` while keeping the shared script reusable for other callers.
 
+### Shared script body pattern
+
+When a `.sh` file under `src/scripts/` is both invoked directly via `scriptName` and `source`d by another script (e.g., a service script that calls functions and does extra work after the shared body), use `extraEnv` with `scriptName` to pass Nix-computed values. The shared body reads env vars set by both callers — `extraEnv` for the `scriptName` caller, POSIX shell defaults for the `source`-based caller — without needing to parse positional arguments.
+
+```nix
+extraEnv = {
+  NIX_STORE_BIN = "${pkgs.nix}/bin/nix";
+  MANAGED_PREF_DOMAINS = builtins.concatStringsSep " " resetUserPreferenceDomains;
+};
+scriptName = "hosts/MacBook/macos-gc-preferences";
+```
+
+This avoids:
+- Dual-parsing `$1` vs env-var fallbacks in the shared body (the env var is the natural interface).
+- A `text` wrapper that duplicates the `extraEnv` mechanism and bypasses `writeNucleusShellApplication`'s PATH setup.
+- Breaking the `source`-based caller if the wrapper were changed to pass args instead.
+
+Do NOT use `text` to wrap a shared-body script with inline env var assignments — that duplicates `extraEnv`. If the script body exists as a file under `src/scripts/`, reference it via `scriptName` (with `extraEnv` for values) or `bundleDefault` + `scriptName` (with args for standalone invocation). Reserve `text` for truly inline scripts or host-specific wrappers without a shared body.
+
 ### Env-var fallback pattern for scripts with callers that use positional args
 
 Scripts that accept positional args should also support the corresponding env var as a fallback, enabling both launchd-agent usage (args from ProgramArguments) and direct invocation during development:
@@ -140,6 +159,7 @@ This pattern is used by `open-host-manual.sh`, `macos-set-gui-env.sh`, and `conf
 ### Sites that cannot use the CLI-arg pattern
 
 Some scripts embed Nix-computed values via `builtins.readFile` into activation blocks or `writeTextFile` derivations. These are **Category 3** sites where the content is either:
+
 - A library function definition (not a script body) that must be sourced by multiple callers.
 - A token-replaced template that uses `builtins.replaceStrings` (the established token-injection pattern).
 
