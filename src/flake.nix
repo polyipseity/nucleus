@@ -75,9 +75,7 @@
     let
       # Loaded from src/modules/users.json, mirroring the Windows pattern.
       # Strip $schema key — it's metadata for JSON Schema validators, not a user entry.
-      users = builtins.removeAttrs (builtins.fromJSON (builtins.readFile ./modules/users.json)) [
-        "$schema"
-      ];
+      users = removeAttrs (builtins.fromJSON (builtins.readFile ./modules/users.json)) [ "$schema" ];
 
       # Filter users by isPrimary=true and extract the attr name.
       username = builtins.head (
@@ -336,6 +334,8 @@
               # Mirror all scripts with exact repo structure.
               cp -r --no-preserve=mode ${../scripts}/. "$out/scripts/"
               cp -r --no-preserve=mode ${./scripts}/. "$out/src/scripts/"
+              # Make scripts executable so the wrapper can exec them.
+              chmod -R +x "$out/scripts/" "$out/src/scripts/"
             ''}
 
             ${
@@ -357,20 +357,20 @@
                 ''
               else
                 ''
-                    # Create thin wrapper with runtime subdirectory detection.
-                    cat > "$out/bin/nucleus-${name}" << 'WRAPPER'
-                    #!${pkgs.runtimeShell}
-                    set -euo pipefail
-                    export PATH="${lib.makeBinPath runtimeInputs}:$PATH"
-                    ${
-                      lib.concatStringsSep "\n" (
-                        lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") extraEnv
-                      )
-                    }for _d in scripts src/scripts; do
-                    _script="$(CDPATH="" cd -- "$(dirname -- "$0")/../$_d" && pwd -P)/${scriptName}.sh"
-                    if [ -f "$_script" ]; then
-                      exec "$_script" "$@"
-                    fi
+                  # Create thin wrapper with runtime subdirectory detection.
+                  cat > "$out/bin/nucleus-${name}" << 'WRAPPER'
+                  #!${pkgs.runtimeShell}
+                  set -euo pipefail
+                  export PATH="${lib.makeBinPath runtimeInputs}:$PATH"
+                  ${
+                    lib.concatStringsSep "\n" (
+                      lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") extraEnv
+                    )
+                  }for _d in scripts src/scripts; do
+                  _script="$(CDPATH="" cd -- "$(dirname -- "$0")/../$_d" && pwd -P)/${scriptName}.sh"
+                  if [ -f "$_script" ]; then
+                    exec "$_script" "$@"
+                  fi
                   done
                   echo "error: ${scriptName}.sh not found under scripts/ or src/scripts/" >&2
                   exit 1
