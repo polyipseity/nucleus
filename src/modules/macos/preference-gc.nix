@@ -67,12 +67,10 @@ in
   # writeBoundary defaults application.
   managedPreferencesGcScript = pkgs.writeNucleusShellApplication {
     name = "gc-managed-user-preferences";
-    runtimeInputs = [ pkgs.nix ];
     text = ''
-      NIX_STORE_BIN="${pkgs.nix}/bin/nix"
-      MANAGED_PREF_DOMAINS="${builtins.concatStringsSep " " resetUserPreferenceDomains}"
-
-    ''
-    + builtins.readFile ../../scripts/hosts/MacBook/macos-gc-preferences.sh;
+      NIX_STORE_BIN="${pkgs.nix}/bin/nix" \
+        MANAGED_PREF_DOMAINS="${builtins.concatStringsSep " " resetUserPreferenceDomains}" \
+        exec '${../../scripts/hosts/MacBook/macos-gc-preferences.sh}' "$@"
+    '';
   };
 }
