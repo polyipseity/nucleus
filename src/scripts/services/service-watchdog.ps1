@@ -9,7 +9,7 @@
   Runs indefinitely with 300 s sleep between iterations (persistent daemon
   pattern — launched by scheduled task AtStartup).
   Use -Oneshot to run a single iteration (for manual or CI use).
-  Mirrors scripts/service-watchdog.sh (POSIX counterpart).
+  Mirrors src/scripts/services/service-watchdog.sh (POSIX counterpart).
 #>
 
 param(
@@ -18,14 +18,14 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+$modulePath = Join-Path $PSScriptRoot '..\..\..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
 # ── Resolve repo root ──────────────────────────────────────────────────────
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
   $env:NUCLEUS_REPO_ROOT
 } else {
-  Split-Path -Parent (Get-Item $PSScriptRoot).Parent.FullName
+  Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))
 }
 
 $ServicesJson = Join-Path $RepoRoot "src\modules\services.json"

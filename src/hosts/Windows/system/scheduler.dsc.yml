@@ -50,9 +50,9 @@ properties:
             Write-Output "watchdog: NUCLEUS_REPO_ROOT not set; run via apply.ps1"
             exit 1
           }
-          $WatchdogScript = Join-Path $RepoRoot "scripts\service-watchdog.ps1"
+          $WatchdogScript = Join-Path $RepoRoot "src\scripts\services\service-watchdog.ps1"
           if (-not (Test-Path $WatchdogScript)) {
-            Write-Output "watchdog: scripts/service-watchdog.ps1 not found"
+            Write-Output "watchdog: src/scripts/services/service-watchdog.ps1 not found"
             exit 1
           }
           & $WatchdogScript
