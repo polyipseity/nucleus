@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/bin/sh
 # Warn-only check that installed Homebrew versions match lockfile.
 # Silent when all versions match.
 # Takes repo root path as $1.

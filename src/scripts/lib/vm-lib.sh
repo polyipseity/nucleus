@@ -352,7 +352,7 @@ vm_write_start_script() {
         "$TEMPLATES_DIR/start-posix.sh" >"$_wss_path_sh"
   else
     warn "start-posix.sh template not found at $TEMPLATES_DIR/start-posix.sh"
-    printf '#!/usr/bin/env sh\nset -eu\necho "VM start script for %s"\n' "$_wss_name" >"$_wss_path_sh"
+    printf '#!/bin/sh\nset -eu\necho "VM start script for %s"\n' "$_wss_name" >"$_wss_path_sh"
   fi
   chmod 755 "$_wss_path_sh"
 
