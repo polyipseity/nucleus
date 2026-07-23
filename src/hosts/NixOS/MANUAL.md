@@ -33,7 +33,7 @@
 - `nucleus-replica-sync` — pull cloud replicas
 - `nucleus-replica-reset` — reset local replica state
 - `nucleus-update` — update repository
-- `nucleus-vm-setup` — build and provision VMs from `src/modules/VMs.json`. Requires `libvirtd` active (from `vms.nix`). Guest converge is automatic; run `nixos-rebuild switch` inside the guest for manual re-converge.
+- `nucleus-vm setup` — build and provision VMs from `src/modules/VMs.json`. Requires `libvirtd` active (from `vms.nix`). Guest converge is automatic; run `nixos-rebuild switch` inside the guest for manual re-converge.
   - **macOS guest**: not automated (Apple EULA restricts redistribution).
   - **NixOS guest**: automatic; `nixos-generators` builds the image.
   - **Windows 11 guest**: ISO auto-downloaded (Fido-style); fallback `--windows-iso /path/to/Win11.iso` (download from <https://www.microsoft.com/software-download/windows11>).

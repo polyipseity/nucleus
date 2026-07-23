@@ -4,7 +4,7 @@
 - Hide MiddleClick from the menu bar: hold ⌘, drag icon away until ✖️ appears. Re-open to show the icon again.
 - Grant Accessibility to BetterDisplay, Chrome Remote Desktop Host, and MiddleClick.
 - Grant Screen Recording to BetterDisplay and Chrome Remote Desktop Host.
-- Grant Automation to the terminal running `nucleus-vm-setup` for UTM imports.
+- Grant Automation to the terminal running `nucleus-vm setup` for UTM imports.
 - **Allow full disk access for remote users**: Open System Settings → General → Sharing → Remote Login → click the **(i)** icon → toggle **Allow full disk access for remote users** to **On**.
 - Open `fuse-t.app` once, then enable the extension in System Settings > General > Login Items & Extensions > Extensions.
 - NTFS read-write: launch Mounty, agree to the dialog, plug in an NTFS drive, then re-mount it via the Mounty menu-bar icon. If the drive mounts read-only (e.g. after Windows Fast Startup): unmount the drive, run `sudo ntfsfix /dev/diskXsY`, then reconnect the drive. Fallback: unmount and `sudo ntfs-3g /dev/diskXsY /path/to/mountpoint`. The ntfs-3g binary is built automatically during `nucleus-apply`. If the build fails, see `/Users/Shared/nucleus/logs/ntfs-3g-build.log` for the full output.
@@ -65,7 +65,7 @@ path` to take effect (though it is known to be unreliable — see
 - `nucleus-replica-sync` — pull cloud replicas
 - `nucleus-replica-reset` — reset local replica state
 - `nucleus-update` — update repository
-- `nucleus-vm-setup` — build and provision VMs from `src/modules/VMs.json`
+- `nucleus-vm setup` — build and provision VMs from `src/modules/VMs.json`
   - **macOS guest** (tart): automatic on Apple Silicon. Requires `brew install cirruslabs/cli/tart`. Start with `tart run MacBook [--no-graphics]`.
   - **NixOS guest**: automatic; `nixos-generators` builds QCOW2.
   - **Windows 11 guest**: ISO auto-downloaded (Mido on POSIX, Fido on Windows); pass `--windows-iso /path/to/Win11.iso` to skip.

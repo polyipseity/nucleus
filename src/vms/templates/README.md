@@ -1,6 +1,6 @@
 # virtual machines
 
-This directory stores VM artifacts managed by `nucleus-vm-setup`.
+This directory stores VM artifacts managed by `nucleus-vm setup`.
 
 ## Layout
 
@@ -56,7 +56,7 @@ To move a UTM VM to another macOS host:
 
 1. Copy the entire `<name>.utm` directory.
 2. Place it under `{{VM_DIR_DISPLAY}}` on the target host.
-3. Open it in UTM (or re-run `nucleus-vm-setup` to refresh the managed registration).
+3. Open it in UTM (or re-run `nucleus-vm setup` to refresh the managed registration).
 
 Copying only `config.plist` or only `disk-main.qcow2` is not sufficient for a portable UTM VM transfer.
 
@@ -66,10 +66,10 @@ Copying only `config.plist` or only `disk-main.qcow2` is not sufficient for a po
 build → provision → run → rebuild
 ```
 
-1. **Build** — `nucleus-vm-setup` builds guest images (nixos-generators, Packer).
+1. **Build** — `nucleus-vm setup` builds guest images (nixos-generators, Packer).
 2. **Provision** — Guest boots, automation channels converge guest state.
 3. **Run** — Generated start scripts launch the VM for daily use.
-4. **Rebuild** — Re-run `nucleus-vm-setup` to rebuild images after config changes.
+4. **Rebuild** — Re-run `nucleus-vm setup` to rebuild images after config changes.
 
 ## Safe cleanup
 
@@ -100,20 +100,20 @@ Persistent VM artifacts (remove only when intentionally deleting a VM):
 
 These artifacts are preserved by `nucleus-gc` because they are expensive to reproduce. Delete them manually when you need to reclaim space:
 
-- `{{IMAGES_DIR_DISPLAY}}/<name>-installer.iso` — cached Windows ISO (~5–6 GB). Remove with `rm "{{IMAGES_DIR_DISPLAY}}/<name>-installer.iso"` (POSIX) or `Remove-Item "{{IMAGES_DIR_DISPLAY}}/<name>-installer.iso"` (Windows). `nucleus-vm-setup` re-downloads it on the next build.
+- `{{IMAGES_DIR_DISPLAY}}/<name>-installer.iso` — cached Windows ISO (~5–6 GB). Remove with `rm "{{IMAGES_DIR_DISPLAY}}/<name>-installer.iso"` (POSIX) or `Remove-Item "{{IMAGES_DIR_DISPLAY}}/<name>-installer.iso"` (Windows). `nucleus-vm setup` re-downloads it on the next build.
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Build slow on Windows | WHPX not enabled | `Enable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -NoRestart` |
-| Packer fails / timeout | Missing SSH key or incorrect credentials | Verify `src/secrets/users-*.yml` and re-run `nucleus-vm-setup` |
+| Packer fails / timeout | Missing SSH key or incorrect credentials | Verify `src/secrets/users-*.yml` and re-run `nucleus-vm setup` |
 | SSH connection refused | Guest not booted or SSH not started | Check guest status; start VM and wait 60s before retry |
 | QEMU GA not responding | Guest agent not running inside guest | Verify `qemu-guest-agent` service is enabled in guest config |
 | `virsh start` fails on NixOS | libvirt pool not defined | Run `virsh pool-define-as nucleus dir --target /var/lib/libvirt/images` |
 
 ## Notes
 
-- Keep this directory managed by `nucleus-vm-setup`; avoid hand-editing generated artifacts.
-- Re-run `nucleus-vm-setup` after changing `src/modules/VMs.json`.
+- Keep this directory managed by `nucleus-vm setup`; avoid hand-editing generated artifacts.
+- Re-run `nucleus-vm setup` after changing `src/modules/VMs.json`.
 - macOS guest images are built and run with Tart today; automated Tart→UTM runtime handoff is not yet supported.

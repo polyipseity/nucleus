@@ -38,7 +38,7 @@ Apply this convention when adding or modifying:
 VM guest credentials must come from per-user SOPS secrets (`src/secrets/users-<username>.yml`), not from host login or defaults.
 
 - Keys: `vm_guest_username`, `vm_guest_password` — referenced via `vmGuest` object (`usernameSecretKey`, `passwordSecretKey`) in `src/modules/users.json` (POSIX) or `src/hosts/Windows/users.json` (Windows).
-- Each setup script (`vm-setup.sh` / `Invoke-VMSetup.ps1`) resolves the current user, reads the `vmGuest` reference, decrypts the secret, and passes credentials into guest builders/templates.
+- Each setup script (`vm.sh` / `Invoke-VMSetup.ps1`) resolves the current user, reads the `vmGuest` reference, decrypts the secret, and passes credentials into guest builders/templates.
 - All guest paths (NixOS: `guest.nix` + `packer.pkr.hcl`; Windows: `Autounattend.xml` + `packer.pkr.hcl`; macOS: `packer.pkr.hcl`) must consume injected credentials.
 - Credential drift must invalidate stale VM artifacts so changing secret-backed values rebuilds rather than reusing stale disks.
 
@@ -76,14 +76,14 @@ QCOW2 throughout all three platforms. Stored at:
 - NixOS: `~/virtual machines/<name>.qcow2`
 - Windows: `%USERPROFILE%\virtual machines\<name>.qcow2`
 
-Pre-built images land in `~/virtual machines/images/<name>.qcow2` (Windows: `%USERPROFILE%\virtual machines\images\<name>.qcow2`). `nucleus-vm-setup` builds these images in phase 1 (if absent) and copies them to the disk location in phase 2.
+Pre-built images land in `~/virtual machines/images/<name>.qcow2` (Windows: `%USERPROFILE%\virtual machines\images\<name>.qcow2`). `nucleus-vm setup` builds these images in phase 1 (if absent) and copies them to the disk location in phase 2.
 
 QCOW2 enables copy-based migration between hosts without conversion.
 
 ## macOS — Tart (macOS guests)
 
 - VM backend: Tart CLI (Apple Virtualization.framework); macOS host only.
-- VM store: `~/virtual machines/.tart/vms/<name>/` — Tart's storage root (`~/.tart`) is symlinked to `~/virtual machines/.tart` by `nucleus-vm-setup` so Tart artifacts co-locate with UTM bundles for unified backup.
+- VM store: `~/virtual machines/.tart/vms/<name>/` — Tart's storage root (`~/.tart`) is symlinked to `~/virtual machines/.tart` by `nucleus-vm setup` so Tart artifacts co-locate with UTM bundles for unified backup.
 - Build tool: Packer + `tart-cli` plugin pulling `ghcr.io/cirruslabs/macos-<version>-base:latest` from GHCR.
 - Start command (after build): `tart run <name>`.
 - No UTM bundle is created for macOS guests; they remain Tart-managed.
@@ -92,7 +92,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 
 - VM backend: UTM 4.x QEMU backend.
 - Bundle location: `~/virtual machines/<name>.utm/`
-- Config template: `config.plist` pre-generated at `~/.local/share/nucleus/vms/<name>-config.plist` by `src/hosts/MacBook/vms.nix` at Home Manager activation time; `vm-setup.sh` copies it into the bundle.
+- Config template: `config.plist` pre-generated at `~/.local/share/nucleus/vms/<name>-config.plist` by `src/hosts/MacBook/vms.nix` at Home Manager activation time; `vm.sh setup` copies it into the bundle.
 - Disk pre-created in `Images/disk-main.qcow2` by copying the pre-built image from the images directory.
 - After provisioning, UTM opens each bundle automatically.
 - VirtioFS shared directory: configured via `Sharing.DirectoryShare` in the Nix-generated config.plist.
@@ -105,7 +105,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - VM infrastructure declared in `src/hosts/NixOS/vms.nix` (system module).
 - Package: `qemu_kvm`, `virt-manager`, `virt-viewer`, `virtiofsd` in `environment.systemPackages`.
 - User groups: `kvm` and `libvirtd` added to the managed user via `lib.mkAfter` in `vms.nix`.
-- Domain XML pre-generated at `/etc/nucleus/vms/<name>-domain.xml` by `src/hosts/NixOS/vms.nix` at NixOS activation time; `vm-setup.sh` calls `virsh define` on the pre-generated file (idempotent).
+- Domain XML pre-generated at `/etc/nucleus/vms/<name>-domain.xml` by `src/hosts/NixOS/vms.nix` at NixOS activation time; `vm.sh setup` calls `virsh define` on the pre-generated file (idempotent).
 - VirtioFS shared directory: uses `virtiofsd` daemon; configured in the XML domain definition.
 - SPICE display + clipboard sharing enabled by default.
 - OVMF firmware (UEFI) and swtpm (TPM 2.0) enabled for Windows 11 compatibility.
@@ -122,7 +122,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 
 ## Apply hook
 
-`nucleus-vm-setup` (and the `--vm-setup` flag for `nucleus apply`) is opt-in:
+`nucleus-vm setup` (and the `--vm-setup` flag for `nucleus apply`) is opt-in:
 
 - POSIX: `src/scripts/apply.sh` passes `--vm-setup` to enable; skipped by default.
 - Windows: `src/hosts/Windows/apply.ps1` uses `-VMSetup` switch; skipped by default.
@@ -132,13 +132,13 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 ## Adding a new VM
 
 1. Add an entry to `src/modules/VMs.json` with all required fields.
-2. Run `nucleus-vm-setup` on all three host platforms.
+2. Run `nucleus-vm setup` on all three host platforms.
 3. Add a test in `tests/modules/vm-setup-tests.nix` if the new VM has platform-specific constraints.
 4. Update `src/hosts/<platform>/MANUAL.md` if the VM requires manual steps.
 
 ## VM image building
 
-`nucleus-vm-setup` is a two-phase command. Phase 1 builds QCOW2 OS images (if absent); phase 2 provisions VM bundles/domains from those images.
+`nucleus-vm setup` is a two-phase command. Phase 1 builds QCOW2 OS images (if absent); phase 2 provisions VM bundles/domains from those images.
 
 ### Files
 
@@ -148,8 +148,8 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 | `src/vms/nixos/packer.pkr.hcl`                        | Packer template for NixOS guest on Windows hosts               |
 | `src/vms/windows/packer.pkr.hcl`                      | Packer template for Windows 11 guest on all hosts              |
 | `src/vms/windows/Autounattend.xml`                    | Windows 11 answer file (unattended install, TPM bypass, WinRM) |
-| `scripts/vm-setup.sh`                                 | Unified build+provision script for macOS and NixOS hosts       |
-| `scripts/vm-setup.ps1`                                | Windows wrapper calling `Invoke-VMSetup.ps1`                   |
+| `scripts/vm.sh`                                        | Unified build+provision script for macOS and NixOS hosts       |
+| `scripts/vm.ps1`                                    | Windows wrapper calling `Invoke-VMSetup.ps1`                   |
 | `src/hosts/Windows/modules/system/Invoke-VMSetup.ps1` | Build + provision logic for Windows hosts                      |
 
 ### Build strategies
@@ -166,7 +166,7 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 - Downloads NixOS minimal ISO, boots via QEMU, sets root password, SSH-installs NixOS.
 - `whpx` accelerator strongly recommended (Windows Hypervisor Platform); `tcg` works but is very slow.
 
-**Windows 11 guest (all hosts)** (`nucleus-vm-setup --windows-iso /path/to/Win11.iso`):
+**Windows 11 guest (all hosts)** (`nucleus-vm setup --windows-iso /path/to/Win11.iso`):
 
 - Uses Packer with `src/vms/windows/packer.pkr.hcl` and QEMU builder.
 - Requires a Windows 11 ISO path via `--windows-iso` **or** a `windowsIsoUrl` field in the `VMs.json` windows entry. When `windowsIsoUrl` is set, the ISO is downloaded automatically to `~/virtual machines/images/<name>-installer.iso` on first run (subsequent runs reuse the cache).
@@ -178,7 +178,7 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 
 ### Guest configuration status
 
-Guest configuration is not automatic after first boot. `nucleus-vm-setup` builds images and provisions VM runtimes; apply commands must be run inside each guest.
+Guest configuration is not automatic after first boot. `nucleus-vm setup` builds images and provisions VM runtimes; apply commands must be run inside each guest.
 
 ### Packer requirements
 
