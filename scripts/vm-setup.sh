@@ -28,6 +28,8 @@ windows_headless='true'
 accelerator=''
 gc=false
 accept_gsi_license=false
+upgrade_android=false
+reset_userdata=false
 
 usage() {
   usage_std "$(basename "$0")" "[options]"
@@ -45,6 +47,10 @@ usage() {
   --gc|--no-gc               Remove non-provisioned VM artifacts (default: --no-gc).
   --accept-gsi-license|--no-accept-gsi-license
                              Accept the GSI license for Android GSI downloads (default: --no-accept-gsi-license).
+  --upgrade-android|--no-upgrade-android
+                             Force re-download and replace the Android system image (default: --no-upgrade-android).
+  --reset-userdata|--no-reset-userdata
+                             Reset Android userdata disk (factory reset; default: --no-reset-userdata).
 EOF
 }
 
@@ -71,6 +77,10 @@ while [ "$#" -gt 0 ]; do
     --no-gc)        gc=false ;;
     --accept-gsi-license) accept_gsi_license=true ;;
     --no-accept-gsi-license) accept_gsi_license=false ;;
+    --upgrade-android)  upgrade_android=true ;;
+    --no-upgrade-android) upgrade_android=false ;;
+    --reset-userdata)   reset_userdata=true ;;
+    --no-reset-userdata) reset_userdata=false ;;
     *)
       error "unsupported argument '$1'"
       usage >&2
@@ -239,7 +249,9 @@ vm_setup_init "$REPO_ROOT" "$VM_DIR" "$IMAGES_DIR" "$TEMPLATES_DIR" \
   "$windows_headless" "$accelerator" "$vm_secret_owner" "$vm_guest_username" \
   "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
   "${NUCLEUS_MIDO_PATCH_FILE:-}" "${NUCLEUS_MIDO_SCRIPT:-}" \
-  "$accept_gsi_license"
+  "$accept_gsi_license" \
+  "$upgrade_android" \
+  "$reset_userdata"
 
 # ---------------------------------------------------------------------------
 # Main

@@ -26,6 +26,8 @@ vm_setup_init() {
   NUCLEUS_MIDO_PATCH_FILE="${15}"
   NUCLEUS_MIDO_SCRIPT="${16}"
   accept_gsi_license="${17}"
+  upgrade_android="${18}"
+  reset_userdata="${19}"
 }
 
 # write_vm_directory_readme
@@ -593,8 +595,14 @@ build_android_image() {
   _bai_gsi_img="$IMAGES_DIR/android-gsi.img"
 
   # Step 1: Download and extract LineageOS base system image
-  if [ ! -f "$_bai_system_img" ]; then
-    say "downloading LineageOS base image for '$_bai_vm_name'..."
+  # shellcheck disable=SC2154 # reason: upgrade_android is set by vm-setup.sh caller (Phase 8)
+  if [ ! -f "$_bai_system_img" ] || [ "$upgrade_android" = "true" ]; then
+    if [ "$upgrade_android" = "true" ] && [ -f "$_bai_system_img" ]; then
+      say "upgrading Android system image for '$_bai_vm_name' (re-downloading)..."
+      rm -f "$_bai_system_img"
+    else
+      say "downloading LineageOS base image for '$_bai_vm_name'..."
+    fi
     run_with_backoff "download LineageOS release metadata" \
       curl -fsSL -o "$IMAGES_DIR/android-lineage-release.json" \
       "https://api.github.com/repos/jqssun/android-lineage-qemu/releases/latest" \
@@ -625,8 +633,13 @@ build_android_image() {
     say "system image already exists: $_bai_system_img"
   fi
 
-  # Step 2: Create userdata disk (skip if exists)
-  if [ ! -f "$_bai_userdata_img" ]; then
+  # Step 2: Create userdata disk (skip if exists, unless reset requested)
+  # shellcheck disable=SC2154 # reason: reset_userdata is set by vm-setup.sh caller (Phase 8)
+  if [ ! -f "$_bai_userdata_img" ] || [ "$reset_userdata" = "true" ]; then
+    if [ "$reset_userdata" = "true" ] && [ -f "$_bai_userdata_img" ]; then
+      say "resetting Android userdata disk..."
+      rm -f "$_bai_userdata_img"
+    fi
     say "creating userdata disk (8 GiB)..."
     run_cmd qemu-img create -f qcow2 "$_bai_userdata_img" 8G
     validate_qcow2_image "$_bai_userdata_img" "Android userdata disk for $_bai_vm_name" || return 1
