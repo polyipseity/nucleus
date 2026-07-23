@@ -67,10 +67,15 @@ in
   # writeBoundary defaults application.
   managedPreferencesGcScript = pkgs.writeNucleusShellApplication {
     name = "gc-managed-user-preferences";
-    text = ''
-      NIX_STORE_BIN="${pkgs.nix}/bin/nix" \
-        MANAGED_PREF_DOMAINS="${builtins.concatStringsSep " " resetUserPreferenceDomains}" \
-        exec '${../../scripts/hosts/MacBook/macos-gc-preferences.sh}' "$@"
-    '';
+    runtimeInputs = [ pkgs.nix ];
+    # extraEnv because the underlying script body expects env vars: it is also
+    # sourced by gc-managed-preferences.sh (which sets the same vars with POSIX
+    # shell defaults).  Positional args would require the shared body to handle
+    # both $1 and env-var fallbacks, gaining nothing.
+    extraEnv = {
+      NIX_STORE_BIN = "${pkgs.nix}/bin/nix";
+      MANAGED_PREF_DOMAINS = builtins.concatStringsSep " " resetUserPreferenceDomains;
+    };
+    scriptName = "hosts/MacBook/macos-gc-preferences";
   };
 }
