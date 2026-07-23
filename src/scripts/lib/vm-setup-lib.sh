@@ -25,6 +25,7 @@ vm_setup_init() {
   vm_guest_credentials_fingerprint="${14}"
   NUCLEUS_MIDO_PATCH_FILE="${15}"
   NUCLEUS_MIDO_SCRIPT="${16}"
+  accept_gsi_license="${17}"
 }
 
 # write_vm_directory_readme

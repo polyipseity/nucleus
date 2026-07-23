@@ -27,6 +27,7 @@ windows_iso_retries='0'
 windows_headless='true'
 accelerator=''
 gc=false
+accept_gsi_license=false
 
 usage() {
   usage_std "$(basename "$0")" "[options]"
@@ -42,6 +43,8 @@ usage() {
   --headful|--no-headful     Run guest builds with visible GUI (--headful) or headless (--no-headful, default: on).
   --vm-dir-override PATH     Override the default ~/virtual machines path.
   --gc|--no-gc               Remove non-provisioned VM artifacts (default: --no-gc).
+  --accept-gsi-license|--no-accept-gsi-license
+                             Accept the GSI license for Android GSI downloads (default: --no-accept-gsi-license).
 EOF
 }
 
@@ -66,6 +69,8 @@ while [ "$#" -gt 0 ]; do
     --accelerator)  accelerator="$2"; shift ;;
     --gc)           gc=true ;;
     --no-gc)        gc=false ;;
+    --accept-gsi-license) accept_gsi_license=true ;;
+    --no-accept-gsi-license) accept_gsi_license=false ;;
     *)
       error "unsupported argument '$1'"
       usage >&2
@@ -233,7 +238,8 @@ vm_setup_init "$REPO_ROOT" "$VM_DIR" "$IMAGES_DIR" "$TEMPLATES_DIR" \
   "$dry_run" "$windows_iso" "$windows_iso_source" "$windows_iso_retries" \
   "$windows_headless" "$accelerator" "$vm_secret_owner" "$vm_guest_username" \
   "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
-  "${NUCLEUS_MIDO_PATCH_FILE:-}" "${NUCLEUS_MIDO_SCRIPT:-}"
+  "${NUCLEUS_MIDO_PATCH_FILE:-}" "${NUCLEUS_MIDO_SCRIPT:-}" \
+  "$accept_gsi_license"
 
 # ---------------------------------------------------------------------------
 # Main

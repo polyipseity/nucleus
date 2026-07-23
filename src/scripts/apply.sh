@@ -168,7 +168,7 @@ run_vm_setup() {
   fi
 
   printf '%s\n' "vm-setup: running post-apply VM provisioning..."
-  if ! nucleus-vm-setup; then
+  if ! nucleus-vm-setup --accept-gsi-license; then
     printf '%s\n' "vm-setup: nucleus-vm-setup exited with an error; VM setup incomplete (system apply succeeded)" >&2
   fi
 }
