@@ -1887,6 +1887,32 @@ setup_libvirt_vms() {
   say "NixOS VM setup complete; use the generated start-<name> helpers (or virt-manager) to start VMs"
 }
 
+# Windows / QEMU
+
+# setup_windows_qemu_vm — Callback for for_each_vm on Windows. Writes a QEMU
+#   start script for Android VMs on the Windows host.
+setup_windows_qemu_vm() {
+  local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
+  local vm_display
+
+  vm_display=$(jq -r ".VMs[$vm_index].display" "$MANIFEST")
+
+  case "$vm_type" in
+    Android)
+      say "configuring QEMU start script for '$vm_display' on Windows..."
+      write_start_script "$vm_name" "$vm_display" "$vm_type" 'windows-qemu'
+      ;;
+    *)
+      say "skipping script generation for '$vm_display' on Windows (type $vm_type not supported via QEMU)"
+      ;;
+  esac
+}
+
+setup_windows_qemu_vms() {
+  for_each_vm setup_windows_qemu_vm
+  say "Windows VM setup complete; use the generated start-<name> scripts to start VMs"
+}
+
 # Garbage collection for non-provisioned VM artifacts
 
 # gc_vms — Top-level GC dispatcher.  Called from the vm-setup.sh main flow

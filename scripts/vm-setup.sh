@@ -300,6 +300,9 @@ case "$_os" in
       say "unsupported Linux host outside NixOS; no provisioning actions executed"
     fi
     ;;
+  MINGW*|MSYS*|CYGWIN*)
+    setup_windows_qemu_vms
+    ;;
   *)
     say "unsupported OS '$_os'; nothing to do"
     ;;
