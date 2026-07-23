@@ -19,8 +19,9 @@
 #     PDF presets grouped as a block sorted quality-descending (default →
 #     prepress → printer → ebook → screen). This is the cross-platform
 #     convention (same on NixOS and Windows).
-{ lib, ... }:
+{ lib, pkgs, ... }:
 let
+  activationBundle = pkgs.callPackage ../../modules/lib/activation-bundle.nix { };
   # Generate a plist <dict> from an attribute set of booleans.
   # Used to build NSServicesStatus presentation_modes values.
   mkPresentationModes =
@@ -46,12 +47,11 @@ in
   home.activation.deployNucleusServicesFlush =
     lib.hm.dag.entryAfter [ "deployNucleusAutomatorWorkflows" "macos-app-bundle-lib" ]
       ''
-          # ── Phase 4: Flush daemon caches so changes take effect immediately ─
-          # Without these restarts, cfprefsd and pbs hold stale cached state in
-          # process memory. Finder is intentionally excluded here —
-          # relaunchDesktopServices (DAG-ordered after writeBoundary) restarts it
-          # via launchctl kickstart to preserve window state.
-          ${builtins.readFile ../../scripts/lib/macos-launch-services-lib.sh}
-        refresh_services_menu
+        # ── Phase 4: Flush daemon caches so changes take effect immediately ─
+        # Without these restarts, cfprefsd and pbs hold stale cached state in
+        # process memory. Finder is intentionally excluded here —
+        # relaunchDesktopServices (DAG-ordered after writeBoundary) restarts it
+        # via launchctl kickstart to preserve window state.
+        "${activationBundle}/services/refresh-services-menu.sh"
       '';
 }
