@@ -79,7 +79,7 @@ test_has_documentation() {
     if [[ $comment_ratio -ge 15 ]]; then
         assert_pass "Documentation present: $(basename "$script") ($comment_ratio% comments)"
     else
-        echo -e "${YELLOW}⚠${NC}  Low documentation: $(basename "$script") ($comment_ratio% comments, recommend ≥15%)"
+        echo -e "ℹ  Low documentation: $(basename "$script") ($comment_ratio% comments, recommend ≥15%): informational"
     fi
 }
 
@@ -92,13 +92,13 @@ test_no_dangerous_patterns() {
     # shellcheck disable=SC2016 # reason: $ chars are literal regex metacharacters, not shell expansions.
     if grep -E '\$[A-Za-z_][A-Za-z0-9_]*\s+(&&|;|\||>)' "$script" | grep -v '\$([^)]*' | grep -v '${' >/dev/null 2>&1; then
         dangerous=$((dangerous + 1))
-        echo -e "${YELLOW}⚠${NC}  Potential unquoted variable: $(basename "$script")"
+        assert_fail "Potential unquoted variable: $(basename "$script")" "Found unquoted variable in dangerous context (&&, ;, |, >)"
     fi
 
     # Check for rm -rf without safeguards (-- after rm -rf is accepted as a separator guard)
     if grep -E 'rm\s+-rf' "$script" | grep -v 'HOME\|TMPDIR\|/tmp\|--' >/dev/null 2>&1; then
         dangerous=$((dangerous + 1))
-        echo -e "${YELLOW}⚠${NC}  Potentially unsafe rm -rf: $(basename "$script")"
+        assert_fail "Potentially unsafe rm -rf: $(basename "$script")" "Found rm -rf without HOME/TMPDIR/tmp/-- guard"
     fi
 
     if [[ $dangerous -eq 0 ]]; then
