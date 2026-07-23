@@ -175,25 +175,14 @@ let
 
   # fdaWarningFunction extracted to src/scripts/lib/macos-fda-warning-lib.sh
 
-  # Standalone script for the daily icloud-exclusions LaunchAgent.
-  # Uses bash (from the Nix store) rather than /bin/sh because the array-based
-  # find-predicate builder and process substitution (< <(...)) require bash
-  # semantics that macOS /bin/sh (zsh in POSIX mode) does not provide.
-  # Logic mirrors configureICloudExclusions so both paths stay in sync.
-  # Source: https://developer.apple.com/documentation/fileprovider
-  # Standalone launchd script: embeds the clean function definition (no Nix
-  # placeholders, no env-var deps) and calls apply_exclusions with arguments.
-  # builtins.readFile here embeds a pure function definition, not a token-filled
-  # script, so the lib-file policy (no token substitution in lib content) holds.
-  icloudExclusionsScript = pkgs.writeTextFile {
+  # Daily launchd agent script for iCloud exclusion convergence.
+  # Uses scriptName mode with runtime SCRIPT_DIR sourcing of the shared lib.
+  # All values passed as positional args via ProgramArguments so the script
+  # has no hardcoded paths or env-var dependencies.
+  icloudExclusionsScript = pkgs.writeNucleusShellApplication {
     name = "icloud-exclusions";
-    executable = true;
-    text = ''
-      #!${pkgs.bash}/bin/bash
-      set -eu
-      ${builtins.readFile ../scripts/lib/macos-icloud-exclusions-lib.sh}
-      apply_exclusions "${pkgs.jq}/bin/jq" "${pkgs.findutils}/bin/find" ${lib.escapeShellArg icloudExcludedDirsJson} ${lib.escapeShellArg icloudManagedRootsJson}
-    '';
+    runtimeInputs = [ ]; # tools resolved by absolute paths passed as args
+    scriptName = "services/icloud-exclusions";
   };
 
   betterdisplayHeartbeat = pkgs.writeNucleusShellApplication {
@@ -720,7 +709,13 @@ lib.mkIf pkgs.stdenv.isDarwin {
     enable = true;
     config = {
       Label = "local.icloud-exclusions";
-      ProgramArguments = [ "${icloudExclusionsScript}" ];
+      ProgramArguments = [
+        "${icloudExclusionsScript}/bin/nucleus-icloud-exclusions"
+        "${pkgs.jq}/bin/jq"
+        "${pkgs.findutils}/bin/find"
+        icloudExcludedDirsJson
+        icloudManagedRootsJson
+      ];
       # Do not run on every agent reload during apply/bootstrap apply; the
       # activation hook (configureICloudExclusions) runs synchronously during
       # apply and covers the immediate case.  The hourly timer handles drift
