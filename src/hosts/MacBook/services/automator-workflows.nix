@@ -201,14 +201,13 @@ let
   ];
   activationBundle = pkgs.callPackage ../../../modules/lib/activation-bundle.nix { };
 
-  # Nix-built open-manual script that takes the manual path as positional arg.
+  # Nix-built open-manual script with the manual path baked in.
   openManualScript = pkgs.writeNucleusShellApplication {
     name = "open-manual";
     runtimeInputs = [ ];
-    extraEnv = {
-      NUCLEUS_MANUAL_PATH = "${repoRoot}/src/hosts/MacBook/MANUAL.md";
-    };
-    scriptName = "integrations/open-host-manual";
+    text = ''
+      exec xdg-open "${repoRoot}/src/hosts/MacBook/MANUAL.md"
+    '';
   };
 in
 {

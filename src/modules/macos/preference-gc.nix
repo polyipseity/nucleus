@@ -68,8 +68,11 @@ in
   managedPreferencesGcScript = pkgs.writeNucleusShellApplication {
     name = "gc-managed-user-preferences";
     runtimeInputs = [ pkgs.nix ];
-    extraEnv = {
-      MANAGED_PREF_DOMAINS = builtins.concatStringsSep " " resetUserPreferenceDomains;
-    };
+    text = ''
+      NIX_STORE_BIN="${pkgs.nix}/bin/nix"
+      MANAGED_PREF_DOMAINS="${builtins.concatStringsSep " " resetUserPreferenceDomains}"
+
+    ''
+    + builtins.readFile ../../scripts/hosts/MacBook/macos-gc-preferences.sh;
   };
 }
