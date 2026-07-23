@@ -489,8 +489,8 @@ let
   # vm-setup must resize NixOS images to manifest disk size so provisioning
   # logic does not reject the pre-built image for being too small.
   test_nixos_image_resize_to_manifest_disk = assert' (
-    (lib.hasInfix "build_nixos_image NAME DISK_GIB" vm_setup_sh_text)
-    && (lib.hasInfix "resize_and_mark_image \"$_out\" \"$_marker\" \"$_disk_gib\"" vm_setup_sh_text)
+    (lib.hasInfix "vm_build_nixos NAME DISK_GIB" vm_setup_sh_text)
+    && (lib.hasInfix "if ! resize_and_mark_image \"$_out\" \"$_marker\" \"$_disk_gib\"; then" vm_setup_sh_text)
   ) "scripts/vm.sh must resize generated NixOS qcow2 images to the manifest disk size";
 
   # The Packer failure branch for the macOS build must print a human-readable
