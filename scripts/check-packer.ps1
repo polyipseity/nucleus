@@ -64,6 +64,22 @@ if ($Paths.Count -gt 0) {
 # ---------------------------------------------------------------------------
 # Phase 2: Template validation
 # ---------------------------------------------------------------------------
+
+# Read NixOS ISO digest from lockfile for the current architecture.
+$lockfilePath = Join-Path -Path $repoRoot -ChildPath 'src/lockfiles/lockfile.json'
+$lockfileData = Get-Content -Path $lockfilePath -Raw | ConvertFrom-Json -AsHashtable
+$nixArch = if ([Environment]::Is64BitOperatingSystem) {
+  $arch = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'aarch64' } else { 'x86_64' }
+  "$arch-linux"
+} else {
+  'x86_64-linux'
+}
+$nixosDigest = if ($lockfileData['vm-setup']['nixos-iso'].$nixArch) {
+  $lockfileData['vm-setup']['nixos-iso'].$nixArch.digest
+} else {
+  'none'
+}
+
 function Test-PackerDir {
   param([string]$Dir)
   Write-Output "Validating $Dir..."
@@ -75,7 +91,7 @@ function Test-PackerDir {
     }
     # Required -var flags depend on the template directory
     $varArgs = switch -Wildcard ($Dir) {
-      '*nixos'   { @('guest_username=dummy', 'guest_password=dummy', 'nixos_iso_url=https://dummy.iso', 'nixos_iso_checksum=none') }
+      '*nixos'   { @('guest_username=dummy', 'guest_password=dummy', 'nixos_iso_url=https://dummy.iso', "nixos_iso_checksum=$nixosDigest") }
       '*windows' { @('windows_iso=dummy.iso') }
       '*macos'   { @('macos_version=14.0', 'vm_name=dummy', 'cpus=2', 'memory_gib=4', 'disk_size_gib=40', 'guest_username=dummy', 'guest_password=dummy', 'ssh_username=dummy', 'ssh_password=dummy', 'tart_image_ref=dummy') }
       default    { @() }

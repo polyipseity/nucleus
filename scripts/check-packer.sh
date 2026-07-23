@@ -40,6 +40,22 @@ while [ "$#" -gt 0 ]; do
 done
 
 require_command packer
+require_command jq
+
+# Determine system architecture for reading the NixOS ISO checksum from lockfile.
+# Lockfile uses nixpkgo-style arch names: x86_64-linux, aarch64-linux.
+_arch="$(uname -m)"
+case "$_arch" in
+  x86_64) _nix_arch="x86_64-linux" ;;
+  arm64|aarch64) _nix_arch="aarch64-linux" ;;
+  *)
+    error "unsupported architecture '$_arch' for NixOS ISO checksum lookup"
+    exit 1
+    ;;
+esac
+
+# Read NixOS ISO digest from lockfile for the current arch.
+_nixos_digest="$(jq -r --arg arch "$_nix_arch" '(.vm-setup.nixos-iso // {})[$arch].digest // "none"' "$REPO_ROOT/src/lockfiles/lockfile.json")"
 
 # Check formatting
 if [ "$#" -gt 0 ]; then
@@ -57,7 +73,7 @@ validate_dir() {
   local vars=()
   case "$dir" in
     *nixos)
-      vars=(-var guest_username=dummy -var guest_password=dummy -var nixos_iso_url=https://dummy.iso -var nixos_iso_checksum=none)
+      vars=(-var guest_username=dummy -var guest_password=dummy -var nixos_iso_url=https://dummy.iso -var "nixos_iso_checksum=$_nixos_digest")
       ;;
     *windows)
       vars=(-var windows_iso=dummy.iso)
