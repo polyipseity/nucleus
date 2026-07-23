@@ -225,7 +225,7 @@ source "qemu" "windows11" {
   net_device = "e1000"
 
   iso_url      = var.windows_iso
-  iso_checksum = var.windows_iso_checksum
+  iso_checksum = var.windows_iso_checksum # check-suppress:packer_validate: Windows ISO checksum varies by release; no stable value.
 
   # Autounattend.xml on floppy (A:\) — Windows Setup reads it automatically.
   floppy_files = [
