@@ -76,6 +76,7 @@ while ($_dirIndex -lt $_directories.Count) {
 
   # Enqueue subdirectories, skipping reparse points (symlinks/junctions)
   # to avoid following symlinks into Nix store or other large trees.
+  # check-suppress:suppression_doc: -ErrorAction SilentlyContinue on Get-ChildItem to skip permission-denied directories without aborting traversal.
   Get-ChildItem -Path $_dir -Directory -Force -ErrorAction SilentlyContinue |
     Where-Object { -not ($_.Attributes -band [System.IO.FileAttributes]::ReparsePoint) } |
     ForEach-Object { $_directories += $_.FullName }

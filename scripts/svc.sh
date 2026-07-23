@@ -825,8 +825,12 @@ show_file_logs() {
   [ -z "$files" ] && return 1
   local sanitize_cmd="log_sanitize"
   "$raw" && sanitize_cmd="cat"
-  # shellcheck disable=SC2086 # reason: $files is a space-separated list from service_log_files, word splitting intentional
-  tail -n "$lines" $files | "$sanitize_cmd"
+  # Use array to pass multiple log files to tail without unquoted variable.
+  local -a files_arr=()
+  while IFS= read -r _file; do
+    files_arr+=("$_file")
+  done <<< "$files"
+  tail -n "$lines" "${files_arr[@]}" | "$sanitize_cmd"
 }
 
 # Show journald logs for a service (NixOS only).
