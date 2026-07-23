@@ -272,7 +272,14 @@ $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Dead Nix code detection
 section "$((_step += 1))" "Dead Nix code"
-if ! $HAS_ARGS; then
+if [ ${#NIX_FILES[@]} -gt 0 ]; then
+  if ! deadnix --fail "${NIX_FILES[@]}"; then
+    exit_code=$?
+  else
+    say "no dead Nix code found."
+  fi
+  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+elif ! $HAS_ARGS; then
   if ! deadnix --fail src/; then
     exit_code=$?
   else
@@ -283,19 +290,15 @@ else
   say "skipping deadnix (path-scoped mode)."
 fi
 
-# Nix flake evaluation
+# Always-run: Nix flake evaluation
 section "$((_step += 1))" "Nix flake evaluation"
-if ! $HAS_ARGS; then
-  sys=$(nix eval --impure --expr 'builtins.currentSystem' --raw 2>/dev/null || echo 'aarch64-darwin')
-  if ! nix eval --impure "path:./src#packages.$sys" >/dev/null; then
-    exit_code=$?
-  else
-    say "nix flake evaluation passed."
-  fi
-  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+sys=$(nix eval --impure --expr 'builtins.currentSystem' --raw 2>/dev/null || echo 'aarch64-darwin')
+if ! nix eval --impure "path:./src#packages.$sys" >/dev/null; then
+  exit_code=$?
 else
-  say "skipping nix flake check (path-scoped mode)."
+  say "nix flake evaluation passed."
 fi
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Nix formatting check
 section "$((_step += 1))" "Nix formatting (nixfmt)"
@@ -362,59 +365,39 @@ else
 fi
 $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Stale Nix build artifact check
+# Always-run: Stale Nix build artifact check
 section "$((_step += 1))" "Stale Nix build artifact check"
-if ! $HAS_ARGS; then
-  _cnba_output="$("$SCRIPT_DIR/cleanup-nix.sh" --dry-run 2>&1)"
-  if echo "$_cnba_output" | grep -q "would remove stale Nix build symlink"; then
-    warn "stale Nix build artifacts found:"
-    echo "$_cnba_output" | while IFS= read -r _cnba_line; do
-      warn "  $_cnba_line"
-    done
-    exit_code=1
-  else
-    say "no stale Nix build artifacts found."
-  fi
-  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
+_cnba_output="$("$SCRIPT_DIR/cleanup-nix.sh" --dry-run 2>&1)"
+if echo "$_cnba_output" | grep -q "would remove stale Nix build symlink"; then
+  warn "stale Nix build artifacts found:"
+  echo "$_cnba_output" | while IFS= read -r _cnba_line; do
+    warn "  $_cnba_line"
+  done
+  exit_code=1
 else
-  say "skipping (path-scoped mode)."
+  say "no stale Nix build artifacts found."
 fi
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Shell script validation tests
+# Always-run: Shell script validation tests
 section "$((_step += 1))" "Shell script validation tests"
-if ! $HAS_ARGS; then
-  bash tests/scripts/script-validation-tests.sh || exit_code=$?
-  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
-else
-  say "skipping validation tests (path-scoped mode)."
-fi
+bash tests/scripts/script-validation-tests.sh || exit_code=$?
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
-# CWD-independence tests
+# Always-run: CWD-independence tests
 section "$((_step += 1))" "CWD-independence tests"
-if ! $HAS_ARGS; then
-  bash tests/scripts/cwd-independence-tests.sh || exit_code=$?
-  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
-else
-  say "skipping cwd-independence tests (path-scoped mode)."
-fi
+bash tests/scripts/cwd-independence-tests.sh || exit_code=$?
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Nix search path regression tests
+# Always-run: Nix search path tests
 section "$((_step += 1))" "Nix search path tests"
-if ! $HAS_ARGS; then
-  bash tests/scripts/nix-search-path-tests.sh || exit_code=$?
-  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
-else
-  say "skipping nix-search-path tests (path-scoped mode)."
-fi
+bash tests/scripts/nix-search-path-tests.sh || exit_code=$?
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Port utility function tests
+# Always-run: Port utility function tests
 section "$((_step += 1))" "Port utility function tests"
-if ! $HAS_ARGS; then
-  bash tests/scripts/lib-port-functions-tests.sh || exit_code=$?
-  $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
-else
-  say "skipping port utility function tests (path-scoped mode)."
-fi
+bash tests/scripts/lib-port-functions-tests.sh || exit_code=$?
+$FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
 # Lockfile validation
 section "$((_step += 1))" "Lockfile validation"
@@ -492,8 +475,8 @@ else
   say "lifecycle-allowlist.json: valid (entry count: $_lf_al_count)"
 fi
 
-if ! $HAS_ARGS; then
-  if [ -f "$_lfpath" ]; then
+# Always-run: Lockfile section validation
+if [ -f "$_lfpath" ]; then
     _lf_errors=0
 
     # Helper: check a section is non-null, non-empty, and has no placeholder values.
@@ -580,15 +563,11 @@ if ! $HAS_ARGS; then
     exit_code=1
     $FAIL_FAST && exit $exit_code
   fi
-else
-  say "skipping lockfile validation (path-scoped mode)."
-fi
 
-# Locked DSC validation
+# Always-run: Locked DSC validation
 section "$((_step += 1))" "Locked DSC validation"
 # Platform parallel: check.ps1 uses powershell-yaml with normalization helpers (Windows-native equivalent).
-if ! $HAS_ARGS; then
-  _dsc_system_dir="src/hosts/Windows/system"
+_dsc_system_dir="src/hosts/Windows/system"
   _lockfile="src/lockfiles/lockfile.json"
   _lf_errors=0
 
@@ -633,15 +612,38 @@ if ! $HAS_ARGS; then
     $FAIL_FAST && exit $exit_code
   fi
   say "locked DSC validation passed"
-else
-  say "skipping locked DSC validation (path-scoped mode)."
-fi
 
-# Schema validation (JSON/YAML)
+# Schema validation (JSON/YAML) — path-scopable
 section "$((_step += 1))" "Schema validation (JSON/YAML)"
 _jsonschema_errors=0
 if $HAS_ARGS; then
-  say "skipping schema validation (path-scoped mode)."
+  # Validate only explicitly provided files
+  for _sf in "$@"; do
+    case "$_sf" in
+      *.json)
+        _schema=$(jq -r 'if type == "object" then .["$schema"] // "" else "" end' "$_sf" 2>/dev/null)
+        if [ -n "$_schema" ]; then
+          case "$_schema" in
+            http://*|https://*) continue ;;
+            ./*|../*) _schemafile="$(cd "$(dirname "$_sf")" && echo "$(pwd)/${_schema#./}")" ;;
+            *)        _schemafile="$_schema" ;;
+          esac
+          check-jsonschema --schemafile "$_schemafile" "$_sf" 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+        fi
+        ;;
+      *.yml|*.yaml)
+        # shellcheck disable=SC2016 # reason: .$schema is a yq expression, not shell variable expansion
+        _schema=$(yq eval '.$schema // ""' "$_sf" 2>/dev/null)
+        if [ -n "$_schema" ]; then
+          case "$_schema" in
+            ./*|../*) _schemafile="$(cd "$(dirname "$_sf")" && echo "$(pwd)/${_schema#./}")" ;;
+            *)        _schemafile="$_schema" ;;
+          esac
+          check-jsonschema --schemafile "$_schemafile" "$_sf" 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+        fi
+        ;;
+    esac
+  done
 else
   # JSON files with inline $schema — auto-discover and validate
   while IFS= read -r -d '' _json_file; do
@@ -667,10 +669,10 @@ else
       check-jsonschema --schemafile "$_schemafile" "$_yaml_file" 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
     fi
   done < <(find . -not -path '*/vendor/*' -not -path '*/secrets/*' \( -name '*.yml' -o -name '*.yaml' \) -print0)
-  # GitHub schema validation (complements existing prek hooks — CI enforcement)
-  check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-  check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
 fi
+# GitHub schema validation (complements existing prek hooks — CI enforcement) — always-run
+check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
 if [ "$_jsonschema_errors" -gt 0 ]; then
   warn "schema validation failed with $_jsonschema_errors error(s)"
   exit_code=1
@@ -679,9 +681,8 @@ fi
 say "schema validation passed."
 $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Service registry validation
+# Always-run: Service registry validation
 section "$((_step += 1))" "Service registry validation"
-if ! $HAS_ARGS; then
   _svc_json="src/modules/services.json"
   _svc_errors=0
 
@@ -809,9 +810,6 @@ if ! $HAS_ARGS; then
     $FAIL_FAST && exit $exit_code
   fi
   say "services.json validation passed"
-else
-  say "skipping service registry validation (path-scoped mode)."
-fi
 
 # YAML validation
 section "$((_step += 1))" "YAML validation"
@@ -874,38 +872,34 @@ fi
 say "YAML linting passed."
 $FAIL_FAST && [ $exit_code -ne 0 ] && exit $exit_code
 
-# Package manager usage enforcement
+# Always-run: Package manager usage enforcement
 section "$((_step += 1))" "Package manager usage enforcement"
 # Ban bare `pip install` and `npm install` — these bypass the lockfile and
 # produce non-reproducible environments.  `uv pip install` is allowed (uv
 # respects the lockfile).  Exclude self-references and help-text mentions.
-if ! $HAS_ARGS; then
-  _violations=0
-  if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
-       --exclude='check.sh' --exclude='check.ps1' --exclude='shell.nix' \
-       -E '(^|[^a-z])pip install([^-]|$)' \
-       scripts/ src/ tests/ 2>/dev/null \
-       | grep -v 'uv pip install' \
-       | grep . >/dev/null 2>&1; then
-    warn "bare pip install detected (use uv pip install instead)"
-    _violations=$((_violations + 1))
-  fi
-  if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
-       --exclude='check.sh' --exclude='check.ps1' --exclude='shell.nix' \
-       -E '(^|[^a-z])npm install([^-]|$)' \
-       scripts/ src/ tests/ 2>/dev/null \
-       | grep . >/dev/null 2>&1; then
-    warn "bare npm install detected (use bun or nix instead)"
-    _violations=$((_violations + 1))
-  fi
-  if [ "$_violations" -gt 0 ]; then
-    exit_code=1
-    $FAIL_FAST && exit $exit_code
-  fi
-  say "no package manager violations found."
-else
-  say "skipping (path-scoped mode)."
+_violations=0
+if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
+     --exclude='check.sh' --exclude='check.ps1' --exclude='shell.nix' \
+     -E '(^|[^a-z])pip install([^-]|$)' \
+     scripts/ src/ tests/ 2>/dev/null \
+     | grep -v 'uv pip install' \
+     | grep . >/dev/null 2>&1; then
+  warn "bare pip install detected (use uv pip install instead)"
+  _violations=$((_violations + 1))
 fi
+if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
+     --exclude='check.sh' --exclude='check.ps1' --exclude='shell.nix' \
+     -E '(^|[^a-z])npm install([^-]|$)' \
+     scripts/ src/ tests/ 2>/dev/null \
+     | grep . >/dev/null 2>&1; then
+  warn "bare npm install detected (use bun or nix instead)"
+  _violations=$((_violations + 1))
+fi
+if [ "$_violations" -gt 0 ]; then
+  exit_code=1
+  $FAIL_FAST && exit $exit_code
+fi
+say "no package manager violations found."
 
 # Undocumented error suppression check
 section "$((_step += 1))" "Undocumented error suppression"
@@ -973,59 +967,55 @@ else
   say "skipping (use --verify to run online determinism checks)."
 fi
 
-# Config method compliance
+# Always-run: Config method compliance
 section "$((_step += 1))" "Config method compliance"
 _cfg_dir="src/modules/configs"
 _cfg_errors=0
-if ! $HAS_ARGS; then
-  while IFS= read -r -d '' _cfg_file; do
-    _basename=$(basename "$_cfg_file")
-    # Skip infrastructure files and Nix modules inside configs/
-    case "$_basename" in
-      .gitkeep|.gitignore|*.schema.json|qtpass.nix) continue ;;
-    esac
-    # Skip agent customization files (consumed as a directory via Method 4)
-    case "$_cfg_file" in
-      src/modules/configs/agents/*) continue ;;
-    esac
-    _relpath="${_cfg_file#src/modules/configs/}"
-    # Search using relative path first (avoids false matches on generic names like config.toml)
+while IFS= read -r -d '' _cfg_file; do
+  _basename=$(basename "$_cfg_file")
+  # Skip infrastructure files and Nix modules inside configs/
+  case "$_basename" in
+    .gitkeep|.gitignore|*.schema.json|qtpass.nix) continue ;;
+  esac
+  # Skip agent customization files (consumed as a directory via Method 4)
+  case "$_cfg_file" in
+    src/modules/configs/agents/*) continue ;;
+  esac
+  _relpath="${_cfg_file#src/modules/configs/}"
+  # Search using relative path first (avoids false matches on generic names like config.toml)
+  _refs_output=$(grep -rn --include='*.nix' --include='*.ps1' --include='*.sh' \
+    -F "$_relpath" \
+    src/ --exclude-dir='vendor' --exclude-dir='configs' \
+    2>/dev/null || true)  # undoc-supp: grep returns non-zero when no matches — valid case (no references).
+  if [ -z "$_refs_output" ]; then
     _refs_output=$(grep -rn --include='*.nix' --include='*.ps1' --include='*.sh' \
-      -F "$_relpath" \
+      -F "$_basename" \
       src/ --exclude-dir='vendor' --exclude-dir='configs' \
-      2>/dev/null || true)  # undoc-supp: grep returns non-zero when no matches — valid case (no references).
-    if [ -z "$_refs_output" ]; then
-      _refs_output=$(grep -rn --include='*.nix' --include='*.ps1' --include='*.sh' \
-        -F "$_basename" \
-        src/ --exclude-dir='vendor' --exclude-dir='configs' \
-        2>/dev/null || true)  # undoc-supp: same rationale as relative-path search above.
-    fi
-    _refs_lines=0
+      2>/dev/null || true)  # undoc-supp: same rationale as relative-path search above.
+  fi
+  _refs_lines=0
+  _method_lines=0
+  if [ -n "$_refs_output" ]; then
+    _refs_lines=$(echo "$_refs_output" | wc -l | tr -d ' ')
+    # Count lines with # Method on the matched line or preceding line
     _method_lines=0
-    if [ -n "$_refs_output" ]; then
-      _refs_lines=$(echo "$_refs_output" | wc -l | tr -d ' ')
-      # Count lines with # Method on the matched line or preceding line
-      _method_lines=0
-      while IFS=: read -r _f _ln _rest; do
-        if echo "$_rest" | grep -q '# Method'; then
-          _method_lines=$((_method_lines + 1))
-        elif [ "$_ln" -gt 1 ]; then
-          sed -n "$((_ln - 1))p" "$_f" | grep -q '# Method' && _method_lines=$((_method_lines + 1))
-        fi
-      # undoc-supp: here-string with empty/malformed output should not abort the check.
-      done <<< "$_refs_output" 2>/dev/null || true
-    fi
-    if [ "$_refs_lines" -eq 0 ]; then
-      warn "$_relpath: no references found in src/ (excluding configs/) — orphaned config?"
-      _cfg_errors=$((_cfg_errors + 1))
-    elif [ "$_method_lines" -eq 0 ]; then
-      warn "$_relpath: referenced but no '# Method N' comment found on or before reference lines"
-      _cfg_errors=$((_cfg_errors + 1))
-    fi
-  done < <(find "$_cfg_dir" -type f -print0)
-else
-  say "skipping (path-scoped mode)."
-fi
+    while IFS=: read -r _f _ln _rest; do
+      if echo "$_rest" | grep -q '# Method'; then
+        _method_lines=$((_method_lines + 1))
+      elif [ "$_ln" -gt 1 ]; then
+        sed -n "$((_ln - 1))p" "$_f" | grep -q '# Method' && _method_lines=$((_method_lines + 1))
+      fi
+    # undoc-supp: here-string with empty/malformed output should not abort the check.
+    done <<< "$_refs_output" 2>/dev/null || true
+  fi
+  if [ "$_refs_lines" -eq 0 ]; then
+    warn "$_relpath: no references found in src/ (excluding configs/) — orphaned config?"
+    _cfg_errors=$((_cfg_errors + 1))
+  elif [ "$_method_lines" -eq 0 ]; then
+    warn "$_relpath: referenced but no '# Method N' comment found on or before reference lines"
+    _cfg_errors=$((_cfg_errors + 1))
+  fi
+done < <(find "$_cfg_dir" -type f -print0)
 if [ "$_cfg_errors" -gt 0 ]; then
   warn "config method compliance check failed with $_cfg_errors error(s)"
   exit_code=1

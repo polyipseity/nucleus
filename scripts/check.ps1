@@ -244,8 +244,8 @@ say "skipping (requires Nix toolchain — not available on Windows)."
 # 8. Stale Nix build artifact check
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Stale Nix build artifact check ===" -f (++$_step))
-if (-not $HAS_ARGS) {
-  $_cnbaOutput = & "$PSScriptRoot\cleanup-nix.ps1" -WhatIf 2>&1
+# Always-run: Stale Nix build artifact check
+$_cnbaOutput = & "$PSScriptRoot\cleanup-nix.ps1" -WhatIf 2>&1
   $_cnbaFound = $_cnbaOutput | Select-String -Pattern 'would remove stale Nix build symlink'
   if ($_cnbaFound) {
     warn "stale Nix build artifacts found:"
@@ -255,9 +255,6 @@ if (-not $HAS_ARGS) {
   } else {
     say "no stale Nix build artifacts found."
   }
-} else {
-  say "skipping (path-scoped mode)."
-}
 
 # ---------------------------------------------------------------------------
 # 9. Shell script validation tests
@@ -375,8 +372,8 @@ if ($_lfAlErrors -gt 0) {
   say ("lifecycle-allowlist.json: valid (entry count: {0})" -f $_lfAlCount)
 }
 
-if (-not $HAS_ARGS) {
-  if ($null -eq $_lf) {
+# Always-run: Lockfile section validation
+if ($null -eq $_lf) {
     warn "lockfile.json could not be loaded — skipping section validation"
     $exitCode = 1
     if ($FAIL_FAST) { exit $exitCode }
@@ -463,20 +460,17 @@ if (-not $HAS_ARGS) {
       say "lockfile.json validation passed"
     }
   }
-} else {
-  say "skipping lockfile section validation (path-scoped mode)."
-}
 
 # ---------------------------------------------------------------------------
 # 14. Locked DSC validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Locked DSC validation ===" -f (++$_step))
 # Platform parallel: check.sh uses yq+jq pipeline (POSIX-native equivalent).
-if (-not $HAS_ARGS) {
-  $_dscSystemDir = Join-Path $RepoRoot 'src\hosts\Windows\system'
-  $_dscSystemPackages = Join-Path $RepoRoot 'src\hosts\Windows\system\packages.dsc.yml'
-  $_lockfilePath = Join-Path $RepoRoot 'src\lockfiles\lockfile.json'
-  $_lfErrors = 0
+# Always-run: Locked DSC validation
+$_dscSystemDir = Join-Path $RepoRoot 'src\hosts\Windows\system'
+$_dscSystemPackages = Join-Path $RepoRoot 'src\hosts\Windows\system\packages.dsc.yml'
+$_lockfilePath = Join-Path $RepoRoot 'src\lockfiles\lockfile.json'
+$_lfErrors = 0
 
   # Helper: convert mixed PSCustomObject/hashtable/list trees to pure hashtable/array.
   function ConvertTo-HashtableDeep ($_obj) {
@@ -606,9 +600,6 @@ if (-not $HAS_ARGS) {
   } else {
     say "locked DSC validation passed"
   }
-} else {
-  say "skipping locked DSC validation (path-scoped mode)."
-}
 
 # ---------------------------------------------------------------------------
 # 15. Schema validation (JSON/YAML)
@@ -616,7 +607,35 @@ if (-not $HAS_ARGS) {
 Write-Output ("`n=== [{0}] Schema validation (JSON/YAML) ===" -f (++$_step))
 $_jsonschemaErrors = 0
 if ($HAS_ARGS) {
-  say "skipping schema validation (path-scoped mode)."
+  # Validate only explicitly provided files
+  foreach ($_sf in $positionalArgs) {
+    if ($_sf -like '*.json') {
+      $_schema = try { (Get-Content $_sf -Raw | ConvertFrom-Json -AsHashtable)['$schema'] } catch { $null }
+      if ($_schema) {
+        if ($_schema -match '^\.') {
+          $_schemafile = [System.IO.Path]::GetFullPath((Join-Path (Split-Path $_sf -Parent) $_schema))
+        } else {
+          $_schemafile = $_schema
+        }
+        check-jsonschema --schemafile $_schemafile $_sf 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+      }
+    } elseif ($_sf -like '*.yml' -or $_sf -like '*.yaml') {
+      $_schema = try {
+        $_content = Get-Content $_sf -Raw
+        ($_content | ConvertFrom-Yaml)['$schema']
+      } catch { $null }
+      if ($_schema) {
+        if ($_schema -match '^\.') {
+          $_schemafile = [System.IO.Path]::GetFullPath((Join-Path (Split-Path $_sf) $_schema))
+        } else {
+          $_schemafile = $_schema
+        }
+        check-jsonschema --schemafile $_schemafile $_sf 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+      }
+    }
+  }
 } else {
   # JSON files with inline $schema — auto-discover and validate
   Get-ChildItem -Recurse -Path "$RepoRoot/src" -Filter '*.json' | Where-Object {
@@ -651,15 +670,15 @@ if ($HAS_ARGS) {
       if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
     }
   }
-  # GitHub schema validation (complements existing prek hooks — CI enforcement)
-  $_ghWorkflows = Join-Path $RepoRoot '.github\workflows\*.yml'
-  check-jsonschema --builtin-schema vendor.github-workflows $_ghWorkflows 2>&1 | Out-Null
+}
+# GitHub schema validation (complements existing prek hooks — CI enforcement) — always-run
+$_ghWorkflows = Join-Path $RepoRoot '.github\workflows\*.yml'
+check-jsonschema --builtin-schema vendor.github-workflows $_ghWorkflows 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+$_dependabot = Join-Path $RepoRoot '.github\dependabot.yml'
+if (Test-Path $_dependabot) {
+  check-jsonschema --builtin-schema vendor.dependabot $_dependabot 2>&1 | Out-Null
   if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-  $_dependabot = Join-Path $RepoRoot '.github\dependabot.yml'
-  if (Test-Path $_dependabot) {
-    check-jsonschema --builtin-schema vendor.dependabot $_dependabot 2>&1 | Out-Null
-    if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-  }
 }
 if ($_jsonschemaErrors -gt 0) {
   warn "schema validation failed with $_jsonschemaErrors error(s)"
@@ -672,11 +691,11 @@ say "schema validation passed."
 # 16. Service registry validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Service registry validation ===" -f (++$_step))
-if (-not $HAS_ARGS) {
-  $_svcJson = Join-Path $RepoRoot "src\modules\services.json"
-  $_svcErrors = 0
+# Always-run: Service registry validation
+$_svcJson = Join-Path $RepoRoot "src\modules\services.json"
+$_svcErrors = 0
 
-  if (-not (Test-Path $_svcJson)) {
+if (-not (Test-Path $_svcJson)) {
     warn "services.json not found at $_svcJson"
     $_svcErrors++
   } else {
@@ -784,9 +803,6 @@ if (-not $HAS_ARGS) {
     }
     say "services.json validation passed"
   }
-} else {
-  say "skipping service registry validation (path-scoped mode)."
-}
 
 # ---------------------------------------------------------------------------
 # 17. YAML validation
@@ -848,8 +864,8 @@ say "YAML linting passed."
 # 19. Package manager usage enforcement
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Package manager usage enforcement ===" -f (++$_step))
-if (-not $HAS_ARGS) {
-  $_violations = 0
+# Always-run: Package manager usage enforcement
+$_violations = 0
   # Ban bare pip install and npm install — these bypass the lockfile.
   # uv pip install is allowed.  Exclude self-references.
   $_pipViolations = Select-String -Path @(
@@ -879,9 +895,6 @@ if (-not $HAS_ARGS) {
   } else {
     say "no package manager violations found."
   }
-} else {
-  say "skipping (path-scoped mode)."
-}
 
 # ---------------------------------------------------------------------------
 # 20. Undocumented error suppression check
@@ -979,8 +992,8 @@ Write-Output ("`n=== [{0}] Config method compliance ===" -f (++$_step))
 $_cfgDir = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs"
 $_cfgErrors = 0
 
-if (-not $HAS_ARGS) {
-  $_cfgFiles = Get-ChildItem -Path $_cfgDir -Recurse -File
+# Always-run: Config method compliance
+$_cfgFiles = Get-ChildItem -Path $_cfgDir -Recurse -File
 
   # Build source file list once for efficiency
   $_srcFiles = Get-ChildItem -Path (Join-Path $RepoRoot "src") -Recurse -Include '*.nix', '*.ps1', '*.sh' |
@@ -1034,9 +1047,6 @@ if (-not $HAS_ARGS) {
       }
     }
   }
-} else {
-  say "skipping (path-scoped mode)."
-}
 
 if ($_cfgErrors -gt 0) {
   warn ("config method compliance check failed with {0} error(s)" -f $_cfgErrors)
