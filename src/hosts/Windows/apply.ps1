@@ -887,14 +887,14 @@ Test-ArchivingStack | Out-Null
 # missing or unreachable ollama binary is informational, not a hard failure,
 # because the system configuration has already been applied successfully.
 if ($NoAISync) {
-  Write-Output "ai-sync: -NoAISync set; skipping post-apply model sync"
+  Write-Output "ai: -NoAISync set; skipping post-apply model sync"
 } else {
   # undoc-supp: probe whether ollama is installed (may not be on first-provision hosts).
   $ollamaOnPath = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaOnPath) {
-    Write-Output "ai-sync: ollama not found in PATH; skipping post-apply model sync"
+    Write-Output "ai: ollama not found in PATH; skipping post-apply model sync"
   } else {
-    Write-Output "ai-sync: running post-apply AI model sync..."
+    Write-Output "ai: running post-apply AI model sync..."
     Invoke-AISync -RepoRoot $repoRoot -ServerReadyTimeoutSeconds 60
   }
 }

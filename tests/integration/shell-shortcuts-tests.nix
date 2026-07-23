@@ -43,7 +43,7 @@ let
   ) "Windows shell profile must mirror curated shell shortcuts";
 
   test_posix_shell_exposes_managed_commands = assert' (
-    lib.hasInfix ''"nucleus-ai-sync"'' shellText
+    lib.hasInfix ''"nucleus-ai"'' shellText
     && lib.hasInfix ''"nucleus-apply"'' shellText
     && lib.hasInfix ''"nucleus-bootstrap"'' shellText
     && lib.hasInfix ''"nucleus-check-pwsh"'' shellText
@@ -59,7 +59,7 @@ let
   ) "shell.nix must expose the managed nucleus command set";
 
   test_windows_shell_exposes_managed_commands = assert' (
-    lib.hasInfix "function nucleus-ai-sync" windowsShellProfileText
+    lib.hasInfix "function nucleus-ai" windowsShellProfileText
     && lib.hasInfix "function nucleus-apply" windowsShellProfileText
     && lib.hasInfix "function nucleus-bootstrap" windowsShellProfileText
     && lib.hasInfix "function nucleus-check-pwsh" windowsShellProfileText
@@ -85,7 +85,7 @@ let
       && lib.hasInfix "`-ni` — run `bun install`." text
       && lib.hasInfix "`-nr` — run `bun run`." text
       && lib.hasInfix "`-nx` — run `bun x`." text
-      && lib.hasInfix "`nucleus-ai-sync` — run the managed AI model sync flow." text
+      && lib.hasInfix "\`nucleus-ai\` — manage AI models (sync, list, status, endpoint, config)." text
       && lib.hasInfix "`nucleus-apply` — run the managed apply flow." text
       && lib.hasInfix "`nucleus-bootstrap` — run the managed bootstrap flow." text
       && lib.hasInfix "`nucleus-check-pwsh` — run PowerShell syntax checks." text

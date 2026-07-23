@@ -4,7 +4,7 @@
 
 
 .DESCRIPTION
-  Windows counterpart to scripts/ai-sync.sh.  Reads the model manifest at
+  Windows counterpart to scripts/ai.sh sync subcommand.  Reads the model manifest at
   src/modules/ai/models.json, selects the `Windows` profile (always used on
   Windows), and converges the locally installed Ollama model set:
 
@@ -122,12 +122,12 @@ function Invoke-AISync {
   # undoc-supp: probe — ollama may not be installed; $null check handles absence.
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaCmd) {
-    Write-Output "ai-sync: ollama not found; skipping sync"
+    Write-Output "ai: ollama not found; skipping sync"
     return
   }
 
   if ($ServerReadyTimeoutSeconds -lt 0) {
-    throw "ai-sync: ServerReadyTimeoutSeconds must be zero or greater."
+    throw "ai: ServerReadyTimeoutSeconds must be zero or greater."
   }
 
   # Probe the server with `ollama list`.  A non-zero exit means the server is
@@ -147,7 +147,7 @@ function Invoke-AISync {
   $listOutput = @($probeResult.Output)
 
   if ($listExitCode -ne 0 -and $ServerReadyTimeoutSeconds -gt 0) {
-    Write-Output "ai-sync: waiting up to ${ServerReadyTimeoutSeconds}s for ollama server readiness..."
+    Write-Output "ai: waiting up to ${ServerReadyTimeoutSeconds}s for ollama server readiness..."
     $deadline = (Get-Date).AddSeconds($ServerReadyTimeoutSeconds)
     do {
       Start-Sleep -Seconds 2
@@ -161,7 +161,7 @@ function Invoke-AISync {
   }
 
   if ($listExitCode -ne 0) {
-    Write-Output "ai-sync: ollama server unavailable after waiting ${ServerReadyTimeoutSeconds}s; skipping sync"
+    Write-Output "ai: ollama server unavailable after waiting ${ServerReadyTimeoutSeconds}s; skipping sync"
     return
   }
 
@@ -186,17 +186,17 @@ function Invoke-AISync {
         continue
       }
       if ($DryRun) {
-        Write-Output "ai-sync: would pull $model"
+        Write-Output "ai: would pull $model"
       } else {
-        Write-Output "ai-sync: pulling $model"
+        Write-Output "ai: pulling $model"
         & $ollamaCmd.Source pull $model
         if ($LASTEXITCODE -ne 0) {
-          Write-Error "ai-sync: ollama pull $model failed with exit code $LASTEXITCODE"
+          Write-Error "ai: ollama pull $model failed with exit code $LASTEXITCODE"
         } else {
           # Verify pull succeeded via ollama list
           $pullCheck = @(& $ollamaCmd.Source list 2>&1 | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[0] } | Where-Object { $_ -ne '' })
           if ($pullCheck -notcontains $model) {
-            Write-Error "ai-sync: $model was pulled but is not in 'ollama list'"
+            Write-Error "ai: $model was pulled but is not in 'ollama list'"
           } else {
             # Lockfile digest verification (optional)
             if (Test-Path $lockfilePath) {
@@ -210,9 +210,9 @@ function Invoke-AISync {
                 $_showJson = & $ollamaCmd.Source show --format json $model 2>&1 | Out-String
                 $_actualDigest = ($_showJson | ConvertFrom-Json).digest
                 if ($_actualDigest -and $_actualDigest -ne $_expectedDigest) {
-                  Write-Warning "ai-sync: digest mismatch for $model (expected $_expectedDigest, got $_actualDigest)"
+                  Write-Warning "ai: digest mismatch for $model (expected $_expectedDigest, got $_actualDigest)"
                 } elseif ($_actualDigest) {
-                  Write-Output "ai-sync: digest verified for $model"
+                  Write-Output "ai: digest verified for $model"
                 }
               }
             }
@@ -230,12 +230,12 @@ function Invoke-AISync {
       continue
     }
     if ($DryRun) {
-        Write-Output "ai-sync: would remove $model"
+        Write-Output "ai: would remove $model"
     } else {
-        Write-Output "ai-sync: removing $model"
+        Write-Output "ai: removing $model"
       & $ollamaCmd.Source rm $model
       if ($LASTEXITCODE -ne 0) {
-        Write-Error "ai-sync: ollama rm $model failed with exit code $LASTEXITCODE"
+        Write-Error "ai: ollama rm $model failed with exit code $LASTEXITCODE"
       }
     }
   }
@@ -244,5 +244,5 @@ function Invoke-AISync {
   if ($DryRun)    { $flags += "dry-run" }
   if ($GcOnly) { $flags += "gc-only" }
   $flagStr = if ($flags.Count -gt 0) { " ($($flags -join ', '))" } else { "" }
-  Write-Output "ai-sync: sync completed (profile=$profileName$flagStr)"
+  Write-Output "ai: sync completed (profile=$profileName$flagStr)"
 }

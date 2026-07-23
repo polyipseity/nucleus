@@ -13,7 +13,7 @@ let
   # Ordered to match mkNucleusApps in flake.nix.
   nucleusCommands = [
     "nucleus-apply"
-    "nucleus-ai-sync"
+    "nucleus-ai"
     "nucleus-bootstrap"
     "nucleus-bump-lockfile"
     "nucleus-check"

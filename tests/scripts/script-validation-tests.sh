@@ -245,18 +245,18 @@ if [[ -f "$UPDATE_SH" ]]; then
     test_help_handler "$UPDATE_SH"
 fi
 
-# Test scripts/ai-sync.sh
-AI_SYNC_SH="scripts/ai-sync.sh"
-if [[ -f "$AI_SYNC_SH" ]]; then
-    test_bash_syntax "$AI_SYNC_SH"
-    test_has_shebang "$AI_SYNC_SH"
-    test_is_executable "$AI_SYNC_SH"
-    test_error_handling "$AI_SYNC_SH"
-    test_has_documentation "$AI_SYNC_SH"
-    test_no_dangerous_patterns "$AI_SYNC_SH"
-    test_strict_shell_mode "$AI_SYNC_SH"
-    test_usage_std_present "$AI_SYNC_SH"
-    test_help_handler "$AI_SYNC_SH"
+# Test scripts/ai.sh
+AI_SH="scripts/ai.sh"
+if [[ -f "$AI_SH" ]]; then
+    test_bash_syntax "$AI_SH"
+    test_has_shebang "$AI_SH"
+    test_is_executable "$AI_SH"
+    test_error_handling "$AI_SH"
+    test_has_documentation "$AI_SH"
+    test_no_dangerous_patterns "$AI_SH"
+    test_strict_shell_mode "$AI_SH"
+    test_usage_std_present "$AI_SH"
+    test_help_handler "$AI_SH"
 fi
 
 # Test scripts/cloud-setup.sh

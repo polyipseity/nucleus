@@ -34,7 +34,7 @@ assert_skip() {
 # All nucleus-* packages that we test. Ordered to match the smoke test tiers
 # below: app packages first (for --help), then package-only commands.
 declare -a BATCH_PACKAGES=(
-	nucleus-apply nucleus-ai-sync nucleus-bootstrap nucleus-bump-lockfile
+	nucleus-apply nucleus-ai nucleus-bootstrap nucleus-bump-lockfile
 	nucleus-check nucleus-test nucleus-check-packer nucleus-check-pwsh
 	nucleus-check-sh nucleus-cloud-setup nucleus-config nucleus-gc
 	nucleus-gs-pdf-opt nucleus-health-check nucleus-replica-reset
@@ -77,7 +77,7 @@ run_binary() {
 # Map app names (nix run names) to their corresponding package names.
 declare -A APP_TO_PKG=(
 	[apply]=nucleus-apply
-	[ai-sync]=nucleus-ai-sync
+	[ai]=nucleus-ai
 	[bootstrap]=nucleus-bootstrap
 	[bump-lockfile]=nucleus-bump-lockfile
 	[check]=nucleus-check
@@ -114,7 +114,7 @@ test_app_help() {
 
 # App commands (names match `nix run ./src#<name>`)
 APP_COMMANDS=(
-	apply ai-sync bootstrap bump-lockfile check test
+	apply ai bootstrap bump-lockfile check test
 	check-packer check-sh cloud-setup config
 	gc health-check replica-reset replica-sync update svc vm
 )
@@ -150,7 +150,7 @@ echo ""
 echo "=== Tier 2: dry-run tests ==="
 
 declare -A DRY_RUN_APPS=(
-	[ai-sync]=nucleus-ai-sync
+	[ai]=nucleus-ai
 	[gc]=nucleus-gc
 	[replica-sync]=nucleus-replica-sync
 	[replica-reset]=nucleus-replica-reset
@@ -173,8 +173,8 @@ test_app_dry_run() {
 	fi
 }
 
-# ai-sync needs NUCLEUS_AI_SYNC_TIMEOUT=0 to avoid blocking on Ollama
-NUCLEUS_AI_SYNC_TIMEOUT=0 test_app_dry_run ai-sync
+# ai sync needs NUCLEUS_AI_SYNC_TIMEOUT=0 to avoid blocking on Ollama
+NUCLEUS_AI_SYNC_TIMEOUT=0 test_app_dry_run ai
 test_app_dry_run gc
 test_app_dry_run replica-sync
 test_app_dry_run replica-reset

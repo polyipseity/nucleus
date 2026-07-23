@@ -610,9 +610,9 @@ Register-ArgumentCompleter -CommandName nucleus-check -ScriptBlock {
   @('--help', '--format', '--verify') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
-Register-ArgumentCompleter -CommandName nucleus-ai-sync -ScriptBlock {
+Register-ArgumentCompleter -CommandName nucleus-ai -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  @('--help', '--dry-run', '--ollama-profile', '--gc-only', '--no-gc-only') |
+  @('--help', 'sync', 'list', 'status', 'endpoint', 'config') |
     Where-Object { $_ -like "$wordToComplete*" }
 }
 

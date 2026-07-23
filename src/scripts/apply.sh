@@ -131,26 +131,26 @@ start_sudo_keepalive() {
 }
 
 run_ai_sync() {
-  # Call scripts/ai-sync.sh to converge locally installed Ollama models with
+  # Call nucleus-ai sync to converge locally installed Ollama models with
   # the declarative manifest after the system configuration has been applied.
   if [ "$ai_sync" = false ]; then
-    printf '%s\n' "ai-sync: --no-ai-sync set; skipping post-apply model sync"
+    printf '%s\n' "ai: --no-ai-sync set; skipping post-apply model sync"
     return
   fi
 
-  if ! command -v nucleus-ai-sync >/dev/null 2>&1; then
-    printf '%s\n' "ai-sync: nucleus-ai-sync not found in PATH; skipping model sync"
+  if ! command -v nucleus-ai >/dev/null 2>&1; then
+    printf '%s\n' "ai: nucleus-ai not found in PATH; skipping model sync"
     return
   fi
 
   if ! command -v ollama >/dev/null 2>&1; then
-    printf '%s\n' "ai-sync: ollama not found in PATH; skipping post-apply model sync"
+    printf '%s\n' "ai: ollama not found in PATH; skipping post-apply model sync"
     return
   fi
 
-  printf '%s\n' "ai-sync: running post-apply AI model sync..."
-  if ! nucleus-ai-sync; then
-    printf '%s\n' "ai-sync: nucleus-ai-sync exited with an error; model sync incomplete (system apply succeeded)" >&2
+  printf '%s\n' "ai: running post-apply AI model sync..."
+  if ! nucleus-ai sync; then
+    printf '%s\n' "ai: nucleus-ai sync exited with an error; model sync incomplete (system apply succeeded)" >&2
   fi
 }
 

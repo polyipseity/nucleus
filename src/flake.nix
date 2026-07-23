@@ -591,11 +591,11 @@
           ];
         };
 
-      # Build AI model sync app for POSIX hosts.
-      mkAiSyncApp =
+      # Build unified AI management app for POSIX hosts.
+      mkAiApp =
         pkgs:
         mkApp pkgs {
-          name = "ai-sync";
+          name = "ai";
           runtimeInputs = [ pkgs.jq ];
         };
 
@@ -652,8 +652,8 @@
             pkgs.ssh-to-age
           ];
         };
-        nucleus-ai-sync = writeNucleusShellApplication pkgs {
-          name = "ai-sync";
+        nucleus-ai = writeNucleusShellApplication pkgs {
+          name = "ai";
           runtimeInputs = [ pkgs.jq ];
         };
         nucleus-bootstrap = writeNucleusShellApplication pkgs {
@@ -795,7 +795,7 @@
       # -----------------------------------------------------------------------
       apps = {
         "${systems.mac}" = {
-          ai-sync = mkAiSyncApp pkgsMac;
+          ai = mkAiApp pkgsMac;
           apply = mkApplyApp pkgsMac;
           bootstrap = mkBootstrapApp pkgsMac;
           bump-lockfile = mkBumpLockfileApp pkgsMac;
@@ -820,7 +820,7 @@
           vm = mkVmApp pkgsMac;
         };
         "${systems.linux}" = {
-          ai-sync = mkAiSyncApp pkgsLinux;
+          ai = mkAiApp pkgsLinux;
           apply = mkApplyApp pkgsLinux;
           bootstrap = mkBootstrapApp pkgsLinux;
           bump-lockfile = mkBumpLockfileApp pkgsLinux;

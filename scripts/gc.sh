@@ -456,11 +456,11 @@ gc_git_cache_if_present() {
 
 gc_ollama_models_if_available() {
   # Remove locally installed Ollama models that are absent from the declarative
-  # manifest at src/modules/ai/models.json.  Delegates to ai-sync.sh with
+  # manifest at src/modules/ai/models.json.  Delegates to nucleus-ai sync with
   # --gc-only so no new pulls are attempted during GC — a GC run should only
   # reclaim space, not trigger multi-GB model downloads.
   #
-  # The probe below checks for both ollama and jq before delegating; ai-sync.sh
+  # The probe below checks for both ollama and jq before delegating; nucleus-ai
   # performs the same checks internally but printing a single skip message here
   # avoids noise from two separate absence warnings.
   if ! command -v ollama >/dev/null 2>&1; then
@@ -470,14 +470,14 @@ gc_ollama_models_if_available() {
     return 0
   fi
   if ! command -v jq >/dev/null 2>&1; then
-    # jq is required by ai-sync.sh to parse the JSON manifest.
+    # jq is required by nucleus-ai to parse the JSON manifest.
     say "jq unavailable; skipping ollama model gc"
     return 0
   fi
 
   # GC must stay space-reclaim only; do not wait for a cold Ollama daemon to
   # start because that would stall GC on hosts where the AI service is idle.
-  NUCLEUS_AI_SYNC_TIMEOUT=0 "$REPO_ROOT/scripts/ai-sync.sh" --gc-only
+  nucleus-ai sync --gc-only
 }
 
 gc_sccache_cache_if_available() {

@@ -1,7 +1,7 @@
 let
   inherit (import ../lib.nix) containsRegex flatten;
 
-  aiSyncText = builtins.readFile ../../scripts/ai-sync.sh;
+  aiText = builtins.readFile ../../scripts/ai.sh;
   flakeText = builtins.readFile ../../src/flake.nix;
   gcText = builtins.readFile ../../scripts/gc.sh;
   coreText = builtins.readFile ../../src/modules/core.nix;
@@ -13,11 +13,12 @@ let
 in
 assert containsRegex "pkgs.jq" flakeText;
 assert containsRegex "pkgs.litellm" coreText;
-assert containsRegex "NUCLEUS_AI_SYNC_TIMEOUT" aiSyncText;
-assert containsRegex "waiting up to" aiSyncText;
-assert containsRegex "dry_run=false" aiSyncText;
-assert containsRegex "gc_only=false" aiSyncText;
-assert containsRegex "NUCLEUS_AI_SYNC_TIMEOUT=0" gcText;
+assert containsRegex "NUCLEUS_AI_SYNC_TIMEOUT" aiText;
+assert containsRegex "waiting up to" aiText;
+assert containsRegex "dry_run=false" aiText;
+assert containsRegex "gc_only=false" aiText;
+# GC script no longer references ai-sync directly; gc.sh now calls nucleus-ai
+assert containsRegex "nucleus-ai sync" gcText;
 # GC script expiry & dry-run assertions
 assert containsRegex "dry_run=false" gcText;
 assert containsRegex "expiry_arg=\"\"" gcText;
@@ -29,7 +30,7 @@ assert containsRegex "hm_expiry_hm_format" gcText;
 # LiteLLM gateway assertions
 assert containsRegex "litellm" coreText;
 assert containsRegex "OPENROUTER_API_KEY" litellmConfigText;
-assert containsRegex "127.0.0.1:11434" aiSyncText;
+assert containsRegex "127.0.0.1:11434" aiText;
 # OLLAMA_HOST is now defined in src/modules/lib/env-catalog.nix, not default.nix
 assert containsRegex "local.litellm" macbookAiText;
 assert containsRegex "ai_openrouter_api_key" secretsText;

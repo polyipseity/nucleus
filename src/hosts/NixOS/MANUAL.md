@@ -20,7 +20,7 @@
 
 ## nucleus commands
 
-- `nucleus-ai-sync` — sync AI models
+- `nucleus-ai` — manage AI models (sync, list, status, endpoint, config)
 - `nucleus-apply` — apply configuration
 - `nucleus-bootstrap` — bootstrap system
 - `nucleus-bump-lockfile` — update version pins in `src/lockfiles/lockfile.json`; pass `--sections winget,scoop,...` for specific sections
