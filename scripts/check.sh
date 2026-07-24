@@ -229,6 +229,11 @@ if ! $HAS_ARGS; then
   readarray -t CACHED_SH_FILES < <(find src/scripts -type f -name '*.sh' -print | sort)
 fi
 
+# Wave parallelism infrastructure: each step writes its exit code to a per-step temp file.
+# Results are aggregated at the end. In FAIL_FAST mode, steps run sequentially (original behavior).
+_wave_tmpdir=$(mktemp -d) || { error "failed to create wave temp directory"; exit 1; }
+trap 'rm -rf -- "$_wave_tmpdir"' EXIT
+
 _step=0
 
 # Pre-flight tool availability checks.
@@ -259,8 +264,7 @@ elif ! $HAS_ARGS; then
 else
   say "skipping (no shell scripts to check)."
 fi
-if [ $_sc_exit -ne 0 ]; then exit_code=$_sc_exit; fi
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
+if [ $_sc_exit -ne 0 ]; then echo "$_sc_exit" > "$_wave_tmpdir/step-1.exit"; fi
 
 # powershell_syntax — PowerShell syntax validation (parser only, no PSScriptAnalyzer)
 section "$((_step += 1))" "PowerShell syntax validation"
@@ -272,39 +276,39 @@ elif ! $HAS_ARGS; then
 else
   say "skipping (no PowerShell scripts to check)."
 fi
-if [ $_ps_exit -ne 0 ]; then exit_code=$_ps_exit; fi
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
+if [ $_ps_exit -ne 0 ]; then echo "$_ps_exit" > "$_wave_tmpdir/step-2.exit"; fi
 
 # packer_validate — Packer template validation
 section "$((_step += 1))" "Packer template validation"
+_pkr_exit=0
 if [ "${#PKR_FILES[@]}" -gt 0 ]; then
-  bash scripts/check-packer.sh "${PKR_FILES[@]}" || exit_code=$?
+  bash scripts/check-packer.sh "${PKR_FILES[@]}" || _pkr_exit=$?
 elif ! $HAS_ARGS; then
-  bash scripts/check-packer.sh || exit_code=$?
+  bash scripts/check-packer.sh || _pkr_exit=$?
 else
   say "skipping (no Packer templates to check)."
 fi
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
+echo "$_pkr_exit" > "$_wave_tmpdir/step-3.exit"
 
 # dead_nix — Dead Nix code detection
 section "$((_step += 1))" "Dead Nix code"
+_dn_exit=0
 if [ ${#NIX_FILES[@]} -gt 0 ]; then
   if ! deadnix --fail "${NIX_FILES[@]}"; then
-    exit_code=$?
+    _dn_exit=1
   else
     say "no dead Nix code found."
   fi
-  "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 elif ! $HAS_ARGS; then
   if ! deadnix --fail src/; then
-    exit_code=$?
+    _dn_exit=1
   else
     say "no dead Nix code found."
   fi
-  "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 else
   say "skipping deadnix (path-scoped mode)."
 fi
+echo "$_dn_exit" > "$_wave_tmpdir/step-4.exit"
 
 # nix_flake_eval — Nix flake evaluation (conditional skip: only when .nix files changed)
 section "$((_step += 1))" "Nix flake evaluation"
@@ -320,36 +324,38 @@ else
     done < <({ git diff --name-only HEAD -- '*.nix' 2>/dev/null || true; git ls-files --others --exclude-standard '*.nix' 2>/dev/null || true; } | sort -u || true) # check-suppress:suppression_doc: all three may fail (no HEAD in shallow clone, git ls-files on uninitialized repo, sort on empty input)
   fi
 fi
+_ne_exit=0
 if [ "${#_nix_eval_nix_files[@]}" -gt 0 ]; then
   sys=$(nix eval --impure --expr 'builtins.currentSystem' --raw 2>/dev/null || echo 'aarch64-darwin')
   if ! nix eval --impure "path:./src#packages.$sys" >/dev/null; then
-    exit_code=$?
+    _ne_exit=1
   else
     say "nix flake evaluation passed."
   fi
 else
   say "skipping (no Nix files changed since HEAD)."
 fi
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
+echo "$_ne_exit" > "$_wave_tmpdir/step-5.exit"
 
 # nix_format — Nix formatting (nixfmt)
 section "$((_step += 1))" "Nix formatting (nixfmt)"
+_nf_exit=0
 if [ "${#NIX_FILES[@]}" -gt 0 ]; then
   # Parallelize nixfmt across PARALLEL_JOBS workers, batching files to reduce process overhead.
   if $FORMAT_NIX; then
     if printf '%s\0' "${NIX_FILES[@]}" | xargs -0 -P "$PARALLEL_JOBS" -n 10 nixfmt -s; then
       say "nix formatting applied."
     else
-      exit_code=$?
+      _nf_exit=1
     fi
   else
     if printf '%s\0' "${NIX_FILES[@]}" | xargs -0 -P "$PARALLEL_JOBS" -n 10 nixfmt -s --verify; then
       say "nix formatting OK."
     else
-      exit_code=$?
+      _nf_exit=1
     fi
   fi
-  "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
+  echo "$_nf_exit" > "$_wave_tmpdir/step-6.exit"
 else
   say "skipping nixfmt (no Nix files to check)."
 fi
@@ -402,15 +408,13 @@ if [ "${#_nixf_files[@]}" -gt 0 ]; then
   done
   [ -n "$_nixf_tmpdir" ] && rm -rf -- "$_nixf_tmpdir"
   if [ "$_nixf_errors" -gt 0 ]; then
-    exit_code=1
-    "$FAIL_FAST" && exit $exit_code
+    echo "1" > "$_wave_tmpdir/step-7.exit"
   else
     say "nixf-tidy lint passed."
   fi
 else
   say "skipping nixf-tidy (no Nix files to check)."
 fi
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # stale_nix_artifact — Always-run: Stale Nix build artifact check
 section "$((_step += 1))" "Stale Nix build artifact check"
@@ -420,31 +424,26 @@ if echo "$_cnba_output" | grep -q "would remove stale Nix build symlink"; then
   echo "$_cnba_output" | while IFS= read -r _cnba_line; do
     warn "  $_cnba_line"
   done
-  exit_code=1
+  echo "1" > "$_wave_tmpdir/step-8.exit"
 else
   say "no stale Nix build artifacts found."
 fi
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # shell_validation_test — Always-run: Shell script validation tests
 section "$((_step += 1))" "Shell script validation tests"
-bash tests/scripts/script-validation-tests.sh || exit_code=$?
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
+bash tests/scripts/script-validation-tests.sh || echo "1" > "$_wave_tmpdir/step-9.exit"
 
 # cwd_independence_test — Always-run: CWD-independence tests
 section "$((_step += 1))" "CWD-independence tests"
-bash tests/scripts/cwd-independence-tests.sh || exit_code=$?
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
+bash tests/scripts/cwd-independence-tests.sh || echo "1" > "$_wave_tmpdir/step-10.exit"
 
 # nix_search_path_test — Always-run: Nix search path tests
 section "$((_step += 1))" "Nix search path tests"
-bash tests/scripts/nix-search-path-tests.sh || exit_code=$?
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
+bash tests/scripts/nix-search-path-tests.sh || echo "1" > "$_wave_tmpdir/step-11.exit"
 
 # port_util_test — Always-run: Port utility function tests
 section "$((_step += 1))" "Port utility function tests"
-bash tests/scripts/lib-port-functions-tests.sh || exit_code=$?
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
+bash tests/scripts/lib-port-functions-tests.sh || echo "1" > "$_wave_tmpdir/step-12.exit"
 
 # lockfile_validation — Lockfile validation
 section "$((_step += 1))" "Lockfile validation"
@@ -481,8 +480,7 @@ else
 fi
 if [ "$_lf_overlap_issues" -gt 0 ]; then
   warn "lockfile.json has $_lf_overlap_issues overlapping package(s) across sections"
-  exit_code=1
-  "$FAIL_FAST" && exit $exit_code
+  echo "1" > "$_wave_tmpdir/step-13.exit"
 else
   say "lockfile.json consistency: no overlapping packages across sections"
 fi
@@ -515,8 +513,7 @@ else
 fi
 if [ "$_lf_al_errors" -gt 0 ]; then
   warn "lifecycle-allowlist.json validation failed with $_lf_al_errors error(s)"
-  exit_code=1
-  "$FAIL_FAST" && exit $exit_code
+  echo "1" > "$_wave_tmpdir/step-13.exit"
 else
   _lf_al_count=$(jq 'length' "$_lf_al_path" 2>/dev/null || echo 0)
   say "lifecycle-allowlist.json: valid (entry count: $_lf_al_count)"
@@ -601,14 +598,12 @@ if [ -f "$_lfpath" ]; then
 
     if [ "$_lf_errors" -gt 0 ]; then
       warn "lockfile.json validation failed with $_lf_errors error(s)"
-      exit_code=1
-      "$FAIL_FAST" && exit $exit_code
+      echo "1" > "$_wave_tmpdir/step-13.exit"
     fi
     say "lockfile.json validation passed"
   else
     warn "lockfile.json not found — skipping section validation"
-    exit_code=1
-    "$FAIL_FAST" && exit $exit_code
+    echo "1" > "$_wave_tmpdir/step-13.exit"
   fi
 
 # locked_dsc_validation — Always-run: Locked DSC validation
@@ -655,8 +650,7 @@ _dsc_system_dir="src/hosts/Windows/system"
 
   if [ "$_lf_errors" -gt 0 ]; then
     warn "locked DSC validation failed with $_lf_errors error(s)"
-    exit_code=1
-    "$FAIL_FAST" && exit $exit_code
+    echo "1" > "$_wave_tmpdir/step-14.exit"
   fi
   say "locked DSC validation passed"
 
@@ -723,11 +717,9 @@ check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.ym
 check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
 if [ "$_jsonschema_errors" -gt 0 ]; then
   warn "schema validation failed with $_jsonschema_errors error(s)"
-  exit_code=1
-  "$FAIL_FAST" && exit $exit_code
+  echo "1" > "$_wave_tmpdir/step-15.exit"
 fi
 say "schema validation passed."
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # service_registry_validation — Always-run: Service registry validation
 section "$((_step += 1))" "Service registry validation"
@@ -796,8 +788,7 @@ section "$((_step += 1))" "Service registry validation"
 
   if [ "$_svc_errors" -gt 0 ]; then
     warn "services.json validation failed with $_svc_errors error(s)"
-    exit_code=1
-    "$FAIL_FAST" && exit $exit_code
+    echo "1" > "$_wave_tmpdir/step-16.exit"
   fi
   # No premature "passed" — verdict is after sub-checks below.
 
@@ -854,8 +845,7 @@ section "$((_step += 1))" "Service registry validation"
 
   if [ "$_svc_errors" -gt 0 ]; then
     warn "services.json validation failed with $_svc_errors error(s)"
-    exit_code=1
-    "$FAIL_FAST" && exit $exit_code
+    echo "1" > "$_wave_tmpdir/step-16.exit"
   fi
   say "services.json validation passed"
 
@@ -892,11 +882,9 @@ else
 fi
 if [ "$_yaml_errors" -gt 0 ]; then
   warn "YAML validation/lint failed with $_yaml_errors error(s)"
-  exit_code=1
-  "$FAIL_FAST" && exit $exit_code
+  echo "1" > "$_wave_tmpdir/step-17.exit"
 fi
 say "YAML validation and linting passed."
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # package_manager_enforcement — Always-run: Package manager usage enforcement
 section "$((_step += 1))" "Package manager usage enforcement"
@@ -922,14 +910,13 @@ if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
   _violations=$((_violations + 1))
 fi
 if [ "$_violations" -gt 0 ]; then
-  exit_code=1
-  "$FAIL_FAST" && exit $exit_code
+  echo "1" > "$_wave_tmpdir/step-18.exit"
 fi
 say "no package manager violations found."
 
 # suppression_doc — Undocumented error suppression check
 section "$((_step += 1))" "Undocumented error suppression"
-_undoc_supp_out="$(mktemp)" || { warn "failed to create temp file"; exit_code=1; "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code; }
+_undoc_supp_out="$(mktemp)" || { warn "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-19.exit"; }
 
 # _is_suppressed check_id file line
 # Returns 0 if the given line (or its preceding line) has a
@@ -988,12 +975,11 @@ if [ -s "$_undoc_supp_out" ]; then
     warn "  $_line"
   done
   say "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
-  exit_code=1
+  echo "1" > "$_wave_tmpdir/step-19.exit"
 else
   say "no undocumented error suppressions found."
 fi
 rm -f "$_undoc_supp_out"
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 # online_determinism — Online determinism checks (--verify mode only)
 section "$((_step += 1))" "Online determinism checks (--verify)"
 if $VERIFY; then
@@ -1012,7 +998,7 @@ _cfg_dir="src/modules/configs"
 _cfg_errors=0
 
 # Single-pass: collect all config file basenames, run one grep across src/
-_cfg_patterns=$(mktemp) || { warn "failed to create temp file"; exit_code=1; "$FAIL_FAST" && exit $exit_code; }
+_cfg_patterns=$(mktemp) || { warn "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-21.exit"; }
 find "$_cfg_dir" -type f -exec basename {} \; | sort -u > "$_cfg_patterns"
 _cfg_grep_output=$(grep -rn --include='*.nix' --include='*.ps1' --include='*.sh' \
   -F -f "$_cfg_patterns" \
@@ -1069,15 +1055,13 @@ while IFS= read -r -d '' _cfg_file; do
 done < <(find "$_cfg_dir" -type f -print0)
 if [ "$_cfg_errors" -gt 0 ]; then
   warn "config method compliance check failed with $_cfg_errors error(s)"
-  exit_code=1
-  "$FAIL_FAST" && exit $exit_code
+  echo "1" > "$_wave_tmpdir/step-21.exit"
 fi
 say "config method compliance passed."
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # activation_token_placeholder — Activation script token placeholder in comment check
 section "$((_step += 1))" "Activation script token placeholder in comment check"
-_act_temp="$(mktemp)" || { warn "failed to create temp file"; exit_code=1; "$FAIL_FAST" && exit $exit_code; }
+_act_temp="$(mktemp)" || { warn "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-22.exit"; }
 
 if $HAS_ARGS; then
   for _f in "$@"; do
@@ -1096,12 +1080,23 @@ if [ -s "$_act_temp" ]; then
   sort -u "$_act_temp" | while IFS= read -r _line; do
     warn "  $_line"
   done
-  exit_code=1
+  echo "1" > "$_wave_tmpdir/step-22.exit"
 else
   say "no token placeholder strings in script comments."
 fi
 rm -f "$_act_temp"
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
+
+# Wave result aggregation — collect step exit codes from temp files
+for _s in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 21 22; do
+  _exit_file="$_wave_tmpdir/step-$_s.exit"
+  if [ -f "$_exit_file" ]; then
+    read -r _code < "$_exit_file"
+    if [ "$_code" != "0" ]; then
+      exit_code=1
+      "$FAIL_FAST" && exit $exit_code
+    fi
+  fi
+done
 
 if [ $exit_code -ne 0 ]; then
   warn "some checks failed with exit code $exit_code"

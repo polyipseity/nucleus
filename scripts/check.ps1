@@ -178,6 +178,13 @@ if (-not $HAS_ARGS) {
   $script:CachedPs1Files = Get-ChildItem -Recurse -Path $RepoRoot -Filter '*.ps1' | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object FullName
 }
 
+# Wave parallelism infrastructure
+$script:WaveTmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
+$null = New-Item -ItemType Directory -Path $script:WaveTmpDir -Force
+Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action {
+  if (Test-Path $script:WaveTmpDir) { Remove-Item -Recurse -Force $script:WaveTmpDir }
+} | Out-Null
+
 $_step = 0
 
 # Pre-flight tool availability checks.
@@ -197,6 +204,7 @@ Ensure-Tool -Name 'check-jsonschema' -Type 'Command' -InstallCommand 'pip instal
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Shell script linting (shellcheck) ===" -f (++$_step))
 say "skipping (requires POSIX shellcheck — not available natively on Windows; use WSL or check.sh)."
+0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-1.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
 # 2. PowerShell syntax validation
@@ -209,8 +217,8 @@ if ($PS1_FILES.Count -gt 0) {
 } else {
   say "skipping (no PowerShell scripts to check)."
 }
-if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
-if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
+$_stepExit = $LASTEXITCODE
+$_stepExit | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-2.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
 # 3. Packer template validation
@@ -223,32 +231,36 @@ if ($PKR_FILES.Count -gt 0) {
 } else {
   say "skipping (no Packer templates to check)."
 }
-if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
-if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
+$_stepExit = $LASTEXITCODE
+$_stepExit | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-3.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
 # 4. Dead Nix code
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Dead Nix code ===" -f (++$_step))
 say "skipping (requires Nix toolchain — not available on Windows)."
+0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-4.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
 # 5. Nix flake evaluation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Nix flake evaluation ===" -f (++$_step))
 say "skipping (requires Nix toolchain — not available on Windows)."
+0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-5.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
 # 6. Nix formatting (nixfmt)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Nix formatting (nixfmt) ===" -f (++$_step))
 say "skipping (requires Nix toolchain — not available on Windows)."
+0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-6.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
 # 7. Nix lint (nixf-tidy)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Nix lint (nixf-tidy) ===" -f (++$_step))
 say "skipping (requires Nix toolchain — not available on Windows)."
+0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-7.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
 # 8. Stale Nix build artifact check
@@ -260,8 +272,7 @@ $_cnbaOutput = & "$PSScriptRoot\cleanup-nix.ps1" -WhatIf 2>&1
   if ($_cnbaFound) {
     warn "stale Nix build artifacts found:"
     $_cnbaOutput | ForEach-Object { warn "  $_" }
-    $exitCode = 1
-    if ($FAIL_FAST) { exit $exitCode }
+    1 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-8.exit") -NoNewline
   } else {
     say "no stale Nix build artifacts found."
   }
@@ -271,24 +282,28 @@ $_cnbaOutput = & "$PSScriptRoot\cleanup-nix.ps1" -WhatIf 2>&1
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Shell script validation tests ===" -f (++$_step))
 say "skipping (bash-based test scripts — not available on Windows)."
+0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-9.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
 # 10. CWD-independence tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] CWD-independence tests ===" -f (++$_step))
 say "skipping (bash-based test scripts — not available on Windows)."
+0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-10.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
 # 11. Nix search path tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Nix search path tests ===" -f (++$_step))
 say "skipping (bash-based test scripts — not available on Windows)."
+0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-11.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
 # 12. Port utility function tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Port utility function tests ===" -f (++$_step))
 say "skipping (bash-based test scripts — not available on Windows)."
+0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-12.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
 # 13. Lockfile validation
@@ -306,8 +321,7 @@ $_lf = $null
 $_lfOverlapErrors = 0
 if (-not (Test-Path $_lfPath)) {
   warn "lockfile.json not found at $_lfPath"
-  $exitCode = 1
-  if ($FAIL_FAST) { exit $exitCode }
+  1 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-13.exit") -NoNewline
   $_lfOverlapErrors++
 } else {
   $_lf = Get-Content $_lfPath -Raw | ConvertFrom-Json -AsHashtable
@@ -338,8 +352,7 @@ if (-not (Test-Path $_lfPath)) {
 }
 if ($_lfOverlapErrors -gt 0) {
   warn ("lockfile.json consistency: {0} overlap issue(s)" -f $_lfOverlapErrors)
-  $exitCode = 1
-  if ($FAIL_FAST) { exit $exitCode }
+  1 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-13.exit") -NoNewline
 } else {
   say "lockfile.json consistency: no overlapping packages across sections"
 }
@@ -375,8 +388,7 @@ if (-not (Test-Path $_lfAlPath)) {
 }
 if ($_lfAlErrors -gt 0) {
   warn "lifecycle-allowlist.json validation failed with $_lfAlErrors error(s)"
-  $exitCode = 1
-  if ($FAIL_FAST) { exit $exitCode }
+  1 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-13.exit") -NoNewline
 } else {
   $_lfAlCount = if ($null -ne $_lfAl -and $_lfAl -is [hashtable]) { $_lfAl.Count } else { 0 }
   say ("lifecycle-allowlist.json: valid (entry count: {0})" -f $_lfAlCount)
@@ -385,8 +397,7 @@ if ($_lfAlErrors -gt 0) {
 # Always-run: Lockfile section validation
 if ($null -eq $_lf) {
     warn "lockfile.json could not be loaded — skipping section validation"
-    $exitCode = 1
-    if ($FAIL_FAST) { exit $exitCode }
+    1 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-13.exit") -NoNewline
   } else {
     $_lfErrors = 0
 
@@ -464,8 +475,7 @@ if ($null -eq $_lf) {
 
     if ($_lfErrors -gt 0) {
       warn "lockfile.json validation failed with $_lfErrors error(s)"
-      $exitCode = 1
-      if ($FAIL_FAST) { exit $exitCode }
+      1 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-13.exit") -NoNewline
     } else {
       say "lockfile.json validation passed"
     }
@@ -605,8 +615,7 @@ $_lfErrors = 0
 
   if ($_lfErrors -gt 0) {
     warn "locked DSC validation failed with $_lfErrors error(s)"
-    $exitCode = 1
-    if ($FAIL_FAST) { exit $exitCode }
+    1 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-14.exit") -NoNewline
   } else {
     say "locked DSC validation passed"
   }
@@ -692,8 +701,7 @@ if (Test-Path $_dependabot) {
 }
 if ($_jsonschemaErrors -gt 0) {
   warn "schema validation failed with $_jsonschemaErrors error(s)"
-  $exitCode = 1
-  if ($FAIL_FAST) { exit $exitCode }
+  1 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-15.exit") -NoNewline
 }
 say "schema validation passed."
 
@@ -749,8 +757,7 @@ if (-not (Test-Path $_svcJson)) {
 
   if ($_svcErrors -gt 0) {
     warn "services.json validation failed with $_svcErrors error(s)"
-    $exitCode = 1
-    if ($FAIL_FAST) { exit $exitCode }
+    1 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-16.exit") -NoNewline
   } else {
     # Validate user-scoped platform entries have justification.
     foreach ($_svcName in $_svc.Keys) {
@@ -808,8 +815,7 @@ if (-not (Test-Path $_svcJson)) {
 
     if ($_svcErrors -gt 0) {
       warn "services.json validation failed with $_svcErrors error(s)"
-      $exitCode = 1
-      if ($FAIL_FAST) { exit $exitCode }
+      1 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-16.exit") -NoNewline
     }
     say "services.json validation passed"
   }
@@ -845,8 +851,7 @@ foreach ($_yf in $_yamlFiles) {
 }
 if ($_yamlErrors -gt 0) {
   warn "YAML validation/lint failed with $_yamlErrors error(s)"
-  $exitCode = 1
-  if ($FAIL_FAST) { exit $exitCode }
+  1 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-17.exit") -NoNewline
 }
 say "YAML validation and linting passed."
 
@@ -880,8 +885,7 @@ $_violations = 0
     $_violations++
   }
   if ($_violations -gt 0) {
-    $exitCode = 1
-    if ($FAIL_FAST) { exit $exitCode }
+    1 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-18.exit") -NoNewline
   } else {
     say "no package manager violations found."
   }
@@ -966,12 +970,10 @@ if ($_undocSuppViolations.Count -gt 0) {
   }
   warn ("undocumented error suppression check failed with {0} violation(s)" -f $_undocSuppViolations.Count)
   say "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
-  $exitCode = 1
-  if ($FAIL_FAST) { exit $exitCode }
+  1 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-19.exit") -NoNewline
 } else {
   say "no undocumented error suppressions found."
 }
-if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 
 # ---------------------------------------------------------------------------
 # 21. Online determinism checks (--verify mode only)
@@ -1052,12 +1054,10 @@ $_cfgMethodOutput = $_srcFiles | Select-String -Pattern '# Method'
 
 if ($_cfgErrors -gt 0) {
   warn ("config method compliance check failed with {0} error(s)" -f $_cfgErrors)
-  $exitCode = 1
-  if ($FAIL_FAST) { exit $exitCode }
+  1 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-21.exit") -NoNewline
 } else {
   say "config method compliance passed."
 }
-if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 
 # ---------------------------------------------------------------------------
 # 23. Activation script token placeholder in comment check
@@ -1078,10 +1078,32 @@ if ($HAS_ARGS) {
 if ($_actViolations.Count -gt 0) {
   foreach ($_av in ($_actViolations | Sort-Object -Unique)) { warn $_av }
   warn "token placeholder strings found in script comments"
-  $exitCode = 1
-  if ($FAIL_FAST) { exit $exitCode }
+  1 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-22.exit") -NoNewline
 } else {
   say "no token placeholder strings in script comments."
+}
+
+# Aggregate wave results
+for ($_s = 1; $_s -le 19; $_s++) {
+  $_exitFile = Join-Path $script:WaveTmpDir "step-$_s.exit"
+  if (Test-Path $_exitFile) {
+    $_code = Get-Content $_exitFile -Raw
+    if ($_code -ne '0') {
+      $exitCode = 1
+      if ($FAIL_FAST) { exit $exitCode }
+    }
+  }
+}
+# Step 21-22 same pattern
+for ($_s = 21; $_s -le 22; $_s++) {
+  $_exitFile = Join-Path $script:WaveTmpDir "step-$_s.exit"
+  if (Test-Path $_exitFile) {
+    $_code = Get-Content $_exitFile -Raw
+    if ($_code -ne '0') {
+      $exitCode = 1
+      if ($FAIL_FAST) { exit $exitCode }
+    }
+  }
 }
 
 # ---------------------------------------------------------------------------

@@ -104,6 +104,12 @@ foreach ($_arg in $args) {
 # Cache file lists — used by active steps to avoid repeated discovery.
 $script:CachedPs1Files = Get-ChildItem -Recurse -Path $RepoRoot -Filter '*.ps1' | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object FullName
 
+# Wave parallelism infrastructure: each step writes its exit code to a per-step temp file.
+# Results are aggregated at the end. In FAIL_FAST mode, steps run sequentially (original behavior).
+$script:WaveTmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
+$null = New-Item -ItemType Directory -Path $script:WaveTmpDir
+Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Remove-Item -Recurse -Force $script:WaveTmpDir -ErrorAction SilentlyContinue } | Out-Null # check-suppress:suppression_doc: cleanup of temp dir in %TEMP%; failure is harmless on process exit
+
 # ---------------------------------------------------------------------------
 # 1. Nix test suite — POSIX only (stub on Windows)
 # ---------------------------------------------------------------------------
@@ -121,8 +127,7 @@ say "skipping (requires ShellCheck — not available on Windows)."
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] PowerShell lint ===" -f (++$_step))
 & "$PSScriptRoot\check-pwsh.ps1"
-if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
-if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
+$LASTEXITCODE | Out-File -NoNewline (Join-Path $script:WaveTmpDir "step-3.exit")
 
 # ---------------------------------------------------------------------------
 # 4. Nucleus apps smoke tests — POSIX only (stub on Windows)
@@ -135,6 +140,18 @@ say "skipping (requires Nix and bash — not available on Windows)."
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] System config build ===" -f (++$_step))
 say "skipping (system config build is POSIX-only)."
+
+# Wave result aggregation — collect step exit codes from temp files
+foreach ($_s in @(1, 2, 3, 4)) {
+  $_exitFile = Join-Path $script:WaveTmpDir "step-$_s.exit"
+  if (Test-Path $_exitFile) {
+    $_code = Get-Content $_exitFile -Raw | ForEach-Object { $_.Trim() }
+    if ($_code -ne '0') {
+      $exitCode = 1
+      if ($FAIL_FAST) { exit $exitCode }
+    }
+  }
+}
 
 Write-Output ""
 if ($exitCode -ne 0) {

@@ -128,6 +128,11 @@ _step=0
 TEST_NIX_FILES=$(find tests -name '*.nix' -type f ! -name 'lib.nix' | sort)
 readarray -t TEST_NIX_FILES_ARR <<< "$TEST_NIX_FILES"
 
+# Wave parallelism infrastructure: each step writes its exit code to a per-step temp file.
+# Results are aggregated at the end. In FAIL_FAST mode, steps run sequentially (original behavior).
+_wave_tmpdir=$(mktemp -d) || { error "failed to create wave temp directory"; exit 1; }
+trap 'rm -rf -- "$_wave_tmpdir"' EXIT
+
 # 1. Nix test suite — auto-discover and run all *.nix test files
 section "$((_step += 1))" "Nix test suite"
 tmp_failed=$(mktemp) || { error "failed to create temp file"; }
@@ -157,30 +162,26 @@ if [ -s "$tmp_failed" ]; then
   error "FAILED Nix tests:"
   cat "$tmp_failed" >&2
   rm -f "$tmp_failed"
-  exit_code=1
+  echo "1" > "$_wave_tmpdir/step-1.exit"
 fi
 rm -f "$tmp_failed"
 say "all Nix tests passed."
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # 2. Shell script linting (ShellCheck)
 section "$((_step += 1))" "Shell script linting"
-bash scripts/check-sh.sh || exit_code=$?
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
+bash scripts/check-sh.sh || echo "1" > "$_wave_tmpdir/step-2.exit"
 
 # 3. PowerShell lint (PSScriptAnalyzer)
 section "$((_step += 1))" "PowerShell lint"
-pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 || exit_code=$?
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
+pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 || echo "1" > "$_wave_tmpdir/step-3.exit"
 
 # 4. Nucleus apps smoke tests (build + --help / dry-run)
 section "$((_step += 1))" "Nucleus apps smoke tests"
 if [ "$quiet_mode" = true ]; then
-  bash tests/scripts/nucleus-apps-smoke-tests.sh >/dev/null || exit_code=$?
+  bash tests/scripts/nucleus-apps-smoke-tests.sh >/dev/null || echo "1" > "$_wave_tmpdir/step-4.exit"
 else
-  bash tests/scripts/nucleus-apps-smoke-tests.sh || exit_code=$?
+  bash tests/scripts/nucleus-apps-smoke-tests.sh || echo "1" > "$_wave_tmpdir/step-4.exit"
 fi
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # 5. System config build — build all derivations in the host system config.
 # WHY soft-fail: building derivations is slow and network-dependent. Always
@@ -212,6 +213,18 @@ else
     fi
   fi
 fi
+
+# Wave result aggregation — collect step exit codes from temp files
+for _s in 1 2 3 4; do
+  _exit_file="$_wave_tmpdir/step-$_s.exit"
+  if [ -f "$_exit_file" ]; then
+    read -r _code < "$_exit_file"
+    if [ "$_code" != "0" ]; then
+      exit_code=1
+      "$FAIL_FAST" && exit $exit_code
+    fi
+  fi
+done
 
 if [ $exit_code -ne 0 ]; then
   warn "some tests failed with exit code $exit_code"
