@@ -131,3 +131,4 @@ if [ "$skip_system_build" != true ]; then
 fi
 
 nuc_done
+exit $exit_code
