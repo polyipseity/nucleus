@@ -9,55 +9,53 @@
 # within the appropriate group, respecting any dependency constraints.
 #
 # Toolchain checks (1-3):
-#   1. Shell script linting (shellcheck) (stub on Windows)
+#   1. Shell script formatting/linting (treefmt) (stub on Windows)
 #   2. PowerShell syntax validation
 #   3. Packer template validation
 #
-# Nix checks (4-8, stubs on Windows):
-#   4. Dead Nix code (stub)
+# Nix checks (4-7, stubs on Windows):
+#   4. Code formatting (treefmt) (stub)
 #   5. Nix flake evaluation (stub)
-#   6. Nix formatting (nixfmt) (stub)
-#   7. Nix lint (nixf-tidy) (stub)
-#   8. Stale Nix build artifact check
+#   6. Nix lint (nixf-tidy) (stub)
+#   7. Stale Nix build artifact check
 #
-# Test suites (9-12, stubs on Windows):
-#   9. Shell script validation tests (stub)
+# Test suites (8-11, stubs on Windows):
+#   8. Shell script validation tests (stub)
 #  10. CWD-independence tests (stub)
 #  11. Nix search path tests (stub)
 #  12. Port utility function tests (stub)
 #
-# Data integrity (13-18):
-# Data integrity (13-16):
+# Data integrity (12-15):
 #  13. Lockfile validation
 #  14. Locked DSC validation
 #  15. Schema validation (JSON/YAML)
 #  16. Service registry validation
 #
-# Policy/verification (17-22):
-#  17. YAML validation and linting (yamllint)
-#  18. Package manager usage enforcement
-#  19. Undocumented error suppression check
-#  20. Online determinism checks (--verify mode only)
-#  21. Config method compliance
-#  22. Activation script token placeholder in comment check
+# Policy/verification (16-21):
+#  16. YAML structural validation
+#  17. Package manager usage enforcement
+#  18. Undocumented error suppression check
+#  19. Online determinism checks (--verify mode only)
+#  20. Config method compliance
+#  21. Activation script token placeholder in comment check
 #
 # Mode taxonomy:
 #   Always-run (no HAS_ARGS guard — run in both --full and --scoped):
-#     - Stale Nix build artifact check        (step 8)
-#     - Lockfile section validation           (step 13)
-#     - Locked DSC validation                 (step 14)
-#     - Service registry validation           (step 16)
-#     - Package manager usage enforcement     (step 18)
-#     - Config method compliance              (step 21)
+#     - Stale Nix build artifact check        (step 7)
+#     - Lockfile section validation           (step 12)
+#     - Locked DSC validation                 (step 13)
+#     - Service registry validation           (step 15)
+#     - Package manager usage enforcement     (step 17)
+#     - Config method compliance              (step 20)
 #   Path-scopable (accept file filtering in both modes):
 #     - PowerShell syntax validation          (step 2)
 #     - Packer template validation            (step 3)
-#     - Schema validation                     (step 15)
-#     - YAML validation/linting               (step 17)
-#     - Undocumented error suppression        (step 19)
-#     - Activation script token placeholder   (step 22)
+#     - Schema validation                     (step 14)
+#     - YAML structural validation            (step 16)
+#     - Undocumented error suppression        (step 18)
+#     - Activation script token placeholder   (step 21)
 #
-# Note: Steps 1, 4-7, 9-12 are stubs on Windows (POSIX/Nix toolchain not available).
+# Note: Steps 1, 4-6, 8-11 are stubs on Windows (POSIX/Nix toolchain not available).
 #
 # Output conventions:
 #   All messages (info, success, skip, warning) go to stdout.
@@ -79,16 +77,15 @@
 # patterns). Hard-coded file paths in validation steps are not allowed.
 #
 # Tests (Nix test suite) are run separately via scripts/test.ps1.
-# Step 1 is a POSIX-only stub (shellcheck not available on Windows).
-# Steps 4-7, 9-12 are stubs (require Nix or bash — not available on Windows).
-# Step 21 only runs with the --verify flag.
+# Step 1 is a POSIX-only stub (treefmt not available on Windows).
+# Steps 4-6, 8-11 are stubs (require Nix or bash — not available on Windows).
+# Step 19 only runs with the --verify flag.
 #
 # Prerequisites:
 #   - check-jsonschema (pip install check-jsonschema) for schema validation
 #   - Ensure-Tool module (imported via pre-flight block) for tool validation
 #   - powershell-yaml module (Install-Module powershell-yaml -Scope CurrentUser)
 #     is required for locked DSC validation.
-#   - yamllint (pip install yamllint) for YAML linting
 #
 # Arguments:
 #   (none)        Paths may be provided as positional arguments; passed
@@ -195,16 +192,15 @@ $modulesPath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules'
 Import-Module (Join-Path $modulesPath 'Ensure-Tool.psm1') -Force
 Ensure-Tool -Name 'powershell-yaml' -Type 'Module' -InstallCommand "Install-Module powershell-yaml -Scope CurrentUser -Force"
 Ensure-Tool -Name 'packer' -Type 'Command' -InstallCommand "winget install Hashicorp.Packer"
-Ensure-Tool -Name 'yamllint' -Type 'Command' -InstallCommand 'pip install yamllint'
 Ensure-Tool -Name 'check-jsonschema' -Type 'Command' -InstallCommand 'pip install check-jsonschema'
-# shellcheck is POSIX-native and not available on Windows.
-# Use check.sh on WSL/Linux for shell script linting.
+# treefmt is POSIX-native and not available on Windows.
+# Use check.sh on WSL/Linux for shell script formatting/linting.
 
 # ---------------------------------------------------------------------------
-# 1. Shell script linting (shellcheck) — POSIX only (stub on Windows)
+# 1. Shell script formatting/linting (treefmt) — POSIX only (stub on Windows)
 # ---------------------------------------------------------------------------
-Write-Output ("`n=== [{0}] Shell script linting (shellcheck) ===" -f (++$_step))
-say "skipping (requires POSIX shellcheck — not available natively on Windows; use WSL or check.sh)."
+Write-Output ("`n=== [{0}] Shell script formatting/linting (treefmt) ===" -f (++$_step))
+say "skipping (requires POSIX treefmt — not available natively on Windows; use WSL or check.sh)."
 0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-1.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
@@ -250,10 +246,10 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
 } -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES))
 
 # ---------------------------------------------------------------------------
-# 4. Dead Nix code
+# 4. Code formatting (treefmt)
 # ---------------------------------------------------------------------------
-Write-Output ("`n=== [{0}] Dead Nix code ===" -f (++$_step))
-say "skipping (requires Nix toolchain — not available on Windows)."
+Write-Output ("`n=== [{0}] Code formatting (treefmt) ===" -f (++$_step))
+say "skipping (requires POSIX treefmt — not available natively on Windows; use WSL or check.sh)."
 0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-4.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
@@ -264,21 +260,14 @@ say "skipping (requires Nix toolchain — not available on Windows)."
 0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-5.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
-# 6. Nix formatting (nixfmt)
+# 6. Nix lint (nixf-tidy)
 # ---------------------------------------------------------------------------
-Write-Output ("`n=== [{0}] Nix formatting (nixfmt) ===" -f (++$_step))
+Write-Output ("`n=== [{0}] Nix lint (nixf-tidy) ===" -f (++$_step))
 say "skipping (requires Nix toolchain — not available on Windows)."
 0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-6.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
-# 7. Nix lint (nixf-tidy)
-# ---------------------------------------------------------------------------
-Write-Output ("`n=== [{0}] Nix lint (nixf-tidy) ===" -f (++$_step))
-say "skipping (requires Nix toolchain — not available on Windows)."
-0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-7.exit") -NoNewline
-
-# ---------------------------------------------------------------------------
-# 8. Stale Nix build artifact check
+# 7. Stale Nix build artifact check
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Stale Nix build artifact check ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
@@ -293,42 +282,42 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   if ($_cnbaFound) {
     warn "stale Nix build artifacts found:"
     $_cnbaOutput | ForEach-Object { warn "  $_" }
-    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-8.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-7.exit") -NoNewline
   } else {
     say "no stale Nix build artifacts found."
   }
 } -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES))
 
 # ---------------------------------------------------------------------------
-# 9. Shell script validation tests
+# 8. Shell script validation tests
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Shell script validation tests ===" -f (++$_step))
+say "skipping (bash-based test scripts — not available on Windows)."
+0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-8.exit") -NoNewline
+
+# ---------------------------------------------------------------------------
+# 9. CWD-independence tests
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] CWD-independence tests ===" -f (++$_step))
 say "skipping (bash-based test scripts — not available on Windows)."
 0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-9.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
-# 10. CWD-independence tests
+# 10. Nix search path tests
 # ---------------------------------------------------------------------------
-Write-Output ("`n=== [{0}] CWD-independence tests ===" -f (++$_step))
+Write-Output ("`n=== [{0}] Nix search path tests ===" -f (++$_step))
 say "skipping (bash-based test scripts — not available on Windows)."
 0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-10.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
-# 11. Nix search path tests
+# 11. Port utility function tests
 # ---------------------------------------------------------------------------
-Write-Output ("`n=== [{0}] Nix search path tests ===" -f (++$_step))
+Write-Output ("`n=== [{0}] Port utility function tests ===" -f (++$_step))
 say "skipping (bash-based test scripts — not available on Windows)."
 0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-11.exit") -NoNewline
 
 # ---------------------------------------------------------------------------
-# 12. Port utility function tests
-# ---------------------------------------------------------------------------
-Write-Output ("`n=== [{0}] Port utility function tests ===" -f (++$_step))
-say "skipping (bash-based test scripts — not available on Windows)."
-0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-12.exit") -NoNewline
-
-# ---------------------------------------------------------------------------
-# 13. Lockfile validation
+# 12. Lockfile validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Lockfile validation ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
@@ -349,7 +338,7 @@ $_lf = $null
 $_lfOverlapErrors = 0
 if (-not (Test-Path $_lfPath)) {
   warn "lockfile.json not found at $_lfPath"
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-13.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-12.exit") -NoNewline
   $_lfOverlapErrors++
 } else {
   $_lf = Get-Content $_lfPath -Raw | ConvertFrom-Json -AsHashtable
@@ -380,7 +369,7 @@ if (-not (Test-Path $_lfPath)) {
 }
 if ($_lfOverlapErrors -gt 0) {
   warn ("lockfile.json consistency: {0} overlap issue(s)" -f $_lfOverlapErrors)
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-13.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-12.exit") -NoNewline
 } else {
   say "lockfile.json consistency: no overlapping packages across sections"
 }
@@ -416,7 +405,7 @@ if (-not (Test-Path $_lfAlPath)) {
 }
 if ($_lfAlErrors -gt 0) {
   warn "lifecycle-allowlist.json validation failed with $_lfAlErrors error(s)"
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-13.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-12.exit") -NoNewline
 } else {
   $_lfAlCount = if ($null -ne $_lfAl -and $_lfAl -is [hashtable]) { $_lfAl.Count } else { 0 }
   say ("lifecycle-allowlist.json: valid (entry count: {0})" -f $_lfAlCount)
@@ -425,7 +414,7 @@ if ($_lfAlErrors -gt 0) {
 # Always-run: Lockfile section validation
 if ($null -eq $_lf) {
     warn "lockfile.json could not be loaded — skipping section validation"
-    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-13.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-12.exit") -NoNewline
   } else {
     $_lfErrors = 0
 
@@ -503,7 +492,7 @@ if ($null -eq $_lf) {
 
     if ($_lfErrors -gt 0) {
       warn "lockfile.json validation failed with $_lfErrors error(s)"
-      1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-13.exit") -NoNewline
+      1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-12.exit") -NoNewline
     } else {
       say "lockfile.json validation passed"
     }
@@ -511,7 +500,7 @@ if ($null -eq $_lf) {
 } -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES))
 
 # ---------------------------------------------------------------------------
-# 14. Locked DSC validation
+# 13. Locked DSC validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Locked DSC validation ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
@@ -650,14 +639,14 @@ $_lfErrors = 0
 
   if ($_lfErrors -gt 0) {
     warn "locked DSC validation failed with $_lfErrors error(s)"
-    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-14.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-13.exit") -NoNewline
   } else {
     say "locked DSC validation passed"
   }
 } -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES))
 
 # ---------------------------------------------------------------------------
-# 15. Schema validation (JSON/YAML)
+# 14. Schema validation (JSON/YAML)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Schema validation (JSON/YAML) ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
@@ -743,13 +732,13 @@ if (Test-Path $_dependabot) {
 }
 if ($_jsonschemaErrors -gt 0) {
   warn "schema validation failed with $_jsonschemaErrors error(s)"
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-15.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-14.exit") -NoNewline
 }
 say "schema validation passed."
 } -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES))
 
 # ---------------------------------------------------------------------------
-# 16. Service registry validation
+# 15. Service registry validation
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Service registry validation ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
@@ -806,7 +795,7 @@ if (-not (Test-Path $_svcJson)) {
 
   if ($_svcErrors -gt 0) {
     warn "services.json validation failed with $_svcErrors error(s)"
-    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-16.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-15.exit") -NoNewline
   } else {
     # Validate user-scoped platform entries have justification.
     foreach ($_svcName in $_svc.Keys) {
@@ -864,16 +853,16 @@ if (-not (Test-Path $_svcJson)) {
 
     if ($_svcErrors -gt 0) {
       warn "services.json validation failed with $_svcErrors error(s)"
-      1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-16.exit") -NoNewline
+      1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-15.exit") -NoNewline
     }
     say "services.json validation passed"
   }
 } -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES))
 
 # ---------------------------------------------------------------------------
-# 17. YAML validation and linting
+# 16. YAML structural validation
 # ---------------------------------------------------------------------------
-Write-Output ("`n=== [{0}] YAML validation and linting ===" -f (++$_step))
+Write-Output ("`n=== [{0}] YAML structural validation ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   param($RepoRoot, $WaveTmpDir, $HAS_ARGS, $positionalArgs, $scriptCachedPs1Files, $scriptCachedNixFiles, $scriptCachedYamlFiles, $scriptCachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES)
   Set-StrictMode -Version Latest
@@ -898,22 +887,16 @@ foreach ($_yf in $_yamlFiles) {
     warn "$($_yf): invalid YAML"
     $_yamlErrors++
   }
-  # Lint
-  yamllint --strict $_yf 2>&1 | Out-Null
-  if ($LASTEXITCODE -ne 0) {
-    warn "$($_yf): yamllint violations"
-    $_yamlErrors++
-  }
 }
 if ($_yamlErrors -gt 0) {
-  warn "YAML validation/lint failed with $_yamlErrors error(s)"
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-17.exit") -NoNewline
+  warn "YAML structural validation failed with $_yamlErrors error(s)"
+  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-16.exit") -NoNewline
 }
-say "YAML validation and linting passed."
+say "YAML structural validation passed."
 } -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES))
 
 # ---------------------------------------------------------------------------
-# 19. Package manager usage enforcement
+# 17. Package manager usage enforcement
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Package manager usage enforcement ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
@@ -948,14 +931,14 @@ $_violations = 0
     $_violations++
   }
   if ($_violations -gt 0) {
-    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-18.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-17.exit") -NoNewline
   } else {
     say "no package manager violations found."
   }
 } -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES))
 
 # ---------------------------------------------------------------------------
-# 20. Undocumented error suppression check
+# 18. Undocumented error suppression check
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Undocumented error suppression check ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
@@ -1040,14 +1023,14 @@ if ($_undocSuppViolations.Count -gt 0) {
   }
   warn ("undocumented error suppression check failed with {0} violation(s)" -f $_undocSuppViolations.Count)
   say "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-19.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-18.exit") -NoNewline
 } else {
   say "no undocumented error suppressions found."
 }
 } -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES))
 
 # ---------------------------------------------------------------------------
-# 21. Online determinism checks (--verify mode only)
+# 19. Online determinism checks (--verify mode only)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Online determinism checks (--verify) ===" -f (++$_step))
 if ($VERIFY) {
@@ -1062,7 +1045,7 @@ if ($VERIFY) {
 }
 
 # ---------------------------------------------------------------------------
-# 22. Config method compliance
+# 20. Config method compliance
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Config method compliance ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
@@ -1131,14 +1114,14 @@ $_cfgMethodOutput = $_srcFiles | Select-String -Pattern '# Method'
 
 if ($_cfgErrors -gt 0) {
   warn ("config method compliance check failed with {0} error(s)" -f $_cfgErrors)
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-21.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-19.exit") -NoNewline
 } else {
   say "config method compliance passed."
 }
 } -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES))
 
 # ---------------------------------------------------------------------------
-# 23. Activation script token placeholder in comment check
+# 21. Activation script token placeholder in comment check
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] Activation script token placeholder in comment check ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
@@ -1162,7 +1145,7 @@ if ($HAS_ARGS) {
 if ($_actViolations.Count -gt 0) {
   foreach ($_av in ($_actViolations | Sort-Object -Unique)) { warn $_av }
   warn "token placeholder strings found in script comments"
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-22.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-20.exit") -NoNewline
 } else {
   say "no token placeholder strings in script comments."
 }
@@ -1174,7 +1157,7 @@ if ($script:waveJobs.Count -gt 0) {
 }
 
 # Aggregate wave results
-for ($_s = 1; $_s -le 19; $_s++) {
+for ($_s = 1; $_s -le 18; $_s++) {
   $_exitFile = Join-Path $script:WaveTmpDir "step-$_s.exit"
   if (Test-Path $_exitFile) {
     $_code = Get-Content $_exitFile -Raw
@@ -1184,8 +1167,8 @@ for ($_s = 1; $_s -le 19; $_s++) {
     }
   }
 }
-# Step 21-22 same pattern
-for ($_s = 21; $_s -le 22; $_s++) {
+# Step 19-20 same pattern
+for ($_s = 19; $_s -le 20; $_s++) {
   $_exitFile = Join-Path $script:WaveTmpDir "step-$_s.exit"
   if (Test-Path $_exitFile) {
     $_code = Get-Content $_exitFile -Raw

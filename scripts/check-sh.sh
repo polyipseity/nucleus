@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Checks all tracked *.sh files with ShellCheck. With arguments, only provided paths.
+# Checks all tracked *.sh files with treefmt (ShellCheck via treefmt-nix). With arguments, only provided paths.
 set -euo pipefail
 
 # Resolve symlinks so SCRIPT_DIR works from Nix wrapper symlinks.
@@ -15,7 +15,7 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 usage() {
-  usage_std "check-sh.sh" "[--scoped] [path ...]" "Validate shell script syntax and lint quality with ShellCheck. With no arguments, checks all tracked *.sh files from Git. With arguments, checks only the provided paths. Use --scoped to skip whole-repo discovery when no paths are given."
+  usage_std "check-sh.sh" "[--scoped] [path ...]" "Validate shell script syntax and lint quality with treefmt (ShellCheck). With no arguments, checks all tracked *.sh files from Git. With arguments, checks only the provided paths. Use --scoped to skip whole-repo discovery when no paths are given."
 }
 
 # --source-path=SCRIPTDIR lets shellcheck resolve `# shellcheck source=` directives
@@ -45,19 +45,21 @@ while [ "$#" -gt 0 ]; do
 done
 
 if [ "$#" -gt 0 ]; then
-  # Paths given: always run shellcheck on them, regardless of --scoped.
-  printf '%s\0' "$@" | xargs -0 -P "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" shellcheck --source-path=SCRIPTDIR -x  # DO NOT add --severity — both style and info issues must be caught; see commit cab5661a for why this was erroneously restricted
+  # Paths given: always run treefmt on them, regardless of --scoped.
+  treefmt --ci "$@"
   count="$#"
 elif $_SCOPED; then
   # --scoped with no paths: nothing to check.
   say 'no shell scripts to check (scoped mode).'
   exit 0
 else
-  if ! files="$(git ls-files '*.sh' ':(exclude)vendor/')" || [ -z "$files" ]; then
+  files="$(git ls-files '*.sh' ':(exclude)vendor/')" || true  # check-suppress:suppression_doc: git ls-files returns 1 when no matches found
+  if [ -z "$files" ]; then
     say 'no shell scripts to check.'
     exit 0
   fi
-  git ls-files -z '*.sh' ':(exclude)vendor/' | xargs -0 -P "$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)" shellcheck --source-path=SCRIPTDIR -x  # DO NOT add --severity — both style and info issues must be caught; see commit cab5661a for why this was erroneously restricted
+  # shellcheck disable=SC2086 # reason: word splitting intentional for treefmt file args
+  treefmt --ci $files
   count=$(printf '%s\n' "$files" | awk 'NF { c += 1 } END { print c + 0 }')
 fi
 

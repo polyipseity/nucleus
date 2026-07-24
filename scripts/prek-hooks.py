@@ -51,7 +51,7 @@ def run_check(files: list[str], repo_root: Path, format_enabled: bool = False, s
         non-zero on failure.
     """
     if sys.platform != "win32":
-        # Direct call is safe because the required tools (nixfmt, pwsh, packer)
+        # Direct call is safe because the required tools (treefmt, pwsh, packer)
         # are available in the default devShell (loaded by .envrc use flake).
         # Intentionally NOT passing --no-fail-fast: check accumulates by default
         # (no-fail-fast). Runs on every commit — should report all issues.

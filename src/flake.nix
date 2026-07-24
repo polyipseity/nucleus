@@ -23,6 +23,10 @@
       url = "github:Mic92/sops-nix";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    treefmt-nix = {
+      url = "github:numtide/treefmt-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
     nix-homebrew.url = "github:zhaofengli/nix-homebrew";
     homebrew-core = {
       url = "github:homebrew/homebrew-core";
@@ -56,6 +60,7 @@
 
   outputs =
     {
+      treefmt-nix,
       cirruslabs-cli,
       darwin,
       home-manager,
@@ -422,13 +427,13 @@
 
       # ShellCheck-based shell script linting.
       mkCheckShApp =
-        pkgs:
+        pkgs: treefmtWrapper:
         mkApp pkgs {
           name = "check-sh";
           runtimeInputs = [
             pkgs.bash
             pkgs.git
-            pkgs.shellcheck
+            treefmtWrapper
           ];
         };
 
@@ -443,26 +448,25 @@
           ];
         };
 
+      mkTreefmtWrapper = _system: pkgs: treefmt-nix.lib.mkWrapper pkgs ./treefmt.nix;
+
       # Build the consolidated repository check app for a given package set.
       # Does NOT inject nixpkgs `pkgs.nix` into PATH — scripts/check.sh uses
       # nix eval which should use the host nix binary so host-specific nix.conf
       # settings (eval-cores, lazy-trees) are interpreted without warnings.
       mkCheckApp =
-        pkgs:
+        pkgs: treefmtWrapper:
         mkApp pkgs {
           name = "check";
           runtimeInputs = [
             pkgs.bash
             pkgs.check-jsonschema
-            pkgs.deadnix
             pkgs.git
             pkgs.jq
             pkgs.nixf
-            pkgs.nixfmt
             pkgs.packer
             pkgs.powershell
-            pkgs.shellcheck
-            pkgs.yamllint
+            treefmtWrapper
             pkgs.yq-go
           ];
         };
@@ -610,7 +614,7 @@
 
       # Build the full set of nucleus app packages for a given package set.
       # Used by home-manager (home.packages) and flake packages output.
-      mkNucleusApps = pkgs: {
+      mkNucleusApps = pkgs: treefmtWrapper: {
         nucleus-apply = writeNucleusShellApplication pkgs {
           name = "apply";
           runtimeInputs = [
@@ -639,15 +643,13 @@
           name = "check";
           runtimeInputs = [
             pkgs.bash
-            pkgs.deadnix
             pkgs.git
             pkgs.jq
             pkgs.nixf
-            pkgs.nixfmt
             pkgs.packer
             pkgs.powershell
             pkgs.check-jsonschema
-            pkgs.yamllint
+            treefmtWrapper
             pkgs.yq-go
           ];
         };
@@ -664,7 +666,7 @@
           runtimeInputs = [
             pkgs.bash
             pkgs.git
-            pkgs.shellcheck
+            treefmtWrapper
           ];
         };
         nucleus-cleanup-nix = writeNucleusShellApplication pkgs {
@@ -751,8 +753,8 @@
         };
       };
 
-      nucleusAppsMac = mkNucleusApps pkgsMac;
-      nucleusAppsLinux = mkNucleusApps pkgsLinux;
+      nucleusAppsMac = mkNucleusApps pkgsMac (mkTreefmtWrapper systems.mac pkgsMac);
+      nucleusAppsLinux = mkNucleusApps pkgsLinux (mkTreefmtWrapper systems.linux pkgsLinux);
 
     in
     {
@@ -770,11 +772,11 @@
           apply = mkApplyApp pkgsMac;
           bootstrap = mkBootstrapApp pkgsMac;
           bump-lockfile = mkBumpLockfileApp pkgsMac;
-          check = mkCheckApp pkgsMac;
+          check = mkCheckApp pkgsMac (mkTreefmtWrapper systems.mac pkgsMac);
           test = mkTestApp pkgsMac;
           check-packer = mkCheckPackerApp pkgsMac;
           check-pwsh = mkCheckPwshApp pkgsMac;
-          check-sh = mkCheckShApp pkgsMac;
+          check-sh = mkCheckShApp pkgsMac (mkTreefmtWrapper systems.mac pkgsMac);
           cloud-setup = mkCloudSetupApp pkgsMac;
           darwin-rebuild = {
             type = "app";
@@ -795,11 +797,11 @@
           apply = mkApplyApp pkgsLinux;
           bootstrap = mkBootstrapApp pkgsLinux;
           bump-lockfile = mkBumpLockfileApp pkgsLinux;
-          check = mkCheckApp pkgsLinux;
+          check = mkCheckApp pkgsLinux (mkTreefmtWrapper systems.linux pkgsLinux);
           test = mkTestApp pkgsLinux;
           check-packer = mkCheckPackerApp pkgsLinux;
           check-pwsh = mkCheckPwshApp pkgsLinux;
-          check-sh = mkCheckShApp pkgsLinux;
+          check-sh = mkCheckShApp pkgsLinux (mkTreefmtWrapper systems.linux pkgsLinux);
           cloud-setup = mkCloudSetupApp pkgsLinux;
           gc = mkGcApp pkgsLinux;
           health-check = mkHealthCheckApp pkgsLinux;
@@ -901,6 +903,11 @@
         ];
       };
 
+      formatter = {
+        "${systems.mac}" = mkTreefmtWrapper systems.mac pkgsMac;
+        "${systems.linux}" = mkTreefmtWrapper systems.linux pkgsLinux;
+      };
+
       # -----------------------------------------------------------------------
       # packages — installable via `nix profile add .#bootstrap-deps`.
       # bootstrap-deps is a symlink-joined set of the tools used for manual
@@ -908,7 +915,7 @@
       # -----------------------------------------------------------------------
       packages = {
         "${systems.mac}" = {
-          nixfmt = pkgsMac.nixfmt;
+          treefmt = mkTreefmtWrapper systems.mac pkgsMac;
           bootstrap-deps = pkgsMac.symlinkJoin {
             name = "bootstrap-deps";
             paths = [
@@ -920,7 +927,7 @@
         }
         // nucleusAppsMac;
         "${systems.linux}" = {
-          nixfmt = pkgsLinux.nixfmt;
+          treefmt = mkTreefmtWrapper systems.linux pkgsLinux;
           bootstrap-deps = pkgsLinux.symlinkJoin {
             name = "bootstrap-deps";
             paths = [
@@ -966,7 +973,9 @@
             pkgsDevMac.mkShell {
               packages = [
                 pkgsDevMac.bun
-                pkgsDevMac.nixfmt
+                mkTreefmtWrapper
+                systems.mac
+                pkgsDevMac
                 pkgsDevMac.packer
                 pkgsDevMac.powershell
                 pkgsDevMac.prek
@@ -1012,7 +1021,9 @@
             pkgsDevLinux.mkShell {
               packages = [
                 pkgsDevLinux.bun
-                pkgsDevLinux.nixfmt
+                mkTreefmtWrapper
+                systems.linux
+                pkgsDevLinux
                 pkgsDevLinux.packer
                 pkgsDevLinux.powershell
                 pkgsDevLinux.prek

@@ -9,12 +9,12 @@ in
 
 # check.sh — verify step ordering via quoted step names from section() calls
 assert containsRegex
-  "[\"]PowerShell syntax validation[\"].*[\"]Packer template validation[\"].*[\"]Dead Nix code[\"].*[\"]Nix flake evaluation[\"].*[\"]Nix formatting [(]nixfmt[)][\"].*[\"]Nix lint [(]nixf-tidy[)][\"].*[\"]Stale Nix build artifact check[\"].*[\"]Shell script validation tests[\"].*[\"]CWD-independence tests[\"].*[\"]Nix search path tests[\"].*[\"]Port utility function tests[\"].*[\"]Lockfile validation[\"].*[\"]Locked DSC validation[\"].*[\"]Service registry validation[\"].*[\"]Package manager usage enforcement[\"].*[\"]Undocumented error suppression[\"].*[\"]Online determinism checks [(]--verify[)][\"].*"
+  "[\"]Shell script formatting/linting [(]treefmt[)][\"].*[\"]PowerShell syntax validation[\"].*[\"]Packer template validation[\"].*[\"]Code formatting [(]treefmt[)][\"].*[\"]Nix flake evaluation[\"].*[\"]Nix lint [(]nixf-tidy[)][\"].*[\"]Stale Nix build artifact check[\"].*[\"]Shell script validation tests[\"].*[\"]CWD-independence tests[\"].*[\"]Nix search path tests[\"].*[\"]Port utility function tests[\"].*[\"]Lockfile validation[\"].*[\"]Locked DSC validation[\"].*[\"]Service registry validation[\"].*[\"]Package manager usage enforcement[\"].*[\"]Undocumented error suppression[\"].*[\"]Online determinism checks [(]--verify[)][\"].*"
   checkShText;
 
 # check.ps1 — verify step ordering via step names with === suffix from Write-Output calls
 assert containsRegex
-  "PowerShell syntax validation ===.*Packer template validation ===.*Dead Nix code ===.*Nix flake evaluation ===.*Nix formatting [(]nixfmt[)] ===.*Nix lint [(]nixf-tidy[)] ===.*Stale Nix build artifact check ===.*Shell script validation tests ===.*CWD-independence tests ===.*Nix search path tests ===.*Port utility function tests ===.*Lockfile validation ===.*Locked DSC validation ===.*Service registry validation ===.*Package manager usage enforcement ===.*Undocumented error suppression check ===.*Online determinism checks [(]--verify[)] ==="
+  "Shell script formatting/linting [(]treefmt[)] ===.*PowerShell syntax validation ===.*Packer template validation ===.*Code formatting [(]treefmt[)] ===.*Nix flake evaluation ===.*Nix lint [(]nixf-tidy[)] ===.*Stale Nix build artifact check ===.*Shell script validation tests ===.*CWD-independence tests ===.*Nix search path tests ===.*Port utility function tests ===.*Lockfile validation ===.*Locked DSC validation ===.*Service registry validation ===.*Package manager usage enforcement ===.*Undocumented error suppression check ===.*Online determinism checks [(]--verify[)] ==="
   checkPs1Text;
 
 {

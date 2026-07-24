@@ -16,6 +16,7 @@ pkgs.runCommand "nucleus-script-tree"
     preferLocalBuild = true;
   }
   ''
+    mkdir -p "$out/src"
     cp -r "${../../../src/scripts}" "$out/src/scripts"
     chmod -R +x "$out"
     # Shellcheck all scripts so consumers don't need to re-check.

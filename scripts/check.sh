@@ -10,58 +10,57 @@
 # within the appropriate group, respecting any dependency constraints.
 #
 # Toolchain checks (1-3):
-#   1. Shell script linting (shellcheck)
+#   1. Shell script formatting/linting (treefmt)
 #   2. PowerShell syntax validation (parser only, no PSScriptAnalyzer)
 #   3. Packer template validation
 #
-# Nix checks (4-8):
-#   4. Dead Nix code detection (deadnix)
+# Nix checks (4-7):
+#   4. Code formatting (treefmt — nixfmt + deadnix + yamllint)
 #   5. Nix flake evaluation
-#   6. Nix formatting check (nixfmt --verify)
-#   7. Nix lint check (nixf-tidy)
-#   8. Stale Nix build artifact check
+#   6. Nix lint check (nixf-tidy)
+#   7. Stale Nix build artifact check
 #
-# Test suites (9-12):
-#   9. Shell script validation tests
-#  10. CWD-independence tests
-#  11. Nix search path tests
-#  12. Port utility function tests
+# Test suites (8-11):
+#   8. Shell script validation tests
+#   9. CWD-independence tests
+#  10. Nix search path tests
+#  11. Port utility function tests
 #
-# Data integrity (13-16):
-#  13. Lockfile validation
-#  14. Locked DSC validation
-#  15. Schema validation (JSON/YAML)
-#  16. Service registry validation
+# Data integrity (12-15):
+#  12. Lockfile validation
+#  13. Locked DSC validation
+#  14. Schema validation (JSON/YAML)
+#  15. Service registry validation
 #
-# Policy/verification (17-22):
-#  17. YAML validation and linting (yamllint)
-#  18. Package manager usage enforcement
-#  19. Undocumented error suppression check
-#  20. Online determinism checks (--verify mode only)
-#  21. Config method compliance
-#  22. Activation script token placeholder in comment check
+# Policy/verification (16-21):
+#  16. YAML structural validation
+#  17. Package manager usage enforcement
+#  18. Undocumented error suppression check
+#  19. Online determinism checks (--verify mode only)
+#  20. Config method compliance
+#  21. Activation script token placeholder in comment check
 #
 # Mode taxonomy:
 #   Always-run (no HAS_ARGS guard — run in both --full and --scoped):
-#     - Stale Nix build artifact check        (step 8)
-#     - All test suites                       (steps 9-12)
-#     - Lockfile section validation           (step 13)
-#     - Locked DSC validation                 (step 14)
-#     - Service registry validation           (step 16)
-#     - Package manager usage enforcement     (step 18)
-#     - Config method compliance              (step 21)
+#     - Stale Nix build artifact check        (step 7)
+#     - All test suites                       (steps 8-11)
+#     - Lockfile section validation           (step 12)
+#     - Locked DSC validation                 (step 13)
+#     - Service registry validation           (step 15)
+#     - Package manager usage enforcement     (step 17)
+#     - Config method compliance              (step 20)
 #   Conditional (skips when no .nix files changed):
 #     - Nix flake evaluation                  (step 5)
 #   Path-scopable (accept file filtering in both modes):
-#     - Shell script linting (shellcheck)     (step 1)
+#     - Shell script formatting/linting       (step 1)
 #     - PowerShell syntax validation          (step 2)
 #     - Packer template validation            (step 3)
-#     - Dead Nix code (deadnix)               (step 4)
-#     - Nix formatting/lint                   (steps 6-7)
-#     - Schema validation                     (step 15)
-#     - YAML validation/linting               (step 17)
-#     - Undocumented error suppression        (step 19)
-#     - Activation script token placeholder   (step 22)
+#     - Code formatting (treefmt)             (step 4)
+#     - Nix lint (nixf-tidy)                  (step 6)
+#     - Schema validation                     (step 14)
+#     - YAML structural validation            (step 16)
+#     - Undocumented error suppression        (step 18)
+#     - Activation script token placeholder   (step 21)
 #
 # Output conventions:
 #   Warnings (warn) and errors (error) go to stderr; info/success/skip
@@ -96,14 +95,12 @@
 #
 # Prerequisites:
 #   - check-jsonschema (for schema validation)
-#   - deadnix (for dead Nix code detection)
 #   - jq, yq (for lockfile/registry/DSC validation)
 #   - nix (for flake evaluation)
 #   - nixf (for Nix lint via nixf-tidy)
-#   - nixfmt (for Nix formatting)
 #   - packer (for Packer template validation)
 #   - pwsh (for PowerShell syntax validation)
-#   - yamllint (for YAML linting)
+#   - treefmt (for code formatting and linting)
 #
 # Exit conditions:
 #   0 on success; non-zero on any check failure.
@@ -241,19 +238,16 @@ _step=0
 # an immediate hard failure — run nucleus-apply to install them, or use
 # nix run .#check to run via the flake wrapper which bundles all deps.
 require_command pwsh
-require_command nixfmt
+require_command treefmt
 require_command yq
 require_command jq
-require_command deadnix
 require_command nixf-tidy
 require_command nix
 require_command packer
-require_command shellcheck
 require_command check-jsonschema
-require_command yamllint
 
-# sh_lint — Shell script linting (shellcheck)
-section "$((_step += 1))" "Shell script linting (shellcheck)"
+# sh_lint — Shell script formatting/linting (treefmt)
+section "$((_step += 1))" "Shell script formatting/linting (treefmt)"
 {
 _sc_exit=0
 if [ "${#SH_FILES[@]}" -gt 0 ]; then
@@ -296,26 +290,33 @@ fi
 echo "$_pkr_exit" > "$_wave_tmpdir/step-3.exit"
 } &
 
-# dead_nix — Dead Nix code detection
-section "$((_step += 1))" "Dead Nix code"
+# code_formatting — Code formatting (treefmt — nixfmt + deadnix + yamllint)
+section "$((_step += 1))" "Code formatting (treefmt)"
 {
-_dn_exit=0
-if [ ${#NIX_FILES[@]} -gt 0 ]; then
-  if ! deadnix --fail "${NIX_FILES[@]}"; then
-    _dn_exit=1
+_tf_exit=0
+if $HAS_ARGS; then
+  # treefmt --ci: --no-cache + --fail-on-change. Pass all positional args;
+  # treefmt filters to files matching its configured includes.
+  if $FORMAT_NIX; then
+    treefmt "$@" 2>/dev/null || _tf_exit=$?
   else
-    say "no dead Nix code found."
-  fi
-elif ! $HAS_ARGS; then
-  if ! deadnix --fail src/; then
-    _dn_exit=1
-  else
-    say "no dead Nix code found."
+    treefmt --ci "$@" 2>/dev/null || _tf_exit=$?
   fi
 else
-  say "skipping deadnix (path-scoped mode)."
+  if $FORMAT_NIX; then
+    treefmt 2>/dev/null || _tf_exit=$?
+  else
+    treefmt --ci 2>/dev/null || _tf_exit=$?
+  fi
 fi
-echo "$_dn_exit" > "$_wave_tmpdir/step-4.exit"
+if [ $_tf_exit -eq 0 ]; then
+  say "formatting OK."
+elif [ $_tf_exit -eq 1 ]; then
+  warn "formatting issues found (run 'treefmt' to fix)."
+else
+  warn "treefmt failed with exit code $_tf_exit"
+fi
+echo "$_tf_exit" > "$_wave_tmpdir/step-4.exit"
 } &
 
 # nix_flake_eval — Nix flake evaluation (conditional skip: only when .nix files changed)
@@ -345,31 +346,6 @@ else
   say "skipping (no Nix files changed since HEAD)."
 fi
 echo "$_ne_exit" > "$_wave_tmpdir/step-5.exit"
-} &
-
-# nix_format — Nix formatting (nixfmt)
-section "$((_step += 1))" "Nix formatting (nixfmt)"
-{
-_nf_exit=0
-if [ "${#NIX_FILES[@]}" -gt 0 ]; then
-  # Parallelize nixfmt across PARALLEL_JOBS workers, batching files to reduce process overhead.
-  if $FORMAT_NIX; then
-    if printf '%s\0' "${NIX_FILES[@]}" | xargs -0 -P "$PARALLEL_JOBS" -n 10 nixfmt -s; then
-      say "nix formatting applied."
-    else
-      _nf_exit=1
-    fi
-  else
-    if printf '%s\0' "${NIX_FILES[@]}" | xargs -0 -P "$PARALLEL_JOBS" -n 10 nixfmt -s --verify; then
-      say "nix formatting OK."
-    else
-      _nf_exit=1
-    fi
-  fi
-else
-  say "skipping nixfmt (no Nix files to check)."
-fi
-echo "$_nf_exit" > "$_wave_tmpdir/step-6.exit"
 } &
 
 # nix_lint — Nix lint check (nixf-tidy)
@@ -422,10 +398,10 @@ if [ "${#_nixf_files[@]}" -gt 0 ]; then
   [ -n "$_nixf_tmpdir" ] && rm -rf -- "$_nixf_tmpdir"
 fi
 if [ "$_nixf_exit" -gt 0 ]; then
-  echo "1" > "$_wave_tmpdir/step-7.exit"
+  echo "1" > "$_wave_tmpdir/step-6.exit"
 else
   say "nixf-tidy lint passed."
-  echo "0" > "$_wave_tmpdir/step-7.exit"
+  echo "0" > "$_wave_tmpdir/step-6.exit"
 fi
 } &
 
@@ -438,10 +414,10 @@ if echo "$_cnba_output" | grep -q "would remove stale Nix build symlink"; then
   echo "$_cnba_output" | while IFS= read -r _cnba_line; do
     warn "  $_cnba_line"
   done
-  echo "1" > "$_wave_tmpdir/step-8.exit"
+  echo "1" > "$_wave_tmpdir/step-7.exit"
 else
   say "no stale Nix build artifacts found."
-  echo "0" > "$_wave_tmpdir/step-8.exit"
+  echo "0" > "$_wave_tmpdir/step-7.exit"
 fi
 } &
 
@@ -450,7 +426,7 @@ section "$((_step += 1))" "Shell script validation tests"
 {
 _svt_exit=0
 bash tests/scripts/script-validation-tests.sh || _svt_exit=$?
-echo "$_svt_exit" > "$_wave_tmpdir/step-9.exit"
+echo "$_svt_exit" > "$_wave_tmpdir/step-8.exit"
 } &
 
 # cwd_independence_test — Always-run: CWD-independence tests
@@ -458,7 +434,7 @@ section "$((_step += 1))" "CWD-independence tests"
 {
 _cit_exit=0
 bash tests/scripts/cwd-independence-tests.sh || _cit_exit=$?
-echo "$_cit_exit" > "$_wave_tmpdir/step-10.exit"
+echo "$_cit_exit" > "$_wave_tmpdir/step-9.exit"
 } &
 
 # nix_search_path_test — Always-run: Nix search path tests
@@ -466,7 +442,7 @@ section "$((_step += 1))" "Nix search path tests"
 {
 _nspt_exit=0
 bash tests/scripts/nix-search-path-tests.sh || _nspt_exit=$?
-echo "$_nspt_exit" > "$_wave_tmpdir/step-11.exit"
+echo "$_nspt_exit" > "$_wave_tmpdir/step-10.exit"
 } &
 
 # port_util_test — Always-run: Port utility function tests
@@ -474,7 +450,7 @@ section "$((_step += 1))" "Port utility function tests"
 {
 _put_exit=0
 bash tests/scripts/lib-port-functions-tests.sh || _put_exit=$?
-echo "$_put_exit" > "$_wave_tmpdir/step-12.exit"
+echo "$_put_exit" > "$_wave_tmpdir/step-11.exit"
 } &
 
 # lockfile_validation — Lockfile validation
@@ -512,7 +488,7 @@ else
 fi
 if [ "$_lf_overlap_issues" -gt 0 ]; then
   warn "lockfile.json has $_lf_overlap_issues overlapping package(s) across sections"
-  echo "1" > "$_wave_tmpdir/step-13.exit"
+  echo "1" > "$_wave_tmpdir/step-12.exit"
 else
   say "lockfile.json consistency: no overlapping packages across sections"
 fi
@@ -545,7 +521,7 @@ else
 fi
 if [ "$_lf_al_errors" -gt 0 ]; then
   warn "lifecycle-allowlist.json validation failed with $_lf_al_errors error(s)"
-  echo "1" > "$_wave_tmpdir/step-13.exit"
+  echo "1" > "$_wave_tmpdir/step-12.exit"
 else
   _lf_al_count=$(jq 'length' "$_lf_al_path" 2>/dev/null || echo 0)
   say "lifecycle-allowlist.json: valid (entry count: $_lf_al_count)"
@@ -630,15 +606,15 @@ if [ -f "$_lfpath" ]; then
 
     if [ "$_lf_errors" -gt 0 ]; then
       warn "lockfile.json validation failed with $_lf_errors error(s)"
-      echo "1" > "$_wave_tmpdir/step-13.exit"
+      echo "1" > "$_wave_tmpdir/step-12.exit"
     fi
     say "lockfile.json validation passed"
   else
     warn "lockfile.json not found — skipping section validation"
-    echo "1" > "$_wave_tmpdir/step-13.exit"
+    echo "1" > "$_wave_tmpdir/step-12.exit"
   fi
 # If no exit file was written (all checks passed), write success
-[ -f "$_wave_tmpdir/step-13.exit" ] || echo "0" > "$_wave_tmpdir/step-13.exit"
+[ -f "$_wave_tmpdir/step-12.exit" ] || echo "0" > "$_wave_tmpdir/step-12.exit"
 } &
 
 # locked_dsc_validation — Always-run: Locked DSC validation
@@ -686,11 +662,11 @@ _dsc_system_dir="src/hosts/Windows/system"
 
   if [ "$_lf_errors" -gt 0 ]; then
     warn "locked DSC validation failed with $_lf_errors error(s)"
-    echo "1" > "$_wave_tmpdir/step-14.exit"
+    echo "1" > "$_wave_tmpdir/step-13.exit"
   fi
   say "locked DSC validation passed"
 # If no exit file was written (all checks passed), write success
-[ -f "$_wave_tmpdir/step-14.exit" ] || echo "0" > "$_wave_tmpdir/step-14.exit"
+[ -f "$_wave_tmpdir/step-13.exit" ] || echo "0" > "$_wave_tmpdir/step-13.exit"
 } &
 
 # schema_validation — Schema validation (JSON/YAML) — path-scopable
@@ -757,11 +733,11 @@ check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.ym
 check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
 if [ "$_jsonschema_errors" -gt 0 ]; then
   warn "schema validation failed with $_jsonschema_errors error(s)"
-  echo "1" > "$_wave_tmpdir/step-15.exit"
+  echo "1" > "$_wave_tmpdir/step-14.exit"
 fi
 say "schema validation passed."
 # If no exit file was written (all checks passed), write success
-[ -f "$_wave_tmpdir/step-15.exit" ] || echo "0" > "$_wave_tmpdir/step-15.exit"
+[ -f "$_wave_tmpdir/step-14.exit" ] || echo "0" > "$_wave_tmpdir/step-14.exit"
 } &
 
 # service_registry_validation — Always-run: Service registry validation
@@ -832,7 +808,7 @@ section "$((_step += 1))" "Service registry validation"
 
   if [ "$_svc_errors" -gt 0 ]; then
     warn "services.json validation failed with $_svc_errors error(s)"
-    echo "1" > "$_wave_tmpdir/step-16.exit"
+    echo "1" > "$_wave_tmpdir/step-15.exit"
   fi
   # No premature "passed" — verdict is after sub-checks below.
 
@@ -889,15 +865,15 @@ section "$((_step += 1))" "Service registry validation"
 
   if [ "$_svc_errors" -gt 0 ]; then
     warn "services.json validation failed with $_svc_errors error(s)"
-    echo "1" > "$_wave_tmpdir/step-16.exit"
+    echo "1" > "$_wave_tmpdir/step-15.exit"
   fi
   say "services.json validation passed"
 # If no exit file was written (all checks passed), write success
-[ -f "$_wave_tmpdir/step-16.exit" ] || echo "0" > "$_wave_tmpdir/step-16.exit"
+[ -f "$_wave_tmpdir/step-15.exit" ] || echo "0" > "$_wave_tmpdir/step-15.exit"
 } &
 
-# yaml_validation_lint — YAML validation and linting (merged single loop)
-section "$((_step += 1))" "YAML validation and linting"
+# yaml_structural_validation — YAML structural validation
+section "$((_step += 1))" "YAML structural validation"
 {
 _yaml_errors=0
 if $HAS_ARGS; then
@@ -910,10 +886,6 @@ if $HAS_ARGS; then
       warn "$_yf: invalid YAML"
       _yaml_errors=$((_yaml_errors + 1))
     fi
-    if ! yamllint --strict "$_yf" >/dev/null 2>&1; then
-      warn "$_yf: yamllint violations"
-      _yaml_errors=$((_yaml_errors + 1))
-    fi
   done
 else
   for _yaml_file in "${CACHED_YAML_FILES[@]}"; do
@@ -922,19 +894,15 @@ else
       warn "$_yaml_file: invalid YAML"
       _yaml_errors=$((_yaml_errors + 1))
     fi
-    if ! yamllint --strict "$_yaml_file" >/dev/null 2>&1; then
-      warn "$_yaml_file: yamllint violations"
-      _yaml_errors=$((_yaml_errors + 1))
-    fi
   done
 fi
 if [ "$_yaml_errors" -gt 0 ]; then
-  warn "YAML validation/lint failed with $_yaml_errors error(s)"
-  echo "1" > "$_wave_tmpdir/step-17.exit"
+  warn "YAML structural validation failed with $_yaml_errors error(s)"
+  echo "1" > "$_wave_tmpdir/step-16.exit"
 fi
-say "YAML validation and linting passed."
+say "YAML structural validation passed."
 # If no exit file was written (all checks passed), write success
-[ -f "$_wave_tmpdir/step-17.exit" ] || echo "0" > "$_wave_tmpdir/step-17.exit"
+[ -f "$_wave_tmpdir/step-16.exit" ] || echo "0" > "$_wave_tmpdir/step-16.exit"
 } &
 
 # package_manager_enforcement — Always-run: Package manager usage enforcement
@@ -962,16 +930,16 @@ if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
   _violations=$((_violations + 1))
 fi
 if [ "$_violations" -gt 0 ]; then
-  echo "1" > "$_wave_tmpdir/step-18.exit"
+  echo "1" > "$_wave_tmpdir/step-17.exit"
 fi
 say "no package manager violations found."
-[ -f "$_wave_tmpdir/step-18.exit" ] || echo "0" > "$_wave_tmpdir/step-18.exit"
+[ -f "$_wave_tmpdir/step-17.exit" ] || echo "0" > "$_wave_tmpdir/step-17.exit"
 } &
 
 # suppression_doc — Undocumented error suppression check
 section "$((_step += 1))" "Undocumented error suppression"
 {
-_undoc_supp_out="$(mktemp)" || { warn "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-19.exit"; }
+_undoc_supp_out="$(mktemp)" || { warn "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-18.exit"; }
 
 # _is_suppressed check_id file line
 # Returns 0 if the given line (or its preceding line) has a
@@ -1030,13 +998,13 @@ if [ -s "$_undoc_supp_out" ]; then
     warn "  $_line"
   done
   say "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
-  echo "1" > "$_wave_tmpdir/step-19.exit"
+  echo "1" > "$_wave_tmpdir/step-18.exit"
 else
   say "no undocumented error suppressions found."
 fi
 rm -f "$_undoc_supp_out"
 # If no exit file was written (all checks passed), write success
-[ -f "$_wave_tmpdir/step-19.exit" ] || echo "0" > "$_wave_tmpdir/step-19.exit"
+[ -f "$_wave_tmpdir/step-18.exit" ] || echo "0" > "$_wave_tmpdir/step-18.exit"
 } &
 
 # online_determinism — Online determinism checks (--verify mode only)
@@ -1058,7 +1026,7 @@ _cfg_dir="src/modules/configs"
 _cfg_errors=0
 
 # Single-pass: collect all config file basenames, run one grep across src/
-_cfg_patterns=$(mktemp) || { warn "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-21.exit"; }
+_cfg_patterns=$(mktemp) || { warn "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-20.exit"; }
 find "$_cfg_dir" -type f -exec basename {} \; | sort -u > "$_cfg_patterns"
 _cfg_grep_output=$(grep -rn --include='*.nix' --include='*.ps1' --include='*.sh' \
   -F -f "$_cfg_patterns" \
@@ -1115,17 +1083,17 @@ while IFS= read -r -d '' _cfg_file; do
 done < <(find "$_cfg_dir" -type f -print0)
 if [ "$_cfg_errors" -gt 0 ]; then
   warn "config method compliance check failed with $_cfg_errors error(s)"
-  echo "1" > "$_wave_tmpdir/step-21.exit"
+  echo "1" > "$_wave_tmpdir/step-20.exit"
 fi
 say "config method compliance passed."
 # If no exit file was written (all checks passed), write success
-[ -f "$_wave_tmpdir/step-21.exit" ] || echo "0" > "$_wave_tmpdir/step-21.exit"
+[ -f "$_wave_tmpdir/step-20.exit" ] || echo "0" > "$_wave_tmpdir/step-20.exit"
 } &
 
 # activation_token_placeholder — Activation script token placeholder in comment check
 section "$((_step += 1))" "Activation script token placeholder in comment check"
 {
-_act_temp="$(mktemp)" || { warn "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-22.exit"; }
+_act_temp="$(mktemp)" || { warn "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-21.exit"; }
 
 if $HAS_ARGS; then
   for _f in "$@"; do
@@ -1144,20 +1112,20 @@ if [ -s "$_act_temp" ]; then
   sort -u "$_act_temp" | while IFS= read -r _line; do
     warn "  $_line"
   done
-  echo "1" > "$_wave_tmpdir/step-22.exit"
+  echo "1" > "$_wave_tmpdir/step-21.exit"
 else
   say "no token placeholder strings in script comments."
 fi
 rm -f "$_act_temp"
 # If no exit file was written (all checks passed), write success
-[ -f "$_wave_tmpdir/step-22.exit" ] || echo "0" > "$_wave_tmpdir/step-22.exit"
+[ -f "$_wave_tmpdir/step-21.exit" ] || echo "0" > "$_wave_tmpdir/step-21.exit"
 } &
 
 # Wait for all background steps to complete before aggregating
 wait
 
 # Wave result aggregation — collect step exit codes from temp files
-for _s in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 21 22; do
+for _s in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 20 21; do
   _exit_file="$_wave_tmpdir/step-$_s.exit"
   if [ -f "$_exit_file" ]; then
     read -r _code < "$_exit_file"

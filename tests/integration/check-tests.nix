@@ -27,10 +27,9 @@ assert containsRegex "lockfile\\.json could not be loaded — skipping section v
 # Pre-flight tool availability block
 assert containsRegex "Pre-flight tool availability checks" checkShText;
 assert containsRegex "require_command pwsh" checkShText;
-assert containsRegex "require_command nixfmt" checkShText;
+assert containsRegex "require_command treefmt" checkShText;
 assert containsRegex "require_command yq" checkShText;
 assert containsRegex "require_command jq" checkShText;
-assert containsRegex "require_command deadnix" checkShText;
 assert containsRegex "require_command nix" checkShText;
 assert containsRegex "require_command packer" checkShText;
 
