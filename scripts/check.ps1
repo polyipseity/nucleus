@@ -996,11 +996,14 @@ $_cfgDir = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs"
 $_cfgErrors = 0
 
 # Always-run: Config method compliance
+# Single-pass: collect all config file basenames, run one Select-String across src/
 $_cfgFiles = Get-ChildItem -Path $_cfgDir -Recurse -File
-
-  # Build source file list once for efficiency
-  $_srcFiles = Get-ChildItem -Path (Join-Path $RepoRoot "src") -Recurse -Include '*.nix', '*.ps1', '*.sh' |
-    Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' -and $_.FullName -notmatch '[\\/]configs[\\/]' }
+$_srcFiles = Get-ChildItem -Path (Join-Path $RepoRoot "src") -Recurse -Include '*.nix', '*.ps1', '*.sh' |
+  Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' -and $_.FullName -notmatch '[\\/]configs[\\/]' }
+$_cfgPatterns = @($_cfgFiles | ForEach-Object { [regex]::Escape($_.Name) } | Sort-Object -Unique)
+$_cfgSelectOutput = $_srcFiles | Select-String -Pattern $_cfgPatterns -SimpleMatch
+# Single-pass: collect all # Method lines for preceding-line checking
+$_cfgMethodOutput = $_srcFiles | Select-String -Pattern '# Method'
 
   foreach ($_cfgFile in $_cfgFiles) {
     $_basename = $_cfgFile.Name
@@ -1014,12 +1017,10 @@ $_cfgFiles = Get-ChildItem -Path $_cfgDir -Recurse -File
     $_relPath = $_cfgFile.FullName.Substring($_cfgDir.Length + 1) -replace '\\', '/'
     if ($_relPath -like 'agents/*') { continue }
 
-    # Search using relative path first (avoids false matches on generic names like config.toml)
-    $_refs = @($_srcFiles | Select-String -Pattern ([regex]::Escape($_relPath)) -SimpleMatch)
-
+    # Check against cached Select-String output — relative path first, then basename
+    $_refs = @($_cfgSelectOutput | Where-Object { $_.Line -match [regex]::Escape($_relPath) })
     if ($_refs.Count -eq 0) {
-      # Fall back to basename
-      $_refs = @($_srcFiles | Select-String -Pattern ([regex]::Escape($_basename)) -SimpleMatch)
+      $_refs = @($_cfgSelectOutput | Where-Object { $_.Line -match [regex]::Escape($_basename) })
     }
 
     if ($_refs.Count -eq 0) {
@@ -1032,15 +1033,13 @@ $_cfgFiles = Get-ChildItem -Path $_cfgDir -Recurse -File
           $_hasMethod = $true
           break
         }
-        # Check preceding line
+        # Check preceding line using cached # Method output
         if ($_ref.LineNumber -gt 1) {
-          $_prevLines = Get-Content -Path $_ref.Path -TotalCount $_ref.LineNumber
-          if ($_prevLines.Count -ge 2) {
-            $_prevLine = $_prevLines[$_prevLines.Count - 2]
-            if ($_prevLine -match '# Method') {
-              $_hasMethod = $true
-              break
-            }
+          $_prevLineNum = $_ref.LineNumber - 1
+          $_prevMatch = $_cfgMethodOutput | Where-Object { $_.Path -eq $_ref.Path -and $_.LineNumber -eq $_prevLineNum }
+          if ($_prevMatch) {
+            $_hasMethod = $true
+            break
           }
         }
       }

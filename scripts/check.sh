@@ -993,6 +993,23 @@ fi
 section "$((_step += 1))" "Config method compliance"
 _cfg_dir="src/modules/configs"
 _cfg_errors=0
+
+# Single-pass: collect all config file basenames, run one grep across src/
+_cfg_patterns=$(mktemp) || { warn "failed to create temp file"; exit_code=1; "$FAIL_FAST" && exit $exit_code; }
+find "$_cfg_dir" -type f -exec basename {} \; | sort -u > "$_cfg_patterns"
+_cfg_grep_output=$(grep -rn --include='*.nix' --include='*.ps1' --include='*.sh' \
+  -F -f "$_cfg_patterns" \
+  src/ --exclude-dir='vendor' --exclude-dir='configs' \
+  2>/dev/null || true)  # check-suppress:suppression_doc: no matches is valid (no config files referenced in tree)
+rm -f "$_cfg_patterns"
+_cfg_patterns=
+
+# Single-pass: collect all # Method lines for preceding-line checking
+_cfg_method_output=$(grep -rn --include='*.nix' --include='*.ps1' --include='*.sh' \
+  '# Method' \
+  src/ --exclude-dir='vendor' --exclude-dir='configs' \
+  2>/dev/null || true)  # check-suppress:suppression_doc: no matches is valid
+
 while IFS= read -r -d '' _cfg_file; do
   _basename=$(basename "$_cfg_file")
   # Skip infrastructure files and Nix modules inside configs/
@@ -1004,28 +1021,23 @@ while IFS= read -r -d '' _cfg_file; do
     src/modules/configs/agents/*) continue ;;
   esac
   _relpath="${_cfg_file#src/modules/configs/}"
-  # Search using relative path first (avoids false matches on generic names like config.toml)
-  _refs_output=$(grep -rn --include='*.nix' --include='*.ps1' --include='*.sh' \
-    -F "$_relpath" \
-    src/ --exclude-dir='vendor' --exclude-dir='configs' \
-    2>/dev/null || true)  # check-suppress:suppression_doc: grep returns non-zero when no matches — valid case (no references).
+
+  # Check against cached grep output — relative path first, then basename
+  _refs_output=$(echo "$_cfg_grep_output" | grep -F "$_relpath" 2>/dev/null || true)  # check-suppress:suppression_doc: grep returns non-zero when no matches
   if [ -z "$_refs_output" ]; then
-    _refs_output=$(grep -rn --include='*.nix' --include='*.ps1' --include='*.sh' \
-      -F "$_basename" \
-      src/ --exclude-dir='vendor' --exclude-dir='configs' \
-      2>/dev/null || true)  # check-suppress:suppression_doc: same rationale as relative-path search above.
+    _refs_output=$(echo "$_cfg_grep_output" | grep -F "$_basename" 2>/dev/null || true)  # check-suppress:suppression_doc: same
   fi
+
   _refs_lines=0
   _method_lines=0
   if [ -n "$_refs_output" ]; then
     _refs_lines=$(echo "$_refs_output" | wc -l | tr -d ' ')
     # Count lines with # Method on the matched line or preceding line
-    _method_lines=0
     while IFS=: read -r _f _ln _rest; do
       if echo "$_rest" | grep -q '# Method'; then
         _method_lines=$((_method_lines + 1))
-      elif [ "$_ln" -gt 1 ]; then
-        sed -n "$((_ln - 1))p" "$_f" | grep -q '# Method' && _method_lines=$((_method_lines + 1))
+      elif [ "$_ln" -gt 1 ] && echo "$_cfg_method_output" | grep -q -F "$_f:$((_ln - 1)):"; then
+        _method_lines=$((_method_lines + 1))
       fi
     # check-suppress:suppression_doc: here-string with empty/malformed output should not abort the check.
     done <<< "$_refs_output" 2>/dev/null || true
