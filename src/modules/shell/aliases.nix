@@ -42,6 +42,7 @@
   "-gds" = "git diff --stat";
   "-gf" = "git fetch";
   "-gfa" = "git fetch --all";
+  "-gff" = "git fetch --force";
   "-gg" = "git grep";
   "-gl" = "git log --oneline --decorate --graph";
   "-gla" = "git log --oneline --decorate --graph --all";
@@ -56,6 +57,7 @@
   "-gpf" = "git push --force-with-lease";
   "-gpff" = "git push --force";
   "-gpl" = "git pull";
+  "-gplf" = "git pull --force";
   "-gplo" = "git pull origin";
   "-gplr" = "git pull --rebase";
   "-gpo" = "git push origin";

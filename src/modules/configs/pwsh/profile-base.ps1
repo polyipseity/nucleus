@@ -228,6 +228,7 @@ function -gdc { & git diff --cached @Args }
 function -gds { & git diff --stat @Args }
 function -gf { & git fetch @Args }
 function -gfa { & git fetch --all @Args }
+function -gff { & git fetch --force @Args }
 function -gg { & git grep @Args }
 function -gl { & git log --oneline --decorate --graph @Args }
 function -gla { & git log --oneline --decorate --graph --all @Args }
@@ -242,6 +243,7 @@ function -gp { & git push @Args }
 function -gpf { & git push --force-with-lease @Args }
 function -gpff { & git push --force @Args }
 function -gpl { & git pull @Args }
+function -gplf { & git pull --force @Args }
 function -gplo { & git pull origin @Args }
 function -gplr { & git pull --rebase @Args }
 function -gpo { & git push origin @Args }
