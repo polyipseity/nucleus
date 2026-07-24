@@ -28,16 +28,7 @@ Broad cleanup rule:
 - Merge results, then run another parallel pass for remaining hotspots.
 - Stop when only minor/cosmetic improvements remain.
 
-## Script simplification patterns
-
-Apply these patterns when maintaining scripts under `src/scripts/`:
-
-- **Tiny libs (<20 lines, single caller)**: When a lib file provides only 1-2 variable definitions or one small function used by a single caller, inline the content directly into the caller and delete the lib file.
-- **Trivial scripts (<10 lines, simple if/command check)**: Inline into the parent Nix activation string via `${builtins.readFile ...}` instead of maintaining a separate file.
-- **Console user boilerplate (MacBook scripts)**: When multiple scripts independently probe `/dev/console` for UID/username, extract into a shared function under `src/scripts/lib/macos-console-user-lib.sh`.
-- **Service script helper duplication**: When two daemon scripts define identical small functions (e.g., `require_command`), extract to `src/scripts/lib/require-command-lib.sh` and prepend at Nix build time.
-- **Shared symlink convergence logic**: When scripts share structural overlap (iterate find results → remove stale → create missing), extract into `src/scripts/lib/symlink-convergence-lib.sh`.
-- **Nix prepend pattern**: For scripts built via `pkgs.writeShellScript` or activation strings, prepend lib content at build time: `(builtins.readFile ../scripts/lib/foo-lib.sh) + (builtins.readFile ../scripts/main-script.sh)` — avoids runtime sourcing path dependency.
+For repo-specific script simplification patterns, see the repo's `scripts-simplify.instructions.md`.
 
 Guidance-file rule (`AGENTS.md`, `.agents/**`):
 
