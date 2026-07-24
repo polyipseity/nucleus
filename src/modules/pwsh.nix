@@ -47,7 +47,9 @@ let
         agentEnv.devinPosixPath
       ]
       (builtins.readFile ../scripts/shell/init.ps1)
-    + (builtins.readFile ./configs/pwsh/profile-base.ps1); # Method 4 (runtime embedded into activation block as a literal string)
+    + (builtins.readFile ./configs/pwsh/profile-base.ps1) # Method 4 (runtime embedded into activation block as a literal string)
+  # PSScriptAnalyzerSettings.psd1 — Method 3 (consumed by scripts/check-pwsh.ps1 at CI time via -SettingsPath)
+  ;
 
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in

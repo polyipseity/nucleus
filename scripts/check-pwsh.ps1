@@ -111,13 +111,11 @@ if ($SyntaxOnly) {
 else {
   Import-Module PSScriptAnalyzer
 
-  $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
-  $excludeRules = @('PSUseBOMForUnicodeEncodedFile')
-  $settings = @{ Severity = @('Error', 'Warning') }  # DO NOT drop Warning — both Error and Warning are required; see commit ac7a2aba for why this was erroneously restricted
+  # Method 3 (consumed by script at CI time via -SettingsPath): settings file defines Severity and ExcludeRules.
+  $settingsFile = Join-Path (git rev-parse --show-toplevel) 'src/modules/configs/pwsh/PSScriptAnalyzerSettings.psd1'
 
-  $lintResults = @($files | ForEach-Object {
-    Invoke-ScriptAnalyzer -Path $_ -Settings $settings -ExcludeRule $excludeRules
-  })
+  $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
+  $lintResults = $files | Invoke-ScriptAnalyzer -Settings $settingsFile
 
   if ($lintResults.Count -gt 0) {
     $lintResults | ForEach-Object {
