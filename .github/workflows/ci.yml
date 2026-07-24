@@ -82,18 +82,22 @@ jobs:
         if: runner.os != 'Windows'
         env:
           PACKER_GITHUB_API_TOKEN: ${{ github.token }}
-        run: nix run ./src#check
+        # --no-fail-fast: CI should accumulate all failures for visibility.
+        run: nix run ./src#check -- --no-fail-fast
 
       - name: Run repository checks (Windows)
         if: runner.os == 'Windows'
         env:
           PACKER_GITHUB_API_TOKEN: ${{ github.token }}
-        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check.ps1
+        # --no-fail-fast: CI should accumulate all failures for visibility.
+        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check.ps1 --no-fail-fast
 
       - name: Run repository tests (POSIX)
         if: runner.os != 'Windows'
-        run: nix run ./src#test
+        # --no-fail-fast: CI should accumulate all failures for visibility.
+        run: nix run ./src#test -- --no-fail-fast
 
       - name: Run repository tests (Windows)
         if: runner.os == 'Windows'
-        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/test.ps1
+        # --no-fail-fast: CI should accumulate all failures for visibility.
+        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/test.ps1 --no-fail-fast
