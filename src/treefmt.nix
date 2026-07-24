@@ -43,11 +43,5 @@
 
   settings.excludes = [
     "vendor/**"
-    "**/secrets/**"
-    "tests/**"
-    "rust-toolchain.toml"
-    "*.lock"
-    "*.lockfile"
-    ".envrc"
   ];
 }

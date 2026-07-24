@@ -4,6 +4,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 
 # The function under test — extracted verbatim from src/scripts/apply.sh.
