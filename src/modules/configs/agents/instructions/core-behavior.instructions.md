@@ -27,15 +27,9 @@ Default operating mode for all agent interactions.
 - **Git commit enforcement.** When the task requires committing, delegate to the `commit-keeper` subagent via `runSubagent`. The commit-keeper agent follows `commit-safety.instructions.md` for verification, failure recovery, and amend prohibition. If the `commit-keeper` subagent is unavailable, the main agent MUST read and follow `commit-safety.instructions.md` directly, acting as commit-keeper.
 - **Defer privileged operations.** If a task requires `sudo`, admin elevation, or any operation that cannot run as the current user, do not execute it. Instead, note the required privilege in the completion summary and prompt the user to run it.
 - See `.agents/instructions/execution-details.instructions.md` for multi-edit fallback and tool-retry discipline.
-- **Strict scope adherence. When the user says "only do X", "only fix X", or otherwise scopes the task to a specific pass, phase, file, or rule, do exactly that scope and nothing else. Do not fix related issues, do not improve surrounding code, do not pre-emptively address future passes, or re-organize or refactor outside the stated scope. The user will explicitly ask for follow-up work if needed.
+- **Strict scope adherence.** When the user says "only do X", "only fix X", or otherwise scopes the task to a specific pass, phase, file, or rule, do exactly that scope and nothing else. Do not fix related issues, do not improve surrounding code, do not pre-emptively address future passes, or re-organize or refactor outside the stated scope. The user will explicitly ask for follow-up work if needed.
 - **Enumerate subagent opportunities before starting.** Before executing any task, explicitly list which subproblems could be delegated to subagents. Write this list into session memory (`/memories/session/`) if the task is complex. Do not skip this step.
 - **Record animated CLIs/TUIs with asciinema.** For detailed usage, invoke the skill: `skill: "asciinema"`.
-
-
-
-
-
-
 
 ## Subagent delegation
 
@@ -46,6 +40,7 @@ Default operating mode for all agent interactions.
 **MUST prefer subagents for narrow tasks** — 1 subagent turn instead of N+ turns inline. Use `Explore` for research, `General Purpose` for focused implementations.
 
 **Concrete thresholds:**
+
 - ≥3 file reads → `Explore` subagent
 - ≥2 independently modifiable files → parallel `General Purpose` subagents
 - ≥2 separable questions → one subagent per question

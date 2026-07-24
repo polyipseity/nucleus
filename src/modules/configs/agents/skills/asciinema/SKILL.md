@@ -61,6 +61,7 @@ PowerSession.exe convert <file>.cast <file>.txt
 ```
 
 The conversion:
+
 1. Strips all ANSI escape codes (colors, cursor movements, bold/italic formatting).
 2. Resolves screen overwrites via the embedded `avt` (abstract virtual terminal) library — text that was displayed and then overwritten is removed from the output.
 3. Produces a chronological plain-text log of the visible terminal state.
@@ -76,9 +77,9 @@ what happened during the interactive workflow.
 
 ## Cross-platform notes
 
-| Platform | Record tool | Convert tool |
-|----------|-------------|--------------|
-| macOS / Linux / NixOS | `asciinema rec` | `asciinema convert` |
-| Windows | `PowerSession.exe rec` | `PowerSession.exe convert` |
+| Platform              | Record tool            | Convert tool               |
+| --------------------- | ---------------------- | -------------------------- |
+| macOS / Linux / NixOS | `asciinema rec`        | `asciinema convert`        |
+| Windows               | `PowerSession.exe rec` | `PowerSession.exe convert` |
 
 Both tools produce the same `.cast` intermediate format and the same `.txt` output after conversion, so the workflow is identical across platforms — only the binary name differs.
