@@ -25,17 +25,19 @@ REPO_ROOT=$(derive_repo_root)
 cd "$REPO_ROOT" || exit
 
 usage() {
-  usage_std "test.sh" "[-q|--quiet] [--fail-fast|--no-fail-fast]" "Run the repository test suite. With --quiet, only show FAIL lines and nix output for failing tests. By default, all output is shown. --fail-fast exits immediately on first failure (default); --no-fail-fast accumulates all failures."
+  usage_std "test.sh" "[-q|--quiet] [--fail-fast|--no-fail-fast] [--skip-system-build]" "Run the repository test suite. With --quiet, only show FAIL lines and nix output for failing tests. By default, all output is shown. --fail-fast exits immediately on first failure (default); --no-fail-fast accumulates all failures. --skip-system-build skips building the system configuration."
 }
 
 # Flags
 quiet_mode=false
+skip_system_build=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -q|--quiet) quiet_mode=true; shift ;;
     -h|--help) usage; exit 0 ;;
     --no-fail-fast) FAIL_FAST=false; shift ;;
     --fail-fast) FAIL_FAST=true; shift ;;
+    --skip-system-build) skip_system_build=true; shift ;;
     --) shift; break ;;
     -*)
       error "unsupported argument '$1'"
@@ -102,5 +104,30 @@ pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 || exit_cod
 section "$((_step += 1))" "Nucleus apps smoke tests"
 bash tests/scripts/nucleus-apps-smoke-tests.sh || exit_code=$?
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
+
+# 5. System config build — build all derivations in the host system config.
+# WHY soft-fail: building derivations is slow and network-dependent. Always
+# accumulates exit code regardless of FAIL_FAST. Use --skip-system-build to
+# skip this step entirely.
+if [ "$skip_system_build" != true ]; then
+  section "$((_step += 1))" "System config build"
+  case "$(uname)" in
+    Darwin) attr="darwinConfigurations.macbook.system" ;;
+    Linux)
+      if [ -d /etc/nixos ]; then
+        attr="nixosConfigurations.nixos.config.system.build.toplevel"
+      else
+        attr="homeConfigurations.polyipseity.activationPackage"
+      fi
+      ;;
+    *)
+      say "system config build: unsupported OS ($(uname)), skipping."
+      skip_system_build=true
+      ;;
+  esac
+  if [ "$skip_system_build" != true ]; then
+    nix build --no-link --keep-going --print-out-paths "./src#$attr" || exit_code=$?
+  fi
+fi
 
 nuc_done

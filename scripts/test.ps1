@@ -24,15 +24,18 @@ $FAIL_FAST = $true
 # Process flags
 foreach ($_arg in $args) {
   if ($_arg -eq '-h' -or $_arg -eq '--help') {
-    Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast]"
+    Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast] [--skip-system-build]"
     Write-Output "  Run all Windows-compatible repository test suites."
-    Write-Output "  --fail-fast      Exit immediately on first failure (default)."
-    Write-Output "  --no-fail-fast    Accumulate all failures."
+    Write-Output "  --fail-fast            Exit immediately on first failure (default)."
+    Write-Output "  --no-fail-fast          Accumulate all failures."
+    Write-Output "  --skip-system-build     No-op (system config build is POSIX-only)."
     exit 0
   } elseif ($_arg -eq '--fail-fast') {
     $FAIL_FAST = $true
   } elseif ($_arg -eq '--no-fail-fast') {
     $FAIL_FAST = $false
+  } elseif ($_arg -eq '--skip-system-build') {
+    # No-op: system config build is POSIX-only.
   } else {
     Write-Output "test: error: unrecognized argument: $_arg"
     exit 1
