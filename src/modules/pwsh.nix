@@ -48,7 +48,7 @@ let
       ]
       (builtins.readFile ../scripts/shell/init.ps1)
     + (builtins.readFile ./configs/pwsh/profile-base.ps1) # Method 4 (runtime embedded into activation block as a literal string)
-  # PSScriptAnalyzerSettings.psd1 — Method 3 (consumed by scripts/check-pwsh.ps1 at CI time via -SettingsPath)
+  # PSScriptAnalyzerSettings.psd1 — Method 3 (consumed by scripts/check-pwsh.ps1 at CI time via -SettingsPath); refer to scripts/PSScriptAnalyzerSettings.psd1.
   ;
 
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
@@ -58,6 +58,15 @@ in
   # interactive pwsh sessions.  On macOS and Linux, pwsh reads this path from
   # $PROFILE.CurrentUserCurrentHost at startup.
   home.file.".config/powershell/Microsoft.PowerShell_profile.ps1".text = profileContent;
+
+  # Default PSScriptAnalyzer settings: Severity filter and ExcludeRules.
+  # PSScriptAnalyzer reads this path by default in PSEdition Desktop if the
+  # file exists; scripts/check-pwsh.ps1 also references the CI copy at
+  # scripts/PSScriptAnalyzerSettings.psd1 via $PSScriptRoot (Method 3).
+  home.file.".config/powershell/PSScriptAnalyzerSettings.psd1" = {
+    # Method 1 (writable symlink): repo changes take effect without rebuild.
+    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/pwsh/PSScriptAnalyzerSettings.psd1";
+  };
 
   # Install PSScriptAnalyzer for PowerShell linting if pwsh is available.
   # This enables the lint phase in scripts/check-pwsh.ps1.
