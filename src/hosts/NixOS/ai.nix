@@ -20,6 +20,7 @@ let
   litellmDaemon = pkgs.writeNucleusShellApplication {
     name = "litellm-daemon";
     runtimeInputs = [ pkgs.litellm ];
+    scriptName = "src/scripts/services/litellm-daemon";
   };
 in
 {

@@ -36,6 +36,7 @@ let
   jellyfinDaemon = pkgs.writeNucleusShellApplication {
     name = "jellyfin-daemon";
     runtimeInputs = [ pkgs.jellyfin ];
+    scriptName = "src/scripts/services/jellyfin-daemon";
   };
 in
 {
