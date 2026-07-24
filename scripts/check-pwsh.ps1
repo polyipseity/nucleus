@@ -109,22 +109,34 @@ if ($SyntaxOnly) {
   Write-Warning 'PSScriptAnalyzer not found; skipping lint phase. Install it with: Install-Module PSScriptAnalyzer'
 }
 else {
-  Import-Module PSScriptAnalyzer
-  # Pre-import commonly-used modules to reduce PSSA's implicit Get-Command overhead during rule evaluation.
-  Import-Module PSReadLine -ErrorAction SilentlyContinue
+  # Scope PSModulePath to reduce module-discovery overhead during PSSA rule evaluation.
+  $originalPSModulePath = $env:PSModulePath
+  try {
+    $env:PSModulePath = @(
+      "$PSHome/Modules"
+      [System.IO.Path]::Combine($HOME, '.local/share/powershell/Modules')
+    ) -join [System.IO.Path]::PathSeparator
 
-  # Method 3 (consumed by script at CI time via -SettingsPath): settings file defines Severity and ExcludeRules.
-  $settingsFile = Join-Path (git rev-parse --show-toplevel) 'src/modules/configs/pwsh/PSScriptAnalyzerSettings.psd1'
+    Import-Module PSScriptAnalyzer
+    # Pre-import commonly-used modules to reduce PSSA's implicit Get-Command overhead during rule evaluation.
+    Import-Module PSReadLine -ErrorAction SilentlyContinue
 
-  $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
-  $lintResults = $files | Invoke-ScriptAnalyzer -Settings $settingsFile
+    # Method 3 (consumed by script at CI time via -SettingsPath): settings file defines Severity and ExcludeRules.
+    $settingsFile = Join-Path (git rev-parse --show-toplevel) 'src/modules/configs/pwsh/PSScriptAnalyzerSettings.psd1'
 
-  if ($lintResults.Count -gt 0) {
-    $lintResults | ForEach-Object {
-      Write-Output ('{0}:{1}:{2}: [{3}] {4}' -f $_.ScriptPath, $_.Line, $_.Column, $_.Severity, $_.Message)
+    $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
+    $lintResults = $files | Invoke-ScriptAnalyzer -Settings $settingsFile
+
+    if ($lintResults.Count -gt 0) {
+      $lintResults | ForEach-Object {
+        Write-Output ('{0}:{1}:{2}: [{3}] {4}' -f $_.ScriptPath, $_.Line, $_.Column, $_.Severity, $_.Message)
+      }
+      throw 'PowerShell lint check failed.'
     }
-    throw 'PowerShell lint check failed.'
-  }
 
-  Write-Output ("PowerShell lint check passed for {0} files." -f $Paths.Count)
+    Write-Output ("PowerShell lint check passed for {0} files." -f $Paths.Count)
+  }
+  finally {
+    $env:PSModulePath = $originalPSModulePath
+  }
 }
