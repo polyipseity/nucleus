@@ -227,10 +227,8 @@ in
     # script does not depend on the activation environment's PATH.
     # SOPS_AGE_KEY_FILE defaults to /etc/sops/age/machine.txt.
     "${activationBundle}/src/scripts/services/jellyfin-sync.sh" \
-      ${
-        lib.optionalString (repoRoot != "") "--repo-root ${lib.escapeShellArg repoRoot} \
-      "
-      }--jq-path "${pkgs.jq}/bin/jq" \
+      ${lib.optionalString (repoRoot != "") "--repo-root ${lib.escapeShellArg repoRoot} "}\
+      --jq-path "${pkgs.jq}/bin/jq" \
       --sops-path "${pkgs.sops}/bin/sops"
 
     # ---- verifyNucleusServices ---------------------------------------------------
