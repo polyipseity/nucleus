@@ -5,7 +5,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-# shellcheck source=src/scripts/lib/macos-icloud-exclusions-lib.sh
+# shellcheck source=../lib/macos-icloud-exclusions-lib.sh
 . "$SCRIPT_DIR/../lib/macos-icloud-exclusions-lib.sh"
 
 apply_exclusions "$@"
