@@ -137,7 +137,7 @@ SCOPED=false
 FULL=false
 
 usage() {
-  usage_std "check.sh" "[--format] [--fail-fast] [--scoped|--full] [--verify] [path ...]" "Run all repository validation checks in sequence. Use --scoped to skip whole-repo checks (path-scoped mode), --full to force whole-repo checks even with paths. Default: scoped if paths given, full otherwise. With arguments, passes paths through to supporting checkers. Use --format to enable in-place Nix formatting. Use --fail-fast to exit immediately on first failure. Use --verify to additionally run online determinism checks (requires network)."
+  usage_std "check.sh" "[--format] [--fail-fast|--no-fail-fast] [--scoped|--full] [--verify] [path ...]" "Run all repository validation checks in sequence. Use --scoped to skip whole-repo checks (path-scoped mode), --full to force whole-repo checks even with paths. Default: scoped if paths given, full otherwise. With arguments, passes paths through to supporting checkers. Use --format to enable in-place Nix formatting. Use --fail-fast to exit immediately on first failure (default: accumulate all). Use --no-fail-fast to accumulate all failures (default). Use --verify to additionally run online determinism checks (requires network)."
 }
 
 while [ "$#" -gt 0 ]; do
@@ -152,6 +152,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --fail-fast)
       FAIL_FAST=true
+      shift
+      ;;
+    --no-fail-fast)
+      FAIL_FAST=false
       shift
       ;;
     --scoped)

@@ -124,15 +124,18 @@ function warn { Write-Output "check: warning: $args" }
 # Process flags
 foreach ($_arg in $args) {
   if ($_arg -eq '-h' -or $_arg -eq '--help') {
-    Write-Output "Usage: check.ps1 [--fail-fast] [--scoped|--full] [--verify] [path ...]"
+    Write-Output "Usage: check.ps1 [--fail-fast|--no-fail-fast] [--scoped|--full] [--verify] [path ...]"
     Write-Output "  Run all Windows-compatible repository validation checks in sequence."
     Write-Output "  Use --scoped to skip whole-repo checks (path-scoped mode), --full to force"
     Write-Output "  whole-repo checks even with paths. Default: scoped if paths given, full if not."
-    Write-Output "  --fail-fast  Exit immediately on first failure (default: accumulate all)."
-    Write-Output "  --verify     Additionally run online determinism checks (requires network)."
+    Write-Output "  --fail-fast      Exit immediately on first failure (default: accumulate all)."
+    Write-Output "  --no-fail-fast    Accumulate all failures (default)."
+    Write-Output "  --verify         Additionally run online determinism checks (requires network)."
     exit 0
   } elseif ($_arg -eq '--fail-fast') {
     $FAIL_FAST = $true
+  } elseif ($_arg -eq '--no-fail-fast') {
+    $FAIL_FAST = $false
   } elseif ($_arg -eq '--scoped') {
     $SCOPED = $true
   } elseif ($_arg -eq '--full') {
