@@ -82,3 +82,13 @@ identical in both contexts.
 
 When adding new shell scripts, ensure they pass shellcheck with these flags. Do not add
 new scripts with pre-existing suppression warnings unless documented per the rules above.
+
+## Severity enforcement
+
+All shellcheck invocations in this repository explicitly pass
+`--severity=style` (the lowest severity level). There is no severity
+threshold — **any** shellcheck finding, regardless of its severity
+classification, causes the step to fail. Do not add `--severity`
+overrides that raise the threshold (e.g. `--severity=warning` or
+`--severity=error`). If a new shellcheck invocation point is added,
+it must also pass `-S style`.

@@ -347,7 +347,7 @@
                   }${text}
                   WRAPPER
                   chmod +x "$out/bin/nucleus-${name}"
-                  shellcheck -x "$out/bin/nucleus-${name}"
+                  shellcheck -x -S style "$out/bin/nucleus-${name}"
                 ''
               else
                 ''
@@ -364,7 +364,7 @@
                   exec "$_script" "$@"
                   WRAPPER
                   chmod +x "$out/bin/nucleus-${name}"
-                  shellcheck -x "$out/bin/nucleus-${name}"
+                  shellcheck -x -S style "$out/bin/nucleus-${name}"
                 ''
             }
           ''

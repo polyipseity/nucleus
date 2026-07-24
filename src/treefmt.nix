@@ -27,6 +27,8 @@
       source-path = "SCRIPTDIR";
       # follow external sourced files (required for source-path to work)
       external-sources = true;
+      # Explicitly enforce the lowest severity so ALL findings fail the build.
+      severity = "style";
     };
 
     # Additional formatters (all explicitly disabled — enable by flipping to true):

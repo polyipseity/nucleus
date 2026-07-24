@@ -20,5 +20,5 @@ pkgs.runCommand "nucleus-script-tree"
     cp -r "${../../../src/scripts}" "$out/src/scripts"
     chmod -R +x "$out"
     # Shellcheck all scripts so consumers don't need to re-check.
-    find "$out" -name '*.sh' -exec shellcheck --source-path=SCRIPTDIR -x {} +
+    find "$out" -name '*.sh' -exec shellcheck --source-path=SCRIPTDIR -x -S style {} +
   ''
