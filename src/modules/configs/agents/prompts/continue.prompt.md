@@ -15,6 +15,11 @@ You are resuming after an interruption.
   3. Parse the frontmatter to recover input variables (`atomicCommits`, `backwardsCompat`, `maxConcurrency`) and current progress (`status`, `current-step`, `committed`). Re-apply these to the resumed execution (e.g., commit atomically if `atomicCommits: yes`; preserve the `committed` value as-is — it carries over from the interrupted session).
   4. If `status` is `completed`, report that the plan is already finished and skip re-execution.
   5. Otherwise, resume executing from the `current-step` value using the `implement-plan` workflow. Do NOT restart the plan.
+  6. Find and load the latest checkpoint for supplementary context:
+     - Run `ls -1 <base-path>/checkpoint-*.md 2>/dev/null | sort -r | head -1` to locate the latest checkpoint.
+     - If a checkpoint exists, read it — the checkpoint's "Work done" and "Next steps" sections provide rich resumption context (what was accomplished, what files were touched, pending decisions).
+     - If no checkpoint exists, proceed without it.
+- After loading the plan and checkpoint context, invoke `skill: "checkpoint"` to save a resumption checkpoint. This anchors the resumed session state so future interruptions can restore from this point.
 - If no active plan is found, proceed normally. Do not re-read session notes or workspace files beyond what's needed for the task.
 - Recall the exact user prompt before continuing. If one is provided below, use it; otherwise reconstruct from memory.
 - Do not trust subagent failure reports at face value — the agent harness that returns subagent output may fail partway through (e.g. a transient network error), discarding the subagent's result message. File edits the subagent made before the failure are preserved. If a subagent reports failure, inspect what it may have already done on disk, then re-run it with remaining work.
