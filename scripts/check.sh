@@ -366,8 +366,8 @@ if [ "${#_nixf_files[@]}" -gt 0 ]; then
   # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
   printf '%s\0' "${_nixf_files[@]}" \
     | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
-      f="$1"
-      tmpdir="$2"
+      tmpdir="$1"
+      f="$2"
       # Use tr to encode file path as a safe filename component
       safe_name="$(echo "$f" | tr "/" "_")"
       if ! out=$(nixf-tidy < "$f" 2>&1); then
@@ -375,7 +375,7 @@ if [ "${#_nixf_files[@]}" -gt 0 ]; then
       elif [ "$(echo "$out" | jq "length" 2>/dev/null)" -gt 0 ] 2>/dev/null; then
         printf "ISSUES\n%s\n%s\n" "$f" "$out" > "$tmpdir/${safe_name}.nixf"
       fi
-    ' _ {} "$_nixf_tmpdir"
+    ' _ "$_nixf_tmpdir"
   # Aggregate results from per-worker temp files
   for _nixf_result in "$_nixf_tmpdir"/*.nixf; do
     [ -f "$_nixf_result" ] || continue

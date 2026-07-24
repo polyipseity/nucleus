@@ -21,7 +21,13 @@
     nixfmt.enable = true;
     deadnix.enable = true;
     yamllint.enable = true;
-    shellcheck.enable = true;
+    shellcheck = {
+      enable = true;
+      # resolves `# shellcheck source=` directives relative to each script's directory
+      source-path = "SCRIPTDIR";
+      # follow external sourced files (required for source-path to work)
+      external-sources = true;
+    };
 
     # Additional formatters (all explicitly disabled — enable by flipping to true):
     shfmt.enable = false; # Shell script formatting
@@ -40,5 +46,6 @@
     "rust-toolchain.toml"
     "*.lock"
     "*.lockfile"
+    ".envrc"
   ];
 }

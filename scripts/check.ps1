@@ -1145,7 +1145,7 @@ if ($HAS_ARGS) {
 if ($_actViolations.Count -gt 0) {
   foreach ($_av in ($_actViolations | Sort-Object -Unique)) { warn $_av }
   warn "token placeholder strings found in script comments"
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-20.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-21.exit") -NoNewline
 } else {
   say "no token placeholder strings in script comments."
 }
@@ -1168,7 +1168,7 @@ for ($_s = 1; $_s -le 18; $_s++) {
   }
 }
 # Step 19-20 same pattern
-for ($_s = 19; $_s -le 20; $_s++) {
+for ($_s = 19; $_s -le 21; $_s++) {
   $_exitFile = Join-Path $script:WaveTmpDir "step-$_s.exit"
   if (Test-Path $_exitFile) {
     $_code = Get-Content $_exitFile -Raw

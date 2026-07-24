@@ -4,7 +4,7 @@
 # Test suites (1-5):
 #
 # Code quality tests (2-3):
-#   2. Shell script linting (ShellCheck)
+#   2. Shell script linting (treefmt)
 #   3. PowerShell lint (PSScriptAnalyzer)
 #
 # Functional tests (1, 4-5):
@@ -52,7 +52,7 @@
 #
 # Prerequisites:
 #   - nix, nix-instantiate (for Nix test suite)
-#   - shellcheck (for shell linting)
+#   - treefmt (for shell linting)
 #   - pwsh (for PowerShell lint)
 #   - bash, find, xargs (for test discovery and execution)
 #
@@ -75,6 +75,7 @@ if [ -h "$_self" ]; then
   esac
 fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
+# shellcheck source=../src/scripts/lib/lib.sh
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 REPO_ROOT=$(derive_repo_root)
@@ -117,7 +118,7 @@ fi
 # nix run .#test to run via the flake wrapper which bundles all deps.
 require_command nix
 require_command nix-instantiate
-require_command shellcheck
+require_command treefmt
 require_command pwsh
 require_command bash
 require_command find
@@ -170,8 +171,8 @@ say "all Nix tests passed."
 [ -f "$_wave_tmpdir/step-1.exit" ] || echo "0" > "$_wave_tmpdir/step-1.exit"
 } &
 
-# 2. Shell script linting (ShellCheck)
-section "$((_step += 1))" "Shell script linting"
+# 2. Shell script linting (treefmt)
+section "$((_step += 1))" "Shell script linting (treefmt)"
 {
 bash scripts/check-sh.sh || echo "1" > "$_wave_tmpdir/step-2.exit"
 [ -f "$_wave_tmpdir/step-2.exit" ] || echo "0" > "$_wave_tmpdir/step-2.exit"

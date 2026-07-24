@@ -425,7 +425,7 @@
         program = "${mkCheckPwshPackage pkgs}/bin/nucleus-check-pwsh";
       };
 
-      # ShellCheck-based shell script linting.
+      # treefmt-based shell script linting (ShellCheck via treefmt-nix).
       mkCheckShApp =
         pkgs: treefmtWrapper:
         mkApp pkgs {
@@ -476,7 +476,7 @@
       # host-specific nix.conf settings (eval-cores, lazy-trees) are
       # interpreted without warnings.
       mkTestApp =
-        pkgs:
+        pkgs: treefmtWrapper:
         mkApp pkgs {
           name = "test";
           runtimeInputs = [
@@ -484,7 +484,7 @@
             pkgs.findutils
             pkgs.git
             pkgs.powershell
-            pkgs.shellcheck
+            treefmtWrapper
           ];
         };
 
@@ -737,7 +737,7 @@
             pkgs.findutils
             pkgs.git
             pkgs.powershell
-            pkgs.shellcheck
+            treefmtWrapper
           ];
         };
         nucleus-update = writeNucleusShellApplication pkgs {
@@ -773,7 +773,7 @@
           bootstrap = mkBootstrapApp pkgsMac;
           bump-lockfile = mkBumpLockfileApp pkgsMac;
           check = mkCheckApp pkgsMac (mkTreefmtWrapper systems.mac pkgsMac);
-          test = mkTestApp pkgsMac;
+          test = mkTestApp pkgsMac (mkTreefmtWrapper systems.mac pkgsMac);
           check-packer = mkCheckPackerApp pkgsMac;
           check-pwsh = mkCheckPwshApp pkgsMac;
           check-sh = mkCheckShApp pkgsMac (mkTreefmtWrapper systems.mac pkgsMac);
@@ -798,7 +798,7 @@
           bootstrap = mkBootstrapApp pkgsLinux;
           bump-lockfile = mkBumpLockfileApp pkgsLinux;
           check = mkCheckApp pkgsLinux (mkTreefmtWrapper systems.linux pkgsLinux);
-          test = mkTestApp pkgsLinux;
+          test = mkTestApp pkgsLinux (mkTreefmtWrapper systems.linux pkgsLinux);
           check-packer = mkCheckPackerApp pkgsLinux;
           check-pwsh = mkCheckPwshApp pkgsLinux;
           check-sh = mkCheckShApp pkgsLinux (mkTreefmtWrapper systems.linux pkgsLinux);
@@ -973,9 +973,7 @@
             pkgsDevMac.mkShell {
               packages = [
                 pkgsDevMac.bun
-                mkTreefmtWrapper
-                systems.mac
-                pkgsDevMac
+                (mkTreefmtWrapper systems.mac pkgsDevMac)
                 pkgsDevMac.packer
                 pkgsDevMac.powershell
                 pkgsDevMac.prek
@@ -1021,9 +1019,7 @@
             pkgsDevLinux.mkShell {
               packages = [
                 pkgsDevLinux.bun
-                mkTreefmtWrapper
-                systems.linux
-                pkgsDevLinux
+                (mkTreefmtWrapper systems.linux pkgsDevLinux)
                 pkgsDevLinux.packer
                 pkgsDevLinux.powershell
                 pkgsDevLinux.prek

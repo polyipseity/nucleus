@@ -377,7 +377,7 @@ _run_script_worker() {
         test_bash_syntax "$_script_path"
         test_has_shebang "$_script_path"
         test_is_executable "$_script_path"
-        test_dependencies_available "$_script_path" shellcheck
+        test_dependencies_available "$_script_path" treefmt
         test_error_handling "$_script_path"
         test_has_documentation "$_script_path"
         test_no_dangerous_patterns "$_script_path"
@@ -393,7 +393,7 @@ _run_script_worker() {
         test_bash_syntax "$_script_path"
         test_has_shebang "$_script_path"
         test_is_executable "$_script_path"
-        test_dependencies_available "$_script_path" shellcheck pwsh packer nix deadnix
+        test_dependencies_available "$_script_path" treefmt pwsh packer nix
         test_error_handling "$_script_path"
         test_has_documentation "$_script_path"
         test_no_dangerous_patterns "$_script_path"
