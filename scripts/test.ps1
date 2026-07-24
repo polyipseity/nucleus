@@ -1,60 +1,141 @@
-<#
-.SYNOPSIS
-  Repository test suite runner (Windows).
+# test.ps1 — Repository test suite runner (Windows).
+#
+# Runs all Windows-compatible repository test suites in sequence:
+#
+# Test suites (1-5):
+#   1. Nix test suite (stub — requires POSIX/Nix)
+#   2. Shell script linting (stub — requires POSIX/ShellCheck)
+#   3. PowerShell lint (PSScriptAnalyzer)
+#   4. Nucleus apps smoke tests (stub — requires Nix/bash)
+#   5. System config build (stub — POSIX-only)
+#
+# Mode taxonomy:
+#   No --scoped/--full distinction (all steps always run). Use --skip-system-build
+#   to skip step 5.
+#
+# Output conventions:
+#   All messages (info, success, skip, warning) go to stdout.
+#   This differs from test.sh, which routes warnings to stderr — the
+#   split is intentional per platform convention.
+#   Use test.sh's header comment as the cross-reference source of truth
+#   for the POSIX-side convention.
+#
+# Dependencies policy:
+# Every external tool required by any step in this script MUST be declared in
+# the pre-flight block below. Missing tools cause an immediate hard failure —
+# steps MUST NEVER silently skip due to missing dependencies.
+# The pre-flight block is the single source of truth for all tool requirements.
+# To add a new tool-using step, first add it to pre-flight, then provision it
+# on all target hosts.
+#
+# File discovery policy:
+# Nix test discovery is dynamic on POSIX (find tests/ -name '*.nix').
+# PowerShell files are auto-discovered by check-pwsh.ps1.
+#
+# Note: Steps 1, 2, 4, 5 are stubs on Windows (POSIX/Nix/bash toolchain not available).
+#       --quiet is only supported on POSIX (test.sh); accepted as no-op on Windows.
+#
+# Prerequisites:
+#   - PSScriptAnalyzer module (Install-Module PSScriptAnalyzer -Scope CurrentUser)
+#   - Ensure-Tool module (imported via pre-flight block) for tool validation
+#
+# Arguments:
+#   --fail-fast         Exit immediately on first failure (default).
+#   --no-fail-fast      Accumulate all failures.
+#   --skip-system-build No-op (system config build is POSIX-only).
+#   --quiet             No-op (--quiet is POSIX-only; accepted for CLI parity).
+#
+# Environment variables:
+#   NUCLEUS_REPO_ROOT  Override the detected repository root path.
+#
+# Exit conditions:
+#   0 on success; non-zero on any check failure.
+# By default, fail-fast is enabled (exit immediately on first failure).
+# Use --no-fail-fast to accumulate all failures.
 
-.DESCRIPTION
-  Runs PSScriptAnalyzer lint on all PowerShell files.
-  No Nix-based tests run on Windows (Nix test suite requires POSIX).
-  Use --no-fail-fast to accumulate all failures. Default: fail-fast.
-
-.EXAMPLE
-  pwsh -File scripts/test.ps1
-  pwsh -File scripts/test.ps1 --no-fail-fast
-
-.NOTES
-  Exit codes: 0 on success; non-zero on failure.
-#>
-
+#Requires -Version 7.4
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { Split-Path -Parent $PSScriptRoot }
 $exitCode = 0
 $FAIL_FAST = $true
+$skipSystemBuild = $false
+$_step = 0
+
+# Output helpers — structured prefix pattern matching section()/say/warn from test.sh.
+function say { Write-Output "test: $args" }
+function warn { Write-Output "test: warning: $args" }
+
+# Pre-flight tool availability checks.
+# All tools listed in Prerequisites must be present. Missing tools produce
+# an immediate hard failure — run nucleus-apply to install them.
+$modulesPath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules'
+Import-Module (Join-Path $modulesPath 'Ensure-Tool.psm1') -Force
+# PSScriptAnalyzer is required for PowerShell lint step 3
+Ensure-Tool -Name 'PSScriptAnalyzer' -Type 'Module' -InstallCommand "Install-Module PSScriptAnalyzer -Scope CurrentUser -Force"
 
 # Process flags
 foreach ($_arg in $args) {
   if ($_arg -eq '-h' -or $_arg -eq '--help') {
-    Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast] [--skip-system-build]"
+    Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast] [--skip-system-build] [--quiet]"
     Write-Output "  Run all Windows-compatible repository test suites."
     Write-Output "  --fail-fast            Exit immediately on first failure (default)."
     Write-Output "  --no-fail-fast          Accumulate all failures."
     Write-Output "  --skip-system-build     No-op (system config build is POSIX-only)."
+    Write-Output "  --quiet                No-op (--quiet is POSIX-only; accepted for CLI parity)."
     exit 0
   } elseif ($_arg -eq '--fail-fast') {
     $FAIL_FAST = $true
   } elseif ($_arg -eq '--no-fail-fast') {
     $FAIL_FAST = $false
   } elseif ($_arg -eq '--skip-system-build') {
-    # No-op: system config build is POSIX-only.
+    $skipSystemBuild = $true
+  } elseif ($_arg -eq '--quiet') {
+    # No-op: --quiet is POSIX-only.
   } else {
     Write-Output "test: error: unrecognized argument: $_arg"
     exit 1
   }
 }
 
-$_step = 0
+# ---------------------------------------------------------------------------
+# 1. Nix test suite — POSIX only (stub on Windows)
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Nix test suite ===" -f (++$_step))
+say "skipping (requires Nix toolchain — not available on Windows)."
 
 # ---------------------------------------------------------------------------
-# 1. PowerShell lint (PSScriptAnalyzer)
+# 2. Shell script linting — POSIX only (stub on Windows)
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Shell script linting ===" -f (++$_step))
+say "skipping (requires ShellCheck — not available on Windows)."
+
+# ---------------------------------------------------------------------------
+# 3. PowerShell lint (PSScriptAnalyzer)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] PowerShell lint ===" -f (++$_step))
-try {
-  & "$PSScriptRoot\check-pwsh.ps1"
-  $exitCode = 0
-} catch {
-  $exitCode = 1
-}
+& "$PSScriptRoot\check-pwsh.ps1"
+if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
 if ($FAIL_FAST -and $exitCode -ne 0) { exit $exitCode }
 
+# ---------------------------------------------------------------------------
+# 4. Nucleus apps smoke tests — POSIX only (stub on Windows)
+# ---------------------------------------------------------------------------
+Write-Output ("`n=== [{0}] Nucleus apps smoke tests ===" -f (++$_step))
+say "skipping (requires Nix and bash — not available on Windows)."
+
+# ---------------------------------------------------------------------------
+# 5. System config build — POSIX only (stub on Windows)
+# ---------------------------------------------------------------------------
+if ($skipSystemBuild) {
+  Write-Output ("`n=== [{0}] System config build ===" -f (++$_step))
+  say "skipping (--skip-system-build)."
+} else {
+  Write-Output ("`n=== [{0}] System config build ===" -f (++$_step))
+  say "skipping (system config build is POSIX-only)."
+}
+
 Write-Output ""
-Write-Output 'All tests passed.'
+Write-Output 'test: done'
+exit $exitCode
