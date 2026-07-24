@@ -119,10 +119,36 @@ let
     var: lib.hasInfix "env:${var}" posixPwshText
   ) agentEnvVarNames) "POSIX pwsh profile must check all env vars listed in agent-env-vars.nix";
 in
-builtins.seq (builtins.deepSeq {
-  inherit test_posix_binary_baseline test_windows_binary_baseline test_apply_runtime_bundles_prek test_posix_apply_installs_hooks test_zsh_hook_installs_hooks test_posix_pwsh_hook_installs_hooks test_windows_apply_installs_hooks test_windows_install_module_exists test_windows_shell_hook_installs_hooks test_posix_prek_uses_git_rev_parse test_windows_prek_uses_git_rev_parse test_posix_prek_handles_relative_git_dir test_windows_prek_handles_relative_git_dir test_zsh_agent_session_detection test_windows_agent_session_detection test_posix_pwsh_agent_session_detection test_windows_agent_env_vars_complete test_zsh_agent_session_suppression test_posix_pwsh_agent_session_suppression test_windows_pwsh_agent_session_suppression test_windows_cmd_autorun_agent_detection test_zsh_agent_env_vars_complete test_posix_pwsh_agent_env_vars_complete;
-}) {
-  success = true;
-  testCount = 23;
-  message = "All 23 prek integration tests passed";
-}
+builtins.seq
+  (builtins.deepSeq {
+    inherit
+      test_posix_binary_baseline
+      test_windows_binary_baseline
+      test_apply_runtime_bundles_prek
+      test_posix_apply_installs_hooks
+      test_zsh_hook_installs_hooks
+      test_posix_pwsh_hook_installs_hooks
+      test_windows_apply_installs_hooks
+      test_windows_install_module_exists
+      test_windows_shell_hook_installs_hooks
+      test_posix_prek_uses_git_rev_parse
+      test_windows_prek_uses_git_rev_parse
+      test_posix_prek_handles_relative_git_dir
+      test_windows_prek_handles_relative_git_dir
+      test_zsh_agent_session_detection
+      test_windows_agent_session_detection
+      test_posix_pwsh_agent_session_detection
+      test_windows_agent_env_vars_complete
+      test_zsh_agent_session_suppression
+      test_posix_pwsh_agent_session_suppression
+      test_windows_pwsh_agent_session_suppression
+      test_windows_cmd_autorun_agent_detection
+      test_zsh_agent_env_vars_complete
+      test_posix_pwsh_agent_env_vars_complete
+      ;
+  })
+  {
+    success = true;
+    testCount = 23;
+    message = "All 23 prek integration tests passed";
+  }

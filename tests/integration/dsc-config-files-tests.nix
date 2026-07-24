@@ -124,10 +124,24 @@ let
     containsRegex ''match.*[\\/]'' windowsApplyText && containsRegex "path separators" windowsApplyText
   ) "apply.ps1 per-user loop must reject dscConfigFiles entries with path separators or '..'";
 in
-builtins.seq (builtins.deepSeq {
-  inherit test_default_includes_system_files test_default_excludes_user_files test_param_doc_describes_per_user test_deduplication_mechanism test_exactly_one_primary_user test_primary_user_has_dsc_config test_primary_user_files_complete test_primary_user_no_system_files test_primary_user_files_alphabetical test_per_user_prepends_user_prefix test_per_user_escape_prevention;
-}) {
-  success = true;
-  testCount = 11;
-  message = "All 11 DSC config file declaration tests passed";
-}
+builtins.seq
+  (builtins.deepSeq {
+    inherit
+      test_default_includes_system_files
+      test_default_excludes_user_files
+      test_param_doc_describes_per_user
+      test_deduplication_mechanism
+      test_exactly_one_primary_user
+      test_primary_user_has_dsc_config
+      test_primary_user_files_complete
+      test_primary_user_no_system_files
+      test_primary_user_files_alphabetical
+      test_per_user_prepends_user_prefix
+      test_per_user_escape_prevention
+      ;
+  })
+  {
+    success = true;
+    testCount = 11;
+    message = "All 11 DSC config file declaration tests passed";
+  }

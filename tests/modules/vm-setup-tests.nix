@@ -34,8 +34,9 @@ let
     let
       results = builtins.map validateVm manifest.VMs;
     in
-    assert' (builtins.length manifest.VMs > 0 && builtins.all (r: r == null) results)
-      "VMs.json must declare at least one VM";
+    assert' (
+      builtins.length manifest.VMs > 0 && builtins.all (r: r == null) results
+    ) "VMs.json must declare at least one VM";
 
   # Disk sizes must be positive integers.
   test_disk_sizes =

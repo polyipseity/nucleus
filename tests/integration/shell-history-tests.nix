@@ -45,10 +45,21 @@ let
     && lib.hasInfix "HISTCONTROL=ignorespace:ignoredups" shellText
   ) "shell.nix header must document equivalent settings for future shells (bash, fish, nushell)";
 in
-builtins.seq (builtins.deepSeq {
-  inherit test_zsh_has_hist_ignore_space test_zsh_has_hist_ignore_dups test_posix_pwsh_has_history_no_duplicates test_posix_pwsh_has_space_prefix_handler test_windows_pwsh_has_history_no_duplicates test_windows_pwsh_has_space_prefix_handler test_cmd_exe_limitation_documented test_future_shell_reference_documented;
-}) {
-  success = true;
-  testCount = 8;
-  message = "All 8 shell-history tests passed";
-}
+builtins.seq
+  (builtins.deepSeq {
+    inherit
+      test_zsh_has_hist_ignore_space
+      test_zsh_has_hist_ignore_dups
+      test_posix_pwsh_has_history_no_duplicates
+      test_posix_pwsh_has_space_prefix_handler
+      test_windows_pwsh_has_history_no_duplicates
+      test_windows_pwsh_has_space_prefix_handler
+      test_cmd_exe_limitation_documented
+      test_future_shell_reference_documented
+      ;
+  })
+  {
+    success = true;
+    testCount = 8;
+    message = "All 8 shell-history tests passed";
+  }
