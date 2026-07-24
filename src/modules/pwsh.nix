@@ -59,10 +59,12 @@ in
   # $PROFILE.CurrentUserCurrentHost at startup.
   home.file.".config/powershell/Microsoft.PowerShell_profile.ps1".text = profileContent;
 
-  # Default PSScriptAnalyzer settings: Severity filter and ExcludeRules.
-  # PSScriptAnalyzer reads this path by default in PSEdition Desktop if the
-  # file exists; scripts/check-pwsh.ps1 also references the CI copy at
-  # scripts/PSScriptAnalyzerSettings.psd1 via $PSScriptRoot (Method 3).
+  # Provisioned PSScriptAnalyzer settings file: Severity filter and ExcludeRules.
+  # This is a reference copy that can be passed to Invoke-ScriptAnalyzer
+  # via -Settings. PSSA does not auto-discover this path — it only discovers
+  # PSScriptAnalyzerSettings.psd1 in the sibling directory of the analyzed file.
+  # The CI copy consumed by scripts/check-pwsh.ps1 lives at
+  # scripts/PSScriptAnalyzerSettings.psd1 (Method 3).
   home.file.".config/powershell/PSScriptAnalyzerSettings.psd1" = {
     # Method 1 (writable symlink): repo changes take effect without rebuild.
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/pwsh/PSScriptAnalyzerSettings.psd1";
