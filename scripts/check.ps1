@@ -170,6 +170,13 @@ if ($HAS_ARGS) {
     if ($_f -like '*.pkr.hcl') { $PKR_FILES += $_f }
   }
 }
+# cached file lists — used in full mode to avoid repeated Get-ChildItem traversals.
+if (-not $HAS_ARGS) {
+  $script:CachedNixFiles = Get-ChildItem -Recurse -Path "$RepoRoot/src" -Filter '*.nix' | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object FullName
+  $script:CachedYamlFiles = Get-ChildItem -Recurse -Path $RepoRoot -Include '*.yml','*.yaml' | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object FullName
+  $script:CachedJsonFiles = Get-ChildItem -Recurse -Path "$RepoRoot/src" -Include '*.json' | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notlike '*.schema.json' } | Sort-Object FullName
+  $script:CachedPs1Files = Get-ChildItem -Recurse -Path $RepoRoot -Filter '*.ps1' | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object FullName
+}
 
 $_step = 0
 
@@ -816,8 +823,8 @@ $_yamlFiles = @()
 if ($HAS_ARGS) {
   $_yamlFiles = $positionalArgs | Where-Object { $_ -like '*.yml' -or $_ -like '*.yaml' }
 } else {
-  $_yamlFiles = Get-ChildItem -Recurse -Path $RepoRoot -Include '*.yml','*.yaml' |
-    Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.FullName -notmatch '[/\\]secrets[/\\]' } |
+  $_yamlFiles = $script:CachedYamlFiles |
+    Where-Object { $_.FullName -notmatch '[/\\]secrets[/\\]' } |
     ForEach-Object { $_.FullName }
 }
 foreach ($_yf in $_yamlFiles) {
@@ -845,9 +852,7 @@ $_yamlFiles = @()
 if ($HAS_ARGS) {
   $_yamlFiles = $positionalArgs | Where-Object { $_ -like '*.yml' -or $_ -like '*.yaml' }
 } else {
-  $_yamlFiles = Get-ChildItem -Recurse -Path $RepoRoot -Include '*.yml','*.yaml' |
-    Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } |
-    ForEach-Object { $_.FullName }
+  $_yamlFiles = $script:CachedYamlFiles | ForEach-Object { $_.FullName }
 }
 foreach ($_yf in $_yamlFiles) {
   yamllint --strict $_yf 2>&1 | Out-Null

@@ -101,6 +101,8 @@ foreach ($_arg in $args) {
     exit 1
   }
 }
+# Cache file lists — used by active steps to avoid repeated discovery.
+$script:CachedPs1Files = Get-ChildItem -Recurse -Path $RepoRoot -Filter '*.ps1' | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object FullName
 
 # ---------------------------------------------------------------------------
 # 1. Nix test suite — POSIX only (stub on Windows)

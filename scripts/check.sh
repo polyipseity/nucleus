@@ -217,6 +217,18 @@ if $HAS_ARGS; then
   done
 fi
 
+# Cached file lists — used in full mode to avoid repeated find traversals.
+# Populated only when no explicit paths provided.
+if ! $HAS_ARGS; then
+  readarray -t CACHED_NIX_FILES < <(find . -path ./vendor -prune -false -o -name '*.nix' -print | sort)
+  readarray -t CACHED_YAML_FILES < <(find . -not -path '*/vendor/*' \( -name '*.yml' -o -name '*.yaml' \) -print | sort)
+  readarray -t CACHED_JSON_FILES < <(find src -name '*.json' -not -path '*/vendor/*' -not -name '*.schema.json' -print | sort)
+  # For PS1 files, search src/ (check.ps1 is the traditional home) but also scripts/ for completeness.
+  readarray -t CACHED_PS1_FILES < <(find . -path ./vendor -prune -false -o -name '*.ps1' -print | sort)
+  # Shell files for full-mode suppression check — covers both .sh and .zsh in src/scripts.
+  readarray -t CACHED_SH_FILES < <(find src/scripts -type f -name '*.sh' -print | sort)
+fi
+
 _step=0
 
 # Pre-flight tool availability checks.
@@ -347,7 +359,7 @@ if [ "${#NIX_FILES[@]}" -gt 0 ]; then
     say "nixf-tidy lint passed."
   fi
 elif ! $HAS_ARGS; then
-  while IFS= read -r -d '' _nixf_file; do
+  for _nixf_file in "${CACHED_NIX_FILES[@]}"; do
     if ! _nixf_out=$(nixf-tidy < "$_nixf_file" 2>&1); then
       warn "$_nixf_file: nixf-tidy failed"
       _nixf_errors=$((_nixf_errors + 1))
@@ -357,7 +369,7 @@ elif ! $HAS_ARGS; then
       done
       _nixf_errors=$((_nixf_errors + 1))
     fi
-  done < <(find . -path ./vendor -prune -o -name '*.nix' -print0)
+  done
   if [ "$_nixf_errors" -gt 0 ]; then
     exit_code=1
     "$FAIL_FAST" && exit $exit_code
@@ -650,7 +662,7 @@ if $HAS_ARGS; then
   done
 else
   # JSON files with inline $schema — auto-discover and validate
-  while IFS= read -r -d '' _json_file; do
+  for _json_file in "${CACHED_JSON_FILES[@]}"; do
     _schema=$(jq -r 'if type == "object" then .["$schema"] // "" else "" end' "$_json_file")
     if [ -n "$_schema" ]; then
       case "$_schema" in
@@ -660,9 +672,10 @@ else
       esac
       check-jsonschema --schemafile "$_schemafile" "$_json_file" 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
     fi
-  done < <(find src -name '*.json' -not -path '*/vendor/*' -not -name '*.schema.json' -print0)
+  done
   # YAML files with inline $schema — auto-discover and validate
-  while IFS= read -r -d '' _yaml_file; do
+  for _yaml_file in "${CACHED_YAML_FILES[@]}"; do
+    case "$_yaml_file" in */secrets/*) continue ;; esac
     # shellcheck disable=SC2016 # reason: .$schema is a yq expression, not shell variable expansion
     _schema=$(yq eval '.$schema // ""' "$_yaml_file" 2>/dev/null)
     if [ -n "$_schema" ]; then
@@ -672,7 +685,7 @@ else
       esac
       check-jsonschema --schemafile "$_schemafile" "$_yaml_file" 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
     fi
-  done < <(find . -not -path '*/vendor/*' -not -path '*/secrets/*' \( -name '*.yml' -o -name '*.yaml' \) -print0)
+  done
 fi
 # GitHub schema validation (complements existing prek hooks — CI enforcement) — always-run
 check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
@@ -830,13 +843,13 @@ if $HAS_ARGS; then
     fi
   done
 else
-  while IFS= read -r -d '' _yaml_file; do
+  for _yaml_file in "${CACHED_YAML_FILES[@]}"; do
     case "$_yaml_file" in */secrets/*) continue ;; esac
     if ! yq eval '.' "$_yaml_file" >/dev/null 2>&1; then
       warn "$_yaml_file: invalid YAML"
       _yaml_errors=$((_yaml_errors + 1))
     fi
-  done < <(find . -path ./vendor -prune -o \( -name '*.yml' -o -name '*.yaml' \) -print0)
+  done
 fi
 if [ "$_yaml_errors" -gt 0 ]; then
   warn "YAML validation failed with $_yaml_errors error(s)"
@@ -861,12 +874,12 @@ if $HAS_ARGS; then
     esac
   done
 else
-  while IFS= read -r -d '' _yaml_file; do
+  for _yaml_file in "${CACHED_YAML_FILES[@]}"; do
     if ! yamllint --strict "$_yaml_file" >/dev/null 2>&1; then
       warn "$_yaml_file: yamllint violations"
       _yaml_lint_errors=$((_yaml_lint_errors + 1))
     fi
-  done < <(find . -path ./vendor -prune -o \( -name '*.yml' -o -name '*.yaml' \) -print0)
+  done
 fi
 if [ "$_yaml_lint_errors" -gt 0 ]; then
   warn "YAML linting failed with $_yaml_lint_errors error(s)"
@@ -949,10 +962,9 @@ if $HAS_ARGS; then
   [ ${#PS1_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '-ErrorAction SilentlyContinue' '-ErrorAction SilentlyContinue' "${PS1_FILES[@]}"
   [ ${#PS1_FILES[@]} -gt 0 ] && _check_undoc_supp '-E' 'catch[[:space:]]*\{[[:space:]]*\}' 'empty catch {}' "${PS1_FILES[@]}"
 else
-  # Full mode: find all relevant files.
-  # Use readarray to avoid SC2046 word-splitting warnings from unquoted $(find).
-  readarray -t _nix_sh_files < <(find . -path ./vendor -prune -o \( -name '*.nix' -print \) -o \( -name '*.sh' -print \))
-  readarray -t _ps1_files < <(find . -path ./vendor -prune -o -name '*.ps1' -print)
+  # Full mode: use cached file lists.
+  _nix_sh_files=("${CACHED_NIX_FILES[@]}" "${CACHED_SH_FILES[@]}")
+  _ps1_files=("${CACHED_PS1_FILES[@]}")
   # check-suppress:suppression_doc: string argument specifying the suppression pattern for the check function, not a real || true operator.
   _check_undoc_supp '-F' '|| true' '|| true' "${_nix_sh_files[@]}"
   # shellcheck disable=SC2016 # reason: PowerShell redirection literal, not shell expansion
