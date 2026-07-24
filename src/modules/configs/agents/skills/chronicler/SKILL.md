@@ -1,5 +1,5 @@
 ---
-name: chronicle
+name: chronicler
 version: 1.0.0
 description: |
   Analyze Copilot session history for standup reports, usage tips, session search,
@@ -17,7 +17,7 @@ allowed-tools:
   - AskUserQuestion
 ---
 
-# Chronicle: session history analysis
+# Chronicler: session history analysis
 
 Analyze the local Copilot session store to provide daily standups, usage tips, session search, reindexing, and improvement suggestions.
 
