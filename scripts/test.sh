@@ -10,8 +10,8 @@
 #
 # Mode taxonomy:
 #   No --scoped/--full distinction (all steps run by default). Use
-#   --skip-system-build to skip step 5. Use --quiet to suppress PASS/Testing
-#   lines (only show failures).
+#   --skip-system-build to skip step 5. Use --quiet to suppress non-error
+#   output across all applicable steps (failures always shown).
 #
 # Output conventions:
 #   Warnings (warn) and errors (error) go to stderr; info/success/skip
@@ -34,7 +34,11 @@
 # directory does NOT require editing this script.
 #
 # Arguments:
-#   -q|--quiet           Suppress PASS/Testing lines (only show FAIL).
+#   -q|--quiet           Suppress success/progress output across applicable steps.
+#                        Step 1: suppresses PASS/Testing lines from Nix test suite.
+#                        Steps 2-3: naturally quiet (only output on failure).
+#                        Step 4: suppresses progress messages from smoke tests.
+#                        Step 5: suppresses build output on success.
 #   --fail-fast          Exit immediately on first failure (default).
 #   --no-fail-fast       Accumulate all failures.
 #   --skip-system-build  Skip building the host system configuration.
@@ -72,7 +76,7 @@ REPO_ROOT=$(derive_repo_root)
 cd "$REPO_ROOT" || exit
 
 usage() {
-  usage_std "test.sh" "[-q|--quiet] [--fail-fast|--no-fail-fast] [--skip-system-build]" "Run the repository test suite. With --quiet, only show FAIL lines and nix output for failing tests. By default, all output is shown. --fail-fast exits immediately on first failure (default); --no-fail-fast accumulates all failures. --skip-system-build skips building the system configuration."
+  usage_std "test.sh" "[-q|--quiet] [--fail-fast|--no-fail-fast] [--skip-system-build]" "Run the repository test suite. With --quiet, suppress success/progress output across applicable steps (failures always shown). By default, all output is shown. --fail-fast exits immediately on first failure (default); --no-fail-fast accumulates all failures. --skip-system-build skips building the system configuration."
 }
 
 # Flags
@@ -161,15 +165,21 @@ pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 || exit_cod
 
 # 4. Nucleus apps smoke tests (build + --help / dry-run)
 section "$((_step += 1))" "Nucleus apps smoke tests"
-bash tests/scripts/nucleus-apps-smoke-tests.sh || exit_code=$?
+if [ "$quiet_mode" = true ]; then
+  bash tests/scripts/nucleus-apps-smoke-tests.sh >/dev/null || exit_code=$?
+else
+  bash tests/scripts/nucleus-apps-smoke-tests.sh || exit_code=$?
+fi
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # 5. System config build — build all derivations in the host system config.
 # WHY soft-fail: building derivations is slow and network-dependent. Always
 # accumulates exit code regardless of FAIL_FAST. Use --skip-system-build to
 # skip this step entirely.
-if [ "$skip_system_build" != true ]; then
-  section "$((_step += 1))" "System config build"
+section "$((_step += 1))" "System config build"
+if [ "$skip_system_build" = true ]; then
+  say "skipping (--skip-system-build)."
+else
   case "$(uname)" in
     Darwin) attr="darwinConfigurations.macbook.system" ;;
     Linux)
@@ -185,7 +195,11 @@ if [ "$skip_system_build" != true ]; then
       ;;
   esac
   if [ "$skip_system_build" != true ]; then
-    nix build --no-link --keep-going --print-out-paths "./src#$attr" || exit_code=$?
+    if [ "$quiet_mode" = true ]; then
+      nix build --no-link --keep-going --print-out-paths "./src#$attr" >/dev/null || exit_code=$?
+    else
+      nix build --no-link --keep-going --print-out-paths "./src#$attr" || exit_code=$?
+    fi
   fi
 fi
 
