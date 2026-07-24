@@ -21,15 +21,15 @@
 #
 # Test suites (8-11, stubs on Windows):
 #   8. Shell script validation tests (stub)
-#  10. CWD-independence tests (stub)
-#  11. Nix search path tests (stub)
-#  12. Port utility function tests (stub)
+#   9. CWD-independence tests (stub)
+#  10. Nix search path tests (stub)
+#  11. Port utility function tests (stub)
 #
 # Data integrity (12-15):
-#  13. Lockfile validation
-#  14. Locked DSC validation
-#  15. Schema validation (JSON/YAML)
-#  16. Service registry validation
+#  12. Lockfile validation
+#  13. Locked DSC validation
+#  14. Schema validation (JSON/YAML)
+#  15. Service registry validation
 #
 # Policy/verification (16-21):
 #  16. YAML structural validation
@@ -1114,7 +1114,7 @@ $_cfgMethodOutput = $_srcFiles | Select-String -Pattern '# Method'
 
 if ($_cfgErrors -gt 0) {
   warn ("config method compliance check failed with {0} error(s)" -f $_cfgErrors)
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-19.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-20.exit") -NoNewline
 } else {
   say "config method compliance passed."
 }
