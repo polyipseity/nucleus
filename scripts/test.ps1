@@ -3,9 +3,13 @@
 # Runs all Windows-compatible repository test suites in sequence:
 #
 # Test suites (1-5):
-#   1. Nix test suite (stub — requires POSIX/Nix)
+#
+# Code quality tests (2-3):
 #   2. Shell script linting (stub — requires POSIX/ShellCheck)
 #   3. PowerShell lint (PSScriptAnalyzer)
+#
+# Functional tests (1, 4-5):
+#   1. Nix test suite (stub — requires POSIX/Nix)
 #   4. Nucleus apps smoke tests (stub — requires Nix/bash)
 #   5. System config build (stub — POSIX-only)
 #
@@ -64,6 +68,7 @@ $_step = 0
 
 # Output helpers — structured prefix pattern matching section()/say/warn from test.sh.
 function say { Write-Output "test: $args" }
+function warn { Write-Output "test: warning: $args" }
 
 # Pre-flight tool availability checks.
 # All tools listed in Prerequisites must be present. Missing tools produce
@@ -130,5 +135,8 @@ Write-Output ("`n=== [{0}] System config build ===" -f (++$_step))
 say "skipping (system config build is POSIX-only)."
 
 Write-Output ""
-Write-Output 'test: done'
-exit $exitCode
+if ($exitCode -ne 0) {
+  warn "some tests failed with exit code $exitCode"
+  exit $exitCode
+}
+say "all tests passed."
