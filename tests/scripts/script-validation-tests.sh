@@ -169,8 +169,8 @@ _TEST_TMPDIR=$(mktemp -d) || { echo "FATAL: failed to create temp dir"; exit 1; 
 trap 'rm -rf "$_TEST_TMPDIR"' EXIT
 
 # Worker function: runs a single script's tests in a subshell.
-# Each worker sources test-lib.sh for fresh counters, runs the tests,
-# and writes structured output to its temp file.
+# The subshell inherits assert_pass/assert_fail and color vars from the
+# top-level source of test-lib.sh; no need to re-source it inside.
 _run_script_worker() {
   local _script_path="$1"
   local _worker_id="$2"
@@ -180,7 +180,6 @@ _run_script_worker() {
   # Run in subshell for isolation
   (
     set -euo pipefail
-    . "$SCRIPT_DIR/test-lib.sh"
 
     [[ ! -f "$_script_path" ]] && exit 0
 
@@ -763,9 +762,7 @@ fi
 echo ""
 echo "============================================================"
 echo "Test Summary:"
-# shellcheck disable=SC2031 # reason: GREEN is a constant (set in test-lib.sh), not modified in subshell
 echo -e "${GREEN}Passed: $TESTS_PASSED${NC}"
-# shellcheck disable=SC2031 # reason: RED is a constant (set in test-lib.sh), not modified in subshell
 echo -e "${RED}Failed: $TESTS_FAILED${NC}"
 echo "============================================================"
 
