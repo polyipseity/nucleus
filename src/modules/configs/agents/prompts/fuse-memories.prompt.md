@@ -30,27 +30,10 @@ Scope and memoryName are AND-ed — only memories matching both are selected.
 
 Memory storage is not a flat filesystem — `list_dir` on canonical paths typically fails (ENOENT) or returns empty due to UUID-keyed subdirectory layout. Do not rely on filesystem listing.
 
-### Step 1: Check context metadata (fastest, most reliable)
-
-The agent's context already contains `<repoMemory>` and `<sessionMemory>` blocks that list all available filenames. Scan those directly.
-
-If `${input:memoryName}` is set, filter to only those names. Otherwise collect all names from the matching scopes.
-
-### Step 2: Confirm each file exists via resolve_memory_file_uri
-
-For each candidate filename, call `resolve_memory_file_uri("/memories/<scope>/<name>.md")`. If it returns a valid URI, the file exists. Collect the resolved URIs for reading.
-
-### Step 3: Explicit probe fallback chain
-
-If context metadata is unavailable (no `<repoMemory>`/`<sessionMemory>` blocks in context):
-
-1. **Best**: `session_store_sql` — query `SELECT DISTINCT filename FROM memory_index` or equivalent.
-2. **Fallback**: For each scope, call `resolve_memory_file_uri("/memories/<scope>/")` to get the base directory URI, then use the resolved path with `list_dir` or `file_search` with glob `**/*.md` at that path.
-3. **Last resort**: Probe known names directly with `resolve_memory_file_uri("/memories/<scope>/<name>.md")` for each expected file.
-
-### Fail closed
-
-If all probe methods return zero files, report: "No memory files found at scopes `${input:scope}`. Aborting." and stop.
+1. **Check context metadata** — scan `<repoMemory>` and `<sessionMemory>` blocks in context for all available filenames. Filter by `${input:memoryName}` if set.
+2. **Confirm existence** — for each candidate, call `resolve_memory_file_uri("/memories/<scope>/<name>.md")`. Valid URIs confirm existence. Collect them for reading.
+3. **Probe fallback** — if context metadata is unavailable, call `resolve_memory_file_uri("/memories/<scope>/")` to get the base path, then `file_search` with glob `**/*.md` at that path.
+4. **Fail closed** — If all probe methods return zero files, report: "No memory files found at scopes `${input:scope}`. Aborting." and stop.
 
 ## Read
 
@@ -62,42 +45,27 @@ Read all confirmed memory files and all `.instructions.md` files at the target l
 
 ## Evaluate — assess memory staleness
 
-Before absorbing, evaluate each atomic fact for staleness. Break each memory file into atomic facts (paragraph-level or bullet-level claims). For each fact, apply these checks from cheapest to most expensive:
+Break each memory file into atomic facts. For each fact, apply these checks from cheapest to most expensive:
 
-### Staleness indicators
+| Signal | Method |
+|--------|--------|
+| **Codebase contradiction** | Search codebase for the key claim. If current code contradicts it → outdated. |
+| **Reference death** | Check referenced files, functions, commands still exist. If any are missing → outdated. |
+| **Instruction supersession** | Cross-reference against current `.instructions.md` files. If an instruction already covers the topic and is authoritative → outdated. |
+| **Git timestamps** (optional, high cost) | Get memory file timestamp via `git log -1 --format=%ct`. If memory predates changes to referenced code → likely outdated. |
+| **Ambiguous / unverifiable** | Fact cannot be verified or falsified against current workspace → uncertain. |
 
-| Signal | Method | Example |
-|--------|--------|--------|
-| **Codebase contradiction** | Search the codebase (`grep_search`, `file_search`) for the key claim. If current code contradicts it → **outdated**. | Memory says "activation runs via `apply.sh`" but the file was renamed. |
-| **Reference death** | Check that files, functions, commands, or config keys referenced in the fact still exist. If any are missing → **outdated**. | Memory says "see `src/modules/foo.nix`" but that file was deleted. |
-| **Instruction supersession** | Cross-reference against current `.instructions.md` files. If an instruction already covers the topic differently and is authoritative → **outdated**. | Memory says "use `nix build`" but `core-behavior.instructions.md` says "use `nix build .#target`". |
-| **Git timestamps** (optional, high cost) | Get the memory file timestamp via `git log -1 --format=%ct <memory_path>`. If the memory predates significant changes to referenced code, likely **outdated**. Corroborate with other signals. | Memory is 6 months old; referenced code was refactored 3 months ago. |
-| **Ambiguous / unverifiable** | Fact cannot be verified or falsified against current workspace. Mark as **uncertain**. | Memory says "prefer TCP over UDP" with no supporting code to check. |
-
-### Verdicts
-
-| Verdict | Meaning | Action |
-|---------|---------|--------|
-| **current** | Fact matches current codebase state and isn't superseded. | Proceed to **Absorb** normally. |
-| **discard** | Fact is provably wrong or references removed features. | Remove from memory file; do **not** absorb. |
-| **update** | Useful core but expressed inaccurately for current state. | Correct the fact inline in memory, then proceed to **Absorb** with corrected version. |
-| **ignore** | Outdated but harmless, and you cannot confidently update it. | Discard; do **not** absorb (file will be deleted). |
-| **uncertain** | Cannot determine staleness with available evidence. | Discard; do **not** absorb (file will be deleted, no source to reference). |
+Verdicts: **current** → absorb, **discard** → remove (provably wrong), **update** → correct then absorb, **ignore** → discard (outdated but harmless), **uncertain** → discard (unverifiable).
 
 ### Report before acting
 
-Print an evaluation summary after processing all facts:
+Print evaluation summary with each fact's verdict. Example:
 
 ```
-Evaluation summary:
-  memory-foo.md:
-    ✅ "run prek for formatting" — current
-    ❌ "use build.sh" — discard (file removed)
-    🔄 "deploy via rsync" — update (now uses nucleus-apply)
-    ⚠️ "use port 8080" — ignore (harmless, can't verify)
-    ❓ "prefer UDP" — uncertain, discarding (file will be deleted)
-  memory-bar.md:
-    ... etc
+memory-foo.md:
+  ✅ "run prek for formatting" — current
+  ❌ "use build.sh" — discard (file removed)
+  🔄 "deploy via rsync" — update (now uses nucleus-apply)
 ```
 
 ## Absorb — cohesive multi-location edits
@@ -130,16 +98,6 @@ Do not bulk-append to the end of files unless every other placement was tried an
 2. Group edits by target file.
 3. For each target file, order edits bottom-up (last line first) to preserve line numbers.
 4. Apply all edits for one file in a single `multi_replace_string_in_file` call.
-
-### Examples of good vs. poor absorption
-
-Good: Memory says "prek run --all-files before commit". Instruction file has a "Validation" section with a bullet list of commands. Add the prek command as a new bullet in that list.
-
-Poor: Memory says "prek run --all-files before commit". Appended to end of `core-behavior.instructions.md` as a new section.
-
-Good: Memory says "macOS watchdog daemon: use `launchctl bootout` then `launchctl bootstrap` to reload". Instruction file `spotlight-disable.instructions.md` has a section on "Disable spotlight" already. Add the reload pattern inline to the relevant step.
-
-Poor: Memory says "macOS watchdog daemon: use launchctl to reload". Appended verbatim to end of file.
 
 ## Delete
 
