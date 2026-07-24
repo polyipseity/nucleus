@@ -199,7 +199,7 @@ let
       };
     }
   ];
-  activationBundle = pkgs.callPackage ../../../modules/lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ../../../modules/lib/script-tree.nix { };
 
   # Nix-built open-manual script with the manual path baked in.
   openManualScript = pkgs.writeNucleusShellApplication {

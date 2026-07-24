@@ -21,7 +21,7 @@
 #     convention (same on NixOS and Windows).
 { lib, pkgs, ... }:
 let
-  activationBundle = pkgs.callPackage ../../modules/lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
   # Generate a plist <dict> from an attribute set of booleans.
   # Used to build NSServicesStatus presentation_modes values.
   mkPresentationModes =

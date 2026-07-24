@@ -19,7 +19,7 @@
 #   build on modern macOS.
 { lib, pkgs, ... }:
 let
-  activationBundle = pkgs.callPackage ../../modules/lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
   # Pinned source for the polyipseity/ext.ntfs-3g fork (edge branch).
   ntfs3gSrc = pkgs.fetchFromGitHub {
     owner = "polyipseity";

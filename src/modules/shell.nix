@@ -79,7 +79,7 @@ let
   iCloudExcludedDirNames = _iCloudCfg.excludedDirNames;
   iCloudManagedRoots = _iCloudCfg.managedRoots;
 
-  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 
 in
 {

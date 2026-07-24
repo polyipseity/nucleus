@@ -57,7 +57,7 @@ let
   # Sorting policy: alphabetically by appDir (when list is non-empty).
   currentNucleusAppBundles = [ ];
 
-  activationBundle = pkgs.callPackage ../../../modules/lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ../../../modules/lib/script-tree.nix { };
 
 in
 {

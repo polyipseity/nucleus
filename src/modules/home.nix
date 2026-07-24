@@ -134,7 +134,7 @@ let
   # Path to the checked-out dotfiles/ directory at the root of this repo.
   dotfilesRoot = ../dotfiles;
 
-  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 {
   options.nucleus.rclone = {

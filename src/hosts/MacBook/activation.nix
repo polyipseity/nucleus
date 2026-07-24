@@ -44,7 +44,7 @@ let
   # Baked at eval time from NUCLEUS_REPO_ROOT (set by apply.sh). Used to
   # resolve the repo checkout root in activation blocks that embed or invoke
   # repo-local scripts.
-  activationBundle = pkgs.callPackage ../../modules/lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
 
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 

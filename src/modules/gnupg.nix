@@ -25,7 +25,7 @@ lib.mkIf
     # Without this file, pinentry-program defaults to the first on PATH and
     # allow-loopback-pinentry is unset, breaking non-interactive signing.
     system.activationScripts.postActivation.text = lib.mkAfter ''
-      "${pkgs.callPackage ./lib/activation-bundle.nix { }}/secrets/configure-gpg-agent.sh" \
+      "${pkgs.callPackage ./lib/script-tree.nix { }}/secrets/configure-gpg-agent.sh" \
         "${pkgs.pinentry_mac}/bin/pinentry-mac"
     '';
   }

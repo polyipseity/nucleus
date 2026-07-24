@@ -4,7 +4,7 @@ name: "Activation Script Conventions"
 applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/**/services/*.nix, src/scripts/**/*.sh"
 ---
 
-All activation blocks in this repo must use the **activation bundle subprocess pattern**: scripts live in `src/scripts/`, are assembled into a single Nix derivation (`src/modules/lib/activation-bundle.nix`), and are invoked as subprocesses from activation blocks.
+All activation blocks in this repo must use the **activation bundle subprocess pattern**: scripts live in `src/scripts/`, are assembled into a single Nix derivation (`src/modules/lib/script-tree.nix`), and are invoked as subprocesses from activation blocks.
 
 This eliminates `builtins.readFile` embedding, `__TOKEN__` placeholders, and `+` concatenation from activation blocks entirely.
 
@@ -12,7 +12,7 @@ This eliminates `builtins.readFile` embedding, `__TOKEN__` placeholders, and `+`
 
 ## Activation bundle architecture
 
-`src/modules/lib/activation-bundle.nix` (thin wrapper around `src/modules/lib/script-tree.nix`) builds a `nucleus-activation-bundle` derivation. All scripts from `src/scripts/` are bundled into `$out/src/scripts/` with the same subtree structure, making `$out/` the repo root.
+`src/modules/lib/script-tree.nix` builds a `nucleus-script-tree` derivation containing all scripts from `src/scripts/` bundled into `$out/src/scripts/` with the same subtree structure, making `$out/` the repo root.
 
 Every script in the bundle:
 
@@ -36,7 +36,7 @@ Every activation block must invoke a bundle script as a subprocess. The Nix expr
 
 ```nix
 # Shared activation bundle path (define in `let` block or inherit from imports)
-activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
+activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 
 # Simple inline: pure inline, ≤3 lines, no deps (the ONLY exception to subprocess)
 home.activation.provisionDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
@@ -63,7 +63,7 @@ home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGenerat
 
 Rules:
 
-- **Always use `activationBundle` from `pkgs.callPackage ./lib/activation-bundle.nix { }`** — never hardcode a store path.
+- **Always use `activationBundle` from `pkgs.callPackage ./lib/script-tree.nix { }`** — never hardcode a store path.
 - **Use `"${activationBundle}/src/scripts/<path>.sh"`** — the leading `"` makes Nix expand the store path.
 - **Positional CLI args for all per-user values.** No `__TOKEN__` placeholders.
 - **Use `lib.escapeShellArg` for values going into shell single-quoted context** (prevents injection).

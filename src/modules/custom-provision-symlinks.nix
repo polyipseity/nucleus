@@ -64,7 +64,7 @@ let
     map (entry: entry.linkAbsolutePath) selectedSymlinksResolved
   );
 
-  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 {
   options.nucleus.customProvisionSymlinks = lib.mkOption {

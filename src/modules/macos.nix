@@ -265,7 +265,7 @@ let
     scriptName = "src/scripts/hosts/MacBook/macos-set-gui-env";
   };
 
-  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 lib.mkIf pkgs.stdenv.isDarwin {
   home.packages = [

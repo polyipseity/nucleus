@@ -81,7 +81,7 @@ let
   # does not attempt to instantiate an unsupported package.
   desktopprBinPath = if pkgs.stdenv.isDarwin then "${pkgs.desktoppr}/bin/desktoppr" else "";
 
-  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 {
   assertions = [

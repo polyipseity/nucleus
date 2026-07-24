@@ -23,7 +23,7 @@ let
 
   managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };
 
-  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 {
   home.file = {

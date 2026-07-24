@@ -6,7 +6,7 @@
   ...
 }:
 let
-  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 {
   # ---------------------------------------------------------------------------

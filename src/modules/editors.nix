@@ -279,7 +279,7 @@ let
       ]
       (builtins.readFile ../scripts/editors/neovim-init.lua);
 
-  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 {
   programs.neovim = {

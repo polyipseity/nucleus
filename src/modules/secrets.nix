@@ -44,7 +44,7 @@ let
   userSecretFilePath = ../secrets + "/users-${primaryUsername}.yml";
   hasUserSecretFile = builtins.pathExists userSecretFilePath;
 
-  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 lib.mkIf isPrimaryUser {
   # Machine age key derived from /etc/ssh/ssh_host_ed25519_key by

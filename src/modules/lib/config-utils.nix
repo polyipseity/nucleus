@@ -16,7 +16,7 @@ let
   # (baked into activation scripts at build time, resolved at runtime).
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
-  activationBundle = pkgs.callPackage ./activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ./script-tree.nix { };
 in
 {
   # ---------------------------------------------------------------------------

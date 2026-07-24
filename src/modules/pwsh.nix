@@ -49,7 +49,7 @@ let
       (builtins.readFile ../scripts/shell/init.ps1)
     + (builtins.readFile ./configs/pwsh/profile-base.ps1); # Method 4 (runtime embedded into activation block as a literal string)
 
-  activationBundle = pkgs.callPackage ./lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 {
   # Place the PowerShell profile at the CurrentUserCurrentHost location for

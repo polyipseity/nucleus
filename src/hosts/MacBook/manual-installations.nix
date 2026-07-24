@@ -10,7 +10,7 @@
 #   after openssh.  lib.mkBefore prepends before the HM activation call.
 { lib, pkgs, ... }:
 let
-  activationBundle = pkgs.callPackage ../../modules/lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
 in
 {
   # ---------------------------------------------------------------------------

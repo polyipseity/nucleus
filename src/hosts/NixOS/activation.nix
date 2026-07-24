@@ -25,7 +25,7 @@ let
     name = "nucleus-services-json";
   };
 
-  activationBundle = pkgs.callPackage ../../modules/lib/activation-bundle.nix { };
+  activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
 in
 {
   # ---------------------------------------------------------------------------
