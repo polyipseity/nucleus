@@ -5,7 +5,9 @@
 # Test file discovery is dynamic — the script finds all *.nix files under
 # tests/ automatically. Adding a new test directory does NOT require
 # editing this script.
-set -euo pipefail
+set -uo pipefail
+exit_code=0
+FAIL_FAST=true
 
 # Resolve symlinks so SCRIPT_DIR works from Nix wrapper symlinks.
 _self="$0"
@@ -20,10 +22,10 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 REPO_ROOT=$(derive_repo_root)
-cd "$REPO_ROOT"
+cd "$REPO_ROOT" || exit
 
 usage() {
-  usage_std "test.sh" "[-q|--quiet]" "Run the repository test suite. With --quiet, only show FAIL lines and nix output for failing tests. By default, all output is shown."
+  usage_std "test.sh" "[-q|--quiet] [--fail-fast|--no-fail-fast]" "Run the repository test suite. With --quiet, only show FAIL lines and nix output for failing tests. By default, all output is shown. --fail-fast exits immediately on first failure (default); --no-fail-fast accumulates all failures."
 }
 
 # Flags
@@ -32,6 +34,8 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     -q|--quiet) quiet_mode=true; shift ;;
     -h|--help) usage; exit 0 ;;
+    --no-fail-fast) FAIL_FAST=false; shift ;;
+    --fail-fast) FAIL_FAST=true; shift ;;
     --) shift; break ;;
     -*)
       error "unsupported argument '$1'"
@@ -78,21 +82,25 @@ if [ -s "$tmp_failed" ]; then
   error "FAILED Nix tests:"
   cat "$tmp_failed" >&2
   rm -f "$tmp_failed"
-  exit 1
+  exit_code=1
 fi
 rm -f "$tmp_failed"
 say "all Nix tests passed."
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # 2. Shell script linting (ShellCheck)
 section "$((_step += 1))" "Shell script linting"
-bash scripts/check-sh.sh
+bash scripts/check-sh.sh || exit_code=$?
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # 3. PowerShell lint (PSScriptAnalyzer)
 section "$((_step += 1))" "PowerShell lint"
-pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1
+pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 || exit_code=$?
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # 4. Nucleus apps smoke tests (build + --help / dry-run)
 section "$((_step += 1))" "Nucleus apps smoke tests"
-bash tests/scripts/nucleus-apps-smoke-tests.sh
+bash tests/scripts/nucleus-apps-smoke-tests.sh || exit_code=$?
+"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 nuc_done
