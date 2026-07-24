@@ -37,7 +37,7 @@ _nucleus_remove_stale_symlinks() {
 }
 
 # _nucleus_converge_symlinks SOURCE_DIR TARGET_DIR LABEL FIND_TYPE \
-#   CONFLICT_TEST CONFLICT_MSG_SUFFIX [SKIP_NAMES]
+#   CONFLICT_TEST CONFLICT_MSG_SUFFIX [SKIP_NAMES] [CONFLICT_MODE]
 #
 # Creates or updates symlinks in TARGET_DIR for each entry in SOURCE_DIR.
 # FIND_TYPE is a find(1) type qualifier (e.g. "-type d") or "" for all entry
@@ -45,6 +45,8 @@ _nucleus_remove_stale_symlinks() {
 # the target path when it exists as a non-symlink.  On conflict the message
 # "LABEL: LINK_PATH CONFLICT_MSG_SUFFIX" is printed before exit(1).
 # SKIP_NAMES is a space-separated list of basenames to skip.
+# CONFLICT_MODE is "fail" (default, exit with error) or "backup" (move
+# conflicting path to NAME.backup.TIMESTAMP and replace with symlink).
 _nucleus_converge_symlinks() {
   _ncs_source="$1"
   _ncs_target="$2"
@@ -53,6 +55,7 @@ _nucleus_converge_symlinks() {
   _ncs_conflict_test="$5"
   _ncs_conflict_msg_suffix="$6"
   _ncs_skips="${7:-}"
+  _ncs_conflict_mode="${8:-fail}"
   # shellcheck disable=SC2086 # reason: $_ncs_find_type is a space-separated find type flag list, word splitting intentional
   find "$_ncs_source" -mindepth 1 -maxdepth 1 $_ncs_find_type | while IFS= read -r _ncs_entry; do
     _ncs_name="$(basename "$_ncs_entry")"
@@ -70,8 +73,17 @@ _nucleus_converge_symlinks() {
       _nucleus_protect_symlink "$_ncs_label" "$_ncs_link"
       echo "$_ncs_label: updated $_ncs_target/$_ncs_name -> $_ncs_entry"
     elif test "$_ncs_conflict_test" "$_ncs_link"; then
-      echo "$_ncs_label: $_ncs_link $_ncs_conflict_msg_suffix" >&2
-      exit 1
+      if [ "$_ncs_conflict_mode" = "backup" ]; then
+        _ncs_backup="${_ncs_link}.backup.$(date +%Y%m%d%H%M%S)"
+        mv "$_ncs_link" "$_ncs_backup"
+        echo "$_ncs_label: backed up $_ncs_link -> $_ncs_backup"
+        ln -s "$_ncs_entry" "$_ncs_link"
+        _nucleus_protect_symlink "$_ncs_label" "$_ncs_link"
+        echo "$_ncs_label: linked $_ncs_target/$_ncs_name -> $_ncs_entry"
+      else
+        echo "$_ncs_label: $_ncs_link $_ncs_conflict_msg_suffix" >&2
+        exit 1
+      fi
     else
       ln -s "$_ncs_entry" "$_ncs_link"
       _nucleus_protect_symlink "$_ncs_label" "$_ncs_link"

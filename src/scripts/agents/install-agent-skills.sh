@@ -31,4 +31,5 @@ _nucleus_converge_symlinks \
   "$_ask_skills_source" "$_ask_skills_dir" "skills" \
   "-type d" "-d" \
   "is a real directory — if it is a fetched ClawHub download for a skill that has been re-committed, remove it and re-run apply." \
-  ""
+  "" \
+  "backup"
