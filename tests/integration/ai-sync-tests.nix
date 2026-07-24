@@ -1,5 +1,5 @@
 let
-  inherit (import ../lib.nix) containsRegex flatten;
+  inherit (import ../lib.nix) containsRegex;
 
   aiText = builtins.readFile ../../scripts/ai.sh;
   flakeText = builtins.readFile ../../src/flake.nix;

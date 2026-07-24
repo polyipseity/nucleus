@@ -1,5 +1,5 @@
 let
-  inherit (import ../lib.nix) containsRegex flatten;
+  inherit (import ../lib.nix) containsRegex;
 
   # Test files that should contain symlink protection code
   editorsText = builtins.readFile ../../src/modules/editors.nix;

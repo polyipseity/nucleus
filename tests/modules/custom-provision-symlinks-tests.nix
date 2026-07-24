@@ -1,7 +1,7 @@
 # tests/modules/custom-provision-symlinks-tests.nix — Custom provision symlink wiring.
 
 let
-  inherit (import ../lib.nix) assert' flatten containsRegex;
+  inherit (import ../lib.nix) assert' containsRegex;
 
   homeText = builtins.readFile ../../src/modules/home.nix;
   customModuleText = builtins.readFile ../../src/modules/custom-provision-symlinks.nix;

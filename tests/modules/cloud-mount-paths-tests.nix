@@ -1,7 +1,7 @@
 # tests/modules/cloud-mount-paths-tests.nix — Cloud mount path invariants.
 
 let
-  inherit (import ../lib.nix) assert' flatten containsRegex;
+  inherit (import ../lib.nix) assert' containsRegex;
 
   moduleText = builtins.readFile ../../src/modules/cloud-drives.nix;
 

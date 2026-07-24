@@ -1,5 +1,5 @@
 let
-  inherit (import ../lib.nix) flatten containsRegex;
+  inherit (import ../lib.nix) containsRegex;
 
   envVarsText = builtins.readFile ../../src/modules/lib/env-catalog.nix;
   windowsSystemDscText = builtins.readFile ../../src/hosts/Windows/system/env.dsc.yml;

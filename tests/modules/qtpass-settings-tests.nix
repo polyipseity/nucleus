@@ -1,5 +1,5 @@
 let
-  inherit (import ../lib.nix) flatten containsRegex;
+  inherit (import ../lib.nix) containsRegex;
 
   applyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   flakeText = builtins.readFile ../../src/flake.nix;

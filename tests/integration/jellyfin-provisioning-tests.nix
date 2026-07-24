@@ -1,7 +1,7 @@
 # tests/integration/jellyfin-provisioning-tests.nix — Validate Jellyfin provisioning parity.
 
 let
-  inherit (import ../lib.nix) assert' containsRegex flatten;
+  inherit (import ../lib.nix) assert' containsRegex;
   hasAdminAccount =
     accounts:
     builtins.any (

@@ -1,5 +1,5 @@
 let
-  inherit (import ../lib.nix) containsRegex flatten;
+  inherit (import ../lib.nix) containsRegex;
 
   homeText = builtins.readFile ../../src/modules/home.nix;
   loadUserRegistryText = builtins.readFile ../../src/hosts/Windows/modules/Load-UserRegistry.ps1;

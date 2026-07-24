@@ -1,7 +1,7 @@
 # tests/modules/nix-conf-warnings-tests.nix — nix.conf warnings regression guard.
 
 let
-  inherit (import ../lib.nix) flatten containsRegex;
+  inherit (import ../lib.nix) containsRegex;
 
   flakeText = builtins.readFile ../../src/flake.nix;
   cleaned = builtins.replaceStrings [ "`pkgs.nix`" ] [ "" ] flakeText;

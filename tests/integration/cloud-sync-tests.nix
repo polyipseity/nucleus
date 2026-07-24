@@ -1,7 +1,7 @@
 # tests/integration/cloud-sync-tests.nix — Schema and invariant tests for cloud-drives.nix.
 
 let
-  inherit (import ../lib.nix) assert' containsRegex flatten;
+  inherit (import ../lib.nix) assert' containsRegex;
 
   moduleText = builtins.readFile ../../src/modules/cloud-drives.nix;
   posixUsersText = builtins.readFile ../../src/modules/users.json;

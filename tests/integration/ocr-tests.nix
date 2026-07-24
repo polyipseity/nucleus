@@ -1,7 +1,7 @@
 # tests/integration/ocr-tests.nix — Verify PaddleOCR provisioning across all hosts.
 
 let
-  inherit (import ../lib.nix) containsRegex flatten;
+  inherit (import ../lib.nix) containsRegex;
 
   agentsText = builtins.readFile ../../src/modules/agents.nix;
   uvSetupText = builtins.readFile ../../src/hosts/Windows/modules/setup/Invoke-UvSetup.ps1;

@@ -1,7 +1,7 @@
 # tests/integration/svc-tests.nix — Schema and invariant tests for service management.
 
 let
-  inherit (import ../lib.nix) containsRegex flatten;
+  inherit (import ../lib.nix) containsRegex;
 
   servicesJsonText = builtins.readFile ../../src/modules/services.json;
   svcShText = builtins.readFile ../../scripts/svc.sh;

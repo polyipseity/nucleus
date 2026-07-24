@@ -1,7 +1,7 @@
 # tests/integration/bump-lockfile-tests.nix — Content assertions for the bump-lockfile.ps1 skip-guard removal.
 
 let
-  inherit (import ../lib.nix) containsRegex flatten;
+  inherit (import ../lib.nix) containsRegex;
 
   notContainsRegex = pattern: haystack: !containsRegex pattern haystack;
 

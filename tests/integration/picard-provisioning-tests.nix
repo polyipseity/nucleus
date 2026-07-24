@@ -3,7 +3,7 @@ let
   nixosDesktopText = builtins.readFile ../../src/hosts/NixOS/desktop.nix;
   windowsSystemPackagesText = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
 
-  inherit (import ../lib.nix) assert' containsRegex flatten;
+  inherit (import ../lib.nix) assert' containsRegex;
 
   test_macos_routes_picard_to_homebrew = assert' (
     containsRegex ''"musicbrainz-picard" = \{'' coreText

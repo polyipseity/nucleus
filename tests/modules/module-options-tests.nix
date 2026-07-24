@@ -1,7 +1,7 @@
 # tests/modules/module-options-tests.nix — Module option validation.
 
 let
-  inherit (import ../lib.nix) assert' flatten containsRegex;
+  inherit (import ../lib.nix) assert' containsRegex;
 
   homeModuleText = builtins.readFile ../../src/modules/home.nix;
   coreModuleText = builtins.readFile ../../src/modules/core.nix;

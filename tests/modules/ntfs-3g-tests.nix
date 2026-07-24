@@ -1,7 +1,7 @@
 # tests/modules/ntfs-3g-tests.nix — ntfs-3g patch files and Nix module.
 
 let
-  inherit (import ../lib.nix) assert' flatten containsRegex;
+  inherit (import ../lib.nix) assert' containsRegex;
   nonEmpty = text: builtins.stringLength text > 0;
 
   nixText = builtins.readFile ../../src/hosts/MacBook/ntfs-3g.nix;

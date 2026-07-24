@@ -1,7 +1,7 @@
 # tests/integration/check-ordering-tests.nix — Verify that all 21 validation steps appear in correct order in both check.sh and check.ps1.
 
 let
-  inherit (import ../lib.nix) containsRegex flatten;
+  inherit (import ../lib.nix) containsRegex;
 
   checkShText = builtins.readFile ../../scripts/check.sh;
   checkPs1Text = builtins.readFile ../../scripts/check.ps1;

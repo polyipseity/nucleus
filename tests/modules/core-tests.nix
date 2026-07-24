@@ -2,7 +2,7 @@
 
 let
   lib = import <nixpkgs/lib>;
-  inherit (import ../lib.nix) assert' flatten containsRegex;
+  inherit (import ../lib.nix) assert' containsRegex;
 
   # === NIX-INDEX SCHEDULE INVARIANTS ===
   linuxText = builtins.readFile ../../src/modules/linux.nix;

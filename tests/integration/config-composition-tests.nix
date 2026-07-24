@@ -1,7 +1,7 @@
 # tests/integration/config-composition-tests.nix — Verify host configurations compose correctly.
 
 let
-  inherit (import ../lib.nix) assert' containsRegex flatten;
+  inherit (import ../lib.nix) assert' containsRegex;
 
   flakeText = builtins.readFile ../../src/flake.nix;
   homeModuleText = builtins.readFile ../../src/modules/home.nix;

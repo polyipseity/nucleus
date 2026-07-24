@@ -2,7 +2,7 @@
 
 let
   lib = import <nixpkgs/lib>;
-  inherit (import ../lib.nix) containsRegex flatten;
+  inherit (import ../lib.nix) containsRegex;
 
   posixGitText = builtins.readFile ../../src/modules/git.nix;
   windowsGitText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1;

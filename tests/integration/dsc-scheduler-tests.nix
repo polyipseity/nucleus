@@ -1,7 +1,7 @@
 # tests/integration/dsc-scheduler-tests.nix — Content assertions for the Windows DSC scheduler configuration.
 
 let
-  inherit (import ../lib.nix) containsRegex flatten;
+  inherit (import ../lib.nix) containsRegex;
 
   notContainsRegex = pattern: haystack: !containsRegex pattern haystack;
 

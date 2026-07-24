@@ -1,7 +1,7 @@
 # tests/integration/log-rotation-tests.nix — Content assertions for cross-platform log rotation.
 
 let
-  inherit (import ../lib.nix) containsRegex flatten;
+  inherit (import ../lib.nix) containsRegex;
 
   libShText = builtins.readFile ../../src/scripts/lib/lib.sh;
   gcShText = builtins.readFile ../../scripts/gc.sh;

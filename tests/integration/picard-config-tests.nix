@@ -10,7 +10,7 @@ let
   usersRegistry = builtins.fromJSON (builtins.readFile ../../src/modules/users.json);
   windowsUsersRegistry = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
 
-  inherit (import ../lib.nix) assert' containsRegex flatten;
+  inherit (import ../lib.nix) assert' containsRegex;
 
   test_posix_picard_ini_merge_overwrite_wiring = assert' (
     containsRegex "picard-merge-ini" homeText

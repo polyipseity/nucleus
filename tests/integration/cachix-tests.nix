@@ -1,7 +1,7 @@
 # tests/integration/cachix-tests.nix — Content assertions for nix-community cachix configuration.
 
 let
-  inherit (import ../lib.nix) containsRegex flatten;
+  inherit (import ../lib.nix) containsRegex;
 
   posixBaseText = builtins.readFile ../../src/modules/posix-base.nix;
 in

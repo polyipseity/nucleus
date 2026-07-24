@@ -1,7 +1,7 @@
 # tests/integration/check-tests.nix — Content assertions for check.sh lockfile overlap detection.
 
 let
-  inherit (import ../lib.nix) containsRegex flatten;
+  inherit (import ../lib.nix) containsRegex;
 
   checkShText = builtins.readFile ../../scripts/check.sh;
 

@@ -1,7 +1,7 @@
 # tests/integration/service-watchdog-tests.nix — Schema and invariant tests for service watchdog.
 
 let
-  inherit (import ../lib.nix) containsRegex flatten;
+  inherit (import ../lib.nix) containsRegex;
 
   watchdogShText = builtins.readFile ../../src/scripts/services/service-watchdog.sh;
   watchdogPs1Text = builtins.readFile ../../src/scripts/services/service-watchdog.ps1;

@@ -12,7 +12,7 @@ let
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   windowsUsersRegistry = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
 
-  inherit (import ../lib.nix) assert' containsRegex flatten;
+  inherit (import ../lib.nix) assert' containsRegex;
 
   # Expected user-level DSC files (bare filenames; apply.ps1 prepends "user/").
   expectedUserDscFiles = [
