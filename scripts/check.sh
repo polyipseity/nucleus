@@ -27,20 +27,19 @@
 #  11. Nix search path tests
 #  12. Port utility function tests
 #
-# Data integrity (13-18):
+# Data integrity (13-16):
 #  13. Lockfile validation
 #  14. Locked DSC validation
 #  15. Schema validation (JSON/YAML)
 #  16. Service registry validation
-#  17. YAML validation
-#  18. YAML linting (yamllint)
 #
-# Policy/verification (19-23):
-#  19. Package manager usage enforcement
-#  20. Undocumented error suppression check
-#  21. Online determinism checks (--verify mode only)
-#  22. Config method compliance
-#  23. Activation script token placeholder in comment check
+# Policy/verification (17-22):
+#  17. YAML validation and linting (yamllint)
+#  18. Package manager usage enforcement
+#  19. Undocumented error suppression check
+#  20. Online determinism checks (--verify mode only)
+#  21. Config method compliance
+#  22. Activation script token placeholder in comment check
 #
 # Mode taxonomy:
 #   Always-run (no HAS_ARGS guard — run in both --full and --scoped):
@@ -50,8 +49,8 @@
 #     - Lockfile section validation           (step 13)
 #     - Locked DSC validation                 (step 14)
 #     - Service registry validation           (step 16)
-#     - Package manager usage enforcement     (step 19)
-#     - Config method compliance              (step 22)
+#     - Package manager usage enforcement     (step 18)
+#     - Config method compliance              (step 21)
 #   Path-scopable (accept file filtering in both modes):
 #     - Shell script linting (shellcheck)     (step 1)
 #     - PowerShell syntax validation          (step 2)
@@ -59,9 +58,9 @@
 #     - Dead Nix code (deadnix)               (step 4)
 #     - Nix formatting/lint                   (steps 6-7)
 #     - Schema validation                     (step 15)
-#     - YAML validation/linting               (steps 17-18)
-#     - Undocumented error suppression        (step 20)
-#     - Activation script token placeholder   (step 23)
+#     - YAML validation/linting               (step 17)
+#     - Undocumented error suppression        (step 19)
+#     - Activation script token placeholder   (step 22)
 #
 # Output conventions:
 #   Warnings (warn) and errors (error) go to stderr; info/success/skip
@@ -843,8 +842,8 @@ section "$((_step += 1))" "Service registry validation"
   fi
   say "services.json validation passed"
 
-# yaml_validation — YAML validation
-section "$((_step += 1))" "YAML validation"
+# yaml_validation_lint — YAML validation and linting (merged single loop)
+section "$((_step += 1))" "YAML validation and linting"
 _yaml_errors=0
 if $HAS_ARGS; then
   for _yf in "$@"; do
@@ -856,6 +855,10 @@ if $HAS_ARGS; then
       warn "$_yf: invalid YAML"
       _yaml_errors=$((_yaml_errors + 1))
     fi
+    if ! yamllint --strict "$_yf" >/dev/null 2>&1; then
+      warn "$_yf: yamllint violations"
+      _yaml_errors=$((_yaml_errors + 1))
+    fi
   done
 else
   for _yaml_file in "${CACHED_YAML_FILES[@]}"; do
@@ -864,44 +867,18 @@ else
       warn "$_yaml_file: invalid YAML"
       _yaml_errors=$((_yaml_errors + 1))
     fi
-  done
-fi
-if [ "$_yaml_errors" -gt 0 ]; then
-  warn "YAML validation failed with $_yaml_errors error(s)"
-  exit_code=1
-  "$FAIL_FAST" && exit $exit_code
-fi
-say "YAML validation passed."
-"$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
-
-# yaml_lint — YAML linting (yamllint)
-section "$((_step += 1))" "YAML linting (yamllint)"
-_yaml_lint_errors=0
-if $HAS_ARGS; then
-  for _yf in "$@"; do
-    case "$_yf" in
-      *.yml|*.yaml)
-        if ! yamllint --strict "$_yf" >/dev/null 2>&1; then
-          warn "$_yf: yamllint violations"
-          _yaml_lint_errors=$((_yaml_lint_errors + 1))
-        fi
-        ;;
-    esac
-  done
-else
-  for _yaml_file in "${CACHED_YAML_FILES[@]}"; do
     if ! yamllint --strict "$_yaml_file" >/dev/null 2>&1; then
       warn "$_yaml_file: yamllint violations"
-      _yaml_lint_errors=$((_yaml_lint_errors + 1))
+      _yaml_errors=$((_yaml_errors + 1))
     fi
   done
 fi
-if [ "$_yaml_lint_errors" -gt 0 ]; then
-  warn "YAML linting failed with $_yaml_lint_errors error(s)"
+if [ "$_yaml_errors" -gt 0 ]; then
+  warn "YAML validation/lint failed with $_yaml_errors error(s)"
   exit_code=1
   "$FAIL_FAST" && exit $exit_code
 fi
-say "YAML linting passed."
+say "YAML validation and linting passed."
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
 # package_manager_enforcement — Always-run: Package manager usage enforcement

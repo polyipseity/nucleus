@@ -27,19 +27,19 @@
 #  12. Port utility function tests (stub)
 #
 # Data integrity (13-18):
+# Data integrity (13-16):
 #  13. Lockfile validation
 #  14. Locked DSC validation
 #  15. Schema validation (JSON/YAML)
 #  16. Service registry validation
-#  17. YAML validation
-#  18. YAML linting (yamllint)
 #
-# Policy/verification (19-23):
-#  19. Package manager usage enforcement
-#  20. Undocumented error suppression check
-#  21. Online determinism checks (--verify mode only)
-#  22. Config method compliance
-#  23. Activation script token placeholder in comment check
+# Policy/verification (17-22):
+#  17. YAML validation and linting (yamllint)
+#  18. Package manager usage enforcement
+#  19. Undocumented error suppression check
+#  20. Online determinism checks (--verify mode only)
+#  21. Config method compliance
+#  22. Activation script token placeholder in comment check
 #
 # Mode taxonomy:
 #   Always-run (no HAS_ARGS guard — run in both --full and --scoped):
@@ -47,15 +47,15 @@
 #     - Lockfile section validation           (step 13)
 #     - Locked DSC validation                 (step 14)
 #     - Service registry validation           (step 16)
-#     - Package manager usage enforcement     (step 19)
-#     - Config method compliance              (step 22)
+#     - Package manager usage enforcement     (step 18)
+#     - Config method compliance              (step 21)
 #   Path-scopable (accept file filtering in both modes):
 #     - PowerShell syntax validation          (step 2)
 #     - Packer template validation            (step 3)
 #     - Schema validation                     (step 15)
-#     - YAML validation/linting               (steps 17-18)
-#     - Undocumented error suppression        (step 20)
-#     - Activation script token placeholder   (step 23)
+#     - YAML validation/linting               (step 17)
+#     - Undocumented error suppression        (step 19)
+#     - Activation script token placeholder   (step 22)
 #
 # Note: Steps 1, 4-7, 9-12 are stubs on Windows (POSIX/Nix toolchain not available).
 #
@@ -815,9 +815,9 @@ if (-not (Test-Path $_svcJson)) {
   }
 
 # ---------------------------------------------------------------------------
-# 17. YAML validation
+# 17. YAML validation and linting
 # ---------------------------------------------------------------------------
-Write-Output ("`n=== [{0}] YAML validation ===" -f (++$_step))
+Write-Output ("`n=== [{0}] YAML validation and linting ===" -f (++$_step))
 $_yamlErrors = 0
 $_yamlFiles = @()
 if ($HAS_ARGS) {
@@ -828,6 +828,7 @@ if ($HAS_ARGS) {
     ForEach-Object { $_.FullName }
 }
 foreach ($_yf in $_yamlFiles) {
+  # Validate
   try {
     $_content = Get-Content $_yf -Raw -ErrorAction Stop
     $null = $_content | ConvertFrom-Yaml -ErrorAction Stop
@@ -835,38 +836,19 @@ foreach ($_yf in $_yamlFiles) {
     warn "$($_yf): invalid YAML"
     $_yamlErrors++
   }
-}
-if ($_yamlErrors -gt 0) {
-  warn "YAML validation failed with $_yamlErrors error(s)"
-  $exitCode = 1
-  if ($FAIL_FAST) { exit $exitCode }
-}
-say "YAML validation passed."
-
-# ---------------------------------------------------------------------------
-# 18. YAML linting (yamllint)
-# ---------------------------------------------------------------------------
-Write-Output ("`n=== [{0}] YAML linting (yamllint) ===" -f (++$_step))
-$_yamlLintErrors = 0
-$_yamlFiles = @()
-if ($HAS_ARGS) {
-  $_yamlFiles = $positionalArgs | Where-Object { $_ -like '*.yml' -or $_ -like '*.yaml' }
-} else {
-  $_yamlFiles = $script:CachedYamlFiles | ForEach-Object { $_.FullName }
-}
-foreach ($_yf in $_yamlFiles) {
+  # Lint
   yamllint --strict $_yf 2>&1 | Out-Null
   if ($LASTEXITCODE -ne 0) {
     warn "$($_yf): yamllint violations"
-    $_yamlLintErrors++
+    $_yamlErrors++
   }
 }
-if ($_yamlLintErrors -gt 0) {
-  warn "YAML linting failed with $_yamlLintErrors error(s)"
+if ($_yamlErrors -gt 0) {
+  warn "YAML validation/lint failed with $_yamlErrors error(s)"
   $exitCode = 1
   if ($FAIL_FAST) { exit $exitCode }
 }
-say "YAML linting passed."
+say "YAML validation and linting passed."
 
 # ---------------------------------------------------------------------------
 # 19. Package manager usage enforcement
