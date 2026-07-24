@@ -135,6 +135,7 @@ trap 'rm -rf -- "$_wave_tmpdir"' EXIT
 
 # 1. Nix test suite — auto-discover and run all *.nix test files
 section "$((_step += 1))" "Nix test suite"
+{
 tmp_failed=$(mktemp) || { error "failed to create temp file"; }
 if [ "$quiet_mode" = true ]; then
   # Quiet: suppress Testing: / PASS: lines and nix output on success.
@@ -166,22 +167,33 @@ if [ -s "$tmp_failed" ]; then
 fi
 rm -f "$tmp_failed"
 say "all Nix tests passed."
+[ -f "$_wave_tmpdir/step-1.exit" ] || echo "0" > "$_wave_tmpdir/step-1.exit"
+} &
 
 # 2. Shell script linting (ShellCheck)
 section "$((_step += 1))" "Shell script linting"
+{
 bash scripts/check-sh.sh || echo "1" > "$_wave_tmpdir/step-2.exit"
+[ -f "$_wave_tmpdir/step-2.exit" ] || echo "0" > "$_wave_tmpdir/step-2.exit"
+} &
 
 # 3. PowerShell lint (PSScriptAnalyzer)
 section "$((_step += 1))" "PowerShell lint"
+{
 pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 || echo "1" > "$_wave_tmpdir/step-3.exit"
+[ -f "$_wave_tmpdir/step-3.exit" ] || echo "0" > "$_wave_tmpdir/step-3.exit"
+} &
 
 # 4. Nucleus apps smoke tests (build + --help / dry-run)
 section "$((_step += 1))" "Nucleus apps smoke tests"
+{
 if [ "$quiet_mode" = true ]; then
   bash tests/scripts/nucleus-apps-smoke-tests.sh >/dev/null || echo "1" > "$_wave_tmpdir/step-4.exit"
 else
   bash tests/scripts/nucleus-apps-smoke-tests.sh || echo "1" > "$_wave_tmpdir/step-4.exit"
 fi
+[ -f "$_wave_tmpdir/step-4.exit" ] || echo "0" > "$_wave_tmpdir/step-4.exit"
+} &
 
 # 5. System config build — build all derivations in the host system config.
 # WHY soft-fail: building derivations is slow and network-dependent. Always
@@ -213,6 +225,9 @@ else
     fi
   fi
 fi
+
+# Wait for all background steps to complete before aggregating
+wait
 
 # Wave result aggregation — collect step exit codes from temp files
 for _s in 1 2 3 4; do

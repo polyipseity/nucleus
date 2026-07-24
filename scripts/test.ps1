@@ -126,8 +126,11 @@ say "skipping (requires ShellCheck — not available on Windows)."
 # 3. PowerShell lint (PSScriptAnalyzer)
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] PowerShell lint ===" -f (++$_step))
-& "$PSScriptRoot\check-pwsh.ps1"
-$LASTEXITCODE | Out-File -NoNewline (Join-Path $script:WaveTmpDir "step-3.exit")
+$script:waveJob3 = Start-Job -ScriptBlock {
+  param($pwshScript)
+  & $pwshScript
+  $LASTEXITCODE
+} -ArgumentList "$PSScriptRoot\check-pwsh.ps1"
 
 # ---------------------------------------------------------------------------
 # 4. Nucleus apps smoke tests — POSIX only (stub on Windows)
@@ -140,6 +143,12 @@ say "skipping (requires Nix and bash — not available on Windows)."
 # ---------------------------------------------------------------------------
 Write-Output ("`n=== [{0}] System config build ===" -f (++$_step))
 say "skipping (system config build is POSIX-only)."
+
+# Wait for background jobs and collect exit codes
+if ($script:waveJob3) {
+  $result = $script:waveJob3 | Wait-Job | Receive-Job
+  $result | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-3.exit") -NoNewline
+}
 
 # Wave result aggregation — collect step exit codes from temp files
 foreach ($_s in @(1, 2, 3, 4)) {
