@@ -339,38 +339,52 @@ else
 fi
 
 # nix_lint — Nix lint check (nixf-tidy)
+# Parallelizes across PARALLEL_JOBS workers, each worker writes results
+# to a per-file temp file for race-free aggregation.
 section "$((_step += 1))" "Nix lint (nixf-tidy)"
-_nixf_errors=0
 if [ "${#NIX_FILES[@]}" -gt 0 ]; then
-  for _nixf_file in "${NIX_FILES[@]}"; do
-    if ! _nixf_out=$(nixf-tidy < "$_nixf_file" 2>&1); then
-      warn "$_nixf_file: nixf-tidy failed"
-      _nixf_errors=$((_nixf_errors + 1))
-    elif [ "$(echo "$_nixf_out" | jq 'length')" -gt 0 ]; then
-      echo "$_nixf_out" | jq -r '.[] | "\(.sname): \(.message)"' | while IFS= read -r _nixf_issue; do
-        warn "$_nixf_file: $_nixf_issue"
-      done
-      _nixf_errors=$((_nixf_errors + 1))
-    fi
-  done
-  if [ "$_nixf_errors" -gt 0 ]; then
-    exit_code=1
-    "$FAIL_FAST" && exit $exit_code
-  else
-    say "nixf-tidy lint passed."
-  fi
+  _nixf_files=("${NIX_FILES[@]}")
 elif ! $HAS_ARGS; then
-  for _nixf_file in "${CACHED_NIX_FILES[@]}"; do
-    if ! _nixf_out=$(nixf-tidy < "$_nixf_file" 2>&1); then
-      warn "$_nixf_file: nixf-tidy failed"
-      _nixf_errors=$((_nixf_errors + 1))
-    elif [ "$(echo "$_nixf_out" | jq 'length')" -gt 0 ]; then
-      echo "$_nixf_out" | jq -r '.[] | "\(.sname): \(.message)"' | while IFS= read -r _nixf_issue; do
-        warn "$_nixf_file: $_nixf_issue"
-      done
-      _nixf_errors=$((_nixf_errors + 1))
-    fi
+  _nixf_files=("${CACHED_NIX_FILES[@]}")
+else
+  _nixf_files=()
+fi
+_nixf_errors=0
+if [ "${#_nixf_files[@]}" -gt 0 ]; then
+  _nixf_tmpdir=$(mktemp -d) || { error "failed to create temp directory"; _nixf_errors=$((_nixf_errors + 1)); }
+  # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
+  printf '%s\0' "${_nixf_files[@]}" \
+    | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+      f="$1"
+      tmpdir="$2"
+      # Use tr to encode file path as a safe filename component
+      safe_name="$(echo "$f" | tr "/" "_")"
+      if ! out=$(nixf-tidy < "$f" 2>&1); then
+        printf "FAIL\n%s\n" "$f" > "$tmpdir/${safe_name}.nixf"
+      elif [ "$(echo "$out" | jq "length" 2>/dev/null)" -gt 0 ] 2>/dev/null; then
+        printf "ISSUES\n%s\n%s\n" "$f" "$out" > "$tmpdir/${safe_name}.nixf"
+      fi
+    ' _ {} "$_nixf_tmpdir"
+  # Aggregate results from per-worker temp files
+  for _nixf_result in "$_nixf_tmpdir"/*.nixf; do
+    [ -f "$_nixf_result" ] || continue
+    IFS= read -r _nixf_status < "$_nixf_result"
+    IFS= read -r _nixf_file_path < "$_nixf_result"
+    case "$_nixf_status" in
+      FAIL)
+        warn "$_nixf_file_path: nixf-tidy failed"
+        _nixf_errors=$((_nixf_errors + 1))
+        ;;
+      ISSUES)
+        # Read the jq output (rest of file after first two lines)
+        tail -n +3 "$_nixf_result" | jq -r '.[] | "\(.sname): \(.message)"' | while IFS= read -r _nixf_issue; do
+          warn "$_nixf_file_path: $_nixf_issue"
+        done
+        _nixf_errors=$((_nixf_errors + 1))
+        ;;
+    esac
   done
+  [ -n "$_nixf_tmpdir" ] && rm -rf -- "$_nixf_tmpdir"
   if [ "$_nixf_errors" -gt 0 ]; then
     exit_code=1
     "$FAIL_FAST" && exit $exit_code
