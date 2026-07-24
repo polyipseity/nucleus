@@ -43,7 +43,6 @@
 #
 # Mode taxonomy:
 #   Always-run (no HAS_ARGS guard — run in both --full and --scoped):
-#     - Nix flake evaluation                  (step 5)
 #     - Stale Nix build artifact check        (step 8)
 #     - All test suites                       (steps 9-12)
 #     - Lockfile section validation           (step 13)
@@ -51,6 +50,8 @@
 #     - Service registry validation           (step 16)
 #     - Package manager usage enforcement     (step 18)
 #     - Config method compliance              (step 21)
+#   Conditional (skips when no .nix files changed):
+#     - Nix flake evaluation                  (step 5)
 #   Path-scopable (accept file filtering in both modes):
 #     - Shell script linting (shellcheck)     (step 1)
 #     - PowerShell syntax validation          (step 2)
@@ -305,13 +306,29 @@ else
   say "skipping deadnix (path-scoped mode)."
 fi
 
-# nix_flake_eval — Always-run: Nix flake evaluation
+# nix_flake_eval — Nix flake evaluation (conditional skip: only when .nix files changed)
 section "$((_step += 1))" "Nix flake evaluation"
-sys=$(nix eval --impure --expr 'builtins.currentSystem' --raw 2>/dev/null || echo 'aarch64-darwin')
-if ! nix eval --impure "path:./src#packages.$sys" >/dev/null; then
-  exit_code=$?
+_nix_eval_nix_files=()
+if $HAS_ARGS; then
+  # Scoped mode: check if any .nix files are in scope
+  _nix_eval_nix_files=("${NIX_FILES[@]+${NIX_FILES[@]}}")
 else
-  say "nix flake evaluation passed."
+  # Full mode: check for .nix files changed from HEAD (tracked + untracked)
+  if command -v git >/dev/null 2>&1; then
+    while IFS= read -r _f; do
+      _nix_eval_nix_files+=("$_f")
+    done < <({ git diff --name-only HEAD -- '*.nix' 2>/dev/null || true; git ls-files --others --exclude-standard '*.nix' 2>/dev/null || true; } | sort -u || true) # check-suppress:suppression_doc: all three may fail (no HEAD in shallow clone, git ls-files on uninitialized repo, sort on empty input)
+  fi
+fi
+if [ "${#_nix_eval_nix_files[@]}" -gt 0 ]; then
+  sys=$(nix eval --impure --expr 'builtins.currentSystem' --raw 2>/dev/null || echo 'aarch64-darwin')
+  if ! nix eval --impure "path:./src#packages.$sys" >/dev/null; then
+    exit_code=$?
+  else
+    say "nix flake evaluation passed."
+  fi
+else
+  say "skipping (no Nix files changed since HEAD)."
 fi
 "$FAIL_FAST" && [ $exit_code -ne 0 ] && exit $exit_code
 
