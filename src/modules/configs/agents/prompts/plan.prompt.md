@@ -37,6 +37,8 @@ Before writing or modifying the plan, gather all necessary context:
 
 ### 2. Plan creation
 
+Before writing the plan, invoke the checkpoint skill (`skill: "checkpoint"`) to persist research context.
+
 **Note: write the plan file only — do not implement any of the planned steps.** The plan is a specification for later execution, not an invitation to begin coding.
 
 Create a detailed, step-by-step implementation plan. Write it into a new session memory file with a datetime-suffixed name (see "Create a new plan file" below). Each plan iteration gets its own file; only update an existing file in-place when the changes are extremely small and certain.

@@ -54,11 +54,13 @@ If the user's message that triggered this prompt contains "only plan", "only res
    - Re-read the original plan file regularly — especially after interruptions, subagent returns, or context switches — to ensure no phase is skipped or misinterpreted.
    - **Always retrieve the plan via session memory first:** use the find-latest-plan pattern (see "Find the latest plan file" below). Parse the frontmatter to recover input variables (`atomicCommits`, `backwardsCompat`, `maxConcurrency`) and current progress (`status`, `current-step`, `committed`). If no plan is found, fall back to the temp file path from step 1.
    - **Update frontmatter after every meaningful sub-step.** Before switching context, calling a subagent, or at any natural break point: retrieve the plan (find-latest-plan pattern), bump `current-step` to the current workflow number, update `committed`, and write back using `replace_string_in_file` or `create_file`. This is how progress survives context compaction — do not skip it.
+     Also invoke the checkpoint skill (`skill: "checkpoint"`) after each meaningful sub-step alongside the frontmatter update. This preserves work-done context across interruptions.
      - `committed` transitions: `no` → `partial` (on first atomic commit made during this plan execution). Stay at `partial` on subsequent commits.
      - **Do not set `committed` to `yes` here** — that happens only in step 5, to distinguish "some commits made" from "all commits done".
      - If `inputs.atomicCommits` is `no`, leave `committed` at `no` — no transition needed.
 
 3. **Use subagents for every opportunity**
+   - First, invoke the checkpoint skill (`skill: "checkpoint"`) to save current state before delegation.
    - Spawn subagents for any sufficiently independent subproblem — planning sub-steps, implementing separate files, researching unknowns, or verifying intermediate results. Subagents prevent context overflow and reduce the risk of forgetting earlier requirements by giving each subproblem a fresh, focused context.
    - Limit concurrent subagents to `${input:maxConcurrency}` (default 1). Even at maxConcurrency=1, subagents are highly beneficial — do not skip spawning them just because parallelism is limited.
    - Subagents must also follow the step-by-step reasoning and no-filler style.
