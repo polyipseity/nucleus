@@ -319,14 +319,15 @@ fi
 # nix_format — Nix formatting (nixfmt)
 section "$((_step += 1))" "Nix formatting (nixfmt)"
 if [ "${#NIX_FILES[@]}" -gt 0 ]; then
+  # Parallelize nixfmt across PARALLEL_JOBS workers, batching files to reduce process overhead.
   if $FORMAT_NIX; then
-    if nixfmt -s "${NIX_FILES[@]}"; then
+    if printf '%s\0' "${NIX_FILES[@]}" | xargs -0 -P "$PARALLEL_JOBS" -n 10 nixfmt -s; then
       say "nix formatting applied."
     else
       exit_code=$?
     fi
   else
-    if nixfmt -s --verify "${NIX_FILES[@]}"; then
+    if printf '%s\0' "${NIX_FILES[@]}" | xargs -0 -P "$PARALLEL_JOBS" -n 10 nixfmt -s --verify; then
       say "nix formatting OK."
     else
       exit_code=$?

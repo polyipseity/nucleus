@@ -8,6 +8,12 @@
 #
 # Environment variables:
 #   NUCLEUS_REPO_ROOT  Repository root path. Falls back to auto-detection if unset.
+#   PARALLEL_JOBS      Worker count for parallel operations. Auto-detected from CPU count if unset.
+
+# Auto-scale parallelism to available CPU cores.
+# Override via PARALLEL_JOBS environment variable.
+: "${PARALLEL_JOBS:=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 2)}"
+export PARALLEL_JOBS
 
 usage_std() {
   _us_name="$1"
