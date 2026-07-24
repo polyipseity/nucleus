@@ -9,9 +9,6 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 . "$SCRIPT_DIR/../lib/lib.sh"
 
 REPO_ROOT="${NUCLEUS_REPO_ROOT:-}"
-if [ -z "$REPO_ROOT" ]; then
-  REPO_ROOT="$(derive_repo_root)"
-fi
 
 export SOPS_AGE_KEY_FILE="${SOPS_AGE_KEY_FILE:-/etc/sops/age/machine.txt}"
 
@@ -55,6 +52,14 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+# Derive repo root only after CLI argument parsing so --repo-root takes
+# precedence.  The activation script runs with env -i (cleared environment),
+# so NUCLEUS_REPO_ROOT is not available there and derive_repo_root would fail
+# if called early.
+if [ -z "$REPO_ROOT" ]; then
+  REPO_ROOT="$(derive_repo_root)"
+fi
 
 # If explicit tool paths were provided, define shell function wrappers so all
 # bare jq/sops invocations resolve to the pinned binary without changing every
