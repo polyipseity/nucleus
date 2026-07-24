@@ -110,6 +110,8 @@ if ($SyntaxOnly) {
 }
 else {
   Import-Module PSScriptAnalyzer
+  # Pre-import commonly-used modules to reduce PSSA's implicit Get-Command overhead during rule evaluation.
+  Import-Module PSReadLine -ErrorAction SilentlyContinue
 
   # Method 3 (consumed by script at CI time via -SettingsPath): settings file defines Severity and ExcludeRules.
   $settingsFile = Join-Path (git rev-parse --show-toplevel) 'src/modules/configs/pwsh/PSScriptAnalyzerSettings.psd1'
