@@ -1,10 +1,57 @@
 #!/usr/bin/env bash
-# Runs Nix test suite, ShellCheck, and PSScriptAnalyzer.
+# Runs the full repository test suite in sequence.
+#
+# Test suites (1-5):
+#   1. Nix test suite — auto-discover and run all *.nix test files
+#   2. Shell script linting (ShellCheck)
+#   3. PowerShell lint (PSScriptAnalyzer)
+#   4. Nucleus apps smoke tests (build + --help / dry-run)
+#   5. System config build (build all host system derivations)
+#
+# Mode taxonomy:
+#   No --scoped/--full distinction (all steps run by default). Use
+#   --skip-system-build to skip step 5. Use --quiet to suppress PASS/Testing
+#   lines (only show failures).
+#
+# Output conventions:
+#   Warnings (warn) and errors (error) go to stderr; info/success/skip
+#   (say) go to stdout. This differs from test.ps1, which routes all
+#   output to stdout. The split is intentional per platform convention.
+#   Use test.ps1's header comment as the cross-reference source of truth
+#   for the Windows-side convention.
+#
+# Dependencies policy:
+# Every external tool required by any step in this script MUST be declared in
+# the pre-flight block below. Missing tools cause an immediate hard failure —
+# steps MUST NEVER silently skip due to missing dependencies.
+# The pre-flight block is the single source of truth for all tool requirements.
+# To add a new tool-using step, first add it to pre-flight, then provision it
+# on all target hosts (core.nix for POSIX).
 #
 # File discovery policy:
 # Test file discovery is dynamic — the script finds all *.nix files under
-# tests/ automatically. Adding a new test directory does NOT require
-# editing this script.
+# tests/ automatically via `find tests -name '*.nix'`. Adding a new test
+# directory does NOT require editing this script.
+#
+# Arguments:
+#   -q|--quiet           Suppress PASS/Testing lines (only show FAIL).
+#   --fail-fast          Exit immediately on first failure (default).
+#   --no-fail-fast       Accumulate all failures.
+#   --skip-system-build  Skip building the host system configuration.
+#
+# Environment variables:
+#   NUCLEUS_REPO_ROOT  Override the detected repository root path.
+#
+# Prerequisites:
+#   - nix, nix-instantiate (for Nix test suite)
+#   - shellcheck (for shell linting)
+#   - pwsh (for PowerShell lint)
+#   - bash, find, xargs (for test discovery and execution)
+#
+# Exit conditions:
+#   0 on success; non-zero on any check failure.
+# By default, FAIL_FAST=true (exit immediately on first failure).
+# Use --no-fail-fast to accumulate all failures.
 set -uo pipefail
 exit_code=0
 FAIL_FAST=true
@@ -54,6 +101,18 @@ if [ "$#" -gt 0 ]; then
   usage >&2
   exit 1
 fi
+
+# Pre-flight tool availability checks.
+# All tools listed in Prerequisites must be present. Missing tools produce
+# an immediate hard failure — run nucleus-apply to install them, or use
+# nix run .#test to run via the flake wrapper which bundles all deps.
+require_command nix
+require_command nix-instantiate
+require_command shellcheck
+require_command pwsh
+require_command bash
+require_command find
+require_command xargs
 
 _step=0
 
