@@ -17,6 +17,21 @@ Tests must accompany every feature or breaking change. Ensure tests pass locally
 
 ---
 
+## Fail-fast convention
+
+The repository's check and test scripts follow a deliberate fail-fast convention that differs between the two:
+
+| Script | Default behavior | Rationale |
+|---|---|---|
+| `check.sh` / `check.ps1` | **NOT fail-fast** (accumulate all) | Runs on every commit; should report all issues found, not stop at the first one. |
+| `test.sh` / `test.ps1` | **Fail-fast** (exit on first failure) | Runs in CI and pre-push; early exit reduces CI time and avoids masking the first failure with cascading noise. |
+
+Both scripts accept `--fail-fast` and `--no-fail-fast` flags for explicit control over the default behavior.
+
+The prek hooks (`prek.toml`) use the defaults (`--no-fail-fast` is not passed for check, not passed for test). The CI workflow (`.github/workflows/ci.yml`) always passes `--no-fail-fast` explicitly to both check and test, ensuring CI reports all failures regardless of the default.
+
+---
+
 ## Quick Start
 
 ### Run All Tests Locally

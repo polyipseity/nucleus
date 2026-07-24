@@ -58,10 +58,12 @@ hooks = [{ id = "check-dependabot" }, { id = "check-github-workflows" }]
 repo = "local"
 hooks = [
   # Consolidated check for shell, PowerShell, Packer, and Nix files.
+  # Uses default behavior (accumulate-all) since check runs on every commit.
   { id = "repo-check", name = "repository checks", language = "python", always_run = true, entry = "python scripts/prek-hooks.py check", args = [
     "--format", "--scoped",
   ] },
   # Repository test suite — runs Nix test suite evaluation under tests/.
+  # Uses default behavior (fail-fast). CI explicitly passes --no-fail-fast.
   # Always runs on pre-push regardless of changed files.
   { id = "repo-test", name = "repository tests", language = "python", always_run = true, stages = [
     "pre-push",

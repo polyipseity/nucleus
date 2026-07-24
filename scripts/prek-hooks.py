@@ -53,6 +53,8 @@ def run_check(files: list[str], repo_root: Path, format_enabled: bool = False, s
     if sys.platform != "win32":
         # Direct call is safe because the required tools (nixfmt, pwsh, packer)
         # are available in the default devShell (loaded by .envrc use flake).
+        # Intentionally NOT passing --no-fail-fast: check accumulates by default
+        # (no-fail-fast). Runs on every commit — should report all issues.
         cmd = [str(repo_root / "scripts" / "check.sh")]
         if format_enabled:
             cmd.append("--format")
@@ -110,6 +112,8 @@ def run_test(files: list[str], repo_root: Path) -> int:
     if sys.platform != "win32":
         env = os.environ.copy()
         env["NIX_CONFIG"] = "experimental-features = nix-command flakes"
+        # Intentionally NOT passing --no-fail-fast: test defaults to fail-fast.
+        # CI explicitly passes --no-fail-fast to accumulate all failures.
         cmd = ["nix", "run", "./src#test"]
         if files:
             cmd.append("--")
