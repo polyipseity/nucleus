@@ -55,9 +55,7 @@ if [ ! -f "$FARM_DIR/$FARM_MARKER" ]; then
   : > "$FARM_DIR/$FARM_MARKER"
 fi
 
-# Parse current farm entries into an associative array.
-# Bash <4 doesn't support declare -A, but macOS 26 ships Bash 5+.
-declare -A active_symlinks
+# Parse current farm entries into an indexed array.
 IFS=' ' read -r -a entries <<< "$1"
 
 _created=0
@@ -65,8 +63,6 @@ for entry in "${entries[@]}"; do
   target="${entry%%->*}"
   link_name="${entry##*->}"
   link_path="$FARM_DIR/$link_name"
-
-  active_symlinks[$link_name]=1
 
   if [ -L "$link_path" ]; then
     current_target="$(readlink "$link_path")"
@@ -88,10 +84,17 @@ for link_path in "$FARM_DIR"/*; do
   [ "$link_name" = "$FARM_MARKER" ] && continue
   if [ -L "$link_path" ]; then
     target="$(readlink "$link_path")"
-    if [[ "$target" == /nix/store/* ]] && [[ -z "${active_symlinks[$link_name]:-}" ]]; then
-      /bin/rm "$link_path"
-      _log "GC removed $link_name → $target"
-      _gc_count=$((_gc_count + 1))
+    if [[ "$target" == /nix/store/* ]]; then
+      # Check if link_name is in the active entries list.
+      _is_active=false
+      for entry in "${entries[@]}"; do
+        [ "${entry##*->}" = "$link_name" ] && { _is_active=true; break; }
+      done
+      if [ "$_is_active" = false ]; then
+        /bin/rm "$link_path"
+        _log "GC removed $link_name → $target"
+        _gc_count=$((_gc_count + 1))
+      fi
     fi
   fi
 done
