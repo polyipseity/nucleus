@@ -48,8 +48,10 @@ let
 
   test_setup_module_uses_pwsh_section = assert' (builtins.hasInfix "\$lockfile.pwsh" powershellModuleSetupText) "Invoke-PowerShellModuleSetup.ps1 must read the pwsh section from lockfile";
 in
-{
+builtins.seq (builtins.deepSeq {
+  inherit test_powershell_yaml_in_lockfile test_analyzer_in_lockfile test_pwsh_nix_reads_yaml_version test_pwsh_nix_has_installPwshYaml test_pwsh_nix_installPwshYaml_uses_correct_module test_apply_ps1_dot_sources_module test_apply_ps1_calls_setup test_setup_module_exists test_setup_module_reads_lockfile test_setup_module_uses_pwsh_section;
+}) {
   success = true;
-  testCount = 9;
-  message = "All ${builtins.toString 9} PowerShell module provisioning tests passed";
+  testCount = 10;
+  message = "All 10 PowerShell module provisioning tests passed";
 }

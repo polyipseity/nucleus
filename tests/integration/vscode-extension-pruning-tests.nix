@@ -19,7 +19,10 @@ let
     && lib.hasInfix "Remove-Item -Path (Join-Path $channel.ExtDir '.obsolete') -Force -ErrorAction SilentlyContinue" windowsExtensions
   ) "Windows VS Code extension provisioning must prune unmanaged entries and remove derived metadata";
 in
-{
+builtins.seq (builtins.deepSeq [
+  test_posix_prunes_all_unmanaged_entries
+  test_windows_prunes_all_unmanaged_entries
+]) {
   success = true;
   testCount = 2;
   message = "All ${builtins.toString 2} VS Code extension pruning regression tests passed";

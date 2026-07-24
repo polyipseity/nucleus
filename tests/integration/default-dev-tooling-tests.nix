@@ -30,7 +30,6 @@ let
   windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
   envCatalogText = builtins.readFile ../../src/modules/lib/env-catalog.nix;
   windowsUserEnvText = builtins.readFile ../../src/hosts/Windows/user/env.dsc.yml;
-  windowsSyncNextestConfigText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-NextestConfig.ps1;
   vscodeSettingsText = builtins.readFile ../../src/modules/configs/vscode/settings.json;
 
   inherit (import ../lib.nix) assert';

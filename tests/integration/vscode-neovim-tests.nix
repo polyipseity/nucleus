@@ -50,8 +50,10 @@ let
       )
       "settings.json must have vscode-neovim neovimExecutablePaths with /etc/nucleus-bin/nvim for darwin/linux and no win32 entry";
 in
-{
+builtins.seq (builtins.deepSeq {
+  inherit test_extension_in_editors_nix test_extension_in_windows_ps1 test_extension_in_lockfile test_vscode_conditional_in_init_lua test_jk_mapping_in_init_lua test_keyrepeat_in_macos_defaults test_neovim_launcher_symlink test_editor_line_numbers_in_settings test_scroll_beyond_last_line_in_settings test_composite_keys_in_settings test_neovim_executable_paths_in_settings;
+}) {
   success = true;
   testCount = 11;
-  message = "All ${builtins.toString 11} vscode-neovim provisioning tests passed";
+  message = "All 11 vscode-neovim tests passed";
 }

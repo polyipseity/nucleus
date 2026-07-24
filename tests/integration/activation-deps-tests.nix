@@ -9,12 +9,11 @@
 #
 let
   lib = import <nixpkgs/lib>;
-  inherit (lib) topologicalSort unique;
+  inherit (lib) unique;
 
   # Read live module files so ordering/name regressions are caught by tests
   # instead of relying only on mocked activation maps.
   agentsModuleText = builtins.readFile ../../src/modules/agents.nix;
-  linuxModuleText = builtins.readFile ../../src/modules/linux.nix;
   macosModuleText = builtins.readFile ../../src/modules/macos.nix;
   activationDagModuleText = builtins.readFile ../../src/modules/lib/activation-dag.nix;
   macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
@@ -48,7 +47,6 @@ let
         };
       };
       # Check order: secrets → git identity → dev repos
-      secretsFirst = activations.waitForSopsSecrets;
       gitSecond = activations."git-identity";
       devThird = activations.devReposProvision;
     in
@@ -109,22 +107,6 @@ let
 
   # === TEST: No circular dependencies ===
   test_no_circular_deps =
-    let
-      # Represent as edges: step -> steps it depends on (before list)
-      activations = {
-        a = {
-          before = [ "b" ];
-        };
-        b = {
-          before = [ "c" ];
-        };
-        c = {
-          before = [ ];
-        }; # Terminal: no deps
-      };
-      # Check simple case: no step depends on itself through transitivity
-      # In practice, Home Manager's activation system would error on cycles
-    in
     assert' true # Validated by NixOS/Home Manager eval
       "Activation graph should be acyclic";
 

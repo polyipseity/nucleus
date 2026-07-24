@@ -34,7 +34,8 @@ let
     let
       results = builtins.map validateVm manifest.VMs;
     in
-    assert' (builtins.length manifest.VMs > 0) "VMs.json must declare at least one VM";
+    assert' (builtins.length manifest.VMs > 0 && builtins.all (r: r == null) results)
+      "VMs.json must declare at least one VM";
 
   # Disk sizes must be positive integers.
   test_disk_sizes =
@@ -446,7 +447,6 @@ let
 
   # The MacBook base.nix must point the Nix daemon at /etc/nix/machines so the
   # linux-builder registration written by nix-darwin is actually used.
-  base_nix_text = builtins.readFile ../../src/hosts/MacBook/base.nix;
   nixCustomConfText = builtins.readFile ../../src/modules/configs/nix/nix.custom.conf;
   test_macbook_builders_machines = assert' (lib.hasInfix "builders = @/etc/nix/machines" nixCustomConfText) "MacBook base.nix must set builders = @/etc/nix/machines in nix.extraOptions";
 
@@ -458,7 +458,6 @@ let
   vm_setup_sh_text =
     builtins.readFile ../../scripts/vm.sh + builtins.readFile ../../src/scripts/lib/vm-lib.sh;
   windows_vm_setup_ps1_text = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-VMSetup.ps1;
-  windows_vm_wrapper_ps1_text = builtins.readFile ../../scripts/vm.ps1;
   readmeTemplateText = builtins.readFile ../../src/vms/templates/README.md;
   startPosixTemplateText = builtins.readFile ../../src/vms/templates/start-posix.sh;
   startWindowsTemplateText = builtins.readFile ../../src/vms/templates/start-windows.ps1;
@@ -1028,6 +1027,10 @@ let
     test_vm_enabled_policy_wiring
     test_macbook_macos_version_tahoe
     test_windows_iso_fido_nonwindows_fallback
+    test_android_gsi_version_type
+    test_android_gsi_version_only_on_android
+    test_enabled_vm_not_orphaned
+    test_macbook_utm_required_key_guard
   ];
 
 in
@@ -1112,6 +1115,10 @@ in
     test_vm_enabled_policy_wiring
     test_macbook_macos_version_tahoe
     test_windows_iso_fido_nonwindows_fallback
+    test_android_gsi_version_type
+    test_android_gsi_version_only_on_android
+    test_enabled_vm_not_orphaned
+    test_macbook_utm_required_key_guard
     ;
 
   summary = builtins.deepSeq all_tests "vm-setup-tests: all tests passed";

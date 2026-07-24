@@ -4,9 +4,6 @@ let
   lib = import <nixpkgs/lib>;
   inherit (lib)
     mkOption
-    mkIf
-    mkDefault
-    mkMerge
     types
     ;
 
