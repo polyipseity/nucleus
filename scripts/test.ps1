@@ -42,7 +42,7 @@
 # Arguments:
 #   --fail-fast         Exit immediately on first failure (default).
 #   --no-fail-fast      Accumulate all failures.
-#   --skip-system-build No-op (system config build is POSIX-only).
+#   --skip-system-build No-op (accepted for CLI parity with test.sh).
 #   --quiet             No-op (--quiet is POSIX-only; accepted for CLI parity).
 #
 # Environment variables:
@@ -60,12 +60,10 @@ $ErrorActionPreference = 'Stop'
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { Split-Path -Parent $PSScriptRoot }
 $exitCode = 0
 $FAIL_FAST = $true
-$skipSystemBuild = $false
 $_step = 0
 
 # Output helpers — structured prefix pattern matching section()/say/warn from test.sh.
 function say { Write-Output "test: $args" }
-function warn { Write-Output "test: warning: $args" }
 
 # Pre-flight tool availability checks.
 # All tools listed in Prerequisites must be present. Missing tools produce
@@ -82,7 +80,7 @@ foreach ($_arg in $args) {
     Write-Output "  Run all Windows-compatible repository test suites."
     Write-Output "  --fail-fast            Exit immediately on first failure (default)."
     Write-Output "  --no-fail-fast          Accumulate all failures."
-    Write-Output "  --skip-system-build     No-op (system config build is POSIX-only)."
+    Write-Output "  --skip-system-build     No-op (accepted for CLI parity with test.sh)."
     Write-Output "  --quiet                No-op (--quiet is POSIX-only; accepted for CLI parity)."
     exit 0
   } elseif ($_arg -eq '--fail-fast') {
@@ -90,7 +88,7 @@ foreach ($_arg in $args) {
   } elseif ($_arg -eq '--no-fail-fast') {
     $FAIL_FAST = $false
   } elseif ($_arg -eq '--skip-system-build') {
-    $skipSystemBuild = $true
+    # No-op: accepted for CLI parity with test.sh.
   } elseif ($_arg -eq '--quiet') {
     # No-op: --quiet is POSIX-only.
   } else {
@@ -128,13 +126,8 @@ say "skipping (requires Nix and bash — not available on Windows)."
 # ---------------------------------------------------------------------------
 # 5. System config build — POSIX only (stub on Windows)
 # ---------------------------------------------------------------------------
-if ($skipSystemBuild) {
-  Write-Output ("`n=== [{0}] System config build ===" -f (++$_step))
-  say "skipping (--skip-system-build)."
-} else {
-  Write-Output ("`n=== [{0}] System config build ===" -f (++$_step))
-  say "skipping (system config build is POSIX-only)."
-}
+Write-Output ("`n=== [{0}] System config build ===" -f (++$_step))
+say "skipping (system config build is POSIX-only)."
 
 Write-Output ""
 Write-Output 'test: done'
