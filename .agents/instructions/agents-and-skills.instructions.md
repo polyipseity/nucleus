@@ -19,6 +19,8 @@ The `~/.agents/` directory is the runtime home for all agent configuration, prom
 
 The per-subdir layout replaces an older whole-dir symlink scheme. The old scheme forced every clawhub download into the tracked repo tree; the real-dir layout lets the `skills/` subtree be writable without any writes entering Git.
 
+The phrase "global agent instructions" (or "user agent instructions", "provisioned global agent instructions") refers to `src/modules/configs/agents/` — the actual source files for agent customizations. Files in `~/.agents/` are per-entry symlinks into this directory, not the source of truth. Always edit files under `src/modules/configs/agents/` rather than editing `~/.agents/` directly; changes there would be overwritten on the next apply.
+
 ## Bundled vs. fetched skills
 
 **Bundled**: AGPL-compatible license → commit all skill files to `src/modules/configs/agents/skills/<name>/`. The `install-agent-skills` activation creates a symlink at `~/.agents/skills/<name>` that points into the store.

@@ -77,6 +77,7 @@ Checks in both `scripts/check.sh` and `scripts/check.ps1` are classified into th
 
 - For every detected stack, document what to run and where commands are defined.
 - **Nix check-and-format (pre-commit hook)**: `check.sh` accepts `--format` to auto-fix Nix files (treefmt runs nixfmt-rfc-style for Nix formatting when invoked in-place). The flag is passed by `prek-hooks.py` when `args = ["--format"]` in `prek.toml`. `treefmtWrapper` is bundled in `mkCheckApp` runtimeInputs in `src/flake.nix`. No separate `format-nix` hook exists.
+- **treefmt `tests/` exclusion**: `src/treefmt.nix` excludes `tests/**` from formatting because nixfmt and deadnix corrupt test code (removes unused variables in test assertions). Do not remove this exclusion without addressing the formatters' handling of test patterns.
 - **Commit message validation**: commitlint (via `prek.toml` commit-msg hook) enforces conventional commit types. Valid types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`. Do not use `maintain` — use `refactor` for cleanup without behavior change or `chore` for config/tooling maintenance.
 - **prek hook stashing**: prek hooks stash unstaged changes during commit execution, run checks, then restore them. Stashing output during commits is normal, not an error.
 - **CI policy**: Do not add new checks or tests to `ci.yml`. Route new validation into repo checks (`scripts/check.sh` / `scripts/check.ps1`) or repo tests (`tests/`). Decouples checks from CI runners so they work locally too.
