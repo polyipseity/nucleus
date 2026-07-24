@@ -2,9 +2,13 @@
 # Runs the full repository test suite in sequence.
 #
 # Test suites (1-5):
-#   1. Nix test suite — auto-discover and run all *.nix test files
+#
+# Code quality tests (2-3):
 #   2. Shell script linting (ShellCheck)
 #   3. PowerShell lint (PSScriptAnalyzer)
+#
+# Functional tests (1, 4-5):
+#   1. Nix test suite — auto-discover and run all *.nix test files
 #   4. Nucleus apps smoke tests (build + --help / dry-run)
 #   5. System config build (build all host system derivations)
 #
@@ -54,6 +58,7 @@
 #
 # Exit conditions:
 #   0 on success; non-zero on any check failure.
+#   Intentionally omits -e: errors accumulate via exit_code variable.
 # By default, FAIL_FAST=true (exit immediately on first failure).
 # Use --no-fail-fast to accumulate all failures.
 set -uo pipefail
@@ -203,5 +208,8 @@ else
   fi
 fi
 
-nuc_done
-exit $exit_code
+if [ $exit_code -ne 0 ]; then
+  warn "some tests failed with exit code $exit_code"
+  exit $exit_code
+fi
+say "all tests passed."
