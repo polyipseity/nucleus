@@ -1,7 +1,6 @@
 # tests/modules/logging-dirs-tests.nix — Log directory consistency in services.json and activation.nix.
 
 let
-  lib = import <nixpkgs/lib>;
   inherit (import ../lib.nix) assert';
 
   services = builtins.fromJSON (builtins.readFile ../../src/modules/services.json);

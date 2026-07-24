@@ -10,7 +10,6 @@ let
   flakeText = builtins.readFile ../../src/flake.nix;
   cloudDrivesModuleText = builtins.readFile ../../src/modules/cloud-drives.nix;
   terminalActivationsModuleText = builtins.readFile ../../src/modules/terminal-activations.nix;
-  managedPathsText = builtins.readFile ../../src/modules/lib/managed-paths.nix;
 
   # Test 1: Verify home.username option exists and is a string
   test_home_username_type = assert' (

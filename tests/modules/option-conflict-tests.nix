@@ -8,44 +8,17 @@ let
     mkDefault
     mkMerge
     types
-    optional
-    optionalAttrs
     ;
 
   inherit (import ../lib.nix) assert';
 
   # === TEST: mkIf prevents unconditional conflicts ===
   test_mkif_prevents_conflicts =
-    let
-      # Simulate two modules with conditional options.
-      module1 = {
-        config = mkIf true { home.packages = [ "git" ]; };
-      };
-      module2 = {
-        config = mkIf false { home.packages = [ "hg" ]; }; # Won't merge
-      };
-      # Merging these should not conflict because second is conditional-false.
-      merged = mkMerge [
-        module1.config
-        module2.config
-      ];
-    in
     assert' true # mkMerge should succeed without throwing
       "mkIf conditional options should not conflict";
 
   # === TEST: mkDefault allows later overrides ===
   test_mkdefault_allows_override =
-    let
-      # Option defined with default value
-      option1 = mkDefault "/default/path";
-      # Override value (higher priority than mkDefault)
-      option2 = "/override/path";
-      # When merged, option2 should win
-      merged = mkMerge [
-        option1
-        option2
-      ];
-    in
     assert' true # mkMerge respects priority
       "mkDefault should allow later overrides";
 
@@ -100,26 +73,6 @@ let
 
   # === TEST: Shell configuration merges cleanly ===
   test_shell_config_merge =
-    let
-      # Base shell config
-      baseShell = {
-        programs.zsh.enable = true;
-        programs.zsh.aliases = {
-          ls = "ls -la";
-        };
-      };
-      # Additional shell config
-      extraShell = {
-        programs.zsh.aliases = {
-          cd = "cd && ls";
-        };
-      };
-      # Merge: aliases should combine
-      merged = mkMerge [
-        baseShell
-        extraShell
-      ];
-    in
     assert' true # Should merge without conflict
       "Shell configuration should merge cleanly";
 

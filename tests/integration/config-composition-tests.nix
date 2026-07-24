@@ -8,7 +8,6 @@ let
   coreModuleText = builtins.readFile ../../src/modules/core.nix;
   secretsModuleText = builtins.readFile ../../src/modules/secrets.nix;
   shellModuleText = builtins.readFile ../../src/modules/shell.nix;
-  macosModuleText = builtins.readFile ../../src/modules/macos.nix;
   macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
   nixosDefaultText = builtins.readFile ../../src/hosts/NixOS/default.nix;
 

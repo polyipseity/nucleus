@@ -5,7 +5,6 @@ let
   flakeText = builtins.readFile ../../src/flake.nix;
   gcText = builtins.readFile ../../scripts/gc.sh;
   coreText = builtins.readFile ../../src/modules/core.nix;
-  defaultAiText = builtins.readFile ../../src/modules/ai/default.nix;
   nixosAiText = builtins.readFile ../../src/hosts/NixOS/ai.nix;
   litellmConfigText = builtins.readFile ../../src/modules/ai/litellm-config.yml;
   secretsText = builtins.readFile ../../src/modules/secrets.nix;

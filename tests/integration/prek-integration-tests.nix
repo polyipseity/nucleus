@@ -18,7 +18,6 @@ let
   agentEnvVarNames = (import ../../src/modules/agent-env-vars.nix).agentEnvVarNames;
   windowsInstallModuleText = builtins.readFile ../../src/hosts/Windows/modules/setup/Install-PrekHook.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
-  windowsSystemDscText = builtins.readFile ../../src/hosts/Windows/system/computer-name.dsc.yml;
   windowsSystemPackagesDscText = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
   windowsUserDscText = builtins.readFile ../../src/hosts/Windows/user/shell.dsc.yml;
 
