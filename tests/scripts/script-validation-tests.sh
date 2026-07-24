@@ -161,363 +161,518 @@ test_help_handler() {
 echo "Testing shell scripts for correctness and best practices..."
 echo ""
 
-# Test scripts/vm.sh
-VM_SETUP_SH="scripts/vm.sh"
-if [[ -f "$VM_SETUP_SH" ]]; then
-    test_bash_syntax "$VM_SETUP_SH"
-    test_has_shebang "$VM_SETUP_SH"
-    test_is_executable "$VM_SETUP_SH"
-    test_dependencies_available "$VM_SETUP_SH" qemu-system-aarch64 qemu-system-x86_64 rsync
-    test_error_handling "$VM_SETUP_SH"
-    test_has_documentation "$VM_SETUP_SH"
-    test_no_dangerous_patterns "$VM_SETUP_SH"
-    test_strict_shell_mode "$VM_SETUP_SH"
-    test_usage_std_present "$VM_SETUP_SH"
-    test_help_handler "$VM_SETUP_SH"
+# Source PARALLEL_JOBS for parallel execution
+. "$SCRIPT_DIR/../../src/scripts/lib/lib.sh"
 
-    # HVF on arm64 macOS only accelerates AArch64 guests; x86_64 Windows QEMU builds must use tcg.
-    # Without this fix, qemu-system-x86_64 -accel hvf fails with
-    # "invalid accelerator hvf" on Apple Silicon.
-    if grep -q 'arm64' "$VM_SETUP_SH" && grep -q "accelerator='tcg'" "$VM_SETUP_SH"; then
-        assert_pass "arm64 tcg fallback present: $(basename "$VM_SETUP_SH")"
-    else
-        assert_fail "arm64 tcg fallback present: $(basename "$VM_SETUP_SH")" \
+# Temp directory for parallel worker output
+_TEST_TMPDIR=$(mktemp -d) || { echo "FATAL: failed to create temp dir"; exit 1; }
+trap 'rm -rf "$_TEST_TMPDIR"' EXIT
+
+# Worker function: runs a single script's tests in a subshell.
+# Each worker sources test-lib.sh for fresh counters, runs the tests,
+# and writes structured output to its temp file.
+_run_script_worker() {
+  local _script_path="$1"
+  local _worker_id="$2"
+  local _out_file
+  _out_file="$_TEST_TMPDIR/worker_$(printf '%02d' "$_worker_id").out"
+
+  # Run in subshell for isolation
+  (
+    set -euo pipefail
+    . "$SCRIPT_DIR/test-lib.sh"
+
+    [[ ! -f "$_script_path" ]] && exit 0
+
+    case "$_script_path" in
+      ######################################################################
+      # scripts/vm.sh
+      ######################################################################
+      scripts/vm.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_dependencies_available "$_script_path" qemu-system-aarch64 qemu-system-x86_64 rsync
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_no_dangerous_patterns "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        test_usage_std_present "$_script_path"
+        test_help_handler "$_script_path"
+        if grep -q 'arm64' "$_script_path" && grep -q "accelerator='tcg'" "$_script_path"; then
+          assert_pass "arm64 tcg fallback present: $(basename "$_script_path")"
+        else
+          assert_fail "arm64 tcg fallback present: $(basename "$_script_path")" \
             "Missing Apple Silicon tcg fallback for x86_64 QEMU builds"
-    fi
-fi
+        fi
+        ;;
 
-# Test scripts/apply.sh → src/scripts/apply.sh
-APPLY_SH="src/scripts/apply.sh"
-if [[ -f "$APPLY_SH" ]]; then
-    test_bash_syntax "$APPLY_SH"
-    test_has_shebang "$APPLY_SH"
-    test_is_executable "$APPLY_SH"
-    test_dependencies_available "$APPLY_SH" git sops ssh-to-age
-    test_error_handling "$APPLY_SH"
-    test_has_documentation "$APPLY_SH"
-    test_no_dangerous_patterns "$APPLY_SH"
-    test_strict_shell_mode "$APPLY_SH"
-    test_usage_std_present "$APPLY_SH"
-    test_help_handler "$APPLY_SH"
-fi
+      ######################################################################
+      # src/scripts/apply.sh
+      ######################################################################
+      src/scripts/apply.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_dependencies_available "$_script_path" git sops ssh-to-age
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_no_dangerous_patterns "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        test_usage_std_present "$_script_path"
+        test_help_handler "$_script_path"
+        ;;
 
-# Test scripts/bootstrap.sh
-BOOTSTRAP_SH="scripts/bootstrap.sh"
-if [[ -f "$BOOTSTRAP_SH" ]]; then
-    test_bash_syntax "$BOOTSTRAP_SH"
-    test_has_shebang "$BOOTSTRAP_SH"
-    test_is_executable "$BOOTSTRAP_SH"
-    test_dependencies_available "$BOOTSTRAP_SH" git nix
-    test_error_handling "$BOOTSTRAP_SH"
-    test_bootstrap_direnv_scope "$BOOTSTRAP_SH"
-    test_has_documentation "$BOOTSTRAP_SH"
-    test_no_dangerous_patterns "$BOOTSTRAP_SH"
-    test_strict_shell_mode "$BOOTSTRAP_SH"
-    test_usage_std_present "$BOOTSTRAP_SH"
-    test_help_handler "$BOOTSTRAP_SH"
-fi
+      ######################################################################
+      # scripts/bootstrap.sh
+      ######################################################################
+      scripts/bootstrap.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_dependencies_available "$_script_path" git nix
+        test_error_handling "$_script_path"
+        test_bootstrap_direnv_scope "$_script_path"
+        test_has_documentation "$_script_path"
+        test_no_dangerous_patterns "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        test_usage_std_present "$_script_path"
+        test_help_handler "$_script_path"
+        ;;
 
-# Test scripts/health-check.sh
-HEALTH_CHECK_SH="scripts/health-check.sh"
-if [[ -f "$HEALTH_CHECK_SH" ]]; then
-    test_bash_syntax "$HEALTH_CHECK_SH"
-    test_has_shebang "$HEALTH_CHECK_SH"
-    test_is_executable "$HEALTH_CHECK_SH"
-    test_dependencies_available "$HEALTH_CHECK_SH" git curl
-    test_error_handling "$HEALTH_CHECK_SH"
-    test_has_documentation "$HEALTH_CHECK_SH"
-    test_strict_shell_mode "$HEALTH_CHECK_SH"
-    test_usage_std_present "$HEALTH_CHECK_SH"
-    test_help_handler "$HEALTH_CHECK_SH"
-fi
+      ######################################################################
+      # scripts/health-check.sh
+      ######################################################################
+      scripts/health-check.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_dependencies_available "$_script_path" git curl
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        test_usage_std_present "$_script_path"
+        test_help_handler "$_script_path"
+        ;;
 
-# Test scripts/update.sh
-UPDATE_SH="scripts/update.sh"
-if [[ -f "$UPDATE_SH" ]]; then
-    test_bash_syntax "$UPDATE_SH"
-    test_has_shebang "$UPDATE_SH"
-    test_is_executable "$UPDATE_SH"
-    test_dependencies_available "$UPDATE_SH" nix sops
-    test_error_handling "$UPDATE_SH"
-    test_has_documentation "$UPDATE_SH"
-    test_strict_shell_mode "$UPDATE_SH"
-    test_usage_std_present "$UPDATE_SH"
-    test_help_handler "$UPDATE_SH"
-fi
+      ######################################################################
+      # scripts/update.sh
+      ######################################################################
+      scripts/update.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_dependencies_available "$_script_path" nix sops
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        test_usage_std_present "$_script_path"
+        test_help_handler "$_script_path"
+        ;;
 
-# Test scripts/ai.sh
-AI_SH="scripts/ai.sh"
-if [[ -f "$AI_SH" ]]; then
-    test_bash_syntax "$AI_SH"
-    test_has_shebang "$AI_SH"
-    test_is_executable "$AI_SH"
-    test_error_handling "$AI_SH"
-    test_has_documentation "$AI_SH"
-    test_no_dangerous_patterns "$AI_SH"
-    test_strict_shell_mode "$AI_SH"
-    test_usage_std_present "$AI_SH"
-    test_help_handler "$AI_SH"
-fi
+      ######################################################################
+      # scripts/ai.sh
+      ######################################################################
+      scripts/ai.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_no_dangerous_patterns "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        test_usage_std_present "$_script_path"
+        test_help_handler "$_script_path"
+        ;;
 
-# Test scripts/cloud-setup.sh
-CLOUD_SETUP_SH="scripts/cloud-setup.sh"
-if [[ -f "$CLOUD_SETUP_SH" ]]; then
-    test_bash_syntax "$CLOUD_SETUP_SH"
-    test_has_shebang "$CLOUD_SETUP_SH"
-    test_is_executable "$CLOUD_SETUP_SH"
-    test_dependencies_available "$CLOUD_SETUP_SH" git rsync
-    test_error_handling "$CLOUD_SETUP_SH"
-    test_has_documentation "$CLOUD_SETUP_SH"
-    test_no_dangerous_patterns "$CLOUD_SETUP_SH"
-    test_strict_shell_mode "$CLOUD_SETUP_SH"
-    test_usage_std_present "$CLOUD_SETUP_SH"
-    test_help_handler "$CLOUD_SETUP_SH"
-fi
+      ######################################################################
+      # scripts/cloud-setup.sh
+      ######################################################################
+      scripts/cloud-setup.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_dependencies_available "$_script_path" git rsync
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_no_dangerous_patterns "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        test_usage_std_present "$_script_path"
+        test_help_handler "$_script_path"
+        ;;
 
-# Test scripts/gc.sh
-GC_SH="scripts/gc.sh"
-if [[ -f "$GC_SH" ]]; then
-    test_bash_syntax "$GC_SH"
-    test_has_shebang "$GC_SH"
-    test_is_executable "$GC_SH"
-    test_dependencies_available "$GC_SH" git nix
-    test_error_handling "$GC_SH"
-    test_has_documentation "$GC_SH"
-    test_no_dangerous_patterns "$GC_SH"
-    test_strict_shell_mode "$GC_SH"
-    test_usage_std_present "$GC_SH"
-    test_help_handler "$GC_SH"
-fi
+      ######################################################################
+      # scripts/gc.sh
+      ######################################################################
+      scripts/gc.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_dependencies_available "$_script_path" git nix
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_no_dangerous_patterns "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        test_usage_std_present "$_script_path"
+        test_help_handler "$_script_path"
+        ;;
 
-# Test scripts/gc.ps1 (Windows: garbage collection)
-GC_PS1="scripts/gc.ps1"
-if [[ -f "$GC_PS1" ]]; then
-    if pwsh -NoProfile -Command "& { if (!(Test-Path '$GC_PS1')) { exit 1 }; \$null = Get-Command '$GC_PS1' -Syntax; exit 0 }" 2>/dev/null; then
-        assert_pass "PowerShell syntax: gc.ps1"
-    else
-        assert_fail "PowerShell syntax: gc.ps1" "Parse error detected by pwsh"
-    fi
-fi
+      ######################################################################
+      # scripts/gc.ps1
+      ######################################################################
+      scripts/gc.ps1)
+        if pwsh -NoProfile -Command "& { if (!(Test-Path '$_script_path')) { exit 1 }; \$null = Get-Command '$_script_path' -Syntax; exit 0 }" 2>/dev/null; then
+          assert_pass "PowerShell syntax: gc.ps1"
+        else
+          assert_fail "PowerShell syntax: gc.ps1" "Parse error detected by pwsh"
+        fi
+        ;;
 
-# Test src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1 (Windows: git+ssh config)
-GIT_SSH_CONFIG_PS1="src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1"
-if [[ -f "$GIT_SSH_CONFIG_PS1" ]]; then
-    if pwsh -NoProfile -Command "& { if (!(Test-Path '$GIT_SSH_CONFIG_PS1')) { exit 1 }; \$null = Get-Command '$GIT_SSH_CONFIG_PS1' -Syntax; exit 0 }" 2>/dev/null; then
-        assert_pass "PowerShell syntax: Sync-GitAndSshConfig.ps1"
-    else
-        assert_fail "PowerShell syntax: Sync-GitAndSshConfig.ps1" "Parse error detected by pwsh"
-    fi
-fi
+      ######################################################################
+      # src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1
+      ######################################################################
+      src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1)
+        if pwsh -NoProfile -Command "& { if (!(Test-Path '$_script_path')) { exit 1 }; \$null = Get-Command '$_script_path' -Syntax; exit 0 }" 2>/dev/null; then
+          assert_pass "PowerShell syntax: Sync-GitAndSshConfig.ps1"
+        else
+          assert_fail "PowerShell syntax: Sync-GitAndSshConfig.ps1" "Parse error detected by pwsh"
+        fi
+        ;;
 
-# Test scripts/replica-reset.sh
-REPLICA_RESET_SH="scripts/replica-reset.sh"
-if [[ -f "$REPLICA_RESET_SH" ]]; then
-    test_bash_syntax "$REPLICA_RESET_SH"
-    test_has_shebang "$REPLICA_RESET_SH"
-    test_is_executable "$REPLICA_RESET_SH"
-    test_dependencies_available "$REPLICA_RESET_SH" git rsync
-    test_error_handling "$REPLICA_RESET_SH"
-    test_has_documentation "$REPLICA_RESET_SH"
-    test_no_dangerous_patterns "$REPLICA_RESET_SH"
-    test_strict_shell_mode "$REPLICA_RESET_SH"
-    test_usage_std_present "$REPLICA_RESET_SH"
-    test_help_handler "$REPLICA_RESET_SH"
-fi
+      ######################################################################
+      # scripts/replica-reset.sh
+      ######################################################################
+      scripts/replica-reset.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_dependencies_available "$_script_path" git rsync
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_no_dangerous_patterns "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        test_usage_std_present "$_script_path"
+        test_help_handler "$_script_path"
+        ;;
 
-# Test scripts/replica-sync.sh
-REPLICA_SYNC_SH="scripts/replica-sync.sh"
-if [[ -f "$REPLICA_SYNC_SH" ]]; then
-    test_bash_syntax "$REPLICA_SYNC_SH"
-    test_has_shebang "$REPLICA_SYNC_SH"
-    test_is_executable "$REPLICA_SYNC_SH"
-    test_dependencies_available "$REPLICA_SYNC_SH" git rsync
-    test_error_handling "$REPLICA_SYNC_SH"
-    test_has_documentation "$REPLICA_SYNC_SH"
-    test_no_dangerous_patterns "$REPLICA_SYNC_SH"
-    test_strict_shell_mode "$REPLICA_SYNC_SH"
-    test_usage_std_present "$REPLICA_SYNC_SH"
-    test_help_handler "$REPLICA_SYNC_SH"
-fi
+      ######################################################################
+      # scripts/replica-sync.sh
+      ######################################################################
+      scripts/replica-sync.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_dependencies_available "$_script_path" git rsync
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_no_dangerous_patterns "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        test_usage_std_present "$_script_path"
+        test_help_handler "$_script_path"
+        ;;
 
-# Test scripts/check-sh.sh
-CHECK_SH_SH="scripts/check-sh.sh"
-if [[ -f "$CHECK_SH_SH" ]]; then
-    test_bash_syntax "$CHECK_SH_SH"
-    test_has_shebang "$CHECK_SH_SH"
-    test_is_executable "$CHECK_SH_SH"
-    test_dependencies_available "$CHECK_SH_SH" shellcheck
-    test_error_handling "$CHECK_SH_SH"
-    test_has_documentation "$CHECK_SH_SH"
-    test_no_dangerous_patterns "$CHECK_SH_SH"
-    test_strict_shell_mode "$CHECK_SH_SH"
-    test_usage_std_present "$CHECK_SH_SH"
-    test_help_handler "$CHECK_SH_SH"
-fi
+      ######################################################################
+      # scripts/check-sh.sh
+      ######################################################################
+      scripts/check-sh.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_dependencies_available "$_script_path" shellcheck
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_no_dangerous_patterns "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        test_usage_std_present "$_script_path"
+        test_help_handler "$_script_path"
+        ;;
 
-# Test scripts/check.sh
-CHECK_SH="scripts/check.sh"
-if [[ -f "$CHECK_SH" ]]; then
-    test_bash_syntax "$CHECK_SH"
-    test_has_shebang "$CHECK_SH"
-    test_is_executable "$CHECK_SH"
-    test_dependencies_available "$CHECK_SH" shellcheck pwsh packer nix deadnix
-    test_error_handling "$CHECK_SH"
-    test_has_documentation "$CHECK_SH"
-    test_no_dangerous_patterns "$CHECK_SH"
-    # test_strict_shell_mode "$CHECK_SH"  # Intentionally skipped: check.sh uses set -uo pipefail (no -e)
-    # because it accumulates errors across all 18 check steps via exit_code variable.
-    # See scripts/check.sh header: "all checks run and failures accumulate (report-at-end)".
-    # Adding -e would abort on the first failure, defeating the purpose of error accumulation.
-    test_usage_std_present "$CHECK_SH"
-    test_help_handler "$CHECK_SH"
-fi
+      ######################################################################
+      # scripts/check.sh
+      ######################################################################
+      scripts/check.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_dependencies_available "$_script_path" shellcheck pwsh packer nix deadnix
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_no_dangerous_patterns "$_script_path"
+        # test_strict_shell_mode intentionally skipped: check.sh uses set -uo pipefail (no -e)
+        # because it accumulates errors across all steps via exit_code variable.
+        test_usage_std_present "$_script_path"
+        test_help_handler "$_script_path"
+        ;;
 
-# Test scripts/gs-pdf-opt.sh
-GS_PDF_OPT_SH="scripts/gs-pdf-opt.sh"
-if [[ -f "$GS_PDF_OPT_SH" ]]; then
-    test_bash_syntax "$GS_PDF_OPT_SH"
-    test_has_shebang "$GS_PDF_OPT_SH"
-    test_is_executable "$GS_PDF_OPT_SH"
-    test_dependencies_available "$GS_PDF_OPT_SH" gs
-    test_error_handling "$GS_PDF_OPT_SH"
-    test_has_documentation "$GS_PDF_OPT_SH"
-    test_no_dangerous_patterns "$GS_PDF_OPT_SH"
-    test_strict_shell_mode "$GS_PDF_OPT_SH"
-    test_usage_std_present "$GS_PDF_OPT_SH"
-    test_help_handler "$GS_PDF_OPT_SH"
-fi
+      ######################################################################
+      # scripts/gs-pdf-opt.sh
+      ######################################################################
+      scripts/gs-pdf-opt.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_dependencies_available "$_script_path" gs
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_no_dangerous_patterns "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        test_usage_std_present "$_script_path"
+        test_help_handler "$_script_path"
+        ;;
 
-# Test src/scripts/camilladsp-daemon.sh
-CAMILLADSP_DAEMON_SH="src/scripts/services/camilladsp-daemon.sh"
-if [[ -f "$CAMILLADSP_DAEMON_SH" ]]; then
-    test_bash_syntax "$CAMILLADSP_DAEMON_SH"
-    test_has_shebang "$CAMILLADSP_DAEMON_SH"
-    test_is_executable "$CAMILLADSP_DAEMON_SH"
-    test_dependencies_available "$CAMILLADSP_DAEMON_SH" camilladsp websocat jq
-    test_error_handling "$CAMILLADSP_DAEMON_SH"
-    test_has_documentation "$CAMILLADSP_DAEMON_SH"
-    test_no_dangerous_patterns "$CAMILLADSP_DAEMON_SH"
-    test_strict_shell_mode "$CAMILLADSP_DAEMON_SH"
-fi
+      ######################################################################
+      # src/scripts/services/camilladsp-daemon.sh
+      ######################################################################
+      src/scripts/services/camilladsp-daemon.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_dependencies_available "$_script_path" camilladsp websocat jq
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_no_dangerous_patterns "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        ;;
 
-# Test src/scripts/services/camilladsp-heartbeat.sh
-CAMILLADSP_HEARTBEAT_SH="src/scripts/services/camilladsp-heartbeat.sh"
-if [[ -f "$CAMILLADSP_HEARTBEAT_SH" ]]; then
-    test_bash_syntax "$CAMILLADSP_HEARTBEAT_SH"
-    test_has_shebang "$CAMILLADSP_HEARTBEAT_SH"
-    test_is_executable "$CAMILLADSP_HEARTBEAT_SH"
-    test_dependencies_available "$CAMILLADSP_HEARTBEAT_SH" websocat jq
-    test_error_handling "$CAMILLADSP_HEARTBEAT_SH"
-    test_has_documentation "$CAMILLADSP_HEARTBEAT_SH"
-    test_no_dangerous_patterns "$CAMILLADSP_HEARTBEAT_SH"
-    test_strict_shell_mode "$CAMILLADSP_HEARTBEAT_SH"
-fi
+      ######################################################################
+      # src/scripts/services/camilladsp-heartbeat.sh
+      ######################################################################
+      src/scripts/services/camilladsp-heartbeat.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_dependencies_available "$_script_path" websocat jq
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_no_dangerous_patterns "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        ;;
 
-# Test scripts/svc.sh (macOS-only: launchctl-based service management)
-SVC_SH="scripts/svc.sh"
-if [[ -f "$SVC_SH" ]]; then
-    test_bash_syntax "$SVC_SH"
-    test_has_shebang "$SVC_SH"
-    test_is_executable "$SVC_SH"
-    test_dependencies_available "$SVC_SH" jq
-    test_error_handling "$SVC_SH"
-    test_has_documentation "$SVC_SH"
-    test_no_dangerous_patterns "$SVC_SH"
-    test_strict_shell_mode "$SVC_SH"
-    test_usage_std_present "$SVC_SH"
-    test_help_handler "$SVC_SH"
+      ######################################################################
+      # src/scripts/services/service-watchdog.sh
+      ######################################################################
+      src/scripts/services/service-watchdog.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_dependencies_available "$_script_path" jq
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_no_dangerous_patterns "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        test_usage_std_present "$_script_path"
+        test_help_handler "$_script_path"
+        ;;
 
-    # svc list / list --json with SVC_DOMAIN_FILTER=user avoids sudo entirely.
-    # Assertions use ssh-agent and discord-music-rpc, which are user-domain on
-    # all platforms (unlike ollama/litellm/jellyfin which are system-domain on NixOS).
-    SVC_LIST_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" SVC_DOMAIN_FILTER=user "$SVC_SH" list 2>&1 || true)  # check-suppress:suppression_doc: test probe — capturing output regardless of exit code for assertion below
-    if echo "$SVC_LIST_OUTPUT" | grep -q "ID.*Name.*Status.*Running.*PID"; then
-        assert_pass "svc list: table headers present"
-    else
-        assert_fail "svc list: table headers present" "Missing expected table header line"
-    fi
-    if echo "$SVC_LIST_OUTPUT" | grep -qE "^ssh-agent +SSH Agent"; then
-        assert_pass "svc list: ID and Name columns show service key and display name"
-    else
-        assert_fail "svc list: ID and Name columns show service key and display name" "Expected 'ssh-agent  SSH Agent' pattern in output"
-    fi
-    if echo "$SVC_LIST_OUTPUT" | grep -qE "ssh-agent|discord-music-rpc"; then
-        assert_pass "svc list: known services listed"
-    else
-        {
-          echo "DIAG: svc list output follows"
-          echo "$SVC_LIST_OUTPUT" | head -15
-          echo "DIAG: end svc list output"
-        } >&2
-        assert_fail "svc list: known services listed" "No expected service names found in output"
-    fi
-    if ! echo "$SVC_LIST_OUTPUT" | grep -q "unknown"; then
-        assert_pass "svc list: no unknown services"
-    else
-        assert_fail "svc list: no unknown services" "Output contains 'unknown' (likely jq parse failure)"
-    fi
+      ######################################################################
+      # src/scripts/services/service-watchdog.ps1
+      ######################################################################
+      src/scripts/services/service-watchdog.ps1)
+        if pwsh -NoProfile -Command "& { if (!(Test-Path '$_script_path')) { exit 1 }; \$null = Get-Command '$_script_path' -Syntax; exit 0 }" 2>/dev/null; then
+          assert_pass "PowerShell syntax: service-watchdog.ps1"
+        else
+          assert_fail "PowerShell syntax: service-watchdog.ps1" "Parse error detected by pwsh"
+        fi
+        ;;
 
-    SVC_JSON_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" SVC_DOMAIN_FILTER=user "$SVC_SH" list --json 2>/dev/null || true)  # check-suppress:suppression_doc: test probe — discard stderr (domain-filter info) to keep JSON parseable
-    if echo "$SVC_JSON_OUTPUT" | jq -e '.version == "1"' >/dev/null 2>&1; then
-        assert_pass "svc list --json: valid JSON with version"
-    else
-        {
-          echo "DIAG: svc list --json output follows"
-          echo "$SVC_JSON_OUTPUT" | head -5
-          echo "DIAG: end svc list --json output"
-        } >&2
-        assert_fail "svc list --json: valid JSON with version" "Output is not valid JSON or missing version"
+      ######################################################################
+      # src/hosts/Windows/modules/system/Sync-TerminalActivation.ps1
+      ######################################################################
+      src/hosts/Windows/modules/system/Sync-TerminalActivation.ps1)
+        if pwsh -NoProfile -Command "& { if (!(Test-Path '$_script_path')) { exit 1 }; \$null = Get-Command '$_script_path' -Syntax; exit 0 }" 2>/dev/null; then
+          assert_pass "PowerShell syntax: Sync-TerminalActivation.ps1"
+        else
+          assert_fail "PowerShell syntax: Sync-TerminalActivation.ps1" "Parse error detected by pwsh"
+        fi
+        ;;
 
-    fi
-    if echo "$SVC_JSON_OUTPUT" | jq -e 'has("services")' >/dev/null 2>&1; then
-        assert_pass "svc list --json: services key present"
-    else
-        assert_fail "svc list --json: services key present" "Missing services key in JSON output"
-    fi
+      ######################################################################
+      # tests/hosts/Windows/system/Sync-TerminalActivation.Tests.ps1
+      ######################################################################
+      tests/hosts/Windows/system/Sync-TerminalActivation.Tests.ps1)
+        if pwsh -NoProfile -Command "& { if (!(Test-Path '$_script_path')) { exit 1 }; \$null = Get-Command '$_script_path' -Syntax; exit 0 }" 2>/dev/null; then
+          assert_pass "PowerShell syntax: Sync-TerminalActivation.Tests.ps1"
+        else
+          assert_fail "PowerShell syntax: Sync-TerminalActivation.Tests.ps1" "Parse error detected by pwsh"
+        fi
+        ;;
 
-    # Regression: log-config shows correct capture values for all services (Fix 1 + Fix 3)
-    SVC_LOG_CONFIG_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" log-config 2>&1 || true)  # check-suppress:suppression_doc: test probe — capturing output regardless of exit code for assertion below
-    if echo "$SVC_LOG_CONFIG_OUTPUT" | grep -q "capture: all"; then
-        capture_all_lines=$(echo "$SVC_LOG_CONFIG_OUTPUT" | grep -c "capture: all" || true)  # check-suppress:suppression_doc: grep -c exits 1 when count is 0 (no match); expected when services lack capture field
-        capture_none_lines=$(echo "$SVC_LOG_CONFIG_OUTPUT" | grep -c "capture: none" || true)  # check-suppress:suppression_doc: same as above
-        if [ "$capture_all_lines" -gt 0 ] && [ "$capture_none_lines" -eq 0 ]; then
+      ######################################################################
+      # tests/scripts/terminal-activations-tests.sh
+      ######################################################################
+      tests/scripts/terminal-activations-tests.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_no_dangerous_patterns "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        ;;
+
+      ######################################################################
+      # scripts/svc.sh (macOS-only: launchctl-based service management)
+      ######################################################################
+      scripts/svc.sh)
+        test_bash_syntax "$_script_path"
+        test_has_shebang "$_script_path"
+        test_is_executable "$_script_path"
+        test_dependencies_available "$_script_path" jq
+        test_error_handling "$_script_path"
+        test_has_documentation "$_script_path"
+        test_no_dangerous_patterns "$_script_path"
+        test_strict_shell_mode "$_script_path"
+        test_usage_std_present "$_script_path"
+        test_help_handler "$_script_path"
+
+        # svc list / list --json with SVC_DOMAIN_FILTER=user avoids sudo entirely.
+        _svc_list_output=$(NUCLEUS_REPO_ROOT="$PWD" SVC_DOMAIN_FILTER=user "$_script_path" list 2>&1 || true)  # check-suppress:suppression_doc: test probe — capturing output regardless of exit code for assertion below
+        if echo "$_svc_list_output" | grep -q "ID.*Name.*Status.*Running.*PID"; then
+          assert_pass "svc list: table headers present"
+        else
+          assert_fail "svc list: table headers present" "Missing expected table header line"
+        fi
+        if echo "$_svc_list_output" | grep -qE "^ssh-agent +SSH Agent"; then
+          assert_pass "svc list: ID and Name columns show service key and display name"
+        else
+          assert_fail "svc list: ID and Name columns show service key and display name" "Expected 'ssh-agent  SSH Agent' pattern in output"
+        fi
+        if echo "$_svc_list_output" | grep -qE "ssh-agent|discord-music-rpc"; then
+          assert_pass "svc list: known services listed"
+        else
+          {
+            echo "DIAG: svc list output follows"
+            echo "$_svc_list_output" | head -15
+            echo "DIAG: end svc list output"
+          } >&2
+          assert_fail "svc list: known services listed" "No expected service names found in output"
+        fi
+        if ! echo "$_svc_list_output" | grep -q "unknown"; then
+          assert_pass "svc list: no unknown services"
+        else
+          assert_fail "svc list: no unknown services" "Output contains 'unknown' (likely jq parse failure)"
+        fi
+
+        _svc_json_output=$(NUCLEUS_REPO_ROOT="$PWD" SVC_DOMAIN_FILTER=user "$_script_path" list --json 2>/dev/null || true)  # check-suppress:suppression_doc: test probe — discard stderr (domain-filter info) to keep JSON parseable
+        if echo "$_svc_json_output" | jq -e '.version == "1"' >/dev/null 2>&1; then
+          assert_pass "svc list --json: valid JSON with version"
+        else
+          {
+            echo "DIAG: svc list --json output follows"
+            echo "$_svc_json_output" | head -5
+            echo "DIAG: end svc list --json output"
+          } >&2
+          assert_fail "svc list --json: valid JSON with version" "Output is not valid JSON or missing version"
+        fi
+        if echo "$_svc_json_output" | jq -e 'has("services")' >/dev/null 2>&1; then
+          assert_pass "svc list --json: services key present"
+        else
+          assert_fail "svc list --json: services key present" "Missing services key in JSON output"
+        fi
+
+        # Regression: log-config shows correct capture values for all services
+        _svc_log_config_output=$(NUCLEUS_REPO_ROOT="$PWD" "$_script_path" log-config 2>&1 || true)  # check-suppress:suppression_doc: test probe — capturing output regardless of exit code for assertion below
+        if echo "$_svc_log_config_output" | grep -q "capture: all"; then
+          _capture_all_lines=$(echo "$_svc_log_config_output" | grep -c "capture: all" || true)  # check-suppress:suppression_doc: grep -c exits 1 when count is 0
+          _capture_none_lines=$(echo "$_svc_log_config_output" | grep -c "capture: none" || true)  # check-suppress:suppression_doc: same
+          if [ "$_capture_all_lines" -gt 0 ] && [ "$_capture_none_lines" -eq 0 ]; then
             assert_pass "svc log-config: all services have capture=all"
+          else
+            assert_fail "svc log-config: all services have capture=all" "capture=all: $_capture_all_lines, capture=none: $_capture_none_lines"
+          fi
         else
-            assert_fail "svc log-config: all services have capture=all" "capture=all: $capture_all_lines, capture=none: $capture_none_lines"
+          assert_fail "svc log-config: all services have capture=all" "No capture=all found in output"
         fi
-    else
-        assert_fail "svc log-config: all services have capture=all" "No capture=all found in output"
-    fi
 
-    SVC_LOG_CONFIG_JSON=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" log-config --json 2>/dev/null || true)  # check-suppress:suppression_doc: test probe — discard stderr (domain-filter warning) to keep JSON parseable
-    if echo "$SVC_LOG_CONFIG_JSON" | jq -e --slurp 'all(.[]; .[].capture == "all")' >/dev/null 2>&1; then
-        assert_pass "svc log-config --json: all capture=all via jq"
-    else
-        {
-          echo "DIAG: svc log-config --json output follows"
-          echo "$SVC_LOG_CONFIG_JSON" | head -5
-          echo "DIAG: end svc log-config --json output"
-        } >&2
-        assert_fail "svc log-config --json: all capture=all via jq" "jq filter 'all(.[]; .[].capture == \"all\")' failed"
-    fi
-
-    # Regression: logs listing shows all services with capture=all (Fix 2 + Fix 4)
-    SVC_LOGS_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" logs 2>&1 || true)  # check-suppress:suppression_doc: test probe — capturing output regardless of exit code for assertion below
-    # Strip domain-filter warning from start of output to keep grep clean.
-    SVC_LOGS_OUTPUT=$(echo "$SVC_LOGS_OUTPUT" | grep -v '^svc: warning:' || true)  # check-suppress:suppression_doc: filter may produce empty output if all lines are warnings
-    if echo "$SVC_LOGS_OUTPUT" | grep -q "capture=all"; then
-        assert_pass "svc logs: listing shows capture=all"
-    else
-        assert_fail "svc logs: listing shows capture=all" "No capture=all found in logs listing"
-    fi
-    for expected_svc in caddy jellyfin litellm ollama sshd; do
-        if echo "$SVC_LOGS_OUTPUT" | grep -qE "^\s+$expected_svc\s"; then
-            assert_pass "svc logs: service $expected_svc listed"
+        _svc_log_config_json=$(NUCLEUS_REPO_ROOT="$PWD" "$_script_path" log-config --json 2>/dev/null || true)  # check-suppress:suppression_doc: test probe — discard stderr
+        if echo "$_svc_log_config_json" | jq -e --slurp 'all(.[]; .[].capture == "all")' >/dev/null 2>&1; then
+          assert_pass "svc log-config --json: all capture=all via jq"
         else
-            assert_fail "svc logs: service $expected_svc listed" "Missing from listing"
+          {
+            echo "DIAG: svc log-config --json output follows"
+            echo "$_svc_log_config_json" | head -5
+            echo "DIAG: end svc log-config --json output"
+          } >&2
+          assert_fail "svc log-config --json: all capture=all via jq" "jq filter 'all(.[]; .[].capture == \"all\")' failed"
         fi
-    done
-fi
+
+        # Regression: logs listing shows all services with capture=all
+        _svc_logs_output=$(NUCLEUS_REPO_ROOT="$PWD" "$_script_path" logs 2>&1 || true)  # check-suppress:suppression_doc: test probe
+        _svc_logs_output=$(echo "$_svc_logs_output" | grep -v '^svc: warning:' || true)  # check-suppress:suppression_doc: strip warning
+        if echo "$_svc_logs_output" | grep -q "capture=all"; then
+          assert_pass "svc logs: listing shows capture=all"
+        else
+          assert_fail "svc logs: listing shows capture=all" "No capture=all found in logs listing"
+        fi
+        for _expected_svc in caddy jellyfin litellm ollama sshd; do
+          if echo "$_svc_logs_output" | grep -qE "^\s+$_expected_svc\s"; then
+            assert_pass "svc logs: service $_expected_svc listed"
+          else
+            assert_fail "svc logs: service $_expected_svc listed" "Missing from listing"
+          fi
+        done
+        ;;
+
+      *)
+        echo "WARNING: unknown script '$_script_path'"
+        ;;
+    esac
+  ) > "$_out_file" 2>&1
+}
+
+# Parallel execution: launch workers with PID cap
+_ALL_SCRIPTS=(
+  scripts/vm.sh
+  src/scripts/apply.sh
+  scripts/bootstrap.sh
+  scripts/health-check.sh
+  scripts/update.sh
+  scripts/ai.sh
+  scripts/cloud-setup.sh
+  scripts/gc.sh
+  scripts/gc.ps1
+  src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1
+  scripts/replica-reset.sh
+  scripts/replica-sync.sh
+  scripts/check-sh.sh
+  scripts/check.sh
+  scripts/gs-pdf-opt.sh
+  src/scripts/services/camilladsp-daemon.sh
+  src/scripts/services/camilladsp-heartbeat.sh
+  scripts/svc.sh
+  src/scripts/services/service-watchdog.sh
+  src/scripts/services/service-watchdog.ps1
+  src/hosts/Windows/modules/system/Sync-TerminalActivation.ps1
+  tests/scripts/terminal-activations-tests.sh
+  tests/hosts/Windows/system/Sync-TerminalActivation.Tests.ps1
+)
+
+_PIDS=()
+_WORKER_ID=0
+for _SCRIPT in "${_ALL_SCRIPTS[@]}"; do
+  _run_script_worker "$_SCRIPT" "$_WORKER_ID" &
+  _PIDS+=($!)
+  _WORKER_ID=$((_WORKER_ID + 1))
+  if [[ ${#_PIDS[@]} -ge $PARALLEL_JOBS ]]; then
+    wait "${_PIDS[@]}"
+    _PIDS=()
+  fi
+done
+wait
+
+# Aggregate results from worker output files
+TESTS_PASSED=0
+TESTS_FAILED=0
+for _out_file in "$_TEST_TMPDIR"/worker_*.out; do
+  [[ -f "$_out_file" ]] || continue
+  cat "$_out_file"
+  while IFS= read -r _line; do
+    # Strip ANSI escape sequences for accurate pattern matching
+    _clean_line=$(printf '%s' "$_line" | sed 's/\x1b\[[0-9;]*m//g')
+    if [[ "$_clean_line" == ✓* ]]; then ((++TESTS_PASSED)); fi
+    if [[ "$_clean_line" == ✗* ]]; then ((++TESTS_FAILED)); fi
+  done < "$_out_file"
+done
 
 # jq unit test: do_log_config filter resolves fields correctly (Fix 1 regression)
 # shellcheck disable=SC2016 # reason: $svc/$platform are jq variables, not shell variables
@@ -603,69 +758,14 @@ else
     assert_fail "jq do_log_config: compress defaults to true" "got '$result'"
 fi
 
-# Test src/scripts/services/service-watchdog.sh (macOS/NixOS: launchctl/systemctl watchdog)
-WATCHDOG_SH="src/scripts/services/service-watchdog.sh"
-if [[ -f "$WATCHDOG_SH" ]]; then
-    test_bash_syntax "$WATCHDOG_SH"
-    test_has_shebang "$WATCHDOG_SH"
-    test_is_executable "$WATCHDOG_SH"
-    test_dependencies_available "$WATCHDOG_SH" jq
-    test_error_handling "$WATCHDOG_SH"
-    test_has_documentation "$WATCHDOG_SH"
-    test_no_dangerous_patterns "$WATCHDOG_SH"
-    test_strict_shell_mode "$WATCHDOG_SH"
-    test_usage_std_present "$WATCHDOG_SH"
-    test_help_handler "$WATCHDOG_SH"
-fi
-
-# Test src/scripts/services/service-watchdog.ps1 (Windows: scheduled task watchdog)
-WATCHDOG_PS1="src/scripts/services/service-watchdog.ps1"
-if [[ -f "$WATCHDOG_PS1" ]]; then
-    if pwsh -NoProfile -Command "& { if (!(Test-Path '$WATCHDOG_PS1')) { exit 1 }; \$null = Get-Command '$WATCHDOG_PS1' -Syntax; exit 0 }" 2>/dev/null; then
-        assert_pass "PowerShell syntax: service-watchdog.ps1"
-    else
-        assert_fail "PowerShell syntax: service-watchdog.ps1" "Parse error detected by pwsh"
-    fi
-fi
-
-# Test src/hosts/Windows/modules/system/Sync-TerminalActivation.ps1
-SYNC_TERMINAL_PS1="src/hosts/Windows/modules/system/Sync-TerminalActivation.ps1"
-if [[ -f "$SYNC_TERMINAL_PS1" ]]; then
-    if pwsh -NoProfile -Command "& { if (!(Test-Path '$SYNC_TERMINAL_PS1')) { exit 1 }; \$null = Get-Command '$SYNC_TERMINAL_PS1' -Syntax; exit 0 }" 2>/dev/null; then
-        assert_pass "PowerShell syntax: Sync-TerminalActivation.ps1"
-    else
-        assert_fail "PowerShell syntax: Sync-TerminalActivation.ps1" "Parse error detected by pwsh"
-    fi
-fi
-
-# Test tests/scripts/terminal-activations-tests.sh
-TERMINAL_TEST_SH="tests/scripts/terminal-activations-tests.sh"
-if [[ -f "$TERMINAL_TEST_SH" ]]; then
-    test_bash_syntax "$TERMINAL_TEST_SH"
-    test_has_shebang "$TERMINAL_TEST_SH"
-    test_is_executable "$TERMINAL_TEST_SH"
-    test_error_handling "$TERMINAL_TEST_SH"
-    test_has_documentation "$TERMINAL_TEST_SH"
-    test_no_dangerous_patterns "$TERMINAL_TEST_SH"
-    test_strict_shell_mode "$TERMINAL_TEST_SH"
-fi
-
-# Test tests/hosts/Windows/system/Sync-TerminalActivation.Tests.ps1
-TERMINAL_PESTER_PS1="tests/hosts/Windows/system/Sync-TerminalActivation.Tests.ps1"
-if [[ -f "$TERMINAL_PESTER_PS1" ]]; then
-    if pwsh -NoProfile -Command "& { if (!(Test-Path '$TERMINAL_PESTER_PS1')) { exit 1 }; \$null = Get-Command '$TERMINAL_PESTER_PS1' -Syntax; exit 0 }" 2>/dev/null; then
-        assert_pass "PowerShell syntax: Sync-TerminalActivation.Tests.ps1"
-    else
-        assert_fail "PowerShell syntax: Sync-TerminalActivation.Tests.ps1" "Parse error detected by pwsh"
-    fi
-fi
-
 # Summary
 
 echo ""
 echo "============================================================"
 echo "Test Summary:"
+# shellcheck disable=SC2031 # reason: GREEN is a constant (set in test-lib.sh), not modified in subshell
 echo -e "${GREEN}Passed: $TESTS_PASSED${NC}"
+# shellcheck disable=SC2031 # reason: RED is a constant (set in test-lib.sh), not modified in subshell
 echo -e "${RED}Failed: $TESTS_FAILED${NC}"
 echo "============================================================"
 
