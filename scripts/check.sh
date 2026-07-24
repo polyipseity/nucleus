@@ -15,7 +15,7 @@
 #   3. Packer template validation
 #
 # Nix checks (4-7):
-#   4. Code formatting (treefmt — nixfmt + deadnix + yamllint)
+#   4. Code formatting (treefmt)
 #   5. Nix flake evaluation
 #   6. Nix lint check (nixf-tidy)
 #   7. Stale Nix build artifact check
@@ -88,7 +88,7 @@
 # Arguments:
 #   --format      Format Nix files in-place (instead of just validating).
 #   (paths)       Files to check; passes paths through to sub-checkers and
-#                 skips whole-repo checks (deadnix, script validation).
+#                 skips whole-repo checks (always-run checks that don't support path filtering).
 #
 # Environment variables:
 #   NUCLEUS_REPO_ROOT  Override the detected repository root path.
@@ -290,7 +290,7 @@ fi
 echo "$_pkr_exit" > "$_wave_tmpdir/step-3.exit"
 } &
 
-# code_formatting — Code formatting (treefmt — nixfmt + deadnix + yamllint)
+# code_formatting — Code formatting (treefmt)
 section "$((_step += 1))" "Code formatting (treefmt)"
 {
 _tf_exit=0

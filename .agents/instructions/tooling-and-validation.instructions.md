@@ -55,29 +55,28 @@ Choose the right vehicle:
 ### Check script structure
 
 - Both `scripts/check.sh` (POSIX) and `scripts/check.ps1` (Windows) follow the same 5-group structure in their header comments:
-  - **Toolchain checks** (1-3): Shell script linting (shellcheck), PowerShell syntax, Packer templates.
-  - **Nix checks** (4-8): Dead Nix code, flake eval, formatting, lint, stale artifacts.
-  - **Test suites** (9-12): Shell validation, CWD, search path, port functions.
-  - **Data integrity** (13-18): Lockfile, locked DSC, schema, service registry, YAML validation, YAML linting.
-  - **Policy/verification** (19-23): Package manager enforcement, error suppression, online checks, config compliance, activation script token check.
-- On Windows (check.ps1), steps 1 (shellcheck) and 4-7, 9-12 are stubs (POSIX/Nix-only tools).
+  - **Toolchain checks** (1-3): Shell script formatting/linting (treefmt), PowerShell syntax, Packer templates.
+  - **Nix checks** (4-7): Code formatting (treefmt), flake evaluation, lint (nixf-tidy), stale artifacts.
+  - **Test suites** (8-11): Shell validation, CWD, search path, port functions.
+  - **Data integrity** (12-15): Lockfile, locked DSC, schema, service registry.
+  - **Policy/verification** (16-21): YAML structural, package manager enforcement, error suppression, online checks, config compliance, activation token check.
+- On Windows (check.ps1), steps 1, 4-6, 8-11 are stubs (POSIX/Nix-only tools).
 - Pre-flight tool validation runs at the start of both scripts (before `$_step=0`). On POSIX this uses `require_command` from `src/scripts/lib.sh`; on Windows it uses `Ensure-Tool` from `src/hosts/Windows/modules/Ensure-Tool.psm1`.
 - Tool provisioning is handled by `nucleus-apply` (POSIX: `home.packages` in `src/modules/core.nix`; Windows: WinGet DSC). The pre-flight block is a safety net only — `nix profile install` and similar ad-hoc provisioning are banned.
 - When adding new tools to the check suite, add them to both: (a) the pre-flight block, and (b) `src/modules/core.nix` (POSIX) or WinGet DSC (Windows).
 
 ### Check mode taxonomy
 
-Checks in both `scripts/check.sh` and `scripts/check.ps1` are classified into two categories:
+Checks in both `scripts/check.sh` and `scripts/check.ps1` are classified into three categories:
 
-- **Always-run checks**: These cannot meaningfully accept path filtering — they validate whole-repo invariants. They execute unconditionally in both `--full` and `--scoped` modes, with no `$HAS_ARGS` guard. Examples: Nix flake evaluation (step 5), stale Nix build artifacts (step 8), test suites (steps 9-12), lockfile section validation (step 13), locked DSC validation (step 14), service registry validation (step 16), package manager enforcement (step 19), config method compliance (step 22).
-- **Path-scopable checks**: These operate per-file or per-file-type and accept path filtering in `--scoped` mode. They produce valid results when given only the changed file subset. Examples: shellcheck (step 1), PowerShell syntax (step 2), Packer validation (step 3), deadnix (step 4), Nix formatting (step 6), Nix lint (step 7), schema validation (step 15), YAML validation (step 17), YAML linting (step 18), undocumented error suppression (step 20), activation token placeholder (step 23).
-
-**Rule**: Always-run checks must NOT be gated behind `$HAS_ARGS`. They execute the same code path in both modes. There is no third category — every check is either always-run or path-scopable.
+- **Always-run checks**: These cannot meaningfully accept path filtering — they validate whole-repo invariants. They execute unconditionally in both `--full` and `--scoped` modes, with no `$HAS_ARGS` guard. Examples: stale Nix build artifacts (step 7), test suites (steps 8-11), lockfile section validation (step 12), locked DSC validation (step 13), service registry validation (step 15), package manager enforcement (step 17), config method compliance (step 20).
+- **Conditional checks**: These run only when certain file types are present in the changed set. Example: Nix flake evaluation (step 5, only when .nix files changed).
+- **Path-scopable checks**: These operate per-file or per-file-type and accept path filtering in `--scoped` mode. They produce valid results when given only the changed file subset. Examples: Shell script formatting/linting (step 1), PowerShell syntax (step 2), Packer validation (step 3), code formatting (step 4), Nix lint/nixf-tidy (step 6), schema validation (step 14), YAML structural validation (step 16), undocumented error suppression (step 18), activation token placeholder (step 21).
 
 **Source of truth**: The header docstrings in `check.sh` and `check.ps1` are the canonical step-by-step reference. Update both when changing the taxonomy.
 
 - For every detected stack, document what to run and where commands are defined.
-- **Nix check-and-format (pre-commit hook)**: `check.sh` accepts `--format` to auto-fix Nix files (nixfmt). The flag is passed by `prek-hooks.py` when `args = ["--format"]` in `prek.toml`. `nixfmt` is bundled in `mkCheckApp` runtimeInputs in `src/flake.nix` to avoid expensive nixpkgs eval. No separate `format-nix` hook exists.
+- **Nix check-and-format (pre-commit hook)**: `check.sh` accepts `--format` to auto-fix Nix files (treefmt runs nixfmt-rfc-style for Nix formatting when invoked in-place). The flag is passed by `prek-hooks.py` when `args = ["--format"]` in `prek.toml`. `treefmtWrapper` is bundled in `mkCheckApp` runtimeInputs in `src/flake.nix`. No separate `format-nix` hook exists.
 - **Commit message validation**: commitlint (via `prek.toml` commit-msg hook) enforces conventional commit types. Valid types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`. Do not use `maintain` — use `refactor` for cleanup without behavior change or `chore` for config/tooling maintenance.
 - **prek hook stashing**: prek hooks stash unstaged changes during commit execution, run checks, then restore them. Stashing output during commits is normal, not an error.
 - **CI policy**: Do not add new checks or tests to `ci.yml`. Route new validation into repo checks (`scripts/check.sh` / `scripts/check.ps1`) or repo tests (`tests/`). Decouples checks from CI runners so they work locally too.
