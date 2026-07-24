@@ -330,6 +330,7 @@
 
               # Reuse pre-built + shellchecked script tree (src/scripts/).
               cp -r --no-preserve=mode ${thisScriptTree}/. "$out/"
+              chmod -R +x "$out/src/"
             ''}
 
             ${
@@ -341,9 +342,10 @@
                   set -euo pipefail
                   export PATH="${lib.makeBinPath runtimeInputs}:$PATH"
                   ${
-                    lib.concatStringsSep "\n" (
-                      lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") extraEnv
-                    )
+                    let
+                      envExports = lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") extraEnv;
+                    in
+                    if envExports == [ ] then "" else lib.concatStringsSep "\n" envExports + "\n"
                   }${text}
                   WRAPPER
                   chmod +x "$out/bin/nucleus-${name}"
@@ -352,15 +354,25 @@
               else
                 ''
                   # Create thin wrapper with repo-root-relative script path.
+                  # Resolve symlinks so it works through home-manager profile symlinks.
                   cat > "$out/bin/nucleus-${name}" << 'WRAPPER'
                   #!${pkgs.runtimeShell}
                   set -euo pipefail
                   export PATH="${lib.makeBinPath runtimeInputs}:$PATH"
                   ${
-                    lib.concatStringsSep "\n" (
-                      lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") extraEnv
-                    )
-                  }_script="$(CDPATH="" cd -- "$(dirname -- "$0")/.." && pwd -P)/${scriptName}.sh"
+                    let
+                      envExports = lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") extraEnv;
+                    in
+                    if envExports == [ ] then "" else lib.concatStringsSep "\n" envExports + "\n"
+                  }_self="$0"
+                  while [ -h "$_self" ]; do
+                    _target="$(readlink "$_self")"
+                    case "$_target" in
+                      /*) _self="$_target" ;;
+                      *) _self="$(CDPATH="" cd -- "$(dirname -- "$_self")" && pwd -P)/$_target" ;;
+                    esac
+                  done
+                  _script="$(CDPATH="" cd -- "$(dirname -- "$_self")/.." && pwd -P)/${scriptName}.sh"
                   exec "$_script" "$@"
                   WRAPPER
                   chmod +x "$out/bin/nucleus-${name}"
@@ -392,6 +404,7 @@
         program = "${
           writeNucleusShellApplication pkgs {
             name = "apply";
+            scriptName = "src/scripts/apply";
             runtimeInputs = [
               pkgs.curl
               pkgs.git
@@ -617,6 +630,7 @@
       mkNucleusApps = pkgs: treefmtWrapper: {
         nucleus-apply = writeNucleusShellApplication pkgs {
           name = "apply";
+          scriptName = "src/scripts/apply";
           runtimeInputs = [
             pkgs.curl
             pkgs.git
