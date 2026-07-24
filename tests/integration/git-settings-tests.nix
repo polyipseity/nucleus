@@ -1,7 +1,6 @@
 # tests/integration/git-settings-tests.nix — Validate shared Git defaults and alias parity across POSIX and Windows.
 
 let
-  lib = import <nixpkgs/lib>;
   inherit (import ../lib.nix) containsRegex;
 
   posixGitText = builtins.readFile ../../src/modules/git.nix;
