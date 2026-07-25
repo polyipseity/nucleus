@@ -46,7 +46,7 @@ done
 
 if [ "$#" -gt 0 ]; then
   # Paths given: always run treefmt on them, regardless of --scoped.
-  treefmt --ci "$@"
+  treefmt --fail-on-change "$@"
   count="$#"
 elif $_SCOPED; then
   # --scoped with no paths: nothing to check.
@@ -59,7 +59,7 @@ else
     exit 0
   fi
   # shellcheck disable=SC2086 # reason: word splitting intentional for treefmt file args
-  treefmt --ci $files
+  treefmt --fail-on-change $files
   count=$(printf '%s\n' "$files" | awk 'NF { c += 1 } END { print c + 0 }')
 fi
 
