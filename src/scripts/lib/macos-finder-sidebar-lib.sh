@@ -175,7 +175,7 @@ finder_reconcile_best_effort() {
 
 # ---------------------------------------------------------------------------
 # Full Finder sidebar activation orchestration.
-# Called from configureFinderSidebar activation block.
+# Called from macos-configure-finder-sidebar activation block.
 # ---------------------------------------------------------------------------
 finder_configure_sidebar() {
   local favorites_json="$1"

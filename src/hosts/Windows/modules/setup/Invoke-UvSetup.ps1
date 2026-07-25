@@ -9,7 +9,7 @@ function Invoke-UvSetup {
     removes anything installed but absent from the desired list (zap-style),
     and installs any desired tools that are missing.
 
-    Mirrors the installUvTools POSIX activation in agents.nix.
+    Mirrors the install-uv-tools POSIX activation in agents.nix.
 
     Requires uv to be on PATH (installed from WinGet by system/packages.dsc.yml).
     Prepends %USERPROFILE%\.local\bin to PATH internally so uv-installed

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# ---- configureRosetta ------------------------------------------------------
+# ---- macos-install-rosetta -------------------------------------------------
 # Installs Rosetta 2 once on Apple Silicon hosts if it is not already
 # present. `--agree-to-license` keeps activation non-interactive.
 #

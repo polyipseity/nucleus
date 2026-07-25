@@ -26,9 +26,9 @@ let
 
   test_pwsh_nix_reads_yaml_version = assert' (builtins.hasInfix "pwshYamlVersion = lockfile.pwsh.\"powershell-yaml\" or null" pwshNixText) "pwsh.nix must read 'powershell-yaml' version from lockfile";
 
-  test_pwsh_nix_has_installPwshYaml = assert' (builtins.hasInfix "home.activation.install-pwsh-yaml" pwshNixText) "pwsh.nix must have install-pwsh-yaml activation block";
+  test_pwsh_nix_has_install_pwsh_yaml = assert' (builtins.hasInfix "home.activation.install-pwsh-yaml" pwshNixText) "pwsh.nix must have install-pwsh-yaml activation block";
 
-  test_pwsh_nix_installPwshYaml_uses_correct_module = assert' (builtins.hasInfix "Install-Module -Name powershell-yaml" pwshNixText) "pwsh.nix install-pwsh-yaml activation must reference 'powershell-yaml'";
+  test_pwsh_nix_install_pwsh_yaml_uses_correct_module = assert' (builtins.hasInfix "Install-Module -Name powershell-yaml" pwshNixText) "pwsh.nix install-pwsh-yaml activation must reference 'powershell-yaml'";
 
   # ---------------------------------------------------------------------------
   # apply.ps1 assertions (Windows provisioning orchestration)
@@ -54,8 +54,8 @@ builtins.seq
       test_powershell_yaml_in_lockfile
       test_analyzer_in_lockfile
       test_pwsh_nix_reads_yaml_version
-      test_pwsh_nix_has_installPwshYaml
-      test_pwsh_nix_installPwshYaml_uses_correct_module
+      test_pwsh_nix_has_install_pwsh_yaml
+      test_pwsh_nix_install_pwsh_yaml_uses_correct_module
       test_apply_ps1_dot_sources_module
       test_apply_ps1_calls_setup
       test_setup_module_exists

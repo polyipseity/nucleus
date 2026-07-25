@@ -3,7 +3,7 @@
     Post-apply secret health check for SOPS file recipient verification.
 
 .DESCRIPTION
-    Mirrors the POSIX verifySecretDecryption Home Manager activation in secrets.nix.
+    Mirrors the POSIX verify-secret-decryption Home Manager activation in secrets.nix.
     Verifies that all SOPS files have the correct recipients registered and that
     managed secret artefacts are present on disk.  Uses metadata inspection rather
     than live decryption so passphrase-protected keys do not cause false failures.
@@ -24,7 +24,7 @@ function Invoke-SecretVerification {
     each registered backend.
 
   .DESCRIPTION
-    Runs five checks in order, mirroring the POSIX verifySecretDecryption
+    Runs five checks in order, mirroring the POSIX verify-secret-decryption
     activation in src/modules/secrets.nix:
 
     1. Materialization sanity: managed SSH key files, git-identity env, and

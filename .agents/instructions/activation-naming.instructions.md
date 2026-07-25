@@ -33,3 +33,10 @@ The following activation entry types are **not** subject to the naming policy:
 When referencing another activation in `entryAfter [...]` or `entryBefore [...]`, use the exact kebab-case name of the target entry. For built-in phases, use the framework-provided name (e.g., `"linkGeneration"`, `"writeBoundary"`).
 
 Shared DAG dependency names are defined in `src/modules/lib/activation-dag.nix`.
+
+## References in documentation and comments
+
+All references to activation entry names in documentation, code comments, echo
+messages, script header comments, and any other human-readable text must use the
+same kebab-case verb-first naming convention. Stale camelCase references to
+renamed activations must be updated alongside the rename.

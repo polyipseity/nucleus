@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Reload Dock preference state.
-# Replaces the reloadDockPreferenceState inline activation block.
+# Replaces the macos-reload-dock inline activation block.
 #
 # Usage: reload-dock-preference-state
 set -euo pipefail

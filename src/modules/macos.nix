@@ -141,7 +141,7 @@ let
   # Pre-computed JSON payloads for the iCloud exclusions launchd script.
   # Evaluated at derivation time so the standalone script can be placed in the
   # Nix store without needing runtime user-context access.  Both values mirror
-  # the inline computation in configureICloudExclusions to keep the activation
+  # the inline computation in macos-configure-icloud-exclusions to keep the activation
   # hook and the daily launchd agent in sync.
   icloudExcludedDirsJson = builtins.toJSON (
     let
@@ -290,7 +290,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   home.activation = {
     # -------------------------------------------------------------------------
     # -------------------------------------------------------------------------
-    # display-resolutions
+    # macos-configure-display-resolutions
     # Uses displayplacer to match all external monitors to the MacBook's built-in
     # display mode so that remote-desktop clients see a consistent resolution.
     #
@@ -416,7 +416,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # configureICloudExclusions
+    # macos-configure-icloud-exclusions
     # Marks directories matching configured names with the com.apple.fileprovider
     # .ignore#P xattr to exclude them from iCloud sync. This prevents large
     # directories (e.g., node_modules, .venv) from syncing across devices.
@@ -435,7 +435,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # preflightPrivacyPermissions
+    # macos-check-privacy-permissions
     # Detects privacy-gated preference access problems early and emits an
     # explicit Full Disk Access remediation block so activation logs explain why
     # subsequent defaults writes may fail.
@@ -464,7 +464,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # reloadDockPreferenceState
+    # macos-reload-dock
     # Restarts Dock so declarative Dock defaults take effect immediately.
     #
     # WHY separate activation: Dock refresh is a UI cache reload, not dev-tree
@@ -475,7 +475,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # configureFinderSidebar
+    # macos-configure-finder-sidebar
     # Configure Finder favorites via mysides using a deterministic ordered list.
     # Avoids archive-rewrite workarounds; sidebar converges from activation.
     # NOTE: mysides writes to the SFLSharedFileList via com.apple.sharedfilelistd.
@@ -705,7 +705,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # Runs the iCloud directory exclusion logic hourly so that newly created
   # build/cache directories inside iCloud-managed trees are marked with
   # com.apple.fileprovider.ignore#P without waiting for the next home-manager
-  # switch.  configureICloudExclusions handles the immediate first-run case;
+  # switch.  macos-configure-icloud-exclusions handles the immediate first-run case;
   # this agent provides drift correction between activations.
   # RunAtLoad = false because the activation hook already runs on every apply.
   # --------------------------------------------------------------------------
@@ -721,7 +721,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
         icloudManagedRootsJson
       ];
       # Do not run on every agent reload during apply/bootstrap apply; the
-      # activation hook (configureICloudExclusions) runs synchronously during
+      # activation hook (macos-configure-icloud-exclusions) runs synchronously during
       # apply and covers the immediate case.  The hourly timer handles drift
       # correction for directories created between activations.
       RunAtLoad = false;

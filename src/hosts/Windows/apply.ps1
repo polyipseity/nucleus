@@ -138,8 +138,8 @@
   plain files on next launch.
 
 .PARAMETER EnableDevDirectoryParity
-  Create %USERPROFILE%\dev when absent.  Mirrors macOS configureSystemHardening
-  and NixOS provisionDevDirectory which both provision ~/dev during activation.
+  Create %USERPROFILE%\dev when absent.  Mirrors the MacBook and NixOS
+  ensure-dev-directory activation which provisions ~/dev across all hosts.
   False skips creation without error.
 
 .PARAMETER EnableDevReposParity
@@ -671,7 +671,7 @@ $wallpaperOutputDir = Join-Path -Path $HOME -ChildPath "Pictures\wallpapers"
 
 # Post-materialization health check: verify all SOPS files are decryptable by
 # both the GPG and personal SSH age backends, and that managed artefacts exist.
-# Mirrors the POSIX verifySecretDecryption Home Manager activation.
+# Mirrors the POSIX verify-secret-decryption Home Manager activation.
 Invoke-SecretVerification `
   -GpgExe $gpgExe `
   -HostKeyPath $machineSshHostKeyPath `

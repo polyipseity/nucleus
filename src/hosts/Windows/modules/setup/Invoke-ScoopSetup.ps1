@@ -10,7 +10,7 @@ function Invoke-ScoopSetup {
     apps that are missing at versions pinned in the repository lockfile.
 
     Mirrors the declarative install+prune approach used by Invoke-BunSetup and
-    the installBunPackages POSIX activation.
+    the install-bun-packages POSIX activation.
 
     This function must run after the WinGet DSC step that installs Scoop.Scoop,
     because Scoop shims are written to %USERPROFILE%\scoop\shims which is not

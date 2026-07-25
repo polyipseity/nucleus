@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Configure Finder sidebar favorites via mysides.
-# Replaces the configureFinderSidebar inline activation block.
+# Replaces the macos-configure-finder-sidebar inline activation block.
 #
 # Usage: configure-finder-sidebar <favorites-json> <jq-bin> <mysides-bin> <expected-order> <managed-count>
 set -euo pipefail
