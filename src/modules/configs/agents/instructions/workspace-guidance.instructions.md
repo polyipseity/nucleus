@@ -42,3 +42,9 @@ name: "Windows DSC Configuration"
 applyTo: "src/hosts/Windows/**/*.yml"
 ---
 ```
+
+## Related instruction files
+
+- `authoring.instructions.md` — Instructions file authoring conventions, markdown formatting, and document structure.
+- `core-behavior.instructions.md` — General agent operating model, communication, and execution patterns.
+- `programming-principles.instructions.md` — Coding conventions and architectural standards for workspace code.
