@@ -655,86 +655,103 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
   function warn { Write-Output "check: warning: $args" }
+  # Build manifest of file→schema pairs.
+  # Each entry: @{SchemaFile=...; InstanceFile=...}
+  $manifest = [System.Collections.Generic.List[hashtable]]::new()
+  if ($HAS_ARGS) {
+    foreach ($_sf in $positionalArgs) {
+      if ($_sf -like '*.json') {
+        $_schema = try { (Get-Content $_sf -Raw | ConvertFrom-Json -AsHashtable)['$schema'] } catch { $null }
+        if ($_schema) {
+          if ($_schema -match '^\.') {
+            $_schemafile = [System.IO.Path]::GetFullPath((Join-Path (Split-Path $_sf -Parent) $_schema))
+          } else {
+            $_schemafile = $_schema
+          }
+          $manifest.Add(@{SchemaFile=$_schemafile; InstanceFile=$_sf})
+        }
+      } elseif ($_sf -like '*.yml' -or $_sf -like '*.yaml') {
+        $_schema = try { ($_sf | Get-Content -Raw | ConvertFrom-Yaml)['$schema'] } catch { $null }
+        if ($_schema) {
+          if ($_schema -match '^\.') {
+            $_schemafile = [System.IO.Path]::GetFullPath((Join-Path (Split-Path $_sf) $_schema))
+          } else {
+            $_schemafile = $_schema
+          }
+          $manifest.Add(@{SchemaFile=$_schemafile; InstanceFile=$_sf})
+        }
+      }
+    }
+  } else {
+    # JSON files
+    Get-ChildItem -Recurse -Path "$RepoRoot/src" -Filter '*.json' | Where-Object {
+      $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notlike '*.schema.json'
+    } | ForEach-Object {
+      $_schema = try { (Get-Content $_.FullName -Raw | ConvertFrom-Json -AsHashtable)['$schema'] } catch { $null }
+      if ($_schema) {
+        if ($_schema -match '^\.') {
+          $_schemafile = [System.IO.Path]::GetFullPath((Join-Path $_.DirectoryName $_schema))
+        } else {
+          $_schemafile = $_schema
+        }
+        $manifest.Add(@{SchemaFile=$_schemafile; InstanceFile=$_.FullName})
+      }
+    }
+    # YAML files
+    Get-ChildItem -Recurse -Path $RepoRoot -Include '*.yml','*.yaml' | Where-Object {
+      $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.FullName -notmatch '[/\\]secrets[/\\]'
+    } | ForEach-Object {
+      $_schema = try { ($_ | Get-Content -Raw | ConvertFrom-Yaml)['$schema'] } catch { $null }
+      if ($_schema) {
+        if ($_schema -match '^\.') {
+          $_schemafile = [System.IO.Path]::GetFullPath((Join-Path $_.DirectoryName $_schema))
+        } else {
+          $_schemafile = $_schema
+        }
+        $manifest.Add(@{SchemaFile=$_schemafile; InstanceFile=$_.FullName})
+      }
+    }
+  }
+  # Group by schemafile and dispatch parallel jobs
   $_jsonschemaErrors = 0
-if ($HAS_ARGS) {
-  # Validate only explicitly provided files
-  foreach ($_sf in $positionalArgs) {
-    if ($_sf -like '*.json') {
-      $_schema = try { (Get-Content $_sf -Raw | ConvertFrom-Json -AsHashtable)['$schema'] } catch { $null }
-      if ($_schema) {
-        if ($_schema -match '^\.') {
-          $_schemafile = [System.IO.Path]::GetFullPath((Join-Path (Split-Path $_sf -Parent) $_schema))
-        } else {
-          $_schemafile = $_schema
+  if ($manifest.Count -gt 0) {
+    $groups = $manifest | Group-Object SchemaFile
+    $validationJobs = foreach ($g in $groups) {
+      Start-Job -ScriptBlock {
+        param($SchemaFile, $InstanceFiles)
+        Set-StrictMode -Version Latest
+        $ErrorActionPreference = 'Stop'
+        $output = check-jsonschema --schemafile $SchemaFile $InstanceFiles 2>&1
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0) {
+          return @{SchemaFile=$SchemaFile; ExitCode=$exitCode; Output="$output"}
         }
-        check-jsonschema --schemafile $_schemafile $_sf 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-      }
-    } elseif ($_sf -like '*.yml' -or $_sf -like '*.yaml') {
-      $_schema = try {
-        $_content = Get-Content $_sf -Raw
-        ($_content | ConvertFrom-Yaml)['$schema']
-      } catch { $null }
-      if ($_schema) {
-        if ($_schema -match '^\.') {
-          $_schemafile = [System.IO.Path]::GetFullPath((Join-Path (Split-Path $_sf) $_schema))
-        } else {
-          $_schemafile = $_schema
-        }
-        check-jsonschema --schemafile $_schemafile $_sf 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+        return @{SchemaFile=$SchemaFile; ExitCode=$exitCode; Output=$null}
+      } -ArgumentList $g.Name, @($g.Group.InstanceFile)
+    }
+    $results = $validationJobs | Wait-Job | Receive-Job
+    $validationJobs | Remove-Job
+    foreach ($r in $results) {
+      if ($r.ExitCode -ne 0) {
+        $_jsonschemaErrors++
+        if ($r.Output) { warn $r.Output }
       }
     }
   }
-} else {
-  # JSON files with inline $schema — auto-discover and validate
-  Get-ChildItem -Recurse -Path "$RepoRoot/src" -Filter '*.json' | Where-Object {
-    $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notlike '*.schema.json'
-  } | ForEach-Object {
-    $_schema = try { (Get-Content $_.FullName -Raw | ConvertFrom-Json -AsHashtable)['$schema'] } catch { $null }
-    if ($_schema) {
-      if ($_schema -match '^\.') {
-        $_schemafile = [System.IO.Path]::GetFullPath((Join-Path $_.DirectoryName $_schema))
-      } else {
-        $_schemafile = $_schema
-      }
-      check-jsonschema --schemafile $_schemafile $_.FullName 2>&1 | Out-Null
-      if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-    }
-  }
-  # YAML files with inline $schema — auto-discover and validate
-  Get-ChildItem -Recurse -Path $RepoRoot -Include '*.yml','*.yaml' | Where-Object {
-    $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.FullName -notmatch '[/\\]secrets[/\\]'
-  } | ForEach-Object {
-    $_schema = try {
-      $_content = Get-Content $_.FullName -Raw
-      ($_content | ConvertFrom-Yaml)['$schema']
-    } catch { $null }
-    if ($_schema) {
-      if ($_schema -match '^\.') {
-        $_schemafile = [System.IO.Path]::GetFullPath((Join-Path $_.DirectoryName $_schema))
-      } else {
-        $_schemafile = $_schema
-      }
-      check-jsonschema --schemafile $_schemafile $_.FullName 2>&1 | Out-Null
-      if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-    }
-  }
-}
-# GitHub schema validation (complements existing prek hooks — CI enforcement) — always-run
-$_ghWorkflows = Join-Path $RepoRoot '.github\workflows\*.yml'
-check-jsonschema --builtin-schema vendor.github-workflows $_ghWorkflows 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-$_dependabot = Join-Path $RepoRoot '.github\dependabot.yml'
-if (Test-Path $_dependabot) {
-  check-jsonschema --builtin-schema vendor.dependabot $_dependabot 2>&1 | Out-Null
+  # GitHub schema validation — always-run
+  $_ghWorkflows = Join-Path $RepoRoot '.github\workflows\*.yml'
+  check-jsonschema --builtin-schema vendor.github-workflows $_ghWorkflows
   if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-}
-if ($_jsonschemaErrors -gt 0) {
-  warn "schema validation failed with $_jsonschemaErrors error(s)"
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-14.exit") -NoNewline
-}
-say "schema validation passed."
+  $_dependabot = Join-Path $RepoRoot '.github\dependabot.yml'
+  if (Test-Path $_dependabot) {
+    check-jsonschema --builtin-schema vendor.dependabot $_dependabot
+    if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
+  }
+  if ($_jsonschemaErrors -gt 0) {
+    warn "schema validation failed with $_jsonschemaErrors error(s)"
+    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-14.exit") -NoNewline
+  }
+  say "schema validation passed."
 } -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES))
 
 # ---------------------------------------------------------------------------

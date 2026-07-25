@@ -291,22 +291,24 @@ echo "$_pkr_exit" > "$_wave_tmpdir/step-3.exit"
 } &
 
 # code_formatting — Code formatting (treefmt)
+# Uses --fail-on-change instead of --ci to preserve eval cache (mtime-based)
+# for faster subsequent runs. --fail-on-change replicates the CI-safe
+# exit-code contract (exit 1 = formatting drift) without --no-cache.
 section "$((_step += 1))" "Code formatting (treefmt)"
 {
 _tf_exit=0
 if $HAS_ARGS; then
-  # treefmt --ci: --no-cache + --fail-on-change. Pass all positional args;
   # treefmt filters to files matching its configured includes.
   if $FORMAT_NIX; then
-    treefmt "$@" 2>/dev/null || _tf_exit=$?
+    treefmt "$@" || _tf_exit=$?
   else
-    treefmt --ci "$@" 2>/dev/null || _tf_exit=$?
+    treefmt --fail-on-change "$@" || _tf_exit=$?
   fi
 else
   if $FORMAT_NIX; then
-    treefmt 2>/dev/null || _tf_exit=$?
+    treefmt || _tf_exit=$?
   else
-    treefmt --ci 2>/dev/null || _tf_exit=$?
+    treefmt --fail-on-change || _tf_exit=$?
   fi
 fi
 if [ $_tf_exit -eq 0 ]; then
@@ -670,11 +672,18 @@ _dsc_system_dir="src/hosts/Windows/system"
 } &
 
 # schema_validation — Schema validation (JSON/YAML) — path-scopable
+# Parallelized: groups files by resolved $schema path, dispatches one
+# check-jsonschema per schema group via xargs -P "$PARALLEL_JOBS".
+# Follows the nixf-tidy parallel pattern (step 6).
 section "$((_step += 1))" "Schema validation (JSON/YAML)"
 {
 _jsonschema_errors=0
+_js_tmpdir=$(mktemp -d) || { error "failed to create temp directory"; echo "1" > "$_wave_tmpdir/step-14.exit"; }
+
+# Collect file → schema pairs into a temp manifest.
+# Format: schemafile<TAB>filepath (one per line)
+_js_manifest="$_js_tmpdir/manifest"
 if $HAS_ARGS; then
-  # Validate only explicitly provided files
   for _sf in "$@"; do
     case "$_sf" in
       *.json)
@@ -685,7 +694,7 @@ if $HAS_ARGS; then
             ./*|../*) _schemafile="$(cd "$(dirname "$_sf")" && echo "$(pwd)/${_schema#./}")" ;;
             *)        _schemafile="$_schema" ;;
           esac
-          check-jsonschema --schemafile "$_schemafile" "$_sf" 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+          printf '%s\t%s\n' "$_schemafile" "$_sf"
         fi
         ;;
       *.yml|*.yaml)
@@ -696,11 +705,11 @@ if $HAS_ARGS; then
             ./*|../*) _schemafile="$(cd "$(dirname "$_sf")" && echo "$(pwd)/${_schema#./}")" ;;
             *)        _schemafile="$_schema" ;;
           esac
-          check-jsonschema --schemafile "$_schemafile" "$_sf" 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+          printf '%s\t%s\n' "$_schemafile" "$_sf"
         fi
         ;;
     esac
-  done
+  done > "$_js_manifest"
 else
   # JSON files with inline $schema — auto-discover and validate
   for _json_file in "${CACHED_JSON_FILES[@]}"; do
@@ -711,9 +720,9 @@ else
         ./*|../*) _schemafile="$(cd "$(dirname "$_json_file")" && echo "$(pwd)/${_schema#./}")" ;;
         *)        _schemafile="$_schema" ;;
       esac
-      check-jsonschema --schemafile "$_schemafile" "$_json_file" 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+      printf '%s\t%s\n' "$_schemafile" "$_json_file"
     fi
-  done
+  done > "$_js_manifest"
   # YAML files with inline $schema — auto-discover and validate
   for _yaml_file in "${CACHED_YAML_FILES[@]}"; do
     case "$_yaml_file" in */secrets/*) continue ;; esac
@@ -724,20 +733,81 @@ else
         ./*|../*) _schemafile="$(cd "$(dirname "$_yaml_file")" && echo "$(pwd)/${_schema#./}")" ;;
         *)        _schemafile="$_schema" ;;
       esac
-      check-jsonschema --schemafile "$_schemafile" "$_yaml_file" 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+      printf '%s\t%s\n' "$_schemafile" "$_yaml_file"
     fi
-  done
+  done >> "$_js_manifest"
 fi
-# GitHub schema validation (complements existing prek hooks — CI enforcement) — always-run
-check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
-check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml 2>/dev/null || _jsonschema_errors=$((_jsonschema_errors + 1))
+
+# Group by schema and dispatch via xargs -P
+if [ -s "$_js_manifest" ]; then
+  # Sort by schemafile and group using awk
+  # Generates group files: one per unique schema, first line is schemafile,
+  # subsequent lines are instance files.
+  sort -k1 "$_js_manifest" | awk -F'\t' '
+    BEGIN { gid = 0; cur = "" }
+    {
+      if ($1 != cur) {
+        if (cur != "") close(f)
+        gid++; cur = $1
+        f = "'"$_js_tmpdir"'/g-" gid ".sch"
+        print $1 > f
+      }
+      print $2 >> f
+    }
+    END { if (cur != "") close(f) }
+  '
+  # Dispatch each group via xargs -P
+  # Each worker reads the batch file (schemafile + instance files), runs
+  # check-jsonschema once, writes status to a .st temp file.
+  # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
+  if [ -n "$(find "$_js_tmpdir" -maxdepth 1 -name 'g-*.sch' -print 2>/dev/null | head -1)" ]; then
+    printf '%s\0' "$_js_tmpdir"/g-*.sch \
+      | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+        _tmpdir="$1"
+        _batch="$2"
+        _schemafile=""
+        _files=()
+        while IFS= read -r _line; do
+          if [ -z "$_schemafile" ]; then
+            _schemafile="$_line"
+          else
+            _files+=("$_line")
+          fi
+        done < "$_batch"
+        _safe="$(echo "$_schemafile" | tr "/" "_")"
+        if check-jsonschema --schemafile "$_schemafile" "${_files[@]}" 2>> "$_tmpdir/${_safe}.err"; then
+          echo "PASS" > "$_tmpdir/${_safe}.st"
+        else
+          echo "FAIL" > "$_tmpdir/${_safe}.st"
+        fi
+      ' _ "$_js_tmpdir"
+
+    # Aggregate results
+    for _st_file in "$_js_tmpdir"/*.st; do
+      [ -f "$_st_file" ] || continue
+      read -r _status < "$_st_file"
+      [ "$_status" = "FAIL" ] && _jsonschema_errors=$((_jsonschema_errors + 1))
+    done
+    # Report per-schema errors
+    for _err_file in "$_js_tmpdir"/*.err; do
+      [ -s "$_err_file" ] || continue
+      while IFS= read -r _line; do
+        warn "$_line"
+      done < "$_err_file"
+    done
+  fi
+fi
+
+# GitHub schema validation — always-run
+check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml || _jsonschema_errors=$((_jsonschema_errors + 1))
+check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml || _jsonschema_errors=$((_jsonschema_errors + 1))
 if [ "$_jsonschema_errors" -gt 0 ]; then
   warn "schema validation failed with $_jsonschema_errors error(s)"
   echo "1" > "$_wave_tmpdir/step-14.exit"
 fi
 say "schema validation passed."
-# If no exit file was written (all checks passed), write success
 [ -f "$_wave_tmpdir/step-14.exit" ] || echo "0" > "$_wave_tmpdir/step-14.exit"
+[ -n "${_js_tmpdir:-}" ] && rm -rf -- "$_js_tmpdir"
 } &
 
 # service_registry_validation — Always-run: Service registry validation
