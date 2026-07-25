@@ -42,6 +42,7 @@ let
   proxyDaemon = pkgs.writeNucleusShellApplication {
     name = "https-proxy-daemon";
     runtimeInputs = [ pkgs.caddy ];
+    scriptName = "src/scripts/services/https-proxy-daemon";
   };
 
   systemLogDir = config.nucleus.logging.systemLogDir;
