@@ -85,12 +85,32 @@ validate_dir() {
   (cd "$dir" && packer init . && packer validate "${vars[@]}" .)
 }
 
-validate_dir src/vms/nixos
-validate_dir src/vms/windows
+# Parallel validation: each VM directory validates independently.
+# Uses temp exit files for race-free aggregation (same pattern as check.sh).
+_pkr_tmpdir=$(mktemp -d) || { error "failed to create temp directory for packer validation"; exit 1; }
+
+{ _vd_exit=0; validate_dir src/vms/nixos || _vd_exit=$?; echo "$_vd_exit" > "$_pkr_tmpdir/exit-nixos"; } &
+{ _vd_exit=0; validate_dir src/vms/windows || _vd_exit=$?; echo "$_vd_exit" > "$_pkr_tmpdir/exit-windows"; } &
 
 # macOS template uses the Tart plugin which is macOS-only.
 if [ "$(uname)" = "Darwin" ]; then
-  validate_dir src/vms/macos
+  { _vd_exit=0; validate_dir src/vms/macos || _vd_exit=$?; echo "$_vd_exit" > "$_pkr_tmpdir/exit-macos"; } &
 else
   say "skipping macOS Packer template validation (requires Tart plugin on macOS)"
+fi
+
+wait
+
+_pkr_exit=0
+for _pkr_ef in "$_pkr_tmpdir"/exit-*; do
+  [ -f "$_pkr_ef" ] || continue
+  read -r _pkr_code < "$_pkr_ef"
+  [ "$_pkr_code" != "0" ] && _pkr_exit=$((_pkr_exit + 1))
+done
+
+rm -rf -- "$_pkr_tmpdir"
+
+if [ "$_pkr_exit" -gt 0 ]; then
+  error "Packer validation failed with $_pkr_exit error(s)"
+  exit 1
 fi
