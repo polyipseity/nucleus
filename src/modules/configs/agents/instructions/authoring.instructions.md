@@ -27,3 +27,9 @@ Default rule: write for readability in raw form, not for rendered aesthetics.
 - **Code references.** Wrap file paths, command names, and inline code in backticks.
 - **Parallel list structure.** Keep bullet items grammatically parallel — all nouns, all imperatives, or all full sentences, not a mix.
 - **Minimal emphasis.** Use **bold** for key terms and rules only. Overused emphasis dilutes its effect.
+
+## Related instruction files
+
+- `programming-principles.instructions.md` — General coding conventions for document structure, naming, and formatting.
+- `workspace-guidance.instructions.md` — `.instructions.md` frontmatter structure and project-level source of truth conventions.
+- `core-behavior.instructions.md` — Communication conventions, terminal hygiene, and output formatting rules.
