@@ -36,7 +36,7 @@ let
       builtins.trace "VS Code: ${pub}.${name} not in marketplace index — skipping" [ ];
 
   # Canonical extension set shared by both platforms, sorted alphabetically by
-  # publisher.name.  44 extensions come from nixpkgs; 22 come from the VS Code
+  # publisher.name.  45 extensions come from nixpkgs; 22 come from the VS Code
   # Marketplace via nix-vscode-extensions (via mkMktx).  A missing marketplace
   # entry degrades gracefully to an empty contribution rather than failing eval.
   # On all platforms, symlink-vscode-extensions symlinks each extension into the
@@ -123,6 +123,7 @@ let
     (mkMktx "ms-vscode" "remote-server")
     (mkMktx "ms-vscode" "vscode-chat-customizations-evaluations")
     (mkMktx "ms-vscode" "vscode-serial-monitor")
+    [ pkgs.vscode-extensions.ms-vscode.vscode-speech ]
     # ms-vsliveshare
     [ pkgs.vscode-extensions.ms-vsliveshare.vsliveshare ]
     # myriad-dreamin (stable only — pre-release builds have caused editor crashes)
