@@ -135,6 +135,7 @@ _wave_tmpdir=$(mktemp -d) || { error "failed to create wave temp directory"; exi
 trap 'rm -rf -- "$_wave_tmpdir"' EXIT
 
 # 1. Nix test suite — auto-discover and run all *.nix test files
+_step_start=$(date +%s%3N)
 section "$((_step += 1))" "Nix test suite"
 {
 tmp_failed=$(mktemp) || { error "failed to create temp file"; }
@@ -169,23 +170,32 @@ fi
 rm -f "$tmp_failed"
 say "all Nix tests passed."
 [ -f "$_wave_tmpdir/step-1.exit" ] || echo "0" > "$_wave_tmpdir/step-1.exit"
+_elapsed=$(($(date +%s%3N) - _step_start))
+echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 } &
 
 # 2. Shell script linting (treefmt)
+_step_start=$(date +%s%3N)
 section "$((_step += 1))" "Shell script linting (treefmt)"
 {
 bash scripts/check-sh.sh || echo "1" > "$_wave_tmpdir/step-2.exit"
 [ -f "$_wave_tmpdir/step-2.exit" ] || echo "0" > "$_wave_tmpdir/step-2.exit"
+_elapsed=$(($(date +%s%3N) - _step_start))
+echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 } &
 
 # 3. PowerShell lint (PSScriptAnalyzer)
+_step_start=$(date +%s%3N)
 section "$((_step += 1))" "PowerShell lint"
 {
 pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 || echo "1" > "$_wave_tmpdir/step-3.exit"
 [ -f "$_wave_tmpdir/step-3.exit" ] || echo "0" > "$_wave_tmpdir/step-3.exit"
+_elapsed=$(($(date +%s%3N) - _step_start))
+echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 } &
 
 # 4. Nucleus apps smoke tests (build + --help / dry-run)
+_step_start=$(date +%s%3N)
 section "$((_step += 1))" "Nucleus apps smoke tests"
 {
 if [ "$quiet_mode" = true ]; then
@@ -194,12 +204,15 @@ else
   bash tests/scripts/nucleus-apps-smoke-tests.sh || echo "1" > "$_wave_tmpdir/step-4.exit"
 fi
 [ -f "$_wave_tmpdir/step-4.exit" ] || echo "0" > "$_wave_tmpdir/step-4.exit"
+_elapsed=$(($(date +%s%3N) - _step_start))
+echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 } &
 
 # 5. System config build — build all derivations in the host system config.
 # WHY soft-fail: building derivations is slow and network-dependent. Always
 # accumulates exit code regardless of FAIL_FAST. Use --skip-system-build to
 # skip this step entirely.
+_step_start=$(date +%s%3N)
 section "$((_step += 1))" "System config build"
 if [ "$skip_system_build" = true ]; then
   say "skipping (--skip-system-build)."
@@ -226,6 +239,8 @@ else
     fi
   fi
 fi
+_elapsed=$(($(date +%s%3N) - _step_start))
+echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 
 # Wait for all background steps to complete before aggregating
 wait
@@ -241,6 +256,19 @@ for _s in 1 2 3 4; do
     fi
   fi
 done
+
+# Timing summary
+say "test step timing:"
+_total_ms=0
+for _s in 1 2 3 4 5; do
+  _time_file="$_wave_tmpdir/step-$_s.time"
+  if [ -f "$_time_file" ]; then
+    read -r _ms < "$_time_file"
+    _total_ms=$((_total_ms + _ms))
+    printf '  step %2d: %5d ms\n' "$_s" "$_ms"
+  fi
+done
+printf '  total:   %5d ms\n' "$_total_ms"
 
 if [ $exit_code -ne 0 ]; then
   warn "some tests failed with exit code $exit_code"
