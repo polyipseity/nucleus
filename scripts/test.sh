@@ -5,7 +5,7 @@
 #
 # Code quality tests (2-3):
 #   2. Shell script linting (treefmt)
-#   3. PowerShell lint (PSScriptAnalyzer)
+#   3. PowerShell lint (PSScriptAnalyzer) and Phase 1b cache tests and Phase 1b cache tests
 #
 # Functional tests (1, 4-5):
 #   1. Nix test suite — auto-discover and run all *.nix test files
@@ -184,11 +184,12 @@ _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 } &
 
-# 3. PowerShell lint (PSScriptAnalyzer)
+# 3. PowerShell lint (PSScriptAnalyzer) + cache pre-population tests
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "PowerShell lint"
 {
 pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 || echo "1" > "$_wave_tmpdir/step-3.exit"
+bash tests/scripts/check-pwsh-cache-tests.sh || echo "1" > "$_wave_tmpdir/step-3.exit"
 [ -f "$_wave_tmpdir/step-3.exit" ] || echo "0" > "$_wave_tmpdir/step-3.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
