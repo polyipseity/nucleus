@@ -21,7 +21,7 @@ Default operating mode for all agent interactions.
 - Keep reasoning explicit but compact: show decision-critical logic, omit filler.
 - **Verify changes thoroughly before finishing: use the `get_errors` tool (when available via VS Code) after each editing round to catch early errors, then run syntax/lint/tests/runtime checks relevant to the task.**
 - **Consult project architecture docs** (AGENTS.md, .agents/instructions/) before placing new code. Do not guess code organization.
-- **CRITICAL: immutable by default in all code.** Before writing any variable, constant, parameter, field, property, return type, data structure, or interface — default to the immutable variant. Reach for mutable only when mutation is the core purpose of the value, and even then minimize the scope of mutability. This principle is universal and language-independent: `const` over `let`/`var`, `val` over `var`, `readonly` properties, `readonly T[]`/`ReadonlyMap`/`ReadonlySet` over mutable collections, frozen dataclasses, immutable records, read-only borrows/views over mutable references. Every mutable choice must be a deliberate, justifiable decision — mutability is never the default. When the type system offers an immutable variant, always use it unless you can positively demonstrate why mutation is required.
+- **CRITICAL: immutable by default in all code.** Before writing any variable, constant, parameter, field, property, return type, data structure, or interface — default to the immutable variant. Reach for mutable only when mutation is the core purpose of the value, and even then minimize the scope of mutability. This principle is universal and language-independent: `const` over `let`/`var`, `val` over `var`, `readonly` properties, `readonly T[]`/`ReadonlyMap`/`ReadonlySet` over mutable collections, frozen dataclasses, immutable records, read-only borrows/views over mutable references. Every mutable choice must be a deliberate, justifiable decision — mutability is never the default. When the type system offers an immutable variant, always use it unless you can positively demonstrate why mutation is required. See `programming-principles.instructions.md` (Tier 4) for the overarching immutability-by-default principle and `typing-conventions.instructions.md` for language-specific immutable type rules.
 - **No fallbacks.** Never add fallback paths in code. If a primary path fails or a dependency is absent, report the failure — do not silently fall back to a different implementation. Fallbacks hide real problems, make debugging harder, and accumulate complexity. If you find yourself writing a fallback, reconsider: the simplest fix is to make the primary path work correctly.
 - **Git boundary.** Never perform git operations (commit, push, checkout, stash, add, reset, restore — any `git` command) unless the task explicitly asks for them. When the user says "do not touch git", treat it as a hard invariant: do not run any `git` command, do not suggest git operations, do not prepare staged content for future commits.
 - **Git commit enforcement.** When the task requires committing, delegate to the `commit-keeper` subagent via `runSubagent`. The commit-keeper agent follows `commit-safety.instructions.md` for verification, failure recovery, and amend prohibition. If the `commit-keeper` subagent is unavailable, the main agent MUST read and follow `commit-safety.instructions.md` directly, acting as commit-keeper.
@@ -63,7 +63,7 @@ Default operating mode for all agent interactions.
 ## Instruction compliance
 
 - **Re-read instructions when context changes.** When a task transitions into a new domain (e.g., switches from editing notes to running Python, or from writing content to debugging a tool), re-read any instruction files that apply to the new context. Do not rely on memory of rules from earlier in the conversation — instruction files are the ground truth.
-- **Watch Markdown line wrapping specifically.** When editing `.md` files, `authoring.instructions.md` requires no hard line breaks in paragraphs. Re-read that section before editing — this rule is frequently violated.
+- **Watch Markdown line wrapping specifically.** When editing `.md` files, `authoring.instructions.md` requires no hard line breaks in paragraphs. Re-read that section before editing — this rule is frequently violated. Also consult `workspace-guidance.instructions.md` for workspace setup context.
 - **Critical gotchas (violations cause data loss or task failure):**
   - NEVER `cd` into `.agents/skills/` or any skill subfolder. Always run commands from the repo root. Running inside a skill folder creates `.venv/`/`uv.lock` trash there and fails.
   - NEVER suggest or run `uv run -m init generate` — content generation is automatic. This instruction applies to ALL content in this repo.
@@ -121,3 +121,13 @@ When the user says "refer back to the plan", "verify the plan", "check the plan"
 4. Otherwise, read the file at the returned path.
 5. Check the frontmatter: `status: completed` means the plan was fully executed; `status: in-progress` means execution was interrupted. The `current-step` field shows which workflow step was last reached. The `committed` field tracks atomic commit progress: `no` (no commits made), `partial` (some commits made), `yes` (all commits done).
 6. Present the plan and its frontmatter status to the user or act as instructed.
+
+## Related instruction files
+
+- `authoring.instructions.md` — Markdown authoring conventions, document structure, and formatting rules.
+- `commit-safety.instructions.md` — Git commit verification, amend prohibition, and failure recovery.
+- `execution-details.instructions.md` — Tool recovery, multi-edit fallback, and investigation protocol.
+- `maintain.instructions.md` — Codebase maintainability workflow, safety rules, and atomic commit patterns.
+- `programming-principles.instructions.md` — General coding principles, patterns, and architectural standards.
+- `typing-conventions.instructions.md` — Language-specific type-level conventions and immutability rules.
+- `workspace-guidance.instructions.md` — Workspace setup, AGENTS.md conventions, and customization hierarchy.
