@@ -48,6 +48,8 @@ Crucial when writing network services, concurrent code, or running automated tes
 
 ## Related instruction files
 
-- `typing-conventions.instructions.md` — Language-specific type-level conventions (immutability per language, abstract over concrete, no catch-all types, structural typing).
+- `authoring.instructions.md` — Markdown authoring conventions, document structure, and formatting rules.
 - `core-behavior.instructions.md` — Agent operational model (communication, subagent delegation, terminal hygiene, git rules, premise integrity).
+- `execution-details.instructions.md` — Tool recovery, multi-edit fallback, and investigation protocol.
 - `maintain.instructions.md` — Codebase maintainability workflow (atomic commits, safety rules, broad cleanup patterns).
+- `typing-conventions.instructions.md` — Language-specific type-level conventions (immutability per language, abstract over concrete, no catch-all types, structural typing).
