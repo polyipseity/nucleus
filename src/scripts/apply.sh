@@ -230,7 +230,7 @@ run_replica_sync() {
 run_terminal_activations() {
   # Run activation commands that require the user's terminal TCC context
   # (macOS Full Disk Access / Accessibility), serialised by the
-  # writeDarwinTerminalActivations HM activation step to
+  # write-darwin-terminal-activations HM activation step to
   # ~/.config/nucleus/terminal-activations.list.
   #
   # This runs after the rebuild so the manifest exists, but before any

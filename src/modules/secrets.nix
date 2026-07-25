@@ -274,7 +274,7 @@ lib.mkIf isPrimaryUser {
   '';
 
   # --------------------------------------------------------------------------
-  # verifySecretDecryption
+  # verify-secret-decryption
   # Post-activation health check that verifies ALL SOPS files can be decrypted
   # by each registered backend after gpg-import and ssh-key-adopt have completed.
   #
@@ -302,7 +302,7 @@ lib.mkIf isPrimaryUser {
   #      private key material to decrypt once the passphrase is provided.
 
   # --------------------------------------------------------------------------
-  # verifySecretDecryption
+  # verify-secret-decryption
   # Post-activation health check that verifies ALL SOPS files can be decrypted
   # by each registered backend after gpg-import and ssh-key-adopt have completed.
   #

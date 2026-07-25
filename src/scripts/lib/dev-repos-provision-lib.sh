@@ -14,7 +14,7 @@ devReposErrors=${devReposErrors:-0}
 
 report_error() {
   devReposErrors=$((devReposErrors + 1))
-  echo "devReposProvision: $1" >&2
+  echo "provision-dev-repos: $1" >&2
 }
 
 # Convert declarative repo paths into real filesystem paths for the
@@ -72,7 +72,7 @@ list_direct_submodules() {
   repoTarget="$1"
 
   if ! submoduleConfig=$(cd "$repoTarget" && git config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>&1); then
-    echo "devReposProvision: failed to read .gitmodules in $repoTarget ($submoduleConfig)" >&2
+    echo "provision-dev-repos: failed to read .gitmodules in $repoTarget ($submoduleConfig)" >&2
     return 1
   fi
 
@@ -102,7 +102,7 @@ ensure_symlink() {
       return 0
     fi
 
-    _nucleus_unprotect_symlink "devReposProvision" "$symlinkPath"
+    _nucleus_unprotect_symlink "provision-dev-repos" "$symlinkPath"
     if ! rm "$symlinkPath"; then
       report_error "failed to replace stale symlink for $repoName"
       return 0
@@ -113,7 +113,7 @@ ensure_symlink() {
   fi
 
   if ln -s "$symlinkTarget" "$symlinkPath"; then
-    _nucleus_protect_symlink "devReposProvision" "$symlinkPath"
+    _nucleus_protect_symlink "provision-dev-repos" "$symlinkPath"
     # Symlink created successfully (idempotent)
   else
     report_error "failed to create symlink for $repoName"
@@ -229,7 +229,7 @@ ensure_fresh_submodule_on_branch() {
   [ -e "$submoduleTarget/.git" ] || return 0
 
   if currentBranch=$(cd "$submoduleTarget" && git symbolic-ref --quiet --short HEAD 2>&1); then
-    echo "devReposProvision: submodule $submodulePath already on branch '$currentBranch' after initialization in $dirLabel"
+    echo "provision-dev-repos: submodule $submodulePath already on branch '$currentBranch' after initialization in $dirLabel"
     return 0
   fi
 
@@ -239,12 +239,12 @@ ensure_fresh_submodule_on_branch() {
   fi
 
   if branchErr=$(cd "$submoduleTarget" && git checkout "$branchName" 2>&1); then
-    echo "devReposProvision: checked out freshly initialized submodule $submodulePath on branch '$branchName' in $dirLabel"
+    echo "provision-dev-repos: checked out freshly initialized submodule $submodulePath on branch '$branchName' in $dirLabel"
     return 0
   fi
 
   if branchErr=$(cd "$submoduleTarget" && git checkout -b "$branchName" --track "origin/$branchName" 2>&1); then
-    echo "devReposProvision: created+checked out branch '$branchName' for freshly initialized submodule $submodulePath in $dirLabel"
+    echo "provision-dev-repos: created+checked out branch '$branchName' for freshly initialized submodule $submodulePath in $dirLabel"
   else
     report_error "failed to switch freshly initialized submodule $submodulePath to branch '$branchName' in $dirLabel ($branchErr)"
   fi
@@ -281,14 +281,14 @@ clone_directory_submodules() {
 
     if [ "$recursive" = "1" ]; then
       if submoduleErr=$(cd "$dirPath" && git submodule update --init --recursive "$submodulePath" 2>&1); then
-        echo "devReposProvision: initialized submodule $submodulePath (recursive) in $dirLabel"
+        echo "provision-dev-repos: initialized submodule $submodulePath (recursive) in $dirLabel"
         ensure_fresh_submodule_on_branch "$dirPath" "$submodulePath" "$dirLabel"
       else
         report_error "failed to initialize submodule $submodulePath (recursive) in $dirLabel ($submoduleErr)"
       fi
     else
       if submoduleErr=$(cd "$dirPath" && git submodule update --init "$submodulePath" 2>&1); then
-        echo "devReposProvision: initialized submodule $submodulePath in $dirLabel"
+        echo "provision-dev-repos: initialized submodule $submodulePath in $dirLabel"
         ensure_fresh_submodule_on_branch "$dirPath" "$submodulePath" "$dirLabel"
       else
         report_error "failed to initialize submodule $submodulePath in $dirLabel ($submoduleErr)"

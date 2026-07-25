@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Manage out-of-store symlinks (protect/unprotect) using a JSON path manifest.
-# Handles the inline logic from home.nix unprotectOutOfStoreSymlinks /
-# protectOutOfStoreSymlinks activation blocks.
+# Handles the inline logic from home.nix unprotect-out-of-store-symlinks /
+# protect-out-of-store-symlinks activation blocks.
 #
 # Usage: manage-out-of-store-symlinks (protect|unprotect) <context> <paths-json> <jq-bin>
 set -euo pipefail

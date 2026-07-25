@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Dev repos provisioning activation.
-# Called by home-manager activation devReposProvision.
+# Called by home-manager activation provision-dev-repos.
 #
 # This is a data-driven replacement for the previous Nix-generated inline
 # shell code. Instead of concatMapStringsSep producing per-repo shell lines
@@ -24,12 +24,12 @@ _jqBin="$5"
 devReposJson="$6"
 
 if [ -z "$repoRoot" ] || [ ! -d "$repoRoot" ]; then
-  echo "devReposProvision: repo root is empty or invalid — check NUCLEUS_REPO_ROOT at build time" >&2
+  echo "provision-dev-repos: repo root is empty or invalid — check NUCLEUS_REPO_ROOT at build time" >&2
   exit 1
 fi
 
 devDir="$HOME/dev"
-mkdir -p "$devDir" || { echo "devReposProvision: failed to create $devDir" >&2; exit 1; }
+mkdir -p "$devDir" || { echo "provision-dev-repos: failed to create $devDir" >&2; exit 1; }
 
 # Step 1: Provision configured repositories
 # Use temp file to avoid subshell isolation (while-read in pipelines
@@ -108,7 +108,7 @@ done < "$_submoduleListTmp"
 rm -f "$_submoduleListTmp"
 unset _submoduleListTmp _jq
 
-echo "devReposProvision: completed provisioning dev repositories and submodules"
+echo "provision-dev-repos: completed provisioning dev repositories and submodules"
 if [ "$devReposErrors" -gt 0 ]; then
-  echo "devReposProvision: completed with $devReposErrors non-fatal error(s); see messages above." >&2
+  echo "provision-dev-repos: completed with $devReposErrors non-fatal error(s); see messages above." >&2
 fi

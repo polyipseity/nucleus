@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # VS Code config symlinks activation.
-# Called by home-manager activation vsCodeSymlinks.
+# Called by home-manager activation symlink-vscode-config.
 # Provides: ensure_file_symlink, ensure_dir_symlink (from symlink-hardening-lib.sh)
 
 set -euo pipefail

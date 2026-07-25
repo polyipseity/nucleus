@@ -452,7 +452,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     '';
 
     # -------------------------------------------------------------------------
-    # provisionDevDirectory
+    # ensure-dev-directory (cross-host)
     # Ensures ~/dev exists before any dev-tree maintenance runs.
     #
     # WHY separate activation: the directory itself is cross-host provisioning

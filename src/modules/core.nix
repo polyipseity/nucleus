@@ -14,7 +14,7 @@ let
     pkgs.bun
     pkgs.caddy
     # REMOVED: pkgs.cargo conflicts with pkgs.rustup (both provide bin/cargo).
-    # Activation script installCargoBinstallPackages gets pkgs.cargo as
+    # Activation script install-cargo-binstall-packages gets pkgs.cargo as
     # a store-path argument directly — no PATH dependency needed.
     pkgs.camilladsp
     pkgs.camillagui-backend

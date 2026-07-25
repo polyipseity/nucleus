@@ -39,7 +39,7 @@ Every activation block must invoke a bundle script as a subprocess. The Nix expr
 activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 
 # Simple inline: pure inline, ≤3 lines, no deps (the ONLY exception to subprocess)
-home.activation.provisionDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+home.activation.ensure-dev-directory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
   mkdir -p "$HOME/dev"
 '';
 
@@ -56,7 +56,7 @@ home.activation.protectFoo = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
 '';
 
 # Out-of-store symlinks bulk: manage-out-of-store-symlinks
-home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+home.activation.protect-out-of-store-symlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
   "${activationBundle}/src/scripts/configs/manage-out-of-store-symlinks.sh" "protect" "home.nix" '${builtins.toJSON paths}' "${pkgs.jq}/bin/jq"
 '';
 ```

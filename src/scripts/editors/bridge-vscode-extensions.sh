@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # VS Code extension bridge activation.
-# Called by home-manager activation vsCodeExtensionBridge.
+# Called by home-manager activation symlink-vscode-extensions.
 # Provides: _nucleus_protect_symlink, _nucleus_unprotect_symlink (from symlink-hardening-lib.sh)
 
 set -euo pipefail

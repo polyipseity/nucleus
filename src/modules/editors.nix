@@ -1,6 +1,6 @@
 # Cross-platform editor configuration and VS Code extensions.
 # Extension backend: nixpkgs on Linux vs Homebrew/nixpkgs on macOS;
-# extensions managed by vsCodeExtensionBridge on all backends.
+# extensions managed by symlink-vscode-extensions on all backends.
 {
   lib,
   managedUser ? null,
@@ -39,7 +39,7 @@ let
   # publisher.name.  44 extensions come from nixpkgs; 22 come from the VS Code
   # Marketplace via nix-vscode-extensions (via mkMktx).  A missing marketplace
   # entry degrades gracefully to an empty contribution rather than failing eval.
-  # On all platforms, vsCodeExtensionBridge symlinks each extension into the
+  # On all platforms, symlink-vscode-extensions symlinks each extension into the
   # writable ~/.vscode/extensions and ~/.vscode-insiders/extensions directories
   # so both stable and insiders channels share an identical extension payload.
   sharedExtensions = builtins.concatLists [
@@ -154,13 +154,13 @@ let
   # Materialize the extension list under a deterministic Nix-store directory so
   # all VS Code app bundles (both stable and insiders, Homebrew or nixpkgs) can
   # consume the exact same extension payload via per-extension symlinks in the
-  # vsCodeExtensionBridge activation.
+  # symlink-vscode-extensions activation.
   extensionStore = pkgs.symlinkJoin {
     name = "vscode-extensions";
     paths = sharedExtensions;
   };
 
-  # Per-channel User data directories referenced by the vsCodeSymlinks activation.
+  # Per-channel User data directories referenced by the symlink-vscode-config activation.
   # These are shell strings whose $HOME is intentionally left unexpanded so the
   # activation script evaluates them at runtime with the actual home directory.
   stableBaseDir =
@@ -198,7 +198,7 @@ let
   # not break the activation chain.
   #
   # The script exits immediately when ~/dev does not yet exist (no-op for
-  # edge cases such as a first-run race before provisionDevDirectory completes).
+  # edge cases such as a first-run race before ensure-dev-directory completes).
   # Resolve the active managed user record so Neovim settings can follow the
   # same per-user override model used by other application configs.
   effectiveUsername =
@@ -306,7 +306,7 @@ in
     # Enable native Home Manager integration on non-Darwin hosts so the VS Code
     # binary is registered via the HM module.  On Darwin the backend is selected
     # in core.nix (Homebrew or nixpkgs) and must not be duplicated here.
-    # Extension management is handled exclusively by vsCodeExtensionBridge on all
+    # Extension management is handled exclusively by symlink-vscode-extensions on all
     # platforms; do not add extensions here to avoid a dual-manager conflict where
     # both HM and the bridge simultaneously write to ~/.vscode/extensions.
     enable = !isDarwin;
@@ -315,7 +315,7 @@ in
 
   home.activation = {
     # -------------------------------------------------------------------------
-    # vsCodeSymlinks
+    # symlink-vscode-config
     # Method 1 (writable symlink) — repo changes take effect without rebuild.
     # Replaces VS Code's per-channel config files with symlinks into the live
     # repo tree (src/modules/configs/vscode/) so that every VS Code write
@@ -358,7 +358,7 @@ in
     '';
 
     # -----------------------------------------------------------------------
-    # vsCodeExtensionBridge
+    # symlink-vscode-extensions
     # Populates both ~/.vscode/extensions and ~/.vscode-insiders/extensions
     # with per-extension symlinks into the Nix-managed extension store.  This
     # bridge runs unconditionally on ALL platforms (macOS and Linux) and for
@@ -375,7 +375,7 @@ in
     '';
 
     # -----------------------------------------------------------------------
-    # vsCodeWorkspaceTrust
+    # trust-vscode-workspace
     # Inserts a workspace trust entry for ~/dev into VS Code's SQLite state
     # database (globalStorage/state.vscdb) for both stable and insiders
     # channels so that the repository workspace opens without a trust prompt.
@@ -392,7 +392,7 @@ in
     # activation chain is not interrupted.
     #
     # The Python script exits immediately when ~/dev is absent (edge case:
-    # first-run race before provisionDevDirectory completes).
+    # first-run race before ensure-dev-directory completes).
     # -----------------------------------------------------------------------
     trust-vscode-workspace = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/editors/trust-vscode-workspace.sh" "${pkgs.python3}/bin/python3"

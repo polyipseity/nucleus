@@ -16,7 +16,7 @@ _scs_manifest_rel="$5"
 _scs_do_sync=true
 
 # Add managed bin directories (managed-paths.nix pathComponents) to PATH
-# so the ClawHub binary installed by installBunPackages is on PATH for
+# so the ClawHub binary installed by install-bun-packages is on PATH for
 # this activation step.
 PATH="${_scs_path_prepend}$PATH${_scs_path_append}"
 export PATH
@@ -51,10 +51,10 @@ if [ ! -d "$_scs_skills_dir" ]; then
 fi
 
 # Probe for the ClawHub CLI.  ClawHub must be pre-installed by the
-# installBunPackages activation before this step is called; this step
+# install-bun-packages activation before this step is called; this step
 # never installs ClawHub itself.
 if [ "$_scs_do_sync" = true ] && ! command -v clawhub >/dev/null 2>&1; then
-  echo "clawhub: clawhub not found in PATH; installBunPackages must complete before fetched skill sync; skipping" >&2
+  echo "clawhub: clawhub not found in PATH; install-bun-packages must complete before fetched skill sync; skipping" >&2
   _scs_do_sync=false
 fi
 

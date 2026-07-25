@@ -84,7 +84,7 @@ in
     '';
 
     # -------------------------------------------------------------------------
-    # installBunPackages
+    # install-bun-packages
     # Idempotently converges the declarative bun global package set.
     #
     # Maintains a managed set of JS CLI tools installed via `bun install -g`.
@@ -105,7 +105,7 @@ in
     '';
 
     # -------------------------------------------------------------------------
-    # installUvTools
+    # install-uv-tools
     # Idempotently converges the declarative uv tool set (install + prune).
     #
     # Maintains a managed set of Python CLI tools installed via `uv tool install`.
@@ -134,14 +134,14 @@ in
     '';
 
     # -------------------------------------------------------------------------
-    # initRustup
+    # init-rustup
     # Initialises the rustup Rust toolchain manager on POSIX hosts, mirroring
     # the Windows Invoke-RustupSetup behaviour.
     #
     # Sets rustup default to none so rust-toolchain.toml is always authoritative
     # and installs the stable toolchain for cargo-binstall compilation fallback.
     #
-    # Why after linkGeneration: must run before installCargoBinstallPackages
+    # Why after linkGeneration: must run before install-cargo-binstall-packages
     # (enforced by that step's entryAfter).
     # -------------------------------------------------------------------------
     init-rustup = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
@@ -150,7 +150,7 @@ in
     '';
 
     # -------------------------------------------------------------------------
-    # installCargoBinstallPackages
+    # install-cargo-binstall-packages
     # Converges the declarative cargo-binstall package set (install + zap).
     #
     # On POSIX hosts all packages that would otherwise require cargo-binstall
@@ -165,9 +165,9 @@ in
     #
     # Install priority: nixpkgs > cargo binstall > cargo > bun > uv.
     #
-    # Why after initRustup: the stable toolchain is needed for
+    # Why after init-rustup: the stable toolchain is needed for
     # cargo-binstall's compilation fallback strategy (--strategies compile);
-    # initRustup ensures stable is installed before this step.  Unified with
+    # init-rustup ensures stable is installed before this step.  Unified with
     # Windows Invoke-RustupSetup + Invoke-CargoBinstallSetup behavior.
     # -------------------------------------------------------------------------
     install-cargo-binstall-packages = lib.hm.dag.entryAfter [ "init-rustup" ] ''
@@ -179,13 +179,13 @@ in
     '';
 
     # -------------------------------------------------------------------------
-    # syncClawHubSkills
+    # sync-clawhub-skills
     # Converges fetched skills (non-AGPL-compatible, downloaded at apply time
     # via ClawHub) with the declarative manifest in
     # src/modules/configs/agents/clawhub-skills.json.
     #
-    # Why after installBunPackages: requires the ClawHub CLI, which is
-    # installed by installBunPackages.  Ordering ensures ClawHub is present
+    # Why after install-bun-packages: requires the ClawHub CLI, which is
+    # installed by install-bun-packages.  Ordering ensures ClawHub is present
     # before this step tries to invoke it.
     #
     # Why best-effort: the system configuration applied successfully.  Skill

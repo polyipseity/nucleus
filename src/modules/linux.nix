@@ -190,7 +190,7 @@ lib.mkIf pkgs.stdenv.isLinux {
     '';
 
     # -----------------------------------------------------------------------
-    # provisionDevDirectory
+    # ensure-dev-directory
     # Creates ~/dev when absent so NixOS mirrors the macOS
     # configureSystemHardening behaviour.  VS Code workspace trust and editor
     # tooling rely on the directory existing on all hosts.

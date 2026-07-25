@@ -240,7 +240,7 @@ in
   };
 
   # ---------------------------------------------------------------------------
-  # installZshCompletions
+  # install-zsh-completions
   # Idempotently generates zsh completion files for CLI tools whose Nix packages
   # do not auto-bundle them into fpath, writing into the writable user-local
   # completion directory created in initContent.
@@ -251,7 +251,7 @@ in
   #     tool binary (mtime freshness check).
   #   * Fails gracefully if a completion subcommand exits non-zero (soft-fail).
   #
-  # Why after installCargoBinstallPackages: all Nix and non-Nix package managers
+  # Why after install-cargo-binstall-packages: all Nix and non-Nix package managers
   # (bun, uv, cargo-binstall) have converged by that point, so every tool binary
   # that could provide completions is present before we try to generate them.
   # ---------------------------------------------------------------------------

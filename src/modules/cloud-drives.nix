@@ -332,7 +332,7 @@ in
 
       # -----------------------------------------------------------------------
       # Shared: directory structure
-      # cloudDrivesSetup: creates ~/clouds/ and per-entry subdirectories.
+      # cloud-drives-setup: creates ~/clouds/ and per-entry subdirectories.
       # -----------------------------------------------------------------------
       {
         home.activation.cloud-drives-setup = lib.hm.dag.entryAfter [ "writeBoundary" ] ''

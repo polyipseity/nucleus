@@ -211,24 +211,24 @@ let
       (builtins.elem "step2" activations.step1.before) && (builtins.elem "step1" activations.step2.after)
     ) "Before/after lists should be bidirectionally consistent";
 
-  # === TEST: syncClawHubSkills dependency name stays aligned across modules ===
+  # === TEST: sync-clawhub-skills dependency name stays aligned across modules ===
   test_sync_clawhub_dependency_name_alignment =
     assert'
       (
-        (lib.hasInfix "syncClawHubSkills = lib.hm.dag.entryAfter" agentsModuleText)
-        && (lib.hasInfix "\"syncClawHubSkills\"" activationDagModuleText)
+        (lib.hasInfix "sync-clawhub-skills = lib.hm.dag.entryAfter" agentsModuleText)
+        && (lib.hasInfix "\"sync-clawhub-skills\"" activationDagModuleText)
       )
-      "syncClawHubSkills activation name must match between agents.nix and activation-dag.nix dependency list";
+      "sync-clawhub-skills activation name must match between agents.nix and activation-dag.nix dependency list";
 
-  # === TEST: syncClawHubSkills must not short-circuit activation ===
+  # === TEST: sync-clawhub-skills must not short-circuit activation ===
   test_sync_clawhub_does_not_exit_activation =
     let
       syncHasExitZero =
-        builtins.match "(.|\n)*syncClawHubSkills = lib.hm.dag.entryAfter(.|\n)*exit 0(.|\n)*" agentsModuleText
+        builtins.match "(.|\n)*sync-clawhub-skills = lib.hm.dag.entryAfter(.|\n)*exit 0(.|\n)*" agentsModuleText
         != null;
     in
     assert' (!syncHasExitZero)
-      "syncClawHubSkills must not call exit 0, or later activation steps (including displayHostManualInstructions) are skipped";
+      "sync-clawhub-skills must not call exit 0, or later activation steps (including displayHostManualInstructions) are skipped";
 
   # === TEST: GIMP sensitivity targets installed app version dynamically ===
   test_gimp_sensitivity_version_tracking =

@@ -16,7 +16,7 @@ dev_path = os.path.join(HOME, "dev")
 
 # Only trust the dev directory when it actually exists on this machine.
 # Exits immediately when ~/dev is absent (edge case: first-run race before
-# provisionDevDirectory completes; resolved on the next apply).
+# ensure-dev-directory completes; resolved on the next apply).
 if not os.path.isdir(dev_path):
     sys.exit(0)
 
