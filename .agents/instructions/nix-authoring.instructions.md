@@ -428,7 +428,7 @@ Examples with their extracted helpers:
 - `icloudExclusionsScript` → `icloud-exclusions-lib.sh` (JSON args via env vars)
 - `wallpaper-provision` per-wallpaper loop → `provision-wallpaper.sh`
 - `installBunPackages` entry iteration → `home/install-bun-packages.sh`
-- `devReposProvision` per-repo loop → `dev-repos-provision-lib.sh`
+- `provision-dev-repos` per-repo loop → `dev-repos-provision-lib.sh`
 - `macos-set-gui-env-path` PATH dedup → `gui-env-agent.sh` + `macos-set-gui-env-path.sh`
 
 **Rule**: when adding a new split-pattern inline script, extract the pure-shell body to `src/scripts/` first, then wrap it in Nix with environment variable injection or `builtins.replaceStrings` for Nix-evaluated values.

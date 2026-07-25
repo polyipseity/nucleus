@@ -7,7 +7,7 @@ let
   raycastManualConfigText = builtins.readFile ../../../src/hosts/MacBook/raycast-manual-config.md;
   raycastAliasesScriptText = builtins.readFile ../../../src/scripts/hosts/MacBook/macos-install-raycast-aliases.sh;
 in
-assert containsRegex "raycast-aliases = lib.hm.dag.entryAfter" macosText;
+assert containsRegex "macos-install-raycast-aliases = lib.hm.dag.entryAfter" macosText;
 assert containsRegex "Nucleus App Aliases" macosText;
 assert containsRegex "Books [(]English[)]\\.app" raycastAliasesScriptText;
 assert containsRegex "Messages [(]English[)]\\.app" raycastAliasesScriptText;

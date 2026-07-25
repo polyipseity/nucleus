@@ -93,9 +93,9 @@ let
       (
         containsRegex "options\.nucleus\.terminalActivations = lib\.mkOption" terminalActivationsModuleText
         && containsRegex "type = lib\.types\.attrsOf" terminalActivationsModuleText
-        && containsRegex "home\.activation\.writeDarwinTerminalActivations" terminalActivationsModuleText
+        && containsRegex "home\.activation\.write-terminal-activations" terminalActivationsModuleText
       )
-      "terminal-activations module must define nucleus.terminalActivations option with attrsOf type and writeDarwinTerminalActivations activation entry";
+      "terminal-activations module must define nucleus.terminalActivations option with attrsOf type and write-terminal-activations activation entry";
   # Test 15: Verify terminal-activations module defines command sub-option with str type
   test_terminal_activations_command_option = assert' (
     containsRegex "command = lib\.mkOption" terminalActivationsModuleText

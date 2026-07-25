@@ -54,7 +54,6 @@ rec {
   devReposProtection =
     assert containsRegex "activationBundle" devReposText;
     assert containsRegex "provision-dev-repos" devReposText;
-    assert containsRegex "devReposProvision" devReposText;
     assert containsRegex "chflags -h" agentsHelpersText;
     true;
 
@@ -74,7 +73,7 @@ rec {
   # =========================================================================
   raycastAliasProtection =
     assert containsRegex "activationBundle" macosText;
-    assert containsRegex "raycast-aliases" macosText;
+    assert containsRegex "macos-install-raycast-aliases" macosText;
     assert containsRegex "_nucleus_protect_symlink" agentsHelpersText;
     true;
 
@@ -84,7 +83,7 @@ rec {
   finderSidebarRewrite =
     assert containsRegex "pkgs\\.mysides" macosText;
     assert containsRegex "configure-finder-sidebar" macosText;
-    assert containsRegex "configureFinderSidebar" macosText;
+    assert containsRegex "macos-configure-finder-sidebar" macosText;
     assert containsRegex "import \\./macos/finder-sidebar" macosText;
     assert containsRegex "finderSidebarManagedFavorites" finderSidebarText;
     assert containsRegex "uriEncode" finderSidebarText;
@@ -117,7 +116,7 @@ rec {
   devReposLoggingPolicy =
     assert containsRegex "provision-dev-repos" devReposText;
     assert containsRegex "activationBundle" devReposText;
-    assert !containsRegex "devReposProvision: .*\(skipping\)" devReposText;
+    assert !containsRegex "provision-dev-repos: .*\(skipping\)" devReposText;
     true;
 
   # =========================================================================

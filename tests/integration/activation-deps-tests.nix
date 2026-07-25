@@ -33,25 +33,25 @@ let
     let
       # Define activation steps with dependencies.
       activations = {
-        waitForSopsSecrets = {
+        wait-for-sops-secrets = {
           before = [ ];
           after = [ ];
         };
         "git-identity" = {
-          before = [ "waitForSopsSecrets" ];
+          before = [ "wait-for-sops-secrets" ];
           after = [ ];
         };
-        devReposProvision = {
+        provision-dev-repos = {
           before = [ "git-identity" ];
           after = [ ];
         };
       };
       # Check order: secrets → git identity → dev repos
       gitSecond = activations."git-identity";
-      devThird = activations.devReposProvision;
+      devThird = activations.provision-dev-repos;
     in
     assert' (
-      (builtins.elem "waitForSopsSecrets" gitSecond.before)
+      (builtins.elem "wait-for-sops-secrets" gitSecond.before)
       && (builtins.elem "git-identity" devThird.before)
     ) "Secrets must materialize before dev repos provision";
 
@@ -60,23 +60,23 @@ let
     let
       activations = {
         "ssh-key-adopt" = {
-          before = [ "waitForSopsSecrets" ];
+          before = [ "wait-for-sops-secrets" ];
           after = [ ];
         };
-        devReposProvision = {
+        provision-dev-repos = {
           before = [ "ssh-key-adopt" ];
           after = [ ];
         };
       };
     in
-    assert' (builtins.elem "ssh-key-adopt" activations.devReposProvision.before) "SSH keys must load before Git clones";
+    assert' (builtins.elem "ssh-key-adopt" activations.provision-dev-repos.before) "SSH keys must load before Git clones";
 
   # === TEST: GPG keys imported before commits ===
   test_gpg_before_commits =
     let
       activations = {
         "gpg-import" = {
-          before = [ "waitForSopsSecrets" ];
+          before = [ "wait-for-sops-secrets" ];
           after = [ ];
         };
         "git-identity" = {
@@ -93,11 +93,11 @@ let
   test_activation_names_unique =
     let
       names = [
-        "waitForSopsSecrets"
+        "wait-for-sops-secrets"
         "git-identity"
         "gpg-import"
         "ssh-key-adopt"
-        "devReposProvision"
+        "provision-dev-repos"
       ];
       uniqueNames = unique names;
     in
@@ -179,11 +179,11 @@ let
   test_valid_dependency_references =
     let
       activationNames = [
-        "waitForSopsSecrets"
+        "wait-for-sops-secrets"
         "git-identity"
         "gpg-import"
         "ssh-key-adopt"
-        "devReposProvision"
+        "provision-dev-repos"
       ];
       # Each dependency reference should exist in the names list
       testDep = name: builtins.elem name activationNames;
@@ -268,14 +268,14 @@ let
   # === TEST: Spotlight disables all known launcher hotkey slots ===
   test_spotlight_disables_all_hotkey_slots = assert' (lib.hasInfix "for hotkey in 61 64 65; do" macbookActivationText) "Spotlight disable flow must cover symbolic hotkey IDs 61, 64, and 65";
 
-  # === TEST: installCargoBinstallPackages activation name aligned across modules ===
+  # === TEST: install-cargo-binstall-packages activation name aligned across modules ===
   test_install_cargo_binstall_dependency_name_alignment =
     assert'
       (
-        (lib.hasInfix "installCargoBinstallPackages = lib.hm.dag.entryAfter" agentsModuleText)
-        && (lib.hasInfix "\"installCargoBinstallPackages\"" macosModuleText)
+        (lib.hasInfix "install-cargo-binstall-packages = lib.hm.dag.entryAfter" agentsModuleText)
+        && (lib.hasInfix "\"install-cargo-binstall-packages\"" macosModuleText)
       )
-      "installCargoBinstallPackages activation name must match between agents.nix and macos.nix dependency list";
+      "install-cargo-binstall-packages activation name must match between agents.nix and macos.nix dependency list";
 
   # === TEST: macOS dev-tree maintenance is scheduled, not activation-bound ===
   test_macos_dev_maintenance_is_scheduled = assert' (
@@ -290,15 +290,18 @@ let
   ) "macOS dev-tree maintenance must run from launchd agents instead of Home Manager activation";
 
   # === TEST: discord-music-rpc out-of-store symlink properly wired ===
-  # Verify that protectDiscordMusicRPCConfig activation exists and that the
-  # config.yaml path appears in the protect/unprotect hooks in home.nix.
+  # Verify that the config.yaml path appears in managedSymlinkPaths in home.nix
+  # and uses mkOutOfStoreSymlink in its own module.
+  # discord-music-rpc config is managed via out-of-store symlink (Method 1).
+  # Verify it appears in the managedSymlinkPaths list in home.nix and uses
+  # mkOutOfStoreSymlink in its own module.
   test_discord_music_rpc_out_of_store_symlink =
     assert'
       (
-        (lib.hasInfix "protectDiscordMusicRPCConfig" discordMusicRpcModuleText)
-        && (lib.hasInfix "discord-music-rpc/config.yaml" homeModuleText)
+        (lib.hasInfix "discord-music-rpc/config.yaml" homeModuleText)
+        && (lib.hasInfix "mkOutOfStoreSymlink" discordMusicRpcModuleText)
       )
-      "discord-music-rpc config.yaml must have protectDiscordMusicRPCConfig activation and be listed in home.nix protect/unprotect hooks";
+      "discord-music-rpc config.yaml must be in home.nix managedSymlinkPaths and use mkOutOfStoreSymlink";
 
   # === TEST: App bundles Phase 2 uses declared order (no re-sort) ===
   test_app_bundles_deployment_uses_declared_order = assert' (lib.hasInfix "'') currentNucleusAppBundles" macbookAppBundlesText) "app-bundles.nix Phase 2 must iterate currentNucleusAppBundles directly without re-sorting";
@@ -307,19 +310,19 @@ let
   test_workflows_deployment_uses_declared_order = assert' (lib.hasInfix "'') currentNucleusWorkflows" macbookAutomatorWorkflowsText) "automator-workflows.nix Phase 3 must iterate currentNucleusWorkflows directly without re-sorting";
 
   # === TEST: macOS app-bundles DAG orders after linkGeneration ===
-  test_services_app_bundles_dag_after_link_generation = assert' (lib.hasInfix "\"macos-app-bundle-lib\" = lib.hm.dag.entryAfter [ \"linkGeneration\" ]" macbookAppBundlesText) "app-bundles.nix macos-app-bundle-lib activation must run after linkGeneration";
+  test_services_app_bundles_dag_after_link_generation = assert' (lib.hasInfix "macos-deploy-app-bundles = lib.hm.dag.entryAfter [ \"linkGeneration\" ]" macbookAppBundlesText) "app-bundles.nix macos-deploy-app-bundles activation must run after linkGeneration";
 
   # === TEST: macOS automator-workflows DAG orders after linkGeneration ===
-  test_services_workflows_dag_after_link_generation = assert' (lib.hasInfix "deployNucleusAutomatorWorkflows = lib.hm.dag.entryAfter [ \"linkGeneration\" ]" macbookAutomatorWorkflowsText) "automator-workflows.nix deployNucleusAutomatorWorkflows must run after linkGeneration";
+  test_services_workflows_dag_after_link_generation = assert' (lib.hasInfix "deploy-automator-workflows = lib.hm.dag.entryAfter [ \"linkGeneration\" ]" macbookAutomatorWorkflowsText) "automator-workflows.nix deploy-automator-workflows must run after linkGeneration";
 
   # === TEST: macOS services flush DAG orders after both deploy steps ===
   test_services_flush_dag_after_both =
     assert'
       (
-        lib.hasInfix "deployNucleusServicesFlush =" macbookServicesText
-        && lib.hasInfix "entryAfter [ \"deployNucleusAutomatorWorkflows\" \"macos-app-bundle-lib\" ]" macbookServicesText
+        lib.hasInfix "flush-services-cache =" macbookServicesText
+        && lib.hasInfix "entryAfter [ \"deploy-automator-workflows\" \"macos-deploy-app-bundles\" ]" macbookServicesText
       )
-      "services.nix deployNucleusServicesFlush must run after both deployNucleusAutomatorWorkflows and macos-app-bundle-lib";
+      "services.nix flush-services-cache must run after both deploy-automator-workflows and macos-deploy-app-bundles";
 
   # === TEST: macOS services.nix imports both sub-modules ===
   test_services_imports_both_submodules = assert' (

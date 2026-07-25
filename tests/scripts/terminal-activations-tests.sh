@@ -158,9 +158,9 @@ test_command_failure_continues() {
 test_name_header_lines() {
   setup
   {
-    printf '# safari-defaults\n'
+    printf '# macos-configure-safari-defaults\n'
     printf 'touch %s/marker-safari\n' "$TESTDIR"
-    printf '# universal-access-defaults\n'
+    printf '# macos-configure-universal-access\n'
     printf 'touch %s/marker-universal\n' "$TESTDIR"
   } > "$MANIFEST"
   local output

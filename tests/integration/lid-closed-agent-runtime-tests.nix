@@ -24,7 +24,7 @@ let
         (lib.hasInfix "apply_pmset -a standby 1 ttyskeepawake 1 hibernatemode 3 networkoversleep 0 tcpkeepalive 1 powernap 1 lidwake 1" macbookActivationText)
         && (lib.hasInfix "apply_pmset -c displaysleep 1 sleep 0 disksleep 0 womp 1" macbookActivationText)
         && (lib.hasInfix "apply_pmset -b displaysleep 1 sleep 0 disksleep 0 womp 1" macbookActivationText)
-        && (lib.hasInfix "macos-headless-display" macosText)
+        && (lib.hasInfix "macos-configure-headless-display" macosText)
         && (lib.hasInfix "betterdisplay-heartbeat" macbookActivationText)
       )
       "macOS must keep the no-idle-sleep pmset posture and BetterDisplay heartbeat for closed-lid remote work";

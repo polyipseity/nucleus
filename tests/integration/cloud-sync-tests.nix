@@ -69,8 +69,8 @@ let
     containsRegex "pkgs\.rclone" moduleText && containsRegex "hasRcloneProvider" moduleText
   ) "rclone package should only be installed when rclone-backed providers are configured";
 
-  # Test 10: cloudDrivesSetup activation is defined
-  test_setup_activation_exists = assert' (containsRegex "cloudDrivesSetup" moduleText) "cloudDrivesSetup activation must be defined for directory creation";
+  # Test 10: cloud-drives-setup activation is defined
+  test_setup_activation_exists = assert' (containsRegex "cloud-drives-setup" moduleText) "cloud-drives-setup activation must be defined for directory creation";
 
   # Test 11: cloudDrivesICloudRefresh activation is not required in rclone-first design
   test_no_icloud_refresh_activation = assert' (
@@ -162,7 +162,7 @@ let
         containsRegex "pkgs\\.mysides" macosText
         && containsRegex "configure-finder-sidebar" macosText
         && containsRegex "mysides}/bin/mysides" macosText
-        && containsRegex "configureFinderSidebar" macosText
+        && containsRegex "macos-configure-finder-sidebar" macosText
         && containsRegex "import \\./macos/finder-sidebar" macosText
         && containsRegex "finderSidebar\\.finderSidebar" macosText
         && containsRegex "finderSidebarManagedFavorites" finderSidebarText

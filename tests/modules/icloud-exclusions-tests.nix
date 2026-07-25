@@ -69,7 +69,7 @@ let
   ) "shell.nix must keep mkdir-triggered iCloud exclusion checks";
 
   test_macos_activation_recursive_pass = assert' (
-    (lib.hasInfix "configureICloudExclusions" macosModuleText)
+    (lib.hasInfix "macos-configure-icloud-exclusions" macosModuleText)
     && (lib.hasInfix "com.apple.fileprovider.ignore#P" macosModuleText)
     && (lib.hasInfix "sanitizeICloudManagedRoots" macosModuleText)
   ) "macos.nix must retain activation-time recursive iCloud exclusion pass";

@@ -24,12 +24,12 @@ let
   ) "custom provision symlink module must declare platform targets and managed manifest wiring";
 
   test_manual_instruction_terminal_order_keeps_custom_symlinks = assert' (
-    containsRegex ''"ensureCustomProvisionSymlinkTargets"'' macosText
-    && containsRegex ''"prepareCustomProvisionSymlinks"'' macosText
-    && containsRegex ''"finalizeCustomProvisionSymlinks"'' macosText
-    && containsRegex ''"ensureCustomProvisionSymlinkTargets"'' linuxText
-    && containsRegex ''"prepareCustomProvisionSymlinks"'' linuxText
-    && containsRegex ''"finalizeCustomProvisionSymlinks"'' linuxText
+    containsRegex ''"ensure-custom-provision-symlink-targets"'' macosText
+    && containsRegex ''"prepare-custom-provision-symlinks"'' macosText
+    && containsRegex ''"finalize-custom-provision-symlinks"'' macosText
+    && containsRegex ''"ensure-custom-provision-symlink-targets"'' linuxText
+    && containsRegex ''"prepare-custom-provision-symlinks"'' linuxText
+    && containsRegex ''"finalize-custom-provision-symlinks"'' linuxText
   ) "macOS and Linux terminal activation lists must include all custom symlink activation steps";
 
   test_polyipseity_data_mapping_in_registries = assert' (

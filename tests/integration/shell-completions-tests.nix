@@ -59,7 +59,7 @@ let
   # --- Zsh completions are installed by activation hook ---
   test_zsh_completions_installed_by_shell_nix = assert' (
     lib.hasInfix "install-zsh-completions" shellText && lib.hasInfix "./completions/zsh" shellText
-  ) "shell.nix installZshCompletions must copy nucleus completion files";
+  ) "shell.nix install-zsh-completions must copy nucleus completion files";
 
   # --- Windows PowerShell completions ---
   test_windows_pwsh_has_completers_for_all = assert' (lib.all

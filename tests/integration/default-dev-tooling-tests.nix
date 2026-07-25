@@ -97,20 +97,20 @@ let
 
   # Verify that POSIX hosts use pkgs.rustup (not pkgs.cargo from nixpkgs) so
   # that all platforms are unified on rustup for Rust toolchain management.
-  # agents.nix must contain initRustup to set up rustup on POSIX hosts.
+  # agents.nix must contain init-rustup to set up rustup on POSIX hosts.
   test_posix_uses_rustup_not_cargo_nix =
     assert'
       (
         !(lib.hasInfix "pkgs.cargo" coreNixText)
         && (lib.hasInfix "pkgs.rustup" coreNixText)
-        && (lib.hasInfix "initRustup" posixAgentsText)
+        && (lib.hasInfix "init-rustup" posixAgentsText)
       )
-      "POSIX hosts must use pkgs.rustup (not pkgs.cargo from nixpkgs) and agents.nix must contain initRustup";
+      "POSIX hosts must use pkgs.rustup (not pkgs.cargo from nixpkgs) and agents.nix must contain init-rustup";
 
-  # Verify that the POSIX initRustup activation calls 'rustup default none' to
+  # Verify that the POSIX init-rustup activation calls 'rustup default none' to
   # enforce project-local toolchain selection, matching Invoke-RustupSetup.ps1
   # on Windows.
-  test_posix_init_rustup_sets_default_none = assert' (lib.hasInfix "rustup default none" posixAgentsText) "agents.nix initRustup must call 'rustup default none' to enforce project-local toolchain selection on POSIX hosts";
+  test_posix_init_rustup_sets_default_none = assert' (lib.hasInfix "rustup default none" posixAgentsText) "agents.nix init-rustup must call 'rustup default none' to enforce project-local toolchain selection on POSIX hosts";
 
   # Verify that POSIX shell.nix does NOT include NUCLEUS_LIBICONV_LIB since
   # Nix-managed cargo/rustc are no longer in the fallback bundle.  The devShell
@@ -122,7 +122,7 @@ let
 
   # Verify that the Windows Invoke-RustupSetup.ps1 calls 'rustup default none'
   # after toolchain installation so per-project toolchains are always
-  # authoritative on Windows (mirrors initRustup behavior on POSIX).
+  # authoritative on Windows (mirrors init-rustup behavior on POSIX).
   test_windows_rustup_sets_default_stable = assert' (lib.hasInfix "rustup default none" rustupSetupText) "Invoke-RustupSetup.ps1 must call 'rustup default none' after toolchain convergence";
 
   # Verify that the cargo package convergence uses `cargo +stable install --list`
@@ -271,7 +271,7 @@ let
     test_posix_shell_no_libiconv_fallback
     # Verify POSIX now uses pkgs.rustup (not pkgs.cargo).
     test_posix_uses_rustup_not_cargo_nix
-    # Verify initRustup sets default none on POSIX.
+    # Verify init-rustup sets default none on POSIX.
     test_posix_init_rustup_sets_default_none
     test_windows_rustup_sets_default_stable
     test_posix_cargo_prunes_both_install_and_binstall

@@ -69,7 +69,7 @@ Describe 'Sync-TerminalActivation behavior' {
         $manifestPath = Join-Path -Path $manifestDir -ChildPath 'terminal-activations.list'
         $markerPath = Join-Path -Path $script:testRoot -ChildPath 'marker-comment'
         @(
-            '# safari-defaults'
+            '# macos-configure-safari-defaults'
             '# a comment line'
             "New-Item -Path '$markerPath' -ItemType File -Force"
         ) | Out-File -LiteralPath $manifestPath -Encoding ASCII

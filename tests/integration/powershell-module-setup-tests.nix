@@ -26,9 +26,9 @@ let
 
   test_pwsh_nix_reads_yaml_version = assert' (builtins.hasInfix "pwshYamlVersion = lockfile.pwsh.\"powershell-yaml\" or null" pwshNixText) "pwsh.nix must read 'powershell-yaml' version from lockfile";
 
-  test_pwsh_nix_has_installPwshYaml = assert' (builtins.hasInfix "home.activation.installPwshYaml" pwshNixText) "pwsh.nix must have installPwshYaml activation block";
+  test_pwsh_nix_has_installPwshYaml = assert' (builtins.hasInfix "home.activation.install-pwsh-yaml" pwshNixText) "pwsh.nix must have install-pwsh-yaml activation block";
 
-  test_pwsh_nix_installPwshYaml_uses_correct_module = assert' (builtins.hasInfix "Install-Module -Name powershell-yaml" pwshNixText) "pwsh.nix installPwshYaml activation must reference 'powershell-yaml'";
+  test_pwsh_nix_installPwshYaml_uses_correct_module = assert' (builtins.hasInfix "Install-Module -Name powershell-yaml" pwshNixText) "pwsh.nix install-pwsh-yaml activation must reference 'powershell-yaml'";
 
   # ---------------------------------------------------------------------------
   # apply.ps1 assertions (Windows provisioning orchestration)
