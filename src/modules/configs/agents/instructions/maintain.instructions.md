@@ -46,6 +46,7 @@ Safety rules:
 - **Commitlint recovery example:** Commit rejected with "subject may not be empty" or "no type prefix" — the commit was not created. Fix the message and retry: `git commit -m "type(scope): correct message"`. Do NOT use `git commit --amend` — that would modify the previous commit, not the failed one.
 - Never revert or cherry-pick earlier than the captured baseline hash.
 - Do not mix unrelated concerns in the same commit.
+- See `commit-safety.instructions.md` for the full commit verification protocol and amend prohibition.
 
 ## Atomic commit workflow
 
@@ -57,3 +58,9 @@ Final check:
 2. Is this the simplest design that still meets the requirement?
 3. Did we remove at least as much complexity as we added?
 4. Can a human quickly locate the source of truth?
+
+## Related instruction files
+
+- `core-behavior.instructions.md` — Subagent delegation patterns, git boundary rules, and immutable-by-default enforcement.
+- `commit-safety.instructions.md` — Commit verification protocol, amend prohibition, and failure recovery.
+- `execution-details.instructions.md` — Tool recovery and multi-edit fallback strategies.
