@@ -11,7 +11,7 @@ This file is the canonical maintainability policy text. Keep this as the single 
 - Prefer deletion over abstraction.
 - Keep edits local, explicit, and reversible.
 - Remove duplication and stale guidance aggressively.
-- Preserve behavior unless the task explicitly requires behavior change.
+- **See `programming-principles.instructions.md` (Chesterton's Fence)** before removing or changing legacy behavior.
 
 Execution checklist:
 
