@@ -118,8 +118,8 @@ in
       }) selectedSymlinksResolved
     );
 
-    home.activation.ensureCustomProvisionSymlinkTargets =
-      lib.hm.dag.entryBefore [ "prepareCustomProvisionSymlinks" ]
+    home.activation.ensure-custom-provision-symlink-targets =
+      lib.hm.dag.entryBefore [ "prepare-custom-provision-symlinks" ]
         ''
           "${activationBundle}/src/scripts/configs/ensure-symlink-targets.sh" \
             "${managedSymlinkManifestPath}" \
@@ -133,13 +133,13 @@ in
             "${pkgs.jq}/bin/jq"
         '';
 
-    home.activation.prepareCustomProvisionSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
+    home.activation.prepare-custom-provision-symlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/provision-symlinks.sh" \
         "${managedSymlinkManifestPath}" \
         "${pkgs.jq}/bin/jq"
     '';
 
-    home.activation.finalizeCustomProvisionSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    home.activation.finalize-custom-provision-symlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/finalize-symlinks.sh" \
         "${managedSymlinkManifestPath}" \
         "${pkgs.jq}/bin/jq" \

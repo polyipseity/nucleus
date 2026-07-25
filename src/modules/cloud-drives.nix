@@ -335,7 +335,7 @@ in
       # cloudDrivesSetup: creates ~/clouds/ and per-entry subdirectories.
       # -----------------------------------------------------------------------
       {
-        home.activation.cloudDrivesSetup = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        home.activation.cloud-drives-setup = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
           "${activationBundle}/src/scripts/services/cloud-drives-setup.sh" \
             "${pkgs.jq}/bin/jq" \
             '${builtins.toJSON (map (m: { inherit (m) localPath; }) enabledMounts)}' \

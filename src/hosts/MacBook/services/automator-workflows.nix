@@ -220,7 +220,7 @@ in
     executable = true;
   };
 
-  home.activation.deployNucleusAutomatorWorkflows = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.deploy-automator-workflows = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/hosts/MacBook/macos-deploy-automator-workflows.sh" \
       "${pkgs.jq}/bin/jq" \
       '${

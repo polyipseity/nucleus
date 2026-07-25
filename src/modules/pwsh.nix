@@ -72,7 +72,7 @@ in
 
   # Install PSScriptAnalyzer for PowerShell linting if pwsh is available.
   # This enables the lint phase in scripts/check-pwsh.ps1.
-  home.activation.installPwshScriptAnalyzer = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+  home.activation.install-pwsh-script-analyzer = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     "${activationBundle}/src/scripts/packages/install-pwsh-module.sh" \
       "${pkgs.powershell}/bin/pwsh" \
       "PSScriptAnalyzer" \
@@ -81,7 +81,7 @@ in
 
   # Install powershell-yaml for locked DSC validation if pwsh is available.
   # This enables the locked DSC validation phase in scripts/check.ps1.
-  home.activation.installPwshYaml = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+  home.activation.install-pwsh-yaml = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     "${activationBundle}/src/scripts/packages/install-pwsh-module.sh" \
       "${pkgs.powershell}/bin/pwsh" \
       "powershell-yaml" \

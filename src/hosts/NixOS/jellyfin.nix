@@ -29,7 +29,7 @@ in
   #
   # Runs via a bundled script tree so the script can resolve its lib/
   # dependencies at runtime via SCRIPT_DIR.
-  system.activationScripts.jellyfin-sync = lib.mkAfter (
+  system.activationScripts.nixos-sync-jellyfin = lib.mkAfter (
     let
       # Bundle the script + lib dependencies so SCRIPT_DIR-relative sourcing works.
       scriptsBundle = pkgs.runCommand "nucleus-jellyfin-scripts" { preferLocalBuild = true; } ''

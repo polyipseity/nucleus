@@ -101,14 +101,14 @@ in
     # identity include, and decryption health checks from secrets.nix. Keep
     # this activation ordered after the secrets pipeline so every managed user
     # sees the same post-secrets provisioning order on both macOS and NixOS.
-    home.activation.devReposProvision =
+    home.activation.provision-dev-repos =
       lib.hm.dag.entryAfter
         [
           "git-identity"
           "gpg-import"
           "ssh-key-adopt"
-          "verifySecretDecryption"
-          "waitForSopsSecrets"
+          "verify-secret-decryption"
+          "wait-for-sops-secrets"
           "writeBoundary"
         ]
         ''

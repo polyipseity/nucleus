@@ -42,7 +42,7 @@ in
       }
     else
       {
-        deriveHostAgeKey.text = ''
+        nixos-derive-host-age-key.text = ''
           "${activationBundle}/src/scripts/secrets/derive-host-age-key.sh" "${pkgs.ssh-to-age}/bin/ssh-to-age" "${username}"
         '';
       };

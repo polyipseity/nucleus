@@ -257,7 +257,7 @@ in
   # ---------------------------------------------------------------------------
 
   home.activation = {
-    installZshCompletions = lib.hm.dag.entryAfter [ "installCargoBinstallPackages" ] ''
+    install-zsh-completions = lib.hm.dag.entryAfter [ "install-cargo-binstall-packages" ] ''
       "${activationBundle}/src/scripts/shell/install-zsh-completions.sh" \
         "${pkgs.bat}/bin/bat" \
         "${pkgs.bun}/bin/bun" \

@@ -35,7 +35,7 @@ in
   # Resolves the nvim path from the home-manager profile directory so that no
   # username is hardcoded, matching Home Manager's useUserPackages = true layout.
   # ---------------------------------------------------------------------------
-  system.activationScripts."nvim-launcher" = lib.mkAfter ''
+  system.activationScripts.nixos-launch-nvim = lib.mkAfter ''
     "${activationBundle}/src/scripts/editors/launch-nvim.sh" "${
       config.home-manager.users.${username}.home.profileDirectory
     }/bin/nvim"
@@ -46,7 +46,7 @@ in
   # Create system log directories for all nucleus systemd services before they
   # start, so journald/stderr redirect targets exist on disk.
   # ---------------------------------------------------------------------------
-  system.activationScripts."ensure-log-dirs" = lib.mkAfter ''
+  system.activationScripts.nixos-ensure-log-dirs = lib.mkAfter ''
     "${activationBundle}/src/scripts/services/log-dirs-init.sh" \
       "${config.nucleus.logging.systemLogDir}" \
       "${builtins.toString linuxSystemLogDirs}" \
@@ -84,7 +84,7 @@ in
   # Failing to start a service should not block activation, but the warning
   # surfaces issues for post-apply investigation.
   # ---------------------------------------------------------------------------
-  system.activationScripts."verify-nucleus-services" = lib.mkAfter ''
+  system.activationScripts.nixos-verify-nucleus-services = lib.mkAfter ''
     if command -v nucleus-svc >/dev/null 2>&1; then
       if ! nucleus-svc verify; then
         echo "svc: some services are inactive (non-fatal; check journalctl for details)" >&2

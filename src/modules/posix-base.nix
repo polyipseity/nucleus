@@ -57,13 +57,13 @@ in
       # /etc/gitconfig is a writable symlink to the repo tree so local Git defaults
       # can be adjusted in-place without rebuild. Activation script creates the
       # Method 1 (writable symlink): symlink; runs as root via nucleus-apply.
-      system.activationScripts."nucleus-gitconfig" = lib.mkAfter ''
+      system.activationScripts.gitconfig = lib.mkAfter ''
         # Method 1 (writable symlink): repo changes take effect without rebuild.
         ln -sf "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/git/system.gitconfig" /etc/gitconfig
       '';
     })
     (lib.optionalAttrs hasLaunchdDaemonsOption {
-      system.activationScripts.nucleusGitconfig.text = ''
+      system.activationScripts.gitconfig.text = ''
         # Method 1 (writable symlink): repo changes take effect without rebuild.
         ln -sf "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/git/system.gitconfig" /etc/gitconfig
       '';

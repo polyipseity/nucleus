@@ -185,7 +185,7 @@ in
     # Change CWD to a safe location before any activation steps. The Nix build
     # directory that darwin-rebuild inherits as CWD can be deleted during
     # activation, causing harmless but noisy getcwd errors.
-    home.activation.changeCwdToHome = lib.hm.dag.entryBefore [ "checkLinkTargets" ] ''
+    home.activation.ensure-safe-cwd = lib.hm.dag.entryBefore [ "checkLinkTargets" ] ''
       cd /
     '';
 
@@ -203,7 +203,7 @@ in
     # Windows: registry). A symlink does not apply to these platform-native
     # stores. Merge writes the managed defaults into each store while
     # preserving any user-configured settings outside managed keys.
-    home.activation."qtpass-merge-ini" = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation.merge-qtpass-ini = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/configs/merge-qtpass-ini.sh" \
         "${pkgs.gawk}/bin/awk" \
         ${lib.escapeShellArg qtpassModule.qtPassDarwinCommands} \
@@ -220,7 +220,7 @@ in
     # settings that should persist across applies). A symlink would let app
     # writes reach the repo file. Merge applies managed defaults while
     # preserving all app-owned keys and sections.
-    home.activation."picard-merge-ini" = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation.merge-picard-ini = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/configs/merge-picard-ini.sh" \
         "${pkgs.gawk}/bin/awk" \
         ${lib.escapeShellArg picardDefaultsIniText} \
@@ -237,7 +237,7 @@ in
     # it. A symlink would let those app-owned writes reach the repo file,
     # mixing managed settings with runtime state that does not belong in the
     # repo. Merge preserves both managed and app-owned keys.
-    home.activation."obsidian-merge-json" = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation.merge-obsidian-json = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/configs/merge-obsidian-json.sh" \
         "${pkgs.python3}/bin/python3" \
         ${lib.escapeShellArg obsidianManagedSettingsJson}
@@ -245,11 +245,11 @@ in
 
     # Protect out-of-store symlinks (mkOutOfStoreSymlink) against accidental
     # deletion between rebuilds.
-    home.activation.unprotectOutOfStoreSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
+    home.activation.unprotect-out-of-store-symlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/manage-out-of-store-symlinks.sh" "unprotect" "home.nix" '${managedSymlinkPathsJson}' "${pkgs.jq}/bin/jq"
     '';
 
-    home.activation.protectOutOfStoreSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    home.activation.protect-out-of-store-symlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/manage-out-of-store-symlinks.sh" "protect" "home.nix" '${managedSymlinkPathsJson}' "${pkgs.jq}/bin/jq"
     '';
 

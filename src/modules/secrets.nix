@@ -168,7 +168,7 @@ lib.mkIf isPrimaryUser {
   # the sentinel already exists when this hook fires; the loop exits
   # immediately with no added latency.
   # --------------------------------------------------------------------------
-  home.activation.waitForSopsSecrets = lib.hm.dag.entryAfter [ "sops-nix" ] ''
+  home.activation.wait-for-sops-secrets = lib.hm.dag.entryAfter [ "sops-nix" ] ''
     "${activationBundle}/src/scripts/secrets/wait-for-sops-secrets.sh" "${
       config.sops.secrets.${gitIdentitySecretName}.path
     }"
@@ -195,7 +195,7 @@ lib.mkIf isPrimaryUser {
   #      git config --file creates the file if absent and overwrites values
   #      idempotently on repeated activation runs.
   # --------------------------------------------------------------------------
-  home.activation."git-identity" = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
+  home.activation.git-identity = lib.hm.dag.entryAfter [ "wait-for-sops-secrets" ] ''
     "${activationBundle}/src/scripts/secrets/configure-git-identity.sh" "${
       config.sops.secrets.${gitIdentitySecretName}.path
     }" "${pkgs.git}/bin/git"
@@ -237,7 +237,7 @@ lib.mkIf isPrimaryUser {
   # `--batch` (`IPC parameter error`) on this key format. We intentionally use
   # a non-batch import invocation to ensure a successful secret-key import.
   # --------------------------------------------------------------------------
-  home.activation."gpg-import" = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
+  home.activation.gpg-import = lib.hm.dag.entryAfter [ "wait-for-sops-secrets" ] ''
     "${activationBundle}/src/scripts/secrets/import-gpg-key.sh" \
       "${config.home.homeDirectory}/.gnupg" \
       "${pkgs.gnupg}/bin/gpg" \
@@ -269,7 +269,7 @@ lib.mkIf isPrimaryUser {
   #      provision), flush the SSH agent (ssh-add -D).
   #   5. Write the current fingerprint to the manifest.
   # --------------------------------------------------------------------------
-  home.activation."ssh-key-adopt" = lib.hm.dag.entryAfter [ "waitForSopsSecrets" ] ''
+  home.activation.ssh-key-adopt = lib.hm.dag.entryAfter [ "wait-for-sops-secrets" ] ''
     "${activationBundle}/src/scripts/secrets/adopt-ssh-key.sh" "${sshPublicKeyPath}" "${pkgs.openssh}/bin/ssh-keygen" "${pkgs.openssh}/bin/ssh-add"
   '';
 
@@ -355,7 +355,7 @@ lib.mkIf isPrimaryUser {
   #   Shell variables (_vsd_sops_gpg_fp, _vsd_ssh_age_pub) are expanded
   #   at activation runtime.
   # --------------------------------------------------------------------------
-  home.activation.verifySecretDecryption =
+  home.activation.verify-secret-decryption =
     let
       wallpaperDir = ../assets/wallpapers;
       # Enumerate every *.sops blob in the wallpapers directory at eval time

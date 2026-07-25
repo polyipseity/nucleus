@@ -79,13 +79,13 @@ in
   # extraActivation — runs before openssh / Homebrew bundle.
   # ---------------------------------------------------------------------------
   system.activationScripts.extraActivation.text = ''
-    # ---- ensureFuseTHeadersDir --------------------------------------------------
+    # ---- ensure-fuse-t-headers-dir --------------------------------------------------
     # fuse-t cask post-install symlinks headers into /usr/local/include.  If that
     # directory doesn't exist, the cask install silently skips the link step,
     # leaving ntfs-3g build with no fuse headers.  Create it pre-emptively.
     /bin/mkdir -p /usr/local/include
 
-    # ---- ensureLogDirs -----------------------------------------------------------
+    # ---- ensure-log-dirs -----------------------------------------------------------
     # Create system log dirs (all hosts) and macOS-specific user log dirs (console
     # user + chown). Shared with NixOS via ensure-log-dirs.sh.
     "${activationBundle}/src/scripts/services/log-dirs-init.sh" \
@@ -118,7 +118,7 @@ in
   #   disableSpotlight                 — disable all Spotlight hotkeys + service
   # ---------------------------------------------------------------------------
   system.activationScripts.postActivation.text = lib.mkBefore ''
-    # ---- configureXcodeSelect --------------------------------------------------
+    # ---- configure-xcode-select --------------------------------------------------
     # Point the system developer directory at the Nix apple-sdk store path so
     # xcrun (invoked by rustc/cargo for SDK discovery) works without Xcode CLT
     # installed.  Without this, every native-code build outside a Nix devShell
@@ -131,7 +131,7 @@ in
     #   darwin-rebuild switch, so no sudo wrapper is needed.
     /usr/bin/xcode-select --switch "${appleSdkEnhanced}"
 
-    # ---- configureSymlinkFarm ------------------------------------------------
+    # ---- configure-symlink-farm ------------------------------------------------
     # Create/update symlinks in /usr/local/bin for tools that GUI apps resolve
     # via PATH directly (without xcrun).  Only operates on Nix store symlinks
     # and leaves regular files and non-Nix symlinks untouched.
@@ -139,13 +139,13 @@ in
       "${symlinkFarmEntries}" \
       "${config.nucleus.logging.systemLogDir}/symlink-farm.log"
 
-    # ---- configureBatteryPolicy ------------------------------------------------
+    # ---- configure-battery-policy ------------------------------------------------
     "${activationBundle}/src/scripts/hosts/MacBook/macos-configure-battery-policy.sh"
 
-    # ---- configureChargeLimit --------------------------------------------------
+    # ---- configure-charge-limit --------------------------------------------------
     "${activationBundle}/src/scripts/hosts/MacBook/macos-charge-limit.sh"
 
-    # ---- configureSshAccess -----------------------------------------------------
+    # ---- configure-ssh-access -----------------------------------------------------
     # Allow all users to connect via SSH by removing the macOS access-control
     # group. When com.apple.access_ssh does not exist, sshd allows any user
     # (subject to sshd_config AllowUsers/AllowGroups).
@@ -157,20 +157,20 @@ in
       echo "ssh: com.apple.access_ssh group does not exist (already allowing all users)." >&2
     fi
 
-    # ---- configureMiddleClick -------------------------------------------------
+    # ---- configure-middle-click -------------------------------------------------
     "${activationBundle}/src/scripts/hosts/MacBook/macos-enable-middle-click.sh"
 
-    # ---- configureMountyLoginItem ---------------------------------------------
+    # ---- configure-mounty-login-item ---------------------------------------------
     "${activationBundle}/src/scripts/hosts/MacBook/macos-register-mounty-login-item.sh"
-    # ---- configureLinearMousePreferences --------------------------------------
+    # ---- configure-linearmouse-preferences --------------------------------------
     "${activationBundle}/src/scripts/hosts/MacBook/macos-set-linearmouse-prefs.sh"
-    # ---- configureGimpScrollSensitivity ---------------------------------------
+    # ---- configure-gimp-scroll-sensitivity ---------------------------------------
     "${activationBundle}/src/scripts/configs/configure-gimp-scroll-sensitivity.sh"
 
-    # ---- configureMissionControlSpansDisplays ----------------------------------
+    # ---- configure-mission-control-spans-displays ----------------------------------
     "${activationBundle}/src/scripts/hosts/MacBook/macos-configure-mission-control.sh"
 
-    # ---- configureMonitorColorProfile ------------------------------------------
+    # ---- configure-monitor-color-profile ------------------------------------------
     # Clears the ColorSync device-profile cache so that newly connected monitors
     # re-trigger profile detection and pick up the correct ICC profile.
     # ColorSync is a macOS-only subsystem; NixOS uses colord for ICC profile
@@ -185,13 +185,13 @@ in
       /usr/bin/defaults delete /Library/Preferences/com.apple.ColorSync.DeviceCache
     fi
 
-    # ---- clearFinderCache -------------------------------------------------------
+    # ---- clear-finder-cache -------------------------------------------------------
     "${activationBundle}/src/scripts/hosts/MacBook/macos-clear-finder-cache.sh"
 
-    # ---- disableSpotlight -------------------------------------------------------
+    # ---- disable-spotlight -------------------------------------------------------
     "${activationBundle}/src/scripts/hosts/MacBook/macos-disable-spotlight.sh"
 
-    # ---- nvimLauncher -----------------------------------------------------------
+    # ---- launcher -----------------------------------------------------------
     # Pass empty arg to trigger runtime resolution from /dev/console (macOS).
     "${activationBundle}/src/scripts/editors/launch-nvim.sh" ""
 

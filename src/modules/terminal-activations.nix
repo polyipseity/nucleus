@@ -64,7 +64,7 @@ in
   };
 
   config = lib.mkIf (cfg != { }) {
-    home.activation.writeDarwinTerminalActivations = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    home.activation.write-terminal-activations = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       manifest="$HOME/.config/nucleus/terminal-activations.list"
       mkdir -p "$(dirname "$manifest")"
       : > "$manifest"

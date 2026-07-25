@@ -17,11 +17,11 @@ in
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/git/system.gitignore";
   };
 
-  home.activation.gitIgnoreAssemble = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.assemble-gitignore = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/assemble-git-ignore.sh"
   '';
 
-  home.activation.gitEmptyTemplate = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.assemble-git-empty-template = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     # Ensure the empty template directory exists so `init.templateDir` always
     # points at an existing (but empty) directory.  This suppresses the 15+ sample
     # hook scripts and description file that Git otherwise copies into every new

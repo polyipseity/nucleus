@@ -213,7 +213,7 @@
   #   macOS   — login item removal in MacBook/activation.nix (osascript)
   #   NixOS   — this activation script
   #   Windows — Disable-SteamAutoStartup module + apply.ps1
-  system.activationScripts."nixos-disable-steam-autostart" = lib.mkAfter ''
+  system.activationScripts.nixos-disable-steam-autostart = lib.mkAfter ''
     find /home -maxdepth 3 -path '*/autostart/steam.desktop' -delete 2>/dev/null || true  # check-suppress:suppression_doc: steam autostart entry may not exist; find exits 1 when no match, harmless
   '';
 

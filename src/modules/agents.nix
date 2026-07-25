@@ -33,12 +33,12 @@ in
       config.lib.file.mkOutOfStoreSymlink "${config.home.homeDirectory}/.agents/prompts";
   };
 
-  home.activation.unprotectOpencodeSymlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
+  home.activation.unprotect-opencode-symlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/managed-symlink.sh" "unprotect" "agents.nix" "$HOME/.config/opencode/agents"
     "${activationBundle}/src/scripts/configs/managed-symlink.sh" "unprotect" "agents.nix" "$HOME/.config/opencode/commands"
   '';
 
-  home.activation.protectOpencodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.protect-opencode-symlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/configs/managed-symlink.sh" "protect" "agents.nix" "$HOME/.config/opencode/agents"
     "${activationBundle}/src/scripts/configs/managed-symlink.sh" "protect" "agents.nix" "$HOME/.config/opencode/commands"
   '';
@@ -98,7 +98,7 @@ in
     #   clawhub — fetched skill install vehicle; absent from nixpkgs and
     #             cargo-binstall; bun is the only viable install tier.
     # -------------------------------------------------------------------------
-    installBunPackages = lib.hm.dag.entryAfter [ "install-agent-skills" ] ''
+    install-bun-packages = lib.hm.dag.entryAfter [ "install-agent-skills" ] ''
       "${activationBundle}/src/scripts/packages/install-bun-packages.sh" \
         "${pkgs.jq}/bin/jq" \
         "${pkgs.bun}/bin/bun"
@@ -116,7 +116,7 @@ in
     # Only tools absent from nixpkgs, cargo-binstall, and bun are managed here
     # (install preference: nixpkgs > cargo binstall > cargo > bun > uv).
     # -------------------------------------------------------------------------
-    installUvTools = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
+    install-uv-tools = lib.hm.dag.entryAfter [ "install-bun-packages" ] ''
       "${activationBundle}/src/scripts/packages/install-uv-tools.sh" \
         "${pkgs.uv}/bin/uv" \
         "${pkgs.gawk}/bin/awk" \
@@ -144,7 +144,7 @@ in
     # Why after linkGeneration: must run before installCargoBinstallPackages
     # (enforced by that step's entryAfter).
     # -------------------------------------------------------------------------
-    initRustup = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    init-rustup = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/packages/init-rustup.sh" \
         "${pkgs.rustup}/bin/rustup"
     '';
@@ -170,7 +170,7 @@ in
     # initRustup ensures stable is installed before this step.  Unified with
     # Windows Invoke-RustupSetup + Invoke-CargoBinstallSetup behavior.
     # -------------------------------------------------------------------------
-    installCargoBinstallPackages = lib.hm.dag.entryAfter [ "initRustup" ] ''
+    install-cargo-binstall-packages = lib.hm.dag.entryAfter [ "init-rustup" ] ''
       "${activationBundle}/src/scripts/packages/install-cargo-binstall-packages.sh" \
         "${pkgs.jq}/bin/jq" \
         "${pkgs.gawk}/bin/awk" \
@@ -192,7 +192,7 @@ in
     # sync is additive; a missing skill does not break any declared system
     # state.
     # -------------------------------------------------------------------------
-    syncClawHubSkills = lib.hm.dag.entryAfter [ "installBunPackages" ] ''
+    sync-clawhub-skills = lib.hm.dag.entryAfter [ "install-bun-packages" ] ''
       "${activationBundle}/src/scripts/agents/sync-clawhub-skills.sh" \
         "${pkgs.jq}/bin/jq" \
         "${managedPaths.toShellPrependGuard}" \

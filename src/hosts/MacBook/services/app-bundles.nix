@@ -64,7 +64,7 @@ in
   # home.file for manual.md is now in automator-workflows.nix (where the
   # consuming workflow lives).
 
-  home.activation."macos-app-bundle-lib" = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+  home.activation.macos-deploy-app-bundles = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
     "${activationBundle}/src/scripts/hosts/MacBook/macos-deploy-app-bundles.sh" \
       "${pkgs.jq}/bin/jq" \
       '${

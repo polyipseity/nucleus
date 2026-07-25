@@ -347,7 +347,7 @@ in
     # Repo root is resolved from $NUCLEUS_REPO_ROOT (set by apply.sh before invoking
     # darwin-rebuild / nixos-rebuild and forwarded through sudo).
     # -------------------------------------------------------------------------
-    vsCodeSymlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    symlink-vscode-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/editors/symlink-vscode-config.sh" \
         "${repoRoot}" \
         "${stableBaseDir}" \
@@ -370,7 +370,7 @@ in
     # a whole-directory store symlink would cause EACCES.  Instead, keep a real
     # writable directory and populate it with per-extension symlinks.
     # -----------------------------------------------------------------------
-    vsCodeExtensionBridge = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    symlink-vscode-extensions = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/editors/bridge-vscode-extensions.sh" "${extensionStore}"
     '';
 
@@ -394,7 +394,7 @@ in
     # The Python script exits immediately when ~/dev is absent (edge case:
     # first-run race before provisionDevDirectory completes).
     # -----------------------------------------------------------------------
-    vsCodeWorkspaceTrust = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    trust-vscode-workspace = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/editors/trust-vscode-workspace.sh" "${pkgs.python3}/bin/python3"
     '';
   };

@@ -14,7 +14,7 @@ let
 in
 {
   # ---------------------------------------------------------------------------
-  # configureRosetta (postActivation fragment)
+  # configure-rosetta (postActivation fragment)
   # Installs Rosetta 2 once on Apple Silicon hosts if it is not already
   # present. `--agree-to-license` keeps activation non-interactive.
   #

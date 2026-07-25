@@ -183,7 +183,7 @@ lib.mkIf pkgs.stdenv.isLinux {
     # packages), (2) this comment explains why, and (3) the timer and any
     # subsequent provision run serve as implicit follow-up checks.
     # -----------------------------------------------------------------------
-    buildNixIndex = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    build-nix-index = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/packages/update-nix-index.sh" \
         "${pkgs.nix-index}/bin/nix-index" \
         ""
@@ -195,7 +195,7 @@ lib.mkIf pkgs.stdenv.isLinux {
     # configureSystemHardening behaviour.  VS Code workspace trust and editor
     # tooling rely on the directory existing on all hosts.
     # -----------------------------------------------------------------------
-    provisionDevDirectory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    ensure-dev-directory = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       mkdir -p "$HOME/dev"
     '';
 

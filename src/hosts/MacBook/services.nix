@@ -44,8 +44,8 @@ in
   # Shared cache flush that runs after both Automator workflows and App bundles
   # have been deployed. Each sub-module handles its own deploy and prune
   # lifecycle; this entry ensures final cache coherency.
-  home.activation.deployNucleusServicesFlush =
-    lib.hm.dag.entryAfter [ "deployNucleusAutomatorWorkflows" "macos-app-bundle-lib" ]
+  home.activation.flush-services-cache =
+    lib.hm.dag.entryAfter [ "deploy-automator-workflows" "macos-deploy-app-bundles" ]
       ''
         # ── Phase 4: Flush daemon caches so changes take effect immediately ─
         # Without these restarts, cfprefsd and pbs hold stale cached state in
