@@ -172,15 +172,18 @@ else {
         } -ThrottleLimit ([System.Environment]::ProcessorCount) | Where-Object { $_ }) | Sort-Object -Unique
 
         if ($commandNames.Count -gt 0) {
-          # Fetch CommandInfo objects from the warm main runspace (single round-trip).
-          # check-suppress:suppression_doc: AST-extracted names may include aliases not resolvable as cmdlets; silently skip unresolvable names
-          $commandInfos = Get-Command -Name $commandNames -ErrorAction SilentlyContinue
+          # Enumerate all available commands once (fast: ~0.1s) and hash-match
+          # against AST-extracted names. Get-Command -Name with 274 unresolvable
+          # (custom/variable) names costs ~28s; enumeration avoids this entirely.
+          $allCommands = Get-Command -CommandType Cmdlet, Function, Alias, Application -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: Get-Command may throw for inaccessible/corrupt modules during enumeration; safe to skip because we only use matched commands
+          $lookup = @{}; foreach ($c in $allCommands) { $lookup[$c.Name] = $c }
+          $commandInfos = @($commandNames | Where-Object { $lookup.ContainsKey($_) } | ForEach-Object { $lookup[$_] })
 
           # Inject found commands into PSSA's internal cache via .NET reflection.
           # PSSA uses a RunspacePool(1,10) for Get-Command lookups; cold cache is ~60s.
           # The ConcurrentDictionary was introduced in PSSA PR #1162; pre-population is
           # blocked upstream by PowerShell #8910 (ScriptBlock not populated without -Name).
-          if ($commandInfos) {
+          if ($commandInfos.Count -gt 0) {
             # ---- Reflection bootstrap (per-field null guards) ----
             $pssaAssembly = [AppDomain]::CurrentDomain.GetAssemblies() |
               Where-Object { $_.GetName().Name -eq 'Microsoft.Windows.PowerShell.ScriptAnalyzer' }
