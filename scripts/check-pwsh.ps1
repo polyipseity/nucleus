@@ -45,11 +45,35 @@
 .NOTES
   Environment variables: NUCLEUS_CHECK_PATHS.
   Exit codes: 0 on success; non-zero on failure.
+
+  CommandInfo cache pre-population (Phase 1b):
+  PSScriptAnalyzer's CommandInfoCache runs Get-Command in a
+  RunspacePool(1,10), causing ~4000+ individual cold calls (~60s) across 126
+  PS1 files. Phase 1b AST-scans all target files, runs Get-Command once from
+  the main runspace, and injects results into PSSA's internal cache via .NET
+  reflection.
+
+  Upstream tracking:
+  - PSSA #1189 (Get-Command bottleneck):
+    https://github.com/PowerShell/PSScriptAnalyzer/issues/1189
+  - PSSA PR #1162 (ConcurrentDictionary, pre-population blocked by #8910):
+    https://github.com/PowerShell/PSScriptAnalyzer/pull/1162
+  - PowerShell #8910 (ScriptBlock not populated without -Name):
+    https://github.com/PowerShell/PowerShell/issues/8910
+    Our alias/ShouldProcess use case does NOT need ScriptBlock, so #8910
+    is not a blocker.
+  - Remove this workaround when PSSA ships a native pre-population API or
+    when #8910 is fixed and PSSA adopts pre-population.
+
+  Cross-platform parity note:
+  This optimization is PowerShell-only (PSScriptAnalyzer runs in-process).
+  No cross-platform equivalent exists; the lint phase is pwsh-only.
 #>
 [CmdletBinding()]
 param(
   [switch]$SyntaxOnly,
   [switch]$Scoped,
+  [switch]$SkipCachePrepopulation,
 
   [Parameter(ValueFromRemainingArguments = $true)]
   [string[]]$Paths = @($env:NUCLEUS_CHECK_PATHS -split ';' | Where-Object { $_ })
