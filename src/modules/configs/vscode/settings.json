@@ -96,6 +96,7 @@
   "[yaml]": {
     "editor.defaultFormatter": "redhat.vscode-yaml"
   },
+  "accessibility.voice.speechLanguage": "en-US",
   "chat.agent.maxRequests": 1000,
   "chat.agentFilesLocations": {
     ".agents/agents": true,
