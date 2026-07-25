@@ -26,3 +26,8 @@ Default typing policy for all code.
 - **No catch-all types.** Never use `any` (TypeScript), `object` used as an escape hatch (Python, C#), or equivalent catch-all types. `unknown` (TypeScript) is not a catch-all — it is sound and forces narrowing before use. Always find or define a precise type.
 - **No type-error suppression.** Do not use `# type: ignore`, `@ts-ignore`, `@ts-expect-error`, `@SuppressWarnings`, `// NOLINT`, or similar suppression mechanisms. When intentionally bypassing the type system (e.g., testing with deliberately wrong types), use an explicit checked cast or conversion that produces a correctly-typed value.
 - **`assert` is test-only.** Use `assert` only in test code. In production code, use proper error handling. The sole exception is runtime invariants whose violation must halt execution immediately.
+
+## Related instruction files
+
+- `programming-principles.instructions.md` — General coding principles including immutability-by-default, error handling, and architectural patterns.
+- `core-behavior.instructions.md` — Immutable-by-default enforcement rules and agent-wide coding conventions.
