@@ -181,24 +181,48 @@ else {
           # The ConcurrentDictionary was introduced in PSSA PR #1162; pre-population is
           # blocked upstream by PowerShell #8910 (ScriptBlock not populated without -Name).
           if ($commandInfos) {
+            # ---- Reflection bootstrap (per-field null guards) ----
             $pssaAssembly = [AppDomain]::CurrentDomain.GetAssemblies() |
               Where-Object { $_.GetName().Name -eq 'Microsoft.Windows.PowerShell.ScriptAnalyzer' }
+            if (-not $pssaAssembly) { throw 'Assembly Microsoft.Windows.PowerShell.ScriptAnalyzer not loaded' }
 
             $helperType = $pssaAssembly.GetType('Microsoft.Windows.PowerShell.ScriptAnalyzer.Helper')
-            $helperInstance = $helperType.GetProperty('Instance', [System.Reflection.BindingFlags]'Static,Public').GetValue($null)
+            if (-not $helperType) { throw 'Type Helper not found in PSSA assembly' }
+
+            $helperInstanceProp = $helperType.GetProperty('Instance', [System.Reflection.BindingFlags]'Static,Public')
+            if (-not $helperInstanceProp) { throw 'Property Helper.Instance not found' }
+            $helperInstance = $helperInstanceProp.GetValue($null)
+            if (-not $helperInstance) { throw 'Helper.Instance returned null (not initialized?)' }
 
             $cacheLazyField = $helperType.GetField('_commandInfoCacheLazy', [System.Reflection.BindingFlags]'NonPublic,Instance')
+            if (-not $cacheLazyField) { throw 'Field Helper._commandInfoCacheLazy not found' }
             $cacheLazy = $cacheLazyField.GetValue($helperInstance)
-            $cacheInstance = $cacheLazy.GetType().GetProperty('Value').GetValue($cacheLazy)
+            if (-not $cacheLazy) { throw 'Helper._commandInfoCacheLazy is null' }
+
+            $cacheInstanceProp = $cacheLazy.GetType().GetProperty('Value')
+            if (-not $cacheInstanceProp) { throw 'Property Lazy<CommandInfoCache>.Value not found' }
+            $cacheInstance = $cacheInstanceProp.GetValue($cacheLazy)
+            if (-not $cacheInstance) { throw 'CommandInfoCache instance is null' }
 
             $cacheType = $pssaAssembly.GetType('Microsoft.Windows.PowerShell.ScriptAnalyzer.CommandInfoCache')
+            if (-not $cacheType) { throw 'Type CommandInfoCache not found in PSSA assembly' }
+
             $dictField = $cacheType.GetField('_commandInfoCache', [System.Reflection.BindingFlags]'NonPublic,Instance')
+            if (-not $dictField) { throw 'Field CommandInfoCache._commandInfoCache not found' }
             $dict = $dictField.GetValue($cacheInstance)
+            if (-not $dict) { throw 'CommandInfoCache._commandInfoCache dictionary is null' }
 
             $lookupKeyType = $cacheType.GetNestedType('CommandLookupKey', [System.Reflection.BindingFlags]'NonPublic')
-            $lookupKeyCtor = $lookupKeyType.GetConstructors([System.Reflection.BindingFlags]'NonPublic,Instance')[0]
-            $tryAddMethod = $dict.GetType().GetMethod('TryAdd')
+            if (-not $lookupKeyType) { throw 'Nested type CommandLookupKey not found in CommandInfoCache' }
 
+            $lookupKeyCtors = $lookupKeyType.GetConstructors([System.Reflection.BindingFlags]'NonPublic,Instance')
+            if (-not $lookupKeyCtors -or $lookupKeyCtors.Length -eq 0) { throw 'Constructor not found for CommandLookupKey' }
+            $lookupKeyCtor = $lookupKeyCtors[0]
+
+            $tryAddMethod = $dict.GetType().GetMethod('TryAdd')
+            if (-not $tryAddMethod) { throw 'Method ConcurrentDictionary.TryAdd not found' }
+
+            # ---- Injection loop (unchanged) ----
             foreach ($ci in $commandInfos) {
               $key = $lookupKeyCtor.Invoke(@($ci.Name, $ci.CommandType))
               # Lazy<T>(T) defaults to ExecutionAndPublication thread-safety mode.
