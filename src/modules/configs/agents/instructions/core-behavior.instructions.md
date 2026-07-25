@@ -45,6 +45,7 @@ Default operating mode for all agent interactions.
 - ≥2 independently modifiable files → parallel `General Purpose` subagents
 - ≥2 separable questions → one subagent per question
 - Steps described as "do X in file Y" → `General Purpose` subagent
+- Max 2 concurrent subagents by default
 
 **Template:** See `delegate.prompt.md`. Keep prompts short: 2-3 sentence context, one-sentence task, hard constraints, expected return.
 
