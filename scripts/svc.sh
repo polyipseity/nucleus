@@ -58,6 +58,14 @@ if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
   HAS_SUDO=true
 fi
 
+# Resolve the real user UID for launchctl user-domain queries under sudo.
+# When running via sudo, $(id -u) returns 0 (root), but user-domain launchctl
+# services live under the original user's gui/<uid> context.
+REAL_USER_UID="$(id -u)"
+if [ "$EUID" -eq 0 ] && [ -n "${SUDO_UID:-}" ]; then
+  REAL_USER_UID="$SUDO_UID"
+fi
+
 # Helpers
 
 # read_registry — Parse services.json and return JSON filtered to current platform.
@@ -132,8 +140,14 @@ expand_prefix() {
       domain=$(echo "$plat_json" | jq -r '.domain // "user"')
       [ "$domain" = "system" ] && sudo_prefix="sudo"
       local matches
+      # When running under sudo, user-domain launchctl list shows root's
+      # user context — use launchctl asuser to query the real user's domain.
       # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
-      matches=$($sudo_prefix launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true)
+      if [ "$domain" = "user" ] && [ "$EUID" -eq 0 ]; then
+        matches=$(launchctl asuser "$REAL_USER_UID" launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true)  # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
+      else
+        matches=$($sudo_prefix launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true)  # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
+      fi
       if [ -z "$matches" ]; then
         printf '%s\t%s\t%s\t%s\n' "$name" "$prefix" "$plat_json" "$name"
       else
@@ -176,8 +190,15 @@ svc_status() {
       [ "$domain" = "system" ] && domain_flag="sudo"
 
       local list_line running=true enabled=true pid=""
+      # When running under sudo, user-domain launchctl list shows root's
+      # user context (gui/0/), not the original user's (gui/<SUDO_UID>/).
+      # Use launchctl asuser to query the real user's launchd domain.
       # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
-      list_line=$($domain_flag launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true)
+      if [ "$domain" = "user" ] && [ "$EUID" -eq 0 ]; then
+        list_line=$(launchctl asuser "$REAL_USER_UID" launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true)  # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
+      else
+        list_line=$($domain_flag launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true)  # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
+      fi
       local socket_activated
       socket_activated=$(echo "$entry_json" | jq -r '.socketActivated // false')
       if [ -z "$list_line" ]; then

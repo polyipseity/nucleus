@@ -36,22 +36,26 @@ register_handler() {
 # launchctl_target — Build a macOS launchctl service target specifier.
 # macOS 25+ requires gui/<uid>/<service> for user domain and
 # system/<service> for system domain. Older macOS accepted bare service IDs.
+# Respects REAL_USER_UID if set (used by nucleus-svc when running under sudo).
 launchctl_target() {
+  local uid="${REAL_USER_UID:-$(id -u)}"
   if [ "$1" = "system" ]; then
     printf 'system/%s' "$2"
   else
-    printf 'gui/%s/%s' "$(id -u)" "$2"
+    printf 'gui/%s/%s' "$uid" "$2"
   fi
 }
 
 # launchctl_bootstrap_domain — Build a macOS launchctl bootstrap domain target.
 # bootstrap expects a domain target (system or gui/<uid>), not a service target.
 # macOS 26 dropped the "user" alias; gui/<uid> is the only valid form for user.
+# Respects REAL_USER_UID if set (used by nucleus-svc when running under sudo).
 launchctl_bootstrap_domain() {
+  local uid="${REAL_USER_UID:-$(id -u)}"
   if [ "$1" = "system" ]; then
     printf 'system'
   else
-    printf 'gui/%s' "$(id -u)"
+    printf 'gui/%s' "$uid"
   fi
 }
 
