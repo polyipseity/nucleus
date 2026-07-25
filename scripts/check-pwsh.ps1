@@ -147,6 +147,71 @@ else {
     # Method 3 (consumed by script at CI time via -SettingsPath): sibling settings file defines Severity and ExcludeRules.
     $settingsFile = Join-Path $PSScriptRoot 'PSScriptAnalyzerSettings.psd1'
 
+    # -----------------------------------------------------------------------
+    # Phase 1b: Pre-populate CommandInfo cache (performance).
+    # -----------------------------------------------------------------------
+    if (-not $SkipCachePrepopulation) {
+      try {
+        # Warmup: trigger Helper.Initialize() safely before reflection cache injection.
+        # Direct .Value access on _commandInfoCacheLazy before Initialize() causes
+        # a NullReferenceException during subsequent Invoke-ScriptAnalyzer calls.
+        $null = Invoke-ScriptAnalyzer -ScriptDefinition '1+1' -Settings $settingsFile
+
+        # AST-extract all invoked command names from target .ps1 files.
+        $commandNames = @($Paths | Sort-Object -Unique | ForEach-Object -Parallel {
+          $path = $_
+          if (-not (Test-Path -Path $path)) { return }
+          $tokens = $null; $errors = $null
+          $ast = [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)
+          if ($errors) { return }
+          $commands = $ast.FindAll({ $args[0] -is [System.Management.Automation.Language.CommandAst] }, $true)
+          $commands | ForEach-Object {
+            $name = $_.GetCommandName()
+            if ($name) { $name }
+          }
+        } -ThrottleLimit ([System.Environment]::ProcessorCount) | Where-Object { $_ }) | Sort-Object -Unique
+
+        if ($commandNames.Count -gt 0) {
+          # Fetch CommandInfo objects from the warm main runspace (single round-trip).
+          # check-suppress:suppression_doc: AST-extracted names may include aliases not resolvable as cmdlets; silently skip unresolvable names
+          $commandInfos = Get-Command -Name $commandNames -ErrorAction SilentlyContinue
+
+          # Inject found commands into PSSA's internal cache via .NET reflection.
+          # PSSA uses a RunspacePool(1,10) for Get-Command lookups; cold cache is ~60s.
+          # The ConcurrentDictionary was introduced in PSSA PR #1162; pre-population is
+          # blocked upstream by PowerShell #8910 (ScriptBlock not populated without -Name).
+          if ($commandInfos) {
+            $pssaAssembly = [AppDomain]::CurrentDomain.GetAssemblies() |
+              Where-Object { $_.GetName().Name -eq 'Microsoft.Windows.PowerShell.ScriptAnalyzer' }
+
+            $helperType = $pssaAssembly.GetType('Microsoft.Windows.PowerShell.ScriptAnalyzer.Helper')
+            $helperInstance = $helperType.GetProperty('Instance', [System.Reflection.BindingFlags]'Static,Public').GetValue($null)
+
+            $cacheLazyField = $helperType.GetField('_commandInfoCacheLazy', [System.Reflection.BindingFlags]'NonPublic,Instance')
+            $cacheLazy = $cacheLazyField.GetValue($helperInstance)
+            $cacheInstance = $cacheLazy.GetType().GetProperty('Value').GetValue($cacheLazy)
+
+            $cacheType = $pssaAssembly.GetType('Microsoft.Windows.PowerShell.ScriptAnalyzer.CommandInfoCache')
+            $dictField = $cacheType.GetField('_commandInfoCache', [System.Reflection.BindingFlags]'NonPublic,Instance')
+            $dict = $dictField.GetValue($cacheInstance)
+
+            $lookupKeyType = $cacheType.GetNestedType('CommandLookupKey', [System.Reflection.BindingFlags]'NonPublic')
+            $lookupKeyCtor = $lookupKeyType.GetConstructors([System.Reflection.BindingFlags]'NonPublic,Instance')[0]
+            $tryAddMethod = $dict.GetType().GetMethod('TryAdd')
+
+            foreach ($ci in $commandInfos) {
+              $key = $lookupKeyCtor.Invoke(@($ci.Name, $ci.CommandType))
+              # Lazy<T>(T) defaults to ExecutionAndPublication thread-safety mode.
+              $lazy = [System.Lazy[System.Management.Automation.CommandInfo]]::new($ci)
+              $null = $tryAddMethod.Invoke($dict, @([object]$key, $lazy))
+            }
+          }
+        }
+      } catch {
+        Write-Warning "CommandInfo cache pre-population failed ($($_.Exception.Message)); falling back to uncached PSSA."
+      }
+    }
+
     $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
     $lintResults = $files | Invoke-ScriptAnalyzer -Settings $settingsFile
 
