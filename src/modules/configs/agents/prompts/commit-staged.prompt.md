@@ -25,9 +25,20 @@ Proceed automatically with best-effort defaults and available context.
    - Optional body (each line wrapped to 72 chars or fewer; bullets allowed)
    - Footer (`BREAKING CHANGE` / `Refs` / `Ticket`), including `${input:extra}` when provided
 
-   Prefer tooling-enforced rules; default to Conventional Commits when unclear. If the commit is rejected by commitlint, rewrap and retry with a fresh `git commit`. NEVER use `git commit --amend` — the commit was not created, so `--amend` would modify whatever HEAD currently points to (a pre-existing commit), potentially destroying history.
+   Prefer tooling-enforced rules; default to Conventional Commits when unclear. After composing, proceed to step 2b for commitlint validation.
 
-2a. **Verify commit** - Run `git rev-parse HEAD` and `git log -1 --format=%s`. Confirm the hash is new and the message is your intended message. If they show the previous commit's message, the commit was not created — retry with a fresh `git commit` (not `--amend`).
+2b. **Validate with commitlint**
+   Before running `git commit`, validate the message with commitlint:
+
+   - **Detect project setup.** Check for a commitlint config file (`.commitlintrc.*`, `commitlint.config.*`) in the project root. If found, the config is used. If not found, check for a documented conflicting convention (CONTRIBUTING.md / README.md specifies a non-conventional-commit format such as `gitmoji` or a custom schema). If a conflicting convention exists AND no commitlint config is present, skip validation entirely — the project has explicitly opted out.
+   - **Run validation.** From the project root:
+     - **Bash/zsh:** `echo "<full message>" | npx commitlint 2>&1`
+     - **PowerShell:** `"<full message>" | npx commitlint 2>&1`
+     - If `npx` / `commitlint` is unavailable, fall back to a structural conventional-commit check (type-prefix, format).
+   - **On failure.** If validation fails AND no conflicting convention is documented, fix the message and re-run validation. Do not proceed to `git commit` until validation passes. If commitlint is present but fails with a tool error (not a lint error), report the failure — do not proceed.
+   - **On success.** Proceed to step 2c.
+
+2c. **Verify commit** - Run `git rev-parse HEAD` and `git log -1 --format=%s`. Confirm the hash is new and the message is your intended message. If they show the previous commit's message, the commit was not created — retry with a fresh `git commit` (not `--amend`).
 
 3. **Create the commit**
    If `${input:commitNow}` is `no`, skip and only present the message.

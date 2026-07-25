@@ -48,6 +48,7 @@ After a commit failure: always retry with a fresh `git commit`. Never amend.
 
 ## Related instruction files
 
+- `commit.instructions.md` — Pre-commit commitlint validation policy.
 - `core-behavior.instructions.md` — Git commit enforcement policy and commit-keeper subagent delegation.
 - `maintain.instructions.md` — Atomic commit workflow, safety rules, and git operation restrictions.
 - `execution-details.instructions.md` — Tool recovery and multi-edit fallback after failed operations.
