@@ -1,4 +1,3 @@
-
 ---
 name: commit-staged
 description: Produce a commit message for the currently staged changes and commit by default.
