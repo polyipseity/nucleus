@@ -74,11 +74,10 @@ if (-not $Paths -or $Paths.Count -eq 0) {
 # ---------------------------------------------------------------------------
 # Phase 1: Syntax validation via the built-in parser.
 # ---------------------------------------------------------------------------
-$parseErrors = @()
-
-foreach ($path in $Paths | Sort-Object -Unique) {
+$parseErrors = @($Paths | Sort-Object -Unique | ForEach-Object -Parallel {
+  $path = $_
   if (-not (Test-Path -Path $path)) {
-    continue
+    return
   }
 
   $tokens = $null
@@ -86,9 +85,9 @@ foreach ($path in $Paths | Sort-Object -Unique) {
   [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)
 
   if ($errors) {
-    $parseErrors += $errors
+    $errors
   }
-}
+} -ThrottleLimit ([System.Environment]::ProcessorCount) | Where-Object { $_ -ne $null })
 
 if ($parseErrors.Count -gt 0) {
   foreach ($parseError in $parseErrors) {
@@ -119,7 +118,7 @@ else {
 
     Import-Module PSScriptAnalyzer
     # Pre-import commonly-used modules to reduce PSSA's implicit Get-Command overhead during rule evaluation.
-    Import-Module PSReadLine -ErrorAction SilentlyContinue
+    Import-Module PSReadLine -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: PSReadLine may be absent in CI/non-interactive shells; this import is a performance optimization, not required
 
     # Method 3 (consumed by script at CI time via -SettingsPath): sibling settings file defines Severity and ExcludeRules.
     $settingsFile = Join-Path $PSScriptRoot 'PSScriptAnalyzerSettings.psd1'
