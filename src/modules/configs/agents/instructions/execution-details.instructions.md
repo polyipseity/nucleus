@@ -24,3 +24,8 @@ When investigating a bug or unexpected behavior:
 4. For each cause, produce concrete evidence (log lines, error output, observed values) — do not reason from assumptions.
 5. Report findings with evidence before proposing fixes.
 6. Propose the simplest fix that addresses the confirmed root cause.
+
+## Related instruction files
+
+- `core-behavior.instructions.md` — General agent behavior model, investigation trigger points, and error handling conventions.
+- `programming-principles.instructions.md` — Fail-fast principle, defensive boundaries, and railway-oriented error propagation patterns.
