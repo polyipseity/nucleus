@@ -113,36 +113,52 @@ Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Remove-Item 
 # ---------------------------------------------------------------------------
 # 1. Nix test suite — POSIX only (stub on Windows)
 # ---------------------------------------------------------------------------
+$_sw = [System.Diagnostics.Stopwatch]::StartNew()
 Write-Output ("`n=== [{0}] Nix test suite ===" -f (++$_step))
 say "skipping (requires Nix toolchain — not available on Windows)."
+$_sw.Stop()
+$_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.time") -NoNewline
 
 # ---------------------------------------------------------------------------
 # 2. Shell script linting — POSIX only (stub on Windows)
 # ---------------------------------------------------------------------------
+$_sw = [System.Diagnostics.Stopwatch]::StartNew()
 Write-Output ("`n=== [{0}] Shell script linting ===" -f (++$_step))
 say "skipping (requires ShellCheck — not available on Windows)."
+$_sw.Stop()
+$_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.time") -NoNewline
 
 # ---------------------------------------------------------------------------
 # 3. PowerShell lint (PSScriptAnalyzer)
 # ---------------------------------------------------------------------------
+$_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] PowerShell lint ===" -f (++$_step))
 $script:waveJob3 = Start-Job -ScriptBlock {
-  param($pwshScript)
+  param($pwshScript, $_stepStartTicks)
   & $pwshScript
+  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $_stepStartTicks
+  $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
+  $_elapsedMs | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-3.time") -NoNewline
   $LASTEXITCODE
-} -ArgumentList "$PSScriptRoot\check-pwsh.ps1"
+} -ArgumentList "$PSScriptRoot\check-pwsh.ps1", $_stepStartTicks
 
 # ---------------------------------------------------------------------------
 # 4. Nucleus apps smoke tests — POSIX only (stub on Windows)
 # ---------------------------------------------------------------------------
+$_sw = [System.Diagnostics.Stopwatch]::StartNew()
 Write-Output ("`n=== [{0}] Nucleus apps smoke tests ===" -f (++$_step))
 say "skipping (requires Nix and bash — not available on Windows)."
+$_sw.Stop()
+$_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.time") -NoNewline
 
 # ---------------------------------------------------------------------------
 # 5. System config build — POSIX only (stub on Windows)
 # ---------------------------------------------------------------------------
+$_sw = [System.Diagnostics.Stopwatch]::StartNew()
 Write-Output ("`n=== [{0}] System config build ===" -f (++$_step))
 say "skipping (system config build is POSIX-only)."
+$_sw.Stop()
+$_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.time") -NoNewline
 
 # Wait for background jobs and collect exit codes
 if ($script:waveJob3) {
@@ -161,6 +177,19 @@ foreach ($_s in @(1, 2, 3, 4)) {
     }
   }
 }
+
+# Timing summary
+say "test step timing:"
+$_totalMs = 0
+for ($_s = 1; $_s -le 5; $_s++) {
+  $_timeFile = Join-Path $script:WaveTmpDir "step-$_s.time"
+  if (Test-Path $_timeFile) {
+    $_ms = [int](Get-Content $_timeFile -Raw)
+    $_totalMs += $_ms
+    say ("  step {0,2}: {1,5} ms" -f $_s, $_ms)
+  }
+}
+say ("  total:   {0,5} ms" -f $_totalMs)
 
 Write-Output ""
 if ($exitCode -ne 0) {
