@@ -1,7 +1,7 @@
 ---
 name: implement-plan
 description: Execute an implementation plan with subagent parallelism and atomic commits.
-argument-hint: "backwardsCompat=no atomicCommits=no maxConcurrency=1"
+argument-hint: "backwardsCompat=no atomicCommits=yes maxConcurrency=2"
 ---
 
 # Implement plan
@@ -50,7 +50,7 @@ If the user's message that triggered this prompt contains "only plan", "only res
    - Simplify code as you edit whenever possible.
    - Backwards compatibility: if `${input:backwardsCompat}` is `yes`, preserve backwards compatibility; otherwise (default), do not add compat shims.
    - Think and work step by step, explain your reasoning. No filler.
-   - If `${input:atomicCommits}` is `yes`, commit each atomic change with a precise message after each meaningful sub-step. Otherwise (default `no`), skip all git operations.
+   - If `${input:atomicCommits}` is `yes`, commit each atomic change with a precise message after each meaningful sub-step. Otherwise, skip all git operations.
    - Re-read the original plan file regularly — especially after interruptions, subagent returns, or context switches — to ensure no phase is skipped or misinterpreted.
    - **Always retrieve the plan via session memory first:** use the find-latest-plan pattern (see "Find the latest plan file" below). Parse the frontmatter to recover input variables (`atomicCommits`, `backwardsCompat`, `maxConcurrency`) and current progress (`status`, `current-step`, `committed`). If no plan is found, fall back to the temp file path from step 1.
    - **Update frontmatter after every meaningful sub-step.** Before switching context, calling a subagent, or at any natural break point: retrieve the plan (find-latest-plan pattern), bump `current-step` to the current workflow number, update `committed`, and write back using `replace_string_in_file` or `create_file`. This is how progress survives context compaction — do not skip it.
@@ -62,7 +62,7 @@ If the user's message that triggered this prompt contains "only plan", "only res
 3. **Use subagents for every opportunity**
    - First, invoke the checkpoint skill (`skill: "checkpoint"`) to save current state before delegation.
    - Spawn subagents for any sufficiently independent subproblem — planning sub-steps, implementing separate files, researching unknowns, or verifying intermediate results. Subagents prevent context overflow and reduce the risk of forgetting earlier requirements by giving each subproblem a fresh, focused context.
-   - Limit concurrent subagents to `${input:maxConcurrency}` (default 1). Even at maxConcurrency=1, subagents are highly beneficial — do not skip spawning them just because parallelism is limited.
+   - Limit concurrent subagents to `${input:maxConcurrency}` (default 2). Even at maxConcurrency=1, subagents are highly beneficial — do not skip spawning them just because parallelism is limited.
    - Subagents must also follow the step-by-step reasoning and no-filler style.
    - See `~/.agents/prompts/delegate.prompt.md` for the standardized delegation template.
    - **Before spawning subagents, update frontmatter `current-step` to 3.** Also pass the plan path in the subagent prompt context so the subagent can read the plan if needed.
@@ -92,5 +92,5 @@ If the user's message that triggered this prompt contains "only plan", "only res
 ## Inputs
 
 - `${input:backwardsCompat}` — `yes` to preserve backwards compatibility; default `no` (do not add compat shims)
-- `${input:atomicCommits}` — `yes` to commit atomically; default `no` (skip git commits entirely)
-- `${input:maxConcurrency}` — maximum number of concurrent subagents (default 1)
+- `${input:atomicCommits}` — `yes` to commit atomically; default `yes`
+- `${input:maxConcurrency}` — maximum number of concurrent subagents (default 2)
