@@ -598,6 +598,10 @@ do_list() {
       fi
       printf '%-20s %-24s %-10s %-8s %s\n' "$json_key" "$display" "$status" "$running" "$pid"
     done <<< "$entries"
+    if [ -n "$domain_filter_warning" ]; then
+      printf '\n'
+      warn "$domain_filter_warning"
+    fi
   fi
   "$has_error" && return 1 || return 0
 }
@@ -1030,13 +1034,14 @@ if [ "$domain_filter" = "system" ] && ! $HAS_SUDO; then
   exit 1
 fi
 
-# Emit domain filter info/warning
+# Capture domain filter info/warning, emitted after the table in do_list.
+domain_filter_warning=""
 if [ "$domain_filter" = "user" ]; then
-  warn "listing user-domain services only"
+  domain_filter_warning="listing user-domain services only"
 elif [ "$domain_filter" = "system" ]; then
-  warn "listing system-domain services only"
+  domain_filter_warning="listing system-domain services only"
 elif [ "$domain_filter" = "all" ] && ! $HAS_SUDO; then
-  warn "sudo not available — skipping system-domain services (use --user or --system)"
+  domain_filter_warning="sudo not available — skipping system-domain services (use --user or --system)"
 fi
 
 [ -z "$action" ] && { error "missing action (list, status, start, stop, restart, enable, disable, verify, endpoint, logs, log-paths, log-config)" ; usage >&2 ; exit 1; }
