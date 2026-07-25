@@ -12,7 +12,7 @@ You are resuming after an interruption.
      - Run `ls -1 <base-path>/plan-*.md 2>/dev/null | sort -r | head -1` in a terminal to locate the latest plan file.
      - If no files match, no active plan is found — proceed normally (skip steps 2-5).
   2. Read the plan file — it contains the active plan with a lifecycle frontmatter.
-  3. Parse the frontmatter to recover input variables (`atomicCommits`, `backwardsCompat`, `maxConcurrency`) and current progress (`status`, `current-step`, `committed`). Re-apply these to the resumed execution (e.g., commit atomically if `atomicCommits: yes`; preserve the `committed` value as-is — it carries over from the interrupted session).
+  3. Parse the frontmatter to recover input variables (`atomicCommits`, `backwardsCompat`, `maxConcurrency`) and current progress (`status`, `current-step`, `committed`). If any input is missing from the frontmatter, fall back to built-in defaults (`atomicCommits=yes`, `backwardsCompat=no`, `maxConcurrency=2`). Log the recovered values. Re-apply these to the resumed execution (e.g., commit atomically if `atomicCommits: yes`; preserve the `committed` value as-is — it carries over from the interrupted session).
   4. If `status` is `completed`, report that the plan is already finished and skip re-execution.
   5. Otherwise, resume executing from the `current-step` value using the `implement-plan` workflow. Do NOT restart the plan.
   6. Find and load the latest checkpoint for supplementary context:

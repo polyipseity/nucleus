@@ -22,7 +22,8 @@ If the user's message that triggered this prompt contains "implement", "do it", 
    - If no files match, report: "No active plan found — nothing to verify." and stop.
 2. Read the plan file at the returned path.
 3. Parse the frontmatter for context (`status`, `current-step`, `committed`). Do not short-circuit on any status value — proceed to verify regardless.
-4. Find and load the latest checkpoint for supplementary context:
+4. Parse `inputs` from frontmatter. Record `atomicCommits`, `backwardsCompat`, `maxConcurrency` for awareness — not used during verification but helpful context for the report.
+5. Find and load the latest checkpoint for supplementary context:
    - Run `ls -1 <base-path>/checkpoint-*.md 2>/dev/null | sort -r | head -1` to locate the latest checkpoint.
    - If a checkpoint exists, read it — the checkpoint's "Work done" and "Next steps" sections provide rich verification context (what was just implemented, what files were touched, pending decisions).
    - If no checkpoint exists, proceed without it.

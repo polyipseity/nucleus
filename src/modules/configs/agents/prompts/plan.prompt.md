@@ -12,6 +12,16 @@ You are in plan mode. Produce, refine, or update a detailed implementation plan.
 
 If the user's message that triggered this prompt contains "implement", "do it", "go ahead", "execute", "make the changes", "edit files", or any equivalent execution indicator, this prompt MUST NOT proceed with implementation. Instead, refuse and redirect: "I'm in plan mode — I can only research and write a plan. To execute, use the implement-plan prompt." Do not create plan files, run commands, or edit anything in this case.
 
+## Default inputs
+
+Before proceeding, explicitly acknowledge these default input values that will be written into the plan frontmatter and used by `implement-plan`:
+
+- **`atomicCommits: yes`** — each meaningful sub-step will be committed atomically with a precise message.
+- **`backwardsCompat: no`** — do not add compatibility shims.
+- **`maxConcurrency: 2`** — at most 2 concurrent subagents.
+
+State "Defaults acknowledged: atomicCommits=yes, backwardsCompat=no, maxConcurrency=2" at the start of your response. If the user passes explicit overrides, state those instead. This acknowledgment must appear before any research or writing begins.
+
 ## Input
 
 The user provides either:
@@ -33,7 +43,7 @@ Before writing or modifying the plan, gather all necessary context:
   - DuckDuckGo / other search engines — research APIs, documentation, best practices, alternatives.
   - Any other search tools available to you.
 - **Clarify ambiguity**: If requirements are ambiguous, ask clarifying questions.
-- **Subagent delegation**: Delegate independent research branches to Explore subagents.
+- **MUST enumerate subagent opportunities before starting.** Write into session memory (`/memories/session/`) a list of which subproblems can be delegated (separate research branches, independent file reads, architecture exploration). Delegate each to an `Explore` or `General Purpose` subagent. Do not skip this step.
 
 ### 2. Plan creation
 
@@ -51,9 +61,9 @@ Create a detailed, step-by-step implementation plan. Write it into a new session
   committed: no
   current-step: 1
   inputs:
-    atomicCommits: no
+    atomicCommits: yes
     backwardsCompat: no
-    maxConcurrency: 1
+    maxConcurrency: 2
   ---
 
   # Plan: <short title>
@@ -66,6 +76,8 @@ Create a detailed, step-by-step implementation plan. Write it into a new session
 
   <detailed steps>
   ```
+
+> **Wiring**: The `inputs` section is read by `implement-plan.prompt.md` to control behavior. `atomicCommits: yes` means each phase change should be committed; `backwardsCompat: no` means no compatibility shims; `maxConcurrency` limits parallel subagents.
 
 - Each phase should be specific, actionable, and ordered by dependency.
 - After writing, verify the file is nonempty and substantive.

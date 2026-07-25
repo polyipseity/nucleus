@@ -19,6 +19,8 @@ Refer to the triggering thresholds in `core-behavior.instructions.md`:
 
 ## Template
 
+When delegating to subagents, include the active input defaults (`atomicCommits`, `backwardsCompat`, `maxConcurrency`) in the Context section so the subagent is aware of the governing constraints.
+
 ```text
 runSubagent(
   prompt: "
