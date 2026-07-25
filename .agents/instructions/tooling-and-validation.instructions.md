@@ -92,6 +92,7 @@ Checks in both `scripts/check.sh` and `scripts/check.ps1` are classified into th
   ```
 
   The pragma `# deadnix: skip` is available for rare cases where a binding must remain syntactically unused (e.g. a placeholder for future tests). Use it only as a last resort.
+
 - **Commit message validation**: commitlint (via `prek.toml` commit-msg hook) enforces conventional commit types. Valid types: `build`, `chore`, `ci`, `docs`, `feat`, `fix`, `perf`, `refactor`, `revert`, `style`, `test`. Do not use `maintain` — use `refactor` for cleanup without behavior change or `chore` for config/tooling maintenance.
 - **prek hook stashing**: prek hooks stash unstaged changes during commit execution, run checks, then restore them. Stashing output during commits is normal, not an error.
 - **CI policy**: Do not add new checks or tests to `ci.yml`. Route new validation into repo checks (`scripts/check.sh` / `scripts/check.ps1`) or repo tests (`tests/`). Decouples checks from CI runners so they work locally too.

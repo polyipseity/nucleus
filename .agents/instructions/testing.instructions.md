@@ -129,7 +129,6 @@ These patterns have been learned from fixing real test failures:
 - **Cascading assertion failures**: `builtins.throw` in assertion helpers (e.g., `assert'`) only reveals the first failure per eval run. To find all failures at once, temporarily replace `assert'` with a no-op version that records rather than throws.
 - **Template refactoring ripple**: When code refactors from inline Nix strings to external template files (`builtins.readFile`), tests that previously checked the Nix source file must be updated to read the template file instead. Every assertion that references the old inline source is a latent failure.
 - **Deadnix-reported unused bindings**: deadnix flags `let` bindings in test files that are never forced by the final return expression. These are **not false positives** — Nix is lazy, so bindings unreferenced from the expression tree are genuinely never evaluated. If deadnix flags a binding:
-
   - **Remove it** if it was leftover from an earlier version of the test.
   - **Force evaluation** if the binding must be computed for correctness. The canonical pattern:
 
