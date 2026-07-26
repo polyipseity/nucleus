@@ -252,6 +252,215 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Test 10: Warmup-only produces empty cache (no injection).
+# ---------------------------------------------------------------------------
+echo "--- Test 10: Warmup-only produces empty cache ---"
+
+set +e
+# shellcheck disable=SC2016 # reason: PowerShell syntax inside single-quoted -Command
+_empty_cache_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInteractive -Command '
+  $rp = $env:NUCLEUS_TEST_ROOT
+  $ErrorActionPreference = "Stop"
+  Set-StrictMode -Version Latest
+  Import-Module PSScriptAnalyzer
+  . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
+  . "$rp/tests/scripts/cache-verify-lib.ps1"
+  # Warmup-only: no -RealCommandMap, no -InjectDummies
+  $null = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1"
+  $stats = Get-CacheStats
+  Write-Output "T=$($stats.TotalEntries) R=$($stats.RealCount) D=$($stats.DummyCount)"
+' 2>&1)
+_empty_cache_exit=$?
+set -e
+
+if [ "$_empty_cache_exit" -eq 0 ]; then
+  assert_pass "Warmup-only empty cache: executes without error"
+else
+  assert_fail "Warmup-only empty cache: executes without error" "Exit code: $_empty_cache_exit, Output: $_empty_cache_out"
+fi
+
+if echo "$_empty_cache_out" | grep -qE '^T=1 R=1 D=0$'; then
+  assert_pass "Warmup-only empty cache: TotalEntries=1 (warmup resolves Export-ModuleMember)"
+else
+  assert_fail "Warmup-only empty cache: TotalEntries=1" "Expected T=1 R=1 D=0, got: $_empty_cache_out"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 11: RealCommandMap injects real objects with both key types (74, 383).
+# ---------------------------------------------------------------------------
+echo "--- Test 11: RealCommandMap injects both key types ---"
+
+set +e
+# shellcheck disable=SC2016 # reason: PowerShell syntax inside single-quoted -Command
+_bothkeys_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInteractive -Command '
+  $rp = $env:NUCLEUS_TEST_ROOT
+  $ErrorActionPreference = "Stop"
+  Set-StrictMode -Version Latest
+  Import-Module PSScriptAnalyzer
+  . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
+  . "$rp/tests/scripts/cache-verify-lib.ps1"
+  # Inject a known command via RealCommandMap
+  $realMap = @{ "Write-Output" = (Get-Command Write-Output | ForEach-Object { $_.PSObject.BaseObject }) }
+  $null = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -RealCommandMap $realMap
+  $contents = @(Get-CacheContents)
+  $has74 = @($contents | Where-Object { $_.Name -eq "Write-Output" -and $_.CommandTypes -eq 74 -and $_.IsReal }).Count -gt 0
+  $has383 = @($contents | Where-Object { $_.Name -eq "Write-Output" -and $_.CommandTypes -eq 383 -and $_.IsReal }).Count -gt 0
+  Write-Output "HAS74=$has74 HAS383=$has383"
+' 2>&1)
+_bothkeys_exit=$?
+set -e
+
+if [ "$_bothkeys_exit" -eq 0 ]; then
+  assert_pass "Both key types: executes without error"
+else
+  assert_fail "Both key types: executes without error" "Exit code: $_bothkeys_exit, Output: $_bothkeys_out"
+fi
+
+if echo "$_bothkeys_out" | grep -qE '^HAS74=True HAS383=True$'; then
+  assert_pass "Both key types: Write-Output present with CommandTypes 74 and 383 (both real)"
+else
+  assert_fail "Both key types: Write-Output present with both key types" "Expected HAS74=True HAS383=True, got: $_bothkeys_out"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 12: InjectDummies creates dummy entries.
+# ---------------------------------------------------------------------------
+echo "--- Test 12: InjectDummies creates dummy entries ---"
+
+set +e
+# shellcheck disable=SC2016 # reason: PowerShell syntax inside single-quoted -Command
+_dummies_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInteractive -Command '
+  $rp = $env:NUCLEUS_TEST_ROOT
+  $ErrorActionPreference = "Stop"
+  Set-StrictMode -Version Latest
+  Import-Module PSScriptAnalyzer
+  . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
+  . "$rp/tests/scripts/cache-verify-lib.ps1"
+  # Inject dummies only
+  $null = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -InjectDummies
+  $stats = Get-CacheStats
+  Write-Output "T=$($stats.TotalEntries) R=$($stats.RealCount) D=$($stats.DummyCount)"
+' 2>&1)
+_dummies_exit=$?
+set -e
+
+if [ "$_dummies_exit" -eq 0 ]; then
+  assert_pass "InjectDummies: executes without error"
+else
+  assert_fail "InjectDummies: executes without error" "Exit code: $_dummies_exit, Output: $_dummies_out"
+fi
+
+if echo "$_dummies_out" | grep -qE '^T=[1-9][0-9]* R=[1-9][0-9]* D=[1-9][0-9]*$'; then
+  assert_pass "InjectDummies: TotalEntries>0, RealCount>0 (warmup), DummyCount>0 (injected)"
+else
+  assert_fail "InjectDummies: creates dummy entries" "Expected T>0 R>0 D>0, got: $_dummies_out"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 13: InjectDummies preserves real objects from prior RealCommandMap.
+# ---------------------------------------------------------------------------
+echo "--- Test 13: Dummy injection preserves prior real entries ---"
+
+set +e
+# shellcheck disable=SC2016 # reason: PowerShell syntax inside single-quoted -Command
+_preserve_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInteractive -Command '
+  $rp = $env:NUCLEUS_TEST_ROOT
+  $ErrorActionPreference = "Stop"
+  Set-StrictMode -Version Latest
+  Import-Module PSScriptAnalyzer
+  . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
+  . "$rp/tests/scripts/cache-verify-lib.ps1"
+  # Phase 1: inject real Write-Output
+  $realMap = @{ "Write-Output" = (Get-Command Write-Output | ForEach-Object { $_.PSObject.BaseObject }) }
+  $null = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -RealCommandMap $realMap
+  # Phase 2: inject dummies for all names
+  $null = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -InjectDummies
+  # Verify Write-Output with CommandTypes=74 is still real
+  $contents = @(Get-CacheContents)
+  $wo74 = $contents | Where-Object { $_.Name -eq "Write-Output" -and $_.CommandTypes -eq 74 }
+  $wo383 = $contents | Where-Object { $_.Name -eq "Write-Output" -and $_.CommandTypes -eq 383 }
+  $wo74stillReal = $wo74.Count -gt 0 -and $wo74[0].IsReal
+  $wo383stillReal = $wo383.Count -gt 0 -and $wo383[0].IsReal
+  $stats = Get-CacheStats
+  Write-Output "WO74=$wo74stillReal WO383=$wo383stillReal T=$($stats.TotalEntries) R=$($stats.RealCount) D=$($stats.DummyCount)"
+' 2>&1)
+_preserve_exit=$?
+set -e
+
+if [ "$_preserve_exit" -eq 0 ]; then
+  assert_pass "Preserve real entries: executes without error"
+else
+  assert_fail "Preserve real entries: executes without error" "Exit code: $_preserve_exit, Output: $_preserve_out"
+fi
+
+if echo "$_preserve_out" | grep -qE '^WO74=True WO383=True T=[1-9] R=[1-9] D=[1-9]'; then
+  assert_pass "Preserve real entries: Write-Output still real after dummy injection"
+else
+  assert_fail "Preserve real entries: Write-Output still real" "Expected WO74=True WO383=True with R>0, D>0, got: $_preserve_out"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 14: Full pipeline (check-pwsh.ps1) produces diagnostics.
+# ---------------------------------------------------------------------------
+echo "--- Test 14: Full pipeline produces diagnostics ---"
+
+set +e
+_pipeline_out=$(pwsh -NoLogo -NoProfile -NonInteractive -File "$CHECK_PWSH" 2>&1)
+_pipeline_exit=$?
+set -e
+
+# Count diagnostic lines
+_pipeline_diag=$(echo "$_pipeline_out" | grep -Ec '\.ps1:[0-9]+:[0-9]+: \[' 2>/dev/null || echo "0")
+
+if [ "$_pipeline_exit" -ne 0 ] && [ "$_pipeline_diag" -gt 0 ]; then
+  assert_pass "Full pipeline: exits non-zero with $_pipeline_diag diagnostics"
+else
+  assert_fail "Full pipeline: produces diagnostics" "Expected exit != 0 with diag > 0, got exit=$_pipeline_exit, diag=$_pipeline_diag"
+fi
+
+# Check for no unhandled exceptions
+if echo "$_pipeline_out" | grep -qi 'RuntimeException\|NullReferenceException\|MethodInvocationException'; then
+  assert_fail "Full pipeline: no unhandled exceptions" "Found exception in output"
+else
+  assert_pass "Full pipeline: no unhandled exceptions"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 15: Warmup-only doesn't suppress diagnostics.
+# ---------------------------------------------------------------------------
+echo "--- Test 15: Warmup-only doesn't suppress diagnostics ---"
+
+set +e
+# shellcheck disable=SC2016 # reason: PowerShell syntax inside single-quoted -Command
+_warmup_diag_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInteractive -Command '
+  $rp = $env:NUCLEUS_TEST_ROOT
+  $ErrorActionPreference = "Stop"
+  Set-StrictMode -Version Latest
+  Import-Module PSScriptAnalyzer
+  . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
+  # Warmup only (no injection) — same as check-pwsh.ps1 Phase C + Phase D baseline
+  $null = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1"
+  # Run lint on a file with known issues (cache-verify-lib.ps1 has 3 PSUseSingularNouns issues)
+  $diags = Invoke-ScriptAnalyzer -Path "$rp/tests/scripts/cache-verify-lib.ps1" -Settings "$rp/scripts/PSScriptAnalyzerSettings.psd1"
+  Write-Output "DIAG=$($diags.Count)"
+' 2>&1)
+_warmup_diag_exit=$?
+set -e
+
+if [ "$_warmup_diag_exit" -eq 0 ]; then
+  assert_pass "Warmup diag: executes without error"
+else
+  assert_fail "Warmup diag: executes without error" "Exit code: $_warmup_diag_exit, Output: $_warmup_diag_out"
+fi
+
+if echo "$_warmup_diag_out" | grep -qE '^DIAG=[1-9][0-9]*$'; then
+  _warmup_diag_val=$(echo "$_warmup_diag_out" | grep -oE 'DIAG=[0-9]+' | grep -oE '[0-9]+')
+  assert_pass "Warmup diag: produces $_warmup_diag_val diagnostics"
+else
+  assert_fail "Warmup diag: produces diagnostics" "Expected DIAG=N with N>0, got: $_warmup_diag_out"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
