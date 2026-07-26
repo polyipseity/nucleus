@@ -5,7 +5,7 @@
 .DESCRIPTION
   PSScriptAnalyzer's AvoidAlias (PSAvoidUsingCmdletAliases) rule calls
   GetCommandInfo for every unique command name found in the target files, with
-  two different CommandTypes values (74 = Function|Cmdlet|Filter and 383 = All).
+  two different CommandTypes values (74 = Function|Cmdlet|Script and 383 = All).
   Each call resolves via Get-Command, which is slow (~60s per file for a large
   repo). By pre-populating the cache with lightweight RemoteCommandInfo dummy
   objects (or real CommandInfo objects from Get-Command), the rule avoids
@@ -64,7 +64,7 @@
 
 .NOTES
   Magic numbers:
-  - 74 = CommandTypes value for Function|Cmdlet|Filter — hardcoded in AvoidAlias IL
+  - 74 = CommandTypes value for Function|Cmdlet|Script — hardcoded in AvoidAlias IL
     (ldc.i4.s 74 at IL offset 0x1F).
   - 383 = CommandTypes value for All — used when AvoidAlias calls GetCommandInfo
     with a null nullable parameter.
@@ -139,7 +139,7 @@ function Initialize-PSScriptAnalyzerCache {
     $getCmdInfo = $helperType.GetMethod('GetCommandInfo')
     $paramType = $getCmdInfo.GetParameters()[1].ParameterType
     $underlyingType = $paramType.GetGenericArguments()[0]
-    # 74 = Function|Cmdlet|Filter — hardcoded in AvoidAlias IL (ldc.i4.s 74 at offset 0x1F)
+    # 74 = Function|Cmdlet|Script — hardcoded in AvoidAlias IL (ldc.i4.s 74 at offset 0x1F)
     $cmdletVal = [System.Enum]::ToObject($underlyingType, 74)
     # 383 = All — used when nullable CommandTypes parameter is null
     $allVal = [System.Enum]::ToObject($underlyingType, 383)
@@ -183,7 +183,7 @@ function Initialize-PSScriptAnalyzerCache {
         $ci = if ($hasRealMap -and $RealCommandMap.ContainsKey($n)) { $RealCommandMap[$n] } else { $remoteCtor.Invoke(@($n, [System.Management.Automation.CommandTypes]::Cmdlet)) }
         $lazy = $lazyCtor.Invoke(@($ci))
 
-        # Insert with key type 74 (Function|Cmdlet|Filter)
+        # Insert with key type 74 (Function|Cmdlet|Script)
         $k1 = [Activator]::CreateInstance($keyType)
         $nameField.SetValue($k1, $n)
         $ctField.SetValue($k1, $nullableCmdlet)
@@ -206,7 +206,7 @@ function Initialize-PSScriptAnalyzerCache {
         $ci = $RealCommandMap[$n]
         $lazy = $lazyCtor.Invoke(@($ci))
 
-        # Insert with key type 74 (Function|Cmdlet|Filter)
+        # Insert with key type 74 (Function|Cmdlet|Script)
         $k1 = [Activator]::CreateInstance($keyType)
         $nameField.SetValue($k1, $n)
         $ctField.SetValue($k1, $nullableCmdlet)
