@@ -427,9 +427,18 @@
             pkgs.git
             pkgs.powershell
           ];
-          bundleDefault = false;
+          bundleDefault = true;
           text = ''
-            exec pwsh -NoLogo -NoProfile -NonInteractive -File "${../scripts + "/check-pwsh.ps1"}" "$@"
+            _self="$0"
+            while [ -h "$_self" ]; do
+              _target="$(readlink "$_self")"
+              case "$_target" in
+                /*) _self="$_target" ;;
+                *) _self="$(CDPATH="" cd -- "$(dirname -- "$_self")" && pwd -P)/$_target" ;;
+              esac
+            done
+            _script_dir="$(CDPATH="" cd -- "$(dirname -- "$_self")/../scripts" && pwd -P)"
+            exec pwsh -NoLogo -NoProfile -NonInteractive -File "$_script_dir/check-pwsh.ps1" "$@"
           '';
         };
 
