@@ -63,6 +63,47 @@
 #
 # Re-measure after each PSScriptAnalyzer or PowerShell version bump.
 #
+# === Exhaustive per-rule benchmark (127 files, fresh process, 3 orderings) ===
+# Measured: 2026-07-25 on MacBook (Apple Silicon)
+#
+# Exhaustive single-rule-in-fresh-process benchmark across all 75 rules, all
+# 127 tracked PS1 files, with 3 different rule orderings to isolate order
+# effects (forward alphabetical, reverse, random). Each run is an independent
+# fresh pwsh process (Import-Module PSScriptAnalyzer, run one rule, exit).
+# No warmup, no CachePrePopulation.
+#
+# 4 inherently slow rules dominate:
+# Rule                                    Fwd(ms) Rev(ms) Rand(ms) Diags   Cause
+# ----                                    ------- ------- -------- -----   -----
+# PSAvoidUsingCmdletAliases                 44957   45599   82492      9   CPU-bound
+# PSShouldProcess                           37234   36944   96846      0   CPU-bound
+# PSUseCmdletCorrectly                      29442   30199   55646      0   CPU-bound
+# PSDSCUseVerboseMessageInDSCResource         498   20456     609      0   Page-cold sensitive
+#
+# Totals: fwd=148.6s, rev=169.4s, rand=311.2s (577 total diags across all 75 rules)
+#
+# Interpretation:
+# - PSAvoidUsingCmdletAliases (~45-97s): iterates every command name in every
+#   PS1 file and calls GetCommandInfo with TWO CommandTypes values (74 and
+#   383) per name. This is the single biggest PSSA cost. CachePrePopulation
+#   eliminates it (reduces to <100ms warm).
+# - PSShouldProcess (~37-97s): validates that every cmdlet with ShouldProcess
+#   support is correctly called in a ShouldProcess scope. Must trace call
+#   context for every cmdlet invocation. CPU-bound, no Get-Command dependency.
+# - PSUseCmdletCorrectly (~29-56s): checks correct parameter usage for all
+#   known cmdlets. Requires full parameter-set resolution per invocation.
+#   CPU-bound, no Get-Command dependency.
+# - PSDSCUseVerboseMessageInDSCResource (~0.5-20s): very fast when warm,
+#   extremely slow when page-cold (first rule in process). Not inherently
+#   CPU-bound — just pays .NET assembly loading cost. Once warm it runs in
+#   <1s like all other non-CPU-bound rules.
+# - All other 71 rules: 468-598ms each (baseline), no inherent slowness.
+#
+# Random-order effect: the 3 CPU-bound rules scatter .NET assembly access
+# patterns, causing page-cache thrashing for nearby rules. Observed as 13
+# rules temporarily inflated to 1-5s (up from 473-546ms baseline). These
+# are cache artifacts, not real slowness.
+#
 # === AvoidAlias bottleneck analysis ===
 # PSAvoidUsingCmdletAliases dominates cold-start (~30s/36s = 83%).
 # Root cause: MoveNext calls Get-Command for every unique command name,
