@@ -7,16 +7,14 @@
   (`System.Management.Automation.Language.Parser`) to validate `.ps1` syntax
   without executing scripts.
 
-  Phase 2 — Lint: if PSScriptAnalyzer is available in the current session,
-  runs `Invoke-ScriptAnalyzer` in-process at Error and Warning severity with
-  excluded rules that trigger false positives. Rules are executed in two
-  ordered groups to prevent cache pollution:
+  Phase 2 — Lint: runs `Invoke-ScriptAnalyzer` in-process at Error and Warning
+  severity with excluded rules that trigger false positives. Rules are executed
+  in two ordered groups to prevent cache pollution:
   - Group 1 (Phase C): all rules except PSAvoidUsingCmdletAliases — runs with
     natural cache population (real Get-Command objects from Phase B).
   - Group 2 (Phase D): PSAvoidUsingCmdletAliases (last) — runs after dummy
     injection populates all remaining cache entries, giving 100% cache hits.
-  If the module is absent, a warning is printed and the lint phase is skipped
-  so CI can run on machines without PSScriptAnalyzer (syntax still passes).
+  PSScriptAnalyzer is required — if the module is absent, the lint phase fails.
 
   By default the script checks every tracked `*.ps1` file in the current Git
   repository.
@@ -49,6 +47,8 @@
 .NOTES
   Environment variables: NUCLEUS_CHECK_PATHS.
   Exit codes: 0 on success; non-zero on failure.
+
+  PSScriptAnalyzer is required — the lint phase fails if the module is absent.
 
   The lint phase runs rules in two explicit groups:
   1. All rules except PSAvoidUsingCmdletAliases — runs with natural cache
@@ -126,17 +126,21 @@ if ($parseErrors.Count -gt 0) {
 Write-Output ("PowerShell syntax check passed for {0} files." -f $Paths.Count)
 
 # ---------------------------------------------------------------------------
-# Phase 2: PSScriptAnalyzer lint (best-effort).
+# Phase 2: PSScriptAnalyzer lint.
 # ---------------------------------------------------------------------------
 if ($SyntaxOnly) {
   Write-Output 'PowerShell lint skipped (-SyntaxOnly).'
-} elseif (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
-  Write-Warning 'PSScriptAnalyzer not found; skipping lint phase. Install it with: Install-Module PSScriptAnalyzer'
+  return
 }
-else {
+
+# Preflight: PSScriptAnalyzer is required.
+if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+  throw 'PSScriptAnalyzer module is required for lint phase. Install with: Install-Module PSScriptAnalyzer -Scope CurrentUser'
+}
+
+$originalPSModulePath = $env:PSModulePath
+try {
   # Scope PSModulePath to reduce module-discovery overhead during PSSA rule evaluation.
-  $originalPSModulePath = $env:PSModulePath
-  try {
     $env:PSModulePath = @(
       "$PSHome/Modules"
       [System.IO.Path]::Combine($HOME, '.local/share/powershell/Modules')
@@ -213,4 +217,3 @@ else {
   finally {
     $env:PSModulePath = $originalPSModulePath
   }
-}
