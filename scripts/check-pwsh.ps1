@@ -172,20 +172,27 @@ try {
       }
     }
 
-    # Phase C: All rules except PSAvoidUsingCmdletAliases.
+    # Phase C: All enabled rules except PSAvoidUsingCmdletAliases.
     # Must run BEFORE Phase D (dummy injection). These rules inspect CommandInfo
     # metadata (Parameters, ParameterSets) and would crash on RemoteCommandInfo
     # dummies. Phase B's real-object injection gives them fast cache hits.
+    #
+    # Enabled rules come from the settings file: Severity filter + ExcludeRules.
     $allDiagnostics = [System.Collections.Generic.List[object]]::new()
-    $nonAvoidAliasRules = @(Get-ScriptAnalyzerRule | ForEach-Object RuleName | Where-Object { $_ -ne 'PSAvoidUsingCmdletAliases' })
-    if ($nonAvoidAliasRules.Count -gt 0) {
-      $groupSettings = @{
-        IncludeRules = [string[]]$nonAvoidAliasRules
-        Severity = @('Error', 'Warning')
-        ExcludeRules = @('PSUseBOMForUnicodeEncodedFile')
+    $settings = Import-PowerShellDataFile $settingsFile
+    $enabledSeverities = [System.Collections.Generic.HashSet[string]]@($settings.Severity)
+    $excludedRules = [System.Collections.Generic.HashSet[string]]@($settings.ExcludeRules)
+    $enabledRuleNames = @(Get-ScriptAnalyzerRule | Where-Object {
+        $_.RuleName -notin $excludedRules -and $_.Severity -in $enabledSeverities
+    } | ForEach-Object RuleName)
+    $phaseCRuleNames = [string[]]@($enabledRuleNames | Where-Object { $_ -ne 'PSAvoidUsingCmdletAliases' })
+    $phaseDRuleNames = [string[]]@($enabledRuleNames | Where-Object { $_ -eq 'PSAvoidUsingCmdletAliases' })
+    if ($phaseCRuleNames.Count -gt 0) {
+      $phaseCSettings = @{
+        IncludeRules = $phaseCRuleNames
         Rules = @{}
       }
-      $diags = $files | Invoke-ScriptAnalyzer -Settings $groupSettings
+      $diags = $files | Invoke-ScriptAnalyzer -Settings $phaseCSettings
       $allDiagnostics.AddRange($diags)
     }
 
@@ -193,16 +200,13 @@ try {
     # is existence-only (aliases → commands), so RemoteCommandInfo dummies work.
     # Dummy injection happens here, after all other rules have finished, to
     # prevent cross-pollution of the cache.
-    $avoidAliasAvailable = @(Get-ScriptAnalyzerRule | Where-Object RuleName -eq 'PSAvoidUsingCmdletAliases').Count -gt 0
-    if ($avoidAliasAvailable -and $allNames.Count -gt 0) {
+    if ($phaseDRuleNames.Count -gt 0 -and $allNames.Count -gt 0) {
       $null = Initialize-PSScriptAnalyzerCache -Files $files -SettingsFile $settingsFile -CommandNames @($allNames) -InjectDummies
-      $avoidSettings = @{
-        IncludeRules = @('PSAvoidUsingCmdletAliases')
-        Severity = @('Error', 'Warning')
-        ExcludeRules = @('PSUseBOMForUnicodeEncodedFile')
+      $phaseDSettings = @{
+        IncludeRules = $phaseDRuleNames
         Rules = @{}
       }
-      $avoidDiags = $files | Invoke-ScriptAnalyzer -Settings $avoidSettings
+      $avoidDiags = $files | Invoke-ScriptAnalyzer -Settings $phaseDSettings
       $allDiagnostics.AddRange($avoidDiags)
     }
     if ($allDiagnostics.Count -gt 0) {
