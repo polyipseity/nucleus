@@ -3,29 +3,21 @@
   Parse-validates and lints repository PowerShell files.
 
 .DESCRIPTION
-  Phase 1 — Syntax: uses the built-in PowerShell parser
+  Syntax validation: uses the built-in PowerShell parser
   (`System.Management.Automation.Language.Parser`) to validate `.ps1` syntax
   without executing scripts.
 
-  Phase 2 — Lint: runs `Invoke-ScriptAnalyzer` in-process at Error and Warning
-  severity with excluded rules that trigger false positives. Rules are executed
-  in two ordered groups to prevent cache pollution:
-  - Group 1 (Phase C): all rules except PSAvoidUsingCmdletAliases — runs with
-    natural cache population (real Get-Command objects from Phase B).
-  - Group 2 (Phase D): PSAvoidUsingCmdletAliases (last) — runs after dummy
-    injection populates all remaining cache entries, giving 100% cache hits.
-  PSScriptAnalyzer is required — if the module is absent, the lint phase fails.
+  PSScriptAnalyzer lint: runs `Invoke-ScriptAnalyzer` at Error and Warning
+  severity on enabled rules. Rules execute in two ordered groups to prevent
+  cache pollution — all rules except PSAvoidUsingCmdletAliases first (with
+  real CommandInfo pre-population), then PSAvoidUsingCmdletAliases last (after
+  dummy cache injection).
 
-  By default the script checks every tracked `*.ps1` file in the current Git
-  repository.
-
-  This script is intended to be called via the flake app
-  `nix run ./src#check-pwsh`, which pins runtime dependencies (`pwsh`, `git`)
-  to repository-managed versions.
-
-.PARAMETER SyntaxOnly
-  If specified, skip Phase 2 (PSScriptAnalyzer). Used by check.sh for fast
-  pre-commit validation; full lint runs in test.sh.
+.PARAMETER SkipTest
+  Test names to skip. Initially only 'PSSA' is recognized — bypasses the
+  PSScriptAnalyzer lint. Used by check.sh/check.ps1 for fast pre-commit
+  validation; test.sh/test.ps1 run without -SkipTest (full lint). Unknown
+  names are silently ignored.
 
 .PARAMETER Scoped
   If specified and no paths are given, skip Git discovery (no files to check).
@@ -39,7 +31,7 @@
   nix run ./src#check-pwsh
 
 .EXAMPLE
-  nix run ./src#check-pwsh -- -SyntaxOnly
+  nix run ./src#check-pwsh -- -SkipTest PSSA
 
 .EXAMPLE
   nix run ./src#check-pwsh -- src/hosts/Windows/apply.ps1
@@ -48,34 +40,17 @@
   Environment variables: NUCLEUS_CHECK_PATHS.
   Exit codes: 0 on success; non-zero on failure.
 
-  PSScriptAnalyzer is required — the lint phase fails if the module is absent.
-
   The lint phase runs rules in two explicit groups:
   1. All rules except PSAvoidUsingCmdletAliases — runs with natural cache
-     population (Phase B injects real CommandInfo objects for matched names).
-  2. PSAvoidUsingCmdletAliases (last) — runs after Initialize-PSScriptAnalyzerCache
-     -InjectDummies fills all remaining cache entries with RemoteCommandInfo.
-     This avoids cross-pollution: rules needing real CommandInfo metadata
-     (Parameters, ParameterSets) never see RemoteCommandInfo dummies.
-
-  The CommandInfoCache pre-population optimization (function
-  Initialize-PSScriptAnalyzerCache) triggers PSSA's internal lazy
-  initialization and injects real CommandInfo objects and/or
-  RemoteCommandInfo dummies into the command cache, avoiding slow Get-Command
-  calls. The optimization is non-fatal: if it fails, linting continues using
-  the uncached path.
-
-  PSModulePath is scoped to the Nix store and user-local modules to reduce
-  module-discovery overhead during rule evaluation. This is the dominant
-  factor (reduces first-run from ~100s to ~60s).
-
-  Cross-platform parity note:
-  This optimization is PowerShell-only (PSScriptAnalyzer runs in-process).
-  No cross-platform equivalent exists; the lint phase is pwsh-only.
+     population (hybrid pre-population injects real CommandInfo objects for
+     matched command names first).
+  2. PSAvoidUsingCmdletAliases (last) — runs after dummy injection fills all
+     remaining cache entries. This avoids cross-pollution: rules needing real
+     CommandInfo metadata (Parameters, ParameterSets) never see dummies.
 #>
 [CmdletBinding()]
 param(
-  [switch]$SyntaxOnly,
+  [string[]]$SkipTest = @(),
   [switch]$Scoped,
   [Parameter(ValueFromRemainingArguments = $true)]
   [string[]]$Paths = @($env:NUCLEUS_CHECK_PATHS -split ';' | Where-Object { $_ })
@@ -97,8 +72,13 @@ if (-not $Paths -or $Paths.Count -eq 0) {
   exit 0
 }
 
+$skipTestSet = [System.Collections.Generic.HashSet[string]]::new(
+  [System.StringComparer]::OrdinalIgnoreCase
+)
+foreach ($t in $SkipTest) { $null = $skipTestSet.Add($t) }
+
 # ---------------------------------------------------------------------------
-# Phase 1: Syntax validation via the built-in parser.
+# Syntax validation.
 # ---------------------------------------------------------------------------
 $parseErrors = @($Paths | Sort-Object -Unique | ForEach-Object -Parallel {
   $path = $_
@@ -126,20 +106,17 @@ if ($parseErrors.Count -gt 0) {
 Write-Output ("PowerShell syntax check passed for {0} files." -f $Paths.Count)
 
 # ---------------------------------------------------------------------------
-# Phase 2: PSScriptAnalyzer lint.
+# PSScriptAnalyzer lint.
 # ---------------------------------------------------------------------------
-if ($SyntaxOnly) {
-  Write-Output 'PowerShell lint skipped (-SyntaxOnly).'
-  return
-}
+$skipPSSA = $skipTestSet -contains 'PSSA'
+if (-not $skipPSSA) {
+  # Preflight: PSScriptAnalyzer is required.
+  if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
+    throw 'PSScriptAnalyzer module is required for lint phase. Install with: Install-Module PSScriptAnalyzer -Scope CurrentUser'
+  }
 
-# Preflight: PSScriptAnalyzer is required.
-if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
-  throw 'PSScriptAnalyzer module is required for lint phase. Install with: Install-Module PSScriptAnalyzer -Scope CurrentUser'
-}
-
-$originalPSModulePath = $env:PSModulePath
-try {
+  $originalPSModulePath = $env:PSModulePath
+  try {
   # Scope PSModulePath to reduce module-discovery overhead during PSSA rule evaluation.
     $env:PSModulePath = @(
       "$PSHome/Modules"
@@ -160,9 +137,9 @@ try {
 
     $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
 
-    # Phase B: Hybrid pre-population — parse all command names from target files
+    # Hybrid pre-population — parse all command names from target files
     # and inject real CommandInfo objects for names that match loaded commands.
-    # This runs before any Invoke-ScriptAnalyzer call, so Phase C rules benefit
+    # This runs before any Invoke-ScriptAnalyzer call, so the main rules benefit
     # from fast cache hits on real commands.
     $allNames = @(Get-UniqueCommandNames -Files $files)
     if ($allNames.Count -gt 0) {
@@ -172,10 +149,10 @@ try {
       }
     }
 
-    # Phase C: All enabled rules except PSAvoidUsingCmdletAliases.
-    # Must run BEFORE Phase D (dummy injection). These rules inspect CommandInfo
+    # All enabled rules except PSAvoidUsingCmdletAliases.
+    # Must run BEFORE dummy injection. These rules inspect CommandInfo
     # metadata (Parameters, ParameterSets) and would crash on RemoteCommandInfo
-    # dummies. Phase B's real-object injection gives them fast cache hits.
+    # dummies. The hybrid pre-population real-object injection gives them fast cache hits.
     #
     # Enabled rules come from the settings file: Severity filter + ExcludeRules.
     $allDiagnostics = [System.Collections.Generic.List[object]]::new()
@@ -196,7 +173,7 @@ try {
       $allDiagnostics.AddRange($diags)
     }
 
-    # Phase D: PSAvoidUsingCmdletAliases (last). This rule's cache hit pattern
+    # PSAvoidUsingCmdletAliases (last). This rule's cache hit pattern
     # is existence-only (aliases → commands), so RemoteCommandInfo dummies work.
     # Dummy injection happens here, after all other rules have finished, to
     # prevent cross-pollution of the cache.
@@ -221,3 +198,6 @@ try {
   finally {
     $env:PSModulePath = $originalPSModulePath
   }
+} else {
+  Write-Output 'PowerShell lint skipped (-SkipTest PSSA).'
+}

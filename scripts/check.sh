@@ -265,15 +265,15 @@ _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 } &
 
-# powershell_syntax — PowerShell syntax validation (parser only, no PSScriptAnalyzer)
+# powershell_syntax — PowerShell syntax validation (parser only, skip PSSA)
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "PowerShell syntax validation"
 {
 _ps_exit=0
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly -Scoped "${PS1_FILES[@]}" || _ps_exit=$?
+  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SkipTest PSSA -Scoped "${PS1_FILES[@]}" || _ps_exit=$?
 elif ! $HAS_ARGS; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SyntaxOnly || _ps_exit=$?
+  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SkipTest PSSA || _ps_exit=$?
 else
   say "skipping (no PowerShell scripts to check)."
 fi
