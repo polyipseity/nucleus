@@ -62,7 +62,17 @@ function Initialize-PSScriptAnalyzerCache {
     [Parameter(Mandatory = $true)]
     [string]$SettingsFile,
 
-    [string[]]$Workaround = @('CachePrePopulation')
+    [string[]]$Workaround = @('CachePrePopulation'),
+
+    # Hashtable of name → real CommandInfo objects (CmdletInfo, FunctionInfo)
+    # obtained from Get-MatchingRealCommands. When populated, matched names
+    # inject the real object instead of a RemoteCommandInfo dummy.
+    [hashtable]$RealCommandMap = @{},
+
+    # Pre-parsed command names to inject. When non-empty, skips internal file
+    # parsing. Used by the hybrid flow (check-pwsh.ps1 Phase B) where
+    # Get-UniqueCommandNames has already been called externally.
+    [string[]]$CommandNames = @()
   )
 
   $injectedNameCount = 0
@@ -74,7 +84,7 @@ function Initialize-PSScriptAnalyzerCache {
     # traversable without NullReferenceException.
     $null = Invoke-ScriptAnalyzer -ScriptDefinition '1+1' -Settings $SettingsFile
 
-    if ($Workaround -contains 'CachePrePopulation') {
+    if ($Workaround -contains 'CachePrePopulation' -or $Workaround -contains 'InjectRealOnly') {
       # Reflective access to Helper.Instance._commandInfoCacheLazy.Value._commandInfoCache
       $helperType = [Microsoft.Windows.PowerShell.ScriptAnalyzer.Helper]
       $helper = [Microsoft.Windows.PowerShell.ScriptAnalyzer.Helper]::Instance
@@ -105,22 +115,36 @@ function Initialize-PSScriptAnalyzerCache {
       $remoteType = [System.Management.Automation.RemoteCommandInfo]
       $remoteCtor = $remoteType.GetConstructor([System.Reflection.BindingFlags]'NonPublic,Instance', $null, @([string], [System.Management.Automation.CommandTypes]), $null)
 
-      # Collect unique command names across all target files
-      $allNames = [System.Collections.Generic.HashSet[string]]::new()
-      foreach ($f in $Files) {
-        $fileAst = [System.Management.Automation.Language.Parser]::ParseFile($f, [ref]$null, [ref]$null)
-        $cmdNames = $fileAst.FindAll({ $args[0] -is [System.Management.Automation.Language.CommandAst] }, $true) |
-          ForEach-Object { $_.GetCommandName() } | Where-Object { $_ }
-        foreach ($n in $cmdNames) {
-          $null = $allNames.Add($n)
-          # AvoidAlias checks both the raw name and Get-<name> for non-Get- commands
-          if ($n -notlike 'Get-*') { $null = $allNames.Add("Get-$n") }
+      # Determine the names to inject — use pre-parsed $CommandNames if provided,
+      # otherwise fall back to file parsing (backward compat).
+      if ($CommandNames -and $CommandNames.Count -gt 0) {
+        $namesToInject = $CommandNames
+      } else {
+        $parsedNames = [System.Collections.Generic.HashSet[string]]::new()
+        foreach ($f in $Files) {
+          if (-not (Test-Path -Path $f)) { continue }
+          $fileAst = [System.Management.Automation.Language.Parser]::ParseFile($f, [ref]$null, [ref]$null)
+          $cmdNames = $fileAst.FindAll({ $args[0] -is [System.Management.Automation.Language.CommandAst] }, $true) |
+            ForEach-Object { $_.GetCommandName() } | Where-Object { $_ }
+          foreach ($n in $cmdNames) {
+            $null = $parsedNames.Add($n)
+            # AvoidAlias checks both the raw name and Get-<name> for non-Get- commands
+            if ($n -notlike 'Get-*') { $null = $parsedNames.Add("Get-$n") }
+          }
         }
+        $namesToInject = $parsedNames
       }
 
-      # Inject dummy RemoteCommandInfo entries for both key types AvoidAlias uses
-      foreach ($n in $allNames) {
-        $ci = $remoteCtor.Invoke(@($n, [System.Management.Automation.CommandTypes]::Cmdlet))
+      $isInjectRealOnly = $Workaround -contains 'InjectRealOnly'
+      $injectedCount = 0
+
+      # Inject CommandInfo entries for both key types
+      foreach ($n in $namesToInject) {
+        # InjectRealOnly skips names not present in RealCommandMap
+        if ($isInjectRealOnly -and -not $RealCommandMap.ContainsKey($n)) { continue }
+
+        # Use real object from map if available, otherwise create RemoteCommandInfo dummy
+        $ci = if ($RealCommandMap.ContainsKey($n)) { $RealCommandMap[$n] } else { $remoteCtor.Invoke(@($n, [System.Management.Automation.CommandTypes]::Cmdlet)) }
         $lazy = $lazyCtor.Invoke(@($ci))
 
         # Insert with key type 74 (Function|Cmdlet|Filter)
@@ -134,8 +158,10 @@ function Initialize-PSScriptAnalyzerCache {
         $nameField.SetValue($k2, $n)
         $ctField.SetValue($k2, $nullableAll)
         $null = $dict.TryAdd($k2, $lazy)
+
+        $injectedCount++
       }
-      $injectedNameCount = $allNames.Count
+      $injectedNameCount = $injectedCount
     }
   } catch {
     # Injection is a performance optimization; failure is non-fatal.
