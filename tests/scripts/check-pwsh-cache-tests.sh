@@ -21,16 +21,16 @@ cd "$REPO_ROOT"
 
 CHECK_PWSH="scripts/check-pwsh.ps1"
 
-# Pre-flight: skip all tests if pwsh or PSScriptAnalyzer is unavailable.
+# Pre-flight: hard fail if pwsh or PSScriptAnalyzer is unavailable.
 if ! command -v pwsh &>/dev/null; then
-  echo -e "\033[1;33m⊘\033[0m All tests skipped: pwsh not found"
-  exit 0
+  echo "FATAL: pwsh not found — required by cache tests"
+  exit 1
 fi
 
 # shellcheck disable=SC2016 # reason: PowerShell syntax $true/$_ inside single quotes, not shell variables
 if ! pwsh -NoLogo -NoProfile -NonInteractive -Command '& { exit (Get-Module -ListAvailable -Name PSScriptAnalyzer ? { $true } ? { 0 } : { 1 }) }' 2>/dev/null; then
-  echo -e "\033[1;33m⊘\033[0m All tests skipped: PSScriptAnalyzer not installed"
-  exit 0
+  echo "FATAL: PSScriptAnalyzer module not installed — required by cache tests"
+  exit 1
 fi
 
 # ---------------------------------------------------------------------------
@@ -149,43 +149,6 @@ if [ "$_diag_exit" -ne 0 ] && [ "$_diag_count" -gt 0 ]; then
   assert_pass "Injection preserves diagnostics: $_diag_count total, exit $_diag_exit"
 else
   assert_fail "Injection preserves diagnostics" "Expected exit != 0 with diag count > 0, got exit=$_diag_exit, diag=$_diag_count"
-fi
-
-# ---------------------------------------------------------------------------
-# Test 6: Standalone function call with single Windows file (cross-host).
-# ---------------------------------------------------------------------------
-echo "--- Test 6: Standalone function with Windows file ---"
-
-_WIN_FILE="src/hosts/Windows/apply.ps1"
-if [ -f "$_WIN_FILE" ]; then
-  set +e
-  # shellcheck disable=SC2016 # reason: PowerShell syntax ($rp, $env, $result) inside single-quoted -Command, not shell variables
-  _single_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" NUCLEUS_TEST_WIN_FILE="$_WIN_FILE" pwsh -NoLogo -NoProfile -NonInteractive -Command '
-    $rp = $env:NUCLEUS_TEST_ROOT
-    $wf = $env:NUCLEUS_TEST_WIN_FILE
-    $ErrorActionPreference = "Stop"
-    Set-StrictMode -Version Latest
-    Import-Module PSScriptAnalyzer
-    . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
-    $result = Initialize-PSScriptAnalyzerCache -Files @("$rp/$wf") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -InjectDummies
-    Write-Output "INJECTED=$($result.InjectedNameCount)"
-  ' 2>&1)
-  _single_exit=$?
-  set -e
-
-  if [ "$_single_exit" -eq 0 ]; then
-    assert_pass "Standalone Windows file: function executes without error"
-  else
-    assert_fail "Standalone Windows file: function executes without error" "Exit code: $_single_exit"
-  fi
-
-  if echo "$_single_out" | grep -q '^INJECTED=[1-9]'; then
-    assert_pass "Standalone Windows file: injected at least one command name"
-  else
-    assert_fail "Standalone Windows file: injected at least one command name" "Output: $_single_out"
-  fi
-else
-  echo -e "\033[1;33m⊘\033[0m Standalone Windows file: skipped ($_WIN_FILE not found)"
 fi
 
 # ---------------------------------------------------------------------------

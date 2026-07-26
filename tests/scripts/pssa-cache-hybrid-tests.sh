@@ -14,10 +14,10 @@ cd "$REPO_ROOT"
 
 HYBRID_FILE="src/scripts/shell/pssa-cache-hybrid.ps1"
 
-# Pre-flight: skip all tests if pwsh is unavailable.
+# Pre-flight: hard fail if pwsh is unavailable.
 if ! command -v pwsh &>/dev/null; then
-  echo -e "\033[1;33m⊘\033[0m All tests skipped: pwsh not found"
-  exit 0
+  echo "FATAL: pwsh not found — required by hybrid cache tests"
+  exit 1
 fi
 
 # ---------------------------------------------------------------------------
