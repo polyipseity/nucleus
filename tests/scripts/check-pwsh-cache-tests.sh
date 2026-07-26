@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests for PSScriptAnalyzer warmup behavior.
+# Tests for PSScriptAnalyzer cache pre-population behavior.
 #
 # Verifies that:
 #   1. -SyntaxOnly skips lint (exit 0, lint skipped message)
@@ -107,7 +107,7 @@ _dot_source_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInt
   Set-StrictMode -Version Latest
   Import-Module PSScriptAnalyzer
   . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
-  $result = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1"
+  $result = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -InjectDummies
   Write-Output "INJECTED=$($result.InjectedNameCount)"
 ' 2>&1)
 _dot_source_exit=$?
@@ -167,7 +167,7 @@ if [ -f "$_WIN_FILE" ]; then
     Set-StrictMode -Version Latest
     Import-Module PSScriptAnalyzer
     . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
-    $result = Initialize-PSScriptAnalyzerCache -Files @("$rp/$wf") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1"
+    $result = Initialize-PSScriptAnalyzerCache -Files @("$rp/$wf") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -InjectDummies
     Write-Output "INJECTED=$($result.InjectedNameCount)"
   ' 2>&1)
   _single_exit=$?
@@ -189,9 +189,9 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Test 7: Empty workaround disables injection (InjectedNameCount=0).
+# Test 7: Default (no switches) is warmup only — InjectedNameCount=0.
 # ---------------------------------------------------------------------------
-echo "--- Test 7: Empty workaround disables injection ---"
+echo "--- Test 7: Default (no switches) ---"
 
 set +e
 # shellcheck disable=SC2016 # reason: PowerShell syntax inside single-quoted -Command
@@ -201,67 +201,28 @@ _empty_wa_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInter
   Set-StrictMode -Version Latest
   Import-Module PSScriptAnalyzer
   . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
-  $result = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -Workaround @()
+  $result = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1"
   Write-Output "INJECTED=$($result.InjectedNameCount)"
 ' 2>&1)
 _empty_wa_exit=$?
 set -e
 
 if [ "$_empty_wa_exit" -eq 0 ]; then
-  assert_pass "Empty workaround: function executes without error"
+  assert_pass "Default (no switches): function executes without error"
 else
-  assert_fail "Empty workaround: function executes without error" "Exit code: $_empty_wa_exit, Output: $_empty_wa_out"
+  assert_fail "Default (no switches): function executes without error" "Exit code: $_empty_wa_exit, Output: $_empty_wa_out"
 fi
 
 if echo "$_empty_wa_out" | grep -q '^INJECTED=0$'; then
-  assert_pass "Empty workaround: injected 0 command names (injection skipped)"
+  assert_pass "Default (no switches): injected 0 command names (warmup only)"
 else
-  assert_fail "Empty workaround: injected 0 command names" "Expected INJECTED=0, got: $_empty_wa_out"
+  assert_fail "Default (no switches): injected 0 command names" "Expected INJECTED=0, got: $_empty_wa_out"
 fi
 
 # ---------------------------------------------------------------------------
-# Test 8: \$RuleWorkaroundMap contains expected entry.
+# Test 8: RealCommandMap injects real objects (matched names only).
 # ---------------------------------------------------------------------------
-echo "--- Test 8: \$RuleWorkaroundMap ---"
-
-set +e
-# shellcheck disable=SC2016 # reason: PowerShell syntax inside single-quoted -Command
-_map_out=$(pwsh -NoLogo -NoProfile -NonInteractive -Command '
-  $rp = "'"$REPO_ROOT"'"
-  $ErrorActionPreference = "Stop"
-  Set-StrictMode -Version Latest
-  . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
-  $entry = $RuleWorkaroundMap["PSAvoidUsingCmdletAliases"]
-  $count = $RuleWorkaroundMap.Count
-  Write-Output "MAP_ENTRY=$entry"
-  Write-Output "MAP_COUNT=$count"
-' 2>&1)
-_map_exit=$?
-set -e
-
-if [ "$_map_exit" -eq 0 ]; then
-  assert_pass "RuleWorkaroundMap: dot-source publishes map without error"
-else
-  assert_fail "RuleWorkaroundMap: dot-source publishes map" "Exit code: $_map_exit, Output: $_map_out"
-fi
-
-if echo "$_map_out" | grep -q '^MAP_ENTRY=CachePrePopulation$'; then
-  assert_pass "RuleWorkaroundMap: PSAvoidUsingCmdletAliases maps to CachePrePopulation"
-else
-  assert_fail "RuleWorkaroundMap: PSAvoidUsingCmdletAliases mapping" "Expected MAP_ENTRY=CachePrePopulation, got: $_map_out"
-fi
-
-if echo "$_map_out" | grep -q '^MAP_COUNT=[1-9]'; then
-  assert_pass "RuleWorkaroundMap: has at least 1 entry"
-else
-  assert_fail "RuleWorkaroundMap: has entries" "Expected MAP_COUNT > 0, got: $_map_out"
-fi
-
-# ---------------------------------------------------------------------------
-# Test 9: InjectRealOnly workaround with RealCommandMap injects real objects.
-#         Only names present in RealCommandMap are injected; unmatched skipped.
-# ---------------------------------------------------------------------------
-echo "--- Test 9: InjectRealOnly with RealCommandMap ---"
+echo "--- Test 8: RealCommandMap injects real objects ---"
 
 set +e
 # shellcheck disable=SC2016 # reason: PowerShell syntax ($rp, $env, $result) inside single-quoted -Command, not shell variables
@@ -272,30 +233,30 @@ _hybrid_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInterac
   Import-Module PSScriptAnalyzer
   . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
   $realMap = @{ "Write-Output" = (Get-Command Write-Output | ForEach-Object { $_.PSObject.BaseObject }) }
-  $result = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -Workaround @("InjectRealOnly") -RealCommandMap $realMap
+  $result = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -RealCommandMap $realMap
   Write-Output "INJECTED=$($result.InjectedNameCount)"
 ' 2>&1)
 _hybrid_exit=$?
 set -e
 
 if [ "$_hybrid_exit" -eq 0 ]; then
-  assert_pass "InjectRealOnly: executes without error"
+  assert_pass "RealCommandMap: executes without error"
 else
-  assert_fail "InjectRealOnly: executes without error" "Exit code: $_hybrid_exit, Output: $_hybrid_out"
+  assert_fail "RealCommandMap: executes without error" "Exit code: $_hybrid_exit, Output: $_hybrid_out"
 fi
 
 if echo "$_hybrid_out" | grep -q '^INJECTED=[1-9][0-9]*$'; then
-  assert_pass "InjectRealOnly: injected at least 1 real command name"
+  assert_pass "RealCommandMap: injected at least 1 real command name"
 else
-  assert_fail "InjectRealOnly: injected at least 1 real command name" "Expected INJECTED=N with N>0, got: $_hybrid_out"
+  assert_fail "RealCommandMap: injected at least 1 real command name" "Expected INJECTED=N with N>0, got: $_hybrid_out"
 fi
 
 # ---------------------------------------------------------------------------
-# Test 10: TryAdd idempotence — real objects survive subsequent dummy injection.
-#          InjectRealOnly injects real Write-Output, then CachePrePopulation
-#          tries to inject dummies for everything. TryAdd skips existing keys.
+# Test 9: TryAdd idempotence — real objects survive subsequent dummy injection.
+#          RealCommandMap injects real Write-Output, then InjectDummies tries to
+#          inject everything. TryAdd skips existing keys.
 # ---------------------------------------------------------------------------
-echo "--- Test 10: TryAdd idempotence (real survives dummies) ---"
+echo "--- Test 9: TryAdd idempotence (real survives dummies) ---"
 
 set +e
 # shellcheck disable=SC2016 # reason: PowerShell syntax ($rp, $env, $result) inside single-quoted -Command, not shell variables
@@ -305,11 +266,11 @@ _tryadd_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInterac
   Set-StrictMode -Version Latest
   Import-Module PSScriptAnalyzer
   . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
-  # Phase B: inject real objects only
+  # Phase 1: inject real objects only via RealCommandMap
   $realMap = @{ "Write-Output" = (Get-Command Write-Output | ForEach-Object { $_.PSObject.BaseObject }) }
-  $resultB = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -Workaround @("InjectRealOnly") -RealCommandMap $realMap
-  # Phase C: inject dummies for all names (TryAdd skips existing Write-Output)
-  $resultC = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -Workaround @("CachePrePopulation")
+  $resultB = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -RealCommandMap $realMap
+  # Phase 2: inject dummies for all names (TryAdd skips existing Write-Output)
+  $resultC = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -InjectDummies
   Write-Output "B=$($resultB.InjectedNameCount) C=$($resultC.InjectedNameCount)"
 ' 2>&1)
 _tryadd_exit=$?
