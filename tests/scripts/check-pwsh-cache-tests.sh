@@ -108,7 +108,7 @@ _dot_source_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInt
   Import-Module PSScriptAnalyzer
   . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
   $result = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1"
-  Write-Output "INJECTED=$result"
+  Write-Output "INJECTED=$($result.InjectedNameCount)"
 ' 2>&1)
 _dot_source_exit=$?
 set -e
@@ -168,7 +168,7 @@ if [ -f "$_WIN_FILE" ]; then
     Import-Module PSScriptAnalyzer
     . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
     $result = Initialize-PSScriptAnalyzerCache -Files @("$rp/$wf") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1"
-    Write-Output "INJECTED=$result"
+    Write-Output "INJECTED=$($result.InjectedNameCount)"
   ' 2>&1)
   _single_exit=$?
   set -e
@@ -186,6 +186,75 @@ if [ -f "$_WIN_FILE" ]; then
   fi
 else
   echo -e "\033[1;33m⊘\033[0m Standalone Windows file: skipped ($_WIN_FILE not found)"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 7: Empty workaround disables injection (InjectedNameCount=0).
+# ---------------------------------------------------------------------------
+echo "--- Test 7: Empty workaround disables injection ---"
+
+set +e
+# shellcheck disable=SC2016 # reason: PowerShell syntax inside single-quoted -Command
+_empty_wa_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInteractive -Command '
+  $rp = $env:NUCLEUS_TEST_ROOT
+  $ErrorActionPreference = "Stop"
+  Set-StrictMode -Version Latest
+  Import-Module PSScriptAnalyzer
+  . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
+  $result = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -Workaround @()
+  Write-Output "INJECTED=$($result.InjectedNameCount)"
+' 2>&1)
+_empty_wa_exit=$?
+set -e
+
+if [ "$_empty_wa_exit" -eq 0 ]; then
+  assert_pass "Empty workaround: function executes without error"
+else
+  assert_fail "Empty workaround: function executes without error" "Exit code: $_empty_wa_exit, Output: $_empty_wa_out"
+fi
+
+if echo "$_empty_wa_out" | grep -q '^INJECTED=0$'; then
+  assert_pass "Empty workaround: injected 0 command names (injection skipped)"
+else
+  assert_fail "Empty workaround: injected 0 command names" "Expected INJECTED=0, got: $_empty_wa_out"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 8: \$RuleWorkaroundMap contains expected entry.
+# ---------------------------------------------------------------------------
+echo "--- Test 8: \$RuleWorkaroundMap ---"
+
+set +e
+# shellcheck disable=SC2016 # reason: PowerShell syntax inside single-quoted -Command
+_map_out=$(pwsh -NoLogo -NoProfile -NonInteractive -Command '
+  $rp = "'"$REPO_ROOT"'"
+  $ErrorActionPreference = "Stop"
+  Set-StrictMode -Version Latest
+  . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
+  $entry = $RuleWorkaroundMap["PSAvoidUsingCmdletAliases"]
+  $count = $RuleWorkaroundMap.Count
+  Write-Output "MAP_ENTRY=$entry"
+  Write-Output "MAP_COUNT=$count"
+' 2>&1)
+_map_exit=$?
+set -e
+
+if [ "$_map_exit" -eq 0 ]; then
+  assert_pass "RuleWorkaroundMap: dot-source publishes map without error"
+else
+  assert_fail "RuleWorkaroundMap: dot-source publishes map" "Exit code: $_map_exit, Output: $_map_out"
+fi
+
+if echo "$_map_out" | grep -q '^MAP_ENTRY=CachePrePopulation$'; then
+  assert_pass "RuleWorkaroundMap: PSAvoidUsingCmdletAliases maps to CachePrePopulation"
+else
+  assert_fail "RuleWorkaroundMap: PSAvoidUsingCmdletAliases mapping" "Expected MAP_ENTRY=CachePrePopulation, got: $_map_out"
+fi
+
+if echo "$_map_out" | grep -q '^MAP_COUNT=[1-9]'; then
+  assert_pass "RuleWorkaroundMap: has at least 1 entry"
+else
+  assert_fail "RuleWorkaroundMap: has entries" "Expected MAP_COUNT > 0, got: $_map_out"
 fi
 
 # ---------------------------------------------------------------------------
