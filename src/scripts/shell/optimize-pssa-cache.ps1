@@ -34,7 +34,7 @@
 
 .PARAMETER CommandNames
   Pre-parsed command names to inject. When non-empty, skips internal file
-  parsing. Used by the hybrid flow (check-pwsh.ps1 Phase B) where
+  parsing. Used by the hybrid flow (check-pwsh.ps1) where
   Get-UniqueCommandNames has already been called externally.
 
 .PARAMETER RealCommandMap
@@ -87,7 +87,7 @@ function Initialize-PSScriptAnalyzerCache {
     [string]$SettingsFile,
 
     # Pre-parsed command names to inject. When non-empty, skips internal file
-    # parsing. Used by the hybrid flow (check-pwsh.ps1 Phase B) where
+    # parsing. Used by the hybrid flow (check-pwsh.ps1) where
     # Get-UniqueCommandNames has already been called externally.
     [string[]]$CommandNames = @(),
 
