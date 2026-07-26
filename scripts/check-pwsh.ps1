@@ -46,13 +46,19 @@
   Environment variables: NUCLEUS_CHECK_PATHS.
   Exit codes: 0 on success; non-zero on failure.
 
-  The lint phase includes a CommandInfoCache pre-population optimization
-  implemented in src/scripts/shell/optimize-pssa-cache.ps1 (function
-  Initialize-PSScriptAnalyzerCache). It triggers PSSA's internal lazy
-  initialization and injects lightweight RemoteCommandInfo dummy objects
-  into the command cache, avoiding slow Get-Command calls during
-  PSAvoidUsingCmdletAliases rule evaluation. The optimization is non-fatal:
-  if it fails, linting continues using the uncached path.
+  The lint phase uses a grouped execution model via $RuleWorkaroundMap (published
+  by src/scripts/shell/optimize-pssa-cache.ps1). Rules not in the map run first
+  with no cache manipulation (natural Get-Command population). Rules requiring
+  'CachePrePopulation' (e.g., PSAvoidUsingCmdletAliases) run after their
+  workaround is applied. This avoids cross-pollution: rules needing real
+  CommandInfo metadata never see RemoteCommandInfo dummies.
+
+  The CommandInfoCache pre-population optimization (function
+  Initialize-PSScriptAnalyzerCache) triggers PSSA's internal lazy
+  initialization and injects lightweight RemoteCommandInfo dummy objects into
+  the command cache, avoiding slow Get-Command calls during AvoidAlias
+  evaluation. The optimization is non-fatal: if it fails, linting continues
+  using the uncached path.
 
   PSModulePath is scoped to the Nix store and user-local modules to reduce
   module-discovery overhead during rule evaluation. This is the dominant
@@ -135,25 +141,48 @@ else {
     # Pre-import commonly-used modules to reduce PSSA's implicit Get-Command overhead during rule evaluation.
     Import-Module PSReadLine -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: PSReadLine may be absent in CI/non-interactive shells; this import is a performance optimization, not required
 
-    # Dot-source the CommandInfoCache pre-population helper.
+    # Dot-source the CommandInfoCache pre-population helper (provides
+    # Initialize-PSScriptAnalyzerCache and $RuleWorkaroundMap).
     . (Join-Path $PSScriptRoot '../src/scripts/shell/optimize-pssa-cache.ps1')
 
-    # Method 3 (consumed by script at CI time via -SettingsPath): sibling settings file defines Severity and ExcludeRules.
     $settingsFile = Join-Path $PSScriptRoot 'PSScriptAnalyzerSettings.psd1'
 
     $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
 
-    # Pre-populate PSSA's CommandInfoCache (warmup + injection handled internally).
-    $injectedNameCount = Initialize-PSScriptAnalyzerCache -Files $files -SettingsFile $settingsFile
-
-    $lintResults = $files | Invoke-ScriptAnalyzer -Settings $settingsFile
-
-    if ($injectedNameCount -gt 0) {
-      Write-Debug "Pre-populated CommandInfoCache with $injectedNameCount unique command names."
+    # Get all rule names and group by workaround.
+    # Rules not in $RuleWorkaroundMap get the empty-string key (no workaround).
+    $allRuleNames = Get-ScriptAnalyzerRule | ForEach-Object RuleName
+    $groups = @{}
+    foreach ($rule in $allRuleNames) {
+      $wa = if ($RuleWorkaroundMap.ContainsKey($rule)) { $RuleWorkaroundMap[$rule] } else { '' }
+      if (-not $groups.ContainsKey($wa)) { $groups[$wa] = [System.Collections.Generic.List[string]]::new() }
+      $groups[$wa].Add($rule)
     }
 
-    if (@($lintResults).Count -gt 0) {
-      $lintResults | ForEach-Object {
+    # Execute groups sequentially: no-workaround first, then workaround groups.
+    # Cross-pollution is avoided because CachePrePopulation (dummy injection)
+    # runs after all real-CommandInfo population from the no-workaround group.
+    $allDiagnostics = [System.Collections.Generic.List[object]]::new()
+    $groupOrder = $groups.Keys | Sort-Object
+    foreach ($workaround in $groupOrder) {
+      $rules = $groups[$workaround]
+      if ($workaround -eq 'CachePrePopulation') {
+        $null = Initialize-PSScriptAnalyzerCache -Files $files -SettingsFile $settingsFile -Workaround @('CachePrePopulation')
+      }
+      $groupSettings = @{
+        IncludeRules = [string[]]$rules
+        Severity = @('Error', 'Warning')
+        ExcludeRules = @('PSUseBOMForUnicodeEncodedFile')
+        Rules = @{}
+      }
+      $diags = $files | Invoke-ScriptAnalyzer -Settings $groupSettings
+      $allDiagnostics.AddRange($diags)
+    }
+
+    # Each rule runs in exactly one group (IncludeRules filters are mutually exclusive),
+    # so no rule produces diagnostics in two groups.
+    if ($allDiagnostics.Count -gt 0) {
+      $allDiagnostics | ForEach-Object {
         Write-Output ('{0}:{1}:{2}: [{3}] {4}' -f $_.ScriptPath, $_.Line, $_.Column, $_.Severity, $_.Message)
       }
       throw 'PowerShell lint check failed.'

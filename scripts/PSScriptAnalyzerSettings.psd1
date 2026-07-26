@@ -15,6 +15,13 @@
 # module-discovery overhead). Together the two optimizations bring a
 # full-repo lint from ~100s to ~20s.
 #
+# Execution model: check-pwsh.ps1 groups rules by workaround via
+# $RuleWorkaroundMap. The no-workaround group (all rules except AvoidAlias)
+# runs first with natural cache population. CachePrePopulation (AvoidAlias)
+# runs after dummy injection. This avoids cross-pollution between real and
+# dummy CommandInfo entries. Total runtime impact is negligible because PSSA
+# already parallelizes rules internally.
+#
 # === Per-rule timing (30 largest PS1 files, fresh process) ===
 # Measured: 2026-07-26 on MacBook (Apple Silicon)
 #
