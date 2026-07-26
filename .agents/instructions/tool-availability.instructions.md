@@ -55,11 +55,12 @@ if (-not (Get-Command -Name 'some-tool' -ErrorAction SilentlyContinue)) {
 
 - **Inline alternative selection.** Choosing between equivalent tools (e.g., `code` vs `code-insiders`, or `gsha256sum` vs `shasum -a 256`) is permitted, as long as at least one alternative is required to be present.
 - **Pre-flight validation at script entry.** A script or test may check for all required tools at startup and `exit 1` with a descriptive message if any are missing. This is the preferred pattern over inline skip-guards.
-- **Genuinely optional features.** If a *feature* (not a tool) is optional, the decision must be configuration-driven (e.g., section filters via `-Sections`/`SECTIONS`), not implicit tool-detection.
+- **Genuinely optional features.** If a _feature_ (not a tool) is optional, the decision must be configuration-driven (e.g., section filters via `-Sections`/`SECTIONS`), not implicit tool-detection.
 
 ## Enforcement
 
 This policy applies to:
+
 - **All check scripts** under `scripts/` (`.sh`, `.ps1`)
 - **All test files** under `tests/` (`.sh`, `.ps1`)
 - **All internal scripts** under `src/scripts/` (`.sh`)
