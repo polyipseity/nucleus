@@ -16,14 +16,14 @@
 # full-repo lint from ~100s to ~20s.
 #
 # Execution model: check-pwsh.ps1 runs rules in two explicit groups.
-# Group 1 (Phase C): all rules except PSAvoidUsingCmdletAliases (natural cache).
-# Group 2 (Phase D): PSAvoidUsingCmdletAliases (post-dummy-injection, last).
+# Group 1: all rules except PSAvoidUsingCmdletAliases (natural cache).
+# Group 2: PSAvoidUsingCmdletAliases (post-dummy-injection, last).
 #
-# Phase B (hybrid pre-population) injects real CommandInfo objects for command
+# Hybrid pre-population injects real CommandInfo objects for command
 # names matching loaded commands before any rule runs. This gives Group 1 rules
 # limited cache hits for names resolvable via Get-Command.
-# Dummy injection (Phase D) fills remaining cache gaps via RemoteCommandInfo,
-# with TryAdd ensuring real objects survive. Phase C never sees dummies.
+# Dummy injection (after Group 1) fills remaining cache gaps via RemoteCommandInfo,
+# with TryAdd ensuring real objects survive. Group 1 never sees dummies.
 #
 # === Per-rule timing (30 largest PS1 files, fresh process) ===
 # Measured: 2026-07-26 on MacBook (Apple Silicon)

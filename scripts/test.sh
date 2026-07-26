@@ -5,7 +5,7 @@
 #
 # Code quality tests (2-3):
 #   2. Shell script linting (treefmt)
-#   3. PowerShell lint (PSScriptAnalyzer) and Phase 1b cache tests and Phase 1b cache tests
+#   3. PowerShell lint (PSScriptAnalyzer) and cache tests
 #
 # Functional tests (1, 4-5):
 #   1. Nix test suite — auto-discover and run all *.nix test files
