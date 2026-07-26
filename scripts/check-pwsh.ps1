@@ -144,10 +144,27 @@ else {
     # Dot-source the CommandInfoCache pre-population helper (provides
     # Initialize-PSScriptAnalyzerCache and $RuleWorkaroundMap).
     . (Join-Path $PSScriptRoot '../src/scripts/shell/optimize-pssa-cache.ps1')
+    # Dot-source hybrid pre-population helpers (Get-UniqueCommandNames, Get-MatchingRealCommands).
+    . (Join-Path $PSScriptRoot '../src/scripts/shell/pssa-cache-hybrid.ps1')
 
     $settingsFile = Join-Path $PSScriptRoot 'PSScriptAnalyzerSettings.psd1'
 
     $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
+
+    # Phase B: Hybrid pre-population — inject real CommandInfo objects for command
+    # names that match loaded commands. This runs before any rule group, so
+    # no-workaround rules (UseCmdletCorrectly, etc.) benefit from cache hits.
+    # Dummy injection (Phase C) is deferred to the CachePrePopulation group after
+    # no-workaround rules finish.
+    $null = Initialize-PSScriptAnalyzerCache -Files $files -SettingsFile $settingsFile -Workaround @()
+    $allNames = @(Get-UniqueCommandNames -Files $files)
+    if ($allNames.Count -gt 0) {
+      $realMap = Get-MatchingRealCommands -CommandNames $allNames
+      if ($realMap.Count -gt 0) {
+        $null = Initialize-PSScriptAnalyzerCache -Files $files -SettingsFile $settingsFile `
+          -Workaround @('InjectRealOnly') -RealCommandMap $realMap
+      }
+    }
 
     # Get all rule names and group by workaround.
     # Rules not in $RuleWorkaroundMap get the empty-string key (no workaround).
