@@ -258,6 +258,76 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Test 9: InjectRealOnly workaround with RealCommandMap injects real objects.
+#         Only names present in RealCommandMap are injected; unmatched skipped.
+# ---------------------------------------------------------------------------
+echo "--- Test 9: InjectRealOnly with RealCommandMap ---"
+
+set +e
+# shellcheck disable=SC2016 # reason: PowerShell syntax ($rp, $env, $result) inside single-quoted -Command, not shell variables
+_hybrid_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInteractive -Command '
+  $rp = $env:NUCLEUS_TEST_ROOT
+  $ErrorActionPreference = "Stop"
+  Set-StrictMode -Version Latest
+  Import-Module PSScriptAnalyzer
+  . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
+  $realMap = @{ "Write-Output" = (Get-Command Write-Output | ForEach-Object { $_.PSObject.BaseObject }) }
+  $result = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -Workaround @("InjectRealOnly") -RealCommandMap $realMap
+  Write-Output "INJECTED=$($result.InjectedNameCount)"
+' 2>&1)
+_hybrid_exit=$?
+set -e
+
+if [ "$_hybrid_exit" -eq 0 ]; then
+  assert_pass "InjectRealOnly: executes without error"
+else
+  assert_fail "InjectRealOnly: executes without error" "Exit code: $_hybrid_exit, Output: $_hybrid_out"
+fi
+
+if echo "$_hybrid_out" | grep -q '^INJECTED=[1-9][0-9]*$'; then
+  assert_pass "InjectRealOnly: injected at least 1 real command name"
+else
+  assert_fail "InjectRealOnly: injected at least 1 real command name" "Expected INJECTED=N with N>0, got: $_hybrid_out"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 10: TryAdd idempotence — real objects survive subsequent dummy injection.
+#          InjectRealOnly injects real Write-Output, then CachePrePopulation
+#          tries to inject dummies for everything. TryAdd skips existing keys.
+# ---------------------------------------------------------------------------
+echo "--- Test 10: TryAdd idempotence (real survives dummies) ---"
+
+set +e
+# shellcheck disable=SC2016 # reason: PowerShell syntax ($rp, $env, $result) inside single-quoted -Command, not shell variables
+_tryadd_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInteractive -Command '
+  $rp = $env:NUCLEUS_TEST_ROOT
+  $ErrorActionPreference = "Stop"
+  Set-StrictMode -Version Latest
+  Import-Module PSScriptAnalyzer
+  . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
+  # Phase B: inject real objects only
+  $realMap = @{ "Write-Output" = (Get-Command Write-Output | ForEach-Object { $_.PSObject.BaseObject }) }
+  $resultB = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -Workaround @("InjectRealOnly") -RealCommandMap $realMap
+  # Phase C: inject dummies for all names (TryAdd skips existing Write-Output)
+  $resultC = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -Workaround @("CachePrePopulation")
+  Write-Output "B=$($resultB.InjectedNameCount) C=$($resultC.InjectedNameCount)"
+' 2>&1)
+_tryadd_exit=$?
+set -e
+
+if [ "$_tryadd_exit" -eq 0 ]; then
+  assert_pass "TryAdd idempotence: two-phase injection executes without error"
+else
+  assert_fail "TryAdd idempotence: two-phase injection executes without error" "Exit code: $_tryadd_exit, Output: $_tryadd_out"
+fi
+
+if echo "$_tryadd_out" | grep -qE '^B=[1-9][0-9]* C=[1-9][0-9]*$'; then
+  assert_pass "TryAdd idempotence: both phases injected names (B > 0, C > 0)"
+else
+  assert_fail "TryAdd idempotence: both phases injected names" "Expected B=N C=M with N,M>0, got: $_tryadd_out"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""

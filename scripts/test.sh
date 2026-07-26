@@ -190,6 +190,7 @@ section "$((_step += 1))" "PowerShell lint"
 {
 pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 || echo "1" > "$_wave_tmpdir/step-3.exit"
 bash tests/scripts/check-pwsh-cache-tests.sh || echo "1" > "$_wave_tmpdir/step-3.exit"
+bash tests/scripts/pssa-cache-hybrid-tests.sh || echo "1" > "$_wave_tmpdir/step-3.exit"
 [ -f "$_wave_tmpdir/step-3.exit" ] || echo "0" > "$_wave_tmpdir/step-3.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
