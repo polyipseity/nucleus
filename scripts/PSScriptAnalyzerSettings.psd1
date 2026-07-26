@@ -19,8 +19,14 @@
 # $RuleWorkaroundMap. The no-workaround group (all rules except AvoidAlias)
 # runs first with natural cache population. CachePrePopulation (AvoidAlias)
 # runs after dummy injection. This avoids cross-pollution between real and
-# dummy CommandInfo entries. Total runtime impact is negligible because PSSA
-# already parallelizes rules internally.
+# dummy CommandInfo entries.
+#
+# Hybrid pre-population: before any rule group, check-pwsh.ps1 injects real
+# CommandInfo objects (CmdletInfo, FunctionInfo) for command names that match
+# loaded commands (Phase B). This gives no-workaround rules like
+# UseCmdletCorrectly limited cache hits for names resolvable via Get-Command.
+# Dummy injection (Phase C) then fills remaining cache gaps via
+# RemoteCommandInfo, with TryAdd ensuring real objects survive.
 #
 # === Per-rule timing (30 largest PS1 files, fresh process) ===
 # Measured: 2026-07-26 on MacBook (Apple Silicon)
@@ -97,29 +103,33 @@
 # Random-order effect: the 3 CPU-bound rules scatter .NET assembly access
 # patterns, causing page-cache thrashing for nearby rules. Observed as 13
 # rules temporarily inflated to 1-5s (up from 473-546ms baseline). These
-# are cache artifacts, not real slowness.
+# are cache artifacts, not real slowness.#
+# === Hybrid real+dummy injection ===
+# Measured: 2026-07-26 on MacBook (Apple Silicon), 127 PS1 files
 #
-# === AvoidAlias bottleneck analysis ===
-# PSAvoidUsingCmdletAliases dominates cold-start (~30s/36s = 83%).
-# Root cause: MoveNext calls Get-Command for every unique command name,
-# though GetCmdletNameFromAlias (O(1) dict lookup) already covers all
-# 110/111 aliases with 0 false negatives. The Get-Command calls are entirely
-# wasted — they never find an alias in this codebase.
+# Hybrid = 90 real CmdletInfo/FunctionInfo objects + 673 RemoteCommandInfo
+# dummies pre-injected in two phases. Real objects 1st (before no-workaround
+# rules), dummies 2nd (before CachePrePopulation group).
 #
-# Cache key discrimination (CommandLookupKey):
-#   AvoidAlias calls GetCommandInfo with TWO CommandTypes:
-#   - null (→All=383 per constructor): for most built-in cmdlets
-#   - type 74 (Function|Cmdlet|Filter, hardcoded 0x1F 0x4A in IL): for
-#     Get-prefixed variants
-#   Pre-populating with type 8 (Cmdlet only) has zero benefit — matches
-#     neither. Both null and type 74 must be pre-populated.
+# Scenario                                     Time   Speedup
+# ----                                         ----   -------
+# AvoidAlias (cold, no pre-pop)               108.9s     1x
+# AvoidAlias (+CachePrePopulation dummies)      0.3s   406x
+# AvoidAlias (+hybrid pre-pop)                  0.3s   406x
+# UseCmdletCorrectly (cold)                    67.3s     1x
+# UseCmdletCorrectly (+hybrid 90 real)         59-67s  ~1.1x*
+# UseCmdletCorrectly (100% cache after Avoid)   1.4s    48x
+# PSShouldProcess (cold)                       67.4s     1x
+# PSShouldProcess (+hybrid)                    67.4s     1x**
 #
-# RemoteCommandInfo injection (implemented in
-# src/scripts/shell/optimize-pssa-cache.ps1) pre-populates the cache with
-# both key variants before PSSA rule evaluation, avoiding the slow
-# Get-Command path.
+# * Only 90/763 names matched real commands → 12% cache hit rate.
+#   Remaining 673 trigger Get-Command fallthrough (same as cold).
+# ** Not cache-dependent — bottleneck is rule logic.
 #
-# Re-measure after each PSScriptAnalyzer or PowerShell version bump.
+# Key conclusion: CachePrePopulation alone solves AvoidAlias. Hybrid adds
+# incremental improvement for UseCmdletCorrectly. PSShouldProcess needs
+# rule-level profiling, not cache manipulation.
+### Re-measure after each PSScriptAnalyzer or PowerShell version bump.
 @{
     Severity = @('Error', 'Warning')
     ExcludeRules = @('PSUseBOMForUnicodeEncodedFile')
