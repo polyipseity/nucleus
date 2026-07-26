@@ -400,29 +400,42 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Test 14: Full pipeline (check-pwsh.ps1) produces diagnostics.
+# Test 14: Diagnostic transparency — baseline vs injection produces identical output.
+#          Uses Get-DiagnosticComparison to compare diagnostics across cache states.
+#          Target file: cache-verify-lib.ps1 (produces PSUseSingularNouns warnings
+#          under the default settings with Warning severity included).
 # ---------------------------------------------------------------------------
-echo "--- Test 14: Full pipeline produces diagnostics ---"
+echo "--- Test 14: Diagnostic transparency (baseline vs injection) ---"
 
 set +e
-_pipeline_out=$(pwsh -NoLogo -NoProfile -NonInteractive -File "$CHECK_PWSH" 2>&1)
-_pipeline_exit=$?
+# shellcheck disable=SC2016 # reason: PowerShell syntax inside single-quoted -Command, not shell variables
+_t14_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInteractive -Command '
+  $rp = $env:NUCLEUS_TEST_ROOT
+  $ErrorActionPreference = "Stop"
+  Set-StrictMode -Version Latest
+  Import-Module PSScriptAnalyzer
+  . "$rp/tests/scripts/cache-verify-lib.ps1"
+  $target = "$rp/tests/scripts/cache-verify-lib.ps1"
+  $settings = "$rp/scripts/PSScriptAnalyzerSettings.psd1"
+  $result = Get-DiagnosticComparison -TargetFile $target -SettingsFile $settings
+  Write-Output "BASELINE=$($result.BaselineCount) INJECTION=$($result.InjectionCount) DIFF=$($result.BaselineVsInjectionDiff.Count)"
+' 2>&1)
+_t14_exit=$?
 set -e
 
-# Count diagnostic lines
-_pipeline_diag=$(echo "$_pipeline_out" | grep -Ec '\.ps1:[0-9]+:[0-9]+: \[' 2>/dev/null || echo "0")
-
-if [ "$_pipeline_exit" -ne 0 ] && [ "$_pipeline_diag" -gt 0 ]; then
-  assert_pass "Full pipeline: exits non-zero with $_pipeline_diag diagnostics"
+if [ "$_t14_exit" -eq 0 ]; then
+  assert_pass "T14 diagnostic transparency: executes without error"
 else
-  assert_fail "Full pipeline: produces diagnostics" "Expected exit != 0 with diag > 0, got exit=$_pipeline_exit, diag=$_pipeline_diag"
+  assert_fail "T14 diagnostic transparency: executes without error" "Exit code: $_t14_exit, Output: $_t14_out"
 fi
 
-# Check for no unhandled exceptions
-if echo "$_pipeline_out" | grep -qi 'RuntimeException\|NullReferenceException\|MethodInvocationException'; then
-  assert_fail "Full pipeline: no unhandled exceptions" "Found exception in output"
+# Expected: baseline and injection produce same number of diagnostics, 0 differences
+if echo "$_t14_out" | grep -qE '^BASELINE=[1-9][0-9]* INJECTION=[1-9][0-9]* DIFF=0$'; then
+  _t14_baseline=$(echo "$_t14_out" | grep -oE 'BASELINE=[0-9]+' | grep -oE '[0-9]+')
+  _t14_injection=$(echo "$_t14_out" | grep -oE 'INJECTION=[0-9]+' | grep -oE '[0-9]+')
+  assert_pass "T14 diagnostic transparency: baseline=$_t14_baseline injection=$_t14_injection, 0 differences (identical diagnostic output)"
 else
-  assert_pass "Full pipeline: no unhandled exceptions"
+  assert_fail "T14 diagnostic transparency: identical diagnostics" "Expected BASELINE>0 INJECTION>0 DIFF=0, got: $_t14_out"
 fi
 
 # ---------------------------------------------------------------------------
