@@ -72,13 +72,12 @@
 # fresh pwsh process (Import-Module PSScriptAnalyzer, run one rule, exit).
 # No warmup, no CachePrePopulation.
 #
-# 4 inherently slow rules dominate:
+# 3 inherently slow rules dominate:
 # Rule                                    Fwd(ms) Rev(ms) Rand(ms) Diags   Cause
 # ----                                    ------- ------- -------- -----   -----
 # PSAvoidUsingCmdletAliases                 44957   45599   82492      9   CPU-bound
 # PSShouldProcess                           37234   36944   96846      0   CPU-bound
 # PSUseCmdletCorrectly                      29442   30199   55646      0   CPU-bound
-# PSDSCUseVerboseMessageInDSCResource         498   20456     609      0   Page-cold sensitive
 #
 # Totals: fwd=148.6s, rev=169.4s, rand=311.2s (577 total diags across all 75 rules)
 #
@@ -93,11 +92,7 @@
 # - PSUseCmdletCorrectly (~29-56s): checks correct parameter usage for all
 #   known cmdlets. Requires full parameter-set resolution per invocation.
 #   CPU-bound, no Get-Command dependency.
-# - PSDSCUseVerboseMessageInDSCResource (~0.5-20s): very fast when warm,
-#   extremely slow when page-cold (first rule in process). Not inherently
-#   CPU-bound — just pays .NET assembly loading cost. Once warm it runs in
-#   <1s like all other non-CPU-bound rules.
-# - All other 71 rules: 468-598ms each (baseline), no inherent slowness.
+# - All other 72 rules: 468-598ms each (baseline), no inherent slowness.
 #
 # Random-order effect: the 3 CPU-bound rules scatter .NET assembly access
 # patterns, causing page-cache thrashing for nearby rules. Observed as 13
