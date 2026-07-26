@@ -38,6 +38,7 @@
 
 function Get-UniqueCommandNames {
   [CmdletBinding()]
+  [OutputType([System.Collections.Generic.HashSet[string]])]
   param(
     [Parameter(Mandatory = $true)]
     [string[]]$Files
@@ -59,6 +60,7 @@ function Get-UniqueCommandNames {
 
 function Get-MatchingRealCommands {
   [CmdletBinding()]
+  [OutputType([hashtable])]
   param(
     [Parameter(Mandatory = $true)]
     [string[]]$CommandNames
