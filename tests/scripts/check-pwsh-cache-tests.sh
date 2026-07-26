@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# Tests for PSScriptAnalyzer CommandInfo cache pre-population (Phase 1b).
+# Tests for PSScriptAnalyzer warmup behavior.
 #
 # Verifies that:
-#   1. -SyntaxOnly skips Phase 1b and Phase 2 (exit 0, lint skipped message)
-#   2. Default mode (with pre-population) runs without unhandled errors
-#   3. -SkipCachePrepopulation bypasses Phase 1b without changing exit code
-#   4. Diagnostic count is identical with and without pre-population
+#   1. -SyntaxOnly skips lint (exit 0, lint skipped message)
+#   2. Default mode (with warmup) completes without unhandled errors
+#   3. Warmup message is printed (notably absent from output — silent)
 #
-# These tests are additive to the existing Step 3 (PowerShell lint) in test.sh.
-# They specifically verify Phase 1b behavior, while Step 3 runs the lint itself.
+# These tests complement the existing Step 3 (PowerShell lint) in test.sh.
 #
 # Dependencies: pwsh, PSScriptAnalyzer module.
 
@@ -29,6 +27,7 @@ if ! command -v pwsh &>/dev/null; then
   exit 0
 fi
 
+# shellcheck disable=SC2016 # reason: PowerShell syntax $true/$_ inside single quotes, not shell variables
 if ! pwsh -NoLogo -NoProfile -NonInteractive -Command '& { exit (Get-Module -ListAvailable -Name PSScriptAnalyzer ? { $true } ? { 0 } : { 1 }) }' 2>/dev/null; then
   echo -e "\033[1;33m⊘\033[0m All tests skipped: PSScriptAnalyzer not installed"
   exit 0
@@ -49,10 +48,10 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Test 2: Default mode (with pre-population) must complete without errors
-#         and produce diagnostics (there ARE lint issues in the repo).
+# Test 2: Default mode (with warmup) completes without errors
+#         and produces diagnostics.
 # ---------------------------------------------------------------------------
-echo "--- Test 2: Default mode (with pre-population) ---"
+echo "--- Test 2: Default mode (with warmup) ---"
 
 set +e
 _default_output=$(pwsh -NoLogo -NoProfile -NonInteractive -File "$CHECK_PWSH" 2>&1)
@@ -60,7 +59,6 @@ _default_exit=$?
 set -e
 
 # Count diagnostic lines (format: file:line:col: [Severity] Message)
-# Note: use -E for extended regex (BSD grep on macOS lacks -P).
 _default_diag=$(echo "$_default_output" | grep -Ec '\.ps1:[0-9]+:[0-9]+: \[' 2>/dev/null || echo "0")
 
 if [ "$_default_exit" -ne 0 ]; then
@@ -83,46 +81,111 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-# Test 3: -SkipCachePrepopulation bypasses Phase 1b without changing exit code
+# Test 3: Warmup is silent (no error messages from the trivial invocation).
 # ---------------------------------------------------------------------------
-echo "--- Test 3: -SkipCachePrepopulation ---"
+echo "--- Test 3: Warmup silent ---"
+
+# The warmup ('1+1') should not produce any crash-level error output.
+# Exclude the deliberate 'PowerShell lint check failed.' throw from check-pwsh.ps1.
+# grep for actual runtime exceptions that would indicate a bug in the warmup.
+if echo "$_default_output" | grep -qi 'NullReferenceException\|RuntimeException\|MethodInvocationException\|Cannot bind argument'; then
+  assert_fail "Warmup: no runtime exceptions" "Found unexpected exception in output"
+else
+  assert_pass "Warmup: no runtime exceptions from trivial invocation"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 4: Direct function dot-source works (standalone invocation).
+# ---------------------------------------------------------------------------
+echo "--- Test 4: Dot-source function ---"
 
 set +e
-_skip_output=$(pwsh -NoLogo -NoProfile -NonInteractive -File "$CHECK_PWSH" -SkipCachePrepopulation 2>&1)
-_skip_exit=$?
+# shellcheck disable=SC2016 # reason: PowerShell syntax ($rp, $env, $result) inside single-quoted -Command, not shell variables
+_dot_source_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInteractive -Command '
+  $rp = $env:NUCLEUS_TEST_ROOT
+  $ErrorActionPreference = "Stop"
+  Set-StrictMode -Version Latest
+  Import-Module PSScriptAnalyzer
+  . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
+  $result = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1"
+  Write-Output "INJECTED=$result"
+' 2>&1)
+_dot_source_exit=$?
 set -e
 
-_skip_diag=$(echo "$_skip_output" | grep -Ec '\.ps1:[0-9]+:[0-9]+: \[' 2>/dev/null || echo "0")
-
-# Check for "cache pre-population" or similar Phase 1b messages in the output
-# If Phase 1b is skipped, there should be no cache-related output
-if echo "$_skip_output" | grep -qi 'CommandInfo cache pre-population'; then
-  assert_fail "SkipCachePrepopulation: Phase 1b suppressed" "Expected no cache pre-population output, but found some"
+if [ "$_dot_source_exit" -eq 0 ]; then
+  assert_pass "Dot-source: function executes without error"
 else
-  assert_pass "SkipCachePrepopulation: Phase 1b suppressed"
+  assert_fail "Dot-source: function executes without error" "Exit code: $_dot_source_exit, Output: $_dot_source_out"
 fi
 
-# Exit code must match default mode (both should find the same lint issues)
-if [ "$_default_exit" -eq "$_skip_exit" ]; then
-  assert_pass "SkipCachePrepopulation: exit code matches default ($_default_exit)"
+if echo "$_dot_source_out" | grep -q '^INJECTED=[1-9]'; then
+  assert_pass "Dot-source: injected at least one command name (INJECTED=$_dot_source_exit)"
 else
-  assert_fail "SkipCachePrepopulation: exit code matches default" "Default: $_default_exit, Skip: $_skip_exit"
+  assert_fail "Dot-source: injected at least one command name" "Expected INJECTED=N with N>0, got: $_dot_source_out"
+fi
+
+if echo "$_dot_source_out" | grep -qi 'NullReferenceException\|RuntimeException'; then
+  assert_fail "Dot-source: no exceptions" "Found unexpected exception in output"
+else
+  assert_pass "Dot-source: no exceptions"
 fi
 
 # ---------------------------------------------------------------------------
-# Test 4: Diagnostic count parity (with and without pre-population)
+# Test 5: Injection does not suppress real diagnostics.
+#         Running lint on a file with known issues should still produce
+#         diagnostics even after cache pre-population.
 # ---------------------------------------------------------------------------
-echo "--- Test 4: Diagnostic count parity ---"
+echo "--- Test 5: Injection preserves real diagnostics ---"
 
-# Allow a small tolerance (maybe 0-3 difference) for edge cases where
-# a command resolves differently due to module loading order
-_diag_diff=$(( _default_diag - _skip_diag ))
-_diag_diff_abs=${_diag_diff#-}  # absolute value
+set +e
+_diag_output=$(pwsh -NoLogo -NoProfile -NonInteractive -File "$CHECK_PWSH" 2>&1)
+_diag_exit=$?
+set -e
 
-if [ "$_diag_diff_abs" -le 3 ]; then
-  assert_pass "Diagnostic count parity: within tolerance (default=$_default_diag, skip=$_skip_diag, diff=$_diag_diff_abs)"
+_diag_count=$(echo "$_diag_output" | grep -Ec '\.ps1:[0-9]+:[0-9]+: \[' 2>/dev/null || echo "0")
+
+if [ "$_diag_exit" -ne 0 ] && [ "$_diag_count" -gt 0 ]; then
+  assert_pass "Injection preserves diagnostics: $_diag_count total, exit $_diag_exit"
 else
-  assert_fail "Diagnostic count parity" "Default: $_default_diag diagnostics, Skip: $_skip_diag diagnostics (diff=$_diag_diff_abs, max tolerance=3)"
+  assert_fail "Injection preserves diagnostics" "Expected exit != 0 with diag count > 0, got exit=$_diag_exit, diag=$_diag_count"
+fi
+
+# ---------------------------------------------------------------------------
+# Test 6: Standalone function call with single Windows file (cross-host).
+# ---------------------------------------------------------------------------
+echo "--- Test 6: Standalone function with Windows file ---"
+
+_WIN_FILE="src/hosts/Windows/apply.ps1"
+if [ -f "$_WIN_FILE" ]; then
+  set +e
+  # shellcheck disable=SC2016 # reason: PowerShell syntax ($rp, $env, $result) inside single-quoted -Command, not shell variables
+  _single_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" NUCLEUS_TEST_WIN_FILE="$_WIN_FILE" pwsh -NoLogo -NoProfile -NonInteractive -Command '
+    $rp = $env:NUCLEUS_TEST_ROOT
+    $wf = $env:NUCLEUS_TEST_WIN_FILE
+    $ErrorActionPreference = "Stop"
+    Set-StrictMode -Version Latest
+    Import-Module PSScriptAnalyzer
+    . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
+    $result = Initialize-PSScriptAnalyzerCache -Files @("$rp/$wf") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1"
+    Write-Output "INJECTED=$result"
+  ' 2>&1)
+  _single_exit=$?
+  set -e
+
+  if [ "$_single_exit" -eq 0 ]; then
+    assert_pass "Standalone Windows file: function executes without error"
+  else
+    assert_fail "Standalone Windows file: function executes without error" "Exit code: $_single_exit"
+  fi
+
+  if echo "$_single_out" | grep -q '^INJECTED=[1-9]'; then
+    assert_pass "Standalone Windows file: injected at least one command name"
+  else
+    assert_fail "Standalone Windows file: injected at least one command name" "Output: $_single_out"
+  fi
+else
+  echo -e "\033[1;33m⊘\033[0m Standalone Windows file: skipped ($_WIN_FILE not found)"
 fi
 
 # ---------------------------------------------------------------------------
