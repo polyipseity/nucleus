@@ -13,10 +13,10 @@
   real CommandInfo pre-population), then PSAvoidUsingCmdletAliases last (after
   dummy cache injection).
 
-.PARAMETER SkipTest
-  Test names to skip. Initially only 'PSSA' is recognized — bypasses the
+.PARAMETER SkipStep
+  Step names to skip. Initially only 'PSSA' is recognized — bypasses the
   PSScriptAnalyzer lint. Used by check.sh/check.ps1 for fast pre-commit
-  validation; test.sh/test.ps1 run without -SkipTest (full lint). Unknown
+  validation; test.sh/test.ps1 run without -SkipStep (full lint). Unknown
   names are silently ignored.
 
 .PARAMETER Scoped
@@ -31,7 +31,7 @@
   nix run ./src#check-pwsh
 
 .EXAMPLE
-  nix run ./src#check-pwsh -- -SkipTest PSSA
+  nix run ./src#check-pwsh -- -SkipStep PSSA
 
 .EXAMPLE
   nix run ./src#check-pwsh -- src/hosts/Windows/apply.ps1
@@ -50,7 +50,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string[]]$SkipTest = @(),
+  [string[]]$SkipStep = @(),
   [switch]$Scoped,
   [Parameter(ValueFromRemainingArguments = $true)]
   [string[]]$Paths = @($env:NUCLEUS_CHECK_PATHS -split ';' | Where-Object { $_ })
@@ -72,10 +72,10 @@ if (-not $Paths -or $Paths.Count -eq 0) {
   exit 0
 }
 
-$skipTestSet = [System.Collections.Generic.HashSet[string]]::new(
+$skipStepSet = [System.Collections.Generic.HashSet[string]]::new(
   [System.StringComparer]::OrdinalIgnoreCase
 )
-foreach ($t in $SkipTest) { $null = $skipTestSet.Add($t) }
+foreach ($t in $SkipStep) { $null = $skipStepSet.Add($t) }
 
 # ---------------------------------------------------------------------------
 # Syntax validation.
@@ -108,7 +108,7 @@ Write-Output ("PowerShell syntax check passed for {0} files." -f $Paths.Count)
 # ---------------------------------------------------------------------------
 # PSScriptAnalyzer lint.
 # ---------------------------------------------------------------------------
-$skipPSSA = $skipTestSet -contains 'PSSA'
+$skipPSSA = $skipStepSet -contains 'PSSA'
 if (-not $skipPSSA) {
   # Preflight: PSScriptAnalyzer is required.
   if (-not (Get-Module -ListAvailable -Name PSScriptAnalyzer)) {
@@ -199,5 +199,5 @@ if (-not $skipPSSA) {
     $env:PSModulePath = $originalPSModulePath
   }
 } else {
-  Write-Output 'PowerShell lint skipped (-SkipTest PSSA).'
+  Write-Output 'PowerShell lint skipped (-SkipStep PSSA).'
 }

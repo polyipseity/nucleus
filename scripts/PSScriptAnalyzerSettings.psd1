@@ -3,7 +3,7 @@
 #
 # Mode                                               Real
 # ----                                               ----
-# -SyntaxOnly                                         2.0s
+# -SkipStep PSSA                                     2.0s
 # Full lint (via check-pwsh.ps1, cache + syntax)    24.9s
 # Full lint (cache pre-pop)                          20.5s
 # Full lint (no cache pre-pop)                       63.1s

@@ -218,9 +218,9 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   function say { Write-Output "check: $args" }
   function warn { Write-Output "check: warning: $args" }
   if ($PS1_FILES.Count -gt 0) {
-    & "$RepoRoot\scripts\check-pwsh.ps1" -SkipTest PSSA -Scoped $PS1_FILES
+    & "$RepoRoot\scripts\check-pwsh.ps1" -SkipStep PSSA -Scoped $PS1_FILES
   } elseif (-not $HAS_ARGS) {
-    & "$RepoRoot\scripts\check-pwsh.ps1" -SkipTest PSSA
+    & "$RepoRoot\scripts\check-pwsh.ps1" -SkipStep PSSA
   } else {
     say "skipping (no PowerShell scripts to check)."
   }

@@ -2,7 +2,7 @@
 # Tests for PSScriptAnalyzer cache pre-population behavior.
 #
 # Verifies that:
-#   1. -SkipTest PSSA skips lint (exit 0, lint skipped message)
+#   1. -SkipStep PSSA skips lint (exit 0, lint skipped message)
 #   2. Default mode (with warmup) completes without unhandled errors
 #   3. Warmup message is printed (notably absent from output — silent)
 #
@@ -34,17 +34,17 @@ if ! pwsh -NoLogo -NoProfile -NonInteractive -Command '& { exit (Get-Module -Lis
 fi
 
 # ---------------------------------------------------------------------------
-# Test 1: -SkipTest PSSA must skip lint (exit 0) and print skip message.
+# Test 1: -SkipStep PSSA must skip lint (exit 0) and print skip message.
 # ---------------------------------------------------------------------------
-echo "--- Test 1: -SkipTest PSSA behavior ---"
+echo "--- Test 1: -SkipStep PSSA behavior ---"
 
 # check-suppress:suppression_doc: || true prevents set -e abort when pwsh exits non-zero; exit code is checked explicitly via assert_fail
-_syntax_output=$(pwsh -NoLogo -NoProfile -NonInteractive -File "$CHECK_PWSH" -SkipTest PSSA 2>&1 || true)
+_syntax_output=$(pwsh -NoLogo -NoProfile -NonInteractive -File "$CHECK_PWSH" -SkipStep PSSA 2>&1 || true)
 
 if echo "$_syntax_output" | grep -q 'PowerShell lint skipped'; then
-  assert_pass "SkipTest PSSA: prints lint skipped message"
+  assert_pass "SkipStep PSSA: prints lint skipped message"
 else
-  assert_fail "SkipTest PSSA: prints lint skipped message" "Expected 'PowerShell lint skipped' in output"
+  assert_fail "SkipStep PSSA: prints lint skipped message" "Expected 'PowerShell lint skipped' in output"
 fi
 
 # ---------------------------------------------------------------------------

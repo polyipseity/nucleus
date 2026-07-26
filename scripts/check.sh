@@ -271,9 +271,9 @@ section "$((_step += 1))" "PowerShell syntax validation"
 {
 _ps_exit=0
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SkipTest PSSA -Scoped "${PS1_FILES[@]}" || _ps_exit=$?
+  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SkipStep PSSA -Scoped "${PS1_FILES[@]}" || _ps_exit=$?
 elif ! $HAS_ARGS; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SkipTest PSSA || _ps_exit=$?
+  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SkipStep PSSA || _ps_exit=$?
 else
   say "skipping (no PowerShell scripts to check)."
 fi
