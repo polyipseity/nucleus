@@ -8,11 +8,15 @@
   without executing scripts.
 
   Phase 2 — Lint: if PSScriptAnalyzer is available in the current session,
-  runs `Invoke-ScriptAnalyzer` sequentially in-process at Error and Warning
-  severity with excluded rules that trigger false positives.  If the module is
-  absent, a warning is printed and the lint phase is skipped so CI can run on
-  machines that do not have PSScriptAnalyzer installed (syntax validation
-  still passes).
+  runs `Invoke-ScriptAnalyzer` in-process at Error and Warning severity with
+  excluded rules that trigger false positives. Rules are executed in two
+  ordered groups to prevent cache pollution:
+  - Group 1 (Phase C): all rules except PSAvoidUsingCmdletAliases — runs with
+    natural cache population (real Get-Command objects from Phase B).
+  - Group 2 (Phase D): PSAvoidUsingCmdletAliases (last) — runs after dummy
+    injection populates all remaining cache entries, giving 100% cache hits.
+  If the module is absent, a warning is printed and the lint phase is skipped
+  so CI can run on machines without PSScriptAnalyzer (syntax still passes).
 
   By default the script checks every tracked `*.ps1` file in the current Git
   repository.
@@ -46,19 +50,20 @@
   Environment variables: NUCLEUS_CHECK_PATHS.
   Exit codes: 0 on success; non-zero on failure.
 
-  The lint phase uses a grouped execution model via $RuleWorkaroundMap (published
-  by src/scripts/shell/optimize-pssa-cache.ps1). Rules not in the map run first
-  with no cache manipulation (natural Get-Command population). Rules requiring
-  'CachePrePopulation' (e.g., PSAvoidUsingCmdletAliases) run after their
-  workaround is applied. This avoids cross-pollution: rules needing real
-  CommandInfo metadata never see RemoteCommandInfo dummies.
+  The lint phase runs rules in two explicit groups:
+  1. All rules except PSAvoidUsingCmdletAliases — runs with natural cache
+     population (Phase B injects real CommandInfo objects for matched names).
+  2. PSAvoidUsingCmdletAliases (last) — runs after Initialize-PSScriptAnalyzerCache
+     -InjectDummies fills all remaining cache entries with RemoteCommandInfo.
+     This avoids cross-pollution: rules needing real CommandInfo metadata
+     (Parameters, ParameterSets) never see RemoteCommandInfo dummies.
 
   The CommandInfoCache pre-population optimization (function
   Initialize-PSScriptAnalyzerCache) triggers PSSA's internal lazy
-  initialization and injects lightweight RemoteCommandInfo dummy objects into
-  the command cache, avoiding slow Get-Command calls during AvoidAlias
-  evaluation. The optimization is non-fatal: if it fails, linting continues
-  using the uncached path.
+  initialization and injects real CommandInfo objects and/or
+  RemoteCommandInfo dummies into the command cache, avoiding slow Get-Command
+  calls. The optimization is non-fatal: if it fails, linting continues using
+  the uncached path.
 
   PSModulePath is scoped to the Nix store and user-local modules to reduce
   module-discovery overhead during rule evaluation. This is the dominant
@@ -142,7 +147,7 @@ else {
     Import-Module PSReadLine -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: PSReadLine may be absent in CI/non-interactive shells; this import is a performance optimization, not required
 
     # Dot-source the CommandInfoCache pre-population helper (provides
-    # Initialize-PSScriptAnalyzerCache and $RuleWorkaroundMap).
+    # Initialize-PSScriptAnalyzerCache).
     . (Join-Path $PSScriptRoot '../src/scripts/shell/optimize-pssa-cache.ps1')
     # Dot-source hybrid pre-population helpers (Get-UniqueCommandNames, Get-MatchingRealCommands).
     . (Join-Path $PSScriptRoot '../src/scripts/shell/pssa-cache-hybrid.ps1')
@@ -151,43 +156,27 @@ else {
 
     $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
 
-    # Phase B: Hybrid pre-population — inject real CommandInfo objects for command
-    # names that match loaded commands. This runs before any rule group, so
-    # no-workaround rules (UseCmdletCorrectly, etc.) benefit from cache hits.
-    # Dummy injection (Phase C) is deferred to the CachePrePopulation group after
-    # no-workaround rules finish.
-    $null = Initialize-PSScriptAnalyzerCache -Files $files -SettingsFile $settingsFile -Workaround @()
+    # Phase B: Hybrid pre-population — parse all command names from target files
+    # and inject real CommandInfo objects for names that match loaded commands.
+    # This runs before any Invoke-ScriptAnalyzer call, so Phase C rules benefit
+    # from fast cache hits on real commands.
     $allNames = @(Get-UniqueCommandNames -Files $files)
     if ($allNames.Count -gt 0) {
       $realMap = Get-MatchingRealCommands -CommandNames $allNames
       if ($realMap.Count -gt 0) {
-        $null = Initialize-PSScriptAnalyzerCache -Files $files -SettingsFile $settingsFile `
-          -Workaround @('InjectRealOnly') -RealCommandMap $realMap
+        $null = Initialize-PSScriptAnalyzerCache -Files $files -SettingsFile $settingsFile -RealCommandMap $realMap
       }
     }
 
-    # Get all rule names and group by workaround.
-    # Rules not in $RuleWorkaroundMap get the empty-string key (no workaround).
-    $allRuleNames = Get-ScriptAnalyzerRule | ForEach-Object RuleName
-    $groups = @{}
-    foreach ($rule in $allRuleNames) {
-      $wa = if ($RuleWorkaroundMap.ContainsKey($rule)) { $RuleWorkaroundMap[$rule] } else { '' }
-      if (-not $groups.ContainsKey($wa)) { $groups[$wa] = [System.Collections.Generic.List[string]]::new() }
-      $groups[$wa].Add($rule)
-    }
-
-    # Execute groups sequentially: no-workaround first, then workaround groups.
-    # Cross-pollution is avoided because CachePrePopulation (dummy injection)
-    # runs after all real-CommandInfo population from the no-workaround group.
+    # Phase C: All rules except PSAvoidUsingCmdletAliases.
+    # Must run BEFORE Phase D (dummy injection). These rules inspect CommandInfo
+    # metadata (Parameters, ParameterSets) and would crash on RemoteCommandInfo
+    # dummies. Phase B's real-object injection gives them fast cache hits.
     $allDiagnostics = [System.Collections.Generic.List[object]]::new()
-    $groupOrder = $groups.Keys | Sort-Object
-    foreach ($workaround in $groupOrder) {
-      $rules = $groups[$workaround]
-      if ($workaround -eq 'CachePrePopulation') {
-        $null = Initialize-PSScriptAnalyzerCache -Files $files -SettingsFile $settingsFile -Workaround @('CachePrePopulation')
-      }
+    $nonAvoidAliasRules = @(Get-ScriptAnalyzerRule | ForEach-Object RuleName | Where-Object { $_ -ne 'PSAvoidUsingCmdletAliases' })
+    if ($nonAvoidAliasRules.Count -gt 0) {
       $groupSettings = @{
-        IncludeRules = [string[]]$rules
+        IncludeRules = [string[]]$nonAvoidAliasRules
         Severity = @('Error', 'Warning')
         ExcludeRules = @('PSUseBOMForUnicodeEncodedFile')
         Rules = @{}
@@ -196,8 +185,22 @@ else {
       $allDiagnostics.AddRange($diags)
     }
 
-    # Each rule runs in exactly one group (IncludeRules filters are mutually exclusive),
-    # so no rule produces diagnostics in two groups.
+    # Phase D: PSAvoidUsingCmdletAliases (last). This rule's cache hit pattern
+    # is existence-only (aliases → commands), so RemoteCommandInfo dummies work.
+    # Dummy injection happens here, after all other rules have finished, to
+    # prevent cross-pollution of the cache.
+    $avoidAliasAvailable = @(Get-ScriptAnalyzerRule | Where-Object RuleName -eq 'PSAvoidUsingCmdletAliases').Count -gt 0
+    if ($avoidAliasAvailable -and $allNames.Count -gt 0) {
+      $null = Initialize-PSScriptAnalyzerCache -Files $files -SettingsFile $settingsFile -CommandNames @($allNames) -InjectDummies
+      $avoidSettings = @{
+        IncludeRules = @('PSAvoidUsingCmdletAliases')
+        Severity = @('Error', 'Warning')
+        ExcludeRules = @('PSUseBOMForUnicodeEncodedFile')
+        Rules = @{}
+      }
+      $avoidDiags = $files | Invoke-ScriptAnalyzer -Settings $avoidSettings
+      $allDiagnostics.AddRange($avoidDiags)
+    }
     if ($allDiagnostics.Count -gt 0) {
       $allDiagnostics | ForEach-Object {
         Write-Output ('{0}:{1}:{2}: [{3}] {4}' -f $_.ScriptPath, $_.Line, $_.Column, $_.Severity, $_.Message)
