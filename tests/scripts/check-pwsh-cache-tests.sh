@@ -393,7 +393,7 @@ else
   assert_fail "Preserve real entries: executes without error" "Exit code: $_preserve_exit, Output: $_preserve_out"
 fi
 
-if echo "$_preserve_out" | grep -qE '^WO74=True WO383=True T=[1-9] R=[1-9] D=[1-9]'; then
+if echo "$_preserve_out" | grep -qE '^WO74=True WO383=True T=[1-9][0-9]* R=[1-9][0-9]* D=[1-9][0-9]*$'; then
   assert_pass "Preserve real entries: Write-Output still real after dummy injection"
 else
   assert_fail "Preserve real entries: Write-Output still real" "Expected WO74=True WO383=True with R>0, D>0, got: $_preserve_out"
