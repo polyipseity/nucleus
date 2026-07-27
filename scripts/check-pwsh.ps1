@@ -170,7 +170,7 @@ if (-not $skipPSSA) {
         Rules = @{}
       }
       $diags = $files | Invoke-ScriptAnalyzer -Settings $phaseCSettings
-      $allDiagnostics.AddRange($diags)
+      if ($diags) { $allDiagnostics.AddRange($diags) }
     }
 
     # PSAvoidUsingCmdletAliases (last). This rule's cache hit pattern
@@ -184,7 +184,7 @@ if (-not $skipPSSA) {
         Rules = @{}
       }
       $avoidDiags = $files | Invoke-ScriptAnalyzer -Settings $phaseDSettings
-      $allDiagnostics.AddRange($avoidDiags)
+      if ($avoidDiags) { $allDiagnostics.AddRange($avoidDiags) }
     }
     if ($allDiagnostics.Count -gt 0) {
       $allDiagnostics | ForEach-Object {
