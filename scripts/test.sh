@@ -5,7 +5,7 @@
 #
 # Code quality tests (2-3):
 #   2. Shell script linting (treefmt)
-#   3. PowerShell lint (PSScriptAnalyzer) and cache tests
+#   3. PowerShell lint (PSScriptAnalyzer) and check-pwsh smoke tests
 #
 # Functional tests (1, 4-5):
 #   1. Nix test suite — auto-discover and run all *.nix test files
@@ -184,12 +184,17 @@ _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 } &
 
-# 3. PowerShell lint (PSScriptAnalyzer)
+# 3. PowerShell lint (PSScriptAnalyzer) and check-pwsh smoke tests
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "PowerShell lint"
 {
-pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -Settings scripts/PSScriptAnalyzerSettings.test.psd1 || echo "1" > "$_wave_tmpdir/step-3.exit"
-[ -f "$_wave_tmpdir/step-3.exit" ] || echo "0" > "$_wave_tmpdir/step-3.exit"
+_ps_exit=0
+# Use -File (not -Command): test mode never passes paths, so no array binding
+# is needed. -File is simpler and avoids shell-quoting overhead.
+pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -Settings scripts/PSScriptAnalyzerSettings.test.psd1 || _ps_exit=1
+# check-pwsh smoke tests (syntax validation, -SkipStep, error handling).
+bash tests/scripts/check-pwsh-tests.sh || _ps_exit=1
+echo "$_ps_exit" > "$_wave_tmpdir/step-3.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 } &

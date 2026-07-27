@@ -129,18 +129,27 @@ $_sw.Stop()
 $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.time") -NoNewline
 
 # ---------------------------------------------------------------------------
-# 3. PowerShell lint (PSScriptAnalyzer)
+# 3. PowerShell lint (PSScriptAnalyzer) and check-pwsh smoke tests
 # ---------------------------------------------------------------------------
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] PowerShell lint ===" -f (++$_step))
 $script:waveJob3 = Start-Job -ScriptBlock {
-  param($pwshScript, $settings, $_stepStartTicks)
+  param($pwshScript, $settings, $_stepStartTicks, $RepoRoot)
+  # PSScriptAnalyzer lint
   & $pwshScript -Settings $settings
+  $_exitCode = $LASTEXITCODE
+  # check-pwsh smoke tests
+  # 1. Syntax validation on known-good file
+  & $pwshScript -SkipStep PSSA -Paths (Join-Path $RepoRoot 'scripts\check-pwsh.ps1')
+  if ($LASTEXITCODE -ne 0) { $_exitCode = $LASTEXITCODE }
+  # 2. Unknown -SkipStep name should fail
+  & $pwshScript -SkipStep UnknownName -Paths (Join-Path $RepoRoot 'scripts\check-pwsh.ps1')
+  if ($LASTEXITCODE -eq 0) { $_exitCode = 1 }
   $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
   $_elapsedMs | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-3.time") -NoNewline
-  $LASTEXITCODE
-} -ArgumentList "$PSScriptRoot\check-pwsh.ps1", "$PSScriptRoot\PSScriptAnalyzerSettings.test.psd1", $_stepStartTicks
+  $_exitCode
+} -ArgumentList "$PSScriptRoot\check-pwsh.ps1", "$PSScriptRoot\PSScriptAnalyzerSettings.test.psd1", $_stepStartTicks, $RepoRoot
 
 # ---------------------------------------------------------------------------
 # 4. Nucleus apps smoke tests — POSIX only (stub on Windows)
