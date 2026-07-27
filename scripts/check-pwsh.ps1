@@ -135,9 +135,9 @@ if (-not $skipPSSA) {
 
     $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
 
-    $settings = Import-PowerShellDataFile $settingsFile
-    $enabledSeverities = [System.Collections.Generic.HashSet[string]]@($settings.Severity)
-    $excludedRules = [System.Collections.Generic.HashSet[string]]@($settings.ExcludeRules)
+    $settingsTable = Import-PowerShellDataFile $settingsFile
+    $enabledSeverities = [System.Collections.Generic.HashSet[string]]@($settingsTable.Severity)
+    $excludedRules = [System.Collections.Generic.HashSet[string]]@($settingsTable.ExcludeRules)
     $enabledRuleNames = @(Get-ScriptAnalyzerRule | Where-Object {
         $_.RuleName -notin $excludedRules -and $_.Severity -in $enabledSeverities
     } | ForEach-Object RuleName)
