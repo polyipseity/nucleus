@@ -15,6 +15,11 @@
   Benchmark results:
     pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1
     data: .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark-results.json
+
+  Related settings files (all intentionally separate — no deduplication):
+    scripts/PSScriptAnalyzerSettings.check.psd1                   — pre-commit/lint (excludes slow rules)
+    src/modules/configs/pwsh/PSScriptAnalyzerSettings.psd1       — interactive profile
+    .agents/skills/pssa-rule-benchmark/PSScriptAnalyzerSettings.psd1 — benchmarking
 #>
 @{
     Severity = @('Error', 'Warning')
