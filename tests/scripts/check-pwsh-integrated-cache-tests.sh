@@ -98,8 +98,8 @@ _i2_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInteractive
   $allNames = Get-UniqueCommandNames -Files @("$rp/scripts/check-pwsh.ps1")
   $realMap = Get-MatchingRealCommands -CommandNames @($allNames)
   $null = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -RealCommandMap $realMap
-  # Run Invoke-ScriptAnalyzer to exercise the cache (use ScriptDefinition due to Path issue)
-  $null = Invoke-ScriptAnalyzer -ScriptDefinition "echo hello" -Settings "$rp/scripts/PSScriptAnalyzerSettings.psd1"
+  # Run Invoke-ScriptAnalyzer to exercise the cache
+  $null = Invoke-ScriptAnalyzer -Path "$rp/scripts/check-pwsh.ps1" -Settings "$rp/scripts/PSScriptAnalyzerSettings.psd1"
 
   # Capture Phase C cache state
   $statsC = Get-CacheStats
