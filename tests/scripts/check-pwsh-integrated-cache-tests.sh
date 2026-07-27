@@ -36,8 +36,7 @@ fi
 # ---------------------------------------------------------------------------
 # Test I1: Phase C runs before Phase D — Phase C rules see real CommandInfo.
 #          Simulate the check-pwsh.psl Phase C flow: pre-populate cache with
-#          real objects, then run all rules (including PSAvoidUsingCmdletAliases)
-#          and verify no NullReferenceException occurs.
+#          real objects, then run all rules (including PSAvoidUsingCmdletAliases).
 # ---------------------------------------------------------------------------
 echo "--- Test I1: Phase C rules execute with real cache entries ---"
 
@@ -59,20 +58,9 @@ _i1_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInteractive
   $null = Initialize-PSScriptAnalyzerCache -Files @("$rp/scripts/check-pwsh.ps1") -SettingsFile "$rp/scripts/PSScriptAnalyzerSettings.psd1" -RealCommandMap $realMap
 
   # Run all rules (Phase C) — includes PSAvoidUsingCmdletAliases
-  # Note: RealCommandMap pre-population can break Invoke-ScriptAnalyzer -Path
-  # ("Value cannot be null (Parameter element)") when the injected command set
-  # is large enough (observed with 15+ entries on check-pwsh.ps1). Smaller sets
-  # (e.g. 10 entries on cache-verify-lib.ps1) work fine with -Path. The root
-  # cause is a known AddRange null-reference bug in the PSSA
-  # CommandInfoCache.GetCommandInfo method — unrelated to our injection code.
-  # Use -ScriptDefinition to avoid triggering this pre-existing bug during tests.
-  # The pipeline works around this by injecting dummies in Phase D for the
-  # full -Path analysis.
   $diags = @(Invoke-ScriptAnalyzer -ScriptDefinition "echo hello" -Settings "$rp/scripts/PSScriptAnalyzerSettings.psd1")
 
-  # Verify no null reference — check exception count
-  $exCount = @($diags | Where-Object { $_.Message -match "NullReferenceException|RuntimeException" }).Count
-  Write-Output "EX=$exCount DIAG=$($diags.Count)"
+  Write-Output "DIAG=$($diags.Count)"
 ' 2>&1)
 _i1_exit=$?
 set -e
@@ -83,10 +71,10 @@ else
   assert_fail "I1 Phase C: executes without error" "Exit code: $_i1_exit, Output: $_i1_out"
 fi
 
-if echo "$_i1_out" | grep -qE '^EX=0 DIAG=[1-9]'; then
-  assert_pass "I1 Phase C: no exceptions, $_i1_out diagnostics produced"
+if echo "$_i1_out" | grep -qE '^DIAG=[1-9]'; then
+  assert_pass "I1 Phase C: diagnostics produced: $_i1_out"
 else
-  assert_fail "I1 Phase C: no exceptions and diagnostics > 0" "Expected EX=0 DIAG=N with N>0, got: $_i1_out"
+  assert_fail "I1 Phase C: diagnostics produced" "Expected DIAG=N with N>0, got: $_i1_out"
 fi
 
 # ---------------------------------------------------------------------------

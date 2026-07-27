@@ -329,8 +329,7 @@ function Compare-RealCommandMapTransparency {
 
   .DESCRIPTION
     Runs Invoke-ScriptAnalyzer in 3 modes within a single session and compares
-    diagnostic output for equality. Uses -ScriptDefinition for the analysis to avoid
-    the known -RealCommandMap + -Path nullref crash that occurs with large command sets.
+    diagnostic output for equality. Uses -ScriptDefinition for the analysis.
 
     Mode A (Baseline): No cache manipulation — PSSA's natural cache state.
     Mode B (Warmup-only): Calls Initialize-PSScriptAnalyzerCache with no injection
