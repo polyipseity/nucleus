@@ -271,9 +271,9 @@ section "$((_step += 1))" "PowerShell lint"
 {
 _ps_exit=0
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -Scoped "${PS1_FILES[@]}" || _ps_exit=$?
+  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -Settings scripts/PSScriptAnalyzerSettings.check.psd1 -Scoped "${PS1_FILES[@]}" || _ps_exit=$?
 elif ! $HAS_ARGS; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 || _ps_exit=$?
+  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -Settings scripts/PSScriptAnalyzerSettings.check.psd1 || _ps_exit=$?
 else
   say "skipping (no PowerShell scripts to check)."
 fi

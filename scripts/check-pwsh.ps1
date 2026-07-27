@@ -35,7 +35,7 @@
   nix run ./src#check-pwsh -- -SkipStep PSSA
 
 .EXAMPLE
-  nix run ./src#check-pwsh -- src/hosts/Windows/apply.ps1
+  nix run ./src#check-pwsh -- -Settings scripts/PSScriptAnalyzerSettings.check.psd1 src/hosts/Windows/apply.ps1
 
 .NOTES
   Environment variables: NUCLEUS_CHECK_PATHS.
