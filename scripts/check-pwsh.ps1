@@ -8,10 +8,7 @@
   without executing scripts.
 
   PSScriptAnalyzer lint: runs `Invoke-ScriptAnalyzer` at Error and Warning
-  severity on enabled rules. Rules execute in two ordered groups to prevent
-  cache pollution — all rules except PSAvoidUsingCmdletAliases first (with
-  real CommandInfo pre-population), then PSAvoidUsingCmdletAliases last (after
-  dummy cache injection).
+  severity on all enabled rules.
 
 .PARAMETER SkipStep
   Step names to skip. Initially only 'PSSA' is recognized — bypasses the
@@ -39,14 +36,6 @@
 .NOTES
   Environment variables: NUCLEUS_CHECK_PATHS.
   Exit codes: 0 on success; non-zero on failure.
-
-  The lint phase runs rules in two explicit groups:
-  1. All rules except PSAvoidUsingCmdletAliases — runs with natural cache
-     population (hybrid pre-population injects real CommandInfo objects for
-     matched command names first).
-  2. PSAvoidUsingCmdletAliases (last) — runs after dummy injection fills all
-     remaining cache entries. This avoids cross-pollution: rules needing real
-     CommandInfo metadata (Parameters, ParameterSets) never see dummies.
 #>
 [CmdletBinding()]
 param(
@@ -127,67 +116,23 @@ if (-not $skipPSSA) {
     # Pre-import commonly-used modules to reduce PSSA's implicit Get-Command overhead during rule evaluation.
     Import-Module PSReadLine -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: PSReadLine may be absent in CI/non-interactive shells; this import is a performance optimization, not required
 
-    # Dot-source the CommandInfoCache pre-population helper (provides
-    # Initialize-PSScriptAnalyzerCache).
-    . (Join-Path $PSScriptRoot '../src/scripts/shell/optimize-pssa-cache.ps1')
-    # Dot-source hybrid pre-population helpers (Get-UniqueCommandNames, Get-MatchingRealCommands).
-    . (Join-Path $PSScriptRoot '../src/scripts/shell/pssa-cache-hybrid.ps1')
-
     $settingsFile = Join-Path $PSScriptRoot 'PSScriptAnalyzerSettings.psd1'
 
     $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
 
-    # Hybrid pre-population — parse all command names from target files
-    # and inject real CommandInfo objects for names that match loaded commands.
-    # This runs before any Invoke-ScriptAnalyzer call, so the main rules benefit
-    # from fast cache hits on real commands.
-    $allNames = @(Get-UniqueCommandNames -Files $files)
-    if ($allNames.Count -gt 0) {
-      $realMap = Get-MatchingRealCommands -CommandNames $allNames
-      if ($realMap.Count -gt 0) {
-        $null = Initialize-PSScriptAnalyzerCache -Files $files -SettingsFile $settingsFile -RealCommandMap $realMap
-      }
-    }
-
-    # All enabled rules except PSAvoidUsingCmdletAliases.
-    # Must run BEFORE dummy injection. These rules inspect CommandInfo
-    # metadata (Parameters, ParameterSets) and would crash on RemoteCommandInfo
-    # dummies. The hybrid pre-population real-object injection gives them fast cache hits.
-    #
-    # Enabled rules come from the settings file: Severity filter + ExcludeRules.
-    $allDiagnostics = [System.Collections.Generic.List[object]]::new()
     $settings = Import-PowerShellDataFile $settingsFile
     $enabledSeverities = [System.Collections.Generic.HashSet[string]]@($settings.Severity)
     $excludedRules = [System.Collections.Generic.HashSet[string]]@($settings.ExcludeRules)
     $enabledRuleNames = @(Get-ScriptAnalyzerRule | Where-Object {
         $_.RuleName -notin $excludedRules -and $_.Severity -in $enabledSeverities
     } | ForEach-Object RuleName)
-    $phaseCRuleNames = [string[]]@($enabledRuleNames | Where-Object { $_ -ne 'PSAvoidUsingCmdletAliases' })
-    $phaseDRuleNames = [string[]]@($enabledRuleNames | Where-Object { $_ -eq 'PSAvoidUsingCmdletAliases' })
-    if ($phaseCRuleNames.Count -gt 0) {
-      $phaseCSettings = @{
-        IncludeRules = $phaseCRuleNames
-        Rules = @{}
-      }
-      $diags = $files | Invoke-ScriptAnalyzer -Settings $phaseCSettings
-      if ($diags) { $allDiagnostics.AddRange($diags) }
-    }
 
-    # PSAvoidUsingCmdletAliases (last). This rule's cache hit pattern
-    # is existence-only (aliases → commands), so RemoteCommandInfo dummies work.
-    # Dummy injection happens here, after all other rules have finished, to
-    # prevent cross-pollution of the cache.
-    if ($phaseDRuleNames.Count -gt 0 -and $allNames.Count -gt 0) {
-      $null = Initialize-PSScriptAnalyzerCache -Files $files -SettingsFile $settingsFile -CommandNames @($allNames) -InjectDummies
-      $phaseDSettings = @{
-        IncludeRules = $phaseDRuleNames
-        Rules = @{}
-      }
-      $avoidDiags = $files | Invoke-ScriptAnalyzer -Settings $phaseDSettings
-      if ($avoidDiags) { $allDiagnostics.AddRange($avoidDiags) }
+    $diags = $files | Invoke-ScriptAnalyzer -Settings @{
+      IncludeRules = [string[]]$enabledRuleNames
+      Rules = @{}
     }
-    if ($allDiagnostics.Count -gt 0) {
-      $allDiagnostics | ForEach-Object {
+    if ($diags) {
+      $diags | ForEach-Object {
         Write-Output ('{0}:{1}:{2}: [{3}] {4}' -f $_.ScriptPath, $_.Line, $_.Column, $_.Severity, $_.Message)
       }
       throw 'PowerShell lint check failed.'
