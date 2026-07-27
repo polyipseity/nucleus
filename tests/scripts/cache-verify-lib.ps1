@@ -3,11 +3,16 @@
   Inspects PSScriptAnalyzer's internal CommandInfoCache content for test verification.
 
 .DESCRIPTION
-  Provides three functions that reflectively access PSScriptAnalyzer's internal
+  Provides five functions that reflectively access PSScriptAnalyzer's internal
   CommandInfoCache (ConcurrentDictionary<CommandLookupKey, Lazy<CommandInfo>>)
   and return typed diagnostics about cache contents.
 
-  These functions are pure inspection — they do not modify the cache.
+  - Get-CacheContents, Get-CacheStats, Assert-CacheEntry: pure inspection —
+    they do not modify the cache.
+  - Get-DiagnosticComparison: compares diagnostics across 3 execution states
+    (baseline, warmup-only, full injection via -InjectDummies).
+  - Compare-RealCommandMapTransparency: compares diagnostics across 3 execution
+    states (baseline, warmup-only, full injection via -RealCommandMap).
 
   Dependencies: PSScriptAnalyzer module must be imported and Helper.Instance
   must be initialized before calling these functions.
@@ -25,6 +30,10 @@
   $contents = @(Get-CacheContents)
   $stats = Get-CacheStats
   Assert-CacheEntry -Name "Write-Output" -CommandTypes 74 -ExpectedKind Real
+
+.EXAMPLE
+  $result = Compare-RealCommandMapTransparency -TargetFile "tests/scripts/cache-verify-lib.ps1" -SettingsFile "scripts/PSScriptAnalyzerSettings.psd1"
+  $result.BaselineVsInjectionDiff.Count  # 0 when identical
 #>
 
 function Get-CacheContents {
@@ -176,7 +185,7 @@ function Assert-CacheEntry {
 function Get-DiagnosticComparison {
   <#
   .SYNOPSIS
-    Compares diagnostics across 3 cache states: baseline, warmup-only, full injection.
+    Compares diagnostics across 3 execution states: baseline, warmup-only, full injection.
 
   .DESCRIPTION
     Runs Invoke-ScriptAnalyzer in 3 modes within a single session and compares
@@ -184,8 +193,21 @@ function Get-DiagnosticComparison {
     results.
 
     Mode A (Baseline): No cache manipulation — PSSA's natural cache state.
-    Mode B (Warmup): Initialize-PSScriptAnalyzerCache (warmup only) before analysis.
-    Mode C (Full injection): Initialize-PSScriptAnalyzerCache -InjectDummies before analysis.
+    Mode B (Warmup-only): Calls Initialize-PSScriptAnalyzerCache with no injection
+      parameters. The warmup triggers PSSA's lazy initialization (required before
+      any cache manipulation) without adding any entries to the cache. This proves
+      the warmup prerequisite itself does not alter diagnostic output.
+    Mode C (Full injection via -InjectDummies): Calls
+      Initialize-PSScriptAnalyzerCache -InjectDummies, which populates the cache
+      with RemoteCommandInfo dummies for every command name found in the target
+      file. This tests the dummy-injection cache mechanism.
+
+    Note: This function tests only the -InjectDummies mechanism. The other cache
+    mechanism (-RealCommandMap) is tested separately in I2. The warmup-only mode
+    (Mode B) is NOT a cache mechanism — it is the mandatory prerequisite step
+    required before any cache manipulation can occur.
+
+    The comparison uses composite keys (ScriptName|Line|Column|RuleName|Severity|Message)
 
     The comparison uses composite keys (ScriptName|Line|Column|RuleName|Severity|Message)
     for deep equality. Empty diff arrays mean the modes produced identical diagnostics.
@@ -200,8 +222,9 @@ function Get-DiagnosticComparison {
     Path to the PSScriptAnalyzer settings file (.psd1).
 
   .PARAMETER NoInjection
-    When set, skips Mode C (full injection) and only compares baseline vs warmup.
-    Useful for isolating warmup effects.
+    When set, skips Mode C (full injection via -InjectDummies) and only compares
+    baseline vs warmup. Useful for isolating the effect of the warmup prerequisite
+    step alone.
 
   .EXAMPLE
     $result = Get-DiagnosticComparison -TargetFile "tests/scripts/cache-verify-lib.ps1" -SettingsFile "scripts/PSScriptAnalyzerSettings.psd1"
@@ -260,7 +283,7 @@ function Get-DiagnosticComparison {
   # Mode A: Baseline — no cache manipulation
   $baselineDiags = @(Invoke-ScriptAnalyzer -Path $TargetFile -Settings $SettingsFile)
 
-  # Mode B: Warmup-only — pre-populate via file analysis (no injection)
+  # Mode B: Warmup-only — triggers lazy initialization (no injection, no cache entries added)
   $null = Initialize-PSScriptAnalyzerCache -Files @($TargetFile) -SettingsFile $SettingsFile
   $warmupDiags = @(Invoke-ScriptAnalyzer -Path $TargetFile -Settings $SettingsFile)
 
@@ -269,6 +292,145 @@ function Get-DiagnosticComparison {
     $null = Initialize-PSScriptAnalyzerCache -Files @($TargetFile) -SettingsFile $SettingsFile -InjectDummies
   }
   $injectionDiags = @(Invoke-ScriptAnalyzer -Path $TargetFile -Settings $SettingsFile)
+
+  # Build composite key arrays for comparison
+  $baselineKeys = @($baselineDiags | Get-DiagnosticKey)
+  $warmupKeys = @($warmupDiags | Get-DiagnosticKey)
+  $injectionKeys = @($injectionDiags | Get-DiagnosticKey)
+
+  # Compare baseline vs warmup
+  $bVsWDiff = @(if ($baselineKeys.Count -eq $warmupKeys.Count) {
+    Compare-Object -ReferenceObject $baselineKeys -DifferenceObject $warmupKeys
+  } else {
+    [PSCustomObject]@{ SideIndicator = '=>'; InputObject = "Count mismatch: baseline=$($baselineKeys.Count) vs warmup=$($warmupKeys.Count)" }
+  })
+
+  # Compare baseline vs injection
+  $bVsIDiff = @(if ($baselineKeys.Count -eq $injectionKeys.Count) {
+    Compare-Object -ReferenceObject $baselineKeys -DifferenceObject $injectionKeys
+  } else {
+    [PSCustomObject]@{ SideIndicator = '=>'; InputObject = "Count mismatch: baseline=$($baselineKeys.Count) vs injection=$($injectionKeys.Count)" }
+  })
+
+  return [PSCustomObject]@{
+    BaselineCount           = $baselineKeys.Count
+    WarmupCount             = $warmupKeys.Count
+    InjectionCount          = $injectionKeys.Count
+    BaselineVsWarmupDiff    = $bVsWDiff
+    BaselineVsInjectionDiff = $bVsIDiff
+    BaselineDiagnostics     = $baselineDiags
+    WarmupDiagnostics       = $warmupDiags
+    InjectionDiagnostics    = $injectionDiags
+  }
+}
+
+function Compare-RealCommandMapTransparency {
+  <#
+  .SYNOPSIS
+    Compares diagnostics across 3 execution states: baseline, warmup, RealCommandMap injection.
+
+  .DESCRIPTION
+    Runs Invoke-ScriptAnalyzer in 3 modes within a single session and compares
+    diagnostic output for equality. Uses -ScriptDefinition for the analysis to avoid
+    the known -RealCommandMap + -Path nullref crash that occurs with large command sets.
+
+    Mode A (Baseline): No cache manipulation — PSSA's natural cache state.
+    Mode B (Warmup-only): Calls Initialize-PSScriptAnalyzerCache with no injection
+      parameters. Triggers PSSA's lazy initialization (required before any cache
+      manipulation) without adding any entries.
+    Mode C (RealCommandMap injection): Calls Initialize-PSScriptAnalyzerCache with
+      -RealCommandMap, injecting real CmdletInfo/FunctionInfo objects for every
+      command name found in the target file. Uses Get-UniqueCommandNames and
+      Get-MatchingRealCommands (from pssa-cache-hybrid.ps1) to build the map.
+
+    Comparison uses composite keys (ScriptName|Line|Column|RuleName|Severity|Message)
+    for deep equality. Empty diff arrays mean the modes produced identical diagnostics.
+
+    Requires PSScriptAnalyzer module imported and NUCLEUS_TEST_ROOT environment
+    variable set (to locate optimize-pssa-cache.ps1 and pssa-cache-hybrid.ps1).
+
+  .PARAMETER TargetFile
+    Path to the .ps1 file to scan for command names.
+
+  .PARAMETER SettingsFile
+    Path to the PSScriptAnalyzer settings file (.psd1).
+
+  .PARAMETER ScriptDefinition
+    The script text to analyze with Invoke-ScriptAnalyzer -ScriptDefinition.
+    Default: "echo hello; get-date; write-output test; get-childitem /"
+
+  .EXAMPLE
+    $result = Compare-RealCommandMapTransparency -TargetFile "tests/scripts/cache-verify-lib.ps1" -SettingsFile "scripts/PSScriptAnalyzerSettings.psd1"
+    $result.BaselineVsInjectionDiff.Count  # 0 when identical
+  #>
+  [CmdletBinding()]
+  [OutputType([System.Management.Automation.PSObject])]
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$TargetFile,
+
+    [Parameter(Mandatory = $true)]
+    [string]$SettingsFile,
+
+    [Parameter()]
+    [string]$ScriptDefinition = 'echo hello; get-date; write-output test; get-childitem /'
+  )
+
+  # Check PSSA availability
+  if (-not (Get-Module -Name PSScriptAnalyzer)) {
+    Write-Warning "Compare-RealCommandMapTransparency: PSScriptAnalyzer module not imported"
+    return [PSCustomObject]@{
+      BaselineCount           = -1
+      WarmupCount             = -1
+      InjectionCount          = -1
+      BaselineVsWarmupDiff    = @()
+      BaselineVsInjectionDiff = @()
+      BaselineDiagnostics     = @()
+      WarmupDiagnostics       = @()
+      InjectionDiagnostics    = @()
+    }
+  }
+
+  # Dot-source cache helper scripts if available
+  $repoRoot = $env:NUCLEUS_TEST_ROOT
+  if ($repoRoot) {
+    $cacheScript = Join-Path -Path $repoRoot -ChildPath "src/scripts/shell/optimize-pssa-cache.ps1"
+    if (Test-Path -LiteralPath $cacheScript) {
+      . $cacheScript
+    }
+    $hybridScript = Join-Path -Path $repoRoot -ChildPath "src/scripts/shell/pssa-cache-hybrid.ps1"
+    if (Test-Path -LiteralPath $hybridScript) {
+      . $hybridScript
+    }
+  }
+
+  # Mode A: Baseline — no cache manipulation
+  $baselineDiags = @(Invoke-ScriptAnalyzer -ScriptDefinition $ScriptDefinition -Settings $SettingsFile)
+
+  # Mode B: Warmup-only — triggers lazy initialization (no injection, no cache entries added)
+  $null = Initialize-PSScriptAnalyzerCache -Files @($TargetFile) -SettingsFile $SettingsFile
+  $warmupDiags = @(Invoke-ScriptAnalyzer -ScriptDefinition $ScriptDefinition -Settings $SettingsFile)
+
+  # Mode C: RealCommandMap injection — inject real CommandInfo objects
+  $allNames = Get-UniqueCommandNames -Files @($TargetFile)
+  $realMap = Get-MatchingRealCommands -CommandNames @($allNames)
+  if ($realMap.Count -gt 0) {
+    $null = Initialize-PSScriptAnalyzerCache -Files @($TargetFile) -SettingsFile $SettingsFile -RealCommandMap $realMap
+  }
+  $injectionDiags = @(Invoke-ScriptAnalyzer -ScriptDefinition $ScriptDefinition -Settings $SettingsFile)
+
+  # Helper: build a composite key from a diagnostic object
+  function Get-DiagnosticKey {
+    [CmdletBinding()]
+    [OutputType([string])]
+    param(
+      [Parameter(Mandatory = $true, ValueFromPipeline = $true)]
+      [object]$Diagnostic
+    )
+    process {
+      "$($Diagnostic.ScriptName)|$($Diagnostic.Line)|$($Diagnostic.Column)|$($Diagnostic.RuleName)|$($Diagnostic.Severity)|$($Diagnostic.Message)"
+    }
+  }
 
   # Build composite key arrays for comparison
   $baselineKeys = @($baselineDiags | Get-DiagnosticKey)
