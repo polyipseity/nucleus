@@ -72,6 +72,17 @@
             "description": "Whether to share the ~/dev directory.",
             "type": "boolean"
           },
+          "windowsIsoUrl": {
+            "description": "Windows ISO download URL. Null means auto-resolve via Mido/Fido.",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "type": {
             "description": "Guest operating system type.",
             "enum": [
@@ -95,7 +106,8 @@
           "name",
           "ramBytes",
           "shareDevDir",
-          "type"
+          "type",
+          "windowsIsoUrl"
         ],
         "type": "object"
       },

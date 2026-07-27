@@ -16,6 +16,7 @@ let
     "diskBytes"
     "type"
     "shareDevDir"
+    "windowsIsoUrl"
   ];
 
   # Validate that every VM entry has all required fields with correct types.
@@ -110,15 +111,22 @@ let
         builtins.toString (builtins.map (v: v.name) badEnabled)
       }";
 
-  # windowsIsoUrl must be a string when present; the field is optional.
+  # windowsIsoUrl must be present on every VM, and must be a string or null.
   test_windows_iso_url_type =
     let
+      missingIsoUrls = builtins.filter (
+        vm: !builtins.hasAttr "windowsIsoUrl" vm
+      ) manifest.VMs;
       badIsoUrls = builtins.filter (
-        vm: builtins.hasAttr "windowsIsoUrl" vm && !builtins.isString vm.windowsIsoUrl
+        vm:
+        builtins.hasAttr "windowsIsoUrl" vm
+        && !(builtins.isString vm.windowsIsoUrl || builtins.isNull vm.windowsIsoUrl)
       ) manifest.VMs;
     in
-    assert' (badIsoUrls == [ ])
-      "windowsIsoUrl must be a string for all VMs that declare it; bad entries: ${
+    assert' (missingIsoUrls == [ ] && badIsoUrls == [ ])
+      "windowsIsoUrl is required on all VMs (must be string or null); missing: ${
+        builtins.toString (builtins.map (v: v.name) missingIsoUrls)
+      }; bad types: ${
         builtins.toString (builtins.map (v: v.name) badIsoUrls)
       }";
 

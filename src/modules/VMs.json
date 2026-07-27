@@ -11,7 +11,8 @@
       "ramBytes": 8000000000,
       "shareDevDir": false,
       "type": "Android",
-      "androidGsiVersion": null
+      "androidGsiVersion": null,
+      "windowsIsoUrl": null
     },
     {
       "cpus": 4,
@@ -25,7 +26,8 @@
       "name": "MacBook",
       "ramBytes": 8000000000,
       "shareDevDir": true,
-      "type": "macOS"
+      "type": "macOS",
+      "windowsIsoUrl": null
     },
     {
       "cpus": 4,
@@ -36,7 +38,8 @@
       "name": "NixOS",
       "ramBytes": 8000000000,
       "shareDevDir": true,
-      "type": "NixOS"
+      "type": "NixOS",
+      "windowsIsoUrl": null
     },
     {
       "cpus": 4,
@@ -48,7 +51,8 @@
       "ramBytes": 8000000000,
       "shareDevDir": true,
       "type": "Windows",
-      "windowsEdition": "pro"
+      "windowsEdition": "pro",
+      "windowsIsoUrl": null
     }
   ]
 }
