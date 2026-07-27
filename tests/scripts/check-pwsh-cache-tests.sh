@@ -548,6 +548,42 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Test 18: Cross-script RealCommandMap transparency — verify on a different
+#          script to prove coverage isn't file-specific.
+# ---------------------------------------------------------------------------
+echo "--- Test 18: Cross-script RealCommandMap transparency ---"
+
+set +e
+# shellcheck disable=SC2016 # reason: PowerShell syntax inside single-quoted -Command, not shell variables
+_t18_out=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInteractive -Command '
+  $rp = $env:NUCLEUS_TEST_ROOT
+  $ErrorActionPreference = "Stop"
+  Set-StrictMode -Version Latest
+  Import-Module PSScriptAnalyzer
+  . "$rp/tests/scripts/cache-verify-lib.ps1"
+  $target = "$rp/scripts/check-pwsh.ps1"
+  $settings = "$rp/scripts/PSScriptAnalyzerSettings.psd1"
+  $result = Compare-RealCommandMapTransparency -TargetFile $target -SettingsFile $settings
+  Write-Output "BASELINE=$($result.BaselineCount) WARMUP=$($result.WarmupCount) INJECTION=$($result.InjectionCount) DIFF=$($result.BaselineVsInjectionDiff.Count)"
+' 2>&1)
+_t18_exit=$?
+set -e
+
+if [ "$_t18_exit" -eq 0 ]; then
+  assert_pass "T18 Cross-script RealCommandMap transparency: executes without error"
+else
+  assert_fail "T18 Cross-script RealCommandMap transparency: executes without error" "Exit code: $_t18_exit, Output: $_t18_out"
+fi
+
+if echo "$_t18_out" | grep -qE '^BASELINE=[1-9][0-9]* WARMUP=[1-9][0-9]* INJECTION=[1-9][0-9]* DIFF=0$'; then
+  _t18_baseline=$(echo "$_t18_out" | grep -oE 'BASELINE=[0-9]+' | grep -oE '[0-9]+')
+  _t18_injection=$(echo "$_t18_out" | grep -oE 'INJECTION=[0-9]+' | grep -oE '[0-9]+')
+  assert_pass "T18 Cross-script RealCommandMap transparency: baseline=$_t18_baseline injection=$_t18_injection, 0 differences"
+else
+  assert_fail "T18 Cross-script RealCommandMap transparency: identical diagnostics" "Expected BASELINE>0 WARMUP>0 INJECTION>0 DIFF=0, got: $_t18_out"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
