@@ -18,6 +18,7 @@ argument-hint: "[ResultsFile]"
 - `pwsh` 7+, `PSScriptAnalyzer`, and `git` on `PATH`
 - Run from the repository root (script uses `git ls-files` for file discovery)
 - Settings file `PSScriptAnalyzerSettings.psd1` is bundled in the skill folder — tweak `Severity` / `ExcludeRules` there
+- The two-script split (`invoke-pssa-rule.ps1` + `pssa-rule-benchmark.ps1`) must stay together in the same directory
 
 ## Procedure
 
@@ -27,22 +28,35 @@ Run the benchmark:
 pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1
 ```
 
-Optionally write results elsewhere:
+Optionally tune runs or output path:
 
 ```powershell
+# 5 runs per rule (default: 3)
+pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1 -Runs 5
+
+# Write results elsewhere
 pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1 -ResultsFile /tmp/my-results.json
+
+# Skip existing rules (resume after partial run)
+pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1 -SkipExisting
 ```
 
-The script measures each enabled rule in isolation (via `IncludeRules` + empty `Rules` hashtable), outputs per-rule progress and timing, then prints top-10 / bottom-5 tables. Results are saved incrementally — partial output survives interruption.
+The benchmark launches a **separate `pwsh` subprocess per task**, each running `invoke-pssa-rule.ps1` with `-RuleName` set. This ensures complete isolation — no cross-rule state leaks, no cached AST or module state. Each subprocess imports `PSScriptAnalyzer` fresh and runs `Invoke-ScriptAnalyzer` against all repository `.ps1` files using the given rule in isolation (via `IncludeRules` + empty `Rules` hashtable). Subprocess output (JSON) is parsed; if parsing fails or the subprocess exits non-zero, the error is recorded and the run continues.
 
-### Known performance (macOS Apple Silicon, pwsh 7.6.3, PSScriptAnalyzer 1.25.0, 126 files × 63 rules)
+The task execution order is **globally randomized** using a printed seed (for reproducibility). Each task outputs progress: `[N/189 (P%)] RuleName (run R/R)` with elapsed time and diagnostic count. Results are checkpoint-incremented every 10 tasks — partial output survives interruption.
 
-| Metric                      | Value                                |
-| --------------------------- | ------------------------------------ |
-| Total wall-clock            | ~282s                                |
-| `PSAvoidUsingCmdletAliases` | ~158s (56%) — `Get-Command` per file |
-| `PSShouldProcess`           | ~72s (26%) — `Get-Command` per file  |
-| All other 61 rules          | each <5s                             |
+### Known performance (macOS Apple Silicon, pwsh 7.6.3, PSScriptAnalyzer 1.25.0, 128 files × 63 rules × 3 runs)
+
+| Metric                      | Mean    | Max     | StdDev  | Notes                                          |
+| --------------------------- | ------- | ------- | ------- | ---------------------------------------------- |
+| **Total wall-clock**        | —       | ~681s   | —       | 189 tasks randomized                           |
+| `PSAvoidUsingCmdletAliases` | 67.2s   | 98.3s   | 22.6s   | High variance — `Get-Command` per file         |
+| `PSUseCmdletCorrectly`      | 43.3s   | 62.4s   | 13.9s   | `Get-Command` per file                         |
+| `PSShouldProcess`           | 42.8s   | 54.0s   | 8.4s    | `Get-Command` per file                         |
+| `PSUseConstrainedLanguageMode` | 1.1s | 2.9s   | 1.2s    | Spikes on constrained-mode checks              |
+| All other 59 rules          | <1.2s   | <1.4s   | —       | Bulk completes in ~190s                        |
+
+The three slow rules (`PSAvoidUsingCmdletAliases`, `PSUseCmdletCorrectly`, `PSShouldProcess`) together consume ~77% of total benchmark time. Their slowness is a PSScriptAnalyzer engine limitation (each queries `Get-Command` per file), not the rule definitions themselves. `PSAvoidUsingCmdletAliases` shows high run-to-run variance (45–98s), suggesting sensitivity to system load / AMT JIT warmup.
 
 ## Interpreting results
 
@@ -50,11 +64,14 @@ The script measures each enabled rule in isolation (via `IncludeRules` + empty `
 
 ## Internals
 
+- **Script split**: `invoke-pssa-rule.ps1` measures a single rule in a fresh process; `pssa-rule-benchmark.ps1` orchestrates the task matrix, spawns subprocesses, and aggregates results.
 - **Settings**: reads bundled `PSScriptAnalyzerSettings.psd1` for `Severity` and `ExcludeRules`
 - **File discovery**: `git ls-files '*.ps1'` — version-controlled files only
-- **Per-rule invocation**: `$paths | Invoke-ScriptAnalyzer -Settings @{IncludeRules=@($ruleName); Rules=@{}}`
-- **Measurement**: `[System.Diagnostics.Stopwatch]` per rule
-- **Output**: incremental `ConvertTo-Json | Set-Content`
+- **Task matrix**: all enabled rules × `$Runs` (default 3) = $N$ tasks, then **shuffled** with `Sort-Object { Get-Random }` and a printed seed for reproducibility
+- **Subprocess runner** (`invoke-pssa-rule.psl`): imports `PSScriptAnalyzer`, calls `Invoke-ScriptAnalyzer` with `-IncludeRules @($ruleName) -ExcludeRules @()`, measures with `[System.Diagnostics.Stopwatch]`, outputs JSON to stdout via `ConvertTo-Json -Compress`. Exit 0 on success, 1 on failure.
+- **Subprocess spawning** (`pssa-rule-benchmark.ps1`): `System.Diagnostics.Process` with `RedirectStandardOutput=true`, `RedirectStandardError=true`, 600s timeout per task. Stdout parsed from JSON; stderr captured to `ErrorMessage` on parse failure.
+- **Aggregation**: per rule across $R$ runs: `MeanMs`, `MinMs`, `MaxMs`, `StdDevMs` (population stddev), `MedianMs`, `MeanDiagCount`. Raw per-run data included in `RawData` array.
+- **Incremental output**: raw results saved to `$ResultsFile.raw` every 10 tasks; deleted on success. Final aggregated JSON written to `$ResultsFile`.
 
 ## File layout
 
@@ -62,6 +79,7 @@ The script measures each enabled rule in isolation (via `IncludeRules` + empty `
 .agents/skills/pssa-rule-benchmark/
 ├── SKILL.md                               # This file
 ├── PSScriptAnalyzerSettings.psd1          # Rule severity/exclusion config
-├── pssa-rule-benchmark.ps1                # Benchmark runner
-└── pssa-rule-benchmark-results.json       # Latest results (63 rules) (reference data)
+├── invoke-pssa-rule.ps1                   # Single-rule subprocess runner
+├── pssa-rule-benchmark.ps1                # Benchmark orchestrator
+└── pssa-rule-benchmark-results.json       # Latest aggregated results (63 rules × 3 runs) (reference data)
 ```

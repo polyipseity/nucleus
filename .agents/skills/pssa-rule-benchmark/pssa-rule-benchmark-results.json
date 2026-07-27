@@ -2,442 +2,2017 @@
   {
     "RuleName": "PSAlignAssignmentStatement",
     "Severity": "Warning",
-    "ElapsedMs": 744.1,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 266.0,
+    "MinMs": 231.7,
+    "MaxMs": 333.3,
+    "StdDevMs": 47.6,
+    "MedianMs": 233.1,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 233.1,
+        "Timestamp": "2026-07-27T23:35:10.786233Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 231.7,
+        "Timestamp": "2026-07-27T23:35:17.884793Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 333.3,
+        "Timestamp": "2026-07-27T23:40:33.788542Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidAssignmentToAutomaticVariable",
     "Severity": "Warning",
-    "ElapsedMs": 4549.6,
-    "DiagCount": 3,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 460.5,
+    "MinMs": 291.1,
+    "MaxMs": 780.2,
+    "StdDevMs": 226.2,
+    "MedianMs": 310.2,
+    "MeanDiagCount": 3.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 291.1,
+        "Timestamp": "2026-07-27T23:37:35.304398Z",
+        "DiagCount": 3
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 780.2,
+        "Timestamp": "2026-07-27T23:39:41.354316Z",
+        "DiagCount": 3
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 310.2,
+        "Timestamp": "2026-07-27T23:40:37.501903Z",
+        "DiagCount": 3
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidDefaultValueForMandatoryParameter",
     "Severity": "Warning",
-    "ElapsedMs": 1170.4,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 623.2,
+    "MinMs": 288.3,
+    "MaxMs": 1186.9,
+    "StdDevMs": 401.0,
+    "MedianMs": 394.3,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 394.3,
+        "Timestamp": "2026-07-27T23:31:14.316724Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 288.3,
+        "Timestamp": "2026-07-27T23:36:41.436716Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 1186.9,
+        "Timestamp": "2026-07-27T23:39:29.937184Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidDefaultValueSwitchParameter",
     "Severity": "Warning",
-    "ElapsedMs": 682.0,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 415.7,
+    "MinMs": 296.8,
+    "MaxMs": 648.3,
+    "StdDevMs": 164.5,
+    "MedianMs": 302.1,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 648.3,
+        "Timestamp": "2026-07-27T23:32:29.230607Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 296.8,
+        "Timestamp": "2026-07-27T23:37:40.540642Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 302.1,
+        "Timestamp": "2026-07-27T23:40:41.000693Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidExclaimOperator",
     "Severity": "Warning",
-    "ElapsedMs": 524.8,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 352.7,
+    "MinMs": 213.9,
+    "MaxMs": 449.1,
+    "StdDevMs": 100.6,
+    "MedianMs": 395.2,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 213.9,
+        "Timestamp": "2026-07-27T23:35:09.057514Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 449.1,
+        "Timestamp": "2026-07-27T23:39:31.155884Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 395.2,
+        "Timestamp": "2026-07-27T23:39:36.29776Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidGlobalAliases",
     "Severity": "Warning",
-    "ElapsedMs": 451.1,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 659.4,
+    "MinMs": 295.8,
+    "MaxMs": 1309.1,
+    "StdDevMs": 460.5,
+    "MedianMs": 373.2,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 373.2,
+        "Timestamp": "2026-07-27T23:30:57.484842Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 1309.1,
+        "Timestamp": "2026-07-27T23:32:39.098612Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 295.8,
+        "Timestamp": "2026-07-27T23:37:34.416007Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidGlobalFunctions",
     "Severity": "Warning",
-    "ElapsedMs": 655.0,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 339.4,
+    "MinMs": 302.0,
+    "MaxMs": 379.5,
+    "StdDevMs": 31.7,
+    "MedianMs": 336.7,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 379.5,
+        "Timestamp": "2026-07-27T23:39:33.056629Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 336.7,
+        "Timestamp": "2026-07-27T23:39:51.870821Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 302.0,
+        "Timestamp": "2026-07-27T23:40:44.782711Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidGlobalVars",
     "Severity": "Warning",
-    "ElapsedMs": 498.6,
-    "DiagCount": 3,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 703.0,
+    "MinMs": 310.8,
+    "MaxMs": 1017.8,
+    "StdDevMs": 293.8,
+    "MedianMs": 780.3,
+    "MeanDiagCount": 3.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 780.3,
+        "Timestamp": "2026-07-27T23:30:33.620915Z",
+        "DiagCount": 3
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 1017.8,
+        "Timestamp": "2026-07-27T23:32:31.732727Z",
+        "DiagCount": 3
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 310.8,
+        "Timestamp": "2026-07-27T23:36:40.733433Z",
+        "DiagCount": 3
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidInvokingEmptyMembers",
     "Severity": "Warning",
-    "ElapsedMs": 449.4,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 358.7,
+    "MinMs": 297.2,
+    "MaxMs": 408.2,
+    "StdDevMs": 46.1,
+    "MedianMs": 370.6,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 370.6,
+        "Timestamp": "2026-07-27T23:31:21.239403Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 297.2,
+        "Timestamp": "2026-07-27T23:31:22.013388Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 408.2,
+        "Timestamp": "2026-07-27T23:33:53.901188Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidLongLines",
     "Severity": "Warning",
-    "ElapsedMs": 350.1,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 415.0,
+    "MinMs": 323.4,
+    "MaxMs": 573.1,
+    "StdDevMs": 112.3,
+    "MedianMs": 348.4,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 573.1,
+        "Timestamp": "2026-07-27T23:30:41.296224Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 348.4,
+        "Timestamp": "2026-07-27T23:31:10.580561Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 323.4,
+        "Timestamp": "2026-07-27T23:37:31.6957Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidMultipleTypeAttributes",
     "Severity": "Warning",
-    "ElapsedMs": 632.2,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 380.8,
+    "MinMs": 254.5,
+    "MaxMs": 522.3,
+    "StdDevMs": 109.9,
+    "MedianMs": 365.7,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 365.7,
+        "Timestamp": "2026-07-27T23:30:59.50398Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 254.5,
+        "Timestamp": "2026-07-27T23:35:06.646621Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 522.3,
+        "Timestamp": "2026-07-27T23:39:24.196889Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidNullOrEmptyHelpMessageAttribute",
     "Severity": "Warning",
-    "ElapsedMs": 386.4,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 461.9,
+    "MinMs": 314.7,
+    "MaxMs": 580.7,
+    "StdDevMs": 110.4,
+    "MedianMs": 490.3,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 580.7,
+        "Timestamp": "2026-07-27T23:30:50.78997Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 314.7,
+        "Timestamp": "2026-07-27T23:33:56.141514Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 490.3,
+        "Timestamp": "2026-07-27T23:39:25.404152Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidOverwritingBuiltInCmdlets",
     "Severity": "Warning",
-    "ElapsedMs": 759.0,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 296.9,
+    "MinMs": 262.5,
+    "MaxMs": 343.4,
+    "StdDevMs": 34.1,
+    "MedianMs": 284.7,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 262.5,
+        "Timestamp": "2026-07-27T23:33:55.429464Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 284.7,
+        "Timestamp": "2026-07-27T23:35:03.591333Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 343.4,
+        "Timestamp": "2026-07-27T23:37:23.852421Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidReservedWordsAsFunctionNames",
     "Severity": "Warning",
-    "ElapsedMs": 766.8,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 480.7,
+    "MinMs": 264.1,
+    "MaxMs": 760.7,
+    "StdDevMs": 207.6,
+    "MedianMs": 417.3,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 760.7,
+        "Timestamp": "2026-07-27T23:30:37.203763Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 264.1,
+        "Timestamp": "2026-07-27T23:35:15.010038Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 417.3,
+        "Timestamp": "2026-07-27T23:37:38.856414Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidSemicolonsAsLineTerminators",
     "Severity": "Warning",
-    "ElapsedMs": 777.9,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 580.7,
+    "MinMs": 349.9,
+    "MaxMs": 992.7,
+    "StdDevMs": 292.1,
+    "MedianMs": 399.4,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 399.4,
+        "Timestamp": "2026-07-27T23:30:58.536759Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 992.7,
+        "Timestamp": "2026-07-27T23:32:50.017401Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 349.9,
+        "Timestamp": "2026-07-27T23:39:27.366128Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidShouldContinueWithoutForce",
     "Severity": "Warning",
-    "ElapsedMs": 519.7,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 466.9,
+    "MinMs": 323.4,
+    "MaxMs": 688.0,
+    "StdDevMs": 158.6,
+    "MedianMs": 389.4,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 688.0,
+        "Timestamp": "2026-07-27T23:32:33.180134Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 323.4,
+        "Timestamp": "2026-07-27T23:39:45.889143Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 389.4,
+        "Timestamp": "2026-07-27T23:40:47.927219Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidUsingAllowUnencryptedAuthentication",
     "Severity": "Warning",
-    "ElapsedMs": 461.8,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 690.6,
+    "MinMs": 254.5,
+    "MaxMs": 1375.4,
+    "StdDevMs": 490.2,
+    "MedianMs": 441.9,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 441.9,
+        "Timestamp": "2026-07-27T23:30:39.783179Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 1375.4,
+        "Timestamp": "2026-07-27T23:32:36.237448Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 254.5,
+        "Timestamp": "2026-07-27T23:37:35.957757Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidUsingBrokenHashAlgorithms",
     "Severity": "Warning",
-    "ElapsedMs": 475.5,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 328.3,
+    "MinMs": 230.0,
+    "MaxMs": 429.6,
+    "StdDevMs": 81.5,
+    "MedianMs": 325.3,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 230.0,
+        "Timestamp": "2026-07-27T23:35:14.41005Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 429.6,
+        "Timestamp": "2026-07-27T23:39:26.460772Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 325.3,
+        "Timestamp": "2026-07-27T23:39:47.419848Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidUsingCmdletAliases",
     "Severity": "Warning",
-    "ElapsedMs": 157905.2,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 67241.0,
+    "MinMs": 45542.5,
+    "MaxMs": 98331.9,
+    "StdDevMs": 22551.3,
+    "MedianMs": 57848.6,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 57848.6,
+        "Timestamp": "2026-07-27T23:33:52.945019Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 45542.5,
+        "Timestamp": "2026-07-27T23:36:05.201737Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 98331.9,
+        "Timestamp": "2026-07-27T23:39:21.127988Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidUsingComputerNameHardcoded",
     "Severity": "Error",
-    "ElapsedMs": 585.7,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 344.7,
+    "MinMs": 334.7,
+    "MaxMs": 357.2,
+    "StdDevMs": 9.3,
+    "MedianMs": 342.3,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 334.7,
+        "Timestamp": "2026-07-27T23:36:39.887733Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 357.2,
+        "Timestamp": "2026-07-27T23:39:22.954864Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 342.3,
+        "Timestamp": "2026-07-27T23:39:33.844422Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidUsingConvertToSecureStringWithPlainText",
     "Severity": "Error",
-    "ElapsedMs": 547.1,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 392.7,
+    "MinMs": 322.5,
+    "MaxMs": 467.1,
+    "StdDevMs": 59.1,
+    "MedianMs": 388.5,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 467.1,
+        "Timestamp": "2026-07-27T23:31:06.110746Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 388.5,
+        "Timestamp": "2026-07-27T23:37:32.753821Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 322.5,
+        "Timestamp": "2026-07-27T23:40:36.795361Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidUsingDeprecatedManifestFields",
     "Severity": "Warning",
-    "ElapsedMs": 598.0,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 437.7,
+    "MinMs": 276.0,
+    "MaxMs": 535.9,
+    "StdDevMs": 115.2,
+    "MedianMs": 501.3,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 535.9,
+        "Timestamp": "2026-07-27T23:32:27.767976Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 276.0,
+        "Timestamp": "2026-07-27T23:37:37.273103Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 501.3,
+        "Timestamp": "2026-07-27T23:39:38.853626Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidUsingEmptyCatchBlock",
     "Severity": "Warning",
-    "ElapsedMs": 400.1,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 324.8,
+    "MinMs": 242.7,
+    "MaxMs": 409.0,
+    "StdDevMs": 67.9,
+    "MedianMs": 322.6,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 409.0,
+        "Timestamp": "2026-07-27T23:31:19.248482Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 242.7,
+        "Timestamp": "2026-07-27T23:35:13.194152Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 322.6,
+        "Timestamp": "2026-07-27T23:35:15.735432Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidUsingInvokeExpression",
     "Severity": "Warning",
-    "ElapsedMs": 606.7,
-    "DiagCount": 5,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 432.8,
+    "MinMs": 293.0,
+    "MaxMs": 550.9,
+    "StdDevMs": 106.4,
+    "MedianMs": 454.5,
+    "MeanDiagCount": 5.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 550.9,
+        "Timestamp": "2026-07-27T23:29:34.760539Z",
+        "DiagCount": 5
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 293.0,
+        "Timestamp": "2026-07-27T23:31:16.264026Z",
+        "DiagCount": 5
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 454.5,
+        "Timestamp": "2026-07-27T23:40:35.915871Z",
+        "DiagCount": 5
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidUsingPlainTextForPassword",
     "Severity": "Warning",
-    "ElapsedMs": 564.9,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 319.0,
+    "MinMs": 300.4,
+    "MaxMs": 347.3,
+    "StdDevMs": 20.4,
+    "MedianMs": 309.2,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 347.3,
+        "Timestamp": "2026-07-27T23:29:29.187219Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 300.4,
+        "Timestamp": "2026-07-27T23:35:05.337063Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 309.2,
+        "Timestamp": "2026-07-27T23:40:42.557318Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidUsingUsernameAndPasswordParams",
     "Severity": "Error",
-    "ElapsedMs": 514.1,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 343.6,
+    "MinMs": 252.2,
+    "MaxMs": 440.9,
+    "StdDevMs": 77.1,
+    "MedianMs": 337.8,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 252.2,
+        "Timestamp": "2026-07-27T23:35:05.963439Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 337.8,
+        "Timestamp": "2026-07-27T23:39:35.434187Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 440.9,
+        "Timestamp": "2026-07-27T23:39:49.436821Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidUsingWMICmdlet",
     "Severity": "Warning",
-    "ElapsedMs": 501.7,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 318.8,
+    "MinMs": 256.6,
+    "MaxMs": 366.3,
+    "StdDevMs": 46.0,
+    "MedianMs": 333.6,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 256.6,
+        "Timestamp": "2026-07-27T23:35:12.593243Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 333.6,
+        "Timestamp": "2026-07-27T23:37:24.769917Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 366.3,
+        "Timestamp": "2026-07-27T23:39:43.420276Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSAvoidUsingWriteHost",
     "Severity": "Warning",
-    "ElapsedMs": 1007.1,
-    "DiagCount": 44,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 309.9,
+    "MinMs": 264.1,
+    "MaxMs": 340.1,
+    "StdDevMs": 32.9,
+    "MedianMs": 325.4,
+    "MeanDiagCount": 44.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 264.1,
+        "Timestamp": "2026-07-27T23:35:08.484385Z",
+        "DiagCount": 44
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 340.1,
+        "Timestamp": "2026-07-27T23:35:16.541192Z",
+        "DiagCount": 44
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 325.4,
+        "Timestamp": "2026-07-27T23:39:54.988783Z",
+        "DiagCount": 44
+      }
+    ]
   },
   {
     "RuleName": "PSDSCStandardDSCFunctionsInResource",
     "Severity": "Error",
-    "ElapsedMs": 974.2,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 322.2,
+    "MinMs": 285.7,
+    "MaxMs": 357.5,
+    "StdDevMs": 29.3,
+    "MedianMs": 323.3,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 323.3,
+        "Timestamp": "2026-07-27T23:31:00.32162Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 357.5,
+        "Timestamp": "2026-07-27T23:39:45.127463Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 285.7,
+        "Timestamp": "2026-07-27T23:39:46.630889Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSDSCUseIdenticalMandatoryParametersForDSC",
     "Severity": "Error",
-    "ElapsedMs": 760.6,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 433.2,
+    "MinMs": 363.9,
+    "MaxMs": 503.5,
+    "StdDevMs": 57.0,
+    "MedianMs": 432.1,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 503.5,
+        "Timestamp": "2026-07-27T23:31:03.241162Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 432.1,
+        "Timestamp": "2026-07-27T23:37:25.824673Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 363.9,
+        "Timestamp": "2026-07-27T23:37:42.132772Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSDSCUseIdenticalParametersForDSC",
     "Severity": "Error",
-    "ElapsedMs": 634.8,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 367.4,
+    "MinMs": 335.8,
+    "MaxMs": 389.7,
+    "StdDevMs": 23.0,
+    "MedianMs": 376.7,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 376.7,
+        "Timestamp": "2026-07-27T23:30:45.501739Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 335.8,
+        "Timestamp": "2026-07-27T23:39:28.16802Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 389.7,
+        "Timestamp": "2026-07-27T23:40:34.826476Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSMisleadingBacktick",
     "Severity": "Warning",
-    "ElapsedMs": 466.6,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 266.4,
+    "MinMs": 241.2,
+    "MaxMs": 280.7,
+    "StdDevMs": 17.9,
+    "MedianMs": 277.4,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 241.2,
+        "Timestamp": "2026-07-27T23:35:12.008895Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 277.4,
+        "Timestamp": "2026-07-27T23:37:37.945664Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 280.7,
+        "Timestamp": "2026-07-27T23:40:38.191187Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSMissingModuleManifestField",
     "Severity": "Warning",
-    "ElapsedMs": 699.1,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 447.2,
+    "MinMs": 398.1,
+    "MaxMs": 542.9,
+    "StdDevMs": 67.7,
+    "MedianMs": 400.5,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 398.1,
+        "Timestamp": "2026-07-27T23:31:13.338136Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 542.9,
+        "Timestamp": "2026-07-27T23:32:46.98857Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 400.5,
+        "Timestamp": "2026-07-27T23:39:32.179087Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSPlaceCloseBrace",
     "Severity": "Warning",
-    "ElapsedMs": 618.1,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 319.4,
+    "MinMs": 234.3,
+    "MaxMs": 422.4,
+    "StdDevMs": 77.8,
+    "MedianMs": 301.4,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 301.4,
+        "Timestamp": "2026-07-27T23:29:30.697539Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 422.4,
+        "Timestamp": "2026-07-27T23:31:07.163016Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 234.3,
+        "Timestamp": "2026-07-27T23:33:57.584414Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSPlaceOpenBrace",
     "Severity": "Warning",
-    "ElapsedMs": 685.8,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 515.1,
+    "MinMs": 235.6,
+    "MaxMs": 750.8,
+    "StdDevMs": 212.6,
+    "MedianMs": 558.9,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 558.9,
+        "Timestamp": "2026-07-27T23:30:42.501449Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 750.8,
+        "Timestamp": "2026-07-27T23:32:41.479305Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 235.6,
+        "Timestamp": "2026-07-27T23:35:09.618221Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSPossibleIncorrectComparisonWithNull",
     "Severity": "Warning",
-    "ElapsedMs": 932.5,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 387.3,
+    "MinMs": 265.9,
+    "MaxMs": 588.9,
+    "StdDevMs": 143.5,
+    "MedianMs": 307.1,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 588.9,
+        "Timestamp": "2026-07-27T23:30:38.475966Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 265.9,
+        "Timestamp": "2026-07-27T23:37:36.56951Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 307.1,
+        "Timestamp": "2026-07-27T23:40:39.588232Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSPossibleIncorrectUsageOfRedirectionOperator",
     "Severity": "Warning",
-    "ElapsedMs": 822.0,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 454.9,
+    "MinMs": 438.9,
+    "MaxMs": 464.3,
+    "StdDevMs": 11.4,
+    "MedianMs": 461.5,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 461.5,
+        "Timestamp": "2026-07-27T23:30:51.910045Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 464.3,
+        "Timestamp": "2026-07-27T23:32:26.582534Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 438.9,
+        "Timestamp": "2026-07-27T23:39:42.457987Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSReservedCmdletChar",
     "Severity": "Warning",
-    "ElapsedMs": 1082.8,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 607.1,
+    "MinMs": 322.6,
+    "MaxMs": 1055.2,
+    "StdDevMs": 320.7,
+    "MedianMs": 443.6,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 443.6,
+        "Timestamp": "2026-07-27T23:29:32.577726Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 1055.2,
+        "Timestamp": "2026-07-27T23:31:04.967502Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 322.6,
+        "Timestamp": "2026-07-27T23:40:46.209015Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSReservedParams",
     "Severity": "Error",
-    "ElapsedMs": 1159.1,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 604.6,
+    "MinMs": 252.6,
+    "MaxMs": 1052.8,
+    "StdDevMs": 333.7,
+    "MedianMs": 508.5,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 508.5,
+        "Timestamp": "2026-07-27T23:29:35.909413Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 1052.8,
+        "Timestamp": "2026-07-27T23:30:55.09853Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 252.6,
+        "Timestamp": "2026-07-27T23:35:11.412558Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSReviewUnusedParameter",
     "Severity": "Warning",
-    "ElapsedMs": 551.7,
-    "DiagCount": 189,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 433.0,
+    "MinMs": 300.4,
+    "MaxMs": 503.9,
+    "StdDevMs": 93.8,
+    "MedianMs": 494.7,
+    "MeanDiagCount": 189.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 503.9,
+        "Timestamp": "2026-07-27T23:30:46.596118Z",
+        "DiagCount": 189
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 494.7,
+        "Timestamp": "2026-07-27T23:32:48.187462Z",
+        "DiagCount": 189
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 300.4,
+        "Timestamp": "2026-07-27T23:35:19.26255Z",
+        "DiagCount": 189
+      }
+    ]
   },
   {
     "RuleName": "PSShouldProcess",
     "Severity": "Warning",
-    "ElapsedMs": 71962.5,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 42778.3,
+    "MinMs": 33945.0,
+    "MaxMs": 54030.6,
+    "StdDevMs": 8376.4,
+    "MedianMs": 40359.3,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 54030.6,
+        "Timestamp": "2026-07-27T23:30:30.571521Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 33945.0,
+        "Timestamp": "2026-07-27T23:34:31.872731Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 40359.3,
+        "Timestamp": "2026-07-27T23:37:23.012614Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseApprovedVerbs",
     "Severity": "Warning",
-    "ElapsedMs": 1189.1,
-    "DiagCount": 82,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 452.4,
+    "MinMs": 315.2,
+    "MaxMs": 646.9,
+    "StdDevMs": 141.4,
+    "MedianMs": 395.0,
+    "MeanDiagCount": 82.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 646.9,
+        "Timestamp": "2026-07-27T23:29:28.066543Z",
+        "DiagCount": 82
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 395.0,
+        "Timestamp": "2026-07-27T23:29:33.580096Z",
+        "DiagCount": 82
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 315.2,
+        "Timestamp": "2026-07-27T23:33:56.90971Z",
+        "DiagCount": 82
+      }
+    ]
   },
   {
     "RuleName": "PSUseCmdletCorrectly",
     "Severity": "Warning",
-    "ElapsedMs": 702.4,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 43285.5,
+    "MinMs": 29909.9,
+    "MaxMs": 62411.6,
+    "StdDevMs": 13877.8,
+    "MedianMs": 37535.0,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 62411.6,
+        "Timestamp": "2026-07-27T23:32:24.875301Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 29909.9,
+        "Timestamp": "2026-07-27T23:35:02.243725Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 37535.0,
+        "Timestamp": "2026-07-27T23:40:32.978476Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseCompatibleCmdlets",
     "Severity": "Warning",
-    "ElapsedMs": 436.1,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 390.3,
+    "MinMs": 295.5,
+    "MaxMs": 441.2,
+    "StdDevMs": 67.1,
+    "MedianMs": 434.3,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 434.3,
+        "Timestamp": "2026-07-27T23:31:08.294163Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 441.2,
+        "Timestamp": "2026-07-27T23:39:52.848247Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 295.5,
+        "Timestamp": "2026-07-27T23:40:46.942851Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseCompatibleCommands",
     "Severity": "Warning",
-    "ElapsedMs": 577.9,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 363.9,
+    "MinMs": 261.5,
+    "MaxMs": 522.8,
+    "StdDevMs": 113.9,
+    "MedianMs": 307.3,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 522.8,
+        "Timestamp": "2026-07-27T23:32:52.66304Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 261.5,
+        "Timestamp": "2026-07-27T23:37:30.210746Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 307.3,
+        "Timestamp": "2026-07-27T23:40:41.767713Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseCompatibleSyntax",
     "Severity": "Error",
-    "ElapsedMs": 522.1,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 429.4,
+    "MinMs": 243.5,
+    "MaxMs": 729.0,
+    "StdDevMs": 213.9,
+    "MedianMs": 315.8,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 729.0,
+        "Timestamp": "2026-07-27T23:30:49.573246Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 243.5,
+        "Timestamp": "2026-07-27T23:37:29.583163Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 315.8,
+        "Timestamp": "2026-07-27T23:39:51.051962Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseCompatibleTypes",
     "Severity": "Warning",
-    "ElapsedMs": 447.4,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 539.0,
+    "MinMs": 316.7,
+    "MaxMs": 857.0,
+    "StdDevMs": 230.7,
+    "MedianMs": 443.2,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 857.0,
+        "Timestamp": "2026-07-27T23:30:44.467592Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 443.2,
+        "Timestamp": "2026-07-27T23:39:54.10765Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 316.7,
+        "Timestamp": "2026-07-27T23:40:44.048245Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseConsistentIndentation",
     "Severity": "Warning",
-    "ElapsedMs": 399.9,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 346.3,
+    "MinMs": 260.3,
+    "MaxMs": 483.8,
+    "StdDevMs": 98.3,
+    "MedianMs": 294.7,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 483.8,
+        "Timestamp": "2026-07-27T23:32:51.528084Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 260.3,
+        "Timestamp": "2026-07-27T23:37:28.40259Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 294.7,
+        "Timestamp": "2026-07-27T23:39:34.643105Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseConsistentParameterSetName",
     "Severity": "Warning",
-    "ElapsedMs": 475.9,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 465.3,
+    "MinMs": 285.6,
+    "MaxMs": 727.2,
+    "StdDevMs": 189.4,
+    "MedianMs": 383.2,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 285.6,
+        "Timestamp": "2026-07-27T23:30:56.610019Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 727.2,
+        "Timestamp": "2026-07-27T23:32:54.240965Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 383.2,
+        "Timestamp": "2026-07-27T23:37:39.820536Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseConsistentParametersKind",
     "Severity": "Warning",
-    "ElapsedMs": 1346.4,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 290.0,
+    "MinMs": 247.5,
+    "MaxMs": 345.1,
+    "StdDevMs": 40.8,
+    "MedianMs": 277.5,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 277.5,
+        "Timestamp": "2026-07-27T23:31:01.952983Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 247.5,
+        "Timestamp": "2026-07-27T23:35:02.972098Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 345.1,
+        "Timestamp": "2026-07-27T23:39:22.032442Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseConsistentWhitespace",
     "Severity": "Warning",
-    "ElapsedMs": 1026.8,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 277.6,
+    "MinMs": 256.6,
+    "MaxMs": 297.2,
+    "StdDevMs": 16.6,
+    "MedianMs": 278.9,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 256.6,
+        "Timestamp": "2026-07-27T23:35:17.253485Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 297.2,
+        "Timestamp": "2026-07-27T23:37:30.970586Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 278.9,
+        "Timestamp": "2026-07-27T23:40:38.876229Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseConstrainedLanguageMode",
     "Severity": "Warning",
-    "ElapsedMs": 943.6,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 1143.0,
+    "MinMs": 282.9,
+    "MaxMs": 2858.3,
+    "StdDevMs": 1212.9,
+    "MedianMs": 287.9,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 282.9,
+        "Timestamp": "2026-07-27T23:30:55.869726Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 2858.3,
+        "Timestamp": "2026-07-27T23:32:45.671623Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 287.9,
+        "Timestamp": "2026-07-27T23:40:40.276683Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseDeclaredVarsMoreThanAssignments",
     "Severity": "Warning",
-    "ElapsedMs": 1812.7,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 376.7,
+    "MinMs": 270.5,
+    "MaxMs": 517.7,
+    "StdDevMs": 103.9,
+    "MedianMs": 341.8,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 517.7,
+        "Timestamp": "2026-07-27T23:31:17.197077Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 270.5,
+        "Timestamp": "2026-07-27T23:35:13.82021Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 341.8,
+        "Timestamp": "2026-07-27T23:39:44.226151Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseLiteralInitializerForHashtable",
     "Severity": "Warning",
-    "ElapsedMs": 2694.1,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 349.6,
+    "MinMs": 244.5,
+    "MaxMs": 479.3,
+    "StdDevMs": 97.4,
+    "MedianMs": 325.1,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 479.3,
+        "Timestamp": "2026-07-27T23:30:47.774133Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 325.1,
+        "Timestamp": "2026-07-27T23:33:54.777147Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 244.5,
+        "Timestamp": "2026-07-27T23:35:07.267231Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseProcessBlockForPipelineCommand",
     "Severity": "Warning",
-    "ElapsedMs": 2369.1,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 410.1,
+    "MinMs": 343.3,
+    "MaxMs": 530.0,
+    "StdDevMs": 85.0,
+    "MedianMs": 357.0,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 530.0,
+        "Timestamp": "2026-07-27T23:31:09.572025Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 357.0,
+        "Timestamp": "2026-07-27T23:31:18.317725Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 343.3,
+        "Timestamp": "2026-07-27T23:39:50.259862Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUsePSCredentialType",
     "Severity": "Warning",
-    "ElapsedMs": 1553.8,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 344.8,
+    "MinMs": 235.5,
+    "MaxMs": 425.1,
+    "StdDevMs": 80.1,
+    "MedianMs": 373.7,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 235.5,
+        "Timestamp": "2026-07-27T23:35:07.852043Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 373.7,
+        "Timestamp": "2026-07-27T23:37:33.639087Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 425.1,
+        "Timestamp": "2026-07-27T23:39:39.848335Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseShouldProcessForStateChangingFunctions",
     "Severity": "Warning",
-    "ElapsedMs": 538.6,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 276.1,
+    "MinMs": 231.0,
+    "MaxMs": 300.8,
+    "StdDevMs": 31.9,
+    "MedianMs": 296.5,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 3,
+        "ElapsedMs": 300.8,
+        "Timestamp": "2026-07-27T23:37:27.792733Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 231.0,
+        "Timestamp": "2026-07-27T23:37:29.003133Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 296.5,
+        "Timestamp": "2026-07-27T23:40:43.314137Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseSingleValueFromPipelineParameter",
     "Severity": "Warning",
-    "ElapsedMs": 457.2,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 382.5,
+    "MinMs": 218.6,
+    "MaxMs": 576.6,
+    "StdDevMs": 147.7,
+    "MedianMs": 352.3,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 576.6,
+        "Timestamp": "2026-07-27T23:30:53.194558Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 352.3,
+        "Timestamp": "2026-07-27T23:35:04.554442Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 218.6,
+        "Timestamp": "2026-07-27T23:35:10.168207Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseSingularNouns",
     "Severity": "Warning",
-    "ElapsedMs": 1244.3,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 440.0,
+    "MinMs": 371.6,
+    "MaxMs": 563.3,
+    "StdDevMs": 87.4,
+    "MedianMs": 385.0,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 385.0,
+        "Timestamp": "2026-07-27T23:31:01.19768Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 563.3,
+        "Timestamp": "2026-07-27T23:31:15.478234Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 371.6,
+        "Timestamp": "2026-07-27T23:36:42.195725Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseSupportsShouldProcess",
     "Severity": "Warning",
-    "ElapsedMs": 622.9,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 422.4,
+    "MinMs": 301.8,
+    "MaxMs": 499.4,
+    "StdDevMs": 86.3,
+    "MedianMs": 465.9,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 301.8,
+        "Timestamp": "2026-07-27T23:29:31.541482Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 499.4,
+        "Timestamp": "2026-07-27T23:31:20.362427Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 465.9,
+        "Timestamp": "2026-07-27T23:37:26.958766Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseToExportFieldsInManifest",
     "Severity": "Warning",
-    "ElapsedMs": 924.5,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 412.7,
+    "MinMs": 326.6,
+    "MaxMs": 571.7,
+    "StdDevMs": 112.6,
+    "MedianMs": 339.8,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 571.7,
+        "Timestamp": "2026-07-27T23:30:35.033775Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 339.8,
+        "Timestamp": "2026-07-27T23:35:18.568611Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 326.6,
+        "Timestamp": "2026-07-27T23:37:41.240098Z",
+        "DiagCount": 0
+      }
+    ]
   },
   {
     "RuleName": "PSUseUsingScopeModifierInNewRunspaces",
     "Severity": "Warning",
-    "ElapsedMs": 976.0,
-    "DiagCount": 169,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 444.1,
+    "MinMs": 277.2,
+    "MaxMs": 623.7,
+    "StdDevMs": 141.7,
+    "MedianMs": 431.4,
+    "MeanDiagCount": 174.0,
+    "RawData": [
+      {
+        "Run": 2,
+        "ElapsedMs": 277.2,
+        "Timestamp": "2026-07-27T23:31:11.444986Z",
+        "DiagCount": 174
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 431.4,
+        "Timestamp": "2026-07-27T23:31:12.274177Z",
+        "DiagCount": 174
+      },
+      {
+        "Run": 1,
+        "ElapsedMs": 623.7,
+        "Timestamp": "2026-07-27T23:39:37.713984Z",
+        "DiagCount": 174
+      }
+    ]
   },
   {
     "RuleName": "PSUseUTF8EncodingForHelpFile",
     "Severity": "Warning",
-    "ElapsedMs": 574.5,
-    "DiagCount": 0,
-    "FileCount": 126
+    "FileCount": 128,
+    "Runs": 3,
+    "MeanMs": 322.3,
+    "MinMs": 278.5,
+    "MaxMs": 400.9,
+    "StdDevMs": 55.7,
+    "MedianMs": 287.6,
+    "MeanDiagCount": 0.0,
+    "RawData": [
+      {
+        "Run": 1,
+        "ElapsedMs": 278.5,
+        "Timestamp": "2026-07-27T23:29:29.945557Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 2,
+        "ElapsedMs": 400.9,
+        "Timestamp": "2026-07-27T23:39:48.292647Z",
+        "DiagCount": 0
+      },
+      {
+        "Run": 3,
+        "ElapsedMs": 287.6,
+        "Timestamp": "2026-07-27T23:40:45.490624Z",
+        "DiagCount": 0
+      }
+    ]
   }
 ]
