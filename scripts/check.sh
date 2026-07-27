@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fast pre-commit checks. PSScriptAnalyzer (heavy lint) lives in test.sh.
+# Fast pre-commit checks. PSScriptAnalyzer (slow rules excluded) runs inline.
 #
 # Runs repository checks in sequence:
 #
@@ -11,7 +11,7 @@
 #
 # Toolchain checks (1-3):
 #   1. Shell script formatting/linting (treefmt)
-#   2. PowerShell syntax validation (parser only, no PSScriptAnalyzer)
+#   2. PowerShell lint (PSScriptAnalyzer with check settings, slow rules excluded)
 #   3. Packer template validation
 #
 # Nix checks (4-7):
@@ -265,15 +265,15 @@ _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 } &
 
-# powershell_syntax — PowerShell syntax validation (parser only, skip PSSA)
+# powershell_lint — PowerShell lint (PSScriptAnalyzer with check settings)
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "PowerShell syntax validation"
+section "$((_step += 1))" "PowerShell lint"
 {
 _ps_exit=0
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SkipStep PSSA -Scoped "${PS1_FILES[@]}" || _ps_exit=$?
+  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -Scoped "${PS1_FILES[@]}" || _ps_exit=$?
 elif ! $HAS_ARGS; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SkipStep PSSA || _ps_exit=$?
+  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 || _ps_exit=$?
 else
   say "skipping (no PowerShell scripts to check)."
 fi

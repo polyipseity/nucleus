@@ -134,13 +134,13 @@ $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "ste
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] PowerShell lint ===" -f (++$_step))
 $script:waveJob3 = Start-Job -ScriptBlock {
-  param($pwshScript, $_stepStartTicks)
-  & $pwshScript
+  param($pwshScript, $settings, $_stepStartTicks)
+  & $pwshScript -Settings $settings
   $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
   $_elapsedMs | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-3.time") -NoNewline
   $LASTEXITCODE
-} -ArgumentList "$PSScriptRoot\check-pwsh.ps1", $_stepStartTicks
+} -ArgumentList "$PSScriptRoot\check-pwsh.ps1", "$PSScriptRoot\PSScriptAnalyzerSettings.test.psd1", $_stepStartTicks
 
 # ---------------------------------------------------------------------------
 # 4. Nucleus apps smoke tests — POSIX only (stub on Windows)

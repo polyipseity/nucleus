@@ -10,11 +10,15 @@
   PSScriptAnalyzer lint: runs `Invoke-ScriptAnalyzer` at Error and Warning
   severity on all enabled rules.
 
+.PARAMETER Settings
+  Path to a PSScriptAnalyzerSettings .psd1 file. Controls which rules and
+  severities are enabled. Defaults to PSScriptAnalyzerSettings.check.psd1
+  (excludes the two slowest rules). Pass test settings for full coverage:
+  -Settings scripts/PSScriptAnalyzerSettings.test.psd1
+
 .PARAMETER SkipStep
   Step names to skip. Initially only 'PSSA' is recognized — bypasses the
-  PSScriptAnalyzer lint. Used by check.sh/check.ps1 for fast pre-commit
-  validation; test.sh/test.ps1 run without -SkipStep (full lint). Unknown
-  names are silently ignored.
+  PSScriptAnalyzer lint. Unknown names are silently ignored.
 
 .PARAMETER Scoped
   If specified and no paths are given, skip Git discovery (no files to check).
@@ -39,6 +43,7 @@
 #>
 [CmdletBinding()]
 param(
+  [string]$Settings = (Join-Path $PSScriptRoot 'PSScriptAnalyzerSettings.check.psd1'),
   [string[]]$SkipStep = @(),
   [switch]$Scoped,
   [Parameter(ValueFromRemainingArguments = $true)]
@@ -116,7 +121,7 @@ if (-not $skipPSSA) {
     # Pre-import commonly-used modules to reduce PSSA's implicit Get-Command overhead during rule evaluation.
     Import-Module PSReadLine -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: PSReadLine may be absent in CI/non-interactive shells; this import is a performance optimization, not required
 
-    $settingsFile = Join-Path $PSScriptRoot 'PSScriptAnalyzerSettings.psd1'
+    $settingsFile = $Settings
 
     $files = @($Paths | Sort-Object -Unique | Where-Object { Test-Path -Path $_ })
 

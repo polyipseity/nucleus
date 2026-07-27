@@ -10,7 +10,7 @@
 #
 # Toolchain checks (1-3):
 #   1. Shell script formatting/linting (treefmt) (stub on Windows)
-#   2. PowerShell syntax validation
+#   2. PowerShell lint (PSScriptAnalyzer with check settings, slow rules excluded)
 #   3. Packer template validation
 #
 # Nix checks (4-7, stubs on Windows):
@@ -207,10 +207,10 @@ $_sw.Stop()
 $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-1.time") -NoNewline
 
 # ---------------------------------------------------------------------------
-# 2. PowerShell syntax validation
+# 2. PowerShell lint
 # ---------------------------------------------------------------------------
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
-Write-Output ("`n=== [{0}] PowerShell syntax validation ===" -f (++$_step))
+Write-Output ("`n=== [{0}] PowerShell lint ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   param($RepoRoot, $WaveTmpDir, $HAS_ARGS, $positionalArgs, $scriptCachedPs1Files, $scriptCachedNixFiles, $scriptCachedYamlFiles, $scriptCachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks)
   Set-StrictMode -Version Latest
@@ -218,9 +218,9 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   function say { Write-Output "check: $args" }
   function warn { Write-Output "check: warning: $args" }
   if ($PS1_FILES.Count -gt 0) {
-    & "$RepoRoot\scripts\check-pwsh.ps1" -SkipStep PSSA -Scoped $PS1_FILES
+    & "$RepoRoot\scripts\check-pwsh.ps1" -Scoped $PS1_FILES
   } elseif (-not $HAS_ARGS) {
-    & "$RepoRoot\scripts\check-pwsh.ps1" -SkipStep PSSA
+    & "$RepoRoot\scripts\check-pwsh.ps1"
   } else {
     say "skipping (no PowerShell scripts to check)."
   }

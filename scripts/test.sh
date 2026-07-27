@@ -188,7 +188,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "PowerShell lint"
 {
-pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 || echo "1" > "$_wave_tmpdir/step-3.exit"
+pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -Settings scripts/PSScriptAnalyzerSettings.test.psd1 || echo "1" > "$_wave_tmpdir/step-3.exit"
 [ -f "$_wave_tmpdir/step-3.exit" ] || echo "0" > "$_wave_tmpdir/step-3.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
