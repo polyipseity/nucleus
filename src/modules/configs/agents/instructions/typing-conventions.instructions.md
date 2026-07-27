@@ -25,6 +25,12 @@ Default typing policy for all code.
 - **Fully parameterize generic types.** Never leave generic types unparameterized (e.g., a bare `list` or `dict` in Python, a raw `List` or `Map` in Java, an unparameterized `array` in TypeScript). A bare generic discards all type information about elements, keys, values, and signatures — it is as vague as a catch-all type.
 - **No catch-all types.** Never use `any` (TypeScript), `object` used as an escape hatch (Python, C#), or equivalent catch-all types. `unknown` (TypeScript) is not a catch-all — it is sound and forces narrowing before use. Always find or define a precise type.
 - **No type-error suppression.** Do not use `# type: ignore`, `@ts-ignore`, `@ts-expect-error`, `@SuppressWarnings`, `// NOLINT`, or similar suppression mechanisms. When intentionally bypassing the type system (e.g., testing with deliberately wrong types), use an explicit checked cast or conversion that produces a correctly-typed value.
+- **No non-null assertions.** Do not use operators that assert non-null without runtime checking. These bypass strict null checks at the type level, making null-pointer errors possible at runtime. Instead, use proper type narrowing, early returns, or optional chaining to handle nullable values explicitly. Affected operators per language:
+  - TypeScript: postfix `!`
+  - Kotlin: `!!`
+  - Swift: postfix `!` (force unwrapping)
+  - Dart: postfix `!`
+  - C#: postfix `!` (null-forgiving operator)
 - **`assert` is test-only.** Use `assert` only in test code. In production code, use proper error handling. The sole exception is runtime invariants whose violation must halt execution immediately.
 
 ## Related instruction files
