@@ -329,7 +329,8 @@ function Compare-RealCommandMapTransparency {
 
   .DESCRIPTION
     Runs Invoke-ScriptAnalyzer in 3 modes within a single session and compares
-    diagnostic output for equality. Uses -ScriptDefinition for the analysis.
+    diagnostic output for equality. By default uses -ScriptDefinition; pass
+    -UsePath to analyze $TargetFile directly instead.
 
     Mode A (Baseline): No cache manipulation — PSSA's natural cache state.
     Mode B (Warmup-only): Calls Initialize-PSScriptAnalyzerCache with no injection
@@ -347,17 +348,26 @@ function Compare-RealCommandMapTransparency {
     variable set (to locate optimize-pssa-cache.ps1 and pssa-cache-hybrid.ps1).
 
   .PARAMETER TargetFile
-    Path to the .ps1 file to scan for command names.
+    Path to the .ps1 file to scan for command names. Also used as the analysis
+    target when -UsePath is set.
 
   .PARAMETER SettingsFile
     Path to the PSScriptAnalyzer settings file (.psd1).
 
   .PARAMETER ScriptDefinition
     The script text to analyze with Invoke-ScriptAnalyzer -ScriptDefinition.
+    Ignored when -UsePath is set.
     Default: "echo hello; get-date; write-output test; get-childitem /"
+
+  .PARAMETER UsePath
+    Switch. When set, uses Invoke-ScriptAnalyzer -Path $TargetFile instead of
+    -ScriptDefinition for all 3 modes.
 
   .EXAMPLE
     $result = Compare-RealCommandMapTransparency -TargetFile "tests/scripts/cache-verify-lib.ps1" -SettingsFile "scripts/PSScriptAnalyzerSettings.psd1"
+    $result.BaselineVsInjectionDiff.Count  # 0 when identical
+  .EXAMPLE
+    $result = Compare-RealCommandMapTransparency -TargetFile "tests/scripts/cache-verify-lib.ps1" -SettingsFile "scripts/PSScriptAnalyzerSettings.psd1" -UsePath
     $result.BaselineVsInjectionDiff.Count  # 0 when identical
   #>
   [CmdletBinding()]
@@ -370,7 +380,10 @@ function Compare-RealCommandMapTransparency {
     [string]$SettingsFile,
 
     [Parameter()]
-    [string]$ScriptDefinition = 'echo hello; get-date; write-output test; get-childitem /'
+    [string]$ScriptDefinition = 'echo hello; get-date; write-output test; get-childitem /',
+
+    [Parameter()]
+    [switch]$UsePath
   )
 
   # Check PSSA availability
@@ -401,12 +414,19 @@ function Compare-RealCommandMapTransparency {
     }
   }
 
+  # Build Invoke-ScriptAnalyzer splat params based on analysis mode
+  $analyzeParams = if ($UsePath) {
+    @{ Path = $TargetFile; Settings = $SettingsFile }
+  } else {
+    @{ ScriptDefinition = $ScriptDefinition; Settings = $SettingsFile }
+  }
+
   # Mode A: Baseline — no cache manipulation
-  $baselineDiags = @(Invoke-ScriptAnalyzer -ScriptDefinition $ScriptDefinition -Settings $SettingsFile)
+  $baselineDiags = @(Invoke-ScriptAnalyzer @analyzeParams)
 
   # Mode B: Warmup-only — triggers lazy initialization (no injection, no cache entries added)
   $null = Initialize-PSScriptAnalyzerCache -Files @($TargetFile) -SettingsFile $SettingsFile
-  $warmupDiags = @(Invoke-ScriptAnalyzer -ScriptDefinition $ScriptDefinition -Settings $SettingsFile)
+  $warmupDiags = @(Invoke-ScriptAnalyzer @analyzeParams)
 
   # Mode C: RealCommandMap injection — inject real CommandInfo objects
   $allNames = Get-UniqueCommandNames -Files @($TargetFile)
@@ -414,7 +434,7 @@ function Compare-RealCommandMapTransparency {
   if ($realMap.Count -gt 0) {
     $null = Initialize-PSScriptAnalyzerCache -Files @($TargetFile) -SettingsFile $SettingsFile -RealCommandMap $realMap
   }
-  $injectionDiags = @(Invoke-ScriptAnalyzer -ScriptDefinition $ScriptDefinition -Settings $SettingsFile)
+  $injectionDiags = @(Invoke-ScriptAnalyzer @analyzeParams)
 
   # Helper: build a composite key from a diagnostic object
   function Get-DiagnosticKey {
