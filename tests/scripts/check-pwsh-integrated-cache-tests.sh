@@ -331,6 +331,94 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Test I6: Cross-session RealCommandMap + Path transparency — 3 independent
+#          pwsh processes (baseline, warmup-only, RealCommandMap injection)
+#          using -Path analysis. Proves RealCommandMap injection with file
+#          analysis produces identical diagnostics across sessions.
+# ---------------------------------------------------------------------------
+echo "--- Test I6: Cross-session RealCommandMap + Path transparency ---"
+
+set +e
+
+# Mode A: Baseline — no cache manipulation, plain -Path analysis
+# shellcheck disable=SC2016 # reason: PowerShell syntax inside single-quoted -Command, not shell variables
+_i6_a=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInteractive -Command '
+  $ErrorActionPreference = "Stop"
+  Set-StrictMode -Version Latest
+  $rp = $env:NUCLEUS_TEST_ROOT
+  Import-Module PSScriptAnalyzer
+  $target = "$rp/tests/scripts/cache-verify-lib.ps1"
+  $settings = "$rp/scripts/PSScriptAnalyzerSettings.psd1"
+  $diags = @(Invoke-ScriptAnalyzer -Path $target -Settings $settings)
+  $diags | ForEach-Object { "$($_.ScriptName)|$($_.Line)|$($_.Column)|$($_.RuleName)|$($_.Severity)|$($_.Message)" }
+' 2>&1)
+_i6_a_exit=$?
+
+# Mode B: Warmup-only — triggers lazy initialization, no injection
+# shellcheck disable=SC2016 # reason: PowerShell syntax inside single-quoted -Command, not shell variables
+_i6_b=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInteractive -Command '
+  $ErrorActionPreference = "Stop"
+  Set-StrictMode -Version Latest
+  $rp = $env:NUCLEUS_TEST_ROOT
+  Import-Module PSScriptAnalyzer
+  . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
+  $target = "$rp/tests/scripts/cache-verify-lib.ps1"
+  $settings = "$rp/scripts/PSScriptAnalyzerSettings.psd1"
+  $null = Initialize-PSScriptAnalyzerCache -Files @($target) -SettingsFile $settings
+  $diags = @(Invoke-ScriptAnalyzer -Path $target -Settings $settings)
+  $diags | ForEach-Object { "$($_.ScriptName)|$($_.Line)|$($_.Column)|$($_.RuleName)|$($_.Severity)|$($_.Message)" }
+' 2>&1)
+_i6_b_exit=$?
+
+# Mode C: RealCommandMap injection — inject real CommandInfo objects, then -Path analysis
+# shellcheck disable=SC2016 # reason: PowerShell syntax inside single-quoted -Command, not shell variables
+_i6_c=$(NUCLEUS_TEST_ROOT="$REPO_ROOT" pwsh -NoLogo -NoProfile -NonInteractive -Command '
+  $ErrorActionPreference = "Stop"
+  Set-StrictMode -Version Latest
+  $rp = $env:NUCLEUS_TEST_ROOT
+  Import-Module PSScriptAnalyzer
+  . "$rp/src/scripts/shell/optimize-pssa-cache.ps1"
+  . "$rp/src/scripts/shell/pssa-cache-hybrid.ps1"
+  $target = "$rp/tests/scripts/cache-verify-lib.ps1"
+  $settings = "$rp/scripts/PSScriptAnalyzerSettings.psd1"
+  $allNames = Get-UniqueCommandNames -Files @($target)
+  $realMap = Get-MatchingRealCommands -CommandNames @($allNames)
+  $null = Initialize-PSScriptAnalyzerCache -Files @($target) -SettingsFile $settings -RealCommandMap $realMap
+  $diags = @(Invoke-ScriptAnalyzer -Path $target -Settings $settings)
+  $diags | ForEach-Object { "$($_.ScriptName)|$($_.Line)|$($_.Column)|$($_.RuleName)|$($_.Severity)|$($_.Message)" }
+' 2>&1)
+_i6_c_exit=$?
+
+set -e
+
+# All 3 processes must exit successfully
+if [ "$_i6_a_exit" -eq 0 ] && [ "$_i6_b_exit" -eq 0 ] && [ "$_i6_c_exit" -eq 0 ]; then
+  assert_pass "I6 Cross-session RealCommandMap + Path: all 3 modes execute successfully"
+else
+  assert_fail "I6 Cross-session RealCommandMap + Path: all modes execute" "Exit codes: A=$_i6_a_exit B=$_i6_b_exit C=$_i6_c_exit"
+fi
+
+# Compare baseline vs warmup, baseline vs injection — diffs must be empty
+if diff <(echo "$_i6_a") <(echo "$_i6_b") >/dev/null 2>&1 && diff <(echo "$_i6_a") <(echo "$_i6_c") >/dev/null 2>&1; then
+  _i6_count=$(echo "$_i6_a" | wc -l | tr -d ' ')
+  assert_pass "I6 Cross-session RealCommandMap + Path: all 3 modes produce identical diagnostics ($_i6_count diagnostics)"
+else
+  _i6_ab_diff=$(diff <(echo "$_i6_a") <(echo "$_i6_b") | head -20)
+  _i6_ac_diff=$(diff <(echo "$_i6_a") <(echo "$_i6_c") | head -20)
+  assert_fail "I6 Cross-session RealCommandMap + Path: identical diagnostics" "A vs B diff: $_i6_ab_diff ; A vs C diff: $_i6_ac_diff"
+fi
+
+# Each mode must produce at least one diagnostic
+_i6_a_count=$(echo "$_i6_a" | wc -l | tr -d ' ')
+_i6_b_count=$(echo "$_i6_b" | wc -l | tr -d ' ')
+_i6_c_count=$(echo "$_i6_c" | wc -l | tr -d ' ')
+if [ "$_i6_a_count" -gt 0 ] && [ "$_i6_b_count" -gt 0 ] && [ "$_i6_c_count" -gt 0 ]; then
+  assert_pass "I6 Cross-session RealCommandMap + Path: all modes produce diagnostics (A=$_i6_a_count, B=$_i6_b_count, C=$_i6_c_count)"
+else
+  assert_fail "I6 Cross-session RealCommandMap + Path: diagnostics > 0" "A=$_i6_a_count B=$_i6_b_count C=$_i6_c_count"
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""
