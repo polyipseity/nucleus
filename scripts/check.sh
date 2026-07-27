@@ -271,7 +271,10 @@ section "$((_step += 1))" "PowerShell lint"
 {
 _ps_exit=0
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
-  pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -Settings scripts/PSScriptAnalyzerSettings.check.psd1 -Scoped "${PS1_FILES[@]}" || _ps_exit=$?
+  # Use -Command (not -File) because -File mode can't bind array/remaining-arguments params.
+  # Build a PowerShell array literal for the paths and pass via -Command.
+  _ps_paths=$(printf "'%s'," "${PS1_FILES[@]}")
+  pwsh -NoLogo -NoProfile -NonInteractive -Command "& scripts/check-pwsh.ps1 -Settings scripts/PSScriptAnalyzerSettings.check.psd1 -Scoped -Paths @(${_ps_paths%,})" || _ps_exit=$?
 elif ! $HAS_ARGS; then
   pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -Settings scripts/PSScriptAnalyzerSettings.check.psd1 || _ps_exit=$?
 else

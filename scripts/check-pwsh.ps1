@@ -46,7 +46,7 @@ param(
   [string]$Settings = (Join-Path $PSScriptRoot 'PSScriptAnalyzerSettings.check.psd1'),
   [string[]]$SkipStep = @(),
   [switch]$Scoped,
-  [Parameter(ValueFromRemainingArguments = $true)]
+  [Parameter(Position = 0)]
   [string[]]$Paths = @($env:NUCLEUS_CHECK_PATHS -split ';' | Where-Object { $_ })
 )
 
