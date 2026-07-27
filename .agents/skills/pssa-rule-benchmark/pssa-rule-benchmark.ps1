@@ -62,7 +62,7 @@ $psVersion = $PSVersionTable.PSVersion
 $psaModule = Get-Module PSScriptAnalyzer
 $psaVersion = if ($psaModule) { $psaModule.Version } else { 'unknown' }
 
-Write-Output "pwsh: $($psVersion.Major).$($psVersion.Minor).$($psVersion.Build)"
+Write-Output "pwsh: $($psVersion.Major).$($psVersion.Minor).$($psVersion.Patch)"
 Write-Output "PSScriptAnalyzer: $psaVersion"
 Write-Output "Repository: $repoRoot"
 Write-Output ""
@@ -199,6 +199,8 @@ function Convert-RawResultsToAggregated {
 $rawResults = [System.Collections.Generic.List[object]]::new()
 $totalSw = [System.Diagnostics.Stopwatch]::StartNew()
 $failedTasks = 0
+$rawResultsFile = "$ResultsFile.raw"
+$incrementalCounter = 0
 
 for ($ti = 0; $ti -lt $totalTasks; $ti++) {
   $task = $tasks[$ti]
@@ -294,7 +296,18 @@ for ($ti = 0; $ti -lt $totalTasks; $ti++) {
     Timestamp    = if ($null -ne $parsed -and $parsed.Timestamp) { $parsed.Timestamp } else { [DateTime]::UtcNow.ToString('o') }
     Run          = $runIdx
   })
+
+  # Incremental save every 10 tasks
+  $incrementalCounter++
+  if ($incrementalCounter % 10 -eq 0) {
+    $rawResults.ToArray() | ConvertTo-Json -Depth 5 | Set-Content $rawResultsFile
+    $elapsed = [math]::Round($totalSw.Elapsed.TotalSeconds, 0)
+    Write-Output "  [checkpoint saved: $incrementalCounter tasks in ${elapsed}s]"
+  }
 }
+
+# Final raw save (catches remaining <10 tasks)
+$rawResults.ToArray() | ConvertTo-Json -Depth 5 | Set-Content $rawResultsFile
 
 $totalSw.Stop()
 
@@ -320,3 +333,4 @@ $aggregated | Sort-Object MeanMs | Select-Object -First 5 |
 Write-Output ''
 $aggregated | ConvertTo-Json -Depth 5 | Set-Content $ResultsFile
 Write-Output "Full results saved to: $ResultsFile"
+Remove-Item $rawResultsFile -ErrorAction SilentlyContinue
