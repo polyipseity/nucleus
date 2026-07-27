@@ -1,7 +1,7 @@
 ---
 name: pssa-rule-benchmark
-description: 'Benchmark each PSScriptAnalyzer rule independently to identify slow rules and measure per-rule performance. Use when debugging slow lint runs, optimizing check-pwsh.ps1, or profiling PSSA rule timing.'
-argument-hint: '[ResultsFile]'
+description: "Benchmark each PSScriptAnalyzer rule independently to identify slow rules and measure per-rule performance. Use when debugging slow lint runs, optimizing check-pwsh.ps1, or profiling PSSA rule timing."
+argument-hint: "[ResultsFile]"
 ---
 
 # PSScriptAnalyzer per-rule benchmarking
@@ -28,6 +28,7 @@ pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1
 ```
 
 Optionally write results elsewhere:
+
 ```powershell
 pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1 -ResultsFile /tmp/my-results.json
 ```
@@ -36,12 +37,12 @@ The script measures each enabled rule in isolation (via `IncludeRules` + empty `
 
 ### Known performance (macOS Apple Silicon, pwsh 7.6.3, PSScriptAnalyzer 1.25.0, 126 files × 63 rules)
 
-| Metric | Value |
-|---|---|
-| Total wall-clock | ~282s |
+| Metric                      | Value                                |
+| --------------------------- | ------------------------------------ |
+| Total wall-clock            | ~282s                                |
 | `PSAvoidUsingCmdletAliases` | ~158s (56%) — `Get-Command` per file |
-| `PSShouldProcess` | ~72s (26%) — `Get-Command` per file |
-| All other 61 rules | each <5s |
+| `PSShouldProcess`           | ~72s (26%) — `Get-Command` per file  |
+| All other 61 rules          | each <5s                             |
 
 ## Interpreting results
 
