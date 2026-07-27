@@ -1,6 +1,7 @@
 ---
 name: pssa-rule-benchmark
 description: 'Benchmark each PSScriptAnalyzer rule independently to identify slow rules and measure per-rule performance. Use when debugging slow lint runs, optimizing check-pwsh.ps1, or profiling PSSA rule timing.'
+argument-hint: '[ResultsFile]'
 ---
 
 # PSScriptAnalyzer per-rule benchmarking
@@ -12,57 +13,54 @@ description: 'Benchmark each PSScriptAnalyzer rule independently to identify slo
 - Compare performance between PSScriptAnalyzer versions
 - Identify rules that dominate total lint time
 
-## How it works
+## Prerequisites
 
-For each enabled rule, runs `Invoke-ScriptAnalyzer` on all tracked `.ps1` files with *only that rule* enabled (via `IncludeRules` + empty `Rules` hashtable). Measures elapsed wall-clock time per rule and saves incremental results as JSON.
-
-### Known performance characteristics (benchmarked on macOS Apple Silicon, pwsh 7.6.3, PSScriptAnalyzer 1.25.0, 126 files × 63 rules)
-
-- **Total wall-clock**: ~282s
-- **Two rules dominate**: `PSAvoidUsingCmdletAliases` (~158s, 56%) and `PSShouldProcess` (~72s, 26%) — both involve `Get-Command` resolution per file
-- **All other 61 rules**: each completes in <5s
-- Results file: [pssa-rule-benchmark-results.json](./references/pssa-rule-benchmark-results.json)
+- `pwsh` 7+, `PSScriptAnalyzer`, and `git` on `PATH`
+- Run from the repository root (script uses `git ls-files` for file discovery)
+- Settings file `PSScriptAnalyzerSettings.psd1` is bundled in the skill folder — tweak `Severity` / `ExcludeRules` there
 
 ## Procedure
 
-1. Ensure you're in the repository root (scripts use `git ls-files` to discover `.ps1` files).
+Run the benchmark:
 
-2. Run the benchmark:
-   ```powershell
-   pwsh .agents/skills/pssa-rule-benchmark/scripts/pssa-rule-benchmark.ps1
-   ```
-   Optionally specify a custom results path:
-   ```powershell
-   pwsh .agents/skills/pssa-rule-benchmark/scripts/pssa-rule-benchmark.ps1 -ResultsFile /tmp/my-results.json
-   ```
+```powershell
+pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1
+```
 
-3. The script outputs:
-   - Per-rule progress with percentage (`[12/63 (19.0%)] PSAvoidUsingCmdletAliases`)
-   - Per-rule elapsed time and diagnostic count
-   - Top 10 slowest rules table
-   - Bottom 5 fastest rules table
+Optionally write results elsewhere:
+```powershell
+pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1 -ResultsFile /tmp/my-results.json
+```
 
-4. Results are saved incrementally after each rule — if the script is interrupted, partial results are still available.
+The script measures each enabled rule in isolation (via `IncludeRules` + empty `Rules` hashtable), outputs per-rule progress and timing, then prints top-10 / bottom-5 tables. Results are saved incrementally — partial output survives interruption.
 
-## Script internals
+### Known performance (macOS Apple Silicon, pwsh 7.6.3, PSScriptAnalyzer 1.25.0, 126 files × 63 rules)
 
-- **Settings source**: Reads `PSScriptAnalyzerSettings.psd1` from `scripts/` for `Severity` and `ExcludeRules`
-- **File discovery**: `git ls-files '*.ps1'` — only tracks version-controlled files
-- **Per-rule invocation**: `$paths | Invoke-ScriptAnalyzer -Settings @{IncludeRules=@($ruleName); Rules=@{}}`
-- **Measurement**: `[System.Diagnostics.Stopwatch]` per rule
-- **Output**: Incremental `ConvertTo-Json | Set-Content`
+| Metric | Value |
+|---|---|
+| Total wall-clock | ~282s |
+| `PSAvoidUsingCmdletAliases` | ~158s (56%) — `Get-Command` per file |
+| `PSShouldProcess` | ~72s (26%) — `Get-Command` per file |
+| All other 61 rules | each <5s |
 
 ## Interpreting results
 
-The `ElapsedMs` field is wall-clock time — it includes pipeline overhead, module loading, and file I/O. The key insight is which rules are *disproportionately* slow relative to others. The two `Get-Command`-intensive rules are a known PSScriptAnalyzer design limitation; optimizing them would require changes to the analyzer engine, not the rule definitions.
+`ElapsedMs` is wall-clock time (pipeline + I/O + module load overhead). The two `Get-Command`-intensive rules are a PSScriptAnalyzer engine limitation, not the rule definitions themselves.
+
+## Internals
+
+- **Settings**: reads bundled `PSScriptAnalyzerSettings.psd1` for `Severity` and `ExcludeRules`
+- **File discovery**: `git ls-files '*.ps1'` — version-controlled files only
+- **Per-rule invocation**: `$paths | Invoke-ScriptAnalyzer -Settings @{IncludeRules=@($ruleName); Rules=@{}}`
+- **Measurement**: `[System.Diagnostics.Stopwatch]` per rule
+- **Output**: incremental `ConvertTo-Json | Set-Content`
 
 ## File layout
 
 ```
 .agents/skills/pssa-rule-benchmark/
-├── SKILL.md                                          # This file
-├── scripts/
-│   └── pssa-rule-benchmark.ps1                       # Benchmark runner
-└── references/
-    └── pssa-rule-benchmark-results.json              # Latest benchmark results (63 rules)
+├── SKILL.md                               # This file
+├── PSScriptAnalyzerSettings.psd1          # Rule severity/exclusion config
+├── pssa-rule-benchmark.ps1                # Benchmark runner
+└── pssa-rule-benchmark-results.json       # Latest results (63 rules) (reference data)
 ```
