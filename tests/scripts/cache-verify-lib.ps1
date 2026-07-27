@@ -208,8 +208,6 @@ function Get-DiagnosticComparison {
     required before any cache manipulation can occur.
 
     The comparison uses composite keys (ScriptName|Line|Column|RuleName|Severity|Message)
-
-    The comparison uses composite keys (ScriptName|Line|Column|RuleName|Severity|Message)
     for deep equality. Empty diff arrays mean the modes produced identical diagnostics.
 
     Requires PSScriptAnalyzer module imported and NUCLEUS_TEST_ROOT environment
