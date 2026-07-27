@@ -438,6 +438,9 @@
               esac
             done
             _script_dir="$(CDPATH="" cd -- "$(dirname -- "$_self")/../scripts" && pwd -P)"
+            # Use -File (not -Command): -File binds positional parameters directly,
+            # which works with check-pwsh.ps1's [Parameter(Position=0)] $Paths.
+            # -Command would require array-literal construction and shell quoting.
             exec pwsh -NoLogo -NoProfile -NonInteractive -File "$_script_dir/check-pwsh.ps1" "$@"
           '';
         };
