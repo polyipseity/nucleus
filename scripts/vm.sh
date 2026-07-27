@@ -103,6 +103,17 @@ resolve_vm_guest_credentials() {
   return 0
 }
 
+resolve_vm_guest_ssh_key() {
+  local _key_path=''
+  for _key_path in "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/id_ecdsa.pub" "$HOME/.ssh/id_rsa.pub" "$HOME/.ssh/id_ecdsa_sk.pub"; do
+    if [ -f "$_key_path" ] && [ -r "$_key_path" ]; then
+      cat "$_key_path"
+      return 0
+    fi
+  done
+  return 1
+}
+
 vm_guest_credentials_hash() {
   if command -v sha256sum >/dev/null 2>&1; then
     printf '%s\n%s' "$vm_guest_username" "$vm_guest_password" | sha256sum | awk '{print $1}'
@@ -316,6 +327,14 @@ do_setup() {
     vm_guest_credentials_fingerprint="$(vm_guest_credentials_hash)"
     export NUCLEUS_VM_GUEST_USERNAME="$vm_guest_username"
     export NUCLEUS_VM_GUEST_PASSWORD="$vm_guest_password"
+
+    # Export SSH public key for NixOS guest provisioning (guest.nix uses it for authorized_keys).
+    vm_guest_ssh_public_key="$(resolve_vm_guest_ssh_key)" || true
+    if [ -n "$vm_guest_ssh_public_key" ]; then
+      export NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY="$vm_guest_ssh_public_key"
+    else
+      warn "no SSH public key found; NixOS guest will use password auth only"
+    fi
   fi
 
   vm_init "$REPO_ROOT" "$VM_DIR" "$IMAGES_DIR" "$TEMPLATES_DIR" "$dry_run" \
@@ -368,24 +387,61 @@ do_setup() {
   nuc_done
 }
 
+# Query hypervisors for currently running VM names.
+vm_get_running_names() {
+  case "$(uname -s)" in
+    Darwin)
+      tart list 2>/dev/null | awk 'NR>1{print $2}'
+      utmctl list 2>/dev/null | awk 'NR>1{print $3}'
+      ;;
+    Linux)
+      virsh list --name 2>/dev/null
+      ;;
+    MINGW*|MSYS*|CYGWIN*)
+      # Runtime detection on Windows is handled by PowerShell.
+      return 0
+      ;;
+  esac
+}
+
+# Annotate a VM name with its running state.
+# Returns "running", "stopped", or "unknown".
+_vm_state() {
+  _vs_name="$1"
+  _vs_running_set="$2"
+  if echo "$_vs_running_set" | grep -qxF "$_vs_name"; then
+    printf 'running'
+  else
+    printf 'stopped'
+  fi
+}
+
 do_list() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
   NUCLEUS_HOST="$(resolve_nucleus_host)"
   require_command jq
 
+  local running_names
+  running_names="$(vm_get_running_names)" || true
+
   if $json_output; then
+    # Annotate each VM with its state.
     jq -c --arg host "$NUCLEUS_HOST" '
       [.VMs[] | select(.enabled == true) | select(.hosts == null or (.hosts | length == 0) or (.hosts | contains([$host])))]
-    ' "$MANIFEST"
+    ' "$MANIFEST" | jq -c --arg running "$running_names" '
+      [.[] | .state = (if $running | split("\n") | index(.name) then "running" else "stopped" end)]
+    '
   else
-    printf '%-20s %-12s %-10s %s\n' "NAME" "TYPE" "ENABLED" "HOSTS"
+    printf '%-20s %-12s %-10s %-8s %s\n' "NAME" "TYPE" "ENABLED" "STATE" "HOSTS"
     jq -r --arg host "$NUCLEUS_HOST" '
       .VMs[] | select(.enabled == true) | select(.hosts == null or (.hosts | length == 0) or (.hosts | contains([$host]))) |
       [.name, .type, (.enabled | tostring), (if .hosts then (.hosts | join(",")) else "all" end)] |
       @tsv
     ' "$MANIFEST" | while IFS=$'\t' read -r name type enabled hosts; do
-      printf '%-20s %-12s %-10s %s\n' "$name" "$type" "$enabled" "$hosts"
+      local state
+      state="$(_vm_state "$name" "$running_names")"
+      printf '%-20s %-12s %-10s %-8s %s\n' "$name" "$type" "$enabled" "$state" "$hosts"
     done
   fi
 }
@@ -395,6 +451,9 @@ do_status() {
   resolve_manifest
   NUCLEUS_HOST="$(resolve_nucleus_host)"
   require_command jq
+
+  local running_names
+  running_names="$(vm_get_running_names)" || true
 
   # Build base filter: enabled VMs matching the current host.
   # Names are passed via --argjson when filtering specific VMs.
@@ -416,12 +475,18 @@ do_status() {
 
   if $json_output; then
     if [ -n "$names_json" ]; then
-      jq -c --arg host "$NUCLEUS_HOST" --argjson names "$names_json" "$base_filter" "$MANIFEST"
+      jq -c --arg host "$NUCLEUS_HOST" --argjson names "$names_json" "$base_filter" "$MANIFEST" | \
+        jq -c --arg running "$running_names" '
+          [.[] | .state = (if $running | split("\n") | index(.name) then "running" else "stopped" end)]
+        '
     else
-      jq -c --arg host "$NUCLEUS_HOST" "$base_filter" "$MANIFEST"
+      jq -c --arg host "$NUCLEUS_HOST" "$base_filter" "$MANIFEST" | \
+        jq -c --arg running "$running_names" '
+          [.[] | .state = (if $running | split("\n") | index(.name) then "running" else "stopped" end)]
+        '
     fi
   else
-    printf '%-20s %-12s %-10s %-8s %-8s %-10s\n' "NAME" "TYPE" "ENABLED" "HOSTS" "CPUS" "RAM"
+    printf '%-20s %-12s %-10s %-8s %-8s %-8s %-10s\n' "NAME" "TYPE" "ENABLED" "STATE" "HOSTS" "CPUS" "RAM"
 
     # Table projection uses single-quote fragment for the literal filter tail
     # to keep shellcheck happy (no embedded double quotes in double-quoted
@@ -435,7 +500,9 @@ do_status() {
       jq -r --arg host "$NUCLEUS_HOST" "$table_filter" "$MANIFEST"
     fi | while IFS=$'\t' read -r name type enabled hosts cpus ram; do
       local ram_gib="$(( (ram + 536870912) / 1073741824 ))"
-      printf '%-20s %-12s %-10s %-8s %-8s %-10s\n' "$name" "$type" "$enabled" "$hosts" "$cpus" "${ram_gib}G"
+      local state
+      state="$(_vm_state "$name" "$running_names")"
+      printf '%-20s %-12s %-10s %-8s %-8s %-8s %-10s\n' "$name" "$type" "$enabled" "$state" "$hosts" "$cpus" "${ram_gib}G"
     done
   fi
 }
@@ -453,13 +520,56 @@ do_start() {
   fi
 
   local vm_name="${filtered_vm_args[0]}"
-  local vm_type vm_index
   local resolved
   resolved="$(resolve_target_vm "$vm_name")" || exit 1
+
+  VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
+
+  local start_script="$VM_DIR/scripts/start-${vm_name}.sh"
+  if [ -f "$start_script" ] && [ -x "$start_script" ]; then
+    say "starting VM '$vm_name' via generated script..."
+    exec "$start_script"
+  fi
+
+  # Fallback: direct hypervisor invocation (no script = setup not run)
+  local vm_type vm_index
   vm_type="$(printf '%s' "$resolved" | cut -f1)"
   vm_index="$(printf '%s' "$resolved" | cut -f2)"
 
-  say "start not yet implemented for '$vm_name' (type=$vm_type)"
+  case "$(uname -s)" in
+    Darwin)
+      case "$vm_type" in
+        macOS)
+          require_command tart "brew install cirruslabs/cli/tart"
+          exec tart run "$vm_name"
+          ;;
+        *)
+          # UTM guests
+          if command -v utmctl >/dev/null 2>&1; then
+            exec utmctl start "$vm_name"
+          fi
+          local bundle="$VM_DIR/${vm_name}.utm"
+          if [ -d "$bundle" ]; then
+            exec open "$bundle"
+          fi
+          error "cannot start '$vm_name': no generated script, utmctl not found, and no UTM bundle at $bundle"
+          exit 1
+          ;;
+      esac
+      ;;
+    Linux)
+      require_command virsh
+      exec virsh start "$vm_name"
+      ;;
+    MINGW*|MSYS*|CYGWIN*)
+      local win_script="$VM_DIR/scripts/start-${vm_name}.ps1"
+      if [ -f "$win_script" ]; then
+        exec pwsh -File "$win_script"
+      fi
+      error "cannot start '$vm_name': no start script at $win_script"
+      exit 1
+      ;;
+  esac
 }
 
 do_stop() {
@@ -475,13 +585,53 @@ do_stop() {
   fi
 
   local vm_name="${filtered_vm_args[0]}"
-  local vm_type vm_index
   local resolved
   resolved="$(resolve_target_vm "$vm_name")" || exit 1
+
+  VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
+
+  local stop_script="$VM_DIR/scripts/stop-${vm_name}.sh"
+  if [ -f "$stop_script" ] && [ -x "$stop_script" ]; then
+    say "stopping VM '$vm_name' via generated script..."
+    exec "$stop_script"
+  fi
+
+  # Fallback: direct hypervisor invocation
+  local vm_type vm_index
   vm_type="$(printf '%s' "$resolved" | cut -f1)"
   vm_index="$(printf '%s' "$resolved" | cut -f2)"
 
-  say "stop not yet implemented for '$vm_name' (type=$vm_type)"
+  case "$(uname -s)" in
+    Darwin)
+      case "$vm_type" in
+        macOS)
+          require_command tart
+          exec tart stop "$vm_name"
+          ;;
+        *)
+          require_command utmctl
+          exec utmctl stop "$vm_name"
+          ;;
+      esac
+      ;;
+    Linux)
+      require_command virsh
+      if virsh shutdown "$vm_name" 2>/dev/null; then
+        say "ACPI shutdown signal sent to '$vm_name'"
+      else
+        warn "virsh shutdown failed; trying virsh destroy..."
+        exec virsh destroy "$vm_name"
+      fi
+      ;;
+    MINGW*|MSYS*|CYGWIN*)
+      local win_script="$VM_DIR/scripts/stop-${vm_name}.ps1"
+      if [ -f "$win_script" ]; then
+        exec pwsh -File "$win_script"
+      fi
+      error "cannot stop '$vm_name': no stop script at $win_script"
+      exit 1
+      ;;
+  esac
 }
 
 do_upgrade() {

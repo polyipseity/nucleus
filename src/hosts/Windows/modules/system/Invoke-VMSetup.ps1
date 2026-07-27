@@ -339,6 +339,27 @@ function Invoke-VMSetup {
         }
     }
 
+    function Resolve-VMGuestSshKey {
+        # Resolve the first available SSH public key from standard locations.
+        # Returns the key as a string, or $null if none found.
+        $sshDir = Join-Path $env:USERPROFILE '.ssh'
+        if (-not (Test-Path -LiteralPath $sshDir -PathType Container)) {
+            return $null
+        }
+        $keyNames = @('id_ed25519.pub', 'id_ecdsa.pub', 'id_rsa.pub', 'id_ecdsa_sk.pub')
+        foreach ($keyName in $keyNames) {
+            $keyPath = Join-Path $sshDir $keyName
+            if (Test-Path -LiteralPath $keyPath -PathType Leaf) {
+                try {
+                    return (Get-Content -Path $keyPath -Raw).Trim()
+                } catch {
+                    continue
+                }
+            }
+        }
+        return $null
+    }
+
     function Test-VMEnabled {
         param(
             [Parameter(Mandatory)]
@@ -396,6 +417,15 @@ function Invoke-VMSetup {
     $guestUsername = $guestCredential.AccountName
     $guestPassword = $guestCredential.Secret
     $guestSecretHash = $guestCredential.Hash
+
+    # Export SSH public key for NixOS guest provisioning (guest.nix uses it for authorized_keys).
+    $sshPublicKey = Resolve-VMGuestSshKey
+    if ($null -ne $sshPublicKey) {
+        $env:NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY = $sshPublicKey
+        Write-Information "vm-setup: SSH public key exported for NixOS guest provisioning"
+    } else {
+        Write-Warning "vm-setup: no SSH public key found; NixOS guest will use password auth only"
+    }
 
     Write-Information "vm-setup: guest credential policy active (owner=$($guestCredential.Owner), username=$guestUsername, source=SOPS)"
 

@@ -128,6 +128,14 @@ function Invoke-VmSetup {
       }
       '--headful' { $invokeArgs['Headful'] = $true }
       '--no-headful' { $invokeArgs['Headful'] = $false }
+      '--vm-dir-override' {
+        $i++
+        if ($i -ge $SubcommandArgs.Length) {
+          Write-NucleusError '--vm-dir-override requires a path argument'
+          exit 1
+        }
+        $env:VM_DIR_OVERRIDE = $SubcommandArgs[$i]
+      }
       '--dry-run' { $invokeArgs['DryRun'] = $true }
       '--gc' { $invokeArgs['Gc'] = $true }
       '--no-gc' { $invokeArgs['Gc'] = $false }
@@ -145,9 +153,23 @@ function Invoke-VmSetup {
   Invoke-VMSetup @invokeArgs
 }
 
+function Get-VmRunningNames {
+  # Detect running VMs from QEMU processes (Windows uses QEMU).
+  # Matches process command lines containing -name qemu-<vmname>.
+  $running = @()
+  $procs = Get-CimInstance Win32_Process -Filter "Name = 'qemu-system-x86_64w.exe'" -ErrorAction SilentlyContinue
+  foreach ($p in $procs) {
+    if ($p.CommandLine -match '-name\s+(?:qemu-)?(\S+)') {
+      $running += $Matches[1]
+    }
+  }
+  return $running
+}
+
 function Invoke-VmList {
   $manifest = Get-VmManifest
   $hostName = if ($env:NUCLEUS_HOST) { $env:NUCLEUS_HOST } else { 'windows' }
+  $runningNames = Get-VmRunningNames
 
   # Filter to enabled VMs matching the current host
   $vms = $manifest.VMs | Where-Object {
@@ -156,16 +178,18 @@ function Invoke-VmList {
     )
   }
 
-  Write-Output "NAME                TYPE           ENABLED    HOSTS"
+  Write-Output "NAME                TYPE           ENABLED    STATE    HOSTS"
   foreach ($vm in $vms) {
     $hostsStr = if ($vm.hosts) { ($vm.hosts -join ',') } else { 'all' }
-    Write-Output ("{0,-20} {1,-14} {2,-10} {3}" -f $vm.name, $vm.type, $vm.enabled, $hostsStr)
+    $state = if ($vm.name -in $runningNames) { 'running' } else { 'stopped' }
+    Write-Output ("{0,-20} {1,-14} {2,-10} {3,-9} {4}" -f $vm.name, $vm.type, $vm.enabled, $state, $hostsStr)
   }
 }
 
 function Invoke-VmStatus {
   $manifest = Get-VmManifest
   $hostName = if ($env:NUCLEUS_HOST) { $env:NUCLEUS_HOST } else { 'windows' }
+  $runningNames = Get-VmRunningNames
 
   # Filter to enabled VMs matching the current host
   $vms = $manifest.VMs | Where-Object {
@@ -174,11 +198,12 @@ function Invoke-VmStatus {
     )
   }
 
-  Write-Output "NAME                TYPE           ENABLED    HOSTS    CPUS      RAM"
+  Write-Output "NAME                TYPE           ENABLED    STATE    HOSTS    CPUS      RAM"
   foreach ($vm in $vms) {
     $hostsStr = if ($vm.hosts) { ($vm.hosts -join ',') } else { 'all' }
     $ramGb = [math]::Round($vm.ramBytes / 1GB, 0)
-    Write-Output ("{0,-20} {1,-14} {2,-10} {3,-9} {4,-9} {5}" -f $vm.name, $vm.type, $vm.enabled, $hostsStr, $vm.cpus, "${ramGb}G")
+    $state = if ($vm.name -in $runningNames) { 'running' } else { 'stopped' }
+    Write-Output ("{0,-20} {1,-14} {2,-10} {3,-9} {4,-9} {5,-9} {6}" -f $vm.name, $vm.type, $vm.enabled, $state, $hostsStr, $vm.cpus, "${ramGb}G")
   }
 }
 
@@ -187,7 +212,26 @@ function Invoke-VmStart {
     Write-NucleusError 'start requires a VM name'
     exit 1
   }
-  Write-NucleusWarning "start not yet implemented for '$($SubcommandArgs[0])'"
+
+  $vmName = $SubcommandArgs[0]
+  $vmDir = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
+  $startScript = Join-Path $vmDir 'scripts' "start-$vmName.ps1"
+
+  if (Test-Path -LiteralPath $startScript -PathType Leaf) {
+    Write-NucleusInfo "starting VM '$vmName' via generated script..."
+    & $startScript
+    return
+  }
+
+  $manifest = Get-VmManifest
+  $vm = $manifest.VMs | Where-Object { $_.name -eq $vmName }
+  if (-not $vm) {
+    Write-NucleusError "VM '$vmName' not found in manifest"
+    exit 1
+  }
+
+  Write-NucleusWarning "start script not found at $startScript; run 'nucleus-vm setup' first"
+  exit 1
 }
 
 function Invoke-VmStop {
@@ -195,7 +239,37 @@ function Invoke-VmStop {
     Write-NucleusError 'stop requires a VM name'
     exit 1
   }
-  Write-NucleusWarning "stop not yet implemented for '$($SubcommandArgs[0])'"
+
+  $vmName = $SubcommandArgs[0]
+  $vmDir = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
+  $stopScript = Join-Path $vmDir 'scripts' "stop-$vmName.ps1"
+
+  if (Test-Path -LiteralPath $stopScript -PathType Leaf) {
+    Write-NucleusInfo "stopping VM '$vmName' via generated script..."
+    & $stopScript
+    return
+  }
+
+  $manifest = Get-VmManifest
+  $vm = $manifest.VMs | Where-Object { $_.name -eq $vmName }
+  if (-not $vm) {
+    Write-NucleusError "VM '$vmName' not found in manifest"
+    exit 1
+  }
+
+  # Fallback: try to find and kill the QEMU process
+  $qemuProc = Get-Process -Name 'qemu-system-*' -ErrorAction SilentlyContinue | Where-Object {
+    $_.CommandLine -match $vmName
+  }
+  if ($qemuProc) {
+    Write-NucleusInfo "stopping QEMU process for VM '$vmName'..."
+    $qemuProc | Stop-Process -Force
+    return
+  }
+
+  Write-NucleusWarning "stop script not found at $stopScript and no running QEMU process found for '$vmName'"
+  Write-NucleusWarning "run 'nucleus-vm setup' to generate stop scripts, or stop the VM manually"
+  exit 1
 }
 
 function Invoke-VmUpgrade {
@@ -203,7 +277,18 @@ function Invoke-VmUpgrade {
     Write-NucleusError 'upgrade requires a VM name'
     exit 1
   }
-  Write-NucleusWarning "upgrade not yet implemented on Windows for '$($SubcommandArgs[0])'"
+
+  $vmName = $SubcommandArgs[0]
+  $module = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
+  if (-not (Test-Path $module)) {
+    Write-NucleusError "Invoke-VMSetup module not found at $module"
+    exit 1
+  }
+  . $module
+
+  Resolve-VMGuestCredential -RepoRoot $RepoRoot | Out-Null
+  Write-NucleusInfo "upgrading Android VM '$vmName' on Windows..."
+  Write-NucleusWarning "Android upgrade on Windows is not yet fully implemented"
 }
 
 function Invoke-VmReset {
@@ -211,7 +296,18 @@ function Invoke-VmReset {
     Write-NucleusError 'reset requires a VM name'
     exit 1
   }
-  Write-NucleusWarning "reset not yet implemented on Windows for '$($SubcommandArgs[0])'"
+
+  $vmName = $SubcommandArgs[0]
+  $module = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
+  if (-not (Test-Path $module)) {
+    Write-NucleusError "Invoke-VMSetup module not found at $module"
+    exit 1
+  }
+  . $module
+
+  Resolve-VMGuestCredential -RepoRoot $RepoRoot | Out-Null
+  Write-NucleusInfo "resetting Android VM '$vmName' on Windows..."
+  Write-NucleusWarning "Android reset on Windows is not yet fully implemented"
 }
 
 function Invoke-VmGc {

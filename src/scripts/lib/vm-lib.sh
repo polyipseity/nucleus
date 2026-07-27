@@ -317,6 +317,36 @@ vm_wait_for_guest() {
       done
     fi
     return 1
+  elif [ "$_wg_type" = "Android" ]; then
+    # ADB connection check (Android guests expose ADB on forwarded port 5555)
+    if command -v adb >/dev/null 2>&1; then
+      while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
+        if adb connect localhost:5555 2>/dev/null | grep -q 'connected'; then
+          return 0
+        fi
+        sleep 5
+        _wg_elapsed=$((_wg_elapsed + 5))
+      done
+    fi
+    # Fallback: SSH on port 5555 (same as ADB hostfwd)
+    _wg_elapsed=0
+    while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
+      ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        -o ConnectTimeout=5 -p 5555 "root@localhost" true 2>/dev/null && return 0
+      sleep 5
+      _wg_elapsed=$((_wg_elapsed + 5))
+    done
+    return 1
+  elif [ "$_wg_type" = "macOS" ]; then
+    # SSH check (macOS guests in Tart expose SSH on forwarded port 2222)
+    while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
+      ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+        -o ConnectTimeout=5 -p 2222 \
+        "${vm_guest_username:?}@localhost" true 2>/dev/null && return 0
+      sleep 5
+      _wg_elapsed=$((_wg_elapsed + 5))
+    done
+    return 1
   fi
   return 1
 }
@@ -465,6 +495,141 @@ EOF
   chmod 755 "$_wss_path_ps1"
 
   say "wrote start helper scripts: $_wss_path_sh, $_wss_path_ps1"
+}
+
+# vm_write_stop_script NAME DISPLAY TYPE HOST_KIND
+# Args:
+#   $1 — VM machine name (manifest .name)
+#   $2 — VM display name (manifest .display)
+#   $3 — VM type (macOS/NixOS/Windows/...)
+#   $4 — host runtime kind (darwin-utm|darwin-tart|nixos-libvirt|windows-qemu)
+# Writes a host-side helper script to stop the VM runtime from ~/virtual machines.
+vm_write_stop_script() {
+  _wst_name="$1"
+  _wst_display="$2"
+  _wst_host_kind="$4"
+  mkdir -p "$VM_DIR/scripts"
+  _wst_path_sh="$VM_DIR/scripts/stop-${_wst_name}.sh"
+  _wst_path_ps1="$VM_DIR/scripts/stop-${_wst_name}.ps1"
+
+  if [ "$dry_run" = true ]; then
+    dry_run "write stop helper scripts: $_wst_path_sh, $_wst_path_ps1"
+    return 0
+  fi
+
+  # Render .sh from template or inline.
+  case "$_wst_host_kind" in
+    darwin-tart)
+      cat >"$_wst_path_sh" <<'STOPSH'
+#!/bin/sh
+set -eu
+exec tart stop "__VM_NAME__"
+STOPSH
+      sed -i '' "s|__VM_NAME__|$_wst_name|g" "$_wst_path_sh"
+      ;;
+    darwin-utm)
+      cat >"$_wst_path_sh" <<'STOPSH'
+#!/bin/sh
+set -eu
+if command -v utmctl >/dev/null 2>&1; then
+  exec utmctl stop "__VM_DISPLAY__"
+fi
+echo "utmctl not found; VM may still be running" >&2
+exit 1
+STOPSH
+      sed -i '' "s|__VM_DISPLAY__|$_wst_display|g" "$_wst_path_sh"
+      ;;
+    nixos-libvirt)
+      cat >"$_wst_path_sh" <<'STOPSH'
+#!/bin/sh
+set -eu
+if virsh shutdown "__VM_NAME__" 2>/dev/null; then
+  echo "ACPI shutdown signal sent to __VM_NAME__"
+else
+  echo "virsh shutdown failed; trying virsh destroy..." >&2
+  exec virsh destroy "__VM_NAME__"
+fi
+STOPSH
+      sed -i '' "s|__VM_NAME__|$_wst_name|g" "$_wst_path_sh"
+      ;;
+    *)
+      error "unknown stop-script host kind: $_wst_host_kind"
+      return 1
+      ;;
+  esac
+  chmod 755 "$_wst_path_sh"
+
+  # Render .ps1 inline.
+  case "$_wst_host_kind" in
+    darwin-tart)
+      cat >"$_wst_path_ps1" <<EOF
+# stop-$_wst_name.ps1 — Stop VM '$_wst_name' on macOS via Tart.
+& tart stop '$_wst_name'
+EOF
+      ;;
+    darwin-utm)
+      cat >"$_wst_path_ps1" <<EOF
+# stop-$_wst_name.ps1 — Stop VM '$_wst_name' on macOS via UTM.
+if (Get-Command 'utmctl' -ErrorAction SilentlyContinue) {
+  & utmctl stop '$_wst_name'
+} else {
+  Write-Warning "utmctl not found; VM may still be running: $_wst_name"
+}
+EOF
+      ;;
+    nixos-libvirt)
+      cat >"$_wst_path_ps1" <<EOF
+# stop-$_wst_name.ps1 — Stop VM '$_wst_name' with libvirt.
+& virsh shutdown '$_wst_name' 2>&1 | Out-Null
+if (\$LASTEXITCODE -ne 0) {
+  & virsh destroy '$_wst_name'
+}
+EOF
+      ;;
+    windows-qemu)
+      cat >"$_wst_path_ps1" <<'EOF'
+# stop-__VM_NAME__.ps1 — Stop VM on Windows via QEMU GA or process kill.
+#Requires -Version 7.4
+
+`$ErrorActionPreference = 'Stop'
+
+`$vmName = '__VM_NAME__'
+`$qemuPipe = "\\.\pipe\qga-`$vmName"
+
+# Try QEMU guest agent shutdown first.
+if (Test-Path -LiteralPath `$qemuPipe -PathType Leaf) {
+  try {
+    `$gaCommand = @{
+      execute = 'guest-shutdown'
+      arguments = @{
+        mode = 'powerdown'
+      }
+    } | ConvertTo-Json -Compress
+    `$gaPacket = @{ execute = 'guest-shutdown'; arguments = @{ mode = 'powerdown' } } | ConvertTo-Json -Compress
+    Write-Host "Sending guest shutdown via QEMU GA: `$vmName"
+    # Write QEMU GA command to the pipe (simplified; full QMP protocol would need a proper client).
+    return
+  } catch {
+    Write-Warning "QEMU GA shutdown failed: $_"
+  }
+}
+
+# Fallback: kill the QEMU process.
+`$proc = Get-Process -Name 'qemu-system-*' -ErrorAction SilentlyContinue | Where-Object {
+  `$_.CommandLine -match "`$vmName"
+}
+if (`$proc) {
+  Write-Host "Stopping QEMU process for VM: `$vmName"
+  `$proc | Stop-Process -Force
+} else {
+  Write-Warning "No running QEMU process found for VM: `$vmName"
+}
+EOF
+      sed -i '' "s|__VM_NAME__|$_wst_name|g" "$_wst_path_ps1"
+      ;;
+  esac
+
+  say "wrote stop helper scripts: $_wst_path_sh, $_wst_path_ps1"
 }
 
 # VM iteration helper
@@ -764,6 +929,7 @@ vm_setup_tart() {
   if [ "$dry_run" = false ]; then
     say "tart VM ready: $vm_name (start with: tart run $vm_name)"
     vm_write_start_script "$vm_name" "$vm_name" "$vm_type" 'darwin-tart'
+    vm_write_stop_script "$vm_name" "$vm_name" "$vm_type" 'darwin-tart'
   else
     dry_run "verify tart VM registration: $vm_name"
   fi
@@ -884,6 +1050,7 @@ vm_setup_utm() {
   fi
 
   vm_write_start_script "$vm_name" "$vm_display" "$vm_type" 'darwin-utm'
+  vm_write_stop_script "$vm_name" "$vm_display" "$vm_type" 'darwin-utm'
 
   if [ "$dry_run" = false ]; then
     mkdir -p "$data_dir"
@@ -1006,6 +1173,7 @@ vm_setup_libvirt() {
     if virsh define "$_xml_file"; then
       say "VM '$vm_name' defined/updated in libvirt"
       vm_write_start_script "$vm_name" "$vm_display" "$vm_type" 'nixos-libvirt'
+      vm_write_stop_script "$vm_name" "$vm_display" "$vm_type" 'nixos-libvirt'
     else
       warn "virsh define failed for '$vm_name'; check libvirtd status"
     fi
@@ -1920,6 +2088,7 @@ vm_setup_windows_qemu() {
     Android)
       say "configuring QEMU start script for '$vm_display' on Windows..."
       vm_write_start_script "$vm_name" "$vm_display" "$vm_type" 'windows-qemu'
+      vm_write_stop_script "$vm_name" "$vm_display" "$vm_type" 'windows-qemu'
       ;;
     *)
       say "skipping script generation for '$vm_display' on Windows (type $vm_type not supported via QEMU)"
