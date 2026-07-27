@@ -1,0 +1,443 @@
+[
+  {
+    "RuleName": "PSAlignAssignmentStatement",
+    "Severity": "Warning",
+    "ElapsedMs": 744.1,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidAssignmentToAutomaticVariable",
+    "Severity": "Warning",
+    "ElapsedMs": 4549.6,
+    "DiagCount": 3,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidDefaultValueForMandatoryParameter",
+    "Severity": "Warning",
+    "ElapsedMs": 1170.4,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidDefaultValueSwitchParameter",
+    "Severity": "Warning",
+    "ElapsedMs": 682.0,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidExclaimOperator",
+    "Severity": "Warning",
+    "ElapsedMs": 524.8,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidGlobalAliases",
+    "Severity": "Warning",
+    "ElapsedMs": 451.1,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidGlobalFunctions",
+    "Severity": "Warning",
+    "ElapsedMs": 655.0,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidGlobalVars",
+    "Severity": "Warning",
+    "ElapsedMs": 498.6,
+    "DiagCount": 3,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidInvokingEmptyMembers",
+    "Severity": "Warning",
+    "ElapsedMs": 449.4,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidLongLines",
+    "Severity": "Warning",
+    "ElapsedMs": 350.1,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidMultipleTypeAttributes",
+    "Severity": "Warning",
+    "ElapsedMs": 632.2,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidNullOrEmptyHelpMessageAttribute",
+    "Severity": "Warning",
+    "ElapsedMs": 386.4,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidOverwritingBuiltInCmdlets",
+    "Severity": "Warning",
+    "ElapsedMs": 759.0,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidReservedWordsAsFunctionNames",
+    "Severity": "Warning",
+    "ElapsedMs": 766.8,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidSemicolonsAsLineTerminators",
+    "Severity": "Warning",
+    "ElapsedMs": 777.9,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidShouldContinueWithoutForce",
+    "Severity": "Warning",
+    "ElapsedMs": 519.7,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidUsingAllowUnencryptedAuthentication",
+    "Severity": "Warning",
+    "ElapsedMs": 461.8,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidUsingBrokenHashAlgorithms",
+    "Severity": "Warning",
+    "ElapsedMs": 475.5,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidUsingCmdletAliases",
+    "Severity": "Warning",
+    "ElapsedMs": 157905.2,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidUsingComputerNameHardcoded",
+    "Severity": "Error",
+    "ElapsedMs": 585.7,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidUsingConvertToSecureStringWithPlainText",
+    "Severity": "Error",
+    "ElapsedMs": 547.1,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidUsingDeprecatedManifestFields",
+    "Severity": "Warning",
+    "ElapsedMs": 598.0,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidUsingEmptyCatchBlock",
+    "Severity": "Warning",
+    "ElapsedMs": 400.1,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidUsingInvokeExpression",
+    "Severity": "Warning",
+    "ElapsedMs": 606.7,
+    "DiagCount": 5,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidUsingPlainTextForPassword",
+    "Severity": "Warning",
+    "ElapsedMs": 564.9,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidUsingUsernameAndPasswordParams",
+    "Severity": "Error",
+    "ElapsedMs": 514.1,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidUsingWMICmdlet",
+    "Severity": "Warning",
+    "ElapsedMs": 501.7,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSAvoidUsingWriteHost",
+    "Severity": "Warning",
+    "ElapsedMs": 1007.1,
+    "DiagCount": 44,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSDSCStandardDSCFunctionsInResource",
+    "Severity": "Error",
+    "ElapsedMs": 974.2,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSDSCUseIdenticalMandatoryParametersForDSC",
+    "Severity": "Error",
+    "ElapsedMs": 760.6,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSDSCUseIdenticalParametersForDSC",
+    "Severity": "Error",
+    "ElapsedMs": 634.8,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSMisleadingBacktick",
+    "Severity": "Warning",
+    "ElapsedMs": 466.6,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSMissingModuleManifestField",
+    "Severity": "Warning",
+    "ElapsedMs": 699.1,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSPlaceCloseBrace",
+    "Severity": "Warning",
+    "ElapsedMs": 618.1,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSPlaceOpenBrace",
+    "Severity": "Warning",
+    "ElapsedMs": 685.8,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSPossibleIncorrectComparisonWithNull",
+    "Severity": "Warning",
+    "ElapsedMs": 932.5,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSPossibleIncorrectUsageOfRedirectionOperator",
+    "Severity": "Warning",
+    "ElapsedMs": 822.0,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSReservedCmdletChar",
+    "Severity": "Warning",
+    "ElapsedMs": 1082.8,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSReservedParams",
+    "Severity": "Error",
+    "ElapsedMs": 1159.1,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSReviewUnusedParameter",
+    "Severity": "Warning",
+    "ElapsedMs": 551.7,
+    "DiagCount": 189,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSShouldProcess",
+    "Severity": "Warning",
+    "ElapsedMs": 71962.5,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseApprovedVerbs",
+    "Severity": "Warning",
+    "ElapsedMs": 1189.1,
+    "DiagCount": 82,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseCmdletCorrectly",
+    "Severity": "Warning",
+    "ElapsedMs": 702.4,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseCompatibleCmdlets",
+    "Severity": "Warning",
+    "ElapsedMs": 436.1,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseCompatibleCommands",
+    "Severity": "Warning",
+    "ElapsedMs": 577.9,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseCompatibleSyntax",
+    "Severity": "Error",
+    "ElapsedMs": 522.1,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseCompatibleTypes",
+    "Severity": "Warning",
+    "ElapsedMs": 447.4,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseConsistentIndentation",
+    "Severity": "Warning",
+    "ElapsedMs": 399.9,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseConsistentParameterSetName",
+    "Severity": "Warning",
+    "ElapsedMs": 475.9,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseConsistentParametersKind",
+    "Severity": "Warning",
+    "ElapsedMs": 1346.4,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseConsistentWhitespace",
+    "Severity": "Warning",
+    "ElapsedMs": 1026.8,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseConstrainedLanguageMode",
+    "Severity": "Warning",
+    "ElapsedMs": 943.6,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseDeclaredVarsMoreThanAssignments",
+    "Severity": "Warning",
+    "ElapsedMs": 1812.7,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseLiteralInitializerForHashtable",
+    "Severity": "Warning",
+    "ElapsedMs": 2694.1,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseProcessBlockForPipelineCommand",
+    "Severity": "Warning",
+    "ElapsedMs": 2369.1,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUsePSCredentialType",
+    "Severity": "Warning",
+    "ElapsedMs": 1553.8,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseShouldProcessForStateChangingFunctions",
+    "Severity": "Warning",
+    "ElapsedMs": 538.6,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseSingleValueFromPipelineParameter",
+    "Severity": "Warning",
+    "ElapsedMs": 457.2,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseSingularNouns",
+    "Severity": "Warning",
+    "ElapsedMs": 1244.3,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseSupportsShouldProcess",
+    "Severity": "Warning",
+    "ElapsedMs": 622.9,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseToExportFieldsInManifest",
+    "Severity": "Warning",
+    "ElapsedMs": 924.5,
+    "DiagCount": 0,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseUsingScopeModifierInNewRunspaces",
+    "Severity": "Warning",
+    "ElapsedMs": 976.0,
+    "DiagCount": 169,
+    "FileCount": 126
+  },
+  {
+    "RuleName": "PSUseUTF8EncodingForHelpFile",
+    "Severity": "Warning",
+    "ElapsedMs": 574.5,
+    "DiagCount": 0,
+    "FileCount": 126
+  }
+]
