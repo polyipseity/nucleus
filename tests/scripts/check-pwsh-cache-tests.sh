@@ -120,7 +120,8 @@ else
 fi
 
 if echo "$_dot_source_out" | grep -q '^INJECTED=[1-9]'; then
-  assert_pass "Dot-source: injected at least one command name (INJECTED=$_dot_source_exit)"
+  _dot_source_injected=$(echo "$_dot_source_out" | grep -oE 'INJECTED=[0-9]+' | grep -oE '[0-9]+')
+  assert_pass "Dot-source: injected at least one command name (INJECTED=$_dot_source_injected)"
 else
   assert_fail "Dot-source: injected at least one command name" "Expected INJECTED=N with N>0, got: $_dot_source_out"
 fi
