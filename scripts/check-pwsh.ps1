@@ -17,8 +17,8 @@
   -Settings scripts/PSScriptAnalyzerSettings.test.psd1
 
 .PARAMETER SkipStep
-  Step names to skip. Initially only 'PSSA' is recognized — bypasses the
-  PSScriptAnalyzer lint. Unknown names are silently ignored.
+  Step names to skip. Currently only 'PSSA' is recognized — bypasses the
+  PSScriptAnalyzer lint. Unknown step names cause an error.
 
 .PARAMETER Scoped
   If specified and no paths are given, skip Git discovery (no files to check).
@@ -64,6 +64,16 @@ if (-not $Paths -or $Paths.Count -eq 0) {
 if (-not $Paths -or $Paths.Count -eq 0) {
   Write-Output 'No PowerShell files to check.'
   exit 0
+}
+
+# Validate SkipStep entries against known step names.
+$knownStepNames = [System.Collections.Generic.HashSet[string]]::new(
+  [System.StringComparer]::OrdinalIgnoreCase
+)
+$null = $knownStepNames.Add('PSSA')
+$unknownNames = @($SkipStep | Where-Object { $_ -notin $knownStepNames })
+if ($unknownNames.Count -gt 0) {
+  throw "Unknown -SkipStep value(s): $($unknownNames -join ', '). Valid values: $($knownStepNames -join ', ')"
 }
 
 $skipStepSet = [System.Collections.Generic.HashSet[string]]::new(
