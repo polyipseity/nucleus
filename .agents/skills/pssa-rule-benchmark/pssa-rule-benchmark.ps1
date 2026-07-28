@@ -333,4 +333,4 @@ $aggregated | Sort-Object MeanMs | Select-Object -First 5 |
 Write-Output ''
 $aggregated | ConvertTo-Json -Depth 5 | Set-Content $ResultsFile
 Write-Output "Full results saved to: $ResultsFile"
-Remove-Item $rawResultsFile -ErrorAction SilentlyContinue
+Remove-Item $rawResultsFile -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: temp file may have already been cleaned up on previous run; deletion is best-effort

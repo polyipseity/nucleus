@@ -157,7 +157,7 @@ function Get-VmRunningNames {
   # Detect running VMs from QEMU processes (Windows uses QEMU).
   # Matches process command lines containing -name qemu-<vmname>.
   $running = @()
-  $procs = Get-CimInstance Win32_Process -Filter "Name = 'qemu-system-x86_64w.exe'" -ErrorAction SilentlyContinue
+  $procs = Get-CimInstance Win32_Process -Filter "Name = 'qemu-system-x86_64w.exe'" -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: VM may not be running; failure to find processes is expected
   foreach ($p in $procs) {
     if ($p.CommandLine -match '-name\s+(?:qemu-)?(\S+)') {
       $running += $Matches[1]
@@ -258,6 +258,7 @@ function Invoke-VmStop {
   }
 
   # Fallback: try to find and kill the QEMU process
+  # check-suppress:suppression_doc: VM may not have a running process; expected path
   $qemuProc = Get-Process -Name 'qemu-system-*' -ErrorAction SilentlyContinue | Where-Object {
     $_.CommandLine -match $vmName
   }
