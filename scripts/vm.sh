@@ -430,7 +430,7 @@ do_list() {
     jq -c --arg host "$NUCLEUS_HOST" '
       [.VMs[] | select(.enabled == true) | select(.hosts == null or (.hosts | length == 0) or (.hosts | contains([$host])))]
     ' "$MANIFEST" | jq -c --arg running "$running_names" '
-      [.[] | .state = (if $running | split("\n") | index(.name) then "running" else "stopped" end)]
+      [.[] | .state = (if $running| split("\n") | index(.name) then "running" else "stopped" end)]
     '
   else
     printf '%-20s %-12s %-10s %-8s %s\n' "NAME" "TYPE" "ENABLED" "STATE" "HOSTS"
@@ -477,12 +477,12 @@ do_status() {
     if [ -n "$names_json" ]; then
       jq -c --arg host "$NUCLEUS_HOST" --argjson names "$names_json" "$base_filter" "$MANIFEST" | \
         jq -c --arg running "$running_names" '
-          [.[] | .state = (if $running | split("\n") | index(.name) then "running" else "stopped" end)]
+          [.[] | .state = (if $running| split("\n") | index(.name) then "running" else "stopped" end)]
         '
     else
       jq -c --arg host "$NUCLEUS_HOST" "$base_filter" "$MANIFEST" | \
         jq -c --arg running "$running_names" '
-          [.[] | .state = (if $running | split("\n") | index(.name) then "running" else "stopped" end)]
+          [.[] | .state = (if $running| split("\n") | index(.name) then "running" else "stopped" end)]
         '
     fi
   else
