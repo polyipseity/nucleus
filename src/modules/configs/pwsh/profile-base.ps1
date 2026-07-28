@@ -158,7 +158,7 @@ function Invoke-PrekHookInstallIfNeeded {
 
 if (-not $script:__nucleusPrekPromptWrapped) {
   $script:__nucleusPrekPromptWrapped = $true
-  $global:__nucleusPrekPreviousPrompt = if (Test-Path Function:\prompt) {
+  $script:__nucleusPrekPreviousPrompt = if (Test-Path Function:\prompt) {
     (Get-Command prompt -CommandType Function).ScriptBlock
   } else {
     $null
@@ -166,8 +166,8 @@ if (-not $script:__nucleusPrekPromptWrapped) {
 
   function global:prompt {
     Invoke-PrekHookInstallIfNeeded
-    if ($null -ne $global:__nucleusPrekPreviousPrompt) {
-      & $global:__nucleusPrekPreviousPrompt
+    if ($null -ne $script:__nucleusPrekPreviousPrompt) {
+      & $script:__nucleusPrekPreviousPrompt
     } else {
       "PS $(Get-Location)> "
     }
