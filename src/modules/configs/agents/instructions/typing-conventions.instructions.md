@@ -24,6 +24,44 @@ Default typing policy for all code.
 - **Prefer structural typing over nominal inheritance for interfaces.** Use protocols, interfaces, or type-classes to define type contracts based on the operations an object supports, rather than requiring a specific base class. Reserve class inheritance for implementation sharing, not interface definition.
 - **Fully parameterize generic types.** Never leave generic types unparameterized (e.g., a bare `list` or `dict` in Python, a raw `List` or `Map` in Java, an unparameterized `array` in TypeScript). A bare generic discards all type information about elements, keys, values, and signatures — it is as vague as a catch-all type.
 - **No catch-all types.** Never use `any` (TypeScript), `object` used as an escape hatch (Python, C#), or equivalent catch-all types. `unknown` (TypeScript) is not a catch-all — it is sound and forces narrowing before use. Always find or define a precise type.
+
+  **Handling `any` from untyped boundaries.** When `any` appears from an
+  external/untyped source, use this decision hierarchy. Levels 1-2 are type
+  narrowing (no justification needed); levels 3-4 are assertions (require inline
+  justification).
+
+  1. **`: T / satisfies T as T`** — when the expected type is known from context
+     (e.g., matcher value in a typed property).
+  2. **`: unknown / satisfies unknown as unknown`** — when no compile-time type
+     info is available. Prefer `: unknown` when a variable annotation is possible.
+  3. **`as T`** — requires inline comment: why narrowing is insufficient and why
+     the assertion is sound.
+  4. **`as unknown as T`** — requires justification: why `as T` fails structurally
+     and why the boundary is safe. **`as any` is never acceptable.**
+
+  **`satisfies` identity rule:** `satisfies T as U` is only valid when `T` and `U`
+  are the same type. If they differ, the `satisfies` constraint is meaningless —
+  the `as` cast independently decides the result type.
+
+  **Reference examples** (short forms):
+
+  | Pattern | Correct approach |
+  |---|---|
+  | Matcher in typed context | `expect.any(Number) satisfies number as number` |
+  | Matcher, unknown inline | `expect.anything() satisfies unknown as unknown` |
+  | Static import | `await import(\"./mod\") as typeof import(\"./mod\")` |
+  | Dynamic/no-d.ts import | Runtime validation: `typeof value.method === \"function\"` |
+  | Unparameterized `vi.fn()` | `vi.fn<() => string>(() => \"test\")` |
+  | Unparameterized matcher | `expect.objectContaining<Record<string, unknown>>({...})` |
+  | Callback param inference | `vi.fn((cb: (v: string) => unknown) => {...})` |
+  | `Object.create(null)` | `... satisfies Record<string, unknown> as Record<string, unknown>` |
+  | Discriminated union | Check `.type` first, then access `.value` |
+  | Structurally incompatible | `{} as unknown as WorkspaceLeaf` |
+  | Stdlib `any`, justification | `as T` + inline comment why narrowing can't work |
+  | Redundant cast after narrowing | Omit assertion; add runtime shape check at boundary |
+  | Blind `as T` on stdlib `any` | Use `: unknown` boundary, then narrow |
+  | `path.join(cwd(), ...)` for local script | Use relative path — keeps import statically analyzable |
+  | Lint suppression for test idiom | `// eslint-disable-next-line -- <why intentional>` |
 - **No type-error suppression.** Do not use `# type: ignore`, `@ts-ignore`, `@ts-expect-error`, `@SuppressWarnings`, `// NOLINT`, or similar suppression mechanisms. When intentionally bypassing the type system (e.g., testing with deliberately wrong types), use an explicit checked cast or conversion that produces a correctly-typed value.
 - **No non-null assertions.** Do not use operators that assert non-null without runtime checking. These bypass strict null checks at the type level, making null-pointer errors possible at runtime. Instead, use proper type narrowing, early returns, or optional chaining to handle nullable values explicitly. Affected operators per language:
   - TypeScript: postfix `!`
