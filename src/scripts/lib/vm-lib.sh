@@ -588,7 +588,7 @@ EOF
       ;;
     windows-qemu)
       cat >"$_wst_path_ps1" <<'EOF'
-# stop-__VM_NAME__.ps1 — Stop VM on Windows via QEMU GA or process kill.
+# stop-{VM_NAME}.ps1 — Stop VM on Windows via QEMU GA or process kill.
 #Requires -Version 7.4
 
 `$ErrorActionPreference = 'Stop'
