@@ -204,76 +204,76 @@ if ((Get-Command fzf -ErrorAction SilentlyContinue) -and (Get-Module -ListAvaila
 # - `-gca*` = amend (every alias starting with `-gca` expands to `git commit --amend ...`).
 # - No casing distinction (case-insensitive on Windows).
 # - Double letter = more: more verbose, more forceful, or full form.
-function -g { & git @Args }
-function -ga { & git add @Args }
-function -gap { & git add -p @Args }
-function -gb { & git branch @Args }
-function -gba { & git branch -a @Args }
-function -gbd { & git branch -d @Args }
-function -gbdd { & git branch -D @Args }
-function -gbm { & git branch -m @Args }
-function -gc { & git commit @Args }
-function -gca { & git commit --amend @Args }
-function -gcaa { & git commit -a --amend @Args }
-function -gcam { & git commit --amend -m @Args }
-function -gcl { & git clone @Args }
-function -gclean { & git clean -fdn @Args }
-function -gcleanf { & git clean -fd @Args }
-function -gcm { & git commit -m @Args }
-function -gcma { & git commit -am @Args }
-function -gco { & git checkout @Args }
-function -gcob { & git checkout -b @Args }
-function -gd { & git diff @Args }
-function -gdc { & git diff --cached @Args }
-function -gds { & git diff --stat @Args }
-function -gf { & git fetch @Args }
-function -gfa { & git fetch --all @Args }
-function -gff { & git fetch --force @Args }
-function -gg { & git grep @Args }
-function -gl { & git log --oneline --decorate --graph @Args }
-function -gla { & git log --oneline --decorate --graph --all @Args }
-function -gll { & git log --decorate --graph --show-signature --stat @Args }
-function -glla { & git log --decorate --graph --show-signature --stat --all @Args }
-function -glp { & git log --oneline --decorate --graph -p @Args }
-function -gls { & git log --oneline --decorate --graph --stat @Args }
-function -gm { & git merge @Args }
-function -gma { & git merge --abort @Args }
-function -gmnff { & git merge --no-ff @Args }
-function -gp { & git push @Args }
-function -gpf { & git push --force-with-lease @Args }
-function -gpff { & git push --force @Args }
-function -gpl { & git pull @Args }
-function -gplf { & git pull --force @Args }
-function -gplo { & git pull origin @Args }
-function -gplr { & git pull --rebase @Args }
-function -gpo { & git push origin @Args }
-function -gr { & git remote @Args }
-function -grb { & git rebase @Args }
-function -grba { & git rebase --abort @Args }
-function -grbc { & git rebase --continue @Args }
-function -grbi { & git rebase -i @Args }
-function -grbm { & git rebase main @Args }
-function -grbo { & git rebase --onto @Args }
-function -grbs { & git rebase --skip @Args }
-function -grev { & git revert @Args }
-function -grs { & git reset @Args }
-function -grsh { & git reset --soft HEAD~ @Args }
-function -grshh { & git reset --hard HEAD~ @Args }
-function -grv { & git remote -v @Args }
+$null = New-Item -Path Function: -Name '-g' -Value { & git @Args } -Force
+$null = New-Item -Path Function: -Name '-ga' -Value { & git add @Args } -Force
+$null = New-Item -Path Function: -Name '-gap' -Value { & git add -p @Args } -Force
+$null = New-Item -Path Function: -Name '-gb' -Value { & git branch @Args } -Force
+$null = New-Item -Path Function: -Name '-gba' -Value { & git branch -a @Args } -Force
+$null = New-Item -Path Function: -Name '-gbd' -Value { & git branch -d @Args } -Force
+$null = New-Item -Path Function: -Name '-gbdd' -Value { & git branch -D @Args } -Force
+$null = New-Item -Path Function: -Name '-gbm' -Value { & git branch -m @Args } -Force
+$null = New-Item -Path Function: -Name '-gc' -Value { & git commit @Args } -Force
+$null = New-Item -Path Function: -Name '-gca' -Value { & git commit --amend @Args } -Force
+$null = New-Item -Path Function: -Name '-gcaa' -Value { & git commit -a --amend @Args } -Force
+$null = New-Item -Path Function: -Name '-gcam' -Value { & git commit --amend -m @Args } -Force
+$null = New-Item -Path Function: -Name '-gcl' -Value { & git clone @Args } -Force
+$null = New-Item -Path Function: -Name '-gclean' -Value { & git clean -fdn @Args } -Force
+$null = New-Item -Path Function: -Name '-gcleanf' -Value { & git clean -fd @Args } -Force
+$null = New-Item -Path Function: -Name '-gcm' -Value { & git commit -m @Args } -Force
+$null = New-Item -Path Function: -Name '-gcma' -Value { & git commit -am @Args } -Force
+$null = New-Item -Path Function: -Name '-gco' -Value { & git checkout @Args } -Force
+$null = New-Item -Path Function: -Name '-gcob' -Value { & git checkout -b @Args } -Force
+$null = New-Item -Path Function: -Name '-gd' -Value { & git diff @Args } -Force
+$null = New-Item -Path Function: -Name '-gdc' -Value { & git diff --cached @Args } -Force
+$null = New-Item -Path Function: -Name '-gds' -Value { & git diff --stat @Args } -Force
+$null = New-Item -Path Function: -Name '-gf' -Value { & git fetch @Args } -Force
+$null = New-Item -Path Function: -Name '-gfa' -Value { & git fetch --all @Args } -Force
+$null = New-Item -Path Function: -Name '-gff' -Value { & git fetch --force @Args } -Force
+$null = New-Item -Path Function: -Name '-gg' -Value { & git grep @Args } -Force
+$null = New-Item -Path Function: -Name '-gl' -Value { & git log --oneline --decorate --graph @Args } -Force
+$null = New-Item -Path Function: -Name '-gla' -Value { & git log --oneline --decorate --graph --all @Args } -Force
+$null = New-Item -Path Function: -Name '-gll' -Value { & git log --decorate --graph --show-signature --stat @Args } -Force
+$null = New-Item -Path Function: -Name '-glla' -Value { & git log --decorate --graph --show-signature --stat --all @Args } -Force
+$null = New-Item -Path Function: -Name '-glp' -Value { & git log --oneline --decorate --graph -p @Args } -Force
+$null = New-Item -Path Function: -Name '-gls' -Value { & git log --oneline --decorate --graph --stat @Args } -Force
+$null = New-Item -Path Function: -Name '-gm' -Value { & git merge @Args } -Force
+$null = New-Item -Path Function: -Name '-gma' -Value { & git merge --abort @Args } -Force
+$null = New-Item -Path Function: -Name '-gmnff' -Value { & git merge --no-ff @Args } -Force
+$null = New-Item -Path Function: -Name '-gp' -Value { & git push @Args } -Force
+$null = New-Item -Path Function: -Name '-gpf' -Value { & git push --force-with-lease @Args } -Force
+$null = New-Item -Path Function: -Name '-gpff' -Value { & git push --force @Args } -Force
+$null = New-Item -Path Function: -Name '-gpl' -Value { & git pull @Args } -Force
+$null = New-Item -Path Function: -Name '-gplf' -Value { & git pull --force @Args } -Force
+$null = New-Item -Path Function: -Name '-gplo' -Value { & git pull origin @Args } -Force
+$null = New-Item -Path Function: -Name '-gplr' -Value { & git pull --rebase @Args } -Force
+$null = New-Item -Path Function: -Name '-gpo' -Value { & git push origin @Args } -Force
+$null = New-Item -Path Function: -Name '-gr' -Value { & git remote @Args } -Force
+$null = New-Item -Path Function: -Name '-grb' -Value { & git rebase @Args } -Force
+$null = New-Item -Path Function: -Name '-grba' -Value { & git rebase --abort @Args } -Force
+$null = New-Item -Path Function: -Name '-grbc' -Value { & git rebase --continue @Args } -Force
+$null = New-Item -Path Function: -Name '-grbi' -Value { & git rebase -i @Args } -Force
+$null = New-Item -Path Function: -Name '-grbm' -Value { & git rebase main @Args } -Force
+$null = New-Item -Path Function: -Name '-grbo' -Value { & git rebase --onto @Args } -Force
+$null = New-Item -Path Function: -Name '-grbs' -Value { & git rebase --skip @Args } -Force
+$null = New-Item -Path Function: -Name '-grev' -Value { & git revert @Args } -Force
+$null = New-Item -Path Function: -Name '-grs' -Value { & git reset @Args } -Force
+$null = New-Item -Path Function: -Name '-grsh' -Value { & git reset --soft HEAD~ @Args } -Force
+$null = New-Item -Path Function: -Name '-grshh' -Value { & git reset --hard HEAD~ @Args } -Force
+$null = New-Item -Path Function: -Name '-grv' -Value { & git remote -v @Args } -Force
 # git status in short format with branch info, restored from git history.
-function -gs { & git status -sb @Args }
-function -gsh { & git show @Args }
-function -gss { & git status @Args }
-function -gst { & git stash push @Args }
-function -gstd { & git stash drop @Args }
-function -gstl { & git stash list @Args }
-function -gstp { & git stash pop @Args }
-function -gstsh { & git stash show -p @Args }
-function -gsw { & git switch @Args }
-function -gswc { & git switch -c @Args }
-function -gt { & git tag @Args }
-function -gtd { & git tag -d @Args }
-function -gtl { & git tag -l @Args }
+$null = New-Item -Path Function: -Name '-gs' -Value { & git status -sb @Args } -Force
+$null = New-Item -Path Function: -Name '-gsh' -Value { & git show @Args } -Force
+$null = New-Item -Path Function: -Name '-gss' -Value { & git status @Args } -Force
+$null = New-Item -Path Function: -Name '-gst' -Value { & git stash push @Args } -Force
+$null = New-Item -Path Function: -Name '-gstd' -Value { & git stash drop @Args } -Force
+$null = New-Item -Path Function: -Name '-gstl' -Value { & git stash list @Args } -Force
+$null = New-Item -Path Function: -Name '-gstp' -Value { & git stash pop @Args } -Force
+$null = New-Item -Path Function: -Name '-gstsh' -Value { & git stash show -p @Args } -Force
+$null = New-Item -Path Function: -Name '-gsw' -Value { & git switch @Args } -Force
+$null = New-Item -Path Function: -Name '-gswc' -Value { & git switch -c @Args } -Force
+$null = New-Item -Path Function: -Name '-gt' -Value { & git tag @Args } -Force
+$null = New-Item -Path Function: -Name '-gtd' -Value { & git tag -d @Args } -Force
+$null = New-Item -Path Function: -Name '-gtl' -Value { & git tag -l @Args } -Force
 
 # --- Ghostscript PDF optimization aliases ---
 function Invoke-NucleusGhostscript {
@@ -297,28 +297,28 @@ function Invoke-NucleusGhostscript {
 
 # CompatibilityLevel is pinned to 2.0 (latest as of 2026-05); bump when a
 # newer PDF compatibility target is released by Ghostscript.
-function -gs-pdf-opt-default  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/default  -dNOPAUSE -dQUIET -dBATCH @Args }
-function -gs-pdf-opt-prepress { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH @Args }
-function -gs-pdf-opt-printer  { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer  -dNOPAUSE -dQUIET -dBATCH @Args }
-function -gs-pdf-opt-ebook    { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook    -dNOPAUSE -dQUIET -dBATCH @Args }
-function -gs-pdf-opt-screen   { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen   -dNOPAUSE -dQUIET -dBATCH @Args }
+$null = New-Item -Path Function: -Name '-gs-pdf-opt-default' -Value { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/default  -dNOPAUSE -dQUIET -dBATCH @Args } -Force
+$null = New-Item -Path Function: -Name '-gs-pdf-opt-prepress' -Value { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH @Args } -Force
+$null = New-Item -Path Function: -Name '-gs-pdf-opt-printer' -Value { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer  -dNOPAUSE -dQUIET -dBATCH @Args } -Force
+$null = New-Item -Path Function: -Name '-gs-pdf-opt-ebook' -Value { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook    -dNOPAUSE -dQUIET -dBATCH @Args } -Force
+$null = New-Item -Path Function: -Name '-gs-pdf-opt-screen' -Value { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen   -dNOPAUSE -dQUIET -dBATCH @Args } -Force
 
 # la/ll: prefer eza for colour, icons, and extended metadata; fall back to
 # Get-ChildItem when eza is absent so the profile loads on unmanaged machines.
 # check-suppress:suppression_doc: tool-availability guard -- eza may not be installed
 if (Get-Command eza -ErrorAction SilentlyContinue) {
-  function -la { & eza -la @Args }
-  function -ll { & eza -la @Args }
+  $null = New-Item -Path Function: -Name '-la' -Value { & eza -la @Args } -Force
+  $null = New-Item -Path Function: -Name '-ll' -Value { & eza -la @Args } -Force
 } else {
-  function -la { Get-ChildItem -Force @Args }
-  function -ll { Get-ChildItem -Force @Args }
+  $null = New-Item -Path Function: -Name '-la' -Value { Get-ChildItem -Force @Args } -Force
+  $null = New-Item -Path Function: -Name '-ll' -Value { Get-ChildItem -Force @Args } -Force
 }
 
-function -ni { & bun install @Args }
-function -nr { & bun run @Args }
-function -nx { & bun x @Args }
+$null = New-Item -Path Function: -Name '-ni' -Value { & bun install @Args } -Force
+$null = New-Item -Path Function: -Name '-nr' -Value { & bun run @Args } -Force
+$null = New-Item -Path Function: -Name '-nx' -Value { & bun x @Args } -Force
 
-function -v { & nvim @Args }
+$null = New-Item -Path Function: -Name '-v' -Value { & nvim @Args } -Force
 
 function Test-NucleusPythonScopeActive {
   return (-not [string]::IsNullOrWhiteSpace($env:VIRTUAL_ENV)) -or (-not [string]::IsNullOrWhiteSpace($env:CONDA_PREFIX))
