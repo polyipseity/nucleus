@@ -50,6 +50,10 @@ param(
   [switch]$Help
 )
 
+# Suppress false positive PSReviewUnusedParameter — $SubcommandArgs IS used below
+# (setup flag parsing, status/stop/reset actions).
+$null = $SubcommandArgs
+
 $ErrorActionPreference = 'Stop'
 
 $modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'

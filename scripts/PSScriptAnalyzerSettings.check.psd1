@@ -43,6 +43,7 @@
         'PSAvoidUsingInvokeExpression'              # intentional usage in profile
         'PSAvoidUsingWriteHost'                     # intentional in profile output
         'PSUseApprovedVerbs'                        # many false positives
+        'PSUseSingularNouns'                        # false positive: Get-VmRunningNames returns multiple names
         # Slow rules (~56s added wall-clock, see benchmark above):
         'PSAvoidUsingCmdletAliases'
         'PSUseCmdletCorrectly'
