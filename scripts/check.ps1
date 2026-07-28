@@ -218,8 +218,9 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
   function warn { Write-Output "check: warning: $args" }
-  if ($using:PS1_FILES.Count -gt 0) {
-    & "$using:RepoRoot\scripts\check-pwsh.ps1" -Settings "$using:RepoRoot\scripts\PSScriptAnalyzerSettings.check.psd1" -Scoped -Paths $using:PS1_FILES
+  $_ps1Files = $using:PS1_FILES
+  if ($_ps1Files.Count -gt 0) {
+    & "$using:RepoRoot\scripts\check-pwsh.ps1" -Settings "$using:RepoRoot\scripts\PSScriptAnalyzerSettings.check.psd1" -Scoped -Paths $_ps1Files
   } elseif (-not $using:HAS_ARGS) {
     & "$using:RepoRoot\scripts\check-pwsh.ps1" -Settings "$using:RepoRoot\scripts\PSScriptAnalyzerSettings.check.psd1"
   } else {
@@ -242,8 +243,9 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
   function warn { Write-Output "check: warning: $args" }
-  if ($using:PKR_FILES.Count -gt 0) {
-    & "$using:RepoRoot\scripts\check-packer.ps1" $using:PKR_FILES
+  $_pkrFiles = $using:PKR_FILES
+  if ($_pkrFiles.Count -gt 0) {
+    & "$using:RepoRoot\scripts\check-packer.ps1" $_pkrFiles
   } elseif (-not $using:HAS_ARGS) {
     & "$using:RepoRoot\scripts\check-packer.ps1"
   } else {
