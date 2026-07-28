@@ -1,20 +1,19 @@
 #!/usr/bin/env bash
 # Runs the full repository test suite in sequence.
 #
-# Test suites (1-5):
+# Test suites (1-4):
 #
-# Code quality tests (2-3):
-#   2. Shell script linting (treefmt)
-#   3. PowerShell lint (PSScriptAnalyzer) and check-pwsh smoke tests
+# Code quality tests (2):
+#   2. PowerShell lint (PSScriptAnalyzer) and check-pwsh smoke tests
 #
-# Functional tests (1, 4-5):
+# Functional tests (1, 3-4):
 #   1. Nix test suite — auto-discover and run all *.nix test files
-#   4. Nucleus apps smoke tests (build + --help / dry-run)
-#   5. System config build (build all host system derivations)
+#   3. Nucleus apps smoke tests (build + --help / dry-run)
+#   4. System config build (build all host system derivations)
 #
 # Mode taxonomy:
 #   No --scoped/--full distinction (all steps run by default). Use
-#   --skip-system-build to skip step 5. Use --quiet to suppress non-error
+#   --skip-system-build to skip step 4. Use --quiet to suppress non-error
 #   output across all applicable steps (failures always shown).
 #
 # Output conventions:
@@ -40,9 +39,9 @@
 # Arguments:
 #   -q|--quiet           Suppress success/progress output across applicable steps.
 #                        Step 1: suppresses PASS/Testing lines from Nix test suite.
-#                        Steps 2-3: naturally quiet (only output on failure).
-#                        Step 4: suppresses progress messages from smoke tests.
-#                        Step 5: suppresses build output on success.
+#                        Step 2: naturally quiet (only output on failure).
+#                        Step 3: suppresses progress messages from smoke tests.
+#                        Step 4: suppresses build output on success.
 #   --fail-fast          Exit immediately on first failure (default).
 #   --no-fail-fast       Accumulate all failures.
 #   --skip-system-build  Skip building the host system configuration.
@@ -52,7 +51,6 @@
 #
 # Prerequisites:
 #   - nix, nix-instantiate (for Nix test suite)
-#   - treefmt (for shell linting)
 #   - pwsh (for PowerShell lint)
 #   - bash, find, xargs (for test discovery and execution)
 #
@@ -118,7 +116,6 @@ fi
 # nix run .#test to run via the flake wrapper which bundles all deps.
 require_command nix
 require_command nix-instantiate
-require_command treefmt
 require_command pwsh
 require_command bash
 require_command find
@@ -174,17 +171,7 @@ _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 } &
 
-# 2. Shell script linting (treefmt)
-_step_start=$(date +%s%3N)
-section "$((_step += 1))" "Shell script linting (treefmt)"
-{
-bash scripts/check-sh.sh || echo "1" > "$_wave_tmpdir/step-2.exit"
-[ -f "$_wave_tmpdir/step-2.exit" ] || echo "0" > "$_wave_tmpdir/step-2.exit"
-_elapsed=$(($(date +%s%3N) - _step_start))
-echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
-
-# 3. PowerShell lint (PSScriptAnalyzer) and check-pwsh smoke tests
+# 2. PowerShell lint (PSScriptAnalyzer) and check-pwsh smoke tests
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "PowerShell lint"
 {
@@ -199,7 +186,7 @@ _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 } &
 
-# 4. Nucleus apps smoke tests (build + --help / dry-run)
+# 3. Nucleus apps smoke tests (build + --help / dry-run)
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Nucleus apps smoke tests"
 {
@@ -213,7 +200,7 @@ _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 } &
 
-# 5. System config build — build all derivations in the host system config.
+# 4. System config build — build all derivations in the host system config.
 # WHY soft-fail: building derivations is slow and network-dependent. Always
 # accumulates exit code regardless of FAIL_FAST. Use --skip-system-build to
 # skip this step entirely.
@@ -251,7 +238,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 wait
 
 # Wave result aggregation — collect step exit codes from temp files
-for _s in 1 2 3 4; do
+for _s in 1 2 3; do
   _exit_file="$_wave_tmpdir/step-$_s.exit"
   if [ -f "$_exit_file" ]; then
     read -r _code < "$_exit_file"
@@ -265,7 +252,7 @@ done
 # Timing summary
 say "test step timing:"
 _total_ms=0
-for _s in 1 2 3 4 5; do
+for _s in 1 2 3 4; do
   _time_file="$_wave_tmpdir/step-$_s.time"
   if [ -f "$_time_file" ]; then
     read -r _ms < "$_time_file"

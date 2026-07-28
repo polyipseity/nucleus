@@ -2,20 +2,19 @@
 #
 # Runs all Windows-compatible repository test suites in sequence:
 #
-# Test suites (1-5):
+# Test suites (1-4):
 #
-# Code quality tests (2-3):
-#   2. Shell script linting (stub — requires POSIX/ShellCheck)
-#   3. PowerShell lint (PSScriptAnalyzer)
+# Code quality tests (2):
+#   2. PowerShell lint (PSScriptAnalyzer)
 #
-# Functional tests (1, 4-5):
+# Functional tests (1, 3-4):
 #   1. Nix test suite (stub — requires POSIX/Nix)
-#   4. Nucleus apps smoke tests (stub — requires Nix/bash)
-#   5. System config build (stub — POSIX-only)
+#   3. Nucleus apps smoke tests (stub — requires Nix/bash)
+#   4. System config build (stub — POSIX-only)
 #
 # Mode taxonomy:
 #   No --scoped/--full distinction (all steps always run). Use --skip-system-build
-#   to skip step 5.
+#   to skip step 4.
 #
 # Output conventions:
 #   All messages (info, success, skip, warning) go to stdout.
@@ -36,7 +35,7 @@
 # Nix test discovery is dynamic on POSIX (find tests/ -name '*.nix').
 # PowerShell files are auto-discovered by check-pwsh.ps1.
 #
-# Note: Steps 1, 2, 4, 5 are stubs on Windows (POSIX/Nix/bash toolchain not available).
+# Note: Steps 1, 3, 4 are stubs on Windows (POSIX/Nix/bash toolchain not available).
 #       --quiet is only supported on POSIX (test.sh); accepted as no-op on Windows.
 #
 # Prerequisites:
@@ -75,7 +74,7 @@ function warn { Write-Output "test: warning: $args" }
 # an immediate hard failure — run nucleus-apply to install them.
 $modulesPath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules'
 Import-Module (Join-Path $modulesPath 'Ensure-Tool.psm1') -Force
-# PSScriptAnalyzer is required for PowerShell lint step 3
+# PSScriptAnalyzer is required for PowerShell lint step 2
 Ensure-Tool -Name 'PSScriptAnalyzer' -Type 'Module' -InstallCommand "Install-Module PSScriptAnalyzer -Scope CurrentUser -Force"
 
 # Process flags
@@ -120,20 +119,11 @@ $_sw.Stop()
 $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.time") -NoNewline
 
 # ---------------------------------------------------------------------------
-# 2. Shell script linting — POSIX only (stub on Windows)
-# ---------------------------------------------------------------------------
-$_sw = [System.Diagnostics.Stopwatch]::StartNew()
-Write-Output ("`n=== [{0}] Shell script linting ===" -f (++$_step))
-say "skipping (requires ShellCheck — not available on Windows)."
-$_sw.Stop()
-$_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.time") -NoNewline
-
-# ---------------------------------------------------------------------------
-# 3. PowerShell lint (PSScriptAnalyzer) and check-pwsh smoke tests
+# 2. PowerShell lint (PSScriptAnalyzer) and check-pwsh smoke tests
 # ---------------------------------------------------------------------------
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] PowerShell lint ===" -f (++$_step))
-$script:waveJob3 = Start-Job -ScriptBlock {
+$script:waveJob2 = Start-Job -ScriptBlock {
   param($pwshScript, $settings, $_stepStartTicks, $RepoRoot)
   # PSScriptAnalyzer lint
   & $pwshScript -Settings $settings
@@ -152,7 +142,7 @@ $script:waveJob3 = Start-Job -ScriptBlock {
 } -ArgumentList "$PSScriptRoot\check-pwsh.ps1", "$PSScriptRoot\PSScriptAnalyzerSettings.test.psd1", $_stepStartTicks, $RepoRoot
 
 # ---------------------------------------------------------------------------
-# 4. Nucleus apps smoke tests — POSIX only (stub on Windows)
+# 3. Nucleus apps smoke tests — POSIX only (stub on Windows)
 # ---------------------------------------------------------------------------
 $_sw = [System.Diagnostics.Stopwatch]::StartNew()
 Write-Output ("`n=== [{0}] Nucleus apps smoke tests ===" -f (++$_step))
@@ -161,7 +151,7 @@ $_sw.Stop()
 $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.time") -NoNewline
 
 # ---------------------------------------------------------------------------
-# 5. System config build — POSIX only (stub on Windows)
+# 4. System config build — POSIX only (stub on Windows)
 # ---------------------------------------------------------------------------
 $_sw = [System.Diagnostics.Stopwatch]::StartNew()
 Write-Output ("`n=== [{0}] System config build ===" -f (++$_step))
@@ -170,13 +160,13 @@ $_sw.Stop()
 $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.time") -NoNewline
 
 # Wait for background jobs and collect exit codes
-if ($script:waveJob3) {
-  $result = $script:waveJob3 | Wait-Job | Receive-Job
-  $result | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-3.exit") -NoNewline
+if ($script:waveJob2) {
+  $result = $script:waveJob2 | Wait-Job | Receive-Job
+  $result | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-2.exit") -NoNewline
 }
 
 # Wave result aggregation — collect step exit codes from temp files
-foreach ($_s in @(1, 2, 3, 4)) {
+foreach ($_s in @(1, 2, 3)) {
   $_exitFile = Join-Path $script:WaveTmpDir "step-$_s.exit"
   if (Test-Path $_exitFile) {
     $_code = Get-Content $_exitFile -Raw | ForEach-Object { $_.Trim() }
@@ -190,7 +180,7 @@ foreach ($_s in @(1, 2, 3, 4)) {
 # Timing summary
 say "test step timing:"
 $_totalMs = 0
-for ($_s = 1; $_s -le 5; $_s++) {
+for ($_s = 1; $_s -le 4; $_s++) {
   $_timeFile = Join-Path $script:WaveTmpDir "step-$_s.time"
   if (Test-Path $_timeFile) {
     $_ms = [int](Get-Content $_timeFile -Raw)
