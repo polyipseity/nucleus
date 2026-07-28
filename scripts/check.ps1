@@ -58,8 +58,9 @@
 # Note: Steps 1, 4-6, 8-11 are stubs on Windows (POSIX/Nix toolchain not available).
 #
 # Output conventions:
-#   All messages (info, success, skip, warning) go to stdout.
-#   This differs from check.sh, which routes warnings to stderr — the
+#   Three-tier messaging: say() for info/success/skip, warn() for non-fatal
+#   warnings, error() for failures — all to stdout.
+#   This differs from check.sh, which routes warn/error to stderr — the
 #   split is intentional per platform convention.
 #   Use check.sh's header comment as the cross-reference source of truth
 #   for the POSIX-side convention.
@@ -113,10 +114,11 @@ $positionalArgs = @()
 
 # Output helpers — structured prefix pattern matching check.sh's lib.sh.
 # Use these instead of raw Write-Output for all validation messages.
-# Warnings are routed to stdout (PowerShell convention);
-# compare with check.sh which routes warn() to stderr (POSIX convention).
+# All three (say/warn/error) route to stdout (PowerShell convention);
+# compare with check.sh which routes warn/error to stderr (POSIX convention).
 function say { Write-Output "check: $args" }
 function warn { Write-Output "check: warning: $args" }
+function error { Write-Output "check: error: $args" }
 
 # Process flags
 foreach ($_arg in $args) {
@@ -296,13 +298,13 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
-  function warn { Write-Output "check: warning: $args" }
+  function error { Write-Output "check: error: $args" }
   # Always-run: Stale Nix build artifact check
   $_cnbaOutput = & "$RepoRoot\scripts\cleanup-nix.ps1" -WhatIf 2>&1
   $_cnbaFound = $_cnbaOutput | Select-String -Pattern 'would remove stale Nix build symlink'
   if ($_cnbaFound) {
-    warn "stale Nix build artifacts found:"
-    $_cnbaOutput | ForEach-Object { warn "  $_" }
+    error "stale Nix build artifacts found:"
+    $_cnbaOutput | ForEach-Object { error "  $_" }
     1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-7.exit") -NoNewline
   } else {
     say "no stale Nix build artifacts found."
@@ -362,7 +364,7 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
-  function warn { Write-Output "check: warning: $args" }
+  function error { Write-Output "check: error: $args" }
 
 
 # Consistency and overlap checks (always run, even in path-scoped mode):
@@ -374,7 +376,7 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
 $_lf = $null
 $_lfOverlapErrors = 0
 if (-not (Test-Path $_lfPath)) {
-  warn "lockfile.json not found at $_lfPath"
+  error "lockfile.json not found at $_lfPath"
   1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-12.exit") -NoNewline
   $_lfOverlapErrors++
 } else {
@@ -399,13 +401,13 @@ if (-not (Test-Path $_lfPath)) {
   }
   foreach ($_entry in $_pkgToSections.GetEnumerator()) {
     if ($_entry.Value.Count -gt 1 -and $_entry.Key -notin $_lfOverlapExceptions) {
-      warn ("package '{0}' appears in both {1}" -f $_entry.Key, ($_entry.Value -join ', '))
+      error ("package '{0}' appears in both {1}" -f $_entry.Key, ($_entry.Value -join ', '))
       $_lfOverlapErrors++
     }
   }
 }
 if ($_lfOverlapErrors -gt 0) {
-  warn ("lockfile.json consistency: {0} overlap issue(s)" -f $_lfOverlapErrors)
+  error ("lockfile.json consistency: {0} overlap issue(s)" -f $_lfOverlapErrors)
   1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-12.exit") -NoNewline
 } else {
   say "lockfile.json consistency: no overlapping packages across sections"
@@ -417,7 +419,7 @@ if ($_lfOverlapErrors -gt 0) {
 $_lfAlPath = Join-Path $RepoRoot "src\lockfiles\lifecycle-allowlist.json"
 $_lfAlErrors = 0
 if (-not (Test-Path $_lfAlPath)) {
-  warn "lifecycle-allowlist.json not found at $_lfAlPath"
+  error "lifecycle-allowlist.json not found at $_lfAlPath"
   $_lfAlErrors++
 } else {
   $_lfAlRaw = Get-Content $_lfAlPath -Raw -ErrorAction Stop
@@ -425,23 +427,23 @@ if (-not (Test-Path $_lfAlPath)) {
   try {
     $_lfAl = ConvertFrom-Json $_lfAlRaw -AsHashtable
   } catch {
-    warn "lifecycle-allowlist.json is not valid JSON: $_($_.Exception.Message)"
+    error "lifecycle-allowlist.json is not valid JSON: $_($_.Exception.Message)"
     $_lfAlErrors++
   }
   if ($null -ne $_lfAl -and $_lfAl -isnot [hashtable]) {
-    warn "lifecycle-allowlist.json must be a JSON object"
+    error "lifecycle-allowlist.json must be a JSON object"
     $_lfAlErrors++
   } elseif ($null -ne $_lfAl) {
     foreach ($_entry in $_lfAl.GetEnumerator()) {
       if ($_entry.Value -isnot [string] -or [string]::IsNullOrEmpty($_entry.Value)) {
-        warn "lifecycle-allowlist.json: '$_($_entry.Key)' has empty or non-string justification"
+        error "lifecycle-allowlist.json: '$_($_entry.Key)' has empty or non-string justification"
         $_lfAlErrors++
       }
     }
   }
 }
 if ($_lfAlErrors -gt 0) {
-  warn "lifecycle-allowlist.json validation failed with $_lfAlErrors error(s)"
+  error "lifecycle-allowlist.json validation failed with $_lfAlErrors error(s)"
   1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-12.exit") -NoNewline
 } else {
   $_lfAlCount = if ($null -ne $_lfAl -and $_lfAl -is [hashtable]) { $_lfAl.Count } else { 0 }
@@ -450,7 +452,7 @@ if ($_lfAlErrors -gt 0) {
 
 # Always-run: Lockfile section validation
 if ($null -eq $_lf) {
-    warn "lockfile.json could not be loaded — skipping section validation"
+    error "lockfile.json could not be loaded — skipping section validation"
     1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-12.exit") -NoNewline
   } else {
     $_lfErrors = 0
@@ -458,12 +460,12 @@ if ($null -eq $_lf) {
     # Check sections that must be non-empty
     foreach ($_section in @('scoop', 'cargo-binstall', 'bun', 'uv', 'rustup', 'pwsh')) {
       if (-not $_lf.ContainsKey($_section) -or $_lf[$_section].Count -eq 0) {
-        warn "${_section}: empty or missing section"
+        error "${_section}: empty or missing section"
         $_lfErrors++
       } else {
         foreach ($_entry in $_lf[$_section].GetEnumerator()) {
           if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME', '1.0.0') -contains $_entry.Value) {
-            warn "${_section}.$($_entry.Key): placeholder version ($($_entry.Value))"
+            error "${_section}.$($_entry.Key): placeholder version ($($_entry.Value))"
             $_lfErrors++
           }
         }
@@ -472,12 +474,12 @@ if ($null -eq $_lf) {
 
     # winget: warn if empty
     if (-not $_lf.ContainsKey('winget')) {
-      warn "winget: missing section"
+      error "winget: missing section"
       $_lfErrors++
     } elseif ($_lf.winget.Count -gt 0) {
       foreach ($_entry in $_lf.winget.GetEnumerator()) {
         if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME', '1.0.0') -contains $_entry.Value) {
-          warn "winget.$($_entry.Key): placeholder version ($($_entry.Value))"
+          error "winget.$($_entry.Key): placeholder version ($($_entry.Value))"
           $_lfErrors++
         }
       }
@@ -487,12 +489,12 @@ if ($null -eq $_lf) {
 
     # vscode: warn if empty
     if (-not $_lf.ContainsKey('vscode')) {
-      warn "vscode: missing section"
+      error "vscode: missing section"
       $_lfErrors++
     } elseif ($_lf.vscode.Count -gt 0) {
       foreach ($_entry in $_lf.vscode.GetEnumerator()) {
         if ([string]::IsNullOrEmpty($_entry.Value) -or @('CHANGEME', '1.0.0') -contains $_entry.Value) {
-          warn "vscode.$($_entry.Key): placeholder version ($($_entry.Value))"
+          error "vscode.$($_entry.Key): placeholder version ($($_entry.Value))"
           $_lfErrors++
         }
       }
@@ -502,24 +504,24 @@ if ($null -eq $_lf) {
 
     # homebrew: must be non-empty
     if (-not $_lf.ContainsKey('homebrew') -or $_lf.homebrew.Count -eq 0) {
-      warn "homebrew: empty or missing section"
+      error "homebrew: empty or missing section"
       $_lfErrors++
     }
 
     # ollama: must have at least one profile with models
     if (-not $_lf.ContainsKey('ollama') -or $_lf.ollama.Count -eq 0) {
-      warn "ollama: empty or missing section"
+      error "ollama: empty or missing section"
       $_lfErrors++
     } else {
       foreach ($_profile in $_lf.ollama.GetEnumerator()) {
         if ($_profile.Value.Count -eq 0) {
-          warn "ollama.$_($_profile.Key): empty model list"
+          error "ollama.$_($_profile.Key): empty model list"
           $_lfErrors++
         } else {
           for ($_i = 0; $_i -lt $_profile.Value.Count; $_i++) {
             $_model = $_profile.Value[$_i]
             if ([string]::IsNullOrEmpty($_model.name) -or [string]::IsNullOrEmpty($_model.tag)) {
-              warn "ollama.$_($_profile.Key)[$_i]: missing name or tag"
+              error "ollama.$_($_profile.Key)[$_i]: missing name or tag"
               $_lfErrors++
             }
           }
@@ -528,7 +530,7 @@ if ($null -eq $_lf) {
     }
 
     if ($_lfErrors -gt 0) {
-      warn "lockfile.json validation failed with $_lfErrors error(s)"
+      error "lockfile.json validation failed with $_lfErrors error(s)"
       1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-12.exit") -NoNewline
     } else {
       say "lockfile.json validation passed"
@@ -549,7 +551,7 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
-  function warn { Write-Output "check: warning: $args" }
+  function error { Write-Output "check: error: $args" }
   # Platform parallel: check.sh uses yq+jq pipeline (POSIX-native equivalent).
 # Always-run: Locked DSC validation
 $_dscSystemDir = Join-Path $RepoRoot 'src\hosts\Windows\system'
@@ -648,10 +650,10 @@ $_lfErrors = 0
       $_lfVer = if ($_lockfileData.winget.ContainsKey($_id)) { $_lockfileData.winget[$_id] } else { '' }
 
       if ([string]::IsNullOrEmpty($_lfVer)) {
-        warn "system DSC files: $_id has version $_pinnedVer but no lockfile entry"
+        error "system DSC files: $_id has version $_pinnedVer but no lockfile entry"
         $_lfErrors++
       } elseif ($_pinnedVer -ne $_lfVer) {
-        warn "system DSC files: $_id pinned $_pinnedVer but lockfile has $_lfVer"
+        error "system DSC files: $_id pinned $_pinnedVer but lockfile has $_lfVer"
         $_lfErrors++
       }
     }
@@ -673,13 +675,13 @@ $_lfErrors = 0
       }
     }
     if (-not $_foundPin) {
-      warn "$_id ($_lfVer) is in lockfile but missing version pin after generation"
+      error "$_id ($_lfVer) is in lockfile but missing version pin after generation"
       $_lfErrors++
     }
   }
 
   if ($_lfErrors -gt 0) {
-    warn "locked DSC validation failed with $_lfErrors error(s)"
+    error "locked DSC validation failed with $_lfErrors error(s)"
     1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-13.exit") -NoNewline
   } else {
     say "locked DSC validation passed"
@@ -699,7 +701,7 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
-  function warn { Write-Output "check: warning: $args" }
+  function error { Write-Output "check: error: $args" }
   # Build manifest of file→schema pairs.
   # Each entry: @{SchemaFile=...; InstanceFile=...}
   $manifest = [System.Collections.Generic.List[hashtable]]::new()
@@ -779,7 +781,7 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
     foreach ($r in $results) {
       if ($r.ExitCode -ne 0) {
         $_jsonschemaErrors++
-        if ($r.Output) { warn $r.Output }
+        if ($r.Output) { error $r.Output }
       }
     }
   }
@@ -793,7 +795,7 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
     if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
   }
   if ($_jsonschemaErrors -gt 0) {
-    warn "schema validation failed with $_jsonschemaErrors error(s)"
+    error "schema validation failed with $_jsonschemaErrors error(s)"
     1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-14.exit") -NoNewline
   }
   say "schema validation passed."
@@ -812,13 +814,13 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
-  function warn { Write-Output "check: warning: $args" }
+  function error { Write-Output "check: error: $args" }
   # Always-run: Service registry validation
 $_svcJson = Join-Path $RepoRoot "src\modules\services.json"
 $_svcErrors = 0
 
 if (-not (Test-Path $_svcJson)) {
-    warn "services.json not found at $_svcJson"
+    error "services.json not found at $_svcJson"
     $_svcErrors++
   } else {
     $_svc = Get-Content $_svcJson -Raw | ConvertFrom-Json -AsHashtable
@@ -828,18 +830,18 @@ if (-not (Test-Path $_svcJson)) {
       $_entry = $_svc[$_svcName]
       if ($_entry -isnot [hashtable]) { continue }
       if (-not $_entry.ContainsKey('displayName') -or [string]::IsNullOrEmpty($_entry.displayName)) {
-        warn "services.json: '$_svcName' missing displayName"
+        error "services.json: '$_svcName' missing displayName"
         $_svcErrors++
       }
       if (-not $_entry.ContainsKey('platforms') -or $_entry.platforms.Count -eq 0) {
-        warn "services.json: '$_svcName' missing or empty platforms"
+        error "services.json: '$_svcName' missing or empty platforms"
         $_svcErrors++
       } else {
         foreach ($_plat in $_entry.platforms.Keys) {
           $_pEntry = $_entry.platforms[$_plat]
           $_type = $_pEntry.type
           if ($_type -notin @('launchctl', 'systemctl', 'native', 'schtask', 'omitted')) {
-            warn "services.json: '$_svcName' platform '$_plat' has invalid type '$_type'"
+            error "services.json: '$_svcName' platform '$_plat' has invalid type '$_type'"
             $_svcErrors++
           }
           $_hasRequired = switch ($_type) {
@@ -851,7 +853,7 @@ if (-not (Test-Path $_svcJson)) {
             default     { $false }
           }
           if (-not $_hasRequired) {
-            warn "services.json: '$_svcName' platform '$_plat' missing required fields for type '$_type'"
+            error "services.json: '$_svcName' platform '$_plat' missing required fields for type '$_type'"
             $_svcErrors++
           }
         }
@@ -860,7 +862,7 @@ if (-not (Test-Path $_svcJson)) {
   }
 
   if ($_svcErrors -gt 0) {
-    warn "services.json validation failed with $_svcErrors error(s)"
+    error "services.json validation failed with $_svcErrors error(s)"
     1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-15.exit") -NoNewline
   } else {
     # Validate user-scoped platform entries have justification.
@@ -874,7 +876,7 @@ if (-not (Test-Path $_svcJson)) {
           $_domainScope = if ($_pEntry.ContainsKey('domain')) { $_pEntry.domain } elseif ($_pEntry.ContainsKey('scope')) { $_pEntry.scope } else { $null }
           $_hasJustification = $_pEntry.ContainsKey('justification') -and -not [string]::IsNullOrEmpty($_pEntry.justification)
           if ($_domainScope -eq 'user' -and -not $_hasJustification) {
-            warn "services.json: '$_svcName' platform '$_plat' is user-scoped but missing justification"
+            error "services.json: '$_svcName' platform '$_plat' is user-scoped but missing justification"
             $_svcErrors++
           }
         }
@@ -890,7 +892,7 @@ if (-not (Test-Path $_svcJson)) {
         if ($_userEntry.ContainsKey('services')) {
           foreach ($_svcKey in $_userEntry.services.Keys) {
             if (-not $_svc.ContainsKey($_svcKey)) {
-              warn "${_usersJson}: user '$_username' references unknown service '$_svcKey'"
+              error "${_usersJson}: user '$_username' references unknown service '$_svcKey'"
               $_svcErrors++
             }
           }
@@ -908,7 +910,7 @@ if (-not (Test-Path $_svcJson)) {
           if ($_userEntry.ContainsKey('services')) {
             foreach ($_svcKey in $_userEntry.services.Keys) {
               if (-not $_svc.ContainsKey($_svcKey)) {
-                warn "${_winUsersJson}: user '$_username' references unknown service '$_svcKey'"
+                error "${_winUsersJson}: user '$_username' references unknown service '$_svcKey'"
                 $_svcErrors++
               }
             }
@@ -918,7 +920,7 @@ if (-not (Test-Path $_svcJson)) {
     }
 
     if ($_svcErrors -gt 0) {
-      warn "services.json validation failed with $_svcErrors error(s)"
+      error "services.json validation failed with $_svcErrors error(s)"
       1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-15.exit") -NoNewline
     }
     say "services.json validation passed"
@@ -938,7 +940,7 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
-  function warn { Write-Output "check: warning: $args" }
+  function error { Write-Output "check: error: $args" }
   $_yamlErrors = 0
 $_yamlFiles = @()
 if ($HAS_ARGS) {
@@ -954,12 +956,12 @@ foreach ($_yf in $_yamlFiles) {
     $_content = Get-Content $_yf -Raw -ErrorAction Stop
     $null = $_content | ConvertFrom-Yaml -ErrorAction Stop
   } catch {
-    warn "$($_yf): invalid YAML"
+    error "$($_yf): invalid YAML"
     $_yamlErrors++
   }
 }
 if ($_yamlErrors -gt 0) {
-  warn "YAML structural validation failed with $_yamlErrors error(s)"
+  error "YAML structural validation failed with $_yamlErrors error(s)"
   1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-16.exit") -NoNewline
 }
 say "YAML structural validation passed."
@@ -978,7 +980,7 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
-  function warn { Write-Output "check: warning: $args" }
+  function error { Write-Output "check: error: $args" }
   # Always-run: Package manager usage enforcement
 $_violations = 0
   # Ban bare pip install and npm install — these bypass the lockfile.
@@ -991,7 +993,7 @@ $_violations = 0
     ) -Pattern '(^|[^a-z])pip install([^-]|$)' `
     | Where-Object { $_.Line -notmatch 'uv pip install' }
   if ($_pipViolations) {
-    warn "bare pip install detected (use uv pip install instead)"
+    error "bare pip install detected (use uv pip install instead)"
     $_violations++
   }
   $_npmViolations = Select-String -Path @(
@@ -1001,7 +1003,7 @@ $_violations = 0
       | ForEach-Object { $_.FullName }
     ) -Pattern '(^|[^a-z])npm install([^-]|$)'
   if ($_npmViolations) {
-    warn "bare npm install detected (use bun or nix instead)"
+    error "bare npm install detected (use bun or nix instead)"
     $_violations++
   }
   if ($_violations -gt 0) {
@@ -1024,7 +1026,7 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
-  function warn { Write-Output "check: warning: $args" }
+  function error { Write-Output "check: error: $args" }
 
 $_undocSuppViolations = @()
 
@@ -1097,9 +1099,9 @@ if ($HAS_ARGS) {
 
 if ($_undocSuppViolations.Count -gt 0) {
   foreach ($_uv in ($_undocSuppViolations | Sort-Object -Unique)) {
-    warn $_uv
+    error $_uv
   }
-  warn ("undocumented error suppression check failed with {0} violation(s)" -f $_undocSuppViolations.Count)
+  error ("undocumented error suppression check failed with {0} violation(s)" -f $_undocSuppViolations.Count)
   say "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
   1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-18.exit") -NoNewline
 } else {
@@ -1138,7 +1140,7 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
-  function warn { Write-Output "check: warning: $args" }
+  function error { Write-Output "check: error: $args" }
   $_cfgDir = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs"
 $_cfgErrors = 0
 
@@ -1171,7 +1173,7 @@ $_cfgMethodOutput = $_srcFiles | Select-String -Pattern '# Method'
     }
 
     if ($_refs.Count -eq 0) {
-      warn "$_relPath : no references found in src/ (excluding configs/) — orphaned config?"
+      error "$_relPath : no references found in src/ (excluding configs/) — orphaned config?"
       $_cfgErrors++
     } else {
       $_hasMethod = $false
@@ -1191,14 +1193,14 @@ $_cfgMethodOutput = $_srcFiles | Select-String -Pattern '# Method'
         }
       }
       if (-not $_hasMethod) {
-        warn "$_relPath : referenced but no '# Method N' comment found on or before reference lines"
+        error "$_relPath : referenced but no '# Method N' comment found on or before reference lines"
         $_cfgErrors++
       }
     }
   }
 
 if ($_cfgErrors -gt 0) {
-  warn ("config method compliance check failed with {0} error(s)" -f $_cfgErrors)
+  error ("config method compliance check failed with {0} error(s)" -f $_cfgErrors)
   1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-20.exit") -NoNewline
 } else {
   say "config method compliance passed."
@@ -1218,7 +1220,7 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
-  function warn { Write-Output "check: warning: $args" }
+  function error { Write-Output "check: error: $args" }
   $_actPattern = '^\s*#.*__[A-Z][A-Z_]*__'
 $_actViolations = @()
 if ($HAS_ARGS) {
@@ -1232,8 +1234,8 @@ if ($HAS_ARGS) {
   $_actViolations += Select-String -Path $_actFiles -Pattern $_actPattern | ForEach-Object { "$($_.Path):$($_.LineNumber)" }
 }
 if ($_actViolations.Count -gt 0) {
-  foreach ($_av in ($_actViolations | Sort-Object -Unique)) { warn $_av }
-  warn "token placeholder strings found in script comments"
+  foreach ($_av in ($_actViolations | Sort-Object -Unique)) { error $_av }
+  error "token placeholder strings found in script comments"
   1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-21.exit") -NoNewline
 } else {
   say "no token placeholder strings in script comments."
@@ -1286,7 +1288,7 @@ say ("  total:   {0,5} ms" -f $_totalMs)
 
 # ---------------------------------------------------------------------------
 if ($exitCode -ne 0) {
-  warn "some checks failed with exit code $exitCode"
+  error "some checks failed with exit code $exitCode"
   exit $exitCode
 }
 say "all checks passed."

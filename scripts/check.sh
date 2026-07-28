@@ -63,8 +63,11 @@
 #     - Activation script token placeholder   (step 21)
 #
 # Output conventions:
-#   Warnings (warn) and errors (error) go to stderr; info/success/skip
-#   (say) go to stdout. This differs from check.ps1, which routes all
+#   Three-tier messaging: say() for info/success/skip (stdout),
+#   warn() for non-fatal warnings (stderr), error() for failures (stderr).
+#   The error function returns 1 but is safe here (no set -e; calls are in
+#   brace groups). Exit code is driven by the wave exit-file mechanism, not
+#   by the function called. This differs from check.ps1, which routes all
 #   output to stdout. The split is intentional per platform convention.
 #   Use check.ps1's header comment as the cross-reference source of truth
 #   for the Windows-side convention.
@@ -327,9 +330,9 @@ fi
 if [ $_tf_exit -eq 0 ]; then
   say "formatting OK."
 elif [ $_tf_exit -eq 1 ]; then
-  warn "formatting issues found (run 'treefmt' to fix)."
+  error "formatting issues found (run 'treefmt' to fix)."
 else
-  warn "treefmt failed with exit code $_tf_exit"
+  error "treefmt failed with exit code $_tf_exit"
 fi
 echo "$_tf_exit" > "$_wave_tmpdir/step-4.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
@@ -404,13 +407,13 @@ if [ "${#_nixf_files[@]}" -gt 0 ]; then
     IFS= read -r _nixf_file_path < "$_nixf_result"
     case "$_nixf_status" in
       FAIL)
-        warn "$_nixf_file_path: nixf-tidy failed"
+        error "$_nixf_file_path: nixf-tidy failed"
         _nixf_exit=$((_nixf_exit + 1))
         ;;
       ISSUES)
         # Read the jq output (rest of file after first two lines)
         tail -n +3 "$_nixf_result" | jq -r '.[] | "\(.sname): \(.message)"' | while IFS= read -r _nixf_issue; do
-          warn "$_nixf_file_path: $_nixf_issue"
+          error "$_nixf_file_path: $_nixf_issue"
         done
         _nixf_exit=$((_nixf_exit + 1))
         ;;
@@ -434,9 +437,9 @@ section "$((_step += 1))" "Stale Nix build artifact check"
 {
 _cnba_output="$("$SCRIPT_DIR/cleanup-nix.sh" --dry-run 2>&1)"
 if echo "$_cnba_output" | grep -q "would remove stale Nix build symlink"; then
-  warn "stale Nix build artifacts found:"
+  error "stale Nix build artifacts found:"
   echo "$_cnba_output" | while IFS= read -r _cnba_line; do
-    warn "  $_cnba_line"
+    error "  $_cnba_line"
   done
   echo "1" > "$_wave_tmpdir/step-7.exit"
 else
@@ -503,7 +506,7 @@ section "$((_step += 1))" "Lockfile validation"
 _lfpath="src/lockfiles/lockfile.json"
 _lf_overlap_issues=0
 if [ ! -f "$_lfpath" ]; then
-    warn "lockfile.json not found at $_lfpath"
+    error "lockfile.json not found at $_lfpath"
   _lf_overlap_issues=$((_lf_overlap_issues + 1))
   # Do not exit early — the section below may still run useful checks if
   # HAS_ARGS is false; the error count will cause a non-zero exit later.
@@ -521,12 +524,12 @@ else
     | select(.p as $p | ($exceptions | index($p)) | not)
     | "ERROR: package \"\(.p)\" appears in both \(.s)"' "$_lfpath" 2>/dev/null)
   if [ -n "$_lf_overlaps" ]; then
-    warn "$_lf_overlaps"
+    error "$_lf_overlaps"
     _lf_overlap_issues=$((_lf_overlap_issues + 1))
   fi
 fi
 if [ "$_lf_overlap_issues" -gt 0 ]; then
-  warn "lockfile.json has $_lf_overlap_issues overlapping package(s) across sections"
+  error "lockfile.json has $_lf_overlap_issues overlapping package(s) across sections"
   echo "1" > "$_wave_tmpdir/step-12.exit"
 else
   say "lockfile.json consistency: no overlapping packages across sections"
@@ -540,12 +543,12 @@ fi
 _lf_al_path="src/lockfiles/lifecycle-allowlist.json"
 _lf_al_errors=0
 if [ ! -f "$_lf_al_path" ]; then
-  warn "lifecycle-allowlist.json not found at $_lf_al_path"
+  error "lifecycle-allowlist.json not found at $_lf_al_path"
   _lf_al_errors=$((_lf_al_errors + 1))
 else
   _al_is_obj=$(jq -e 'type == "object"' "$_lf_al_path" >/dev/null 2>&1 && echo true || echo false)
   if [ "$_al_is_obj" != "true" ]; then
-    warn "lifecycle-allowlist.json must be a JSON object"
+    error "lifecycle-allowlist.json must be a JSON object"
     _lf_al_errors=$((_lf_al_errors + 1))
   else
     # Validate each entry has a non-empty justification string.
@@ -553,13 +556,13 @@ else
       to_entries[] | select((.value | type) != "string" or .value == "") |
       "WARNING: lifecycle-allowlist.json: \"\(.key)\" has empty or non-string justification"' "$_lf_al_path")
     if [ -n "$_al_invalid" ]; then
-      warn "$_al_invalid"
+      error "$_al_invalid"
       _lf_al_errors=$((_lf_al_errors + 1))
     fi
   fi
 fi
 if [ "$_lf_al_errors" -gt 0 ]; then
-  warn "lifecycle-allowlist.json validation failed with $_lf_al_errors error(s)"
+  error "lifecycle-allowlist.json validation failed with $_lf_al_errors error(s)"
   echo "1" > "$_wave_tmpdir/step-12.exit"
 else
   _lf_al_count=$(jq 'length' "$_lf_al_path" 2>/dev/null || echo 0)
@@ -574,15 +577,15 @@ if [ -f "$_lfpath" ]; then
     _check_section_nonempty() {
       _section="$1"
       if ! jq -e ".[\"$_section\"] | type == \"object\" and length > 0" "$_lfpath" >/dev/null 2>&1; then
-        warn "$_section: empty or missing section"
+        error "$_section: empty or missing section"
         _lf_errors=$((_lf_errors + 1))
         return
       fi
       # Check for placeholder values
       _placeholders=$(jq -r ".[\"$_section\"] | to_entries[] | select(.value == \"\" or .value == \"CHANGEME\" or .value == \"1.0.0\") | .key" "$_lfpath" 2>/dev/null)
       if [ -n "$_placeholders" ]; then
-        warn "$_section has placeholder versions for:"
-        warn "  ${_placeholders//$'\n'/$'\n'  }"
+        error "$_section has placeholder versions for:"
+        error "  ${_placeholders//$'\n'/$'\n'  }"
         _lf_errors=$((_lf_errors + 1))
       fi
     }
@@ -594,46 +597,46 @@ if [ -f "$_lfpath" ]; then
 
     # winget: must be non-null; warn if empty, validate non-placeholder if non-empty
     if ! jq -e '.winget | type == "object"' "$_lfpath" >/dev/null 2>&1; then
-      warn "winget: missing or invalid section"
+      error "winget: missing or invalid section"
       _lf_errors=$((_lf_errors + 1))
     elif jq '.winget | length == 0' "$_lfpath" >/dev/null 2>&1; then
       say "winget: empty section (not yet populated)"
     else
       _placeholders=$(jq -r '.winget | to_entries[] | select(.value == "" or .value == "CHANGEME" or .value == "1.0.0") | .key' "$_lfpath" 2>/dev/null)
       if [ -n "$_placeholders" ]; then
-        warn "winget has placeholder versions for:"
-        warn "  ${_placeholders//$'\n'/$'\n'  }"
+        error "winget has placeholder versions for:"
+        error "  ${_placeholders//$'\n'/$'\n'  }"
         _lf_errors=$((_lf_errors + 1))
       fi
     fi
     # homebrew: must be non-empty
     if ! jq -e '.homebrew | type == "object" and length > 0' "$_lfpath" >/dev/null 2>&1; then
-      warn "homebrew: empty or missing section"
+      error "homebrew: empty or missing section"
       _lf_errors=$((_lf_errors + 1))
     fi
     # vscode: must be non-null; warn if empty, validate non-placeholder if non-empty
     if ! jq -e '.vscode | type == "object"' "$_lfpath" >/dev/null 2>&1; then
-      warn "vscode: missing or invalid section"
+      error "vscode: missing or invalid section"
       _lf_errors=$((_lf_errors + 1))
     elif jq '.vscode | length == 0' "$_lfpath" >/dev/null 2>&1; then
       say "vscode: empty section (not yet populated)"
     else
       _placeholders=$(jq -r '.vscode | to_entries[] | select(.value == "" or .value == "CHANGEME" or .value == "1.0.0") | .key' "$_lfpath" 2>/dev/null)
       if [ -n "$_placeholders" ]; then
-        warn "vscode has placeholder versions for:"
-        warn "  ${_placeholders//$'\n'/$'\n'  }"
+        error "vscode has placeholder versions for:"
+        error "  ${_placeholders//$'\n'/$'\n'  }"
         _lf_errors=$((_lf_errors + 1))
       fi
     fi
 
     # ollama: must have at least one profile with models
     if ! jq -e '.ollama | type == "object" and length > 0' "$_lfpath" >/dev/null 2>&1; then
-      warn "ollama: empty or missing section"
+      error "ollama: empty or missing section"
       _lf_errors=$((_lf_errors + 1))
     else
       while IFS=$'\t' read -r _profile _idx _name _tag; do
         if [ -z "$_name" ] || [ -z "$_tag" ]; then
-          warn "ollama.${_profile}[${_idx}]: missing name or tag"
+          error "ollama.${_profile}[${_idx}]: missing name or tag"
           _lf_errors=$((_lf_errors + 1))
         fi
       done < <(jq -r '
@@ -644,12 +647,12 @@ if [ -f "$_lfpath" ]; then
     fi
 
     if [ "$_lf_errors" -gt 0 ]; then
-      warn "lockfile.json validation failed with $_lf_errors error(s)"
+      error "lockfile.json validation failed with $_lf_errors error(s)"
       echo "1" > "$_wave_tmpdir/step-12.exit"
     fi
     say "lockfile.json validation passed"
   else
-    warn "lockfile.json not found — skipping section validation"
+    error "lockfile.json not found — skipping section validation"
     echo "1" > "$_wave_tmpdir/step-12.exit"
   fi
 # If no exit file was written (all checks passed), write success
@@ -685,10 +688,10 @@ _dsc_system_dir="src/hosts/Windows/system"
   while IFS=$'\t' read -r _id _pinned_ver; do
     _lf_ver=$(jq -r --arg id "$_id" '.winget[$id] // ""' "$_lockfile")
     if [ -z "$_lf_ver" ]; then
-      warn "system DSC files: $_id has version $_pinned_ver but no lockfile entry"
+      error "system DSC files: $_id has version $_pinned_ver but no lockfile entry"
       _lf_errors=$((_lf_errors + 1))
     elif [ "$_pinned_ver" != "$_lf_ver" ]; then
-      warn "system DSC files: $_id pinned $_pinned_ver but lockfile has $_lf_ver"
+      error "system DSC files: $_id pinned $_pinned_ver but lockfile has $_lf_ver"
       _lf_errors=$((_lf_errors + 1))
     fi
   done < <(echo "$_locked_json" | jq -r '.properties.resources[] | select(.resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and .settings.version != null) | [.settings.id, .settings.version] | @tsv')
@@ -697,13 +700,13 @@ _dsc_system_dir="src/hosts/Windows/system"
   while IFS=$'\t' read -r _id _lf_ver; do
     _pinned=$(echo "$_locked_json" | jq -r --arg id "$_id" '.properties.resources[] | select(.resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and .settings.id == $id) | .settings.version // ""')
     if [ -z "$_pinned" ]; then
-      warn "$_id ($_lf_ver) is in lockfile but missing version pin after generation"
+      error "$_id ($_lf_ver) is in lockfile but missing version pin after generation"
       _lf_errors=$((_lf_errors + 1))
     fi
   done < <(jq -r '.winget // {} | to_entries[] | [.key, .value] | @tsv' "$_lockfile")
 
   if [ "$_lf_errors" -gt 0 ]; then
-    warn "locked DSC validation failed with $_lf_errors error(s)"
+    error "locked DSC validation failed with $_lf_errors error(s)"
     echo "1" > "$_wave_tmpdir/step-13.exit"
   fi
   say "locked DSC validation passed"
@@ -835,7 +838,7 @@ if [ -s "$_js_manifest" ]; then
     for _err_file in "$_js_tmpdir"/*.err; do
       [ -s "$_err_file" ] || continue
       while IFS= read -r _line; do
-        warn "$_line"
+        error "$_line"
       done < "$_err_file"
     done
   fi
@@ -845,7 +848,7 @@ fi
 check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml || _jsonschema_errors=$((_jsonschema_errors + 1))
 check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml || _jsonschema_errors=$((_jsonschema_errors + 1))
 if [ "$_jsonschema_errors" -gt 0 ]; then
-  warn "schema validation failed with $_jsonschema_errors error(s)"
+  error "schema validation failed with $_jsonschema_errors error(s)"
   echo "1" > "$_wave_tmpdir/step-14.exit"
 fi
 say "schema validation passed."
@@ -863,21 +866,21 @@ section "$((_step += 1))" "Service registry validation"
   _svc_errors=0
 
   if [ ! -f "$_svc_json" ]; then
-    warn "services.json not found at $_svc_json"
+    error "services.json not found at $_svc_json"
     _svc_errors=$((_svc_errors + 1))
   else
     # Check each entry has displayName and platforms
     while IFS=$'\t' read -r _name _has_display _has_platforms _platform_count; do
       if [ "$_has_display" != "true" ]; then
-        warn "services.json: '$_name' missing displayName"
+        error "services.json: '$_name' missing displayName"
         _svc_errors=$((_svc_errors + 1))
       fi
       if [ "$_has_platforms" != "true" ]; then
-        warn "services.json: '$_name' missing platforms"
+        error "services.json: '$_name' missing platforms"
         _svc_errors=$((_svc_errors + 1))
       fi
       if [ "$_platform_count" -lt 1 ]; then
-        warn "services.json: '$_name' has no platform entries"
+        error "services.json: '$_name' has no platform entries"
         _svc_errors=$((_svc_errors + 1))
       fi
     done < <(jq -r '
@@ -894,12 +897,12 @@ section "$((_step += 1))" "Service registry validation"
       case "$_type" in
         launchctl|systemctl|native|schtask|omitted) ;;
         *)
-          warn "services.json: '$_name' platform '$_platform' has invalid type '$_type'"
+          error "services.json: '$_name' platform '$_platform' has invalid type '$_type'"
           _svc_errors=$((_svc_errors + 1))
           ;;
       esac
       if [ "$_has_required" != "true" ]; then
-        warn "services.json: '$_name' platform '$_platform' missing required fields for type '$_type'"
+        error "services.json: '$_name' platform '$_platform' missing required fields for type '$_type'"
         _svc_errors=$((_svc_errors + 1))
       fi
     done < <(jq -r '
@@ -923,7 +926,7 @@ section "$((_step += 1))" "Service registry validation"
   fi
 
   if [ "$_svc_errors" -gt 0 ]; then
-    warn "services.json validation failed with $_svc_errors error(s)"
+    error "services.json validation failed with $_svc_errors error(s)"
     echo "1" > "$_wave_tmpdir/step-15.exit"
   fi
   # No premature "passed" — verdict is after sub-checks below.
@@ -932,7 +935,7 @@ section "$((_step += 1))" "Service registry validation"
   # User-scoped means domain=user (macOS launchctl) or scope=user (Linux systemctl).
   while IFS=$'\t' read -r _name _platform _domain_scope _value; do
     if [ "$_domain_scope" = "user" ] && { [ "$_value" = "null" ] || [ -z "$_value" ]; }; then
-      warn "services.json: '$_name' platform '$_platform' is user-scoped but missing justification"
+      error "services.json: '$_name' platform '$_platform' is user-scoped but missing justification"
       _svc_errors=$((_svc_errors + 1))
     fi
   done < <(jq -r '
@@ -952,7 +955,7 @@ section "$((_step += 1))" "Service registry validation"
     _svc_names=$(jq -r 'to_entries[].key' "$_svc_json")
     while IFS=$'\t' read -r _username _svc_name _has_enable; do
       if ! echo "$_svc_names" | grep -qxF "$_svc_name"; then
-        warn "$_users_json: user '$_username' references unknown service '$_svc_name'"
+        error "$_users_json: user '$_username' references unknown service '$_svc_name'"
         _svc_errors=$((_svc_errors + 1))
       fi
     done < <(jq -r '
@@ -968,7 +971,7 @@ section "$((_step += 1))" "Service registry validation"
   if [ -f "$_win_users_json" ]; then
     while IFS=$'\t' read -r _username _svc_name _has_enable; do
       if ! echo "$_svc_names" | grep -qxF "$_svc_name"; then
-        warn "$_win_users_json: user '$_username' references unknown service '$_svc_name'"
+        error "$_win_users_json: user '$_username' references unknown service '$_svc_name'"
         _svc_errors=$((_svc_errors + 1))
       fi
     done < <(jq -r '
@@ -980,7 +983,7 @@ section "$((_step += 1))" "Service registry validation"
   fi
 
   if [ "$_svc_errors" -gt 0 ]; then
-    warn "services.json validation failed with $_svc_errors error(s)"
+    error "services.json validation failed with $_svc_errors error(s)"
     echo "1" > "$_wave_tmpdir/step-15.exit"
   fi
   say "services.json validation passed"
@@ -1002,7 +1005,7 @@ if $HAS_ARGS; then
       *) continue ;;
     esac
     if ! yq eval '.' "$_yf" >/dev/null 2>&1; then
-      warn "$_yf: invalid YAML"
+      error "$_yf: invalid YAML"
       _yaml_errors=$((_yaml_errors + 1))
     fi
   done
@@ -1010,13 +1013,13 @@ else
   for _yaml_file in "${CACHED_YAML_FILES[@]}"; do
     case "$_yaml_file" in */secrets/*) continue ;; esac
     if ! yq eval '.' "$_yaml_file" >/dev/null 2>&1; then
-      warn "$_yaml_file: invalid YAML"
+      error "$_yaml_file: invalid YAML"
       _yaml_errors=$((_yaml_errors + 1))
     fi
   done
 fi
 if [ "$_yaml_errors" -gt 0 ]; then
-  warn "YAML structural validation failed with $_yaml_errors error(s)"
+  error "YAML structural validation failed with $_yaml_errors error(s)"
   echo "1" > "$_wave_tmpdir/step-16.exit"
 fi
 say "YAML structural validation passed."
@@ -1040,7 +1043,7 @@ if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
      scripts/ src/ tests/ 2>/dev/null \
      | grep -v 'uv pip install' \
      | grep . >/dev/null 2>&1; then
-  warn "bare pip install detected (use uv pip install instead)"
+  error "bare pip install detected (use uv pip install instead)"
   _violations=$((_violations + 1))
 fi
 if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
@@ -1048,7 +1051,7 @@ if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
      -E '(^|[^a-z])npm install([^-]|$)' \
      scripts/ src/ tests/ 2>/dev/null \
      | grep . >/dev/null 2>&1; then
-  warn "bare npm install detected (use bun or nix instead)"
+  error "bare npm install detected (use bun or nix instead)"
   _violations=$((_violations + 1))
 fi
 if [ "$_violations" -gt 0 ]; then
@@ -1064,7 +1067,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Undocumented error suppression"
 {
-_undoc_supp_out="$(mktemp)" || { warn "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-18.exit"; }
+_undoc_supp_out="$(mktemp)" || { error "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-18.exit"; }
 
 # _is_suppressed check_id file line
 # Returns 0 if the given line (or its preceding line) has a
@@ -1118,9 +1121,9 @@ else
 fi
 
 if [ -s "$_undoc_supp_out" ]; then
-  warn "undocumented error suppressions found:"
+  error "undocumented error suppressions found:"
   sort -u "$_undoc_supp_out" | while IFS= read -r _line; do
-    warn "  $_line"
+    error "  $_line"
   done
   say "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
   echo "1" > "$_wave_tmpdir/step-18.exit"
@@ -1157,7 +1160,7 @@ _cfg_dir="src/modules/configs"
 _cfg_errors=0
 
 # Single-pass: collect all config file basenames, run one grep across src/
-_cfg_patterns=$(mktemp) || { warn "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-20.exit"; }
+_cfg_patterns=$(mktemp) || { error "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-20.exit"; }
 find "$_cfg_dir" -type f -exec basename {} \; | sort -u > "$_cfg_patterns"
 _cfg_grep_output=$(grep -rn --include='*.nix' --include='*.ps1' --include='*.sh' \
   -F -f "$_cfg_patterns" \
@@ -1205,15 +1208,15 @@ while IFS= read -r -d '' _cfg_file; do
     done <<< "$_refs_output" 2>/dev/null || true
   fi
   if [ "$_refs_lines" -eq 0 ]; then
-    warn "$_relpath: no references found in src/ (excluding configs/) — orphaned config?"
+    error "$_relpath: no references found in src/ (excluding configs/) — orphaned config?"
     _cfg_errors=$((_cfg_errors + 1))
   elif [ "$_method_lines" -eq 0 ]; then
-    warn "$_relpath: referenced but no '# Method N' comment found on or before reference lines"
+    error "$_relpath: referenced but no '# Method N' comment found on or before reference lines"
     _cfg_errors=$((_cfg_errors + 1))
   fi
 done < <(find "$_cfg_dir" -type f -print0)
 if [ "$_cfg_errors" -gt 0 ]; then
-  warn "config method compliance check failed with $_cfg_errors error(s)"
+  error "config method compliance check failed with $_cfg_errors error(s)"
   echo "1" > "$_wave_tmpdir/step-20.exit"
 fi
 say "config method compliance passed."
@@ -1227,7 +1230,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Activation script token placeholder in comment check"
 {
-_act_temp="$(mktemp)" || { warn "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-21.exit"; }
+_act_temp="$(mktemp)" || { error "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-21.exit"; }
 
 if $HAS_ARGS; then
   for _f in "$@"; do
@@ -1242,9 +1245,9 @@ else
 fi
 
 if [ -s "$_act_temp" ]; then
-  warn "token placeholder strings found in script comments:"
+  error "token placeholder strings found in script comments:"
   sort -u "$_act_temp" | while IFS= read -r _line; do
-    warn "  $_line"
+    error "  $_line"
   done
   echo "1" > "$_wave_tmpdir/step-21.exit"
 else
@@ -1286,7 +1289,7 @@ done
 printf '  total:   %5d ms\n' "$_total_ms"
 
 if [ $exit_code -ne 0 ]; then
-  warn "some checks failed with exit code $exit_code"
+  error "some checks failed with exit code $exit_code"
   exit $exit_code
 fi
 say "all checks passed."
