@@ -9,10 +9,15 @@
   and rarely relevant for lint-only runs).
 
   Unlike scripts/PSScriptAnalyzerSettings.check.psd1, this file does NOT
-  exclude the two slow rules (PSAvoidUsingCmdletAliases, PSShouldProcess).
-  Test runs are expected to take longer (~3-4 min on 126 files).
+  exclude the three slow rules (PSAvoidUsingCmdletAliases, PSUseCmdletCorrectly,
+  PSShouldProcess). Test runs take ~56s on 128 *.ps1 files (all rules enabled).
 
-  Benchmark results:
+  Wall-clock benchmark (isolated single-pass runs, each in a fresh pwsh process,
+  128 *.ps1 files, macOS Apple Silicon, pwsh 7.6.3, PSScriptAnalyzer 1.25.0):
+    TEST (no slow rules excluded):                         56.3s, 501 diagnostics
+    CHECK (all three excluded):                              0.6s, 501 diagnostics
+
+  Benchmark data:
     pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1
     data: .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark-results.json
 
