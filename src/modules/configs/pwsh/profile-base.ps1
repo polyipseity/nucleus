@@ -555,6 +555,7 @@ $nucleusConfigCommands = @('get', 'set', 'list')
 
 Register-ArgumentCompleter -CommandName nucleus-svc -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $fakeBoundParameters
   $nucleusSvcCommands | Where-Object { $_ -like "$wordToComplete*" }
   if ($commandAst.CommandElements.Count -ge 2) {
     $prev = $commandAst.CommandElements[1].Value
@@ -575,12 +576,14 @@ Register-ArgumentCompleter -CommandName nucleus-svc -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-config -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   $nucleusConfigCommands | Where-Object { $_ -like "$wordToComplete*" }
   @('--help') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-gc -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @(
     '--help', '--dry-run', '--no-dry-run',
     '--tool-cache-gc', '--no-tool-cache-gc',
@@ -597,41 +600,48 @@ Register-ArgumentCompleter -CommandName nucleus-gc -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-health-check -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @('--help', '--min-free-bytes', '--secret-health', '--no-secret-health', '--log-health') |
     Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-update -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @('--help', '--flake', '--no-flake', '--brew', '--no-brew', '--sops', '--no-sops') |
     Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-check -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @('--help', '--format', '--verify') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-ai -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @('--help', 'sync', 'list', 'status', 'endpoint', 'config') |
     Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-replica-sync -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @('--help', '--dry-run', '--replica-id', '--repo-root') |
     Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-replica-reset -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @('--help', '--dry-run', '--replica-id', '--repo-root') |
     Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-bootstrap -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @('--help', '--apply', '--no-apply', '--ai-sync', '--no-ai-sync',
     '--replica-sync', '--no-replica-sync', '--target-user') |
     Where-Object { $_ -like "$wordToComplete*" }
@@ -639,6 +649,7 @@ Register-ArgumentCompleter -CommandName nucleus-bootstrap -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-cloud-setup -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @('--help', '--apply', '--no-apply') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
@@ -654,6 +665,7 @@ $nucleusVmSetupFlags = @('--help', '--dry-run', '--gc', '--no-gc',
 
 Register-ArgumentCompleter -CommandName nucleus-vm -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $fakeBoundParameters
   $nucleusVmCommands | Where-Object { $_ -like "$wordToComplete*" }
   if ($commandAst.CommandElements.Count -ge 2) {
     $subcommand = $commandAst.CommandElements[1].Value
@@ -666,6 +678,7 @@ Register-ArgumentCompleter -CommandName nucleus-vm -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-apply -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @('--help', '--ai-sync', '--no-ai-sync',
     '--replica-sync', '--no-replica-sync',
     '--vm-setup', '--no-vm-setup',
@@ -675,35 +688,42 @@ Register-ArgumentCompleter -CommandName nucleus-apply -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-bump-lockfile -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @('--help', '--sections', '--verify') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-check-packer -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @('--help') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-check-pwsh -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @('--help') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-check-sh -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @('--help') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-service-watchdog -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @('--help') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-gs-pdf-opt -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @('--help') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-test -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @('--help') | Where-Object { $_ -like "$wordToComplete*" }
 }

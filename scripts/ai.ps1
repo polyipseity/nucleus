@@ -66,6 +66,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+# Used inside functions below via closure (PSSA cannot track)
+$null = $DryRun, $GcOnly, $AiProfile, $Json
+
 $fmtModulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $fmtModulePath -Force -DisableNameChecking
 

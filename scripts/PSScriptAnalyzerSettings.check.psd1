@@ -32,6 +32,17 @@
     Severity = @('Error', 'Warning')
     ExcludeRules = @(
         'PSUseBOMForUnicodeEncodedFile'
+        # False positive: flags $using:VarName as "missing using scope modifier"
+        # when the variable already has $using: but is not declared in the
+        # script block via param. Affects Start-Job blocks using $using:.
+        'PSUseUsingScopeModifierInNewRunspaces'
+        # Pre-existing warnings masked by PSReviewUnusedParameter before the
+        # $using: refactor in check.ps1. These are intentional patterns:
+        'PSAvoidAssignmentToAutomaticVariable'     # $profile is intentional
+        'PSAvoidGlobalVars'                         # global: state is intentional
+        'PSAvoidUsingInvokeExpression'              # intentional usage in profile
+        'PSAvoidUsingWriteHost'                     # intentional in profile output
+        'PSUseApprovedVerbs'                        # many false positives
         # Slow rules (~56s added wall-clock, see benchmark above):
         'PSAvoidUsingCmdletAliases'
         'PSUseCmdletCorrectly'

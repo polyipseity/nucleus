@@ -214,24 +214,23 @@ $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "ste
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] PowerShell lint ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
-  param($RepoRoot, $WaveTmpDir, $HAS_ARGS, $positionalArgs, $scriptCachedPs1Files, $scriptCachedNixFiles, $scriptCachedYamlFiles, $scriptCachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks)
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
   function warn { Write-Output "check: warning: $args" }
-  if ($PS1_FILES.Count -gt 0) {
-    & "$RepoRoot\scripts\check-pwsh.ps1" -Settings "$RepoRoot\scripts\PSScriptAnalyzerSettings.check.psd1" -Scoped -Paths $PS1_FILES
-  } elseif (-not $HAS_ARGS) {
-    & "$RepoRoot\scripts\check-pwsh.ps1" -Settings "$RepoRoot\scripts\PSScriptAnalyzerSettings.check.psd1"
+  if ($using:PS1_FILES.Count -gt 0) {
+    & "$using:RepoRoot\scripts\check-pwsh.ps1" -Settings "$using:RepoRoot\scripts\PSScriptAnalyzerSettings.check.psd1" -Scoped -Paths $using:PS1_FILES
+  } elseif (-not $using:HAS_ARGS) {
+    & "$using:RepoRoot\scripts\check-pwsh.ps1" -Settings "$using:RepoRoot\scripts\PSScriptAnalyzerSettings.check.psd1"
   } else {
     say "skipping (no PowerShell scripts to check)."
   }
   $_stepExit = $LASTEXITCODE
-  $_stepExit | Out-File -FilePath (Join-Path $WaveTmpDir "step-2.exit") -NoNewline
-  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $_stepStartTicks
+  $_stepExit | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-2.exit") -NoNewline
+  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-  $_elapsedMs | Out-File -FilePath (Join-Path $WaveTmpDir "step-2.time") -NoNewline
-} -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks))
+  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-2.time") -NoNewline
+}))
 
 # ---------------------------------------------------------------------------
 # 3. Packer template validation
@@ -239,24 +238,23 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Packer template validation ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
-  param($RepoRoot, $WaveTmpDir, $HAS_ARGS, $positionalArgs, $scriptCachedPs1Files, $scriptCachedNixFiles, $scriptCachedYamlFiles, $scriptCachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks)
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
   function warn { Write-Output "check: warning: $args" }
-  if ($PKR_FILES.Count -gt 0) {
-    & "$RepoRoot\scripts\check-packer.ps1" $PKR_FILES
-  } elseif (-not $HAS_ARGS) {
-    & "$RepoRoot\scripts\check-packer.ps1"
+  if ($using:PKR_FILES.Count -gt 0) {
+    & "$using:RepoRoot\scripts\check-packer.ps1" $using:PKR_FILES
+  } elseif (-not $using:HAS_ARGS) {
+    & "$using:RepoRoot\scripts\check-packer.ps1"
   } else {
     say "skipping (no Packer templates to check)."
   }
   $_stepExit = $LASTEXITCODE
-  $_stepExit | Out-File -FilePath (Join-Path $WaveTmpDir "step-3.exit") -NoNewline
-  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $_stepStartTicks
+  $_stepExit | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-3.exit") -NoNewline
+  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-  $_elapsedMs | Out-File -FilePath (Join-Path $WaveTmpDir "step-3.time") -NoNewline
-} -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks))
+  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-3.time") -NoNewline
+}))
 
 # ---------------------------------------------------------------------------
 # 4. Code formatting (treefmt)
@@ -294,25 +292,24 @@ $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "ste
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Stale Nix build artifact check ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
-  param($RepoRoot, $WaveTmpDir, $HAS_ARGS, $positionalArgs, $scriptCachedPs1Files, $scriptCachedNixFiles, $scriptCachedYamlFiles, $scriptCachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks)
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
   function error { Write-Output "check: error: $args" }
   # Always-run: Stale Nix build artifact check
-  $_cnbaOutput = & "$RepoRoot\scripts\cleanup-nix.ps1" -WhatIf 2>&1
+  $_cnbaOutput = & "$using:RepoRoot\scripts\cleanup-nix.ps1" -WhatIf 2>&1
   $_cnbaFound = $_cnbaOutput | Select-String -Pattern 'would remove stale Nix build symlink'
   if ($_cnbaFound) {
     error "stale Nix build artifacts found:"
     $_cnbaOutput | ForEach-Object { error "  $_" }
-    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-7.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-7.exit") -NoNewline
   } else {
     say "no stale Nix build artifacts found."
   }
-  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $_stepStartTicks
+  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-  $_elapsedMs | Out-File -FilePath (Join-Path $WaveTmpDir "step-7.time") -NoNewline
-} -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks))
+  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-7.time") -NoNewline
+}))
 
 # ---------------------------------------------------------------------------
 # 8. Shell script validation tests
@@ -360,7 +357,6 @@ $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "ste
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Lockfile validation ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
-  param($RepoRoot, $WaveTmpDir, $HAS_ARGS, $positionalArgs, $scriptCachedPs1Files, $scriptCachedNixFiles, $scriptCachedYamlFiles, $scriptCachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks)
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
@@ -372,12 +368,12 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   #  2. No package should appear in multiple package-manager sections.
   #     (Ollama is excluded because it uses a nested structure unrelated to
   #      package versions.)
-  $_lfPath = Join-Path $RepoRoot "src\lockfiles\lockfile.json"
+  $_lfPath = Join-Path $using:RepoRoot "src\lockfiles\lockfile.json"
 $_lf = $null
 $_lfOverlapErrors = 0
 if (-not (Test-Path $_lfPath)) {
   error "lockfile.json not found at $_lfPath"
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-12.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-12.exit") -NoNewline
   $_lfOverlapErrors++
 } else {
   $_lf = Get-Content $_lfPath -Raw | ConvertFrom-Json -AsHashtable
@@ -408,7 +404,7 @@ if (-not (Test-Path $_lfPath)) {
 }
 if ($_lfOverlapErrors -gt 0) {
   error ("lockfile.json consistency: {0} overlap issue(s)" -f $_lfOverlapErrors)
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-12.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-12.exit") -NoNewline
 } else {
   say "lockfile.json consistency: no overlapping packages across sections"
 }
@@ -416,7 +412,7 @@ if ($_lfOverlapErrors -gt 0) {
 # Lifecycle script allowlist validation (always run):
 #  - lifecycle-allowlist.json must exist and be a valid JSON object.
 #  - Each entry must have a non-empty justification string.
-$_lfAlPath = Join-Path $RepoRoot "src\lockfiles\lifecycle-allowlist.json"
+$_lfAlPath = Join-Path $using:RepoRoot "src\lockfiles\lifecycle-allowlist.json"
 $_lfAlErrors = 0
 if (-not (Test-Path $_lfAlPath)) {
   error "lifecycle-allowlist.json not found at $_lfAlPath"
@@ -444,7 +440,7 @@ if (-not (Test-Path $_lfAlPath)) {
 }
 if ($_lfAlErrors -gt 0) {
   error "lifecycle-allowlist.json validation failed with $_lfAlErrors error(s)"
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-12.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-12.exit") -NoNewline
 } else {
   $_lfAlCount = if ($null -ne $_lfAl -and $_lfAl -is [hashtable]) { $_lfAl.Count } else { 0 }
   say ("lifecycle-allowlist.json: valid (entry count: {0})" -f $_lfAlCount)
@@ -453,7 +449,7 @@ if ($_lfAlErrors -gt 0) {
 # Always-run: Lockfile section validation
 if ($null -eq $_lf) {
     error "lockfile.json could not be loaded — skipping section validation"
-    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-12.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-12.exit") -NoNewline
   } else {
     $_lfErrors = 0
 
@@ -531,15 +527,15 @@ if ($null -eq $_lf) {
 
     if ($_lfErrors -gt 0) {
       error "lockfile.json validation failed with $_lfErrors error(s)"
-      1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-12.exit") -NoNewline
+      1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-12.exit") -NoNewline
     } else {
       say "lockfile.json validation passed"
     }
   }
-  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $_stepStartTicks
+  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-  $_elapsedMs | Out-File -FilePath (Join-Path $WaveTmpDir "step-12.time") -NoNewline
-} -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks))
+  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-12.time") -NoNewline
+}))
 
 # ---------------------------------------------------------------------------
 # 13. Locked DSC validation
@@ -547,16 +543,15 @@ if ($null -eq $_lf) {
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Locked DSC validation ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
-  param($RepoRoot, $WaveTmpDir, $HAS_ARGS, $positionalArgs, $scriptCachedPs1Files, $scriptCachedNixFiles, $scriptCachedYamlFiles, $scriptCachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks)
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
   function error { Write-Output "check: error: $args" }
   # Platform parallel: check.sh uses yq+jq pipeline (POSIX-native equivalent).
 # Always-run: Locked DSC validation
-$_dscSystemDir = Join-Path $RepoRoot 'src\hosts\Windows\system'
-$_dscSystemPackages = Join-Path $RepoRoot 'src\hosts\Windows\system\packages.dsc.yml'
-$_lockfilePath = Join-Path $RepoRoot 'src\lockfiles\lockfile.json'
+$_dscSystemDir = Join-Path $using:RepoRoot 'src\hosts\Windows\system'
+$_dscSystemPackages = Join-Path $using:RepoRoot 'src\hosts\Windows\system\packages.dsc.yml'
+$_lockfilePath = Join-Path $using:RepoRoot 'src\lockfiles\lockfile.json'
 $_lfErrors = 0
 
   # Helper: convert mixed PSCustomObject/hashtable/list trees to pure hashtable/array.
@@ -682,14 +677,14 @@ $_lfErrors = 0
 
   if ($_lfErrors -gt 0) {
     error "locked DSC validation failed with $_lfErrors error(s)"
-    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-13.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-13.exit") -NoNewline
   } else {
     say "locked DSC validation passed"
   }
-  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $_stepStartTicks
+  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-  $_elapsedMs | Out-File -FilePath (Join-Path $WaveTmpDir "step-13.time") -NoNewline
-} -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks))
+  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-13.time") -NoNewline
+}))
 
 # ---------------------------------------------------------------------------
 # 14. Schema validation (JSON/YAML)
@@ -697,7 +692,6 @@ $_lfErrors = 0
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Schema validation (JSON/YAML) ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
-  param($RepoRoot, $WaveTmpDir, $HAS_ARGS, $positionalArgs, $scriptCachedPs1Files, $scriptCachedNixFiles, $scriptCachedYamlFiles, $scriptCachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks)
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
@@ -705,8 +699,8 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   # Build manifest of file→schema pairs.
   # Each entry: @{SchemaFile=...; InstanceFile=...}
   $manifest = [System.Collections.Generic.List[hashtable]]::new()
-  if ($HAS_ARGS) {
-    foreach ($_sf in $positionalArgs) {
+  if ($using:HAS_ARGS) {
+    foreach ($_sf in $using:positionalArgs) {
       if ($_sf -like '*.json') {
         $_schema = try { (Get-Content $_sf -Raw | ConvertFrom-Json -AsHashtable)['$schema'] } catch { $null }
         if ($_schema) {
@@ -731,7 +725,7 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
     }
   } else {
     # JSON files
-    Get-ChildItem -Recurse -Path "$RepoRoot/src" -Filter '*.json' | Where-Object {
+    Get-ChildItem -Recurse -Path "$using:RepoRoot/src" -Filter '*.json' | Where-Object {
       $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notlike '*.schema.json'
     } | ForEach-Object {
       $_schema = try { (Get-Content $_.FullName -Raw | ConvertFrom-Json -AsHashtable)['$schema'] } catch { $null }
@@ -745,7 +739,7 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
       }
     }
     # YAML files
-    Get-ChildItem -Recurse -Path $RepoRoot -Include '*.yml','*.yaml' | Where-Object {
+    Get-ChildItem -Recurse -Path $using:RepoRoot -Include '*.yml','*.yaml' | Where-Object {
       $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.FullName -notmatch '[/\\]secrets[/\\]'
     } | ForEach-Object {
       $_schema = try { ($_ | Get-Content -Raw | ConvertFrom-Yaml)['$schema'] } catch { $null }
@@ -786,23 +780,23 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
     }
   }
   # GitHub schema validation — always-run
-  $_ghWorkflows = Join-Path $RepoRoot '.github\workflows\*.yml'
+  $_ghWorkflows = Join-Path $using:RepoRoot '.github\workflows\*.yml'
   check-jsonschema --builtin-schema vendor.github-workflows $_ghWorkflows
   if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
-  $_dependabot = Join-Path $RepoRoot '.github\dependabot.yml'
+  $_dependabot = Join-Path $using:RepoRoot '.github\dependabot.yml'
   if (Test-Path $_dependabot) {
     check-jsonschema --builtin-schema vendor.dependabot $_dependabot
     if ($LASTEXITCODE -ne 0) { $_jsonschemaErrors++ }
   }
   if ($_jsonschemaErrors -gt 0) {
     error "schema validation failed with $_jsonschemaErrors error(s)"
-    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-14.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-14.exit") -NoNewline
   }
   say "schema validation passed."
-  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $_stepStartTicks
+  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-  $_elapsedMs | Out-File -FilePath (Join-Path $WaveTmpDir "step-14.time") -NoNewline
-} -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks))
+  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-14.time") -NoNewline
+}))
 
 # ---------------------------------------------------------------------------
 # 15. Service registry validation
@@ -810,13 +804,12 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Service registry validation ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
-  param($RepoRoot, $WaveTmpDir, $HAS_ARGS, $positionalArgs, $scriptCachedPs1Files, $scriptCachedNixFiles, $scriptCachedYamlFiles, $scriptCachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks)
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
   function error { Write-Output "check: error: $args" }
   # Always-run: Service registry validation
-$_svcJson = Join-Path $RepoRoot "src\modules\services.json"
+$_svcJson = Join-Path $using:RepoRoot "src\modules\services.json"
 $_svcErrors = 0
 
 if (-not (Test-Path $_svcJson)) {
@@ -863,7 +856,7 @@ if (-not (Test-Path $_svcJson)) {
 
   if ($_svcErrors -gt 0) {
     error "services.json validation failed with $_svcErrors error(s)"
-    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-15.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-15.exit") -NoNewline
   } else {
     # Validate user-scoped platform entries have justification.
     foreach ($_svcName in $_svc.Keys) {
@@ -884,7 +877,7 @@ if (-not (Test-Path $_svcJson)) {
     }
 
     # Validate that service names in users.json services blocks exist in services.json.
-    $_usersJson = Join-Path $RepoRoot "src\modules\users.json"
+    $_usersJson = Join-Path $using:RepoRoot "src\modules\users.json"
     if (Test-Path $_usersJson) {
       $_users = Get-Content $_usersJson -Raw | ConvertFrom-Json -AsHashtable
       foreach ($_username in $_users.Keys) {
@@ -901,7 +894,7 @@ if (-not (Test-Path $_svcJson)) {
     }
 
     # Windows users.json
-    $_winUsersJson = Join-Path $RepoRoot "src\hosts\Windows\users.json"
+    $_winUsersJson = Join-Path $using:RepoRoot "src\hosts\Windows\users.json"
     if (Test-Path $_winUsersJson) {
       $_winUsers = (Get-Content $_winUsersJson -Raw | ConvertFrom-Json -AsHashtable).users
       if ($_winUsers) {
@@ -921,14 +914,14 @@ if (-not (Test-Path $_svcJson)) {
 
     if ($_svcErrors -gt 0) {
       error "services.json validation failed with $_svcErrors error(s)"
-      1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-15.exit") -NoNewline
+      1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-15.exit") -NoNewline
     }
     say "services.json validation passed"
   }
-  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $_stepStartTicks
+  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-  $_elapsedMs | Out-File -FilePath (Join-Path $WaveTmpDir "step-15.time") -NoNewline
-} -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks))
+  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-15.time") -NoNewline
+}))
 
 # ---------------------------------------------------------------------------
 # 16. YAML structural validation
@@ -936,15 +929,14 @@ if (-not (Test-Path $_svcJson)) {
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] YAML structural validation ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
-  param($RepoRoot, $WaveTmpDir, $HAS_ARGS, $positionalArgs, $scriptCachedPs1Files, $scriptCachedNixFiles, $scriptCachedYamlFiles, $scriptCachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks)
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
   function error { Write-Output "check: error: $args" }
   $_yamlErrors = 0
 $_yamlFiles = @()
-if ($HAS_ARGS) {
-  $_yamlFiles = $positionalArgs | Where-Object { $_ -like '*.yml' -or $_ -like '*.yaml' }
+if ($using:HAS_ARGS) {
+  $_yamlFiles = $using:positionalArgs | Where-Object { $_ -like '*.yml' -or $_ -like '*.yaml' }
 } else {
   $_yamlFiles = $scriptCachedYamlFiles |
     Where-Object { $_.FullName -notmatch '[/\\]secrets[/\\]' } |
@@ -962,13 +954,13 @@ foreach ($_yf in $_yamlFiles) {
 }
 if ($_yamlErrors -gt 0) {
   error "YAML structural validation failed with $_yamlErrors error(s)"
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-16.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-16.exit") -NoNewline
 }
 say "YAML structural validation passed."
-$_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $_stepStartTicks
+$_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
 $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-$_elapsedMs | Out-File -FilePath (Join-Path $WaveTmpDir "step-16.time") -NoNewline
-} -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks))
+$_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-16.time") -NoNewline
+}))
 
 # ---------------------------------------------------------------------------
 # 17. Package manager usage enforcement
@@ -976,7 +968,6 @@ $_elapsedMs | Out-File -FilePath (Join-Path $WaveTmpDir "step-16.time") -NoNewli
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Package manager usage enforcement ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
-  param($RepoRoot, $WaveTmpDir, $HAS_ARGS, $positionalArgs, $scriptCachedPs1Files, $scriptCachedNixFiles, $scriptCachedYamlFiles, $scriptCachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks)
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
@@ -986,7 +977,7 @@ $_violations = 0
   # Ban bare pip install and npm install — these bypass the lockfile.
   # uv pip install is allowed.  Exclude self-references.
   $_pipViolations = Select-String -Path @(
-    Get-ChildItem -Recurse -Path "$RepoRoot\scripts","$RepoRoot\src","$RepoRoot\tests" `
+    Get-ChildItem -Recurse -Path "$using:RepoRoot\scripts","$using:RepoRoot\src","$using:RepoRoot\tests" `
       -Include *.sh,*.ps1,*.nix `
       -Exclude check.sh,check.ps1,shell.nix `
       | ForEach-Object { $_.FullName }
@@ -997,7 +988,7 @@ $_violations = 0
     $_violations++
   }
   $_npmViolations = Select-String -Path @(
-    Get-ChildItem -Recurse -Path "$RepoRoot\scripts","$RepoRoot\src","$RepoRoot\tests" `
+    Get-ChildItem -Recurse -Path "$using:RepoRoot\scripts","$using:RepoRoot\src","$using:RepoRoot\tests" `
       -Include *.sh,*.ps1,*.nix `
       -Exclude check.sh,check.ps1,shell.nix `
       | ForEach-Object { $_.FullName }
@@ -1007,14 +998,14 @@ $_violations = 0
     $_violations++
   }
   if ($_violations -gt 0) {
-    1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-17.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-17.exit") -NoNewline
   } else {
     say "no package manager violations found."
   }
-  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $_stepStartTicks
+  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-  $_elapsedMs | Out-File -FilePath (Join-Path $WaveTmpDir "step-17.time") -NoNewline
-} -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks))
+  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-17.time") -NoNewline
+}))
 
 # ---------------------------------------------------------------------------
 # 18. Undocumented error suppression check
@@ -1022,7 +1013,6 @@ $_violations = 0
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Undocumented error suppression check ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
-  param($RepoRoot, $WaveTmpDir, $HAS_ARGS, $positionalArgs, $scriptCachedPs1Files, $scriptCachedNixFiles, $scriptCachedYamlFiles, $scriptCachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks)
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
@@ -1069,22 +1059,22 @@ function Get-UndocSuppViolation {
   return $_uResult
 }
 
-if ($HAS_ARGS) {
-  $_undocSuppViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files ($SH_FILES + $NIX_FILES)
+if ($using:HAS_ARGS) {
+  $_undocSuppViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files ($using:SH_FILES + $using:NIX_FILES)
   # check-suppress:suppression_doc: string argument specifying the suppression pattern for the check function, not a real suppression operator.
-  $_undocSuppViolations += Get-UndocSuppViolation -Pattern '2>$null' -Label '2>$null' -Files $PS1_FILES
+  $_undocSuppViolations += Get-UndocSuppViolation -Pattern '2>$null' -Label '2>$null' -Files $using:PS1_FILES
   # check-suppress:suppression_doc: string argument specifying the suppression pattern for the check function, not a real suppression operator.
-  $_undocSuppViolations += Get-UndocSuppViolation -Pattern '-ErrorAction SilentlyContinue' -Label '-ErrorAction SilentlyContinue' -Files $PS1_FILES
+  $_undocSuppViolations += Get-UndocSuppViolation -Pattern '-ErrorAction SilentlyContinue' -Label '-ErrorAction SilentlyContinue' -Files $using:PS1_FILES
   # check-suppress:suppression_doc: string argument specifying the suppression pattern for the check function, not a real suppression operator.
-  $_undocSuppViolations += Get-UndocSuppViolation -Pattern 'catch\s*\{\s*\}' -Label 'empty catch {}' -IsRegex -Files $PS1_FILES
+  $_undocSuppViolations += Get-UndocSuppViolation -Pattern 'catch\s*\{\s*\}' -Label 'empty catch {}' -IsRegex -Files $using:PS1_FILES
 } else {
   $_uAllShNix = @(
-    Get-ChildItem -Recurse -Path $RepoRoot -Include '*.sh','*.nix' |
+    Get-ChildItem -Recurse -Path $using:RepoRoot -Include '*.sh','*.nix' |
       Where-Object { $_.FullName -notmatch '[\\\\/]vendor[\\\\/]' } |
       ForEach-Object { $_.FullName }
   )
   $_uAllPs1 = @(
-    Get-ChildItem -Recurse -Path $RepoRoot -Include '*.ps1' |
+    Get-ChildItem -Recurse -Path $using:RepoRoot -Include '*.ps1' |
       Where-Object { $_.FullName -notmatch '[\\\\/]vendor[\\\\/]' } |
       ForEach-Object { $_.FullName }
   )
@@ -1103,14 +1093,14 @@ if ($_undocSuppViolations.Count -gt 0) {
   }
   error ("undocumented error suppression check failed with {0} violation(s)" -f $_undocSuppViolations.Count)
   say "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-18.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-18.exit") -NoNewline
 } else {
   say "no undocumented error suppressions found."
 }
-$_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $_stepStartTicks
+$_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
 $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-$_elapsedMs | Out-File -FilePath (Join-Path $WaveTmpDir "step-18.time") -NoNewline
-} -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks))
+$_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-18.time") -NoNewline
+}))
 
 # ---------------------------------------------------------------------------
 # 19. Online determinism checks (--verify mode only)
@@ -1136,18 +1126,17 @@ $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "ste
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Config method compliance ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
-  param($RepoRoot, $WaveTmpDir, $HAS_ARGS, $positionalArgs, $scriptCachedPs1Files, $scriptCachedNixFiles, $scriptCachedYamlFiles, $scriptCachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks)
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
   function error { Write-Output "check: error: $args" }
-  $_cfgDir = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs"
+  $_cfgDir = Join-Path -Path $using:RepoRoot -ChildPath "src\modules\configs"
 $_cfgErrors = 0
 
 # Always-run: Config method compliance
 # Single-pass: collect all config file basenames, run one Select-String across src/
 $_cfgFiles = Get-ChildItem -Path $_cfgDir -Recurse -File
-$_srcFiles = Get-ChildItem -Path (Join-Path $RepoRoot "src") -Recurse -Include '*.nix', '*.ps1', '*.sh' |
+$_srcFiles = Get-ChildItem -Path (Join-Path $using:RepoRoot "src") -Recurse -Include '*.nix', '*.ps1', '*.sh' |
   Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' -and $_.FullName -notmatch '[\\/]configs[\\/]' }
 $_cfgPatterns = @($_cfgFiles | ForEach-Object { [regex]::Escape($_.Name) } | Sort-Object -Unique)
 $_cfgSelectOutput = $_srcFiles | Select-String -Pattern $_cfgPatterns -SimpleMatch
@@ -1201,14 +1190,14 @@ $_cfgMethodOutput = $_srcFiles | Select-String -Pattern '# Method'
 
 if ($_cfgErrors -gt 0) {
   error ("config method compliance check failed with {0} error(s)" -f $_cfgErrors)
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-20.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-20.exit") -NoNewline
 } else {
   say "config method compliance passed."
 }
-$_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $_stepStartTicks
+$_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
 $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-$_elapsedMs | Out-File -FilePath (Join-Path $WaveTmpDir "step-20.time") -NoNewline
-} -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks))
+$_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-20.time") -NoNewline
+}))
 
 # ---------------------------------------------------------------------------
 # 21. Activation script token placeholder in comment check
@@ -1216,34 +1205,33 @@ $_elapsedMs | Out-File -FilePath (Join-Path $WaveTmpDir "step-20.time") -NoNewli
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Activation script token placeholder in comment check ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
-  param($RepoRoot, $WaveTmpDir, $HAS_ARGS, $positionalArgs, $scriptCachedPs1Files, $scriptCachedNixFiles, $scriptCachedYamlFiles, $scriptCachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks)
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
   function say { Write-Output "check: $args" }
   function error { Write-Output "check: error: $args" }
   $_actPattern = '^\s*#.*__[A-Z][A-Z_]*__'
 $_actViolations = @()
-if ($HAS_ARGS) {
-  foreach ($_f in $positionalArgs) {
+if ($using:HAS_ARGS) {
+  foreach ($_f in $using:positionalArgs) {
     if ($_f -like '*.sh' -or $_f -like '*.zsh') {
       $_actViolations += Select-String -Path $_f -Pattern $_actPattern | ForEach-Object { "$($_.Path):$($_.LineNumber)" }
     }
   }
 } else {
-  $_actFiles = Get-ChildItem -Recurse -Path (Join-Path $RepoRoot "src\scripts") -Include '*.sh','*.zsh' | ForEach-Object { $_.FullName }
+  $_actFiles = Get-ChildItem -Recurse -Path (Join-Path $using:RepoRoot "src\scripts") -Include '*.sh','*.zsh' | ForEach-Object { $_.FullName }
   $_actViolations += Select-String -Path $_actFiles -Pattern $_actPattern | ForEach-Object { "$($_.Path):$($_.LineNumber)" }
 }
 if ($_actViolations.Count -gt 0) {
   foreach ($_av in ($_actViolations | Sort-Object -Unique)) { error $_av }
   error "token placeholder strings found in script comments"
-  1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-21.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-21.exit") -NoNewline
 } else {
   say "no token placeholder strings in script comments."
 }
-$_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $_stepStartTicks
+$_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
 $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-$_elapsedMs | Out-File -FilePath (Join-Path $WaveTmpDir "step-21.time") -NoNewline
-} -ArgumentList $RepoRoot, $script:WaveTmpDir, $HAS_ARGS, $positionalArgs, $script:CachedPs1Files, $script:CachedNixFiles, $script:CachedYamlFiles, $script:CachedJsonFiles, $SH_FILES, $NIX_FILES, $PS1_FILES, $PKR_FILES, $_stepStartTicks))
+$_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-21.time") -NoNewline
+}))
 
 # Wait for all background wave jobs to complete
 if ($script:waveJobs.Count -gt 0) {
