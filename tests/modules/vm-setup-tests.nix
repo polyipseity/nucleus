@@ -114,9 +114,7 @@ let
   # windowsIsoUrl must be present on every VM, and must be a string or null.
   test_windows_iso_url_type =
     let
-      missingIsoUrls = builtins.filter (
-        vm: !builtins.hasAttr "windowsIsoUrl" vm
-      ) manifest.VMs;
+      missingIsoUrls = builtins.filter (vm: !builtins.hasAttr "windowsIsoUrl" vm) manifest.VMs;
       badIsoUrls = builtins.filter (
         vm:
         builtins.hasAttr "windowsIsoUrl" vm
@@ -126,9 +124,7 @@ let
     assert' (missingIsoUrls == [ ] && badIsoUrls == [ ])
       "windowsIsoUrl is required on all VMs (must be string or null); missing: ${
         builtins.toString (builtins.map (v: v.name) missingIsoUrls)
-      }; bad types: ${
-        builtins.toString (builtins.map (v: v.name) badIsoUrls)
-      }";
+      }; bad types: ${builtins.toString (builtins.map (v: v.name) badIsoUrls)}";
 
   # macOSVersion must be a string when present; the field is optional (macOS guests only).
   test_macos_version_type =
