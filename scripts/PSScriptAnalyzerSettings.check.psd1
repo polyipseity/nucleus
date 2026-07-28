@@ -9,12 +9,13 @@
 
   Benchmark results (.agents/skills/pssa-rule-benchmark/pssa-rule-benchmark-results.json):
   - Platform: macOS Apple Silicon, pwsh 7.6.3, PSScriptAnalyzer 1.25.0
-  - Files analyzed: 126 *.ps1 files
-  - Total elapsed: 281.3s across 63 enabled rules
-  - Two rules dominate: PSAvoidUsingCmdletAliases (157.9s, 56%) and
-    PSShouldProcess (72.0s, 26%) — both are PSSA engine-internal
+  - Files analyzed: 128 *.ps1 files
+  - Total elapsed: 681.2s across 63 rules × 3 runs (seed 442497198)
+  - Three rules dominate the per-run cost:
+    PSAvoidUsingCmdletAliases (~67.2s), PSUseCmdletCorrectly (~43.3s),
+    PSShouldProcess (~42.8s) — all are PSSA engine-internal
     Get-Command resolution overhead, not rule-logic slowdowns
-  - Remaining 61 rules: ~51.4s combined (most <1s each)
+  - Remaining 60 rules: all <1.2s each
 
   To re-benchmark after updating PSScriptAnalyzer:
     pwsh .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark.ps1
@@ -28,8 +29,9 @@
     Severity = @('Error', 'Warning')
     ExcludeRules = @(
         'PSUseBOMForUnicodeEncodedFile'
-        # Slow rules (>50s each, 82% of lint time combined):
+        # Slow rules (aggregate >150s, ~86% of total lint time):
         'PSAvoidUsingCmdletAliases'
+        'PSUseCmdletCorrectly'
         'PSShouldProcess'
     )
 }
