@@ -361,12 +361,12 @@ function python {
     & $nucleusPythonPath @Args
     return
   }
-  Write-Host "shell: system-wide Python is banned to prevent accidental modifications." -ForegroundColor Yellow
-  Write-Host "         Use one of these approaches instead:" -ForegroundColor Yellow
-  Write-Host "         - nix develop     (activate project devShell with scoped Python)" -ForegroundColor Yellow
-  Write-Host "         - uv run <cmd>    (run Python via uv package manager)" -ForegroundColor Yellow
-  Write-Host "         - uv venv         (create per-project venv managed by uv)" -ForegroundColor Yellow
-  Write-Host "         - ./venv/bin/python (use pre-existing project venv)" -ForegroundColor Yellow
+  Write-Warning "shell: system-wide Python is banned to prevent accidental modifications."
+  Write-Warning "         Use one of these approaches instead:"
+  Write-Warning "         - nix develop     (activate project devShell with scoped Python)"
+  Write-Warning "         - uv run <cmd>    (run Python via uv package manager)"
+  Write-Warning "         - uv venv         (create per-project venv managed by uv)"
+  Write-Warning "         - ./venv/bin/python (use pre-existing project venv)"
   return 1
 }
 # Intercept python3 invocations: pass through only to the
@@ -389,12 +389,12 @@ function pip {
   if (Invoke-NucleusPythonScopedTool -ToolName "pip" @Args) {
     return
   }
-  Write-Host "shell: system-wide pip is banned to prevent breaking system dependencies." -ForegroundColor Yellow
-  Write-Host "         Use one of these approaches instead:" -ForegroundColor Yellow
-  Write-Host "         - nix develop     (activate project devShell with scoped Python+pip)" -ForegroundColor Yellow
-  Write-Host "         - uv pip install  (use uv to manage project dependencies)" -ForegroundColor Yellow
-  Write-Host "         - uv venv         (create per-project venv managed by uv)" -ForegroundColor Yellow
-  Write-Host "         - ./venv/bin/pip  (use pre-existing project venv)" -ForegroundColor Yellow
+  Write-Warning "shell: system-wide pip is banned to prevent breaking system dependencies."
+  Write-Warning "         Use one of these approaches instead:"
+  Write-Warning "         - nix develop     (activate project devShell with scoped Python+pip)"
+  Write-Warning "         - uv pip install  (use uv to manage project dependencies)"
+  Write-Warning "         - uv venv         (create per-project venv managed by uv)"
+  Write-Warning "         - ./venv/bin/pip  (use pre-existing project venv)"
   return 1
 }
 function pip3 {
@@ -462,41 +462,41 @@ function bun {
   if (Invoke-NucleusManagedDevTool -ToolName "bun" -FallbackBinDirectory "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
     return
   }
-  Write-Host "shell: managed bun is unavailable right now." -ForegroundColor Yellow
-  Write-Host "         For development, use one of these managed entrypoints:" -ForegroundColor Yellow
-  Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
-  Write-Host "         - Or use the user-scoped default toolchain installed by nucleus apply" -ForegroundColor Yellow
-  Write-Host "         Shell shortcuts -ni/-nr/-nx also work inside a devShell." -ForegroundColor Yellow
+  Write-Warning "shell: managed bun is unavailable right now."
+  Write-Warning "         For development, use one of these managed entrypoints:"
+  Write-Warning "         - Enter a project directory with .envrc (direnv auto-loads the devShell)"
+  Write-Warning "         - Or use the user-scoped default toolchain installed by nucleus apply"
+  Write-Warning "         Shell shortcuts -ni/-nr/-nx also work inside a devShell."
   return 1
 }
 function cargo {
   if (Invoke-NucleusManagedDevTool -ToolName "cargo" -FallbackBinDirectory "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
     return
   }
-  Write-Host "shell: managed cargo is unavailable right now." -ForegroundColor Yellow
-  Write-Host "         For Rust development, use one of these managed entrypoints:" -ForegroundColor Yellow
-  Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
-  Write-Host "         - Or add a rust-toolchain.toml file to this directory" -ForegroundColor Yellow
+  Write-Warning "shell: managed cargo is unavailable right now."
+  Write-Warning "         For Rust development, use one of these managed entrypoints:"
+  Write-Warning "         - Enter a project directory with .envrc (direnv auto-loads the devShell)"
+  Write-Warning "         - Or add a rust-toolchain.toml file to this directory"
   return 1
 }
 function rustc {
   if (Invoke-NucleusManagedDevTool -ToolName "rustc" -FallbackBinDirectory "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
     return
   }
-  Write-Host "shell: managed rustc is unavailable right now." -ForegroundColor Yellow
-  Write-Host "         For Rust development, use one of these managed entrypoints:" -ForegroundColor Yellow
-  Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
-  Write-Host "         - Or add a rust-toolchain.toml file to this directory" -ForegroundColor Yellow
+  Write-Warning "shell: managed rustc is unavailable right now."
+  Write-Warning "         For Rust development, use one of these managed entrypoints:"
+  Write-Warning "         - Enter a project directory with .envrc (direnv auto-loads the devShell)"
+  Write-Warning "         - Or add a rust-toolchain.toml file to this directory"
   return 1
 }
 function uv {
   if (Invoke-NucleusManagedDevTool -ToolName "uv" -FallbackBinDirectory "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
     return
   }
-  Write-Host "shell: managed uv is unavailable right now." -ForegroundColor Yellow
-  Write-Host "         For Python development, use one of these managed entrypoints:" -ForegroundColor Yellow
-  Write-Host "         - Enter a project directory with .envrc (direnv auto-loads the devShell)" -ForegroundColor Yellow
-  Write-Host "         - Or use the user-scoped default toolchain installed by nucleus apply" -ForegroundColor Yellow
+  Write-Warning "shell: managed uv is unavailable right now."
+  Write-Warning "         For Python development, use one of these managed entrypoints:"
+  Write-Warning "         - Enter a project directory with .envrc (direnv auto-loads the devShell)"
+  Write-Warning "         - Or use the user-scoped default toolchain installed by nucleus apply"
   return 1
 }
 
@@ -505,31 +505,31 @@ function uv {
 # and package manager is bun.  Users who separately installed Node.js
 # should use bun equivalents instead.
 function npm {
-  Write-Host "shell: system-wide npm is not used in this environment." -ForegroundColor Yellow
-  Write-Host "         Use bun equivalents instead:" -ForegroundColor Yellow
-  Write-Host "         - bun install     (install packages)" -ForegroundColor Yellow
-  Write-Host "         - bun add <pkg>   (add a dependency)" -ForegroundColor Yellow
-  Write-Host "         - bun x <cmd>     (run one-shot package commands, replaces npx)" -ForegroundColor Yellow
-  Write-Host "         - bun run         (run package.json scripts)" -ForegroundColor Yellow
-  Write-Host "         Shell shortcuts -ni/-nr/-nx also work." -ForegroundColor Yellow
+  Write-Warning "shell: system-wide npm is not used in this environment."
+  Write-Warning "         Use bun equivalents instead:"
+  Write-Warning "         - bun install     (install packages)"
+  Write-Warning "         - bun add <pkg>   (add a dependency)"
+  Write-Warning "         - bun x <cmd>     (run one-shot package commands, replaces npx)"
+  Write-Warning "         - bun run         (run package.json scripts)"
+  Write-Warning "         Shell shortcuts -ni/-nr/-nx also work."
   return 1
 }
 function npx {
-  Write-Host "shell: system-wide npx is not used in this environment." -ForegroundColor Yellow
-  Write-Host "         Use bun x <cmd> for one-shot package execution instead." -ForegroundColor Yellow
+  Write-Warning "shell: system-wide npx is not used in this environment."
+  Write-Warning "         Use bun x <cmd> for one-shot package execution instead."
   return 1
 }
 function Invoke-NucleusNode {
-  Write-Host "shell: system-wide Node.js is not used in this environment." -ForegroundColor Yellow
-  Write-Host "         Use bun as the JavaScript runtime instead:" -ForegroundColor Yellow
-  Write-Host "         - bun <script>   (run a script)" -ForegroundColor Yellow
-  Write-Host "         - bun run        (run package.json scripts)" -ForegroundColor Yellow
+  Write-Warning "shell: system-wide Node.js is not used in this environment."
+  Write-Warning "         Use bun as the JavaScript runtime instead:"
+  Write-Warning "         - bun <script>   (run a script)"
+  Write-Warning "         - bun run        (run package.json scripts)"
   return 1
 }
 Set-Alias -Name node -Value Invoke-NucleusNode
 function corepack {
-  Write-Host "shell: corepack is not used in this environment." -ForegroundColor Yellow
-  Write-Host "         Use bun for package management instead." -ForegroundColor Yellow
+  Write-Warning "shell: corepack is not used in this environment."
+  Write-Warning "         Use bun for package management instead."
   return 1
 }
 
