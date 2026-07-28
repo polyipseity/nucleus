@@ -30,6 +30,7 @@ Default operating mode for all agent interactions.
 - **Strict scope adherence.** When the user says "only do X", "only fix X", or otherwise scopes the task to a specific pass, phase, file, or rule, do exactly that scope and nothing else. Do not fix related issues, do not improve surrounding code, do not pre-emptively address future passes, or re-organize or refactor outside the stated scope. The user will explicitly ask for follow-up work if needed.
 - **Enumerate subagent opportunities before starting.** Before executing any task, explicitly list which subproblems could be delegated to subagents. Write this list into session memory (`/memories/session/`) if the task is complex. Do not skip this step.
 - **Record animated CLIs/TUIs with asciinema.** For detailed usage, invoke the skill: `skill: "asciinema"`.
+- **Terminal output: NEVER pipe, always redirect to file.** This is a hard rule — see "Terminal output pipes" section below.
 
 ## Subagent delegation
 
@@ -49,11 +50,47 @@ Default operating mode for all agent interactions.
 
 **Template:** See `delegate.prompt.md`. Keep prompts short: 2-3 sentence context, one-sentence task, hard constraints, expected return.
 
+## Terminal output pipes — ABSOLUTE PROHIBITION
+
+**NEVER** pipe terminal output through `grep`, `tail`, `head`, `awk`, `sed`, or any filter — universally, not just for "long-running" commands. This is an absolute ban on piping terminal output. The agent cannot reliably distinguish fast from slow commands, so the prohibition covers **all** terminal command output without exception.
+
+The **only** allowed pattern: redirect the full output to a temporary file, then read or filter that file.
+
+**BAD** (piping terminal output):
+```sh
+grep foo build.log | tail -5  # ← piping terminal output is prohibited
+```
+
+**GOOD** (redirect to file, then filter):
+```sh
+some-command > /tmp/out.txt
+grep foo /tmp/out.txt | tail -5
+```
+
+**Template** (preferred pattern):
+```sh
+tmpfile=$(mktemp)
+some-command > "$tmpfile"
+grep foo "$tmpfile" | tail -5
+```
+
+**Why this is a hard rule:**
+- The agent cannot distinguish a fast command from a slow one when deciding whether piping is safe.
+- If the filter parameters (`grep` pattern, `tail` line count) are wrong, the command must be re-run, wasting context and time.
+- Re-running expensive commands (builds, tests, network calls) compounds the waste.
+- Piping silently discards output that may later be needed for debugging.
+
+**Exceptions:**
+1. Reading from a file (e.g., `grep foo /tmp/out.txt | tail -5`) — this is filtering stored output, not terminal output, and is always safe.
+2. When the user's task is explicitly about text processing ("extract these lines", "find this pattern"), piping is part of the work.
+
+See "Terminal hygiene" below for output lifecycle management.
+
 ## Terminal hygiene
 
 - Discard terminal output after use. After acting on terminal output, summarize the exit code and relevant result in your own words. Do not carry raw terminal output into the next turn's context. Accumulated terminal noise is the single largest input-token waste in multi-turn sessions.
 - **Logging vs terminal output.** Use terminal output for command results, build output, and test results. Use issue comments and conversation messages for diagnostics. Do not write progress logs into terminal output that the user will see — prefer structured tool output or in-message summaries.
-- **Never filter terminal output with pipes.** Do not pipe terminal output through `grep`, `tail`, `head`, `awk`, `sed`, or any filter — universally, not just for "long-running" commands. The agent cannot reliably distinguish fast from slow commands, so the ban covers all terminal output. Instead, redirect the full output to a temporary file and read that file. If the filter was wrong or the tail was too short, re-grep the saved file — no need to re-run the command. Use `mktemp` or a fixed path under `/tmp/`. Exceptions: reading from a file (grep/tail/head/awk/sed on file paths, not terminal output) is fine; when the user's task is explicitly about text processing ("extract these lines", "find this pattern"), piping is part of the work.
+- **Never pipe terminal output — ABSOLUTE PROHIBITION.** See "Terminal output pipes" section above for the rule, examples, and exceptions.
 
 ## Research scope
 
@@ -70,6 +107,7 @@ Default operating mode for all agent interactions.
   - NEVER suggest or run `uv run -m init generate` — content generation is automatic. This instruction applies to ALL content in this repo.
   - NEVER suggest or run `uv run -m init generate -C`.
   - ALWAYS use `resolve_memory_file_uri` to resolve paths under `/memories/`. Passing a literal path like `/memories/session/plan.md` or a manually constructed absolute path to `create_file` will silently write into a workspace-local `memories/` directory if one exists. Only the URI returned by `resolve_memory_file_uri` points to the real session memory store.
+  - NEVER pipe terminal output — always redirect to a file first. See "Terminal output pipes" above. Piping wastes time and causes repeated command re-runs.
 
 ## Premise integrity
 
