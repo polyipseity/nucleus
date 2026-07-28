@@ -4,7 +4,7 @@
 # direnv: load per-directory environments defined in .envrc files.
 # check-suppress:suppression_doc: tool-availability guard -- direnv may not be installed
 if (Get-Command direnv -ErrorAction SilentlyContinue) {
-  (& direnv hook pwsh) | Out-String | Invoke-Expression
+  . ([ScriptBlock]::Create((& direnv hook pwsh | Out-String)))
 }
 
 # PSReadLine: predictive history completion and menu-style tab expansion.
@@ -25,13 +25,13 @@ if (Get-Module -ListAvailable -Name PSReadLine) {
 # zoxide: smart directory navigation learned from visit history.
 # check-suppress:suppression_doc: tool-availability guard -- zoxide may not be installed
 if (Get-Command zoxide -ErrorAction SilentlyContinue) {
-  Invoke-Expression (& zoxide init powershell | Out-String)
+  . ([ScriptBlock]::Create((& zoxide init powershell | Out-String)))
 }
 
 # Starship prompt: cross-shell prompt with git/nix/status info.
 # check-suppress:suppression_doc: tool-availability guard -- starship may not be installed
 if (Get-Command starship -ErrorAction SilentlyContinue) {
-  Invoke-Expression (& starship init powershell | Out-String)
+  . ([ScriptBlock]::Create((& starship init powershell | Out-String)))
 }
 
 # ---------------------------------------------------------------
@@ -54,7 +54,7 @@ if (Test-NucleusAgentSession) {
 # its interactive prompt with no user to respond.
 # check-suppress:suppression_doc: tool-availability guard -- pay-respects may not be installed
 if ([Environment]::UserInteractive -and -not (Test-NucleusAgentSession) -and (Get-Command pay-respects -ErrorAction SilentlyContinue)) {
-  Invoke-Expression (& pay-respects pwsh --alias | Out-String)
+  . ([ScriptBlock]::Create((& pay-respects pwsh --alias | Out-String)))
 }
 
 # prek: install repository-local Git hooks automatically the first time a
