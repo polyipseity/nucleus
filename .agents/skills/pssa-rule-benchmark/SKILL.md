@@ -47,14 +47,14 @@ The task execution order is **globally randomized** using a printed seed (for re
 
 ### Known performance (macOS Apple Silicon, pwsh 7.6.3, PSScriptAnalyzer 1.25.0, 128 files × 63 rules × 3 runs)
 
-| Metric                      | Mean    | Max     | StdDev  | Notes                                          |
-| --------------------------- | ------- | ------- | ------- | ---------------------------------------------- |
-| **Total wall-clock**        | —       | ~681s   | —       | 189 tasks randomized                           |
-| `PSAvoidUsingCmdletAliases` | 67.2s   | 98.3s   | 22.6s   | High variance — `Get-Command` per file         |
-| `PSUseCmdletCorrectly`      | 43.3s   | 62.4s   | 13.9s   | `Get-Command` per file                         |
-| `PSShouldProcess`           | 42.8s   | 54.0s   | 8.4s    | `Get-Command` per file                         |
-| `PSUseConstrainedLanguageMode` | 1.1s | 2.9s   | 1.2s    | Spikes on constrained-mode checks              |
-| All other 59 rules          | <1.2s   | <1.4s   | —       | Bulk completes in ~190s                        |
+| Metric                         | Mean  | Max   | StdDev | Notes                                  |
+| ------------------------------ | ----- | ----- | ------ | -------------------------------------- |
+| **Total wall-clock**           | —     | ~681s | —      | 189 tasks randomized                   |
+| `PSAvoidUsingCmdletAliases`    | 67.2s | 98.3s | 22.6s  | High variance — `Get-Command` per file |
+| `PSUseCmdletCorrectly`         | 43.3s | 62.4s | 13.9s  | `Get-Command` per file                 |
+| `PSShouldProcess`              | 42.8s | 54.0s | 8.4s   | `Get-Command` per file                 |
+| `PSUseConstrainedLanguageMode` | 1.1s  | 2.9s  | 1.2s   | Spikes on constrained-mode checks      |
+| All other 59 rules             | <1.2s | <1.4s | —      | Bulk completes in ~190s                |
 
 The three slow rules (`PSAvoidUsingCmdletAliases`, `PSUseCmdletCorrectly`, `PSShouldProcess`) together consume ~77% of total benchmark time. Their slowness is a PSScriptAnalyzer engine limitation (each queries `Get-Command` per file), not the rule definitions themselves. `PSAvoidUsingCmdletAliases` shows high run-to-run variance (45–98s), suggesting sensitivity to system load / AMT JIT warmup.
 
