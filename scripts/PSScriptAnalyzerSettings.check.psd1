@@ -1,3 +1,21 @@
+# ============================================================================
+# WARNING: DO NOT MODIFY THIS FILE WITHOUT EXPLICIT PERMISSION
+# ============================================================================
+#
+# This file controls which PSScriptAnalyzer rules are excluded during
+# repository check runs (check.sh / check.ps1, step 2).
+#
+# Adding, removing, or changing ExcludeRules in this file without
+# explicit user approval is FORBIDDEN. If you believe a rule should
+# be excluded, ASK FIRST.
+#
+# Pre-existing rules that may trigger if exclusions are removed:
+#   - PSAvoidUsingCmdletAliases        (excluded: slow, ~42s)
+#   - PSUseCmdletCorrectly             (excluded: slow, ~57s)
+#   - PSShouldProcess                  (excluded: slow, ~43s)
+#   - PSUseBOMForUnicodeEncodedFile    (excluded: auto-fixable, low value)
+# ============================================================================
+
 <#
 .SYNOPSIS
   PSScriptAnalyzer settings for repository check (pre-commit/lint) runs.
@@ -32,18 +50,6 @@
     Severity = @('Error', 'Warning')
     ExcludeRules = @(
         'PSUseBOMForUnicodeEncodedFile'
-        # False positive: flags $using:VarName as "missing using scope modifier"
-        # when the variable already has $using: but is not declared in the
-        # script block via param. Affects Start-Job blocks using $using:.
-        'PSUseUsingScopeModifierInNewRunspaces'
-        # Pre-existing warnings masked by PSReviewUnusedParameter before the
-        # $using: refactor in check.ps1. These are intentional patterns:
-        'PSAvoidAssignmentToAutomaticVariable'     # $profile is intentional
-        'PSAvoidGlobalVars'                         # global: state is intentional
-        'PSAvoidUsingInvokeExpression'              # intentional usage in profile
-        'PSAvoidUsingWriteHost'                     # intentional in profile output
-        'PSUseApprovedVerbs'                        # many false positives
-        'PSUseSingularNouns'                        # false positive: Get-VmRunningNames returns multiple names
         # Slow rules (~56s added wall-clock, see benchmark above):
         'PSAvoidUsingCmdletAliases'
         'PSUseCmdletCorrectly'

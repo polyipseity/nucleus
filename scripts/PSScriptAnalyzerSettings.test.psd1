@@ -1,3 +1,21 @@
+# ============================================================================
+# WARNING: DO NOT MODIFY THIS FILE WITHOUT EXPLICIT PERMISSION
+# ============================================================================
+#
+# This file controls which PSScriptAnalyzer rules are excluded during
+# repository check runs (check.sh / check.ps1, step 2).
+#
+# Adding, removing, or changing ExcludeRules in this file without
+# explicit user approval is FORBIDDEN. If you believe a rule should
+# be excluded, ASK FIRST.
+#
+# Pre-existing rules that may trigger if exclusions are removed:
+#   - PSAvoidUsingCmdletAliases        (excluded: slow, ~42s)
+#   - PSUseCmdletCorrectly             (excluded: slow, ~57s)
+#   - PSShouldProcess                  (excluded: slow, ~43s)
+#   - PSUseBOMForUnicodeEncodedFile    (excluded: auto-fixable, low value)
+# ============================================================================
+
 <#
 .SYNOPSIS
   PSScriptAnalyzer settings for full-coverage repository test runs.
