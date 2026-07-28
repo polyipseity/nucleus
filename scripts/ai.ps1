@@ -129,9 +129,9 @@ function Invoke-AiList {
   }
 
   # Tabular output: Profile<tab>Model1, Model2, ...
-  foreach ($profile in ($allModels.PSObject.Properties.Name | Sort-Object)) {
-    $models = @($allModels.$profile) -join ', '
-    Write-Output ("{0,-12} {1}" -f $profile, $models)
+  foreach ($_profile in ($allModels.PSObject.Properties.Name | Sort-Object)) {
+    $models = @($allModels.$_profile) -join ', '
+    Write-Output ("{0,-12} {1}" -f $_profile, $models)
   }
 }
 
@@ -280,8 +280,8 @@ function Invoke-AiConfig {
 
   # Model counts per profile
   $modelCounts = [ordered]@{}
-  foreach ($profile in ($profiles.PSObject.Properties.Name | Sort-Object)) {
-    $modelCounts[$profile] = @($profiles.$profile).Count
+  foreach ($_profile in ($profiles.PSObject.Properties.Name | Sort-Object)) {
+    $modelCounts[$_profile] = @($profiles.$_profile).Count
   }
 
   # Environment variables
@@ -309,8 +309,8 @@ function Invoke-AiConfig {
   Write-Output "Active profile: $activeProfile"
   Write-Output ""
   Write-Output "Model counts:"
-  foreach ($profile in $modelCounts.Keys) {
-    Write-Output ("  {0,-12} {1}" -f $profile, $modelCounts[$profile])
+  foreach ($_profile in $modelCounts.Keys) {
+    Write-Output ("  {0,-12} {1}" -f $_profile, $modelCounts[$_profile])
   }
   Write-Output ""
   Write-Output "Endpoints:"

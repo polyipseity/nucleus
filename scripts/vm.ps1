@@ -157,7 +157,7 @@ function Invoke-VmSetup {
   Invoke-VMSetup @invokeArgs
 }
 
-function Get-VmRunningNames {
+function Get-VmRunningName {
   # Detect running VMs from QEMU processes (Windows uses QEMU).
   # Matches process command lines containing -name qemu-<vmname>.
   $running = @()
@@ -173,7 +173,7 @@ function Get-VmRunningNames {
 function Invoke-VmList {
   $manifest = Get-VmManifest
   $hostName = if ($env:NUCLEUS_HOST) { $env:NUCLEUS_HOST } else { 'windows' }
-  $runningNames = Get-VmRunningNames
+  $runningNames = Get-VmRunningName
 
   # Filter to enabled VMs matching the current host
   $vms = $manifest.VMs | Where-Object {
@@ -193,7 +193,7 @@ function Invoke-VmList {
 function Invoke-VmStatus {
   $manifest = Get-VmManifest
   $hostName = if ($env:NUCLEUS_HOST) { $env:NUCLEUS_HOST } else { 'windows' }
-  $runningNames = Get-VmRunningNames
+  $runningNames = Get-VmRunningName
 
   # Filter to enabled VMs matching the current host
   $vms = $manifest.VMs | Where-Object {
