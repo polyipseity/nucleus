@@ -1136,6 +1136,7 @@ _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Undocumented error suppression" > "$_wave_tmpdir/step-$_step.out"
 echo "Undocumented error suppression" > "$_wave_tmpdir/step-$_step.name"
 {
+_s17_errors=0
 _step17_tmpdir=$(mktemp -d) || { error "failed to create temp dir"; _s17_errors=$((_s17_errors + 1)); }
 
 # Collect script files
@@ -1168,7 +1169,6 @@ if [ "${#_step17_files[@]}" -gt 0 ]; then
     ' _ "$_step17_tmpdir"
 
   # Aggregate errors
-  _s17_errors=0
   for _f in "$_step17_tmpdir"/*.out; do
     [ -f "$_f" ] || continue
     while IFS= read -r _err; do
