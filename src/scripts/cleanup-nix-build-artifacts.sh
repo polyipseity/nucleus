@@ -38,6 +38,7 @@ while IFS= read -r -d '' _cnba_path; do
     _cnba_target="$(readlink "$_cnba_path")"
     if $_cnba_dry_run; then
       dry_run "would remove stale Nix build symlink: $_cnba_path -> $_cnba_target"
+      dry_run "  how it was created: 'nix build' or 'nix build -o result' at the repo root. Run 'nucleus-cleanup-nix' or 'rm $_cnba_path' to remove."
     else
       rm "$_cnba_path"
       say "removed stale Nix build symlink: $_cnba_path -> $_cnba_target"
