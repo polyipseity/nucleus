@@ -1,20 +1,23 @@
 <#
 .SYNOPSIS
-    Tool availability validation for check.ps1 pre-flight block.
+    Tool availability validation for check/test pre-flight blocks.
 .DESCRIPTION
     Provides Assert-ToolAvailable function that checks whether a required tool
     (command or PowerShell module) is available, and errors with an
     install hint if missing.
 
     This is the Windows counterpart to require_command/ensure_tool in
-    src/scripts/lib.sh — but with provisioning hints (winget, Install-Module)
-    instead of just erroring, since Windows lacks a unified package manager
-    like nixpkgs in the nucleus-apply path.
+    src/scripts/lib.sh.
+
+    POLICY: This module MUST NOT accept an InstallCommand parameter — preflight
+    checks must fail hard on missing tools, not suggest ad-hoc installation.
+    Tools must be provisioned via bootstrap or nucleus-apply, not per-check
+    install commands.
 
     Usage:
         Import-Module Ensure-Tool (note: module filename differs from exported function name)
         Assert-ToolAvailable -Name 'powershell-yaml' -Type 'Module'
-        Assert-ToolAvailable -Name 'packer' -Type 'Command' -InstallCommand 'winget install Hashicorp.Packer'
+        Assert-ToolAvailable -Name 'packer' -Type 'Command'
 #>
 
 function Assert-ToolAvailable {
@@ -25,8 +28,6 @@ function Assert-ToolAvailable {
         Tool name (command name or PowerShell module name).
     .PARAMETER Type
         'Command' (default) for PATH executables, 'Module' for PowerShell modules.
-    .PARAMETER InstallCommand
-        Optional command to suggest for installation.
     #>
     param(
         [Parameter(Mandatory = $true)]
@@ -34,10 +35,7 @@ function Assert-ToolAvailable {
 
         [Parameter(Mandatory = $false)]
         [ValidateSet('Command', 'Module')]
-        [string]$Type = 'Command',
-
-        [Parameter(Mandatory = $false)]
-        [string]$InstallCommand = ''
+        [string]$Type = 'Command'
     )
 
     $available = $false
@@ -48,12 +46,7 @@ function Assert-ToolAvailable {
     }
 
     if (-not $available) {
-        $message = "check: error: $Name is required but was not found"
-        if ($InstallCommand) {
-            $message += ". Install with: $InstallCommand"
-        } else {
-            $message += ". Run bootstrap or nucleus-apply to install it."
-        }
+        $message = "check: error: $Name is required but was not found. Run bootstrap or nucleus-apply to install it."
         Write-Output $message
         exit 1
     }
