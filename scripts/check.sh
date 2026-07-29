@@ -255,6 +255,13 @@ require_command nix
 require_command packer
 require_command check-jsonschema
 
+# Remove stale result symlinks before any checks run.
+# `nix build -o result` and invocations of treefmt wrappers create result
+# symlinks that are stale between rebuilds.  Removing them prevents the
+# stale-artifact check (step 6) from flagging them mid-run.
+# The path is relative to REPO_ROOT which is the cwd at this point.
+rm -f result result-*
+
 # code_formatting — Code formatting (treefmt)
 # Uses --fail-on-change instead of --ci to preserve eval cache (mtime-based)
 # for faster subsequent runs. --fail-on-change replicates the CI-safe
