@@ -43,5 +43,9 @@
 
   settings.excludes = [
     "vendor/**"
+    # discord-music-rpc app rewrites its own config on startup (writable
+    # symlink to the repo file).  treefmt should not touch app-managed
+    # files — it only manages files that the project owns exclusively.
+    "src/modules/configs/discord-music-rpc/config.yaml"
   ];
 }
