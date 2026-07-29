@@ -25,25 +25,10 @@ run_21_preflight_install_command_policy() {
   fi
 
   if [ "${#_ps1_files[@]}" -gt 0 ]; then
-    # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
-    printf '%s\0' "${_ps1_files[@]}" \
-      | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
-        _f="$1"
-        _line_no=0
-        while IFS= read -r _line; do
-          _line_no=$((_line_no + 1))
-          # Check for Assert-ToolAvailable calls with -InstallCommand parameter
-          if echo "$_line" | grep -q "Assert-ToolAvailable.*-InstallCommand"; then
-            echo "$_f:$_line_no:$_line"
-          fi
-        done < "$_f"
-      ' _
-
-    # Read results from xargs (they come through stdout)
-    # We use a temp file approach to capture violations
     local _s21_tmpdir
     _s21_tmpdir=$(mktemp -d) || { error "failed to create temp dir"; _s21_errors=$((_s21_errors + 1)); }
 
+    # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
     printf '%s\0' "${_ps1_files[@]}" \
       | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
         _f="$1"

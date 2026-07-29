@@ -3,7 +3,6 @@
 # inline register_step / Register-Step calls.
 
 let
-  inherit (import ../lib.nix) containsRegex;
 
   checkStepsDir = ../../src/scripts/checks/check-steps;
   checkStepsFiles = builtins.attrNames (builtins.readDir checkStepsDir);
@@ -11,7 +10,9 @@ let
 
   # Sorted lists of step files
   shFiles = builtins.sort builtins.lessThan (builtins.filter (f: hasSuffix ".sh" f) checkStepsFiles);
-  ps1Files = builtins.sort builtins.lessThan (builtins.filter (f: hasSuffix ".ps1" f) checkStepsFiles);
+  ps1Files = builtins.sort builtins.lessThan (
+    builtins.filter (f: hasSuffix ".ps1" f) checkStepsFiles
+  );
 
   # Read a step file by name
   readStep = name: builtins.readFile (checkStepsDir + "/${name}");
@@ -23,7 +24,8 @@ let
   shStepNumStr = f: builtins.head (builtins.match ".*register_step ([0-9]+) .*" (readStep f));
 
   # Extract step number from Register-Step call (Windows)
-  ps1StepNumStr = f: builtins.head (builtins.match ".*Register-Step -Number ([0-9]+) .*" (readStep f));
+  ps1StepNumStr =
+    f: builtins.head (builtins.match ".*Register-Step -Number ([0-9]+) .*" (readStep f));
 
   # Verify file prefix matches inline step number
   checkSh = f: (shStepNumStr f) == (fileStepNumStr f);
