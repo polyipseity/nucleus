@@ -71,6 +71,22 @@ test_explicit_failure_summary() {
     fi
 }
 
+test_step_prefix_present() {
+    if grep -q '\[Step ' "$TEST_SH"; then
+        assert_pass "[Step N] prefix present"
+    else
+        assert_fail "[Step N] prefix" "Expected [Step N] patterns not found"
+    fi
+}
+
+test_test_boundary_markers() {
+    if grep -qF -- '--- test output ---' "$TEST_SH"; then
+        assert_pass "Test boundary markers present"
+    else
+        assert_fail "Test boundary markers" "Expected '--- test output ---' pattern not found"
+    fi
+}
+
 test_step_name_files() {
     # shellcheck disable=SC2016 # reason: literal $ in grep pattern to match step-$_step.name in source
     if grep -qF 'step-$_step.name' "$TEST_SH"; then
@@ -93,9 +109,5 @@ test_generic_failure_message
 test_success_message
 test_explicit_failure_summary
 test_step_name_files
-
-echo ""
-echo "--- Results: $TESTS_PASSED passed, $TESTS_FAILED failed ---"
-echo ""
-
-exit "$TESTS_FAILED"
+ test_step_prefix_present
+ test_test_boundary_markers

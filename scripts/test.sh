@@ -139,6 +139,10 @@ _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Nix test suite"
 echo "Nix test suite" > "$_wave_tmpdir/step-$_step.name"
 {
+say() { printf '[Step %s] %s\n' "$_step" "$*"; }
+error() { printf '[Step %s] error: %s\n' "$_step" "$*" >&2; }
+# shellcheck disable=SC2329 # reason: defined for consistency across all step blocks
+warn() { printf '[Step %s] warning: %s\n' "$_step" "$*" >&2; }
 tmp_failed=$(mktemp) || { error "failed to create temp file"; }
 if [ "$quiet_mode" = true ]; then
   # Quiet: suppress Testing: / PASS: lines and nix output on success.
@@ -180,14 +184,21 @@ _step_start=$(date +%s%3N)
 section "$((_step += 1))" "PowerShell lint"
 echo "PowerShell lint" > "$_wave_tmpdir/step-$_step.name"
 {
+say() { printf '[Step %s] %s\n' "$_step" "$*"; }
+# shellcheck disable=SC2329 # reason: defined for consistency across all step blocks
+error() { printf '[Step %s] error: %s\n' "$_step" "$*" >&2; }
+# shellcheck disable=SC2329 # reason: defined for consistency across all step blocks
+warn() { printf '[Step %s] warning: %s\n' "$_step" "$*" >&2; }
 _ps_exit=0
 # Use -File (not -Command): test mode never passes paths, so no array binding
 # is needed. -File is simpler and avoids shell-quoting overhead.
+say "--- test output ---"
 pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -Settings scripts/PSScriptAnalyzerSettings.test.psd1 || _ps_exit=1
 # check-pwsh smoke tests (syntax validation, -SkipStep, error handling).
 bash tests/scripts/check-pwsh-tests.sh || _ps_exit=1
 # Output format tests — validate test.sh's own output format patterns.
 bash tests/scripts/test-output-format-tests.sh || _ps_exit=1
+say "--- end test output ---"
 echo "$_ps_exit" > "$_wave_tmpdir/step-2.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
@@ -197,10 +208,19 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Nucleus apps smoke tests"
 {
+say() { printf '[Step %s] %s\n' "$_step" "$*"; }
+# shellcheck disable=SC2329 # reason: defined for consistency across all step blocks
+error() { printf '[Step %s] error: %s\n' "$_step" "$*" >&2; }
+# shellcheck disable=SC2329 # reason: defined for consistency across all step blocks
+warn() { printf '[Step %s] warning: %s\n' "$_step" "$*" >&2; }
 if [ "$quiet_mode" = true ]; then
+  say "--- test output ---"
   bash tests/scripts/nucleus-apps-smoke-tests.sh >/dev/null || echo "1" > "$_wave_tmpdir/step-4.exit"
+  say "--- end test output ---"
 else
+  say "--- test output ---"
   bash tests/scripts/nucleus-apps-smoke-tests.sh || echo "1" > "$_wave_tmpdir/step-3.exit"
+  say "--- end test output ---"
 fi
 [ -f "$_wave_tmpdir/step-3.exit" ] || echo "0" > "$_wave_tmpdir/step-3.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
@@ -214,6 +234,11 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "System config build"
 echo "System config build" > "$_wave_tmpdir/step-$_step.name"
+say() { printf '[Step %s] %s\n' "$_step" "$*"; }
+# shellcheck disable=SC2329 # reason: defined for consistency across all step blocks
+error() { printf '[Step %s] error: %s\n' "$_step" "$*" >&2; }
+# shellcheck disable=SC2329 # reason: defined for consistency across all step blocks
+warn() { printf '[Step %s] warning: %s\n' "$_step" "$*" >&2; }
 if [ "$skip_system_build" = true ]; then
   say "skipping (--skip-system-build)."
 else
