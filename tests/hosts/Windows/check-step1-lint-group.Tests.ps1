@@ -34,6 +34,6 @@ Describe 'Step 1: Code formatting and linting (treefmt equivalent)' {
 
 Describe 'Pre-flight: yamllint tool availability' {
     It 'has yamllint in Ensure-Tool pre-flight block' {
-        $script:checkContent | Should -MatchExactly "Ensure-Tool -Name 'yamllint'"
+        $script:checkContent | Should -MatchExactly "Assert-ToolAvailable -Name 'yamllint'"
     }
 }

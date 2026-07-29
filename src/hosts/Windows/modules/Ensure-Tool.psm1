@@ -2,7 +2,7 @@
 .SYNOPSIS
     Tool availability validation for check.ps1 pre-flight block.
 .DESCRIPTION
-    Provides Ensure-Tool function that checks whether a required tool
+    Provides Assert-ToolAvailable function that checks whether a required tool
     (command or PowerShell module) is available, and errors with an
     install hint if missing.
 
@@ -12,12 +12,12 @@
     like nixpkgs in the nucleus-apply path.
 
     Usage:
-        Import-Module Ensure-Tool
-        Ensure-Tool -Name 'powershell-yaml' -Type 'Module'
-        Ensure-Tool -Name 'packer' -Type 'Command' -InstallCommand 'winget install Hashicorp.Packer'
+        Import-Module Ensure-Tool (note: module filename differs from exported function name)
+        Assert-ToolAvailable -Name 'powershell-yaml' -Type 'Module'
+        Assert-ToolAvailable -Name 'packer' -Type 'Command' -InstallCommand 'winget install Hashicorp.Packer'
 #>
 
-function Ensure-Tool {
+function Assert-ToolAvailable {
     <#
     .SYNOPSIS
         Verify a required tool is available; exit with a message if not.
@@ -59,4 +59,4 @@ function Ensure-Tool {
     }
 }
 
-Export-ModuleMember -Function Ensure-Tool
+Export-ModuleMember -Function Assert-ToolAvailable

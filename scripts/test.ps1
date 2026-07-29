@@ -67,9 +67,9 @@ $_step = 0
 $_totalSteps = 4
 $_failedSteps = ""
 
-# Output helpers — structured prefix pattern matching section()/say/warn from test.sh.
-function say { Write-Output "test: $args" }
-function warn { Write-Output "test: warning: $args" }
+# Output helpers — structured prefix pattern matching section()/Write-Message/Write-WarningMessage from test.sh.
+function Write-Message { Write-Output "test: $args" }
+function Write-WarningMessage { Write-Output "test: warning: $args" }
 
 # Pre-flight tool availability checks.
 # All tools listed in Prerequisites must be present. Missing tools produce
@@ -77,7 +77,7 @@ function warn { Write-Output "test: warning: $args" }
 $modulesPath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules'
 Import-Module (Join-Path $modulesPath 'Ensure-Tool.psm1') -Force
 # PSScriptAnalyzer is required for PowerShell lint step 2
-Ensure-Tool -Name 'PSScriptAnalyzer' -Type 'Module' -InstallCommand "Install-Module PSScriptAnalyzer -Scope CurrentUser -Force"
+Assert-ToolAvailable -Name 'PSScriptAnalyzer' -Type 'Module' -InstallCommand "Install-Module PSScriptAnalyzer -Scope CurrentUser -Force"
 
 # Process flags
 foreach ($_arg in $args) {
@@ -118,7 +118,7 @@ Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Remove-Item 
 $_sw = [System.Diagnostics.Stopwatch]::StartNew()
 Write-Output ("`n=== [{0}] Nix test suite ===" -f (++$_step))
 "Nix test suite" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
-say "skipping (requires Nix toolchain — not available on Windows)."
+Write-Message "skipping (requires Nix toolchain — not available on Windows)."
 $_sw.Stop()
 "0" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.exit") -NoNewline
 $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.time") -NoNewline
@@ -154,7 +154,7 @@ $script:waveJob2 = Start-Job -ScriptBlock {
 $_sw = [System.Diagnostics.Stopwatch]::StartNew()
 Write-Output ("`n=== [{0}] Nucleus apps smoke tests ===" -f (++$_step))
 "Nucleus apps smoke tests" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
-say "skipping (requires Nix and bash — not available on Windows)."
+Write-Message "skipping (requires Nix and bash — not available on Windows)."
 $_sw.Stop()
 "0" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.exit") -NoNewline
 $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.time") -NoNewline
@@ -165,7 +165,7 @@ $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "ste
 $_sw = [System.Diagnostics.Stopwatch]::StartNew()
 Write-Output ("`n=== [{0}] System config build ===" -f (++$_step))
 "System config build" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
-say "skipping (system config build is POSIX-only)."
+Write-Message "skipping (system config build is POSIX-only)."
 $_sw.Stop()
 "0" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.exit") -NoNewline
 $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.time") -NoNewline
@@ -178,7 +178,7 @@ if ($script:waveJob2) {
 
 # Wave result aggregation — combined status table with timing and failure collection
 $script:statusIcons = @{ $true = '✓'; $false = '✗' }
-say "test step timing:"
+Write-Message "test step timing:"
 $_totalMs = 0
 for ($_s = 1; $_s -le $_totalSteps; $_s++) {
   $_timeFile = Join-Path $script:WaveTmpDir "step-$_s.time"
@@ -204,8 +204,8 @@ Write-Output ("  total:   {0,5} ms" -f $_totalMs)
 
 Write-Output ""
 if ($exitCode -ne 0) {
-  warn "Failed steps: $($_failedSteps.TrimEnd(', '))"
-  warn "some tests failed with exit code $exitCode"
+  Write-WarningMessage "Failed steps: $($_failedSteps.TrimEnd(', '))"
+  Write-WarningMessage "some tests failed with exit code $exitCode"
   exit $exitCode
 }
-say "all tests passed."
+Write-Message "all tests passed."

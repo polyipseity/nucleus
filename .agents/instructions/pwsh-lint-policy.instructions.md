@@ -72,36 +72,78 @@ $_ps1Files = $using:PS1_FILES
 if ($_ps1Files.Count -gt 0) { ... $_ps1Files ... }
 ```
 
-### `PSUseApprovedVerbs` with `New-Item -Path Function:` aliases
+### `PSUseApprovedVerbs` — always use approved verbs
 
-**Trigger:** Defining functions via the PSFunction provider path instead of the `function` keyword,
-e.g. `New-Item -Path Function: -Name '-g' -Value { & git @Args } -Force`.
+**Trigger:** Function or cmdlet name using an unapproved verb, e.g. `Ensure-Tool`.
 
-**Root cause:** `PSUseApprovedVerbs` only inspects `FunctionDefinitionAst` AST nodes — the node
-produced by `function foo { ... }` syntax. `New-Item -Path Function:` creates a function through
-the PSFunction provider machinery without producing a `FunctionDefinitionAst`, so the rule never
-evaluates the function name against its approved-verb list. There is no AST node for the rule to
-inspect, making this a deliberate structural bypass rather than a parser false positive.
+**Root cause:** PowerShell's `PSUseApprovedVerbs` rule checks every `FunctionDefinitionAst` node — functions defined with the `function` keyword — and verifies that the verb part (text before the first hyphen) is one of the [approved PowerShell verbs](https://learn.microsoft.com/en-us/powershell/scripting/developer/cmdlet/approved-verbs-for-windows-powershell-commands).
 
-**Fix:** Wrap the provider-path call in a helper so call sites stay clean:
+**Fix:** Rename the function to use an approved verb. Example:
 
 ```powershell
-function Add-ShellAlias { param([string]$Name, [scriptblock]$Value) $null = New-Item -Path Function: -Name $Name -Value $Value -Force }
-Add-ShellAlias '-g' { & git @Args }
+# BAD — 'Ensure' is not an approved verb:
+function Ensure-Tool { ... }
+
+# GOOD — use an approved verb:
+function Assert-ToolAvailable { ... }
 ```
 
-This eliminates individual suppressions while keeping the rule satisfied. The rule cannot fire
-because no alias definition produces a `FunctionDefinitionAst`.
+**Lowercase helpers (`say`, `warn`, `error`)**: These do not follow the Verb-Noun pattern at all. Rename them to use an approved Verb-Noun format:
+
+```powershell
+# BAD — no Verb-Noun pattern:
+function say { Write-Output "$args" }
+
+# GOOD — approved verb + descriptive noun:
+function Write-Message { Write-Output "$args" }
+```
+
+**Command-name wrappers** (`python`, `bun`, `cargo`, etc.): Functions that intentionally shadow native commands must keep their exact lowercase name to function as replacements. Add a PSSA-native suppression comment `# SuppressMessageAttribute('PSUseApprovedVerbs', '')` above the function with a `# check-suppress:` reason annotation on the same line:
+
+```powershell
+# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native python for version management
+function python {
+```
+
+This is not an exemption — use inline suppression with a documented reason as per standard suppression rules. The `[SuppressMessageAttribute()]` attribute syntax (with brackets) is NOT used here — it causes `UnexpectedAttribute` ParseErrors in PSSA at script scope. Use the comment syntax (with `#`) instead.
+
+**`Add-ShellAlias` helper**: Functions that create aliases via `New-Item -Path Function:` use the PSFunction provider path and produce no `FunctionDefinitionAst`. The helper itself (`Add-ShellAlias`) uses the approved verb `Add-`. This is the canonical way to create function aliases without triggering the rule.
+
+### `PSUseSingularNouns` — always use singular nouns
+
+**Trigger:** Function or cmdlet name using a plural noun, e.g. `Get-VmRunningNames`.
+
+**Root cause:** PowerShell convention requires function names to use singular nouns. PSSA's `PSUseSingularNouns` rule flags any function whose noun part appears grammatically plural (typically ending in 's', 'es', 'ies', or irregular plurals).
+
+**Fix — two cases:**
+
+1. **Function returns a single item** → use bare singular noun (e.g., `Get-Process`, `Get-Service`).
+2. **Function returns multiple items** (collection/plurality) → use a **collection-indicating singular noun** — never a bare singular noun that misrepresents the return type.
+
+**Allowed collection-indicating singular nouns:**
+
+| Category | Words |
+| -------- | ----- |
+| General collections | List, Set, Collection, Array, Group, Batch, Bundle, Cluster |
+| Key-value structures | Map, Dictionary, Hash, Hashtable, Index, Registry, Catalog, Table |
+| Data structures | Queue, Stack, Vector, Matrix, Range, Buffer, Pool, Cache, Heap, Ring, Tree, Graph, Stream, Sequence, Series |
+| Record-keeping | Enum, Inventory, Manifest, Record, Store, Archive, Suite, Toolkit, Library, Report |
+| Organizational | Aggregate, Compilation, Overview, Summary |
+
+**Suppression:** Never. Do not suppress `PSUseSingularNouns`. Rename the function.
+
+**Edge cases:** Words ending in 's' that are inherently singular (Status, alias, process, bus, focus, virus, analysis, basis, crisis, thesis, etc.) are not violations. PSSA's built-in dictionary handles most of these.
 
 ## Reference table
 
-| Rule ID                                                    | Trigger                                         | Fix strategy                                                                                       |
-| ---------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `PSUseUsingScopeModifierInNewRunspaces`                    | `$using:VAR.Count` member access                | Assign `$using:` var to local, use `.Count` on local                                               |
-| `PSUseApprovedVerbs`                                       | Function aliases via `New-Item -Path Function:` | Wrap in `Add-ShellAlias` helper                                                                    |
-| `PSUseDeclaredVarsMoreThanAssignments`                     | `$null = <cmd>` or `[void]<expr>`               | `> $null` redirect preferred, else annotate with `# check-suppress:SuppressMessageAttribute:`      |
-| `PSPossibleIncorrectComparisonWithNull`                    | `$null = <cmd>`                                 | `> $null` redirect preferred, else annotate with `# check-suppress:SuppressMessageAttribute:`      |
-| `PSReviewUnusedParameter` / `PSAvoidUsingUnusedParameters` | Parameter not used in function body             | Reassess parameter necessity; annotate `$null =` with `# check-suppress:SuppressMessageAttribute:` |
+| Rule ID | Trigger | Fix strategy |
+| ------- | ------- | ------------ |
+| `PSUseUsingScopeModifierInNewRunspaces` | `$using:VAR.Count` member access | Assign `$using:` var to local, use `.Count` on local |
+| `PSUseApprovedVerbs` | Function name uses unapproved verb | Rename to approved verb; lowercase helpers get Verb-Noun name; command-name wrappers add inline suppression |
+| `PSUseSingularNouns` | Function name uses plural noun | Rename to singular noun: bare singular for single-return, collection-indicating singular for multi-return |
+| `PSUseDeclaredVarsMoreThanAssignments` | `$null = <cmd>` or `[void]<expr>` | `> $null` redirect preferred, else annotate with `# check-suppress:SuppressMessageAttribute:` |
+| `PSPossibleIncorrectComparisonWithNull` | `$null = <cmd>` | `> $null` redirect preferred, else annotate with `# check-suppress:SuppressMessageAttribute:` |
+| `PSReviewUnusedParameter` / `PSAvoidUsingUnusedParameters` | Parameter not used in function body | Reassess parameter necessity; annotate `$null =` with `# check-suppress:SuppressMessageAttribute:` |
 
 ## Adding a new rule policy
 

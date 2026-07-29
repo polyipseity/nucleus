@@ -158,7 +158,7 @@ function Invoke-VmSetup {
   Invoke-VMSetup @invokeArgs
 }
 
-function Get-VmRunningName {
+function Get-VmRunningNameList {
   # Detect running VMs from QEMU processes (Windows uses QEMU).
   # Matches process command lines containing -name qemu-<vmname>.
   $running = @()
@@ -174,7 +174,7 @@ function Get-VmRunningName {
 function Invoke-VmList {
   $manifest = Get-VmManifest
   $hostName = if ($env:NUCLEUS_HOST) { $env:NUCLEUS_HOST } else { 'windows' }
-  $runningNames = Get-VmRunningName
+  $runningNameList = Get-VmRunningNameList
 
   # Filter to enabled VMs matching the current host
   $vms = $manifest.VMs | Where-Object {
@@ -186,7 +186,7 @@ function Invoke-VmList {
   Write-Output "NAME                TYPE           ENABLED    STATE    HOSTS"
   foreach ($vm in $vms) {
     $hostsStr = if ($vm.hosts) { ($vm.hosts -join ',') } else { 'all' }
-    $state = if ($vm.name -in $runningNames) { 'running' } else { 'stopped' }
+    $state = if ($vm.name -in $runningNameList) { 'running' } else { 'stopped' }
     Write-Output ("{0,-20} {1,-14} {2,-10} {3,-9} {4}" -f $vm.name, $vm.type, $vm.enabled, $state, $hostsStr)
   }
 }
@@ -194,7 +194,7 @@ function Invoke-VmList {
 function Invoke-VmStatus {
   $manifest = Get-VmManifest
   $hostName = if ($env:NUCLEUS_HOST) { $env:NUCLEUS_HOST } else { 'windows' }
-  $runningNames = Get-VmRunningName
+  $runningNameList = Get-VmRunningNameList
 
   # Filter to enabled VMs matching the current host
   $vms = $manifest.VMs | Where-Object {
@@ -207,7 +207,7 @@ function Invoke-VmStatus {
   foreach ($vm in $vms) {
     $hostsStr = if ($vm.hosts) { ($vm.hosts -join ',') } else { 'all' }
     $ramGb = [math]::Round($vm.ramBytes / 1GB, 0)
-    $state = if ($vm.name -in $runningNames) { 'running' } else { 'stopped' }
+    $state = if ($vm.name -in $runningNameList) { 'running' } else { 'stopped' }
     Write-Output ("{0,-20} {1,-14} {2,-10} {3,-9} {4,-9} {5,-9} {6}" -f $vm.name, $vm.type, $vm.enabled, $state, $hostsStr, $vm.cpus, "${ramGb}G")
   }
 }

@@ -23,12 +23,12 @@ Describe 'Pre-flight — Ensure-Tool module import' {
     $checkPs1Content | Should -MatchExactly 'Import-Module \(Join-Path \$modulesPath'
   }
 
-  It 'checks powershell-yaml module with Ensure-Tool' {
-    $checkPs1Content | Should -MatchExactly "Ensure-Tool -Name 'powershell-yaml' -Type 'Module'"
+  It 'checks powershell-yaml module with Assert-ToolAvailable' {
+    $checkPs1Content | Should -MatchExactly "Assert-ToolAvailable -Name 'powershell-yaml' -Type 'Module'"
   }
 
-  It 'checks packer command with Ensure-Tool' {
-    $checkPs1Content | Should -MatchExactly "Ensure-Tool -Name 'packer' -Type 'Command'"
+  It 'checks packer command with Assert-ToolAvailable' {
+    $checkPs1Content | Should -MatchExactly "Assert-ToolAvailable -Name 'packer' -Type 'Command'"
   }
 
   It 'pre-flight block runs before step 1' {

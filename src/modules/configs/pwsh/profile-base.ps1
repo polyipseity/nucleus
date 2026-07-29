@@ -355,6 +355,7 @@ function Invoke-NucleusPythonScopedTool {
 # WinGet-managed Python installed by this repo
 # (Python.Python.3.13 at %LOCALAPPDATA%\Programs\Python\Python313\python.exe).
 # Everything else triggers the educational ban message.
+# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native python; routes to WinGet-managed Python
 function python {
   if (Invoke-NucleusPythonScopedTool -ToolName "python" @Args) {
     return
@@ -376,6 +377,7 @@ function python {
 # Intercept python3 invocations: pass through only to the
 # WinGet-managed Python at its install path. On Windows there is no
 # python3.exe (only python.exe), so both route to the same binary.
+# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native python3; routes to WinGet-managed Python
 function python3 {
   if (Invoke-NucleusPythonScopedTool -ToolName "python3" @Args) {
     return
@@ -389,6 +391,7 @@ function python3 {
   # Fall back to python() for final resolution (scoped/ban).
   python @Args
 }
+# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native pip; routes through python wrapper to managed Python
 function pip {
   if (Invoke-NucleusPythonScopedTool -ToolName "pip" @Args) {
     return
@@ -401,6 +404,7 @@ function pip {
   Write-Warning "         - ./venv/bin/pip  (use pre-existing project venv)"
   return 1
 }
+# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native pip3; routes through pip wrapper to managed Python
 function pip3 {
   if (Invoke-NucleusPythonScopedTool -ToolName "pip3" @Args) {
     return
@@ -462,6 +466,7 @@ function Invoke-NucleusManagedDevTool {
 # When a rust-toolchain.toml exists in the current directory, cargo/rustc
 # pass through to the rustup shim.  Otherwise, fall back to the managed
 # default toolchain installed by apply.
+# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native bun; redirects to managed dev toolchain or warns
 function bun {
   if (Invoke-NucleusManagedDevTool -ToolName "bun" -FallbackBinDirectory "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
     return
@@ -473,6 +478,7 @@ function bun {
   Write-Warning "         Shell shortcuts -ni/-nr/-nx also work inside a devShell."
   return 1
 }
+# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native cargo; redirects to managed dev toolchain via rustup/direnv
 function cargo {
   if (Invoke-NucleusManagedDevTool -ToolName "cargo" -FallbackBinDirectory "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
     return
@@ -483,6 +489,7 @@ function cargo {
   Write-Warning "         - Or add a rust-toolchain.toml file to this directory"
   return 1
 }
+# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native rustc; redirects to managed toolchain via rustup/direnv
 function rustc {
   if (Invoke-NucleusManagedDevTool -ToolName "rustc" -FallbackBinDirectory "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
     return
@@ -493,6 +500,7 @@ function rustc {
   Write-Warning "         - Or add a rust-toolchain.toml file to this directory"
   return 1
 }
+# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native uv; redirects to managed Python dev toolchain
 function uv {
   if (Invoke-NucleusManagedDevTool -ToolName "uv" -FallbackBinDirectory "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
     return
@@ -508,6 +516,7 @@ function uv {
 # These tools are NOT installed by this repository. The sole JS runtime
 # and package manager is bun.  Users who separately installed Node.js
 # should use bun equivalents instead.
+# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native npm; warns to use bun equivalents
 function npm {
   Write-Warning "shell: system-wide npm is not used in this environment."
   Write-Warning "         Use bun equivalents instead:"
@@ -518,6 +527,7 @@ function npm {
   Write-Warning "         Shell shortcuts -ni/-nr/-nx also work."
   return 1
 }
+# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native npx; warns to use bun x equivalents
 function npx {
   Write-Warning "shell: system-wide npx is not used in this environment."
   Write-Warning "         Use bun x <cmd> for one-shot package execution instead."
@@ -531,6 +541,7 @@ function Invoke-NucleusNode {
   return 1
 }
 Set-Alias -Name node -Value Invoke-NucleusNode
+# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native corepack; warns to use bun
 function corepack {
   Write-Warning "shell: corepack is not used in this environment."
   Write-Warning "         Use bun for package management instead."
