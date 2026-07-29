@@ -34,7 +34,7 @@ assert containsRegex "require_command nix" checkShText;
 assert containsRegex "require_command packer" checkShText;
 
 # Pre-flight tool availability block (check.ps1)
-assert containsRegex "Ensure-Tool -Name 'yamllint'" checkPs1Text;
+assert containsRegex "Assert-ToolAvailable -Name 'yamllint'" checkPs1Text;
 
 # Step name correspondence anchor (check.ps1 step 1)
 assert containsRegex "treefmt equivalent" checkPs1Text;
