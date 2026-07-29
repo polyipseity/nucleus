@@ -471,9 +471,12 @@ section "$((_step += 1))" "Shell script validation tests"
 echo "Shell script validation tests" > "$_wave_tmpdir/step-$_step.name"
 {
 _svt_exit=0
+echo "--- test output ---"
 bash tests/scripts/script-validation-tests.sh || _svt_exit=$?
-# Output format tests — validate check.sh's own output format patterns.
+echo "--- end test output ---"
+echo "--- test output ---"
 bash tests/scripts/check-output-format-tests.sh || _svt_exit=$?
+echo "--- end test output ---"
 echo "$_svt_exit" > "$_wave_tmpdir/step-8.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
@@ -485,7 +488,9 @@ section "$((_step += 1))" "CWD-independence tests"
 echo "CWD-independence tests" > "$_wave_tmpdir/step-$_step.name"
 {
 _cit_exit=0
+echo "--- test output ---"
 bash tests/scripts/cwd-independence-tests.sh || _cit_exit=$?
+echo "--- end test output ---"
 echo "$_cit_exit" > "$_wave_tmpdir/step-9.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
@@ -497,7 +502,9 @@ section "$((_step += 1))" "Nix search path tests"
 echo "Nix search path tests" > "$_wave_tmpdir/step-$_step.name"
 {
 _nspt_exit=0
+echo "--- test output ---"
 bash tests/scripts/nix-search-path-tests.sh || _nspt_exit=$?
+echo "--- end test output ---"
 echo "$_nspt_exit" > "$_wave_tmpdir/step-10.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
@@ -509,7 +516,9 @@ section "$((_step += 1))" "Port utility function tests"
 echo "Port utility function tests" > "$_wave_tmpdir/step-$_step.name"
 {
 _put_exit=0
+echo "--- test output ---"
 bash tests/scripts/lib-port-functions-tests.sh || _put_exit=$?
+echo "--- end test output ---"
 echo "$_put_exit" > "$_wave_tmpdir/step-11.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"

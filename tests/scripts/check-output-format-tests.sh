@@ -66,27 +66,27 @@ test_step_prefix_present() {
     fi
 }
 
-test_no_test_boundary_markers() {
-    # Phase 2 does not add test boundary markers yet
-    if grep -qF -- "--- test output ---" "$CHECK_SH"; then
-        assert_fail "Test boundary markers" "Phase 2 should NOT have test output boundaries yet"
+test_no_explicit_failure_summary() {
+    # Phase 3 does not add explicit failure summary yet
+    if grep -qF "Failed step" "$CHECK_SH"; then
+        assert_fail "Explicit failure summary" "Phase 3 should NOT have explicit failure summary yet"
     else
-        assert_pass "No test boundary markers (Phase 2)"
+        assert_pass "No explicit failure summary (Phase 3)"
     fi
 }
 
-test_no_explicit_failure_summary() {
-    # Phase 2 does not add explicit failure summary yet
-    if grep -qF "Failed step" "$CHECK_SH"; then
-        assert_fail "Explicit failure summary" "Phase 2 should NOT have explicit failure summary yet"
+test_test_boundary_markers() {
+    # Phase 3: test-runner boundary markers present
+    if grep -qF -- "--- test output ---" "$CHECK_SH" && grep -qF -- "--- end test output ---" "$CHECK_SH"; then
+        assert_pass "Test boundary markers present (Phase 3)"
     else
-        assert_pass "No explicit failure summary (Phase 2)"
+        assert_fail "Test boundary markers" "Expected '--- test output ---' and '--- end test output ---' markers"
     fi
 }
 
 # ---- Run tests ----
 echo ""
-echo "Testing check.sh output format (Phase 2: [Step N] prefix)..."
+echo "Testing check.sh output format (Phase 3: test-runner boundaries)..."
 echo ""
 
 test_combined_status_table
@@ -94,7 +94,7 @@ test_total_timing_line
 test_generic_failure_message
 test_generic_success_message
 test_step_prefix_present
-test_no_test_boundary_markers
+test_test_boundary_markers
 test_no_explicit_failure_summary
 
 echo ""
