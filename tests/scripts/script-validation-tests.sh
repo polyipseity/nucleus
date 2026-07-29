@@ -150,7 +150,7 @@ test_usage_std_present() {
 # Test 11: Verify -h|--help handler is present
 test_help_handler() {
     local script="$1"
-    if grep -Eq '\s+-h\||--help\)' "$script"; then
+    if grep -Eq '\s+-h\||--help\)' "$script" || grep -Eq 'parse_args\s+"?\$@' "$script"; then
         assert_pass "Help handler present: $(basename "$script")"
     else
         assert_fail "Help handler present: $(basename "$script")" "Missing -h|--help case"

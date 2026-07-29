@@ -10,7 +10,7 @@ Register-Step -Number 16 -Name "Package manager usage enforcement" -Action {
   $pipViolations = Select-String -Path @(
     Get-ChildItem -Recurse -Path "$r\scripts", "$r\src", "$r\tests" `
       -Include *.sh, *.ps1, *.nix `
-      -Exclude check.sh, check.ps1, shell.nix `
+      -Exclude check.sh, check.ps1, shell.nix, 16-package-manager-enforcement.ps1 `
       | ForEach-Object { $_.FullName }
   ) -Pattern '(^|[^a-z])pip install([^-]|$)' `
     | Where-Object { $_.Line -notmatch 'uv pip install' }
@@ -23,7 +23,7 @@ Register-Step -Number 16 -Name "Package manager usage enforcement" -Action {
   $npmViolations = Select-String -Path @(
     Get-ChildItem -Recurse -Path "$r\scripts", "$r\src", "$r\tests" `
       -Include *.sh, *.ps1, *.nix `
-      -Exclude check.sh, check.ps1, shell.nix `
+      -Exclude check.sh, check.ps1, shell.nix, 16-package-manager-enforcement.ps1 `
       | ForEach-Object { $_.FullName }
   ) -Pattern '(^|[^a-z])npm install([^-]|$)'
 
