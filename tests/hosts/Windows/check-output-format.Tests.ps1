@@ -14,7 +14,7 @@
 #>
 
 BeforeAll {
-    $script:checkContent = Get-Content -Raw -Path "$PWD/scripts/framework-lib.ps1"
+    $script:checkContent = Get-Content -Raw -Path "$PWD/src/scripts/lib/framework-lib.ps1"
 }
 
 Describe 'Combined status table' {

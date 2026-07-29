@@ -13,7 +13,7 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 test_posix_check_step_files_exist() {
     local missing=0
     for n in $(seq -w 1 20); do
-        if [ ! -f "$REPO_ROOT/scripts/check-steps/$n"*.sh ]; then
+        if [ ! -f "$REPO_ROOT/src/scripts/checks/check-steps/$n"*.sh ]; then
             assert_fail "POSIX check step $n" "Missing step file for number $n"
             ((missing++))
         fi
@@ -25,7 +25,7 @@ test_posix_check_step_files_exist() {
 
 test_posix_check_step_has_register_step() {
     local missing=0
-    for f in "$REPO_ROOT/scripts/check-steps/"*.sh; do
+    for f in "$REPO_ROOT/src/scripts/checks/check-steps/"*.sh; do
         if [ -f "$f" ]; then
             if ! grep -q 'register_step [0-9]' "$f"; then
                 assert_fail "$(basename "$f")" "Missing register_step call"
@@ -40,7 +40,7 @@ test_posix_check_step_has_register_step() {
 
 test_posix_check_step_no_overrides() {
     local violations=0
-    for f in "$REPO_ROOT/scripts/check-steps/"*.sh; do
+    for f in "$REPO_ROOT/src/scripts/checks/check-steps/"*.sh; do
         if [ -f "$f" ]; then
             if grep -q 'say\|error\|warn' "$f"; then
                 # Allowed: step functions use say/error/warn.
@@ -60,7 +60,7 @@ test_posix_check_step_no_overrides() {
 
 test_posix_check_step_sequential_numbers() {
     local numbers
-    numbers=$(for f in "$REPO_ROOT/scripts/check-steps/"*.sh; do
+    numbers=$(for f in "$REPO_ROOT/src/scripts/checks/check-steps/"*.sh; do
         grep -oh 'register_step [0-9]*' "$f" | cut -d' ' -f2
     done | sort -n)
     local expected
@@ -76,7 +76,7 @@ test_posix_check_step_sequential_numbers() {
 test_posix_test_step_files_exist() {
     local missing=0
     for n in $(seq 1 4); do
-        if [ ! -f "$REPO_ROOT/scripts/test-steps/0$n"*.sh ]; then
+        if [ ! -f "$REPO_ROOT/src/scripts/tests/test-steps/0$n"*.sh ]; then
             assert_fail "POSIX test step $n" "Missing step file for number $n"
             ((missing++))
         fi
@@ -88,7 +88,7 @@ test_posix_test_step_files_exist() {
 
 test_posix_test_step_has_register_step() {
     local missing=0
-    for f in "$REPO_ROOT/scripts/test-steps/"*.sh; do
+    for f in "$REPO_ROOT/src/scripts/tests/test-steps/"*.sh; do
         if [ -f "$f" ]; then
             if ! grep -q 'register_step [0-9]' "$f"; then
                 assert_fail "$(basename "$f")" "Missing register_step call"
@@ -105,7 +105,7 @@ test_posix_test_step_has_register_step() {
 test_windows_check_step_files_exist() {
     local missing=0
     for n in $(seq -w 1 20); do
-        if [ ! -f "$REPO_ROOT/scripts/check-steps/$n"*.ps1 ]; then
+        if [ ! -f "$REPO_ROOT/src/scripts/checks/check-steps/$n"*.ps1 ]; then
             assert_fail "Windows check step $n" "Missing step file for number $n"
             ((missing++))
         fi
@@ -118,7 +118,7 @@ test_windows_check_step_files_exist() {
 test_windows_test_step_files_exist() {
     local missing=0
     for n in $(seq 1 4); do
-        if [ ! -f "$REPO_ROOT/scripts/test-steps/0$n"*.ps1 ]; then
+        if [ ! -f "$REPO_ROOT/src/scripts/tests/test-steps/0$n"*.ps1 ]; then
             assert_fail "Windows test step $n" "Missing step file for number $n"
             ((missing++))
         fi
@@ -131,8 +131,14 @@ test_windows_test_step_files_exist() {
 # ---- Verify ordering loaders ----
 test_ordering_loaders_exist() {
     local missing=0
-    for f in check-steps.sh check-steps.ps1 test-steps.sh test-steps.ps1; do
-        if [ ! -f "$REPO_ROOT/scripts/$f" ]; then
+    for f in check-steps.sh check-steps.ps1; do
+        if [ ! -f "$REPO_ROOT/src/scripts/checks/$f" ]; then
+            assert_fail "Loader $f" "Missing"
+            ((missing++))
+        fi
+    done
+    for f in test-steps.sh test-steps.ps1; do
+        if [ ! -f "$REPO_ROOT/src/scripts/tests/$f" ]; then
             assert_fail "Loader $f" "Missing"
             ((missing++))
         fi

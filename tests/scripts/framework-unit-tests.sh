@@ -15,7 +15,7 @@ test_register_step_function() {
     result=$(
         REPO_ROOT="$REPO_ROOT"
         # shellcheck disable=SC1090,SC1091 # reason: dynamic source path tested in isolation
-        . "$REPO_ROOT/scripts/framework-lib.sh"
+        . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
         register_step 1 "Test Step" test_func
         echo "${_STEP_NUMBERS[*]} ${_STEP_NAMES[*]} ${_STEP_FUNCS[*]}"
     )
@@ -30,7 +30,7 @@ test_register_step_multiple() {
     local result
     result=$(
         REPO_ROOT="$REPO_ROOT"
-        . "$REPO_ROOT/scripts/framework-lib.sh"
+        . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
         register_step 1 "One" f1
         register_step 2 "Two" f2
         register_step 3 "Three" f3
@@ -49,7 +49,7 @@ test_parse_args_help() {
     # --help should exit 0
     REPO_ROOT="$REPO_ROOT" \
     bash -c '
-        . "'"$REPO_ROOT"'/scripts/framework-lib.sh"
+        . "'"$REPO_ROOT"'/src/scripts/lib/framework-lib.sh"
         usage() { echo "usage: test"; }
         parse_args --help
     ' 2>/dev/null || exit_code=$?
@@ -66,7 +66,7 @@ test_parse_args_format_flag() {
     local result
     result=$(
         REPO_ROOT="$REPO_ROOT"
-        . "$REPO_ROOT/scripts/framework-lib.sh"
+        . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
         usage() { true; }
         parse_args --format
         echo "$FORMAT_NIX"
@@ -82,7 +82,7 @@ test_parse_args_scoped() {
     local result
     result=$(
         REPO_ROOT="$REPO_ROOT"
-        . "$REPO_ROOT/scripts/framework-lib.sh"
+        . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
         usage() { true; }
         parse_args --scoped
         echo "$SCOPED $HAS_ARGS"
@@ -98,7 +98,7 @@ test_parse_args_positions() {
     local result
     result=$(
         REPO_ROOT="$REPO_ROOT"
-        . "$REPO_ROOT/scripts/framework-lib.sh"
+        . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
         usage() { true; }
         parse_args --fail-fast path/to/file.nix
         echo "$HAS_ARGS ${POSITIONAL_ARGS[*]}"
@@ -114,7 +114,7 @@ test_aggregate_results_parses_exit_files() {
     local result
     result=$(
         REPO_ROOT="$REPO_ROOT"
-        . "$REPO_ROOT/scripts/framework-lib.sh"
+        . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
         # Define stubs for functions framework-lib.sh expects
         say() { echo "say: $*"; }
         error() { echo "error: $*" >&2; }

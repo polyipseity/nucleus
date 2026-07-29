@@ -3,11 +3,11 @@
 let
   inherit (import ../lib.nix) containsRegex;
 
-  frameworkLibText = builtins.readFile ../../scripts/framework-lib.sh;
-  frameworkLibPs1Text = builtins.readFile ../../scripts/framework-lib.ps1;
+  frameworkLibText = builtins.readFile ../../src/scripts/lib/framework-lib.sh;
+  frameworkLibPs1Text = builtins.readFile ../../src/scripts/lib/framework-lib.ps1;
   checkShText = builtins.readFile ../../scripts/check.sh;
   checkPs1Text = builtins.readFile ../../scripts/check.ps1;
-  checkStepsDir = ../../scripts/check-steps;
+  checkStepsDir = ../../src/scripts/checks/check-steps;
   checkStepsFiles = builtins.attrNames (builtins.readDir checkStepsDir);
   hasSuffix = suffix: str: builtins.match ".*${suffix}" str != null;
   checkStepsSh = builtins.filter (f: hasSuffix ".sh" f) checkStepsFiles;

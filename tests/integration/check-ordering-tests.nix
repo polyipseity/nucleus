@@ -4,7 +4,7 @@
 let
   inherit (import ../lib.nix) containsRegex;
 
-  checkStepsDir = ../../scripts/check-steps;
+  checkStepsDir = ../../src/scripts/checks/check-steps;
   stepFiles = builtins.attrNames (builtins.readDir checkStepsDir);
   shFiles = builtins.sort builtins.lessThan (builtins.filter (f: builtins.hasSuffix ".sh" f) stepFiles);
   ps1Files = builtins.sort builtins.lessThan (builtins.filter (f: builtins.hasSuffix ".ps1" f) stepFiles);

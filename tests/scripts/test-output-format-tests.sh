@@ -10,8 +10,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/test-lib.sh"
 
 # Path to framework-lib.sh relative to repo root
-# shellcheck source=../../scripts/framework-lib.sh
-FRAMEWORK_LIB="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)/scripts/framework-lib.sh"
+# shellcheck source=../../src/scripts/lib/framework-lib.sh
+FRAMEWORK_LIB="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)/src/scripts/lib/framework-lib.sh"
 
 test_total_steps_variable() {
     if grep -qF '_total_steps' "$FRAMEWORK_LIB"; then
