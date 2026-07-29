@@ -9,53 +9,52 @@
 # within the appropriate group, respecting any dependency constraints.
 #
 # Toolchain checks (1-3):
-#   1. Shell script formatting/linting (treefmt) (stub on Windows)
+#   1. Code formatting (treefmt) (stub on Windows)
 #   2. PowerShell lint (PSScriptAnalyzer with check settings, slow rules excluded)
 #   3. Packer template validation
 #
-# Nix checks (4-7, stubs on Windows):
-#   4. Code formatting (treefmt) (stub)
-#   5. Nix flake evaluation (stub)
-#   6. Nix lint (nixf-tidy) (stub)
-#   7. Stale Nix build artifact check
+# Nix checks (4-6, stubs on Windows):
+#   4. Nix flake evaluation (stub)
+#   5. Nix lint (nixf-tidy) (stub)
+#   6. Stale Nix build artifact check
 #
-# Test suites (8-11, stubs on Windows):
-#   8. Shell script validation tests (stub)
-#   9. CWD-independence tests (stub)
-#  10. Nix search path tests (stub)
-#  11. Port utility function tests (stub)
+# Test suites (7-10, stubs on Windows):
+#   7. Shell script validation tests (stub)
+#   8. CWD-independence tests (stub)
+#   9. Nix search path tests (stub)
+#  10. Port utility function tests (stub)
 #
-# Data integrity (12-15):
-#  12. Lockfile validation
-#  13. Locked DSC validation
-#  14. Schema validation (JSON/YAML)
-#  15. Service registry validation
+# Data integrity (11-14):
+#  11. Lockfile validation
+#  12. Locked DSC validation
+#  13. Schema validation (JSON/YAML)
+#  14. Service registry validation
 #
-# Policy/verification (16-21):
-#  16. YAML structural validation
-#  17. Package manager usage enforcement
-#  18. Undocumented error suppression check
-#  19. Online determinism checks (--verify mode only)
-#  20. Config method compliance
-#  21. Activation script token placeholder in comment check
+# Policy/verification (15-20):
+#  15. YAML structural validation
+#  16. Package manager usage enforcement
+#  17. Undocumented error suppression check
+#  18. Online determinism checks (--verify mode only)
+#  19. Config method compliance
+#  20. Activation script token placeholder in comment check
 #
 # Mode taxonomy:
 #   Always-run (no HAS_ARGS guard — run in both --full and --scoped):
-#     - Stale Nix build artifact check        (step 7)
-#     - Lockfile section validation           (step 12)
-#     - Locked DSC validation                 (step 13)
-#     - Service registry validation           (step 15)
-#     - Package manager usage enforcement     (step 17)
-#     - Config method compliance              (step 20)
+#     - Stale Nix build artifact check        (step 6)
+#     - Lockfile section validation           (step 11)
+#     - Locked DSC validation                 (step 12)
+#     - Service registry validation           (step 14)
+#     - Package manager usage enforcement     (step 16)
+#     - Config method compliance              (step 19)
 #   Path-scopable (accept file filtering in both modes):
-#     - PowerShell syntax validation          (step 2)
+#     - PowerShell lint          (step 2)
 #     - Packer template validation            (step 3)
-#     - Schema validation                     (step 14)
-#     - YAML structural validation            (step 16)
-#     - Undocumented error suppression        (step 18)
-#     - Activation script token placeholder   (step 21)
+#     - Schema validation                     (step 13)
+#     - YAML structural validation            (step 15)
+#     - Undocumented error suppression        (step 17)
+#     - Activation script token placeholder   (step 20)
 #
-# Note: Steps 1, 4-6, 8-11 are stubs on Windows (POSIX/Nix toolchain not available).
+# Note: Steps 1, 4-5, 7-10 are stubs on Windows (POSIX/Nix toolchain not available).
 #
 # Output conventions:
 #   Three-tier messaging: say() for info/success/skip, warn() for non-fatal
@@ -79,8 +78,8 @@
 #
 # Tests (Nix test suite) are run separately via scripts/test.ps1.
 # Step 1 is a POSIX-only stub (treefmt not available on Windows).
-# Steps 4-6, 8-11 are stubs (require Nix or bash — not available on Windows).
-# Step 19 only runs with the --verify flag.
+# Steps 4-5, 7-10 are stubs (require Nix or bash — not available on Windows).
+# Step 18 only runs with the --verify flag.
 #
 # Prerequisites:
 #   - check-jsonschema (pip install check-jsonschema) for schema validation
@@ -199,11 +198,11 @@ Ensure-Tool -Name 'check-jsonschema' -Type 'Command' -InstallCommand 'pip instal
 # Use check.sh on WSL/Linux for shell script formatting/linting.
 
 # ---------------------------------------------------------------------------
-# 1. Shell script formatting/linting (treefmt) — POSIX only (stub on Windows)
+# 1. Code formatting (treefmt) — POSIX only (stub on Windows)
 # ---------------------------------------------------------------------------
 $_sw = [System.Diagnostics.Stopwatch]::StartNew()
-Write-Output ("`n=== [{0}] Shell script formatting/linting (treefmt) ===" -f (++$_step))
-"Shell script formatting/linting (treefmt)" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
+Write-Output ("`n=== [{0}] Code formatting (treefmt) ===" -f (++$_step))
+"Code formatting (treefmt)" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
 say "skipping (requires POSIX treefmt — not available natively on Windows; use WSL or check.sh)."
 0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-1.exit") -NoNewline
 $_sw.Stop()
@@ -263,41 +262,32 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-3.time") -NoNewline
 }))
 
+
+
 # ---------------------------------------------------------------------------
-# 4. Code formatting (treefmt)
+# 4. Nix flake evaluation
 # ---------------------------------------------------------------------------
 $_sw = [System.Diagnostics.Stopwatch]::StartNew()
-Write-Output ("`n=== [{0}] Code formatting (treefmt) ===" -f (++$_step))
-"Code formatting (treefmt)" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
-say "skipping (requires POSIX treefmt — not available natively on Windows; use WSL or check.sh)."
+Write-Output ("`n=== [{0}] Nix flake evaluation ===" -f (++$_step))
+"Nix flake evaluation" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
+say "skipping (requires Nix toolchain — not available on Windows)."
 0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-4.exit") -NoNewline
 $_sw.Stop()
 $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-4.time") -NoNewline
 
 # ---------------------------------------------------------------------------
-# 5. Nix flake evaluation
+# 5. Nix lint (nixf-tidy)
 # ---------------------------------------------------------------------------
 $_sw = [System.Diagnostics.Stopwatch]::StartNew()
-Write-Output ("`n=== [{0}] Nix flake evaluation ===" -f (++$_step))
-"Nix flake evaluation" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
+Write-Output ("`n=== [{0}] Nix lint (nixf-tidy) ===" -f (++$_step))
+"Nix lint (nixf-tidy)" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
 say "skipping (requires Nix toolchain — not available on Windows)."
 0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-5.exit") -NoNewline
 $_sw.Stop()
 $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-5.time") -NoNewline
 
 # ---------------------------------------------------------------------------
-# 6. Nix lint (nixf-tidy)
-# ---------------------------------------------------------------------------
-$_sw = [System.Diagnostics.Stopwatch]::StartNew()
-Write-Output ("`n=== [{0}] Nix lint (nixf-tidy) ===" -f (++$_step))
-"Nix lint (nixf-tidy)" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
-say "skipping (requires Nix toolchain — not available on Windows)."
-0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-6.exit") -NoNewline
-$_sw.Stop()
-$_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-6.time") -NoNewline
-
-# ---------------------------------------------------------------------------
-# 7. Stale Nix build artifact check
+# 6. Stale Nix build artifact check
 # ---------------------------------------------------------------------------
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Stale Nix build artifact check ===" -f (++$_step))
@@ -314,61 +304,61 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   if ($_cnbaFound) {
     error "stale Nix build artifacts found:"
     $_cnbaOutput | ForEach-Object { error "  $_" }
-    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-7.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-6.exit") -NoNewline
   } else {
     say "no stale Nix build artifacts found."
   }
   $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-7.time") -NoNewline
+  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-6.time") -NoNewline
 }))
 
 # ---------------------------------------------------------------------------
-# 8. Shell script validation tests
+# 7. Shell script validation tests
 # ---------------------------------------------------------------------------
 $_sw = [System.Diagnostics.Stopwatch]::StartNew()
 Write-Output ("`n=== [{0}] Shell script validation tests ===" -f (++$_step))
 "Shell script validation tests" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
+say "skipping (bash-based test scripts — not available on Windows)."
+0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-7.exit") -NoNewline
+$_sw.Stop()
+$_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-7.time") -NoNewline
+
+# ---------------------------------------------------------------------------
+# 8. CWD-independence tests
+# ---------------------------------------------------------------------------
+$_sw = [System.Diagnostics.Stopwatch]::StartNew()
+Write-Output ("`n=== [{0}] CWD-independence tests ===" -f (++$_step))
+"CWD-independence tests" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
 say "skipping (bash-based test scripts — not available on Windows)."
 0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-8.exit") -NoNewline
 $_sw.Stop()
 $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-8.time") -NoNewline
 
 # ---------------------------------------------------------------------------
-# 9. CWD-independence tests
+# 9. Nix search path tests
 # ---------------------------------------------------------------------------
 $_sw = [System.Diagnostics.Stopwatch]::StartNew()
-Write-Output ("`n=== [{0}] CWD-independence tests ===" -f (++$_step))
-"CWD-independence tests" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
+Write-Output ("`n=== [{0}] Nix search path tests ===" -f (++$_step))
+"Nix search path tests" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
 say "skipping (bash-based test scripts — not available on Windows)."
 0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-9.exit") -NoNewline
 $_sw.Stop()
 $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-9.time") -NoNewline
 
 # ---------------------------------------------------------------------------
-# 10. Nix search path tests
+# 10. Port utility function tests
 # ---------------------------------------------------------------------------
 $_sw = [System.Diagnostics.Stopwatch]::StartNew()
-Write-Output ("`n=== [{0}] Nix search path tests ===" -f (++$_step))
-"Nix search path tests" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
+Write-Output ("`n=== [{0}] Port utility function tests ===" -f (++$_step))
+"Port utility function tests" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
 say "skipping (bash-based test scripts — not available on Windows)."
 0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-10.exit") -NoNewline
 $_sw.Stop()
 $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-10.time") -NoNewline
 
 # ---------------------------------------------------------------------------
-# 11. Port utility function tests
-# ---------------------------------------------------------------------------
-$_sw = [System.Diagnostics.Stopwatch]::StartNew()
-Write-Output ("`n=== [{0}] Port utility function tests ===" -f (++$_step))
-"Port utility function tests" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
-say "skipping (bash-based test scripts — not available on Windows)."
-0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-11.exit") -NoNewline
-$_sw.Stop()
-$_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-11.time") -NoNewline
-
-# ---------------------------------------------------------------------------
-# 12. Lockfile validation
+# 11. Lockfile validation
 # ---------------------------------------------------------------------------
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Lockfile validation ===" -f (++$_step))
@@ -391,7 +381,7 @@ $_lf = $null
 $_lfOverlapErrors = 0
 if (-not (Test-Path $_lfPath)) {
   error "lockfile.json not found at $_lfPath"
-  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-12.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-11.exit") -NoNewline
   $_lfOverlapErrors++
 } else {
   $_lf = Get-Content $_lfPath -Raw | ConvertFrom-Json -AsHashtable
@@ -422,7 +412,7 @@ if (-not (Test-Path $_lfPath)) {
 }
 if ($_lfOverlapErrors -gt 0) {
   error ("lockfile.json consistency: {0} overlap issue(s)" -f $_lfOverlapErrors)
-  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-12.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-11.exit") -NoNewline
 } else {
   say "lockfile.json consistency: no overlapping packages across sections"
 }
@@ -458,7 +448,7 @@ if (-not (Test-Path $_lfAlPath)) {
 }
 if ($_lfAlErrors -gt 0) {
   error "lifecycle-allowlist.json validation failed with $_lfAlErrors error(s)"
-  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-12.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-11.exit") -NoNewline
 } else {
   $_lfAlCount = if ($null -ne $_lfAl -and $_lfAl -is [hashtable]) { $_lfAl.Count } else { 0 }
   say ("lifecycle-allowlist.json: valid (entry count: {0})" -f $_lfAlCount)
@@ -467,7 +457,7 @@ if ($_lfAlErrors -gt 0) {
 # Always-run: Lockfile section validation
 if ($null -eq $_lf) {
     error "lockfile.json could not be loaded — skipping section validation"
-    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-12.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-11.exit") -NoNewline
   } else {
     $_lfErrors = 0
 
@@ -545,18 +535,18 @@ if ($null -eq $_lf) {
 
     if ($_lfErrors -gt 0) {
       error "lockfile.json validation failed with $_lfErrors error(s)"
-      1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-12.exit") -NoNewline
+      1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-11.exit") -NoNewline
     } else {
       say "lockfile.json validation passed"
     }
   }
   $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-12.time") -NoNewline
+  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-11.time") -NoNewline
 }))
 
 # ---------------------------------------------------------------------------
-# 13. Locked DSC validation
+# 12. Locked DSC validation
 # ---------------------------------------------------------------------------
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Locked DSC validation ===" -f (++$_step))
@@ -697,17 +687,17 @@ $_lfErrors = 0
 
   if ($_lfErrors -gt 0) {
     error "locked DSC validation failed with $_lfErrors error(s)"
-    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-13.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-12.exit") -NoNewline
   } else {
     say "locked DSC validation passed"
   }
   $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-13.time") -NoNewline
+  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-12.time") -NoNewline
 }))
 
 # ---------------------------------------------------------------------------
-# 14. Schema validation (JSON/YAML)
+# 13. Schema validation (JSON/YAML)
 # ---------------------------------------------------------------------------
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Schema validation (JSON/YAML) ===" -f (++$_step))
@@ -812,16 +802,16 @@ $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   }
   if ($_jsonschemaErrors -gt 0) {
     error "schema validation failed with $_jsonschemaErrors error(s)"
-    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-14.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-13.exit") -NoNewline
   }
   say "schema validation passed."
   $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-14.time") -NoNewline
+  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-13.time") -NoNewline
 }))
 
 # ---------------------------------------------------------------------------
-# 15. Service registry validation
+# 14. Service registry validation
 # ---------------------------------------------------------------------------
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Service registry validation ===" -f (++$_step))
@@ -880,7 +870,7 @@ if (-not (Test-Path $_svcJson)) {
 
   if ($_svcErrors -gt 0) {
     error "services.json validation failed with $_svcErrors error(s)"
-    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-15.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-14.exit") -NoNewline
   } else {
     # Validate user-scoped platform entries have justification.
     foreach ($_svcName in $_svc.Keys) {
@@ -938,17 +928,17 @@ if (-not (Test-Path $_svcJson)) {
 
     if ($_svcErrors -gt 0) {
       error "services.json validation failed with $_svcErrors error(s)"
-      1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-15.exit") -NoNewline
+      1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-14.exit") -NoNewline
     }
     say "services.json validation passed"
   }
   $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-15.time") -NoNewline
+  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-14.time") -NoNewline
 }))
 
 # ---------------------------------------------------------------------------
-# 16. YAML structural validation
+# 15. YAML structural validation
 # ---------------------------------------------------------------------------
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] YAML structural validation ===" -f (++$_step))
@@ -980,16 +970,16 @@ foreach ($_yf in $_yamlFiles) {
 }
 if ($_yamlErrors -gt 0) {
   error "YAML structural validation failed with $_yamlErrors error(s)"
-  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-16.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-15.exit") -NoNewline
 }
 say "YAML structural validation passed."
 $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
 $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-$_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-16.time") -NoNewline
+$_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-15.time") -NoNewline
 }))
 
 # ---------------------------------------------------------------------------
-# 17. Package manager usage enforcement
+# 16. Package manager usage enforcement
 # ---------------------------------------------------------------------------
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Package manager usage enforcement ===" -f (++$_step))
@@ -1026,17 +1016,17 @@ $_violations = 0
     $_violations++
   }
   if ($_violations -gt 0) {
-    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-17.exit") -NoNewline
+    1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-16.exit") -NoNewline
   } else {
     say "no package manager violations found."
   }
   $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-17.time") -NoNewline
+  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-16.time") -NoNewline
 }))
 
 # ---------------------------------------------------------------------------
-# 18. Undocumented error suppression check
+# 17. Undocumented error suppression check
 # ---------------------------------------------------------------------------
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Undocumented error suppression check ===" -f (++$_step))
@@ -1123,17 +1113,17 @@ if ($_undocSuppViolations.Count -gt 0) {
   }
   error ("undocumented error suppression check failed with {0} violation(s)" -f $_undocSuppViolations.Count)
   say "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
-  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-18.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-17.exit") -NoNewline
 } else {
   say "no undocumented error suppressions found."
 }
 $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
 $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-$_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-18.time") -NoNewline
+$_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-17.time") -NoNewline
 }))
 
 # ---------------------------------------------------------------------------
-# 19. Online determinism checks (--verify mode only)
+# 18. Online determinism checks (--verify mode only)
 # ---------------------------------------------------------------------------
 $_sw = [System.Diagnostics.Stopwatch]::StartNew()
 Write-Output ("`n=== [{0}] Online determinism checks (--verify) ===" -f (++$_step))
@@ -1149,10 +1139,10 @@ if ($VERIFY) {
   say "skipping (use --verify to run online determinism checks)."
 }
 $_sw.Stop()
-$_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-19.time") -NoNewline
+$_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-18.time") -NoNewline
 
 # ---------------------------------------------------------------------------
-# 20. Config method compliance
+# 19. Config method compliance
 # ---------------------------------------------------------------------------
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Config method compliance ===" -f (++$_step))
@@ -1223,17 +1213,17 @@ $_cfgMethodOutput = $_srcFiles | Select-String -Pattern '# Method'
 
 if ($_cfgErrors -gt 0) {
   error ("config method compliance check failed with {0} error(s)" -f $_cfgErrors)
-  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-20.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-19.exit") -NoNewline
 } else {
   say "config method compliance passed."
 }
 $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
 $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-$_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-20.time") -NoNewline
+$_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-19.time") -NoNewline
 }))
 
 # ---------------------------------------------------------------------------
-# 21. Activation script token placeholder in comment check
+# 20. Activation script token placeholder in comment check
 # ---------------------------------------------------------------------------
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 Write-Output ("`n=== [{0}] Activation script token placeholder in comment check ===" -f (++$_step))
@@ -1259,13 +1249,13 @@ if ($using:HAS_ARGS) {
 if ($_actViolations.Count -gt 0) {
   foreach ($_av in ($_actViolations | Sort-Object -Unique)) { error $_av }
   error "token placeholder strings found in script comments"
-  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-21.exit") -NoNewline
+  1 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-20.exit") -NoNewline
 } else {
   say "no token placeholder strings in script comments."
 }
 $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
 $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-$_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-21.time") -NoNewline
+$_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-20.time") -NoNewline
 }))
 
 # Wait for all background wave jobs to complete
@@ -1275,7 +1265,7 @@ if ($script:waveJobs.Count -gt 0) {
 
 # Aggregate wave results — combined status table with step names
 $_totalMs = 0
-$_totalSteps = 21
+$_totalSteps = 20
 $_failedSteps = ""
 say "check results:"
 for ($_s = 1; $_s -le $_totalSteps; $_s++) {
