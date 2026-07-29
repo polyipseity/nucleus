@@ -13,17 +13,20 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../scripts/check.sh
 CHECK_SH="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)/scripts/check.sh"
 
-# ---- Phase 0 invariants ----
-# These match the current (pre-refactor) format. After each refactor phase,
-# update the corresponding test to expect the new format.
+# ---- Phase 1 invariants ----
+# Combined status+timing table replaces timing-only table.
 
-test_timing_table_format() {
-    # Timing entries use printf with step number and ms.
-    # Pattern: printf '  step %2d: %5d ms\n'  (note: \n is literal backslash-n)
-    if grep -qF "printf '  step %2d: %5d ms" "$CHECK_SH"; then
-        assert_pass "Timing table uses printf format: step %2d, %5d ms"
+test_combined_status_table() {
+    # Combined table: '  step %2d  %s  %5d ms  %s\n' with status icon and name
+    if grep -qF "_total_steps" "$CHECK_SH"; then
+        assert_pass "_total_steps variable present"
     else
-        assert_fail "Timing table format" "Expected printf format for step timing not found"
+        assert_fail "_total_steps variable" "Expected '_total_steps' variable not found"
+    fi
+    if grep -qF "_failed_steps" "$CHECK_SH"; then
+        assert_pass "_failed_steps variable present"
+    else
+        assert_fail "_failed_steps variable" "Expected '_failed_steps' variable not found"
     fi
 }
 
@@ -54,58 +57,42 @@ test_generic_success_message() {
     fi
 }
 
-test_no_combined_status_table() {
-    # Pre-refactor: no combined status indicator in timing table output.
-    # Check that the timing loop does NOT have status inline with step names.
-    # Look specifically near the timing table area: should not have "step  N ✓" pattern.
-    # Use a precise pattern that won't hit FAIL_FAST or similar variable names.
-    if grep -qF "step  1 " "$CHECK_SH" && grep -q '^\s\+step .* [✓✗]' "$CHECK_SH"; then
-        assert_fail "Combined status table" "Pre-refactor should NOT have inline status indicators"
-    else
-        assert_pass "No combined status table (pre-refactor)"
-    fi
-}
-
 test_no_step_prefix() {
-    # Pre-refactor: no [Step N] prefix in section headers
-    # Use fixed-string search for "[Step " to avoid false positives
-    # with the "section" function call pattern.
+    # Phase 1 does not add [Step N] prefix yet
     if grep -qF "[Step " "$CHECK_SH"; then
-        assert_fail "Step N prefix" "Pre-refactor should NOT have [Step N] prefix"
+        assert_fail "Step N prefix" "Phase 1 should NOT have [Step N] prefix yet"
     else
-        assert_pass "No [Step N] prefix (pre-refactor)"
+        assert_pass "No [Step N] prefix (Phase 1)"
     fi
 }
 
 test_no_test_boundary_markers() {
-    # Pre-refactor: no "--- test output ---" boundaries around test-runner steps (8-11)
-    # Use -- to prevent grep from interpreting "---" as options
+    # Phase 1 does not add test boundary markers yet
     if grep -qF -- "--- test output ---" "$CHECK_SH"; then
-        assert_fail "Test boundary markers" "Pre-refactor should NOT have test output boundaries"
+        assert_fail "Test boundary markers" "Phase 1 should NOT have test output boundaries yet"
     else
-        assert_pass "No test boundary markers (pre-refactor)"
+        assert_pass "No test boundary markers (Phase 1)"
     fi
 }
 
 test_no_explicit_failure_summary() {
-    # Pre-refactor: no "Failed steps:" or similar failure summary
+    # Phase 1 does not add explicit failure summary yet
     if grep -qF "Failed step" "$CHECK_SH"; then
-        assert_fail "Explicit failure summary" "Pre-refactor should NOT have explicit failure summary"
+        assert_fail "Explicit failure summary" "Phase 1 should NOT have explicit failure summary yet"
     else
-        assert_pass "No explicit failure summary (pre-refactor)"
+        assert_pass "No explicit failure summary (Phase 1)"
     fi
 }
 
 # ---- Run tests ----
 echo ""
-echo "Testing check.sh output format (pre-refactor pattern)..."
+echo "Testing check.sh output format (Phase 1: combined status table)..."
 echo ""
 
-test_timing_table_format
+test_combined_status_table
 test_total_timing_line
 test_generic_failure_message
 test_generic_success_message
-test_no_combined_status_table
 test_no_step_prefix
 test_no_test_boundary_markers
 test_no_explicit_failure_summary

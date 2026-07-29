@@ -252,6 +252,7 @@ require_command check-jsonschema
 # sh_lint — Shell script formatting/linting (treefmt)
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Shell script formatting/linting (treefmt)"
+echo "Shell script formatting/linting (treefmt)" > "$_wave_tmpdir/step-$_step.name"
 {
 _sc_exit=0
 if [ "${#SH_FILES[@]}" -gt 0 ]; then
@@ -271,6 +272,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # powershell_lint — PowerShell lint (PSScriptAnalyzer with check settings)
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "PowerShell lint"
+echo "PowerShell lint" > "$_wave_tmpdir/step-$_step.name"
 {
 _ps_exit=0
 if [ "${#PS1_FILES[@]}" -gt 0 ]; then
@@ -291,6 +293,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # packer_validate — Packer template validation
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Packer template validation"
+echo "Packer template validation" > "$_wave_tmpdir/step-$_step.name"
 {
 _pkr_exit=0
 if [ "${#PKR_FILES[@]}" -gt 0 ]; then
@@ -311,6 +314,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # exit-code contract (exit 1 = formatting drift) without --no-cache.
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Code formatting (treefmt)"
+echo "Code formatting (treefmt)" > "$_wave_tmpdir/step-$_step.name"
 {
 _tf_exit=0
 if $HAS_ARGS; then
@@ -342,6 +346,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # nix_flake_eval — Nix flake evaluation (conditional skip: only when .nix files changed)
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Nix flake evaluation"
+echo "Nix flake evaluation" > "$_wave_tmpdir/step-$_step.name"
 {
 _nix_eval_nix_files=()
 if $HAS_ARGS; then
@@ -376,6 +381,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # to a per-file temp file for race-free aggregation.
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Nix lint (nixf-tidy)"
+echo "Nix lint (nixf-tidy)" > "$_wave_tmpdir/step-$_step.name"
 {
 if [ "${#NIX_FILES[@]}" -gt 0 ]; then
   _nixf_files=("${NIX_FILES[@]}")
@@ -434,6 +440,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # stale_nix_artifact — Always-run: Stale Nix build artifact check
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Stale Nix build artifact check"
+echo "Stale Nix build artifact check" > "$_wave_tmpdir/step-$_step.name"
 {
 _cnba_output="$("$SCRIPT_DIR/cleanup-nix.sh" --dry-run 2>&1)"
 if echo "$_cnba_output" | grep -q "would remove stale Nix build symlink"; then
@@ -453,6 +460,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # shell_validation_test — Always-run: Shell script validation tests
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Shell script validation tests"
+echo "Shell script validation tests" > "$_wave_tmpdir/step-$_step.name"
 {
 _svt_exit=0
 bash tests/scripts/script-validation-tests.sh || _svt_exit=$?
@@ -466,6 +474,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # cwd_independence_test — Always-run: CWD-independence tests
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "CWD-independence tests"
+echo "CWD-independence tests" > "$_wave_tmpdir/step-$_step.name"
 {
 _cit_exit=0
 bash tests/scripts/cwd-independence-tests.sh || _cit_exit=$?
@@ -477,6 +486,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # nix_search_path_test — Always-run: Nix search path tests
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Nix search path tests"
+echo "Nix search path tests" > "$_wave_tmpdir/step-$_step.name"
 {
 _nspt_exit=0
 bash tests/scripts/nix-search-path-tests.sh || _nspt_exit=$?
@@ -488,6 +498,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # port_util_test — Always-run: Port utility function tests
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Port utility function tests"
+echo "Port utility function tests" > "$_wave_tmpdir/step-$_step.name"
 {
 _put_exit=0
 bash tests/scripts/lib-port-functions-tests.sh || _put_exit=$?
@@ -499,6 +510,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # lockfile_validation — Lockfile validation
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Lockfile validation"
+echo "Lockfile validation" > "$_wave_tmpdir/step-$_step.name"
 {
 # Consistency and overlap checks (always run, even in path-scoped mode):
 #  1. lockfile.json must exist.
@@ -666,6 +678,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # locked_dsc_validation — Always-run: Locked DSC validation
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Locked DSC validation"
+echo "Locked DSC validation" > "$_wave_tmpdir/step-$_step.name"
 {
 # Platform parallel: check.ps1 uses powershell-yaml with normalization helpers (Windows-native equivalent).
 _dsc_system_dir="src/hosts/Windows/system"
@@ -724,6 +737,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # Follows the nixf-tidy parallel pattern (step 6).
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Schema validation (JSON/YAML)"
+echo "Schema validation (JSON/YAML)" > "$_wave_tmpdir/step-$_step.name"
 {
 _jsonschema_errors=0
 _js_tmpdir=$(mktemp -d) || { error "failed to create temp directory"; echo "1" > "$_wave_tmpdir/step-14.exit"; }
@@ -863,6 +877,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # service_registry_validation — Always-run: Service registry validation
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Service registry validation"
+echo "Service registry validation" > "$_wave_tmpdir/step-$_step.name"
 {
   _svc_json="src/modules/services.json"
   _svc_errors=0
@@ -998,6 +1013,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # yaml_structural_validation — YAML structural validation
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "YAML structural validation"
+echo "YAML structural validation" > "$_wave_tmpdir/step-$_step.name"
 {
 _yaml_errors=0
 if $HAS_ARGS; then
@@ -1034,6 +1050,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # package_manager_enforcement — Always-run: Package manager usage enforcement
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Package manager usage enforcement"
+echo "Package manager usage enforcement" > "$_wave_tmpdir/step-$_step.name"
 {
 _violations=0
 # Ban bare `pip install` and `npm install` — these bypass the lockfile and
@@ -1068,6 +1085,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # suppression_doc — Undocumented error suppression check
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Undocumented error suppression"
+echo "Undocumented error suppression" > "$_wave_tmpdir/step-$_step.name"
 {
 _undoc_supp_out="$(mktemp)" || { error "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-18.exit"; }
 
@@ -1142,6 +1160,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # online_determinism — Online determinism checks (--verify mode only)
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Online determinism checks (--verify)"
+echo "Online determinism checks (--verify)" > "$_wave_tmpdir/step-$_step.name"
 if $VERIFY; then
   bash "$SCRIPT_DIR/bump-lockfile.sh" --verify || exit_code=$?
   if [ $exit_code -eq 0 ]; then
@@ -1157,6 +1176,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # config_method_compliance — Always-run: Config method compliance
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Config method compliance"
+echo "Config method compliance" > "$_wave_tmpdir/step-$_step.name"
 {
 _cfg_dir="src/modules/configs"
 _cfg_errors=0
@@ -1231,6 +1251,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # activation_token_placeholder — Activation script token placeholder in comment check
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Activation script token placeholder in comment check"
+echo "Activation script token placeholder in comment check" > "$_wave_tmpdir/step-$_step.name"
 {
 _act_temp="$(mktemp)" || { error "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-21.exit"; }
 
@@ -1266,26 +1287,36 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 wait
 
 # Wave result aggregation — collect step exit codes from temp files
-for _s in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 20 21; do
+say "check results:"
+_total_ms=0
+_total_steps=21
+_failed_steps=""
+for _s in $(seq 1 $_total_steps); do
   _exit_file="$_wave_tmpdir/step-$_s.exit"
+  _time_file="$_wave_tmpdir/step-$_s.time"
+  _name_file="$_wave_tmpdir/step-$_s.name"
+  _status="-"
   if [ -f "$_exit_file" ]; then
     read -r _code < "$_exit_file"
     if [ "$_code" != "0" ]; then
       exit_code=1
+      _status="✗"
       "$FAIL_FAST" && exit $exit_code
+    else
+      _status="✓"
     fi
   fi
-done
-
-# Timing summary
-say "check step timing:"
-_total_ms=0
-for _s in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21; do
-  _time_file="$_wave_tmpdir/step-$_s.time"
   if [ -f "$_time_file" ]; then
     read -r _ms < "$_time_file"
     _total_ms=$((_total_ms + _ms))
-    printf '  step %2d: %5d ms\n' "$_s" "$_ms"
+  else
+    _ms=0
+  fi
+  _name=""
+  [ -f "$_name_file" ] && read -r _name < "$_name_file"
+  printf '  step %2d  %s  %5d ms  %s\n' "$_s" "$_status" "$_ms" "$_name"
+  if [ "$_status" = "✗" ]; then
+    _failed_steps="${_failed_steps}step $_s (${_name}), "
   fi
 done
 printf '  total:   %5d ms\n' "$_total_ms"
