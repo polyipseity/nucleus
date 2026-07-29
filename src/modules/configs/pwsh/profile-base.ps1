@@ -199,6 +199,9 @@ if ((Get-Command fzf -ErrorAction SilentlyContinue) -and (Get-Module -ListAvaila
 }
 
 # Git shell aliases — mirrors src/modules/shell/aliases.nix
+# Use Add-ShellAlias (not `function` or inline `New-Item -Path Function:`) for all shell aliases.
+# The helper wraps the PSFunction provider path, which bypasses PSUseApprovedVerbs by avoiding
+# a FunctionDefinitionAst — the one and only AST node type that rule inspects.
 # Naming conventions:
 # - Prefix = base git command (all `git log` aliases start with `-gl`).
 # - `-gca*` = amend (every alias starting with `-gca` expands to `git commit --amend ...`).
