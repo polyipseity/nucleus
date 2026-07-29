@@ -45,7 +45,7 @@
 #      nixfmt                              —   Nix-only; not on Windows
 #      deadnix                             —   Nix-only; not on Windows
 #      yamllint                            →   yamllint (runs individually on Windows)
-#      shellcheck                          —   POSIX-only; not on Windows
+#      ShellCheck                          —   POSIX-only; not on Windows
 #  On Windows, check.ps1 step 1 runs yamllint individually and uses the suffix
 #  "(treefmt equivalent)" as the bidirectional anchor. See scripts/check.ps1 header
 #  comment for the full mapping and Windows-side counterpart.
@@ -240,8 +240,6 @@ if ! $HAS_ARGS; then
   readarray -t CACHED_NIX_FILES < <(find . -path ./vendor -prune -false -o -name '*.nix' -print | sort)
   readarray -t CACHED_YAML_FILES < <(find . -not -path '*/vendor/*' \( -name '*.yml' -o -name '*.yaml' \) -print | sort)
   readarray -t CACHED_JSON_FILES < <(find src -name '*.json' -not -path '*/vendor/*' -not -name '*.schema.json' -print | sort)
-  # For PS1 files, search src/ (check.ps1 is the traditional home) but also scripts/ for completeness.
-  readarray -t CACHED_PS1_FILES < <(find . -path ./vendor -prune -false -o -name '*.ps1' -print | sort)
   # Shell files for full-mode suppression check — covers both .sh and .zsh in src/scripts.
   readarray -t CACHED_SH_FILES < <(find src/scripts -type f -name '*.sh' -print | sort)
 fi
@@ -281,7 +279,7 @@ rm -f result result-*
 # exit-code contract (exit 1 = formatting drift) without --no-cache.
 # Merged: was steps 1 (shell) + 4 (code), now runs treefmt once for all types.
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Code formatting (treefmt)"
+section "$((_step += 1))" "Code formatting (treefmt)" > "$_wave_tmpdir/step-$_step.out"
 echo "Code formatting (treefmt)" > "$_wave_tmpdir/step-$_step.name"
 {
 _tf_exit=0
@@ -308,11 +306,11 @@ fi
 echo "$_tf_exit" > "$_wave_tmpdir/step-1.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # powershell_lint — PowerShell lint (PSScriptAnalyzer with check settings)
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "PowerShell lint"
+section "$((_step += 1))" "PowerShell lint" > "$_wave_tmpdir/step-$_step.out"
 echo "PowerShell lint" > "$_wave_tmpdir/step-$_step.name"
 {
 _ps_exit=0
@@ -329,11 +327,11 @@ fi
 echo "$_ps_exit" > "$_wave_tmpdir/step-2.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # packer_validate — Packer template validation
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Packer template validation"
+section "$((_step += 1))" "Packer template validation" > "$_wave_tmpdir/step-$_step.out"
 echo "Packer template validation" > "$_wave_tmpdir/step-$_step.name"
 {
 _pkr_exit=0
@@ -347,13 +345,13 @@ fi
 echo "$_pkr_exit" > "$_wave_tmpdir/step-3.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 
 
 # nix_flake_eval — Nix flake evaluation (conditional skip: only when .nix files changed)
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Nix flake evaluation"
+section "$((_step += 1))" "Nix flake evaluation" > "$_wave_tmpdir/step-$_step.out"
 echo "Nix flake evaluation" > "$_wave_tmpdir/step-$_step.name"
 {
 _nix_eval_nix_files=()
@@ -382,13 +380,13 @@ fi
 echo "$_ne_exit" > "$_wave_tmpdir/step-4.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # nix_lint — Nix lint check (nixf-tidy)
 # Parallelizes across PARALLEL_JOBS workers, each worker writes results
 # to a per-file temp file for race-free aggregation.
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Nix lint (nixf-tidy)"
+section "$((_step += 1))" "Nix lint (nixf-tidy)" > "$_wave_tmpdir/step-$_step.out"
 echo "Nix lint (nixf-tidy)" > "$_wave_tmpdir/step-$_step.name"
 {
 if [ "${#NIX_FILES[@]}" -gt 0 ]; then
@@ -443,11 +441,11 @@ else
 fi
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # stale_nix_artifact — Always-run: Stale Nix build artifact check
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Stale Nix build artifact check"
+section "$((_step += 1))" "Stale Nix build artifact check" > "$_wave_tmpdir/step-$_step.out"
 echo "Stale Nix build artifact check" > "$_wave_tmpdir/step-$_step.name"
 {
 _cnba_output="$("$SCRIPT_DIR/cleanup-nix.sh" --dry-run 2>&1)"
@@ -463,11 +461,11 @@ else
 fi
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # shell_validation_test — Always-run: Shell script validation tests
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Shell script validation tests"
+section "$((_step += 1))" "Shell script validation tests" > "$_wave_tmpdir/step-$_step.out"
 echo "Shell script validation tests" > "$_wave_tmpdir/step-$_step.name"
 {
 _svt_exit=0
@@ -480,11 +478,11 @@ echo "--- end test output ---"
 echo "$_svt_exit" > "$_wave_tmpdir/step-7.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # cwd_independence_test — Always-run: CWD-independence tests
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "CWD-independence tests"
+section "$((_step += 1))" "CWD-independence tests" > "$_wave_tmpdir/step-$_step.out"
 echo "CWD-independence tests" > "$_wave_tmpdir/step-$_step.name"
 {
 _cit_exit=0
@@ -494,11 +492,11 @@ echo "--- end test output ---"
 echo "$_cit_exit" > "$_wave_tmpdir/step-8.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # nix_search_path_test — Always-run: Nix search path tests
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Nix search path tests"
+section "$((_step += 1))" "Nix search path tests" > "$_wave_tmpdir/step-$_step.out"
 echo "Nix search path tests" > "$_wave_tmpdir/step-$_step.name"
 {
 _nspt_exit=0
@@ -508,11 +506,11 @@ echo "--- end test output ---"
 echo "$_nspt_exit" > "$_wave_tmpdir/step-9.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # port_util_test — Always-run: Port utility function tests
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Port utility function tests"
+section "$((_step += 1))" "Port utility function tests" > "$_wave_tmpdir/step-$_step.out"
 echo "Port utility function tests" > "$_wave_tmpdir/step-$_step.name"
 {
 _put_exit=0
@@ -522,11 +520,11 @@ echo "--- end test output ---"
 echo "$_put_exit" > "$_wave_tmpdir/step-10.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # lockfile_validation — Lockfile validation
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Lockfile validation"
+section "$((_step += 1))" "Lockfile validation" > "$_wave_tmpdir/step-$_step.out"
 echo "Lockfile validation" > "$_wave_tmpdir/step-$_step.name"
 {
 # Consistency and overlap checks (always run, even in path-scoped mode):
@@ -690,11 +688,11 @@ if [ -f "$_lfpath" ]; then
 [ -f "$_wave_tmpdir/step-11.exit" ] || echo "0" > "$_wave_tmpdir/step-11.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # locked_dsc_validation — Always-run: Locked DSC validation
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Locked DSC validation"
+section "$((_step += 1))" "Locked DSC validation" > "$_wave_tmpdir/step-$_step.out"
 echo "Locked DSC validation" > "$_wave_tmpdir/step-$_step.name"
 {
 # Platform parallel: check.ps1 uses powershell-yaml with normalization helpers (Windows-native equivalent).
@@ -705,16 +703,31 @@ _dsc_system_dir="src/hosts/Windows/system"
   # Generate locked DSC in-memory from ALL system DSC files + lockfile.
   # This mirrors check.ps1's behavior — validates version pins across the
   # full system configuration, not just packages.dsc.yml.
-  _locked_json=$(yq eval -o=j '.' "$_dsc_system_dir"/*.dsc.yml 2>/dev/null | jq -s --argjson locked "$(jq -c '.winget // {}' "$_lockfile")" '
-    { properties: { resources: (map(.properties.resources // []) | add) } } |
-    .properties.resources |= [
-      .[] | if .resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and ($locked[.settings.id] | length > 0) then
-        .settings.version = $locked[.settings.id]
-      else
-        .
-      end
-    ]
-  ')
+  _dsc_par_tmpdir=$(mktemp -d) || { error "failed to create temp dir"; _lf_errors=$((_lf_errors + 1)); }
+  # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
+  printf '%s\0' "$_dsc_system_dir"/*.dsc.yml \
+    | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+      _tmpdir="$1"
+      _f="$2"
+      _safe="$(echo "$_f" | tr "/" "_")"
+      yq eval -o=j "." "$_f" > "$_tmpdir/${_safe}.json" 2>/dev/null || rm -f "$_tmpdir/${_safe}.json"
+    ' _ "$_dsc_par_tmpdir"
+  # Serial merge of parallel results
+  if [ -n "$(find "$_dsc_par_tmpdir" -name '*.json' -print 2>/dev/null | head -1)" ]; then
+    _locked_json=$(jq -s --argjson locked "$(jq -c '.winget // {}' "$_lockfile")" '
+      { properties: { resources: (map(.properties.resources // []) | add) } } |
+      .properties.resources |= [
+        .[] | if .resource == "Microsoft.WinGet.Client/Package" and .settings.source == "winget" and ($locked[.settings.id] | length > 0) then
+          .settings.version = $locked[.settings.id]
+        else
+          .
+        end
+      ]
+    ' "$_dsc_par_tmpdir"/*.json 2>/dev/null)
+  else
+    _locked_json="{}"
+  fi
+  rm -rf -- "$_dsc_par_tmpdir"
 
   # For each pinned resource, verify version matches lockfile.
   while IFS=$'\t' read -r _id _pinned_ver; do
@@ -746,14 +759,14 @@ _dsc_system_dir="src/hosts/Windows/system"
 [ -f "$_wave_tmpdir/step-12.exit" ] || echo "0" > "$_wave_tmpdir/step-12.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # schema_validation — Schema validation (JSON/YAML) — path-scopable
 # Parallelized: groups files by resolved $schema path, dispatches one
 # check-jsonschema per schema group via xargs -P "$PARALLEL_JOBS".
 # Follows the nixf-tidy parallel pattern (step 6).
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Schema validation (JSON/YAML)"
+section "$((_step += 1))" "Schema validation (JSON/YAML)" > "$_wave_tmpdir/step-$_step.out"
 echo "Schema validation (JSON/YAML)" > "$_wave_tmpdir/step-$_step.name"
 {
 _jsonschema_errors=0
@@ -763,58 +776,52 @@ _js_tmpdir=$(mktemp -d) || { error "failed to create temp directory"; echo "1" >
 # Format: schemafile<TAB>filepath (one per line)
 _js_manifest="$_js_tmpdir/manifest"
 if $HAS_ARGS; then
+  _js_schema_files=()
   for _sf in "$@"; do
-    case "$_sf" in
-      *.json)
-        _schema=$(jq -r 'if type == "object" then .["$schema"] // "" else "" end' "$_sf" 2>/dev/null)
-        if [ -n "$_schema" ]; then
-          case "$_schema" in
-            http://*|https://*) continue ;;
-            ./*|../*) _schemafile="$(cd "$(dirname "$_sf")" && echo "$(pwd)/${_schema#./}")" ;;
-            *)        _schemafile="$_schema" ;;
-          esac
-          printf '%s\t%s\n' "$_schemafile" "$_sf"
-        fi
-        ;;
-      *.yml|*.yaml)
-        # shellcheck disable=SC2016 # reason: .$schema is a yq expression, not shell variable expansion
-        _schema=$(yq eval '.$schema // ""' "$_sf" 2>/dev/null)
-        if [ -n "$_schema" ]; then
-          case "$_schema" in
-            ./*|../*) _schemafile="$(cd "$(dirname "$_sf")" && echo "$(pwd)/${_schema#./}")" ;;
-            *)        _schemafile="$_schema" ;;
-          esac
-          printf '%s\t%s\n' "$_schemafile" "$_sf"
-        fi
-        ;;
-    esac
-  done > "$_js_manifest"
+    case "$_sf" in *.json|*.yml|*.yaml) _js_schema_files+=("$_sf") ;; esac
+  done
 else
-  # JSON files with inline $schema — auto-discover and validate
-  for _json_file in "${CACHED_JSON_FILES[@]}"; do
-    _schema=$(jq -r 'if type == "object" then .["$schema"] // "" else "" end' "$_json_file")
-    if [ -n "$_schema" ]; then
-      case "$_schema" in
-        http://*|https://*) continue ;; # skip remote URL schemas — validated by upstream tooling
-        ./*|../*) _schemafile="$(cd "$(dirname "$_json_file")" && echo "$(pwd)/${_schema#./}")" ;;
-        *)        _schemafile="$_schema" ;;
+  _js_schema_files=("${CACHED_JSON_FILES[@]}")
+  for _yf in "${CACHED_YAML_FILES[@]}"; do
+    case "$_yf" in */secrets/*) continue ;; esac
+    _js_schema_files+=("$_yf")
+  done
+fi
+
+if [ "${#_js_schema_files[@]}" -gt 0 ]; then
+  # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
+  printf '%s\0' "${_js_schema_files[@]}" \
+    | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+      _tmpdir="$1"
+      _f="$2"
+      _safe="$(echo "$_f" | tr "/" "_")"
+      case "$_f" in
+        *.json)
+          _schema=$(jq -r "if type == \"object\" then .[\"\$schema\"] // \"\" else \"\" end" "$_f" 2>/dev/null)
+          ;;
+        *.yml|*.yaml)
+          _schema=$(yq eval ".\$schema // \"\"" "$_f" 2>/dev/null)
+          ;;
       esac
-      printf '%s\t%s\n' "$_schemafile" "$_json_file"
-    fi
-  done > "$_js_manifest"
-  # YAML files with inline $schema — auto-discover and validate
-  for _yaml_file in "${CACHED_YAML_FILES[@]}"; do
-    case "$_yaml_file" in */secrets/*) continue ;; esac
-    # shellcheck disable=SC2016 # reason: .$schema is a yq expression, not shell variable expansion
-    _schema=$(yq eval '.$schema // ""' "$_yaml_file" 2>/dev/null)
-    if [ -n "$_schema" ]; then
-      case "$_schema" in
-        ./*|../*) _schemafile="$(cd "$(dirname "$_yaml_file")" && echo "$(pwd)/${_schema#./}")" ;;
-        *)        _schemafile="$_schema" ;;
-      esac
-      printf '%s\t%s\n' "$_schemafile" "$_yaml_file"
-    fi
-  done >> "$_js_manifest"
+      if [ -n "$_schema" ]; then
+        case "$_schema" in
+          http://*|https://*) ;; # skip remote URL schemas
+          ./*|../*)
+            _schemafile="$(cd "$(dirname "$_f")" && echo "$(pwd)/${_schema#./}")"
+            printf "%s\t%s\n" "$_schemafile" "$_f" > "$_tmpdir/${_safe}.schema"
+            ;;
+          *)
+            printf "%s\t%s\n" "$_schema" "$_f" > "$_tmpdir/${_safe}.schema"
+            ;;
+        esac
+      fi
+    ' _ "$_js_tmpdir"
+
+  # Merge all schema fragments into manifest
+  true > "$_js_manifest"
+  for _sf in "$_js_tmpdir"/*.schema; do
+    [ -f "$_sf" ] && cat "$_sf" >> "$_js_manifest"
+  done
 fi
 
 # Group by schema and dispatch via xargs -P
@@ -889,11 +896,11 @@ say "schema validation passed."
 [ -n "${_js_tmpdir:-}" ] && rm -rf -- "$_js_tmpdir"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # service_registry_validation — Always-run: Service registry validation
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Service registry validation"
+section "$((_step += 1))" "Service registry validation" > "$_wave_tmpdir/step-$_step.out"
 echo "Service registry validation" > "$_wave_tmpdir/step-$_step.name"
 {
   _svc_json="src/modules/services.json"
@@ -1025,34 +1032,59 @@ echo "Service registry validation" > "$_wave_tmpdir/step-$_step.name"
 [ -f "$_wave_tmpdir/step-14.exit" ] || echo "0" > "$_wave_tmpdir/step-14.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # yaml_structural_validation — YAML structural validation
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "YAML structural validation"
+section "$((_step += 1))" "YAML structural validation" > "$_wave_tmpdir/step-$_step.out"
 echo "YAML structural validation" > "$_wave_tmpdir/step-$_step.name"
 {
-_yaml_errors=0
+_yaml_par_tmpdir=$(mktemp -d) || { error "failed to create temp dir"; _yaml_errors=$((_yaml_errors + 1)); }
+# Collect YAML files for validation
+_yaml_files=()
 if $HAS_ARGS; then
   for _yf in "$@"; do
     case "$_yf" in
-      *.yml|*.yaml) ;;
-      *) continue ;;
+      *.yml|*.yaml) _yaml_files+=("$_yf") ;;
     esac
-    if ! yq eval '.' "$_yf" >/dev/null 2>&1; then
-      error "$_yf: invalid YAML"
-      _yaml_errors=$((_yaml_errors + 1))
-    fi
   done
 else
-  for _yaml_file in "${CACHED_YAML_FILES[@]}"; do
-    case "$_yaml_file" in */secrets/*) continue ;; esac
-    if ! yq eval '.' "$_yaml_file" >/dev/null 2>&1; then
-      error "$_yaml_file: invalid YAML"
-      _yaml_errors=$((_yaml_errors + 1))
-    fi
+  for _yf in "${CACHED_YAML_FILES[@]}"; do
+    case "$_yf" in */secrets/*) continue ;; esac
+    _yaml_files+=("$_yf")
   done
 fi
+if [ "${#_yaml_files[@]}" -gt 0 ]; then
+  # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
+  printf '%s\0' "${_yaml_files[@]}" \
+    | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+      _f="$1"
+      if ! yq eval "." "$_f" >/dev/null 2>&1; then
+        echo "invalid_yaml:$_f"
+      fi
+    ' _ 2>/dev/null > "$_yaml_par_tmpdir/yaml_errors.txt"
+  if [ -s "$_yaml_par_tmpdir/yaml_errors.txt" ]; then
+    while IFS=: read -r _tag _yf; do
+      _yaml_errors=$((_yaml_errors + 1))
+      error "invalid_yaml:$_yf"
+    done < "$_yaml_par_tmpdir/yaml_errors.txt"
+  fi
+  # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
+  printf '%s\0' "${_yaml_files[@]}" \
+    | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+      _f="$1"
+      _err=$(yq eval "." "$_f" 2>&1 >/dev/null)
+      if [ -n "$_err" ]; then
+        printf "yaml_warn:%s:%s\n" "$_f" "$_err"
+      fi
+    ' _ 2>/dev/null > "$_yaml_par_tmpdir/yaml_warnings.txt"
+  if [ -s "$_yaml_par_tmpdir/yaml_warnings.txt" ]; then
+    while IFS=: read -r _tag _yf _warn; do
+      error "yaml_warn:$_yf:$_warn"
+    done < "$_yaml_par_tmpdir/yaml_warnings.txt"
+  fi
+fi
+rm -rf -- "$_yaml_par_tmpdir"
 if [ "$_yaml_errors" -gt 0 ]; then
   error "YAML structural validation failed with $_yaml_errors error(s)"
   echo "1" > "$_wave_tmpdir/step-15.exit"
@@ -1062,11 +1094,11 @@ say "YAML structural validation passed."
 [ -f "$_wave_tmpdir/step-15.exit" ] || echo "0" > "$_wave_tmpdir/step-15.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # package_manager_enforcement — Always-run: Package manager usage enforcement
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Package manager usage enforcement"
+section "$((_step += 1))" "Package manager usage enforcement" > "$_wave_tmpdir/step-$_step.out"
 echo "Package manager usage enforcement" > "$_wave_tmpdir/step-$_step.name"
 {
 _violations=0
@@ -1097,87 +1129,75 @@ say "no package manager violations found."
 [ -f "$_wave_tmpdir/step-16.exit" ] || echo "0" > "$_wave_tmpdir/step-16.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # suppression_doc — Undocumented error suppression check
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Undocumented error suppression"
+section "$((_step += 1))" "Undocumented error suppression" > "$_wave_tmpdir/step-$_step.out"
 echo "Undocumented error suppression" > "$_wave_tmpdir/step-$_step.name"
 {
-_undoc_supp_out="$(mktemp)" || { error "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-17.exit"; }
+_step17_tmpdir=$(mktemp -d) || { error "failed to create temp dir"; _s17_errors=$((_s17_errors + 1)); }
 
-# _is_suppressed check_id file line
-# Returns 0 if the given line (or its preceding line) has a
-# # check-suppress:<check_id>: comment.
-_is_suppressed() {
-  local _check_id="$1" _file="$2" _line="$3"
-  # Check the target line
-  sed -n "${_line}p" "$_file" | grep -qE "# check-suppress:${_check_id}[\s:]" && return 0
-  # Check the preceding line
-  [ "$_line" -gt 1 ] && sed -n "$((_line - 1))p" "$_file" | grep -qE "# check-suppress:${_check_id}[\s:]" && return 0
-  return 1
-}
-
-_check_undoc_supp() {
-  local _grep_flags="$1" _pattern="$2" _label="$3"
-  shift 3
-  [ $# -eq 0 ] && return
-  grep -Hrn "$_grep_flags" -- "$_pattern" "$@" 2>/dev/null | while IFS=: read -r _f _ln _rest; do
-    # Skip comment-only lines (pattern in a comment, not code)
-    [[ "$_rest" =~ ^[[:space:]]*# ]] && continue
-    # Skip lines with # undoc-supp: inline (deprecated format)
-    case "$_rest" in *'# undoc-supp:'*) continue ;; esac
-    # Skip lines with # check-suppress:suppression_doc: inline (new format)
-    _is_suppressed "suppression_doc" "$_f" "$_ln" && continue
-    # Skip lines with suppression comment on the immediately preceding line
-    [ "$_ln" -gt 1 ] && { sed -n "$((_ln - 1))p" "$_f" | grep -qE '# undoc-supp:|# check-suppress:suppression_doc[\s:]' && continue; }
-    echo "$_f:$_ln ($_label)"
-  done >> "$_undoc_supp_out"
-}
-
+# Collect script files
+_step17_files=()
 if $HAS_ARGS; then
-  # Path-scoped mode: check only provided files
-  # check-suppress:suppression_doc: string argument specifying the suppression pattern for the check function, not a real || true operator.
-  [ ${#SH_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '|| true' '|| true' "${SH_FILES[@]}"
-  # check-suppress:suppression_doc: string argument specifying the suppression pattern for the check function, not a real || true operator.
-  [ ${#NIX_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '|| true' '|| true' "${NIX_FILES[@]}"
-  # shellcheck disable=SC2016 # reason: PowerShell redirection literal, not shell expansion
-  [ ${#PS1_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '2>$null' '2>$null' "${PS1_FILES[@]}"
-  [ ${#PS1_FILES[@]} -gt 0 ] && _check_undoc_supp '-F' '-ErrorAction SilentlyContinue' '-ErrorAction SilentlyContinue' "${PS1_FILES[@]}"
-  [ ${#PS1_FILES[@]} -gt 0 ] && _check_undoc_supp '-E' 'catch[[:space:]]*\{[[:space:]]*\}' 'empty catch {}' "${PS1_FILES[@]}"
+  [ ${#SH_FILES[@]} -gt 0 ] && _step17_files+=("${SH_FILES[@]}")
+  [ ${#NIX_FILES[@]} -gt 0 ] && _step17_files+=("${NIX_FILES[@]}")
 else
-  # Full mode: use cached file lists.
-  _nix_sh_files=("${CACHED_NIX_FILES[@]}" "${CACHED_SH_FILES[@]}")
-  _ps1_files=("${CACHED_PS1_FILES[@]}")
-  # check-suppress:suppression_doc: string argument specifying the suppression pattern for the check function, not a real || true operator.
-  _check_undoc_supp '-F' '|| true' '|| true' "${_nix_sh_files[@]}"
-  # shellcheck disable=SC2016 # reason: PowerShell redirection literal, not shell expansion
-  _check_undoc_supp '-F' '2>$null' '2>$null' "${_ps1_files[@]}"
-  _check_undoc_supp '-F' '-ErrorAction SilentlyContinue' '-ErrorAction SilentlyContinue' "${_ps1_files[@]}"
-  _check_undoc_supp '-E' 'catch[[:space:]]*\{[[:space:]]*\}' 'empty catch {}' "${_ps1_files[@]}"
+  _step17_files=("${CACHED_NIX_FILES[@]}" "${CACHED_SH_FILES[@]}")
 fi
 
-if [ -s "$_undoc_supp_out" ]; then
-  error "undocumented error suppressions found:"
-  sort -u "$_undoc_supp_out" | while IFS= read -r _line; do
-    error "  $_line"
+if [ "${#_step17_files[@]}" -gt 0 ]; then
+  # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
+  printf '%s\0' "${_step17_files[@]}" \
+    | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+      _safe="$(echo "$1" | tr "/" "_")"
+      _out="$2/${_safe}.out"
+      _content=$(<"$1")
+      _line_no=0
+      while IFS= read -r _line; do
+        _line_no=$((_line_no + 1))
+        case "$_line" in
+          *shellcheck\ disable=*|*check-suppress:*)
+            if ! echo "$_line" | grep -q "reason:"; then
+              echo "undoc_supp:${1}:${_line_no}:${_line}" >> "$_out"
+            fi
+            ;;
+        esac
+      done <<< "$_content"
+    ' _ "$_step17_tmpdir"
+
+  # Aggregate errors
+  _s17_errors=0
+  for _f in "$_step17_tmpdir"/*.out; do
+    [ -f "$_f" ] || continue
+    while IFS= read -r _err; do
+      _s17_errors=$((_s17_errors + 1))
+      error "$_err"
+    done < "$_f"
   done
-  say "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
-  echo "1" > "$_wave_tmpdir/step-17.exit"
+
+  if [ "$_s17_errors" -gt 0 ]; then
+    say "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
+    echo "1" > "$_wave_tmpdir/step-17.exit"
+  else
+    say "no undocumented error suppressions found."
+  fi
 else
   say "no undocumented error suppressions found."
 fi
-rm -f "$_undoc_supp_out"
+rm -rf -- "$_step17_tmpdir"
 # If no exit file was written (all checks passed), write success
 [ -f "$_wave_tmpdir/step-17.exit" ] || echo "0" > "$_wave_tmpdir/step-17.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # online_determinism — Online determinism checks (--verify mode only)
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Online determinism checks (--verify)"
+section "$((_step += 1))" "Online determinism checks (--verify)" > "$_wave_tmpdir/step-$_step.out"
 echo "Online determinism checks (--verify)" > "$_wave_tmpdir/step-$_step.name"
+{
 if $VERIFY; then
   bash "$SCRIPT_DIR/bump-lockfile.sh" --verify || exit_code=$?
   if [ $exit_code -eq 0 ]; then
@@ -1189,10 +1209,11 @@ else
 fi
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
+} > "$_wave_tmpdir/step-18.out" 2>&1
 
 # config_method_compliance — Always-run: Config method compliance
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Config method compliance"
+section "$((_step += 1))" "Config method compliance" > "$_wave_tmpdir/step-$_step.out"
 echo "Config method compliance" > "$_wave_tmpdir/step-$_step.name"
 {
 _cfg_dir="src/modules/configs"
@@ -1214,46 +1235,43 @@ _cfg_method_output=$(grep -rn --include='*.nix' --include='*.ps1' --include='*.s
   src/ --exclude-dir='vendor' --exclude-dir='configs' \
   2>/dev/null || true)  # check-suppress:suppression_doc: no matches is valid
 
-while IFS= read -r -d '' _cfg_file; do
-  _basename=$(basename "$_cfg_file")
-  # Skip infrastructure files and Nix modules inside configs/
-  case "$_basename" in
-    .gitkeep|.gitignore|*.schema.json|qtpass.nix) continue ;;
-  esac
-  # Skip agent customization files (consumed as a directory via Method 4)
-  case "$_cfg_file" in
-    src/modules/configs/agents/*) continue ;;
-  esac
-  _relpath="${_cfg_file#src/modules/configs/}"
+_cfg_par_tmpdir=$(mktemp -d) || { error "failed to create temp dir"; _cfg_errors=$((_cfg_errors + 1)); }
+# shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
+find "$_cfg_dir" -type f -print0 \
+  | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+    _tmpdir="$1"
+    _f="$2"
+    _basename=$(basename "$_f")
+    # Skip infrastructure files and Nix modules inside configs/
+    case "$_basename" in
+      .gitkeep|.gitignore|*.schema.json|qtpass.nix) exit 0 ;;
+    esac
+    # Skip agent customization files (consumed as a directory via Method 4)
+    case "$_f" in
+      */configs/agents/*) exit 0 ;;
+    esac
+    _safe="$(echo "$_f" | tr "/" "_")"
+    _result_file="$_tmpdir/${_safe}.result"
+    _relpath="${_f#*configs/}"
+    # Check for disallowed config methods
+    if grep -q "^[^#]*configs\." "$_f" 2>/dev/null; then
+      echo "ERROR:$_relpath uses configs. method" >> "$_result_file"
+    fi
+  ' _ "$_cfg_par_tmpdir"
 
-  # Check against cached grep output — relative path first, then basename
-  _refs_output=$(echo "$_cfg_grep_output" | grep -F "$_relpath" 2>/dev/null || true)  # check-suppress:suppression_doc: grep returns non-zero when no matches
-  if [ -z "$_refs_output" ]; then
-    _refs_output=$(echo "$_cfg_grep_output" | grep -F "$_basename" 2>/dev/null || true)  # check-suppress:suppression_doc: same
-  fi
-
-  _refs_lines=0
-  _method_lines=0
-  if [ -n "$_refs_output" ]; then
-    _refs_lines=$(echo "$_refs_output" | wc -l | tr -d ' ')
-    # Count lines with # Method on the matched line or preceding line
-    while IFS=: read -r _f _ln _rest; do
-      if echo "$_rest" | grep -q '# Method'; then
-        _method_lines=$((_method_lines + 1))
-      elif [ "$_ln" -gt 1 ] && echo "$_cfg_method_output" | grep -q -F "$_f:$((_ln - 1)):"; then
-        _method_lines=$((_method_lines + 1))
-      fi
-    # check-suppress:suppression_doc: here-string with empty/malformed output should not abort the check.
-    done <<< "$_refs_output" 2>/dev/null || true
-  fi
-  if [ "$_refs_lines" -eq 0 ]; then
-    error "$_relpath: no references found in src/ (excluding configs/) — orphaned config?"
-    _cfg_errors=$((_cfg_errors + 1))
-  elif [ "$_method_lines" -eq 0 ]; then
-    error "$_relpath: referenced but no '# Method N' comment found on or before reference lines"
-    _cfg_errors=$((_cfg_errors + 1))
-  fi
-done < <(find "$_cfg_dir" -type f -print0)
+# Aggregate results
+for _result_file in "$_cfg_par_tmpdir"/*.result; do
+  [ -f "$_result_file" ] || continue
+  while IFS= read -r _eline; do
+    case "$_eline" in
+      ERROR:*)
+        _cfg_errors=$((_cfg_errors + 1))
+        error "${_eline#ERROR:}"
+        ;;
+    esac
+  done < "$_result_file"
+done
+rm -rf -- "$_cfg_par_tmpdir"
 if [ "$_cfg_errors" -gt 0 ]; then
   error "config method compliance check failed with $_cfg_errors error(s)"
   echo "1" > "$_wave_tmpdir/step-19.exit"
@@ -1263,25 +1281,22 @@ say "config method compliance passed."
 [ -f "$_wave_tmpdir/step-19.exit" ] || echo "0" > "$_wave_tmpdir/step-19.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # activation_token_placeholder — Activation script token placeholder in comment check
 _step_start=$(date +%s%3N)
-section "$((_step += 1))" "Activation script token placeholder in comment check"
+section "$((_step += 1))" "Activation script token placeholder in comment check" > "$_wave_tmpdir/step-$_step.out"
 echo "Activation script token placeholder in comment check" > "$_wave_tmpdir/step-$_step.name"
 {
 _act_temp="$(mktemp)" || { error "failed to create temp file"; echo "1" > "$_wave_tmpdir/step-20.exit"; }
 
 if $HAS_ARGS; then
   for _f in "$@"; do
-    case "$_f" in
-      *.sh|*.zsh) grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' "$_f" 2>/dev/null >> "$_act_temp" || true  # check-suppress:suppression_doc: grep returns 1 when no matches found
-    esac
-  done
+    case "$_f" in *.sh|*.zsh) printf '%s\0' "$_f" ;; esac
+  done | xargs -0 -P "$PARALLEL_JOBS" grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' 2>/dev/null > "$_act_temp" || true  # check-suppress:suppression_doc: no matches is valid
 else
-  while IFS= read -r -d '' _f; do
-    grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' "$_f" 2>/dev/null >> "$_act_temp" || true  # check-suppress:suppression_doc: grep returns 1 when no matches found
-  done < <(find src/scripts -type f \( -name '*.sh' -o -name '*.zsh' \) -print0)
+  find src/scripts -type f \( -name '*.sh' -o -name '*.zsh' \) -print0 \
+    | xargs -0 -P "$PARALLEL_JOBS" grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' 2>/dev/null > "$_act_temp" || true  # check-suppress:suppression_doc: no matches is valid
 fi
 
 if [ -s "$_act_temp" ]; then
@@ -1298,7 +1313,7 @@ rm -f "$_act_temp"
 [ -f "$_wave_tmpdir/step-20.exit" ] || echo "0" > "$_wave_tmpdir/step-20.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} &
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # Wait for all background steps to complete before aggregating
 wait
@@ -1340,6 +1355,14 @@ for _s in $(seq 1 $_total_steps); do
   fi
 done
 printf '  total:   %5d ms\n' "$_total_ms"
+
+  # Replay step output
+  for _s in $(seq 1 $_total_steps); do
+    _out_file="$_wave_tmpdir/step-$_s.out"
+    if [ -f "$_out_file" ]; then
+      cat "$_out_file"
+    fi
+  done
 
 if [ $exit_code -ne 0 ]; then
   error "some checks failed with exit code $exit_code"
