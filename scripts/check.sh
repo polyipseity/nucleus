@@ -1039,6 +1039,7 @@ _step_start=$(date +%s%3N)
 section "$((_step += 1))" "YAML structural validation" > "$_wave_tmpdir/step-$_step.out"
 echo "YAML structural validation" > "$_wave_tmpdir/step-$_step.name"
 {
+_yaml_errors=0
 _yaml_par_tmpdir=$(mktemp -d) || { error "failed to create temp dir"; _yaml_errors=$((_yaml_errors + 1)); }
 # Collect YAML files for validation
 _yaml_files=()
