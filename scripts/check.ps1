@@ -218,8 +218,9 @@ Write-Output ("`n=== [{0}] PowerShell lint ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
-  function say { Write-Output "check: $args" }
-  function warn { Write-Output "check: warning: $args" }
+  $_step = $using:_step
+  function say { Write-Output "[Step $($_step)] $args" }
+  function warn { Write-Output "[Step $($_step)] warning: $args" }
   $_ps1Files = $using:PS1_FILES
   if ($_ps1Files.Count -gt 0) {
     & "$using:RepoRoot\scripts\check-pwsh.ps1" -Settings "$using:RepoRoot\scripts\PSScriptAnalyzerSettings.check.psd1" -Scoped -Paths $_ps1Files
@@ -244,8 +245,9 @@ Write-Output ("`n=== [{0}] Packer template validation ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
-  function say { Write-Output "check: $args" }
-  function warn { Write-Output "check: warning: $args" }
+  $_step = $using:_step
+  function say { Write-Output "[Step $($_step)] $args" }
+  function warn { Write-Output "[Step $($_step)] warning: $args" }
   $_pkrFiles = $using:PKR_FILES
   if ($_pkrFiles.Count -gt 0) {
     & "$using:RepoRoot\scripts\check-packer.ps1" $_pkrFiles
@@ -303,8 +305,9 @@ Write-Output ("`n=== [{0}] Stale Nix build artifact check ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
-  function say { Write-Output "check: $args" }
-  function error { Write-Output "check: error: $args" }
+  $_step = $using:_step
+  function say { Write-Output "[Step $($_step)] $args" }
+  function error { Write-Output "[Step $($_step)] error: $args" }
   # Always-run: Stale Nix build artifact check
   $_cnbaOutput = & "$using:RepoRoot\scripts\cleanup-nix.ps1" -WhatIf 2>&1
   $_cnbaFound = $_cnbaOutput | Select-String -Pattern 'would remove stale Nix build symlink'
@@ -373,8 +376,9 @@ Write-Output ("`n=== [{0}] Lockfile validation ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
-  function say { Write-Output "check: $args" }
-  function error { Write-Output "check: error: $args" }
+  $_step = $using:_step
+  function say { Write-Output "[Step $($_step)] $args" }
+  function error { Write-Output "[Step $($_step)] error: $args" }
 
 
 # Consistency and overlap checks (always run, even in path-scoped mode):
@@ -560,8 +564,9 @@ Write-Output ("`n=== [{0}] Locked DSC validation ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
-  function say { Write-Output "check: $args" }
-  function error { Write-Output "check: error: $args" }
+  $_step = $using:_step
+  function say { Write-Output "[Step $($_step)] $args" }
+  function error { Write-Output "[Step $($_step)] error: $args" }
   # Platform parallel: check.sh uses yq+jq pipeline (POSIX-native equivalent).
 # Always-run: Locked DSC validation
 $_dscSystemDir = Join-Path $using:RepoRoot 'src\hosts\Windows\system'
@@ -710,8 +715,9 @@ Write-Output ("`n=== [{0}] Schema validation (JSON/YAML) ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
-  function say { Write-Output "check: $args" }
-  function error { Write-Output "check: error: $args" }
+  $_step = $using:_step
+  function say { Write-Output "[Step $($_step)] $args" }
+  function error { Write-Output "[Step $($_step)] error: $args" }
   # Build manifest of file→schema pairs.
   # Each entry: @{SchemaFile=...; InstanceFile=...}
   $manifest = [System.Collections.Generic.List[hashtable]]::new()
@@ -823,8 +829,9 @@ Write-Output ("`n=== [{0}] Service registry validation ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
-  function say { Write-Output "check: $args" }
-  function error { Write-Output "check: error: $args" }
+  $_step = $using:_step
+  function say { Write-Output "[Step $($_step)] $args" }
+  function error { Write-Output "[Step $($_step)] error: $args" }
   # Always-run: Service registry validation
 $_svcJson = Join-Path $using:RepoRoot "src\modules\services.json"
 $_svcErrors = 0
@@ -949,8 +956,9 @@ Write-Output ("`n=== [{0}] YAML structural validation ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
-  function say { Write-Output "check: $args" }
-  function error { Write-Output "check: error: $args" }
+  $_step = $using:_step
+  function say { Write-Output "[Step $($_step)] $args" }
+  function error { Write-Output "[Step $($_step)] error: $args" }
   $_yamlErrors = 0
 $_yamlFiles = @()
 if ($using:HAS_ARGS) {
@@ -989,8 +997,9 @@ Write-Output ("`n=== [{0}] Package manager usage enforcement ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
-  function say { Write-Output "check: $args" }
-  function error { Write-Output "check: error: $args" }
+  $_step = $using:_step
+  function say { Write-Output "[Step $($_step)] $args" }
+  function error { Write-Output "[Step $($_step)] error: $args" }
   # Always-run: Package manager usage enforcement
 $_violations = 0
   # Ban bare pip install and npm install — these bypass the lockfile.
@@ -1035,8 +1044,9 @@ Write-Output ("`n=== [{0}] Undocumented error suppression check ===" -f (++$_ste
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
-  function say { Write-Output "check: $args" }
-  function error { Write-Output "check: error: $args" }
+  $_step = $using:_step
+  function say { Write-Output "[Step $($_step)] $args" }
+  function error { Write-Output "[Step $($_step)] error: $args" }
 
 $_undocSuppViolations = @()
 
@@ -1150,8 +1160,9 @@ Write-Output ("`n=== [{0}] Config method compliance ===" -f (++$_step))
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
-  function say { Write-Output "check: $args" }
-  function error { Write-Output "check: error: $args" }
+  $_step = $using:_step
+  function say { Write-Output "[Step $($_step)] $args" }
+  function error { Write-Output "[Step $($_step)] error: $args" }
   $_cfgDir = Join-Path -Path $using:RepoRoot -ChildPath "src\modules\configs"
 $_cfgErrors = 0
 
@@ -1230,8 +1241,9 @@ Write-Output ("`n=== [{0}] Activation script token placeholder in comment check 
 $null = $script:waveJobs.Add((Start-Job -ScriptBlock {
   Set-StrictMode -Version Latest
   $ErrorActionPreference = 'Stop'
-  function say { Write-Output "check: $args" }
-  function error { Write-Output "check: error: $args" }
+  $_step = $using:_step
+  function say { Write-Output "[Step $($_step)] $args" }
+  function error { Write-Output "[Step $($_step)] error: $args" }
   $_actPattern = '^\s*#.*__[A-Z][A-Z_]*__'
 $_actViolations = @()
 if ($using:HAS_ARGS) {

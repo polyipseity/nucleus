@@ -56,3 +56,10 @@ Describe 'Explicit failure summary (Phase 5)' {
         $script:checkContent | Should -MatchExactly 'Failed steps'
     }
 }
+
+Describe '[Step N] prefix (Phase 5c)' {
+    It 'has [Step N] prefix in Start-Job say/error' {
+        # Look for [Step $($_step)] in say/error function definitions inside Start-Job blocks
+        $script:checkContent | Should -MatchExactly '\[Step \$\(\$_step\)\]'
+    }
+}
