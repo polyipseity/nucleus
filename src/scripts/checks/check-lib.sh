@@ -7,10 +7,11 @@
 _self="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 
-# shellcheck source=../src/scripts/lib/lib.sh
-. "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
 
-. "$SCRIPT_DIR/framework-lib.sh"
+# shellcheck source=../lib/framework-lib.sh
+. "$SCRIPT_DIR/../lib/framework-lib.sh"
 
 # Check-specific defaults
 FAIL_FAST=false

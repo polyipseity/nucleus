@@ -4,7 +4,7 @@
 
 Set-StrictMode -Version Latest
 
-. (Join-Path $ScriptDir "framework-lib.ps1")
+. (Join-Path $FrameworkDir "framework-lib.ps1")
 
 $script:FAIL_FAST = $false
 $script:usageAction = {
