@@ -159,10 +159,15 @@ test_help_handler() {
 
 # Run Tests on All Scripts
 
+# Temp dir for parallel test results
+_tt_tmpdir=$(mktemp -d) || { echo "FATAL: failed to create temp dir"; exit 1; }
+_tt_count=0
+
 echo "Testing shell scripts for correctness and best practices..."
 echo ""
 
 # Test scripts/vm.sh
+{
 VM_SETUP_SH="scripts/vm.sh"
 if [[ -f "$VM_SETUP_SH" ]]; then
     test_bash_syntax "$VM_SETUP_SH"
@@ -186,8 +191,13 @@ if [[ -f "$VM_SETUP_SH" ]]; then
             "Missing Apple Silicon tcg fallback for x86_64 QEMU builds"
     fi
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/vm.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/vm.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test scripts/apply.sh → src/scripts/apply.sh
+{
 APPLY_SH="src/scripts/apply.sh"
 if [[ -f "$APPLY_SH" ]]; then
     test_bash_syntax "$APPLY_SH"
@@ -201,8 +211,13 @@ if [[ -f "$APPLY_SH" ]]; then
     test_usage_std_present "$APPLY_SH"
     test_help_handler "$APPLY_SH"
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/apply.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/apply.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test scripts/bootstrap.sh
+{
 BOOTSTRAP_SH="scripts/bootstrap.sh"
 if [[ -f "$BOOTSTRAP_SH" ]]; then
     test_bash_syntax "$BOOTSTRAP_SH"
@@ -217,8 +232,13 @@ if [[ -f "$BOOTSTRAP_SH" ]]; then
     test_usage_std_present "$BOOTSTRAP_SH"
     test_help_handler "$BOOTSTRAP_SH"
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/bootstrap.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/bootstrap.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test scripts/health-check.sh
+{
 HEALTH_CHECK_SH="scripts/health-check.sh"
 if [[ -f "$HEALTH_CHECK_SH" ]]; then
     test_bash_syntax "$HEALTH_CHECK_SH"
@@ -231,8 +251,13 @@ if [[ -f "$HEALTH_CHECK_SH" ]]; then
     test_usage_std_present "$HEALTH_CHECK_SH"
     test_help_handler "$HEALTH_CHECK_SH"
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/health-check.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/health-check.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test scripts/update.sh
+{
 UPDATE_SH="scripts/update.sh"
 if [[ -f "$UPDATE_SH" ]]; then
     test_bash_syntax "$UPDATE_SH"
@@ -245,8 +270,13 @@ if [[ -f "$UPDATE_SH" ]]; then
     test_usage_std_present "$UPDATE_SH"
     test_help_handler "$UPDATE_SH"
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/update.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/update.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test scripts/ai.sh
+{
 AI_SH="scripts/ai.sh"
 if [[ -f "$AI_SH" ]]; then
     test_bash_syntax "$AI_SH"
@@ -259,8 +289,13 @@ if [[ -f "$AI_SH" ]]; then
     test_usage_std_present "$AI_SH"
     test_help_handler "$AI_SH"
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/ai.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/ai.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test scripts/cloud-setup.sh
+{
 CLOUD_SETUP_SH="scripts/cloud-setup.sh"
 if [[ -f "$CLOUD_SETUP_SH" ]]; then
     test_bash_syntax "$CLOUD_SETUP_SH"
@@ -274,8 +309,13 @@ if [[ -f "$CLOUD_SETUP_SH" ]]; then
     test_usage_std_present "$CLOUD_SETUP_SH"
     test_help_handler "$CLOUD_SETUP_SH"
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/cloud-setup.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/cloud-setup.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test scripts/gc.sh
+{
 GC_SH="scripts/gc.sh"
 if [[ -f "$GC_SH" ]]; then
     test_bash_syntax "$GC_SH"
@@ -289,6 +329,10 @@ if [[ -f "$GC_SH" ]]; then
     test_usage_std_present "$GC_SH"
     test_help_handler "$GC_SH"
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/gc.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/gc.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test scripts/gc.ps1 (Windows: garbage collection)
 GC_PS1="scripts/gc.ps1"
@@ -311,6 +355,7 @@ if [[ -f "$GIT_SSH_CONFIG_PS1" ]]; then
 fi
 
 # Test scripts/replica-reset.sh
+{
 REPLICA_RESET_SH="scripts/replica-reset.sh"
 if [[ -f "$REPLICA_RESET_SH" ]]; then
     test_bash_syntax "$REPLICA_RESET_SH"
@@ -324,8 +369,13 @@ if [[ -f "$REPLICA_RESET_SH" ]]; then
     test_usage_std_present "$REPLICA_RESET_SH"
     test_help_handler "$REPLICA_RESET_SH"
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/replica-reset.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/replica-reset.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test scripts/replica-sync.sh
+{
 REPLICA_SYNC_SH="scripts/replica-sync.sh"
 if [[ -f "$REPLICA_SYNC_SH" ]]; then
     test_bash_syntax "$REPLICA_SYNC_SH"
@@ -339,8 +389,13 @@ if [[ -f "$REPLICA_SYNC_SH" ]]; then
     test_usage_std_present "$REPLICA_SYNC_SH"
     test_help_handler "$REPLICA_SYNC_SH"
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/replica-sync.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/replica-sync.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test scripts/check-sh.sh
+{
 CHECK_SH_SH="scripts/check-sh.sh"
 if [[ -f "$CHECK_SH_SH" ]]; then
     test_bash_syntax "$CHECK_SH_SH"
@@ -354,8 +409,13 @@ if [[ -f "$CHECK_SH_SH" ]]; then
     test_usage_std_present "$CHECK_SH_SH"
     test_help_handler "$CHECK_SH_SH"
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/check-sh.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/check-sh.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test scripts/check.sh
+{
 CHECK_SH="scripts/check.sh"
 if [[ -f "$CHECK_SH" ]]; then
     test_bash_syntax "$CHECK_SH"
@@ -372,8 +432,13 @@ if [[ -f "$CHECK_SH" ]]; then
     test_usage_std_present "$CHECK_SH"
     test_help_handler "$CHECK_SH"
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/check.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/check.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test scripts/gs-pdf-opt.sh
+{
 GS_PDF_OPT_SH="scripts/gs-pdf-opt.sh"
 if [[ -f "$GS_PDF_OPT_SH" ]]; then
     test_bash_syntax "$GS_PDF_OPT_SH"
@@ -387,8 +452,13 @@ if [[ -f "$GS_PDF_OPT_SH" ]]; then
     test_usage_std_present "$GS_PDF_OPT_SH"
     test_help_handler "$GS_PDF_OPT_SH"
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/gs-pdf-opt.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/gs-pdf-opt.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test src/scripts/camilladsp-daemon.sh
+{
 CAMILLADSP_DAEMON_SH="src/scripts/services/camilladsp-daemon.sh"
 if [[ -f "$CAMILLADSP_DAEMON_SH" ]]; then
     test_bash_syntax "$CAMILLADSP_DAEMON_SH"
@@ -400,8 +470,13 @@ if [[ -f "$CAMILLADSP_DAEMON_SH" ]]; then
     test_no_dangerous_patterns "$CAMILLADSP_DAEMON_SH"
     test_strict_shell_mode "$CAMILLADSP_DAEMON_SH"
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/camilladsp-daemon.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/camilladsp-daemon.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test src/scripts/services/camilladsp-heartbeat.sh
+{
 CAMILLADSP_HEARTBEAT_SH="src/scripts/services/camilladsp-heartbeat.sh"
 if [[ -f "$CAMILLADSP_HEARTBEAT_SH" ]]; then
     test_bash_syntax "$CAMILLADSP_HEARTBEAT_SH"
@@ -413,6 +488,10 @@ if [[ -f "$CAMILLADSP_HEARTBEAT_SH" ]]; then
     test_no_dangerous_patterns "$CAMILLADSP_HEARTBEAT_SH"
     test_strict_shell_mode "$CAMILLADSP_HEARTBEAT_SH"
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/camilladsp-heartbeat.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/camilladsp-heartbeat.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test scripts/svc.sh (macOS-only: launchctl-based service management)
 SVC_SH="scripts/svc.sh"
@@ -605,6 +684,7 @@ else
 fi
 
 # Test src/scripts/services/service-watchdog.sh (macOS/NixOS: launchctl/systemctl watchdog)
+{
 WATCHDOG_SH="src/scripts/services/service-watchdog.sh"
 if [[ -f "$WATCHDOG_SH" ]]; then
     test_bash_syntax "$WATCHDOG_SH"
@@ -618,6 +698,10 @@ if [[ -f "$WATCHDOG_SH" ]]; then
     test_usage_std_present "$WATCHDOG_SH"
     test_help_handler "$WATCHDOG_SH"
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/service-watchdog.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/service-watchdog.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test src/scripts/services/service-watchdog.ps1 (Windows: scheduled task watchdog)
 WATCHDOG_PS1="src/scripts/services/service-watchdog.ps1"
@@ -640,6 +724,7 @@ if [[ -f "$SYNC_TERMINAL_PS1" ]]; then
 fi
 
 # Test tests/scripts/terminal-activations-tests.sh
+{
 TERMINAL_TEST_SH="tests/scripts/terminal-activations-tests.sh"
 if [[ -f "$TERMINAL_TEST_SH" ]]; then
     test_bash_syntax "$TERMINAL_TEST_SH"
@@ -650,6 +735,10 @@ if [[ -f "$TERMINAL_TEST_SH" ]]; then
     test_no_dangerous_patterns "$TERMINAL_TEST_SH"
     test_strict_shell_mode "$TERMINAL_TEST_SH"
 fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/terminal-activations-tests.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/terminal-activations-tests.fail"
+} &
+_tt_count=$((_tt_count + 1))
 
 # Test tests/hosts/Windows/system/Sync-TerminalActivation.Tests.ps1
 TERMINAL_PESTER_PS1="tests/hosts/Windows/system/Sync-TerminalActivation.Tests.ps1"
@@ -660,6 +749,18 @@ if [[ -f "$TERMINAL_PESTER_PS1" ]]; then
         assert_fail "PowerShell syntax: Sync-TerminalActivation.Tests.ps1" "Parse error detected by pwsh"
     fi
 fi
+
+# Wait for parallel test groups to complete
+wait
+
+# Aggregate parallel results
+for _pf in "$_tt_tmpdir"/*.pass; do
+  [ -f "$_pf" ] && TESTS_PASSED=$((TESTS_PASSED + $(cat "$_pf")))
+done
+for _ff in "$_tt_tmpdir"/*.fail; do
+  [ -f "$_ff" ] && TESTS_FAILED=$((TESTS_FAILED + $(cat "$_ff")))
+done
+rm -rf -- "$_tt_tmpdir"
 
 # Summary
 
