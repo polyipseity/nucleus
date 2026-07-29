@@ -128,6 +128,14 @@ fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
+# Override say/error/warn/section with step-prefix support for check.sh step blocks.
+# section() sets _step_prefix so say/error/warn include [Step N] in output.
+# This avoids per-block redefinition across 21 step blocks.
+say() { printf '%s\n' "${_step_prefix:+[Step $_step_prefix] }$_nuc_prefix: $*"; }
+error() { printf '%s\n' "${_step_prefix:+[Step $_step_prefix] }$_nuc_prefix: error: $*" >&2; return 1; }
+warn() { printf '%s\n' "${_step_prefix:+[Step $_step_prefix] }$_nuc_prefix: warning: $*" >&2; }
+section() { _step_prefix=$1; printf '\n=== [%s] %s ===\n' "$1" "$2"; }
+
 REPO_ROOT=$(derive_repo_root)
 cd "$REPO_ROOT" || exit
 
@@ -1285,6 +1293,9 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 
 # Wait for all background steps to complete before aggregating
 wait
+
+# Clear step prefix before aggregation output
+_step_prefix=''
 
 # Wave result aggregation — collect step exit codes from temp files
 say "check results:"

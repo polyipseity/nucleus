@@ -57,43 +57,43 @@ test_generic_success_message() {
     fi
 }
 
-test_no_step_prefix() {
-    # Phase 1 does not add [Step N] prefix yet
-    if grep -qF "[Step " "$CHECK_SH"; then
-        assert_fail "Step N prefix" "Phase 1 should NOT have [Step N] prefix yet"
+test_step_prefix_present() {
+    # Phase 2 adds [Step N] prefix via _step_prefix variable
+    if grep -qF "_step_prefix" "$CHECK_SH"; then
+        assert_pass "[Step N] prefix support added (Phase 2)"
     else
-        assert_pass "No [Step N] prefix (Phase 1)"
+        assert_fail "[Step N] prefix" "Expected _step_prefix variable not found"
     fi
 }
 
 test_no_test_boundary_markers() {
-    # Phase 1 does not add test boundary markers yet
+    # Phase 2 does not add test boundary markers yet
     if grep -qF -- "--- test output ---" "$CHECK_SH"; then
-        assert_fail "Test boundary markers" "Phase 1 should NOT have test output boundaries yet"
+        assert_fail "Test boundary markers" "Phase 2 should NOT have test output boundaries yet"
     else
-        assert_pass "No test boundary markers (Phase 1)"
+        assert_pass "No test boundary markers (Phase 2)"
     fi
 }
 
 test_no_explicit_failure_summary() {
-    # Phase 1 does not add explicit failure summary yet
+    # Phase 2 does not add explicit failure summary yet
     if grep -qF "Failed step" "$CHECK_SH"; then
-        assert_fail "Explicit failure summary" "Phase 1 should NOT have explicit failure summary yet"
+        assert_fail "Explicit failure summary" "Phase 2 should NOT have explicit failure summary yet"
     else
-        assert_pass "No explicit failure summary (Phase 1)"
+        assert_pass "No explicit failure summary (Phase 2)"
     fi
 }
 
 # ---- Run tests ----
 echo ""
-echo "Testing check.sh output format (Phase 1: combined status table)..."
+echo "Testing check.sh output format (Phase 2: [Step N] prefix)..."
 echo ""
 
 test_combined_status_table
 test_total_timing_line
 test_generic_failure_message
 test_generic_success_message
-test_no_step_prefix
+test_step_prefix_present
 test_no_test_boundary_markers
 test_no_explicit_failure_summary
 
