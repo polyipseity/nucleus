@@ -122,13 +122,13 @@ This is not an exemption — use inline suppression with a documented reason as 
 
 **Allowed collection-indicating singular nouns:**
 
-| Category | Words |
-| -------- | ----- |
-| General collections | List, Set, Collection, Array, Group, Batch, Bundle, Cluster |
-| Key-value structures | Map, Dictionary, Hash, Hashtable, Index, Registry, Catalog, Table |
-| Data structures | Queue, Stack, Vector, Matrix, Range, Buffer, Pool, Cache, Heap, Ring, Tree, Graph, Stream, Sequence, Series |
-| Record-keeping | Enum, Inventory, Manifest, Record, Store, Archive, Suite, Toolkit, Library, Report |
-| Organizational | Aggregate, Compilation, Overview, Summary |
+| Category             | Words                                                                                                       |
+| -------------------- | ----------------------------------------------------------------------------------------------------------- |
+| General collections  | List, Set, Collection, Array, Group, Batch, Bundle, Cluster                                                 |
+| Key-value structures | Map, Dictionary, Hash, Hashtable, Index, Registry, Catalog, Table                                           |
+| Data structures      | Queue, Stack, Vector, Matrix, Range, Buffer, Pool, Cache, Heap, Ring, Tree, Graph, Stream, Sequence, Series |
+| Record-keeping       | Enum, Inventory, Manifest, Record, Store, Archive, Suite, Toolkit, Library, Report                          |
+| Organizational       | Aggregate, Compilation, Overview, Summary                                                                   |
 
 **Suppression:** Never. Do not suppress `PSUseSingularNouns`. Rename the function.
 
@@ -136,14 +136,14 @@ This is not an exemption — use inline suppression with a documented reason as 
 
 ## Reference table
 
-| Rule ID | Trigger | Fix strategy |
-| ------- | ------- | ------------ |
-| `PSUseUsingScopeModifierInNewRunspaces` | `$using:VAR.Count` member access | Assign `$using:` var to local, use `.Count` on local |
-| `PSUseApprovedVerbs` | Function name uses unapproved verb | Rename to approved verb; lowercase helpers get Verb-Noun name; command-name wrappers add inline suppression |
-| `PSUseSingularNouns` | Function name uses plural noun | Rename to singular noun: bare singular for single-return, collection-indicating singular for multi-return |
-| `PSUseDeclaredVarsMoreThanAssignments` | `$null = <cmd>` or `[void]<expr>` | `> $null` redirect preferred, else annotate with `# check-suppress:SuppressMessageAttribute:` |
-| `PSPossibleIncorrectComparisonWithNull` | `$null = <cmd>` | `> $null` redirect preferred, else annotate with `# check-suppress:SuppressMessageAttribute:` |
-| `PSReviewUnusedParameter` / `PSAvoidUsingUnusedParameters` | Parameter not used in function body | Reassess parameter necessity; annotate `$null =` with `# check-suppress:SuppressMessageAttribute:` |
+| Rule ID                                                    | Trigger                             | Fix strategy                                                                                                |
+| ---------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `PSUseUsingScopeModifierInNewRunspaces`                    | `$using:VAR.Count` member access    | Assign `$using:` var to local, use `.Count` on local                                                        |
+| `PSUseApprovedVerbs`                                       | Function name uses unapproved verb  | Rename to approved verb; lowercase helpers get Verb-Noun name; command-name wrappers add inline suppression |
+| `PSUseSingularNouns`                                       | Function name uses plural noun      | Rename to singular noun: bare singular for single-return, collection-indicating singular for multi-return   |
+| `PSUseDeclaredVarsMoreThanAssignments`                     | `$null = <cmd>` or `[void]<expr>`   | `> $null` redirect preferred, else annotate with `# check-suppress:SuppressMessageAttribute:`               |
+| `PSPossibleIncorrectComparisonWithNull`                    | `$null = <cmd>`                     | `> $null` redirect preferred, else annotate with `# check-suppress:SuppressMessageAttribute:`               |
+| `PSReviewUnusedParameter` / `PSAvoidUsingUnusedParameters` | Parameter not used in function body | Reassess parameter necessity; annotate `$null =` with `# check-suppress:SuppressMessageAttribute:`          |
 
 ## Adding a new rule policy
 
