@@ -56,6 +56,7 @@ applyTo: "**/*.ps1, scripts/PSScriptAnalyzerSettings.*.psd1"
 **Root cause:** The AST for `$using:PS1_FILES.Count` places the `VariableExpressionAst` (`$using:PS1_FILES`) under a `MemberExpressionAst`, **not** a `UsingExpressionAst`. The rule's `IsNonUsingNonSpecialVariableExpressionAst` predicate only checks the immediate parent, so it misses the `$using:` scope modifier in the ancestor chain and falsely flags it as undeclared.
 
 **Upstream status:**
+
 - [Issue #1504](https://github.com/PowerShell/PSScriptAnalyzer/issues/1504): General false-positive tracking (open since 2020)
 - [PR #2005](https://github.com/PowerShell/PSScriptAnalyzer/pull/2005): Draft PR adding tests for the issue but no fix (May 2024)
 - No dedicated bug report for member-access false positive exists; the scope-ancestor check has never been addressed upstream
@@ -94,13 +95,13 @@ because no alias definition produces a `FunctionDefinitionAst`.
 
 ## Reference table
 
-| Rule ID | Trigger | Fix strategy |
-|---------|---------|-------------|
-| `PSUseUsingScopeModifierInNewRunspaces` | `$using:VAR.Count` member access | Assign `$using:` var to local, use `.Count` on local |
-| `PSUseApprovedVerbs` | Function aliases via `New-Item -Path Function:` | Wrap in `Add-ShellAlias` helper |
-| `PSUseDeclaredVarsMoreThanAssignments` | `$null = <cmd>` or `[void]<expr>` | `> $null` redirect preferred, else annotate with `# check-suppress:SuppressMessageAttribute:` |
-| `PSPossibleIncorrectComparisonWithNull` | `$null = <cmd>` | `> $null` redirect preferred, else annotate with `# check-suppress:SuppressMessageAttribute:` |
-| `PSReviewUnusedParameter` / `PSAvoidUsingUnusedParameters` | Parameter not used in function body | Reassess parameter necessity; annotate `$null =` with `# check-suppress:SuppressMessageAttribute:` |
+| Rule ID                                                    | Trigger                                         | Fix strategy                                                                                       |
+| ---------------------------------------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `PSUseUsingScopeModifierInNewRunspaces`                    | `$using:VAR.Count` member access                | Assign `$using:` var to local, use `.Count` on local                                               |
+| `PSUseApprovedVerbs`                                       | Function aliases via `New-Item -Path Function:` | Wrap in `Add-ShellAlias` helper                                                                    |
+| `PSUseDeclaredVarsMoreThanAssignments`                     | `$null = <cmd>` or `[void]<expr>`               | `> $null` redirect preferred, else annotate with `# check-suppress:SuppressMessageAttribute:`      |
+| `PSPossibleIncorrectComparisonWithNull`                    | `$null = <cmd>`                                 | `> $null` redirect preferred, else annotate with `# check-suppress:SuppressMessageAttribute:`      |
+| `PSReviewUnusedParameter` / `PSAvoidUsingUnusedParameters` | Parameter not used in function body             | Reassess parameter necessity; annotate `$null =` with `# check-suppress:SuppressMessageAttribute:` |
 
 ## Adding a new rule policy
 
@@ -119,10 +120,10 @@ To document a new PSScriptAnalyzer rule policy:
 
 Two coexisting annotation formats, both under the `# check-suppress:` prefix:
 
-| Format | Class | Used for |
-|--------|-------|----------|
-| `# check-suppress:SuppressMessageAttribute: <RuleId> — <reason>` | A/C | `$null =`, `[void]`, `[SuppressMessageAttribute]` attribute, and any comment-only suppression of PSSA rules |
-| `# check-suppress:suppression_doc: <reason>` | B | `2>$null`, `-ErrorAction SilentlyContinue`, empty `catch {}`, `|| true` |
+| Format                                                           | Class | Used for                                                                                                    |
+| ---------------------------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------- | --- | ----- |
+| `# check-suppress:SuppressMessageAttribute: <RuleId> — <reason>` | A/C   | `$null =`, `[void]`, `[SuppressMessageAttribute]` attribute, and any comment-only suppression of PSSA rules |
+| `# check-suppress:suppression_doc: <reason>`                     | B     | `2>$null`, `-ErrorAction SilentlyContinue`, empty `catch {}`, `                                             |     | true` |
 
 Both are grep-able: `grep 'check-suppress:' **/*.ps1`
 
