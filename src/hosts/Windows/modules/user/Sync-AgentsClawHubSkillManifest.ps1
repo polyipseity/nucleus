@@ -9,7 +9,7 @@
 
   Fetched skills are those whose license is not AGPL-compatible and therefore
   cannot be committed to this repository.  Bundled (AGPL-compatible, committed)
-  skills are managed by Sync-AgentsSkills; this function manages only fetched
+  skills are managed by Sync-AgentsSkillManifest; this function manages only fetched
   ClawHub-downloaded skills.
 
   For each slug in the manifest:
@@ -42,17 +42,17 @@
   None.  Writes status messages to the host.
 
 .EXAMPLE
-  Sync-AgentsClawHubSkill -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$true
+  Sync-AgentsClawHubSkillManifest -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$true
 
 .EXAMPLE
   # Skip the fetched skill sync without removing any existing downloads:
-  Sync-AgentsClawHubSkill -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$false
+  Sync-AgentsClawHubSkillManifest -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$false
 
 .NOTES
   Environment variables: (none)
   Exit codes: 0 on success; non-zero on failure
 #>
-function Sync-AgentsClawHubSkill {
+function Sync-AgentsClawHubSkillManifest {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)]
@@ -63,17 +63,17 @@ function Sync-AgentsClawHubSkill {
 
   if (-not $Enabled) {
     # When disabled, leave any existing fetched ClawHub downloads untouched.
-    # Unlike Sync-AgentsSkills there are no managed symlinks to clean up here;
+    # Unlike Sync-AgentsSkillManifest there are no managed symlinks to clean up here;
     # the downloaded directories are self-contained real directories created by
     # clawhub.
-    Write-Output "clawhub-skills: Sync-AgentsClawHubSkills: disabled; skipping fetched skill sync"
+    Write-Output "clawhub-skills: Sync-AgentsClawHubSkillManifest: disabled; skipping fetched skill sync"
     return
   }
 
   # Read the declarative fetched skill manifest.
   $manifest = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\agents\clawhub-skills.json"
   if (-not (Test-Path -LiteralPath $manifest)) {
-    Write-Output "clawhub-skills: Sync-AgentsClawHubSkills: manifest not found at $manifest; skipping"
+    Write-Output "clawhub-skills: Sync-AgentsClawHubSkillManifest: manifest not found at $manifest; skipping"
     return
   }
 
@@ -83,18 +83,18 @@ function Sync-AgentsClawHubSkill {
   $slugs = if ($null -ne $data.skills) { @($data.skills) } else { @() }
 
   if ($slugs.Count -eq 0) {
-    Write-Output "clawhub-skills: Sync-AgentsClawHubSkills: no fetched skills in manifest; skipping"
+    Write-Output "clawhub-skills: Sync-AgentsClawHubSkillManifest: no fetched skills in manifest; skipping"
     return
   }
 
   $skillsDir = Join-Path -Path $HOME -ChildPath ".agents\skills"
 
-  # Ensure ~/.agents\skills\ exists as a real directory.  Sync-AgentsSkills
+  # Ensure ~/.agents\skills\ exists as a real directory.  Sync-AgentsSkillManifest
   # creates it during apply, but this guard makes the function safe to call
-  # standalone (e.g. for testing) before Sync-AgentsSkills has run.
+  # standalone (e.g. for testing) before Sync-AgentsSkillManifest has run.
   if (-not (Test-Path -LiteralPath $skillsDir -PathType Container)) {
     New-Item -ItemType Directory -Path $skillsDir -Force > $null
-    Write-Output "clawhub-skills: Sync-AgentsClawHubSkills: created $skillsDir"
+    Write-Output "clawhub-skills: Sync-AgentsClawHubSkillManifest: created $skillsDir"
   }
 
   # Resolve the clawhub binary.  Invoke-BunSetup (called earlier in apply.ps1)
@@ -116,7 +116,7 @@ function Sync-AgentsClawHubSkill {
   }
 
   if ([string]::IsNullOrEmpty($clawhubExe)) {
-    Write-Warning "clawhub-skills: Sync-AgentsClawHubSkills: clawhub not found; Invoke-BunSetup must have failed; skipping fetched skill sync"
+    Write-Warning "clawhub-skills: Sync-AgentsClawHubSkillManifest: clawhub not found; Invoke-BunSetup must have failed; skipping fetched skill sync"
     return
   }
 
@@ -134,7 +134,7 @@ function Sync-AgentsClawHubSkill {
         # A committed-skill (bundled) symlink occupies this slot.  Skip rather
         # than overwriting the managed symlink; the operator must remove the slug
         # from clawhub-skills.json or the committed skill from the repo first.
-        Write-Warning "clawhub-skills: Sync-AgentsClawHubSkills: skipping '$slug' — a committed-skill symlink exists at $skillPath; remove it from clawhub-skills.json or from src\modules\configs\agents\skills"
+        Write-Warning "clawhub-skills: Sync-AgentsClawHubSkillManifest: skipping '$slug' — a committed-skill symlink exists at $skillPath; remove it from clawhub-skills.json or from src\modules\configs\agents\skills"
         continue
       }
       # Unlock an existing fetched skill directory before updating so ClawHub can
@@ -148,12 +148,12 @@ function Sync-AgentsClawHubSkill {
         }
     }
 
-    Write-Output "clawhub-skills: Sync-AgentsClawHubSkills: installing/updating fetched skill '$slug'..."
+    Write-Output "clawhub-skills: Sync-AgentsClawHubSkillManifest: installing/updating fetched skill '$slug'..."
     # Non-zero exit from clawhub is non-fatal: the system apply succeeded; skill
     # sync is additive.  A warning is printed and the loop continues.
     & $clawhubExe install --workdir "$HOME\.agents" --no-input $slug
     if ($LASTEXITCODE -ne 0) {
-      Write-Warning "clawhub-skills: Sync-AgentsClawHubSkills: clawhub install failed for '$slug' (system apply succeeded)"
+      Write-Warning "clawhub-skills: Sync-AgentsClawHubSkillManifest: clawhub install failed for '$slug' (system apply succeeded)"
     } elseif (Test-Path -LiteralPath $skillPath -PathType Container) {
       # Lock installed skill files to prevent modification outside a managed apply
       # run.  Mirrors POSIX chmod -R a-w after install.  The unlock above
@@ -175,11 +175,11 @@ function Sync-AgentsClawHubSkill {
         continue  # Not a clawhub download; skip (could be user data or bundled symlink).
       }
       if ($slugs -notcontains $child.Name) {
-        Write-Output "clawhub-skills: Sync-AgentsClawHubSkills: removing stale fetched skill '$($child.Name)' (removed from manifest)"
+        Write-Output "clawhub-skills: Sync-AgentsClawHubSkillManifest: removing stale fetched skill '$($child.Name)' (removed from manifest)"
         Remove-Item -LiteralPath $child.FullName -Recurse -Force
       }
     }
   }
 
-  Write-Output "clawhub-skills: Sync-AgentsClawHubSkills: fetched skill sync complete"
+  Write-Output "clawhub-skills: Sync-AgentsClawHubSkillManifest: fetched skill sync complete"
 }

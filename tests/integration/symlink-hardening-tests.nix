@@ -99,7 +99,7 @@ rec {
       # Path to Windows PS1 files
       vsCodePs1Path = ../../src/hosts/Windows/modules/editors/Sync-VSCodeConfig.ps1;
       agentsConfigPs1Path = ../../src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1;
-      agentsSkillPs1Path = ../../src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1;
+      agentsSkillPs1Path = ../../src/hosts/Windows/modules/user/Sync-AgentsSkillManifest.ps1;
       customProvisionPs1Path = ../../src/hosts/Windows/modules/user/Sync-CustomProvisionSymlink.ps1;
       devRepoPs1Path = ../../src/hosts/Windows/modules/user/Sync-DevRepo.ps1;
     in

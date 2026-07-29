@@ -7,7 +7,7 @@
   directory symbolic link inside it for every top-level entry in
   src\modules\configs\agents\ except skills\.
 
-  skills\ is excluded here because it is managed by Sync-AgentsSkills and may
+  skills\ is excluded here because it is managed by Sync-AgentsSkillManifest and may
   contain fetched (clawhub) skill downloads that must not be committed.  Using
   a real ~/.agents\ directory with per-subdir symlinks (rather than a single
   whole-dir symlink) lets clawhub write into ~/.agents\skills\ without those
@@ -90,7 +90,7 @@ function Sync-AgentsConfig {
     if (Test-Path -LiteralPath $agentsDir -PathType Container) {
       $children = Get-ChildItem -LiteralPath $agentsDir -Force
       foreach ($child in $children) {
-        if ($child.Name -eq "skills") { continue }  # managed by Sync-AgentsSkills
+        if ($child.Name -eq "skills") { continue }  # managed by Sync-AgentsSkillManifest
         $isSymlink = ($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
                        -and $child.LinkType -eq 'SymbolicLink'
         if ($isSymlink) {
@@ -134,7 +134,7 @@ function Sync-AgentsConfig {
   # into $agentsSource but whose source entry no longer exists there.
   $existingChildren = Get-ChildItem -LiteralPath $agentsDir -Force
   foreach ($child in $existingChildren) {
-    if ($child.Name -eq "skills") { continue }  # managed by Sync-AgentsSkills
+    if ($child.Name -eq "skills") { continue }  # managed by Sync-AgentsSkillManifest
     $isSymlink = ($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
                    -and $child.LinkType -eq 'SymbolicLink'
     if ($isSymlink) {
@@ -151,10 +151,10 @@ function Sync-AgentsConfig {
   }
 
   # Create or update per-entry symlinks for every top-level source entry except
-  # skills\ (managed independently by Sync-AgentsSkills).
+  # skills\ (managed independently by Sync-AgentsSkillManifest).
   $sourceEntries = Get-ChildItem -LiteralPath $agentsSource -Force
   foreach ($entry in $sourceEntries) {
-    if ($entry.Name -eq "skills") { continue }  # owned by Sync-AgentsSkills
+    if ($entry.Name -eq "skills") { continue }  # owned by Sync-AgentsSkillManifest
     $linkPath = Join-Path -Path $agentsDir -ChildPath $entry.Name
     if (Test-Path -LiteralPath $linkPath) {
       $linkItem = Get-Item -LiteralPath $linkPath -Force

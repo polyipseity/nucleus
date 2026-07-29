@@ -21,7 +21,7 @@
   Environment variables: (none)
   Exit codes: 0 on success; non-zero on failure
 #>
-function Sync-AgentsSkill {
+function Sync-AgentsSkillManifest {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory)]
@@ -45,7 +45,7 @@ function Sync-AgentsSkill {
     $devModeProp = Get-ItemProperty -Path $devModeKey -Name "AllowDevelopmentWithoutDevLicense" -ErrorAction SilentlyContinue
     $devModeEnabled = $null -ne $devModeProp -and $devModeProp.AllowDevelopmentWithoutDevLicense -eq 1
     if (-not $isAdmin -and -not $devModeEnabled) {
-      Write-Error "Sync-AgentsSkills requires Developer Mode or an elevated session to create directory symlinks.  Enable Developer Mode in Settings -> System -> For Developers."
+      Write-Error "Sync-AgentsSkillManifest requires Developer Mode or an elevated session to create directory symlinks.  Enable Developer Mode in Settings -> System -> For Developers."
       return
     }
   }
@@ -72,7 +72,7 @@ function Sync-AgentsSkill {
   }
 
   if (-not (Test-Path -LiteralPath $skillsSource -PathType Container)) {
-    Write-Error "skills: Sync-AgentsSkills: skills source dir not found: $skillsSource"
+    Write-Error "skills: Sync-AgentsSkillManifest: skills source dir not found: $skillsSource"
     return
   }
 
@@ -84,7 +84,7 @@ function Sync-AgentsSkill {
                            -and $skillsDirItem.LinkType -eq 'SymbolicLink'
     if ($isWholeDirSymlink) {
       Remove-Item -LiteralPath $skillsDir -Force
-      Write-Output "skills: Sync-AgentsSkills: migrated ~/.agents\skills from symlink to real directory"
+      Write-Output "skills: Sync-AgentsSkillManifest: migrated ~/.agents\skills from symlink to real directory"
     }
   }
 
@@ -92,7 +92,7 @@ function Sync-AgentsSkill {
   # clawhub downloads can land here without entering the tracked repo tree.
   if (-not (Test-Path -LiteralPath $skillsDir -PathType Container)) {
     New-Item -ItemType Directory -Path $skillsDir -Force > $null
-    Write-Output "skills: Sync-AgentsSkills: created $skillsDir"
+    Write-Output "skills: Sync-AgentsSkillManifest: created $skillsDir"
   }
 
   # Remove stale per-skill symlinks: committed skills that have since been
@@ -108,7 +108,7 @@ function Sync-AgentsSkill {
         if (-not (Test-Path -LiteralPath $expectedSource)) {
           Remove-ManagedSymlinkDeleteProtection -Context "skills" -Path $child.FullName
           Remove-Item -LiteralPath $child.FullName -Force
-          Write-Output "skills: Sync-AgentsSkills: removed stale skill link for $($child.Name) (source removed)"
+          Write-Output "skills: Sync-AgentsSkillManifest: removed stale skill link for $($child.Name) (source removed)"
         }
       }
     }
@@ -135,12 +135,12 @@ function Sync-AgentsSkill {
         # Real directory in place of a committed skill — could be a fetched
         # (clawhub) download with the same name, or user data.  Fail fast to
         # prevent silent overwrites; the operator must resolve the conflict.
-        Write-Error "skills: Sync-AgentsSkills: $linkPath is a real directory — if it is a fetched clawhub download for a skill that has been re-committed, remove it and re-run apply."
+        Write-Error "skills: Sync-AgentsSkillManifest: $linkPath is a real directory — if it is a fetched clawhub download for a skill that has been re-committed, remove it and re-run apply."
         return
       }
     }
     New-Item -ItemType SymbolicLink -Path $linkPath -Target $skillEntry.FullName > $null
     Set-ManagedSymlinkDeleteProtection -Context "skills" -Path $linkPath
-    Write-Output "skills: Sync-AgentsSkills: linked $linkPath -> $($skillEntry.FullName)"
+    Write-Output "skills: Sync-AgentsSkillManifest: linked $linkPath -> $($skillEntry.FullName)"
   }
 }

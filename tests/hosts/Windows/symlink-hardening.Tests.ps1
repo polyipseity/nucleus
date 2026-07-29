@@ -93,7 +93,7 @@ Describe "Symlink Hardening - Windows" {
     It "should protect bundled skill symlinks" {
       $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1"
       $content = Get-Content -Path $modulePath -Raw
-      $content | Should -Match "Sync-AgentsSkill"
+      $content | Should -Match "Sync-AgentsSkillManifest"
     }
   }
 
