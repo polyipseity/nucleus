@@ -79,6 +79,18 @@ Create a detailed, step-by-step implementation plan. Write it into a new session
 
 > **Wiring**: The `inputs` section is read by `implement-plan.prompt.md` to control behavior. `atomicCommits: yes` means each phase change should be committed; `backwardsCompat: no` means no compatibility shims; `maxConcurrency` limits parallel subagents.
 
+**Phase-sizing rule:** When `atomicCommits: yes` is in effect, each phase MUST be sized so its work fits in a single coherent atomic commit. If a phase would touch unrelated files or be too broad to describe in one conventional-commit line, split it into smaller phases.
+
+**Phase commit convention:** Each phase should end with an explicit commit sub-step. This makes atomic commit visible in the plan as a task, not an afterthought. Example template:
+
+```text
+## Phase 1: Add feature X
+
+1. Modify `src/lib.rs` to add function `foo`.
+2. Add tests in `tests/test_foo.rs`.
+3. Commit with message "feat(lib): add foo function".
+```
+
 - Each phase should be specific, actionable, and ordered by dependency.
 - After writing, verify the file is nonempty and substantive.
 

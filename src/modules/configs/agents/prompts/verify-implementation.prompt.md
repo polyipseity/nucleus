@@ -41,6 +41,10 @@ For every phase and step in the plan:
 3. **Use subagents for independent verification lanes.** Delegate separate phases or large file sets to Explore subagents to keep the main context focused.
 4. **Log each finding** — for every step, record whether it passed or failed verification, with the evidence.
 
+5. **When plan `inputs.atomicCommits` is `yes`**, also verify that commits exist matching the plan:
+   - Run `git log --oneline` and compare commit messages against plan phases.
+   - If a plan phase has no corresponding commit, flag it as a gap: "Phase N has no commit — changes may be uncommitted or lost."
+
 ### 3. Report or remediate
 
 **If all steps are fully implemented with no gaps:**

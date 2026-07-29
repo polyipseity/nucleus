@@ -64,7 +64,22 @@ State "Inputs loaded: atomicCommits=<value>, backwardsCompat=<value>, maxConcurr
    - Simplify code as you edit whenever possible.
    - Backwards compatibility: if `${input:backwardsCompat}` is `yes`, preserve backwards compatibility; otherwise (default), do not add compat shims.
    - Think and work step by step, explain your reasoning. No filler.
-   - If `${input:atomicCommits}` is `yes`, commit each atomic change with a precise message after each meaningful sub-step. Otherwise, skip all git operations.
+
+### Atomic commit enforcement
+
+> **⚠️ CRITICAL: When `inputs.atomicCommits` is `yes`, you MUST commit after every meaningful sub-step (defined below). Do not skip — this is actively enforced.**
+
+When `inputs.atomicCommits` (from plan frontmatter) is `yes`:
+
+- **Commit after EVERY meaningful sub-step.** A meaningful sub-step is: adding a function, creating/modifying a file, completing a subagent's returned work, or finishing any unit of work described as a bullet in the plan.
+- **Before moving to the next step within a phase**, verify the current change is committed. If not, commit first.
+- **Use precise commit messages.** Follow conventional-commit format (`type(scope): subject`). Each commit should describe exactly what changed, not a vague summary.
+- **If you are uncertain whether a change is worth a commit, it is — commit it.** Over-committing is far better than under-committing.
+
+When `inputs.atomicCommits` is `no` (or absent, falling back to default `yes` — see Inputs section): skip all git operations. Do not commit.
+
+**Hard rule:** Never batch multiple unrelated changes into a single commit. Each commit must be a coherent, single-purpose change.
+
    - Re-read the original plan file regularly — especially after interruptions, subagent returns, or context switches — to ensure no phase is skipped or misinterpreted.
    - **Always retrieve the plan via session memory first:** use the find-latest-plan pattern (see "Find the latest plan file" below). Parse the frontmatter to recover input variables (`atomicCommits`, `backwardsCompat`, `maxConcurrency`) and current progress (`status`, `current-step`, `committed`). If no plan is found, fall back to the temp file path from step 1.
    - **Update frontmatter after every meaningful sub-step.** Before switching context, calling a subagent, or at any natural break point: retrieve the plan (find-latest-plan pattern), bump `current-step` to the current workflow number, update `committed`, and write back using `replace_string_in_file` or `create_file`. This is how progress survives context compaction — do not skip it.
@@ -72,6 +87,8 @@ State "Inputs loaded: atomicCommits=<value>, backwardsCompat=<value>, maxConcurr
      - `committed` transitions: `no` → `partial` (on first atomic commit made during this plan execution). Stay at `partial` on subsequent commits.
      - **Do not set `committed` to `yes` here** — that happens only in step 5, to distinguish "some commits made" from "all commits done".
      - If `inputs.atomicCommits` is `no`, leave `committed` at `no` — no transition needed.
+
+**Pre-subagent commit gate:** Before spawning any subagent, ensure all work completed so far in the current phase is committed. If uncommitted changes exist, commit them first — do not delegate with a dirty working tree. Update the plan frontmatter `committed` field after committing.
 
 3. **MUST use subagents for every delegatable subproblem**
    - First, invoke the checkpoint skill (`skill: "checkpoint"`) to save current state before delegation.
@@ -81,6 +98,13 @@ State "Inputs loaded: atomicCommits=<value>, backwardsCompat=<value>, maxConcurr
    - See `~/.agents/prompts/delegate.prompt.md` for the standardized delegation template.
    - **Before spawning subagents, update frontmatter `current-step` to 3.** Also pass the plan path in the subagent prompt context so the subagent can read the plan if needed.
 
+**Post-subagent commit requirement:** When each subagent returns:
+1. Review the subagent's changes (file modifications, new files, deletions).
+2. Commit the changes atomically with a precise message describing what the subagent accomplished.
+3. Only then process the next subagent result or advance to the next plan phase.
+
+Do not batch multiple subagent results into one commit — commit each subagent's work separately.
+
 4. **Verify completeness before finalizing**
    - Update frontmatter `current-step` to 4.
    - Retrieve the plan: use the find-latest-plan pattern (see "Find the latest plan file" below). If no plan is found, fall back to the temp file path from step 1. Parse the frontmatter to recover input variables and check current progress.
@@ -88,12 +112,20 @@ State "Inputs loaded: atomicCommits=<value>, backwardsCompat=<value>, maxConcurr
    - If any phase was ambiguous, re-read the source context that generated the plan.
    - Do not declare completion for phases that were skipped or only partially done.
 
+**If `inputs.atomicCommits` is `yes`**, also verify commit history:
+- Run `git log --oneline -<number-of-phases>` and confirm each phase has at least one commit.
+- If a phase has no commits, flag it as incomplete and re-execute with proper commits before proceeding.
+
 5. **Finalize**
    - After the plan is fully verified and executed, output a concise summary.
    - Include what was implemented, what files changed, and any deferred items.
    - **Update the frontmatter to mark completion** — do NOT delete the plan file. Retrieve the plan (find-latest-plan pattern), set `status: completed` and `current-step: 5`. Also:
-     - If `inputs.atomicCommits` is `yes` and `committed` is `partial`, set `committed` to `yes`.
-     - If `inputs.atomicCommits` is `yes` and `committed` is still `no`, include a warning in the summary: "atomic commits were requested but none were actually made — verify state manually". Leave `committed` at `no`.
+     - **If `inputs.atomicCommits` is `yes` and `committed` is `no`:** this is a FAILURE. Do NOT set `status: completed`. Instead:
+       1. Log "FAILURE: atomicCommits was requested but no commits were made."
+       2. Re-read the plan and re-execute from phase 1 with the commit enforcement rules above.
+       3. Update `current-step` to 2 (re-implementing) and keep `status: in-progress`.
+     - **If `inputs.atomicCommits` is `yes` and `committed` is `partial`:** set `committed` to `yes`. Normal success path.
+     - **If `inputs.atomicCommits` is `no`:** leave `committed` at `no`. Normal success path.
    - Write the updated frontmatter back. The plan file remains accessible for later "verify the plan" or "refer back to the plan" requests.
 
 ## Find the latest plan file
