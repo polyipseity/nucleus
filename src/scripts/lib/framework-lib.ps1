@@ -199,8 +199,8 @@ function Aggregate-Results {
 
 # --- Preflight-Check ---
 function Preflight-Check {
-  Assert-ToolAvailable -Name 'yamllint' -Type 'Tool' -InstallCommand "uv pip install yamllint"
-  Assert-ToolAvailable -Name 'jq' -Type 'Tool' -InstallCommand "winget install jqlang.jq"
-  Assert-ToolAvailable -Name 'yq' -Type 'Tool' -InstallCommand "winget install MikeFarah.yq"
-  Assert-ToolAvailable -Name 'check-jsonschema' -Type 'Tool' -InstallCommand "uv pip install check-jsonschema"
+  Assert-ToolAvailable -Name 'yamllint' -Type 'Command'
+  Assert-ToolAvailable -Name 'jq' -Type 'Command'
+  Assert-ToolAvailable -Name 'yq' -Type 'Command'
+  Assert-ToolAvailable -Name 'check-jsonschema' -Type 'Command'
 }

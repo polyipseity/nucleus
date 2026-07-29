@@ -22,7 +22,7 @@ function Write-WarningMessage { Write-Output "test: warning: $args" }
 
 $modulesPath = Join-Path $RepoRoot 'src\hosts\Windows\modules'
 Import-Module (Join-Path $modulesPath 'Ensure-Tool.psm1') -Force
-Assert-ToolAvailable -Name 'PSScriptAnalyzer' -Type 'Module' -InstallCommand "Install-Module PSScriptAnalyzer -Scope CurrentUser -Force"
+Assert-ToolAvailable -Name 'PSScriptAnalyzer' -Type 'Module'
 
 # Override Parse-Args for test-specific flags
 function Parse-Args {
@@ -68,7 +68,7 @@ function Parse-Args {
 
 # Override Preflight-Check for test-specific tools
 function Preflight-Check {
-  Assert-ToolAvailable -Name 'PSScriptAnalyzer' -Type 'Module' -InstallCommand "Install-Module PSScriptAnalyzer -Scope CurrentUser -Force"
+  Assert-ToolAvailable -Name 'PSScriptAnalyzer' -Type 'Module'
 }
 
 # Override Run-AllSteps with sequential execution (test steps don't parallelize well)
