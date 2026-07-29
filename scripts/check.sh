@@ -456,6 +456,8 @@ section "$((_step += 1))" "Shell script validation tests"
 {
 _svt_exit=0
 bash tests/scripts/script-validation-tests.sh || _svt_exit=$?
+# Output format tests — validate check.sh's own output format patterns.
+bash tests/scripts/check-output-format-tests.sh || _svt_exit=$?
 echo "$_svt_exit" > "$_wave_tmpdir/step-8.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"

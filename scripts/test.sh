@@ -181,6 +181,8 @@ _ps_exit=0
 pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -Settings scripts/PSScriptAnalyzerSettings.test.psd1 || _ps_exit=1
 # check-pwsh smoke tests (syntax validation, -SkipStep, error handling).
 bash tests/scripts/check-pwsh-tests.sh || _ps_exit=1
+# Output format tests — validate test.sh's own output format patterns.
+bash tests/scripts/test-output-format-tests.sh || _ps_exit=1
 echo "$_ps_exit" > "$_wave_tmpdir/step-3.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
