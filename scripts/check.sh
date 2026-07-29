@@ -39,6 +39,17 @@
 #  19. Config method compliance
 #  20. Activation script token placeholder in comment check
 #
+# Cross-platform correspondence:
+#  POSIX (check.sh step 1 via treefmt)  →  Windows (check.ps1 step 1, individual tools)
+#    treefmt wraps:
+#      nixfmt                              —   Nix-only; not on Windows
+#      deadnix                             —   Nix-only; not on Windows
+#      yamllint                            →   yamllint (runs individually on Windows)
+#      shellcheck                          —   POSIX-only; not on Windows
+#  On Windows, check.ps1 step 1 runs yamllint individually and uses the suffix
+#  "(treefmt equivalent)" as the bidirectional anchor. See scripts/check.ps1 header
+#  comment for the full mapping and Windows-side counterpart.
+#
 # Mode taxonomy:
 #   Always-run (no HAS_ARGS guard — run in both --full and --scoped):
 #     - Stale Nix build artifact check        (step 6)
@@ -263,6 +274,8 @@ require_command check-jsonschema
 rm -f result result-*
 
 # code_formatting — Code formatting (treefmt)
+# On Windows, this corresponds to check.ps1 step 1 which runs yamllint individually
+# (treefmt is not available on Windows). See check.ps1 header comment for the full mapping.
 # Uses --fail-on-change instead of --ci to preserve eval cache (mtime-based)
 # for faster subsequent runs. --fail-on-change replicates the CI-safe
 # exit-code contract (exit 1 = formatting drift) without --no-cache.
