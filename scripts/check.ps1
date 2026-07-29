@@ -27,8 +27,11 @@ $ErrorActionPreference = 'Stop'
 $ScriptDir = Split-Path -Parent $PSCommandPath
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { Split-Path -Parent $PSScriptRoot }
 
-. (Join-Path $ScriptDir "check-lib.ps1")
-. (Join-Path $ScriptDir "check-steps.ps1")
+$CheckDir = Join-Path $RepoRoot "src/scripts/checks"
+$FrameworkDir = Join-Path $RepoRoot "src/scripts/lib"
+
+. (Join-Path $CheckDir "check-lib.ps1")
+. (Join-Path $CheckDir "check-steps.ps1")
 
 Parse-Args $args
 Preflight-Check

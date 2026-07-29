@@ -30,10 +30,10 @@ if [ -h "$_self" ]; then
 fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 
-# shellcheck source=test-lib.sh
-. "$SCRIPT_DIR/test-lib.sh"
-# shellcheck source=test-steps.sh
-. "$SCRIPT_DIR/test-steps.sh"
+# shellcheck source=../src/scripts/tests/test-lib.sh
+. "$SCRIPT_DIR/../src/scripts/tests/test-lib.sh"
+# shellcheck source=../src/scripts/tests/test-steps.sh
+. "$SCRIPT_DIR/../src/scripts/tests/test-steps.sh"
 
 parse_args "$@"
 preflight_check
