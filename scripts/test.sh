@@ -131,9 +131,13 @@ readarray -t TEST_NIX_FILES_ARR <<< "$TEST_NIX_FILES"
 _wave_tmpdir=$(mktemp -d) || { error "failed to create wave temp directory"; exit 1; }
 trap 'rm -rf -- "$_wave_tmpdir"' EXIT
 
+_total_steps=4
+_failed_steps=""
+
 # 1. Nix test suite — auto-discover and run all *.nix test files
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "Nix test suite"
+echo "Nix test suite" > "$_wave_tmpdir/step-$_step.name"
 {
 tmp_failed=$(mktemp) || { error "failed to create temp file"; }
 if [ "$quiet_mode" = true ]; then
@@ -174,6 +178,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # 2. PowerShell lint (PSScriptAnalyzer) and check-pwsh smoke tests
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "PowerShell lint"
+echo "PowerShell lint" > "$_wave_tmpdir/step-$_step.name"
 {
 _ps_exit=0
 # Use -File (not -Command): test mode never passes paths, so no array binding
@@ -183,7 +188,7 @@ pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -Settings s
 bash tests/scripts/check-pwsh-tests.sh || _ps_exit=1
 # Output format tests — validate test.sh's own output format patterns.
 bash tests/scripts/test-output-format-tests.sh || _ps_exit=1
-echo "$_ps_exit" > "$_wave_tmpdir/step-3.exit"
+echo "$_ps_exit" > "$_wave_tmpdir/step-2.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 } &
@@ -195,9 +200,9 @@ section "$((_step += 1))" "Nucleus apps smoke tests"
 if [ "$quiet_mode" = true ]; then
   bash tests/scripts/nucleus-apps-smoke-tests.sh >/dev/null || echo "1" > "$_wave_tmpdir/step-4.exit"
 else
-  bash tests/scripts/nucleus-apps-smoke-tests.sh || echo "1" > "$_wave_tmpdir/step-4.exit"
+  bash tests/scripts/nucleus-apps-smoke-tests.sh || echo "1" > "$_wave_tmpdir/step-3.exit"
 fi
-[ -f "$_wave_tmpdir/step-4.exit" ] || echo "0" > "$_wave_tmpdir/step-4.exit"
+[ -f "$_wave_tmpdir/step-3.exit" ] || echo "0" > "$_wave_tmpdir/step-3.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 } &
@@ -208,6 +213,7 @@ echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
 # skip this step entirely.
 _step_start=$(date +%s%3N)
 section "$((_step += 1))" "System config build"
+echo "System config build" > "$_wave_tmpdir/step-$_step.name"
 if [ "$skip_system_build" = true ]; then
   say "skipping (--skip-system-build)."
 else
@@ -235,37 +241,47 @@ else
 fi
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
+# Write exit file for step 4 — aggregate below to trigger failure summary.
+if [ "$skip_system_build" = true ]; then
+  echo "0" > "$_wave_tmpdir/step-4.exit"
+else
+  [ "$exit_code" -eq 0 ] && echo "0" > "$_wave_tmpdir/step-4.exit" || echo "1" > "$_wave_tmpdir/step-4.exit"
+fi
 
 # Wait for all background steps to complete before aggregating
 wait
 
 # Wave result aggregation — collect step exit codes from temp files
-for _s in 1 2 3; do
+say "test step results:"
+_total_ms=0
+for _s in 1 2 3 4; do
   _exit_file="$_wave_tmpdir/step-$_s.exit"
+  _time_file="$_wave_tmpdir/step-$_s.time"
+  _name_file="$_wave_tmpdir/step-$_s.name"
+  _name=""
+  [ -f "$_name_file" ] && read -r _name < "$_name_file"
+  _ms=0
+  [ -f "$_time_file" ] && read -r _ms < "$_time_file"
+  _total_ms=$((_total_ms + _ms))
   if [ -f "$_exit_file" ]; then
     read -r _code < "$_exit_file"
     if [ "$_code" != "0" ]; then
+      printf '  step %2d  ✗  %5d ms  %s\n' "$_s" "$_ms" "$_name"
       exit_code=1
+      _failed_steps="$_failed_steps$_s, "
       "$FAIL_FAST" && exit $exit_code
+    else
+      printf '  step %2d  ✓  %5d ms  %s\n' "$_s" "$_ms" "$_name"
     fi
-  fi
-done
-
-# Timing summary
-say "test step timing:"
-_total_ms=0
-for _s in 1 2 3 4; do
-  _time_file="$_wave_tmpdir/step-$_s.time"
-  if [ -f "$_time_file" ]; then
-    read -r _ms < "$_time_file"
-    _total_ms=$((_total_ms + _ms))
-    printf '  step %2d: %5d ms\n' "$_s" "$_ms"
+  else
+    printf '  step %2d  —  %5d ms  %s\n' "$_s" "$_ms" "$_name"
   fi
 done
 printf '  total:   %5d ms\n' "$_total_ms"
 
 if [ $exit_code -ne 0 ]; then
   warn "some tests failed with exit code $exit_code"
+  error "Failed steps: ${_failed_steps%, }"
   exit $exit_code
 fi
 say "all tests passed."

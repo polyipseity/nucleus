@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# Tests that test.sh output format matches current expected patterns.
-# This is the "red" phase — assertions match the pre-change format.
-# When test.sh is refactored (Phase 6a), update assertions accordingly.
+# Tests that test.sh output format matches expected patterns (Phase 6a: combined status table).
 
 set -euo pipefail
 
@@ -13,30 +11,43 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../scripts/test.sh
 TEST_SH="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)/scripts/test.sh"
 
-# ---- Phase 0 invariants ----
-# These match the current (pre-refactor) format.
+# ---- Phase 6a format features ----
 
-test_timing_table_format() {
-    # Timing entries use printf with step number and ms.
-    # Pattern: printf '  step %2d: %5d ms\n'  (note: \n is literal backslash-n)
-    if grep -qF "printf '  step %2d: %5d ms" "$TEST_SH"; then
-        assert_pass "Timing table uses printf format: step %2d, %5d ms"
+test_total_steps_variable() {
+    if grep -qF '_total_steps=' "$TEST_SH"; then
+        assert_pass "_total_steps variable present"
     else
-        assert_fail "Timing table format" "Expected printf format for step timing not found"
+        assert_fail "_total_steps variable" "Expected _total_steps= not found"
+    fi
+}
+
+test_failed_steps_variable() {
+    if grep -qF '_failed_steps=' "$TEST_SH"; then
+        assert_pass "_failed_steps variable present"
+    else
+        assert_fail "_failed_steps variable" "Expected _failed_steps= not found"
+    fi
+}
+
+test_combined_status_table() {
+    # Combined format with status icons: printf '  step %2d  %s  %5d ms  %s\n'
+    # test.sh hardcodes ✓/✗/— in the format string, one variant per branch.
+    if grep -qF "printf '  step %2d  ✓  %5d ms" "$TEST_SH"; then
+        assert_pass "Combined status table present"
+    else
+        assert_fail "Combined status table" "Expected combined printf format not found"
     fi
 }
 
 test_total_timing_line() {
-    # Total line uses printf with total ms
     if grep -qF "printf '  total:   %5d ms" "$TEST_SH"; then
-        assert_pass "Total timing line uses printf format"
+        assert_pass "Total timing line present"
     else
         assert_fail "Total timing line" "Expected printf format for total timing not found"
     fi
 }
 
 test_generic_failure_message() {
-    # Generic failure: "some tests failed with exit code"
     if grep -qF "some tests failed" "$TEST_SH"; then
         assert_pass "Generic failure message present"
     else
@@ -44,64 +55,44 @@ test_generic_failure_message() {
     fi
 }
 
-test_generic_success_message() {
-    # Generic success: "all tests passed."
+test_success_message() {
     if grep -qF "all tests passed." "$TEST_SH"; then
-        assert_pass "Generic success message present"
+        assert_pass "Success message present"
     else
-        assert_fail "Generic success message" "Expected 'all tests passed.' pattern not found"
+        assert_fail "Success message" "Expected 'all tests passed.' pattern not found"
     fi
 }
 
-test_no_combined_status_table() {
-    # Pre-refactor: no combined status indicator in timing table output.
-    if grep -q '^\s\+step .* [✓✗]' "$TEST_SH"; then
-        assert_fail "Combined status table" "Pre-refactor should NOT have inline status indicators"
+test_explicit_failure_summary() {
+    if grep -qF "Failed steps" "$TEST_SH"; then
+        assert_pass "Explicit failure summary present"
     else
-        assert_pass "No combined status table (pre-refactor)"
+        assert_fail "Explicit failure summary" "Expected 'Failed steps' pattern not found"
     fi
 }
 
-test_no_step_prefix() {
-    # Pre-refactor: no [Step N] prefix in section headers
-    if grep -qF "[Step " "$TEST_SH"; then
-        assert_fail "Step N prefix" "Pre-refactor should NOT have [Step N] prefix"
+test_step_name_files() {
+    # shellcheck disable=SC2016 # reason: literal $ in grep pattern to match step-$_step.name in source
+    if grep -qF 'step-$_step.name' "$TEST_SH"; then
+        assert_pass "Step name file writes present"
     else
-        assert_pass "No [Step N] prefix (pre-refactor)"
-    fi
-}
-
-test_no_test_boundary_markers() {
-    # Pre-refactor: no "--- test output ---" boundaries
-    if grep -qF -- "--- test output ---" "$TEST_SH"; then
-        assert_fail "Test boundary markers" "Pre-refactor should NOT have test output boundaries"
-    else
-        assert_pass "No test boundary markers (pre-refactor)"
-    fi
-}
-
-test_no_explicit_failure_summary() {
-    # Pre-refactor: no "Failed steps:" or similar failure summary
-    if grep -qF "Failed step" "$TEST_SH"; then
-        assert_fail "Explicit failure summary" "Pre-refactor should NOT have explicit failure summary"
-    else
-        assert_pass "No explicit failure summary (pre-refactor)"
+        assert_fail "Step name files" "Expected step name file writes not found"
     fi
 }
 
 # ---- Run tests ----
 echo ""
-echo "Testing test.sh output format (pre-refactor pattern)..."
+echo "Testing test.sh output format (Phase 6a: combined status table)..."
 echo ""
 
-test_timing_table_format
+test_total_steps_variable
+test_failed_steps_variable
+test_combined_status_table
 test_total_timing_line
 test_generic_failure_message
-test_generic_success_message
-test_no_combined_status_table
-test_no_step_prefix
-test_no_test_boundary_markers
-test_no_explicit_failure_summary
+test_success_message
+test_explicit_failure_summary
+test_step_name_files
 
 echo ""
 echo "--- Results: $TESTS_PASSED passed, $TESTS_FAILED failed ---"
