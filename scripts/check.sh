@@ -97,6 +97,13 @@
 # that pick up new files automatically). Hard-coded file paths in validation
 # steps are not allowed. When adding new checks, implement dynamic discovery.
 #
+# Timing notes:
+#   Step-level timings are measured and reported automatically at the end of
+#   each run. Reference timings below were taken on a MacBook (Apple Silicon)
+#   while charging. Expect roughly 1.3-1.5× longer on battery (CPU throttling).
+#   Windows host timings vary independently — check.ps1 reports its own timing.
+#   See the "check results" summary block after each run for current timings.
+#
 # Arguments:
 #   --format      Format Nix files in-place (instead of just validating).
 #   (paths)       Files to check; passes paths through to sub-checkers and

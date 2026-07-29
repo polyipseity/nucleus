@@ -94,6 +94,13 @@
 # Steps 4-5, 7-10 are stubs (require Nix or bash — not available on Windows).
 # Step 18 only runs with the --verify flag.
 #
+# Timing notes:
+#   Step-level timings are measured and reported automatically at the end of
+#   each run. Windows host timings vary independently from POSIX (check.sh)
+#   timings — the measured total reflects the current machine's hardware and
+#   workload. See the "check results" summary block after each run for current
+#   timings. For POSIX-side (MacBook) timing context, see scripts/check.sh header.
+#
 # Prerequisites:
 #   - check-jsonschema (pip install check-jsonschema) for schema validation
 #   - Ensure-Tool module (imported via pre-flight block) for tool validation
