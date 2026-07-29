@@ -42,6 +42,11 @@
   };
 
   settings.excludes = [
+    # result and result-* are Nix build output symlinks that should never be
+    # formatted. treefmt git-walk mode naturally skips them (gitignored), but
+    # explicit exclusion covers filesystem-walk mode as defense-in-depth.
+    "result"
+    "result-*"
     # discord-music-rpc app rewrites its own config on startup (writable
     # symlink to the repo file).  treefmt should not touch app-managed
     # files — it only manages files that the project owns exclusively.
