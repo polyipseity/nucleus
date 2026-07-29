@@ -66,12 +66,12 @@ test_step_prefix_present() {
     fi
 }
 
-test_no_explicit_failure_summary() {
-    # Phase 3 does not add explicit failure summary yet
-    if grep -qF "Failed step" "$CHECK_SH"; then
-        assert_fail "Explicit failure summary" "Phase 3 should NOT have explicit failure summary yet"
+test_explicit_failure_summary() {
+    # Phase 4: explicit failure summary with "Failed steps:" prefix
+    if grep -qF "Failed steps:" "$CHECK_SH"; then
+        assert_pass "Explicit failure summary present (Phase 4)"
     else
-        assert_pass "No explicit failure summary (Phase 3)"
+        assert_fail "Explicit failure summary" "Expected 'Failed steps:' not found"
     fi
 }
 
@@ -86,7 +86,7 @@ test_test_boundary_markers() {
 
 # ---- Run tests ----
 echo ""
-echo "Testing check.sh output format (Phase 3: test-runner boundaries)..."
+echo "Testing check.sh output format (Phase 4: explicit failure summary)..."
 echo ""
 
 test_combined_status_table
@@ -95,7 +95,7 @@ test_generic_failure_message
 test_generic_success_message
 test_step_prefix_present
 test_test_boundary_markers
-test_no_explicit_failure_summary
+test_explicit_failure_summary
 
 echo ""
 echo "--- Results: $TESTS_PASSED passed, $TESTS_FAILED failed ---"

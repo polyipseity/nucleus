@@ -1343,6 +1343,7 @@ printf '  total:   %5d ms\n' "$_total_ms"
 
 if [ $exit_code -ne 0 ]; then
   error "some checks failed with exit code $exit_code"
+  error "Failed steps: ${_failed_steps%, }"
   exit $exit_code
 fi
 say "all checks passed."
