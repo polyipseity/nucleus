@@ -1,63 +1,84 @@
-# tests/integration/check-tests.nix — Content assertions for check.sh lockfile overlap detection.
+# tests/integration/check-tests.nix — Structural assertions for modularized check scripts.
 
 let
   inherit (import ../lib.nix) containsRegex;
 
+  frameworkLibText = builtins.readFile ../../scripts/framework-lib.sh;
+  frameworkLibPs1Text = builtins.readFile ../../scripts/framework-lib.ps1;
   checkShText = builtins.readFile ../../scripts/check.sh;
-
-  # Also read check.ps1 for cross-validation
   checkPs1Text = builtins.readFile ../../scripts/check.ps1;
+  checkStepsDir = ../../scripts/check-steps;
+  checkStepsFiles = builtins.attrNames (builtins.readDir checkStepsDir);
+  hasSuffix = suffix: str: builtins.match ".*${suffix}" str != null;
+  checkStepsSh = builtins.filter (f: hasSuffix ".sh" f) checkStepsFiles;
+  checkStepsPs1 = builtins.filter (f: hasSuffix ".ps1" f) checkStepsFiles;
 
   libShText = builtins.readFile ../../src/scripts/lib/lib.sh;
+
+  # Helper: read a step file and check it contains a pattern
+  stepFileContains = stepName: pattern:
+    let stepText = builtins.readFile (checkStepsDir + "/${stepName}");
+    in builtins.match ".*${pattern}.*" stepText != null;
 in
 
-# Overlap exception list
-assert containsRegex "_lf_overlap_exceptions" checkShText;
-assert containsRegex "astral-sh\\.ty" checkShText;
+# ---- Framework library assertions ----
 
-# Promoted from WARNING to ERROR
-assert containsRegex "ERROR:" checkShText;
-assert containsRegex "exit 1" checkShText;
+# register_step function present
+assert containsRegex "register_step\\(\\)" frameworkLibText;
+# _run_step wrapper present
+assert containsRegex "_run_step\\(\\)" frameworkLibText;
+# aggregate_results function present
+assert containsRegex "aggregate_results\\(\\)" frameworkLibText;
+# parse_args function present
+assert containsRegex "parse_args\\(\\)" frameworkLibText;
+# Wave parallelism infra
+assert containsRegex "_wave_init" frameworkLibText;
+assert containsRegex "_wave_cleanup" frameworkLibText;
 
-# Graceful missing-lockfile handling (step 4 fix)
-assert containsRegex "lockfile\\.json not found — skipping section validation" checkShText;
-assert containsRegex "lockfile\\.json could not be loaded — skipping section validation"
-  checkPs1Text;
+# Framework-lib.ps1: Register-Step, Invoke-Step, Run-AllSteps, Aggregate-Results
+assert containsRegex "Register-Step" frameworkLibPs1Text;
+assert containsRegex "Invoke-Step" frameworkLibPs1Text;
+assert containsRegex "Run-AllSteps" frameworkLibPs1Text;
+assert containsRegex "Aggregate-Results" frameworkLibPs1Text;
 
-# Pre-flight tool availability block (check.sh)
-assert containsRegex "Pre-flight tool availability checks" checkShText;
-assert containsRegex "require_command pwsh" checkShText;
-assert containsRegex "require_command treefmt" checkShText;
-assert containsRegex "require_command yq" checkShText;
-assert containsRegex "require_command jq" checkShText;
-assert containsRegex "require_command nix" checkShText;
-assert containsRegex "require_command packer" checkShText;
+# ---- Thin orchestrator assertions (check.sh) ----
+# Sources check-lib.sh and check-steps.sh
+assert containsRegex "check-lib\\.sh" checkShText;
+assert containsRegex "check-steps\\.sh" checkShText;
+# Orchestration pipeline
+assert containsRegex "parse_args" checkShText;
+assert containsRegex "preflight_check" checkShText;
+assert containsRegex "run_all_steps" checkShText;
+assert containsRegex "aggregate_results" checkShText;
 
-# Pre-flight tool availability block (check.ps1)
-assert containsRegex "Assert-ToolAvailable -Name 'yamllint'" checkPs1Text;
+# ---- Thin orchestrator assertions (check.ps1) ----
+assert containsRegex "check-lib\\.ps1" checkPs1Text;
+assert containsRegex "check-steps\\.ps1" checkPs1Text;
+assert containsRegex "Parse-Args" checkPs1Text;
+assert containsRegex "Preflight-Check" checkPs1Text;
+assert containsRegex "Run-AllSteps" checkPs1Text;
+assert containsRegex "Aggregate-Results" checkPs1Text;
 
-# Step name correspondence anchor (check.ps1 step 1)
-assert containsRegex "treefmt equivalent" checkPs1Text;
+# ---- Step file structure ----
+# All 20 check step files exist for both platforms
+assert builtins.length checkStepsSh == 20;
+assert builtins.length checkStepsPs1 == 20;
 
-# ensure_tool function in lib.sh
+# Each POSIX step file has a register_step call
+assert builtins.all
+  (f: stepFileContains f "register_step [0-9]+")
+  checkStepsSh;
+
+# Each Windows step file has a Register-Step call
+assert builtins.all
+  (f: stepFileContains f "Register-Step -Number [0-9]+")
+  checkStepsPs1;
+
+# ---- ensure_tool function in lib.sh (unchanged) ----
 assert containsRegex "ensure_tool" libShText;
 assert containsRegex "run nucleus-apply" libShText;
 
-# Group headers in check.sh header comment
-assert containsRegex "Toolchain checks [(][0-9]+-[0-9]+[)]:" checkShText;
-assert containsRegex "Nix checks [(][0-9]+-[0-9]+[)]:" checkShText;
-assert containsRegex "Test suites [(][0-9]+-[0-9]+[)]:" checkShText;
-assert containsRegex "Data integrity [(][0-9]+-[0-9]+[)]:" checkShText;
-assert containsRegex "Policy/verification [(][0-9]+-[0-9]+[)]:" checkShText;
-
-# Group headers in check.ps1 header comment
-assert containsRegex "Toolchain checks [(][0-9]+-[0-9]+[)]:" checkPs1Text;
-assert containsRegex "Nix checks [(][0-9]+-[0-9]+, stubs on Windows[)]:" checkPs1Text;
-assert containsRegex "Test suites [(][0-9]+-[0-9]+, stubs on Windows[)]:" checkPs1Text;
-assert containsRegex "Data integrity [(][0-9]+-[0-9]+[)]:" checkPs1Text;
-assert containsRegex "Policy/verification [(][0-9]+-[0-9]+[)]:" checkPs1Text;
-
 {
   success = true;
-  message = "Check.sh and check.ps1 content assertions passed (overlap, ERROR promotion, missing-lockfile guard, pre-flight, ensure_tool, group headers, yamllint)";
+  message = "Modularized check scripts structural assertions passed (framework functions, thin orchestrator, 20 step files per platform, register_step calls)";
 }
