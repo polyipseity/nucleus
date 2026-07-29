@@ -1067,29 +1067,21 @@ if [ "${#_yaml_files[@]}" -gt 0 ]; then
   printf '%s\0' "${_yaml_files[@]}" \
     | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
       _f="$1"
-      if ! yq eval "." "$_f" >/dev/null 2>&1; then
-        echo "invalid_yaml:$_f"
-      fi
-    ' _ 2>/dev/null > "$_yaml_par_tmpdir/yaml_errors.txt"
-  if [ -s "$_yaml_par_tmpdir/yaml_errors.txt" ]; then
-    while IFS=: read -r _tag _yf; do
-      _yaml_errors=$((_yaml_errors + 1))
-      error "invalid_yaml:$_yf"
-    done < "$_yaml_par_tmpdir/yaml_errors.txt"
-  fi
-  # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
-  printf '%s\0' "${_yaml_files[@]}" \
-    | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
-      _f="$1"
-      _err=$(yq eval "." "$_f" 2>&1 >/dev/null)
-      if [ -n "$_err" ]; then
+      _exit=0
+      _err=$(yq eval "." "$_f" 2>&1 >/dev/null) || _exit=$?
+      if [ "$_exit" -ne 0 ]; then
+        printf "invalid_yaml:%s\n" "$_f"
+      elif [ -n "$_err" ]; then
         printf "yaml_warn:%s:%s\n" "$_f" "$_err"
       fi
-    ' _ 2>/dev/null > "$_yaml_par_tmpdir/yaml_warnings.txt"
-  if [ -s "$_yaml_par_tmpdir/yaml_warnings.txt" ]; then
+    ' _ 2>/dev/null > "$_yaml_par_tmpdir/yaml_results.txt"
+  if [ -s "$_yaml_par_tmpdir/yaml_results.txt" ]; then
     while IFS=: read -r _tag _yf _warn; do
-      error "yaml_warn:$_yf:$_warn"
-    done < "$_yaml_par_tmpdir/yaml_warnings.txt"
+      case "$_tag" in
+        invalid_yaml) _yaml_errors=$((_yaml_errors + 1)); error "invalid_yaml:$_yf" ;;
+        yaml_warn) error "yaml_warn:$_yf:$_warn" ;;
+      esac
+    done < "$_yaml_par_tmpdir/yaml_results.txt"
   fi
 fi
 rm -rf -- "$_yaml_par_tmpdir"
