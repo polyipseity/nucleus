@@ -107,7 +107,7 @@ function Get-RequiredVersionSetting {
 
   .PARAMETER Settings
     An IDictionary (typically ordered hashtable) returned by
-    Import-BootstrapVersion.
+    Import-BootstrapVersionTable.
 
   .PARAMETER Key
     The settings key to look up (e.g. 'NUCLEUS_GPG4WIN_VERSION').
@@ -130,7 +130,7 @@ function Get-RequiredVersionSetting {
   return [string]$Settings[$Key]
 }
 
-function Import-BootstrapVersion {
+function Import-BootstrapVersionTable {
   <#
   .SYNOPSIS
     Parses a shell-compatible KEY=value env file into an ordered hashtable.
@@ -303,7 +303,7 @@ if (-not (Get-Command -Name winget -ErrorAction SilentlyContinue)) {
   throw "winget is required but was not found in PATH."
 }
 
-$BootstrapVersions = Import-BootstrapVersion -FilePath $VersionsFilePath
+$BootstrapVersions = Import-BootstrapVersionTable -FilePath $VersionsFilePath
 
 $BootstrapPackageVersions = [ordered]@{
   "GnuPG.Gpg4win" = Get-RequiredVersionSetting -Settings $BootstrapVersions -Key "NUCLEUS_GPG4WIN_VERSION"
