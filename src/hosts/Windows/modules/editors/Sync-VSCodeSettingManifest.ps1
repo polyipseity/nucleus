@@ -11,7 +11,7 @@
   Exit codes: 0 on success; non-zero on failure
 #>
 
-function Sync-VSCodeSetting {
+function Sync-VSCodeSettingManifest {
   <#
   .SYNOPSIS
     Converges managed VS Code user settings for stable and insiders channels.
@@ -30,10 +30,10 @@ function Sync-VSCodeSetting {
     cleanup-only behavior.
 
   .EXAMPLE
-    Sync-VSCodeSettings -Enabled:$true
+    Sync-VSCodeSettingManifest -Enabled:`$true
 
   .EXAMPLE
-    Sync-VSCodeSettings -Enabled:$false
+    Sync-VSCodeSettingManifest -Enabled:`$false
   #>
   param(
     [Parameter()]

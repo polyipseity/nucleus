@@ -1,4 +1,4 @@
-function Sync-Secret {
+function Sync-SecretCatalog {
   <#
   .SYNOPSIS
     Materializes personal SSH/GPG secrets for users that have secrets defined.

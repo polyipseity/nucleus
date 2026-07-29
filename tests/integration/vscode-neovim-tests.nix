@@ -5,7 +5,7 @@ let
   inherit (import ../lib.nix) assert';
 
   editorsText = builtins.readFile ../../src/modules/editors.nix;
-  windowsExtensionsText = builtins.readFile ../../src/hosts/Windows/modules/editors/Sync-VSCodeExtension.ps1;
+  windowsExtensionsText = builtins.readFile ../../src/hosts/Windows/modules/editors/Sync-VSCodeExtensionManifest.ps1;
   lockfileText = builtins.readFile ../../src/lockfiles/lockfile.json;
   settingsText = builtins.readFile ../../src/modules/configs/vscode/settings.json;
   macosDefaultsText = builtins.readFile ../../src/hosts/MacBook/defaults.nix;
@@ -13,7 +13,7 @@ let
 
   test_extension_in_editors_nix = assert' (lib.hasInfix "asvetliakov.vscode-neovim" editorsText) "editors.nix must list asvetliakov.vscode-neovim in sharedExtensions";
 
-  test_extension_in_windows_ps1 = assert' (lib.hasInfix "asvetliakov.vscode-neovim" windowsExtensionsText) "Sync-VSCodeExtension.ps1 must list asvetliakov.vscode-neovim in managedExtensions";
+  test_extension_in_windows_ps1 = assert' (lib.hasInfix "asvetliakov.vscode-neovim" windowsExtensionsText) "Sync-VSCodeExtensionManifest.ps1 must list asvetliakov.vscode-neovim in managedExtensions";
 
   test_extension_in_lockfile = assert' (lib.hasInfix "asvetliakov.vscode-neovim" lockfileText) "lockfile.json must pin asvetliakov.vscode-neovim version";
 

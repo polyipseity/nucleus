@@ -11,7 +11,7 @@
   Exit codes: 0 on success; non-zero on failure
 #>
 
-function Sync-VSCodeExtension {
+function Sync-VSCodeExtensionManifest {
   <#
   .SYNOPSIS
     Converges managed VS Code extension parity for stable and insiders.
@@ -39,10 +39,10 @@ function Sync-VSCodeExtension {
     (remove managed extensions).
 
   .EXAMPLE
-    Sync-VSCodeExtension -Enabled:$true
+    Sync-VSCodeExtensionManifest -Enabled:`$true
 
   .EXAMPLE
-    Sync-VSCodeExtension -Enabled:$false
+    Sync-VSCodeExtensionManifest -Enabled:`$false
   #>
   param(
     [Parameter(Mandatory)]

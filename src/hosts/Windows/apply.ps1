@@ -384,7 +384,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $secretsModuleDir -ChildPath "Invoke-SecretVerification.ps1")
 . (Join-Path -Path $secretsModuleDir -ChildPath "Register-HostAgeKey.ps1")
 . (Join-Path -Path $secretsModuleDir -ChildPath "Remove-ManagedSecret.ps1")
-. (Join-Path -Path $secretsModuleDir -ChildPath "Sync-Secret.ps1")
+. (Join-Path -Path $secretsModuleDir -ChildPath "Sync-SecretCatalog.ps1")
 . (Join-Path -Path $secretsModuleDir -ChildPath "Sync-SecretFile.ps1")
 . (Join-Path -Path $secretsModuleDir -ChildPath "Sync-UserSecret.ps1")
 # system/: machine-level services and infrastructure (WinGet, SSH host, RDP, power, AI).
@@ -444,8 +444,8 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-UserPath.ps1")
 # editors/: VS Code configuration and workspace management.
 . (Join-Path -Path $editorsModuleDir -ChildPath "Set-VSCodeWorkspaceTrust.ps1")
-. (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeExtension.ps1")
-. (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeSetting.ps1")
+. (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeExtensionManifest.ps1")
+. (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeSettingManifest.ps1")
 . (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeConfig.ps1")
 # wallpapers/: wallpaper materialization and stale-file cleanup.
 . (Join-Path -Path $wallpapersModuleDir -ChildPath "Remove-StaleWallpaper.ps1")
@@ -630,7 +630,7 @@ foreach ($secretFile in $secretPreflightFiles) {
 }
 
 if ($EnableSecretsParity) {
-  Sync-Secret -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
+  Sync-SecretCatalog -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
   # Materialize per-user secrets from src/secrets/users-<username>.yml when present.
   # No-op when the file does not exist so bootstrap runs continue uninterrupted.
   Sync-UserSecret `
@@ -793,7 +793,7 @@ Sync-AgentsConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity
 Sync-AgentsSkillManifest -RepoRoot $repoRoot -Enabled:$EnableAgentsSkillsParity
 Sync-AgentsClawHubSkillManifest -RepoRoot $repoRoot -Enabled:$EnableAgentsClawHubSkillsParity
 Sync-VSCodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity -Username $Users[0]
-Sync-VSCodeExtension -Enabled:$EnableVsCodeExtensionsParity
+Sync-VSCodeExtensionManifest -Enabled:$EnableVsCodeExtensionsParity
 Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
 Set-VSCodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
