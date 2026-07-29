@@ -9,7 +9,7 @@
 # within the appropriate group, respecting any dependency constraints.
 #
 # Toolchain checks (1-3):
-#   1. Code formatting (treefmt) (stub on Windows)
+#   1. Code formatting and linting (treefmt equivalent — yamllint on Windows)
 #   2. PowerShell lint (PSScriptAnalyzer with check settings, slow rules excluded)
 #   3. Packer template validation
 #
@@ -38,6 +38,18 @@
 #  19. Config method compliance
 #  20. Activation script token placeholder in comment check
 #
+# Cross-platform correspondence:
+#  POSIX (check.sh step 1 via treefmt)  →  Windows (check.ps1 step 1, individual tools)
+#    treefmt wraps:
+#      nixfmt                              —   Nix-only; not on Windows
+#      deadnix                             —   Nix-only; not on Windows
+#      yamllint                            →   yamllint (runs individually)
+#      shellcheck                          —   POSIX-only; not on Windows
+#  See scripts/check.sh header comment for the POSIX counterpart. The suffix
+#  "(treefmt equivalent)" in step names is the bidirectional anchor — a reader
+#  seeing it in check.ps1 knows to check check.sh step 1 for the full treefmt
+#  multiplexer, and vice versa.
+#
 # Mode taxonomy:
 #   Always-run (no HAS_ARGS guard — run in both --full and --scoped):
 #     - Stale Nix build artifact check        (step 6)
@@ -47,6 +59,7 @@
 #     - Package manager usage enforcement     (step 16)
 #     - Config method compliance              (step 19)
 #   Path-scopable (accept file filtering in both modes):
+#     - Code formatting and linting (treefmt equivalent)  (step 1)
 #     - PowerShell lint          (step 2)
 #     - Packer template validation            (step 3)
 #     - Schema validation                     (step 13)
@@ -54,7 +67,7 @@
 #     - Undocumented error suppression        (step 17)
 #     - Activation script token placeholder   (step 20)
 #
-# Note: Steps 1, 4-5, 7-10 are stubs on Windows (POSIX/Nix toolchain not available).
+# Note: Steps 4-5, 7-10 are stubs on Windows (Nix toolchain or bash not available).
 #
 # Output conventions:
 #   Three-tier messaging: say() for info/success/skip, warn() for non-fatal
@@ -77,7 +90,7 @@
 # patterns). Hard-coded file paths in validation steps are not allowed.
 #
 # Tests (Nix test suite) are run separately via scripts/test.ps1.
-# Step 1 is a POSIX-only stub (treefmt not available on Windows).
+# Step 1 runs yamllint on Windows (corresponds to treefmt on POSIX — see Cross-platform correspondence above).
 # Steps 4-5, 7-10 are stubs (require Nix or bash — not available on Windows).
 # Step 18 only runs with the --verify flag.
 #
@@ -86,6 +99,7 @@
 #   - Ensure-Tool module (imported via pre-flight block) for tool validation
 #   - powershell-yaml module (Install-Module powershell-yaml -Scope CurrentUser)
 #     is required for locked DSC validation.
+#   - yamllint (pip install yamllint) for YAML linting (step 1, treefmt equivalent on Windows)
 #
 # Arguments:
 #   (none)        Paths may be provided as positional arguments; passed
@@ -194,19 +208,55 @@ Import-Module (Join-Path $modulesPath 'Ensure-Tool.psm1') -Force
 Ensure-Tool -Name 'powershell-yaml' -Type 'Module' -InstallCommand "Install-Module powershell-yaml -Scope CurrentUser -Force"
 Ensure-Tool -Name 'packer' -Type 'Command' -InstallCommand "winget install Hashicorp.Packer"
 Ensure-Tool -Name 'check-jsonschema' -Type 'Command' -InstallCommand 'pip install check-jsonschema'
-# treefmt is POSIX-native and not available on Windows.
-# Use check.sh on WSL/Linux for shell script formatting/linting.
+Ensure-Tool -Name 'yamllint' -Type 'Command' -InstallCommand 'pip install yamllint'
+# yamllint is the Windows-available tool from the treefmt multiplexer (check.sh step 1).
+# treefmt is POSIX-native and not available on Windows. nixfmt, deadnix, and shellcheck
+# (the other treefmt-wrapped tools) are also Nix/POSIX-only.
 
 # ---------------------------------------------------------------------------
-# 1. Code formatting (treefmt) — POSIX only (stub on Windows)
+# 1. Code formatting and linting (treefmt equivalent) — yamllint on Windows (treefmt correspondence group)
+# On POSIX, this check runs via `treefmt --fail-on-change` (check.sh step 1) which wraps
+# nixfmt, deadnix, yamllint, and shellcheck. On Windows, treefmt is unavailable, so
+# yamllint runs individually. See scripts/check.sh header comment for the POSIX counterpart.
 # ---------------------------------------------------------------------------
-$_sw = [System.Diagnostics.Stopwatch]::StartNew()
-Write-Output ("`n=== [{0}] Code formatting (treefmt) ===" -f (++$_step))
-"Code formatting (treefmt)" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
-say "skipping (requires POSIX treefmt — not available natively on Windows; use WSL or check.sh)."
-0 | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-1.exit") -NoNewline
-$_sw.Stop()
-$_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-1.time") -NoNewline
+$_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
+Write-Output ("`n=== [{0}] Code formatting and linting (treefmt equivalent) ===" -f (++$_step))
+"Code formatting and linting (treefmt equivalent)" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
+$null = $script:waveJobs.Add((Start-Job -ScriptBlock {
+  Set-StrictMode -Version Latest
+  $ErrorActionPreference = 'Stop'
+  $_step = $using:_step
+  function say { Write-Output "[Step $($_step)] $args" }
+  function error { Write-Output "[Step $($_step)] error: $args" }
+  $_yamlFiles = @()
+  if ($using:HAS_ARGS) {
+    $_yamlFiles = $using:positionalArgs | Where-Object { $_ -like '*.yml' -or $_ -like '*.yaml' }
+  } else {
+    $_yamlFiles = Get-ChildItem -Recurse -Path $using:RepoRoot -Include '*.yml','*.yaml' |
+      Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.FullName -notmatch '[/\\]secrets[/\\]' } |
+      Sort-Object FullName |
+      ForEach-Object { $_.FullName }
+  }
+  if ($_yamlFiles.Count -gt 0) {
+    $_ylExit = 0
+    foreach ($_yf in $_yamlFiles) {
+      yamllint $_yf 2>&1 | ForEach-Object { Write-Output "[Step $($_step)] $_" }
+      if ($LASTEXITCODE -ne 0) { $_ylExit = $LASTEXITCODE }
+    }
+    if ($_ylExit -ne 0) {
+      error "yamllint found issues in YAML files."
+      $_ylExit | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-1.exit") -NoNewline
+    } else {
+      say "yamllint passed."
+    }
+  } else {
+    say "skipping (no YAML files to check)."
+    0 | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-1.exit") -NoNewline
+  }
+  $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
+  $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
+  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-1.time") -NoNewline
+}))
 
 # ---------------------------------------------------------------------------
 # 2. PowerShell lint
