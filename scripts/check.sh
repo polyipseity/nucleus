@@ -1209,7 +1209,7 @@ else
 fi
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
-} > "$_wave_tmpdir/step-18.out" 2>&1
+} >> "$_wave_tmpdir/step-$_step.out" 2>&1 &
 
 # config_method_compliance — Always-run: Config method compliance
 _step_start=$(date +%s%3N)
