@@ -2,6 +2,11 @@
 # Framework library for check and test orchestrators.
 # Provides step registration, execution, timing, and aggregation.
 # Sourced by check-lib.sh and test-lib.sh.
+#
+# Guard against re-sourcing — step files source framework independently and
+# re-sourcing would wipe step registration arrays, leaving only the last step.
+[ -n "${_NUCLEUS_FRAMEWORK_SOURCED-}" ] && return
+_NUCLEUS_FRAMEWORK_SOURCED=1
 
 # --- Step registration ---
 # Indexed arrays: step numbers, step names, step function names.
@@ -84,6 +89,7 @@ parse_args() {
         exit 0
         ;;
       --format)
+        # shellcheck disable=SC2034 # reason: consumed by check step 01 (code-formatting) via transitive sourcing
         FORMAT_NIX=true
         shift
         ;;
@@ -104,6 +110,7 @@ parse_args() {
         shift
         ;;
       --verify)
+        # shellcheck disable=SC2034 # reason: consumed by check step 18 (online-determinism) via transitive sourcing
         VERIFY=true
         shift
         ;;
@@ -157,9 +164,13 @@ parse_args() {
 # Populates CACHED_NIX_FILES, CACHED_YAML_FILES, CACHED_JSON_FILES, CACHED_SH_FILES.
 # Called only in full mode before steps fire.
 cache_file_lists() {
+  # shellcheck disable=SC2034 # reason: consumed by step files (05, 13, 15, 17) via transitive sourcing
   readarray -t CACHED_NIX_FILES < <(find . -path ./vendor -prune -false -o -name '*.nix' -print | sort)
+  # shellcheck disable=SC2034 # reason: consumed by step files (13, 15) via transitive sourcing
   readarray -t CACHED_YAML_FILES < <(find . -not -path '*/vendor/*' \( -name '*.yml' -o -name '*.yaml' \) -print | sort)
+  # shellcheck disable=SC2034 # reason: consumed by step files (13) via transitive sourcing
   readarray -t CACHED_JSON_FILES < <(find src -name '*.json' -not -path '*/vendor/*' -not -name '*.schema.json' -print | sort)
+  # shellcheck disable=SC2034 # reason: consumed by step files (17) via transitive sourcing
   readarray -t CACHED_SH_FILES < <(find src/scripts -type f -name '*.sh' -print | sort)
 }
 

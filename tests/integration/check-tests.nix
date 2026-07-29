@@ -16,9 +16,12 @@ let
   libShText = builtins.readFile ../../src/scripts/lib/lib.sh;
 
   # Helper: read a step file and check it contains a pattern
-  stepFileContains = stepName: pattern:
-    let stepText = builtins.readFile (checkStepsDir + "/${stepName}");
-    in builtins.match ".*${pattern}.*" stepText != null;
+  stepFileContains =
+    stepName: pattern:
+    let
+      stepText = builtins.readFile (checkStepsDir + "/${stepName}");
+    in
+    builtins.match ".*${pattern}.*" stepText != null;
 in
 
 # ---- Framework library assertions ----
@@ -65,14 +68,10 @@ assert builtins.length checkStepsSh == 20;
 assert builtins.length checkStepsPs1 == 20;
 
 # Each POSIX step file has a register_step call
-assert builtins.all
-  (f: stepFileContains f "register_step [0-9]+")
-  checkStepsSh;
+assert builtins.all (f: stepFileContains f "register_step [0-9]+") checkStepsSh;
 
 # Each Windows step file has a Register-Step call
-assert builtins.all
-  (f: stepFileContains f "Register-Step -Number [0-9]+")
-  checkStepsPs1;
+assert builtins.all (f: stepFileContains f "Register-Step -Number [0-9]+") checkStepsPs1;
 
 # ---- ensure_tool function in lib.sh (unchanged) ----
 assert containsRegex "ensure_tool" libShText;

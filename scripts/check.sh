@@ -32,9 +32,10 @@ fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 
 # shellcheck source=../src/scripts/checks/check-lib.sh
-. "$SCRIPT_DIR/../src/scripts/checks/check-lib.sh"
+_ORCH_SCRIPT_DIR="$SCRIPT_DIR"
+. "$_ORCH_SCRIPT_DIR/../src/scripts/checks/check-lib.sh"
 # shellcheck source=../src/scripts/checks/check-steps.sh
-. "$SCRIPT_DIR/../src/scripts/checks/check-steps.sh"
+. "$_ORCH_SCRIPT_DIR/../src/scripts/checks/check-steps.sh"
 
 parse_args "$@"
 preflight_check

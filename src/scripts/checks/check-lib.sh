@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Check-specific framework library.
 # Sources framework-lib.sh and sets check-specific defaults.
+#
+# Guard against re-sourcing — step files source this independently and
+# re-sourcing would overwrite SCRIPT_DIR and REPO_ROOT.
+[ -n "${_NUCLEUS_CHECK_LIB_SOURCED-}" ] && return
+_NUCLEUS_CHECK_LIB_SOURCED=1
 
 # Resolve SCRIPT_DIR relative to this file so it works when sourced from
 # standalone step files without a pre-set SCRIPT_DIR.

@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 # shellcheck source=../test-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../test-lib.sh"
 

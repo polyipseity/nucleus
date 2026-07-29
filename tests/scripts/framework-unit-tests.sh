@@ -13,6 +13,7 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 test_register_step_function() {
     local result
     result=$(
+        # shellcheck disable=SC2030,SC2269,SC2031 # reason: REPO_ROOT inherited from parent scope; self-assignment to mark as used
         REPO_ROOT="$REPO_ROOT"
         # shellcheck disable=SC1090,SC1091 # reason: dynamic source path tested in isolation
         . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
@@ -29,6 +30,7 @@ test_register_step_function() {
 test_register_step_multiple() {
     local result
     result=$(
+        # shellcheck disable=SC2030,SC2269,SC2031 # reason: REPO_ROOT inherited from parent scope
         REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
         register_step 1 "One" f1
@@ -46,7 +48,7 @@ test_register_step_multiple() {
 test_parse_args_help() {
     local exit_code
     exit_code=0
-    # --help should exit 0
+    # shellcheck disable=SC2097,SC2098,SC2031 # reason: intentional export to bash -c subprocess; REPO_ROOT inherited from parent
     REPO_ROOT="$REPO_ROOT" \
     bash -c '
         . "'"$REPO_ROOT"'/src/scripts/lib/framework-lib.sh"
@@ -65,6 +67,7 @@ test_parse_args_help() {
 test_parse_args_format_flag() {
     local result
     result=$(
+        # shellcheck disable=SC2030,SC2269,SC2031 # reason: REPO_ROOT inherited from parent scope
         REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
         usage() { true; }
@@ -81,6 +84,7 @@ test_parse_args_format_flag() {
 test_parse_args_scoped() {
     local result
     result=$(
+        # shellcheck disable=SC2030,SC2269,SC2031 # reason: REPO_ROOT inherited from parent scope
         REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
         usage() { true; }
@@ -97,6 +101,7 @@ test_parse_args_scoped() {
 test_parse_args_positions() {
     local result
     result=$(
+        # shellcheck disable=SC2030,SC2269,SC2031 # reason: REPO_ROOT inherited from parent scope
         REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
         usage() { true; }
@@ -113,6 +118,7 @@ test_parse_args_positions() {
 test_aggregate_results_parses_exit_files() {
     local result
     result=$(
+        # shellcheck disable=SC2030,SC2269,SC2031 # reason: REPO_ROOT inherited from parent scope
         REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
         # Define stubs for functions framework-lib.sh expects
@@ -126,6 +132,7 @@ test_aggregate_results_parses_exit_files() {
         printf '%s' "42" > "$_wave_tmpdir/step-1.time"
         printf '%s' "Test" > "$_wave_tmpdir/step-1.name"
         # Run aggregate_results (will exit 0, captured in $())
+        # shellcheck disable=SC2317 # reason: aggregate_results calls exit, but this is inside a subshell so || true is reachable
         aggregate_results 2>&1 || true
     ) 2>&1
     if echo "$result" | grep -q "say: all checks passed."; then

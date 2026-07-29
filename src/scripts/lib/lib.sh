@@ -2,6 +2,11 @@
 # Source this at the top of nucleus POSIX shell scripts after setting SCRIPT_DIR.
 # Provides shared functions (usage_std, derive_repo_root).
 #
+# Guard against re-sourcing — step files source this independently and
+# re-sourcing would redundantly re-export PARALLEL_JOBS and redefine functions.
+[ -n "${_NUCLEUS_LIB_SOURCED-}" ] && return
+_NUCLEUS_LIB_SOURCED=1
+#
 # Usage:
 #   SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 #   . "${SCRIPT_DIR}/../src/scripts/lib.sh"

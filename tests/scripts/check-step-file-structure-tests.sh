@@ -9,11 +9,21 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
+# Helper: return 0 if at least one file matching glob exists.
+_glob_has_file() {
+  local _g
+  for _g in $1; do # deliberately unquoted to expand glob
+    [ -f "$_g" ] && return 0
+    break
+  done
+  return 1
+}
+
 # ---- Verify POSIX check step files ----
 test_posix_check_step_files_exist() {
     local missing=0
     for n in $(seq -w 1 20); do
-        if [ ! -f "$REPO_ROOT/src/scripts/checks/check-steps/$n"*.sh ]; then
+        if ! _glob_has_file "$REPO_ROOT/src/scripts/checks/check-steps/$n"*.sh; then
             assert_fail "POSIX check step $n" "Missing step file for number $n"
             ((missing++))
         fi
@@ -76,7 +86,7 @@ test_posix_check_step_sequential_numbers() {
 test_posix_test_step_files_exist() {
     local missing=0
     for n in $(seq 1 4); do
-        if [ ! -f "$REPO_ROOT/src/scripts/tests/test-steps/0$n"*.sh ]; then
+        if ! _glob_has_file "$REPO_ROOT/src/scripts/tests/test-steps/0$n"*.sh; then
             assert_fail "POSIX test step $n" "Missing step file for number $n"
             ((missing++))
         fi
@@ -105,7 +115,7 @@ test_posix_test_step_has_register_step() {
 test_windows_check_step_files_exist() {
     local missing=0
     for n in $(seq -w 1 20); do
-        if [ ! -f "$REPO_ROOT/src/scripts/checks/check-steps/$n"*.ps1 ]; then
+        if ! _glob_has_file "$REPO_ROOT/src/scripts/checks/check-steps/$n"*.ps1; then
             assert_fail "Windows check step $n" "Missing step file for number $n"
             ((missing++))
         fi
@@ -118,7 +128,7 @@ test_windows_check_step_files_exist() {
 test_windows_test_step_files_exist() {
     local missing=0
     for n in $(seq 1 4); do
-        if [ ! -f "$REPO_ROOT/src/scripts/tests/test-steps/0$n"*.ps1 ]; then
+        if ! _glob_has_file "$REPO_ROOT/src/scripts/tests/test-steps/0$n"*.ps1; then
             assert_fail "Windows test step $n" "Missing step file for number $n"
             ((missing++))
         fi

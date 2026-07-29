@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Test-specific framework library.
 # Sources framework-lib.sh and sets test-specific defaults.
+#
+# Guard against re-sourcing — step files source this independently and
+# re-sourcing would overwrite SCRIPT_DIR and REPO_ROOT.
+[ -n "${_NUCLEUS_TEST_LIB_SOURCED-}" ] && return
+_NUCLEUS_TEST_LIB_SOURCED=1
 
 # Resolve SCRIPT_DIR relative to this file so it works when sourced from
 # standalone step files without a pre-set SCRIPT_DIR.
@@ -32,6 +37,7 @@ parse_args() {
         exit 0
         ;;
       -q|--quiet)
+        # shellcheck disable=SC2034 # reason: consumed by test steps 01, 03, 04 via transitive sourcing
         quiet_mode=true
         shift
         ;;
@@ -44,6 +50,7 @@ parse_args() {
         shift
         ;;
       --skip-system-build)
+        # shellcheck disable=SC2034 # reason: consumed by test step 04 (system-config-build) via transitive sourcing
         skip_system_build=true
         shift
         ;;
@@ -69,6 +76,7 @@ parse_args() {
 # Override cache_file_lists for test-specific file caching
 cache_file_lists() {
   TEST_NIX_FILES=$(find tests -name '*.nix' -type f ! -name 'lib.nix' | sort)
+  # shellcheck disable=SC2034 # reason: consumed by test step 01 (nix-tests) via transitive sourcing
   readarray -t TEST_NIX_FILES_ARR <<< "$TEST_NIX_FILES"
 }
 
