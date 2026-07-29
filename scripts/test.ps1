@@ -64,6 +64,8 @@ $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { Split-
 $exitCode = 0
 $FAIL_FAST = $true
 $_step = 0
+$_totalSteps = 4
+$_failedSteps = ""
 
 # Output helpers — structured prefix pattern matching section()/say/warn from test.sh.
 function say { Write-Output "test: $args" }
@@ -114,8 +116,10 @@ Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Remove-Item 
 # ---------------------------------------------------------------------------
 $_sw = [System.Diagnostics.Stopwatch]::StartNew()
 Write-Output ("`n=== [{0}] Nix test suite ===" -f (++$_step))
+"Nix test suite" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
 say "skipping (requires Nix toolchain — not available on Windows)."
 $_sw.Stop()
+"0" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.exit") -NoNewline
 $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.time") -NoNewline
 
 # ---------------------------------------------------------------------------
@@ -125,6 +129,7 @@ $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
 $_pwshScript = "$PSScriptRoot\check-pwsh.ps1"
 $_settings = "$PSScriptRoot\PSScriptAnalyzerSettings.test.psd1"
 Write-Output ("`n=== [{0}] PowerShell lint ===" -f (++$_step))
+"PowerShell lint" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
 $script:waveJob2 = Start-Job -ScriptBlock {
   # PSScriptAnalyzer lint
   & $using:_pwshScript -Settings $using:_settings
@@ -138,7 +143,7 @@ $script:waveJob2 = Start-Job -ScriptBlock {
   if ($LASTEXITCODE -eq 0) { $_exitCode = 1 }
   $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $using:_stepStartTicks
   $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
-  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-3.time") -NoNewline
+  $_elapsedMs | Out-File -FilePath (Join-Path $using:WaveTmpDir "step-2.time") -NoNewline
   $_exitCode
 }
 
@@ -147,8 +152,10 @@ $script:waveJob2 = Start-Job -ScriptBlock {
 # ---------------------------------------------------------------------------
 $_sw = [System.Diagnostics.Stopwatch]::StartNew()
 Write-Output ("`n=== [{0}] Nucleus apps smoke tests ===" -f (++$_step))
+"Nucleus apps smoke tests" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
 say "skipping (requires Nix and bash — not available on Windows)."
 $_sw.Stop()
+"0" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.exit") -NoNewline
 $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.time") -NoNewline
 
 # ---------------------------------------------------------------------------
@@ -156,8 +163,10 @@ $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "ste
 # ---------------------------------------------------------------------------
 $_sw = [System.Diagnostics.Stopwatch]::StartNew()
 Write-Output ("`n=== [{0}] System config build ===" -f (++$_step))
+"System config build" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
 say "skipping (system config build is POSIX-only)."
 $_sw.Stop()
+"0" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.exit") -NoNewline
 $_sw.ElapsedMilliseconds | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$_step.time") -NoNewline
 
 # Wait for background jobs and collect exit codes
@@ -166,33 +175,35 @@ if ($script:waveJob2) {
   $result | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-2.exit") -NoNewline
 }
 
-# Wave result aggregation — collect step exit codes from temp files
-foreach ($_s in @(1, 2, 3)) {
-  $_exitFile = Join-Path $script:WaveTmpDir "step-$_s.exit"
-  if (Test-Path $_exitFile) {
-    $_code = Get-Content $_exitFile -Raw | ForEach-Object { $_.Trim() }
-    if ($_code -ne '0') {
-      $exitCode = 1
-      if ($FAIL_FAST) { exit $exitCode }
-    }
-  }
-}
-
-# Timing summary
+# Wave result aggregation — combined status table with timing and failure collection
+$script:statusIcons = @{ $true = '✓'; $false = '✗' }
 say "test step timing:"
 $_totalMs = 0
-for ($_s = 1; $_s -le 4; $_s++) {
+for ($_s = 1; $_s -le $_totalSteps; $_s++) {
   $_timeFile = Join-Path $script:WaveTmpDir "step-$_s.time"
+  $_exitFile = Join-Path $script:WaveTmpDir "step-$_s.exit"
+  $_nameFile = Join-Path $script:WaveTmpDir "step-$_s.name"
   if (Test-Path $_timeFile) {
     $_ms = [int](Get-Content $_timeFile -Raw)
     $_totalMs += $_ms
-    say ("  step {0,2}: {1,5} ms" -f $_s, $_ms)
+  } else {
+    $_ms = 0
   }
+  $_name = if (Test-Path $_nameFile) { Get-Content $_nameFile -Raw } else { "Step $_s" }
+  $_ok = $true
+  if (Test-Path $_exitFile) {
+    $_code = (Get-Content $_exitFile -Raw).Trim()
+    if ($_code -ne '0') { $_ok = $false; $exitCode = 1 }
+  }
+  $_icon = $script:statusIcons[$_ok]
+  Write-Output ("  step {0,2}  {1}  {2,5} ms  {3}" -f $_s, $_icon, $_ms, $_name)
+  if (-not $_ok) { $_failedSteps += \"$_s, \"; if ($FAIL_FAST) { $exitCode = 1; exit $exitCode } }
 }
-say ("  total:   {0,5} ms" -f $_totalMs)
+Write-Output ("  total:   {0,5} ms" -f $_totalMs)
 
 Write-Output ""
 if ($exitCode -ne 0) {
+  warn "Failed steps: $($_failedSteps.TrimEnd(', '))"
   warn "some tests failed with exit code $exitCode"
   exit $exitCode
 }

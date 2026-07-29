@@ -1,55 +1,58 @@
 <#
 .SYNOPSIS
-  Pester tests for test.ps1 output format (pre-refactor).
-  When test.ps1 is refactored (Phase 6b), update assertions.
+  Pester tests for test.ps1 output format (Phase 6b: combined status table).
 
 .DESCRIPTION
   Validates current output format patterns for test.ps1:
-  - Timing-only table
+  - Combined status table (step N ✓/✗ ms Name)
+  - _totalSteps and _failedSteps variables
   - Generic failure/success messages
-  - Absence of refactored features
+  - Explicit failure summary
+  - Step name files written
 
   Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/test-output-format.Tests.ps1 -Passthru"
 #>
 
-$testPs1Path = Join-Path $PSScriptRoot '../../../scripts/test.ps1'
-$testPs1Content = Get-Content -Path $testPs1Path -Raw
-
-Describe 'Timing table format (pre-refactor)' {
-  It 'uses say with step {0,2} and ms format' {
-    $testPs1Content | Should -MatchExactly "say \(`"  step \{0,2\}: \{1,5\} ms`""
-  }
-
-  It 'has total timing line' {
-    $testPs1Content | Should -MatchExactly "say \(`"  total:   \{0,5\} ms`""
-  }
+BeforeAll {
+    $script:testContent = Get-Content -Raw -Path "$PWD/scripts/test.ps1"
 }
 
-Describe 'Generic messages (pre-refactor)' {
-  It 'has generic failure message' {
-    $testPs1Content | Should -MatchExactly 'some tests failed'
-  }
+Describe 'Combined status table (Phase 6b)' {
+    It 'has _totalSteps variable' {
+        $script:testContent | Should -MatchExactly '\$_totalSteps'
+    }
 
-  It 'has generic success message' {
-    $testPs1Content | Should -MatchExactly 'all tests passed\.'
-  }
+    It 'has _failedSteps variable' {
+        $script:testContent | Should -MatchExactly '\$_failedSteps'
+    }
+
+    It 'uses combined format with step number and ms' {
+        $script:testContent | Should -MatchExactly "Write-Output \(`"  step \{0,2\}  \{1\}  \{2,5\} ms  \{3\}`""
+    }
+
+    It 'has total timing line' {
+        $script:testContent | Should -MatchExactly "Write-Output \(`"  total:   \{0,5\} ms`""
+    }
 }
 
-Describe 'Absence of refactored features (pre-refactor)' {
-  It 'does not have combined status table' {
-    $testPs1Content | Should -Not -MatchExactly '✓'
-    $testPs1Content | Should -Not -MatchExactly '✗'
-  }
+Describe 'Step name files' {
+    It 'writes step name files for all 4 steps' {
+        $script:testContent | Should -MatchExactly 'step-\$\(\$_step\)\.name'
+    }
+}
 
-  It 'does not have [Step N] prefix' {
-    $testPs1Content | Should -Not -MatchExactly '\[Step '
-  }
+Describe 'Generic messages (Phase 6b)' {
+    It 'has generic failure message' {
+        $script:testContent | Should -MatchExactly 'some tests failed'
+    }
 
-  It 'does not have test boundary markers' {
-    $testPs1Content | Should -Not -MatchExactly '--- test output ---'
-  }
+    It 'has generic success message' {
+        $script:testContent | Should -MatchExactly 'all tests passed\.'
+    }
+}
 
-  It 'does not have explicit failure summary' {
-    $testPs1Content | Should -Not -MatchExactly 'Failed step'
-  }
+Describe 'Explicit failure summary (Phase 6b)' {
+    It 'has explicit failure summary with Failed steps' {
+        $script:testContent | Should -MatchExactly 'Failed steps'
+    }
 }
