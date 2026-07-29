@@ -30,6 +30,27 @@ if ($_ps1Files.Count -gt 0) { ... $_ps1Files ... }
 
 This works because the assignment creates a local variable that PSSA finds in its assignment-tracking collection. A separate bug (`yield break` instead of `continue` in `FindNonAssignedNonUsingVarAsts`) causes PSSA to stop checking all remaining variables once it finds a match in the assignment list, suppressing any further warnings for that block.
 
+## `PSUseApprovedVerbs` with `New-Item -Path Function:` aliases
+
+**Trigger:** Defining functions via the PSFunction provider path instead of the `function` keyword,
+e.g. `New-Item -Path Function: -Name '-g' -Value { & git @Args } -Force`.
+
+**Root cause:** `PSUseApprovedVerbs` only inspects `FunctionDefinitionAst` AST nodes — the node
+produced by `function foo { ... }` syntax. `New-Item -Path Function:` creates a function through
+the PSFunction provider machinery without producing a `FunctionDefinitionAst`, so the rule never
+evaluates the function name against its approved-verb list. There is no AST node for the rule to
+inspect, making this a deliberate structural bypass rather than a parser false positive.
+
+**Workaround:** Wrap the provider-path call in a helper so call sites stay clean:
+
+```powershell
+function Add-ShellAlias { param([string]$Name, [scriptblock]$Value) $null = New-Item -Path Function: -Name $Name -Value $Value -Force }
+Add-ShellAlias '-g' { & git @Args }
+```
+
+This eliminates 82 individual suppressions while keeping the rule satisfied. The rule cannot fire
+because no alias definition produces a `FunctionDefinitionAst`.
+
 ## Additional known false-positive patterns (untested)
 
 - `$env:VARNAME` inside script blocks — the rule may flag environment variable accesses (mentioned in issue #1504 comments)
