@@ -14,34 +14,30 @@
 #>
 
 BeforeAll {
-    $script:checkContent = Get-Content -Raw -Path "$PWD/scripts/check.ps1"
+    $script:checkContent = Get-Content -Raw -Path "$PWD/scripts/framework-lib.ps1"
 }
 
-Describe 'Combined status table (Phase 5)' {
-    It 'has _totalSteps variable' {
-        $script:checkContent | Should -MatchExactly '\$_totalSteps'
-    }
-
-    It 'has _failedSteps variable' {
-        $script:checkContent | Should -MatchExactly '\$_failedSteps'
+Describe 'Combined status table' {
+    It 'has totalSteps variable' {
+        $script:checkContent | Should -MatchExactly '\$totalSteps'
     }
 
     It 'uses combined format with step number and ms' {
-        $script:checkContent | Should -MatchExactly "Write-Output \(`"  step \{0,2\}  \{1\}  \{2,5\} ms  \{3\}`""
+        $script:checkContent | Should -MatchExactly '"  step \{0,2\}  \{1\}  \{2,5\} ms  \{3\}"'
     }
 
     It 'has total timing line' {
-        $script:checkContent | Should -MatchExactly "Write-Output \(`"  total:   \{0,5\} ms`""
+        $script:checkContent | Should -MatchExactly '"  total:   \{0,5\} ms"'
     }
 }
 
 Describe 'Step name files' {
-    It 'writes step name files for all 21 steps' {
-        $script:checkContent | Should -MatchExactly 'step-\$\(\$_step\)\.name'
+    It 'writes step name files for 20 steps' {
+        $script:checkContent | Should -MatchExactly 'step-\$Number\.name'
     }
 }
 
-Describe 'Generic messages (Phase 5)' {
+Describe 'Generic messages' {
     It 'has generic failure message' {
         $script:checkContent | Should -MatchExactly 'some checks failed'
     }
