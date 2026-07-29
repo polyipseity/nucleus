@@ -98,7 +98,7 @@ function Sync-ObsidianConfig {
 
     $parentDir = Split-Path -Path $Path -Parent
     if (-not (Test-Path -LiteralPath $parentDir -PathType Container)) {
-      New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+      New-Item -ItemType Directory -Path $parentDir -Force > $null
     }
 
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
@@ -188,6 +188,7 @@ function Sync-ObsidianConfig {
 
     $existingConfig = Read-ObsidianConfig -Path $configPath
     foreach ($settingName in $managedSettingNames) {
+      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; Remove returns boolean, discarded
       $null = $existingConfig.Remove($settingName)
     }
 

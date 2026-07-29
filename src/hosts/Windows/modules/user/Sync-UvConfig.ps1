@@ -53,13 +53,13 @@ function Sync-UvConfig {
   }
 
   if (-not (Test-Path -Path $destDirPath -PathType Container)) {
-    New-Item -Path $destDirPath -ItemType Directory -Force | Out-Null
+    New-Item -Path $destDirPath -ItemType Directory -Force > $null
   }
 
   # Method 1 (writable symlink): remove existing file/symlink and replace with symlink.
   if (Test-Path -Path $destPath) {
     Remove-Item -Path $destPath -Force
   }
-  New-Item -Path $destPath -ItemType SymbolicLink -Target $sourcePath -Force | Out-Null
+  New-Item -Path $destPath -ItemType SymbolicLink -Target $sourcePath -Force > $null
   Write-Output "$($PSStyle.Foreground.Cyan)Sync-UvConfig: symlinked $destPath$($PSStyle.Reset)"
 }

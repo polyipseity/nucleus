@@ -127,11 +127,11 @@ function Sync-SecretFile {
   $sshSecretName = "ssh_personal_$PrimaryUsername"
 
   if (-not (Test-Path -Path $sshDir)) {
-    New-Item -ItemType Directory -Path $sshDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $sshDir -Force > $null
   }
 
   if (-not (Test-Path -Path $gitIdentityConfigDir)) {
-    New-Item -ItemType Directory -Path $gitIdentityConfigDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $gitIdentityConfigDir -Force > $null
   }
 
   # Script block that removes inherited ACEs and grants only the current user
@@ -145,7 +145,7 @@ function Sync-SecretFile {
     # /inheritance:r removes inherited ACEs; /grant:r replaces any existing rule.
     # Soft-failure: icacls may not be available on non-NTFS volumes or in some
     # sandboxed environments; warn and continue rather than aborting the apply.
-    & icacls.exe $Path /inheritance:r /grant:r "${currentUser}:(F)" | Out-Null
+    & icacls.exe $Path /inheritance:r /grant:r "${currentUser}:(F)" > $null
     if ($LASTEXITCODE -ne 0) {
       Write-Warning "secrets: could not restrict ACL on $Path (icacls exit $LASTEXITCODE)"
     }
@@ -218,7 +218,7 @@ function Sync-SecretFile {
             # your authentication agent" when no agent is running.  That
             # failure is benign — nothing to flush — and the noise would
             # obscure the meaningful rotation log line below.
-            & $sshAddCommand.Source -D 2>$null | Out-Null  # check-suppress:suppression_doc: agent may not be running; expected on first provision before key materialization
+            & $sshAddCommand.Source -D *> $null
             Write-Output "$($PSStyle.Foreground.Cyan)  Flushed SSH agent due to key rotation ($oldSshFingerprint -> $newSshFingerprint)$($PSStyle.Reset)"
           }
         }
@@ -283,7 +283,7 @@ function Sync-SecretFile {
         }
       }
 
-      $gpgKeyValue | & $GpgExe --batch --import - | Out-Null
+      $gpgKeyValue | & $GpgExe --batch --import - > $null
       if ($LASTEXITCODE -ne 0) {
         throw "Failed to import GPG material '$gpgSecretName'. Exit code: $LASTEXITCODE"
       }
@@ -304,7 +304,7 @@ function Sync-SecretFile {
       # Ownertrust is best-effort: demote failure to a warning so a transient
       # GnuPG IPC error doesn't abort the whole apply run.  The key is already
       # in the keyring and tracked in the manifest at this point.
-      "${firstFingerprint}:6:" | & $GpgExe --import-ownertrust | Out-Null
+      "${firstFingerprint}:6:" | & $GpgExe --import-ownertrust > $null
       if ($LASTEXITCODE -ne 0) {
         Write-Warning "secrets: ownertrust enforcement for '$firstFingerprint' exited $LASTEXITCODE — key imported and manifest updated, ownertrust may need a retry"
       }

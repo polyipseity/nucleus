@@ -93,7 +93,7 @@ function Sync-AgentsClawHubSkill {
   # creates it during apply, but this guard makes the function safe to call
   # standalone (e.g. for testing) before Sync-AgentsSkills has run.
   if (-not (Test-Path -LiteralPath $skillsDir -PathType Container)) {
-    New-Item -ItemType Directory -Path $skillsDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $skillsDir -Force > $null
     Write-Output "clawhub-skills: Sync-AgentsClawHubSkills: created $skillsDir"
   }
 

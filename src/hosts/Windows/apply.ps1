@@ -626,7 +626,7 @@ foreach ($secretFile in $secretPreflightFiles) {
   }
 
   # Fail fast if current machine identities cannot decrypt managed secrets.
-  Get-Secret -FilePath $secretPath -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe | Out-Null
+  Get-Secret -FilePath $secretPath -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe > $null
 }
 
 if ($EnableSecretsParity) {
@@ -649,6 +649,7 @@ else {
 # into %ProgramData%\nucleus\secrets\ so the SYSTEM-native litellm SCM service
 # can read them at startup.
 $systemSecretsDir = Join-Path -Path $env:ProgramData -ChildPath "nucleus\secrets"
+# check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
 $null = New-Item -Path $systemSecretsDir -ItemType Directory -Force
 $systemYmlPath = Join-Path -Path $secretsDir -ChildPath "system.yml"
 if (Test-Path -Path $systemYmlPath -PathType Leaf) {
@@ -829,11 +830,12 @@ Sync-JellyfinLibrary -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgE
 Sync-CustomProvisionSymlink -Enabled:$EnableCustomProvisionSymlinkParity -UserRecords $selectedUserRecords
 # Method 1 (writable symlink): symlink config so edits take effect immediately.
   $discordMusicRPCConfigDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath "discord-music-rpc"
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
   $null = New-Item -Path $discordMusicRPCConfigDir -ItemType Directory -Force
   $discordMusicRPCConfig = Join-Path -Path $discordMusicRPCConfigDir -ChildPath "config.yaml"
   $discordMusicRPCConfigSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\discord-music-rpc\config.yaml"
   if (Test-Path -Path $discordMusicRPCConfig) { Remove-Item -Path $discordMusicRPCConfig -Force }
-  New-Item -Path $discordMusicRPCConfig -ItemType SymbolicLink -Target $discordMusicRPCConfigSource -Force | Out-Null
+  New-Item -Path $discordMusicRPCConfig -ItemType SymbolicLink -Target $discordMusicRPCConfigSource -Force > $null
 Sync-DiscordMusicRPC -Enabled:$EnableDiscordMusicRPCParity
 Sync-CamillaDSPService -Enabled:$EnableCamillaDSPServiceParity
 Sync-CamillaDSPHeartbeatService -Enabled:$EnableCamillaDSPHeartbeatServiceParity
@@ -879,7 +881,7 @@ if (Test-Path -LiteralPath $svcScript) {
 }
 
 # Health check: verify archiving ecosystem (7-Zip CLI + app) is functional post-apply.
-Test-ArchivingStack | Out-Null
+Test-ArchivingStack > $null
 
 # Converge locally installed Ollama models with the declarative manifest as the
 # final step of every apply.  Model pulls are 2-20 GB, so this runs last to

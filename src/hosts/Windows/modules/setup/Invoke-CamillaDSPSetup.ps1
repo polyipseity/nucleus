@@ -68,7 +68,7 @@ function Invoke-CamillaDSPSetup {
     if (Test-Path $tempDir) {
       Remove-Item -Recurse -Force $tempDir
     }
-    New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
+    New-Item -ItemType Directory -Force -Path $tempDir > $null
 
     Write-Output "camilladsp-setup: downloading v${desiredVersion} from GitHub releases"
     # check-suppress:suppression_doc: probe — download may fail; Test-Path check handles failure downstream.
@@ -80,7 +80,7 @@ function Invoke-CamillaDSPSetup {
 
     Write-Output "camilladsp-setup: extracting camilladsp.exe"
     # Ensure install directory exists.
-    New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+    New-Item -ItemType Directory -Force -Path $installDir > $null
 
     # Extract just camilladsp.exe from the zip.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -111,10 +111,11 @@ function Invoke-CamillaDSPSetup {
     $configPath = Join-Path -Path $configDir -ChildPath "config.yml"
     $configSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\camilladsp\configs\windows\config.yml"
     if (-not (Test-Path $configDir)) {
+      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
       $null = New-Item -ItemType Directory -Path $configDir -Force
     }
     if (Test-Path $configPath) { Remove-Item -Path $configPath -Force }
-    New-Item -Path $configPath -ItemType SymbolicLink -Target $configSource -Force | Out-Null
+    New-Item -Path $configPath -ItemType SymbolicLink -Target $configSource -Force > $null
     Write-Output "camilladsp-setup: symlinked config to $configPath"
   } finally {
     # Clean up temp directory.

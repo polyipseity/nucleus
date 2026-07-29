@@ -38,7 +38,7 @@ function Initialize-DevDirectory {
 
     $devPath = Join-Path -Path $HOME -ChildPath "dev"
     if (-not (Test-Path -LiteralPath $devPath -PathType Container)) {
-        New-Item -ItemType Directory -Path $devPath -Force | Out-Null
+        New-Item -ItemType Directory -Path $devPath -Force > $null
         Write-Output "provision-devdirectory: created $devPath"
     } else {
         Write-Output "provision-devdirectory: $devPath already exists; skipping"

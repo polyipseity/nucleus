@@ -50,7 +50,7 @@ function Sync-UserSecret {
 
   $secretDir = Join-Path $HOME '.config\nucleus\secrets'
   if (-not (Test-Path -Path $secretDir -PathType Container)) {
-    New-Item -ItemType Directory -Path $secretDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $secretDir -Force > $null
   }
 
   $rclonePassKey = 'rclone_config_pass'

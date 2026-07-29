@@ -67,6 +67,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # Used inside functions below via closure (PSSA cannot track)
+# check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; splatting variables, declared for parameter binding
 $null = $DryRun, $GcOnly, $AiProfile, $Json
 
 $fmtModulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'

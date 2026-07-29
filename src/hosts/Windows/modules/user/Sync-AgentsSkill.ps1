@@ -91,7 +91,7 @@ function Sync-AgentsSkill {
     # Ensure ~/.agents\skills\ exists as a real (writable) directory so fetched
   # clawhub downloads can land here without entering the tracked repo tree.
   if (-not (Test-Path -LiteralPath $skillsDir -PathType Container)) {
-    New-Item -ItemType Directory -Path $skillsDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $skillsDir -Force > $null
     Write-Output "skills: Sync-AgentsSkills: created $skillsDir"
   }
 
@@ -139,7 +139,7 @@ function Sync-AgentsSkill {
         return
       }
     }
-    New-Item -ItemType SymbolicLink -Path $linkPath -Target $skillEntry.FullName | Out-Null
+    New-Item -ItemType SymbolicLink -Path $linkPath -Target $skillEntry.FullName > $null
     Set-ManagedSymlinkDeleteProtection -Context "skills" -Path $linkPath
     Write-Output "skills: Sync-AgentsSkills: linked $linkPath -> $($skillEntry.FullName)"
   }

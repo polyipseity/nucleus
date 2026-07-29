@@ -92,10 +92,10 @@ function Sync-CaddyService {
   $caddyfilePath = Join-Path -Path $proxyRoot -ChildPath 'Caddyfile'
 
   if ($Enabled) {
-    New-Item -Path $proxyRoot -ItemType Directory -Force | Out-Null
-    New-Item -Path $logDir -ItemType Directory -Force | Out-Null
-    New-Item -Path $caddyConfigDir -ItemType Directory -Force | Out-Null
-    New-Item -Path $caddyDataDir -ItemType Directory -Force | Out-Null
+    New-Item -Path $proxyRoot -ItemType Directory -Force > $null
+    New-Item -Path $logDir -ItemType Directory -Force > $null
+    New-Item -Path $caddyConfigDir -ItemType Directory -Force > $null
+    New-Item -Path $caddyDataDir -ItemType Directory -Force > $null
 
     # check-suppress:suppression_doc: probe — services.json may not exist yet; $null check handles absence.
     $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json

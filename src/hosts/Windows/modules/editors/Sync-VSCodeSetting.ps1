@@ -55,7 +55,7 @@ function Sync-VSCodeSetting {
   foreach ($settingsPath in $settingsPaths) {
     $settingsDirectory = Split-Path -Path $settingsPath -Parent
     if ($Enabled -and -not (Test-Path -Path $settingsDirectory)) {
-      New-Item -ItemType Directory -Path $settingsDirectory -Force | Out-Null
+      New-Item -ItemType Directory -Path $settingsDirectory -Force > $null
     }
 
     $settingsObject = @{}

@@ -70,7 +70,7 @@ function Sync-DevRepo {
   # Ensure dev directory exists.
   if (-not (Test-Path -PathType Container -Path $devDir)) {
     try {
-      New-Item -ItemType Directory -Path $devDir -Force | Out-Null
+      New-Item -ItemType Directory -Path $devDir -Force > $null
       Write-Verbose "Sync-DevRepo: created dev directory at $devDir"
     }
     catch {
@@ -98,7 +98,7 @@ function Sync-DevRepo {
         # On Windows, use New-Item with -ItemType SymbolicLink.
         # Requires admin or developer mode on Windows 10+.
         if ($PSCmdlet.ShouldProcess($SymlinkPath, "Create symlink to $SymlinkTarget")) {
-          New-Item -ItemType SymbolicLink -Path $SymlinkPath -Target $SymlinkTarget -Force -ErrorAction Stop | Out-Null
+          New-Item -ItemType SymbolicLink -Path $SymlinkPath -Target $SymlinkTarget -Force -ErrorAction Stop > $null
           Set-ManagedSymlinkDeleteProtection -Context "Sync-DevRepo" -Path $SymlinkPath
           Write-Verbose "Sync-DevRepo: created symlink $SymlinkPath -> $SymlinkTarget"
         }
@@ -217,7 +217,7 @@ function Sync-DevRepo {
     # Clone the repository.
     try {
       if (-not (Test-Path -Path $RepoTarget)) {
-        New-Item -ItemType Directory -Path $RepoTarget -Force | Out-Null
+        New-Item -ItemType Directory -Path $RepoTarget -Force > $null
       }
 
       $cloneResult = Invoke-GitCommand -Arguments @('clone', $RepoUrl, $RepoTarget)

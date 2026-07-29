@@ -197,22 +197,22 @@ function Sync-QtPassConfig {
 
     try {
       if ($Enabled) {
-        New-Item -Path $qtPassRegistryPath -Force | Out-Null
+        New-Item -Path $qtPassRegistryPath -Force > $null
 
         foreach ($settingName in $managedSettingNames) {
           $settingValue = $effectiveSettings[$settingName]
           if ($settingValue -is [bool]) {
-            New-ItemProperty -LiteralPath $qtPassRegistryPath -Name $settingName -PropertyType DWord -Value ([int]$settingValue) -Force | Out-Null
+            New-ItemProperty -LiteralPath $qtPassRegistryPath -Name $settingName -PropertyType DWord -Value ([int]$settingValue) -Force > $null
             continue
           }
 
           if ($settingValue -is [int] -or $settingValue -is [long]) {
-            New-ItemProperty -LiteralPath $qtPassRegistryPath -Name $settingName -PropertyType DWord -Value ([int]$settingValue) -Force | Out-Null
+            New-ItemProperty -LiteralPath $qtPassRegistryPath -Name $settingName -PropertyType DWord -Value ([int]$settingValue) -Force > $null
             continue
           }
 
           if ($settingValue -is [string]) {
-            New-ItemProperty -LiteralPath $qtPassRegistryPath -Name $settingName -PropertyType String -Value $settingValue -Force | Out-Null
+            New-ItemProperty -LiteralPath $qtPassRegistryPath -Name $settingName -PropertyType String -Value $settingValue -Force > $null
             continue
           }
 

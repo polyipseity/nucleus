@@ -818,7 +818,7 @@ function Sync-ShellProfile {
   foreach ($profilePath in $profilePaths) {
     $profileDirectory = Split-Path -Path $profilePath -Parent
     if ($Enabled -and -not (Test-Path -Path $profileDirectory)) {
-      New-Item -ItemType Directory -Path $profileDirectory -Force | Out-Null
+      New-Item -ItemType Directory -Path $profileDirectory -Force > $null
     }
 
     $existingLines = @()

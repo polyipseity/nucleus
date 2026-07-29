@@ -57,6 +57,7 @@ function Sync-Wallpaper {
         -Users 'admin', 'guest' `
         -SopsExe 'sops.exe'
   #>
+  # check-suppress:SuppressMessageAttribute: PSReviewUnusedParameter — empty scope suppresses unused parameter warning on the whole param block
   [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '')]
   param(
     [Parameter(Mandatory = $true)]
@@ -103,7 +104,7 @@ function Sync-Wallpaper {
     $outputDir = Join-Path -Path $userHome -ChildPath 'Pictures\wallpapers'
 
     if (-not (Test-Path -Path $outputDir)) {
-      New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+      New-Item -ItemType Directory -Path $outputDir -Force > $null
     }
 
     foreach ($wallpaperFile in $wallpaperFiles) {

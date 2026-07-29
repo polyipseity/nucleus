@@ -142,6 +142,7 @@ function Invoke-ReplicaSync {
     param([Parameter(Mandatory)][string]$Provider)
     # Explicit reference to suppress false-positive PSAvoidUsingUnusedParameters
     # ($Provider is used via closure in Where-Object below).
+    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; Provider variable discarded, used for drive qualification only
     $null = $Provider
 
     $providerProperty = $gcConfig.PSObject.Properties | Where-Object { $_.Name -eq $Provider } | Select-Object -First 1
@@ -202,6 +203,7 @@ function Invoke-ReplicaSync {
     }
 
     if ($null -ne $Set -and $Set.PSObject.Methods.Name -contains 'Add') {
+      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — [void] intentional; Add returns collection count, discarded
       [void]$Set.Add($Value)
     }
   }
@@ -405,13 +407,13 @@ function Invoke-ReplicaSync {
       return $true
     }
 
-    & $icaclsCmd.Source $TargetDir '/remove:d' $currentUserPrincipal '/T' '/C' | Out-Null
+    & $icaclsCmd.Source $TargetDir '/remove:d' $currentUserPrincipal '/T' '/C' > $null
     if ($LASTEXITCODE -ne 0) {
       return $false
     }
 
     if ($null -ne $attribCmd) {
-      & $attribCmd.Source '-R' "$TargetDir\*" '/S' '/D' | Out-Null
+      & $attribCmd.Source '-R' "$TargetDir\*" '/S' '/D' > $null
     }
 
     return $true
@@ -442,18 +444,18 @@ function Invoke-ReplicaSync {
       return $true
     }
 
-    & $icaclsCmd.Source $TargetDir '/remove:d' $currentUserPrincipal '/T' '/C' | Out-Null
+    & $icaclsCmd.Source $TargetDir '/remove:d' $currentUserPrincipal '/T' '/C' > $null
     if ($LASTEXITCODE -ne 0) {
       return $false
     }
 
-    & $icaclsCmd.Source $TargetDir '/deny' "${currentUserPrincipal}:(WD,AD,DC,D,WA,WEA)" '/T' '/C' | Out-Null
+    & $icaclsCmd.Source $TargetDir '/deny' "${currentUserPrincipal}:(WD,AD,DC,D,WA,WEA)" '/T' '/C' > $null
     if ($LASTEXITCODE -ne 0) {
       return $false
     }
 
     if ($null -ne $attribCmd) {
-      & $attribCmd.Source '+R' "$TargetDir\*" '/S' '/D' | Out-Null
+      & $attribCmd.Source '+R' "$TargetDir\*" '/S' '/D' > $null
     }
 
     return $true
@@ -492,7 +494,7 @@ function Invoke-ReplicaSync {
 
     $localDir = Join-Path -Path $HOME -ChildPath $localPath
     if (-not (Test-Path -Path $localDir -PathType Container)) {
-      New-Item -ItemType Directory -Path $localDir -Force | Out-Null
+      New-Item -ItemType Directory -Path $localDir -Force > $null
     }
 
     $unlocked = Invoke-ReplicaTreeWritable -TargetDir $localDir -IsDryRun:$DryRun

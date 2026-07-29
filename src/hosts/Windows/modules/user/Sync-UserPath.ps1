@@ -99,6 +99,7 @@ public static class User32 {
 }
 '@
   Add-Type -TypeDefinition $sendMessageTimeoutSource -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: type may already be loaded; Add-Type errors on redefinition so silently continue
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; SendMessageTimeout return value discarded, HWND broadcast is fire-and-forget
   $null = [User32]::SendMessageTimeout(
     [IntPtr]$HWND_BROADCAST,
     $WM_SETTINGCHANGE,

@@ -430,9 +430,9 @@ function Invoke-VMSetup {
     Write-Information "vm-setup: guest credential policy active (owner=$($guestCredential.Owner), username=$guestUsername, source=SOPS)"
 
     if (-not $DryRun) {
-        New-Item -ItemType Directory -Path $vmDir     -Force | Out-Null
-        New-Item -ItemType Directory -Path $imagesDir -Force | Out-Null
-        New-Item -ItemType Directory -Path (Join-Path $vmDir 'scripts') -Force | Out-Null
+        New-Item -ItemType Directory -Path $vmDir     -Force > $null
+        New-Item -ItemType Directory -Path $imagesDir -Force > $null
+        New-Item -ItemType Directory -Path (Join-Path $vmDir 'scripts') -Force > $null
     } else {
         Write-Information "vm-setup: [dry-run] New-Item Directory $vmDir"
         Write-Information "vm-setup: [dry-run] New-Item Directory $imagesDir"
@@ -1285,7 +1285,7 @@ function Invoke-BuildWindowsImage {
             # Use a fresh temp tree per attempt so a failed try cannot poison the
             # next firmware/boot-strategy combination.
             $attemptTempDir = Join-Path $ImagesDir ('.{0}.{1}.{2}.{3}' -f $VmName, $attempt.Firmware, $attempt.Boot, ([guid]::NewGuid().ToString('N')))
-            New-Item -ItemType Directory -Path $attemptTempDir -Force | Out-Null
+            New-Item -ItemType Directory -Path $attemptTempDir -Force > $null
             $tmpOutput = Join-Path $attemptTempDir 'output'
             $packerLog = Join-Path $attemptTempDir 'packer.log'
             $autounattendTemplate = Join-Path $VmsDir 'windows\Autounattend.xml'

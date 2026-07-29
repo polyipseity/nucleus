@@ -23,9 +23,9 @@ function Set-NucleusService {
   $existingService = Get-Service -Name $Name -ErrorAction SilentlyContinue
   if ($null -eq $existingService) {
     if ($PSCmdlet.ShouldProcess($Name, 'Create service')) {
-      & sc.exe create $Name binPath= $BinaryPath start= $StartType DisplayName= $DisplayName | Out-Null
+      & sc.exe create $Name binPath= $BinaryPath start= $StartType DisplayName= $DisplayName > $null
       if ($Description) {
-        & sc.exe description $Name $Description | Out-Null
+        & sc.exe description $Name $Description > $null
       }
     }
   }
@@ -34,7 +34,7 @@ function Set-NucleusService {
       if ($existingService.Status -ne 'Stopped') {
         Stop-Service -Name $Name -Force
       }
-      & sc.exe config $Name binPath= $BinaryPath start= $StartType | Out-Null
+      & sc.exe config $Name binPath= $BinaryPath start= $StartType > $null
     }
   }
 
@@ -57,7 +57,7 @@ function Remove-NucleusService {
       if ($existingService.Status -ne 'Stopped') {
         Stop-Service -Name $Name -Force
       }
-      & sc.exe delete $Name | Out-Null
+      & sc.exe delete $Name > $null
     }
   }
 }

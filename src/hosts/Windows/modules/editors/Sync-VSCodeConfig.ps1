@@ -187,6 +187,7 @@ function Sync-VSCodeConfig {
           $existing[$idx] = $repoItem
         }
       } else {
+        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; Add returns collection count, discarded
         $null = $existing.Add($repoItem)
       }
     }
@@ -250,9 +251,9 @@ function Sync-VSCodeConfig {
 
       $parentDir = Split-Path -Path $linkPath -Parent
       if (-not (Test-Path -LiteralPath $parentDir)) {
-        New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+        New-Item -ItemType Directory -Path $parentDir -Force > $null
       }
-      New-Item -ItemType SymbolicLink -Path $linkPath -Target $repoTarget | Out-Null
+      New-Item -ItemType SymbolicLink -Path $linkPath -Target $repoTarget > $null
       Set-ManagedSymlinkDeleteProtection -Context "vscode-config" -Path $linkPath
       Write-Output "vscode-config: linked VS Code config file: $linkPath -> $repoTarget"
     }
@@ -303,9 +304,9 @@ function Sync-VSCodeConfig {
 
       $parentDir = Split-Path -Path $linkPath -Parent
       if (-not (Test-Path -LiteralPath $parentDir)) {
-        New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+        New-Item -ItemType Directory -Path $parentDir -Force > $null
       }
-      New-Item -ItemType SymbolicLink -Path $linkPath -Target $repoTarget | Out-Null
+      New-Item -ItemType SymbolicLink -Path $linkPath -Target $repoTarget > $null
       Set-ManagedSymlinkDeleteProtection -Context "vscode-config" -Path $linkPath
       Write-Output "vscode-config: linked VS Code config dir: $linkPath -> $repoTarget"
     }

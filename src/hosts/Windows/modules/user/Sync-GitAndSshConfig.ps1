@@ -85,7 +85,7 @@ function Sync-GitAndSshConfig {
 
     $sshDir = Join-Path -Path $userHome -ChildPath '.ssh'
     if ($Enabled -and -not (Test-Path -Path $sshDir)) {
-      New-Item -ItemType Directory -Path $sshDir -Force | Out-Null
+      New-Item -ItemType Directory -Path $sshDir -Force > $null
     }
 
     $sshConfigPath = Join-Path -Path $sshDir -ChildPath 'config'
@@ -219,10 +219,10 @@ function Sync-GitAndSshConfig {
       $effectiveIgnorePath = Join-Path -Path $userGitConfigDir -ChildPath 'ignore'
 
       if (-not (Test-Path -Path $globalIgnoreDir)) {
-        New-Item -ItemType Directory -Path $globalIgnoreDir -Force | Out-Null
+        New-Item -ItemType Directory -Path $globalIgnoreDir -Force > $null
       }
       if (-not (Test-Path -Path $userGitConfigDir)) {
-        New-Item -ItemType Directory -Path $userGitConfigDir -Force | Out-Null
+        New-Item -ItemType Directory -Path $userGitConfigDir -Force > $null
       }
 
       # Create an empty template directory so `init.templateDir` points at an
@@ -230,7 +230,7 @@ function Sync-GitAndSshConfig {
       # description file that Git otherwise copies into every new .git.
       $emptyTemplateDir = Join-Path -Path $userGitConfigDir -ChildPath 'empty_template'
       if (-not (Test-Path -Path $emptyTemplateDir)) {
-        New-Item -ItemType Directory -Path $emptyTemplateDir -Force | Out-Null
+        New-Item -ItemType Directory -Path $emptyTemplateDir -Force > $null
       }
 
       # Method 1 (writable symlink): global gitignore symlinked to repo file.
@@ -242,7 +242,7 @@ function Sync-GitAndSshConfig {
       if (Test-Path -Path $globalIgnorePath) {
         Remove-Item -Path $globalIgnorePath -Force
       }
-      New-Item -Path $globalIgnorePath -ItemType SymbolicLink -Target $globalIgnoreSource -Force | Out-Null
+      New-Item -Path $globalIgnorePath -ItemType SymbolicLink -Target $globalIgnoreSource -Force > $null
 
       if (-not (Test-Path -Path $userIgnorePath)) {
         $userIgnoreTemplate = @(

@@ -43,7 +43,7 @@ function New-ConfigDir {
   param()
   $dir = Split-Path -Path $configFile -Parent
   if (-not (Test-Path $dir) -and $PSCmdlet.ShouldProcess($dir, 'Create config directory')) {
-    New-Item -Path $dir -ItemType Directory -Force | Out-Null
+    New-Item -Path $dir -ItemType Directory -Force > $null
   }
 }
 

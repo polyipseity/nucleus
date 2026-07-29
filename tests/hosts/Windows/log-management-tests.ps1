@@ -66,7 +66,7 @@ Describe 'Invoke-LogRotation' {
   BeforeEach {
     # Create a fresh test directory per test.
     $dir = Join-Path $Script:TestDir ([System.IO.Path]::GetRandomFileName())
-    New-Item -Path $dir -ItemType Directory -Force | Out-Null
+    New-Item -Path $dir -ItemType Directory -Force > $null
     $Script:LogDir = $dir
   }
 

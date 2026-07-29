@@ -72,6 +72,7 @@ function Sync-CamillaDSPService {
 
   # Write the wrapper script that auto-applies config via WS API.
   $wrapperDir = Join-Path -Path $HOME -ChildPath ".config\camilladsp\bin"
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
   $null = New-Item -Path $wrapperDir -ItemType Directory -Force
   $wrapperScriptPath = Join-Path -Path $wrapperDir -ChildPath "autoconfig.ps1"
   $wrapperScriptPathSource = Join-Path -Path $PSScriptRoot -ChildPath "..\scripts\CamillaDSP-autoconfig.ps1"

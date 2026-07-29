@@ -103,7 +103,7 @@ function Test-Connectivity {
 
   foreach ($target in $targets) {
     try {
-      Invoke-WebRequest -Uri $target -Method Head -TimeoutSec 10 | Out-Null
+      Invoke-WebRequest -Uri $target -Method Head -TimeoutSec 10 > $null
     }
     catch {
       throw "nucleus: connectivity check failed for $target"

@@ -41,6 +41,7 @@ function Sync-DiscordMusicRPC {
   $taskName = "NucleusDiscordMusicRPC"
   $logDir = Get-NucleusLogDir
   $serviceLogDir = Join-Path -Path $logDir -ChildPath "discord-music-rpc"
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
   $null = New-Item -Path $serviceLogDir -ItemType Directory -Force
   $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
 
@@ -56,6 +57,7 @@ function Sync-DiscordMusicRPC {
 
   # Config symlink is managed by apply.ps1 (same as LiteLLM).  Ensure log
   # directory exists.
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
   $null = New-Item -Path $logDir -ItemType Directory -Force
 
   # Find the discord-music-rpc binary (installed via uv tool install or pip).

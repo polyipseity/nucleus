@@ -108,8 +108,9 @@ $script:CachedPs1Files = Get-ChildItem -Recurse -Path $RepoRoot -Filter '*.ps1' 
 # Wave parallelism infrastructure: each step writes its exit code to a per-step temp file.
 # Results are aggregated at the end. In FAIL_FAST mode, steps run sequentially (original behavior).
 $script:WaveTmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
+# check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded via temp dir tracking
 $null = New-Item -ItemType Directory -Path $script:WaveTmpDir
-Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Remove-Item -Recurse -Force $script:WaveTmpDir -ErrorAction SilentlyContinue } | Out-Null # check-suppress:suppression_doc: cleanup of temp dir in %TEMP%; failure is harmless on process exit
+Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Remove-Item -Recurse -Force $script:WaveTmpDir -ErrorAction SilentlyContinue } > $null
 
 # ---------------------------------------------------------------------------
 # 1. Nix test suite — POSIX only (stub on Windows)

@@ -29,6 +29,7 @@ function Invoke-AgentHostShellSetup {
 
   # Create wrapper directory under USERPROFILE
   $wrapperDir = Join-Path -Path $env:USERPROFILE -ChildPath ".local\bin"
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
   $null = New-Item -ItemType Directory -Path $wrapperDir -Force
 
   # Write batch wrapper that sets agent detection vars and launches PowerShell

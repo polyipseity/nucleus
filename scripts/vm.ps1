@@ -52,6 +52,7 @@ param(
 
 # Suppress false positive PSReviewUnusedParameter — $SubcommandArgs IS used below
 # (setup flag parsing, status/stop/reset actions).
+# check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; splatting variable, declared for parameter binding
 $null = $SubcommandArgs
 
 $ErrorActionPreference = 'Stop'
@@ -291,7 +292,7 @@ function Invoke-VmUpgrade {
   }
   . $module
 
-  Resolve-VMGuestCredential -RepoRoot $RepoRoot | Out-Null
+  Resolve-VMGuestCredential -RepoRoot $RepoRoot > $null
   Write-NucleusInfo "upgrading Android VM '$vmName' on Windows..."
   Write-NucleusWarning "Android upgrade on Windows is not yet fully implemented"
 }
@@ -310,7 +311,7 @@ function Invoke-VmReset {
   }
   . $module
 
-  Resolve-VMGuestCredential -RepoRoot $RepoRoot | Out-Null
+  Resolve-VMGuestCredential -RepoRoot $RepoRoot > $null
   Write-NucleusInfo "resetting Android VM '$vmName' on Windows..."
   Write-NucleusWarning "Android reset on Windows is not yet fully implemented"
 }

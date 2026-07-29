@@ -169,7 +169,7 @@ function Invoke-ScoopSetup {
 
   # Hold all managed packages at their locked versions (prevents accidental upgrades).
   foreach ($pkg in $desiredPackages) {
-    scoop hold $pkg 2>&1 | Out-Null
+    scoop hold $pkg 2>&1 > $null
   }
 
   if ($toInstall.Count -eq 0 -and $toRemove.Count -eq 0) {

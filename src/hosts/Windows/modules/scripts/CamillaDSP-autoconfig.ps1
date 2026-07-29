@@ -15,6 +15,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $stateFile = Join-Path -Path $HOME -ChildPath ".local\state\camilladsp\statefile.yml"
+# check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
 $null = New-Item -Path (Split-Path $stateFile -Parent) -ItemType Directory -Force
 
 # Start camilladsp with --no_config (WS server only, no device).
@@ -52,6 +53,7 @@ public static class JobObject {
 "@
 $job = [JobObject]::NewKillOnClose()
 if ($job -ne [IntPtr]::Zero) {
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — [void] intentional; AssignProcessToJobObject return value discarded, error handling is externally verified
   [void][JobObject]::AssignProcessToJobObject($job, $process.SafeHandle.DangerousGetHandle())
 }
 
@@ -73,6 +75,7 @@ for ($i = 0; $i -lt 30; $i++) {
     break
   } catch {
     # Port not ready or connection failed — retry.
+    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; $_ discarded in ForEach-Object, side-effect-only iteration
     $null = $_
   }
 }
@@ -119,6 +122,7 @@ $heartbeatTimer = [System.Threading.Timer]::new({
     $ws.CloseAsync([CloseStatus]::NormalClosure, "done", $ct).Wait()
   } catch {
     # Device may be gone — retry on next heartbeat.
+    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; $_ discarded in ForEach-Object, side-effect-only iteration
     $null = $_
   }
 }, ($ConfigFile, $Port, $nucleusCfgFile), 5000, 5000)

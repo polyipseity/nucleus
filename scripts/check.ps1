@@ -33,7 +33,7 @@
 # Policy/verification (15-20):
 #  15. YAML structural validation
 #  16. Package manager usage enforcement
-#  17. Undocumented error suppression check
+#  17. Suppression audit
 #  18. Online determinism checks (--verify mode only)
 #  19. Config method compliance
 #  20. Activation script token placeholder in comment check
@@ -64,7 +64,7 @@
 #     - Packer template validation            (step 3)
 #     - Schema validation                     (step 13)
 #     - YAML structural validation            (step 15)
-#     - Undocumented error suppression        (step 17)
+#     - Suppression audit (includes PSSA annotation audit)        (step 17)
 #     - Activation script token placeholder   (step 20)
 #
 # Note: Steps 4-5, 7-10 are stubs on Windows (Nix toolchain or bash not available).
@@ -199,10 +199,11 @@ if (-not $HAS_ARGS) {
 
 # Wave parallelism infrastructure
 $script:WaveTmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ([System.Guid]::NewGuid().ToString())
+# check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded via temp dir tracking
 $null = New-Item -ItemType Directory -Path $script:WaveTmpDir -Force
 Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action {
   if (Test-Path $script:WaveTmpDir) { Remove-Item -Recurse -Force $script:WaveTmpDir }
-} | Out-Null
+} > $null
 
 $script:parallelJobs = [Environment]::ProcessorCount
 $script:runspacePool = [System.Management.Automation.Runspaces.RunspaceFactory]::CreateRunspacePool(1, $script:parallelJobs)
@@ -216,6 +217,7 @@ function Add-RunspaceTask {
     )
     $ps = [System.Management.Automation.PowerShell]::Create()
     $ps.RunspacePool = $script:runspacePool
+    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; AddScript returns PowerShell, discarded after BeginInvoke
     $null = $ps.AddScript($ScriptBlock.ToString()).AddArguments($ArgumentList)
     $handle = $ps.BeginInvoke()
     $script:runspaceTasks.Add(@{PS = $ps; Handle = $handle})
@@ -1040,6 +1042,7 @@ $_yamlFileErrors = $_yamlFiles | ForEach-Object -Parallel -ThrottleLimit $using:
   # Validate
   try {
     $_content = Get-Content $_yf -Raw -ErrorAction Stop
+    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; YAML validation only, output discarded
     $null = $_content | ConvertFrom-Yaml -ErrorAction Stop
     return $null
   } catch {
@@ -1111,11 +1114,11 @@ $_violations = 0
 } -ArgumentList $_step, $RepoRoot, $script:WaveTmpDir, $_stepStartTicks
 
 # ---------------------------------------------------------------------------
-# 17. Undocumented error suppression check
+# 17. Suppression audit
 # ---------------------------------------------------------------------------
 $_stepStartTicks = [System.Diagnostics.Stopwatch]::GetTimestamp()
-Write-Output ("`n=== [{0}] Undocumented error suppression check ===" -f (++$_step))
-"Undocumented error suppression check" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
+Write-Output ("`n=== [{0}] Suppression audit ===" -f (++$_step))
+"Suppression audit" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$($_step).name") -NoNewline
 $null = Add-RunspaceTask -ScriptBlock {
   param($_step, $RepoRoot, $HAS_ARGS, $SH_FILES, $NIX_FILES, $PS1_FILES, $WaveTmpDir, $_stepStartTicks)
   Set-StrictMode -Version Latest
@@ -1138,7 +1141,7 @@ function Test-Suppressed {
 }
 
 function Get-UndocSuppViolation {
-  param([string]$_uPattern, [string]$_uLabel, [switch]$_uIsRegex, [string[]]$_uFiles)
+  param([string]$_uPattern, [string]$_uLabel, [switch]$_uIsRegex, [string[]]$_uFiles, [string]$CheckId = 'suppression_doc', [string[]]$ExemptLinePatterns = @(), [switch]$NoSuppressionCheck)
   $_uResult = @()
   if ($_uFiles.Count -eq 0) { return $_uResult }
   try {
@@ -1148,14 +1151,24 @@ function Get-UndocSuppViolation {
     foreach ($_um in $_uMatches) {
       # Skip comment-only lines (PowerShell #, bash #, Nix #)
       if ($_um.Line -match '^\s*#') { continue }
-      # Skip lines with inline # undoc-supp: comment (deprecated format)
-      if ($_um.Line -match '# undoc-supp:') { continue }
-      # Skip lines with # check-suppress:suppression_doc: inline (new format)
-      if (Test-Suppressed -CheckId 'suppression_doc' -Path $_um.Path -LineNumber $_um.LineNumber) { continue }
-      # Skip if preceding line has suppression comment (old or new format)
-      if ($_um.LineNumber -gt 1) {
+      # Skip lines matching exempt patterns
+      $_uSkip = $false
+      foreach ($_uExempt in $ExemptLinePatterns) {
+        if ($_um.Line -match $_uExempt) { $_uSkip = $true; break }
+      }
+      if ($_uSkip) { continue }
+      # Skip lines with inline # undoc-supp: comment (deprecated format, suppression_doc only)
+      if ($CheckId -eq 'suppression_doc' -and $_um.Line -match '# undoc-supp:') { continue }
+      # Skip lines with check-suppress:CheckId inline
+      if (-not $NoSuppressionCheck) {
+        if (Test-Suppressed -CheckId $CheckId -Path $_um.Path -LineNumber $_um.LineNumber) { continue }
+      }
+      # Skip if preceding line has suppression comment
+      if ($_um.LineNumber -gt 1 -and -not $NoSuppressionCheck) {
         $_uPrevLine = Get-Content -Path $_um.Path | Select-Object -Index ($_um.LineNumber - 2)
-        if ($_uPrevLine -match '# undoc-supp:|# check-suppress:suppression_doc[\s:]') { continue }
+        $_uPrevPattern = "# check-suppress:$CheckId"
+        if ($CheckId -eq 'suppression_doc') { $_uPrevPattern += '|# undoc-supp:' }
+        if ($_uPrevLine -match $_uPrevPattern) { continue }
       }
       $_uResult += "$($_um.Path):$($_um.LineNumber) ($_uLabel)"
     }
@@ -1193,15 +1206,32 @@ if ($HAS_ARGS) {
   $_undocSuppViolations += Get-UndocSuppViolation -Pattern 'catch\s*\{\s*\}' -Label 'empty catch {}' -IsRegex -Files $_uAllPs1
 }
 
+# | Out-Null ban (HARD FAIL -- no annotation can suppress)
+if ($HAS_ARGS) {
+  $_uOutNullPs1 = $PS1_FILES
+} else {
+  $_uOutNullPs1 = $_uAllPs1
+}
+$_undocSuppViolations += Get-UndocSuppViolation -Pattern '\| Out-Null' -Label '| Out-Null' -IsRegex -Files $_uOutNullPs1 -NoSuppressionCheck
+
+# $null = undocumented suppression check
+$_undocSuppViolations += Get-UndocSuppViolation -Pattern '\$null\s*=\s*\S' -Label '$null =' -IsRegex -Files $_uOutNullPs1 -CheckId 'SuppressMessageAttribute' -ExemptLinePatterns @('Add-RunspaceTask -ScriptBlock \{', '\$null = \$_step')
+
+# [void] undocumented check
+$_undocSuppViolations += Get-UndocSuppViolation -Pattern '\[void\]' -Label '[void]' -IsRegex -Files $_uOutNullPs1 -CheckId 'SuppressMessageAttribute'
+
+# [SuppressMessageAttribute] auditing check
+$_undocSuppViolations += Get-UndocSuppViolation -Pattern 'SuppressMessageAttribute\(' -Label 'SuppressMessageAttribute' -IsRegex -Files $_uOutNullPs1 -CheckId 'SuppressMessageAttribute'
+
 if ($_undocSuppViolations.Count -gt 0) {
   foreach ($_uv in ($_undocSuppViolations | Sort-Object -Unique)) {
     error $_uv
   }
-  error ("undocumented error suppression check failed with {0} violation(s)" -f $_undocSuppViolations.Count)
-  say "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
+  error ("suppression audit failed with {0} violation(s)" -f $_undocSuppViolations.Count)
+  say "  add '# check-suppress:check_id: reason' comment to explain intentional suppressions."
   1 | Out-File -FilePath (Join-Path $WaveTmpDir "step-17.exit") -NoNewline
 } else {
-  say "no undocumented error suppressions found."
+  say "no suppression audit violations found."
 }
 $_elapsedTicks = [System.Diagnostics.Stopwatch]::GetTimestamp() - $_stepStartTicks
 $_elapsedMs = [Math]::Round($_elapsedTicks * 1000.0 / [System.Diagnostics.Stopwatch]::Frequency)
@@ -1358,6 +1388,7 @@ $_elapsedMs | Out-File -FilePath (Join-Path $WaveTmpDir "step-20.time") -NoNewli
 # Wait for all runspace tasks to complete
 if ($script:runspaceTasks.Count -gt 0) {
   foreach ($_task in $script:runspaceTasks) {
+    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; EndInvoke return value discarded, errors propagated via task status
     $null = $_task.PS.EndInvoke($_task.Handle)
     $_task.PS.Dispose()
   }

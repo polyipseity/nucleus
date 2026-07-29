@@ -559,6 +559,7 @@ $nucleusConfigCommands = @('get', 'set', 'list')
 
 Register-ArgumentCompleter -CommandName nucleus-svc -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; parameter metadata variables, declared for introspection
   $null = $commandName, $parameterName, $fakeBoundParameters
   $nucleusSvcCommands | Where-Object { $_ -like "$wordToComplete*" }
   if ($commandAst.CommandElements.Count -ge 2) {
@@ -580,6 +581,7 @@ Register-ArgumentCompleter -CommandName nucleus-svc -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-config -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; parameter metadata variables, declared for introspection
   $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   $nucleusConfigCommands | Where-Object { $_ -like "$wordToComplete*" }
   @('--help') | Where-Object { $_ -like "$wordToComplete*" }
@@ -587,6 +589,7 @@ Register-ArgumentCompleter -CommandName nucleus-config -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-gc -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; parameter metadata variables, declared for introspection
   $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @(
     '--help', '--dry-run', '--no-dry-run',

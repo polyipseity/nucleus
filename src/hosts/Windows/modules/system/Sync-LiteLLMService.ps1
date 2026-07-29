@@ -95,6 +95,7 @@ function Sync-LiteLLMService {
   $logDir = Get-NucleusSystemLogDir
   $serviceLogDir = Join-Path -Path $logDir -ChildPath "litellm"
   $secretsDir = Join-Path -Path $env:ProgramData -ChildPath "nucleus\secrets"
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
   $null = New-Item -Path $secretsDir -ItemType Directory -Force
 
   . (Join-Path -Path $PSScriptRoot -ChildPath "..\Set-ManagedSymlinkDeleteProtection.ps1")
@@ -107,7 +108,7 @@ function Sync-LiteLLMService {
     throw "litellm config source not found: $configSource"
   }
   if (Test-Path -Path $configLink) { Remove-Item -Path $configLink -Force }
-  New-Item -Path $configLink -ItemType SymbolicLink -Target $configSource -Force | Out-Null
+  New-Item -Path $configLink -ItemType SymbolicLink -Target $configSource -Force > $null
   Set-ManagedSymlinkDeleteProtection -Context "Sync-LiteLLMService" -Path $configLink
 
   $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"

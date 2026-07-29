@@ -194,7 +194,7 @@ function Sync-PicardConfig {
 
     $parentDir = Split-Path -Path $Path -Parent
     if (-not (Test-Path -LiteralPath $parentDir -PathType Container)) {
-      New-Item -ItemType Directory -Path $parentDir -Force | Out-Null
+      New-Item -ItemType Directory -Path $parentDir -Force > $null
     }
 
     $utf8NoBom = New-Object System.Text.UTF8Encoding($false)

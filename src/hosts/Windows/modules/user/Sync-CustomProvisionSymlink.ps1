@@ -135,7 +135,7 @@ function Sync-CustomProvisionSymlink {
       continue
     }
 
-    New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $manifestDir -Force > $null
 
     $configuredEntries = @($userRecord.customProvisionSymlinks | Where-Object { $_ })
     $desiredEntries = @()
@@ -168,7 +168,7 @@ function Sync-CustomProvisionSymlink {
     foreach ($entry in $desiredEntries) {
       $linkParent = Split-Path -Path $entry.LinkPath -Parent
       if (-not [string]::IsNullOrWhiteSpace($linkParent)) {
-        New-Item -ItemType Directory -Path $linkParent -Force | Out-Null
+        New-Item -ItemType Directory -Path $linkParent -Force > $null
       }
 
       if (Test-Path -LiteralPath $entry.LinkPath) {
@@ -197,7 +197,7 @@ function Sync-CustomProvisionSymlink {
       }
 
       try {
-        New-Item -ItemType SymbolicLink -Path $entry.LinkPath -Target $entry.TargetPath -Force -ErrorAction Stop | Out-Null
+        New-Item -ItemType SymbolicLink -Path $entry.LinkPath -Target $entry.TargetPath -Force -ErrorAction Stop > $null
         Set-ManagedSymlinkDeleteProtection -Context "Sync-CustomProvisionSymlink" -Path $entry.LinkPath
       }
       catch {

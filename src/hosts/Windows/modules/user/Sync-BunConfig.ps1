@@ -51,13 +51,13 @@ function Sync-BunConfig {
 
   $destDir = Split-Path $destPath -Parent
   if ($destDir -and -not (Test-Path -Path $destDir -PathType Container)) {
-    New-Item -Path $destDir -ItemType Directory -Force | Out-Null
+    New-Item -Path $destDir -ItemType Directory -Force > $null
   }
 
   # Method 1 (writable symlink): remove existing file/symlink and replace with symlink.
   if (Test-Path -Path $destPath) {
     Remove-Item -Path $destPath -Force
   }
-  New-Item -Path $destPath -ItemType SymbolicLink -Target $sourcePath -Force | Out-Null
+  New-Item -Path $destPath -ItemType SymbolicLink -Target $sourcePath -Force > $null
   Write-Output "$($PSStyle.Foreground.Cyan)Sync-BunConfig: symlinked $destPath$($PSStyle.Reset)"
 }

@@ -140,6 +140,7 @@ function Invoke-RustupSetup {
   $cargoConfigDir = "$env:USERPROFILE\.cargo"
   $cargoConfigPath = "$cargoConfigDir\config.toml"
   if (-not (Test-Path -Path $cargoConfigDir)) {
+    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
     $null = New-Item -ItemType Directory -Path $cargoConfigDir -Force
   }
   $cargoSourcePath = Join-Path $repoRoot $cargoConfigRelPath
@@ -150,6 +151,6 @@ function Invoke-RustupSetup {
   if (Test-Path -Path $cargoConfigPath) {
     Remove-Item -Path $cargoConfigPath -Force
   }
-  New-Item -Path $cargoConfigPath -ItemType SymbolicLink -Target $cargoSourcePath -Force | Out-Null
+  New-Item -Path $cargoConfigPath -ItemType SymbolicLink -Target $cargoSourcePath -Force > $null
   Write-Output "cargo-config: symlinked $cargoConfigPath"
 }

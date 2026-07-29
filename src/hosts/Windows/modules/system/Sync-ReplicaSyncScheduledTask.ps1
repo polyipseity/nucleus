@@ -88,7 +88,7 @@ function Sync-ReplicaSyncScheduledTask {
     -Trigger $trigger `
     -Principal $principal `
     -Settings $settings `
-    -Force | Out-Null
+    -Force > $null
 
   Write-Output "replica-sync: ensured scheduled task '$taskName' (daily 12:00)"
 }

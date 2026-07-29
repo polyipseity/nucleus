@@ -37,7 +37,7 @@ function Test-ArchivingStack {
   }
   else {
     try {
-      & $sevenZipExe.Source --help | Out-Null
+      & $sevenZipExe.Source --help > $null
     }
     catch {
       Write-Error "archiving-stack: warning — 7z.exe exists but --help failed: $_" -ErrorAction Continue

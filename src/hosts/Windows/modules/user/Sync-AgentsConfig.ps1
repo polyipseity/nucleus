@@ -126,7 +126,7 @@ function Sync-AgentsConfig {
 
   # Ensure ~/.agents\ exists as a real (writable) directory.
   if (-not (Test-Path -LiteralPath $agentsDir -PathType Container)) {
-    New-Item -ItemType Directory -Path $agentsDir | Out-Null
+    New-Item -ItemType Directory -Path $agentsDir > $null
     Write-Output "agents-config: Sync-AgentsConfig: created $agentsDir"
   }
 
@@ -173,7 +173,7 @@ function Sync-AgentsConfig {
         return
       }
     }
-    New-Item -ItemType SymbolicLink -Path $linkPath -Target $entry.FullName | Out-Null
+    New-Item -ItemType SymbolicLink -Path $linkPath -Target $entry.FullName > $null
     Set-ManagedSymlinkDeleteProtection -Context "agents-config" -Path $linkPath
     Write-Output "agents-config: Sync-AgentsConfig: linked $linkPath -> $($entry.FullName)"
   }

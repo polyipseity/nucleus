@@ -59,7 +59,7 @@ function Invoke-CamillaGUISetup {
     if (Test-Path $tempDir) {
       Remove-Item -Recurse -Force $tempDir
     }
-    New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
+    New-Item -ItemType Directory -Force -Path $tempDir > $null
 
     Write-Output "camillagui-backend-setup: downloading v${desiredVersion} from GitHub releases"
     # check-suppress:suppression_doc: probe — download may fail; Test-Path check handles failure downstream.
@@ -72,7 +72,7 @@ function Invoke-CamillaGUISetup {
     Write-Output "camillagui-backend-setup: extracting to $installDir"
     # Ensure parent directory exists.
     $parentDir = Split-Path $installDir -Parent
-    New-Item -ItemType Directory -Force -Path $parentDir | Out-Null
+    New-Item -ItemType Directory -Force -Path $parentDir > $null
 
     # Extract the full camillagui_backend directory from the zip.
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -89,7 +89,7 @@ function Invoke-CamillaGUISetup {
         $targetPath = Join-Path $installDir $relativePath
         $targetDir = Split-Path $targetPath -Parent
         if (-not (Test-Path $targetDir)) {
-          New-Item -ItemType Directory -Force -Path $targetDir | Out-Null
+          New-Item -ItemType Directory -Force -Path $targetDir > $null
         }
         [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $targetPath, $true)
       }
@@ -111,10 +111,11 @@ function Invoke-CamillaGUISetup {
     $configPath = Join-Path -Path $configDir -ChildPath "config.yml"
     $configSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\camillagui-backend\config-windows.yml"  # Method 1 (writable symlink)
     if (-not (Test-Path $configDir)) {
+      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
       $null = New-Item -ItemType Directory -Path $configDir -Force
     }
     if (Test-Path $configPath) { Remove-Item -Path $configPath -Force }
-    New-Item -Path $configPath -ItemType SymbolicLink -Target $configSource -Force | Out-Null
+    New-Item -Path $configPath -ItemType SymbolicLink -Target $configSource -Force > $null
     Write-Output "camillagui-backend-setup: symlinked config to $configPath"
   } finally {
     # Clean up temp directory.

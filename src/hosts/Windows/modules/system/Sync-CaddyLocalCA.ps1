@@ -82,7 +82,7 @@ function Sync-CaddyLocalCA {
 
   for ($attempt = 1; $attempt -le 20; $attempt++) {
     try {
-      & $caddyCommand.Source trust --address $adminAddr | Out-Null
+      & $caddyCommand.Source trust --address $adminAddr > $null
       Write-Output 'caddy-trust: local CA trusted successfully.'
       return
     }

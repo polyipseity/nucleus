@@ -137,8 +137,9 @@ function Invoke-SourceBuild {
     $repoCacheDir = Join-Path $cacheRoot $pkgId
     if (-not (Test-Path $repoCacheDir)) {
       Write-Output "Invoke-SourceBuild: cloning $pkgId from $sourceUrl"
+      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
       $null = New-Item -ItemType Directory -Path $repoCacheDir -Force -ErrorAction Stop
-      & git clone $sourceUrl $repoCacheDir 2>&1 | Out-Null
+      & git clone $sourceUrl $repoCacheDir 2>&1 > $null
       if ($LASTEXITCODE -ne 0) {
         Write-Error "Invoke-SourceBuild: git clone failed for '$pkgId'"
         continue
@@ -149,8 +150,8 @@ function Invoke-SourceBuild {
     Push-Location $repoCacheDir
     try {
       # Fetch the specific revision (works for both tags and commits).
-      & git fetch origin '+refs/*:refs/*' 2>&1 | Out-Null
-      & git checkout $rev 2>&1 | Out-Null
+      & git fetch origin '+refs/*:refs/*' 2>&1 > $null
+      & git checkout $rev 2>&1 > $null
       if ($LASTEXITCODE -ne 0) {
         Write-Error "Invoke-SourceBuild: git checkout $rev failed for '$pkgId'"
         continue
@@ -187,6 +188,7 @@ function Invoke-SourceBuild {
       continue
     }
 
+    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
     $null = New-Item -ItemType Directory -Path $installDir -Force -ErrorAction Stop
     Copy-Item $builtBinary $installDir -Force -ErrorAction Stop
     Set-Content -Path $markerPath -Value $rev -Force -ErrorAction Stop

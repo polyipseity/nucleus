@@ -8,13 +8,44 @@ applyTo: "**/*.ps1, scripts/PSScriptAnalyzerSettings.*.psd1"
 
 ## Suppression rules
 
-- **Prefer rewriting over suppressing.** Before adding a `[Diagnostics.CodeAnalysis.SuppressMessageAttribute]`, first attempt to restructure the code to satisfy the rule: use a local variable instead of `$using:VAR.Count`, wrap provider-path calls in a helper function, etc. Suppression is the last resort, not the first reflex.
+1. **Prefer redirecting over suppressing.** Use `> $null` to discard output — it is the fastest and cleanest method and is NOT considered a suppression (no annotation required). Reach for redirect first before any suppression technique.
+2. **Prefer `$null =` or `[void]` over `[SuppressMessageAttribute]` attribute.** When redirect cannot work (e.g., the value is not pipeline output), use `$null = <expr>` or (for method calls) `[void]<expr>`. These ARE considered suppressions and require `# check-suppress:SuppressMessageAttribute:` annotation.
+3. **`| Out-Null` is banned.** It is substantially slower than alternatives due to pipeline overhead. Replace all instances with `> $null` (preferred) or `$null =` with annotation.
+4. **Avoid `[SuppressMessageAttribute('RuleId', '')]` attribute.** It is too coarse — applies to the entire scope (function/file). Prefer `$null =` or `[void]` with `# check-suppress:SuppressMessageAttribute:` annotation. Only use the attribute when there is literally no code path to annotate (e.g., a parameter that appears unused at file scope). When unavoidable, must minimize rules covered (list specific rule IDs, no wildcards) and scope covered (target the narrowest possible function or script block, never file-wide).
+5. **Every suppression needs an annotation.** `$null =`, `[void]`, and `[SuppressMessageAttribute]` attribute must have a `# check-suppress:SuppressMessageAttribute: <RuleId> — <reason>` comment on the same line or preceding line. File-level suppressions of any kind are prohibited.
+6. **No catch-all suppressions.** Suppress specific rule IDs. No wildcards or blanket suppressions.
 
-- **Every `[Diagnostics.CodeAnalysis.SuppressMessageAttribute]` must have an inline `# reason:` comment** on the same line, documenting why the suppression is necessary, what constraint prevents the code from being rewritten to avoid the warning, and (if applicable) why the trigger is a false positive. Format: `[Diagnostics.CodeAnalysis.SuppressMessageAttribute('RuleId', '')] # reason: <justification>`.
+## Redirect alternative (`> $null`)
 
-- **File-level suppressions are prohibited.** Every suppression must be scoped to the narrowest possible range: a single function or expression. Placing a suppression attribute at the top of a file before any code is forbidden — no exceptions.
+`> $null` is the preferred way to discard output. It is NOT a suppression and needs no annotation.
 
-- **No catch-all suppressions.** Suppress specific rule IDs only. Do not use wildcards or blanket suppressions that disable rules entirely across a file.
+- **Performance:** `> $null` and `$null =` are fastest, `[void]` slightly slower, `| Out-Null` is much slower (pipeline overhead).
+- **Syntax:** `Get-ChildItem > $null` (redirects stdout to null). Use `2>$null` for stderr-only suppression (see B-class section below).
+- **Multi-stream:** `*> $null` redirects all streams to null.
+- **`2>$null`** stays documented under B-class error suppression with `# check-suppress:suppression_doc:` annotation.
+
+## `$null = <expr>` suppression
+
+- **Trigger:** Assigning command output to `$null` to suppress it, e.g. `$null = New-Item -Path $dir -ItemType Directory -Force`.
+- **When acceptable:** When the output must be discarded but `> $null` redirect cannot work (e.g., the value is not pipeline output, or the expression is a .NET method call with a return value).
+- **Annotation format:** `$null = New-Item ...  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional suppression`
+- **PSSA rules commonly triggered:** `PSUseDeclaredVarsMoreThanAssignments`, `PSPossibleIncorrectComparisonWithNull`
+
+## `[void]<expr>` suppression
+
+- **Trigger:** Casting an expression to `[void]` to suppress its return value, e.g. `[void]$object.SomeMethod()`.
+- **When acceptable:** When the expression is a method call returning a value that must be suppressed.
+- **Annotation format:** `[void]$object.SomeMethod()  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — reason`
+- **Note:** `[void]` is slightly slower than `$null =` and `> $null`. Prefer `$null =` when both work.
+
+## `| Out-Null` — banned
+
+`| Out-Null` is BANNED. Do not use it in new code. Replace all existing instances.
+
+- **Replacement patterns:**
+  - `Command-WithOutput | Out-Null` → `Command-WithOutput > $null`
+  - `$null = Command-WithOutput  # check-suppress:SuppressMessageAttribute: RuleId — reason` (when redirect cannot work)
+- **Exception:** None. Every `| Out-Null` must be replaced.
 
 ## Rule-specific fix strategies
 
@@ -67,6 +98,9 @@ because no alias definition produces a `FunctionDefinitionAst`.
 |---------|---------|-------------|
 | `PSUseUsingScopeModifierInNewRunspaces` | `$using:VAR.Count` member access | Assign `$using:` var to local, use `.Count` on local |
 | `PSUseApprovedVerbs` | Function aliases via `New-Item -Path Function:` | Wrap in `Add-ShellAlias` helper |
+| `PSUseDeclaredVarsMoreThanAssignments` | `$null = <cmd>` or `[void]<expr>` | `> $null` redirect preferred, else annotate with `# check-suppress:SuppressMessageAttribute:` |
+| `PSPossibleIncorrectComparisonWithNull` | `$null = <cmd>` | `> $null` redirect preferred, else annotate with `# check-suppress:SuppressMessageAttribute:` |
+| `PSReviewUnusedParameter` / `PSAvoidUsingUnusedParameters` | Parameter not used in function body | Reassess parameter necessity; annotate `$null =` with `# check-suppress:SuppressMessageAttribute:` |
 
 ## Adding a new rule policy
 
@@ -80,3 +114,25 @@ To document a new PSScriptAnalyzer rule policy:
    - **Upstream:** link to any related PSSA issue/PR if relevant.
 2. Add a row to the reference table above.
 3. Verify the fix strategy works by testing against actual repo code.
+
+## Annotation reference
+
+Two coexisting annotation formats, both under the `# check-suppress:` prefix:
+
+| Format | Class | Used for |
+|--------|-------|----------|
+| `# check-suppress:SuppressMessageAttribute: <RuleId> — <reason>` | A/C | `$null =`, `[void]`, `[SuppressMessageAttribute]` attribute, and any comment-only suppression of PSSA rules |
+| `# check-suppress:suppression_doc: <reason>` | B | `2>$null`, `-ErrorAction SilentlyContinue`, empty `catch {}`, `|| true` |
+
+Both are grep-able: `grep 'check-suppress:' **/*.ps1`
+
+## B-class error suppression (stable)
+
+The following patterns use `# check-suppress:suppression_doc:` format and are NOT changing:
+
+- `2>$null` — stderr-only suppression
+- `-ErrorAction SilentlyContinue` — suppressing non-terminating errors
+- Empty `catch {}` — suppressing terminating errors
+- `|| true` — shell-level error suppression
+
+These are enforced by `check.ps1` step 17 and require a `# check-suppress:suppression_doc: <reason>` annotation.

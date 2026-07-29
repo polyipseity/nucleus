@@ -52,7 +52,7 @@ function Deploy-WritableSymlink {
 
   $targetDir = Split-Path $TargetPath -Parent
   if (-not (Test-Path -Path $targetDir -PathType Container)) {
-    New-Item -Path $targetDir -ItemType Directory -Force | Out-Null
+    New-Item -Path $targetDir -ItemType Directory -Force > $null
   }
 
   # Remove existing item at target (file, dir, or broken symlink).
@@ -60,7 +60,7 @@ function Deploy-WritableSymlink {
     Remove-Item -Path $TargetPath -Force
   }
 
-  New-Item -Path $TargetPath -ItemType SymbolicLink -Target $sourcePath -Force | Out-Null
+  New-Item -Path $TargetPath -ItemType SymbolicLink -Target $sourcePath -Force > $null
 
   return @{
     Changed = $true
@@ -109,7 +109,7 @@ function Deploy-ReadOnly {
 
   $targetDir = Split-Path $TargetPath -Parent
   if (-not (Test-Path -Path $targetDir -PathType Container)) {
-    New-Item -Path $targetDir -ItemType Directory -Force | Out-Null
+    New-Item -Path $targetDir -ItemType Directory -Force > $null
   }
 
   if ($SkipIfIdentical -and (Test-Path -Path $TargetPath -PathType Leaf)) {
@@ -162,7 +162,7 @@ function Deploy-Merge {
 
   $targetDir = Split-Path $TargetPath -Parent
   if (-not (Test-Path -Path $targetDir -PathType Container)) {
-    New-Item -Path $targetDir -ItemType Directory -Force | Out-Null
+    New-Item -Path $targetDir -ItemType Directory -Force > $null
   }
 
   if ($MergeMode -eq "json") {

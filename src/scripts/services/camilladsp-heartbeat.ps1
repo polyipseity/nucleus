@@ -60,6 +60,7 @@ while ($true) {
     }
   } catch {
     # Can't connect — will retry with backoff.
+    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; $_ discarded in ForEach-Object, side-effect-only iteration
     $null = $_
   }
 
@@ -76,6 +77,7 @@ while ($true) {
         $success = $true
       } catch {
         # Device may be gone — retry with backoff.
+        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; $_ discarded in ForEach-Object, side-effect-only iteration
         $null = $_
       }
     }

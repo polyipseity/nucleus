@@ -263,6 +263,7 @@ function Sync-JellyfinAccount {
       Password = $bootstrap.password
     }
     if ($startupUser.StatusCode -eq 204) {
+      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — [void] intentional; startup-complete API is fire-and-forget, response discarded
       [void](Invoke-JellyfinApi -Method POST -Path '/Startup/Complete')
     }
 

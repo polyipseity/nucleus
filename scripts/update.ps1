@@ -52,7 +52,7 @@ if ($Help) {
 }
 
 # macOS-only parameter; accepted for interface compatibility.
-$NoBrew | Out-Null
+$NoBrew > $null
 
 $repoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path }
 

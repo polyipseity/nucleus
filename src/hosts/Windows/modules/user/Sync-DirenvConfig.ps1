@@ -52,7 +52,7 @@ function Sync-DirenvConfig {
 
   $destDir = Split-Path -Path $destPath -Parent
   if (-not (Test-Path -Path $destDir -PathType Container)) {
-    New-Item -Path $destDir -ItemType Directory -Force | Out-Null
+    New-Item -Path $destDir -ItemType Directory -Force > $null
   }
 
   Deploy-WritableSymlink -SourcePath $sourcePath -DestinationPath $destPath
