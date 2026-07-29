@@ -14,10 +14,10 @@ assert containsRegex
 
 # check.ps1 — verify step ordering via step names with === suffix from Write-Output calls
 assert containsRegex
-  "Code formatting [(]treefmt[)] ===.*PowerShell lint ===.*Packer template validation ===.*Nix flake evaluation ===.*Nix lint [(]nixf-tidy[)] ===.*Stale Nix build artifact check ===.*Shell script validation tests ===.*CWD-independence tests ===.*Nix search path tests ===.*Port utility function tests ===.*Lockfile validation ===.*Locked DSC validation ===.*Schema validation [(]JSON/YAML[)] ===.*Service registry validation ===.*YAML structural validation ===.*Package manager usage enforcement ===.*Undocumented error suppression check ===.*Online determinism checks [(]--verify[)] ===.*Config method compliance ===.*Activation script token placeholder in comment check ==="
+  "Code formatting and linting [(]treefmt equivalent[)] ===.*PowerShell lint ===.*Packer template validation ===.*Nix flake evaluation ===.*Nix lint [(]nixf-tidy[)] ===.*Stale Nix build artifact check ===.*Shell script validation tests ===.*CWD-independence tests ===.*Nix search path tests ===.*Port utility function tests ===.*Lockfile validation ===.*Locked DSC validation ===.*Schema validation [(]JSON/YAML[)] ===.*Service registry validation ===.*YAML structural validation ===.*Package manager usage enforcement ===.*Undocumented error suppression check ===.*Online determinism checks [(]--verify[)] ===.*Config method compliance ===.*Activation script token placeholder in comment check ==="
   checkPs1Text;
 
 {
   success = true;
-  message = "check.sh and check.ps1 step ordering validated: all 20 steps in correct order in both files";
+  message = "check.sh and check.ps1 step ordering validated: all 20 steps in correct order in both files. check.ps1 step 1 uses 'Code formatting and linting (treefmt equivalent)' to indicate cross-platform correspondence with check.sh step 1 'Code formatting (treefmt)'.";
 }

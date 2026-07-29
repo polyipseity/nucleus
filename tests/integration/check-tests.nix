@@ -24,7 +24,7 @@ assert containsRegex "lockfile\\.json not found — skipping section validation"
 assert containsRegex "lockfile\\.json could not be loaded — skipping section validation"
   checkPs1Text;
 
-# Pre-flight tool availability block
+# Pre-flight tool availability block (check.sh)
 assert containsRegex "Pre-flight tool availability checks" checkShText;
 assert containsRegex "require_command pwsh" checkShText;
 assert containsRegex "require_command treefmt" checkShText;
@@ -32,6 +32,12 @@ assert containsRegex "require_command yq" checkShText;
 assert containsRegex "require_command jq" checkShText;
 assert containsRegex "require_command nix" checkShText;
 assert containsRegex "require_command packer" checkShText;
+
+# Pre-flight tool availability block (check.ps1)
+assert containsRegex "Ensure-Tool -Name 'yamllint'" checkPs1Text;
+
+# Step name correspondence anchor (check.ps1 step 1)
+assert containsRegex "treefmt equivalent" checkPs1Text;
 
 # ensure_tool function in lib.sh
 assert containsRegex "ensure_tool" libShText;
@@ -53,5 +59,5 @@ assert containsRegex "Policy/verification [(][0-9]+-[0-9]+[)]:" checkPs1Text;
 
 {
   success = true;
-  message = "Check.sh content assertions passed (overlap, ERROR promotion, missing-lockfile guard, pre-flight, ensure_tool, group headers)";
+  message = "Check.sh and check.ps1 content assertions passed (overlap, ERROR promotion, missing-lockfile guard, pre-flight, ensure_tool, group headers, yamllint)";
 }
