@@ -49,9 +49,9 @@ assert containsRegex "rm.*hooks.*\\.sample" gcShText;
 assert containsRegex "rm.*description" gcShText;
 assert containsRegex "find.*dev_root.*-name.*\\.git" gcShText;
 
-# --- scripts/gc.ps1: -NoGitTemplateGc switch and Clear-GitTemplateFiles ---
+# --- scripts/gc.ps1: -NoGitTemplateGc switch and Clear-GitTemplateBatch ---
 assert containsRegex "NoGitTemplateGc" gcPs1Text;
-assert containsRegex "Clear-GitTemplateFile" gcPs1Text;
+assert containsRegex "Clear-GitTemplateBatch" gcPs1Text;
 assert containsRegex "NUCLEUS_GC_NO_GIT_TEMPLATE_GC" gcPs1Text;
 assert containsRegex "\\.sample" gcPs1Text;
 assert containsRegex "Git template boilerplate" gcPs1Text;
