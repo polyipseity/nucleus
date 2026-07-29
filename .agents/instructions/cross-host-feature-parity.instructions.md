@@ -190,7 +190,7 @@ All hosts use the OS-native SSH agent and server, with no custom service definit
 
 ## Secrets and wallpaper parity
 
-- POSIX secrets: `src/modules/secrets.nix`; Windows: `src/hosts/Windows/modules/sync-secret.ps1` wired by `apply.ps1`.
+- POSIX secrets: `src/modules/secrets.nix`; Windows: `src/hosts/Windows/modules/secrets/Sync-SecretCatalog.ps1` wired by `apply.ps1`.
 - POSIX wallpapers: `src/modules/wallpapers.nix`; Windows: `src/hosts/Windows/modules/sync-wallpaper.ps1` + `user.dsc.yml`.
 - Stale cleanup rules must be preserved on every host implementation.
 
