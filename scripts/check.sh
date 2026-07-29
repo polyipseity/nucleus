@@ -476,12 +476,25 @@ section "$((_step += 1))" "Shell script validation tests" > "$_wave_tmpdir/step-
 echo "Shell script validation tests" > "$_wave_tmpdir/step-$_step.name"
 {
 _svt_exit=0
+_svt_tmpdir=$(mktemp -d) || { error "failed to create temp dir"; _svt_exit=$((_svt_exit + 1)); }
+{
 echo "--- test output ---"
-bash tests/scripts/script-validation-tests.sh || _svt_exit=$?
+bash tests/scripts/script-validation-tests.sh
+echo $? > "$_svt_tmpdir/svt.exit"
 echo "--- end test output ---"
+} &
+{
 echo "--- test output ---"
-bash tests/scripts/check-output-format-tests.sh || _svt_exit=$?
+bash tests/scripts/check-output-format-tests.sh
+echo $? > "$_svt_tmpdir/cot.exit"
 echo "--- end test output ---"
+} &
+wait
+_ssvt_rc=$(cat "$_svt_tmpdir/svt.exit" 2>/dev/null || echo 1)
+_cot_rc=$(cat "$_svt_tmpdir/cot.exit" 2>/dev/null || echo 1)
+[ "$_ssvt_rc" -ne 0 ] && _svt_exit=1
+[ "$_cot_rc" -ne 0 ] && _svt_exit=1
+rm -rf -- "$_svt_tmpdir"
 echo "$_svt_exit" > "$_wave_tmpdir/step-7.exit"
 _elapsed=$(($(date +%s%3N) - _step_start))
 echo "$_elapsed" > "$_wave_tmpdir/step-$_step.time"
