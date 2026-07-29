@@ -42,6 +42,11 @@ done
 require_command packer
 require_command jq
 
+# Share plugin cache across Packer invocations to avoid re-downloading plugins.
+# This is the recommended pattern per Packer docs:
+# https://developer.hashicorp.com/packer/docs/plugins#plugin-cache
+export PACKER_PLUGIN_CACHE_DIR="${PACKER_PLUGIN_CACHE_DIR:-$HOME/.cache/packer/plugins}"
+
 # Determine system architecture for reading the NixOS ISO checksum from lockfile.
 # Lockfile uses nixpkgo-style arch names: x86_64-linux, aarch64-linux.
 _arch="$(uname -m)"
