@@ -29,7 +29,7 @@ $ManifestFile = Join-Path $RepoRoot "result\env-parity-manifest.json"
 # ---- Helpers ----
 
 # Parse DSC YAML and return all Environment resource names.
-function Get-DscEnvVarName {
+function Get-DscEnvVarNameList {
   param ([string]$DscPath)
   if (-not (Test-Path $DscPath)) {
     throw "DSC file not found: $DscPath"
@@ -67,7 +67,7 @@ function Get-NixCatalogManifest {
 }
 
 # Extract profile-only vars (CC, CXX, LD) from Sync-ShellProfile.ps1.
-function Get-ProfileEnvVarName {
+function Get-ProfileEnvVarNameList {
   $profilePath = Join-Path $RepoRoot "src\hosts\Windows\modules\user\Sync-ShellProfile.ps1"
   $content = Get-Content -Raw -Path $profilePath
   $names = @()
@@ -101,7 +101,7 @@ Describe "Windows env var parity with Nix catalog" {
     }
 
     It "every user-specific catalog var has a User-scope DSC entry" {
-      $dscVars = Get-DscEnvVarName -DscPath $UserDscFile
+      $dscVars = Get-DscEnvVarNameList -DscPath $UserDscFile
       $userSpecificVars = @($script:Manifest | Where-Object { $_.userSpecific -and $_.hasWindowsEntry } | ForEach-Object { $_.name })
 
       $missing = $userSpecificVars | Where-Object { $_ -notin $dscVars }
@@ -112,7 +112,7 @@ Describe "Windows env var parity with Nix catalog" {
     }
 
     It "every User-scope DSC Env resource has a Nix catalog counterpart" {
-      $dscVars = Get-DscEnvVarName -DscPath $UserDscFile
+      $dscVars = Get-DscEnvVarNameList -DscPath $UserDscFile
       $catalogNames = $script:Manifest | ForEach-Object { $_.name }
 
       $extra = $dscVars | Where-Object { $_ -notin $catalogNames }
@@ -129,7 +129,7 @@ Describe "Windows env var parity with Nix catalog" {
     }
 
     It "every non-user-specific catalog var has a Machine-scope DSC entry" {
-      $dscVars = Get-DscEnvVarName -DscPath $SystemDscFile
+      $dscVars = Get-DscEnvVarNameList -DscPath $SystemDscFile
       $machineSpecificVars = @($script:Manifest | Where-Object { -not $_.userSpecific -and $_.hasWindowsEntry } | ForEach-Object { $_.name })
 
       $missing = $machineSpecificVars | Where-Object { $_ -notin $dscVars }
@@ -140,7 +140,7 @@ Describe "Windows env var parity with Nix catalog" {
     }
 
     It "every Machine-scope DSC Env resource has a Nix catalog counterpart" {
-      $dscVars = Get-DscEnvVarName -DscPath $SystemDscFile
+      $dscVars = Get-DscEnvVarNameList -DscPath $SystemDscFile
       $catalogNames = $script:Manifest | ForEach-Object { $_.name }
 
       $extra = $dscVars | Where-Object { $_ -notin $catalogNames }
@@ -153,14 +153,14 @@ Describe "Windows env var parity with Nix catalog" {
 
   Context "Shell profile parity" {
     It "Sync-ShellProfile.ps1 no longer sets CC, CXX, LD (moved to Machine-scope DSC)" {
-      $profileVars = Get-ProfileEnvVarName
+      $profileVars = Get-ProfileEnvVarNameList
       $profileVars | Should -Not -Contain "CC"
       $profileVars | Should -Not -Contain "CXX"
       $profileVars | Should -Not -Contain "LD"
     }
 
     It "CC, CXX, LD are in system/env.dsc.yml at Machine scope" {
-      $dscVars = Get-DscEnvVarName -DscPath $SystemDscFile
+      $dscVars = Get-DscEnvVarNameList -DscPath $SystemDscFile
       $dscVars | Should -Contain "CC"
       $dscVars | Should -Contain "CXX"
       $dscVars | Should -Contain "LD"
