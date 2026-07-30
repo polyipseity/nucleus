@@ -108,7 +108,7 @@ See "Terminal hygiene" below for output lifecycle management.
   - NEVER `cd` into `.agents/skills/` or any skill subfolder. Always run commands from the repo root. Running inside a skill folder creates `.venv/`/`uv.lock` trash there and fails.
   - NEVER suggest or run `uv run -m init generate` — content generation is automatic. This instruction applies to ALL content in this repo.
   - NEVER suggest or run `uv run -m init generate -C`.
-  - ALWAYS use `resolve_memory_file_uri` to resolve paths under `/memories/`. Passing a literal path like `/memories/session/plan.md` or a manually constructed absolute path to `create_file` will silently write into a workspace-local `memories/` directory if one exists. Only the URI returned by `resolve_memory_file_uri` points to the real session memory store.
+  - Use the `memory` tool for all session/repo memory operations. It accepts `/memories/...` paths directly and supports commands: `view` (read files or list directories), `create` (create new files), `str_replace` (replace exact text), `insert` (insert at line), `delete` (remove files/directories), and `rename` (move/rename). Use `memory view /memories/session/` to list session files — no need for `resolve_memory_file_uri` or terminal `ls`. Only use `resolve_memory_file_uri` when you need the real filesystem path for a non-memory tool (e.g., running `ls` in a terminal).
   - NEVER pipe terminal output — always redirect to a file first. See "Terminal output pipes" above. Piping wastes time and causes repeated command re-runs.
 
 ## Premise integrity
@@ -142,13 +142,8 @@ When executing a plan with multiple phases:
 ### Creating a plan file
 
 1. Generate an ISO datetime in UTC: run `date -u +%Y-%m-%dT%H%M%S`.
-2. Construct the session memory path: `/memories/session/plan-<datetime>.md`.
-3. Call `resolve_memory_file_uri` on that path to get the real filesystem URI.
-4. Write the plan using `create_file` with the resolved URI. NEVER pass a literal `/memories/` path or a manually constructed absolute path to `create_file`.
-5. Verify the file was created in the correct place:
-   - Read it with `read_file`.
-   - Confirm the resolved path is NOT under any workspace/repo root directory (e.g. no `/Users/.../<reponame>/memories/`).
-   - If it is, delete the bad file and redo from step 1.
+2. Use the `memory` tool with command `create`, path `/memories/session/plan-<datetime>.md`, and `file_text` containing the plan content.
+3. Verify with `memory view /memories/session/plan-<datetime>.md` — confirm content is nonempty and substantive.
 
 ### Finding the active plan file
 
@@ -156,12 +151,9 @@ Plan files are named `plan-<datetime>.md` in session memory — never `active-pl
 
 When the user says "refer back to the plan", "verify the plan", "check the plan", or any equivalent phrase:
 
-1. Call `resolve_memory_file_uri("/memories/session/")` to get the base session memory path.
-2. Run `ls -1 <base-path>/plan-*.md 2>/dev/null | sort -r | head -1` in a terminal to find the latest file.
-3. If no files match, report that no active plan is found. Do not reconstruct or guess — stop.
-4. Otherwise, read the file at the returned path.
-5. Check the frontmatter: `status: completed` means the plan was fully executed; `status: in-progress` means execution was interrupted. The `current-step` field shows which workflow step was last reached. The `committed` field tracks atomic commit progress: `no` (no commits made), `partial` (some commits made), `yes` (all commits done).
-6. Present the plan and its frontmatter status to the user or act as instructed.
+1. Read the plan via `memory view /memories/session/plan-<datetime>.md` if you know the datetime. If not, find the latest by using `memory view /memories/session/` to list files, then pick the most recent `plan-*.md` by sorting the names (descending datetime).
+2. Check the frontmatter: `status: completed` means the plan was fully executed; `status: in-progress` means execution was interrupted. The `current-step` field shows which workflow step was last reached. The `committed` field tracks atomic commit progress: `no` (no commits made), `partial` (some commits made), `yes` (all commits done).
+3. Present the plan and its frontmatter status to the user or act as instructed.
 
 ## Related instruction files
 

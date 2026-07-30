@@ -17,15 +17,15 @@ If the user's message that triggered this prompt contains "implement", "do it", 
 ### 1. Retrieve the plan
 
 1. Find the latest plan file:
-   - Call `resolve_memory_file_uri("/memories/session/")` to get the base session memory path.
-   - Run `ls -1 <base-path>/plan-*.md 2>/dev/null | sort -r | head -1` in a terminal.
+   - Use `memory view /memories/session/` to list session memory files.
+   - Find the most recent `plan-*.md` by sorting names (descending datetime).
    - If no files match, report: "No active plan found — nothing to verify." and stop.
-2. Read the plan file at the returned path.
+2. Read the plan file using `memory view /memories/session/<filename>`.
 3. Parse the frontmatter for context (`status`, `current-step`, `committed`). Do not short-circuit on any status value — proceed to verify regardless.
 4. Parse `inputs` from frontmatter. Record `atomicCommits`, `backwardsCompat`, `maxConcurrency` for awareness — not used during verification but helpful context for the report.
 5. Find and load the latest checkpoint for supplementary context:
-   - Run `ls -1 <base-path>/checkpoint-*.md 2>/dev/null | sort -r | head -1` to locate the latest checkpoint.
-   - If a checkpoint exists, read it — the checkpoint's "Work done" and "Next steps" sections provide rich verification context (what was just implemented, what files were touched, pending decisions).
+   - Use `memory view /memories/session/` to list session files. Find the most recent `checkpoint-*.md` by sorting names (descending datetime).
+   - If a checkpoint exists, read it using `memory view /memories/session/<filename>` — the checkpoint's "Work done" and "Next steps" sections provide rich verification context (what was just implemented, what files were touched, pending decisions).
    - If no checkpoint exists, proceed without it.
 
 ### 2. Verify completeness

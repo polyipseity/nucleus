@@ -8,16 +8,16 @@ You are resuming after an interruption.
 - Continue from the exact next incomplete step. Do not re-read conversation history or workspace files.
 - **First, check for an in-progress implementation plan:**
   1. Find the latest plan file:
-     - Call `resolve_memory_file_uri("/memories/session/")` to get the base session memory path.
-     - Run `ls -1 <base-path>/plan-*.md 2>/dev/null | sort -r | head -1` in a terminal to locate the latest plan file.
-     - If no files match, no active plan is found — proceed normally (skip steps 2-5).
-  2. Read the plan file — it contains the active plan with a lifecycle frontmatter.
+     - Use `memory view /memories/session/` to list session memory files.
+     - Find the most recent `plan-*.md` by sorting names (descending datetime).
+     - If no files match, no active plan is found — proceed normally (skip steps 2-6).
+  2. Read the plan file using `memory view /memories/session/<filename>` — it contains the active plan with a lifecycle frontmatter.
   3. Parse the frontmatter to recover input variables (`atomicCommits`, `backwardsCompat`, `maxConcurrency`) and current progress (`status`, `current-step`, `committed`). If any input is missing from the frontmatter, fall back to built-in defaults (`atomicCommits=yes`, `backwardsCompat=no`, `maxConcurrency=2`). Log the recovered values. Re-apply these as hard constraints. If `atomicCommits: yes`, atomic commit rules from implement-plan step 2 apply in full — commit after each meaningful sub-step, before subagent spawning, and after subagent returns. Preserve the `committed` value as-is — it carries over from the interrupted session.
   4. If `status` is `completed`, report that the plan is already finished and skip re-execution.
   5. Otherwise, resume executing from the `current-step` value using the `implement-plan` workflow. Do NOT restart the plan.
   6. Find and load the latest checkpoint for supplementary context:
-     - Run `ls -1 <base-path>/checkpoint-*.md 2>/dev/null | sort -r | head -1` to locate the latest checkpoint.
-     - If a checkpoint exists, read it — the checkpoint's "Work done" and "Next steps" sections provide rich resumption context (what was accomplished, what files were touched, pending decisions).
+     - Use `memory view /memories/session/` to list session files. Find the most recent `checkpoint-*.md` by sorting names (descending datetime).
+     - If a checkpoint exists, read it using `memory view /memories/session/<filename>` — the checkpoint's "Work done" and "Next steps" sections provide rich resumption context (what was accomplished, what files were touched, pending decisions).
      - If no checkpoint exists, proceed without it.
 - After loading the plan and checkpoint context, invoke `skill: "checkpoint"` to save a resumption checkpoint. This anchors the resumed session state so future interruptions can restore from this point.
 - If no active plan is found, proceed normally. Do not re-read session notes or workspace files beyond what's needed for the task.

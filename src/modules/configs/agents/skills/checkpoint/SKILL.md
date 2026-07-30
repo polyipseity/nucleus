@@ -31,8 +31,7 @@ Each checkpoint captures:
 
 1. Run `date -u +%Y-%m-%dT%H%M%S` for ISO timestamp.
 2. Construct path `/memories/session/checkpoint-<datetime>.md`.
-3. Call `resolve_memory_file_uri` to get the real filesystem URI.
-4. Write checkpoint content via `create_file` with the resolved URI.
+3. Call `memory create` with path `/memories/session/checkpoint-<datetime>.md` and `file_text` containing the checkpoint content.
 
 ## How to restore
 

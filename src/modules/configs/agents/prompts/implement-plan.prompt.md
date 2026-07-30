@@ -48,15 +48,14 @@ State "Inputs loaded: atomicCommits=<value>, backwardsCompat=<value>, maxConcurr
 
    - **Primary approach — store directly in session memory.** This is the only mechanism that survives context compaction:
      1. Generate an ISO datetime in UTC: run `date -u +%Y-%m-%dT%H%M%S` (produces e.g. `2026-07-20T212315`).
-     2. Construct the path as `/memories/session/plan-<datetime>.md` and resolve it via `resolve_memory_file_uri`.
-     3. Write the plan (with metadata header) into that file using `create_file`.
-     4. Verify with `read_file` — confirm the content is nonempty and substantive.
-     5. From this point forward, always retrieve the plan via the find-latest-plan pattern (see "Find the latest plan file" below). Do not rely on ephemeral variables.
-   - **Fallback — if session memory is unavailable** (the tool errors or `create_file` fails):
+     2. Use the `memory` tool with command `create`, path `/memories/session/plan-<datetime>.md`, and `file_text` containing the plan content (with frontmatter).
+     3. Verify with `memory view /memories/session/plan-<datetime>.md` — confirm the content is nonempty and substantive.
+     4. From this point forward, always retrieve the plan via the find-latest-plan pattern (see "Find the latest plan file" below). Do not rely on ephemeral variables.
+   - **Fallback — if session memory is unavailable** (the `memory` tool errors or `memory create` fails):
      1. Generate a temporary file path: use `mktemp` (Linux/macOS) or `$env:TEMP` joined with a random name (Windows). Write the plan there.
      2. Verify with `[[ -s "$planfile" ]]` (POSIX) or `(Get-Item "$planfile").Length -gt 0` (PowerShell).
-     3. **Still try to persist the temp file path to session memory** — generate a datetime, construct `/memories/session/plan-<datetime>.md`, resolve it via `resolve_memory_file_uri`, and write just `planfile=/path/to/temp/file` there. This gives partial survivability across compaction.
-   - **Verify the plan is nonempty and substantive.** Also confirm the content is not just whitespace, a placeholder like "TODO", or a title with no body — use `head -c 200 "$planfile"` (or equivalent) to self-audit. If the file is empty or insubstantial, re-generate the plan and re-verify. Do not proceed to step 2 with a degenerate plan.
+     3. **Still try to persist the temp file path to session memory** — generate a datetime, then use the `memory` tool with command `create`, path `/memories/session/plan-<datetime>.md`, and `file_text` containing `planfile=/path/to/temp/file`. This gives partial survivability across compaction.
+   - **Verify the plan is nonempty and substantive.** Also confirm the content is not just whitespace, a placeholder like "TODO", or a title with no body — use `memory view /memories/session/plan-<datetime>.md` (or `head -c 200 "$planfile"` for fallback) to self-audit. If the file is empty or insubstantial, re-generate the plan and re-verify. Do not proceed to step 2 with a degenerate plan.
 
 2. **Implement the plan**
    - **Recover plan inputs.** Retrieve the plan (find-latest-plan pattern). Parse the frontmatter `inputs` section. If `inputs.atomicCommits` exists, use it; otherwise fall back to built-in default `yes`. Same for `backwardsCompat` and `maxConcurrency`. Log the recovered values.
@@ -82,7 +81,7 @@ When `inputs.atomicCommits` is `no` (or absent, falling back to default `yes` �
 
    - Re-read the original plan file regularly — especially after interruptions, subagent returns, or context switches — to ensure no phase is skipped or misinterpreted.
    - **Always retrieve the plan via session memory first:** use the find-latest-plan pattern (see "Find the latest plan file" below). Parse the frontmatter to recover input variables (`atomicCommits`, `backwardsCompat`, `maxConcurrency`) and current progress (`status`, `current-step`, `committed`). If no plan is found, fall back to the temp file path from step 1.
-   - **Update frontmatter after every meaningful sub-step.** Before switching context, calling a subagent, or at any natural break point: retrieve the plan (find-latest-plan pattern), bump `current-step` to the current workflow number, update `committed`, and write back using `replace_string_in_file` or `create_file`. This is how progress survives context compaction — do not skip it.
+   - **Update frontmatter after every meaningful sub-step.** Before switching context, calling a subagent, or at any natural break point: retrieve the plan (find-latest-plan pattern), bump `current-step` to the current workflow number, update `committed`, and write back using the `memory` tool with command `str_replace`. Do not use `memory create` to overwrite an existing plan file — `memory str_replace` preserves the frontmatter and only changes the relevant fields.
      Also invoke the checkpoint skill (`skill: "checkpoint"`) after each meaningful sub-step alongside the frontmatter update. This preserves work-done context across interruptions.
      - `committed` transitions: `no` → `partial` (on first atomic commit made during this plan execution). Stay at `partial` on subsequent commits.
      - **Do not set `committed` to `yes` here** — that happens only in step 5, to distinguish "some commits made" from "all commits done".
@@ -130,10 +129,9 @@ Do not batch multiple subagent results into one commit — commit each subagent'
 
 ## Find the latest plan file
 
-1. Call `resolve_memory_file_uri("/memories/session/")` to get the base session memory path.
-2. Run `ls -1 <base-path>/plan-*.md 2>/dev/null | sort -r | head -1` in a terminal to find the latest file.
-3. If no files match, report "no active plan found" and stop.
-4. Read the plan file at the returned path.
+1. Use `memory view /memories/session/` to list session files. Find the most recent `plan-*.md` by sorting names (descending datetime).
+2. If no files match, report "no active plan found" and stop.
+3. Read the plan file using `memory view /memories/session/<filename>`.
 
 ## Inputs
 

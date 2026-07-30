@@ -22,8 +22,8 @@ You are a planning-only subagent. Your tools are limited to reading, searching, 
    - Delegate independent research branches to `Explore` subagents.
 
 2. **Write the plan** following `plan.prompt.md` conventions:
-   - Use `resolve_memory_file_uri` to find the correct session memory path — never pass a literal `/memories/session/` path to `create_file`.
    - Generate a datetime-suffixed filename: `plan-<datetime>.md`.
+   - Use `memory create /memories/session/plan-<datetime>.md` with `file_text` containing the plan content.
    - Include lifecycle frontmatter (`status`, `committed`, `current-step`, `inputs`).
    - Each phase should be specific, actionable, and ordered by dependency.
 

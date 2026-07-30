@@ -118,28 +118,19 @@ Present the final plan in your response and stop. Do NOT proceed to implementati
 
 ## Create a new plan file
 
-> **CRITICAL: two most common plan-creation failures. Do not fall for either:**
->
-> 1. **Wrong filename**: The file MUST be named `plan-<datetime>.md`. NEVER use `active-plan.md` — that was the legacy name and no longer exists.
-> 2. **Wrong location**: The file MUST be written to the URI returned by `resolve_memory_file_uri`, NOT to the literal string `/memories/session/plan-<datetime>.md`. Passing the literal path to `create_file` will silently create the file in the wrong place on disk (e.g. inside the repo's `memories/` directory if one exists). Always use the resolved URI.
+> **CRITICAL**: The file MUST be named `plan-<datetime>.md`. NEVER use `active-plan.md` — that was the legacy name and no longer exists.
 
 Steps:
 
 1. Generate an ISO datetime in UTC: run `date -u +%Y-%m-%dT%H%M%S` (produces e.g. `2026-07-20T212315`).
-2. Construct the memory path: `/memories/session/plan-<datetime>.md`.
-3. Call `resolve_memory_file_uri` on that path to get the resolved filesystem URI. **This is the real path you must use for `create_file`.**
-4. Write the plan file using `create_file` with the resolved URI as `filePath`.
-5. Verify the file was created in the correct place:
-   - Confirm the resolved URI path is NOT under the workspace/repo directory. A resolved path under `/Users/.../GitHub.copilot-chat/memory-tool/` or equivalent is correct. A path containing your repo name or workspace folder (e.g. `/Users/.../nucleus/`) means you used a literal path instead of `resolve_memory_file_uri` — delete the bad file and redo.
-   - Read the file with `read_file` — confirm content is nonempty and substantive (not just whitespace, "TODO", or a title with no body).
-   - If the file is empty, insubstantial, or in the wrong location, delete the bad file and redo from step 1.
+2. Use the `memory` tool with command `create`, path `/memories/session/plan-<datetime>.md`, and `file_text` containing the plan content (with frontmatter).
+3. Verify with `memory view /memories/session/plan-<datetime>.md` — confirm content is nonempty and substantive (not just whitespace, "TODO", or a title with no body).
 
 ## Find the latest plan file
 
-1. Call `resolve_memory_file_uri("/memories/session/")` to get the base session memory path.
-2. Run `ls -1 <base-path>/plan-*.md 2>/dev/null | sort -r | head -1` in a terminal to find the latest file.
-3. If no files match, report "no active plan found" and stop.
-4. Read the plan file at the returned path.
+1. Use `memory view /memories/session/` to list session files. Find the most recent `plan-*.md` by sorting names (descending datetime).
+2. If no files match, report "no active plan found" and stop.
+3. Read the plan file using `memory view /memories/session/<filename>`.
 
 ## After writing the plan
 

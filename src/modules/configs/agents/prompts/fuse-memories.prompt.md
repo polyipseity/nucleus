@@ -28,18 +28,17 @@ Scope and memoryName are AND-ed — only memories matching both are selected.
 
 ## Probe — find and list memories
 
-Memory storage is not a flat filesystem — `list_dir` on canonical paths typically fails (ENOENT) or returns empty due to UUID-keyed subdirectory layout. Do not rely on filesystem listing.
+Memory files at `/memories/session/` and `/memories/repo/` are directly listable via `memory view`. Do not use filesystem operations (`list_dir`, `file_search`, `resolve_memory_file_uri`) for memory file discovery.
 
 1. **Check context metadata** — scan `<repoMemory>` and `<sessionMemory>` blocks in context for all available filenames. Filter by `${input:memoryName}` if set.
-2. **Confirm existence** — for each candidate, call `resolve_memory_file_uri("/memories/<scope>/<name>.md")`. Valid URIs confirm existence. Collect them for reading.
-3. **Probe fallback** — if context metadata is unavailable, call `resolve_memory_file_uri("/memories/<scope>/")` to get the base path, then `file_search` with glob `**/*.md` at that path.
-4. **Fail closed** — If all probe methods return zero files, report: "No memory files found at scopes `${input:scope}`. Aborting." and stop.
+2. **List directly via memory tool** — for active scopes, use `memory view /memories/<scope>/` to list available memory files.
+3. **Fail closed** — If all probe methods return zero files, report: "No memory files found at scopes `${input:scope}`. Aborting." and stop.
 
 ## Read
 
 Read all confirmed memory files and all `.instructions.md` files at the target location.
 
-1. Read memory files using the URIs from Step 2 (or `read_file` on canonical path if resolve failed but file is known).
+1. Read memory files using `memory view /memories/<scope>/<name>.md`.
 2. Read all `.instructions.md` files at target: `read_file` each one in full.
 3. **Segment each instruction file by section headings** (top-level `##` blocks). Record the heading name and line range for each section.
 
@@ -52,7 +51,7 @@ Break each memory file into atomic facts. For each fact, apply these checks from
 | **Codebase contradiction** | Search codebase for the key claim. If current code contradicts it → outdated. |
 | **Reference death** | Check referenced files, functions, commands still exist. If any are missing → outdated. |
 | **Instruction supersession** | Cross-reference against current `.instructions.md` files. If an instruction already covers the topic and is authoritative → outdated. |
-| **Git timestamps** (optional, high cost) | Get memory file timestamp via `git log -1 --format=%ct`. If memory predates changes to referenced code → likely outdated. |
+| **Git timestamps** (optional, high cost) | Get memory file timestamp via terminal `ls -l` on the resolved URI (use `resolve_memory_file_uri` — valid because it targets a terminal command, not a memory tool). If memory predates changes to referenced code → likely outdated. |
 | **Ambiguous / unverifiable** | Fact cannot be verified or falsified against current workspace → uncertain. |
 
 Verdicts: **current** → absorb, **discard** → remove (provably wrong), **update** → correct then absorb, **ignore** → discard (outdated but harmless), **uncertain** → discard (unverifiable).
@@ -103,12 +102,7 @@ Do not bulk-append to the end of files unless every other placement was tried an
 
 Delete all specified memory files unconditionally. The file has served its purpose — absorbed facts are in the instruction files, and unabsorbed facts (discard/ignore/uncertain) are not worth preserving.
 
-Use the resolved URI from Step 2 (preferred). Fallback:
-
-- POSIX: `rm "<resolved-path>"`
-- Windows: `Remove-Item -Path "<resolved-path>"`
-
-Verify with `[[ ! -f "<resolved-path>" ]]` or `!(Test-Path "<resolved-path>")`.
+Use `memory delete /memories/<scope>/<name>.md`.
 
 If any edit in the previous step failed, keep the file and report the failure.
 
