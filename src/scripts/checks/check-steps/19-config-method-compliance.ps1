@@ -20,11 +20,11 @@ Register-Step -Number 19 -Name "Config method compliance" -Action {
   $cfgFileErrors = $cfgFiles | ForEach-Object -Parallel -ThrottleLimit $using:parallelJobs {
     $basename = $_.Name
 
-    # Skip infrastructure files and Nix modules inside configs/
+    # Skip infrastructure files and Nix modules inside configs/  # ref: allow-and-deny-lists.instructions.md#A2 — reason: infrastructure files are not configs
     if ($basename -in '.gitkeep', '.gitignore') { return $null }
     if ($basename -like '*.schema.json') { return $null }
 
-    # Skip agent customization files (consumed as a directory via Method 4)
+    # Skip agent customization files (consumed as a directory via Method 4)  # ref: allow-and-deny-lists.instructions.md#A2 — reason: agents/* consumed as directory
     $relPath = $_.FullName.Substring($using:cfgDir.Length + 1) -replace '\\', '/'
     if ($relPath -like 'agents/*') { return $null }
 

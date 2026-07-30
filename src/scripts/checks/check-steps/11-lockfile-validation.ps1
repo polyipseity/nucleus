@@ -38,10 +38,12 @@ Register-Step -Number 11 -Name "Lockfile validation" -Action {
     foreach ($exception in $lfOverlapExceptions) {
       if ($pkgToSections.ContainsKey($exception)) {
         if ($pkgToSections[$exception].Count -le 1) {
-          Write-Warning "stale exception: '$exception' no longer overlaps sections — remove from lfOverlapExceptions"
+          Write-ErrorMessage "stale exception: '$exception' no longer overlaps sections — remove from lfOverlapExceptions"
+          $lfOverlapErrors++
         }
       } else {
-        Write-Warning "stale exception: '$exception' is not present in any lockfile section — remove from lfOverlapExceptions"
+        Write-ErrorMessage "stale exception: '$exception' is not present in any lockfile section — remove from lfOverlapExceptions"
+        $lfOverlapErrors++
       }
     }
   }

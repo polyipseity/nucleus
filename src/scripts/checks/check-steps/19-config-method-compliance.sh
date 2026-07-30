@@ -32,11 +32,11 @@ run_19_config_method_compliance() {
       _tmpdir="$1"
       _f="$2"
       _basename=$(basename "$_f")
-      # Skip infrastructure files and Nix modules inside configs/
+      # Skip infrastructure files and Nix modules inside configs/  # ref: allow-and-deny-lists.instructions.md#A2 — reason: infrastructure files are not configs
       case "$_basename" in
         .gitkeep|.gitignore|*.schema.json) exit 0 ;;
       esac
-      # Skip agent customization files (consumed as a directory via Method 4)
+      # Skip agent customization files (consumed as a directory via Method 4)  # ref: allow-and-deny-lists.instructions.md#A2 — reason: agents/* consumed as directory
       case "$_f" in
         */configs/agents/*) exit 0 ;;
       esac
