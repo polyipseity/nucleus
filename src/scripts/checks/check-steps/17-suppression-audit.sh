@@ -24,13 +24,16 @@ run_17_suppression_audit() {
 
   if [ "${#_step17_files[@]}" -gt 0 ]; then
     # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
+    # xargs passes each filename as $2; $1 is the tempdir bound in bash -c above.
+    # ref: check-step-xargs-bash-c-arg-convention
     printf '%s\0' "${_step17_files[@]}" \
       | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
-        _safe="$(echo "$1" | tr "/" "_")"
-        _out="$2/${_safe}.out"
-        grep -Hn -E "shellcheck disable=|check-suppress:" "$1" \
-          | grep -v "reason:" \
-          | sed "s/^/undoc_supp:/" >> "$_out" || true
+        _safe="$(echo "$2" | tr "/" "_")"
+        _out="$1/${_safe}.out"
+        _s17_grep_pattern="shellcheck disable=|check-suppress:"  # reason: self-reference — grep pattern literal, not a suppression
+        grep -Hn -E "$_s17_grep_pattern" "$2" \
+          | grep -v -E "reason:|suppression_doc:" \
+          | sed "s/^/undoc_supp:/" >> "$_out" 2>/dev/null || true
       ' _ "$_step17_tmpdir"
 
     local _f _err
