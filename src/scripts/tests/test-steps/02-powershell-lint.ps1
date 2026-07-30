@@ -1,5 +1,6 @@
 Register-Step -Number 2 -Name "PowerShell lint" -Action {
   param($Step, $HasArgs, $RepoRoot, $WaveTmpDir, $PositionalArgs)
+  $null = $Step, $HasArgs, $WaveTmpDir, $PositionalArgs  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — intentionally unused parameters in step
   $exitCode = 0
   $pwshScript = Join-Path $RepoRoot 'scripts\check-pwsh.ps1'
   $settings = Join-Path $RepoRoot 'scripts\PSScriptAnalyzerSettings.test.psd1'
