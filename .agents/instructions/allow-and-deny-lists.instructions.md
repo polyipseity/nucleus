@@ -78,4 +78,5 @@ Comments MUST include:
 
 - **Quarterly**: full audit of all T3 entries. Check each excluded file still exists, each excluded pattern is still justified, and no new hard-coded exclude lists have been introduced.
 - **Trigger**: review is due when a check step is added, removed, or renumbered.
+- **Last reviewed**: 2026-07-30 (all T3 entries confirmed valid; no new unregistered exclusions found)
 - **Verification**: run `scripts/check.sh` (which includes step 21 for preflight policy) to catch regressions.
