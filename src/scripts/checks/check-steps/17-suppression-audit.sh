@@ -53,7 +53,9 @@ run_17_suppression_audit() {
       say "no undocumented error suppressions found."
     fi
   else
-    say "no undocumented error suppressions found."
+    say "==== 17: Suppression audit ==== SKIPPED (no script files to check) ✗"
+    rm -rf -- "$_step17_tmpdir"
+    return 0
   fi
 
   rm -rf -- "$_step17_tmpdir"

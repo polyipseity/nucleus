@@ -4,6 +4,7 @@ Register-Step -Id "suppression-audit" -Number 17 -Name "Suppression audit" -Acti
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
   $undocSuppViolations = @()
+  $hasFiles = $false
   $script:fileCache = @{}
 
   function Test-Suppressed {
@@ -72,6 +73,7 @@ Register-Step -Id "suppression-audit" -Number 17 -Name "Suppression audit" -Acti
     $shFiles = if ($script:SH_FILES) { $script:SH_FILES } else { @($PositionalArgs | Where-Object { $_ -like '*.sh' }) }
     $nixFiles = if ($script:NIX_FILES) { $script:NIX_FILES } else { @($PositionalArgs | Where-Object { $_ -like '*.nix' }) }
     $ps1Files = if ($script:PS1_FILES) { $script:PS1_FILES } else { @($PositionalArgs | Where-Object { $_ -like '*.ps1' }) }
+    $hasFiles = ($shFiles.Count -gt 0) -or ($nixFiles.Count -gt 0) -or ($ps1Files.Count -gt 0)
 
     $undocSuppViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files ($shFiles + $nixFiles)
     $undocSuppViolations += Get-UndocSuppViolation -Pattern '2>$null' -Label '2>$null' -Files $ps1Files
@@ -92,6 +94,7 @@ Register-Step -Id "suppression-audit" -Number 17 -Name "Suppression audit" -Acti
         Where-Object { $_.FullName -notmatch '[\/]vendor[\/]' } |  # ref: allow-and-deny-lists.instructions.md#B5 — reason: structural invariant
         ForEach-Object { $_.FullName }
     )
+    $hasFiles = ($allShNix.Count -gt 0) -or ($allPs1.Count -gt 0)
 
     $undocSuppViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files $allShNix
     $undocSuppViolations += Get-UndocSuppViolation -Pattern '2>$null' -Label '2>$null' -Files $allPs1
@@ -110,6 +113,11 @@ Register-Step -Id "suppression-audit" -Number 17 -Name "Suppression audit" -Acti
     Write-ErrorMessage "suppression audit failed with $($undocSuppViolations.Count) violation(s)"
     Write-Message "  add '# check-suppress:check_id: reason' comment to explain intentional suppressions."
     return $false
+  }
+
+  if (-not $hasFiles) {
+    Write-Message "==== 17: Suppression audit ==== SKIPPED (no script files to check) ✗"
+    return $true
   }
 
   Write-Message "no suppression audit violations found."

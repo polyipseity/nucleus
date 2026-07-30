@@ -35,6 +35,11 @@ Register-Step -Id "yaml-structural" -Number 15 -Name "YAML structural validation
     return $false
   }
 
+  if ($yamlFiles.Count -eq 0) {
+    Write-Message "==== 15: YAML structural validation ==== SKIPPED (no YAML files to check) ✗"
+    return $true
+  }
+
   Write-Message "YAML structural validation passed."
   return $true
 }

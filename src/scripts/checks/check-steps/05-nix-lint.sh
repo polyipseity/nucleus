@@ -55,6 +55,9 @@ run_05_nix_lint() {
       esac
     done
     [ -n "$_nixf_tmpdir" ] && rm -rf -- "$_nixf_tmpdir"
+  else
+    say "==== 5: Nix lint (nixf-tidy) ==== SKIPPED (no Nix files to check) ✗"
+    return 0
   fi
 
   if [ "$_nixf_exit" -gt 0 ]; then
