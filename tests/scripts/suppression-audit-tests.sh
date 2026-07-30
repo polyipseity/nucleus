@@ -9,17 +9,15 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 
-REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
-
 # Replicates the core grep pipeline from step 17:
-#   grep -Hn -E "shellcheck disable=|check-suppress:" "$file"
+#   grep -Hn -E "shellcheck disable=|check-suppress:" "$file" # suppression_doc: test file documents the pipeline
 #     | grep -v -E "reason:|suppression_doc:"
 #     | sed "s/^/undoc_supp:/"
 # Returns non-empty string when undocumented suppressions are found.
 _run_s17_pipeline() {
     local file="$1"
     # shellcheck disable=SC2016 # reason: literal pattern for grep
-    local _s17_grep_pattern="shellcheck disable=|check-suppress:"
+    local _s17_grep_pattern="shellcheck disable=|check-suppress:" # suppression_doc: test pipeline variable
     grep -Hn -E "$_s17_grep_pattern" "$file" \
         | grep -v -E "reason:|suppression_doc:" \
         | sed "s/^/undoc_supp:/" 2>/dev/null || true
@@ -28,7 +26,7 @@ _run_s17_pipeline() {
 test_undocumented_shellcheck_suppression_fails() {
     local tmpfile
     tmpfile=$(mktemp)
-    printf '#!/bin/bash\n# shellcheck disable=SC2086\n' > "$tmpfile"
+    printf '#!/bin/bash\n# shellcheck disable=SC2086\n' > "$tmpfile" # suppression_doc: test data with suppression
     local result
     result=$(_run_s17_pipeline "$tmpfile")
     if [ -n "$result" ]; then
@@ -56,7 +54,7 @@ test_documented_shellcheck_suppression_passes() {
 test_undocumented_check_suppress_fails() {
     local tmpfile
     tmpfile=$(mktemp)
-    printf 'some code\n# check-suppress:some-rule\n' > "$tmpfile"
+    printf 'some code\n# check-suppress:some-rule\n' > "$tmpfile" # suppression_doc: test data with suppression
     local result
     result=$(_run_s17_pipeline "$tmpfile")
     if [ -n "$result" ]; then
