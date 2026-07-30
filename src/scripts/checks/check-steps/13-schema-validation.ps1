@@ -62,6 +62,69 @@ Register-Step -Id "schema-validation" -Number 13 -Name "Schema validation (JSON/
   }
 
   $jsonschemaErrors = 0
+
+  # $schema presence and format check (Spec G)
+  $missingSchema = 0
+
+  # Collect all files in scope for $schema presence check
+  $allFiles = [System.Collections.Generic.List[string]]::new()
+  if ($HasArgs) {
+    foreach ($sf in $PositionalArgs) {
+      if ($sf -like '*.json' -or $sf -like '*.yml' -or $sf -like '*.yaml') {
+        $allFiles.Add($sf)
+      }
+    }
+  } else {
+    Get-ChildItem -Recurse -Path "$r/src" -Filter '*.json' | Where-Object {
+      $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notlike '*.schema.json'  # ref: allow-and-deny-lists.instructions.md#B3,#A7 — reason: structural invariants; schema files are meta
+    } | ForEach-Object { $allFiles.Add($_.FullName) }
+    Get-ChildItem -Recurse -Path $r -Include '*.yml', '*.yaml' | Where-Object {
+      $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.FullName -notmatch '[/\\]secrets[/\\]'  # ref: allow-and-deny-lists.instructions.md#B3 — reason: structural invariants
+    } | ForEach-Object { $allFiles.Add($_.FullName) }
+  }
+
+  foreach ($f in $allFiles) {
+    # Exception list (Spec G)
+    $skipFile = $false
+    if ($f -like '*.schema.json' -or $f -like '*\vendor\*' -or $f -like '*/vendor/*' -or `
+        $f -like '*\secrets\*' -or $f -like '*/secrets/*' -or `
+        $f -like '*.github\workflows\*' -or $f -like '*.github/workflows/*' -or `
+        $f -like '.github\dependabot.yml' -or $f -like '.github/dependabot.yml') { $skipFile = $true }
+    if (-not $skipFile) {
+      $fileName = Split-Path $f -Leaf
+      if ($fileName -in @('package.json', 'opencode.jsonc')) { $skipFile = $true }
+    }
+    if ($skipFile) { continue }
+
+    if ($f -like '*.json') {
+      $content = try { Get-Content $f -Raw | ConvertFrom-Json -AsHashtable } catch { $null }
+      $hasSchema = $content -and $content.ContainsKey('$schema')
+      if ($hasSchema) {
+        $schemaVal = $content['$schema']
+        if ([string]::IsNullOrEmpty($schemaVal)) {
+          Write-ErrorMessage "Invalid `$schema in $f: must be a non-empty string"
+          $jsonschemaErrors++
+        }
+      } else {
+        Write-ErrorMessage "Missing `$schema in $f"
+        $jsonschemaErrors++
+      }
+    } elseif ($f -like '*.yml' -or $f -like '*.yaml') {
+      $content = try { Get-Content $f -Raw | ConvertFrom-Yaml } catch { $null }
+      $hasSchema = $content -and $content.ContainsKey('$schema')
+      if ($hasSchema) {
+        $schemaVal = $content['$schema']
+        if ([string]::IsNullOrEmpty($schemaVal)) {
+          Write-ErrorMessage "Invalid `$schema in $f: must be a non-empty string"
+          $jsonschemaErrors++
+        }
+      } else {
+        Write-ErrorMessage "Missing `$schema in $f"
+        $jsonschemaErrors++
+      }
+    }
+  }
+
   if ($manifest.Count -gt 0) {
     # Group by schemafile and validate sequentially.
     $groups = $manifest | Group-Object SchemaFile

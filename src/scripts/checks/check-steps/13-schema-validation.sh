@@ -29,6 +29,51 @@ run_13_schema_validation() {
     done
   fi
 
+  # $schema presence and format check (Spec G)
+  local _missing_schema=0
+  for _f in "${_js_schema_files[@]}"; do
+    # Exception list (Spec G): *.schema.json, vendor/**, secrets/**,
+    # .github/workflows/*.yml, .github/dependabot.yml, package.json, opencode.jsonc
+    case "$_f" in
+      *.schema.json|*/vendor/*|*/secrets/*|.github/workflows/*|.github/dependabot.yml)
+        continue ;;
+    esac
+    local _sf_nobase="${_f##*/}"
+    case "$_sf_nobase" in
+      package.json|opencode.jsonc) continue ;;
+    esac
+
+    case "$_f" in
+      *.json)
+        _has_schema=$(jq -r 'if type == "object" then (has("$schema") | tostring) else "false" end' "$_f" 2>/dev/null)
+        if [ "$_has_schema" = "true" ]; then
+          _schema_val=$(jq -r 'if type == "object" then (."$schema" // "") else "" end' "$_f" 2>/dev/null)
+          if [ -z "$_schema_val" ]; then
+            error "Invalid \$schema in $_f: must be a non-empty string"
+            _missing_schema=$((_missing_schema + 1))
+          fi
+        else
+          error "Missing \$schema in $_f"
+          _missing_schema=$((_missing_schema + 1))
+        fi
+        ;;
+      *.yml|*.yaml)
+        _has_schema=$(yq eval 'has("$schema")' "$_f" 2>/dev/null)
+        if [ "$_has_schema" = "true" ]; then
+          _schema_val=$(yq eval '."$schema" // ""' "$_f" 2>/dev/null)
+          if [ -z "$_schema_val" ]; then
+            error "Invalid \$schema in $_f: must be a non-empty string"
+            _missing_schema=$((_missing_schema + 1))
+          fi
+        else
+          error "Missing \$schema in $_f"
+          _missing_schema=$((_missing_schema + 1))
+        fi
+        ;;
+    esac
+  done
+  _jsonschema_errors=$((_jsonschema_errors + _missing_schema))
+
   if [ "${#_js_schema_files[@]}" -gt 0 ]; then
     # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
     printf '%s\0' "${_js_schema_files[@]}" \

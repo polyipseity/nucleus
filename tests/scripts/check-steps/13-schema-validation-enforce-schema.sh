@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# shellcheck shell=bash
+# shellcheck disable=all
+# Test: step 13 schema-validation must enforce $schema presence (Spec G)
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+TEST_FILE="$REPO_ROOT/src/scripts/checks/check-steps/13-schema-validation.sh"
+
+test_step13_has_missing_schema_check() {
+  # Matches: error "Missing \$schema in $_f"
+  if grep -q 'Missing.*$schema' "$TEST_FILE"; then
+    return 0
+  fi
+  echo "FAIL: step 13 should check for missing \$schema"
+  return 1
+}
+
+test_step13_has_format_check() {
+  # Matches: error "Invalid \$schema in $_f: must be a non-empty string"
+  if grep -q 'Invalid.*$schema.*non-empty' "$TEST_FILE"; then
+    return 0
+  fi
+  echo "FAIL: step 13 should check for invalid (empty) \$schema format"
+  return 1
+}
+
+test_step13_has_exception_list() {
+  # Matches: *.schema.json|*/vendor/*|*/secrets/* etc.
+  if grep -q 'schema.json.*vendor.*secrets' "$TEST_FILE"; then
+    return 0
+  fi
+  echo "FAIL: step 13 should have exception list for \$schema check"
+  return 1
+}
+
+test_step13_missing_schema_errors_counted() {
+  # Matches: _jsonschema_errors=$((_jsonschema_errors + _missing_schema))
+  if grep -q '_jsonschema_errors.*_missing_schema' "$TEST_FILE"; then
+    return 0
+  fi
+  echo "FAIL: step 13 should add missing \$schema errors to total"
+  return 1
+}
+
+failures=0
+for test in test_step13_has_missing_schema_check test_step13_has_format_check test_step13_has_exception_list test_step13_missing_schema_errors_counted; do
+  if ! $test; then
+    failures=$((failures + 1))
+  fi
+done
+[ "$failures" -eq 0 ] || exit 1
