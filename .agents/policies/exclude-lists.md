@@ -31,7 +31,7 @@ Comments MUST include:
 | ID | Files | Excluded | Tier | Reason | Verification |
 |----|-------|----------|------|--------|-------------|
 | A1 | `16-package-manager-enforcement.sh`, `.ps1` | `check.sh`, `check.ps1`, `shell.nix` (+ self-refs) | T2 | Orchestrator/parent config files legitimately contain `pip`/`npm` in comments and error messages; self-refs are dynamic | grep after each run: excluded files still contain pip/npm patterns |
-| A2 | `19-config-method-compliance.sh`, `.ps1` | `.gitkeep`, `.gitignore`, `*.schema.json`, `qtpass.nix`, `agents/*` | T3 | Infrastructure files and `qtpass.nix` are not configs; `agents/*` consumed as directory | Manual quarterly review |
+| A2 | `19-config-method-compliance.sh`, `.ps1` | `.gitkeep`, `.gitignore`, `*.schema.json`, `agents/*` | T3 | Infrastructure files are not configs; `agents/*` consumed as directory. Note: `qtpass.nix` removed 2026-07-29 by self-pruning check — file no longer existed | Manual quarterly review |
 | A3 | `12-locked-dsc-validation.ps1` | `packages.dsc.yml` | T2 | Packages DSC is generated from lockfile, not manually authored | Verify file still exists |
 | A4 | `11-lockfile-validation.ps1` | `lfOverlapExceptions`: `astral-sh.ty` | T2 | Legitimate cross-section overlap in lockfile | Warn if no longer overlaps |
 | A5 | `gc.sh`, `gc.ps1` | `index.lock` | T3 | Git invariant — `index.lock` must never be cleaned | Manual quarterly review |

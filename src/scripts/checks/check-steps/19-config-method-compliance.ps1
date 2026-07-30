@@ -23,7 +23,6 @@ Register-Step -Number 19 -Name "Config method compliance" -Action {
     # Skip infrastructure files and Nix modules inside configs/
     if ($basename -in '.gitkeep', '.gitignore') { return $null }
     if ($basename -like '*.schema.json') { return $null }
-    if ($basename -eq 'qtpass.nix') { return $null }
 
     # Skip agent customization files (consumed as a directory via Method 4)
     $relPath = $_.FullName.Substring($using:cfgDir.Length + 1) -replace '\\', '/'

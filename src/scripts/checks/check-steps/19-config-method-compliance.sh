@@ -34,7 +34,7 @@ run_19_config_method_compliance() {
       _basename=$(basename "$_f")
       # Skip infrastructure files and Nix modules inside configs/
       case "$_basename" in
-        .gitkeep|.gitignore|*.schema.json|qtpass.nix) exit 0 ;;
+        .gitkeep|.gitignore|*.schema.json) exit 0 ;;
       esac
       # Skip agent customization files (consumed as a directory via Method 4)
       case "$_f" in
@@ -62,12 +62,6 @@ run_19_config_method_compliance() {
     done < "$_result_file"
   done
   rm -rf -- "$_cfg_par_tmpdir"
-
-  # Self-pruning: verify excluded file still exists (A2)
-  if [ ! -f "src/modules/configs/qtpass.nix" ]; then
-    error "stale exclusion: src/modules/configs/qtpass.nix no longer exists — remove 'qtpass.nix' from case skip list"
-    _cfg_errors=$((_cfg_errors + 1))
-  fi
 
   if [ "$_cfg_errors" -gt 0 ]; then
     error "config method compliance check failed with $_cfg_errors error(s)"

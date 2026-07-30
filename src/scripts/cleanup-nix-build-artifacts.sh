@@ -48,10 +48,11 @@ while IFS= read -r -d '' _cnba_path; do
     warn "found non-symlink at $_cnba_path — skipping (not a Nix build artifact)"
   fi
 done < <(
+  # ref: EXCLUDE-LISTS.md#B8 — reason: structural invariant
   find "$REPO_ROOT" \
     -path "$REPO_ROOT/.git" -prune -o \
     -path "$REPO_ROOT/.direnv" -prune -o \
-    -path "$REPO_ROOT/vendor" -prune -o \  # ref: EXCLUDE-LISTS.md#B8 — reason: structural invariant
+    -path "$REPO_ROOT/vendor" -prune -o \
     \( -name result -o -name 'result-*' \) \
     -print0 2>/dev/null || true # check-suppress:suppression_doc: find returns non-zero when -prune skips dirs; || true prevents set -e abort
 )
