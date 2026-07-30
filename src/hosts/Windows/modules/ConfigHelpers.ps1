@@ -31,6 +31,7 @@ function Deploy-WritableSymlink {
     Deploy-WritableSymlink -Name "starship" -RepoRoot `$env:NUCLEUS_REPO_ROOT -RepoRelPath "src\modules\configs\starship\starship.toml" -TargetPath "`$env:USERPROFILE\.config\starship.toml"
   #>
   [CmdletBinding()]
+  [OutputType([hashtable])]
   param(
     [Parameter(Mandatory)]
     [string]$Name,
@@ -86,6 +87,7 @@ function Deploy-ReadOnly {
     Deploy-ReadOnly -Name "starship" -RepoRoot $env:NUCLEUS_REPO_ROOT -RepoRelPath "src\modules\configs\starship\starship.toml" -TargetPath "$env:USERPROFILE\.config\starship.toml" -SkipIfIdentical
   #>
   [CmdletBinding()]
+  [OutputType([hashtable])]
   param(
     [Parameter(Mandatory)]
     [string]$Name,
@@ -145,6 +147,7 @@ function Deploy-Merge {
     Deploy-Merge -Name "obsidian" -TargetPath "$env:APPDATA\obsidian\obsidian.json" -ManagedSettings $settings -MergeMode json
   #>
   [CmdletBinding()]
+  [OutputType([hashtable])]
   param(
     [Parameter(Mandatory)]
     [string]$Name,

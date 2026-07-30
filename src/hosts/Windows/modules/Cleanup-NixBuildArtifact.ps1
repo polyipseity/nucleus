@@ -28,6 +28,7 @@
 
 function Clear-NixBuildArtifact {
   [CmdletBinding(SupportsShouldProcess = $true)]
+  [OutputType([int])]
   param(
     [Parameter(Mandatory = $false)]
     [string]$RepoRoot = '',

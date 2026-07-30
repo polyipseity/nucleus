@@ -84,6 +84,7 @@ function Get-NucleusScoopShimsDir {
 #>
 function Get-NucleusLLVMBinDir {
   [CmdletBinding()]
+  [OutputType([string])]
   param()
   "C:\Program Files\LLVM\bin"
 }

@@ -182,7 +182,7 @@ function Invoke-SourceBuild {
     }
 
     # --- Install binary ---
-    $builtBinary = Join-Path $repoCacheDir $binarySubDir $binaryName
+    $builtBinary = Join-Path -Path $repoCacheDir -ChildPath $binarySubDir -AdditionalChildPaths $binaryName
     if (-not (Test-Path $builtBinary)) {
       Write-Error "Invoke-SourceBuild: built binary not found at '$builtBinary' for '$pkgId'"
       continue

@@ -244,7 +244,8 @@ for ($ti = 0; $ti -lt $totalTasks; $ti++) {
     $isError = $true
     $errorMsg = 'subprocess timed out after 600s'
     Write-Output '  TIMEOUT (>600s)'
-  } elseif (($exitCode = $proc.ExitCode) -ne 0) {
+  } elseif ($proc.ExitCode -ne 0) {
+    $exitCode = $proc.ExitCode
     # Non-zero exit — try to parse stdout as JSON for structured error
     try {
       $parsed = $stdout.Trim() | ConvertFrom-Json
