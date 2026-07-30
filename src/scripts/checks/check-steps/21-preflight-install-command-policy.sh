@@ -31,8 +31,8 @@ run_21_preflight_install_command_policy() {
     # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
     printf '%s\0' "${_ps1_files[@]}" \
       | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
-        _f="$1"
-        _out="$2/$(echo "$_f" | tr "/" "_").out"
+        _f="$2"
+        _out="$1/$(echo "$_f" | tr "/" "_").out"
         _line_no=0
         while IFS= read -r _line; do
           _line_no=$((_line_no + 1))
