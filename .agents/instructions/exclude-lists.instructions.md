@@ -10,14 +10,14 @@ applyTo: "**"
 
 1. **Tier 1 (Eliminate).** Remove the exclusion entirely — replace with dynamic discovery, or remove if the exclusion is no longer needed.
 2. **Tier 2 (Self-prune).** If exclusion cannot be eliminated, add a verification step after the main check: verify that each excluded file still justifies its exclusion (either the file still exists, or still contains the pattern that triggered the exclusion). If stale, error out.
-3. **Tier 3 (Track).** If neither Tier 1 nor Tier 2 works, register below with inline `# ref: EXCLUDE-LISTS.md` comments at every exclusion site. All Tier 3 entries must be reviewed quarterly.
+3. **Tier 3 (Track).** If neither Tier 1 nor Tier 2 works, register below with inline `# ref: exclude-lists.instructions.md` comments at every exclusion site. All Tier 3 entries must be reviewed quarterly.
 
 ## Inline comment convention
 
 Every hard-coded filename exclusion site gets a suffix comment:
 
 ```sh
---exclude='check.sh'  # ref: EXCLUDE-LISTS.md#A1 — reason: orchestrator contains pip/npm patterns in comments; would cause false positives
+--exclude='check.sh'  # ref: exclude-lists.instructions.md#A1 — reason: orchestrator contains pip/npm patterns in comments; would cause false positives
 ```
 
 Comments MUST include:
