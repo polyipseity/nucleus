@@ -21,6 +21,6 @@
   benchmarking) and must stay independent.
 #>
 @{
-    Severity = @('Error', 'Warning')
+    Severity = @('Error', 'Warning', 'Information')
     ExcludeRules = @('PSUseBOMForUnicodeEncodedFile')
 }

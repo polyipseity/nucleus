@@ -14,6 +14,6 @@
     src/modules/configs/pwsh/PSScriptAnalyzerSettings.psd1 — interactive profile
 #>
 @{
-    Severity = @('Error', 'Warning')
+    Severity = @('Error', 'Warning', 'Information')
     ExcludeRules = @('PSUseBOMForUnicodeEncodedFile')
 }

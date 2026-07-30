@@ -47,7 +47,7 @@
     .agents/skills/pssa-rule-benchmark/PSScriptAnalyzerSettings.psd1 — benchmarking
 #>
 @{
-    Severity = @('Error', 'Warning')
+    Severity = @('Error', 'Warning', 'Information')
     ExcludeRules = @(
         'PSUseBOMForUnicodeEncodedFile'
         # Slow rules (~56s added wall-clock, see benchmark above):
