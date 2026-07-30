@@ -158,6 +158,52 @@ test_ordering_loaders_exist() {
     fi
 }
 
+# ---- Verify xargs bash -c positional arg convention ----
+# Every xargs bash -c invocation must use $1 for the tempdir and $2 for the
+# filename (or $1 for filename when no tmpdir is passed, i.e., 2-arg form).
+# This catches the class of bug that affected step 17 ($1/$2 swap).
+test_posix_check_step_xargs_bash_c_arg_convention() {
+    local violations=0
+    local _f _basename _xargs_line
+
+    for _f in "$REPO_ROOT/src/scripts/checks/check-steps/"*.sh; do
+        [ -f "$_f" ] || continue
+        _basename=$(basename "$_f")
+
+        # Skip files without xargs bash -c pattern
+        grep -q 'xargs.*bash -c' "$_f" || continue
+
+        # Find first xargs bash -c line number
+        _xargs_line=$(grep -n 'xargs.*bash -c' "$_f" | head -1 | cut -d: -f1)
+
+        # Determine form by checking the closing quote pattern:
+        #   3-arg: ' _ "$var"  — $1=tmpdir, $2=filename
+        #   2-arg: ' _         — $1=filename (no tmpdir)
+        if grep -q "' _ \"\\$" "$_f" 2>/dev/null; then
+            # 3-arg form: verify $2 (filename) is used in the bash -c context
+            if ! tail -n "+$_xargs_line" "$_f" | grep -q '\$2'; then
+                assert_fail "$_basename" "3-arg xargs bash -c: missing \$2 (filename parameter)"
+                ((violations++))
+            fi
+            # Verify $1 (tmpdir) is used in the bash -c context
+            if ! tail -n "+$_xargs_line" "$_f" | grep -q '\$1'; then
+                assert_fail "$_basename" "3-arg xargs bash -c: missing \$1 (tmpdir parameter)"
+                ((violations++))
+            fi
+        elif grep -q "' _ " "$_f" 2>/dev/null; then
+            # 2-arg form: verify $1 (filename) is used
+            if ! tail -n "+$_xargs_line" "$_f" | grep -q '\$1'; then
+                assert_fail "$_basename" "2-arg xargs bash -c: missing \$1 (filename parameter)"
+                ((violations++))
+            fi
+        fi
+    done
+
+    if [ "$violations" -eq 0 ]; then
+        assert_pass "All POSIX check steps follow xargs bash -c positional arg convention"
+    fi
+}
+
 # ---- Run tests ----
 echo ""
 echo "Testing check/test step file structure..."
@@ -167,6 +213,7 @@ test_posix_check_step_files_exist
 test_posix_check_step_has_register_step
 test_posix_check_step_no_overrides
 test_posix_check_step_sequential_numbers
+test_posix_check_step_xargs_bash_c_arg_convention
 test_posix_test_step_files_exist
 test_posix_test_step_has_register_step
 test_windows_check_step_files_exist
