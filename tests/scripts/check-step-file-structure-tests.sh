@@ -12,9 +12,8 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 # Helper: return 0 if at least one file matching glob exists.
 _glob_has_file() {
   local _g
-  for _g in $1; do # deliberately unquoted to expand glob
+  for _g; do # iterates over all positional args (already expanded by glob)
     [ -f "$_g" ] && return 0
-    break
   done
   return 1
 }
@@ -22,14 +21,14 @@ _glob_has_file() {
 # ---- Verify POSIX check step files ----
 test_posix_check_step_files_exist() {
     local missing=0
-    for n in $(seq -w 1 20); do
+    for n in $(seq -w 1 21); do
         if ! _glob_has_file "$REPO_ROOT/src/scripts/checks/check-steps/$n"*.sh; then
             assert_fail "POSIX check step $n" "Missing step file for number $n"
             ((missing++))
         fi
     done
     if [ "$missing" -eq 0 ]; then
-        assert_pass "All 20 POSIX check step files exist"
+        assert_pass "All 21 POSIX check step files exist"
     fi
 }
 
@@ -37,7 +36,7 @@ test_posix_check_step_has_register_step() {
     local missing=0
     for f in "$REPO_ROOT/src/scripts/checks/check-steps/"*.sh; do
         if [ -f "$f" ]; then
-            if ! grep -q 'register_step [0-9]' "$f"; then
+            if ! grep -q 'register_step "' "$f"; then
                 assert_fail "$(basename "$f")" "Missing register_step call"
                 ((missing++))
             fi
@@ -71,14 +70,14 @@ test_posix_check_step_no_overrides() {
 test_posix_check_step_sequential_numbers() {
     local numbers
     numbers=$(for f in "$REPO_ROOT/src/scripts/checks/check-steps/"*.sh; do
-        grep -oh 'register_step [0-9]*' "$f" | cut -d' ' -f2
+        sed -n 's/.*register_step "[^"]*" \([0-9]\+\).*/\1/p' "$f" | head -1
     done | sort -n)
     local expected
-    expected=$(seq 1 20)
+    expected=$(seq 1 21)
     if [ "$numbers" = "$expected" ]; then
-        assert_pass "POSIX check step numbers are sequential 1-20"
+        assert_pass "POSIX check step numbers are sequential 1-21"
     else
-        assert_fail "POSIX check step numbers" "Expected 1-20 sequential, got: $numbers"
+        assert_fail "POSIX check step numbers" "Expected 1-21 sequential, got: $numbers"
     fi
 }
 
@@ -100,7 +99,7 @@ test_posix_test_step_has_register_step() {
     local missing=0
     for f in "$REPO_ROOT/src/scripts/tests/test-steps/"*.sh; do
         if [ -f "$f" ]; then
-            if ! grep -q 'register_step [0-9]' "$f"; then
+            if ! grep -q 'register_step "' "$f"; then
                 assert_fail "$(basename "$f")" "Missing register_step call"
                 ((missing++))
             fi
@@ -114,14 +113,14 @@ test_posix_test_step_has_register_step() {
 # ---- Verify Windows step files exist ----
 test_windows_check_step_files_exist() {
     local missing=0
-    for n in $(seq -w 1 20); do
+    for n in $(seq -w 1 21); do
         if ! _glob_has_file "$REPO_ROOT/src/scripts/checks/check-steps/$n"*.ps1; then
             assert_fail "Windows check step $n" "Missing step file for number $n"
             ((missing++))
         fi
     done
     if [ "$missing" -eq 0 ]; then
-        assert_pass "All 20 Windows check step files exist"
+        assert_pass "All 21 Windows check step files exist"
     fi
 }
 
@@ -204,6 +203,122 @@ test_posix_check_step_xargs_bash_c_arg_convention() {
     fi
 }
 
+# ---- Verify POSIX check step ID format and uniqueness ----
+test_posix_check_step_ids_no_digits() {
+    local violations=0
+    local _id
+    for f in "$REPO_ROOT/src/scripts/checks/check-steps/"*.sh; do
+        [ -f "$f" ] || continue
+        _id=$(sed -n 's/.*register_step "\([^"]*\)".*/\1/p' "$f" | head -1)
+        if echo "$_id" | grep -q '[0-9]'; then
+            assert_fail "$(basename "$f")" "ID '$_id' contains digit characters"
+            ((violations++))
+        fi
+    done
+    if [ "$violations" -eq 0 ]; then
+        assert_pass "All POSIX check step IDs contain no digits"
+    fi
+}
+
+test_posix_check_step_ids_unique() {
+    local dups
+    dups=$(for f in "$REPO_ROOT/src/scripts/checks/check-steps/"*.sh; do
+        [ -f "$f" ] && sed -n 's/.*register_step "\([^"]*\)".*/\1/p' "$f" | head -1
+    done | sort | uniq -d)
+    if [ -z "$dups" ]; then
+        assert_pass "All POSIX check step IDs are unique"
+    else
+        assert_fail "POSIX check step IDs" "Duplicate IDs: $dups"
+    fi
+}
+
+# ---- Verify POSIX test step ID format and uniqueness ----
+test_posix_test_step_ids_no_digits() {
+    local violations=0
+    local _id
+    for f in "$REPO_ROOT/src/scripts/tests/test-steps/"*.sh; do
+        [ -f "$f" ] || continue
+        _id=$(sed -n 's/.*register_step "\([^"]*\)".*/\1/p' "$f" | head -1)
+        if echo "$_id" | grep -q '[0-9]'; then
+            assert_fail "$(basename "$f")" "ID '$_id' contains digit characters"
+            ((violations++))
+        fi
+    done
+    if [ "$violations" -eq 0 ]; then
+        assert_pass "All POSIX test step IDs contain no digits"
+    fi
+}
+
+test_posix_test_step_ids_unique() {
+    local dups
+    dups=$(for f in "$REPO_ROOT/src/scripts/tests/test-steps/"*.sh; do
+        [ -f "$f" ] && sed -n 's/.*register_step "\([^"]*\)".*/\1/p' "$f" | head -1
+    done | sort | uniq -d)
+    if [ -z "$dups" ]; then
+        assert_pass "All POSIX test step IDs are unique"
+    else
+        assert_fail "POSIX test step IDs" "Duplicate IDs: $dups"
+    fi
+}
+
+# ---- Verify PS1 check step ID format and uniqueness ----
+test_ps1_check_step_ids_no_digits() {
+    local violations=0
+    local _id
+    for f in "$REPO_ROOT/src/scripts/checks/check-steps/"*.ps1; do
+        [ -f "$f" ] || continue
+        _id=$(sed -n 's/.*Register-Step -Id "\([^"]*\)".*/\1/p' "$f" | head -1)
+        if echo "$_id" | grep -q '[0-9]'; then
+            assert_fail "$(basename "$f")" "ID '$_id' contains digit characters"
+            ((violations++))
+        fi
+    done
+    if [ "$violations" -eq 0 ]; then
+        assert_pass "All PS1 check step IDs contain no digits"
+    fi
+}
+
+test_ps1_check_step_ids_unique() {
+    local dups
+    dups=$(for f in "$REPO_ROOT/src/scripts/checks/check-steps/"*.ps1; do
+        [ -f "$f" ] && sed -n 's/.*Register-Step -Id "\([^"]*\)".*/\1/p' "$f" | head -1
+    done | sort | uniq -d)
+    if [ -z "$dups" ]; then
+        assert_pass "All PS1 check step IDs are unique"
+    else
+        assert_fail "PS1 check step IDs" "Duplicate IDs: $dups"
+    fi
+}
+
+# ---- Verify PS1 test step ID format and uniqueness ----
+test_ps1_test_step_ids_no_digits() {
+    local violations=0
+    local _id
+    for f in "$REPO_ROOT/src/scripts/tests/test-steps/"*.ps1; do
+        [ -f "$f" ] || continue
+        _id=$(sed -n 's/.*Register-Step -Id "\([^"]*\)".*/\1/p' "$f" | head -1)
+        if echo "$_id" | grep -q '[0-9]'; then
+            assert_fail "$(basename "$f")" "ID '$_id' contains digit characters"
+            ((violations++))
+        fi
+    done
+    if [ "$violations" -eq 0 ]; then
+        assert_pass "All PS1 test step IDs contain no digits"
+    fi
+}
+
+test_ps1_test_step_ids_unique() {
+    local dups
+    dups=$(for f in "$REPO_ROOT/src/scripts/tests/test-steps/"*.ps1; do
+        [ -f "$f" ] && sed -n 's/.*Register-Step -Id "\([^"]*\)".*/\1/p' "$f" | head -1
+    done | sort | uniq -d)
+    if [ -z "$dups" ]; then
+        assert_pass "All PS1 test step IDs are unique"
+    else
+        assert_fail "PS1 test step IDs" "Duplicate IDs: $dups"
+    fi
+}
+
 # ---- Run tests ----
 echo ""
 echo "Testing check/test step file structure..."
@@ -214,10 +329,18 @@ test_posix_check_step_has_register_step
 test_posix_check_step_no_overrides
 test_posix_check_step_sequential_numbers
 test_posix_check_step_xargs_bash_c_arg_convention
+test_posix_check_step_ids_no_digits
+test_posix_check_step_ids_unique
 test_posix_test_step_files_exist
 test_posix_test_step_has_register_step
+test_posix_test_step_ids_no_digits
+test_posix_test_step_ids_unique
 test_windows_check_step_files_exist
 test_windows_test_step_files_exist
+test_ps1_check_step_ids_no_digits
+test_ps1_check_step_ids_unique
+test_ps1_test_step_ids_no_digits
+test_ps1_test_step_ids_unique
 test_ordering_loaders_exist
 
 echo ""
