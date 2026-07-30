@@ -58,8 +58,10 @@ run_13_schema_validation() {
         fi
         ;;
       *.yml|*.yaml)
+        # shellcheck disable=SC2016 # reason: literal $schema in yq eval expression
         _has_schema=$(yq eval 'has("$schema")' "$_f" 2>/dev/null)
         if [ "$_has_schema" = "true" ]; then
+          # shellcheck disable=SC2016 # reason: literal $schema in yq eval expression
           _schema_val=$(yq eval '."$schema" // ""' "$_f" 2>/dev/null)
           if [ -z "$_schema_val" ]; then
             error "Invalid \$schema in $_f: must be a non-empty string"
