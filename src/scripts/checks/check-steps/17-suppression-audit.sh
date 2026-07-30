@@ -28,18 +28,9 @@ run_17_suppression_audit() {
       | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
         _safe="$(echo "$1" | tr "/" "_")"
         _out="$2/${_safe}.out"
-        _content=$(<"$1")
-        _line_no=0
-        while IFS= read -r _line; do
-          _line_no=$((_line_no + 1))
-          case "$_line" in
-            *shellcheck\ disable=*|*check-suppress:*)
-              if ! echo "$_line" | grep -q "reason:"; then
-                echo "undoc_supp:${1}:${_line_no}:${_line}" >> "$_out"
-              fi
-              ;;
-          esac
-        done <<< "$_content"
+        grep -Hn -E "shellcheck disable=|check-suppress:" "$1" \
+          | grep -v "reason:" \
+          | sed "s/^/undoc_supp:/" >> "$_out" || true
       ' _ "$_step17_tmpdir"
 
     local _f _err
