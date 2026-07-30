@@ -17,5 +17,10 @@ Register-Step -Number 2 -Name "PowerShell lint" -Action {
   & $pwshScript -SkipStep UnknownName -Paths (Join-Path $RepoRoot 'scripts\check-pwsh.ps1')
   if ($LASTEXITCODE -eq 0) { $exitCode = 1 }
 
+  # Phase 0 step-runner regression tests
+  Write-Message "--- step-runner regression tests (PS1) ---"
+  & (Join-Path $RepoRoot 'tests\scripts\step-runner-regression-tests.ps1')
+  if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
+
   return ($exitCode -eq 0)
 }
