@@ -5,7 +5,7 @@
 register_step 21 "Preflight InstallCommand policy" run_21_preflight_install_command_policy
 
 run_21_preflight_install_command_policy() {
-  local _step="$1" _has_args="$2" _repo_root="$3" _wave_tmpdir="$4"; shift 4
+  local _has_args="$1" _repo_root="$2"; shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
 

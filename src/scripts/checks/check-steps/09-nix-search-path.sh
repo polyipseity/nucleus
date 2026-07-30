@@ -6,7 +6,7 @@
 register_step 9 "Nix search path tests" run_09_nix_search_path
 
 run_09_nix_search_path() {
-  local _step="$1" _has_args="$2" _repo_root="$3" _wave_tmpdir="$4"; shift 4
+  local _has_args="$1" _repo_root="$2"; shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _nspt_exit=0

@@ -6,7 +6,7 @@
 register_step 11 "Lockfile validation" run_11_lockfile_validation
 
 run_11_lockfile_validation() {
-  local _step="$1" _has_args="$2" _repo_root="$3" _wave_tmpdir="$4"; shift 4
+  local _has_args="$1" _repo_root="$2"; shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _lf_errors=0

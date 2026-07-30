@@ -6,7 +6,7 @@
 register_step 13 "Schema validation (JSON/YAML)" run_13_schema_validation
 
 run_13_schema_validation() {
-  local _step="$1" _has_args="$2" _repo_root="$3" _wave_tmpdir="$4"; shift 4
+  local _has_args="$1" _repo_root="$2"; shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _jsonschema_errors=0

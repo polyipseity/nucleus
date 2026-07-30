@@ -6,7 +6,7 @@
 register_step 8 "CWD-independence tests" run_08_cwd_independence
 
 run_08_cwd_independence() {
-  local _step="$1" _has_args="$2" _repo_root="$3" _wave_tmpdir="$4"; shift 4
+  local _has_args="$1" _repo_root="$2"; shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _cit_exit=0

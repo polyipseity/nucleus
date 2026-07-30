@@ -6,7 +6,7 @@
 register_step 4 "Nix flake evaluation" run_04_nix_flake_eval
 
 run_04_nix_flake_eval() {
-  local _step="$1" _has_args="$2" _repo_root="$3" _wave_tmpdir="$4"; shift 4
+  local _has_args="$1" _repo_root="$2"; shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _ne_exit=0

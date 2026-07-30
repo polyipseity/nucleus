@@ -6,7 +6,7 @@
 register_step 17 "Undocumented error suppression" run_17_suppression_audit
 
 run_17_suppression_audit() {
-  local _step="$1" _has_args="$2" _repo_root="$3" _wave_tmpdir="$4"; shift 4
+  local _has_args="$1" _repo_root="$2"; shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _s17_errors=0

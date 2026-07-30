@@ -5,7 +5,7 @@
 register_step 2 "PowerShell lint" run_02_powershell_lint
 
 run_02_powershell_lint() {
-  local _step="$1" _has_args="$2" _repo_root="$3" _wave_tmpdir="$4"; shift 4
+  local _has_args="$1" _repo_root="$2"; shift 2
   local _exit_code=0
 
   say "--- test output ---"

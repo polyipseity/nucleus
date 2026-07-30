@@ -6,7 +6,7 @@
 register_step 16 "Package manager usage enforcement" run_16_package_manager_enforcement
 
 run_16_package_manager_enforcement() {
-  local _step="$1" _has_args="$2" _repo_root="$3" _wave_tmpdir="$4"; shift 4
+  local _has_args="$1" _repo_root="$2"; shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _violations=0

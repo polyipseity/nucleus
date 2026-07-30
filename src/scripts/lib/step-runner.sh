@@ -56,7 +56,7 @@ _run_step() {
   printf '%s' "$_name" > "$_wave_tmpdir/step-$_n.name"
 
   # 2. Run step function, capture ALL output (stdout+stderr)
-  if "$_func" "$_n" "$HAS_ARGS" "$REPO_ROOT" "$_wave_tmpdir" "$@"; then
+  if "$_func" "$HAS_ARGS" "$REPO_ROOT" "$@"; then
     _exit_code=0
   else
     _exit_code=$?
