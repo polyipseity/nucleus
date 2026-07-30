@@ -51,7 +51,7 @@ done < <(
   find "$REPO_ROOT" \
     -path "$REPO_ROOT/.git" -prune -o \
     -path "$REPO_ROOT/.direnv" -prune -o \
-    -path "$REPO_ROOT/vendor" -prune -o \
+    -path "$REPO_ROOT/vendor" -prune -o \  # ref: EXCLUDE-LISTS.md#B8 — reason: structural invariant
     \( -name result -o -name 'result-*' \) \
     -print0 2>/dev/null || true # check-suppress:suppression_doc: find returns non-zero when -prune skips dirs; || true prevents set -e abort
 )

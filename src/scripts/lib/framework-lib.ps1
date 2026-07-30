@@ -137,9 +137,9 @@ function Parse-Args {
 
 # --- File caching ---
 function Cache-FileLists {
-  $script:CachedNixFiles = Get-ChildItem -Recurse -Filter '*.nix' | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object Name
-  $script:CachedYamlFiles = Get-ChildItem -Recurse -Include '*.yml', '*.yaml' | Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object Name
-  $script:CachedJsonFiles = Get-ChildItem -Path 'src' -Recurse -Filter '*.json' | Where-Object { $_.Name -notmatch '\.schema\.json$' -and $_.FullName -notmatch '[/\\]vendor[/\\]' } | Sort-Object Name
+  $script:CachedNixFiles = Get-ChildItem -Recurse -Filter '*.nix' | Where-Object { $_.FullName -notmatch '[/\]vendor[/\]' } | Sort-Object Name  # ref: EXCLUDE-LISTS.md#B7 — reason: structural invariant
+  $script:CachedYamlFiles = Get-ChildItem -Recurse -Include '*.yml', '*.yaml' | Where-Object { $_.FullName -notmatch '[/\]vendor[/\]' } | Sort-Object Name  # ref: EXCLUDE-LISTS.md#B7 — reason: structural invariant
+  $script:CachedJsonFiles = Get-ChildItem -Path 'src' -Recurse -Filter '*.json' | Where-Object { $_.Name -notmatch '\.schema\.json$' -and $_.FullName -notmatch '[/\]vendor[/\]' } | Sort-Object Name  # ref: EXCLUDE-LISTS.md#A7,#B7 — reason: schema files are meta; vendor is structural invariant
   $script:CachedShFiles = Get-ChildItem -Path 'src/scripts' -Recurse -Filter '*.sh' | Sort-Object Name
 }
 

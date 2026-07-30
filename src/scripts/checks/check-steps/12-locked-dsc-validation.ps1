@@ -60,7 +60,7 @@ Register-Step -Number 12 -Name "Locked DSC validation" -Action {
   # Generate locked DSC in-memory from all system DSC files + lockfile.
   $lockfileData = Get-Content $lockfilePath -Raw | ConvertFrom-Json -AsHashtable
   # Read all system DSC files (sorted by name), excluding packages.dsc.yml.
-  $dscSystemFiles = Get-ChildItem (Join-Path $dscSystemDir '*.dsc.yml') | Where-Object { $_.Name -ne 'packages.dsc.yml' } | Sort-Object Name
+  $dscSystemFiles = Get-ChildItem (Join-Path $dscSystemDir '*.dsc.yml') | Where-Object { $_.Name -ne 'packages.dsc.yml' } | Sort-Object Name  # ref: EXCLUDE-LISTS.md#A3 — reason: packages DSC is generated from lockfile, not manually authored
   # Self-pruning: verify excluded file still exists (A3)
   if (-not (Test-Path $dscSystemPackages)) {
     Write-ErrorMessage "stale exclusion: packages.dsc.yml no longer exists — remove -ne 'packages.dsc.yml' filter"

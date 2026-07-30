@@ -9,7 +9,7 @@ Register-Step -Number 21 -Name "Preflight InstallCommand policy" -Action {
   $ps1Files = if ($HasArgs) {
     if ($script:PS1_FILES) { $script:PS1_FILES } else { @($PositionalArgs | Where-Object { $_ -like '*.ps1' }) }
   } else {
-    @(Get-ChildItem -Recurse -Path $r -Include '*.ps1' | Where-Object { $_.FullName -notmatch '[\\\\/]vendor[\\\\/]' } | ForEach-Object { $_.FullName })
+    @(Get-ChildItem -Recurse -Path $r -Include '*.ps1' | Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' } | ForEach-Object { $_.FullName })  # ref: EXCLUDE-LISTS.md#B6 — reason: structural invariant
   }
 
   if ($ps1Files.Count -gt 0) {

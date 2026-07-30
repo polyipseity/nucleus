@@ -33,7 +33,7 @@ Register-Step -Number 13 -Name "Schema validation (JSON/YAML)" -Action {
   } else {
     # JSON files
     Get-ChildItem -Recurse -Path "$r/src" -Filter '*.json' | Where-Object {
-      $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notlike '*.schema.json'
+      $_.FullName -notmatch '[/\]vendor[/\]' -and $_.Name -notlike '*.schema.json'  # ref: EXCLUDE-LISTS.md#B3,#A7 — reason: structural invariants; schema files are meta
     } | ForEach-Object {
       $schema = try { (Get-Content $_.FullName -Raw | ConvertFrom-Json -AsHashtable)['$schema'] } catch { $null }
       if ($schema) {
@@ -47,7 +47,7 @@ Register-Step -Number 13 -Name "Schema validation (JSON/YAML)" -Action {
     }
     # YAML files
     Get-ChildItem -Recurse -Path $r -Include '*.yml', '*.yaml' | Where-Object {
-      $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.FullName -notmatch '[/\\]secrets[/\\]'
+      $_.FullName -notmatch '[/\]vendor[/\]' -and $_.FullName -notmatch '[/\]secrets[/\]'  # ref: EXCLUDE-LISTS.md#B3 — reason: structural invariants
     } | ForEach-Object {
       $schema = try { ($_ | Get-Content -Raw | ConvertFrom-Yaml)['$schema'] } catch { $null }
       if ($schema) {

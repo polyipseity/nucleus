@@ -78,12 +78,12 @@ Register-Step -Number 17 -Name "Suppression audit" -Action {
   } else {
     $allShNix = @(
       Get-ChildItem -Recurse -Path $r -Include '*.sh', '*.nix' |
-        Where-Object { $_.FullName -notmatch '[\\\\/]vendor[\\\\/]' } |
+        Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' } |  # ref: EXCLUDE-LISTS.md#B5 — reason: structural invariant
         ForEach-Object { $_.FullName }
     )
     $allPs1 = @(
       Get-ChildItem -Recurse -Path $r -Include '*.ps1' |
-        Where-Object { $_.FullName -notmatch '[\\\\/]vendor[\\\\/]' } |
+        Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' } |  # ref: EXCLUDE-LISTS.md#B5 — reason: structural invariant
         ForEach-Object { $_.FullName }
     )
 

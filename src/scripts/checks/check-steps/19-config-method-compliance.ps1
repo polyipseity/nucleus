@@ -9,7 +9,7 @@ Register-Step -Number 19 -Name "Config method compliance" -Action {
   # Single-pass: collect all config file basenames, run one Select-String across src/
   $cfgFiles = Get-ChildItem -Path $cfgDir -Recurse -File
   $srcFiles = Get-ChildItem -Path (Join-Path $r "src") -Recurse -Include '*.nix', '*.ps1', '*.sh' |
-    Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' -and $_.FullName -notmatch '[\\/]configs[\\/]' }
+    Where-Object { $_.FullName -notmatch '[\/]vendor[\/]' -and $_.FullName -notmatch '[\/]configs[\/]' }  # ref: EXCLUDE-LISTS.md#B1 — reason: structural invariants; vendored code and config methods are different concerns
   $cfgPatterns = @($cfgFiles | ForEach-Object { [regex]::Escape($_.Name) } | Sort-Object -Unique)
   $cfgSelectOutput = $srcFiles | Select-String -Pattern $cfgPatterns -SimpleMatch
   # Single-pass: collect all # Method lines for preceding-line checking
