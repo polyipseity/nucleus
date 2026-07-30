@@ -1,4 +1,4 @@
-Register-Step -Number 12 -Name "Locked DSC validation" -Action {
+Register-Step -Id "locked-dsc-validation" -Number 12 -Name "Locked DSC validation" -Action {
   param($RepoRoot)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }

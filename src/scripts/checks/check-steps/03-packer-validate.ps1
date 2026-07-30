@@ -1,4 +1,4 @@
-Register-Step -Number 3 -Name "Packer template validation" -Action {
+Register-Step -Id "packer-validate" -Number 3 -Name "Packer template validation" -Action {
   param($HasArgs, $RepoRoot)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }

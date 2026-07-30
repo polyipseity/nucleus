@@ -1,4 +1,4 @@
-Register-Step -Number 19 -Name "Config method compliance" -Action {
+Register-Step -Id "config-method-compliance" -Number 19 -Name "Config method compliance" -Action {
   param($RepoRoot)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }

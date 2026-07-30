@@ -3,7 +3,7 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step 5 "Nix lint (nixf-tidy)" run_05_nix_lint
+register_step "nix-lint" 5 "Nix lint (nixf-tidy)" run_05_nix_lint
 
 run_05_nix_lint() {
   local _has_args="$1" _repo_root="$2"; shift 2

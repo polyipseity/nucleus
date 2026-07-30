@@ -1,4 +1,4 @@
-Register-Step -Number 17 -Name "Suppression audit" -Action {
+Register-Step -Id "suppression-audit" -Number 17 -Name "Suppression audit" -Action {
   param($HasArgs, $RepoRoot, $PositionalArgs)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }

@@ -3,7 +3,7 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step 16 "Package manager usage enforcement" run_16_package_manager_enforcement
+register_step "package-manager-enforcement" 16 "Package manager usage enforcement" run_16_package_manager_enforcement
 
 run_16_package_manager_enforcement() {
   local _has_args="$1" _repo_root="$2"; shift 2

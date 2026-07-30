@@ -1,4 +1,4 @@
-Register-Step -Number 13 -Name "Schema validation (JSON/YAML)" -Action {
+Register-Step -Id "schema-validation" -Number 13 -Name "Schema validation (JSON/YAML)" -Action {
   param($HasArgs, $RepoRoot, $PositionalArgs)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }

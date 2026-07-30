@@ -1,4 +1,4 @@
-Register-Step -Number 16 -Name "Package manager usage enforcement" -Action {
+Register-Step -Id "package-manager-enforcement" -Number 16 -Name "Package manager usage enforcement" -Action {
   param($RepoRoot)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }

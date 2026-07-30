@@ -2,7 +2,7 @@
 # shellcheck source=../test-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../test-lib.sh"
 
-register_step 3 "Nucleus apps smoke tests" run_03_nucleus_apps_smoke
+register_step "nucleus-apps-smoke" 3 "Nucleus apps smoke tests" run_03_nucleus_apps_smoke
 
 run_03_nucleus_apps_smoke() {
   local _has_args="$1" _repo_root="$2"; shift 2

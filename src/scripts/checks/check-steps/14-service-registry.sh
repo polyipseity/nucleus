@@ -3,7 +3,7 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step 14 "Service registry validation" run_14_service_registry
+register_step "service-registry" 14 "Service registry validation" run_14_service_registry
 
 run_14_service_registry() {
   local _has_args="$1" _repo_root="$2"; shift 2

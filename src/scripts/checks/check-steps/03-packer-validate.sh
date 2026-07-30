@@ -3,7 +3,7 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step 3 "Packer template validation" run_03_packer_validate
+register_step "packer-validate" 3 "Packer template validation" run_03_packer_validate
 
 run_03_packer_validate() {
   local _has_args="$1" _repo_root="$2"; shift 2

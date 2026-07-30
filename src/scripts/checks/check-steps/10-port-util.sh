@@ -3,7 +3,7 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step 10 "Port utility function tests" run_10_port_util
+register_step "port-util" 10 "Port utility function tests" run_10_port_util
 
 run_10_port_util() {
   local _has_args="$1" _repo_root="$2"; shift 2

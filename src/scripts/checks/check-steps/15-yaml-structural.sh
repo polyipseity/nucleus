@@ -3,7 +3,7 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step 15 "YAML structural validation" run_15_yaml_structural
+register_step "yaml-structural" 15 "YAML structural validation" run_15_yaml_structural
 
 run_15_yaml_structural() {
   local _has_args="$1" _repo_root="$2"; shift 2

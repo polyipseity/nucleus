@@ -1,4 +1,4 @@
-Register-Step -Number 2 -Name "PowerShell lint" -Action {
+Register-Step -Id "powershell-lint-test" -Number 2 -Name "PowerShell lint" -Action {
   param($RepoRoot)
 
   $exitCode = 0

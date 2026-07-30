@@ -2,7 +2,7 @@
 # shellcheck source=../check-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step 21 "Preflight InstallCommand policy" run_21_preflight_install_command_policy
+register_step "preflight-install-command-policy" 21 "Preflight InstallCommand policy" run_21_preflight_install_command_policy
 
 run_21_preflight_install_command_policy() {
   local _has_args="$1" _repo_root="$2"; shift 2

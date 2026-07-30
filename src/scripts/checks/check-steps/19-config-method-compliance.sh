@@ -3,7 +3,7 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step 19 "Config method compliance" run_19_config_method_compliance
+register_step "config-method-compliance" 19 "Config method compliance" run_19_config_method_compliance
 
 run_19_config_method_compliance() {
   local _has_args="$1" _repo_root="$2"; shift 2

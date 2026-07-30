@@ -2,7 +2,7 @@
 # shellcheck source=../test-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../test-lib.sh"
 
-register_step 2 "PowerShell lint" run_02_powershell_lint
+register_step "powershell-lint-test" 2 "PowerShell lint" run_02_powershell_lint
 
 run_02_powershell_lint() {
   local _has_args="$1" _repo_root="$2"; shift 2

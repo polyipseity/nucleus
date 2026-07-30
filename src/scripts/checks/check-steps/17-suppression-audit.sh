@@ -3,7 +3,7 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step 17 "Undocumented error suppression" run_17_suppression_audit
+register_step "suppression-audit" 17 "Undocumented error suppression" run_17_suppression_audit
 
 run_17_suppression_audit() {
   local _has_args="$1" _repo_root="$2"; shift 2

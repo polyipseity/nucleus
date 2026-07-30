@@ -1,4 +1,4 @@
-Register-Step -Number 1 -Name "Code formatting and linting (treefmt equivalent)" -Action {
+Register-Step -Id "code-formatting" -Number 1 -Name "Code formatting and linting (treefmt equivalent)" -Action {
   param($HasArgs, $RepoRoot, $PositionalArgs)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
