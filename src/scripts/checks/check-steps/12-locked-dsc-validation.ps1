@@ -61,6 +61,11 @@ Register-Step -Number 12 -Name "Locked DSC validation" -Action {
   $lockfileData = Get-Content $lockfilePath -Raw | ConvertFrom-Json -AsHashtable
   # Read all system DSC files (sorted by name), excluding packages.dsc.yml.
   $dscSystemFiles = Get-ChildItem (Join-Path $dscSystemDir '*.dsc.yml') | Where-Object { $_.Name -ne 'packages.dsc.yml' } | Sort-Object Name
+  # Self-pruning: verify excluded file still exists (A3)
+  if (-not (Test-Path $dscSystemPackages)) {
+    Write-ErrorMessage "stale exclusion: packages.dsc.yml no longer exists — remove -ne 'packages.dsc.yml' filter"
+    $lfErrors++
+  }
   if ($dscSystemFiles.Count -eq 0) {
     Write-ErrorMessage "no system DSC files found in $dscSystemDir"
     return $false

@@ -62,6 +62,12 @@ run_19_config_method_compliance() {
   done
   rm -rf -- "$_cfg_par_tmpdir"
 
+  # Self-pruning: verify excluded file still exists (A2)
+  if [ ! -f "src/modules/configs/qtpass.nix" ]; then
+    error "stale exclusion: src/modules/configs/qtpass.nix no longer exists — remove 'qtpass.nix' from case skip list"
+    _cfg_errors=$((_cfg_errors + 1))
+  fi
+
   if [ "$_cfg_errors" -gt 0 ]; then
     error "config method compliance check failed with $_cfg_errors error(s)"
     return 1

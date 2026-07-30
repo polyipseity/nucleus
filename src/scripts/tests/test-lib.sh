@@ -76,6 +76,11 @@ parse_args() {
 # Override cache_file_lists for test-specific file caching
 cache_file_lists() {
   TEST_NIX_FILES=$(find tests -name '*.nix' -type f ! -name 'lib.nix' | sort)
+  # Self-pruning: verify excluded file still exists (A6)
+  if [ ! -f "tests/lib.nix" ]; then
+    error "stale exclusion: tests/lib.nix no longer exists — remove ! -name 'lib.nix' from find"
+    return 1
+  fi
   # shellcheck disable=SC2034 # reason: consumed by test step 01 (nix-tests) via transitive sourcing
   readarray -t TEST_NIX_FILES_ARR <<< "$TEST_NIX_FILES"
 }

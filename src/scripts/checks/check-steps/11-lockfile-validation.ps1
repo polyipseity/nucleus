@@ -34,6 +34,16 @@ Register-Step -Number 11 -Name "Lockfile validation" -Action {
         $lfOverlapErrors++
       }
     }
+    # Self-pruning: check if lfOverlapExceptions are still needed (A4)
+    foreach ($exception in $lfOverlapExceptions) {
+      if ($pkgToSections.ContainsKey($exception)) {
+        if ($pkgToSections[$exception].Count -le 1) {
+          Write-Warning "stale exception: '$exception' no longer overlaps sections — remove from lfOverlapExceptions"
+        }
+      } else {
+        Write-Warning "stale exception: '$exception' is not present in any lockfile section — remove from lfOverlapExceptions"
+      }
+    }
   }
 
   if ($lfOverlapErrors -gt 0) {

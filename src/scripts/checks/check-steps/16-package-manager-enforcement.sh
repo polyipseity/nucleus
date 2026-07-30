@@ -38,6 +38,14 @@ run_16_package_manager_enforcement() {
     _violations=$((_violations + 1))
   fi
 
+  # Self-pruning: verify excluded files still justify their exclusion (A1)
+  for _excluded in check.sh check.ps1 shell.nix; do
+    if [ -f "$_excluded" ] && ! grep -q -E '(pip install|npm install)' "$_excluded" 2>/dev/null; then
+      error "stale exclusion: '$_excluded' no longer contains pip/npm install patterns — remove from --exclude list"
+      _violations=$((_violations + 1))
+    fi
+  done
+
   if [ "$_violations" -gt 0 ]; then
     return 1
   fi

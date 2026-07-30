@@ -34,6 +34,15 @@ Register-Step -Number 16 -Name "Package manager usage enforcement" -Action {
     $violations++
   }
 
+  # Self-pruning: verify excluded files still justify their exclusion (A1)
+  foreach ($ef in @('check.sh', 'check.ps1', 'shell.nix')) {
+    $efPath = Join-Path $r $ef
+    if ((Test-Path $efPath) -and -not (Select-String -LiteralPath $efPath -Pattern '(pip install|npm install)' -Quiet)) {
+      Write-ErrorMessage "stale exclusion: '$ef' no longer contains pip/npm install patterns — remove from -Exclude list"
+      $violations++
+    }
+  }
+
   if ($violations -gt 0) {
     return $false
   }
