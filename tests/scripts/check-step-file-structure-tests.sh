@@ -181,18 +181,18 @@ test_posix_check_step_xargs_bash_c_arg_convention() {
         #   2-arg: ' _         — $1=filename (no tmpdir)
         if grep -q "' _ \"\\$" "$_f" 2>/dev/null; then
             # 3-arg form: verify $2 (filename) is used in the bash -c context
-            if ! tail -n "+$_xargs_line" "$_f" | grep -q '\$2'; then
+            if ! tail -n "+$_xargs_line" "$_f" | grep -q "\\\$2"; then
                 assert_fail "$_basename" "3-arg xargs bash -c: missing \$2 (filename parameter)"
                 ((violations++))
             fi
             # Verify $1 (tmpdir) is used in the bash -c context
-            if ! tail -n "+$_xargs_line" "$_f" | grep -q '\$1'; then
+            if ! tail -n "+$_xargs_line" "$_f" | grep -q "\\\$1"; then
                 assert_fail "$_basename" "3-arg xargs bash -c: missing \$1 (tmpdir parameter)"
                 ((violations++))
             fi
         elif grep -q "' _ " "$_f" 2>/dev/null; then
             # 2-arg form: verify $1 (filename) is used
-            if ! tail -n "+$_xargs_line" "$_f" | grep -q '\$1'; then
+            if ! tail -n "+$_xargs_line" "$_f" | grep -q "\\\$1"; then
                 assert_fail "$_basename" "2-arg xargs bash -c: missing \$1 (filename parameter)"
                 ((violations++))
             fi
