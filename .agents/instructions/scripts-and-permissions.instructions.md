@@ -41,7 +41,7 @@ Non-host subdirectories follow a two-track convention:
 | `configs/`              |             `<verb>-<target>.sh` | What action?     |
 | `editors/`              |             `<verb>-<target>.sh` | What action?     |
 | `integrations/`         |             `<verb>-<target>.sh` | What action?     |
-| `lib/`                  |                   `<domain>.sh` | What domain?     |
+| `lib/`                  |                    `<domain>.sh` | What domain?     |
 | `packages/`             |             `<verb>-<target>.sh` | What action?     |
 | `secrets/`              |             `<verb>-<target>.sh` | What action?     |
 | `services/`             |             `<entity>-<role>.sh` | Which component? |
