@@ -64,7 +64,7 @@ function Invoke-Step {
   # 2. Run step action, capture ALL output
   $exitCode = 0
   try {
-    $result = & $Action $script:HAS_ARGS $RepoRoot $script:WaveTmpDir $script:positionalArgs
+    $result = & $Action
     if ($result -eq $false) { $exitCode = 1 }
   } catch {
     $exitCode = 1

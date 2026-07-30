@@ -1,6 +1,5 @@
 Register-Step -Number 2 -Name "PowerShell lint" -Action {
-  param($HasArgs, $RepoRoot)
-  $null = $HasArgs # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — positional binding requires HasArgs before RepoRoot
+
   $exitCode = 0
   $pwshScript = Join-Path $RepoRoot 'scripts\check-pwsh.ps1'
   $settings = Join-Path $RepoRoot 'scripts\PSScriptAnalyzerSettings.test.psd1'

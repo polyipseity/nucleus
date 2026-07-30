@@ -1,6 +1,4 @@
 Register-Step -Number 18 -Name "Online determinism checks (--online)" -Action {
-  param($HasArgs, $RepoRoot)
-  $null = $HasArgs # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — positional binding requires HasArgs before RepoRoot
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 

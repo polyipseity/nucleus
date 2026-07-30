@@ -1,6 +1,4 @@
 Register-Step -Number 21 -Name "Preflight InstallCommand policy" -Action {
-  param($HasArgs, $RepoRoot, $WaveTmpDir, $PositionalArgs)
-  $null = $WaveTmpDir # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — positional binding requires all 4 params
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
