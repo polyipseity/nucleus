@@ -6,7 +6,7 @@ description: Resume work after an interruption reusing existing context.
 You are resuming after an interruption.
 
 - Continue from the exact next incomplete step. Do not re-read conversation history or workspace files.
-- **First, check for an in-progress implementation plan:**
+- **First, check for an in-progress implementation plan:** (If the `memory` tool is not available, call `activate_vs_code_interaction` with no arguments first — it is a one-shot call that permanently unlocks VS Code interaction tools.)
   1. Find the latest plan file:
      - Use `memory view /memories/session/` to list session memory files.
      - Find the most recent `plan-*.md` by sorting names (descending datetime).

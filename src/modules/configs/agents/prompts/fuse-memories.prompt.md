@@ -30,6 +30,8 @@ Scope and memoryName are AND-ed — only memories matching both are selected.
 
 Memory files at `/memories/session/` and `/memories/repo/` are directly listable via `memory view`. Do not use filesystem operations (`list_dir`, `file_search`, `resolve_memory_file_uri`) for memory file discovery.
 
+> **Memory tool availability:** If the `memory` tool is not in the available tool list, call `activate_vs_code_interaction` with no arguments first — it is a one-shot call that permanently unlocks VS Code interaction tools.
+
 1. **Check context metadata** — scan `<repoMemory>` and `<sessionMemory>` blocks in context for all available filenames. Filter by `${input:memoryName}` if set.
 2. **List directly via memory tool** — for active scopes, use `memory view /memories/<scope>/` to list available memory files.
 3. **Fail closed** — If all probe methods return zero files, report: "No memory files found at scopes `${input:scope}`. Aborting." and stop.
@@ -37,6 +39,8 @@ Memory files at `/memories/session/` and `/memories/repo/` are directly listable
 ## Read
 
 Read all confirmed memory files and all `.instructions.md` files at the target location.
+
+> **Memory tool availability:** If the `memory` tool is not in the available tool list, call `activate_vs_code_interaction` with no arguments first — it is a one-shot call that permanently unlocks VS Code interaction tools.
 
 1. Read memory files using `memory view /memories/<scope>/<name>.md`.
 2. Read all `.instructions.md` files at target: `read_file` each one in full.

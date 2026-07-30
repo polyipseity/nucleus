@@ -120,6 +120,8 @@ Present the final plan in your response and stop. Do NOT proceed to implementati
 
 > **CRITICAL**: The file MUST be named `plan-<datetime>.md`. NEVER use `active-plan.md` — that was the legacy name and no longer exists.
 
+> **Memory tool availability:** If the `memory` tool is not in the available tool list, call `activate_vs_code_interaction` with no arguments first — it is a one-shot call that permanently unlocks VS Code interaction tools.
+
 Steps:
 
 1. Generate an ISO datetime in UTC: run `date -u +%Y-%m-%dT%H%M%S` (produces e.g. `2026-07-20T212315`).
@@ -127,6 +129,8 @@ Steps:
 3. Verify with `memory view /memories/session/plan-<datetime>.md` — confirm content is nonempty and substantive (not just whitespace, "TODO", or a title with no body).
 
 ## Find the latest plan file
+
+> **Memory tool availability:** If the `memory` tool is not in the available tool list, call `activate_vs_code_interaction` with no arguments first — it is a one-shot call that permanently unlocks VS Code interaction tools.
 
 1. Use `memory view /memories/session/` to list session files. Find the most recent `plan-*.md` by sorting names (descending datetime).
 2. If no files match, report "no active plan found" and stop.

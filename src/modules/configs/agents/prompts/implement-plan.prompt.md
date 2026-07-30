@@ -52,9 +52,12 @@ State "Inputs loaded: atomicCommits=<value>, backwardsCompat=<value>, maxConcurr
      3. Verify with `memory view /memories/session/plan-<datetime>.md` — confirm the content is nonempty and substantive.
      4. From this point forward, always retrieve the plan via the find-latest-plan pattern (see "Find the latest plan file" below). Do not rely on ephemeral variables.
    - **Fallback — if session memory is unavailable** (the `memory` tool errors or `memory create` fails):
-     1. Generate a temporary file path: use `mktemp` (Linux/macOS) or `$env:TEMP` joined with a random name (Windows). Write the plan there.
-     2. Verify with `[[ -s "$planfile" ]]` (POSIX) or `(Get-Item "$planfile").Length -gt 0` (PowerShell).
-     3. **Still try to persist the temp file path to session memory** — generate a datetime, then use the `memory` tool with command `create`, path `/memories/session/plan-<datetime>.md`, and `file_text` containing `planfile=/path/to/temp/file`. This gives partial survivability across compaction.
+     First, call `activate_vs_code_interaction` with no arguments to unlock VS Code interaction tools. This one-shot call permanently unlocks the `memory` tool and disappears from the tool list after activation. Retry the `memory create` after activation.
+     1. Call `activate_vs_code_interaction` with no arguments.
+     2. Retry `memory create` — if it succeeds, proceed normally.
+     3. **If `activate_vs_code_interaction` is unavailable or `memory create` still fails**, use a temporary file as last resort: use `mktemp` (Linux/macOS) or `$env:TEMP` joined with a random name (Windows). Write the plan there.
+     4. Verify with `[[ -s "$planfile" ]]` (POSIX) or `(Get-Item "$planfile").Length -gt 0` (PowerShell).
+     5. **Still try to persist the temp file path to session memory** — generate a datetime, then use the `memory` tool with command `create`, path `/memories/session/plan-<datetime>.md`, and `file_text` containing `planfile=/path/to/temp/file`. This gives partial survivability across compaction.
    - **Verify the plan is nonempty and substantive.** Also confirm the content is not just whitespace, a placeholder like "TODO", or a title with no body — use `memory view /memories/session/plan-<datetime>.md` (or `head -c 200 "$planfile"` for fallback) to self-audit. If the file is empty or insubstantial, re-generate the plan and re-verify. Do not proceed to step 2 with a degenerate plan.
 
 2. **Implement the plan**

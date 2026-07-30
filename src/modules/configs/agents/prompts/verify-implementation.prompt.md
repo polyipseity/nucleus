@@ -16,6 +16,8 @@ If the user's message that triggered this prompt contains "implement", "do it", 
 
 ### 1. Retrieve the plan
 
+> **Memory tool availability:** If the `memory` tool is not in the available tool list, call `activate_vs_code_interaction` with no arguments first — it is a one-shot call that permanently unlocks VS Code interaction tools.
+
 1. Find the latest plan file:
    - Use `memory view /memories/session/` to list session memory files.
    - Find the most recent `plan-*.md` by sorting names (descending datetime).

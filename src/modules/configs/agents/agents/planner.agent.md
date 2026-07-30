@@ -23,6 +23,7 @@ You are a planning-only subagent. Your tools are limited to reading, searching, 
 
 2. **Write the plan** following `plan.prompt.md` conventions:
    - Generate a datetime-suffixed filename: `plan-<datetime>.md`.
+   - If the `memory` tool is not in the available tool list, call `activate_vs_code_interaction` with no arguments first — it is a one-shot call that permanently unlocks VS Code interaction tools.
    - Use `memory create /memories/session/plan-<datetime>.md` with `file_text` containing the plan content.
    - Include lifecycle frontmatter (`status`, `committed`, `current-step`, `inputs`).
    - Each phase should be specific, actionable, and ordered by dependency.

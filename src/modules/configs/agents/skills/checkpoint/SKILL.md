@@ -29,6 +29,8 @@ Each checkpoint captures:
 
 ## How to save
 
+> **Memory tool availability:** If the `memory` tool is not in the available tool list, call `activate_vs_code_interaction` with no arguments first — it is a one-shot call that permanently unlocks VS Code interaction tools.
+
 1. Run `date -u +%Y-%m-%dT%H%M%S` for ISO timestamp.
 2. Construct path `/memories/session/checkpoint-<datetime>.md`.
 3. Call `memory create` with path `/memories/session/checkpoint-<datetime>.md` and `file_text` containing the checkpoint content.
