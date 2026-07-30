@@ -12,7 +12,7 @@ run_16_package_manager_enforcement() {
   local _violations=0
 
   # Ban bare `pip install` and `npm install`.
-  # ref: exclude-lists.instructions.md#A1 — reason: orchestrator/config files contain pip/npm patterns in comments; self-refs are dynamic
+  # ref: allow-and-deny-lists.instructions.md#A1 — reason: orchestrator/config files contain pip/npm patterns in comments; self-refs are dynamic
   local _self_sh _self_ps1
   _self_sh="$(basename "${BASH_SOURCE[0]}")"
   _self_ps1="$(basename "${BASH_SOURCE[0]}" .sh).ps1"

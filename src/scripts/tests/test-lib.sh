@@ -75,7 +75,7 @@ parse_args() {
 
 # Override cache_file_lists for test-specific file caching
 cache_file_lists() {
-  TEST_NIX_FILES=$(find tests -name '*.nix' -type f ! -name 'lib.nix' | sort)  # ref: exclude-lists.instructions.md#A6 — reason: test helper library excluded from namespace of test files
+  TEST_NIX_FILES=$(find tests -name '*.nix' -type f ! -name 'lib.nix' | sort)  # ref: allow-and-deny-lists.instructions.md#A6 — reason: test helper library excluded from namespace of test files
   # Self-pruning: verify excluded file still exists (A6)
   if [ ! -f "tests/lib.nix" ]; then
     error "stale exclusion: tests/lib.nix no longer exists — remove ! -name 'lib.nix' from find"

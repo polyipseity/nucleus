@@ -18,7 +18,7 @@ run_19_config_method_compliance() {
   local _cfg_patterns
   _cfg_patterns=$(mktemp) || { error "failed to create temp file"; _cfg_errors=$((_cfg_errors + 1)); }
   find "$_cfg_dir" -type f -exec basename {} \; | sort -u > "$_cfg_patterns"
-  # ref: exclude-lists.instructions.md#B1 — reason: structural invariants; vendored code and config methods are different concerns
+  # ref: allow-and-deny-lists.instructions.md#B1 — reason: structural invariants; vendored code and config methods are different concerns
   grep -rn --include='*.nix' --include='*.ps1' --include='*.sh' \
     -F -f "$_cfg_patterns" \
     src/ --exclude-dir='vendor' --exclude-dir='configs' \

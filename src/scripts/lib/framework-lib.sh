@@ -165,11 +165,11 @@ parse_args() {
 # Called only in full mode before steps fire.
 cache_file_lists() {
   # shellcheck disable=SC2034 # reason: consumed by step files (05, 13, 15, 17) via transitive sourcing
-  readarray -t CACHED_NIX_FILES < <(find . -path ./vendor -prune -false -o -name '*.nix' -print | sort)  # ref: exclude-lists.instructions.md#B7 — reason: structural invariant
+  readarray -t CACHED_NIX_FILES < <(find . -path ./vendor -prune -false -o -name '*.nix' -print | sort)  # ref: allow-and-deny-lists.instructions.md#B7 — reason: structural invariant
   # shellcheck disable=SC2034 # reason: consumed by step files (13, 15) via transitive sourcing
-  readarray -t CACHED_YAML_FILES < <(find . -not -path '*/vendor/*' \( -name '*.yml' -o -name '*.yaml' \) -print | sort)  # ref: exclude-lists.instructions.md#B7 — reason: structural invariant
+  readarray -t CACHED_YAML_FILES < <(find . -not -path '*/vendor/*' \( -name '*.yml' -o -name '*.yaml' \) -print | sort)  # ref: allow-and-deny-lists.instructions.md#B7 — reason: structural invariant
   # shellcheck disable=SC2034 # reason: consumed by step files (13) via transitive sourcing
-  readarray -t CACHED_JSON_FILES < <(find src -name '*.json' -not -path '*/vendor/*' -not -name '*.schema.json' -print | sort)  # ref: exclude-lists.instructions.md#A7,#B7 — reason: schema files are meta; vendor is structural invariant
+  readarray -t CACHED_JSON_FILES < <(find src -name '*.json' -not -path '*/vendor/*' -not -name '*.schema.json' -print | sort)  # ref: allow-and-deny-lists.instructions.md#A7,#B7 — reason: schema files are meta; vendor is structural invariant
   # shellcheck disable=SC2034 # reason: consumed by step files (17) via transitive sourcing
   readarray -t CACHED_SH_FILES < <(find src/scripts -type f -name '*.sh' -print | sort)
 }
