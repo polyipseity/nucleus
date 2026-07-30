@@ -57,6 +57,23 @@ test_regression_step_id_preserves_order() {
 # ---- Contract B: --format flag removed (Phase 1) ----
 # --format is no longer accepted by parse_args. Tests for it have been removed.
 
+# ---- Contract B2: --skip-system-build removed (Phase 2) ----
+# Flag is no longer accepted by test-lib.sh's parse_args.
+
+test_regression_skip_system_build_flag_removed() {
+    local exit_code=0
+    REPO_ROOT="$REPO_ROOT" \
+    bash -c '
+        . "'"$REPO_ROOT"'/src/scripts/tests/test-lib.sh"
+        parse_args --skip-system-build 2>/dev/null || true
+    ' 2>/dev/null || exit_code=$?
+    if [ "$exit_code" -ne 0 ]; then
+        assert_pass "REGRESSION: --skip-system-build is no longer accepted"
+    else
+        assert_fail "REG-skip-sys-build" "Expected exit != 0 from --skip-system-build, got: $exit_code"
+    fi
+}
+
 # ---- Contract C: parse_args scoped/full behavior ----
 # These should remain stable across all phases.
 
@@ -279,6 +296,7 @@ echo "These tests capture current behavioral contracts. If any fail,"
 echo "the baseline has changed. Review whether the change is intentional."
 echo ""
 
+test_regression_skip_system_build_flag_removed
 test_regression_step_id_format_numeric
 test_regression_step_id_preserves_order
 test_regression_scoped_sets_has_args

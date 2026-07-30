@@ -10,7 +10,6 @@
 #   -q|--quiet           Suppress success/progress output across applicable steps.
 #   --fail-fast          Exit immediately on first failure (default).
 #   --no-fail-fast       Accumulate all failures.
-#   --skip-system-build  Skip building the host system configuration.
 #
 # Environment variables:
 #   NUCLEUS_REPO_ROOT  Override the detected repository root path.

@@ -8,11 +8,6 @@ run_04_system_config_build() {
   local _has_args="$1" _repo_root="$2"; shift 2
   local _exit_code=0
 
-  if [ "$skip_system_build" = true ]; then
-    say "skipping (--skip-system-build)."
-    return 0
-  fi
-
   local _attr=""
   case "$(uname)" in
     Darwin) _attr="darwinConfigurations.macbook.system" ;;

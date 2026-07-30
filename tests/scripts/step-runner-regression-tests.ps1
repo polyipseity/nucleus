@@ -51,7 +51,27 @@ if ($script:StepIds.Count -eq 2 -and $script:StepIds[0] -eq "first" -and $script
     Assert-Fail "REG-ps1-ids" "Expected Ids=['first','second'], Numbers=[1,2]; got Ids=$($script:StepIds -join ','), Numbers=$($script:StepNumbers -join ',')"
 }
 
-# ---- Contract B: Read-Argument rejects unknown flags ----
+# ---- Contract B2: --skip-system-build removed (Phase 2) ----
+# Flag is no longer accepted by test-lib.ps1's Read-Argument.
+# Uses file content analysis because Read-Argument calls exit 1 on unknown flags.
+
+function Test-SkipSystemBuildFlagRemoved {
+    $testLibPs1 = Join-Path $repoRoot 'src\scripts\tests\test-lib.ps1'
+    $content = Get-Content -Path $testLibPs1 -Raw
+    $hasFlagInSwitch = $content -match "'\^--skip-system-build\b"
+    $hasFlagInUsage = $content -match 'skip-system-build'
+    if (-not $hasFlagInSwitch -and -not $hasFlagInUsage) {
+        Assert-Pass "REGRESSION: PS1 --skip-system-build is no longer accepted"
+    } else {
+        $details = @()
+        if ($hasFlagInSwitch) { $details += "still has flag in switch" }
+        if ($hasFlagInUsage) { $details += "still mentions flag in usage" }
+        Assert-Fail "REG-ps1-skip-sys-build" "$($details -join '; ')"
+    }
+}
+Test-SkipSystemBuildFlagRemoved
+
+# ---- Contract B3: Read-Argument rejects unknown flags ----
 # Tests that unknown flags (including --format) are rejected.
 function Test-FormatFlagRejected {
     # Reset step arrays

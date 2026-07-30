@@ -21,14 +21,12 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 # Test-specific defaults
 FAIL_FAST=true
 quiet_mode=false
-skip_system_build=false
 REPO_ROOT=$(derive_repo_root)
 cd "$REPO_ROOT" || exit
 
 # Override parse_args to add test-specific flags
 parse_args() {
   quiet_mode=false
-  skip_system_build=false
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -47,11 +45,6 @@ parse_args() {
         ;;
       --no-fail-fast)
         FAIL_FAST=false
-        shift
-        ;;
-      --skip-system-build)
-        # shellcheck disable=SC2034 # reason: consumed by test step 04 (system-config-build) via transitive sourcing
-        skip_system_build=true
         shift
         ;;
       -*)
@@ -96,5 +89,5 @@ preflight_check() {
 }
 
 usage() {
-  usage_std "test.sh" "[-q|--quiet] [--fail-fast|--no-fail-fast] [--skip-system-build]" "Run the repository test suite. With --quiet, suppress success/progress output across applicable steps (failures always shown). By default, all output is shown. --fail-fast exits immediately on first failure (default); --no-fail-fast accumulates all failures. --skip-system-build skips building the system configuration."
+  usage_std "test.sh" "[-q|--quiet] [--fail-fast|--no-fail-fast]" "Run the repository test suite. With --quiet, suppress success/progress output across applicable steps (failures always shown). By default, all output is shown. --fail-fast exits immediately on first failure (default); --no-fail-fast accumulates all failures."
 }

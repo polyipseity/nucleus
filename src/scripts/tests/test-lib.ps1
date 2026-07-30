@@ -7,13 +7,11 @@ Set-StrictMode -Version Latest
 . (Join-Path $FrameworkDir "step-runner.ps1")
 
 $script:FAIL_FAST = $true
-$script:skipSystemBuild = $false
 $script:usageAction = {
-  Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast] [--skip-system-build] [--quiet]"
+  Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast] [--quiet]"
   Write-Output "  Run all Windows-compatible repository test suites."
   Write-Output "  --fail-fast            Exit immediately on first failure (default)."
   Write-Output "  --no-fail-fast          Accumulate all failures."
-  Write-Output "  --skip-system-build     No-op (accepted for CLI parity with test.sh)."
   Write-Output "  --quiet                No-op (--quiet is POSIX-only; accepted for CLI parity)."
 }
 
@@ -31,7 +29,6 @@ function Read-Argument {
   $script:FAIL_FAST = $true
   $script:HAS_ARGS = $false
   $script:positionalArgs = @()
-  $script:skipSystemBuild = $false
   $script:SCOPED = $false
   $script:FULL = $false
 
@@ -49,10 +46,6 @@ function Read-Argument {
       }
       '^--no-fail-fast$' {
         $script:FAIL_FAST = $false
-        break
-      }
-      '^--skip-system-build$' {
-        $script:skipSystemBuild = $true
         break
       }
       '^--quiet$' {

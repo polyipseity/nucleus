@@ -9,7 +9,6 @@
 # Arguments:
 #   --fail-fast         Exit immediately on first failure (default).
 #   --no-fail-fast      Accumulate all failures.
-#   --skip-system-build No-op (accepted for CLI parity with test.sh).
 #   --quiet             No-op (--quiet is POSIX-only; accepted for CLI parity).
 #
 # Environment variables:
