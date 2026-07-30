@@ -47,6 +47,21 @@ parse_args() {
         FAIL_FAST=false
         shift
         ;;
+      --skip-steps=*)
+        SKIP_STEPS=()
+        _IFS_SAVE="$IFS"; IFS=','
+        for _id in ${1#--skip-steps=}; do
+          _id="${_id## }"; _id="${_id%% }"
+          [ -n "$_id" ] || continue
+          _skip_dup=false
+          for _existing in "${SKIP_STEPS[@]}"; do
+            [ "$_existing" = "$_id" ] && _skip_dup=true && break
+          done
+          $_skip_dup || SKIP_STEPS+=("$_id")
+        done
+        IFS="$_IFS_SAVE"
+        shift
+        ;;
       -*)
         error "unsupported argument '$1'"
         usage >&2
@@ -89,5 +104,5 @@ preflight_check() {
 }
 
 usage() {
-  usage_std "test.sh" "[-q|--quiet] [--fail-fast|--no-fail-fast]" "Run the repository test suite. With --quiet, suppress success/progress output across applicable steps (failures always shown). By default, all output is shown. --fail-fast exits immediately on first failure (default); --no-fail-fast accumulates all failures."
+  usage_std "test.sh" "[-q|--quiet] [--fail-fast|--no-fail-fast] [--skip-steps=<ids>]" "Run the repository test suite. With --quiet, suppress success/progress output across applicable steps (failures always shown). By default, all output is shown. --fail-fast exits immediately on first failure (default); --no-fail-fast accumulates all failures. --skip-steps=<ids> skips steps with the given comma-separated IDs."
 }

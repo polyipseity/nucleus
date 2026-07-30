@@ -8,11 +8,12 @@ Set-StrictMode -Version Latest
 
 $script:FAIL_FAST = $true
 $script:usageAction = {
-  Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast] [--quiet]"
+  Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast] [--quiet] [--skip-steps=<ids>]"
   Write-Output "  Run all Windows-compatible repository test suites."
   Write-Output "  --fail-fast            Exit immediately on first failure (default)."
   Write-Output "  --no-fail-fast          Accumulate all failures."
   Write-Output "  --quiet                No-op (--quiet is POSIX-only; accepted for CLI parity)."
+  Write-Output "  --skip-steps=<ids>     Skip steps with the given comma-separated IDs."
 }
 
 function Write-Message { Write-Output "test: $args" }
@@ -31,6 +32,7 @@ function Read-Argument {
   $script:positionalArgs = @()
   $script:SCOPED = $false
   $script:FULL = $false
+  $script:SkipSteps = @()
 
   $i = 0
   while ($i -lt $Arguments.Count) {
@@ -50,6 +52,20 @@ function Read-Argument {
       }
       '^--quiet$' {
         # No-op: --quiet is POSIX-only.
+        break
+      }
+      '^--skip-steps=(.*)$' {
+        $script:SkipSteps = @()
+        $value = $Matches[1]
+        if ($value) {
+          $ids = $value -split ','
+          foreach ($id in $ids) {
+            $id = $id.Trim()
+            if ($id -and $script:SkipSteps -notcontains $id) {
+              $script:SkipSteps += $id
+            }
+          }
+        }
         break
       }
       '^-.*' {

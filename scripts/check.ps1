@@ -11,6 +11,7 @@
 #   --fail-fast      Exit immediately on first failure.
 #   --no-fail-fast   Accumulate all failures (default).
 #   --online         Run online determinism checks.
+#   --skip-steps=<ids>  Skip steps with the given comma-separated IDs.
 #   (paths)          Files to check; restricts --scoped to matching files.
 #
 # Environment variables:

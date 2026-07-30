@@ -7,8 +7,14 @@
 # See check-lib.sh, step-runner.sh, and files in check-steps/ for step logic.
 #
 # Arguments:
-#   (paths)       Files to check; passes paths through to sub-checkers and
-#                 skips whole-repo checks (always-run checks that don't support path filtering).
+#   --fail-fast       Exit immediately on first failure.
+#   --no-fail-fast    Accumulate all failures (default).
+#   --scoped          Skip whole-repo checks (path-scoped mode).
+#   --full            Force whole-repo checks even with paths.
+#   --online          Run online determinism checks.
+#   --skip-steps=<ids>  Skip steps with the given comma-separated IDs.
+#   (paths)           Files to check; passes paths through to sub-checkers and
+#                     skips whole-repo checks (always-run checks that don't support path filtering).
 #
 # Environment variables:
 #   NUCLEUS_REPO_ROOT  Override the detected repository root path.

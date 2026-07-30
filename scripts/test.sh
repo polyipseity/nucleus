@@ -10,6 +10,7 @@
 #   -q|--quiet           Suppress success/progress output across applicable steps.
 #   --fail-fast          Exit immediately on first failure (default).
 #   --no-fail-fast       Accumulate all failures.
+#   --skip-steps=<ids>   Skip steps with the given comma-separated IDs.
 #
 # Environment variables:
 #   NUCLEUS_REPO_ROOT  Override the detected repository root path.
