@@ -4,13 +4,18 @@ Register-Step -Number 17 -Name "Suppression audit" -Action {
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
   $undocSuppViolations = @()
+  $script:fileCache = @{}
 
   function Test-Suppressed {
     param([string]$CheckId, [string]$Path, [int]$LineNumber)
-    $line = Get-Content -Path $Path | Select-Object -Index ($LineNumber - 1)
+    if (-not $script:fileCache.ContainsKey($Path)) {
+      $script:fileCache[$Path] = Get-Content -Path $Path
+    }
+    $content = $script:fileCache[$Path]
+    $line = $content[$LineNumber - 1]
     if ($line -match "# check-suppress:$CheckId[\s:]") { return $true }
     if ($LineNumber -gt 1) {
-      $prevLine = Get-Content -Path $Path | Select-Object -Index ($LineNumber - 2)
+      $prevLine = $content[$LineNumber - 2]
       if ($prevLine -match "# check-suppress:$CheckId[\s:]") { return $true }
     }
     return $false
@@ -49,7 +54,8 @@ Register-Step -Number 17 -Name "Suppression audit" -Action {
         }
         # Skip if preceding line has suppression comment
         if ($m.LineNumber -gt 1 -and -not $NoSuppressionCheck) {
-          $prevLine = Get-Content -Path $m.Path | Select-Object -Index ($m.LineNumber - 2)
+          if (-not $script:fileCache.ContainsKey($m.Path)) { $script:fileCache[$m.Path] = Get-Content -Path $m.Path }
+          $prevLine = $script:fileCache[$m.Path][$m.LineNumber - 2]
           $prevPattern = "# check-suppress:$CheckId"
           if ($CheckId -eq 'suppression_doc') { $prevPattern += '|# undoc-supp:' }
           if ($prevLine -match $prevPattern) { continue }
