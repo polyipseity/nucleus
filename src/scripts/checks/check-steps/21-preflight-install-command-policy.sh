@@ -33,13 +33,7 @@ run_21_preflight_install_command_policy() {
       | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
         _f="$2"
         _out="$1/$(echo "$_f" | tr "/" "_").out"
-        _line_no=0
-        while IFS= read -r _line; do
-          _line_no=$((_line_no + 1))
-          if echo "$_line" | grep -q "Assert-ToolAvailable.*-InstallCommand"; then
-            echo "$_f:$_line_no:$_line" >> "$_out"
-          fi
-        done < "$_f"
+        grep -Hn "Assert-ToolAvailable.*-InstallCommand" "$_f" >> "$_out" 2>/dev/null || true
       ' _ "$_s21_tmpdir"
 
     local _f _err
