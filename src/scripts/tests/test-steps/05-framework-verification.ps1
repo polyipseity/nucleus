@@ -16,7 +16,7 @@ Register-Step -Id "framework-verification" -Number 5 -Name "Framework verificati
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
   & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPaths '05-nix-lint-explicit-skip.ps1')
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
-  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPaths '13-schema-validation-enforce-schema.ps1')
+  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPaths '13-schema-validation-tests.ps1')
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
   & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPaths '15-yaml-structural-explicit-skip.ps1')
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }

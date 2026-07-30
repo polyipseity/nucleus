@@ -17,7 +17,7 @@ run_05_framework_verification() {
   say "--- step-specific tests ---"
   bash "$_test_dir/check-steps/01-code-formatting-tests.sh" || _exit_code=1
   bash "$_test_dir/check-steps/05-nix-lint-explicit-skip.sh" || _exit_code=1
-  bash "$_test_dir/check-steps/13-schema-validation-enforce-schema.sh" || _exit_code=1
+  bash "$_test_dir/check-steps/13-schema-validation-tests.sh" || _exit_code=1
   bash "$_test_dir/check-steps/15-yaml-structural-explicit-skip.sh" || _exit_code=1
   bash "$_test_dir/check-steps/17-suppression-audit-explicit-skip.sh" || _exit_code=1
 

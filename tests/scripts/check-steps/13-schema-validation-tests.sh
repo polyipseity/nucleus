@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# shellcheck disable=all
 # Test: step 13 schema-validation must enforce $schema presence (Spec G)
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -9,6 +8,7 @@ TEST_FILE="$REPO_ROOT/src/scripts/checks/check-steps/13-schema-validation.sh"
 
 test_step13_has_missing_schema_check() {
   # Matches: error "Missing \$schema in $_f"
+  # shellcheck disable=SC2016 # reason: literal $schema in grep pattern
   if grep -q 'Missing.*$schema' "$TEST_FILE"; then
     return 0
   fi
@@ -18,6 +18,7 @@ test_step13_has_missing_schema_check() {
 
 test_step13_has_format_check() {
   # Matches: error "Invalid \$schema in $_f: must be a non-empty string"
+  # shellcheck disable=SC2016 # reason: literal $schema in grep pattern
   if grep -q 'Invalid.*$schema.*non-empty' "$TEST_FILE"; then
     return 0
   fi
