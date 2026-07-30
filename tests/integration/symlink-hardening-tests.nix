@@ -8,7 +8,7 @@ let
   customProvisionSymlinksText = builtins.readFile ../../src/modules/custom-provision-symlinks.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
   finderSidebarText = builtins.readFile ../../src/modules/macos/finder-sidebar.nix;
-  agentsHelpersText = builtins.readFile ../../src/scripts/lib/symlink-hardening-lib.sh;
+  agentsHelpersText = builtins.readFile ../../src/scripts/lib/symlink-hardening.sh;
   discordMusicRpcText = builtins.readFile ../../src/modules/ext-discord-music-rpc.nix;
   homeNixText = builtins.readFile ../../src/modules/home.nix;
 in
@@ -16,7 +16,7 @@ rec {
   # =========================================================================
   # Assertion 1: VS Code symlink protection in editors.nix
   #               (shell functions that implement chflags/chattr live in
-  #                symlink-hardening-lib.sh — verified below via agentsHelpersText
+  #                symlink-hardening.sh — verified below via agentsHelpersText
   #                editors.nix references the activation scripts that call
   #                those functions)
   # =========================================================================
@@ -29,7 +29,7 @@ rec {
     true;
 
   # =========================================================================
-  # Assertion 2: Agents config symlink protection — function def in symlink-hardening-lib.sh,
+  # Assertion 2: Agents config symlink protection — function def in symlink-hardening.sh,
   #               symlink target name in agents.nix
   # =========================================================================
   agentsConfigProtection =
@@ -39,7 +39,7 @@ rec {
     true;
 
   # =========================================================================
-  # Assertion 3: Agents skills symlink protection — function def in symlink-hardening-lib.sh,
+  # Assertion 3: Agents skills symlink protection — function def in symlink-hardening.sh,
   #               activation name in agents.nix
   # =========================================================================
   skillsProtection =

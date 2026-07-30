@@ -6,7 +6,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../../lib/macos-launch-services-lib.sh"
+. "$SCRIPT_DIR/../../lib/macos-launch-services.sh"
 
 # Source: symbolic hotkey values are persisted in
 # com.apple.symbolichotkeys/AppleSymbolicHotKeys via defaults(1).

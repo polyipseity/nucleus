@@ -173,7 +173,7 @@ let
       sanitizeICloudManagedRoots [ ]
   );
 
-  # fdaWarningFunction extracted to src/scripts/lib/macos-fda-warning-lib.sh
+  # fdaWarningFunction extracted to src/scripts/lib/macos-fda-warning.sh
 
   # Daily launchd agent script for iCloud exclusion convergence.
   # Uses scriptName mode with runtime SCRIPT_DIR sourcing of the shared lib.

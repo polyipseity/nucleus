@@ -4,11 +4,11 @@
 #
 # Usage: managed-symlink (protect|unprotect) <context> <path>
 #
-# Sources symlink-hardening-lib.sh via SCRIPT_DIR at runtime.
+# Sources symlink-hardening.sh via SCRIPT_DIR at runtime.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+. "$SCRIPT_DIR/../lib/symlink-hardening.sh"
 
 _action="$1"
 _context="$2"

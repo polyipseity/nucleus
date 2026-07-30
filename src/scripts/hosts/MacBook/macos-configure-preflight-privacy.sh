@@ -4,7 +4,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../../lib/macos-fda-warning-lib.sh"
+. "$SCRIPT_DIR/../../lib/macos-fda-warning.sh"
 
 _pp_repo_root="$1"
 

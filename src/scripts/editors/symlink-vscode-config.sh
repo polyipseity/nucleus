@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # VS Code config symlinks activation.
 # Called by home-manager activation symlink-vscode-config.
-# Provides: ensure_file_symlink, ensure_dir_symlink (from symlink-hardening-lib.sh)
+# Provides: ensure_file_symlink, ensure_dir_symlink (from symlink-hardening.sh)
 
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+. "$SCRIPT_DIR/../lib/symlink-hardening.sh"
 
 _vsym_repo_root="$1"
 _vsym_stable_base="$2"

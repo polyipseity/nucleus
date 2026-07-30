@@ -3,7 +3,7 @@
 #
 # Source this at the top of each bundle script via:
 #   SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-#   . "$SCRIPT_DIR/../lib/argparse-lib.sh"
+#   . "$SCRIPT_DIR/../lib/argparse.sh"
 #
 # Parsing convention:
 #   --key value    — stores "$key=$value" in _ab_args

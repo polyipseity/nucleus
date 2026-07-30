@@ -93,7 +93,7 @@ Every standalone script must source libs via SCRIPT_DIR and accept CLI positiona
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+. "$SCRIPT_DIR/../lib/symlink-hardening.sh"
 
 _arg1="$1"
 _arg2="$2"

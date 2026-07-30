@@ -207,7 +207,7 @@
   # This activation script removes the file on every rebuild so the declarative
   # config overrides that runtime preference.
   # Inlined (not the shared disable-steam-autostart.sh) because the shared
-  # script sources macos-console-user-lib.sh for macOS login-item removal,
+  # script sources macos-console-user.sh for macOS login-item removal,
   # which is unused on Linux and would fail from SCRIPT_DIR resolution.
   # Cross-platform parity:
   #   macOS   — login item removal in MacBook/activation.nix (osascript)

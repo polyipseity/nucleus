@@ -32,7 +32,7 @@ Non-host subdirectories follow a two-track convention:
 
 - **Verb-first** (most subdirs): `<verb>-<target>.<ext>` — the first word tells what action the script performs.
 - **Entity-first** (`services/` only): `<entity>-<role>.<ext>` — the first word tells which component is managed.
-- **Library scripts** (`lib/`): `<domain>[-lib].sh` — descriptive, no action verb. `lib.sh` is the universal library; `*-lib.sh` marks domain-specific libraries.
+- **Library scripts** (`lib/`): `<domain>.sh` — descriptive, no action verb. `lib.sh` is the universal library; other `.sh` files are domain-specific libraries.
 
 | Subdirectory            |                          Pattern | First-word role  |
 | ----------------------- | -------------------------------: | ---------------- |
@@ -41,7 +41,7 @@ Non-host subdirectories follow a two-track convention:
 | `configs/`              |             `<verb>-<target>.sh` | What action?     |
 | `editors/`              |             `<verb>-<target>.sh` | What action?     |
 | `integrations/`         |             `<verb>-<target>.sh` | What action?     |
-| `lib/`                  |              `<domain>[-lib].sh` | What domain?     |
+| `lib/`                  |                   `<domain>.sh` | What domain?     |
 | `packages/`             |             `<verb>-<target>.sh` | What action?     |
 | `secrets/`              |             `<verb>-<target>.sh` | What action?     |
 | `services/`             |             `<entity>-<role>.sh` | Which component? |
@@ -195,7 +195,7 @@ Adding a new toggle: add a default entry to the `DEFAULTS`/`$Defaults` map in bo
 
 All program/daemon/service killing, refresh, and restart operations must go through centralized library functions:
 
-- **macOS**: `src/scripts/lib/macos-launch-services-lib.sh` (`refresh_*` functions)
+- **macOS**: `src/scripts/lib/macos-launch-services.sh` (`refresh_*` functions)
 - **Windows**: `src/hosts/Windows/modules/Set-NucleusService.ps1`
 
 Do not inline killall/Stop-Service commands in activation blocks or individual scripts. This ensures a single point of control per OS and prevents redundant kills in the same activation run.

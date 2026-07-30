@@ -5,7 +5,7 @@
 # writeNucleusShellApplication wrappers.
 #
 # Scripts source library dependencies via SCRIPT_DIR-relative paths
-# (e.g. $SCRIPT_DIR/../lib/symlink-hardening-lib.sh), which work identically
+# (e.g. $SCRIPT_DIR/../lib/symlink-hardening.sh), which work identically
 # regardless of whether the tree is consumed directly or nested under
 # another derivation's $out/src/scripts/.
 { pkgs }:

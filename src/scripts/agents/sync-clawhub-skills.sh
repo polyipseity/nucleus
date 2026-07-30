@@ -5,7 +5,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
+. "$SCRIPT_DIR/../lib/symlink-hardening.sh"
 
 _scs_jq_bin="$1"
 _scs_path_prepend="$2"

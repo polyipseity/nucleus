@@ -12,8 +12,8 @@
 # hardcoded version list, so new app upgrades keep working automatically.
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-# shellcheck source=../lib/macos-console-user-lib.sh
-. "$SCRIPT_DIR/../lib/macos-console-user-lib.sh"
+# shellcheck source=../lib/macos-console-user.sh
+. "$SCRIPT_DIR/../lib/macos-console-user.sh"
 
 if _nucleus_resolve_console_user; then
       console_home="$(/usr/bin/dscl . -read "/Users/$_nucleus_console_user" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}')"

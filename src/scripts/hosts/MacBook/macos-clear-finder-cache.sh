@@ -12,8 +12,8 @@
 # user intervention (Cmd+Opt+Esc, cache deletion, etc.).
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-# shellcheck source=../../lib/macos-console-user-lib.sh
-. "$SCRIPT_DIR/../../lib/macos-console-user-lib.sh"
+# shellcheck source=../../lib/macos-console-user.sh
+. "$SCRIPT_DIR/../../lib/macos-console-user.sh"
 
 if _nucleus_resolve_console_user; then
       finder_cache_dir="/Users/$_nucleus_console_user/Library/Saved Application State/com.apple.finder.savedState"

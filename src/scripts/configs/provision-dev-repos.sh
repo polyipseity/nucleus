@@ -12,8 +12,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
-. "$SCRIPT_DIR/../lib/dev-repos-provision-lib.sh"
+. "$SCRIPT_DIR/../lib/symlink-hardening.sh"
+. "$SCRIPT_DIR/../lib/dev-repos-provision.sh"
 
 export HOME="$1"
 export PATH="$PATH:$2"

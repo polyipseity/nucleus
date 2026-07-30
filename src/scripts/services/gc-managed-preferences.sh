@@ -7,8 +7,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-# shellcheck source=../lib/macos-launch-services-lib.sh
-. "$SCRIPT_DIR/../lib/macos-launch-services-lib.sh"
+# shellcheck source=../lib/macos-launch-services.sh
+. "$SCRIPT_DIR/../lib/macos-launch-services.sh"
 
 MANAGED_PREF_DOMAINS="${MANAGED_PREF_DOMAINS:-${1:?usage: gc-managed-preferences.sh <space-separated-domains>}}"
 export NIX_STORE_BIN="${NIX_STORE_BIN:-nix}"

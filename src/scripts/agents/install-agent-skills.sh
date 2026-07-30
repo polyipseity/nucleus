@@ -5,8 +5,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../lib/symlink-hardening-lib.sh"
-. "$SCRIPT_DIR/../lib/symlink-convergence-lib.sh"
+. "$SCRIPT_DIR/../lib/symlink-hardening.sh"
+. "$SCRIPT_DIR/../lib/symlink-convergence.sh"
 
 _ask_repo_root="$1"
 _ask_skills_source="$_ask_repo_root/src/modules/configs/agents/skills"

@@ -18,12 +18,12 @@ fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # shellcheck source=../src/scripts/lib/lib.sh
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
-# shellcheck source=../src/scripts/lib/vm-lib.sh
-# shellcheck disable=SC1094 # reason: vm-lib.sh contains inline PowerShell content (backtick-escaped $) that shellcheck cannot parse; pre-existing constraint from the library
-. "$SCRIPT_DIR/../src/scripts/lib/vm-lib.sh"
+# shellcheck source=../src/scripts/lib/vm.sh
+# shellcheck disable=SC1094 # reason: vm.sh contains inline PowerShell content (backtick-escaped $) that shellcheck cannot parse; pre-existing constraint from the library
+. "$SCRIPT_DIR/../src/scripts/lib/vm.sh"
 
 # ---------------------------------------------------------------------------
-# Transient helpers — to be migrated into vm-lib.sh as part of the library
+# Transient helpers — to be migrated into vm.sh as part of the library
 # rename pass.  These resolve VM guest credentials from SOPS and compute a
 # credential fingerprint for drift detection.
 # ---------------------------------------------------------------------------

@@ -10,7 +10,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../lib/require-command-lib.sh"
+. "$SCRIPT_DIR/../lib/require-command.sh"
 
 # --- Argument parsing ---
 ws_port="${WS_PORT:-1234}"

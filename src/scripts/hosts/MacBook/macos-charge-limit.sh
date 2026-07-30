@@ -10,8 +10,8 @@
 # bclm is retained as a fallback only for older macOS versions.
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-# shellcheck source=../../lib/macos-console-user-lib.sh
-. "$SCRIPT_DIR/../../lib/macos-console-user-lib.sh"
+# shellcheck source=../../lib/macos-console-user.sh
+. "$SCRIPT_DIR/../../lib/macos-console-user.sh"
 
 macos_major="$(/usr/bin/sw_vers -productVersion 2>/dev/null | /usr/bin/awk -F. '{print $1}')"
 

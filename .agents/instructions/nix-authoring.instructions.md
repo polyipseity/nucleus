@@ -164,7 +164,7 @@ Some scripts embed Nix-computed values via `builtins.readFile` into activation b
 - A library function definition (not a script body) that must be sourced by multiple callers.
 - A token-replaced template that uses `builtins.replaceStrings` (the established token-injection pattern).
 
-These sites are not candidates for the CLI-arg conversion. Examples: `macos-icloud-exclusions-lib.sh` (sourced by both activation hook and launchd agent), `macos-fda-warning-lib.sh` (library with no script entry point). Do not attempt to convert these unless an alternative dispatch mechanism is introduced.
+These sites are not candidates for the CLI-arg conversion. Examples: `macos-icloud-exclusions.sh` (sourced by both activation hook and launchd agent), `macos-fda-warning.sh` (library with no script entry point). Do not attempt to convert these unless an alternative dispatch mechanism is introduced.
 
 ## Module conventions
 
@@ -425,10 +425,10 @@ Pure-shell logic was extracted to `src/scripts/`, but the Nix-evaluated wrapper 
 Examples with their extracted helpers:
 
 - `devSpotlightExclusions` → `dev-spotlight-exclusions.sh` (find predicate stays in Nix)
-- `icloudExclusionsScript` → `icloud-exclusions-lib.sh` (JSON args via env vars)
+- `icloudExclusionsScript` → `icloud-exclusions.sh` (JSON args via env vars)
 - `provision-wallpapers` per-wallpaper loop → `provision-wallpaper.sh`
 - `install-bun-packages` entry iteration → `home/install-bun-packages.sh`
-- `provision-dev-repos` per-repo loop → `dev-repos-provision-lib.sh`
+- `provision-dev-repos` per-repo loop → `dev-repos-provision.sh`
 - `macos-set-gui-env-path` PATH dedup → `gui-env-agent.sh` + `macos-set-gui-env-path.sh`
 
 **Rule**: when adding a new split-pattern inline script, extract the pure-shell body to `src/scripts/` first, then wrap it in Nix with environment variable injection or `builtins.replaceStrings` for Nix-evaluated values.

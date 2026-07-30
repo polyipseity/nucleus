@@ -1,7 +1,7 @@
 # shellcheck shell=sh
 # Shared symlink convergence functions for managing directory-based symlink
 # collections.  Assumes _nucleus_{un,}protect_symlink from
-# symlink-hardening-lib.sh are available at call sites.
+# symlink-hardening.sh are available at call sites.
 #
 # Provided functions:
 #   _nucleus_remove_stale_symlinks

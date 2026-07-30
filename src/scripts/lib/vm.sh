@@ -2,7 +2,7 @@
 # Source this file from the vm-setup dispatcher, then call vm_init with
 # all config values as positional parameters to make data flow explicit.
 # Example:
-#   . "$SCRIPT_DIR/vm-lib.sh"
+#   . "$SCRIPT_DIR/vm.sh"
 #   vm_init "$REPO_ROOT" "$VM_DIR" ...
 #
 # HARD PROHIBITION: ALL variables used by this library MUST be initialized
