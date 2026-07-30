@@ -333,17 +333,13 @@ function Clear-GitCache {
       }
 
       # Remove stale state files when no active operation.
+      # Uses dynamic glob patterns to discover stale files, so new Git state
+      # files are automatically picked up without maintaining a hard-coded list.
       if (-not $activeOp) {
-        $stateFiles = @(
-          'MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'REBASE_HEAD',
-          'SQUASH_MSG', 'AUTO_MERGE', 'BISECT_LOG',
-          'BISECT_ANCESTORS_OK', 'BISECT_EXPECTED_REV', 'BISECT_NAMES', 'BISECT_RUN'
-        )
+        $stateFiles = Get-ChildItem -LiteralPath $gitDir.FullName -File |
+          Where-Object { $_.Name -match '(_HEAD$|^BISECT_|^AUTO_MERGE$|^SQUASH_MSG$)' }
         foreach ($stateFile in $stateFiles) {
-          $statePath = Join-Path $gitDir.FullName $stateFile
-          if (Test-Path -LiteralPath $statePath -PathType Leaf) {
-            Remove-Item -LiteralPath $statePath -Force -ErrorAction Stop
-          }
+          Remove-Item -LiteralPath $stateFile.FullName -Force -ErrorAction Stop
         }
       }
 

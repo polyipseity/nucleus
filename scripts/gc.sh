@@ -393,25 +393,17 @@ gc_git_cache_if_present() {
       done < <(find ".git" -name '*.lock' ! -name 'index.lock' -type f -print0 2>/dev/null)
 
       # Remove stale state files when no active operation.
+      # Uses dynamic glob patterns to discover stale files, so new Git state
+      # files are automatically picked up without maintaining a hard-coded list.
       if [ "$active_op" = false ]; then
-        for _state_file in ".git/MERGE_HEAD" ".git/CHERRY_PICK_HEAD" ".git/REVERT_HEAD" ".git/REBASE_HEAD" ".git/SQUASH_MSG" ".git/AUTO_MERGE" ".git/BISECT_LOG"; do
-          if [ -f "$_state_file" ]; then
-            if [ "$dry_run" = true ]; then
-              dry_run "would remove stale state file '$_state_file' in '$repo_dir'"
-            else
-              rm -f "$_state_file"
-            fi
+        while IFS= read -r -d '' _state_file; do
+          _state_file="${_state_file#./}"
+          if [ "$dry_run" = true ]; then
+            dry_run "would remove stale state file '$_state_file' in '$repo_dir'"
+          else
+            rm -f "$_state_file"
           fi
-        done
-        for _bisect_file in ".git/BISECT_ANCESTORS_OK" ".git/BISECT_EXPECTED_REV" ".git/BISECT_NAMES" ".git/BISECT_RUN"; do
-          if [ -f "$_bisect_file" ]; then
-            if [ "$dry_run" = true ]; then
-              dry_run "would remove stale bisect file '$_bisect_file' in '$repo_dir'"
-            else
-              rm -f "$_bisect_file"
-            fi
-          fi
-        done
+        done < <(find ".git" -type f \( -name '*_HEAD' -o -name 'BISECT_*' -o -name 'AUTO_MERGE' -o -name 'SQUASH_MSG' \) -print0 2>/dev/null)
       fi
 
       # Remove deprecated directories if empty.

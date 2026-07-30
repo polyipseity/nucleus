@@ -7,10 +7,12 @@ Register-Step -Number 16 -Name "Package manager usage enforcement" -Action {
 
   # Ban bare pip install and npm install -- these bypass the lockfile.
   # uv pip install is allowed. Exclude self-references.
+  $selfPs1 = $MyInvocation.MyCommand.Name
+  $selfSh = [System.IO.Path]::ChangeExtension($selfPs1, '.sh')
   $pipViolations = Select-String -Path @(
     Get-ChildItem -Recurse -Path "$r\scripts", "$r\src", "$r\tests" `
       -Include *.sh, *.ps1, *.nix `
-      -Exclude check.sh, check.ps1, shell.nix, 16-package-manager-enforcement.ps1 `
+      -Exclude check.sh, check.ps1, shell.nix, $selfPs1, $selfSh `
       | ForEach-Object { $_.FullName }
   ) -Pattern '(^|[^a-z])pip install([^-]|$)' `
     | Where-Object { $_.Line -notmatch 'uv pip install' }
@@ -23,7 +25,7 @@ Register-Step -Number 16 -Name "Package manager usage enforcement" -Action {
   $npmViolations = Select-String -Path @(
     Get-ChildItem -Recurse -Path "$r\scripts", "$r\src", "$r\tests" `
       -Include *.sh, *.ps1, *.nix `
-      -Exclude check.sh, check.ps1, shell.nix, 16-package-manager-enforcement.ps1 `
+      -Exclude check.sh, check.ps1, shell.nix, $selfPs1, $selfSh `
       | ForEach-Object { $_.FullName }
   ) -Pattern '(^|[^a-z])npm install([^-]|$)'
 

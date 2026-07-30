@@ -12,10 +12,13 @@ run_16_package_manager_enforcement() {
   local _violations=0
 
   # Ban bare `pip install` and `npm install`.
+  local _self_sh _self_ps1
+  _self_sh="$(basename "${BASH_SOURCE[0]}")"
+  _self_ps1="$(basename "${BASH_SOURCE[0]}" .sh).ps1"
   if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
        --exclude='check.sh' --exclude='check.ps1' --exclude='shell.nix' \
-       --exclude='16-package-manager-enforcement.sh' \
-       --exclude='16-package-manager-enforcement.ps1' \
+       --exclude="$_self_sh" \
+       --exclude="$_self_ps1" \
        -E '(^|[^a-z])pip install([^-]|$)' \
        scripts/ src/ tests/ 2>/dev/null \
        | grep -v 'uv pip install' \
@@ -26,8 +29,8 @@ run_16_package_manager_enforcement() {
 
   if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
        --exclude='check.sh' --exclude='check.ps1' --exclude='shell.nix' \
-       --exclude='16-package-manager-enforcement.sh' \
-       --exclude='16-package-manager-enforcement.ps1' \
+       --exclude="$_self_sh" \
+       --exclude="$_self_ps1" \
        -E '(^|[^a-z])npm install([^-]|$)' \
        scripts/ src/ tests/ 2>/dev/null \
        | grep . >/dev/null 2>&1; then
