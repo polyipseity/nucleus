@@ -6,6 +6,7 @@
 Set-StrictMode -Version Latest
 
 # --- Step registration ---
+$script:StepIds = [System.Collections.Generic.List[string]]::new()
 $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
 $script:StepNames = [System.Collections.Generic.List[string]]::new()
 $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
@@ -13,12 +14,36 @@ $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
 function Register-Step {
   param(
     [Parameter(Mandatory)]
+    [string]$Id,
+    [Parameter(Mandatory)]
     [int]$Number,
     [Parameter(Mandatory)]
     [string]$Name,
     [Parameter(Mandatory)]
     [scriptblock]$Action
   )
+
+  # Validate id not empty (Spec A).
+  if ([string]::IsNullOrEmpty($Id)) {
+    throw "Step ID must not be empty"
+  }
+
+  # Validate id contains no digits (Spec A).
+  if ($Id -match '\d') {
+    throw "Step ID '$Id' contains forbidden digit"
+  }
+
+  # Validate unique id (Spec A).
+  if ($script:StepIds -contains $Id) {
+    throw "Duplicate step ID '$Id'"
+  }
+
+  # Validate unique number (Spec A).
+  if ($script:StepNumbers -contains $Number) {
+    throw "Duplicate step number $Number"
+  }
+
+  $script:StepIds.Add($Id)
   $script:StepNumbers.Add($Number)
   $script:StepNames.Add($Name)
   $script:StepActions.Add($Action)
@@ -40,6 +65,21 @@ function Remove-WaveTempDir {
   if ($script:WaveTmpDir -and (Test-Path $script:WaveTmpDir)) {
     Remove-Item -Path $script:WaveTmpDir -Recurse -Force -ErrorAction SilentlyContinue
   }
+}
+
+# --- Invoke-SkippedStep helper ---
+function Invoke-SkippedStep {
+  param(
+    [int]$Number,
+    [string]$Name,
+    [string]$Id
+  )
+  $stepStart = [System.Diagnostics.Stopwatch]::StartNew()
+  "`n=== [$Number] $Name === SKIPPED (--skip-steps: $Id)" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.out") -Encoding utf8
+  $Name | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.name") -Encoding utf8 -NoNewline
+  "0" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.exit") -Encoding utf8 -NoNewline
+  $stepStart.Stop()
+  "$($stepStart.ElapsedMilliseconds)" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.time") -Encoding utf8 -NoNewline
 }
 
 # --- Invoke-Step wrapper ---
@@ -91,6 +131,7 @@ function Read-Argument {
   $script:ONLINE = $false
   $script:SCOPED = $false
   $script:FULL = $false
+  $script:SkipSteps = @()
   $script:positionalArgs = @()
 
   $i = 0
@@ -119,6 +160,20 @@ function Read-Argument {
       }
       '^--online$' {
         $script:ONLINE = $true
+        break
+      }
+      '^--skip-steps=(.*)$' {
+        $script:SkipSteps = @()
+        $value = $Matches[1]
+        if ($value) {
+          $ids = $value -split ','
+          foreach ($id in $ids) {
+            $id = $id.Trim()
+            if ($id -and $script:SkipSteps -notcontains $id) {
+              $script:SkipSteps += $id
+            }
+          }
+        }
         break
       }
       '^-.*' {
@@ -169,13 +224,80 @@ function Save-FileListCache {
 }
 
 # --- Invoke-StepPipeline ---
+# Default: parallel dispatch via runspaces (wave-based parallelism).
 function Invoke-StepPipeline {
   Initialize-WaveTempDir
   Save-FileListCache
 
+  $runspaces = [System.Collections.Generic.List[hashtable]]::new()
+
   for ($i = 0; $i -lt $script:StepActions.Count; $i++) {
-    Invoke-Step -Number $script:StepNumbers[$i] -Name $script:StepNames[$i] -Action $script:StepActions[$i]
+    $id = $script:StepIds[$i]
+    $n = $script:StepNumbers[$i]
+    $name = $script:StepNames[$i]
+    $action = $script:StepActions[$i]
+
+    # Check skip list.
+    $skip = $false
+    if ($script:SkipSteps -and $script:SkipSteps.Count -gt 0) {
+      if ($script:SkipSteps -contains $id) { $skip = $true }
+    }
+
+    if ($skip) {
+      Invoke-SkippedStep -Number $n -Name $name -Id $id
+    } else {
+      $ps = [System.Management.Automation.PowerShell]::Create()
+      $null = $ps.AddScript({
+        param($Number, $Name, $Action, $HasArgs, $RepoRoot, $WaveTmpDir, $FAIL_FAST)
+
+        $stepStart = [System.Diagnostics.Stopwatch]::StartNew()
+        "`n=== [$Number] $Name ===" | Out-File -FilePath (Join-Path $WaveTmpDir "step-$Number.out") -Encoding utf8
+        $Name | Out-File -FilePath (Join-Path $WaveTmpDir "step-$Number.name") -Encoding utf8 -NoNewline
+
+        $exitCode = 0
+        try {
+          $stepParams = @{ HasArgs = $HasArgs; RepoRoot = $RepoRoot; WaveTmpDir = $WaveTmpDir }
+          $result = & $Action @stepParams
+          if ($result -eq $false) { $exitCode = 1 }
+        } catch {
+          $exitCode = 1
+          "$_" | Out-File -FilePath (Join-Path $WaveTmpDir "step-$Number.out") -Encoding utf8 -Append
+        }
+
+        "$exitCode" | Out-File -FilePath (Join-Path $WaveTmpDir "step-$Number.exit") -Encoding utf8 -NoNewline
+        $stepStart.Stop()
+        "$($stepStart.ElapsedMilliseconds)" | Out-File -FilePath (Join-Path $WaveTmpDir "step-$Number.time") -Encoding utf8 -NoNewline
+
+        if ($exitCode -ne 0 -and $FAIL_FAST) {
+          exit $exitCode
+        }
+      }).AddParameters(@{
+        Number    = $n
+        Name      = $name
+        Action    = $action
+        HasArgs   = $script:HAS_ARGS
+        RepoRoot  = $RepoRoot
+        WaveTmpDir = $script:WaveTmpDir
+        FAIL_FAST = $script:FAIL_FAST
+      })
+      $handle = $ps.BeginInvoke()
+      $null = $runspaces.Add(@{ PowerShell = $ps; AsyncResult = $handle; Number = $n })
+    }
   }
+
+  # Wait for all runspaces to complete.
+  $failed = $false
+  foreach ($rs in $runspaces) {
+    try {
+      $null = $rs.PowerShell.EndInvoke($rs.AsyncResult)
+    } catch {
+      $failed = $true
+    } finally {
+      $rs.PowerShell.Dispose()
+    }
+  }
+
+  if ($failed) { exit 1 }
 }
 
 # --- Format-StepSummary ---

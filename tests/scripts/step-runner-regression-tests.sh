@@ -26,13 +26,13 @@ test_regression_step_id_format_numeric() {
         # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
         REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
-        register_step 1 "Test" test_func
-        echo "${_STEP_NUMBERS[0]}"
+        register_step "a" 1 "Test" test_func
+        echo "${_STEP_IDS[0]} ${_STEP_NUMBERS[0]}"
     )
-    if [ "$result" = "1" ]; then
-        assert_pass "REGRESSION: register_step accepts numeric ID 1"
+    if [ "$result" = "a 1" ]; then
+        assert_pass "REGRESSION: register_step stores ID and number correctly"
     else
-        assert_fail "REG-step-id-numeric" "Expected '1', got: $result"
+        assert_fail "REG-step-id-numeric" "Expected 'a 1', got: $result"
     fi
 }
 
@@ -42,55 +42,20 @@ test_regression_step_id_preserves_order() {
         # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
         REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
-        register_step 5 "Fifth" f5
-        register_step 3 "Third" f3
-        register_step 7 "Seventh" f7
-        echo "${_STEP_NUMBERS[*]}"
+        register_step "five" 5 "Fifth" f5
+        register_step "three" 3 "Third" f3
+        register_step "seven" 7 "Seventh" f7
+        echo "${_STEP_NUMBERS[*]} | ${_STEP_IDS[*]}"
     )
-    if [ "$result" = "5 3 7" ]; then
-        assert_pass "REGRESSION: register_step preserves insertion order"
+    if [ "$result" = "5 3 7 | five three seven" ]; then
+        assert_pass "REGRESSION: register_step preserves insertion order (IDs + numbers)"
     else
-        assert_fail "REG-step-id-order" "Expected '5 3 7', got: $result"
+        assert_fail "REG-step-id-order" "Expected '5 3 7 | five three seven', got: $result"
     fi
 }
 
-# ---- Contract B: --format flag currently accepted ----
-# Will be removed in Phase 1.
-
-test_regression_format_flag_accepted() {
-    local result
-    result=$(
-        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-        REPO_ROOT="$REPO_ROOT"
-        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
-        usage() { true; }
-        parse_args --format
-        echo "$FORMAT_NIX"
-    )
-    if [ "$result" = "true" ]; then
-        assert_pass "REGRESSION: parse_args --format sets FORMAT_NIX=true"
-    else
-        assert_fail "REG-format-flag" "Expected 'true', got: $result"
-    fi
-}
-
-test_regression_format_flag_is_last_position() {
-    local result
-    result=$(
-        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-        REPO_ROOT="$REPO_ROOT"
-        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
-        usage() { true; }
-        # --format must be consumed before positional args
-        parse_args --format some/path.nix
-        echo "$FORMAT_NIX $HAS_ARGS"
-    )
-    if [ "$result" = "true true" ]; then
-        assert_pass "REGRESSION: --format consumed before positional args"
-    else
-        assert_fail "REG-format-pos" "Expected 'true true', got: $result"
-    fi
-}
+# ---- Contract B: --format flag removed (Phase 1) ----
+# --format is no longer accepted by parse_args. Tests for it have been removed.
 
 # ---- Contract C: parse_args scoped/full behavior ----
 # These should remain stable across all phases.
@@ -251,7 +216,7 @@ test_regression_aggregate_results_exits_zero_on_pass() {
         say() { true; }
         error() { true; }
         _wave_init
-        register_step 1 "Pass" some_func
+        register_step "pass" 1 "Pass" some_func
         printf "%s" "0" > "$_wave_tmpdir/step-1.exit"
         printf "%s" "10" > "$_wave_tmpdir/step-1.time"
         printf "%s" "Pass" > "$_wave_tmpdir/step-1.name"
@@ -274,7 +239,7 @@ test_regression_aggregate_results_output_contains_check_summary() {
         say() { echo "say: $*"; }
         error() { echo "error: $*" >&2; }
         _wave_init
-        register_step 1 "PassStep" pfunc
+        register_step "pass" 1 "PassStep" pfunc
         printf "%s" "0" > "$_wave_tmpdir/step-1.exit"
         printf "%s" "42" > "$_wave_tmpdir/step-1.time"
         printf "%s" "PassStep" > "$_wave_tmpdir/step-1.name"
@@ -316,8 +281,6 @@ echo ""
 
 test_regression_step_id_format_numeric
 test_regression_step_id_preserves_order
-test_regression_format_flag_accepted
-test_regression_format_flag_is_last_position
 test_regression_scoped_sets_has_args
 test_regression_full_sets_has_args_false
 test_regression_scoped_and_full_mutually_exclusive

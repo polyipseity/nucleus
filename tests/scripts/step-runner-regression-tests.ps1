@@ -37,23 +37,22 @@ Set-StrictMode -Version Latest
 # ---- Contract A: Step IDs are currently numeric integers ----
 Write-Host "`n=== Stage 1/3: Framework behavioral contracts ==="
 
-# Tests that register steps works
+# Tests that Register-Step works
 . $stepRunner
 
-# Verify step registration accepts numbers
+# Verify step registration accepts string IDs and numbers
 $testAction = { param($HasArgs, $RepoRoot) "ok" }
-Register-Step -Number 1 -Name "Test" -Action $testAction
-Register-Step -Number 2 -Name "Test2" -Action $testAction
+Register-Step -Id "first" -Number 1 -Name "Test" -Action $testAction
+Register-Step -Id "second" -Number 2 -Name "Test2" -Action $testAction
 
-if ($script:StepNumbers.Count -eq 2 -and $script:StepNumbers[0] -eq 1 -and $script:StepNumbers[1] -eq 2) {
-    Assert-Pass "REGRESSION: Register-Step accepts numeric IDs 1,2"
+if ($script:StepIds.Count -eq 2 -and $script:StepIds[0] -eq "first" -and $script:StepNumbers[0] -eq 1) {
+    Assert-Pass "REGRESSION: Register-Step accepts string IDs and numbers"
 } else {
-    Assert-Fail "REG-ps1-ids" "Expected [1,2], got: $($script:StepNumbers -join ',')"
+    Assert-Fail "REG-ps1-ids" "Expected Ids=['first','second'], Numbers=[1,2]; got Ids=$($script:StepIds -join ','), Numbers=$($script:StepNumbers -join ',')"
 }
 
-# ---- Contract B: Read-Argument does NOT accept --format flag ----
-# Unlike POSIX parse_args, PS1 Read-Argument does NOT have --format.
-# This tests that --format is rejected.
+# ---- Contract B: Read-Argument rejects unknown flags ----
+# Tests that unknown flags (including --format) are rejected.
 function Test-FormatFlagRejected {
     # Reset step arrays
     $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
@@ -124,29 +123,28 @@ function Test-ScopedFullBehavior {
 }
 Test-ScopedFullBehavior
 
-# ---- Contract D: Invoke-StepPipeline is SEQUENTIAL (no parallelism) ----
-function Test-SequentialExecution {
+# ---- Contract D: Invoke-StepPipeline uses parallelism (runspaces) ----
+function Test-ParallelExecution {
+    $script:StepIds = [System.Collections.Generic.List[string]]::new()
     $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
     $script:StepNames = [System.Collections.Generic.List[string]]::new()
     $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
     . $stepRunner
 
-    $order = @()
-    Register-Step -Number 1 -Name "First" -Action { param($HasArgs, $RepoRoot) $script:order += 1 }
-    Register-Step -Number 2 -Name "Second" -Action { param($HasArgs, $RepoRoot) $script:order += 2 }
+    Register-Step -Id "first" -Number 1 -Name "First" -Action { param($HasArgs, $RepoRoot) $true }
+    Register-Step -Id "second" -Number 2 -Name "Second" -Action { param($HasArgs, $RepoRoot) $true }
 
-    # Analyze Invoke-StepPipeline source: it uses a sequential for loop
+    # Analyze Invoke-StepPipeline source: it should use BeginInvoke/EndInvoke (runspaces)
     $source = Get-Content -Path $stepRunner -Raw
-    $hasSequentialLoop = $source -match 'for.*\(.*\$i.*StepActions'
-    $hasParallelPattern = $source -match 'Start-Job|RunspacePool|ForEach-Object -Parallel'
+    $hasParallelPattern = $source -match 'BeginInvoke|RunspacePool|ForEach-Object -Parallel|Start-Job'
 
-    if ($hasSequentialLoop -and -not $hasParallelPattern) {
-        Assert-Pass "REGRESSION: PS1 Invoke-StepPipeline is sequential (no parallelism)"
+    if ($hasParallelPattern) {
+        Assert-Pass "REGRESSION: PS1 Invoke-StepPipeline uses parallelism via runspaces"
     } else {
-        Assert-Fail "REG-ps1-sequential" "Expected sequential loop, got: sequential=$hasSequentialLoop parallel=$hasParallelPattern"
+        Assert-Fail "REG-ps1-parallel" "Expected parallel pattern (BeginInvoke/RunspacePool), not found in source"
     }
 }
-Test-SequentialExecution
+Test-ParallelExecution
 
 # ---- Contract E: Format-StepSummary output format ----
 function Test-SummaryOutputFormat {
@@ -159,7 +157,7 @@ function Test-SummaryOutputFormat {
     function global:Write-Message { Write-Output "message: $args" }
     function global:Write-ErrorMessage { Write-Output "error: $args" }
 
-    Register-Step -Number 1 -Name "PassStep" -Action { param($HasArgs, $RepoRoot) $true }
+    Register-Step -Id "pass" -Number 1 -Name "PassStep" -Action { param($HasArgs, $RepoRoot) $true }
     Initialize-WaveTempDir
 
     # Simulate a run by writing files directly

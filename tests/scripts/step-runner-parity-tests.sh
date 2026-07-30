@@ -17,12 +17,12 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
 # ---- Contract: Both parse_args and Read-Argument support the same flags ----
 # Per the plan, the shared flag set is:
-#   --fail-fast, --no-fail-fast, --scoped, --full, --online
-# (--format is POSIX-only, will be removed in Phase 1)
+#   --fail-fast, --no-fail-fast, --scoped, --full, --online, --skip-steps
+# (--format was removed in Phase 1)
 
 test_parity_parse_args_shared_flags() {
     # Test each shared flag is accepted
-    local flags=("--fail-fast" "--no-fail-fast" "--scoped" "--full" "--online")
+    local flags=("--fail-fast" "--no-fail-fast" "--scoped" "--full" "--online" "--skip-steps=a,b")
     local all_ok=true
 
     for flag in "${flags[@]}"; do

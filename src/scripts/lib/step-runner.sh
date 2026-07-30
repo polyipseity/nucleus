@@ -10,12 +10,45 @@ _NUCLEUS_STEP_RUNNER_SOURCED=1
 
 # --- Step registration ---
 # Indexed arrays: step numbers, step names, step function names.
+declare -a _STEP_IDS=()
 declare -a _STEP_NUMBERS=()
 declare -a _STEP_NAMES=()
 declare -a _STEP_FUNCS=()
 
 register_step() {
-  local _n="$1" _name="$2" _func="$3"
+  local _id="$1" _n="$2" _name="$3" _func="$4"
+
+  # Validate id not empty (Spec A).
+  if [ -z "$_id" ]; then
+    error "Step ID must not be empty"
+    exit 1
+  fi
+
+  # Validate id contains no digits (Spec A).
+  if echo "$_id" | grep -q '[0-9]'; then
+    error "Step ID '$_id' contains forbidden digit"
+    exit 1
+  fi
+
+  # Validate unique id (Spec A).
+  local _existing_id
+  for _existing_id in "${_STEP_IDS[@]}"; do
+    if [ "$_existing_id" = "$_id" ]; then
+      error "Duplicate step ID '$_id'"
+      exit 1
+    fi
+  done
+
+  # Validate unique number (Spec A).
+  local _existing_n
+  for _existing_n in "${_STEP_NUMBERS[@]}"; do
+    if [ "$_existing_n" -eq "$_n" ] 2>/dev/null; then
+      error "Duplicate step number $_n"
+      exit 1
+    fi
+  done
+
+  _STEP_IDS+=("$_id")
   _STEP_NUMBERS+=("$_n")
   _STEP_NAMES+=("$_name")
   _STEP_FUNCS+=("$_func")
@@ -90,25 +123,37 @@ _run_step() {
   fi
 }
 
+# --- _run_skipped_step helper ---
+# Writes step files with a SKIPPED marker instead of executing the step function.
+_run_skipped_step() {
+  local _n="$1" _name="$2" _id="$3"
+  local _step_start_ms _elapsed_ms
+
+  _step_start_ms=$(date +%s%3N)
+
+  printf '\n=== [%s] %s === SKIPPED (--skip-steps: %s)\n' "$_n" "$_name" "$_id" > "$_wave_tmpdir/step-$_n.out"
+  printf '%s' "$_name" > "$_wave_tmpdir/step-$_n.name"
+  printf '%s' "0" > "$_wave_tmpdir/step-$_n.exit"
+  _elapsed_ms=$(($(date +%s%3N) - _step_start_ms))
+  printf '%s' "$_elapsed_ms" > "$_wave_tmpdir/step-$_n.time"
+}
+
 # --- Argument parsing ---
 parse_args() {
+  # shellcheck disable=SC2034 # reason: FORMAT_NIX kept for backward compat; removed from accept-flags in
   FORMAT_NIX=false
   ONLINE=false
   SCOPED=false
   FULL=false
   HAS_ARGS=false
   POSITIONAL_ARGS=()
+  SKIP_STEPS=()
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
       -h|--help)
         usage
         exit 0
-        ;;
-      --format)
-        # shellcheck disable=SC2034 # reason: consumed by check step 01 (code-formatting) via transitive sourcing
-        FORMAT_NIX=true
-        shift
         ;;
       --fail-fast)
         FAIL_FAST=true
@@ -129,6 +174,27 @@ parse_args() {
       --online)
         # shellcheck disable=SC2034 # reason: consumed by check step 18 (online-determinism) via transitive sourcing
         ONLINE=true
+        shift
+        ;;
+      --skip-steps=*)
+        SKIP_STEPS=()
+        local _val="${1#--skip-steps=}"
+        if [ -n "$_val" ]; then
+          local _old_ifs="$IFS"
+          IFS=','
+          for _part in $_val; do
+            _part="${_part## }"
+            _part="${_part%% }"
+            if [ -n "$_part" ]; then
+              local _already=false
+              for _existing in "${SKIP_STEPS[@]}"; do
+                [ "$_existing" = "$_part" ] && _already=true && break
+              done
+              $_already || SKIP_STEPS+=("$_part")
+            fi
+          done
+          IFS="$_old_ifs"
+        fi
         shift
         ;;
       -*)
@@ -201,9 +267,22 @@ run_all_steps() {
   # Remove stale result symlinks before any checks run.
   rm -f result result-*
 
-  local _i
+  local _i _id _skip _skip_id
   for _i in "${!_STEP_FUNCS[@]}"; do
-    _run_step "${_STEP_NUMBERS[$_i]}" "${_STEP_NAMES[$_i]}" "${_STEP_FUNCS[$_i]}" "${POSITIONAL_ARGS[@]+${POSITIONAL_ARGS[@]}}" &
+    _id="${_STEP_IDS[$_i]}"
+    # Check skip list. Use safe expansion in case SKIP_STEPS is unset.
+    _skip=false
+    for _skip_id in "${SKIP_STEPS[@]+${SKIP_STEPS[@]}}"; do
+      if [ "$_skip_id" = "$_id" ]; then
+        _skip=true
+        break
+      fi
+    done
+    if $_skip; then
+      _run_skipped_step "${_STEP_NUMBERS[$_i]}" "${_STEP_NAMES[$_i]}" "$_id"
+    else
+      _run_step "${_STEP_NUMBERS[$_i]}" "${_STEP_NAMES[$_i]}" "${_STEP_FUNCS[$_i]}" "${POSITIONAL_ARGS[@]+${POSITIONAL_ARGS[@]}}" &
+    fi
   done
   wait
 }
