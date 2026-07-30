@@ -1,5 +1,6 @@
 Register-Step -Number 21 -Name "Preflight InstallCommand policy" -Action {
-  param($Step, $HasArgs, $RepoRoot, $WaveTmpDir, $PositionalArgs)
+  param($HasArgs, $RepoRoot, $WaveTmpDir, $PositionalArgs)
+  $null = $WaveTmpDir # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — positional binding requires all 4 params
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
@@ -13,8 +14,8 @@ Register-Step -Number 21 -Name "Preflight InstallCommand policy" -Action {
   }
 
   if ($ps1Files.Count -gt 0) {
-    $matches = Select-String -Path $ps1Files -Pattern 'Assert-ToolAvailable.*-InstallCommand' -AllMatches
-    foreach ($m in $matches) {
+    $selMatches = Select-String -Path $ps1Files -Pattern 'Assert-ToolAvailable.*-InstallCommand' -AllMatches
+    foreach ($m in $selMatches) {
       $violations += "$($m.Path):$($m.LineNumber) ($($m.Line.Trim()))"
     }
   }

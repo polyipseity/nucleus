@@ -21,16 +21,16 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$ScriptDir = Split-Path -Parent $PSCommandPath
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { Split-Path -Parent $PSScriptRoot }
 
 $TestDir = Join-Path $RepoRoot "src/scripts/tests"
 $FrameworkDir = Join-Path $RepoRoot "src/scripts/lib"
+$null = $FrameworkDir  # consumed by test-lib.ps1 at runtime
 
 . (Join-Path $TestDir "test-lib.ps1")
 . (Join-Path $TestDir "test-steps.ps1")
 
-Parse-Args $args
-Preflight-Check
-Run-AllSteps
-Aggregate-Results
+Read-Argument $args
+Test-Prerequisite
+Invoke-StepPipeline
+Format-StepSummary

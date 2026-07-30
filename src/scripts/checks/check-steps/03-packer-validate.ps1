@@ -1,9 +1,10 @@
 Register-Step -Number 3 -Name "Packer template validation" -Action {
-  param($Step, $HasArgs, $RepoRoot, $WaveTmpDir, $PositionalArgs)
+  param($HasArgs, $RepoRoot)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
-  $pkrFiles = if ($script:PKR_FILES) { $script:PKR_FILES } else { @() }
+  $pkrFiles = $script:PKR_FILES
+  if (-not $pkrFiles) { $pkrFiles = @() }
   if ($pkrFiles.Count -gt 0) {
     & "$r\scripts\check-packer.ps1" $pkrFiles
   } elseif (-not $HasArgs) {

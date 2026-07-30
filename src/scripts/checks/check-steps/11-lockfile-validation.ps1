@@ -1,5 +1,6 @@
 Register-Step -Number 11 -Name "Lockfile validation" -Action {
-  param($Step, $HasArgs, $RepoRoot, $WaveTmpDir, $PositionalArgs)
+  param($HasArgs, $RepoRoot)
+  $null = $HasArgs # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — positional binding requires HasArgs before RepoRoot
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
@@ -153,13 +154,13 @@ Register-Step -Number 11 -Name "Lockfile validation" -Action {
     Write-ErrorMessage "ollama: empty or missing section"
     $lfErrors++
   } else {
-    foreach ($profile in $lf.ollama.GetEnumerator()) {
-      if ($profile.Value.Count -eq 0) {
-        Write-ErrorMessage "ollama.$($profile.Key): empty model list"
+    foreach ($ollamaProfile in $lf.ollama.GetEnumerator()) {
+      if ($ollamaProfile.Value.Count -eq 0) {
+        Write-ErrorMessage "ollama.$($ollamaProfile.Key): empty model list"
         $lfErrors++
       } else {
-        for ($i = 0; $i -lt $profile.Value.Count; $i++) {
-          $model = $profile.Value[$i]
+        for ($i = 0; $i -lt $ollamaProfile.Value.Count; $i++) {
+          $model = $ollamaProfile.Value[$i]
           if ([string]::IsNullOrEmpty($model.name) -or [string]::IsNullOrEmpty($model.tag)) {
             Write-ErrorMessage "ollama.$($profile.Key)[$i]: missing name or tag"
             $lfErrors++

@@ -1,5 +1,6 @@
 Register-Step -Number 17 -Name "Suppression audit" -Action {
-  param($Step, $HasArgs, $RepoRoot, $WaveTmpDir, $PositionalArgs)
+  param($HasArgs, $RepoRoot, $WaveTmpDir, $PositionalArgs)
+  $null = $WaveTmpDir # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — positional binding requires all 4 params
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
@@ -31,8 +32,8 @@ Register-Step -Number 17 -Name "Suppression audit" -Action {
     try {
       $selParams = @{ Path = $Files; AllMatches = $true }
       if ($IsRegex) { $selParams['Pattern'] = $Pattern } else { $selParams['SimpleMatch'] = $Pattern }
-      $matches = Select-String @selParams
-      foreach ($m in $matches) {
+      $selMatches = Select-String @selParams
+      foreach ($m in $selMatches) {
         # Skip comment-only lines (PowerShell #, bash #, Nix #)
         if ($m.Line -match '^\s*#') { continue }
         # Skip lines matching exempt patterns

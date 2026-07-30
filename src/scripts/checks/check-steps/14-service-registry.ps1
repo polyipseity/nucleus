@@ -1,5 +1,6 @@
 Register-Step -Number 14 -Name "Service registry validation" -Action {
-  param($Step, $HasArgs, $RepoRoot, $WaveTmpDir, $PositionalArgs)
+  param($HasArgs, $RepoRoot)
+  $null = $HasArgs # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — positional binding requires HasArgs before RepoRoot
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
@@ -72,6 +73,7 @@ Register-Step -Number 14 -Name "Service registry validation" -Action {
   if (Test-Path $usersJson) {
     $users = Get-Content $usersJson -Raw | ConvertFrom-Json -AsHashtable
     foreach ($username in $users.Keys) {
+      if ($username -like '$*') { continue }
       $userEntry = $users[$username]
       if ($userEntry.ContainsKey('services')) {
         foreach ($svcKey in $userEntry.services.Keys) {
