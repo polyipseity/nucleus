@@ -13,7 +13,7 @@ run_01_nix_tests() {
 
   if [ "$quiet_mode" = true ]; then
     # shellcheck disable=SC2016 # reason: $1/$2 are sh -c positional params, not shell expansion
-    printf '%s\0' "${TEST_NIX_FILES_ARR[@]}" | xargs -P "$PARALLEL_JOBS" -I{} sh -c '
+    printf '%s\0' "${TEST_NIX_FILES_ARR[@]}" | xargs -0 -P "$PARALLEL_JOBS" -I{} sh -c '
           f="$1"; tmp="$2"
           if out=$(nix-instantiate --eval --strict "$f" 2>&1); then
             true
@@ -25,7 +25,7 @@ run_01_nix_tests() {
         ' _ {} "$_tmp_failed"
   else
     # shellcheck disable=SC2016 # reason: $1/$2 are sh -c positional params, not shell expansion
-    printf '%s\0' "${TEST_NIX_FILES_ARR[@]}" | xargs -P "$PARALLEL_JOBS" -I{} sh -c '
+    printf '%s\0' "${TEST_NIX_FILES_ARR[@]}" | xargs -0 -P "$PARALLEL_JOBS" -I{} sh -c '
           f="$1"
           echo "Testing: $f" >&2
           if ! nix-instantiate --eval --strict "$f"; then
