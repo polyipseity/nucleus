@@ -27,9 +27,20 @@ register_step() {
 _wave_tmpdir=""
 _wave_tmpdir_created=false
 
+_wave_cleanup_stale() {
+  # Clean temp dirs from previous runs that were killed before trap cleanup.
+  # Uses the nucleus-step-runner prefix to avoid removing unrelated temp dirs.
+  local _d
+  for _d in "${TMPDIR:-/tmp}/nucleus-step-runner-"*; do
+    [ -d "$_d" ] || continue  # check-suppress:suppression_doc: glob may expand to literal pattern when no matches; [ -d ] check filters it
+    rm -rf "$_d"
+  done
+}
+
 _wave_init() {
-  _wave_tmpdir=$(mktemp -d) || { error "failed to create wave temp directory"; exit 1; }
+  _wave_tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/nucleus-step-runner-XXXXXX") || { error "failed to create wave temp directory"; exit 1; }
   _wave_tmpdir_created=true
+  trap '_wave_cleanup; exit' INT TERM
   trap '_wave_cleanup' EXIT
 }
 
@@ -177,6 +188,7 @@ cache_file_lists() {
 # --- run_all_steps ---
 # Iterates registered steps, calls _run_step for each, then aggregates.
 run_all_steps() {
+  _wave_cleanup_stale
   _wave_init
   cache_file_lists
 
