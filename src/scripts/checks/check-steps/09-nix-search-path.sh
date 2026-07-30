@@ -11,6 +11,12 @@ run_09_nix_search_path() {
   cd "$_repo_root" || return 1
   local _nspt_exit=0
 
+  # Skip if has_args with no Nix files (scoped mode, no relevant files)
+  if $_has_args && [ "${#NIX_FILES[@]}" -eq 0 ] && [ "${#_files[@]}" -eq 0 ]; then
+    say "==== 9: Nix search path tests ==== SKIPPED (no Nix files to check with args) ✗"
+    return 0
+  fi
+
   echo "--- test output ---"
   bash tests/scripts/nix-search-path-tests.sh || _nspt_exit=$?
   echo "--- end test output ---"
