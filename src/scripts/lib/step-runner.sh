@@ -30,16 +30,22 @@ _wave_tmpdir_created=false
 _wave_cleanup_stale() {
   # Clean temp dirs from previous runs that were killed before trap cleanup.
   # Uses the nucleus-step-runner prefix to avoid removing unrelated temp dirs.
-  local _d
+  # Only removes dirs whose owning PID is no longer alive — concurrent
+  # instances of test.sh and check.sh each have their own temp dir.
+  local _d _pid
   for _d in "${TMPDIR:-/tmp}/nucleus-step-runner-"*; do
     [ -d "$_d" ] || continue  # check-suppress:suppression_doc: glob may expand to literal pattern when no matches; [ -d ] check filters it
-    rm -rf "$_d"
+    _pid=$(cat "$_d/pid" 2>/dev/null || true)
+    if [ -z "$_pid" ] || ! kill -0 "$_pid" 2>/dev/null; then
+      rm -rf "$_d"
+    fi
   done
 }
 
 _wave_init() {
   _wave_tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/nucleus-step-runner-XXXXXX") || { error "failed to create wave temp directory"; exit 1; }
   _wave_tmpdir_created=true
+  printf '%s' "$$" > "$_wave_tmpdir/pid"
   trap '_wave_cleanup; exit' INT TERM
   trap '_wave_cleanup' EXIT
 }
