@@ -34,7 +34,7 @@ assert lib.hasInfix "print-dev-env" shellNix;
 # activation.nix
 assert lib.hasInfix "xcode-select --switch" activationNix;
 assert lib.hasInfix "appleSdkEnhanced" activationNix;
-assert lib.hasInfix "configureSymlinkFarm" activationNix;
+assert lib.hasInfix "configure-symlink-farm" activationNix;
 
 # apple-sdk-tools.nix
 assert lib.hasInfix "python3" appleSdkToolsNix;

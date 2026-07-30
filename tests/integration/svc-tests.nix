@@ -7,8 +7,8 @@ let
   svcShText = builtins.readFile ../../scripts/svc.sh;
   svcPs1Text = builtins.readFile ../../scripts/svc.ps1;
   flakeText = builtins.readFile ../../src/flake.nix;
-  checkShText = builtins.readFile ../../scripts/check.sh;
-  checkPs1Text = builtins.readFile ../../scripts/check.ps1;
+  svcRegistryShText = builtins.readFile ../../src/scripts/checks/check-steps/14-service-registry.sh;
+  svcRegistryPs1Text = builtins.readFile ../../src/scripts/checks/check-steps/14-service-registry.ps1;
   windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
 
   # Parsed services.json for structural assertions
@@ -131,23 +131,23 @@ assert containsRegex ''"discord-music-rpc".*justification'' servicesJsonText;
 assert containsRegex ''"ssh-agent".*justification'' servicesJsonText;
 assert containsRegex ''"cloud-drive".*justification'' servicesJsonText;
 
-# --- check.sh service registry validation assertions ---
-assert containsRegex "Service registry validation" checkShText;
-assert containsRegex ''services\.json'' checkShText;
-assert containsRegex "justification" checkShText;
-assert containsRegex "users.json" checkShText;
+# --- service registry step validation assertions ---
+assert containsRegex "Service registry validation" svcRegistryShText;
+assert containsRegex ''services\.json'' svcRegistryShText;
+assert containsRegex "justification" svcRegistryShText;
+assert containsRegex "users.json" svcRegistryShText;
 
 # Verdict ordering: "validation passed" must follow "justification" (not precede it)
-assert containsRegex "justification.*validation passed" checkShText;
+assert containsRegex "justification.*validation passed" svcRegistryShText;
 
-# --- check.ps1 service registry validation assertions ---
-assert containsRegex "Service registry validation" checkPs1Text;
-assert containsRegex ''services\.json'' checkPs1Text;
-assert containsRegex "justification" checkPs1Text;
-assert containsRegex "users.json" checkPs1Text;
+# --- service registry step validation assertions (PowerShell) ---
+assert containsRegex "Service registry validation" svcRegistryPs1Text;
+assert containsRegex ''services\.json'' svcRegistryPs1Text;
+assert containsRegex "justification" svcRegistryPs1Text;
+assert containsRegex "users.json" svcRegistryPs1Text;
 
 # Verdict ordering: "validation passed" must follow "justification" (not precede it)
-assert containsRegex "justification.*validation passed" checkPs1Text;
+assert containsRegex "justification.*validation passed" svcRegistryPs1Text;
 
 # --- Windows profile wiring assertions ---
 assert containsRegex "nucleus-svc" windowsShellProfileText;

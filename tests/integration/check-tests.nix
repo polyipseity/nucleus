@@ -38,11 +38,11 @@ assert containsRegex "parse_args\\(\\)" stepRunnerText;
 assert containsRegex "_wave_init" stepRunnerText;
 assert containsRegex "_wave_cleanup" stepRunnerText;
 
-# Step-runner.ps1: Register-Step, Invoke-Step, Run-AllSteps, Aggregate-Results
+# Step-runner.ps1: Register-Step, Invoke-Step, Invoke-StepPipeline, Format-StepSummary
 assert containsRegex "Register-Step" stepRunnerPs1Text;
 assert containsRegex "Invoke-Step" stepRunnerPs1Text;
-assert containsRegex "Run-AllSteps" stepRunnerPs1Text;
-assert containsRegex "Aggregate-Results" stepRunnerPs1Text;
+assert containsRegex "Invoke-StepPipeline" stepRunnerPs1Text;
+assert containsRegex "Format-StepSummary" stepRunnerPs1Text;
 
 # ---- Thin orchestrator assertions (check.sh) ----
 # Sources check-lib.sh and check-steps.sh
@@ -57,15 +57,15 @@ assert containsRegex "aggregate_results" checkShText;
 # ---- Thin orchestrator assertions (check.ps1) ----
 assert containsRegex "check-lib\\.ps1" checkPs1Text;
 assert containsRegex "check-steps\\.ps1" checkPs1Text;
-assert containsRegex "Parse-Args" checkPs1Text;
-assert containsRegex "Preflight-Check" checkPs1Text;
-assert containsRegex "Run-AllSteps" checkPs1Text;
-assert containsRegex "Aggregate-Results" checkPs1Text;
+assert containsRegex "Read-Argument" checkPs1Text;
+assert containsRegex "Test-Prerequisite" checkPs1Text;
+assert containsRegex "Invoke-StepPipeline" checkPs1Text;
+assert containsRegex "Format-StepSummary" checkPs1Text;
 
 # ---- Step file structure ----
-# All 20 check step files exist for both platforms
-assert builtins.length checkStepsSh == 20;
-assert builtins.length checkStepsPs1 == 20;
+# All 21 check step files exist for both platforms
+assert builtins.length checkStepsSh == 21;
+assert builtins.length checkStepsPs1 == 21;
 
 # Each POSIX step file has a register_step call
 assert builtins.all (f: stepFileContains f "register_step [0-9]+") checkStepsSh;
@@ -79,5 +79,5 @@ assert containsRegex "run nucleus-apply" libShText;
 
 {
   success = true;
-  message = "Modularized check scripts structural assertions passed (framework functions, thin orchestrator, 20 step files per platform, register_step calls)";
+  message = "Modularized check scripts structural assertions passed (framework functions, thin orchestrator, 21 step files per platform, register_step calls)";
 }

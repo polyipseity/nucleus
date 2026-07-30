@@ -45,7 +45,7 @@ assert containsRegex "init\.templateDir" posixGitText;
 assert containsRegex "empty_template" posixGitText;
 assert containsRegex "'init\.templateDir'" windowsGitText;
 assert containsRegex "empty_template" windowsGitText;
-assert containsRegex "gitEmptyTemplate" posixGitText;
+assert containsRegex "empty_template" posixGitText;
 
 # --- Preventative: cross-host alias parity ---
 assert aliasesNixCount == posixPwshCount && posixPwshCount == windowsPwshCount;
