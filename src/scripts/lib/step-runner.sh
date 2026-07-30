@@ -76,7 +76,7 @@ _run_step() {
 # --- Argument parsing ---
 parse_args() {
   FORMAT_NIX=false
-  VERIFY=false
+  ONLINE=false
   SCOPED=false
   FULL=false
   HAS_ARGS=false
@@ -109,9 +109,9 @@ parse_args() {
         FULL=true
         shift
         ;;
-      --verify)
+      --online)
         # shellcheck disable=SC2034 # reason: consumed by check step 18 (online-determinism) via transitive sourcing
-        VERIFY=true
+        ONLINE=true
         shift
         ;;
       -*)

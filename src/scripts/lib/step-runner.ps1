@@ -84,7 +84,7 @@ function Invoke-Step {
 function Parse-Args {
   param([string[]]$Args)
   $script:FAIL_FAST = $false
-  $script:VERIFY = $false
+  $script:ONLINE = $false
   $script:SCOPED = $false
   $script:FULL = $false
   $script:positionalArgs = @()
@@ -108,8 +108,8 @@ function Parse-Args {
       '^--full$' {
         $script:FULL = $true
       }
-      '^--verify$' {
-        $script:VERIFY = $true
+      '^--online$' {
+        $script:ONLINE = $true
       }
       '^-.*' {
         Write-ErrorMessage "unsupported argument '$($Args[$i])'"

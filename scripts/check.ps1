@@ -11,7 +11,7 @@
 #   --fail-fast      Exit immediately on first failure.
 #   --no-fail-fast   Accumulate all failures (default).
 #   --format         Format supported files in-place.
-#   --verify         Run online determinism checks.
+#   --online         Run online determinism checks.
 #   (paths)          Files to check; restricts --scoped to matching files.
 #
 # Environment variables:

@@ -54,7 +54,7 @@ See `allow-and-deny-lists.instructions.md#D2` for the registry entry of this all
 2. **Overlap detection** — no package name appears in multiple package-manager sections (except intentional multi-source packages, see `allow-and-deny-lists.instructions.md#D1`).
 3. **Lifecycle allowlist validation** — see above.
 
-With the `--verify` flag (requires network), additional checks run: 4. **Freshness** — `bump-lockfile.sh --verify` queries all registries and diffs the result against the current lockfile. 5. **Yanked/removed detection** — queries registries to confirm pinned versions still exist.
+With the `--online` flag (requires network), additional checks run: 4. **Freshness** — `bump-lockfile.sh --verify` queries all registries and diffs the result against the current lockfile. 5. **Yanked/removed detection** — queries registries to confirm pinned versions still exist.
 
 ## Hardening requirement for new additions
 

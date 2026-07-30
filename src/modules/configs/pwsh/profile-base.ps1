@@ -633,7 +633,7 @@ Register-ArgumentCompleter -CommandName nucleus-update -ScriptBlock {
 Register-ArgumentCompleter -CommandName nucleus-check -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
   $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
-  @('--help', '--format', '--verify') | Where-Object { $_ -like "$wordToComplete*" }
+  @('--help', '--format', '--online') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-ai -ScriptBlock {

@@ -3,5 +3,5 @@
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
   '--format[Format files in-place]' \
-  '--verify[Verify formatting without modifying]' \
+  '--online[Run online determinism checks]' \
   '*:path:_files'
