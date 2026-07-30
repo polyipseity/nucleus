@@ -8,10 +8,10 @@ All managed package managers in this repository MUST have a minimum release age 
 
 ## Active delays and pinning defaults
 
-| Package manager | Mechanism | Setting | File(s) |
-|---|---|---|---|
-| **bun** | `~/.bunfig.toml` | `[install] minimumReleaseAge = 432000` (5 days in seconds), `exact = true` | `src/modules/shell.nix`, `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` |
-| **uv** | `uv.toml` | `exclude-newer = "P5D"` (ISO 8601 duration) + `add-bounds = "exact"` | `src/modules/shell.nix`, `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` |
+| Package manager | Mechanism        | Setting                                                                    | File(s)                                                                         |
+| --------------- | ---------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| **bun**         | `~/.bunfig.toml` | `[install] minimumReleaseAge = 432000` (5 days in seconds), `exact = true` | `src/modules/shell.nix`, `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` |
+| **uv**          | `uv.toml`        | `exclude-newer = "P5D"` (ISO 8601 duration) + `add-bounds = "exact"`       | `src/modules/shell.nix`, `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` |
 
 ## Package managers without delay features
 
@@ -34,25 +34,27 @@ When installing packages via `uv tool install`, the `--no-build` flag MUST be us
 `src/lockfiles/lifecycle-allowlist.json` lists packages explicitly permitted to run lifecycle scripts. Each entry maps a package name to a justification string.
 
 Adding a package to this allowlist requires:
+
 1. Review of what the lifecycle scripts do.
 2. A documented justification in the allowlist entry.
 3. Verification that the package's lifecycle scripts are necessary and cannot be replaced by a locked/deterministic alternative.
 
 The validation scripts (`check.sh`, `check.ps1`) verify:
+
 - The allowlist file exists and is valid JSON.
 - Each entry has a non-empty justification string.
+
+See `allow-and-deny-lists.instructions.md#D2` for the registry entry of this allowlist.
 
 ## Lockfile validation
 
 `check.sh` and `check.ps1` run the following lockfile validations always (even in path-scoped mode):
 
 1. **Internal consistency** — lockfile.json exists, schema is valid.
-2. **Overlap detection** — no package name appears in multiple package-manager sections (except intentional multi-source packages).
+2. **Overlap detection** — no package name appears in multiple package-manager sections (except intentional multi-source packages, see `allow-and-deny-lists.instructions.md#D1`).
 3. **Lifecycle allowlist validation** — see above.
 
-With the `--verify` flag (requires network), additional checks run:
-4. **Freshness** — `bump-lockfile.sh --verify` queries all registries and diffs the result against the current lockfile.
-5. **Yanked/removed detection** — queries registries to confirm pinned versions still exist.
+With the `--verify` flag (requires network), additional checks run: 4. **Freshness** — `bump-lockfile.sh --verify` queries all registries and diffs the result against the current lockfile. 5. **Yanked/removed detection** — queries registries to confirm pinned versions still exist.
 
 ## Hardening requirement for new additions
 
