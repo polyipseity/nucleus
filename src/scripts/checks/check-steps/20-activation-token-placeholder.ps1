@@ -1,4 +1,5 @@
 Register-Step -Number 20 -Name "Activation script token placeholder in comment check" -Action {
+  param($HasArgs, $RepoRoot, $PositionalArgs)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 

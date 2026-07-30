@@ -1,4 +1,5 @@
 Register-Step -Number 15 -Name "YAML structural validation" -Action {
+  param($HasArgs, $RepoRoot, $PositionalArgs)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 

@@ -1,4 +1,5 @@
 Register-Step -Number 2 -Name "PowerShell lint" -Action {
+  param($RepoRoot)
 
   $exitCode = 0
   $pwshScript = Join-Path $RepoRoot 'scripts\check-pwsh.ps1'

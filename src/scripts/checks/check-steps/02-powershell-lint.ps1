@@ -1,4 +1,5 @@
 Register-Step -Number 2 -Name "PowerShell lint" -Action {
+  param($HasArgs, $RepoRoot)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 

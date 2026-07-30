@@ -1,4 +1,5 @@
 Register-Step -Number 21 -Name "Preflight InstallCommand policy" -Action {
+  param($HasArgs, $RepoRoot, $PositionalArgs)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
