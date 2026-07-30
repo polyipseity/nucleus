@@ -230,39 +230,33 @@ else
 fi
 unset _zsh_comp_dir _zsh_comp_f _zsh_comp_name
 
-# PowerShell completion ScriptBlocks: extract from pwsh.nix and parse-check.
+# PowerShell completion ScriptBlocks: extract from profile-base.ps1 and parse-check.
 if command -v pwsh >/dev/null 2>&1; then
-  # Extract Register-ArgumentCompleter blocks from pwsh.nix into a temp script
+  # Extract Register-ArgumentCompleter blocks from profile-base.ps1 into a temp script
   # and parse them.  The ScriptBlocks contain valid PowerShell that can be
   # verified with [ScriptBlock]::Create().
-  _pwsh_nix_file="$REPO_ROOT/src/modules/pwsh.nix"
-  if [ -f "$_pwsh_nix_file" ]; then
-    # Extract lines inside profileContent that start with 'Register-ArgumentCompleter'
-    # and run them through pwsh -NoProfile syntax check.
-    # We just verify that the ScriptBlock literals parse correctly.
+  # These were previously extracted from pwsh.nix, which embedded profile-base.ps1
+  # via builtins.readFile at Nix eval time — extracting from pwsh.nix produced an
+  # empty result.  The actual completions are directly in profile-base.ps1.
+  _pwsh_comp_file="$REPO_ROOT/src/modules/configs/pwsh/profile-base.ps1"
+  if [ -f "$_pwsh_comp_file" ]; then
     _temp_pwsh_check="$(mktemp)"
-    # Use sed to extract the Register-ArgumentCompleter section from pwsh.nix.
-    # The content is inside a '' string, so we need to normalize it.
-    awk '
-      /Register-ArgumentCompleter/ { printing=1 }
-      printing { print }
-      printing && /^  '\'\'';?$|^        '\'\'';?$/ { printing=0 }
-    ' "$_pwsh_nix_file" > "$_temp_pwsh_check" 2>/dev/null || true  # check-suppress:suppression_doc: probe — file may not contain completions yet; handled by [ -s ] guard below
+    grep "^Register-ArgumentCompleter" "$_pwsh_comp_file" > "$_temp_pwsh_check" 2>/dev/null || true  # check-suppress:suppression_doc: probe — file may not contain completions yet; handled by [ -s ] guard below
     if [ -s "$_temp_pwsh_check" ]; then
       if pwsh -NoProfile -NonInteractive -Command "
         \$errors = @()
-        Get-Content '$_temp_pwsh_check' -Raw | Select-String -Pattern 'Register-ArgumentCompleter' -AllMatches | ForEach-Object {
-          try { [ScriptBlock]::Create(\$_.Line) > \$null } catch { \$errors += \$_ }
+        Get-Content '$_temp_pwsh_check' | ForEach-Object {
+          try { [ScriptBlock]::Create(\$_) > \$null } catch { \$errors += \$_ }
         }
         if (\$errors.Count -gt 0) { throw \"\$(\$errors.Count) parse error(s): \$(\$errors -join ''; '')\" }
         Write-Host \"pwsh completions: \$(\$errors.Count) errors\"
       " 2>/dev/null; then
-        assert_pass "pwsh completion ScriptBlocks parse (pwsh.nix)"
+        assert_pass "pwsh completion ScriptBlocks parse (profile-base.ps1)"
       else
-        assert_fail "pwsh completion ScriptBlocks parse (pwsh.nix)" "syntax error in extracted completions"
+        assert_fail "pwsh completion ScriptBlocks parse (profile-base.ps1)" "syntax error in extracted completions"
       fi
     else
-      assert_skip "pwsh completion ScriptBlocks parse (pwsh.nix)" "could not extract completions from pwsh.nix"
+      assert_skip "pwsh completion ScriptBlocks parse (profile-base.ps1)" "could not extract completions from profile-base.ps1"
     fi
     rm -f "$_temp_pwsh_check"
   fi
@@ -293,7 +287,7 @@ if command -v pwsh >/dev/null 2>&1; then
 else
   assert_skip "pwsh completion ScriptBlocks parse" "pwsh not available"
 fi
-unset _pwsh_nix_file _win_profile_file
+unset _pwsh_comp_file _win_profile_file
 
 # --- Summary ---------------------------------------------------------------
 echo ""
