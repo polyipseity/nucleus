@@ -7,7 +7,6 @@
 # See check-lib.sh, step-runner.sh, and files in check-steps/ for step logic.
 #
 # Arguments:
-#   --format      Format Nix files in-place (instead of just validating).
 #   (paths)       Files to check; passes paths through to sub-checkers and
 #                 skips whole-repo checks (always-run checks that don't support path filtering).
 #

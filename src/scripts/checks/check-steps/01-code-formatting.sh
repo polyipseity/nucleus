@@ -12,23 +12,13 @@ run_01_code_formatting() {
   local _tf_exit=0
 
   if $_has_args; then
-    if $FORMAT_NIX; then
-      treefmt "${_files[@]}" || _tf_exit=$?
-    else
-      treefmt --fail-on-change "${_files[@]}" || _tf_exit=$?
-    fi
+    treefmt "${_files[@]}" || _tf_exit=$?
   else
-    if $FORMAT_NIX; then
-      treefmt || _tf_exit=$?
-    else
-      treefmt --fail-on-change || _tf_exit=$?
-    fi
+    treefmt || _tf_exit=$?
   fi
 
   if [ $_tf_exit -eq 0 ]; then
     say "formatting OK."
-  elif [ $_tf_exit -eq 1 ]; then
-    error "formatting issues found (run 'treefmt' to fix)."
   else
     error "treefmt failed with exit code $_tf_exit"
   fi

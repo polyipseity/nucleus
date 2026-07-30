@@ -24,5 +24,5 @@ REPO_ROOT=$(derive_repo_root)
 cd "$REPO_ROOT" || exit
 
 usage() {
-  usage_std "check.sh" "[--format] [--fail-fast|--no-fail-fast] [--scoped|--full] [--online] [path ...]" "Run all repository validation checks in sequence. Use --scoped to skip whole-repo checks (path-scoped mode), --full to force whole-repo checks even with paths. Default: scoped if paths given, full otherwise. With arguments, passes paths through to supporting checkers. Use --format to enable in-place Nix formatting. Use --fail-fast to exit immediately on first failure (default: accumulate all). Use --no-fail-fast to accumulate all failures (default). Use --online to additionally run online determinism checks (requires network)."
+  usage_std "check.sh" "[--fail-fast|--no-fail-fast] [--scoped|--full] [--online] [path ...]" "Run all repository validation checks in sequence. Use --scoped to skip whole-repo checks (path-scoped mode), --full to force whole-repo checks even with paths. Default: scoped if paths given, full otherwise. With arguments, passes paths through to supporting checkers. Use --fail-fast to exit immediately on first failure (default: accumulate all). Use --no-fail-fast to accumulate all failures (default). Use --online to additionally run online determinism checks (requires network)."
 }

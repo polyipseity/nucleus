@@ -28,7 +28,7 @@ def get_repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def run_check(files: list[str], repo_root: Path, format_enabled: bool = False, scoped: bool = False) -> int:
+def run_check(files: list[str], repo_root: Path, scoped: bool = False) -> int:
     """Run the check hook.
 
     On POSIX, delegates to ``scripts/check.sh`` directly (tools are available
@@ -41,8 +41,6 @@ def run_check(files: list[str], repo_root: Path, format_enabled: bool = False, s
             empty, in which case all available checks are run.
         repo_root: Absolute path to the repository root, used to locate
             the check scripts.
-        format_enabled: If True, pass ``--format`` to format Nix files
-            in-place instead of just validating.
         scoped: If True, pass ``--scoped`` to run in scoped mode
             (skip whole-repo checks).
 
@@ -56,8 +54,6 @@ def run_check(files: list[str], repo_root: Path, format_enabled: bool = False, s
         # Intentionally NOT passing --no-fail-fast: check accumulates by default
         # (no-fail-fast). Runs on every commit — should report all issues.
         cmd = [str(repo_root / "scripts" / "check.sh")]
-        if format_enabled:
-            cmd.append("--format")
         if scoped:
             cmd.append("--scoped")
         if files:
@@ -163,11 +159,6 @@ def main() -> int:
         description="Cross-platform prek hook wrapper",
     )
     parser.add_argument(
-        "--format",
-        action="store_true",
-        help="Format Nix files in-place (instead of just validating)",
-    )
-    parser.add_argument(
         "--scoped",
         action="store_true",
         help="Run in scoped mode (skip whole-repo checks)",
@@ -187,7 +178,7 @@ def main() -> int:
     repo_root = get_repo_root()
 
     if args.hook == "check":
-        return run_check(args.files, repo_root, format_enabled=args.format, scoped=args.scoped)
+        return run_check(args.files, repo_root, scoped=args.scoped)
     elif args.hook == "test":
         return run_test(args.files, repo_root)
     else:

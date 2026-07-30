@@ -140,8 +140,6 @@ _run_skipped_step() {
 
 # --- Argument parsing ---
 parse_args() {
-  # shellcheck disable=SC2034 # reason: FORMAT_NIX kept for backward compat; removed from accept-flags in
-  FORMAT_NIX=false
   ONLINE=false
   SCOPED=false
   FULL=false
