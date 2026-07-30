@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Check-specific framework library.
-# Sources framework-lib.sh and sets check-specific defaults.
+# Sources step-runner.sh and sets check-specific defaults.
 #
 # Guard against re-sourcing — step files source this independently and
 # re-sourcing would overwrite SCRIPT_DIR and REPO_ROOT.
@@ -15,8 +15,8 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
 
-# shellcheck source=../lib/framework-lib.sh
-. "$SCRIPT_DIR/../lib/framework-lib.sh"
+# shellcheck source=../lib/step-runner.sh
+. "$SCRIPT_DIR/../lib/step-runner.sh"
 
 # Check-specific defaults
 FAIL_FAST=false

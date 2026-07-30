@@ -1,10 +1,10 @@
 #Requires -Version 7.4
 # Check-specific framework library (PowerShell).
-# Sources framework-lib.ps1 and sets check-specific defaults.
+# Sources step-runner.ps1 and sets check-specific defaults.
 
 Set-StrictMode -Version Latest
 
-. (Join-Path $FrameworkDir "framework-lib.ps1")
+. (Join-Path $FrameworkDir "step-runner.ps1")
 
 $script:FAIL_FAST = $false
 $script:usageAction = {
