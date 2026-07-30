@@ -241,15 +241,16 @@ if command -v pwsh >/dev/null 2>&1; then
   _pwsh_comp_file="$REPO_ROOT/src/modules/configs/pwsh/profile-base.ps1"
   if [ -f "$_pwsh_comp_file" ]; then
     _temp_pwsh_check="$(mktemp)"
-    grep "^Register-ArgumentCompleter" "$_pwsh_comp_file" > "$_temp_pwsh_check" 2>/dev/null || true  # check-suppress:suppression_doc: probe — file may not contain completions yet; handled by [ -s ] guard below
+    awk 'function cb(s,c,i){c=0;for(i=1;i<=length(s);i++){if(substr(s,i,1)=="{")c++;if(substr(s,i,1)=="}")c--}return c}
+    BEGIN{ib=0;d=0}{gsub(/\r/,"")}
+    /^Register-ArgumentCompleter/{ib=1;bl=$0;d=cb($0);if(d<=0){print bl;print"";ib=0}next}
+    ib{bl=bl"\n"$0;d+=cb($0);if(d<=0){print bl;print"";ib=0}}
+    END{if(ib)print bl}' "$_pwsh_comp_file" > "$_temp_pwsh_check" 2>/dev/null || true  # check-suppress:suppression_doc: probe — file may not contain completions yet; handled by [ -s ] guard below
     if [ -s "$_temp_pwsh_check" ]; then
       if pwsh -NoProfile -NonInteractive -Command "
-        \$errors = @()
-        Get-Content '$_temp_pwsh_check' | ForEach-Object {
-          try { [ScriptBlock]::Create(\$_) > \$null } catch { \$errors += \$_ }
-        }
-        if (\$errors.Count -gt 0) { throw \"\$(\$errors.Count) parse error(s): \$(\$errors -join ''; '')\" }
-        Write-Host \"pwsh completions: \$(\$errors.Count) errors\"
+        \$content = Get-Content '$_temp_pwsh_check' -Raw -ErrorAction Stop
+        try { [ScriptBlock]::Create(\$content) > \$null } catch { throw \"syntax error: \$(\$_.Exception.Message)\" }
+        Write-Host \"pwsh completions: 0 errors\"
       " 2>/dev/null; then
         assert_pass "pwsh completion ScriptBlocks parse (profile-base.ps1)"
       else
