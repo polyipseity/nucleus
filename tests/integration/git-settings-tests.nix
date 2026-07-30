@@ -22,7 +22,7 @@ let
   # Multi-line alias values do not contain `"-g`, so this is accurate.
   aliasesNixCount = countMatches ''"-g'' aliasesNix;
   # Count `function -g` definitions in both PowerShell profiles.
-  posixPwshCount = countMatches "function -g" posixPwshAliases;
+  posixPwshCount = countMatches "Add-ShellAlias '-g" posixPwshAliases;
   windowsPwshCount = countMatches "function -g" windowsPwshAliases;
 in
 assert containsRegex "core\.autocrlf = false" posixGitText;

@@ -49,7 +49,7 @@ assert lib.hasInfix "apple-sdk-tools" appleSdkEnhancedNix;
 assert lib.hasInfix "symlink-farm" symlinkFarmSh;
 assert lib.hasInfix "FARM_DIR" symlinkFarmSh;
 assert lib.hasInfix "FARM_MARKER" symlinkFarmSh;
-assert lib.hasInfix "active_symlinks" symlinkFarmSh;
+assert lib.hasInfix "entries" symlinkFarmSh;
 
 # ntfs-3g.nix
 assert lib.hasInfix "llvmPackages.clang" ntfs3gText;

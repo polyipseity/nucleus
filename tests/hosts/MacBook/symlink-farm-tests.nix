@@ -25,7 +25,7 @@ assert lib.hasInfix "git" appleSdkToolsNix;
 # Symlink farm script has expected structure
 assert lib.hasInfix "FARM_DIR" symlinkFarmSh;
 assert lib.hasInfix "FARM_MARKER" symlinkFarmSh;
-assert lib.hasInfix "active_symlinks" symlinkFarmSh;
+assert lib.hasInfix "entries" symlinkFarmSh;
 assert lib.hasInfix "_log" symlinkFarmSh;
 assert lib.hasInfix "LOG_FILE" symlinkFarmSh;
 assert lib.hasInfix "NUCLEUS_VERBOSE" symlinkFarmSh;
