@@ -15,7 +15,7 @@ Register-Step -Number 15 -Name "YAML structural validation" -Action {
         ForEach-Object { $_.FullName }
     } else {
       Get-ChildItem -Recurse -Path $r -Include '*.yml', '*.yaml' |
-        Where-Object { $_.FullName -notmatch '[/\]vendor[/\]' -and $_.FullName -notmatch '[/\]secrets[/\]' } |  # ref: EXCLUDE-LISTS.md#B4 — reason: structural invariants
+        Where-Object { $_.FullName -notmatch '[/\]vendor[/\]' -and $_.FullName -notmatch '[/\]secrets[/\]' } |  # ref: exclude-lists.instructions.md#B4 — reason: structural invariants
         Sort-Object FullName | ForEach-Object { $_.FullName }
     }
   }

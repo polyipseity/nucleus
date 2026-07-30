@@ -97,7 +97,7 @@ test_no_dangerous_patterns() {
     fi
 
     # Check for rm -rf without safeguards (-- after rm -rf is accepted as a separator guard)
-    if grep -E 'rm\s+-rf' "$script" | grep -v 'HOME\|TMPDIR\|/tmp\|--' >/dev/null 2>&1; then  # ref: EXCLUDE-LISTS.md#C1 — reason: false-positive reduction; HOME/TMPDIR/tmp/-- are known-safe rm -rf guard patterns
+    if grep -E 'rm\s+-rf' "$script" | grep -v 'HOME\|TMPDIR\|/tmp\|--' >/dev/null 2>&1; then  # ref: exclude-lists.instructions.md#C1 — reason: false-positive reduction; HOME/TMPDIR/tmp/-- are known-safe rm -rf guard patterns
         dangerous=$((dangerous + 1))
         assert_fail "Potentially unsafe rm -rf: $(basename "$script")" "Found rm -rf without HOME/TMPDIR/tmp/-- guard"
     fi
@@ -584,7 +584,7 @@ if [[ -f "$SVC_SH" ]]; then
     # Regression: logs listing shows all services with capture=all (Fix 2 + Fix 4)
     SVC_LOGS_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" logs 2>&1 || true)  # check-suppress:suppression_doc: test probe — capturing output regardless of exit code for assertion below
     # Strip domain-filter warning from start of output to keep grep clean.
-    SVC_LOGS_OUTPUT=$(echo "$SVC_LOGS_OUTPUT" | grep -v '^svc: warning:' || true)  # check-suppress:suppression_doc: filter may produce empty output if all lines are warnings  # ref: EXCLUDE-LISTS.md#C2 — reason: runtime warning noise from svc script in test output
+    SVC_LOGS_OUTPUT=$(echo "$SVC_LOGS_OUTPUT" | grep -v '^svc: warning:' || true)  # check-suppress:suppression_doc: filter may produce empty output if all lines are warnings  # ref: exclude-lists.instructions.md#C2 — reason: runtime warning noise from svc script in test output
     if echo "$SVC_LOGS_OUTPUT" | grep -q "capture=all"; then
         assert_pass "svc logs: listing shows capture=all"
     else

@@ -29,7 +29,7 @@ _nix() {
   if [[ $_has_pe -eq 1 ]]; then
     # shellcheck disable=SC2154 # reason: _nix_direnv_nix is set at runtime by nix-direnv's _nix_direnv_preflight() in ~/.config/direnv/lib/hm-nix-direnv.sh — user-specific path unreachable by # shellcheck source=
     "${_nix_direnv_nix}" --no-warn-dirty --extra-experimental-features "nix-command flakes" "$@" \
-      | command grep -v -E '^(DEVELOPER_DIR=|SDKROOT=|NIX_APPLE_SDK_VERSION=)|^export (DEVELOPER_DIR|SDKROOT|NIX_APPLE_SDK_VERSION)$|^unset (DEVELOPER_DIR|SDKROOT|NIX_APPLE_SDK_VERSION)$'  # ref: EXCLUDE-LISTS.md#C3 — reason: Nix env debug output suppression
+      | command grep -v -E '^(DEVELOPER_DIR=|SDKROOT=|NIX_APPLE_SDK_VERSION=)|^export (DEVELOPER_DIR|SDKROOT|NIX_APPLE_SDK_VERSION)$|^unset (DEVELOPER_DIR|SDKROOT|NIX_APPLE_SDK_VERSION)$'  # ref: exclude-lists.instructions.md#C3 — reason: Nix env debug output suppression
   else
     # shellcheck disable=SC2154 # reason: _nix_direnv_nix is set at runtime by nix-direnv's _nix_direnv_preflight() in ~/.config/direnv/lib/hm-nix-direnv.sh — user-specific path unreachable by # shellcheck source=
     "${_nix_direnv_nix}" --no-warn-dirty --extra-experimental-features "nix-command flakes" "$@"

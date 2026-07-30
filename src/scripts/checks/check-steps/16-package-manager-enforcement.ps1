@@ -7,7 +7,7 @@ Register-Step -Number 16 -Name "Package manager usage enforcement" -Action {
 
   # Ban bare pip install and npm install -- these bypass the lockfile.
   # uv pip install is allowed. Exclude self-references.
-  # ref: EXCLUDE-LISTS.md#A1 — reason: orchestrator/config files contain pip/npm patterns in comments; self-refs are dynamic
+  # ref: exclude-lists.instructions.md#A1 — reason: orchestrator/config files contain pip/npm patterns in comments; self-refs are dynamic
   $selfPs1 = $MyInvocation.MyCommand.Name
   $selfSh = [System.IO.Path]::ChangeExtension($selfPs1, '.sh')
   $pipViolations = Select-String -Path @(

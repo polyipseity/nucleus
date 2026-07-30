@@ -327,7 +327,7 @@ function Clear-GitCache {
       # Remove lock files except index.lock.
       # check-suppress:suppression_doc: probe — lock files may not exist; empty result is handled
       $lockFiles = Get-ChildItem -LiteralPath $gitDir.FullName -Filter '*.lock' -File -Force -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -ne 'index.lock' }  # ref: EXCLUDE-LISTS.md#A5 — reason: Git invariant; index.lock must never be cleaned
+        Where-Object { $_.Name -ne 'index.lock' }  # ref: exclude-lists.instructions.md#A5 — reason: Git invariant; index.lock must never be cleaned
       foreach ($lockFile in $lockFiles) {
         Remove-Item -LiteralPath $lockFile.FullName -Force -ErrorAction Stop
       }
