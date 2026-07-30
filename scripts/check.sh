@@ -18,7 +18,7 @@
 #   0 on success; non-zero on any check failure.
 # By default, all checks run and failures accumulate (report-at-end).
 # Use --fail-fast to exit immediately on the first failure.
-set -uo pipefail
+set -euo pipefail
 
 # Resolve symlinks so SCRIPT_DIR works from Nix wrapper symlinks.
 _self="$0"
