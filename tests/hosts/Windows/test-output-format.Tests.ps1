@@ -14,7 +14,7 @@
 #>
 
 BeforeAll {
-    $script:testContent = Get-Content -Raw -Path "$PWD/src/scripts/lib/framework-lib.ps1"
+    $script:testContent = Get-Content -Raw -Path "$PWD/src/scripts/lib/step-runner.ps1"
 }
 
 Describe 'Combined status table' {

@@ -3,8 +3,8 @@
 let
   inherit (import ../lib.nix) containsRegex;
 
-  frameworkLibText = builtins.readFile ../../src/scripts/lib/framework-lib.sh;
-  frameworkLibPs1Text = builtins.readFile ../../src/scripts/lib/framework-lib.ps1;
+  stepRunnerText = builtins.readFile ../../src/scripts/lib/step-runner.sh;
+  stepRunnerPs1Text = builtins.readFile ../../src/scripts/lib/step-runner.ps1;
   checkShText = builtins.readFile ../../scripts/check.sh;
   checkPs1Text = builtins.readFile ../../scripts/check.ps1;
   checkStepsDir = ../../src/scripts/checks/check-steps;
@@ -27,22 +27,22 @@ in
 # ---- Framework library assertions ----
 
 # register_step function present
-assert containsRegex "register_step\\(\\)" frameworkLibText;
+assert containsRegex "register_step\\(\\)" stepRunnerText;
 # _run_step wrapper present
-assert containsRegex "_run_step\\(\\)" frameworkLibText;
+assert containsRegex "_run_step\\(\\)" stepRunnerText;
 # aggregate_results function present
-assert containsRegex "aggregate_results\\(\\)" frameworkLibText;
+assert containsRegex "aggregate_results\\(\\)" stepRunnerText;
 # parse_args function present
-assert containsRegex "parse_args\\(\\)" frameworkLibText;
+assert containsRegex "parse_args\\(\\)" stepRunnerText;
 # Wave parallelism infra
-assert containsRegex "_wave_init" frameworkLibText;
-assert containsRegex "_wave_cleanup" frameworkLibText;
+assert containsRegex "_wave_init" stepRunnerText;
+assert containsRegex "_wave_cleanup" stepRunnerText;
 
-# Framework-lib.ps1: Register-Step, Invoke-Step, Run-AllSteps, Aggregate-Results
-assert containsRegex "Register-Step" frameworkLibPs1Text;
-assert containsRegex "Invoke-Step" frameworkLibPs1Text;
-assert containsRegex "Run-AllSteps" frameworkLibPs1Text;
-assert containsRegex "Aggregate-Results" frameworkLibPs1Text;
+# Step-runner.ps1: Register-Step, Invoke-Step, Run-AllSteps, Aggregate-Results
+assert containsRegex "Register-Step" stepRunnerPs1Text;
+assert containsRegex "Invoke-Step" stepRunnerPs1Text;
+assert containsRegex "Run-AllSteps" stepRunnerPs1Text;
+assert containsRegex "Aggregate-Results" stepRunnerPs1Text;
 
 # ---- Thin orchestrator assertions (check.sh) ----
 # Sources check-lib.sh and check-steps.sh

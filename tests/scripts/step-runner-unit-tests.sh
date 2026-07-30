@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Unit tests for framework-lib.sh functions in isolation.
+# Unit tests for step-runner.sh functions in isolation.
 
 set -euo pipefail
 
@@ -9,14 +9,14 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
-# Source framework-lib.sh in a sub-shell to test functions
+# Source step-runner.sh in a sub-shell to test functions
 test_register_step_function() {
     local result
     result=$(
         # shellcheck disable=SC2030,SC2269,SC2031 # reason: REPO_ROOT inherited from parent scope; self-assignment to mark as used
         REPO_ROOT="$REPO_ROOT"
         # shellcheck disable=SC1090,SC1091 # reason: dynamic source path tested in isolation
-        . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
+        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         register_step 1 "Test Step" test_func
         echo "${_STEP_NUMBERS[*]} ${_STEP_NAMES[*]} ${_STEP_FUNCS[*]}"
     )
@@ -32,7 +32,7 @@ test_register_step_multiple() {
     result=$(
         # shellcheck disable=SC2030,SC2269,SC2031 # reason: REPO_ROOT inherited from parent scope
         REPO_ROOT="$REPO_ROOT"
-        . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
+        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         register_step 1 "One" f1
         register_step 2 "Two" f2
         register_step 3 "Three" f3
@@ -51,7 +51,7 @@ test_parse_args_help() {
     # shellcheck disable=SC2097,SC2098,SC2031 # reason: intentional export to bash -c subprocess; REPO_ROOT inherited from parent
     REPO_ROOT="$REPO_ROOT" \
     bash -c '
-        . "'"$REPO_ROOT"'/src/scripts/lib/framework-lib.sh"
+        . "'"$REPO_ROOT"'/src/scripts/lib/step-runner.sh"
         usage() { echo "usage: test"; }
         parse_args --help
     ' 2>/dev/null || exit_code=$?
@@ -69,7 +69,7 @@ test_parse_args_format_flag() {
     result=$(
         # shellcheck disable=SC2030,SC2269,SC2031 # reason: REPO_ROOT inherited from parent scope
         REPO_ROOT="$REPO_ROOT"
-        . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
+        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         parse_args --format
         echo "$FORMAT_NIX"
@@ -86,7 +86,7 @@ test_parse_args_scoped() {
     result=$(
         # shellcheck disable=SC2030,SC2269,SC2031 # reason: REPO_ROOT inherited from parent scope
         REPO_ROOT="$REPO_ROOT"
-        . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
+        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         parse_args --scoped
         echo "$SCOPED $HAS_ARGS"
@@ -103,7 +103,7 @@ test_parse_args_positions() {
     result=$(
         # shellcheck disable=SC2030,SC2269,SC2031 # reason: REPO_ROOT inherited from parent scope
         REPO_ROOT="$REPO_ROOT"
-        . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
+        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         parse_args --fail-fast path/to/file.nix
         echo "$HAS_ARGS ${POSITIONAL_ARGS[*]}"
@@ -120,8 +120,8 @@ test_aggregate_results_parses_exit_files() {
     result=$(
         # shellcheck disable=SC2030,SC2269,SC2031 # reason: REPO_ROOT inherited from parent scope
         REPO_ROOT="$REPO_ROOT"
-        . "$REPO_ROOT/src/scripts/lib/framework-lib.sh"
-        # Define stubs for functions framework-lib.sh expects
+        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+        # Define stubs for functions step-runner.sh expects
         say() { echo "say: $*"; }
         error() { echo "error: $*" >&2; }
         # Set up step registration
@@ -144,7 +144,7 @@ test_aggregate_results_parses_exit_files() {
 
 # ---- Run tests ----
 echo ""
-echo "Testing framework-lib.sh unit functions..."
+echo "Testing step-runner.sh unit functions..."
 echo ""
 
 test_register_step_function
