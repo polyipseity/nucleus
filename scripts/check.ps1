@@ -3,7 +3,7 @@
 # Thin orchestrator — sources check-lib.ps1 for framework, check-steps.ps1 for step
 # registration, then runs the orchestration pipeline.
 #
-# See check-lib.ps1, framework-lib.ps1, and files in check-steps/ for step logic.
+# See check-lib.ps1, step-runner.ps1, and files in check-steps/ for step logic.
 #
 # Arguments:
 #   --full           Run all checks including whole-repo checks (default).

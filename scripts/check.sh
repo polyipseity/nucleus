@@ -4,7 +4,7 @@
 # Thin orchestrator — sources check-lib.sh for framework, check-steps.sh for step
 # registration, then runs the orchestration pipeline.
 #
-# See check-lib.sh, framework-lib.sh, and files in check-steps/ for step logic.
+# See check-lib.sh, step-runner.sh, and files in check-steps/ for step logic.
 #
 # Arguments:
 #   --format      Format Nix files in-place (instead of just validating).

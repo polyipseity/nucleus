@@ -4,7 +4,7 @@
 # Thin orchestrator — sources test-lib.ps1 for framework, test-steps.ps1 for step
 # registration, then runs the orchestration pipeline.
 #
-# See test-lib.ps1, framework-lib.ps1, and files in test-steps/ for step logic.
+# See test-lib.ps1, step-runner.ps1, and files in test-steps/ for step logic.
 #
 # Arguments:
 #   --fail-fast         Exit immediately on first failure (default).

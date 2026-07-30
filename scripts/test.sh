@@ -4,7 +4,7 @@
 # Thin orchestrator — sources test-lib.sh for framework, test-steps.sh for step
 # registration, then runs the orchestration pipeline.
 #
-# See test-lib.sh, framework-lib.sh, and files in test-steps/ for step logic.
+# See test-lib.sh, step-runner.sh, and files in test-steps/ for step logic.
 #
 # Arguments:
 #   -q|--quiet           Suppress success/progress output across applicable steps.
