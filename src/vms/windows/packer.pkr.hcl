@@ -39,7 +39,7 @@ variable "windows_iso" {
 variable "windows_iso_checksum" {
   type        = string
   default     = "none"
-  description = "Checksum for the Windows 11 ISO (sha256:...).  Set to 'none' to skip verification."
+  description = "SHA-256 checksum for the Windows 11 ISO.  Microsoft does not publish stable, verifiable checksums for Windows 11 ISOs — the download site redirects to different ISO files depending on region, architecture, and time of download, and Microsoft provides no signed checksum manifest.  Set to \"none\" (the default) to skip verification."
 }
 
 variable "accelerator" {
@@ -225,7 +225,7 @@ source "qemu" "windows11" {
   net_device = "e1000"
 
   iso_url      = var.windows_iso
-  iso_checksum = var.windows_iso_checksum # check-suppress:packer_validate: Windows ISO checksum varies by release; no stable value.
+  iso_checksum = var.windows_iso_checksum # check-suppress:packer_validate: Windows ISO checksums cannot be predetermined — Microsoft does not publish stable, queryable checksums for Windows 11 ISOs. Set the variable to "none" to skip verification.
 
   # Autounattend.xml on floppy (A:\) — Windows Setup reads it automatically.
   floppy_files = [
