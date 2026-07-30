@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Framework library for check and test orchestrators.
+# Step runner library for check and test orchestrators.
 # Provides step registration, execution, timing, and aggregation.
 # Sourced by check-lib.sh and test-lib.sh.
 #
-# Guard against re-sourcing — step files source framework independently and
+# Guard against re-sourcing — step files source independently and
 # re-sourcing would wipe step registration arrays, leaving only the last step.
-[ -n "${_NUCLEUS_FRAMEWORK_SOURCED-}" ] && return
-_NUCLEUS_FRAMEWORK_SOURCED=1
+[ -n "${_NUCLEUS_STEP_RUNNER_SOURCED-}" ] && return
+_NUCLEUS_STEP_RUNNER_SOURCED=1
 
 # --- Step registration ---
 # Indexed arrays: step numbers, step names, step function names.
