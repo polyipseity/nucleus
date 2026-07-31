@@ -150,3 +150,4 @@ See `.agents/instructions/package-installation-scope.instructions.md` for packag
 - When adding new fragments (`.json`, `.md`, `.nix`, `.ps1`), verify wiring (`imports`, `readFile`, dot-sourcing).
 - Keep reusable Windows PowerShell logic in `src/hosts/Windows/modules/`; keep `src/hosts/Windows/apply.ps1` orchestration-focused.
 - Before modifying any file that has cross-references (imports, callers, grep patterns), first run an exhaustive search of all references and report them. Do not start edits until the full reference map is known.
+- Never edit `.gitignore` without explicit user request. Untracked build pollution (e.g. `node_modules/` from `bun install`) must be removed immediately, never silenced with gitignore edits.

@@ -220,22 +220,22 @@ test_regression_cache_file_lists_excludes_gitignored() {
         cd "$REPO_ROOT" || exit 1
         SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
-        # Fixture: a .nix file under gitignored node_modules/ must be filtered
+        # Fixture: a .nix file under gitignored .direnv/ must be filtered
         # out by cache_file_lists (via filter_gitignored -> git check-ignore).
-        mkdir -p node_modules
-        printf '{}' > node_modules/_nucleus_regression_fixture.nix
+        mkdir -p .direnv
+        printf '{}' > .direnv/_nucleus_regression_fixture.nix
         CACHED_NIX_FILES=()
         CACHED_YAML_FILES=()
         CACHED_JSON_FILES=()
         CACHED_SH_FILES=()
         cache_file_lists
-        rm -f node_modules/_nucleus_regression_fixture.nix
-        rmdir node_modules 2>/dev/null || true
+        rm -f .direnv/_nucleus_regression_fixture.nix
+        rmdir .direnv 2>/dev/null || true
         # Invariants: the gitignored fixture is dropped, a tracked file stays.
         _fixture_found=no
         _tracked_found=no
         for _f in "${CACHED_NIX_FILES[@]}"; do
-            if [[ "$_f" == *node_modules/_nucleus_regression_fixture.nix ]]; then
+            if [[ "$_f" == *.direnv/_nucleus_regression_fixture.nix ]]; then
                 _fixture_found=yes
             fi
             if [[ "$_f" == *src/flake.nix ]]; then
