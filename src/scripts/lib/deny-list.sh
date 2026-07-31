@@ -36,7 +36,10 @@ filter_gitignored() {
   [ ! -s "$_tmp" ] && { rm -f "$_tmp"; return; }
   # Batch check via stdin. Capture output to temp file so pipefail
   # does not interfere with the exit code check.
-  git check-ignore --stdin < "$_tmp" 2>/dev/null > "$_tmp.ignored"; _git_exit=$?
+  # `||` (not `;`) is required: git exits 1 when nothing is ignored, and
+  # without the conditional context `set -e` aborts this subshell before
+  # `_git_exit=$?` captures it — leaving callers with empty file lists.
+  git check-ignore --stdin < "$_tmp" 2>/dev/null > "$_tmp.ignored" || _git_exit=$?
   if [ "$_git_exit" -gt 1 ]; then
     # git error (exit 128) — pass through unchanged
     cat "$_tmp"

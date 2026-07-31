@@ -182,9 +182,19 @@ Step 13 validation rules:
     - *.schema.json files (they ARE schema files)
     - vendor/** (vendored third-party code)
     - secrets/** (generated/managed, not human-authored configs)
-    - .github/workflows/*.yml, .github/dependabot.yml (use --builtin-schema for validation)
+    - .github/workflows/*.yml, .github/dependabot.yml (use --builtin-schema for validation; globs are *-prefixed to match find's ./ prefix)
     - .gitignore, .gitkeep, package.json (infrastructure / well-known standard files)
     - opencode.jsonc (already has embedded $schema, checked by built-in schema)
+    - App-owned config formats with no published JSON schema:
+      - src/modules/configs/vscode/*.json (vscode:// schema URIs are not fetchable by check-jsonschema)
+      - src/modules/configs/iterm2/DynamicProfiles/*.json
+      - src/modules/configs/obsidian/*.json
+      - src/modules/configs/qtpass/*.json
+      - src/modules/configs/camilladsp/**, src/modules/configs/camillagui-backend/**, src/modules/configs/discord-music-rpc/**
+      - src/modules/configs/agents/skills/*/_meta.json (ClawHub skill metadata, generated/managed)
+      - src/modules/ai/litellm-config.yml
+      - .sops.yaml
+    (Registered in .agents/instructions/allow-and-deny-lists.instructions.md)
 
   Error aggregation:
     - All errors are collected (non-fatal per-file).

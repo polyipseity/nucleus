@@ -13,6 +13,7 @@ run_05_framework_verification() {
   bash "$_test_dir/step-runner-unit-tests.sh" || _exit_code=1
   bash "$_test_dir/test-lib-unit-tests.sh" || _exit_code=1
   bash "$_test_dir/check-step-file-structure-tests.sh" || _exit_code=1
+  bash "$_test_dir/deny-list-tests.sh" || _exit_code=1
 
   say "--- step-specific tests ---"
   bash "$_test_dir/check-steps/01-code-formatting-tests.sh" || _exit_code=1

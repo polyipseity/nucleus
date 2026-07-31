@@ -85,12 +85,24 @@ Register-Step -Id "schema-validation" -Number 13 -Name "Schema validation (JSON/
 
   foreach ($f in $allFiles) {
     # Exception list: *.schema.json, vendor/**, secrets/**,
-    # .github/workflows/*.yml, .github/dependabot.yml, package.json, opencode.jsonc
+    # */.github/workflows/*.yml, */.github/dependabot.yml, package.json, opencode.jsonc
+    # + app-owned formats with no published JSON schema (vscode:// URIs are not
+    # fetchable by check-jsonschema; other formats have no published schema).
     $skipFile = $false
     if ($f -like '*.schema.json' -or $f -like '*\vendor\*' -or $f -like '*/vendor/*' -or `
         $f -like '*\secrets\*' -or $f -like '*/secrets/*' -or `
         $f -like '*.github\workflows\*' -or $f -like '*.github/workflows/*' -or `
-        $f -like '.github\dependabot.yml' -or $f -like '.github/dependabot.yml') { $skipFile = $true }
+        $f -like '*.github\dependabot.yml' -or $f -like '*.github/dependabot.yml' -or `
+        $f -like '*configs\vscode\*.json' -or $f -like '*configs/vscode/*.json' -or `
+        $f -like '*configs\iterm2\DynamicProfiles\*.json' -or $f -like '*configs/iterm2/DynamicProfiles/*.json' -or `
+        $f -like '*configs\obsidian\*.json' -or $f -like '*configs/obsidian/*.json' -or `
+        $f -like '*configs\qtpass\*.json' -or $f -like '*configs/qtpass/*.json' -or `
+        $f -like '*configs\camilladsp\*' -or $f -like '*configs/camilladsp/*' -or `
+        $f -like '*configs\camillagui-backend\*' -or $f -like '*configs/camillagui-backend/*' -or `
+        $f -like '*configs\discord-music-rpc\*' -or $f -like '*configs/discord-music-rpc/*' -or `
+        $f -like '*configs\agents\skills\*\_meta.json' -or $f -like '*configs/agents/skills/*/_meta.json' -or `
+        $f -like '*ai\litellm-config.yml' -or $f -like '*ai/litellm-config.yml' -or `
+        $f -like '*\.sops.yaml' -or $f -like '*/.sops.yaml') { $skipFile = $true }
     if (-not $skipFile) {
       $fileName = Split-Path $f -Leaf
       if ($fileName -in @('package.json', 'opencode.jsonc')) { $skipFile = $true }

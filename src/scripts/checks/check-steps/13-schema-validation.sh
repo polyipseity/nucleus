@@ -32,9 +32,13 @@ run_13_schema_validation() {
   local _missing_schema=0
   for _f in "${_js_schema_files[@]}"; do
     # Exception list (Spec G): *.schema.json, vendor/**, secrets/**,
-    # .github/workflows/*.yml, .github/dependabot.yml, package.json, opencode.jsonc
+    # */.github/workflows/*.yml, */.github/dependabot.yml, package.json, opencode.jsonc
+    # + app-owned formats with no published JSON schema (vscode:// URIs are not
+    # fetchable by check-jsonschema; other formats have no published schema).
     case "$_f" in
-      *.schema.json|*/vendor/*|*/secrets/*|.github/workflows/*|.github/dependabot.yml)
+      *.schema.json|*/vendor/*|*/secrets/*|*/.github/workflows/*|*/.github/dependabot.yml)
+        continue ;;
+      */configs/vscode/*.json|*/configs/iterm2/DynamicProfiles/*.json|*/configs/obsidian/*.json|*/configs/qtpass/*.json|*/configs/camilladsp/*|*/configs/camillagui-backend/*|*/configs/discord-music-rpc/*|*/configs/agents/skills/*/_meta.json|*/ai/litellm-config.yml|*/.sops.yaml)
         continue ;;
     esac
     local _sf_nobase="${_f##*/}"

@@ -35,6 +35,24 @@ test_step13_has_exception_list() {
   return 1
 }
 
+test_step13_github_exceptions_handle_dot_prefix() {
+  # Matches: find . yields ./.github/... so exception globs must be *-prefixed
+  if grep -q '\*/\.github/workflows/\*' "$TEST_FILE"; then
+    return 0
+  fi
+  echo "FAIL: step 13 .github exception globs should match ./-prefixed paths"
+  return 1
+}
+
+test_step13_exempts_app_configs_without_schema() {
+  # Matches: app-owned formats (vscode, camilladsp, litellm, sops) in exception list
+  if grep -q 'configs/vscode.*configs/camilladsp.*sops' "$TEST_FILE"; then
+    return 0
+  fi
+  echo "FAIL: step 13 should exempt app-owned config formats without published schemas"
+  return 1
+}
+
 test_step13_missing_schema_errors_counted() {
   # Matches: _jsonschema_errors=$((_jsonschema_errors + _missing_schema))
   if grep -q '_jsonschema_errors.*_missing_schema' "$TEST_FILE"; then
@@ -45,7 +63,7 @@ test_step13_missing_schema_errors_counted() {
 }
 
 failures=0
-for test in test_step13_has_missing_schema_check test_step13_has_format_check test_step13_has_exception_list test_step13_missing_schema_errors_counted; do
+for test in test_step13_has_missing_schema_check test_step13_has_format_check test_step13_has_exception_list test_step13_github_exceptions_handle_dot_prefix test_step13_exempts_app_configs_without_schema test_step13_missing_schema_errors_counted; do
   if ! $test; then
     failures=$((failures + 1))
   fi

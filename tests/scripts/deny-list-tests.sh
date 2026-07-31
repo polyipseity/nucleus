@@ -87,6 +87,23 @@ test_filter_subdir_ignored() {
   fi
 }
 
+# Test 7: filter_gitignored survives `set -e` when nothing is ignored.
+# Regression for the cache_file_lists bug: `git check-ignore` exits 1 when
+# no path is ignored, and `set -e` used to abort the subshell before the
+# exit code was captured, yielding empty CACHED_* arrays in full check mode.
+test_filter_no_ignore_under_errexit() {
+  local input="${NUCLEUS_REPO_ROOT}/tests/scripts/deny-list-tests.sh"
+  local result
+  # `set -euo pipefail` + process substitution mirrors cache_file_lists
+  # (step-runner.sh); must pass the tracked input through unchanged.
+  result=$(set -euo pipefail; printf '%s\n' "$input" | filter_gitignored) || true
+  if [[ "$result" == "$input" ]]; then
+    assert_pass "filter_gitignored: no-ignore input passes through under set -e"
+  else
+    assert_fail "filter_gitignored: no-ignore input passes through under set -e" "Expected '$input', got: '$result'"
+  fi
+}
+
 echo ""
 echo "Deny-list library tests"
 echo "======================="
@@ -97,6 +114,7 @@ test_filter_batch_mixed
 test_filter_empty_input
 test_filter_glob_ignored
 test_filter_subdir_ignored
+test_filter_no_ignore_under_errexit
 
 echo ""
 echo "$TESTS_PASSED passed, $TESTS_FAILED failed"
