@@ -2,7 +2,8 @@
 .SYNOPSIS
     Pester coverage for the managed per-user Git baseline on Windows.
 .DESCRIPTION
-    Validates managed fetch and push defaults (pruning, tag-follow), cross-host
+    Validates managed fetch, pull and push defaults (branch pruning, tag
+    retention, fast-forward pull, auto-setup remote, tag-follow), cross-host
     Git parity defaults (signed commits, signed tags, core.autocrlf,
     core.symlinks, user.useConfigOnly).
 .NOTES
@@ -13,13 +14,21 @@
 $script:gitConfigPath = Join-Path -Path $env:USERPROFILE -ChildPath '.gitconfig'
 
 Describe "Windows Git Configuration Parity" {
-    Context "Managed fetch and push defaults" {
+    Context "Managed fetch, pull and push defaults" {
         It "Should prune remote-tracking branches on fetch" {
             git config --file $script:gitConfigPath --get fetch.prune | Should -Be 'true'
         }
 
-        It "Should prune tags on fetch" {
-            git config --file $script:gitConfigPath --get fetch.pruneTags | Should -Be 'true'
+        It "Should not overwrite local tags on fetch" {
+            git config --file $script:gitConfigPath --get fetch.pruneTags | Should -Be 'false'
+        }
+
+        It "Should fast-forward pull when possible" {
+            git config --file $script:gitConfigPath --get pull.ff | Should -Be 'true'
+        }
+
+        It "Should merge rather than rebase on pull" {
+            git config --file $script:gitConfigPath --get pull.rebase | Should -Be 'false'
         }
 
         It "Should auto-setup remote on push" {

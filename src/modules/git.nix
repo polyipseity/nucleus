@@ -48,10 +48,18 @@ in
       # Enable symlink support explicitly; matches the Windows baseline where
       # Developer Mode is required for unprivileged symlink creation.
       core.symlinks = true;
-      # Prune deleted remote-tracking branches and tags on every fetch so stale
-      # refs do not linger indefinitely across long-lived machines.
+      # Prune deleted remote-tracking branches on every fetch so stale refs do
+      # not linger indefinitely across long-lived machines.
       fetch.prune = true;
-      fetch.pruneTags = true;
+      # Disable tag pruning so a fetch never overwrites a local tag: VS Code
+      # auto-fetches in the background, and `fetch.pruneTags` would move a
+      # local tag to match the remote even when the local tag is intentional.
+      fetch.pruneTags = false;
+      # Pin pull to Git's built-in semantics (fast-forward when possible,
+      # merge otherwise) so behavior cannot silently change with a future
+      # upstream default.
+      pull.ff = true;
+      pull.rebase = false;
       init.defaultBranch = "main";
       # Point init.templateDir at an empty directory we manage during activation
       # so `git init` and `git clone` never create hooks/*.sample or the legacy

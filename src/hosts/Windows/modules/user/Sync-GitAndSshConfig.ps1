@@ -9,7 +9,9 @@ function Sync-GitAndSshConfig {
       - commit.gpgsign=true
       - tag.gpgsign=true
       - fetch.prune=true
-      - fetch.pruneTags=true
+      - fetch.pruneTags=false
+      - pull.ff=true
+      - pull.rebase=false
       - push.followTags=true
       - gpg.format=openpgp
       - user.name / user.email / user.signingkey (from SOPS-managed identity)
@@ -264,10 +266,12 @@ function Sync-GitAndSshConfig {
         'core.excludesFile' = $effectiveIgnorePath
         'core.symlinks' = 'true'
         'fetch.prune' = 'true'
-        'fetch.pruneTags' = 'true'
+        'fetch.pruneTags' = 'false'
         'gpg.format' = 'openpgp'
         'init.defaultBranch' = 'main'
         'init.templateDir' = '~/.config/git/empty_template'
+        'pull.ff' = 'true'
+        'pull.rebase' = 'false'
         'push.autoSetupRemote' = 'true'
         'push.followTags' = 'true'
         'tag.gpgsign' = 'true'
@@ -302,9 +306,11 @@ function Sync-GitAndSshConfig {
           'core.excludesFile' = $null
           'core.symlinks' = 'true'
           'fetch.prune' = 'true'
-          'fetch.pruneTags' = 'true'
+          'fetch.pruneTags' = 'false'
           'gpg.format' = 'openpgp'
           'init.defaultBranch' = 'main'
+          'pull.ff' = $null
+          'pull.rebase' = $null
           'push.autoSetupRemote' = $null
           'push.followTags' = 'true'
           'tag.gpgsign' = 'true'
