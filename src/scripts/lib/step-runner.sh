@@ -336,9 +336,13 @@ run_all_steps() {
   # Remove stale result symlinks before any checks run.
   rm -f result result-*
 
-  local _i _id _skip _skip_id
+  local _i _id _skip _skip_id _total _started _n _name _spawned_steps=()
+  _total=${#_STEP_FUNCS[@]}
+  _started=0
   for _i in "${!_STEP_FUNCS[@]}"; do
     _id="${_STEP_IDS[$_i]}"
+    _n="${_STEP_NUMBERS[$_i]}"
+    _name="${_STEP_NAMES[$_i]}"
     # Check skip list. Use safe expansion in case SKIP_STEPS is unset.
     _skip=false
     for _skip_id in "${SKIP_STEPS[@]+${SKIP_STEPS[@]}}"; do
@@ -348,12 +352,24 @@ run_all_steps() {
       fi
     done
     if $_skip; then
-      _run_skipped_step "${_STEP_NUMBERS[$_i]}" "${_STEP_NAMES[$_i]}" "$_id"
+      _run_skipped_step "$_n" "$_name" "$_id"
     else
-      _run_step "${_STEP_NUMBERS[$_i]}" "${_STEP_NAMES[$_i]}" "${_STEP_FUNCS[$_i]}" "${POSITIONAL_ARGS[@]+${POSITIONAL_ARGS[@]}}" &
+      _started=$((_started + 1))
+      _run_step "$_n" "$_name" "${_STEP_FUNCS[$_i]}" "${POSITIONAL_ARGS[@]+${POSITIONAL_ARGS[@]}}" &
+      _spawned_steps+=("$_n")
+      # Live progress: announce each step as it launches (unbuffered stdout).
+      printf '[%d/%d] step %s %s started\n' "$_started" "$_total" "$_n" "$_name"
     fi
   done
   wait
+
+  # Live progress: report elapsed time per launched step (mm:ss).
+  local _elapsed_ms _elapsed_s
+  for _n in "${_spawned_steps[@]}"; do
+    _elapsed_ms=$(cat "$_wave_tmpdir/step-$_n.time" 2>/dev/null || echo 0)
+    _elapsed_s=$((_elapsed_ms / 1000))
+    printf 'step %s finished (%02d:%02d)\n' "$_n" "$((_elapsed_s / 60))" "$((_elapsed_s % 60))"
+  done
 }
 
 # --- aggregate_results ---

@@ -77,6 +77,22 @@ test_aggregate_results() {
     fi
 }
 
+test_started_progress_line() {
+    if grep -qF "[%d/%d] step %s %s started" "$STEP_RUNNER"; then
+        assert_pass "Live started progress line present"
+    else
+        assert_fail "Live started progress line" "Expected '[%d/%d] step %s %s started' pattern not found"
+    fi
+}
+
+test_finished_progress_line() {
+    if grep -qF "step %s finished (%02d:%02d)" "$STEP_RUNNER"; then
+        assert_pass "Live finished progress line present"
+    else
+        assert_fail "Live finished progress line" "Expected 'step %s finished (%02d:%02d)' pattern not found"
+    fi
+}
+
 # ---- Run tests ----
 echo ""
 echo "Testing test output format via step-runner.sh..."
@@ -90,6 +106,8 @@ test_generic_failure_message
 test_success_message
 test_explicit_failure_summary
 test_aggregate_results
+test_started_progress_line
+test_finished_progress_line
 
 echo ""
 echo "--- Results: $TESTS_PASSED passed, $TESTS_FAILED failed ---"

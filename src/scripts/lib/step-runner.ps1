@@ -238,6 +238,8 @@ function Invoke-StepPipeline {
   Save-FileListCache
 
   $runspaces = [System.Collections.Generic.List[hashtable]]::new()
+  $totalSteps = $script:StepActions.Count
+  $startedSteps = 0
 
   for ($i = 0; $i -lt $script:StepActions.Count; $i++) {
     $id = $script:StepIds[$i]
@@ -294,6 +296,9 @@ function Invoke-StepPipeline {
       })
       $handle = $ps.BeginInvoke()
       $null = $runspaces.Add(@{ PowerShell = $ps; AsyncResult = $handle; Number = $n })
+      $startedSteps++
+      # Live progress: announce each step as it launches (main-thread output).
+      Write-Output ("[{0}/{1}] step {2} {3} started" -f $startedSteps, $totalSteps, $n, $name)
     }
   }
 
@@ -307,6 +312,16 @@ function Invoke-StepPipeline {
     } finally {
       $rs.PowerShell.Dispose()
     }
+  }
+
+  # Live progress: report elapsed time per launched step (mm:ss).
+  foreach ($rs in $runspaces) {
+    $n = $rs.Number
+    $timeFile = Join-Path $script:WaveTmpDir "step-$n.time"
+    $elapsedMs = 0
+    if (Test-Path -LiteralPath $timeFile) { $elapsedMs = [int](Get-Content -LiteralPath $timeFile -Raw) }
+    $span = [TimeSpan]::FromMilliseconds($elapsedMs)
+    Write-Output ("step {0} finished ({1:00}:{2:00})" -f $n, [math]::Floor($span.TotalMinutes), $span.Seconds)
   }
 
   if ($failed) { exit 1 }

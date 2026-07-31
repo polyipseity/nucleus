@@ -27,7 +27,7 @@ Describe 'Combined status table' {
     }
 
     It 'has total timing line' {
-        $script:checkContent | Should -MatchExactly '"  total:   \{0,5\} ms"'
+        $script:checkContent | Should -MatchExactly '"`n  total:   \{0,5\} ms"'
     }
 }
 
@@ -53,9 +53,19 @@ Describe 'Explicit failure summary (Phase 5)' {
     }
 }
 
-Describe '[Step N] prefix (Phase 5c)' {
-    It 'has [Step N] prefix in Start-Job say/error' {
-        # Look for [Step $($_step)] in say/error function definitions inside Start-Job blocks
-        $script:checkContent | Should -MatchExactly '\[Step \$\(\$_step\)\]'
+Describe 'Step banner (runspace era)' {
+    It 'has step banner in runspace script block' {
+        # Runspaces write "`n=== [<Number>] <Name> ===" to step-N.out
+        $script:checkContent | Should -MatchExactly '=== \[\$Number\] \$Name ==='
+    }
+}
+
+Describe 'Live progress lines (Phase 11)' {
+    It 'has started progress line' {
+        $script:checkContent | Should -MatchExactly '\[\{0\}/\{1\}\] step \{2\} \{3\} started'
+    }
+
+    It 'has finished progress line' {
+        $script:checkContent | Should -MatchExactly 'step \{0\} finished \(\{1:00\}:\{2:00\}\)'
     }
 }

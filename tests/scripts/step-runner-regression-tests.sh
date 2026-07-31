@@ -371,6 +371,31 @@ test_regression_filter_gitignored_available_through_step_runner() {
     fi
 }
 
+# ---- Contract J: run_all_steps emits live progress lines (Phase 11) ----
+test_regression_run_all_steps_emits_progress_lines() {
+    local result
+    result=$(
+        cd "$REPO_ROOT" || exit 1
+        SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
+        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+        say() { true; }
+        error() { true; }
+        # shellcheck disable=SC2317 # reason: reached via register_step dispatch
+        mock_step() { return 0; }
+        register_step "mock-a" 1 "Mock A" mock_step
+        register_step "mock-b" 2 "Mock B" mock_step
+        run_all_steps 2>&1 || true
+    ) 2>&1
+    if echo "$result" | grep -q '\[1/2\] step 1 Mock A started' \
+        && echo "$result" | grep -q '\[2/2\] step 2 Mock B started' \
+        && echo "$result" | grep -q 'step 1 finished (' \
+        && echo "$result" | grep -q 'step 2 finished ('; then
+        assert_pass "REGRESSION: run_all_steps emits started/finished progress lines"
+    else
+        assert_fail "REG-progress-lines" "Expected started/finished progress lines, got: $result"
+    fi
+}
+
 # ---- Run tests ----
 echo ""
 echo "=== Phase 0: Step-runner regression tests (POSIX) ==="
@@ -396,6 +421,7 @@ test_regression_aggregate_results_output_contains_check_summary
 test_regression_aggregate_results_renders_skip_for_exit_2
 test_regression_run_all_steps_uses_background_jobs
 test_regression_filter_gitignored_available_through_step_runner
+test_regression_run_all_steps_emits_progress_lines
 
 echo ""
 echo "--- Phase 0 POSIX regression tests: $TESTS_PASSED passed, $TESTS_FAILED failed ---"

@@ -27,7 +27,7 @@ Describe 'Combined status table' {
     }
 
     It 'has total timing line' {
-        $script:testContent | Should -MatchExactly '"  total:   \{0,5\} ms"'
+        $script:testContent | Should -MatchExactly '"`n  total:   \{0,5\} ms"'
     }
 }
 
@@ -39,16 +39,26 @@ Describe 'Step name files' {
 
 Describe 'Generic messages' {
     It 'has generic failure message' {
-        $script:testContent | Should -MatchExactly 'some tests failed'
+        $script:testContent | Should -MatchExactly 'some checks failed'
     }
 
     It 'has generic success message' {
-        $script:testContent | Should -MatchExactly 'all tests passed\.'
+        $script:testContent | Should -MatchExactly 'all checks passed\.'
     }
 }
 
 Describe 'Explicit failure summary (Phase 6b)' {
     It 'has explicit failure summary with Failed steps' {
         $script:testContent | Should -MatchExactly 'Failed steps'
+    }
+}
+
+Describe 'Live progress lines (Phase 11)' {
+    It 'has started progress line' {
+        $script:testContent | Should -MatchExactly '\[\{0\}/\{1\}\] step \{2\} \{3\} started'
+    }
+
+    It 'has finished progress line' {
+        $script:testContent | Should -MatchExactly 'step \{0\} finished \(\{1:00\}:\{2:00\}\)'
     }
 }
