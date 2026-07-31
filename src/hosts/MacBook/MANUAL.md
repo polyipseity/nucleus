@@ -19,6 +19,7 @@
 - Run `camilladsp --version`, then approve BlackHole in System Settings > Privacy & Security and grant Microphone permission.
 - Restart macOS to see managed Finder sidebar favorites.
 - Caddy local-CA trust runs automatically. If missing: `sudo caddy trust --address 127.0.0.1:2019`.
+- Nix commands may wait on a `nixpkgs-weekly/0.1` fetch from flakehub (multiple "waiting for another Nix process" or "unpacking" lines). This is machine-level config — the global registry maps `nixpkgs` to flakehub and `/etc/nix/nix.conf` sets `extra-nix-path` — not part of `src/flake.lock`. It is a one-time cold-cache cost; later runs are instant.
 
 ## command shortcuts
 
