@@ -337,6 +337,10 @@ let
           cond = builtins.pathExists ../../src/vms/templates/start-windows.ps1;
           msg = "src/vms/templates/start-windows.ps1 must exist for Windows VM start scripts";
         }
+        {
+          cond = builtins.pathExists ../../src/vms/templates/start-windows-host.sh;
+          msg = "src/vms/templates/start-windows-host.sh must exist for Git Bash/MSYS VM start scripts";
+        }
       ];
       results = builtins.map (c: assert' c.cond c.msg) checks;
     in
@@ -466,6 +470,7 @@ let
   readmeTemplateText = builtins.readFile ../../src/vms/templates/README.md;
   startPosixTemplateText = builtins.readFile ../../src/vms/templates/start-posix.sh;
   startWindowsTemplateText = builtins.readFile ../../src/vms/templates/start-windows.ps1;
+  startWindowsHostTemplateText = builtins.readFile ../../src/vms/templates/start-windows-host.sh;
   macbook_vms_nix_text = builtins.readFile ../../src/hosts/MacBook/vms.nix;
   utmConfigPlistText = builtins.readFile ../../src/modules/configs/vms/utm-config.plist.xml;
   vms_json_text = builtins.readFile ../../src/modules/VMs.json;
@@ -873,6 +878,27 @@ let
     && (lib.hasInfix "chardev pipe" startWindowsTemplateText)
   ) "src/vms/templates/start-windows.ps1 must contain all expected placeholders and QEMU arguments";
 
+  test_vm_start_windows_host_template_content =
+    assert'
+      (
+        (lib.hasInfix "__QEMU_SYSTEM__" startWindowsHostTemplateText)
+        && (lib.hasInfix "__VM_NAME__" startWindowsHostTemplateText)
+        && (lib.hasInfix "__VM_DISPLAY__" startWindowsHostTemplateText)
+        && (lib.hasInfix "__MACHINE__" startWindowsHostTemplateText)
+        && (lib.hasInfix "__CPU__" startWindowsHostTemplateText)
+        && (lib.hasInfix "__CPUS__" startWindowsHostTemplateText)
+        && (lib.hasInfix "__RAM_MIB__" startWindowsHostTemplateText)
+        && (lib.hasInfix "__DISK_PATH__" startWindowsHostTemplateText)
+        && (lib.hasInfix "__VGA__" startWindowsHostTemplateText)
+        && (lib.hasInfix "__DISPLAY_BACKEND__" startWindowsHostTemplateText)
+        && (lib.hasInfix "org.qemu.guest_agent.0" startWindowsHostTemplateText)
+        && (lib.hasInfix "hostfwd=tcp::2222-:22" startWindowsHostTemplateText)
+        && (lib.hasInfix "chardev pipe" startWindowsHostTemplateText)
+        && (lib.hasInfix "set -eu" startWindowsHostTemplateText)
+        && (!lib.hasInfix "{{" startWindowsHostTemplateText)
+      )
+      "src/vms/templates/start-windows-host.sh must contain all expected __TOKEN__ placeholders and QEMU arguments, with no {{TOKEN}} style";
+
   test_vm_directory_readme_generation =
     assert'
       (
@@ -1024,6 +1050,7 @@ let
     test_vm_readme_template_content
     test_vm_start_posix_template_content
     test_vm_start_windows_template_content
+    test_vm_start_windows_host_template_content
     test_vm_directory_readme_generation
     test_windows_vm_directory_readme_generation
     test_vm_setup_generates_helper_scripts
@@ -1112,6 +1139,7 @@ in
     test_vm_readme_template_content
     test_vm_start_posix_template_content
     test_vm_start_windows_template_content
+    test_vm_start_windows_host_template_content
     test_vm_directory_readme_generation
     test_windows_vm_directory_readme_generation
     test_vm_setup_generates_helper_scripts
