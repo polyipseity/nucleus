@@ -90,6 +90,8 @@ If a PowerShell file exports multiple functions or none, keep it in `src/hosts/W
 
 ### PowerShell here-string extraction
 
+The no-embedding invariant, shared cross-platform content rule, token convention, and exceptions are canonical in [embedded-content.instructions.md](embedded-content.instructions.md). This section keeps the mechanical details:
+
 When extracting inline PowerShell here-strings from `src/hosts/Windows/modules/` into standalone scripts:
 
 - Extract the script body to `src/hosts/Windows/modules/scripts/<name>.ps1`.

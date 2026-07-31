@@ -433,4 +433,6 @@ Examples with their extracted helpers:
 
 **Rule**: when adding a new split-pattern inline script, extract the pure-shell body to `src/scripts/` first, then wrap it in Nix with environment variable injection or `builtins.replaceStrings` for Nix-evaluated values.
 
+The cross-platform no-embedding invariant, shared-file rule, and `__TOKEN__` convention are canonical in `embedded-content.instructions.md`; the boundaries above are the Nix-side exceptions.
+
 See `scripts-and-permissions.instructions.md` ("When a script needs its own file") for the complementary policy on when extracted scripts should remain separate files vs. be inlined directly.
