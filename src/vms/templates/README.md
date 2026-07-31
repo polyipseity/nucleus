@@ -5,7 +5,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
 ## Layout
 
 ```
-{{VM_DIR_DISPLAY}}/
+__VM_DIR_DISPLAY__/
 ├── .tart/                              — Tart VM store (macOS only; symlinked from ~/.tart)
 ├── images/                             — build outputs, temporary build dirs, installer cache
 │   ├── <name>.qcow2                    — pre-built guest image
@@ -32,7 +32,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
 | NixOS | NixOS / Windows | libvirt | `scripts/start-<name>.sh` or `scripts/start-<name>.ps1` |
 | Windows | NixOS / Windows | QEMU | `scripts/start-<name>.ps1` (`scripts/start-<name>.sh` in Git Bash) |
 
-Run from `{{VM_DIR_DISPLAY}}/scripts/`.
+Run from `__VM_DIR_DISPLAY__/scripts/`.
 
 ## Guest configuration
 
@@ -55,7 +55,7 @@ Automation channels used during provisioning:
 To move a UTM VM to another macOS host:
 
 1. Copy the entire `<name>.utm` directory.
-2. Place it under `{{VM_DIR_DISPLAY}}` on the target host.
+2. Place it under `__VM_DIR_DISPLAY__` on the target host.
 3. Open it in UTM (or re-run `nucleus-vm setup` to refresh the managed registration).
 
 Copying only `config.plist` or only `disk-main.qcow2` is not sufficient for a portable UTM VM transfer.
@@ -76,17 +76,17 @@ build → provision → run → rebuild
 Temporary files/directories that are safe to remove when builds fail, are interrupted, or when reclaiming space:
 
 ```
-{{IMAGES_DIR_DISPLAY}}/
+__IMAGES_DIR_DISPLAY__/
 └── <name>-build/           — Packer temp files (~10–30 GB)
 ```
 
 Persistent VM artifacts (remove only when intentionally deleting a VM):
 
 ```
-{{IMAGES_DIR_DISPLAY}}/
+__IMAGES_DIR_DISPLAY__/
 ├── <name>.qcow2                    — pre-built guest image (~2–20 GB)
 └── <name>.vm-guest-credentials-sha256 — credential marker for build image
-{{VM_DIR_DISPLAY}}/
+__VM_DIR_DISPLAY__/
 ├── .tart/                          — Tart VM store
 ├── <name>.utm/                     — UTM bundle
 ├── <name>.qcow2                    — runtime disk
@@ -100,7 +100,7 @@ Persistent VM artifacts (remove only when intentionally deleting a VM):
 
 These artifacts are preserved by `nucleus-gc` because they are expensive to reproduce. Delete them manually when you need to reclaim space:
 
-- `{{IMAGES_DIR_DISPLAY}}/<name>-installer.iso` — cached Windows ISO (~5–6 GB). Remove with `rm "{{IMAGES_DIR_DISPLAY}}/<name>-installer.iso"` (POSIX) or `Remove-Item "{{IMAGES_DIR_DISPLAY}}/<name>-installer.iso"` (Windows). `nucleus-vm setup` re-downloads it on the next build.
+- `__IMAGES_DIR_DISPLAY__/<name>-installer.iso` — cached Windows ISO (~5–6 GB). Remove with `rm "__IMAGES_DIR_DISPLAY__/<name>-installer.iso"` (POSIX) or `Remove-Item "__IMAGES_DIR_DISPLAY__/<name>-installer.iso"` (Windows). `nucleus-vm setup` re-downloads it on the next build.
 
 ## Troubleshooting
 

@@ -447,8 +447,8 @@ function Invoke-VMSetup {
         $vmDirShort = $vmDir -replace [regex]::Escape($env:USERPROFILE), '%USERPROFILE%'
         $imagesDirShort = "$vmDirShort\images"
         (Get-Content -Path $vmReadmeTemplate -Raw) `
-            -replace '\{\{VM_DIR_DISPLAY\}\}', $vmDirShort `
-            -replace '\{\{IMAGES_DIR_DISPLAY\}\}', $imagesDirShort `
+            -replace '__VM_DIR_DISPLAY__', $vmDirShort `
+            -replace '__IMAGES_DIR_DISPLAY__', $imagesDirShort `
             | Set-Content -Path $vmReadmePath -Encoding UTF8
         Write-Information "vm-setup: VM directory guide written: $vmReadmePath (template)"
     } else {
@@ -696,17 +696,17 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         $startContentPs1Template = Join-Path $templatesDir 'start-windows.ps1'
         if (Test-Path -LiteralPath $startContentPs1Template -PathType Leaf) {
             $ps1Template = Get-Content -Path $startContentPs1Template -Raw
-            $startContentPs1 = $ps1Template.Replace('{{QEMU_SYSTEM}}', $qemuSystem)
-            $startContentPs1 = $startContentPs1.Replace('{{VM_NAME}}', $vm.name)
-            $startContentPs1 = $startContentPs1.Replace('{{VM_DISPLAY}}', $vm.display)
-            $startContentPs1 = $startContentPs1.Replace('{{MACHINE}}', $machine)
-            $startContentPs1 = $startContentPs1.Replace('{{CPU}}', $cpu)
-            $startContentPs1 = $startContentPs1.Replace('{{CPUS}}', [string]$vm.cpus)
-            $startContentPs1 = $startContentPs1.Replace('{{RAM_MIB}}', [string]$ramMib)
-            $startContentPs1 = $startContentPs1.Replace('{{DISK_PATH}}', $diskPath)
-            $startContentPs1 = $startContentPs1.Replace('{{VGA}}', $vga)
-            $startContentPs1 = $startContentPs1.Replace('{{DISPLAY_BACKEND}}', $display)
-            $startContentPs1 = $startContentPs1.Replace('{{VIRTIOFS_ARGS}}', $virtiofsArgs)
+            $startContentPs1 = $ps1Template.Replace('__QEMU_SYSTEM__', $qemuSystem)
+            $startContentPs1 = $startContentPs1.Replace('__VM_NAME__', $vm.name)
+            $startContentPs1 = $startContentPs1.Replace('__VM_DISPLAY__', $vm.display)
+            $startContentPs1 = $startContentPs1.Replace('__MACHINE__', $machine)
+            $startContentPs1 = $startContentPs1.Replace('__CPU__', $cpu)
+            $startContentPs1 = $startContentPs1.Replace('__CPUS__', [string]$vm.cpus)
+            $startContentPs1 = $startContentPs1.Replace('__RAM_MIB__', [string]$ramMib)
+            $startContentPs1 = $startContentPs1.Replace('__DISK_PATH__', $diskPath)
+            $startContentPs1 = $startContentPs1.Replace('__VGA__', $vga)
+            $startContentPs1 = $startContentPs1.Replace('__DISPLAY_BACKEND__', $display)
+            $startContentPs1 = $startContentPs1.Replace('__VIRTIOFS_ARGS__', $virtiofsArgs)
         } else {
             Write-Warning "vm-setup: start-windows.ps1 template not found at $startContentPs1Template; writing minimal script"
             $startContentPs1 = "Write-Host 'start-$($vm.name).ps1 — Start VM $($vm.display)'"

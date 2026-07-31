@@ -829,24 +829,28 @@ let
         && (lib.hasInfix "repairing stale UTM runtime registration" vm_setup_sh_text)
       )
       "scripts/vm.sh must re-register UTM VMs when legacy display configs or template drift are detected so refreshed config.plist values take effect";
-  test_vm_readme_template_content = assert' (
-    (lib.hasInfix "nucleus-vm setup" readmeTemplateText)
-    && (lib.hasInfix "## Layout" readmeTemplateText)
-    && (lib.hasInfix "<name>-build/" readmeTemplateText)
-    && (lib.hasInfix "<name>-installer.iso" readmeTemplateText)
-    && (lib.hasInfix "## Start commands" readmeTemplateText)
-    && (lib.hasInfix "start-<name>.sh" readmeTemplateText)
-    && (lib.hasInfix "start-<name>.ps1" readmeTemplateText)
-    && (lib.hasInfix "## UTM bundle portability" readmeTemplateText)
-    && (lib.hasInfix "Copying only `config.plist`" readmeTemplateText)
-    && (lib.hasInfix "## Guest configuration" readmeTemplateText)
-    && (lib.hasInfix "## Lifecycle" readmeTemplateText)
-    && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
-    && (lib.hasInfix "## Troubleshooting" readmeTemplateText)
-    && (lib.hasInfix "{{VM_DIR_DISPLAY}}" readmeTemplateText)
-    && (lib.hasInfix "{{IMAGES_DIR_DISPLAY}}" readmeTemplateText)
-    && (lib.hasInfix "## Notes" readmeTemplateText)
-  ) "src/vms/templates/README.md must contain all expected documentation sections and placeholders";
+  test_vm_readme_template_content =
+    assert'
+      (
+        (lib.hasInfix "nucleus-vm setup" readmeTemplateText)
+        && (lib.hasInfix "## Layout" readmeTemplateText)
+        && (lib.hasInfix "<name>-build/" readmeTemplateText)
+        && (lib.hasInfix "<name>-installer.iso" readmeTemplateText)
+        && (lib.hasInfix "## Start commands" readmeTemplateText)
+        && (lib.hasInfix "start-<name>.sh" readmeTemplateText)
+        && (lib.hasInfix "start-<name>.ps1" readmeTemplateText)
+        && (lib.hasInfix "## UTM bundle portability" readmeTemplateText)
+        && (lib.hasInfix "Copying only `config.plist`" readmeTemplateText)
+        && (lib.hasInfix "## Guest configuration" readmeTemplateText)
+        && (lib.hasInfix "## Lifecycle" readmeTemplateText)
+        && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
+        && (lib.hasInfix "## Troubleshooting" readmeTemplateText)
+        && (lib.hasInfix "__VM_DIR_DISPLAY__" readmeTemplateText)
+        && (lib.hasInfix "__IMAGES_DIR_DISPLAY__" readmeTemplateText)
+        && (!lib.hasInfix "{{" readmeTemplateText)
+        && (lib.hasInfix "## Notes" readmeTemplateText)
+      )
+      "src/vms/templates/README.md must contain all expected documentation sections and __TOKEN__ placeholders, with no {{TOKEN}} style";
 
   test_vm_start_posix_template_content = assert' (
     (lib.hasInfix "__VM_NAME__" startPosixTemplateText)
@@ -862,21 +866,25 @@ let
     && (lib.hasInfix "virt-viewer" startPosixTemplateText)
   ) "src/vms/templates/start-posix.sh must contain all expected placeholders and runtime branches";
 
-  test_vm_start_windows_template_content = assert' (
-    (lib.hasInfix "{{QEMU_SYSTEM}}" startWindowsTemplateText)
-    && (lib.hasInfix "{{VM_DISPLAY}}" startWindowsTemplateText)
-    && (lib.hasInfix "{{MACHINE}}" startWindowsTemplateText)
-    && (lib.hasInfix "{{CPU}}" startWindowsTemplateText)
-    && (lib.hasInfix "{{CPUS}}" startWindowsTemplateText)
-    && (lib.hasInfix "{{RAM_MIB}}" startWindowsTemplateText)
-    && (lib.hasInfix "{{DISK_PATH}}" startWindowsTemplateText)
-    && (lib.hasInfix "{{VGA}}" startWindowsTemplateText)
-    && (lib.hasInfix "{{DISPLAY_BACKEND}}" startWindowsTemplateText)
-    && (lib.hasInfix "{{VIRTIOFS_ARGS}}" startWindowsTemplateText)
-    && (lib.hasInfix "org.qemu.guest_agent.0" startWindowsTemplateText)
-    && (lib.hasInfix "hostfwd=tcp::2222-:22" startWindowsTemplateText)
-    && (lib.hasInfix "chardev pipe" startWindowsTemplateText)
-  ) "src/vms/templates/start-windows.ps1 must contain all expected placeholders and QEMU arguments";
+  test_vm_start_windows_template_content =
+    assert'
+      (
+        (lib.hasInfix "__QEMU_SYSTEM__" startWindowsTemplateText)
+        && (lib.hasInfix "__VM_DISPLAY__" startWindowsTemplateText)
+        && (lib.hasInfix "__MACHINE__" startWindowsTemplateText)
+        && (lib.hasInfix "__CPU__" startWindowsTemplateText)
+        && (lib.hasInfix "__CPUS__" startWindowsTemplateText)
+        && (lib.hasInfix "__RAM_MIB__" startWindowsTemplateText)
+        && (lib.hasInfix "__DISK_PATH__" startWindowsTemplateText)
+        && (lib.hasInfix "__VGA__" startWindowsTemplateText)
+        && (lib.hasInfix "__DISPLAY_BACKEND__" startWindowsTemplateText)
+        && (lib.hasInfix "__VIRTIOFS_ARGS__" startWindowsTemplateText)
+        && (lib.hasInfix "org.qemu.guest_agent.0" startWindowsTemplateText)
+        && (lib.hasInfix "hostfwd=tcp::2222-:22" startWindowsTemplateText)
+        && (lib.hasInfix "chardev pipe" startWindowsTemplateText)
+        && (!lib.hasInfix "{{" startWindowsTemplateText)
+      )
+      "src/vms/templates/start-windows.ps1 must contain all expected __TOKEN__ placeholders and QEMU arguments, with no {{TOKEN}} style";
 
   test_vm_start_windows_host_template_content =
     assert'
@@ -905,8 +913,8 @@ let
         (lib.hasInfix "write_vm_directory_readme" vm_setup_sh_text)
         && (lib.hasInfix "wrote VM directory guide" vm_setup_sh_text)
         && (lib.hasInfix "TEMPLATES_DIR/README.md" vm_setup_sh_text)
-        && (lib.hasInfix "{{VM_DIR_DISPLAY}}" readmeTemplateText)
-        && (lib.hasInfix "{{IMAGES_DIR_DISPLAY}}" readmeTemplateText)
+        && (lib.hasInfix "__VM_DIR_DISPLAY__" readmeTemplateText)
+        && (lib.hasInfix "__IMAGES_DIR_DISPLAY__" readmeTemplateText)
         && (lib.hasInfix "## Start commands" readmeTemplateText)
         && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
         && (lib.hasInfix "UTM bundle" readmeTemplateText)
