@@ -340,6 +340,8 @@ __marimo__/
 # }
 
 # self {
+# Node.js dependency tree created by bun install (used for commitlint/other tooling).
+node_modules/
 !/src/modules/configs/direnv/lib/
 !/src/modules/env/
 !/src/modules/lib/
