@@ -378,9 +378,10 @@ test_regression_run_all_steps_emits_progress_lines() {
         cd "$REPO_ROOT" || exit 1
         SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+        # shellcheck disable=SC2329 # reason: stub invoked by run_all_steps internals
         say() { true; }
         error() { true; }
-        # shellcheck disable=SC2317 # reason: reached via register_step dispatch
+        # shellcheck disable=SC2329 # reason: reached via register_step dispatch
         mock_step() { return 0; }
         register_step "mock-a" 1 "Mock A" mock_step
         register_step "mock-b" 2 "Mock B" mock_step
