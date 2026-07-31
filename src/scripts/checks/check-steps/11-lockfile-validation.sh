@@ -15,6 +15,18 @@ run_11_lockfile_validation() {
   local _lfpath="src/lockfiles/lockfile.json"
   local _lf_al_path="src/lockfiles/lifecycle-allowlist.json"
 
+  # Skip when scoped to files outside this step's scope (no lockfile JSON files).
+  if $_has_args; then
+    local _f _has_lf_files=0
+    for _f in "${_files[@]}"; do
+      case "$_f" in */lockfile.json|*/lifecycle-allowlist.json) _has_lf_files=1; break ;; esac
+    done
+    if [ "$_has_lf_files" -eq 0 ]; then
+      say "==== 11: Lockfile validation ==== SKIPPED (no lockfile files to check) ✗"
+      return 0
+    fi
+  fi
+
   # --- Overlap check ---
   local _lf_overlap_issues=0
   if [ ! -f "$_lfpath" ]; then
