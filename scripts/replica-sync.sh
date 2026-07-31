@@ -299,6 +299,8 @@ gc_local_macos_artifacts() {
     find "$_target_dir" -type f -name "$_pattern" -delete
   done
 
+  # Note: this find-prune excludes directories for performance.
+  # For file-processing scripts, use deny-list.sh's filter_gitignored instead.
   for _dir_name in $_dir_names; do
     find "$_target_dir" -type d -name "$_dir_name" -prune -exec rm -rf -- {} +
   done
