@@ -1,0 +1,136 @@
+<#
+.SYNOPSIS
+    Verifies VM template token integrity: every __TOKEN__ placeholder in a VM
+    template is replaced by its consumer (Invoke-VMSetup.ps1) and no legacy
+    {{TOKEN}} syntax remains in templates.
+.DESCRIPTION
+    Static analysis tests (parse files, do not execute).  Guarantees the
+    render-leftover invariant: after Invoke-VMSetup substitutes the render
+    chain, no template placeholder survives in the written start script.  A
+    template token missing from the render chain, or a render-chain token
+    missing from every template, fails the suite.
+
+    Templates covered:
+    - src/vms/templates/start-windows.ps1 (11 tokens, Windows start script)
+    - src/vms/templates/start-windows-host.sh (10 tokens, Git Bash/MSYS start script)
+    - src/vms/templates/README.md (2 tokens, VM directory guide)
+    - src/vms/windows/Autounattend.xml (2 tokens, Windows guest unattended setup)
+
+.NOTES
+    Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/embedded-content/template-token-integrity.Tests.ps1 -Passthru"
+    Exit codes: 0 on success; 1 on failure
+#>
+
+BeforeAll {
+  $ErrorActionPreference = "Stop"
+
+  $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
+  $TemplatesDir = Join-Path $RepoRoot "src\vms\templates"
+  $InvokeVMSetupPath = Join-Path $RepoRoot "src\hosts\Windows\modules\system\Invoke-VMSetup.ps1"
+
+  # Resolves template paths through this closure so PSUseDeclaredVarsMoreThanAssignments
+  # sees TemplatesDir read within the BeforeAll scriptblock (It blocks are sibling scopes).
+  function Get-TemplatePath([string]$Name) {
+    return Join-Path $TemplatesDir $Name
+  }
+
+  function Get-UpperSnakeTokenList([string]$Path) {
+    $content = Get-Content -Raw -Path $Path
+    return @([regex]::Matches($content, '__[A-Z][A-Z_]*__') | ForEach-Object { $_.Value.Trim('_') } | Sort-Object -Unique)
+  }
+
+  # Tokens targeted by the .Replace('__X__', ...) render chains in Invoke-VMSetup.ps1.
+  function Get-ReplaceChainTokenList {
+    $content = Get-Content -Raw -Path $InvokeVMSetupPath
+    return @([regex]::Matches($content, "\.Replace\('__[A-Z][A-Z_]*__'") | ForEach-Object { ($_.Value -replace "\.Replace\('", "" -replace "'", "").Trim('_') } | Sort-Object -Unique)
+  }
+
+  # Tokens targeted by the -replace '__X__', ... chains (README render).
+  function Get-DashReplaceTokenList {
+    $content = Get-Content -Raw -Path $InvokeVMSetupPath
+    return @([regex]::Matches($content, "-replace '__[A-Z][A-Z_]*__'") | ForEach-Object { ($_.Value -replace "-replace '", "" -replace "'", "").Trim('_') } | Sort-Object -Unique)
+  }
+}
+
+Describe "start-windows.ps1 template token integrity" {
+  It "declares exactly the 11 expected __TOKEN__ placeholders" {
+    $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "start-windows.ps1")
+    ($templateTokens -join ",") | Should -Be "CPU,CPUS,DISK_PATH,DISPLAY_BACKEND,MACHINE,QEMU_SYSTEM,RAM_MIB,VGA,VIRTIOFS_ARGS,VM_DISPLAY,VM_NAME"
+  }
+
+  It "every placeholder has a replacement in the Invoke-VMSetup render chain" {
+    $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "start-windows.ps1")
+    $chainTokens = Get-ReplaceChainTokenList
+    $missing = @($templateTokens | Where-Object { $_ -notin $chainTokens })
+    $missing | Should -BeNullOrEmpty
+  }
+}
+
+Describe "start-windows-host.sh template token integrity" {
+  It "declares exactly the 10 expected __TOKEN__ placeholders" {
+    $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "start-windows-host.sh")
+    ($templateTokens -join ",") | Should -Be "CPU,CPUS,DISK_PATH,DISPLAY_BACKEND,MACHINE,QEMU_SYSTEM,RAM_MIB,VGA,VM_DISPLAY,VM_NAME"
+  }
+
+  It "every placeholder has a replacement in the Invoke-VMSetup render chain" {
+    $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "start-windows-host.sh")
+    $chainTokens = Get-ReplaceChainTokenList
+    $missing = @($templateTokens | Where-Object { $_ -notin $chainTokens })
+    $missing | Should -BeNullOrEmpty
+  }
+}
+
+Describe "README.md template token integrity" {
+  It "declares exactly the 2 expected __TOKEN__ placeholders" {
+    $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "README.md")
+    ($templateTokens -join ",") | Should -Be "IMAGES_DIR_DISPLAY,VM_DIR_DISPLAY"
+  }
+
+  It "every placeholder has a replacement in the Invoke-VMSetup -replace chain" {
+    $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "README.md")
+    $chainTokens = Get-DashReplaceTokenList
+    $missing = @($templateTokens | Where-Object { $_ -notin $chainTokens })
+    $missing | Should -BeNullOrEmpty
+  }
+}
+
+Describe "Autounattend.xml template token integrity" {
+  It "declares exactly the 2 expected __TOKEN__ placeholders" {
+    $templateTokens = Get-UpperSnakeTokenList (Join-Path $RepoRoot "src\vms\windows\Autounattend.xml")
+    ($templateTokens -join ",") | Should -Be "NUCLEUS_GUEST_PASSWORD,NUCLEUS_GUEST_USERNAME"
+  }
+
+  It "every placeholder has a replacement in the Invoke-VMSetup render chain" {
+    $templateTokens = Get-UpperSnakeTokenList (Join-Path $RepoRoot "src\vms\windows\Autounattend.xml")
+    $chainTokens = Get-ReplaceChainTokenList
+    $missing = @($templateTokens | Where-Object { $_ -notin $chainTokens })
+    $missing | Should -BeNullOrEmpty
+  }
+}
+
+Describe "Render chain has no dangling replacements" {
+  It "every render-chain token exists in at least one template" {
+    $knownTokens = @(
+      (Get-UpperSnakeTokenList (Get-TemplatePath "start-windows.ps1")) +
+      (Get-UpperSnakeTokenList (Get-TemplatePath "start-windows-host.sh")) +
+      (Get-UpperSnakeTokenList (Get-TemplatePath "README.md")) +
+      (Get-UpperSnakeTokenList (Join-Path $RepoRoot "src\vms\windows\Autounattend.xml"))
+    ) | Sort-Object -Unique
+    $dangling = @((Get-ReplaceChainTokenList) + (Get-DashReplaceTokenList) | Where-Object { $_ -notin $knownTokens } | Sort-Object -Unique)
+    $dangling | Should -BeNullOrEmpty
+  }
+}
+
+Describe "No legacy {{TOKEN}} syntax in VM templates" {
+  It "templates contain no {{ placeholders" {
+    foreach ($relativePath in @(
+        "src\vms\templates\start-windows.ps1",
+        "src\vms\templates\start-windows-host.sh",
+        "src\vms\templates\README.md",
+        "src\vms\windows\Autounattend.xml"
+      )) {
+      $content = Get-Content -Raw -Path (Join-Path $RepoRoot $relativePath)
+      $content | Should -Not -Match '\{\{[A-Za-z_]'
+    }
+  }
+}
