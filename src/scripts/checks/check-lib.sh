@@ -19,7 +19,7 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 . "$SCRIPT_DIR/../lib/step-runner.sh"
 
 # Check-specific defaults
-FAIL_FAST=false
+export FAIL_FAST=false
 REPO_ROOT=$(derive_repo_root)
 cd "$REPO_ROOT" || exit
 

@@ -23,7 +23,7 @@ run_16_package_manager_enforcement() {
   # covered by gitignore (e.g., result, secrets/, .direnv/).
   if find scripts/ src/ tests/ \( -name '*.sh' -o -name '*.ps1' -o -name '*.nix' \) -print \
     | filter_gitignored \
-    | grep -v -E '(check\.sh|check\.ps1|shell\.nix|\.'"$_self_sh"'|\.'"$_self_ps1"')$' \
+    | grep -v -E '(check\.sh|check\.ps1|shell\.nix|'"$_self_sh"'|'"$_self_ps1"')$' \
     | xargs grep -n -E '(^|[^a-z])pip install([^-]|$)' 2>/dev/null \
     | grep -v 'uv pip install' \
     | grep . >/dev/null 2>&1; then
@@ -33,7 +33,7 @@ run_16_package_manager_enforcement() {
 
   if find scripts/ src/ tests/ \( -name '*.sh' -o -name '*.ps1' -o -name '*.nix' \) -print \
     | filter_gitignored \
-    | grep -v -E '(check\.sh|check\.ps1|shell\.nix|\.'"$_self_sh"'|\.'"$_self_ps1"')$' \
+    | grep -v -E '(check\.sh|check\.ps1|shell\.nix|'"$_self_sh"'|'"$_self_ps1"')$' \
     | xargs grep -n -E '(^|[^a-z])npm install([^-]|$)' 2>/dev/null \
     | grep . >/dev/null 2>&1; then
     error "bare npm install detected (use bun or nix instead)"

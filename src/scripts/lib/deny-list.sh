@@ -1,4 +1,4 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 # Gitignore-aware denylist library for POSIX shell.
 # Provides functions to filter out gitignored paths from file lists.
 # Sourced by step-runner.sh and check-lib.sh.
