@@ -8,6 +8,7 @@
 # Phase 3 changes: step registration updates (new ID format)
 # Phase 5 changes: silent-skip elimination
 # Phase 6 changes: step 13 $schema enforcement
+# Phase 7 changes: gitignore filtering in cache_file_lists via deny-list library
 
 set -euo pipefail
 
@@ -25,6 +26,7 @@ test_regression_step_id_format_numeric() {
     result=$(
         # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
         REPO_ROOT="$REPO_ROOT"
+        SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         register_step "a" 1 "Test" test_func
         echo "${_STEP_IDS[0]} ${_STEP_NUMBERS[0]}"
@@ -41,6 +43,7 @@ test_regression_step_id_preserves_order() {
     result=$(
         # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
         REPO_ROOT="$REPO_ROOT"
+        SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         register_step "five" 5 "Fifth" f5
         register_step "three" 3 "Third" f3
@@ -82,6 +85,7 @@ test_regression_scoped_sets_has_args() {
     result=$(
         # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
         REPO_ROOT="$REPO_ROOT"
+        SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         parse_args --scoped
@@ -99,6 +103,7 @@ test_regression_full_sets_has_args_false() {
     result=$(
         # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
         REPO_ROOT="$REPO_ROOT"
+        SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         parse_args --full
@@ -115,6 +120,7 @@ test_regression_scoped_and_full_mutually_exclusive() {
     local exit_code=0
     REPO_ROOT="$REPO_ROOT" \
     bash -c '
+        SCRIPT_DIR="'"$REPO_ROOT"'/src/scripts/lib"
         . "'"$REPO_ROOT"'/src/scripts/lib/step-runner.sh"
         usage() { true; }
         parse_args --scoped --full 2>/dev/null
@@ -135,6 +141,7 @@ test_regression_parse_args_fail_fast_default() {
     result=$(
         # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
         REPO_ROOT="$REPO_ROOT"
+        SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         FAIL_FAST=false
@@ -153,6 +160,7 @@ test_regression_fail_fast_flag_accepted() {
     result=$(
         # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
         REPO_ROOT="$REPO_ROOT"
+        SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         parse_args --fail-fast
@@ -171,6 +179,7 @@ test_regression_wave_init_creates_tempdir() {
     result=$(
         # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
         REPO_ROOT="$REPO_ROOT"
+        SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         _wave_init
         echo "$_wave_tmpdir"
@@ -188,6 +197,7 @@ test_regression_wave_cleanup_removes_tempdir() {
     tmpdir=$(
         # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
         REPO_ROOT="$REPO_ROOT"
+        SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         _wave_init
         echo "$_wave_tmpdir"
@@ -200,12 +210,13 @@ test_regression_wave_cleanup_removes_tempdir() {
     fi
 }
 
-# ---- Contract F: cache_file_lists sets expected variables ----
+# ---- Contract F: cache_file_lists respects gitignore filtering ----
 test_regression_cache_file_lists_sets_cached_vars() {
     local result
     result=$(
         # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
         REPO_ROOT="$REPO_ROOT"
+        SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         CACHED_NIX_FILES=""
         CACHED_YAML_FILES=""
@@ -221,6 +232,32 @@ test_regression_cache_file_lists_sets_cached_vars() {
     fi
 }
 
+test_regression_cache_file_lists_excludes_gitignored() {
+    local result
+    result=$(
+        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
+        REPO_ROOT="$REPO_ROOT"
+        SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
+        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+        CACHED_NIX_FILES=""
+        CACHED_YAML_FILES=""
+        CACHED_JSON_FILES=""
+        CACHED_SH_FILES=""
+        cache_file_lists
+        # Check that no cached file path matches a gitignored pattern
+        for _f in "${CACHED_NIX_FILES[@]}" "${CACHED_YAML_FILES[@]}" "${CACHED_JSON_FILES[@]}" "${CACHED_SH_FILES[@]}"; do
+            if [[ "$_f" == .direnv/* ]]; then
+                echo "IGNORED_PATH_FOUND:$_f"
+            fi
+        done
+    )
+    if [[ -z "$result" ]]; then
+        assert_pass "REGRESSION: cache_file_lists excludes gitignored paths"
+    else
+        assert_fail "REG-cache-excludes-ignored" "Found gitignored path in cached files: $result"
+    fi
+}
+
 # ---- Contract G: aggregate_results output format ----
 # Owns exit behavior (exit 0 on pass, exit 1 on fail).
 
@@ -229,6 +266,7 @@ test_regression_aggregate_results_exits_zero_on_pass() {
     # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
     REPO_ROOT="$REPO_ROOT" \
     bash -c '
+        SCRIPT_DIR="'"$REPO_ROOT"'/src/scripts/lib"
         . "'"$REPO_ROOT"'/src/scripts/lib/step-runner.sh"
         say() { true; }
         error() { true; }
@@ -252,6 +290,7 @@ test_regression_aggregate_results_output_contains_check_summary() {
     result=$(
         # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
         REPO_ROOT="$REPO_ROOT"
+        SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         say() { echo "say: $*"; }
         error() { echo "error: $*" >&2; }
@@ -276,6 +315,7 @@ test_regression_run_all_steps_uses_background_jobs() {
     result=$(
         # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
         REPO_ROOT="$REPO_ROOT"
+        SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         say() { true; }
         error() { true; }
@@ -286,6 +326,24 @@ test_regression_run_all_steps_uses_background_jobs() {
         assert_pass "REGRESSION: run_all_steps uses background parallelism (POSIX)"
     else
         assert_fail "REG-parallelism" "Expected 1 & in run_all_steps, got: $result"
+    fi
+}
+
+# ---- Contract I: gitignore filtering available through step-runner ----
+# deny-list.sh is transitively sourced by step-runner.sh.
+test_regression_filter_gitignored_available_through_step_runner() {
+    local result
+    result=$(
+        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
+        REPO_ROOT="$REPO_ROOT"
+        SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
+        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+        type filter_gitignored 2>&1 || echo "NOT_FOUND"
+    )
+    if echo "$result" | grep -q "function"; then
+        assert_pass "REGRESSION: filter_gitignored available through transitive step-runner source"
+    else
+        assert_fail "REG-filter-step-runner" "filter_gitignored not found through step-runner: $result"
     fi
 }
 
@@ -307,9 +365,11 @@ test_regression_fail_fast_flag_accepted
 test_regression_wave_init_creates_tempdir
 test_regression_wave_cleanup_removes_tempdir
 test_regression_cache_file_lists_sets_cached_vars
+test_regression_cache_file_lists_excludes_gitignored
 test_regression_aggregate_results_exits_zero_on_pass
 test_regression_aggregate_results_output_contains_check_summary
 test_regression_run_all_steps_uses_background_jobs
+test_regression_filter_gitignored_available_through_step_runner
 
 echo ""
 echo "--- Phase 0 POSIX regression tests: $TESTS_PASSED passed, $TESTS_FAILED failed ---"
