@@ -21,11 +21,12 @@ let
   fileStepNumStr = f: builtins.head (builtins.match "0*([0-9]+)-.*" f);
 
   # Extract step number from register_step call (POSIX)
-  shStepNumStr = f: builtins.head (builtins.match ".*register_step ([0-9]+) .*" (readStep f));
+  shStepNumStr =
+    f: builtins.head (builtins.match ".*register_step \"[^\"]*\" ([0-9]+) .*" (readStep f));
 
   # Extract step number from Register-Step call (Windows)
   ps1StepNumStr =
-    f: builtins.head (builtins.match ".*Register-Step -Number ([0-9]+) .*" (readStep f));
+    f: builtins.head (builtins.match ".*Register-Step -Id \"[^\"]*\" -Number ([0-9]+) .*" (readStep f));
 
   # Verify file prefix matches inline step number
   checkSh = f: (shStepNumStr f) == (fileStepNumStr f);
