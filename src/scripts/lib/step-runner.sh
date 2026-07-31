@@ -8,8 +8,12 @@
 [ -n "${_NUCLEUS_STEP_RUNNER_SOURCED-}" ] && return
 _NUCLEUS_STEP_RUNNER_SOURCED=1
 
-# shellcheck source=../lib/deny-list.sh
-. "$SCRIPT_DIR/../lib/deny-list.sh"
+# shellcheck source=./deny-list.sh
+# Self-derived dir: do NOT rely on ambient SCRIPT_DIR — test harnesses source
+# this file from their own directories, and a wrong path would print
+# "No such file or directory" for every subshell invocation.
+_NUCLEUS_STEP_RUNNER_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+. "$_NUCLEUS_STEP_RUNNER_DIR/deny-list.sh"
 
 # --- Step registration ---
 # Indexed arrays: step numbers, step names, step function names.
