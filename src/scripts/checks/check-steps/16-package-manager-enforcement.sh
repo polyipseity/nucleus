@@ -18,8 +18,8 @@ run_16_package_manager_enforcement() {
       case "$_f" in *.sh|*.ps1|*.nix) _has_shell_files=1; break ;; esac
     done
     if [ "$_has_shell_files" -eq 0 ]; then
-      say "==== 16: Package manager usage enforcement ==== SKIPPED (no shell files to check) ✗"
-      return 0
+      say "==== 16: Package manager usage enforcement ==== SKIPPED (no shell files to check)"
+      return 2
     fi
   fi
 

@@ -13,8 +13,8 @@ run_09_nix_search_path() {
 
   # Skip if has_args with no Nix files (scoped mode, no relevant files)
   if $_has_args && [ "${#NIX_FILES[@]}" -eq 0 ] && [ "${#_files[@]}" -eq 0 ]; then
-    say "==== 9: Nix search path tests ==== SKIPPED (no Nix files to check with args) ✗"
-    return 0
+    say "==== 9: Nix search path tests ==== SKIPPED (no Nix files to check with args)"
+    return 2
   fi
 
   echo "--- test output ---"

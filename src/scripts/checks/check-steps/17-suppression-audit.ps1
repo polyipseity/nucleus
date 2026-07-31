@@ -116,8 +116,8 @@ Register-Step -Id "suppression-audit" -Number 17 -Name "Suppression audit" -Acti
   }
 
   if (-not $hasFiles) {
-    Write-Message "==== 17: Suppression audit ==== SKIPPED (no script files to check) ✗"
-    return $true
+    Write-Message "==== 17: Suppression audit ==== SKIPPED (no script files to check)"
+    return 2
   }
 
   Write-Message "no suppression audit violations found."

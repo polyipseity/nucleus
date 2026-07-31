@@ -34,6 +34,7 @@ run_04_nix_flake_eval() {
     fi
   else
     say "skipping (no Nix files in scope)."
+    return 2
   fi
 
   return $_ne_exit

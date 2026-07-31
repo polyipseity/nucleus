@@ -9,8 +9,8 @@ Register-Step -Id "package-manager-enforcement" -Number 16 -Name "Package manage
   if ($HasArgs) {
     $hasShellFiles = @($PositionalArgs | Where-Object { $_ -match '\.(sh|ps1|nix)$' }).Count -gt 0
     if (-not $hasShellFiles) {
-      Write-Message "==== 16: Package manager usage enforcement ==== SKIPPED (no shell files to check) ✗"
-      return $true
+      Write-Message "==== 16: Package manager usage enforcement ==== SKIPPED (no shell files to check)"
+      return 2
     }
   }
 

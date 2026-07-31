@@ -125,7 +125,8 @@ _run_step() {
   printf '%s' "$_elapsed_ms" > "$_wave_tmpdir/step-$_n.time"
 
   # 4. Fail-fast check (framework-level concern, not step-level)
-  if [ "$_exit_code" -ne 0 ] && $FAIL_FAST; then
+  # Exit code 2 = skipped step; never a failure, so never fail-fast on it.
+  if [ "$_exit_code" -ne 0 ] && [ "$_exit_code" -ne 2 ] && $FAIL_FAST; then
     exit "$_exit_code"
   fi
 }
@@ -140,7 +141,8 @@ _run_skipped_step() {
 
   printf '\n=== [%s] %s === SKIPPED (--skip-steps: %s)\n' "$_n" "$_name" "$_id" > "$_wave_tmpdir/step-$_n.out"
   printf '%s' "$_name" > "$_wave_tmpdir/step-$_n.name"
-  printf '%s' "0" > "$_wave_tmpdir/step-$_n.exit"
+  # Exit code 2 = skipped step (rendered as SKIP, not a failure).
+  printf '%s' "2" > "$_wave_tmpdir/step-$_n.exit"
   _elapsed_ms=$(($(date +%s%3N) - _step_start_ms))
   printf '%s' "$_elapsed_ms" > "$_wave_tmpdir/step-$_n.time"
 }
@@ -326,6 +328,9 @@ aggregate_results() {
 
     if [ "$_exit_code" -eq 0 ]; then
       printf '  step %2d  ✓  %5d ms  %s\n' "$_n" "$_elapsed" "$_name"
+    elif [ "$_exit_code" -eq 2 ]; then
+      # Exit code 2 = skipped step; rendered as SKIP, never a failure.
+      printf '  step %2d  SKIP %5d ms  %s\n' "$_n" "$_elapsed" "$_name"
     else
       printf '  step %2d  ✗  %5d ms  %s\n' "$_n" "$_elapsed" "$_name"
       _failed_steps="$_failed_steps$_n "

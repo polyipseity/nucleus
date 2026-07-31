@@ -11,7 +11,7 @@ Register-Step -Id "powershell-lint" -Number 2 -Name "PowerShell lint" -Action {
     & "$r\scripts\check-pwsh.ps1" -Settings "$r\scripts\PSScriptAnalyzerSettings.check.psd1"
   } else {
     Write-Message "skipping (no PowerShell scripts to check)."
-    return $true
+    return 2
   }
 
   if ($LASTEXITCODE -ne 0) {

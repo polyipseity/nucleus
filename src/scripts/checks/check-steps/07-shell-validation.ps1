@@ -2,5 +2,5 @@ Register-Step -Id "shell-validation" -Number 7 -Name "Shell script validation te
   param()
 
   Write-Message "skipping (POSIX-only test suite)."
-  return $true
+  return 2
 }

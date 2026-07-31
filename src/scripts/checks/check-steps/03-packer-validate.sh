@@ -17,6 +17,7 @@ run_03_packer_validate() {
     bash scripts/check-packer.sh || _pkr_exit=$?
   else
     say "skipping (no Packer templates to check)."
+    return 2
   fi
 
   return $_pkr_exit

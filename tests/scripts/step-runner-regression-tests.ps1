@@ -166,7 +166,66 @@ function Test-ParallelExecution {
 }
 Test-ParallelExecution
 
+# ---- Contract E0: Invoke-Step maps skip (return 2) to exit file 2 ----
+function Test-SkipExitMapping {
+    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
+    $script:StepNames = [System.Collections.Generic.List[string]]::new()
+    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
+    . $stepRunner
+
+    # Provide stubs for functions expected by Invoke-Step
+    function global:Write-Message { Write-Output "message: $args" }
+    function global:Write-ErrorMessage { Write-Output "error: $args" }
+
+    $script:HAS_ARGS = $false
+    $script:positionalArgs = @()
+    $script:FAIL_FAST = $false
+
+    Register-Step -Id "skip" -Number 2 -Name "SkipStep" -Action { Write-Message "skipping (test)"; return 2 }
+    Initialize-WaveTempDir
+
+    Invoke-Step -Number 2 -Name "SkipStep" -Action $script:StepActions[0]
+    $exitCode = Get-Content -Path (Join-Path $script:WaveTmpDir "step-2.exit") -Raw
+    Remove-WaveTempDir
+
+    if ($exitCode -eq "2") {
+        Assert-Pass "REGRESSION: PS1 Invoke-Step maps return 2 to exit file 2 (skip)"
+    } else {
+        Assert-Fail "REG-ps1-skip-map" "Expected exit file '2', got: $exitCode"
+    }
+}
+Test-SkipExitMapping
+
+# ---- Contract E2: Format-StepSummary renders exit 2 as SKIP ----
+# Runs in a subprocess because Format-StepSummary exits the calling script.
+function Test-SummarySkipFormat {
+    $scriptText = @"
+Set-StrictMode -Version Latest
+. "$stepRunner"
+function global:Write-Message { Write-Output "message: `$args" }
+function global:Write-ErrorMessage { Write-Output "error: `$args" }
+Register-Step -Id "skip" -Number 2 -Name "SkipStep" -Action { `$true }
+Initialize-WaveTempDir
+"2" | Out-File -FilePath (Join-Path `$script:WaveTmpDir "step-2.exit") -Encoding utf8 -NoNewline
+"7" | Out-File -FilePath (Join-Path `$script:WaveTmpDir "step-2.time") -Encoding utf8 -NoNewline
+"SkipStep" | Out-File -FilePath (Join-Path `$script:WaveTmpDir "step-2.name") -Encoding utf8 -NoNewline
+`$output = & Format-StepSummary 2>&1
+Remove-WaveTempDir
+Write-Output `$output
+"@
+    $subOutput = pwsh -NoProfile -Command $scriptText 2>&1
+
+    if ($subOutput -match 'SKIP') {
+        Assert-Pass "REGRESSION: PS1 Format-StepSummary renders exit 2 as SKIP"
+    } else {
+        Assert-Fail "REG-ps1-summary-skip" "Expected 'SKIP' in subprocess output, got: $([string]::Join("`n", $subOutput))"
+    }
+}
+Test-SummarySkipFormat
+
 # ---- Contract E: Format-StepSummary output format ----
+# NOTE: This test exits the calling script mid-call (Format-StepSummary calls exit 0
+# on all-pass), so it must run LAST — nothing after it is reached.
 function Test-SummaryOutputFormat {
     $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
     $script:StepNames = [System.Collections.Generic.List[string]]::new()

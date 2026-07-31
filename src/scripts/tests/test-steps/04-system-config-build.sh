@@ -20,7 +20,7 @@ run_04_system_config_build() {
       ;;
     *)
       say "system config build: unsupported OS ($(uname)), skipping."
-      return 0
+      return 2
       ;;
   esac
 

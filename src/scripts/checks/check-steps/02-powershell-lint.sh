@@ -19,6 +19,7 @@ run_02_powershell_lint() {
     pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -Settings scripts/PSScriptAnalyzerSettings.check.psd1 || _ps_exit=$?
   else
     say "skipping (no PowerShell scripts to check)."
+    return 2
   fi
 
   return $_ps_exit

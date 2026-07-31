@@ -47,8 +47,8 @@ parse_args flag: --skip-steps=<comma-separated-ids>
   Execution-time behavior (run_all_steps / Invoke-StepPipeline):
     For each step before execution:
       if step.id is in SKIP_STEPS:
-        output: "==== <number>: <name> ==== SKIPPED (--skip-steps: <id>) ✗"
-        skip execution, mark step as skipped (exit code 0 — not a failure)
+        output: "==== <number>: <name> ==== SKIPPED (--skip-steps: <id>)"
+        skip execution, mark step as skipped (exit code 2 — not a failure)
       else:
         execute normally
 
@@ -94,8 +94,9 @@ Step 01 (code-formatting) behavior:
 ```
 Test step 04 (system-config-build):
   - POSIX: always runs on supported platforms (macOS, Linux); skips only with platform message
-    "==== 4: System config build ==== SKIPPED (not a supported OS for system config build) ✗"
-  - PS1: always skips with "==== 4: System config build ==== SKIPPED (system config build is POSIX-only) ✗"
+    "==== 4: System config build ==== SKIPPED (not a supported OS for system config build)"
+  - PS1: always skips with "==== 4: System config build ==== SKIPPED (system config build is POSIX-only)"
+  - A skipped step exits with code 2 (not a failure).
   - No flag controls whether step runs.
   - The --skip-system-build flag no longer exists.
 ```
@@ -133,7 +134,7 @@ Invoke-StepPipeline behavior:
 Every step that chooses NOT to run (for any reason — empty file list, platform mismatch,
 missing tool) MUST output an explicit skip message with the pattern:
 
-  "==== <number>: <name> ==== SKIPPED (<reason>) ✗"
+  "==== <number>: <name> ==== SKIPPED (<reason>)"
 
 The <reason> must be a concise, human-readable explanation. Examples:
   - "no Nix files to check"
@@ -144,7 +145,7 @@ The <reason> must be a concise, human-readable explanation. Examples:
 
 Rules:
   - The step header (==== N: Name ====) must appear in ALL cases, including skip.
-  - A skipped step is NOT a failure (exit code 0).
+  - A skipped step is NOT a failure (exit code 2 — rendered as SKIP in the results table).
   - A skipped step MUST NOT say "passed" or "no issues found" — that implies it ran.
   - Every skip MUST go through the single canonical skip path (the skip check in the
     step function body), not via silent early-return or conditional execution that

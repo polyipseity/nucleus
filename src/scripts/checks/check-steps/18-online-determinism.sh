@@ -19,6 +19,6 @@ run_18_online_determinism() {
     fi
   else
     say "skipping (use --online to run online determinism checks)."
-    return 0
+    return 2
   fi
 }

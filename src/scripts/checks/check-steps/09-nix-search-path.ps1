@@ -2,5 +2,5 @@ Register-Step -Id "nix-search-path" -Number 9 -Name "Nix search path tests" -Act
   param()
 
   Write-Message "skipping (Nix not available on Windows)."
-  return $true
+  return 2
 }

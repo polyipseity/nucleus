@@ -11,7 +11,7 @@ Register-Step -Id "packer-validate" -Number 3 -Name "Packer template validation"
     & "$r\scripts\check-packer.ps1"
   } else {
     Write-Message "skipping (no Packer templates to check)."
-    return $true
+    return 2
   }
 
   if ($LASTEXITCODE -ne 0) {

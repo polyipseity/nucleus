@@ -22,8 +22,8 @@ run_11_lockfile_validation() {
       case "$_f" in */lockfile.json|*/lifecycle-allowlist.json) _has_lf_files=1; break ;; esac
     done
     if [ "$_has_lf_files" -eq 0 ]; then
-      say "==== 11: Lockfile validation ==== SKIPPED (no lockfile files to check) ✗"
-      return 0
+      say "==== 11: Lockfile validation ==== SKIPPED (no lockfile files to check)"
+      return 2
     fi
   fi
 

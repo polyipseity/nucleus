@@ -79,7 +79,8 @@ function Invoke-SkippedStep {
   $stepStart = [System.Diagnostics.Stopwatch]::StartNew()
   "`n=== [$Number] $Name === SKIPPED (--skip-steps: $Id)" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.out") -Encoding utf8
   $Name | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.name") -Encoding utf8 -NoNewline
-  "0" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.exit") -Encoding utf8 -NoNewline
+  # Exit code 2 = skipped step (rendered as SKIP, not a failure).
+  "2" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.exit") -Encoding utf8 -NoNewline
   $stepStart.Stop()
   "$($stepStart.ElapsedMilliseconds)" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.time") -Encoding utf8 -NoNewline
 }
@@ -108,7 +109,11 @@ function Invoke-Step {
   try {
     $stepParams = @{ HasArgs = $script:HAS_ARGS; RepoRoot = $RepoRoot; WaveTmpDir = $script:WaveTmpDir; PositionalArgs = $script:positionalArgs }
     $result = & $Action @stepParams
-    if ($result -eq $false) { $exitCode = 1 }
+    # Steps signal: pass ($true), fail ($false), or skip (int 2). The return value
+    # is the LAST pipeline element. Type-check 2 because $true -eq 2 is True in PowerShell.
+    $status = @($result)[-1]
+    if ($status -is [int] -and $status -eq 2) { $exitCode = 2 }
+    elseif ($status -eq $false) { $exitCode = 1 }
   } catch {
     $exitCode = 1
     Write-Output "ERROR: $_"
@@ -121,7 +126,8 @@ function Invoke-Step {
   "$elapsedMs" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.time") -Encoding utf8 -NoNewline
 
   # 4. Fail-fast check
-  if ($exitCode -ne 0 -and $script:FAIL_FAST) {
+  # Exit code 2 = skipped step; never a failure, so never fail-fast on it.
+  if ($exitCode -ne 0 -and $exitCode -ne 2 -and $script:FAIL_FAST) {
     exit $exitCode
   }
 }
@@ -260,7 +266,11 @@ function Invoke-StepPipeline {
         try {
           $stepParams = @{ HasArgs = $HasArgs; RepoRoot = $RepoRoot; WaveTmpDir = $WaveTmpDir }
           $result = & $Action @stepParams
-          if ($result -eq $false) { $exitCode = 1 }
+          # Steps signal: pass ($true), fail ($false), or skip (int 2). The return value
+          # is the LAST pipeline element. Type-check 2 because $true -eq 2 is True in PowerShell.
+          $status = @($result)[-1]
+          if ($status -is [int] -and $status -eq 2) { $exitCode = 2 }
+          elseif ($status -eq $false) { $exitCode = 1 }
         } catch {
           $exitCode = 1
           "$_" | Out-File -FilePath (Join-Path $WaveTmpDir "step-$Number.out") -Encoding utf8 -Append
@@ -270,7 +280,7 @@ function Invoke-StepPipeline {
         $stepStart.Stop()
         "$($stepStart.ElapsedMilliseconds)" | Out-File -FilePath (Join-Path $WaveTmpDir "step-$Number.time") -Encoding utf8 -NoNewline
 
-        if ($exitCode -ne 0 -and $FAIL_FAST) {
+        if ($exitCode -ne 0 -and $exitCode -ne 2 -and $FAIL_FAST) {
           exit $exitCode
         }
       }).AddParameters(@{
@@ -321,6 +331,9 @@ function Format-StepSummary {
 
     if ($exitCode -eq "0") {
       "  step {0,2}  {1}  {2,5} ms  {3}" -f $n, "✓", $elapsed, $name | Write-Output
+    } elseif ($exitCode -eq "2") {
+      # Exit code 2 = skipped step; rendered as SKIP, never a failure.
+      "  step {0,2}  {1}  {2,5} ms  {3}" -f $n, "SKIP", $elapsed, $name | Write-Output
     } else {
       "  step {0,2}  {1}  {2,5} ms  {3}" -f $n, "✗", $elapsed, $name | Write-Output
       $failedSteps = "$failedSteps$n "

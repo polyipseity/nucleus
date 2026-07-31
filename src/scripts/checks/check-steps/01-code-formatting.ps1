@@ -28,6 +28,7 @@ Register-Step -Id "code-formatting" -Number 1 -Name "Code formatting and linting
     Write-Message "yamllint passed."
   } else {
     Write-Message "skipping (no YAML files to check)."
+    return 2
   }
   return $true
 }

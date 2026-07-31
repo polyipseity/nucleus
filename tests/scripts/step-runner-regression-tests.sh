@@ -283,6 +283,28 @@ test_regression_aggregate_results_output_contains_check_summary() {
     fi
 }
 
+test_regression_aggregate_results_renders_skip_for_exit_2() {
+    local result
+    result=$(
+        SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
+        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+        say() { echo "say: $*"; }
+        error() { echo "error: $*" >&2; }
+        _wave_init
+        register_step "skip" 2 "SkipStep" sfunc
+        printf "%s" "2" > "$_wave_tmpdir/step-2.exit"
+        printf "%s" "7" > "$_wave_tmpdir/step-2.time"
+        printf "%s" "SkipStep" > "$_wave_tmpdir/step-2.name"
+        # shellcheck disable=SC2317 # reason: reached in subshell
+        aggregate_results 2>&1 || true
+    ) 2>&1
+    if echo "$result" | grep -q "SKIP" && ! echo "$result" | grep -q "some checks failed"; then
+        assert_pass "REGRESSION: aggregate_results renders exit 2 as SKIP (not a failure)"
+    else
+        assert_fail "REG-aggr-skip" "Expected SKIP row without failure, got: $result"
+    fi
+}
+
 # ---- Contract H: run_all_steps uses parallelism (POSIX) ----
 test_regression_run_all_steps_uses_background_jobs() {
     local result
@@ -336,6 +358,7 @@ test_regression_cache_file_lists_sets_cached_vars
 test_regression_cache_file_lists_excludes_gitignored
 test_regression_aggregate_results_exits_zero_on_pass
 test_regression_aggregate_results_output_contains_check_summary
+test_regression_aggregate_results_renders_skip_for_exit_2
 test_regression_run_all_steps_uses_background_jobs
 test_regression_filter_gitignored_available_through_step_runner
 
