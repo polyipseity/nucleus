@@ -138,6 +138,7 @@ function Sync-CaddyService {
         continue
       }
 
+      # Inline by embedded-content policy exception 1 (data-driven/generated content: per-service vhost blocks).
       $virtualHostBlocks.Add(@"
 https://$($httpsEndpoint.host):$($httpsEndpoint.port) {
   bind 127.0.0.1 ::1

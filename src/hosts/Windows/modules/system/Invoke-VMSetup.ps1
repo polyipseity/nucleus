@@ -453,6 +453,7 @@ function Invoke-VMSetup {
         Write-Information "vm-setup: VM directory guide written: $vmReadmePath (template)"
     } else {
         Write-Warning "vm-setup: README template not found at $vmReadmeTemplate; writing minimal guide"
+        # Inline by embedded-content policy exception 2 (trivial fallback content <10 lines).
         @"
 # virtual machines
 
@@ -673,6 +674,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         }
 
         # Determine VirtioFS shared directory argument.
+        # Inline by embedded-content policy exception 1 (data-driven/generated content: per-VM conditional args).
         $virtiofsArgs = ''
         if ($vm.shareDevDir) {
             $devDir = Join-Path $env:USERPROFILE 'dev'
