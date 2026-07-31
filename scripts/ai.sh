@@ -2,6 +2,19 @@
 # Provides a uniform CLI for AI model management: sync, list, status, endpoint,
 # and config across POSIX hosts (macOS, NixOS).  Reads models.json for
 # declarative model selection and services.json for service endpoints.
+#
+# Usage: nucleus-ai <sync|list|status|endpoint|config> [options]
+#
+# Env vars (all optional):
+#   NUCLEUS_OLLAMA_HOST     ollama endpoint (default: services.json binding).
+#   NUCLEUS_AI_SYNC_TIMEOUT server readiness wait in seconds (default 60).
+#   NUCLEUS_AI_SYNC_POLL    readiness poll interval in seconds (default 2).
+#   NUCLEUS_AI_SYNC_PROFILE sync profile override (default: host-derived).
+#
+# Prerequisites: jq and ollama on PATH; the repo checkout with models.json and
+# services.json.  sync exits 0 without pulling when ollama is missing or not
+# responding — the manifest stays the source of truth and later runs converge.
+# Other subcommands exit non-zero on missing prerequisites or bad arguments.
 
 set -euo pipefail
 
@@ -57,8 +70,16 @@ EOF
 ready_timeout_seconds="${NUCLEUS_AI_SYNC_TIMEOUT:-60}"
 ready_poll_seconds="${NUCLEUS_AI_SYNC_POLL:-2}"
 NUCLEUS_OLLAMA_HOST="${NUCLEUS_OLLAMA_HOST:-$(jq -r '.ollama.network.default | "\(.host):\(.port)"' "$SERVICES_JSON" 2>/dev/null || echo "127.0.0.1:11434")}"
+# WHY: the endpoint defaults to the registry's declared binding so all hosts
+# agree on one source of truth; the env override exists for remote/test setups.
 
-# wait_for_ollama_server — Poll until ollama responds or timeout.
+# wait_for_ollama_server — Block until the ollama server responds to `list`
+# or the readiness timeout elapses.
+# Args: none (reads NUCLEUS_OLLAMA_HOST, NUCLEUS_AI_SYNC_TIMEOUT,
+# NUCLEUS_AI_SYNC_POLL).  Returns 0 when ollama responds, 1 on timeout.
+# WHY: a cold-start server can take tens of seconds to accept connections;
+# polling here turns that transient startup race into a single user-visible
+# "server unavailable" message instead of a mid-sync failure.
 wait_for_ollama_server() {
   if OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama list >/dev/null 2>&1; then
     return 0
@@ -81,6 +102,11 @@ wait_for_ollama_server() {
   return 1
 }
 
+# do_sync — Converge local ollama models to the manifest for the active profile.
+# Args: none; options parsed from "$@" (--dry-run, --gc-only, --ollama-profile).
+# Side effects: pulls/removes ollama models; prints progress messages.
+# WHY: sync is idempotent by design — it diffs manifest vs installed lists,
+# so a re-run after a partial failure completes only the remaining work.
 do_sync() {
   _sync_dry_run=false
   _sync_gc_only=false
@@ -102,7 +128,8 @@ do_sync() {
         _sync_gc_only=false
         ;;
       --json)
-        # sync ignores --json; it always outputs human-readable messages
+        # WHY: sync emits human progress messages, not machine data, so --json
+        # is accepted for CLI parity but deliberately has no effect.
         ;;
       *)
         error "sync: unsupported argument '$1'"
@@ -114,6 +141,8 @@ do_sync() {
   done
 
   # Determine the active model profile.
+  # WHY: the default is derived from the OS (macOS → MacBook, else NixOS) so
+  # the CLI works with zero config; explicit overrides (flag, then env) win.
   if [ -n "$_sync_profile_override" ]; then
     profile="$_sync_profile_override"
   elif [ -n "${NUCLEUS_AI_SYNC_PROFILE:-}" ]; then
@@ -162,6 +191,9 @@ do_sync() {
           error "$model was pulled but is not in 'ollama list'"
         fi
         if [ -f "$LOCKFILE" ]; then
+          # WHY: the lockfile records expected digests so a tampered or
+          # truncated pull is caught immediately instead of silently serving
+          # a corrupted model later.
           _model_name="${model%%:*}"
           _model_tag="${model#*:}"
           [ "$_model_tag" = "$model" ] && _model_tag="latest"
@@ -197,6 +229,8 @@ do_sync() {
     fi
   done
 
+  # WHY: the summary names dry-run/gc-only explicitly so headless or logged
+  # runs are unambiguous about what was actually executed.
   _summary_flags=""
   if [ "$_sync_dry_run" = true ]; then
     _summary_flags=", not actually running due to --dry-run"
@@ -212,6 +246,11 @@ do_sync() {
 # list subcommand
 # ──────────────────────────────────────────────────────────────────────────────
 
+# do_list — Print the manifest's model list, optionally filtered per profile.
+# Args: none; options from "$@" (--profile <name>, --json).
+# Output: human table or JSON of profile → models.
+# WHY: reads only the manifest — never live ollama state — so it works
+# offline and is cheap enough for scripts to call frequently.
 do_list() {
   _list_profile=""
   _list_json=false
@@ -269,6 +308,11 @@ do_list() {
 # status subcommand
 # ──────────────────────────────────────────────────────────────────────────────
 
+# do_status — Report host, ollama availability/response, and model counts.
+# Args: none; options from "$@" (--json).
+# Output: human messages or a versioned JSON document.
+# WHY: distinguishes "binary missing" from "server not responding" so a
+# failed sync can be diagnosed at a glance; JSON is versioned for consumers.
 do_status() {
   _status_json=false
 
@@ -348,6 +392,11 @@ do_status() {
 # endpoint subcommand
 # ──────────────────────────────────────────────────────────────────────────────
 
+# do_endpoint — Print ollama/litellm network endpoints from services.json.
+# Args: none; options from "$@" (--json).
+# Output: human table or JSON of service → endpoint map.
+# WHY: endpoints come from the registry instead of being hard-coded so the
+# proxy/gateway topology can change without touching the CLI.
 do_endpoint() {
   _endpoint_json=false
 
@@ -395,6 +444,12 @@ do_endpoint() {
 # config subcommand
 # ──────────────────────────────────────────────────────────────────────────────
 
+# do_config — Print the effective AI configuration (host, ollama endpoint,
+# timeouts, profile) including any env-var overrides.
+# Args: none; options from "$@" (--json).
+# Output: human summary or versioned JSON.
+# WHY: surfaces the resolved defaults so users can see exactly which values
+# the other subcommands will use.
 do_config() {
   _config_json=false
 
@@ -449,6 +504,8 @@ do_config() {
 # Main dispatch
 # ──────────────────────────────────────────────────────────────────────────────
 
+# WHY: the subcommand word is captured first, then dropped (tolerating its
+# absence) so every do_* handler receives only its own remaining options.
 action="${1:-help}"
 case "$action" in
   -h|--help|help) usage; exit 0 ;;

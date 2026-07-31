@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # Regression tests for run_terminal_activations() in src/scripts/apply.sh.
+#
+# The function runs each line of a per-user manifest
+# ($HOME/.config/nucleus/terminal-activations.list) and deletes it after, so
+# activations are one-shot.  These tests pin: no-op on missing/empty manifest,
+# ordered execution, comment skipping, and continue-on-error semantics.
 
 set -euo pipefail
 
@@ -8,7 +13,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/test-lib.sh"
 
 # The function under test — extracted verbatim from src/scripts/apply.sh.
-# Tests use a controlled manifest path via HOME override.
+# WHY: the verbatim copy (not apply.sh itself) makes failures attributable to
+# this function in isolation; HOME is overridden per test so the manifest
+# path is controlled and the real user config is never touched.
 run_terminal_activations() {
   local manifest="$HOME/.config/nucleus/terminal-activations.list"
   if [ ! -f "$manifest" ]; then
@@ -37,6 +44,9 @@ run_terminal_activations() {
 }
 
 # ── Setup / teardown ──────────────────────────────────────────────────────
+# setup — Create an isolated HOME and manifest path for one test.
+# WHY: the function derives its manifest path from $HOME internally, so
+# redirecting HOME is the only way to control where it reads and writes.
 setup() {
   TESTDIR=$(mktemp -d)
   # Redirect HOME to the temp dir so the manifest path is isolated.
@@ -51,6 +61,8 @@ teardown() {
 }
 
 # ── Test: no manifest file → no-op ────────────────────────────────────────
+# WHY: apply.sh calls this unconditionally on every activation, so a missing
+# manifest (the common case) must be silent and must not create the file.
 test_no_manifest() {
   setup
   rm -f "$MANIFEST"
@@ -66,6 +78,8 @@ test_no_manifest() {
 }
 
 # ── Test: empty manifest → no-op, file deleted ────────────────────────────
+# WHY: an empty file means every activation already ran; deleting it keeps
+# later runs from re-processing an empty list forever.
 test_empty_manifest() {
   setup
   : > "$MANIFEST"
@@ -81,6 +95,8 @@ test_empty_manifest() {
 }
 
 # ── Test: single command execution ─────────────────────────────────────────
+# WHY: pins that a plain command line is executed and the manifest is removed
+# so the activation cannot run twice.
 test_single_command() {
   setup
   printf 'touch %s/marker-single\n' "$TESTDIR" > "$MANIFEST"
@@ -96,6 +112,8 @@ test_single_command() {
 }
 
 # ── Test: multiple commands in order ───────────────────────────────────────
+# WHY: ordering matters — activations are dependency-ordered (e.g. a symlink
+# step must precede the step that consumes it); markers verify FIFO execution.
 test_multiple_commands_ordered() {
   setup
   {
@@ -115,6 +133,8 @@ test_multiple_commands_ordered() {
 }
 
 # ── Test: comment lines are skipped ───────────────────────────────────────
+# WHY: generated manifests carry # header lines naming each activation; those
+# must be ignored, along with interleaved blank lines.
 test_comments_skipped() {
   setup
   {
@@ -137,6 +157,8 @@ test_comments_skipped() {
 }
 
 # ── Test: command failure does not abort ───────────────────────────────────
+# WHY: one failing activation must not strand the rest; the function logs the
+# error to stderr and continues so partial failures stay visible but non-fatal.
 test_command_failure_continues() {
   setup
   {
@@ -155,6 +177,8 @@ test_command_failure_continues() {
 }
 
 # ── Test: manifest from HM generation (name header lines) ──────────────────
+# WHY: real Home Manager manifests interleave # name headers with commands;
+# this pins that headers are skipped while the commands after them still run.
 test_name_header_lines() {
   setup
   {

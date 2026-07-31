@@ -2,6 +2,18 @@
 # Provides a uniform CLI for listing, starting, stopping, restarting,
 # enabling, and disabling services across macOS (launchctl) and NixOS (systemctl).
 # Services are defined in src/modules/services.json (the canonical registry).
+#
+# Usage: nucleus-svc <action> [service...] [options]
+#   Actions: list, status, start, stop, restart, enable, disable, verify,
+#   endpoint, logs, log-paths, log-config.  See usage() for per-action flags.
+#
+# Env vars: SVC_DOMAIN_FILTER — default domain (user|system|all) used when
+# no --user/--system flag is given (default: all).
+#
+# Prerequisites: services.json in the repo; jq; launchctl (macOS) or
+# systemctl (NixOS); passwordless sudo for system-domain operations.
+# Exit conditions: non-zero when a service name does not resolve, an action
+# fails, or verify finds inactive services.
 
 set -euo pipefail
 
@@ -18,6 +30,10 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 . "$SCRIPT_DIR/../src/scripts/lib/macos-launch-services.sh"
 
+# usage — Print the full command reference.
+# WHY: the help text is the executable contract — it must enumerate every
+# subcommand, flag, and domain option the parsers accept, so it stays in sync
+# with the case branches below.
 usage() {
   usage_std "$(basename "$0")" "list|status|start|stop|restart|enable|disable|verify|endpoint|logs|log-paths|log-config [service...] [options]"
   cat <<'EOF'
@@ -69,6 +85,9 @@ fi
 # Helpers
 
 # read_registry — Parse services.json and return JSON filtered to current platform.
+# Output: compact JSON on stdout; exits non-zero if the file or jq is missing.
+# WHY: platform filtering happens here so every caller sees a uniform registry
+# shape and never repeats the filter logic.
 read_registry() {
   if [ ! -f "$SERVICES_JSON" ]; then
     error "services registry not found at $SERVICES_JSON"
@@ -85,7 +104,12 @@ read_registry() {
 }
 
 # resolve_service_names — Given user-specified names, resolve prefix matches to concrete names.
-# Outputs newline-separated entries of form: key\tdisplayName\tplatformJson
+# Args: $1 — platform registry JSON; remaining args — requested service names.
+# Outputs newline-separated entries of form: key\tdisplayName\tplatformJson\tjsonKey.
+# With no names, expands every registry entry (prefix-match services included).
+# WHY: prefix matching lets users run `svc status jelly` instead of needing
+# the full id; unresolved names become ERROR: rows so callers can surface
+# them without aborting mid-output.
 resolve_service_names() {
   local registry="$1"
   shift
@@ -130,7 +154,11 @@ resolve_service_names() {
 }
 
 # expand_prefix — List concrete services matching a prefix on the current platform.
-# Outputs tab-separated lines: key\tserviceId\tplatformJson
+# Args: $1 — requested name; $2 — id prefix; $3 — platform JSON.
+# Outputs tab-separated lines: name\tserviceId\tplatformJson\tjsonKey.
+# WHY: concrete ids are discovered from the live service manager (launchctl
+# list / systemctl list-units) because the registry's prefix entry stands in
+# for services whose full ids are only knowable at runtime.
 expand_prefix() {
   local name="$1" prefix="$2" plat_json="$3"
   case "$PLATFORM" in
@@ -174,6 +202,11 @@ expand_prefix() {
 }
 
 # svc_status — Print JSON status for a single service entry.
+# Args: $1 — service name; $2 — platform JSON for that service.
+# Output: one JSON object (status/running/enabled/pid/state/exitCode).
+# WHY: status needs two probes — the list probe can miss services in a
+# transient state that `launchctl print` reports as running, so a fallback
+# print check is layered on before declaring the service inactive.
 svc_status() {
   local name="$1"
   local entry_json="$2"
@@ -327,7 +360,10 @@ recover_launchctl_service() {
 }
 
 # poll_service_status — Poll svc_status until running or timeout (~4s).
+# Args: $1 — service name; $2 — platform JSON.
 # Returns the final status JSON on stdout. Exit 0 if running, 1 if still inactive.
+# WHY: service-manager state can lag a few hundred ms after start/restart;
+# polling briefly avoids declaring a healthy start a failure.
 poll_service_status() {
   local name="$1" entry_json="$2"
   for _i in 1 2 3 4 5 6 7 8; do
@@ -346,8 +382,12 @@ poll_service_status() {
 }
 
 # poll_service_ready — Poll for service manager readiness AND port readiness.
+# Args: $1 — service name; $2 — platform JSON.
 # Runs poll_service_status first, then verifies all registered ports are
 # actually listening. Returns 0 only when both checks pass.
+# WHY: a daemon can report "running" while its listener is still binding;
+# checking registered ports catches that race, which manager state alone
+# would miss.
 poll_service_ready() {
   _psr_name="$1"
   _psr_entry_json="$2"
@@ -405,6 +445,9 @@ service_diagnostic() {
 # cleanup_service_ports — Free ports registered for a service by killing
 # any rogue process holding them. Handles manual starts, orphans from
 # previous wrappers, etc. that are outside the service manager's kill domain.
+# WHY: launchctl/systemctl can only terminate processes in their tracked
+# tree, so a stray process on a service port would survive restart and make
+# the new instance fail to bind.
 cleanup_service_ports() {
   _csp_entry_json="$1"
   # check-suppress:suppression_doc: port may not be occupied by this service; extract_ports returns empty for no-network entries.
@@ -419,6 +462,10 @@ EOF
 }
 
 # svc_action — Perform an action on a single service.
+# Args: $1 — action (status|start|stop|restart|enable|disable);
+#        $2 — service name; $3 — platform JSON.
+# Side effects: service-manager operations; may kill port-holding processes.
+# Returns 1 (with a diagnostic warning) when a start/restart ends inactive.
 svc_action() {
   local action="$1"
   local name="$2"
@@ -567,6 +614,11 @@ svc_action() {
 
 # Action implementations
 
+# do_list — Print the status table (or JSON) for the requested services.
+# Args: none; reads global service_names, domain_filter, json_output.
+# Output: aligned human table or versioned JSON; returns 1 if any name failed.
+# WHY: system-domain entries are skipped without passwordless sudo so the
+# table never shows misleading "inactive" rows for unqueryable services.
 do_list() {
   local registry
   registry=$(read_registry)
@@ -627,6 +679,10 @@ do_list() {
   "$has_error" && return 1 || return 0
 }
 
+# do_status — Print one status line per requested service.
+# Args: none; reads global service_names and domain_filter.
+# Output: per-service line (name, status, running, pid/exit code).
+# WHY: reuses do_list for --json so the JSON shape lives in one place.
 do_status() {
   local registry
   registry=$(read_registry)
@@ -667,6 +723,10 @@ do_status() {
   "$any_error" && return 1 || return 0
 }
 
+# do_action — Apply start|stop|restart|enable|disable to each named service.
+# Args: none; reads global action and service_names.
+# Side effects: runs the requested action per service, continuing after a
+# failure so one bad service does not hide the rest; returns a combined exit.
 do_action() {
   if [ "${#service_names[@]}" -eq 0 ]; then
     error "missing service name for $action"
@@ -712,6 +772,10 @@ do_action() {
 }
 
 # do_verify — Check all services and warn about inactive ones.
+# Args: none; reads global service_names and domain_filter.
+# Output: warning per inactive service; returns 1 if any are inactive.
+# WHY: verify is the health gate — its exit code alone must be enough for
+# cron/CI wrappers to alert, so it returns non-zero on any inactive service.
 do_verify() {
   local registry
   registry=$(read_registry)
@@ -741,7 +805,10 @@ do_verify() {
 
 # do_endpoint — Show network endpoint(s) for a service.
 #   svc endpoint <service> [<endpoint-name>]
+# Args: service_names[0] — service; service_names[1] — optional endpoint key.
 # Reads the raw services.json (not platform-filtered) since endpoints are universal.
+# WHY: endpoints are host-independent (the same host:port on every platform),
+# so filtering by PLATFORM would hide valid data.
 do_endpoint() {
   local svc_name="${service_names[0]:-}"
   local endpoint_name="${service_names[1]:-}"
@@ -787,7 +854,10 @@ do_endpoint() {
 # Log subcommand helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
-# Get sorted list of services defined for the current platform.
+# get_platform_services — Sorted list of services defined for the current platform.
+# Output: one service key per line, sorted; $… metadata keys excluded.
+# WHY: sorting keeps logs/log-paths output deterministic, and the $ prefix
+# marks registry metadata entries that are not real services.
 get_platform_services() {
   jq -r --arg platform "$PLATFORM" '
     to_entries[]
@@ -797,7 +867,10 @@ get_platform_services() {
   ' "$SERVICES_JSON" | sort
 }
 
-# Resolve capture mode for a service (platform-specific overrides top-level).
+# get_capture — Resolve the capture mode for a service.
+# Args: $1 — service key. Output: all|stdout|stderr on stdout.
+# WHY: platform-specific logging config overrides the top-level default so
+# hosts can differ without duplicating the whole logging block.
 get_capture() {
   local svc="$1"
   jq -r --arg svc "$svc" --arg platform "$PLATFORM" '
@@ -805,7 +878,10 @@ get_capture() {
   ' "$SERVICES_JSON"
 }
 
-# Get the systemd unit name for a NixOS service.
+# get_unit — Get the systemd unit name for a NixOS service.
+# Args: $1 — service key. Output: unit name or empty string.
+# WHY: NixOS services are queried via their systemd unit; the mapping lives
+# in services.json so the CLI never guesses unit names.
 get_unit() {
   local svc="$1"
   jq -r --arg svc "$svc" '
@@ -813,7 +889,10 @@ get_unit() {
   ' "$SERVICES_JSON"
 }
 
-# Print all log file paths for a service (user + system dirs).
+# service_log_files — Print all log file paths for a service (user + system dirs).
+# Args: $1 — service key. Output: absolute .log paths, one per line.
+# WHY: user and system daemons write to different roots; probing both keeps
+# a single call sufficient for either domain.
 service_log_files() {
   local svc="$1"
   local user_dir system_dir
@@ -826,7 +905,10 @@ service_log_files() {
   done
 }
 
-# Check if a service has any accessible log output.
+# service_has_logs — Check if a service has any accessible log output.
+# Args: $1 — service key. Returns 0 when files exist (or journald has output).
+# WHY: distinguishes "no logs yet" from "no logs configured" so the logs
+# listing can annotate services that simply have never written anything.
 service_has_logs() {
   local svc="$1"
   if [ -n "$(service_log_files "$svc")" ]; then
@@ -842,7 +924,11 @@ service_has_logs() {
   return 1
 }
 
-# Show file-based logs for a service.
+# show_file_logs — Show file-based logs for a service.
+# Args: $1 — service key; $2 — line count; $3 — raw flag (skip sanitizing).
+# Output: tail of the service's log files, sanitized unless --raw.
+# WHY: an array passes multiple files to tail without unquoted-word splitting,
+# and sanitizing strips secrets/timestamps unless raw output is requested.
 show_file_logs() {
   local svc="$1" lines="$2" raw="$3"
   local files
@@ -858,7 +944,11 @@ show_file_logs() {
   tail -n "$lines" "${files_arr[@]}" | "$sanitize_cmd"
 }
 
-# Show journald logs for a service (NixOS only).
+# show_journald_logs — Show journald logs for a service (NixOS only).
+# Args: $1 — service key; $2 — line count; $3 — raw; $4 — since (e.g. "1h").
+# Output: journalctl output, sanitized unless raw.
+# WHY: journald is the authoritative log store on NixOS; --since is carried
+# as a single array element so the timestamp stays atomic.
 show_journald_logs() {
   local svc="$1" lines="$2" raw="$3" since="$4"
   local unit
@@ -875,6 +965,11 @@ show_journald_logs() {
 # Log action implementations
 # ──────────────────────────────────────────────────────────────────────────────
 
+# do_logs — Show logs for the named services, or list log sources when none.
+# Args: none; parses -n/--lines, --since, --raw, -- from global service_names.
+# Output: log content, or an annotated list of services with log availability.
+# WHY: logs parses its own value-bearing flags out of service_names because
+# the main parser treats everything after the action as plain service names.
 do_logs() {
   local lines=10 since="" raw=false
   local parsed_args=()
@@ -938,6 +1033,10 @@ do_logs() {
   done
 }
 
+# do_log_paths — Print log file path(s) for the named services (or all).
+# Output: absolute paths, one per line — suitable for tail -f or editors.
+# WHY: printing paths (not content) lets users open logs in their preferred
+# tool and keeps this action side-effect free.
 do_log_paths() {
   if [ "${#service_names[@]}" -gt 0 ]; then
     for svc in "${service_names[@]}"; do
@@ -950,6 +1049,11 @@ do_log_paths() {
   fi
 }
 
+# do_log_config — Show the effective logging configuration for each service.
+# Args: none; parses --json from global service_names.
+# Output: capture/maxSize/maxFiles/compress/sanitize/level/eventLog per service.
+# WHY: platform-specific values override top-level defaults per key; showing
+# the merged result lets users predict rotation and retention behavior.
 do_log_config() {
   local parsed_args=()
   while [ "${#service_names[@]}" -gt 0 ]; do
@@ -1067,6 +1171,8 @@ fi
 
 [ -z "$action" ] && { error "missing action (list, status, start, stop, restart, enable, disable, verify, endpoint, logs, log-paths, log-config)" ; usage >&2 ; exit 1; }
 
+# WHY: list/status/logs dispatch via "do_$action" because their handler names
+# match the subcommand verb; the hyphenated subcommands need explicit mapping.
 case "$action" in
   list|status|logs) "do_$action" ;;
   log-paths) do_log_paths ;;

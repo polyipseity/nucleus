@@ -2,6 +2,17 @@
 # Validates free disk space, outbound connectivity to key endpoints (GitHub,
 # cache.nixos.org), and SOPS secret decryptability for repository-managed
 # secret files.
+#
+# Commands: [--min-free-bytes N] [--secret-health|--no-secret-health]
+# [--log-health]. Disk and connectivity checks always run; --log-health is
+# opt-in because it reads the services.json registries.
+#
+# Environment variables read: SOPS_AGE_KEY_FILE (exported when the machine
+# age key exists so sops finds it), NUCLEUS_REPO_ROOT (via derive_repo_root),
+# NUCLEUS_LOG_DIR / NUCLEUS_SYSTEM_LOG_DIR (via lib.sh).
+#
+# Prerequisites: curl, sops, and (for --log-health) jq. Exits 1 when a check
+# fails — log checks are aggregated first — and exits 0 when all pass.
 
 set -euo pipefail
 
@@ -17,6 +28,8 @@ fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
+# usage
+#   Prints the CLI synopsis and available check flags to stdout.
 usage() {
   usage_std "health-check.sh" "[options]" "Checks pre-flight readiness before bootstrap/apply/update operations."
 }
@@ -61,6 +74,10 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
+# check_disk_space
+#   Fails when the repo filesystem has less free space than the threshold.
+#   WHY: df -Pk is POSIX-portable (no GNU df required on macOS); awk picks
+#   the free column without locale-dependent formatting.
 check_disk_space() {
   # Fails fast when free disk is below threshold to avoid half-finished
   # rebuilds, package downloads, or decrypt/write operations on low storage.
@@ -74,6 +91,10 @@ check_disk_space() {
   return 0
 }
 
+# check_connectivity
+#   Verifies reachability of GitHub and cache.nixos.org. WHY: these two
+#   endpoints cover the flake fetch path and the binary-substitution path;
+#   the --max-time 10 cap keeps a stalled network from hanging the check.
 check_connectivity() {
   # Verifies network reachability to critical artifact/dependency endpoints.
   # This avoids launching expensive flows that are guaranteed to fail offline.
@@ -88,6 +109,10 @@ check_connectivity() {
   return 0
 }
 
+# check_secret_health
+#   Decrypt-checks every SOPS-managed secret file. WHY: activation depends on
+#   these secrets (git identities, SSH keys); verifying decryptability here
+#   catches identity rot before a half-finished activation.
 check_secret_health() {
   # Ensures encryption identities currently available on the machine can decrypt
   # repository-managed secret files before activation depends on them.
@@ -124,6 +149,9 @@ check_secret_health() {
   return 0
 }
 
+# check_log_health
+#   Validates log dirs and per-service log files against the rotation and
+#   sanitize policy in services.json.
 check_log_health() {
   # Verify log directories exist, check file sizes against rotation
   # thresholds, and validate that sanitized logs contain no control chars.
@@ -160,6 +188,8 @@ check_log_health() {
         [ -f "$log_file" ] || continue
 
         # Check file size against rotation threshold
+        # WHY: 80% is the warning mark — services rotate at maxSize, so
+        # operator action is needed before the next rotation window.
         size=$(wc -c < "$log_file")
         threshold=$((max_size * 80 / 100))
         if [ "$size" -gt "$threshold" ]; then
@@ -173,6 +203,8 @@ check_log_health() {
         fi
       done
     done
+  # WHY: JSON meta keys ($schema, $comment) are excluded from the service
+  # enumeration so they are not treated as services.
   done <<< "$(jq -r 'to_entries[] | select(.key | startswith("$") | not) | .key' "$services_json" | sort)"
 
   if [ "$failures" -gt 0 ]; then

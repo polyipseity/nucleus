@@ -2,6 +2,18 @@
 # Pull-only replica sync (remote -> local). Intended for post-apply best-effort
 # convergence from src/scripts/apply.sh and manual invocation via
 # nucleus-replica-sync.
+#
+# Commands: [--dry-run] [--replica-id ID] [--repo-root PATH]. Syncs every
+# enabled replica declared in src/modules/users.json (cloudDrives.replicas)
+# for the current user.
+#
+# Environment variables read: NUCLEUS_REPO_ROOT (repo-root fallback),
+# RCLONE_CONFIG_PASS (exported from the local rclone config pass file when
+# present, so encrypted rclone configs can be decrypted), USER.
+#
+# Prerequisites: rclone with the replicas' remotes configured, jq, and the
+# users.json / replica-gc.json registries. Exits 1 when any replica fails or
+# when required registries/tools are missing.
 
 set -euo pipefail
 
@@ -19,6 +31,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 
 repo_root="${NUCLEUS_REPO_ROOT:-}"
 
+# usage
+#   Prints the CLI synopsis and accepted options to stdout.
 usage() {
   usage_std "replica-sync.sh" "[--dry-run] [--replica-id ID] [--repo-root PATH]" "Synchronize enabled cloud replicas declared in src/modules/users.json. Pull-only: remote -> local."
 }
@@ -90,12 +104,19 @@ if ! command -v jq >/dev/null 2>&1; then
   error "jq not found; cannot parse users.json"
 fi
 
+# WHY: rclone configs may be pass-encrypted; RCLONE_CONFIG_PASS lets rclone
+# decrypt them at runtime. The pass file is only exported when present, so
+# the environment stays clean on machines without encrypted remotes.
 rclone_pass_path="$HOME/.config/nucleus/secrets/rclone-config-pass"
 if [ -s "$rclone_pass_path" ]; then
   rclone_config_pass_value="$(cat "$rclone_pass_path")"
   export RCLONE_CONFIG_PASS="$rclone_config_pass_value"
 fi
 
+# load_provider_gc_entries PROVIDER FIELD
+#   Reads a GC-config field (files|dirs|remoteExcludes|blockedRoots) for a
+#   provider from replica-gc.json. WHY: per-provider cleanup/exclusion policy
+#   is data, not code — adding a provider needs no script change.
 load_provider_gc_entries() {
   _provider="$1"
   _field="$2"
@@ -132,6 +153,10 @@ if [ -z "$replica_lines" ]; then
   exit 0
 fi
 
+# run_cmd
+#   Executes a command, or prints it under --dry-run. WHY: wrapping every
+#   side-effecting call keeps dry-run honest — nothing is actually synced,
+#   but the exact command that would run is shown.
 run_cmd() {
   if [ "$dry_run" = true ]; then
     dry_run "would run: $*"
@@ -140,6 +165,10 @@ run_cmd() {
   "$@"
 }
 
+# record_unique_name LIST_FILE NAME
+#   Appends NAME to LIST_FILE once. WHY: dirs/files are collected from both
+#   the remote listing and the local scan, so dedupe keeps the generated
+#   rclone filter file free of duplicate + rules.
 record_unique_name() {
   _list_file="$1"
   _name="$2"
@@ -153,6 +182,12 @@ record_unique_name() {
   fi
 }
 
+# remote_top_level_path_accessible REMOTE_REF ENTRY_NAME
+#   Probes whether a top-level remote entry can actually be listed. WHY: on
+#   OneDrive some root entries (e.g. Personal Vault) appear in listings but
+#   fail on access; probing each entry and skipping failures keeps the whole
+#   sync from erroring out. Timeouts are bounded and retries are disabled so
+#   probing N entries stays fast and fail-closed.
 remote_top_level_path_accessible() {
   _remote_ref="$1"
   _entry_name="$2"
@@ -165,6 +200,10 @@ remote_top_level_path_accessible() {
     --max-duration 1m >/dev/null 2>&1
 }
 
+# should_skip_onedrive_root_entry ENTRY_NAME BLOCKED_ROOT_ENTRIES
+#   Returns 0 when ENTRY_NAME must not be synced. WHY: both sides are
+#   lowercased before comparison so blockedRoots entries match regardless of
+#   the casing rclone happened to list.
 should_skip_onedrive_root_entry() {
   _entry_name="$1"
   _blocked_root_entries="$2"
@@ -177,6 +216,12 @@ should_skip_onedrive_root_entry() {
   printf '%s\n' "$_blocked_root_entries" | grep -Fxq "$_entry_lc"
 }
 
+# build_onedrive_root_filter_file ID LOCAL_DIR REMOTE_REF REMOTE_EXCLUDES BLOCKED_ROOT_ENTRIES
+#   Builds a runtime rclone filter file restricting the pull to top-level
+#   entries that are present and actually accessible. WHY: a plain full-root
+#   sync fails when an inaccessible root entry (Personal Vault) is hit;
+#   pre-filtering makes the sync tolerant. Emits the temp-file path on
+#   stdout; the caller removes it after the sync.
 build_onedrive_root_filter_file() {
   _id="$1"
   _local_dir="$2"
@@ -275,12 +320,18 @@ build_onedrive_root_filter_file() {
     done < "$_file_entries_file"
   fi
 
+  # WHY: the trailing catch-all exclude makes the filter closed-world —
+  # only entries explicitly included above can be synced.
   printf '%s\n' '- **' >> "$_filter_file"
 
   rm -f "$_dir_entries_file" "$_file_entries_file"
   printf '%s\n' "$_filter_file"
 }
 
+# gc_local_macos_artifacts TARGET_DIR FILE_GLOBS DIR_NAMES
+#   Deletes macOS metadata artifacts (e.g. .DS_Store, ._*, .fseventsd) from
+#   a replica tree after sync. WHY: these are OS-generated noise that would
+#   otherwise be mirrored back to the remote as fake changes.
 gc_local_macos_artifacts() {
   _target_dir="$1"
   _file_globs="$2"
@@ -306,6 +357,11 @@ gc_local_macos_artifacts() {
   done
 }
 
+# ensure_macos_icloud_replica_symlink RELATIVE_PATH
+#   Ensures ~/RELATIVE_PATH is a symlink to ~/Library/Mobile Documents, the
+#   native iCloud Drive mount. WHY: the replica path must resolve into the
+#   natively-synced iCloud tree — a real directory there would be a separate,
+#   non-synced copy. Existing directories are backed up before replacement.
 ensure_macos_icloud_replica_symlink() {
   _relative_path="$1"
   _native_target="$HOME/Library/Mobile Documents"
@@ -352,6 +408,10 @@ ensure_macos_icloud_replica_symlink() {
   say "[iCloud] linked $_replica_path -> $_native_target"
 }
 
+# resolve_filter_path CANDIDATE
+#   Expands a filters-file path from users.json into an absolute path. WHY:
+#   values like "~/filters.txt" are read via jq, which does not perform
+#   tilde expansion; expanding here keeps the config concise and portable.
 resolve_filter_path() {
   _candidate="$1"
   case "$_candidate" in
@@ -410,11 +470,17 @@ failures=0
 replica_lines_file="$(mktemp)"
 printf '%s\n' "$replica_lines" > "$replica_lines_file"
 
+# WHY: the replica list is staged in a temp file so the loop reads from a
+# real file descriptor — a pipeline would run the loop body in a subshell
+# and lose the failures counter.
 while IFS="$(printf '\t')" read -r id direction local_path remote_path provider icloud_service filters_file read_write display_name; do
   if [ -n "$replica_id_filter" ] && [ "$id" != "$replica_id_filter" ]; then
     continue
   fi
 
+  # WHY: native iCloud already syncs this tree (via the replica symlink), so
+  # pulling it again through the rclone iCloud remote would double-sync and
+  # fight the daemon.
   if [ "$current_os" = "Darwin" ] && [ "$provider" = "iCloud" ] && [ "$id" = "iCloud" ]; then
     if ! ensure_macos_icloud_replica_symlink "$local_path"; then
       failures=$((failures + 1))
@@ -428,6 +494,8 @@ while IFS="$(printf '\t')" read -r id direction local_path remote_path provider 
   provider_remote_excludes="$(load_provider_gc_entries "$provider" "remoteExcludes")"
   provider_blocked_roots="$(load_provider_gc_entries "$provider" "blockedRoots")"
 
+  # WHY: replicas are pull-only by policy — a push would overwrite cloud
+  # data with local state, which is destructive for shared content.
   if [ "$direction" != "pull" ]; then
     warn "[$display_name] unsupported direction '$direction'; replicas are pull-only by policy"
     failures=$((failures + 1))
@@ -447,6 +515,9 @@ while IFS="$(printf '\t')" read -r id direction local_path remote_path provider 
     continue
   fi
 
+  # WHY: a missing filters file is a hard failure for read-only replicas —
+  # syncing without the filter could pull or delete the wrong files. The
+  # tree is re-locked before failing to restore the read-only invariant.
   if [ -n "$resolved_filters" ] && [ ! -f "$resolved_filters" ]; then
     warn "filters file '$resolved_filters' not found for replica '$display_name'"
     if [ "$read_write" != "true" ]; then
@@ -461,7 +532,11 @@ while IFS="$(printf '\t')" read -r id direction local_path remote_path provider 
 
   gc_local_macos_artifacts "$local_dir" "$provider_file_globs" "$provider_dir_names"
 
+  # WHY: default rclone log level is INFO; ERROR keeps successful syncs
+  # quiet while still surfacing real failures in the failure counter.
   set -- --log-level ERROR
+  # WHY: the iCloud remote hosts multiple services (Drive vs Documents);
+  # the manifest selects which tree this replica maps to.
   if [ "$provider" = "iCloud" ]; then
     set -- "$@" --iclouddrive-service "$icloud_service"
   fi
@@ -497,6 +572,8 @@ while IFS="$(printf '\t')" read -r id direction local_path remote_path provider 
     rm -f "$runtime_filter_file"
   fi
 
+  # WHY: restore the read-only invariant after the run so replica trees are
+  # snapshots again between syncs (prevents accidental edits or creation).
   if [ "$read_write" != "true" ]; then
     if ! set_replica_tree_read_only "$local_dir"; then
       warn "[$display_name] failed to lock replica tree '$local_dir'"

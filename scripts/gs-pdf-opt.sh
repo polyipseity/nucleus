@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
-# nucleus-gs-pdf-opt: Optimize PDF files with Ghostscript (backup/restore).
+# nucleus-gs-pdf-opt: Optimize PDF files with Ghostscript, keeping a .bak
+# backup that is restored automatically if optimization fails.
+#
+# Usage: nucleus-gs-pdf-opt [--preset <name>] [--rm-bak] <file>...
+# Presets: default, ebook, prepress, printer, screen (default: default).
+#
+# Env vars: TMPDIR — ghostscript scratch space; falls back to a per-user
+# cache dir when unset (macOS Services sandbox omits it).
+#
+# Exit conditions: refuses when a .bak already exists; restores the original
+# and exits 1 if gs fails; exits 0 on success.
 set -euo pipefail
 
 # Resolve symlinks so SCRIPT_DIR works from Nix wrapper symlinks.
@@ -14,6 +24,10 @@ fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
+# usage — Print the help text; shown on -h/--help, unknown options, or
+# missing file arguments.
+# WHY: help doubles as the contract for supported presets and flags, so it
+# must stay in sync with the case branches in gs_pdf_opt below.
 usage() {
   usage_std "$(basename "$0")" "[--preset <name>] [--rm-bak] <file>..." \
     "Optimize PDF files using Ghostscript. Keeps a .bak backup by default."
@@ -34,6 +48,12 @@ On failure, the original file is restored from backup.
 EOF
 }
 
+# gs_pdf_opt — Optimize each input PDF in place via Ghostscript.
+# Args: $@ — option/flag pairs followed by input file paths.
+# Side effects: renames each input to <file>.bak and writes the optimized
+# file back to <file>; removes the .bak only with --rm-bak.
+# Preconditions: gs on PATH; TMPDIR set or creatable; no pre-existing .bak
+# for any input — the .bak is the only recovery copy if gs fails mid-run.
 gs_pdf_opt() {
   local preset="default"
   local rm_bak=false
@@ -73,6 +93,8 @@ gs_pdf_opt() {
     return 1
   fi
 
+  # WHY: presets are validated up front (never passed to gs blindly) so a
+  # typo fails fast before any file is touched.
   case "$preset" in
     default|ebook|prepress|printer|screen) ;;
     *)
@@ -83,7 +105,8 @@ gs_pdf_opt() {
 
   # Ensure TMPDIR is set for Ghostscript temp files.
   # From macOS sandboxed contexts (do shell script via Services), TMPDIR may not
-  # be set and /tmp may not be writable.
+  # be set and /tmp may not be writable, so fall back to a per-user cache dir
+  # that is guaranteed writable and scoped to this tool.
   export TMPDIR="${TMPDIR:-$HOME/Library/Caches/nucleus-gs-pdf-opt}"
   mkdir -p "$TMPDIR"
 
@@ -106,10 +129,15 @@ gs_pdf_opt() {
       return 1
     fi
 
+    # WHY: move-then-optimize gives an atomic recovery point — gs reads the
+    # .bak and writes the original path, so an interrupt leaves either the
+    # untouched original or the optimized file, never a half-written one.
     mv "$f" "$bak"
     if "$gs_cmd" -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 \
       "-dPDFSETTINGS=/$preset" -dNOPAUSE -dQUIET -dBATCH \
       -sOutputFile="$f" "$bak"; then
+      # WHY: the .bak is kept by default so a later quality regression can be
+      # reverted; --rm-bak deletes it only after a verified success.
       "$rm_bak" && rm -f "$bak"
       say "optimized: $f (preset: $preset)"
     else
@@ -120,6 +148,9 @@ gs_pdf_opt() {
   done
 }
 
+# main — Entry point: print help on bare invocation, else delegate.
+# WHY: a bare invocation shows help with exit 0 (not an error) so the first
+# run is discoverable and harmless.
 main() {
   if [[ $# -eq 0 ]]; then
     usage

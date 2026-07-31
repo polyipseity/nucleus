@@ -3,6 +3,17 @@
 # Consolidates build, provision, start, stop, and lifecycle operations
 # previously scattered across vm-setup.sh (now vm.sh) and host-specific scripts.
 # VMs are defined in src/modules/VMs.json (the canonical manifest).
+#
+# Commands: setup|list|status|start|stop|upgrade|reset|gc [vm...] [options].
+# Guest credentials are resolved from the per-user SOPS secret file referenced
+# by users.json vmGuest keys; see resolve_vm_guest_credentials.
+#
+# Environment variables read: NUCLEUS_VM_SECRET_OWNER, USER, NUCLEUS_REPO_ROOT,
+# NUCLEUS_HOST (see lib.sh derive_repo_root / resolve_nucleus_host).
+#
+# Prerequisites: sops and jq, plus the per-host hypervisor tools (tart, utmctl,
+# virsh, qemu). Exits 1 with an error message on missing tools, unknown
+# arguments, or manifest lookup failures.
 
 set -euo pipefail
 
@@ -28,6 +39,12 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # credential fingerprint for drift detection.
 # ---------------------------------------------------------------------------
 
+# current_vm_secret_owner
+#   Determines which user owns the SOPS VM secrets: NUCLEUS_VM_SECRET_OWNER
+#   (explicit override), then $USER, then `id -un` as last resort. WHY: the
+#   owner selects the per-user secret file src/secrets/users-<owner>.yml, so
+#   resolution order is override -> session user -> system user. Outputs the
+#   owner name on stdout; returns 1 when none can be determined.
 current_vm_secret_owner() {
   if [ -n "${NUCLEUS_VM_SECRET_OWNER:-}" ]; then
     printf '%s\n' "$NUCLEUS_VM_SECRET_OWNER"
@@ -47,6 +64,13 @@ current_vm_secret_owner() {
   return 1
 }
 
+# resolve_vm_guest_credentials
+#   Resolves the VM guest username/password from the per-user SOPS secret file
+#   referenced by users.json vmGuest secret-key entries, setting the globals
+#   vm_secret_owner, vm_guest_username, vm_guest_password. WHY: credentials
+#   stay out of the manifest and are decrypted only at runtime, so the
+#   plaintext never touches disk or the flake. Returns 1 with an error message
+#   on any failure so callers can degrade gracefully (see do_setup).
 resolve_vm_guest_credentials() {
   _rvgc_owner=''
   _rvgc_users_json="$REPO_ROOT/src/modules/users.json"
@@ -103,6 +127,11 @@ resolve_vm_guest_credentials() {
   return 0
 }
 
+# resolve_vm_guest_ssh_key
+#   Prints the first readable SSH public key found in the standard ~/.ssh
+#   locations. WHY: the key is injected into the NixOS guest's authorized_keys
+#   during provisioning so key auth works without shipping the private key.
+#   Returns 1 when no key exists; do_setup then falls back to password auth.
 resolve_vm_guest_ssh_key() {
   local _key_path=''
   for _key_path in "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/id_ecdsa.pub" "$HOME/.ssh/id_rsa.pub" "$HOME/.ssh/id_ecdsa_sk.pub"; do
@@ -114,6 +143,13 @@ resolve_vm_guest_ssh_key() {
   return 1
 }
 
+# vm_guest_credentials_hash
+#   Prints a SHA-256 fingerprint of the resolved guest credentials. WHY: the
+#   fingerprint lets provisioning detect when SOPS secrets changed and the
+#   guest's stored credentials are stale (drift). Tools are tried in the order
+#   sha256sum -> shasum -> openssl because macOS ships shasum/openssl but not
+#   sha256sum, and each tool's output format differs (hence the awk column).
+#   Returns 1 when no SHA-256 tool is available.
 vm_guest_credentials_hash() {
   if command -v sha256sum >/dev/null 2>&1; then
     printf '%s\n%s' "$vm_guest_username" "$vm_guest_password" | sha256sum | awk '{print $1}'
@@ -173,6 +209,8 @@ EOF
 # Defaults
 # ---------------------------------------------------------------------------
 
+# WHY: GSI image downloads require explicit license acceptance, so the flag
+# defaults to off rather than silently accepting Google's license terms.
 dry_run=false
 accept_gsi_license=false
 windows_iso=''
@@ -191,6 +229,8 @@ vm_args=()
 
 # ---------------------------------------------------------------------------
 # Global flag parse + subcommand dispatch  (svc.sh pattern)
+# WHY: parsing is two-pass (global flags here, subcommand flags in
+# filtered_vm_args) so options work in any position relative to the action.
 # ---------------------------------------------------------------------------
 
 while [ "$#" -gt 0 ]; do
@@ -223,6 +263,8 @@ done
 
 # Filter subcommand flags from vm_args (can appear before or after subcommand,
 # same pattern as svc.sh --json/--verbose filtering).
+# WHY: folding post-subcommand flags into the same option set makes flag
+# order irrelevant; unknown flags only warn so subcommand flags can pass.
 filtered_vm_args=()
 for arg in "${vm_args[@]}"; do
   case "$arg" in
@@ -243,6 +285,8 @@ done
 [ -z "$action" ] && { error "missing action (setup, list, status, start, stop, upgrade, reset, gc)" ; usage >&2 ; exit 1; }
 
 # Validate scalars
+# WHY: validating before dispatch fails fast with a precise message instead
+# of surfacing the same error deep inside a subcommand build.
 case "$windows_iso_source" in
   auto|url|mido|'') ;;
   *)
@@ -260,6 +304,11 @@ esac
 # Common helpers
 # ---------------------------------------------------------------------------
 
+# resolve_manifest
+#   Locates the VM manifest and derives the VM/image/template directories
+#   from it. WHY: paths derive from REPO_ROOT rather than being hard-coded,
+#   so --repo-root overrides and Nix store layouts keep working. Exits 1
+#   when the manifest is missing.
 resolve_manifest() {
   MANIFEST="$REPO_ROOT/src/modules/VMs.json"
   VMS_DIR="$REPO_ROOT/src/vms"
@@ -273,6 +322,8 @@ resolve_manifest() {
 
 # resolve_target_vm NAME — look up a VM by name in the manifest, print
 # "type<tab>index" or exit with error.
+# WHY: the index is the manifest position used to address the VM in build
+# commands, not a runtime identifier.
 resolve_target_vm() {
   local _rtv_name="$1"
   _rtv_type="$(jq -r --arg name "$_rtv_name" '.VMs[] | select(.name == $name) | .type // empty' "$MANIFEST")"
@@ -288,6 +339,11 @@ resolve_target_vm() {
 # Subcommand implementations
 # ---------------------------------------------------------------------------
 
+# do_setup
+#   Full lifecycle: resolve credentials, init the runtime, build images, run
+#   host-specific provisioners, then optionally GC. WHY: credential failure
+#   degrades to no-drift-detection instead of aborting, so a missing secret
+#   file cannot block provisioning of VMs that need no guest access.
 do_setup() {
   require_command jq
 
@@ -311,6 +367,8 @@ do_setup() {
           accelerator='hvf'
         fi
         ;;
+      # WHY: KVM is the only practical accelerator for Linux guests; tcg is
+      # the portable fallback for hosts without hardware virtualization.
       Linux)  accelerator='kvm' ;;
       *)      accelerator='tcg' ;;
     esac
@@ -357,6 +415,8 @@ do_setup() {
   vm_build_images
 
   # Prune stale helper scripts from previous runs
+  # WHY: setup regenerates start/stop scripts each run; leftovers from
+  # renamed or removed VMs would otherwise be picked up by do_start/do_stop.
   for f in "$VM_DIR/scripts"/*.sh "$VM_DIR/scripts"/*.ps1; do
     [ -f "$f" ] || continue
     rm -f "$f"
@@ -388,6 +448,9 @@ do_setup() {
 }
 
 # Query hypervisors for currently running VM names.
+# Outputs one name per line; empty output means nothing is running.
+# WHY: state is read from the live hypervisor rather than the manifest, so
+# list/status reflect reality (e.g. VMs started outside nucleus).
 vm_get_running_names() {
   case "$(uname -s)" in
     Darwin)
@@ -416,6 +479,10 @@ _vm_state() {
   fi
 }
 
+# do_list
+#   Lists enabled VMs scoped to the current host, annotated with live
+#   running/stopped state. WHY: the jq host filter mirrors the manifest's
+#   hosts field, so each machine only sees the VMs it can actually manage.
 do_list() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -446,6 +513,10 @@ do_list() {
   fi
 }
 
+# do_status
+#   Shows CPUs/RAM and live state for enabled VMs on this host, optionally
+#   filtered to names given after the subcommand. WHY: ramBytes from the
+#   manifest is rounded to the nearest GiB so the table stays readable.
 do_status() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -507,6 +578,10 @@ do_status() {
   fi
 }
 
+# do_start
+#   Starts a single VM, preferring the per-VM start script generated by
+#   setup — it encodes hypervisor-specific launch options — and falling back
+#   to direct hypervisor invocation when setup has not run yet.
 do_start() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -572,6 +647,10 @@ do_start() {
   esac
 }
 
+# do_stop
+#   Stops a single VM, preferring the generated stop script like do_start.
+#   WHY: on Linux, ACPI shutdown (virsh shutdown) is tried first so the
+#   guest flushes state; virsh destroy is reserved for hung guests.
 do_stop() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -634,6 +713,11 @@ do_stop() {
   esac
 }
 
+# do_upgrade
+#   Re-downloads and replaces the OS image of an Android VM. WHY: only
+#   Android consumes a standalone downloaded GSI image (hence the license
+#   flag); the other types are built locally from the manifest, so an
+#   "upgrade" errors out rather than silently rebuilding.
 do_upgrade() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -679,6 +763,10 @@ do_upgrade() {
   say "upgrade complete for '$vm_name'"
 }
 
+# do_reset
+#   Factory-resets Android VM user state by re-downloading a pristine image.
+#   WHY: restricted to Android because the GSI image model is the only one
+#   where user state can be discarded cleanly.
 do_reset() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -724,6 +812,10 @@ do_reset() {
   say "reset complete for '$vm_name'"
 }
 
+# do_gc
+#   Removes stale VM artifacts: non-provisioned VMs, leftover disks, and
+#   generation markers. WHY: GC is opt-in (--gc) rather than automatic
+#   because artifact deletion is destructive and must stay explicit.
 do_gc() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest

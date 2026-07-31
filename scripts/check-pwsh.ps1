@@ -13,7 +13,10 @@
 .PARAMETER Settings
   Path to a PSScriptAnalyzerSettings .psd1 file. Controls which rules and
   severities are enabled. Defaults to PSScriptAnalyzerSettings.check.psd1
-  (excludes the two slowest rules). Pass test settings for full coverage:
+  (excludes three slow rules — PSAvoidUsingCmdletAliases,
+  PSUseCmdletCorrectly, PSShouldProcess — plus
+  PSUseBOMForUnicodeEncodedFile, which is auto-fixable and low value).
+  Pass test settings for full coverage:
   -Settings scripts/PSScriptAnalyzerSettings.test.psd1
 
 .PARAMETER SkipStep
