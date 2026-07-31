@@ -7,10 +7,12 @@ let
   windowsGitText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1;
 
   # Alias parity: all three shells (zsh, POSIX pwsh, Windows pwsh) must expose
-  # the same set of `-g*` shell aliases.
+  # the same set of `-g*` shell aliases.  POSIX and Windows PowerShell both
+  # consume the shared profile.ps1 (pwsh.nix at eval time, Sync-ShellProfile.ps1
+  # at runtime), so one source is checked for both platforms.
   aliasesNix = builtins.readFile ../../src/modules/shell/aliases.nix;
-  posixPwshAliases = builtins.readFile ../../src/modules/configs/pwsh/profile-base.ps1;
-  windowsPwshAliases = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
+  posixPwshAliases = builtins.readFile ../../src/scripts/shell/profile.ps1;
+  windowsPwshAliases = builtins.readFile ../../src/scripts/shell/profile.ps1;
 
   # Count occurrences of a regex pattern in text by splitting on it.
   countMatches =
@@ -21,9 +23,9 @@ let
   # Matches `"-g` which starts every git and ghostscript alias line.
   # Multi-line alias values do not contain `"-g`, so this is accurate.
   aliasesNixCount = countMatches ''"-g'' aliasesNix;
-  # Count `function -g` definitions in both PowerShell profiles.
+  # Count `Add-ShellAlias '-g` definitions in the shared PowerShell profile.
   posixPwshCount = countMatches "Add-ShellAlias '-g" posixPwshAliases;
-  windowsPwshCount = countMatches "function -g" windowsPwshAliases;
+  windowsPwshCount = countMatches "Add-ShellAlias '-g" windowsPwshAliases;
 in
 assert containsRegex "core\.autocrlf = false" posixGitText;
 assert containsRegex "core\.symlinks = true" posixGitText;

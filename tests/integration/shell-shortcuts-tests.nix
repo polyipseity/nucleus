@@ -4,8 +4,9 @@ let
   lib = import <nixpkgs/lib>;
   aliasesText = builtins.readFile ../../src/modules/shell/aliases.nix;
   shellText = builtins.readFile ../../src/modules/shell.nix;
-  posixPwshText = builtins.readFile ../../src/modules/pwsh.nix;
-  windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
+  # Shared shell-parity profile: single source consumed by pwsh.nix (POSIX,
+  # eval-time embed) and Sync-ShellProfile.ps1 (Windows, runtime read-back).
+  shellProfileText = builtins.readFile ../../src/scripts/shell/profile.ps1;
   macManualText = builtins.readFile ../../src/hosts/MacBook/MANUAL.md;
   nixosManualText = builtins.readFile ../../src/hosts/NixOS/MANUAL.md;
   windowsManualText = builtins.readFile ../../src/hosts/Windows/MANUAL.md;
@@ -21,26 +22,26 @@ let
   ) "aliases.nix must expose the curated git shortcut set";
 
   test_posix_pwsh_shortcuts_match_shell_aliases = assert' (
-    lib.hasInfix "function -gb { & git branch @Args }" posixPwshText
-    && lib.hasInfix "function -gcl { & git clone @Args }" posixPwshText
-    && lib.hasInfix "function -gf { & git fetch @Args }" posixPwshText
-    && lib.hasInfix "function -gl { & git log --oneline --decorate --graph @Args }" posixPwshText
-    && lib.hasInfix "function -gsw { & git switch @Args }" posixPwshText
-    && lib.hasInfix "function -ni { & bun install @Args }" posixPwshText
-    && lib.hasInfix "function -nr { & bun run @Args }" posixPwshText
-    && lib.hasInfix "function -nx { & bun x @Args }" posixPwshText
-  ) "pwsh.nix must mirror curated shell shortcuts, including bun shortcuts";
+    lib.hasInfix "Add-ShellAlias '-gb' { & git branch @Args }" shellProfileText
+    && lib.hasInfix "Add-ShellAlias '-gcl' { & git clone @Args }" shellProfileText
+    && lib.hasInfix "Add-ShellAlias '-gf' { & git fetch @Args }" shellProfileText
+    && lib.hasInfix "Add-ShellAlias '-gl' { & git log --oneline --decorate --graph @Args }" shellProfileText
+    && lib.hasInfix "Add-ShellAlias '-gsw' { & git switch @Args }" shellProfileText
+    && lib.hasInfix "Add-ShellAlias '-ni' { & bun install @Args }" shellProfileText
+    && lib.hasInfix "Add-ShellAlias '-nr' { & bun run @Args }" shellProfileText
+    && lib.hasInfix "Add-ShellAlias '-nx' { & bun x @Args }" shellProfileText
+  ) "shared shell profile must mirror curated shell shortcuts, including bun shortcuts";
 
   test_windows_pwsh_shortcuts_match_shell_aliases = assert' (
-    lib.hasInfix "function -gb { & git branch @Args }" windowsShellProfileText
-    && lib.hasInfix "function -gcl { & git clone @Args }" windowsShellProfileText
-    && lib.hasInfix "function -gf { & git fetch @Args }" windowsShellProfileText
-    && lib.hasInfix "function -gl { & git log --oneline --decorate --graph @Args }" windowsShellProfileText
-    && lib.hasInfix "function -gsw { & git switch @Args }" windowsShellProfileText
-    && lib.hasInfix "function -ni { & bun install @Args }" windowsShellProfileText
-    && lib.hasInfix "function -nr { & bun run @Args }" windowsShellProfileText
-    && lib.hasInfix "function -nx { & bun x @Args }" windowsShellProfileText
-  ) "Windows shell profile must mirror curated shell shortcuts";
+    lib.hasInfix "Add-ShellAlias '-gb' { & git branch @Args }" shellProfileText
+    && lib.hasInfix "Add-ShellAlias '-gcl' { & git clone @Args }" shellProfileText
+    && lib.hasInfix "Add-ShellAlias '-gf' { & git fetch @Args }" shellProfileText
+    && lib.hasInfix "Add-ShellAlias '-gl' { & git log --oneline --decorate --graph @Args }" shellProfileText
+    && lib.hasInfix "Add-ShellAlias '-gsw' { & git switch @Args }" shellProfileText
+    && lib.hasInfix "Add-ShellAlias '-ni' { & bun install @Args }" shellProfileText
+    && lib.hasInfix "Add-ShellAlias '-nr' { & bun run @Args }" shellProfileText
+    && lib.hasInfix "Add-ShellAlias '-nx' { & bun x @Args }" shellProfileText
+  ) "shared shell profile must mirror curated shell shortcuts";
 
   test_posix_shell_exposes_managed_commands = assert' (
     lib.hasInfix ''"nucleus-ai"'' shellText
@@ -59,20 +60,20 @@ let
   ) "shell.nix must expose the managed nucleus command set";
 
   test_windows_shell_exposes_managed_commands = assert' (
-    lib.hasInfix "function nucleus-ai" windowsShellProfileText
-    && lib.hasInfix "function nucleus-apply" windowsShellProfileText
-    && lib.hasInfix "function nucleus-bootstrap" windowsShellProfileText
-    && lib.hasInfix "function nucleus-check-pwsh" windowsShellProfileText
-    && lib.hasInfix "function nucleus-check-sh" windowsShellProfileText
-    && lib.hasInfix "function nucleus-cloud-setup" windowsShellProfileText
-    && lib.hasInfix "function nucleus-gc" windowsShellProfileText
-    && lib.hasInfix "function nucleus-gs-pdf-opt" windowsShellProfileText
-    && lib.hasInfix "function nucleus-health-check" windowsShellProfileText
-    && lib.hasInfix "function nucleus-replica-reset" windowsShellProfileText
-    && lib.hasInfix "function nucleus-replica-sync" windowsShellProfileText
-    && lib.hasInfix "function nucleus-update" windowsShellProfileText
-    && lib.hasInfix "function nucleus-vm" windowsShellProfileText
-  ) "Windows shell profile must expose the managed nucleus command set";
+    lib.hasInfix "function nucleus-ai" shellProfileText
+    && lib.hasInfix "function nucleus-apply" shellProfileText
+    && lib.hasInfix "function nucleus-bootstrap" shellProfileText
+    && lib.hasInfix "function nucleus-check-pwsh" shellProfileText
+    && lib.hasInfix "function nucleus-check-sh" shellProfileText
+    && lib.hasInfix "function nucleus-cloud-setup" shellProfileText
+    && lib.hasInfix "function nucleus-gc" shellProfileText
+    && lib.hasInfix "function nucleus-gs-pdf-opt" shellProfileText
+    && lib.hasInfix "function nucleus-health-check" shellProfileText
+    && lib.hasInfix "function nucleus-replica-reset" shellProfileText
+    && lib.hasInfix "function nucleus-replica-sync" shellProfileText
+    && lib.hasInfix "function nucleus-update" shellProfileText
+    && lib.hasInfix "function nucleus-vm" shellProfileText
+  ) "shared shell profile must expose the managed nucleus command set";
 
   test_manuals_document_curated_shortcuts_and_commands = assert' (builtins.all
     (

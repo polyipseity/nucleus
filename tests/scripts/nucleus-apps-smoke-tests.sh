@@ -230,15 +230,15 @@ else
 fi
 unset _zsh_comp_dir _zsh_comp_f _zsh_comp_name
 
-# PowerShell completion ScriptBlocks: extract from profile-base.ps1 and parse-check.
+# PowerShell completion ScriptBlocks: extract from the shared profile.ps1 and parse-check.
+# profile.ps1 is the single source for shell-parity content — pwsh.nix embeds it
+# for POSIX at eval time and Sync-ShellProfile.ps1 reads it back for Windows at
+# runtime, so one parse check covers both platforms.
 if command -v pwsh >/dev/null 2>&1; then
-  # Extract Register-ArgumentCompleter blocks from profile-base.ps1 into a temp script
+  # Extract Register-ArgumentCompleter blocks from profile.ps1 into a temp script
   # and parse them.  The ScriptBlocks contain valid PowerShell that can be
   # verified with [ScriptBlock]::Create().
-  # These were previously extracted from pwsh.nix, which embedded profile-base.ps1
-  # via builtins.readFile at Nix eval time — extracting from pwsh.nix produced an
-  # empty result.  The actual completions are directly in profile-base.ps1.
-  _pwsh_comp_file="$REPO_ROOT/src/modules/configs/pwsh/profile-base.ps1"
+  _pwsh_comp_file="$REPO_ROOT/src/scripts/shell/profile.ps1"
   if [ -f "$_pwsh_comp_file" ]; then
     _temp_pwsh_check="$(mktemp)"
     awk 'function cb(s,c,i){c=0;for(i=1;i<=length(s);i++){if(substr(s,i,1)=="{")c++;if(substr(s,i,1)=="}")c--}return c}
@@ -252,43 +252,19 @@ if command -v pwsh >/dev/null 2>&1; then
         try { [ScriptBlock]::Create(\$content) > \$null } catch { throw \"syntax error: \$(\$_.Exception.Message)\" }
         Write-Host \"pwsh completions: 0 errors\"
       " 2>/dev/null; then
-        assert_pass "pwsh completion ScriptBlocks parse (profile-base.ps1)"
+        assert_pass "pwsh completion ScriptBlocks parse (profile.ps1)"
       else
-        assert_fail "pwsh completion ScriptBlocks parse (profile-base.ps1)" "syntax error in extracted completions"
+        assert_fail "pwsh completion ScriptBlocks parse (profile.ps1)" "syntax error in extracted completions"
       fi
     else
-      assert_skip "pwsh completion ScriptBlocks parse (profile-base.ps1)" "could not extract completions from profile-base.ps1"
+      assert_skip "pwsh completion ScriptBlocks parse (profile.ps1)" "could not extract completions from profile.ps1"
     fi
     rm -f "$_temp_pwsh_check"
-  fi
-
-  # Windows: extract from Sync-ShellProfile.ps1 managed block.
-  _win_profile_file="$REPO_ROOT/src/hosts/Windows/modules/user/Sync-ShellProfile.ps1"
-  if [ -f "$_win_profile_file" ]; then
-    _temp_win_check="$(mktemp)"
-    grep "^[[:space:]]*'Register-ArgumentCompleter" "$_win_profile_file" > "$_temp_win_check" 2>/dev/null || true  # check-suppress:suppression_doc: probe — file may not contain completions yet; handled by [ -s ] guard below
-    if [ -s "$_temp_win_check" ]; then
-      if pwsh -NoProfile -NonInteractive -Command "
-        \$errors = @()
-        Get-Content '$_temp_win_check' | ForEach-Object {
-          try { [ScriptBlock]::Create(\$_) > \$null } catch { \$errors += \$_ }
-        }
-        if (\$errors.Count -gt 0) { throw \"\$(\$errors.Count) parse error(s): \$(\$errors -join ''; '')\" }
-        Write-Host \"pwsh completions: \$(\$errors.Count) errors\"
-      " 2>/dev/null; then
-        assert_pass "pwsh completion ScriptBlocks parse (Sync-ShellProfile.ps1)"
-      else
-        assert_fail "pwsh completion ScriptBlocks parse (Sync-ShellProfile.ps1)" "syntax error in extracted completions"
-      fi
-    else
-      assert_skip "pwsh completion ScriptBlocks parse (Sync-ShellProfile.ps1)" "could not extract completions"
-    fi
-    rm -f "$_temp_win_check"
   fi
 else
   assert_skip "pwsh completion ScriptBlocks parse" "pwsh not available"
 fi
-unset _pwsh_comp_file _win_profile_file
+unset _pwsh_comp_file
 
 # --- Summary ---------------------------------------------------------------
 echo ""

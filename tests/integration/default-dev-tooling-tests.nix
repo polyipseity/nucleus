@@ -27,7 +27,7 @@ let
   rustToolchainText = builtins.readFile ../../rust-toolchain.toml;
   rustupSetupText = builtins.readFile ../../src/hosts/Windows/modules/setup/Invoke-RustupSetup.ps1;
   uvSetupText = builtins.readFile ../../src/hosts/Windows/modules/setup/Invoke-UvSetup.ps1;
-  windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
+  windowsShellProfileText = builtins.readFile ../../src/scripts/shell/profile.ps1;
   envCatalogText = builtins.readFile ../../src/modules/lib/env-catalog.nix;
   windowsUserEnvText = builtins.readFile ../../src/hosts/Windows/user/env.dsc.yml;
   vscodeSettingsText = builtins.readFile ../../src/modules/configs/vscode/settings.json;
@@ -44,7 +44,7 @@ let
     && (lib.hasInfix "Invoke-NucleusManagedDevTool" posixPwshText)
   ) "pwsh.nix must publish and consume the fallback tool bundle for unmanaged repositories";
 
-  test_windows_shell_uses_default_env = assert' (lib.hasInfix "Invoke-NucleusManagedDevTool" windowsShellProfileText) "Sync-ShellProfile.ps1 must expose the managed default shell environment on Windows";
+  test_windows_shell_uses_default_env = assert' (lib.hasInfix "Invoke-NucleusManagedDevTool" windowsShellProfileText) "profile.ps1 must expose the managed default shell environment on Windows";
 
   test_windows_apply_wires_shell_profile_sync = assert' (
     (lib.hasInfix "Sync-ShellProfile.ps1" applyScriptText)
@@ -86,7 +86,7 @@ let
         && !(lib.hasInfix "Test-Path $bunBinDir" windowsShellProfileText)
         && !(lib.hasInfix "Test-Path $cargoBinDir" windowsShellProfileText)
       )
-      "Sync-ShellProfile.ps1 must prepend .bun\\bin and .cargo\\bin unconditionally (no Test-Path guard) for direnv reliability";
+      "profile.ps1 must prepend .bun\\bin and .cargo\\bin unconditionally (no Test-Path guard) for direnv reliability";
 
   # Verify that __nucleus_run_managed_dev_tool probes tool availability via
   # command -v before routing through the direnv context.  This mirrors the
@@ -209,7 +209,7 @@ let
     (lib.hasInfix "rust-toolchain.toml" posixPwshText) && (lib.hasInfix "''cargo''" posixPwshText)
   ) "pwsh.nix Invoke-NucleusManagedDevTool must check for rust-toolchain.toml scoped to cargo/rustc";
 
-  # Verify that Invoke-NucleusManagedDevTool in Sync-ShellProfile.ps1 contains the
+  # Verify that Invoke-NucleusManagedDevTool in profile.ps1 contains the
   # rust-toolchain.toml pass-through check for cargo/rustc on Windows.
   test_windows_shell_rust_toolchain_toml_check =
     assert'
@@ -217,7 +217,7 @@ let
         (lib.hasInfix "rust-toolchain.toml" windowsShellProfileText)
         && (lib.hasInfix "''cargo''" windowsShellProfileText)
       )
-      "Sync-ShellProfile.ps1 Invoke-NucleusManagedDevTool must check for rust-toolchain.toml scoped to cargo/rustc";
+      "profile.ps1 Invoke-NucleusManagedDevTool must check for rust-toolchain.toml scoped to cargo/rustc";
 
   # Verify that pkgs.nickel (CLI) and pkgs.nls (Nickel Language Server) are both
   # declared in core.nix baseSharedPackages so that .ncl tooling works on POSIX

@@ -9,7 +9,7 @@ let
   flakeText = builtins.readFile ../../src/flake.nix;
   svcRegistryShText = builtins.readFile ../../src/scripts/checks/check-steps/14-service-registry.sh;
   svcRegistryPs1Text = builtins.readFile ../../src/scripts/checks/check-steps/14-service-registry.ps1;
-  windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
+  windowsShellProfileText = builtins.readFile ../../src/scripts/shell/profile.ps1;
 
   # Parsed services.json for structural assertions
   parsedServices = builtins.fromJSON servicesJsonText;

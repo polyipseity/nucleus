@@ -1,5 +1,67 @@
-# This file is managed by nucleus (src/modules/configs/pwsh/profile-base.ps1).
-# Manual edits will be overwritten on the next `nix run .#apply`.
+# This file is managed by nucleus (src/scripts/shell/profile.ps1).
+# Manual edits will be overwritten on the next apply.
+#
+# Shared PowerShell profile content, deployed to both platforms:
+# - POSIX (macOS, NixOS): embedded by src/modules/pwsh.nix after init.ps1 via
+#   builtins.readFile.  The __NUCLEUS_*__ tokens are replaced with empty strings,
+#   leaving the `if ($IsWindows)` blocks inert.
+# - Windows: read by src/hosts/Windows/modules/user/Sync-ShellProfile.ps1, which
+#   substitutes __NUCLEUS_PREPEND_PATH__/__NUCLEUS_APPEND_PATH__ with the managed
+#   PATH snippets and __NUCLEUS_LLVM_BIN_DIR__ with the LLVM bin directory, then
+#   writes the result into the user's PowerShell profile managed block.
+
+# Managed PATH: prepend/append dirs, substituted by the embedding host
+# (Sync-ShellProfile.ps1 on Windows; empty on POSIX).
+__NUCLEUS_PREPEND_PATH__
+__NUCLEUS_APPEND_PATH__
+
+if ($IsWindows) {
+  # Load rclone config passphrase from materialized secret for automatic config
+  # file encryption in interactive and scripted rclone invocations.
+  # WHY conditional: secret file may be absent before apply has materialized it.
+  $_rclonePassFile = Join-Path $HOME ".config\nucleus\secrets\rclone-config-pass"
+  if (Test-Path -Path $_rclonePassFile -PathType Leaf) {
+    # check-suppress:suppression_doc: file may not exist yet (first provision); absence is expected and handled downstream.
+    $env:RCLONE_CONFIG_PASS = (Get-Content -Path $_rclonePassFile -Raw -ErrorAction SilentlyContinue).Trim()
+    # check-suppress:suppression_doc: resource may already be released; idempotent cleanup, not error swallowing.
+    Remove-Variable -Name _rclonePassFile -ErrorAction SilentlyContinue
+  }
+  # LLVM/Clang: add LLVM bin directory to PATH for the current session so
+  # newly provisioned hosts can run clang/ld.lld immediately.
+  # CC/CXX/LD are set at Machine scope via system/env.dsc.yml for
+  # all-process visibility.  Source: src/modules/lib/env-catalog.nix.
+  $llvmBinDir = "__NUCLEUS_LLVM_BIN_DIR__"
+  if ((Test-Path $llvmBinDir) -and ($env:PATH -notlike "*$llvmBinDir*")) {
+    $env:PATH = "$env:PATH;$llvmBinDir"
+  }
+  # AI agent session detection: suppress pay-respects when VSCODE_AGENT,
+  # CLAUDECODE, etc. are set.
+  # Source of truth for env var names: src/modules/agent-env-vars.nix.
+  # Windows variant; POSIX hosts get Test-NucleusAgentSession from init.ps1
+  # (token-based, /opt/.devin marker only).
+  function Test-NucleusAgentSession {
+    # Standard AI agent environment variables
+    if (Test-Path env:AGENT) { return $true }
+    if (Test-Path env:AI_AGENT) { return $true }
+    # Tool-specific environment variables
+    if (Test-Path env:VSCODE_AGENT) { return $true }
+    if (Test-Path env:CLAUDECODE) { return $true }
+    if (Test-Path env:CLAUDE_CODE) { return $true }
+    if (Test-Path env:CURSOR_AGENT) { return $true }
+    if (Test-Path env:GOOSE_TERMINAL) { return $true }
+    if (Test-Path env:CLINE_ACTIVE) { return $true }
+    if (Test-Path env:GEMINI_CLI) { return $true }
+    if (Test-Path env:CODEX_SANDBOX) { return $true }
+    if (Test-Path env:TRAE_AI_SHELL_ID) { return $true }
+    if (Test-Path env:AUGMENT_AGENT) { return $true }
+    if (Test-Path env:NUCLEUS_AGENT_SESSION) { return $true }
+    if (Test-Path env:OPENCODE_CLIENT) { return $true }
+    # Devin filesystem marker
+    if (Test-Path "/opt/.devin") { return $true }
+    if (Test-Path "C:\opt\.devin") { return $true }
+    return $false
+  }
+}
 
 # direnv: load per-directory environments defined in .envrc files.
 # check-suppress:suppression_doc: tool-availability guard -- direnv may not be installed
@@ -207,26 +269,27 @@ if ((Get-Command fzf -ErrorAction SilentlyContinue) -and (Get-Module -ListAvaila
 # - `-gca*` = amend (every alias starting with `-gca` expands to `git commit --amend ...`).
 # - No casing distinction (case-insensitive on Windows).
 # - Double letter = more: more verbose, more forceful, or full form.
+# - All options MUST use long form (--patch, --all, --message, etc.). See aliases.nix header.
 function Add-ShellAlias { param([string]$Name, [scriptblock]$Value) $null = New-Item -Path Function: -Name $Name -Value $Value -Force }
 Add-ShellAlias '-g' { & git @Args }
 Add-ShellAlias '-ga' { & git add @Args }
-Add-ShellAlias '-gap' { & git add -p @Args }
+Add-ShellAlias '-gap' { & git add --patch @Args }
 Add-ShellAlias '-gb' { & git branch @Args }
-Add-ShellAlias '-gba' { & git branch -a @Args }
-Add-ShellAlias '-gbd' { & git branch -d @Args }
-Add-ShellAlias '-gbdd' { & git branch -D @Args }
-Add-ShellAlias '-gbm' { & git branch -m @Args }
+Add-ShellAlias '-gba' { & git branch --all @Args }
+Add-ShellAlias '-gbd' { & git branch --delete @Args }
+Add-ShellAlias '-gbdd' { & git branch --delete --force @Args }
+Add-ShellAlias '-gbm' { & git branch --move @Args }
 Add-ShellAlias '-gc' { & git commit @Args }
 Add-ShellAlias '-gca' { & git commit --amend @Args }
-Add-ShellAlias '-gcaa' { & git commit -a --amend @Args }
-Add-ShellAlias '-gcam' { & git commit --amend -m @Args }
+Add-ShellAlias '-gcaa' { & git commit --all --amend @Args }
+Add-ShellAlias '-gcam' { & git commit --amend --message @Args }
 Add-ShellAlias '-gcl' { & git clone @Args }
-Add-ShellAlias '-gclean' { & git clean -fdn @Args }
-Add-ShellAlias '-gcleanf' { & git clean -fd @Args }
-Add-ShellAlias '-gcm' { & git commit -m @Args }
-Add-ShellAlias '-gcma' { & git commit -am @Args }
+Add-ShellAlias '-gclean' { & git clean --force -d --dry-run @Args }
+Add-ShellAlias '-gcleanf' { & git clean --force -d @Args }
+Add-ShellAlias '-gcm' { & git commit --message @Args }
+Add-ShellAlias '-gcma' { & git commit --all --message @Args }
 Add-ShellAlias '-gco' { & git checkout @Args }
-Add-ShellAlias '-gcob' { & git checkout -b @Args }
+Add-ShellAlias '-gcob' { & git checkout --branch @Args }
 Add-ShellAlias '-gd' { & git diff @Args }
 Add-ShellAlias '-gdc' { & git diff --cached @Args }
 Add-ShellAlias '-gds' { & git diff --stat @Args }
@@ -238,7 +301,7 @@ Add-ShellAlias '-gl' { & git log --oneline --decorate --graph @Args }
 Add-ShellAlias '-gla' { & git log --oneline --decorate --graph --all @Args }
 Add-ShellAlias '-gll' { & git log --decorate --graph --show-signature --stat @Args }
 Add-ShellAlias '-glla' { & git log --decorate --graph --show-signature --stat --all @Args }
-Add-ShellAlias '-glp' { & git log --oneline --decorate --graph -p @Args }
+Add-ShellAlias '-glp' { & git log --oneline --decorate --graph --patch @Args }
 Add-ShellAlias '-gls' { & git log --oneline --decorate --graph --stat @Args }
 Add-ShellAlias '-gm' { & git merge @Args }
 Add-ShellAlias '-gma' { & git merge --abort @Args }
@@ -255,7 +318,7 @@ Add-ShellAlias '-gr' { & git remote @Args }
 Add-ShellAlias '-grb' { & git rebase @Args }
 Add-ShellAlias '-grba' { & git rebase --abort @Args }
 Add-ShellAlias '-grbc' { & git rebase --continue @Args }
-Add-ShellAlias '-grbi' { & git rebase -i @Args }
+Add-ShellAlias '-grbi' { & git rebase --interactive @Args }
 Add-ShellAlias '-grbm' { & git rebase main @Args }
 Add-ShellAlias '-grbo' { & git rebase --onto @Args }
 Add-ShellAlias '-grbs' { & git rebase --skip @Args }
@@ -263,21 +326,21 @@ Add-ShellAlias '-grev' { & git revert @Args }
 Add-ShellAlias '-grs' { & git reset @Args }
 Add-ShellAlias '-grsh' { & git reset --soft HEAD~ @Args }
 Add-ShellAlias '-grshh' { & git reset --hard HEAD~ @Args }
-Add-ShellAlias '-grv' { & git remote -v @Args }
+Add-ShellAlias '-grv' { & git remote --verbose @Args }
 # git status in short format with branch info, restored from git history.
-Add-ShellAlias '-gs' { & git status -sb @Args }
+Add-ShellAlias '-gs' { & git status --short --branch @Args }
 Add-ShellAlias '-gsh' { & git show @Args }
 Add-ShellAlias '-gss' { & git status @Args }
 Add-ShellAlias '-gst' { & git stash push @Args }
 Add-ShellAlias '-gstd' { & git stash drop @Args }
 Add-ShellAlias '-gstl' { & git stash list @Args }
 Add-ShellAlias '-gstp' { & git stash pop @Args }
-Add-ShellAlias '-gstsh' { & git stash show -p @Args }
+Add-ShellAlias '-gstsh' { & git stash show --patch @Args }
 Add-ShellAlias '-gsw' { & git switch @Args }
-Add-ShellAlias '-gswc' { & git switch -c @Args }
+Add-ShellAlias '-gswc' { & git switch --create @Args }
 Add-ShellAlias '-gt' { & git tag @Args }
-Add-ShellAlias '-gtd' { & git tag -d @Args }
-Add-ShellAlias '-gtl' { & git tag -l @Args }
+Add-ShellAlias '-gtd' { & git tag --delete @Args }
+Add-ShellAlias '-gtl' { & git tag --list @Args }
 
 # --- Ghostscript PDF optimization aliases ---
 function Invoke-NucleusGhostscript {
@@ -311,16 +374,21 @@ Add-ShellAlias '-gs-pdf-opt-screen' { Invoke-NucleusGhostscript -sDEVICE=pdfwrit
 # Get-ChildItem when eza is absent so the profile loads on unmanaged machines.
 # check-suppress:suppression_doc: tool-availability guard -- eza may not be installed
 if (Get-Command eza -ErrorAction SilentlyContinue) {
-  Add-ShellAlias '-la' { & eza -la @Args }
-  Add-ShellAlias '-ll' { & eza -la @Args }
+  Add-ShellAlias '-la' { & eza --long --all @Args }
+  Add-ShellAlias '-ll' { & eza --long --all @Args }
 } else {
   Add-ShellAlias '-la' { Get-ChildItem -Force @Args }
   Add-ShellAlias '-ll' { Get-ChildItem -Force @Args }
 }
 
-Add-ShellAlias '-ni' { & bun install @Args }
-Add-ShellAlias '-nr' { & bun run @Args }
-Add-ShellAlias '-nx' { & bun x @Args }
+# bun shortcuts: mirrors -ni/-nr/-nx aliases in shell/aliases.nix on POSIX hosts.
+# Guarded so the profile loads safely on machines where bun is not yet installed.
+# check-suppress:suppression_doc: tool-availability guard -- bun may not be installed
+if (Get-Command bun -ErrorAction SilentlyContinue) {
+  Add-ShellAlias '-ni' { & bun install @Args }
+  Add-ShellAlias '-nr' { & bun run @Args }
+  Add-ShellAlias '-nx' { & bun x @Args }
+}
 
 Add-ShellAlias '-v' { & nvim @Args }
 
@@ -352,46 +420,39 @@ function Invoke-NucleusPythonScopedTool {
 }
 
 # Intercept python invocations: pass through only to the
-# WinGet-managed Python installed by this repo
+# WinGet-managed Python installed by this repo on Windows
 # (Python.Python.3.13 at %LOCALAPPDATA%\Programs\Python\Python313\python.exe).
 # Everything else triggers the educational ban message.
-# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native python; routes to WinGet-managed Python
 function python {
   if (Invoke-NucleusPythonScopedTool -ToolName "python" @Args) {
     return
   }
-  # Pass through only to the WinGet-managed Python from this repo.
-  $nucleusPythonPath = Join-Path $env:LOCALAPPDATA "Programs\Python\Python313\python.exe"
-  if (Test-Path $nucleusPythonPath) {
-    & $nucleusPythonPath @Args
-    return
+  if ($IsWindows) {
+    # Pass through only to the WinGet-managed Python from this repo.
+    $nucleusPythonPath = Join-Path $env:LOCALAPPDATA "Programs\Python\Python313\python.exe"
+    if (Test-Path $nucleusPythonPath) {
+      & $nucleusPythonPath @Args
+      return
+    }
   }
   Write-Warning "shell: system-wide Python is banned to prevent accidental modifications."
   Write-Warning "         Use one of these approaches instead:"
   Write-Warning "         - nix develop     (activate project devShell with scoped Python)"
   Write-Warning "         - uv run <cmd>    (run Python via uv package manager)"
   Write-Warning "         - uv venv         (create per-project venv managed by uv)"
-  Write-Warning "         - ./venv/bin/python (use pre-existing project venv)"
+  $venvHint = if ($IsWindows) { '.\venv\Scripts\python' } else { './venv/bin/python' }
+  Write-Warning "         - $venvHint (use pre-existing project venv)"
   return 1
 }
-# Intercept python3 invocations: pass through only to the
-# WinGet-managed Python at its install path. On Windows there is no
-# python3.exe (only python.exe), so both route to the same binary.
-# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native python3; routes to WinGet-managed Python
+# Intercept python3 invocations: route through the python wrapper.
+# On Windows there is no python3.exe (only python.exe); on POSIX hosts the
+# resolution chain is identical, so both platforms share this function.
 function python3 {
   if (Invoke-NucleusPythonScopedTool -ToolName "python3" @Args) {
     return
   }
-  # Pass through only to the WinGet-managed Python 3 at its install path.
-  $nucleusPython3Path = Join-Path $env:LOCALAPPDATA "Programs\Python\Python313\python.exe"
-  if (Test-Path $nucleusPython3Path) {
-    & $nucleusPython3Path @Args
-    return
-  }
-  # Fall back to python() for final resolution (scoped/ban).
   python @Args
 }
-# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native pip; routes through python wrapper to managed Python
 function pip {
   if (Invoke-NucleusPythonScopedTool -ToolName "pip" @Args) {
     return
@@ -401,15 +462,50 @@ function pip {
   Write-Warning "         - nix develop     (activate project devShell with scoped Python+pip)"
   Write-Warning "         - uv pip install  (use uv to manage project dependencies)"
   Write-Warning "         - uv venv         (create per-project venv managed by uv)"
-  Write-Warning "         - ./venv/bin/pip  (use pre-existing project venv)"
+  $venvHint = if ($IsWindows) { '.\venv\Scripts\pip' } else { './venv/bin/pip' }
+  Write-Warning "         - $venvHint (use pre-existing project venv)"
   return 1
 }
-# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native pip3; routes through pip wrapper to managed Python
 function pip3 {
   if (Invoke-NucleusPythonScopedTool -ToolName "pip3" @Args) {
     return
   }
   pip @Args
+}
+
+# Intercept npm/npx/node/corepack invocations.
+# These tools are NOT installed by this repository. The sole JS runtime
+# and package manager is bun.  Users who separately installed Node.js
+# should use bun equivalents instead.
+function npm {
+  Write-Warning "shell: system-wide npm is not used in this environment."
+  Write-Warning "         Use bun equivalents instead:"
+  Write-Warning "         - bun install     (install packages)"
+  Write-Warning "         - bun add <pkg>   (add a dependency)"
+  Write-Warning "         - bun x <cmd>     (run one-shot package commands, replaces npx)"
+  Write-Warning "         - bun run         (run package.json scripts)"
+  Write-Warning "         Shell shortcuts -ni/-nr/-nx also work."
+  return 1
+}
+function npx {
+  Write-Warning "shell: system-wide npx is not used in this environment."
+  Write-Warning "         Use bun x <cmd> for one-shot package execution instead."
+  return 1
+}
+function node {
+  # check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets — intentional: shadows native node; warns to use bun equivalents
+  [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '')]
+  param()
+  Write-Warning "shell: system-wide Node.js is not used in this environment."
+  Write-Warning "         Use bun as the JavaScript runtime instead:"
+  Write-Warning "         - bun <script>   (run a script)"
+  Write-Warning "         - bun run        (run package.json scripts)"
+  return 1
+}
+function corepack {
+  Write-Warning "shell: corepack is not used in this environment."
+  Write-Warning "         Use bun for package management instead."
+  return 1
 }
 
 # Route managed development tools through an active direnv context, a
@@ -427,9 +523,18 @@ function Invoke-NucleusManagedDevTool {
     [object[]]$ToolArguments
   )
 
+  # On Windows, the managed dev tools are only present on PATH inside an
+  # active context (direnv devShell or rust-toolchain.toml project).  If
+  # the tool is not on PATH at all, no context can satisfy the call and the
+  # caller prints the educational ban message.
+  # check-suppress:suppression_doc: presence probe — tool may be absent; conditional branch handles the result immediately.
+  $application = Get-Command -Name $ToolName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($IsWindows -and $null -eq $application) {
+    return $false
+  }
+
   if ($env:DIRENV_DIR) {
     # check-suppress:suppression_doc: tool-availability guard -- tool may not be in direnv PATH
-    $application = Get-Command -Name $ToolName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($null -ne $application) {
       & $application.Source @ToolArguments
       return $true
@@ -442,7 +547,6 @@ function Invoke-NucleusManagedDevTool {
   # work without a full devShell or direnv context.
   if ($ToolName -in @('cargo', 'rustc') -and (Test-Path -Path (Join-Path (Get-Location).Path 'rust-toolchain.toml') -PathType Leaf)) {
     # check-suppress:suppression_doc: tool-availability guard -- tool may not be in project context
-    $application = Get-Command -Name $ToolName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     if ($null -ne $application) {
       & $application.Source @ToolArguments
       return $true
@@ -465,10 +569,11 @@ function Invoke-NucleusManagedDevTool {
 # When DIRENV_DIR is set, a direnv environment (devShell) is active.
 # When a rust-toolchain.toml exists in the current directory, cargo/rustc
 # pass through to the rustup shim.  Otherwise, fall back to the managed
-# default toolchain installed by apply.
-# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native bun; redirects to managed dev toolchain or warns
+# default toolchain installed by apply (POSIX-only; Windows keeps the
+# user-scoped managed PATH instead, so no separate fallback bin root).
 function bun {
-  if (Invoke-NucleusManagedDevTool -ToolName "bun" -FallbackBinDirectory "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
+  $fallbackBinDirectory = if ($IsWindows) { $null } else { "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" }
+  if (Invoke-NucleusManagedDevTool -ToolName "bun" -FallbackBinDirectory $fallbackBinDirectory @Args) {
     return
   }
   Write-Warning "shell: managed bun is unavailable right now."
@@ -478,9 +583,9 @@ function bun {
   Write-Warning "         Shell shortcuts -ni/-nr/-nx also work inside a devShell."
   return 1
 }
-# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native cargo; redirects to managed dev toolchain via rustup/direnv
 function cargo {
-  if (Invoke-NucleusManagedDevTool -ToolName "cargo" -FallbackBinDirectory "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
+  $fallbackBinDirectory = if ($IsWindows) { $null } else { "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" }
+  if (Invoke-NucleusManagedDevTool -ToolName "cargo" -FallbackBinDirectory $fallbackBinDirectory @Args) {
     return
   }
   Write-Warning "shell: managed cargo is unavailable right now."
@@ -489,9 +594,9 @@ function cargo {
   Write-Warning "         - Or add a rust-toolchain.toml file to this directory"
   return 1
 }
-# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native rustc; redirects to managed toolchain via rustup/direnv
 function rustc {
-  if (Invoke-NucleusManagedDevTool -ToolName "rustc" -FallbackBinDirectory "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
+  $fallbackBinDirectory = if ($IsWindows) { $null } else { "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" }
+  if (Invoke-NucleusManagedDevTool -ToolName "rustc" -FallbackBinDirectory $fallbackBinDirectory @Args) {
     return
   }
   Write-Warning "shell: managed rustc is unavailable right now."
@@ -500,51 +605,15 @@ function rustc {
   Write-Warning "         - Or add a rust-toolchain.toml file to this directory"
   return 1
 }
-# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native uv; redirects to managed Python dev toolchain
 function uv {
-  if (Invoke-NucleusManagedDevTool -ToolName "uv" -FallbackBinDirectory "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" @Args) {
+  $fallbackBinDirectory = if ($IsWindows) { $null } else { "${NUCLEUS_DEFAULT_DEV_TOOLS}/bin" }
+  if (Invoke-NucleusManagedDevTool -ToolName "uv" -FallbackBinDirectory $fallbackBinDirectory @Args) {
     return
   }
   Write-Warning "shell: managed uv is unavailable right now."
   Write-Warning "         For Python development, use one of these managed entrypoints:"
   Write-Warning "         - Enter a project directory with .envrc (direnv auto-loads the devShell)"
   Write-Warning "         - Or use the user-scoped default toolchain installed by nucleus apply"
-  return 1
-}
-
-# Intercept npm/npx/node/corepack invocations.
-# These tools are NOT installed by this repository. The sole JS runtime
-# and package manager is bun.  Users who separately installed Node.js
-# should use bun equivalents instead.
-# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native npm; warns to use bun equivalents
-function npm {
-  Write-Warning "shell: system-wide npm is not used in this environment."
-  Write-Warning "         Use bun equivalents instead:"
-  Write-Warning "         - bun install     (install packages)"
-  Write-Warning "         - bun add <pkg>   (add a dependency)"
-  Write-Warning "         - bun x <cmd>     (run one-shot package commands, replaces npx)"
-  Write-Warning "         - bun run         (run package.json scripts)"
-  Write-Warning "         Shell shortcuts -ni/-nr/-nx also work."
-  return 1
-}
-# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native npx; warns to use bun x equivalents
-function npx {
-  Write-Warning "shell: system-wide npx is not used in this environment."
-  Write-Warning "         Use bun x <cmd> for one-shot package execution instead."
-  return 1
-}
-function Invoke-NucleusNode {
-  Write-Warning "shell: system-wide Node.js is not used in this environment."
-  Write-Warning "         Use bun as the JavaScript runtime instead:"
-  Write-Warning "         - bun <script>   (run a script)"
-  Write-Warning "         - bun run        (run package.json scripts)"
-  return 1
-}
-Set-Alias -Name node -Value Invoke-NucleusNode
-# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native corepack; warns to use bun
-function corepack {
-  Write-Warning "shell: corepack is not used in this environment."
-  Write-Warning "         Use bun for package management instead."
   return 1
 }
 
@@ -562,7 +631,132 @@ function Resolve-NucleusRepoRoot {
   if ($gitRoot -and (Test-Path (Join-Path $gitRoot "src/flake.nix"))) {
     return $gitRoot
   }
+  # Windows: profile functions are invoked via apply.ps1 which sets
+  # NUCLEUS_REPO_ROOT; outside the repo no fallback exists.
+  if ($IsWindows) {
+    throw "Resolve-NucleusRepoRoot: NUCLEUS_REPO_ROOT not set; run via apply.ps1"
+  }
   return $null
+}
+
+if ($IsWindows) {
+  function Invoke-NucleusRepoScript {
+    param(
+      [Parameter(Mandatory = $true)]
+      [string]$ScriptRelativePath,
+      [Parameter(ValueFromRemainingArguments = $true)]
+      [object[]]$ScriptArguments
+    )
+    $repoRoot = Resolve-NucleusRepoRoot
+    $scriptPath = Join-Path $repoRoot $ScriptRelativePath
+    if (-not (Test-Path -Path $scriptPath -PathType Leaf)) {
+      throw "managed script not found at $scriptPath"
+    }
+    & $scriptPath @ScriptArguments
+  }
+  function nucleus-check-pwsh {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\check-pwsh.ps1' @Args
+  }
+  function nucleus-check-sh {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\check-sh.sh' @Args
+  }
+  function nucleus-ai {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\ai.ps1' @Args
+  }
+  function nucleus-apply {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    $repoRoot = Resolve-NucleusRepoRoot
+    $scriptPath = Join-Path $repoRoot 'src\hosts\Windows\apply.ps1'
+    $moduleDir = Join-Path $repoRoot 'src\hosts\Windows\modules'
+    $username = [System.Environment]::UserName
+    if (-not (Test-Path -Path $scriptPath -PathType Leaf)) {
+      throw "nucleus-apply: script not found at $scriptPath"
+    }
+    & $scriptPath -ModuleDir $moduleDir -PrimaryUsername $username -Users @($username) @Args
+  }
+  function nucleus-cloud-setup {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\cloud-setup.ps1' @Args
+  }
+  function nucleus-config {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\config.ps1' @Args
+  }
+  function nucleus-gc {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\gc.ps1' @Args
+  }
+  function nucleus-health-check {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\health-check.ps1' @Args
+  }
+  function nucleus-replica-sync {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\replica-sync.ps1' @Args
+  }
+  function nucleus-replica-reset {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\replica-reset.ps1' @Args
+  }
+  function nucleus-update {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\update.ps1' @Args
+  }
+  function nucleus-bootstrap {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\bootstrap.ps1' @Args
+  }
+  function nucleus-vm {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\vm.ps1' @Args
+  }
+  function nucleus-bump-lockfile {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\bump-lockfile.ps1' @Args
+  }
+  function nucleus-svc {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\svc.ps1' @Args
+  }
+  function nucleus-gs-pdf-opt {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\gs-pdf-opt.ps1' @Args
+  }
 }
 
 $nucleusSvcCommands = @('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable', 'endpoint', 'logs', 'log-paths', 'log-config')
@@ -639,8 +833,15 @@ Register-ArgumentCompleter -CommandName nucleus-check -ScriptBlock {
 Register-ArgumentCompleter -CommandName nucleus-ai -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
   $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
-  @('--help', 'sync', 'list', 'status', 'endpoint', 'config') |
-    Where-Object { $_ -like "$wordToComplete*" }
+  if ($IsWindows) {
+    # Windows nucleus-ai exposes sync-only flags; see scripts/ai.ps1 params.
+    @('--help', '--dry-run', '--ollama-profile', '--gc-only', '--no-gc-only') |
+      Where-Object { $_ -like "$wordToComplete*" }
+  } else {
+    # POSIX nucleus-ai exposes subcommands; see scripts/ai.sh usage.
+    @('--help', 'sync', 'list', 'status', 'endpoint', 'config') |
+      Where-Object { $_ -like "$wordToComplete*" }
+  }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-replica-sync -ScriptBlock {

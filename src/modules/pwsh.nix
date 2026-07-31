@@ -24,7 +24,8 @@ let
   pwshYamlVersion = lockfile.pwsh."powershell-yaml" or null;
 
   profileContent =
-    # Method 4 (runtime embedded): init.ps1 and profile-base.ps1 are read at eval time and embedded into the activation block as a literal string. No deployment step needed.
+    # Method 4 (runtime embedded): init.ps1 and profile.ps1 are read at eval time and embedded into the activation block as a literal string. No deployment step needed.
+    # __NUCLEUS_*__ tokens are Windows-only (substituted by Sync-ShellProfile.ps1); they become empty strings on POSIX, leaving the `if ($IsWindows)` blocks inert.
     builtins.replaceStrings
       [
         "__MANAGED_PREPEND_PATH__"
@@ -35,6 +36,9 @@ let
         "__DEFAULT_DEV_TOOLS_PATH__"
         "__AGENT_ENV_VAR_NAMES__"
         "__AGENT_DEVIN_POSIX_PATH__"
+        "__NUCLEUS_PREPEND_PATH__"
+        "__NUCLEUS_APPEND_PATH__"
+        "__NUCLEUS_LLVM_BIN_DIR__"
       ]
       [
         managedPaths.toPowerShellPrependSnippet
@@ -45,9 +49,11 @@ let
         "${managedPaths.defaultDevTools}"
         (lib.concatStringsSep " " agentEnv.agentEnvVarNames)
         agentEnv.devinPosixPath
+        ""
+        ""
+        ""
       ]
-      (builtins.readFile ../scripts/shell/init.ps1)
-    + (builtins.readFile ./configs/pwsh/profile-base.ps1) # Method 4 (runtime embedded into activation block as a literal string)
+      (builtins.readFile ../scripts/shell/init.ps1 + builtins.readFile ../scripts/shell/profile.ps1)
   # PSScriptAnalyzerSettings.psd1 — Method 3 (consumed by scripts/check-pwsh.ps1 at CI time via -Settings); refer to scripts/PSScriptAnalyzerSettings.check.psd1 and scripts/PSScriptAnalyzerSettings.test.psd1.
   ;
 

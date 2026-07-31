@@ -11,7 +11,7 @@ applyTo: "**/*.ps1, scripts/PSScriptAnalyzerSettings.*.psd1"
 1. **Prefer redirecting over suppressing.** Use `> $null` to discard output — it is the fastest and cleanest method and is NOT considered a suppression (no annotation required). Reach for redirect first before any suppression technique.
 2. **Prefer `$null =` or `[void]` over `[SuppressMessageAttribute]` attribute.** When redirect cannot work (e.g., the value is not pipeline output), use `$null = <expr>` or (for method calls) `[void]<expr>`. These ARE considered suppressions and require `# check-suppress:SuppressMessageAttribute:` annotation.
 3. **`| Out-Null` is banned.** It is substantially slower than alternatives due to pipeline overhead. Replace all instances with `> $null` (preferred) or `$null =` with annotation.
-4. **Avoid `[SuppressMessageAttribute('RuleId', '')]` attribute.** It is too coarse — applies to the entire scope (function/file). Prefer `$null =` or `[void]` with `# check-suppress:SuppressMessageAttribute:` annotation. Only use the attribute when there is literally no code path to annotate (e.g., a parameter that appears unused at file scope). When unavoidable, must minimize rules covered (list specific rule IDs, no wildcards) and scope covered (target the narrowest possible function or script block, never file-wide).
+4. **Avoid file-scope `[SuppressMessageAttribute('RuleId', '')]` attribute.** Placed on a file-scope `param()` block it applies to the entire file (too coarse). Prefer `$null =` or `[void]` with `# check-suppress:SuppressMessageAttribute:` annotation. Use the attribute only when there is literally no code path to annotate — e.g. a function name that must keep its exact form (see `PSUseApprovedVerbs` command-name wrappers below). In that case place it INSIDE the function body immediately before `param()` — this scopes it to that single function only. When unavoidable, must minimize rules covered (list specific rule IDs, no wildcards).
 5. **Every suppression needs an annotation.** `$null =`, `[void]`, and `[SuppressMessageAttribute]` attribute must have a `# check-suppress:SuppressMessageAttribute: <RuleId> — <reason>` comment on the same line or preceding line. File-level suppressions of any kind are prohibited.
 6. **No catch-all suppressions.** Suppress specific rule IDs. No wildcards or blanket suppressions.
 
@@ -98,14 +98,18 @@ function say { Write-Output "$args" }
 function Write-Message { Write-Output "$args" }
 ```
 
-**Command-name wrappers** (`python`, `bun`, `cargo`, etc.): Functions that intentionally shadow native commands must keep their exact lowercase name to function as replacements. Add a PSSA-native suppression comment `# SuppressMessageAttribute('PSUseApprovedVerbs', '')` above the function with a `# check-suppress:` reason annotation on the same line:
+**Command-name wrappers** (`python`, `bun`, `cargo`, etc.): Functions that intentionally shadow native commands must keep their exact lowercase name to function as replacements. Non-hyphenated lowercase names (`python`, `bun`, `node`, etc.) do NOT trigger `PSUseApprovedVerbs` (it only fires on Verb-Noun hyphenated names), but `node` DOES trigger `PSAvoidOverwritingBuiltInCmdlets` (it shadows a built-in cmdlet). Add the attribute INSIDE the function body immediately before `param()`:
 
 ```powershell
-# SuppressMessageAttribute('PSUseApprovedVerbs', '') # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: shadows native python for version management
-function python {
+# check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets — intentional: shadows native node; warns to use bun equivalents
+function node {
+  [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '')]
+  param()
+  ...
+}
 ```
 
-This is not an exemption — use inline suppression with a documented reason as per standard suppression rules. The `[SuppressMessageAttribute()]` attribute syntax (with brackets) is NOT used here — it causes `UnexpectedAttribute` ParseErrors in PSSA at script scope. Use the comment syntax (with `#`) instead.
+This is not an exemption — use inline suppression with a documented reason as per standard suppression rules. The comment syntax `# SuppressMessageAttribute('RuleId', '')` does NOT work — PSSA's `GetSuppressions` only reads `AttributeAst` from param blocks; comment-based suppressions are silently ignored (dead weight). The attribute MUST be placed inside the function body before `param()` (placing it on the `function` keyword line causes `UnexpectedAttribute` ParseErrors).
 
 **`Add-ShellAlias` helper**: Functions that create aliases via `New-Item -Path Function:` use the PSFunction provider path and produce no `FunctionDefinitionAst`. The helper itself (`Add-ShellAlias`) uses the approved verb `Add-`. This is the canonical way to create function aliases without triggering the rule.
 

@@ -16,7 +16,9 @@ let
   applyScriptText = builtins.readFile ../../src/scripts/apply.sh;
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   windowsCloudDriveModuleText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-CloudDrive.ps1;
-  windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
+  # Shared shell-parity profile: single source consumed by pwsh.nix (POSIX,
+  # eval-time embed) and Sync-ShellProfile.ps1 (Windows, runtime read-back).
+  shellProfileText = builtins.readFile ../../src/scripts/shell/profile.ps1;
   windowsReplicaModuleText = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-ReplicaSync.ps1;
   windowsReplicaResetModuleText = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-ReplicaReset.ps1;
   windowsReplicaScheduleModuleText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-ReplicaSyncScheduledTask.ps1;
@@ -272,8 +274,8 @@ let
 
   # Test 40: Windows shell profile exports nucleus-replica-sync command parity
   test_windows_shell_replica_command = assert' (
-    containsRegex "function nucleus-replica-sync" windowsShellProfileText
-    && containsRegex ''scripts\\replica-sync\.ps1'' windowsShellProfileText
+    containsRegex "function nucleus-replica-sync" shellProfileText
+    && containsRegex ''scripts\\replica-sync\.ps1'' shellProfileText
   ) "Windows shell profile must expose nucleus-replica-sync";
 
   # Test 41: OneDrive replica runners must exclude Personal Vault on both platforms
@@ -361,8 +363,8 @@ let
     containsRegex "mkReplicaResetApp" flakeText
     && containsRegex "nucleus-replica-reset" flakeText
     && containsRegex ''name = "replica-reset"'' flakeText
-    && containsRegex "function nucleus-replica-reset" windowsShellProfileText
-    && containsRegex ''scripts\\replica-reset\.ps1'' windowsShellProfileText
+    && containsRegex "function nucleus-replica-reset" shellProfileText
+    && containsRegex ''scripts\\replica-reset\.ps1'' shellProfileText
     && containsRegex "Resolve-NucleusRepoRoot" replicaResetPwshText
     && containsRegex "Invoke-ReplicaReset" replicaResetPwshText
     && containsRegex "derive_repo_root" replicaResetShellText

@@ -5,7 +5,7 @@ let
   zshCompDir = ../../src/modules/completions/zsh;
   zshCompFiles = builtins.readDir zshCompDir;
   shellText = builtins.readFile ../../src/modules/shell.nix;
-  windowsShellProfileText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-ShellProfile.ps1;
+  windowsShellProfileText = builtins.readFile ../../src/scripts/shell/profile.ps1;
 
   inherit (import ../lib.nix) assert';
 
@@ -62,13 +62,12 @@ let
   ) "shell.nix install-zsh-completions must copy nucleus completion files";
 
   # --- Windows PowerShell completions ---
-  test_windows_pwsh_has_completers_for_all = assert' (lib.all
-    (cmd: lib.hasInfix "Register-ArgumentCompleter -CommandName ${cmd}" windowsShellProfileText)
-    nucleusCommands
-  ) "Sync-ShellProfile.ps1 must register argument completers for all nucleus commands";
+  test_windows_pwsh_has_completers_for_all = assert' (lib.all (
+    cmd: lib.hasInfix "Register-ArgumentCompleter -CommandName ${cmd}" windowsShellProfileText
+  ) nucleusCommands) "profile.ps1 must register argument completers for all nucleus commands";
 
   # --- Windows pwsh reuses existing Resolve-NucleusRepoRoot ---
-  test_windows_pwsh_reuses_repo_root_helper = assert' (lib.hasInfix "Resolve-NucleusRepoRoot" windowsShellProfileText) "Sync-ShellProfile.ps1 must reference Resolve-NucleusRepoRoot for dynamic completions";
+  test_windows_pwsh_reuses_repo_root_helper = assert' (lib.hasInfix "Resolve-NucleusRepoRoot" windowsShellProfileText) "profile.ps1 must reference Resolve-NucleusRepoRoot for dynamic completions";
 
   allTests = [
     test_zsh_completions_exist_for_all

@@ -51,7 +51,7 @@ assert containsRegex "nix\\.custom\\.conf" macbookBaseText;
 assert containsRegex "sshd_config\\.d" macbookSecurityText;
 assert containsRegex "linux-builder-known_hosts" macbookLinuxBuilderText;
 assert containsRegex "100-linux-builder\\.conf" macbookLinuxBuilderText;
-assert containsRegex "profile-base\\.ps1" pwshText;
+assert containsRegex "scripts/shell/profile\\.ps1" pwshText;
 assert containsRegex "bunfig\\.toml" shellText;
 assert containsRegex "config\\.toml" shellText;
 assert containsRegex "direnvrc" shellText;
