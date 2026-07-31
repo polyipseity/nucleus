@@ -11,12 +11,12 @@ applyTo: "**"
 Validate every commit message with commitlint *before* calling `git commit`. Run:
 
 ```bash
-echo "<message>" | npx commitlint
+echo "<message>" | bun x commitlint
 ```
 
 from the project root. If a commitlint config exists (`.commitlintrc.*`, `commitlint.config.*`), it is used automatically. If no config is found and no conflicting convention is documented, commitlint validates with its conventional-commit defaults.
 
-If commitlint is not available (`npx` / `commitlint` not found), fall back to a structural check: ensure the message follows conventional-commit format (`type(scope): subject`). The pre-commit hook will still enforce commitlint if configured.
+If commitlint is not available (`bun` not found or `bun x commitlint` fails), fall back to a structural check: ensure the message follows conventional-commit format (`type(scope): subject`). The pre-commit hook will still enforce commitlint if configured.
 
 ## Exception: conflicting conventions
 

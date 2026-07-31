@@ -32,9 +32,9 @@ Proceed automatically with best-effort defaults and available context.
 
    - **Detect project setup.** Check for a commitlint config file (`.commitlintrc.*`, `commitlint.config.*`) in the project root. If found, the config is used. If not found, check for a documented conflicting convention (CONTRIBUTING.md / README.md specifies a non-conventional-commit format such as `gitmoji` or a custom schema). If a conflicting convention exists AND no commitlint config is present, skip validation entirely — the project has explicitly opted out.
    - **Run validation.** From the project root:
-     - **Bash/zsh:** `echo "<full message>" | npx commitlint 2>&1`
-     - **PowerShell:** `"<full message>" | npx commitlint 2>&1`
-     - If `npx` / `commitlint` is unavailable, fall back to a structural conventional-commit check (type-prefix, format).
+     - **Bash/zsh:** `echo "<full message>" | bun x commitlint 2>&1`
+     - **PowerShell:** `"<full message>" | bun x commitlint 2>&1`
+     - If `bun` / `commitlint` is unavailable, fall back to a structural conventional-commit check (type-prefix, format).
    - **On failure.** If validation fails AND no conflicting convention is documented, fix the message and re-run validation. Do not proceed to `git commit` until validation passes. If commitlint is present but fails with a tool error (not a lint error), report the failure — do not proceed.
    - **On success.** Proceed to step 2c.
 
