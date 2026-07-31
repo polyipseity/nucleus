@@ -22,6 +22,9 @@ run_21_preflight_install_command_policy() {
     while IFS= read -r -d '' _f; do
       _ps1_files+=("$_f")
     done < <(find . -name '*.ps1' -not -path './vendor/*' -not -path './.git/*' -print0)
+    # Apply gitignore filter as a second pass (find -print0 uses null separators,
+    # which filter_gitignored doesn't support directly)
+    mapfile -t _ps1_files < <(printf '%s\n' "${_ps1_files[@]}" | filter_gitignored)
   fi
 
   if [ "${#_ps1_files[@]}" -gt 0 ]; then

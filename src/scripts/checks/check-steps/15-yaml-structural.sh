@@ -23,7 +23,6 @@ run_15_yaml_structural() {
     done
   else
     for _yf in "${CACHED_YAML_FILES[@]}"; do
-      case "$_yf" in */secrets/*) continue ;; esac
       _yaml_files+=("$_yf")
     done
   fi

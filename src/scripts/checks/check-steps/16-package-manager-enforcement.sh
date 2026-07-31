@@ -16,25 +16,26 @@ run_16_package_manager_enforcement() {
   local _self_sh _self_ps1
   _self_sh="$(basename "${BASH_SOURCE[0]}")"
   _self_ps1="$(basename "${BASH_SOURCE[0]}" .sh).ps1"
-  if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
-       --exclude='check.sh' --exclude='check.ps1' --exclude='shell.nix' \
-       --exclude="$_self_sh" \
-       --exclude="$_self_ps1" \
-       -E '(^|[^a-z])pip install([^-]|$)' \
-       scripts/ src/ tests/ 2>/dev/null \
-       | grep -v 'uv pip install' \
-       | grep . >/dev/null 2>&1; then
+  # Convert from grep -rn --include (directory traversal without gitignore) to
+  # find | filter_gitignored | xargs grep so gitignored files are excluded.
+  # Keep explicit --exclude for files that legitimately contain the pattern
+  # (check.sh, check.ps1, shell.nix, self-refs). Removed patterns that are now
+  # covered by gitignore (e.g., result, secrets/, .direnv/).
+  if find scripts/ src/ tests/ \( -name '*.sh' -o -name '*.ps1' -o -name '*.nix' \) -print \
+    | filter_gitignored \
+    | grep -v -E '(check\.sh|check\.ps1|shell\.nix|\.'"$_self_sh"'|\.'"$_self_ps1"')$' \
+    | xargs grep -n -E '(^|[^a-z])pip install([^-]|$)' 2>/dev/null \
+    | grep -v 'uv pip install' \
+    | grep . >/dev/null 2>&1; then
     error "bare pip install detected (use uv pip install instead)"
     _violations=$((_violations + 1))
   fi
 
-  if grep -rn --include='*.sh' --include='*.ps1' --include='*.nix' \
-       --exclude='check.sh' --exclude='check.ps1' --exclude='shell.nix' \
-       --exclude="$_self_sh" \
-       --exclude="$_self_ps1" \
-       -E '(^|[^a-z])npm install([^-]|$)' \
-       scripts/ src/ tests/ 2>/dev/null \
-       | grep . >/dev/null 2>&1; then
+  if find scripts/ src/ tests/ \( -name '*.sh' -o -name '*.ps1' -o -name '*.nix' \) -print \
+    | filter_gitignored \
+    | grep -v -E '(check\.sh|check\.ps1|shell\.nix|\.'"$_self_sh"'|\.'"$_self_ps1"')$' \
+    | xargs grep -n -E '(^|[^a-z])npm install([^-]|$)' 2>/dev/null \
+    | grep . >/dev/null 2>&1; then
     error "bare npm install detected (use bun or nix instead)"
     _violations=$((_violations + 1))
   fi

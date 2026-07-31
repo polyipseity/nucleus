@@ -24,7 +24,6 @@ run_13_schema_validation() {
   else
     _js_schema_files=("${CACHED_JSON_FILES[@]}")
     for _yf in "${CACHED_YAML_FILES[@]}"; do
-      case "$_yf" in */secrets/*) continue ;; esac
       _js_schema_files+=("$_yf")
     done
   fi
