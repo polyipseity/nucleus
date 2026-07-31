@@ -1,9 +1,18 @@
 Register-Step -Id "package-manager-enforcement" -Number 16 -Name "Package manager usage enforcement" -Action {
-  param($RepoRoot)
+  param($HasArgs, $RepoRoot, $PositionalArgs)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
   $violations = 0
+
+  # Skip when scoped to files outside this step's scope (no .sh/.ps1/.nix files).
+  if ($HasArgs) {
+    $hasShellFiles = @($PositionalArgs | Where-Object { $_ -match '\.(sh|ps1|nix)$' }).Count -gt 0
+    if (-not $hasShellFiles) {
+      Write-Message "==== 16: Package manager usage enforcement ==== SKIPPED (no shell files to check) ✗"
+      return $true
+    }
+  }
 
   # Ban bare pip install and npm install -- these bypass the lockfile.
   # uv pip install is allowed. Exclude self-references.

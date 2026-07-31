@@ -11,6 +11,18 @@ run_16_package_manager_enforcement() {
   cd "$_repo_root" || return 1
   local _violations=0
 
+  # Skip when scoped to files outside this step's scope (no .sh/.ps1/.nix files).
+  if $_has_args; then
+    local _f _has_shell_files=0
+    for _f in "${_files[@]}"; do
+      case "$_f" in *.sh|*.ps1|*.nix) _has_shell_files=1; break ;; esac
+    done
+    if [ "$_has_shell_files" -eq 0 ]; then
+      say "==== 16: Package manager usage enforcement ==== SKIPPED (no shell files to check) ✗"
+      return 0
+    fi
+  fi
+
   # Ban bare `pip install` and `npm install`.
   # ref: allow-and-deny-lists.instructions.md#A1 — reason: orchestrator/config files contain pip/npm patterns in comments; self-refs are dynamic
   local _self_sh _self_ps1
