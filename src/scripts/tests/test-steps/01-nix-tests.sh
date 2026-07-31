@@ -11,6 +11,31 @@ run_01_nix_tests() {
 
   _tmp_failed=$(mktemp) || { error "failed to create temp file"; return 1; }
 
+  # WHY: nix-instantiate evals contend on the shared SQLite eval cache when
+  # test steps 1/3/4 run concurrently; hold the nix lock for the whole eval
+  # phase so cross-step nix invocations serialize (internal xargs -P
+  # parallelism is preserved).
+  nucleus_nix_locked _run_01_eval_phase "$_tmp_failed"
+
+  if [ -s "$_tmp_failed" ]; then
+    error "FAILED Nix tests:"
+    cat "$_tmp_failed" >&2
+    _exit_code=1
+  fi
+  rm -f "$_tmp_failed"
+
+  if [ "$_exit_code" -eq 0 ]; then
+    say "all Nix tests passed."
+  fi
+  return "$_exit_code"
+}
+
+# Runs the parallel nix-instantiate phase under the nix lock (see
+# nucleus_nix_locked in step-runner.sh). Failures are recorded in the temp
+# file passed as $1; the lock wrapper's exit status is not a test verdict.
+_run_01_eval_phase() {
+  local _tmp_failed="$1"
+
   if [ "$quiet_mode" = true ]; then
     # shellcheck disable=SC2016 # reason: $1/$2 are sh -c positional params, not shell expansion
     printf '%s\0' "${TEST_NIX_FILES_ARR[@]}" | xargs -0 -P "$PARALLEL_JOBS" -I{} sh -c '
@@ -36,16 +61,4 @@ run_01_nix_tests() {
           fi
         ' _ {} "$_tmp_failed"
   fi
-
-  if [ -s "$_tmp_failed" ]; then
-    error "FAILED Nix tests:"
-    cat "$_tmp_failed" >&2
-    _exit_code=1
-  fi
-  rm -f "$_tmp_failed"
-
-  if [ "$_exit_code" -eq 0 ]; then
-    say "all Nix tests passed."
-  fi
-  return "$_exit_code"
 }

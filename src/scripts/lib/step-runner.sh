@@ -96,6 +96,52 @@ _wave_cleanup() {
   fi
 }
 
+# --- Nix lock ---
+# WHY: test steps 1/3/4 and check step 4 invoke nix concurrently from
+# parallel background steps; nix's SQLite eval cache then reports "database is
+# busy" and flakehub fetches block on "waiting for another Nix process".
+# Serializing nix invocations behind one lockfile removes the contention while
+# keeping non-nix steps fully parallel. flock(1) is unavailable on macOS, so
+# the lock is a mkdir-based mutex with PID-based stale recovery (same pattern
+# as _wave_cleanup_stale).
+NUCLEUS_NIX_LOCK="${TMPDIR:-/tmp}/nucleus-nix.lock"
+
+nucleus_nix_locked() {
+  # Runs "$@" while holding the nix lock; releases unconditionally afterward.
+  local _lock_dir="$NUCLEUS_NIX_LOCK"
+  local _lock_owner=""
+  local _lock_waited=0
+  local _lock_ret=0
+
+  # Acquire: mkdir is atomic; loop until we own the lock dir.
+  while ! mkdir "$_lock_dir" 2>/dev/null; do
+    # Stale-lock recovery: reclaim when the recorded owner PID is dead or
+    # missing (crashed holder); BASHPID names the step subshell, not the
+    # orchestrator, so a killed step does not wedge the lock.
+    _lock_owner="$(cat "$_lock_dir/pid" 2>/dev/null || true)"
+    if [ -z "$_lock_owner" ] || ! kill -0 "$_lock_owner" 2>/dev/null; then
+      rm -rf "$_lock_dir"
+      continue
+    fi
+    _lock_waited=$((_lock_waited + 1))
+    if [ "$_lock_waited" -ge 1800 ]; then
+      error "timed out waiting for nix lock $_lock_dir (owner PID $_lock_owner)"
+      return 1
+    fi
+    sleep 1
+  done
+  printf '%s\n' "$BASHPID" > "$_lock_dir/pid"
+
+  # Run the wrapped command, then release unconditionally.
+  if "$@"; then
+    _lock_ret=0
+  else
+    _lock_ret=$?
+  fi
+  rm -rf "$_lock_dir"
+  return "$_lock_ret"
+}
+
 # Default value if parse_args hasn't been called
 HAS_ARGS=${HAS_ARGS:-false}
 

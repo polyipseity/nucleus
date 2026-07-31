@@ -9,10 +9,13 @@ run_03_nucleus_apps_smoke() {
   local _exit_code=0
 
   say "--- test output ---"
+  # WHY: the smoke suite runs `nix build --no-link --json` for all nucleus
+  # apps; serialize it with the other nix steps (01/04) to avoid SQLite
+  # eval-cache contention.
   if [ "$quiet_mode" = true ]; then
-    bash tests/scripts/nucleus-apps-smoke-tests.sh >/dev/null || _exit_code=1
+    nucleus_nix_locked bash tests/scripts/nucleus-apps-smoke-tests.sh >/dev/null || _exit_code=1
   else
-    bash tests/scripts/nucleus-apps-smoke-tests.sh || _exit_code=1
+    nucleus_nix_locked bash tests/scripts/nucleus-apps-smoke-tests.sh || _exit_code=1
   fi
   say "--- end test output ---"
 

@@ -246,6 +246,79 @@ test_aggregate_results_parses_exit_files() {
     fi
 }
 
+# ---- Nix lock helper (Phase 9) ----
+# nucleus_nix_locked serializes nix invocations across concurrent steps via a
+# mkdir-based mutex (flock is unavailable on macOS).
+
+test_nix_lock_runs_command_and_returns_exit() {
+    local result
+    result=$(
+        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+        error() { echo "error: $*" >&2; }
+        rm -rf "$NUCLEUS_NIX_LOCK"
+        nucleus_nix_locked echo "locked-run"
+        nucleus_nix_locked false
+        echo "exit=$?"
+        rm -rf "$NUCLEUS_NIX_LOCK"
+    )
+    if echo "$result" | grep -q "locked-run" && echo "$result" | grep -q "exit=1"; then
+        assert_pass "nucleus_nix_locked runs the command and returns its exit code"
+    else
+        assert_fail "nix-lock-run" "Expected 'locked-run' and 'exit=1', got: $result"
+    fi
+}
+
+test_nix_lock_recovers_stale() {
+    local result
+    result=$(
+        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+        error() { echo "error: $*" >&2; }
+        rm -rf "$NUCLEUS_NIX_LOCK"
+        mkdir "$NUCLEUS_NIX_LOCK"
+        printf '%s\n' "999999" > "$NUCLEUS_NIX_LOCK/pid"  # dead PID
+        nucleus_nix_locked echo "stale-recovered"
+        rm -rf "$NUCLEUS_NIX_LOCK"
+    )
+    if echo "$result" | grep -q "stale-recovered"; then
+        assert_pass "nucleus_nix_locked reclaims a stale lock from a dead owner"
+    else
+        assert_fail "nix-lock-stale" "Expected 'stale-recovered', got: $result"
+    fi
+}
+
+test_nix_lock_serializes() {
+    # Two concurrent acquisitions must not overlap: the second starts only
+    # after the first releases. Use a counter file: holder increments and
+    # sleeps, second must see the held count and wait.
+    local result
+    result=$(
+        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+        error() { echo "error: $*" >&2; }
+        rm -rf "$NUCLEUS_NIX_LOCK"
+        local _counter
+        _counter=$(mktemp) || exit 1
+        (
+            # shellcheck disable=SC2016 # reason: $1 is sh -c positional param, not shell expansion
+            nucleus_nix_locked sh -c 'echo 1 >> "$1"; sleep 1; echo 2 >> "$1"' _ "$_counter"
+        ) &
+        local _holder=$!
+        sleep 0.3
+        # shellcheck disable=SC2016 # reason: $1 is sh -c positional param, not shell expansion
+        nucleus_nix_locked sh -c 'echo 3 >> "$1"' _ "$_counter"
+        wait "$_holder"
+        rm -rf "$NUCLEUS_NIX_LOCK"
+        cat "$_counter"
+        rm -f "$_counter"
+    )
+    # Holder writes 1, sleeps, writes 2; second must wait for release, so
+    # order is strictly 1 2 3 (never 1 3 2).
+    if printf '%s\n' "$result" | grep -qx '1\|2\|3' && [ "$(printf '%s\n' "$result" | tr -d ' \n')" = "123" ]; then
+        assert_pass "nucleus_nix_locked serializes concurrent nix invocations"
+    else
+        assert_fail "nix-lock-serial" "Expected order 123, got: $result"
+    fi
+}
+
 # ---- Run tests ----
 echo ""
 echo "=== Phase 1: Framework core unit tests (POSIX) ==="
@@ -270,6 +343,11 @@ test_parse_args_help
 test_parse_args_scoped
 test_parse_args_positions
 test_aggregate_results_parses_exit_files
+
+echo "--- Nix lock tests (Phase 9) ---"
+test_nix_lock_runs_command_and_returns_exit
+test_nix_lock_recovers_stale
+test_nix_lock_serializes
 
 echo ""
 echo "--- Phase 1 POSIX unit tests: $TESTS_PASSED passed, $TESTS_FAILED failed ---"
