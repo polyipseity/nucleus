@@ -5,11 +5,12 @@
 
 Set-StrictMode -Version Latest
 
-# Filter-GitIgnored — reads paths from pipeline input, filters out gitignored paths.
+# Select-GitIgnored — reads paths from pipeline input, filters out gitignored paths.
 # Uses git check-ignore --stdin for batch-mode efficiency with proper
 # $LASTEXITCODE handling (pipefail-safe).
-function Filter-GitIgnored {
+function Select-GitIgnored {
   [CmdletBinding()]
+  [OutputType([System.Collections.Generic.List[string]])]
   param(
     [Parameter(ValueFromPipeline)]
     [string]$Path
@@ -40,7 +41,7 @@ function Filter-GitIgnored {
 
       # Capture git check-ignore output and exit code.
       # Using cmd /c to avoid PowerShell's own error handling interfering.
-      $ignored = & git check-ignore --stdin 2>$null < $tmp
+      $ignored = Get-Content $tmp | & git check-ignore --stdin 2>$null
       $gitExit = $LASTEXITCODE
 
       if ($gitExit -le 1) {
@@ -72,5 +73,5 @@ function Get-GitTrackedFile {
     [string]$Path = '.'
   )
 
-  Get-ChildItem -Path $Path -Recurse -Filter $Filter -File | Select-Object -ExpandProperty FullName | Filter-GitIgnored
+  Get-ChildItem -Path $Path -Recurse -Filter $Filter -File | Select-Object -ExpandProperty FullName | Select-GitIgnored
 }

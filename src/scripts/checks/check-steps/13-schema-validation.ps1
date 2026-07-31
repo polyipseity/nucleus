@@ -48,7 +48,7 @@ Register-Step -Id "schema-validation" -Number 13 -Name "Schema validation (JSON/
     # YAML files
     Get-ChildItem -Recurse -Path $r -Include '*.yml', '*.yaml' | Where-Object {
       $_.FullName -notmatch '[/\\]vendor[/\\]'  # ref: allow-and-deny-lists.instructions.md#B3 — reason: structural invariant; gitignore filter applied on top
-    } | Filter-GitIgnored | ForEach-Object {
+    } | Select-GitIgnored | ForEach-Object {
       $schema = try { ($_ | Get-Content -Raw | ConvertFrom-Yaml)['$schema'] } catch { $null }
       if ($schema) {
         if ($schema -match '^\.') {
@@ -64,7 +64,7 @@ Register-Step -Id "schema-validation" -Number 13 -Name "Schema validation (JSON/
   $jsonschemaErrors = 0
 
   # $schema presence and format check (Spec G)
-  $missingSchema = 0
+
 
   # Collect all files in scope for $schema presence check
   $allFiles = [System.Collections.Generic.List[string]]::new()
@@ -80,7 +80,7 @@ Register-Step -Id "schema-validation" -Number 13 -Name "Schema validation (JSON/
     } | ForEach-Object { $allFiles.Add($_.FullName) }
     Get-ChildItem -Recurse -Path $r -Include '*.yml', '*.yaml' | Where-Object {
       $_.FullName -notmatch '[/\\]vendor[/\\]'  # ref: allow-and-deny-lists.instructions.md#B3 — reason: structural invariant; gitignore filter applied on top
-    } | Filter-GitIgnored | ForEach-Object { $allFiles.Add($_.FullName) }
+    } | Select-GitIgnored | ForEach-Object { $allFiles.Add($_.FullName) }
   }
 
   foreach ($f in $allFiles) {
@@ -103,7 +103,7 @@ Register-Step -Id "schema-validation" -Number 13 -Name "Schema validation (JSON/
       if ($hasSchema) {
         $schemaVal = $content['$schema']
         if ([string]::IsNullOrEmpty($schemaVal)) {
-          Write-ErrorMessage "Invalid `$schema in $f: must be a non-empty string"
+          Write-ErrorMessage "Invalid `$schema in ${f}: must be a non-empty string"
           $jsonschemaErrors++
         }
       } else {
@@ -116,7 +116,7 @@ Register-Step -Id "schema-validation" -Number 13 -Name "Schema validation (JSON/
       if ($hasSchema) {
         $schemaVal = $content['$schema']
         if ([string]::IsNullOrEmpty($schemaVal)) {
-          Write-ErrorMessage "Invalid `$schema in $f: must be a non-empty string"
+          Write-ErrorMessage "Invalid `$schema in ${f}: must be a non-empty string"
           $jsonschemaErrors++
         }
       } else {

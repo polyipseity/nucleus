@@ -16,7 +16,7 @@ Register-Step -Id "yaml-structural" -Number 15 -Name "YAML structural validation
     } else {
       Get-ChildItem -Recurse -Path $r -Include '*.yml', '*.yaml' |
         Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } |  # ref: allow-and-deny-lists.instructions.md#B4 — reason: structural invariant; gitignore filter applied on top
-        Sort-Object FullName | Filter-GitIgnored | ForEach-Object { $_ }
+        Sort-Object FullName | Select-GitIgnored | ForEach-Object { $_ }
     }
   }
 

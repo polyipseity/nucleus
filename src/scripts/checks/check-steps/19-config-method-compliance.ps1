@@ -10,7 +10,7 @@ Register-Step -Id "config-method-compliance" -Number 19 -Name "Config method com
   $cfgFiles = Get-ChildItem -Path $cfgDir -Recurse -File
   $srcFiles = Get-ChildItem -Path (Join-Path $r "src") -Recurse -Include '*.nix', '*.ps1', '*.sh' |
     Where-Object { $_.FullName -notmatch '[\/]vendor[\/]' -and $_.FullName -notmatch '[\/]configs[\/]' } |
-    Filter-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B1 — reason: structural invariants; vendored code and config methods are different concerns; gitignore filter applied on top
+    Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B1 — reason: structural invariants; vendored code and config methods are different concerns; gitignore filter applied on top
   $cfgPatterns = @($cfgFiles | ForEach-Object { [regex]::Escape($_.Name) } | Sort-Object -Unique)
   $cfgSelectOutput = $srcFiles | Select-String -Pattern $cfgPatterns -SimpleMatch
   # Single-pass: collect all # Method lines for preceding-line checking

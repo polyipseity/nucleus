@@ -10,18 +10,25 @@ run_21_preflight_install_command_policy() {
   cd "$_repo_root" || return 1
 
   local _s21_errors=0
+  # Exclude this check's own sibling file: its source contains the literal pattern text.
+  # ref: allow-and-deny-lists.instructions.md#B6 — reason: structural invariant; self-refs are dynamic
+  local _s21_self_ps1
+  _s21_self_ps1="$(basename "${BASH_SOURCE[0]}" .sh).ps1"
 
   # Collect PowerShell files
   local _ps1_files=()
   if $_has_args; then
     if [ ${#PS1_FILES[@]} -gt 0 ]; then
-      _ps1_files=("${PS1_FILES[@]}")
+      # Drop this check's own sibling file from the scoped set
+      for _f in "${PS1_FILES[@]}"; do
+        [ "$(basename "$_f")" = "$_s21_self_ps1" ] || _ps1_files+=("$_f")
+      done
     fi
   else
-    # Find all .ps1 files outside vendor/
+    # Find all .ps1 files outside vendor/ and this check's own sibling
     while IFS= read -r -d '' _f; do
       _ps1_files+=("$_f")
-    done < <(find . -name '*.ps1' -not -path './vendor/*' -not -path './.git/*' -print0)
+    done < <(find . -name '*.ps1' -not -name "$_s21_self_ps1" -not -path './vendor/*' -not -path './.git/*' -print0)
     # Apply gitignore filter as a second pass (find -print0 uses null separators,
     # which filter_gitignored doesn't support directly)
     mapfile -t _ps1_files < <(printf '%s\n' "${_ps1_files[@]}" | filter_gitignored)
