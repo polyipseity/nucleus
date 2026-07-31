@@ -10,19 +10,21 @@ run_04_nix_flake_eval() {
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _ne_exit=0
-  local _nix_eval_nix_files=()
+  local _ne_eval=false
 
   if $_has_args; then
-    _nix_eval_nix_files=("${NIX_FILES[@]+${NIX_FILES[@]}}")
-  else
-    if command -v git >/dev/null 2>&1; then
-      while IFS= read -r _f; do
-        _nix_eval_nix_files+=("$_f")
-      done < <({ git diff --name-only HEAD -- '*.nix' 2>/dev/null || true; git ls-files --others --exclude-standard '*.nix' 2>/dev/null || true; } | sort -u || true)
+    # Scoped mode: evaluate only when the scoped files include .nix changes.
+    if [ "${#NIX_FILES[@]}" -gt 0 ]; then
+      _ne_eval=true
     fi
+  else
+    # Full mode: always evaluate the flake regardless of git diff — a clean
+    # tree must still be checked (issue 8; the diff gate used to skip
+    # evaluation entirely when nothing changed since HEAD).
+    _ne_eval=true
   fi
 
-  if [ "${#_nix_eval_nix_files[@]}" -gt 0 ]; then
+  if $_ne_eval; then
     local sys
     sys=$(nix eval --impure --expr 'builtins.currentSystem' --raw 2>/dev/null || echo 'aarch64-darwin')
     if ! nix eval --impure "path:./src#packages.$sys" >/dev/null; then
@@ -31,7 +33,7 @@ run_04_nix_flake_eval() {
       say "nix flake evaluation passed."
     fi
   else
-    say "skipping (no Nix files changed since HEAD)."
+    say "skipping (no Nix files in scope)."
   fi
 
   return $_ne_exit

@@ -70,7 +70,7 @@ Choose the right vehicle:
 Checks in both `scripts/check.sh` and `scripts/check.ps1` are classified into three categories:
 
 - **Always-run checks**: These cannot meaningfully accept path filtering — they validate whole-repo invariants. They execute unconditionally in both `--full` and `--scoped` modes, with no `$HAS_ARGS` guard. Examples: stale Nix build artifacts (step 7), test suites (steps 8-11), lockfile section validation (step 12), locked DSC validation (step 13), service registry validation (step 15), package manager enforcement (step 17), config method compliance (step 20).
-- **Conditional checks**: These run only when certain file types are present in the changed set. Example: Nix flake evaluation (step 5, only when .nix files changed).
+- **Conditional checks**: These run only when certain file types are present in the changed set (scoped mode), or always in `--full` mode. Example: Nix flake evaluation (step 4 — in `--full` mode it always evaluates the flake; in `--scoped` mode only when .nix files are in scope).
 - **Path-scopable checks**: These operate per-file or per-file-type and accept path filtering in `--scoped` mode. They produce valid results when given only the changed file subset. Examples: Shell script formatting/linting (step 1), PowerShell syntax (step 2), Packer validation (step 3), code formatting (step 4), Nix lint/nixf-tidy (step 6), schema validation (step 14), YAML structural validation (step 16), undocumented error suppression (step 18), activation token placeholder (step 21).
 
 **Source of truth**: The header docstrings in `check.sh` and `check.ps1` are the canonical step-by-step reference. Update both when changing the taxonomy.
