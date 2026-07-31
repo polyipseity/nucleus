@@ -77,12 +77,12 @@ Get-ChildItem ... | Filter-GitIgnored
 
 ### Integration points
 
-| Layer | Integration |
-|---|---|
-| `step-runner.sh`/`.ps1` | Sources deny-list library; `require_command git` in preflight; `cache_file_lists()` pipes through filter |
-| Check steps (POSIX) | Steps 13, 15, 16, 19, 21 use `filter_gitignored` |
-| Check steps (PowerShell) | Steps 13, 15, 19, 21 use `Filter-GitIgnored` |
-| `test-lib.sh` | Sources deny-list library; test file discovery pipes through filter |
+| Layer                    | Integration                                                                                              |
+| ------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `step-runner.sh`/`.ps1`  | Sources deny-list library; `require_command git` in preflight; `cache_file_lists()` pipes through filter |
+| Check steps (POSIX)      | Steps 13, 15, 16, 19, 21 use `filter_gitignored`                                                         |
+| Check steps (PowerShell) | Steps 13, 15, 19, 21 use `Filter-GitIgnored`                                                             |
+| `test-lib.sh`            | Sources deny-list library; test file discovery pipes through filter                                      |
 
 ## Instance registry
 
@@ -99,16 +99,16 @@ Get-ChildItem ... | Filter-GitIgnored
 
 ### Category B — Directory-based exclude lists
 
-| ID  | Files                                     | Excluded dirs         | Tier | Reason                                                                          | Verification            |
-| --- | ----------------------------------------- | --------------------- | ---- | ------------------------------------------------------------------------------- | ----------------------- |
-| B1  | `19-config-method-compliance.sh`, `.ps1`  | `vendor/`, `configs/` | T3   | Structural invariants — vendored code and config methods are different concerns | Manual quarterly review |
+| ID  | Files                                     | Excluded dirs         | Tier | Reason                                                                                                     | Verification            |
+| --- | ----------------------------------------- | --------------------- | ---- | ---------------------------------------------------------------------------------------------------------- | ----------------------- |
+| B1  | `19-config-method-compliance.sh`, `.ps1`  | `vendor/`, `configs/` | T3   | Structural invariants — vendored code and config methods are different concerns                            | Manual quarterly review |
 | B2  | `01-code-formatting.ps1`                  | `vendor/`             | T3   | Structural invariant (vendor/ speed); secrets/ covered by gitignore (treefmt natively respects .gitignore) | Manual quarterly review |
-| B3  | `13-schema-validation.ps1`                | `vendor/`             | T3   | Structural invariant (vendor/ speed); secrets/ dropped — covered by gitignore + Filter-GitIgnored | Manual quarterly review |
-| B4  | `15-yaml-structural.ps1`                  | `vendor/`             | T3   | Structural invariant (vendor/ speed); secrets/ dropped — covered by gitignore + Filter-GitIgnored | Manual quarterly review |
-| B5  | `17-suppression-audit.ps1`                | `vendor/`             | T3   | Structural invariant; supplemented by Filter-GitIgnored                        | Manual quarterly review |
-| B6  | `21-preflight-install-command-policy.ps1` | `vendor/`             | T3   | Structural invariant; supplemented by Filter-GitIgnored                        | Manual quarterly review |
-| B7  | `step-runner.sh`, `step-runner.ps1`       | `vendor/`             | T3   | Structural invariant; supplemented by filter_gitignored/Filter-GitIgnored       | Manual quarterly review |
-| B8  | `cleanup-nix-build-artifacts.sh`          | `vendor/`             | T3   | Structural invariant                                                            | Manual quarterly review |
+| B3  | `13-schema-validation.ps1`                | `vendor/`             | T3   | Structural invariant (vendor/ speed); secrets/ dropped — covered by gitignore + Filter-GitIgnored          | Manual quarterly review |
+| B4  | `15-yaml-structural.ps1`                  | `vendor/`             | T3   | Structural invariant (vendor/ speed); secrets/ dropped — covered by gitignore + Filter-GitIgnored          | Manual quarterly review |
+| B5  | `17-suppression-audit.ps1`                | `vendor/`             | T3   | Structural invariant; supplemented by Filter-GitIgnored                                                    | Manual quarterly review |
+| B6  | `21-preflight-install-command-policy.ps1` | `vendor/`             | T3   | Structural invariant; supplemented by Filter-GitIgnored                                                    | Manual quarterly review |
+| B7  | `step-runner.sh`, `step-runner.ps1`       | `vendor/`             | T3   | Structural invariant; supplemented by filter_gitignored/Filter-GitIgnored                                  | Manual quarterly review |
+| B8  | `cleanup-nix-build-artifacts.sh`          | `vendor/`             | T3   | Structural invariant                                                                                       | Manual quarterly review |
 
 ### Category C — Content-pattern exclude lists (grep -v, notmatch)
 
