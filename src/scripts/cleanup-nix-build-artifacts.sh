@@ -48,6 +48,8 @@ while IFS= read -r -d '' _cnba_path; do
     warn "found non-symlink at $_cnba_path — skipping (not a Nix build artifact)"
   fi
 done < <(
+  # Note: this find-prune excludes structural directories for performance.
+  # For file-processing scripts, use deny-list.sh's filter_gitignored instead.
   # ref: allow-and-deny-lists.instructions.md#B8 — reason: structural invariant
   find "$REPO_ROOT" \
     -path "$REPO_ROOT/.git" -prune -o \

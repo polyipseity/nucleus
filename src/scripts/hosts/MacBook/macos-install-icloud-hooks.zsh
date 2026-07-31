@@ -78,6 +78,9 @@ __nucleus_mark_icloud_exclusions_under() {
   [[ "${#__nucleus_icloud_excluded_names[@]}" -gt 0 ]] || return 0
 
   # Build find predicate with -prune to stop recursion into excluded dirs.
+  # Note: this find-prune excludes directories for performance (avoiding
+  # descent into large dirs). For file-processing scripts, use
+  # deny-list.sh's filter_gitignored instead.
   # Pattern: ( -name A -prune -o -name B -prune -o ... -o -type d )
   # This avoids descending into node_modules, .venv, etc. during interactive
   # chpwd hook, which would freeze the terminal for 10+ seconds on large repos.
