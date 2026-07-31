@@ -12,18 +12,17 @@ $script:failCount = 0
 
 function Assert-Pass {
     param([string]$Name)
-    Write-Host "✓ $Name" -ForegroundColor Green
+    Write-Output "✓ $Name"
     $script:passCount++
 }
 
 function Assert-Fail {
     param([string]$Name, [string]$Reason)
-    Write-Host "FAIL $Name : $Reason" -ForegroundColor Red
+    Write-Output "FAIL $Name : $Reason"
     $script:failCount++
 }
 
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$frameworkDir = Join-Path $repoRoot 'src\scripts\lib'
 $testDir = Join-Path $repoRoot 'src\scripts\tests'
 Set-StrictMode -Version Latest
 
@@ -52,7 +51,7 @@ function Test-ParseArgsSkipSystemBuildRemoved {
 }
 
 # The catch-all '-.*' pattern must still exist for unknown flags.
-function Test-ParseArgsNoUnrecognizedFlags {
+function Test-ParseArgsNoUnrecognizedFlag {
     $testLibPs1 = Join-Path $testDir 'test-lib.ps1'
     $content = Get-Content -Path $testLibPs1 -Raw
     if ($content -match "'\^-\.\*'") {
@@ -74,12 +73,12 @@ function Test-UsageNoSkipSystemBuild {
 }
 
 # ---- Run tests ----
-Write-Host "`n=== Phase 2: test-lib unit tests (PS1, TDD: red phase) ==="
-Write-Host "These tests will fail until test-lib.ps1 is updated."
-Write-Host ""
+Write-Output "`n=== Phase 2: test-lib unit tests (PS1, TDD: red phase) ==="
+Write-Output "These tests will fail until test-lib.ps1 is updated."
+Write-Output ""
 
 & Test-ParseArgsSkipSystemBuildRemoved
-& Test-ParseArgsNoUnrecognizedFlags
+& Test-ParseArgsNoUnrecognizedFlag
 & Test-UsageNoSkipSystemBuild
 
 Write-Output "`n--- Phase 2 PS1 test-lib unit tests: $($script:passCount) passed, $($script:failCount) failed ---"

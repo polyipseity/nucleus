@@ -29,7 +29,7 @@ function Test-FileNotHasFlag {
 }
 
 # Header comment tests
-function Test-CheckPs1HasSkipSteps {
+function Test-CheckPs1HasSkipStep {
   if (Test-FileHasFlag -Path $checkScript -Flag '--skip-steps') {
     Write-Output "  check.ps1 header: has --skip-steps"
   } else {
@@ -47,7 +47,7 @@ function Test-CheckPs1NoFormat {
   }
 }
 
-function Test-TestPs1HasSkipSteps {
+function Test-TestPs1HasSkipStep {
   if (Test-FileHasFlag -Path $testScript -Flag '--skip-steps') {
     Write-Output "  test.ps1 header: has --skip-steps"
   } else {
@@ -69,7 +69,7 @@ function Test-TestPs1NoSkipSystemBuild {
 $checkLibPs1 = Join-Path $repoRoot 'src\scripts\checks\check-lib.ps1'
 $testLibPs1 = Join-Path $repoRoot 'src\scripts\tests\test-lib.ps1'
 
-function Test-CheckLibPs1HasSkipSteps {
+function Test-CheckLibPs1HasSkipStep {
   if (Test-FileHasFlag -Path $checkLibPs1 -Flag '--skip-steps') {
     Write-Output "  check-lib.ps1: has --skip-steps in usage"
   } else {
@@ -78,7 +78,7 @@ function Test-CheckLibPs1HasSkipSteps {
   }
 }
 
-function Test-TestLibPs1HasSkipSteps {
+function Test-TestLibPs1HasSkipStep {
   if (Test-FileHasFlag -Path $testLibPs1 -Flag '--skip-steps') {
     Write-Output "  test-lib.ps1: has --skip-steps in usage"
   } else {
@@ -97,12 +97,12 @@ function Test-TestLibPs1NoSkipSystemBuild {
 }
 
 Write-Output "=== Documentation consistency tests (PS1) ==="
-Test-CheckPs1HasSkipSteps
+Test-CheckPs1HasSkipStep
 Test-CheckPs1NoFormat
-Test-TestPs1HasSkipSteps
+Test-TestPs1HasSkipStep
 Test-TestPs1NoSkipSystemBuild
-Test-CheckLibPs1HasSkipSteps
-Test-TestLibPs1HasSkipSteps
+Test-CheckLibPs1HasSkipStep
+Test-TestLibPs1HasSkipStep
 Test-TestLibPs1NoSkipSystemBuild
 
 if ($failed) { exit 1 } else { exit 0 }

@@ -15,13 +15,13 @@ $script:failCount = 0
 
 function Assert-Pass {
     param([string]$Name)
-    Write-Host "✓ $Name" -ForegroundColor Green
+    Write-Output "✓ $Name"
     $script:passCount++
 }
 
 function Assert-Fail {
     param([string]$Name, [string]$Reason)
-    Write-Host "FAIL $Name : $Reason" -ForegroundColor Red
+    Write-Output "FAIL $Name : $Reason"
     $script:failCount++
 }
 
@@ -35,13 +35,13 @@ $script:RepoRoot = $repoRoot
 Set-StrictMode -Version Latest
 
 # ---- Contract A: Step IDs are currently numeric integers ----
-Write-Host "`n=== Stage 1/3: Framework behavioral contracts ==="
+Write-Output "`n=== Stage 1/3: Framework behavioral contracts ==="
 
 # Tests that Register-Step works
 . $stepRunner
 
 # Verify step registration accepts string IDs and numbers
-$testAction = { param($HasArgs, $RepoRoot) "ok" }
+$testAction = { "ok" }
 Register-Step -Id "first" -Number 1 -Name "Test" -Action $testAction
 Register-Step -Id "second" -Number 2 -Name "Test2" -Action $testAction
 
@@ -151,8 +151,8 @@ function Test-ParallelExecution {
     $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
     . $stepRunner
 
-    Register-Step -Id "first" -Number 1 -Name "First" -Action { param($HasArgs, $RepoRoot) $true }
-    Register-Step -Id "second" -Number 2 -Name "Second" -Action { param($HasArgs, $RepoRoot) $true }
+    Register-Step -Id "first" -Number 1 -Name "First" -Action { $true }
+    Register-Step -Id "second" -Number 2 -Name "Second" -Action { $true }
 
     # Analyze Invoke-StepPipeline source: it should use BeginInvoke/EndInvoke (runspaces)
     $source = Get-Content -Path $stepRunner -Raw
@@ -177,7 +177,7 @@ function Test-SummaryOutputFormat {
     function global:Write-Message { Write-Output "message: $args" }
     function global:Write-ErrorMessage { Write-Output "error: $args" }
 
-    Register-Step -Id "pass" -Number 1 -Name "PassStep" -Action { param($HasArgs, $RepoRoot) $true }
+    Register-Step -Id "pass" -Number 1 -Name "PassStep" -Action { $true }
     Initialize-WaveTempDir
 
     # Simulate a run by writing files directly
@@ -197,7 +197,7 @@ function Test-SummaryOutputFormat {
 Test-SummaryOutputFormat
 
 # ---- Results ----
-Write-Host "`n--- Phase 0 PS1 regression tests: $($script:passCount) passed, $($script:failCount) failed ---"
-Write-Host ""
+Write-Output "`n--- Phase 0 PS1 regression tests: $($script:passCount) passed, $($script:failCount) failed ---"
+Write-Output ""
 
 exit $script:failCount

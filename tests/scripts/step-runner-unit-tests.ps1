@@ -13,13 +13,13 @@ $stepRunner = Join-Path $repoRoot 'src\scripts\lib\step-runner.ps1'
 
 function Assert-Pass {
     param([string]$Name)
-    Write-Host "✓ $Name" -ForegroundColor Green
+    Write-Output "✓ $Name"
     $script:passCount++
 }
 
 function Assert-Fail {
     param([string]$Name, [string]$Reason)
-    Write-Host "FAIL $Name : $Reason" -ForegroundColor Red
+    Write-Output "FAIL $Name : $Reason"
     $script:failCount++
 }
 
@@ -31,7 +31,7 @@ function Test-RegisterStep-WithId {
     $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
     . $stepRunner
 
-    Register-Step -Id "code-formatting" -Number 1 -Name "Code formatting" -Action { param($HasArgs, $RepoRoot) $true }
+    Register-Step -Id "code-formatting" -Number 1 -Name "Code formatting" -Action { $true }
 
     if ($script:StepIds -and $script:StepIds[0] -eq "code-formatting" -and $script:StepNumbers[0] -eq 1) {
         Assert-Pass "Register-Step -Id stores id, number, name correctly"
@@ -41,15 +41,15 @@ function Test-RegisterStep-WithId {
     }
 }
 
-function Test-RegisterStep-MultipleWithIds {
+function Test-RegisterStep-MultipleWithId {
     $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
     $script:StepNames = [System.Collections.Generic.List[string]]::new()
     $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
     . $stepRunner
 
-    Register-Step -Id "one" -Number 1 -Name "One" -Action { param($HasArgs, $RepoRoot) $true }
-    Register-Step -Id "two" -Number 2 -Name "Two" -Action { param($HasArgs, $RepoRoot) $true }
-    Register-Step -Id "three" -Number 3 -Name "Three" -Action { param($HasArgs, $RepoRoot) $true }
+    Register-Step -Id "one" -Number 1 -Name "One" -Action { $true }
+    Register-Step -Id "two" -Number 2 -Name "Two" -Action { $true }
+    Register-Step -Id "three" -Number 3 -Name "Three" -Action { $true }
 
     if ($script:StepIds.Count -eq 3 -and $script:StepIds[0] -eq "one" -and $script:StepIds[2] -eq "three") {
         Assert-Pass "Register-Step accumulates multiple steps with IDs"
@@ -58,7 +58,7 @@ function Test-RegisterStep-MultipleWithIds {
     }
 }
 
-function Test-RegisterStep-IdWithDigitsErrors {
+function Test-RegisterStep-IdWithDigitError {
     $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
     $script:StepNames = [System.Collections.Generic.List[string]]::new()
     $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
@@ -76,7 +76,7 @@ function Test-RegisterStep-IdWithDigitsErrors {
     }
 }
 
-function Test-RegisterStep-EmptyIdErrors {
+function Test-RegisterStep-EmptyIdError {
     $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
     $script:StepNames = [System.Collections.Generic.List[string]]::new()
     $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
@@ -94,7 +94,7 @@ function Test-RegisterStep-EmptyIdErrors {
     }
 }
 
-function Test-RegisterStep-DuplicateIdErrors {
+function Test-RegisterStep-DuplicateIdError {
     $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
     $script:StepNames = [System.Collections.Generic.List[string]]::new()
     $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
@@ -113,7 +113,7 @@ function Test-RegisterStep-DuplicateIdErrors {
     }
 }
 
-function Test-RegisterStep-DuplicateNumberErrors {
+function Test-RegisterStep-DuplicateNumberError {
     $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
     $script:StepNames = [System.Collections.Generic.List[string]]::new()
     $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
@@ -202,7 +202,7 @@ function Test-SkipSteps-Dedup {
     }
 }
 
-function Test-SkipSteps-LastValueWins {
+function Test-SkipStep-LastValueWin {
     $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
     $script:StepNames = [System.Collections.Generic.List[string]]::new()
     $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
@@ -219,24 +219,24 @@ function Test-SkipSteps-LastValueWins {
 }
 
 # ---- Run tests ----
-Write-Host "`n=== Phase 1: Framework core unit tests (PS1) ==="
-Write-Host "Tests for Spec A (step IDs) and Spec B (--skip-steps)."
-Write-Host "These will FAIL (red phase) until step-runner.ps1 is updated."
-Write-Host ""
+Write-Output "`n=== Phase 1: Framework core unit tests (PS1) ==="
+Write-Output "Tests for Spec A (step IDs) and Spec B (--skip-steps)."
+Write-Output "These will FAIL (red phase) until step-runner.ps1 is updated."
+Write-Output ""
 
 Test-RegisterStep-WithId
-Test-RegisterStep-MultipleWithIds
-Test-RegisterStep-IdWithDigitsErrors
-Test-RegisterStep-EmptyIdErrors
-Test-RegisterStep-DuplicateIdErrors
-Test-RegisterStep-DuplicateNumberErrors
+Test-RegisterStep-MultipleWithId
+Test-RegisterStep-IdWithDigitError
+Test-RegisterStep-EmptyIdError
+Test-RegisterStep-DuplicateIdError
+Test-RegisterStep-DuplicateNumberError
 Test-SkipSteps-EqualsForm
 Test-SkipSteps-EmptyValue
 Test-SkipSteps-UnknownIdNoError
 Test-SkipSteps-Dedup
-Test-SkipSteps-LastValueWins
+Test-SkipStep-LastValueWin
 
-Write-Host "`n--- Phase 1 PS1 unit tests: $($script:passCount) passed, $($script:failCount) failed ---"
-Write-Host ""
+Write-Output "`n--- Phase 1 PS1 unit tests: $($script:passCount) passed, $($script:failCount) failed ---"
+Write-Output ""
 
 exit $script:failCount

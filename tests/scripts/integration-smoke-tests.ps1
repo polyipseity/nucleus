@@ -10,7 +10,7 @@ $failed = $false
 
 function Test-CheckHelp {
   try {
-    $output = & $checkScript --help 2>&1
+    $null = & $checkScript --help 2>&1
     if ($LASTEXITCODE -eq 0) {
       Write-Output "  check.ps1 --help exits 0"
     } else {
@@ -34,7 +34,7 @@ function Test-CheckHelpNoFormat {
   }
 }
 
-function Test-CheckHelpHasSkipSteps {
+function Test-CheckHelpHasSkipStep {
   try {
     $output = & $checkScript --help 2>&1
     if ($output -match '--skip-steps') {
@@ -53,7 +53,7 @@ function Test-TestHelp {
     return
   }
   try {
-    $output = & $testScript --help 2>&1
+    $null = & $testScript --help 2>&1
     if ($LASTEXITCODE -eq 0) {
       Write-Output "  test.ps1 --help exits 0"
     } else {
@@ -81,7 +81,7 @@ function Test-TestHelpNoSkipSystemBuild {
   }
 }
 
-function Test-TestHelpHasSkipSteps {
+function Test-TestHelpHasSkipStep {
   if (-not (Test-Path $testScript)) {
     return
   }
@@ -100,32 +100,9 @@ function Test-TestHelpHasSkipSteps {
 Write-Output "=== Integration smoke tests (PS1) ==="
 Test-CheckHelp
 Test-CheckHelpNoFormat
-Test-CheckHelpHasSkipSteps
+Test-CheckHelpHasSkipStep
 Test-TestHelp
 Test-TestHelpNoSkipSystemBuild
-Test-TestHelpHasSkipSteps
-
-if ($failed) { exit 1 } else { exit 0 }
-
-function Test-TestHelpHasSkipSteps {
-  if (-not (Test-Path $testScript)) {
-    return
-  }
-  $output = & $testScript --help 2>&1
-  if ($output -notmatch '--skip-steps') {
-    Write-Output "FAIL: test.ps1 --help should contain --skip-steps"
-    $script:failed = $true
-    return
-  }
-  Write-Output "  test.ps1 --help: has --skip-steps"
-}
-
-Write-Output "=== Integration smoke tests (PS1) ==="
-Test-CheckHelp
-Test-CheckHelpNoFormat
-Test-CheckHelpHasSkipSteps
-Test-TestHelp
-Test-TestHelpNoSkipSystemBuild
-Test-TestHelpHasSkipSteps
+Test-TestHelpHasSkipStep
 
 if ($failed) { exit 1 } else { exit 0 }
