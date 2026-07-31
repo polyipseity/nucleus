@@ -102,14 +102,13 @@ test_app_help() {
 	local exit_code=0
 	local output
 	output=$(run_binary "$pkg" --help) || exit_code=$?
-	if [ "$exit_code" -eq 0 ] && [ -n "$output" ]; then
+	# Every nucleus-* command's --help path prints a `usage:` line (via
+	# usage_std) and exits 0 (parse_args in step-runner.sh, or the script's
+	# own dispatch). Both must hold — output alone is not a pass.
+	if [ "$exit_code" -eq 0 ] && printf '%s' "$output" | grep -q 'usage:'; then
 		assert_pass "$app_name --help"
-	elif [ -n "$output" ]; then
-		# Non-zero exit but produced output — script ran enough to produce a
-		# meaningful message (e.g. missing runtime dependency).
-		assert_pass "$app_name --help (exit=$exit_code, output present)"
 	else
-		assert_fail "$app_name --help" "exit=$exit_code, no output"
+		assert_fail "$app_name --help" "exit=$exit_code, output: $(printf '%s' "$output" | head -3 | tr '\n' ' ')"
 	fi
 }
 
@@ -137,7 +136,7 @@ assert_pass "nucleus-gs-pdf-opt build"
 # gs-pdf-opt does support --help; run it from the store path.
 gs_pdf_opt_exit=0
 gs_pdf_opt_output=$(run_binary nucleus-gs-pdf-opt --help 2>/dev/null) || gs_pdf_opt_exit=$?
-if [ "$gs_pdf_opt_exit" -eq 0 ] && [ -n "$gs_pdf_opt_output" ]; then
+if [ "$gs_pdf_opt_exit" -eq 0 ] && printf '%s' "$gs_pdf_opt_output" | grep -q 'usage:'; then
 	assert_pass "nucleus-gs-pdf-opt --help"
 else
 	assert_fail "nucleus-gs-pdf-opt --help" "exit=$gs_pdf_opt_exit"
@@ -164,13 +163,14 @@ test_app_dry_run() {
 	local exit_code=0
 	local output
 	output=$(run_binary "$pkg" --dry-run 2>&1) || exit_code=$?
-	if [ "$exit_code" -eq 0 ]; then
-		assert_pass "$app_name --dry-run"
-	else
-		# Non-zero exit on dry-run is acceptable (e.g. config file missing,
-		# host-specific tool not available).  The key is that the command
-		# built and produced diagnostic output.
+	# The command's own <prefix>: diagnostic must be present. Exit codes vary
+	# legitimately by environment (e.g. ai without Ollama), so the marker that
+	# the command's control flow actually ran is required instead of "any
+	# output" (a broken wrapper would produce none).
+	if printf '%s' "$output" | grep -q "$app_name:"; then
 		assert_pass "$app_name --dry-run (exit=$exit_code)"
+	else
+		assert_fail "$app_name --dry-run" "exit=$exit_code, no command output: $(printf '%s' "$output" | head -3 | tr '\n' ' ')"
 	fi
 }
 

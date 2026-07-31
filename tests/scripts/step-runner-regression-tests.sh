@@ -196,6 +196,7 @@ test_regression_wave_cleanup_removes_tempdir() {
 test_regression_cache_file_lists_sets_cached_vars() {
     local result
     result=$(
+        cd "$REPO_ROOT" || exit 1
         SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         CACHED_NIX_FILES=()
@@ -205,34 +206,67 @@ test_regression_cache_file_lists_sets_cached_vars() {
         cache_file_lists
         echo "nix:${#CACHED_NIX_FILES[@]} yaml:${#CACHED_YAML_FILES[@]} json:${#CACHED_JSON_FILES[@]} sh:${#CACHED_SH_FILES[@]}"
     )
-    if echo "$result" | grep -Eq 'nix:[0-9]+ yaml:[0-9]+ json:[0-9]+ sh:[0-9]+'; then
-        assert_pass "REGRESSION: cache_file_lists populates all cache variables"
+    # Non-zero counts required — a vacuous run (all zeros) must not pass.
+    if echo "$result" | grep -Eq 'nix:[1-9][0-9]* yaml:[1-9][0-9]* json:[1-9][0-9]* sh:[1-9][0-9]*'; then
+        assert_pass "REGRESSION: cache_file_lists populates all cache variables (non-zero)"
     else
-        assert_fail "REG-cache-files" "Expected numeric counts, got: $result"
+        assert_fail "REG-cache-files" "Expected non-zero numeric counts, got: $result"
     fi
 }
 
 test_regression_cache_file_lists_excludes_gitignored() {
     local result
     result=$(
+        cd "$REPO_ROOT" || exit 1
         SCRIPT_DIR="$REPO_ROOT/src/scripts/lib"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+        # Fixture: a .nix file under gitignored node_modules/ must be filtered
+        # out by cache_file_lists (via filter_gitignored -> git check-ignore).
+        mkdir -p node_modules
+        printf '{}' > node_modules/_nucleus_regression_fixture.nix
         CACHED_NIX_FILES=()
         CACHED_YAML_FILES=()
         CACHED_JSON_FILES=()
         CACHED_SH_FILES=()
         cache_file_lists
-        # Check that no cached file path matches a gitignored pattern
-        for _f in "${CACHED_NIX_FILES[@]}" "${CACHED_YAML_FILES[@]}" "${CACHED_JSON_FILES[@]}" "${CACHED_SH_FILES[@]}"; do
-            if [[ "$_f" == .direnv/* ]]; then
-                echo "IGNORED_PATH_FOUND:$_f"
+        rm -f node_modules/_nucleus_regression_fixture.nix
+        rmdir node_modules 2>/dev/null || true
+        # Invariants: the gitignored fixture is dropped, a tracked file stays.
+        _fixture_found=no
+        _tracked_found=no
+        for _f in "${CACHED_NIX_FILES[@]}"; do
+            if [[ "$_f" == *node_modules/_nucleus_regression_fixture.nix ]]; then
+                _fixture_found=yes
+            fi
+            if [[ "$_f" == *src/flake.nix ]]; then
+                _tracked_found=yes
             fi
         done
+        echo "fixture_ignored=$_fixture_found tracked_present=$_tracked_found"
     )
-    if [[ -z "$result" ]]; then
-        assert_pass "REGRESSION: cache_file_lists excludes gitignored paths"
+    if [ "$result" = "fixture_ignored=no tracked_present=yes" ]; then
+        assert_pass "REGRESSION: cache_file_lists excludes gitignored fixture, keeps tracked files"
     else
-        assert_fail "REG-cache-excludes-ignored" "Found gitignored path in cached files: $result"
+        assert_fail "REG-cache-excludes-ignored" "Expected 'fixture_ignored=no tracked_present=yes', got: $result"
+    fi
+}
+
+test_regression_cache_file_lists_survives_set_e() {
+    local result exit_code=0
+    result=$(bash -c '
+        set -euo pipefail
+        cd "$1" || exit 1
+        SCRIPT_DIR="$1/src/scripts/lib"
+        . "$1/src/scripts/lib/step-runner.sh"
+        cache_file_lists
+        echo "nix:${#CACHED_NIX_FILES[@]} yaml:${#CACHED_YAML_FILES[@]} json:${#CACHED_JSON_FILES[@]} sh:${#CACHED_SH_FILES[@]}"
+    ' bash "$REPO_ROOT") || exit_code=$?
+    # Phase 1 regression guard: git check-ignore exits 1 when nothing is
+    # ignored; filter_gitignored must survive that under set -euo pipefail.
+    if [ "$exit_code" -eq 0 ] && echo "$result" | grep -Eq 'nix:[1-9][0-9]* yaml:[1-9][0-9]* json:[1-9][0-9]* sh:[1-9][0-9]*'; then
+        assert_pass "REGRESSION: cache_file_lists survives set -euo pipefail (non-zero counts)"
+    else
+        assert_fail "REG-cache-set-e" "exit=$exit_code, got: $result"
     fi
 }
 
@@ -356,6 +390,7 @@ test_regression_wave_init_creates_tempdir
 test_regression_wave_cleanup_removes_tempdir
 test_regression_cache_file_lists_sets_cached_vars
 test_regression_cache_file_lists_excludes_gitignored
+test_regression_cache_file_lists_survives_set_e
 test_regression_aggregate_results_exits_zero_on_pass
 test_regression_aggregate_results_output_contains_check_summary
 test_regression_aggregate_results_renders_skip_for_exit_2
