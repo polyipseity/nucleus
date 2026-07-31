@@ -17,8 +17,6 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 test_register_step_with_id() {
     local result
     result=$(
-        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-        REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         register_step "code-formatting" 1 "Code formatting" test_func
         echo "${_STEP_IDS[0]} ${_STEP_NUMBERS[0]} ${_STEP_NAMES[0]}"
@@ -33,8 +31,6 @@ test_register_step_with_id() {
 test_register_step_multiple_with_ids() {
     local result
     result=$(
-        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-        REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         register_step "one" 1 "One" f1
         register_step "two" 2 "Two" f2
@@ -50,8 +46,6 @@ test_register_step_multiple_with_ids() {
 
 test_register_step_id_with_digits_errors() {
     local exit_code=0
-    # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-    REPO_ROOT="$REPO_ROOT" \
     bash -c '
         . "'"$REPO_ROOT"'/src/scripts/lib/step-runner.sh"
         register_step "test-1-bad" 1 "Bad" true 2>/dev/null
@@ -65,8 +59,6 @@ test_register_step_id_with_digits_errors() {
 
 test_register_step_empty_id_errors() {
     local exit_code=0
-    # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-    REPO_ROOT="$REPO_ROOT" \
     bash -c '
         . "'"$REPO_ROOT"'/src/scripts/lib/step-runner.sh"
         register_step "" 1 "Empty" true 2>/dev/null
@@ -80,8 +72,6 @@ test_register_step_empty_id_errors() {
 
 test_register_step_duplicate_id_errors() {
     local exit_code=0
-    # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-    REPO_ROOT="$REPO_ROOT" \
     bash -c '
         . "'"$REPO_ROOT"'/src/scripts/lib/step-runner.sh"
         register_step "dup" 1 "First" true
@@ -96,8 +86,6 @@ test_register_step_duplicate_id_errors() {
 
 test_register_step_duplicate_number_errors() {
     local exit_code=0
-    # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-    REPO_ROOT="$REPO_ROOT" \
     bash -c '
         . "'"$REPO_ROOT"'/src/scripts/lib/step-runner.sh"
         register_step "first" 1 "First" true
@@ -116,8 +104,6 @@ test_register_step_duplicate_number_errors() {
 test_skip_steps_equals_form() {
     local result
     result=$(
-        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-        REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         parse_args "--skip-steps=a,b"
@@ -133,8 +119,6 @@ test_skip_steps_equals_form() {
 test_skip_steps_empty_value() {
     local result
     result=$(
-        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-        REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         parse_args "--skip-steps="
@@ -149,8 +133,6 @@ test_skip_steps_empty_value() {
 
 test_skip_steps_unknown_id_no_error() {
     local exit_code=0
-    # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-    REPO_ROOT="$REPO_ROOT" \
     bash -c '
         . "'"$REPO_ROOT"'/src/scripts/lib/step-runner.sh"
         usage() { true; }
@@ -166,8 +148,6 @@ test_skip_steps_unknown_id_no_error() {
 test_skip_steps_dedup() {
     local result
     result=$(
-        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-        REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         parse_args "--skip-steps=a,a"
@@ -183,8 +163,6 @@ test_skip_steps_dedup() {
 test_skip_steps_last_value_wins() {
     local result
     result=$(
-        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-        REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         parse_args "--skip-steps=a" "--skip-steps=b"
@@ -203,8 +181,7 @@ test_skip_steps_last_value_wins() {
 test_parse_args_help() {
     local exit_code
     exit_code=0
-    # shellcheck disable=SC2097,SC2098,SC2031 # reason: intentional export to bash -c subprocess
-    REPO_ROOT="$REPO_ROOT" \
+
     bash -c '
         . "'"$REPO_ROOT"'/src/scripts/lib/step-runner.sh"
         usage() { echo "usage: test"; }
@@ -220,8 +197,6 @@ test_parse_args_help() {
 test_parse_args_scoped() {
     local result
     result=$(
-        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-        REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         parse_args --scoped
@@ -237,8 +212,6 @@ test_parse_args_scoped() {
 test_parse_args_positions() {
     local result
     result=$(
-        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-        REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         parse_args --fail-fast path/to/file.nix
@@ -254,8 +227,7 @@ test_parse_args_positions() {
 test_aggregate_results_parses_exit_files() {
     local result
     result=$(
-        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-        REPO_ROOT="$REPO_ROOT"
+
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         say() { echo "say: $*"; }
         error() { echo "error: $*" >&2; }

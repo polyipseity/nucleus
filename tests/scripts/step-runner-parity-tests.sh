@@ -28,8 +28,6 @@ test_parity_parse_args_shared_flags() {
     for flag in "${flags[@]}"; do
         local result
         result=$(
-            # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-            REPO_ROOT="$REPO_ROOT"
             . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
             usage() { true; }
             # shellcheck disable=SC2086 # reason: intentional word splitting for flag var
@@ -52,7 +50,6 @@ test_parity_parse_args_shared_flags() {
 # ---- Contract: unsupported flags are rejected ----
 test_parity_unknown_flag_rejected() {
     local exit_code=0
-    REPO_ROOT="$REPO_ROOT" \
     bash -c '
         . "'"$REPO_ROOT"'/src/scripts/lib/step-runner.sh"
         usage() { true; }
@@ -71,8 +68,6 @@ test_parity_unknown_flag_rejected() {
 test_parity_online_flag_accepted() {
     local result
     result=$(
-        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-        REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         parse_args --online
@@ -89,8 +84,6 @@ test_parity_online_flag_accepted() {
 test_parity_no_fail_fast_flag() {
     local result
     result=$(
-        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-        REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         FAIL_FAST=true
@@ -108,8 +101,6 @@ test_parity_no_fail_fast_flag() {
 test_parity_positional_args_grouped() {
     local result
     result=$(
-        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-        REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         parse_args "file.sh" "file.ps1" "file.nix" "file.pkr.hcl"
@@ -125,7 +116,6 @@ test_parity_positional_args_grouped() {
 # ---- Contract: help flag exits 0 ----
 test_parity_help_exits_cleanly() {
     local exit_code=0
-    REPO_ROOT="$REPO_ROOT" \
     bash -c '
         . "'"$REPO_ROOT"'/src/scripts/lib/step-runner.sh"
         usage() { true; }
@@ -142,8 +132,6 @@ test_parity_help_exits_cleanly() {
 test_parity_flag_ordering_independent() {
     local result1 result2
     result1=$(
-        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-        REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         FAIL_FAST=false
@@ -151,8 +139,6 @@ test_parity_flag_ordering_independent() {
         echo "$FAIL_FAST $SCOPED"
     )
     result2=$(
-        # shellcheck disable=SC2030,SC2031 # reason: REPO_ROOT inherited
-        REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         usage() { true; }
         FAIL_FAST=false

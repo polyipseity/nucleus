@@ -17,7 +17,6 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 # After removal, --skip-system-build must be rejected (unknown flag -> exit 1).
 test_parse_args_skip_system_build_removed() {
     local exit_code=0
-    REPO_ROOT="$REPO_ROOT" \
     bash -c '
         . "'"$REPO_ROOT"'/src/scripts/tests/test-lib.sh"
         parse_args --skip-system-build 2>/dev/null || true
@@ -32,7 +31,6 @@ test_parse_args_skip_system_build_removed() {
 # Unknown flags must still error.
 test_parse_args_no_unrecognized_flags() {
     local exit_code=0
-    REPO_ROOT="$REPO_ROOT" \
     bash -c '
         . "'"$REPO_ROOT"'/src/scripts/tests/test-lib.sh"
         parse_args --nonexistent-flag-x99 2>/dev/null || true
@@ -48,7 +46,6 @@ test_parse_args_no_unrecognized_flags() {
 test_test_lib_usage_no_skip_system_build() {
     local result
     result=$(
-        REPO_ROOT="$REPO_ROOT"
         . "$REPO_ROOT/src/scripts/tests/test-lib.sh"
         usage 2>&1 || true
     )
