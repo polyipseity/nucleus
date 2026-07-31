@@ -118,6 +118,7 @@ Get-ChildItem ... | Filter-GitIgnored
 | C1  | `script-validation-tests.sh` | `HOME\|TMPDIR\|/tmp\|--` in rm -rf check | T3   | Known-safe patterns in test; false-positive reduction | Manual quarterly review |
 | C2  | `script-validation-tests.sh` | `^svc: warning:` in service test         | T3   | Runtime warning noise from svc script                 | Manual quarterly review |
 | C3  | `apple-sdk-override.sh`      | env vars in nix output filter            | T3   | Nix-env debug output suppression                      | Manual quarterly review |
+| C4  | `scripts/check-packer.sh`    | `Warning: A checksum of 'none' was specified … (source code not available)` block | T3   | Microsoft publishes no stable Windows 11 ISO checksums; `iso_checksum = "none"` intentional in `src/vms/windows/packer.pkr.hcl` (lines 39, 228); exit code still enforced | Manual quarterly review |
 
 ### Category D — Allowlists
 

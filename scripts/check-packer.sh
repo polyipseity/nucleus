@@ -72,6 +72,21 @@ fi
 # Validate each Packer template in its own directory (needed for plugin
 # resolution and relative path references).
 # Each template may require different -var flags for required variables.
+#
+# Filter the known checksum-none warning (windows template only). WHY:
+# Microsoft publishes no stable Windows 11 ISO checksums, so
+# src/vms/windows/packer.pkr.hcl intentionally sets iso_checksum to "none"
+# (see the variable description at line 39 and check-suppress comment at
+# line 228). The packer validate exit code below is still enforced — only
+# the expected warning text is hidden.
+_filter_known_packer_warnings() {
+  awk '
+    /Warning: A checksum of .none. was specified/ { skip=1 }
+    skip && /\(source code not available\)/ { skip=0; next }
+    !skip { print }
+  '
+}
+
 validate_dir() {
   local dir="$1"
   say "validating $dir..."
@@ -87,7 +102,9 @@ validate_dir() {
       vars=(-var macos_version=14.0 -var vm_name=dummy -var cpus=2 -var memory_gib=4 -var disk_size_gib=40 -var guest_username=dummy -var guest_password=dummy -var ssh_username=dummy -var ssh_password=dummy -var tart_image_ref=dummy)
       ;;
   esac
-  (cd "$dir" && packer init . && packer validate "${vars[@]}" .)
+  # 2>&1 into the filter: the warning goes to stderr; pipefail keeps the
+  # packer validate exit code authoritative.
+  (cd "$dir" && packer init . && packer validate "${vars[@]}" . 2>&1 | _filter_known_packer_warnings)
 }
 
 # Parallel validation: each VM directory validates independently.
