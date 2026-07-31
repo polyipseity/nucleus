@@ -47,8 +47,8 @@ Register-Step -Id "schema-validation" -Number 13 -Name "Schema validation (JSON/
     }
     # YAML files
     Get-ChildItem -Recurse -Path $r -Include '*.yml', '*.yaml' | Where-Object {
-      $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.FullName -notmatch '[/\\]secrets[/\\]'  # ref: allow-and-deny-lists.instructions.md#B3 — reason: structural invariants
-    } | ForEach-Object {
+      $_.FullName -notmatch '[/\\]vendor[/\\]'  # ref: allow-and-deny-lists.instructions.md#B3 — reason: structural invariant; gitignore filter applied on top
+    } | Filter-GitIgnored | ForEach-Object {
       $schema = try { ($_ | Get-Content -Raw | ConvertFrom-Yaml)['$schema'] } catch { $null }
       if ($schema) {
         if ($schema -match '^\.') {
@@ -79,12 +79,13 @@ Register-Step -Id "schema-validation" -Number 13 -Name "Schema validation (JSON/
       $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notlike '*.schema.json'  # ref: allow-and-deny-lists.instructions.md#B3,#A7 — reason: structural invariants; schema files are meta
     } | ForEach-Object { $allFiles.Add($_.FullName) }
     Get-ChildItem -Recurse -Path $r -Include '*.yml', '*.yaml' | Where-Object {
-      $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.FullName -notmatch '[/\\]secrets[/\\]'  # ref: allow-and-deny-lists.instructions.md#B3 — reason: structural invariants
-    } | ForEach-Object { $allFiles.Add($_.FullName) }
+      $_.FullName -notmatch '[/\\]vendor[/\\]'  # ref: allow-and-deny-lists.instructions.md#B3 — reason: structural invariant; gitignore filter applied on top
+    } | Filter-GitIgnored | ForEach-Object { $allFiles.Add($_.FullName) }
   }
 
   foreach ($f in $allFiles) {
-    # Exception list (Spec G)
+    # Exception list: *.schema.json, vendor/**, secrets/**,
+    # .github/workflows/*.yml, .github/dependabot.yml, package.json, opencode.jsonc
     $skipFile = $false
     if ($f -like '*.schema.json' -or $f -like '*\vendor\*' -or $f -like '*/vendor/*' -or `
         $f -like '*\secrets\*' -or $f -like '*/secrets/*' -or `

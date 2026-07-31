@@ -11,12 +11,12 @@ Register-Step -Id "yaml-structural" -Number 15 -Name "YAML structural validation
   } else {
     $yamlFiles = if ($script:CachedYamlFiles) {
       $script:CachedYamlFiles |
-        Where-Object { $_.FullName -notmatch '[/\\]secrets[/\\]' } |
-        ForEach-Object { $_.FullName }
+        Where-Object { $_ } |
+        ForEach-Object { $_ }
     } else {
       Get-ChildItem -Recurse -Path $r -Include '*.yml', '*.yaml' |
-        Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.FullName -notmatch '[/\\]secrets[/\\]' } |  # ref: allow-and-deny-lists.instructions.md#B4 — reason: structural invariants
-        Sort-Object FullName | ForEach-Object { $_.FullName }
+        Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } |  # ref: allow-and-deny-lists.instructions.md#B4 — reason: structural invariant; gitignore filter applied on top
+        Sort-Object FullName | Filter-GitIgnored | ForEach-Object { $_ }
     }
   }
 
