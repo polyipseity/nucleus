@@ -344,9 +344,4 @@ __marimo__/
 !/src/modules/env/
 !/src/modules/lib/
 !/src/scripts/lib/
-/src/hosts/Windows/system/*.locked.dsc.yml
-/src/hosts/Windows/user/*.locked.dsc.yml
 # }
-
-# Node.js / Bun
-node_modules/
