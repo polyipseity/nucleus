@@ -44,7 +44,7 @@ if ($content -match 'Add-Type') {
   Assert-Fail -Name 'step22_ps1_add_type' -Reason 'step 22 PS1 should exempt Add-Type C# blocks (policy exception 3)'
 }
 
-if ($content -match 'Inline by embedded-content policy exception') {
+if ($content -match 'check-suppress:embedded-content') {
   Assert-Pass -Name 'step22_ps1_citation' -Reason 'step 22 PS1 honors inline policy citation comments'
 } else {
   Assert-Fail -Name 'step22_ps1_citation' -Reason 'step 22 PS1 should honor inline policy citation comments'

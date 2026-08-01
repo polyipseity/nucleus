@@ -92,7 +92,7 @@ function Sync-OpenSSHServer {
   }
 
   if ($Enabled) {
-    # Inline by embedded-content policy exception 1 (data-driven/generated content: managed sshd_config keys).
+    # check-suppress:embedded-content: exception 1 (data-driven/generated content) -- managed sshd_config keys
     $retainedConfigLines += @(
       # %u expands to the connecting username, matching the filename that
       # sync-secretfile.ps1 materializes from the SOPS secret bundle.

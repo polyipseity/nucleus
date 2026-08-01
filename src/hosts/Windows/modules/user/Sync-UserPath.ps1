@@ -87,7 +87,7 @@ function Sync-UserPath {
   # so they pick up the new PATH without a restart.
   $HWND_BROADCAST = 0xffff
   $WM_SETTINGCHANGE = 0x001a
-  # Inline by embedded-content policy exception 3 (C# interop, <=25 lines).
+  # check-suppress:embedded-content: exception 3 (C# interop) -- P/Invoke classes stay inline up to 25 lines
   $sendMessageTimeoutSource = @'
 using System;
 using System.Runtime.InteropServices;

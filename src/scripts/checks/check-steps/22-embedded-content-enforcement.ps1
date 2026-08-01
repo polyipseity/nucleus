@@ -73,7 +73,7 @@ Register-Step -Id "embedded-content-enforcement" -Number 22 -Name "Embedded cont
       $startIdx = [Math]::Max(0, $hs.Extent.StartLineNumber - 11)
       $endIdx = $hs.Extent.StartLineNumber - 1
       for ($i = $startIdx; $i -lt $endIdx; $i++) {
-        if ($fileLines[$i] -match 'Inline by embedded-content policy exception') { $cited = $true; break }
+        if ($fileLines[$i] -match 'check-suppress:embedded-content') { $cited = $true; break }
       }
       if ($cited) { continue }
 

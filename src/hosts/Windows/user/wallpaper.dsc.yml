@@ -27,7 +27,7 @@ properties:
 
     - resource: PSDscResources/Script
       id: wallpaperRefresh
-      # Inline by embedded-content policy exception 5 (DSC Script resource requires inline Get/Test/Set).
+      # check-suppress:embedded-content: exception 5 (DSC Script resource) -- Get/Test/Set must stay inline per API requirement
       dependsOn:
         - wallpaperPath
       directives:

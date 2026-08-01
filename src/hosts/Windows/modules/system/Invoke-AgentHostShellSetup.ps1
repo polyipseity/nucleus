@@ -34,7 +34,7 @@ function Invoke-AgentHostShellSetup {
 
   # Write batch wrapper that sets agent detection vars and launches PowerShell
   $wrapperPath = Join-Path -Path $wrapperDir -ChildPath "nucleus-agent-host-wrapper.cmd"
-  # Inline by embedded-content policy exception 2 (trivial static content <10 lines).
+  # check-suppress:embedded-content: exception 2 (trivial static content) -- .cmd wrapper under 10 lines
   @"
 @echo off
 SET NUCLEUS_AGENT_SESSION=1

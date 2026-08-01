@@ -91,7 +91,7 @@ function Sync-GitAndSshConfig {
     }
 
     $sshConfigPath = Join-Path -Path $sshDir -ChildPath 'config'
-    # Inline by embedded-content policy exception 2 (trivial static content <10 lines).
+    # check-suppress:embedded-content: exception 2 (trivial static content) -- managed ssh config block under 10 lines
     $desiredSshBlock = @(
       'Host github.com'
       '  HostName github.com'

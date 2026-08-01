@@ -25,7 +25,7 @@ if ($null -eq $process) { exit 1 }
 # Assign camilladsp to a Windows Job Object with KILL_ON_JOB_CLOSE.
 # When this wrapper exits (for any reason), the kernel automatically
 # kills camilladsp too — no orphan processes on Windows.
-# Inline by embedded-content policy exception 3 (C# interop, <=25 lines).
+# check-suppress:embedded-content: exception 3 (C# interop) -- P/Invoke classes stay inline up to 25 lines
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;

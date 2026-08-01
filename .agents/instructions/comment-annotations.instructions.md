@@ -36,7 +36,7 @@ Hard rules:
 
 | Family | Sites | Check id | Canonical form | Machine consumer |
 | --- | --- | --- | --- | --- |
-| `# Inline by embedded-content policy exception N (name).` | 10 + 1 detector | `embedded-content` | `# check-suppress:embedded-content: exception N (name) -- <reason>` | step 22 `.ps1` (regex `'Inline by embedded-content policy exception'`) |
+| `# Inline by embedded-content policy exception N (name).` | 10 + 1 detector | `embedded-content` | `# check-suppress:embedded-content: exception N (name) -- <reason>` | step 22 `.ps1` (regex `'check-suppress:embedded-content'`) |
 | `# Method N (name) — <why>` | 68 | `config-method` | `# check-suppress:config-method: method N (name) -- <reason>` — lowercase | step 19 `.ps1` + `.sh` twin (regex `'# Method'`) |
 | `# check-suppress:SuppressMessageAttribute: <rule> — <just>` / bare rule lists | 74 | `SuppressMessageAttribute` | `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | step 17 `Get-UndocSuppViolation -CheckId 'SuppressMessageAttribute'` |
 | `# check-suppress:suppression_doc: <just>` | 394 | `suppression_doc` | unchanged (plain form) | step 17 regex `# check-suppress:$CheckId[\s:]` |

@@ -10,7 +10,7 @@ Canonical cross-platform policy for file content inside scripts. Supersedes the 
 
 ## Invariant
 
-File content — config templates, shell/PowerShell profile content, start scripts, service wrappers, Caddyfiles, READMEs — lives in dedicated files on disk, never in script string literals (here-strings, string arrays, heredocs, `Add-Content`/`Set-Content` text). This holds on every platform and for every script type (Nix, POSIX sh, PowerShell). The only exceptions are listed in "Exceptions" below and must be cited with an inline comment at the call site.
+File content — config templates, shell/PowerShell profile content, start scripts, service wrappers, Caddyfiles, READMEs — lives in dedicated files on disk, never in script string literals (here-strings, string arrays, heredocs, `Add-Content`/`Set-Content` text). This holds on every platform and for every script type (Nix, POSIX sh, PowerShell). The only exceptions are listed in "Exceptions" below and must be cited with an inline `# check-suppress:embedded-content:` comment at the call site.
 
 ## Platform matrix
 
@@ -44,7 +44,7 @@ Content with analogous semantics across platforms MUST be a single shared file, 
 
 ## Exceptions
 
-Each exception requires an inline comment citing this policy and the exception letter:
+Each exception requires an inline `# check-suppress:embedded-content:` comment naming the exception letter and giving the reason:
 
 1. **Data-driven/generated content** — per-entry loops and JSON-derived text (vhost blocks in `Sync-CaddyService.ps1`, rclone wrapper in `Sync-CloudDrive.ps1`, PATH snippets, `$virtiofsArgs` in `Invoke-VMSetup.ps1`, host-kind heredocs in `vm.sh`). The loop structure IS the script expression.
 2. **Trivial static content** — under 10 lines (`.cmd` wrapper in `Invoke-AgentHostShellSetup.ps1`, README fallback in `Invoke-VMSetup.ps1`, ssh block and ignore template in `Sync-GitAndSshConfig.ps1`).
