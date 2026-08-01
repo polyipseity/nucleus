@@ -25,6 +25,7 @@ run_05_framework_verification() {
   bash "$_test_dir/check-steps/16-package-manager-enforcement-explicit-skip.sh" || _exit_code=1
   bash "$_test_dir/check-steps/17-suppression-audit-explicit-skip.sh" || _exit_code=1
   bash "$_test_dir/check-steps/22-embedded-content-enforcement-tests.sh" || _exit_code=1
+  bash "$_test_dir/check-steps/23-legacy-token-syntax-tests.sh" || _exit_code=1
 
   say "--- integration smoke tests ---"
   bash "$_test_dir/integration-smoke-tests.sh" || _exit_code=1
