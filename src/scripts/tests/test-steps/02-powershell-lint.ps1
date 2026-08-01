@@ -14,8 +14,15 @@ Register-Step -Id "powershell-lint-test" -Number 2 -Name "PowerShell lint" -Acti
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
 
   # Unknown -SkipStep name should fail
-  & $pwshScript -SkipStep UnknownName -Paths (Join-Path $RepoRoot 'scripts\check-pwsh.ps1')
-  if ($LASTEXITCODE -eq 0) { $exitCode = 1 }
+  $unknownSkipRejected = $false
+  try {
+    & $pwshScript -SkipStep UnknownName -Paths (Join-Path $RepoRoot 'scripts\check-pwsh.ps1')
+    if ($LASTEXITCODE -ne 0) { $unknownSkipRejected = $true }
+  } catch {
+    # check-pwsh.ps1 signals unknown skip names with a terminating error.
+    $unknownSkipRejected = $true
+  }
+  if (-not $unknownSkipRejected) { $exitCode = 1 }
 
   # Phase 0 step-runner regression tests
   Write-Message "--- step-runner regression tests (PS1) ---"
