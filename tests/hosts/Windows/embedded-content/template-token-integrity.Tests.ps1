@@ -50,6 +50,14 @@ BeforeAll {
     $content = Get-Content -Raw -Path $InvokeVMSetupPath
     return @([regex]::Matches($content, "-replace '__[A-Z][A-Z_]*__'") | ForEach-Object { ($_.Value -replace "-replace '", "" -replace "'", "").Trim('_') } | Sort-Object -Unique)
   }
+
+  # Tokens targeted by the sed -e "s|__X__|..." render chains in vm.sh
+  # (POSIX-side start/stop helper templates).
+  function Get-VmShSedChainTokenList {
+    $vmSh = (Get-Content -Raw -Path (Join-Path $RepoRoot "scripts\vm.sh")) +
+      (Get-Content -Raw -Path (Join-Path $RepoRoot "src\scripts\lib\vm.sh"))
+    return @([regex]::Matches($vmSh, 's\|__[A-Z][A-Z_]*__\|') | ForEach-Object { ($_.Value -replace 's\|__', '' -replace '__\|', '').Trim('_') } | Sort-Object -Unique)
+  }
 }
 
 Describe "start-windows.ps1 template token integrity" {
@@ -75,6 +83,48 @@ Describe "start-windows-host.sh template token integrity" {
   It "every placeholder has a replacement in the Invoke-VMSetup render chain" {
     $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "start-windows-host.sh")
     $chainTokens = Get-ReplaceChainTokenList
+    $missing = @($templateTokens | Where-Object { $_ -notin $chainTokens })
+    $missing | Should -BeNullOrEmpty
+  }
+}
+
+Describe "start-host.ps1 template token integrity" {
+  It "declares exactly the 4 expected __TOKEN__ placeholders" {
+    $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "start-host.ps1")
+    ($templateTokens -join ",") | Should -Be "HOST_KIND,VM_DIR,VM_DISPLAY,VM_NAME"
+  }
+
+  It "every placeholder has a replacement in the vm.sh sed render chain" {
+    $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "start-host.ps1")
+    $chainTokens = Get-VmShSedChainTokenList
+    $missing = @($templateTokens | Where-Object { $_ -notin $chainTokens })
+    $missing | Should -BeNullOrEmpty
+  }
+}
+
+Describe "stop-posix.sh template token integrity" {
+  It "declares exactly the 3 expected __TOKEN__ placeholders" {
+    $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "stop-posix.sh")
+    ($templateTokens -join ",") | Should -Be "HOST_KIND,VM_DISPLAY,VM_NAME"
+  }
+
+  It "every placeholder has a replacement in the vm.sh sed render chain" {
+    $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "stop-posix.sh")
+    $chainTokens = Get-VmShSedChainTokenList
+    $missing = @($templateTokens | Where-Object { $_ -notin $chainTokens })
+    $missing | Should -BeNullOrEmpty
+  }
+}
+
+Describe "stop-host.ps1 template token integrity" {
+  It "declares exactly the 2 expected __TOKEN__ placeholders" {
+    $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "stop-host.ps1")
+    ($templateTokens -join ",") | Should -Be "HOST_KIND,VM_NAME"
+  }
+
+  It "every placeholder has a replacement in the vm.sh sed render chain" {
+    $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "stop-host.ps1")
+    $chainTokens = Get-VmShSedChainTokenList
     $missing = @($templateTokens | Where-Object { $_ -notin $chainTokens })
     $missing | Should -BeNullOrEmpty
   }
@@ -126,6 +176,9 @@ Describe "No legacy {{TOKEN}} syntax in VM templates" {
     foreach ($relativePath in @(
         "src\vms\templates\start-windows.ps1",
         "src\vms\templates\start-windows-host.sh",
+        "src\vms\templates\start-host.ps1",
+        "src\vms\templates\stop-posix.sh",
+        "src\vms\templates\stop-host.ps1",
         "src\vms\templates\README.md",
         "src\vms\windows\Autounattend.xml"
       )) {

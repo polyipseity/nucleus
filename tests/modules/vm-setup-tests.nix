@@ -341,6 +341,18 @@ let
           cond = builtins.pathExists ../../src/vms/templates/start-windows-host.sh;
           msg = "src/vms/templates/start-windows-host.sh must exist for Git Bash/MSYS VM start scripts";
         }
+        {
+          cond = builtins.pathExists ../../src/vms/templates/start-host.ps1;
+          msg = "src/vms/templates/start-host.ps1 must exist for POSIX-host PowerShell VM start scripts";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/templates/stop-posix.sh;
+          msg = "src/vms/templates/stop-posix.sh must exist for POSIX VM stop scripts";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/templates/stop-host.ps1;
+          msg = "src/vms/templates/stop-host.ps1 must exist for PowerShell VM stop scripts (incl. Windows QEMU)";
+        }
       ];
       results = builtins.map (c: assert' c.cond c.msg) checks;
     in
@@ -471,6 +483,9 @@ let
   startPosixTemplateText = builtins.readFile ../../src/vms/templates/start-posix.sh;
   startWindowsTemplateText = builtins.readFile ../../src/vms/templates/start-windows.ps1;
   startWindowsHostTemplateText = builtins.readFile ../../src/vms/templates/start-windows-host.sh;
+  startHostPs1TemplateText = builtins.readFile ../../src/vms/templates/start-host.ps1;
+  stopPosixShTemplateText = builtins.readFile ../../src/vms/templates/stop-posix.sh;
+  stopHostPs1TemplateText = builtins.readFile ../../src/vms/templates/stop-host.ps1;
   macbook_vms_nix_text = builtins.readFile ../../src/hosts/MacBook/vms.nix;
   utmConfigPlistText = builtins.readFile ../../src/modules/configs/vms/utm-config.plist.xml;
   vms_json_text = builtins.readFile ../../src/modules/VMs.json;
@@ -866,6 +881,76 @@ let
     && (lib.hasInfix "virt-viewer" startPosixTemplateText)
   ) "src/vms/templates/start-posix.sh must contain all expected placeholders and runtime branches";
 
+  # The PowerShell host-side start/stop helpers are single shared dispatcher
+  # templates (embedded-content policy), one per file kind, with __TOKEN__
+  # placeholders for the host kind and VM attributes substituted by vm.sh.
+  test_vm_start_host_ps1_template_content =
+    assert'
+      (
+        (lib.hasInfix "__HOST_KIND__" startHostPs1TemplateText)
+        && (lib.hasInfix "__VM_NAME__" startHostPs1TemplateText)
+        && (lib.hasInfix "__VM_DISPLAY__" startHostPs1TemplateText)
+        && (lib.hasInfix "__VM_DIR__" startHostPs1TemplateText)
+        && (lib.hasInfix "switch ('__HOST_KIND__')" startHostPs1TemplateText)
+        && (lib.hasInfix "darwin-tart" startHostPs1TemplateText)
+        && (lib.hasInfix "darwin-utm" startHostPs1TemplateText)
+        && (lib.hasInfix "nixos-libvirt" startHostPs1TemplateText)
+        && (lib.hasInfix "tart run" startHostPs1TemplateText)
+        && (lib.hasInfix "utmctl" startHostPs1TemplateText)
+        && (lib.hasInfix "virsh start" startHostPs1TemplateText)
+        && (lib.hasInfix "virt-viewer" startHostPs1TemplateText)
+        && (!lib.hasInfix "{{" startHostPs1TemplateText)
+      )
+      "src/vms/templates/start-host.ps1 must be a single dispatcher with all expected placeholders and runtime branches, with no {{TOKEN}} style";
+
+  test_vm_stop_posix_template_content =
+    assert'
+      (
+        (lib.hasInfix "__HOST_KIND__" stopPosixShTemplateText)
+        && (lib.hasInfix "__VM_NAME__" stopPosixShTemplateText)
+        && (lib.hasInfix "__VM_DISPLAY__" stopPosixShTemplateText)
+        && (lib.hasInfix "case \"$HOST_KIND\"" stopPosixShTemplateText)
+        && (lib.hasInfix "tart stop" stopPosixShTemplateText)
+        && (lib.hasInfix "utmctl stop" stopPosixShTemplateText)
+        && (lib.hasInfix "virsh shutdown" stopPosixShTemplateText)
+        && (lib.hasInfix "virsh destroy" stopPosixShTemplateText)
+        && (lib.hasInfix "set -eu" stopPosixShTemplateText)
+        && (!lib.hasInfix "{{" stopPosixShTemplateText)
+      )
+      "src/vms/templates/stop-posix.sh must be a single dispatcher with all expected placeholders and runtime branches, with no {{TOKEN}} style";
+
+  test_vm_stop_host_ps1_template_content =
+    assert'
+      (
+        (lib.hasInfix "__HOST_KIND__" stopHostPs1TemplateText)
+        && (lib.hasInfix "__VM_NAME__" stopHostPs1TemplateText)
+        && (lib.hasInfix "#Requires -Version 7.4" stopHostPs1TemplateText)
+        && (lib.hasInfix "tart stop" stopHostPs1TemplateText)
+        && (lib.hasInfix "utmctl stop" stopHostPs1TemplateText)
+        && (lib.hasInfix "virsh shutdown" stopHostPs1TemplateText)
+        && (lib.hasInfix "virsh destroy" stopHostPs1TemplateText)
+        && (lib.hasInfix "guest-shutdown" stopHostPs1TemplateText)
+        && (lib.hasInfix "Stop-Process -Force" stopHostPs1TemplateText)
+        && (!lib.hasInfix "{{" stopHostPs1TemplateText)
+        && (!lib.hasInfix "`$ErrorActionPreference" stopHostPs1TemplateText)
+      )
+      "src/vms/templates/stop-host.ps1 must be a single dispatcher with all expected placeholders and runtime branches, no {{TOKEN}} style, and no backtick-escaped statement dollars";
+
+  # Every __TOKEN__ in the host-kind templates must have a sed replacement in
+  # vm.sh so no placeholder survives into a rendered helper script.
+  test_vm_host_templates_render_chains =
+    assert'
+      (
+        (lib.hasInfix "s|__HOST_KIND__|" vm_setup_sh_text)
+        && (lib.hasInfix "s|__VM_NAME__|" vm_setup_sh_text)
+        && (lib.hasInfix "s|__VM_DISPLAY__|" vm_setup_sh_text)
+        && (lib.hasInfix "s|__VM_DIR__|" vm_setup_sh_text)
+        && (lib.hasInfix "start-host.ps1" vm_setup_sh_text)
+        && (lib.hasInfix "stop-posix.sh" vm_setup_sh_text)
+        && (lib.hasInfix "stop-host.ps1" vm_setup_sh_text)
+      )
+      "vm.sh must render start-host.ps1/stop-posix.sh/stop-host.ps1 via sed token chains that cover all template placeholders";
+
   test_vm_start_windows_template_content =
     assert'
       (
@@ -1059,6 +1144,10 @@ let
     test_vm_start_posix_template_content
     test_vm_start_windows_template_content
     test_vm_start_windows_host_template_content
+    test_vm_start_host_ps1_template_content
+    test_vm_stop_posix_template_content
+    test_vm_stop_host_ps1_template_content
+    test_vm_host_templates_render_chains
     test_vm_directory_readme_generation
     test_windows_vm_directory_readme_generation
     test_vm_setup_generates_helper_scripts
@@ -1148,6 +1237,10 @@ in
     test_vm_start_posix_template_content
     test_vm_start_windows_template_content
     test_vm_start_windows_host_template_content
+    test_vm_start_host_ps1_template_content
+    test_vm_stop_posix_template_content
+    test_vm_stop_host_ps1_template_content
+    test_vm_host_templates_render_chains
     test_vm_directory_readme_generation
     test_windows_vm_directory_readme_generation
     test_vm_setup_generates_helper_scripts

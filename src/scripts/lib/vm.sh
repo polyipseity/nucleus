@@ -386,42 +386,20 @@ vm_write_start_script() {
   fi
   chmod 755 "$_wss_path_sh"
 
-  # Render .ps1 inline (macOS/Unix-specific PowerShell wrappers).
+  # Render .ps1 from the shared host-kind dispatcher template
+  # (embedded-content policy: single shared file per platform).
   case "$_wss_host_kind" in
-    darwin-tart)
-      cat >"$_wss_path_ps1" <<EOF
-# start-$_wss_name.ps1 — Start VM '$_wss_name' on macOS via Tart.
-& tart run '$_wss_name'
-EOF
-      ;;
-    darwin-utm)
-      cat >"$_wss_path_ps1" <<EOF
-# start-$_wss_name.ps1 — Start VM '$_wss_name' on macOS via UTM.
-if (Test-Path '/Applications/UTM.app/Contents/MacOS/utmctl') {
-  & '/Applications/UTM.app/Contents/MacOS/utmctl' start '$_wss_name'
-  if (\$LASTEXITCODE -ne 0) {
-    Write-Warning "nucleus-vm: utmctl start failed for $_wss_name; opening bundle instead"
-    Start-Process -FilePath open -ArgumentList '$VM_DIR/$_wss_name.utm' | Out-Null
-  }
-} else {
-  Start-Process -FilePath open -ArgumentList '$VM_DIR/$_wss_name.utm' | Out-Null
-}
-EOF
-      ;;
-    nixos-libvirt)
-      cat >"$_wss_path_ps1" <<EOF
-# start-$_wss_name.ps1 — Start VM '$_wss_name' with libvirt.
-& virsh start '$_wss_name' | Out-Null
-if (\$LASTEXITCODE -ne 0) {
-  Write-Warning "nucleus-vm: virsh start failed (or VM already running): $_wss_name"
-}
-if (Get-Command virt-viewer -ErrorAction SilentlyContinue) {
-  & virt-viewer --connect qemu:///system '$_wss_name'
-} else {
-  Write-Host "nucleus-vm: VM started: $_wss_name"
-  Write-Host 'nucleus-vm: install virt-viewer to open a console automatically'
-}
-EOF
+    darwin-tart|darwin-utm|nixos-libvirt)
+      if [ -f "$TEMPLATES_DIR/start-host.ps1" ]; then
+        sed -e "s|__HOST_KIND__|$_wss_host_kind|g" \
+            -e "s|__VM_NAME__|$_wss_name|g" \
+            -e "s|__VM_DISPLAY__|$_wss_display|g" \
+            -e "s|__VM_DIR__|$VM_DIR|g" \
+            "$TEMPLATES_DIR/start-host.ps1" >"$_wss_path_ps1"
+      else
+        warn "start-host.ps1 template not found at $TEMPLATES_DIR/start-host.ps1"
+        printf '# start script for %s\n' "$_wss_name" >"$_wss_path_ps1"
+      fi
       ;;
     windows-qemu)
       # WHY: the Android QEMU start script is shared cross-platform content
@@ -464,40 +442,19 @@ vm_write_stop_script() {
     return 0
   fi
 
-  # Render .sh from template or inline.
+  # Render .sh from the shared host-kind dispatcher template
+  # (embedded-content policy: single shared file per platform).
   case "$_wst_host_kind" in
-    darwin-tart)
-      cat >"$_wst_path_sh" <<'STOPSH'
-#!/bin/sh
-set -eu
-exec tart stop "__VM_NAME__"
-STOPSH
-      sed -i '' "s|__VM_NAME__|$_wst_name|g" "$_wst_path_sh"
-      ;;
-    darwin-utm)
-      cat >"$_wst_path_sh" <<'STOPSH'
-#!/bin/sh
-set -eu
-if command -v utmctl >/dev/null 2>&1; then
-  exec utmctl stop "__VM_DISPLAY__"
-fi
-echo "utmctl not found; VM may still be running" >&2
-exit 1
-STOPSH
-      sed -i '' "s|__VM_DISPLAY__|$_wst_display|g" "$_wst_path_sh"
-      ;;
-    nixos-libvirt)
-      cat >"$_wst_path_sh" <<'STOPSH'
-#!/bin/sh
-set -eu
-if virsh shutdown "__VM_NAME__" 2>/dev/null; then
-  echo "ACPI shutdown signal sent to __VM_NAME__"
-else
-  echo "virsh shutdown failed; trying virsh destroy..." >&2
-  exec virsh destroy "__VM_NAME__"
-fi
-STOPSH
-      sed -i '' "s|__VM_NAME__|$_wst_name|g" "$_wst_path_sh"
+    darwin-tart|darwin-utm|nixos-libvirt)
+      if [ -f "$TEMPLATES_DIR/stop-posix.sh" ]; then
+        sed -e "s|__HOST_KIND__|$_wst_host_kind|g" \
+            -e "s|__VM_NAME__|$_wst_name|g" \
+            -e "s|__VM_DISPLAY__|$_wst_display|g" \
+            "$TEMPLATES_DIR/stop-posix.sh" >"$_wst_path_sh"
+      else
+        warn "stop-posix.sh template not found at $TEMPLATES_DIR/stop-posix.sh"
+        printf '#!/bin/sh\nset -eu\necho "stop script for %s"\n' "$_wst_name" >"$_wst_path_sh"
+      fi
       ;;
     *)
       error "unknown stop-script host kind: $_wst_host_kind"
@@ -506,73 +463,22 @@ STOPSH
   esac
   chmod 755 "$_wst_path_sh"
 
-  # Render .ps1 inline.
+  # Render .ps1 from the shared host-kind dispatcher template
+  # (embedded-content policy: single shared file per platform).
   case "$_wst_host_kind" in
-    darwin-tart)
-      cat >"$_wst_path_ps1" <<EOF
-# stop-$_wst_name.ps1 — Stop VM '$_wst_name' on macOS via Tart.
-& tart stop '$_wst_name'
-EOF
+    darwin-tart|darwin-utm|nixos-libvirt|windows-qemu)
+      if [ -f "$TEMPLATES_DIR/stop-host.ps1" ]; then
+        sed -e "s|__HOST_KIND__|$_wst_host_kind|g" \
+            -e "s|__VM_NAME__|$_wst_name|g" \
+            "$TEMPLATES_DIR/stop-host.ps1" >"$_wst_path_ps1"
+      else
+        warn "stop-host.ps1 template not found at $TEMPLATES_DIR/stop-host.ps1"
+        printf '# stop script for %s\n' "$_wst_name" >"$_wst_path_ps1"
+      fi
       ;;
-    darwin-utm)
-      cat >"$_wst_path_ps1" <<EOF
-# stop-$_wst_name.ps1 — Stop VM '$_wst_name' on macOS via UTM.
-if (Get-Command 'utmctl' -ErrorAction SilentlyContinue) {
-  & utmctl stop '$_wst_name'
-} else {
-  Write-Warning "utmctl not found; VM may still be running: $_wst_name"
-}
-EOF
-      ;;
-    nixos-libvirt)
-      cat >"$_wst_path_ps1" <<EOF
-# stop-$_wst_name.ps1 — Stop VM '$_wst_name' with libvirt.
-& virsh shutdown '$_wst_name' 2>&1 | Out-Null
-if (\$LASTEXITCODE -ne 0) {
-  & virsh destroy '$_wst_name'
-}
-EOF
-      ;;
-    windows-qemu)
-      cat >"$_wst_path_ps1" <<'EOF'
-# stop-{VM_NAME}.ps1 — Stop VM on Windows via QEMU GA or process kill.
-#Requires -Version 7.4
-
-`$ErrorActionPreference = 'Stop'
-
-`$vmName = '__VM_NAME__'
-`$qemuPipe = "\\.\pipe\qga-`$vmName"
-
-# Try QEMU guest agent shutdown first.
-if (Test-Path -LiteralPath `$qemuPipe -PathType Leaf) {
-  try {
-    `$gaCommand = @{
-      execute = 'guest-shutdown'
-      arguments = @{
-        mode = 'powerdown'
-      }
-    } | ConvertTo-Json -Compress
-    `$gaPacket = @{ execute = 'guest-shutdown'; arguments = @{ mode = 'powerdown' } } | ConvertTo-Json -Compress
-    Write-Host "Sending guest shutdown via QEMU GA: `$vmName"
-    # Write QEMU GA command to the pipe (simplified; full QMP protocol would need a proper client).
-    return
-  } catch {
-    Write-Warning "QEMU GA shutdown failed: $_"
-  }
-}
-
-# Fallback: kill the QEMU process.
-`$proc = Get-Process -Name 'qemu-system-*' -ErrorAction SilentlyContinue | Where-Object {
-  `$_.CommandLine -match "`$vmName"
-}
-if (`$proc) {
-  Write-Host "Stopping QEMU process for VM: `$vmName"
-  `$proc | Stop-Process -Force
-} else {
-  Write-Warning "No running QEMU process found for VM: `$vmName"
-}
-EOF
-      sed -i '' "s|__VM_NAME__|$_wst_name|g" "$_wst_path_ps1"
+    *)
+      error "unknown stop-script host kind: $_wst_host_kind"
+      return 1
       ;;
   esac
 
