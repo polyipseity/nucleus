@@ -77,14 +77,63 @@ fi
 # Microsoft publishes no stable Windows 11 ISO checksums, so
 # src/vms/windows/packer.pkr.hcl intentionally sets iso_checksum to "none"
 # (see the variable description at line 39 and check-suppress comment at
-# line 228). The packer validate exit code below is still enforced — only
-# the expected warning text is hidden.
+# line 228). The packer validate exit code below is still enforced -- only
+# the expected warning text is hidden. The filter is authorized by the
+# check_packer_validate_annotations gate below (Category 1 machine-parsing
+# invariant: the annotation must exist before the warning may be hidden).
 _filter_known_packer_warnings() {
   awk '
     /Warning: A checksum of .none. was specified/ { skip=1 }
     skip && /\(source code not available\)/ { skip=0; next }
     !skip { print }
   '
+}
+
+# packer_validate annotation gate (Category 1 machine-parsing invariant).
+# The Windows template sets iso_checksum to "none"; that choice MUST carry the
+# `# check-suppress:packer_validate:` annotation on the same iso_checksum
+# line. This script and scripts/check-packer.ps1 are the annotation's machine
+# consumers. When iso_checksum resolves to "none" without the annotation,
+# validation fails.
+check_packer_validate_annotations() {
+  local tpl="$REPO_ROOT/src/vms/windows/packer.pkr.hcl"
+  [ -f "$tpl" ] || return 0
+  local content line effective varname violations=0
+  content=$(< "$tpl")
+  while IFS= read -r line; do
+    case "$line" in
+      *iso_checksum[[:space:]]*=*)
+        effective=$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*iso_checksum[[:space:]]*=//; s/#.*//; s/[[:space:]]//g')
+        if [[ "$effective" =~ ^var\.([A-Za-z0-9_]+)$ ]]; then
+          varname="${BASH_REMATCH[1]}"
+          effective=$(printf '%s\n' "$content" | awk -v v="$varname" '
+            $0 ~ ("variable \"" v "\"") { block=1; next }
+            block && /^[[:space:]]*default[[:space:]]*=/ {
+              sub(/^[[:space:]]*default[[:space:]]*=[[:space:]]*/, "")
+              gsub(/[[:space:]]/, "")
+              print
+              exit
+            }
+            block && /^\}/ { exit }
+          ')
+        fi
+        case "$effective" in
+          none|'"none"'|"'none'")
+            if [[ "$line" != *'# check-suppress:packer_validate:'* ]]; then
+              error "iso_checksum resolves to 'none' without '# check-suppress:packer_validate:' annotation: $line"
+              violations=1
+            fi
+            ;;
+        esac
+        ;;
+    esac
+  done <<< "$content"
+  return "$violations"
+}
+
+check_packer_validate_annotations || {
+  error "packer_validate annotation check failed"
+  exit 1
 }
 
 validate_dir() {

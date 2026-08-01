@@ -31,7 +31,14 @@
 [CmdletBinding()]
 param(
   [Parameter(ValueFromRemainingArguments = $true)]
-  [string[]]$Paths = @()
+  [string[]]$Paths = @(),
+
+  # Test seam: point the packer_validate annotation check at a different
+  # template file (used by tests/scripts/check-packer-annotation-tests.ps1).
+  [string]$WindowsTemplateOverride = '',
+
+  # Test seam: run only the packer_validate annotation check, then exit.
+  [switch]$AnnotationCheckOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -43,6 +50,93 @@ $repoRoot = if ($env:NUCLEUS_REPO_ROOT) {
   (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
 }
 Set-Location -Path $repoRoot
+
+# ---------------------------------------------------------------------------
+# packer_validate annotation check (Category 1 machine-parsing invariant)
+# ---------------------------------------------------------------------------
+# The Windows template sets iso_checksum to "none" because Microsoft publishes
+# no stable Windows 11 ISO checksums. That choice is authorized by the
+# `# check-suppress:packer_validate:` annotation on the iso_checksum line; this
+# script (and its scripts/check-packer.sh twin) is the annotation's machine
+# consumer. When the annotation is present, the expected packer "checksum of
+# none" warning is hidden from validation output; when iso_checksum resolves
+# to "none" without the annotation, the check fails.
+$packerWindowsTemplate = if ($WindowsTemplateOverride) {
+  $WindowsTemplateOverride
+} else {
+  Join-Path -Path $repoRoot -ChildPath 'src/vms/windows/packer.pkr.hcl'
+}
+
+function Get-EffectiveChecksum {
+  <#
+  .SYNOPSIS
+    Resolve the effective iso_checksum value of a .pkr.hcl assignment line.
+  .DESCRIPTION
+    Returns 'none' when the line's value is the literal "none"/'none' or
+    references a variable whose default is "none"; returns $null otherwise.
+    Inline HCL comments are ignored.
+  #>
+  param(
+    [string]$Line,
+    [string[]]$TemplateLines
+  )
+  $value = ($Line.Split('#')[0] -replace '^\s*iso_checksum\s*=\s*', '').Trim()
+  if ($value -in @('"none"', "'none'")) { return 'none' }
+  $varMatch = [regex]::Match($value, '^var\.([A-Za-z0-9_]+)')
+  if (-not $varMatch.Success) { return $null }
+  $varName = $varMatch.Groups[1].Value
+  $blockOpen = $false
+  foreach ($tpl in $TemplateLines) {
+    if ($tpl -match ('^variable\s+"' + [regex]::Escape($varName) + '"')) {
+      $blockOpen = $true
+      continue
+    }
+    if ($blockOpen) {
+      if ($tpl -match '^\s*default\s*=\s*["'']none[""'']') { return 'none' }
+      if ($tpl -match '^\}') { break }
+    }
+  }
+  return $null
+}
+
+function Test-PackerValidateAnnotation {
+  <#
+  .SYNOPSIS
+    Enforce the packer_validate annotation on iso_checksum = "none" sites.
+  .DESCRIPTION
+    Parses the Windows Packer template: every iso_checksum assignment that
+    resolves to "none" (skip verification) MUST carry a
+    `# check-suppress:packer_validate:` annotation on the same line. Throws
+    listing all violations. Returns $true when the annotation was found (which
+    authorizes hiding the expected packer warning), $false when no iso_checksum
+    assignment exists.
+  #>
+  param([string]$TemplatePath)
+  if (-not (Test-Path -Path $TemplatePath)) { return $false }
+  $templateLines = Get-Content -Path $TemplatePath
+  $violations = [System.Collections.Generic.List[string]]::new()
+  $annotated = $false
+  foreach ($line in $templateLines) {
+    if ($line -notmatch '^\s*iso_checksum\s*=') { continue }
+    $effective = Get-EffectiveChecksum -Line $line -TemplateLines $templateLines
+    $hasAnnotation = $line -match '#\s*check-suppress:packer_validate:'
+    if ($hasAnnotation) { $annotated = $true }
+    if ($effective -eq 'none' -and -not $hasAnnotation) {
+      $violations.Add("iso_checksum resolves to 'none' without '# check-suppress:packer_validate:' annotation: $($line.Trim())")
+    }
+  }
+  if ($violations.Count -gt 0) {
+    throw ("packer_validate annotation violation(s):`n" + ($violations -join "`n"))
+  }
+  return $annotated
+}
+
+$suppressChecksumWarning = Test-PackerValidateAnnotation -TemplatePath $packerWindowsTemplate
+
+if ($AnnotationCheckOnly) {
+  Write-Output 'packer_validate annotation check passed.'
+  exit 0
+}
 
 # ---------------------------------------------------------------------------
 # Phase 1: Formatting check
@@ -97,9 +191,25 @@ function Test-PackerDir {
       default    { @() }
     }
     $validateArgs = @('validate') + ($varArgs | ForEach-Object { @('-var', $_) }) + @('.')
-    & packer $validateArgs
+    $validateOutput = @(& packer $validateArgs 2>&1)
     if ($LASTEXITCODE -ne 0) {
+      $validateOutput | ForEach-Object { Write-Output ($_ -as [string]) }
       throw "packer validate failed in $Dir"
+    }
+    # Hide the expected "checksum of none" warning when the packer_validate
+    # annotation authorizes it (see the annotation check above). Mirrors the
+    # _filter_known_packer_warnings awk filter in scripts/check-packer.sh.
+    if ($Dir -like '*windows' -and $suppressChecksumWarning) {
+      $skip = $false
+      foreach ($out in $validateOutput) {
+        $text = $out -as [string]
+        if ($text -match 'Warning: A checksum of .none. was specified') { $skip = $true; continue }
+        if ($skip -and $text -match '\(source code not available\)') { $skip = $false; continue }
+        if ($skip) { continue }
+        Write-Output $text
+      }
+    } else {
+      $validateOutput | ForEach-Object { Write-Output ($_ -as [string]) }
     }
   } finally {
     Pop-Location

@@ -40,7 +40,7 @@ Hard rules:
 | `# Method N (name) -- <why>` (legacy form) | 68 → 71 sites | `config-method` | `# check-suppress:config-method: method N (name) -- <reason>` (lowercase `method N`) | step 19 `.ps1` (regex `'# check-suppress:config-method'`); `.sh` twin has no `# Method` regex (checks `configs\.` method usage only) |
 | `# check-suppress:SuppressMessageAttribute: <rule> -- <just>` / bare rule lists | 74 | `SuppressMessageAttribute` | `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | step 17 `Get-UndocSuppViolation -CheckId 'SuppressMessageAttribute'` |
 | `# check-suppress:suppression_doc: <just>` | 394 | `suppression_doc` | unchanged (plain form) | step 17 regex `# check-suppress:$CheckId[\s:]` |
-| `# check-suppress:packer_validate: ...` | 1 | `packer_validate` | unchanged form; parser required | `scripts/check-packer.ps1` (reads the comment, suppresses the checksum warning) |
+| `# check-suppress:packer_validate: ...` | 1 | `packer_validate` | unchanged form (implemented) | `scripts/check-packer.ps1` + `scripts/check-packer.sh` (read the comment; suppress the checksum warning when present; fail when `iso_checksum = "none"` lacks the annotation) |
 | `|| true` (shell) / `$null =` / `[void]` (ps1) | 5 sh sites + ps1 sites | `suppression_doc` | annotate with `# check-suppress:suppression_doc: <reason>` | step 17 `.sh` twin (flags bare `|| true`), step 17 `.ps1` (flags `$null =` / `[void]`) |
 
 **Suppression semantics:** `|| true`, `$null =`, and `[void]` are suppression patterns (they silence exit codes or discard values). They are NOT rationale markers — justify them with `# check-suppress:suppression_doc:` on the same line, never with `# WHY:`.
@@ -75,7 +75,7 @@ Dividers (`# --- section ---`), DSC structural headers (`# WinGet DSC v3 -`, `# 
 | --- | --- | --- |
 | `suppression_doc` | generic suppression documentation | step 17 `.ps1` + `.sh` twin |
 | `SuppressMessageAttribute` | PSSA rule-name suppression comments | step 17 `Get-UndocSuppViolation` |
-| `packer_validate` | packer checksum annotations | `scripts/check-packer.ps1` |
+| `packer_validate` | packer checksum annotations | `scripts/check-packer.ps1` + `scripts/check-packer.sh` |
 | `embedded-content` | embedded-content policy exceptions | step 22 `.ps1` |
 | `config-method` | config deployment method annotations | step 19 `.ps1` + `.sh` twin |
 
@@ -106,6 +106,7 @@ Rule: any new tool-enforced marker MUST register a check id AND a machine consum
 | no `—` after `# ref:` | no em dash in refs | documented only |
 | `# ref:.*reason:` = 0 | no reason keyword in refs | documented only |
 | `# (Source\|Cross-reference\|See):` in dsc.yml = 0 | DSC headers → `ref` | documented only |
+| `iso_checksum = "none"` without `# check-suppress:packer_validate:` = 0 | packer_validate annotation required | step 3 (check-packer) |
 
 ## Related instruction files
 
