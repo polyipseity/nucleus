@@ -52,8 +52,10 @@ function Sync-ShellProfile {
     [bool]$Enabled
   )
 
-  $managedBlockStart = '# >>> config managed shell parity >>>'
-  $managedBlockEnd = '# <<< config managed shell parity <<<'
+  # ref: comment-annotations.instructions.md -- Category 2 sentinel convention
+  # (nucleus-managed framing; brackets reserved for machine-managed regions).
+  $managedBlockStart = '# >>> begin nucleus-managed: shell profile >>>'
+  $managedBlockEnd = '# <<< end nucleus-managed: shell profile <<<'
   # User-scope package manager bin directories are prepended before the
   # direnv hook initializes so they are always part of the environment
   # direnv saves and restores, regardless of whether the directories
@@ -111,12 +113,17 @@ function Sync-ShellProfile {
     $filteredLines = @()
     $insideManagedBlock = $false
     foreach ($line in $existingLines) {
-      if ($line -eq $managedBlockStart) {
+      # WHY: strip by bracket pattern (not exact subject text) so blocks written
+      # under earlier sentinel wording (e.g. old 'config managed shell parity'
+      # framing) are also regenerated on the next apply. The spec reserves
+      # '>>>'/'<<<' brackets for machine-managed regions (Category 2 sentinel
+      # convention), so any such region is nucleus-owned regardless of subject.
+      if ($line -like '# >>>*') {
         $insideManagedBlock = $true
         continue
       }
 
-      if ($line -eq $managedBlockEnd) {
+      if ($line -like '# <<<*') {
         $insideManagedBlock = $false
         continue
       }
@@ -134,7 +141,10 @@ function Sync-ShellProfile {
       $filteredLines += $managedBlock
     }
 
-    $hasNonWhitespaceLines = ($filteredLines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0
+    # WHY: @(...) forces an array so an empty filtered result yields Count 0,
+    # not $null.Count (throws under Set-StrictMode when the profile is exactly
+    # the managed block and disable strips everything).
+    $hasNonWhitespaceLines = @($filteredLines | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }).Count -gt 0
     if ($hasNonWhitespaceLines) {
       [System.IO.File]::WriteAllLines($profilePath, $filteredLines, [System.Text.UTF8Encoding]::new($false))
     }
