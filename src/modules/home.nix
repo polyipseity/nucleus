@@ -82,7 +82,7 @@ let
   #
   # WHY checkSlowStartup is not configured: checkSlowStartup is localStorage-backed
   # and vault-specific. It cannot be declaratively managed via obsidian.json.
-  # Method 3 (merge) — see the activation entry below for full rationale.
+  # check-suppress:config-method: method 3 (merge) -- see the activation entry below for full rationale.
   obsidianDefaultSettings = builtins.fromJSON (builtins.readFile ./configs/obsidian/obsidian.json);
 
   obsidianManagedSettings = managedAppSettings "obsidian" obsidianDefaultSettings;
@@ -104,7 +104,7 @@ let
   # Picard baseline defaults are sourced from the canonical native INI file.
   # We apply these defaults with merge-overwrite semantics, then layer
   # user-specific [setting] overrides from users.json.
-  # Method 3 (merge): Picard INI defaults are merged with user overrides.
+  # check-suppress:config-method: method 3 (merge) -- Picard INI defaults are merged with user overrides.
   picardDefaultsIniText = builtins.readFile ./configs/picard/Picard.ini;
   picardUserSettings = userAppSettings "picard";
 
@@ -198,7 +198,7 @@ in
     # Keep both aligned with the per-user passwordStoreDir and the shared
     # screenshot-backed Settings + Template tab baseline, while still allowing
     # centralized per-user overrides from flake.nix.
-    # Method 3 (merge) — cannot use Method 1 (symlink) because QtPass manages
+    # check-suppress:config-method: method 3 (merge) -- cannot use Method 1 (symlink) because QtPass manages
     # its own UI preferences via QSettings (macOS: defaults, Linux: INI,
     # Windows: registry). A symlink does not apply to these platform-native
     # stores. Merge writes the managed defaults into each store while
@@ -215,7 +215,7 @@ in
     # on macOS and Linux. Merge-overwrite defaults from the canonical
     # Picard.ini baseline file, then layer per-user [setting] overrides.
     # Always preserve unmanaged keys and sections.
-    # Method 3 (merge) — cannot use Method 1 (symlink) because Picard manages
+    # check-suppress:config-method: method 3 (merge) -- cannot use Method 1 (symlink) because Picard manages
     # its INI through UI preferences (window state, plugin tokens, user
     # settings that should persist across applies). A symlink would let app
     # writes reach the repo file. Merge applies managed defaults while
@@ -232,7 +232,7 @@ in
     # file so the declarative defaults converge without clobbering vault lists
     # or other app-owned state.
     #
-    # Method 3 (merge) — cannot use Method 1 (symlink) because Obsidian owns
+    # check-suppress:config-method: method 3 (merge) -- cannot use Method 1 (symlink) because Obsidian owns
     # obsidian.json and writes vault metadata (vault paths, window state) into
     # it. A symlink would let those app-owned writes reach the repo file,
     # mixing managed settings with runtime state that does not belong in the
@@ -281,14 +281,14 @@ in
           configName = if pkgs.stdenv.isDarwin then "macos" else "linux";
         in
         {
-          # Method 1 (writable symlink): repo changes take effect without rebuild.
+          # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
           # camilladsp/configs/macos/default.yml — Method 1 (writable symlink) consumed via directory symlink above
-          # Method 1 (writable symlink): camilladsp/configs/linux/default.yml consumed via directory symlink above
+          # check-suppress:config-method: method 1 (writable symlink) -- camilladsp/configs/linux/default.yml consumed via directory symlink above
           ".config/camilladsp/configs".source =
             config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/camilladsp/configs/${configName}";
-          # Method 1 (writable symlink): repo changes take effect without rebuild.
+          # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
           # camillagui-backend/config-macos.yml — Method 1 (writable symlink) consumed via dynamic configName above
-          # Method 1 (writable symlink): camillagui-backend/config-linux.yml consumed via dynamic configName above
+          # check-suppress:config-method: method 1 (writable symlink) -- camillagui-backend/config-linux.yml consumed via dynamic configName above
           ".config/camillagui-backend/config.yml".source =
             config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/camillagui-backend/config-${configName}.yml";
         }

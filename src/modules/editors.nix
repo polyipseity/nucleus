@@ -176,15 +176,15 @@ let
   # Select the per-host keybindings source file so that platform-specific
   # shortcuts (Cmd on macOS vs Ctrl on NixOS/Linux) are tracked independently
   # without cross-host pollution in a shared repo file.
-  # Method 1 (writable symlink): repo changes take effect without rebuild.
+  # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
   vsCodeKeybindingsFile = if isDarwin then "keybindings.mac.json" else "keybindings.nixos.json";
 
   # Select the per-host Copilot chat model list so that each machine only
   # surfaces the Ollama models that fit within its VRAM budget.
   # mac: gemma4:e4b + qwen3:14b (24 GB unified memory allows both).
   # nixos/other: qwen3:8b only (discrete GPU capped at 6 GB VRAM).
-  # Method 1 (writable symlink): repo changes take effect without rebuild.
-  vsCodeChatLanguageModelsFile = # Method 1 (writable symlink)
+  # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
+  vsCodeChatLanguageModelsFile = # check-suppress:config-method: method 1 (writable symlink)
     if isDarwin then "chatLanguageModels.mac.json" else "chatLanguageModels.nixos.json";
 
   # Python script that inserts a workspace trust entry for ~/dev into VS Code's
@@ -317,7 +317,7 @@ in
   home.activation = {
     # -------------------------------------------------------------------------
     # symlink-vscode-config
-    # Method 1 (writable symlink) — repo changes take effect without rebuild.
+    # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
     # Replaces VS Code's per-channel config files with symlinks into the live
     # repo tree (src/modules/configs/vscode/) so that every VS Code write
     # (settings change, keybinding edit, MCP server addition, Copilot memory)

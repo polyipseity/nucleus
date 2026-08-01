@@ -565,11 +565,11 @@ $secretsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\secrets"
 $wallpaperAssetsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\assets\wallpapers"
 $machineSshHostKeyPubPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key.pub"
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\")).Path
-# Method 3 (merge) — QtPass shared settings JSON source of truth shared with
+# check-suppress:config-method: method 3 (merge) -- QtPass shared settings JSON source of truth shared with
 # POSIX activation. QtPass stores settings in platform-native stores
-# (registry on Windows), so Method 1 (symlink) does not apply.  # Method 3 (merge)
+# (registry on Windows), so Method 1 (symlink) does not apply.
 $qtPassSettingsPath = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\qtpass\qtpass.json"
-# Method 3 (merge) — Picard defaults INI merged via Sync-PicardConfig on Windows
+# check-suppress:config-method: method 3 (merge) -- Picard defaults INI merged via Sync-PicardConfig on Windows
 $picardDefaultsPath = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\picard\Picard.ini"
 $sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
 
@@ -809,11 +809,11 @@ if ($null -eq $EnableDevReposParity) {
 # secret/key ordering across macOS, NixOS, and Windows.
 Sync-DevRepo -Enabled:$EnableDevReposParity -Repositories $devRepositories
 Sync-ShellProfile -Enabled:$EnableShellParity
-# Method 1 (writable symlink): bun and uv configs symlinked to repo files.
+# check-suppress:config-method: method 1 (writable symlink) -- bun and uv configs symlinked to repo files.
 Sync-BunConfig -Enabled:$EnableShellParity
 Sync-UvConfig -Enabled:$EnableShellParity
 Sync-NextestConfig -Enabled:$EnableShellParity
-# Method 1 (writable symlink): direnvrc cross-platform base config.
+# check-suppress:config-method: method 1 (writable symlink) -- direnvrc cross-platform base config.
 Sync-DirenvConfig -Enabled:$EnableShellParity
 Sync-StarshipConfig -Enabled:$EnableShellParity
 if ($EnableCloudDrivesParity) {
@@ -828,7 +828,7 @@ Sync-CaddyLocalCA -RepoRoot $repoRoot -Enabled:$true
 Sync-JellyfinAccount -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
 Sync-JellyfinLibrary -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
 Sync-CustomProvisionSymlink -Enabled:$EnableCustomProvisionSymlinkParity -UserRecords $selectedUserRecords
-# Method 1 (writable symlink): symlink config so edits take effect immediately.
+# check-suppress:config-method: method 1 (writable symlink) -- symlink config so edits take effect immediately.
   $discordMusicRPCConfigDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath "discord-music-rpc"
   # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
   $null = New-Item -Path $discordMusicRPCConfigDir -ItemType Directory -Force

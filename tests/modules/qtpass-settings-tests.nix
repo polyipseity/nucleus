@@ -17,7 +17,7 @@ in
 # Verify QtPass settings are now sourced from qtpass.json via builtins.fromJSON
 assert containsRegex "qtPassDefaultSettings = builtins\\.fromJSON" qtpassText;
 assert containsRegex "readFile \\./qtpass\\.json" qtpassText;
-assert containsRegex "# Method 3" qtpassText;
+assert containsRegex "# check-suppress:config-method: method 3" qtpassText;
 # Verify qtpass.json contains expected settings (shared baseline)
 assert qtpassJson.addGPGId == true;
 assert qtpassJson.alwaysOnTop == true;
@@ -47,7 +47,7 @@ assert containsRegex "EnableQtPassParity" applyText;
 # Verify Windows path uses qtpass.json
 assert containsRegex "qtpass\\\\qtpass\\.json" applyText;
 # Verify Windows side has method label
-assert containsRegex "# Method 3" applyText;
+assert containsRegex "# check-suppress:config-method: method 3" applyText;
 # Verify user override structure for all app configs
 assert builtins.hasAttr "qtpass" windowsUsers.users.polyipseity;
 assert builtins.hasAttr "settings" windowsUsers.users.polyipseity.qtpass;

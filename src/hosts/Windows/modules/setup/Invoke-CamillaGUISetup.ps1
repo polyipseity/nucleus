@@ -105,11 +105,11 @@ function Invoke-CamillaGUISetup {
 
     Write-Output "camillagui-backend-setup: v$desiredVersion installed to $installDir"
 
-    # Method 1 (writable symlink): deploy user-level config to $HOME\.config
+    # check-suppress:config-method: method 1 (writable symlink) -- deploy user-level config to $HOME\.config
     # (cross-platform parity with POSIX ~/.config/camillagui-backend/config.yml).
     $configDir = Join-Path -Path $HOME -ChildPath ".config\camillagui-backend"
     $configPath = Join-Path -Path $configDir -ChildPath "config.yml"
-    $configSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\camillagui-backend\config-windows.yml"  # Method 1 (writable symlink)
+    $configSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\camillagui-backend\config-windows.yml"  # check-suppress:config-method: method 1 (writable symlink)
     if (-not (Test-Path $configDir)) {
       # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
       $null = New-Item -ItemType Directory -Path $configDir -Force

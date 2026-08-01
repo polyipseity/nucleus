@@ -236,7 +236,7 @@ function Sync-GitAndSshConfig {
         New-Item -ItemType Directory -Path $emptyTemplateDir -Force > $null
       }
 
-      # Method 1 (writable symlink): global gitignore symlinked to repo file.
+      # check-suppress:config-method: method 1 (writable symlink) -- global gitignore symlinked to repo file.
       # Mirrors the POSIX git.nix deployment of system.gitignore.
       $globalIgnoreSource = Join-Path $env:NUCLEUS_REPO_ROOT 'src\modules\configs\git\system.gitignore'
       if (-not (Test-Path -Path $globalIgnoreSource -PathType Leaf)) {

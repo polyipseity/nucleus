@@ -175,7 +175,7 @@ in
   # in package.json (no caret ranges). Bun reads bunfig.toml from $HOME by default.
   # Source: https://bun.sh/docs/runtime/bunfig#install
   home.file.".bunfig.toml" = {
-    # Method 1 (writable symlink): repo changes take effect without rebuild.
+    # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/bun/bunfig.toml";
   };
 
@@ -187,13 +187,13 @@ in
   #   macOS   → native Apple ld64 via cc     (system default, explicit for clarity)
   #   Windows → rust-lld bundled with Rust    (zero-install, lld-link)
   home.file.".cargo/config.toml" = {
-    # Method 1 (writable symlink): repo changes take effect without rebuild.
+    # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/cargo/config.toml";
   };
 
   # Global nextest configuration: test runner UI settings.
   home.file.".config/nextest/config.toml" = {
-    # Method 1 (writable symlink): repo changes take effect without rebuild.
+    # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/nextest/config.toml";
   };
 
@@ -220,13 +220,13 @@ in
   # The _nix_direnv_nix variable is set by nix-direnv's _nix_direnv_preflight()
   # at the start of use_flake, so referencing it from the override is safe.
   home.file.".config/direnv/direnvrc" = {
-    # Method 1 (writable symlink): cross-platform base config.
+    # check-suppress:config-method: method 1 (writable symlink) -- cross-platform base config.
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/direnv/direnvrc";
   };
 
   # Host-specific apple-sdk _nix() override, auto-sourced by direnv before direnvrc.
   home.file.".config/direnv/lib/apple-sdk-override.sh" = {
-    # Method 1 (writable symlink): POSIX-only; Windows deploys only the base config.
+    # check-suppress:config-method: method 1 (writable symlink) -- POSIX-only; Windows deploys only the base config.
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/direnv/lib/apple-sdk-override.sh";
   };
 
@@ -235,7 +235,7 @@ in
   # Source: https://docs.astral.sh/uv/reference/settings/#add-bounds
   # Source: https://docs.astral.sh/uv/reference/settings/#exclude-newer
   home.file."${config.xdg.configHome}/uv/uv.toml" = {
-    # Method 1 (writable symlink): repo changes take effect without rebuild.
+    # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/uv/uv.toml";
   };
 

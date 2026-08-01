@@ -4,7 +4,7 @@
 
   home.file.".config/starship.toml".source =
     config.lib.file.mkOutOfStoreSymlink
-      # Method 1 (writable symlink): repo changes take effect without reactivation since starship reads ~/.config/starship.toml at shell start. Windows: deployed via Deploy-WritableSymlink in ConfigHelpers.ps1 (same method).
+      # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without reactivation since starship reads ~/.config/starship.toml at shell start. Windows: deployed via Deploy-WritableSymlink in ConfigHelpers.ps1 (same method).
       "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/starship/starship.toml";
 
   # STARSHIP_CACHE and STARSHIP_CONFIG are defined in the centralized env var

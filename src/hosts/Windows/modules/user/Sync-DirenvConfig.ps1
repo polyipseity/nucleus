@@ -29,6 +29,7 @@ function Sync-DirenvConfig {
     [bool]$Enabled
   )
 
+  # check-suppress:config-method: method 1 (writable symlink) -- direnvrc cross-platform base config symlinked to repo file.
   $configRelPath = 'src\modules\configs\direnv\direnvrc'
   $destPath = Join-Path $env:USERPROFILE '.config\direnv\direnvrc'
 

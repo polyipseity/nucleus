@@ -13,8 +13,8 @@ Register-Step -Id "config-method-compliance" -Number 19 -Name "Config method com
     Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B1 — reason: structural invariants; vendored code and config methods are different concerns; gitignore filter applied on top
   $cfgPatterns = @($cfgFiles | ForEach-Object { [regex]::Escape($_.Name) } | Sort-Object -Unique)
   $cfgSelectOutput = $srcFiles | Select-String -Pattern $cfgPatterns -SimpleMatch
-  # Single-pass: collect all # Method lines for preceding-line checking
-  $cfgMethodOutput = $srcFiles | Select-String -Pattern '# Method'
+  # Single-pass: collect all check-suppress:config-method lines for preceding-line checking
+  $cfgMethodOutput = $srcFiles | Select-String -Pattern '# check-suppress:config-method'
 
   $parallelJobs = [Environment]::ProcessorCount
 
@@ -41,11 +41,11 @@ Register-Step -Id "config-method-compliance" -Number 19 -Name "Config method com
 
     $hasMethod = $false
     foreach ($ref in $refs) {
-      if ($ref.Line -match '# Method') {
+      if ($ref.Line -match '# check-suppress:config-method') {
         $hasMethod = $true
         break
       }
-      # Check preceding line using cached # Method output
+      # Check preceding line using cached check-suppress:config-method output
       if ($ref.LineNumber -gt 1) {
         $prevLineNum = $ref.LineNumber - 1
         $prevMatch = $using:cfgMethodOutput | Where-Object { $_.Path -eq $ref.Path -and $_.LineNumber -eq $prevLineNum }
@@ -56,7 +56,7 @@ Register-Step -Id "config-method-compliance" -Number 19 -Name "Config method com
       }
     }
     if (-not $hasMethod) {
-      return "$relPath : referenced but no '# Method N' comment found on or before reference lines"
+      return "$relPath : referenced but no '# check-suppress:config-method' comment found on or before reference lines"
     }
 
     return $null

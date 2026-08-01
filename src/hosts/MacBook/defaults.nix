@@ -35,7 +35,7 @@ let
   # Loaded from src/modules/configs/autocorrect/wordlist.txt: one word per line, sorted
   # alphabetically. Identity substitutions (word → word) prevent macOS from
   # autocorrecting technical terms and product names.
-  # Method 3 (merge / defaults-based) — not Method 1 (symlink) because macOS
+  # check-suppress:config-method: method 3 (merge / defaults-based) -- not Method 1 (symlink) because macOS
   # NSUserDictionaryReplacementItems is managed via the `defaults` system
   # preference store, not a file path. There is no file to symlink. The value
   # is read from wordlist.txt at Nix eval time and written into the defaults
@@ -44,7 +44,7 @@ let
   # ---------------------------------------------------------------------------
   autocorrectWords = builtins.filter (w: w != "") (
     builtins.filter builtins.isString (
-      # Method 4 (runtime embedded at eval time): wordlist.txt is read at Nix evaluation time and embedded into the Nix store. No deployment step needed.
+      # check-suppress:config-method: method 4 (runtime embedded at eval time) -- wordlist.txt is read at Nix evaluation time and embedded into the Nix store. No deployment step needed.
       builtins.split "\n" (builtins.readFile ../../modules/configs/autocorrect/wordlist.txt)
     )
   );
@@ -623,7 +623,7 @@ in
       # Source: https://iterm2.com/documentation.html
       "com.googlecode.iterm2" = {
         # Set the default profile GUID to the Dynamic Profile defined in
-        # Method 1 (writable symlink): src/modules/configs/iterm2/DynamicProfiles/default-profile.json via iterm2.nix
+        # check-suppress:config-method: method 1 (writable symlink) -- src/modules/configs/iterm2/DynamicProfiles/default-profile.json via iterm2.nix
         # This key (KEY_DEFAULT_GUID) tells iTerm2 which profile to use for
         # new windows/tabs when no other profile is explicitly selected.
         # Source: ITAddressBookMgr.h

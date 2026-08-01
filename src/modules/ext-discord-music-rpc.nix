@@ -78,7 +78,7 @@ in
 
       # The app writes back to the repo file on startup; this is acceptable
       # since the config is managed in and versioned by the repo.
-      # Method 1 (writable symlink): repo changes take effect without rebuild.
+      # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
       home.file.".config/discord-music-rpc/config.yaml".source =
         config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/discord-music-rpc/config.yaml";
     }

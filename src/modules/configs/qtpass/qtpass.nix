@@ -16,7 +16,7 @@
   ...
 }:
 let
-  # Method 3 (merge) — shared baseline from declarative JSON. The JSON file is
+  # check-suppress:config-method: method 3 (merge) -- shared baseline from declarative JSON. The JSON file is
   # the single source of truth consumed by both Nix (POSIX merge) and Windows
   # activation. QtPass settings are merged into platform-native stores
   # (macOS: defaults, Linux: INI, Windows: registry), so Method 1 (symlink)

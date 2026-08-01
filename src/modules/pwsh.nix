@@ -24,7 +24,7 @@ let
   pwshYamlVersion = lockfile.pwsh."powershell-yaml" or null;
 
   profileContent =
-    # Method 4 (runtime embedded): init.ps1 and profile.ps1 are read at eval time and embedded into the activation block as a literal string. No deployment step needed.
+    # check-suppress:config-method: method 4 (runtime embedded) -- init.ps1 and profile.ps1 are read at eval time and embedded into the activation block as a literal string. No deployment step needed.
     # __NUCLEUS_*__ tokens are Windows-only (substituted by Sync-ShellProfile.ps1); they become empty strings on POSIX, leaving the `if ($IsWindows)` blocks inert.
     builtins.replaceStrings
       [
@@ -73,7 +73,7 @@ in
   # scripts/PSScriptAnalyzerSettings.check.psd1 and
   # scripts/PSScriptAnalyzerSettings.test.psd1 (Method 3).
   home.file.".config/powershell/PSScriptAnalyzerSettings.psd1" = {
-    # Method 1 (writable symlink): repo changes take effect without rebuild.
+    # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
     source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/pwsh/PSScriptAnalyzerSettings.psd1";
   };
 

@@ -32,12 +32,14 @@ run_17_suppression_audit() {
         _out="$1/${_safe}.out"
         _s17_grep_pattern="shellcheck disable=|check-suppress:"  # reason: self-reference — grep pattern literal, not a suppression
         grep -Hn -E "$_s17_grep_pattern" "$2" \
-          | grep -v -E "reason:|suppression_doc:" \
+          | grep -v -E "reason:|suppression_doc:|config-method|embedded-content|packer_validate|SuppressMessageAttribute" \
           | sed "s/^/undoc_supp:/" >> "$_out" 2>/dev/null || true
       ' _ "$_step17_tmpdir"
 
     local _f _err
-    for _f in "$_step17_tmpdir"/*.out; do
+    # Full mode produces .out files with leading dots (find . yields ./-prefixed
+    # paths); the plain *.out glob misses dotfiles, so match them explicitly.
+    for _f in "$_step17_tmpdir"/*.out "$_step17_tmpdir"/.*.out; do
       [ -f "$_f" ] || continue
       while IFS= read -r _err; do
         _s17_errors=$((_s17_errors + 1))

@@ -173,7 +173,7 @@ let
         (androidDrives vm)
         (additionalPortForwards vm)
       ]
-      # Method 4 (runtime direct read — builtins.readFile embeds at eval time)
+      # check-suppress:config-method: method 4 (runtime direct read) -- builtins.readFile embeds at eval time
       (builtins.readFile ../../modules/configs/vms/utm-config.plist.xml);
 in
 {

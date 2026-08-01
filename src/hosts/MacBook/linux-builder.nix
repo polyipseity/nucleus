@@ -78,8 +78,8 @@ in
   # not materialized automatically here, so we write it explicitly.
   environment.etc."nix/machines".text = "${builderMachine}\n";
 
-  # Method 2 (read-only): Derived from SOPS secrets and machine identity — not user-editable content.
-  environment.etc."nix/linux-builder-known_hosts".text = # Method 2 (read-only)
+  # check-suppress:config-method: method 2 (read-only) -- Derived from SOPS secrets and machine identity -- not user-editable content.
+  environment.etc."nix/linux-builder-known_hosts".text = # check-suppress:config-method: method 2 (read-only)
     builtins.readFile ../../modules/configs/ssh/linux-builder-known_hosts;
 
   # SSH config so the Nix daemon and user-level nix commands reach the builder
@@ -88,7 +88,7 @@ in
   # correct for the daemon but unreadable to user-space ssh-ng clients.
   # Route root to the daemon-owned key and the primary user to a dedicated 0600
   # mirror so nix store / nixos-generators probes never fall back to password.
-  # Method 2 (read-only): Builder VM wiring — modifying port/address requires coordinated changes across multiple files, so changes go through Nix eval.
+  # check-suppress:config-method: method 2 (read-only) -- Builder VM wiring -- modifying port/address requires coordinated changes across multiple files, so changes go through Nix eval.
   environment.etc."ssh/ssh_config.d/100-linux-builder.conf".text =
     builtins.replaceStrings
       [ "__USERNAME__" "__USER_BUILDER_KEY_PATH__" ]

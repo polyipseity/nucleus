@@ -53,7 +53,7 @@ function Sync-NextestConfig {
     New-Item -Path $destDir -ItemType Directory -Force > $null
   }
 
-  # Method 1 (writable symlink): remove existing file/symlink and replace with symlink.
+  # check-suppress:config-method: method 1 (writable symlink) -- remove existing file/symlink and replace with symlink.
   if (Test-Path -Path $destPath) {
     Remove-Item -Path $destPath -Force
   }

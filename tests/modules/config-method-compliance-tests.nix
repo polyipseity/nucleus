@@ -20,26 +20,26 @@ let
   qtpassText = builtins.readFile ../../src/modules/configs/qtpass/qtpass.nix;
 in
 # Verify method comments exist on all consumer files.
-# Method 1 (writable symlink) consumers:
-assert containsRegex "# Method 1" editorsText;
-assert containsRegex "# Method 1" macosText;
-assert containsRegex "# Method 1" homeText;
-assert containsRegex "# Method 1 \\(writable symlink\\)" gitText;
-assert containsRegex "# Method 1" shellText;
-# Method 2 (read-only) consumers:
-assert containsRegex "# Method 2" macbookBaseText;
-assert containsRegex "# Method 2" macbookSecurityText;
-assert containsRegex "# Method 2" macbookLinuxBuilderText;
-assert containsRegex "# Method 1" posixBaseText;
-# Method 3 (merge) consumers:
-assert containsRegex "# Method 3" homeText;
-assert containsRegex "# Method 3" qtpassText;
-# Method 4 (runtime embedded) consumers:
-assert containsRegex "# Method 4" pwshText;
-assert containsRegex "# Method 4" defaultsText;
-assert containsRegex "# Method 4" agentsText;
+# method 1 (writable symlink) consumers:
+assert containsRegex "# check-suppress:config-method: method 1" editorsText;
+assert containsRegex "# check-suppress:config-method: method 1" macosText;
+assert containsRegex "# check-suppress:config-method: method 1" homeText;
+assert containsRegex "# check-suppress:config-method: method 1 \\(writable symlink\\)" gitText;
+assert containsRegex "# check-suppress:config-method: method 1" shellText;
+# method 2 (read-only) consumers:
+assert containsRegex "# check-suppress:config-method: method 2" macbookBaseText;
+assert containsRegex "# check-suppress:config-method: method 2" macbookSecurityText;
+assert containsRegex "# check-suppress:config-method: method 2" macbookLinuxBuilderText;
+assert containsRegex "# check-suppress:config-method: method 1" posixBaseText;
+# method 3 (merge) consumers:
+assert containsRegex "# check-suppress:config-method: method 3" homeText;
+assert containsRegex "# check-suppress:config-method: method 3" qtpassText;
+# method 4 (runtime embedded) consumers:
+assert containsRegex "# check-suppress:config-method: method 4" pwshText;
+assert containsRegex "# check-suppress:config-method: method 4" defaultsText;
+assert containsRegex "# check-suppress:config-method: method 4" agentsText;
 # Verify each host/service file that had method docs added
-assert containsRegex "# Method 1" nixosServicesText;
+assert containsRegex "# check-suppress:config-method: method 1" nixosServicesText;
 # Verify key config files are referenced in their consumer files
 assert containsRegex "system\\.gitignore" gitText;
 assert containsRegex "src/modules/configs/git/system\\.gitignore" gitText;

@@ -38,7 +38,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
 
     # Symlink the Dynamic Profiles directory so iTerm2 picks up profile
     # definitions at runtime.  iTerm2 monitors this directory for changes.
-    # Method 1 (writable symlink) via config.lib.file.mkOutOfStoreSymlink.
+    # check-suppress:config-method: method 1 (writable symlink) -- via config.lib.file.mkOutOfStoreSymlink.
     # See .agents/instructions/app-config-policy.instructions.md
     "Library/Application Support/iTerm2/DynamicProfiles".source =
       config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/modules/configs/iterm2/DynamicProfiles";

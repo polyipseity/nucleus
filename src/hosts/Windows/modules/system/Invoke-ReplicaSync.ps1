@@ -53,7 +53,7 @@ function Invoke-ReplicaSync {
 
   $resolvedRepoRoot = (Resolve-Path -Path $RepoRoot).Path
   $usersJsonPath = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\users.json"
-  # Method 4 (runtime direct read): consumed only by nucleus-owned scripts, not by third-party apps.
+  # check-suppress:config-method: method 4 (runtime direct read) -- consumed only by nucleus-owned scripts, not by third-party apps.
   $gcConfigPath = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\configs\cloud\replica-gc.json"
   if (-not (Test-Path -Path $usersJsonPath -PathType Leaf)) {
     throw "replica-sync: users registry not found at '$usersJsonPath'."

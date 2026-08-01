@@ -49,7 +49,7 @@ in
 lib.mkIf pkgs.stdenv.isLinux {
   home.file = {
     # Shared script that Nautilus and Dolphin both invoke
-    # Method 1 (writable symlink): repo edits take effect without rebuild.
+    # check-suppress:config-method: method 1 (writable symlink) -- repo edits take effect without rebuild.
     ".local/lib/nucleus/open-manual" = {
       source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/scripts/integrations/open-host-manual.sh";
       executable = true;
@@ -86,13 +86,13 @@ lib.mkIf pkgs.stdenv.isLinux {
 
     # Dolphin: right-click → open nucleus manual
     ".local/share/kio/servicemenus/nucleus-manual.desktop" = {
-      # Method 1 (writable symlink): repo edits take effect without rebuild.
+      # check-suppress:config-method: method 1 (writable symlink) -- repo edits take effect without rebuild.
       source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/plasma/nucleus-manual.desktop";
     };
 
     # Dolphin: right-click → optimize PDF (5 presets as sub-actions)
     ".local/share/kio/servicemenus/nucleus-gs-pdf-opt.desktop" = {
-      # Method 1 (writable symlink): the GS PDF Opt preset file can be updated in-place; no rebuild needed after adding/changing presets.
+      # check-suppress:config-method: method 1 (writable symlink) -- the GS PDF Opt preset file can be updated in-place; no rebuild needed after adding/changing presets.
       source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/plasma/nucleus-gs-pdf-opt.desktop";
     };
   };

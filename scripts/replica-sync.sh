@@ -87,9 +87,9 @@ else
   REPO_ROOT="$repo_root"
 fi
 USERS_JSON="$REPO_ROOT/src/modules/users.json"
-# Method 4 (runtime direct read): replica-gc.json is consumed only by
+# check-suppress:config-method: method 4 (runtime direct read) -- replica-gc.json is consumed only by
 # nucleus-owned scripts at runtime, not by third-party apps. No deployment
-# step needed — the script reads directly from the repo tree via $REPO_ROOT.
+# step needed; the script reads directly from the repo tree via $REPO_ROOT.
 REPLICA_GC_CONFIG_JSON="$REPO_ROOT/src/modules/configs/cloud/replica-gc.json"
 
 if [ ! -f "$USERS_JSON" ]; then

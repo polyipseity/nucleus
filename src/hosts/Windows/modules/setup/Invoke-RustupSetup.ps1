@@ -134,7 +134,7 @@ function Invoke-RustupSetup {
   }
   Write-Output "rustup: global default toolchain set to none"
 
-  # Method 1 (writable symlink): cargo config symlinked to repo file.
+  # check-suppress:config-method: method 1 (writable symlink) -- cargo config symlinked to repo file.
   # Mirrors the POSIX shell.nix deployment of cargo/config.toml.
   $cargoConfigRelPath = 'src\modules\configs\cargo\config.toml'
   $cargoConfigDir = "$env:USERPROFILE\.cargo"

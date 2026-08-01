@@ -43,7 +43,7 @@ in
     "${activationBundle}/src/scripts/configs/managed-symlink.sh" "protect" "agents.nix" "$HOME/.config/opencode/commands"
   '';
 
-  # Method 4 (activation script manages whole-directory symlinks): the agents/
+  # check-suppress:config-method: method 4 (activation script manages whole-directory symlinks) -- the agents/
   # config directory is deployed via symlink-agent-config.sh which creates per-entry
   # symlinks in ~/.agents/. No Nix-level deployment needed — the scripts read
   # directly from the repo tree at activation time.
