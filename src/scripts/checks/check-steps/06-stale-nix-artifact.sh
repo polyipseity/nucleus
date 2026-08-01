@@ -10,7 +10,7 @@ run_06_stale_nix_artifact() {
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _cnba_output
-  _cnba_output="$("$_repo_root/scripts/cleanup-nix.sh" --dry-run 2>&1)" || true
+  _cnba_output="$("$_repo_root/scripts/cleanup-nix.sh" --dry-run 2>&1)" || true  # check-suppress:suppression_doc: cleanup-nix.sh --dry-run exits 1 when no stale artifacts exist; the captured output is the signal
 
   if echo "$_cnba_output" | grep -q "would remove stale Nix build symlink"; then
     error "stale Nix build artifacts found:"

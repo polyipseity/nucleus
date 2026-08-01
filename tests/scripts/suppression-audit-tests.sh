@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Functional regression test for step 17 (suppression audit).
-# Verifies the grep pipeline correctly distinguishes documented from undocumented
-# suppressions. Runs in <1s with no external dependencies beyond POSIX tools.
+# Verifies the grep pipeline and the bare '|| true' detection distinguish
+# documented from undocumented suppressions. Runs in <1s with no external
+# dependencies beyond POSIX tools.
 
 set -euo pipefail
 
@@ -108,6 +109,110 @@ test_self_referencing_grep_pattern_with_reason_not_flagged() {
     rm -f "$tmpfile"
 }
 
+# Replicates the bare '|| true' detection pass from step 17 (sh twin): flags a
+# bare '|| true' unless documented by '# check-suppress:suppression_doc:' on the
+# same or preceding line. Comment-only lines are skipped. The tests/ exemption is
+# the caller's path guard, replicated by _s17_is_exempt.
+_run_s17_pipe_true() {
+    local file="$1"
+    awk '
+      /^[[:space:]]*#/ { prev = $0; next }
+      /\|\| true/ {
+        if ($0 !~ /check-suppress:suppression_doc:/ && prev !~ /# check-suppress:suppression_doc:/) {
+          print FILENAME ":" FNR ":|| true: " $0
+        }
+      }
+      { prev = $0 }
+    ' "$file" | sed "s/^/undoc_supp:/" 2>/dev/null || true
+}
+
+# Replicates the sh twin's test-fixture exemption for || true detection.
+_s17_is_exempt() {
+    case "$1" in
+        *"/tests/"* | "tests/"*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+test_undocumented_pipe_true_fails() {
+    local tmpfile
+    tmpfile=$(mktemp)
+    printf '#!/bin/bash\necho hi || true\n' > "$tmpfile"
+    local result
+    result=$(_run_s17_pipe_true "$tmpfile")
+    if [ -n "$result" ]; then
+        assert_pass "undocumented || true detected"
+    else
+        assert_fail "undocumented || true" "not detected"
+    fi
+    rm -f "$tmpfile"
+}
+
+test_documented_pipe_true_same_line_passes() {
+    local tmpfile
+    tmpfile=$(mktemp)
+    printf '#!/bin/bash\necho hi || true  # check-suppress:suppression_doc: intentional\n' > "$tmpfile"
+    local result
+    result=$(_run_s17_pipe_true "$tmpfile")
+    if [ -z "$result" ]; then
+        assert_pass "|| true with same-line suppression_doc passes"
+    else
+        assert_fail "|| true with same-line suppression_doc" "unexpectedly flagged: $result"
+    fi
+    rm -f "$tmpfile"
+}
+
+test_documented_pipe_true_previous_line_passes() {
+    local tmpfile
+    tmpfile=$(mktemp)
+    # shellcheck disable=SC2016 # reason: fixture content contains a literal $_f
+    printf '#!/bin/bash\n# check-suppress:suppression_doc: intentional\ncat "$_f" 2>/dev/null || true\n' > "$tmpfile"
+    local result
+    result=$(_run_s17_pipe_true "$tmpfile")
+    if [ -z "$result" ]; then
+        assert_pass "|| true with preceding-line suppression_doc passes"
+    else
+        assert_fail "|| true with preceding-line suppression_doc" "unexpectedly flagged: $result"
+    fi
+    rm -f "$tmpfile"
+}
+
+test_pipe_true_in_comment_not_flagged() {
+    local tmpfile
+    tmpfile=$(mktemp)
+    printf '#!/bin/bash\n# Soft-fail (|| true) because the tool is flaky\n' > "$tmpfile"
+    local result
+    result=$(_run_s17_pipe_true "$tmpfile")
+    if [ -z "$result" ]; then
+        assert_pass "|| true inside a comment not flagged"
+    else
+        assert_fail "|| true inside a comment" "unexpectedly flagged: $result"
+    fi
+    rm -f "$tmpfile"
+}
+
+test_pipe_true_test_fixture_exempt() {
+    local fixture sub
+    fixture=$(mktemp -d)
+    sub="$fixture/tests/x.sh"
+    mkdir -p "$(dirname "$sub")"
+    printf '#!/bin/bash\necho hi || true\n' > "$sub"
+    if _s17_is_exempt "$sub"; then
+        assert_pass "tests/ fixtures exempt from || true detection"
+    else
+        assert_fail "tests/ fixture exemption" "path not recognized as exempt"
+    fi
+    rm -rf "$fixture"
+}
+
+test_pipe_true_production_path_not_exempt() {
+    if _s17_is_exempt "src/scripts/foo.sh"; then
+        assert_fail "production path exemption" "src/scripts path wrongly exempt"
+    else
+        assert_pass "production paths scanned for || true"
+    fi
+}
+
 test_mixed_documented_and_undocumented_fails() {
     local tmpfile
     tmpfile=$(mktemp)
@@ -147,6 +252,12 @@ test_undocumented_check_suppress_fails
 test_documented_check_suppress_suppression_doc_passes
 test_documented_check_suppress_reason_passes
 test_self_referencing_grep_pattern_with_reason_not_flagged
+test_undocumented_pipe_true_fails
+test_documented_pipe_true_same_line_passes
+test_documented_pipe_true_previous_line_passes
+test_pipe_true_in_comment_not_flagged
+test_pipe_true_test_fixture_exempt
+test_pipe_true_production_path_not_exempt
 test_mixed_documented_and_undocumented_fails
 test_no_suppressions_passes
 

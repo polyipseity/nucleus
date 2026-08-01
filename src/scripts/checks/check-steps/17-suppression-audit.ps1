@@ -75,7 +75,7 @@ Register-Step -Id "suppression-audit" -Number 17 -Name "Suppression audit" -Acti
     $ps1Files = if ($script:PS1_FILES) { $script:PS1_FILES } else { @($PositionalArgs | Where-Object { $_ -like '*.ps1' }) }
     $hasFiles = ($shFiles.Count -gt 0) -or ($nixFiles.Count -gt 0) -or ($ps1Files.Count -gt 0)
 
-    $undocSuppViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files ($shFiles + $nixFiles)
+    $undocSuppViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files (($shFiles + $nixFiles) | Where-Object { $_ -notmatch '(^|[\\/])tests[\\/]' })
     $undocSuppViolations += Get-UndocSuppViolation -Pattern '2>$null' -Label '2>$null' -Files $ps1Files
     $undocSuppViolations += Get-UndocSuppViolation -Pattern '-ErrorAction SilentlyContinue' -Label '-ErrorAction SilentlyContinue' -Files $ps1Files
     $undocSuppViolations += Get-UndocSuppViolation -Pattern 'catch\s*\{\s*\}' -Label 'empty catch {}' -IsRegex -Files $ps1Files
@@ -96,7 +96,7 @@ Register-Step -Id "suppression-audit" -Number 17 -Name "Suppression audit" -Acti
     )
     $hasFiles = ($allShNix.Count -gt 0) -or ($allPs1.Count -gt 0)
 
-    $undocSuppViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files $allShNix
+    $undocSuppViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files ($allShNix | Where-Object { $_ -notmatch '(^|[\\/])tests[\\/]' })
     $undocSuppViolations += Get-UndocSuppViolation -Pattern '2>$null' -Label '2>$null' -Files $allPs1
     $undocSuppViolations += Get-UndocSuppViolation -Pattern '-ErrorAction SilentlyContinue' -Label '-ErrorAction SilentlyContinue' -Files $allPs1
     $undocSuppViolations += Get-UndocSuppViolation -Pattern 'catch\s*\{\s*\}' -Label 'empty catch {}' -IsRegex -Files $allPs1

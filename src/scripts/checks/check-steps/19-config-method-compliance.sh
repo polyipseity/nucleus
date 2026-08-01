@@ -22,7 +22,7 @@ run_19_config_method_compliance() {
   find src/ \( -name '*.nix' -o -name '*.ps1' -o -name '*.sh' \) -not -path '*/vendor/*' -not -path '*/configs/*' -print \
     | filter_gitignored \
     | xargs grep -n -F -f "$_cfg_patterns" 2>/dev/null \
-    || true
+    || true  # check-suppress:suppression_doc: xargs grep exits 1 when no config basename collisions are found; no match is the expected state
   rm -f "$_cfg_patterns"
 
   # Check for configs. method usage

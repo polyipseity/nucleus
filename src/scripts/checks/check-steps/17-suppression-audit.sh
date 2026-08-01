@@ -33,7 +33,24 @@ run_17_suppression_audit() {
         _s17_grep_pattern="shellcheck disable=|check-suppress:"  # reason: self-reference — grep pattern literal, not a suppression
         grep -Hn -E "$_s17_grep_pattern" "$2" \
           | grep -v -E "reason:|suppression_doc:|config-method|embedded-content|packer_validate|SuppressMessageAttribute" \
-          | sed "s/^/undoc_supp:/" >> "$_out" 2>/dev/null || true
+          | sed "s/^/undoc_supp:/" >> "$_out" 2>/dev/null || true  # check-suppress:suppression_doc: grep exits 1 on no matches; an empty .out file is the clean signal
+        # Bare "|| true" suppressions (mirrors the ps1 twin Get-UndocSuppViolation
+        # -Pattern "|| true"): documented by "# check-suppress:suppression_doc:" on
+        # the same or preceding line; test fixtures (tests/) are exempt.
+        case "$2" in
+          *"/tests/"* | "tests/"*) ;;
+          *)
+            awk "
+              /^[[:space:]]*#/ { prev = \$0; next }
+              /\|\| true/ {
+                if (\$0 !~ /check-suppress:suppression_doc:/ && prev !~ /# check-suppress:suppression_doc:/) {
+                  print FILENAME \":\" FNR \":|| true: \" \$0
+                }
+              }
+              { prev = \$0 }
+            " "$2" | sed "s/^/undoc_supp:/" >> "$_out" 2>/dev/null || true  # check-suppress:suppression_doc: awk exits 1 on no || true matches; an empty .out file is the clean signal
+            ;;
+        esac
       ' _ "$_step17_tmpdir"
 
     local _f _err

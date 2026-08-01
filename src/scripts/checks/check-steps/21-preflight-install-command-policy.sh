@@ -43,7 +43,7 @@ run_21_preflight_install_command_policy() {
       | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
         _f="$2"
         _out="$1/$(echo "$_f" | tr "/" "_").out"
-        grep -Hn "Assert-ToolAvailable.*-InstallCommand" "$_f" >> "$_out" 2>/dev/null || true
+        grep -Hn "Assert-ToolAvailable.*-InstallCommand" "$_f" >> "$_out" 2>/dev/null || true  # check-suppress:suppression_doc: grep exits 1 when a file has no InstallCommand matches; an empty .out file is the clean state
       ' _ "$_s21_tmpdir"
 
     local _f _err

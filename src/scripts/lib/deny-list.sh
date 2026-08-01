@@ -45,7 +45,7 @@ filter_gitignored() {
     cat "$_tmp"
   elif [ -s "$_tmp.ignored" ]; then
     # Some paths were ignored — subtract them from the input
-    grep -v -F -x -f "$_tmp.ignored" "$_tmp" 2>/dev/null || true
+    grep -v -F -x -f "$_tmp.ignored" "$_tmp" 2>/dev/null || true  # check-suppress:suppression_doc: grep -v exits 1 when every path is ignored; an empty result is handled by the caller
   else
     # Nothing ignored (exit 1 with empty output) — pass through
     cat "$_tmp"

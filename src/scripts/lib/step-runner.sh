@@ -118,7 +118,7 @@ nucleus_nix_locked() {
     # Stale-lock recovery: reclaim when the recorded owner PID is dead or
     # missing (crashed holder); BASHPID names the step subshell, not the
     # orchestrator, so a killed step does not wedge the lock.
-    _lock_owner="$(cat "$_lock_dir/pid" 2>/dev/null || true)"
+    _lock_owner="$(cat "$_lock_dir/pid" 2>/dev/null || true)"  # check-suppress:suppression_doc: the pid file may be absent; an empty owner falls through to stale-lock recovery
     if [ -z "$_lock_owner" ] || ! kill -0 "$_lock_owner" 2>/dev/null; then
       rm -rf "$_lock_dir"
       continue

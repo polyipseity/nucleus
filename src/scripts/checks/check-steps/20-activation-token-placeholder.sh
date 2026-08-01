@@ -15,10 +15,10 @@ run_20_activation_token_placeholder() {
   if $_has_args; then
     for _f in "${_files[@]}"; do
       case "$_f" in *.sh|*.zsh) printf '%s\0' "$_f" ;; esac
-    done | xargs -0 -P "$PARALLEL_JOBS" grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' 2>/dev/null > "$_act_temp" || true
+    done | xargs -0 -P "$PARALLEL_JOBS" grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' 2>/dev/null > "$_act_temp" || true  # check-suppress:suppression_doc: grep exits 1 when no token placeholders are found; an empty result file is the clean state
   else
     find src/scripts -type f \( -name '*.sh' -o -name '*.zsh' \) -print0 \
-      | xargs -0 -P "$PARALLEL_JOBS" grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' 2>/dev/null > "$_act_temp" || true
+      | xargs -0 -P "$PARALLEL_JOBS" grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' 2>/dev/null > "$_act_temp" || true  # check-suppress:suppression_doc: grep exits 1 when no token placeholders are found; an empty result file is the clean state
   fi
 
   if [ -s "$_act_temp" ]; then

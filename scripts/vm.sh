@@ -387,7 +387,7 @@ do_setup() {
     export NUCLEUS_VM_GUEST_PASSWORD="$vm_guest_password"
 
     # Export SSH public key for NixOS guest provisioning (guest.nix uses it for authorized_keys).
-    vm_guest_ssh_public_key="$(resolve_vm_guest_ssh_key)" || true
+    vm_guest_ssh_public_key="$(resolve_vm_guest_ssh_key)" || true  # check-suppress:suppression_doc: resolve_vm_guest_ssh_key may fail when no guest SSH key exists; an empty value skips key provisioning
     if [ -n "$vm_guest_ssh_public_key" ]; then
       export NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY="$vm_guest_ssh_public_key"
     else
@@ -490,7 +490,7 @@ do_list() {
   require_command jq
 
   local running_names
-  running_names="$(vm_get_running_names)" || true
+  running_names="$(vm_get_running_names)" || true  # check-suppress:suppression_doc: vm_get_running_names may exit non-zero when no VMs match; the empty list is handled downstream
 
   if $json_output; then
     # Annotate each VM with its state.
@@ -524,7 +524,7 @@ do_status() {
   require_command jq
 
   local running_names
-  running_names="$(vm_get_running_names)" || true
+  running_names="$(vm_get_running_names)" || true  # check-suppress:suppression_doc: vm_get_running_names may exit non-zero when no VMs match; the empty list is handled downstream
 
   # Build base filter: enabled VMs matching the current host.
   # Names are passed via --argjson when filtering specific VMs.
