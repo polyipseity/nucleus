@@ -24,13 +24,14 @@ Every hard-coded filter — whether positive (allow) or negative (deny) — must
 Every hard-coded filename exclusion site gets a suffix comment:
 
 ```sh
---exclude='check.sh'  # ref: allow-and-deny-lists.instructions.md#A1 — reason: orchestrator contains pip/npm patterns in comments; would cause false positives
+--exclude='check.sh'  # ref: allow-and-deny-lists.instructions.md#A1 -- orchestrator contains pip/npm patterns in comments; would cause false positives
 ```
 
-Comments MUST include:
+Comments MUST use the canonical grammar `# ref: <target> -- <just>` and include:
 
-- The reference to the policy section (`#A1`, `#A2`, etc.)
-- A brief reason why the exclusion cannot be (or was not) eliminated
+- The reference to the policy section as `<target>` (`#A1`, `#A2`, etc.)
+- A brief reason as `<just>` why the exclusion cannot be (or was not) eliminated
+- The `--` separator (never an em dash), with no `reason:` keyword
 
 ## Gitignore-based denylist
 

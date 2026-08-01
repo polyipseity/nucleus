@@ -10,7 +10,7 @@ Register-Step -Id "config-method-compliance" -Number 19 -Name "Config method com
   $cfgFiles = Get-ChildItem -Path $cfgDir -Recurse -File
   $srcFiles = Get-ChildItem -Path (Join-Path $r "src") -Recurse -Include '*.nix', '*.ps1', '*.sh' |
     Where-Object { $_.FullName -notmatch '[\/]vendor[\/]' -and $_.FullName -notmatch '[\/]configs[\/]' } |
-    Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B1 — reason: structural invariants; vendored code and config methods are different concerns; gitignore filter applied on top
+    Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B1 -- structural invariants; vendored code and config methods are different concerns; gitignore filter applied on top
   $cfgPatterns = @($cfgFiles | ForEach-Object { [regex]::Escape($_.Name) } | Sort-Object -Unique)
   $cfgSelectOutput = $srcFiles | Select-String -Pattern $cfgPatterns -SimpleMatch
   # Single-pass: collect all check-suppress:config-method lines for preceding-line checking
@@ -21,11 +21,11 @@ Register-Step -Id "config-method-compliance" -Number 19 -Name "Config method com
   $cfgFileErrors = $cfgFiles | ForEach-Object -Parallel -ThrottleLimit $using:parallelJobs {
     $basename = $_.Name
 
-    # Skip infrastructure files and Nix modules inside configs/  # ref: allow-and-deny-lists.instructions.md#A2 — reason: infrastructure files are not configs
+    # Skip infrastructure files and Nix modules inside configs/  # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
     if ($basename -in '.gitkeep', '.gitignore') { return $null }
     if ($basename -like '*.schema.json') { return $null }
 
-    # Skip agent customization files (consumed as a directory via Method 4)  # ref: allow-and-deny-lists.instructions.md#A2 — reason: agents/* consumed as directory
+    # Skip agent customization files (consumed as a directory via Method 4)  # ref: allow-and-deny-lists.instructions.md#A2 -- agents/* consumed as directory
     $relPath = $_.FullName.Substring($using:cfgDir.Length + 1) -replace '\\', '/'
     if ($relPath -like 'agents/*') { return $null }
 

@@ -4,7 +4,7 @@ $schema: https://aka.ms/configuration-dsc-schema/0.2
 properties:
   configurationVersion: 0.2.0
   resources:
-    # Source: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-systemparametersinfoa
+    # ref: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-systemparametersinfoa -- SystemParametersInfo API docs for wallpaper settings
     - resource: Microsoft.Windows.Storage/Folder
       id: wallpaperFolder
       directives:

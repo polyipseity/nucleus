@@ -4,7 +4,7 @@ $schema: https://aka.ms/configuration-dsc-schema/0.2
 properties:
   configurationVersion: 0.2.0
   resources:
-    # Source: https://admx.help/?Category=Windows_10_2016&Policy=Microsoft.Policies.WindowsExplorer::HideFileExt
+    # ref: https://admx.help/?Category=Windows_10_2016&Policy=Microsoft.Policies.WindowsExplorer::HideFileExt -- ADMX policy reference for HideFileExt registry value
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: explorerHideFileExt
       directives:

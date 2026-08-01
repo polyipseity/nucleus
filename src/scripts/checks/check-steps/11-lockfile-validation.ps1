@@ -23,7 +23,7 @@ Register-Step -Id "lockfile-validation" -Number 11 -Name "Lockfile validation" -
   } else {
     $lf = Get-Content $lfPath -Raw | ConvertFrom-Json -AsHashtable
     # Known cross-section overlaps that are legitimate
-    $lfOverlapExceptions = @('astral-sh.ty')  # ref: allow-and-deny-lists.instructions.md#D1 — reason: legitimate cross-section overlap in lockfile
+    $lfOverlapExceptions = @('astral-sh.ty')  # ref: allow-and-deny-lists.instructions.md#D1 -- legitimate cross-section overlap in lockfile
     $pkgToSections = @{}
     foreach ($section in $lf.Keys) {
       if ($section -eq 'ollama') { continue }

@@ -11,7 +11,7 @@ run_22_embedded_content_enforcement() {
 
   local _s22_errors=0
   # Exclude this check's own file: its source contains the literal heredoc-detection patterns.
-  # ref: allow-and-deny-lists.instructions.md#C5 — reason: self-refs are dynamic
+  # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
   local _s22_self_sh
   _s22_self_sh="$(basename "${BASH_SOURCE[0]}")"
 

@@ -9,14 +9,14 @@ Register-Step -Id "embedded-content-enforcement" -Number 22 -Name "Embedded cont
   $ps1Files = if ($HasArgs) {
     if ($script:PS1_FILES) { $script:PS1_FILES } else { @($PositionalArgs | Where-Object { $_ -like '*.ps1' }) }
   } else {
-    @(Get-ChildItem -Recurse -Path $r -Include '*.ps1' | Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' } | ForEach-Object { $_.FullName } | Select-GitIgnored)  # ref: allow-and-deny-lists.instructions.md#C5 — reason: structural invariant; gitignore filter applied on top
+    @(Get-ChildItem -Recurse -Path $r -Include '*.ps1' | Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' } | ForEach-Object { $_.FullName } | Select-GitIgnored)  # ref: allow-and-deny-lists.instructions.md#C5 -- structural invariant; gitignore filter applied on top
   }
 
   $writeCommands = @('Set-Content', 'Add-Content', 'Out-File', 'Tee-Object')
 
   foreach ($file in $ps1Files) {
     # Exclude this check's own file: its source contains the literal here-string patterns.
-    # ref: allow-and-deny-lists.instructions.md#C5 — reason: self-refs are dynamic
+    # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
     if ((Split-Path -Leaf $file) -eq $selfLeaf) { continue }
 
     $tokens = $null

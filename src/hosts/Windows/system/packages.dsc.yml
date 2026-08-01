@@ -3,9 +3,8 @@
 # Package ID policy: prefer human-readable named IDs (for example
 # `Microsoft.PowerToys`) over opaque Microsoft Store-generated IDs. Use
 # generated IDs only when the Store package has no stable named identifier.
-# Source for package ID validity: WinGet package index and manifests.
-# https://learn.microsoft.com/windows/package-manager/winget/
-# https://github.com/microsoft/winget-pkgs
+# ref: https://learn.microsoft.com/windows/package-manager/winget/ -- WinGet package manager documentation
+# ref: https://github.com/microsoft/winget-pkgs -- WinGet package manifest repository; source of truth for package ID validity
 $schema: https://aka.ms/configuration-dsc-schema/0.2
 properties:
   configurationVersion: 0.2.0

@@ -64,8 +64,8 @@ Dividers (`# --- section ---`), DSC structural headers (`# WinGet DSC v3 -`, `# 
 
 | Family | Sites | Canonical form |
 | --- | --- | --- |
-| `# ref:` | 38 | `# ref: <target> -- <just>` (drop `reason:`; em dash → `--`) |
-| DSC `# Source:` / `# Cross-reference:` / `# See:` headers | few | `# ref: <target> -- <reason>` |
+| `# ref:` | 54 | `# ref: <target> -- <just>` (drop `reason:`; em dash → `--`) |
+| DSC reference headers (ex-`# Source:` / `# Cross-reference:` / `# See:`) | 0 | migrated → `# ref: <target> -- <just>`; gate `# (Source\|Cross-reference\|See):` in dsc.yml = 0 |
 | `# WHY:` | 150 (44 no-colon) | `# WHY: <reason>` — mandatory colon |
 | `# TODO:` | 0 tracked | `# TODO: <text>` — mandatory colon |
 

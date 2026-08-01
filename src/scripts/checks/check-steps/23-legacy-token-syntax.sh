@@ -12,7 +12,7 @@ run_23_legacy_token_syntax() {
 
   local _s23_errors=0
   # Exclude this check's own file: its source contains the literal detection pattern.
-  # ref: allow-and-deny-lists.instructions.md#C6 — reason: self-refs are dynamic
+  # ref: allow-and-deny-lists.instructions.md#C6 -- self-refs are dynamic
   local _s23_self_sh
   _s23_self_sh="$(basename "${BASH_SOURCE[0]}")"
 

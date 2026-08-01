@@ -22,7 +22,7 @@ Register-Step -Id "legacy-token-syntax" -Number 23 -Name "Legacy token syntax ga
     @(Get-ChildItem -Path (Join-Path $r 'src'), (Join-Path $r 'scripts') -Recurse -File |
       Where-Object { $extensions -contains $_.Extension } |
       Where-Object { $_.Name -ne $selfLeaf } |
-      ForEach-Object { $_.FullName } | Select-GitIgnored)  # ref: allow-and-deny-lists.instructions.md#C6 — reason: structural invariant; gitignore filter applied on top
+      ForEach-Object { $_.FullName } | Select-GitIgnored)  # ref: allow-and-deny-lists.instructions.md#C6 -- structural invariant; gitignore filter applied on top
   }
 
   foreach ($file in $scanFiles) {

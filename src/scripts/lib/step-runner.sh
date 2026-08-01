@@ -305,19 +305,19 @@ cache_file_lists() {
     find . -path ./vendor -prune -false -o -name '*.nix' -print \
     | filter_gitignored \
     | sort
-  )  # ref: allow-and-deny-lists.instructions.md#B7 — reason: structural invariant; gitignore filter applied on top
+  )  # ref: allow-and-deny-lists.instructions.md#B7 -- structural invariant; gitignore filter applied on top
   # shellcheck disable=SC2034 # reason: consumed by step files (13, 15) via transitive sourcing
   readarray -t CACHED_YAML_FILES < <(
     find . -not -path '*/vendor/*' \( -name '*.yml' -o -name '*.yaml' \) -print \
     | filter_gitignored \
     | sort
-  )  # ref: allow-and-deny-lists.instructions.md#B7 — reason: structural invariant; gitignore filter applied on top
+  )  # ref: allow-and-deny-lists.instructions.md#B7 -- structural invariant; gitignore filter applied on top
   # shellcheck disable=SC2034 # reason: consumed by step files (13) via transitive sourcing
   readarray -t CACHED_JSON_FILES < <(
     find src -name '*.json' -not -path '*/vendor/*' -not -name '*.schema.json' -print \
     | filter_gitignored \
     | sort
-  )  # ref: allow-and-deny-lists.instructions.md#A7,#B7 — reason: schema files are meta; vendor is structural invariant; gitignore filter applied on top
+  )  # ref: allow-and-deny-lists.instructions.md#A7,#B7 -- schema files are meta; vendor is structural invariant; gitignore filter applied on top
   # shellcheck disable=SC2034 # reason: consumed by step files (17) via transitive sourcing
   readarray -t CACHED_SH_FILES < <(
     find src/scripts -type f -name '*.sh' -print \

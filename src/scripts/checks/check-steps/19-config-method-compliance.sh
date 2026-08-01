@@ -18,7 +18,7 @@ run_19_config_method_compliance() {
   local _cfg_patterns
   _cfg_patterns=$(mktemp) || { error "failed to create temp file"; _cfg_errors=$((_cfg_errors + 1)); }
   find "$_cfg_dir" -type f -exec basename {} \; | sort -u > "$_cfg_patterns"
-  # ref: allow-and-deny-lists.instructions.md#B1 — reason: structural invariants; vendored code and config methods are different concerns
+  # ref: allow-and-deny-lists.instructions.md#B1 -- structural invariants; vendored code and config methods are different concerns
   find src/ \( -name '*.nix' -o -name '*.ps1' -o -name '*.sh' \) -not -path '*/vendor/*' -not -path '*/configs/*' -print \
     | filter_gitignored \
     | xargs grep -n -F -f "$_cfg_patterns" 2>/dev/null \
@@ -32,11 +32,11 @@ run_19_config_method_compliance() {
       _tmpdir="$1"
       _f="$2"
       _basename=$(basename "$_f")
-      # Skip infrastructure files and Nix modules inside configs/  # ref: allow-and-deny-lists.instructions.md#A2 — reason: infrastructure files are not configs
+      # Skip infrastructure files and Nix modules inside configs/  # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
       case "$_basename" in
         .gitkeep|.gitignore|*.schema.json) exit 0 ;;
       esac
-      # Skip agent customization files (consumed as a directory via Method 4)  # ref: allow-and-deny-lists.instructions.md#A2 — reason: agents/* consumed as directory
+      # Skip agent customization files (consumed as a directory via Method 4)  # ref: allow-and-deny-lists.instructions.md#A2 -- agents/* consumed as directory
       case "$_f" in
         */configs/agents/*) exit 0 ;;
       esac

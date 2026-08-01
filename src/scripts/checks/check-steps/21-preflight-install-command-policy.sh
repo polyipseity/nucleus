@@ -11,7 +11,7 @@ run_21_preflight_install_command_policy() {
 
   local _s21_errors=0
   # Exclude this check's own sibling file: its source contains the literal pattern text.
-  # ref: allow-and-deny-lists.instructions.md#B6 — reason: structural invariant; self-refs are dynamic
+  # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; self-refs are dynamic
   local _s21_self_ps1
   _s21_self_ps1="$(basename "${BASH_SOURCE[0]}" .sh).ps1"
 

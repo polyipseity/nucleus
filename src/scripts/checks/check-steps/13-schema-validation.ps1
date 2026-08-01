@@ -33,7 +33,7 @@ Register-Step -Id "schema-validation" -Number 13 -Name "Schema validation (JSON/
   } else {
     # JSON files
     Get-ChildItem -Recurse -Path "$r/src" -Filter '*.json' | Where-Object {
-      $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notlike '*.schema.json'  # ref: allow-and-deny-lists.instructions.md#B3,#A7 — reason: structural invariants; schema files are meta
+      $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notlike '*.schema.json'  # ref: allow-and-deny-lists.instructions.md#B3,#A7 -- structural invariants; schema files are meta
     } | ForEach-Object {
       $schema = try { (Get-Content $_.FullName -Raw | ConvertFrom-Json -AsHashtable)['$schema'] } catch { $null }
       if ($schema) {
@@ -47,7 +47,7 @@ Register-Step -Id "schema-validation" -Number 13 -Name "Schema validation (JSON/
     }
     # YAML files
     Get-ChildItem -Recurse -Path $r -Include '*.yml', '*.yaml' | Where-Object {
-      $_.FullName -notmatch '[/\\]vendor[/\\]'  # ref: allow-and-deny-lists.instructions.md#B3 — reason: structural invariant; gitignore filter applied on top
+      $_.FullName -notmatch '[/\\]vendor[/\\]'  # ref: allow-and-deny-lists.instructions.md#B3 -- structural invariant; gitignore filter applied on top
     } | Select-GitIgnored | ForEach-Object {
       $schema = try { ($_ | Get-Content -Raw | ConvertFrom-Yaml)['$schema'] } catch { $null }
       if ($schema) {
@@ -76,10 +76,10 @@ Register-Step -Id "schema-validation" -Number 13 -Name "Schema validation (JSON/
     }
   } else {
     Get-ChildItem -Recurse -Path "$r/src" -Filter '*.json' | Where-Object {
-      $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notlike '*.schema.json'  # ref: allow-and-deny-lists.instructions.md#B3,#A7 — reason: structural invariants; schema files are meta
+      $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.Name -notlike '*.schema.json'  # ref: allow-and-deny-lists.instructions.md#B3,#A7 -- structural invariants; schema files are meta
     } | ForEach-Object { $allFiles.Add($_.FullName) }
     Get-ChildItem -Recurse -Path $r -Include '*.yml', '*.yaml' | Where-Object {
-      $_.FullName -notmatch '[/\\]vendor[/\\]'  # ref: allow-and-deny-lists.instructions.md#B3 — reason: structural invariant; gitignore filter applied on top
+      $_.FullName -notmatch '[/\\]vendor[/\\]'  # ref: allow-and-deny-lists.instructions.md#B3 -- structural invariant; gitignore filter applied on top
     } | Select-GitIgnored | ForEach-Object { $allFiles.Add($_.FullName) }
   }
 

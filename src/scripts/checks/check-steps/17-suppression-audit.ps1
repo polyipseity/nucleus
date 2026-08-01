@@ -86,12 +86,12 @@ Register-Step -Id "suppression-audit" -Number 17 -Name "Suppression audit" -Acti
   } else {
     $allShNix = @(
       Get-ChildItem -Recurse -Path $r -Include '*.sh', '*.nix' |
-        Where-Object { $_.FullName -notmatch '[\/]vendor[\/]' } |  # ref: allow-and-deny-lists.instructions.md#B5 — reason: structural invariant
+        Where-Object { $_.FullName -notmatch '[\/]vendor[\/]' } |  # ref: allow-and-deny-lists.instructions.md#B5 -- structural invariant
         ForEach-Object { $_.FullName }
     )
     $allPs1 = @(
       Get-ChildItem -Recurse -Path $r -Include '*.ps1' |
-        Where-Object { $_.FullName -notmatch '[\/]vendor[\/]' } |  # ref: allow-and-deny-lists.instructions.md#B5 — reason: structural invariant
+        Where-Object { $_.FullName -notmatch '[\/]vendor[\/]' } |  # ref: allow-and-deny-lists.instructions.md#B5 -- structural invariant
         ForEach-Object { $_.FullName }
     )
     $hasFiles = ($allShNix.Count -gt 0) -or ($allPs1.Count -gt 0)

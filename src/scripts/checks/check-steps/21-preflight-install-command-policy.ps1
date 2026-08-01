@@ -9,12 +9,12 @@ Register-Step -Id "preflight-install-command-policy" -Number 21 -Name "Preflight
   $ps1Files = if ($HasArgs) {
     if ($script:PS1_FILES) { $script:PS1_FILES } else { @($PositionalArgs | Where-Object { $_ -like '*.ps1' }) }
   } else {
-    @(Get-ChildItem -Recurse -Path $r -Include '*.ps1' | Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' } | ForEach-Object { $_.FullName } | Select-GitIgnored)  # ref: allow-and-deny-lists.instructions.md#B6 — reason: structural invariant; gitignore filter applied on top
+    @(Get-ChildItem -Recurse -Path $r -Include '*.ps1' | Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' } | ForEach-Object { $_.FullName } | Select-GitIgnored)  # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; gitignore filter applied on top
   }
 
   if ($ps1Files.Count -gt 0) {
     # Exclude this check's own file: its source contains the literal pattern text.
-    # ref: allow-and-deny-lists.instructions.md#B6 — reason: structural invariant; self-refs are dynamic
+    # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; self-refs are dynamic
     $selfLeaf = Split-Path -Leaf $PSCommandPath
     $selMatches = Select-String -Path $ps1Files -Pattern 'Assert-ToolAvailable.*-InstallCommand' -AllMatches |
       Where-Object { (Split-Path -Leaf $_.Path) -ne $selfLeaf }

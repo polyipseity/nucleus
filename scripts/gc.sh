@@ -390,7 +390,7 @@ gc_git_cache_if_present() {
         else
           rm -f "$_lockfile"
         fi
-      done < <(find ".git" -name '*.lock' ! -name 'index.lock' -type f -print0 2>/dev/null)  # ref: allow-and-deny-lists.instructions.md#A5 — reason: Git invariant; index.lock must never be cleaned
+      done < <(find ".git" -name '*.lock' ! -name 'index.lock' -type f -print0 2>/dev/null)  # ref: allow-and-deny-lists.instructions.md#A5 -- Git invariant; index.lock must never be cleaned
 
       # Remove stale state files when no active operation.
       # Uses dynamic glob patterns to discover stale files, so new Git state
