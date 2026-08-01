@@ -1,7 +1,7 @@
 Register-Step -Id "framework-verification" -Number 5 -Name "Framework verification" -Action {
   param($RepoRoot)
   $exitCode = 0
-  $testDir = Join-Path -Path $RepoRoot -ChildPath 'tests' -AdditionalChildPaths 'scripts'
+  $testDir = Join-Path -Path $RepoRoot -ChildPath 'tests' -AdditionalChildPath 'scripts'
 
   Write-Message "--- framework unit tests ---"
   & (Join-Path -Path $testDir -ChildPath 'step-runner-unit-tests.ps1')
@@ -12,19 +12,21 @@ Register-Step -Id "framework-verification" -Number 5 -Name "Framework verificati
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
 
   Write-Message "--- step-specific tests ---"
-  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPaths '01-code-formatting-tests.ps1')
+  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPath '01-code-formatting-tests.ps1')
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
-  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPaths '05-nix-lint-explicit-skip.ps1')
+  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPath '05-nix-lint-explicit-skip.ps1')
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
-  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPaths '11-lockfile-validation-explicit-skip.ps1')
+  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPath '11-lockfile-validation-explicit-skip.ps1')
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
-  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPaths '13-schema-validation-tests.ps1')
+  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPath '13-schema-validation-tests.ps1')
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
-  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPaths '15-yaml-structural-explicit-skip.ps1')
+  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPath '15-yaml-structural-explicit-skip.ps1')
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
-  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPaths '16-package-manager-enforcement-explicit-skip.ps1')
+  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPath '16-package-manager-enforcement-explicit-skip.ps1')
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
-  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPaths '17-suppression-audit-explicit-skip.ps1')
+  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPath '17-suppression-audit-explicit-skip.ps1')
+  if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
+  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPath '22-embedded-content-enforcement-tests.ps1')
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
 
   Write-Message "--- integration smoke tests ---"

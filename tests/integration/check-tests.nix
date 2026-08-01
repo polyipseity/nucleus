@@ -63,9 +63,9 @@ assert containsRegex "Invoke-StepPipeline" checkPs1Text;
 assert containsRegex "Format-StepSummary" checkPs1Text;
 
 # ---- Step file structure ----
-# All 21 check step files exist for both platforms
-assert builtins.length checkStepsSh == 21;
-assert builtins.length checkStepsPs1 == 21;
+# All 22 check step files exist for both platforms
+assert builtins.length checkStepsSh == 22;
+assert builtins.length checkStepsPs1 == 22;
 
 # Each POSIX step file has a register_step call
 assert builtins.all (f: stepFileContains f "register_step \"[^\"]*\" [0-9]+") checkStepsSh;
