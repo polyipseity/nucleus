@@ -220,7 +220,7 @@ function Invoke-VmStart {
 
   $vmName = $SubcommandArgs[0]
   $vmDir = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
-  $startScript = Join-Path -Path $vmDir -ChildPath 'scripts' -AdditionalChildPaths "start-$vmName.ps1"
+  $startScript = Join-Path -Path $vmDir -ChildPath 'scripts' -AdditionalChildPath "start-$vmName.ps1"
 
   if (Test-Path -LiteralPath $startScript -PathType Leaf) {
     Write-NucleusInfo "starting VM '$vmName' via generated script..."
@@ -247,7 +247,7 @@ function Invoke-VmStop {
 
   $vmName = $SubcommandArgs[0]
   $vmDir = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
-  $stopScript = Join-Path -Path $vmDir -ChildPath 'scripts' -AdditionalChildPaths "stop-$vmName.ps1"
+  $stopScript = Join-Path -Path $vmDir -ChildPath 'scripts' -AdditionalChildPath "stop-$vmName.ps1"
 
   if (Test-Path -LiteralPath $stopScript -PathType Leaf) {
     Write-NucleusInfo "stopping VM '$vmName' via generated script..."
