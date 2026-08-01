@@ -5,6 +5,7 @@ $PSStyle.OutputRendering = 'PlainText'
 
 $repoRoot = Split-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -Parent
 $testFile = Join-Path -Path $repoRoot -ChildPath 'src/scripts/checks/check-steps/11-lockfile-validation.ps1'
+$script:failed = $false
 
 function Assert-Pass {
   param($Name, $Reason)
