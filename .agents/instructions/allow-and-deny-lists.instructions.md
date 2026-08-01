@@ -133,6 +133,7 @@ Get-ChildItem ... | Filter-GitIgnored
 ## Review cadence
 
 - **Quarterly**: full audit of all T3 entries. Check each excluded file still exists, each excluded pattern is still justified, and no new hard-coded exclude lists have been introduced. Verify that gitignore-based filtering (via `filter_gitignored`/`Filter-GitIgnored`) is applied to any new file-generation script.
+- **Quarterly — shared-content audit**: for each content category in the embedded-content policy (profile body, VM start scripts, service wrappers, Caddyfile, cloud-drive wrappers), confirm there is exactly ONE canonical file on disk and no same-language duplicate has re-appeared (e.g. a second inline copy of the Android VM QEMU start script). Step 22 (embedded-content enforcement) flags new large embedded literals; any duplicate found here is fixed in the same review. Registry of shared files lives in `embedded-content.instructions.md` § Shared cross-platform content.
 - **Trigger**: review is due when a check step is added, removed, or renumbered.
 - **Last reviewed**: 2026-07-31 (C6 added for check step 23 legacy-token self-exclusion)
 - **Verification**: run `scripts/check.sh` (which includes step 21 for preflight policy) to catch regressions.
