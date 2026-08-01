@@ -275,7 +275,7 @@ if [ -n "$missing_remotes" ]; then
   # Inject rclone config passphrase from materialized SOPS secret so the remote
   # creation flow inherits it and rclone encrypts the new config entry with the
   # managed passphrase automatically.
-  # WHY conditional: secret file may be absent on first bootstrap before sops-nix
+  # WHY: conditional: secret file may be absent on first bootstrap before sops-nix
   # has materialized it; benign absence — rclone uses an unencrypted config.
   _rclone_pass_file="$HOME/.config/nucleus/secrets/rclone-config-pass"
   if [ -s "$_rclone_pass_file" ]; then

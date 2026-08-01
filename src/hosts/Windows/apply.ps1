@@ -861,7 +861,7 @@ Sync-PowerPolicy -Enabled:$EnablePowerParity
 Sync-UserPath -Enabled:$EnableShellParity
 Sync-WifiMacRandomization -Enabled:$EnableWiFiParity
 Sync-TerminalActivation
-# WHY terminal-activations (last resort): this stage runs in the user's
+# WHY: terminal-activations (last resort): this stage runs in the user's
 # terminal context (outside the Nix rebuild) for macOS TCC-sensitive commands.
 # On Windows the manifest is absent by default (no TCC constraints), but the
 # mechanism is shared cross-platform.  See src/modules/terminal-activations.nix

@@ -1,5 +1,5 @@
 # macOS-only iCloud exclusion hooks.
-# WHY macOS-only: com.apple.fileprovider.ignore#P is a macOS FileProvider
+# WHY: macOS-only: com.apple.fileprovider.ignore#P is a macOS FileProvider
 # xattr with no equivalent on NixOS/Windows.
 #
 # Variables below are substituted via Nix replaceStrings at build time.

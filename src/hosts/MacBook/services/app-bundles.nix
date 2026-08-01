@@ -13,7 +13,7 @@
 # Less reliable than Quick Actions for context menu placement but work
 # reliably in the Services menu.
 #
-# WHY home.activation instead of home.file:
+# WHY: home.activation instead of home.file:
 #   home.file creates a symlink to the Nix store, but macOS LaunchServices
 #   does not traverse symlinks when discovering Service provider .app
 #   bundles. This is a required Method 2 (read-only deployment) case;

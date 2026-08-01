@@ -75,12 +75,12 @@ let
   # the managed settings from a declarative config file so they are versioned
   # and merge them into the live file without clobbering vault data.
   #
-  # WHY nativeMenus is not configured: nativeMenus is stored per-vault in
+  # WHY: nativeMenus is not configured: nativeMenus is stored per-vault in
   # appearance.json (.obsidian/appearance.json), not in obsidian.json. We cannot
   # manage vault-specific files without reading the vault path from obsidian.json,
   # which is app-owned state that changes at runtime.
   #
-  # WHY checkSlowStartup is not configured: checkSlowStartup is localStorage-backed
+  # WHY: checkSlowStartup is not configured: checkSlowStartup is localStorage-backed
   # and vault-specific. It cannot be declaratively managed via obsidian.json.
   # check-suppress:config-method: method 3 (merge) -- see the activation entry below for full rationale.
   obsidianDefaultSettings = builtins.fromJSON (builtins.readFile ./configs/obsidian/obsidian.json);

@@ -18,7 +18,7 @@ __NUCLEUS_APPEND_PATH__
 if ($IsWindows) {
   # Load rclone config passphrase from materialized secret for automatic config
   # file encryption in interactive and scripted rclone invocations.
-  # WHY conditional: secret file may be absent before apply has materialized it.
+  # WHY: conditional: secret file may be absent before apply has materialized it.
   $_rclonePassFile = Join-Path $HOME ".config\nucleus\secrets\rclone-config-pass"
   if (Test-Path -Path $_rclonePassFile -PathType Leaf) {
     # check-suppress:suppression_doc: file may not exist yet (first provision); absence is expected and handled downstream.
@@ -132,7 +132,7 @@ function Test-PrekHooksInstalled {
     [string]$RepositoryRoot
   )
 
-  # WHY git rev-parse: handles .git as file (submodules, worktrees) + directory.
+  # WHY: git rev-parse: handles .git as file (submodules, worktrees) + directory.
   # Avoids silent failure when .git is a gitlink (file with gitdir: path).
   # check-suppress:suppression_doc: may run outside a git repo; 2>$null is the explicit guard
   $gitDirOutput = & git -C $RepositoryRoot rev-parse --git-dir 2>$null

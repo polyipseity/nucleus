@@ -6,7 +6,7 @@ applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, src/hosts/**/M
 
 # Documentation Standards
 
-Document the **WHY, not the WHAT**: rationale, security implications, and design tradeoffs — not restatements of existing code. Use the formal documentation mechanism for each file type; fall back to `#` comments when none exists.
+Document the **WHY, not the WHAT**: rationale, security implications, and design tradeoffs — not restatements of existing code. Use the formal documentation mechanism for each file type; fall back to `#` comments when none exists. Rationale comments use the canonical `# WHY: <reason>` form (mandatory colon, lowercase keyword); see `comment-annotations.instructions.md`.
 
 - **No backwards compatibility**: see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility). Document the current path only.
 

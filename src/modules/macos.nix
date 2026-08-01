@@ -455,7 +455,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # ensure-dev-directory (cross-host)
     # Ensures ~/dev exists before any dev-tree maintenance runs.
     #
-    # WHY separate activation: the directory itself is cross-host provisioning
+    # WHY: separate activation: the directory itself is cross-host provisioning
     # state, while the macOS-only cleanup/indexing steps below are session-side
     # maintenance concerns.
     # -------------------------------------------------------------------------
@@ -467,7 +467,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # macos-reload-dock
     # Restarts Dock so declarative Dock defaults take effect immediately.
     #
-    # WHY separate activation: Dock refresh is a UI cache reload, not dev-tree
+    # WHY: separate activation: Dock refresh is a UI cache reload, not dev-tree
     # maintenance. Keeping it independent avoids fake coupling with ~/dev work.
     # -------------------------------------------------------------------------
     macos-reload-dock = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
@@ -760,7 +760,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     };
   };
 
-  # WHY terminal-activations (last resort): Safari and accessibility defaults
+  # WHY: terminal-activations (last resort): Safari and accessibility defaults
   # require Full Disk Access (FDA), which is lost when running inside a sudo
   # process tree during darwin-rebuild switch.  Execute them in the user's
   # terminal context via the terminal-activations manifest so macOS TCC grants

@@ -14,7 +14,7 @@ export PATH
 if [ ! -x "$_rustup_bin" ]; then
   echo "rustup: $_rustup_bin not found in nix store; skipping initialization" >&2
 else
-  # WHY none: forces every project to declare its toolchain via
+  # WHY: none: forces every project to declare its toolchain via
   # rust-toolchain.toml; prevents silent use of a global stable and
   # matches Windows Invoke-RustupSetup.
   "$_rustup_bin" default none

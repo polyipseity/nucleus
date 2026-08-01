@@ -3,7 +3,7 @@
 # This module is intentionally limited to software not managed by nixpkgs or
 # Homebrew. Keep install/uninstall logic for each manual package here.
 #
-# WHY postActivation.text, not a custom script name:
+# WHY: postActivation.text, not a custom script name:
 #   nix-darwin (rev 8c62fba) assembles only a hardcoded fixed list of named
 #   scripts into the activate binary; custom names are silently ignored.
 #   postActivation is the correct extension point for scripts that must run
@@ -18,7 +18,7 @@ in
   # Installs Rosetta 2 once on Apple Silicon hosts if it is not already
   # present. `--agree-to-license` keeps activation non-interactive.
   #
-  # WHY Rosetta is not provisioned via Homebrew: Rosetta 2 is a macOS system
+  # WHY: Rosetta is not provisioned via Homebrew: Rosetta 2 is a macOS system
   # component that is pre-installed on all Apple Silicon Macs. While Homebrew
   # casks use the `requires_rosetta` caveat to declare dependency on Rosetta
   # for x86_64 apps, Rosetta itself cannot be installed via Homebrew because it

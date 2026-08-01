@@ -106,7 +106,7 @@ Always use `pkgs.writeNucleusShellApplication` instead of `pkgs.writeShellApplic
 
 `writeShellApplication` (from nixpkgs) does not support `bundleDefault`, `extraEnv`, or `text`. Scripts built with it cannot source sibling libraries via `SCRIPT_DIR`-relative paths, leading to silent breakage when a script evolves to need library access.
 
-The only exception is when technical constraints prevent using `writeNucleusShellApplication` (e.g., dynamic names in function context as in `cloud-drives.nix`). In that case, add a `# WHY` comment explaining the constraint.
+The only exception is when technical constraints prevent using `writeNucleusShellApplication` (e.g., dynamic names in function context as in `cloud-drives.nix`). In that case, add a `# WHY:` comment explaining the constraint.
 
 ### CLI-arg-first pattern (standalone scripts)
 

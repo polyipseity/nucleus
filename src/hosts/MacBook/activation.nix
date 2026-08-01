@@ -4,7 +4,7 @@
 # system.activationScripts is a nix-darwin-only option they are guaranteed to
 # execute on macOS; no OS check inside the shell body is needed.
 #
-# WHY postActivation.text, not custom script names:
+# WHY: postActivation.text, not custom script names:
 #   nix-darwin's activation-scripts.nix (rev 8c62fba) assembles only a fixed
 #   hardcoded list of named scripts into the activate binary.  Any name outside
 #   that list (e.g. configureBatteryPolicy, enableScreenSharing) is silently
@@ -123,7 +123,7 @@ in
     # xcrun (invoked by rustc/cargo for SDK discovery) works without Xcode CLT
     # installed.  Without this, every native-code build outside a Nix devShell
     # triggers the CLT installation dialog.
-    # WHY xcode-select --switch (not just DEVELOPER_DIR):
+    # WHY: xcode-select --switch (not just DEVELOPER_DIR):
     #   DEVELOPER_DIR only helps processes that inherit the shell environment.
     #   launchd services, VS Code tasks with non-shell exec, and other non-shell
     #   process trees rely on the system-level developer directory set via
@@ -221,7 +221,7 @@ in
     # Converge Jellyfin accounts and libraries declared in src/modules/users.json
     # with a running Jellyfin server.
     #
-    # WHY subprocess invocation (not readFile + replaceStrings): the activation
+    # WHY: subprocess invocation (not readFile + replaceStrings): the activation
     # bundle already contains the full scripts/ tree.  The repo root is passed
     # as a CLI arg.  jq and sops are pinned via --jq-path/--sops-path so the
     # script does not depend on the activation environment's PATH.

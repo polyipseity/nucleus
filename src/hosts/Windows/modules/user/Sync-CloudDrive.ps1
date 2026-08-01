@@ -105,7 +105,7 @@ function Sync-CloudDrive {
 
         # Suppress stderr only for this probe so invalid/missing remotes do not
         # emit noisy warnings during expected discovery runs.
-        # WHY safe: we immediately check exit code and remote presence below.
+        # WHY: safe: we immediately check exit code and remote presence below.
         $remoteList = & $rcloneExe listremotes 2>$null  # check-suppress:suppression_doc: probe -- remote may not be configured; $LASTEXITCODE checked below
         $remoteListExitCode = $LASTEXITCODE
         if ($remoteListExitCode -ne 0) {

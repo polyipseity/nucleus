@@ -7,7 +7,7 @@
   # Allow Nix to use Rosetta for x86_64-darwin binaries on Apple Silicon.
   # Point the daemon at the machines file written by linux-builder.nix so it
   # routes aarch64-linux derivations to the builder VM.
-  # WHY builders-use-substitutes: lets the builder VM fetch cached derivations
+  # WHY: builders-use-substitutes: lets the builder VM fetch cached derivations
   # from the binary cache directly instead of routing all bytes through the
   # macOS host, which would be much slower for large NixOS guest builds.
   # Determinate Nix includes /etc/nix/nix.custom.conf from /etc/nix/nix.conf.

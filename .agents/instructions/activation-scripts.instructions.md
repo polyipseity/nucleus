@@ -170,4 +170,4 @@ text = ''
 
 ### Exception documentation
 
-Every exception to these rules must have an inline `# WHY` comment in the Nix expression explaining the technical constraint that prevents using the standard pattern.
+Every exception to these rules must have an inline `# WHY:` comment in the Nix expression explaining the technical constraint that prevents using the standard pattern.

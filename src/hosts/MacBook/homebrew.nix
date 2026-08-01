@@ -117,7 +117,7 @@ in
     onActivation.cleanup = "zap"; # remove unlisted formulae/casks and their data
     onActivation.upgrade = false; # prevent network calls during activation
 
-    # WHY --force: newer brew-bundle (Homebrew 4.x) requires --force when
+    # WHY: --force: newer brew-bundle (Homebrew 4.x) requires --force when
     # --cleanup would uninstall packages unattended; activation runs under
     # sudo with no TTY to confirm.
     onActivation.extraFlags = [ "--force" ];

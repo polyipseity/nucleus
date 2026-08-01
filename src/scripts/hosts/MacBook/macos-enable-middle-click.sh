@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Set MiddleClick gesture recognition to 4 fingers and ensure it starts at
 # login using the native macOS Login Items mechanism (not LaunchAgent).
-# WHY 4 fingers: TFD uses 3 fingers; using 4 for middle-click prevents both
+# WHY: 4 fingers: TFD uses 3 fingers; using 4 for middle-click prevents both
 # the TFD conflict and the phantom left-click issue described at
 # https://github.com/artginzburg/MiddleClick/blob/main/docs/three-finger-drag.md
-# WHY native login item: MiddleClick upstream manages startup through macOS
+# WHY: native login item: MiddleClick upstream manages startup through macOS
 # Login Items APIs (ServiceManagement), so declarative convergence should
 # target that same system surface instead of maintaining a parallel
 # LaunchAgent path.

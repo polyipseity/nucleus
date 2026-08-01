@@ -325,7 +325,7 @@ in
       };
 
       # Finder: desktop visibility, iCloud Drive folder pinning, and UI prefs.
-      # WHY in CustomUserPreferences: Finder reads these from the user domain
+      # WHY: in CustomUserPreferences: Finder reads these from the user domain
       # (~/.Library/Preferences/com.apple.finder.plist), not system domain.
       # These settings MUST be written via CustomUserPreferences to take effect.
       # Source: https://support.apple.com/en-us/guide/mac-help/finder-settings-mchla834/mac
@@ -656,7 +656,7 @@ in
       };
 
       # Amphetamine: declaratively enable the Power Protect install toggle.
-      # WHY partial declarative only: upstream requires users to place the
+      # WHY: partial declarative only: upstream requires users to place the
       # helper script and sudoers fragment manually due platform restrictions;
       # this key activates that feature path once those files exist.
       # Source (upstream maintainer docs):
@@ -738,7 +738,7 @@ in
     screencapture = {
       disable-shadow = true; # omit window drop-shadow from screenshots
       location = "~/Desktop"; # default save location
-      # WHY target is explicitly set: keep clipboard-first capture behavior as the
+      # WHY: target is explicitly set: keep clipboard-first capture behavior as the
       # default while still retaining a deterministic file-save location for
       # workflows that explicitly switch target back to file.
       target = "clipboard"; # default capture destination

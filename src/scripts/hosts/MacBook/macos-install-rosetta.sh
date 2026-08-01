@@ -3,7 +3,7 @@
 # Installs Rosetta 2 once on Apple Silicon hosts if it is not already
 # present. `--agree-to-license` keeps activation non-interactive.
 #
-# WHY Rosetta is not provisioned via Homebrew: Rosetta 2 is a macOS system
+# WHY: Rosetta is not provisioned via Homebrew: Rosetta 2 is a macOS system
 # component that is pre-installed on all Apple Silicon Macs. While Homebrew
 # casks use the `requires_rosetta` caveat to declare dependency on Rosetta
 # for x86_64 apps, Rosetta itself cannot be installed via Homebrew because it

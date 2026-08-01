@@ -16,7 +16,7 @@
 # Preview.app and all Apple built-in Automator PDF actions use "com.adobe.pdf".
 # "public.pdf" is a common AI hallucination — if you see it suggested, reject it.
 #
-# WHY home.activation instead of home.file:
+# WHY: home.activation instead of home.file:
 #   home.file creates a symlink to the Nix store, but Automator .workflow
 #   bundles stored as symlinks are not discoverable by the service menu
 #   system. This is a required Method 2 (read-only deployment) case;
@@ -24,7 +24,7 @@
 #   A home.activation script that copies workflows on each generation
 #   switch guarantees they are registered.
 #
-# WHY home.file for manual.md:
+# WHY: home.file for manual.md:
 #   The manual.md file is symlinked via home.file so the workflow's shell
 #   script can find it at $HOME/.local/share/nucleus/manual.md without needing
 #   NUCLEUS_REPO_ROOT at runtime.

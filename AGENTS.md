@@ -122,7 +122,7 @@
 - Do not hide meaningful errors (`2>/dev/null`, unconditional `|| true`, `-ErrorAction SilentlyContinue`) unless failure is expected, explicitly justified, and still checked.
 - Comment annotations (suppressions, references, rationale, sentinels) follow the unified grammar and four-category taxonomy in `.agents/instructions/comment-annotations.instructions.md`; Category 1+2 annotations must be machine-parsed, Category 3+4 must not.
 - Keep canonical hostnames and display names aligned: `MacBook`, `NixOS`, `Windows`.
-- Prefer preview/beta/canary channels when viable; if stable is required, add a short `# WHY`.
+- Prefer preview/beta/canary channels when viable; if stable is required, add a short `# WHY:` comment.
 
 ## Interaction Boundaries
 

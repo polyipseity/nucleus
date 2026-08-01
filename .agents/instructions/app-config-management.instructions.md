@@ -26,7 +26,7 @@ All app settings must support per-user overrides. The merge order is: `defaults 
 
 ## Cross-platform parity
 
-When adding app settings, audit all three hosts (macOS, NixOS, Windows). For each host where the app exists, ensure defaults are centrally defined, user override fields exist in the user registry, activation applies `defaults // platform_overrides // user_overrides` in the same order, and tests cover all enabled hosts. If an app exists on only one or two hosts, document why with a `# WHY` comment in code. See `cross-host-feature-parity.instructions.md` for the full parity policy.
+When adding app settings, audit all three hosts (macOS, NixOS, Windows). For each host where the app exists, ensure defaults are centrally defined, user override fields exist in the user registry, activation applies `defaults // platform_overrides // user_overrides` in the same order, and tests cover all enabled hosts. If an app exists on only one or two hosts, document why with a `# WHY:` comment in code. See `cross-host-feature-parity.instructions.md` for the full parity policy.
 
 ## Checklist for adding a new app config
 
@@ -34,7 +34,7 @@ When adding app settings, audit all three hosts (macOS, NixOS, Windows). For eac
 - Add defaults in the appropriate location.
 - Add user override fields to user registries.
 - Implement merge logic.
-- Activate on all applicable platforms or document exceptions with `# WHY`.
+- Activate on all applicable platforms or document exceptions with `# WHY:`.
 - Add tests.
 - Verify `nix flake check` and all tests pass.
 - After choosing a config method, verify the `# check-suppress:config-method: method N` comment cites a technical reason, not a preference (see `app-config-policy.instructions.md` Method 2 for invalid justifications).

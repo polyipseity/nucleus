@@ -36,7 +36,7 @@ let
   # May not exist until the user manually runs `sops edit src/secrets/users-<username>.yml`.
   # All downstream consumers guard on hasUserSecretFile / configPassEnabled so
   # activation succeeds even when the file has not been created yet.
-  # WHY key name is unscoped: the file itself is already user-scoped
+  # WHY: key name is unscoped: the file itself is already user-scoped
   # (src/secrets/users-<username>.yml), so repeating the username in every
   # key adds noise without improving isolation.
   rcloneConfigPassSecretName = "rclone_config_pass";
@@ -364,7 +364,7 @@ lib.mkIf isPrimaryUser {
         builtins.attrNames (builtins.readDir wallpaperDir)
       );
       # Build list of SOPS files with their paths and display names.
-      # WHY regular paths instead of builtins.path: Avoid creating derivation
+      # WHY: regular paths instead of builtins.path: Avoid creating derivation
       # context warnings. The activation script will convert these to strings
       # naturally during shell code generation without requiring explicit
       # store-path construction.

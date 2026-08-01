@@ -68,10 +68,10 @@ function Sync-ReplicaSyncScheduledTask {
     "$($env:USERDOMAIN)\$($env:USERNAME)"
   }
 
-  # WHY interactive token: replica sync depends on user-scoped rclone config
+  # WHY: interactive token: replica sync depends on user-scoped rclone config
   # and home-directory paths, so running in the logged-in user session avoids
   # machine-context path/credential mismatches.
-  # WHY command wrapper first: daily fallback should follow the same user-facing
+  # WHY: command wrapper first: daily fallback should follow the same user-facing
   # nucleus-replica-sync entrypoint as manual runs. If managed profile blocks
   # are not loaded yet, fall back to the scripts/replica-sync.ps1 wrapper.
   $actionTemplate = Get-Content -Raw (Join-Path -Path $PSScriptRoot -ChildPath "..\scripts\ReplicaSync-task-action.ps1")
