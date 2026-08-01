@@ -16,7 +16,7 @@ Aggressively remove unnecessary complexity across code, docs, and AI customizati
 4. Run parallel `maintain` subagents, one per lane, using:
 
    ```text
-   Improve maintainability across {{LANE_SCOPE}}.
+   Improve maintainability across __LANE_SCOPE__.
    Be aggressive: remove unnecessary indirection, duplicated policy,
    stale guidance, and avoidable abstractions.
    Preserve behavior.
