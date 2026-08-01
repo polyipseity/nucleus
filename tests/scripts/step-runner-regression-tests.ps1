@@ -72,24 +72,24 @@ function Test-SkipSystemBuildFlagRemoved {
 Test-SkipSystemBuildFlagRemoved
 
 # ---- Contract B3: Read-Argument rejects unknown flags ----
-# Tests that unknown flags (including --format) are rejected.
+# Runs in a subprocess because Read-Argument exits the calling script on
+# unknown flags (exit is not catchable by try/catch).
 function Test-FormatFlagRejected {
-    # Reset step arrays
-    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
-    $script:StepNames = [System.Collections.Generic.List[string]]::new()
-    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
+    $scriptText = @"
+Set-StrictMode -Version Latest
+. "$stepRunner"
+function global:Write-Message { Write-Output "message: `$args" }
+function global:Write-ErrorMessage { Write-Output "error: `$args" }
+`$script:usageAction = { Write-Output "usage: test" }
+Read-Argument -Arguments @('--format')
+"@
+    $subOutput = pwsh -NoProfile -Command $scriptText 2>&1
+    $subExitCode = $LASTEXITCODE
 
-    $exitCode = 0
-    try {
-        & $stepRunner
-        Read-Argument -Arguments @('--format')
-    } catch {
-        $exitCode = 1
-    }
-    if ($exitCode -eq 1) {
+    if ($subExitCode -eq 1 -and $subOutput -match 'unsupported argument') {
         Assert-Pass "REGRESSION: PS1 Read-Argument rejects --format (no POSIX parity)"
     } else {
-        Assert-Fail "REG-ps1-no-format" "Expected --format to be rejected, but was accepted"
+        Assert-Fail "REG-ps1-no-format" "Expected exit 1 rejecting --format; got exit=$subExitCode, output: $([string]::Join("`n", $subOutput))"
     }
 }
 Test-FormatFlagRejected
@@ -123,22 +123,21 @@ function Test-ScopedFullBehavior {
         Assert-Fail "REG-ps1-full" "Expected FULL=true, HAS_ARGS=false; got FULL=$($script:FULL), HAS_ARGS=$($script:HAS_ARGS)"
     }
 
-    # Test mutual exclusivity
-    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
-    $script:StepNames = [System.Collections.Generic.List[string]]::new()
-    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
-    . $stepRunner
-
-    $mutexOk = $false
-    try {
-        Read-Argument -Arguments @('--scoped', '--full')
-    } catch {
-        $mutexOk = $true
-    }
+    # Test mutual exclusivity (subprocess: exit is not catchable)
+    $scriptText = @"
+Set-StrictMode -Version Latest
+. "$stepRunner"
+function global:Write-Message { Write-Output "message: `$args" }
+function global:Write-ErrorMessage { Write-Output "error: `$args" }
+`$script:usageAction = { Write-Output "usage: test" }
+Read-Argument -Arguments @('--scoped', '--full')
+"@
+    $mutexOutput = pwsh -NoProfile -Command $scriptText 2>&1
+    $mutexOk = ($LASTEXITCODE -eq 1) -and ($mutexOutput -match 'both --scoped and --full')
     if ($mutexOk) {
         Assert-Pass "REGRESSION: PS1 --scoped and --full combined errors"
     } else {
-        Assert-Fail "REG-ps1-mutex" "Expected error from --scoped + --full, but none raised"
+        Assert-Fail "REG-ps1-mutex" "Expected error from --scoped + --full; got exit=$LASTEXITCODE, output: $([string]::Join("`n", $mutexOutput))"
     }
 }
 Test-ScopedFullBehavior
