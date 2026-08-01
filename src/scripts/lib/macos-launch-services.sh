@@ -177,14 +177,14 @@ refresh_desktop_services() {
 refresh_services_menu() {
   case "$(uname -s)" in
     Darwin)
-      # check-suppress:suppression_doc: see refresh_cfprefsd — daemon may not be running.
+      # check-suppress:suppression_doc: see refresh_cfprefsd -- daemon may not be running.
       /usr/bin/killall -KILL cfprefsd 2>/dev/null || true
-      # check-suppress:suppression_doc: see refresh_lsd — LS db may already be fresh.
+      # check-suppress:suppression_doc: see refresh_lsd -- LS db may already be fresh.
       /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -domain user 2>/dev/null || true
-      # check-suppress:suppression_doc: see refresh_pbs — pasteboard server may not be running.
+      # check-suppress:suppression_doc: see refresh_pbs -- pasteboard server may not be running.
       /usr/bin/killall -KILL pbs 2>/dev/null || true
       /bin/sleep 1
-      # check-suppress:suppression_doc: see refresh_finder — Finder may not be running.
+      # check-suppress:suppression_doc: see refresh_finder -- Finder may not be running.
       /usr/bin/killall Finder 2>/dev/null || true
       ;;
   esac

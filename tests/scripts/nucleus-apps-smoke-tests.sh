@@ -245,7 +245,7 @@ if command -v pwsh >/dev/null 2>&1; then
     BEGIN{ib=0;d=0}{gsub(/\r/,"")}
     /^Register-ArgumentCompleter/{ib=1;bl=$0;d=cb($0);if(d<=0){print bl;print"";ib=0}next}
     ib{bl=bl"\n"$0;d+=cb($0);if(d<=0){print bl;print"";ib=0}}
-    END{if(ib)print bl}' "$_pwsh_comp_file" > "$_temp_pwsh_check" 2>/dev/null || true  # check-suppress:suppression_doc: probe — file may not contain completions yet; handled by [ -s ] guard below
+    END{if(ib)print bl}' "$_pwsh_comp_file" > "$_temp_pwsh_check" 2>/dev/null || true  # check-suppress:suppression_doc: probe -- file may not contain completions yet; handled by [ -s ] guard below
     if [ -s "$_temp_pwsh_check" ]; then
       if pwsh -NoProfile -NonInteractive -Command "
         \$content = Get-Content '$_temp_pwsh_check' -Raw -ErrorAction Stop

@@ -60,7 +60,7 @@ function Sync-LiteLLMService {
   $serviceName = 'nucleus-litellm'
   $oldTaskName = 'NucleusLiteLLM'
 
-  # check-suppress:suppression_doc: probe — legacy task may not exist; $null check handles missing task.
+  # check-suppress:suppression_doc: probe -- legacy task may not exist; $null check handles missing task.
   $existingTask = Get-ScheduledTask -TaskName $oldTaskName -ErrorAction SilentlyContinue
   if ($null -ne $existingTask) {
     Unregister-ScheduledTask -TaskName $oldTaskName -Confirm:$false
@@ -95,7 +95,7 @@ function Sync-LiteLLMService {
   $logDir = Get-NucleusSystemLogDir
   $serviceLogDir = Join-Path -Path $logDir -ChildPath "litellm"
   $secretsDir = Join-Path -Path $env:ProgramData -ChildPath "nucleus\secrets"
-  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
   $null = New-Item -Path $secretsDir -ItemType Directory -Force
 
   . (Join-Path -Path $PSScriptRoot -ChildPath "..\Set-ManagedSymlinkDeleteProtection.ps1")
@@ -117,7 +117,7 @@ function Sync-LiteLLMService {
   $opencodeZenKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_opencode_zen_api_key"
 
   $litellmEndpoint = & {
-    # check-suppress:suppression_doc: probe — services.json may not exist yet; $null check handles absence.
+    # check-suppress:suppression_doc: probe -- services.json may not exist yet; $null check handles absence.
     $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
     if ($svc.litellm.network.default) { $svc.litellm.network.default } else { @{ host = '127.0.0.1'; port = 4000 } }
   }

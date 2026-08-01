@@ -510,7 +510,7 @@ if [[ -f "$SVC_SH" ]]; then
     # svc list / list --json with SVC_DOMAIN_FILTER=user avoids sudo entirely.
     # Assertions use ssh-agent and discord-music-rpc, which are user-domain on
     # all platforms (unlike ollama/litellm/jellyfin which are system-domain on NixOS).
-    SVC_LIST_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" SVC_DOMAIN_FILTER=user "$SVC_SH" list 2>&1 || true)  # check-suppress:suppression_doc: test probe — capturing output regardless of exit code for assertion below
+    SVC_LIST_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" SVC_DOMAIN_FILTER=user "$SVC_SH" list 2>&1 || true)  # check-suppress:suppression_doc: test probe -- capturing output regardless of exit code for assertion below
     if echo "$SVC_LIST_OUTPUT" | grep -q "ID.*Name.*Status.*Running.*PID"; then
         assert_pass "svc list: table headers present"
     else
@@ -537,7 +537,7 @@ if [[ -f "$SVC_SH" ]]; then
         assert_fail "svc list: no unknown services" "Output contains 'unknown' (likely jq parse failure)"
     fi
 
-    SVC_JSON_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" SVC_DOMAIN_FILTER=user "$SVC_SH" list --json 2>/dev/null || true)  # check-suppress:suppression_doc: test probe — discard stderr (domain-filter info) to keep JSON parseable
+    SVC_JSON_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" SVC_DOMAIN_FILTER=user "$SVC_SH" list --json 2>/dev/null || true)  # check-suppress:suppression_doc: test probe -- discard stderr (domain-filter info) to keep JSON parseable
     if echo "$SVC_JSON_OUTPUT" | jq -e '.version == "1"' >/dev/null 2>&1; then
         assert_pass "svc list --json: valid JSON with version"
     else
@@ -556,7 +556,7 @@ if [[ -f "$SVC_SH" ]]; then
     fi
 
     # Regression: log-config shows correct capture values for all services (Fix 1 + Fix 3)
-    SVC_LOG_CONFIG_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" log-config 2>&1 || true)  # check-suppress:suppression_doc: test probe — capturing output regardless of exit code for assertion below
+    SVC_LOG_CONFIG_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" log-config 2>&1 || true)  # check-suppress:suppression_doc: test probe -- capturing output regardless of exit code for assertion below
     if echo "$SVC_LOG_CONFIG_OUTPUT" | grep -q "capture: all"; then
         capture_all_lines=$(echo "$SVC_LOG_CONFIG_OUTPUT" | grep -c "capture: all" || true)  # check-suppress:suppression_doc: grep -c exits 1 when count is 0 (no match); expected when services lack capture field
         capture_none_lines=$(echo "$SVC_LOG_CONFIG_OUTPUT" | grep -c "capture: none" || true)  # check-suppress:suppression_doc: same as above
@@ -569,7 +569,7 @@ if [[ -f "$SVC_SH" ]]; then
         assert_fail "svc log-config: all services have capture=all" "No capture=all found in output"
     fi
 
-    SVC_LOG_CONFIG_JSON=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" log-config --json 2>/dev/null || true)  # check-suppress:suppression_doc: test probe — discard stderr (domain-filter warning) to keep JSON parseable
+    SVC_LOG_CONFIG_JSON=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" log-config --json 2>/dev/null || true)  # check-suppress:suppression_doc: test probe -- discard stderr (domain-filter warning) to keep JSON parseable
     if echo "$SVC_LOG_CONFIG_JSON" | jq -e --slurp 'all(.[]; .[].capture == "all")' >/dev/null 2>&1; then
         assert_pass "svc log-config --json: all capture=all via jq"
     else
@@ -582,9 +582,9 @@ if [[ -f "$SVC_SH" ]]; then
     fi
 
     # Regression: logs listing shows all services with capture=all (Fix 2 + Fix 4)
-    SVC_LOGS_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" logs 2>&1 || true)  # check-suppress:suppression_doc: test probe — capturing output regardless of exit code for assertion below
+    SVC_LOGS_OUTPUT=$(NUCLEUS_REPO_ROOT="$PWD" "$SVC_SH" logs 2>&1 || true)  # check-suppress:suppression_doc: test probe -- capturing output regardless of exit code for assertion below
     # Strip domain-filter warning from start of output to keep grep clean.
-    SVC_LOGS_OUTPUT=$(echo "$SVC_LOGS_OUTPUT" | grep -v '^svc: warning:' || true)  # check-suppress:suppression_doc: filter may produce empty output if all lines are warnings  # ref: allow-and-deny-lists.instructions.md#C2 — reason: runtime warning noise from svc script in test output
+    SVC_LOGS_OUTPUT=$(echo "$SVC_LOGS_OUTPUT" | grep -v '^svc: warning:' || true)  # check-suppress:suppression_doc: filter may produce empty output if all lines are warnings  # ref: allow-and-deny-lists.instructions.md#C2 -- reason: runtime warning noise from svc script in test output
     if echo "$SVC_LOGS_OUTPUT" | grep -q "capture=all"; then
         assert_pass "svc logs: listing shows capture=all"
     else

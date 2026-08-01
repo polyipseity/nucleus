@@ -102,7 +102,7 @@ function Sync-JellyfinLibrary {
   )
 
   if ([string]::IsNullOrEmpty($BaseUrl)) {
-    # check-suppress:suppression_doc: probe — services.json may not exist yet; $null check handles absence.
+    # check-suppress:suppression_doc: probe -- services.json may not exist yet; $null check handles absence.
     $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
     $BaseUrl = if ($svc.jellyfin.network.http) { "http://$($svc.jellyfin.network.http.host):$($svc.jellyfin.network.http.port)" } else { 'http://127.0.0.1:8096' }
   }
@@ -293,7 +293,7 @@ function Sync-JellyfinLibrary {
         Password = $bootstrapCred.password
       }
       if ($startupUser.StatusCode -eq 204) {
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — [void] intentional; startup-complete API is fire-and-forget, response discarded
+        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- [void] intentional; startup-complete API is fire-and-forget, response discarded
         [void](Invoke-JellyfinApi -Method POST -Path '/Startup/Complete')
       }
 
@@ -400,7 +400,7 @@ function Sync-JellyfinLibrary {
       }
       if ($createResponse.StatusCode -eq 204) {
         Write-Output "jellyfin/library: created library '$($spec.name)' ($($spec.collectionType))."
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; refresh API call is fire-and-forget, response discarded
+        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; refresh API call is fire-and-forget, response discarded
         $null = Invoke-JellyfinApi -Method POST -Path '/Library/Refresh' -Token $adminToken
       }
       else {
@@ -419,7 +419,7 @@ function Sync-JellyfinLibrary {
       }
       if ($updateResponse.StatusCode -eq 204) {
         Write-Output "jellyfin/library: updated library options for '$($spec.name)'."
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; refresh API call is fire-and-forget, response discarded
+        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; refresh API call is fire-and-forget, response discarded
         $null = Invoke-JellyfinApi -Method POST -Path '/Library/Refresh' -Token $adminToken
       }
       else {

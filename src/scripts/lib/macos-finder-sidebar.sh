@@ -52,7 +52,7 @@ finder_pre_remove() {
   done < "$_pr_tmp"
   rm -f "$_pr_tmp"
   # Default extras that reappear after daemon restarts
-  # check-suppress:suppression_doc: see finder_pre_remove — mysides segfaults.
+  # check-suppress:suppression_doc: see finder_pre_remove -- mysides segfaults.
   "$mysides_bin" remove "/" >/dev/null 2>&1 || true
   # check-suppress:suppression_doc: see finder_pre_remove.
   "$mysides_bin" remove "$(id -un)" >/dev/null 2>&1 || true
@@ -136,7 +136,7 @@ finder_remove_default_extras() {
   local mysides_bin="$1"
   # check-suppress:suppression_doc: mysides is known to segfault on corrupted bookmarks; soft-fail prevents activation abort.
   "$mysides_bin" remove "/" >/dev/null 2>&1 || true
-  # check-suppress:suppression_doc: see finder_remove_default_extras — mysides segfaults.
+  # check-suppress:suppression_doc: see finder_remove_default_extras -- mysides segfaults.
   "$mysides_bin" remove "$(id -un)" >/dev/null 2>&1 || true
   # check-suppress:suppression_doc: see finder_remove_default_extras.
   "$mysides_bin" remove ".Trash" >/dev/null 2>&1 || true
@@ -204,7 +204,7 @@ finder_configure_sidebar() {
   # Refresh finder-related daemons in-session
   # check-suppress:suppression_doc: daemon may not be running; killall exits 1, activation must not abort.
   /usr/bin/killall sharedfilelistd 2>/dev/null || true
-  # check-suppress:suppression_doc: see killall sharedfilelistd — daemon may not be running.
+  # check-suppress:suppression_doc: see killall sharedfilelistd -- daemon may not be running.
   /usr/bin/killall -KILL cfprefsd 2>/dev/null || true
 
   if [ "$_finder_sidebar_failed" -eq 1 ]; then

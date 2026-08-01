@@ -179,7 +179,7 @@ function Get-ServiceStatus {
         $enabled = $svc.StartType -in @('Automatic', 'AutomaticDelayedStart')
         $processId = $null
         if ($running) {
-          $processId = (Get-CimInstance -ClassName Win32_Service -Filter "Name='$svcName'" -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe — service may not exist (race condition); $processId becomes $null and handled below
+          $processId = (Get-CimInstance -ClassName Win32_Service -Filter "Name='$svcName'" -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- service may not exist (race condition); $processId becomes $null and handled below
           ).ProcessId
           if ($processId -eq 0) { $processId = $null }
         }
@@ -242,7 +242,7 @@ function Invoke-ServiceAction {
         'status'  { return Get-ServiceStatus -Platform $Platform }
         'start'   { Start-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
         'stop'    { Stop-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
-        'restart' { Stop-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort stop before start — task may not be running
+        'restart' { Stop-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort stop before start -- task may not be running
           ; Start-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
         'enable'  { Enable-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
         'disable' { Disable-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
@@ -349,7 +349,7 @@ function Test-ServiceHasLog {
   }
   $eventLog = Get-EventLogConfig -ServiceKey $ServiceKey
   if ($eventLog -and $eventLog.ContainsKey('provider')) {
-    # check-suppress:suppression_doc: probe — event may not exist; expected on fresh systems.
+    # check-suppress:suppression_doc: probe -- event may not exist; expected on fresh systems.
     $evt = Get-WinEvent -ProviderName $eventLog.provider -MaxEvents 1 -ErrorAction SilentlyContinue
     if ($evt) { return $true }
   }

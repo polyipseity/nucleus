@@ -50,7 +50,7 @@ function Install-PrekHook {
   $prekConfigPath = Join-Path -Path $resolvedRepositoryRoot -ChildPath "prek.toml"
 
   # Use git rev-parse --git-dir to handle submodules/worktrees where .git is a file
-  $gitDirOutput = & git -C $resolvedRepositoryRoot rev-parse --git-dir 2>$null  # check-suppress:suppression_doc: probe — non-git repos or submodule dirs expected; checked via $gitDirOutput below
+  $gitDirOutput = & git -C $resolvedRepositoryRoot rev-parse --git-dir 2>$null  # check-suppress:suppression_doc: probe -- non-git repos or submodule dirs expected; checked via $gitDirOutput below
   if (-not $gitDirOutput) {
     Write-Warning "prek: unable to detect git directory for $resolvedRepositoryRoot"
     return
@@ -79,11 +79,11 @@ function Install-PrekHook {
 
   $resolvedPrekPath = $PrekExecutablePath
   if ([string]::IsNullOrWhiteSpace($resolvedPrekPath)) {
-    # check-suppress:suppression_doc: probe — prek may not be installed; if-guard checks absence below.
+    # check-suppress:suppression_doc: probe -- prek may not be installed; if-guard checks absence below.
     $resolvedPrekPath = Get-Command -Name "prek.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
   }
   if ([string]::IsNullOrWhiteSpace($resolvedPrekPath)) {
-    # check-suppress:suppression_doc: probe — prek (without .exe) may not be installed; if-guard checks absence below.
+    # check-suppress:suppression_doc: probe -- prek (without .exe) may not be installed; if-guard checks absence below.
     $resolvedPrekPath = Get-Command -Name "prek" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
   }
   if ([string]::IsNullOrWhiteSpace($resolvedPrekPath)) {

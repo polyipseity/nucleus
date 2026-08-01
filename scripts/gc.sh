@@ -413,7 +413,7 @@ gc_git_cache_if_present() {
             if [ "$dry_run" = true ]; then
               dry_run "would remove empty deprecated directory '$_dep_dir' in '$repo_dir'"
             else
-              # check-suppress:suppression_doc: race — directory may no longer be empty between check and removal
+              # check-suppress:suppression_doc: race -- directory may no longer be empty between check and removal
               rmdir "$_dep_dir" 2>/dev/null || true
             fi
           fi

@@ -34,7 +34,7 @@ function Get-NucleusLogDir {
 
   $path = Join-Path -Path $env:LOCALAPPDATA -ChildPath "nucleus\logs"
   if ($PassThru -and -not (Test-Path -LiteralPath $path -PathType Container)) {
-    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
+    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
     $null = New-Item -Path $path -ItemType Directory -Force
   }
   return $path
@@ -58,7 +58,7 @@ function Get-NucleusSystemLogDir {
 
   $path = Join-Path -Path $env:ProgramData -ChildPath "nucleus\logs"
   if ($PassThru -and -not (Test-Path -LiteralPath $path -PathType Container)) {
-    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
+    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
     $null = New-Item -Path $path -ItemType Directory -Force
   }
   return $path
@@ -167,7 +167,7 @@ function Invoke-LogRotation {
     Move-Item -LiteralPath $file.FullName -Destination $archivePath -Force
 
     if ($Compress) {
-      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; gzip output discarded, exit code checked below
+      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; gzip output discarded, exit code checked below
       $null = & "gzip" @("$archivePath") 2>$null  # check-suppress:suppression_doc: archive may fail to compress if already corrupted or missing; $? checked below
       if (-not $?) {
         Write-Warning "log-rotation: gzip failed for $archivePath; keeping uncompressed."

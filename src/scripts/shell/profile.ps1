@@ -493,7 +493,7 @@ function npx {
   return 1
 }
 function node {
-  # check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets — intentional: shadows native node; warns to use bun equivalents
+  # check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets -- intentional: shadows native node; warns to use bun equivalents
   [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '')]
   param()
   Write-Warning "shell: system-wide Node.js is not used in this environment."
@@ -527,7 +527,7 @@ function Invoke-NucleusManagedDevTool {
   # active context (direnv devShell or rust-toolchain.toml project).  If
   # the tool is not on PATH at all, no context can satisfy the call and the
   # caller prints the educational ban message.
-  # check-suppress:suppression_doc: presence probe — tool may be absent; conditional branch handles the result immediately.
+  # check-suppress:suppression_doc: presence probe -- tool may be absent; conditional branch handles the result immediately.
   $application = Get-Command -Name $ToolName -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
   if ($IsWindows -and $null -eq $application) {
     return $false
@@ -655,25 +655,25 @@ if ($IsWindows) {
     & $scriptPath @ScriptArguments
   }
   function nucleus-check-pwsh {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\check-pwsh.ps1' @Args
   }
   function nucleus-check-sh {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\check-sh.sh' @Args
   }
   function nucleus-ai {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\ai.ps1' @Args
   }
   function nucleus-apply {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     $repoRoot = Resolve-NucleusRepoRoot
@@ -686,73 +686,73 @@ if ($IsWindows) {
     & $scriptPath -ModuleDir $moduleDir -PrimaryUsername $username -Users @($username) @Args
   }
   function nucleus-cloud-setup {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\cloud-setup.ps1' @Args
   }
   function nucleus-config {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\config.ps1' @Args
   }
   function nucleus-gc {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\gc.ps1' @Args
   }
   function nucleus-health-check {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\health-check.ps1' @Args
   }
   function nucleus-replica-sync {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\replica-sync.ps1' @Args
   }
   function nucleus-replica-reset {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\replica-reset.ps1' @Args
   }
   function nucleus-update {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\update.ps1' @Args
   }
   function nucleus-bootstrap {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\bootstrap.ps1' @Args
   }
   function nucleus-vm {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\vm.ps1' @Args
   }
   function nucleus-bump-lockfile {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\bump-lockfile.ps1' @Args
   }
   function nucleus-svc {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\svc.ps1' @Args
   }
   function nucleus-gs-pdf-opt {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs — intentional: wrapper function name is the fixed nucleus CLI contract
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\gs-pdf-opt.ps1' @Args
@@ -764,7 +764,7 @@ $nucleusConfigCommands = @('get', 'set', 'list')
 
 Register-ArgumentCompleter -CommandName nucleus-svc -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; parameter metadata variables, declared for introspection
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; parameter metadata variables, declared for introspection
   $null = $commandName, $parameterName, $fakeBoundParameters
   $nucleusSvcCommands | Where-Object { $_ -like "$wordToComplete*" }
   if ($commandAst.CommandElements.Count -ge 2) {
@@ -786,7 +786,7 @@ Register-ArgumentCompleter -CommandName nucleus-svc -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-config -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; parameter metadata variables, declared for introspection
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; parameter metadata variables, declared for introspection
   $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   $nucleusConfigCommands | Where-Object { $_ -like "$wordToComplete*" }
   @('--help') | Where-Object { $_ -like "$wordToComplete*" }
@@ -794,7 +794,7 @@ Register-ArgumentCompleter -CommandName nucleus-config -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-gc -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; parameter metadata variables, declared for introspection
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; parameter metadata variables, declared for introspection
   $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
   @(
     '--help', '--dry-run', '--no-dry-run',

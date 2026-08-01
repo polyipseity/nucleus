@@ -136,7 +136,7 @@ function Sync-VSCodeExtensionManifest {
 
   foreach ($channel in $channels) {
     # check-suppress:suppression_doc: probe whether the VS Code CLI is installed; Get-Command throws when absent.
-    $cliPath = Get-Command -Name $channel.Command -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source  # check-suppress:suppression_doc: probe — CLI may not be in PATH; null check below handles absence
+    $cliPath = Get-Command -Name $channel.Command -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source  # check-suppress:suppression_doc: probe -- CLI may not be in PATH; null check below handles absence
     if ([string]::IsNullOrWhiteSpace($cliPath)) {
       Write-Output "Skipping VS Code $($channel.Name) extension sync: '$($channel.Command)' not found in PATH."
       continue

@@ -57,7 +57,7 @@ function Sync-Wallpaper {
         -Users 'admin', 'guest' `
         -SopsExe 'sops.exe'
   #>
-  # check-suppress:SuppressMessageAttribute: PSReviewUnusedParameter — empty scope suppresses unused parameter warning on the whole param block
+  # check-suppress:SuppressMessageAttribute: PSReviewUnusedParameter -- empty scope suppresses unused parameter warning on the whole param block
   [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '')]
   param(
     [Parameter(Mandatory = $true)]

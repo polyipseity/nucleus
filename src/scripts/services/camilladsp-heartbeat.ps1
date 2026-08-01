@@ -32,7 +32,7 @@ while ($true) {
   # ── Runtime toggle from config.json ─────────────────────────────────────
   $nucleusCfgFile = Join-Path $HOME ".local\state\nucleus\config.json"
   if (Test-Path $nucleusCfgFile) {
-    # check-suppress:suppression_doc: probe — no config file may not exist; $null check below handles absence
+    # check-suppress:suppression_doc: probe -- no config file may not exist; $null check below handles absence
     $nc = Get-Content -Raw $nucleusCfgFile -ErrorAction SilentlyContinue | ConvertFrom-Json
     if ($null -ne $nc.camilladsp.heartbeat -and -not $nc.camilladsp.heartbeat) {
       Start-Sleep -Seconds $baseSleep
@@ -60,7 +60,7 @@ while ($true) {
     }
   } catch {
     # Can't connect — will retry with backoff.
-    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; $_ discarded in ForEach-Object, side-effect-only iteration
+    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; $_ discarded in ForEach-Object, side-effect-only iteration
     $null = $_
   }
 
@@ -77,7 +77,7 @@ while ($true) {
         $success = $true
       } catch {
         # Device may be gone — retry with backoff.
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; $_ discarded in ForEach-Object, side-effect-only iteration
+        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; $_ discarded in ForEach-Object, side-effect-only iteration
         $null = $_
       }
     }

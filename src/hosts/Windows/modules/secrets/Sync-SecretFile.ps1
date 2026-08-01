@@ -212,7 +212,7 @@ function Sync-SecretFile {
           # This evicts any pre-placed key already loaded in the agent before
           # the managed key was materialized.  Soft-failure so apply proceeds
           # even when no agent is running.  Parity with POSIX ssh-key-adopt behavior.
-          $sshAddCommand = Get-Command 'ssh-add' -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe — ssh-add may not be installed; $null check below handles absence
+          $sshAddCommand = Get-Command 'ssh-add' -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- ssh-add may not be installed; $null check below handles absence
           if ($null -ne $sshAddCommand) {
             # 2>$null is intentional: ssh-add -D emits "Could not connect to
             # your authentication agent" when no agent is running.  That

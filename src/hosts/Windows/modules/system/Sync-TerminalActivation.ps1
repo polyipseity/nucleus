@@ -28,7 +28,7 @@ function Sync-TerminalActivation {
 
   $lines = Get-Content -LiteralPath $manifestPath | Where-Object { $_ -and $_ -notmatch '^\s*#' }
   if ($lines.Count -eq 0) {
-    # check-suppress:suppression_doc: best-effort cleanup of empty manifest — file may already be gone.
+    # check-suppress:suppression_doc: best-effort cleanup of empty manifest -- file may already be gone.
     Remove-Item -LiteralPath $manifestPath -Force -ErrorAction SilentlyContinue
     return
   }
@@ -45,6 +45,6 @@ function Sync-TerminalActivation {
       Write-Warning "terminal-activations: command exited with error (continuing): $_"
     }
   }
-  # check-suppress:suppression_doc: best-effort cleanup — file may already be deleted by earlier steps or locked.
+  # check-suppress:suppression_doc: best-effort cleanup -- file may already be deleted by earlier steps or locked.
   Remove-Item -LiteralPath $manifestPath -Force -ErrorAction SilentlyContinue
 }

@@ -25,7 +25,7 @@ _iut_desired_names="$(mktemp)"
 # functionality.  Real failures surface at tool-install time below.
 while IFS=' ' read -r _iut_tool _iut_python; do
   [ -z "$_iut_tool" ] && continue
-  # check-suppress:suppression_doc: uv python install may fail if the Python version is already installed or unavailable on this platform; that's fine — a real failure surfaces at tool-install time.
+  # check-suppress:suppression_doc: uv python install may fail if the Python version is already installed or unavailable on this platform; that's fine -- a real failure surfaces at tool-install time.
   [ -n "$_iut_python" ] && "$_iut_uv_bin" python install "$_iut_python" 2>/dev/null || true
 done < "$_iut_desired"
 

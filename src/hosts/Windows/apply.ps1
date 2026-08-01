@@ -359,7 +359,7 @@ if (-not $Elevated) {
   }
   $proc.WaitForExit()
   $exitCode = $proc.ExitCode
-  Remove-Item $paramsJsonPath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: same — temp file in %TEMP%; child may have already cleaned up
+  Remove-Item $paramsJsonPath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: same -- temp file in %TEMP%; child may have already cleaned up
   exit $exitCode
 }
 
@@ -507,7 +507,7 @@ $machineSshHostKeyPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_ho
 $primarySshKeyPath = Join-Path -Path $HOME -ChildPath ".ssh\ssh_personal_$PrimaryUsername"
 
 # Resolve managed executables before running any decryption/materialization.
-# check-suppress:suppression_doc: probe — SOPS WinGet package directory may not exist; $null check handles absence.
+# check-suppress:suppression_doc: probe -- SOPS WinGet package directory may not exist; $null check handles absence.
 $sopsPackageDir = Get-ChildItem -Path (Join-Path -Path $env:LOCALAPPDATA -ChildPath "Microsoft\WinGet\Packages\SecretsOPerationS.SOPS_*") -Directory -ErrorAction SilentlyContinue |
   Sort-Object -Property Name -Descending |
   Select-Object -First 1
@@ -529,14 +529,14 @@ $gpgCandidates = @(
   (Get-Command -Name "gpg.exe" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source)
 ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
-# check-suppress:suppression_doc: probe — prek WinGet package directory may not exist; $null check handles absence.
+# check-suppress:suppression_doc: probe -- prek WinGet package directory may not exist; $null check handles absence.
 $prekPackageDir = Get-ChildItem -Path (Join-Path -Path $env:LOCALAPPDATA -ChildPath "Microsoft\WinGet\Packages\j178.Prek_*") -Directory -ErrorAction SilentlyContinue |
   Sort-Object -Property Name -Descending |
   Select-Object -First 1
 
 $prekExecutableFromWinget = $null
 if ($null -ne $prekPackageDir) {
-  # check-suppress:suppression_doc: probe — prek executable may not be in expected location; $null check handles absence.
+  # check-suppress:suppression_doc: probe -- prek executable may not be in expected location; $null check handles absence.
   $prekExecutableFromWinget = Get-ChildItem -Path $prekPackageDir.FullName -Filter "prek*.exe" -File -Recurse -ErrorAction SilentlyContinue |
     Sort-Object -Property FullName |
     Select-Object -First 1 -ExpandProperty FullName
@@ -649,7 +649,7 @@ else {
 # into %ProgramData%\nucleus\secrets\ so the SYSTEM-native litellm SCM service
 # can read them at startup.
 $systemSecretsDir = Join-Path -Path $env:ProgramData -ChildPath "nucleus\secrets"
-# check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
+# check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
 $null = New-Item -Path $systemSecretsDir -ItemType Directory -Force
 $systemYmlPath = Join-Path -Path $secretsDir -ChildPath "system.yml"
 if (Test-Path -Path $systemYmlPath -PathType Leaf) {
@@ -830,7 +830,7 @@ Sync-JellyfinLibrary -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgE
 Sync-CustomProvisionSymlink -Enabled:$EnableCustomProvisionSymlinkParity -UserRecords $selectedUserRecords
 # check-suppress:config-method: method 1 (writable symlink) -- symlink config so edits take effect immediately.
   $discordMusicRPCConfigDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath "discord-music-rpc"
-  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
   $null = New-Item -Path $discordMusicRPCConfigDir -ItemType Directory -Force
   $discordMusicRPCConfig = Join-Path -Path $discordMusicRPCConfigDir -ChildPath "config.yaml"
   $discordMusicRPCConfigSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\discord-music-rpc\config.yaml"
@@ -908,7 +908,7 @@ if ($NoAISync) {
 if (-not $ReplicaSync) {
   Write-Output "replica-sync: skipping post-apply replica sync (default; pass -ReplicaSync to run now)"
 } else {
-  # check-suppress:suppression_doc: probe — rclone may be absent on first-provision hosts.
+  # check-suppress:suppression_doc: probe -- rclone may be absent on first-provision hosts.
   $rcloneOnPath = Get-Command -Name "rclone" -ErrorAction SilentlyContinue
   if ($null -eq $rcloneOnPath) {
     Write-Output "replica-sync: rclone not found in PATH; skipping post-apply replica sync"

@@ -62,7 +62,7 @@ function Invoke-CamillaGUISetup {
     New-Item -ItemType Directory -Force -Path $tempDir > $null
 
     Write-Output "camillagui-backend-setup: downloading v${desiredVersion} from GitHub releases"
-    # check-suppress:suppression_doc: probe — download may fail; Test-Path check handles failure downstream.
+    # check-suppress:suppression_doc: probe -- download may fail; Test-Path check handles failure downstream.
     Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -ErrorAction SilentlyContinue
     if (-not (Test-Path $zipPath)) {
       Write-Error "camillagui-backend-setup: download failed from $zipUrl"
@@ -111,7 +111,7 @@ function Invoke-CamillaGUISetup {
     $configPath = Join-Path -Path $configDir -ChildPath "config.yml"
     $configSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\camillagui-backend\config-windows.yml"  # check-suppress:config-method: method 1 (writable symlink)
     if (-not (Test-Path $configDir)) {
-      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
+      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
       $null = New-Item -ItemType Directory -Path $configDir -Force
     }
     if (Test-Path $configPath) { Remove-Item -Path $configPath -Force }

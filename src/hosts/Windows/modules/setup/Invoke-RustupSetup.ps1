@@ -48,7 +48,7 @@ function Invoke-RustupSetup {
   )
 
   # Guard: rustup must be accessible after WinGet DSC has installed Rustlang.Rustup.
-  # check-suppress:suppression_doc: probe — rustup may not be installed; if-guard checks absence below.
+  # check-suppress:suppression_doc: probe -- rustup may not be installed; if-guard checks absence below.
   if (-not (Get-Command rustup -ErrorAction SilentlyContinue)) {
     Write-Error "Invoke-RustupSetup: rustup not found on PATH; ensure Rustlang.Rustup was installed by WinGet DSC before calling this function"
     return
@@ -140,7 +140,7 @@ function Invoke-RustupSetup {
   $cargoConfigDir = "$env:USERPROFILE\.cargo"
   $cargoConfigPath = "$cargoConfigDir\config.toml"
   if (-not (Test-Path -Path $cargoConfigDir)) {
-    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
+    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
     $null = New-Item -ItemType Directory -Path $cargoConfigDir -Force
   }
   $cargoSourcePath = Join-Path $repoRoot $cargoConfigRelPath

@@ -225,7 +225,7 @@ source "qemu" "windows11" {
   net_device = "e1000"
 
   iso_url      = var.windows_iso
-  iso_checksum = var.windows_iso_checksum # check-suppress:packer_validate: Windows ISO checksums cannot be predetermined — Microsoft does not publish stable, queryable checksums for Windows 11 ISOs. Set the variable to "none" to skip verification.
+  iso_checksum = var.windows_iso_checksum # check-suppress:packer_validate: Windows ISO checksums cannot be predetermined -- Microsoft does not publish stable, queryable checksums for Windows 11 ISOs. Set the variable to "none" to skip verification.
 
   # Autounattend.xml on floppy (A:\) — Windows Setup reads it automatically.
   floppy_files = [

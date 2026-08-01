@@ -62,7 +62,7 @@ function Invoke-ReplicaSync {
     throw "replica-sync: gc config not found at '$gcConfigPath'."
   }
 
-  # check-suppress:suppression_doc: probe — rclone may not be installed; $null check handles absence.
+  # check-suppress:suppression_doc: probe -- rclone may not be installed; $null check handles absence.
   $rcloneCmd = Get-Command -Name "rclone" -ErrorAction SilentlyContinue
   if ($null -eq $rcloneCmd) {
     Write-Output "replica-sync: rclone not found; skipping replica sync"
@@ -71,7 +71,7 @@ function Invoke-ReplicaSync {
 
   $rclonePassPath = Join-Path -Path $HOME -ChildPath ".config\nucleus\secrets\rclone-config-pass"
   if (Test-Path -Path $rclonePassPath -PathType Leaf) {
-    # check-suppress:suppression_doc: probe — passphrase file may be unreadable; .Trim() handles empty result.
+    # check-suppress:suppression_doc: probe -- passphrase file may be unreadable; .Trim() handles empty result.
     $passphrase = (Get-Content -Path $rclonePassPath -Raw -ErrorAction SilentlyContinue).Trim()
     if (-not [string]::IsNullOrWhiteSpace($passphrase)) {
       $env:RCLONE_CONFIG_PASS = $passphrase
@@ -81,9 +81,9 @@ function Invoke-ReplicaSync {
   $usersConfig = Get-Content -Raw -Path $usersJsonPath | ConvertFrom-Json
   $gcConfig = Get-Content -Raw -Path $gcConfigPath | ConvertFrom-Json
   $isWindowsHost = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)
-  # check-suppress:suppression_doc: probe — icacls may not be available on non-Windows hosts; $null check handles absence.
+  # check-suppress:suppression_doc: probe -- icacls may not be available on non-Windows hosts; $null check handles absence.
   $icaclsCmd = Get-Command -Name "icacls" -ErrorAction SilentlyContinue
-  # check-suppress:suppression_doc: probe — attrib may not be available on non-Windows hosts; $null check handles absence.
+  # check-suppress:suppression_doc: probe -- attrib may not be available on non-Windows hosts; $null check handles absence.
   $attribCmd = Get-Command -Name "attrib" -ErrorAction SilentlyContinue
   $currentUserPrincipal = [System.Environment]::UserName
   try {
@@ -142,7 +142,7 @@ function Invoke-ReplicaSync {
     param([Parameter(Mandatory)][string]$Provider)
     # Explicit reference to suppress false-positive PSAvoidUsingUnusedParameters
     # ($Provider is used via closure in Where-Object below).
-    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; Provider variable discarded, used for drive qualification only
+    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; Provider variable discarded, used for drive qualification only
     $null = $Provider
 
     $providerProperty = $gcConfig.PSObject.Properties | Where-Object { $_.Name -eq $Provider } | Select-Object -First 1
@@ -203,7 +203,7 @@ function Invoke-ReplicaSync {
     }
 
     if ($null -ne $Set -and $Set.PSObject.Methods.Name -contains 'Add') {
-      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — [void] intentional; Add returns collection count, discarded
+      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- [void] intentional; Add returns collection count, discarded
       [void]$Set.Add($Value)
     }
   }
@@ -281,7 +281,7 @@ function Invoke-ReplicaSync {
       '--contimeout', '10s',
       '--max-duration', '1m'
     )
-    $remoteDirs = if ($IsDryRun) { @() } else { & $rcloneCmd.Source @remoteDirsArgs 2>$null }  # check-suppress:suppression_doc: probe — remote may not exist; $LASTEXITCODE checked below
+    $remoteDirs = if ($IsDryRun) { @() } else { & $rcloneCmd.Source @remoteDirsArgs 2>$null }  # check-suppress:suppression_doc: probe -- remote may not exist; $LASTEXITCODE checked below
     if ($LASTEXITCODE -eq 0 -and $null -ne $remoteDirs) {
       foreach ($remoteDir in @($remoteDirs)) {
         $trimmedDir = ([string]$remoteDir).TrimEnd('/')
@@ -312,7 +312,7 @@ function Invoke-ReplicaSync {
       '--contimeout', '10s',
       '--max-duration', '1m'
     )
-    $remoteFiles = if ($IsDryRun) { @() } else { & $rcloneCmd.Source @remoteFilesArgs 2>$null }  # check-suppress:suppression_doc: probe — remote may not exist; $LASTEXITCODE checked below
+    $remoteFiles = if ($IsDryRun) { @() } else { & $rcloneCmd.Source @remoteFilesArgs 2>$null }  # check-suppress:suppression_doc: probe -- remote may not exist; $LASTEXITCODE checked below
     if ($LASTEXITCODE -eq 0 -and $null -ne $remoteFiles) {
       foreach ($remoteFile in @($remoteFiles)) {
         if (Test-IsOneDriveInaccessibleRootEntry -EntryName ([string]$remoteFile) -BlockedRoots $BlockedRoots) {
@@ -324,7 +324,7 @@ function Invoke-ReplicaSync {
     }
 
     if (Test-Path -Path $LocalDir -PathType Container) {
-      # check-suppress:suppression_doc: probe — directory may be empty; foreach handles empty result.
+      # check-suppress:suppression_doc: probe -- directory may be empty; foreach handles empty result.
       foreach ($localEntry in Get-ChildItem -Path $LocalDir -Force -ErrorAction SilentlyContinue) {
         if (Test-IsOneDriveInaccessibleRootEntry -EntryName $localEntry.Name -BlockedRoots $BlockedRoots) {
           Write-Warning "replica-sync: [$ReplicaId] skipping inaccessible OneDrive root entry '$($localEntry.Name)'"

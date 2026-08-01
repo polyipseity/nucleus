@@ -729,7 +729,7 @@ vm_build_one_image() {
 
   case "$_vm_type" in
     NixOS)
-      # check-suppress:suppression_doc: best-effort — a prerequisite-missing or build failure for one
+      # check-suppress:suppression_doc: best-effort -- a prerequisite-missing or build failure for one
       # VM type must not abort builds for the remaining VMs; the build
       # function prints a specific error before returning non-zero.
       vm_build_nixos "$_vm_name" "$_vm_disk_gib" \
@@ -737,7 +737,7 @@ vm_build_one_image() {
       ;;
     Windows)
       _vm_edition="$(jq -r ".VMs[$_vm_index].windowsEdition // \"Pro\"" "$MANIFEST")"
-      # check-suppress:suppression_doc: best-effort — see NixOS branch above.
+      # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
       vm_build_windows "$_vm_name" "$_vm_disk_gib" "$_vm_edition" \
         || say "Windows image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
       ;;
@@ -748,12 +748,12 @@ vm_build_one_image() {
       # Uses (n + 2^19) / 2^20 for round-half-up in POSIX integer arithmetic.
       _vm_ram_mib="$(( (_vm_ram_bytes + 524288) / 1048576 ))"
       _vm_cpus="$(jq -r ".VMs[$_vm_index].cpus" "$MANIFEST")"
-      # check-suppress:suppression_doc: best-effort — see NixOS branch above.
+      # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
       vm_build_macos "$_vm_name" "$_vm_disk_gib" "$_vm_ram_mib" "$_vm_cpus" "$_vm_macos_ver" \
         || say "macOS image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
       ;;
     Android)
-      # check-suppress:suppression_doc: best-effort — see NixOS branch above.
+      # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
       vm_build_android "$_vm_name" "$_vm_index" \
         "$accept_gsi_license" "$upgrade_android" "$reset_userdata" \
         || say "Android image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"

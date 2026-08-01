@@ -22,7 +22,7 @@ Describe 'Sync-TerminalActivation behavior' {
     BeforeEach {
         # Use a temp directory as USERPROFILE so manifest paths are isolated.
         $script:testRoot = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "nucleus-test-$([System.IO.Path]::GetRandomFileName())"
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded in test setup
+        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded in test setup
         $null = New-Item -Path $script:testRoot -ItemType Directory -Force
         $script:originalUserProfile = $env:USERPROFILE
         $env:USERPROFILE = $script:testRoot
@@ -31,7 +31,7 @@ Describe 'Sync-TerminalActivation behavior' {
     AfterEach {
         $env:USERPROFILE = $script:originalUserProfile
         if ($script:testRoot -and (Test-Path -LiteralPath $script:testRoot)) {
-            # check-suppress:suppression_doc: cleanup in test teardown — failure is acceptable
+            # check-suppress:suppression_doc: cleanup in test teardown -- failure is acceptable
             Remove-Item -LiteralPath $script:testRoot -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
@@ -42,10 +42,10 @@ Describe 'Sync-TerminalActivation behavior' {
 
     It 'Should be a no-op and delete empty manifest' {
         $manifestDir = Join-Path -Path $script:testRoot -ChildPath '.config\nucleus'
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded in test setup
+        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded in test setup
         $null = New-Item -Path $manifestDir -ItemType Directory -Force
         $manifestPath = Join-Path -Path $manifestDir -ChildPath 'terminal-activations.list'
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns FileInfo, discarded in test setup
+        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns FileInfo, discarded in test setup
         $null = New-Item -Path $manifestPath -ItemType File -Force
 
         Sync-TerminalActivation
@@ -55,7 +55,7 @@ Describe 'Sync-TerminalActivation behavior' {
 
     It 'Should execute a single command from the manifest' {
         $manifestDir = Join-Path -Path $script:testRoot -ChildPath '.config\nucleus'
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded in test setup
+        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded in test setup
         $null = New-Item -Path $manifestDir -ItemType Directory -Force
         $manifestPath = Join-Path -Path $manifestDir -ChildPath 'terminal-activations.list'
         $markerPath = Join-Path -Path $script:testRoot -ChildPath 'marker-single'
@@ -69,7 +69,7 @@ Describe 'Sync-TerminalActivation behavior' {
 
     It 'Should skip comment lines' {
         $manifestDir = Join-Path -Path $script:testRoot -ChildPath '.config\nucleus'
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded in test setup
+        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded in test setup
         $null = New-Item -Path $manifestDir -ItemType Directory -Force
         $manifestPath = Join-Path -Path $manifestDir -ChildPath 'terminal-activations.list'
         $markerPath = Join-Path -Path $script:testRoot -ChildPath 'marker-comment'
@@ -86,7 +86,7 @@ Describe 'Sync-TerminalActivation behavior' {
 
     It 'Should continue on command failure' {
         $manifestDir = Join-Path -Path $script:testRoot -ChildPath '.config\nucleus'
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded in test setup
+        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded in test setup
         $null = New-Item -Path $manifestDir -ItemType Directory -Force
         $manifestPath = Join-Path -Path $manifestDir -ChildPath 'terminal-activations.list'
         $markerPath = Join-Path -Path $script:testRoot -ChildPath 'marker-after-fail'

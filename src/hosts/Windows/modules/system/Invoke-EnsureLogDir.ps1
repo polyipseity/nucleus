@@ -38,7 +38,7 @@ function Invoke-EnsureLogDir {
     if ($dirs.system -and $dirs.system.Count -gt 0) {
       foreach ($subdir in $dirs.system) {
         $path = Join-Path -Path $systemLogDir -ChildPath $subdir
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
+        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
         $null = New-Item -Path $path -ItemType Directory -Force
       }
     }
@@ -47,7 +47,7 @@ function Invoke-EnsureLogDir {
     if ($dirs.user -and $dirs.user.Count -gt 0) {
       foreach ($subdir in $dirs.user) {
         $path = Join-Path -Path $userLogDir -ChildPath $subdir
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
+        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
         $null = New-Item -Path $path -ItemType Directory -Force
       }
     }

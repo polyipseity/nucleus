@@ -66,7 +66,7 @@ function Invoke-UvSetup {
   }
 
   # Guard: uv must be accessible after WinGet DSC has installed astral-sh.uv.
-  # check-suppress:suppression_doc: probe — uv may not be installed; if-guard checks absence below.
+  # check-suppress:suppression_doc: probe -- uv may not be installed; if-guard checks absence below.
   if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     Write-Error "Invoke-UvSetup: uv not found on PATH; ensure astral-sh.uv was installed by WinGet DSC before calling this function"
     return

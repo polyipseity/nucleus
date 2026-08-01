@@ -49,7 +49,7 @@ Register-Step -Id "suppression-audit" -Number 17 -Name "Suppression audit" -Acti
         if ($skip) { continue }
         # Skip lines with inline # undoc-supp: comment (deprecated format, suppression_doc only)
         if ($CheckId -eq 'suppression_doc' -and $m.Line -match '# undoc-supp:') { continue }
-        # Skip lines with check-suppress:CheckId inline
+        # Skip lines with check-suppress:<CheckId> inline
         if (-not $NoSuppressionCheck) {
           if (Test-Suppressed -CheckId $CheckId -Path $m.Path -LineNumber $m.LineNumber) { continue }
         }
@@ -111,7 +111,7 @@ Register-Step -Id "suppression-audit" -Number 17 -Name "Suppression audit" -Acti
       Write-ErrorMessage $uv
     }
     Write-ErrorMessage "suppression audit failed with $($undocSuppViolations.Count) violation(s)"
-    Write-Message "  add '# check-suppress:check_id: reason' comment to explain intentional suppressions."
+    Write-Message "  add '# check-suppress:suppression_doc: reason' comment to explain intentional suppressions."
     return $false
   }
 

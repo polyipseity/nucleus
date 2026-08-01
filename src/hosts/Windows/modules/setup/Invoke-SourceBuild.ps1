@@ -98,7 +98,7 @@ function Invoke-SourceBuild {
     # --- Dependency guard ---
     $missingDep = $false
     foreach ($dep in $deps) {
-      # check-suppress:suppression_doc: probe — build dependency may not be installed; if-guard checks absence below.
+      # check-suppress:suppression_doc: probe -- build dependency may not be installed; if-guard checks absence below.
       if (-not (Get-Command $dep -ErrorAction SilentlyContinue)) {
         Write-Warning "Invoke-SourceBuild: missing build dependency '$dep' for '$pkgId'; skipping. Ensure $dep is installed via Scoop before calling Invoke-SourceBuild."
         $missingDep = $true
@@ -137,7 +137,7 @@ function Invoke-SourceBuild {
     $repoCacheDir = Join-Path $cacheRoot $pkgId
     if (-not (Test-Path $repoCacheDir)) {
       Write-Output "Invoke-SourceBuild: cloning $pkgId from $sourceUrl"
-      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
+      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
       $null = New-Item -ItemType Directory -Path $repoCacheDir -Force -ErrorAction Stop
       & git clone $sourceUrl $repoCacheDir 2>&1 > $null
       if ($LASTEXITCODE -ne 0) {
@@ -188,7 +188,7 @@ function Invoke-SourceBuild {
       continue
     }
 
-    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
+    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
     $null = New-Item -ItemType Directory -Path $installDir -Force -ErrorAction Stop
     Copy-Item $builtBinary $installDir -Force -ErrorAction Stop
     Set-Content -Path $markerPath -Value $rev -Force -ErrorAction Stop

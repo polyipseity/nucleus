@@ -37,8 +37,8 @@ Hard rules:
 | Family | Sites | Check id | Canonical form | Machine consumer |
 | --- | --- | --- | --- | --- |
 | `# Inline by embedded-content policy exception N (name).` | 10 + 1 detector | `embedded-content` | `# check-suppress:embedded-content: exception N (name) -- <reason>` | step 22 `.ps1` (regex `'check-suppress:embedded-content'`) |
-| `# Method N (name) — <why>` | 68 → 71 sites | `config-method` | `# check-suppress:config-method: method N (name) -- <reason>` — lowercase | step 19 `.ps1` (regex `'# check-suppress:config-method'`); `.sh` twin has no `# Method` regex — checks `configs\.` method usage only |
-| `# check-suppress:SuppressMessageAttribute: <rule> — <just>` / bare rule lists | 74 | `SuppressMessageAttribute` | `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | step 17 `Get-UndocSuppViolation -CheckId 'SuppressMessageAttribute'` |
+| `# Method N (name) -- <why>` (legacy form) | 68 → 71 sites | `config-method` | `# check-suppress:config-method: method N (name) -- <reason>` (lowercase `method N`) | step 19 `.ps1` (regex `'# check-suppress:config-method'`); `.sh` twin has no `# Method` regex (checks `configs\.` method usage only) |
+| `# check-suppress:SuppressMessageAttribute: <rule> -- <just>` / bare rule lists | 74 | `SuppressMessageAttribute` | `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | step 17 `Get-UndocSuppViolation -CheckId 'SuppressMessageAttribute'` |
 | `# check-suppress:suppression_doc: <just>` | 394 | `suppression_doc` | unchanged (plain form) | step 17 regex `# check-suppress:$CheckId[\s:]` |
 | `# check-suppress:packer_validate: ...` | 1 | `packer_validate` | unchanged form; parser required | `scripts/check-packer.ps1` (reads the comment, suppresses the checksum warning) |
 | `|| true` (shell) / `$null =` / `[void]` (ps1) | 5 sh sites + ps1 sites | `suppression_doc` | annotate with `# check-suppress:suppression_doc: <reason>` | step 17 `.sh` twin (flags bare `|| true`), step 17 `.ps1` (flags `$null =` / `[void]`) |
@@ -64,7 +64,7 @@ Dividers (`# --- section ---`), DSC structural headers (`# WinGet DSC v3 -`, `# 
 
 | Family | Sites | Canonical form |
 | --- | --- | --- |
-| `# ref:` | 38 | `# ref: <target> -- <just>` (drop `reason:`, `—` → `--`) |
+| `# ref:` | 38 | `# ref: <target> -- <just>` (drop `reason:`; em dash → `--`) |
 | DSC `# Source:` / `# Cross-reference:` / `# See:` headers | few | `# ref: <target> -- <reason>` |
 | `# WHY:` | 150 (44 no-colon) | `# WHY: <reason>` — mandatory colon |
 | `# TODO:` | 0 tracked | `# TODO: <text>` — mandatory colon |
@@ -102,8 +102,8 @@ Rule: any new tool-enforced marker MUST register a check id AND a machine consum
 | `# TODO[^:]` = 0 | no-colon TODO | documented only |
 | bare `Inline by embedded-content` = 0 | migrated annotations | step 22 (updated regex) |
 | capital `# Method` = 0 | lowercase method | step 19 (updated regex) |
-| `# check-suppress:.*—` = 0 | no em dash in markers | documented only |
-| `# ref:.*—` = 0 | no em dash in refs | documented only |
+| no `—` after `# check-suppress:` | no em dash in markers | documented only |
+| no `—` after `# ref:` | no em dash in refs | documented only |
 | `# ref:.*reason:` = 0 | no reason keyword in refs | documented only |
 | `# (Source\|Cross-reference\|See):` in dsc.yml = 0 | DSC headers → `ref` | documented only |
 

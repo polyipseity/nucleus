@@ -33,7 +33,7 @@ $qemu = Get-Command 'qemu-system-aarch64.exe' -ErrorAction Stop
 
 # --- Paths ---
 $imagesDir   = Join-Path $env:USERPROFILE 'virtual machines\images'
-$firmwareDir = if (Get-Command 'qemu-img.exe' -ErrorAction SilentlyContinue) { # check-suppress:suppression_doc: qemu-img.exe is optional — fallback to qemu dir
+$firmwareDir = if (Get-Command 'qemu-img.exe' -ErrorAction SilentlyContinue) { # check-suppress:suppression_doc: qemu-img.exe is optional -- fallback to qemu dir
                  Split-Path (Get-Command 'qemu-img.exe').Source -Parent
                } else {
                  Split-Path $qemu.Source -Parent

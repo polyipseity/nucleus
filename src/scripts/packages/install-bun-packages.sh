@@ -41,7 +41,7 @@ printf '%s\n' \
 _ibp_global_json="$HOME/.bun/install/global/package.json"
 _ibp_installed="$(mktemp)"
 if [ -f "$_ibp_global_json" ]; then
-  # check-suppress:suppression_doc: parse failure on a malformed or partially-written file treats the installed set as empty — safe because desired packages will simply be re-installed on the next run.
+  # check-suppress:suppression_doc: parse failure on a malformed or partially-written file treats the installed set as empty -- safe because desired packages will simply be re-installed on the next run.
   "$_jq_bin" -r '.dependencies // {} | keys[]' "$_ibp_global_json" > "$_ibp_installed" || true
 fi
 

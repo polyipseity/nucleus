@@ -109,7 +109,7 @@ function Invoke-ReplicaReset {
     # Never recurse into the symlink target during reset; remove only link.
     if ($isMacOSHost -and $provider -eq 'iCloud' -and $iCloudService -eq 'drive') {
       if (Test-Path -Path $localRoot) {
-        # check-suppress:suppression_doc: probe — path may be inaccessible; $null check handles absence.
+        # check-suppress:suppression_doc: probe -- path may be inaccessible; $null check handles absence.
         $localItem = Get-Item -Path $localRoot -Force -ErrorAction SilentlyContinue
         $isSymlink = $null -ne $localItem -and ($localItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint)
         if ($isSymlink) {
@@ -174,7 +174,7 @@ function Invoke-ReplicaReset {
       )) {
       $candidate = Join-Path -Path $HOME -ChildPath $cacheSuffix
       if (-not $cacheDirs.Contains($candidate)) {
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — [void] intentional; Add returns bool, discarded
+        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- [void] intentional; Add returns bool, discarded
         [void]$cacheDirs.Add($candidate)
       }
     }
@@ -189,7 +189,7 @@ function Invoke-ReplicaReset {
       )) {
       $candidate = Join-Path -Path $cacheBase -ChildPath $cacheSuffix
       if (-not $cacheDirs.Contains($candidate)) {
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — [void] intentional; Add returns bool, discarded
+        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- [void] intentional; Add returns bool, discarded
         [void]$cacheDirs.Add($candidate)
       }
     }

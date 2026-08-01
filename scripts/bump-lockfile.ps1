@@ -45,7 +45,7 @@ param(
 )
 # Explicit reference to suppress false-positive PSAvoidUsingUnusedParameters
 # ($Sections is used via closure in Test-SectionEnabled).
-# check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; $Sections collected inline for iteration, not used after
+# check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; $Sections collected inline for iteration, not used after
 $null = $Sections
 
 $ErrorActionPreference = 'Stop'
@@ -158,7 +158,7 @@ if (Test-SectionEnabled 'winget') {
   if ($ht.ContainsKey('winget') -and $ht['winget'] -is [hashtable]) {
     foreach ($key in $ht['winget'].Keys) {
       $old = $ht['winget'][$key]
-      # check-suppress:suppression_doc: probe — package may not exist; stderr suppressed for clean output.
+      # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
       $result = & winget show --id $key 2>$null | Select-String -Pattern '^Version '
       if ($result) {
         $new = ($result -split ':\s*', 2)[-1].Trim()
@@ -178,7 +178,7 @@ if (Test-SectionEnabled 'scoop') {
   if ($ht.ContainsKey('scoop') -and $ht['scoop'] -is [hashtable]) {
     foreach ($key in $ht['scoop'].Keys) {
       $old = $ht['scoop'][$key]
-      # check-suppress:suppression_doc: probe — package may not exist; stderr suppressed for clean output.
+      # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
       $result = & scoop info $key 2>$null | Select-String -Pattern '^Version '
       if ($result) {
         $new = ($result -split ':\s*', 2)[-1].Trim()
@@ -203,7 +203,7 @@ if (Test-SectionEnabled 'bun') {
   if ($ht.ContainsKey('bun') -and $ht['bun'] -is [hashtable]) {
     foreach ($key in $ht['bun'].Keys) {
       $old = $ht['bun'][$key]
-      # check-suppress:suppression_doc: probe — package may not exist; stderr suppressed for clean output.
+      # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
       $result = & npm view $key version 2>$null
       if ($result) {
         $new = $result.Trim()
@@ -220,7 +220,7 @@ if (Test-SectionEnabled 'bun') {
 # uv — uv tool list
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'uv') {
-  # check-suppress:suppression_doc: probe — uv may not be installed; stderr suppressed for clean output.
+  # check-suppress:suppression_doc: probe -- uv may not be installed; stderr suppressed for clean output.
   $uvOutput = & uv tool list 2>$null
   if ($uvOutput) {
     # Build hashtable from uv tool list output.
@@ -267,7 +267,7 @@ if (Test-SectionEnabled 'uv') {
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'rustup') {
   # Get installed toolchains
-  # check-suppress:suppression_doc: probe — rustup may not be installed; stderr suppressed for clean output.
+  # check-suppress:suppression_doc: probe -- rustup may not be installed; stderr suppressed for clean output.
   $toolchains = & rustup toolchain list 2>$null
   $toolchainSet = @{}
   if ($toolchains) {
@@ -285,7 +285,7 @@ if (Test-SectionEnabled 'rustup') {
     foreach ($key in $ht['rustup'].Keys) {
       $old = $ht['rustup'][$key]
       if ($toolchainSet.ContainsKey($key)) {
-        # check-suppress:suppression_doc: probe — toolchain may not be installed; stderr suppressed for clean output.
+        # check-suppress:suppression_doc: probe -- toolchain may not be installed; stderr suppressed for clean output.
         $versionOutput = & rustc "+$key" --version 2>$null
         if ($versionOutput) {
           $match = [regex]::Match($versionOutput, '\d{4}-\d{2}-\d{2}')
@@ -309,7 +309,7 @@ if (Test-SectionEnabled 'pwsh') {
   if ($ht.ContainsKey('pwsh') -and $ht['pwsh'] -is [hashtable]) {
     foreach ($key in $ht['pwsh'].Keys) {
       $old = $ht['pwsh'][$key]
-      # check-suppress:suppression_doc: probe — module may not exist in PSGallery; stderr suppressed for clean output.
+      # check-suppress:suppression_doc: probe -- module may not exist in PSGallery; stderr suppressed for clean output.
       $result = & pwsh -NoProfile -Command "Find-Module -Name '$key' | Select-Object -ExpandProperty Version" 2>$null
       if ($result) {
         $new = $result.Trim()
@@ -329,11 +329,11 @@ if (Test-SectionEnabled 'vscode') {
   $vscodeOutput = $null
   # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
   if (Get-Command -Name 'code' -ErrorAction SilentlyContinue) {
-    # check-suppress:suppression_doc: probe — tool may not be installed; stderr suppressed for clean output.
+    # check-suppress:suppression_doc: probe -- tool may not be installed; stderr suppressed for clean output.
     $vscodeOutput = & code --list-extensions --show-versions 2>$null
   # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
   } elseif (Get-Command -Name 'code-insiders' -ErrorAction SilentlyContinue) {
-    # check-suppress:suppression_doc: probe — tool may not be installed; stderr suppressed for clean output.
+    # check-suppress:suppression_doc: probe -- tool may not be installed; stderr suppressed for clean output.
     $vscodeOutput = & code-insiders --list-extensions --show-versions 2>$null
   }
 
@@ -387,12 +387,12 @@ if (Test-SectionEnabled 'ollama') {  # Point at the Ollama daemon directly, bypa
         $hasDigest = $entry.ContainsKey('digest')
         $oldDigest = if ($hasDigest) { $entry['digest'] } else { $null }
 
-        $ollamaHostAddr = if ($env:NUCLEUS_OLLAMA_HOST) { $env:NUCLEUS_OLLAMA_HOST } else { # check-suppress:suppression_doc: probe — services.json may not exist yet; falls back to default localhost port
+        $ollamaHostAddr = if ($env:NUCLEUS_OLLAMA_HOST) { $env:NUCLEUS_OLLAMA_HOST } else { # check-suppress:suppression_doc: probe -- services.json may not exist yet; falls back to default localhost port
         $svc = Get-Content -Raw (Join-Path $repoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json; if ($svc.ollama.network.default) { "$($svc.ollama.network.default.host):$($svc.ollama.network.default.port)" } else { '127.0.0.1:11434' } }
         try {
           $oldOllamaHost = $env:OLLAMA_HOST
           $env:OLLAMA_HOST = $ollamaHostAddr
-          # check-suppress:suppression_doc: probe — model may not exist in registry; stderr suppressed for clean output.
+          # check-suppress:suppression_doc: probe -- model may not exist in registry; stderr suppressed for clean output.
           $ollamaInfo = & ollama show "${name}:${tag}" --format json 2>$null
           $env:OLLAMA_HOST = $oldOllamaHost
           if ($ollamaInfo) {

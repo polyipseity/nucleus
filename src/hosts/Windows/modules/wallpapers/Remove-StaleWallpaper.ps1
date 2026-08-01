@@ -33,13 +33,13 @@ function Remove-StaleWallpaper {
   }
 
   $managedWallpaperSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-  # check-suppress:suppression_doc: probe — assets dir may not exist or have no .sops files; empty result handled.
+  # check-suppress:suppression_doc: probe -- assets dir may not exist or have no .sops files; empty result handled.
   Get-ChildItem -LiteralPath $AssetsDir -Filter "*.sops" -File -ErrorAction SilentlyContinue |
-    ForEach-Object { # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — [void] intentional; Add returns bool, discarded
+    ForEach-Object { # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- [void] intentional; Add returns bool, discarded
       [void]$managedWallpaperSet.Add([System.IO.Path]::GetFileNameWithoutExtension($_.Name)) }
 
 
-  # check-suppress:suppression_doc: probe — output dir may not exist or have no files; empty result handled.
+  # check-suppress:suppression_doc: probe -- output dir may not exist or have no files; empty result handled.
   $decryptedWallpapers = Get-ChildItem -LiteralPath $OutputDir -File -ErrorAction SilentlyContinue
   foreach ($decryptedWallpaper in $decryptedWallpapers) {
     if ($decryptedWallpaper.Extension -eq ".xml") {

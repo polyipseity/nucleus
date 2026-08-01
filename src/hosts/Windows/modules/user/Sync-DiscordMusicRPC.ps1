@@ -41,12 +41,12 @@ function Sync-DiscordMusicRPC {
   $taskName = "NucleusDiscordMusicRPC"
   $logDir = Get-NucleusLogDir
   $serviceLogDir = Join-Path -Path $logDir -ChildPath "discord-music-rpc"
-  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
   $null = New-Item -Path $serviceLogDir -ItemType Directory -Force
   $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
 
   if (-not $Enabled) {
-    # check-suppress:suppression_doc: probe — task may not exist; $null check handles missing task.
+    # check-suppress:suppression_doc: probe -- task may not exist; $null check handles missing task.
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($null -ne $existingTask) {
       Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
@@ -57,11 +57,11 @@ function Sync-DiscordMusicRPC {
 
   # Config symlink is managed by apply.ps1 (same as LiteLLM).  Ensure log
   # directory exists.
-  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; New-Item returns DirectoryInfo, discarded
+  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
   $null = New-Item -Path $logDir -ItemType Directory -Force
 
   # Find the discord-music-rpc binary (installed via uv tool install or pip).
-  # check-suppress:suppression_doc: probe — command may not be installed; $null check handles absence.
+  # check-suppress:suppression_doc: probe -- command may not be installed; $null check handles absence.
   $discordMusicRpcCmd = Get-Command -Name "discord-music-rpc" -ErrorAction SilentlyContinue
   if ($null -eq $discordMusicRpcCmd) {
     Write-Output "discord-music-rpc: binary not found in PATH; install via 'uv tool install git+https://github.com/polyipseity/ext.discord-music-rpc'"
@@ -82,7 +82,7 @@ function Sync-DiscordMusicRPC {
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
   $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
 
-  # check-suppress:suppression_doc: probe — task may not exist; $null check handles missing task.
+  # check-suppress:suppression_doc: probe -- task may not exist; $null check handles missing task.
   $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
   if ($null -ne $existingTask) {
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false

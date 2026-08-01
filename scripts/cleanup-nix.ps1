@@ -55,7 +55,7 @@ while ($_dirIndex -lt $_directories.Count) {
   $_dirIndex++
 
   foreach ($_pattern in @('result', 'result-*')) {
-    # check-suppress:suppression_doc: probe — result symlinks may not exist; ForEach-Object handles absent results gracefully.
+    # check-suppress:suppression_doc: probe -- result symlinks may not exist; ForEach-Object handles absent results gracefully.
     Get-ChildItem -Path $_dir -Filter $_pattern -Force -ErrorAction SilentlyContinue | ForEach-Object {
       if ($_.LinkType -eq 'SymbolicLink') {
         $_target = $_.Target

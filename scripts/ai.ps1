@@ -67,7 +67,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 # Used inside functions below via closure (PSSA cannot track)
-# check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments — $null = intentional; splatting variables, declared for parameter binding
+# check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; splatting variables, declared for parameter binding
 $null = $DryRun, $GcOnly, $AiProfile, $Json
 
 $fmtModulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
@@ -142,7 +142,7 @@ function Invoke-AiList {
 
 function Invoke-AiStatus {
   # Check ollama binary availability
-  $ollamaCmd = Get-Command "ollama" -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe — expected on fresh systems
+  $ollamaCmd = Get-Command "ollama" -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- expected on fresh systems
   $ollamaAvailable = $null -ne $ollamaCmd
 
   # Check ollama service

@@ -38,7 +38,7 @@ Import-Module $modulePath -Force -DisableNameChecking
 function Resolve-NucleusRoot {
   $repoRoot = $env:NUCLEUS_REPO_ROOT
   if (-not $repoRoot) {
-    # check-suppress:suppression_doc: probe — may be invoked outside repo checkouts; resolution handled below.
+    # check-suppress:suppression_doc: probe -- may be invoked outside repo checkouts; resolution handled below.
     $candidate = Resolve-Path "$PSScriptRoot\.." -ErrorAction SilentlyContinue
     if ($candidate) {
       return $candidate
@@ -59,7 +59,7 @@ function Get-RcloneMissingRemote {
 
   # listremotes stderr is suppressed because missing/first-run configs may emit
   # expected setup hints; caller checks for null output and handles failure.
-  # check-suppress:suppression_doc: probe — rclone may not be configured yet; $LASTEXITCODE checked below.
+  # check-suppress:suppression_doc: probe -- rclone may not be configured yet; $LASTEXITCODE checked below.
   $listed = & rclone listremotes 2>$null
   if ($LASTEXITCODE -ne 0) {
     return $null
@@ -312,12 +312,12 @@ Write-NucleusInfo 'all credentials valid.'
 # Ensure acknowledge_abuse is set on GoogleDrive to prevent 403 errors on
 # publicly-shared files. This is required for rclone to download files shared
 # via Google Drive links with "anyone with the link" permissions.
-# check-suppress:suppression_doc: probe — rclone may not be configured yet; exit code checked downstream.
+# check-suppress:suppression_doc: probe -- rclone may not be configured yet; exit code checked downstream.
 $gdListed = & rclone listremotes 2>$null
 if ($LASTEXITCODE -eq 0 -and ($gdListed -contains 'GoogleDrive:')) {
   $gdAckAlreadySet = $false
   try {
-    # check-suppress:suppression_doc: probe — rclone may not be configured yet; catch block handles failure.
+    # check-suppress:suppression_doc: probe -- rclone may not be configured yet; catch block handles failure.
     $gdDump = & rclone config dump 2>$null | Out-String | ConvertFrom-Json
     if ($gdDump.GoogleDrive.acknowledge_abuse -eq 'true') {
       $gdAckAlreadySet = $true

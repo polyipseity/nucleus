@@ -139,12 +139,12 @@ if ($Help) {
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
   $env:NUCLEUS_REPO_ROOT
 } else {
-  # check-suppress:suppression_doc: probe — path may not exist; $null check handles absence.
+  # check-suppress:suppression_doc: probe -- path may not exist; $null check handles absence.
   $candidate = Resolve-Path "$PSScriptRoot\.." -ErrorAction SilentlyContinue
   if ($candidate -and (Test-Path "$candidate\src\flake.nix")) {
     $candidate
   } else {
-    # check-suppress:suppression_doc: probe — may not be in a git repo; $null check below handles absence.
+    # check-suppress:suppression_doc: probe -- may not be in a git repo; $null check below handles absence.
     $gitRoot = & git -C (Get-Location).Path rev-parse --show-toplevel 2>$null | Out-String
     $gitRoot = $gitRoot.Trim()
     if (-not [string]::IsNullOrWhiteSpace($gitRoot) -and (Test-Path -Path $gitRoot -PathType Container)) {
@@ -300,12 +300,12 @@ function Clear-GitCache {
       )
       foreach ($marker in $activeMarkers) {
         $markerPath = Join-Path $gitDir.FullName $marker
-        # check-suppress:suppression_doc: probe — marker may not exist; silent skip is intentional
+        # check-suppress:suppression_doc: probe -- marker may not exist; silent skip is intentional
         if (Test-Path -LiteralPath $markerPath -PathType Container -ErrorAction SilentlyContinue) {
           $activeOp = $true
           break
         }
-        # check-suppress:suppression_doc: probe — marker may not exist; silent skip is intentional
+        # check-suppress:suppression_doc: probe -- marker may not exist; silent skip is intentional
         if (Test-Path -LiteralPath $markerPath -PathType Leaf -ErrorAction SilentlyContinue) {
           $activeOp = $true
           break
@@ -325,7 +325,7 @@ function Clear-GitCache {
       }
 
       # Remove lock files except index.lock.
-      # check-suppress:suppression_doc: probe — lock files may not exist; empty result is handled
+      # check-suppress:suppression_doc: probe -- lock files may not exist; empty result is handled
       $lockFiles = Get-ChildItem -LiteralPath $gitDir.FullName -Filter '*.lock' -File -Force -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -ne 'index.lock' }  # ref: allow-and-deny-lists.instructions.md#A5 — reason: Git invariant; index.lock must never be cleaned
       foreach ($lockFile in $lockFiles) {
@@ -348,7 +348,7 @@ function Clear-GitCache {
       foreach ($depDir in $depDirs) {
         $depPath = Join-Path $gitDir.FullName $depDir
         if (Test-Path -LiteralPath $depPath -PathType Container) {
-          # check-suppress:suppression_doc: probe — dir may already be empty; empty result is handled
+          # check-suppress:suppression_doc: probe -- dir may already be empty; empty result is handled
           $depChildren = Get-ChildItem -LiteralPath $depPath -Force -ErrorAction SilentlyContinue
           if ($null -eq $depChildren -or $depChildren.Count -eq 0) {
             Remove-Item -LiteralPath $depPath -Force -ErrorAction Stop
@@ -369,7 +369,7 @@ function Clear-GitCache {
         }
         $originalDir = Join-Path $gitDir.FullName 'refs\original'
         if (Test-Path -LiteralPath $originalDir -PathType Container) {
-          # check-suppress:suppression_doc: probe — dir may not exist or may have leftover refs
+          # check-suppress:suppression_doc: probe -- dir may not exist or may have leftover refs
           $originalChildren = Get-ChildItem -LiteralPath $originalDir -Force -ErrorAction SilentlyContinue
           if ($null -eq $originalChildren -or $originalChildren.Count -eq 0) {
             Remove-Item -LiteralPath $originalDir -Force -ErrorAction Stop
@@ -507,21 +507,21 @@ if (-not $NoVMGc) {
 
     if (Test-Path -LiteralPath $imagesDir -PathType Container) {
       # Remove temporary Packer build directories.
-      # check-suppress:suppression_doc: probe — temporary build directories may not exist; ForEach-Object handles empty result.
+      # check-suppress:suppression_doc: probe -- temporary build directories may not exist; ForEach-Object handles empty result.
       Get-ChildItem -LiteralPath $imagesDir -Filter "*-build" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
         Remove-VMGcItem -Item $_ -Label "temporary VM build directory" -Recurse
       }
 
       # Remove leftover Packer temporary build directories (dot-prefixed, from interrupted runs).
       if (Test-Path -LiteralPath $imagesDir -PathType Container) {
-        # check-suppress:suppression_doc: probe — stale temporary directories may not exist; Where-Object handles empty result.
+        # check-suppress:suppression_doc: probe -- stale temporary directories may not exist; Where-Object handles empty result.
         Get-ChildItem -LiteralPath $imagesDir -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^\..+' } | ForEach-Object {
           Remove-VMGcItem -Item $_ -Label "stale Packer temporary build directory" -Recurse
         }
       }
 
       # Remove stale VM disk images (qcow2) for VMs not declared in the manifest.
-      # check-suppress:suppression_doc: probe — stale disk images may not exist; ForEach-Object handles empty result.
+      # check-suppress:suppression_doc: probe -- stale disk images may not exist; ForEach-Object handles empty result.
       Get-ChildItem -LiteralPath $imagesDir -Filter "*.qcow2" -File -ErrorAction SilentlyContinue | ForEach-Object {
         $imageName = $_.BaseName
         if ($imageName -notin $declaredVMNames) {
@@ -532,7 +532,7 @@ if (-not $NoVMGc) {
       # GC stale VM scripts from scripts/ subfolder.
       $scriptsDir = Join-Path $vmDir 'scripts'
       if (Test-Path -LiteralPath $scriptsDir -PathType Container) {
-        # check-suppress:suppression_doc: probe — VM scripts may not exist; foreach handles empty result.
+        # check-suppress:suppression_doc: probe -- VM scripts may not exist; foreach handles empty result.
         $scripts = Get-ChildItem -LiteralPath $scriptsDir -Include '*.sh', '*.ps1' -File -ErrorAction SilentlyContinue
         foreach ($script in $scripts) {
           $isDeclared = $false

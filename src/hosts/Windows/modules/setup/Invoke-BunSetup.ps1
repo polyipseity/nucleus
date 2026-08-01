@@ -71,7 +71,7 @@ function Invoke-BunSetup {
   $bunBinDir = Get-NucleusManagedBinDir "bun"
 
   # Guard: bun must be accessible after WinGet DSC has installed Oven-sh.Bun.
-  # check-suppress:suppression_doc: probe — bun may not be installed; if-guard checks absence below.
+  # check-suppress:suppression_doc: probe -- bun may not be installed; if-guard checks absence below.
   if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
     Write-Error "Invoke-BunSetup: bun not found on PATH; ensure Oven-sh.Bun was installed by WinGet DSC before calling this function"
     return
