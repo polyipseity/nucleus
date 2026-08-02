@@ -248,6 +248,9 @@ if (Test-SectionEnabled 'uv') {
 
     if ($ht.ContainsKey('uv') -and $ht['uv'] -is [hashtable]) {
       foreach ($key in $ht['uv'].Keys) {
+        if ($ht['uv'][$key] -is [hashtable]) {
+          continue  # VCS hash-pin entry — no CLI query can update the rev
+        }
         $old = $ht['uv'][$key]
         if ($uvInstalled.ContainsKey($key)) {
           $new = $uvInstalled[$key]

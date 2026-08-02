@@ -179,6 +179,9 @@ if section_enabled uv; then
 
   while IFS= read -r key; do
     [ -z "$key" ] && continue
+    if printf '%s\n' "$data" | jq -e --arg k "$key" '(.uv[$k] | type) == "object"' >/dev/null; then
+      continue  # VCS hash-pin entry — no CLI query can update the rev
+    fi
     old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.uv // {})[$k] // empty')
     [ -z "$old" ] && continue
     new="${uv_installed[$key]:-}"
