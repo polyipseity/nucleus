@@ -38,13 +38,21 @@ Rules:
 
 Defaults-fallback rule: the per-user directory wins; if `<username>/git/<Host>.gitconfig` (or `.gitignore`) does not exist, `default/git/<Host>.gitconfig` (or `.gitignore`) is used. A user can override by creating their own file.
 
+Hostname derivation: `<Host>` is the canonical hostname (MacBook, NixOS, Windows). POSIX threads it through the flake as `specialArgs.hostName`; Windows derives it at runtime from `$env:NUCLEUS_HOST` (set to `Windows` by `apply.ps1`), mirroring the POSIX `hostName` threading.
+
 ## 3. Admin-privilege assumption
 
 `nucleus apply` always runs with admin/elevated privileges on every platform, including Windows. Therefore `<Git install>\etc\gitconfig` IS writable and replaceable (elevated admins hold SeCreateSymbolicLinkPrivilege). Git for Windows upgrades overwrite the file, breaking the symlink — the next apply re-creates it (convergence); shipped defaults are folded into `Windows.gitconfig`.
 
 ## 4. Backup/restore lifecycle (ALL platforms)
 
-Every scope where a real config file is replaced by a symlink gets a same-folder backup of the original, visible right next to it: `/etc/gitconfig.bak`, `<install>\etc\gitconfig.bak`, `~/.gitconfig.bak`, `~/.config/git/ignore.bak`. POSIX user scope uses Home Manager's `backupFileExtension = "bak"` (`~/.gitconfig.bak` / `ignore.bak` — same folder, same visibility rule, uniform `.bak` across all four scopes). Restore happens wherever an enable/disable lifecycle exists (Windows `-Enabled:$false`: enable = back up original then symlink; disable = remove symlink then restore `.bak` if present). POSIX activations are always-on → backup-on-first-replacement only, no restore path. **If the `.bak` is missing at restore time, that's OK — assume there was no original config: remove the symlink and leave nothing.**
+Every scope where a real config file is replaced by a symlink gets a same-folder backup of the original, visible right next to it: `/etc/gitconfig.bak`, `<install>\etc\gitconfig.bak`, `~/.gitconfig.bak`, `~/.config/git/ignore.bak`. POSIX user scope uses Home Manager's `backupFileExtension = "bak"` — uniform `.bak` across all four scopes.
+
+**Backup-once rule (all platforms).** A `.bak` is created only on first replacement of a pre-existing regular file; a stale `.bak` is never overwritten (first original wins). POSIX: the activation guards the move with `! -e /etc/gitconfig.bak`. Windows: `Save-RegularFileBackup` skips when the `.bak` already exists — the current file stays in place for the symlink to replace, matching POSIX `ln -sf`.
+
+**Restore is a feature of the disable path (by design).** Restore happens only where an enable/disable lifecycle exists (Windows `-Enabled:$false`: remove the symlink, then restore the `.bak` if present). POSIX activations are always-on → backup-on-first-replacement only, no restore path. This asymmetry is intentional — it is NOT a parity gap.
+
+**Missing `.bak` at restore time.** That's OK — assume there was no original config: remove the symlink and leave nothing.
 
 ## 5. Identity
 
