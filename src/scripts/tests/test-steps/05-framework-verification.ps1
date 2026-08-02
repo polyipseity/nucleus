@@ -26,6 +26,8 @@ Register-Step -Id "framework-verification" -Number 5 -Name "Framework verificati
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
   & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPath '17-suppression-audit-explicit-skip.ps1')
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
+  & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPath '17-suppression-audit-tests.ps1')
+  if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
   & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPath '22-embedded-content-enforcement-tests.ps1')
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
   & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPath '23-legacy-token-syntax-tests.ps1')
