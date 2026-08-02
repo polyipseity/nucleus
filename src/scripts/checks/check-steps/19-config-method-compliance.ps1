@@ -11,14 +11,19 @@ Register-Step -Id "config-method-compliance" -Number 19 -Name "Config method com
   $srcFiles = Get-ChildItem -Path (Join-Path $r "src") -Recurse -Include '*.nix', '*.ps1', '*.sh' |
     Where-Object { $_.FullName -notmatch '[\/]vendor[\/]' -and $_.FullName -notmatch '[\/]configs[\/]' } |
     Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B1 -- structural invariants; vendored code and config methods are different concerns; gitignore filter applied on top
-  $cfgPatterns = @($cfgFiles | ForEach-Object { [regex]::Escape($_.Name) } | Sort-Object -Unique)
-  $cfgSelectOutput = $srcFiles | Select-String -Pattern $cfgPatterns -SimpleMatch
+  # WHY: raw basenames with -SimpleMatch mirror the .sh twin's grep -F -f semantics; [regex]::Escape here would make dotted basenames (e.g. system.gitconfig) match literally and never be found
+  $cfgPatterns = @($cfgFiles | ForEach-Object { $_.Name } | Sort-Object -Unique)
+  # WHY: Select-GitIgnored returns path strings; piping strings to Select-String searches them as content, so -Path is required to read the actual files
+  $cfgSelectOutput = Select-String -Path $srcFiles -Pattern $cfgPatterns -SimpleMatch
   # Single-pass: collect all check-suppress:config-method lines for preceding-line checking
-  $cfgMethodOutput = $srcFiles | Select-String -Pattern '# check-suppress:config-method'
+  $cfgMethodOutput = Select-String -Path $srcFiles -Pattern '# check-suppress:config-method'
 
   $parallelJobs = [Environment]::ProcessorCount
 
-  $cfgFileErrors = $cfgFiles | ForEach-Object -Parallel -ThrottleLimit $using:parallelJobs {
+  # WHY: $using: is only valid inside the -Parallel scriptblock; -ThrottleLimit is
+  # evaluated in the caller scope, so it takes the plain variable (canonical order:
+  # scriptblock first, then -ThrottleLimit)
+  $cfgFileErrors = $cfgFiles | ForEach-Object -Parallel {
     $basename = $_.Name
 
     # Skip infrastructure files and Nix modules inside configs/  # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
@@ -60,7 +65,7 @@ Register-Step -Id "config-method-compliance" -Number 19 -Name "Config method com
     }
 
     return $null
-  }
+  } -ThrottleLimit $parallelJobs
 
   foreach ($cfe in $cfgFileErrors) {
     if ($cfe) {
