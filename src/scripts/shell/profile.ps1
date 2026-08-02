@@ -288,8 +288,16 @@ Add-ShellAlias '-gca' { & git commit --amend @Args }
 Add-ShellAlias '-gcaa' { & git commit --all --amend @Args }
 Add-ShellAlias '-gcam' { & git commit --amend --message @Args }
 Add-ShellAlias '-gcl' { & git clone @Args }
-Add-ShellAlias '-gclean' { & git clean --force -d --dry-run @Args }
+# git clean matrix: prefix = force level, suffix = ignore scope (see aliases.nix).
+Add-ShellAlias '-gclean' { & git clean --dry-run -d @Args }
 Add-ShellAlias '-gcleanf' { & git clean --force -d @Args }
+Add-ShellAlias '-gcleanff' { & git clean --force --force -d @Args }
+Add-ShellAlias '-gcleanffx' { & git clean --force --force -d -x @Args }
+Add-ShellAlias '-gcleanffxx' { & git clean --force --force -d -X @Args }
+Add-ShellAlias '-gcleanfx' { & git clean --force -d -x @Args }
+Add-ShellAlias '-gcleanfxx' { & git clean --force -d -X @Args }
+Add-ShellAlias '-gcleanx' { & git clean --dry-run -d -x @Args }
+Add-ShellAlias '-gcleanxx' { & git clean --dry-run -d -X @Args }
 Add-ShellAlias '-gcm' { & git commit --message @Args }
 Add-ShellAlias '-gcma' { & git commit --all --message @Args }
 Add-ShellAlias '-gco' { & git checkout @Args }
