@@ -161,11 +161,10 @@ function ConvertFrom-SshEd25519PublicKeyToAgePubKey {
   # Assemble the final bech32 string: HRP + "1" + encoded(data5 + checksum).
   $charset = 'qpzry9x8gf2tvdw0s3jn54khce6mua7l'
   $sb = [System.Text.StringBuilder]::new()
-  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; Append returns StringBuilder, discarded
-  $null = $sb.Append($hrp + '1')
-  foreach ($v in $data5) { # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; Append returns StringBuilder, discarded
-      $null = $sb.Append($charset[$v]) }
-  foreach ($v in $checksum) { # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; Append returns StringBuilder, discarded
-      $null = $sb.Append($charset[$v]) }
+  $null = $sb.Append($hrp + '1')  # check-suppress:suppression_doc: Append returns StringBuilder, discarded
+  foreach ($v in $data5) {
+      $null = $sb.Append($charset[$v]) }  # check-suppress:suppression_doc: Append returns StringBuilder, discarded
+  foreach ($v in $checksum) {
+      $null = $sb.Append($charset[$v]) }  # check-suppress:suppression_doc: Append returns StringBuilder, discarded
   return $sb.ToString()
 }

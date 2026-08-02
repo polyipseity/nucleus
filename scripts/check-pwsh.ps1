@@ -73,8 +73,7 @@ if (-not $Paths -or $Paths.Count -eq 0) {
 $knownStepNames = [System.Collections.Generic.HashSet[string]]::new(
   [System.StringComparer]::OrdinalIgnoreCase
 )
-# check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; Add returns collection count, discarded
-$null = $knownStepNames.Add('PSSA')
+$null = $knownStepNames.Add('PSSA')  # check-suppress:suppression_doc: Add returns collection count, discarded
 $unknownNames = @($SkipStep | Where-Object { $_ -notin $knownStepNames })
 if ($unknownNames.Count -gt 0) {
   throw "Unknown -SkipStep value(s): $($unknownNames -join ', '). Valid values: $($knownStepNames -join ', ')"
@@ -83,8 +82,8 @@ if ($unknownNames.Count -gt 0) {
 $skipStepSet = [System.Collections.Generic.HashSet[string]]::new(
   [System.StringComparer]::OrdinalIgnoreCase
 )
-foreach ($t in $SkipStep) { # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; Add returns bool, discarded
-    $null = $skipStepSet.Add($t) }
+foreach ($t in $SkipStep) {
+    $null = $skipStepSet.Add($t) }  # check-suppress:suppression_doc: Add returns bool, discarded
 
 # ---------------------------------------------------------------------------
 # Syntax validation.
@@ -97,8 +96,7 @@ $parseErrors = @($Paths | Sort-Object -Unique | ForEach-Object -Parallel {
 
   $tokens = $null
   $errors = $null
-  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- [void] intentional; ParseFile returns AST, discarded -- only token/error refs needed
-  [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)
+  [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)  # check-suppress:suppression_doc: ParseFile returns AST, discarded; only token/error refs needed
 
   if ($errors) {
     $errors

@@ -16,18 +16,18 @@ switch ('__HOST_KIND__') {
       & '/Applications/UTM.app/Contents/MacOS/utmctl' start $vmDisplay
       if ($LASTEXITCODE -ne 0) {
         Write-Warning "nucleus-vm: utmctl start failed for $vmName; opening bundle instead"
-        Start-Process -FilePath open -ArgumentList "$vmDir/$vmName.utm" | Out-Null
+        Start-Process -FilePath open -ArgumentList "$vmDir/$vmName.utm" > $null
       }
     } else {
-      Start-Process -FilePath open -ArgumentList "$vmDir/$vmName.utm" | Out-Null
+      Start-Process -FilePath open -ArgumentList "$vmDir/$vmName.utm" > $null
     }
   }
   'nixos-libvirt' {
-    & virsh start $vmName | Out-Null
+    & virsh start $vmName > $null
     if ($LASTEXITCODE -ne 0) {
       Write-Warning "nucleus-vm: virsh start failed (or VM already running): $vmName"
     }
-    if (Get-Command virt-viewer -ErrorAction SilentlyContinue) {
+    if (Get-Command virt-viewer -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: virt-viewer optional; absent falls back to console hint
       & virt-viewer --connect qemu:///system $vmName
     } else {
       Write-Output "nucleus-vm: VM started: $vmName"

@@ -140,8 +140,7 @@ function Invoke-RustupSetup {
   $cargoConfigDir = "$env:USERPROFILE\.cargo"
   $cargoConfigPath = "$cargoConfigDir\config.toml"
   if (-not (Test-Path -Path $cargoConfigDir)) {
-    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
-    $null = New-Item -ItemType Directory -Path $cargoConfigDir -Force
+    $null = New-Item -ItemType Directory -Path $cargoConfigDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
   }
   $cargoSourcePath = Join-Path $repoRoot $cargoConfigRelPath
   if (-not (Test-Path -Path $cargoSourcePath -PathType Leaf)) {

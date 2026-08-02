@@ -188,8 +188,7 @@ function Sync-ObsidianConfig {
 
     $existingConfig = Read-ObsidianConfig -Path $configPath
     foreach ($settingName in $managedSettingNames) {
-      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; Remove returns boolean, discarded
-      $null = $existingConfig.Remove($settingName)
+      $null = $existingConfig.Remove($settingName)  # check-suppress:suppression_doc: Remove returns boolean, discarded
     }
 
     if ($existingConfig.Count -eq 0) {

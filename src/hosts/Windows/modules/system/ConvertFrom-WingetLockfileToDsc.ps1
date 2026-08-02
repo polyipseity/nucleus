@@ -80,16 +80,14 @@ function ConvertFrom-WingetLockfileToDsc {
     }
 
     # Emit the current line.
-    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- [void] intentional; Add returns collection count, discarded
-    [void]$outputLines.Add($line)
+    [void]$outputLines.Add($line)  # check-suppress:suppression_doc: Add returns collection count, discarded
 
     # After source: winget at 8-space indent, inject version if lockfile has one.
     if ($line -match '^        source:\s+winget$' -and $currentWingetId) {
       if ($wingetVersions.ContainsKey($currentWingetId)) {
         $version = $wingetVersions[$currentWingetId]
         if ($version) {
-          # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- [void] intentional; Add returns collection count, discarded
-          [void]$outputLines.Add("        version: $version")
+          [void]$outputLines.Add("        version: $version")  # check-suppress:suppression_doc: Add returns collection count, discarded
         }
       }
     }

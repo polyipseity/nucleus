@@ -174,8 +174,7 @@ function Invoke-ReplicaReset {
       )) {
       $candidate = Join-Path -Path $HOME -ChildPath $cacheSuffix
       if (-not $cacheDirs.Contains($candidate)) {
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- [void] intentional; Add returns bool, discarded
-        [void]$cacheDirs.Add($candidate)
+        [void]$cacheDirs.Add($candidate)  # check-suppress:suppression_doc: Add returns bool, discarded
       }
     }
   }
@@ -189,8 +188,7 @@ function Invoke-ReplicaReset {
       )) {
       $candidate = Join-Path -Path $cacheBase -ChildPath $cacheSuffix
       if (-not $cacheDirs.Contains($candidate)) {
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- [void] intentional; Add returns bool, discarded
-        [void]$cacheDirs.Add($candidate)
+        [void]$cacheDirs.Add($candidate)  # check-suppress:suppression_doc: Add returns bool, discarded
       }
     }
   }

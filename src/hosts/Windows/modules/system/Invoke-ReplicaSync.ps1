@@ -142,8 +142,7 @@ function Invoke-ReplicaSync {
     param([Parameter(Mandatory)][string]$Provider)
     # Explicit reference to suppress false-positive PSAvoidUsingUnusedParameters
     # ($Provider is used via closure in Where-Object below).
-    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; Provider variable discarded, used for drive qualification only
-    $null = $Provider
+    $null = $Provider  # check-suppress:suppression_doc: Provider variable discarded, used for drive qualification only
 
     $providerProperty = $gcConfig.PSObject.Properties | Where-Object { $_.Name -eq $Provider } | Select-Object -First 1
     if ($null -eq $providerProperty) {
@@ -203,8 +202,7 @@ function Invoke-ReplicaSync {
     }
 
     if ($null -ne $Set -and $Set.PSObject.Methods.Name -contains 'Add') {
-      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- [void] intentional; Add returns collection count, discarded
-      [void]$Set.Add($Value)
+      [void]$Set.Add($Value)  # check-suppress:suppression_doc: Add returns collection count, discarded
     }
   }
 

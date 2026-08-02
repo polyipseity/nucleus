@@ -187,8 +187,7 @@ function Sync-VSCodeConfig {
           $existing[$idx] = $repoItem
         }
       } else {
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; Add returns collection count, discarded
-        $null = $existing.Add($repoItem)
+        $null = $existing.Add($repoItem)  # check-suppress:suppression_doc: Add returns collection count, discarded
       }
     }
 

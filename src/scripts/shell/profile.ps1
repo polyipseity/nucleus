@@ -270,7 +270,11 @@ if ((Get-Command fzf -ErrorAction SilentlyContinue) -and (Get-Module -ListAvaila
 # - No casing distinction (case-insensitive on Windows).
 # - Double letter = more: more verbose, more forceful, or full form.
 # - All options MUST use long form (--patch, --all, --message, etc.). See aliases.nix header.
-function Add-ShellAlias { param([string]$Name, [scriptblock]$Value) $null = New-Item -Path Function: -Name $Name -Value $Value -Force }
+function Add-ShellAlias {
+  param([string]$Name, [scriptblock]$Value)
+  # check-suppress:suppression_doc: New-Item returns FileInfo, discarded
+  $null = New-Item -Path Function: -Name $Name -Value $Value -Force
+}
 Add-ShellAlias '-g' { & git @Args }
 Add-ShellAlias '-ga' { & git add @Args }
 Add-ShellAlias '-gap' { & git add --patch @Args }
@@ -764,8 +768,7 @@ $nucleusConfigCommands = @('get', 'set', 'list')
 
 Register-ArgumentCompleter -CommandName nucleus-svc -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; parameter metadata variables, declared for introspection
-  $null = $commandName, $parameterName, $fakeBoundParameters
+  $null = $commandName, $parameterName, $fakeBoundParameters  # check-suppress:suppression_doc: parameter metadata variables, declared for introspection
   $nucleusSvcCommands | Where-Object { $_ -like "$wordToComplete*" }
   if ($commandAst.CommandElements.Count -ge 2) {
     $prev = $commandAst.CommandElements[1].Value
@@ -786,16 +789,14 @@ Register-ArgumentCompleter -CommandName nucleus-svc -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-config -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; parameter metadata variables, declared for introspection
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: parameter metadata variables, declared for introspection
   $nucleusConfigCommands | Where-Object { $_ -like "$wordToComplete*" }
   @('--help') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-gc -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; parameter metadata variables, declared for introspection
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: parameter metadata variables, declared for introspection
   @(
     '--help', '--dry-run', '--no-dry-run',
     '--tool-cache-gc', '--no-tool-cache-gc',
@@ -812,27 +813,27 @@ Register-ArgumentCompleter -CommandName nucleus-gc -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-health-check -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   @('--help', '--min-free-bytes', '--secret-health', '--no-secret-health', '--log-health') |
     Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-update -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   @('--help', '--flake', '--no-flake', '--brew', '--no-brew', '--sops', '--no-sops') |
     Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-check -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   @('--help', '--format', '--online') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-ai -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   if ($IsWindows) {
     # Windows nucleus-ai exposes sync-only flags; see scripts/ai.ps1 params.
     @('--help', '--dry-run', '--ollama-profile', '--gc-only', '--no-gc-only') |
@@ -846,21 +847,21 @@ Register-ArgumentCompleter -CommandName nucleus-ai -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-replica-sync -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   @('--help', '--dry-run', '--replica-id', '--repo-root') |
     Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-replica-reset -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   @('--help', '--dry-run', '--replica-id', '--repo-root') |
     Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-bootstrap -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   @('--help', '--apply', '--no-apply', '--ai-sync', '--no-ai-sync',
     '--replica-sync', '--no-replica-sync', '--target-user') |
     Where-Object { $_ -like "$wordToComplete*" }
@@ -868,7 +869,7 @@ Register-ArgumentCompleter -CommandName nucleus-bootstrap -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-cloud-setup -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   @('--help', '--apply', '--no-apply') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
@@ -884,7 +885,7 @@ $nucleusVmSetupFlags = @('--help', '--dry-run', '--gc', '--no-gc',
 
 Register-ArgumentCompleter -CommandName nucleus-vm -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $fakeBoundParameters
+  $null = $commandName, $parameterName, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   $nucleusVmCommands | Where-Object { $_ -like "$wordToComplete*" }
   if ($commandAst.CommandElements.Count -ge 2) {
     $subcommand = $commandAst.CommandElements[1].Value
@@ -897,7 +898,7 @@ Register-ArgumentCompleter -CommandName nucleus-vm -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-apply -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   @('--help', '--ai-sync', '--no-ai-sync',
     '--replica-sync', '--no-replica-sync',
     '--vm-setup', '--no-vm-setup',
@@ -907,42 +908,42 @@ Register-ArgumentCompleter -CommandName nucleus-apply -ScriptBlock {
 
 Register-ArgumentCompleter -CommandName nucleus-bump-lockfile -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   @('--help', '--sections', '--verify') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-check-packer -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   @('--help') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-check-pwsh -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   @('--help') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-check-sh -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   @('--help') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-service-watchdog -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   @('--help') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-gs-pdf-opt -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   @('--help') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-test -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   @('--help') | Where-Object { $_ -like "$wordToComplete*" }
 }

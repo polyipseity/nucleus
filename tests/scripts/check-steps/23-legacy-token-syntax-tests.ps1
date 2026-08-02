@@ -63,8 +63,8 @@ if ($content -match 'src/\*' -and $content -match 'scripts/\*') {
 $action = $script:StepActions[$script:StepActions.Count - 1]
 
 $tmpDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ("nucleus-step23-" + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Path (Join-Path -Path $tmpDir -ChildPath 'src') -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path -Path $tmpDir -ChildPath 'scripts') -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path -Path $tmpDir -ChildPath 'src') -Force > $null
+New-Item -ItemType Directory -Path (Join-Path -Path $tmpDir -ChildPath 'scripts') -Force > $null
 
 # Reject: {{X}} in a .ps1 file under src/ (scoped mode)
 $legacyFixture = Join-Path -Path $tmpDir -ChildPath 'src/fixture.ps1'
@@ -72,7 +72,7 @@ Set-Content -Path $legacyFixture -Value 'value = {{DEPLOY_ID}}'
 $threw = $false
 try {
   Push-Location $tmpDir
-  & $action -HasArgs $true -RepoRoot $tmpDir -PositionalArgs @('src/fixture.ps1') | Out-Null
+  & $action -HasArgs $true -RepoRoot $tmpDir -PositionalArgs @('src/fixture.ps1') > $null
 } catch {
   $threw = $true
 } finally {
@@ -90,7 +90,7 @@ Set-Content -Path $okFixture -Value 'value = __DEPLOY_ID__'
 $threw = $false
 try {
   Push-Location $tmpDir
-  & $action -HasArgs $true -RepoRoot $tmpDir -PositionalArgs @('src/good.ps1') | Out-Null
+  & $action -HasArgs $true -RepoRoot $tmpDir -PositionalArgs @('src/good.ps1') > $null
 } catch {
   $threw = $true
 } finally {
@@ -108,7 +108,7 @@ Set-Content -Path $fullFixture -Value 'value = {{LANE_SCOPE}}'
 $threw = $false
 try {
   Push-Location $tmpDir
-  & $action -HasArgs $false -RepoRoot $tmpDir -PositionalArgs @() | Out-Null
+  & $action -HasArgs $false -RepoRoot $tmpDir -PositionalArgs @() > $null
 } catch {
   $threw = $true
 } finally {

@@ -95,8 +95,7 @@ function Sync-LiteLLMService {
   $logDir = Get-NucleusSystemLogDir
   $serviceLogDir = Join-Path -Path $logDir -ChildPath "litellm"
   $secretsDir = Join-Path -Path $env:ProgramData -ChildPath "nucleus\secrets"
-  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
-  $null = New-Item -Path $secretsDir -ItemType Directory -Force
+  $null = New-Item -Path $secretsDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
 
   . (Join-Path -Path $PSScriptRoot -ChildPath "..\Set-ManagedSymlinkDeleteProtection.ps1")
 

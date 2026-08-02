@@ -63,9 +63,7 @@ function Sync-WifiMacRandomization {
 
     # Ensure Parameters subkey exists
     if (-not (Test-Path -Path $paramsPath)) {
-      # check-suppress:suppression_doc: best-effort -- Parameters subkey may already exist.
-      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
-      $null = New-Item -Path $paramsPath -Force -ErrorAction SilentlyContinue
+      $null = New-Item -Path $paramsPath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort -- Parameters subkey may already exist
       if (-not (Test-Path -Path $paramsPath)) {
         Write-Warning "Wi-Fi MAC: could not create Parameters subkey for interface $guid ($ifaceName); skipping."
         continue

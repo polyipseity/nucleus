@@ -45,8 +45,7 @@ param(
 )
 # Explicit reference to suppress false-positive PSAvoidUsingUnusedParameters
 # ($Sections is used via closure in Test-SectionEnabled).
-# check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; $Sections collected inline for iteration, not used after
-$null = $Sections
+$null = $Sections  # check-suppress:suppression_doc: $Sections collected inline for iteration, not used after
 
 $ErrorActionPreference = 'Stop'
 

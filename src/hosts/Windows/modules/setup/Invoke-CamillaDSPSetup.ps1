@@ -111,8 +111,7 @@ function Invoke-CamillaDSPSetup {
     $configPath = Join-Path -Path $configDir -ChildPath "config.yml"
     $configSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\camilladsp\configs\windows\config.yml"
     if (-not (Test-Path $configDir)) {
-      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
-      $null = New-Item -ItemType Directory -Path $configDir -Force
+      $null = New-Item -ItemType Directory -Path $configDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
     }
     if (Test-Path $configPath) { Remove-Item -Path $configPath -Force }
     New-Item -Path $configPath -ItemType SymbolicLink -Target $configSource -Force > $null

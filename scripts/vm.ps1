@@ -52,8 +52,7 @@ param(
 
 # Suppress false positive PSReviewUnusedParameter — $SubcommandArgs IS used below
 # (setup flag parsing, status/stop/reset actions).
-# check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; splatting variable, declared for parameter binding
-$null = $SubcommandArgs
+$null = $SubcommandArgs  # check-suppress:suppression_doc: splatting variable, declared for parameter binding
 
 $ErrorActionPreference = 'Stop'
 

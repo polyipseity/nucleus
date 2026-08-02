@@ -15,8 +15,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $stateFile = Join-Path -Path $HOME -ChildPath ".local\state\camilladsp\statefile.yml"
-# check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
-$null = New-Item -Path (Split-Path $stateFile -Parent) -ItemType Directory -Force
+$null = New-Item -Path (Split-Path $stateFile -Parent) -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
 
 # Start camilladsp with --no_config (WS server only, no device).
 $process = [System.Diagnostics.Process]::Start($CamillaDSPBin, "-p $Port --statefile `"$stateFile`" -w --no_config -o `"$LogFile`"")
@@ -54,8 +53,7 @@ public static class JobObject {
 "@
 $job = [JobObject]::NewKillOnClose()
 if ($job -ne [IntPtr]::Zero) {
-  # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- [void] intentional; AssignProcessToJobObject return value discarded, error handling is externally verified
-  [void][JobObject]::AssignProcessToJobObject($job, $process.SafeHandle.DangerousGetHandle())
+  [void][JobObject]::AssignProcessToJobObject($job, $process.SafeHandle.DangerousGetHandle())  # check-suppress:suppression_doc: AssignProcessToJobObject return value discarded, error handling is externally verified
 }
 
 # Poll WS port and push config (up to ~15s).  Graceful if config file
@@ -76,8 +74,7 @@ for ($i = 0; $i -lt 30; $i++) {
     break
   } catch {
     # Port not ready or connection failed — retry.
-    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; $_ discarded in ForEach-Object, side-effect-only iteration
-    $null = $_
+    $null = $_  # check-suppress:suppression_doc: $_ discarded in ForEach-Object, side-effect-only iteration
   }
 }
 
@@ -123,8 +120,7 @@ $heartbeatTimer = [System.Threading.Timer]::new({
     $ws.CloseAsync([CloseStatus]::NormalClosure, "done", $ct).Wait()
   } catch {
     # Device may be gone — retry on next heartbeat.
-    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; $_ discarded in ForEach-Object, side-effect-only iteration
-    $null = $_
+    $null = $_  # check-suppress:suppression_doc: $_ discarded in ForEach-Object, side-effect-only iteration
   }
 }, ($ConfigFile, $Port, $nucleusCfgFile), 5000, 5000)
 

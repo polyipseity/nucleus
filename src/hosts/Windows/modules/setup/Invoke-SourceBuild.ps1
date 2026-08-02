@@ -137,8 +137,7 @@ function Invoke-SourceBuild {
     $repoCacheDir = Join-Path $cacheRoot $pkgId
     if (-not (Test-Path $repoCacheDir)) {
       Write-Output "Invoke-SourceBuild: cloning $pkgId from $sourceUrl"
-      # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
-      $null = New-Item -ItemType Directory -Path $repoCacheDir -Force -ErrorAction Stop
+      $null = New-Item -ItemType Directory -Path $repoCacheDir -Force -ErrorAction Stop  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
       & git clone $sourceUrl $repoCacheDir 2>&1 > $null
       if ($LASTEXITCODE -ne 0) {
         Write-Error "Invoke-SourceBuild: git clone failed for '$pkgId'"
@@ -188,8 +187,7 @@ function Invoke-SourceBuild {
       continue
     }
 
-    # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; New-Item returns DirectoryInfo, discarded
-    $null = New-Item -ItemType Directory -Path $installDir -Force -ErrorAction Stop
+    $null = New-Item -ItemType Directory -Path $installDir -Force -ErrorAction Stop  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
     Copy-Item $builtBinary $installDir -Force -ErrorAction Stop
     Set-Content -Path $markerPath -Value $rev -Force -ErrorAction Stop
     Write-Output "Invoke-SourceBuild: installed $pkgId v$version to '$installDir'"

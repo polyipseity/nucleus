@@ -25,7 +25,7 @@ $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { Split-
 
 $TestDir = Join-Path $RepoRoot "src/scripts/tests"
 $FrameworkDir = Join-Path $RepoRoot "src/scripts/lib"
-$null = $FrameworkDir  # consumed by test-lib.ps1 at runtime
+$null = $FrameworkDir  # check-suppress:suppression_doc: consumed by test-lib.ps1 at runtime
 
 . (Join-Path $TestDir "test-lib.ps1")
 . (Join-Path $TestDir "test-steps.ps1")

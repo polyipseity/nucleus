@@ -25,7 +25,7 @@ function Assert-Fail {
 }
 
 $script:tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("check-packer-tests-" + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Path $script:tempDir | Out-Null
+New-Item -ItemType Directory -Path $script:tempDir > $null
 
 function New-Fixture {
     [CmdletBinding(SupportsShouldProcess)]
@@ -56,7 +56,7 @@ function New-Fixture {
 
 function Invoke-AnnotationCheck {
     param([string]$FixturePath)
-    & pwsh -NoProfile -File $script:checkPacker -AnnotationCheckOnly -WindowsTemplateOverride $FixturePath 2>&1 | Out-Null
+    & pwsh -NoProfile -File $script:checkPacker -AnnotationCheckOnly -WindowsTemplateOverride $FixturePath > $null 2>&1
     return $LASTEXITCODE
 }
 

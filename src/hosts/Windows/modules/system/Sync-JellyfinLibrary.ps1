@@ -293,8 +293,7 @@ function Sync-JellyfinLibrary {
         Password = $bootstrapCred.password
       }
       if ($startupUser.StatusCode -eq 204) {
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- [void] intentional; startup-complete API is fire-and-forget, response discarded
-        [void](Invoke-JellyfinApi -Method POST -Path '/Startup/Complete')
+        [void](Invoke-JellyfinApi -Method POST -Path '/Startup/Complete')  # check-suppress:suppression_doc: startup-complete API is fire-and-forget, response discarded
       }
 
       foreach ($attempt in 1..15) {
@@ -400,8 +399,7 @@ function Sync-JellyfinLibrary {
       }
       if ($createResponse.StatusCode -eq 204) {
         Write-Output "jellyfin/library: created library '$($spec.name)' ($($spec.collectionType))."
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; refresh API call is fire-and-forget, response discarded
-        $null = Invoke-JellyfinApi -Method POST -Path '/Library/Refresh' -Token $adminToken
+        $null = Invoke-JellyfinApi -Method POST -Path '/Library/Refresh' -Token $adminToken  # check-suppress:suppression_doc: refresh API call is fire-and-forget, response discarded
       }
       else {
         Write-Warning "jellyfin/library: failed to create library '$($spec.name)' (HTTP $($createResponse.StatusCode))."
@@ -419,8 +417,7 @@ function Sync-JellyfinLibrary {
       }
       if ($updateResponse.StatusCode -eq 204) {
         Write-Output "jellyfin/library: updated library options for '$($spec.name)'."
-        # check-suppress:SuppressMessageAttribute: PSUseDeclaredVarsMoreThanAssignments -- $null = intentional; refresh API call is fire-and-forget, response discarded
-        $null = Invoke-JellyfinApi -Method POST -Path '/Library/Refresh' -Token $adminToken
+        $null = Invoke-JellyfinApi -Method POST -Path '/Library/Refresh' -Token $adminToken  # check-suppress:suppression_doc: refresh API call is fire-and-forget, response discarded
       }
       else {
         Write-Warning "jellyfin/library: failed to update library options for '$($spec.name)' (HTTP $($updateResponse.StatusCode))."

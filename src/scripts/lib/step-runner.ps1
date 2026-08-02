@@ -56,8 +56,8 @@ $script:WaveTmpDir = $null
 
 function Initialize-WaveTempDir {
   $script:WaveTmpDir = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-wave-$([System.IO.Path]::GetRandomFileName())"
-  $null = New-Item -ItemType Directory -Path $script:WaveTmpDir -Force
-  Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Remove-WaveTempDir } | Out-Null
+  $null = New-Item -ItemType Directory -Path $script:WaveTmpDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+  Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Remove-WaveTempDir } > $null
 }
 
 function Remove-WaveTempDir {
