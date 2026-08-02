@@ -34,8 +34,8 @@ Proceed automatically with best-effort defaults and available context.
    - **Run validation.** From the project root:
      - **Bash/zsh:** `echo "<full message>" | bun x commitlint 2>&1`
      - **PowerShell:** `"<full message>" | bun x commitlint 2>&1`
-     - If `bun` / `commitlint` is unavailable, fall back to a structural conventional-commit check (type-prefix, format).
-   - **On failure.** If validation fails AND no conflicting convention is documented, fix the message and re-run validation. Do not proceed to `git commit` until validation passes. If commitlint is present but fails with a tool error (not a lint error), report the failure — do not proceed.
+     - **NEVER run `bun install` (or any package install) and NEVER create or modify `package.json`, `bun.lock`, or `node_modules` to enable commitlint — `bun x` is zero-footprint and needs no install.** If `bun` / `commitlint` is unavailable, fall back to a structural conventional-commit check (type-prefix, format).
+   - **On failure.** If validation fails AND no conflicting convention is documented, fix the message and re-run validation. Do not proceed to `git commit` until validation passes. If commitlint is present but fails with a tool error (not a lint error), report the failure — do not proceed. If the failure is `Cannot find module "@commitlint/config-conventional"` (config `extends` unresolvable), do NOT install the package — run `bun x commitlint --default-config` or fall back to the structural check.
    - **On success.** Proceed to step 2c.
 
 2c. **Verify commit** - Run `git rev-parse HEAD` and `git log -1 --format=%s`. Confirm the hash is new and the message is your intended message. If they show the previous commit's message, the commit was not created — retry with a fresh `git commit` (not `--amend`).
@@ -70,6 +70,7 @@ Proceed automatically with best-effort defaults and available context.
 ## Rules
 
 - Only run the two approved shell commands. Do not change the index (`git add`, `git reset`, etc.).
+- Never run `bun install` or any package install to enable commitlint, and never create/modify `package.json`/`bun.lock`/`node_modules` for that purpose. If such artifacts were accidentally created in a repository that must not have them, delete them before finishing; never commit them.
 
 ## Inputs
 
