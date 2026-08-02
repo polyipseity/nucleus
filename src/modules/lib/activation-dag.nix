@@ -24,7 +24,6 @@
   "ensure-custom-provision-symlink-targets"
   "finalize-custom-provision-symlinks"
   "git-identity"
-  "assemble-gitignore"
   "gpg-import"
   "install-bun-packages"
   "install-pwsh-script-analyzer"

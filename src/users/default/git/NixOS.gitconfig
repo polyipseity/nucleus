@@ -1,0 +1,47 @@
+# User-scope git config (git --global, ~/.gitconfig).
+# Global-scope (git --system) settings live in src/modules/configs/git/<host>.gitconfig.
+[core]
+    # Ignore patterns live at user scope: git has no global-scoped ignore file.
+    excludesFile = ~/.config/git/ignore
+[fetch]
+    # Prune deleted remote-tracking branches on every fetch so stale refs do
+    # not linger indefinitely across long-lived machines.
+    prune = true
+    # Disable tag pruning so a fetch never overwrites a local tag: VS Code
+    # auto-fetches in the background, and `fetch.pruneTags` would move a
+    # local tag to match the remote even when the local tag is intentional.
+    pruneTags = false
+[gpg "openpgp"]
+    # WHY: gpg is resolved from PATH (gnupg is pinned in sharedPackages via
+    # core.nix); a static config file cannot interpolate ${pkgs.gnupg}.
+    program = gpg
+[include]
+    # Pull in name/email/signingkey written by the git-identity activation
+    # hook at ~/.config/git/identity.  Using an include file lets the hook
+    # write to a path it owns without touching the symlinked config.
+    path = ~/.config/git/identity
+[init]
+    defaultBranch = main
+    # Point init.templateDir at an empty directory managed during activation
+    # so `git init` and `git clone` never create hooks/*.sample or the legacy
+    # description file.
+    templateDir = ~/.config/git/empty_template
+[pull]
+    # Pin pull to Git's built-in semantics (fast-forward when possible, merge
+    # otherwise) so behavior cannot silently change with a future upstream
+    # default.
+    ff = true
+    rebase = false
+[push]
+    # `push.autoSetupRemote` makes `git push` on a branch without an upstream
+    # automatically configure the upstream to the same-named remote branch.
+    autoSetupRemote = true
+    # `push.followTags` keeps release/signing tags in sync with branch pushes.
+    followTags = true
+[url "git@github.com:"]
+    # Rewrite GitHub HTTPS remotes to SSH globally for this user so clones and
+    # future remotes authenticate with the managed SSH identity automatically.
+    insteadOf = https://github.com/
+[user]
+    # Refuse to auto-invent identity; name/email come from the identity include.
+    useConfigOnly = true
