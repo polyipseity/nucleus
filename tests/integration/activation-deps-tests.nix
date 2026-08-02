@@ -14,10 +14,13 @@ let
   # Read live module files so ordering/name regressions are caught by tests
   # instead of relying only on mocked activation maps.
   agentsModuleText = builtins.readFile ../../src/modules/agents.nix;
+  shellModuleText = builtins.readFile ../../src/modules/shell.nix;
   macosModuleText = builtins.readFile ../../src/modules/macos.nix;
   activationDagModuleText = builtins.readFile ../../src/modules/lib/activation-dag.nix;
-  macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
   macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
+  middleClickScriptText = builtins.readFile ../../src/scripts/hosts/MacBook/macos-enable-middle-click.sh;
+  spotlightScriptText = builtins.readFile ../../src/scripts/hosts/MacBook/macos-disable-spotlight.sh;
+  gimpScrollSensitivityScriptText = builtins.readFile ../../src/scripts/configs/configure-gimp-scroll-sensitivity.sh;
   windowsGitSshModuleText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1;
   macbookGlobalGitconfigText = builtins.readFile ../../src/modules/configs/git/MacBook.gitconfig;
   nixosGlobalGitconfigText = builtins.readFile ../../src/modules/configs/git/NixOS.gitconfig;
@@ -222,33 +225,37 @@ let
       "sync-clawhub-skills activation name must match between agents.nix and activation-dag.nix dependency list";
 
   # === TEST: sync-clawhub-skills must not short-circuit activation ===
+  # NOTE: uses hasInfix (substring) instead of builtins.match — Nix's POSIX
+  # extended regex has no multiline dot, so the old (.|\n)* pattern was an
+  # invalid regular expression and could never evaluate.
   test_sync_clawhub_does_not_exit_activation =
-    let
-      syncHasExitZero =
-        builtins.match "(.|\n)*sync-clawhub-skills = lib.hm.dag.entryAfter(.|\n)*exit 0(.|\n)*" agentsModuleText
-        != null;
-    in
-    assert' (!syncHasExitZero)
+    assert' (!lib.hasInfix "exit 0" agentsModuleText)
       "sync-clawhub-skills must not call exit 0, or later activation steps (including displayHostManualInstructions) are skipped";
 
   # === TEST: GIMP sensitivity targets installed app version dynamically ===
+  # NOTE: version derivation lives in configure-gimp-scroll-sensitivity.sh, not
+  # in activation.nix (which only invokes the script); target the script text.
   test_gimp_sensitivity_version_tracking =
     assert'
       (
-        (lib.hasInfix "/Applications/GIMP.app/Contents/Info" macbookActivationText)
-        && (lib.hasInfix "gimp_version_branch" macbookActivationText)
-        && !(lib.hasInfix "for gimp_version in 2.10 3.0" macbookActivationText)
+        (lib.hasInfix "/Applications/GIMP.app/Contents/Info" gimpScrollSensitivityScriptText)
+        && (lib.hasInfix "gimp_version_branch" gimpScrollSensitivityScriptText)
+        && !(lib.hasInfix "for gimp_version in 2.10 3.0" gimpScrollSensitivityScriptText)
       )
       "GIMP sensitivity provisioning must derive version from installed GIMP.app (no hardcoded version loop)";
 
   # === TEST: Windows Git identity applies to each managed profile path ===
+  # Identity now lives in the user-scope include file (~\.config\git\identity):
+  # the user gitconfig (~\.gitconfig) is a symlink into the repo tree and must
+  # never be written by the provisioner, so per-user identity keys go to the
+  # include file instead (referenced by [include] path in Windows.gitconfig).
   test_windows_git_identity_targets_user_gitconfig =
     assert'
       (
-        (lib.hasInfix "config --file $gitConfigPath" windowsGitSshModuleText)
+        (lib.hasInfix "config --file $identityConfigPath" windowsGitSshModuleText)
         && !(lib.hasInfix "config --global" windowsGitSshModuleText)
       )
-      "Windows Git identity must write via --file $gitConfigPath, not --global, so each managed user profile gets the correct target path";
+      "Windows Git identity must write via --file $identityConfigPath, not --global, so each managed user profile gets the correct target path";
 
   # === TEST: POSIX Git defaults enforce signed commits and tags ===
   # commit.gpgsign/tag.gpgsign live at global scope in the per-host
@@ -262,32 +269,39 @@ let
       "POSIX Git defaults must keep commit.gpgsign and tag.gpgsign enabled for cross-host signing parity";
 
   # === TEST: macOS MiddleClick startup uses native Login Items, not LaunchAgent ===
+  # NOTE: login-item registration lives in macos-enable-middle-click.sh, not in
+  # activation.nix (which only invokes the script); target the script text.
   test_middleclick_native_login_item = assert' (
-    (lib.hasInfix "make login item at end with properties {name:\"MiddleClick\"" macbookActivationText)
-    && (lib.hasInfix "tell application \"System Events\"" macbookActivationText)
+    (lib.hasInfix "make login item at end with properties {name:\"MiddleClick\"" middleClickScriptText)
+    && (lib.hasInfix "tell application \"System Events\"" middleClickScriptText)
     && !(lib.hasInfix "launchd.agents.\"art.ginzburg.MiddleClick\"" macbookDefaultText)
   ) "MiddleClick startup on macOS must use native Login Items (no custom LaunchAgent)";
 
   # === TEST: Spotlight disables all known launcher hotkey slots ===
-  test_spotlight_disables_all_hotkey_slots = assert' (lib.hasInfix "for hotkey in 61 64 65; do" macbookActivationText) "Spotlight disable flow must cover symbolic hotkey IDs 61, 64, and 65";
+  # NOTE: hotkey loop lives in macos-disable-spotlight.sh, not in activation.nix
+  # (which only invokes the script); target the script text.
+  test_spotlight_disables_all_hotkey_slots = assert' (lib.hasInfix "for hotkey in 61 64 65; do" spotlightScriptText) "Spotlight disable flow must cover symbolic hotkey IDs 61, 64, and 65";
 
   # === TEST: install-cargo-binstall-packages activation name aligned across modules ===
+  # NOTE: the dependent activation (install-zsh-completions) lives in shell.nix,
+  # not macos.nix; target the actual dependency list.
   test_install_cargo_binstall_dependency_name_alignment =
     assert'
       (
         (lib.hasInfix "install-cargo-binstall-packages = lib.hm.dag.entryAfter" agentsModuleText)
-        && (lib.hasInfix "\"install-cargo-binstall-packages\"" macosModuleText)
+        && (lib.hasInfix "\"install-cargo-binstall-packages\"" shellModuleText)
       )
-      "install-cargo-binstall-packages activation name must match between agents.nix and macos.nix dependency list";
+      "install-cargo-binstall-packages activation name must match between agents.nix and its dependent module's dependency list";
 
   # === TEST: macOS dev-tree maintenance is scheduled, not activation-bound ===
   test_macos_dev_maintenance_is_scheduled = assert' (
-    (lib.hasInfix "launchd.agents.\"dev-ds-store-gc\"" macosModuleText)
-    && (lib.hasInfix "launchd.agents.\"dev-spotlight-exclusions\"" macosModuleText)
-    && (lib.hasInfix "Label = \"local.dev-ds-store-gc\";" macosModuleText)
-    && (lib.hasInfix "Label = \"local.dev-spotlight-exclusions\";" macosModuleText)
-    && (lib.hasInfix "ProgramArguments = [ \"\${devDsStoreGc}\" ];" macosModuleText)
-    && (lib.hasInfix "ProgramArguments = [ \"\${devSpotlightExclusions}\" ];" macosModuleText)
+    (lib.hasInfix "launchd.agents.\"ds-store-gc\"" macosModuleText)
+    && (lib.hasInfix "launchd.agents.\"spotlight-exclusions\"" macosModuleText)
+    && (lib.hasInfix "Label = \"local.ds-store-gc\";" macosModuleText)
+    && (lib.hasInfix "Label = \"local.spotlight-exclusions\";" macosModuleText)
+    && (lib.hasInfix "ProgramArguments = [ \"\${devDsStoreGc}/bin/nucleus-ds-store-gc\" ];" macosModuleText)
+    && (lib.hasInfix "ProgramArguments = [" macosModuleText)
+    && (lib.hasInfix "\"\${devSpotlightExclusions}/bin/nucleus-spotlight-exclusions\"" macosModuleText)
     && !(lib.hasInfix "cleanDevDsStore = lib.hm.dag.entryAfter" macosModuleText)
     && !(lib.hasInfix "configureDevSpotlightExclusions = lib.hm.dag.entryAfter" macosModuleText)
   ) "macOS dev-tree maintenance must run from launchd agents instead of Home Manager activation";
@@ -307,10 +321,10 @@ let
       "discord-music-rpc config.yaml must be in home.nix managedSymlinkPaths and use mkOutOfStoreSymlink";
 
   # === TEST: App bundles Phase 2 uses declared order (no re-sort) ===
-  test_app_bundles_deployment_uses_declared_order = assert' (lib.hasInfix "'') currentNucleusAppBundles" macbookAppBundlesText) "app-bundles.nix Phase 2 must iterate currentNucleusAppBundles directly without re-sorting";
+  test_app_bundles_deployment_uses_declared_order = assert' (lib.hasInfix "}) currentNucleusAppBundles" macbookAppBundlesText) "app-bundles.nix Phase 2 must iterate currentNucleusAppBundles directly without re-sorting";
 
   # === TEST: Automator workflows Phase 3 uses declared order (no re-sort) ===
-  test_workflows_deployment_uses_declared_order = assert' (lib.hasInfix "'') currentNucleusWorkflows" macbookAutomatorWorkflowsText) "automator-workflows.nix Phase 3 must iterate currentNucleusWorkflows directly without re-sorting";
+  test_workflows_deployment_uses_declared_order = assert' (lib.hasInfix "}) currentNucleusWorkflows" macbookAutomatorWorkflowsText) "automator-workflows.nix Phase 3 must iterate currentNucleusWorkflows directly without re-sorting";
 
   # === TEST: macOS app-bundles DAG orders after linkGeneration ===
   test_services_app_bundles_dag_after_link_generation = assert' (lib.hasInfix "macos-deploy-app-bundles = lib.hm.dag.entryAfter [ \"linkGeneration\" ]" macbookAppBundlesText) "app-bundles.nix macos-deploy-app-bundles activation must run after linkGeneration";
@@ -374,7 +388,10 @@ let
     test_macos_workflows_has_open_nucleus_manual
   ];
 in
-builtins.seq (builtins.deepSeq allTests) {
+# NOTE: force allTests as deepSeq's SECOND argument.  `builtins.seq (builtins.deepSeq allTests) { ... }`
+# only forces the partially-applied deepSeq function (WHNF) and never evaluates
+# any test, silently passing every assertion.  This form actually evaluates them.
+builtins.deepSeq allTests {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${builtins.toString (builtins.length allTests)} activation and service dependency tests passed";

@@ -5,7 +5,7 @@
 #   1. $using:parallelJobs in -ThrottleLimit parameter position -> always runtime error
 #   2. string paths piped to Select-String are searched as content, never as files
 #      (Select-GitIgnored returns path strings) -> both scans always empty
-#   3. [regex]::Escape + -SimpleMatch -> dotted basenames (system.gitconfig) never match
+#   3. [regex]::Escape + -SimpleMatch -> dotted basenames (Windows.gitconfig) never match
 # Plus the intended semantics the fixes restore: dotted-basename reference
 # detection and the same-or-immediately-preceding-line annotation rule.
 
@@ -80,16 +80,16 @@ function Invoke-ScopedStep19 {
 $fixture1 = Join-Path -Path $tmpDir -ChildPath 'case1'
 $cfgDir = Join-Path -Path $fixture1 -ChildPath 'src/modules/configs/git'
 New-Item -ItemType Directory -Path $cfgDir -Force > $null
-Set-Content -Path (Join-Path $cfgDir 'system.gitconfig') -Value '[core]`nsymlinks=true'
+Set-Content -Path (Join-Path $cfgDir 'Windows.gitconfig') -Value '[core]`nsymlinks=true'
 $nixDir = Join-Path -Path $fixture1 -ChildPath 'src/modules'
 New-Item -ItemType Directory -Path $nixDir -Force > $null
 Set-Content -Path (Join-Path $nixDir 'fake.nix') -Value @(
   '# check-suppress:config-method: method 1 (writable symlink) -- fixture test'
-  'ln -sf system.gitconfig /etc/gitconfig'
+  'ln -sf Windows.gitconfig /etc/gitconfig'
 )
 $status = Invoke-ScopedStep19 -FixtureRoot $fixture1
 if ($status -eq $true) {
-  Assert-Pass -Name 'step19_dotted_annotated_passes' -Reason 'dotted basename (system.gitconfig) found with annotation on preceding line -> pass'
+  Assert-Pass -Name 'step19_dotted_annotated_passes' -Reason 'dotted basename (Windows.gitconfig) found with annotation on preceding line -> pass'
 } else {
   Assert-Fail -Name 'step19_dotted_annotated_passes' -Reason 'dotted basename reference with preceding annotation should pass'
 }
@@ -98,10 +98,10 @@ if ($status -eq $true) {
 $fixture2 = Join-Path -Path $tmpDir -ChildPath 'case2'
 $cfgDir2 = Join-Path -Path $fixture2 -ChildPath 'src/modules/configs/git'
 New-Item -ItemType Directory -Path $cfgDir2 -Force > $null
-Set-Content -Path (Join-Path $cfgDir2 'system.gitconfig') -Value '[core]`nsymlinks=true'
+Set-Content -Path (Join-Path $cfgDir2 'Windows.gitconfig') -Value '[core]`nsymlinks=true'
 $nixDir2 = Join-Path -Path $fixture2 -ChildPath 'src/modules'
 New-Item -ItemType Directory -Path $nixDir2 -Force > $null
-Set-Content -Path (Join-Path $nixDir2 'fake.nix') -Value 'ln -sf system.gitconfig /etc/gitconfig'
+Set-Content -Path (Join-Path $nixDir2 'fake.nix') -Value 'ln -sf Windows.gitconfig /etc/gitconfig'
 $status = Invoke-ScopedStep19 -FixtureRoot $fixture2
 if ($status -eq $false) {
   Assert-Pass -Name 'step19_dotted_unannotated_fails' -Reason 'dotted basename reference without annotation -> fail'
@@ -113,13 +113,13 @@ if ($status -eq $false) {
 $fixture3 = Join-Path -Path $tmpDir -ChildPath 'case3'
 $cfgDir3 = Join-Path -Path $fixture3 -ChildPath 'src/modules/configs/git'
 New-Item -ItemType Directory -Path $cfgDir3 -Force > $null
-Set-Content -Path (Join-Path $cfgDir3 'system.gitconfig') -Value '[core]`nsymlinks=true'
+Set-Content -Path (Join-Path $cfgDir3 'Windows.gitconfig') -Value '[core]`nsymlinks=true'
 $nixDir3 = Join-Path -Path $fixture3 -ChildPath 'src/modules'
 New-Item -ItemType Directory -Path $nixDir3 -Force > $null
 Set-Content -Path (Join-Path $nixDir3 'fake.nix') -Value @(
   '# check-suppress:config-method: method 1 (writable symlink) -- fixture test'
   ''
-  'ln -sf system.gitconfig /etc/gitconfig'
+  'ln -sf Windows.gitconfig /etc/gitconfig'
 )
 $status = Invoke-ScopedStep19 -FixtureRoot $fixture3
 if ($status -eq $false) {

@@ -60,9 +60,14 @@ Describe "Windows config method documentation" {
     }
 
     Context "module file path references have method labels" {
-        It "Sync-GitAndSshConfig should have # check-suppress:config-method comment near gitignore symlink" {
+        It "Sync-GitAndSshConfig should have # check-suppress:config-method comment near user gitignore symlink" {
             $moduleContent = Get-Content -Path (Join-Path $PSScriptRoot '..\..\..\src\hosts\Windows\modules\user\Sync-GitAndSshConfig.ps1') -Raw
-            Test-ConfigMethodLabel -Content $moduleContent -Pattern 'system\.gitignore' | Should -Be $true
+            Test-ConfigMethodLabel -Content $moduleContent -Pattern 'userIgnorePath' | Should -Be $true
+        }
+
+        It "Sync-GitAndSshConfig should have # check-suppress:config-method comment near user gitconfig symlink" {
+            $moduleContent = Get-Content -Path (Join-Path $PSScriptRoot '..\..\..\src\hosts\Windows\modules\user\Sync-GitAndSshConfig.ps1') -Raw
+            Test-ConfigMethodLabel -Content $moduleContent -Pattern 'userGitConfigPath' | Should -Be $true
         }
 
         It "Sync-GitAndSshConfig should have # check-suppress:config-method comment near Windows.gitconfig" {

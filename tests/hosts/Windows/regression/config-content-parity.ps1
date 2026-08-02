@@ -9,7 +9,8 @@
 
     Currently covers:
     - cargo/config.toml: deployed content must match repo file (jobs=4, sccache)
-    - git/system.gitignore: deployed global ignore must match repo file
+    - git/Windows.gitignore: deployed user ignore must symlink to the repo file
+    - git/Windows.gitconfig: deployed user gitconfig must symlink to the repo file
     - git/Windows.gitconfig: Git system config must symlink to the repo file
     - pwsh/PSScriptAnalyzerSettings.psd1: deployed symlink must point to repo file
     - SSH config: deployed Host github.com block must have correct directives
@@ -64,20 +65,20 @@ Describe "Cargo config content parity" {
 }
 
 Describe "Git ignore content parity" {
-    Context "system.gitignore" {
+    Context "user-scope Windows.gitignore" {
         It "Repo file should contain Nix build output patterns" {
-            $repoContent = Get-Content -Path (Join-Path $repoRoot 'src\modules\configs\git\system.gitignore') -Raw
+            $repoContent = Get-Content -Path (Join-Path $repoRoot 'src\users\default\git\Windows.gitignore') -Raw
             $repoContent | Should -Match '^result$'
             $repoContent | Should -Match '^\.direnv$'
         }
 
-        It "Repo file should be the source for the deployed global ignore" {
-            $deployedPath = "$env:ProgramData\nucleus\git\ignore-global"
+        It "Deployed user ignore should be a symlink to the repo file" {
+            $deployedPath = "$env:USERPROFILE\.config\git\ignore"
             if (Test-Path -Path $deployedPath) {
                 $item = Get-Item -Path $deployedPath -Force
                 if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
                     $target = $item.Target
-                    $target | Should -Be (Join-Path $repoRoot 'src\modules\configs\git\system.gitignore')
+                    $target | Should -Be (Join-Path $repoRoot 'src\users\default\git\Windows.gitignore')
                 }
                 else {
                     Set-ItResult -Skipped -Because "gitignore is a regular file (not a symlink) — content parity verified via repo source"
@@ -85,6 +86,32 @@ Describe "Git ignore content parity" {
             }
             else {
                 Set-ItResult -Skipped -Because "gitignore not yet deployed on this machine"
+            }
+        }
+
+        It "Legacy ProgramData ignore-global should NOT be deployed" {
+            $legacyPath = "$env:ProgramData\nucleus\git\ignore-global"
+            Test-Path -Path $legacyPath | Should -Be $false
+        }
+    }
+}
+
+Describe "Git user config content parity" {
+    Context "user-scope Windows.gitconfig symlink" {
+        It "Deployed user gitconfig should be a symlink to the repo file" {
+            $deployedPath = "$env:USERPROFILE\.gitconfig"
+            if (Test-Path -Path $deployedPath) {
+                $item = Get-Item -Path $deployedPath -Force
+                if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+                    $target = $item.Target
+                    $target | Should -Be (Join-Path $repoRoot 'src\users\default\git\Windows.gitconfig')
+                }
+                else {
+                    Set-ItResult -Skipped -Because "gitconfig is a regular file (not a symlink) — content parity verified via repo source"
+                }
+            }
+            else {
+                Set-ItResult -Skipped -Because "user gitconfig not yet deployed on this machine"
             }
         }
     }

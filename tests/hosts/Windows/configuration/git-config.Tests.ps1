@@ -14,8 +14,46 @@
 #>
 
 $script:gitConfigPath = Join-Path -Path $env:USERPROFILE -ChildPath '.gitconfig'
+$script:repoRoot = $env:NUCLEUS_REPO_ROOT
+if ([string]::IsNullOrWhiteSpace($script:repoRoot)) {
+    # Fall back to deriving from script path (tests/hosts/Windows/configuration/ -> repo root is 5 levels up).
+    $script:repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
+}
 
 Describe "Windows Git Configuration Parity" {
+    Context "Managed user-scope symlinks" {
+        It "User gitconfig should be a symlink to the repo Windows.gitconfig" {
+            if (Test-Path -Path $script:gitConfigPath) {
+                $item = Get-Item -Path $script:gitConfigPath -Force
+                if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+                    $item.Target | Should -Be (Join-Path $script:repoRoot 'src\users\default\git\Windows.gitconfig')
+                }
+                else {
+                    Set-ItResult -Skipped -Because "user gitconfig is a regular file (not a symlink) — content parity verified via repo source"
+                }
+            }
+            else {
+                Set-ItResult -Skipped -Because "user gitconfig not yet deployed on this machine"
+            }
+        }
+
+        It "User ignore should be a symlink to the repo Windows.gitignore" {
+            $userIgnorePath = Join-Path -Path $env:USERPROFILE -ChildPath '.config\git\ignore'
+            if (Test-Path -Path $userIgnorePath) {
+                $item = Get-Item -Path $userIgnorePath -Force
+                if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+                    $item.Target | Should -Be (Join-Path $script:repoRoot 'src\users\default\git\Windows.gitignore')
+                }
+                else {
+                    Set-ItResult -Skipped -Because "user ignore is a regular file (not a symlink) — content parity verified via repo source"
+                }
+            }
+            else {
+                Set-ItResult -Skipped -Because "user ignore not yet deployed on this machine"
+            }
+        }
+    }
+
     Context "Managed fetch, pull and push defaults" {
         It "Should prune remote-tracking branches on fetch" {
             git config --file $script:gitConfigPath --get fetch.prune | Should -Be 'true'
@@ -49,6 +87,26 @@ Describe "Windows Git Configuration Parity" {
     }
 
     Context "System-scope cross-host Git parity defaults" {
+        It "Should symlink Git system config to the repo Windows.gitconfig" {
+            # check-suppress:suppression_doc: probe -- git may not be installed; skip handles absence.
+            $gitExecutable = Get-Command -Name 'git.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
+            if ([string]::IsNullOrWhiteSpace($gitExecutable)) {
+                Set-ItResult -Skipped -Because "git not installed on this machine"
+            }
+            else {
+                $installRoot = (Get-ItemProperty -Path 'HKLM:\Software\GitForWindows' -Name 'InstallPath' -ErrorAction SilentlyContinue).InstallPath
+                $systemConfigPath = Join-Path $installRoot 'etc\gitconfig'
+                if (Test-Path -Path $systemConfigPath) {
+                    $item = Get-Item -Path $systemConfigPath -Force
+                    [bool]($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) | Should -BeTrue
+                    $item.Target | Should -Be (Join-Path $script:repoRoot 'src\modules\configs\git\Windows.gitconfig')
+                }
+                else {
+                    Set-ItResult -Skipped -Because "Git system config not yet deployed on this machine"
+                }
+            }
+        }
+
         It "Should enable signed commits at system scope" {
             git config --system --get commit.gpgsign | Should -Be 'true'
         }

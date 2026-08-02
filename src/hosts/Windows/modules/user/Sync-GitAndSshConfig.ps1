@@ -51,7 +51,7 @@ function Sync-GitAndSshConfig {
 
   foreach ($User in $Users) {
     # Resolve the target profile path explicitly from the managed username.
-    # check-suppress:suppression_doc: `git config --global` always targets the current process user, so
+    # check-suppress:suppression_doc: a user-scoped write via the --global flag targets the current process user, so
     # we need deterministic per-user paths to converge each managed profile.
     $userHome = Join-Path -Path $env:SystemDrive -ChildPath "Users\$User"
     if (-not (Test-Path -Path $userHome)) {
@@ -59,8 +59,15 @@ function Sync-GitAndSshConfig {
       continue
     }
 
-    $gitConfigPath = Join-Path -Path $userHome -ChildPath '.gitconfig'
     $identityPath = Join-Path -Path $userHome -ChildPath ".config\nucleus\git-identity.env"
+    # check-suppress:config-method: method 1 (writable symlink) -- per-user .gitconfig symlinked to the repo's Windows.gitconfig, so git reads managed keys directly from the repo tree (mirrors POSIX git.nix user scope).
+    $userGitConfigPath = Join-Path -Path $userHome -ChildPath '.gitconfig'
+    $userGitConfigDir = Join-Path -Path $userHome -ChildPath '.config\git'
+    # check-suppress:config-method: method 1 (writable symlink) -- per-user ignore file symlinked to the repo's Windows.gitignore (git has no global-scoped ignore; core.excludesFile at user scope is the only mechanism).
+    $userIgnorePath = Join-Path -Path $userGitConfigDir -ChildPath 'ignore'
+    # Identity include file referenced by [include] path in Windows.gitconfig;
+    # writable by this provisioner without touching the symlinked config.
+    $identityConfigPath = Join-Path -Path $userGitConfigDir -ChildPath 'identity'
     $identityKv = @{}
     $hasCompleteIdentity = $false
     if (Test-Path -Path $identityPath) {
@@ -213,22 +220,27 @@ function Sync-GitAndSshConfig {
         throw 'git.exe is required for managed Git parity but was not found in PATH.'
       }
 
-      # Global + user-specific gitignore layering:
-      # - global baseline in ProgramData (machine scope, shared by all users)
-      # - user overlay in each profile
-      # - merged effective file consumed by core.excludesFile
-      $globalIgnoreDir = Join-Path -Path $env:ProgramData -ChildPath 'nucleus\git'
-      $globalIgnorePath = Join-Path -Path $globalIgnoreDir -ChildPath 'ignore-global'
-      $userGitConfigDir = Join-Path -Path $userHome -ChildPath '.config\git'
-      $userIgnorePath = Join-Path -Path $userGitConfigDir -ChildPath 'ignore-user'
-      $effectiveIgnorePath = Join-Path -Path $userGitConfigDir -ChildPath 'ignore'
-
-      if (-not (Test-Path -Path $globalIgnoreDir)) {
-        New-Item -ItemType Directory -Path $globalIgnoreDir -Force > $null
+      # User-scope Git config and ignore are method-1 writable symlinks into the
+      # repo tree (src/users/default/git/Windows.gitconfig + Windows.gitignore),
+      # mirroring POSIX git.nix.  A regular file found at the target is moved to
+      # a same-folder .bak before symlinking so disabling can restore it; a
+      # pre-existing symlink is simply replaced.
+      $gitConfigSource = Join-Path $env:NUCLEUS_REPO_ROOT 'src\users\default\git\Windows.gitconfig'
+      if (-not (Test-Path -Path $gitConfigSource -PathType Leaf)) {
+        throw "Sync-GitAndSshConfig: Windows.gitconfig source not found at $gitConfigSource"
       }
       if (-not (Test-Path -Path $userGitConfigDir)) {
         New-Item -ItemType Directory -Path $userGitConfigDir -Force > $null
       }
+      Save-RegularFileBackup -Path $userGitConfigPath -BackupPath "$userGitConfigPath.bak"
+      New-Item -ItemType SymbolicLink -Path $userGitConfigPath -Target $gitConfigSource -Force > $null
+
+      $ignoreSource = Join-Path $env:NUCLEUS_REPO_ROOT 'src\users\default\git\Windows.gitignore'
+      if (-not (Test-Path -Path $ignoreSource -PathType Leaf)) {
+        throw "Sync-GitAndSshConfig: Windows.gitignore source not found at $ignoreSource"
+      }
+      Save-RegularFileBackup -Path $userIgnorePath -BackupPath "$userIgnorePath.bak"
+      New-Item -ItemType SymbolicLink -Path $userIgnorePath -Target $ignoreSource -Force > $null
 
       # Create an empty template directory so `init.templateDir` points at an
       # existing (but empty) directory, suppressing the sample hooks and legacy
@@ -238,107 +250,39 @@ function Sync-GitAndSshConfig {
         New-Item -ItemType Directory -Path $emptyTemplateDir -Force > $null
       }
 
-      # check-suppress:config-method: method 1 (writable symlink) -- global gitignore symlinked to repo file.
-      # Mirrors the POSIX git.nix deployment of system.gitignore.
-      $globalIgnoreSource = Join-Path $env:NUCLEUS_REPO_ROOT 'src\modules\configs\git\system.gitignore'
-      if (-not (Test-Path -Path $globalIgnoreSource -PathType Leaf)) {
-        throw "Sync-GitAndSshConfig: system.gitignore source not found at $globalIgnoreSource"
-      }
-      if (Test-Path -Path $globalIgnorePath) {
-        Remove-Item -Path $globalIgnorePath -Force
-      }
-      New-Item -Path $globalIgnorePath -ItemType SymbolicLink -Target $globalIgnoreSource -Force > $null
-
-      if (-not (Test-Path -Path $userIgnorePath)) {
-        $userIgnoreTemplate = @(
-          '# User-specific Git ignore patterns.'
-          '# Add one pattern per line; these are appended after ignore-global.'
-        )
-        [System.IO.File]::WriteAllLines($userIgnorePath, $userIgnoreTemplate, [System.Text.UTF8Encoding]::new($false))
-      }
-
-      $effectiveIgnoreLines = @()
-      $effectiveIgnoreLines += Get-Content -Path $globalIgnorePath -ErrorAction Stop
-      $effectiveIgnoreLines += ''
-      $effectiveIgnoreLines += Get-Content -Path $userIgnorePath -ErrorAction Stop
-      [System.IO.File]::WriteAllLines($effectiveIgnorePath, $effectiveIgnoreLines, [System.Text.UTF8Encoding]::new($false))
-
-      # commit.gpgsign, tag.gpgsign and core.symlinks are NOT set here: they are
-      # provisioned machine-wide in Git's system scope via the Windows.gitconfig
-      # symlink (see the system-scope block after the user loop), mirroring the
-      # POSIX /etc/gitconfig symlink. core.autocrlf stays per-user: Windows
-      # normalises CRLF -> LF on commit, overriding the shared file's false (same
-      # rationale as src/modules/git.nix).
-      $managedGitSettings = [ordered]@{
-        'core.autocrlf' = 'true'
-        'core.excludesFile' = $effectiveIgnorePath
-        'fetch.prune' = 'true'
-        'fetch.pruneTags' = 'false'
-        'gpg.format' = 'openpgp'
-        'init.defaultBranch' = 'main'
-        'init.templateDir' = '~/.config/git/empty_template'
-        'pull.ff' = 'true'
-        'pull.rebase' = 'false'
-        'push.autoSetupRemote' = 'true'
-        'push.followTags' = 'true'
-        'url.git@github.com:.insteadOf' = 'https://github.com/'
-        'user.useConfigOnly' = 'true'
-      }
-
-      if ($hasCompleteIdentity) {
-        $managedGitSettings['user.email'] = $identityKv['email']
-        $managedGitSettings['user.name'] = $identityKv['name']
-        $managedGitSettings['user.signingkey'] = $identityKv['signingKey']
-      }
-
-      foreach ($settingKey in $managedGitSettings.Keys) {
-        & $gitExecutable config --file $gitConfigPath $settingKey $managedGitSettings[$settingKey]
-        if ($LASTEXITCODE -ne 0) {
-          throw "Failed to set Git config '$settingKey' for user '$User'."
+      # Remove legacy layering artifacts from pre-symlink deployments: the
+      # machine-scoped ProgramData ignore-global and the per-profile ignore-user
+      # overlay are superseded by the single symlinked Windows.gitignore.
+      foreach ($legacyIgnore in @((Join-Path $env:ProgramData 'nucleus\git\ignore-global'), (Join-Path $userGitConfigDir 'ignore-user'))) {
+        if (Test-Path -Path $legacyIgnore) {
+          Remove-Item -Path $legacyIgnore -Force
         }
       }
 
-      # The signing/symlink keys now live in Git's system scope; drop legacy
-      # per-user copies written by previous deployments so this file converges.
-      foreach ($legacyKey in 'commit.gpgsign', 'core.symlinks', 'tag.gpgsign') {
-        & $gitExecutable config --file $gitConfigPath --unset-all $legacyKey *> $null
+      # Per-user identity lives in the include file referenced by [include] path
+      # in Windows.gitconfig; the symlinked .gitconfig is never written.  The
+      # include file is also writable when the config itself is read-only.
+      if ($hasCompleteIdentity) {
+        foreach ($identitySetting in @('user.name', 'user.email', 'user.signingkey')) {
+          & $gitExecutable config --file $identityConfigPath $identitySetting $identityKv[$identitySetting.Substring(5)]
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to set Git identity '$identitySetting' for user '$User'."
+          }
+        }
       }
-
-      if (-not $hasCompleteIdentity) {
-        Write-Warning "Applied managed Git signing defaults for user '$User' without user identity keys."
+      else {
+        Write-Warning "Applied managed Git baseline for user '$User' without user identity keys."
       }
     }
     else {
-      # check-suppress:suppression_doc: probe -- git may not be installed; condition handles absence.
-      $gitExecutable = Get-Command -Name 'git.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
-      if (-not [string]::IsNullOrWhiteSpace($gitExecutable)) {
-        # commit.gpgsign, core.symlinks and tag.gpgsign are unset here only to
-        # clean up legacy per-user copies from pre-system-include deployments;
-        # the live values are removed by removing the system-scope include.
-        $managedGitSettings = [ordered]@{
-          'commit.gpgsign' = 'true'
-          'core.autocrlf' = 'true'
-          'core.excludesFile' = $null
-          'core.symlinks' = 'true'
-          'fetch.prune' = 'true'
-          'fetch.pruneTags' = 'false'
-          'gpg.format' = 'openpgp'
-          'init.defaultBranch' = 'main'
-          'pull.ff' = $null
-          'pull.rebase' = $null
-          'push.autoSetupRemote' = $null
-          'push.followTags' = 'true'
-          'tag.gpgsign' = 'true'
-          'url.git@github.com:.insteadOf' = 'https://github.com/'
-          'user.email' = $null
-          'user.name' = $null
-          'user.signingkey' = $null
-          'user.useConfigOnly' = $null
-        }
-
-        foreach ($settingKey in $managedGitSettings.Keys) {
-          & $gitExecutable config --file $gitConfigPath --unset-all $settingKey *> $null
-        }
+      # Disabled: remove the user-scope symlinks and restore any backed-up
+      # originals.  A missing .bak simply means the path was managed; nothing to
+      # restore.  The identity include file is managed state and is removed.
+      foreach ($managedPath in @($userGitConfigPath, $userIgnorePath)) {
+        Restore-FileBackup -Path $managedPath -BackupPath "$managedPath.bak"
+      }
+      if (Test-Path -Path $identityConfigPath) {
+        Remove-Item -Path $identityConfigPath -Force
       }
     }
   }
@@ -364,20 +308,14 @@ function Sync-GitAndSshConfig {
     }
     # check-suppress:config-method: method 1 (writable symlink) -- per-host Windows.gitconfig symlinked into Git's system scope; installer-owned original backed up to etc\gitconfig.bak
     if ($Enabled) {
-      if (Test-Path -Path $systemConfigPath -PathType Leaf) {
-        $isSymlink = [bool]((Get-Item -Path $systemConfigPath -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint)
-        if (-not $isSymlink -and -not (Test-Path -Path $systemConfigBackup)) {
-          Move-Item -Path $systemConfigPath -Destination $systemConfigBackup -Force
-        }
-      }
-      New-Item -ItemType SymbolicLink -Path $systemConfigPath -Target $managedSource -Force | Out-Null
+      Save-RegularFileBackup -Path $systemConfigPath -BackupPath $systemConfigBackup
+      New-Item -ItemType SymbolicLink -Path $systemConfigPath -Target $managedSource -Force > $null
     }
-    elseif (Test-Path -Path $systemConfigPath -PathType Leaf) {
-      Remove-Item -Path $systemConfigPath -Force
-      # check-suppress:suppression_doc: missing .bak means no pre-existing original; nothing to restore.
-      if (Test-Path -Path $systemConfigBackup) {
-        Move-Item -Path $systemConfigBackup -Destination $systemConfigPath
-      }
+    else {
+      # WHY: only a managed symlink is removed; a regular file here is unmanaged
+      # state (e.g. a newer installer-owned file) and must not be deleted over a
+      # stale .bak.
+      Restore-FileBackup -Path $systemConfigPath -BackupPath $systemConfigBackup
     }
   }
 
@@ -390,5 +328,64 @@ function Sync-GitAndSshConfig {
         Start-Service -Name 'ssh-agent'
       }
     }
+  }
+}
+
+# Backup/restore of unmanaged originals displaced by managed symlinks.  Extracted
+# from Sync-GitAndSshConfig so the convergence (newest original wins) and
+# lossless-restore semantics are unit-testable; see
+# tests/hosts/Windows/configuration/git-config-helpers.Tests.ps1.
+
+function Save-RegularFileBackup {
+  <#
+  .SYNOPSIS
+    Moves a regular file at $Path to $BackupPath before a managed symlink replaces it.
+  .DESCRIPTION
+    When a regular file (installer-owned original, user file, or a newer
+    converged copy) occupies $Path, it is moved to $BackupPath so disabling can
+    restore it.  A stale backup is overwritten -- the newest original wins
+    (convergence).  A symlink at $Path is managed state and is left untouched.
+  #>
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path,
+    [Parameter(Mandatory = $true)]
+    [string]$BackupPath
+  )
+  if (Test-Path -Path $Path -PathType Leaf) {
+    $isSymlink = [bool]((Get-Item -Path $Path -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint)
+    # check-suppress:suppression_doc: a stale .bak is overwritten so the newest original wins (convergence); a symlink is managed state, nothing to back up.
+    if (-not $isSymlink) {
+      Move-Item -Path $Path -Destination $BackupPath -Force
+    }
+  }
+}
+
+function Restore-FileBackup {
+  <#
+  .SYNOPSIS
+    Removes a managed symlink at $Path and restores $BackupPath when present.
+  .DESCRIPTION
+    A symlink at $Path is managed state and is removed.  If $Path is then
+    absent and $BackupPath exists, $BackupPath is moved back to $Path (lossless
+    restore of the unmanaged original).  A missing backup means no pre-existing
+    original; nothing is restored.  A regular file at $Path is unmanaged state
+    (e.g. a newer installer-owned file) and is left untouched.
+  #>
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path,
+    [Parameter(Mandatory = $true)]
+    [string]$BackupPath
+  )
+  if (Test-Path -Path $Path) {
+    $isSymlink = [bool]((Get-Item -Path $Path -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint)
+    if ($isSymlink) {
+      Remove-Item -Path $Path -Force
+    }
+  }
+  # check-suppress:suppression_doc: missing .bak means no pre-existing original; nothing to restore.
+  if (-not (Test-Path -Path $Path) -and (Test-Path -Path $BackupPath)) {
+    Move-Item -Path $BackupPath -Destination $Path
   }
 }

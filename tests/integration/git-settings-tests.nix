@@ -4,7 +4,9 @@ let
   inherit (import ../lib.nix) containsRegex;
 
   posixGitText = builtins.readFile ../../src/modules/git.nix;
-  windowsGitText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1;
+  # Phase 4: Windows settings moved out of Sync-GitAndSshConfig.ps1 into the
+  # user-scope file (src/users/default/git/Windows.gitconfig, INI format) and
+  # the global-scope file (src/modules/configs/git/Windows.gitconfig).
 
   # User-scope POSIX files live in src/users/default/git/ (defaults fallback:
   # per-user src/users/<username>/git/ wins when present).  Global-scope
@@ -15,6 +17,8 @@ let
   nixosUserIgnoreText = builtins.readFile ../../src/users/default/git/NixOS.gitignore;
   macbookGlobalGitText = builtins.readFile ../../src/modules/configs/git/MacBook.gitconfig;
   nixosGlobalGitText = builtins.readFile ../../src/modules/configs/git/NixOS.gitconfig;
+  windowsUserGitText = builtins.readFile ../../src/users/default/git/Windows.gitconfig;
+  windowsGlobalGitText = builtins.readFile ../../src/modules/configs/git/Windows.gitconfig;
 
   # Alias parity: all three shells (zsh, POSIX pwsh, Windows pwsh) must expose
   # the same set of `-g*` shell aliases.  POSIX and Windows PowerShell both
@@ -87,24 +91,28 @@ assert !(containsRegex "ignore-global" posixGitText);
 assert !(containsRegex "assemble-gitignore" posixGitText);
 assert !(containsRegex "programs\.git" posixGitText);
 
-# --- Windows settings (Phase 4 scope; kept for parity until then) ---
-assert containsRegex "'core\.autocrlf' = 'true'" windowsGitText;
-assert containsRegex "'core\.symlinks' = 'true'" windowsGitText;
-assert containsRegex "'fetch\.prune' = 'true'" windowsGitText;
-assert containsRegex "'fetch\.pruneTags' = 'false'" windowsGitText;
-assert containsRegex "'pull\.ff' = 'true'" windowsGitText;
-assert containsRegex "'pull\.rebase' = 'false'" windowsGitText;
-assert containsRegex "'push\.autoSetupRemote' = 'true'" windowsGitText;
-assert containsRegex "'push\.followTags' = 'true'" windowsGitText;
-assert containsRegex "'user\.useConfigOnly' = 'true'" windowsGitText;
+# --- Windows user-scope settings (src/users/default/git/Windows.gitconfig) ---
+assert containsRegex "autocrlf = true" windowsUserGitText;
+assert containsRegex "prune = true" windowsUserGitText;
+assert containsRegex "pruneTags = false" windowsUserGitText;
+assert containsRegex "ff = true" windowsUserGitText;
+assert containsRegex "rebase = false" windowsUserGitText;
+assert containsRegex "autoSetupRemote = true" windowsUserGitText;
+assert containsRegex "followTags = true" windowsUserGitText;
+assert containsRegex "useConfigOnly = true" windowsUserGitText;
+
+# --- Windows global-scope settings (src/modules/configs/git/Windows.gitconfig) ---
+assert containsRegex "symlinks = true" windowsGlobalGitText;
+assert containsRegex "autocrlf = false" windowsGlobalGitText;
+assert containsRegex "gpgsign = true" windowsGlobalGitText;
 
 # --- Preventative: init.templateDir suppresses new-repo boilerplate ---
 # INI format splits dotted keys into [section] + key lines, so assert the
 # key/value pair (and the empty_template dir it points at) instead.
 assert containsRegex "templateDir = ~/.config/git/empty_template" macbookUserGitText;
 assert containsRegex "empty_template" posixGitText;
-assert containsRegex "'init\.templateDir'" windowsGitText;
-assert containsRegex "empty_template" windowsGitText;
+assert containsRegex "templateDir = ~/.config/git/empty_template" windowsUserGitText;
+assert containsRegex "empty_template" windowsUserGitText;
 
 # --- Preventative: cross-host alias parity ---
 assert aliasesNixCount == posixPwshCount && posixPwshCount == windowsPwshCount;
