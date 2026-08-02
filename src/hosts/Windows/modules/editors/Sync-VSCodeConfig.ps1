@@ -326,7 +326,7 @@ function Sync-VSCodeConfig {
           Remove-Item -LiteralPath $chatLmPath -Force
         }
       }
-      # check-suppress:config-method: method 1 (writable symlink)
+      # check-suppress:config-method: method 3 (merge) -- name-keyed merge preserves VS Code-added model entries while refreshing repo entries.
       $repoFile = Join-Path -Path $vsConfigDir -ChildPath "chatLanguageModels.windows.json"
       Merge-VSChatLanguageModel -RepoFile $repoFile -DestFile $chatLmPath
     }

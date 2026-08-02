@@ -183,8 +183,8 @@ let
   # surfaces the Ollama models that fit within its VRAM budget.
   # mac: gemma4:e4b + qwen3:14b (24 GB unified memory allows both).
   # nixos/other: qwen3:8b only (discrete GPU capped at 6 GB VRAM).
-  # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-  vsCodeChatLanguageModelsFile = # check-suppress:config-method: method 1 (writable symlink)
+  # check-suppress:config-method: method 3 (merge) -- name-keyed merge preserves VS Code-added model entries while refreshing repo entries.
+  vsCodeChatLanguageModelsFile = # check-suppress:config-method: method 3 (merge)
     if isDarwin then "chatLanguageModels.mac.json" else "chatLanguageModels.nixos.json";
 
   # Python script that inserts a workspace trust entry for ~/dev into VS Code's
