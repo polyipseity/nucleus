@@ -25,9 +25,9 @@ Proceed automatically with best-effort defaults and available context.
    - Optional body (each line wrapped to 72 chars or fewer; bullets allowed)
    - Footer (`BREAKING CHANGE` / `Refs` / `Ticket`), including `${input:extra}` when provided
 
-   Prefer tooling-enforced rules; default to Conventional Commits when unclear. If the commit is rejected by commitlint, rewrap and retry with a fresh `git commit`. NEVER use `git commit --amend` — the commit was not created, so `--amend` would modify whatever HEAD currently points to (a pre-existing commit), potentially destroying history. After composing, proceed to step 2b for commitlint validation.
+   Prefer tooling-enforced rules; default to Conventional Commits when unclear. If the commit is rejected by commitlint, rewrap and retry with a fresh `git commit`. NEVER use `git commit --amend` — the commit was not created, so `--amend` would modify whatever HEAD currently points to (a pre-existing commit), potentially destroying history. After composing, proceed to step 3 for commitlint validation.
 
-2b. **Validate with commitlint**
+3. **Validate with commitlint**
 Before running `git commit`, validate the message with commitlint:
 
 - **Detect project setup.** Check for a commitlint config file (`.commitlintrc.*`, `commitlint.config.*`) in the project root. If found, the config is used. If not found, check for a documented conflicting convention (CONTRIBUTING.md / README.md specifies a non-conventional-commit format such as `gitmoji` or a custom schema). If a conflicting convention exists AND no commitlint config is present, skip validation entirely — the project has explicitly opted out.
@@ -46,11 +46,9 @@ Before running `git commit`, validate the message with commitlint:
     Copy whichever lockfile exists (`bun.lock`, `package-lock.json`, `yarn.lock`). If the repo has no manifest, replace the `cp` line with a minimal `package.json` in the temp dir (devDependencies `@commitlint/cli` + `@commitlint/config-conventional`) — `--frozen-lockfile` is safe because bun generates a lockfile when none is copied. The commitlint config must live inside the temp dir (`extends` resolves relative to the config file's location, not the cwd). Use `bun run commitlint` — no `node` binary assumed. The `trap` guarantees cleanup; never create or modify `package.json`, `bun.lock`, or `node_modules` in the project repo.
   - Structural conventional-commit check (type-prefix, format) is the LAST resort: only if `bun` is unavailable or the temp-dir install cannot complete.
 - **On failure.** If validation fails AND no conflicting convention is documented, fix the message and re-run validation. Do not proceed to `git commit` until validation passes. If commitlint is present but fails with a tool error (not a lint error), report the failure — do not proceed. If the failure is `Cannot find package 'conventional-changelog-conventionalcommits'` (config `extends` unresolvable by `bun x`), use the temp-dir install fallback above — `bun x commitlint --default-config` is not a workaround.
-- **On success.** Proceed to step 2c.
+- **On success.** Proceed to step 4.
 
-2c. **Verify commit** - Run `git rev-parse HEAD` and `git log -1 --format=%s`. Confirm the hash is new and the message is your intended message. If they show the previous commit's message, the commit was not created — retry with a fresh `git commit` (not `--amend`).
-
-3. **Create the commit**
+4. **Create the commit**
    If `${input:commitNow}` is `no`, skip and only present the message.
    Otherwise, run the appropriate command:
    - **PowerShell (Windows):**
@@ -74,7 +72,9 @@ Before running `git commit`, validate the message with commitlint:
 
    If heredoc quoting fails, retry up to 3 times with a different delimiter. For other failures, report the error and do not modify the index.
 
-4. **Output**
+5. **Verify commit** - Run `git rev-parse HEAD` and `git log -1 --format=%s`. Confirm the hash is new and the message is your intended message. If they show the previous commit's message, the commit was not created — retry with a fresh `git commit` (not `--amend`).
+
+6. **Output**
    Summary of staged files, detected convention, commit message, and result (SHA or skip reason).
 
 ## Rules
