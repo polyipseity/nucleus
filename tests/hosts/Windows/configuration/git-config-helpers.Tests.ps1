@@ -3,8 +3,9 @@
     Pester coverage for the backup/restore helpers in Sync-GitAndSshConfig.ps1.
 .DESCRIPTION
     Unit-tests Save-RegularFileBackup and Restore-FileBackup on temp paths:
-    the enable-side convergence (regular file moved to a same-folder .bak,
-    symlink untouched) and the disable-side lossless restore (symlink removed,
+    the enable-side backup-once semantics (regular file moved to a same-folder
+    .bak on first replacement; a stale .bak is never overwritten; symlink
+    untouched) and the disable-side lossless restore (symlink removed,
     .bak restored when present, nothing left when absent, unmanaged regular
     file left alone).
 .NOTES
@@ -51,6 +52,19 @@ Describe 'Sync-GitAndSshConfig backup/restore helpers' {
             $backup = "$target.bak"
             Save-RegularFileBackup -Path $target -BackupPath $backup
             Test-Path -Path $backup | Should -Be $false
+        }
+
+        It 'does not overwrite a stale .bak (backup-once)' {
+            $target = Join-Path $script:testDir 'stale-bak'
+            $backup = "$target.bak"
+            Set-Content -Path $target -Value 'newer installer copy' -NoNewline
+            Set-Content -Path $backup -Value 'first original' -NoNewline
+            Save-RegularFileBackup -Path $target -BackupPath $backup
+            # First original wins: the stale .bak is preserved and the newer
+            # copy stays for the symlink to replace (-Force, ln -sf parity).
+            Test-Path -Path $target | Should -Be $true
+            Get-Content -Path $target -Raw | Should -Be 'newer installer copy'
+            Get-Content -Path $backup -Raw | Should -Be 'first original'
         }
     }
 

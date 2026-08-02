@@ -332,7 +332,7 @@ function Sync-GitAndSshConfig {
 }
 
 # Backup/restore of unmanaged originals displaced by managed symlinks.  Extracted
-# from Sync-GitAndSshConfig so the convergence (newest original wins) and
+# from Sync-GitAndSshConfig so the backup-once (first original wins) and
 # lossless-restore semantics are unit-testable; see
 # tests/hosts/Windows/configuration/git-config-helpers.Tests.ps1.
 
@@ -341,10 +341,11 @@ function Save-RegularFileBackup {
   .SYNOPSIS
     Moves a regular file at $Path to $BackupPath before a managed symlink replaces it.
   .DESCRIPTION
-    When a regular file (installer-owned original, user file, or a newer
-    converged copy) occupies $Path, it is moved to $BackupPath so disabling can
-    restore it.  A stale backup is overwritten -- the newest original wins
-    (convergence).  A symlink at $Path is managed state and is left untouched.
+    When a regular file occupies $Path and no backup exists yet, it is moved to
+    $BackupPath so disabling can restore it (backup-once: the first original
+    wins; a stale .bak is never overwritten and the current file stays for the
+    symlink to replace, matching POSIX `ln -sf`).  A symlink at $Path is
+    managed state and is left untouched.
   #>
   param(
     [Parameter(Mandatory = $true)]
@@ -354,9 +355,9 @@ function Save-RegularFileBackup {
   )
   if (Test-Path -Path $Path -PathType Leaf) {
     $isSymlink = [bool]((Get-Item -Path $Path -Force).Attributes -band [System.IO.FileAttributes]::ReparsePoint)
-    # check-suppress:suppression_doc: a stale .bak is overwritten so the newest original wins (convergence); a symlink is managed state, nothing to back up.
-    if (-not $isSymlink) {
-      Move-Item -Path $Path -Destination $BackupPath -Force
+    # check-suppress:suppression_doc: backup-once mirrors POSIX -- a stale .bak is preserved (first original wins) and the current file stays for the symlink to replace (ln -sf parity); a symlink is managed state, nothing to back up.
+    if (-not $isSymlink -and -not (Test-Path -Path $BackupPath)) {
+      Move-Item -Path $Path -Destination $BackupPath
     }
   }
 }
