@@ -245,3 +245,53 @@ function Deploy-Merge {
     }
   }
 }
+
+function Resolve-UserConfigSource {
+  <#
+  .SYNOPSIS
+    Resolves the per-user overlay source file for a config, mirroring
+    src/modules/lib/users-overlay.nix on POSIX.
+
+  .DESCRIPTION
+    Looks up src/users/<User>/<ConfigName>/<HostName>.<Extension> under the repo,
+    falling back to src/users/default/<ConfigName>/<HostName>.<Extension>. The
+    per-user file wins when it exists; throws when neither exists (fail-fast, no
+    silent fallback).
+  .PARAMETER User
+    Username from the user registry (src/hosts/Windows/users.json).
+  .PARAMETER ConfigName
+    Config directory name under src/users/.
+  .PARAMETER Extension
+    File extension without leading dot, e.g. "gitconfig" or "toml".
+  .PARAMETER HostName
+    Host name, e.g. "Windows".
+  .PARAMETER RepoRoot
+    Absolute path to the repository root ($env:NUCLEUS_REPO_ROOT).
+  .EXAMPLE
+    Resolve-UserConfigSource -User "polyipseity" -ConfigName "git" -Extension "gitconfig" -HostName "Windows" -RepoRoot $env:NUCLEUS_REPO_ROOT
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$User,
+
+    [Parameter(Mandatory)]
+    [string]$ConfigName,
+
+    [Parameter(Mandatory)]
+    [string]$Extension,
+
+    [Parameter(Mandatory)]
+    [string]$HostName,
+
+    [Parameter(Mandatory)]
+    [string]$RepoRoot
+  )
+
+  $perUser = Join-Path -Path $RepoRoot -ChildPath "src\users\$User\$ConfigName\$HostName.$Extension"
+  $default = Join-Path -Path $RepoRoot -ChildPath "src\users\default\$ConfigName\$HostName.$Extension"
+  if (Test-Path -Path $perUser -PathType Leaf) { return $perUser }
+  if (Test-Path -Path $default -PathType Leaf) { return $default }
+  throw "Resolve-UserConfigSource: no source found for user '$User', config '$ConfigName', extension '$Extension' (tried '$perUser' and '$default')"
+}

@@ -56,6 +56,6 @@ function Sync-DirenvConfig {
     New-Item -Path $destDir -ItemType Directory -Force > $null
   }
 
-  Deploy-WritableSymlink -SourcePath $sourcePath -DestinationPath $destPath
+  Deploy-WritableSymlink -Name "direnv" -RepoRoot $repoRoot -RepoRelPath $configRelPath -TargetPath $destPath
   Write-Output "$($PSStyle.Foreground.Cyan)Sync-DirenvConfig: deployed symlink $destPath -> $sourcePath$($PSStyle.Reset)"
 }

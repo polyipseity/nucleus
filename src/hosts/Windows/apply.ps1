@@ -369,6 +369,9 @@ if (-not $Elevated) {
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ManagedPaths.ps1")
 
 # Root utilities: shared helpers with no single domain affinity.
+# Config deployment helpers (Deploy-WritableSymlink, Resolve-UserConfigSource):
+# must load before any Sync-* module that deploys managed configs.
+. (Join-Path -Path $resolvedModuleDir -ChildPath "ConfigHelpers.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Load-UserRegistry.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-LogManagement.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Resolve-Executable.ps1")
