@@ -243,6 +243,28 @@ Describe "Windows Package Installation" {
 
 ---
 
+## Test script gotchas
+
+Learned from authoring `tests/scripts/` check-step tests; applies to test scripts, not production code.
+
+- **Assert-Pass style, not Pester**: functional tests under `tests/scripts/check-steps/` (e.g. `17-suppression-audit-tests.ps1`) are plain `pwsh -NoProfile -File` scripts with explicit PASS/FAIL output — `Invoke-Pester` discovers 0 tests in them. Run them directly and check the exit code; they are wired into `05-framework-verification.ps1`.
+- **PowerShell gotchas**:
+  - `exit` inside a function/script is NOT catchable by `try/catch` — `ExitException` propagates and kills the script. Tests of exit-based rejection must spawn a subprocess (`pwsh -NoProfile -Command $scriptText`) and check `$LASTEXITCODE` plus output.
+  - `Write-ErrorMessage`/`Write-Message` are defined by `test-lib.ps1`, not `step-runner.ps1`. Tests asserting these are UNDEFINED (`CommandNotFoundException` catch) pass standalone but FAIL in-suite because test-lib defines them — and the test's `exit 1` really runs.
+  - `& script.ps1` does NOT set `$LASTEXITCODE` (only native commands do); reading it before any native command throws under StrictMode.
+  - Explicit-skip test files reading `$script:failed` must initialize it (`$script:failed = $false`) after the `$testFile = ...` line or they crash under StrictMode when sourced in-suite.
+  - `test.ps1` fail-fast kills the process before any summary — zero stdout. Use `--no-fail-fast` when debugging.
+- **Comment content in test files**:
+  - Comments in test `.sh` files must NEVER contain `__TOKEN__`-delimited names — step 20 (`20-activation-token-placeholder`) greps `^\s*#.*__[A-Z][A-Z_]*__` and in scoped mode scans staged files including `tests/`. Refer to them as "double-underscore tokens" or `start-<VM_NAME>.sh` style.
+  - Never put both fragments of a same-line step regex in one comment — step 21's `Assert-ToolAvailable`/`-InstallCommand` regex is SAME-LINE, so a comment containing both fragments on one line fails the prek scoped hook.
+- **Test script mechanics**:
+  - `.sh` test scripts with shebangs MUST be executable (`chmod +x`; pre-commit hook `check-shebang-scripts-are-executable`); `.ps1` test files stay `644`.
+  - `test-lib.sh`/`check-lib.sh`/`step-runner.sh` derive `REPO_ROOT` themselves — do NOT add `REPO_ROOT="$REPO_ROOT"` env-prefixes or `# shellcheck disable=SC2030,SC2031` self-assignment pairs. `bash -c` children in tests use parent-spliced paths only (e.g. `. "'"$REPO_ROOT"'/src/scripts/lib/step-runner.sh"`).
+  - `cache_file_lists()` in `step-runner.sh` fills arrays with `readarray -t`; test stubs must initialize `CACHED_*_FILES=()` first (SC2178).
+- **`test.sh` output buffering**: `test.sh` buffers ALL output until completion — the log stays 0 bytes for ~15 minutes. Run it in an async terminal and poll with `pgrep`; do not assume failure from an empty log.
+
+---
+
 ## CI Integration
 
 Tests run automatically on push, pull request, and manual dispatch. CI runs `nix flake check`, Nix unit tests, PowerShell syntax check, and shell script check. Windows-specific tests not run in CI (uses Linux runners); run locally before commit.
