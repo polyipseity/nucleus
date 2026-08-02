@@ -62,7 +62,7 @@ function Sync-DiscordMusicRPC {
   # check-suppress:suppression_doc: probe -- command may not be installed; $null check handles absence.
   $discordMusicRpcCmd = Get-Command -Name "discord-music-rpc" -ErrorAction SilentlyContinue
   if ($null -eq $discordMusicRpcCmd) {
-    Write-Output "discord-music-rpc: binary not found in PATH; install via 'uv tool install git+https://github.com/polyipseity/ext.discord-music-rpc'"
+    Write-Output "discord-music-rpc: binary not found in PATH; run nucleus-apply to converge the uv install (pinned via the uv section of src/lockfiles/lockfile.json — see Invoke-UvSetup)"
     return
   }
   $discordMusicRpcBin = $discordMusicRpcCmd.Source

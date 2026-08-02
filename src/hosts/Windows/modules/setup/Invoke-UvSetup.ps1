@@ -41,6 +41,9 @@ function Invoke-UvSetup {
   # package name (without extras).  Only add packages absent from WinGet,
   # Scoop, and cargo-binstall.
   $desiredPackages = @(
+    # Discord Music RPC: tray Rich Presence app for Discord.  Pinned to a VCS
+    # rev via the uv section of lockfile.json (see Invoke-UvSetup).
+    'discord-music-rpc'
     # PaddleOCR: cross-platform OCR with GPU auto-detection.
     # Managed via uv for version consistency across all hosts.
     'paddleocr'
