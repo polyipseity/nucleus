@@ -8,7 +8,7 @@ applyTo: "**"
 
 ## Core rule
 
-Validate every commit message with commitlint *before* calling `git commit`. Run:
+Validate every commit message with commitlint _before_ calling `git commit`. Run:
 
 ```bash
 echo "<message>" | bun x commitlint
@@ -29,7 +29,7 @@ ln -s "$PWD/.commitlintrc.mjs" "$tmpdir/.commitlintrc.mjs"
 echo "$message" | (cd "$tmpdir" && bun run commitlint)
 ```
 
-Copy whichever lockfile exists (`bun.lock`, `package-lock.json`, or `yarn.lock`). If the repo has no manifest at all, write a minimal `package.json` into the temp dir instead (devDependencies `@commitlint/cli` + `@commitlint/config-conventional`) so the install still works. The commitlint config must live inside the temp dir: auto-discovery is cwd-based, and `extends` resolves relative to the config file's location, not the cwd. Use `bun run commitlint` — the repo may have no `node` binary. The `trap` guarantees cleanup; the repo is never touched (no `node_modules/`, no `package.json`/lockfile edits).
+Copy whichever lockfile exists (`bun.lock`, `package-lock.json`, or `yarn.lock`). If the repo has no manifest at all, replace the `cp` line with a minimal `package.json` in the temp dir (devDependencies `@commitlint/cli` + `@commitlint/config-conventional`) so the install still works — `--frozen-lockfile` is safe here because bun generates a lockfile when none is copied. The commitlint config must live inside the temp dir: auto-discovery is cwd-based, and `extends` resolves relative to the config file's location, not the cwd. Use `bun run commitlint` — the repo may have no `node` binary. The `trap` guarantees cleanup; the repo is never touched (no `node_modules/`, no `package.json`/lockfile edits).
 
 The structural check (`type(scope): subject`) is the LAST resort: only when `bun` is unavailable or the temp-dir install cannot complete (e.g. no network). The pre-commit hook will still enforce commitlint if configured.
 
@@ -47,7 +47,7 @@ If commitlint validation fails AND no conflicting convention is documented, fix 
 
 ### Config-extension resolution failure
 
-If `bun x commitlint` fails with `Cannot find module "@commitlint/config-conventional"` (or similar), the repository's commitlint config `extends` a package that `bun x`'s cache-based resolution cannot reach. Use the temp-dir install fallback above. `--default-config` is NOT a workaround: bun's global cache cannot resolve `conventional-changelog-conventionalcommits` from the transpiled `noop.js` either (verified in nucleus). The repository's real commit-msg hook enforces the actual config with its own dependency setup.
+If `bun x commitlint` fails with `Cannot find package 'conventional-changelog-conventionalcommits'` (resolved from the config's transpiled `noop.js`), the repository's commitlint config `extends` a package that `bun x`'s cache-based resolution cannot reach. Use the temp-dir install fallback above. `--default-config` is NOT a workaround: bun's global cache cannot resolve `conventional-changelog-conventionalcommits` from the transpiled `noop.js` either (verified in nucleus). The repository's real commit-msg hook enforces the actual config with its own dependency setup.
 
 If commitlint is present and configured but fails unexpectedly (tool error, not lint error), report the failure — do not proceed with the commit. This follows the no-fallbacks principle.
 
