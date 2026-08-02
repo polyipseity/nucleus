@@ -71,3 +71,7 @@ Rules:
 4. When a host does not deploy the application at all (e.g., no direnv on a host), document as N/A per the cross-host parity policy.
 
 Example: `src/modules/configs/direnv/lib/apple-sdk-override.sh` — a macOS-specific `_nix()` override auto-sourced by direnv. Deployed on POSIX hosts via the shared `shell.nix`; Windows deploys only the base `direnvrc`.
+
+### User-scoped configs
+
+User-scoped configs live in `src/users/<username>/<config>/` (per-user) with `src/users/default/<config>/` as defaults-fallback; only `git/` is migrated so far. These paths are OUTSIDE the step-19 config-method-compliance scan (`src/modules/configs/**` only) — no `# check-suppress:config-method` annotations are required for `src/users/**` reference sites, but the same method-1 writable-symlink rule still applies.

@@ -5,6 +5,7 @@
 - Root `AGENTS.md` is the workspace-wide source of truth. Do not add `.github/copilot-instructions.md`.
 - `src/` contains the Nix-based declarative configuration: `flake.nix`, `hosts/` (per-machine configs), and `modules/` (shared logic).
   - `src/flake.lock` is the Nix-mandated lockfile location — Nix requires `flake.lock` adjacent to `flake.nix`. The canonical lockfile storage is under `src/lockfiles/` but `flake.lock` cannot be moved there due to this Nix limitation. It is not duplicated; the `src/lockfiles/` directory holds all other lockfiles (`lockfile.json`, etc.) alongside a symlinked copy of `flake.lock` for organizational consistency.
+- `src/users/` contains per-user configuration overlays: `src/users/<username>/<config>/…` per user, with `src/users/default/` providing fallback defaults applied when a user's own file does not exist. Currently only `git/` configs live here; other configs follow later.
 - Use single-file modules only in `src/modules/`. Do not create `src/modules/<name>/` directories. The only allowed exceptions are `src/modules/macos/` (daemon-refresh.nix, finder-sidebar.nix, preference-gc.nix) and `src/modules/env/` (centralized env var introspection module).
 - `scripts/` contains user-facing automation helpers with paired `.sh`/`.ps1` entry points: bootstrap, check, cloud-setup, gc, health-check, replica-sync, replica-reset, update, vm-setup, ai-sync, and others.
 - `src/scripts/` contains Nix-internal scripts organized into domain subdirectories:
@@ -108,6 +109,7 @@
 
 - Prefer declarative state (`src/modules/*.nix`, WinGet DSC YAML) over imperative scripts.
 - Config deployment follows priority-ordered methods defined in `.agents/instructions/app-config-policy.instructions.md`: writable symlink (default) > read-only > merge > runtime direct read. Any deviation from the default must have a code comment explaining why.
+- Git scope terminology is canonical: "global" means machine-wide (`git --system`), "user" means per-user (`git --global`). Never use "global" for `--global`. See `.agents/instructions/git-scope-terminology.instructions.md`.
 - Keep POSIX shared behavior in shared modules, not duplicated per-host.
 - Centralize all daemon and service restarts per OS and restart each daemon at most once per activation run. macOS daemon refreshes go in `src/modules/macos/daemon-refresh.nix`; Windows SCM operations go in `src/hosts/Windows/modules/Set-NucleusService.ps1`; cross-platform shell helpers go in `src/scripts/lib.sh`.
 - Design for cross-host parity first; see `.agents/instructions/cross-host-feature-parity.instructions.md` for the full policy.
