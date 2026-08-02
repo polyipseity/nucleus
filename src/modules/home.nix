@@ -60,6 +60,7 @@ let
 
   managedAppSettings = appName: defaults: defaults // (userAppSettings appName);
 
+  # check-suppress:config-method: method 3 (merge) -- qtpass.nix returns declarative merged settings applied via platform-native stores (macOS defaults, Linux INI); imported module, not a deployed file
   qtpassModule = import ./configs/qtpass/qtpass.nix {
     inherit
       config
