@@ -12,15 +12,19 @@ let
   # overlay directory, falling back to the shared defaults below.
   effectiveUsername = if managedUsername != null then managedUsername else username;
 
-  # Defaults-fallback selection (per-user dir wins, else default/git/), matching
-  # the src/users/<username>/ → src/users/default/ convention in AGENTS.md.
+  # Defaults-fallback selection (per-user dir wins, else default/<config>/),
+  # matching the src/users/<username>/ → src/users/default/ convention in
+  # AGENTS.md.  Delegates to the generic overlay selector so future configs
+  # reuse the same mechanism.
+  selectUserOverlayFile = import ./lib/users-overlay.nix;
+
   selectUserGitFile =
     ext:
-    let
-      perUser = "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/users/${effectiveUsername}/git/${hostName}.${ext}";
-      default = "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/users/default/git/${hostName}.${ext}";
-    in
-    if builtins.pathExists perUser then perUser else default;
+    selectUserOverlayFile {
+      configName = "git";
+      inherit ext hostName effectiveUsername;
+      repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+    };
 in
 {
   # User-scope gitconfig (~/.gitconfig) as a writable symlink to the selected

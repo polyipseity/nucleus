@@ -4,6 +4,7 @@ let
   inherit (import ../lib.nix) containsRegex;
 
   posixGitText = builtins.readFile ../../src/modules/git.nix;
+  usersOverlayText = builtins.readFile ../../src/modules/lib/users-overlay.nix;
   # Phase 4: Windows settings moved out of Sync-GitAndSshConfig.ps1 into the
   # user-scope file (src/users/default/git/Windows.gitconfig, INI format) and
   # the global-scope file (src/modules/configs/git/Windows.gitconfig).
@@ -84,8 +85,11 @@ assert containsRegex "symlinks = true" macbookGlobalGitText;
 assert containsRegex "home\.file" posixGitText;
 assert containsRegex "mkOutOfStoreSymlink.*gitconfig" posixGitText;
 assert containsRegex "configFile\.\"git/ignore\"" posixGitText;
-assert containsRegex "builtins\.pathExists" posixGitText;
-assert containsRegex "src/users/default/git" posixGitText;
+assert containsRegex "selectUserOverlayFile" posixGitText;
+assert containsRegex "configName = \"git\"" posixGitText;
+# The generic overlay selector lives in src/modules/lib/users-overlay.nix.
+assert containsRegex "builtins\.pathExists" usersOverlayText;
+assert containsRegex "src/users/default" usersOverlayText;
 # The old global-ignore/assembly mechanism and programs.git settings are gone.
 assert !(containsRegex "ignore-global" posixGitText);
 assert !(containsRegex "assemble-gitignore" posixGitText);

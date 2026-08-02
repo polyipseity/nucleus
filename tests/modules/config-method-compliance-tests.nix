@@ -6,6 +6,7 @@ let
   defaultsText = builtins.readFile ../../src/hosts/MacBook/defaults.nix;
   editorsText = builtins.readFile ../../src/modules/editors.nix;
   gitText = builtins.readFile ../../src/modules/git.nix;
+  usersOverlayText = builtins.readFile ../../src/modules/lib/users-overlay.nix;
   homeText = builtins.readFile ../../src/modules/home.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
   posixBaseText = builtins.readFile ../../src/modules/posix-base.nix;
@@ -42,11 +43,13 @@ assert containsRegex "# check-suppress:config-method: method 4" agentsText;
 assert containsRegex "# check-suppress:config-method: method 1" nixosServicesText;
 # Verify key config files are referenced in their consumer files
 # Phase 3: git.nix wires the user-scope ~/.gitconfig and ~/.config/git/ignore to
-# src/users/<username>/git/ with a src/users/default/git/ defaults fallback; the
-# old ignore-global/assembly mechanism is gone.
+# src/users/<username>/git/ with a src/users/default/git/ defaults fallback via
+# the generic overlay selector (src/modules/lib/users-overlay.nix); the old
+# ignore-global/assembly mechanism is gone.
 assert containsRegex "\\.gitconfig" gitText;
 assert containsRegex "git/ignore" gitText;
-assert containsRegex "src/users/default/git/" gitText;
+assert containsRegex "configName = \"git\"" gitText;
+assert containsRegex "src/users/default" usersOverlayText;
 assert !(containsRegex "system\\.gitignore" gitText);
 assert !(containsRegex "ignore-global" gitText);
 # Phase 2: global gitconfig is per-host (${hostName}.gitconfig), no more system.gitconfig.
