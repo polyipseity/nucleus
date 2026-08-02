@@ -29,6 +29,7 @@ Hard rules:
 - The `reason:` keyword is eliminated everywhere except shellcheck's inner `# reason:` (tool-fixed, Category 2).
 - `method N` is lowercase; `Method` is not a proper noun.
 - `# WHY:` and `# TODO:` always carry a colon.
+- A trailing annotation swallows everything after it on the line (comment-to-EOF) — never put a closing `}` or other code after `# check-suppress:` on the same line. Use the multi-line form with the annotation on the immediately-PRECEDING line.
 
 ## Unified taxonomy
 
@@ -44,6 +45,8 @@ Hard rules:
 | `|| true` (shell) / `$null =` / `[void]` (ps1) | 11 sh sites + 92 ps1 discard sites | `suppression_doc` | annotate with `# check-suppress:suppression_doc: <reason>` (implemented) | step 17 `.sh` + `.ps1` twins flag bare `|| true` in production scripts (`tests/` exempt); `.ps1` also flags `$null =` / `[void]` |
 
 **Suppression semantics:** `|| true`, `$null =`, and `[void]` are suppression patterns (they silence exit codes or discard values). They are NOT rationale markers — justify them with `# check-suppress:suppression_doc:` on the same line, never with `# WHY:`.
+
+**Counting sites:** registry "Sites" counts are CODE-ONLY — exclude `.md` doc-prose matches. Count with `git grep -h 'check-suppress:<id>:' -- '*.ps1' '*.sh' '*.nix' '*.zsh' | wc -l`; dropping the extension pathspec includes markdown. Grep patterns containing a literal `$` MUST be single-quoted (e.g. `'\$null ='`).
 
 ### Category 2 — Tool-fixed (format dictated by the tool; ALL machine-parsed)
 
