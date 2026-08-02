@@ -79,13 +79,13 @@ Checks in both `scripts/check.sh` and `scripts/check.ps1` are classified into th
 - **Nix check-and-format (pre-commit hook)**: `check.sh` accepts `--format` to auto-fix Nix files (treefmt runs nixfmt-rfc-style for Nix formatting when invoked in-place). The flag is passed by `prek-hooks.py` when `args = ["--format"]` in `prek.toml`. `treefmtWrapper` is bundled in `mkCheckApp` runtimeInputs in `src/flake.nix`. No separate `format-nix` hook exists.
 - **deadnix in test files**: deadnix runs on all `.nix` files including tests — no excludes are configured. deadnix findings in test files are **not false positives**. Due to Nix's lazy evaluation, a `let` binding that is not syntactically referenced from the test's final return expression is genuinely never evaluated. If deadnix reports a binding as unused, the correct fix is to either remove it or force evaluation (see `deepSeq` pattern below). Do not suppress deadnix warnings or re-add `tests/**` excludes.
 
-  The canonical fix for test bindings that should be evaluated: wrap the test result in `builtins.seq (builtins.deepSeq { ... })` which forces deep evaluation of all attribute values:
+  The canonical fix for test bindings that should be evaluated: wrap the test result in `builtins.seq (builtins.deepSeq { ... } null)`. `builtins.deepSeq` is TWO-arg (`deepSeq a b` returns `b` after deep-forcing `a`); the one-arg form returns a partial lambda (WHNF), so `seq` skips forcing and every assertion is dead code while tests still report success. Known trap: many `tests/` files still use the one-arg form — fix them when touched:
 
   ```nix
   in
   builtins.seq (builtins.deepSeq {
     inherit test1 test2 test3;
-  }) {
+  } null) {
     success = true;
     message = "All checks passed";
   }

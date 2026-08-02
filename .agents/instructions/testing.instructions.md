@@ -130,16 +130,18 @@ These patterns have been learned from fixing real test failures:
 - **Template refactoring ripple**: When code refactors from inline Nix strings to external template files (`builtins.readFile`), tests that previously checked the Nix source file must be updated to read the template file instead. Every assertion that references the old inline source is a latent failure.
 - **Deadnix-reported unused bindings**: deadnix flags `let` bindings in test files that are never forced by the final return expression. These are **not false positives** — Nix is lazy, so bindings unreferenced from the expression tree are genuinely never evaluated. If deadnix flags a binding:
   - **Remove it** if it was leftover from an earlier version of the test.
-  - **Force evaluation** if the binding must be computed for correctness. The canonical pattern:
+  - **Force evaluation** if the binding must be computed for correctness. `builtins.deepSeq` takes TWO arguments — `deepSeq a b` returns `b` after deep-forcing `a`. The one-arg form (`builtins.seq (builtins.deepSeq { ... }) { ... }`) returns a partial lambda (WHNF), so `seq` never forces the assertions and the test silently reports success. The canonical pattern:
 
     ```nix
     in
     builtins.seq (builtins.deepSeq {
       inherit binding1 binding2;
-    }) {
+    } null) {
       success = true;
     }
     ```
+
+    or use `(builtins.deepSeq { inherit binding1 binding2; } { result = ...; })` directly as the return expression.
 
   - Do **not** suppress deadnix or exclude test files from analysis — dead code that is never evaluated cannot catch regressions.
 
