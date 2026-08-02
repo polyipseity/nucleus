@@ -6,11 +6,12 @@ Register-Step -Id "preflight-install-command-policy" -Number 21 -Name "Preflight
   $violations = @()
 
   # Find all .ps1 files
-  $ps1Files = if ($HasArgs) {
+  # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
+  $ps1Files = @(if ($HasArgs) {
     if ($script:PS1_FILES) { $script:PS1_FILES } else { @($PositionalArgs | Where-Object { $_ -like '*.ps1' }) }
   } else {
     @(Get-ChildItem -Recurse -Path $r -Include '*.ps1' | Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' } | ForEach-Object { $_.FullName } | Select-GitIgnored)  # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; gitignore filter applied on top
-  }
+  })
 
   if ($ps1Files.Count -gt 0) {
     # Exclude this check's own file: its source contains the literal pattern text.

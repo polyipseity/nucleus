@@ -6,11 +6,12 @@ Register-Step -Id "embedded-content-enforcement" -Number 22 -Name "Embedded cont
   $violations = @()
   $selfLeaf = Split-Path -Leaf $PSCommandPath
 
-  $ps1Files = if ($HasArgs) {
+  # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count checks below under StrictMode; the @() wrapper forces an array
+  $ps1Files = @(if ($HasArgs) {
     if ($script:PS1_FILES) { $script:PS1_FILES } else { @($PositionalArgs | Where-Object { $_ -like '*.ps1' }) }
   } else {
     @(Get-ChildItem -Recurse -Path $r -Include '*.ps1' | Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' } | ForEach-Object { $_.FullName } | Select-GitIgnored)  # ref: allow-and-deny-lists.instructions.md#C5 -- structural invariant; gitignore filter applied on top
-  }
+  })
 
   $writeCommands = @('Set-Content', 'Add-Content', 'Out-File', 'Tee-Object')
 
