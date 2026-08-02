@@ -128,6 +128,39 @@ if ($status -eq $false) {
   Assert-Fail -Name 'step19_annotation_gap_fails' -Reason 'annotation must be on the same or immediately preceding line of the reference'
 }
 
+# (4) host-parameterized config (${hostName}.gitconfig) with preceding annotation -> pass
+$fixture4 = Join-Path -Path $tmpDir -ChildPath 'case4'
+$cfgDir4 = Join-Path -Path $fixture4 -ChildPath 'src/modules/configs/git'
+New-Item -ItemType Directory -Path $cfgDir4 -Force > $null
+Set-Content -Path (Join-Path $cfgDir4 'MacBook.gitconfig') -Value '[core]`nsymlinks=true'
+$nixDir4 = Join-Path -Path $fixture4 -ChildPath 'src/modules'
+New-Item -ItemType Directory -Path $nixDir4 -Force > $null
+Set-Content -Path (Join-Path $nixDir4 'fake.nix') -Value @(
+  '# check-suppress:config-method: method 1 (writable symlink) -- fixture test'
+  'ln -sf "${NUCLEUS_REPO_ROOT}/src/modules/configs/git/${hostName}.gitconfig" /etc/gitconfig'
+)
+$status = Invoke-ScopedStep19 -FixtureRoot $fixture4
+if ($status -eq $true) {
+  Assert-Pass -Name 'step19_hostname_template_passes' -Reason 'host-parameterized config (${hostName}.gitconfig) with preceding annotation -> pass'
+} else {
+  Assert-Fail -Name 'step19_hostname_template_passes' -Reason 'host-parameterized reference with preceding annotation should pass'
+}
+
+# (5) host-parameterized config without annotation -> fail
+$fixture5 = Join-Path -Path $tmpDir -ChildPath 'case5'
+$cfgDir5 = Join-Path -Path $fixture5 -ChildPath 'src/modules/configs/git'
+New-Item -ItemType Directory -Path $cfgDir5 -Force > $null
+Set-Content -Path (Join-Path $cfgDir5 'NixOS.gitconfig') -Value '[core]`nsymlinks=true'
+$nixDir5 = Join-Path -Path $fixture5 -ChildPath 'src/modules'
+New-Item -ItemType Directory -Path $nixDir5 -Force > $null
+Set-Content -Path (Join-Path $nixDir5 'fake.nix') -Value 'ln -sf "${NUCLEUS_REPO_ROOT}/src/modules/configs/git/${hostName}.gitconfig" /etc/gitconfig'
+$status = Invoke-ScopedStep19 -FixtureRoot $fixture5
+if ($status -eq $false) {
+  Assert-Pass -Name 'step19_hostname_template_unannotated_fails' -Reason 'host-parameterized reference without annotation -> fail'
+} else {
+  Assert-Fail -Name 'step19_hostname_template_unannotated_fails' -Reason 'host-parameterized reference without annotation should fail'
+}
+
 Remove-Item -Path $tmpDir -Recurse -Force
 
 if ($script:failed) { exit 1 } else { exit 0 }

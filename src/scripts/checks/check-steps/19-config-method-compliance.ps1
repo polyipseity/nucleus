@@ -17,6 +17,9 @@ Register-Step -Id "config-method-compliance" -Number 19 -Name "Config method com
   $cfgSelectOutput = Select-String -Path $srcFiles -Pattern $cfgPatterns -SimpleMatch
   # Single-pass: collect all check-suppress:config-method lines for preceding-line checking
   $cfgMethodOutput = Select-String -Path $srcFiles -Pattern '# check-suppress:config-method'
+  # WHY: refs may use a ${hostName} template (e.g. git/${hostName}.gitconfig) that no
+  # raw basename substring-matches; gather those lines for per-file resolution below.
+  $cfgTemplateOutput = Select-String -Path $srcFiles -Pattern '${hostName}' -SimpleMatch
 
   $parallelJobs = [Environment]::ProcessorCount
 
@@ -38,6 +41,15 @@ Register-Step -Id "config-method-compliance" -Number 19 -Name "Config method com
     $refs = @($using:cfgSelectOutput | Where-Object { $_.Line -match [regex]::Escape($relPath) })
     if ($refs.Count -eq 0) {
       $refs = @($using:cfgSelectOutput | Where-Object { $_.Line -match [regex]::Escape($basename) })
+    }
+    if ($refs.Count -eq 0) {
+      # WHY: ${hostName}.gitconfig references every host's config (MacBook/NixOS/Windows.gitconfig);
+      # match template lines by the basename's extension suffix.
+      $dotIndex = $basename.IndexOf('.')
+      if ($dotIndex -gt 0) {
+        $templateSuffix = [regex]::Escape($basename.Substring($dotIndex))
+        $refs = @($using:cfgTemplateOutput | Where-Object { $_.Line -match ('\$\{hostName\}' + $templateSuffix) })
+      }
     }
 
     if ($refs.Count -eq 0) {

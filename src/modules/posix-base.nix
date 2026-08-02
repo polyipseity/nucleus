@@ -1,6 +1,7 @@
 # Shared system-layer defaults for POSIX hosts.
 {
   config,
+  hostName,
   lib,
   options,
   ...
@@ -54,18 +55,26 @@ in
     }
 
     (lib.optionalAttrs (!hasLaunchdDaemonsOption) {
-      # /etc/gitconfig is a writable symlink to the repo tree so local Git defaults
-      # can be adjusted in-place without rebuild. Activation script creates the
+      # /etc/gitconfig is a writable symlink to the per-host gitconfig in the repo
+      # tree so local Git defaults can be adjusted in-place without rebuild. A
+      # same-folder .bak preserves any system-owned original the first time a real
+      # file is replaced. Activation script creates the
       # check-suppress:config-method: method 1 (writable symlink) -- symlink; runs as root via nucleus-apply.
       system.activationScripts.gitconfig = lib.mkAfter ''
-        # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-        ln -sf "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/git/system.gitconfig" /etc/gitconfig
+        # check-suppress:config-method: method 1 (writable symlink) -- per-host file; repo changes take effect without rebuild.
+        if [ -f /etc/gitconfig ] && [ ! -L /etc/gitconfig ] && [ ! -e /etc/gitconfig.bak ]; then
+          mv /etc/gitconfig /etc/gitconfig.bak
+        fi
+        ln -sf "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/git/${hostName}.gitconfig" /etc/gitconfig
       '';
     })
     (lib.optionalAttrs hasLaunchdDaemonsOption {
       system.activationScripts.gitconfig.text = ''
-        # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-        ln -sf "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/git/system.gitconfig" /etc/gitconfig
+        # check-suppress:config-method: method 1 (writable symlink) -- per-host file; repo changes take effect without rebuild.
+        if [ -f /etc/gitconfig ] && [ ! -L /etc/gitconfig ] && [ ! -e /etc/gitconfig.bak ]; then
+          mv /etc/gitconfig /etc/gitconfig.bak
+        fi
+        ln -sf "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/git/${hostName}.gitconfig" /etc/gitconfig
       '';
     })
 

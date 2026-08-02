@@ -1,0 +1,18 @@
+# Managed global (system) Git config for Windows (see
+# .agents/instructions/git-scope-terminology.instructions.md). Symlinked as
+# <Git install>\etc\gitconfig by Sync-GitAndSshConfig.ps1; the installer-owned
+# original is backed up to etc\gitconfig.bak. Git for Windows installer shipped
+# defaults (credential.helper, http.sslBackend, core.fscache) are folded in here
+# so replacing the installer-owned file does not change behavior.
+[commit]
+    gpgsign = true
+[core]
+    autocrlf = false
+    fscache = true
+    symlinks = true
+[credential]
+    helper = manager
+[http]
+    sslBackend = schannel
+[tag]
+    gpgsign = true

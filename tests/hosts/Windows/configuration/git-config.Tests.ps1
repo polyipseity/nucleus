@@ -6,7 +6,7 @@
     retention, fast-forward pull, auto-setup remote, tag-follow) and cross-host
     Git parity defaults. Signing and symlink keys (commit.gpgsign,
     tag.gpgsign, core.symlinks) are asserted at system scope via the
-    system.gitconfig include; core.autocrlf and user.useConfigOnly stay
+    Windows.gitconfig symlink; core.autocrlf and user.useConfigOnly stay
     per-user.
 .NOTES
     Environment variables: USERPROFILE (resolved to locate .gitconfig)

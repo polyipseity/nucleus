@@ -1,0 +1,7 @@
+[commit]
+    gpgsign = true
+[core]
+    autocrlf = false
+    symlinks = true
+[tag]
+    gpgsign = true

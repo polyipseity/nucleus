@@ -52,6 +52,11 @@ in
 
   networking.hostName = "NixOS";
 
+  # WHY: posix-base.nix selects its per-host gitconfig via hostName; nixos-generators passes no specialArgs, so thread it here.
+  _module.args = {
+    hostName = "NixOS";
+  };
+
   # VirtioFS sharing is configured after first boot when the host actually
   # exposes a shared directory. Do not force virtio_fs into the initrd here:
   # current aarch64 guest kernels may not ship it as a standalone module, which

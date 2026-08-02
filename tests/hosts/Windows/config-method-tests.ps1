@@ -65,9 +65,9 @@ Describe "Windows config method documentation" {
             Test-ConfigMethodLabel -Content $moduleContent -Pattern 'system\.gitignore' | Should -Be $true
         }
 
-        It "Sync-GitAndSshConfig should have # check-suppress:config-method comment near system.gitconfig" {
+        It "Sync-GitAndSshConfig should have # check-suppress:config-method comment near Windows.gitconfig" {
             $moduleContent = Get-Content -Path (Join-Path $PSScriptRoot '..\..\..\src\hosts\Windows\modules\user\Sync-GitAndSshConfig.ps1') -Raw
-            Test-ConfigMethodLabel -Content $moduleContent -Pattern 'system\.gitconfig' | Should -Be $true
+            Test-ConfigMethodLabel -Content $moduleContent -Pattern 'Windows\.gitconfig' | Should -Be $true
         }
 
         It "Invoke-RustupSetup should have # check-suppress:config-method comment near cargo config" {

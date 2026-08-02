@@ -10,7 +10,7 @@
     Currently covers:
     - cargo/config.toml: deployed content must match repo file (jobs=4, sccache)
     - git/system.gitignore: deployed global ignore must match repo file
-    - git/system.gitconfig: Git system config must include the repo file
+    - git/Windows.gitconfig: Git system config must symlink to the repo file
     - pwsh/PSScriptAnalyzerSettings.psd1: deployed symlink must point to repo file
     - SSH config: deployed Host github.com block must have correct directives
 
@@ -120,17 +120,24 @@ Describe "SSH config content parity" {
 }
 
 Describe "Git system config content parity" {
-    Context "system.gitconfig include in git system scope" {
-        It "System config should include the repo system.gitconfig via include.path" {
+    Context "Windows.gitconfig symlink in Git system scope" {
+        It "Git install etc\gitconfig should symlink to the repo Windows.gitconfig" {
             # check-suppress:suppression_doc: probe -- git may not be installed; skip handles absence.
             $gitExecutable = Get-Command -Name 'git.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
             if ([string]::IsNullOrWhiteSpace($gitExecutable)) {
                 Set-ItResult -Skipped -Because "git not installed on this machine"
             }
             else {
-                $expectedInclude = (Join-Path $repoRoot 'src\modules\configs\git\system.gitconfig').Replace('\', '/')
-                $systemIncludes = @(& $gitExecutable config --system --get-all include.path)
-                $systemIncludes | Should -Contain $expectedInclude
+                $installRoot = (Get-ItemProperty -Path 'HKLM:\Software\GitForWindows' -Name 'InstallPath' -ErrorAction SilentlyContinue).InstallPath
+                $systemConfigPath = Join-Path $installRoot 'etc\gitconfig'
+                if (Test-Path -Path $systemConfigPath) {
+                    $item = Get-Item -Path $systemConfigPath -Force
+                    [bool]($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) | Should -BeTrue
+                    $item.Target | Should -Be (Join-Path $repoRoot 'src\modules\configs\git\Windows.gitconfig')
+                }
+                else {
+                    Set-ItResult -Skipped -Because "Git system config not yet deployed on this machine"
+                }
             }
         }
     }

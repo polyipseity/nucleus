@@ -89,12 +89,12 @@
 
       # home-manager.users attrset: each user gets home.nix; primary also gets sops-nix.
       mkHomeManagerUsers =
-        userModulesPath:
+        hostName: userModulesPath:
         builtins.mapAttrs (name: user: {
           imports = [
             {
               _module.args = {
-                inherit users;
+                inherit hostName users;
                 managedUser = user;
                 managedUsername = name;
               };
@@ -859,6 +859,7 @@
         # applied consistently to both system and embedded Home Manager evals.
         pkgs = pkgsMac;
         specialArgs = {
+          hostName = "MacBook";
           inherit username users;
           inherit
             homebrew-core
@@ -886,11 +887,12 @@
             # Install user packages into the user profile rather than /etc.
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
+              hostName = "MacBook";
               inherit nixpkgs username users;
               nucleusApps = nucleusAppsMac;
               vsCodeMarketplace = vsCodeMarketplaceMac;
             };
-            home-manager.users = mkHomeManagerUsers ./modules/home.nix;
+            home-manager.users = mkHomeManagerUsers "MacBook" ./modules/home.nix;
           }
         ];
       };
@@ -904,6 +906,7 @@
         # unfree policy used by the rest of the flake outputs.
         pkgs = pkgsLinux;
         specialArgs = {
+          hostName = "NixOS";
           inherit username users;
           nucleusApps = nucleusAppsLinux;
         };
@@ -920,11 +923,12 @@
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
+              hostName = "NixOS";
               inherit nixpkgs username users;
               nucleusApps = nucleusAppsLinux;
               vsCodeMarketplace = vsCodeMarketplaceLinux;
             };
-            home-manager.users = mkHomeManagerUsers ./modules/home.nix;
+            home-manager.users = mkHomeManagerUsers "NixOS" ./modules/home.nix;
           }
         ];
       };
@@ -1081,12 +1085,14 @@
       # -----------------------------------------------------------------------
       homeConfigurations.${username} = home-manager.lib.homeManagerConfiguration {
         extraSpecialArgs = {
+          hostName = "NixOS";
           inherit nixpkgs username users;
           vsCodeMarketplace = vsCodeMarketplaceLinux;
         };
         modules = [
           {
             _module.args = {
+              hostName = "NixOS";
               managedUsername = username;
               managedUser = users.${username};
             };

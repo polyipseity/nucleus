@@ -43,6 +43,9 @@ assert containsRegex "# check-suppress:config-method: method 1" nixosServicesTex
 # Verify key config files are referenced in their consumer files
 assert containsRegex "system\\.gitignore" gitText;
 assert containsRegex "src/modules/configs/git/system\\.gitignore" gitText;
+# Phase 2: global gitconfig is per-host (${hostName}.gitconfig), no more system.gitconfig.
+assert containsRegex "\\.gitconfig" posixBaseText;
+assert !(containsRegex "system\\.gitconfig" posixBaseText);
 assert containsRegex "wordlist\\.txt" defaultsText;
 assert containsRegex "camilladsp/configs" homeText;
 assert containsRegex "camillagui-backend/config" homeText;
