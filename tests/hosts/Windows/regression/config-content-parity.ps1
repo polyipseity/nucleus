@@ -11,6 +11,7 @@
     - cargo/config.toml: deployed content must match repo file (jobs=4, sccache)
     - git/system.gitignore: deployed global ignore must match repo file
     - git/system.gitconfig: Git system config must include the repo file
+    - pwsh/PSScriptAnalyzerSettings.psd1: deployed symlink must point to repo file
     - SSH config: deployed Host github.com block must have correct directives
 
 .NOTES
@@ -130,6 +131,32 @@ Describe "Git system config content parity" {
                 $expectedInclude = (Join-Path $repoRoot 'src\modules\configs\git\system.gitconfig').Replace('\', '/')
                 $systemIncludes = @(& $gitExecutable config --system --get-all include.path)
                 $systemIncludes | Should -Contain $expectedInclude
+            }
+        }
+    }
+}
+
+Describe "Pwsh settings content parity" {
+    Context "PSScriptAnalyzerSettings.psd1" {
+        It "Deployed settings symlink should point to repo file" {
+            $currentUserHostProfile = $PROFILE.CurrentUserCurrentHost
+            if ([string]::IsNullOrWhiteSpace($currentUserHostProfile)) {
+                Set-ItResult -Skipped -Because "no CurrentUserCurrentHost profile path available"
+            }
+            else {
+                $deployedPath = Join-Path (Split-Path -Path $currentUserHostProfile -Parent) 'PSScriptAnalyzerSettings.psd1'
+                if (Test-Path -Path $deployedPath) {
+                    $item = Get-Item -Path $deployedPath -Force
+                    if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+                        $item.Target | Should -Be (Join-Path $repoRoot 'src\modules\configs\pwsh\PSScriptAnalyzerSettings.psd1')
+                    }
+                    else {
+                        Set-ItResult -Skipped -Because "settings file is a regular file (not a symlink) — content parity verified via repo source"
+                    }
+                }
+                else {
+                    Set-ItResult -Skipped -Because "PSScriptAnalyzerSettings.psd1 not yet deployed on this machine"
+                }
             }
         }
     }

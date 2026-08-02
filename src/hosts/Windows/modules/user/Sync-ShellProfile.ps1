@@ -30,7 +30,12 @@ function Sync-ShellProfile {
         or when the managed default dev environment is active for repositories
         that do not ship direnv/Nix metadata
 
-    Cleanup behavior when disabled removes only the managed block.
+    Also converges (creates/removes) the provisioned PSScriptAnalyzerSettings
+    reference symlink next to the CurrentUserCurrentHost profile, mirroring
+    POSIX pwsh.nix deployment (method 1 writable symlink).
+
+    Cleanup behavior when disabled removes only the managed block and the
+    settings symlink.
 
   .PARAMETER Enabled
     Whether managed shell parity should be enforced. Mandatory: caller must
@@ -44,7 +49,8 @@ function Sync-ShellProfile {
     Sync-ShellProfile -Enabled:$false
 
   .NOTES
-    Environment variables: (none)
+    Environment variables: NUCLEUS_REPO_ROOT — must be set by caller (apply.ps1
+    exports it) when the settings symlink is enabled.
     Exit codes: 0 on success; non-zero on failure
   #>
   param(
@@ -147,6 +153,36 @@ function Sync-ShellProfile {
     }
     elseif (Test-Path -Path $profilePath) {
       Remove-Item -Path $profilePath -Force
+    }
+  }
+
+  # Provisioned PSScriptAnalyzerSettings reference copy (method 1 writable
+  # symlink), mirroring POSIX pwsh.nix deployment:
+  # home.file.".config/powershell/PSScriptAnalyzerSettings.psd1" ->
+  # src/modules/configs/pwsh/PSScriptAnalyzerSettings.psd1. PSSA does not
+  # auto-discover this path; it is a -Settings passthrough convenience.
+  $currentUserHostProfile = $PROFILE.CurrentUserCurrentHost
+  if (-not [string]::IsNullOrWhiteSpace($currentUserHostProfile)) {
+    $profileDirectory = Split-Path -Path $currentUserHostProfile -Parent
+    $settingsPath = Join-Path $profileDirectory 'PSScriptAnalyzerSettings.psd1'
+    # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild; mirrors pwsh.nix POSIX deployment.
+    $settingsSource = Join-Path $env:NUCLEUS_REPO_ROOT 'src\modules\configs\pwsh\PSScriptAnalyzerSettings.psd1'
+    if ($Enabled) {
+      if (-not (Test-Path -Path $settingsSource -PathType Leaf)) {
+        throw "Sync-ShellProfile: source settings file not found at $settingsSource"
+      }
+      if (-not (Test-Path -Path $profileDirectory -PathType Container)) {
+        New-Item -Path $profileDirectory -ItemType Directory -Force > $null
+      }
+      if (Test-Path -Path $settingsPath) {
+        Remove-Item -Path $settingsPath -Force
+      }
+      New-Item -Path $settingsPath -ItemType SymbolicLink -Target $settingsSource -Force > $null
+      Write-Output "$($PSStyle.Foreground.Cyan)Sync-ShellProfile: symlinked $settingsPath$($PSStyle.Reset)"
+    }
+    elseif (Test-Path -Path $settingsPath -PathType Leaf) {
+      Remove-Item -Path $settingsPath -Force
+      Write-Output "$($PSStyle.Foreground.Cyan)Sync-ShellProfile: removed $settingsPath$($PSStyle.Reset)"
     }
   }
 }
