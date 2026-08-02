@@ -10,6 +10,7 @@
     Currently covers:
     - cargo/config.toml: deployed content must match repo file (jobs=4, sccache)
     - git/system.gitignore: deployed global ignore must match repo file
+    - git/system.gitconfig: Git system config must include the repo file
     - SSH config: deployed Host github.com block must have correct directives
 
 .NOTES
@@ -112,6 +113,23 @@ Describe "SSH config content parity" {
             }
             else {
                 Set-ItResult -Skipped -Because "SSH config not yet deployed on this machine"
+            }
+        }
+    }
+}
+
+Describe "Git system config content parity" {
+    Context "system.gitconfig include in git system scope" {
+        It "System config should include the repo system.gitconfig via include.path" {
+            # check-suppress:suppression_doc: probe -- git may not be installed; skip handles absence.
+            $gitExecutable = Get-Command -Name 'git.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
+            if ([string]::IsNullOrWhiteSpace($gitExecutable)) {
+                Set-ItResult -Skipped -Because "git not installed on this machine"
+            }
+            else {
+                $expectedInclude = (Join-Path $repoRoot 'src\modules\configs\git\system.gitconfig').Replace('\', '/')
+                $systemIncludes = @(& $gitExecutable config --system --get-all include.path)
+                $systemIncludes | Should -Contain $expectedInclude
             }
         }
     }

@@ -3,9 +3,11 @@
     Pester coverage for the managed per-user Git baseline on Windows.
 .DESCRIPTION
     Validates managed fetch, pull and push defaults (branch pruning, tag
-    retention, fast-forward pull, auto-setup remote, tag-follow), cross-host
-    Git parity defaults (signed commits, signed tags, core.autocrlf,
-    core.symlinks, user.useConfigOnly).
+    retention, fast-forward pull, auto-setup remote, tag-follow) and cross-host
+    Git parity defaults. Signing and symlink keys (commit.gpgsign,
+    tag.gpgsign, core.symlinks) are asserted at system scope via the
+    system.gitconfig include; core.autocrlf and user.useConfigOnly stay
+    per-user.
 .NOTES
     Environment variables: USERPROFILE (resolved to locate .gitconfig)
     Exit codes: 0 on success; 1 on failure
@@ -46,21 +48,29 @@ Describe "Windows Git Configuration Parity" {
         }
     }
 
+    Context "System-scope cross-host Git parity defaults" {
+        It "Should enable signed commits at system scope" {
+            git config --system --get commit.gpgsign | Should -Be 'true'
+        }
+
+        It "Should enable signed tags at system scope" {
+            git config --system --get tag.gpgsign | Should -Be 'true'
+        }
+
+        It "Should keep symlink support enabled at system scope" {
+            git config --system --get core.symlinks | Should -Be 'true'
+        }
+
+        It "Should NOT duplicate signing/symlink defaults per-user" {
+            git config --file $script:gitConfigPath --get commit.gpgsign | Should -BeNullOrEmpty
+            git config --file $script:gitConfigPath --get tag.gpgsign | Should -BeNullOrEmpty
+            git config --file $script:gitConfigPath --get core.symlinks | Should -BeNullOrEmpty
+        }
+    }
+
     Context "Existing cross-host Git parity defaults" {
-        It "Should enable signed commits" {
-            git config --file $script:gitConfigPath --get commit.gpgsign | Should -Be 'true'
-        }
-
-        It "Should enable signed tags" {
-            git config --file $script:gitConfigPath --get tag.gpgsign | Should -Be 'true'
-        }
-
         It "Should keep core.autocrlf enabled on Windows" {
             git config --file $script:gitConfigPath --get core.autocrlf | Should -Be 'true'
-        }
-
-        It "Should keep symlink support enabled" {
-            git config --file $script:gitConfigPath --get core.symlinks | Should -Be 'true'
         }
 
         It "Should require explicit user identity config" {

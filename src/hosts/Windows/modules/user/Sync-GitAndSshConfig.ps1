@@ -6,21 +6,20 @@ function Sync-GitAndSshConfig {
   .DESCRIPTION
     Applies a managed Git baseline and an SSH host block for GitHub for every
     user in $Users:
-      - commit.gpgsign=true
-      - tag.gpgsign=true
-      - fetch.prune=true
-      - fetch.pruneTags=false
-      - pull.ff=true
-      - pull.rebase=false
-      - push.followTags=true
-      - gpg.format=openpgp
+      - system scope: shared system.gitconfig merged via include.path into Git's
+        system config (commit.gpgsign, tag.gpgsign, core.symlinks, core.autocrlf
+        = false; mirrors the POSIX /etc/gitconfig symlink)
+      - per-user: core.autocrlf=true (Windows override of system false),
+        fetch.prune=true, fetch.pruneTags=false, pull.ff=true, pull.rebase=false,
+        push.followTags=true, push.autoSetupRemote=true, gpg.format=openpgp,
+        init.defaultBranch, init.templateDir, core.excludesFile,
+        url.git@github.com:.insteadOf=https://github.com/, user.useConfigOnly
       - user.name / user.email / user.signingkey (from SOPS-managed identity)
-      - url.git@github.com:.insteadOf=https://github.com/
       - ~/.ssh/config managed block for Host github.com (per-user key path)
       - ssh-agent service startup set to Automatic (for session persistence)
 
-    When -Enabled:$false is passed, only the managed Git keys and SSH block are
-    removed. Unmanaged settings remain untouched.
+    When -Enabled:$false is passed, the system-scope include, managed Git keys
+    and SSH block are removed. Unmanaged settings remain untouched.
 
   .PARAMETER Enabled
     Whether managed Git/SSH parity should be enforced. False triggers cleanup.
@@ -261,11 +260,15 @@ function Sync-GitAndSshConfig {
       $effectiveIgnoreLines += Get-Content -Path $userIgnorePath -ErrorAction Stop
       [System.IO.File]::WriteAllLines($effectiveIgnorePath, $effectiveIgnoreLines, [System.Text.UTF8Encoding]::new($false))
 
+      # commit.gpgsign, tag.gpgsign and core.symlinks are NOT set here: they are
+      # provisioned machine-wide in Git's system scope via the system.gitconfig
+      # include (see the system-scope block after the user loop), mirroring the
+      # POSIX /etc/gitconfig symlink. core.autocrlf stays per-user: Windows
+      # normalises CRLF -> LF on commit, overriding the shared file's false (same
+      # rationale as src/modules/git.nix).
       $managedGitSettings = [ordered]@{
-        'commit.gpgsign' = 'true'
         'core.autocrlf' = 'true'
         'core.excludesFile' = $effectiveIgnorePath
-        'core.symlinks' = 'true'
         'fetch.prune' = 'true'
         'fetch.pruneTags' = 'false'
         'gpg.format' = 'openpgp'
@@ -275,7 +278,6 @@ function Sync-GitAndSshConfig {
         'pull.rebase' = 'false'
         'push.autoSetupRemote' = 'true'
         'push.followTags' = 'true'
-        'tag.gpgsign' = 'true'
         'url.git@github.com:.insteadOf' = 'https://github.com/'
         'user.useConfigOnly' = 'true'
       }
@@ -293,6 +295,12 @@ function Sync-GitAndSshConfig {
         }
       }
 
+      # The signing/symlink keys now live in Git's system scope; drop legacy
+      # per-user copies written by previous deployments so this file converges.
+      foreach ($legacyKey in 'commit.gpgsign', 'core.symlinks', 'tag.gpgsign') {
+        & $gitExecutable config --file $gitConfigPath --unset-all $legacyKey *> $null
+      }
+
       if (-not $hasCompleteIdentity) {
         Write-Warning "Applied managed Git signing defaults for user '$User' without user identity keys."
       }
@@ -301,6 +309,9 @@ function Sync-GitAndSshConfig {
       # check-suppress:suppression_doc: probe -- git may not be installed; condition handles absence.
       $gitExecutable = Get-Command -Name 'git.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
       if (-not [string]::IsNullOrWhiteSpace($gitExecutable)) {
+        # commit.gpgsign, core.symlinks and tag.gpgsign are unset here only to
+        # clean up legacy per-user copies from pre-system-include deployments;
+        # the live values are removed by removing the system-scope include.
         $managedGitSettings = [ordered]@{
           'commit.gpgsign' = 'true'
           'core.autocrlf' = 'true'
@@ -326,6 +337,38 @@ function Sync-GitAndSshConfig {
           & $gitExecutable config --file $gitConfigPath --unset-all $settingKey *> $null
         }
       }
+    }
+  }
+
+  # Machine-wide Git system-scope include: merge the shared system.gitconfig
+  # (commit/tag gpgsign, core symlinks/autocrlf) into Git's system config so
+  # signing defaults apply to every user, mirroring the POSIX /etc/gitconfig
+  # symlink (src/modules/posix-base.nix). Git for Windows >= 2.24 does not read
+  # %ProgramData%\Git\config (program_data_config removed upstream in PR #2358);
+  # <install>\etc\gitconfig is the only system config and is installer-owned,
+  # so its shipped defaults (credential.helper=manager, sslCAInfo, i18n) must
+  # survive -- an include.path merge, not a symlink replacement.
+  # check-suppress:suppression_doc: probe -- git may not be installed; condition handles absence.
+  $gitExecutable = Get-Command -Name 'git.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
+  if (-not [string]::IsNullOrWhiteSpace($gitExecutable)) {
+    # check-suppress:config-method: method 3 (merge) -- system.gitconfig merged into Git's system config via include.path; installer-owned <install>\etc\gitconfig keeps shipped defaults (credential.helper, sslCAInfo, i18n), mirrors posix-base.nix /etc/gitconfig
+    $systemGitConfigSource = (Join-Path $env:NUCLEUS_REPO_ROOT 'src\modules\configs\git\system.gitconfig').Replace('\', '/')
+    if (-not (Test-Path -Path $systemGitConfigSource -PathType Leaf)) {
+      throw "Sync-GitAndSshConfig: system.gitconfig source not found at $systemGitConfigSource"
+    }
+    # check-suppress:suppression_doc: git config --get-all exits 1 silently when no include.path is set.
+    $systemIncludes = @(& $gitExecutable config --system --get-all include.path 2>$null)
+    if ($Enabled) {
+      if ($systemIncludes -notcontains $systemGitConfigSource) {
+        & $gitExecutable config --system --add include.path $systemGitConfigSource
+        if ($LASTEXITCODE -ne 0) {
+          throw 'Failed to add system.gitconfig include to Git system config.'
+        }
+      }
+    }
+    elseif ($systemIncludes -contains $systemGitConfigSource) {
+      # Converge to absent while preserving any non-managed include.path entries.
+      & $gitExecutable config --system --unset-all include.path ([regex]::Escape($systemGitConfigSource)) *> $null
     }
   }
 
