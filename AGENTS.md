@@ -101,6 +101,7 @@
 
 - Tests are required for feature additions and breaking changes.
 - Detailed testing guidance lives in `.agents/instructions/testing.instructions.md`.
+- The step-runner framework contract for check/test pipelines lives in `.agents/instructions/step-runner.instructions.md`.
 
 ## Core Conventions
 
