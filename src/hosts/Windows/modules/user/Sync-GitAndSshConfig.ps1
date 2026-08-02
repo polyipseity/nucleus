@@ -7,7 +7,7 @@ function Sync-GitAndSshConfig {
     Applies a managed Git baseline and an SSH host block for GitHub for every
     user in $Users:
       - system scope: <Git install>\etc\gitconfig symlinked to the repo's
-        Windows.gitconfig (commit.gpgsign, tag.gpgsign, core.symlinks,
+        <Host>.gitconfig (commit.gpgsign, tag.gpgsign, core.symlinks,
         core.autocrlf=false plus the installer's shipped defaults; mirrors the
         POSIX /etc/gitconfig symlink), with a same-folder .bak backup of any
         installer-owned original and restore on disable
@@ -38,7 +38,8 @@ function Sync-GitAndSshConfig {
 
   .NOTES
     Environment variables: SystemDrive — used to resolve each user's profile
-      directory for per-user Git and SSH configuration.
+      directory for per-user Git and SSH configuration. NUCLEUS_HOST — the
+      canonical hostname ("Windows") that selects the per-host config files.
     Exit codes: 0 on success; non-zero on failure
   #>
   param(
@@ -48,6 +49,15 @@ function Sync-GitAndSshConfig {
     [Parameter(Mandatory = $true)]
     [string[]]$Users
   )
+
+  # Per-host config filenames (<Host>.gitconfig/.gitignore) mirror POSIX git.nix
+  # hostName threading; NUCLEUS_HOST is set by apply.ps1 and hard-fails here
+  # instead of guessing.
+  # WHY: no fallback -- a missing hostname would silently target the wrong repo file.
+  $hostName = $env:NUCLEUS_HOST
+  if ([string]::IsNullOrWhiteSpace($hostName)) {
+    throw 'Sync-GitAndSshConfig: NUCLEUS_HOST must be set (apply.ps1 sets it to the canonical hostname).'
+  }
 
   foreach ($User in $Users) {
     # Resolve the target profile path explicitly from the managed username.
@@ -60,12 +70,12 @@ function Sync-GitAndSshConfig {
     }
 
     $identityPath = Join-Path -Path $userHome -ChildPath ".config\nucleus\git-identity.env"
-    # check-suppress:config-method: method 1 (writable symlink) -- per-user .gitconfig symlinked to the repo's Windows.gitconfig, so git reads managed keys directly from the repo tree (mirrors POSIX git.nix user scope).
+    # check-suppress:config-method: method 1 (writable symlink) -- per-user .gitconfig symlinked to the repo's <Host>.gitconfig (derived from $env:NUCLEUS_HOST; mirrors POSIX git.nix user scope), so git reads managed keys directly from the repo tree.
     $userGitConfigPath = Join-Path -Path $userHome -ChildPath '.gitconfig'
     $userGitConfigDir = Join-Path -Path $userHome -ChildPath '.config\git'
-    # check-suppress:config-method: method 1 (writable symlink) -- per-user ignore file symlinked to the repo's Windows.gitignore (git has no global-scoped ignore; core.excludesFile at user scope is the only mechanism).
+    # check-suppress:config-method: method 1 (writable symlink) -- per-user ignore file symlinked to the repo's <Host>.gitignore (git has no global-scoped ignore; core.excludesFile at user scope is the only mechanism).
     $userIgnorePath = Join-Path -Path $userGitConfigDir -ChildPath 'ignore'
-    # Identity include file referenced by [include] path in Windows.gitconfig;
+    # Identity include file referenced by [include] path in <Host>.gitconfig;
     # writable by this provisioner without touching the symlinked config.
     $identityConfigPath = Join-Path -Path $userGitConfigDir -ChildPath 'identity'
     $identityKv = @{}
@@ -221,13 +231,13 @@ function Sync-GitAndSshConfig {
       }
 
       # User-scope Git config and ignore are method-1 writable symlinks into the
-      # repo tree (src/users/default/git/Windows.gitconfig + Windows.gitignore),
+      # repo tree (src/users/default/git/<Host>.gitconfig + <Host>.gitignore),
       # mirroring POSIX git.nix.  A regular file found at the target is moved to
       # a same-folder .bak before symlinking so disabling can restore it; a
       # pre-existing symlink is simply replaced.
-      $gitConfigSource = Join-Path $env:NUCLEUS_REPO_ROOT 'src\users\default\git\Windows.gitconfig'
+      $gitConfigSource = Join-Path $env:NUCLEUS_REPO_ROOT "src\users\default\git\$hostName.gitconfig"
       if (-not (Test-Path -Path $gitConfigSource -PathType Leaf)) {
-        throw "Sync-GitAndSshConfig: Windows.gitconfig source not found at $gitConfigSource"
+        throw "Sync-GitAndSshConfig: $hostName.gitconfig source not found at $gitConfigSource"
       }
       if (-not (Test-Path -Path $userGitConfigDir)) {
         New-Item -ItemType Directory -Path $userGitConfigDir -Force > $null
@@ -235,9 +245,9 @@ function Sync-GitAndSshConfig {
       Save-RegularFileBackup -Path $userGitConfigPath -BackupPath "$userGitConfigPath.bak"
       New-Item -ItemType SymbolicLink -Path $userGitConfigPath -Target $gitConfigSource -Force > $null
 
-      $ignoreSource = Join-Path $env:NUCLEUS_REPO_ROOT 'src\users\default\git\Windows.gitignore'
+      $ignoreSource = Join-Path $env:NUCLEUS_REPO_ROOT "src\users\default\git\$hostName.gitignore"
       if (-not (Test-Path -Path $ignoreSource -PathType Leaf)) {
-        throw "Sync-GitAndSshConfig: Windows.gitignore source not found at $ignoreSource"
+        throw "Sync-GitAndSshConfig: $hostName.gitignore source not found at $ignoreSource"
       }
       Save-RegularFileBackup -Path $userIgnorePath -BackupPath "$userIgnorePath.bak"
       New-Item -ItemType SymbolicLink -Path $userIgnorePath -Target $ignoreSource -Force > $null
@@ -252,7 +262,7 @@ function Sync-GitAndSshConfig {
 
       # Remove legacy layering artifacts from pre-symlink deployments: the
       # machine-scoped ProgramData ignore-global and the per-profile ignore-user
-      # overlay are superseded by the single symlinked Windows.gitignore.
+      # overlay are superseded by the single symlinked <Host>.gitignore.
       foreach ($legacyIgnore in @((Join-Path $env:ProgramData 'nucleus\git\ignore-global'), (Join-Path $userGitConfigDir 'ignore-user'))) {
         if (Test-Path -Path $legacyIgnore) {
           Remove-Item -Path $legacyIgnore -Force
@@ -260,7 +270,7 @@ function Sync-GitAndSshConfig {
       }
 
       # Per-user identity lives in the include file referenced by [include] path
-      # in Windows.gitconfig; the symlinked .gitconfig is never written.  The
+      # in <Host>.gitconfig; the symlinked .gitconfig is never written.  The
       # include file is also writable when the config itself is read-only.
       if ($hasCompleteIdentity) {
         foreach ($identitySetting in @('user.name', 'user.email', 'user.signingkey')) {
@@ -288,10 +298,10 @@ function Sync-GitAndSshConfig {
   }
 
   # Machine-wide Git system scope: symlink <install>\etc\gitconfig to the repo's
-  # Windows.gitconfig (commit/tag gpgsign, core symlinks/autocrlf), mirroring the
+  # <Host>.gitconfig (commit/tag gpgsign, core symlinks/autocrlf), mirroring the
   # POSIX /etc/gitconfig symlink (src/modules/posix-base.nix). Git for Windows
   # >= 2.24 does not read %ProgramData%\Git\config; <install>\etc\gitconfig is
-  # the only system config and is installer-owned, so Windows.gitconfig folds in
+  # the only system config and is installer-owned, so <Host>.gitconfig folds in
   # the installer's shipped defaults (credential.helper, http.sslBackend,
   # core.fscache) and the original file is backed up in the same folder
   # (etc\gitconfig.bak) so disabling restores it.
@@ -301,12 +311,12 @@ function Sync-GitAndSshConfig {
     $installRoot = Split-Path -Path (Split-Path -Path $gitExecutable -Parent) -Parent
     $systemConfigPath = Join-Path -Path $installRoot -ChildPath 'etc\gitconfig'
     $systemConfigBackup = "$systemConfigPath.bak"
-    $managedSource = (Join-Path $env:NUCLEUS_REPO_ROOT 'src\modules\configs\git\Windows.gitconfig').Replace('\', '/')
+    $managedSource = (Join-Path $env:NUCLEUS_REPO_ROOT "src\modules\configs\git\$hostName.gitconfig").Replace('\', '/')
     # check-suppress:suppression_doc: repo checkout may lack the file; fail loudly instead of silently skipping.
     if (-not (Test-Path -Path $managedSource -PathType Leaf)) {
-      throw "Sync-GitAndSshConfig: Windows.gitconfig source not found at $managedSource"
+      throw "Sync-GitAndSshConfig: $hostName.gitconfig source not found at $managedSource"
     }
-    # check-suppress:config-method: method 1 (writable symlink) -- per-host Windows.gitconfig symlinked into Git's system scope; installer-owned original backed up to etc\gitconfig.bak
+    # check-suppress:config-method: method 1 (writable symlink) -- per-host <Host>.gitconfig symlinked into Git's system scope; installer-owned original backed up to etc\gitconfig.bak
     if ($Enabled) {
       Save-RegularFileBackup -Path $systemConfigPath -BackupPath $systemConfigBackup
       New-Item -ItemType SymbolicLink -Path $systemConfigPath -Target $managedSource -Force > $null
