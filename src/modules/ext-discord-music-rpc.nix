@@ -37,8 +37,8 @@ let
     src = pkgs.fetchFromGitHub {
       owner = "polyipseity";
       repo = "ext.discord-music-rpc";
-      rev = "9a44dcd0e912e42fe029eb319153a89029f8ab18";
-      hash = "sha256-iLtXeDny+sbKY4PCO7zCp2LNu5ka936D5BnxYdc9J1w=";
+      rev = "bba71027a684db53f3fcde5adbd3d42627241a83";
+      hash = "sha256-JfXCCrlb6kfEgjQ22YaOYaevnyb6PCpFHcF3NEp30mg=";
     };
 
     format = "pyproject";
@@ -64,7 +64,7 @@ let
     # propagatedBuildInputs above.
     postPatch = ''
       substituteInPlace pyproject.toml \
-        --replace 'pypresence @ git+https://github.com/polyipseity/ext.pypresence.git@e941a582d0aa920d5e51301fbc9744d6ab4a9603' \
+        --replace 'pypresence @ git+https://github.com/f0e/pypresence.git@66f43b724c8b9df9a34c96c90cee113b23d5a301' \
                   'pypresence'
     '';
 
@@ -76,8 +76,9 @@ in
     {
       home.packages = [ discord-music-rpc ];
 
-      # The app writes back to the repo file on startup; this is acceptable
-      # since the config is managed in and versioned by the repo.
+      # The app only writes the config file when the schema needs migration
+      # (diff-driven, stat-cached) and tolerates read-only targets, so a
+      # writable symlink is safe: repo-managed settings are preserved.
       # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
       home.file.".config/discord-music-rpc/config.yaml".source =
         config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/discord-music-rpc/config.yaml";
