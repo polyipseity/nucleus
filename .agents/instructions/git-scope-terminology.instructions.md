@@ -8,10 +8,10 @@ This file is the single source of truth for git configuration and gitignore nami
 
 ## 1. Scope terminology (THE canonical convention — never use these words loosely)
 
-| Term | git flag | Location (POSIX) | Location (Windows) | Meaning |
-| --- | --- | --- | --- | --- |
-| **global** | `--system` | `/etc/gitconfig` | `<Git install>\etc\gitconfig` (e.g. `C:\Program Files\Git\etc\gitconfig`) | Machine-wide, all users of the host. The word "global" in this repo ALWAYS means git's `--system` scope. It is the SAME thing as "system". |
-| **user** | `--global` | `~/.gitconfig` (or `$XDG_CONFIG_HOME/git/config`) | `%USERPROFILE%\.gitconfig` | Per-user, one user's identity/preferences. |
+| Term       | git flag   | Location (POSIX)                                  | Location (Windows)                                                        | Meaning                                                                                                                                    |
+| ---------- | ---------- | ------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **global** | `--system` | `/etc/gitconfig`                                  | `<Git install>\etc\gitconfig` (e.g. `C:\Program Files\Git\etc\gitconfig`) | Machine-wide, all users of the host. The word "global" in this repo ALWAYS means git's `--system` scope. It is the SAME thing as "system". |
+| **user**   | `--global` | `~/.gitconfig` (or `$XDG_CONFIG_HOME/git/config`) | `%USERPROFILE%\.gitconfig`                                                | Per-user, one user's identity/preferences.                                                                                                 |
 
 Rules:
 
