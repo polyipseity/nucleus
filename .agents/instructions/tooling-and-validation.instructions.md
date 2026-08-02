@@ -54,12 +54,12 @@ Choose the right vehicle:
 
 ### Check script structure
 
-- Both `scripts/check.sh` (POSIX) and `scripts/check.ps1` (Windows) follow the same 5-group structure in their header comments:
+- Both `scripts/check.sh` (POSIX) and `scripts/check.ps1` (Windows) organize check steps into five groups. Step numbers follow the `src/scripts/checks/check-steps/<nn>-*.sh|.ps1` file names — that file list is the source of truth:
   - **Toolchain checks** (1-3): Shell script formatting/linting (treefmt), PowerShell syntax, Packer templates.
-  - **Nix checks** (4-7): Code formatting (treefmt), flake evaluation, lint (nixf-tidy), stale artifacts.
-  - **Test suites** (8-11): Shell validation, CWD, search path, port functions.
-  - **Data integrity** (12-15): Lockfile, locked DSC, schema, service registry.
-  - **Policy/verification** (16-21): YAML structural, package manager enforcement, error suppression, online checks, config compliance, activation token check.
+  - **Nix checks** (4-6): Flake evaluation, nix lint (nixf-tidy), stale Nix build artifacts.
+  - **Test suites** (7-10): Shell validation, CWD independence, nix search path, port utilities.
+  - **Data integrity** (11-14): Lockfile validation, locked DSC validation, schema validation, service registry.
+  - **Policy/verification** (15-23): YAML structural, package manager enforcement, error suppression, online determinism, config method compliance, activation token placeholder, preflight install-command policy, embedded-content enforcement, legacy token syntax.
 - On Windows (check.ps1), steps 1, 4-6, 8-11 are stubs (POSIX/Nix-only tools).
 - Pre-flight tool validation runs at the start of both scripts (before `$_step=0`). On POSIX this uses `require_command` from `src/scripts/lib.sh`; on Windows it uses `Ensure-Tool` from `src/hosts/Windows/modules/Ensure-Tool.psm1`.
 - Tool provisioning is handled by `nucleus-apply` (POSIX: `home.packages` in `src/modules/core.nix`; Windows: WinGet DSC). The pre-flight block is a safety net only — `nix profile install` and similar ad-hoc provisioning are banned.
