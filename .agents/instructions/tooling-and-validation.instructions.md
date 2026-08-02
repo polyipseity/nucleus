@@ -69,11 +69,21 @@ Choose the right vehicle:
 
 Checks in both `scripts/check.sh` and `scripts/check.ps1` are classified into three categories:
 
-- **Always-run checks**: These cannot meaningfully accept path filtering — they validate whole-repo invariants. They execute unconditionally in both `--full` and `--scoped` modes, with no `$HAS_ARGS` guard. Examples: stale Nix build artifacts (step 7), test suites (steps 8-11), lockfile section validation (step 12), locked DSC validation (step 13), service registry validation (step 15), package manager enforcement (step 17), config method compliance (step 20).
-- **Conditional checks**: These run only when certain file types are present in the changed set (scoped mode), or always in `--full` mode. Example: Nix flake evaluation (step 4 — in `--full` mode it always evaluates the flake; in `--scoped` mode only when .nix files are in scope).
-- **Path-scopable checks**: These operate per-file or per-file-type and accept path filtering in `--scoped` mode. They produce valid results when given only the changed file subset. Examples: Shell script formatting/linting (step 1), PowerShell syntax (step 2), Packer validation (step 3), code formatting (step 4), Nix lint/nixf-tidy (step 6), schema validation (step 14), YAML structural validation (step 16), undocumented error suppression (step 18), activation token placeholder (step 21).
+- **Always-run checks**: These cannot meaningfully accept path filtering — they validate whole-repo invariants. They execute unconditionally in both `--full` and `--scoped` modes, with no `$HAS_ARGS` guard. Examples: stale Nix build artifacts (step 6), test suites (steps 7-10), locked DSC validation (step 12), service registry validation (step 14), config method compliance (step 19).
+- **Conditional checks**: These run only when certain file types are present in the changed set (scoped mode), or always in `--full` mode. Examples: Nix flake evaluation (step 4 — in `--full` mode it always evaluates the flake; in `--scoped` mode only when .nix files are in scope), lockfile validation (step 11, matches `*/lockfile.json`/`*/lifecycle-allowlist.json`), package manager enforcement (step 16, matches `*.sh|*.ps1|*.nix`).
+- **Path-scopable checks**: These operate per-file or per-file-type and accept path filtering in `--scoped` mode. They produce valid results when given only the changed file subset. Examples: Shell script formatting/linting (step 1), PowerShell syntax (step 2), Packer validation (step 3), Nix lint/nixf-tidy (step 5), schema validation (step 13), YAML structural validation (step 15), undocumented error suppression (step 17), activation token placeholder (step 20).
 
-**Source of truth**: The header docstrings in `check.sh` and `check.ps1` are the canonical step-by-step reference. Update both when changing the taxonomy.
+**Source of truth**: The check-step file names under `src/scripts/checks/check-steps/` and their header docstrings are the canonical step-by-step reference. Update both check scripts when changing the taxonomy.
+
+### Scoped-mode conventions (`_has_args`)
+
+Check steps receive scoped file sets when prek passes staged files as args:
+
+- **POSIX**: step functions receive `$1=_has_args`, `$2=_repo_root`, remaining args = scoped files. Scoped skip pattern (steps 11, 16): loop the scoped files for a type match; if none, print `==== N: Name ==== SKIPPED (no X files to check)` and `return 0`.
+- **PowerShell**: steps are splatted with named params `param($HasArgs, $RepoRoot, $PositionalArgs)` (step-runner.ps1). Skip check: count matching `$PositionalArgs`; if none, emit `... SKIPPED ...` and `return $true`.
+- **Scoped-mode `$null` trap**: building a scoped file list as an if-EXPRESSION pipeline-enumerates branch output — an empty scoped list enumerates away to `$null`, so `.Count` throws under StrictMode (steps 21/22 hit this). Wrap the whole outer if-expression in `@(...)` (e.g. `$ps1Files = @(if ($HasArgs) {...} else {...})`) with a `# WHY:` comment.
+- Per-step explicit-skip tests live in `tests/scripts/check-steps/<nn>-<step>-explicit-skip.sh|.ps1`, wired into `05-framework-verification.sh|.ps1` in numeric order. `.sh` tests may source the real step file and invoke `run_NN_* true "$REPO_ROOT" <file>` to assert SKIPPED behavior (grep-based assertions, `# shellcheck disable=SC2016` for literal patterns). New `.sh` tests `chmod +x`; `.ps1` stay `644`.
+- End-to-end scoped check: `scripts/check.sh README.md` → steps 11+16 SKIP, exit 0; `scripts/check.sh src/modules/core.nix` → step 16 runs its scan, exit 0.
 
 - For every detected stack, document what to run and where commands are defined.
 - **Nix check-and-format (pre-commit hook)**: `check.sh` accepts `--format` to auto-fix Nix files (treefmt runs nixfmt-rfc-style for Nix formatting when invoked in-place). The flag is passed by `prek-hooks.py` when `args = ["--format"]` in `prek.toml`. `treefmtWrapper` is bundled in `mkCheckApp` runtimeInputs in `src/flake.nix`. No separate `format-nix` hook exists.
