@@ -16,11 +16,22 @@ echo "<message>" | bun x commitlint
 
 from the project root. If a commitlint config exists (`.commitlintrc.*`, `commitlint.config.*`), it is used automatically. If no config is found and no conflicting convention is documented, commitlint validates with its conventional-commit defaults.
 
-### No package installation to enable commitlint
+### Temp-dir install fallback (never in the repo)
 
-NEVER run `bun install`, `npm install`, `yarn`, or any other package-manager install to enable commitlint. NEVER create or modify `package.json`, `bun.lock`, `package-lock.json`, `yarn.lock`, or `node_modules/` for this purpose. `bun x` needs no install step — it fetches the requested package into a per-run temp dir (`/tmp/bunx-*`) plus a global cache (`~/.bun/install/cache`) and never writes to the repository.
+`bun x commitlint` needs no install — it fetches the requested package into a per-run temp dir (`/tmp/bunx-*`) plus a global cache (`~/.bun/install/cache`) and never writes to the repository. If `bun x commitlint` fails to resolve the config's `extends` dependencies (see below), run commitlint from a temp dir with `bun install`:
 
-If commitlint is not available (`bun` not found or `bun x commitlint` fails), fall back to a structural check: ensure the message follows conventional-commit format (`type(scope): subject`). The pre-commit hook will still enforce commitlint if configured. Never attempt to install commitlint or any of its dependencies as a workaround.
+```bash
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+cp package.json bun.lock "$tmpdir"/
+ln -s "$PWD/.commitlintrc.mjs" "$tmpdir/.commitlintrc.mjs"
+(cd "$tmpdir" && bun install --frozen-lockfile --no-summary)
+echo "$message" | (cd "$tmpdir" && bun run commitlint)
+```
+
+Copy whichever lockfile exists (`bun.lock`, `package-lock.json`, or `yarn.lock`). The commitlint config must live inside the temp dir: auto-discovery is cwd-based, and `extends` resolves relative to the config file's location, not the cwd. Use `bun run commitlint` — the repo may have no `node` binary. The `trap` guarantees cleanup; the repo is never touched (no `node_modules/`, no `package.json`/lockfile edits).
+
+Only if the repo has no package manifest to install from (no `package.json` or lockfile) does the structural check apply: ensure the message follows conventional-commit format (`type(scope): subject`). The pre-commit hook will still enforce commitlint if configured.
 
 If `node_modules/`, `package.json`, `bun.lock`, or other package-manager artifacts were accidentally created in a repository that must not have them, delete them before finishing the task. Never stage or commit them, and never edit `.gitignore` to hide them.
 
@@ -36,7 +47,7 @@ If commitlint validation fails AND no conflicting convention is documented, fix 
 
 ### Config-extension resolution failure
 
-If `bun x commitlint` fails with `Cannot find module "@commitlint/config-conventional"` (or similar), the repository's commitlint config `extends` a package that commitlint cannot resolve without a local install. Do NOT install the package to fix this. Either run `echo "<message>" | bun x commitlint --default-config` (validates against commitlint's bundled conventional defaults, ignoring the custom config's `ignores`) or fall back to the structural check. The repository's real commit-msg hook enforces the actual config with its own dependency setup.
+If `bun x commitlint` fails with `Cannot find module "@commitlint/config-conventional"` (or similar), the repository's commitlint config `extends` a package that `bun x`'s cache-based resolution cannot reach. Use the temp-dir install fallback above. `--default-config` is NOT a workaround: bun's global cache cannot resolve `conventional-changelog-conventionalcommits` from the transpiled `noop.js` either (verified in nucleus). The repository's real commit-msg hook enforces the actual config with its own dependency setup.
 
 If commitlint is present and configured but fails unexpectedly (tool error, not lint error), report the failure — do not proceed with the commit. This follows the no-fallbacks principle.
 
