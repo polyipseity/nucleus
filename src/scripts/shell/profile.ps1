@@ -335,7 +335,9 @@ Add-ShellAlias '-grv' { & git remote --verbose @Args }
 Add-ShellAlias '-gs' { & git status --short --branch @Args }
 Add-ShellAlias '-gsh' { & git show @Args }
 Add-ShellAlias '-gss' { & git status @Args }
-Add-ShellAlias '-gst' { & git stash push @Args }
+# WHY: bare `git stash` (not `push`): no-arg still pushes (default subcommand),
+# and any stash subcommand works via args (e.g. `-gst list`).
+Add-ShellAlias '-gst' { & git stash @Args }
 Add-ShellAlias '-gstd' { & git stash drop @Args }
 Add-ShellAlias '-gstl' { & git stash list @Args }
 Add-ShellAlias '-gstp' { & git stash pop @Args }

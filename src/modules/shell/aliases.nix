@@ -77,7 +77,9 @@
   "-gs" = "git status --short --branch";
   "-gsh" = "git show";
   "-gss" = "git status";
-  "-gst" = "git stash push";
+  # WHY: bare `git stash` (not `push`): no-arg still pushes (default subcommand),
+  # and any stash subcommand works via args (e.g. `-gst list`).
+  "-gst" = "git stash";
   "-gstd" = "git stash drop";
   "-gstl" = "git stash list";
   "-gstp" = "git stash pop";
