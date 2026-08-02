@@ -231,24 +231,19 @@ function Sync-GitAndSshConfig {
       }
 
       # User-scope Git config and ignore are method-1 writable symlinks into the
-      # repo tree (src/users/default/git/<Host>.gitconfig + <Host>.gitignore),
-      # mirroring POSIX git.nix.  A regular file found at the target is moved to
-      # a same-folder .bak before symlinking so disabling can restore it; a
-      # pre-existing symlink is simply replaced.
-      $gitConfigSource = Join-Path $env:NUCLEUS_REPO_ROOT "src\users\default\git\$hostName.gitconfig"
-      if (-not (Test-Path -Path $gitConfigSource -PathType Leaf)) {
-        throw "Sync-GitAndSshConfig: $hostName.gitconfig source not found at $gitConfigSource"
-      }
+      # per-user overlay (src/users/<User>/git/<Host>.gitconfig + <Host>.gitignore
+      # with src/users/default fallback), mirroring POSIX users-overlay.nix; the
+      # helper fails fast when neither exists.  A regular file found at the target
+      # is moved to a same-folder .bak before symlinking so disabling can restore
+      # it; a pre-existing symlink is simply replaced.
+      $gitConfigSource = Resolve-UserConfigSource -User $User -ConfigName 'git' -Extension 'gitconfig' -HostName $hostName -RepoRoot $env:NUCLEUS_REPO_ROOT
       if (-not (Test-Path -Path $userGitConfigDir)) {
         New-Item -ItemType Directory -Path $userGitConfigDir -Force > $null
       }
       Save-RegularFileBackup -Path $userGitConfigPath -BackupPath "$userGitConfigPath.bak"
       New-Item -ItemType SymbolicLink -Path $userGitConfigPath -Target $gitConfigSource -Force > $null
 
-      $ignoreSource = Join-Path $env:NUCLEUS_REPO_ROOT "src\users\default\git\$hostName.gitignore"
-      if (-not (Test-Path -Path $ignoreSource -PathType Leaf)) {
-        throw "Sync-GitAndSshConfig: $hostName.gitignore source not found at $ignoreSource"
-      }
+      $ignoreSource = Resolve-UserConfigSource -User $User -ConfigName 'git' -Extension 'gitignore' -HostName $hostName -RepoRoot $env:NUCLEUS_REPO_ROOT
       Save-RegularFileBackup -Path $userIgnorePath -BackupPath "$userIgnorePath.bak"
       New-Item -ItemType SymbolicLink -Path $userIgnorePath -Target $ignoreSource -Force > $null
 
