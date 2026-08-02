@@ -242,12 +242,6 @@ Every provisioned symlink must be writable AND delete-protected.
 
 When a symlink exists on both POSIX and Windows, writability semantics MUST match. A read-only symlink on POSIX (Nix store target) must be made read-only on Windows (read-only attribute or restrictive ACL).
 
-### Known exceptions
-
-| Symlink                                   | Reason                                                                                                         | Platform        |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------- | --------------- |
-| `~/.config/discord-music-rpc/config.yaml` | discord-music-rpc overwrites config on startup; read-only target prevents app from discarding managed settings | POSIX + Windows |
-
 ### macOS /usr/local/bin symlink farm
 
 `src/scripts/hosts/MacBook/macos-symlink-farm.sh` manages `/usr/local/bin` symlinks for Nix store entries. It reads `__nucleus_symlink_farm` (space-separated `target->name` pairs), creates/updates symlinks, and GCs stale Nix store entries. Safety: only removes symlinks (`-L`), never regular files, never non-Nix symlinks.
