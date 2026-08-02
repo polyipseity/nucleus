@@ -880,7 +880,7 @@
           {
             # Preserve pre-existing dotfiles on first activation instead of
             # aborting when Home Manager would overwrite them.
-            home-manager.backupFileExtension = "hm-backup";
+            home-manager.backupFileExtension = "bak";
 
             # Share the system nixpkgs instance to avoid a duplicate evaluation.
             home-manager.useGlobalPkgs = true;
@@ -918,7 +918,7 @@
           {
             # Mirror the Darwin behavior so first switch is non-destructive when
             # user-owned files already exist at Home Manager target paths.
-            home-manager.backupFileExtension = "hm-backup";
+            home-manager.backupFileExtension = "bak";
 
             home-manager.useGlobalPkgs = true;
             home-manager.useUserPackages = true;

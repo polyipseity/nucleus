@@ -25,7 +25,7 @@ in
 {
   # User-scope gitconfig (~/.gitconfig) as a writable symlink to the selected
   # repo file.  HM's backupFileExtension renames a pre-existing regular file to
-  # ~/.gitconfig.hm-backup (same folder) on first activation.
+  # ~/.gitconfig.bak (same folder) on first activation.
   home.file."\.gitconfig" = {
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
     source = config.lib.file.mkOutOfStoreSymlink (selectUserGitFile "gitconfig");

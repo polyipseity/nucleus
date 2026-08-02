@@ -44,7 +44,7 @@ Defaults-fallback rule: the per-user directory wins; if `<username>/git/<Host>.g
 
 ## 4. Backup/restore lifecycle (ALL platforms)
 
-Every scope where a real config file is replaced by a symlink gets a same-folder backup of the original, visible right next to it: `/etc/gitconfig.bak`, `<install>\etc\gitconfig.bak`, `~/.gitconfig.bak`, `~/.config/git/ignore.bak`. POSIX user scope uses Home Manager's `backupFileExtension = "hm-backup"` (`~/.gitconfig.hm-backup` / `ignore.hm-backup` — same folder, same visibility rule). Restore happens wherever an enable/disable lifecycle exists (Windows `-Enabled:$false`: enable = back up original then symlink; disable = remove symlink then restore `.bak` if present). POSIX activations are always-on → backup-on-first-replacement only, no restore path. **If the `.bak` is missing at restore time, that's OK — assume there was no original config: remove the symlink and leave nothing.**
+Every scope where a real config file is replaced by a symlink gets a same-folder backup of the original, visible right next to it: `/etc/gitconfig.bak`, `<install>\etc\gitconfig.bak`, `~/.gitconfig.bak`, `~/.config/git/ignore.bak`. POSIX user scope uses Home Manager's `backupFileExtension = "bak"` (`~/.gitconfig.bak` / `ignore.bak` — same folder, same visibility rule, uniform `.bak` across all four scopes). Restore happens wherever an enable/disable lifecycle exists (Windows `-Enabled:$false`: enable = back up original then symlink; disable = remove symlink then restore `.bak` if present). POSIX activations are always-on → backup-on-first-replacement only, no restore path. **If the `.bak` is missing at restore time, that's OK — assume there was no original config: remove the symlink and leave nothing.**
 
 ## 5. Identity
 
