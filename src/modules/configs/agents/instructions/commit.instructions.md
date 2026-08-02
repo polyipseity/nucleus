@@ -29,9 +29,9 @@ ln -s "$PWD/.commitlintrc.mjs" "$tmpdir/.commitlintrc.mjs"
 echo "$message" | (cd "$tmpdir" && bun run commitlint)
 ```
 
-Copy whichever lockfile exists (`bun.lock`, `package-lock.json`, or `yarn.lock`). The commitlint config must live inside the temp dir: auto-discovery is cwd-based, and `extends` resolves relative to the config file's location, not the cwd. Use `bun run commitlint` — the repo may have no `node` binary. The `trap` guarantees cleanup; the repo is never touched (no `node_modules/`, no `package.json`/lockfile edits).
+Copy whichever lockfile exists (`bun.lock`, `package-lock.json`, or `yarn.lock`). If the repo has no manifest at all, write a minimal `package.json` into the temp dir instead (devDependencies `@commitlint/cli` + `@commitlint/config-conventional`) so the install still works. The commitlint config must live inside the temp dir: auto-discovery is cwd-based, and `extends` resolves relative to the config file's location, not the cwd. Use `bun run commitlint` — the repo may have no `node` binary. The `trap` guarantees cleanup; the repo is never touched (no `node_modules/`, no `package.json`/lockfile edits).
 
-Only if the repo has no package manifest to install from (no `package.json` or lockfile) does the structural check apply: ensure the message follows conventional-commit format (`type(scope): subject`). The pre-commit hook will still enforce commitlint if configured.
+The structural check (`type(scope): subject`) is the LAST resort: only when `bun` is unavailable or the temp-dir install cannot complete (e.g. no network). The pre-commit hook will still enforce commitlint if configured.
 
 If `node_modules/`, `package.json`, `bun.lock`, or other package-manager artifacts were accidentally created in a repository that must not have them, delete them before finishing the task. Never stage or commit them, and never edit `.gitignore` to hide them.
 
