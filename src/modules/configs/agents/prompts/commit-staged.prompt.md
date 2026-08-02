@@ -28,25 +28,24 @@ Proceed automatically with best-effort defaults and available context.
    Prefer tooling-enforced rules; default to Conventional Commits when unclear. After composing, proceed to step 3 for commitlint validation.
 
 3. **Validate with commitlint**
-Before running `git commit`, validate the message with commitlint:
-
-- **Detect project setup.** Check for a commitlint config file (`.commitlintrc.*`, `commitlint.config.*`) in the project root. If found, the config is used. If not found, check for a documented conflicting convention (CONTRIBUTING.md / README.md specifies a non-conventional-commit format such as `gitmoji` or a custom schema). If a conflicting convention exists AND no commitlint config is present, skip validation entirely — the project has explicitly opted out.
-- **Run validation.** From the project root:
-  - **Bash/zsh:** `echo "<full message>" | bun x commitlint 2>&1`
-  - **PowerShell:** `"<full message>" | bun x commitlint 2>&1`
-  - **If `bun x commitlint` fails to resolve the config's `extends` deps** (e.g. `Cannot find package 'conventional-changelog-conventionalcommits'` from the config's `noop.js`), install into a temp dir and run commitlint from there — never install into the project repo:
-    ```bash
-    tmpdir=$(mktemp -d)
-    trap 'rm -rf "$tmpdir"' EXIT
-    cp package.json bun.lock "$tmpdir"/
-    ln -s "$PWD/.commitlintrc.mjs" "$tmpdir/.commitlintrc.mjs"
-    (cd "$tmpdir" && bun install --frozen-lockfile --no-summary)
-    echo "<full message>" | (cd "$tmpdir" && bun run commitlint)
-    ```
-    Copy whichever lockfile exists (`bun.lock`, `package-lock.json`, `yarn.lock`). If the repo has no manifest, replace the `cp` line with a minimal `package.json` in the temp dir (devDependencies `@commitlint/cli` + `@commitlint/config-conventional`) — `--frozen-lockfile` is safe because bun generates a lockfile when none is copied. The commitlint config must live inside the temp dir (`extends` resolves relative to the config file's location, not the cwd). Use `bun run commitlint` — no `node` binary assumed. The `trap` guarantees cleanup; never create or modify `package.json`, `bun.lock`, or `node_modules` in the project repo.
-  - Structural conventional-commit check (type-prefix, format) is the LAST resort: only if `bun` is unavailable or the temp-dir install cannot complete.
-- **On failure.** If validation fails AND no conflicting convention is documented, fix the message and re-run validation. Do not proceed to `git commit` until validation passes. If commitlint is present but fails with a tool error (not a lint error), report the failure — do not proceed. If the failure is `Cannot find package 'conventional-changelog-conventionalcommits'` (config `extends` unresolvable by `bun x`), use the temp-dir install fallback above — `bun x commitlint --default-config` is not a workaround.
-- **On success.** Proceed to step 4.
+   Before running `git commit`, validate the message with commitlint:
+   - **Detect project setup.** Check for a commitlint config file (`.commitlintrc.*`, `commitlint.config.*`) in the project root. If found, the config is used. If not found, check for a documented conflicting convention (CONTRIBUTING.md / README.md specifies a non-conventional-commit format such as `gitmoji` or a custom schema). If a conflicting convention exists AND no commitlint config is present, skip validation entirely — the project has explicitly opted out.
+   - **Run validation.** From the project root:
+     - **Bash/zsh:** `echo "<full message>" | bun x commitlint 2>&1`
+     - **PowerShell:** `"<full message>" | bun x commitlint 2>&1`
+     - **If `bun x commitlint` fails to resolve the config's `extends` deps** (e.g. `Cannot find package 'conventional-changelog-conventionalcommits'` from the config's `noop.js`), install into a temp dir and run commitlint from there — never install into the project repo:
+       ```bash
+       tmpdir=$(mktemp -d)
+       trap 'rm -rf "$tmpdir"' EXIT
+       cp package.json bun.lock "$tmpdir"/
+       ln -s "$PWD/.commitlintrc.mjs" "$tmpdir/.commitlintrc.mjs"
+       (cd "$tmpdir" && bun install --frozen-lockfile --no-summary)
+       echo "<full message>" | (cd "$tmpdir" && bun run commitlint)
+       ```
+       Copy whichever lockfile exists (`bun.lock`, `package-lock.json`, `yarn.lock`). If the repo has no manifest, replace the `cp` line with a minimal `package.json` in the temp dir (devDependencies `@commitlint/cli` + `@commitlint/config-conventional`) — `--frozen-lockfile` is safe because bun generates a lockfile when none is copied. The commitlint config must live inside the temp dir (`extends` resolves relative to the config file's location, not the cwd). Use `bun run commitlint` — no `node` binary assumed. The `trap` guarantees cleanup; never create or modify `package.json`, `bun.lock`, or `node_modules` in the project repo.
+     - Structural conventional-commit check (type-prefix, format) is the LAST resort: only if `bun` is unavailable or the temp-dir install cannot complete.
+   - **On failure.** If validation fails AND no conflicting convention is documented, fix the message and re-run validation. Do not proceed to `git commit` until validation passes. If commitlint is present but fails with a tool error (not a lint error), report the failure — do not proceed. If the failure is `Cannot find package 'conventional-changelog-conventionalcommits'` (config `extends` unresolvable by `bun x`), use the temp-dir install fallback above — `bun x commitlint --default-config` is not a workaround.
+   - **On success.** Proceed to step 4.
 
 4. **Create the commit**
    If `${input:commitNow}` is `no`, skip and only present the message.
