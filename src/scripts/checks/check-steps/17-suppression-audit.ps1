@@ -47,8 +47,6 @@ Register-Step -Id "suppression-audit" -Number 17 -Name "Suppression audit" -Acti
           if ($m.Line -match $exempt) { $skip = $true; break }
         }
         if ($skip) { continue }
-        # Skip lines with inline # undoc-supp: comment (deprecated format, suppression_doc only)
-        if ($CheckId -eq 'suppression_doc' -and $m.Line -match '# undoc-supp:') { continue }
         # Skip lines with check-suppress:<CheckId> inline
         if (-not $NoSuppressionCheck) {
           if (Test-Suppressed -CheckId $CheckId -Path $m.Path -LineNumber $m.LineNumber) { continue }
@@ -57,9 +55,7 @@ Register-Step -Id "suppression-audit" -Number 17 -Name "Suppression audit" -Acti
         if ($m.LineNumber -gt 1 -and -not $NoSuppressionCheck) {
           if (-not $script:fileCache.ContainsKey($m.Path)) { $script:fileCache[$m.Path] = Get-Content -Path $m.Path }
           $prevLine = $script:fileCache[$m.Path][$m.LineNumber - 2]
-          $prevPattern = "# check-suppress:$CheckId"
-          if ($CheckId -eq 'suppression_doc') { $prevPattern += '|# undoc-supp:' }
-          if ($prevLine -match $prevPattern) { continue }
+          if ($prevLine -match "# check-suppress:$CheckId") { continue }
         }
         $result += "$($m.Path):$($m.LineNumber) ($Label)"
       }

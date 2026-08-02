@@ -52,7 +52,7 @@ __nucleus_check_icloud_exclusion() {
     if [[ "$target_name" == "$excluded" ]]; then
       # Missing xattr is expected for newly created paths, so probe the
       # value quietly and only log when we actually mutate state.
-      # undoc-supp: xattr may not be set yet on newly created path; absence is not an error — the check below gates on value "1".
+      # check-suppress:suppression_doc: xattr may not be set yet on newly created path; absence is not an error -- the check below gates on value "1".
       current_mark="$(
         /usr/bin/xattr -p com.apple.fileprovider.ignore#P "$normalized_path" 2>/dev/null
       )" || true

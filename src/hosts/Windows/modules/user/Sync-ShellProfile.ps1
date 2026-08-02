@@ -113,17 +113,14 @@ function Sync-ShellProfile {
     $filteredLines = @()
     $insideManagedBlock = $false
     foreach ($line in $existingLines) {
-      # WHY: strip by bracket pattern (not exact subject text) so blocks written
-      # under earlier sentinel wording (e.g. old 'config managed shell parity'
-      # framing) are also regenerated on the next apply. The spec reserves
-      # '>>>'/'<<<' brackets for machine-managed regions (Category 2 sentinel
-      # convention), so any such region is nucleus-owned regardless of subject.
-      if ($line -like '# >>>*') {
+      # WHY: exact sentinel text only -- older sentinel wording is intentionally
+      # not stripped (no backwards compatibility; a stale block stays user-owned).
+      if ($line -eq $managedBlockStart) {
         $insideManagedBlock = $true
         continue
       }
 
-      if ($line -like '# <<<*') {
+      if ($line -eq $managedBlockEnd) {
         $insideManagedBlock = $false
         continue
       }

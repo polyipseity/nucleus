@@ -100,6 +100,7 @@ Rule: any new tool-enforced marker MUST register a check id AND a machine consum
 | --- | --- | --- |
 | `# WHY [^:]` = 0 | no-colon WHY | documented only |
 | `# TODO[^:]` = 0 | no-colon TODO | documented only |
+| `# undoc-supp:` = 0 | deprecated annotation format (migrated to `suppression_doc`) | documented only |
 | bare `Inline by embedded-content` = 0 | migrated annotations | step 22 (updated regex) |
 | capital `# Method` = 0 | lowercase method | step 19 (updated regex) |
 | no `—` after `# check-suppress:` | no em dash in markers | documented only |
