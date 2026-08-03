@@ -114,6 +114,27 @@ let
         </dict>
       '';
 
+  # Base SSH forward (guest 22 -> host 2222) for non-Android VMs.  Android
+  # guests expose ADB and SSH on forwarded ports 5555/5554 instead, and must
+  # NOT also claim host 2222: when Android and NixOS run together the second
+  # VM would fail to start ("Could not set up host forwarding rule") because
+  # host port 2222 is already taken by the first.
+  basePortForward =
+    vm:
+    if vm.type == "Android" then
+      ""
+    else
+      ''
+        <dict>
+            <key>Protocol</key>
+            <string>TCP</string>
+            <key>GuestPort</key>
+            <integer>22</integer>
+            <key>HostPort</key>
+            <integer>2222</integer>
+        </dict>
+      '';
+
   additionalPortForwards =
     vm:
     if vm.type != "Android" then
@@ -157,6 +178,7 @@ let
         "__VM_HYPERVISOR__"
         "__VM_UEFI_BOOT__"
         "__VM_ANDROID_DRIVES__"
+        "__VM_BASE_PORT_FORWARD__"
         "__VM_ADDITIONAL_PORT_FORWARDS__"
       ]
       [
@@ -173,6 +195,7 @@ let
         (if qemuHypervisor vm then "<true/>" else "<false/>")
         (if qemuUefiBoot vm then "<true/>" else "<false/>")
         (androidDrives vm)
+        (basePortForward vm)
         (additionalPortForwards vm)
       ]
       # check-suppress:config-method: method 4 (runtime direct read) -- builtins.readFile embeds at eval time
