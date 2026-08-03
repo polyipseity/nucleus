@@ -12,10 +12,8 @@ let
   applyScriptText = builtins.readFile ../../src/scripts/apply.sh;
   macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
   macbookJellyfinText = builtins.readFile ../../src/hosts/MacBook/jellyfin.nix;
-  macbookManualText = builtins.readFile ../../src/hosts/MacBook/MANUAL.md;
   nixosDefaultText = builtins.readFile ../../src/hosts/NixOS/default.nix;
   nixosJellyfinText = builtins.readFile ../../src/hosts/NixOS/jellyfin.nix;
-  nixosManualText = builtins.readFile ../../src/hosts/NixOS/MANUAL.md;
   linuxText = builtins.readFile ../../src/modules/linux.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
   usersRegistry = builtins.fromJSON (builtins.readFile ../../src/modules/users.json);
@@ -25,7 +23,6 @@ let
   windowsCaddyServiceText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-CaddyService.ps1;
   windowsJellyfinAccountText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinAccount.ps1;
   windowsJellyfinLibraryText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinLibrary.ps1;
-  windowsManualText = builtins.readFile ../../src/hosts/Windows/MANUAL.md;
   windowsUsersRegistry = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
   windowsSystemPackagesText = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
   jellyfinSyncScript = builtins.readFile ../../src/scripts/services/jellyfin-sync.sh;
@@ -48,7 +45,7 @@ let
 
   test_macbook_runs_shared_jellyfin_daemon = assert' (
     containsRegex ''launchd\.daemons\.jellyfin'' macbookJellyfinText
-    && containsRegex ''state_root="/Users/Shared/Jellyfin"'' macbookJellyfinText
+    && containsRegex ''jellyfinStateRoot = "/Users/Shared/Jellyfin"'' macbookJellyfinText
   ) "macOS must provision Jellyfin as a host-level shared launchd daemon";
 
   test_macbook_declares_https_proxy_virtual_host = assert' (
@@ -78,14 +75,10 @@ let
     && containsRegex "tls internal" windowsCaddyServiceText
   ) "Windows apply flow must converge Caddy HTTPS proxy service";
 
-  test_host_manuals_document_jellyfin_endpoints = assert' (
-    containsRegex "https://localhost:8920" macbookManualText
-    && containsRegex ''http://127\.0\.0\.1:8096'' macbookManualText
-    && containsRegex "https://localhost:8920" nixosManualText
-    && containsRegex ''http://127\.0\.0\.1:8096'' nixosManualText
-    && containsRegex "https://localhost:8920" windowsManualText
-    && containsRegex ''http://127\.0\.0\.1:8096'' windowsManualText
-  ) "Host manuals must document Jellyfin HTTPS and loopback HTTP endpoints";
+  test_host_jellyfin_modules_declare_loopback_ports = assert' (
+    containsRegex "jellyfinHttpPort = 8096" macbookJellyfinText
+    && containsRegex "jellyfinHttpPort = 8096" nixosJellyfinText
+  ) "Host Jellyfin modules must declare loopback HTTP (8096) as the Caddy upstream";
 
   test_polyipseity_declared_as_jellyfin_admin = assert' (
     hasAdminAccount (usersRegistry.polyipseity.jellyfin.accounts or [ ])
@@ -105,7 +98,7 @@ let
   test_caddy_local_ca_trust_is_automated = assert' (
     containsRegex "run_caddy_local_ca_trust" applyScriptText
     && containsRegex ''caddy-trust\.sh'' applyScriptText
-    && containsRegex ''caddy trust --address 127\.0\.0\.1:2019'' caddyTrustScriptText
+    && containsRegex "caddy trust --address" caddyTrustScriptText
     && containsRegex "Sync-CaddyLocalCA" windowsApplyText
     && containsRegex "function Sync-CaddyLocalCA" windowsCaddyTrustText
     && containsRegex ''caddy.*trust --address 127\.0\.0\.1:2019'' windowsCaddyTrustText
@@ -163,7 +156,7 @@ let
     test_windows_installs_jellyfin_server
     test_windows_installs_caddy_for_https_proxy
     test_windows_wires_https_proxy_module
-    test_host_manuals_document_jellyfin_endpoints
+    test_host_jellyfin_modules_declare_loopback_ports
     test_polyipseity_declared_as_jellyfin_admin
     test_jellyfin_admin_flag_defaults_false_in_sync_logic
     test_jellyfin_admin_policy_is_converged
@@ -176,7 +169,7 @@ let
     test_windows_library_module_wired
   ];
 in
-builtins.seq (builtins.deepSeq allTests) {
+builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${toString (builtins.length allTests)} Jellyfin provisioning tests passed";

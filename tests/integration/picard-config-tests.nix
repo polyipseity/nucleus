@@ -6,6 +6,8 @@ let
   windowsLoadUserRegistryText = builtins.readFile ../../src/hosts/Windows/modules/Load-UserRegistry.ps1;
   windowsPicardConfigText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-PicardConfig.ps1;
   picardDefaultsIniText = builtins.readFile ../../src/modules/configs/picard/Picard.ini;
+  picardMergeScriptText = builtins.readFile ../../src/scripts/configs/merge-picard-ini.sh;
+  picardMergeAwkText = builtins.readFile ../../src/scripts/configs/merge-picard-ini.awk;
 
   usersRegistry = builtins.fromJSON (builtins.readFile ../../src/modules/users.json);
   windowsUsersRegistry = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
@@ -15,7 +17,7 @@ let
   test_posix_picard_ini_merge_overwrite_wiring = assert' (
     containsRegex "merge-picard-ini" homeText
     && containsRegex ''builtins\.readFile ./configs/picard/Picard\.ini'' homeText
-    && containsRegex "_apply_picard_defaults_from_file" homeText
+    && containsRegex "_apply_picard_defaults_from_file" picardMergeScriptText
     && containsRegex "_upsert_ini_key" homeText
     && containsRegex "picardOverrideCommands" homeText
     && containsRegex ''renderPicardIniCommand "\$_picard_conf" "setting"'' homeText
@@ -28,24 +30,24 @@ let
         containsRegex "EnablePicardParity" windowsApplyText
         && containsRegex ''Sync-PicardConfig -Enabled:\$EnablePicardParity -Users \$selectedUserRecords -DefaultsFilePath \$picardDefaultsPath'' windowsApplyText
         && containsRegex "function Sync-PicardConfig" windowsPicardConfigText
-        && containsRegex ''\[string\]\$DefaultsFilePath'' windowsPicardConfigText
+        && containsRegex ''[[]string[]]\$DefaultsFilePath'' windowsPicardConfigText
         && containsRegex "Get-PicardDefaultPairsFromFile" windowsPicardConfigText
         && containsRegex "Get-PicardSettingOverride" windowsPicardConfigText
         && containsRegex ''AppData\\Roaming\\MusicBrainz\\Picard\.ini'' windowsPicardConfigText
         && containsRegex "_upsert_ini_key" windowsPicardConfigText
         && containsRegex "-Section 'setting'" windowsPicardConfigText
         && containsRegex "_remove_managed_ini_keys" windowsPicardConfigText
-        && containsRegex "preserves all unmanaged" windowsPicardConfigText
-        && containsRegex ''picard\s*=\s*ConvertTo-PlainObject'' windowsLoadUserRegistryText
+        && containsRegex "unmanaged keys/sections" windowsPicardConfigText
+        && containsRegex ''picard[ \t]*=[ \t]*ConvertTo-PlainObject'' windowsLoadUserRegistryText
       )
       "Windows apply path must converge Picard.ini via merge-overwrite module and user registry mapping";
 
   test_canonical_picard_defaults_file = assert' (
-    containsRegex ''^\[application\]'' picardDefaultsIniText
-    && containsRegex ''^version=2\.13\.3\.final0'' picardDefaultsIniText
-    && containsRegex ''^\[profiles\]'' picardDefaultsIniText
-    && containsRegex ''^\[setting\]'' picardDefaultsIniText
-    && containsRegex ''^user_profiles=@Invalid\(\)'' picardDefaultsIniText
+    containsRegex "[[]application[]]" picardDefaultsIniText
+    && containsRegex ''version=2\.13\.3\.final0'' picardDefaultsIniText
+    && containsRegex "[[]profiles[]]" picardDefaultsIniText
+    && containsRegex "[[]setting[]]" picardDefaultsIniText
+    && containsRegex ''user_profiles=@Invalid\(\)'' picardDefaultsIniText
   ) "Canonical Picard defaults file must exist and include expected native INI sections";
 
   test_users_registry_exposes_picard_settings = assert' (
@@ -61,11 +63,11 @@ let
   test_posix_picard_ini_awk_environ_escape =
     assert'
       (
-        containsRegex ''ENVIRON\["_UPSERT_VALUE"\]'' homeText
-        && containsRegex "_UPSERT_VALUE.*_value" homeText
-        && !containsRegex "-v value=.*_value" homeText
+        containsRegex ''ENVIRON[[]"_UPSERT_VALUE"[]]'' picardMergeAwkText
+        && containsRegex ''value = ENVIRON[[]"_UPSERT_VALUE"[]]'' picardMergeAwkText
+        && !containsRegex "-v value=.*_value" picardMergeScriptText
       )
-      "home.nix _upsert_ini_key must pass value via ENVIRON to prevent AWK from interpreting Qt @Variant escape sequences";
+      "merge-picard-ini.sh _upsert_ini_key must pass value via ENVIRON to prevent AWK from interpreting Qt @Variant escape sequences";
 
   # On Linux, Picard's .desktop file registers audio MIME types.  Without
   # explicit xdg.mimeApps overrides the default handler depends on installation
@@ -81,14 +83,15 @@ let
       "linux.nix must set VLC as default for audio MIME types to prevent Picard from claiming media file handlers";
 
   # Newly created build/cache directories inside iCloud-managed roots are not
-  # excluded automatically.  A daily launchd agent runs iCloud exclusion
-  # marking at 00:00 to close the drift window between home-manager activations.
+  # excluded automatically.  A launchd agent reruns iCloud exclusion marking on
+  # an hourly StartInterval timer to close the drift window between
+  # home-manager activations; the activation hook covers the immediate case.
   test_macos_icloud_exclusions_daily_schedule = assert' (
     containsRegex "icloud-exclusions" macosModuleText
     && containsRegex ''local\.icloud-exclusions'' macosModuleText
-    && containsRegex "Hour = 0" macosModuleText
+    && containsRegex "StartInterval = 3600;" macosModuleText
     && containsRegex "icloudExclusionsScript" macosModuleText
-  ) "macos.nix must schedule iCloud exclusions as a daily launchd agent at 00:00";
+  ) "macos.nix must schedule iCloud exclusions as a recurring launchd agent";
 
   allTests = [
     test_posix_picard_ini_merge_overwrite_wiring
@@ -100,7 +103,7 @@ let
     test_macos_icloud_exclusions_daily_schedule
   ];
 in
-builtins.seq (builtins.deepSeq allTests) {
+builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${toString (builtins.length allTests)} Picard config merge tests passed";

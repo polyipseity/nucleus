@@ -7,6 +7,8 @@ let
   macAppBundlesText = builtins.readFile ../../src/hosts/MacBook/services/app-bundles.nix;
   nixosServicesText = builtins.readFile ../../src/hosts/NixOS/services.nix;
   windowsDscText = builtins.readFile ../../src/hosts/Windows/user/context-pdf-opt.dsc.yml;
+  nautilusScriptText = builtins.readFile ../../src/scripts/integrations/configure-file-manager-pdf-opt.sh;
+  plasmaDesktopText = builtins.readFile ../../src/modules/configs/plasma/nucleus-gs-pdf-opt.desktop;
 
   inherit (import ../lib.nix) assert';
 
@@ -111,11 +113,11 @@ let
       "NixOS services.nix presets must be in quality-descending order (default < prepress < printer < ebook < screen)";
 
   test_nixos_nautilus_has_mime_guard = assert' (
-    lib.hasInfix "file --mime-type" nixosServicesText
-    && lib.hasInfix "application/pdf" nixosServicesText
+    lib.hasInfix "file --mime-type" nautilusScriptText
+    && lib.hasInfix "application/pdf" nautilusScriptText
   ) "NixOS Nautilus scripts must have MIME-type guards";
 
-  test_nixos_dolphin_scoped_to_pdf = assert' (lib.hasInfix "MimeType=application/pdf;" nixosServicesText) "NixOS Dolphin ServiceMenu must have MimeType=application/pdf;";
+  test_nixos_dolphin_scoped_to_pdf = assert' (lib.hasInfix "MimeType=application/pdf;" plasmaDesktopText) "NixOS Dolphin ServiceMenu must ship MimeType=application/pdf; in the plasma desktop file";
 
   test_all_5_presets_in_windows = assert' (
     allPresetsPresent windowsDscText
@@ -155,7 +157,7 @@ let
       )
       "Windows DSC presets must be in quality-descending order (default < prepress < printer < ebook < screen)";
 
-  test_windows_scoped_to_pdf = assert' (lib.hasInfix "SystemFileAssociations\\\\.pdf" windowsDscText) "Windows DSC must scope to PDF files via SystemFileAssociations\\.pdf";
+  test_windows_scoped_to_pdf = assert' (lib.hasInfix "SystemFileAssociations\\.pdf" windowsDscText) "Windows DSC must scope to PDF files via SystemFileAssociations\\.pdf";
 
   # === TEST: App bundle dirs are alphabetically sorted ===
   # Verifies that appDir values appear in currentNucleusAppBundles in
@@ -257,7 +259,7 @@ let
     test_macos_workflows_scoped_to_pdf
   ];
 in
-builtins.seq (builtins.deepSeq allTests) {
+builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
   message = "gs-pdf-opt cross-platform preset parity tests passed";

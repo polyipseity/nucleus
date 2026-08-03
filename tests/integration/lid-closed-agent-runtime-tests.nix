@@ -9,31 +9,28 @@
 let
   lib = import <nixpkgs/lib>;
   ciWorkflowText = builtins.readFile ../../.github/workflows/ci.yml;
-  macManualText = builtins.readFile ../../src/hosts/MacBook/MANUAL.md;
-  macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
   nixosDesktopText = builtins.readFile ../../src/hosts/NixOS/desktop.nix;
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   windowsPowerPolicyText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-PowerPolicy.ps1;
+  batteryPolicyText = builtins.readFile ../../src/scripts/hosts/MacBook/macos-configure-battery-policy.sh;
 
   inherit (import ../lib.nix) assert';
 
   test_macos_keeps_remote_session_pmset_posture =
     assert'
       (
-        (lib.hasInfix "apply_pmset -a standby 1 ttyskeepawake 1 hibernatemode 3 networkoversleep 0 tcpkeepalive 1 powernap 1 lidwake 1" macbookActivationText)
-        && (lib.hasInfix "apply_pmset -c displaysleep 1 sleep 0 disksleep 0 womp 1" macbookActivationText)
-        && (lib.hasInfix "apply_pmset -b displaysleep 1 sleep 0 disksleep 0 womp 1" macbookActivationText)
+        (lib.hasInfix "apply_pmset -a standby 1 ttyskeepawake 1 hibernatemode 3 networkoversleep 0 tcpkeepalive 1 powernap 1 lidwake 1" batteryPolicyText)
+        && (lib.hasInfix "apply_pmset -c displaysleep 1 sleep 0 disksleep 0 womp 1" batteryPolicyText)
+        && (lib.hasInfix "apply_pmset -b displaysleep 1 sleep 0 disksleep 0 womp 1" batteryPolicyText)
         && (lib.hasInfix "macos-configure-headless-display" macosText)
-        && (lib.hasInfix "betterdisplay-heartbeat" macbookActivationText)
+        && (lib.hasInfix "betterdisplay-heartbeat" macosText)
       )
       "macOS must keep the no-idle-sleep pmset posture and BetterDisplay heartbeat for closed-lid remote work";
 
-  test_macos_manual_documents_clamshell_limit = assert' (
-    (lib.hasInfix "Closed-lid agent work: keep the Mac on AC power" macManualText)
-    && (lib.hasInfix "closing a Mac laptop display puts it to sleep" macManualText)
-    && (lib.hasInfix "HeadlessDisplay" macManualText)
-  ) "macOS manual must document the AC-power clamshell requirement and HeadlessDisplay fallback";
+  test_macos_documents_clamshell_limit = assert' (
+    (lib.hasInfix "HeadlessDisplay" macosText) && (lib.hasInfix "clamshell" macosText)
+  ) "macos.nix must document the HeadlessDisplay fallback for closed-lid remote work";
 
   test_nixos_ignores_lid_switch_on_all_power_sources = assert' (
     (lib.hasInfix "HandleLidSwitch = \"ignore\";" nixosDesktopText)
@@ -56,18 +53,18 @@ let
     && (lib.hasInfix "Sync-PowerPolicy -Enabled:$EnablePowerParity" windowsApplyText)
   ) "Windows apply.ps1 must load and execute Sync-PowerPolicy for lid-close parity";
 
-  test_ci_runs_this_suite = assert' (lib.hasInfix "tests/integration/lid-closed-agent-runtime-tests.nix" ciWorkflowText) "CI must execute the lid-closed agent runtime tests";
+  test_ci_runs_this_suite = assert' (lib.hasInfix "nix run ./src#test -- --no-fail-fast" ciWorkflowText) "CI must execute the Nix test suite (dynamic discovery) so lid-closed runtime tests run";
 
   allTests = [
     test_macos_keeps_remote_session_pmset_posture
-    test_macos_manual_documents_clamshell_limit
+    test_macos_documents_clamshell_limit
     test_nixos_ignores_lid_switch_on_all_power_sources
     test_windows_power_policy_manages_lid_action
     test_windows_apply_executes_power_policy
     test_ci_runs_this_suite
   ];
 in
-builtins.seq (builtins.deepSeq allTests) {
+builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${toString (builtins.length allTests)} lid-closed agent runtime tests passed";

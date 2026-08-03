@@ -10,6 +10,8 @@ let
   shellModuleText = builtins.readFile ../../src/modules/shell.nix;
   macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
   nixosDefaultText = builtins.readFile ../../src/hosts/NixOS/default.nix;
+  macbookAutomatorText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows.nix;
+  nixosServicesText = builtins.readFile ../../src/hosts/NixOS/services.nix;
 
   # Test 1: Verify all POSIX hosts import core.nix
   test_posix_hosts_import_core = assert' (
@@ -43,7 +45,7 @@ let
   # Test 6: Verify wallpaper module is imported by all hosts
   test_wallpaper_module_imported = assert' (
     containsRegex "\./wallpapers\.nix" homeModuleText
-    && containsRegex "mkHomeManagerUsers \./modules/home\.nix" flakeText
+    && containsRegex ''mkHomeManagerUsers "[^"]*" \./modules/home\.nix'' flakeText
   ) "Wallpaper module must be imported by all hosts";
 
   # Test 7: Verify dev-repos module is imported for primary user only
@@ -54,8 +56,8 @@ let
 
   # Test 9: Verify specialArgs are passed correctly to all modules
   test_special_args_passed = assert' (
-    containsRegex "specialArgs = \{ inherit username users; \};" flakeText
-    && containsRegex "extraSpecialArgs = \{" flakeText
+    containsRegex ''specialArgs = \{.*inherit username users;'' flakeText
+    && containsRegex ''extraSpecialArgs = \{'' flakeText
   ) "specialArgs (username, users) must be passed to all configs";
 
   # Test 10: Verify config sections compose with mkMerge where needed
@@ -70,10 +72,10 @@ let
     && containsRegex "home-manager\.sharedModules" nixosDefaultText
   ) "Module import order should satisfy dependencies";
 
-  # Test 12: Verify host-specific MANUAL.md files exist in the macOS host config
+  # Test 12: Verify host-specific MANUAL.md files are wired into host configs
   test_manual_md_paths = assert' (
-    containsRegex "src/hosts/MacBook/MANUAL\.md" macbookDefaultText
-    && containsRegex "src/hosts/NixOS/MANUAL\.md" nixosDefaultText
+    containsRegex "src/hosts/MacBook/MANUAL\.md" macbookAutomatorText
+    && containsRegex "src/hosts/NixOS/MANUAL\.md" nixosServicesText
   ) "Each host must reference its MANUAL.md path";
 
   allTests = [
@@ -91,7 +93,7 @@ let
     test_manual_md_paths
   ];
 in
-builtins.seq (builtins.deepSeq allTests) {
+builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${toString (builtins.length allTests)} configuration composition tests passed";

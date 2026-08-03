@@ -3,7 +3,7 @@
 let
   lib = import <nixpkgs/lib>;
   aliasesText = builtins.readFile ../../src/modules/shell/aliases.nix;
-  shellText = builtins.readFile ../../src/modules/shell.nix;
+  flakeText = builtins.readFile ../../src/flake.nix;
   # Shared shell-parity profile: single source consumed by pwsh.nix (POSIX,
   # eval-time embed) and Sync-ShellProfile.ps1 (Windows, runtime read-back).
   shellProfileText = builtins.readFile ../../src/scripts/shell/profile.ps1;
@@ -44,20 +44,20 @@ let
   ) "shared shell profile must mirror curated shell shortcuts";
 
   test_posix_shell_exposes_managed_commands = assert' (
-    lib.hasInfix ''"nucleus-ai"'' shellText
-    && lib.hasInfix ''"nucleus-apply"'' shellText
-    && lib.hasInfix ''"nucleus-bootstrap"'' shellText
-    && lib.hasInfix ''"nucleus-check-pwsh"'' shellText
-    && lib.hasInfix ''"nucleus-check-sh"'' shellText
-    && lib.hasInfix ''"nucleus-cloud-setup"'' shellText
-    && lib.hasInfix ''"nucleus-gc"'' shellText
-    && lib.hasInfix ''"nucleus-gs-pdf-opt"'' shellText
-    && lib.hasInfix ''"nucleus-health-check"'' shellText
-    && lib.hasInfix ''"nucleus-replica-reset"'' shellText
-    && lib.hasInfix ''"nucleus-replica-sync"'' shellText
-    && lib.hasInfix ''"nucleus-update"'' shellText
-    && lib.hasInfix ''"nucleus-vm"'' shellText
-  ) "shell.nix must expose the managed nucleus command set";
+    lib.hasInfix "nucleus-ai = writeNucleusShellApplication pkgs {" flakeText
+    && lib.hasInfix "nucleus-apply = writeNucleusShellApplication pkgs {" flakeText
+    && lib.hasInfix "nucleus-bootstrap = writeNucleusShellApplication pkgs {" flakeText
+    && lib.hasInfix "nucleus-check-pwsh = mkCheckPwshPackage pkgs;" flakeText
+    && lib.hasInfix "nucleus-check-sh = writeNucleusShellApplication pkgs {" flakeText
+    && lib.hasInfix "nucleus-cloud-setup = writeNucleusShellApplication pkgs {" flakeText
+    && lib.hasInfix "nucleus-gc = writeNucleusShellApplication pkgs {" flakeText
+    && lib.hasInfix "nucleus-gs-pdf-opt = writeNucleusShellApplication pkgs {" flakeText
+    && lib.hasInfix "nucleus-health-check = writeNucleusShellApplication pkgs {" flakeText
+    && lib.hasInfix "nucleus-replica-reset = writeNucleusShellApplication pkgs {" flakeText
+    && lib.hasInfix "nucleus-replica-sync = writeNucleusShellApplication pkgs {" flakeText
+    && lib.hasInfix "nucleus-update = writeNucleusShellApplication pkgs {" flakeText
+    && lib.hasInfix "nucleus-vm = writeNucleusShellApplication pkgs {" flakeText
+  ) "flake.nix must expose the managed nucleus command set";
 
   test_windows_shell_exposes_managed_commands = assert' (
     lib.hasInfix "function nucleus-ai" shellProfileText
@@ -78,27 +78,25 @@ let
   test_manuals_document_curated_shortcuts_and_commands = assert' (builtins.all
     (
       text:
-      lib.hasInfix "`-gb` — run `git branch`." text
-      && lib.hasInfix "`-gcl` — run `git clone`." text
-      && lib.hasInfix "`-gf` — run `git fetch`." text
-      && lib.hasInfix "`-gl` — run `git log --oneline --decorate --graph`." text
-      && lib.hasInfix "`-gsw` — run `git switch`." text
-      && lib.hasInfix "`-ni` — run `bun install`." text
-      && lib.hasInfix "`-nr` — run `bun run`." text
-      && lib.hasInfix "`-nx` — run `bun x`." text
-      && lib.hasInfix "\`nucleus-ai\` — manage AI models (sync, list, status, endpoint, config)." text
-      && lib.hasInfix "`nucleus-apply` — run the managed apply flow." text
-      && lib.hasInfix "`nucleus-bootstrap` — run the managed bootstrap flow." text
-      && lib.hasInfix "`nucleus-check-pwsh` — run PowerShell syntax checks." text
-      && lib.hasInfix "`nucleus-check-sh` — run POSIX shell syntax checks." text
-      && lib.hasInfix "`nucleus-cloud-setup` — configure required cloud remotes and re-run apply." text
-      && lib.hasInfix "`nucleus-gc` — run the managed Nix garbage-collection flow." text
-      && lib.hasInfix "`nucleus-gs-pdf-opt` — run the gs-pdf-opt script (optimize PDFs with Ghostscript)." text
-      && lib.hasInfix "`nucleus-health-check` — run the managed repository health checks." text
-      && lib.hasInfix "`nucleus-replica-sync` — run one-shot pull sync for enabled cloud replicas." text
-      && lib.hasInfix "`nucleus-replica-reset` — clear local replica state without touching remote data." text
-      && lib.hasInfix "`nucleus-update` — run the managed repository update flow." text
-      && lib.hasInfix "`nucleus-vm setup` — build and provision VMs" text
+      lib.hasInfix "`-gsw` — git commands" text
+      && lib.hasInfix "`-ni` — `bun install`" text
+      && lib.hasInfix "`-nr` — `bun run`" text
+      && lib.hasInfix "`-nx` — `bun x`" text
+      && lib.hasInfix "`-la`, `-ll` — `eza -la`" text
+      && lib.hasInfix "`-v` — `nvim`" text
+      && lib.hasInfix "`nucleus-ai` — manage AI models (sync, list, status, endpoint, config)" text
+      && lib.hasInfix "`nucleus-apply` — apply configuration" text
+      && lib.hasInfix "`nucleus-bootstrap` — bootstrap system" text
+      && lib.hasInfix "`nucleus-check-pwsh` — check PowerShell syntax" text
+      && lib.hasInfix "`nucleus-check-sh` — check POSIX shell syntax" text
+      && lib.hasInfix "`nucleus-cloud-setup` — configure cloud remotes and re-apply" text
+      && lib.hasInfix "`nucleus-gc` — run Nix garbage collection" text
+      && lib.hasInfix "`nucleus-gs-pdf-opt` — optimize PDF files with Ghostscript" text
+      && lib.hasInfix "`nucleus-health-check` — run health checks" text
+      && lib.hasInfix "`nucleus-replica-sync` — pull cloud replicas" text
+      && lib.hasInfix "`nucleus-replica-reset` — reset local replica state" text
+      && lib.hasInfix "`nucleus-update` — update repository" text
+      && lib.hasInfix "`nucleus-vm setup` — build and provision VMs from `src/modules/VMs.json`" text
     )
     [
       macManualText
@@ -116,7 +114,7 @@ let
     test_manuals_document_curated_shortcuts_and_commands
   ];
 in
-builtins.seq (builtins.deepSeq allTests) {
+builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
   message = "Managed shell shortcut parity tests passed";

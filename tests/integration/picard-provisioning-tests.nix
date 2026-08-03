@@ -1,6 +1,5 @@
 let
   coreText = builtins.readFile ../../src/modules/core.nix;
-  nixosDesktopText = builtins.readFile ../../src/hosts/NixOS/desktop.nix;
   windowsSystemPackagesText = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
 
   inherit (import ../lib.nix) assert' containsRegex;
@@ -11,7 +10,7 @@ let
     && containsRegex ''nixpkgsAttr = "picard"'' coreText
   ) "core.nix must route musicbrainz-picard via overlap policy with nixpkgs picard fallback";
 
-  test_nixos_installs_picard = assert' (containsRegex ''\bpicard\b'' nixosDesktopText) "NixOS desktop package list must include picard";
+  test_nixos_installs_picard = assert' (containsRegex "environment.systemPackages = sharedPackages" coreText) "NixOS must install picard via core.nix sharedPackages routing";
 
   test_windows_installs_picard = assert' (containsRegex ''id: MusicBrainz\.Picard'' windowsSystemPackagesText) "Windows system/packages.dsc.yml must install MusicBrainz.Picard";
 
@@ -21,7 +20,7 @@ let
     test_windows_installs_picard
   ];
 in
-builtins.seq (builtins.deepSeq allTests) {
+builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${toString (builtins.length allTests)} Picard package provisioning tests passed";

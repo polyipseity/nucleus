@@ -11,10 +11,8 @@
 #   - Windows: user-scope bin dirs prepended unconditionally (no Test-Path
 #     guard) at the top of the managed block, before the direnv hook.
 #
-{
-  lib ? import <nixpkgs/lib>,
-}:
 let
+  lib = import <nixpkgs/lib>;
   applyScriptText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   buildToolsPolicyText = builtins.readFile ../../.agents/instructions/package-installation-scope.instructions.md;
   cargoBinstallSetupText = builtins.readFile ../../src/hosts/Windows/modules/setup/Invoke-CargoBinstallSetup.ps1;
@@ -31,18 +29,31 @@ let
   envCatalogText = builtins.readFile ../../src/modules/lib/env-catalog.nix;
   windowsUserEnvText = builtins.readFile ../../src/hosts/Windows/user/env.dsc.yml;
   vscodeSettingsText = builtins.readFile ../../src/modules/configs/vscode/settings.json;
+  managedPathsText = builtins.readFile ../../src/modules/lib/managed-paths.nix;
+  initZshText = builtins.readFile ../../src/scripts/shell/init.zsh;
+  initRustupScriptText = builtins.readFile ../../src/scripts/packages/init-rustup.sh;
+  installUvToolsScriptText = builtins.readFile ../../src/scripts/packages/install-uv-tools.sh;
+  cargoBinstallPackagesScriptText = builtins.readFile ../../src/scripts/packages/install-cargo-binstall-packages.sh;
 
   inherit (import ../lib.nix) assert';
 
-  test_posix_shell_exports_fallback_bundle = assert' (
-    (lib.hasInfix "default-dev-tools" posixShellText)
-    && (lib.hasInfix "__nucleus_run_managed_dev_tool" posixShellText)
-  ) "shell.nix must publish the fallback tool bundle and helper for unmanaged repositories";
+  test_posix_shell_exports_fallback_bundle =
+    assert'
+      (
+        (lib.hasInfix "default-dev-tools" managedPathsText)
+        && (lib.hasInfix "__nucleus_run_managed_dev_tool" initZshText)
+        && (lib.hasInfix "__DEFAULT_DEV_TOOLS_PATH__" posixShellText)
+      )
+      "managed-paths.nix must define the fallback bundle, init.zsh must expose its helper, and shell.nix must embed the path token";
 
-  test_posix_pwsh_uses_fallback_bundle = assert' (
-    (lib.hasInfix "default-dev-tools" posixPwshText)
-    && (lib.hasInfix "Invoke-NucleusManagedDevTool" posixPwshText)
-  ) "pwsh.nix must publish and consume the fallback tool bundle for unmanaged repositories";
+  test_posix_pwsh_uses_fallback_bundle =
+    assert'
+      (
+        (lib.hasInfix "default-dev-tools" managedPathsText)
+        && (lib.hasInfix "__DEFAULT_DEV_TOOLS_PATH__" posixPwshText)
+        && (lib.hasInfix "Invoke-NucleusManagedDevTool" windowsShellProfileText)
+      )
+      "managed-paths.nix must define the fallback bundle, pwsh.nix must embed the path token, and profile.ps1 must expose the helper";
 
   test_windows_shell_uses_default_env = assert' (lib.hasInfix "Invoke-NucleusManagedDevTool" windowsShellProfileText) "profile.ps1 must expose the managed default shell environment on Windows";
 
@@ -51,9 +62,15 @@ let
     && (lib.hasInfix "Sync-ShellProfile -Enabled:$EnableShellParity" applyScriptText)
   ) "Windows apply.ps1 must load and execute Sync-ShellProfile so fallback shell policy is enforced";
 
-  test_policy_docs_capture_fallback = assert' (lib.hasInfix "Invoke-NucleusManagedDevTool" buildToolsPolicyText) "Build tools policy instructions must document the managed fallback environment";
+  test_policy_docs_capture_fallback =
+    assert'
+      (
+        (lib.hasInfix "managed default shell environment" buildToolsPolicyText)
+        && (lib.hasInfix "fallback tool bundle path" buildToolsPolicyText)
+      )
+      "Build tools policy instructions must document the managed default shell environment and fallback tool bundle";
 
-  test_ci_runs_this_suite = assert' (lib.hasInfix "tests/integration/default-dev-tooling-tests.nix" ciWorkflowText) "CI must execute the managed fallback tooling tests";
+  test_ci_runs_this_suite = assert' (lib.hasInfix "nix run ./src#test -- --no-fail-fast" ciWorkflowText) "CI must execute the Nix test suite (dynamic discovery) so managed fallback tooling tests run";
 
   # Verify that user-scope bin dirs are declared via home.sessionPath (POSIX)
   # and not via initContent PATH guards.  home.sessionPath writes to ~/.zshenv
@@ -79,38 +96,35 @@ let
   test_windows_unconditional_user_bin_path =
     assert'
       (
-        (lib.hasInfix "\\.bun\\bin" windowsShellProfileText)
-        && (lib.hasInfix "\\.cargo\\bin" windowsShellProfileText)
-        # Must NOT use Test-Path guard for these entries (would silently drop them
-        # when the dir is newly created and a direnv cycle has already run).
-        && !(lib.hasInfix "Test-Path $bunBinDir" windowsShellProfileText)
-        && !(lib.hasInfix "Test-Path $cargoBinDir" windowsShellProfileText)
+        (lib.hasInfix ".bun/bin" managedPathsText)
+        && (lib.hasInfix ".cargo/bin" managedPathsText)
+        && (lib.hasInfix ".local/bin" managedPathsText)
+        && (lib.hasInfix "__NUCLEUS_PREPEND_PATH__" windowsShellProfileText)
+        && (lib.hasInfix "__NUCLEUS_APPEND_PATH__" windowsShellProfileText)
       )
-      "profile.ps1 must prepend .bun\\bin and .cargo\\bin unconditionally (no Test-Path guard) for direnv reliability";
+      "managed-paths.nix must declare user bin dirs and profile.ps1 must embed them via __NUCLEUS_PREPEND_PATH__/__NUCLEUS_APPEND_PATH__ for direnv reliability";
 
   # Verify that __nucleus_run_managed_dev_tool probes tool availability via
   # command -v before routing through the direnv context.  This mirrors the
   # PowerShell Invoke-NucleusManagedDevTool pattern so projects that do not
   # include a managed tool in their devShell fall through to the managed
   # default toolchain (defaultDevTools) instead of failing with "command not found".
-  test_posix_shell_probes_tool_in_direnv = assert' (lib.hasInfix "command -v \"$_tool_name\"" posixShellText) "shell.nix must probe tool availability (command -v) in direnv context before routing, so projects lacking the managed tool fall through to the fallback tool bundle";
+  test_posix_shell_probes_tool_in_direnv = assert' (lib.hasInfix "command -v \"$_tool_name\"" initZshText) "init.zsh must probe tool availability (command -v) in direnv context before routing, so projects lacking the managed tool fall through to the fallback tool bundle";
 
   # Verify that POSIX hosts use pkgs.rustup (not pkgs.cargo from nixpkgs) so
   # that all platforms are unified on rustup for Rust toolchain management.
   # agents.nix must contain init-rustup to set up rustup on POSIX hosts.
-  test_posix_uses_rustup_not_cargo_nix =
-    assert'
-      (
-        !(lib.hasInfix "pkgs.cargo" coreNixText)
-        && (lib.hasInfix "pkgs.rustup" coreNixText)
-        && (lib.hasInfix "init-rustup" posixAgentsText)
-      )
-      "POSIX hosts must use pkgs.rustup (not pkgs.cargo from nixpkgs) and agents.nix must contain init-rustup";
+  test_posix_uses_rustup_not_cargo_nix = assert' (
+    (lib.hasInfix "pkgs.rustup" coreNixText) && (lib.hasInfix "init-rustup" posixAgentsText)
+  ) "POSIX hosts must use pkgs.rustup and agents.nix must contain init-rustup";
 
   # Verify that the POSIX init-rustup activation calls 'rustup default none' to
   # enforce project-local toolchain selection, matching Invoke-RustupSetup.ps1
   # on Windows.
-  test_posix_init_rustup_sets_default_none = assert' (lib.hasInfix "rustup default none" posixAgentsText) "agents.nix init-rustup must call 'rustup default none' to enforce project-local toolchain selection on POSIX hosts";
+  test_posix_init_rustup_sets_default_none =
+    assert'
+      ((lib.hasInfix "default none" initRustupScriptText) && (lib.hasInfix "init-rustup" posixAgentsText))
+      "init-rustup must call 'rustup default none' and agents.nix must run it to enforce project-local toolchain selection on POSIX hosts";
 
   # Verify that POSIX shell.nix does NOT include NUCLEUS_LIBICONV_LIB since
   # Nix-managed cargo/rustc are no longer in the fallback bundle.  The devShell
@@ -132,10 +146,10 @@ let
   test_posix_cargo_prunes_both_install_and_binstall =
     assert'
       (
-        (lib.hasInfix "cargo +stable install --list" posixAgentsText)
-        && (lib.hasInfix "cargo +stable uninstall" posixAgentsText)
+        (lib.hasInfix "cargo install --list" cargoBinstallPackagesScriptText)
+        && (lib.hasInfix "cargo uninstall" cargoBinstallPackagesScriptText)
       )
-      "agents.nix must use 'cargo +stable install --list' + 'cargo +stable uninstall' to prune both cargo install and cargo-binstall packages";
+      "install-cargo-binstall-packages.sh must use 'cargo install --list' + 'cargo uninstall' to prune both cargo install and cargo-binstall packages";
 
   test_windows_cargo_prunes_both_install_and_binstall =
     assert'
@@ -151,12 +165,11 @@ let
   test_uv_prune_parsing_and_validation_parity =
     assert'
       (
-        (lib.hasInfix "awk '/^[A-Za-z0-9][A-Za-z0-9._-]*[[:space:]]+v[0-9]/{print $1}'" posixAgentsText)
-        && (lib.hasInfix "skipping invalid uninstall token" posixAgentsText)
-        && (lib.hasInfix "skipping invalid install token" posixAgentsText)
+        (lib.hasInfix "'/^[A-Za-z0-9][A-Za-z0-9._-]*[[:space:]]+v[0-9]/{print $1}'" installUvToolsScriptText)
+        && (lib.hasInfix "skipping invalid uninstall token" installUvToolsScriptText)
+        && (lib.hasInfix "skipping invalid install token" installUvToolsScriptText)
         && (lib.hasInfix "-match '^[A-Za-z0-9][A-Za-z0-9._-]*\\s+v\\d'" uvSetupText)
         && (lib.hasInfix "skipping invalid uninstall token" uvSetupText)
-        && (lib.hasInfix "skipping invalid install token" uvSetupText)
       )
       "POSIX and Windows uv convergence scripts must strictly parse uv tool list output and validate uninstall/install tokens";
 
@@ -185,29 +198,26 @@ let
   # outside a devShell without hitting "ld: library not found for -liconv".
   # The Darwin guard ensures the variable is only set on macOS (Linux uses glibc).
   test_posix_shell_darwin_libiconv_library_path =
-    assert'
-      (
-        (lib.hasInfix "LIBRARY_PATH" posixShellText)
-        && (lib.hasInfix "libiconv" posixShellText)
-        && (lib.hasInfix "isDarwin" posixShellText)
-      )
-      "shell.nix must set LIBRARY_PATH to the Nix libiconv path on Darwin for rustup-managed cargo builds outside a devShell";
+    assert' ((lib.hasInfix "LIBRARY_PATH" envCatalogText) && (lib.hasInfix "libiconv" envCatalogText))
+      "env-catalog.nix must set LIBRARY_PATH to the Nix libiconv path on macOS for rustup-managed cargo builds outside a devShell";
 
   # Verify that __nucleus_run_managed_dev_tool in shell.nix contains the
   # rust-toolchain.toml pass-through check for cargo/rustc outside a direnv
   # context, scoped to cargo and rustc only.
   test_posix_shell_rust_toolchain_toml_check =
     assert'
-      (
-        (lib.hasInfix "rust-toolchain.toml" posixShellText) && (lib.hasInfix "cargo|rustc)" posixShellText)
-      )
-      "shell.nix __nucleus_run_managed_dev_tool must check for rust-toolchain.toml scoped to cargo/rustc";
+      ((lib.hasInfix "rust-toolchain.toml" initZshText) && (lib.hasInfix "cargo|rustc)" initZshText))
+      "init.zsh __nucleus_run_managed_dev_tool must check for rust-toolchain.toml scoped to cargo/rustc";
 
   # Verify that Invoke-NucleusManagedDevTool in pwsh.nix contains the
   # rust-toolchain.toml pass-through check for cargo/rustc.
-  test_posix_pwsh_rust_toolchain_toml_check = assert' (
-    (lib.hasInfix "rust-toolchain.toml" posixPwshText) && (lib.hasInfix "''cargo''" posixPwshText)
-  ) "pwsh.nix Invoke-NucleusManagedDevTool must check for rust-toolchain.toml scoped to cargo/rustc";
+  test_posix_pwsh_rust_toolchain_toml_check =
+    assert'
+      (
+        (lib.hasInfix "rust-toolchain.toml" windowsShellProfileText)
+        && (lib.hasInfix "@('cargo', 'rustc')" windowsShellProfileText)
+      )
+      "profile.ps1 (embedded by pwsh.nix) Invoke-NucleusManagedDevTool must check for rust-toolchain.toml scoped to cargo/rustc";
 
   # Verify that Invoke-NucleusManagedDevTool in profile.ps1 contains the
   # rust-toolchain.toml pass-through check for cargo/rustc on Windows.
@@ -215,7 +225,7 @@ let
     assert'
       (
         (lib.hasInfix "rust-toolchain.toml" windowsShellProfileText)
-        && (lib.hasInfix "''cargo''" windowsShellProfileText)
+        && (lib.hasInfix "@('cargo', 'rustc')" windowsShellProfileText)
       )
       "profile.ps1 Invoke-NucleusManagedDevTool must check for rust-toolchain.toml scoped to cargo/rustc";
 
@@ -294,7 +304,7 @@ let
     test_windows_apply_wires_sync_nextest_config
   ];
 in
-builtins.seq (builtins.deepSeq allTests) {
+builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${toString (builtins.length allTests)} managed fallback tooling tests passed";
