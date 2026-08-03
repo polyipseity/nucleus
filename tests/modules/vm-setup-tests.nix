@@ -391,6 +391,38 @@ let
         builtins.toString (builtins.map (v: v.name) orphaned)
       }";
 
+  # GC must preserve disabled VM entries by default: only names absent from
+  # VMs.json entirely are cleared.  --gc-disabled opts into clearing disabled
+  # entries, narrowing the expected set to enabled-and-host-matched VMs.
+  test_vm_gc_preserves_disabled_entries_by_default = assert' (
+    (lib.hasInfix "vm_get_manifest_vm_names" vm_setup_sh_text)
+    && (lib.hasInfix "if [ \"\$gc_disabled_mode\" = true ]" vm_setup_sh_text)
+    && (lib.hasInfix "gc_disabled_mode=false" vm_setup_sh_text)
+    && (lib.hasInfix "_gcv_expected=\"\$(vm_get_manifest_vm_names)\"" vm_setup_sh_text)
+  ) "vm-setup GC must preserve disabled VM entries by default and clear them only with --gc-disabled";
+
+  # The --gc-disabled/--no-gc-disabled option pair must be accepted in both
+  # parse loops (global and post-subcommand) and documented in usage.
+  test_vm_gc_disabled_option_pair = assert' (
+    (lib.hasInfix "--gc-disabled) gc_disabled_mode=true; shift ;;" vm_setup_sh_text)
+    && (lib.hasInfix "--no-gc-disabled) gc_disabled_mode=false; shift ;;" vm_setup_sh_text)
+    && (lib.hasInfix "--gc-disabled) gc_disabled_mode=true ;;" vm_setup_sh_text)
+    && (lib.hasInfix "--no-gc-disabled) gc_disabled_mode=false ;;" vm_setup_sh_text)
+    && (lib.hasInfix "--gc-disabled|--no-gc-disabled" vm_setup_sh_text)
+  ) "vm.sh must accept the --gc-disabled/--no-gc-disabled option pair in both parse loops and usage";
+
+  # Windows vm-setup must mirror POSIX GC: preserve disabled entries by
+  # default, clear them only with -GcDisabled (--gc-disabled/--no-gc-disabled).
+  test_windows_vm_gc_preserves_disabled_entries_by_default =
+    assert'
+      (
+        (lib.hasInfix "[switch]\$GcDisabled" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "\$expectedNames = @(\$vmDef.VMs | ForEach-Object { \$_.name })" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "'--gc-disabled' { \$invokeArgs['GcDisabled'] = \$true }" vm_ps1_text)
+        && (lib.hasInfix "'--no-gc-disabled' { \$invokeArgs['GcDisabled'] = \$false }" vm_ps1_text)
+      )
+      "Windows vm-setup GC must preserve disabled VM entries by default and clear them only with --gc-disabled/-GcDisabled";
+
   # guest.nix must be non-empty (parseable as a Nix expression).
   test_guest_nix_nonempty =
     let
@@ -479,6 +511,7 @@ let
   # that were extracted to vm.sh during refactoring.
   vm_setup_sh_text =
     builtins.readFile ../../scripts/vm.sh + builtins.readFile ../../src/scripts/lib/vm.sh;
+  vm_ps1_text = builtins.readFile ../../scripts/vm.ps1;
   windows_vm_setup_ps1_text = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-VMSetup.ps1;
   readmeTemplateText = builtins.readFile ../../src/vms/templates/README.md;
   startPosixTemplateText = builtins.readFile ../../src/vms/templates/start-posix.sh;
@@ -1390,6 +1423,9 @@ let
     test_android_gsi_version_type
     test_android_gsi_version_only_on_android
     test_enabled_vm_not_orphaned
+    test_vm_gc_preserves_disabled_entries_by_default
+    test_vm_gc_disabled_option_pair
+    test_windows_vm_gc_preserves_disabled_entries_by_default
     test_nixos_guest_import_paths_resolve
     test_nixos_guest_config_drift_rebuild
     test_nixos_guest_avoids_host_sops_modules
@@ -1500,6 +1536,9 @@ in
     test_android_gsi_version_type
     test_android_gsi_version_only_on_android
     test_enabled_vm_not_orphaned
+    test_vm_gc_preserves_disabled_entries_by_default
+    test_vm_gc_disabled_option_pair
+    test_windows_vm_gc_preserves_disabled_entries_by_default
     test_nixos_guest_import_paths_resolve
     test_nixos_guest_config_drift_rebuild
     test_nixos_guest_avoids_host_sops_modules

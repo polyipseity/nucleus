@@ -39,6 +39,7 @@ vm_init() {
   VMS_DIR="${20}"
   MANIFEST="${21}"
   NUCLEUS_HOST="${22}"
+  gc_disabled_mode="${23}"
 }
 
 # write_vm_directory_readme
@@ -609,6 +610,15 @@ vm_get_expected_vm_names() {
     select(.hosts == null or (.hosts | length == 0) or (.hosts | contains([$host]))) |
     .name
   ' "$MANIFEST"
+}
+
+# vm_get_manifest_vm_names
+#   Prints a newline-separated list of ALL VM names present in the manifest,
+#   regardless of enabled state or host match.  Used by default GC so only
+#   entries absent from VMs.json entirely are cleared; disabled entries are
+#   preserved unless --gc-disabled is passed.
+vm_get_manifest_vm_names() {
+  jq -r '.VMs[] | .name' "$MANIFEST"
 }
 
 # UTM re-registration helper
@@ -2170,10 +2180,19 @@ vm_setup_windows_qemu_vms() {
 
 # vm_gc_vms — Top-level GC dispatcher.  Called from the vm.sh main flow
 #   when --gc is passed.  Removes VM artifacts (Tart VMs, UTM bundles,
-#   libvirt domains, disk images, credential markers) for VMs that are not
-#   in the enabled-and-host-matched set.
+#   libvirt domains, disk images, credential markers) for VMs not in the
+#   expected set.  By default only entries absent from VMs.json entirely are
+#   cleared; disabled entries are preserved unless --gc-disabled is passed,
+#   which narrows the expected set to enabled-and-host-matched VMs.
 vm_gc_vms() {
-  _gcv_expected="$(vm_get_expected_vm_names)" || return
+  # WHY: default GC keeps disabled entries; only names absent from the
+  # manifest are orphans.  --gc-disabled opts into clearing disabled entries.
+  if [ "$gc_disabled_mode" = true ]; then
+    _gcv_expected="$(vm_get_expected_vm_names)" || return
+    say "GC — including disabled VM entries (--gc-disabled)..."
+  else
+    _gcv_expected="$(vm_get_manifest_vm_names)" || return
+  fi
 
   say "GC — scanning for non-provisioned VM artifacts..."
   if [ "$dry_run" = true ]; then

@@ -194,7 +194,13 @@ function Invoke-VMSetup {
         [switch]$DryRun,
 
         # Remove orphaned VM disk images and credential markers.
-        [switch]$Gc
+        [switch]$Gc,
+
+        # Also clear disabled VM entries during GC.
+        # WHY: default GC preserves disabled entries; only names absent from
+        # VMs.json entirely are cleared.  -GcDisabled opts into clearing
+        # disabled entries too.
+        [switch]$GcDisabled
     )
 
     $ErrorActionPreference = 'Stop'
@@ -751,13 +757,22 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
 
     if ($Gc) {
         Write-Information 'vm-setup: GC — scanning for non-provisioned VM artifacts...'
-        $expectedNames = @(
-            foreach ($vm in $vmDef.VMs) {
-                if ((Test-VMEnabled $vm) -and (Test-VMHostMatch $vm)) {
-                    $vm.name
+        if ($GcDisabled) {
+            # WHY: -GcDisabled opts into clearing disabled entries, so only
+            # enabled-and-host-matched names are expected.
+            $expectedNames = @(
+                foreach ($vm in $vmDef.VMs) {
+                    if ((Test-VMEnabled $vm) -and (Test-VMHostMatch $vm)) {
+                        $vm.name
+                    }
                 }
-            }
-        )
+            )
+        }
+        else {
+            # WHY: default GC preserves disabled entries; only names absent
+            # from VMs.json entirely are cleared.
+            $expectedNames = @($vmDef.VMs | ForEach-Object { $_.name })
+        }
         Invoke-GcOrphanDisk -ExpectedNames $expectedNames
         Invoke-GcOrphanMarker
         Write-Information 'vm-setup: GC — done'

@@ -15,6 +15,8 @@
   upgrade: Upgrade an Android VM image (not yet implemented on Windows).
   reset:   Reset an Android VM image (not yet implemented on Windows).
   gc:      Remove stale VM artifacts. Delegates to Invoke-VMSetup -Gc.
+           Default GC preserves disabled VM entries; pass --gc-disabled
+           to clear them too.
 
 .PARAMETER Action
   The operation to perform: setup, list, status, start, stop, upgrade, reset, gc.
@@ -29,6 +31,8 @@
   .\vm.ps1 setup
   .\vm.ps1 setup --windows-iso C:\ISOs\Win11.iso --headful
   .\vm.ps1 setup --gc
+  .\vm.ps1 gc
+  .\vm.ps1 gc --gc-disabled
   .\vm.ps1 list
   .\vm.ps1 status
   .\vm.ps1 gc
@@ -143,6 +147,8 @@ function Invoke-VmSetup {
       '--dry-run' { $invokeArgs['DryRun'] = $true }
       '--gc' { $invokeArgs['Gc'] = $true }
       '--no-gc' { $invokeArgs['Gc'] = $false }
+      '--gc-disabled' { $invokeArgs['GcDisabled'] = $true }
+      '--no-gc-disabled' { $invokeArgs['GcDisabled'] = $false }
       '--help' {
         Get-Help $PSCommandPath -Detailed
         exit 0
@@ -322,7 +328,17 @@ function Invoke-VmGc {
     exit 1
   }
   . $module
-  Invoke-VMSetup -RepoRoot $RepoRoot -Gc
+
+  $gcDisabled = $false
+  foreach ($arg in $SubcommandArgs) {
+    switch ($arg) {
+      '--gc-disabled' { $gcDisabled = $true }
+      '--no-gc-disabled' { $gcDisabled = $false }
+      default { Write-NucleusWarning "ignoring unknown flag for gc: $arg" }
+    }
+  }
+
+  Invoke-VMSetup -RepoRoot $RepoRoot -Gc -GcDisabled:$gcDisabled
 }
 
 # ---------------------------------------------------------------------------

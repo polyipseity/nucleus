@@ -168,6 +168,8 @@ usage() {
   upgrade <vm>             Re-download+replace OS image (Android only; error for others).
   reset <vm>               Factory-reset VM user state (Android only; error for others).
   gc                       Remove stale VM artifacts (non-provisioned VMs, disks, markers).
+                          Default GC preserves disabled VM entries; pass --gc-disabled
+                          to clear them too.
 
   --dry-run                     Print planned actions without executing (default: off).
   --accept-gsi-license          Accept the GSI license for Android GSI downloads.
@@ -179,6 +181,8 @@ usage() {
                                 headless (--no-headful, default).
   --accelerator A               QEMU accelerator override (hvf|kvm|tcg).
   --gc|--no-gc                  Run GC after setup (default: --no-gc).
+  --gc-disabled|--no-gc-disabled  Also clear disabled VM entries during GC
+                                (default: --no-gc-disabled).
   --vm-dir-override PATH        Override the default ~/virtual machines path.
   --mido-patch-file PATH        Override runtime Mido patch file path.
   --mido-script PATH            Override the Mido script path.
@@ -202,6 +206,7 @@ windows_iso_retries=0
 windows_headless=true
 accelerator=''
 gc_mode=false
+gc_disabled_mode=false
 vm_dir_override=''
 NUCLEUS_MIDO_PATCH_FILE=''
 NUCLEUS_MIDO_SCRIPT=''
@@ -230,6 +235,8 @@ while [ "$#" -gt 0 ]; do
     --accelerator) accelerator="$2"; shift 2 ;;
     --gc) gc_mode=true; shift ;;
     --no-gc) gc_mode=false; shift ;;
+    --gc-disabled) gc_disabled_mode=true; shift ;;
+    --no-gc-disabled) gc_disabled_mode=false; shift ;;
     --vm-dir-override) vm_dir_override="$2"; shift 2 ;;
     --mido-patch-file) NUCLEUS_MIDO_PATCH_FILE="$2"; shift 2 ;;
     --mido-script) NUCLEUS_MIDO_SCRIPT="$2"; shift 2 ;;
@@ -255,6 +262,8 @@ for arg in "${vm_args[@]}"; do
     --dry-run) dry_run=true ;;
     --gc) gc_mode=true ;;
     --no-gc) gc_mode=false ;;
+    --gc-disabled) gc_disabled_mode=true ;;
+    --no-gc-disabled) gc_disabled_mode=false ;;
     --accept-gsi-license) accept_gsi_license=true ;;
     --no-accept-gsi-license) accept_gsi_license=false ;;
     --headful) windows_headless=false ;;
@@ -384,7 +393,7 @@ do_setup() {
     "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
     "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
     "$accept_gsi_license" "false" "false" \
-    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST"
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode"
 
   mkdir -p "$VM_DIR" "$IMAGES_DIR" "$VM_DIR/scripts"
   write_vm_directory_readme
@@ -740,7 +749,7 @@ do_upgrade() {
     "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
     "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
     "$accept_gsi_license" "true" "false" \
-    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST"
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode"
 
   vm_build_android "$vm_name" "$vm_index" "$accept_gsi_license" "true" "false"
   say "upgrade complete for '$vm_name'"
@@ -789,7 +798,7 @@ do_reset() {
     "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
     "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
     "$accept_gsi_license" "false" "true" \
-    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST"
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode"
 
   vm_build_android "$vm_name" "$vm_index" "$accept_gsi_license" "false" "true"
   say "reset complete for '$vm_name'"
