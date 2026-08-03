@@ -22,8 +22,8 @@
             <key>ReadOnly</key>
             <false/>
         </dict>
+        __VM_ANDROID_DRIVES__
     </array>
-    __VM_ANDROID_DRIVES__
     <key>Display</key>
     <array>
         <dict>
