@@ -728,6 +728,18 @@ let
       )
       "scripts/vm.sh must provision Android UTM bundles from the shared android-* images with android-system.qcow2 as the prebuilt";
 
+  # The Android build must strip the whitespace wc -c pads its output with
+  # (macOS pads, Linux does not); otherwise the size leaks into the selected
+  # qcow2 path and cp fails, aborting the build.
+  test_android_build_strips_wc_padding =
+    assert'
+      (
+        (lib.hasInfix "wc -c < \"\$_f\" | tr -d '[:space:]'" vm_setup_sh_text)
+        && (lib.hasInfix "pick the largest qcow2 as the system image" vm_setup_sh_text)
+        && (lib.hasInfix "sort -rn | head -1 | cut -d' ' -f2-" vm_setup_sh_text)
+      )
+      "scripts/vm.sh must strip wc -c whitespace padding when selecting the largest qcow2 from the extracted LineageOS bundle";
+
   test_libvirt_runtime_validation_parity =
     assert'
       (
@@ -1177,6 +1189,7 @@ let
     test_vm_guest_credential_drift_replacement
     test_utm_runtime_replacement_requires_valid_prebuilt
     test_utm_android_uses_shared_images
+    test_android_build_strips_wc_padding
     test_libvirt_runtime_validation_parity
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
@@ -1274,6 +1287,7 @@ in
     test_vm_guest_credential_drift_replacement
     test_utm_runtime_replacement_requires_valid_prebuilt
     test_utm_android_uses_shared_images
+    test_android_build_strips_wc_padding
     test_libvirt_runtime_validation_parity
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
