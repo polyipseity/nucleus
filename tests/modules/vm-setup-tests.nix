@@ -487,6 +487,7 @@ let
   stopPosixShTemplateText = builtins.readFile ../../src/vms/templates/stop-posix.sh;
   stopHostPs1TemplateText = builtins.readFile ../../src/vms/templates/stop-host.ps1;
   macbook_vms_nix_text = builtins.readFile ../../src/hosts/MacBook/vms.nix;
+  nixos_vms_nix_text = builtins.readFile ../../src/hosts/NixOS/vms.nix;
   utmConfigPlistText = builtins.readFile ../../src/modules/configs/vms/utm-config.plist.xml;
   vms_json_text = builtins.readFile ../../src/modules/VMs.json;
   users_json_text = builtins.readFile ../../src/modules/users.json;
@@ -1033,6 +1034,39 @@ let
     && (lib.hasInfix "enabledVms = builtins.filter (" macbook_vms_nix_text)
     && (lib.hasInfix "enabledVms = builtins.filter (" (builtins.readFile ../../src/hosts/NixOS/vms.nix))
   ) "VM enable/disable policy must be wired in manifest, setup scripts, and host template generation";
+
+  # The Android GSI drive must be rendered only when androidGsiVersion is set
+  # (the manifest permits null); a revert to unconditional GSI emission must
+  # fail. The userdata drive stays attached unconditionally.
+  test_macbook_android_gsi_conditional =
+    assert'
+      (
+        (lib.hasInfix "androidGsiVersion != null" macbook_vms_nix_text)
+        && (lib.hasInfix "android-gsi.img" macbook_vms_nix_text)
+        && (lib.hasInfix "android-userdata.qcow2" macbook_vms_nix_text)
+      )
+      "src/hosts/MacBook/vms.nix must render the GSI drive only when androidGsiVersion is non-null while keeping android-userdata.qcow2 attached unconditionally";
+
+  # NixOS libvirt domain XML must attach the GSI disk only when
+  # androidGsiVersion is set, mirroring the MacBook UTM template.
+  test_nixos_android_gsi_conditional = assert' (
+    (lib.hasInfix "androidGsiVersion != null" nixos_vms_nix_text)
+    && (lib.hasInfix "images/android-gsi.img" nixos_vms_nix_text)
+  ) "src/hosts/NixOS/vms.nix must render the GSI disk only when androidGsiVersion is non-null";
+
+  # NixOS Android system/userdata disks must live under images/ inside the VM
+  # directory; bare ${vmDir}/android-*.qcow2 paths would break the cross-host
+  # images layout.
+  test_nixos_android_disk_paths_in_images_dir =
+    assert'
+      (
+        (lib.hasInfix "images/android-system.qcow2" nixos_vms_nix_text)
+        && (lib.hasInfix "images/android-userdata.qcow2" nixos_vms_nix_text)
+        && !(lib.hasInfix "\${vmDir}/android-system.qcow2" nixos_vms_nix_text)
+        && !(lib.hasInfix "\${vmDir}/android-userdata.qcow2" nixos_vms_nix_text)
+      )
+      "src/hosts/NixOS/vms.nix must place Android system/userdata disks under \${vmDir}/images/ and never at the bare VM directory root";
+
   test_macbook_tart_storage_link =
     assert'
       (
@@ -1154,6 +1188,9 @@ let
     test_macbook_utm_default_location_link
     test_macbook_tart_storage_link
     test_vm_enabled_policy_wiring
+    test_macbook_android_gsi_conditional
+    test_nixos_android_gsi_conditional
+    test_nixos_android_disk_paths_in_images_dir
     test_macbook_macos_version_tahoe
     test_windows_iso_fido_nonwindows_fallback
     test_android_gsi_version_type
@@ -1247,6 +1284,9 @@ in
     test_macbook_utm_default_location_link
     test_macbook_tart_storage_link
     test_vm_enabled_policy_wiring
+    test_macbook_android_gsi_conditional
+    test_nixos_android_gsi_conditional
+    test_nixos_android_disk_paths_in_images_dir
     test_macbook_macos_version_tahoe
     test_windows_iso_fido_nonwindows_fallback
     test_android_gsi_version_type
