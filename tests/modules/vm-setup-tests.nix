@@ -825,6 +825,20 @@ let
         && (lib.hasInfix "<key>AdditionalArguments</key>" utmConfigPlistText)
       )
       "src/modules/configs/vms/utm-config.plist.xml must not add a QEMU GA chardev: UTM's app sandbox denies binding unix sockets in /tmp (EPERM on boot) and UTM's own bundles omit it";
+  # UTM's QEMU backend only emits hostfwd= for Mode=Emulated (user/slirp
+  # networking); for Mode=Shared (vmnet-shared) the PortForward array is
+  # silently ignored, so SSH (2222) and ADB (5555) become unreachable.  The
+  # template must stay on Emulated so vm.sh's guest-wait checks actually work.
+  test_macbook_utm_emulated_network_for_port_forward =
+    assert'
+      (
+        (lib.hasInfix "<key>Mode</key>" utmConfigPlistText)
+        && (lib.hasInfix "<string>Emulated</string>" utmConfigPlistText)
+        && !(lib.hasInfix "<string>Shared</string>" utmConfigPlistText)
+        && (lib.hasInfix "<key>PortForward</key>" utmConfigPlistText)
+        && (lib.hasInfix "<integer>2222</integer>" utmConfigPlistText)
+      )
+      "src/modules/configs/vms/utm-config.plist.xml must use Mode=Emulated (not Shared) so UTM forwards ports 2222/5555 via hostfwd; vmnet-shared silently drops PortForward";
   test_macbook_utm_display_card_validity = assert' (
     (lib.hasInfix "displayCard = vm: if vm.type == \"Windows\" then \"virtio-vga\" else \"virtio-gpu-pci\";" macbook_vms_nix_text)
     && !(lib.hasInfix "virtio-ramfb" macbook_vms_nix_text)
@@ -1219,6 +1233,7 @@ let
     test_macbook_utm_schema_keys
     test_macbook_utm_plist_correctness
     test_macbook_utm_no_qemu_guest_agent
+    test_macbook_utm_emulated_network_for_port_forward
     test_macbook_utm_display_card_validity
     test_macbook_utm_firmware_contract
     test_macbook_utm_data_dir_disk_path
@@ -1319,6 +1334,7 @@ in
     test_macbook_utm_schema_keys
     test_macbook_utm_plist_correctness
     test_macbook_utm_no_qemu_guest_agent
+    test_macbook_utm_emulated_network_for_port_forward
     test_macbook_utm_display_card_validity
     test_macbook_utm_firmware_contract
     test_macbook_utm_data_dir_disk_path
