@@ -402,6 +402,7 @@ let
   # is optional at runtime and some current kernels do not provide a loadable
   # virtio_fs module, which would make image generation fail before first boot.
   guest_nix_text = builtins.readFile ../../src/vms/nixos/guest.nix;
+  core_nix_text = builtins.readFile ../../src/modules/core.nix;
   nixos_packer_text = builtins.readFile ../../src/vms/nixos/packer.pkr.hcl;
   test_nixos_guest_virtiofs_not_forced = assert' (
     !(lib.hasInfix "boot.initrd.availableKernelModules = [ \"virtio_fs\" ];" guest_nix_text)
@@ -703,6 +704,85 @@ let
         && (lib.hasInfix "runtime disk guest credential drift detected" windows_vm_setup_ps1_text)
       )
       "POSIX and Windows vm setup flows must detect VM guest credential drift via marker files and replace stale images/runtime disks";
+
+  # guest.nix lives at src/vms/nixos/, so repo imports resolve via ../../../src/
+  # (three levels up). Two levels (../../src) would hit the nonexistent
+  # src/src/ path — the regression that left the NixOS image unbuildable after
+  # the file moved from vms/nixos/ to src/vms/nixos/.
+  test_nixos_guest_import_paths_resolve =
+    assert'
+      (
+        (lib.hasInfix "../../../src/modules/core.nix" guest_nix_text)
+        && (lib.hasInfix "../../../src/hosts/NixOS/desktop.nix" guest_nix_text)
+        # WHY: negative checks must be newline-anchored: "../../../src/..." contains
+        # "../../src/..." as a substring, so a bare !hasInfix always fails.
+        && !(lib.hasInfix "\n    ../../src/modules/core.nix" guest_nix_text)
+        && !(lib.hasInfix "\n    ../../src/hosts/NixOS/desktop.nix" guest_nix_text)
+      )
+      "src/vms/nixos/guest.nix must import repo files via ../../../src/ (three levels up from src/vms/nixos/)";
+
+  # The NixOS guest must NOT import the host-only SOPS modules: they define
+  # sops.* options that only exist when sops-nix.nixosModules.sops is loaded,
+  # which the standalone nixos-generators evaluation does not do.  The guest
+  # injects credentials via NUCLEUS_VM_GUEST_* env vars instead.
+  test_nixos_guest_avoids_host_sops_modules =
+    assert'
+      (
+        !(lib.hasInfix "../../../src/modules/posix-sops.nix" guest_nix_text)
+        && !(lib.hasInfix "../../../src/hosts/NixOS/sops.nix" guest_nix_text)
+        && (lib.hasInfix "NUCLEUS_VM_GUEST_* environment variables instead of SOPS" guest_nix_text)
+      )
+      "src/vms/nixos/guest.nix must not import host-only SOPS modules that break the standalone nixos-generators evaluation";
+
+  # The NixOS guest must thread username (and hostName) through _module.args
+  # because nixos-generators passes no specialArgs; shared modules key off both.
+  test_nixos_guest_threads_username_arg =
+    assert'
+      (
+        (lib.hasInfix "_module.args = {" guest_nix_text)
+        && (lib.hasInfix "username = guestUsername;" guest_nix_text)
+        && (lib.hasInfix "hostName = \"NixOS\";" guest_nix_text)
+      )
+      "src/vms/nixos/guest.nix must thread username/hostName via _module.args for standalone nixos-generators evals";
+
+  # The NixOS guest must force overrides on host modules whose defaults cannot
+  # evaluate on aarch64-linux or collide under the standalone evaluation.
+  test_nixos_guest_standalone_eval_overrides =
+    assert'
+      (
+        (lib.hasInfix "services.gnome.gcr-ssh-agent.enable = lib.mkForce false;" guest_nix_text)
+        && (lib.hasInfix "hardware.graphics.enable32Bit = lib.mkForce false;" guest_nix_text)
+        && (lib.hasInfix "programs.steam.enable = lib.mkForce false;" guest_nix_text)
+        && (lib.hasInfix "system.stateVersion = lib.mkForce \"25.05\";" guest_nix_text)
+        && (lib.hasInfix "allowUnfree = true;" guest_nix_text)
+        && (lib.hasInfix "permittedInsecurePackages = [ \"dotnet-runtime-6.0.36\" ];" guest_nix_text)
+      )
+      "src/vms/nixos/guest.nix must force standalone-eval overrides (gcr-ssh-agent, 32-bit graphics, Steam, stateVersion, unfree/insecure policy)";
+
+  # core.nix must append camillagui-backend via ++ (lib.optionals ...) so the
+  # overlay-only package is skipped by vanilla nixpkgs evaluations (e.g. the
+  # nixos-generators guest build); placing lib.optionals inside the list literal
+  # would nest a list element and fail the systemPackages package-type check.
+  test_core_nix_guards_overlay_only_packages =
+    assert'
+      (
+        (lib.hasInfix "++ (lib.optionals (pkgs ? camillagui-backend) [ pkgs.camillagui-backend ])" core_nix_text)
+        && (lib.hasInfix "vanilla nixpkgs has no such attribute" core_nix_text)
+      )
+      "src/modules/core.nix must guard camillagui-backend behind a ++ (lib.optionals (pkgs ? camillagui-backend)) concat, not a nested list literal";
+
+  # core.nix must filter overlap packages by meta.available on Linux so
+  # arch-specific nixpkgs attrs (e.g. discord-canary, x86_64-linux only) are
+  # dropped from aarch64-linux evals like the nixos-generators guest build.
+  test_core_nix_overlap_arch_available_filter =
+    assert'
+      (
+        (lib.hasInfix "overlapNixAttrAvailable name" core_nix_text)
+        && (lib.hasInfix "overlapNixAttrAvailable =" core_nix_text)
+        && (lib.hasInfix "(pkgs.\${attr}.meta.available or true)" core_nix_text)
+        && (lib.hasInfix "does NOT trigger check-meta's refusal" core_nix_text)
+      )
+      "src/modules/core.nix must filter overlap nixpkgs packages by meta.available on Linux (arch-aware, lazy, non-refusing)";
 
   test_utm_runtime_replacement_requires_valid_prebuilt =
     assert'
@@ -1294,6 +1374,12 @@ let
     test_android_gsi_version_type
     test_android_gsi_version_only_on_android
     test_enabled_vm_not_orphaned
+    test_nixos_guest_import_paths_resolve
+    test_nixos_guest_avoids_host_sops_modules
+    test_nixos_guest_threads_username_arg
+    test_nixos_guest_standalone_eval_overrides
+    test_core_nix_guards_overlay_only_packages
+    test_core_nix_overlap_arch_available_filter
     test_macbook_utm_required_key_guard
   ];
 
@@ -1397,6 +1483,12 @@ in
     test_android_gsi_version_type
     test_android_gsi_version_only_on_android
     test_enabled_vm_not_orphaned
+    test_nixos_guest_import_paths_resolve
+    test_nixos_guest_avoids_host_sops_modules
+    test_nixos_guest_threads_username_arg
+    test_nixos_guest_standalone_eval_overrides
+    test_core_nix_guards_overlay_only_packages
+    test_core_nix_overlap_arch_available_filter
     test_macbook_utm_required_key_guard
     ;
 

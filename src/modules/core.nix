@@ -17,7 +17,6 @@ let
     # Activation script install-cargo-binstall-packages gets pkgs.cargo as
     # a store-path argument directly — no PATH dependency needed.
     pkgs.camilladsp
-    pkgs.camillagui-backend
     pkgs.cargo-binstall
     pkgs.cargo-cache
     pkgs.cargo-nextest
@@ -282,6 +281,11 @@ let
   # Cross-platform nixpkgs packages from the overlap set.
   # On macOS: respects backend selection (only if routed to nixpkgs).
   # On NixOS: all platform-compatible packages go to nixpkgs unconditionally.
+  # WHY meta.available: overlappingPackages.platforms is a coarse darwin/linux
+  # filter, but some packages only build for one Linux arch (e.g. discord-canary
+  # is x86_64-linux only; the nixos-generators guest builds aarch64-linux).
+  # meta.available reads lazily and does NOT trigger check-meta's refusal
+  # assertion, so filtering by it safely drops arch-incompatible packages.
   overlapNixPackages =
     map (packageName: builtins.getAttr overlappingPackages.${packageName}.nixpkgsAttr pkgs)
       (
@@ -290,8 +294,18 @@ let
             name: selectedOverlapBackends.${name} == "nixpkgs" && platformCompatible name
           ) overlapPackageNames
         else
-          builtins.filter platformCompatible overlapPackageNames
+          builtins.filter (name: platformCompatible name && overlapNixAttrAvailable name) overlapPackageNames
       );
+
+  # Whether the overlap package's nixpkgs attribute is actually available on
+  # the current platform (checks meta.available, defaulting to true when the
+  # attribute or its meta is missing).
+  overlapNixAttrAvailable =
+    packageName:
+    let
+      attr = overlappingPackages.${packageName}.nixpkgsAttr;
+    in
+    (pkgs.${attr}.meta.available or true);
 
   overlapHomebrewBrews = lib.optionals pkgs.stdenv.isDarwin (
     builtins.filter (name: name != null) (
@@ -323,7 +337,16 @@ let
     )
   );
 
-  sharedPackages = baseSharedPackages ++ darwinSharedPackages ++ overlapNixPackages;
+  sharedPackages =
+    baseSharedPackages
+    # WHY: camillagui-backend ships only via the nucleus flake overlay (a
+    # PyInstaller bundle; vanilla nixpkgs has no such attribute).  The real
+    # NixOS/Darwin hosts get it through mkPkgs' overlays, but standalone
+    # evaluations like the nixos-generators guest build use plain nixpkgs, so
+    # append it only when the evaluating package set actually provides it.
+    ++ (lib.optionals (pkgs ? camillagui-backend) [ pkgs.camillagui-backend ])
+    ++ darwinSharedPackages
+    ++ overlapNixPackages;
 in
 {
   options.nucleus.macos.packageSelection = {
