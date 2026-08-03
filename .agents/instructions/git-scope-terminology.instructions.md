@@ -36,7 +36,7 @@ Rules:
 - `~/.gitconfig` → user or default `<Host>.gitconfig`
 - `~/.config/git/ignore` (POSIX) / `%USERPROFILE%\.config\git\ignore` (Windows) → user or default `<Host>.gitignore`
 
-Defaults-fallback rule: the per-user directory wins; if `<username>/git/<Host>.gitconfig` (or `.gitignore`) does not exist, `default/git/<Host>.gitconfig` (or `.gitignore`) is used. A user can override by creating their own file.
+Defaults-fallback rule: the per-user directory wins; if `<username>/git/<Host>.gitconfig` (or `.gitignore`) does not exist, `default/git/<Host>.gitconfig` (or `.gitignore`) is used. A user can override by creating their own file. Selection is identical on all platforms: POSIX resolves via `src/modules/lib/users-overlay.nix`, Windows via `Resolve-UserConfigSource` in `ConfigHelpers.ps1` — both fail fast when neither the per-user nor the default file exists.
 
 Hostname derivation: `<Host>` is the canonical hostname (MacBook, NixOS, Windows). POSIX threads it through the flake as `specialArgs.hostName`; Windows derives it at runtime from `$env:NUCLEUS_HOST` (set to `Windows` by `apply.ps1`), mirroring the POSIX `hostName` threading.
 

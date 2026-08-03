@@ -74,4 +74,4 @@ Example: `src/modules/configs/direnv/lib/apple-sdk-override.sh` — a macOS-spec
 
 ### User-scoped configs
 
-User-scoped configs live in `src/users/<username>/<config>/` (per-user) with `src/users/default/<config>/` as defaults-fallback; only `git/` is migrated so far. These paths are OUTSIDE the step-19 config-method-compliance scan (`src/modules/configs/**` only) — no `# check-suppress:config-method` annotations are required for `src/users/**` reference sites, but the same method-1 writable-symlink rule still applies.
+User-scoped configs live in `src/users/<username>/<config>/` (per-user) with `src/users/default/<config>/` as defaults-fallback. The mechanism is generic — file selection goes through `src/modules/lib/users-overlay.nix` (POSIX) and `Resolve-UserConfigSource` in `src/hosts/Windows/modules/ConfigHelpers.ps1` (Windows), so any future config reuses the same per-user-over-default lookup. These paths are OUTSIDE the step-19 config-method-compliance scan (`src/modules/configs/**` only) — no `# check-suppress:config-method` annotations are required for `src/users/**` reference sites, but the same method-1 writable-symlink rule still applies.
