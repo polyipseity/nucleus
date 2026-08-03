@@ -62,6 +62,13 @@ let
   # QEMU display card appropriate for the guest OS.
   # Linux/NixOS VMs use VirtIO GPU so UTM exposes an active display on both
   # Apple Silicon and Intel hosts.
+  #
+  # Android (LineageOS) on UTM additionally requires UTM's global
+  # "Renderer backend" (pref QEMURendererBackend) to be ANGLE (OpenGL),
+  # value 1; ANGLE (Metal) makes the UI not appear after boot, and UTM's
+  # default/software path is prone to a frozen display (UTM issue #378).
+  # ref: https://wiki.lineageos.org/utms/utm-vm-on-apple-silicon-mac -- renderer backend must be ANGLE (OpenGL) for the Android UI to appear
+  # ref: https://github.com/utmapp/UTM/issues/378 -- Android VMs randomly freeze; renderer-dependent
   displayCard = vm: if vm.type == "Windows" then "virtio-vga" else "virtio-gpu-pci";
 
   # UTM 4.x sharing mode selector.
