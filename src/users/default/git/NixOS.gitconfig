@@ -1,8 +1,18 @@
 # User-scope git config (git --global, ~/.gitconfig).
-# Global-scope (git --system) settings live in src/modules/configs/git/<host>.gitconfig.
+# Signing, newline and symlink defaults are user-scoped; system-scope
+# (git --system) settings live in src/modules/configs/git/<host>.gitconfig.
+[commit]
+    # WHY: signing is required by default so unsigned commits are rejected;
+    # the signing key comes from the identity include below.
+    gpgsign = true
 [core]
+    # POSIX checkouts stay LF on disk and in the repo; newline policy is
+    # controlled by .gitattributes.
+    autocrlf = false
     # Ignore patterns live at user scope: git has no global-scoped ignore file.
     excludesFile = ~/.config/git/ignore
+    # WHY: symlinks are required for dev-repo and managed-symlink workflows.
+    symlinks = true
 [fetch]
     # Prune deleted remote-tracking branches on every fetch so stale refs do
     # not linger indefinitely across long-lived machines.
@@ -38,6 +48,9 @@
     autoSetupRemote = true
     # `push.followTags` keeps release/signing tags in sync with branch pushes.
     followTags = true
+[tag]
+    # WHY: signing is required by default so unsigned tags are rejected.
+    gpgsign = true
 [url "git@github.com:"]
     # Rewrite GitHub HTTPS remotes to SSH globally for this user so clones and
     # future remotes authenticate with the managed SSH identity automatically.

@@ -1,7 +1,6 @@
-[commit]
-    gpgsign = true
-[core]
-    autocrlf = false
-    symlinks = true
-[tag]
-    gpgsign = true
+# Managed global (system) Git config for POSIX hosts (see
+# .agents/instructions/git-scope-terminology.instructions.md). Symlinked as
+# /etc/gitconfig by the posix-base.nix activation script, with a same-folder
+# .bak backup of any system-owned original. Intentionally empty: signing,
+# newline and symlink defaults are user-scoped in
+# src/users/default/git/<host>.gitconfig.
