@@ -114,8 +114,9 @@
   # --- Non-git aliases ---
   "-la" = "eza --long --all";
   "-ll" = "eza --long --all";
-  # bun shortcuts — mirror the Windows bun function aliases in shell.ps1 managed block.
-  # -ni/-nr/-nx are concise but unambiguous; `bun x` replaces npx for one-shot package execution.
+  # bun shortcuts — mirror the Windows bun function aliases in profile.ps1 managed block.
+  # -n is the bare bun command; -ni/-nr/-nx are concise but unambiguous; `bun x` replaces npx for one-shot package execution.
+  "-n" = "bun";
   "-ni" = "bun install";
   "-nr" = "bun run";
   "-nx" = "bun x";

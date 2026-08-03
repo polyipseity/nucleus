@@ -395,10 +395,11 @@ if (Get-Command eza -ErrorAction SilentlyContinue) {
   Add-ShellAlias '-ll' { Get-ChildItem -Force @Args }
 }
 
-# bun shortcuts: mirrors -ni/-nr/-nx aliases in shell/aliases.nix on POSIX hosts.
+# bun shortcuts: mirrors -n/-ni/-nr/-nx aliases in shell/aliases.nix on POSIX hosts.
 # Guarded so the profile loads safely on machines where bun is not yet installed.
 # check-suppress:suppression_doc: tool-availability guard -- bun may not be installed
 if (Get-Command bun -ErrorAction SilentlyContinue) {
+  Add-ShellAlias '-n' { & bun @Args }
   Add-ShellAlias '-ni' { & bun install @Args }
   Add-ShellAlias '-nr' { & bun run @Args }
   Add-ShellAlias '-nx' { & bun x @Args }
@@ -498,7 +499,7 @@ function npm {
   Write-Warning "         - bun add <pkg>   (add a dependency)"
   Write-Warning "         - bun x <cmd>     (run one-shot package commands, replaces npx)"
   Write-Warning "         - bun run         (run package.json scripts)"
-  Write-Warning "         Shell shortcuts -ni/-nr/-nx also work."
+  Write-Warning "         Shell shortcuts -n/-ni/-nr/-nx also work."
   return 1
 }
 function npx {

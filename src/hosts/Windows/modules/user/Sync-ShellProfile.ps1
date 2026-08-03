@@ -22,7 +22,7 @@ function Sync-ShellProfile {
         via cargo-binstall by Invoke-CargoBinstallSetup)
       - common aliases (`-g`, `-ga`, `-gb`, `-gc`, `-gca`, `-gcl`, `-gco`, `-gd`, `-gf`, `-gl`, `-gp`,
         `-gpl`, `-gs-pdf-opt-*` (Ghostscript PDF presets), `-gsw`, `-gst`, `-la`, `-ll` (eza preferred, Get-ChildItem fallback),
-        `-ni`, `-nr`, `-nx` (bun shortcuts, if bun present), `-v`)
+        `-n`, `-ni`, `-nr`, `-nx` (bun shortcuts, if bun present), `-v`)
       - Python ban: blocks system-wide python/pip to prevent accidental
          modifications to system environment
       - Build tool ban: blocks system-wide bun/cargo/rustc/uv direct invocation;

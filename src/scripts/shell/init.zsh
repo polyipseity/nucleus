@@ -356,7 +356,7 @@ shell: system-wide npm is not used in this environment.
          - bun add <pkg>   (add a dependency)
          - bun x <cmd>     (run one-shot package commands, replaces npx)
          - bun run         (run package.json scripts)
-         Shell shortcuts -ni/-nr/-nx also work.
+         Shell shortcuts -n/-ni/-nr/-nx also work.
 EOF
   return 1
 }

@@ -21,12 +21,20 @@ let
     && lib.hasInfix ''"-gsw" = "git switch";'' aliasesText
   ) "aliases.nix must expose the curated git shortcut set";
 
+  test_zsh_aliases_include_bun_shortcuts = assert' (
+    lib.hasInfix ''"-n" = "bun";'' aliasesText
+    && lib.hasInfix ''"-ni" = "bun install";'' aliasesText
+    && lib.hasInfix ''"-nr" = "bun run";'' aliasesText
+    && lib.hasInfix ''"-nx" = "bun x";'' aliasesText
+  ) "aliases.nix must expose the curated bun shortcut set";
+
   test_posix_pwsh_shortcuts_match_shell_aliases = assert' (
     lib.hasInfix "Add-ShellAlias '-gb' { & git branch @Args }" shellProfileText
     && lib.hasInfix "Add-ShellAlias '-gcl' { & git clone @Args }" shellProfileText
     && lib.hasInfix "Add-ShellAlias '-gf' { & git fetch @Args }" shellProfileText
     && lib.hasInfix "Add-ShellAlias '-gl' { & git log --oneline --decorate --graph @Args }" shellProfileText
     && lib.hasInfix "Add-ShellAlias '-gsw' { & git switch @Args }" shellProfileText
+    && lib.hasInfix "Add-ShellAlias '-n' { & bun @Args }" shellProfileText
     && lib.hasInfix "Add-ShellAlias '-ni' { & bun install @Args }" shellProfileText
     && lib.hasInfix "Add-ShellAlias '-nr' { & bun run @Args }" shellProfileText
     && lib.hasInfix "Add-ShellAlias '-nx' { & bun x @Args }" shellProfileText
@@ -38,6 +46,7 @@ let
     && lib.hasInfix "Add-ShellAlias '-gf' { & git fetch @Args }" shellProfileText
     && lib.hasInfix "Add-ShellAlias '-gl' { & git log --oneline --decorate --graph @Args }" shellProfileText
     && lib.hasInfix "Add-ShellAlias '-gsw' { & git switch @Args }" shellProfileText
+    && lib.hasInfix "Add-ShellAlias '-n' { & bun @Args }" shellProfileText
     && lib.hasInfix "Add-ShellAlias '-ni' { & bun install @Args }" shellProfileText
     && lib.hasInfix "Add-ShellAlias '-nr' { & bun run @Args }" shellProfileText
     && lib.hasInfix "Add-ShellAlias '-nx' { & bun x @Args }" shellProfileText
@@ -107,6 +116,7 @@ let
 
   allTests = [
     test_zsh_aliases_include_curated_git_shortcuts
+    test_zsh_aliases_include_bun_shortcuts
     test_posix_pwsh_shortcuts_match_shell_aliases
     test_windows_pwsh_shortcuts_match_shell_aliases
     test_posix_shell_exposes_managed_commands
