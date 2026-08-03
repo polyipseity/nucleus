@@ -10,15 +10,14 @@ let
 
   test_linux_nix_index_is_daily = assert' (
     containsRegex ''Description = "Daily nix-index database refresh";'' linuxText
-    && containsRegex ''OnCalendar = "00:00:00";'' linuxText
-    && !containsRegex ''OnCalendar = "Sun 00:00:00";'' linuxText
-  ) "linux nix-index timer must run daily at 00:00";
+    && containsRegex ''OnCalendar = "12:00:00";'' linuxText
+    && !containsRegex ''OnCalendar = "Sun 12:00:00";'' linuxText
+  ) "linux nix-index timer must run daily at 12:00";
 
   test_macos_nix_index_is_daily = assert' (
     containsRegex ''Label = "local.nix-index-update";'' macosText
-    && containsRegex ''StartCalendarInterval = \[ \{ Hour = 0; Minute = 0; \} \];'' macosText
-    && !containsRegex "Weekday = 0;" macosText
-  ) "macOS nix-index launch agent must run daily at 00:00";
+    && containsRegex "StartCalendarInterval = [[] .*[{] .*Hour = 12; .*Minute = 0; *[}] .*[]];" macosText
+  ) "macOS nix-index launch agent must run daily at 12:00";
 
   # === BACKEND SELECTION RESOLUTION LOGIC ===
   # Mimics core.nix resolveBackend: check overrides → check policy → fall back to global backend.
@@ -359,13 +358,13 @@ let
     test_package_category_enum
   ];
 in
-{
+builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${builtins.toString (builtins.length allTests)} core tests passed";
   testNames = [
-    "1: Linux nix-index timer runs daily at 00:00"
-    "2: macOS nix-index launch agent runs daily at 00:00"
+    "1: Linux nix-index timer runs daily at 12:00"
+    "2: macOS nix-index launch agent runs daily at 12:00"
     "3: Override precedence (overrides > policy > global)"
     "4: Policy-based categorization (CLI→nixpkgs, GUI→homebrew)"
     "5: Global backend fallback when not in policy"

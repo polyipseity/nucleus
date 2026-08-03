@@ -200,7 +200,8 @@ let
     }
   ];
 
-  # Darwin-only overlappingPackages entries (not available on Linux nixpkgs).
+  # Darwin-only overlappingPackages entries (attrs exist on Linux nixpkgs but
+  # are only buildable on darwin via meta.platforms).
   darwinOnlyPackages = [
     {
       name = "iterm2";
@@ -233,18 +234,23 @@ let
     let
       darwinOnlyPkgNames = map (p: p.name) darwinOnlyPackages;
       # Match a core.nix package entry with platforms = ["darwin"].
+      # The name may be written quoted in core.nix (e.g. "visual-studio-code@insiders").
       hasDarwinPlatform =
         name:
-        builtins.match (".*" + name + " = \\{\n.*platforms = \\[ \"darwin\" \];.*") coreModuleText != null;
+        builtins.match (".*" + name + "\"? = \\{\n.*platforms = \\[ \"darwin\" \];.*") coreModuleText
+        != null;
     in
     assert' (builtins.all hasDarwinPlatform darwinOnlyPkgNames) "Darwin-only packages should have platforms field set in core.nix";
 
   test_darwin_only_absent_on_linux =
     let
       linuxPkgs = import <nixpkgs> { system = "x86_64-linux"; };
-      notExistsOnLinux = p: !builtins.hasAttr p.nixpkgsAttr linuxPkgs;
+      notBuildableOnLinux =
+        p:
+        !builtins.hasAttr p.nixpkgsAttr linuxPkgs
+        || !(builtins.elem "x86_64-linux" (linuxPkgs.${p.nixpkgsAttr}.meta.platforms or [ ]));
     in
-    assert' (builtins.all notExistsOnLinux darwinOnlyPackages) "Darwin-only packages should not exist in nixpkgs on Linux";
+    assert' (builtins.all notBuildableOnLinux darwinOnlyPackages) "Darwin-only packages must not be buildable on Linux";
 
   # Guard: every overlappingPackages entry in core.nix must be covered by either
   # crossPlatformOverlapAttrs (cross-platform) or darwinOnlyPackages (darwin-only).
@@ -279,7 +285,7 @@ let
     test_all_overlapping_packages_covered
   ];
 in
-{
+builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
   packageCount = builtins.length essentialPackages;

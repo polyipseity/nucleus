@@ -190,7 +190,7 @@ let
         ssh_key = "\${HOME}/.ssh/id_ed25519_nucleus";
         gpg_keys = "\${HOME}/.gnupg/nucleus";
       };
-      allAbsolute = all (path: (builtins.match "^\$.*" path) != null) (
+      allAbsolute = all (path: (builtins.match "^\\$.*" path) != null) (
         builtins.attrValues materializedPaths
       );
     in
@@ -227,7 +227,7 @@ let
     test_sops_updatekeys_frequency
   ];
 in
-{
+builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${builtins.toString (builtins.length allTests)} SOPS mock validation tests passed";

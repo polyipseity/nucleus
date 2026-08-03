@@ -33,7 +33,11 @@ let
         default = [ "git" ];
       };
     in
-    assert' (optionDef1.type == optionDef2.type) "Option types should match across modules";
+    # Nix type values are closures, so == compares reference identity and is
+    # always false; descriptions are the stable structural fingerprint.
+    assert' (
+      optionDef1.type.description == optionDef2.type.description
+    ) "Option types should match across modules";
 
   # === TEST: Home Manager state version doesn't conflict ===
   test_home_stateversion_no_conflict =
@@ -163,7 +167,7 @@ let
     test_import_order_acyclic
   ];
 in
-{
+builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
   message = "All ${builtins.toString (builtins.length allTests)} option conflict detection tests passed";
