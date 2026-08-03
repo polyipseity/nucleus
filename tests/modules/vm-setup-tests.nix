@@ -721,6 +721,22 @@ let
       )
       "src/vms/nixos/guest.nix must import repo files via ../../../src/ (three levels up from src/vms/nixos/)";
 
+  # The NixOS image and runtime disks must rebuild when the guest config
+  # (guest.nix, its imports, flake.lock) drifts, not just on credential drift;
+  # otherwise stale images ship silently after guest.nix changes.
+  test_nixos_guest_config_drift_rebuild =
+    assert'
+      (
+        (lib.hasInfix "vm_guest_config_marker_path" vm_setup_sh_text)
+        && (lib.hasInfix "vm_guest_config_marker_matches" vm_setup_sh_text)
+        && (lib.hasInfix "vm_guest_config_fingerprint" vm_setup_sh_text)
+        && (lib.hasInfix ".vm-guest-config-sha256" vm_setup_sh_text)
+        && (lib.hasInfix "NixOS image guest config drift detected" vm_setup_sh_text)
+        && (lib.hasInfix "runtime disk guest config drift detected" vm_setup_sh_text)
+        && (lib.hasInfix "src/flake.lock" vm_setup_sh_text)
+      )
+      "scripts/vm.sh must rebuild the NixOS image and replace runtime disks when the guest config fingerprint drifts";
+
   # The NixOS guest must NOT import the host-only SOPS modules: they define
   # sops.* options that only exist when sops-nix.nixosModules.sops is loaded,
   # which the standalone nixos-generators evaluation does not do.  The guest
@@ -1375,6 +1391,7 @@ let
     test_android_gsi_version_only_on_android
     test_enabled_vm_not_orphaned
     test_nixos_guest_import_paths_resolve
+    test_nixos_guest_config_drift_rebuild
     test_nixos_guest_avoids_host_sops_modules
     test_nixos_guest_threads_username_arg
     test_nixos_guest_standalone_eval_overrides
@@ -1484,6 +1501,7 @@ in
     test_android_gsi_version_only_on_android
     test_enabled_vm_not_orphaned
     test_nixos_guest_import_paths_resolve
+    test_nixos_guest_config_drift_rebuild
     test_nixos_guest_avoids_host_sops_modules
     test_nixos_guest_threads_username_arg
     test_nixos_guest_standalone_eval_overrides

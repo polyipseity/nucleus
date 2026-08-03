@@ -146,28 +146,11 @@ resolve_vm_guest_ssh_key() {
 # vm_guest_credentials_hash
 #   Prints a SHA-256 fingerprint of the resolved guest credentials. WHY: the
 #   fingerprint lets provisioning detect when SOPS secrets changed and the
-#   guest's stored credentials are stale (drift). Tools are tried in the order
-#   sha256sum -> shasum -> openssl because macOS ships shasum/openssl but not
-#   sha256sum, and each tool's output format differs (hence the awk column).
-#   Returns 1 when no SHA-256 tool is available.
+#   guest's stored credentials are stale (drift).  Delegates to
+#   vm_sha256_input (src/scripts/lib/vm.sh) so all VM fingerprints share one
+#   tool chain.
 vm_guest_credentials_hash() {
-  if command -v sha256sum >/dev/null 2>&1; then
-    printf '%s\n%s' "$vm_guest_username" "$vm_guest_password" | sha256sum | awk '{print $1}'
-    return 0
-  fi
-
-  if command -v shasum >/dev/null 2>&1; then
-    printf '%s\n%s' "$vm_guest_username" "$vm_guest_password" | shasum -a 256 | awk '{print $1}'
-    return 0
-  fi
-
-  if command -v openssl >/dev/null 2>&1; then
-    printf '%s\n%s' "$vm_guest_username" "$vm_guest_password" | openssl dgst -sha256 | awk '{print $NF}'
-    return 0
-  fi
-
-  error "no SHA-256 tool is available; cannot track VM guest credential drift"
-  return 1
+  printf '%s\n%s' "$vm_guest_username" "$vm_guest_password" | vm_sha256_input
 }
 
 # ---------------------------------------------------------------------------

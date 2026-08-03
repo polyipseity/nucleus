@@ -228,6 +228,72 @@ vm_guest_credentials_marker_matches() {
   [ "$_vgcm_actual" = "$_vgcm_expected" ]
 }
 
+# vm_sha256_input
+#   Prints the SHA-256 fingerprint of stdin using the first available tool:
+#   sha256sum -> shasum -a 256 -> openssl dgst -sha256.  WHY: macOS ships
+#   shasum/openssl but not sha256sum, and each tool's output format differs
+#   (hence the awk column).  Returns 1 when no SHA-256 tool is available.
+vm_sha256_input() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | awk '{print $1}'
+    return 0
+  fi
+
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 | awk '{print $1}'
+    return 0
+  fi
+
+  if command -v openssl >/dev/null 2>&1; then
+    openssl dgst -sha256 | awk '{print $NF}'
+    return 0
+  fi
+
+  error "no SHA-256 tool is available; cannot fingerprint VM guest state"
+  return 1
+}
+
+# vm_guest_config_marker_path NAME [DISK_PATH]
+#   Returns the sidecar marker path storing the guest-config fingerprint
+#   (NixOS guest.nix + imports + flake.lock) for drift detection.
+vm_guest_config_marker_path() {
+  _vgcmp_name="$1"
+  _vgcmp_disk_path="${2:-}"
+  if [ -n "$_vgcmp_disk_path" ]; then
+    printf '%s.vm-guest-config-sha256\n' "$_vgcmp_disk_path"
+  else
+    printf '%s/%s.vm-guest-config-sha256\n' "$IMAGES_DIR" "$_vgcmp_name"
+  fi
+}
+
+# vm_guest_config_marker_matches EXPECTED_FINGERPRINT MARKER_PATH
+#   Returns 0 when MARKER_PATH exists and equals EXPECTED.
+vm_guest_config_marker_matches() {
+  _vgcmm_expected="$1"
+  _vgcmm_marker="$2"
+  if [ ! -f "$_vgcmm_marker" ]; then
+    return 1
+  fi
+  _vgcmm_actual="$(tr -d '\r\n' <"$_vgcmm_marker")"
+  [ "$_vgcmm_actual" = "$_vgcmm_expected" ]
+}
+
+# vm_guest_config_fingerprint
+#   Prints a SHA-256 fingerprint of the NixOS guest configuration: the resolved
+#   paths of every src/ import in guest.nix plus src/flake.lock.  WHY: the
+#   imported files are leaf modules (no transitive imports), so resolving the
+#   import list captures all configuration source; flake.lock pins the
+#   nixos-generators revision.  Returns 1 when no SHA-256 tool is available.
+vm_guest_config_fingerprint() {
+  _gcf_imports="$(grep -oE '(\.\./)+src/[A-Za-z0-9_./-]+\.nix' "$VMS_DIR/nixos/guest.nix" | sort -u)"
+  {
+    printf '%s\n' "$_gcf_imports"
+    if [ -f "$REPO_ROOT/src/flake.lock" ]; then
+      cat "$REPO_ROOT/src/flake.lock"
+    fi
+  } | vm_sha256_input
+}
+
 # wait_for_utm_registration NAME
 #   Polls utmctl list until VM NAME appears or timeout is reached.
 wait_for_utm_registration() {
@@ -806,9 +872,10 @@ vm_setup_tart() {
 vm_setup_utm() {
   local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display bundle data_dir disk_file
-  local disk_credential_marker config_plist bundle_exists legacy_display_config
+  local disk_credential_marker disk_config_marker config_plist bundle_exists legacy_display_config
   local template_drift_config _plist_template _prebuilt _prebuilt_valid
   local _android_system _android_userdata _android_gsi _userdata_file _gsi_file
+  local _guest_config_fingerprint
 
   vm_display=$(jq -r ".VMs[$vm_index].display" "$MANIFEST")
 
@@ -822,6 +889,13 @@ vm_setup_utm() {
   data_dir="$bundle/Data"
   disk_file="$data_dir/disk-main.qcow2"
   disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_name" "$disk_file")"
+  disk_config_marker="$(vm_guest_config_marker_path "$vm_name" "$disk_file")"
+  # WHY: only NixOS guests have a Nix-managed guest config to fingerprint;
+  # Windows/macOS are built by Packer with separate templates.
+  _guest_config_fingerprint=''
+  if [ "$vm_type" = "NixOS" ]; then
+    _guest_config_fingerprint="$(vm_guest_config_fingerprint)"
+  fi
   config_plist="$bundle/config.plist"
   bundle_exists=false
   legacy_display_config=false
@@ -992,6 +1066,12 @@ vm_setup_utm() {
         rm -f "$disk_file"
         _replace_runtime=true
       fi
+      if [ -n "$_guest_config_fingerprint" ] && [ -f "$disk_file" ] \
+        && ! vm_guest_config_marker_matches "$_guest_config_fingerprint" "$disk_config_marker"; then
+        warn "$vm_name runtime disk guest config drift detected; replacing runtime disk from pre-built image"
+        rm -f "$disk_file"
+        _replace_runtime=true
+      fi
       if [ ! -f "$disk_file" ]; then
         if [ "$_prebuilt_valid" != true ]; then
           warn "cannot replace the $vm_name runtime disk because no valid pre-built image is available: $_prebuilt"
@@ -1000,6 +1080,9 @@ vm_setup_utm() {
         cp "$_prebuilt" "$disk_file"
         say "copied pre-built disk image: $disk_file"
         resize_and_mark_image '' "$disk_credential_marker"
+        if [ -n "$_guest_config_fingerprint" ]; then
+          printf '%s\n' "$_guest_config_fingerprint" >"$disk_config_marker"
+        fi
       elif [ "$_replace_runtime" = true ]; then
         warn "replacement was requested for '$vm_name' but the runtime disk still exists; leaving it untouched"
       else
@@ -1043,13 +1126,20 @@ vm_setup_utm() {
 
 vm_setup_libvirt() {
   local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
-  local vm_display disk_path disk_credential_marker _prebuilt
+  local vm_display disk_path disk_credential_marker disk_config_marker _prebuilt
   local _android_system _android_userdata _android_gsi
+  local _guest_config_fingerprint
 
   vm_display=$(jq -r ".VMs[$vm_index].display" "$MANIFEST")
 
   disk_path="$VM_DIR/${vm_name}.qcow2"
   disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_name" "$disk_path")"
+  disk_config_marker="$(vm_guest_config_marker_path "$vm_name" "$disk_path")"
+  # WHY: only NixOS guests have a Nix-managed guest config to fingerprint.
+  _guest_config_fingerprint=''
+  if [ "$vm_type" = "NixOS" ]; then
+    _guest_config_fingerprint="$(vm_guest_config_fingerprint)"
+  fi
 
   say "configuring libvirt VM '$vm_display' (hosts: $vm_hosts)..."
 
@@ -1099,12 +1189,19 @@ vm_setup_libvirt() {
         warn "$vm_name runtime disk guest credential drift detected; replacing runtime disk from pre-built image"
         rm -f "$disk_path"
         _replace_runtime=true
+      elif [ -n "$_guest_config_fingerprint" ] && ! vm_guest_config_marker_matches "$_guest_config_fingerprint" "$disk_config_marker"; then
+        warn "$vm_name runtime disk guest config drift detected; replacing runtime disk from pre-built image"
+        rm -f "$disk_path"
+        _replace_runtime=true
       fi
 
       if [ "$_replace_runtime" = true ]; then
         cp "$_prebuilt" "$disk_path"
         say "disk image placed: $disk_path"
         resize_and_mark_image '' "$disk_credential_marker"
+        if [ -n "$_guest_config_fingerprint" ]; then
+          printf '%s\n' "$_guest_config_fingerprint" >"$disk_config_marker"
+        fi
       else
         say "disk already exists: $disk_path"
       fi
@@ -1167,21 +1264,32 @@ vm_build_nixos() {
   _disk_gib="$2"
   _out="$IMAGES_DIR/${_name}.qcow2"
   _marker="$(vm_guest_credentials_marker_path "$_name")"
+  _config_marker="$(vm_guest_config_marker_path "$_name")"
+
+  # WHY: rebuild when the guest config (guest.nix + imports + flake.lock)
+  # drifts too, not just on credential drift; otherwise config edits silently
+  # keep shipping the stale pre-built image.
+  _config_fingerprint="$(vm_guest_config_fingerprint)" || return 1
 
   if [ -f "$_out" ]; then
     if validate_qcow2_image "$_out" "existing NixOS image"; then
-      if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker"; then
-        say "NixOS image already built for the current guest credentials (owner=$vm_secret_owner, username=$vm_guest_username): $_out"
+      if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker" \
+        && vm_guest_config_marker_matches "$_config_fingerprint" "$_config_marker"; then
+        say "NixOS image already built for the current guest credentials and config (owner=$vm_secret_owner, username=$vm_guest_username): $_out"
         return 0
       fi
-      say "NixOS image guest credential drift detected; rebuilding image: $_out"
+      if vm_guest_config_marker_matches "$_config_fingerprint" "$_config_marker"; then
+        say "NixOS image guest credential drift detected; rebuilding image: $_out"
+      else
+        say "NixOS image guest config drift detected; rebuilding image: $_out"
+      fi
     else
       warn "existing NixOS image is invalid; rebuilding from scratch: $_out"
     fi
     if [ "$dry_run" = false ]; then
-      rm -f "$_out" "$_marker"
+      rm -f "$_out" "$_marker" "$_config_marker"
     else
-      dry_run "rm -f $_out $_marker"
+      dry_run "rm -f $_out $_marker $_config_marker"
       return 0
     fi
   fi
@@ -1233,6 +1341,7 @@ vm_build_nixos() {
     rm -rf "$_tmpdir"
     return 1
   fi
+  printf '%s\n' "$_config_fingerprint" >"$_config_marker"
 
   rm -rf "$_tmpdir"
   say "NixOS image ready: $_out"
@@ -2158,18 +2267,21 @@ vm_gc_orphan_disks() {
   done
 }
 
-# vm_gc_orphan_markers EXPECTED_NAMES — Remove credential markers whose disk
-#   image no longer exists.
+# vm_gc_orphan_markers EXPECTED_NAMES — Remove guest marker files (credential
+#   and config fingerprints) whose disk image no longer exists.
 vm_gc_orphan_markers() {
   _gcom_expected="$1"
 
   for _gcom_dir in "$VM_DIR" "$IMAGES_DIR"; do
     [ -d "$_gcom_dir" ] || continue
-    for _gcom_marker in "$_gcom_dir"/*.vm-guest-credentials-sha256; do
+    for _gcom_marker in "$_gcom_dir"/*.vm-guest-credentials-sha256 "$_gcom_dir"/*.vm-guest-config-sha256; do
       [ -f "$_gcom_marker" ] || continue
-      _gcom_base="${_gcom_marker%.vm-guest-credentials-sha256}"
+      case "$_gcom_marker" in
+        *.vm-guest-credentials-sha256) _gcom_base="${_gcom_marker%.vm-guest-credentials-sha256}" ;;
+        *) _gcom_base="${_gcom_marker%.vm-guest-config-sha256}" ;;
+      esac
       if [ ! -f "$_gcom_base" ]; then
-        say "GC — removing orphaned credential marker: $_gcom_marker"
+        say "GC — removing orphaned guest marker: $_gcom_marker"
         if [ "$dry_run" = false ]; then
           rm -f "$_gcom_marker"
         fi
