@@ -101,13 +101,31 @@ let
     builtins.elem "ripgrep" [ "git" "ripgrep" "zsh" ]
   ) "ripgrep parity mapping missing";
 in
-{
+builtins.seq (builtins.deepSeq {
+  inherit test_ripgrep_parity;
+} null) {
   success = true;
   message = "Package parity checks passed";
 }
 ```
 
-**Run:** `nix-instantiate --eval tests/modules/package-parity-tests.nix`
+**Run:** `nix-instantiate --eval --strict tests/modules/package-parity-tests.nix`
+
+**Force evaluation is mandatory.** Nix is lazy — a test file that only counts its tests (`success = true; testCount = builtins.length allTests;`) never forces the `assert'` thunks, so the suite reports green while no test actually runs. Every Nix test file MUST force evaluation of every test binding with at least one of these constructs:
+
+- top-level `assert cond;` chains
+- 2-arg `builtins.seq (builtins.deepSeq <tests> null)`
+- `success = builtins.all (t: t == null) <tests>`
+- `inherit test_x ...` into the result attrset (or into a deepSeq attrset)
+- `builtins.filter (x: x != null) [ ... ]`
+- `success = <value derived from the tests>` (e.g. `all_tests_pass`)
+
+Prohibited patterns:
+
+- `success = true` with only counting references (`builtins.length allTests` or `all_tests`) — the tests are referenced for the count but never evaluated. Without the `deepSeq` wrapper the example above is exactly this silent no-op.
+- 1-arg `builtins.seq (builtins.deepSeq <tests>)` — a partial application (lambda) in WHNF; `seq` forces nothing. See "Deadnix-reported unused bindings" below for the correct 2-arg form.
+
+Check step 24 (`nix-test-eval`) enforces this in `scripts/check.sh`; test step 1 evaluates every file with `nix-instantiate --eval --strict`.
 
 ### Layer 3: Module Import Validation
 
