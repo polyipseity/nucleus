@@ -64,8 +64,13 @@
             <false/>
             <key>MacAddress</key>
             <string>__VM_MAC_ADDRESS__</string>
+            <!-- Mode must be "Emulated" (QEMU user/slirp networking): UTM's
+                 QEMU backend only emits hostfwd= for emulated VLANs, and
+                 silently ignores the PortForward array for vmnet-shared
+                 (Mode=Shared), which is why SSH (2222) and ADB (5555) were
+                 unreachable despite the PortForward entries. -->
             <key>Mode</key>
-            <string>Shared</string>
+            <string>Emulated</string>
             <key>PortForward</key>
             <array>
                 <dict>
