@@ -712,6 +712,22 @@ let
       )
       "scripts/vm.sh must refuse to replace UTM runtime disks when the rebuild step did not produce a valid pre-built qcow2";
 
+  # UTM provisioning for Android must treat android-system.qcow2 as the
+  # pre-built image (never a nonexistent Android.qcow2), validate it with the
+  # relaxed 4 GiB floor, and copy system/userdata/optional-GSI into the bundle.
+  test_utm_android_uses_shared_images =
+    assert'
+      (
+        (lib.hasInfix ''_android_system="$IMAGES_DIR/android-system.qcow2"'' vm_setup_sh_text)
+        && (lib.hasInfix ''_android_userdata="$IMAGES_DIR/android-userdata.qcow2"'' vm_setup_sh_text)
+        && (lib.hasInfix ''_prebuilt="$_android_system"'' vm_setup_sh_text)
+        && (lib.hasInfix "_prebuilt_min_size=4294967296" vm_setup_sh_text)
+        && (lib.hasInfix "copied Android system image" vm_setup_sh_text)
+        && (lib.hasInfix "copied Android userdata disk" vm_setup_sh_text)
+        && (lib.hasInfix "Android userdata image not found" vm_setup_sh_text)
+      )
+      "scripts/vm.sh must provision Android UTM bundles from the shared android-* images with android-system.qcow2 as the prebuilt";
+
   test_libvirt_runtime_validation_parity =
     assert'
       (
@@ -1160,6 +1176,7 @@ let
     test_guest_credentials_policy_in_macos_packer
     test_vm_guest_credential_drift_replacement
     test_utm_runtime_replacement_requires_valid_prebuilt
+    test_utm_android_uses_shared_images
     test_libvirt_runtime_validation_parity
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
@@ -1256,6 +1273,7 @@ in
     test_guest_credentials_policy_in_macos_packer
     test_vm_guest_credential_drift_replacement
     test_utm_runtime_replacement_requires_valid_prebuilt
+    test_utm_android_uses_shared_images
     test_libvirt_runtime_validation_parity
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support

@@ -885,9 +885,22 @@ vm_setup_utm() {
     template_drift_config=true
     say "detected config drift in existing bundle; VM will be re-registered to refresh runtime state: $vm_name"
   fi
+  # Android uses the shared android-* images (system + userdata, optional GSI)
+  # rather than a single <Name>.qcow2 pre-built image; other guests keep the
+  # ${vm_name}.qcow2 convention.
+  if [ "$vm_type" = "Android" ]; then
+    _android_system="$IMAGES_DIR/android-system.qcow2"
+    _android_userdata="$IMAGES_DIR/android-userdata.qcow2"
+    _android_gsi="$IMAGES_DIR/android-gsi.img"
+  fi
+
   # Require a pre-built image only when the bundle does not already have a
   # disk. Existing bundles can refresh config.plist in-place.
-  _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
+  if [ "$vm_type" = "Android" ]; then
+    _prebuilt="$_android_system"
+  else
+    _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
+  fi
   _prebuilt_valid=false
   if [ ! -f "$disk_file" ] && [ ! -f "$_prebuilt" ]; then
     _build_tmp="$IMAGES_DIR/${vm_name}-build"
@@ -900,7 +913,9 @@ vm_setup_utm() {
   fi
 
   if [ -f "$_prebuilt" ]; then
-    if validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}"; then
+    _prebuilt_min_size=10737418240
+    [ "$vm_type" = "Android" ] && _prebuilt_min_size=4294967296
+    if validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}" "$_prebuilt_min_size"; then
       _prebuilt_valid=true
     else
       warn "pre-built image is invalid for '$vm_name': $_prebuilt"
@@ -916,6 +931,10 @@ vm_setup_utm() {
     if [ "$vm_type" = "Android" ]; then
       # Android guests do not run the vm-guest-credentials service, so no
       # credential markers apply; sync system/userdata/GSI into the bundle.
+      if [ ! -f "$_android_userdata" ]; then
+        warn "Android userdata image not found: $_android_userdata; run vm-build first"
+        return
+      fi
       _replace_runtime=false
       if [ -f "$disk_file" ] && ! validate_qcow2_image "$disk_file" "existing UTM runtime disk for ${vm_name}" 4294967296; then
         warn "existing Android runtime disk is invalid for '$vm_name'; replacing from pre-built image"
