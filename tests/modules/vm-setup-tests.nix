@@ -836,9 +836,23 @@ let
         && (lib.hasInfix "<string>Emulated</string>" utmConfigPlistText)
         && !(lib.hasInfix "<string>Shared</string>" utmConfigPlistText)
         && (lib.hasInfix "<key>PortForward</key>" utmConfigPlistText)
-        && (lib.hasInfix "<integer>2222</integer>" utmConfigPlistText)
+        && (lib.hasInfix "__VM_BASE_PORT_FORWARD__" utmConfigPlistText)
+        && (lib.hasInfix "__VM_ADDITIONAL_PORT_FORWARDS__" utmConfigPlistText)
       )
       "src/modules/configs/vms/utm-config.plist.xml must use Mode=Emulated (not Shared) so UTM forwards ports 2222/5555 via hostfwd; vmnet-shared silently drops PortForward";
+  # Android must not claim host port 2222: it exposes ADB and SSH on forwarded
+  # ports 5555/5554, and a base 2222->22 forward would collide with NixOS when
+  # both VMs run at once ("Could not set up host forwarding rule" on the second
+  # start).  The base forward is a per-VM token so each VM only binds its own
+  # host ports.
+  test_macbook_utm_android_no_2222_collision =
+    assert'
+      (
+        (lib.hasInfix "basePortForward =\n    vm:\n    if vm.type == \"Android\" then\n      \"\"" macbook_vms_nix_text)
+        && (lib.hasInfix "<integer>2222</integer>" macbook_vms_nix_text)
+        && (lib.hasInfix "__VM_BASE_PORT_FORWARD__\n                __VM_ADDITIONAL_PORT_FORWARDS__" utmConfigPlistText)
+      )
+      "src/hosts/MacBook/vms.nix must gate the base 2222->22 forward off for Android (which uses 5555/5554) so simultaneous Android+NixOS starts do not collide on host port 2222";
   test_macbook_utm_display_card_validity = assert' (
     (lib.hasInfix "displayCard = vm: if vm.type == \"Windows\" then \"virtio-vga\" else \"virtio-gpu-pci\";" macbook_vms_nix_text)
     && !(lib.hasInfix "virtio-ramfb" macbook_vms_nix_text)
@@ -1234,6 +1248,7 @@ let
     test_macbook_utm_plist_correctness
     test_macbook_utm_no_qemu_guest_agent
     test_macbook_utm_emulated_network_for_port_forward
+    test_macbook_utm_android_no_2222_collision
     test_macbook_utm_display_card_validity
     test_macbook_utm_firmware_contract
     test_macbook_utm_data_dir_disk_path
@@ -1335,6 +1350,7 @@ in
     test_macbook_utm_plist_correctness
     test_macbook_utm_no_qemu_guest_agent
     test_macbook_utm_emulated_network_for_port_forward
+    test_macbook_utm_android_no_2222_collision
     test_macbook_utm_display_card_validity
     test_macbook_utm_firmware_contract
     test_macbook_utm_data_dir_disk_path
