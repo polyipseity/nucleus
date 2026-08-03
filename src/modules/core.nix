@@ -184,12 +184,12 @@ let
       };
       nixpkgsAttr = "stats";
     };
-    utm = {
+    "utm@beta" = {
       category = "gui";
       platforms = [ "darwin" ];
       homebrew = {
         kind = "cask";
-        name = "utm";
+        name = "utm@beta";
       };
       nixpkgsAttr = "utm";
     };

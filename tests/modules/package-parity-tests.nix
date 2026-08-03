@@ -216,7 +216,7 @@ let
       nixpkgsAttr = "stats";
     }
     {
-      name = "utm";
+      name = "utm@beta";
       nixpkgsAttr = "utm";
     }
     {
