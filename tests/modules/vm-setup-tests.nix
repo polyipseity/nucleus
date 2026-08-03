@@ -740,6 +740,20 @@ let
       )
       "scripts/vm.sh must strip wc -c whitespace padding when selecting the largest qcow2 from the extracted LineageOS bundle";
 
+  # The Android build must size the userdata disk from the manifest's
+  # diskBytes (SI bytes -> nearest binary GiB, same rounding as
+  # vm_build_one_image) instead of a hardcoded 8 GiB; otherwise the
+  # VMs.json diskBytes setting is silently ignored.
+  test_android_build_honors_manifest_disk_size =
+    assert'
+      (
+        (lib.hasInfix ".VMs[\$_bai_vm_index].diskBytes" vm_setup_sh_text)
+        && (lib.hasInfix "_bai_disk_gib=\"\$(( (_bai_disk_bytes + 536870912) / 1073741824 ))\"" vm_setup_sh_text)
+        && (lib.hasInfix "qemu-img create -f qcow2 \"\$_bai_userdata_img\" \"\${_bai_disk_gib}G\"" vm_setup_sh_text)
+        && (lib.hasInfix "creating userdata disk (\${_bai_disk_gib} GiB)..." vm_setup_sh_text)
+      )
+      "scripts/vm.sh must size the Android userdata disk from the manifest diskBytes, not a hardcoded 8 GiB";
+
   test_libvirt_runtime_validation_parity =
     assert'
       (
@@ -1239,6 +1253,7 @@ let
     test_utm_runtime_replacement_requires_valid_prebuilt
     test_utm_android_uses_shared_images
     test_android_build_strips_wc_padding
+    test_android_build_honors_manifest_disk_size
     test_libvirt_runtime_validation_parity
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
@@ -1341,6 +1356,7 @@ in
     test_utm_runtime_replacement_requires_valid_prebuilt
     test_utm_android_uses_shared_images
     test_android_build_strips_wc_padding
+    test_android_build_honors_manifest_disk_size
     test_libvirt_runtime_validation_parity
     test_windows_iso_mido_patch_file_exists
     test_windows_iso_mido_runtime_patch_support
