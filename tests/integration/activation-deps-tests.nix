@@ -22,8 +22,8 @@ let
   spotlightScriptText = builtins.readFile ../../src/scripts/hosts/MacBook/macos-disable-spotlight.sh;
   gimpScrollSensitivityScriptText = builtins.readFile ../../src/scripts/configs/configure-gimp-scroll-sensitivity.sh;
   windowsGitSshModuleText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1;
-  macbookGlobalGitconfigText = builtins.readFile ../../src/modules/configs/git/MacBook.gitconfig;
-  nixosGlobalGitconfigText = builtins.readFile ../../src/modules/configs/git/NixOS.gitconfig;
+  macbookUserGitconfigText = builtins.readFile ../../src/users/default/git/MacBook.gitconfig;
+  nixosUserGitconfigText = builtins.readFile ../../src/users/default/git/NixOS.gitconfig;
   discordMusicRpcModuleText = builtins.readFile ../../src/modules/ext-discord-music-rpc.nix;
   homeModuleText = builtins.readFile ../../src/modules/home.nix;
   macbookServicesText = builtins.readFile ../../src/hosts/MacBook/services.nix;
@@ -258,13 +258,13 @@ let
       "Windows Git identity must write via --file $identityConfigPath, not --global, so each managed user profile gets the correct target path";
 
   # === TEST: POSIX Git defaults enforce signed commits and tags ===
-  # commit.gpgsign/tag.gpgsign live at global scope in the per-host
-  # <host>.gitconfig files (git.nix user settings dropped in Phase 3).
+  # commit.gpgsign/tag.gpgsign live at user scope in the per-user
+  # <host>.gitconfig files (src/users/default/git/<host>.gitconfig).
   test_posix_git_signing_defaults_enabled =
     assert'
       (
-        (lib.hasInfix "gpgsign = true" macbookGlobalGitconfigText)
-        && (lib.hasInfix "gpgsign = true" nixosGlobalGitconfigText)
+        (lib.hasInfix "gpgsign = true" macbookUserGitconfigText)
+        && (lib.hasInfix "gpgsign = true" nixosUserGitconfigText)
       )
       "POSIX Git defaults must keep commit.gpgsign and tag.gpgsign enabled for cross-host signing parity";
 

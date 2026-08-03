@@ -63,9 +63,10 @@ assert containsRegex "program = gpg" macbookUserGitText;
 assert containsRegex "path = ~/.config/git/identity" macbookUserGitText;
 assert containsRegex "insteadOf = https://github.com/" macbookUserGitText;
 assert containsRegex "useConfigOnly = true" macbookUserGitText;
-# Global-scope settings must NOT leak into the user-scope file.
-assert !(containsRegex "autocrlf = false" macbookUserGitText);
-assert !(containsRegex "symlinks = true" macbookUserGitText);
+# Signing, newline and symlink defaults are user-scoped.
+assert containsRegex "gpgsign = true" macbookUserGitText;
+assert containsRegex "autocrlf = false" macbookUserGitText;
+assert containsRegex "symlinks = true" macbookUserGitText;
 
 # --- POSIX user-scope ignore (src/users/default/git/<host>.gitignore) ---
 assert userIgnoreParity;
@@ -77,9 +78,11 @@ assert containsRegex "metadata_never_index" macbookUserIgnoreText;
 
 # --- POSIX global-scope settings (src/modules/configs/git/<host>.gitconfig) ---
 assert globalGitParity;
-assert containsRegex "gpgsign = true" macbookGlobalGitText;
-assert containsRegex "autocrlf = false" macbookGlobalGitText;
-assert containsRegex "symlinks = true" macbookGlobalGitText;
+# The POSIX global files are intentionally empty: signing, newline and symlink
+# defaults are user-scoped and must NOT appear at global scope.
+assert !(containsRegex "gpgsign = true" macbookGlobalGitText);
+assert !(containsRegex "autocrlf = false" macbookGlobalGitText);
+assert !(containsRegex "symlinks = true" macbookGlobalGitText);
 
 # --- POSIX git.nix wiring: symlinks with defaults-fallback selection ---
 assert containsRegex "home\.file" posixGitText;
@@ -96,6 +99,8 @@ assert !(containsRegex "assemble-gitignore" posixGitText);
 assert !(containsRegex "programs\.git" posixGitText);
 
 # --- Windows user-scope settings (src/users/default/git/Windows.gitconfig) ---
+assert containsRegex "gpgsign = true" windowsUserGitText;
+assert containsRegex "symlinks = true" windowsUserGitText;
 assert containsRegex "autocrlf = true" windowsUserGitText;
 assert containsRegex "prune = true" windowsUserGitText;
 assert containsRegex "pruneTags = false" windowsUserGitText;
@@ -106,9 +111,15 @@ assert containsRegex "followTags = true" windowsUserGitText;
 assert containsRegex "useConfigOnly = true" windowsUserGitText;
 
 # --- Windows global-scope settings (src/modules/configs/git/Windows.gitconfig) ---
-assert containsRegex "symlinks = true" windowsGlobalGitText;
-assert containsRegex "autocrlf = false" windowsGlobalGitText;
-assert containsRegex "gpgsign = true" windowsGlobalGitText;
+# Only the installer shipped defaults remain at global scope.
+assert containsRegex "fscache = true" windowsGlobalGitText;
+assert containsRegex "helper = manager" windowsGlobalGitText;
+assert containsRegex "sslBackend = schannel" windowsGlobalGitText;
+# Signing, newline and symlink defaults are user-scoped and must NOT appear at
+# global scope.
+assert !(containsRegex "gpgsign = true" windowsGlobalGitText);
+assert !(containsRegex "autocrlf = false" windowsGlobalGitText);
+assert !(containsRegex "symlinks = true" windowsGlobalGitText);
 
 # --- Preventative: init.templateDir suppresses new-repo boilerplate ---
 # INI format splits dotted keys into [section] + key lines, so assert the
