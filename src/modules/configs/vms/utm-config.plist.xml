@@ -94,14 +94,10 @@
     <key>QEMU</key>
     <dict>
         <key>AdditionalArguments</key>
-        <array>
-            <string>-chardev</string>
-            <string>socket,id=qga,path=/tmp/qga-__VM_NAME__.sock,server=on,wait=off</string>
-            <string>-device</string>
-            <string>virtio-serial</string>
-            <string>-device</string>
-            <string>virtserialport,chardev=qga,name=org.qemu.guest_agent.0</string>
-        </array>
+        <array/>
+        <!-- QEMU GA was removed: UTM's app sandbox denies QEMU from binding unix
+             sockets in /tmp (EPERM on boot), and UTM's own bundles omit it. On
+             macOS, vm.sh reaches guests via SSH (forwarded port 2222) instead. -->
         <key>BalloonDevice</key>
         <false/>
         <key>DebugLog</key>
