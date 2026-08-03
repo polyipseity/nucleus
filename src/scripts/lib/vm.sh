@@ -663,7 +663,9 @@ vm_build_android() {
     run_cmd unzip -q "$IMAGES_DIR/android-lineage.zip" -d "$_bai_extract_dir"
     # UTM bundle layouts differ across versions (vda.qcow2 in UTM 1-3,
     # disk-main.qcow2 in UTM 4); pick the largest qcow2 as the system image.
-    _bai_qcow2="$(find "$_bai_extract_dir" -type f -name '*.qcow2' -print | while IFS= read -r _f; do printf '%s %s\n' "$(wc -c < "$_f")" "$_f"; done | sort -rn | head -1 | cut -d' ' -f2-)"
+    # tr strips the whitespace wc -c pads its output with (macOS pads; Linux
+    # does not), which would otherwise leak into the path after cut.
+    _bai_qcow2="$(find "$_bai_extract_dir" -type f -name '*.qcow2' -print | while IFS= read -r _f; do printf '%s %s\n' "$(wc -c < "$_f" | tr -d '[:space:]')" "$_f"; done | sort -rn | head -1 | cut -d' ' -f2-)"
     if [ -z "$_bai_qcow2" ]; then
       error "no qcow2 system image found inside extracted LineageOS bundle"
       return 1
