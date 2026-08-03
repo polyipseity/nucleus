@@ -1,14 +1,20 @@
 #!/usr/bin/env bash
-# Keep UTM's global renderer backend pinned to ANGLE (OpenGL) for the console
-# user.
-# WHY: Android (LineageOS) guests on UTM require ANGLE (OpenGL) for the UI to
-# appear after boot; ANGLE (Metal) hides the UI and the default software
-# renderer is prone to a frozen display (UTM issue #378).  UTM is sandboxed, so
-# the pref lives in the app container
+# Keep UTM's global renderer backend pinned to Apple Core OpenGL (CGL) for the
+# console user.
+# WHY: UTM 5.x introduced a native CGL (Apple Core OpenGL) backend
+# (QEMURendererBackend = 3, kQEMURendererBackendCGL) replacing the ANGLE
+# (OpenGL) path.  ANGLE (OpenGL) was previously required for the Android
+# (LineageOS) UI to appear after boot (ANGLE (Metal) hides the UI and the
+# default software renderer is prone to a frozen display, UTM issue #378),
+# but its SPICE display channel still stalls under load; CGL is a different GL
+# path that sidesteps that race, and the 5.0.x line shipped SPICE renderer
+# fixes (5.0.2 GL regression fix #7626, 5.0.4 renderer and memory-leak fixes).
+# UTM is sandboxed, so the pref lives in the app container
 # (~/Library/Containers/com.utmapp.UTM/Data/Library/Preferences/), not
 # ~/Library/Preferences; cfprefsd resolves the domain there when the write runs
 # as the console user.
-# ref: https://wiki.lineageos.org/utms/utm-vm-on-apple-silicon-mac -- renderer backend must be ANGLE (OpenGL) for the Android UI to appear
+# ref: https://github.com/utmapp/UTM/blob/v5.0.3/Services/UTMQemuSystemBackends.h -- kQEMURendererBackendCGL = 3
+# ref: https://wiki.lineageos.org/utms/utm-vm-on-apple-silicon-mac -- Android UI renderer guidance (predates the CGL backend)
 # ref: https://github.com/utmapp/UTM/issues/378 -- Android VMs randomly freeze; renderer-dependent
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -21,8 +27,8 @@ if _nucleus_resolve_console_user; then
     if [ -f "$utm_container_prefs" ]; then
       # Container already registered (UTM launched before): write through
       # cfprefsd so the domain resolves to the container.
-      if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" /usr/bin/defaults write com.utmapp.UTM QEMURendererBackend -int 1; then
-        echo "utm: failed to set renderer backend to ANGLE (OpenGL) for user '$_nucleus_console_user'." >&2
+      if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" /usr/bin/defaults write com.utmapp.UTM QEMURendererBackend -int 3; then
+        echo "utm: failed to set renderer backend to Apple Core OpenGL (CGL) for user '$_nucleus_console_user'." >&2
       fi
     else
       # UTM never launched, so its sandbox container does not exist yet.
@@ -30,8 +36,8 @@ if _nucleus_resolve_console_user; then
       # cfprefsd adopts it when UTM first launches.
       if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" /bin/mkdir -p "$(dirname "$utm_container_prefs")"; then
         echo "utm: failed to create container prefs directory for user '$_nucleus_console_user'." >&2
-      elif ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" /usr/bin/defaults write "$utm_container_prefs" QEMURendererBackend -int 1; then
-        echo "utm: failed to set renderer backend to ANGLE (OpenGL) for user '$_nucleus_console_user'." >&2
+      elif ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" /usr/bin/defaults write "$utm_container_prefs" QEMURendererBackend -int 3; then
+        echo "utm: failed to set renderer backend to Apple Core OpenGL (CGL) for user '$_nucleus_console_user'." >&2
       fi
     fi
   fi

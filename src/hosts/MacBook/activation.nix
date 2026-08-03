@@ -115,7 +115,7 @@ in
   #   configureMonitorColorProfile     — clear ColorSync device cache
   #   clearFinderCache                 — purge stale Finder state for desktop visibility
   #   configureNvimLauncher            — macOS-specific neovim launcher
-  #   configureUtmRendererPrefs        — UTM ANGLE (OpenGL) renderer for Android guest
+  #   configureUtmRendererPrefs        — UTM Apple Core OpenGL (CGL) renderer for Android guest
   #   disableSpotlight                 — disable all Spotlight hotkeys + service
   # ---------------------------------------------------------------------------
   system.activationScripts.postActivation.text = lib.mkBefore ''
@@ -166,8 +166,11 @@ in
     # ---- configure-linearmouse-preferences --------------------------------------
     "${activationBundle}/src/scripts/hosts/MacBook/macos-set-linearmouse-prefs.sh"
     # ---- configure-utm-renderer-prefs -------------------------------------------
-    # Pin UTM's global renderer backend to ANGLE (OpenGL) in the sandboxed app
-    # container so the Android (LineageOS) guest UI appears instead of freezing.
+    # Pin UTM's global renderer backend to Apple Core OpenGL (CGL) in the
+    # sandboxed app container so the Android (LineageOS) guest UI appears
+    # instead of freezing.  CGL is the UTM 5.x replacement for the ANGLE
+    # (OpenGL) path (QEMURendererBackend = 3) and sidesteps the SPICE display
+    # stall that ANGLE still hits under load.
     # Runs unconditionally: the pref is a global UTM setting, harmless when no
     # Android VM is enabled, and idempotent when already set.
     "${activationBundle}/src/scripts/hosts/MacBook/macos-set-utm-renderer.sh"

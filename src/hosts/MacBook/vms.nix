@@ -64,12 +64,15 @@ let
   # Apple Silicon and Intel hosts.
   #
   # Android (LineageOS) on UTM additionally requires UTM's global
-  # "Renderer backend" (pref QEMURendererBackend) to be ANGLE (OpenGL),
-  # value 1; ANGLE (Metal) makes the UI not appear after boot, and UTM's
-  # default/software path is prone to a frozen display (UTM issue #378).
+  # "Renderer backend" (pref QEMURendererBackend) to be Apple Core OpenGL
+  # (CGL), value 3; ANGLE (Metal) makes the UI not appear after boot, and the
+  # ANGLE (OpenGL)/software paths are prone to a frozen display (UTM issue
+  # #378).  CGL is the native macOS GL backend introduced in UTM 5.x
+  # (kQEMURendererBackendCGL) and sidesteps the ANGLE SPICE display stall.
   # The pref is provisioned automatically by macos-set-utm-renderer.sh via
   # activation.nix, so no manual UTM settings change is needed.
-  # ref: https://wiki.lineageos.org/utms/utm-vm-on-apple-silicon-mac -- renderer backend must be ANGLE (OpenGL) for the Android UI to appear
+  # ref: https://github.com/utmapp/UTM/blob/v5.0.3/Services/UTMQemuSystemBackends.h -- kQEMURendererBackendCGL = 3
+  # ref: https://wiki.lineageos.org/utms/utm-vm-on-apple-silicon-mac -- Android UI renderer guidance (predates the CGL backend)
   # ref: https://github.com/utmapp/UTM/issues/378 -- Android VMs randomly freeze; renderer-dependent
   displayCard = vm: if vm.type == "Windows" then "virtio-vga" else "virtio-gpu-pci";
 
