@@ -115,10 +115,24 @@
   "-la" = "eza --long --all";
   "-ll" = "eza --long --all";
   # bun shortcuts — mirror the Windows bun function aliases in profile.ps1 managed block.
-  # -n is the bare bun command; -ni/-nr/-nx are concise but unambiguous; `bun x` replaces npx for one-shot package execution.
+  # -n is the bare bun command; each other alias maps one concise suffix to a bun subcommand.
+  # -no (outdated) reads like a negation prefix but o = outdated; the -n* namespace keeps it unambiguous.
+  # Excluded (YAGNI): audit, info, init, patch, pm, publish, repl, unlink.
   "-n" = "bun";
+  "-na" = "bun add";
+  "-nb" = "bun build";
+  "-nc" = "bun create";
+  "-nci" = "bun ci";
+  "-nf" = "bun fmt";
   "-ni" = "bun install";
+  "-nl" = "bun link";
+  "-no" = "bun outdated";
   "-nr" = "bun run";
+  "-nrm" = "bun remove";
+  "-nt" = "bun test";
+  "-nu" = "bun update";
+  "-nup" = "bun upgrade";
+  "-nw" = "bun why";
   "-nx" = "bun x";
   # Terminal clearing — `cls` alias for cross-platform parity (Windows/PowerShell
   # and cmd.exe both use cls; this makes zsh accept it too).

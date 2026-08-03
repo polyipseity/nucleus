@@ -13,10 +13,7 @@
 - `-g`, `-ga`, `-gb`, `-gc`, `-gca`, `-gcl`, `-gco`, `-gd`, `-gf`, `-gff`, `-gl`, `-gp`, `-gpl`, `-gplf`, `-gs`, `-gst`, `-gsw` — git commands
 - `-gs-pdf-opt-default`, `-gs-pdf-opt-ebook`, `-gs-pdf-opt-prepress`, `-gs-pdf-opt-printer`, `-gs-pdf-opt-screen` — Ghostscript PDF optimization profiles
 - `-la`, `-ll` — `eza -la`
-- `-n` — `bun`
-- `-ni` — `bun install`
-- `-nr` — `bun run`
-- `-nx` — `bun x`
+- `-n`, `-na`, `-nb`, `-nc`, `-nci`, `-nf`, `-ni`, `-nl`, `-no`, `-nr`, `-nrm`, `-nt`, `-nu`, `-nup`, `-nw`, `-nx` — bun commands
 - `-v` — `nvim`
 
 ## nucleus commands

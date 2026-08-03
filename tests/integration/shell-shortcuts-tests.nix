@@ -21,11 +21,26 @@ let
     && lib.hasInfix ''"-gsw" = "git switch";'' aliasesText
   ) "aliases.nix must expose the curated git shortcut set";
 
-  test_zsh_aliases_include_bun_shortcuts = assert' (
-    lib.hasInfix ''"-n" = "bun";'' aliasesText
-    && lib.hasInfix ''"-ni" = "bun install";'' aliasesText
-    && lib.hasInfix ''"-nr" = "bun run";'' aliasesText
-    && lib.hasInfix ''"-nx" = "bun x";'' aliasesText
+  test_zsh_aliases_include_bun_shortcuts = assert' (builtins.all
+    (aliasLine: lib.hasInfix aliasLine aliasesText)
+    [
+      ''"-n" = "bun";''
+      ''"-na" = "bun add";''
+      ''"-nb" = "bun build";''
+      ''"-nc" = "bun create";''
+      ''"-nci" = "bun ci";''
+      ''"-nf" = "bun fmt";''
+      ''"-ni" = "bun install";''
+      ''"-nl" = "bun link";''
+      ''"-no" = "bun outdated";''
+      ''"-nr" = "bun run";''
+      ''"-nrm" = "bun remove";''
+      ''"-nt" = "bun test";''
+      ''"-nu" = "bun update";''
+      ''"-nup" = "bun upgrade";''
+      ''"-nw" = "bun why";''
+      ''"-nx" = "bun x";''
+    ]
   ) "aliases.nix must expose the curated bun shortcut set";
 
   test_posix_pwsh_shortcuts_match_shell_aliases = assert' (
@@ -34,10 +49,24 @@ let
     && lib.hasInfix "Add-ShellAlias '-gf' { & git fetch @Args }" shellProfileText
     && lib.hasInfix "Add-ShellAlias '-gl' { & git log --oneline --decorate --graph @Args }" shellProfileText
     && lib.hasInfix "Add-ShellAlias '-gsw' { & git switch @Args }" shellProfileText
-    && lib.hasInfix "Add-ShellAlias '-n' { & bun @Args }" shellProfileText
-    && lib.hasInfix "Add-ShellAlias '-ni' { & bun install @Args }" shellProfileText
-    && lib.hasInfix "Add-ShellAlias '-nr' { & bun run @Args }" shellProfileText
-    && lib.hasInfix "Add-ShellAlias '-nx' { & bun x @Args }" shellProfileText
+    && builtins.all (aliasLine: lib.hasInfix aliasLine shellProfileText) [
+      "Add-ShellAlias '-n' { & bun @Args }"
+      "Add-ShellAlias '-na' { & bun add @Args }"
+      "Add-ShellAlias '-nb' { & bun build @Args }"
+      "Add-ShellAlias '-nc' { & bun create @Args }"
+      "Add-ShellAlias '-nci' { & bun ci @Args }"
+      "Add-ShellAlias '-nf' { & bun fmt @Args }"
+      "Add-ShellAlias '-ni' { & bun install @Args }"
+      "Add-ShellAlias '-nl' { & bun link @Args }"
+      "Add-ShellAlias '-no' { & bun outdated @Args }"
+      "Add-ShellAlias '-nr' { & bun run @Args }"
+      "Add-ShellAlias '-nrm' { & bun remove @Args }"
+      "Add-ShellAlias '-nt' { & bun test @Args }"
+      "Add-ShellAlias '-nu' { & bun update @Args }"
+      "Add-ShellAlias '-nup' { & bun upgrade @Args }"
+      "Add-ShellAlias '-nw' { & bun why @Args }"
+      "Add-ShellAlias '-nx' { & bun x @Args }"
+    ]
   ) "shared shell profile must mirror curated shell shortcuts, including bun shortcuts";
 
   test_windows_pwsh_shortcuts_match_shell_aliases = assert' (
@@ -46,10 +75,24 @@ let
     && lib.hasInfix "Add-ShellAlias '-gf' { & git fetch @Args }" shellProfileText
     && lib.hasInfix "Add-ShellAlias '-gl' { & git log --oneline --decorate --graph @Args }" shellProfileText
     && lib.hasInfix "Add-ShellAlias '-gsw' { & git switch @Args }" shellProfileText
-    && lib.hasInfix "Add-ShellAlias '-n' { & bun @Args }" shellProfileText
-    && lib.hasInfix "Add-ShellAlias '-ni' { & bun install @Args }" shellProfileText
-    && lib.hasInfix "Add-ShellAlias '-nr' { & bun run @Args }" shellProfileText
-    && lib.hasInfix "Add-ShellAlias '-nx' { & bun x @Args }" shellProfileText
+    && builtins.all (aliasLine: lib.hasInfix aliasLine shellProfileText) [
+      "Add-ShellAlias '-n' { & bun @Args }"
+      "Add-ShellAlias '-na' { & bun add @Args }"
+      "Add-ShellAlias '-nb' { & bun build @Args }"
+      "Add-ShellAlias '-nc' { & bun create @Args }"
+      "Add-ShellAlias '-nci' { & bun ci @Args }"
+      "Add-ShellAlias '-nf' { & bun fmt @Args }"
+      "Add-ShellAlias '-ni' { & bun install @Args }"
+      "Add-ShellAlias '-nl' { & bun link @Args }"
+      "Add-ShellAlias '-no' { & bun outdated @Args }"
+      "Add-ShellAlias '-nr' { & bun run @Args }"
+      "Add-ShellAlias '-nrm' { & bun remove @Args }"
+      "Add-ShellAlias '-nt' { & bun test @Args }"
+      "Add-ShellAlias '-nu' { & bun update @Args }"
+      "Add-ShellAlias '-nup' { & bun upgrade @Args }"
+      "Add-ShellAlias '-nw' { & bun why @Args }"
+      "Add-ShellAlias '-nx' { & bun x @Args }"
+    ]
   ) "shared shell profile must mirror curated shell shortcuts";
 
   test_posix_shell_exposes_managed_commands = assert' (
@@ -88,9 +131,7 @@ let
     (
       text:
       lib.hasInfix "`-gsw` — git commands" text
-      && lib.hasInfix "`-ni` — `bun install`" text
-      && lib.hasInfix "`-nr` — `bun run`" text
-      && lib.hasInfix "`-nx` — `bun x`" text
+      && lib.hasInfix "`-n`, `-na`, `-nb`, `-nc`, `-nci`, `-nf`, `-ni`, `-nl`, `-no`, `-nr`, `-nrm`, `-nt`, `-nu`, `-nup`, `-nw`, `-nx` — bun commands" text
       && lib.hasInfix "`-la`, `-ll` — `eza -la`" text
       && lib.hasInfix "`-v` — `nvim`" text
       && lib.hasInfix "`nucleus-ai` — manage AI models (sync, list, status, endpoint, config)" text

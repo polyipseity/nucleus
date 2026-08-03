@@ -395,13 +395,25 @@ if (Get-Command eza -ErrorAction SilentlyContinue) {
   Add-ShellAlias '-ll' { Get-ChildItem -Force @Args }
 }
 
-# bun shortcuts: mirrors -n/-ni/-nr/-nx aliases in shell/aliases.nix on POSIX hosts.
+# bun shortcuts: mirrors the full -n* alias set in shell/aliases.nix on POSIX hosts.
 # Guarded so the profile loads safely on machines where bun is not yet installed.
 # check-suppress:suppression_doc: tool-availability guard -- bun may not be installed
 if (Get-Command bun -ErrorAction SilentlyContinue) {
   Add-ShellAlias '-n' { & bun @Args }
+  Add-ShellAlias '-na' { & bun add @Args }
+  Add-ShellAlias '-nb' { & bun build @Args }
+  Add-ShellAlias '-nc' { & bun create @Args }
+  Add-ShellAlias '-nci' { & bun ci @Args }
+  Add-ShellAlias '-nf' { & bun fmt @Args }
   Add-ShellAlias '-ni' { & bun install @Args }
+  Add-ShellAlias '-nl' { & bun link @Args }
+  Add-ShellAlias '-no' { & bun outdated @Args }
   Add-ShellAlias '-nr' { & bun run @Args }
+  Add-ShellAlias '-nrm' { & bun remove @Args }
+  Add-ShellAlias '-nt' { & bun test @Args }
+  Add-ShellAlias '-nu' { & bun update @Args }
+  Add-ShellAlias '-nup' { & bun upgrade @Args }
+  Add-ShellAlias '-nw' { & bun why @Args }
   Add-ShellAlias '-nx' { & bun x @Args }
 }
 
@@ -499,7 +511,7 @@ function npm {
   Write-Warning "         - bun add <pkg>   (add a dependency)"
   Write-Warning "         - bun x <cmd>     (run one-shot package commands, replaces npx)"
   Write-Warning "         - bun run         (run package.json scripts)"
-  Write-Warning "         Shell shortcuts -n/-ni/-nr/-nx also work."
+  Write-Warning "         Shell shortcuts -n* (bun) also work."
   return 1
 }
 function npx {
@@ -595,7 +607,7 @@ function bun {
   Write-Warning "         For development, use one of these managed entrypoints:"
   Write-Warning "         - Enter a project directory with .envrc (direnv auto-loads the devShell)"
   Write-Warning "         - Or use the user-scoped default toolchain installed by nucleus apply"
-  Write-Warning "         Shell shortcuts -ni/-nr/-nx also work inside a devShell."
+  Write-Warning "         Shell shortcuts -n* (bun) also work inside a devShell."
   return 1
 }
 function cargo {

@@ -293,7 +293,7 @@ shell: managed bun is unavailable right now.
          For development, use one of these managed entrypoints:
          - Enter a project directory with .envrc (direnv auto-loads the devShell)
          - Or use the user-scoped default toolchain installed by nucleus apply
-         Shell shortcuts ni/nr/nx also work inside a devShell.
+         Shell shortcuts -n* (bun) also work inside a devShell.
 EOF
   return 1
 }
@@ -356,7 +356,7 @@ shell: system-wide npm is not used in this environment.
          - bun add <pkg>   (add a dependency)
          - bun x <cmd>     (run one-shot package commands, replaces npx)
          - bun run         (run package.json scripts)
-         Shell shortcuts -n/-ni/-nr/-nx also work.
+         Shell shortcuts -n* (bun) also work.
 EOF
   return 1
 }
