@@ -624,6 +624,12 @@ vm_build_android() {
   _bai_accept_gsi_license="$3"
   _bai_upgrade_android="$4"
   _bai_reset_userdata="$5"
+  # The Android userdata disk size comes from the manifest (diskBytes),
+  # converted SI bytes -> nearest binary GiB exactly like vm_build_one_image
+  # does for the other VM types; a hardcoded size here would silently ignore
+  # VMs.json.
+  _bai_disk_bytes="$(jq ".VMs[$_bai_vm_index].diskBytes" "$MANIFEST")"
+  _bai_disk_gib="$(( (_bai_disk_bytes + 536870912) / 1073741824 ))"
   _bai_gsi_version="$(jq -r ".VMs[$_bai_vm_index].androidGsiVersion // \"\"" "$MANIFEST")"
   _bai_system_img="$IMAGES_DIR/android-system.qcow2"
   _bai_userdata_img="$IMAGES_DIR/android-userdata.qcow2"
@@ -684,8 +690,8 @@ vm_build_android() {
       say "resetting Android userdata disk..."
       rm -f "$_bai_userdata_img"
     fi
-    say "creating userdata disk (8 GiB)..."
-    run_cmd qemu-img create -f qcow2 "$_bai_userdata_img" 8G
+    say "creating userdata disk (${_bai_disk_gib} GiB)..."
+    run_cmd qemu-img create -f qcow2 "$_bai_userdata_img" "${_bai_disk_gib}G"
     validate_qcow2_image "$_bai_userdata_img" "Android userdata disk for $_bai_vm_name" 4294967296 || return 1
     say "userdata disk ready: $_bai_userdata_img"
   else
