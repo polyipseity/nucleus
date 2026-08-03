@@ -800,6 +800,7 @@ vm_setup_utm() {
   local vm_display bundle data_dir disk_file
   local disk_credential_marker config_plist bundle_exists legacy_display_config
   local template_drift_config _plist_template _prebuilt _prebuilt_valid
+  local _android_system _android_userdata _android_gsi _userdata_file _gsi_file
 
   vm_display=$(jq -r ".VMs[$vm_index].display" "$MANIFEST")
 
@@ -912,29 +913,71 @@ vm_setup_utm() {
 
   if [ "$dry_run" = false ]; then
     mkdir -p "$data_dir"
-    _replace_runtime=false
-    if [ -f "$disk_file" ] && ! validate_qcow2_image "$disk_file" "existing UTM runtime disk for ${vm_name}"; then
-      warn "existing runtime disk is invalid for '$vm_name'; replacing from pre-built image"
-      rm -f "$disk_file"
-      _replace_runtime=true
-    fi
-    if [ -f "$disk_file" ] && ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$disk_credential_marker"; then
-      warn "$vm_name runtime disk guest credential drift detected; replacing runtime disk from pre-built image"
-      rm -f "$disk_file"
-      _replace_runtime=true
-    fi
-    if [ ! -f "$disk_file" ]; then
-      if [ "$_prebuilt_valid" != true ]; then
-        warn "cannot replace the $vm_name runtime disk because no valid pre-built image is available: $_prebuilt"
-        return
+    if [ "$vm_type" = "Android" ]; then
+      # Android guests do not run the vm-guest-credentials service, so no
+      # credential markers apply; sync system/userdata/GSI into the bundle.
+      _replace_runtime=false
+      if [ -f "$disk_file" ] && ! validate_qcow2_image "$disk_file" "existing UTM runtime disk for ${vm_name}" 4294967296; then
+        warn "existing Android runtime disk is invalid for '$vm_name'; replacing from pre-built image"
+        rm -f "$disk_file"
+        _replace_runtime=true
       fi
-      cp "$_prebuilt" "$disk_file"
-      say "copied pre-built disk image: $disk_file"
-      resize_and_mark_image '' "$disk_credential_marker"
-    elif [ "$_replace_runtime" = true ]; then
-      warn "replacement was requested for '$vm_name' but the runtime disk still exists; leaving it untouched"
+      if [ ! -f "$disk_file" ]; then
+        if [ "$_prebuilt_valid" != true ]; then
+          warn "cannot create the $vm_name Android runtime disk because no valid system image is available: $_android_system"
+          return
+        fi
+        cp "$_android_system" "$disk_file"
+        say "copied Android system image: $disk_file"
+      elif [ "$_replace_runtime" = true ]; then
+        warn "replacement was requested for '$vm_name' but the Android runtime disk still exists; leaving it untouched"
+      else
+        say "preserving existing Android system disk: $disk_file"
+      fi
+      _userdata_file="$data_dir/android-userdata.qcow2"
+      if [ -f "$_userdata_file" ] && ! validate_qcow2_image "$_userdata_file" "existing Android userdata disk for ${vm_name}" 4294967296; then
+        warn "existing Android userdata disk is invalid for '$vm_name'; replacing from pre-built image"
+        rm -f "$_userdata_file"
+      fi
+      if [ ! -f "$_userdata_file" ]; then
+        cp "$_android_userdata" "$_userdata_file"
+        say "copied Android userdata disk: $_userdata_file"
+      else
+        say "preserving existing Android userdata disk: $_userdata_file"
+      fi
+      _gsi_file="$data_dir/android-gsi.img"
+      if [ -f "$_android_gsi" ]; then
+        cp "$_android_gsi" "$_gsi_file"
+        say "copied Android GSI image: $_gsi_file"
+      elif [ -f "$_gsi_file" ]; then
+        warn "Android GSI image removed from images dir; removing stale bundle copy: $_gsi_file"
+        rm -f "$_gsi_file"
+      fi
     else
-      say "preserving existing disk image: $disk_file"
+      _replace_runtime=false
+      if [ -f "$disk_file" ] && ! validate_qcow2_image "$disk_file" "existing UTM runtime disk for ${vm_name}"; then
+        warn "existing runtime disk is invalid for '$vm_name'; replacing from pre-built image"
+        rm -f "$disk_file"
+        _replace_runtime=true
+      fi
+      if [ -f "$disk_file" ] && ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$disk_credential_marker"; then
+        warn "$vm_name runtime disk guest credential drift detected; replacing runtime disk from pre-built image"
+        rm -f "$disk_file"
+        _replace_runtime=true
+      fi
+      if [ ! -f "$disk_file" ]; then
+        if [ "$_prebuilt_valid" != true ]; then
+          warn "cannot replace the $vm_name runtime disk because no valid pre-built image is available: $_prebuilt"
+          return
+        fi
+        cp "$_prebuilt" "$disk_file"
+        say "copied pre-built disk image: $disk_file"
+        resize_and_mark_image '' "$disk_credential_marker"
+      elif [ "$_replace_runtime" = true ]; then
+        warn "replacement was requested for '$vm_name' but the runtime disk still exists; leaving it untouched"
+      else
+        say "preserving existing disk image: $disk_file"
+      fi
     fi
     cp "$_plist_template" "$config_plist"
     # Nix store files are read-only (mode 0444).  Make the bundle-local copy
