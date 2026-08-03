@@ -63,9 +63,9 @@ assert containsRegex "Invoke-StepPipeline" checkPs1Text;
 assert containsRegex "Format-StepSummary" checkPs1Text;
 
 # ---- Step file structure ----
-# All 23 check step files exist for both platforms
-assert builtins.length checkStepsSh == 23;
-assert builtins.length checkStepsPs1 == 23;
+# All 24 check step files exist for both platforms
+assert builtins.length checkStepsSh == 24;
+assert builtins.length checkStepsPs1 == 24;
 
 # Each POSIX step file has a register_step call
 assert builtins.all (f: stepFileContains f "register_step \"[^\"]*\" [0-9]+") checkStepsSh;
@@ -81,5 +81,5 @@ assert containsRegex "run nucleus-apply" libShText;
 
 {
   success = true;
-  message = "Modularized check scripts structural assertions passed (framework functions, thin orchestrator, 23 step files per platform, register_step calls)";
+  message = "Modularized check scripts structural assertions passed (framework functions, thin orchestrator, 24 step files per platform, register_step calls)";
 }

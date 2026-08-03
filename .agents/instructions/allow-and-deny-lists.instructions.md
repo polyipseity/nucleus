@@ -123,6 +123,7 @@ Get-ChildItem ... | Filter-GitIgnored
 | C4  | `scripts/check-packer.sh`    | `Warning: A checksum of 'none' was specified … (source code not available)` block | T3   | Microsoft publishes no stable Windows 11 ISO checksums; `iso_checksum = "none"` intentional in `src/vms/windows/packer.pkr.hcl` (lines 39, 228); exit code still enforced | Manual quarterly review |
 | C5  | `22-embedded-content-enforcement.sh`, `.ps1` | self-file (`basename "${BASH_SOURCE[0]}"` / `Split-Path -Leaf $PSCommandPath`) | T3   | Self-refs are dynamic — the source contains the literal heredoc/here-string patterns being detected | Manual quarterly review |
 | C6  | `23-legacy-token-syntax.sh`, `.ps1` | self-file (`basename "${BASH_SOURCE[0]}"` / `Split-Path -Leaf $PSCommandPath`) | T3   | Self-refs are dynamic — the source contains the literal legacy token pattern being detected | Manual quarterly review |
+| C7  | `24-nix-test-eval.sh`, `.ps1` | self-file (`basename "${BASH_SOURCE[0]}"` / `Split-Path -Leaf $PSCommandPath`) | T3   | Self-refs are dynamic — the source contains the literal no-op/partial-application patterns being detected | Manual quarterly review |
 
 ### Category D — Allowlists
 
@@ -137,5 +138,5 @@ Get-ChildItem ... | Filter-GitIgnored
 - **Quarterly**: full audit of all T3 entries. Check each excluded file still exists, each excluded pattern is still justified, and no new hard-coded exclude lists have been introduced. Verify that gitignore-based filtering (via `filter_gitignored`/`Filter-GitIgnored`) is applied to any new file-generation script.
 - **Quarterly — shared-content audit**: for each content category in the embedded-content policy (profile body, VM start scripts, service wrappers, Caddyfile, cloud-drive wrappers), confirm there is exactly ONE canonical file on disk and no same-language duplicate has re-appeared (e.g. a second inline copy of the Android VM QEMU start script). Step 22 (embedded-content enforcement) flags new large embedded literals; any duplicate found here is fixed in the same review. Registry of shared files lives in `embedded-content.instructions.md` § Shared cross-platform content.
 - **Trigger**: review is due when a check step is added, removed, or renumbered.
-- **Last reviewed**: 2026-08-01 (A9 added for check step 17 suppression-audit self-exclusion)
+- **Last reviewed**: 2026-08-01 (A9 added for check step 17 suppression-audit self-exclusion); 2026-08-03 (C7 added for check step 24 nix-test-eval self-exclusion — step count 23 → 24)
 - **Verification**: run `scripts/check.sh` (which includes step 21 for preflight policy) to catch regressions.
