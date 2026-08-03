@@ -816,6 +816,15 @@ let
     && (lib.hasInfix "<key>UsbBusSupport</key>" utmConfigPlistText)
     && (lib.hasInfix "<key>UsbSharing</key>" utmConfigPlistText)
   ) "src/modules/configs/vms/utm-config.plist.xml must include a schema-complete UTM configuration";
+  test_macbook_utm_no_qemu_guest_agent =
+    assert'
+      (
+        !(lib.hasInfix "qga-" utmConfigPlistText)
+        && !(lib.hasInfix "org.qemu.guest_agent.0" utmConfigPlistText)
+        && !(lib.hasInfix "-chardev" utmConfigPlistText)
+        && (lib.hasInfix "<key>AdditionalArguments</key>" utmConfigPlistText)
+      )
+      "src/modules/configs/vms/utm-config.plist.xml must not add a QEMU GA chardev: UTM's app sandbox denies binding unix sockets in /tmp (EPERM on boot) and UTM's own bundles omit it";
   test_macbook_utm_display_card_validity = assert' (
     (lib.hasInfix "displayCard = vm: if vm.type == \"Windows\" then \"virtio-vga\" else \"virtio-gpu-pci\";" macbook_vms_nix_text)
     && !(lib.hasInfix "virtio-ramfb" macbook_vms_nix_text)
@@ -1209,6 +1218,7 @@ let
     test_macbook_utm_windows_arch_override
     test_macbook_utm_schema_keys
     test_macbook_utm_plist_correctness
+    test_macbook_utm_no_qemu_guest_agent
     test_macbook_utm_display_card_validity
     test_macbook_utm_firmware_contract
     test_macbook_utm_data_dir_disk_path
@@ -1308,6 +1318,7 @@ in
     test_macbook_utm_windows_arch_override
     test_macbook_utm_schema_keys
     test_macbook_utm_plist_correctness
+    test_macbook_utm_no_qemu_guest_agent
     test_macbook_utm_display_card_validity
     test_macbook_utm_firmware_contract
     test_macbook_utm_data_dir_disk_path
