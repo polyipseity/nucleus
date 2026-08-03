@@ -93,14 +93,14 @@ switch ('windows-qemu') {
     & tart stop $vmName
   }
   'darwin-utm' {
-    if (Get-Command 'utmctl' -ErrorAction SilentlyContinue) {
+    if (Get-Command 'utmctl' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: utmctl optional; absent warns
       & utmctl stop $vmName
     } else {
       Write-Warning "utmctl not found; VM may still be running: $vmName"
     }
   }
   'nixos-libvirt' {
-    & virsh shutdown $vmName 2>&1 | Out-Null
+    & virsh shutdown $vmName > $null 2>&1
     if ($LASTEXITCODE -ne 0) {
       & virsh destroy $vmName
     }

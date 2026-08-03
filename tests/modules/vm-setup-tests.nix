@@ -929,7 +929,7 @@ let
         && (lib.hasInfix "utmctl stop" stopHostPs1TemplateText)
         && (lib.hasInfix "virsh shutdown" stopHostPs1TemplateText)
         && (lib.hasInfix "virsh destroy" stopHostPs1TemplateText)
-        && (lib.hasInfix "guest-shutdown" stopHostPs1TemplateText)
+        && (lib.hasInfix "qga-" stopHostPs1TemplateText)
         && (lib.hasInfix "Stop-Process -Force" stopHostPs1TemplateText)
         && (!lib.hasInfix "{{" stopHostPs1TemplateText)
         && (!lib.hasInfix "`$ErrorActionPreference" stopHostPs1TemplateText)
