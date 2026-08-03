@@ -62,8 +62,8 @@ let
       + "\n    </filesystem>";
 
   # Android-specific disk attachments for GSI-based Android VM images.
-  # Three disks: system (read-only), userdata (writable qcow2), and GSI
-  # image.  Only included for Android-type VMs.
+  # system (read-only) and userdata (writable qcow2) are always attached;
+  # the GSI image is attached only when androidGsiVersion is set.
   androidDisks =
     vm:
     if vm.type != "Android" then
@@ -71,20 +71,22 @@ let
     else
       "<disk type='file' device='disk'>\n"
       + "      <driver name='qemu' type='qcow2'/>\n"
-      + "      <source file='${vmDir}/android-system.qcow2'/>\n"
+      + "      <source file='${vmDir}/images/android-system.qcow2'/>\n"
       + "      <target dev='vda' bus='virtio'/>\n"
       + "    </disk>\n"
       + "    <disk type='file' device='disk'>\n"
       + "      <driver name='qemu' type='qcow2'/>\n"
-      + "      <source file='${vmDir}/android-userdata.qcow2'/>\n"
+      + "      <source file='${vmDir}/images/android-userdata.qcow2'/>\n"
       + "      <target dev='vdb' bus='virtio'/>\n"
       + "    </disk>\n"
-      + "    <disk type='file' device='disk'>\n"
-      + "      <driver name='qemu' type='raw'/>\n"
-      + "      <source file='${vmDir}/android-gsi.img'/>\n"
-      + "      <target dev='vdc' bus='virtio'/>\n"
-      + "      <readonly/>\n"
-      + "    </disk>";
+      + lib.optionalString ((vm ? androidGsiVersion) && vm.androidGsiVersion != null) (
+        "<disk type='file' device='disk'>\n"
+        + "      <driver name='qemu' type='raw'/>\n"
+        + "      <source file='${vmDir}/images/android-gsi.img'/>\n"
+        + "      <target dev='vdc' bus='virtio'/>\n"
+        + "      <readonly/>\n"
+        + "    </disk>"
+      );
 
   # Firmware block selecting UEFI (Android) or legacy BIOS (non-Android).
   # Android requires AArch64 UEFI via AAVMF for GSI boot; non-Android VMs

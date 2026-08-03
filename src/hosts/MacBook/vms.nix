@@ -10,7 +10,7 @@
 # so re-provisioning from scratch always produces the same UTM identity.
 #
 # Source: https://github.com/utmapp/UTM/blob/main/Configuration/UTMQemuConfiguration.swift
-{ pkgs, ... }:
+{ pkgs, lib, ... }:
 let
   vmsData = builtins.fromJSON (builtins.readFile ../../modules/VMs.json);
   nucleusHost = "MacBook";
@@ -96,6 +96,8 @@ let
             <key>ReadOnly</key>
             <false/>
         </dict>
+      ''
+      + lib.optionalString ((vm ? androidGsiVersion) && vm.androidGsiVersion != null) ''
         <dict>
             <key>Identifier</key>
             <string>${vm.name}-disk-gsi</string>
