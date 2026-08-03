@@ -5,9 +5,10 @@
     Validates managed fetch, pull and push defaults (branch pruning, tag
     retention, fast-forward pull, auto-setup remote, tag-follow) and cross-host
     Git parity defaults. Signing and symlink keys (commit.gpgsign,
-    tag.gpgsign, core.symlinks) are asserted at system scope via the
-    Windows.gitconfig symlink; core.autocrlf and user.useConfigOnly stay
-    per-user.
+    tag.gpgsign, core.symlinks) are asserted at user scope via
+    $script:gitConfigPath; system scope holds only the Git for Windows
+    installer shipped defaults (core.fscache, credential.helper,
+    http.sslBackend). core.autocrlf and user.useConfigOnly stay per-user.
 .NOTES
     Environment variables: USERPROFILE (resolved to locate .gitconfig)
     Exit codes: 0 on success; 1 on failure
@@ -107,22 +108,28 @@ Describe "Windows Git Configuration Parity" {
             }
         }
 
-        It "Should enable signed commits at system scope" {
-            git config --system --get commit.gpgsign | Should -Be 'true'
+        It "Should enable signed commits at user scope" {
+            git config --file $script:gitConfigPath --get commit.gpgsign | Should -Be 'true'
         }
 
-        It "Should enable signed tags at system scope" {
-            git config --system --get tag.gpgsign | Should -Be 'true'
+        It "Should enable signed tags at user scope" {
+            git config --file $script:gitConfigPath --get tag.gpgsign | Should -Be 'true'
         }
 
-        It "Should keep symlink support enabled at system scope" {
-            git config --system --get core.symlinks | Should -Be 'true'
+        It "Should keep symlink support enabled at user scope" {
+            git config --file $script:gitConfigPath --get core.symlinks | Should -Be 'true'
         }
 
-        It "Should NOT duplicate signing/symlink defaults per-user" {
-            git config --file $script:gitConfigPath --get commit.gpgsign | Should -BeNullOrEmpty
-            git config --file $script:gitConfigPath --get tag.gpgsign | Should -BeNullOrEmpty
-            git config --file $script:gitConfigPath --get core.symlinks | Should -BeNullOrEmpty
+        It "Should NOT define signing/symlink defaults at system scope" {
+            git config --system --get commit.gpgsign | Should -BeNullOrEmpty
+            git config --system --get tag.gpgsign | Should -BeNullOrEmpty
+            git config --system --get core.symlinks | Should -BeNullOrEmpty
+        }
+
+        It "Should keep Git for Windows installer defaults at system scope" {
+            git config --system --get core.fscache | Should -Be 'true'
+            git config --system --get credential.helper | Should -Be 'manager'
+            git config --system --get http.sslBackend | Should -Be 'schannel'
         }
     }
 
