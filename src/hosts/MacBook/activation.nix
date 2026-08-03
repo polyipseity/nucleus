@@ -115,6 +115,7 @@ in
   #   configureMonitorColorProfile     — clear ColorSync device cache
   #   clearFinderCache                 — purge stale Finder state for desktop visibility
   #   configureNvimLauncher            — macOS-specific neovim launcher
+  #   configureUtmRendererPrefs        — UTM ANGLE (OpenGL) renderer for Android guest
   #   disableSpotlight                 — disable all Spotlight hotkeys + service
   # ---------------------------------------------------------------------------
   system.activationScripts.postActivation.text = lib.mkBefore ''
@@ -164,6 +165,12 @@ in
     "${activationBundle}/src/scripts/hosts/MacBook/macos-register-mounty-login-item.sh"
     # ---- configure-linearmouse-preferences --------------------------------------
     "${activationBundle}/src/scripts/hosts/MacBook/macos-set-linearmouse-prefs.sh"
+    # ---- configure-utm-renderer-prefs -------------------------------------------
+    # Pin UTM's global renderer backend to ANGLE (OpenGL) in the sandboxed app
+    # container so the Android (LineageOS) guest UI appears instead of freezing.
+    # Runs unconditionally: the pref is a global UTM setting, harmless when no
+    # Android VM is enabled, and idempotent when already set.
+    "${activationBundle}/src/scripts/hosts/MacBook/macos-set-utm-renderer.sh"
     # ---- configure-gimp-scroll-sensitivity ---------------------------------------
     "${activationBundle}/src/scripts/configs/configure-gimp-scroll-sensitivity.sh"
 
