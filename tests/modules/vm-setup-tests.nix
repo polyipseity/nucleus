@@ -1075,6 +1075,18 @@ let
       )
       "src/hosts/MacBook/vms.nix must render the GSI drive only when androidGsiVersion is non-null while keeping android-userdata.qcow2 attached unconditionally";
 
+  # The Android drive token must be emitted inside the Drive array (before
+  # </array>); an emission outside the array produces orphan <dict> entries at
+  # the plist top level, yielding a malformed config.plist that UTM silently
+  # rejects on import (the bundle never registers).
+  test_utm_android_drives_inside_drive_array =
+    assert'
+      (
+        (lib.hasInfix "__VM_ANDROID_DRIVES__\n    </array>\n    <key>Display</key>" utmConfigPlistText)
+        && !(lib.hasInfix "</array>\n    __VM_ANDROID_DRIVES__" utmConfigPlistText)
+      )
+      "src/modules/configs/vms/utm-config.plist.xml must emit __VM_ANDROID_DRIVES__ inside the Drive array so Android dict entries are valid array elements";
+
   # NixOS libvirt domain XML must attach the GSI disk only when
   # androidGsiVersion is set, mirroring the MacBook UTM template.
   test_nixos_android_gsi_conditional = assert' (
@@ -1219,6 +1231,7 @@ let
     test_macbook_tart_storage_link
     test_vm_enabled_policy_wiring
     test_macbook_android_gsi_conditional
+    test_utm_android_drives_inside_drive_array
     test_nixos_android_gsi_conditional
     test_nixos_android_disk_paths_in_images_dir
     test_macbook_macos_version_tahoe
@@ -1317,6 +1330,7 @@ in
     test_macbook_tart_storage_link
     test_vm_enabled_policy_wiring
     test_macbook_android_gsi_conditional
+    test_utm_android_drives_inside_drive_array
     test_nixos_android_gsi_conditional
     test_nixos_android_disk_paths_in_images_dir
     test_macbook_macos_version_tahoe
