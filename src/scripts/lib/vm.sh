@@ -158,12 +158,15 @@ run_cmd() {
   fi
 }
 
-# validate_qcow2_image PATH LABEL
+# validate_qcow2_image PATH LABEL [MIN_VIRTUAL_SIZE]
 #   Verifies that a QCOW2 image exists, is non-empty, and (when qemu-img is
-#   available) reports format=qcow2 with a sensible virtual size.
+#   available) reports format=qcow2 with a sensible virtual size.  The
+#   minimum virtual size defaults to 10 GiB; pass a smaller value for
+#   compact images such as the 8 GiB Android userdata disk.
 validate_qcow2_image() {
   _vqi_path="$1"
   _vqi_label="$2"
+  _vqi_min_size="${3:-10737418240}"
 
   if [ ! -f "$_vqi_path" ]; then
     error "$_vqi_label not found: $_vqi_path"
@@ -191,8 +194,8 @@ validate_qcow2_image() {
     fi
 
     _vqi_virtual_size="$(printf '%s' "$_vqi_info" | jq -r '."virtual-size" // 0')"
-    if [ -z "$_vqi_virtual_size" ] || [ "$_vqi_virtual_size" -lt 10737418240 ]; then
-      error "$_vqi_label virtual size is too small ($_vqi_virtual_size bytes): $_vqi_path"
+    if [ -z "$_vqi_virtual_size" ] || [ "$_vqi_virtual_size" -lt "$_vqi_min_size" ]; then
+      error "$_vqi_label virtual size is too small ($_vqi_virtual_size bytes; minimum $_vqi_min_size): $_vqi_path"
       return 1
     fi
   fi
@@ -645,7 +648,7 @@ vm_build_android() {
       curl -fsSL -o "$IMAGES_DIR/android-lineage-release.json" \
       "https://api.github.com/repos/jqssun/android-lineage-qemu/releases/latest" \
       || { error "failed to fetch latest LineageOS release info"; return 1; }
-    _bai_dl_url="$(jq -r '.assets[] | select(.name | test("UTM-VM-lineage-arm64only-.*\\.zip")) | .browser_download_url' "$IMAGES_DIR/android-lineage-release.json" | head -1)"
+    _bai_dl_url="$(jq -r '.assets[] | select(.name | test("UTM-VM-lineage-.*-virtio_arm64only\\.zip")) | .browser_download_url' "$IMAGES_DIR/android-lineage-release.json" | head -1)"
     if [ -z "$_bai_dl_url" ] || [ "$_bai_dl_url" = "null" ]; then
       error "no LineageOS UTM zip found in latest release assets"
       return 1
@@ -658,14 +661,16 @@ vm_build_android() {
     rm -rf "$_bai_extract_dir"
     mkdir -p "$_bai_extract_dir"
     run_cmd unzip -q "$IMAGES_DIR/android-lineage.zip" -d "$_bai_extract_dir"
-    _bai_qcow2="$(find "$_bai_extract_dir" -path '*/LineageOS_on_*.utm/Data/vda.qcow2' -type f | head -1)"
+    # UTM bundle layouts differ across versions (vda.qcow2 in UTM 1-3,
+    # disk-main.qcow2 in UTM 4); pick the largest qcow2 as the system image.
+    _bai_qcow2="$(find "$_bai_extract_dir" -type f -name '*.qcow2' -print | while IFS= read -r _f; do printf '%s %s\n' "$(wc -c < "$_f")" "$_f"; done | sort -rn | head -1 | cut -d' ' -f2-)"
     if [ -z "$_bai_qcow2" ]; then
-      error "vda.qcow2 not found inside extracted LineageOS bundle"
+      error "no qcow2 system image found inside extracted LineageOS bundle"
       return 1
     fi
     run_cmd cp "$_bai_qcow2" "$_bai_system_img"
     rm -rf "$_bai_extract_dir" "$IMAGES_DIR/android-lineage.zip" "$IMAGES_DIR/android-lineage-release.json"
-    validate_qcow2_image "$_bai_system_img" "Android system image for $_bai_vm_name" || return 1
+    validate_qcow2_image "$_bai_system_img" "Android system image for $_bai_vm_name" 4294967296 || return 1
     say "system image ready: $_bai_system_img"
   else
     say "system image already exists: $_bai_system_img"
@@ -679,7 +684,7 @@ vm_build_android() {
     fi
     say "creating userdata disk (8 GiB)..."
     run_cmd qemu-img create -f qcow2 "$_bai_userdata_img" 8G
-    validate_qcow2_image "$_bai_userdata_img" "Android userdata disk for $_bai_vm_name" || return 1
+    validate_qcow2_image "$_bai_userdata_img" "Android userdata disk for $_bai_vm_name" 4294967296 || return 1
     say "userdata disk ready: $_bai_userdata_img"
   else
     say "userdata disk already exists: $_bai_userdata_img"
