@@ -7,15 +7,17 @@ function Sync-GitAndSshConfig {
     Applies a managed Git baseline and an SSH host block for GitHub for every
     user in $Users:
       - system scope: <Git install>\etc\gitconfig symlinked to the repo's
-        <Host>.gitconfig (commit.gpgsign, tag.gpgsign, core.symlinks,
-        core.autocrlf=false plus the installer's shipped defaults; mirrors the
-        POSIX /etc/gitconfig symlink), with a same-folder .bak backup of any
-        installer-owned original and restore on disable
-      - per-user: core.autocrlf=true (Windows override of system false),
-        fetch.prune=true, fetch.pruneTags=false, pull.ff=true, pull.rebase=false,
-        push.followTags=true, push.autoSetupRemote=true, gpg.format=openpgp,
-        init.defaultBranch, init.templateDir, core.excludesFile,
-        url.git@github.com:.insteadOf=https://github.com/, user.useConfigOnly
+        <Host>.gitconfig (installer shipped defaults only: core.fscache,
+        credential.helper, http.sslBackend; mirrors the POSIX /etc/gitconfig
+        symlink), with a same-folder .bak backup of any installer-owned
+        original and restore on disable
+      - per-user: commit.gpgsign=true, tag.gpgsign=true, core.symlinks=true,
+        core.autocrlf=true (Windows checkouts stay CRLF on disk and LF in the
+        repo), fetch.prune=true, fetch.pruneTags=false, pull.ff=true,
+        pull.rebase=false, push.followTags=true, push.autoSetupRemote=true,
+        gpg.format=openpgp, init.defaultBranch, init.templateDir,
+        core.excludesFile, url.git@github.com:.insteadOf=https://github.com/,
+        user.useConfigOnly
       - user.name / user.email / user.signingkey (from SOPS-managed identity)
       - ~/.ssh/config managed block for Host github.com (per-user key path)
       - ssh-agent service startup set to Automatic (for session persistence)
@@ -293,8 +295,9 @@ function Sync-GitAndSshConfig {
   }
 
   # Machine-wide Git system scope: symlink <install>\etc\gitconfig to the repo's
-  # <Host>.gitconfig (commit/tag gpgsign, core symlinks/autocrlf), mirroring the
-  # POSIX /etc/gitconfig symlink (src/modules/posix-base.nix). Git for Windows
+  # <Host>.gitconfig (installer shipped defaults only — signing, newline and
+  # symlink defaults are user-scoped), mirroring the POSIX /etc/gitconfig
+  # symlink (src/modules/posix-base.nix). Git for Windows
   # >= 2.24 does not read %ProgramData%\Git\config; <install>\etc\gitconfig is
   # the only system config and is installer-owned, so <Host>.gitconfig folds in
   # the installer's shipped defaults (credential.helper, http.sslBackend,

@@ -47,10 +47,6 @@ in
         keep-outputs = true;
       };
 
-      # Enforce baseline Git behavior globally for every local account.
-      # Commit/tag signing is required by default, symlinks are enabled, and
-      # POSIX hosts keep core.autocrlf=false so Git never rejects an invalid
-      # boolean value and newline policy remains controlled by .gitattributes.
       programs.zsh.enable = true;
     }
 
