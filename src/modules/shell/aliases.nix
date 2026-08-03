@@ -117,13 +117,16 @@
   # bun shortcuts — mirror the Windows bun function aliases in profile.ps1 managed block.
   # -n is the bare bun command; each other alias maps one concise suffix to a bun subcommand.
   # -no (outdated) reads like a negation prefix but o = outdated; the -n* namespace keeps it unambiguous.
+  # -nf is fmt and -nff is format; bun accepts both spellings, the double letter maps to the longer form.
   # Excluded (YAGNI): audit, info, init, patch, pm, publish, repl, unlink.
   "-n" = "bun";
   "-na" = "bun add";
   "-nb" = "bun build";
   "-nc" = "bun create";
   "-nci" = "bun ci";
+  "-ncl" = "bun clean";
   "-nf" = "bun fmt";
+  "-nff" = "bun format";
   "-ni" = "bun install";
   "-nl" = "bun link";
   "-no" = "bun outdated";

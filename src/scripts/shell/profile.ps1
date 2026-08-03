@@ -404,7 +404,9 @@ if (Get-Command bun -ErrorAction SilentlyContinue) {
   Add-ShellAlias '-nb' { & bun build @Args }
   Add-ShellAlias '-nc' { & bun create @Args }
   Add-ShellAlias '-nci' { & bun ci @Args }
+  Add-ShellAlias '-ncl' { & bun clean @Args }
   Add-ShellAlias '-nf' { & bun fmt @Args }
+  Add-ShellAlias '-nff' { & bun format @Args }
   Add-ShellAlias '-ni' { & bun install @Args }
   Add-ShellAlias '-nl' { & bun link @Args }
   Add-ShellAlias '-no' { & bun outdated @Args }

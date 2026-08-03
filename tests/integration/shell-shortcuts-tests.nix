@@ -29,7 +29,9 @@ let
       ''"-nb" = "bun build";''
       ''"-nc" = "bun create";''
       ''"-nci" = "bun ci";''
+      ''"-ncl" = "bun clean";''
       ''"-nf" = "bun fmt";''
+      ''"-nff" = "bun format";''
       ''"-ni" = "bun install";''
       ''"-nl" = "bun link";''
       ''"-no" = "bun outdated";''
@@ -55,7 +57,9 @@ let
       "Add-ShellAlias '-nb' { & bun build @Args }"
       "Add-ShellAlias '-nc' { & bun create @Args }"
       "Add-ShellAlias '-nci' { & bun ci @Args }"
+      "Add-ShellAlias '-ncl' { & bun clean @Args }"
       "Add-ShellAlias '-nf' { & bun fmt @Args }"
+      "Add-ShellAlias '-nff' { & bun format @Args }"
       "Add-ShellAlias '-ni' { & bun install @Args }"
       "Add-ShellAlias '-nl' { & bun link @Args }"
       "Add-ShellAlias '-no' { & bun outdated @Args }"
@@ -81,7 +85,9 @@ let
       "Add-ShellAlias '-nb' { & bun build @Args }"
       "Add-ShellAlias '-nc' { & bun create @Args }"
       "Add-ShellAlias '-nci' { & bun ci @Args }"
+      "Add-ShellAlias '-ncl' { & bun clean @Args }"
       "Add-ShellAlias '-nf' { & bun fmt @Args }"
+      "Add-ShellAlias '-nff' { & bun format @Args }"
       "Add-ShellAlias '-ni' { & bun install @Args }"
       "Add-ShellAlias '-nl' { & bun link @Args }"
       "Add-ShellAlias '-no' { & bun outdated @Args }"
@@ -131,7 +137,7 @@ let
     (
       text:
       lib.hasInfix "`-gsw` — git commands" text
-      && lib.hasInfix "`-n`, `-na`, `-nb`, `-nc`, `-nci`, `-nf`, `-ni`, `-nl`, `-no`, `-nr`, `-nrm`, `-nt`, `-nu`, `-nup`, `-nw`, `-nx` — bun commands" text
+      && lib.hasInfix "`-n`, `-na`, `-nb`, `-nc`, `-nci`, `-ncl`, `-nf`, `-nff`, `-ni`, `-nl`, `-no`, `-nr`, `-nrm`, `-nt`, `-nu`, `-nup`, `-nw`, `-nx` — bun commands" text
       && lib.hasInfix "`-la`, `-ll` — `eza -la`" text
       && lib.hasInfix "`-v` — `nvim`" text
       && lib.hasInfix "`nucleus-ai` — manage AI models (sync, list, status, endpoint, config)" text
