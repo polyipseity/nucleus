@@ -1017,6 +1017,7 @@ vm_setup_utm() {
 vm_setup_libvirt() {
   local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display disk_path disk_credential_marker _prebuilt
+  local _android_system _android_userdata _android_gsi
 
   vm_display=$(jq -r ".VMs[$vm_index].display" "$MANIFEST")
 
@@ -1025,41 +1026,68 @@ vm_setup_libvirt() {
 
   say "configuring libvirt VM '$vm_display' (hosts: $vm_hosts)..."
 
-  # Require a pre-built image (built in phase 1).
-  _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
-  if [ ! -f "$_prebuilt" ]; then
-    warn "image not found: $_prebuilt; skipping '$vm_name'"
-    return
-  fi
-  if ! validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}"; then
-    warn "pre-built image is invalid for '$vm_name': $_prebuilt"
-    return
+  # Require pre-built images (built in phase 1).  Android uses the shared
+  # android-* images (system + userdata, optional GSI) referenced directly by
+  # the domain XML rather than a single <Name>.qcow2 runtime copy.
+  if [ "$vm_type" = "Android" ]; then
+    _android_system="$IMAGES_DIR/android-system.qcow2"
+    _android_userdata="$IMAGES_DIR/android-userdata.qcow2"
+    _android_gsi="$IMAGES_DIR/android-gsi.img"
+    if [ ! -f "$_android_system" ] || [ ! -f "$_android_userdata" ]; then
+      warn "Android images not found: $_android_system and $_android_userdata; skipping '$vm_name'"
+      return
+    fi
+    if ! validate_qcow2_image "$_android_system" "Android system image for ${vm_name}" 4294967296 \
+      || ! validate_qcow2_image "$_android_userdata" "Android userdata disk for ${vm_name}" 4294967296; then
+      warn "Android images are invalid for '$vm_name'"
+      return
+    fi
+  else
+    _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
+    if [ ! -f "$_prebuilt" ]; then
+      warn "image not found: $_prebuilt; skipping '$vm_name'"
+      return
+    fi
+    if ! validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}"; then
+      warn "pre-built image is invalid for '$vm_name': $_prebuilt"
+      return
+    fi
   fi
 
   if [ "$dry_run" = false ]; then
     mkdir -p "$VM_DIR"
-    _replace_runtime=false
-    if [ ! -f "$disk_path" ]; then
-      _replace_runtime=true
-    elif ! validate_qcow2_image "$disk_path" "existing libvirt runtime disk for ${vm_name}"; then
-      warn "existing libvirt runtime disk is invalid for '$vm_name'; replacing from pre-built image"
-      rm -f "$disk_path"
-      _replace_runtime=true
-    elif ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$disk_credential_marker"; then
-      warn "$vm_name runtime disk guest credential drift detected; replacing runtime disk from pre-built image"
-      rm -f "$disk_path"
-      _replace_runtime=true
-    fi
-
-    if [ "$_replace_runtime" = true ]; then
-      cp "$_prebuilt" "$disk_path"
-      say "disk image placed: $disk_path"
-      resize_and_mark_image '' "$disk_credential_marker"
+    if [ "$vm_type" = "Android" ]; then
+      # The Android domain XML references the shared images directly; no
+      # runtime copy and no guest-credential markers apply.
+      say "Android images referenced directly by domain XML: $_android_system, $_android_userdata"
     else
-      say "disk already exists: $disk_path"
+      _replace_runtime=false
+      if [ ! -f "$disk_path" ]; then
+        _replace_runtime=true
+      elif ! validate_qcow2_image "$disk_path" "existing libvirt runtime disk for ${vm_name}"; then
+        warn "existing libvirt runtime disk is invalid for '$vm_name'; replacing from pre-built image"
+        rm -f "$disk_path"
+        _replace_runtime=true
+      elif ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$disk_credential_marker"; then
+        warn "$vm_name runtime disk guest credential drift detected; replacing runtime disk from pre-built image"
+        rm -f "$disk_path"
+        _replace_runtime=true
+      fi
+
+      if [ "$_replace_runtime" = true ]; then
+        cp "$_prebuilt" "$disk_path"
+        say "disk image placed: $disk_path"
+        resize_and_mark_image '' "$disk_credential_marker"
+      else
+        say "disk already exists: $disk_path"
+      fi
     fi
   else
-    dry_run "copy $_prebuilt to $disk_path"
+    if [ "$vm_type" = "Android" ]; then
+      dry_run "use Android images in domain XML: $_android_system, $_android_userdata"
+    else
+      dry_run "copy $_prebuilt to $disk_path"
+    fi
   fi
 
   # Define/update the libvirt domain from the Nix-generated XML (idempotent).
