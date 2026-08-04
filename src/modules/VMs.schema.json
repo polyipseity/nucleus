@@ -14,7 +14,7 @@
         "properties": {
           "Android": {
             "additionalProperties": false,
-            "description": "Android guest configuration. Present only for type: Android.",
+            "description": "Android guest configuration. Required when type is Android; forbidden for every other type. All inner properties are required.",
             "properties": {
               "gsiImage": {
                 "description": "GSI image filename under the shared VM images directory.",
@@ -47,7 +47,7 @@
             "type": "integer"
           },
           "diskSize": {
-            "description": "Boot disk size, as a suffixed size string (decimal kB/MB/GB/TB or binary kiB/MiB/GiB/TiB).",
+            "description": "Boot disk size as a suffixed size string matching the size grammar (^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$). Decimal prefixes (kB/MB/GB/TB) are canonical in manifest values; binary prefixes (kiB/MiB/GiB/TiB) are accepted input. KB and KiB (capital K) are invalid.",
             "pattern": "^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$",
             "type": "string"
           },
@@ -82,7 +82,7 @@
           },
           "macOS": {
             "additionalProperties": false,
-            "description": "macOS guest configuration. Present only for type: macOS.",
+            "description": "macOS guest configuration. Required when type is macOS; forbidden for every other type. All inner properties are required.",
             "properties": {
               "version": {
                 "description": "macOS version (e.g. tahoe).",
@@ -95,7 +95,7 @@
             "type": "object"
           },
           "minImageSize": {
-            "description": "Minimum prebuilt disk image size accepted during provisioning, as a suffixed size (decimal kB/MB/GB/TB or binary kiB/MiB/GiB/TiB).",
+            "description": "Minimum prebuilt disk image size accepted during provisioning, as a suffixed size string matching the size grammar (^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$). Decimal prefixes (kB/MB/GB/TB) are canonical in manifest values; binary prefixes (kiB/MiB/GiB/TiB) are accepted input. KB and KiB (capital K) are invalid.",
             "pattern": "^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$",
             "type": "string"
           },
@@ -127,7 +127,7 @@
             "type": "array"
           },
           "ram": {
-            "description": "RAM size, as a suffixed size string (decimal kB/MB/GB/TB or binary kiB/MiB/GiB/TiB).",
+            "description": "RAM size as a suffixed size string matching the size grammar (^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$). Decimal prefixes (kB/MB/GB/TB) are canonical in manifest values; binary prefixes (kiB/MiB/GiB/TiB) are accepted input. KB and KiB (capital K) are invalid.",
             "pattern": "^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$",
             "type": "string"
           },
@@ -156,7 +156,7 @@
           },
           "Windows": {
             "additionalProperties": false,
-            "description": "Windows guest configuration. Present only for type: Windows.",
+            "description": "Windows guest configuration. Required when type is Windows; forbidden for every other type. All inner properties are required (isoUrl is nullable).",
             "properties": {
               "edition": {
                 "description": "Windows edition.",

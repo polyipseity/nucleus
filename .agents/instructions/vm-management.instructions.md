@@ -18,20 +18,22 @@ macOS guest uses Tart (Apple Virtualization.framework) exclusively; automated Ta
 
 ## Hostname convention
 
-VM guest OSes must use the same hostname and display name as the corresponding host OS. The canonical values are:
+VM guest OSes must use the same hostname as the corresponding host OS. The canonical values are declared in the `hostname` field of each entry in `src/modules/VMs.json` (identical to `name` for every VM today):
 
-| Guest OS | `networking.hostName` / `ComputerName` | `display` in VMs.json |
-| -------- | -------------------------------------- | --------------------- |
-| macOS    | (set manually inside guest)            | `MacBook`             |
-| NixOS    | `NixOS`                                | `NixOS`               |
-| Windows  | `Windows`                              | `Windows`             |
+| Guest OS | `hostname` in VMs.json |
+| -------- | ---------------------- |
+| macOS    | `MacBook`              |
+| NixOS    | `NixOS`                |
+| Windows  | `Windows`              |
 
-Apply this convention when adding or modifying:
+The manifest `hostname` is the single source of truth. Guest files consume it through env/var/token plumbing and must not hard-code a hostname:
 
-- `src/vms/nixos/guest.nix` — set `networking.hostName = "NixOS"`
-- `src/vms/nixos/packer.pkr.hcl` — set `networking.hostName = "NixOS"` inline
-- `src/vms/windows/Autounattend.xml` — set `<ComputerName>Windows</ComputerName>`
-- `src/modules/VMs.json` — set `display` to the canonical PascalCase name
+- `src/vms/nixos/guest.nix` — `networking.hostName = builtins.getEnv "NUCLEUS_VM_GUEST_HOSTNAME"` (and the flake attr `hostName`)
+- `src/vms/nixos/packer.pkr.hcl` — `guest_hostname` var rendered into `networking.hostName`
+- `src/vms/macos/packer.pkr.hcl` — `vm_hostname` var applied via `scutil` (HostName/ComputerName/LocalHostName)
+- `src/vms/windows/Autounattend.xml` — `<ComputerName>__GUEST_HOSTNAME__</ComputerName>`
+
+When adding a VM, set `hostname` (and matching `name`) in `src/modules/VMs.json`; do not edit hostname literals in guest files.
 
 ## Guest credential convention
 
@@ -52,28 +54,55 @@ Required fields for each VM entry:
 
 | Field              | Type    | Description                                                       |
 | ------------------ | ------- | ----------------------------------------------------------------- |
-| `id`               | string  | Machine-readable key used for files, domains, and CLI names       |
+| `id`               | string  | Machine-readable key used for files, domains, UUID/MAC derivation, and CLI selection |
 | `name`             | string  | Human-readable label shown in UTM/virt-manager and CLI tables     |
 | `type`             | string  | Guest OS family: `"Android"`, `"NixOS"`, `"Windows"`, `"macOS"`, `"Linux"` |
 | `enabled`          | bool    | Whether the VM is provisioned                                     |
-| `hosts`            | array   | Hosts that provision this VM (`"MacBook"`, `"NixOS"`, `"Windows"`) |
+| `hosts`            | array   | Hosts that provision this VM (`"MacBook"`, `"NixOS"`, `"Windows"`); non-empty |
 | `cpus`             | int     | Number of virtual CPUs                                            |
-| `ram`             | string  | RAM as a suffixed size string (e.g. `"8GB"`)                    |
-| `diskSize`        | string  | Boot disk size as a suffixed size string (e.g. `"128GB"`)     |
+| `ram`             | string  | RAM as a suffixed size string per the size grammar (e.g. `"8GB"`) |
+| `diskSize`        | string  | Boot disk size as a suffixed size string per the size grammar (e.g. `"128GB"`) |
 | `shareDevDir`      | bool    | Mount `~/dev` inside the guest via VirtioFS                       |
 | `sound`            | string  | Audio device: `"intel-hda"` or `"none"`                        |
-| `portForwards`     | array   | Non-empty `{guestPort, hostPort}` port-forward pairs              |
-| `hostname`         | string  | Guest hostname                                                    |
-| `minImageSize`     | string  | Minimum prebuilt image size floor (suffixed, e.g. `"4GB"`)      |
+| `portForwards`     | array   | Non-empty `{guestPort, hostPort}` port-forward pairs (see Port forwarding) |
+| `hostname`         | string  | Guest OS hostname; must equal the `name` value (see Hostname convention) |
+| `minImageSize`     | string  | Minimum prebuilt image size floor per the size grammar (e.g. `"4GB"`) |
 | `macAddressPrefix` | string  | MAC address prefix used for the guest NIC                         |
 
-Type-specific fields (nested objects keyed by `type`; required when `type` matches, forbidden otherwise):
+Type-specific fields (nested objects keyed by `type`; all fields required when `type` matches, forbidden otherwise):
 
 | `type`      | Group      | Fields                                                                                                                                                                                                                    |
 | ----------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `"Android"` | `Android`  | `systemImage`, `userdataImage`, `gsiImage`, `gsiUrl` (all required; `gsiUrl` may be `null` to use the built-in LineageOS GSI)                                                                                             |
 | `"macOS"`  | `macOS`    | `version` (release name, e.g. `"tahoe"`)                                                                                                                                                                                 |
 | `"Windows"` | `Windows`  | `edition` (e.g. `"pro"`), `isoUrl` (`null` = Mido/Fido auto-resolve; a URL auto-downloads the installer ISO when `--windows-iso` is omitted, cached at `~/virtual machines/images/<id>-installer.iso`)                  |
+
+All common fields and every field in the matching type group are **required** — there are no optional manifest properties. `Windows.isoUrl` is the sole deliberate nullable value (`null` is valid; a URL is valid).
+
+## Size suffix grammar
+
+All size fields (`ram`, `diskSize`, `minImageSize`) are suffixed size strings matching the grammar below. The grammar is case-sensitive and identical across all three platform parsers (`src/modules/lib/size.nix`, `src/scripts/lib/size.sh`, `src/hosts/Windows/modules/SizeStrings.ps1`); a malformed string aborts provisioning with an error rather than coercing.
+
+```
+^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$
+```
+
+- **Decimal prefixes** `kB`, `MB`, `GB`, `TB` multiply by powers of 10 (×10³, ×10⁶, ×10⁹, ×10¹²).
+- **Binary prefixes** `kiB`, `MiB`, `GiB`, `TiB` multiply by powers of 2 (×2¹⁰, ×2²⁰, ×2³⁰, ×2⁴⁰).
+- A single optional space between the number and the prefix is allowed: `"8GB"`, `"8 GB"`, `"8192MiB"` are all valid.
+- `KB` and `KiB` (capital `K`) are **invalid** and rejected. IEC/ISO spell the binary prefix `Ki`; this repo uses `kiB` for case-consistency — `k` is always lowercase and `K` is always invalid.
+- Canonical manifest values use **decimal** prefixes (`"8GB"`, `"128GB"`); binary prefixes are accepted input but not the manifest convention.
+- Property names carry no unit — the suffix string carries it (`ram`, `diskSize`, `minImageSize`; never `ramBytes`/`diskSizeBytes`).
+- Canonical internal unit: integer bytes. Each parser returns the exact byte count; 1024-based math appears only inside the three parsers and the documented backend adapters (e.g. Packer's MiB `memory` adapter, Tart's whole-GiB conversion), never scattered through renderers.
+
+## Port forwarding
+
+Guest port forwards are declared in the `portForwards` array of each VM entry: non-empty `{guestPort, hostPort}` pairs mapping a guest port to a host port. All host-side forwards (UTM forwards, QEMU `hostfwd` rules, Packer, start scripts) and guest-readiness probes are derived from this array — never hard-code host ports in production code.
+
+- Non-Android VMs (`macOS`, `NixOS`, `Windows`) declare a `guestPort: 22` SSH entry; Android declares ADB `5555` and console `5554` entries instead (Android must not also claim host port `2222` — when Android and NixOS run together the second VM would fail to start with "Could not set up host forwarding rule" because host 2222 is already taken).
+- UTM rendering: for non-Android VMs the `guestPort: 22` entry is rendered as the base forward and other entries as additional forwards; Android renders all its entries into the forward list (no base/additional split).
+- QEMU/Packer render one `hostfwd=tcp::<hostPort>-:<guestPort>` rule per entry.
+- Guest-readiness probes per type: `NixOS` tries QEMU guest agent first (`guest-ping` on the `qga-<id>` pipe) then falls back to SSH on the guest-22 host port; `Windows` uses QEMU guest agent only; `macOS` uses SSH on the guest-22 host port; `Android` uses `adb connect localhost:<hostPort>` on the guest-5555 host port (with an SSH fallback).
 
 ## Disk format
 
@@ -90,16 +119,16 @@ QCOW2 enables copy-based migration between hosts without conversion.
 ## macOS — Tart (macOS guests)
 
 - VM backend: Tart CLI (Apple Virtualization.framework); macOS host only.
-- VM store: `~/virtual machines/.tart/vms/<name>/` — Tart's storage root (`~/.tart`) is symlinked to `~/virtual machines/.tart` by `nucleus-vm setup` so Tart artifacts co-locate with UTM bundles for unified backup.
+- VM store: `~/virtual machines/.tart/vms/<id>/` — Tart's storage root (`~/.tart`) is symlinked to `~/virtual machines/.tart` by `nucleus-vm setup` so Tart artifacts co-locate with UTM bundles for unified backup.
 - Build tool: Packer + `tart-cli` plugin pulling `ghcr.io/cirruslabs/macos-<version>-base:latest` from GHCR.
-- Start command (after build): `tart run <name>`.
+- Start command (after build): `tart run <id>`.
 - No UTM bundle is created for macOS guests; they remain Tart-managed.
 
 ## macOS — UTM
 
 - VM backend: UTM 4.x QEMU backend.
-- Bundle location: `~/virtual machines/<name>.utm/`
-- Config template: `config.plist` pre-generated at `~/.local/share/nucleus/vms/<name>-config.plist` by `src/hosts/MacBook/vms.nix` at Home Manager activation time; `vm.sh setup` copies it into the bundle.
+- Bundle location: `~/virtual machines/<id>.utm/`
+- Config template: `config.plist` pre-generated at `~/.local/share/nucleus/vms/<id>-config.plist` by `src/hosts/MacBook/vms.nix` at Home Manager activation time; `vm.sh setup` copies it into the bundle.
 - Disk pre-created in `Images/disk-main.qcow2` by copying the pre-built image from the images directory.
 - After provisioning, UTM opens each bundle automatically.
 - VirtioFS shared directory: configured via `Sharing.DirectoryShare` in the Nix-generated config.plist.
