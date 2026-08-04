@@ -141,7 +141,7 @@ let
     if vm.type == "Android" then
       ""
     else
-      builtins.concatMapStrings (p: ''
+      lib.concatMapStrings (p: ''
         <dict>
             <key>Protocol</key>
             <string>TCP</string>
@@ -157,7 +157,7 @@ let
     if vm.type != "Android" then
       ""
     else
-      builtins.concatMapStrings (p: ''
+      lib.concatMapStrings (p: ''
         <dict>
             <key>Protocol</key>
             <string>TCP</string>
