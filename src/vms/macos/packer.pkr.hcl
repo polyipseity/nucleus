@@ -29,7 +29,6 @@
 
 variable "macos_version" {
   type        = string
-  default     = "tahoe"
   description = "macOS version to provision (tahoe, sequoia, sonoma, ventura, etc.)."
 }
 
@@ -86,6 +85,11 @@ variable "ssh_password" {
   description = "SSH password for Packer communicator (matches Cirrus CI base image default)."
 }
 
+variable "vm_hostname" {
+  type        = string
+  description = "Guest hostname from the VMs.json hostname field, applied via scutil (HostName/ComputerName/LocalHostName)."
+}
+
 packer {
   required_plugins {
     tart = {
@@ -122,9 +126,9 @@ build {
   # (host name equals display name: MacBook for the macOS guest).
   provisioner "shell" {
     inline = [
-      "sudo scutil --set HostName MacBook",
-      "sudo scutil --set ComputerName MacBook",
-      "sudo scutil --set LocalHostName MacBook",
+      "sudo scutil --set HostName ${var.vm_hostname}",
+      "sudo scutil --set ComputerName ${var.vm_hostname}",
+      "sudo scutil --set LocalHostName ${var.vm_hostname}",
       "if id -u '${var.guest_username}' >/dev/null 2>&1; then sudo dscl . -passwd '/Users/${var.guest_username}' '${var.guest_password}'; else sudo sysadminctl -addUser '${var.guest_username}' -fullName '${var.guest_username}' -password '${var.guest_password}' -admin; fi",
       "echo 'macOS VM provisioned via Packer Tart'",
     ]

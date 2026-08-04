@@ -142,13 +142,13 @@ validate_dir() {
   local vars=()
   case "$dir" in
     *nixos)
-      vars=(-var guest_username=dummy -var guest_password=dummy -var nixos_iso_url=https://dummy.iso -var "nixos_iso_checksum=$_nixos_digest")
+      vars=(-var guest_username=dummy -var guest_password=dummy -var guest_hostname=dummy -var nixos_iso_url=https://dummy.iso -var "nixos_iso_checksum=$_nixos_digest")
       ;;
     *windows)
-      vars=(-var windows_iso=dummy.iso)
+      vars=(-var windows_iso=dummy.iso -var hostfwd=dummy -var guest_hostname=dummy)
       ;;
     *macos)
-      vars=(-var macos_version=14.0 -var vm_name=dummy -var cpus=2 -var memory_gib=4 -var disk_size_gib=40 -var guest_username=dummy -var guest_password=dummy -var ssh_username=dummy -var ssh_password=dummy -var tart_image_ref=dummy)
+      vars=(-var macos_version=14.0 -var vm_name=dummy -var cpus=2 -var memory_gib=4 -var disk_size_gib=40 -var guest_username=dummy -var guest_password=dummy -var ssh_username=dummy -var ssh_password=dummy -var tart_image_ref=dummy -var vm_hostname=dummy)
       ;;
   esac
   # 2>&1 into the filter: the warning goes to stderr; pipefail keeps the

@@ -132,6 +132,16 @@ variable "autounattend_path" {
   description = "Path to the rendered Autounattend.xml consumed by Windows Setup.  Wrapper scripts pass the full resolved path."
 }
 
+variable "hostfwd" {
+  type        = string
+  description = "Comma-separated QEMU hostfwd rules (e.g. 'hostfwd=tcp::2222-:22') derived from the VMs.json portForwards of the VM being built."
+}
+
+variable "guest_hostname" {
+  type        = string
+  description = "Guest hostname from the VMs.json hostname field.  Consumed by the Autounattend render before Packer runs; declared here so the wrapper's -var is accepted."
+}
+
 packer {
   required_plugins {
     qemu = {
@@ -275,7 +285,7 @@ source "qemu" "windows11" {
   qemuargs = [
     ["-cpu", "max"],
     ["-boot", "order=d"],
-    ["-netdev", "user,id=user.0,hostfwd=tcp::2222-:22"],
+    ["-netdev", "user,id=user.0,${var.hostfwd}"],
   ]
 
   headless = var.headless

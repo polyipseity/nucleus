@@ -75,6 +75,11 @@ variable "guest_password" {
   description = "Password for the primary NixOS guest user."
 }
 
+variable "guest_hostname" {
+  type        = string
+  description = "Guest hostname from the VMs.json hostname field, rendered into configuration.nix as networking.hostName."
+}
+
 packer {
   required_plugins {
     qemu = {
@@ -145,21 +150,24 @@ build {
       # Generate hardware configuration
       "nixos-generate-config --root /mnt",
       # Write the nucleus NixOS guest configuration
-      "cat > /mnt/etc/nixos/configuration.nix << 'NIXEOF'",
-      "{ modulesPath, ... }:",
-      "{",
-      "  imports = [ ./hardware-configuration.nix \"$${modulesPath}/profiles/qemu-guest.nix\" ];",
-      "  boot.loader.grub.enable = true;",
-      "  boot.loader.grub.device = \"/dev/vda\";",
-      "  networking.hostName = \"NixOS\";",
-      "  users.users.\"${var.guest_username}\" = {",
-      "    isNormalUser = true;",
-      "    extraGroups = [ \"wheel\" ];",
-      "    initialPassword = \"${var.guest_password}\";",
-      "  };",
-      "  system.stateVersion = \"25.05\";",
-      "}",
-      "NIXEOF",
+      <<-EOT
+        cat > /mnt/etc/nixos/configuration.nix << 'NIXEOF'
+        { modulesPath, ... }:
+        {
+          imports = [ ./hardware-configuration.nix "$${modulesPath}/profiles/qemu-guest.nix" ];
+          boot.loader.grub.enable = true;
+          boot.loader.grub.device = "/dev/vda";
+      networking.hostName = "${var.guest_hostname}";
+          users.users."${var.guest_username}" = {
+            isNormalUser = true;
+            extraGroups = [ "wheel" ];
+            initialPassword = "${var.guest_password}";
+          };
+          system.stateVersion = "25.05";
+        }
+        NIXEOF
+      EOT
+      ,
       # Install
       "nixos-install --no-root-passwd",
     ]
