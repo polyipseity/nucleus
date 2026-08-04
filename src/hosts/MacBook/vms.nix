@@ -50,13 +50,14 @@ let
     in
     "${builtins.substring 0 8 h}-${builtins.substring 8 4 h}-${builtins.substring 12 4 h}-${builtins.substring 16 4 h}-${builtins.substring 20 12 h}";
 
-  # Deterministic locally-administered unicast MAC per VM name.
+  # Deterministic locally-administered unicast MAC per VM name, with the
+  # prefix taken from the manifest's macAddressPrefix field.
   mkMacAddress =
-    name:
+    name: prefix:
     let
       h = builtins.hashString "sha256" "mac:${name}";
     in
-    "52:${builtins.substring 0 2 h}:${builtins.substring 2 2 h}:${builtins.substring 4 2 h}:${builtins.substring 6 2 h}:${builtins.substring 8 2 h}";
+    "${prefix}:${builtins.substring 0 2 h}:${builtins.substring 2 2 h}:${builtins.substring 4 2 h}:${builtins.substring 6 2 h}:${builtins.substring 8 2 h}";
 
   # QEMU display card appropriate for the guest OS.
   # Linux/NixOS VMs use VirtIO GPU so UTM exposes an active display on both
@@ -218,7 +219,7 @@ let
         (displayCard vm)
         (directoryShareMode vm)
         (mkUuid vm.id)
-        (mkMacAddress vm.id)
+        (mkMacAddress vm.id vm.macAddressPrefix)
         (vmArch vm)
         (toString vm.cpus)
         (toString (size.ceilMib (size.parse vm.ram)))

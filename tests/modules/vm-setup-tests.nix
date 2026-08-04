@@ -397,6 +397,13 @@ let
         builtins.toString (builtins.map (v: v.name) badPrefixes)
       }";
 
+  # The UTM MAC must derive its prefix from the manifest's macAddressPrefix
+  # field — no hard-coded 52: default in the generator.
+  test_macbook_mac_address_uses_manifest_prefix = assert' (
+    lib.hasInfix "mkMacAddress vm.id vm.macAddressPrefix" macbook_vms_nix_text
+    && !(lib.hasInfix "\"52:\"" macbook_vms_nix_text)
+  ) "src/hosts/MacBook/vms.nix must consume vm.macAddressPrefix and not hard-code 52:";
+
   # Type-specific group objects: a VM carries the group named by its type
   # (Android/macOS/Windows) and no other; NixOS/Linux carry no group.
   groupTypes = [
@@ -1913,6 +1920,7 @@ let
     test_vm_guest_hostname_env_export
     test_nixos_packer_guest_hostname_var
     test_windows_autounattend_guest_hostname_token
+    test_macbook_mac_address_uses_manifest_prefix
   ];
 
 in
@@ -2058,6 +2066,7 @@ in
     test_vm_guest_hostname_env_export
     test_nixos_packer_guest_hostname_var
     test_windows_autounattend_guest_hostname_token
+    test_macbook_mac_address_uses_manifest_prefix
     ;
 
   summary = builtins.deepSeq all_tests "vm-setup-tests: all tests passed";
