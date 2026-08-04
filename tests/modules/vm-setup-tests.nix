@@ -14,8 +14,8 @@ let
     "enabled"
     "hosts"
     "cpus"
-    "ramBytes"
-    "diskBytes"
+    "ram"
+    "diskSize"
     "shareDevDir"
     "sound"
     "portForwards"
@@ -44,25 +44,212 @@ let
       builtins.length manifest.VMs > 0 && builtins.all (r: r == null) results
     ) "VMs.json must declare at least one VM";
 
-  # Disk sizes must be positive integers.
+  # Disk sizes must be suffixed size strings that parse to positive bytes.
   test_disk_sizes =
     let
-      badDisks = builtins.filter (vm: vm.diskBytes <= 0) manifest.VMs;
+      badDisks = builtins.filter (vm: size.parse vm.diskSize <= 0) manifest.VMs;
     in
     assert' (badDisks == [ ])
-      "Every VM must have diskBytes > 0; bad entries: ${
+      "Every VM must have diskSize parsing to > 0 bytes; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badDisks)
       }";
 
-  # RAM sizes must be positive integers.
+  # RAM sizes must be suffixed size strings that parse to positive bytes.
   test_ram_sizes =
     let
-      badRam = builtins.filter (vm: vm.ramBytes <= 0) manifest.VMs;
+      badRam = builtins.filter (vm: size.parse vm.ram <= 0) manifest.VMs;
     in
     assert' (badRam == [ ])
-      "Every VM must have ramBytes > 0; bad entries: ${
+      "Every VM must have ram parsing to > 0 bytes; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badRam)
       }";
+
+  # ---------------------------------------------------------------------------
+  # Phase 2 — VM sizes are suffixed strings (kB/MB/GB/TB and kiB/MiB/GiB/TiB)
+  # ---------------------------------------------------------------------------
+  # The Nix parser (src/modules/lib/size.nix) is the reference implementation;
+  # src/scripts/lib/size.sh and src/hosts/Windows/modules/SizeStrings.ps1 must
+  # accept and reject exactly the same inputs.  Grammar parity is enforced
+  # textually by test_size_grammar_parity_across_implementations; functional
+  # acceptance/rejection is pinned on the reference parser below.
+  size = import ../../src/modules/lib/size.nix;
+  sizePrefixes = [
+    "kB"
+    "MB"
+    "GB"
+    "TB"
+    "kiB"
+    "MiB"
+    "GiB"
+    "TiB"
+  ];
+  sizeSchemaPattern = "\"pattern\": \"^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$\"";
+  size_accept_fixtures = [
+    {
+      input = "8GB";
+      bytes = 8000000000;
+    }
+    {
+      input = "8 GB";
+      bytes = 8000000000;
+    }
+    {
+      input = "8192MiB";
+      bytes = 8589934592;
+    }
+    {
+      input = "1GiB";
+      bytes = 1073741824;
+    }
+    {
+      input = "512MB";
+      bytes = 512000000;
+    }
+    {
+      input = "512MiB";
+      bytes = 536870912;
+    }
+    {
+      input = "1kB";
+      bytes = 1000;
+    }
+    {
+      input = "1kiB";
+      bytes = 1024;
+    }
+    {
+      input = "1TB";
+      bytes = 1000000000000;
+    }
+    {
+      input = "1TiB";
+      bytes = 1099511627776;
+    }
+    {
+      input = "0GB";
+      bytes = 0;
+    }
+  ];
+  size_reject_inputs = [
+    "8KB"
+    "8KiB"
+    "8gb"
+    "8GBi"
+    "8B"
+    "B"
+    "8"
+    "8G"
+    "8 MB "
+    " GB"
+    "8MBK"
+  ];
+  size_sh_text = builtins.readFile ../../src/scripts/lib/size.sh;
+  size_ps_text = builtins.readFile ../../src/hosts/Windows/modules/SizeStrings.ps1;
+  vms_schema_text = builtins.readFile ../../src/modules/VMs.schema.json;
+
+  test_size_parser_accepts = assert' (builtins.all (f: size.parse f.input == f.bytes)
+    size_accept_fixtures
+  ) "size.parse must accept every canonical suffixed size string and return the exact byte count";
+
+  test_size_parser_rejects =
+    assert' (builtins.all (input: !(builtins.tryEval (size.parse input)).success) size_reject_inputs)
+      "size.parse must abort on invalid size strings (capital K, lowercase prefix, bare numbers, missing prefix, trailing junk)";
+
+  test_size_ceil_mib =
+    assert'
+      (
+        (size.ceilMib 8000000000 == 7630)
+        && (size.ceilMib 8589934592 == 8192)
+        && (size.ceilMib 1073741824 == 1024)
+        && (size.ceilMib 7999540000 == 7629)
+      )
+      "size.ceilMib must round UP so allocated memory never under-allocates (8GB -> 7630 MiB, not 7629)";
+
+  # Grammar parity: all three parsers plus the schema must support the same
+  # canonical prefix set.  Textual hasInfix keeps the gate language-agnostic
+  # (each implementation escapes its own regex metacharacters).
+  test_size_grammar_parity_across_implementations =
+    assert'
+      (
+        builtins.all (p: lib.hasInfix p (builtins.readFile ../../src/modules/lib/size.nix)) sizePrefixes
+        && builtins.all (p: lib.hasInfix p size_sh_text) sizePrefixes
+        && builtins.all (p: lib.hasInfix p size_ps_text) sizePrefixes
+        && builtins.all (p: lib.hasInfix p vms_schema_text) sizePrefixes
+      )
+      "size.nix, size.sh, SizeStrings.ps1 and VMs.schema.json must all support the same canonical prefix set (kB MB GB TB kiB MiB GiB TiB)";
+
+  # The schema must declare the identical suffixed-size pattern for ram,
+  # diskSize and minImageSize (3 occurrences -> 4 splitString parts).
+  test_size_schema_pattern =
+    assert' (builtins.length (lib.splitString sizeSchemaPattern vms_schema_text) == 4)
+      "VMs.schema.json must declare the canonical size-string pattern for ram, diskSize and minImageSize";
+
+  test_manifest_sizes_are_suffixed_strings = assert' (builtins.all (
+    vm: builtins.isString vm.ram && builtins.isString vm.diskSize
+  ) manifest.VMs) "Every VM must declare ram and diskSize as suffixed size strings";
+
+  test_manifest_sizes_match_pattern = assert' (builtins.all (
+    vm:
+    builtins.match "^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$" vm.ram != null
+    && builtins.match "^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$" vm.diskSize != null
+  ) manifest.VMs) "Every VM ram/diskSize must match the suffixed-size grammar";
+
+  # Manifest values stay canonical decimal (no embedded spaces, no binary
+  # prefixes) so all hosts present identical numbers.
+  test_manifest_size_values_are_canonical = assert' (
+    builtins.all (vm: builtins.match "^[0-9]+(GB|TB)$" vm.ram != null) manifest.VMs
+    && builtins.all (vm: builtins.match "^[0-9]+(GB|TB)$" vm.diskSize != null) manifest.VMs
+  ) "Manifest ram/diskSize values must be canonical decimal GB/TB";
+
+  # Status listing must parse the suffixed ram string and display decimal GB.
+  test_vm_status_display_parses_suffixed_ram = assert' (
+    (lib.hasInfix "ram_bytes=\"\$(parse_size \"\$ram\")\"" vm_setup_sh_text)
+    && (lib.hasInfix "ram_gib=\"\$(( (ram_bytes + 500000000) / 1000000000 ))\"" vm_setup_sh_text)
+    && (lib.hasInfix ".ram, .id] | @tsv" vm_setup_sh_text)
+    && (lib.hasInfix "ConvertFrom-SizeString \$vm.ram" vm_ps1_text)
+  ) "scripts/vm.sh and vm.ps1 status must parse the suffixed ram value and display decimal GB";
+
+  # Tart accepts only whole GiB (decimal for `tart create --disk-size`, MB via
+  # the packer plugin's GiB*1024 passthrough for `tart set --memory`).  The
+  # macOS build must round UP from exact manifest bytes so allocated capacity
+  # never under-allocates the declared size.
+  test_macos_packer_ceil_units =
+    assert'
+      (
+        (lib.hasInfix "vm_build_macos NAME DISK_BYTES RAM_BYTES" vm_setup_sh_text)
+        && (lib.hasInfix "_disk_gib=\"\$(( (_disk_bytes + 999999999) / 1000000000 ))\"" vm_setup_sh_text)
+        && (lib.hasInfix "_mem_gib=\"\$(( (_ram_bytes + 1073741823) / 1073741824 ))\"" vm_setup_sh_text)
+        && (lib.hasInfix "-var \"disk_size_gib=\$_disk_gib\"" vm_setup_sh_text)
+        && (lib.hasInfix "-var \"memory_gib=\$_mem_gib\"" vm_setup_sh_text)
+      )
+      "vm.sh must round manifest RAM/disk bytes UP to whole GiB for the Tart Packer build (tart accepts integer GB/MB only)";
+
+  # Image validation floors must derive from the manifest's minImageSize, not
+  # hardcoded byte constants.
+  test_min_image_size_floor_wiring =
+    assert'
+      (
+        (lib.hasInfix "_prebuilt_min_size=\"\$(parse_size \"\$(jq -r \".VMs[\$vm_index].minImageSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
+        && (lib.hasInfix "validate_qcow2_image \"\$_bai_system_img\" \"Android system image for \$_bai_vm_name\" \"\$(parse_size \"\$(jq -r \".VMs[\$_bai_vm_index].minImageSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
+        && (lib.hasInfix "validate_qcow2_image \"\$_bai_userdata_img\" \"Android userdata disk for \$_bai_vm_name\" \"\$(parse_size \"\$(jq -r \".VMs[\$_bai_vm_index].minImageSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
+        && (lib.hasInfix "Test-Qcow2Image -ImagePath \$prebuilt -ImageLabel \"pre-built image '\$(\$vm.id)'\" -MinBytes \$minSizeBytes" windows_vm_setup_ps1_text)
+      )
+      "Image validation floors must be parsed from manifest minImageSize instead of hardcoded byte constants";
+
+  # Legacy hardcoded binary size constants must be gone from the runtime
+  # scripts (the values now come from the parsers and manifest).
+  test_no_legacy_binary_size_constants =
+    assert'
+      (
+        !(lib.hasInfix "10737418240" vm_setup_sh_text)
+        && !(lib.hasInfix "4294967296" vm_setup_sh_text)
+        && !(lib.hasInfix "536870912" vm_setup_sh_text)
+        && !(lib.hasInfix "524288" vm_setup_sh_text)
+        && !(lib.hasInfix "10737418240" windows_vm_setup_ps1_text)
+        && !(lib.hasInfix "536870912" windows_vm_setup_ps1_text)
+        && !(lib.hasInfix "524288" windows_vm_setup_ps1_text)
+      )
+      "vm.sh and Invoke-VMSetup.ps1 must not contain legacy hardcoded binary size constants (10 GiB floor, 4 GiB Android floor, round-half-up divisors)";
 
   # CPU counts must be positive integers.
   test_cpu_counts =
@@ -404,7 +591,7 @@ let
     in
     "<domain type='kvm'>"
     + "\n  <name>${vm.name}</name>"
-    + "\n  <memory unit='MB'>${toString (vm.ramBytes / 1000000)}</memory>"
+    + "\n  <memory unit='B'>${toString (size.parse vm.ram)}</memory>"
     + "\n  <vcpu>${toString vm.cpus}</vcpu>"
     + "\n  <devices>"
     + "\n    <source file='${vmDir}/${vm.name}.qcow2'/>"
@@ -421,14 +608,14 @@ let
     in
     assert' (builtins.all (r: r == null) results) "Domain XML kvm type check failed";
 
-  # Domain XML must use MB (SI megabytes) as the memory unit so the SI byte
-  # value from VMs.json maps to libvirt without lossy binary conversion.
-  # libvirt supports SI units directly; see https://libvirt.org/formatdomain.html
+  # Domain XML must use unit='B' (exact bytes) so the parsed manifest RAM maps
+  # to libvirt without lossy conversion; libvirt's virScaleInteger accepts 'B'.
+  # See https://libvirt.org/formatdomain.html
   test_domain_xml_memory_unit =
     let
       results = builtins.map (
         vm:
-        assert' (lib.hasInfix "unit='MB'" (mkDomainXml vm)) "Domain XML for VM '${vm.name}' must specify memory unit='MB' (SI megabytes)"
+        assert' (lib.hasInfix "unit='B'>${toString (size.parse vm.ram)}</memory>" (mkDomainXml vm)) "Domain XML for VM '${vm.name}' must specify memory unit='B' with the exact parsed RAM bytes"
       ) manifest.VMs;
     in
     assert' (builtins.all (r: r == null) results) "Domain XML memory unit check failed";
@@ -705,9 +892,9 @@ let
   # vm-setup must resize NixOS images to manifest disk size so provisioning
   # logic does not reject the pre-built image for being too small.
   test_nixos_image_resize_to_manifest_disk = assert' (
-    (lib.hasInfix "vm_build_nixos NAME DISK_GIB" vm_setup_sh_text)
-    && (lib.hasInfix "if ! resize_and_mark_image \"$_out\" \"$_marker\" \"$_disk_gib\"; then" vm_setup_sh_text)
-  ) "scripts/vm.sh must resize generated NixOS qcow2 images to the manifest disk size";
+    (lib.hasInfix "vm_build_nixos NAME DISK_BYTES" vm_setup_sh_text)
+    && (lib.hasInfix "if ! resize_and_mark_image \"$_out\" \"$_marker\" \"$_disk_bytes\"; then" vm_setup_sh_text)
+  ) "scripts/vm.sh must resize generated NixOS qcow2 images to the exact manifest disk byte count";
 
   # The Packer failure branch for the macOS build must print a human-readable
   # error and return the captured exit code.
@@ -842,9 +1029,9 @@ let
   test_windows_nixos_build_honors_manifest_disk_size =
     assert'
       (
-        (lib.hasInfix "-DiskGib $diskGib" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "[int]$DiskGib" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "-var \"disk_size=\${DiskGib}G\"" windows_vm_setup_ps1_text)
+        (lib.hasInfix "-DiskBytes $diskBytes" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "[string]$DiskBytes" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "-var \"disk_size=\${DiskBytes}\"" windows_vm_setup_ps1_text)
       )
       "Invoke-VMSetup.ps1 must pass the manifest-derived disk size into Windows-host NixOS Packer builds";
 
@@ -1007,7 +1194,7 @@ let
         (lib.hasInfix ''_android_system="$IMAGES_DIR/android-system.qcow2"'' vm_setup_sh_text)
         && (lib.hasInfix ''_android_userdata="$IMAGES_DIR/android-userdata.qcow2"'' vm_setup_sh_text)
         && (lib.hasInfix ''_prebuilt="$_android_system"'' vm_setup_sh_text)
-        && (lib.hasInfix "_prebuilt_min_size=4294967296" vm_setup_sh_text)
+        && (lib.hasInfix "_prebuilt_min_size=\"\$(parse_size \"\$(jq -r \".VMs[\$vm_index].minImageSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
         && (lib.hasInfix "copied Android system image" vm_setup_sh_text)
         && (lib.hasInfix "copied Android userdata disk" vm_setup_sh_text)
         && (lib.hasInfix "Android userdata image not found" vm_setup_sh_text)
@@ -1027,18 +1214,17 @@ let
       "scripts/vm.sh must strip wc -c whitespace padding when selecting the largest qcow2 from the extracted LineageOS bundle";
 
   # The Android build must size the userdata disk from the manifest's
-  # diskBytes (SI bytes -> nearest binary GiB, same rounding as
-  # vm_build_one_image) instead of a hardcoded 8 GiB; otherwise the
-  # VMs.json diskBytes setting is silently ignored.
+  # diskSize (exact bytes) instead of a hardcoded 8 GiB; otherwise the
+  # VMs.json diskSize setting is silently ignored.
   test_android_build_honors_manifest_disk_size =
     assert'
       (
-        (lib.hasInfix ".VMs[\$_bai_vm_index].diskBytes" vm_setup_sh_text)
-        && (lib.hasInfix "_bai_disk_gib=\"\$(( (_bai_disk_bytes + 536870912) / 1073741824 ))\"" vm_setup_sh_text)
-        && (lib.hasInfix "qemu-img create -f qcow2 \"\$_bai_userdata_img\" \"\${_bai_disk_gib}G\"" vm_setup_sh_text)
-        && (lib.hasInfix "creating userdata disk (\${_bai_disk_gib} GiB)..." vm_setup_sh_text)
+        (lib.hasInfix ".VMs[\$_bai_vm_index].diskSize" vm_setup_sh_text)
+        && (lib.hasInfix "_bai_disk_bytes=\"\$(parse_size \"\$(jq -r \".VMs[\$_bai_vm_index].diskSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
+        && (lib.hasInfix "qemu-img create -f qcow2 \"\$_bai_userdata_img\" \"\$_bai_disk_bytes\"" vm_setup_sh_text)
+        && (lib.hasInfix "creating userdata disk (\${_bai_disk_bytes} bytes)..." vm_setup_sh_text)
       )
-      "scripts/vm.sh must size the Android userdata disk from the manifest diskBytes, not a hardcoded 8 GiB";
+      "scripts/vm.sh must size the Android userdata disk from the exact manifest diskSize bytes, not a hardcoded 8 GiB";
 
   test_libvirt_runtime_validation_parity =
     assert'
@@ -1338,7 +1524,7 @@ let
         && (lib.hasInfix "__MACHINE__" startWindowsTemplateText)
         && (lib.hasInfix "__CPU__" startWindowsTemplateText)
         && (lib.hasInfix "__CPUS__" startWindowsTemplateText)
-        && (lib.hasInfix "__RAM_MIB__" startWindowsTemplateText)
+        && (lib.hasInfix "__RAM_BYTES__" startWindowsTemplateText)
         && (lib.hasInfix "__DISK_PATH__" startWindowsTemplateText)
         && (lib.hasInfix "__VGA__" startWindowsTemplateText)
         && (lib.hasInfix "__DISPLAY_BACKEND__" startWindowsTemplateText)
@@ -1359,7 +1545,7 @@ let
         && (lib.hasInfix "__MACHINE__" startWindowsHostTemplateText)
         && (lib.hasInfix "__CPU__" startWindowsHostTemplateText)
         && (lib.hasInfix "__CPUS__" startWindowsHostTemplateText)
-        && (lib.hasInfix "__RAM_MIB__" startWindowsHostTemplateText)
+        && (lib.hasInfix "__RAM_BYTES__" startWindowsHostTemplateText)
         && (lib.hasInfix "__DISK_PATH__" startWindowsHostTemplateText)
         && (lib.hasInfix "__VGA__" startWindowsHostTemplateText)
         && (lib.hasInfix "__DISPLAY_BACKEND__" startWindowsHostTemplateText)
@@ -1500,6 +1686,18 @@ let
     test_required_fields
     test_disk_sizes
     test_ram_sizes
+    test_size_parser_accepts
+    test_size_parser_rejects
+    test_size_ceil_mib
+    test_size_grammar_parity_across_implementations
+    test_size_schema_pattern
+    test_manifest_sizes_are_suffixed_strings
+    test_manifest_sizes_match_pattern
+    test_manifest_size_values_are_canonical
+    test_vm_status_display_parses_suffixed_ram
+    test_macos_packer_ceil_units
+    test_min_image_size_floor_wiring
+    test_no_legacy_binary_size_constants
     test_cpu_counts
     test_vm_names
     test_vm_types
@@ -1624,6 +1822,18 @@ in
     test_required_fields
     test_disk_sizes
     test_ram_sizes
+    test_size_parser_accepts
+    test_size_parser_rejects
+    test_size_ceil_mib
+    test_size_grammar_parity_across_implementations
+    test_size_schema_pattern
+    test_manifest_sizes_are_suffixed_strings
+    test_manifest_sizes_match_pattern
+    test_manifest_size_values_are_canonical
+    test_vm_status_display_parses_suffixed_ram
+    test_macos_packer_ceil_units
+    test_min_image_size_floor_wiring
+    test_no_legacy_binary_size_constants
     test_cpu_counts
     test_vm_names
     test_vm_types

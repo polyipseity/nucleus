@@ -63,7 +63,7 @@ BeforeAll {
 Describe "start-windows.ps1 template token integrity" {
   It "declares exactly the 11 expected __TOKEN__ placeholders" {
     $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "start-windows.ps1")
-    ($templateTokens -join ",") | Should -Be "CPU,CPUS,DISK_PATH,DISPLAY_BACKEND,MACHINE,QEMU_SYSTEM,RAM_MIB,VGA,VIRTIOFS_ARGS,VM_DISPLAY,VM_NAME"
+    ($templateTokens -join ",") | Should -Be "CPU,CPUS,DISK_PATH,DISPLAY_BACKEND,MACHINE,QEMU_SYSTEM,RAM_BYTES,VGA,VIRTIOFS_ARGS,VM_DISPLAY,VM_NAME"
   }
 
   It "every placeholder has a replacement in the Invoke-VMSetup render chain" {
@@ -77,7 +77,7 @@ Describe "start-windows.ps1 template token integrity" {
 Describe "start-windows-host.sh template token integrity" {
   It "declares exactly the 10 expected __TOKEN__ placeholders" {
     $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "start-windows-host.sh")
-    ($templateTokens -join ",") | Should -Be "CPU,CPUS,DISK_PATH,DISPLAY_BACKEND,MACHINE,QEMU_SYSTEM,RAM_MIB,VGA,VM_DISPLAY,VM_NAME"
+    ($templateTokens -join ",") | Should -Be "CPU,CPUS,DISK_PATH,DISPLAY_BACKEND,MACHINE,QEMU_SYSTEM,RAM_BYTES,VGA,VM_DISPLAY,VM_NAME"
   }
 
   It "every placeholder has a replacement in the Invoke-VMSetup render chain" {

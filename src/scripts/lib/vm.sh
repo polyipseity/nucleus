@@ -162,12 +162,12 @@ run_cmd() {
 # validate_qcow2_image PATH LABEL [MIN_VIRTUAL_SIZE]
 #   Verifies that a QCOW2 image exists, is non-empty, and (when qemu-img is
 #   available) reports format=qcow2 with a sensible virtual size.  The
-#   minimum virtual size defaults to 10 GiB; pass a smaller value for
-#   compact images such as the 8 GiB Android userdata disk.
+#   minimum virtual size defaults to 10GB; pass a smaller value for
+#   compact images such as the Android userdata disk.
 validate_qcow2_image() {
   _vqi_path="$1"
   _vqi_label="$2"
-  _vqi_min_size="${3:-10737418240}"
+  _vqi_min_size="${3:-$(parse_size '10GB')}"
 
   if [ ! -f "$_vqi_path" ]; then
     error "$_vqi_label not found: $_vqi_path"
@@ -671,21 +671,21 @@ re_register_utm_bundle() {
 
 # Credential marker helper
 
-# resize_and_mark_image IMAGE_PATH MARKER_PATH [DISK_GIB]
+# resize_and_mark_image IMAGE_PATH MARKER_PATH [DISK_BYTES]
 #   Writes the current guest credential fingerprint to MARKER_PATH for drift
-#   detection.  When DISK_GIB is specified, also resizes IMAGE_PATH via
-#   qemu-img before marking.
+#   detection.  When DISK_BYTES is specified, also resizes IMAGE_PATH via
+#   qemu-img before marking (qemu-img accepts bare byte counts).
 resize_and_mark_image() {
-  local _rmi_file="$1" _rmi_marker="$2" _rmi_disk_gib="${3:-}"
+  local _rmi_file="$1" _rmi_marker="$2" _rmi_disk_bytes="${3:-}"
 
-  if [ -n "$_rmi_disk_gib" ]; then
+  if [ -n "$_rmi_disk_bytes" ]; then
     if command -v qemu-img >/dev/null 2>&1; then
-      if ! qemu-img resize "$_rmi_file" "${_rmi_disk_gib}G" >/dev/null; then
-        error "failed to resize $_rmi_file to $_rmi_disk_gib GiB"
+      if ! qemu-img resize "$_rmi_file" "$_rmi_disk_bytes" >/dev/null; then
+        error "failed to resize $_rmi_file to $_rmi_disk_bytes bytes"
         return 1
       fi
     else
-      error "qemu-img not found; cannot resize $_rmi_file to $_rmi_disk_gib GiB"
+      error "qemu-img not found; cannot resize $_rmi_file to $_rmi_disk_bytes bytes"
       return 1
     fi
   fi
@@ -700,12 +700,10 @@ vm_build_android() {
   _bai_accept_gsi_license="$3"
   _bai_upgrade_android="$4"
   _bai_reset_userdata="$5"
-  # The Android userdata disk size comes from the manifest (diskBytes),
-  # converted SI bytes -> nearest binary GiB exactly like vm_build_one_image
-  # does for the other VM types; a hardcoded size here would silently ignore
+  # The Android userdata disk size comes from the manifest (diskSize),
+  # parsed to exact bytes; a hardcoded size here would silently ignore
   # VMs.json.
-  _bai_disk_bytes="$(jq ".VMs[$_bai_vm_index].diskBytes" "$MANIFEST")"
-  _bai_disk_gib="$(( (_bai_disk_bytes + 536870912) / 1073741824 ))"
+  _bai_disk_bytes="$(parse_size "$(jq -r ".VMs[$_bai_vm_index].diskSize" "$MANIFEST")")"
   _bai_gsi_url="$(jq -r ".VMs[$_bai_vm_index].Android.gsiUrl" "$MANIFEST")"
   _bai_system_img="$IMAGES_DIR/android-system.qcow2"
   _bai_userdata_img="$IMAGES_DIR/android-userdata.qcow2"
@@ -754,7 +752,7 @@ vm_build_android() {
     fi
     run_cmd cp "$_bai_qcow2" "$_bai_system_img"
     rm -rf "$_bai_extract_dir" "$IMAGES_DIR/android-lineage.zip" "$IMAGES_DIR/android-lineage-release.json"
-    validate_qcow2_image "$_bai_system_img" "Android system image for $_bai_vm_name" 4294967296 || return 1
+    validate_qcow2_image "$_bai_system_img" "Android system image for $_bai_vm_name" "$(parse_size "$(jq -r ".VMs[$_bai_vm_index].minImageSize" "$MANIFEST")")" || return 1
     say "system image ready: $_bai_system_img"
   else
     say "system image already exists: $_bai_system_img"
@@ -766,9 +764,9 @@ vm_build_android() {
       say "resetting Android userdata disk..."
       rm -f "$_bai_userdata_img"
     fi
-    say "creating userdata disk (${_bai_disk_gib} GiB)..."
-    run_cmd qemu-img create -f qcow2 "$_bai_userdata_img" "${_bai_disk_gib}G"
-    validate_qcow2_image "$_bai_userdata_img" "Android userdata disk for $_bai_vm_name" 4294967296 || return 1
+    say "creating userdata disk (${_bai_disk_bytes} bytes)..."
+    run_cmd qemu-img create -f qcow2 "$_bai_userdata_img" "$_bai_disk_bytes"
+    validate_qcow2_image "$_bai_userdata_img" "Android userdata disk for $_bai_vm_name" "$(parse_size "$(jq -r ".VMs[$_bai_vm_index].minImageSize" "$MANIFEST")")" || return 1
     say "userdata disk ready: $_bai_userdata_img"
   else
     say "userdata disk already exists: $_bai_userdata_img"
@@ -810,35 +808,29 @@ vm_build_android() {
 
 vm_build_one_image() {
   local _vm_name="$1" _vm_type="$2" _vm_hosts="$3" _vm_index="$4"
-  local _vm_disk_bytes _vm_disk_gib
-  _vm_disk_bytes="$(jq ".VMs[$_vm_index].diskBytes" "$MANIFEST")"
-  # Convert SI bytes to nearest binary GiB for hypervisor tools.
-  # Uses (n + 2^29) / 2^30 for round-half-up in POSIX integer arithmetic.
-  _vm_disk_gib="$(( (_vm_disk_bytes + 536870912) / 1073741824 ))"
+  local _vm_disk_bytes _vm_ram_bytes
+  _vm_disk_bytes="$(parse_size "$(jq -r ".VMs[$_vm_index].diskSize" "$MANIFEST")")"
 
   case "$_vm_type" in
     NixOS)
       # check-suppress:suppression_doc: best-effort -- a prerequisite-missing or build failure for one
       # VM type must not abort builds for the remaining VMs; the build
       # function prints a specific error before returning non-zero.
-      vm_build_nixos "$_vm_name" "$_vm_disk_gib" \
+      vm_build_nixos "$_vm_name" "$_vm_disk_bytes" \
         || say "NixOS image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
       ;;
     Windows)
       _vm_edition="$(jq -r ".VMs[$_vm_index].Windows.edition" "$MANIFEST")"
       # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
-      vm_build_windows "$_vm_name" "$_vm_disk_gib" "$_vm_edition" \
+      vm_build_windows "$_vm_name" "$_vm_disk_bytes" "$_vm_edition" \
         || say "Windows image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
       ;;
     macOS)
       _vm_macos_ver="$(jq -r ".VMs[$_vm_index].macOS.version" "$MANIFEST")"
-      _vm_ram_bytes="$(jq -r ".VMs[$_vm_index].ramBytes" "$MANIFEST")"
-      # Convert SI bytes to nearest binary MiB for hypervisor tools.
-      # Uses (n + 2^19) / 2^20 for round-half-up in POSIX integer arithmetic.
-      _vm_ram_mib="$(( (_vm_ram_bytes + 524288) / 1048576 ))"
+      _vm_ram_bytes="$(parse_size "$(jq -r ".VMs[$_vm_index].ram" "$MANIFEST")")"
       _vm_cpus="$(jq -r ".VMs[$_vm_index].cpus" "$MANIFEST")"
       # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
-      vm_build_macos "$_vm_name" "$_vm_disk_gib" "$_vm_ram_mib" "$_vm_cpus" "$_vm_macos_ver" \
+      vm_build_macos "$_vm_name" "$_vm_disk_bytes" "$_vm_ram_bytes" "$_vm_cpus" "$_vm_macos_ver" \
         || say "macOS image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
       ;;
     Android)
@@ -1004,9 +996,8 @@ vm_setup_utm() {
     return
   fi
 
+  _prebuilt_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
   if [ -f "$_prebuilt" ]; then
-    _prebuilt_min_size=10737418240
-    [ "$vm_type" = "Android" ] && _prebuilt_min_size=4294967296
     if validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}" "$_prebuilt_min_size"; then
       _prebuilt_valid=true
     else
@@ -1028,7 +1019,7 @@ vm_setup_utm() {
         return
       fi
       _replace_runtime=false
-      if [ -f "$disk_file" ] && ! validate_qcow2_image "$disk_file" "existing UTM runtime disk for ${vm_name}" 4294967296; then
+      if [ -f "$disk_file" ] && ! validate_qcow2_image "$disk_file" "existing UTM runtime disk for ${vm_name}" "$_prebuilt_min_size"; then
         warn "existing Android runtime disk is invalid for '$vm_name'; replacing from pre-built image"
         rm -f "$disk_file"
         _replace_runtime=true
@@ -1046,7 +1037,7 @@ vm_setup_utm() {
         say "preserving existing Android system disk: $disk_file"
       fi
       _userdata_file="$data_dir/android-userdata.qcow2"
-      if [ -f "$_userdata_file" ] && ! validate_qcow2_image "$_userdata_file" "existing Android userdata disk for ${vm_name}" 4294967296; then
+      if [ -f "$_userdata_file" ] && ! validate_qcow2_image "$_userdata_file" "existing Android userdata disk for ${vm_name}" "$_prebuilt_min_size"; then
         warn "existing Android userdata disk is invalid for '$vm_name'; replacing from pre-built image"
         rm -f "$_userdata_file"
       fi
@@ -1164,8 +1155,9 @@ vm_setup_libvirt() {
       warn "Android images not found: $_android_system and $_android_userdata; skipping '$vm_name'"
       return
     fi
-    if ! validate_qcow2_image "$_android_system" "Android system image for ${vm_name}" 4294967296 \
-      || ! validate_qcow2_image "$_android_userdata" "Android userdata disk for ${vm_name}" 4294967296; then
+    _android_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
+    if ! validate_qcow2_image "$_android_system" "Android system image for ${vm_name}" "$_android_min_size" \
+      || ! validate_qcow2_image "$_android_userdata" "Android userdata disk for ${vm_name}" "$_android_min_size"; then
       warn "Android images are invalid for '$vm_name'"
       return
     fi
@@ -1261,7 +1253,7 @@ case "$(uname -m)" in
     ;;
 esac
 
-# vm_build_nixos NAME DISK_GIB
+# vm_build_nixos NAME DISK_BYTES
 #   Builds the NixOS guest image via nixos-generators (pinned as a flake
 #   input in src/flake.nix).  On macOS this requires an aarch64-linux builder;
 #   enable nix.linux-builder.enable in the macOS host config so the Nix daemon
@@ -1271,7 +1263,7 @@ esac
 #   and cannot be cached.
 vm_build_nixos() {
   _name="$1"
-  _disk_gib="$2"
+  _disk_bytes="$2"
   _out="$IMAGES_DIR/${_name}.qcow2"
   _marker="$(vm_guest_credentials_marker_path "$_name")"
   _config_marker="$(vm_guest_config_marker_path "$_name")"
@@ -1347,7 +1339,7 @@ vm_build_nixos() {
   # outputs, but this repository declares guest disk sizes in VMs.json.
   # Resize here so the pre-built image matches the manifest contract used by
   # all runtime backends (UTM/libvirt/QEMU).
-  if ! resize_and_mark_image "$_out" "$_marker" "$_disk_gib"; then
+  if ! resize_and_mark_image "$_out" "$_marker" "$_disk_bytes"; then
     rm -rf "$_tmpdir"
     return 1
   fi
@@ -1620,12 +1612,12 @@ download_windows_iso_fido_url_nonwindows() {
   return 0
 }
 
-# vm_build_windows NAME DISK_GIB
+# vm_build_windows NAME DISK_BYTES
 #   Builds the Windows 11 guest image using Packer and the Autounattend.xml
 #   answer file at src/vms/windows/Autounattend.xml.
 vm_build_windows() {
   _name="$1"
-  _disk_gib="$2"
+  _disk_bytes="$2"
   _edition="${3:-Pro}"
   _out="$IMAGES_DIR/${_name}.qcow2"
   _marker="$(vm_guest_credentials_marker_path "$_name")"
@@ -1764,7 +1756,7 @@ vm_build_windows() {
     _ssh_timeout='72h'
   fi
 
-  say "building Windows 11 image (disk=$_disk_gib GiB, accelerator=$accelerator)..."
+  say "building Windows 11 image (disk=$_disk_bytes bytes, accelerator=$accelerator)..."
   _display_backend=''
   if [ "$windows_headless" = 'false' ]; then
     # check-suppress:suppression_doc: QEMU binary may not be installed; display backend probe expected to fail.
@@ -1859,7 +1851,7 @@ bios legacy 3h'
       if [ "$_firmware_mode" = 'efi' ] && [ -n "$_efi_code" ] && [ -n "$_efi_vars" ]; then
         _pv="$_pv -var efi_firmware_code=$_efi_code -var efi_firmware_vars=$_efi_vars"
       fi
-      _pv="$_pv -var disk_size=${_disk_gib}G -var output_directory=$_tmp_out"
+      _pv="$_pv -var disk_size=${_disk_bytes} -var output_directory=$_tmp_out"
       dry_run "cd $_packer_dir && packer build $_pv ."
     done <<EOF
 $_build_attempts
@@ -1917,7 +1909,7 @@ EOF
           ${_display_backend:+-var "display_backend=$_display_backend"} \
           -var "efi_firmware_code=$_efi_code" \
           -var "efi_firmware_vars=$_efi_vars" \
-          -var "disk_size=${_disk_gib}G" \
+          -var "disk_size=${_disk_bytes}" \
           -var "output_directory=$_tmp_out" \
           .
       ) || _attempt_status=$?
@@ -1935,7 +1927,7 @@ EOF
           -var "ssh_timeout=$_attempt_timeout" \
           -var "headless=$windows_headless" \
           ${_display_backend:+-var "display_backend=$_display_backend"} \
-          -var "disk_size=${_disk_gib}G" \
+          -var "disk_size=${_disk_bytes}" \
           -var "output_directory=$_tmp_out" \
           .
       ) || _attempt_status=$?
@@ -1989,7 +1981,7 @@ EOF
   say "Windows 11 image ready: $_out"
 }
 
-# vm_build_macos NAME DISK_GIB RAM_MIB CPUS MACOS_VERSION
+# vm_build_macos NAME DISK_BYTES RAM_BYTES CPUS MACOS_VERSION
 #   Builds the macOS guest VM using the Packer Tart plugin.  Requires tart
 #   and packer to be installed; only runs on Darwin hosts (Tart uses Apple
 #   Virtualization.framework which is not available on other platforms).
@@ -1998,8 +1990,8 @@ EOF
 #   Source: https://github.com/cirruslabs/packer-plugin-tart
 vm_build_macos() {
   _name="$1"
-  _disk_gib="$2"
-  _ram_mib="$3"
+  _disk_bytes="$2"
+  _ram_bytes="$3"
   _cpus="$4"
   _macos_version="${5:-tahoe}"
   _marker="$(vm_guest_credentials_marker_path "$_name")"
@@ -2036,9 +2028,12 @@ vm_build_macos() {
   fi
 
   _packer_dir="$VMS_DIR/macos"
-  # Round MiB to nearest GiB for Tart (which accepts integer GiB only).
-  # Uses (n + 512) / 1024 for round-half-up in integer arithmetic.
-  _mem_gib="$(( (_ram_mib + 512) / 1024 ))"
+  # Tart accepts only whole GiB: `tart create --disk-size` is decimal GB
+  # (UInt64 * 1000^3) and the Packer Tart plugin passes memory as GiB*1024 MB
+  # to `tart set --memory`.  Round UP from exact manifest bytes so allocated
+  # capacity never under-allocates the declared size.
+  _disk_gib="$(( (_disk_bytes + 999999999) / 1000000000 ))"
+  _mem_gib="$(( (_ram_bytes + 1073741823) / 1073741824 ))"
 
   say "building macOS $_macos_version VM via Packer Tart (disk=$_disk_gib GiB, mem=$_mem_gib GiB, cpus=$_cpus)..."
 

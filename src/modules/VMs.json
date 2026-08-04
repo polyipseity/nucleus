@@ -12,8 +12,8 @@
         "Windows"
       ],
       "cpus": 4,
-      "ramBytes": 8000000000,
-      "diskBytes": 64000000000,
+      "ram": "8GB",
+      "diskSize": "64GB",
       "shareDevDir": false,
       "sound": "none",
       "portForwards": [
@@ -45,8 +45,8 @@
         "MacBook"
       ],
       "cpus": 4,
-      "ramBytes": 8000000000,
-      "diskBytes": 128000000000,
+      "ram": "8GB",
+      "diskSize": "128GB",
       "shareDevDir": true,
       "sound": "intel-hda",
       "portForwards": [
@@ -73,8 +73,8 @@
         "Windows"
       ],
       "cpus": 4,
-      "ramBytes": 8000000000,
-      "diskBytes": 64000000000,
+      "ram": "8GB",
+      "diskSize": "64GB",
       "shareDevDir": true,
       "sound": "intel-hda",
       "portForwards": [
@@ -98,8 +98,8 @@
         "Windows"
       ],
       "cpus": 4,
-      "ramBytes": 8000000000,
-      "diskBytes": 128000000000,
+      "ram": "8GB",
+      "diskSize": "128GB",
       "shareDevDir": true,
       "sound": "intel-hda",
       "portForwards": [

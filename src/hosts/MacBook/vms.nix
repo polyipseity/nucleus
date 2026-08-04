@@ -13,6 +13,7 @@
 { pkgs, lib, ... }:
 let
   vmsData = builtins.fromJSON (builtins.readFile ../../modules/VMs.json);
+  size = import ../../modules/lib/size.nix;
   nucleusHost = "MacBook";
   enabledVms = builtins.filter (
     vm: vm.enabled && (!vm ? hosts || vm.hosts == null || builtins.elem nucleusHost vm.hosts)
@@ -211,7 +212,7 @@ let
         "__VM_MAC_ADDRESS__"
         "__VM_ARCH__"
         "__VM_CPUS__"
-        "__VM_RAM_MB__"
+        "__VM_RAM_BYTES__"
         "__VM_MACHINE__"
         "__VM_HYPERVISOR__"
         "__VM_UEFI_BOOT__"
@@ -229,7 +230,7 @@ let
         (mkMacAddress vm.id)
         (vmArch vm)
         (toString vm.cpus)
-        (toString ((vm.ramBytes + 524288) / 1048576))
+        (toString (size.ceilMib (size.parse vm.ram)))
         (vmMachine vm)
         (if qemuHypervisor vm then "<true/>" else "<false/>")
         (if qemuUefiBoot vm then "<true/>" else "<false/>")

@@ -1,7 +1,7 @@
 <domain type='kvm'>
   <name>__VM_NAME__</name>
   <title>__VM_DISPLAY__</title>
-  <memory unit='MB'>__VM_RAM_MB__</memory>
+  <memory unit='B'>__VM_RAM_BYTES__</memory>
   <vcpu>__VM_CPUS__</vcpu>
   __VM_FIRMWARE__
   <cpu mode='host-passthrough'/>

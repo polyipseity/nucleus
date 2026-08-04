@@ -12,7 +12,7 @@
     Source: https://www.qemu.org/docs/master/system/invocation.html
     Environment variables: (none)
     Exit codes: 0 on success; non-zero on failure
-    Placeholders (VM_NAME, VM_DISPLAY, MACHINE, CPU, CPUS, RAM_MIB, DISK_PATH,
+    Placeholders (VM_NAME, VM_DISPLAY, MACHINE, CPU, CPUS, RAM_BYTES, DISK_PATH,
     VGA, DISPLAY_BACKEND, QEMU_SYSTEM, VIRTIOFS_ARGS) are substituted by
     Invoke-VMSetup at generation time.
 #>
@@ -23,7 +23,7 @@ __VIRTIOFS_ARGS__
     -machine __MACHINE__ `
     -cpu __CPU__ `
     -smp __CPUS__ `
-    -m __RAM_MIB__ `
+    -m __RAM_BYTES__B `
     -drive file='__DISK_PATH__',format=qcow2,if=virtio `
     -netdev user,id=net0,hostfwd=tcp::2222-:22 `
     -device virtio-net-pci,netdev=net0 `

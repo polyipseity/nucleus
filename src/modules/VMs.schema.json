@@ -46,10 +46,10 @@
             "minimum": 1,
             "type": "integer"
           },
-          "diskBytes": {
-            "description": "Disk size in bytes.",
-            "minimum": 1,
-            "type": "integer"
+          "diskSize": {
+            "description": "Boot disk size, as a suffixed size string (decimal kB/MB/GB/TB or binary kiB/MiB/GiB/TiB).",
+            "pattern": "^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$",
+            "type": "string"
           },
           "enabled": {
             "description": "Whether the VM is enabled.",
@@ -126,10 +126,10 @@
             "minItems": 1,
             "type": "array"
           },
-          "ramBytes": {
-            "description": "RAM size in bytes.",
-            "minimum": 1,
-            "type": "integer"
+          "ram": {
+            "description": "RAM size, as a suffixed size string (decimal kB/MB/GB/TB or binary kiB/MiB/GiB/TiB).",
+            "pattern": "^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$",
+            "type": "string"
           },
           "shareDevDir": {
             "description": "Whether to share the ~/dev directory.",
@@ -183,7 +183,7 @@
         },
         "required": [
           "cpus",
-          "diskBytes",
+          "diskSize",
           "enabled",
           "hostname",
           "hosts",
@@ -192,7 +192,7 @@
           "minImageSize",
           "name",
           "portForwards",
-          "ramBytes",
+          "ram",
           "shareDevDir",
           "sound",
           "type"

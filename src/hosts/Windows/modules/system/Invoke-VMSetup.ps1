@@ -401,6 +401,8 @@ function Invoke-VMSetup {
         return ($hosts -contains $nucleusHost)
     }
 
+    . (Join-Path -Path $RepoRoot -ChildPath 'src\hosts\Windows\modules\SizeStrings.ps1')
+
     $manifest = Join-Path $RepoRoot 'src\modules\VMs.json'
     if (-not (Test-Path $manifest)) {
         Write-Information "vm-setup: manifest not found at $manifest; skipping"
@@ -522,19 +524,18 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
 
         switch ($vm.type) {
             'NixOS' {
-                $diskGib = [long](($vm.diskBytes + 536870912) / 1073741824)
+                $diskBytes = ConvertFrom-SizeString $vm.diskSize
                 Invoke-BuildNixosImage -VmName $vm.id -Accelerator $Accelerator `
-                    -DiskGib $diskGib `
+                    -DiskBytes $diskBytes `
                     -VmsDir $vmsDir -ImagesDir $imagesDir `
                     -GuestAccountName $guestUsername -GuestSecret $guestPassword `
                     -GuestSecretHash $guestSecretHash `
                     -DryRun:$DryRun
             }
             'Windows' {
-                # Convert SI bytes to nearest binary GiB for packer disk_size.
-                $diskGib = [long](($vm.diskBytes + 536870912) / 1073741824)
+                $diskBytes = ConvertFrom-SizeString $vm.diskSize
                 $isoUrl = if ($null -ne $vm.Windows.isoUrl) { [string]$vm.Windows.isoUrl } else { '' }
-                Invoke-BuildWindowsImage -VmName $vm.id -DiskGib $diskGib `
+                Invoke-BuildWindowsImage -VmName $vm.id -DiskBytes $diskBytes `
                     -WindowsIso $WindowsIso -WindowsIsoUrl $isoUrl `
                     -WindowsIsoSource $WindowsIsoSource `
                     -WindowsIsoRetries $WindowsIsoRetries `
@@ -595,9 +596,9 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         if ($NixosOnly   -and $vm.type -ne 'NixOS')   { continue }
         if ($WindowsOnly -and $vm.type -ne 'Windows') { continue }
 
-        # Convert SI bytes to nearest binary MiB for QEMU -m flag (which
-        # interprets bare integers as MiB).
-        $ramMib      = [long](($vm.ramBytes + 524288) / 1048576)
+        # QEMU -m accepts bare byte counts with the 'B' suffix; pass exact
+        # manifest RAM bytes without lossy conversion.
+        $ramBytes    = ConvertFrom-SizeString $vm.ram
         $diskPath    = Join-Path -Path $vmDir -ChildPath "$($vm.id).qcow2"
         $diskCredentialMarker = Get-VMGuestSecretMarkerPath -BasePath $diskPath
         $startScriptPs1 = Join-Path -Path $vmDir -ChildPath "scripts" -AdditionalChildPath "start-$($vm.id).ps1"
@@ -606,7 +607,8 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
 
         Write-Information "vm-setup: configuring VM '$($vm.name)'..."
 
-        $prebuiltValid = (Test-Path $prebuilt) -and (Test-Qcow2Image -ImagePath $prebuilt -ImageLabel "pre-built image '$($vm.id)'")
+        $minSizeBytes = ConvertFrom-SizeString $vm.minImageSize
+        $prebuiltValid = (Test-Path $prebuilt) -and (Test-Qcow2Image -ImagePath $prebuilt -ImageLabel "pre-built image '$($vm.id)'" -MinBytes $minSizeBytes)
 
         # Place disk image from pre-built image (empty disk fallback removed).
         if (Test-Path $diskPath) {
@@ -695,7 +697,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
 # 2. Then run this script.
 # -chardev socket,id=char0,path=\\.\pipe\$($vm.id)-virtiofs ``
 # -device vhost-user-fs-pci,chardev=char0,tag=dev ``
-# -object memory-backend-file,id=mem,size=$ramMib`M,mem-path=/dev/shm,share=on ``
+# -object memory-backend-file,id=mem,size=${ramBytes}B,mem-path=/dev/shm,share=on ``
 # -numa node,memdev=mem
 "@
         }
@@ -710,7 +712,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             $startContentPs1 = $startContentPs1.Replace('__MACHINE__', $machine)
             $startContentPs1 = $startContentPs1.Replace('__CPU__', $cpu)
             $startContentPs1 = $startContentPs1.Replace('__CPUS__', [string]$vm.cpus)
-            $startContentPs1 = $startContentPs1.Replace('__RAM_MIB__', [string]$ramMib)
+            $startContentPs1 = $startContentPs1.Replace('__RAM_BYTES__', "${ramBytes}B")
             $startContentPs1 = $startContentPs1.Replace('__DISK_PATH__', $diskPath)
             $startContentPs1 = $startContentPs1.Replace('__VGA__', $vga)
             $startContentPs1 = $startContentPs1.Replace('__DISPLAY_BACKEND__', $display)
@@ -732,7 +734,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             $startContentSh = $startContentSh.Replace('__MACHINE__', $machine)
             $startContentSh = $startContentSh.Replace('__CPU__', $cpu)
             $startContentSh = $startContentSh.Replace('__CPUS__', [string]$vm.cpus)
-            $startContentSh = $startContentSh.Replace('__RAM_MIB__', [string]$ramMib)
+            $startContentSh = $startContentSh.Replace('__RAM_BYTES__', "${ramBytes}B")
             $startContentSh = $startContentSh.Replace('__DISK_PATH__', $diskPath)
             $startContentSh = $startContentSh.Replace('__VGA__', $vga)
             $startContentSh = $startContentSh.Replace('__DISPLAY_BACKEND__', $display)
@@ -795,7 +797,9 @@ function Test-Qcow2Image {
         [Parameter(Mandatory)]
         [string]$ImagePath,
 
-        [string]$ImageLabel = 'image'
+        [string]$ImageLabel = 'image',
+
+        [long]$MinBytes = 10000000000
     )
 
     if (-not (Test-Path $ImagePath)) {
@@ -834,7 +838,7 @@ function Test-Qcow2Image {
         return $false
     }
 
-    if ([long]$info.'virtual-size' -lt 10737418240) {
+    if ([long]$info.'virtual-size' -lt $MinBytes) {
         Write-Warning "vm-setup: $ImageLabel virtual size is too small ($($info.'virtual-size') bytes): $ImagePath"
         return $false
     }
@@ -853,7 +857,7 @@ function Invoke-BuildNixosImage {
     param(
         [string]$VmName,
         [string]$Accelerator,
-        [int]$DiskGib,
+        [string]$DiskBytes,
         [string]$VmsDir,
         [string]$ImagesDir,
         [string]$GuestAccountName,
@@ -894,7 +898,7 @@ function Invoke-BuildNixosImage {
 
     if ($DryRun) {
         Write-Information "vm-setup: [dry-run] Remove stale temporary output directory if present: $tmpOutput"
-        Write-Information "vm-setup: [dry-run] cd $packerDir; packer init .; packer build -var accelerator=$Accelerator -var disk_size=${DiskGib}G -var guest_username=$GuestAccountName -var guest_password=<redacted> -var output_directory=$tmpOutput ."
+        Write-Information "vm-setup: [dry-run] cd $packerDir; packer init .; packer build -var accelerator=$Accelerator -var disk_size=${DiskBytes} -var guest_username=$GuestAccountName -var guest_password=<redacted> -var output_directory=$tmpOutput ."
         return
     }
 
@@ -912,7 +916,7 @@ function Invoke-BuildNixosImage {
         }
         & packer build `
             -var "accelerator=$Accelerator" `
-            -var "disk_size=${DiskGib}G" `
+            -var "disk_size=${DiskBytes}" `
             -var "guest_username=$GuestAccountName" `
             -var "guest_password=$GuestSecret" `
             -var "output_directory=$tmpOutput" `
@@ -1048,7 +1052,7 @@ function Invoke-BuildWindowsImage {
     [CmdletBinding()]
     param(
         [string]$VmName,
-        [int]$DiskGib,
+        [string]$DiskBytes,
         [string]$WindowsIso,
         # Optional URL to auto-download the Windows installer ISO when -WindowsIso
         # is not provided.  Set via the Windows.isoUrl field in VMs.json.
@@ -1249,7 +1253,7 @@ function Invoke-BuildWindowsImage {
         }
     }
 
-    Write-Information "vm-setup: building Windows 11 image (disk=${DiskGib} GiB, accelerator=$Accelerator)..."
+    Write-Information "vm-setup: building Windows 11 image (disk=${DiskBytes} bytes, accelerator=$Accelerator)..."
     Write-Information 'vm-setup: this takes ~30-90 minutes; VirtIO drivers are downloaded from the internet'
     if ($Headful) {
         Write-Information 'vm-setup: debug mode enabled; running Windows Packer build headful (headless=false)'
@@ -1261,15 +1265,15 @@ function Invoke-BuildWindowsImage {
         foreach ($attempt in $buildAttempts) {
             if ($attempt.Firmware -eq 'efi') {
                 if ($Headful) {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
                 } else {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
                 }
             } else {
                 if ($Headful) {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
                 } else {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var disk_size=${DiskGib}G -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
                 }
             }
         }
@@ -1315,7 +1319,7 @@ function Invoke-BuildWindowsImage {
                 '-var', "boot_strategy=$($attempt.Boot)",
                 '-var', "ssh_timeout=$($attempt.Timeout)",
                 '-var', "headless=$packerHeadless",
-                '-var', "disk_size=${DiskGib}G",
+                '-var', "disk_size=${DiskBytes}",
                 '-var', "output_directory=$tmpOutput",
                 '.'
             )
@@ -1331,7 +1335,7 @@ function Invoke-BuildWindowsImage {
                     '-var', "ssh_timeout=$($attempt.Timeout)",
                     '-var', "headless=$packerHeadless",
                     '-var', "display_backend=$packerDisplayBackend",
-                    '-var', "disk_size=${DiskGib}G",
+                    '-var', "disk_size=${DiskBytes}",
                     '-var', "output_directory=$tmpOutput",
                     '.'
                 )
@@ -1349,7 +1353,7 @@ function Invoke-BuildWindowsImage {
                     '-var', "headless=$packerHeadless",
                     '-var', "efi_firmware_code=$efiCode",
                     '-var', "efi_firmware_vars=$efiVars",
-                    '-var', "disk_size=${DiskGib}G",
+                    '-var', "disk_size=${DiskBytes}",
                     '-var', "output_directory=$tmpOutput",
                     '.'
                 )
@@ -1367,7 +1371,7 @@ function Invoke-BuildWindowsImage {
                         '-var', "display_backend=$packerDisplayBackend",
                         '-var', "efi_firmware_code=$efiCode",
                         '-var', "efi_firmware_vars=$efiVars",
-                        '-var', "disk_size=${DiskGib}G",
+                        '-var', "disk_size=${DiskBytes}",
                         '-var', "output_directory=$tmpOutput",
                         '.'
                     )

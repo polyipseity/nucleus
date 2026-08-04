@@ -134,7 +134,7 @@
         <key>JITCacheSize</key>
         <integer>0</integer>
         <key>MemorySize</key>
-        <integer>__VM_RAM_MB__</integer>
+        <integer>__VM_RAM_BYTES__</integer>
         <key>Target</key>
         <string>__VM_MACHINE__</string>
     </dict>

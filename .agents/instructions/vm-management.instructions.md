@@ -58,8 +58,8 @@ Required fields for each VM entry:
 | `enabled`          | bool    | Whether the VM is provisioned                                     |
 | `hosts`            | array   | Hosts that provision this VM (`"MacBook"`, `"NixOS"`, `"Windows"`) |
 | `cpus`             | int     | Number of virtual CPUs                                            |
-| `ramBytes`         | int     | RAM in bytes                                                      |
-| `diskBytes`        | int     | Boot disk size in bytes                                           |
+| `ram`             | string  | RAM as a suffixed size string (e.g. `"8GB"`)                    |
+| `diskSize`        | string  | Boot disk size as a suffixed size string (e.g. `"128GB"`)     |
 | `shareDevDir`      | bool    | Mount `~/dev` inside the guest via VirtioFS                       |
 | `sound`            | string  | Audio device: `"intel-hda"` or `"none"`                        |
 | `portForwards`     | array   | Non-empty `{guestPort, hostPort}` port-forward pairs              |

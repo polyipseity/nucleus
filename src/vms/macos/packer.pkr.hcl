@@ -48,13 +48,13 @@ variable "cpus" {
 variable "memory_gib" {
   type        = number
   default     = 8
-  description = "RAM in GiB (match VMs.json ramMiB / 1024)."
+  description = "RAM in GiB (match VMs.json ram, rounded up to whole GiB)."
 }
 
 variable "disk_size_gib" {
   type        = number
   default     = 128
-  description = "Disk size in GiB (match VMs.json diskGiB)."
+  description = "Disk size in GiB (match VMs.json diskSize, rounded up to whole GiB)."
 }
 
 variable "guest_username" {

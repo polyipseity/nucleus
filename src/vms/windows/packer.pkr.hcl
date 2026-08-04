@@ -56,14 +56,14 @@ variable "output_directory" {
 
 variable "disk_size" {
   type        = string
-  default     = "128G"
-  description = "Boot disk size matching VMs.json diskGiB for the Windows guest."
+  default     = "137438953472"
+  description = "Boot disk size in bytes matching VMs.json diskSize for the Windows guest (128GB)."
 }
 
 variable "memory" {
   type        = number
   default     = 8192
-  description = "RAM in MiB during the build (match VMs.json ramMiB)."
+  description = "RAM in MiB during the build (match VMs.json ram, rounded up to whole MiB)."
 }
 
 variable "cpus" {

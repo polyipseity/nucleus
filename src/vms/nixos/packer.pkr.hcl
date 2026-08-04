@@ -49,8 +49,8 @@ variable "output_directory" {
 
 variable "disk_size" {
   type        = string
-  default     = "64G"
-  description = "Boot disk size matching VMs.json diskGiB for the NixOS guest."
+  default     = "64000000000"
+  description = "Boot disk size in bytes matching VMs.json diskSize for the NixOS guest (64GB)."
 }
 
 variable "memory" {

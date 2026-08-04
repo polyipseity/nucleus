@@ -71,6 +71,7 @@ if ($Help -or -not $Action) {
 
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Get-Item $PSScriptRoot).Parent.FullName }
 $ManifestPath = Join-Path $RepoRoot 'src\modules\VMs.json'
+. (Join-Path $RepoRoot 'src\hosts\Windows\modules\SizeStrings.ps1')
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -211,7 +212,8 @@ function Invoke-VmStatus {
   Write-Output "NAME                TYPE           ENABLED    STATE    HOSTS    CPUS      RAM"
   foreach ($vm in $vms) {
     $hostsStr = if ($vm.hosts) { ($vm.hosts -join ',') } else { 'all' }
-    $ramGb = [math]::Round($vm.ramBytes / 1GB, 0)
+    $ramBytes = ConvertFrom-SizeString $vm.ram
+    $ramGb = [math]::Round($ramBytes / 1000000000, 0)
     $state = if ($vm.id -in $runningNameList) { 'running' } else { 'stopped' }
     Write-Output ("{0,-20} {1,-14} {2,-10} {3,-9} {4,-9} {5,-9} {6}" -f $vm.name, $vm.type, $vm.enabled, $state, $hostsStr, $vm.cpus, "${ramGb}G")
   }

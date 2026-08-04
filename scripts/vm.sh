@@ -29,6 +29,8 @@ fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # shellcheck source=../src/scripts/lib/lib.sh
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
+# shellcheck source=../src/scripts/lib/size.sh
+. "$SCRIPT_DIR/../src/scripts/lib/size.sh"
 # shellcheck source=../src/scripts/lib/vm.sh
 # shellcheck disable=SC1094 # reason: vm.sh contains inline PowerShell content (backtick-escaped $) that shellcheck cannot parse; pre-existing constraint from the library
 . "$SCRIPT_DIR/../src/scripts/lib/vm.sh"
@@ -507,8 +509,9 @@ do_list() {
 
 # do_status
 #   Shows CPUs/RAM and live state for enabled VMs on this host, optionally
-#   filtered to names given after the subcommand. WHY: ramBytes from the
-#   manifest is rounded to the nearest GiB so the table stays readable.
+#   filtered to names given after the subcommand. WHY: the suffixed ram string
+#   is parsed to bytes and displayed as whole decimal GB so the table stays
+#   readable.
 do_status() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest
@@ -555,14 +558,16 @@ do_status() {
     # to keep shellcheck happy (no embedded double quotes in double-quoted
     # strings).
     local table_filter
-    table_filter="${base_filter}"' | .[] | [.name, .type, (.enabled | tostring), (if .hosts then (.hosts | join(",")) else "all" end), (.cpus | tostring), (.ramBytes | tostring), .id] | @tsv'
+    table_filter="${base_filter}"' | .[] | [.name, .type, (.enabled | tostring), (if .hosts then (.hosts | join(",")) else "all" end), (.cpus | tostring), .ram, .id] | @tsv'
 
     if [ -n "$names_json" ]; then
       jq -r --arg host "$NUCLEUS_HOST" --argjson names "$names_json" "$table_filter" "$MANIFEST"
     else
       jq -r --arg host "$NUCLEUS_HOST" "$table_filter" "$MANIFEST"
     fi | while IFS=$'\t' read -r name type enabled hosts cpus ram id; do
-      local ram_gib="$(( (ram + 536870912) / 1073741824 ))"
+      local ram_bytes ram_gib
+      ram_bytes="$(parse_size "$ram")"
+      ram_gib="$(( (ram_bytes + 500000000) / 1000000000 ))"
       local state
       state="$(_vm_state "$id" "$running_names")"
       printf '%-20s %-12s %-10s %-8s %-8s %-8s %-10s\n' "$name" "$type" "$enabled" "$state" "$hosts" "$cpus" "${ram_gib}G"

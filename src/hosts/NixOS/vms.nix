@@ -23,6 +23,7 @@
 }:
 let
   vmsData = builtins.fromJSON (builtins.readFile ../../modules/VMs.json);
+  size = import ../../modules/lib/size.nix;
   nucleusHost = "NixOS";
   enabledVms = builtins.filter (
     vm: vm.enabled && (!vm ? hosts || vm.hosts == null || builtins.elem nucleusHost vm.hosts)
@@ -123,7 +124,7 @@ let
       [
         "__VM_NAME__"
         "__VM_DISPLAY__"
-        "__VM_RAM_MB__"
+        "__VM_RAM_BYTES__"
         "__VM_CPUS__"
         "__VM_EMULATOR__"
         "__VM_DIR__"
@@ -137,7 +138,7 @@ let
       [
         vm.id
         vm.name
-        (toString (vm.ramBytes / 1000000))
+        (toString (size.parse vm.ram))
         (toString vm.cpus)
         (vmEmulator vm)
         vmDir
