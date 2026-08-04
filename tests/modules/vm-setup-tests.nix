@@ -1217,21 +1217,23 @@ let
       )
       "scripts/vm.sh must refuse to replace UTM runtime disks when the rebuild step did not produce a valid pre-built qcow2";
 
-  # UTM provisioning for Android must treat android-system.qcow2 as the
-  # pre-built image (never a nonexistent Android.qcow2), validate it with the
-  # relaxed 4 GiB floor, and copy system/userdata/optional-GSI into the bundle.
+  # UTM provisioning for Android must derive the system/userdata/GSI image
+  # filenames from the manifest Android group (never hardcoded android-*
+  # literals), validate the prebuilt with the relaxed 4 GiB floor, and copy
+  # system/userdata/optional-GSI into the bundle.
   test_utm_android_uses_shared_images =
     assert'
       (
-        (lib.hasInfix ''_android_system="$IMAGES_DIR/android-system.qcow2"'' vm_setup_sh_text)
-        && (lib.hasInfix ''_android_userdata="$IMAGES_DIR/android-userdata.qcow2"'' vm_setup_sh_text)
+        (lib.hasInfix ''_android_system="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.systemImage" "$MANIFEST")"'' vm_setup_sh_text)
+        && (lib.hasInfix ''_android_userdata="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.userdataImage" "$MANIFEST")"'' vm_setup_sh_text)
+        && (lib.hasInfix ''_android_gsi="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")"'' vm_setup_sh_text)
         && (lib.hasInfix ''_prebuilt="$_android_system"'' vm_setup_sh_text)
         && (lib.hasInfix "_prebuilt_min_size=\"\$(parse_size \"\$(jq -r \".VMs[\$vm_index].minImageSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
         && (lib.hasInfix "copied Android system image" vm_setup_sh_text)
         && (lib.hasInfix "copied Android userdata disk" vm_setup_sh_text)
         && (lib.hasInfix "Android userdata image not found" vm_setup_sh_text)
       )
-      "scripts/vm.sh must provision Android UTM bundles from the shared android-* images with android-system.qcow2 as the prebuilt";
+      "scripts/vm.sh must provision Android UTM bundles from the manifest Android group image names with the group systemImage as the prebuilt";
 
   # The Android build must strip the whitespace wc -c pads its output with
   # (macOS pads, Linux does not); otherwise the size leaks into the selected
@@ -1282,22 +1284,32 @@ let
       "vm.sh and Invoke-VMSetup.ps1 must require an explicit minImageSize floor at every image validation call site (no 10 GB fallback defaults)";
 
   # The shared Android start script must expose manifest-driven tokens for CPU
-  # count, RAM, and the ADB/console ports instead of hardcoded values.
+  # count, RAM, image filenames, and the ADB/console ports instead of hardcoded
+  # values.
   test_android_start_script_tokens =
     assert'
       (
         (lib.hasInfix "__ANDROID_CPU_COUNT__" start_android_ps1_text)
         && (lib.hasInfix "__ANDROID_RAM_BYTES__" start_android_ps1_text)
+        && (lib.hasInfix "__ANDROID_SYSTEM_IMAGE__" start_android_ps1_text)
+        && (lib.hasInfix "__ANDROID_USERDATA_IMAGE__" start_android_ps1_text)
+        && (lib.hasInfix "__ANDROID_GSI_IMAGE__" start_android_ps1_text)
         && (lib.hasInfix "__ADB_PORT__" start_android_ps1_text)
         && (lib.hasInfix "__ADB_CONSOLE_PORT__" start_android_ps1_text)
       )
-      "start-android-vm.ps1 must expose __ANDROID_CPU_COUNT__/__ANDROID_RAM_BYTES__/__ADB_PORT__/__ADB_CONSOLE_PORT__ tokens for manifest-driven rendering";
+      "start-android-vm.ps1 must expose __ANDROID_CPU_COUNT__/__ANDROID_RAM_BYTES__/__ANDROID_SYSTEM_IMAGE__/__ANDROID_USERDATA_IMAGE__/__ANDROID_GSI_IMAGE__/__ADB_PORT__/__ADB_CONSOLE_PORT__ tokens for manifest-driven rendering";
 
-  test_android_start_script_no_legacy_literals = assert' (
-    !(lib.hasInfix "'-smp', '4'" start_android_ps1_text)
-    && !(lib.hasInfix "'-m', '4096'" start_android_ps1_text)
-    && !(lib.hasInfix "hostfwd=tcp::5555-:5555,hostfwd=tcp::5554-:5554" start_android_ps1_text)
-  ) "start-android-vm.ps1 must not hardcode -smp 4, -m 4096, or the 5555/5554 hostfwd pair";
+  test_android_start_script_no_legacy_literals =
+    assert'
+      (
+        !(lib.hasInfix "'-smp', '4'" start_android_ps1_text)
+        && !(lib.hasInfix "'-m', '4096'" start_android_ps1_text)
+        && !(lib.hasInfix "hostfwd=tcp::5555-:5555,hostfwd=tcp::5554-:5554" start_android_ps1_text)
+        && !(lib.hasInfix "'android-system.qcow2'" start_android_ps1_text)
+        && !(lib.hasInfix "'android-userdata.qcow2'" start_android_ps1_text)
+        && !(lib.hasInfix "'android-gsi.img'" start_android_ps1_text)
+      )
+      "start-android-vm.ps1 must not hardcode -smp 4, -m 4096, the 5555/5554 hostfwd pair, or Android image filenames";
 
   # The CLI list/status host filters must rely on the manifest's required
   # non-null hosts field — no dead null/empty fallback branches.
@@ -1313,12 +1325,18 @@ let
 
   # vm_write_start_script must render the Android tokens via a sed chain after
   # copying the shared file, preserving the android-vm-single-source invariant.
-  test_vm_write_start_script_android_sed_chain = assert' (
-    (lib.hasInfix "s|__ANDROID_CPU_COUNT__|" vm_setup_sh_text)
-    && (lib.hasInfix "s|__ANDROID_RAM_BYTES__|" vm_setup_sh_text)
-    && (lib.hasInfix "s|__ADB_PORT__|" vm_setup_sh_text)
-    && (lib.hasInfix "s|__ADB_CONSOLE_PORT__|" vm_setup_sh_text)
-  ) "vm.sh must render Android start-script tokens via a sed chain after copying the shared file";
+  test_vm_write_start_script_android_sed_chain =
+    assert'
+      (
+        (lib.hasInfix "s|__ANDROID_CPU_COUNT__|" vm_setup_sh_text)
+        && (lib.hasInfix "s|__ANDROID_RAM_BYTES__|" vm_setup_sh_text)
+        && (lib.hasInfix "s|__ANDROID_SYSTEM_IMAGE__|" vm_setup_sh_text)
+        && (lib.hasInfix "s|__ANDROID_USERDATA_IMAGE__|" vm_setup_sh_text)
+        && (lib.hasInfix "s|__ANDROID_GSI_IMAGE__|" vm_setup_sh_text)
+        && (lib.hasInfix "s|__ADB_PORT__|" vm_setup_sh_text)
+        && (lib.hasInfix "s|__ADB_CONSOLE_PORT__|" vm_setup_sh_text)
+      )
+      "vm.sh must render Android start-script tokens (CPU/RAM/images/ports) via a sed chain after copying the shared file";
 
   # Local Mido compatibility adjustments must be applied at runtime from a
   # repository-owned patch file, not by editing the vendored submodule files.
@@ -1697,15 +1715,16 @@ let
 
   # The Android GSI drive must be rendered only when the Android group's
   # gsiUrl is set; a revert to unconditional GSI emission must fail. The
-  # userdata drive stays attached unconditionally.
+  # userdata drive stays attached unconditionally.  Image names come from the
+  # manifest Android group, never hardcoded android-* literals.
   test_macbook_android_gsi_conditional =
     assert'
       (
         (lib.hasInfix "vm.Android.gsiUrl != null" macbook_vms_nix_text)
-        && (lib.hasInfix "android-gsi.img" macbook_vms_nix_text)
-        && (lib.hasInfix "android-userdata.qcow2" macbook_vms_nix_text)
+        && (lib.hasInfix "\${vm.Android.gsiImage}" macbook_vms_nix_text)
+        && (lib.hasInfix "\${vm.Android.userdataImage}" macbook_vms_nix_text)
       )
-      "src/hosts/MacBook/vms.nix must render the GSI drive only when vm.Android.gsiUrl is non-null while keeping android-userdata.qcow2 attached unconditionally";
+      "src/hosts/MacBook/vms.nix must render the GSI drive only when vm.Android.gsiUrl is non-null while keeping the userdata drive (vm.Android.userdataImage) attached unconditionally";
 
   # The Android drive token must be emitted inside the Drive array (before
   # </array>); an emission outside the array produces orphan <dict> entries at
@@ -1720,24 +1739,25 @@ let
       "src/modules/configs/vms/utm-config.plist.xml must emit __VM_ANDROID_DRIVES__ inside the Drive array so Android dict entries are valid array elements";
 
   # NixOS libvirt domain XML must attach the GSI disk only when the Android
-  # group's gsiUrl is set, mirroring the MacBook UTM template.
+  # group's gsiUrl is set, mirroring the MacBook UTM template.  The image name
+  # comes from the manifest Android group, never a hardcoded android-* literal.
   test_nixos_android_gsi_conditional = assert' (
     (lib.hasInfix "vm.Android.gsiUrl != null" nixos_vms_nix_text)
-    && (lib.hasInfix "images/android-gsi.img" nixos_vms_nix_text)
+    && (lib.hasInfix "images/\${vm.Android.gsiImage}" nixos_vms_nix_text)
   ) "src/hosts/NixOS/vms.nix must render the GSI disk only when vm.Android.gsiUrl is non-null";
 
   # NixOS Android system/userdata disks must live under images/ inside the VM
-  # directory; bare ${vmDir}/android-*.qcow2 paths would break the cross-host
-  # images layout.
+  # directory, named from the manifest Android group; bare ${vmDir}/android-*
+  # paths would break the cross-host images layout.
   test_nixos_android_disk_paths_in_images_dir =
     assert'
       (
-        (lib.hasInfix "images/android-system.qcow2" nixos_vms_nix_text)
-        && (lib.hasInfix "images/android-userdata.qcow2" nixos_vms_nix_text)
+        (lib.hasInfix "images/\${vm.Android.systemImage}" nixos_vms_nix_text)
+        && (lib.hasInfix "images/\${vm.Android.userdataImage}" nixos_vms_nix_text)
         && !(lib.hasInfix "\${vmDir}/android-system.qcow2" nixos_vms_nix_text)
         && !(lib.hasInfix "\${vmDir}/android-userdata.qcow2" nixos_vms_nix_text)
       )
-      "src/hosts/NixOS/vms.nix must place Android system/userdata disks under \${vmDir}/images/ and never at the bare VM directory root";
+      "src/hosts/NixOS/vms.nix must place Android system/userdata disks under \${vmDir}/images/ named from the manifest Android group and never at the bare VM directory root";
 
   test_macbook_tart_storage_link =
     assert'

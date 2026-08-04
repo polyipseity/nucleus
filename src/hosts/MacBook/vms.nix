@@ -93,6 +93,8 @@ let
   # - NixOS images are qcow-efi on aarch64 and qcow (BIOS) on x86_64.
   qemuUefiBoot = vm: vm.type != "Windows" && vmArch vm == "aarch64";
 
+  # Image filenames come from the manifest Android group (userdataImage /
+  # gsiImage) so VMs.json is the single source of truth.
   androidDrives =
     vm:
     if vm.type != "Android" then
@@ -103,7 +105,7 @@ let
             <key>Identifier</key>
             <string>${vm.id}-disk-userdata</string>
             <key>ImageName</key>
-            <string>android-userdata.qcow2</string>
+            <string>${vm.Android.userdataImage}</string>
             <key>ImageType</key>
             <string>Disk</string>
             <key>Interface</key>
@@ -119,7 +121,7 @@ let
             <key>Identifier</key>
             <string>${vm.id}-disk-gsi</string>
             <key>ImageName</key>
-            <string>android-gsi.img</string>
+            <string>${vm.Android.gsiImage}</string>
             <key>ImageType</key>
             <string>Disk</string>
             <key>Interface</key>

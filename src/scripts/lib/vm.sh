@@ -486,14 +486,21 @@ vm_write_start_script() {
           error "shared Android VM start script not found: $_wss_android_start"
           return 1
         fi
-        # Manifest-driven tokens: CPU count, RAM bytes, and the ADB/console
-        # host ports from VMs.json portForwards (single-source start script).
+        # Manifest-driven tokens: CPU count, RAM bytes, image filenames, and the
+        # ADB/console host ports from VMs.json portForwards (single-source
+        # start script).  Image names come from the manifest Android group.
         _wss_cpus="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .cpus' "$MANIFEST")"
         _wss_ram_bytes="$(parse_size "$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .ram' "$MANIFEST")")"
+        _wss_system_image="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .Android.systemImage' "$MANIFEST")"
+        _wss_userdata_image="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .Android.userdataImage' "$MANIFEST")"
+        _wss_gsi_image="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .Android.gsiImage' "$MANIFEST")"
         _wss_adb_port="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .portForwards[] | select(.guestPort == 5555) | .hostPort' "$MANIFEST")"
         _wss_console_port="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .portForwards[] | select(.guestPort == 5554) | .hostPort' "$MANIFEST")"
         sed -e "s|__ANDROID_CPU_COUNT__|$_wss_cpus|g" \
             -e "s|__ANDROID_RAM_BYTES__|${_wss_ram_bytes}B|g" \
+            -e "s|__ANDROID_SYSTEM_IMAGE__|$_wss_system_image|g" \
+            -e "s|__ANDROID_USERDATA_IMAGE__|$_wss_userdata_image|g" \
+            -e "s|__ANDROID_GSI_IMAGE__|$_wss_gsi_image|g" \
             -e "s|__ADB_PORT__|$_wss_adb_port|g" \
             -e "s|__ADB_CONSOLE_PORT__|$_wss_console_port|g" \
             "$_wss_android_start" >"$_wss_path_ps1"
@@ -775,9 +782,11 @@ vm_build_android() {
   # VMs.json.
   _bai_disk_bytes="$(parse_size "$(jq -r ".VMs[$_bai_vm_index].diskSize" "$MANIFEST")")"
   _bai_gsi_url="$(jq -r ".VMs[$_bai_vm_index].Android.gsiUrl" "$MANIFEST")"
-  _bai_system_img="$IMAGES_DIR/android-system.qcow2"
-  _bai_userdata_img="$IMAGES_DIR/android-userdata.qcow2"
-  _bai_gsi_img="$IMAGES_DIR/android-gsi.img"
+  # Image filenames come from the manifest Android group (systemImage /
+  # userdataImage / gsiImage) so VMs.json is the single source of truth.
+  _bai_system_img="$IMAGES_DIR/$(jq -r ".VMs[$_bai_vm_index].Android.systemImage" "$MANIFEST")"
+  _bai_userdata_img="$IMAGES_DIR/$(jq -r ".VMs[$_bai_vm_index].Android.userdataImage" "$MANIFEST")"
+  _bai_gsi_img="$IMAGES_DIR/$(jq -r ".VMs[$_bai_vm_index].Android.gsiImage" "$MANIFEST")"
 
   # shareDevDir is unsupported on Android (no host filesystem sharing via QEMU).
   _bai_share_dev_dir="$(jq -r ".VMs[$_bai_vm_index].shareDevDir // false" "$MANIFEST")"
@@ -1047,11 +1056,12 @@ vm_setup_utm() {
   fi
   # Android uses the shared android-* images (system + userdata, optional GSI)
   # rather than a single <Name>.qcow2 pre-built image; other guests keep the
-  # ${vm_name}.qcow2 convention.
+  # ${vm_name}.qcow2 convention.  Image filenames come from the manifest
+  # Android group (systemImage / userdataImage / gsiImage).
   if [ "$vm_type" = "Android" ]; then
-    _android_system="$IMAGES_DIR/android-system.qcow2"
-    _android_userdata="$IMAGES_DIR/android-userdata.qcow2"
-    _android_gsi="$IMAGES_DIR/android-gsi.img"
+    _android_system="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.systemImage" "$MANIFEST")"
+    _android_userdata="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.userdataImage" "$MANIFEST")"
+    _android_gsi="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")"
   fi
 
   # Require a pre-built image only when the bundle does not already have a
@@ -1112,7 +1122,9 @@ vm_setup_utm() {
       else
         say "preserving existing Android system disk: $disk_file"
       fi
-      _userdata_file="$data_dir/android-userdata.qcow2"
+      # Bundle copies keep the manifest Android group filenames so UTM's
+      # config.plist ImageName matches the on-disk file (single source: VMs.json).
+      _userdata_file="$data_dir/$(jq -r ".VMs[$vm_index].Android.userdataImage" "$MANIFEST")"
       if [ -f "$_userdata_file" ] && ! validate_qcow2_image "$_userdata_file" "existing Android userdata disk for ${vm_name}" "$_prebuilt_min_size"; then
         warn "existing Android userdata disk is invalid for '$vm_name'; replacing from pre-built image"
         rm -f "$_userdata_file"
@@ -1123,7 +1135,7 @@ vm_setup_utm() {
       else
         say "preserving existing Android userdata disk: $_userdata_file"
       fi
-      _gsi_file="$data_dir/android-gsi.img"
+      _gsi_file="$data_dir/$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")"
       if [ -f "$_android_gsi" ]; then
         cp "$_android_gsi" "$_gsi_file"
         say "copied Android GSI image: $_gsi_file"
@@ -1222,11 +1234,13 @@ vm_setup_libvirt() {
 
   # Require pre-built images (built in phase 1).  Android uses the shared
   # android-* images (system + userdata, optional GSI) referenced directly by
-  # the domain XML rather than a single <Name>.qcow2 runtime copy.
+  # the domain XML rather than a single <Name>.qcow2 runtime copy.  Image
+  # filenames come from the manifest Android group (systemImage / userdataImage
+  # / gsiImage).
   if [ "$vm_type" = "Android" ]; then
-    _android_system="$IMAGES_DIR/android-system.qcow2"
-    _android_userdata="$IMAGES_DIR/android-userdata.qcow2"
-    _android_gsi="$IMAGES_DIR/android-gsi.img"
+    _android_system="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.systemImage" "$MANIFEST")"
+    _android_userdata="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.userdataImage" "$MANIFEST")"
+    _android_gsi="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")"
     if [ ! -f "$_android_system" ] || [ ! -f "$_android_userdata" ]; then
       warn "Android images not found: $_android_system and $_android_userdata; skipping '$vm_name'"
       return

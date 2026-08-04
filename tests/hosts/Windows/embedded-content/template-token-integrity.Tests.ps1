@@ -15,7 +15,7 @@
     - src/vms/templates/start-windows-host.sh (11 tokens, Git Bash/MSYS start script)
     - src/vms/templates/README.md (2 tokens, VM directory guide)
     - src/vms/windows/Autounattend.xml (3 tokens, Windows guest unattended setup)
-    - src/scripts/vms/start-android-vm.ps1 (4 tokens, Android QEMU start script)
+    - src/scripts/vms/start-android-vm.ps1 (7 tokens, Android QEMU start script)
 
 .NOTES
     Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/embedded-content/template-token-integrity.Tests.ps1 -Passthru"
@@ -164,9 +164,9 @@ Describe "Autounattend.xml template token integrity" {
 }
 
 Describe "start-android-vm.ps1 template token integrity" {
-  It "declares exactly the 4 expected __TOKEN__ placeholders" {
+  It "declares exactly the 7 expected __TOKEN__ placeholders" {
     $templateTokens = Get-UpperSnakeTokenList (Join-Path $RepoRoot "src\scripts\vms\start-android-vm.ps1")
-    ($templateTokens -join ",") | Should -Be "ADB_CONSOLE_PORT,ADB_PORT,ANDROID_CPU_COUNT,ANDROID_RAM_BYTES"
+    ($templateTokens -join ",") | Should -Be "ADB_CONSOLE_PORT,ADB_PORT,ANDROID_CPU_COUNT,ANDROID_GSI_IMAGE,ANDROID_RAM_BYTES,ANDROID_SYSTEM_IMAGE,ANDROID_USERDATA_IMAGE"
   }
 
   It "every placeholder has a replacement in the vm.sh sed render chain" {

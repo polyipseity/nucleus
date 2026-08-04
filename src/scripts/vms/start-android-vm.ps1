@@ -11,10 +11,12 @@
   (windows-qemu start script generation) and Start-AndroidVM.ps1 (thin
   wrapper). Keep single-source — do not embed a copy elsewhere.
 
-  Expects disk images under ~\virtual machines\images\:
-    - android-system.qcow2   (system partition, vda)
-    - android-userdata.qcow2 (userdata partition, vdb)
-    - android-gsi.img        (optional GSI system image, vdc)
+  Expects disk images under ~\virtual machines\images\ with filenames from
+  the manifest Android group (rendered by vm.sh via __ANDROID_SYSTEM_IMAGE__ /
+  __ANDROID_USERDATA_IMAGE__ / __ANDROID_GSI_IMAGE__ tokens):
+    - <systemImage>   (system partition, vda)
+    - <userdataImage> (userdata partition, vdb)
+    - <gsiImage>      (optional GSI system image, vdc)
 
   Firmware path defaults to the edk2-aarch64 UEFI image bundled with QEMU's
   standard installation layout (Scoop/manual).
@@ -39,9 +41,9 @@ $firmwareDir = if (Get-Command 'qemu-img.exe' -ErrorAction SilentlyContinue) { #
                  Split-Path $qemu.Source -Parent
                }
 
-$diskSystem   = Join-Path $imagesDir 'android-system.qcow2'
-$diskUserdata = Join-Path $imagesDir 'android-userdata.qcow2'
-$diskGsi      = Join-Path $imagesDir 'android-gsi.img'
+$diskSystem   = Join-Path $imagesDir '__ANDROID_SYSTEM_IMAGE__'
+$diskUserdata = Join-Path $imagesDir '__ANDROID_USERDATA_IMAGE__'
+$diskGsi      = Join-Path $imagesDir '__ANDROID_GSI_IMAGE__'
 $uefiCode     = Join-Path $firmwareDir 'edk2-aarch64-code.fd'
 $uefiVars     = Join-Path $firmwareDir 'edk2-arm-vars.fd'
 

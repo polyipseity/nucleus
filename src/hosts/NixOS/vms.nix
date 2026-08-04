@@ -63,6 +63,8 @@ let
   # Android-specific disk attachments for GSI-based Android VM images.
   # system (read-only) and userdata (writable qcow2) are always attached;
   # the GSI image is attached only when the Android group's gsiUrl is set.
+  # Image filenames come from the manifest Android group so VMs.json is the
+  # single source of truth.
   androidDisks =
     vm:
     if vm.type != "Android" then
@@ -70,18 +72,18 @@ let
     else
       "<disk type='file' device='disk'>\n"
       + "      <driver name='qemu' type='qcow2'/>\n"
-      + "      <source file='${vmDir}/images/android-system.qcow2'/>\n"
+      + "      <source file='${vmDir}/images/${vm.Android.systemImage}'/>\n"
       + "      <target dev='vda' bus='virtio'/>\n"
       + "    </disk>\n"
       + "    <disk type='file' device='disk'>\n"
       + "      <driver name='qemu' type='qcow2'/>\n"
-      + "      <source file='${vmDir}/images/android-userdata.qcow2'/>\n"
+      + "      <source file='${vmDir}/images/${vm.Android.userdataImage}'/>\n"
       + "      <target dev='vdb' bus='virtio'/>\n"
       + "    </disk>\n"
       + lib.optionalString ((vm ? Android) && vm.Android.gsiUrl != null) (
         "<disk type='file' device='disk'>\n"
         + "      <driver name='qemu' type='raw'/>\n"
-        + "      <source file='${vmDir}/images/android-gsi.img'/>\n"
+        + "      <source file='${vmDir}/images/${vm.Android.gsiImage}'/>\n"
         + "      <target dev='vdc' bus='virtio'/>\n"
         + "      <readonly/>\n"
         + "    </disk>"
