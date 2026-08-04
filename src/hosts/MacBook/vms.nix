@@ -76,7 +76,7 @@ let
   # provisioned automatically by macos-set-utm-renderer.sh via activation.nix,
   # so no manual UTM settings change is needed.
   # ref: https://github.com/utmapp/UTM/blob/v5.0.3/Services/UTMQemuSystemBackends.h -- kQEMURendererBackendCGL = 3
-  # ref: https://wiki.lineageos.org/utms/utm-vm-on-apple-silicon-mac -- Android UI renderer guidance
+  # ref: https://wiki.lineageos.org/libvirt-qemu.html -- Android UI renderer guidance
   # ref: https://github.com/utmapp/UTM/issues/2221 -- "Display freezes randomly"; renderer-orthogonal SPICE stall
   # ref: https://github.com/utmapp/UTM/issues/378 -- historic Android VM freeze reports
   displayCard = vm: if vm.type == "Windows" then "virtio-vga" else "virtio-gpu-pci";
