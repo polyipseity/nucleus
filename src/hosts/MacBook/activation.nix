@@ -168,9 +168,12 @@ in
     # ---- configure-utm-renderer-prefs -------------------------------------------
     # Pin UTM's global renderer backend to Apple Core OpenGL (CGL) in the
     # sandboxed app container so the Android (LineageOS) guest UI appears
-    # instead of freezing.  CGL is the UTM 5.x replacement for the ANGLE
-    # (OpenGL) path (QEMURendererBackend = 3) and sidesteps the SPICE display
-    # stall that ANGLE still hits under load.
+    # after boot (ANGLE (Metal) hides it; CGL is the UTM 5.x maintained GL
+    # backend, QEMURendererBackend = 3).  This does not prevent the recurring
+    # "display freezes randomly" bug -- that is a renderer-orthogonal
+    # client-side SPICE stall (UTM #2221, CocoaSpice#5); UTM 5.0.4 SPICE
+    # renderer fixes and keeping the VM window visible are the mitigations.
+    # See .agents/instructions/utm-android-freeze.instructions.md.
     # Runs unconditionally: the pref is a global UTM setting, harmless when no
     # Android VM is enabled, and idempotent when already set.
     "${activationBundle}/src/scripts/hosts/MacBook/macos-set-utm-renderer.sh"

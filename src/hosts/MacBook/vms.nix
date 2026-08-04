@@ -65,15 +65,20 @@ let
   #
   # Android (LineageOS) on UTM additionally requires UTM's global
   # "Renderer backend" (pref QEMURendererBackend) to be Apple Core OpenGL
-  # (CGL), value 3; ANGLE (Metal) makes the UI not appear after boot, and the
-  # ANGLE (OpenGL)/software paths are prone to a frozen display (UTM issue
-  # #378).  CGL is the native macOS GL backend introduced in UTM 5.x
-  # (kQEMURendererBackendCGL) and sidesteps the ANGLE SPICE display stall.
-  # The pref is provisioned automatically by macos-set-utm-renderer.sh via
-  # activation.nix, so no manual UTM settings change is needed.
+  # (CGL), value 3; ANGLE (Metal) makes the UI not appear after boot
+  # (LineageOS wiki).  CGL is the native macOS GL backend introduced in UTM
+  # 5.x (kQEMURendererBackendCGL).  Note the recurring "display freezes
+  # randomly" bug is renderer-orthogonal -- a client-side SPICE
+  # display-channel stall in UTM's SPICE client (UTM #2221, CocoaSpice#5), so
+  # CGL does not prevent freezes; UTM 5.0.4 SPICE renderer fixes and keeping
+  # the VM window visible are the mitigations.  See
+  # .agents/instructions/utm-android-freeze.instructions.md.  The pref is
+  # provisioned automatically by macos-set-utm-renderer.sh via activation.nix,
+  # so no manual UTM settings change is needed.
   # ref: https://github.com/utmapp/UTM/blob/v5.0.3/Services/UTMQemuSystemBackends.h -- kQEMURendererBackendCGL = 3
-  # ref: https://wiki.lineageos.org/utms/utm-vm-on-apple-silicon-mac -- Android UI renderer guidance (predates the CGL backend)
-  # ref: https://github.com/utmapp/UTM/issues/378 -- Android VMs randomly freeze; renderer-dependent
+  # ref: https://wiki.lineageos.org/utms/utm-vm-on-apple-silicon-mac -- Android UI renderer guidance
+  # ref: https://github.com/utmapp/UTM/issues/2221 -- "Display freezes randomly"; renderer-orthogonal SPICE stall
+  # ref: https://github.com/utmapp/UTM/issues/378 -- historic Android VM freeze reports
   displayCard = vm: if vm.type == "Windows" then "virtio-vga" else "virtio-gpu-pci";
 
   # UTM 4.x sharing mode selector.

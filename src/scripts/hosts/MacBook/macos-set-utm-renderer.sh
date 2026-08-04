@@ -1,21 +1,29 @@
 #!/usr/bin/env bash
 # Keep UTM's global renderer backend pinned to Apple Core OpenGL (CGL) for the
 # console user.
-# WHY: UTM 5.x introduced a native CGL (Apple Core OpenGL) backend
-# (QEMURendererBackend = 3, kQEMURendererBackendCGL) replacing the ANGLE
-# (OpenGL) path.  ANGLE (OpenGL) was previously required for the Android
-# (LineageOS) UI to appear after boot (ANGLE (Metal) hides the UI and the
-# default software renderer is prone to a frozen display, UTM issue #378),
-# but its SPICE display channel still stalls under load; CGL is a different GL
-# path that sidesteps that race, and the 5.0.x line shipped SPICE renderer
-# fixes (5.0.2 GL regression fix #7626, 5.0.4 renderer and memory-leak fixes).
+# WHY: The Android (LineageOS) guest UI only appears with a GL renderer
+# backend; ANGLE (Metal) hides the UI after boot (LineageOS wiki) and the
+# ANGLE (OpenGL) path was the historic freeze-prone default (UTM issue #378).
+# UTM 5.x added a native CGL (Apple Core OpenGL) backend (QEMURendererBackend
+# = 3, kQEMURendererBackendCGL), the maintained GL path for Android on UTM.
+# The recurring "display freezes randomly" bug is NOT renderer-dependent: it
+# is a client-side SPICE display-channel stall in UTM's SPICE client
+# (CocoaSpice#5 scanout-texture race, read() deadlock; UTM #2221), observed
+# locally as the SPICE Main Loop blocked in playback_stop ->
+# gst_element_set_state, freezing the single glib main loop that dispatches
+# all SPICE channels (display + QMP-over-spiceport; utmctl suspend fails with
+# "Timed out waiting for RPC").  UTM 5.0.4 (2026-08-01) ships targeted SPICE
+# renderer + memory-leak fixes; zero-cost mitigation: keep the VM window
+# visible.  Full findings in .agents/instructions/utm-android-freeze.instructions.md.
 # UTM is sandboxed, so the pref lives in the app container
 # (~/Library/Containers/com.utmapp.UTM/Data/Library/Preferences/), not
 # ~/Library/Preferences; cfprefsd resolves the domain there when the write runs
 # as the console user.
 # ref: https://github.com/utmapp/UTM/blob/v5.0.3/Services/UTMQemuSystemBackends.h -- kQEMURendererBackendCGL = 3
-# ref: https://wiki.lineageos.org/utms/utm-vm-on-apple-silicon-mac -- Android UI renderer guidance (predates the CGL backend)
-# ref: https://github.com/utmapp/UTM/issues/378 -- Android VMs randomly freeze; renderer-dependent
+# ref: https://wiki.lineageos.org/utms/utm-vm-on-apple-silicon-mac -- Android UI renderer guidance
+# ref: https://github.com/utmapp/UTM/issues/2221 -- "Display freezes randomly"; renderer-orthogonal SPICE stall
+# ref: https://github.com/utmapp/CocoaSpice/issues/5 -- scanout-texture race, read() deadlock; mitigated, not fixed
+# ref: https://github.com/utmapp/UTM/issues/5886 -- guest kernel trace: virtio-gpu queue fills when client stalls
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../lib/macos-console-user.sh
