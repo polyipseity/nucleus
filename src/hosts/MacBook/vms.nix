@@ -114,7 +114,7 @@ let
             <false/>
         </dict>
       ''
-      + lib.optionalString ((vm ? androidGsiVersion) && vm.androidGsiVersion != null) ''
+      + lib.optionalString ((vm ? androidGsiUrl) && vm.androidGsiUrl != null) ''
         <dict>
             <key>Identifier</key>
             <string>${vm.name}-disk-gsi</string>

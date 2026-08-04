@@ -12,8 +12,8 @@
       "items": {
         "additionalProperties": false,
         "properties": {
-          "androidGsiVersion": {
-            "description": "GSI system image version (e.g. 14.0). Only for type: Android. Null means use built-in LineageOS.",
+          "androidGsiUrl": {
+            "description": "Android GSI system image download URL (gsi_gms_arm64, includes Google Mobile Services). Only for type: Android. Null means use built-in LineageOS. Use the URL from https://developer.android.com/topic/generic-system-image/releases (e.g. https://dl.google.com/developers/android/baklava/images/gsi/gsi_gms_arm64-exp-BP4A.251205.006-14401865-f8760221.zip).",
             "oneOf": [
               {
                 "type": "string"

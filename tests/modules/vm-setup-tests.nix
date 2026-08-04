@@ -150,30 +150,30 @@ let
         builtins.toString (builtins.map (v: v.name) badEditions)
       }";
 
-  # androidGsiVersion must be a string or null when present; the field is optional (Android guests only).
-  test_android_gsi_version_type =
+  # androidGsiUrl must be a string or null when present; the field is optional (Android guests only).
+  test_android_gsi_url_type =
     let
-      badGsiVersions = builtins.filter (
+      badGsiUrls = builtins.filter (
         vm:
-        builtins.hasAttr "androidGsiVersion" vm
-        && !(builtins.isString vm.androidGsiVersion || builtins.isNull vm.androidGsiVersion)
+        builtins.hasAttr "androidGsiUrl" vm
+        && !(builtins.isString vm.androidGsiUrl || builtins.isNull vm.androidGsiUrl)
       ) manifest.VMs;
     in
-    assert' (badGsiVersions == [ ])
-      "androidGsiVersion must be a string or null for all VMs that declare it; bad entries: ${
-        builtins.toString (builtins.map (v: v.name) badGsiVersions)
+    assert' (badGsiUrls == [ ])
+      "androidGsiUrl must be a string or null for all VMs that declare it; bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badGsiUrls)
       }";
 
-  # androidGsiVersion must only appear on VMs with type Android.
-  test_android_gsi_version_only_on_android =
+  # androidGsiUrl must only appear on VMs with type Android.
+  test_android_gsi_url_only_on_android =
     let
-      badGsiVersionVms = builtins.filter (
-        vm: builtins.hasAttr "androidGsiVersion" vm && vm.type != "Android"
+      badGsiUrlVms = builtins.filter (
+        vm: builtins.hasAttr "androidGsiUrl" vm && vm.type != "Android"
       ) manifest.VMs;
     in
-    assert' (badGsiVersionVms == [ ])
-      "androidGsiVersion must only appear on VMs of type Android; bad entries: ${
-        builtins.toString (builtins.map (v: v.name) badGsiVersionVms)
+    assert' (badGsiUrlVms == [ ])
+      "androidGsiUrl must only appear on VMs of type Android; bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badGsiUrlVms)
       }";
 
   # hosts must be absent, null, or a non-empty array of valid host names
@@ -1243,17 +1243,17 @@ let
     && (lib.hasInfix "enabledVms = builtins.filter (" (builtins.readFile ../../src/hosts/NixOS/vms.nix))
   ) "VM enable/disable policy must be wired in manifest, setup scripts, and host template generation";
 
-  # The Android GSI drive must be rendered only when androidGsiVersion is set
+  # The Android GSI drive must be rendered only when androidGsiUrl is set
   # (the manifest permits null); a revert to unconditional GSI emission must
   # fail. The userdata drive stays attached unconditionally.
   test_macbook_android_gsi_conditional =
     assert'
       (
-        (lib.hasInfix "androidGsiVersion != null" macbook_vms_nix_text)
+        (lib.hasInfix "androidGsiUrl != null" macbook_vms_nix_text)
         && (lib.hasInfix "android-gsi.img" macbook_vms_nix_text)
         && (lib.hasInfix "android-userdata.qcow2" macbook_vms_nix_text)
       )
-      "src/hosts/MacBook/vms.nix must render the GSI drive only when androidGsiVersion is non-null while keeping android-userdata.qcow2 attached unconditionally";
+      "src/hosts/MacBook/vms.nix must render the GSI drive only when androidGsiUrl is non-null while keeping android-userdata.qcow2 attached unconditionally";
 
   # The Android drive token must be emitted inside the Drive array (before
   # </array>); an emission outside the array produces orphan <dict> entries at
@@ -1268,11 +1268,11 @@ let
       "src/modules/configs/vms/utm-config.plist.xml must emit __VM_ANDROID_DRIVES__ inside the Drive array so Android dict entries are valid array elements";
 
   # NixOS libvirt domain XML must attach the GSI disk only when
-  # androidGsiVersion is set, mirroring the MacBook UTM template.
+  # androidGsiUrl is set, mirroring the MacBook UTM template.
   test_nixos_android_gsi_conditional = assert' (
-    (lib.hasInfix "androidGsiVersion != null" nixos_vms_nix_text)
+    (lib.hasInfix "androidGsiUrl != null" nixos_vms_nix_text)
     && (lib.hasInfix "images/android-gsi.img" nixos_vms_nix_text)
-  ) "src/hosts/NixOS/vms.nix must render the GSI disk only when androidGsiVersion is non-null";
+  ) "src/hosts/NixOS/vms.nix must render the GSI disk only when androidGsiUrl is non-null";
 
   # NixOS Android system/userdata disks must live under images/ inside the VM
   # directory; bare ${vmDir}/android-*.qcow2 paths would break the cross-host
@@ -1420,8 +1420,8 @@ let
     test_nixos_android_disk_paths_in_images_dir
     test_macbook_macos_version_tahoe
     test_windows_iso_fido_nonwindows_fallback
-    test_android_gsi_version_type
-    test_android_gsi_version_only_on_android
+    test_android_gsi_url_type
+    test_android_gsi_url_only_on_android
     test_enabled_vm_not_orphaned
     test_vm_gc_preserves_disabled_entries_by_default
     test_vm_gc_disabled_option_pair
@@ -1533,8 +1533,8 @@ in
     test_nixos_android_disk_paths_in_images_dir
     test_macbook_macos_version_tahoe
     test_windows_iso_fido_nonwindows_fallback
-    test_android_gsi_version_type
-    test_android_gsi_version_only_on_android
+    test_android_gsi_url_type
+    test_android_gsi_url_only_on_android
     test_enabled_vm_not_orphaned
     test_vm_gc_preserves_disabled_entries_by_default
     test_vm_gc_disabled_option_pair

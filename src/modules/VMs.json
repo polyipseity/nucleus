@@ -11,7 +11,7 @@
       "ramBytes": 8000000000,
       "shareDevDir": false,
       "type": "Android",
-      "androidGsiVersion": null,
+      "androidGsiUrl": null,
       "windowsIsoUrl": null
     },
     {

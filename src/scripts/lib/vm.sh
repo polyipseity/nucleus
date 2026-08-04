@@ -706,7 +706,7 @@ vm_build_android() {
   # VMs.json.
   _bai_disk_bytes="$(jq ".VMs[$_bai_vm_index].diskBytes" "$MANIFEST")"
   _bai_disk_gib="$(( (_bai_disk_bytes + 536870912) / 1073741824 ))"
-  _bai_gsi_version="$(jq -r ".VMs[$_bai_vm_index].androidGsiVersion // \"\"" "$MANIFEST")"
+  _bai_gsi_url="$(jq -r ".VMs[$_bai_vm_index].androidGsiUrl // \"\"" "$MANIFEST")"
   _bai_system_img="$IMAGES_DIR/android-system.qcow2"
   _bai_userdata_img="$IMAGES_DIR/android-userdata.qcow2"
   _bai_gsi_img="$IMAGES_DIR/android-gsi.img"
@@ -774,19 +774,19 @@ vm_build_android() {
     say "userdata disk already exists: $_bai_userdata_img"
   fi
 
-  # Step 3: GSI system image (optional, when androidGsiVersion is set)
-  if [ -n "$_bai_gsi_version" ] && [ "$_bai_gsi_version" != "null" ]; then
+  # Step 3: GSI system image (optional, when androidGsiUrl is set)
+  if [ -n "$_bai_gsi_url" ] && [ "$_bai_gsi_url" != "null" ]; then
     if [ "$_bai_accept_gsi_license" != "true" ]; then
       error "GSI license not accepted for '$_bai_vm_name'; see https://developer.android.com/license"
       exit 1
     fi
     say "GSI license: https://developer.android.com/license"
     if [ ! -f "$_bai_gsi_img" ]; then
-      say "downloading GSI system image v$_bai_gsi_version..."
-      _bai_gsi_zip="$IMAGES_DIR/android-gsi-${_bai_gsi_version}.zip"
+      say "downloading GSI system image..."
+      _bai_gsi_zip="$IMAGES_DIR/android-gsi.zip"
       run_with_backoff "download GSI zip" \
-        curl -fL -o "$_bai_gsi_zip" "https://developer.android.com/topic/generic-system-image/release/gsi_gms_arm64-${_bai_gsi_version}.zip" \
-        || { error "failed to download GSI zip for v$_bai_gsi_version"; return 1; }
+        curl -fL -o "$_bai_gsi_zip" "$_bai_gsi_url" \
+        || { error "failed to download GSI zip from $_bai_gsi_url"; return 1; }
       say "extracting GSI system.img..."
       run_cmd unzip -q -o "$_bai_gsi_zip" system.img -d "$(dirname "$_bai_gsi_img")"
       run_cmd mv "$(dirname "$_bai_gsi_img")/system.img" "$_bai_gsi_img"
@@ -800,7 +800,7 @@ vm_build_android() {
       say "GSI system image already exists: $_bai_gsi_img"
     fi
   else
-    say "no GSI version set; using built-in LineageOS GSI"
+    say "no GSI URL set; using built-in LineageOS GSI"
   fi
 
   say "Android image build complete for '$_bai_vm_name'"

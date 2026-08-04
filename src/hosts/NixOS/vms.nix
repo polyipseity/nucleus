@@ -63,7 +63,7 @@ let
 
   # Android-specific disk attachments for GSI-based Android VM images.
   # system (read-only) and userdata (writable qcow2) are always attached;
-  # the GSI image is attached only when androidGsiVersion is set.
+  # the GSI image is attached only when androidGsiUrl is set.
   androidDisks =
     vm:
     if vm.type != "Android" then
@@ -79,7 +79,7 @@ let
       + "      <source file='${vmDir}/images/android-userdata.qcow2'/>\n"
       + "      <target dev='vdb' bus='virtio'/>\n"
       + "    </disk>\n"
-      + lib.optionalString ((vm ? androidGsiVersion) && vm.androidGsiVersion != null) (
+      + lib.optionalString ((vm ? androidGsiUrl) && vm.androidGsiUrl != null) (
         "<disk type='file' device='disk'>\n"
         + "      <driver name='qemu' type='raw'/>\n"
         + "      <source file='${vmDir}/images/android-gsi.img'/>\n"
