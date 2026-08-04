@@ -104,7 +104,7 @@ function Invoke-VMSetup {
     Absolute path to the repository root.
 
   .PARAMETER WindowsIso
-    Path to the Windows 11 ISO. Optional when windowsIsoUrl is set in VMs.json;
+    Path to the Windows 11 ISO. Optional when Windows.isoUrl is set in VMs.json;
     the URL is used to auto-download the installer on first run.
 
   .PARAMETER NixosOnly
@@ -114,8 +114,8 @@ function Invoke-VMSetup {
     Build and provision only the Windows 11 guest.
 
   .PARAMETER WindowsIsoSource
-    Windows installer ISO resolution strategy. Auto: windowsIsoUrl cache/download
-    first, then Fido fallback. Url: use only -WindowsIso or windowsIsoUrl (no
+    Windows installer ISO resolution strategy. Auto: Windows.isoUrl cache/download
+    first, then Fido fallback. Url: use only -WindowsIso or Windows.isoUrl (no
     downloader fallback). Fido: use only local cache/Fido when -WindowsIso is omitted.
 
   .PARAMETER WindowsIsoRetries
@@ -159,7 +159,7 @@ function Invoke-VMSetup {
         [Parameter(Mandatory)]
         [string]$RepoRoot,
 
-        # Path to the Windows 11 ISO. Optional when windowsIsoUrl is set in VMs.json;
+        # Path to the Windows 11 ISO. Optional when Windows.isoUrl is set in VMs.json;
         # the URL is used to auto-download the installer on first run.
         # Download from: https://www.microsoft.com/software-download/windows11
         [string]$WindowsIso = '',
@@ -171,8 +171,8 @@ function Invoke-VMSetup {
         [switch]$WindowsOnly,
 
         # Windows installer ISO resolution strategy.
-        # Auto: windowsIsoUrl cache/download first, then Fido fallback.
-        # Url:  use only -WindowsIso or windowsIsoUrl (no downloader fallback).
+        # Auto: Windows.isoUrl cache/download first, then Fido fallback.
+        # Url:  use only -WindowsIso or Windows.isoUrl (no downloader fallback).
         # Fido: use only local cache/Fido when -WindowsIso is omitted.
         [ValidateSet('auto', 'url', 'fido')]
         [string]$WindowsIsoSource = 'Auto',
@@ -373,7 +373,7 @@ function Invoke-VMSetup {
         )
 
         if ($Vm.enabled -isnot [bool]) {
-            throw "vm-setup: VM '$($Vm.name)' must declare boolean 'enabled' in src\\modules\\VMs.json"
+            throw "vm-setup: VM '$($Vm.id)' must declare boolean 'enabled' in src\\modules\\VMs.json"
         }
 
         return [bool]$Vm.enabled
@@ -505,14 +505,14 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
 
     foreach ($vm in $vmDef.VMs) {
         if (-not (Test-VMEnabled -Vm $vm)) {
-            Write-Information "vm-setup: VM '$($vm.name)' is disabled in manifest; skipping"
+            Write-Information "vm-setup: VM '$($vm.id)' is disabled in manifest; skipping"
             continue
         }
 
         # Apply host-scoping filter.  VMs that list a hosts array that does
         # not include the current NUCLEUS_HOST are skipped.
         if (-not (Test-VMHostMatch -Vm $vm)) {
-            Write-Information "vm-setup: VM '$($vm.name)' is not available on host '$env:NUCLEUS_HOST'; skipping"
+            Write-Information "vm-setup: VM '$($vm.id)' is not available on host '$env:NUCLEUS_HOST'; skipping"
             continue
         }
 
@@ -523,7 +523,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         switch ($vm.type) {
             'NixOS' {
                 $diskGib = [long](($vm.diskBytes + 536870912) / 1073741824)
-                Invoke-BuildNixosImage -VmName $vm.name -Accelerator $Accelerator `
+                Invoke-BuildNixosImage -VmName $vm.id -Accelerator $Accelerator `
                     -DiskGib $diskGib `
                     -VmsDir $vmsDir -ImagesDir $imagesDir `
                     -GuestAccountName $guestUsername -GuestSecret $guestPassword `
@@ -533,13 +533,13 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             'Windows' {
                 # Convert SI bytes to nearest binary GiB for packer disk_size.
                 $diskGib = [long](($vm.diskBytes + 536870912) / 1073741824)
-                $isoUrl = if ($null -ne $vm.windowsIsoUrl) { [string]$vm.windowsIsoUrl } else { '' }
-                Invoke-BuildWindowsImage -VmName $vm.name -DiskGib $diskGib `
+                $isoUrl = if ($null -ne $vm.Windows.isoUrl) { [string]$vm.Windows.isoUrl } else { '' }
+                Invoke-BuildWindowsImage -VmName $vm.id -DiskGib $diskGib `
                     -WindowsIso $WindowsIso -WindowsIsoUrl $isoUrl `
                     -WindowsIsoSource $WindowsIsoSource `
                     -WindowsIsoRetries $WindowsIsoRetries `
                     -RepoRoot $RepoRoot `
-                    -WindowsEdition ($vm.windowsEdition ?? 'Pro') `
+                    -WindowsEdition $vm.Windows.edition `
                     -Accelerator $Accelerator `
                         -GuestAccountName $guestUsername -GuestSecret $guestPassword `
                         -GuestSecretHash $guestSecretHash `
@@ -550,7 +550,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 Write-Information "vm-setup: macOS image must be obtained manually (licensing restricts automation)"
             }
             default {
-                Write-Information "vm-setup: skipping build for '$($vm.name)' (unsupported type: $($vm.type))"
+                Write-Information "vm-setup: skipping build for '$($vm.id)' (unsupported type: $($vm.type))"
             }
         }
     }
@@ -580,14 +580,14 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
 
     foreach ($vm in $vmDef.VMs) {
         if (-not (Test-VMEnabled -Vm $vm)) {
-            Write-Information "vm-setup: VM '$($vm.name)' is disabled in manifest; skipping"
+            Write-Information "vm-setup: VM '$($vm.id)' is disabled in manifest; skipping"
             continue
         }
 
         # Apply host-scoping filter.  VMs that list a hosts array that does
         # not include the current NUCLEUS_HOST are skipped.
         if (-not (Test-VMHostMatch -Vm $vm)) {
-            Write-Information "vm-setup: VM '$($vm.name)' is not available on host '$env:NUCLEUS_HOST'; skipping"
+            Write-Information "vm-setup: VM '$($vm.id)' is not available on host '$env:NUCLEUS_HOST'; skipping"
             continue
         }
 
@@ -598,22 +598,22 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         # Convert SI bytes to nearest binary MiB for QEMU -m flag (which
         # interprets bare integers as MiB).
         $ramMib      = [long](($vm.ramBytes + 524288) / 1048576)
-        $diskPath    = Join-Path -Path $vmDir -ChildPath "$($vm.name).qcow2"
+        $diskPath    = Join-Path -Path $vmDir -ChildPath "$($vm.id).qcow2"
         $diskCredentialMarker = Get-VMGuestSecretMarkerPath -BasePath $diskPath
-        $startScriptPs1 = Join-Path -Path $vmDir -ChildPath "scripts" -AdditionalChildPath "start-$($vm.name).ps1"
-        $startScriptSh = Join-Path -Path $vmDir -ChildPath "scripts" -AdditionalChildPath "start-$($vm.name).sh"
-        $prebuilt    = Join-Path -Path $imagesDir -ChildPath "$($vm.name).qcow2"
+        $startScriptPs1 = Join-Path -Path $vmDir -ChildPath "scripts" -AdditionalChildPath "start-$($vm.id).ps1"
+        $startScriptSh = Join-Path -Path $vmDir -ChildPath "scripts" -AdditionalChildPath "start-$($vm.id).sh"
+        $prebuilt    = Join-Path -Path $imagesDir -ChildPath "$($vm.id).qcow2"
 
-        Write-Information "vm-setup: configuring VM '$($vm.display)'..."
+        Write-Information "vm-setup: configuring VM '$($vm.name)'..."
 
-        $prebuiltValid = (Test-Path $prebuilt) -and (Test-Qcow2Image -ImagePath $prebuilt -ImageLabel "pre-built image '$($vm.name)'")
+        $prebuiltValid = (Test-Path $prebuilt) -and (Test-Qcow2Image -ImagePath $prebuilt -ImageLabel "pre-built image '$($vm.id)'")
 
         # Place disk image from pre-built image (empty disk fallback removed).
         if (Test-Path $diskPath) {
-            if (Test-Qcow2Image -ImagePath $diskPath -ImageLabel "runtime disk '$($vm.name)'") {
+            if (Test-Qcow2Image -ImagePath $diskPath -ImageLabel "runtime disk '$($vm.id)'") {
                 if (-not (Test-VMGuestSecretMarker -ExpectedHash $guestSecretHash -MarkerPath $diskCredentialMarker)) {
                     if ($prebuiltValid) {
-                        Write-Warning "vm-setup: $($vm.type) runtime disk guest credential drift detected for '$($vm.name)'; replacing runtime disk from pre-built image"
+                        Write-Warning "vm-setup: $($vm.type) runtime disk guest credential drift detected for '$($vm.id)'; replacing runtime disk from pre-built image"
                         if (-not $DryRun) {
                             Remove-Item $diskPath -Force
                             Copy-Item $prebuilt $diskPath
@@ -624,7 +624,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                             Write-Information "vm-setup: [dry-run] Set-Content '$diskCredentialMarker' '$guestSecretHash'"
                         }
                     } else {
-                        Write-Warning "vm-setup: $($vm.type) runtime disk credential drift detected but no valid pre-built image exists for '$($vm.name)'; skipping"
+                        Write-Warning "vm-setup: $($vm.type) runtime disk credential drift detected but no valid pre-built image exists for '$($vm.id)'; skipping"
                         continue
                     }
                 } else {
@@ -642,7 +642,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                     Write-Information "vm-setup: [dry-run] Set-Content '$diskCredentialMarker' '$guestSecretHash'"
                 }
             } else {
-                Write-Warning "vm-setup: runtime disk is invalid and no valid pre-built image exists for '$($vm.name)'; skipping"
+                Write-Warning "vm-setup: runtime disk is invalid and no valid pre-built image exists for '$($vm.id)'; skipping"
                 continue
             }
         } elseif ($prebuiltValid) {
@@ -655,7 +655,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 Write-Information "vm-setup: [dry-run] Set-Content '$diskCredentialMarker' '$guestSecretHash'"
             }
         } else {
-            Write-Warning "vm-setup: image not found or invalid for '$($vm.name)': $prebuilt; skipping"
+            Write-Warning "vm-setup: image not found or invalid for '$($vm.id)': $prebuilt; skipping"
             continue
         }
 
@@ -691,9 +691,9 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
 
 # To enable ~/dev directory sharing:
 # 1. Start virtiofsd in a separate terminal:
-#      virtiofsd --socket-path=\\.\pipe\$($vm.name)-virtiofs --shared-dir="$devDir"
+#      virtiofsd --socket-path=\\.\pipe\$($vm.id)-virtiofs --shared-dir="$devDir"
 # 2. Then run this script.
-# -chardev socket,id=char0,path=\\.\pipe\$($vm.name)-virtiofs ``
+# -chardev socket,id=char0,path=\\.\pipe\$($vm.id)-virtiofs ``
 # -device vhost-user-fs-pci,chardev=char0,tag=dev ``
 # -object memory-backend-file,id=mem,size=$ramMib`M,mem-path=/dev/shm,share=on ``
 # -numa node,memdev=mem
@@ -705,8 +705,8 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         if (Test-Path -LiteralPath $startContentPs1Template -PathType Leaf) {
             $ps1Template = Get-Content -Path $startContentPs1Template -Raw
             $startContentPs1 = $ps1Template.Replace('__QEMU_SYSTEM__', $qemuSystem)
-            $startContentPs1 = $startContentPs1.Replace('__VM_NAME__', $vm.name)
-            $startContentPs1 = $startContentPs1.Replace('__VM_DISPLAY__', $vm.display)
+            $startContentPs1 = $startContentPs1.Replace('__VM_NAME__', $vm.id)
+            $startContentPs1 = $startContentPs1.Replace('__VM_DISPLAY__', $vm.name)
             $startContentPs1 = $startContentPs1.Replace('__MACHINE__', $machine)
             $startContentPs1 = $startContentPs1.Replace('__CPU__', $cpu)
             $startContentPs1 = $startContentPs1.Replace('__CPUS__', [string]$vm.cpus)
@@ -717,7 +717,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             $startContentPs1 = $startContentPs1.Replace('__VIRTIOFS_ARGS__', $virtiofsArgs)
         } else {
             Write-Warning "vm-setup: start-windows.ps1 template not found at $startContentPs1Template; writing minimal script"
-            $startContentPs1 = "Write-Host 'start-$($vm.name).ps1 — Start VM $($vm.display)'"
+            $startContentPs1 = "Write-Host 'start-$($vm.id).ps1 — Start VM $($vm.name)'"
         }
 
         # Write a self-contained QEMU start script (Git Bash/MSYS variant).
@@ -727,8 +727,8 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         if (Test-Path -LiteralPath $startContentShTemplate -PathType Leaf) {
             $shTemplate = Get-Content -Path $startContentShTemplate -Raw
             $startContentSh = $shTemplate.Replace('__QEMU_SYSTEM__', $qemuSystem)
-            $startContentSh = $startContentSh.Replace('__VM_NAME__', $vm.name)
-            $startContentSh = $startContentSh.Replace('__VM_DISPLAY__', $vm.display)
+            $startContentSh = $startContentSh.Replace('__VM_NAME__', $vm.id)
+            $startContentSh = $startContentSh.Replace('__VM_DISPLAY__', $vm.name)
             $startContentSh = $startContentSh.Replace('__MACHINE__', $machine)
             $startContentSh = $startContentSh.Replace('__CPU__', $cpu)
             $startContentSh = $startContentSh.Replace('__CPUS__', [string]$vm.cpus)
@@ -738,7 +738,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             $startContentSh = $startContentSh.Replace('__DISPLAY_BACKEND__', $display)
         } else {
             Write-Warning "vm-setup: start-windows-host.sh template not found at $startContentShTemplate; writing minimal script"
-            $startContentSh = "#!/bin/sh`n# start-$($vm.name).sh — Start VM $($vm.display)"
+            $startContentSh = "#!/bin/sh`n# start-$($vm.id).sh — Start VM $($vm.name)"
         }
 
         if ($DryRun) {
@@ -752,7 +752,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         # NOTE: Configure script generation was removed. Guest-side converge
         # is handled by the guest itself or via manual invocation.
 
-        Write-Information "vm-setup: VM '$($vm.display)' setup complete"
+        Write-Information "vm-setup: VM '$($vm.name)' setup complete"
     }
 
     if ($Gc) {
@@ -763,7 +763,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             $expectedNames = @(
                 foreach ($vm in $vmDef.VMs) {
                     if ((Test-VMEnabled $vm) -and (Test-VMHostMatch $vm)) {
-                        $vm.name
+                        $vm.id
                     }
                 }
             )
@@ -771,7 +771,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         else {
             # WHY: default GC preserves disabled entries; only names absent
             # from VMs.json entirely are cleared.
-            $expectedNames = @($vmDef.VMs | ForEach-Object { $_.name })
+            $expectedNames = @($vmDef.VMs | ForEach-Object { $_.id })
         }
         Invoke-GcOrphanDisk -ExpectedNames $expectedNames
         Invoke-GcOrphanMarker
@@ -1051,7 +1051,7 @@ function Invoke-BuildWindowsImage {
         [int]$DiskGib,
         [string]$WindowsIso,
         # Optional URL to auto-download the Windows installer ISO when -WindowsIso
-        # is not provided.  Set via the windowsIsoUrl field in VMs.json.
+        # is not provided.  Set via the Windows.isoUrl field in VMs.json.
         [string]$WindowsIsoUrl = '',
         [ValidateSet('auto', 'url', 'fido')]
         [string]$WindowsIsoSource = 'Auto',
@@ -1090,7 +1090,7 @@ function Invoke-BuildWindowsImage {
         return
     }
 
-    Write-Information "vm-setup: Windows ISO fallback order: cached installer -> windowsIsoUrl -> downloader ($WindowsIsoSource mode)"
+    Write-Information "vm-setup: Windows ISO fallback order: cached installer -> Windows.isoUrl -> downloader ($WindowsIsoSource mode)"
 
     $cachedIso = Join-Path $ImagesDir "$VmName-installer.iso"
     if (-not $WindowsIso -and (Test-Path $cachedIso)) {
@@ -1099,9 +1099,9 @@ function Invoke-BuildWindowsImage {
     }
 
     # Resolve the installer ISO: use -WindowsIso if provided, otherwise try the
-    # VMs.json windowsIsoUrl field as a download source.
+    # VMs.json Windows.isoUrl field as a download source.
     if (-not $WindowsIso -and $WindowsIsoSource -ne 'Fido' -and $WindowsIsoUrl) {
-        Write-Information "vm-setup: downloading Windows installer from windowsIsoUrl..."
+        Write-Information "vm-setup: downloading Windows installer from Windows.isoUrl..."
         if (-not $DryRun) {
             # Use curl.exe (available on Windows 10 1803+) for large ISO downloads;
             # Invoke-WebRequest buffers the full file in memory before writing to disk.
@@ -1127,13 +1127,13 @@ function Invoke-BuildWindowsImage {
                 }
 
                 $sleepSeconds = [Math]::Min([Math]::Pow(2, $attempt - 1), 30)
-                Write-Warning "vm-setup: windowsIsoUrl download attempt $attempt/$maxAttempts failed; retrying in $sleepSeconds seconds"
+                Write-Warning "vm-setup: Windows.isoUrl download attempt $attempt/$maxAttempts failed; retrying in $sleepSeconds seconds"
                 Start-Sleep -Seconds $sleepSeconds
                 $attempt++
             }
 
             if (-not $downloadOk) {
-                Write-Warning "vm-setup: windowsIsoUrl download failed; removing partial file $cachedIso"
+                Write-Warning "vm-setup: Windows.isoUrl download failed; removing partial file $cachedIso"
                 if (Test-Path $cachedIso) {
                     Remove-Item $cachedIso -Force
                 }
@@ -1162,7 +1162,7 @@ function Invoke-BuildWindowsImage {
         if ($WindowsIsoSource -eq 'Url') {
             Write-Information 'vm-setup: windowsIsoSource=Url selected and no cached URL-based installer was resolved'
         }
-        Write-Information 'vm-setup: alternatively add "windowsIsoUrl": "<url>" to the VMs.json windows entry'
+        Write-Information 'vm-setup: alternatively set "Windows": { "isoUrl": "<url>" } on the VMs.json windows entry'
         Write-Information 'vm-setup: download from: https://www.microsoft.com/software-download/windows11'
         return
     }

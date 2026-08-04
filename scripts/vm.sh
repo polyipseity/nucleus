@@ -312,14 +312,14 @@ resolve_manifest() {
   fi
 }
 
-# resolve_target_vm NAME — look up a VM by name in the manifest, print
+# resolve_target_vm ID — look up a VM by id in the manifest, print
 # "type<tab>index" or exit with error.
 # WHY: the index is the manifest position used to address the VM in build
 # commands, not a runtime identifier.
 resolve_target_vm() {
   local _rtv_name="$1"
-  _rtv_type="$(jq -r --arg name "$_rtv_name" '.VMs[] | select(.name == $name) | .type // empty' "$MANIFEST")"
-  _rtv_index="$(jq --arg name "$_rtv_name" '[.VMs[] | .name] | index($name)' "$MANIFEST")"
+  _rtv_type="$(jq -r --arg name "$_rtv_name" '.VMs[] | select(.id == $name) | .type // empty' "$MANIFEST")"
+  _rtv_index="$(jq --arg name "$_rtv_name" '[.VMs[] | .id] | index($name)' "$MANIFEST")"
   if [ -z "$_rtv_type" ] || [ "$_rtv_index" = "null" ]; then
     error "VM '$_rtv_name' not found in manifest"
     return 1
@@ -489,17 +489,17 @@ do_list() {
     jq -c --arg host "$NUCLEUS_HOST" '
       [.VMs[] | select(.enabled == true) | select(.hosts == null or (.hosts | length == 0) or (.hosts | contains([$host])))]
     ' "$MANIFEST" | jq -c --arg running "$running_names" '
-      [.[] | .state = (if $running| split("\n") | index(.name) then "running" else "stopped" end)]
+      [.[] | .state = (if $running| split("\n") | index(.id) then "running" else "stopped" end)]
     '
   else
     printf '%-20s %-12s %-10s %-8s %s\n' "NAME" "TYPE" "ENABLED" "STATE" "HOSTS"
     jq -r --arg host "$NUCLEUS_HOST" '
       .VMs[] | select(.enabled == true) | select(.hosts == null or (.hosts | length == 0) or (.hosts | contains([$host]))) |
-      [.name, .type, (.enabled | tostring), (if .hosts then (.hosts | join(",")) else "all" end)] |
+      [.name, .type, (.enabled | tostring), (if .hosts then (.hosts | join(",")) else "all" end), .id] |
       @tsv
-    ' "$MANIFEST" | while IFS=$'\t' read -r name type enabled hosts; do
+    ' "$MANIFEST" | while IFS=$'\t' read -r name type enabled hosts id; do
       local state
-      state="$(_vm_state "$name" "$running_names")"
+      state="$(_vm_state "$id" "$running_names")"
       printf '%-20s %-12s %-10s %-8s %s\n' "$name" "$type" "$enabled" "$state" "$hosts"
     done
   fi
@@ -531,21 +531,21 @@ do_status() {
       names_list+="\"$name\","
     done
     names_json="[${names_list%,}]"
-    # Append name filter using single-quote concatenation to avoid SC2140.
+    # Append id filter using single-quote concatenation to avoid SC2140.
     # shellcheck disable=SC2016 # reason: $n and $names are jq variables, not shell expansion
-    base_filter="${base_filter%]}"' | select(.name as $n | $names | index($n))]'
+    base_filter="${base_filter%]}"' | select(.id as $n | $names | index($n))]'
   fi
 
   if $json_output; then
     if [ -n "$names_json" ]; then
       jq -c --arg host "$NUCLEUS_HOST" --argjson names "$names_json" "$base_filter" "$MANIFEST" | \
         jq -c --arg running "$running_names" '
-          [.[] | .state = (if $running| split("\n") | index(.name) then "running" else "stopped" end)]
+          [.[] | .state = (if $running| split("\n") | index(.id) then "running" else "stopped" end)]
         '
     else
       jq -c --arg host "$NUCLEUS_HOST" "$base_filter" "$MANIFEST" | \
         jq -c --arg running "$running_names" '
-          [.[] | .state = (if $running| split("\n") | index(.name) then "running" else "stopped" end)]
+          [.[] | .state = (if $running| split("\n") | index(.id) then "running" else "stopped" end)]
         '
     fi
   else
@@ -555,16 +555,16 @@ do_status() {
     # to keep shellcheck happy (no embedded double quotes in double-quoted
     # strings).
     local table_filter
-    table_filter="${base_filter}"' | .[] | [.name, .type, (.enabled | tostring), (if .hosts then (.hosts | join(",")) else "all" end), (.cpus | tostring), (.ramBytes | tostring)] | @tsv'
+    table_filter="${base_filter}"' | .[] | [.name, .type, (.enabled | tostring), (if .hosts then (.hosts | join(",")) else "all" end), (.cpus | tostring), (.ramBytes | tostring), .id] | @tsv'
 
     if [ -n "$names_json" ]; then
       jq -r --arg host "$NUCLEUS_HOST" --argjson names "$names_json" "$table_filter" "$MANIFEST"
     else
       jq -r --arg host "$NUCLEUS_HOST" "$table_filter" "$MANIFEST"
-    fi | while IFS=$'\t' read -r name type enabled hosts cpus ram; do
+    fi | while IFS=$'\t' read -r name type enabled hosts cpus ram id; do
       local ram_gib="$(( (ram + 536870912) / 1073741824 ))"
       local state
-      state="$(_vm_state "$name" "$running_names")"
+      state="$(_vm_state "$id" "$running_names")"
       printf '%-20s %-12s %-10s %-8s %-8s %-8s %-10s\n' "$name" "$type" "$enabled" "$state" "$hosts" "$cpus" "${ram_gib}G"
     done
   fi

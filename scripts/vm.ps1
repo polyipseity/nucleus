@@ -191,7 +191,7 @@ function Invoke-VmList {
   Write-Output "NAME                TYPE           ENABLED    STATE    HOSTS"
   foreach ($vm in $vms) {
     $hostsStr = if ($vm.hosts) { ($vm.hosts -join ',') } else { 'all' }
-    $state = if ($vm.name -in $runningNameList) { 'running' } else { 'stopped' }
+    $state = if ($vm.id -in $runningNameList) { 'running' } else { 'stopped' }
     Write-Output ("{0,-20} {1,-14} {2,-10} {3,-9} {4}" -f $vm.name, $vm.type, $vm.enabled, $state, $hostsStr)
   }
 }
@@ -212,7 +212,7 @@ function Invoke-VmStatus {
   foreach ($vm in $vms) {
     $hostsStr = if ($vm.hosts) { ($vm.hosts -join ',') } else { 'all' }
     $ramGb = [math]::Round($vm.ramBytes / 1GB, 0)
-    $state = if ($vm.name -in $runningNameList) { 'running' } else { 'stopped' }
+    $state = if ($vm.id -in $runningNameList) { 'running' } else { 'stopped' }
     Write-Output ("{0,-20} {1,-14} {2,-10} {3,-9} {4,-9} {5,-9} {6}" -f $vm.name, $vm.type, $vm.enabled, $state, $hostsStr, $vm.cpus, "${ramGb}G")
   }
 }
@@ -234,7 +234,7 @@ function Invoke-VmStart {
   }
 
   $manifest = Get-VmManifest
-  $vm = $manifest.VMs | Where-Object { $_.name -eq $vmName }
+  $vm = $manifest.VMs | Where-Object { $_.id -eq $vmName }
   if (-not $vm) {
     Write-NucleusError "VM '$vmName' not found in manifest"
     exit 1
@@ -261,7 +261,7 @@ function Invoke-VmStop {
   }
 
   $manifest = Get-VmManifest
-  $vm = $manifest.VMs | Where-Object { $_.name -eq $vmName }
+  $vm = $manifest.VMs | Where-Object { $_.id -eq $vmName }
   if (-not $vm) {
     Write-NucleusError "VM '$vmName' not found in manifest"
     exit 1

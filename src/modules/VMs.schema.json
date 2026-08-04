@@ -12,16 +12,34 @@
       "items": {
         "additionalProperties": false,
         "properties": {
-          "androidGsiUrl": {
-            "description": "Android GSI system image download URL (gsi_gms_arm64, includes Google Mobile Services). Only for type: Android. Null means use built-in LineageOS. Use the URL from https://developer.android.com/topic/generic-system-image/releases (e.g. https://dl.google.com/developers/android/baklava/images/gsi/gsi_gms_arm64-exp-BP4A.251205.006-14401865-f8760221.zip).",
-            "oneOf": [
-              {
+          "Android": {
+            "additionalProperties": false,
+            "description": "Android guest configuration. Present only for type: Android.",
+            "properties": {
+              "gsiImage": {
+                "description": "GSI image filename under the shared VM images directory.",
                 "type": "string"
               },
-              {
-                "type": "null"
+              "gsiUrl": {
+                "description": "Android GSI system image download URL (gsi_gms_arm64, includes Google Mobile Services). Use the URL from https://developer.android.com/topic/generic-system-image/releases (e.g. https://dl.google.com/developers/android/baklava/images/gsi/gsi_gms_arm64-exp-BP4A.251205.006-14401865-f8760221.zip).",
+                "type": "string"
+              },
+              "systemImage": {
+                "description": "System image filename under the shared VM images directory.",
+                "type": "string"
+              },
+              "userdataImage": {
+                "description": "Userdata image filename under the shared VM images directory.",
+                "type": "string"
               }
-            ]
+            },
+            "required": [
+              "gsiImage",
+              "gsiUrl",
+              "systemImage",
+              "userdataImage"
+            ],
+            "type": "object"
           },
           "cpus": {
             "description": "Number of CPU cores.",
@@ -33,35 +51,80 @@
             "minimum": 1,
             "type": "integer"
           },
-          "display": {
-            "description": "Human-readable display name.",
-            "type": "string"
-          },
           "enabled": {
             "description": "Whether the VM is enabled.",
             "type": "boolean"
           },
           "hosts": {
-            "description": "Hosts where this VM should be provisioned (null = all hosts).",
-            "oneOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ]
+            "description": "Hosts where this VM should be provisioned.",
+            "items": {
+              "enum": [
+                "MacBook",
+                "NixOS",
+                "Windows"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
           },
-          "macOSVersion": {
-            "description": "macOS version (e.g. tahoe). Only for type: macOS.",
+          "hostname": {
+            "description": "Guest OS hostname.",
+            "type": "string"
+          },
+          "id": {
+            "description": "Unique machine identifier used in file paths, UUID/MAC derivation, and CLI selection.",
+            "type": "string"
+          },
+          "macAddressPrefix": {
+            "description": "MAC address prefix used to derive the guest NIC address.",
+            "type": "string"
+          },
+          "macOS": {
+            "additionalProperties": false,
+            "description": "macOS guest configuration. Present only for type: macOS.",
+            "properties": {
+              "version": {
+                "description": "macOS version (e.g. tahoe).",
+                "type": "string"
+              }
+            },
+            "required": [
+              "version"
+            ],
+            "type": "object"
+          },
+          "minImageSize": {
+            "description": "Minimum prebuilt disk image size accepted during provisioning, as a suffixed size (decimal kB/MB/GB/TB or binary kiB/MiB/GiB/TiB).",
+            "pattern": "^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$",
             "type": "string"
           },
           "name": {
-            "description": "Unique VM identifier.",
+            "description": "Human-readable display name.",
             "type": "string"
+          },
+          "portForwards": {
+            "description": "Guest-to-host port forward mappings.",
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "guestPort": {
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                "hostPort": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "guestPort",
+                "hostPort"
+              ],
+              "type": "object"
+            },
+            "minItems": 1,
+            "type": "array"
           },
           "ramBytes": {
             "description": "RAM size in bytes.",
@@ -73,51 +136,142 @@
             "type": "boolean"
           },
           "sound": {
-            "description": "UTM guest audio hardware. \"none\" disables the guest sound card (empty Sound array) — the workaround for the UTM SPICE audio teardown deadlock (see .agents/instructions/utm-android-freeze.instructions.md). Absent means intel-hda.",
+            "description": "UTM guest audio hardware. \"none\" disables the guest sound card (empty Sound array) — the workaround for the UTM SPICE audio teardown deadlock (see .agents/instructions/utm-android-freeze.instructions.md).",
             "enum": [
               "intel-hda",
               "none"
             ],
             "type": "string"
           },
-          "windowsIsoUrl": {
-            "description": "Windows ISO download URL. Null means auto-resolve via Mido/Fido.",
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "type": {
             "description": "Guest operating system type.",
             "enum": [
               "Android",
-              "macOS",
+              "Linux",
               "NixOS",
-              "Windows"
+              "Windows",
+              "macOS"
             ],
             "type": "string"
           },
-          "windowsEdition": {
-            "description": "Windows edition. Only for type: Windows.",
-            "type": "string"
+          "Windows": {
+            "additionalProperties": false,
+            "description": "Windows guest configuration. Present only for type: Windows.",
+            "properties": {
+              "edition": {
+                "description": "Windows edition.",
+                "type": "string"
+              },
+              "isoUrl": {
+                "description": "Windows ISO download URL. Null means auto-resolve via Mido/Fido.",
+                "oneOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "edition",
+              "isoUrl"
+            ],
+            "type": "object"
           }
         },
         "required": [
           "cpus",
           "diskBytes",
-          "display",
           "enabled",
+          "hostname",
+          "hosts",
+          "id",
+          "macAddressPrefix",
+          "minImageSize",
           "name",
+          "portForwards",
           "ramBytes",
           "shareDevDir",
-          "type",
-          "windowsIsoUrl"
+          "sound",
+          "type"
         ],
-        "type": "object"
+        "type": "object",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "Android"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "then": {
+              "required": [
+                "Android"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "Android"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "macOS"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "then": {
+              "required": [
+                "macOS"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "macOS"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "Windows"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "then": {
+              "required": [
+                "Windows"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "Windows"
+                ]
+              }
+            }
+          }
+        ]
       },
       "type": "array"
     }

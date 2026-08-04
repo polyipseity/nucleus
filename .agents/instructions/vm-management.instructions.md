@@ -50,33 +50,40 @@ All virtual machines are declared in `src/modules/VMs.json`. This is the single 
 
 Required fields for each VM entry:
 
-| Field         | Type   | Description                                           |
-| ------------- | ------ | ----------------------------------------------------- |
-| `name`        | string | Machine-readable identifier used as file/domain name  |
-| `display`     | string | Human-readable name shown in UTM/virt-manager         |
-| `cpus`        | int    | Number of virtual CPUs                                |
-| `ramBytes`    | int    | RAM in bytes                                          |
-| `diskBytes`   | int    | Boot disk size in bytes                               |
-| `type`        | string | Guest OS family: `"NixOS"`, `"Windows"`, or `"Linux"` |
-| `shareDevDir` | bool   | Mount `~/dev` inside the guest via VirtioFS           |
+| Field              | Type    | Description                                                       |
+| ------------------ | ------- | ----------------------------------------------------------------- |
+| `id`               | string  | Machine-readable key used for files, domains, and CLI names       |
+| `name`             | string  | Human-readable label shown in UTM/virt-manager and CLI tables     |
+| `type`             | string  | Guest OS family: `"Android"`, `"NixOS"`, `"Windows"`, `"macOS"`, `"Linux"` |
+| `enabled`          | bool    | Whether the VM is provisioned                                     |
+| `hosts`            | array   | Hosts that provision this VM (`"MacBook"`, `"NixOS"`, `"Windows"`) |
+| `cpus`             | int     | Number of virtual CPUs                                            |
+| `ramBytes`         | int     | RAM in bytes                                                      |
+| `diskBytes`        | int     | Boot disk size in bytes                                           |
+| `shareDevDir`      | bool    | Mount `~/dev` inside the guest via VirtioFS                       |
+| `sound`            | string  | Audio device: `"intel-hda"` or `"none"`                        |
+| `portForwards`     | array   | Non-empty `{guestPort, hostPort}` port-forward pairs              |
+| `hostname`         | string  | Guest hostname                                                    |
+| `minImageSize`     | string  | Minimum prebuilt image size floor (suffixed, e.g. `"4GB"`)      |
+| `macAddressPrefix` | string  | MAC address prefix used for the guest NIC                         |
 
-Optional fields:
+Type-specific fields (nested objects keyed by `type`; required when `type` matches, forbidden otherwise):
 
-| Field            | Type   | Description                                                                                                                                                                                                                                                                              |
-| ---------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `macOSVersion`   | string | macOS release name (e.g. `"sequoia"`). Required for `type: "macOS"` entries; used by the Tart Packer build to select the base image.                                                                                                                                                     |
-| `windowsEdition` | string | Windows edition string passed to Packer (e.g. `"pro"`). Optional for `type: "Windows"` entries; defaults to `"Pro"` when absent.                                                                                                                                                         |
-| `windowsIsoUrl`  | string | URL to auto-download the Windows installer ISO when `--windows-iso` is omitted. Set to a stable direct download URL (e.g. an evaluation ISO from Microsoft's Evaluation Center or an internal mirror). The downloaded ISO is cached at `~/virtual machines/images/<name>-installer.iso`. |
+| `type`      | Group      | Fields                                                                                                                                                                                                                    |
+| ----------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"Android"` | `Android`  | `systemImage`, `userdataImage`, `gsiImage`, `gsiUrl` (all required; `gsiUrl` may be `null` to use the built-in LineageOS GSI)                                                                                             |
+| `"macOS"`  | `macOS`    | `version` (release name, e.g. `"tahoe"`)                                                                                                                                                                                 |
+| `"Windows"` | `Windows`  | `edition` (e.g. `"pro"`), `isoUrl` (`null` = Mido/Fido auto-resolve; a URL auto-downloads the installer ISO when `--windows-iso` is omitted, cached at `~/virtual machines/images/<id>-installer.iso`)                  |
 
 ## Disk format
 
 QCOW2 throughout all three platforms. Stored at:
 
-- macOS: `~/virtual machines/<name>.utm/Data/disk-main.qcow2`
-- NixOS: `~/virtual machines/<name>.qcow2`
-- Windows: `%USERPROFILE%\virtual machines\<name>.qcow2`
+- macOS: `~/virtual machines/<id>.utm/Data/disk-main.qcow2`
+- NixOS: `~/virtual machines/<id>.qcow2`
+- Windows: `%USERPROFILE%\virtual machines\<id>.qcow2`
 
-Pre-built images land in `~/virtual machines/images/<name>.qcow2` (Windows: `%USERPROFILE%\virtual machines\images\<name>.qcow2`). `nucleus-vm setup` builds these images in phase 1 (if absent) and copies them to the disk location in phase 2.
+Pre-built images land in `~/virtual machines/images/<id>.qcow2` (Windows: `%USERPROFILE%\virtual machines\images\<id>.qcow2`). `nucleus-vm setup` builds these images in phase 1 (if absent) and copies them to the disk location in phase 2.
 
 QCOW2 enables copy-based migration between hosts without conversion.
 
@@ -169,7 +176,7 @@ The hook is always best-effort: a VM setup failure does not abort a completed sy
 **Windows 11 guest (all hosts)** (`nucleus-vm setup --windows-iso /path/to/Win11.iso`):
 
 - Uses Packer with `src/vms/windows/packer.pkr.hcl` and QEMU builder.
-- Requires a Windows 11 ISO path via `--windows-iso` **or** a `windowsIsoUrl` field in the `VMs.json` windows entry. When `windowsIsoUrl` is set, the ISO is downloaded automatically to `~/virtual machines/images/<name>-installer.iso` on first run (subsequent runs reuse the cache).
+- Requires a Windows 11 ISO path via `--windows-iso` **or** a `Windows.isoUrl` field in the `VMs.json` windows entry. When `Windows.isoUrl` is set, the ISO is downloaded automatically to `~/virtual machines/images/<id>-installer.iso` on first run (subsequent runs reuse the cache).
 - On macOS/Linux, falls back from Mido to Fido URL resolver via `pwsh` (`Fido.ps1 -GetUrl`) + `curl`.
 - On Windows, auto-detects WHPX accelerator when `tcg` is default; upgrades automatically. Pass `-Accelerator tcg` to suppress.
 - SATA disk during build → VirtIO drivers installed post-install → final image is VirtIO-disk ready.

@@ -101,7 +101,7 @@ let
       ''
         <dict>
             <key>Identifier</key>
-            <string>${vm.name}-disk-userdata</string>
+            <string>${vm.id}-disk-userdata</string>
             <key>ImageName</key>
             <string>android-userdata.qcow2</string>
             <key>ImageType</key>
@@ -114,10 +114,10 @@ let
             <false/>
         </dict>
       ''
-      + lib.optionalString ((vm ? androidGsiUrl) && vm.androidGsiUrl != null) ''
+      + lib.optionalString ((vm ? Android) && vm.Android.gsiUrl != null) ''
         <dict>
             <key>Identifier</key>
-            <string>${vm.name}-disk-gsi</string>
+            <string>${vm.id}-disk-gsi</string>
             <key>ImageName</key>
             <string>android-gsi.img</string>
             <key>ImageType</key>
@@ -221,12 +221,12 @@ let
         "__VM_SOUND__"
       ]
       [
+        vm.id
         vm.name
-        vm.display
         (displayCard vm)
         (directoryShareMode vm)
-        (mkUuid vm.name)
-        (mkMacAddress vm.name)
+        (mkUuid vm.id)
+        (mkMacAddress vm.id)
         (vmArch vm)
         (toString vm.cpus)
         (toString ((vm.ramBytes + 524288) / 1048576))
@@ -247,7 +247,7 @@ in
   # provisioning time so PlistBuddy is no longer needed at runtime.
   home.file = builtins.listToAttrs (
     builtins.map (vm: {
-      name = ".local/share/nucleus/vms/${vm.name}-config.plist";
+      name = ".local/share/nucleus/vms/${vm.id}-config.plist";
       value = {
         text = mkConfigPlist vm;
       };

@@ -63,7 +63,7 @@ let
 
   # Android-specific disk attachments for GSI-based Android VM images.
   # system (read-only) and userdata (writable qcow2) are always attached;
-  # the GSI image is attached only when androidGsiUrl is set.
+  # the GSI image is attached only when the Android group's gsiUrl is set.
   androidDisks =
     vm:
     if vm.type != "Android" then
@@ -79,7 +79,7 @@ let
       + "      <source file='${vmDir}/images/android-userdata.qcow2'/>\n"
       + "      <target dev='vdb' bus='virtio'/>\n"
       + "    </disk>\n"
-      + lib.optionalString ((vm ? androidGsiUrl) && vm.androidGsiUrl != null) (
+      + lib.optionalString ((vm ? Android) && vm.Android.gsiUrl != null) (
         "<disk type='file' device='disk'>\n"
         + "      <driver name='qemu' type='raw'/>\n"
         + "      <source file='${vmDir}/images/android-gsi.img'/>\n"
@@ -135,8 +135,8 @@ let
         "__VM_ANDROID_SOUND__"
       ]
       [
+        vm.id
         vm.name
-        vm.display
         (toString (vm.ramBytes / 1000000))
         (toString vm.cpus)
         (vmEmulator vm)
@@ -201,13 +201,13 @@ in
   ];
 
   # Pre-generate libvirt domain XML for each declared VM so vm.sh can
-  # call `virsh define /etc/nucleus/vms/<name>-domain.xml` without needing to
+  # call `virsh define /etc/nucleus/vms/<id>-domain.xml` without needing to
   # inline or template the XML at provisioning time.  Files are mode 444
   # (readable by all) so the regular user can pass them to virsh define.
   # Source: https://mynixos.com/nixpkgs/option/environment.etc
   environment.etc = lib.listToAttrs (
     builtins.map (
-      vm: lib.nameValuePair "nucleus/vms/${vm.name}-domain.xml" { text = mkDomainXml vm; }
+      vm: lib.nameValuePair "nucleus/vms/${vm.id}-domain.xml" { text = mkDomainXml vm; }
     ) enabledVms
   );
 }

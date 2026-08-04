@@ -8,15 +8,20 @@ let
 
   # Required fields for every VM entry.
   requiredFields = [
+    "id"
     "name"
-    "display"
+    "type"
     "enabled"
+    "hosts"
     "cpus"
     "ramBytes"
     "diskBytes"
-    "type"
     "shareDevDir"
-    "windowsIsoUrl"
+    "sound"
+    "portForwards"
+    "hostname"
+    "minImageSize"
+    "macAddressPrefix"
   ];
 
   # Validate that every VM entry has all required fields with correct types.
@@ -111,68 +116,214 @@ let
         builtins.toString (builtins.map (v: v.name) badEnabled)
       }";
 
-  # windowsIsoUrl must be present on every VM, and must be a string or null.
+  # id must be present, non-empty, and filesystem-safe (used in file paths,
+  # UUID/MAC derivation, and CLI selection).
+  test_vm_id_nonempty_and_filesystem_safe =
+    let
+      badIds = builtins.filter (
+        vm:
+        !(builtins.hasAttr "id" vm)
+        || !builtins.isString vm.id
+        || vm.id == ""
+        || builtins.match "^[A-Za-z0-9][A-Za-z0-9._-]*$" vm.id == null
+      ) manifest.VMs;
+    in
+    assert' (badIds == [ ])
+      "Every VM must have a non-empty filesystem-safe id ([A-Za-z0-9][A-Za-z0-9._-]*); bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badIds)
+      }";
+
+  # id values must be unique across all VMs.
+  test_vm_id_uniqueness =
+    let
+      ids = builtins.map (vm: vm.id) manifest.VMs;
+    in
+    assert' (
+      builtins.length ids == builtins.length (lib.unique ids)
+    ) "All VMs must have distinct id values";
+
+  # portForwards must be a non-empty array of {guestPort, hostPort} objects
+  # with integer ports >= 1; every VM exposes at least one forwarded port.
+  test_port_forwards_shape =
+    let
+      badPorts = builtins.filter (
+        vm:
+        !(builtins.hasAttr "portForwards" vm)
+        || !builtins.isList vm.portForwards
+        || builtins.length vm.portForwards == 0
+        || !builtins.all (
+          pf:
+          builtins.isAttrs pf
+          && (pf ? guestPort)
+          && builtins.isInt pf.guestPort
+          && pf.guestPort >= 1
+          && (pf ? hostPort)
+          && builtins.isInt pf.hostPort
+          && pf.hostPort >= 1
+        ) vm.portForwards
+      ) manifest.VMs;
+    in
+    assert' (badPorts == [ ])
+      "Every VM must declare portForwards (non-empty array of {guestPort, hostPort} with integer ports >= 1); bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badPorts)
+      }";
+
+  # hostname must be a non-empty string (guest OS identity).
+  test_hostname_nonempty =
+    let
+      badHostnames = builtins.filter (
+        vm: !(builtins.hasAttr "hostname" vm) || !builtins.isString vm.hostname || vm.hostname == ""
+      ) manifest.VMs;
+    in
+    assert' (badHostnames == [ ])
+      "Every VM must declare a non-empty string hostname; bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badHostnames)
+      }";
+
+  # minImageSize must match the suffixed-size grammar (decimal kB/MB/GB/TB or
+  # binary kiB/MiB/GiB/TiB; case-sensitive — KB/KiB are invalid).
+  test_min_image_size_pattern =
+    let
+      badSizes = builtins.filter (
+        vm:
+        !(builtins.hasAttr "minImageSize" vm)
+        || builtins.match "^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$" vm.minImageSize == null
+      ) manifest.VMs;
+    in
+    assert' (badSizes == [ ])
+      "Every VM must declare minImageSize matching ^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$; bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badSizes)
+      }";
+
+  # macAddressPrefix must be a non-empty string (MAC address derivation).
+  test_mac_address_prefix_nonempty =
+    let
+      badPrefixes = builtins.filter (
+        vm:
+        !(builtins.hasAttr "macAddressPrefix" vm)
+        || !builtins.isString vm.macAddressPrefix
+        || vm.macAddressPrefix == ""
+      ) manifest.VMs;
+    in
+    assert' (badPrefixes == [ ])
+      "Every VM must declare a non-empty macAddressPrefix; bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badPrefixes)
+      }";
+
+  # Type-specific group objects: a VM carries the group named by its type
+  # (Android/macOS/Windows) and no other; NixOS/Linux carry no group.
+  groupTypes = [
+    "Android"
+    "macOS"
+    "Windows"
+  ];
+  test_group_key_equals_type =
+    let
+      badGroups = builtins.filter (
+        vm:
+        let
+          expected = lib.optional (builtins.elem vm.type groupTypes) vm.type;
+          actual = builtins.filter (g: builtins.hasAttr g vm) groupTypes;
+        in
+        actual != expected
+      ) manifest.VMs;
+    in
+    assert' (badGroups == [ ])
+      "Each VM must declare exactly the group object matching its type (Android/macOS/Windows; NixOS/Linux have none); bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badGroups)
+      }";
+
+  # Every present group object must carry all its required inner properties.
+  test_group_inner_props_required =
+    let
+      androidRequired = [
+        "systemImage"
+        "userdataImage"
+        "gsiImage"
+        "gsiUrl"
+      ];
+      checkGroup =
+        vm:
+        if vm ? Android then
+          assert' (builtins.all (p: builtins.hasAttr p vm.Android)
+            androidRequired
+          ) "Android group for VM '${vm.name}' must declare ${builtins.toString androidRequired}"
+        else if vm ? macOS then
+          assert' (builtins.hasAttr "version" vm.macOS) "macOS group for VM '${vm.name}' must declare version"
+        else if vm ? Windows then
+          assert' (
+            builtins.hasAttr "edition" vm.Windows && builtins.hasAttr "isoUrl" vm.Windows
+          ) "Windows group for VM '${vm.name}' must declare edition and isoUrl"
+        else
+          null;
+      results = builtins.map checkGroup manifest.VMs;
+    in
+    assert' (builtins.all (r: r == null) results) "Group inner property check failed";
+
+  # Windows VMs must declare a Windows group with isoUrl (string or null; null
+  # means auto-resolve via Mido/Fido — the sole deliberately nullable value).
   test_windows_iso_url_type =
     let
-      missingIsoUrls = builtins.filter (vm: !builtins.hasAttr "windowsIsoUrl" vm) manifest.VMs;
+      windowsVms = builtins.filter (vm: vm.type == "Windows") manifest.VMs;
       badIsoUrls = builtins.filter (
         vm:
-        builtins.hasAttr "windowsIsoUrl" vm
-        && !(builtins.isString vm.windowsIsoUrl || builtins.isNull vm.windowsIsoUrl)
-      ) manifest.VMs;
+        !(vm ? Windows)
+        || !builtins.hasAttr "isoUrl" vm.Windows
+        || !(builtins.isString vm.Windows.isoUrl || builtins.isNull vm.Windows.isoUrl)
+      ) windowsVms;
     in
-    assert' (missingIsoUrls == [ ] && badIsoUrls == [ ])
-      "windowsIsoUrl is required on all VMs (must be string or null); missing: ${
-        builtins.toString (builtins.map (v: v.name) missingIsoUrls)
-      }; bad types: ${builtins.toString (builtins.map (v: v.name) badIsoUrls)}";
+    assert' (badIsoUrls == [ ])
+      "Windows VMs must declare a Windows group with isoUrl (string or null); bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badIsoUrls)
+      }";
 
-  # macOSVersion must be a string when present; the field is optional (macOS guests only).
+  # macOS VMs must declare a macOS group with a string version.
   test_macos_version_type =
     let
+      macosVms = builtins.filter (vm: vm.type == "macOS") manifest.VMs;
       badVersions = builtins.filter (
-        vm: builtins.hasAttr "macOSVersion" vm && !builtins.isString vm.macOSVersion
-      ) manifest.VMs;
+        vm: !(vm ? macOS) || !builtins.hasAttr "version" vm.macOS || !builtins.isString vm.macOS.version
+      ) macosVms;
     in
     assert' (badVersions == [ ])
-      "macOSVersion must be a string for all VMs that declare it; bad entries: ${
+      "macOS VMs must declare a macOS group with string version; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badVersions)
       }";
 
-  # windowsEdition must be a string when present; the field is optional (Windows guests only).
+  # Windows VMs must declare a Windows group with a string edition.
   test_windows_edition_type =
     let
+      windowsVms = builtins.filter (vm: vm.type == "Windows") manifest.VMs;
       badEditions = builtins.filter (
-        vm: builtins.hasAttr "windowsEdition" vm && !builtins.isString vm.windowsEdition
-      ) manifest.VMs;
+        vm:
+        !(vm ? Windows) || !builtins.hasAttr "edition" vm.Windows || !builtins.isString vm.Windows.edition
+      ) windowsVms;
     in
     assert' (badEditions == [ ])
-      "windowsEdition must be a string for all VMs that declare it; bad entries: ${
+      "Windows VMs must declare a Windows group with string edition; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badEditions)
       }";
 
-  # androidGsiUrl must be a string or null when present; the field is optional (Android guests only).
+  # Android VMs must declare an Android group with a string gsiUrl.
   test_android_gsi_url_type =
     let
+      androidVms = builtins.filter (vm: vm.type == "Android") manifest.VMs;
       badGsiUrls = builtins.filter (
-        vm:
-        builtins.hasAttr "androidGsiUrl" vm
-        && !(builtins.isString vm.androidGsiUrl || builtins.isNull vm.androidGsiUrl)
-      ) manifest.VMs;
+        vm: !(vm ? Android) || !builtins.hasAttr "gsiUrl" vm.Android || !builtins.isString vm.Android.gsiUrl
+      ) androidVms;
     in
     assert' (badGsiUrls == [ ])
-      "androidGsiUrl must be a string or null for all VMs that declare it; bad entries: ${
+      "Android VMs must declare an Android group with string gsiUrl; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badGsiUrls)
       }";
 
-  # androidGsiUrl must only appear on VMs with type Android.
+  # The Android group must only appear on VMs with type Android.
   test_android_gsi_url_only_on_android =
     let
-      badGsiUrlVms = builtins.filter (
-        vm: builtins.hasAttr "androidGsiUrl" vm && vm.type != "Android"
-      ) manifest.VMs;
+      badGsiUrlVms = builtins.filter (vm: (vm ? Android) && vm.type != "Android") manifest.VMs;
     in
     assert' (badGsiUrlVms == [ ])
-      "androidGsiUrl must only appear on VMs of type Android; bad entries: ${
+      "The Android group must only appear on VMs of type Android; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badGsiUrlVms)
       }";
 
@@ -187,9 +338,9 @@ let
       builtins.length androidVms == 1 && (builtins.head androidVms).sound == "none"
     ) "VMs.json Android entry must declare sound == \"none\" (UTM SPICE audio deadlock workaround)";
 
-  # hosts must be absent, null, or a non-empty array of valid host names
-  # (["MacBook", "NixOS", "Windows"]). This enables host-scoped VM availability
-  # so different machines see only their intended VMs.
+  # hosts must be present and a non-empty array of valid host names
+  # (["MacBook", "NixOS", "Windows"]) on every VM; the null "all hosts"
+  # shorthand is not allowed — each VM lists the hosts it provisions on.
   validHosts = [
     "MacBook"
     "NixOS"
@@ -199,19 +350,14 @@ let
     let
       badHosts = builtins.filter (
         vm:
-        let
-          h = vm.hosts or null;
-        in
-        h != null
-        && (
-          !builtins.isList h
-          || builtins.length h == 0
-          || !builtins.all (host: builtins.elem host validHosts) h
-        )
+        !(builtins.hasAttr "hosts" vm)
+        || !builtins.isList vm.hosts
+        || builtins.length vm.hosts == 0
+        || !builtins.all (host: builtins.elem host validHosts) vm.hosts
       ) manifest.VMs;
     in
     assert' (badHosts == [ ])
-      "hosts must be null, absent, or a non-empty list of valid host names (MacBook, NixOS, Windows); bad entries: ${
+      "hosts must be a non-empty list of valid host names (MacBook, NixOS, Windows) on every VM; bad entries: ${
         builtins.toString (builtins.map (v: "${v.name}: ${builtins.toString (v.hosts or null)}") badHosts)
       }";
 
@@ -428,7 +574,7 @@ let
     assert'
       (
         (lib.hasInfix "[switch]\$GcDisabled" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "\$expectedNames = @(\$vmDef.VMs | ForEach-Object { \$_.name })" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "\$expectedNames = @(\$vmDef.VMs | ForEach-Object { \$_.id })" windows_vm_setup_ps1_text)
         && (lib.hasInfix "'--gc-disabled' { \$invokeArgs['GcDisabled'] = \$true }" vm_ps1_text)
         && (lib.hasInfix "'--no-gc-disabled' { \$invokeArgs['GcDisabled'] = \$false }" vm_ps1_text)
       )
@@ -1267,17 +1413,17 @@ let
     && (lib.hasInfix "enabledVms = builtins.filter (" (builtins.readFile ../../src/hosts/NixOS/vms.nix))
   ) "VM enable/disable policy must be wired in manifest, setup scripts, and host template generation";
 
-  # The Android GSI drive must be rendered only when androidGsiUrl is set
-  # (the manifest permits null); a revert to unconditional GSI emission must
-  # fail. The userdata drive stays attached unconditionally.
+  # The Android GSI drive must be rendered only when the Android group's
+  # gsiUrl is set; a revert to unconditional GSI emission must fail. The
+  # userdata drive stays attached unconditionally.
   test_macbook_android_gsi_conditional =
     assert'
       (
-        (lib.hasInfix "androidGsiUrl != null" macbook_vms_nix_text)
+        (lib.hasInfix "vm.Android.gsiUrl != null" macbook_vms_nix_text)
         && (lib.hasInfix "android-gsi.img" macbook_vms_nix_text)
         && (lib.hasInfix "android-userdata.qcow2" macbook_vms_nix_text)
       )
-      "src/hosts/MacBook/vms.nix must render the GSI drive only when androidGsiUrl is non-null while keeping android-userdata.qcow2 attached unconditionally";
+      "src/hosts/MacBook/vms.nix must render the GSI drive only when vm.Android.gsiUrl is non-null while keeping android-userdata.qcow2 attached unconditionally";
 
   # The Android drive token must be emitted inside the Drive array (before
   # </array>); an emission outside the array produces orphan <dict> entries at
@@ -1291,12 +1437,12 @@ let
       )
       "src/modules/configs/vms/utm-config.plist.xml must emit __VM_ANDROID_DRIVES__ inside the Drive array so Android dict entries are valid array elements";
 
-  # NixOS libvirt domain XML must attach the GSI disk only when
-  # androidGsiUrl is set, mirroring the MacBook UTM template.
+  # NixOS libvirt domain XML must attach the GSI disk only when the Android
+  # group's gsiUrl is set, mirroring the MacBook UTM template.
   test_nixos_android_gsi_conditional = assert' (
-    (lib.hasInfix "androidGsiUrl != null" nixos_vms_nix_text)
+    (lib.hasInfix "vm.Android.gsiUrl != null" nixos_vms_nix_text)
     && (lib.hasInfix "images/android-gsi.img" nixos_vms_nix_text)
-  ) "src/hosts/NixOS/vms.nix must render the GSI disk only when androidGsiUrl is non-null";
+  ) "src/hosts/NixOS/vms.nix must render the GSI disk only when vm.Android.gsiUrl is non-null";
 
   # NixOS Android system/userdata disks must live under images/ inside the VM
   # directory; bare ${vmDir}/android-*.qcow2 paths would break the cross-host
@@ -1324,13 +1470,14 @@ let
   test_macbook_macos_version_tahoe =
     assert'
       (
-        (lib.hasInfix "\"macOSVersion\": \"tahoe\"" vms_json_text)
+        (lib.hasInfix "\"macOS\": {" vms_json_text)
+        && (lib.hasInfix "\"version\": \"tahoe\"" vms_json_text)
         && (lib.hasInfix "[-var macos_version=tahoe]" vms_macos_packer_text)
         && (lib.hasInfix "default     = \"tahoe\"" vms_macos_packer_text)
         && (lib.hasInfix "macOS version to provision (tahoe, sequoia, sonoma, ventura, etc.)" vms_macos_packer_text)
         && (lib.hasInfix "tahoe" vm_setup_sh_text)
       )
-      "MacBook macOS guest version must default to Tahoe across VMs.json, vm.sh, and the macOS Packer template";
+      "MacBook macOS guest version must default to Tahoe across VMs.json (macOS group), vm.sh, and the macOS Packer template";
 
   # On non-Windows hosts, after Mido failure the script should try a pwsh/Fido
   # URL resolver fallback before requiring manual ISO input.
@@ -1358,6 +1505,14 @@ let
     test_vm_types
     test_share_dev_dir_types
     test_enabled_types
+    test_vm_id_nonempty_and_filesystem_safe
+    test_vm_id_uniqueness
+    test_port_forwards_shape
+    test_hostname_nonempty
+    test_min_image_size_pattern
+    test_mac_address_prefix_nonempty
+    test_group_key_equals_type
+    test_group_inner_props_required
     test_windows_iso_url_type
     test_macos_version_type
     test_windows_edition_type
@@ -1474,6 +1629,14 @@ in
     test_vm_types
     test_share_dev_dir_types
     test_enabled_types
+    test_vm_id_nonempty_and_filesystem_safe
+    test_vm_id_uniqueness
+    test_port_forwards_shape
+    test_hostname_nonempty
+    test_min_image_size_pattern
+    test_mac_address_prefix_nonempty
+    test_group_key_equals_type
+    test_group_inner_props_required
     test_windows_iso_url_type
     test_macos_version_type
     test_windows_edition_type

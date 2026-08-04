@@ -2,58 +2,119 @@
   "$schema": "./VMs.schema.json",
   "VMs": [
     {
-      "cpus": 4,
-      "diskBytes": 64000000000,
-      "display": "Android",
-      "enabled": true,
-      "hosts": null,
+      "id": "Android",
       "name": "Android",
+      "type": "Android",
+      "enabled": true,
+      "hosts": [
+        "MacBook",
+        "NixOS",
+        "Windows"
+      ],
+      "cpus": 4,
       "ramBytes": 8000000000,
+      "diskBytes": 64000000000,
       "shareDevDir": false,
       "sound": "none",
-      "type": "Android",
-      "androidGsiUrl": "https://dl.google.com/developers/android/baklava/images/gsi/gsi_gms_arm64-exp-BP4A.251205.006-14401865-f8760221.zip",
-      "windowsIsoUrl": null
+      "portForwards": [
+        {
+          "guestPort": 5555,
+          "hostPort": 5555
+        },
+        {
+          "guestPort": 5554,
+          "hostPort": 5554
+        }
+      ],
+      "hostname": "Android",
+      "minImageSize": "4GB",
+      "macAddressPrefix": "52",
+      "Android": {
+        "systemImage": "android-system.qcow2",
+        "userdataImage": "android-userdata.qcow2",
+        "gsiImage": "android-gsi.img",
+        "gsiUrl": "https://dl.google.com/developers/android/baklava/images/gsi/gsi_gms_arm64-exp-BP4A.251205.006-14401865-f8760221.zip"
+      }
     },
     {
-      "cpus": 4,
-      "diskBytes": 128000000000,
-      "display": "MacBook",
+      "id": "MacBook",
+      "name": "MacBook",
+      "type": "macOS",
       "enabled": false,
       "hosts": [
         "MacBook"
       ],
-      "macOSVersion": "tahoe",
-      "name": "MacBook",
-      "ramBytes": 8000000000,
-      "shareDevDir": true,
-      "type": "macOS",
-      "windowsIsoUrl": null
-    },
-    {
       "cpus": 4,
-      "diskBytes": 64000000000,
-      "display": "NixOS",
-      "enabled": false,
-      "hosts": null,
-      "name": "NixOS",
       "ramBytes": 8000000000,
-      "shareDevDir": true,
-      "type": "NixOS",
-      "windowsIsoUrl": null
-    },
-    {
-      "cpus": 4,
       "diskBytes": 128000000000,
-      "display": "Windows",
-      "enabled": false,
-      "hosts": null,
-      "name": "Windows",
-      "ramBytes": 8000000000,
       "shareDevDir": true,
+      "sound": "intel-hda",
+      "portForwards": [
+        {
+          "guestPort": 22,
+          "hostPort": 2222
+        }
+      ],
+      "hostname": "MacBook",
+      "minImageSize": "10GB",
+      "macAddressPrefix": "52",
+      "macOS": {
+        "version": "tahoe"
+      }
+    },
+    {
+      "id": "NixOS",
+      "name": "NixOS",
+      "type": "NixOS",
+      "enabled": false,
+      "hosts": [
+        "MacBook",
+        "NixOS",
+        "Windows"
+      ],
+      "cpus": 4,
+      "ramBytes": 8000000000,
+      "diskBytes": 64000000000,
+      "shareDevDir": true,
+      "sound": "intel-hda",
+      "portForwards": [
+        {
+          "guestPort": 22,
+          "hostPort": 2222
+        }
+      ],
+      "hostname": "NixOS",
+      "minImageSize": "10GB",
+      "macAddressPrefix": "52"
+    },
+    {
+      "id": "Windows",
+      "name": "Windows",
       "type": "Windows",
-      "windowsEdition": "pro",
-      "windowsIsoUrl": null
+      "enabled": false,
+      "hosts": [
+        "MacBook",
+        "NixOS",
+        "Windows"
+      ],
+      "cpus": 4,
+      "ramBytes": 8000000000,
+      "diskBytes": 128000000000,
+      "shareDevDir": true,
+      "sound": "intel-hda",
+      "portForwards": [
+        {
+          "guestPort": 22,
+          "hostPort": 2222
+        }
+      ],
+      "hostname": "Windows",
+      "minImageSize": "10GB",
+      "macAddressPrefix": "52",
+      "Windows": {
+        "edition": "pro",
+        "isoUrl": null
+      }
     }
   ]
 }

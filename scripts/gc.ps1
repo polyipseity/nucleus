@@ -498,7 +498,7 @@ if (-not $NoVMGc) {
     # Load the manifest and build a list of enabled VM names.
     try {
       $manifestContent = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
-      $declaredVMNames = @($manifestContent.VMs | Where-Object { $_.enabled -eq $true } | ForEach-Object { $_.name })
+      $declaredVMNames = @($manifestContent.VMs | Where-Object { $_.enabled -eq $true } | ForEach-Object { $_.id })
     }
     catch {
       Write-NucleusWarning "failed to parse manifest '$manifest' — $($_.Exception.Message); skipping VM artifact gc"

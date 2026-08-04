@@ -423,8 +423,8 @@ vm_wait_for_guest() {
 
 # vm_write_start_script NAME DISPLAY TYPE HOST_KIND
 # Args:
-#   $1 — VM machine name (manifest .name)
-#   $2 — VM display name (manifest .display)
+#   $1 — VM machine name (manifest .id)
+#   $2 — VM display name (manifest .name)
 #   $3 — VM type (macOS/NixOS/Windows/...)
 #   $4 — host runtime kind (darwin-utm|darwin-tart|nixos-libvirt)
 # Writes a host-side helper script to start the VM runtime from ~/virtual machines.
@@ -494,8 +494,8 @@ vm_write_start_script() {
 
 # vm_write_stop_script NAME DISPLAY TYPE HOST_KIND
 # Args:
-#   $1 — VM machine name (manifest .name)
-#   $2 — VM display name (manifest .display)
+#   $1 — VM machine name (manifest .id)
+#   $2 — VM display name (manifest .name)
 #   $3 — VM type (macOS/NixOS/Windows/...)
 #   $4 — host runtime kind (darwin-utm|darwin-tart|nixos-libvirt|windows-qemu)
 # Writes a host-side helper script to stop the VM runtime from ~/virtual machines.
@@ -568,7 +568,7 @@ vm_for_each() {
   _count="$(jq '.VMs | length' "$MANIFEST")"
   _i=0
   while [ "$_i" -lt "$_count" ]; do
-    _vm_name="$(jq -r ".VMs[$_i].name" "$MANIFEST")"
+    _vm_name="$(jq -r ".VMs[$_i].id" "$MANIFEST")"
     _vm_type="$(jq -r ".VMs[$_i].type" "$MANIFEST")"
     _vm_enabled="$(jq -r ".VMs[$_i].enabled" "$MANIFEST")"
 
@@ -608,7 +608,7 @@ vm_get_expected_vm_names() {
     .VMs[] |
     select(.enabled == true) |
     select(.hosts == null or (.hosts | length == 0) or (.hosts | contains([$host]))) |
-    .name
+    .id
   ' "$MANIFEST"
 }
 
@@ -618,7 +618,7 @@ vm_get_expected_vm_names() {
 #   entries absent from VMs.json entirely are cleared; disabled entries are
 #   preserved unless --gc-disabled is passed.
 vm_get_manifest_vm_names() {
-  jq -r '.VMs[] | .name' "$MANIFEST"
+  jq -r '.VMs[] | .id' "$MANIFEST"
 }
 
 # UTM re-registration helper
@@ -706,7 +706,7 @@ vm_build_android() {
   # VMs.json.
   _bai_disk_bytes="$(jq ".VMs[$_bai_vm_index].diskBytes" "$MANIFEST")"
   _bai_disk_gib="$(( (_bai_disk_bytes + 536870912) / 1073741824 ))"
-  _bai_gsi_url="$(jq -r ".VMs[$_bai_vm_index].androidGsiUrl // \"\"" "$MANIFEST")"
+  _bai_gsi_url="$(jq -r ".VMs[$_bai_vm_index].Android.gsiUrl" "$MANIFEST")"
   _bai_system_img="$IMAGES_DIR/android-system.qcow2"
   _bai_userdata_img="$IMAGES_DIR/android-userdata.qcow2"
   _bai_gsi_img="$IMAGES_DIR/android-gsi.img"
@@ -774,7 +774,7 @@ vm_build_android() {
     say "userdata disk already exists: $_bai_userdata_img"
   fi
 
-  # Step 3: GSI system image (optional, when androidGsiUrl is set)
+  # Step 3: GSI system image (optional, when the Android group's gsiUrl is set)
   if [ -n "$_bai_gsi_url" ] && [ "$_bai_gsi_url" != "null" ]; then
     if [ "$_bai_accept_gsi_license" != "true" ]; then
       error "GSI license not accepted for '$_bai_vm_name'; see https://developer.android.com/license"
@@ -825,13 +825,13 @@ vm_build_one_image() {
         || say "NixOS image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
       ;;
     Windows)
-      _vm_edition="$(jq -r ".VMs[$_vm_index].windowsEdition // \"Pro\"" "$MANIFEST")"
+      _vm_edition="$(jq -r ".VMs[$_vm_index].Windows.edition" "$MANIFEST")"
       # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
       vm_build_windows "$_vm_name" "$_vm_disk_gib" "$_vm_edition" \
         || say "Windows image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
       ;;
     macOS)
-      _vm_macos_ver="$(jq -r ".VMs[$_vm_index].macOSVersion // \"tahoe\"" "$MANIFEST")"
+      _vm_macos_ver="$(jq -r ".VMs[$_vm_index].macOS.version" "$MANIFEST")"
       _vm_ram_bytes="$(jq -r ".VMs[$_vm_index].ramBytes" "$MANIFEST")"
       # Convert SI bytes to nearest binary MiB for hypervisor tools.
       # Uses (n + 2^19) / 2^20 for round-half-up in POSIX integer arithmetic.
@@ -887,7 +887,7 @@ vm_setup_utm() {
   local _android_system _android_userdata _android_gsi _userdata_file _gsi_file
   local _guest_config_fingerprint
 
-  vm_display=$(jq -r ".VMs[$vm_index].display" "$MANIFEST")
+  vm_display=$(jq -r ".VMs[$vm_index].name" "$MANIFEST")
 
   # macOS guests are provisioned via tart (vm_setup_tart_vms), not UTM.
   if [ "$vm_type" = "macOS" ]; then
@@ -1140,7 +1140,7 @@ vm_setup_libvirt() {
   local _android_system _android_userdata _android_gsi
   local _guest_config_fingerprint
 
-  vm_display=$(jq -r ".VMs[$vm_index].display" "$MANIFEST")
+  vm_display=$(jq -r ".VMs[$vm_index].name" "$MANIFEST")
 
   disk_path="$VM_DIR/${vm_name}.qcow2"
   disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_name" "$disk_path")"
@@ -1643,10 +1643,10 @@ vm_build_windows() {
   fi
 
   # Resolve the installer ISO: use --windows-iso if provided, otherwise try the
-  # windowsIsoUrl field from VMs.json as a download source.
+  # Windows.isoUrl field from VMs.json as a download source.
   _iso="$windows_iso"
   if [ -z "$_iso" ]; then
-    say "Windows ISO fallback order: cached installer -> windowsIsoUrl -> downloader ($windows_iso_source mode)"
+    say "Windows ISO fallback order: cached installer -> Windows.isoUrl -> downloader ($windows_iso_source mode)"
   fi
 
   # Resolve from cache first when --windows-iso is omitted.
@@ -1658,18 +1658,18 @@ vm_build_windows() {
     fi
   fi
 
-  # Resolve via windowsIsoUrl next when allowed by source mode.
+  # Resolve via Windows.isoUrl next when allowed by source mode.
   if [ -z "$_iso" ] && [ "$windows_iso_source" != "mido" ]; then
-    _iso_url="$(jq -r ".VMs[] | select(.name == \"$_name\") | .windowsIsoUrl // empty" "$MANIFEST")"
+    _iso_url="$(jq -r ".VMs[] | select(.id == \"$_name\") | .Windows.isoUrl // empty" "$MANIFEST")"
     if [ -n "$_iso_url" ]; then
       _cached_iso="$IMAGES_DIR/${_name}-installer.iso"
-      say "downloading Windows installer from windowsIsoUrl..."
+      say "downloading Windows installer from Windows.isoUrl..."
       if [ "$dry_run" = false ]; then
-        if run_with_backoff 'windowsIsoUrl download' curl -fL -o "$_cached_iso" "$_iso_url"; then
+        if run_with_backoff 'Windows.isoUrl download' curl -fL -o "$_cached_iso" "$_iso_url"; then
           _iso="$_cached_iso"
           say "Windows installer downloaded: $_cached_iso"
         else
-          error "windowsIsoUrl download failed; remove $_cached_iso and retry"
+          error "Windows.isoUrl download failed; remove $_cached_iso and retry"
           rm -f "$_cached_iso"
           return 1
         fi
@@ -1689,7 +1689,7 @@ vm_build_windows() {
     if [ "$dry_run" = false ]; then
       case "$windows_iso_source" in
         url)
-          error "windows-iso-source=url selected and no cached/windowsIsoUrl installer was resolved"
+          error "windows-iso-source=url selected and no cached/Windows.isoUrl installer was resolved"
           ;;
         mido)
           if run_with_backoff 'Mido Windows ISO download' download_windows_iso_mido "$_cached_iso" "$_edition"; then
@@ -1736,7 +1736,7 @@ vm_build_windows() {
 
   if [ -z "$_iso" ]; then
     error "--windows-iso PATH is required for Windows 11 builds"
-    error "alternatively add 'windowsIsoUrl': '<url>' to the VMs.json windows entry"
+    error "alternatively add 'Windows.isoUrl': '<url>' to the VMs.json windows entry"
     error "download from: https://www.microsoft.com/software-download/windows11"
     return 1
   fi
@@ -2157,7 +2157,7 @@ vm_setup_windows_qemu() {
   local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display
 
-  vm_display=$(jq -r ".VMs[$vm_index].display" "$MANIFEST")
+  vm_display=$(jq -r ".VMs[$vm_index].name" "$MANIFEST")
 
   case "$vm_type" in
     Android)
