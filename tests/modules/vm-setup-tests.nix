@@ -176,6 +176,17 @@ let
         builtins.toString (builtins.map (v: v.name) badGsiUrlVms)
       }";
 
+  # Android must disable guest audio (sound == "none"): UTM's SPICE audio
+  # pipeline teardown deadlocks against the CoreAudio IO thread, freezing the
+  # display (see .agents/instructions/utm-android-freeze.instructions.md).
+  test_android_sound_disabled =
+    let
+      androidVms = builtins.filter (vm: vm.type == "Android") manifest.VMs;
+    in
+    assert' (
+      builtins.length androidVms == 1 && (builtins.head androidVms).sound == "none"
+    ) "VMs.json Android entry must declare sound == \"none\" (UTM SPICE audio deadlock workaround)";
+
   # hosts must be absent, null, or a non-empty array of valid host names
   # (["MacBook", "NixOS", "Windows"]). This enables host-scoped VM availability
   # so different machines see only their intended VMs.
@@ -959,6 +970,19 @@ let
     && (lib.hasInfix "<key>UsbBusSupport</key>" utmConfigPlistText)
     && (lib.hasInfix "<key>UsbSharing</key>" utmConfigPlistText)
   ) "src/modules/configs/vms/utm-config.plist.xml must include a schema-complete UTM configuration";
+  # The Sound block must be tokenized (__VM_SOUND__) so per-VM guest audio
+  # hardware is rendered from vms.nix (Android: empty array).
+  test_macbook_utm_sound_token = assert' (lib.hasInfix "__VM_SOUND__" utmConfigPlistText) "src/modules/configs/vms/utm-config.plist.xml must tokenize the Sound block (__VM_SOUND__) so Android can disable guest audio";
+  test_macbook_utm_vm_sound_mapping =
+    assert'
+      (
+        (lib.hasInfix "vmSound =" macbook_vms_nix_text)
+        && (lib.hasInfix "vm.sound == \"none\"" macbook_vms_nix_text)
+        && (lib.hasInfix "<array/>" macbook_vms_nix_text)
+        && (lib.hasInfix "<string>intel-hda</string>" macbook_vms_nix_text)
+        && (lib.hasInfix "__VM_SOUND__" macbook_vms_nix_text)
+      )
+      "src/hosts/MacBook/vms.nix must map VM sound ('none' → empty Sound array, default → intel-hda) via the __VM_SOUND__ token";
   test_macbook_utm_no_qemu_guest_agent =
     assert'
       (
@@ -1434,6 +1458,9 @@ let
     test_core_nix_guards_overlay_only_packages
     test_core_nix_overlap_arch_available_filter
     test_macbook_utm_required_key_guard
+    test_android_sound_disabled
+    test_macbook_utm_sound_token
+    test_macbook_utm_vm_sound_mapping
   ];
 
 in
@@ -1547,6 +1574,9 @@ in
     test_core_nix_guards_overlay_only_packages
     test_core_nix_overlap_arch_available_filter
     test_macbook_utm_required_key_guard
+    test_android_sound_disabled
+    test_macbook_utm_sound_token
+    test_macbook_utm_vm_sound_mapping
     ;
 
   summary = builtins.deepSeq all_tests "vm-setup-tests: all tests passed";

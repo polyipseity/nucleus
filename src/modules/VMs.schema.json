@@ -72,6 +72,14 @@
             "description": "Whether to share the ~/dev directory.",
             "type": "boolean"
           },
+          "sound": {
+            "description": "UTM guest audio hardware. \"none\" disables the guest sound card (empty Sound array) — the workaround for the UTM SPICE audio teardown deadlock (see .agents/instructions/utm-android-freeze.instructions.md). Absent means intel-hda.",
+            "enum": [
+              "intel-hda",
+              "none"
+            ],
+            "type": "string"
+          },
           "windowsIsoUrl": {
             "description": "Windows ISO download URL. Null means auto-resolve via Mido/Fido.",
             "oneOf": [

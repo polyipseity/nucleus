@@ -176,6 +176,27 @@ let
         </dict>
       '';
 
+  # Guest audio hardware per VM.  Android disables audio ("none" -> empty
+  # Sound array): the SPICE audio pipeline teardown deadlocks UTM's SPICE
+  # Main Loop against the CoreAudio IO thread, freezing the display.  No
+  # upstream UTM fix exists as of 5.0.4, so the workaround stays until one
+  # lands.  Any other value (or an absent field) keeps the intel-hda sound
+  # card for the other guests.
+  # ref: .agents/instructions/utm-android-freeze.instructions.md
+  vmSound =
+    vm:
+    if vm ? sound && vm.sound == "none" then
+      "<array/>"
+    else
+      ''
+        <array>
+            <dict>
+                <key>Hardware</key>
+                <string>intel-hda</string>
+            </dict>
+        </array>
+      '';
+
   # UTM 4.x QEMU-backend plist template.  Indented strings in Nix strip the
   # common leading whitespace (6 spaces here), producing a 0-based document.
   mkConfigPlist =
@@ -197,6 +218,7 @@ let
         "__VM_ANDROID_DRIVES__"
         "__VM_BASE_PORT_FORWARD__"
         "__VM_ADDITIONAL_PORT_FORWARDS__"
+        "__VM_SOUND__"
       ]
       [
         vm.name
@@ -214,6 +236,7 @@ let
         (androidDrives vm)
         (basePortForward vm)
         (additionalPortForwards vm)
+        (vmSound vm)
       ]
       # check-suppress:config-method: method 4 (runtime direct read) -- builtins.readFile embeds at eval time
       (builtins.readFile ../../modules/configs/vms/utm-config.plist.xml);
