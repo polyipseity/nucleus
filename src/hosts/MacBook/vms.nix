@@ -15,9 +15,7 @@ let
   vmsData = builtins.fromJSON (builtins.readFile ../../modules/VMs.json);
   size = import ../../modules/lib/size.nix;
   nucleusHost = "MacBook";
-  enabledVms = builtins.filter (
-    vm: vm.enabled && (!vm ? hosts || vm.hosts == null || builtins.elem nucleusHost vm.hosts)
-  ) vmsData.VMs;
+  enabledVms = builtins.filter (vm: vm.enabled && builtins.elem nucleusHost vm.hosts) vmsData.VMs;
 
   isArm = pkgs.stdenv.hostPlatform.isAarch64;
 
@@ -132,7 +130,8 @@ let
         </dict>
       '';
 
-  # Base SSH forward (guest 22 -> host 2222) for non-Android VMs.  Android
+  # Base SSH forward (guest 22) for non-Android VMs, derived from the
+  # manifest portForwards so the plist always matches VMs.json.  Android
   # guests expose ADB and SSH on forwarded ports 5555/5554 instead, and must
   # NOT also claim host 2222: when Android and NixOS run together the second
   # VM would fail to start ("Could not set up host forwarding rule") because
@@ -142,40 +141,32 @@ let
     if vm.type == "Android" then
       ""
     else
-      ''
+      builtins.concatMapStrings (p: ''
         <dict>
             <key>Protocol</key>
             <string>TCP</string>
             <key>GuestPort</key>
-            <integer>22</integer>
+            <integer>${toString p.guestPort}</integer>
             <key>HostPort</key>
-            <integer>2222</integer>
+            <integer>${toString p.hostPort}</integer>
         </dict>
-      '';
+      '') (builtins.filter (p: p.guestPort == 22) vm.portForwards);
 
   additionalPortForwards =
     vm:
     if vm.type != "Android" then
       ""
     else
-      ''
+      builtins.concatMapStrings (p: ''
         <dict>
             <key>Protocol</key>
             <string>TCP</string>
             <key>GuestPort</key>
-            <integer>5555</integer>
+            <integer>${toString p.guestPort}</integer>
             <key>HostPort</key>
-            <integer>5555</integer>
+            <integer>${toString p.hostPort}</integer>
         </dict>
-        <dict>
-            <key>Protocol</key>
-            <string>TCP</string>
-            <key>GuestPort</key>
-            <integer>5554</integer>
-            <key>HostPort</key>
-            <integer>5554</integer>
-        </dict>
-      '';
+      '') (builtins.filter (p: p.guestPort != 22) vm.portForwards);
 
   # Guest audio hardware per VM.  Android disables audio ("none" -> empty
   # Sound array): the SPICE audio pipeline teardown deadlocks UTM's SPICE
@@ -186,7 +177,7 @@ let
   # ref: .agents/instructions/utm-android-freeze.instructions.md
   vmSound =
     vm:
-    if vm ? sound && vm.sound == "none" then
+    if vm.sound == "none" then
       "<array/>"
     else
       ''

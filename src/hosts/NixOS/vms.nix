@@ -25,9 +25,7 @@ let
   vmsData = builtins.fromJSON (builtins.readFile ../../modules/VMs.json);
   size = import ../../modules/lib/size.nix;
   nucleusHost = "NixOS";
-  enabledVms = builtins.filter (
-    vm: vm.enabled && (!vm ? hosts || vm.hosts == null || builtins.elem nucleusHost vm.hosts)
-  ) vmsData.VMs;
+  enabledVms = builtins.filter (vm: vm.enabled && builtins.elem nucleusHost vm.hosts) vmsData.VMs;
 
   isArm = pkgs.stdenv.hostPlatform.isAarch64;
 
