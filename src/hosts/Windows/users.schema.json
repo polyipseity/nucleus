@@ -78,11 +78,7 @@
             "description": "Per-user service enablement.",
             "type": "object"
           },
-          "vmGuest": {
-            "description": "VM guest credentials for this user.",
-            "type": "object"
-          },
-          "vscode": {
+          "vsCode": {
             "description": "VS Code settings overrides.",
             "type": "object"
           }

@@ -232,11 +232,7 @@
           "enable": true
         }
       },
-      "vmGuest": {
-        "passwordSecretKey": "vm_guest_password",
-        "usernameSecretKey": "vm_guest_username"
-      },
-      "vscode": {
+      "vsCode": {
         "settings": {}
       }
     }

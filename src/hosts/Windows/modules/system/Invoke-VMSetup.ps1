@@ -294,13 +294,13 @@ function Invoke-VMSetup {
             throw 'vm-setup: could not determine the per-user VM secret owner (set NUCLEUS_VM_SECRET_OWNER to override).'
         }
 
-        $userRegistryPath = Join-Path $RepoRoot 'src\hosts\Windows\users.json'
+        $userRegistryPath = Join-Path $RepoRoot 'src\modules\users.json'
         if (-not (Test-Path -LiteralPath $userRegistryPath -PathType Leaf)) {
             throw "vm-setup: users registry not found: $userRegistryPath"
         }
 
         $userRegistry = Get-Content -Path $userRegistryPath -Raw | ConvertFrom-Json
-        $userProperty = $userRegistry.users.PSObject.Properties[$secretOwner]
+        $userProperty = $userRegistry.PSObject.Properties[$secretOwner]
         if ($null -eq $userProperty -or $null -eq $userProperty.Value) {
             throw "vm-setup: user '$secretOwner' is missing from $userRegistryPath"
         }
