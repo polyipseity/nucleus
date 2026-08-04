@@ -27,6 +27,7 @@ run_05_framework_verification() {
   bash "$_test_dir/check-steps/22-embedded-content-enforcement-tests.sh" || _exit_code=1
   bash "$_test_dir/check-steps/23-legacy-token-syntax-tests.sh" || _exit_code=1
   bash "$_test_dir/check-steps/24-nix-test-eval-tests.sh" || _exit_code=1
+  bash "$_test_dir/check-steps/25-vm-manifest-regression-tests.sh" || _exit_code=1
 
   say "--- integration smoke tests ---"
   bash "$_test_dir/integration-smoke-tests.sh" || _exit_code=1

@@ -21,7 +21,7 @@ $testStepsDir = Join-Path -Path $repoRoot -ChildPath 'src/scripts/tests/test-ste
 # ---- Verify POSIX check step files ----
 function PosixCheckStepFilesExist {
   $missing = 0
-  foreach ($n in 1..24) {
+  foreach ($n in 1..25) {
     $pattern = Join-Path -Path $checkStepsDir -ChildPath "$("{0:D2}" -f $n)*.sh"
     if (-not (Test-Path -Path $pattern)) {
       Assert-Fail "POSIX check step $n" "Missing step file for number $n"
@@ -29,7 +29,7 @@ function PosixCheckStepFilesExist {
     }
   }
   if ($missing -eq 0) {
-    Assert-Pass "All 24 POSIX check step files exist"
+    Assert-Pass "All 25 POSIX check step files exist"
   }
 }
 
@@ -79,7 +79,7 @@ function PosixTestStepHasRegisterStep {
 # ---- Verify Windows check step files ----
 function WindowsCheckStepFilesExist {
   $missing = 0
-  foreach ($n in 1..24) {
+  foreach ($n in 1..25) {
     $pattern = Join-Path -Path $checkStepsDir -ChildPath "$("{0:D2}" -f $n)*.ps1"
     if (-not (Test-Path -Path $pattern)) {
       Assert-Fail "Windows check step $n" "Missing step file for number $n"
@@ -87,7 +87,7 @@ function WindowsCheckStepFilesExist {
     }
   }
   if ($missing -eq 0) {
-    Assert-Pass "All 24 Windows check step files exist"
+    Assert-Pass "All 25 Windows check step files exist"
   }
 }
 
