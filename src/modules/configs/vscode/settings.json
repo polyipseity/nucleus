@@ -2,6 +2,18 @@
   "[c]": {
     "editor.defaultFormatter": "ms-vscode.cpptools"
   },
+  "[chatagent]": {
+    "editor.codeActionsOnSave": {
+      "source.fixAll.markdownlint": "explicit",
+      "source.fixAll.prettier": "never"
+    },
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false,
+    "notebook.codeActionsOnSave": {
+      "source.fixAll.markdownlint": "explicit",
+      "source.fixAll.prettier": "never"
+    }
+  },
   "[cpp]": {
     "editor.defaultFormatter": "ms-vscode.cpptools"
   },
@@ -16,6 +28,18 @@
   },
   "[html]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[instructions]": {
+    "editor.codeActionsOnSave": {
+      "source.fixAll.markdownlint": "explicit",
+      "source.fixAll.prettier": "never"
+    },
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false,
+    "notebook.codeActionsOnSave": {
+      "source.fixAll.markdownlint": "explicit",
+      "source.fixAll.prettier": "never"
+    }
   },
   "[javascript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
@@ -66,6 +90,18 @@
   "[powershell]": {
     "editor.defaultFormatter": "ms-vscode.powershell"
   },
+  "[prompt]": {
+    "editor.codeActionsOnSave": {
+      "source.fixAll.markdownlint": "explicit",
+      "source.fixAll.prettier": "never"
+    },
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false,
+    "notebook.codeActionsOnSave": {
+      "source.fixAll.markdownlint": "explicit",
+      "source.fixAll.prettier": "never"
+    }
+  },
   "[python]": {
     "editor.defaultFormatter": "charliermarsh.ruff"
   },
@@ -74,6 +110,18 @@
   },
   "[scss]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[skill]": {
+    "editor.codeActionsOnSave": {
+      "source.fixAll.markdownlint": "explicit",
+      "source.fixAll.prettier": "never"
+    },
+    "editor.defaultFormatter": null,
+    "editor.formatOnSave": false,
+    "notebook.codeActionsOnSave": {
+      "source.fixAll.markdownlint": "explicit",
+      "source.fixAll.prettier": "never"
+    }
   },
   "[svelte]": {
     "editor.defaultFormatter": "svelte.svelte-vscode"
