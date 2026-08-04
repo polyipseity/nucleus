@@ -7,8 +7,8 @@
 # UTM 5.x added a native CGL (Apple Core OpenGL) backend (QEMURendererBackend
 # = 3, kQEMURendererBackendCGL), the maintained GL path for Android on UTM.
 # The recurring "display freezes randomly" bug is NOT renderer-dependent: it
-# is a client-side SPICE display-channel stall in UTM's SPICE client
-# (CocoaSpice#5 scanout-texture race, read() deadlock; UTM #2221), observed
+# is a client-side two-thread deadlock in UTM's SPICE client (SPICE main loop
+# in GStreamer audio teardown vs the CoreAudio IO thread; UTM #2221), observed
 # locally as the SPICE Main Loop blocked in playback_stop ->
 # gst_element_set_state, freezing the single glib main loop that dispatches
 # all SPICE channels (display + QMP-over-spiceport; utmctl suspend fails with
