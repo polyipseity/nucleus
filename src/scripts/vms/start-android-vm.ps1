@@ -65,8 +65,8 @@ $qemuArgs.AddRange(@(
 # CPU and memory.
 $qemuArgs.AddRange(@(
   '-cpu', 'max',
-  '-smp', '4',
-  '-m', '4096'
+  '-smp', '__ANDROID_CPU_COUNT__',
+  '-m', '__ANDROID_RAM_BYTES__'
 ))
 
 # UEFI firmware.
@@ -92,7 +92,7 @@ if (Test-Path -LiteralPath $diskGsi -PathType Leaf) {
 
 # Network (ADB port forwarding).
 $qemuArgs.AddRange(@(
-  '-netdev', 'user,id=net0,hostfwd=tcp::5555-:5555,hostfwd=tcp::5554-:5554',
+  '-netdev', 'user,id=net0,hostfwd=tcp::__ADB_PORT__-:5555,hostfwd=tcp::__ADB_CONSOLE_PORT__-:5554',
   '-device', 'virtio-net-pci,netdev=net0'
 ))
 
@@ -119,7 +119,7 @@ $qemuArgs.AddRange(@(
 
 # --- Launch QEMU ---
 Write-Output "Starting Android VM: $($qemu.Source)"
-Write-Output "  CPUs: 4  RAM: 4096 MB  Accel: tcg"
-Write-Output "  ADB:   localhost:5555 -> guest:5555 (emulator) / localhost:5554 -> guest:5554 (console)"
+Write-Output "  CPUs: __ANDROID_CPU_COUNT__  RAM: __ANDROID_RAM_BYTES__  Accel: tcg"
+Write-Output "  ADB:   localhost:__ADB_PORT__ -> guest:5555 (emulator) / localhost:__ADB_CONSOLE_PORT__ -> guest:5554 (console)"
 
 Start-Process -FilePath $qemu.Source -ArgumentList $qemuArgs -Wait -NoNewWindow

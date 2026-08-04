@@ -57,7 +57,7 @@ in
     ../../../src/hosts/NixOS/users.nix
   ];
 
-  networking.hostName = "NixOS";
+  networking.hostName = builtins.getEnv "NUCLEUS_VM_GUEST_HOSTNAME";
 
   # WHY: posix-base.nix selects its per-host gitconfig via hostName and the
   # shared user modules key off username; nixos-generators passes no
@@ -65,10 +65,10 @@ in
   # hosts/NixOS/sops.nix) are deliberately NOT imported: they define the
   # sops.* options that only exist when sops-nix.nixosModules.sops is loaded,
   # which nixos-generators does not do for standalone guest builds.  The
-  # guest injects its credentials via NUCLEUS_VM_GUEST_* environment
-  # variables instead of SOPS decryption.
+  # guest injects its credentials and hostname via NUCLEUS_VM_GUEST_*
+  # environment variables instead of SOPS decryption.
   _module.args = {
-    hostName = "NixOS";
+    hostName = builtins.getEnv "NUCLEUS_VM_GUEST_HOSTNAME";
     username = guestUsername;
   };
 

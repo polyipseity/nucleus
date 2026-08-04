@@ -139,13 +139,10 @@ ensure_tart_vm_dir() {
 
 # should_include_host HOSTS_JSON — returns 0 if the VM should run on the
 # current host.  HOSTS_JSON is the raw JSON value of the VM's "hosts" field
-# (null or a string array of host names).  A null value means the VM is
-# available on all hosts.
+# (a string array of host names).  A VM whose hosts list omits the current
+# host is excluded.
 should_include_host() {
   _sjh_json="$1"
-  if [ "$_sjh_json" = "null" ] || [ -z "$_sjh_json" ]; then
-    return 0
-  fi
   printf '%s' "$_sjh_json" | jq -e --arg host "$NUCLEUS_HOST" 'contains([$host])' >/dev/null 2>&1
 }
 
@@ -159,15 +156,15 @@ run_cmd() {
   fi
 }
 
-# validate_qcow2_image PATH LABEL [MIN_VIRTUAL_SIZE]
+# validate_qcow2_image PATH LABEL MIN_VIRTUAL_SIZE
 #   Verifies that a QCOW2 image exists, is non-empty, and (when qemu-img is
 #   available) reports format=qcow2 with a sensible virtual size.  The
-#   minimum virtual size defaults to 10GB; pass a smaller value for
-#   compact images such as the Android userdata disk.
+#   minimum virtual size must be passed explicitly from the manifest
+#   minImageSize so every call site applies the VM's declared floor.
 validate_qcow2_image() {
   _vqi_path="$1"
   _vqi_label="$2"
-  _vqi_min_size="${3:-$(parse_size '10GB')}"
+  _vqi_min_size="$3"
 
   if [ ! -f "$_vqi_path" ]; then
     error "$_vqi_label not found: $_vqi_path"
@@ -361,6 +358,12 @@ vm_wait_for_guest() {
   _wg_timeout="${3:-150}"
   _wg_elapsed=0
 
+  # Probe host ports come from the manifest portForwards, not hard-coded
+  # 2222/5555 values: guest 22 -> SSH, guest 5555 -> ADB.  The Windows QEMU
+  # GA pipe path below is host-kind based and involves no host port.
+  _wg_ssh_port="$(jq -r --arg t "$_wg_type" '[.VMs[] | select(.type == $t) | .portForwards[] | select(.guestPort == 22)][0].hostPort // empty' "$MANIFEST")"
+  _wg_adb_port="$(jq -r --arg t "$_wg_type" '[.VMs[] | select(.type == $t) | .portForwards[] | select(.guestPort == 5555)][0].hostPort // empty' "$MANIFEST")"
+
   if [ "$_wg_type" = "NixOS" ]; then
     # Try QEMU GA via socat first
     if command -v socat >/dev/null 2>&1; then
@@ -372,7 +375,7 @@ vm_wait_for_guest() {
     fi
     # Fallback: SSH
     while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
-      ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -p 2222 "$_wg_name@localhost" true 2>/dev/null && return 0
+      ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -p "$_wg_ssh_port" "$_wg_name@localhost" true 2>/dev/null && return 0
       sleep 5
       _wg_elapsed=$((_wg_elapsed + 5))
     done
@@ -388,30 +391,32 @@ vm_wait_for_guest() {
     fi
     return 1
   elif [ "$_wg_type" = "Android" ]; then
-    # ADB connection check (Android guests expose ADB on forwarded port 5555)
+    # ADB connection check (Android guests expose ADB on the manifest
+    # forwarded host port for guest 5555)
     if command -v adb >/dev/null 2>&1; then
       while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
-        if adb connect localhost:5555 2>/dev/null | grep -q 'connected'; then
+        if adb connect "localhost:$_wg_adb_port" 2>/dev/null | grep -q 'connected'; then
           return 0
         fi
         sleep 5
         _wg_elapsed=$((_wg_elapsed + 5))
       done
     fi
-    # Fallback: SSH on port 5555 (same as ADB hostfwd)
+    # Fallback: SSH on the same host port as ADB
     _wg_elapsed=0
     while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
       ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-        -o ConnectTimeout=5 -p 5555 "root@localhost" true 2>/dev/null && return 0
+        -o ConnectTimeout=5 -p "$_wg_adb_port" "root@localhost" true 2>/dev/null && return 0
       sleep 5
       _wg_elapsed=$((_wg_elapsed + 5))
     done
     return 1
   elif [ "$_wg_type" = "macOS" ]; then
-    # SSH check (macOS guests in Tart expose SSH on forwarded port 2222)
+    # SSH check (macOS guests in Tart expose SSH on the manifest forwarded
+    # host port for guest 22)
     while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
       ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-        -o ConnectTimeout=5 -p 2222 \
+        -o ConnectTimeout=5 -p "$_wg_ssh_port" \
         "${vm_guest_username:?}@localhost" true 2>/dev/null && return 0
       sleep 5
       _wg_elapsed=$((_wg_elapsed + 5))
@@ -472,15 +477,80 @@ vm_write_start_script() {
       fi
       ;;
     windows-qemu)
-      # WHY: the Android QEMU start script is shared cross-platform content
-      # (embedded-content policy); render the canonical file instead of an
-      # embedded copy (which had drifted and wrote literal backticks).
-      _wss_android_start="$REPO_ROOT/src/scripts/vms/start-android-vm.ps1"
-      if [ ! -f "$_wss_android_start" ]; then
-        error "shared Android VM start script not found: $_wss_android_start"
-        return 1
+      if [ "$_wss_type" = "Android" ]; then
+        # WHY: the Android QEMU start script is shared cross-platform content
+        # (embedded-content policy); render the canonical file instead of an
+        # embedded copy (which had drifted and wrote literal backticks).
+        _wss_android_start="$REPO_ROOT/src/scripts/vms/start-android-vm.ps1"
+        if [ ! -f "$_wss_android_start" ]; then
+          error "shared Android VM start script not found: $_wss_android_start"
+          return 1
+        fi
+        # Manifest-driven tokens: CPU count, RAM bytes, and the ADB/console
+        # host ports from VMs.json portForwards (single-source start script).
+        _wss_cpus="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .cpus' "$MANIFEST")"
+        _wss_ram_bytes="$(parse_size "$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .ram' "$MANIFEST")")"
+        _wss_adb_port="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .portForwards[] | select(.guestPort == 5555) | .hostPort' "$MANIFEST")"
+        _wss_console_port="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .portForwards[] | select(.guestPort == 5554) | .hostPort' "$MANIFEST")"
+        sed -e "s|__ANDROID_CPU_COUNT__|$_wss_cpus|g" \
+            -e "s|__ANDROID_RAM_BYTES__|${_wss_ram_bytes}B|g" \
+            -e "s|__ADB_PORT__|$_wss_adb_port|g" \
+            -e "s|__ADB_CONSOLE_PORT__|$_wss_console_port|g" \
+            "$_wss_android_start" >"$_wss_path_ps1"
+      else
+        # Windows VM start scripts mirror Invoke-VMSetup.ps1 rendering (Git
+        # Bash host): the cross-host templates stay single-source and all
+        # tokens come from the manifest (portForwards, cpus, ram, id).
+        _wss_hostfwds="$(jq -r --arg n "$_wss_name" '[.VMs[] | select(.id == $n) | .portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")' "$MANIFEST")"
+        _wss_cpus="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .cpus' "$MANIFEST")"
+        _wss_ram_bytes="$(parse_size "$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .ram' "$MANIFEST")")"
+        _wss_disk_path="$VM_DIR/${_wss_name}.qcow2"
+        _wss_qemu_arch="x86_64"
+        if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
+          _wss_qemu_arch="aarch64"
+        fi
+        _wss_qemu_system="$HOME/scoop/apps/qemu/current/qemu-system-${_wss_qemu_arch}.exe"
+        if [ "$_wss_qemu_arch" = "x86_64" ]; then
+          _wss_machine="q35"
+        else
+          _wss_machine="virt"
+        fi
+        if [ -f "$TEMPLATES_DIR/start-windows.ps1" ]; then
+          sed -e "s|__QEMU_SYSTEM__|$_wss_qemu_system|g" \
+              -e "s|__VM_NAME__|$_wss_name|g" \
+              -e "s|__VM_DISPLAY__|$_wss_display|g" \
+              -e "s|__MACHINE__|$_wss_machine|g" \
+              -e "s|__CPU__|host|g" \
+              -e "s|__CPUS__|$_wss_cpus|g" \
+              -e "s|__RAM_BYTES__|$_wss_ram_bytes|g" \
+              -e "s|__DISK_PATH__|$_wss_disk_path|g" \
+              -e "s|__HOSTFWDS__|$_wss_hostfwds|g" \
+              -e "s|__VGA__|std|g" \
+              -e "s|__DISPLAY_BACKEND__|sdl|g" \
+              -e "s|__VIRTIOFS_ARGS__||g" \
+              "$TEMPLATES_DIR/start-windows.ps1" >"$_wss_path_ps1"
+        else
+          warn "start-windows.ps1 template not found at $TEMPLATES_DIR/start-windows.ps1"
+          printf '# start script for %s\n' "$_wss_name" >"$_wss_path_ps1"
+        fi
+        if [ -f "$TEMPLATES_DIR/start-windows-host.sh" ]; then
+          sed -e "s|__QEMU_SYSTEM__|$_wss_qemu_system|g" \
+              -e "s|__VM_NAME__|$_wss_name|g" \
+              -e "s|__VM_DISPLAY__|$_wss_display|g" \
+              -e "s|__MACHINE__|$_wss_machine|g" \
+              -e "s|__CPU__|host|g" \
+              -e "s|__CPUS__|$_wss_cpus|g" \
+              -e "s|__RAM_BYTES__|$_wss_ram_bytes|g" \
+              -e "s|__DISK_PATH__|$_wss_disk_path|g" \
+              -e "s|__HOSTFWDS__|$_wss_hostfwds|g" \
+              -e "s|__VGA__|std|g" \
+              -e "s|__DISPLAY_BACKEND__|sdl|g" \
+              "$TEMPLATES_DIR/start-windows-host.sh" >"$_wss_path_sh"
+          chmod 755 "$_wss_path_sh"
+        else
+          warn "start-windows-host.sh template not found at $TEMPLATES_DIR/start-windows-host.sh"
+        fi
       fi
-      cat "$_wss_android_start" >"$_wss_path_ps1"
       ;;
     *)
       error "unknown start-script host kind: $_wss_host_kind"
@@ -607,7 +677,7 @@ vm_get_expected_vm_names() {
   jq -r --arg host "$NUCLEUS_HOST" '
     .VMs[] |
     select(.enabled == true) |
-    select(.hosts == null or (.hosts | length == 0) or (.hosts | contains([$host]))) |
+    select(.hosts | contains([$host])) |
     .id
   ' "$MANIFEST"
 }
@@ -810,6 +880,12 @@ vm_build_one_image() {
   local _vm_name="$1" _vm_type="$2" _vm_hosts="$3" _vm_index="$4"
   local _vm_disk_bytes _vm_ram_bytes
   _vm_disk_bytes="$(parse_size "$(jq -r ".VMs[$_vm_index].diskSize" "$MANIFEST")")"
+
+  # Per-VM guest hostname: guest builds (nixos-generators, packer) read it via
+  # NUCLEUS_VM_GUEST_HOSTNAME so each VM's declared hostname reaches the guest.
+  local _vm_guest_hostname
+  _vm_guest_hostname="$(jq -r --arg n "$_vm_name" '.VMs[] | select(.id == $n) | .hostname // empty' "$MANIFEST")"
+  export NUCLEUS_VM_GUEST_HOSTNAME="$_vm_guest_hostname"
 
   case "$_vm_type" in
     NixOS)
@@ -1057,7 +1133,7 @@ vm_setup_utm() {
       fi
     else
       _replace_runtime=false
-      if [ -f "$disk_file" ] && ! validate_qcow2_image "$disk_file" "existing UTM runtime disk for ${vm_name}"; then
+      if [ -f "$disk_file" ] && ! validate_qcow2_image "$disk_file" "existing UTM runtime disk for ${vm_name}" "$_prebuilt_min_size"; then
         warn "existing runtime disk is invalid for '$vm_name'; replacing from pre-built image"
         rm -f "$disk_file"
         _replace_runtime=true
@@ -1163,11 +1239,12 @@ vm_setup_libvirt() {
     fi
   else
     _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
+    _prebuilt_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
     if [ ! -f "$_prebuilt" ]; then
       warn "image not found: $_prebuilt; skipping '$vm_name'"
       return
     fi
-    if ! validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}"; then
+    if ! validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}" "$_prebuilt_min_size"; then
       warn "pre-built image is invalid for '$vm_name': $_prebuilt"
       return
     fi
@@ -1183,7 +1260,7 @@ vm_setup_libvirt() {
       _replace_runtime=false
       if [ ! -f "$disk_path" ]; then
         _replace_runtime=true
-      elif ! validate_qcow2_image "$disk_path" "existing libvirt runtime disk for ${vm_name}"; then
+      elif ! validate_qcow2_image "$disk_path" "existing libvirt runtime disk for ${vm_name}" "$_prebuilt_min_size"; then
         warn "existing libvirt runtime disk is invalid for '$vm_name'; replacing from pre-built image"
         rm -f "$disk_path"
         _replace_runtime=true
@@ -1267,6 +1344,7 @@ vm_build_nixos() {
   _out="$IMAGES_DIR/${_name}.qcow2"
   _marker="$(vm_guest_credentials_marker_path "$_name")"
   _config_marker="$(vm_guest_config_marker_path "$_name")"
+  _min_size="$(parse_size "$(jq -r ".VMs[] | select(.id == \"$_name\") | .minImageSize" "$MANIFEST")")"
 
   # WHY: rebuild when the guest config (guest.nix + imports + flake.lock)
   # drifts too, not just on credential drift; otherwise config edits silently
@@ -1274,7 +1352,7 @@ vm_build_nixos() {
   _config_fingerprint="$(vm_guest_config_fingerprint)" || return 1
 
   if [ -f "$_out" ]; then
-    if validate_qcow2_image "$_out" "existing NixOS image"; then
+    if validate_qcow2_image "$_out" "existing NixOS image" "$_min_size"; then
       if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker" \
         && vm_guest_config_marker_matches "$_config_fingerprint" "$_config_marker"; then
         say "NixOS image already built for the current guest credentials and config (owner=$vm_secret_owner, username=$vm_guest_username): $_out"
@@ -1358,7 +1436,7 @@ vm_build_nixos() {
 #   Source: https://github.com/QubesOS/qvm-create-windows-qube
 download_windows_iso_mido() {
   _mido_cached="$1"
-  _mido_edition="${2:-Pro}"
+  _mido_edition="$2"
 
   _mido_vendor_script="$REPO_ROOT/vendor/qvm-create-windows-qube/windows/isos/mido.sh"
   _mido_script="${NUCLEUS_MIDO_SCRIPT:-$_mido_vendor_script}"
@@ -1470,7 +1548,7 @@ EOF
 #   Source: https://github.com/pbatard/Fido
 download_windows_iso_fido() {
   _fido_cached="$1"
-  _fido_edition="${2:-Pro}"
+  _fido_edition="$2"
 
   _fido_script="$REPO_ROOT/vendor/Fido/Fido.ps1"
   if [ ! -f "$_fido_script" ]; then
@@ -1526,7 +1604,7 @@ download_windows_iso_fido() {
 #   Source: https://github.com/pbatard/Fido
 download_windows_iso_fido_url_nonwindows() {
   _fido_cached="$1"
-  _fido_edition="${2:-Pro}"
+  _fido_edition="$2"
 
   _fido_script="$REPO_ROOT/vendor/Fido/Fido.ps1"
   if [ ! -f "$_fido_script" ]; then
@@ -1618,12 +1696,15 @@ download_windows_iso_fido_url_nonwindows() {
 vm_build_windows() {
   _name="$1"
   _disk_bytes="$2"
-  _edition="${3:-Pro}"
+  _edition="$3"
   _out="$IMAGES_DIR/${_name}.qcow2"
   _marker="$(vm_guest_credentials_marker_path "$_name")"
+  _min_size="$(parse_size "$(jq -r ".VMs[] | select(.id == \"$_name\") | .minImageSize" "$MANIFEST")")"
+  _hostfwd="$(jq -r --arg n "$_name" '[.VMs[] | select(.id == $n) | .portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")' "$MANIFEST")"
+  _guest_hostname="$(jq -r --arg n "$_name" '.VMs[] | select(.id == $n) | .hostname // empty' "$MANIFEST")"
 
   if [ -f "$_out" ]; then
-    if validate_qcow2_image "$_out" "existing Windows image"; then
+    if validate_qcow2_image "$_out" "existing Windows image" "$_min_size"; then
       if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker"; then
         say "Windows image already built for the current guest credentials (owner=$vm_secret_owner, username=$vm_guest_username): $_out"
         return 0
@@ -1841,6 +1922,7 @@ bios legacy 3h'
     while IFS=' ' read -r _firmware_mode _boot_strategy _attempt_timeout; do
       [ -n "$_firmware_mode" ] || continue
       _pv="-var windows_iso=$_iso -var guest_username=$vm_guest_username -var guest_password=<redacted>"
+      _pv="$_pv -var hostfwd=$_hostfwd -var guest_hostname=$_guest_hostname"
       _pv="$_pv -var autounattend_path=$VMS_DIR/windows/Autounattend.xml"
       _pv="$_pv -var accelerator=$accelerator"
       _pv="$_pv -var firmware_mode=$_firmware_mode -var boot_strategy=$_boot_strategy"
@@ -1888,7 +1970,7 @@ EOF
     _tmp_out="$_attempt_tmpdir/output"
     _packer_log="$_attempt_tmpdir/packer.log"
     _autounattend_rendered="$_attempt_tmpdir/Autounattend.xml"
-    perl -pe "s/__NUCLEUS_GUEST_USERNAME__/${vm_guest_username}/g; s/__NUCLEUS_GUEST_PASSWORD__/${vm_guest_password}/g" \
+    perl -pe "s/__NUCLEUS_GUEST_USERNAME__/${vm_guest_username}/g; s/__NUCLEUS_GUEST_PASSWORD__/${vm_guest_password}/g; s/__GUEST_HOSTNAME__/$_guest_hostname/g" \
       "$VMS_DIR/windows/Autounattend.xml" >"$_autounattend_rendered"
     say "writing Packer debug log for this attempt: $_packer_log"
 
@@ -1900,6 +1982,8 @@ EOF
           -var "windows_iso=$_iso" \
           -var "guest_username=$vm_guest_username" \
           -var "guest_password=$vm_guest_password" \
+          -var "hostfwd=$_hostfwd" \
+          -var "guest_hostname=$_guest_hostname" \
           -var "autounattend_path=$_autounattend_rendered" \
           -var "accelerator=$accelerator" \
           -var "firmware_mode=$_firmware_mode" \
@@ -1920,6 +2004,8 @@ EOF
           -var "windows_iso=$_iso" \
           -var "guest_username=$vm_guest_username" \
           -var "guest_password=$vm_guest_password" \
+          -var "hostfwd=$_hostfwd" \
+          -var "guest_hostname=$_guest_hostname" \
           -var "autounattend_path=$_autounattend_rendered" \
           -var "accelerator=$accelerator" \
           -var "firmware_mode=$_firmware_mode" \
@@ -1971,7 +2057,7 @@ EOF
   mv "$_built" "$_out"
   rm -rf "$_built_tmpdir"
 
-  if ! validate_qcow2_image "$_out" 'newly built Windows image'; then
+  if ! validate_qcow2_image "$_out" 'newly built Windows image' "$_min_size"; then
     error "Windows image validation failed after build; removing $_out"
     rm -f "$_out"
     return 1
@@ -1993,7 +2079,7 @@ vm_build_macos() {
   _disk_bytes="$2"
   _ram_bytes="$3"
   _cpus="$4"
-  _macos_version="${5:-tahoe}"
+  _macos_version="$5"
   _marker="$(vm_guest_credentials_marker_path "$_name")"
 
   # Tart requires Apple Virtualization.framework — macOS host only.
@@ -2038,7 +2124,7 @@ vm_build_macos() {
   say "building macOS $_macos_version VM via Packer Tart (disk=$_disk_gib GiB, mem=$_mem_gib GiB, cpus=$_cpus)..."
 
   if [ "$dry_run" = true ]; then
-    dry_run "cd $_packer_dir && packer build -var vm_name=$_name -var macos_version=$_macos_version -var guest_username=$vm_guest_username -var guest_password=<redacted> -var disk_size_gib=$_disk_gib -var memory_gib=$_mem_gib -var cpus=$_cpus ."
+    dry_run "cd $_packer_dir && packer build -var vm_name=$_name -var macos_version=$_macos_version -var guest_username=$vm_guest_username -var guest_password=<redacted> -var vm_hostname=$NUCLEUS_VM_GUEST_HOSTNAME -var disk_size_gib=$_disk_gib -var memory_gib=$_mem_gib -var cpus=$_cpus ."
     return 0
   fi
 
@@ -2051,6 +2137,7 @@ vm_build_macos() {
       -var "macos_version=$_macos_version" \
       -var "guest_username=$vm_guest_username" \
       -var "guest_password=$vm_guest_password" \
+      -var "vm_hostname=$NUCLEUS_VM_GUEST_HOSTNAME" \
       -var "disk_size_gib=$_disk_gib" \
       -var "memory_gib=$_mem_gib" \
       -var "cpus=$_cpus" \
@@ -2147,7 +2234,7 @@ vm_setup_libvirt_vms() {
 # Windows / QEMU
 
 # vm_setup_windows_qemu — Callback for vm_for_each on Windows. Writes a QEMU
-#   start script for Android VMs on the Windows host.
+#   start script for Android and Windows VMs on the Windows host.
 vm_setup_windows_qemu() {
   local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display
@@ -2155,8 +2242,8 @@ vm_setup_windows_qemu() {
   vm_display=$(jq -r ".VMs[$vm_index].name" "$MANIFEST")
 
   case "$vm_type" in
-    Android)
-      say "configuring QEMU start script for '$vm_display' on Windows..."
+    Android|Windows)
+      say "configuring QEMU start scripts for '$vm_display' on Windows..."
       vm_write_start_script "$vm_name" "$vm_display" "$vm_type" 'windows-qemu'
       vm_write_stop_script "$vm_name" "$vm_display" "$vm_type" 'windows-qemu'
       ;;
