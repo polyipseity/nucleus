@@ -11,7 +11,7 @@
       "ramBytes": 8000000000,
       "shareDevDir": false,
       "type": "Android",
-      "androidGsiUrl": null,
+      "androidGsiUrl": "https://dl.google.com/developers/android/baklava/images/gsi/gsi_gms_arm64-exp-BP4A.251205.006-14401865-f8760221.zip",
       "windowsIsoUrl": null
     },
     {
