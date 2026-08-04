@@ -184,14 +184,12 @@ function Invoke-VmList {
 
   # Filter to enabled VMs matching the current host
   $vms = $manifest.VMs | Where-Object {
-    $_.enabled -eq $true -and (
-      -not $_.hosts -or $_.hosts.Count -eq 0 -or $_.hosts -contains $hostName
-    )
+    $_.enabled -eq $true -and $_.hosts -contains $hostName
   }
 
   Write-Output "NAME                TYPE           ENABLED    STATE    HOSTS"
   foreach ($vm in $vms) {
-    $hostsStr = if ($vm.hosts) { ($vm.hosts -join ',') } else { 'all' }
+    $hostsStr = ($vm.hosts -join ',')
     $state = if ($vm.id -in $runningNameList) { 'running' } else { 'stopped' }
     Write-Output ("{0,-20} {1,-14} {2,-10} {3,-9} {4}" -f $vm.name, $vm.type, $vm.enabled, $state, $hostsStr)
   }
@@ -204,14 +202,12 @@ function Invoke-VmStatus {
 
   # Filter to enabled VMs matching the current host
   $vms = $manifest.VMs | Where-Object {
-    $_.enabled -eq $true -and (
-      -not $_.hosts -or $_.hosts.Count -eq 0 -or $_.hosts -contains $hostName
-    )
+    $_.enabled -eq $true -and $_.hosts -contains $hostName
   }
 
   Write-Output "NAME                TYPE           ENABLED    STATE    HOSTS    CPUS      RAM"
   foreach ($vm in $vms) {
-    $hostsStr = if ($vm.hosts) { ($vm.hosts -join ',') } else { 'all' }
+    $hostsStr = ($vm.hosts -join ',')
     $ramBytes = ConvertFrom-SizeString $vm.ram
     $ramGb = [math]::Round($ramBytes / 1000000000, 0)
     $state = if ($vm.id -in $runningNameList) { 'running' } else { 'stopped' }

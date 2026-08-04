@@ -489,15 +489,15 @@ do_list() {
   if $json_output; then
     # Annotate each VM with its state.
     jq -c --arg host "$NUCLEUS_HOST" '
-      [.VMs[] | select(.enabled == true) | select(.hosts == null or (.hosts | length == 0) or (.hosts | contains([$host])))]
+      [.VMs[] | select(.enabled == true) | select(.hosts | contains([$host]))]
     ' "$MANIFEST" | jq -c --arg running "$running_names" '
       [.[] | .state = (if $running| split("\n") | index(.id) then "running" else "stopped" end)]
     '
   else
     printf '%-20s %-12s %-10s %-8s %s\n' "NAME" "TYPE" "ENABLED" "STATE" "HOSTS"
     jq -r --arg host "$NUCLEUS_HOST" '
-      .VMs[] | select(.enabled == true) | select(.hosts == null or (.hosts | length == 0) or (.hosts | contains([$host]))) |
-      [.name, .type, (.enabled | tostring), (if .hosts then (.hosts | join(",")) else "all" end), .id] |
+      .VMs[] | select(.enabled == true) | select(.hosts | contains([$host])) |
+      [.name, .type, (.enabled | tostring), (.hosts | join(",")), .id] |
       @tsv
     ' "$MANIFEST" | while IFS=$'\t' read -r name type enabled hosts id; do
       local state
@@ -525,7 +525,7 @@ do_status() {
   # Names are passed via --argjson when filtering specific VMs.
   local base_filter
   # shellcheck disable=SC2016 # reason: $host is a jq variable, not shell expansion
-  base_filter='[.VMs[] | select(.enabled == true) | select(.hosts == null or (.hosts | length == 0) or (.hosts | contains([$host])))]'
+  base_filter='[.VMs[] | select(.enabled == true) | select(.hosts | contains([$host]))]'
 
   local names_json=''
   if [ "${#filtered_vm_args[@]}" -gt 0 ]; then
@@ -558,7 +558,7 @@ do_status() {
     # to keep shellcheck happy (no embedded double quotes in double-quoted
     # strings).
     local table_filter
-    table_filter="${base_filter}"' | .[] | [.name, .type, (.enabled | tostring), (if .hosts then (.hosts | join(",")) else "all" end), (.cpus | tostring), .ram, .id] | @tsv'
+    table_filter="${base_filter}"' | .[] | [.name, .type, (.enabled | tostring), (.hosts | join(",")), (.cpus | tostring), .ram, .id] | @tsv'
 
     if [ -n "$names_json" ]; then
       jq -r --arg host "$NUCLEUS_HOST" --argjson names "$names_json" "$table_filter" "$MANIFEST"

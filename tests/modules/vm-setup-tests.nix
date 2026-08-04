@@ -1292,6 +1292,18 @@ let
     && !(lib.hasInfix "hostfwd=tcp::5555-:5555,hostfwd=tcp::5554-:5554" start_android_ps1_text)
   ) "start-android-vm.ps1 must not hardcode -smp 4, -m 4096, or the 5555/5554 hostfwd pair";
 
+  # The CLI list/status host filters must rely on the manifest's required
+  # non-null hosts field — no dead null/empty fallback branches.
+  test_vm_cli_no_hosts_null_branches =
+    assert'
+      (
+        !(lib.hasInfix ".hosts == null or (.hosts | length == 0)" vm_setup_sh_text)
+        && !(lib.hasInfix "else \"all\" end" vm_setup_sh_text)
+        && !(lib.hasInfix "-not \$_.hosts -or \$_.hosts.Count -eq 0" vm_ps1_text)
+        && !(lib.hasInfix "else { 'all' }" vm_ps1_text)
+      )
+      "scripts/vm.sh/vm.ps1 must not contain dead hosts-null branches (hosts is required non-null in VMs.json)";
+
   # vm_write_start_script must render the Android tokens via a sed chain after
   # copying the shared file, preserving the android-vm-single-source invariant.
   test_vm_write_start_script_android_sed_chain = assert' (
@@ -1896,6 +1908,7 @@ let
     test_android_start_script_tokens
     test_android_start_script_no_legacy_literals
     test_vm_write_start_script_android_sed_chain
+    test_vm_cli_no_hosts_null_branches
     test_vm_hostfwds_render_chain
     test_vm_guest_hostname_env_export
     test_nixos_packer_guest_hostname_var
@@ -2040,6 +2053,7 @@ in
     test_android_start_script_tokens
     test_android_start_script_no_legacy_literals
     test_vm_write_start_script_android_sed_chain
+    test_vm_cli_no_hosts_null_branches
     test_vm_hostfwds_render_chain
     test_vm_guest_hostname_env_export
     test_nixos_packer_guest_hostname_var
