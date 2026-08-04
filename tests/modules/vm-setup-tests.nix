@@ -874,6 +874,7 @@ let
   vms_windows_packer_text = builtins.readFile ../../src/vms/windows/packer.pkr.hcl;
   vms_windows_autounattend_text = builtins.readFile ../../src/vms/windows/Autounattend.xml;
   vms_macos_packer_text = builtins.readFile ../../src/vms/macos/packer.pkr.hcl;
+  start_android_ps1_text = builtins.readFile ../../src/scripts/vms/start-android-vm.ps1;
   test_macos_packer_exit_check = assert' (lib.hasInfix "_packer_status=0" vm_setup_sh_text) "scripts/vm.sh must capture packer exit status (_packer_status=0)";
 
   # nixos-generators' -o flag expects a non-existent symlink path, not a
@@ -915,7 +916,8 @@ let
       (
         (lib.hasInfix "communicator = \"ssh\"" vms_windows_packer_text)
         && (lib.hasInfix "skip_nat_mapping = true" vms_windows_packer_text)
-        && (lib.hasInfix "hostfwd=tcp::2222-:22" vms_windows_packer_text)
+        && (lib.hasInfix "variable \"hostfwd\"" vms_windows_packer_text)
+        && (lib.hasInfix "\${var.hostfwd}" vms_windows_packer_text)
         && (lib.hasInfix "boot_wait    = \"5s\"" vms_windows_packer_text)
         && (lib.hasInfix "pause_before_connecting = \"120s\"" vms_windows_packer_text)
         && (lib.hasInfix "variable \"firmware_mode\"" vms_windows_packer_text)
@@ -931,7 +933,7 @@ let
         && (lib.hasInfix "skip_compaction  = true" vms_windows_packer_text)
         && (lib.hasInfix "disk_compression = false" vms_windows_packer_text)
       )
-      "Windows VM packer template must use SSH communicator with port 2222 forwarding and expose controlled firmware/debug knobs";
+      "Windows VM packer template must use SSH communicator with hostfwd driven by the required hostfwd variable and expose controlled firmware/debug knobs";
 
   # Autounattend.xml must configure OpenSSH before VirtIO driver scan to prevent blocking.
   test_windows_autounattend_ssh_before_virtio =
@@ -1021,7 +1023,7 @@ let
       (
         (lib.hasInfix "variable \"guest_username\"" nixos_packer_text)
         && (lib.hasInfix "variable \"guest_password\"" nixos_packer_text)
-        && (lib.hasInfix "users.users.\\\"\${var.guest_username}\\\"" nixos_packer_text)
+        && (lib.hasInfix "users.users.\"\${var.guest_username}\"" nixos_packer_text)
         && !(lib.hasInfix "default     = \"nixos\"" nixos_packer_text)
       )
       "src/vms/nixos/packer.pkr.hcl must accept and apply guest credentials for Windows-host NixOS builds";
@@ -1134,9 +1136,28 @@ let
       (
         (lib.hasInfix "_module.args = {" guest_nix_text)
         && (lib.hasInfix "username = guestUsername;" guest_nix_text)
-        && (lib.hasInfix "hostName = \"NixOS\";" guest_nix_text)
+        && (lib.hasInfix "builtins.getEnv \"NUCLEUS_VM_GUEST_HOSTNAME\"" guest_nix_text)
+        && !(lib.hasInfix "hostName = \"NixOS\";" guest_nix_text)
       )
-      "src/vms/nixos/guest.nix must thread username/hostName via _module.args for standalone nixos-generators evals";
+      "src/vms/nixos/guest.nix must thread username/hostName via _module.args (hostName from NUCLEUS_VM_GUEST_HOSTNAME) for standalone nixos-generators evals";
+
+  # The per-VM guest hostname must reach every build path: exported to guest
+  # builds via the NUCLEUS_VM_GUEST_HOSTNAME env var, rendered into the NixOS
+  # packer configuration.nix, and tokenized in Autounattend.xml.
+  test_vm_guest_hostname_env_export = assert' (lib.hasInfix "export NUCLEUS_VM_GUEST_HOSTNAME" vm_setup_sh_text) "vm.sh must export NUCLEUS_VM_GUEST_HOSTNAME for guest builds";
+
+  test_nixos_packer_guest_hostname_var = assert' (
+    (lib.hasInfix "variable \"guest_hostname\"" nixos_packer_text)
+    && (lib.hasInfix "networking.hostName = \"\${var.guest_hostname}\";" nixos_packer_text)
+  ) "NixOS packer must take a required guest_hostname variable and render it into configuration.nix";
+
+  test_windows_autounattend_guest_hostname_token =
+    assert'
+      (
+        (lib.hasInfix "__GUEST_HOSTNAME__" vms_windows_autounattend_text)
+        && (lib.hasInfix ".Replace('__GUEST_HOSTNAME__'" windows_vm_setup_ps1_text)
+      )
+      "Autounattend.xml must expose __GUEST_HOSTNAME__ and Invoke-VMSetup.ps1 must replace it from the manifest hostname";
 
   # The NixOS guest must force overrides on host modules whose defaults cannot
   # evaluate on aarch64-linux or collide under the standalone evaluation.
@@ -1231,11 +1252,50 @@ let
       (
         (lib.hasInfix "failed to start libvirt default network" vm_setup_sh_text)
         && (lib.hasInfix "failed to mark libvirt default network for autostart" vm_setup_sh_text)
-        && (lib.hasInfix "validate_qcow2_image \"$_prebuilt\" \"pre-built image for \${vm_name}\"" vm_setup_sh_text)
-        && (lib.hasInfix "validate_qcow2_image \"$disk_path\" \"existing libvirt runtime disk for \${vm_name}\"" vm_setup_sh_text)
+        && (lib.hasInfix "validate_qcow2_image \"$_prebuilt\" \"pre-built image for \${vm_name}\" \"$_prebuilt_min_size\"" vm_setup_sh_text)
+        && (lib.hasInfix "validate_qcow2_image \"$disk_path\" \"existing libvirt runtime disk for \${vm_name}\" \"$_prebuilt_min_size\"" vm_setup_sh_text)
         && (lib.hasInfix "existing libvirt runtime disk is invalid" vm_setup_sh_text)
       )
-      "scripts/vm.sh must validate libvirt prebuilt/runtime disks and surface default-network recovery failures";
+      "scripts/vm.sh must validate libvirt prebuilt/runtime disks against the manifest minImageSize and surface default-network recovery failures";
+
+  # Image validation must pass an explicit manifest-derived min-size floor at
+  # every call site; the 10 GiB fallback default is dead once Android's 4 GiB
+  # floor is data-driven.
+  test_validate_qcow2_min_size_default_removed =
+    assert'
+      (
+        !(lib.hasInfix "_vqi_min_size=\"\${3:-\$(parse_size '10GB')}\"" vm_setup_sh_text)
+        && !(lib.hasInfix "[long]\$MinBytes = 10000000000" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Test-Qcow2Image -ImagePath \$diskPath -ImageLabel \"runtime disk '\$(\$vm.id)'\" -MinBytes \$minSizeBytes" windows_vm_setup_ps1_text)
+      )
+      "vm.sh and Invoke-VMSetup.ps1 must require an explicit minImageSize floor at every image validation call site (no 10 GB fallback defaults)";
+
+  # The shared Android start script must expose manifest-driven tokens for CPU
+  # count, RAM, and the ADB/console ports instead of hardcoded values.
+  test_android_start_script_tokens =
+    assert'
+      (
+        (lib.hasInfix "__ANDROID_CPU_COUNT__" start_android_ps1_text)
+        && (lib.hasInfix "__ANDROID_RAM_BYTES__" start_android_ps1_text)
+        && (lib.hasInfix "__ADB_PORT__" start_android_ps1_text)
+        && (lib.hasInfix "__ADB_CONSOLE_PORT__" start_android_ps1_text)
+      )
+      "start-android-vm.ps1 must expose __ANDROID_CPU_COUNT__/__ANDROID_RAM_BYTES__/__ADB_PORT__/__ADB_CONSOLE_PORT__ tokens for manifest-driven rendering";
+
+  test_android_start_script_no_legacy_literals = assert' (
+    !(lib.hasInfix "'-smp', '4'" start_android_ps1_text)
+    && !(lib.hasInfix "'-m', '4096'" start_android_ps1_text)
+    && !(lib.hasInfix "hostfwd=tcp::5555-:5555,hostfwd=tcp::5554-:5554" start_android_ps1_text)
+  ) "start-android-vm.ps1 must not hardcode -smp 4, -m 4096, or the 5555/5554 hostfwd pair";
+
+  # vm_write_start_script must render the Android tokens via a sed chain after
+  # copying the shared file, preserving the android-vm-single-source invariant.
+  test_vm_write_start_script_android_sed_chain = assert' (
+    (lib.hasInfix "s|__ANDROID_CPU_COUNT__|" vm_setup_sh_text)
+    && (lib.hasInfix "s|__ANDROID_RAM_BYTES__|" vm_setup_sh_text)
+    && (lib.hasInfix "s|__ADB_PORT__|" vm_setup_sh_text)
+    && (lib.hasInfix "s|__ADB_CONSOLE_PORT__|" vm_setup_sh_text)
+  ) "vm.sh must render Android start-script tokens via a sed chain after copying the shared file";
 
   # Local Mido compatibility adjustments must be applied at runtime from a
   # repository-owned patch file, not by editing the vendored submodule files.
@@ -1339,19 +1399,22 @@ let
         && (lib.hasInfix "__VM_ADDITIONAL_PORT_FORWARDS__" utmConfigPlistText)
       )
       "src/modules/configs/vms/utm-config.plist.xml must use Mode=Emulated (not Shared) so UTM forwards ports 2222/5555 via hostfwd; vmnet-shared silently drops PortForward";
-  # Android must not claim host port 2222: it exposes ADB and SSH on forwarded
-  # ports 5555/5554, and a base 2222->22 forward would collide with NixOS when
-  # both VMs run at once ("Could not set up host forwarding rule" on the second
-  # start).  The base forward is a per-VM token so each VM only binds its own
-  # host ports.
+  # Android must not claim host port 2222: its manifest portForwards expose ADB
+  # and SSH on host ports 5555/5554, and a base 2222->22 forward would collide
+  # with NixOS when both VMs run at once ("Could not set up host forwarding
+  # rule" on the second start).  The base forward derives from the manifest
+  # portForwards (the guestPort-22 entry) so each VM only binds its own host
+  # ports.
   test_macbook_utm_android_no_2222_collision =
     assert'
       (
-        (lib.hasInfix "basePortForward =\n    vm:\n    if vm.type == \"Android\" then\n      \"\"" macbook_vms_nix_text)
-        && (lib.hasInfix "<integer>2222</integer>" macbook_vms_nix_text)
+        (lib.hasInfix "vm.portForwards" macbook_vms_nix_text)
+        && (lib.hasInfix "guestPort == 22" macbook_vms_nix_text)
+        && (lib.hasInfix "guestPort != 22" macbook_vms_nix_text)
+        && !(lib.hasInfix "<integer>2222</integer>" macbook_vms_nix_text)
         && (lib.hasInfix "__VM_BASE_PORT_FORWARD__\n                __VM_ADDITIONAL_PORT_FORWARDS__" utmConfigPlistText)
       )
-      "src/hosts/MacBook/vms.nix must gate the base 2222->22 forward off for Android (which uses 5555/5554) so simultaneous Android+NixOS starts do not collide on host port 2222";
+      "src/hosts/MacBook/vms.nix must derive base/additional UTM port forwards from the manifest portForwards (base = guestPort-22 entry) so Android (5555/5554 only) never collides on host port 2222";
   test_macbook_utm_display_card_validity = assert' (
     (lib.hasInfix "displayCard = vm: if vm.type == \"Windows\" then \"virtio-vga\" else \"virtio-gpu-pci\";" macbook_vms_nix_text)
     && !(lib.hasInfix "virtio-ramfb" macbook_vms_nix_text)
@@ -1530,7 +1593,7 @@ let
         && (lib.hasInfix "__DISPLAY_BACKEND__" startWindowsTemplateText)
         && (lib.hasInfix "__VIRTIOFS_ARGS__" startWindowsTemplateText)
         && (lib.hasInfix "org.qemu.guest_agent.0" startWindowsTemplateText)
-        && (lib.hasInfix "hostfwd=tcp::2222-:22" startWindowsTemplateText)
+        && (lib.hasInfix "__HOSTFWDS__" startWindowsTemplateText)
         && (lib.hasInfix "chardev pipe" startWindowsTemplateText)
         && (!lib.hasInfix "{{" startWindowsTemplateText)
       )
@@ -1550,12 +1613,22 @@ let
         && (lib.hasInfix "__VGA__" startWindowsHostTemplateText)
         && (lib.hasInfix "__DISPLAY_BACKEND__" startWindowsHostTemplateText)
         && (lib.hasInfix "org.qemu.guest_agent.0" startWindowsHostTemplateText)
-        && (lib.hasInfix "hostfwd=tcp::2222-:22" startWindowsHostTemplateText)
+        && (lib.hasInfix "__HOSTFWDS__" startWindowsHostTemplateText)
         && (lib.hasInfix "chardev pipe" startWindowsHostTemplateText)
         && (lib.hasInfix "set -eu" startWindowsHostTemplateText)
         && (!lib.hasInfix "{{" startWindowsHostTemplateText)
       )
       "src/vms/templates/start-windows-host.sh must contain all expected __TOKEN__ placeholders and QEMU arguments, with no {{TOKEN}} style";
+
+  # Windows start-script render chains must inject the __HOSTFWDS__ token from
+  # the manifest portForwards on both platforms.
+  test_vm_hostfwds_render_chain =
+    assert'
+      (
+        (lib.hasInfix "s|__HOSTFWDS__|" vm_setup_sh_text)
+        && (lib.hasInfix ".Replace('__HOSTFWDS__'" windows_vm_setup_ps1_text)
+      )
+      "vm.sh and Invoke-VMSetup.ps1 must render __HOSTFWDS__ into Windows start scripts from the manifest portForwards";
 
   test_vm_directory_readme_generation =
     assert'
@@ -1658,12 +1731,13 @@ let
       (
         (lib.hasInfix "\"macOS\": {" vms_json_text)
         && (lib.hasInfix "\"version\": \"tahoe\"" vms_json_text)
-        && (lib.hasInfix "[-var macos_version=tahoe]" vms_macos_packer_text)
-        && (lib.hasInfix "default     = \"tahoe\"" vms_macos_packer_text)
         && (lib.hasInfix "macOS version to provision (tahoe, sequoia, sonoma, ventura, etc.)" vms_macos_packer_text)
-        && (lib.hasInfix "tahoe" vm_setup_sh_text)
+        && !(lib.hasInfix "default     = \"tahoe\"" vms_macos_packer_text)
+        && !(lib.hasInfix "\${5:-tahoe}" vm_setup_sh_text)
+        && (lib.hasInfix "variable \"vm_hostname\"" vms_macos_packer_text)
+        && (lib.hasInfix "\${var.vm_hostname}" vms_macos_packer_text)
       )
-      "MacBook macOS guest version must default to Tahoe across VMs.json (macOS group), vm.sh, and the macOS Packer template";
+      "MacBook macOS guest version must come from the manifest (no hardcoded tahoe defaults in vm.sh or the packer) and the packer must take a required vm_hostname variable";
 
   # On non-Windows hosts, after Mido failure the script should try a pwsh/Fido
   # URL resolver fallback before requiring manual ISO input.
@@ -1814,6 +1888,14 @@ let
     test_android_sound_disabled
     test_macbook_utm_sound_token
     test_macbook_utm_vm_sound_mapping
+    test_validate_qcow2_min_size_default_removed
+    test_android_start_script_tokens
+    test_android_start_script_no_legacy_literals
+    test_vm_write_start_script_android_sed_chain
+    test_vm_hostfwds_render_chain
+    test_vm_guest_hostname_env_export
+    test_nixos_packer_guest_hostname_var
+    test_windows_autounattend_guest_hostname_token
   ];
 
 in
@@ -1950,6 +2032,14 @@ in
     test_android_sound_disabled
     test_macbook_utm_sound_token
     test_macbook_utm_vm_sound_mapping
+    test_validate_qcow2_min_size_default_removed
+    test_android_start_script_tokens
+    test_android_start_script_no_legacy_literals
+    test_vm_write_start_script_android_sed_chain
+    test_vm_hostfwds_render_chain
+    test_vm_guest_hostname_env_export
+    test_nixos_packer_guest_hostname_var
+    test_windows_autounattend_guest_hostname_token
     ;
 
   summary = builtins.deepSeq all_tests "vm-setup-tests: all tests passed";
