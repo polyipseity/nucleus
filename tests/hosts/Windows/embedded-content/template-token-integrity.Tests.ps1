@@ -11,10 +11,11 @@
     missing from every template, fails the suite.
 
     Templates covered:
-    - src/vms/templates/start-windows.ps1 (11 tokens, Windows start script)
-    - src/vms/templates/start-windows-host.sh (10 tokens, Git Bash/MSYS start script)
+    - src/vms/templates/start-windows.ps1 (12 tokens, Windows start script)
+    - src/vms/templates/start-windows-host.sh (11 tokens, Git Bash/MSYS start script)
     - src/vms/templates/README.md (2 tokens, VM directory guide)
-    - src/vms/windows/Autounattend.xml (2 tokens, Windows guest unattended setup)
+    - src/vms/windows/Autounattend.xml (3 tokens, Windows guest unattended setup)
+    - src/scripts/vms/start-android-vm.ps1 (4 tokens, Android QEMU start script)
 
 .NOTES
     Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/embedded-content/template-token-integrity.Tests.ps1 -Passthru"
@@ -33,6 +34,10 @@ BeforeAll {
   function Get-TemplatePath([string]$Name) {
     return Join-Path $TemplatesDir $Name
   }
+
+  # start-android-vm.ps1 lives outside src/vms/templates; its path is resolved
+  # inline in the Describe below (same pattern as Autounattend.xml) to keep
+  # PSUseDeclaredVarsMoreThanAssignments quiet.
 
   function Get-UpperSnakeTokenList([string]$Path) {
     $content = Get-Content -Raw -Path $Path
@@ -61,9 +66,9 @@ BeforeAll {
 }
 
 Describe "start-windows.ps1 template token integrity" {
-  It "declares exactly the 11 expected __TOKEN__ placeholders" {
+  It "declares exactly the 12 expected __TOKEN__ placeholders" {
     $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "start-windows.ps1")
-    ($templateTokens -join ",") | Should -Be "CPU,CPUS,DISK_PATH,DISPLAY_BACKEND,MACHINE,QEMU_SYSTEM,RAM_BYTES,VGA,VIRTIOFS_ARGS,VM_DISPLAY,VM_NAME"
+    ($templateTokens -join ",") | Should -Be "CPU,CPUS,DISK_PATH,DISPLAY_BACKEND,HOSTFWDS,MACHINE,QEMU_SYSTEM,RAM_BYTES,VGA,VIRTIOFS_ARGS,VM_DISPLAY,VM_NAME"
   }
 
   It "every placeholder has a replacement in the Invoke-VMSetup render chain" {
@@ -75,9 +80,9 @@ Describe "start-windows.ps1 template token integrity" {
 }
 
 Describe "start-windows-host.sh template token integrity" {
-  It "declares exactly the 10 expected __TOKEN__ placeholders" {
+  It "declares exactly the 11 expected __TOKEN__ placeholders" {
     $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "start-windows-host.sh")
-    ($templateTokens -join ",") | Should -Be "CPU,CPUS,DISK_PATH,DISPLAY_BACKEND,MACHINE,QEMU_SYSTEM,RAM_BYTES,VGA,VM_DISPLAY,VM_NAME"
+    ($templateTokens -join ",") | Should -Be "CPU,CPUS,DISK_PATH,DISPLAY_BACKEND,HOSTFWDS,MACHINE,QEMU_SYSTEM,RAM_BYTES,VGA,VM_DISPLAY,VM_NAME"
   }
 
   It "every placeholder has a replacement in the Invoke-VMSetup render chain" {
@@ -145,14 +150,28 @@ Describe "README.md template token integrity" {
 }
 
 Describe "Autounattend.xml template token integrity" {
-  It "declares exactly the 2 expected __TOKEN__ placeholders" {
+  It "declares exactly the 3 expected __TOKEN__ placeholders" {
     $templateTokens = Get-UpperSnakeTokenList (Join-Path $RepoRoot "src\vms\windows\Autounattend.xml")
-    ($templateTokens -join ",") | Should -Be "NUCLEUS_GUEST_PASSWORD,NUCLEUS_GUEST_USERNAME"
+    ($templateTokens -join ",") | Should -Be "GUEST_HOSTNAME,NUCLEUS_GUEST_PASSWORD,NUCLEUS_GUEST_USERNAME"
   }
 
   It "every placeholder has a replacement in the Invoke-VMSetup render chain" {
     $templateTokens = Get-UpperSnakeTokenList (Join-Path $RepoRoot "src\vms\windows\Autounattend.xml")
     $chainTokens = Get-ReplaceChainTokenList
+    $missing = @($templateTokens | Where-Object { $_ -notin $chainTokens })
+    $missing | Should -BeNullOrEmpty
+  }
+}
+
+Describe "start-android-vm.ps1 template token integrity" {
+  It "declares exactly the 4 expected __TOKEN__ placeholders" {
+    $templateTokens = Get-UpperSnakeTokenList (Join-Path $RepoRoot "src\scripts\vms\start-android-vm.ps1")
+    ($templateTokens -join ",") | Should -Be "ADB_CONSOLE_PORT,ADB_PORT,ANDROID_CPU_COUNT,ANDROID_RAM_BYTES"
+  }
+
+  It "every placeholder has a replacement in the vm.sh sed render chain" {
+    $templateTokens = Get-UpperSnakeTokenList (Join-Path $RepoRoot "src\scripts\vms\start-android-vm.ps1")
+    $chainTokens = Get-VmShSedChainTokenList
     $missing = @($templateTokens | Where-Object { $_ -notin $chainTokens })
     $missing | Should -BeNullOrEmpty
   }

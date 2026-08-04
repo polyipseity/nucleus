@@ -154,7 +154,7 @@
                language="neutral"
                versionScope="nonSxS"
                xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
-      <ComputerName>Windows</ComputerName>
+      <ComputerName>__GUEST_HOSTNAME__</ComputerName>
       <TimeZone>UTC</TimeZone>
     </component>
     <!-- Install OpenSSH during specialize as a pre-logon baseline.

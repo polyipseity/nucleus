@@ -525,8 +525,10 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         switch ($vm.type) {
             'NixOS' {
                 $diskBytes = ConvertFrom-SizeString $vm.diskSize
+                $minSizeBytes = ConvertFrom-SizeString $vm.minImageSize
+                $env:NUCLEUS_VM_GUEST_HOSTNAME = $vm.hostname
                 Invoke-BuildNixosImage -VmName $vm.id -Accelerator $Accelerator `
-                    -DiskBytes $diskBytes `
+                    -DiskBytes $diskBytes -MinSize $minSizeBytes `
                     -VmsDir $vmsDir -ImagesDir $imagesDir `
                     -GuestAccountName $guestUsername -GuestSecret $guestPassword `
                     -GuestSecretHash $guestSecretHash `
@@ -534,6 +536,8 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             }
             'Windows' {
                 $diskBytes = ConvertFrom-SizeString $vm.diskSize
+                $minSizeBytes = ConvertFrom-SizeString $vm.minImageSize
+                $hostFwds = ($vm.portForwards | ForEach-Object { "hostfwd=tcp::$($_.hostPort)-:$($_.guestPort)" }) -join ','
                 $isoUrl = if ($null -ne $vm.Windows.isoUrl) { [string]$vm.Windows.isoUrl } else { '' }
                 Invoke-BuildWindowsImage -VmName $vm.id -DiskBytes $diskBytes `
                     -WindowsIso $WindowsIso -WindowsIsoUrl $isoUrl `
@@ -544,6 +548,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                     -Accelerator $Accelerator `
                         -GuestAccountName $guestUsername -GuestSecret $guestPassword `
                         -GuestSecretHash $guestSecretHash `
+                    -MinSize $minSizeBytes -GuestHostname $vm.hostname -HostFwds $hostFwds `
                     -Headful:$Headful `
                     -VmsDir $vmsDir -ImagesDir $imagesDir -DryRun:$DryRun
             }
@@ -608,11 +613,12 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         Write-Information "vm-setup: configuring VM '$($vm.name)'..."
 
         $minSizeBytes = ConvertFrom-SizeString $vm.minImageSize
+        $hostFwds = ($vm.portForwards | ForEach-Object { "hostfwd=tcp::$($_.hostPort)-:$($_.guestPort)" }) -join ','
         $prebuiltValid = (Test-Path $prebuilt) -and (Test-Qcow2Image -ImagePath $prebuilt -ImageLabel "pre-built image '$($vm.id)'" -MinBytes $minSizeBytes)
 
         # Place disk image from pre-built image (empty disk fallback removed).
         if (Test-Path $diskPath) {
-            if (Test-Qcow2Image -ImagePath $diskPath -ImageLabel "runtime disk '$($vm.id)'") {
+            if (Test-Qcow2Image -ImagePath $diskPath -ImageLabel "runtime disk '$($vm.id)'" -MinBytes $minSizeBytes) {
                 if (-not (Test-VMGuestSecretMarker -ExpectedHash $guestSecretHash -MarkerPath $diskCredentialMarker)) {
                     if ($prebuiltValid) {
                         Write-Warning "vm-setup: $($vm.type) runtime disk guest credential drift detected for '$($vm.id)'; replacing runtime disk from pre-built image"
@@ -712,8 +718,9 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             $startContentPs1 = $startContentPs1.Replace('__MACHINE__', $machine)
             $startContentPs1 = $startContentPs1.Replace('__CPU__', $cpu)
             $startContentPs1 = $startContentPs1.Replace('__CPUS__', [string]$vm.cpus)
-            $startContentPs1 = $startContentPs1.Replace('__RAM_BYTES__', "${ramBytes}B")
+            $startContentPs1 = $startContentPs1.Replace('__RAM_BYTES__', [string]$ramBytes)
             $startContentPs1 = $startContentPs1.Replace('__DISK_PATH__', $diskPath)
+            $startContentPs1 = $startContentPs1.Replace('__HOSTFWDS__', $hostFwds)
             $startContentPs1 = $startContentPs1.Replace('__VGA__', $vga)
             $startContentPs1 = $startContentPs1.Replace('__DISPLAY_BACKEND__', $display)
             $startContentPs1 = $startContentPs1.Replace('__VIRTIOFS_ARGS__', $virtiofsArgs)
@@ -734,8 +741,9 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             $startContentSh = $startContentSh.Replace('__MACHINE__', $machine)
             $startContentSh = $startContentSh.Replace('__CPU__', $cpu)
             $startContentSh = $startContentSh.Replace('__CPUS__', [string]$vm.cpus)
-            $startContentSh = $startContentSh.Replace('__RAM_BYTES__', "${ramBytes}B")
+            $startContentSh = $startContentSh.Replace('__RAM_BYTES__', [string]$ramBytes)
             $startContentSh = $startContentSh.Replace('__DISK_PATH__', $diskPath)
+            $startContentSh = $startContentSh.Replace('__HOSTFWDS__', $hostFwds)
             $startContentSh = $startContentSh.Replace('__VGA__', $vga)
             $startContentSh = $startContentSh.Replace('__DISPLAY_BACKEND__', $display)
         } else {
@@ -799,7 +807,8 @@ function Test-Qcow2Image {
 
         [string]$ImageLabel = 'image',
 
-        [long]$MinBytes = 10000000000
+        [Parameter(Mandatory)]
+        [long]$MinBytes
     )
 
     if (-not (Test-Path $ImagePath)) {
@@ -858,6 +867,7 @@ function Invoke-BuildNixosImage {
         [string]$VmName,
         [string]$Accelerator,
         [string]$DiskBytes,
+        [string]$MinSize,
         [string]$VmsDir,
         [string]$ImagesDir,
         [string]$GuestAccountName,
@@ -869,7 +879,7 @@ function Invoke-BuildNixosImage {
     $outPath = Join-Path $ImagesDir "$VmName.qcow2"
     $credentialMarkerPath = Get-VMGuestSecretMarkerPath -BasePath $outPath
     if (Test-Path $outPath) {
-        if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing NixOS image') {
+        if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing NixOS image' -MinBytes $MinSize) {
             if (Test-VMGuestSecretMarker -ExpectedHash $GuestSecretHash -MarkerPath $credentialMarkerPath) {
                 Write-Information "vm-setup: NixOS image already built for the current guest credentials (username=$GuestAccountName): $outPath"
                 return
@@ -940,7 +950,7 @@ function Invoke-BuildNixosImage {
     Remove-Item $tmpOutput -Recurse -Force
     Set-Content -Path $credentialMarkerPath -Value $GuestSecretHash -Encoding UTF8
 
-    if (-not (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'newly built NixOS image')) {
+    if (-not (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'newly built NixOS image' -MinBytes $MinSize)) {
         Write-Warning "vm-setup: NixOS image validation failed after build; removing $outPath"
         Remove-Item $outPath -Force
         return
@@ -1068,6 +1078,9 @@ function Invoke-BuildWindowsImage {
         [string]$GuestAccountName,
         [string]$GuestSecret,
         [string]$GuestSecretHash,
+        [string]$MinSize,
+        [string]$GuestHostname,
+        [string]$HostFwds,
         [switch]$Headful,
         [switch]$DryRun
     )
@@ -1075,7 +1088,7 @@ function Invoke-BuildWindowsImage {
     $outPath = Join-Path $ImagesDir "$VmName.qcow2"
     $credentialMarkerPath = Get-VMGuestSecretMarkerPath -BasePath $outPath
     if (Test-Path $outPath) {
-        if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing Windows image') {
+        if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing Windows image' -MinBytes $MinSize) {
             if (Test-VMGuestSecretMarker -ExpectedHash $GuestSecretHash -MarkerPath $credentialMarkerPath) {
                 Write-Information "vm-setup: Windows image already built for the current guest credentials (username=$GuestAccountName): $outPath"
                 return
@@ -1265,15 +1278,15 @@ function Invoke-BuildWindowsImage {
         foreach ($attempt in $buildAttempts) {
             if ($attempt.Firmware -eq 'efi') {
                 if ($Headful) {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
                 } else {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
                 }
             } else {
                 if ($Headful) {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
                 } else {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
                 }
             }
         }
@@ -1306,6 +1319,7 @@ function Invoke-BuildWindowsImage {
             $autounattendContent = Get-Content -Path $autounattendTemplate -Raw
             $autounattendContent = $autounattendContent.Replace('__NUCLEUS_GUEST_USERNAME__', $GuestAccountName)
             $autounattendContent = $autounattendContent.Replace('__NUCLEUS_GUEST_PASSWORD__', $GuestSecret)
+            $autounattendContent = $autounattendContent.Replace('__GUEST_HOSTNAME__', $GuestHostname)
             Set-Content -Path $autounattendRendered -Value $autounattendContent -Encoding UTF8
             Write-Information "vm-setup: writing Packer debug log for this attempt: $packerLog"
 
@@ -1313,6 +1327,8 @@ function Invoke-BuildWindowsImage {
                 '-var', "windows_iso=$WindowsIso",
                 '-var', "guest_username=$GuestAccountName",
                 '-var', "guest_password=$GuestSecret",
+                '-var', "hostfwd=$HostFwds",
+                '-var', "guest_hostname=$GuestHostname",
                 '-var', "autounattend_path=$autounattendRendered",
                 '-var', "accelerator=$Accelerator",
                 '-var', "firmware_mode=$($attempt.Firmware)",
@@ -1328,6 +1344,8 @@ function Invoke-BuildWindowsImage {
                     '-var', "windows_iso=$WindowsIso",
                     '-var', "guest_username=$GuestAccountName",
                     '-var', "guest_password=$GuestSecret",
+                    '-var', "hostfwd=$HostFwds",
+                    '-var', "guest_hostname=$GuestHostname",
                     '-var', "autounattend_path=$autounattendRendered",
                     '-var', "accelerator=$Accelerator",
                     '-var', "firmware_mode=$($attempt.Firmware)",
@@ -1345,6 +1363,8 @@ function Invoke-BuildWindowsImage {
                     '-var', "windows_iso=$WindowsIso",
                     '-var', "guest_username=$GuestAccountName",
                     '-var', "guest_password=$GuestSecret",
+                    '-var', "hostfwd=$HostFwds",
+                    '-var', "guest_hostname=$GuestHostname",
                     '-var', "autounattend_path=$autounattendRendered",
                     '-var', "accelerator=$Accelerator",
                     '-var', "firmware_mode=$($attempt.Firmware)",
@@ -1362,6 +1382,8 @@ function Invoke-BuildWindowsImage {
                         '-var', "windows_iso=$WindowsIso",
                         '-var', "guest_username=$GuestAccountName",
                         '-var', "guest_password=$GuestSecret",
+                        '-var', "hostfwd=$HostFwds",
+                        '-var', "guest_hostname=$GuestHostname",
                         '-var', "autounattend_path=$autounattendRendered",
                         '-var', "accelerator=$Accelerator",
                         '-var', "firmware_mode=$($attempt.Firmware)",
@@ -1424,7 +1446,7 @@ function Invoke-BuildWindowsImage {
         Remove-Item $builtTempDir -Recurse -Force
         Set-Content -Path $credentialMarkerPath -Value $GuestSecretHash -Encoding UTF8
 
-    if (-not (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'newly built Windows image')) {
+    if (-not (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'newly built Windows image' -MinBytes $MinSize)) {
         Write-Warning "vm-setup: Windows image validation failed after build; removing $outPath"
         Remove-Item $outPath -Force
         return
