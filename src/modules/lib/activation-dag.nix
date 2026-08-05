@@ -16,6 +16,7 @@
   "agent-host-shell-config"
   "install-agent-skills"
   "symlink-agent-config"
+  "symlink-cursor-config"
   "cloud-drives-setup"
   "merge-obsidian-json"
   "merge-picard-ini"

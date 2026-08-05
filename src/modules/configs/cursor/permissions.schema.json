@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "Cursor global permissions (~/.cursor/permissions.json).",
+  "properties": {
+    "$schema": {
+      "description": "Reference to the JSON Schema file that validates this data file.",
+      "type": "string"
+    },
+    "autoRun": {
+      "description": "Natural-language guidance for Auto-review mode.",
+      "type": "string"
+    },
+    "mcpAllowlist": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "terminalAllowlist": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "title": "Cursor permissions configuration",
+  "type": "object"
+}
