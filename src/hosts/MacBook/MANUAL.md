@@ -66,3 +66,6 @@
     - **First boot**: boot the VM into recovery, factory reset, then select **Boot GSI from /dev/block/vdc** (the GSI attaches read-only as the third virtio disk; the label is the one documented for the equivalent vdc disk in the [LineageOS libvirt-qemu wiki](https://wiki.lineageos.org/libvirt-qemu.html) — confirm the exact UTM recovery label on first boot). This step is manual and cannot be automated from the host.
     - **Power-cycle caveat**: GSI reboots may fail to come back up; a recovery factory reset recovers the guest.
     - **Play Integrity**: QEMU VMs are detected as emulator environments, so `MEETS_STRONG`/`DEVICE_INTEGRITY` are impossible (they require hardware-backed attestation; the VM has no TPM, `TPMDevice=false`). Banking, Google Wallet, and DRM apps will not work; ordinary GMS apps run on an uncertified device.
+- `nucleus-vm resize <id> <size>` — grow the writable runtime disk `data/<id>.qcow2` (grow-only; shrinking requires `--allow-shrink`)
+- `nucleus-vm pack` — strip trivially regenerable artifacts (UTM bundles, generated start/stop scripts, `images/<type>.base.qcow2` copies) so the tree copies as-is to another host; dry-run by default, `--force` performs
+- `nucleus-vm unpack` — regenerate platform artifacts (start/stop scripts, UTM bundles) from `<id>.vm.json` descriptors after copying a packed tree

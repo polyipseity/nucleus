@@ -2931,11 +2931,8 @@ vm_pack_vms() {
     dry_run "pack mode enabled — printing planned removals (pass --force to perform)"
   fi
 
-  # Android userdata lives inside the bundle copy; pack removes bundles, so
-  # the manual sync-out one-liner must run first when preserving data matters.
-  if [ -d "$VM_DIR/Android.utm" ]; then
-    warn "pack — Android userdata lives in the bundle copy; to preserve it, copy Android.utm/Data/<userdataImage> → data/Android.qcow2 BEFORE packing (see README)"
-  fi
+  # Android userdata is canonical at data/Android.qcow2; the UTM bundle copy
+  # is a hard link (G1a), so removing bundles never loses userdata.
 
   # UTM bundles — regenerable by setup from the descriptors (trivial).
   for _pv_bundle in "$VM_DIR"/*.utm/; do
