@@ -126,6 +126,7 @@ ensure_tart_vm_dir() {
 # host is excluded.
 should_include_host() {
   _sjh_json="$1"
+  [ -n "$NUCLEUS_HOST" ] || return 1
   printf '%s' "$_sjh_json" | jq -e --arg host "$NUCLEUS_HOST" 'contains([$host])' >/dev/null 2>&1
 }
 
@@ -765,10 +766,13 @@ vm_for_each() {
 #   enabled and match the current host.  Reuses the same filter logic as
 #   vm_for_each but without the callback dispatch.
 vm_get_expected_vm_names() {
+  if [ -z "$NUCLEUS_HOST" ]; then
+    return 0
+  fi
   jq -r --arg host "$NUCLEUS_HOST" '
     .VMs[] |
     select(.enabled == true) |
-    select(.hosts | contains([$host])) |
+    select((.hosts // []) | contains([$host])) |
     .id
   ' "$MANIFEST"
 }
