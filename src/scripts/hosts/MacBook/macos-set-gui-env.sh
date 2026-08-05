@@ -7,9 +7,11 @@
 #   GUI_ENV_MACOS_ALL_VARS / $4 = env var commands      (multi-line shell code for launchctl setenv)
 set -eu
 
-__nucleus_prepend="${GUI_ENV_PREPEND_PATH:-${1:?}}"
-__nucleus_append="${GUI_ENV_APPEND_PATH:-${2:?}}"
-__nucleus_managed_set="${GUI_ENV_DEDUP_SET_HOME:-${3:?}}"
+# `:-` not `:?`: empty prepend/append are legitimate (managedPaths.prepend is
+# currently empty); `:?` killed the whole agent at login with exit 1.
+__nucleus_prepend="${GUI_ENV_PREPEND_PATH:-${1:-}}"
+__nucleus_append="${GUI_ENV_APPEND_PATH:-${2:-}}"
+__nucleus_managed_set="${GUI_ENV_DEDUP_SET_HOME:-${3:-}}"
 __all_vars="${GUI_ENV_MACOS_ALL_VARS:-${4:-}}"
 
 __nucleus_cleaned=""
