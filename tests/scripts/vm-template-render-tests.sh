@@ -6,11 +6,25 @@
 # host kind. The windows-qemu stop render is compared byte-for-byte against the
 # canonical golden content (formerly a 36-line heredoc in vm.sh).
 #
+# Descriptor-driven renders (P7): with vm.sh sourced and a fixture manifest,
+# vm_write_start_script/vm_write_stop_script must render start/stop helpers
+# from the descriptor JSON document (id/name/type/cpus/ram/portForwards +
+# Android images) with no leftover tokens — covering windows-qemu (shared
+# start-android-vm.ps1 / start-windows templates) and darwin-utm (posix +
+# host dispatcher). vm_unpack_vms in dry-run mode must plan the regeneration
+# without writing any file (scripts/, bundles, disks all stay untouched).
+#
 # Run with: bash tests/scripts/vm-template-render-tests.sh
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 TEMPLATES_DIR="$REPO_ROOT/src/vms/templates"
+# shellcheck source=../../src/scripts/lib/lib.sh
+. "$REPO_ROOT/src/scripts/lib/lib.sh"
+# shellcheck source=../../src/scripts/lib/size.sh
+. "$REPO_ROOT/src/scripts/lib/size.sh"
+# shellcheck source=../../src/scripts/lib/vm.sh
+. "$REPO_ROOT/src/scripts/lib/vm.sh"
 
 _failures=0
 
@@ -38,6 +52,29 @@ assert_contains() { # assert_contains <needle> <file> <label>
   local _needle="$1" _file="$2" _label="$3"
   if ! grep -qF -- "$_needle" "$_file"; then
     echo "FAIL: $_label does not contain expected text: $_needle"
+    _failures=$((_failures + 1))
+  fi
+}
+
+assert_absent() { # assert_absent <needle> <file> <label>
+  local _needle="$1" _file="$2" _label="$3"
+  if grep -qF -- "$_needle" "$_file"; then
+    echo "FAIL: $_label contains unexpected text: $_needle"
+    grep -nF -- "$_needle" "$_file" | head -5
+    _failures=$((_failures + 1))
+  fi
+}
+
+assert_file_exists() { # assert_file_exists <path> <label>
+  if [ ! -f "$1" ]; then
+    echo "FAIL: $2: expected file '$1' to exist"
+    _failures=$((_failures + 1))
+  fi
+}
+
+assert_file_missing() { # assert_file_missing <path> <label>
+  if [ -f "$1" ]; then
+    echo "FAIL: $2: expected file '$1' to be absent"
     _failures=$((_failures + 1))
   fi
 }
@@ -147,9 +184,187 @@ GOLDEN
   fi
 }
 
+write_fixture_manifest() { # write_fixture_manifest <path> — Android (enabled) + NixOS/Windows (disabled)
+  cat >"$1" <<'EOF'
+{
+  "VMs": [
+    {
+      "id": "Android",
+      "name": "Android",
+      "type": "Android",
+      "enabled": true,
+      "hosts": ["MacBook", "NixOS", "Windows"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "portForwards": [{"guestPort": 5555, "hostPort": 5555}, {"guestPort": 5554, "hostPort": 5554}],
+      "macAddressPrefix": "52",
+      "Android": {
+        "systemImage": "Android-system.qcow2",
+        "userdataImage": "Android.qcow2",
+        "gsiImage": "Android-gsi.img",
+        "gsiUrl": "https://example.invalid/gsi.zip"
+      }
+    },
+    {
+      "id": "NixOS",
+      "name": "NixOS",
+      "type": "NixOS",
+      "enabled": false,
+      "hosts": ["NixOS"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "portForwards": [],
+      "macAddressPrefix": "52"
+    },
+    {
+      "id": "Windows",
+      "name": "Windows",
+      "type": "Windows",
+      "enabled": false,
+      "hosts": ["Windows"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "128GB",
+      "portForwards": [],
+      "macAddressPrefix": "52",
+      "Windows": {"edition": "pro", "isoUrl": null}
+    }
+  ]
+}
+EOF
+}
+
+test_descriptor_fixture_render() {
+  local _vm_dir="$_tmp/render/vm" _images_dir="$_tmp/render/vm/images" _vms_dir="$_tmp/render/vms"
+  local _manifest="$_tmp/render/manifest.json"
+  local _android_doc _nixos_doc _windows_doc
+
+  mkdir -p "$_vm_dir" "$_images_dir" "$_vms_dir"
+  write_fixture_manifest "$_manifest"
+
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+    "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
+    "$_vms_dir" "$_manifest" "MacBook" "false" "false"
+  vm_write_descriptors
+
+  _android_doc="$(cat "$_vm_dir/Android.vm.json")"
+  _nixos_doc="$(cat "$_vm_dir/NixOS.vm.json")"
+  _windows_doc="$(cat "$_vm_dir/Windows.vm.json")"
+
+  # windows-qemu renders (PowerShell-first): Android renders the shared
+  # start-android-vm.ps1 with descriptor-driven tokens (cpus/ram/images/ports);
+  # Windows renders start-windows.ps1 + start-windows-host.sh. The .ps1 disk
+  # path points at the packed payload (data/<id>.qcow2 under VM_DIR); P8 makes
+  # the template path itself relocatable.
+  vm_write_start_script "$_android_doc" windows-qemu
+  vm_write_start_script "$_windows_doc" windows-qemu
+  assert_no_tokens "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 (Android, windows-qemu)"
+  assert_no_tokens "$_vm_dir/scripts/start-Android.sh" "start-posix.sh (Android, windows-qemu)"
+  # shellcheck disable=SC2016 # reason: literal $ in single quotes is intentional for grep -F needle matching of rendered PowerShell
+  assert_contains "Join-Path \$imagesDir 'Android-system.qcow2'" "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 systemImage token"
+  assert_contains "'-smp', '4'," "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 cpus token"
+  assert_contains "'-m', '8000000000B'" "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 ram token"
+  assert_contains "hostfwd=tcp::5555-:5555,hostfwd=tcp::5554-:5554" "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 portForwards token"
+  assert_no_tokens "$_vm_dir/scripts/start-Windows.ps1" "start-windows.ps1 (windows-qemu)"
+  assert_no_tokens "$_vm_dir/scripts/start-Windows.sh" "start-windows-host.sh (windows-qemu)"
+  assert_contains "-smp 4" "$_vm_dir/scripts/start-Windows.ps1" "start-windows.ps1 cpus token"
+  # shellcheck disable=SC2016 # reason: literal $ in single quotes is intentional for grep -F needle matching of rendered PowerShell
+  assert_contains "Windows.qcow2',format=qcow2,if=virtio" "$_vm_dir/scripts/start-Windows.ps1" "start-windows.ps1 packed payload disk path"
+  assert_absent "hostfwd=tcp::" "$_vm_dir/scripts/start-Windows.ps1" "start-windows.ps1 empty portForwards render"
+  # shellcheck disable=SC2016 # reason: literal $ in single quotes is intentional for grep -F needle matching of rendered PowerShell
+  assert_contains "Windows.qcow2',format=qcow2,if=virtio" "$_vm_dir/scripts/start-Windows.sh" "start-windows-host.sh packed payload disk path"
+
+  # windows-qemu stop: only the .ps1 variant is written (stop-posix.sh cannot
+  # dispatch to QEMU); the missing .sh must not fail the render (P7 chmod fix).
+  vm_write_stop_script "$_windows_doc" windows-qemu
+  assert_no_tokens "$_vm_dir/scripts/stop-Windows.ps1" "stop-host.ps1 (Windows, windows-qemu)"
+  assert_contains "switch ('windows-qemu')" "$_vm_dir/scripts/stop-Windows.ps1" "stop-host.ps1 (Windows, windows-qemu)"
+  assert_file_missing "$_vm_dir/scripts/stop-Windows.sh" "no stop-Windows.sh for windows-qemu hosts"
+
+  # darwin-utm renders: posix .sh + host-dispatcher .ps1 for every guest type.
+  vm_write_start_script "$_android_doc" darwin-utm
+  vm_write_start_script "$_nixos_doc" darwin-utm
+  vm_write_stop_script "$_nixos_doc" darwin-utm
+  assert_no_tokens "$_vm_dir/scripts/start-Android.sh" "start-posix.sh (Android, darwin-utm)"
+  assert_no_tokens "$_vm_dir/scripts/start-Android.ps1" "start-host.ps1 (Android, darwin-utm)"
+  assert_contains 'HOST_KIND="darwin-utm"' "$_vm_dir/scripts/start-Android.sh" "start-Android.sh host kind"
+  assert_contains "switch ('darwin-utm')" "$_vm_dir/scripts/start-Android.ps1" "start-Android.ps1 host kind"
+  assert_no_tokens "$_vm_dir/scripts/stop-NixOS.sh" "stop-posix.sh (NixOS, darwin-utm)"
+  assert_no_tokens "$_vm_dir/scripts/stop-NixOS.ps1" "stop-host.ps1 (NixOS, darwin-utm)"
+  assert_contains 'exec utmctl stop "NixOS"' "$_vm_dir/scripts/stop-NixOS.sh" "stop-NixOS.sh utmctl dispatch"
+
+  # pack/unpack wrappers are refreshed for the whole tree.
+  vm_write_pack_unpack_scripts
+  assert_file_exists "$_vm_dir/scripts/pack.sh" "pack.sh wrapper"
+  assert_file_exists "$_vm_dir/scripts/unpack.sh" "unpack.sh wrapper"
+  assert_file_exists "$_vm_dir/scripts/pack.ps1" "pack.ps1 wrapper"
+  assert_file_exists "$_vm_dir/scripts/unpack.ps1" "unpack.ps1 wrapper"
+}
+
+test_unpack_dry_run() {
+  local _vm_dir="$_tmp/unpack/vm" _images_dir="$_tmp/unpack/vm/images" _vms_dir="$_tmp/unpack/vms"
+  local _manifest="$_tmp/unpack/manifest.json" _home_fixture="$_tmp/unpack/home"
+  local _out="$_tmp/unpack/out.txt"
+
+  mkdir -p "$_vm_dir" "$_vm_dir/data" "$_images_dir" "$_vms_dir" \
+    "$_home_fixture/.local/share/nucleus/vms"
+  write_fixture_manifest "$_manifest"
+  # Fixture payload: userdata overlay, Android system/GSI goldens, non-Android
+  # prebuilt goldens, and the Nix-rendered UTM plist templates — a packed tree
+  # with the target config applied. Dry-run must not touch any of them.
+  : >"$_vm_dir/data/Android.qcow2"
+  : >"$_images_dir/Android-system.qcow2"
+  : >"$_images_dir/Android-gsi.img"
+  : >"$_images_dir/NixOS.qcow2"
+  : >"$_images_dir/Windows.qcow2"
+  : >"$_home_fixture/.local/share/nucleus/vms/Android-config.plist"
+  : >"$_home_fixture/.local/share/nucleus/vms/NixOS-config.plist"
+  : >"$_home_fixture/.local/share/nucleus/vms/Windows-config.plist"
+
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+    "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
+    "$_vms_dir" "$_manifest" "MacBook" "false" "false"
+  vm_write_descriptors
+
+  # Dry-run unpack on a Darwin/UTM host: HOME points at the fixture so the
+  # enabled Android VM reaches its dry-run UTM path; nothing may be written.
+  HOME="$_home_fixture" dry_run=true vm_unpack_vms >"$_out" 2>&1 || {
+    echo "FAIL: vm_unpack_vms dry-run exited non-zero"
+    _failures=$((_failures + 1))
+  }
+
+  assert_contains "[dry-run] unpack mode enabled" "$_out" "unpack dry-run banner"
+  assert_contains "[dry-run] write start helper scripts:" "$_out" "dry-run start scripts"
+  assert_contains "[dry-run] write stop helper scripts:" "$_out" "dry-run stop scripts"
+  assert_contains "[dry-run] write pack/unpack helper scripts:" "$_out" "dry-run pack/unpack wrappers"
+  assert_contains "[dry-run] recreate UTM bundle" "$_out" "dry-run UTM bundle (enabled Android)"
+  assert_contains "descriptor 'NixOS' is disabled; scripts rendered, no bundle/domain" "$_out" "disabled gate (NixOS)"
+  assert_contains "descriptor 'Windows' is disabled; scripts rendered, no bundle/domain" "$_out" "disabled gate (Windows)"
+  assert_contains "regenerated wrappers for 3 descriptor(s)" "$_out" "unpack summary count"
+  assert_contains "unpack — dry-run: nothing was regenerated; pass --force to perform" "$_out" "dry-run completion message"
+
+  # Dry-run plans without writing any helper script file or bundle; the
+  # scripts/ directory itself may be created by the planning pass, so the
+  # assertions are file-level.
+  assert_file_missing "$_vm_dir/scripts/start-Android.sh" "dry-run must not write start scripts"
+  assert_file_missing "$_vm_dir/scripts/stop-Windows.ps1" "dry-run must not write stop scripts"
+  assert_file_missing "$_vm_dir/scripts/pack.sh" "dry-run must not write pack wrapper"
+  if [ -e "$_vm_dir/Android.utm" ]; then
+    echo "FAIL: unpack dry-run must not create UTM bundles"
+    _failures=$((_failures + 1))
+  fi
+  # Fixture disks must be untouched (no base copies, no new overlays).
+  assert_file_missing "$_images_dir/NixOS.base.qcow2" "dry-run must not restore base images"
+  assert_file_missing "$_vm_dir/data/NixOS.qcow2" "dry-run must not recreate overlays"
+}
+
 test_start_host_ps1_render
 test_stop_posix_sh_render
 test_stop_host_ps1_windows_golden
+test_descriptor_fixture_render
+test_unpack_dry_run
 
 if [ "$_failures" -eq 0 ]; then
   echo "vm-template-render-tests: all checks passed"

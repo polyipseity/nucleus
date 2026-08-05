@@ -409,18 +409,19 @@ vm_wait_for_guest() {
   return 1
 }
 
-# vm_write_start_script NAME DISPLAY TYPE HOST_KIND
+# vm_write_start_script DOC HOST_KIND
 # Args:
-#   $1 — VM machine name (manifest .id)
-#   $2 — VM display name (manifest .name)
-#   $3 — VM type (macOS/NixOS/Windows/...)
-#   $4 — host runtime kind (darwin-utm|darwin-tart|nixos-libvirt)
+#   $1 — JSON document for the VM: the self-describing descriptor when present
+#        (vm_vm_json NAME), otherwise the manifest entry.  Fields read:
+#        id/name/type/cpus/ram/portForwards (+ the Android group when present).
+#   $2 — host runtime kind (darwin-utm|darwin-tart|nixos-libvirt|windows-qemu)
 # Writes a host-side helper script to start the VM runtime from ~/virtual machines.
 vm_write_start_script() {
-  _wss_name="$1"
-  _wss_display="$2"
-  _wss_type="$3"
-  _wss_host_kind="$4"
+  _wss_doc="$1"
+  _wss_host_kind="$2"
+  _wss_name="$(printf '%s' "$_wss_doc" | jq -r '.id')"
+  _wss_display="$(printf '%s' "$_wss_doc" | jq -r '.name')"
+  _wss_type="$(printf '%s' "$_wss_doc" | jq -r '.type')"
   mkdir -p "$VM_DIR/scripts"
   _wss_path_sh="$VM_DIR/scripts/start-${_wss_name}.sh"
   _wss_path_ps1="$VM_DIR/scripts/start-${_wss_name}.ps1"
@@ -469,16 +470,17 @@ vm_write_start_script() {
           error "shared Android VM start script not found: $_wss_android_start"
           return 1
         fi
-        # Manifest-driven tokens: CPU count, RAM bytes, image filenames, and the
-        # ADB/console host ports from VMs.json portForwards (single-source
-        # start script).  Image names come from the manifest Android group.
-        _wss_cpus="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .cpus' "$MANIFEST")"
-        _wss_ram_bytes="$(parse_size "$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .ram' "$MANIFEST")")"
-        _wss_system_image="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .Android.systemImage' "$MANIFEST")"
-        _wss_userdata_image="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .Android.userdataImage' "$MANIFEST")"
-        _wss_gsi_image="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .Android.gsiImage' "$MANIFEST")"
-        _wss_adb_port="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .portForwards[] | select(.guestPort == 5555) | .hostPort' "$MANIFEST")"
-        _wss_console_port="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .portForwards[] | select(.guestPort == 5554) | .hostPort' "$MANIFEST")"
+        # Document-driven tokens: CPU count, RAM bytes, image filenames, and
+        # the ADB/console host ports come from the JSON doc (descriptor or
+        # manifest fallback via vm_vm_json), keeping the shared start script
+        # single-source (embedded-content policy).
+        _wss_cpus="$(printf '%s' "$_wss_doc" | jq -r '.cpus')"
+        _wss_ram_bytes="$(parse_size "$(printf '%s' "$_wss_doc" | jq -r '.ram')")"
+        _wss_system_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.systemImage')"
+        _wss_userdata_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.userdataImage')"
+        _wss_gsi_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.gsiImage')"
+        _wss_adb_port="$(printf '%s' "$_wss_doc" | jq -r '.portForwards[] | select(.guestPort == 5555) | .hostPort')"
+        _wss_console_port="$(printf '%s' "$_wss_doc" | jq -r '.portForwards[] | select(.guestPort == 5554) | .hostPort')"
         sed -e "s|__ANDROID_CPU_COUNT__|$_wss_cpus|g" \
             -e "s|__ANDROID_RAM_BYTES__|${_wss_ram_bytes}B|g" \
             -e "s|__ANDROID_SYSTEM_IMAGE__|$_wss_system_image|g" \
@@ -490,10 +492,10 @@ vm_write_start_script() {
       else
         # Windows VM start scripts mirror Invoke-VMSetup.ps1 rendering (Git
         # Bash host): the cross-host templates stay single-source and all
-        # tokens come from the manifest (portForwards, cpus, ram, id).
-        _wss_hostfwds="$(jq -r --arg n "$_wss_name" '[.VMs[] | select(.id == $n) | .portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")' "$MANIFEST")"
-        _wss_cpus="$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .cpus' "$MANIFEST")"
-        _wss_ram_bytes="$(parse_size "$(jq -r --arg n "$_wss_name" '.VMs[] | select(.id == $n) | .ram' "$MANIFEST")")"
+        # tokens come from the JSON doc (descriptor or manifest fallback).
+        _wss_hostfwds="$(printf '%s' "$_wss_doc" | jq -r '[.portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")')"
+        _wss_cpus="$(printf '%s' "$_wss_doc" | jq -r '.cpus')"
+        _wss_ram_bytes="$(parse_size "$(printf '%s' "$_wss_doc" | jq -r '.ram')")"
         _wss_disk_path="$VM_DIR/data/${_wss_name}.qcow2"
         _wss_qemu_arch="x86_64"
         if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
@@ -552,17 +554,17 @@ vm_write_start_script() {
   say "wrote start helper scripts: $_wss_path_sh, $_wss_path_ps1"
 }
 
-# vm_write_stop_script NAME DISPLAY TYPE HOST_KIND
+# vm_write_stop_script DOC HOST_KIND
 # Args:
-#   $1 — VM machine name (manifest .id)
-#   $2 — VM display name (manifest .name)
-#   $3 — VM type (macOS/NixOS/Windows/...)
-#   $4 — host runtime kind (darwin-utm|darwin-tart|nixos-libvirt|windows-qemu)
+#   $1 — JSON document for the VM (see vm_write_start_script): the
+#        self-describing descriptor when present, otherwise the manifest entry.
+#   $2 — host runtime kind (darwin-utm|darwin-tart|nixos-libvirt|windows-qemu)
 # Writes a host-side helper script to stop the VM runtime from ~/virtual machines.
 vm_write_stop_script() {
-  _wst_name="$1"
-  _wst_display="$2"
-  _wst_host_kind="$4"
+  _wst_doc="$1"
+  _wst_host_kind="$2"
+  _wst_name="$(printf '%s' "$_wst_doc" | jq -r '.id')"
+  _wst_display="$(printf '%s' "$_wst_doc" | jq -r '.name')"
   mkdir -p "$VM_DIR/scripts"
   _wst_path_sh="$VM_DIR/scripts/stop-${_wst_name}.sh"
   _wst_path_ps1="$VM_DIR/scripts/stop-${_wst_name}.ps1"
@@ -586,12 +588,22 @@ vm_write_stop_script() {
         printf '#!/bin/sh\nset -eu\necho "stop script for %s"\n' "$_wst_name" >"$_wst_path_sh"
       fi
       ;;
+    windows-qemu)
+      # WHY: stop-posix.sh dispatches to tart/utmctl/virsh only.  QEMU guests
+      # on Windows are stopped via stop-<id>.ps1 (rendered below), so no .sh
+      # variant is written for windows-qemu hosts.
+      :
+      ;;
     *)
       error "unknown stop-script host kind: $_wst_host_kind"
       return 1
       ;;
   esac
-  chmod 755 "$_wst_path_sh"
+  # The .sh variant does not exist for windows-qemu hosts; chmod only when
+  # present (set -euo pipefail in scripts/vm.sh would abort otherwise).
+  if [ -f "$_wst_path_sh" ]; then
+    chmod 755 "$_wst_path_sh"
+  fi
 
   # Render .ps1 from the shared host-kind dispatcher template
   # (embedded-content policy: single shared file per platform).
@@ -648,17 +660,18 @@ vm_script_host_kind() {
 #   Writes start/stop helper scripts (BOTH .sh and .ps1 variants) for EVERY
 #   manifest guest — enabled or disabled, host-matched or not — so scripts/
 #   serves all VMs without a live manifest (mirrors vm_write_descriptors).
+#   Renders from vm_vm_json (descriptor-first, manifest fallback).
 vm_write_all_guest_scripts() {
-  local _wags_count _wags_i _wags_id _wags_type _wags_name _wags_host_kind
+  local _wags_count _wags_i _wags_id _wags_type _wags_host_kind _wags_doc
   _wags_count="$(jq '.VMs | length' "$MANIFEST")"
   _wags_i=0
   while [ "$_wags_i" -lt "$_wags_count" ]; do
     _wags_id="$(jq -r ".VMs[$_wags_i].id" "$MANIFEST")"
     _wags_type="$(jq -r ".VMs[$_wags_i].type" "$MANIFEST")"
-    _wags_name="$(jq -r ".VMs[$_wags_i].name" "$MANIFEST")"
     _wags_host_kind="$(vm_script_host_kind "$_wags_type")" || return 1
-    vm_write_start_script "$_wags_id" "$_wags_name" "$_wags_type" "$_wags_host_kind"
-    vm_write_stop_script "$_wags_id" "$_wags_name" "$_wags_type" "$_wags_host_kind"
+    _wags_doc="$(vm_vm_json "$_wags_id")" || return 1
+    vm_write_start_script "$_wags_doc" "$_wags_host_kind"
+    vm_write_stop_script "$_wags_doc" "$_wags_host_kind"
     _wags_i=$((_wags_i + 1))
   done
   vm_write_pack_unpack_scripts
@@ -770,6 +783,22 @@ vm_get_manifest_vm_names() {
 #   <VM_DIR>/<NAME>.vm.json.
 vm_descriptor_path() {
   printf '%s/%s.vm.json\n' "$VM_DIR" "$1"
+}
+
+# vm_vm_json NAME
+#   Prints the JSON document used to render a VM's artifacts: the
+#   self-describing descriptor (<VM_DIR>/<NAME>.vm.json) when present, else
+#   the manifest entry.  Descriptor-first so unpack (and setup on a
+#   descriptor-carrying tree) renders from the packed/authoritative source;
+#   the manifest fallback keeps a fresh tree working before descriptors are
+#   written.  Mirror of the descriptor shape built by vm_write_descriptor.
+vm_vm_json() {
+  _vvj_desc="$(vm_descriptor_path "$1")"
+  if [ -f "$_vvj_desc" ]; then
+    cat "$_vvj_desc"
+  else
+    jq -c --arg n "$1" '.VMs[] | select(.id == $n)' "$MANIFEST"
+  fi
 }
 
 # vm_mk_uuid NAME
@@ -2947,5 +2976,206 @@ vm_pack_vms() {
   say "pack — next: copy the packed tree to the target host, then run 'nucleus-vm unpack' or 'nucleus-vm setup' there"
   if [ "$dry_run" = true ]; then
     say "pack — dry-run: nothing was removed; pass --force to perform"
+  fi
+}
+
+# vm_unpack_ensure_base_overlay NAME TYPE
+#   Restores the base/overlay disk pair after pack.  The base copy
+#   (images/<type>.base.qcow2) is a trivial cp from the kept prebuilt golden
+#   (images/<type>.qcow2) — pack removes the copy, never the golden; the
+#   overlay (data/<name>.qcow2) is recreated only when absent — never rebuilt
+#   (its content is user data by design).  Returns 1 when the golden is
+#   missing (packed trees always carry it, so this signals a broken tree).
+vm_unpack_ensure_base_overlay() {
+  _uebo_name="$1"
+  _uebo_type="$2"
+  _uebo_prebuilt="$IMAGES_DIR/${_uebo_type}.qcow2"
+  _uebo_base="$IMAGES_DIR/${_uebo_type}.base.qcow2"
+  _uebo_overlay="$VM_DIR/data/${_uebo_name}.qcow2"
+
+  if [ ! -f "$_uebo_prebuilt" ]; then
+    warn "unpack — prebuilt golden missing: $_uebo_prebuilt (re-provision or copy it back)"
+    return 1
+  fi
+
+  if [ "$dry_run" = false ]; then
+    mkdir -p "$VM_DIR/data"
+    if [ ! -f "$_uebo_base" ]; then
+      say "unpack — restoring base image from prebuilt: $_uebo_base"
+      cp "$_uebo_prebuilt" "$_uebo_base"
+    fi
+    if [ ! -f "$_uebo_overlay" ]; then
+      say "unpack — recreating absent overlay disk: $_uebo_overlay"
+      # Relative backing path (../images/<type>.base.qcow2), mirroring
+      # vm_ensure_base_and_overlay, so the tree stays relocatable between
+      # hosts (an absolute path would pin it to this machine).
+      qemu-img create -f qcow2 -b "../images/${_uebo_type}.base.qcow2" -F qcow2 "$_uebo_overlay" >/dev/null
+    else
+      say "unpack — keeping existing overlay disk: $_uebo_overlay"
+    fi
+  else
+    dry_run "ensure base/overlay for $_uebo_name (base cp from $_uebo_prebuilt; overlay recreated only if absent)"
+  fi
+}
+
+# vm_unpack_vms — Regenerate per-platform VM artifacts from the descriptors
+#   (<id>.vm.json) in the VM directory, after copying a packed tree to a
+#   target host (nucleus-vm unpack; complements vm_pack_vms).  For EVERY
+#   descriptor — enabled or disabled — start/stop helper scripts (BOTH .sh
+#   and .ps1 variants) are re-rendered from the descriptor fields via
+#   vm_write_start_script/vm_write_stop_script, and the pack/unpack wrappers
+#   are refreshed.  Bundle/domain creation happens only for enabled
+#   descriptors (mirrors setup): UTM (Darwin) re-creates the bundle dir +
+#   cp the Nix-rendered plist template + chmod +w + link disks into Data/ +
+#   open + wait for registration; libvirt (Linux) virsh define + ensure
+#   base/overlay; Windows re-renders start scripts (PowerShell).  Dependency:
+#   the target's nucleus config must be applied (provides the plist/domain
+#   templates); copied data files are consumed as-is — never modified.
+vm_unpack_vms() {
+  if [ "$dry_run" = true ]; then
+    dry_run "unpack mode enabled — printing planned regeneration (pass --force to perform)"
+  fi
+
+  _uv_desc_count=0
+  for _uv_desc in "$VM_DIR"/*.vm.json; do
+    [ -f "$_uv_desc" ] || continue
+    _uv_desc_count=$((_uv_desc_count + 1))
+  done
+  if [ "$_uv_desc_count" -eq 0 ]; then
+    say "unpack — no descriptors found in $VM_DIR; run 'nucleus-vm setup' to write them"
+    return 0
+  fi
+
+  for _uv_desc in "$VM_DIR"/*.vm.json; do
+    [ -f "$_uv_desc" ] || continue
+    _uv_name="$(jq -r '.id' "$_uv_desc")"
+    if [ -z "$_uv_name" ] || [ "$_uv_name" = "null" ]; then
+      warn "unpack — descriptor without an id, skipping: $_uv_desc"
+      continue
+    fi
+    _uv_type="$(jq -r '.type' "$_uv_desc")"
+    _uv_enabled="$(jq -r '.enabled // false' "$_uv_desc")"
+    _uv_host_kind="$(vm_script_host_kind "$_uv_type")" || return 1
+
+    # Scripts pass — for ALL descriptors, enabled or disabled: start/stop
+    # helper scripts (BOTH variants) from the descriptor JSON document.
+    vm_write_start_script "$(cat "$_uv_desc")" "$_uv_host_kind"
+    vm_write_stop_script "$(cat "$_uv_desc")" "$_uv_host_kind"
+
+    # Bundle/domain pass — only for enabled descriptors (mirrors setup).
+    if [ "$_uv_enabled" != "true" ]; then
+      say "unpack — descriptor '$_uv_name' is disabled; scripts rendered, no bundle/domain"
+      continue
+    fi
+    case "$(uname -s)" in
+      Darwin)
+        if [ "$_uv_type" = "macOS" ]; then
+          # macOS/tart guests are managed by Tart's own store (kept by pack);
+          # nothing beyond the scripts pass applies here.
+          say "unpack — macOS/tart guest '$_uv_name' is managed by Tart; nothing else to regenerate"
+          continue
+        fi
+        _uv_bundle="$VM_DIR/${_uv_name}.utm"
+        _uv_plist_template="${HOME}/.local/share/nucleus/vms/${_uv_name}-config.plist"
+        if [ ! -f "$_uv_plist_template" ]; then
+          warn "unpack — UTM config template not found: $_uv_plist_template (apply the macOS config on this host first)"
+          continue
+        fi
+        say "unpack — recreating UTM bundle from descriptor: $_uv_bundle"
+        if [ "$dry_run" = false ]; then
+          if [ -e "$_uv_bundle" ]; then
+            say "unpack — removing stale UTM bundle: $_uv_bundle"
+            rm -rf "$_uv_bundle"
+          fi
+          mkdir -p "$_uv_bundle/Data"
+          if [ "$_uv_type" = "Android" ]; then
+            # Android: system/GSI come from images/ (kept prebuilts, read
+            # only — copied like setup so writes never corrupt the golden);
+            # userdata comes from data/<id>.qcow2 (payload) and is linked
+            # (G1a write-through), mirroring vm_setup_utm.
+            _uv_android_system="$IMAGES_DIR/$(jq -r '.Android.systemImage' "$_uv_desc")"
+            _uv_android_userdata="$VM_DIR/data/$(jq -r '.Android.userdataImage' "$_uv_desc")"
+            _uv_android_gsi="$IMAGES_DIR/$(jq -r '.Android.gsiImage' "$_uv_desc")"
+            if [ ! -f "$_uv_android_userdata" ]; then
+              warn "unpack — Android userdata missing: $_uv_android_userdata; skipping bundle for '$_uv_name'"
+              continue
+            fi
+            cp "$_uv_android_system" "$_uv_bundle/Data/disk-main.qcow2"
+            ln -f "$_uv_android_userdata" "$_uv_bundle/Data/$(basename "$_uv_android_userdata")"
+            if [ -f "$_uv_android_gsi" ]; then
+              cp "$_uv_android_gsi" "$_uv_bundle/Data/$(basename "$_uv_android_gsi")"
+            fi
+          else
+            # Base/overlay: base cp from the kept prebuilt; overlay recreated
+            # only when absent (never rebuilt — its content is user data).
+            if ! vm_unpack_ensure_base_overlay "$_uv_name" "$_uv_type"; then
+              continue
+            fi
+            ln -f "$IMAGES_DIR/${_uv_type}.base.qcow2" "$_uv_bundle/Data/${_uv_type}.base.qcow2"
+            ln -f "$VM_DIR/data/${_uv_name}.qcow2" "$_uv_bundle/Data/disk-main.qcow2"
+          fi
+          cp "$_uv_plist_template" "$_uv_bundle/config.plist"
+          chmod +w "$_uv_bundle/config.plist"
+          if ! "$UTMCTL" list | awk 'NR > 1 { print $3 }' | grep -qxF "$_uv_name"; then
+            say "opening UTM bundle in place: $_uv_bundle"
+            if open "$_uv_bundle"; then
+              if wait_for_utm_registration "$_uv_name"; then
+                say "UTM VM opened and registered: $_uv_name"
+              else
+                warn "UTM did not register VM '$_uv_name' within timeout; open UTM and retry vm-unpack"
+              fi
+            else
+              warn "opening $_uv_bundle failed; ensure UTM can access the managed VM directory and retry"
+            fi
+          else
+            say "UTM VM already registered: $_uv_name"
+          fi
+        else
+          dry_run "recreate UTM bundle $_uv_bundle (cp plist template + link disks into Data/ + open)"
+        fi
+        ;;
+      Linux)
+        _uv_xml_file="/etc/nucleus/vms/${_uv_name}-domain.xml"
+        if [ ! -f "$_uv_xml_file" ]; then
+          warn "unpack — libvirt domain XML not found: $_uv_xml_file (apply the NixOS config on this host first)"
+          continue
+        fi
+        say "unpack — defining libvirt domain from descriptor: $_uv_name"
+        if [ "$dry_run" = false ]; then
+          if [ "$_uv_type" = "Android" ]; then
+            # Android images are referenced directly by the domain XML
+            # (mirrors vm_setup_libvirt); just validate the payload exists.
+            _uv_android_system="$IMAGES_DIR/$(jq -r '.Android.systemImage' "$_uv_desc")"
+            _uv_android_userdata="$VM_DIR/data/$(jq -r '.Android.userdataImage' "$_uv_desc")"
+            _uv_android_gsi="$IMAGES_DIR/$(jq -r '.Android.gsiImage' "$_uv_desc")"
+            if [ ! -f "$_uv_android_system" ] || [ ! -f "$_uv_android_userdata" ]; then
+              warn "unpack — Android images missing for '$_uv_name': $_uv_android_system, $_uv_android_userdata"
+              continue
+            fi
+            if [ -f "$_uv_android_gsi" ]; then
+              say "unpack — Android GSI present: $_uv_android_gsi"
+            fi
+          else
+            if ! vm_unpack_ensure_base_overlay "$_uv_name" "$_uv_type"; then
+              continue
+            fi
+          fi
+          virsh define "$_uv_xml_file"
+        else
+          dry_run "define libvirt domain from $_uv_xml_file"
+        fi
+        ;;
+      MINGW*|MSYS*|CYGWIN*)
+        say "unpack — Windows host: start/stop scripts re-rendered above; no bundle/domain to regenerate for '$_uv_name'"
+        ;;
+    esac
+  done
+
+  # Refresh the pack/unpack wrappers once for the whole tree.
+  vm_write_pack_unpack_scripts
+
+  say "unpack — summary: regenerated wrappers for $_uv_desc_count descriptor(s) in $VM_DIR"
+  if [ "$dry_run" = true ]; then
+    say "unpack — dry-run: nothing was regenerated; pass --force to perform"
   fi
 }

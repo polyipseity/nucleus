@@ -1038,13 +1038,13 @@ let
   test_vm_resize_cli_subcommand =
     assert'
       (
-        (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack [vm...] [options]" vm_setup_sh_text)
+        (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
         && (lib.hasInfix "resize <vm> <size>" vm_setup_sh_text)
         && (lib.hasInfix "--allow-shrink) allow_shrink=true" vm_setup_sh_text)
         && (lib.hasInfix "do_resize() {" vm_setup_sh_text)
         && (lib.hasInfix "disk_bytes=\"\$(parse_size \"$size_arg\")\" || exit 1" vm_setup_sh_text)
         && (lib.hasInfix "vm_resize_vm \"$vm_name\" \"$disk_bytes\" \"$allow_shrink\"" vm_setup_sh_text)
-        && (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack) \"do_$action\" ;;") vm_setup_sh_text
+        && (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) \"do_$action\" ;;") vm_setup_sh_text
       )
       "scripts/vm.sh must wire the resize subcommand (usage, dispatch, parse_size, --allow-shrink) to vm_resize_vm";
 
@@ -1053,7 +1053,7 @@ let
   test_vm_resize_windows_twin =
     assert'
       (
-        (lib.hasInfix "reset', 'resize', 'gc', 'pack'" vm_ps1_text)
+        (lib.hasInfix "reset', 'resize', 'gc', 'pack', 'unpack'" vm_ps1_text)
         && (lib.hasInfix "'resize'  { Invoke-VmResize }" vm_ps1_text)
         && (lib.hasInfix "function Invoke-VmResize {" vm_ps1_text)
         && (lib.hasInfix "'--allow-shrink' { $allowShrink = $true }" vm_ps1_text)
@@ -1067,9 +1067,9 @@ let
   test_vm_pack_cli_subcommand =
     assert'
       (
-        (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack [vm...] [options]" vm_setup_sh_text)
+        (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
         && (lib.hasInfix "pack                     Strip trivially regenerable artifacts" vm_setup_sh_text)
-        && (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack) \"do_$action\" ;;" vm_setup_sh_text)
+        && (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) \"do_$action\" ;;" vm_setup_sh_text)
         && (lib.hasInfix "do_pack() {" vm_setup_sh_text)
         && (lib.hasInfix "if [ \"$force\" != true ]; then" vm_setup_sh_text)
         && (lib.hasInfix "vm_pack_vms" vm_setup_sh_text)
@@ -1106,13 +1106,62 @@ let
   test_vm_pack_windows_twin =
     assert'
       (
-        (lib.hasInfix "'gc', 'pack'" vm_ps1_text)
+        (lib.hasInfix "'gc', 'pack', 'unpack'" vm_ps1_text)
         && (lib.hasInfix "'pack'    { Invoke-VmPack }" vm_ps1_text)
         && (lib.hasInfix "function Invoke-VmPack {" vm_ps1_text)
         && (lib.hasInfix "'--force' { $perform = $true }" vm_ps1_text)
         && (lib.hasInfix "cannot pack while a VM is running" vm_ps1_text)
       )
       "scripts/vm.ps1 must mirror the pack subcommand (ValidateSet, dispatch, Invoke-VmPack with --force)";
+
+  # The unpack subcommand must be wired into the CLI: usage synopsis + body,
+  # dispatch, do_unpack, and vm_unpack_vms regenerating from descriptors
+  # (BOTH start/stop variants, enabled or disabled) plus the wrappers.
+  test_vm_unpack_cli_subcommand =
+    assert'
+      (
+        (lib.hasInfix "unpack                   Regenerate per-platform VM artifacts" vm_setup_sh_text)
+        && (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) \"do_$action\" ;;" vm_setup_sh_text)
+        && (lib.hasInfix "do_unpack() {" vm_setup_sh_text)
+        && (lib.hasInfix "vm_unpack_vms() {" vm_setup_sh_text)
+        && (lib.hasInfix "\"$VM_DIR\"/*.vm.json" vm_setup_sh_text)
+        && (lib.hasInfix "vm_write_start_script \"$(cat \"$_uv_desc\")\" \"$_uv_host_kind\"" vm_setup_sh_text)
+        && (lib.hasInfix "vm_write_stop_script \"$(cat \"$_uv_desc\")\" \"$_uv_host_kind\"" vm_setup_sh_text)
+        && (lib.hasInfix "vm_write_pack_unpack_scripts" vm_setup_sh_text)
+      )
+      "scripts/vm.sh must wire the unpack subcommand (usage, dispatch, do_unpack, vm_unpack_vms over descriptors)";
+
+  # unpack must gate bundle/domain creation on enabled descriptors (mirrors
+  # setup) and consume copied data files as-is.
+  test_vm_unpack_enabled_gate =
+    assert'
+      (
+        (lib.hasInfix "if [ \"$_uv_enabled\" != \"true\" ]; then" vm_setup_sh_text)
+        && (lib.hasInfix "descriptor '$_uv_name' is disabled; scripts rendered, no bundle/domain" vm_setup_sh_text)
+        && (lib.hasInfix "data files are consumed" vm_setup_sh_text)
+      )
+      "vm_unpack_vms must gate bundle/domain creation on enabled descriptors and consume data files as-is";
+
+  # vm_vm_json must prefer the on-disk descriptor and fall back to the
+  # manifest entry so rendering works on a fresh tree (setup-side) and from
+  # descriptors on a packed tree (unpack-side).
+  test_vm_unpack_descriptor_first = assert' (
+    (lib.hasInfix "vm_vm_json() {" vm_setup_sh_text)
+    && (lib.hasInfix "vm_descriptor_path" vm_setup_sh_text)
+    && (lib.hasInfix ".VMs[] | select(.id == $n)" vm_setup_sh_text)
+  ) "vm.sh must provide vm_vm_json with descriptor-first, manifest-fallback JSON for VM rendering";
+
+  # The Windows twin must mirror the unpack subcommand: ValidateSet, dispatch,
+  # Invoke-VmUnpack with --dry-run support.
+  test_vm_unpack_windows_twin =
+    assert'
+      (
+        (lib.hasInfix "'gc', 'pack', 'unpack'" vm_ps1_text)
+        && (lib.hasInfix "'unpack'  { Invoke-VmUnpack }" vm_ps1_text)
+        && (lib.hasInfix "function Invoke-VmUnpack {" vm_ps1_text)
+        && (lib.hasInfix "'--dry-run' { $perform = $false }" vm_ps1_text)
+      )
+      "scripts/vm.ps1 must mirror the unpack subcommand (ValidateSet, dispatch, Invoke-VmUnpack with --dry-run)";
 
   # The Packer failure branch for the macOS build must print a human-readable
   # error and return the captured exit code.
@@ -2183,6 +2232,10 @@ let
     test_vm_pack_removal_set
     test_vm_pack_next_steps
     test_vm_pack_windows_twin
+    test_vm_unpack_cli_subcommand
+    test_vm_unpack_enabled_gate
+    test_vm_unpack_descriptor_first
+    test_vm_unpack_windows_twin
     test_vm_gc_keep_set_preserves_manifest_images
     test_vm_gc_orphan_descriptors_removed
     test_vm_gc_marker_expected_set_semantics
@@ -2343,6 +2396,10 @@ in
     test_vm_pack_removal_set
     test_vm_pack_next_steps
     test_vm_pack_windows_twin
+    test_vm_unpack_cli_subcommand
+    test_vm_unpack_enabled_gate
+    test_vm_unpack_descriptor_first
+    test_vm_unpack_windows_twin
     test_vm_gc_keep_set_preserves_manifest_images
     test_vm_gc_orphan_descriptors_removed
     test_vm_gc_marker_expected_set_semantics

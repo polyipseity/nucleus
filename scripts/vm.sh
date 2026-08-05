@@ -4,7 +4,7 @@
 # previously scattered across vm-setup.sh (now vm.sh) and host-specific scripts.
 # VMs are defined in src/modules/VMs.json (the canonical manifest).
 #
-# Commands: setup|list|status|start|stop|upgrade|reset|gc [vm...] [options].
+# Commands: setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack [vm...] [options].
 # Guest credentials are resolved from the per-user SOPS secret file referenced
 # by users.json vmGuest keys; see resolve_vm_guest_credentials.
 #
@@ -160,7 +160,7 @@ vm_guest_credentials_hash() {
 # ---------------------------------------------------------------------------
 
 usage() {
-  usage_std "$(basename "$0")" "setup|list|status|start|stop|upgrade|reset|gc|resize|pack [vm...] [options]"
+  usage_std "$(basename "$0")" "setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack [vm...] [options]"
   cat <<'EOF'
   setup                    Build images and provision VMs (full lifecycle).
   list                     List all VMs from manifest with runtime status.
@@ -181,6 +181,13 @@ usage() {
                           images/*-build/ + stale dot-dirs) so the tree can be copied
                           as-is to another host. Dry-run by default; pass --force to
                           perform. Refuses while any VM is running.
+  unpack                   Regenerate per-platform VM artifacts (start/stop scripts +
+                          pack/unpack wrappers, UTM bundles, libvirt domains) from the
+                          <id>.vm.json descriptors in the VM directory. Complements
+                          pack: run it on the target host after copying a packed tree.
+                          Requires the target's nucleus config applied (provides the
+                          Nix-rendered plist/domain templates); data files are consumed
+                          as-is. Pass --dry-run to preview.
 
   --dry-run                     Print planned actions without executing (default: off).
   --accept-gsi-license          Accept the GSI license for Android GSI downloads.
@@ -261,7 +268,7 @@ while [ "$#" -gt 0 ]; do
     --mido-script) NUCLEUS_MIDO_SCRIPT="$2"; shift 2 ;;
     --json) json_output=true; shift ;;
     --repo-root) repo_root_override="$2"; shift 2 ;;
-    setup|list|status|start|stop|upgrade|reset|gc|resize|pack)
+    setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack)
       action="$1"; shift
       vm_args=("$@")
       break
@@ -295,7 +302,7 @@ for arg in "${vm_args[@]}"; do
   esac
 done
 
-[ -z "$action" ] && { error "missing action (setup, list, status, start, stop, upgrade, reset, gc, resize, pack)" ; usage >&2 ; exit 1; }
+[ -z "$action" ] && { error "missing action (setup, list, status, start, stop, upgrade, reset, gc, resize, pack, unpack)" ; usage >&2 ; exit 1; }
 
 # Validate scalars
 # WHY: validating before dispatch fails fast with a precise message instead
@@ -907,10 +914,33 @@ do_pack() {
   nuc_done
 }
 
+# do_unpack
+#   Regenerates per-platform VM artifacts (start/stop scripts + pack/unpack
+#   wrappers, UTM bundles, libvirt domains) from the <id>.vm.json descriptors
+#   in the VM directory, after copying a packed tree to the target host.
+#   WHY: unpack complements pack — pack strips regenerable wrappers, unpack
+#   rebuilds them from the descriptors on the destination.  Requires the
+#   target's nucleus config applied (provides the Nix-rendered plist/domain
+#   templates); data files are consumed as-is.  Default is perform; --dry-run
+#   previews.
+do_unpack() {
+  REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
+  resolve_manifest
+  NUCLEUS_HOST="$(resolve_nucleus_host)"
+
+  VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
+  IMAGES_DIR="$VM_DIR/images"
+
+  require_command jq
+
+  vm_unpack_vms
+  nuc_done
+}
+
 # ---------------------------------------------------------------------------
 # Dispatch
 # ---------------------------------------------------------------------------
 
 case "$action" in
-  setup|list|status|start|stop|upgrade|reset|gc|resize|pack) "do_$action" ;;
+  setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) "do_$action" ;;
 esac

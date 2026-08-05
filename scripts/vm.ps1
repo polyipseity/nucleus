@@ -3,7 +3,7 @@
   Unified VM management for Windows.
 
 .DESCRIPTION
-  Subcommands: setup, list, status, start, stop, upgrade, reset, resize, gc, pack.
+  Subcommands: setup, list, status, start, stop, upgrade, reset, resize, gc, pack, unpack.
 
   setup:   Build VM images (if needed) and provision VMs.
            Delegates to Invoke-VMSetup.ps1 (phase 1: Packer build,
@@ -24,9 +24,15 @@
            dot-dirs) so the tree can be copied as-is to another host.
            Dry-run by default; pass --force to perform. Refuses while any
            VM is running.
+  unpack:  Regenerate per-platform VM artifacts (start/stop scripts +
+           pack/unpack wrappers) from the <id>.vm.json descriptors in the
+           VM directory, after copying a packed tree to this host.
+           Complements pack; re-renders start/stop scripts (PowerShell) for
+           every descriptor, enabled or disabled. Data files are consumed
+           as-is. Pass --dry-run to preview.
 
 .PARAMETER Action
-  The operation to perform: setup, list, status, start, stop, upgrade, reset, resize, gc, pack.
+  The operation to perform: setup, list, status, start, stop, upgrade, reset, resize, gc, pack, unpack.
 
 .PARAMETER SubcommandArgs
   Additional arguments passed after the subcommand (flags, VM names, etc.).
@@ -44,6 +50,8 @@
   .\vm.ps1 status
   .\vm.ps1 pack
   .\vm.ps1 pack --force
+  .\vm.ps1 unpack
+  .\vm.ps1 unpack --dry-run
 
 .NOTES
   Environment variables: NUCLEUS_REPO_ROOT.
@@ -52,7 +60,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('setup', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'resize', 'gc', 'pack')]
+  [ValidateSet('setup', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'resize', 'gc', 'pack', 'unpack')]
   [string]$Action,
 
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
@@ -72,7 +80,7 @@ $modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-Nucle
 Import-Module $modulePath -Force -DisableNameChecking
 
 if ($Help -or -not $Action) {
-  if (-not $Action) { Write-NucleusError "missing action (setup, list, status, start, stop, upgrade, reset, resize, gc, pack)" }
+  if (-not $Action) { Write-NucleusError "missing action (setup, list, status, start, stop, upgrade, reset, resize, gc, pack, unpack)" }
   Get-Help $PSCommandPath -Detailed
   exit 0
 }
@@ -469,6 +477,174 @@ function Invoke-VmPack {
   }
 }
 
+function Invoke-VmUnpack {
+  $perform = $true
+  foreach ($arg in $SubcommandArgs) {
+    switch ($arg) {
+      '--dry-run' { $perform = $false }
+      default { Write-NucleusWarning "ignoring unknown flag for unpack: $arg" }
+    }
+  }
+
+  $vmDir = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
+  $templatesDir = Join-Path $RepoRoot 'src\vms\templates'
+  $scriptsDir = Join-Path $vmDir 'scripts'
+
+  if (-not $perform) {
+    Write-NucleusInfo 'unpack (dry-run): pass --force to regenerate artifacts'
+  }
+
+  $descriptors = @(Get-ChildItem -LiteralPath $vmDir -Filter '*.vm.json' -File -ErrorAction SilentlyContinue)
+  if ($descriptors.Count -eq 0) {
+    Write-NucleusInfo "unpack — no descriptors found in $vmDir; run 'nucleus-vm setup' to write them"
+    return
+  }
+
+  foreach ($descriptor in $descriptors) {
+    $vmDoc = Get-Content -LiteralPath $descriptor.FullName -Raw | ConvertFrom-Json
+    if (-not $vmDoc.id) {
+      Write-NucleusWarning "unpack — descriptor without an id, skipping: $($descriptor.FullName)"
+      continue
+    }
+    $vmId = [string]$vmDoc.id
+    $vmType = [string]$vmDoc.type
+
+    # Start script (PowerShell) — the cross-host dispatcher for the
+    # non-Android case; the shared Android start script otherwise.
+    $startPs1Path = Join-Path $scriptsDir "start-$vmId.ps1"
+    $startShPath = Join-Path $scriptsDir "start-$vmId.sh"
+    $stopPs1Path = Join-Path $scriptsDir "stop-$vmId.ps1"
+
+    if ($vmType -eq 'Android') {
+      $androidTemplate = Join-Path $RepoRoot 'src\scripts\vms\start-android-vm.ps1'
+      if (Test-Path -LiteralPath $androidTemplate -PathType Leaf) {
+        $ramBytes = ConvertFrom-SizeString $vmDoc.ram
+        $adbPort = @($vmDoc.portForwards | Where-Object { $_.guestPort -eq 5555 } | Select-Object -First 1 -ExpandProperty hostPort)
+        $adbConsolePort = @($vmDoc.portForwards | Where-Object { $_.guestPort -eq 5554 } | Select-Object -First 1 -ExpandProperty hostPort)
+        $content = (Get-Content -LiteralPath $androidTemplate -Raw)
+        $content = $content.Replace('__ANDROID_CPU_COUNT__', [string]$vmDoc.cpus)
+        $content = $content.Replace('__ANDROID_RAM_BYTES__', "$ramBytes" + 'B')
+        $content = $content.Replace('__ANDROID_SYSTEM_IMAGE__', [string]$vmDoc.Android.systemImage)
+        $content = $content.Replace('__ANDROID_USERDATA_IMAGE__', [string]$vmDoc.Android.userdataImage)
+        $content = $content.Replace('__ANDROID_GSI_IMAGE__', [string]$vmDoc.Android.gsiImage)
+        $content = $content.Replace('__ADB_PORT__', [string]$adbPort)
+        $content = $content.Replace('__ADB_CONSOLE_PORT__', [string]$adbConsolePort)
+        Write-VmUnpackFile -Path $startPs1Path -Content $content -Perform $perform
+      } else {
+        Write-NucleusWarning "unpack — shared Android start script not found: $androidTemplate"
+      }
+    } else {
+      # Windows QEMU start scripts mirror Invoke-VMSetup.ps1 rendering: the
+      # cross-host templates stay single-source and all tokens come from the
+      # descriptor JSON document.
+      $hostFwds = @($vmDoc.portForwards | ForEach-Object { "hostfwd=tcp::$($_.hostPort)-:$($_.guestPort)" }) -join ','
+      $ramBytes = ConvertFrom-SizeString $vmDoc.ram
+      $diskPath = Join-Path -Path $vmDir -ChildPath 'data' -AdditionalChildPath "$vmId.qcow2"
+      $qemuArch = if ($env:PROCESSOR_ARCHITECTURE -match 'ARM64|ARM') { 'aarch64' } else { 'x86_64' }
+      $qemuSystem = Join-Path $env:USERPROFILE "scoop\apps\qemu\current\qemu-system-$qemuArch.exe"
+      $machine = if ($qemuArch -eq 'x86_64') { 'q35' } else { 'virt' }
+
+      $startPs1Template = Join-Path $templatesDir 'start-windows.ps1'
+      if (Test-Path -LiteralPath $startPs1Template -PathType Leaf) {
+        $content = (Get-Content -LiteralPath $startPs1Template -Raw)
+        $content = $content.Replace('__QEMU_SYSTEM__', $qemuSystem)
+        $content = $content.Replace('__VM_NAME__', $vmId)
+        $content = $content.Replace('__VM_DISPLAY__', [string]$vmDoc.name)
+        $content = $content.Replace('__MACHINE__', $machine)
+        $content = $content.Replace('__CPU__', 'host')
+        $content = $content.Replace('__CPUS__', [string]$vmDoc.cpus)
+        $content = $content.Replace('__RAM_BYTES__', [string]$ramBytes)
+        $content = $content.Replace('__DISK_PATH__', $diskPath)
+        $content = $content.Replace('__HOSTFWDS__', $hostFwds)
+        $content = $content.Replace('__VGA__', 'std')
+        $content = $content.Replace('__DISPLAY_BACKEND__', 'sdl')
+        $content = $content.Replace('__VIRTIOFS_ARGS__', '')
+        Write-VmUnpackFile -Path $startPs1Path -Content $content -Perform $perform
+      } else {
+        Write-NucleusWarning "unpack — start-windows.ps1 template not found: $startPs1Template"
+      }
+
+      $startShTemplate = Join-Path $templatesDir 'start-windows-host.sh'
+      if (Test-Path -LiteralPath $startShTemplate -PathType Leaf) {
+        $content = (Get-Content -LiteralPath $startShTemplate -Raw)
+        $content = $content.Replace('__QEMU_SYSTEM__', $qemuSystem)
+        $content = $content.Replace('__VM_NAME__', $vmId)
+        $content = $content.Replace('__VM_DISPLAY__', [string]$vmDoc.name)
+        $content = $content.Replace('__MACHINE__', $machine)
+        $content = $content.Replace('__CPU__', 'host')
+        $content = $content.Replace('__CPUS__', [string]$vmDoc.cpus)
+        $content = $content.Replace('__RAM_BYTES__', [string]$ramBytes)
+        $content = $content.Replace('__DISK_PATH__', $diskPath)
+        $content = $content.Replace('__HOSTFWDS__', $hostFwds)
+        $content = $content.Replace('__VGA__', 'std')
+        $content = $content.Replace('__DISPLAY_BACKEND__', 'sdl')
+        Write-VmUnpackFile -Path $startShPath -Content $content -Perform $perform
+      } else {
+        Write-NucleusWarning "unpack — start-windows-host.sh template not found: $startShTemplate"
+      }
+    }
+
+    # Stop script (PowerShell).  The .sh variant is not rendered for
+    # windows-qemu hosts (stop-posix.sh dispatches to tart/utmctl/virsh only),
+    # mirroring the POSIX lib.
+    $stopPs1Template = Join-Path $templatesDir 'stop-host.ps1'
+    if (Test-Path -LiteralPath $stopPs1Template -PathType Leaf) {
+      $content = (Get-Content -LiteralPath $stopPs1Template -Raw)
+      $content = $content.Replace('__HOST_KIND__', 'windows-qemu')
+      $content = $content.Replace('__VM_NAME__', $vmId)
+      Write-VmUnpackFile -Path $stopPs1Path -Content $content -Perform $perform
+    } else {
+      Write-NucleusWarning "unpack — stop-host.ps1 template not found: $stopPs1Template"
+    }
+  }
+
+  # Refresh the pack/unpack wrappers (BOTH variants) for the whole tree.
+  if ($perform) {
+    if (-not (Test-Path -LiteralPath $scriptsDir)) { New-Item -ItemType Directory -Path $scriptsDir -Force | Out-Null }
+  }
+  Write-VmUnpackFile -Path (Join-Path $scriptsDir 'pack.sh') -Content @'
+#!/usr/bin/env bash
+set -euo pipefail
+exec nucleus-vm pack "$@"
+'@ -Perform $perform
+  Write-VmUnpackFile -Path (Join-Path $scriptsDir 'unpack.sh') -Content @'
+#!/usr/bin/env bash
+set -euo pipefail
+exec nucleus-vm unpack "$@"
+'@ -Perform $perform
+  Write-VmUnpackFile -Path (Join-Path $scriptsDir 'pack.ps1') -Content @'
+# Generated by nucleus-vm setup — pack.ps1. Delegates to nucleus-vm pack.
+& nucleus-vm pack @args
+'@ -Perform $perform
+  Write-VmUnpackFile -Path (Join-Path $scriptsDir 'unpack.ps1') -Content @'
+# Generated by nucleus-vm setup — unpack.ps1. Delegates to nucleus-vm unpack.
+& nucleus-vm unpack @args
+'@ -Perform $perform
+
+  Write-NucleusInfo "unpack — summary: regenerated wrappers for $($descriptors.Count) descriptor(s) in $vmDir"
+  if (-not $perform) {
+    Write-NucleusInfo 'unpack — dry-run: nothing was regenerated; pass --force to perform'
+  }
+}
+
+# Write-VmUnpackFile PATH CONTENT PERFORM
+#   Writes PATH unless PERFORM is false (dry-run prints the planned write).
+function Write-VmUnpackFile {
+  param(
+    [Parameter(Mandatory = $true)][string]$Path,
+    [Parameter(Mandatory = $true)][string]$Content,
+    [Parameter(Mandatory = $true)][bool]$Perform
+  )
+  if ($Perform) {
+    $parent = Split-Path -Parent $Path
+    if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+    Set-Content -LiteralPath $Path -Value $Content -Encoding UTF8
+    Write-NucleusInfo "unpack — wrote $Path"
+  } else {
+    Write-NucleusInfo "unpack (dry-run): would write $Path"
+  }
+}
+
 # ---------------------------------------------------------------------------
 # Dispatch
 # ---------------------------------------------------------------------------
@@ -484,4 +660,5 @@ switch ($Action) {
   'resize'  { Invoke-VmResize }
   'gc'      { Invoke-VmGc }
   'pack'    { Invoke-VmPack }
+  'unpack'  { Invoke-VmUnpack }
 }
