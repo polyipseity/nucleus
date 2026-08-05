@@ -7,8 +7,9 @@
 # cannot drift from Nix. The real shell twin is also sourced and exercised
 # through vm_init against a fixture manifest: emitted descriptors are checked
 # against a golden object, per-field invariants, and vm-descriptor.schema.json
-# via check-jsonschema. Later phases extend this file with sandboxed qemu-img
-# disk-model tests (overlay creation, backing-file paths, resize).
+# via check-jsonschema. Sandboxed qemu-img tests exercise the base/overlay
+# provisioning helper (vm_ensure_base_and_overlay): base copy, relative backing
+# paths, invalid-overlay skip, drift refresh, and grow-only auto-grow.
 #
 # Run with: bash tests/scripts/vm-disk-model-tests.sh
 
@@ -92,9 +93,9 @@ test_descriptor_writer() {
       "portForwards": [{"guestPort": 5555, "hostPort": 5555}, {"guestPort": 5554, "hostPort": 5554}],
       "macAddressPrefix": "52",
       "Android": {
-        "systemImage": "android-system.qcow2",
-        "userdataImage": "android-userdata.qcow2",
-        "gsiImage": "android-gsi.img",
+        "systemImage": "Android-system.qcow2",
+        "userdataImage": "Android.qcow2",
+        "gsiImage": "Android-gsi.img",
         "gsiUrl": "https://example.invalid/gsi.zip"
       }
     },
@@ -129,7 +130,7 @@ EOF
 
   vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
     "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
-    "$_vms_dir" "$_manifest" "MacBook" "false"
+    "$_vms_dir" "$_manifest" "MacBook" "false" "false"
 
   vm_write_descriptors
 
@@ -166,9 +167,9 @@ EOF
       ],
       createdBy: "nucleus-vm",
       Android: {
-        systemImage: "android-system.qcow2",
-        userdataImage: "android-userdata.qcow2",
-        gsiImage: "android-gsi.img",
+        systemImage: "Android-system.qcow2",
+        userdataImage: "Android.qcow2",
+        gsiImage: "Android-gsi.img",
         gsiUrl: "https://example.invalid/gsi.zip"
       }
     }
@@ -201,11 +202,113 @@ EOF
   fi
 }
 
+# Stub: the running-VM probe lives in scripts/vm.sh, not the lib; unit tests
+# control it directly.
+vm_get_running_names() {
+  printf ''
+}
+
+# test_base_overlay_provisioning
+#   Sandboxed qemu-img tests for vm_ensure_base_and_overlay.  Builds a small
+#   pre-built golden image and verifies the five provisioning cases against a
+#   scratch VM_DIR.
+require_command qemu-img
+
+test_base_overlay_provisioning() {
+  local _vm_dir="$_tmp/p2/vm" _images_dir="$_tmp/p2/vm/images" _vms_dir="$_tmp/p2/vms"
+  local _manifest="$_tmp/p2/manifest.json"
+  local _prebuilt _base _overlay _cred_marker _config_marker
+  local _before_hash _after_hash _virtual_size
+
+  mkdir -p "$_vm_dir" "$_images_dir" "$_vms_dir"
+
+  cat > "$_manifest" <<'EOF'
+{
+  "VMs": [
+    {
+      "id": "NixOS",
+      "name": "NixOS",
+      "type": "NixOS",
+      "enabled": false,
+      "hosts": ["NixOS"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "16GB",
+      "portForwards": [],
+      "macAddressPrefix": "52"
+    }
+  ]
+}
+EOF
+
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+    "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
+    "$_vms_dir" "$_manifest" "NixOS" "false" "false"
+  vm_guest_credentials_fingerprint="test-fingerprint"
+
+  _prebuilt="$_images_dir/NixOS.qcow2"
+  _base="$_images_dir/NixOS.base.qcow2"
+  _overlay="$_vm_dir/data/NixOS.qcow2"
+  _cred_marker="$(vm_guest_credentials_marker_path NixOS "$_overlay")"
+  _config_marker="$(vm_guest_config_marker_path NixOS "$_overlay")"
+
+  qemu-img create -f qcow2 "$_prebuilt" 16M >/dev/null
+
+  # Case 1: base missing → copied from the pre-built golden image.
+  vm_ensure_base_and_overlay NixOS "$_prebuilt" 0 16777216 "$_cred_marker" "$_config_marker" "" >/dev/null 2>&1
+  assert_eq "0" "$([ -f "$_base" ] && echo 0 || echo 1)" "base created from prebuilt"
+
+  # Case 2: overlay missing → created with a RELATIVE backing path + markers.
+  assert_eq "0" "$([ -f "$_overlay" ] && echo 0 || echo 1)" "overlay created"
+  assert_eq "1" "$(qemu-img info "$_overlay" | grep -cF 'backing file: ../images/NixOS.base.qcow2')" "overlay relative backing path"
+  assert_eq "test-fingerprint" "$(tr -d '\r\n' <"$_cred_marker")" "credential marker written on overlay create"
+
+  # Case 3: overlay invalid → preserved without --force, recreated with it.
+  printf 'garbage' > "$_overlay"
+  vm_ensure_base_and_overlay NixOS "$_prebuilt" 0 16777216 "$_cred_marker" "$_config_marker" "" >/dev/null 2>&1
+  assert_eq "garbage" "$(cat "$_overlay")" "invalid overlay preserved without --force"
+  force=true
+  vm_ensure_base_and_overlay NixOS "$_prebuilt" 0 16777216 "$_cred_marker" "$_config_marker" "" >/dev/null 2>&1
+  force=false
+  validate_qcow2_image "$_overlay" "overlay after --force recreate" 0 >/dev/null 2>&1
+  assert_eq "0" "$?" "overlay valid after --force recreate"
+  assert_eq "test-fingerprint" "$(tr -d '\r\n' <"$_cred_marker")" "credential marker rewritten after --force recreate"
+
+  # Case 4: credential drift → base replaced from prebuilt, overlay + markers refreshed.
+  _before_hash="$(vm_sha256_input < "$_overlay")"
+  printf 'stale-fingerprint\n' > "$_cred_marker"
+  vm_ensure_base_and_overlay NixOS "$_prebuilt" 0 16777216 "$_cred_marker" "$_config_marker" "" >/dev/null 2>&1
+  _after_hash="$(vm_sha256_input < "$_overlay")"
+  assert_eq "$_before_hash" "$_after_hash" "overlay preserved across credential drift"
+  assert_eq "test-fingerprint" "$(tr -d '\r\n' <"$_cred_marker")" "credential marker refreshed after drift"
+
+  # Case 4b: running VM → base refresh skipped.
+  # shellcheck disable=SC2329 # reason: stub invoked indirectly by vm_ensure_base_and_overlay's running-VM guard; shellcheck cannot trace the call
+  vm_get_running_names() { printf 'NixOS\n'; }
+  printf 'stale-again\n' > "$_cred_marker"
+  _before_hash="$(vm_sha256_input < "$_base")"
+  vm_ensure_base_and_overlay NixOS "$_prebuilt" 0 16777216 "$_cred_marker" "$_config_marker" "" >/dev/null 2>&1
+  _after_hash="$(vm_sha256_input < "$_base")"
+  assert_eq "$_before_hash" "$_after_hash" "base not refreshed while VM is running"
+  assert_eq "stale-again" "$(tr -d '\r\n' <"$_cred_marker")" "credential marker not refreshed while VM is running"
+  # shellcheck disable=SC2329 # reason: stub restored to empty after indirect use by vm_ensure_base_and_overlay
+  vm_get_running_names() { printf ''; }
+
+  # Case 5: grow-only auto-grow (never shrink).
+  vm_ensure_base_and_overlay NixOS "$_prebuilt" 0 33554432 "$_cred_marker" "$_config_marker" "" >/dev/null 2>&1
+  _virtual_size="$(qemu-img info --output=json "$_overlay" | jq -r '."virtual-size" // 0')"
+  assert_eq "33554432" "$_virtual_size" "overlay grown to manifest disk size"
+  vm_ensure_base_and_overlay NixOS "$_prebuilt" 0 16777216 "$_cred_marker" "$_config_marker" "" >/dev/null 2>&1
+  _virtual_size="$(qemu-img info --output=json "$_overlay" | jq -r '."virtual-size" // 0')"
+  assert_eq "33554432" "$_virtual_size" "overlay not shrunk when manifest disk size decreased"
+}
+
 test_uuid_vectors
 test_mac_vectors
 test_deterministic
 test_real_helper_vectors
 test_descriptor_writer
+test_base_overlay_provisioning
 
 if [ "$_failures" -eq 0 ]; then
   echo "vm-disk-model-tests: all checks passed"

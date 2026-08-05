@@ -77,7 +77,7 @@ let
       + "    </disk>\n"
       + "    <disk type='file' device='disk'>\n"
       + "      <driver name='qemu' type='qcow2'/>\n"
-      + "      <source file='${vmDir}/images/${vm.Android.userdataImage}'/>\n"
+      + "      <source file='${vmDir}/data/${vm.id}.qcow2'/>\n"
       + "      <target dev='vdb' bus='virtio'/>\n"
       + "    </disk>\n"
       + lib.optionalString ((vm ? Android) && vm.Android.gsiUrl != null) (

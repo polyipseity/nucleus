@@ -7,18 +7,21 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
 ```
 __VM_DIR_DISPLAY__/
 ├── .tart/                              — Tart VM store (macOS only; symlinked from ~/.tart)
-├── images/                             — build outputs, temporary build dirs, installer cache
-│   ├── <name>.qcow2                    — pre-built guest image
+├── images/                             — read-only type-prefixed base images and build outputs
+│   ├── <type>.base.qcow2               — pristine base image (copied from <id>.qcow2 at setup)
+│   ├── <name>.qcow2                    — pre-built guest image (source for <type>.base.qcow2)
 │   ├── <name>-build/                   — temporary Packer build output (safe to delete)
 │   ├── <name>-installer.iso            — cached Windows installer ISO
 │   └── <name>.vm-guest-credentials-sha256 — guest credential fingerprint for build image
-├── scripts/                            — generated start helper scripts
-│   ├── start-<name>.sh                 — POSIX start helper
-│   └── start-<name>.ps1                — PowerShell start helper
+├── data/                               — writable per-guest runtime overlays
+│   └── <id>.qcow2                      — overlay backing ../images/<type>.base.qcow2 (Android: userdata)
+├── scripts/                            — generated helper scripts
+│   ├── start-<name>.sh / .ps1          — start helper variants
+│   ├── stop-<name>.sh / .ps1           — stop helper variants
+│   └── pack.sh / unpack.sh (+ .ps1)    — pack/unpack delegation wrappers
 ├── <name>.utm/                         — UTM bundle directory (macOS only)
 │   ├── config.plist                    — UTM VM configuration
-│   └── Data/disk-main.qcow2            — UTM runtime disk
-├── <name>.qcow2                        — libvirt/QEMU runtime disk (Linux/Windows only)
+│   └── Data/disk-main.qcow2            — hard link to the canonical overlay (Android: userdata)
 ├── <name>.qcow2.vm-guest-credentials-sha256 — guest credential fingerprint for runtime disk
 └── README.md                           — this file
 ```

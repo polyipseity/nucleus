@@ -185,6 +185,9 @@ usage() {
   --gc|--no-gc                  Run GC after setup (default: --no-gc).
   --gc-disabled|--no-gc-disabled  Also clear disabled VM entries during GC
                                 (default: --no-gc-disabled).
+  --force                       Recreate invalid runtime overlays during setup
+                                (default: off; invalid overlays are skipped
+                                with a pointer to 'nucleus-vm reset <vm>').
   --vm-dir-override PATH        Override the default ~/virtual machines path.
   --mido-patch-file PATH        Override runtime Mido patch file path.
   --mido-script PATH            Override the Mido script path.
@@ -209,6 +212,7 @@ windows_headless=true
 accelerator=''
 gc_mode=false
 gc_disabled_mode=false
+force=false
 vm_dir_override=''
 NUCLEUS_MIDO_PATCH_FILE=''
 NUCLEUS_MIDO_SCRIPT=''
@@ -239,6 +243,7 @@ while [ "$#" -gt 0 ]; do
     --no-gc) gc_mode=false; shift ;;
     --gc-disabled) gc_disabled_mode=true; shift ;;
     --no-gc-disabled) gc_disabled_mode=false; shift ;;
+    --force) force=true; shift ;;
     --vm-dir-override) vm_dir_override="$2"; shift 2 ;;
     --mido-patch-file) NUCLEUS_MIDO_PATCH_FILE="$2"; shift 2 ;;
     --mido-script) NUCLEUS_MIDO_SCRIPT="$2"; shift 2 ;;
@@ -266,6 +271,7 @@ for arg in "${vm_args[@]}"; do
     --no-gc) gc_mode=false ;;
     --gc-disabled) gc_disabled_mode=true ;;
     --no-gc-disabled) gc_disabled_mode=false ;;
+    --force) force=true ;;
     --accept-gsi-license) accept_gsi_license=true ;;
     --no-accept-gsi-license) accept_gsi_license=false ;;
     --headful) windows_headless=false ;;
@@ -395,7 +401,7 @@ do_setup() {
     "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
     "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
     "$accept_gsi_license" "false" "false" \
-    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode"
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force"
 
   mkdir -p "$VM_DIR" "$IMAGES_DIR" "$VM_DIR/scripts"
   write_vm_directory_readme
@@ -405,6 +411,17 @@ do_setup() {
   # VMs without a live manifest.
   vm_write_descriptors
 
+  # Prune stale helper scripts from previous runs, then write the complete
+  # all-guests set (start/stop + pack/unpack, both .sh and .ps1 variants).
+  # WHY: leftover scripts from renamed or removed VMs would otherwise be
+  # picked up by do_start/do_stop; the all-guests pass regenerates every
+  # current manifest guest regardless of enable/host-match state.
+  for f in "$VM_DIR/scripts"/*.sh "$VM_DIR/scripts"/*.ps1; do
+    [ -f "$f" ] || continue
+    rm -f "$f"
+  done
+  vm_write_all_guest_scripts
+
   # Darwin-specific environment setup
   if [ "$(uname -s)" = "Darwin" ]; then
     ensure_tart_vm_dir
@@ -412,14 +429,6 @@ do_setup() {
   fi
 
   vm_build_images
-
-  # Prune stale helper scripts from previous runs
-  # WHY: setup regenerates start/stop scripts each run; leftovers from
-  # renamed or removed VMs would otherwise be picked up by do_start/do_stop.
-  for f in "$VM_DIR/scripts"/*.sh "$VM_DIR/scripts"/*.ps1; do
-    [ -f "$f" ] || continue
-    rm -f "$f"
-  done
 
   # Host-specific provisioners
   case "$(uname -s)" in
@@ -759,7 +768,7 @@ do_upgrade() {
     "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
     "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
     "$accept_gsi_license" "true" "false" \
-    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode"
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force"
 
   vm_build_android "$vm_name" "$vm_index" "$accept_gsi_license" "true" "false"
   say "upgrade complete for '$vm_name'"
@@ -808,7 +817,7 @@ do_reset() {
     "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
     "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
     "$accept_gsi_license" "false" "true" \
-    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode"
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force"
 
   vm_build_android "$vm_name" "$vm_index" "$accept_gsi_license" "false" "true"
   say "reset complete for '$vm_name'"

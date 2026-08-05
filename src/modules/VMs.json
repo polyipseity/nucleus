@@ -30,9 +30,9 @@
       "minImageSize": "4GB",
       "macAddressPrefix": "52",
       "Android": {
-        "systemImage": "android-system.qcow2",
-        "userdataImage": "android-userdata.qcow2",
-        "gsiImage": "android-gsi.img",
+        "systemImage": "Android-system.qcow2",
+        "userdataImage": "Android.qcow2",
+        "gsiImage": "Android-gsi.img",
         "gsiUrl": "https://dl.google.com/developers/android/baklava/images/gsi/gsi_gms_arm64-exp-BP4A.251205.006-14401865-f8760221.zip"
       }
     },

@@ -13,7 +13,7 @@
     <emulator>__VM_EMULATOR__</emulator>
     <disk type='file' device='disk'>
       <driver name='qemu' type='qcow2'/>
-      <source file='__VM_DIR__/__VM_NAME__.qcow2'/>
+      <source file='__VM_DIR__/data/__VM_NAME__.qcow2'/>
       <target dev='vda' bus='virtio'/>
     </disk>
     __VM_ANDROID_DISKS__

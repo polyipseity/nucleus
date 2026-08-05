@@ -674,7 +674,7 @@ let
     + "\n  <memory unit='B'>${toString (size.parse vm.ram)}</memory>"
     + "\n  <vcpu>${toString vm.cpus}</vcpu>"
     + "\n  <devices>"
-    + "\n    <source file='${vmDir}/${vm.name}.qcow2'/>"
+    + "\n    <source file='${vmDir}/data/${vm.name}.qcow2'/>"
     + "\n  </devices>"
     + "\n</domain>";
 
@@ -705,7 +705,7 @@ let
     let
       results = builtins.map (
         vm:
-        assert' (lib.hasInfix "virtual machines/${vm.name}.qcow2" (mkDomainXml vm)) "Domain XML for VM '${vm.name}' must use lowercase 'virtual machines' in disk path"
+        assert' (lib.hasInfix "virtual machines/data/${vm.name}.qcow2" (mkDomainXml vm)) "Domain XML for VM '${vm.name}' must use lowercase 'virtual machines' in disk path"
       ) manifest.VMs;
     in
     assert' (builtins.all (r: r == null) results) "Domain XML disk path check failed";
@@ -1158,7 +1158,7 @@ let
         && (lib.hasInfix "NixOS image guest credential drift detected" vm_setup_sh_text)
         && (lib.hasInfix "Windows image guest credential drift detected" vm_setup_sh_text)
         && (lib.hasInfix "macOS guest credential drift detected" vm_setup_sh_text)
-        && (lib.hasInfix "runtime disk guest credential drift detected" vm_setup_sh_text)
+        && (lib.hasInfix "refreshing base from pre-built image (overlay preserved)" vm_setup_sh_text)
         && (lib.hasInfix ".vm-guest-credentials-sha256" vm_setup_sh_text)
         && (lib.hasInfix "Get-VMGuestSecretMarkerPath" windows_vm_setup_ps1_text)
         && (lib.hasInfix "Test-VMGuestSecretMarker" windows_vm_setup_ps1_text)
@@ -1195,7 +1195,7 @@ let
         && (lib.hasInfix "vm_guest_config_fingerprint" vm_setup_sh_text)
         && (lib.hasInfix ".vm-guest-config-sha256" vm_setup_sh_text)
         && (lib.hasInfix "NixOS image guest config drift detected" vm_setup_sh_text)
-        && (lib.hasInfix "runtime disk guest config drift detected" vm_setup_sh_text)
+        && (lib.hasInfix "refreshing base from pre-built image (overlay preserved)" vm_setup_sh_text)
         && (lib.hasInfix "src/flake.lock" vm_setup_sh_text)
       )
       "scripts/vm.sh must rebuild the NixOS image and replace runtime disks when the guest config fingerprint drifts";
@@ -1282,13 +1282,15 @@ let
       )
       "src/modules/core.nix must filter overlap nixpkgs packages by meta.available on Linux (arch-aware, lazy, non-refusing)";
 
-  test_utm_runtime_replacement_requires_valid_prebuilt =
+  test_utm_base_overlay_provisioning =
     assert'
       (
-        (lib.hasInfix "_prebuilt_valid=false" vm_setup_sh_text)
-        && (lib.hasInfix "cannot replace the $vm_name runtime disk because no valid pre-built image is available" vm_setup_sh_text)
+        (lib.hasInfix "vm_ensure_base_and_overlay \"\$vm_name\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
+        && (lib.hasInfix "linked runtime overlay into UTM bundle: \$disk_file" vm_setup_sh_text)
+        && (lib.hasInfix "_base_link=\"\$data_dir/\${vm_type}.base.qcow2\"" vm_setup_sh_text)
+        && (lib.hasInfix "linked base image into UTM bundle: \$_base_link" vm_setup_sh_text)
       )
-      "scripts/vm.sh must refuse to replace UTM runtime disks when the rebuild step did not produce a valid pre-built qcow2";
+      "scripts/vm.sh must provision UTM runtime disks as base/overlay pairs (images/<type>.base.qcow2 base + data/<id>.qcow2 overlay hard-linked into the bundle)";
 
   # UTM provisioning for Android must derive the system/userdata/GSI image
   # filenames from the manifest Android group (never hardcoded android-*
@@ -1298,15 +1300,15 @@ let
     assert'
       (
         (lib.hasInfix ''_android_system="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.systemImage" "$MANIFEST")"'' vm_setup_sh_text)
-        && (lib.hasInfix ''_android_userdata="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.userdataImage" "$MANIFEST")"'' vm_setup_sh_text)
+        && (lib.hasInfix "_android_userdata=\"\$VM_DIR/data/\${vm_name}.qcow2\"" vm_setup_sh_text)
         && (lib.hasInfix ''_android_gsi="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")"'' vm_setup_sh_text)
         && (lib.hasInfix ''_prebuilt="$_android_system"'' vm_setup_sh_text)
         && (lib.hasInfix "_prebuilt_min_size=\"\$(parse_size \"\$(jq -r \".VMs[\$vm_index].minImageSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
         && (lib.hasInfix "copied Android system image" vm_setup_sh_text)
-        && (lib.hasInfix "copied Android userdata disk" vm_setup_sh_text)
+        && (lib.hasInfix "linked Android userdata disk" vm_setup_sh_text)
         && (lib.hasInfix "Android userdata image not found" vm_setup_sh_text)
       )
-      "scripts/vm.sh must provision Android UTM bundles from the manifest Android group image names with the group systemImage as the prebuilt";
+      "scripts/vm.sh must provision Android UTM bundles from the manifest Android group image names, hard-linking the canonical data/<id>.qcow2 userdata into the bundle";
 
   # The Android build must strip the whitespace wc -c pads its output with
   # (macOS pads, Linux does not); otherwise the size leaks into the selected
@@ -1339,10 +1341,11 @@ let
         (lib.hasInfix "failed to start libvirt default network" vm_setup_sh_text)
         && (lib.hasInfix "failed to mark libvirt default network for autostart" vm_setup_sh_text)
         && (lib.hasInfix "validate_qcow2_image \"$_prebuilt\" \"pre-built image for \${vm_name}\" \"$_prebuilt_min_size\"" vm_setup_sh_text)
-        && (lib.hasInfix "validate_qcow2_image \"$disk_path\" \"existing libvirt runtime disk for \${vm_name}\" \"$_prebuilt_min_size\"" vm_setup_sh_text)
-        && (lib.hasInfix "existing libvirt runtime disk is invalid" vm_setup_sh_text)
+        && (lib.hasInfix "disk_path=\"\$VM_DIR/data/\${vm_name}.qcow2\"" vm_setup_sh_text)
+        && (lib.hasInfix "vm_ensure_base_and_overlay \"\$vm_name\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
+        && (lib.hasInfix "runtime overlay ready: \$disk_path" vm_setup_sh_text)
       )
-      "scripts/vm.sh must validate libvirt prebuilt/runtime disks against the manifest minImageSize and surface default-network recovery failures";
+      "scripts/vm.sh must validate libvirt prebuilt disks against the manifest minImageSize, provision the data/<id>.qcow2 overlay, and surface default-network recovery failures";
 
   # Image validation must pass an explicit manifest-derived min-size floor at
   # every call site; the 10 GiB fallback default is dead once Android's 4 GiB
@@ -1819,18 +1822,19 @@ let
     && (lib.hasInfix "images/\${vm.Android.gsiImage}" nixos_vms_nix_text)
   ) "src/hosts/NixOS/vms.nix must render the GSI disk only when vm.Android.gsiUrl is non-null";
 
-  # NixOS Android system/userdata disks must live under images/ inside the VM
-  # directory, named from the manifest Android group; bare ${vmDir}/android-*
-  # paths would break the cross-host images layout.
-  test_nixos_android_disk_paths_in_images_dir =
+  # NixOS Android system/GSI disks must live under images/ inside the VM
+  # directory, named from the manifest Android group; the userdata disk is the
+  # canonical data/<id>.qcow2 overlay.  Bare ${vmDir}/android-* paths would
+  # break the cross-host images/data layout.
+  test_nixos_android_disk_paths =
     assert'
       (
         (lib.hasInfix "images/\${vm.Android.systemImage}" nixos_vms_nix_text)
-        && (lib.hasInfix "images/\${vm.Android.userdataImage}" nixos_vms_nix_text)
+        && (lib.hasInfix "\${vmDir}/data/\${vm.id}.qcow2" nixos_vms_nix_text)
         && !(lib.hasInfix "\${vmDir}/android-system.qcow2" nixos_vms_nix_text)
         && !(lib.hasInfix "\${vmDir}/android-userdata.qcow2" nixos_vms_nix_text)
       )
-      "src/hosts/NixOS/vms.nix must place Android system/userdata disks under \${vmDir}/images/ named from the manifest Android group and never at the bare VM directory root";
+      "src/hosts/NixOS/vms.nix must place Android system/GSI under \${vmDir}/images/ from the manifest Android group and userdata under \${vmDir}/data/<id>.qcow2, never at the bare VM directory root";
 
   test_macbook_tart_storage_link =
     assert'
@@ -1946,7 +1950,7 @@ let
     test_guest_credentials_policy_in_windows_autounattend
     test_guest_credentials_policy_in_macos_packer
     test_vm_guest_credential_drift_replacement
-    test_utm_runtime_replacement_requires_valid_prebuilt
+    test_utm_base_overlay_provisioning
     test_utm_android_uses_shared_images
     test_android_build_strips_wc_padding
     test_android_build_honors_manifest_disk_size
@@ -1984,7 +1988,7 @@ let
     test_macbook_android_gsi_conditional
     test_utm_android_drives_inside_drive_array
     test_nixos_android_gsi_conditional
-    test_nixos_android_disk_paths_in_images_dir
+    test_nixos_android_disk_paths
     test_macbook_macos_version_tahoe
     test_windows_iso_fido_nonwindows_fallback
     test_android_gsi_url_type
@@ -2095,7 +2099,7 @@ in
     test_guest_credentials_policy_in_windows_autounattend
     test_guest_credentials_policy_in_macos_packer
     test_vm_guest_credential_drift_replacement
-    test_utm_runtime_replacement_requires_valid_prebuilt
+    test_utm_base_overlay_provisioning
     test_utm_android_uses_shared_images
     test_android_build_strips_wc_padding
     test_android_build_honors_manifest_disk_size
@@ -2133,7 +2137,7 @@ in
     test_macbook_android_gsi_conditional
     test_utm_android_drives_inside_drive_array
     test_nixos_android_gsi_conditional
-    test_nixos_android_disk_paths_in_images_dir
+    test_nixos_android_disk_paths
     test_macbook_macos_version_tahoe
     test_windows_iso_fido_nonwindows_fallback
     test_android_gsi_url_type
