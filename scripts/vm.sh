@@ -400,6 +400,11 @@ do_setup() {
   mkdir -p "$VM_DIR" "$IMAGES_DIR" "$VM_DIR/scripts"
   write_vm_directory_readme
 
+  # Write self-describing descriptors for EVERY manifest guest (enabled or
+  # disabled, host-matched or not) so scripts/ and unpack can serve disabled
+  # VMs without a live manifest.
+  vm_write_descriptors
+
   # Darwin-specific environment setup
   if [ "$(uname -s)" = "Darwin" ]; then
     ensure_tart_vm_dir

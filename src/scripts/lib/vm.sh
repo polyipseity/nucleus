@@ -698,6 +698,170 @@ vm_get_manifest_vm_names() {
   jq -r '.VMs[] | .id' "$MANIFEST"
 }
 
+# vm_descriptor_path NAME
+#   Prints the path of the self-describing descriptor for a VM:
+#   <VM_DIR>/<NAME>.vm.json.
+vm_descriptor_path() {
+  printf '%s/%s.vm.json\n' "$VM_DIR" "$1"
+}
+
+# vm_mk_uuid NAME
+#   Prints the deterministic 8-4-4-4-12 UUID for a VM, derived from the
+#   SHA-256 of the guest id. Mirrors mkUuid in src/hosts/MacBook/vms.nix
+#   (uuidFromDigest of hashString "sha256" id).
+vm_mk_uuid() {
+  local _vmu_id="$1" _vmu_h
+  _vmu_h="$(printf '%s' "$_vmu_id" | vm_sha256_input)" || return 1
+  printf '%s-%s-%s-%s-%s' \
+    "${_vmu_h:0:8}" "${_vmu_h:8:4}" "${_vmu_h:12:4}" "${_vmu_h:16:4}" "${_vmu_h:20:12}"
+}
+
+# vm_mk_mac_address NAME PREFIX
+#   Prints the deterministic MAC address (PREFIX + 5 hex octets) for a VM,
+#   derived from the SHA-256 of "mac:<NAME>". Mirrors mkMacAddress in
+#   src/hosts/MacBook/vms.nix.
+vm_mk_mac_address() {
+  local _vmm_id="$1" _vmm_prefix="$2" _vmm_h
+  _vmm_h="$(printf 'mac:%s' "$_vmm_id" | vm_sha256_input)" || return 1
+  printf '%s:%s:%s:%s:%s:%s' \
+    "$_vmm_prefix" "${_vmm_h:0:2}" "${_vmm_h:2:2}" "${_vmm_h:4:2}" "${_vmm_h:6:2}" "${_vmm_h:8:2}"
+}
+
+# vm_derive_arch TYPE
+#   Prints the guest architecture for a VM type. Mirrors vmArch in
+#   src/hosts/MacBook/vms.nix: Android is always aarch64, Windows always
+#   x86_64, other types follow the host architecture.
+vm_derive_arch() {
+  local _vda_type="$1" _vda_host
+  case "$_vda_type" in
+    Android) printf 'aarch64\n'; return 0 ;;
+    Windows) printf 'x86_64\n'; return 0 ;;
+  esac
+  _vda_host="$(uname -m)"
+  case "$_vda_host" in
+    arm64|aarch64) printf 'aarch64\n' ;;
+    *) printf 'x86_64\n' ;;
+  esac
+}
+
+# vm_derive_machine ARCH
+#   Prints the QEMU machine type for an architecture. Mirrors vmMachine in
+#   src/hosts/MacBook/vms.nix: x86_64 → q35, everything else → virt.
+vm_derive_machine() {
+  if [ "$1" = "x86_64" ]; then
+    printf 'q35\n'
+  else
+    printf 'virt\n'
+  fi
+}
+
+# vm_derive_uefi TYPE ARCH
+#   Prints whether the guest boots via UEFI. Mirrors qemuUefiBoot in
+#   src/hosts/MacBook/vms.nix: every non-Windows aarch64 guest uses UEFI.
+vm_derive_uefi() {
+  if [ "$1" != "Windows" ] && [ "$2" = "aarch64" ]; then
+    printf 'true\n'
+  else
+    printf 'false\n'
+  fi
+}
+
+# vm_write_descriptor ID TYPE INDEX
+#   Writes the self-describing descriptor <ID>.vm.json for the manifest VM at
+#   INDEX: manifest fields (id/name/type/enabled/cpus/ram/diskSize/
+#   portForwards + the type group when present) plus derived hardware identity
+#   (uuid/mac/arch/machine/uefi), the disks array, and createdBy. Written for
+#   EVERY manifest guest (enabled or disabled) so scripts/ and unpack can
+#   serve disabled VMs without a live manifest. Atomic (temp + mv); honors
+#   dry_run.
+vm_write_descriptor() {
+  local _vwd_id="$1" _vwd_type="$2" _vwd_index="$3"
+  local _vwd_path _vwd_uuid _vwd_mac_prefix _vwd_mac _vwd_arch _vwd_machine _vwd_uefi
+  local _vwd_tmp
+
+  _vwd_path="$(vm_descriptor_path "$_vwd_id")"
+  if [ "$dry_run" = true ]; then
+    dry_run "write VM descriptor: $_vwd_path"
+    return 0
+  fi
+
+  _vwd_uuid="$(vm_mk_uuid "$_vwd_id")" || return 1
+  _vwd_mac_prefix="$(jq -r --argjson i "$_vwd_index" '.VMs[$i].macAddressPrefix // ""' "$MANIFEST")"
+  if [ -z "$_vwd_mac_prefix" ]; then
+    error "VM '$_vwd_id' lacks macAddressPrefix in manifest; every managed VM must have a deterministic MAC"
+    return 1
+  fi
+  _vwd_mac="$(vm_mk_mac_address "$_vwd_id" "$_vwd_mac_prefix")"
+  _vwd_arch="$(vm_derive_arch "$_vwd_type")"
+  _vwd_machine="$(vm_derive_machine "$_vwd_arch")"
+  _vwd_uefi="$(vm_derive_uefi "$_vwd_type" "$_vwd_arch")"
+
+  _vwd_tmp="$_vwd_path.tmp.$$"
+  jq -c \
+    --argjson i "$_vwd_index" \
+    --arg uuid "$_vwd_uuid" \
+    --arg mac "$_vwd_mac" \
+    --arg arch "$_vwd_arch" \
+    --arg machine "$_vwd_machine" \
+    --arg uefi "$_vwd_uefi" \
+    --arg schema "$REPO_ROOT/src/modules/vm-descriptor.schema.json" \
+    --arg createdBy "nucleus-vm" \
+    '
+    .VMs[$i] as $vm |
+    {
+      "$schema": $schema,
+      id: $vm.id,
+      name: $vm.name,
+      type: $vm.type,
+      enabled: $vm.enabled,
+      cpus: $vm.cpus,
+      ram: $vm.ram,
+      diskSize: $vm.diskSize,
+      portForwards: ($vm.portForwards // []),
+      uuid: $uuid,
+      mac: $mac,
+      arch: $arch,
+      machine: $machine,
+      uefi: ($uefi == "true"),
+      disks: (
+        if $vm.type == "Android" then
+          [
+            {role: "system", path: ("images/" + $vm.type + "-system.qcow2")},
+            {role: "gsi", path: ("images/" + $vm.type + "-gsi.img")},
+            {role: "userdata", path: ("data/" + $vm.id + ".qcow2")}
+          ]
+        else
+          [
+            {role: "base", path: ("images/" + $vm.type + ".base.qcow2")},
+            {role: "runtime", path: ("data/" + $vm.id + ".qcow2")}
+          ]
+        end
+      ),
+      createdBy: $createdBy
+    }
+    + (if $vm.Android then {Android: $vm.Android} else {} end)
+    + (if $vm.macOS then {macOS: $vm.macOS} else {} end)
+    + (if $vm.Windows then {Windows: $vm.Windows} else {} end)
+    ' "$MANIFEST" >"$_vwd_tmp" || return 1
+  mv "$_vwd_tmp" "$_vwd_path"
+  say "wrote VM descriptor: $_vwd_path"
+}
+
+# vm_write_descriptors
+#   Writes a descriptor for EVERY guest in the manifest (enabled or disabled,
+#   host-matched or not), unlike vm_for_each.
+vm_write_descriptors() {
+  local _count _i _id _type
+  _count="$(jq '.VMs | length' "$MANIFEST")"
+  _i=0
+  while [ "$_i" -lt "$_count" ]; do
+    _id="$(jq -r ".VMs[$_i].id" "$MANIFEST")"
+    _type="$(jq -r ".VMs[$_i].type" "$MANIFEST")"
+    vm_write_descriptor "$_id" "$_type" "$_i"
+    _i=$((_i + 1))
+  done
+}
+
 # UTM re-registration helper
 
 UTMCTL="/Applications/UTM.app/Contents/MacOS/utmctl"

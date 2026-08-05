@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "Self-describing descriptor for a managed VM: manifest fields plus derived hardware identity (uuid/mac/arch/machine/uefi), disk layout, and provenance. Written to <VM_DIR>/<id>.vm.json by nucleus-vm setup for every manifest guest.",
+  "required": [
+    "$schema",
+    "id",
+    "name",
+    "type",
+    "enabled",
+    "cpus",
+    "ram",
+    "diskSize",
+    "portForwards",
+    "uuid",
+    "mac",
+    "arch",
+    "machine",
+    "uefi",
+    "disks",
+    "createdBy"
+  ],
+  "properties": {
+    "$schema": {
+      "description": "Reference to vm-descriptor.schema.json.",
+      "type": "string"
+    },
+    "id": {
+      "description": "Unique guest id (manifest id). Drives deterministic UUID/MAC derivation.",
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "type": {
+      "enum": ["Android", "macOS", "NixOS", "Windows"],
+      "type": "string"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "cpus": {
+      "minimum": 1,
+      "type": "integer"
+    },
+    "ram": {
+      "pattern": "^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$",
+      "type": "string"
+    },
+    "diskSize": {
+      "pattern": "^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$",
+      "type": "string"
+    },
+    "portForwards": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "guestPort": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "hostPort": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": ["guestPort", "hostPort"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "uuid": {
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "type": "string"
+    },
+    "mac": {
+      "pattern": "^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$",
+      "type": "string"
+    },
+    "arch": {
+      "enum": ["aarch64", "x86_64"],
+      "type": "string"
+    },
+    "machine": {
+      "enum": ["q35", "virt"],
+      "type": "string"
+    },
+    "uefi": {
+      "type": "boolean"
+    },
+    "disks": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "role": {
+            "enum": ["base", "runtime", "system", "gsi", "userdata"],
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": ["role", "path"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "createdBy": {
+      "type": "string"
+    },
+    "Android": {
+      "additionalProperties": false,
+      "properties": {
+        "gsiImage": {
+          "type": "string"
+        },
+        "gsiUrl": {
+          "type": "string"
+        },
+        "systemImage": {
+          "type": "string"
+        },
+        "userdataImage": {
+          "type": "string"
+        }
+      },
+      "required": ["systemImage", "userdataImage", "gsiImage", "gsiUrl"],
+      "type": "object"
+    },
+    "macOS": {
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": ["version"],
+      "type": "object"
+    },
+    "Windows": {
+      "additionalProperties": false,
+      "properties": {
+        "edition": {
+          "type": "string"
+        },
+        "isoUrl": {
+          "type": ["string", "null"]
+        }
+      },
+      "required": ["edition", "isoUrl"],
+      "type": "object"
+    }
+  },
+  "type": "object"
+}

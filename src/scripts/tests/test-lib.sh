@@ -101,6 +101,8 @@ preflight_check() {
   require_command bash
   require_command find
   require_command xargs
+  require_command jq
+  require_command check-jsonschema
 }
 
 usage() {
