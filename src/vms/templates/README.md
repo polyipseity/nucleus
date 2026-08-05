@@ -126,6 +126,10 @@ __VM_DIR_DISPLAY__/
 
 ## Manual cleanup
 
+### GC guarantees
+
+Weekly `nucleus-gc` and explicit `nucleus-vm gc` preserve every guest listed in `src/modules/VMs.json` — enabled or disabled, on any host — plus every manifest-referenced image (pre-built goldens, `images/<type>.base.qcow2`, Android system/GSI, and `data/<id>.qcow2` userdata/overlays for those guests). Only artifacts with no matching manifest entry are removed. Pass `--gc-disabled` to narrow the keep-set to enabled guests on the current host only. VM GC is opt-in via `nucleus-vm gc` (or the VM step inside `nucleus-gc`); `nucleus-vm pack` is dry-run by default (`--force` performs).
+
 These artifacts are preserved by `nucleus-gc` because they are expensive to reproduce. Delete them manually when you need to reclaim space:
 
 - `__IMAGES_DIR_DISPLAY__/<name>-installer.iso` — cached Windows ISO (~5–6 GB). Remove with `rm "__IMAGES_DIR_DISPLAY__/<name>-installer.iso"` (POSIX) or `Remove-Item "__IMAGES_DIR_DISPLAY__/<name>-installer.iso"` (Windows). `nucleus-vm setup` re-downloads it on the next build.
