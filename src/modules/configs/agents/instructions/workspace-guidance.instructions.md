@@ -13,6 +13,7 @@ Agent customization hierarchy:
 
 | Path                                     | Purpose                                                                      |
 | ---------------------------------------- | ---------------------------------------------------------------------------- |
+| `.agents/hooks/*.json`                   | Deterministic lifecycle hooks (VS Code Copilot `PreToolUse`/`PostToolUse` etc.), loaded via `chat.hookFilesLocations` (`~/.agents/hooks`). |
 | `.agents/instructions/*.instructions.md` | Narrow, file-type-scoped authoring rules loaded automatically by agents.     |
 | `.agents/prompts/*.prompt.md`            | Reusable workflow prompts (e.g., commit-staged, release).                    |
 | `.agents/skills/<skill>/`                | Skill bundles (scripts + instructions) for repeatable multi-step operations. |

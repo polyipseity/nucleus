@@ -8,11 +8,12 @@ applyTo: "src/modules/agents.nix, src/hosts/Windows/modules/user/Sync-AgentsSkil
 
 ## Directory layout
 
-The `~/.agents/` directory is the runtime home for all agent configuration, prompts, and skills. It is a real (writable) directory, **not** a whole-dir symlink into the repo tree.
+The `~/.agents/` directory is the runtime home for all agent configuration, prompts, skills, and hooks. It is a real (writable) directory, **not** a whole-dir symlink into the repo tree.
 
 | Path                                  | Owner                                              | Purpose                                                                                            |
 | ------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
 | `~/.agents/`                          | `symlink-agent-config` activation                  | Real directory; per-subdir symlinks for every `src/modules/configs/agents/` entry except `skills/` |
+| `~/.agents/hooks/`                    | `symlink-agent-config` activation                  | VS Code Copilot hook configs (e.g. `PreToolUse`/`PostToolUse`), loaded via `chat.hookFilesLocations` (`~/.agents/hooks`) |
 | `~/.agents/skills/`                   | `install-agent-skills` activation                  | Real directory; per-skill symlinks for bundled skills + real dirs for fetched skills               |
 | `~/.agents/skills/<name>/` (symlink)  | `install-agent-skills`                             | Bundled skill committed to `src/modules/configs/agents/skills/<name>/`                             |
 | `~/.agents/skills/<name>/` (real dir) | `sync-clawhub-skills` / `Sync-AgentsClawHubSkills` | Fetched skill downloaded by ClawHub; contains a `.clawhub/origin.json` marker                      |
