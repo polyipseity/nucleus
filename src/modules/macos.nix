@@ -40,9 +40,10 @@ let
   # entries from the current PATH before re-adding them.
   # This joins prepend+append as a SET for dedup — NOT as a PATH ordering.
   # The order within the returned string is irrelevant; only membership
-  # matters.  The prefix argument is "${config.home.homeDirectory}" for
-  # the activation script (build-time eval) or "$HOME" for the launchd
-  # agent (runtime shell expansion).
+  # matters.  The prefix argument is an absolute home directory resolved
+  # at build time ("${config.home.homeDirectory}") for BOTH the activation
+  # script and the launchd agent — launchd performs no shell expansion,
+  # so "$HOME" would stay literal and never match real PATH entries.
   # Used by guiEnvAgent and gui-env-path activation step;
   # also informs launchctl config user path composition via pathComponents.
   mkManagedDedupSet =
@@ -834,9 +835,9 @@ lib.mkIf pkgs.stdenv.isDarwin {
       Label = "local.gui-env";
       ProgramArguments = [
         "${guiEnvAgent}/bin/nucleus-gui-env"
-        managedPaths.toShellPrependPath
-        managedPaths.toShellAppendPath
-        (mkManagedDedupSet "$HOME")
+        (managedPaths.toAbsolutePrependPath config.home.homeDirectory)
+        (managedPaths.toAbsoluteAppendPath config.home.homeDirectory)
+        (mkManagedDedupSet config.home.homeDirectory)
         envVars.macOSAllVars
       ];
       # One-shot at login; gui-env-path activation step covers subsequent applies.

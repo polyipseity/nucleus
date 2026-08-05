@@ -6,8 +6,9 @@
 # Takes only `pkgs` — no config, lib, or username dependency.
 # Returns: { defaultDevTools, pathComponents, cargoBinDir,
 #   toShellPrependPath, toShellAppendPath, toShellPrependGuard,
-#   toShellAppendGuard, toPowerShellPrependSnippet,
-#   toPowerShellAppendSnippet, toLaunchctlConfigPath }
+#   toShellAppendGuard, toAbsolutePrependPath, toAbsoluteAppendPath,
+#   toPowerShellPrependSnippet, toPowerShellAppendSnippet,
+#   toLaunchctlConfigPath }
 { pkgs, ... }:
 let
   lib = pkgs.lib;
@@ -79,6 +80,19 @@ let
   # Same format as toShellPrependPath but for the append position.
   toShellAppendPath = builtins.concatStringsSep ":" (map (p: "$HOME/${p}") pathComponents.append);
 
+  # ── Helper: render absolute PATH prepend string ────────────────────
+  # Like toShellPrependPath but resolves the home directory at build
+  # time: takes homeDir (e.g. "${config.home.homeDirectory}") and renders
+  # managed dirs as absolute paths.  For launchd argv, where no shell
+  # expansion occurs (the sh -c wrapper single-quotes arguments).
+  toAbsolutePrependPath =
+    homeDir: builtins.concatStringsSep ":" (map (p: "${homeDir}/${p}") pathComponents.prepend);
+
+  # ── Helper: render absolute PATH append string ─────────────────────
+  # Same as toAbsolutePrependPath but for the append group.
+  toAbsoluteAppendPath =
+    homeDir: builtins.concatStringsSep ":" (map (p: "${homeDir}/${p}") pathComponents.append);
+
   # ── Helper: shell prepend guard (:suffix) ─────────────────────────
   # Expands to "<prepend>:" when prepend renders non-empty, empty string
   # otherwise.  Computed at Nix time to avoid nested ${} in Nix string
@@ -143,6 +157,8 @@ in
     cargoBinDir
     defaultDevTools
     pathComponents
+    toAbsoluteAppendPath
+    toAbsolutePrependPath
     toLaunchctlConfigPath
     toShellAppendGuard
     toShellAppendPath
