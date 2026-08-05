@@ -36,10 +36,21 @@ for __component in $CURRENT_PATH; do
 done
 IFS="$old_IFS"
 
-# Compose with guard fragments: join only non-empty segments (prepend may be
-# empty, cleaned may be empty when every PATH entry is managed).  Avoids a
-# leading/trailing colon, which would mean an empty PATH entry (= cwd).
-/bin/launchctl setenv PATH "${_mge_prepend:+${_mge_prepend}:}${_mge_cleaned}${_mge_append:+:${_mge_append}}"
+# Compose PATH from non-empty fragments only (prepend may be empty, cleaned
+# may be empty when every PATH entry is managed, append may be empty).  A
+# guard expression cannot express "join non-empty segments with a single
+# colon": when prepend AND cleaned are both empty, the append guard's leading
+# colon survives and the PATH starts with an empty entry (= cwd).
+_mge_path=""
+for _mge_frag in "$_mge_prepend" "$_mge_cleaned" "$_mge_append"; do
+  [ -n "$_mge_frag" ] || continue
+  if [ -n "$_mge_path" ]; then
+    _mge_path="${_mge_path}:${_mge_frag}"
+  else
+    _mge_path="$_mge_frag"
+  fi
+  done
+/bin/launchctl setenv PATH "$_mge_path"
 
 # ── All other GUI env vars (user and non-user) ──
 eval "$_mge_all_vars_block"
