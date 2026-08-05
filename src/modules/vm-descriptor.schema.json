@@ -33,7 +33,12 @@
       "type": "string"
     },
     "type": {
-      "enum": ["Android", "macOS", "NixOS", "Windows"],
+      "enum": [
+        "Android",
+        "macOS",
+        "NixOS",
+        "Windows"
+      ],
       "type": "string"
     },
     "enabled": {
@@ -64,7 +69,10 @@
             "type": "integer"
           }
         },
-        "required": ["guestPort", "hostPort"],
+        "required": [
+          "guestPort",
+          "hostPort"
+        ],
         "type": "object"
       },
       "type": "array"
@@ -78,11 +86,17 @@
       "type": "string"
     },
     "arch": {
-      "enum": ["aarch64", "x86_64"],
+      "enum": [
+        "aarch64",
+        "x86_64"
+      ],
       "type": "string"
     },
     "machine": {
-      "enum": ["q35", "virt"],
+      "enum": [
+        "q35",
+        "virt"
+      ],
       "type": "string"
     },
     "uefi": {
@@ -93,14 +107,23 @@
         "additionalProperties": false,
         "properties": {
           "role": {
-            "enum": ["base", "runtime", "system", "gsi", "userdata"],
+            "enum": [
+              "base",
+              "runtime",
+              "system",
+              "gsi",
+              "userdata"
+            ],
             "type": "string"
           },
           "path": {
             "type": "string"
           }
         },
-        "required": ["role", "path"],
+        "required": [
+          "role",
+          "path"
+        ],
         "type": "object"
       },
       "type": "array"
@@ -124,7 +147,12 @@
           "type": "string"
         }
       },
-      "required": ["systemImage", "userdataImage", "gsiImage", "gsiUrl"],
+      "required": [
+        "systemImage",
+        "userdataImage",
+        "gsiImage",
+        "gsiUrl"
+      ],
       "type": "object"
     },
     "macOS": {
@@ -134,7 +162,9 @@
           "type": "string"
         }
       },
-      "required": ["version"],
+      "required": [
+        "version"
+      ],
       "type": "object"
     },
     "Windows": {
@@ -144,10 +174,16 @@
           "type": "string"
         },
         "isoUrl": {
-          "type": ["string", "null"]
+          "type": [
+            "string",
+            "null"
+          ]
         }
       },
-      "required": ["edition", "isoUrl"],
+      "required": [
+        "edition",
+        "isoUrl"
+      ],
       "type": "object"
     }
   },
