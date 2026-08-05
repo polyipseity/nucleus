@@ -29,6 +29,7 @@
       "blender": "5.1.2",
       "chrome-remote-desktop-host": "147.0.7727.3",
       "coolterm": "2.4.0.3.0.1425",
+      "cursor": "3.14.7,a758f2241ca99fecf380180b6cbdbbce0f1f42cf",
       "discord@canary": "0.0.1076",
       "fuse-t": "1.2.7",
       "gimp": "3.2.4",
@@ -231,6 +232,7 @@
   "winget": {
     "7zip.7zip": "26.01",
     "ajeetdsouza.zoxide": "0.9.9",
+    "Anysphere.Cursor": "3.14.7",
     "astral-sh.ruff": "0.15.16",
     "astral-sh.ty": "0.0.44",
     "astral-sh.uv": "0.11.19",

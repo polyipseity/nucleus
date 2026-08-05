@@ -193,6 +193,15 @@ let
       };
       nixpkgsAttr = "utm";
     };
+    cursor = {
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "cursor";
+      };
+      # WHY: code-cursor is Linux-only (AppImage repack); macOS uses the Homebrew cask.
+      nixpkgsAttr = "code-cursor";
+    };
     visual-studio-code = {
       category = "gui";
       homebrew = {

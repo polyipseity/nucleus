@@ -47,6 +47,7 @@ Describe "Windows Package Installation" {
             @{ id = 'Microsoft.PowerShell'; displayName = 'PowerShell' }
             @{ id = 'Microsoft.VisualStudioCode'; displayName = 'VS Code stable' }
             @{ id = 'Microsoft.VisualStudioCode.Insiders'; displayName = 'VS Code Insiders' }
+            @{ id = 'Anysphere.Cursor'; displayName = 'Cursor' }
             @{ id = 'Microsoft.WindowsTerminal.Preview'; displayName = 'Windows Terminal Preview' }
             @{ id = 'Neovim.Neovim'; displayName = 'Neovim' }
             @{ id = 'Ollama.Ollama'; displayName = 'Ollama' }

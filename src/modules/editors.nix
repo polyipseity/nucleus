@@ -314,6 +314,13 @@ in
     package = pkgs.vscode;
   };
 
+  programs.cursor = lib.mkIf (!isDarwin && pkgs ? code-cursor) {
+    # Mirror programs.vscode: install via Homebrew on Darwin, nixpkgs on Linux.
+    # Agent config is bridged separately via cursor.nix (symlink-cursor-config).
+    enable = true;
+    package = pkgs.code-cursor;
+  };
+
   home.activation = {
     # -------------------------------------------------------------------------
     # symlink-vscode-config

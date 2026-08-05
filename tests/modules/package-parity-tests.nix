@@ -187,6 +187,10 @@ let
       nixpkgsAttr = "discord-canary";
     }
     {
+      name = "cursor";
+      nixpkgsAttr = "code-cursor";
+    }
+    {
       name = "visual-studio-code";
       nixpkgsAttr = "vscode";
     }

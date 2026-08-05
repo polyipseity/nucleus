@@ -346,6 +346,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure Cursor is installed for cross-host editor parity with macOS (Homebrew cask cursor) and NixOS (nixpkgs code-cursor)
+      settings:
+        id: Anysphere.Cursor
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: >-
           Windows Terminal Preview — preferred over stable per repository policy
           (preview/beta channels are favoured when available).  Provides "Open in
