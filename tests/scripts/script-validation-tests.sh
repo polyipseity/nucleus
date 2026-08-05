@@ -493,6 +493,34 @@ echo "$TESTS_FAILED" > "$_tt_tmpdir/camilladsp-heartbeat.fail"
 } &
 _tt_count=$((_tt_count + 1))
 
+# Test src/scripts/services/litellm-daemon.sh
+{
+LITELLM_DAEMON_SH="src/scripts/services/litellm-daemon.sh"
+if [[ -f "$LITELLM_DAEMON_SH" ]]; then
+    test_bash_syntax "$LITELLM_DAEMON_SH"
+    test_has_shebang "$LITELLM_DAEMON_SH"
+    test_is_executable "$LITELLM_DAEMON_SH"
+    test_dependencies_available "$LITELLM_DAEMON_SH" litellm
+    test_error_handling "$LITELLM_DAEMON_SH"
+    test_has_documentation "$LITELLM_DAEMON_SH"
+    test_no_dangerous_patterns "$LITELLM_DAEMON_SH"
+    test_strict_shell_mode "$LITELLM_DAEMON_SH"
+
+    # Regression: keyfile contents must be exported as values, never via
+    # command substitution (bug: `export "$_varname"="$(_value)"` ran a
+    # nonexistent `_value` command, exporting empty keys -> 429s).
+    # shellcheck disable=SC2016 # reason: $ chars are literal regression pattern matched against script source.
+    if grep -Fq 'export "$_varname"="$(_value)"' "$LITELLM_DAEMON_SH"; then
+        assert_fail "litellm-daemon: keyfile export uses plain variable" "Found buggy \$(_value) command-substitution pattern"
+    else
+        assert_pass "litellm-daemon: keyfile export uses plain variable"
+    fi
+fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/litellm-daemon.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/litellm-daemon.fail"
+} &
+_tt_count=$((_tt_count + 1))
+
 # Test scripts/svc.sh (macOS-only: launchctl-based service management)
 SVC_SH="scripts/svc.sh"
 if [[ -f "$SVC_SH" ]]; then

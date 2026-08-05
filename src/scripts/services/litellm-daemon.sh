@@ -53,11 +53,11 @@ for _spec in \
   _varname="${_spec#*:}"
   if [ "$_poll_ticks" -gt 0 ]; then
     if _value="$(_wait_for_keyfile "$_keyfile" "$_poll_ticks")"; then
-      export "$_varname"="$(_value)"
+      export "$_varname"="$_value"
     fi
   else
     if _value="$(_read_keyfile "$_keyfile")"; then
-      export "$_varname"="$(_value)"
+      export "$_varname"="$_value"
     fi
   fi
 done
