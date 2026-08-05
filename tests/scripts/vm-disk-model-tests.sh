@@ -11,8 +11,8 @@
 # provisioning helper (vm_ensure_base_and_overlay): base copy, relative backing
 # paths, invalid-overlay skip, drift refresh, and grow-only auto-grow. Sandboxed
 # GC tests exercise the keep-set semantics of vm_gc_orphan_disks,
-# vm_gc_orphan_markers, and vm_gc_orphan_descriptors under both default and
-# --gc-disabled expected sets.
+# vm_gc_orphan_markers, vm_gc_orphan_descriptors, and vm_gc_vms under both
+# default and --gc-disabled expected sets.
 #
 # Run with: bash tests/scripts/vm-disk-model-tests.sh
 
@@ -893,6 +893,257 @@ EOF
   assert_eq "128000000" "$_virtual_size" "windows-qemu android userdata grown grow-only"
 }
 
+# _gcd_populate_fixture VM_DIR IMAGES_DIR VMS_DIR MANIFEST
+#   Shared sandbox layout for dispatcher GC tests: four-guest manifest,
+#   manifest-referenced images/overlays/markers/descriptors, plus stale orphans.
+_gcd_populate_fixture() {
+  local _vm_dir="$1" _images_dir="$2" _vms_dir="$3" _manifest="$4"
+
+  mkdir -p "$_vm_dir" "$_images_dir" "$_vm_dir/data" "$_vms_dir"
+
+  cat > "$_manifest" <<'EOF'
+{
+  "VMs": [
+    {
+      "id": "Android",
+      "name": "Android",
+      "type": "Android",
+      "enabled": true,
+      "hosts": ["MacBook", "NixOS", "Windows"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "portForwards": [],
+      "macAddressPrefix": "52",
+      "Android": {
+        "systemImage": "Android-system.qcow2",
+        "userdataImage": "Android.qcow2",
+        "gsiImage": "Android-gsi.img",
+        "gsiUrl": "https://example.invalid/gsi.zip"
+      }
+    },
+    {
+      "id": "NixOS",
+      "name": "NixOS",
+      "type": "NixOS",
+      "enabled": true,
+      "hosts": ["NixOS"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "portForwards": [],
+      "macAddressPrefix": "52"
+    },
+    {
+      "id": "MacBook",
+      "name": "MacBook",
+      "type": "macOS",
+      "enabled": true,
+      "hosts": ["MacBook"],
+      "cpus": 4,
+      "ram": "16GB",
+      "diskSize": "128GB",
+      "portForwards": [],
+      "macAddressPrefix": "52"
+    },
+    {
+      "id": "Windows",
+      "name": "Windows",
+      "type": "Windows",
+      "enabled": false,
+      "hosts": ["Windows"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "128GB",
+      "portForwards": [],
+      "macAddressPrefix": "52"
+    }
+  ]
+}
+EOF
+
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+    "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
+    "$_vms_dir" "$_manifest" "NixOS" "false" "false"
+
+  : > "$_images_dir/Android-system.qcow2"
+  : > "$_images_dir/Android-gsi.img"
+  : > "$_images_dir/NixOS.qcow2"
+  : > "$_images_dir/NixOS.base.qcow2"
+  : > "$_images_dir/macOS.base.qcow2"
+  : > "$_images_dir/Windows.qcow2"
+  : > "$_vm_dir/data/Android.qcow2"
+  : > "$_vm_dir/data/NixOS.qcow2"
+  : > "$_vm_dir/data/Windows.qcow2"
+  : > "$_images_dir/stale.qcow2"
+  : > "$_vm_dir/data/stale.qcow2"
+  : > "$_vm_dir/data/NixOS.qcow2.vm-guest-credentials-sha256"
+  : > "$_vm_dir/data/stale.qcow2.vm-guest-credentials-sha256"
+  : > "$_images_dir/NixOS.vm-guest-credentials-sha256"
+  : > "$_images_dir/Android.vm-guest-config-sha256"
+  : > "$_images_dir/MacBook.vm-guest-credentials-sha256"
+  : > "$_images_dir/Windows.vm-guest-credentials-sha256"
+  vm_write_descriptors
+  : > "$_vm_dir/stale.vm.json"
+}
+
+# test_gc_dispatcher
+#   Behavioral tests for vm_gc_vms (the dispatcher): default keep-set preserves
+#   disabled and other-host guests; --gc-disabled narrows; dry_run is a no-op.
+test_gc_dispatcher() {
+  local _vm_dir _images_dir _vms_dir _manifest
+
+  # Scenario A — default: all manifest guests preserved, stale removed.
+  _vm_dir="$_tmp/gcd-a/vm"
+  _images_dir="$_tmp/gcd-a/vm/images"
+  _vms_dir="$_tmp/gcd-a/vms"
+  _manifest="$_tmp/gcd-a/manifest.json"
+  _gcd_populate_fixture "$_vm_dir" "$_images_dir" "$_vms_dir" "$_manifest"
+  gc_disabled_mode=false
+  dry_run=false
+  vm_gc_vms
+  for _keep in Android-system.qcow2 NixOS.qcow2 NixOS.base.qcow2 macOS.base.qcow2 Windows.qcow2; do
+    assert_file_exists "$_images_dir/$_keep" "dispatcher default kept images/$_keep"
+  done
+  assert_file_exists "$_images_dir/Android-gsi.img" "dispatcher default kept Android GSI"
+  for _keep in Android.qcow2 NixOS.qcow2 Windows.qcow2; do
+    assert_file_exists "$_vm_dir/data/$_keep" "dispatcher default kept data/$_keep"
+  done
+  assert_file_missing "$_images_dir/stale.qcow2" "dispatcher default removed stale image"
+  assert_file_missing "$_vm_dir/data/stale.qcow2" "dispatcher default removed stale overlay"
+  assert_file_missing "$_vm_dir/stale.vm.json" "dispatcher default removed stale descriptor"
+  for _keep in Android.vm.json NixOS.vm.json MacBook.vm.json Windows.vm.json; do
+    assert_file_exists "$_vm_dir/$_keep" "dispatcher default kept descriptor $_keep"
+  done
+
+  # Scenario B — gc-disabled: Windows + other-host MacBook artifacts cleared.
+  _vm_dir="$_tmp/gcd-b/vm"
+  _images_dir="$_tmp/gcd-b/vm/images"
+  _vms_dir="$_tmp/gcd-b/vms"
+  _manifest="$_tmp/gcd-b/manifest.json"
+  _gcd_populate_fixture "$_vm_dir" "$_images_dir" "$_vms_dir" "$_manifest"
+  gc_disabled_mode=true
+  dry_run=false
+  vm_gc_vms
+  assert_file_missing "$_images_dir/Windows.qcow2" "dispatcher gc-disabled removed Windows golden"
+  assert_file_missing "$_images_dir/macOS.base.qcow2" "dispatcher gc-disabled removed MacBook base"
+  assert_file_missing "$_vm_dir/data/Windows.qcow2" "dispatcher gc-disabled removed Windows overlay"
+  assert_file_missing "$_vm_dir/Windows.vm.json" "dispatcher gc-disabled removed Windows descriptor"
+  assert_file_missing "$_vm_dir/MacBook.vm.json" "dispatcher gc-disabled removed MacBook descriptor"
+  for _keep in Android-system.qcow2 NixOS.qcow2 NixOS.base.qcow2; do
+    assert_file_exists "$_images_dir/$_keep" "dispatcher gc-disabled kept images/$_keep"
+  done
+  assert_file_exists "$_vm_dir/data/NixOS.qcow2" "dispatcher gc-disabled kept NixOS overlay"
+
+  # Scenario C — dry_run: nothing removed.
+  _vm_dir="$_tmp/gcd-c/vm"
+  _images_dir="$_tmp/gcd-c/vm/images"
+  _vms_dir="$_tmp/gcd-c/vms"
+  _manifest="$_tmp/gcd-c/manifest.json"
+  _gcd_populate_fixture "$_vm_dir" "$_images_dir" "$_vms_dir" "$_manifest"
+  gc_disabled_mode=false
+  dry_run=true
+  vm_gc_vms
+  assert_file_exists "$_images_dir/stale.qcow2" "dispatcher dry-run preserved stale image"
+  assert_file_exists "$_vm_dir/data/stale.qcow2" "dispatcher dry-run preserved stale overlay"
+  assert_file_exists "$_vm_dir/stale.vm.json" "dispatcher dry-run preserved stale descriptor"
+}
+
+# test_expected_vm_names_edge_cases
+#   Direct unit tests for vm_get_manifest_vm_names (all guests) vs
+#   vm_get_expected_vm_names (enabled + current-host only).
+test_expected_vm_names_edge_cases() {
+  local _manifest="$_tmp/names/manifest.json" _names _sorted
+
+  mkdir -p "$_tmp/names"
+
+  cat > "$_manifest" <<'EOF'
+{
+  "VMs": [
+    {
+      "id": "AllHosts",
+      "name": "AllHosts",
+      "type": "NixOS",
+      "enabled": true,
+      "hosts": ["MacBook", "NixOS", "Windows"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "portForwards": [],
+      "macAddressPrefix": "52"
+    },
+    {
+      "id": "NixOnly",
+      "name": "NixOnly",
+      "type": "NixOS",
+      "enabled": true,
+      "hosts": ["NixOS"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "portForwards": [],
+      "macAddressPrefix": "52"
+    },
+    {
+      "id": "DisabledGuest",
+      "name": "DisabledGuest",
+      "type": "Windows",
+      "enabled": false,
+      "hosts": ["Windows"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "portForwards": [],
+      "macAddressPrefix": "52"
+    },
+    {
+      "id": "NoEnabledField",
+      "name": "NoEnabledField",
+      "type": "NixOS",
+      "hosts": ["NixOS"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "portForwards": [],
+      "macAddressPrefix": "52"
+    },
+    {
+      "id": "EmptyHosts",
+      "name": "EmptyHosts",
+      "type": "macOS",
+      "enabled": true,
+      "hosts": [],
+      "cpus": 4,
+      "ram": "16GB",
+      "diskSize": "128GB",
+      "portForwards": [],
+      "macAddressPrefix": "52"
+    }
+  ]
+}
+EOF
+
+  vm_init "$REPO_ROOT" "$_tmp/names/vm" "$_tmp/names/vm/images" "$REPO_ROOT/src/vms/templates" \
+    "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
+    "$_tmp/names/vms" "$_manifest" "NixOS" "false" "false"
+
+  _names="$(vm_get_manifest_vm_names | sort | tr '\n' ' ')"
+  assert_eq "AllHosts DisabledGuest EmptyHosts NixOnly NoEnabledField " "$_names" "manifest names include all guests"
+
+  _names="$(vm_get_expected_vm_names | sort | tr '\n' ' ')"
+  assert_eq "AllHosts NixOnly " "$_names" "expected names are enabled-and-host-matched only"
+
+  # Host with no manifest match → empty expected set.
+  NUCLEUS_HOST="NonexistentHost"
+  _names="$(vm_get_expected_vm_names | tr '\n' ' ')"
+  assert_eq "" "$_names" "expected names empty when NUCLEUS_HOST matches no enabled guest"
+
+  # Manifest names unchanged regardless of NUCLEUS_HOST.
+  NUCLEUS_HOST="NixOS"
+  _sorted="$(vm_get_manifest_vm_names | wc -l | tr -d ' ')"
+  assert_eq "5" "$_sorted" "manifest names count stable across NUCLEUS_HOST changes"
+}
+
 test_uuid_vectors
 test_mac_vectors
 test_deterministic
@@ -904,6 +1155,8 @@ test_resize_and_mark_image_grow_only
 test_gc_keep_set
 test_pack_keep_set
 test_windows_qemu_provisioning
+test_gc_dispatcher
+test_expected_vm_names_edge_cases
 
 if [ "$_failures" -eq 0 ]; then
   echo "vm-disk-model-tests: all checks passed"
