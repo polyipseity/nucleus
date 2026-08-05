@@ -740,6 +740,23 @@ echo "$TESTS_FAILED" > "$_tt_tmpdir/terminal-activations-tests.fail"
 } &
 _tt_count=$((_tt_count + 1))
 
+# Test tests/scripts/gui-env-tests.sh
+{
+GUI_ENV_TEST_SH="tests/scripts/gui-env-tests.sh"
+if [[ -f "$GUI_ENV_TEST_SH" ]]; then
+    test_bash_syntax "$GUI_ENV_TEST_SH"
+    test_has_shebang "$GUI_ENV_TEST_SH"
+    test_is_executable "$GUI_ENV_TEST_SH"
+    test_error_handling "$GUI_ENV_TEST_SH"
+    test_has_documentation "$GUI_ENV_TEST_SH"
+    test_no_dangerous_patterns "$GUI_ENV_TEST_SH"
+    test_strict_shell_mode "$GUI_ENV_TEST_SH"
+fi
+echo "$TESTS_PASSED" > "$_tt_tmpdir/gui-env-tests.pass"
+echo "$TESTS_FAILED" > "$_tt_tmpdir/gui-env-tests.fail"
+} &
+_tt_count=$((_tt_count + 1))
+
 # Test tests/hosts/Windows/system/Sync-TerminalActivation.Tests.ps1
 TERMINAL_PESTER_PS1="tests/hosts/Windows/system/Sync-TerminalActivation.Tests.ps1"
 if [[ -f "$TERMINAL_PESTER_PS1" ]]; then
