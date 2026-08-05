@@ -18,19 +18,29 @@
 #>
 
 __VIRTIOFS_ARGS__
-& '__QEMU_SYSTEM__' `
-    -name '__VM_DISPLAY__' `
-    -machine __MACHINE__ `
-    -cpu __CPU__ `
-    -smp __CPUS__ `
-    -m __RAM_BYTES__B `
-    -drive file='__DISK_PATH__',format=qcow2,if=virtio `
-    -netdev user,id=net0,__HOSTFWDS__ `
-    -device virtio-net-pci,netdev=net0 `
-    -vga __VGA__ `
-    -display __DISPLAY_BACKEND__ `
-    -rtc base=localtime `
-    -chardev pipe,id=qga,path=\.\pipe\qga-__VM_NAME__ `
-    -device virtio-serial `
-    -device virtserialport,chardev=qga,name=org.qemu.guest_agent.0 `
-    -usb -device usb-tablet
+
+# The disk path below is relative to the VM tree root (data/<id>.qcow2) so
+# the rendered script stays relocatable across hosts; run QEMU from the tree
+# root so the relative path resolves from any working directory.
+Push-Location -LiteralPath (Split-Path -Parent $PSScriptRoot)
+try {
+    & '__QEMU_SYSTEM__' `
+        -name '__VM_DISPLAY__' `
+        -machine __MACHINE__ `
+        -cpu __CPU__ `
+        -smp __CPUS__ `
+        -m __RAM_BYTES__B `
+        -drive file='__DISK_PATH__',format=qcow2,if=virtio `
+        -netdev user,id=net0,__HOSTFWDS__ `
+        -device virtio-net-pci,netdev=net0 `
+        -vga __VGA__ `
+        -display __DISPLAY_BACKEND__ `
+        -rtc base=localtime `
+        -chardev pipe,id=qga,path=\.\pipe\qga-__VM_NAME__ `
+        -device virtio-serial `
+        -device virtserialport,chardev=qga,name=org.qemu.guest_agent.0 `
+        -usb -device usb-tablet
+}
+finally {
+    Pop-Location
+}

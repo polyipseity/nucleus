@@ -496,7 +496,11 @@ vm_write_start_script() {
         _wss_hostfwds="$(printf '%s' "$_wss_doc" | jq -r '[.portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")')"
         _wss_cpus="$(printf '%s' "$_wss_doc" | jq -r '.cpus')"
         _wss_ram_bytes="$(parse_size "$(printf '%s' "$_wss_doc" | jq -r '.ram')")"
-        _wss_disk_path="$VM_DIR/data/${_wss_name}.qcow2"
+        # WHY: the disk path is RELATIVE (data/<id>.qcow2, tree-root-relative)
+        # so rendered start scripts stay relocatable across hosts and users
+        # (the templates cd/Push-Location to the tree root before invoking
+        # QEMU).  Mirrors Invoke-VMSetup.ps1 and the descriptor disks array.
+        _wss_disk_path="data/${_wss_name}.qcow2"
         _wss_qemu_arch="x86_64"
         if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
           _wss_qemu_arch="aarch64"

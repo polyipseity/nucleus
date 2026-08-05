@@ -16,6 +16,7 @@
     - src/vms/templates/README.md (2 tokens, VM directory guide)
     - src/vms/windows/Autounattend.xml (3 tokens, Windows guest unattended setup)
     - src/scripts/vms/start-android-vm.ps1 (7 tokens, Android QEMU start script)
+    - src/vms/templates/stop-host.ps1 (2 tokens, host-kind stop script)
 
 .NOTES
     Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/embedded-content/template-token-integrity.Tests.ps1 -Passthru"
@@ -183,7 +184,9 @@ Describe "Render chain has no dangling replacements" {
       (Get-UpperSnakeTokenList (Get-TemplatePath "start-windows.ps1")) +
       (Get-UpperSnakeTokenList (Get-TemplatePath "start-windows-host.sh")) +
       (Get-UpperSnakeTokenList (Get-TemplatePath "README.md")) +
-      (Get-UpperSnakeTokenList (Join-Path $RepoRoot "src\vms\windows\Autounattend.xml"))
+      (Get-UpperSnakeTokenList (Join-Path $RepoRoot "src\vms\windows\Autounattend.xml")) +
+      (Get-UpperSnakeTokenList (Join-Path $RepoRoot "src\scripts\vms\start-android-vm.ps1")) +
+      (Get-UpperSnakeTokenList (Get-TemplatePath "stop-host.ps1"))
     ) | Sort-Object -Unique
     $dangling = @((Get-ReplaceChainTokenList) + (Get-DashReplaceTokenList) | Where-Object { $_ -notin $knownTokens } | Sort-Object -Unique)
     $dangling | Should -BeNullOrEmpty

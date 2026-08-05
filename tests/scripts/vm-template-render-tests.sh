@@ -283,6 +283,22 @@ test_descriptor_fixture_render() {
   assert_contains "switch ('windows-qemu')" "$_vm_dir/scripts/stop-Windows.ps1" "stop-host.ps1 (Windows, windows-qemu)"
   assert_file_missing "$_vm_dir/scripts/stop-Windows.sh" "no stop-Windows.sh for windows-qemu hosts"
 
+  # P8 relocatable-template parity: the windows-qemu start scripts must
+  # re-anchor to the tree root before invoking QEMU (relative data/ disk path),
+  # and the Android start script must use the shared data/ dir for userdata.
+  assert_contains "#!/usr/bin/env bash" "$_vm_dir/scripts/start-Windows.sh" "start-windows-host.sh bash shebang"
+  assert_contains "set -euo pipefail" "$_vm_dir/scripts/start-Windows.sh" "start-windows-host.sh strict mode"
+  # shellcheck disable=SC2016 # reason: literal $ and quotes in the needle are intentional for grep -F matching of rendered bash
+  assert_contains 'cd "$(dirname "$0")/.." || exit 1' "$_vm_dir/scripts/start-Windows.sh" "start-windows-host.sh re-anchors to tree root"
+  # shellcheck disable=SC2016 # reason: literal $ in single quotes is intentional for grep -F needle matching of rendered PowerShell
+  assert_contains 'Push-Location -LiteralPath (Split-Path -Parent $PSScriptRoot)' "$_vm_dir/scripts/start-Windows.ps1" "start-windows.ps1 re-anchors to tree root"
+  assert_contains "finally {" "$_vm_dir/scripts/start-Windows.ps1" "start-windows.ps1 restores caller location (finally)"
+  assert_contains "Pop-Location" "$_vm_dir/scripts/start-Windows.ps1" "start-windows.ps1 restores caller location (Pop-Location)"
+  # shellcheck disable=SC2016 # reason: literal $ in double quotes is intentional for grep -F needle matching of rendered PowerShell
+  assert_contains "Join-Path \$env:USERPROFILE 'virtual machines\data'" "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 shared data dir"
+  # shellcheck disable=SC2016 # reason: literal $ in single quotes is intentional for grep -F needle matching of rendered PowerShell
+  assert_contains '$diskUserdata = Join-Path $dataDir' "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 userdata under data/"
+
   # darwin-utm renders: posix .sh + host-dispatcher .ps1 for every guest type.
   vm_write_start_script "$_android_doc" darwin-utm
   vm_write_start_script "$_nixos_doc" darwin-utm

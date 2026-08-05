@@ -1478,6 +1478,23 @@ let
       )
       "scripts/vm.sh must provision UTM runtime disks as base/overlay pairs (images/<type>.base.qcow2 base + data/<id>.qcow2 overlay hard-linked into the bundle)";
 
+  # Windows vm-setup must mirror POSIX base/overlay provisioning: the runtime
+  # disk is a qcow2 overlay data/<id>.qcow2 backed by images/<type>.base.qcow2
+  # (backing path tree-root-relative), the base is a cp of the kept prebuilt
+  # golden refreshed only while the VM is stopped, growth is grow-only via
+  # qemu-img resize, and Android userdata is a standalone data/ qcow2.
+  test_windows_base_overlay_parity =
+    assert'
+      (
+        (lib.hasInfix ''$qemuImg create -f qcow2 -b "..\images\$($vm.type).base.qcow2" -F qcow2'' windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Copy-Item $prebuilt $basePath" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Test-VmProcessRunning -VmName $vm.id -VmDisplay $vm.name" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Get-VmQcow2VirtualSize -ImagePath $diskPath" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "$qemuImg resize $diskPath $diskBytes" windows_vm_setup_ps1_text)
+        && (lib.hasInfix ''Join-Path -Path $dataDir -ChildPath "$($vm.id).qcow2"'' windows_vm_setup_ps1_text)
+      )
+      "Windows vm-setup must provision data/<id>.qcow2 overlays over images/<type>.base.qcow2 (tree-root-relative backing, running-VM-guarded base refresh, grow-only resize, Android standalone userdata)";
+
   # UTM provisioning for Android must derive the system/userdata/GSI image
   # filenames from the manifest Android group (never hardcoded android-*
   # literals), validate the prebuilt with the relaxed 4 GiB floor, and copy
@@ -2241,6 +2258,7 @@ let
     test_vm_gc_marker_expected_set_semantics
     test_windows_vm_gc_keep_set
     test_android_build_relink_refresh
+    test_windows_base_overlay_parity
   ];
 
 in
@@ -2405,6 +2423,7 @@ in
     test_vm_gc_marker_expected_set_semantics
     test_windows_vm_gc_keep_set
     test_android_build_relink_refresh
+    test_windows_base_overlay_parity
     ;
 
   summary = builtins.deepSeq all_tests "vm-setup-tests: all tests passed";

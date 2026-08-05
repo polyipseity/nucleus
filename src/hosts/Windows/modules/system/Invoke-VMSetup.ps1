@@ -238,7 +238,7 @@ function Invoke-VMSetup {
 
     function Invoke-GcOrphanDisk {
         param([string[]] $ExpectedNames)
-        $dirs = @($vmDir, $imagesDir) | Where-Object { Test-Path $_ -PathType Container }
+        $dirs = @($dataDir, $imagesDir) | Where-Object { Test-Path $_ -PathType Container }
         foreach ($dir in $dirs) {
             $keep = @(Get-VMGcDiskKeepSet -Dir $dir -ExpectedNames $ExpectedNames)
             # check-suppress:suppression_doc: probe -- no disk images may exist; foreach handles empty result.
@@ -254,7 +254,7 @@ function Invoke-VMSetup {
     }
 
     function Invoke-GcOrphanMarker {
-        $dirs = @($vmDir, $imagesDir) | Where-Object { Test-Path $_ -PathType Container }
+        $dirs = @($dataDir, $imagesDir) | Where-Object { Test-Path $_ -PathType Container }
         foreach ($dir in $dirs) {
             # check-suppress:suppression_doc: probe -- no credential markers may exist; foreach handles empty result.
             foreach ($marker in @(
@@ -435,6 +435,317 @@ function Invoke-VMSetup {
         return ($hosts -contains $nucleusHost)
     }
 
+    function Invoke-GcOrphanDescriptor {
+        param([string[]] $ExpectedNames)
+        if (-not (Test-Path -LiteralPath $vmDir -PathType Container)) { return }
+        # check-suppress:suppression_doc: probe -- no VM descriptors may exist; Where-Object handles empty result.
+        $orphanDescriptors = Get-ChildItem -LiteralPath $vmDir -File -Filter '*.vm.json' -ErrorAction SilentlyContinue |
+            Where-Object { $_.BaseName -notin $ExpectedNames }
+        foreach ($descriptor in $orphanDescriptors) {
+            Write-Information "vm-setup: GC — removing orphaned VM descriptor: $($descriptor.FullName)"
+            if (-not $DryRun) {
+                Remove-Item -LiteralPath $descriptor.FullName -Force
+            }
+        }
+    }
+
+    function Test-VmProcessRunning {
+        param(
+            [Parameter(Mandatory)]
+            [string]$VmName,
+
+            [Parameter(Mandatory)]
+            [string]$VmDisplay
+        )
+        # check-suppress:suppression_doc: probe -- no qemu processes may exist; foreach handles empty result.
+        foreach ($proc in Get-CimInstance Win32_Process -Filter "Name LIKE 'qemu-system%'" -ErrorAction SilentlyContinue) {
+            if ($proc.CommandLine -match '-name\s+(\S+)') {
+                if ($Matches[1] -eq $VmName -or $Matches[1] -eq $VmDisplay) {
+                    return $true
+                }
+            }
+        }
+        return $false
+    }
+
+    function Get-VmQcow2VirtualSize {
+        param(
+            [Parameter(Mandatory)]
+            [string]$ImagePath
+        )
+        if ($null -eq $qemuImg) {
+            return [long]0
+        }
+        $infoJson = & $qemuImg info --output=json $ImagePath 2>$null  # check-suppress:suppression_doc: probe -- image file may not exist or be corrupt; $LASTEXITCODE checked below
+        if ($LASTEXITCODE -ne 0 -or -not $infoJson) {
+            return [long]0
+        }
+        try {
+            return [long]($infoJson | ConvertFrom-Json).'virtual-size'
+        } catch {
+            return [long]0
+        }
+    }
+
+    function Invoke-VmWriteDescriptor {
+        param(
+            [Parameter(Mandatory)]
+            $Vm,
+
+            [Parameter(Mandatory)]
+            [string]$RepoRoot
+        )
+
+        $descriptorPath = Join-Path $vmDir "$($Vm.id).vm.json"
+        if ($DryRun) {
+            Write-Information "vm-setup: [dry-run] Write VM descriptor: $descriptorPath"
+            return
+        }
+
+        # Deterministic hardware identity mirrors vm_mk_uuid / vm_mk_mac_address
+        # in scripts/lib/vm.sh (and the MacBook vms.nix mkUuid/mkMacAddress)
+        # so descriptors are identical across hosts and platforms.
+        $macPrefix = [string]$Vm.macAddressPrefix
+        if ([string]::IsNullOrWhiteSpace($macPrefix)) {
+            throw "vm-setup: VM '$($Vm.id)' must declare macAddressPrefix in src\modules\VMs.json"
+        }
+
+        $sha = [System.Security.Cryptography.SHA256]::HashData([System.Text.Encoding]::UTF8.GetBytes([string]$Vm.id))
+        $hex = [System.Convert]::ToHexString($sha).ToLowerInvariant()
+        $uuid = '{0}-{1}-{2}-{3}-{4}' -f $hex.Substring(0, 8), $hex.Substring(8, 4), $hex.Substring(12, 4), $hex.Substring(16, 4), $hex.Substring(20, 12)
+        $macSha = [System.Security.Cryptography.SHA256]::HashData([System.Text.Encoding]::UTF8.GetBytes("mac:$($Vm.id)"))
+        $macHex = [System.Convert]::ToHexString($macSha).ToLowerInvariant()
+        $mac = '{0}:{1}:{2}:{3}:{4}:{5}' -f $macPrefix, $macHex.Substring(0, 2), $macHex.Substring(2, 2), $macHex.Substring(4, 2), $macHex.Substring(6, 2), $macHex.Substring(8, 2)
+
+        $hostArch = $env:PROCESSOR_ARCHITECTURE
+        $arch = switch ($Vm.type) {
+            'Android' { 'aarch64' }
+            'Windows' { 'x86_64' }
+            default { if ($hostArch -eq 'ARM64') { 'aarch64' } else { 'x86_64' } }
+        }
+        $machine = if ($arch -eq 'x86_64') { 'q35' } else { 'virt' }
+        $uefi = ($Vm.type -ne 'Windows' -and $arch -eq 'aarch64')
+
+        if ($Vm.type -eq 'Android') {
+            $disks = @(
+                @{ role = 'system'; path = "images/$($Vm.type)-system.qcow2" },
+                @{ role = 'gsi'; path = "images/$($Vm.type)-gsi.img" },
+                @{ role = 'userdata'; path = "data/$($Vm.id).qcow2" }
+            )
+        } else {
+            $disks = @(
+                @{ role = 'base'; path = "images/$($Vm.type).base.qcow2" },
+                @{ role = 'runtime'; path = "data/$($Vm.id).qcow2" }
+            )
+        }
+
+        $descriptor = [ordered]@{
+            '$schema'    = Join-Path $RepoRoot 'src\modules\vm-descriptor.schema.json'
+            id           = [string]$Vm.id
+            name         = [string]$Vm.name
+            type         = [string]$Vm.type
+            enabled      = [bool]$Vm.enabled
+            cpus         = [int]$Vm.cpus
+            ram          = [string]$Vm.ram
+            diskSize     = [string]$Vm.diskSize
+            portForwards = @($Vm.portForwards)
+            uuid         = $uuid
+            mac          = $mac
+            arch         = $arch
+            machine      = $machine
+            uefi         = $uefi
+            disks        = @($disks)
+            createdBy    = 'nucleus-vm'
+        }
+        if ($null -ne $Vm.Android) { $descriptor['Android'] = $Vm.Android }
+        if ($null -ne $Vm.macOS)   { $descriptor['macOS']   = $Vm.macOS }
+        if ($null -ne $Vm.Windows) { $descriptor['Windows'] = $Vm.Windows }
+
+        $descriptor | ConvertTo-Json -Depth 8 | Set-Content -Path $descriptorPath -Encoding UTF8
+        Write-Information "vm-setup: VM descriptor written: $descriptorPath"
+    }
+
+    function Invoke-VmWriteStartHelper {
+        param(
+            [Parameter(Mandatory)]
+            $Vm,
+
+            [Parameter(Mandatory)]
+            [string]$QemuDir,
+
+            [Parameter(Mandatory)]
+            [string]$ScriptsDir,
+
+            [Parameter(Mandatory)]
+            [string]$TemplatesDir
+        )
+
+        if ($Vm.type -eq 'Android') {
+            # The Android QEMU start script is shared canonical content
+            # (embedded-content policy); render the shared file instead of an
+            # embedded copy.
+            $androidStartPath = Join-Path $RepoRoot 'src\scripts\vms\start-android-vm.ps1'
+            if (-not (Test-Path -LiteralPath $androidStartPath -PathType Leaf)) {
+                throw "vm-setup: shared Android VM start script not found: $androidStartPath"
+            }
+            $ramBytes = ConvertFrom-SizeString $Vm.ram
+            $adbPort = [string](@($Vm.portForwards | Where-Object { $_.guestPort -eq 5555 } | Select-Object -First 1).hostPort)
+            $consolePort = [string](@($Vm.portForwards | Where-Object { $_.guestPort -eq 5554 } | Select-Object -First 1).hostPort)
+            $template = Get-Content -Path $androidStartPath -Raw
+            $content = $template.Replace('__ANDROID_CPU_COUNT__', [string]$Vm.cpus)
+            $content = $content.Replace('__ANDROID_RAM_BYTES__', "${ramBytes}B")
+            $content = $content.Replace('__ANDROID_SYSTEM_IMAGE__', [string]$Vm.Android.systemImage)
+            $content = $content.Replace('__ANDROID_USERDATA_IMAGE__', [string]$Vm.Android.userdataImage)
+            $content = $content.Replace('__ANDROID_GSI_IMAGE__', [string]$Vm.Android.gsiImage)
+            $content = $content.Replace('__ADB_PORT__', $adbPort)
+            $content = $content.Replace('__ADB_CONSOLE_PORT__', $consolePort)
+            $startPs1 = Join-Path $ScriptsDir "start-$($Vm.id).ps1"
+            if ($DryRun) {
+                Write-Information "vm-setup: [dry-run] Write start script: $startPs1"
+            } else {
+                Set-Content -Path $startPs1 -Value $content -Encoding UTF8
+                Write-Information "vm-setup: start script written: $startPs1"
+            }
+            return
+        }
+
+        $hostArch = $env:PROCESSOR_ARCHITECTURE
+        # The QEMU system binary is host-arch based (mirrors the POSIX
+        # windows-qemu render); the descriptor arch is type-based.
+        $vmArch = if ($hostArch -eq 'ARM64') { 'aarch64' } else { 'x86_64' }
+        $qemuSystem = Join-Path $QemuDir "qemu-system-$vmArch.exe"
+        $machine = if ($vmArch -eq 'x86_64') { 'q35' } else { 'virt' }
+        $cpu = 'host'
+
+        $ramBytes = ConvertFrom-SizeString $Vm.ram
+        $hostFwds = ($Vm.portForwards | ForEach-Object { "hostfwd=tcp::$($_.hostPort)-:$($_.guestPort)" }) -join ','
+        # Relocatable writable-disk path: data/<id>.qcow2 relative to the VM
+        # tree root (the rendered templates cd/Push-Location before QEMU).
+        $diskPath = Join-Path 'data' "$($Vm.id).qcow2"
+
+        $display = 'sdl'
+        $vga = if ($Vm.type -eq 'Windows') { 'std' } else { 'virtio' }
+
+        # Determine VirtioFS shared directory argument.
+        # check-suppress:embedded-content: exception 1 (data-driven/generated content) -- per-VM conditional args
+        $virtiofsArgs = ''
+        if ($Vm.shareDevDir) {
+            $devDir = Join-Path $env:USERPROFILE 'dev'
+            # VirtioFS on Windows requires virtiofsd running separately.
+            # Add a placeholder reminder; the start script shows how to launch
+            # virtiofsd before starting the guest.
+            $virtiofsArgs = @"
+
+# To enable ~/dev directory sharing:
+# 1. Start virtiofsd in a separate terminal:
+#      virtiofsd --socket-path=\\.\pipe\$($Vm.id)-virtiofs --shared-dir="$devDir"
+# 2. Then run this script.
+# -chardev socket,id=char0,path=\\.\pipe\$($Vm.id)-virtiofs ``
+# -device vhost-user-fs-pci,chardev=char0,tag=dev ``
+# -object memory-backend-file,id=mem,size=${ramBytes}B,mem-path=/dev/shm,share=on ``
+# -numa node,memdev=mem
+"@
+        }
+
+        $startPs1Path = Join-Path $ScriptsDir "start-$($Vm.id).ps1"
+        $startShPath = Join-Path $ScriptsDir "start-$($Vm.id).sh"
+        $ps1TemplatePath = Join-Path $TemplatesDir 'start-windows.ps1'
+        $shTemplatePath = Join-Path $TemplatesDir 'start-windows-host.sh'
+        if (Test-Path -LiteralPath $ps1TemplatePath -PathType Leaf) {
+            $ps1Template = Get-Content -Path $ps1TemplatePath -Raw
+            $startContentPs1 = $ps1Template.Replace('__QEMU_SYSTEM__', $qemuSystem)
+            $startContentPs1 = $startContentPs1.Replace('__VM_NAME__', $Vm.id)
+            $startContentPs1 = $startContentPs1.Replace('__VM_DISPLAY__', $Vm.name)
+            $startContentPs1 = $startContentPs1.Replace('__MACHINE__', $machine)
+            $startContentPs1 = $startContentPs1.Replace('__CPU__', $cpu)
+            $startContentPs1 = $startContentPs1.Replace('__CPUS__', [string]$Vm.cpus)
+            $startContentPs1 = $startContentPs1.Replace('__RAM_BYTES__', [string]$ramBytes)
+            $startContentPs1 = $startContentPs1.Replace('__DISK_PATH__', $diskPath)
+            $startContentPs1 = $startContentPs1.Replace('__HOSTFWDS__', $hostFwds)
+            $startContentPs1 = $startContentPs1.Replace('__VGA__', $vga)
+            $startContentPs1 = $startContentPs1.Replace('__DISPLAY_BACKEND__', $display)
+            $startContentPs1 = $startContentPs1.Replace('__VIRTIOFS_ARGS__', $virtiofsArgs)
+        } else {
+            Write-Warning "vm-setup: start-windows.ps1 template not found at $ps1TemplatePath; writing minimal script"
+            $startContentPs1 = "Write-Host 'start-$($Vm.id).ps1 — Start VM $($Vm.name)'"
+        }
+        if (Test-Path -LiteralPath $shTemplatePath -PathType Leaf) {
+            $shTemplate = Get-Content -Path $shTemplatePath -Raw
+            $startContentSh = $shTemplate.Replace('__QEMU_SYSTEM__', $qemuSystem)
+            $startContentSh = $startContentSh.Replace('__VM_NAME__', $Vm.id)
+            $startContentSh = $startContentSh.Replace('__VM_DISPLAY__', $Vm.name)
+            $startContentSh = $startContentSh.Replace('__MACHINE__', $machine)
+            $startContentSh = $startContentSh.Replace('__CPU__', $cpu)
+            $startContentSh = $startContentSh.Replace('__CPUS__', [string]$Vm.cpus)
+            $startContentSh = $startContentSh.Replace('__RAM_BYTES__', [string]$ramBytes)
+            $startContentSh = $startContentSh.Replace('__DISK_PATH__', $diskPath)
+            $startContentSh = $startContentSh.Replace('__HOSTFWDS__', $hostFwds)
+            $startContentSh = $startContentSh.Replace('__VGA__', $vga)
+            $startContentSh = $startContentSh.Replace('__DISPLAY_BACKEND__', $display)
+        } else {
+            Write-Warning "vm-setup: start-windows-host.sh template not found at $shTemplatePath; writing minimal script"
+            $startContentSh = "#!/bin/sh`n# start-$($Vm.id).sh — Start VM $($Vm.name)"
+        }
+
+        if ($DryRun) {
+            Write-Information "vm-setup: [dry-run] Write start scripts: $startPs1Path, $startShPath"
+        } else {
+            Set-Content -Path $startPs1Path -Value $startContentPs1 -Encoding UTF8
+            Set-Content -Path $startShPath -Value $startContentSh -Encoding UTF8
+            Write-Information "vm-setup: start scripts written: $startPs1Path, $startShPath"
+        }
+    }
+
+    function Invoke-VmWriteStopHelper {
+        param(
+            [Parameter(Mandatory)]
+            $Vm,
+
+            [Parameter(Mandatory)]
+            [string]$ScriptsDir,
+
+            [Parameter(Mandatory)]
+            [string]$TemplatesDir
+        )
+
+        $stopPs1 = Join-Path $ScriptsDir "stop-$($Vm.id).ps1"
+        $stopTemplatePath = Join-Path $TemplatesDir 'stop-host.ps1'
+        if (-not (Test-Path -LiteralPath $stopTemplatePath -PathType Leaf)) {
+            Write-Warning "vm-setup: stop-host.ps1 template not found at $stopTemplatePath; skipping stop script"
+            return
+        }
+        if ($DryRun) {
+            Write-Information "vm-setup: [dry-run] Write stop script: $stopPs1"
+            return
+        }
+        $template = Get-Content -Path $stopTemplatePath -Raw
+        $content = $template.Replace('__HOST_KIND__', 'windows-qemu').Replace('__VM_NAME__', $Vm.id)
+        Set-Content -Path $stopPs1 -Value $content -Encoding UTF8
+        Write-Information "vm-setup: stop script written: $stopPs1"
+    }
+
+    function Invoke-VmWritePackUnpackHelper {
+        param(
+            [Parameter(Mandatory)]
+            [string]$ScriptsDir
+        )
+
+        if ($DryRun) {
+            Write-Information "vm-setup: [dry-run] Write pack/unpack helper scripts under $ScriptsDir"
+            return
+        }
+        New-Item -ItemType Directory -Path $ScriptsDir -Force > $null
+        $packSh = "#!/usr/bin/env bash`nset -euo pipefail`nexec nucleus-vm pack `"`$@`"`n"
+        $unpackSh = "#!/usr/bin/env bash`nset -euo pipefail`nexec nucleus-vm unpack `"`$@`"`n"
+        $packPs1 = "# Generated by nucleus-vm setup — pack.ps1. Delegates to nucleus-vm pack.`n& nucleus-vm pack @args`nexit `$LASTEXITCODE`n"
+        $unpackPs1 = "# Generated by nucleus-vm setup — unpack.ps1. Delegates to nucleus-vm unpack.`n& nucleus-vm unpack @args`nexit `$LASTEXITCODE`n"
+        Set-Content -Path (Join-Path $ScriptsDir 'pack.sh') -Value $packSh -Encoding UTF8
+        Set-Content -Path (Join-Path $ScriptsDir 'unpack.sh') -Value $unpackSh -Encoding UTF8
+        Set-Content -Path (Join-Path $ScriptsDir 'pack.ps1') -Value $packPs1 -Encoding UTF8
+        Set-Content -Path (Join-Path $ScriptsDir 'unpack.ps1') -Value $unpackPs1 -Encoding UTF8
+        Write-Information "vm-setup: pack/unpack helper scripts written: $ScriptsDir"
+    }
+
     . (Join-Path -Path $RepoRoot -ChildPath 'src\hosts\Windows\modules\SizeStrings.ps1')
 
     $manifest = Join-Path $RepoRoot 'src\modules\VMs.json'
@@ -448,6 +759,7 @@ function Invoke-VMSetup {
     $templatesDir = Join-Path $vmsDir 'templates'
     $vmDir       = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
     $imagesDir   = Join-Path $vmDir 'images'
+    $dataDir     = Join-Path $vmDir 'data'
     try {
         $guestCredential = Resolve-VMGuestCredential -RepoRoot $RepoRoot
     }
@@ -474,10 +786,12 @@ function Invoke-VMSetup {
     if (-not $DryRun) {
         New-Item -ItemType Directory -Path $vmDir     -Force > $null
         New-Item -ItemType Directory -Path $imagesDir -Force > $null
+        New-Item -ItemType Directory -Path $dataDir   -Force > $null
         New-Item -ItemType Directory -Path (Join-Path $vmDir 'scripts') -Force > $null
     } else {
         Write-Information "vm-setup: [dry-run] New-Item Directory $vmDir"
         Write-Information "vm-setup: [dry-run] New-Item Directory $imagesDir"
+        Write-Information "vm-setup: [dry-run] New-Item Directory $dataDir"
         Write-Information "vm-setup: [dry-run] New-Item Directory $(Join-Path $vmDir 'scripts')"
     }
 
@@ -586,6 +900,13 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                     -Headful:$Headful `
                     -VmsDir $vmsDir -ImagesDir $imagesDir -DryRun:$DryRun
             }
+            'Android' {
+                # Android system/GSI images are fetched from the manifest
+                # Android group (gsiUrl) and cannot be automated here; the
+                # writable data/<id>.qcow2 userdata disk is provisioned in
+                # Phase 2.
+                Write-Information "vm-setup: Android image must be obtained from the manifest Android group (gsiUrl); place system/GSI images under $imagesDir"
+            }
             'macOS' {
                 Write-Information "vm-setup: macOS image must be obtained manually (licensing restricts automation)"
             }
@@ -612,10 +933,23 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         }
     }
 
-    # Prune stale start scripts so removed VMs leave no orphaned files.
+    # Prune stale generated per-guest start/stop scripts so removed VMs leave
+    # no orphaned files.  pack/unpack wrappers are regenerated in Pass B.
+    # WHY: the prune is DryRun-guarded (pack/unpack wrappers and any other
+    # non-start/stop scripts in scripts/ are preserved).
     $scriptsDir = Join-Path $vmDir 'scripts'
     if (Test-Path $scriptsDir) {
-        Remove-Item -Path (Join-Path $scriptsDir '*.sh'), (Join-Path $scriptsDir '*.ps1') -Force
+        $staleScripts = @(
+            Get-ChildItem -LiteralPath $scriptsDir -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -match '^(start|stop)-.+\.(sh|ps1)$' }
+        )
+        foreach ($stale in $staleScripts) {
+            if ($DryRun) {
+                Write-Information "vm-setup: [dry-run] Remove-Item '$($stale.FullName)' -Force"
+            } else {
+                Remove-Item -LiteralPath $stale.FullName -Force
+            }
+        }
     }
 
     foreach ($vm in $vmDef.VMs) {
@@ -635,169 +969,149 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         if ($NixosOnly   -and $vm.type -ne 'NixOS')   { continue }
         if ($WindowsOnly -and $vm.type -ne 'Windows') { continue }
 
-        # QEMU -m accepts bare byte counts with the 'B' suffix; pass exact
-        # manifest RAM bytes without lossy conversion.
-        $ramBytes    = ConvertFrom-SizeString $vm.ram
-        $diskPath    = Join-Path -Path $vmDir -ChildPath "$($vm.id).qcow2"
-        $diskCredentialMarker = Get-VMGuestSecretMarkerPath -BasePath $diskPath
-        $startScriptPs1 = Join-Path -Path $vmDir -ChildPath "scripts" -AdditionalChildPath "start-$($vm.id).ps1"
-        $startScriptSh = Join-Path -Path $vmDir -ChildPath "scripts" -AdditionalChildPath "start-$($vm.id).sh"
-        $prebuilt    = Join-Path -Path $imagesDir -ChildPath "$($vm.id).qcow2"
-
+        # Pass A — disk provisioning (enabled-only, mirroring
+        # vm_ensure_base_and_overlay): the writable runtime disk is a qcow2
+        # overlay over images/<type>.base.qcow2 (base = cp of the prebuilt
+        # golden) created with a tree-root-relative backing path.  Android's
+        # userdata disk is a standalone qcow2 (no base).
         Write-Information "vm-setup: configuring VM '$($vm.name)'..."
 
         $minSizeBytes = ConvertFrom-SizeString $vm.minImageSize
-        $hostFwds = ($vm.portForwards | ForEach-Object { "hostfwd=tcp::$($_.hostPort)-:$($_.guestPort)" }) -join ','
+        $prebuilt = Join-Path -Path $imagesDir -ChildPath "$($vm.id).qcow2"
         $prebuiltValid = (Test-Path $prebuilt) -and (Test-Qcow2Image -ImagePath $prebuilt -ImageLabel "pre-built image '$($vm.id)'" -MinBytes $minSizeBytes)
 
-        # Place disk image from pre-built image (empty disk fallback removed).
+        if ($vm.type -eq 'Android') {
+            # Android userdata: standalone writable qcow2 created at the
+            # manifest disk size (system/GSI images are read-only payload
+            # under images/).  Mirrors the POSIX Android provisioning branch.
+            $userdataPath = Join-Path -Path $dataDir -ChildPath "$($vm.id).qcow2"
+            if (-not (Test-Path -LiteralPath $userdataPath -PathType Leaf)) {
+                $diskBytes = ConvertFrom-SizeString $vm.diskSize
+                Write-Information "vm-setup: Android userdata disk missing; creating $userdataPath"
+                if (-not $DryRun) {
+                    if ($null -eq $qemuImg) {
+                        Write-Warning "vm-setup: qemu-img not found; cannot create Android userdata disk for '$($vm.id)'"
+                    } else {
+                        & $qemuImg create -f qcow2 $userdataPath $diskBytes
+                        if ($LASTEXITCODE -ne 0) {
+                            Write-Warning "vm-setup: qemu-img create failed for Android userdata disk: $userdataPath"
+                        }
+                    }
+                } else {
+                    Write-Information "vm-setup: [dry-run] qemu-img create -f qcow2 '$userdataPath' '$diskBytes'"
+                }
+            } else {
+                Write-Information "vm-setup: Android userdata disk already exists: $userdataPath"
+            }
+            continue
+        }
+
+        $diskPath = Join-Path -Path $dataDir -ChildPath "$($vm.id).qcow2"
+        $basePath = Join-Path -Path $imagesDir -ChildPath "$($vm.type).base.qcow2"
+        $diskCredentialMarker = Get-VMGuestSecretMarkerPath -BasePath $diskPath
+
+        # Base/overlay provisioning (mirrors vm_ensure_base_and_overlay):
+        # - overlay valid: refresh backing base on credential drift (overlay
+        #   preserved; skipped while the VM runs)
+        # - overlay invalid: refresh base from the prebuilt (overlay preserved)
+        # - overlay absent: create base (cp of prebuilt) + overlay
         if (Test-Path $diskPath) {
             if (Test-Qcow2Image -ImagePath $diskPath -ImageLabel "runtime disk '$($vm.id)'" -MinBytes $minSizeBytes) {
                 if (-not (Test-VMGuestSecretMarker -ExpectedHash $guestSecretHash -MarkerPath $diskCredentialMarker)) {
                     if ($prebuiltValid) {
-                        Write-Warning "vm-setup: $($vm.type) runtime disk guest credential drift detected for '$($vm.id)'; replacing runtime disk from pre-built image"
+                        Write-Warning "vm-setup: $($vm.type) runtime disk guest credential drift detected for '$($vm.id)'; refreshing base image from pre-built image (overlay preserved)"
                         if (-not $DryRun) {
-                            Remove-Item $diskPath -Force
-                            Copy-Item $prebuilt $diskPath
-                            Set-Content -Path $diskCredentialMarker -Value $guestSecretHash -Encoding UTF8
+                            if (-not (Test-VmProcessRunning -VmName $vm.id -VmDisplay $vm.name)) {
+                                Copy-Item $prebuilt $basePath -Force
+                                Set-Content -Path $diskCredentialMarker -Value $guestSecretHash -Encoding UTF8
+                            } else {
+                                Write-Warning "vm-setup: VM '$($vm.id)' is running; skipping base refresh until it is stopped"
+                            }
                         } else {
-                            Write-Information "vm-setup: [dry-run] Remove-Item '$diskPath' -Force"
-                            Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$diskPath'"
+                            Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$basePath' -Force"
                             Write-Information "vm-setup: [dry-run] Set-Content '$diskCredentialMarker' '$guestSecretHash'"
                         }
                     } else {
                         Write-Warning "vm-setup: $($vm.type) runtime disk credential drift detected but no valid pre-built image exists for '$($vm.id)'; skipping"
-                        continue
                     }
                 } else {
                     Write-Information "vm-setup: disk already exists: $diskPath"
                 }
             } elseif ($prebuiltValid) {
-                Write-Warning "vm-setup: existing runtime disk is invalid; replacing with pre-built image: $diskPath"
+                Write-Warning "vm-setup: existing runtime disk is invalid; refreshing base image and preserving overlay: $basePath"
                 if (-not $DryRun) {
-                    Remove-Item $diskPath -Force
-                    Copy-Item $prebuilt $diskPath
+                    Copy-Item $prebuilt $basePath -Force
                     Set-Content -Path $diskCredentialMarker -Value $guestSecretHash -Encoding UTF8
                 } else {
-                    Write-Information "vm-setup: [dry-run] Remove-Item '$diskPath' -Force"
-                    Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$diskPath'"
+                    Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$basePath' -Force"
                     Write-Information "vm-setup: [dry-run] Set-Content '$diskCredentialMarker' '$guestSecretHash'"
                 }
             } else {
                 Write-Warning "vm-setup: runtime disk is invalid and no valid pre-built image exists for '$($vm.id)'; skipping"
-                continue
             }
         } elseif ($prebuiltValid) {
             Write-Information "vm-setup: using pre-built image: $prebuilt"
             if (-not $DryRun) {
-                Copy-Item $prebuilt $diskPath
+                Copy-Item $prebuilt $basePath
+                if ($null -eq $qemuImg) {
+                    Write-Warning "vm-setup: qemu-img not found; cannot create overlay for '$($vm.id)'"
+                } else {
+                    & $qemuImg create -f qcow2 -b "..\images\$($vm.type).base.qcow2" -F qcow2 $diskPath
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Warning "vm-setup: qemu-img create failed for overlay: $diskPath"
+                    }
+                }
                 Set-Content -Path $diskCredentialMarker -Value $guestSecretHash -Encoding UTF8
             } else {
-                Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$diskPath'"
+                Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$basePath'"
+                Write-Information "vm-setup: [dry-run] qemu-img create -f qcow2 -b '..\images\$($vm.type).base.qcow2' -F qcow2 '$diskPath'"
                 Write-Information "vm-setup: [dry-run] Set-Content '$diskCredentialMarker' '$guestSecretHash'"
             }
         } else {
             Write-Warning "vm-setup: image not found or invalid for '$($vm.id)': $prebuilt; skipping"
-            continue
         }
 
-        # Determine the QEMU system binary and machine type based on host arch.
-        $hostArch = $env:PROCESSOR_ARCHITECTURE
-        if ($hostArch -eq 'ARM64') {
-            $qemuSystem = Join-Path $scoopQemuDir 'qemu-system-aarch64.exe'
-            $machine = 'virt'
-            $cpu = 'host'
-        } else {
-            $qemuSystem = Join-Path $scoopQemuDir 'qemu-system-x86_64.exe'
-            $machine = 'q35'
-            $cpu = 'host'
+        # Grow-only auto-grow: bring the overlay's virtual size up to the
+        # manifest disk size (never shrink).  Mirrors vm_ensure_base_and_overlay.
+        $diskBytes = ConvertFrom-SizeString $vm.diskSize
+        $overlaySize = Get-VmQcow2VirtualSize -ImagePath $diskPath
+        if ($overlaySize -gt 0 -and $diskBytes -gt $overlaySize) {
+            Write-Information "vm-setup: growing overlay '$($vm.id)' from $overlaySize to $diskBytes bytes (grow-only)"
+            if (-not $DryRun) {
+                if ($null -eq $qemuImg) {
+                    Write-Warning "vm-setup: qemu-img not found; cannot grow overlay for '$($vm.id)'"
+                } else {
+                    & $qemuImg resize $diskPath $diskBytes
+                    if ($LASTEXITCODE -ne 0) {
+                        Write-Warning "vm-setup: qemu-img resize failed for '$($vm.id)': $diskPath"
+                    }
+                }
+            } else {
+                Write-Information "vm-setup: [dry-run] qemu-img resize '$diskPath' '$diskBytes'"
+            }
         }
-
-        if ($vm.type -eq 'Windows') {
-            $display = 'sdl'
-            $vga = 'std'
-        } else {
-            $display = 'sdl'
-            $vga = 'virtio'
-        }
-
-        # Determine VirtioFS shared directory argument.
-        # check-suppress:embedded-content: exception 1 (data-driven/generated content) -- per-VM conditional args
-        $virtiofsArgs = ''
-        if ($vm.shareDevDir) {
-            $devDir = Join-Path $env:USERPROFILE 'dev'
-            # VirtioFS on Windows requires virtiofsd running separately.
-            # Add a placeholder reminder; the start script shows how to launch
-            # virtiofsd before starting the guest.
-            $virtiofsArgs = @"
-
-# To enable ~/dev directory sharing:
-# 1. Start virtiofsd in a separate terminal:
-#      virtiofsd --socket-path=\\.\pipe\$($vm.id)-virtiofs --shared-dir="$devDir"
-# 2. Then run this script.
-# -chardev socket,id=char0,path=\\.\pipe\$($vm.id)-virtiofs ``
-# -device vhost-user-fs-pci,chardev=char0,tag=dev ``
-# -object memory-backend-file,id=mem,size=${ramBytes}B,mem-path=/dev/shm,share=on ``
-# -numa node,memdev=mem
-"@
-        }
-
-        # Write a self-contained QEMU start script for this VM.
-        $startContentPs1Template = Join-Path $templatesDir 'start-windows.ps1'
-        if (Test-Path -LiteralPath $startContentPs1Template -PathType Leaf) {
-            $ps1Template = Get-Content -Path $startContentPs1Template -Raw
-            $startContentPs1 = $ps1Template.Replace('__QEMU_SYSTEM__', $qemuSystem)
-            $startContentPs1 = $startContentPs1.Replace('__VM_NAME__', $vm.id)
-            $startContentPs1 = $startContentPs1.Replace('__VM_DISPLAY__', $vm.name)
-            $startContentPs1 = $startContentPs1.Replace('__MACHINE__', $machine)
-            $startContentPs1 = $startContentPs1.Replace('__CPU__', $cpu)
-            $startContentPs1 = $startContentPs1.Replace('__CPUS__', [string]$vm.cpus)
-            $startContentPs1 = $startContentPs1.Replace('__RAM_BYTES__', [string]$ramBytes)
-            $startContentPs1 = $startContentPs1.Replace('__DISK_PATH__', $diskPath)
-            $startContentPs1 = $startContentPs1.Replace('__HOSTFWDS__', $hostFwds)
-            $startContentPs1 = $startContentPs1.Replace('__VGA__', $vga)
-            $startContentPs1 = $startContentPs1.Replace('__DISPLAY_BACKEND__', $display)
-            $startContentPs1 = $startContentPs1.Replace('__VIRTIOFS_ARGS__', $virtiofsArgs)
-        } else {
-            Write-Warning "vm-setup: start-windows.ps1 template not found at $startContentPs1Template; writing minimal script"
-            $startContentPs1 = "Write-Host 'start-$($vm.id).ps1 — Start VM $($vm.name)'"
-        }
-
-        # Write a self-contained QEMU start script (Git Bash/MSYS variant).
-        # start-posix.sh is the cross-host dispatcher with different semantics,
-        # so a Windows-specific template is justified (embedded-content policy §3).
-        $startContentShTemplate = Join-Path $templatesDir 'start-windows-host.sh'
-        if (Test-Path -LiteralPath $startContentShTemplate -PathType Leaf) {
-            $shTemplate = Get-Content -Path $startContentShTemplate -Raw
-            $startContentSh = $shTemplate.Replace('__QEMU_SYSTEM__', $qemuSystem)
-            $startContentSh = $startContentSh.Replace('__VM_NAME__', $vm.id)
-            $startContentSh = $startContentSh.Replace('__VM_DISPLAY__', $vm.name)
-            $startContentSh = $startContentSh.Replace('__MACHINE__', $machine)
-            $startContentSh = $startContentSh.Replace('__CPU__', $cpu)
-            $startContentSh = $startContentSh.Replace('__CPUS__', [string]$vm.cpus)
-            $startContentSh = $startContentSh.Replace('__RAM_BYTES__', [string]$ramBytes)
-            $startContentSh = $startContentSh.Replace('__DISK_PATH__', $diskPath)
-            $startContentSh = $startContentSh.Replace('__HOSTFWDS__', $hostFwds)
-            $startContentSh = $startContentSh.Replace('__VGA__', $vga)
-            $startContentSh = $startContentSh.Replace('__DISPLAY_BACKEND__', $display)
-        } else {
-            Write-Warning "vm-setup: start-windows-host.sh template not found at $startContentShTemplate; writing minimal script"
-            $startContentSh = "#!/bin/sh`n# start-$($vm.id).sh — Start VM $($vm.name)"
-        }
-
-        if ($DryRun) {
-            Write-Information "vm-setup: [dry-run] Write start scripts: $startScriptPs1, $startScriptSh"
-        } else {
-            Set-Content -Path $startScriptPs1 -Value $startContentPs1 -Encoding UTF8
-            Set-Content -Path $startScriptSh -Value $startContentSh -Encoding UTF8
-            Write-Information "vm-setup: start scripts written: $startScriptPs1, $startScriptSh"
-        }
-
-        # NOTE: Configure script generation was removed. Guest-side converge
-        # is handled by the guest itself or via manual invocation.
-
-        Write-Information "vm-setup: VM '$($vm.name)' setup complete"
     }
+
+    # -------------------------------------------------------------------------
+    # Phase 2 (cont.) — Pass B: per-guest scripts, descriptors, and pack/unpack
+    # wrappers for ALL manifest guests (enabled or disabled, host-matched or
+    # not) so a packed tree regenerates identically on any host.  Mirrors
+    # vm_write_all_guest_scripts / vm_write_descriptors in scripts/lib/vm.sh.
+    # -------------------------------------------------------------------------
+
+    if (-not $DryRun) {
+        New-Item -ItemType Directory -Path $dataDir -Force > $null
+        New-Item -ItemType Directory -Path $scriptsDir -Force > $null
+    }
+
+    foreach ($vm in $vmDef.VMs) {
+        Invoke-VmWriteDescriptor -Vm $vm -RepoRoot $RepoRoot
+        Invoke-VmWriteStartHelper -Vm $vm -QemuDir $scoopQemuDir -ScriptsDir $scriptsDir -TemplatesDir $templatesDir
+        Invoke-VmWriteStopHelper -Vm $vm -ScriptsDir $scriptsDir -TemplatesDir $templatesDir
+        Write-Information "vm-setup: VM '$($vm.name)' scripts ready"
+    }
+
+    Invoke-VmWritePackUnpackHelper -ScriptsDir $scriptsDir
 
     if ($Gc) {
         Write-Information 'vm-setup: GC — scanning for non-provisioned VM artifacts...'
@@ -819,6 +1133,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         }
         Invoke-GcOrphanDisk -ExpectedNames $expectedNames
         Invoke-GcOrphanMarker
+        Invoke-GcOrphanDescriptor -ExpectedNames $expectedNames
         Write-Information 'vm-setup: GC — done'
     }
 
