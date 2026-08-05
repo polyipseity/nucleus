@@ -73,7 +73,7 @@
             "type": "string"
           },
           "id": {
-            "description": "Unique machine identifier used in file paths, UUID/MAC derivation, and CLI selection.",
+            "description": "Unique machine identifier used in file paths, UUID/MAC derivation, and CLI selection. UUID/MAC derivation is a pure SHA-256 function of this value (see src/modules/lib/vm-identity.nix).",
             "type": "string"
           },
           "macAddressPrefix": {

@@ -6,14 +6,16 @@
 # and consumed by scripts/vm.sh (nucleus-vm setup) to create UTM bundles
 # without PlistBuddy invocations.
 #
-# The UUID for each VM is derived deterministically from the VM name via SHA-256
-# so re-provisioning from scratch always produces the same UTM identity.
+# The UUID for each VM is derived deterministically from the VM id via SHA-256
+# (src/modules/lib/vm-identity.nix) so re-provisioning from scratch always
+# produces the same UTM identity.
 #
 # Source: https://github.com/utmapp/UTM/blob/main/Configuration/UTMQemuConfiguration.swift
 { pkgs, lib, ... }:
 let
   vmsData = builtins.fromJSON (builtins.readFile ../../modules/VMs.json);
   size = import ../../modules/lib/size.nix;
+  vmIdentity = import ../../modules/lib/vm-identity.nix;
   nucleusHost = "MacBook";
   enabledVms = builtins.filter (vm: vm.enabled && builtins.elem nucleusHost vm.hosts) vmsData.VMs;
 
@@ -39,25 +41,6 @@ let
   # Keep Hypervisor false in that case so imports/starts do not fail with an
   # invalid accelerator path; native-arch guests still use acceleration.
   qemuHypervisor = vm: if isArm then vmArch vm == "aarch64" else true;
-
-  # Derive a deterministic UUID from the VM name (format: 8-4-4-4-12 hex).
-  # The same name always maps to the same UUID so re-provisioning the same VM
-  # produces a stable UTM identity across apply runs.
-  mkUuid =
-    name:
-    let
-      h = builtins.hashString "sha256" name;
-    in
-    "${builtins.substring 0 8 h}-${builtins.substring 8 4 h}-${builtins.substring 12 4 h}-${builtins.substring 16 4 h}-${builtins.substring 20 12 h}";
-
-  # Deterministic locally-administered unicast MAC per VM name, with the
-  # prefix taken from the manifest's macAddressPrefix field.
-  mkMacAddress =
-    name: prefix:
-    let
-      h = builtins.hashString "sha256" "mac:${name}";
-    in
-    "${prefix}:${builtins.substring 0 2 h}:${builtins.substring 2 2 h}:${builtins.substring 4 2 h}:${builtins.substring 6 2 h}:${builtins.substring 8 2 h}";
 
   # QEMU display card appropriate for the guest OS.
   # Linux/NixOS VMs use VirtIO GPU so UTM exposes an active display on both
@@ -220,8 +203,8 @@ let
         vm.name
         (displayCard vm)
         (directoryShareMode vm)
-        (mkUuid vm.id)
-        (mkMacAddress vm.id vm.macAddressPrefix)
+        (vmIdentity.mkUuid vm.id)
+        (vmIdentity.mkMacAddress vm.id vm.macAddressPrefix)
         (vmArch vm)
         (toString vm.cpus)
         (toString (size.ceilMib (size.parse vm.ram)))

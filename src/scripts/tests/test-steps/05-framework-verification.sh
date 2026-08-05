@@ -15,6 +15,7 @@ run_05_framework_verification() {
   bash "$_test_dir/check-step-file-structure-tests.sh" || _exit_code=1
   bash "$_test_dir/deny-list-tests.sh" || _exit_code=1
   bash "$_test_dir/vm-template-render-tests.sh" || _exit_code=1
+  bash "$_test_dir/vm-disk-model-tests.sh" || _exit_code=1
   bash "$_test_dir/gui-env-tests.sh" || _exit_code=1
 
   say "--- step-specific tests ---"

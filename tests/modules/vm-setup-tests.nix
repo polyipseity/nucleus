@@ -6,6 +6,9 @@ let
 
   manifest = builtins.fromJSON (builtins.readFile ../../src/modules/VMs.json);
 
+  # Deterministic identity derivation, shared with src/hosts/MacBook/vms.nix.
+  vmIdentity = import ../../src/modules/lib/vm-identity.nix;
+
   # Required fields for every VM entry.
   requiredFields = [
     "id"
@@ -559,22 +562,19 @@ let
   # Declarative config generation tests
   # ---------------------------------------------------------------------------
 
-  # Deterministic UUID derivation (same logic as macbook/vms.nix).
-  # We re-implement it here to validate the algorithm independently.
-  mkUuid =
-    name:
-    let
-      h = builtins.hashString "sha256" name;
-    in
-    "${builtins.substring 0 8 h}-${builtins.substring 8 4 h}-${builtins.substring 12 4 h}-${builtins.substring 16 4 h}-${builtins.substring 20 12 h}";
+  # Deterministic identity derivation, imported from the shared library.
+  # UUIDs/MACs are pure SHA-256 functions of the VM id (runtime truth in
+  # src/hosts/MacBook/vms.nix); the shell twin
+  # (tests/scripts/vm-disk-model-tests.sh) is pinned to the same vectors.
+  mkUuid = vmIdentity.mkUuid;
 
   # UUID must be 36 characters long (8-4-4-4-12 hex with dashes).
   test_plist_uuid_format =
     let
       checkUuid =
         vm:
-        assert' (builtins.stringLength (mkUuid vm.name) == 36)
-          "UUID for VM '${vm.name}' must be 36 characters; got ${toString (builtins.stringLength (mkUuid vm.name))}";
+        assert' (builtins.stringLength (mkUuid vm.id) == 36)
+          "UUID for VM '${vm.id}' must be 36 characters; got ${toString (builtins.stringLength (mkUuid vm.id))}";
       results = builtins.map checkUuid manifest.VMs;
     in
     # Force evaluation of all results.
@@ -583,10 +583,83 @@ let
   # Each VM must have a distinct UUID so UTM and libvirt can tell them apart.
   test_plist_uuid_uniqueness =
     let
-      uuids = builtins.map (vm: mkUuid vm.name) manifest.VMs;
+      uuids = builtins.map (vm: mkUuid vm.id) manifest.VMs;
       uniqueUuids = lib.unique uuids;
     in
     assert' (builtins.length uuids == builtins.length uniqueUuids) "All VMs must have distinct UUIDs";
+
+  # Known SHA-256 identity vectors (see src/modules/lib/vm-identity.nix). The
+  # vectors pin the derivation so neither the Nix lib nor its shell twin can
+  # drift silently; a guest id change is a breaking identity change.
+  knownUuidVectors = [
+    {
+      id = "Android";
+      uuid = "6d612a86-bee4-b0a6-59b8-b3affd6f1fbc";
+    }
+    {
+      id = "MacBook";
+      uuid = "ac92e761-3044-a456-82e8-cf01eb2471d0";
+    }
+    {
+      id = "NixOS";
+      uuid = "cdf51633-aff8-ffbd-4feb-c43ff4de3f1c";
+    }
+    {
+      id = "Windows";
+      uuid = "d598026a-9cbc-6050-5f13-8ce53ac78088";
+    }
+  ];
+  knownMacVectors = [
+    {
+      id = "Android";
+      prefix = "52";
+      mac = "52:dd:a9:e1:f8:66";
+    }
+    {
+      id = "MacBook";
+      prefix = "52";
+      mac = "52:d2:6b:37:60:34";
+    }
+  ];
+
+  # UUID derivation must match the pinned SHA-256 vectors.
+  test_identity_uuid_vectors =
+    let
+      check =
+        v:
+        let
+          got = vmIdentity.mkUuid v.id;
+        in
+        assert' (got == v.uuid) "vmIdentity.mkUuid '${v.id}' must be '${v.uuid}'; got '${got}'";
+      results = builtins.map check knownUuidVectors;
+    in
+    assert' (builtins.all (r: r == null) results) "identity UUID vector check failed";
+
+  # MAC derivation must match the pinned SHA-256 vectors.
+  test_identity_mac_vectors =
+    let
+      check =
+        v:
+        let
+          got = vmIdentity.mkMacAddress v.id v.prefix;
+        in
+        assert' (
+          got == v.mac
+        ) "vmIdentity.mkMacAddress '${v.id}' '${v.prefix}' must be '${v.mac}'; got '${got}'";
+      results = builtins.map check knownMacVectors;
+    in
+    assert' (builtins.all (r: r == null) results) "identity MAC vector check failed";
+
+  # The MacBook host must derive identities from the shared library using the
+  # VM id (runtime truth) — never a local re-implementation keyed on name.
+  test_macbook_identity_from_shared_lib =
+    assert'
+      (
+        lib.hasInfix "vmIdentity = import ../../modules/lib/vm-identity.nix;" macbook_vms_nix_text
+        && lib.hasInfix "vmIdentity.mkUuid vm.id" macbook_vms_nix_text
+        && lib.hasInfix "vmIdentity.mkMacAddress vm.id vm.macAddressPrefix" macbook_vms_nix_text
+      )
+      "src/hosts/MacBook/vms.nix must derive identities from src/modules/lib/vm-identity.nix with vm.id";
 
   # Domain XML template function (re-implemented without pkgs for test isolation;
   # uses hardcoded x86_64 arch and a placeholder emulator path).
@@ -1941,6 +2014,9 @@ let
     test_nixos_packer_guest_hostname_var
     test_windows_autounattend_guest_hostname_token
     test_macbook_mac_address_uses_manifest_prefix
+    test_identity_uuid_vectors
+    test_identity_mac_vectors
+    test_macbook_identity_from_shared_lib
   ];
 
 in
@@ -2087,6 +2163,9 @@ in
     test_nixos_packer_guest_hostname_var
     test_windows_autounattend_guest_hostname_token
     test_macbook_mac_address_uses_manifest_prefix
+    test_identity_uuid_vectors
+    test_identity_mac_vectors
+    test_macbook_identity_from_shared_lib
     ;
 
   summary = builtins.deepSeq all_tests "vm-setup-tests: all tests passed";
