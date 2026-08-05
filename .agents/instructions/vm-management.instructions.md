@@ -119,7 +119,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 ## macOS — Tart (macOS guests)
 
 - VM backend: Tart CLI (Apple Virtualization.framework); macOS host only.
-- VM store: `~/virtual machines/.tart/vms/<id>/` — Tart's storage root (`~/.tart`) is symlinked to `~/virtual machines/.tart` by `nucleus-vm setup` so Tart artifacts co-locate with UTM bundles for unified backup.
+- VM store: `~/virtual machines/tart/vms/<id>/` — Tart's storage root (`~/.tart`) is symlinked to `~/virtual machines/tart` by `nucleus-vm setup` so Tart artifacts co-locate with UTM bundles for unified backup.
 - Build tool: Packer + `tart-cli` plugin pulling `ghcr.io/cirruslabs/macos-<version>-base:latest` from GHCR.
 - Start command (after build): `tart run <id>`.
 - No UTM bundle is created for macOS guests; they remain Tart-managed.

@@ -71,45 +71,22 @@ write_vm_directory_readme() {
   fi
 }
 
-# ensure_utm_default_vm_location
-#   Best-effort default-location wiring for UTM by linking the sandboxed
-#   Documents root to the managed ~/virtual machines directory when safe.
-ensure_utm_default_vm_location() {
-  _eudvl_utm_docs="$HOME/Library/Containers/com.utmapp.UTM/Data/Documents"
-
-  if [ -L "$_eudvl_utm_docs" ]; then
-    # check-suppress:suppression_doc: symlink may not exist yet; readlink exits 1 for broken/missing links.
-    _eudvl_target="$(readlink "$_eudvl_utm_docs" 2>/dev/null || true)"
-    if [ "$_eudvl_target" = "$VM_DIR" ]; then
-      say "UTM default VM location already points to $VM_DIR"
-    else
-      warn "$_eudvl_utm_docs is a symlink to $_eudvl_target; expected $VM_DIR"
-    fi
-    return 0
-  fi
-
-  if [ -d "$_eudvl_utm_docs" ]; then
-    # WHY: preserve existing user-managed UTM document stores; only replace an
-    # empty directory to avoid destructive moves.
-    if [ -n "$(find "$_eudvl_utm_docs" -mindepth 1 -maxdepth 1 -print -quit)" ]; then
-      warn "$_eudvl_utm_docs is non-empty; cannot auto-link to $VM_DIR"
-      return 0
-    fi
-    rmdir "$_eudvl_utm_docs"
-  fi
-
-  ln -s "$VM_DIR" "$_eudvl_utm_docs"
-  say "linked UTM default VM location: $_eudvl_utm_docs -> $VM_DIR"
-}
-
 # ensure_tart_vm_dir
 #   Co-locates Tart's VM store inside the managed ~/virtual machines directory
-#   by symlinking ~/.tart → ~/virtual machines/.tart so Tart artifacts (VMs and
+#   by symlinking ~/.tart → ~/virtual machines/tart so Tart artifacts (VMs and
 #   OCI cache) stay alongside UTM bundles in one tree for unified backup.
 #   Only runs on Darwin; Tart uses Apple's Virtualization.framework.
 ensure_tart_vm_dir() {
-  _etd_target="$VM_DIR/.tart"
+  _etd_target="$VM_DIR/tart"
   _etd_default="$HOME/.tart"
+
+  # WHY: same-commit rename of the co-location target (.tart -> tart/).  Tart
+  # reads only the fixed ~/.tart default, so the symlink target inside the
+  # managed directory is arbitrary; moving an existing store preserves
+  # Tart-managed guest data with no compat layer.
+  if [ -d "$VM_DIR/.tart" ] && [ ! -e "$_etd_target" ]; then
+    mv "$VM_DIR/.tart" "$_etd_target"
+  fi
 
   mkdir -p "$_etd_target"
 
@@ -118,6 +95,11 @@ ensure_tart_vm_dir() {
     _etd_current="$(readlink "$_etd_default" 2>/dev/null || true)"
     if [ "$_etd_current" = "$_etd_target" ]; then
       say "tart storage already linked: $_etd_default -> $_etd_target"
+    elif [ "$_etd_current" = "$VM_DIR/.tart" ]; then
+      # WHY: repoint a pre-rename symlink to the renamed target so an existing
+      # setup keeps working after the same-commit .tart -> tart/ move.
+      ln -sfn "$_etd_target" "$_etd_default"
+      say "repointed tart storage link: $_etd_default -> $_etd_target"
     else
       warn "$_etd_default is a symlink to $_etd_current (expected $_etd_target); not relinking"
     fi
@@ -1205,6 +1187,10 @@ vm_build_android() {
   # The canonical userdata disk is data/<id>.qcow2 (per-guest writable overlay).
   _bai_userdata_img="$VM_DIR/data/${_bai_vm_name}.qcow2"
   _bai_gsi_img="$IMAGES_DIR/$(jq -r ".VMs[$_bai_vm_index].Android.gsiImage" "$MANIFEST")"
+  # Set when this run replaces a canonical disk (system image re-download or
+  # userdata reset), so the end-of-build bundle refresh knows to re-link.
+  _bai_system_replaced=false
+  _bai_userdata_replaced=false
 
   # shareDevDir is unsupported on Android (no host filesystem sharing via QEMU).
   _bai_share_dev_dir="$(jq -r ".VMs[$_bai_vm_index].shareDevDir // false" "$MANIFEST")"
@@ -1248,6 +1234,7 @@ vm_build_android() {
       return 1
     fi
     run_cmd cp "$_bai_qcow2" "$_bai_system_img"
+    _bai_system_replaced=true
     rm -rf "$_bai_extract_dir" "$IMAGES_DIR/android-lineage.zip" "$IMAGES_DIR/android-lineage-release.json"
     validate_qcow2_image "$_bai_system_img" "Android system image for $_bai_vm_name" "$(parse_size "$(jq -r ".VMs[$_bai_vm_index].minImageSize" "$MANIFEST")")" || return 1
     say "system image ready: $_bai_system_img"
@@ -1264,6 +1251,7 @@ vm_build_android() {
     fi
     say "creating userdata disk (${_bai_disk_bytes} bytes)..."
     run_cmd qemu-img create -f qcow2 "$_bai_userdata_img" "$_bai_disk_bytes"
+    _bai_userdata_replaced=true
     validate_qcow2_image "$_bai_userdata_img" "Android userdata disk for $_bai_vm_name" "$(parse_size "$(jq -r ".VMs[$_bai_vm_index].minImageSize" "$MANIFEST")")" || return 1
     say "userdata disk ready: $_bai_userdata_img"
   else
@@ -1297,6 +1285,34 @@ vm_build_android() {
     fi
   else
     say "no GSI URL set; using built-in LineageOS GSI"
+  fi
+
+  # Re-link refresh: when this build replaced a canonical disk (system image
+  # re-download or userdata reset), refresh an existing UTM bundle so UTM
+  # boots the new artifacts instead of stale inodes (G1a).  Only macOS has a
+  # bundle; skipped in dry-run (no real mutations).  WHY: do_upgrade and
+  # do_reset call vm_build_android directly without the vm_setup_utm_vms
+  # provisioning pass, which would otherwise refresh these links.
+  if [ "$dry_run" = false ]; then
+    if [ "$_bai_system_replaced" = true ] || [ "$_bai_userdata_replaced" = true ]; then
+      _bai_bundle_dir="$VM_DIR/${_bai_vm_name}.utm/Data"
+      if [ -d "$_bai_bundle_dir" ]; then
+        if [ "$_bai_userdata_replaced" = true ]; then
+          _bai_bundle_userdata="$_bai_bundle_dir/$(jq -r ".VMs[$_bai_vm_index].Android.userdataImage" "$MANIFEST")"
+          if [ -f "$_bai_bundle_userdata" ]; then
+            ln -f "$_bai_userdata_img" "$_bai_bundle_userdata"
+            say "refreshed Android userdata link in UTM bundle: $_bai_bundle_userdata"
+          fi
+        fi
+        if [ "$_bai_system_replaced" = true ]; then
+          _bai_bundle_system="$_bai_bundle_dir/disk-main.qcow2"
+          if [ -f "$_bai_bundle_system" ]; then
+            cp "$_bai_system_img" "$_bai_bundle_system"
+            say "refreshed Android system disk in UTM bundle: $_bai_bundle_system"
+          fi
+        fi
+      fi
+    fi
   fi
 
   say "Android image build complete for '$_bai_vm_name'"
@@ -2471,7 +2487,7 @@ EOF
 #   Builds the macOS guest VM using the Packer Tart plugin.  Requires tart
 #   and packer to be installed; only runs on Darwin hosts (Tart uses Apple
 #   Virtualization.framework which is not available on other platforms).
-#   The resulting VM is stored in ~/virtual machines/.tart/vms/<name>/ (via
+#   The resulting VM is stored in ~/virtual machines/tart/vms/<name>/ (via
 #   the ~/.tart symlink created by ensure_tart_vm_dir).
 #   Source: https://github.com/cirruslabs/packer-plugin-tart
 vm_build_macos() {

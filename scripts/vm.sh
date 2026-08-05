@@ -433,7 +433,6 @@ do_setup() {
   # Darwin-specific environment setup
   if [ "$(uname -s)" = "Darwin" ]; then
     ensure_tart_vm_dir
-    ensure_utm_default_vm_location
   fi
 
   vm_build_images

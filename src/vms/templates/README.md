@@ -6,7 +6,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
 
 ```
 __VM_DIR_DISPLAY__/
-├── .tart/                              — Tart VM store (macOS only; symlinked from ~/.tart)
+├── tart/                               — Tart VM store (macOS only; symlinked from ~/.tart)
 ├── images/                             — read-only type-prefixed base images and build outputs
 │   ├── <type>.base.qcow2               — pristine base image (copied from <id>.qcow2 at setup)
 │   ├── <name>.qcow2                    — pre-built guest image (source for <type>.base.qcow2)
@@ -51,17 +51,20 @@ Automation channels used during provisioning:
 2. SSH port forwarding (host/guest ports from `VMs.json` `portForwards`, per VM)
 3. Tart guest agent (macOS guests only)
 
-## UTM bundle portability
+## Moving VMs between hosts
 
-`*.utm` is a folder bundle (not a single opaque file). It contains VM metadata plus disk data (typically `Data/disk-main.qcow2`).
+VM artifacts split into two classes:
 
-To move a UTM VM to another macOS host:
+- **Regenerable** — rebuilt by `nucleus-vm setup`: `.utm` bundles, `images/<type>.base.qcow2` copies, start/stop scripts.
+- **Payload** — copied as-is: `data/<id>.qcow2` runtime overlays (Android userdata), `images/` prebuilt goldens, Android system/GSI images, installer ISOs, and `<id>.vm.json` descriptors.
 
-1. Copy the entire `<name>.utm` directory.
-2. Place it under `__VM_DIR_DISPLAY__` on the target host.
-3. Open it in UTM (or re-run `nucleus-vm setup` to refresh the managed registration).
+To move VMs to another host:
 
-Copying only `config.plist` or only `disk-main.qcow2` is not sufficient for a portable UTM VM transfer.
+1. Run `nucleus-vm pack` on the source host to strip regenerable artifacts into a compact payload.
+2. Copy the packed tree (or the payload files above) to `__VM_DIR_DISPLAY__` on the target host.
+3. Run `nucleus-vm unpack` on the target to regenerate platform artifacts (`.utm` bundles, base copies, start/stop scripts) from the descriptors.
+
+Do not copy `.utm` bundles directly — they are regenerable and their bundle-local links would go stale.
 
 ## Lifecycle
 
@@ -90,7 +93,7 @@ __IMAGES_DIR_DISPLAY__/
 ├── <name>.qcow2                    — pre-built guest image (~2–20 GB)
 └── <name>.vm-guest-credentials-sha256 — credential marker for build image
 __VM_DIR_DISPLAY__/
-├── .tart/                          — Tart VM store
+├── tart/                           — Tart VM store
 ├── <name>.utm/                     — UTM bundle
 ├── <name>.qcow2                    — runtime disk
 ├── <name>.qcow2.vm-guest-credentials-sha256 — credential marker for runtime disk

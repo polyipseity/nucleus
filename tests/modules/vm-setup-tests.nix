@@ -1419,6 +1419,25 @@ let
       )
       "scripts/vm.sh must size the Android userdata disk from the exact manifest diskSize bytes, not a hardcoded 8 GiB";
 
+  # After a rebuild replaces a canonical disk (system image re-download or
+  # userdata reset), an existing UTM bundle must re-link/re-copy it so UTM
+  # boots the new inode; do_upgrade/do_reset call vm_build_android directly
+  # without the vm_setup_utm_vms provisioning pass, which is what normally
+  # keeps bundle links fresh (P5 re-link refresh).
+  test_android_build_relink_refresh =
+    assert'
+      (
+        (lib.hasInfix "_bai_system_replaced=false" vm_setup_sh_text)
+        && (lib.hasInfix "_bai_userdata_replaced=false" vm_setup_sh_text)
+        && (lib.hasInfix "_bai_system_replaced=true" vm_setup_sh_text)
+        && (lib.hasInfix "_bai_userdata_replaced=true" vm_setup_sh_text)
+        && (lib.hasInfix "refreshed Android userdata link in UTM bundle" vm_setup_sh_text)
+        && (lib.hasInfix "refreshed Android system disk in UTM bundle" vm_setup_sh_text)
+        && (lib.hasInfix "if [ \"\$dry_run\" = false ]; then" vm_setup_sh_text)
+        && (lib.hasInfix "\"\$VM_DIR/\${_bai_vm_name}.utm/Data\"" vm_setup_sh_text)
+      )
+      "vm_build_android must re-link the UTM bundle's Android userdata/system disks after replacing a canonical disk (system re-download or userdata reset) so do_upgrade/do_reset do not leave stale bundle inodes";
+
   test_libvirt_runtime_validation_parity =
     assert'
       (
@@ -1683,8 +1702,12 @@ let
         && (lib.hasInfix "## Start commands" readmeTemplateText)
         && (lib.hasInfix "start-<name>.sh" readmeTemplateText)
         && (lib.hasInfix "start-<name>.ps1" readmeTemplateText)
-        && (lib.hasInfix "## UTM bundle portability" readmeTemplateText)
-        && (lib.hasInfix "Copying only `config.plist`" readmeTemplateText)
+        && (lib.hasInfix "## Moving VMs between hosts" readmeTemplateText)
+        && (lib.hasInfix "nucleus-vm pack" readmeTemplateText)
+        && (lib.hasInfix "nucleus-vm unpack" readmeTemplateText)
+        && (lib.hasInfix "Regenerable" readmeTemplateText)
+        && (lib.hasInfix "Payload" readmeTemplateText)
+        && (lib.hasInfix "Do not copy `.utm` bundles directly" readmeTemplateText)
         && (lib.hasInfix "## Guest configuration" readmeTemplateText)
         && (lib.hasInfix "## Lifecycle" readmeTemplateText)
         && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
@@ -1857,11 +1880,6 @@ let
       )
       "Invoke-VMSetup.ps1 must write %USERPROFILE%\\virtual machines\\README.md using the cross-host README template with placeholder substitution";
   test_vm_setup_generates_helper_scripts = assert' (lib.hasInfix "write_start_script" vm_setup_sh_text) "VM setup flows must generate discoverable start helper scripts";
-  test_macbook_utm_default_location_link = assert' (
-    (lib.hasInfix "ensure_utm_default_vm_location" vm_setup_sh_text)
-    && (lib.hasInfix "$HOME/Library/Containers/com.utmapp.UTM/Data/Documents" vm_setup_sh_text)
-    && (lib.hasInfix "linked UTM default VM location" vm_setup_sh_text)
-  ) "scripts/vm.sh must best-effort wire UTM's sandboxed document location to ~/virtual machines";
 
   test_vm_enabled_policy_wiring = assert' (
     (lib.hasInfix "\"enabled\"" vms_json_text)
@@ -1924,11 +1942,12 @@ let
     assert'
       (
         (lib.hasInfix "ensure_tart_vm_dir" vm_setup_sh_text)
-        && (lib.hasInfix "/.tart" vm_setup_sh_text)
+        && (lib.hasInfix "_etd_target=\"\$VM_DIR/tart\"" vm_setup_sh_text)
+        && (lib.hasInfix "mv \"\$VM_DIR/.tart\"" vm_setup_sh_text)
         && (lib.hasInfix "linked tart storage" vm_setup_sh_text)
         && (lib.hasInfix "rsync" vm_setup_sh_text)
       )
-      "scripts/vm.sh must link ~/.tart -> ~/virtual machines/.tart so Tart artifacts co-locate with UTM bundles for backup";
+      "scripts/vm.sh must link ~/.tart -> ~/virtual machines/tart (migrating an existing .tart store with mv) so Tart artifacts co-locate with UTM bundles for backup";
 
   test_macbook_macos_version_tahoe =
     assert'
@@ -2066,7 +2085,6 @@ let
     test_vm_directory_readme_generation
     test_windows_vm_directory_readme_generation
     test_vm_setup_generates_helper_scripts
-    test_macbook_utm_default_location_link
     test_macbook_tart_storage_link
     test_vm_enabled_policy_wiring
     test_macbook_android_gsi_conditional
@@ -2112,6 +2130,7 @@ let
     test_vm_gc_orphan_descriptors_removed
     test_vm_gc_marker_expected_set_semantics
     test_windows_vm_gc_keep_set
+    test_android_build_relink_refresh
   ];
 
 in
@@ -2222,7 +2241,6 @@ in
     test_vm_directory_readme_generation
     test_windows_vm_directory_readme_generation
     test_vm_setup_generates_helper_scripts
-    test_macbook_utm_default_location_link
     test_macbook_tart_storage_link
     test_vm_enabled_policy_wiring
     test_macbook_android_gsi_conditional
@@ -2268,6 +2286,7 @@ in
     test_vm_gc_orphan_descriptors_removed
     test_vm_gc_marker_expected_set_semantics
     test_windows_vm_gc_keep_set
+    test_android_build_relink_refresh
     ;
 
   summary = builtins.deepSeq all_tests "vm-setup-tests: all tests passed";
