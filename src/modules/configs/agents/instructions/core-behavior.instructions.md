@@ -2,6 +2,7 @@
 description: "Use always: agent's invariant operating model covering communication, execution patterns, terminal hygiene, research scope, premise integrity, investigation protocol, and plan completeness."
 name: "Core Agent Behavior"
 applyTo: "**"
+alwaysApply: true
 ---
 
 Default operating mode for all agent interactions.

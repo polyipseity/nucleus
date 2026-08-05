@@ -2,6 +2,7 @@
 description: "Use when setting up a new repository or unfamiliar workspace. Establishes AGENTS.md as the canonical source of truth, explains the .agents/ customization hierarchy, and maps agent entry points."
 name: "Workspace Guidance"
 applyTo: "**"
+alwaysApply: true
 ---
 
 Project-level source of truth:
@@ -26,7 +27,7 @@ Agent entry-point mapping by tool:
 | -------------- | --------------------------------------------------------------- | ---------------------------- |
 | GitHub Copilot | `AGENTS.md`                                                     | `~/.agents/instructions/`    |
 | OpenCode       | `AGENTS.md` + `opencode.jsonc` → `.agents/instructions/**/*.md` | `~/.agents/instructions/`    |
-| Cursor         | `.cursor/rules/`                                                | `~/.cursor/rules/`           |
+| Cursor         | `.cursor/rules/` (symlinks to shared `instructions/`)         | `~/.cursor/rules/` (`.mdc` aliases → `~/.agents/instructions/`) |
 | Claude Code    | `CLAUDE.md` or `AGENTS.md`                                      | `~/.claude/`                 |
 | Aider          | `AGENTS.md`                                                     | `.aider.conf.yml` / env vars |
 

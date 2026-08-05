@@ -2,6 +2,7 @@
 description: "Use when authoring markdown documents and output-format-sensitive content. Covers line wrapping, document structure, and formatting conventions."
 name: "Authoring and Output Format"
 applyTo: "**"
+alwaysApply: true
 ---
 
 Default rule: write for readability in raw form, not for rendered aesthetics.

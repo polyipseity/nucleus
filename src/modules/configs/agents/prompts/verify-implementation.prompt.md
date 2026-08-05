@@ -1,5 +1,6 @@
 ---
 description: "Verify that the active plan (plan-*.md in session memory) is fully implemented. If gaps exist, produce a remediation plan without implementing."
+disable-model-invocation: true
 name: "verify-implementation"
 argument-hint: "optional: specific phase or file to focus verification on"
 ---

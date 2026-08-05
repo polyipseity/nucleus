@@ -2,6 +2,8 @@
 description: "Use when performing git commit operations. Covers commit verification, recovery from failure, amend prohibition, and concrete failure modes."
 name: "Commit Safety"
 applyTo: ".git/**"
+globs: ".git/**"
+alwaysApply: false
 ---
 
 # Commit safety

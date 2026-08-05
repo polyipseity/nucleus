@@ -2,6 +2,7 @@
 description: "Use when writing code: type-level conventions for interfaces, mutability, generics, and invariants. Covers abstract-over-concrete discipline, collection-precision, structural typing, catch-all prohibition, and type-system invariants."
 name: "Typing Conventions"
 applyTo: "**"
+alwaysApply: true
 ---
 
 Default typing policy for all code.

@@ -1,5 +1,6 @@
 ---
 description: "Research the active plan (plan-*.md in session memory) using online searches to verify feasibility, accuracy, and risks before implementation."
+disable-model-invocation: true
 name: "verify-plan"
 argument-hint: "optional: specific phase, file, or question to focus research on"
 ---

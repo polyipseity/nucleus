@@ -1,6 +1,7 @@
 ---
 name: plan
 description: "Use when creating or updating an implementation plan with thorough research. Counterpart to implement-plan."
+disable-model-invocation: true
 argument-hint: "task description, or Update: <changes> to modify existing plan"
 ---
 

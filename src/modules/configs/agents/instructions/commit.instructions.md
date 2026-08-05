@@ -2,6 +2,7 @@
 description: "Use when performing commit operations. Enforces commitlint validation before every commit to ensure messages pass commit-msg hooks the first time."
 name: "Commit Message Validation"
 applyTo: "**"
+alwaysApply: true
 ---
 
 # Commit message validation

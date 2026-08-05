@@ -1,6 +1,9 @@
 ---
 name: planner
 description: Read-only agent for researching and writing implementation plans. Has no write tools — cannot edit workspace files or run state-modifying commands.
+model: inherit
+readonly: true
+is_background: false
 ---
 
 # Planner

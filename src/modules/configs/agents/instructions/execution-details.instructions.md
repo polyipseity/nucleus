@@ -2,6 +2,7 @@
 description: "Use when debugging tool retries, structuring investigation of failures, or applying multi-edit fallback strategies."
 name: "Execution Details and Tool Recovery"
 applyTo: "**"
+alwaysApply: true
 ---
 
 # Execution details and tool recovery

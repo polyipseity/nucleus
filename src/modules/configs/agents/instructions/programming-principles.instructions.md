@@ -2,6 +2,7 @@
 description: "Use when writing any code: general best-practice programming principles, patterns, and architectural standards organized by priority for AI agents."
 name: "Programming Principles and Patterns"
 applyTo: "**"
+alwaysApply: true
 ---
 
 Default coding policy for all code. Principles are tiered by priority: higher tiers address failure modes most specific to AI agents.

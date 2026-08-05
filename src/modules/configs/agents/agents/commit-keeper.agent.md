@@ -1,6 +1,9 @@
 ---
 name: commit-keeper
 description: Focused agent for commit safety verification. Runs git rev-parse HEAD, checks hook failures, enforces the amend prohibition.
+model: inherit
+readonly: false
+is_background: false
 ---
 
 # Commit keeper

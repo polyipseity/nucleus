@@ -1,6 +1,7 @@
 ---
 name: maintain
 description: Aggressively improve maintainability via repeated parallel waves of maintain subagents, with strict atomic commit discipline and rollback safety.
+disable-model-invocation: true
 argument-hint: Optional scope (e.g., `target=src/modules/` or `target=scripts/`). Default: entire codebase.
 ---
 

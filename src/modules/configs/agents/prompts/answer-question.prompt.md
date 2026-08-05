@@ -1,6 +1,7 @@
 ---
 name: answer-question
 description: "Use when the user says 'only answer the question', 'only investigate', or equivalent. Enforces strict answer-only mode with no scope expansion, no implementation, and no suggestions."
+disable-model-invocation: true
 argument-hint: "optional: specific question to focus on"
 ---
 

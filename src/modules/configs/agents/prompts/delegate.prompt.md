@@ -1,6 +1,7 @@
 ---
 name: delegate
 description: "Standardized subagent delegation workflow for any task."
+disable-model-invocation: true
 ---
 
 # Delegate to a subagent

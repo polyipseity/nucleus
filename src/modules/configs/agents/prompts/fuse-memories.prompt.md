@@ -1,6 +1,7 @@
 ---
 name: fuse-memories
 description: "Use when: user says 'absorb memories', 'fuse memories', 'merge memories into instructions', or asks to persist session/repo/user memory into agent instructions. Merges selected memory files into repo or user .instructions.md files and deletes the originals."
+disable-model-invocation: true
 argument-hint: "scope=session,repo | memoryName= | target=repo"
 ---
 

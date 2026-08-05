@@ -2,6 +2,7 @@
 description: "Use always: aggressively simplify code, human docs, and AI customization docs; prefer deletion over abstraction; enforce atomic commits and parallel multi-pass maintain subagent runs for broad cleanup."
 name: "Maintainability"
 applyTo: "**"
+alwaysApply: true
 ---
 
 Default rule: optimize for long-term human maintainability.

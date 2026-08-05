@@ -1,6 +1,7 @@
 ---
 name: continue
 description: Resume work after an interruption reusing existing context.
+disable-model-invocation: true
 ---
 
 You are resuming after an interruption.

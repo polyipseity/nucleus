@@ -1,6 +1,7 @@
 ---
 name: implement-plan
 description: Execute an implementation plan with subagent parallelism and atomic commits.
+disable-model-invocation: true
 argument-hint: "backwardsCompat=no atomicCommits=yes maxConcurrency=2"
 ---
 
