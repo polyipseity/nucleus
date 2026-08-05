@@ -29,16 +29,17 @@ IFS=:
 for __component in $CURRENT_PATH; do
   case ":${_mge_managed_set}:" in
     *":${__component}:"*) ;;
-    *) _mge_cleaned="${_mge_cleaned}:${__component}" ;;
+    *)
+      _mge_cleaned="${_mge_cleaned:+${_mge_cleaned}:}${__component}"
+      ;;
   esac
 done
 IFS="$old_IFS"
 
-if [ -n "$_mge_cleaned" ]; then
-  /bin/launchctl setenv PATH "${_mge_prepend}:${_mge_cleaned}:${_mge_append}"
-else
-  /bin/launchctl setenv PATH "${_mge_prepend}:${_mge_append}"
-fi
+# Compose with guard fragments: join only non-empty segments (prepend may be
+# empty, cleaned may be empty when every PATH entry is managed).  Avoids a
+# leading/trailing colon, which would mean an empty PATH entry (= cwd).
+/bin/launchctl setenv PATH "${_mge_prepend:+${_mge_prepend}:}${_mge_cleaned}${_mge_append:+:${_mge_append}}"
 
 # ── All other GUI env vars (user and non-user) ──
 eval "$_mge_all_vars_block"
