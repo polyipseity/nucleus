@@ -1118,6 +1118,17 @@ test_expected_vm_names_edge_cases() {
       "diskSize": "128GB",
       "portForwards": [],
       "macAddressPrefix": "52"
+    },
+    {
+      "id": "NoHostsField",
+      "name": "NoHostsField",
+      "type": "NixOS",
+      "enabled": true,
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "portForwards": [],
+      "macAddressPrefix": "52"
     }
   ]
 }
@@ -1128,7 +1139,7 @@ EOF
     "$_tmp/names/vms" "$_manifest" "NixOS" "false" "false"
 
   _names="$(vm_get_manifest_vm_names | sort | tr '\n' ' ')"
-  assert_eq "AllHosts DisabledGuest EmptyHosts NixOnly NoEnabledField " "$_names" "manifest names include all guests"
+  assert_eq "AllHosts DisabledGuest EmptyHosts NixOnly NoEnabledField NoHostsField " "$_names" "manifest names include all guests"
 
   _names="$(vm_get_expected_vm_names | sort | tr '\n' ' ')"
   assert_eq "AllHosts NixOnly " "$_names" "expected names are enabled-and-host-matched only"
@@ -1138,10 +1149,15 @@ EOF
   _names="$(vm_get_expected_vm_names | tr '\n' ' ')"
   assert_eq "" "$_names" "expected names empty when NUCLEUS_HOST matches no enabled guest"
 
+  # Unset/empty NUCLEUS_HOST → no host match.
+  NUCLEUS_HOST=""
+  _names="$(vm_get_expected_vm_names | tr '\n' ' ')"
+  assert_eq "" "$_names" "expected names empty when NUCLEUS_HOST is unset"
+
   # Manifest names unchanged regardless of NUCLEUS_HOST.
   NUCLEUS_HOST="NixOS"
   _sorted="$(vm_get_manifest_vm_names | wc -l | tr -d ' ')"
-  assert_eq "5" "$_sorted" "manifest names count stable across NUCLEUS_HOST changes"
+  assert_eq "6" "$_sorted" "manifest names count stable across NUCLEUS_HOST changes"
 }
 
 test_uuid_vectors
