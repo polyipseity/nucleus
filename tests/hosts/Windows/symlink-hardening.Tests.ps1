@@ -63,6 +63,21 @@ Describe "Symlink Hardening - Windows" {
     }
   }
 
+  Context "Sync-CursorConfig" {
+    It "should contain Sync-CursorConfig function" {
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-CursorConfig.ps1"
+      $content = Get-Content -Path $modulePath -Raw
+      $content | Should -Match "Sync-CursorConfig"
+    }
+
+    It "should map instructions to rules mdc symlinks" {
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-CursorConfig.ps1"
+      $content = Get-Content -Path $modulePath -Raw
+      $content | Should -Match "\.instructions\.md"
+      $content | Should -Match "\.mdc"
+    }
+  }
+
   Context "Sync-AgentsConfig" {
     It "should contain Set-ManagedSymlinkDeleteProtection" {
       $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1"
@@ -137,6 +152,7 @@ Describe "Symlink Hardening - Windows" {
         "src/hosts/Windows/modules/editors/Sync-VSCodeConfig.ps1",
         "src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1",
         "src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1",
+        "src/hosts/Windows/modules/user/Sync-CursorConfig.ps1",
         "src/hosts/Windows/modules/user/Sync-CustomProvisionSymlink.ps1",
         "src/hosts/Windows/modules/user/Sync-DevRepo.ps1"
       )

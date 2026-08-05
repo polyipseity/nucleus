@@ -111,6 +111,19 @@ rec {
     true;
 
   # =========================================================================
+  # Assertion 9: Cursor config bridge in cursor.nix
+  # =========================================================================
+  cursorConfigProtection =
+    let
+      cursorModuleText = builtins.readFile ../../src/modules/cursor.nix;
+      cursorScriptText = builtins.readFile ../../src/scripts/configs/symlink-cursor-config.sh;
+    in
+    assert containsRegex "symlink-cursor-config" cursorModuleText;
+    assert containsRegex "_nucleus_protect_symlink" cursorScriptText;
+    assert containsRegex "_nucleus_protect_symlink" agentsHelpersText;
+    true;
+
+  # =========================================================================
   # Assertion 8: Dev repos logging keeps errors visible and no-op skips quiet
   # =========================================================================
   devReposLoggingPolicy =
@@ -120,7 +133,7 @@ rec {
     true;
 
   # =========================================================================
-  # Assertion 9: Discord Music RPC config symlink protection
+  # Assertion 10: Discord Music RPC config symlink protection
   # =========================================================================
   discordMusicRpcConfigProtection =
     assert containsRegex "mkOutOfStoreSymlink" discordMusicRpcText;
@@ -144,6 +157,7 @@ rec {
         finderSidebarRewrite
         shouldProcessCompliance
         devReposLoggingPolicy
+        cursorConfigProtection
         discordMusicRpcConfigProtection
       ];
     in
