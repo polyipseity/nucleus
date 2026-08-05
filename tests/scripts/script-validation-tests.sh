@@ -157,6 +157,31 @@ test_help_handler() {
     fi
 }
 
+# Test 12: Verify gc.sh delegates VM-artifact GC to the single source of truth
+# (vm.sh gc) instead of an enabled-only name sweep.
+test_vm_gc_delegation() {
+    local script="$1"
+
+    if grep -Fq 'vm.sh" gc' "$script"; then
+        assert_pass "VM GC delegation: $(basename "$script")"
+    else
+        assert_fail "VM GC delegation: $(basename "$script")" "Missing delegation to vm.sh gc"
+        return
+    fi
+
+    if grep -Fq 'select(.enabled == true)' "$script"; then
+        assert_fail "VM GC enabled-only sweep removed: $(basename "$script")" "Found enabled-only jq filter"
+    else
+        assert_pass "VM GC enabled-only sweep removed: $(basename "$script")"
+    fi
+
+    if grep -Fq 'qcow2_name=' "$script"; then
+        assert_fail "VM GC name-based qcow2 sweep removed: $(basename "$script")" "Found basename qcow2 comparison"
+    else
+        assert_pass "VM GC name-based qcow2 sweep removed: $(basename "$script")"
+    fi
+}
+
 # Run Tests on All Scripts
 
 # Temp dir for parallel test results
@@ -328,6 +353,7 @@ if [[ -f "$GC_SH" ]]; then
     test_strict_shell_mode "$GC_SH"
     test_usage_std_present "$GC_SH"
     test_help_handler "$GC_SH"
+    test_vm_gc_delegation "$GC_SH"
 fi
 echo "$TESTS_PASSED" > "$_tt_tmpdir/gc.pass"
 echo "$TESTS_FAILED" > "$_tt_tmpdir/gc.fail"

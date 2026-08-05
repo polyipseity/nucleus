@@ -30,17 +30,26 @@ BeforeAll {
   $InvokeVMSetupPath = Join-Path $RepoRoot "src\hosts\Windows\modules\system\Invoke-VMSetup.ps1"
   $VmPs1Path = Join-Path $RepoRoot "scripts\vm.ps1"
   $VmShLibPath = Join-Path $RepoRoot "src\scripts\lib\vm.sh"
+  $GcPs1Path = Join-Path $RepoRoot "scripts\gc.ps1"
 
   # Path variables are read through these closures so PSUseDeclaredVarsMoreThanAssignments
   # sees them used within the BeforeAll scriptblock (It blocks are sibling scopes).
   function Get-VmSetupPs1Content { return Get-Content -Raw -Path $InvokeVMSetupPath }
   function Get-VmPs1Content { return Get-Content -Raw -Path $VmPs1Path }
   function Get-VmShLibContent { return Get-Content -Raw -Path $VmShLibPath }
+  function Get-GcPs1Content { return Get-Content -Raw -Path $GcPs1Path }
 }
 
 Describe "Windows VM disk-model parity (P8)" {
   It "GC orphan sweeps limit the keep-set to data/ + images/" {
     (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('@($dataDir, $imagesDir)'))
+  }
+
+  It "gc.ps1 Step 7 delegates VM-artifact GC to Invoke-VMSetup -Gc" {
+    $content = Get-GcPs1Content
+    $content | Should -Match ([regex]::Escape('Invoke-VMSetup -RepoRoot $resolvedRepoRoot -Gc'))
+    $content | Should -Not -Match ([regex]::Escape('$_.enabled -eq $true'))
+    $content | Should -Not -Match ([regex]::Escape('-Filter "*.qcow2"'))
   }
 
   It "start-helper renders the runtime disk path relative (data/<id>.qcow2)" {

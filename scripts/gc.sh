@@ -487,18 +487,15 @@ gc_sccache_cache_if_available() {
 
 gc_vm_artifacts_if_present() {
   # Remove stale VM artifacts from ~/virtual machines that accumulate across
-  # provisioning cycles. This includes temporary Packer build directories and
-  # pre-built images for VMs no longer declared in the manifest at
-  # src/modules/VMs.json.
+  # provisioning cycles. Transient Packer build directories are removed here;
+  # the destructive keep-set logic is delegated to vm.sh gc.
   #
-  # WHY: VM disk images are large (multi-gigabyte); clearing stale files keeps
-  # disk usage bounded and VM provisioning fast.
-  if ! command -v jq >/dev/null 2>&1; then
-    # jq is required to parse the manifest.
-    say "jq unavailable; skipping VM artifact gc"
-    return 0
-  fi
-
+  # WHY: keep-set has one source of truth in src/scripts/lib/vm.sh — vm_gc_vms
+  # preserves every manifest guest by default; the old enabled-only sweep
+  # deleted non-regenerable goldens/bases of disabled/other-host guests
+  # (Android-system.qcow2, Windows.qcow2). Start/stop scripts are regenerated
+  # per manifest guest (vm_write_all_guest_scripts) and stripped by pack;
+  # descriptor staleness is owned by vm_gc_orphan_descriptors.
   vm_dir="${HOME}/virtual machines"
   images_dir="$vm_dir/images"
   manifest="$REPO_ROOT/src/modules/VMs.json"
@@ -513,28 +510,26 @@ gc_vm_artifacts_if_present() {
     return 0
   fi
 
-  # Load the list of VMs declared in the manifest.
+  # Verify the manifest exists before sweeping or delegating.
   if [ ! -f "$manifest" ]; then
     error "manifest '$manifest' not found; skipping VM artifact gc"
   fi
 
-  vm_count=$(jq '.VMs | length' "$manifest" 2>/dev/null || printf '%s\n' "0")
+  require_command jq
+
+  # WHY: an empty manifest would give vm_gc_vms an empty keep-set and delete
+  # every image; bail out instead.
+  vm_count="$(jq '.VMs | length' "$manifest")"
   if [ "$vm_count" -eq 0 ]; then
     return 0
-  fi
-
-  # Build a list of enabled VM names (disabled VMs are treated as stale).
-  declared_names_tmp=$(mktemp)
-
-  if ! jq -r '.VMs[] | select(.enabled == true) | .name' "$manifest" >"$declared_names_tmp" 2>/dev/null; then
-    rm -f "$declared_names_tmp"
-    error "failed to parse enabled VM names from '$manifest'; skipping VM artifact gc"
   fi
 
   # Remove temporary Packer build directories.
   for build_dir in "$images_dir"/*-build; do
     if [ -d "$build_dir" ]; then
-      if rm -rf -- "$build_dir" 2>/dev/null; then
+      if [ "$dry_run" = true ]; then
+        dry_run "would remove temporary VM build directory '$(basename "$build_dir")'"
+      elif rm -rf -- "$build_dir" 2>/dev/null; then
         say "removed temporary VM build directory '$(basename "$build_dir")'"
       else
         warn "failed to remove temporary VM build directory '$build_dir'"
@@ -543,52 +538,28 @@ gc_vm_artifacts_if_present() {
   done
 
   # Remove leftover Packer temporary build directories (dot-prefixed, from interrupted runs).
-  if [ -d "$images_dir" ]; then
-    for _gc_packer_tmp in "$images_dir"/.??*; do
-      [ -d "$_gc_packer_tmp" ] || continue
+  for _gc_packer_tmp in "$images_dir"/.??*; do
+    [ -d "$_gc_packer_tmp" ] || continue
+    if [ "$dry_run" = true ]; then
+      dry_run "would remove stale Packer temporary build directory: ${_gc_packer_tmp##*/}"
+    else
       warn "removing stale Packer temporary build directory: ${_gc_packer_tmp##*/}"
       rm -rf -- "$_gc_packer_tmp"
-    done
-    unset _gc_packer_tmp
-  fi
-
-  # Remove stale VM disk images (qcow2) for VMs not declared in the manifest.
-  for qcow2_file in "$images_dir"/*.qcow2; do
-    if [ -f "$qcow2_file" ]; then
-      qcow2_name=$(basename "$qcow2_file" .qcow2)
-      if ! grep -Fxq "$qcow2_name" "$declared_names_tmp"; then
-        if rm -f "$qcow2_file" 2>/dev/null; then
-          say "removed stale VM disk image '$(basename "$qcow2_file")'"
-        else
-          warn "failed to remove stale VM disk image '$qcow2_file'"
-        fi
-      fi
     fi
   done
+  unset _gc_packer_tmp
 
-  # GC stale VM scripts from scripts/ subfolder.
-  if [ -d "$vm_dir/scripts" ]; then
-    for _gc_script in "$vm_dir"/scripts/*.sh "$vm_dir"/scripts/*.ps1; do
-      [ -f "$_gc_script" ] || continue
-      _gc_base="$(basename "$_gc_script")"
-      _gc_is_declared=false
-      while IFS= read -r _gc_declared; do
-        case "$_gc_base" in
-          *-"$_gc_declared".sh|*-"$_gc_declared".ps1)
-            _gc_is_declared=true
-            break
-            ;;
-        esac
-      done < "$declared_names_tmp"
-      if ! $_gc_is_declared; then
-        say "removed stale VM script '$_gc_base'"
-        rm -f "$_gc_script"
-      fi
-    done
-    unset _gc_script _gc_base _gc_is_declared _gc_declared
+  # Delegate the destructive disk/script/descriptor GC to the single source of
+  # truth (default keep-set preserves every manifest guest; --gc-disabled
+  # narrows). Repo-relative path: no PATH lookup.
+  if [ ! -f "$REPO_ROOT/scripts/vm.sh" ]; then
+    error "vm.sh not found at '$REPO_ROOT/scripts/vm.sh'; cannot gc VM artifacts"
   fi
-
-  rm -f "$declared_names_tmp"
+  if [ "$dry_run" = true ]; then
+    "$REPO_ROOT/scripts/vm.sh" gc --dry-run
+  else
+    "$REPO_ROOT/scripts/vm.sh" gc
+  fi
 }
 
 # Step 1: expire HM generations before Nix store GC so the store can reclaim
@@ -663,11 +634,7 @@ fi
 
 # Step 8: remove stale VM artifacts (temporary builds, orphaned images).
 if [ "$vm_gc" = true ]; then
-  if [ "$dry_run" = true ]; then
-    dry_run "would gc stale VM artifacts"
-  else
-    gc_vm_artifacts_if_present
-  fi
+  gc_vm_artifacts_if_present
 fi
 
 gc_logs() {
