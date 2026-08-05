@@ -429,7 +429,7 @@ Examples with their extracted helpers:
 - `provision-wallpapers` per-wallpaper loop → `provision-wallpaper.sh`
 - `install-bun-packages` entry iteration → `home/install-bun-packages.sh`
 - `provision-dev-repos` per-repo loop → `dev-repos-provision.sh`
-- `macos-set-gui-env-path` PATH dedup → `gui-env-agent.sh` + `macos-set-gui-env-path.sh`
+- `macos-set-gui-env-path` PATH dedup → `macos-set-gui-env.sh` + `macos-set-gui-env-path.sh`
 
 **Rule**: when adding a new split-pattern inline script, extract the pure-shell body to `src/scripts/` first, then wrap it in Nix with environment variable injection or `builtins.replaceStrings` for Nix-evaluated values.
 

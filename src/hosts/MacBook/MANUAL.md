@@ -31,15 +31,8 @@
 
 ## service management
 
-- macOS GUI env vars: propagated at activation time via `macos-gui-env-path`
-  (src/modules/macos.nix), which runs `launchctl setenv` for all managed vars
-  and `launchctl config user path` for LaunchServices PATH. A one-shot
-  `gui-env` LaunchAgent provides login-time coverage before the first activation.
-  After first `nucleus-apply`, a reboot is required for `launchctl config user
-path` to take effect (though it is known to be unreliable — see
-  [nix-darwin#1080](https://github.com/nix-darwin/nix-darwin/issues/1080)).
-  Verify with:
-  `/usr/libexec/PlistBuddy -c 'Print PathEnvironmentVariable' /private/var/db/com.apple.xpc.launchd/config/user.plist`
+- macOS GUI env vars: propagated at activation time via `macos-gui-env-path` (src/modules/macos.nix), which runs `launchctl setenv` for all managed vars and `launchctl config user path` for LaunchServices PATH. A one-shot `gui-env` LaunchAgent provides login-time coverage before the first activation: it invokes `macos-set-gui-env.sh` with the managed PATH fragments as argv, so catalog vars reach the GUI launchd domain even when no activation has run yet.
+- `launchctl config user path` is KNOWN BROKEN on macOS 26.4.1 ([nix-darwin#1080](https://github.com/nix-darwin/nix-darwin/issues/1080)): LaunchServices ignores the value, so .app bundles launched from Finder fall back to the system default `PATH=/usr/bin:/bin:/usr/sbin:/sbin`. The managed PATH still applies to launchd-spawned processes (Terminal sessions, LaunchAgents, background daemons) via `launchctl setenv PATH`. To inspect the persistent value: `/usr/libexec/PlistBuddy -c 'Print PathEnvironmentVariable' /private/var/db/com.apple.xpc.launchd/config/user.plist` (a reboot is required for it to take effect at all).
 - `nucleus-svc list` — list all nucleus-managed services with status
 - `nucleus-svc restart <service>` — restart a service:
   1. If stuck (EX_CONFIG / "waiting" / "spawn scheduled"): full `bootout+bootstrap` recovery.
