@@ -9,7 +9,10 @@
 # against a golden object, per-field invariants, and vm-descriptor.schema.json
 # via check-jsonschema. Sandboxed qemu-img tests exercise the base/overlay
 # provisioning helper (vm_ensure_base_and_overlay): base copy, relative backing
-# paths, invalid-overlay skip, drift refresh, and grow-only auto-grow.
+# paths, invalid-overlay skip, drift refresh, and grow-only auto-grow. Sandboxed
+# GC tests exercise the keep-set semantics of vm_gc_orphan_disks,
+# vm_gc_orphan_markers, and vm_gc_orphan_descriptors under both default and
+# --gc-disabled expected sets.
 #
 # Run with: bash tests/scripts/vm-disk-model-tests.sh
 
@@ -42,6 +45,20 @@ assert_eq() { # assert_eq <expected> <actual> <label>
   local _expected="$1" _actual="$2" _label="$3"
   if [ "$_expected" != "$_actual" ]; then
     echo "FAIL: $_label: expected '$_expected', got '$_actual'"
+    _failures=$((_failures + 1))
+  fi
+}
+
+assert_file_exists() { # assert_file_exists <path> <label>
+  if [ ! -f "$1" ]; then
+    echo "FAIL: $2: expected file '$1' to exist"
+    _failures=$((_failures + 1))
+  fi
+}
+
+assert_file_missing() { # assert_file_missing <path> <label>
+  if [ -f "$1" ]; then
+    echo "FAIL: $2: expected file '$1' to be removed"
     _failures=$((_failures + 1))
   fi
 }
@@ -428,6 +445,162 @@ EOF
   assert_eq "test-fingerprint" "$(tr -d '\r\n' <"$_marker")" "marker rewritten after no-op resize"
 }
 
+# test_gc_keep_set
+#   GC keep-sets preserve every manifest-referenced image (goldens, bases,
+#   Android system/GSI/userdata, disabled-entries prebuilts by default) while
+#   sweeping stale disks, orphaned sidecar markers, name-based markers for
+#   un-expected guests, and orphaned descriptors.  --gc-disabled narrows the
+#   expected set and clears disabled entries too.
+test_gc_keep_set() {
+  local _vm_dir="$_tmp/gc/vm" _images_dir="$_tmp/gc/vm/images" _vms_dir="$_tmp/gc/vms"
+  local _manifest="$_tmp/gc/manifest.json"
+  local _expected _keep
+
+  mkdir -p "$_vm_dir" "$_images_dir" "$_vm_dir/data" "$_vms_dir"
+
+  cat > "$_manifest" <<'EOF'
+{
+  "VMs": [
+    {
+      "id": "Android",
+      "name": "Android",
+      "type": "Android",
+      "enabled": true,
+      "hosts": ["MacBook", "NixOS", "Windows"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "portForwards": [],
+      "macAddressPrefix": "52",
+      "Android": {
+        "systemImage": "Android-system.qcow2",
+        "userdataImage": "Android.qcow2",
+        "gsiImage": "Android-gsi.img",
+        "gsiUrl": "https://example.invalid/gsi.zip"
+      }
+    },
+    {
+      "id": "NixOS",
+      "name": "NixOS",
+      "type": "NixOS",
+      "enabled": true,
+      "hosts": ["NixOS"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "portForwards": [],
+      "macAddressPrefix": "52"
+    },
+    {
+      "id": "MacBook",
+      "name": "MacBook",
+      "type": "macOS",
+      "enabled": true,
+      "hosts": ["MacBook"],
+      "cpus": 4,
+      "ram": "16GB",
+      "diskSize": "128GB",
+      "portForwards": [],
+      "macAddressPrefix": "52"
+    },
+    {
+      "id": "Windows",
+      "name": "Windows",
+      "type": "Windows",
+      "enabled": false,
+      "hosts": ["Windows"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "128GB",
+      "portForwards": [],
+      "macAddressPrefix": "52"
+    }
+  ]
+}
+EOF
+
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+    "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
+    "$_vms_dir" "$_manifest" "NixOS" "false" "false"
+
+  # Files that must survive default GC (host NixOS; manifest holds all four
+  # guests): Android system/GSI/userdata, NixOS golden+base+overlay, macOS
+  # base (type-prefixed keep), Windows golden (disabled entry preserved).
+  : > "$_images_dir/Android-system.qcow2"
+  : > "$_images_dir/Android-gsi.img"
+  : > "$_images_dir/NixOS.qcow2"
+  : > "$_images_dir/NixOS.base.qcow2"
+  : > "$_images_dir/macOS.base.qcow2"
+  : > "$_images_dir/Windows.qcow2"
+  : > "$_vm_dir/data/Android.qcow2"
+  : > "$_vm_dir/data/NixOS.qcow2"
+  : > "$_vm_dir/data/Windows.qcow2"
+
+  # Stale disk images in both directories.
+  : > "$_images_dir/stale.qcow2"
+  : > "$_vm_dir/data/stale.qcow2"
+
+  # Sidecar markers (data/) and name-based markers (images/).
+  : > "$_vm_dir/data/NixOS.qcow2.vm-guest-credentials-sha256"
+  : > "$_vm_dir/data/stale.qcow2.vm-guest-credentials-sha256"
+  : > "$_images_dir/NixOS.vm-guest-credentials-sha256"
+  : > "$_images_dir/Android.vm-guest-config-sha256"
+  : > "$_images_dir/MacBook.vm-guest-credentials-sha256"
+  : > "$_images_dir/Windows.vm-guest-credentials-sha256"
+
+  # Descriptors for every guest plus one stale entry.
+  vm_write_descriptors
+  : > "$_vm_dir/stale.vm.json"
+
+  _expected="$(vm_get_manifest_vm_names)"
+  vm_gc_orphan_disks "$_expected"
+  vm_gc_orphan_markers "$_expected"
+  vm_gc_orphan_descriptors "$_expected"
+
+  for _keep in Android-system.qcow2 NixOS.qcow2 NixOS.base.qcow2 macOS.base.qcow2 Windows.qcow2; do
+    assert_file_exists "$_images_dir/$_keep" "default GC kept image images/$_keep"
+  done
+  assert_file_exists "$_images_dir/Android-gsi.img" "default GC kept Android GSI image"
+  for _keep in Android.qcow2 NixOS.qcow2 Windows.qcow2; do
+    assert_file_exists "$_vm_dir/data/$_keep" "default GC kept overlay data/$_keep"
+  done
+  assert_file_missing "$_images_dir/stale.qcow2" "default GC removed stale image images/stale.qcow2"
+  assert_file_missing "$_vm_dir/data/stale.qcow2" "default GC removed stale overlay data/stale.qcow2"
+
+  # Sidecar markers follow their disk; name-based markers survive while the
+  # guest is expected (including macOS/tart, which has no local qcow2 base).
+  assert_file_exists "$_vm_dir/data/NixOS.qcow2.vm-guest-credentials-sha256" "default GC kept live sidecar marker"
+  assert_file_missing "$_vm_dir/data/stale.qcow2.vm-guest-credentials-sha256" "default GC removed orphaned sidecar marker"
+  for _keep in NixOS.vm-guest-credentials-sha256 Android.vm-guest-config-sha256 MacBook.vm-guest-credentials-sha256 Windows.vm-guest-credentials-sha256; do
+    assert_file_exists "$_images_dir/$_keep" "default GC kept live name-based marker $_keep"
+  done
+
+  for _keep in Android.vm.json NixOS.vm.json MacBook.vm.json Windows.vm.json; do
+    assert_file_exists "$_vm_dir/$_keep" "default GC kept descriptor $_keep"
+  done
+  assert_file_missing "$_vm_dir/stale.vm.json" "default GC removed orphaned descriptor stale.vm.json"
+
+  # --gc-disabled narrows the expected set to enabled-and-host-matched VMs
+  # (Android, NixOS on host NixOS): disabled-entries artifacts are cleared.
+  _expected="$(vm_get_expected_vm_names)"
+  vm_gc_orphan_disks "$_expected"
+  vm_gc_orphan_markers "$_expected"
+  vm_gc_orphan_descriptors "$_expected"
+
+  assert_file_missing "$_images_dir/Windows.qcow2" "gc-disabled removed disabled prebuilt images/Windows.qcow2"
+  assert_file_missing "$_images_dir/macOS.base.qcow2" "gc-disabled removed disabled base images/macOS.base.qcow2"
+  assert_file_missing "$_vm_dir/data/Windows.qcow2" "gc-disabled removed disabled overlay data/Windows.qcow2"
+  assert_file_missing "$_images_dir/Windows.vm-guest-credentials-sha256" "gc-disabled removed disabled name-based marker"
+  assert_file_missing "$_images_dir/MacBook.vm-guest-credentials-sha256" "gc-disabled removed tart marker for un-expected guest"
+  assert_file_missing "$_vm_dir/Windows.vm.json" "gc-disabled removed disabled descriptor Windows.vm.json"
+  assert_file_missing "$_vm_dir/MacBook.vm.json" "gc-disabled removed disabled descriptor MacBook.vm.json"
+  for _keep in Android-system.qcow2 NixOS.qcow2 NixOS.base.qcow2; do
+    assert_file_exists "$_images_dir/$_keep" "gc-disabled kept image images/$_keep"
+  done
+  assert_file_exists "$_vm_dir/data/Android.qcow2" "gc-disabled kept Android userdata"
+  assert_file_exists "$_vm_dir/data/NixOS.qcow2" "gc-disabled kept NixOS overlay"
+}
+
 test_uuid_vectors
 test_mac_vectors
 test_deterministic
@@ -436,6 +609,7 @@ test_descriptor_writer
 test_base_overlay_provisioning
 test_resize_vm
 test_resize_and_mark_image_grow_only
+test_gc_keep_set
 
 if [ "$_failures" -eq 0 ]; then
   echo "vm-disk-model-tests: all checks passed"

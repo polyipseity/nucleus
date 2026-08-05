@@ -847,6 +847,44 @@ let
       )
       "Windows vm-setup GC must preserve disabled VM entries by default and clear them only with --gc-disabled/-GcDisabled";
 
+  # GC keep-sets must preserve every manifest-referenced disk image: prebuilt
+  # goldens, type bases, Android system/GSI images under images/, and runtime
+  # overlays under data/.  Matching by full filename (with extension) keeps
+  # type-prefixed artifacts (Android-system.qcow2, NixOS.base.qcow2) from
+  # being orphaned by a basename-stripped guest-id comparison.
+  test_vm_gc_keep_set_preserves_manifest_images = assert' (
+    (lib.hasInfix "vm_gc_disk_keep_set" vm_setup_sh_text)
+    && (lib.hasInfix ".Android.systemImage" vm_setup_sh_text)
+    && (lib.hasInfix ".Android.gsiImage" vm_setup_sh_text)
+    && (lib.hasInfix ".Android.userdataImage" vm_setup_sh_text)
+    && (lib.hasInfix "_gcod_name=\"\$(basename \"\$_gcod_path\")\"" vm_setup_sh_text)
+  ) "vm-setup GC keep-set must preserve manifest-referenced images and match full filenames";
+
+  # Orphaned VM descriptors are removed when their guest leaves the expected
+  # set.  Descriptors are keyed to the expected set, not disk existence,
+  # because macOS/tart guests keep their disks in tart's store.
+  test_vm_gc_orphan_descriptors_removed = assert' (
+    (lib.hasInfix "vm_gc_orphan_descriptors" vm_setup_sh_text)
+    && (lib.hasInfix "vm_descriptor_path" vm_setup_sh_text)
+    && (lib.hasInfix "vm_gc_orphan_descriptors \"\$_gcv_expected\"" vm_setup_sh_text)
+  ) "vm-setup GC must remove orphaned VM descriptors for guests absent from the expected set";
+
+  # images/ name-based markers gate prebuilt goldens AND tart registrations,
+  # so they are removed only when the guest leaves the expected set; data/
+  # sidecar markers are removed when their disk image is gone.
+  test_vm_gc_marker_expected_set_semantics = assert' (
+    (lib.hasInfix "\"\$VM_DIR/data\"" vm_setup_sh_text)
+    && (lib.hasInfix "grep -qxF \"\$_gcom_name\"" vm_setup_sh_text)
+  ) "vm-setup marker GC must key images/ name-based markers to the expected set";
+
+  # Windows vm-setup must mirror POSIX keep-set semantics: match full disk
+  # filenames against per-directory keep-sets and sweep config markers too.
+  test_windows_vm_gc_keep_set = assert' (
+    (lib.hasInfix "Get-VMGcDiskKeepSet" windows_vm_setup_ps1_text)
+    && (lib.hasInfix "\$disk.Name -notin \$keep" windows_vm_setup_ps1_text)
+    && (lib.hasInfix "vm-guest-config-sha256" windows_vm_setup_ps1_text)
+  ) "Windows vm-setup GC must match full filenames against keep-sets and sweep config markers";
+
   # guest.nix must be non-empty (parseable as a Nix expression).
   test_guest_nix_nonempty =
     let
@@ -2070,6 +2108,10 @@ let
     test_vm_resize_grow_only_and_guard
     test_vm_resize_cli_subcommand
     test_vm_resize_windows_twin
+    test_vm_gc_keep_set_preserves_manifest_images
+    test_vm_gc_orphan_descriptors_removed
+    test_vm_gc_marker_expected_set_semantics
+    test_windows_vm_gc_keep_set
   ];
 
 in
@@ -2222,6 +2264,10 @@ in
     test_vm_resize_grow_only_and_guard
     test_vm_resize_cli_subcommand
     test_vm_resize_windows_twin
+    test_vm_gc_keep_set_preserves_manifest_images
+    test_vm_gc_orphan_descriptors_removed
+    test_vm_gc_marker_expected_set_semantics
+    test_windows_vm_gc_keep_set
     ;
 
   summary = builtins.deepSeq all_tests "vm-setup-tests: all tests passed";

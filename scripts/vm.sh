@@ -172,9 +172,10 @@ usage() {
   resize <vm> <size>       Grow-only resize of the writable disk (data/<vm>.qcow2)
                           to an explicit size (e.g. 64GB). Pass --allow-shrink to
                           shrink instead.
-  gc                       Remove stale VM artifacts (non-provisioned VMs, disks, markers).
-                          Default GC preserves disabled VM entries; pass --gc-disabled
-                          to clear them too.
+  gc                       Remove stale VM artifacts (non-provisioned VMs, disks, markers,
+                          descriptors). Default GC preserves disabled VM entries and every
+                          manifest-referenced image (goldens, bases, Android system/GSI/
+                          userdata); pass --gc-disabled to clear disabled entries too.
 
   --dry-run                     Print planned actions without executing (default: off).
   --accept-gsi-license          Accept the GSI license for Android GSI downloads.

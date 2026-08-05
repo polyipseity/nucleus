@@ -205,14 +205,45 @@ function Invoke-VMSetup {
 
     $ErrorActionPreference = 'Stop'
 
+    function Get-VMGcDiskKeepSet {
+        param(
+            [Parameter(Mandatory)]
+            [string]$Dir,
+
+            [Parameter(Mandatory)]
+            [string[]]$ExpectedNames
+        )
+
+        $keep = @()
+        foreach ($vm in $vmDef.VMs) {
+            if ($vm.id -notin $ExpectedNames) { continue }
+            if ($Dir -eq $imagesDir) {
+                $keep += "$($vm.id).qcow2"
+                $keep += "$($vm.type).qcow2"
+                $keep += "$($vm.type).base.qcow2"
+                if ($null -ne $vm.Android) {
+                    $keep += [string]$vm.Android.systemImage
+                    $keep += [string]$vm.Android.gsiImage
+                }
+            }
+            else {
+                $keep += "$($vm.id).qcow2"
+                if ($null -ne $vm.Android) {
+                    $keep += [string]$vm.Android.userdataImage
+                }
+            }
+        }
+        return @($keep | Sort-Object -Unique)
+    }
+
     function Invoke-GcOrphanDisk {
         param([string[]] $ExpectedNames)
         $dirs = @($vmDir, $imagesDir) | Where-Object { Test-Path $_ -PathType Container }
         foreach ($dir in $dirs) {
+            $keep = @(Get-VMGcDiskKeepSet -Dir $dir -ExpectedNames $ExpectedNames)
             # check-suppress:suppression_doc: probe -- no disk images may exist; foreach handles empty result.
             foreach ($disk in Get-ChildItem "$dir\*.qcow2" -ErrorAction SilentlyContinue) {
-                $name = [System.IO.Path]::GetFileNameWithoutExtension($disk.Name)
-                if ($name -notin $ExpectedNames) {
+                if ($disk.Name -notin $keep) {
                     Write-Information "vm-setup: GC — removing non-provisioned disk image: $($disk.FullName)"
                     if (-not $DryRun) {
                         Remove-Item -Path $disk.FullName -Force -ErrorAction Continue
@@ -226,8 +257,11 @@ function Invoke-VMSetup {
         $dirs = @($vmDir, $imagesDir) | Where-Object { Test-Path $_ -PathType Container }
         foreach ($dir in $dirs) {
             # check-suppress:suppression_doc: probe -- no credential markers may exist; foreach handles empty result.
-            foreach ($marker in Get-ChildItem "$dir\*.vm-guest-credentials-sha256" -ErrorAction SilentlyContinue) {
-                $basePath = $marker.FullName -replace '\.vm-guest-credentials-sha256$'
+            foreach ($marker in @(
+                Get-ChildItem "$dir\*.vm-guest-credentials-sha256" -ErrorAction SilentlyContinue
+                Get-ChildItem "$dir\*.vm-guest-config-sha256" -ErrorAction SilentlyContinue
+            )) {
+                $basePath = $marker.FullName -replace '\.vm-guest-(credentials|config)-sha256$'
                 if (-not (Test-Path $basePath -PathType Leaf)) {
                     Write-Information "vm-setup: GC — removing orphaned credential marker: $($marker.FullName)"
                     if (-not $DryRun) {

@@ -2651,10 +2651,11 @@ vm_setup_windows_qemu_vms() {
 
 # vm_gc_vms — Top-level GC dispatcher.  Called from the vm.sh main flow
 #   when --gc is passed.  Removes VM artifacts (Tart VMs, UTM bundles,
-#   libvirt domains, disk images, credential markers) for VMs not in the
-#   expected set.  By default only entries absent from VMs.json entirely are
-#   cleared; disabled entries are preserved unless --gc-disabled is passed,
-#   which narrows the expected set to enabled-and-host-matched VMs.
+#   libvirt domains, disk images, credential markers, VM descriptors) for
+#   VMs not in the expected set.  By default only entries absent from
+#   VMs.json entirely are cleared; disabled entries are preserved unless
+#   --gc-disabled is passed, which narrows the expected set to
+#   enabled-and-host-matched VMs.
 vm_gc_vms() {
   # WHY: default GC keeps disabled entries; only names absent from the
   # manifest are orphans.  --gc-disabled opts into clearing disabled entries.
@@ -2684,6 +2685,7 @@ vm_gc_vms() {
 
   vm_gc_orphan_disks "$_gcv_expected"
   vm_gc_orphan_markers "$_gcv_expected"
+  vm_gc_orphan_descriptors "$_gcv_expected"
 
   say "GC — done"
 }
@@ -2738,16 +2740,52 @@ gc_libvirt_vms() {
   done
 }
 
-# vm_gc_orphan_disks EXPECTED_NAMES — Remove disk images not in the expected set.
+# vm_gc_disk_keep_set DIR EXPECTED_NAMES — Print the full filenames (with
+#   extension) of every disk image under DIR that must be preserved for the
+#   expected VMs.  images/ keeps prebuilt goldens (<id>.qcow2), type bases
+#   (<type>.base.qcow2), and Android system/GSI images; data/ keeps runtime
+#   overlays (<id>.qcow2) and the Android userdata image.  Matching by full
+#   filename, not a basename-stripped id, keeps type-prefixed artifacts
+#   (Android-system.qcow2, NixOS.base.qcow2) inside the keep-set.
+vm_gc_disk_keep_set() {
+  _gcdks_dir="$1"
+  _gcdks_expected="$2"
+
+  if [ "$_gcdks_dir" = "$IMAGES_DIR" ]; then
+    jq -r --arg expected "$_gcdks_expected" '
+      .VMs[] |
+      select(.id as $id | ($expected | split("\n") | contains([$id]))) |
+      [
+        .id + ".qcow2",
+        .type + ".qcow2",
+        .type + ".base.qcow2",
+        (if .Android then (.Android.systemImage, .Android.gsiImage) else empty end)
+      ] | .[]
+    ' "$MANIFEST"
+  else
+    jq -r --arg expected "$_gcdks_expected" '
+      .VMs[] |
+      select(.id as $id | ($expected | split("\n") | contains([$id]))) |
+      [
+        .id + ".qcow2",
+        (if .Android then .Android.userdataImage else empty end)
+      ] | .[]
+    ' "$MANIFEST"
+  fi
+}
+
+# vm_gc_orphan_disks EXPECTED_NAMES — Remove disk images not in the
+#   manifest-derived keep-set for the expected VMs (see vm_gc_disk_keep_set).
 vm_gc_orphan_disks() {
   _gcod_expected="$1"
 
-  for _gcod_dir in "$VM_DIR" "$IMAGES_DIR"; do
+  for _gcod_dir in "$VM_DIR/data" "$IMAGES_DIR"; do
     [ -d "$_gcod_dir" ] || continue
+    _gcod_keep="$(vm_gc_disk_keep_set "$_gcod_dir" "$_gcod_expected")" || return
     for _gcod_path in "$_gcod_dir"/*.qcow2; do
       [ -f "$_gcod_path" ] || continue
-      _gcod_name="$(basename "$_gcod_path" .qcow2)"
-      if ! printf '%s\n' "$_gcod_expected" | grep -qxF "$_gcod_name"; then
+      _gcod_name="$(basename "$_gcod_path")"
+      if ! printf '%s\n' "$_gcod_keep" | grep -qxF "$_gcod_name"; then
         say "GC — removing non-provisioned disk image: $_gcod_path"
         if [ "$dry_run" = false ]; then
           rm -f "$_gcod_path"
@@ -2758,11 +2796,15 @@ vm_gc_orphan_disks() {
 }
 
 # vm_gc_orphan_markers EXPECTED_NAMES — Remove guest marker files (credential
-#   and config fingerprints) whose disk image no longer exists.
+#   and config fingerprints) that are no longer meaningful.  data/ markers are
+#   sidecars of runtime overlays: they are removed when their disk image is
+#   gone.  images/ markers are name-based and gate a prebuilt golden or a tart
+#   registration; tart VMs keep their disks in tart's store, so their markers
+#   stay live while the guest remains in the expected set.
 vm_gc_orphan_markers() {
   _gcom_expected="$1"
 
-  for _gcom_dir in "$VM_DIR" "$IMAGES_DIR"; do
+  for _gcom_dir in "$VM_DIR/data" "$IMAGES_DIR"; do
     [ -d "$_gcom_dir" ] || continue
     for _gcom_marker in "$_gcom_dir"/*.vm-guest-credentials-sha256 "$_gcom_dir"/*.vm-guest-config-sha256; do
       [ -f "$_gcom_marker" ] || continue
@@ -2770,12 +2812,48 @@ vm_gc_orphan_markers() {
         *.vm-guest-credentials-sha256) _gcom_base="${_gcom_marker%.vm-guest-credentials-sha256}" ;;
         *) _gcom_base="${_gcom_marker%.vm-guest-config-sha256}" ;;
       esac
-      if [ ! -f "$_gcom_base" ]; then
-        say "GC — removing orphaned guest marker: $_gcom_marker"
-        if [ "$dry_run" = false ]; then
-          rm -f "$_gcom_marker"
-        fi
-      fi
+      case "$_gcom_base" in
+        *.qcow2)
+          # data/ sidecar marker: remove when its disk image is gone.
+          if [ ! -f "$_gcom_base" ]; then
+            say "GC — removing orphaned guest marker: $_gcom_marker"
+            if [ "$dry_run" = false ]; then
+              rm -f "$_gcom_marker"
+            fi
+          fi
+          ;;
+        *)
+          # images/ name-based marker: gates a prebuilt golden or a tart
+          # registration, so it stays live while the guest is expected.
+          _gcom_name="$(basename "$_gcom_base")"
+          if ! printf '%s\n' "$_gcom_expected" | grep -qxF "$_gcom_name"; then
+            say "GC — removing orphaned guest marker: $_gcom_marker"
+            if [ "$dry_run" = false ]; then
+              rm -f "$_gcom_marker"
+            fi
+          fi
+          ;;
+      esac
     done
+  done
+}
+
+# vm_gc_orphan_descriptors EXPECTED_NAMES — Remove VM descriptors
+#   ($VM_DIR/<id>.vm.json) whose guest is not in the expected set.
+#   WHY: descriptors are keyed to the expected set rather than to disk
+#   existence because macOS/tart guests keep their disks in tart's store;
+#   a disk-based check would delete their descriptors on every GC run.
+vm_gc_orphan_descriptors() {
+  _gcods_expected="$1"
+
+  for _gcods_desc in "$VM_DIR"/*.vm.json; do
+    [ -f "$_gcods_desc" ] || continue
+    _gcods_name="$(basename "$_gcods_desc" .vm.json)"
+    if ! printf '%s\n' "$_gcods_expected" | grep -qxF "$_gcods_name"; then
+      say "GC — removing orphaned VM descriptor: $_gcods_desc"
+      if [ "$dry_run" = false ]; then
+        rm -f "$_gcods_desc"
+      fi
+    fi
   done
 }
