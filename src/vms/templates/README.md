@@ -66,6 +66,25 @@ To move VMs to another host:
 
 Do not copy `.utm` bundles directly — they are regenerable and their bundle-local links would go stale.
 
+### What `nucleus-vm pack` removes
+
+`nucleus-vm pack` refuses while any VM is running. It is dry-run by default: it prints what it would remove; pass `--force` to perform. Only trivially regenerable artifacts (pure function of kept inputs plus a trivial command — no downloads, no build time) plus transient junk are removed:
+
+- `<name>.utm/` bundles (rebuilt by `nucleus-vm unpack` from the descriptor)
+- `scripts/start-*.sh` / `stop-*.sh` / `start-*.ps1` / `stop-*.ps1` (sed-rendered from templates)
+- `images/<type>.base.qcow2` (copied from the kept prebuilt at setup)
+- `images/<name>-build/` and stale dot-directories (transient Packer junk)
+
+Everything else stays: `images/` prebuilt goldens + markers, Android system/GSI images (`Android-system.qcow2`, `Android-gsi.img`), installer caches (`images/*-installer.iso`, `virtio-win.iso`), `data/<id>.qcow2` runtime overlays (including Android userdata), `<id>.vm.json` descriptors, runtime markers, `tart/`, `README.md`, and `scripts/pack.sh` / `pack.ps1` / `unpack.sh` / `unpack.ps1` (payload bootstrap).
+
+> **Android userdata caveat:** the Android userdata image lives inside the bundle copy (`Android.utm/Data/<userdataImage>`); pack removes bundles. If preserving that data matters, sync it out BEFORE packing:
+>
+> ```sh
+> cp "Android.utm/Data/<userdataImage>" "data/Android.qcow2"
+> ```
+>
+> or accept the loss (the bundled copy is replaced by `data/Android.qcow2` on the next `nucleus-vm setup`).
+
 ## Lifecycle
 
 ```

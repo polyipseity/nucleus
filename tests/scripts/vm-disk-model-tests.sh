@@ -601,6 +601,166 @@ EOF
   assert_file_exists "$_vm_dir/data/NixOS.qcow2" "gc-disabled kept NixOS overlay"
 }
 
+# test_pack_keep_set
+#   Pack strips exactly the trivially regenerable set — UTM bundles, generated
+#   start/stop scripts (BOTH variants), images/<type>.base.qcow2 copies, and
+#   images/*-build/ + stale dot-dirs — while keeping the payload: goldens +
+#   markers, Android system/GSI, installer ISOs, data/ overlays (incl. Android
+#   userdata), descriptors, tart store, README, and pack/unpack wrappers.
+#   Dry-run prints removals without deleting; --force performs.  Refuses
+#   while any VM is running.
+test_pack_keep_set() {
+  local _vm_dir="$_tmp/pack/vm" _images_dir="$_tmp/pack/vm/images" _vms_dir="$_tmp/pack/vms"
+  local _manifest="$_tmp/pack/manifest.json"
+  local _out
+
+  mkdir -p "$_vm_dir" "$_images_dir" "$_vm_dir/data" "$_vms_dir" "$_vm_dir/scripts"
+
+  cat > "$_manifest" <<'EOF'
+{
+  "VMs": [
+    {
+      "id": "Android",
+      "name": "Android",
+      "type": "Android",
+      "enabled": true,
+      "hosts": ["MacBook", "NixOS", "Windows"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "portForwards": [],
+      "macAddressPrefix": "52",
+      "Android": {
+        "systemImage": "Android-system.qcow2",
+        "userdataImage": "Android.qcow2",
+        "gsiImage": "Android-gsi.img",
+        "gsiUrl": "https://example.invalid/gsi.zip"
+      }
+    },
+    {
+      "id": "NixOS",
+      "name": "NixOS",
+      "type": "NixOS",
+      "enabled": true,
+      "hosts": ["NixOS"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "portForwards": [],
+      "macAddressPrefix": "52"
+    }
+  ]
+}
+EOF
+
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+    "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
+    "$_vms_dir" "$_manifest" "NixOS" "false" "false"
+
+  # Keep-set payload: goldens + markers, Android system/GSI, installer ISOs,
+  # data/ overlays (incl. Android userdata), descriptors, tart store, README,
+  # pack/unpack wrappers (BOTH variants).
+  : > "$_images_dir/Android-system.qcow2"
+  : > "$_images_dir/Android-gsi.img"
+  : > "$_images_dir/NixOS.qcow2"
+  : > "$_images_dir/NixOS.qcow2.vm-guest-credentials-sha256"
+  : > "$_images_dir/NixOS-installer.iso"
+  : > "$_images_dir/virtio-win.iso"
+  : > "$_vm_dir/data/Android.qcow2"
+  : > "$_vm_dir/data/NixOS.qcow2"
+  vm_write_descriptors
+  mkdir -p "$_vm_dir/tart"
+  : > "$_vm_dir/README.md"
+  : > "$_vm_dir/scripts/pack.sh"
+  : > "$_vm_dir/scripts/unpack.sh"
+  : > "$_vm_dir/scripts/pack.ps1"
+  : > "$_vm_dir/scripts/unpack.ps1"
+
+  # Removed set: UTM bundles, generated start/stop scripts (BOTH variants),
+  # base copies, *-build/ + stale dot-dirs.
+  mkdir -p "$_vm_dir/Android.utm/Data" "$_vm_dir/NixOS.utm"
+  : > "$_vm_dir/Android.utm/Data/Android.qcow2"
+  : > "$_vm_dir/scripts/start-NixOS.sh"
+  : > "$_vm_dir/scripts/stop-NixOS.sh"
+  : > "$_vm_dir/scripts/start-NixOS.ps1"
+  : > "$_vm_dir/scripts/stop-NixOS.ps1"
+  : > "$_images_dir/NixOS.base.qcow2"
+  mkdir -p "$_images_dir/NixOS-build" "$_images_dir/.packer-tmp"
+
+  # Dry-run: prints removals, removes nothing.
+  dry_run=true
+  _out="$(vm_pack_vms 2>&1)"
+  printf '%s\n' "$_out" | grep -q "removing regenerable UTM bundle" \
+    || { echo "FAIL: pack dry-run did not print UTM bundle removal"; _failures=$((_failures + 1)); }
+  printf '%s\n' "$_out" | grep -q "removing regenerable start/stop script" \
+    || { echo "FAIL: pack dry-run did not print start/stop script removal"; _failures=$((_failures + 1)); }
+  printf '%s\n' "$_out" | grep -q "removing regenerable base image" \
+    || { echo "FAIL: pack dry-run did not print base image removal"; _failures=$((_failures + 1)); }
+  printf '%s\n' "$_out" | grep -q "removing transient build directory" \
+    || { echo "FAIL: pack dry-run did not print build directory removal"; _failures=$((_failures + 1)); }
+  assert_file_exists "$_vm_dir/Android.utm/Data/Android.qcow2" "pack dry-run kept Android bundle userdata"
+  assert_file_exists "$_vm_dir/scripts/start-NixOS.sh" "pack dry-run kept start script"
+  assert_file_exists "$_images_dir/NixOS.base.qcow2" "pack dry-run kept base copy"
+  if [ ! -d "$_images_dir/NixOS-build" ]; then
+    echo "FAIL: pack dry-run kept build dir images/NixOS-build"
+    _failures=$((_failures + 1))
+  fi
+  assert_file_exists "$_vm_dir/scripts/pack.sh" "pack dry-run kept pack wrapper"
+
+  # Perform: removes only the regenerable set.
+  dry_run=false
+  vm_pack_vms >/dev/null 2>&1
+  if [ -d "$_vm_dir/Android.utm" ]; then
+    echo "FAIL: pack removed Android bundle"
+    _failures=$((_failures + 1))
+  fi
+  if [ -d "$_vm_dir/NixOS.utm" ]; then
+    echo "FAIL: pack removed NixOS bundle"
+    _failures=$((_failures + 1))
+  fi
+  assert_file_missing "$_vm_dir/scripts/start-NixOS.sh" "pack removed start script"
+  assert_file_missing "$_vm_dir/scripts/stop-NixOS.sh" "pack removed stop script"
+  assert_file_missing "$_vm_dir/scripts/start-NixOS.ps1" "pack removed start ps1"
+  assert_file_missing "$_vm_dir/scripts/stop-NixOS.ps1" "pack removed stop ps1"
+  assert_file_missing "$_images_dir/NixOS.base.qcow2" "pack removed base copy"
+  if [ -d "$_images_dir/NixOS-build" ]; then
+    echo "FAIL: pack removed build dir images/NixOS-build"
+    _failures=$((_failures + 1))
+  fi
+  if [ -d "$_images_dir/.packer-tmp" ]; then
+    echo "FAIL: pack removed stale dot-dir images/.packer-tmp"
+    _failures=$((_failures + 1))
+  fi
+
+  for _keep in Android-system.qcow2 Android-gsi.img NixOS.qcow2 NixOS.qcow2.vm-guest-credentials-sha256 NixOS-installer.iso virtio-win.iso; do
+    assert_file_exists "$_images_dir/$_keep" "pack kept image images/$_keep"
+  done
+  for _keep in Android.qcow2 NixOS.qcow2; do
+    assert_file_exists "$_vm_dir/data/$_keep" "pack kept overlay data/$_keep"
+  done
+  for _keep in Android.vm.json NixOS.vm.json; do
+    assert_file_exists "$_vm_dir/$_keep" "pack kept descriptor $_keep"
+  done
+  if [ ! -d "$_vm_dir/tart" ]; then
+    echo "FAIL: pack kept tart store $_vm_dir/tart"
+    _failures=$((_failures + 1))
+  fi
+  assert_file_exists "$_vm_dir/README.md" "pack kept README"
+  for _keep in pack.sh unpack.sh pack.ps1 unpack.ps1; do
+    assert_file_exists "$_vm_dir/scripts/$_keep" "pack kept wrapper scripts/$_keep"
+  done
+
+  # Running-VM refusal: pack aborts (non-zero) while any VM is running.
+  # shellcheck disable=SC2329 # reason: stub invoked indirectly by vm_pack_vms's running-VM guard; shellcheck cannot trace the call
+  vm_get_running_names() { printf 'NixOS\n'; }
+  if vm_pack_vms >/dev/null 2>&1; then
+    echo "FAIL: pack must refuse while a VM is running"
+    _failures=$((_failures + 1))
+  fi
+  # shellcheck disable=SC2329 # reason: stub restored to empty after indirect use by vm_pack_vms
+  vm_get_running_names() { printf ''; }
+}
+
 test_uuid_vectors
 test_mac_vectors
 test_deterministic
@@ -610,6 +770,7 @@ test_base_overlay_provisioning
 test_resize_vm
 test_resize_and_mark_image_grow_only
 test_gc_keep_set
+test_pack_keep_set
 
 if [ "$_failures" -eq 0 ]; then
   echo "vm-disk-model-tests: all checks passed"

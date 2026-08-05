@@ -1038,13 +1038,13 @@ let
   test_vm_resize_cli_subcommand =
     assert'
       (
-        (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize [vm...] [options]" vm_setup_sh_text)
+        (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack [vm...] [options]" vm_setup_sh_text)
         && (lib.hasInfix "resize <vm> <size>" vm_setup_sh_text)
         && (lib.hasInfix "--allow-shrink) allow_shrink=true" vm_setup_sh_text)
         && (lib.hasInfix "do_resize() {" vm_setup_sh_text)
         && (lib.hasInfix "disk_bytes=\"\$(parse_size \"$size_arg\")\" || exit 1" vm_setup_sh_text)
         && (lib.hasInfix "vm_resize_vm \"$vm_name\" \"$disk_bytes\" \"$allow_shrink\"" vm_setup_sh_text)
-        && (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize) \"do_$action\" ;;") vm_setup_sh_text
+        && (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack) \"do_$action\" ;;") vm_setup_sh_text
       )
       "scripts/vm.sh must wire the resize subcommand (usage, dispatch, parse_size, --allow-shrink) to vm_resize_vm";
 
@@ -1053,13 +1053,66 @@ let
   test_vm_resize_windows_twin =
     assert'
       (
-        (lib.hasInfix "reset', 'resize', 'gc'" vm_ps1_text)
+        (lib.hasInfix "reset', 'resize', 'gc', 'pack'" vm_ps1_text)
         && (lib.hasInfix "'resize'  { Invoke-VmResize }" vm_ps1_text)
         && (lib.hasInfix "function Invoke-VmResize {" vm_ps1_text)
         && (lib.hasInfix "'--allow-shrink' { $allowShrink = $true }" vm_ps1_text)
         && (lib.hasInfix "ConvertFrom-SizeString $sizeArg" vm_ps1_text)
       )
       "scripts/vm.ps1 must mirror the resize subcommand (ValidateSet, dispatch, Invoke-VmResize, --allow-shrink)";
+
+  # The pack subcommand must be wired into the CLI: usage synopsis, dispatch,
+  # do_pack with dry-run-by-default (--force performs), the running-VM refusal,
+  # and vm_pack_vms.
+  test_vm_pack_cli_subcommand =
+    assert'
+      (
+        (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack [vm...] [options]" vm_setup_sh_text)
+        && (lib.hasInfix "pack                     Strip trivially regenerable artifacts" vm_setup_sh_text)
+        && (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack) \"do_$action\" ;;" vm_setup_sh_text)
+        && (lib.hasInfix "do_pack() {" vm_setup_sh_text)
+        && (lib.hasInfix "if [ \"$force\" != true ]; then" vm_setup_sh_text)
+        && (lib.hasInfix "vm_pack_vms" vm_setup_sh_text)
+      )
+      "scripts/vm.sh must wire the pack subcommand (usage, dispatch, do_pack with dry-run-by-default, vm_pack_vms)";
+
+  # pack's keep-set must exactly match the trivially-regenerable rule: only
+  # UTM bundles, generated start/stop scripts, images/<type>.base.qcow2
+  # copies, and *-build/ + stale dot-dirs are removed; everything else stays.
+  test_vm_pack_removal_set =
+    assert'
+      (
+        (lib.hasInfix "removing regenerable UTM bundle" vm_setup_sh_text)
+        && (lib.hasInfix "\"$VM_DIR\"/*.utm/; do" vm_setup_sh_text)
+        && (lib.hasInfix "removing regenerable start/stop script" vm_setup_sh_text)
+        && (lib.hasInfix "scripts/start-*.sh" vm_setup_sh_text)
+        && (lib.hasInfix "scripts/stop-*.ps1" vm_setup_sh_text)
+        && (lib.hasInfix "removing regenerable base image" vm_setup_sh_text)
+        && (lib.hasInfix "\"$IMAGES_DIR\"/*.base.qcow2" vm_setup_sh_text)
+        && (lib.hasInfix "removing transient build directory" vm_setup_sh_text)
+        && (lib.hasInfix "\"$IMAGES_DIR\"/*-build/" vm_setup_sh_text)
+        && (lib.hasInfix "cannot pack while a VM is running" vm_setup_sh_text)
+      )
+      "vm_pack_vms must remove only trivially regenerable artifacts (UTM bundles, start/stop scripts, base copies, *-build/ + dot-dirs) and refuse while a VM is running";
+
+  # pack must refuse while any VM is running and print next steps.
+  test_vm_pack_next_steps = assert' (
+    (lib.hasInfix "copy the packed tree to the target host" vm_setup_sh_text)
+    && (lib.hasInfix "nucleus-vm unpack' or 'nucleus-vm setup'" vm_setup_sh_text)
+  ) "vm_pack_vms must print next steps (nucleus-vm unpack or nucleus-vm setup on the target)";
+
+  # The Windows twin must mirror the pack subcommand: ValidateSet, dispatch,
+  # Invoke-VmPack with dry-run-by-default (--force performs), and running-VM refusal.
+  test_vm_pack_windows_twin =
+    assert'
+      (
+        (lib.hasInfix "'gc', 'pack'" vm_ps1_text)
+        && (lib.hasInfix "'pack'    { Invoke-VmPack }" vm_ps1_text)
+        && (lib.hasInfix "function Invoke-VmPack {" vm_ps1_text)
+        && (lib.hasInfix "'--force' { $perform = $true }" vm_ps1_text)
+        && (lib.hasInfix "cannot pack while a VM is running" vm_ps1_text)
+      )
+      "scripts/vm.ps1 must mirror the pack subcommand (ValidateSet, dispatch, Invoke-VmPack with --force)";
 
   # The Packer failure branch for the macOS build must print a human-readable
   # error and return the captured exit code.
@@ -2126,6 +2179,10 @@ let
     test_vm_resize_grow_only_and_guard
     test_vm_resize_cli_subcommand
     test_vm_resize_windows_twin
+    test_vm_pack_cli_subcommand
+    test_vm_pack_removal_set
+    test_vm_pack_next_steps
+    test_vm_pack_windows_twin
     test_vm_gc_keep_set_preserves_manifest_images
     test_vm_gc_orphan_descriptors_removed
     test_vm_gc_marker_expected_set_semantics
@@ -2282,6 +2339,10 @@ in
     test_vm_resize_grow_only_and_guard
     test_vm_resize_cli_subcommand
     test_vm_resize_windows_twin
+    test_vm_pack_cli_subcommand
+    test_vm_pack_removal_set
+    test_vm_pack_next_steps
+    test_vm_pack_windows_twin
     test_vm_gc_keep_set_preserves_manifest_images
     test_vm_gc_orphan_descriptors_removed
     test_vm_gc_marker_expected_set_semantics

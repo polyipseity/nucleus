@@ -2873,3 +2873,79 @@ vm_gc_orphan_descriptors() {
     fi
   done
 }
+
+# vm_pack_vms — Strip trivially regenerable artifacts from the VM directory
+#   so the tree can be copied as-is to another host (nucleus-vm pack).
+#   Default is dry-run: prints planned removals.  --force performs them.
+#   Refuses while any VM is running.  WHY: pack removes only artifacts that
+#   are a pure function of kept inputs plus a trivial command (no downloads,
+#   no build time) plus transient junk: UTM bundles (rebuilt by setup from
+#   the plist template + ln -f + open), generated start/stop scripts
+#   (sed-rendered), images/<type>.base.qcow2 (cp from the kept prebuilt),
+#   and images/*-build/ + stale dot-dirs (Packer junk).  Everything else —
+#   data overlays, Android userdata, prebuilt goldens + markers, installer
+#   ISOs, descriptors, runtime markers, tart store, README, and the
+#   pack/unpack wrappers — is payload or data and stays.
+vm_pack_vms() {
+  local _pv_running
+  _pv_running="$(vm_get_running_names)"
+  if [ -n "$_pv_running" ]; then
+    error "cannot pack while a VM is running: $(printf '%s' "$_pv_running" | tr '\n' ' ')"
+    return 1
+  fi
+
+  if [ "$dry_run" = true ]; then
+    dry_run "pack mode enabled — printing planned removals (pass --force to perform)"
+  fi
+
+  # Android userdata lives inside the bundle copy; pack removes bundles, so
+  # the manual sync-out one-liner must run first when preserving data matters.
+  if [ -d "$VM_DIR/Android.utm" ]; then
+    warn "pack — Android userdata lives in the bundle copy; to preserve it, copy Android.utm/Data/<userdataImage> → data/Android.qcow2 BEFORE packing (see README)"
+  fi
+
+  # UTM bundles — regenerable by setup from the descriptors (trivial).
+  for _pv_bundle in "$VM_DIR"/*.utm/; do
+    [ -d "$_pv_bundle" ] || continue
+    say "pack — removing regenerable UTM bundle: $_pv_bundle"
+    if [ "$dry_run" = false ]; then
+      rm -rf "$_pv_bundle"
+    fi
+  done
+
+  # Generated start/stop helper scripts (BOTH variants) — sed-rendered,
+  # regenerable.  The pack/unpack wrappers are payload bootstrap and stay.
+  if [ -d "$VM_DIR/scripts" ]; then
+    for _pv_script in "$VM_DIR"/scripts/start-*.sh "$VM_DIR"/scripts/start-*.ps1 "$VM_DIR"/scripts/stop-*.sh "$VM_DIR"/scripts/stop-*.ps1; do
+      [ -f "$_pv_script" ] || continue
+      say "pack — removing regenerable start/stop script: $_pv_script"
+      if [ "$dry_run" = false ]; then
+        rm -f "$_pv_script"
+      fi
+    done
+  fi
+
+  # images/<type>.base.qcow2 — trivial cp from the kept prebuilt golden.
+  for _pv_base in "$IMAGES_DIR"/*.base.qcow2; do
+    [ -f "$_pv_base" ] || continue
+    say "pack — removing regenerable base image: $_pv_base"
+    if [ "$dry_run" = false ]; then
+      rm -f "$_pv_base"
+    fi
+  done
+
+  # images/*-build/ + stale dot-dirs (transient Packer junk).
+  for _pv_build in "$IMAGES_DIR"/*-build/ "$IMAGES_DIR"/.[!.]*/; do
+    [ -d "$_pv_build" ] || continue
+    say "pack — removing transient build directory: $_pv_build"
+    if [ "$dry_run" = false ]; then
+      rm -rf "$_pv_build"
+    fi
+  done
+
+  say "pack — summary: stripped regenerable wrappers; payload retained (images, data, descriptors, tart/, README)"
+  say "pack — next: copy the packed tree to the target host, then run 'nucleus-vm unpack' or 'nucleus-vm setup' there"
+  if [ "$dry_run" = true ]; then
+    say "pack — dry-run: nothing was removed; pass --force to perform"
+  fi
+}

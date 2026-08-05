@@ -3,7 +3,7 @@
   Unified VM management for Windows.
 
 .DESCRIPTION
-  Subcommands: setup, list, status, start, stop, upgrade, reset, resize, gc.
+  Subcommands: setup, list, status, start, stop, upgrade, reset, resize, gc, pack.
 
   setup:   Build VM images (if needed) and provision VMs.
            Delegates to Invoke-VMSetup.ps1 (phase 1: Packer build,
@@ -19,9 +19,14 @@
   gc:      Remove stale VM artifacts. Delegates to Invoke-VMSetup -Gc.
            Default GC preserves disabled VM entries; pass --gc-disabled
            to clear them too.
+  pack:    Strip trivially regenerable artifacts (generated start/stop
+           scripts, images/<type>.base.qcow2 copies, images/*-build/ + stale
+           dot-dirs) so the tree can be copied as-is to another host.
+           Dry-run by default; pass --force to perform. Refuses while any
+           VM is running.
 
 .PARAMETER Action
-  The operation to perform: setup, list, status, start, stop, upgrade, reset, resize, gc.
+  The operation to perform: setup, list, status, start, stop, upgrade, reset, resize, gc, pack.
 
 .PARAMETER SubcommandArgs
   Additional arguments passed after the subcommand (flags, VM names, etc.).
@@ -37,7 +42,8 @@
   .\vm.ps1 gc --gc-disabled
   .\vm.ps1 list
   .\vm.ps1 status
-  .\vm.ps1 gc
+  .\vm.ps1 pack
+  .\vm.ps1 pack --force
 
 .NOTES
   Environment variables: NUCLEUS_REPO_ROOT.
@@ -46,7 +52,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('setup', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'resize', 'gc')]
+  [ValidateSet('setup', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'resize', 'gc', 'pack')]
   [string]$Action,
 
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
@@ -66,7 +72,7 @@ $modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-Nucle
 Import-Module $modulePath -Force -DisableNameChecking
 
 if ($Help -or -not $Action) {
-  if (-not $Action) { Write-NucleusError "missing action (setup, list, status, start, stop, upgrade, reset, resize, gc)" }
+  if (-not $Action) { Write-NucleusError "missing action (setup, list, status, start, stop, upgrade, reset, resize, gc, pack)" }
   Get-Help $PSCommandPath -Detailed
   exit 0
 }
@@ -412,6 +418,57 @@ function Invoke-VmGc {
   Invoke-VMSetup -RepoRoot $RepoRoot -Gc -GcDisabled:$gcDisabled
 }
 
+function Invoke-VmPack {
+  $perform = $false
+  foreach ($arg in $SubcommandArgs) {
+    switch ($arg) {
+      '--force' { $perform = $true }
+      default { Write-NucleusWarning "ignoring unknown flag for pack: $arg" }
+    }
+  }
+
+  if (@(Get-VmRunningNameList).Count -gt 0) {
+    Write-NucleusError 'cannot pack while a VM is running; stop all VMs first'
+    exit 1
+  }
+
+  $vmDir = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
+  $imagesDir = Join-Path $vmDir 'images'
+
+  if (-not $perform) {
+    Write-NucleusInfo 'pack (dry-run): pass --force to remove regenerable artifacts'
+  }
+
+  # Generated start/stop helper scripts (keep pack/unpack wrappers).
+  $scriptsDir = Join-Path $vmDir 'scripts'
+  if (Test-Path -LiteralPath $scriptsDir -PathType Container) {
+    Get-ChildItem -LiteralPath $scriptsDir -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^(start|stop)-.+\\.(sh|ps1)$' } | ForEach-Object {
+      Write-NucleusInfo "pack — removing regenerable start/stop script: $($_.FullName)"
+      if ($perform) { Remove-Item -LiteralPath $_.FullName -Force }
+    }
+  }
+
+  if (Test-Path -LiteralPath $imagesDir -PathType Container) {
+    # images/<type>.base.qcow2 — trivial cp from the kept prebuilt golden.
+    Get-ChildItem -LiteralPath $imagesDir -Filter '*.base.qcow2' -File -ErrorAction SilentlyContinue | ForEach-Object {
+      Write-NucleusInfo "pack — removing regenerable base image: $($_.FullName)"
+      if ($perform) { Remove-Item -LiteralPath $_.FullName -Force }
+    }
+
+    # images/*-build/ + stale dot-dirs (transient Packer junk).
+    Get-ChildItem -LiteralPath $imagesDir -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*-build' -or $_.Name -match '^\..+' } | ForEach-Object {
+      Write-NucleusInfo "pack — removing transient build directory: $($_.FullName)"
+      if ($perform) { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
+    }
+  }
+
+  Write-NucleusInfo 'pack — summary: stripped regenerable wrappers; payload retained (images, data, descriptors, README)'
+  Write-NucleusInfo "pack — next: copy the tree to the target host, then run 'nucleus-vm unpack' or 'nucleus-vm setup' there"
+  if (-not $perform) {
+    Write-NucleusInfo 'pack — dry-run: nothing was removed; pass --force to perform'
+  }
+}
+
 # ---------------------------------------------------------------------------
 # Dispatch
 # ---------------------------------------------------------------------------
@@ -426,4 +483,5 @@ switch ($Action) {
   'reset'   { Invoke-VmReset }
   'resize'  { Invoke-VmResize }
   'gc'      { Invoke-VmGc }
+  'pack'    { Invoke-VmPack }
 }

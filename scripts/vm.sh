@@ -160,7 +160,7 @@ vm_guest_credentials_hash() {
 # ---------------------------------------------------------------------------
 
 usage() {
-  usage_std "$(basename "$0")" "setup|list|status|start|stop|upgrade|reset|gc|resize [vm...] [options]"
+  usage_std "$(basename "$0")" "setup|list|status|start|stop|upgrade|reset|gc|resize|pack [vm...] [options]"
   cat <<'EOF'
   setup                    Build images and provision VMs (full lifecycle).
   list                     List all VMs from manifest with runtime status.
@@ -176,6 +176,11 @@ usage() {
                           descriptors). Default GC preserves disabled VM entries and every
                           manifest-referenced image (goldens, bases, Android system/GSI/
                           userdata); pass --gc-disabled to clear disabled entries too.
+  pack                     Strip trivially regenerable artifacts (UTM bundles, generated
+                          start/stop scripts, images/<type>.base.qcow2 copies, and
+                          images/*-build/ + stale dot-dirs) so the tree can be copied
+                          as-is to another host. Dry-run by default; pass --force to
+                          perform. Refuses while any VM is running.
 
   --dry-run                     Print planned actions without executing (default: off).
   --accept-gsi-license          Accept the GSI license for Android GSI downloads.
@@ -189,9 +194,9 @@ usage() {
   --gc|--no-gc                  Run GC after setup (default: --no-gc).
   --gc-disabled|--no-gc-disabled  Also clear disabled VM entries during GC
                                 (default: --no-gc-disabled).
-  --force                       Recreate invalid runtime overlays during setup
-                                (default: off; invalid overlays are skipped
-                                with a pointer to 'nucleus-vm reset <vm>').
+  --force                       Recreate invalid runtime overlays during setup, and
+                                perform pack removals (default: off; invalid overlays
+                                are skipped with a pointer to 'nucleus-vm reset <vm>').
   --allow-shrink                Allow shrinking during resize (default: off).
   --vm-dir-override PATH        Override the default ~/virtual machines path.
   --mido-patch-file PATH        Override runtime Mido patch file path.
@@ -256,7 +261,7 @@ while [ "$#" -gt 0 ]; do
     --mido-script) NUCLEUS_MIDO_SCRIPT="$2"; shift 2 ;;
     --json) json_output=true; shift ;;
     --repo-root) repo_root_override="$2"; shift 2 ;;
-    setup|list|status|start|stop|upgrade|reset|gc|resize)
+    setup|list|status|start|stop|upgrade|reset|gc|resize|pack)
       action="$1"; shift
       vm_args=("$@")
       break
@@ -290,7 +295,7 @@ for arg in "${vm_args[@]}"; do
   esac
 done
 
-[ -z "$action" ] && { error "missing action (setup, list, status, start, stop, upgrade, reset, gc, resize)" ; usage >&2 ; exit 1; }
+[ -z "$action" ] && { error "missing action (setup, list, status, start, stop, upgrade, reset, gc, resize, pack)" ; usage >&2 ; exit 1; }
 
 # Validate scalars
 # WHY: validating before dispatch fails fast with a precise message instead
@@ -878,10 +883,34 @@ do_gc() {
   nuc_done
 }
 
+# do_pack
+#   Strips trivially regenerable artifacts (UTM bundles, generated
+#   start/stop scripts, images/<type>.base.qcow2 copies, images/*-build/ +
+#   stale dot-dirs) so the VM tree can be copied as-is to another host.
+#   WHY: pack complements setup — setup regenerates the wrappers, pack
+#   strips them into a compact payload for transfer.  Default is dry-run;
+#   --force performs.  Refuses while any VM is running.
+do_pack() {
+  REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
+  resolve_manifest
+  NUCLEUS_HOST="$(resolve_nucleus_host)"
+
+  VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
+  IMAGES_DIR="$VM_DIR/images"
+
+  # Pack is dry-run by default; --force performs the removals.
+  if [ "$force" != true ]; then
+    dry_run=true
+  fi
+
+  vm_pack_vms
+  nuc_done
+}
+
 # ---------------------------------------------------------------------------
 # Dispatch
 # ---------------------------------------------------------------------------
 
 case "$action" in
-  setup|list|status|start|stop|upgrade|reset|gc|resize) "do_$action" ;;
+  setup|list|status|start|stop|upgrade|reset|gc|resize|pack) "do_$action" ;;
 esac
