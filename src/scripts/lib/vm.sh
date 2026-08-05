@@ -2682,13 +2682,93 @@ vm_setup_libvirt_vms() {
 
 # Windows / QEMU
 
-# vm_setup_windows_qemu — Callback for vm_for_each on Windows. Writes a QEMU
-#   start script for Android and Windows VMs on the Windows host.
+# vm_setup_windows_qemu — Callback for vm_for_each on Windows. Provisions the
+#   writable runtime disk per VM: Windows guests get a data/<id>.qcow2 overlay
+#   over images/<type>.base.qcow2 (mirroring vm_setup_libvirt and the
+#   PowerShell vm-setup Pass A); Android guests get a standalone
+#   data/<id>.qcow2 userdata disk (system/GSI images are referenced directly).
 vm_setup_windows_qemu() {
-  # P2: per-guest start/stop scripts are written for ALL manifest guests by
-  # vm_write_all_guest_scripts; Windows base/overlay disk provisioning lands
-  # with the P8 parity phase, so the callback currently has no work.
-  return 0
+  local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
+  local vm_display disk_path disk_credential_marker disk_config_marker _prebuilt
+  local _prebuilt_min_size _prebuilt_disk_bytes
+  local _android_userdata _android_disk_bytes _android_virtual_size
+  local _guest_config_fingerprint
+
+  vm_display=$(jq -r ".VMs[$vm_index].name" "$MANIFEST")
+
+  disk_path="$VM_DIR/data/${vm_name}.qcow2"
+  disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_name" "$disk_path")"
+  disk_config_marker="$(vm_guest_config_marker_path "$vm_name" "$disk_path")"
+  # WHY: only NixOS guests have a Nix-managed guest config to fingerprint.
+  _guest_config_fingerprint=''
+
+  say "configuring Windows QEMU VM '$vm_display' (hosts: $vm_hosts)..."
+
+  # Android uses a standalone writable userdata disk at data/<id>.qcow2
+  # (system/GSI images stay read-only under images/ and are referenced
+  # directly).  The build phase creates it when missing, so this only fills
+  # gaps and grows it grow-only (never shrinks).
+  if [ "$vm_type" = "Android" ]; then
+    _android_userdata="$VM_DIR/data/${vm_name}.qcow2"
+    _android_disk_bytes="$(parse_size "$(jq -r ".VMs[$vm_index].diskSize" "$MANIFEST")")"
+    if [ "$dry_run" = false ]; then
+      mkdir -p "$VM_DIR/data"
+      if [ ! -f "$_android_userdata" ]; then
+        if command -v qemu-img >/dev/null 2>&1; then
+          say "creating Android userdata disk for '$vm_name' (${_android_disk_bytes} bytes)"
+          if ! qemu-img create -f qcow2 "$_android_userdata" "$_android_disk_bytes" >/dev/null; then
+            error "failed to create Android userdata disk: $_android_userdata"
+            return
+          fi
+        else
+          warn "qemu-img not found; cannot create Android userdata disk for '$vm_name'"
+        fi
+      else
+        say "Android userdata disk already exists: $_android_userdata"
+        if command -v qemu-img >/dev/null 2>&1; then
+          _android_virtual_size="$(qemu-img info --output=json "$_android_userdata" | jq -r '."virtual-size" // 0')"
+          if [ -n "$_android_virtual_size" ] && [ "$_android_virtual_size" -lt "$_android_disk_bytes" ]; then
+            say "growing Android userdata disk for '$vm_name' from $_android_virtual_size to $_android_disk_bytes bytes (grow-only)"
+            if ! qemu-img resize "$_android_userdata" "$_android_disk_bytes" >/dev/null; then
+              error "failed to grow Android userdata disk: $_android_userdata"
+            fi
+          fi
+        else
+          warn "qemu-img not found; cannot grow Android userdata disk for '$vm_name'"
+        fi
+      fi
+    else
+      dry_run "ensure Android userdata disk: $_android_userdata (${_android_disk_bytes} bytes)"
+    fi
+    return
+  fi
+
+  # Base/overlay provisioning: data/<id>.qcow2 is the canonical writable
+  # overlay backing images/<type>.base.qcow2 (base = copy of the prebuilt
+  # golden); credential drift refreshes the base from the prebuilt while
+  # preserving the overlay, and growth is grow-only.
+  _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
+  _prebuilt_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
+  _prebuilt_disk_bytes="$(parse_size "$(jq -r ".VMs[$vm_index].diskSize" "$MANIFEST")")"
+  if [ ! -f "$_prebuilt" ]; then
+    warn "image not found: $_prebuilt; skipping '$vm_name'"
+    return
+  fi
+  if ! validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}" "$_prebuilt_min_size"; then
+    warn "pre-built image is invalid for '$vm_name': $_prebuilt"
+    return
+  fi
+
+  if [ "$dry_run" = false ]; then
+    mkdir -p "$VM_DIR"
+    if ! vm_ensure_base_and_overlay "$vm_name" "$_prebuilt" "$_prebuilt_min_size" \
+        "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
+      return
+    fi
+    say "runtime overlay ready: $disk_path"
+  else
+    dry_run "ensure base/overlay: $IMAGES_DIR/${vm_type}.base.qcow2 + $disk_path"
+  fi
 }
 
 vm_setup_windows_qemu_vms() {

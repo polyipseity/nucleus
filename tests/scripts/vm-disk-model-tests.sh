@@ -761,6 +761,138 @@ EOF
   vm_get_running_names() { printf ''; }
 }
 
+# test_windows_qemu_provisioning
+#   Sandboxed qemu-img tests for the vm_setup_windows_qemu callback: Windows
+#   guests get a base/overlay pair (base copied from the prebuilt golden,
+#   overlay with a relative backing path, invalid-overlay --force semantics,
+#   credential-drift base refresh with the overlay SHA-256 preserved, grow-only
+#   auto-grow); Android guests get a standalone data/<id>.qcow2 userdata disk
+#   created at the manifest disk size and grown grow-only.
+test_windows_qemu_provisioning() {
+  local _vm_dir="$_tmp/wq/vm" _images_dir="$_tmp/wq/vm/images" _vms_dir="$_tmp/wq/vms"
+  local _manifest="$_tmp/wq/manifest.json"
+  local _prebuilt _base _overlay _cred_marker _config_marker
+  local _before_hash _after_hash _virtual_size _android_data
+
+  mkdir -p "$_vm_dir" "$_images_dir" "$_vms_dir"
+
+  cat > "$_manifest" <<'EOF'
+{
+  "VMs": [
+    {
+      "id": "Windows",
+      "name": "Windows",
+      "type": "Windows",
+      "enabled": true,
+      "hosts": ["Windows"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64MB",
+      "minImageSize": "10MB",
+      "portForwards": [],
+      "macAddressPrefix": "52",
+      "Windows": {"edition": "pro", "isoUrl": null}
+    }
+  ]
+}
+EOF
+
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+    "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
+    "$_vms_dir" "$_manifest" "Windows" "false" "false"
+  vm_guest_credentials_fingerprint="test-fingerprint"
+
+  _prebuilt="$_images_dir/Windows.qcow2"
+  _base="$_images_dir/Windows.base.qcow2"
+  _overlay="$_vm_dir/data/Windows.qcow2"
+  _cred_marker="$(vm_guest_credentials_marker_path Windows "$_overlay")"
+  _config_marker="$(vm_guest_config_marker_path Windows "$_overlay")"
+
+  qemu-img create -f qcow2 "$_prebuilt" 16M >/dev/null
+
+  # Provision: base copied from the prebuilt golden, overlay created with a
+  # relative backing path, credential marker written with the fingerprint.
+  vm_setup_windows_qemu Windows Windows '["Windows"]' 0 >/dev/null 2>&1
+  assert_eq "0" "$([ -f "$_base" ] && echo 0 || echo 1)" "windows-qemu base created from prebuilt"
+  assert_eq "0" "$([ -f "$_overlay" ] && echo 0 || echo 1)" "windows-qemu overlay created"
+  assert_eq "1" "$(qemu-img info "$_overlay" | grep -cF 'backing file: ../images/Windows.base.qcow2')" "windows-qemu overlay relative backing path"
+  assert_eq "test-fingerprint" "$(tr -d '\r\n' <"$_cred_marker")" "windows-qemu credential marker written on overlay create"
+
+  # Invalid overlay: preserved without --force, recreated with it.
+  printf 'garbage' > "$_overlay"
+  vm_setup_windows_qemu Windows Windows '["Windows"]' 0 >/dev/null 2>&1
+  assert_eq "garbage" "$(cat "$_overlay")" "windows-qemu invalid overlay preserved without --force"
+  force=true
+  vm_setup_windows_qemu Windows Windows '["Windows"]' 0 >/dev/null 2>&1
+  force=false
+  validate_qcow2_image "$_overlay" "windows-qemu overlay after --force recreate" 0 >/dev/null 2>&1
+  assert_eq "0" "$?" "windows-qemu overlay valid after --force recreate"
+  assert_eq "test-fingerprint" "$(tr -d '\r\n' <"$_cred_marker")" "windows-qemu credential marker rewritten after --force recreate"
+
+  # Credential drift: base replaced from the prebuilt (overlay preserved).
+  # Overwrite the base with a different valid qcow2 so the replacement is
+  # observable; the overlay must keep its SHA-256.
+  qemu-img create -f qcow2 "$_tmp/wq/other.qcow2" 24M >/dev/null
+  cp "$_tmp/wq/other.qcow2" "$_base"
+  _before_hash="$(vm_sha256_input < "$_overlay")"
+  printf 'stale-fingerprint\n' > "$_cred_marker"
+  vm_setup_windows_qemu Windows Windows '["Windows"]' 0 >/dev/null 2>&1
+  _after_hash="$(vm_sha256_input < "$_overlay")"
+  assert_eq "$_before_hash" "$_after_hash" "windows-qemu overlay preserved across credential drift"
+  assert_eq "test-fingerprint" "$(tr -d '\r\n' <"$_cred_marker")" "windows-qemu credential marker refreshed after drift"
+  assert_eq "$(vm_sha256_input < "$_prebuilt")" "$(vm_sha256_input < "$_base")" "windows-qemu base replaced from prebuilt after drift"
+
+  # Grow-only auto-grow to the manifest disk size; never shrink.
+  jq '.VMs[0].diskSize = "128MB"' "$_manifest" > "$_tmp/wq/manifest.tmp" && mv "$_tmp/wq/manifest.tmp" "$_manifest"
+  vm_setup_windows_qemu Windows Windows '["Windows"]' 0 >/dev/null 2>&1
+  _virtual_size="$(qemu-img info --output=json "$_overlay" | jq -r '."virtual-size" // 0')"
+  assert_eq "128000000" "$_virtual_size" "windows-qemu overlay grown to manifest disk size"
+  jq '.VMs[0].diskSize = "64MB"' "$_manifest" > "$_tmp/wq/manifest.tmp" && mv "$_tmp/wq/manifest.tmp" "$_manifest"
+  vm_setup_windows_qemu Windows Windows '["Windows"]' 0 >/dev/null 2>&1
+  _virtual_size="$(qemu-img info --output=json "$_overlay" | jq -r '."virtual-size" // 0')"
+  assert_eq "128000000" "$_virtual_size" "windows-qemu overlay not shrunk when manifest disk size decreased"
+
+  # Android: standalone userdata disk at the manifest disk size, grow-only.
+  cat > "$_manifest" <<'EOF'
+{
+  "VMs": [
+    {
+      "id": "Android",
+      "name": "Android",
+      "type": "Android",
+      "enabled": true,
+      "hosts": ["Windows"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64MB",
+      "minImageSize": "10MB",
+      "portForwards": [],
+      "macAddressPrefix": "52",
+      "Android": {
+        "systemImage": "Android-system.qcow2",
+        "userdataImage": "Android.qcow2",
+        "gsiImage": "Android-gsi.img",
+        "gsiUrl": "https://example.invalid/gsi.zip"
+      }
+    }
+  ]
+}
+EOF
+  _android_data="$_vm_dir/data/Android.qcow2"
+  vm_setup_windows_qemu Android Android '["Windows"]' 0 >/dev/null 2>&1
+  assert_eq "0" "$([ -f "$_android_data" ] && echo 0 || echo 1)" "windows-qemu android userdata created at disk size"
+  _virtual_size="$(qemu-img info --output=json "$_android_data" | jq -r '."virtual-size" // 0')"
+  assert_eq "64000000" "$_virtual_size" "windows-qemu android userdata created at manifest disk size"
+  jq '.VMs[0].diskSize = "32MB"' "$_manifest" > "$_tmp/wq/manifest.tmp" && mv "$_tmp/wq/manifest.tmp" "$_manifest"
+  vm_setup_windows_qemu Android Android '["Windows"]' 0 >/dev/null 2>&1
+  _virtual_size="$(qemu-img info --output=json "$_android_data" | jq -r '."virtual-size" // 0')"
+  assert_eq "64000000" "$_virtual_size" "windows-qemu android userdata not shrunk"
+  jq '.VMs[0].diskSize = "128MB"' "$_manifest" > "$_tmp/wq/manifest.tmp" && mv "$_tmp/wq/manifest.tmp" "$_manifest"
+  vm_setup_windows_qemu Android Android '["Windows"]' 0 >/dev/null 2>&1
+  _virtual_size="$(qemu-img info --output=json "$_android_data" | jq -r '."virtual-size" // 0')"
+  assert_eq "128000000" "$_virtual_size" "windows-qemu android userdata grown grow-only"
+}
+
 test_uuid_vectors
 test_mac_vectors
 test_deterministic
@@ -771,6 +903,7 @@ test_resize_vm
 test_resize_and_mark_image_grow_only
 test_gc_keep_set
 test_pack_keep_set
+test_windows_qemu_provisioning
 
 if [ "$_failures" -eq 0 ]; then
   echo "vm-disk-model-tests: all checks passed"

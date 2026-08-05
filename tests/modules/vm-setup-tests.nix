@@ -1495,6 +1495,16 @@ let
       )
       "Windows vm-setup must provision data/<id>.qcow2 overlays over images/<type>.base.qcow2 (tree-root-relative backing, running-VM-guarded base refresh, grow-only resize, Android standalone userdata)";
 
+  # The POSIX Windows/QEMU vm-setup callback must provision base/overlay
+  # disks for Windows guests (parity with the PowerShell Pass A): the
+  # vm_ensure_base_and_overlay call is what actually creates the writable
+  # runtime overlay data/<id>.qcow2 on the Windows host.
+  test_windows_qemu_ensure_base_and_overlay = assert' (
+    (lib.hasInfix "vm_setup_windows_qemu()" vm_setup_sh_text)
+    && (lib.hasInfix "vm_ensure_base_and_overlay \"\$vm_name\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
+    && (lib.hasInfix "runtime overlay ready: \$disk_path" vm_setup_sh_text)
+  ) "vm_setup_windows_qemu must call vm_ensure_base_and_overlay for Windows guests";
+
   # UTM provisioning for Android must derive the system/userdata/GSI image
   # filenames from the manifest Android group (never hardcoded android-*
   # literals), validate the prebuilt with the relaxed 4 GiB floor, and copy
@@ -2259,6 +2269,7 @@ let
     test_windows_vm_gc_keep_set
     test_android_build_relink_refresh
     test_windows_base_overlay_parity
+    test_windows_qemu_ensure_base_and_overlay
   ];
 
 in
@@ -2424,6 +2435,7 @@ in
     test_windows_vm_gc_keep_set
     test_android_build_relink_refresh
     test_windows_base_overlay_parity
+    test_windows_qemu_ensure_base_and_overlay
     ;
 
   summary = builtins.deepSeq all_tests "vm-setup-tests: all tests passed";
