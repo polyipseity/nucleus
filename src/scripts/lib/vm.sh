@@ -1001,14 +1001,22 @@ re_register_utm_bundle() {
 #   Writes the current guest credential fingerprint to MARKER_PATH for drift
 #   detection.  When DISK_BYTES is specified, also resizes IMAGE_PATH via
 #   qemu-img before marking (qemu-img accepts bare byte counts).
+#   Grow-only: the image is only resized when its current virtual size is
+#   below DISK_BYTES; it is never shrunk here.  WHY: a shrink can destroy
+#   data beyond the new end, so shrinking is opt-in via
+#   'nucleus-vm resize --allow-shrink' only.
 resize_and_mark_image() {
   local _rmi_file="$1" _rmi_marker="$2" _rmi_disk_bytes="${3:-}"
+  local _rmi_current_size
 
   if [ -n "$_rmi_disk_bytes" ]; then
     if command -v qemu-img >/dev/null 2>&1; then
-      if ! qemu-img resize "$_rmi_file" "$_rmi_disk_bytes" >/dev/null; then
-        error "failed to resize $_rmi_file to $_rmi_disk_bytes bytes"
-        return 1
+      _rmi_current_size="$(qemu-img info --output=json "$_rmi_file" | jq -r '."virtual-size" // 0')"
+      if [ "$_rmi_current_size" -lt "$_rmi_disk_bytes" ]; then
+        if ! qemu-img resize "$_rmi_file" "$_rmi_disk_bytes" >/dev/null; then
+          error "failed to resize $_rmi_file to $_rmi_disk_bytes bytes"
+          return 1
+        fi
       fi
     else
       error "qemu-img not found; cannot resize $_rmi_file to $_rmi_disk_bytes bytes"
@@ -1016,6 +1024,54 @@ resize_and_mark_image() {
     fi
   fi
   printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_rmi_marker"
+}
+
+# vm_resize_vm NAME SIZE_BYTES ALLOW_SHRINK
+#   Grows (or with ALLOW_SHRINK=true shrinks) the writable disk of manifest
+#   VM NAME to SIZE_BYTES.  The writable disk is always data/<name>.qcow2 —
+#   for Android that disk IS its userdata image, so resizing it resizes the
+#   user's data disk.  Refuses to shrink without ALLOW_SHRINK (a shrink can
+#   destroy data beyond the new end) and refuses while the VM is running.
+#   Prints the old and new virtual sizes.
+vm_resize_vm() {
+  local _rvm_name="$1" _rvm_size_bytes="$2" _rvm_allow_shrink="$3"
+  local _rvm_type _rvm_disk _rvm_old_size _rvm_running _rvm_qemu_args
+
+  _rvm_type="$(jq -r --arg name "$_rvm_name" '.VMs[] | select(.id == $name) | .type // empty' "$MANIFEST")"
+  if [ -z "$_rvm_type" ]; then
+    error "VM '$_rvm_name' not found in manifest"
+    return 1
+  fi
+
+  _rvm_disk="$VM_DIR/data/${_rvm_name}.qcow2"
+  if [ ! -f "$_rvm_disk" ]; then
+    error "writable disk not found for '$_rvm_name': $_rvm_disk (run 'nucleus-vm setup' first)"
+    return 1
+  fi
+
+  _rvm_old_size="$(qemu-img info --output=json "$_rvm_disk" | jq -r '."virtual-size" // 0')"
+
+  if [ "$_rvm_size_bytes" -le "$_rvm_old_size" ] && [ "$_rvm_allow_shrink" != "true" ]; then
+    error "shrink requires --allow-shrink (current $_rvm_old_size bytes, target $_rvm_size_bytes bytes)"
+    return 1
+  fi
+
+  _rvm_running="$(vm_get_running_names)"
+  if printf '%s\n' "$_rvm_running" | grep -qxF "$_rvm_name"; then
+    error "VM '$_rvm_name' is running; stop it before resizing"
+    return 1
+  fi
+
+  _rvm_qemu_args=()
+  if [ "$_rvm_size_bytes" -lt "$_rvm_old_size" ]; then
+    _rvm_qemu_args=(--shrink)
+  fi
+  if ! qemu-img resize "${_rvm_qemu_args[@]}" "$_rvm_disk" "$_rvm_size_bytes" >/dev/null; then
+    error "failed to resize $_rvm_disk to $_rvm_size_bytes bytes"
+    return 1
+  fi
+
+  say "resized '$_rvm_name' disk: $_rvm_old_size -> $_rvm_size_bytes bytes"
 }
 
 # base/overlay provisioning helper

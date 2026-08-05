@@ -3,7 +3,7 @@
   Unified VM management for Windows.
 
 .DESCRIPTION
-  Subcommands: setup, list, status, start, stop, upgrade, reset, gc.
+  Subcommands: setup, list, status, start, stop, upgrade, reset, resize, gc.
 
   setup:   Build VM images (if needed) and provision VMs.
            Delegates to Invoke-VMSetup.ps1 (phase 1: Packer build,
@@ -14,12 +14,14 @@
   stop:    Stop a VM (not yet implemented).
   upgrade: Upgrade an Android VM image (not yet implemented on Windows).
   reset:   Reset an Android VM image (not yet implemented on Windows).
+  resize:  Grow-only resize of the writable disk (data/<id>.qcow2) to an
+           explicit size (e.g. 64GB); pass --allow-shrink to shrink instead.
   gc:      Remove stale VM artifacts. Delegates to Invoke-VMSetup -Gc.
            Default GC preserves disabled VM entries; pass --gc-disabled
            to clear them too.
 
 .PARAMETER Action
-  The operation to perform: setup, list, status, start, stop, upgrade, reset, gc.
+  The operation to perform: setup, list, status, start, stop, upgrade, reset, resize, gc.
 
 .PARAMETER SubcommandArgs
   Additional arguments passed after the subcommand (flags, VM names, etc.).
@@ -44,7 +46,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('setup', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'gc')]
+  [ValidateSet('setup', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'resize', 'gc')]
   [string]$Action,
 
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
@@ -64,7 +66,7 @@ $modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-Nucle
 Import-Module $modulePath -Force -DisableNameChecking
 
 if ($Help -or -not $Action) {
-  if (-not $Action) { Write-NucleusError "missing action (setup, list, status, start, stop, upgrade, reset, gc)" }
+  if (-not $Action) { Write-NucleusError "missing action (setup, list, status, start, stop, upgrade, reset, resize, gc)" }
   Get-Help $PSCommandPath -Detailed
   exit 0
 }
@@ -319,6 +321,77 @@ function Invoke-VmReset {
   Write-NucleusWarning "Android reset on Windows is not yet fully implemented"
 }
 
+function Invoke-VmResize {
+  if ($SubcommandArgs.Length -lt 2) {
+    Write-NucleusError 'resize requires a VM name and a size (e.g. "nucleus-vm resize NixOS 64GB")'
+    exit 1
+  }
+
+  $vmName = $SubcommandArgs[0]
+  $sizeArg = $SubcommandArgs[1]
+  $allowShrink = $false
+  for ($i = 2; $i -lt $SubcommandArgs.Length; $i++) {
+    switch ($SubcommandArgs[$i]) {
+      '--allow-shrink' { $allowShrink = $true }
+      default { Write-NucleusWarning "ignoring unknown flag for resize: $($SubcommandArgs[$i])" }
+    }
+  }
+
+  $manifest = Get-VmManifest
+  $vm = $manifest.VMs | Where-Object { $_.id -eq $vmName }
+  if (-not $vm) {
+    Write-NucleusError "VM '$vmName' not found in manifest"
+    exit 1
+  }
+
+  $diskBytes = ConvertFrom-SizeString $sizeArg
+
+  $vmDir = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
+  $diskPath = Join-Path -Path $vmDir -ChildPath 'data' -AdditionalChildPath "$vmName.qcow2"
+  if (-not (Test-Path -LiteralPath $diskPath -PathType Leaf)) {
+    Write-NucleusError "writable disk not found at $diskPath; run 'nucleus-vm setup' first"
+    exit 1
+  }
+
+  if ($vmName -in (Get-VmRunningNameList)) {
+    Write-NucleusError "VM '$vmName' is running; stop it before resizing"
+    exit 1
+  }
+
+  # Locate qemu-img from the Scoop-managed QEMU installation (or PATH).
+  $scoopQemuDir = Join-Path $env:USERPROFILE 'scoop\apps\qemu\current'
+  $qemuImg = Join-Path $scoopQemuDir 'qemu-img.exe'
+  if (-not (Test-Path $qemuImg)) {
+    # check-suppress:suppression_doc: probe whether qemu-img is on PATH; Get-Command throws when absent.
+    $qemuImgInPath = Get-Command qemu-img -ErrorAction SilentlyContinue
+    if ($qemuImgInPath) {
+      $qemuImg = $qemuImgInPath.Source
+    } else {
+      $qemuImg = $null
+    }
+  }
+  if (-not $qemuImg) {
+    Write-NucleusError "qemu-img not found; install QEMU via Scoop (scoop install qemu) or add it to PATH"
+    exit 1
+  }
+
+  $oldBytes = [long]((& $qemuImg info --output=json $diskPath | Out-String) | ConvertFrom-Json).'virtual-size'
+  if ($diskBytes -le $oldBytes -and -not $allowShrink) {
+    Write-NucleusError "shrink requires --allow-shrink (current $oldBytes bytes, target $diskBytes bytes)"
+    exit 1
+  }
+
+  $qemuArgs = @()
+  if ($diskBytes -lt $oldBytes) { $qemuArgs += '--shrink' }
+  & $qemuImg resize @qemuArgs $diskPath $diskBytes
+  if ($LASTEXITCODE -ne 0) {
+    Write-NucleusError "failed to resize $diskPath to $diskBytes bytes"
+    exit 1
+  }
+
+  Write-NucleusInfo "resized '$vmName' disk: $oldBytes -> $diskBytes bytes"
+}
+
 function Invoke-VmGc {
   $module = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
   if (-not (Test-Path $module)) {
@@ -351,5 +424,6 @@ switch ($Action) {
   'stop'    { Invoke-VmStop }
   'upgrade' { Invoke-VmUpgrade }
   'reset'   { Invoke-VmReset }
+  'resize'  { Invoke-VmResize }
   'gc'      { Invoke-VmGc }
 }

@@ -977,6 +977,52 @@ let
     && (lib.hasInfix "if ! resize_and_mark_image \"$_out\" \"$_marker\" \"$_disk_bytes\"; then" vm_setup_sh_text)
   ) "scripts/vm.sh must resize generated NixOS qcow2 images to the exact manifest disk byte count";
 
+  # The runtime resize path must be grow-only: resize_and_mark_image only
+  # grows when the current virtual size is below the requested size, and
+  # vm_resize_vm refuses to shrink without --allow-shrink (never destroys
+  # data by default).  The writable disk is always data/<id>.qcow2 — for
+  # Android that disk IS the userdata image, so resizing it resizes the
+  # user's data disk.
+  test_vm_resize_grow_only_and_guard =
+    assert'
+      (
+        (lib.hasInfix "if [ \"$_rmi_current_size\" -lt \"$_rmi_disk_bytes\" ]; then" vm_setup_sh_text)
+        && (lib.hasInfix "vm_resize_vm() {" vm_setup_sh_text)
+        && (lib.hasInfix "_rvm_disk=\"$VM_DIR/data/\${_rvm_name}.qcow2\"" vm_setup_sh_text)
+        && (lib.hasInfix "shrink requires --allow-shrink" vm_setup_sh_text)
+        && (lib.hasInfix "_rvm_qemu_args=(--shrink)" vm_setup_sh_text)
+        && (lib.hasInfix "vm_get_running_names" vm_setup_sh_text)
+      )
+      "scripts/vm.sh must resize grow-only: resize_and_mark_image never shrinks, vm_resize_vm guards shrink with --allow-shrink, rejects running VMs, and targets data/<id>.qcow2";
+
+  # The resize subcommand must be wired into the CLI: usage synopsis,
+  # dispatch, size parsing via parse_size, and the --allow-shrink flag.
+  test_vm_resize_cli_subcommand =
+    assert'
+      (
+        (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize [vm...] [options]" vm_setup_sh_text)
+        && (lib.hasInfix "resize <vm> <size>" vm_setup_sh_text)
+        && (lib.hasInfix "--allow-shrink) allow_shrink=true" vm_setup_sh_text)
+        && (lib.hasInfix "do_resize() {" vm_setup_sh_text)
+        && (lib.hasInfix "disk_bytes=\"\$(parse_size \"$size_arg\")\" || exit 1" vm_setup_sh_text)
+        && (lib.hasInfix "vm_resize_vm \"$vm_name\" \"$disk_bytes\" \"$allow_shrink\"" vm_setup_sh_text)
+        && (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize) \"do_$action\" ;;") vm_setup_sh_text
+      )
+      "scripts/vm.sh must wire the resize subcommand (usage, dispatch, parse_size, --allow-shrink) to vm_resize_vm";
+
+  # The Windows twin must mirror the resize subcommand: ValidateSet, dispatch,
+  # Invoke-VmResize with --allow-shrink, and ConvertFrom-SizeString parsing.
+  test_vm_resize_windows_twin =
+    assert'
+      (
+        (lib.hasInfix "reset', 'resize', 'gc'" vm_ps1_text)
+        && (lib.hasInfix "'resize'  { Invoke-VmResize }" vm_ps1_text)
+        && (lib.hasInfix "function Invoke-VmResize {" vm_ps1_text)
+        && (lib.hasInfix "'--allow-shrink' { $allowShrink = $true }" vm_ps1_text)
+        && (lib.hasInfix "ConvertFrom-SizeString $sizeArg" vm_ps1_text)
+      )
+      "scripts/vm.ps1 must mirror the resize subcommand (ValidateSet, dispatch, Invoke-VmResize, --allow-shrink)";
+
   # The Packer failure branch for the macOS build must print a human-readable
   # error and return the captured exit code.
   test_macos_packer_failure_message = assert' (lib.hasInfix "Packer build for macOS VM" vm_setup_sh_text) "scripts/vm.sh must print a failure message for a failed macOS Packer build";
@@ -2021,6 +2067,9 @@ let
     test_identity_uuid_vectors
     test_identity_mac_vectors
     test_macbook_identity_from_shared_lib
+    test_vm_resize_grow_only_and_guard
+    test_vm_resize_cli_subcommand
+    test_vm_resize_windows_twin
   ];
 
 in
@@ -2170,6 +2219,9 @@ in
     test_identity_uuid_vectors
     test_identity_mac_vectors
     test_macbook_identity_from_shared_lib
+    test_vm_resize_grow_only_and_guard
+    test_vm_resize_cli_subcommand
+    test_vm_resize_windows_twin
     ;
 
   summary = builtins.deepSeq all_tests "vm-setup-tests: all tests passed";

@@ -160,7 +160,7 @@ vm_guest_credentials_hash() {
 # ---------------------------------------------------------------------------
 
 usage() {
-  usage_std "$(basename "$0")" "setup|list|status|start|stop|upgrade|reset|gc [vm...] [options]"
+  usage_std "$(basename "$0")" "setup|list|status|start|stop|upgrade|reset|gc|resize [vm...] [options]"
   cat <<'EOF'
   setup                    Build images and provision VMs (full lifecycle).
   list                     List all VMs from manifest with runtime status.
@@ -169,6 +169,9 @@ usage() {
   stop <vm>                Stop a VM.
   upgrade <vm>             Re-download+replace OS image (Android only; error for others).
   reset <vm>               Factory-reset VM user state (Android only; error for others).
+  resize <vm> <size>       Grow-only resize of the writable disk (data/<vm>.qcow2)
+                          to an explicit size (e.g. 64GB). Pass --allow-shrink to
+                          shrink instead.
   gc                       Remove stale VM artifacts (non-provisioned VMs, disks, markers).
                           Default GC preserves disabled VM entries; pass --gc-disabled
                           to clear them too.
@@ -188,6 +191,7 @@ usage() {
   --force                       Recreate invalid runtime overlays during setup
                                 (default: off; invalid overlays are skipped
                                 with a pointer to 'nucleus-vm reset <vm>').
+  --allow-shrink                Allow shrinking during resize (default: off).
   --vm-dir-override PATH        Override the default ~/virtual machines path.
   --mido-patch-file PATH        Override runtime Mido patch file path.
   --mido-script PATH            Override the Mido script path.
@@ -213,6 +217,7 @@ accelerator=''
 gc_mode=false
 gc_disabled_mode=false
 force=false
+allow_shrink=false
 vm_dir_override=''
 NUCLEUS_MIDO_PATCH_FILE=''
 NUCLEUS_MIDO_SCRIPT=''
@@ -244,12 +249,13 @@ while [ "$#" -gt 0 ]; do
     --gc-disabled) gc_disabled_mode=true; shift ;;
     --no-gc-disabled) gc_disabled_mode=false; shift ;;
     --force) force=true; shift ;;
+    --allow-shrink) allow_shrink=true; shift ;;
     --vm-dir-override) vm_dir_override="$2"; shift 2 ;;
     --mido-patch-file) NUCLEUS_MIDO_PATCH_FILE="$2"; shift 2 ;;
     --mido-script) NUCLEUS_MIDO_SCRIPT="$2"; shift 2 ;;
     --json) json_output=true; shift ;;
     --repo-root) repo_root_override="$2"; shift 2 ;;
-    setup|list|status|start|stop|upgrade|reset|gc)
+    setup|list|status|start|stop|upgrade|reset|gc|resize)
       action="$1"; shift
       vm_args=("$@")
       break
@@ -272,6 +278,7 @@ for arg in "${vm_args[@]}"; do
     --gc-disabled) gc_disabled_mode=true ;;
     --no-gc-disabled) gc_disabled_mode=false ;;
     --force) force=true ;;
+    --allow-shrink) allow_shrink=true ;;
     --accept-gsi-license) accept_gsi_license=true ;;
     --no-accept-gsi-license) accept_gsi_license=false ;;
     --headful) windows_headless=false ;;
@@ -282,7 +289,7 @@ for arg in "${vm_args[@]}"; do
   esac
 done
 
-[ -z "$action" ] && { error "missing action (setup, list, status, start, stop, upgrade, reset, gc)" ; usage >&2 ; exit 1; }
+[ -z "$action" ] && { error "missing action (setup, list, status, start, stop, upgrade, reset, gc, resize)" ; usage >&2 ; exit 1; }
 
 # Validate scalars
 # WHY: validating before dispatch fails fast with a precise message instead
@@ -823,6 +830,36 @@ do_reset() {
   say "reset complete for '$vm_name'"
 }
 
+# do_resize
+#   Grows (or with --allow-shrink shrinks) a VM's writable disk to an
+#   explicit byte count.  WHY: the disk's virtual size can only be changed
+#   by resizing the image itself; shrinking can destroy data beyond the new
+#   end, so it requires the explicit --allow-shrink opt-in.
+do_resize() {
+  REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
+  resolve_manifest
+  NUCLEUS_HOST="$(resolve_nucleus_host)"
+  require_command jq
+  require_command qemu-img
+
+  if [ "${#filtered_vm_args[@]}" -ne 2 ]; then
+    error "resize requires a VM name and a size (e.g. 'nucleus-vm resize NixOS 64GB')"
+    usage >&2
+    exit 1
+  fi
+
+  local vm_name="${filtered_vm_args[0]}"
+  local size_arg="${filtered_vm_args[1]}"
+  local disk_bytes
+  disk_bytes="$(parse_size "$size_arg")" || exit 1
+
+  VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
+  IMAGES_DIR="$VM_DIR/images"
+
+  vm_resize_vm "$vm_name" "$disk_bytes" "$allow_shrink"
+  nuc_done
+}
+
 # do_gc
 #   Removes stale VM artifacts: non-provisioned VMs, leftover disks, and
 #   generation markers. WHY: GC is opt-in (--gc) rather than automatic
@@ -846,5 +883,5 @@ do_gc() {
 # ---------------------------------------------------------------------------
 
 case "$action" in
-  setup|list|status|start|stop|upgrade|reset|gc) "do_$action" ;;
+  setup|list|status|start|stop|upgrade|reset|gc|resize) "do_$action" ;;
 esac

@@ -303,12 +303,139 @@ EOF
   assert_eq "33554432" "$_virtual_size" "overlay not shrunk when manifest disk size decreased"
 }
 
+# test_resize_vm
+#   Sandboxed qemu-img tests for vm_resize_vm: grow allowed by default,
+#   shrink rejected without --allow-shrink, shrink allowed with the flag,
+#   running-VM rejection, and Android resizing data/<id>.qcow2.
+test_resize_vm() {
+  local _vm_dir="$_tmp/resize/vm" _images_dir="$_tmp/resize/vm/images" _vms_dir="$_tmp/resize/vms"
+  local _manifest="$_tmp/resize/manifest.json"
+  local _disk _old_size _new_size
+
+  mkdir -p "$_vm_dir" "$_images_dir" "$_vms_dir" "$_vm_dir/data"
+
+  cat > "$_manifest" <<'EOF'
+{
+  "VMs": [
+    {
+      "id": "Android",
+      "name": "Android",
+      "type": "Android",
+      "enabled": true,
+      "hosts": ["MacBook", "NixOS", "Windows"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "portForwards": [],
+      "macAddressPrefix": "52",
+      "Android": {"systemImage": "Android-system.qcow2", "userdataImage": "Android.qcow2", "gsiImage": "Android-gsi.img", "gsiUrl": "https://example.invalid/gsi.zip"}
+    },
+    {
+      "id": "NixOS",
+      "name": "NixOS",
+      "type": "NixOS",
+      "enabled": false,
+      "hosts": ["NixOS"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "portForwards": [],
+      "macAddressPrefix": "52"
+    }
+  ]
+}
+EOF
+
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+    "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
+    "$_vms_dir" "$_manifest" "NixOS" "false" "false"
+
+  # Grow allowed.
+  _disk="$_vm_dir/data/NixOS.qcow2"
+  qemu-img create -f qcow2 "$_disk" 16M >/dev/null
+  _old_size="$(qemu-img info --output=json "$_disk" | jq -r '."virtual-size" // 0')"
+  vm_resize_vm NixOS 33554432 false >/dev/null 2>&1
+  _new_size="$(qemu-img info --output=json "$_disk" | jq -r '."virtual-size" // 0')"
+  assert_eq "33554432" "$_new_size" "resize grows disk to target"
+
+  # Shrink rejected without flag.
+  if vm_resize_vm NixOS 16777216 false >/dev/null 2>&1; then
+    echo "FAIL: shrink without --allow-shrink should fail"
+    _failures=$((_failures + 1))
+  fi
+  _new_size="$(qemu-img info --output=json "$_disk" | jq -r '."virtual-size" // 0')"
+  assert_eq "33554432" "$_new_size" "disk unchanged after rejected shrink"
+
+  # Shrink allowed with flag.
+  vm_resize_vm NixOS 16777216 true >/dev/null 2>&1
+  _new_size="$(qemu-img info --output=json "$_disk" | jq -r '."virtual-size" // 0')"
+  assert_eq "16777216" "$_new_size" "resize shrinks disk with --allow-shrink"
+
+  # Running VM rejection.
+  # shellcheck disable=SC2329 # reason: stub invoked indirectly by vm_resize_vm's running-VM guard; shellcheck cannot trace the call
+  vm_get_running_names() { printf 'NixOS\n'; }
+  if vm_resize_vm NixOS 33554432 false >/dev/null 2>&1; then
+    echo "FAIL: resize while running should fail"
+    _failures=$((_failures + 1))
+  fi
+  _new_size="$(qemu-img info --output=json "$_disk" | jq -r '."virtual-size" // 0')"
+  assert_eq "16777216" "$_new_size" "disk unchanged while VM running"
+  # shellcheck disable=SC2329 # reason: stub restored to empty after indirect use by vm_resize_vm
+  vm_get_running_names() { printf ''; }
+
+  # Android userdata resize targets data/<id>.qcow2.
+  _disk="$_vm_dir/data/Android.qcow2"
+  qemu-img create -f qcow2 "$_disk" 16M >/dev/null
+  vm_resize_vm Android 33554432 false >/dev/null 2>&1
+  _new_size="$(qemu-img info --output=json "$_disk" | jq -r '."virtual-size" // 0')"
+  assert_eq "33554432" "$_new_size" "Android resize targets data/Android.qcow2"
+
+  # Unknown VM rejected.
+  if vm_resize_vm Missing 16777216 false >/dev/null 2>&1; then
+    echo "FAIL: resize of unknown VM should fail"
+    _failures=$((_failures + 1))
+  fi
+}
+
+# test_resize_and_mark_image_grow_only
+#   resize_and_mark_image grows to DISK_BYTES but never shrinks below the
+#   current virtual size.
+test_resize_and_mark_image_grow_only() {
+  local _vm_dir="$_tmp/rmi/vm" _images_dir="$_tmp/rmi/vm/images" _vms_dir="$_tmp/rmi/vms"
+  local _manifest="$_tmp/rmi/manifest.json"
+  local _img _marker _virtual_size
+
+  mkdir -p "$_vm_dir" "$_images_dir" "$_vms_dir"
+
+  cat > "$_manifest" <<'EOF'
+{ "VMs": [] }
+EOF
+
+  vm_guest_credentials_fingerprint="test-fingerprint"
+
+  _img="$_images_dir/Test.qcow2"
+  _marker="$_images_dir/Test.vm-guest-credentials-sha256"
+  qemu-img create -f qcow2 "$_img" 16M >/dev/null
+
+  resize_and_mark_image "$_img" "$_marker" 33554432
+  _virtual_size="$(qemu-img info --output=json "$_img" | jq -r '."virtual-size" // 0')"
+  assert_eq "33554432" "$_virtual_size" "resize_and_mark_image grows to DISK_BYTES"
+  assert_eq "test-fingerprint" "$(tr -d '\r\n' <"$_marker")" "marker written after grow"
+
+  resize_and_mark_image "$_img" "$_marker" 16777216
+  _virtual_size="$(qemu-img info --output=json "$_img" | jq -r '."virtual-size" // 0')"
+  assert_eq "33554432" "$_virtual_size" "resize_and_mark_image never shrinks"
+  assert_eq "test-fingerprint" "$(tr -d '\r\n' <"$_marker")" "marker rewritten after no-op resize"
+}
+
 test_uuid_vectors
 test_mac_vectors
 test_deterministic
 test_real_helper_vectors
 test_descriptor_writer
 test_base_overlay_provisioning
+test_resize_vm
+test_resize_and_mark_image_grow_only
 
 if [ "$_failures" -eq 0 ]; then
   echo "vm-disk-model-tests: all checks passed"
