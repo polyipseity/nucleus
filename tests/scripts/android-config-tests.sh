@@ -164,18 +164,71 @@ test_no_flags_prints_manual() {
   fi
 }
 
-test_root_flag_rejected() {
+test_root_enables_debuggable_and_root_access() {
   setup_fixture
-  set +e
-  vm_android_config Android 0 --root 2>"$_tmp/err.txt"
-  _af_status=$?
-  set -e
-  if [ "$_af_status" -eq 0 ]; then
-    echo "FAIL: --root should be rejected in favor of --magisk"
+  _af_shell_log="$_tmp/shell.log"
+  : > "$_af_shell_log"
+  _af_root_attempts=0
+  _af_bin="$_tmp/bin"
+  mkdir -p "$_af_bin"
+  cat > "$_af_bin/adb" <<EOF
+#!/usr/bin/env bash
+case "\$*" in
+  *disconnect*) exit 0 ;;
+  *devices*) printf '%s\n' 'List of devices attached' 'localhost:22040	device' '' ;;
+  *connect*) exit 0 ;;
+  *get-state*) printf 'device\n' ;;
+  *' root')
+    _af_root_attempts=\$((_af_root_attempts + 1))
+    echo "root \$*" >> "$_af_shell_log"
+    exit 0
+    ;;
+  *shell*settings*) echo "settings \$*" >> "$_af_shell_log"; exit 0 ;;
+  *shell*su\ -c*pm\ path*) echo "su \$*" >> "$_af_shell_log"; printf 'package:/system/app/Terminal/Terminal.apk\n'; exit 0 ;;
+  *shell*su\ -c*com.android.terminal*) echo "su \$*" >> "$_af_shell_log"; printf '1\n'; exit 0 ;;
+  *shell*su\ -c*resetprop*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
+  *shell*su\ -c*nucleus-root-props*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
+  *shell*su\ -c*service.d*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
+  *shell*su\ -c*magiskpolicy*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
+  *shell*su\ -c*) echo "su \$*" >> "$_af_shell_log"; printf '0\n'; exit 0 ;;
+  *shell*id*) printf '0\n'; exit 0 ;;
+  *shell*setprop*) echo "setprop \$*" >> "$_af_shell_log"; exit 0 ;;
+  *push*) exit 0 ;;
+  *shell*) exit 0 ;;
+esac
+exit 0
+EOF
+  chmod +x "$_af_bin/adb"
+  cat > "$_af_bin/fastboot" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "$_af_bin/fastboot"
+  PATH="$_af_bin:$PATH"
+  export PATH
+
+  if ! vm_android_config Android 0 --root >"$_tmp/out.txt" 2>&1; then
+    echo "FAIL: --root should succeed when Magisk su and adb root are available"
     _failures=$((_failures + 1))
   fi
-  if ! grep -q -- '--magisk' "$_tmp/err.txt"; then
-    echo "FAIL: --root rejection should mention --magisk"
+  if ! grep -q 'settings put global development_settings_enabled' "$_af_shell_log"; then
+    echo "FAIL: --root should enable Developer options via settings put global"
+    _failures=$((_failures + 1))
+  fi
+  if ! grep -q 'com.android.terminal' "$_af_shell_log"; then
+    echo "FAIL: --root should enable Local terminal (com.android.terminal)"
+    _failures=$((_failures + 1))
+  fi
+  if ! grep -q 'resetprop ro.debuggable 1' "$_af_shell_log"; then
+    echo "FAIL: --root should apply resetprop ro.debuggable 1"
+    _failures=$((_failures + 1))
+  fi
+  if ! grep -q 'nucleus-root-props.sh' "$_af_shell_log"; then
+    echo "FAIL: --root should persist nucleus-root-props.sh in service.d"
+    _failures=$((_failures + 1))
+  fi
+  if ! grep -q 'adb root ready' "$_tmp/out.txt"; then
+    echo "FAIL: --root should report adb root ready"
     _failures=$((_failures + 1))
   fi
 }
@@ -496,6 +549,7 @@ EOF
 test_android_config_magisk_configures_existing_su() {
   setup_fixture
   _af_shell_log="$_tmp/shell.log"
+  : > "$_af_shell_log"
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"
   cat > "$_af_bin/adb" <<EOF
@@ -531,16 +585,16 @@ EOF
     echo "FAIL: --magisk should succeed when Magisk su is already available"
     _failures=$((_failures + 1))
   fi
-  if ! grep -q 'settings put global adb_enabled' "$_af_shell_log"; then
-    echo "FAIL: --magisk should enable USB debugging via settings put global"
+  if grep -q 'settings put global adb_enabled' "$_af_shell_log"; then
+    echo "FAIL: --magisk must not enable USB debugging (use --root instead)"
     _failures=$((_failures + 1))
   fi
-  if ! grep -q 'Magisk su ready' "$_tmp/out.txt"; then
-    echo "FAIL: --magisk should report Magisk su ready"
+  if ! grep -q 'Magisk installed' "$_tmp/out.txt"; then
+    echo "FAIL: --magisk should report Magisk installed"
     _failures=$((_failures + 1))
   fi
-  if grep -q 'nucleus-adb-root' "$_tmp/out.txt" || grep -q 'adb root' "$_tmp/out.txt"; then
-    echo "FAIL: --magisk must not install or enable adb root on user builds"
+  if grep -q 'nucleus-adb-root' "$_tmp/out.txt" || grep -q 'nucleus-root-props' "$_af_shell_log" || grep -q 'adb root' "$_af_shell_log"; then
+    echo "FAIL: --magisk must not install root props or enable adb root"
     _failures=$((_failures + 1))
   fi
 }
@@ -638,7 +692,7 @@ test_adb_list_state_unauthorized
 test_wait_authorized_fails_on_unauthorized
 test_wait_recovery_succeeds_on_recovery
 test_no_flags_prints_manual
-test_root_flag_rejected
+test_root_enables_debuggable_and_root_access
 test_gapps_rejects_booted_device_state
 test_gapps_unauthorized_flashes_recovery
 test_gapps_sideload_path
