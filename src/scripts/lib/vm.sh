@@ -1370,7 +1370,7 @@ vm_android_fastboot_probe() {
   _afp_getvar="$2"
   _afp_out=''
 
-  _afp_out="$(run_command_with_timeout 8 fastboot -s "$_afp_serial" getvar "$_afp_getvar" 2>/dev/null)" || return 1
+  _afp_out="$(run_command_with_timeout 8 fastboot -s "$_afp_serial" getvar "$_afp_getvar" 2>&1)" || return 1
   printf '%s' "$_afp_out" | grep -q "^${_afp_getvar}:"
 }
 
@@ -1504,6 +1504,69 @@ vm_android_adb_wait_authorized() {
   return 1
 }
 
+# vm_android_guest_boot_completed VM_INDEX
+#   True when the booted guest reports sys.boot_completed=1.
+vm_android_guest_boot_completed() {
+  _agbc_vm_index="$1"
+
+  if [ "$(vm_android_adb_poll_state "$_agbc_vm_index")" != "device" ]; then
+    return 1
+  fi
+
+  [ "$(vm_android_shell_getprop "$_agbc_vm_index" sys.boot_completed)" = "1" ]
+}
+
+# vm_android_adb_wait_boot_completed VM_INDEX [TIMEOUT]
+#   Wait until adb is authorized and sys.boot_completed=1 (safe for pm/adb install).
+vm_android_adb_wait_boot_completed() {
+  _awbc_vm_index="$1"
+  _awbc_timeout="${2:-600}"
+  _awbc_serial="$(vm_android_adb_serial "$_awbc_vm_index")"
+  _awbc_elapsed=0
+  _awbc_last_hint=-30
+
+  say "waiting for booted guest on $_awbc_serial (timeout ${_awbc_timeout}s)..."
+
+  while [ "$_awbc_elapsed" -lt "$_awbc_timeout" ]; do
+    _awbc_state="$(vm_android_adb_poll_state "$_awbc_vm_index")"
+    case "$_awbc_state" in
+      device)
+        if vm_android_guest_boot_completed "$_awbc_vm_index"; then
+          return 0
+        fi
+        if [ "$_awbc_elapsed" -ge "$((_awbc_last_hint + 30))" ]; then
+          say "guest ADB is up but still booting (waiting for sys.boot_completed=1)..."
+          _awbc_last_hint="$_awbc_elapsed"
+        fi
+        ;;
+      unauthorized)
+        if [ "$_awbc_elapsed" -ge "$((_awbc_last_hint + 30))" ]; then
+          say "ADB unauthorized — boot LineageOS, enable USB debugging, and tap Allow on the device"
+          _awbc_last_hint="$_awbc_elapsed"
+        fi
+        ;;
+      recovery|sideload)
+        if [ "$_awbc_elapsed" -ge "$((_awbc_last_hint + 30))" ]; then
+          say "guest is in $_awbc_state; boot LineageOS system for this step (Reboot system now from recovery)"
+          _awbc_last_hint="$_awbc_elapsed"
+        fi
+        ;;
+    esac
+    sleep 5
+    _awbc_elapsed=$((_awbc_elapsed + 5))
+  done
+
+  _awbc_final="$(vm_android_adb_poll_state "$_awbc_vm_index")"
+  if [ "$_awbc_final" = "unauthorized" ]; then
+    error "timed out waiting for booted guest on $_awbc_serial; tap Allow USB debugging"
+  elif [ "$_awbc_final" = "device" ]; then
+    error "timed out waiting for boot completion on $_awbc_serial (sys.boot_completed never became 1)"
+  else
+    error "timed out waiting for booted guest on $_awbc_serial (state: $_awbc_final)"
+  fi
+  return 1
+}
+
 # vm_android_adb_wait_sideload VM_INDEX [TIMEOUT]
 #   Wait until ADB reports sideload (refreshes the TCP session each poll).
 vm_android_adb_wait_sideload() {
@@ -1560,6 +1623,49 @@ vm_android_adb_connect() {
     _aac_elapsed=$((_aac_elapsed + 5))
   done
   return 1
+}
+
+# vm_android_shell_getprop VM_INDEX NAME
+#   Return a trimmed getprop value from the guest, or empty when unavailable.
+vm_android_shell_getprop() {
+  _asgp_vm_index="$1"
+  _asgp_name="$2"
+  _asgp_serial="$(vm_android_adb_serial "$_asgp_vm_index")"
+  adb -s "$_asgp_serial" shell getprop "$_asgp_name" 2>/dev/null | tr -d '\r\n'
+}
+
+# vm_android_adb_ensure_root VM_INDEX
+#   Restart adbd as root when the guest allows it; return 0 when shell uid is 0.
+vm_android_adb_ensure_root() {
+  _aer_vm_index="$1"
+  _aer_serial="$(vm_android_adb_serial "$_aer_vm_index")"
+  _aer_attempt=0
+
+  if adb -s "$_aer_serial" shell 'id -u' 2>/dev/null | tr -d '\r' | grep -qx '0'; then
+    return 0
+  fi
+
+  while [ "$_aer_attempt" -lt 3 ]; do
+    adb -s "$_aer_serial" root 2>/dev/null || true
+    sleep 3
+    vm_android_adb_refresh "$_aer_vm_index"
+    if adb -s "$_aer_serial" shell 'id -u' 2>/dev/null | tr -d '\r' | grep -qx '0'; then
+      return 0
+    fi
+    _aer_attempt=$((_aer_attempt + 1))
+  done
+  return 1
+}
+
+# vm_android_recovery_prepare_adb VM_INDEX
+#   Restart adbd as root in userdebug recovery (Advanced → Enable ADB must be on).
+vm_android_recovery_prepare_adb() {
+  _arpa_vm_index="$1"
+  _arpa_serial="$(vm_android_adb_serial "$_arpa_vm_index")"
+
+  adb -s "$_arpa_serial" root 2>/dev/null || true
+  sleep 2
+  vm_android_adb_refresh "$_arpa_vm_index"
 }
 
 # vm_android_recovery_asset_suffix VM_INDEX
@@ -1671,16 +1777,20 @@ vm_android_download_userdebug_recovery() {
 }
 
 # vm_android_guest_has_userdebug_recovery VM_INDEX
-#   True when recovery/sideload ADB reports ro.debuggable=1 (guest has userdebug recovery).
+#   True when recovery/sideload ADB reports a userdebug/eng build (LineageOS 23 sets ro.debuggable=0).
 vm_android_guest_has_userdebug_recovery() {
   _aghur_vm_index="$1"
-  _aghur_serial="$(vm_android_adb_serial "$_aghur_vm_index")"
   _aghur_state="$(vm_android_adb_poll_state "$_aghur_vm_index")"
+  _aghur_build_type=''
   _aghur_debuggable=''
 
   case "$_aghur_state" in
     recovery|sideload)
-      _aghur_debuggable="$(adb -s "$_aghur_serial" shell getprop ro.debuggable 2>/dev/null | tr -d '\r\n')"
+      _aghur_build_type="$(vm_android_shell_getprop "$_aghur_vm_index" ro.build.type)"
+      _aghur_debuggable="$(vm_android_shell_getprop "$_aghur_vm_index" ro.debuggable)"
+      case "$_aghur_build_type" in
+        userdebug|eng) return 0 ;;
+      esac
       [ "$_aghur_debuggable" = "1" ] && return 0
       ;;
   esac
@@ -1703,7 +1813,9 @@ vm_android_ensure_userdebug_recovery() {
   if [ "$(vm_android_fastboot_list_state "$_aeur_vm_index")" = "fastboot" ]; then
     say "guest already in fastboot on $_aeur_fb_serial"
   elif vm_android_guest_has_userdebug_recovery "$_aeur_vm_index"; then
-    say "userdebug recovery is active on the guest (ro.debuggable=1)"
+    _aeur_build_type="$(vm_android_shell_getprop "$_aeur_vm_index" ro.build.type)"
+    _aeur_debuggable="$(vm_android_shell_getprop "$_aeur_vm_index" ro.debuggable)"
+    say "userdebug recovery is active on the guest (ro.build.type=${_aeur_build_type:-unknown}, ro.debuggable=${_aeur_debuggable:-0})"
     return 0
   else
     say "flashing userdebug recovery for MindTheGapps sideload..."
