@@ -3,9 +3,10 @@
   Unified VM management for Windows.
 
 .DESCRIPTION
-  Subcommands: setup, list, status, start, stop, upgrade, reset, resize, gc, pack, unpack.
+  Subcommands: setup, sync, list, status, start, stop, upgrade, reset, resize, gc, pack, unpack.
 
-  setup:   Build VM images (if needed) and provision VMs.
+  sync:    Refresh VM config (descriptors, start/stop scripts). Non-destructive.
+  setup:   Full provision: config sync + image build + disk setup.
            Delegates to Invoke-VMSetup.ps1 (phase 1: Packer build,
            phase 2: QEMU start scripts + disk images).
   list:    List VMs from the manifest.
@@ -60,7 +61,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('setup', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'resize', 'gc', 'pack', 'unpack')]
+  [ValidateSet('setup', 'sync', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'resize', 'gc', 'pack', 'unpack')]
   [string]$Action,
 
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
@@ -80,7 +81,7 @@ $modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-Nucle
 Import-Module $modulePath -Force -DisableNameChecking
 
 if ($Help -or -not $Action) {
-  if (-not $Action) { Write-NucleusError "missing action (setup, list, status, start, stop, upgrade, reset, resize, gc, pack, unpack)" }
+  if (-not $Action) { Write-NucleusError "missing action (setup, sync, list, status, start, stop, upgrade, reset, resize, gc, pack, unpack)" }
   Get-Help $PSCommandPath -Detailed
   exit 0
 }
@@ -104,6 +105,41 @@ function Get-VmManifest {
 # ---------------------------------------------------------------------------
 # Subcommand implementations
 # ---------------------------------------------------------------------------
+
+function Invoke-VmSync {
+  $module = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
+  if (-not (Test-Path $module)) {
+    Write-NucleusWarning "Invoke-VMSetup module not found at $module"
+    exit 1
+  }
+  . $module
+
+  $invokeArgs = @{ RepoRoot = $RepoRoot }
+  $i = 0
+  while ($i -lt $SubcommandArgs.Length) {
+    switch ($SubcommandArgs[$i]) {
+      '--vm-dir-override' {
+        $i++
+        if ($i -ge $SubcommandArgs.Length) {
+          Write-NucleusError '--vm-dir-override requires a path argument'
+          exit 1
+        }
+        $env:VM_DIR_OVERRIDE = $SubcommandArgs[$i]
+      }
+      '--dry-run' { $invokeArgs['DryRun'] = $true }
+      '--help' {
+        Get-Help $PSCommandPath -Detailed
+        exit 0
+      }
+      default {
+        Write-NucleusWarning "ignoring unknown flag for sync: $($SubcommandArgs[$i])"
+      }
+    }
+    $i++
+  }
+
+  Invoke-VMSync @invokeArgs
+}
 
 function Invoke-VmSetup {
   $module = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
@@ -653,6 +689,7 @@ function Write-VmUnpackFile {
 
 switch ($Action) {
   'setup'   { Invoke-VmSetup }
+  'sync'    { Invoke-VmSync }
   'list'    { Invoke-VmList }
   'status'  { Invoke-VmStatus }
   'start'   { Invoke-VmStart }

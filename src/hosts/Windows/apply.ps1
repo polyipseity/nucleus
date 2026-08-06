@@ -166,10 +166,13 @@
   already converges replicas.
 
 .PARAMETER VMSetup
-  When specified, runs the post-apply VM provisioning step to create QCOW2
-  disk images and QEMU start scripts for VMs declared in src/modules/VMs.json.
-  Skipped by default because disk pre-allocation is slow and only required on
-  the first provision of a new machine.
+  When specified, runs full post-apply VM provisioning (image build + disk setup).
+  Includes config sync.  Skipped by default because disk pre-allocation is slow.
+
+.PARAMETER NoVMSync
+  When specified, skips the post-apply VM config refresh (descriptors and
+  start/stop scripts).  By default apply runs a lightweight sync after every
+  apply unless -VMSetup is set.
 .PARAMETER MinFreeDiskGB
   Minimum free space threshold (GiB) used by the pre-flight health check.
 
@@ -240,6 +243,7 @@ param(
   [int]$MinFreeDiskGB = 10,
   [switch]$NoAISync,
   [switch]$ReplicaSync,
+  [switch]$NoVMSync,
   [switch]$VMSetup,
   [switch]$Elevated,
   [string]$ParamsJson = ""
@@ -263,6 +267,7 @@ if ($ParamsJson -and (Test-Path $ParamsJson)) {
   $MinFreeDiskGB = [int]$p.MinFreeDiskGB
   $NoAISync = [bool]$p.NoAISync
   $ReplicaSync = [bool]$p.ReplicaSync
+  $NoVMSync = [bool]$p.NoVMSync
   $VMSetup = [bool]$p.VMSetup
   $Elevated = $true
 }
@@ -341,6 +346,7 @@ if (-not $Elevated) {
     MinFreeDiskGB     = $MinFreeDiskGB
     NoAISync         = $NoAISync
     ReplicaSync      = $ReplicaSync
+    NoVMSync         = $NoVMSync
     VMSetup          = $VMSetup
     Elevated         = $true
   }
@@ -924,17 +930,22 @@ if (-not $ReplicaSync) {
   }
 }
 
-# Provision VM disk images and QEMU start scripts for VMs declared in VMs.json.
-# This is best-effort: a VM setup failure should not retroactively fail a
-# completed configuration apply.
-if (-not $VMSetup) {
-  Write-Output "vm-setup: -VMSetup not set; skipping post-apply VM provisioning"
-} else {
-  Write-Output "vm-setup: running post-apply VM provisioning..."
+# Post-apply VM step: full setup (-VMSetup) or lightweight config sync (default).
+if ($VMSetup) {
+  Write-Output "vm-setup: running post-apply VM provisioning (setup)..."
   try {
     Invoke-VMSetup -RepoRoot $repoRoot
   } catch {
     Write-Warning "vm-setup: VM setup incomplete (system apply succeeded): $($_.Exception.Message)"
+  }
+} elseif ($NoVMSync) {
+  Write-Output "vm-sync: -NoVMSync set; skipping post-apply VM config refresh"
+} else {
+  Write-Output "vm-sync: running post-apply VM config refresh..."
+  try {
+    Invoke-VMSync -RepoRoot $repoRoot
+  } catch {
+    Write-Warning "vm-sync: VM sync incomplete (system apply succeeded): $($_.Exception.Message)"
   }
 }
 

@@ -200,7 +200,11 @@ function Invoke-VMSetup {
         # WHY: default GC preserves disabled entries; only names absent from
         # VMs.json entirely are cleared.  -GcDisabled opts into clearing
         # disabled entries too.
-        [switch]$GcDisabled
+        [switch]$GcDisabled,
+
+        # Config-only refresh: descriptors and start/stop scripts.  Skips image
+        # build and disk provisioning.  Used by nucleus-vm sync and apply.
+        [switch]$SyncOnly
     )
 
     $ErrorActionPreference = 'Stop'
@@ -762,24 +766,32 @@ function Invoke-VMSetup {
         $guestCredential = Resolve-VMGuestCredential -RepoRoot $RepoRoot
     }
     catch {
-        Write-Warning $_.Exception.Message
-        return
+        if ($SyncOnly) {
+            Write-Warning $_.Exception.Message
+            Write-Warning 'vm-sync: proceeding without guest credentials'
+            $guestCredential = $null
+        } else {
+            Write-Warning $_.Exception.Message
+            return
+        }
     }
 
-    $guestUsername = $guestCredential.AccountName
-    $guestPassword = $guestCredential.Secret
-    $guestSecretHash = $guestCredential.Hash
+    if ($null -ne $guestCredential) {
+        $guestUsername = $guestCredential.AccountName
+        $guestPassword = $guestCredential.Secret
+        $guestSecretHash = $guestCredential.Hash
 
-    # Export SSH public key for NixOS guest provisioning (guest.nix uses it for authorized_keys).
-    $sshPublicKey = Resolve-VMGuestSshKey
-    if ($null -ne $sshPublicKey) {
-        $env:NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY = $sshPublicKey
-        Write-Information "vm-setup: SSH public key exported for NixOS guest provisioning"
-    } else {
-        Write-Warning "vm-setup: no SSH public key found; NixOS guest will use password auth only"
+        # Export SSH public key for NixOS guest provisioning (guest.nix uses it for authorized_keys).
+        $sshPublicKey = Resolve-VMGuestSshKey
+        if ($null -ne $sshPublicKey) {
+            $env:NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY = $sshPublicKey
+            Write-Information "vm-setup: SSH public key exported for NixOS guest provisioning"
+        } else {
+            Write-Warning "vm-setup: no SSH public key found; NixOS guest will use password auth only"
+        }
+
+        Write-Information "vm-setup: guest credential policy active (owner=$($guestCredential.Owner), username=$guestUsername, source=SOPS)"
     }
-
-    Write-Information "vm-setup: guest credential policy active (owner=$($guestCredential.Owner), username=$guestUsername, source=SOPS)"
 
     if (-not $DryRun) {
         New-Item -ItemType Directory -Path $vmDir     -Force > $null
@@ -819,7 +831,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     # WHPX (Windows Hypervisor Platform) is significantly faster than tcg software
     # emulation and should be used when available.
     # Source: https://learn.microsoft.com/en-us/virtualization/hyper-v-on-windows/user-guide/nested-virtualization
-    if ($Accelerator -eq 'tcg') {
+    if (-not $SyncOnly -and $Accelerator -eq 'tcg') {
         try {
             $whpxFeature = Get-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -ErrorAction Stop
             if ($whpxFeature.State -eq 'Enabled') {
@@ -834,6 +846,64 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             # Source: https://learn.microsoft.com/en-us/powershell/module/dism/get-windowsoptionalfeature
             Write-Information 'vm-setup: cannot detect WHPX (requires elevation); defaulting to tcg'
         }
+    }
+
+    # -------------------------------------------------------------------------
+    # Config sync — descriptors and start/stop scripts (all manifest guests).
+    # Runs before image build; shared with nucleus-vm sync (-SyncOnly).
+    # -------------------------------------------------------------------------
+
+    $scoopQemuDir = Join-Path $env:USERPROFILE 'scoop\apps\qemu\current'
+    $qemuImg = Join-Path $scoopQemuDir 'qemu-img.exe'
+    if (-not (Test-Path $qemuImg)) {
+        # check-suppress:suppression_doc: probe whether qemu-img is on PATH; Get-Command throws when absent.
+        $qemuImgInPath = Get-Command qemu-img -ErrorAction SilentlyContinue
+        if ($qemuImgInPath) {
+            $qemuImg = $qemuImgInPath.Source
+        } else {
+            $qemuImg = $null
+        }
+    }
+
+    $scriptsDir = Join-Path $vmDir 'scripts'
+    if (Test-Path $scriptsDir) {
+        $staleScripts = @(
+            Get-ChildItem -LiteralPath $scriptsDir -File -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -match '^(start|stop)-.+\.(sh|ps1)$' }
+        )
+        foreach ($stale in $staleScripts) {
+            if ($DryRun) {
+                Write-Information "vm-sync: [dry-run] Remove-Item '$($stale.FullName)' -Force"
+            } else {
+                Remove-Item -LiteralPath $stale.FullName -Force
+            }
+        }
+    }
+
+    if (-not $DryRun) {
+        New-Item -ItemType Directory -Path $scriptsDir -Force > $null
+    }
+
+    foreach ($vm in $vmDef.VMs) {
+        Invoke-VmWriteDescriptor -Vm $vm -RepoRoot $RepoRoot
+        Invoke-VmWriteStartHelper -Vm $vm -QemuDir $scoopQemuDir -ScriptsDir $scriptsDir -TemplatesDir $templatesDir
+        Invoke-VmWriteStopHelper -Vm $vm -ScriptsDir $scriptsDir -TemplatesDir $templatesDir
+        Write-Information "vm-sync: VM '$($vm.name)' scripts ready"
+    }
+
+    Invoke-VmWritePackUnpackHelper -ScriptsDir $scriptsDir
+
+    foreach ($vm in $vmDef.VMs) {
+        if (-not (Test-VMEnabled -Vm $vm)) { continue }
+        if (-not (Test-VMHostMatch -Vm $vm)) { continue }
+        if (Test-VmProcessRunning -VmName $vm.id -VmDisplay $vm.name) {
+            Write-Warning "vm-sync: VM '$($vm.id)' is running; stop and restart it for config changes (e.g. port forwards) to take effect"
+        }
+    }
+
+    if ($SyncOnly) {
+        Write-Information 'vm-sync: Windows VM config refresh complete'
+        return
     }
 
     # -------------------------------------------------------------------------
@@ -915,39 +985,11 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     }
 
     # -------------------------------------------------------------------------
-    # Phase 2 — Provision VMs
+    # Phase 2 — Provision VMs (disk provisioning)
     # -------------------------------------------------------------------------
 
-    # Locate qemu-img from the Scoop-managed QEMU installation.
-    $scoopQemuDir = Join-Path $env:USERPROFILE 'scoop\apps\qemu\current'
-    $qemuImg = Join-Path $scoopQemuDir 'qemu-img.exe'
-    if (-not (Test-Path $qemuImg)) {
-        # check-suppress:suppression_doc: probe whether qemu-img is on PATH; Get-Command throws when absent.
-    $qemuImgInPath = Get-Command qemu-img -ErrorAction SilentlyContinue
-        if ($qemuImgInPath) {
-            $qemuImg = $qemuImgInPath.Source
-        } else {
-            $qemuImg = $null
-        }
-    }
-
-    # Prune stale generated per-guest start/stop scripts so removed VMs leave
-    # no orphaned files.  pack/unpack wrappers are regenerated in Pass B.
-    # WHY: the prune is DryRun-guarded (pack/unpack wrappers and any other
-    # non-start/stop scripts in scripts/ are preserved).
-    $scriptsDir = Join-Path $vmDir 'scripts'
-    if (Test-Path $scriptsDir) {
-        $staleScripts = @(
-            Get-ChildItem -LiteralPath $scriptsDir -File -ErrorAction SilentlyContinue |
-                Where-Object { $_.Name -match '^(start|stop)-.+\.(sh|ps1)$' }
-        )
-        foreach ($stale in $staleScripts) {
-            if ($DryRun) {
-                Write-Information "vm-setup: [dry-run] Remove-Item '$($stale.FullName)' -Force"
-            } else {
-                Remove-Item -LiteralPath $stale.FullName -Force
-            }
-        }
+    if (-not $DryRun) {
+        New-Item -ItemType Directory -Path $dataDir -Force > $null
     }
 
     foreach ($vm in $vmDef.VMs) {
@@ -1090,27 +1132,6 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         }
     }
 
-    # -------------------------------------------------------------------------
-    # Phase 2 (cont.) — Pass B: per-guest scripts, descriptors, and pack/unpack
-    # wrappers for ALL manifest guests (enabled or disabled, host-matched or
-    # not) so a packed tree regenerates identically on any host.  Mirrors
-    # vm_write_all_guest_scripts / vm_write_descriptors in scripts/lib/vm.sh.
-    # -------------------------------------------------------------------------
-
-    if (-not $DryRun) {
-        New-Item -ItemType Directory -Path $dataDir -Force > $null
-        New-Item -ItemType Directory -Path $scriptsDir -Force > $null
-    }
-
-    foreach ($vm in $vmDef.VMs) {
-        Invoke-VmWriteDescriptor -Vm $vm -RepoRoot $RepoRoot
-        Invoke-VmWriteStartHelper -Vm $vm -QemuDir $scoopQemuDir -ScriptsDir $scriptsDir -TemplatesDir $templatesDir
-        Invoke-VmWriteStopHelper -Vm $vm -ScriptsDir $scriptsDir -TemplatesDir $templatesDir
-        Write-Information "vm-setup: VM '$($vm.name)' scripts ready"
-    }
-
-    Invoke-VmWritePackUnpackHelper -ScriptsDir $scriptsDir
-
     if ($Gc) {
         Write-Information 'vm-setup: GC — scanning for non-provisioned VM artifacts...'
         if ($GcDisabled) {
@@ -1139,6 +1160,22 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     Write-Information "vm-setup: Disk images at: $vmDir"
     Write-Information "vm-setup: VM directory guide at: $vmReadmePath"
     Write-Information "vm-setup: Run the generated scripts/start-<name>.ps1 (or scripts/start-<name>.sh) scripts to launch VMs"
+}
+
+function Invoke-VMSync {
+    <#
+    .SYNOPSIS
+      Refresh VM config (descriptors and start/stop scripts) without building images or disks.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$RepoRoot,
+
+        [switch]$DryRun
+    )
+
+    Invoke-VMSetup -RepoRoot $RepoRoot -DryRun:$DryRun -SyncOnly
 }
 
 # Test-Qcow2Image — Validates a QCOW2 image file before reuse.
