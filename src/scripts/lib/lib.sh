@@ -133,6 +133,28 @@ ensure_tool() {
   fi
 }
 
+# run_command_with_timeout SECONDS COMMAND...
+#   Run COMMAND in the background; return its exit code, or 124 on timeout.
+run_command_with_timeout() {
+  _rcwt_timeout="$1"
+  shift
+  (
+    "$@" &
+    _rcwt_pid=$!
+    _rcwt_elapsed=0
+    while kill -0 "$_rcwt_pid" 2>/dev/null; do
+      if [ "$_rcwt_elapsed" -ge "$_rcwt_timeout" ]; then
+        kill "$_rcwt_pid" 2>/dev/null || true
+        wait "$_rcwt_pid" 2>/dev/null || true
+        exit 124
+      fi
+      sleep 1
+      _rcwt_elapsed=$((_rcwt_elapsed + 1))
+    done
+    wait "$_rcwt_pid"
+  )
+}
+
 # Tries sha256sum, shasum -a 256, then openssl dgst -sha256.
 sha256_of_file() {
   _sof_file="$1"
