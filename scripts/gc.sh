@@ -643,11 +643,14 @@ gc_logs() {
 
   _gl_log_dir="$(nucleus_log_dir)"
   _gl_system_log_dir="$(nucleus_system_log_dir)"
+  _gl_expiry="${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}"
 
   rotate_logs_in_directory "$_gl_log_dir" "$_gl_maxsize" "$_gl_maxfiles" "$_gl_compress"
+  expire_logs_in_directory "$_gl_log_dir" "$_gl_expiry"
 
   if [ -n "$_gl_system_log_dir" ] && [ "$_gl_system_log_dir" != "$_gl_log_dir" ]; then
     rotate_logs_in_directory "$_gl_system_log_dir" "$_gl_maxsize" "$_gl_maxfiles" "$_gl_compress"
+    expire_logs_in_directory "$_gl_system_log_dir" "$_gl_expiry"
   fi
 }
 

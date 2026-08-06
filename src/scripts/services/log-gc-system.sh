@@ -29,3 +29,4 @@ else
 fi
 
 rotate_logs_in_directory "$(nucleus_system_log_dir)" "$_lgs_maxsize" "$_lgs_maxfiles" "$_lgs_compress"
+expire_logs_in_directory "$(nucleus_system_log_dir)" "${NUCLEUS_GC_EXPIRY:-7d}"

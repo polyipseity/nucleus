@@ -190,30 +190,74 @@ sha256_of_file() {
   openssl dgst -sha256 "$_sof_file" | awk '{ print $2 }'
 }
 
-# Platform-aware user log directory.
-nucleus_log_dir() {
-  if [ -n "${NUCLEUS_LOG_DIR:-}" ]; then
+# Platform-aware host key for services.json $logging lookups.
+nucleus_host_key() {
+  case "$(uname -s)" in
+    Darwin) printf '%s\n' MacBook ;;
+    Linux)  printf '%s\n' NixOS ;;
+    *)      printf '%s\n' NixOS ;;
+  esac
+}
+
+# Path to services.json in the nucleus repo.
+nucleus_services_json_path() {
+  _nsjp_repo="${NUCLEUS_REPO_ROOT:-}"
+  if [ -z "$_nsjp_repo" ]; then
+    _nsjp_repo="$(derive_repo_root)" || return 1
+  fi
+  printf '%s\n' "$_nsjp_repo/src/modules/services.json"
+}
+
+# Expand ~ in POSIX log path templates.
+nucleus_expand_log_path() {
+  _nelp_path="$1"
+  case "$_nelp_path" in
+    "~/"*) printf '%s\n' "${HOME}${_nelp_path#~}" ;;
+    "~"*)  printf '%s\n' "${HOME}${_nelp_path#~}" ;;
+    *)     printf '%s\n' "$_nelp_path" ;;
+  esac
+}
+
+# Read logDir or systemLogDir from services.json $logging for the current host.
+nucleus_log_path_from_json() {
+  _nlpfj_field="$1"
+
+  if [ "$_nlpfj_field" = logDir ] && [ -n "${NUCLEUS_LOG_DIR:-}" ]; then
     printf '%s\n' "$NUCLEUS_LOG_DIR"
     return 0
   fi
-  case "$(uname -s)" in
-    Darwin) printf '%s\n' "${HOME}/Library/Logs/nucleus" ;;
-    Linux)  printf '%s\n' "${HOME}/.local/state/nucleus/log" ;;
-    *)      printf '%s\n' "${HOME}/.local/state/nucleus/log" ;;
-  esac
+  if [ "$_nlpfj_field" = systemLogDir ] && [ -n "${NUCLEUS_SYSTEM_LOG_DIR:-}" ]; then
+    printf '%s\n' "$NUCLEUS_SYSTEM_LOG_DIR"
+    return 0
+  fi
+
+  require_command jq
+  _nlpfj_json="$(nucleus_services_json_path)" || return 1
+  _nlpfj_host="$(nucleus_host_key)"
+  _nlpfj_template="$(jq -r --arg h "$_nlpfj_host" --arg f "$_nlpfj_field" '.["$logging"][$h][$f] // empty' "$_nlpfj_json")"
+  [ -n "$_nlpfj_template" ] || return 1
+
+  if [ "$_nlpfj_field" = logDir ]; then
+    nucleus_expand_log_path "$_nlpfj_template"
+  else
+    printf '%s\n' "$_nlpfj_template"
+  fi
+}
+
+# Platform-aware user log directory.
+nucleus_log_dir() {
+  nucleus_log_path_from_json logDir
 }
 
 # Platform-aware system log directory.
 nucleus_system_log_dir() {
-  if [ -n "${NUCLEUS_SYSTEM_LOG_DIR:-}" ]; then
-    printf '%s\n' "$NUCLEUS_SYSTEM_LOG_DIR"
-    return 0
-  fi
-  case "$(uname -s)" in
-    Darwin)  printf '%s\n' "/Users/Shared/nucleus/logs" ;;
-    Linux)   printf '%s\n' "/var/log/nucleus" ;;
-    *)       printf '%s\n' "/var/log/nucleus" ;;
-  esac
+  nucleus_log_path_from_json systemLogDir
+}
+
+# Caddy state directory sibling to the system log root (/Users/Shared/nucleus/caddy).
+nucleus_caddy_state_dir() {
+  _ncsd_sys="$(nucleus_system_log_dir)" || return 1
+  printf '%s\n' "$(dirname -- "$_ncsd_sys")/caddy"
 }
 
 # sccache_cache_dir — Resolve the local sccache disk cache directory.
@@ -327,6 +371,30 @@ rotate_logs_in_directory() {
   find "$_rld_dir" -name '*.log' -type f | while IFS= read -r _rld_logfile; do
     rotate_log_file "$_rld_logfile" "$_rld_maxsize" "$_rld_maxfiles" "$_rld_compress"
   done
+}
+
+# Parse duration strings like 7d or 24h into whole-day counts for find -mtime.
+parse_expiry_days() {
+  _ped_exp="${1:-7d}"
+  case "$_ped_exp" in
+    *d) printf '%s\n' "${_ped_exp%d}" ;;
+    *h) printf '%s\n' $(( (${_ped_exp%h} + 23) / 24 )) ;;
+    *)  printf '%s\n' 7 ;;
+  esac
+}
+
+# Delete rotated archives and dated application logs older than EXPIRY (default 7d).
+expire_logs_in_directory() {
+  _eld_dir="$1"
+  _eld_expiry="${2:-7d}"
+
+  [ -d "$_eld_dir" ] || return 0
+  _eld_days="$(parse_expiry_days "$_eld_expiry")"
+  [ "$_eld_days" -gt 0 ] || return 0
+
+  find "$_eld_dir" -type f \
+    \( -name '*.log.[0-9]*' -o -name '*.log.gz' -o -name '*.log.[0-9]*.gz' -o -name 'log_*.log' \) \
+    -mtime +"${_eld_days}" -delete
 }
 
 # kill_processes_on_port — Kill all processes listening on PORT.

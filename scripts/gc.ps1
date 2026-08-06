@@ -540,11 +540,14 @@ if (-not $NoLogGc) {
 
     $logDir = Get-NucleusLogDir
     $systemLogDir = Get-NucleusSystemLogDir
+    $logExpiry = if ($Expiry) { $Expiry } elseif ($env:NUCLEUS_GC_EXPIRY) { $env:NUCLEUS_GC_EXPIRY } else { '7d' }
 
     Invoke-LogRotation -Path $logDir -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
+    Invoke-LogExpiry -Path $logDir -Expiry $logExpiry
 
     if ($systemLogDir -and ($systemLogDir -ne $logDir)) {
       Invoke-LogRotation -Path $systemLogDir -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
+      Invoke-LogExpiry -Path $systemLogDir -Expiry $logExpiry
     }
   }
 }
