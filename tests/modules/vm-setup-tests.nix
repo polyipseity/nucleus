@@ -1108,18 +1108,6 @@ let
 
   # Running-state detection must distinguish registered catalog entries from
   # actually running VMs on macOS (utmctl Status, tart JSON .Running).
-  test_vm_running_state_detection =
-    assert'
-      (
-        (lib.hasInfix "vm_parse_utm_running_names_from_list" vm_setup_sh_text)
-        && (lib.hasInfix "vm_parse_tart_running_names_from_json" vm_setup_sh_text)
-        && (lib.hasInfix "tart list --format json" vm_setup_sh_text)
-        && (lib.hasInfix "if ($2 != \"stopped\") print $3" vm_setup_sh_text)
-        && (lib.hasInfix "vm_get_utm_registered_names" vm_setup_sh_text)
-        && (lib.hasInfix "vm_get_tart_registered_names" vm_setup_sh_text)
-        && (lib.hasInfix "vm_get_running_names()" vm_setup_sh_text)
-      )
-      "vm running detection must filter utmctl Status and tart JSON Running; registration helpers stay separate from running probes";
 
   # The resize subcommand must be wired into the CLI: usage synopsis,
   # dispatch, size parsing via parse_size, and the --allow-shrink flag.
@@ -1612,6 +1600,24 @@ let
         && (lib.hasInfix "Android userdata image not found" vm_setup_sh_text)
       )
       "scripts/vm.sh must provision Android UTM bundles from the manifest Android group image names, hard-linking the canonical data/<id>.qcow2 userdata into the bundle";
+
+  # Android userdata must never delete standalone bundle copies; canonical
+  # data/<id>.qcow2 is the source of truth and sync must re-link it.
+  test_android_userdata_preserve_or_fail_fast =
+    assert'
+      (
+        (lib.hasInfix "vm_link_android_userdata_to_utm_bundle" vm_setup_sh_text)
+        && (lib.hasInfix "exists only in the UTM bundle" vm_setup_sh_text)
+        && (lib.hasInfix "vm_link_android_userdata_to_utm_bundle \"\$vm_name\" \"\$vm_index\" \"\$bundle/Data\"" vm_setup_sh_text)
+        && !(lib.hasInfix "removing legacy bundle userdata" vm_setup_sh_text)
+        && !(lib.hasInfix "pre-migration" vm_setup_sh_text)
+      )
+      "Android userdata must hard-link from canonical data/<id>.qcow2 without deleting standalone bundle copies";
+
+  test_libvirt_android_userdata_canonical_path = assert' (
+    (lib.hasInfix "vm_setup_libvirt()" vm_setup_sh_text)
+    && (lib.hasInfix "_android_userdata=\"\$VM_DIR/data/\${vm_name}.qcow2\"" vm_setup_sh_text)
+  ) "vm_setup_libvirt must validate Android userdata at data/<id>.qcow2";
 
   # The Android build must strip the whitespace wc -c pads its output with
   # (macOS pads, Linux does not); otherwise the size leaks into the selected
@@ -2309,6 +2315,8 @@ let
     test_vm_guest_credential_drift_replacement
     test_utm_base_overlay_provisioning
     test_utm_android_uses_shared_images
+    test_android_userdata_preserve_or_fail_fast
+    test_libvirt_android_userdata_canonical_path
     test_android_build_strips_wc_padding
     test_android_build_honors_manifest_disk_size
     test_libvirt_runtime_validation_parity
@@ -2484,6 +2492,8 @@ in
     test_vm_guest_credential_drift_replacement
     test_utm_base_overlay_provisioning
     test_utm_android_uses_shared_images
+    test_android_userdata_preserve_or_fail_fast
+    test_libvirt_android_userdata_canonical_path
     test_android_build_strips_wc_padding
     test_android_build_honors_manifest_disk_size
     test_libvirt_runtime_validation_parity

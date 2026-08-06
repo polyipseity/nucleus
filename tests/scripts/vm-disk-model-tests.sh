@@ -1160,6 +1160,103 @@ EOF
   assert_eq "6" "$_sorted" "manifest names count stable across NUCLEUS_HOST changes"
 }
 
+# _android_userdata_init_fixture VM_DIR IMAGES_DIR VMS_DIR MANIFEST
+#   Minimal Android manifest + vm_init for userdata link tests.
+_android_userdata_init_fixture() {
+  local _vm_dir="$1" _images_dir="$2" _vms_dir="$3" _manifest="$4"
+
+  mkdir -p "$_vm_dir" "$_images_dir" "$_vms_dir" "$_vm_dir/data"
+
+  cat > "$_manifest" <<'EOF'
+{
+  "VMs": [
+    {
+      "id": "Android",
+      "name": "Android",
+      "type": "Android",
+      "enabled": true,
+      "hosts": ["MacBook"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "minImageSize": "10MB",
+      "portForwards": [],
+      "macAddressPrefix": "52",
+      "Android": {
+        "systemImage": "Android-system.qcow2",
+        "userdataImage": "Android.qcow2",
+        "gsiImage": "Android-gsi.img",
+        "gsiUrl": "https://example.invalid/gsi.zip"
+      }
+    }
+  ]
+}
+EOF
+
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+    "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
+    "$_vms_dir" "$_manifest" "MacBook" "false" "false"
+}
+
+test_android_userdata_link_idempotent() {
+  local _vm_dir="$_tmp/aul/vm" _images_dir="$_tmp/aul/vm/images" _vms_dir="$_tmp/aul/vms"
+  local _manifest="$_tmp/aul/manifest.json"
+
+  _android_userdata_init_fixture "$_vm_dir" "$_images_dir" "$_vms_dir" "$_manifest"
+  : > "$_vm_dir/data/Android.qcow2"
+  mkdir -p "$_vm_dir/Android.utm/Data"
+
+  vm_link_android_userdata_to_utm_bundle Android 0 "$_vm_dir/Android.utm/Data" >/dev/null 2>&1 \
+    || { echo "FAIL: link helper should succeed when canonical exists"; _failures=$((_failures + 1)); return; }
+  if ! [ "$_vm_dir/data/Android.qcow2" -ef "$_vm_dir/Android.utm/Data/Android.qcow2" ]; then
+    echo "FAIL: bundle userdata hard-linked to canonical"
+    _failures=$((_failures + 1))
+    return
+  fi
+
+  vm_link_android_userdata_to_utm_bundle Android 0 "$_vm_dir/Android.utm/Data" >/dev/null 2>&1 \
+    || { echo "FAIL: second link call should succeed"; _failures=$((_failures + 1)); return; }
+  if ! [ "$_vm_dir/data/Android.qcow2" -ef "$_vm_dir/Android.utm/Data/Android.qcow2" ]; then
+    echo "FAIL: second link call is idempotent"
+    _failures=$((_failures + 1))
+  fi
+}
+
+test_android_userdata_bundle_only_fails() {
+  local _vm_dir="$_tmp/aub/vm" _images_dir="$_tmp/aub/vm/images" _vms_dir="$_tmp/aub/vms"
+  local _manifest="$_tmp/aub/manifest.json"
+
+  _android_userdata_init_fixture "$_vm_dir" "$_images_dir" "$_vms_dir" "$_manifest"
+  mkdir -p "$_vm_dir/Android.utm/Data"
+  printf 'bundle-only-data' > "$_vm_dir/Android.utm/Data/Android.qcow2"
+
+  if vm_link_android_userdata_to_utm_bundle Android 0 "$_vm_dir/Android.utm/Data" >/dev/null 2>&1; then
+    echo "FAIL: bundle-only layout should error"
+    _failures=$((_failures + 1))
+  fi
+  assert_file_exists "$_vm_dir/Android.utm/Data/Android.qcow2" "bundle-only error kept bundle userdata"
+  assert_file_missing "$_vm_dir/data/Android.qcow2" "bundle-only error did not create empty canonical"
+}
+
+test_android_userdata_canonical_wins_over_standalone_bundle() {
+  local _vm_dir="$_tmp/auc/vm" _images_dir="$_tmp/auc/vm/images" _vms_dir="$_tmp/auc/vms"
+  local _manifest="$_tmp/auc/manifest.json"
+
+  _android_userdata_init_fixture "$_vm_dir" "$_images_dir" "$_vms_dir" "$_manifest"
+  printf 'canonical-data' > "$_vm_dir/data/Android.qcow2"
+  mkdir -p "$_vm_dir/Android.utm/Data"
+  printf 'stale-bundle' > "$_vm_dir/Android.utm/Data/Android.qcow2"
+
+  vm_link_android_userdata_to_utm_bundle Android 0 "$_vm_dir/Android.utm/Data" >/dev/null 2>&1 \
+    || { echo "FAIL: link helper should succeed when canonical has data"; _failures=$((_failures + 1)); return; }
+  if ! [ "$_vm_dir/data/Android.qcow2" -ef "$_vm_dir/Android.utm/Data/Android.qcow2" ]; then
+    echo "FAIL: canonical data preserved via hard link"
+    _failures=$((_failures + 1))
+    return
+  fi
+  assert_eq "canonical-data" "$(cat "$_vm_dir/data/Android.qcow2")" "canonical file content unchanged"
+}
+
 test_uuid_vectors
 test_mac_vectors
 test_deterministic
@@ -1173,6 +1270,9 @@ test_pack_keep_set
 test_windows_qemu_provisioning
 test_gc_dispatcher
 test_expected_vm_names_edge_cases
+test_android_userdata_link_idempotent
+test_android_userdata_bundle_only_fails
+test_android_userdata_canonical_wins_over_standalone_bundle
 
 if [ "$_failures" -eq 0 ]; then
   echo "vm-disk-model-tests: all checks passed"
