@@ -870,6 +870,7 @@
             zackelia-formulae
             ;
           nucleusApps = nucleusAppsMac;
+          treefmtPackage = mkTreefmtWrapper systems.mac pkgsMac;
         };
         system = systems.mac;
         modules = [
@@ -891,6 +892,7 @@
               inherit nixpkgs username users;
               nucleusApps = nucleusAppsMac;
               vsCodeMarketplace = vsCodeMarketplaceMac;
+              treefmtPackage = mkTreefmtWrapper systems.mac pkgsMac;
             };
             home-manager.users = mkHomeManagerUsers "MacBook" ./modules/home.nix;
           }
@@ -909,6 +911,7 @@
           hostName = "NixOS";
           inherit username users;
           nucleusApps = nucleusAppsLinux;
+          treefmtPackage = mkTreefmtWrapper systems.linux pkgsLinux;
         };
         system = systems.linux;
         modules = [
@@ -927,6 +930,7 @@
               inherit nixpkgs username users;
               nucleusApps = nucleusAppsLinux;
               vsCodeMarketplace = vsCodeMarketplaceLinux;
+              treefmtPackage = mkTreefmtWrapper systems.linux pkgsLinux;
             };
             home-manager.users = mkHomeManagerUsers "NixOS" ./modules/home.nix;
           }
@@ -952,6 +956,7 @@
               pkgsMac.gnupg
               pkgsMac.sops
               pkgsMac.ssh-to-age
+              (mkTreefmtWrapper systems.mac pkgsMac)
             ];
           };
         }
@@ -964,6 +969,7 @@
               pkgsLinux.gnupg
               pkgsLinux.sops
               pkgsLinux.ssh-to-age
+              (mkTreefmtWrapper systems.linux pkgsLinux)
             ];
           };
         }

@@ -4,6 +4,7 @@
   lib,
   pkgs,
   options,
+  treefmtPackage ? null,
   ...
 }:
 let
@@ -354,6 +355,7 @@ let
     # evaluations like the nixos-generators guest build use plain nixpkgs, so
     # append it only when the evaluating package set actually provides it.
     ++ (lib.optionals (pkgs ? camillagui-backend) [ pkgs.camillagui-backend ])
+    ++ lib.optional (treefmtPackage != null) treefmtPackage
     ++ darwinSharedPackages
     ++ overlapNixPackages;
 in

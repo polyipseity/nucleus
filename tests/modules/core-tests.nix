@@ -7,6 +7,12 @@ let
   # === NIX-INDEX SCHEDULE INVARIANTS ===
   linuxText = builtins.readFile ../../src/modules/linux.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
+  coreModuleText = builtins.readFile ../../src/modules/core.nix;
+
+  test_core_accepts_treefmt_package = assert' (
+    lib.hasInfix "treefmtPackage ? null" coreModuleText
+    && lib.hasInfix "++ lib.optional (treefmtPackage != null) treefmtPackage" coreModuleText
+  ) "core.nix must accept treefmtPackage and append it to sharedPackages when set";
 
   test_linux_nix_index_is_daily = assert' (
     containsRegex ''Description = "Daily nix-index database refresh";'' linuxText
@@ -343,6 +349,7 @@ let
   allTests = [
     test_linux_nix_index_is_daily
     test_macos_nix_index_is_daily
+    test_core_accepts_treefmt_package
     test_override_precedence
     test_policy_based_categorization
     test_global_backend_fallback
@@ -365,15 +372,16 @@ builtins.seq (builtins.deepSeq allTests null) {
   testNames = [
     "1: Linux nix-index timer runs daily at 12:00"
     "2: macOS nix-index launch agent runs daily at 12:00"
-    "3: Override precedence (overrides > policy > global)"
-    "4: Policy-based categorization (CLI→nixpkgs, GUI→homebrew)"
-    "5: Global backend fallback when not in policy"
-    "6: Policy with no overrides cascades to defaults"
-    "7: Selective override in policy mode"
-    "8: Multiple overrides apply independently"
-    "9: List filtering preserves order"
-    "10: Config merging with lib.mkMerge"
-    "11: OS-conditional path resolution"
-    "12: Package category validation"
+    "3: core.nix accepts optional treefmtPackage for sharedPackages"
+    "4: Override precedence (overrides > policy > global)"
+    "5: Policy-based categorization (CLI→nixpkgs, GUI→homebrew)"
+    "6: Global backend fallback when not in policy"
+    "7: Policy with no overrides cascades to defaults"
+    "8: Selective override in policy mode"
+    "9: Multiple overrides apply independently"
+    "10: List filtering preserves order"
+    "11: Config merging with lib.mkMerge"
+    "12: OS-conditional path resolution"
+    "13: Package category validation"
   ];
 }

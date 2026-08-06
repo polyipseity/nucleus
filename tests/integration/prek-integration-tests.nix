@@ -118,6 +118,17 @@ let
   test_posix_pwsh_agent_env_vars_complete = assert' (lib.all (
     var: lib.hasInfix "env:${var}" posixPwshText
   ) agentEnvVarNames) "POSIX pwsh profile must check all env vars listed in agent-env-vars.nix";
+
+  test_bootstrap_deps_includes_treefmt = assert' (
+    lib.hasInfix "bootstrap-deps = pkgsMac.symlinkJoin" flakeText
+    && lib.hasInfix "(mkTreefmtWrapper systems.mac pkgsMac)" flakeText
+    && lib.hasInfix "(mkTreefmtWrapper systems.linux pkgsLinux)" flakeText
+  ) "bootstrap-deps must bundle the flake mkTreefmtWrapper on macOS and Linux";
+
+  test_flake_threads_treefmt_package_to_hosts = assert' (
+    lib.hasInfix "treefmtPackage = mkTreefmtWrapper systems.mac pkgsMac;" flakeText
+    && lib.hasInfix "treefmtPackage = mkTreefmtWrapper systems.linux pkgsLinux;" flakeText
+  ) "flake must pass treefmtPackage to Darwin/NixOS system and Home Manager evals";
 in
 builtins.seq
   (builtins.deepSeq {
@@ -145,10 +156,12 @@ builtins.seq
       test_windows_cmd_autorun_agent_detection
       test_zsh_agent_env_vars_complete
       test_posix_pwsh_agent_env_vars_complete
+      test_bootstrap_deps_includes_treefmt
+      test_flake_threads_treefmt_package_to_hosts
       ;
   })
   {
     success = true;
-    testCount = 23;
-    message = "All 23 prek integration tests passed";
+    testCount = 25;
+    message = "All 25 prek integration tests passed";
   }

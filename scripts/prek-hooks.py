@@ -49,8 +49,9 @@ def run_check(files: list[str], repo_root: Path, scoped: bool = False) -> int:
         non-zero on failure.
     """
     if sys.platform != "win32":
-        # Direct call is safe because the required tools (treefmt, pwsh, packer)
-        # are available in the default devShell (loaded by .envrc use flake).
+        # Direct call is safe because required tools (treefmt, pwsh, packer)
+        # are provisioned on PATH via bootstrap-deps and core.nix sharedPackages
+        # (flake mkTreefmtWrapper), not only the Nix dev shell.
         # Intentionally NOT passing --no-fail-fast: check accumulates by default
         # (no-fail-fast). Runs on every commit — should report all issues.
         cmd = [str(repo_root / "scripts" / "check.sh")]
