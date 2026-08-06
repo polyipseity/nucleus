@@ -5,6 +5,10 @@
     "$schema": {
       "description": "Reference to the JSON Schema file that validates this data file.",
       "type": "string"
+    },
+    "$logging": {
+      "$ref": "#/definitions/hostLoggingRoots",
+      "description": "Per-host log root paths (canonical host keys: MacBook, NixOS, Windows)."
     }
   },
   "additionalProperties": {
@@ -49,6 +53,31 @@
     "type": "object"
   },
   "definitions": {
+    "hostLogRoots": {
+      "description": "User and system log directory paths for one host. MacBook logDir uses ~/nucleus/logs for nucleus/logs consistency across hosts rather than ~/Library/Logs.",
+      "properties": {
+        "logDir": {
+          "description": "User-level log root. May use ~ (POSIX) or %ENV% (Windows) templates.",
+          "type": "string"
+        },
+        "systemLogDir": {
+          "description": "System-level log root. MacBook uses /Users/Shared/nucleus/logs because SIP blocks non-root launchd daemons from /Library/Logs.",
+          "type": "string"
+        }
+      },
+      "required": [ "logDir", "systemLogDir" ],
+      "type": "object"
+    },
+    "hostLoggingRoots": {
+      "description": "Log roots keyed by canonical hostname (MacBook, NixOS, Windows).",
+      "properties": {
+        "MacBook": { "$ref": "#/definitions/hostLogRoots" },
+        "NixOS": { "$ref": "#/definitions/hostLogRoots" },
+        "Windows": { "$ref": "#/definitions/hostLogRoots" }
+      },
+      "required": [ "MacBook", "NixOS", "Windows" ],
+      "type": "object"
+    },
     "loggingEntry": {
       "description": "Logging configuration for a service. Per-platform entry overrides the top-level logging block.",
       "properties": {

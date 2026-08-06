@@ -1,5 +1,19 @@
 {
   "$schema": "./services.schema.json",
+  "$logging": {
+    "MacBook": {
+      "logDir": "~/nucleus/logs",
+      "systemLogDir": "/Users/Shared/nucleus/logs"
+    },
+    "NixOS": {
+      "logDir": "~/.local/state/nucleus/log",
+      "systemLogDir": "/var/log/nucleus"
+    },
+    "Windows": {
+      "logDir": "%LOCALAPPDATA%\\nucleus\\logs",
+      "systemLogDir": "%ProgramData%\\nucleus\\logs"
+    }
+  },
   "caddy": {
     "description": "Local TLS reverse proxy engine",
     "displayName": "Caddy",

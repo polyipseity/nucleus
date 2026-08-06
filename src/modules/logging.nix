@@ -1,14 +1,15 @@
 # Logging paths, rotation, and sanitization shared across service modules.
-{ lib, pkgs, ... }:
+{ lib, pkgs, hostName ? null, ... }:
 let
   inherit (lib) mkOption types;
+  loggingPaths = import ./lib/logging-paths.nix { inherit lib pkgs hostName; };
 in
 {
   options.nucleus.logging = {
     logDir = mkOption {
       type = types.str;
-      default = if pkgs.stdenv.isDarwin then "~/Library/Logs/nucleus" else "~/.local/state/nucleus/log";
-      defaultText = lib.literalExpression ''if pkgs.stdenv.isDarwin then "~/Library/Logs/nucleus" else "~/.local/state/nucleus/log"'';
+      default = loggingPaths.logDirTemplate;
+      defaultText = lib.literalExpression "services.json \$logging.${loggingPaths.hostKey}.logDir";
       description = "User-level log directory for nucleus services.";
     };
 
@@ -21,8 +22,8 @@ in
     # (.agents/instructions/macos-launchd-sip.instructions.md).
     systemLogDir = mkOption {
       type = types.str;
-      default = if pkgs.stdenv.isDarwin then "/Users/Shared/nucleus/logs" else "/var/log/nucleus";
-      defaultText = lib.literalExpression ''if pkgs.stdenv.isDarwin then "/Users/Shared/nucleus/logs" else "/var/log/nucleus"'';
+      default = loggingPaths.systemLogDir;
+      defaultText = lib.literalExpression "services.json \$logging.${loggingPaths.hostKey}.systemLogDir";
       description = "System-level log directory for nucleus services.";
     };
 
