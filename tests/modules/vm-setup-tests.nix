@@ -881,8 +881,9 @@ let
     && (lib.hasInfix "Android.gappsUrl" android_config_sh_text)
     && (lib.hasInfix "vm_android_adb_wait_authorized" vm_setup_sh_text)
     && (lib.hasInfix "vm_android_adb_list_state" vm_setup_sh_text)
-    && (lib.hasInfix "android-gapps-extract" android_config_sh_text)
-    && (lib.hasInfix "adb remount" android_config_sh_text)
+    && (lib.hasInfix "vm_android_adb_wait_recovery" vm_setup_sh_text)
+    && (lib.hasInfix "vm_android_fastboot_wait" vm_setup_sh_text)
+    && (lib.hasInfix "adb sideload" android_config_sh_text)
   ) "nucleus-vm android-config must be wired with GSI-null guards and fake Wi-Fi support";
 
   test_android_tools_provisioned_all_hosts = assert' (
