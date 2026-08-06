@@ -140,18 +140,18 @@ EOF
   fi
 }
 
-test_requires_at_least_one_flag() {
+test_no_flags_prints_manual() {
   setup_fixture
   set +e
-  vm_android_config Android 0 2>"$_tmp/err.txt"
+  vm_android_config Android 0 >"$_tmp/out.txt" 2>&1
   _af_status=$?
   set -e
-  if [ "$_af_status" -eq 0 ]; then
-    echo "FAIL: vm_android_config without flags should fail"
+  if [ "$_af_status" -ne 0 ]; then
+    echo "FAIL: vm_android_config without flags should succeed and print the manual"
     _failures=$((_failures + 1))
   fi
-  if ! grep -q 'at least one' "$_tmp/err.txt"; then
-    echo "FAIL: expected at-least-one-flag error message"
+  if ! grep -q 'Enter fastboot' "$_tmp/out.txt"; then
+    echo "FAIL: expected manual workflow with Enter fastboot step"
     _failures=$((_failures + 1))
   fi
 }
@@ -172,7 +172,10 @@ EOF
   chmod +x "$_af_bin/adb"
   cat > "$_af_bin/fastboot" <<'EOF'
 #!/usr/bin/env bash
-exit 0
+case "$*" in
+  *getvar*) exit 0 ;;
+  *) exit 0 ;;
+esac
 EOF
   chmod +x "$_af_bin/fastboot"
   PATH="$_af_bin:$PATH"
@@ -223,6 +226,7 @@ EOF
   cat > "$_af_bin/fastboot" <<EOF
 #!/usr/bin/env bash
 case "\$*" in
+  *getvar*) exit 0 ;;
   devices) printf '%s\n' 'tcp:localhost:22041	fastboot' '' ;;
   *flash*) echo "flash \$*" >> "$_af_flash_log"; exit 0 ;;
   *reboot*) printf 'recovery\n' > "$_af_state_file"; exit 0 ;;
@@ -230,17 +234,24 @@ esac
 exit 0
 EOF
   chmod +x "$_af_bin/fastboot"
-  cat > "$_af_bin/curl" <<EOF
+  cat > "$_af_bin/curl" <<'EOF'
 #!/usr/bin/env bash
-while [ "\$#" -gt 0 ]; do
-  case "\$1" in
-    -o) _af_out="\$2"; shift 2 ;;
+_af_out=''
+_af_head=false
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -I|-fsI) _af_head=true; shift ;;
+    -o) _af_out="$2"; shift 2 ;;
     *) shift ;;
   esac
 done
-cat > "\$_af_out" <<'JSON'
-{"tag_name":"test-release","assets":[{"name":"recovery_arm64only-userdebug.img","browser_download_url":"https://example.invalid/recovery.img"}]}
-JSON
+if [ "$_af_head" = true ]; then
+  printf 'HTTP/2 302\nlocation: https://github.com/jqssun/android-lineage-qemu/releases/download/test-release/recovery_arm64only-userdebug.img\n\n'
+  exit 0
+fi
+if [ -n "$_af_out" ]; then
+  printf 'recovery\n' > "$_af_out"
+fi
 exit 0
 EOF
   chmod +x "$_af_bin/curl"
@@ -255,8 +266,8 @@ EOF
     echo "FAIL: expected fastboot flash recovery when unauthorized"
     _failures=$((_failures + 1))
   fi
-  if ! grep -q 'unauthorized' "$_tmp/out.txt"; then
-    echo "FAIL: expected unauthorized guidance in output"
+  if ! grep -q 'Enter fastboot' "$_tmp/out.txt"; then
+    echo "FAIL: expected Enter fastboot guidance in output"
     _failures=$((_failures + 1))
   fi
 }
@@ -288,20 +299,30 @@ EOF
   chmod +x "$_af_bin/adb"
   cat > "$_af_bin/fastboot" <<'EOF'
 #!/usr/bin/env bash
-exit 0
+case "$*" in
+  *getvar*) exit 0 ;;
+  *) exit 0 ;;
+esac
 EOF
   chmod +x "$_af_bin/fastboot"
-  cat > "$_af_bin/curl" <<EOF
+  cat > "$_af_bin/curl" <<'EOF'
 #!/usr/bin/env bash
-while [ "\$#" -gt 0 ]; do
-  case "\$1" in
-    -o) _af_out="\$2"; shift 2 ;;
+_af_out=''
+_af_head=false
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    -I|-fsI) _af_head=true; shift ;;
+    -o) _af_out="$2"; shift 2 ;;
     *) shift ;;
   esac
 done
-cat > "\$_af_out" <<'JSON'
-{"tag_name":"test-release","assets":[{"name":"recovery_arm64only-userdebug.img","browser_download_url":"https://example.invalid/recovery.img"}]}
-JSON
+if [ "$_af_head" = true ]; then
+  printf 'HTTP/2 302\nlocation: https://github.com/jqssun/android-lineage-qemu/releases/download/test-release/recovery_arm64only-userdebug.img\n\n'
+  exit 0
+fi
+if [ -n "$_af_out" ]; then
+  printf 'recovery\n' > "$_af_out"
+fi
 exit 0
 EOF
   chmod +x "$_af_bin/curl"
@@ -322,11 +343,33 @@ EOF
   fi
 }
 
+test_fastboot_probe_uses_getvar() {
+  setup_fixture
+  _af_bin="$_tmp/bin"
+  mkdir -p "$_af_bin"
+  _af_probe_log="$_tmp/fb-probe.log"
+  cat > "$_af_bin/fastboot" <<EOF
+#!/usr/bin/env bash
+case "\$*" in
+  *getvar*) echo "getvar \$*" >> "$_af_probe_log"; exit 0 ;;
+esac
+exit 1
+EOF
+  chmod +x "$_af_bin/fastboot"
+  PATH="$_af_bin:$PATH"
+  export PATH
+  assert_eq "fastboot" "$(vm_android_fastboot_list_state 0)" "fastboot probe via getvar"
+  if ! grep -q 'getvar version' "$_af_probe_log"; then
+    echo "FAIL: expected fastboot getvar version probe"
+    _failures=$((_failures + 1))
+  fi
+}
+
 test_adb_port_resolution
 test_adb_list_state_unauthorized
 test_wait_authorized_fails_on_unauthorized
 test_wait_recovery_succeeds_on_recovery
-test_requires_at_least_one_flag
+test_no_flags_prints_manual
 test_gapps_rejects_booted_device_state
 test_gapps_unauthorized_flashes_recovery
 test_gapps_sideload_path
