@@ -116,43 +116,20 @@ let
         </dict>
       '';
 
-  # Base SSH forward (guest 22) for non-Android VMs, derived from the
-  # manifest portForwards so the plist always matches VMs.json.  Android
-  # guests expose ADB and SSH on forwarded ports 5555/5554 instead, and must
-  # NOT also claim host 2222: when Android and NixOS run together the second
-  # VM would fail to start ("Could not set up host forwarding rule") because
-  # host port 2222 is already taken by the first.
-  basePortForward =
+  # UTM PortForward entries derived from the manifest portForwards so the
+  # plist always matches VMs.json (host ports in the 22000-22099 range).
+  portForwardEntries =
     vm:
-    if vm.type == "Android" then
-      ""
-    else
-      lib.concatMapStrings (p: ''
-        <dict>
-            <key>Protocol</key>
-            <string>TCP</string>
-            <key>GuestPort</key>
-            <integer>${toString p.guestPort}</integer>
-            <key>HostPort</key>
-            <integer>${toString p.hostPort}</integer>
-        </dict>
-      '') (builtins.filter (p: p.guestPort == 22) vm.portForwards);
-
-  additionalPortForwards =
-    vm:
-    if vm.type != "Android" then
-      ""
-    else
-      lib.concatMapStrings (p: ''
-        <dict>
-            <key>Protocol</key>
-            <string>TCP</string>
-            <key>GuestPort</key>
-            <integer>${toString p.guestPort}</integer>
-            <key>HostPort</key>
-            <integer>${toString p.hostPort}</integer>
-        </dict>
-      '') (builtins.filter (p: p.guestPort != 22) vm.portForwards);
+    lib.concatMapStrings (p: ''
+      <dict>
+          <key>Protocol</key>
+          <string>TCP</string>
+          <key>GuestPort</key>
+          <integer>${toString p.guestPort}</integer>
+          <key>HostPort</key>
+          <integer>${toString p.hostPort}</integer>
+      </dict>
+    '') vm.portForwards;
 
   # Guest audio hardware per VM.  Android disables audio ("none" -> empty
   # Sound array): the SPICE audio pipeline teardown deadlocks UTM's SPICE
@@ -194,8 +171,7 @@ let
         "__VM_HYPERVISOR__"
         "__VM_UEFI_BOOT__"
         "__VM_ANDROID_DRIVES__"
-        "__VM_BASE_PORT_FORWARD__"
-        "__VM_ADDITIONAL_PORT_FORWARDS__"
+        "__VM_PORT_FORWARDS__"
         "__VM_SOUND__"
       ]
       [
@@ -212,8 +188,7 @@ let
         (if qemuHypervisor vm then "<true/>" else "<false/>")
         (if qemuUefiBoot vm then "<true/>" else "<false/>")
         (androidDrives vm)
-        (basePortForward vm)
-        (additionalPortForwards vm)
+        (portForwardEntries vm)
         (vmSound vm)
       ]
       # check-suppress:config-method: method 4 (runtime direct read) -- builtins.readFile embeds at eval time

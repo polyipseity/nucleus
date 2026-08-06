@@ -62,14 +62,14 @@
             <!-- Mode must be "Emulated" (QEMU user/slirp networking): UTM's
                  QEMU backend only emits hostfwd= for emulated VLANs, and
                  silently ignores the PortForward array for vmnet-shared
-                 (Mode=Shared), which is why SSH (2222) and ADB (5555) were
-                 unreachable despite the PortForward entries. -->
+                 (Mode=Shared), which is why manifest port forwards (host
+                 ports 22000-22099) were unreachable despite the PortForward
+                 entries. -->
             <key>Mode</key>
             <string>Emulated</string>
             <key>PortForward</key>
             <array>
-                __VM_BASE_PORT_FORWARD__
-                __VM_ADDITIONAL_PORT_FORWARDS__
+                __VM_PORT_FORWARDS__
             </array>
         </dict>
     </array>
@@ -90,7 +90,7 @@
         <array/>
         <!-- QEMU GA was removed: UTM's app sandbox denies QEMU from binding unix
              sockets in /tmp (EPERM on boot), and UTM's own bundles omit it. On
-             macOS, vm.sh reaches guests via SSH (forwarded port 2222) instead. -->
+             macOS, vm.sh reaches guests via SSH (manifest portForwards) instead. -->
         <key>BalloonDevice</key>
         <false/>
         <key>DebugLog</key>
