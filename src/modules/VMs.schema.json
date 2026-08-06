@@ -24,6 +24,10 @@
                 "description": "MindTheGapps zip download URL for sideloading Google apps onto LineageOS (e.g. https://github.com/MindTheGapps/16.0.0-arm64/releases/download/.../MindTheGapps-16.0.0-arm64-....zip).",
                 "type": "string"
               },
+              "magiskUrl": {
+                "description": "Magisk APK download URL for boot-image patching and guest install (official GitHub releases only).",
+                "type": "string"
+              },
               "gsiUrl": {
                 "description": "Android GSI system image download URL (gsi_gms_arm64, includes Google Mobile Services). Null means no GSI disk — boot Lineage only and sideload gappsUrl instead. When set, use a URL from https://developer.android.com/topic/generic-system-image/releases.",
                 "oneOf": [
@@ -48,6 +52,7 @@
               "gappsUrl",
               "gsiImage",
               "gsiUrl",
+              "magiskUrl",
               "systemImage",
               "userdataImage"
             ],

@@ -34,7 +34,8 @@
         "userdataImage": "Android.qcow2",
         "gsiImage": "Android-gsi.img",
         "gsiUrl": null,
-        "gappsUrl": "https://github.com/MindTheGapps/16.0.0-arm64/releases/download/MindTheGapps-16.0.0-arm64-20260409_073023/MindTheGapps-16.0.0-arm64-20260409_073023.zip"
+        "gappsUrl": "https://github.com/MindTheGapps/16.0.0-arm64/releases/download/MindTheGapps-16.0.0-arm64-20260409_073023/MindTheGapps-16.0.0-arm64-20260409_073023.zip",
+        "magiskUrl": "https://github.com/topjohnwu/Magisk/releases/download/v30.7/Magisk-v30.7.apk"
       }
     },
     {
