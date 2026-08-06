@@ -3,25 +3,63 @@
   Log directory helpers and management functions for nucleus services.
 
 .DESCRIPTION
-  Provides four functions:
-    Get-NucleusLogDir        — user-level log directory (%LOCALAPPDATA%\nucleus\logs)
-    Get-NucleusSystemLogDir  — system-level log directory (%ProgramData%\nucleus\logs)
-    ConvertTo-SanitizedText  — strips ANSI escapes and control characters from log text
-    Invoke-LogRotation       — rotates log files in a directory based on size
+  Provides functions for log paths, sanitization, rotation (copy-truncate), and
+  time-based expiry. Paths are read from services.json $logging for Windows.
 
 .NOTES
   Environment variables:
-    (none)    Paths are derived from %LOCALAPPDATA% and %ProgramData%.
+    NUCLEUS_LOG_DIR / NUCLEUS_SYSTEM_LOG_DIR override JSON paths when set.
+    NUCLEUS_REPO_ROOT required for JSON path resolution.
   Exit codes:
     0 on success; 1 on error.
 #>
+
+function Get-NucleusHostKey {
+  return 'Windows'
+}
+
+function Get-NucleusServicesJsonPath {
+  $repoRoot = $env:NUCLEUS_REPO_ROOT
+  if ([string]::IsNullOrWhiteSpace($repoRoot)) {
+    throw 'NUCLEUS_REPO_ROOT not set'
+  }
+  return Join-Path -Path $repoRoot -ChildPath 'src\modules\services.json'
+}
+
+function Expand-NucleusLogPathTemplate {
+  <#
+  .SYNOPSIS
+    Expands ~ and %ENV% templates in log path strings.
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Template
+  )
+
+  if ($Template.StartsWith('~/')) {
+    return Join-Path -Path $env:USERPROFILE -ChildPath $Template.Substring(2)
+  }
+  if ($Template.StartsWith('~')) {
+    return $Template.Replace('~', $env:USERPROFILE)
+  }
+  return [Environment]::ExpandEnvironmentVariables($Template)
+}
+
+function Get-NucleusLoggingRootsFromJson {
+  $jsonPath = Get-NucleusServicesJsonPath
+  $json = Get-Content -LiteralPath $jsonPath -Raw | ConvertFrom-Json
+  $hostKey = Get-NucleusHostKey
+  return $json.'$logging'.$hostKey
+}
 
 function Get-NucleusLogDir {
   <#
   .SYNOPSIS
     Returns the user-level log directory path.
   .DESCRIPTION
-    Returns %LOCALAPPDATA%\nucleus\logs. Creates the directory if it does not exist.
+    Reads logDir from services.json $logging for Windows. Creates the directory
+    when -PassThru is specified.
   .PARAMETER PassThru
     When specified, creates the directory and returns the path.
   .EXAMPLE
@@ -32,7 +70,13 @@ function Get-NucleusLogDir {
     [switch]$PassThru
   )
 
-  $path = Join-Path -Path $env:LOCALAPPDATA -ChildPath "nucleus\logs"
+  if ($env:NUCLEUS_LOG_DIR) {
+    $path = $env:NUCLEUS_LOG_DIR
+  } else {
+    $roots = Get-NucleusLoggingRootsFromJson
+    $path = Expand-NucleusLogPathTemplate -Template $roots.logDir
+  }
+
   if ($PassThru -and -not (Test-Path -LiteralPath $path -PathType Container)) {
     $null = New-Item -Path $path -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
   }
@@ -44,7 +88,8 @@ function Get-NucleusSystemLogDir {
   .SYNOPSIS
     Returns the system-level log directory path.
   .DESCRIPTION
-    Returns %ProgramData%\nucleus\logs. Creates the directory if it does not exist.
+    Reads systemLogDir from services.json $logging for Windows. Creates the
+    directory when -PassThru is specified.
   .PARAMETER PassThru
     When specified, creates the directory and returns the path.
   .EXAMPLE
@@ -55,7 +100,13 @@ function Get-NucleusSystemLogDir {
     [switch]$PassThru
   )
 
-  $path = Join-Path -Path $env:ProgramData -ChildPath "nucleus\logs"
+  if ($env:NUCLEUS_SYSTEM_LOG_DIR) {
+    $path = $env:NUCLEUS_SYSTEM_LOG_DIR
+  } else {
+    $roots = Get-NucleusLoggingRootsFromJson
+    $path = [Environment]::ExpandEnvironmentVariables($roots.systemLogDir)
+  }
+
   if ($PassThru -and -not (Test-Path -LiteralPath $path -PathType Container)) {
     $null = New-Item -Path $path -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
   }
@@ -94,16 +145,65 @@ function ConvertTo-SanitizedText {
   }
 }
 
+function Parse-NucleusExpiryDays {
+  <#
+  .SYNOPSIS
+    Parses duration strings like 7d or 24h into whole-day counts.
+  #>
+  [CmdletBinding()]
+  param(
+    [string]$Expiry = '7d'
+  )
+
+  if ($Expiry -match '^(\d+)d$') {
+    return [int]$Matches[1]
+  }
+  if ($Expiry -match '^(\d+)h$') {
+    return [int][Math]::Ceiling([int]$Matches[1] / 24.0)
+  }
+  return 7
+}
+
+function Invoke-LogExpiry {
+  <#
+  .SYNOPSIS
+    Deletes rotated archives and dated application logs older than Expiry.
+  .PARAMETER Path
+    Root directory to scan recursively.
+  .PARAMETER Expiry
+    Duration string (default 7d).
+  #>
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Path,
+    [string]$Expiry = '7d'
+  )
+
+  if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return }
+
+  $days = Parse-NucleusExpiryDays -Expiry $Expiry
+  if ($days -le 0) { return }
+
+  $cutoff = (Get-Date).AddDays(-$days)
+  $pattern = '(\.log\.\d+(\.gz)?$|^log_.*\.log$|\.log\.gz$)'
+
+  Get-ChildItem -LiteralPath $Path -Recurse -File -ErrorAction SilentlyContinue | Where-Object {
+    $_.Name -match $pattern -and $_.LastWriteTime -lt $cutoff
+  } | ForEach-Object {
+    Remove-Item -LiteralPath $_.FullName -Force
+  }
+}
+
 function Invoke-LogRotation {
   <#
   .SYNOPSIS
-    Rotates log files in a directory based on size.
+    Rotates log files in a directory tree based on size.
   .DESCRIPTION
-    Scans for *.log files in the given directory. When a file exceeds MaxSize,
-    it is renamed to <name>.N.log (shifting existing archives) up to MaxFiles.
-    Rotated files are optionally compressed with gzip.
+    Recursively scans for *.log files. When a file exceeds MaxSize, copy-truncate
+    rotation preserves the inode (POSIX parity). Archives shift .1 through MaxFiles.
   .PARAMETER Path
-    Directory containing log files to rotate.
+    Root directory containing log files to rotate.
   .PARAMETER MaxSize
     Maximum file size in bytes before rotation (default: 10 MB).
   .PARAMETER MaxFiles
@@ -124,7 +224,7 @@ function Invoke-LogRotation {
 
   if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return }
 
-  $logFiles = Get-ChildItem -Path $Path -Filter "*.log" -File
+  $logFiles = Get-ChildItem -LiteralPath $Path -Recurse -Filter '*.log' -File -ErrorAction SilentlyContinue
   foreach ($file in $logFiles) {
     if ($file.Length -le $MaxSize) { continue }
 
@@ -173,12 +273,19 @@ function Invoke-LogRotation {
       }
     }
 
-    # Rename current log → .1.log, optionally compress
+    # Copy-truncate: copy to .1.log, then truncate in-place
     $archivePath = Join-Path -Path $dir -ChildPath "$baseName.1.log"
-    Move-Item -LiteralPath $file.FullName -Destination $archivePath -Force
+    Copy-Item -LiteralPath $file.FullName -Destination $archivePath -Force
+    $truncateStream = [System.IO.File]::Open(
+      $file.FullName,
+      [System.IO.FileMode]::Open,
+      [System.IO.FileAccess]::Write
+    )
+    $truncateStream.SetLength(0)
+    $truncateStream.Close()
 
     if ($Compress) {
-      $null = & "gzip" @("$archivePath") 2>$null  # check-suppress:suppression_doc: archive may fail to compress if already corrupted or missing; $? checked below
+      $null = & gzip @($archivePath) 2>$null  # check-suppress:suppression_doc: archive may fail to compress if already corrupted or missing; $? checked below
       if (-not $?) {
         Write-Warning "log-rotation: gzip failed for $archivePath; keeping uncompressed."
       }
