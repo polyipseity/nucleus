@@ -24,8 +24,8 @@ usage() {
   --gapps               Sideload MindTheGapps in recovery (requires userdebug recovery).
   --adb-keys            Install host ~/.android/adbkey.pub (recovery or booted system).
   --magisk              Install and configure Magisk on booted Lineage (user build).
-  --fake-wifi           Load virt_wifi and bring up wlan0 (requires Magisk su).
-  --fake-wifi-revert    Remove persisted fake Wi-Fi and unload virt_wifi.
+  --fake-wifi           Create wlan0 via virt_wifi on eth0 (requires Magisk su).
+  --fake-wifi-revert    Remove persisted fake Wi-Fi and restore eth0.
   -h|--help             Show usage.
 EOF
 }

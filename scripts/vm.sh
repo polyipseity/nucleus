@@ -220,8 +220,8 @@ Android android-config flags (after VM name; omit all flags to print the manual)
   --gapps               Sideload MindTheGapps in recovery (enter fastboot first; tap Install anyway when prompted).
   --adb-keys            Install host ~/.android/adbkey.pub into guest adb_keys.
   --magisk              Install and configure Magisk (patch boot, flash, Magisk su).
-  --fake-wifi           Load virt_wifi and bring up wlan0 (requires Magisk).
-  --fake-wifi-revert    Remove persisted fake Wi-Fi and unload virt_wifi.
+  --fake-wifi           Create wlan0 via virt_wifi on eth0 (requires Magisk).
+  --fake-wifi-revert    Remove persisted fake Wi-Fi and restore eth0.
 EOF
 }
 
