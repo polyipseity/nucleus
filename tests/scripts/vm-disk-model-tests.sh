@@ -113,7 +113,8 @@ test_descriptor_writer() {
         "systemImage": "Android-system.qcow2",
         "userdataImage": "Android.qcow2",
         "gsiImage": "Android-gsi.img",
-        "gsiUrl": "https://example.invalid/gsi.zip"
+        "gsiUrl": "https://example.invalid/gsi.zip",
+        "gappsUrl": "https://example.invalid/gapps.zip"
       }
     },
     {
@@ -187,7 +188,8 @@ EOF
         systemImage: "Android-system.qcow2",
         userdataImage: "Android.qcow2",
         gsiImage: "Android-gsi.img",
-        gsiUrl: "https://example.invalid/gsi.zip"
+        gsiUrl: "https://example.invalid/gsi.zip",
+        gappsUrl: "https://example.invalid/gapps.zip"
       }
     }
   ' "$_android_desc" >/dev/null; then
@@ -345,7 +347,7 @@ test_resize_vm() {
       "diskSize": "64GB",
       "portForwards": [],
       "macAddressPrefix": "52",
-      "Android": {"systemImage": "Android-system.qcow2", "userdataImage": "Android.qcow2", "gsiImage": "Android-gsi.img", "gsiUrl": "https://example.invalid/gsi.zip"}
+      "Android": {"systemImage": "Android-system.qcow2", "userdataImage": "Android.qcow2", "gsiImage": "Android-gsi.img", "gsiUrl": "https://example.invalid/gsi.zip", "gappsUrl": "https://example.invalid/gapps.zip"}
     },
     {
       "id": "NixOS",
@@ -476,7 +478,8 @@ test_gc_keep_set() {
         "systemImage": "Android-system.qcow2",
         "userdataImage": "Android.qcow2",
         "gsiImage": "Android-gsi.img",
-        "gsiUrl": "https://example.invalid/gsi.zip"
+        "gsiUrl": "https://example.invalid/gsi.zip",
+        "gappsUrl": "https://example.invalid/gapps.zip"
       }
     },
     {
@@ -634,7 +637,8 @@ test_pack_keep_set() {
         "systemImage": "Android-system.qcow2",
         "userdataImage": "Android.qcow2",
         "gsiImage": "Android-gsi.img",
-        "gsiUrl": "https://example.invalid/gsi.zip"
+        "gsiUrl": "https://example.invalid/gsi.zip",
+        "gappsUrl": "https://example.invalid/gapps.zip"
       }
     },
     {
@@ -872,7 +876,8 @@ EOF
         "systemImage": "Android-system.qcow2",
         "userdataImage": "Android.qcow2",
         "gsiImage": "Android-gsi.img",
-        "gsiUrl": "https://example.invalid/gsi.zip"
+        "gsiUrl": "https://example.invalid/gsi.zip",
+        "gappsUrl": "https://example.invalid/gapps.zip"
       }
     }
   ]
@@ -919,7 +924,8 @@ _gcd_populate_fixture() {
         "systemImage": "Android-system.qcow2",
         "userdataImage": "Android.qcow2",
         "gsiImage": "Android-gsi.img",
-        "gsiUrl": "https://example.invalid/gsi.zip"
+        "gsiUrl": "https://example.invalid/gsi.zip",
+        "gappsUrl": "https://example.invalid/gapps.zip"
       }
     },
     {
@@ -1186,7 +1192,8 @@ _android_userdata_init_fixture() {
         "systemImage": "Android-system.qcow2",
         "userdataImage": "Android.qcow2",
         "gsiImage": "Android-gsi.img",
-        "gsiUrl": "https://example.invalid/gsi.zip"
+        "gsiUrl": "https://example.invalid/gsi.zip",
+        "gappsUrl": "https://example.invalid/gapps.zip"
       }
     }
   ]
@@ -1257,11 +1264,52 @@ test_android_userdata_canonical_wins_over_standalone_bundle() {
   assert_eq "canonical-data" "$(cat "$_vm_dir/data/Android.qcow2")" "canonical file content unchanged"
 }
 
+test_descriptor_null_gsi_url() {
+  local _vm_dir="$_tmp/null-gsi-vm" _images_dir="$_tmp/null-gsi-vm/images" _vms_dir="$_tmp/vms-null"
+  local _manifest="$_tmp/manifest-null-gsi.json" _android_desc
+
+  mkdir -p "$_vm_dir" "$_images_dir" "$_vms_dir"
+  cat > "$_manifest" <<'EOF'
+{
+  "VMs": [
+    {
+      "id": "Android",
+      "name": "Android",
+      "type": "Android",
+      "enabled": true,
+      "hosts": ["MacBook"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "64GB",
+      "portForwards": [{"guestPort": 5555, "hostPort": 22040}],
+      "macAddressPrefix": "52",
+      "Android": {
+        "systemImage": "Android-system.qcow2",
+        "userdataImage": "Android.qcow2",
+        "gsiImage": "Android-gsi.img",
+        "gsiUrl": null,
+        "gappsUrl": "https://example.invalid/gapps.zip"
+      }
+    }
+  ]
+}
+EOF
+
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+    "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
+    "$_vms_dir" "$_manifest" "MacBook" "false" "false"
+
+  vm_write_descriptors
+  _android_desc="$_vm_dir/Android.vm.json"
+  assert_eq "system,userdata" "$(jq -r '.disks | map(.role) | join(",")' "$_android_desc")" "null gsiUrl omits gsi disk role"
+}
+
 test_uuid_vectors
 test_mac_vectors
 test_deterministic
 test_real_helper_vectors
 test_descriptor_writer
+test_descriptor_null_gsi_url
 test_base_overlay_provisioning
 test_resize_vm
 test_resize_and_mark_image_grow_only

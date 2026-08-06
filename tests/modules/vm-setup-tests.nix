@@ -478,10 +478,11 @@ let
   test_group_inner_props_required =
     let
       androidRequired = [
-        "systemImage"
-        "userdataImage"
+        "gappsUrl"
         "gsiImage"
         "gsiUrl"
+        "systemImage"
+        "userdataImage"
       ];
       checkGroup =
         vm:
@@ -502,7 +503,7 @@ let
     assert' (builtins.all (r: r == null) results) "Group inner property check failed";
 
   # Windows VMs must declare a Windows group with isoUrl (string or null; null
-  # means auto-resolve via Mido/Fido — the sole deliberately nullable value).
+  # means auto-resolve via Mido/Fido. Android.gsiUrl may also be null (Lineage-only).
   test_windows_iso_url_type =
     let
       windowsVms = builtins.filter (vm: vm.type == "Windows") manifest.VMs;
@@ -545,17 +546,34 @@ let
         builtins.toString (builtins.map (v: v.name) badEditions)
       }";
 
-  # Android VMs must declare an Android group with a string gsiUrl.
+  # Android VMs must declare gsiUrl (string or null) and a non-null string gappsUrl.
   test_android_gsi_url_type =
     let
       androidVms = builtins.filter (vm: vm.type == "Android") manifest.VMs;
       badGsiUrls = builtins.filter (
-        vm: !(vm ? Android) || !builtins.hasAttr "gsiUrl" vm.Android || !builtins.isString vm.Android.gsiUrl
+        vm:
+          !(vm ? Android)
+          || !builtins.hasAttr "gsiUrl" vm.Android
+          || !(
+            builtins.isString vm.Android.gsiUrl
+            || vm.Android.gsiUrl == null
+          )
+      ) androidVms;
+      badGappsUrls = builtins.filter (
+        vm:
+          !(vm ? Android)
+          || !builtins.hasAttr "gappsUrl" vm.Android
+          || !builtins.isString vm.Android.gappsUrl
+          || vm.Android.gappsUrl == ""
       ) androidVms;
     in
     assert' (badGsiUrls == [ ])
-      "Android VMs must declare an Android group with string gsiUrl; bad entries: ${
+      "Android VMs must declare gsiUrl as string or null; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badGsiUrls)
+      }"
+      && assert' (badGappsUrls == [ ])
+      "Android VMs must declare a non-empty string gappsUrl; bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badGappsUrls)
       }";
 
   # The Android group must only appear on VMs with type Android.
@@ -851,6 +869,22 @@ let
     && (lib.hasInfix "function Invoke-VMSync" windows_vm_setup_ps1_text)
   ) "nucleus-vm sync must be wired on POSIX and Windows";
 
+  test_vm_android_config_subcommand_wired = assert' (
+    (lib.hasInfix "android-config" vm_setup_sh_text)
+    && (lib.hasInfix "do_android_config" vm_setup_sh_text)
+    && (lib.hasInfix "android-config.sh" vm_setup_sh_text)
+    && (lib.hasInfix "'android-config'" vm_ps1_text)
+    && (lib.hasInfix "vm_android_adb_host_port" vm_setup_sh_text)
+    && (lib.hasInfix "Android.gsiUrl != null" vm_setup_sh_text)
+    && (lib.hasInfix "modprobe virt_wifi" android_fake_wifi_sh_text)
+    && (lib.hasInfix "Android.gappsUrl" android_config_sh_text)
+  ) "nucleus-vm android-config must be wired with GSI-null guards and fake Wi-Fi support";
+
+  test_android_tools_provisioned_all_hosts = assert' (
+    (lib.hasInfix "pkgs.android-tools" flake_nix_text)
+    && (lib.hasInfix "Google.PlatformTools" windows_system_packages_dsc_text)
+  ) "adb/fastboot must be provisioned on POSIX (core.nix + nucleus-vm flake) and Windows (Google.PlatformTools winget)";
+
   test_vm_setup_calls_sync_phase = assert' (
     (lib.hasInfix "vm_prepare_vm_command" vm_setup_sh_text)
     && (lib.hasInfix "vm_sync_config_phase" vm_setup_sh_text)
@@ -1066,6 +1100,10 @@ let
   vms_windows_autounattend_text = builtins.readFile ../../src/vms/windows/Autounattend.xml;
   vms_macos_packer_text = builtins.readFile ../../src/vms/macos/packer.pkr.hcl;
   start_android_ps1_text = builtins.readFile ../../src/scripts/vms/start-android-vm.ps1;
+  android_config_sh_text = builtins.readFile ../../src/scripts/vms/android-config.sh;
+  android_fake_wifi_sh_text = builtins.readFile ../../src/scripts/vms/android-fake-wifi.sh;
+  flake_nix_text = builtins.readFile ../../flake.nix;
+  windows_system_packages_dsc_text = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
   test_macos_packer_exit_check = assert' (lib.hasInfix "_packer_status=0" vm_setup_sh_text) "scripts/vm.sh must capture packer exit status (_packer_status=0)";
 
   # nixos-generators' -o flag expects a non-existent symlink path, not a
@@ -2277,6 +2315,8 @@ let
     test_vm_templates_exist
     test_vm_setup_scripts_exist
     test_vm_sync_subcommand_wired
+    test_vm_android_config_subcommand_wired
+    test_android_tools_provisioned_all_hosts
     test_vm_setup_calls_sync_phase
     test_vm_sync_utm_includes_registration
     test_apply_vm_sync_default_on
@@ -2454,6 +2494,8 @@ in
     test_vm_templates_exist
     test_vm_setup_scripts_exist
     test_vm_sync_subcommand_wired
+    test_vm_android_config_subcommand_wired
+    test_android_tools_provisioned_all_hosts
     test_vm_setup_calls_sync_phase
     test_vm_sync_utm_includes_registration
     test_apply_vm_sync_default_on

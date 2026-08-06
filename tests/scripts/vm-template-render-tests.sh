@@ -224,7 +224,8 @@ write_fixture_manifest() { # write_fixture_manifest <path> — Android (enabled)
         "systemImage": "Android-system.qcow2",
         "userdataImage": "Android.qcow2",
         "gsiImage": "Android-gsi.img",
-        "gsiUrl": "https://example.invalid/gsi.zip"
+        "gsiUrl": "https://example.invalid/gsi.zip",
+        "gappsUrl": "https://example.invalid/gapps.zip"
       }
     },
     {
