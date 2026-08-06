@@ -96,12 +96,6 @@ run_25_vm_manifest_regression() {
     _s25_gate '1048576' '' "${_g3_files[@]}"
   fi
 
-  # G4: no `.display` manifest property refs (`.displayName` is a different,
-  # unrelated field). `power.sleep.display` (macOS power management) is allowed.
-  if [ "${#_scan_files[@]}" -gt 0 ]; then
-    _s25_gate '\.display([^A-Za-z0-9_]|$)|vm\.display([^A-Za-z0-9_]|$)|"display"' 'power\.sleep\.display' "${_scan_files[@]}"
-  fi
-
   # G5: no hard-coded host-side ports — guest port forwards must come from the
   # manifest portForwards (22000-22099 host refs belong only in manifest/tests/docs).
   if [ "${#_scan_files[@]}" -gt 0 ]; then

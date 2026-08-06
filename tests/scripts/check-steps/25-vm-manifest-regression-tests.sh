@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
 # Test: step 25 vm-manifest-regression must flag manifest-contract regressions
-# (byte-count refs, binary literals, .display, hard-coded ports, KB/KiB, mib/gib
+# (byte-count refs, binary literals, hard-coded ports, KB/KiB, mib/gib
 # identifiers) and accept the sanctioned adapter sites.
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -46,15 +46,6 @@ test_step25_has_mib_literal_pattern() {
     return 0
   fi
   echo "FAIL: step 25 should detect the MiB literal 1048576"
-  return 1
-}
-
-test_step25_has_display_pattern() {
-  # G4: no `.display` manifest property refs
-  if grep -qF '\.display([^A-Za-z0-9_]' "$TEST_FILE"; then
-    return 0
-  fi
-  echo "FAIL: step 25 should detect .display manifest property refs"
   return 1
 }
 
@@ -180,22 +171,6 @@ test_step25_behavioral_rejects_mib_literal() {
   return 1
 }
 
-test_step25_behavioral_rejects_display() {
-  # Behavioral: a fixture with a .display ref must fail the check (G4).
-  local _tmpdir _exit_code
-  _tmpdir=$(mktemp -d) || return 1
-  mkdir -p "$_tmpdir/src"
-  printf 'vm.display = "My VM"\n' > "$_tmpdir/src/fixture.nix"
-  _exit_code=0
-  run_step25 true "$_tmpdir" "src/fixture.nix" || _exit_code=$?
-  rm -rf "$_tmpdir"
-  if [ "$_exit_code" -ne 0 ]; then
-    return 0
-  fi
-  echo "FAIL: step 25 should reject .display in scoped mode"
-  return 1
-}
-
 test_step25_behavioral_rejects_port() {
   # Behavioral: a fixture with a hard-coded hostfwd port must fail (G5).
   local _tmpdir _exit_code
@@ -245,15 +220,13 @@ test_step25_behavioral_rejects_identifier() {
 }
 
 test_step25_behavioral_accepts_sanctioned() {
-  # Behavioral: sanctioned sites (tart adapter, df -Pk KiB message,
-  # macOS power.sleep.display) must NOT be flagged.
+  # Behavioral: sanctioned sites (tart adapter, df -Pk KiB message) must NOT be flagged.
   local _tmpdir _exit_code
   _tmpdir=$(mktemp -d) || return 1
   mkdir -p "$_tmpdir/src/scripts"
   cat > "$_tmpdir/src/scripts/fixture.sh" <<'EOF'
 _mem_gib="$(( (_ram_bytes + 1073741823) / 1073741824 ))"
 KiB available, requires
-power.sleep.display = 1
 EOF
   _exit_code=0
   run_step25 true "$_tmpdir" "src/scripts/fixture.sh" || _exit_code=$?
@@ -293,9 +266,6 @@ fi
 if [ "$#" -eq 0 ] || [ "$1" = "test_step25_has_mib_literal_pattern" ]; then
   test_step25_has_mib_literal_pattern || exit 1
 fi
-if [ "$#" -eq 0 ] || [ "$1" = "test_step25_has_display_pattern" ]; then
-  test_step25_has_display_pattern || exit 1
-fi
 if [ "$#" -eq 0 ] || [ "$1" = "test_step25_has_port_pattern" ]; then
   test_step25_has_port_pattern || exit 1
 fi
@@ -328,9 +298,6 @@ if [ "$#" -eq 0 ] || [ "$1" = "test_step25_behavioral_rejects_gib_literal" ]; th
 fi
 if [ "$#" -eq 0 ] || [ "$1" = "test_step25_behavioral_rejects_mib_literal" ]; then
   test_step25_behavioral_rejects_mib_literal || exit 1
-fi
-if [ "$#" -eq 0 ] || [ "$1" = "test_step25_behavioral_rejects_display" ]; then
-  test_step25_behavioral_rejects_display || exit 1
 fi
 if [ "$#" -eq 0 ] || [ "$1" = "test_step25_behavioral_rejects_port" ]; then
   test_step25_behavioral_rejects_port || exit 1

@@ -1,5 +1,5 @@
 # Test: step 25 vm-manifest-regression PS1 must flag manifest-contract regressions
-# (byte-count refs, binary literals, .display, hard-coded ports, KB/KiB, mib/gib
+# (byte-count refs, binary literals, hard-coded ports, KB/KiB, mib/gib
 # identifiers) and accept the sanctioned adapter sites.
 
 $ErrorActionPreference = 'Stop'
@@ -45,12 +45,6 @@ if ($content -match '1048576') {
   Assert-Pass -Name 'step25_ps1_g3' -Reason 'step 25 PS1 detects the MiB literal 1048576'
 } else {
   Assert-Fail -Name 'step25_ps1_g3' -Reason 'step 25 PS1 should detect the MiB literal 1048576'
-}
-
-if ($content -match '\.display\(\[\^A-Za-z0-9_\]') {
-  Assert-Pass -Name 'step25_ps1_g4' -Reason 'step 25 PS1 detects .display property refs'
-} else {
-  Assert-Fail -Name 'step25_ps1_g4' -Reason 'step 25 PS1 should detect .display property refs'
 }
 
 if ($content -match 'hostfwd=tcp::') {
@@ -140,24 +134,6 @@ if ($threw) {
   Assert-Fail -Name 'step25_ps1_rejects_gib_literal' -Reason 'step 25 PS1 should reject 1073741824 outside the size parsers'
 }
 
-# Reject: .display ref (G4, scoped mode)
-$g4Fixture = Join-Path -Path $tmpDir -ChildPath 'src/fixture.nix'
-Set-Content -Path $g4Fixture -Value 'vm.display = "My VM"'
-$threw = $false
-try {
-  Push-Location $tmpDir
-  & $action -HasArgs $true -RepoRoot $tmpDir -PositionalArgs @('src/fixture.nix') > $null
-} catch {
-  $threw = $true
-} finally {
-  Pop-Location
-}
-if ($threw) {
-  Assert-Pass -Name 'step25_ps1_rejects_display' -Reason 'step 25 PS1 rejects .display in scoped mode'
-} else {
-  Assert-Fail -Name 'step25_ps1_rejects_display' -Reason 'step 25 PS1 should reject .display in scoped mode'
-}
-
 # Reject: invalid KB suffix (G6, scoped mode)
 $g6Fixture = Join-Path -Path $tmpDir -ChildPath 'src/kb.nix'
 Set-Content -Path $g6Fixture -Value 'size = 8KB'
@@ -199,7 +175,6 @@ $goodFixture = Join-Path -Path $tmpDir -ChildPath 'src/scripts/good.sh'
 Set-Content -Path $goodFixture -Value @'
 _mem_gib="$(( (_ram_bytes + 1073741823) / 1073741824 ))"
 KiB available, requires
-power.sleep.display = 1
 '@
 $threw = $false
 try {

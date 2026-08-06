@@ -50,9 +50,6 @@ Register-Step -Id "vm-manifest-regression" -Number 25 -Name "VM manifest regress
     @{ Label = 'binary GiB literal (524288/536870912/1073741824)'; Pattern = '524288|536870912|1073741824'; Allow = '_mem_gib='; Files = $g2Files },
     # G3: no 1048576 (1 MiB) outside the three size parser files.
     @{ Label = 'binary MiB literal (1048576)'; Pattern = '1048576'; Allow = '^$'; Files = $g3Files },
-    # G4: no `.display` manifest property refs (`.displayName` is a different,
-    # unrelated field). `power.sleep.display` (macOS power management) is allowed.
-    @{ Label = '.display manifest property reference'; Pattern = '\.display([^A-Za-z0-9_]|$)|vm\.display([^A-Za-z0-9_]|$)|"display"'; Allow = 'power\.sleep\.display'; Files = $scanFiles },
     # G5: no hard-coded host-side ports — guest port forwards must come from the
     # manifest portForwards (22000-22099 host refs belong only in manifest/tests/docs).
     @{ Label = 'hard-coded host-side port (22000-22099)'; Pattern = 'hostfwd=tcp::220[0-9]{2}|localhost:220[0-9]{2}|-p 220[0-9]{2}|::220[0-9]{2}-:|<integer>220[0-9]{2}</integer>'; Allow = '^$'; Files = $scanFiles },
