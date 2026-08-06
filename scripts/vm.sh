@@ -767,9 +767,9 @@ do_upgrade() {
 }
 
 # do_reset
-#   Factory-resets Android VM user state by re-downloading a pristine image.
-#   WHY: restricted to Android because the GSI image model is the only one
-#   where user state can be discarded cleanly.
+#   Factory-resets Android VM user state by recreating the canonical userdata
+#   disk at data/<id>.qcow2.  WHY: restricted to Android because the GSI
+#   image model is the only one where user state can be discarded cleanly.
 do_reset() {
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
   resolve_manifest

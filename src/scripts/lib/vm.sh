@@ -1301,6 +1301,46 @@ vm_ensure_base_and_overlay() {
   return 0
 }
 
+# vm_link_android_userdata_to_utm_bundle NAME INDEX [BUNDLE_DATA_DIR]
+#   Ensure Android.utm/Data/<userdataImage> is a hard link to data/<id>.qcow2
+#   (G1a write-through).  Canonical data/ is the source of truth when present.
+#   Never deletes userdata disks — only ln -f when canonical exists.
+vm_link_android_userdata_to_utm_bundle() {
+  _lautb_name="$1"
+  _lautb_index="$2"
+  _lautb_bundle_data_dir="${3:-}"
+
+  _lautb_canonical="$VM_DIR/data/${_lautb_name}.qcow2"
+  _lautb_userdata_image="$(jq -r ".VMs[$_lautb_index].Android.userdataImage" "$MANIFEST")"
+  if [ -z "$_lautb_bundle_data_dir" ]; then
+    _lautb_bundle_data_dir="$VM_DIR/${_lautb_name}.utm/Data"
+  fi
+  _lautb_bundle="$_lautb_bundle_data_dir/$_lautb_userdata_image"
+
+  if [ ! -f "$_lautb_canonical" ]; then
+    if [ -f "$_lautb_bundle" ]; then
+      error "Android userdata for '$_lautb_name' exists only in the UTM bundle ($_lautb_bundle); move it manually to $_lautb_canonical and re-run"
+      return 1
+    fi
+    return 0
+  fi
+
+  if [ "$dry_run" = true ]; then
+    dry_run "link Android userdata into UTM bundle: $_lautb_bundle -> $_lautb_canonical"
+    return 0
+  fi
+
+  mkdir -p "$_lautb_bundle_data_dir"
+  if [ -f "$_lautb_bundle" ] && [ "$_lautb_bundle" -ef "$_lautb_canonical" ]; then
+    say "Android userdata disk already linked: $_lautb_bundle"
+    return 0
+  fi
+
+  ln -f "$_lautb_canonical" "$_lautb_bundle"
+  say "linked Android userdata disk into UTM bundle: $_lautb_bundle"
+  return 0
+}
+
 # android (qemu/lineageos) image build
 
 vm_build_android() {
@@ -1376,17 +1416,23 @@ vm_build_android() {
   fi
 
   # Step 2: Create userdata disk (skip if exists, unless reset requested)
+  _bai_bundle_userdata="$VM_DIR/${_bai_vm_name}.utm/Data/$(jq -r ".VMs[$_bai_vm_index].Android.userdataImage" "$MANIFEST")"
   mkdir -p "$VM_DIR/data"
   if [ ! -f "$_bai_userdata_img" ] || [ "$_bai_reset_userdata" = "true" ]; then
     if [ "$_bai_reset_userdata" = "true" ] && [ -f "$_bai_userdata_img" ]; then
       say "resetting Android userdata disk..."
       rm -f "$_bai_userdata_img"
+    elif [ ! -f "$_bai_userdata_img" ] && [ -f "$_bai_bundle_userdata" ]; then
+      error "Android userdata for '$_bai_vm_name' exists only in the UTM bundle ($_bai_bundle_userdata); move it manually to $_bai_userdata_img and re-run"
+      return 1
     fi
-    say "creating userdata disk (${_bai_disk_bytes} bytes)..."
-    run_cmd qemu-img create -f qcow2 "$_bai_userdata_img" "$_bai_disk_bytes"
-    _bai_userdata_replaced=true
-    validate_qcow2_image "$_bai_userdata_img" "Android userdata disk for $_bai_vm_name" "$(parse_size "$(jq -r ".VMs[$_bai_vm_index].minImageSize" "$MANIFEST")")" || return 1
-    say "userdata disk ready: $_bai_userdata_img"
+    if [ ! -f "$_bai_userdata_img" ]; then
+      say "creating userdata disk (${_bai_disk_bytes} bytes)..."
+      run_cmd qemu-img create -f qcow2 "$_bai_userdata_img" "$_bai_disk_bytes"
+      _bai_userdata_replaced=true
+      validate_qcow2_image "$_bai_userdata_img" "Android userdata disk for $_bai_vm_name" "$(parse_size "$(jq -r ".VMs[$_bai_vm_index].minImageSize" "$MANIFEST")")" || return 1
+      say "userdata disk ready: $_bai_userdata_img"
+    fi
   else
     say "userdata disk already exists: $_bai_userdata_img"
   fi
@@ -1431,11 +1477,8 @@ vm_build_android() {
       _bai_bundle_dir="$VM_DIR/${_bai_vm_name}.utm/Data"
       if [ -d "$_bai_bundle_dir" ]; then
         if [ "$_bai_userdata_replaced" = true ]; then
-          _bai_bundle_userdata="$_bai_bundle_dir/$(jq -r ".VMs[$_bai_vm_index].Android.userdataImage" "$MANIFEST")"
-          if [ -f "$_bai_bundle_userdata" ]; then
-            ln -f "$_bai_userdata_img" "$_bai_bundle_userdata"
-            say "refreshed Android userdata link in UTM bundle: $_bai_bundle_userdata"
-          fi
+          vm_link_android_userdata_to_utm_bundle "$_bai_vm_name" "$_bai_vm_index" "$_bai_bundle_dir" \
+            || return 1
         fi
         if [ "$_bai_system_replaced" = true ]; then
           _bai_bundle_system="$_bai_bundle_dir/disk-main.qcow2"
@@ -1632,6 +1675,11 @@ vm_sync_utm() {
     say "detected config drift in existing bundle; VM will be re-registered to refresh runtime state: $vm_name"
   elif [ ! -f "$config_plist" ]; then
     vm_validate_utm_plist_template "$vm_name" || return
+  fi
+
+  if [ "$vm_type" = "Android" ]; then
+    vm_link_android_userdata_to_utm_bundle "$vm_name" "$vm_index" "$bundle/Data" \
+      || return 1
   fi
 
   vm_apply_utm_plist_and_register "$vm_name" "$bundle" "$legacy_display_config" "$template_drift_config"
@@ -1878,21 +1926,8 @@ vm_setup_utm() {
       else
         say "preserving existing Android system disk: $disk_file"
       fi
-      # Bundle copies keep the manifest Android group filenames so UTM's
-      # config.plist ImageName matches the on-disk file (single source: VMs.json).
-      _userdata_file="$data_dir/$(jq -r ".VMs[$vm_index].Android.userdataImage" "$MANIFEST")"
-      # Replace a legacy standalone bundle copy (pre-migration user state is
-      # optional; see the VM README) with a hard link to the canonical
-      # data/<id>.qcow2 disk so UTM writes go straight through (G1a).
-      if [ -f "$_userdata_file" ] && [ ! "$_userdata_file" -ef "$_android_userdata" ]; then
-        warn "removing legacy bundle userdata copy (pre-migration state is optional; see VM README): $_userdata_file"
-        rm -f "$_userdata_file"
-      fi
-      if [ ! -f "$_userdata_file" ]; then
-        ln -f "$_android_userdata" "$_userdata_file"
-        say "linked Android userdata disk into UTM bundle: $_userdata_file"
-      else
-        say "Android userdata disk already linked: $_userdata_file"
+      if ! vm_link_android_userdata_to_utm_bundle "$vm_name" "$vm_index" "$data_dir"; then
+        return 1
       fi
       _gsi_file="$data_dir/$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")"
       if [ -f "$_android_gsi" ]; then
@@ -1961,7 +1996,7 @@ vm_setup_libvirt() {
   # / gsiImage).
   if [ "$vm_type" = "Android" ]; then
     _android_system="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.systemImage" "$MANIFEST")"
-    _android_userdata="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.userdataImage" "$MANIFEST")"
+    _android_userdata="$VM_DIR/data/${vm_name}.qcow2"
     _android_gsi="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")"
     if [ ! -f "$_android_system" ] || [ ! -f "$_android_userdata" ]; then
       warn "Android images not found: $_android_system and $_android_userdata; skipping '$vm_name'"
