@@ -162,6 +162,10 @@ test_no_flags_prints_manual() {
     echo "FAIL: expected manual workflow to mention Magisk"
     _failures=$((_failures + 1))
   fi
+  if ! grep -q -- '--root' "$_tmp/out.txt"; then
+    echo "FAIL: expected manual workflow to mention --root"
+    _failures=$((_failures + 1))
+  fi
 }
 
 test_root_enables_debuggable_and_root_access() {
@@ -227,8 +231,8 @@ EOF
     echo "FAIL: --root should persist nucleus-root-props.sh in service.d"
     _failures=$((_failures + 1))
   fi
-  if ! grep -q 'adb root ready' "$_tmp/out.txt"; then
-    echo "FAIL: --root should report adb root ready"
+  if ! grep -q 'next: --fake-wifi' "$_tmp/out.txt"; then
+    echo "FAIL: --root should suggest --fake-wifi as next step"
     _failures=$((_failures + 1))
   fi
 }
