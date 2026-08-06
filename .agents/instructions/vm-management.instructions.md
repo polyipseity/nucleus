@@ -122,6 +122,8 @@ Guest port forwards are declared in the `portForwards` array of each VM entry: n
 | Tart (macOS) | `--net-softnet-expose hostPort:guestPort` | Use `tart ip <name>` + SSH guest port `22` (softnet-expose does not bind loopback) |
 | Android | Same as QEMU host backend | `adb connect localhost:<hostPort for guest 5555>` |
 
+**Host tooling:** `adb` and `fastboot` are required for `nucleus-vm android-config`. POSIX hosts install them via `pkgs.android-tools` in `src/modules/core.nix` (`nucleus-apply`); the `nucleus-vm` flake app also bundles `android-tools` in its runtime inputs. Windows installs `Google.PlatformTools` via WinGet DSC (`src/hosts/Windows/system/packages.dsc.yml`).
+
 ## Disk format
 
 QCOW2 throughout all three platforms. Stored at:

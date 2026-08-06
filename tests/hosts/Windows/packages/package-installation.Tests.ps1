@@ -116,6 +116,7 @@ Describe "Windows Package Installation" {
             @{ id = 'Google.NotoSans.CJK.TC'; displayName = 'Noto Sans CJK TC' }
             @{ id = 'Google.NotoSerif.CJK.SC'; displayName = 'Noto Serif CJK SC' }
             @{ id = 'Google.NotoSerif.CJK.TC'; displayName = 'Noto Serif CJK TC' }
+            @{ id = 'Google.PlatformTools'; displayName = 'Android platform tools (adb, fastboot)' }
             @{ id = 'Gyan.FFmpeg'; displayName = 'FFmpeg (Gyan)' }
             @{ id = 'ImageMagick.ImageMagick'; displayName = 'ImageMagick' }
             @{ id = 'Inter.Inter'; displayName = 'Inter' }

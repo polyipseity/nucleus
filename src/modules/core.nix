@@ -9,6 +9,7 @@
 }:
 let
   baseSharedPackages = [
+    pkgs.android-tools
     pkgs.asciinema
     pkgs.bat
     pkgs.bottom

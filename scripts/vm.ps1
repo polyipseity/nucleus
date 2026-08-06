@@ -3,7 +3,7 @@
   Unified VM management for Windows.
 
 .DESCRIPTION
-  Subcommands: setup, sync, list, status, start, stop, upgrade, reset, resize, gc, pack, unpack.
+  Subcommands: setup, sync, list, status, start, stop, upgrade, reset, android-config, resize, gc, pack, unpack.
 
   sync:    Refresh VM config (descriptors, start/stop scripts). Non-destructive.
   setup:   Full provision: config sync + image build + disk setup.
@@ -15,6 +15,7 @@
   stop:    Stop a VM (not yet implemented).
   upgrade: Upgrade an Android VM image (not yet implemented on Windows).
   reset:   Reset an Android VM image (not yet implemented on Windows).
+  android-config: Android post-provision (recovery, GApps, ADB keys, root, fake Wi-Fi). Delegates to nucleus-vm.
   resize:  Grow-only resize of the writable disk (data/<id>.qcow2) to an
            explicit size (e.g. 64GB); pass --allow-shrink to shrink instead.
   gc:      Remove stale VM artifacts. Delegates to Invoke-VMSetup -Gc.
@@ -33,7 +34,7 @@
            as-is. Pass --dry-run to preview.
 
 .PARAMETER Action
-  The operation to perform: setup, list, status, start, stop, upgrade, reset, resize, gc, pack, unpack.
+  The operation to perform: setup, list, status, start, stop, upgrade, reset, android-config, resize, gc, pack, unpack.
 
 .PARAMETER SubcommandArgs
   Additional arguments passed after the subcommand (flags, VM names, etc.).
@@ -61,7 +62,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('setup', 'sync', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'resize', 'gc', 'pack', 'unpack')]
+  [ValidateSet('setup', 'sync', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'android-config', 'resize', 'gc', 'pack', 'unpack')]
   [string]$Action,
 
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
@@ -81,7 +82,7 @@ $modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-Nucle
 Import-Module $modulePath -Force -DisableNameChecking
 
 if ($Help -or -not $Action) {
-  if (-not $Action) { Write-NucleusError "missing action (setup, sync, list, status, start, stop, upgrade, reset, resize, gc, pack, unpack)" }
+  if (-not $Action) { Write-NucleusError "missing action (setup, sync, list, status, start, stop, upgrade, reset, android-config, resize, gc, pack, unpack)" }
   Get-Help $PSCommandPath -Detailed
   exit 0
 }
@@ -366,6 +367,16 @@ function Invoke-VmReset {
   Resolve-VMGuestCredential -RepoRoot $RepoRoot > $null
   Write-NucleusInfo "resetting Android VM '$vmName' on Windows..."
   Write-NucleusWarning "Android reset on Windows is not yet fully implemented"
+}
+
+function Invoke-VmAndroidConfig {
+  if ($SubcommandArgs.Length -eq 0) {
+    Write-NucleusError 'android-config requires a VM name'
+    exit 1
+  }
+
+  & nucleus-vm android-config @SubcommandArgs
+  exit $LASTEXITCODE
 }
 
 function Invoke-VmResize {
@@ -693,6 +704,7 @@ switch ($Action) {
   'stop'    { Invoke-VmStop }
   'upgrade' { Invoke-VmUpgrade }
   'reset'   { Invoke-VmReset }
+  'android-config' { Invoke-VmAndroidConfig }
   'resize'  { Invoke-VmResize }
   'gc'      { Invoke-VmGc }
   'pack'    { Invoke-VmPack }

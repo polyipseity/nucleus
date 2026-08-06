@@ -4,7 +4,7 @@
 # previously scattered across vm-setup.sh (now vm.sh) and host-specific scripts.
 # VMs are defined in src/modules/VMs.json (the canonical manifest).
 #
-# Commands: setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack [vm...] [options].
+# Commands: setup|sync|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options].
 # Guest credentials are resolved from the per-user SOPS secret file referenced
 # by users.json vmGuest keys; see resolve_vm_guest_credentials.
 #
@@ -160,7 +160,7 @@ vm_guest_credentials_hash() {
 # ---------------------------------------------------------------------------
 
 usage() {
-  usage_std "$(basename "$0")" "setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack [vm...] [options]"
+  usage_std "$(basename "$0")" "setup|sync|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options]"
   cat <<'EOF'
   sync [vm...]             Refresh VM config (scripts, UTM plists, virsh define).
                           Non-destructive; runs automatically after nucleus-apply.
@@ -171,6 +171,7 @@ usage() {
   stop <vm>                Stop a VM.
   upgrade <vm>             Re-download+replace OS image (Android only; error for others).
   reset <vm>               Factory-reset VM user state (Android only; error for others).
+  android-config <vm>      Android post-provision: recovery, GApps, ADB keys, root, fake Wi-Fi.
   resize <vm> <size>       Grow-only resize of the writable disk (data/<vm>.qcow2)
                           to an explicit size (e.g. 64GB). Pass --allow-shrink to
                           shrink instead.
@@ -213,6 +214,15 @@ usage() {
   --json                        Machine-readable JSON output (list, status).
   --repo-root PATH              Override the repository root path.
   -h|--help                     Show usage.
+
+Android android-config flags (after VM name):
+  --recovery            Flash userdebug recovery from the latest jqssun release.
+  --gapps               Download and sideload MindTheGapps.
+  --adb-keys            Install host ~/.android/adbkey.pub into guest adb_keys.
+  --root                Enable Lineage root for apps and adb.
+  --fake-wifi           Load virt_wifi and bring up wlan0.
+  --fake-wifi-revert    Remove persisted fake Wi-Fi and unload virt_wifi.
+  --all                 Recovery, GApps, adb-keys, root, and fake Wi-Fi pipeline.
 EOF
 }
 
@@ -270,7 +280,7 @@ while [ "$#" -gt 0 ]; do
     --mido-script) NUCLEUS_MIDO_SCRIPT="$2"; shift 2 ;;
     --json) json_output=true; shift ;;
     --repo-root) repo_root_override="$2"; shift 2 ;;
-    setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack)
+    setup|sync|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack)
       action="$1"; shift
       vm_args=("$@")
       break
@@ -304,7 +314,7 @@ for arg in "${vm_args[@]}"; do
   esac
 done
 
-[ -z "$action" ] && { error "missing action (setup, sync, list, status, start, stop, upgrade, reset, gc, resize, pack, unpack)" ; usage >&2 ; exit 1; }
+[ -z "$action" ] && { error "missing action (setup, sync, list, status, start, stop, upgrade, reset, android-config, gc, resize, pack, unpack)" ; usage >&2 ; exit 1; }
 
 # Validate scalars
 # WHY: validating before dispatch fails fast with a precise message instead
@@ -815,6 +825,61 @@ do_reset() {
   say "reset complete for '$vm_name'"
 }
 
+# do_android_config
+#   Post-provision Android guest setup (recovery, GApps, ADB keys, root, fake Wi-Fi).
+do_android_config() {
+  REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
+  resolve_manifest
+  NUCLEUS_HOST="$(resolve_nucleus_host)"
+  require_command jq
+
+  if [ "${#vm_args[@]}" -eq 0 ]; then
+    error "android-config requires a VM name"
+    usage >&2
+    exit 1
+  fi
+
+  local vm_name="${vm_args[0]}"
+  local vm_type vm_index
+  local resolved
+  resolved="$(resolve_target_vm "$vm_name")" || exit 1
+  vm_type="$(printf '%s' "$resolved" | cut -f1)"
+  vm_index="$(printf '%s' "$resolved" | cut -f2)"
+
+  if [ "$vm_type" != "Android" ]; then
+    error "android-config is only supported for Android VMs ('$vm_name' is type $vm_type)"
+    exit 1
+  fi
+
+  VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
+  IMAGES_DIR="$VM_DIR/images"
+
+  if ! resolve_vm_guest_credentials; then
+    error "cannot configure '$vm_name' — guest credential resolution failed"
+    exit 1
+  fi
+  vm_guest_credentials_fingerprint="$(vm_guest_credentials_hash)"
+
+  vm_init "$REPO_ROOT" "$VM_DIR" "$IMAGES_DIR" "$TEMPLATES_DIR" "$dry_run" \
+    "$windows_iso" "$windows_iso_source" "$windows_iso_retries" \
+    "$windows_headless" "$accelerator" "$vm_secret_owner" "$vm_guest_username" \
+    "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
+    "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
+    "$accept_gsi_license" "false" "false" \
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force"
+
+  local config_flags=()
+  local _i=1
+  while [ "$_i" -lt "${#vm_args[@]}" ]; do
+    config_flags+=("${vm_args[$_i]}")
+    _i=$((_i + 1))
+  done
+
+  # shellcheck source=../src/scripts/vms/android-config.sh
+  . "$REPO_ROOT/src/scripts/vms/android-config.sh"
+  vm_android_config "$vm_name" "$vm_index" "${config_flags[@]}"
+}
+
 # do_resize
 #   Grows (or with --allow-shrink shrinks) a VM's writable disk to an
 #   explicit byte count.  WHY: the disk's virtual size can only be changed
@@ -915,5 +980,5 @@ do_unpack() {
 # ---------------------------------------------------------------------------
 
 case "$action" in
-  setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) "do_$action" ;;
+  setup|sync|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack) "do_$action" ;;
 esac

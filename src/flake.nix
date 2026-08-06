@@ -775,7 +775,10 @@
         };
         nucleus-vm = writeNucleusShellApplication pkgs {
           name = "vm";
-          runtimeInputs = [ pkgs.jq ];
+          runtimeInputs = [
+            pkgs.android-tools
+            pkgs.jq
+          ];
         };
       };
 

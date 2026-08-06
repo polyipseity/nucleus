@@ -184,6 +184,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure Google Platform Tools (adb, fastboot) is installed for Android VM configuration
+      settings:
+        id: Google.PlatformTools
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure Chrome is installed
       settings:
         id: Google.Chrome
