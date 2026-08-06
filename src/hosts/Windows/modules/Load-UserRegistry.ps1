@@ -1,46 +1,86 @@
 <#
 .SYNOPSIS
-  Load and validate the Windows user registry from src/hosts/Windows/users.json.
+  Load and validate the user registry from src/users/ domain JSON files.
 
 .DESCRIPTION
-  Reads the declarative user registry and exposes functions for querying user
-  configuration. The registry defines all users managed by this host
-  configuration (primary and secondary) and their home directories. This
-  mirrors the Nix users/default.nix module.
+  Assembles per-user configuration by deep-merging src/users/default/ with
+  src/users/<username>/ domain files, then resolving platform-keyed fields for
+  Windows.
 
-  The user registry is loaded once and cached during apply execution. All
-  user-specific configuration (secrets, DSC, VSCode settings) must query this
-  registry to determine which users to process.
-
-.PARAMETER RegistryPath
-  Absolute path to src/hosts/Windows/users.json. Mandatory: callers must
-  explicitly pass the path so they are aware of where host user configuration
-  lives.
+.PARAMETER RepoRoot
+  Absolute path to the nucleus repository root.
 
 .OUTPUTS
   Returns a hashtable with keys: 'users' (array of user objects) and
   'primaryUser' (the user with isPrimary=true, or $null if none).
 
-.EXAMPLE
-  $registry = & "$ModuleDir\Load-UserRegistry.ps1" -RegistryPath "$PSScriptRoot\users.json"
-  $adminUser = $registry.users | Where-Object { $_.name -eq 'admin' }
-  Write-Host "Admin home: $($adminUser.homeDirectory)"
-
-.EXAMPLE
-  $registry = & "$ModuleDir\Load-UserRegistry.ps1" -RegistryPath "$PSScriptRoot\users.json"
-  if ($registry.primaryUser) {
-    Write-Host "Materializing secrets for: $($registry.primaryUser.name)"
-  }
-
 .NOTES
   Environment variables: (none)
-  Exit codes: 0 on success; 1 on failure (missing file, invalid JSON, validation error)
+  Exit codes: 0 on success; 1 on failure
 #>
 [CmdletBinding()]
 param(
   [Parameter(Mandatory)]
-  [string]$RegistryPath
+  [string]$RepoRoot
 )
+
+$ErrorActionPreference = 'Stop'
+
+$Platform = 'windows'
+$UsersRoot = Join-Path -Path $RepoRoot -ChildPath 'src\users'
+$DefaultRoot = Join-Path -Path $UsersRoot -ChildPath 'default'
+$PlatformKeys = @('linux', 'macos', 'nixos', 'windows')
+
+function Test-PlatformMap {
+  param([object]$Value)
+
+  if ($null -eq $Value) {
+    return $false
+  }
+  if ($Value -isnot [System.Collections.IDictionary] -and $Value -isnot [pscustomobject]) {
+    return $false
+  }
+
+  $keys = @()
+  if ($Value -is [System.Collections.IDictionary]) {
+    $keys = @($Value.Keys)
+  }
+  else {
+    $keys = @($Value.PSObject.Properties.Name)
+  }
+
+  if ($keys.Count -eq 0) {
+    return $false
+  }
+
+  foreach ($key in $keys) {
+    if ($PlatformKeys -notcontains [string]$key) {
+      return $false
+    }
+  }
+
+  return $true
+}
+
+function Resolve-PlatformValue {
+  param([object]$Value)
+
+  if (-not (Test-PlatformMap -Value $Value)) {
+    return $Value
+  }
+
+  if ($Value -is [pscustomobject]) {
+    $Value = ConvertTo-PlainObject -InputObject $Value
+  }
+
+  foreach ($key in @($Platform, 'linux', 'macos', 'nixos', 'windows')) {
+    if ($Value.ContainsKey($key)) {
+      return $Value[$key]
+    }
+  }
+
+  return ($Value.Values | Select-Object -First 1)
+}
 
 function ConvertTo-PlainObject {
   param(
@@ -76,65 +116,208 @@ function ConvertTo-PlainObject {
   return $InputObject
 }
 
-# Load and validate the JSON registry file.
-if (-not (Test-Path -Path $RegistryPath -PathType Leaf)) {
-  Write-Error "User registry not found: $RegistryPath" -ErrorAction Stop
-  exit 1
-}
+function Read-DomainJson {
+  param(
+    [Parameter(Mandatory)]
+    [string]$Path
+  )
 
-try {
-  $rawRegistry = Get-Content -Path $RegistryPath -Raw | ConvertFrom-Json
-} catch {
-  Write-Error "Failed to parse user registry JSON: $_" -ErrorAction Stop
-  exit 1
-}
-
-# Validate structure: must have 'users' object.
-if (-not $rawRegistry.users -or $rawRegistry.users -isnot [PSCustomObject]) {
-  Write-Error "User registry missing or invalid 'users' object" -ErrorAction Stop
-  exit 1
-}
-
-# Convert users object to array of user records, adding the username as a property.
-$userList = @()
-foreach ($userName in $rawRegistry.users.PSObject.Properties.Name) {
-  $userConfig = $rawRegistry.users.$userName
-  if (-not $userConfig.homeDirectory) {
-    Write-Error "User '$userName' missing required 'homeDirectory'" -ErrorAction Stop
-    exit 1
+  if (-not (Test-Path -Path $Path -PathType Leaf)) {
+    return @{}
   }
-  $userList += @{
-    name           = $userName
-    dscConfigFiles = if ($userConfig.dscConfigFiles -is [System.Array]) {
-      @($userConfig.dscConfigFiles | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+
+  $raw = Get-Content -Path $Path -Raw | ConvertFrom-Json
+  $plain = ConvertTo-PlainObject -InputObject $raw
+  if ($plain.ContainsKey('$schema')) {
+    $plain.Remove('$schema')
+  }
+  return $plain
+}
+
+function Merge-Hashtables {
+  param(
+    [hashtable]$Base,
+    [hashtable]$Override
+  )
+
+  $merged = @{}
+  foreach ($key in $Base.Keys) {
+    $merged[$key] = $Base[$key]
+  }
+  foreach ($key in $Override.Keys) {
+    if ($merged.ContainsKey($key) -and $merged[$key] -is [hashtable] -and $Override[$key] -is [hashtable]) {
+      $merged[$key] = Merge-Hashtables -Base $merged[$key] -Override $Override[$key]
     }
     else {
-      @()
+      $merged[$key] = $Override[$key]
     }
-    cloudDrives    = ConvertTo-PlainObject -InputObject $userConfig.cloudDrives
-    customProvisionSymlinks = ConvertTo-PlainObject -InputObject $userConfig.customProvisionSymlinks
-    devRepos       = ConvertTo-PlainObject -InputObject $userConfig.devRepos
-    jellyfin       = ConvertTo-PlainObject -InputObject $userConfig.jellyfin
-    homeDirectory  = $userConfig.homeDirectory
-    isPrimary      = if ($userConfig.isPrimary) { $true } else { $false }
-    obsidian       = ConvertTo-PlainObject -InputObject $userConfig.obsidian
-    picard         = ConvertTo-PlainObject -InputObject $userConfig.picard
-    qtpass         = ConvertTo-PlainObject -InputObject $userConfig.qtpass
-    description    = if ($userConfig.description) { $userConfig.description } else { "" }
   }
+  return $merged
+}
+
+function Read-MergedDomain {
+  param(
+    [Parameter(Mandatory)]
+    [string]$Username,
+    [Parameter(Mandatory)]
+    [string]$FileName
+  )
+
+  $defaultPath = Join-Path -Path $DefaultRoot -ChildPath $FileName
+  $userPath = Join-Path -Path $UsersRoot -ChildPath (Join-Path $Username $FileName)
+  return Merge-Hashtables -Base (Read-DomainJson -Path $defaultPath) -Override (Read-DomainJson -Path $userPath)
+}
+
+function Resolve-CloudDriveItem {
+  param([hashtable]$Item)
+
+  $resolved = @{}
+  foreach ($key in $Item.Keys) {
+    $resolved[$key] = $Item[$key]
+  }
+
+  if ($resolved.ContainsKey('localPath')) {
+    $resolved['localPath'] = Resolve-PlatformValue -Value $resolved['localPath']
+  }
+  if ($resolved.ContainsKey('enable')) {
+    $resolved['enable'] = Resolve-PlatformValue -Value $resolved['enable']
+  }
+  if ($resolved.ContainsKey('fallbackTimer') -and $resolved['fallbackTimer'] -is [hashtable] -and $resolved['fallbackTimer'].ContainsKey('enable')) {
+    $resolved['fallbackTimer']['enable'] = Resolve-PlatformValue -Value $resolved['fallbackTimer']['enable']
+  }
+
+  return $resolved
+}
+
+function Resolve-CloudDrives {
+  param([hashtable]$CloudDrives)
+
+  $mounts = @()
+  foreach ($mount in @($CloudDrives['mounts'])) {
+    if ($null -ne $mount) {
+      $mounts += Resolve-CloudDriveItem -Item $mount
+    }
+  }
+
+  $replicas = @()
+  foreach ($replica in @($CloudDrives['replicas'])) {
+    if ($null -ne $replica) {
+      $replicas += Resolve-CloudDriveItem -Item $replica
+    }
+  }
+
+  return @{
+    mounts   = $mounts
+    replicas = $replicas
+  }
+}
+
+function Resolve-DevRepos {
+  param([hashtable]$DevRepos)
+
+  $repositories = @()
+  foreach ($repo in @($DevRepos['repositories'])) {
+    if ($null -eq $repo) {
+      continue
+    }
+    $resolvedRepo = @{}
+    foreach ($key in $repo.Keys) {
+      $resolvedRepo[$key] = $repo[$key]
+    }
+    if ($resolvedRepo.ContainsKey('target')) {
+      $resolvedRepo['target'] = Resolve-PlatformValue -Value $resolvedRepo['target']
+    }
+    $repositories += $resolvedRepo
+  }
+
+  return @{
+    enable                = $DevRepos['enable']
+    gitHubUsername        = $DevRepos['gitHubUsername']
+    repositories          = $repositories
+    submoduleDirectories  = @($DevRepos['submoduleDirectories'])
+  }
+}
+
+function Assemble-UserRecord {
+  param(
+    [Parameter(Mandatory)]
+    [string]$Username
+  )
+
+  $profile = Read-MergedDomain -Username $Username -FileName 'profile.json'
+  $homeDirectory = $null
+  if ($profile.ContainsKey('homeDirectory')) {
+    $homeDirectory = Resolve-PlatformValue -Value $profile['homeDirectory']
+  }
+
+  $cloudDrives = Resolve-CloudDrives -CloudDrives (Read-MergedDomain -Username $Username -FileName 'cloud-drives.json')
+  $customProvision = Read-MergedDomain -Username $Username -FileName 'custom-provision-symlinks.json'
+  $devRepos = Resolve-DevRepos -DevRepos (Read-MergedDomain -Username $Username -FileName 'dev-repos.json')
+  $envVars = Read-MergedDomain -Username $Username -FileName 'env-vars.json'
+  $icloud = Read-MergedDomain -Username $Username -FileName 'icloud-exclusions.json'
+  $jellyfin = Read-MergedDomain -Username $Username -FileName 'jellyfin.json'
+  $passwordStore = Read-MergedDomain -Username $Username -FileName 'password-store.json'
+  $services = Read-MergedDomain -Username $Username -FileName 'services.json'
+  $vmGuest = Read-MergedDomain -Username $Username -FileName 'vm-guest.json'
+  $windows = Read-MergedDomain -Username $Username -FileName 'windows.json'
+
+  return @{
+    name                    = $Username
+    isPrimary               = [bool]($profile['isPrimary'])
+    homeDirectory           = [string]$homeDirectory
+    cloudDrives             = $cloudDrives
+    customProvisionSymlinks = @($customProvision['customProvisionSymlinks'])
+    devRepos                = $devRepos
+    envVars                 = $envVars
+    iCloudExclusions        = @{
+      excludedDirNames = @($icloud['excludedDirNames'])
+      managedRoots     = @($icloud['managedRoots'])
+    }
+    jellyfin                = @{
+      accounts  = @($jellyfin['accounts'])
+      libraries = @($jellyfin['libraries'])
+    }
+    passwordStore           = @{
+      path = [string]$passwordStore['path']
+    }
+    services                = $services
+    vmGuest                 = @{
+      passwordSecretKey = [string]$vmGuest['passwordSecretKey']
+      usernameSecretKey = [string]$vmGuest['usernameSecretKey']
+    }
+    dscConfigFiles          = @($windows['dscConfigFiles'])
+    description             = [string]($windows['description'])
+  }
+}
+
+if (-not (Test-Path -Path $UsersRoot -PathType Container)) {
+  Write-Error "User registry root not found: $UsersRoot" -ErrorAction Stop
+  exit 1
+}
+
+$userList = @()
+foreach ($entry in Get-ChildItem -Path $UsersRoot -Directory) {
+  $name = $entry.Name
+  if ($name -eq 'default' -or $name -eq 'schemas') {
+    continue
+  }
+
+  $record = Assemble-UserRecord -Username $name
+  if ([string]::IsNullOrWhiteSpace($record.homeDirectory)) {
+    Write-Error "User '$name' missing required 'homeDirectory'" -ErrorAction Stop
+    exit 1
+  }
+  $userList += $record
 }
 
 if ($userList.Count -eq 0) {
-  Write-Error "User registry contains no users" -ErrorAction Stop
+  Write-Error 'User registry contains no users' -ErrorAction Stop
   exit 1
 }
 
-# Find the primary user (there should be exactly one, but the registry doesn't
-# enforce this; activation logic will fail if zero or multiple are marked primary).
-$primaryUser = $userList | Where-Object { $_.isPrimary }
+$primaryUser = @($userList | Where-Object { $_.isPrimary })
 
-# Return the loaded and validated registry.
 @{
   users       = $userList
-  primaryUser = if ($primaryUser.Count -eq 1) { $primaryUser } else { $null }
+  primaryUser = if ($primaryUser.Count -eq 1) { $primaryUser[0] } else { $null }
 }

@@ -78,9 +78,20 @@
       ...
     }:
     let
-      # Loaded from src/modules/users.json, mirroring the Windows pattern.
-      # Strip $schema key — it's metadata for JSON Schema validators, not a user entry.
-      users = removeAttrs (builtins.fromJSON (builtins.readFile ./modules/users.json)) [ "$schema" ];
+      repoRoot = ./.;
+
+      loadUserRegistry =
+        hostName:
+        import ./modules/lib/users-registry.nix {
+          lib = nixpkgs.lib;
+          inherit repoRoot hostName;
+        };
+
+      usersMacBook = loadUserRegistry "MacBook";
+      usersNixOS = loadUserRegistry "NixOS";
+
+      # Primary user is platform-independent; derive from the macOS registry view.
+      users = usersMacBook;
 
       # Filter users by isPrimary=true and extract the attr name.
       username = builtins.head (
@@ -89,12 +100,13 @@
 
       # home-manager.users attrset: each user gets home.nix; primary also gets sops-nix.
       mkHomeManagerUsers =
-        hostName: userModulesPath:
+        hostName: userModulesPath: hostUsers:
         builtins.mapAttrs (name: user: {
           imports = [
             {
               _module.args = {
-                inherit hostName users;
+                inherit hostName;
+                users = hostUsers;
                 managedUser = user;
                 managedUsername = name;
               };
@@ -104,7 +116,7 @@
           ++ (builtins.filter (m: m != null) [
             (if user.isPrimary then sops-nix.homeManagerModules.sops else null)
           ]);
-        }) users;
+        }) hostUsers;
 
       # Supported architectures.
       systems = {
@@ -868,7 +880,8 @@
         pkgs = pkgsMac;
         specialArgs = {
           hostName = "MacBook";
-          inherit username users;
+          inherit username;
+          users = usersMacBook;
           inherit
             homebrew-core
             homebrew-cask
@@ -897,12 +910,13 @@
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
               hostName = "MacBook";
-              inherit nixpkgs username users;
+              inherit nixpkgs username;
+              users = usersMacBook;
               nucleusApps = nucleusAppsMac;
               vsCodeMarketplace = vsCodeMarketplaceMac;
               treefmtPackage = mkTreefmtWrapper systems.mac pkgsMac;
             };
-            home-manager.users = mkHomeManagerUsers "MacBook" ./modules/home.nix;
+            home-manager.users = mkHomeManagerUsers "MacBook" ./modules/home.nix usersMacBook;
           }
         ];
       };
@@ -917,7 +931,8 @@
         pkgs = pkgsLinux;
         specialArgs = {
           hostName = "NixOS";
-          inherit username users;
+          inherit username;
+          users = usersNixOS;
           nucleusApps = nucleusAppsLinux;
           treefmtPackage = mkTreefmtWrapper systems.linux pkgsLinux;
         };
@@ -935,12 +950,13 @@
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
               hostName = "NixOS";
-              inherit nixpkgs username users;
+              inherit nixpkgs username;
+              users = usersNixOS;
               nucleusApps = nucleusAppsLinux;
               vsCodeMarketplace = vsCodeMarketplaceLinux;
               treefmtPackage = mkTreefmtWrapper systems.linux pkgsLinux;
             };
-            home-manager.users = mkHomeManagerUsers "NixOS" ./modules/home.nix;
+            home-manager.users = mkHomeManagerUsers "NixOS" ./modules/home.nix usersNixOS;
           }
         ];
       };
@@ -1100,7 +1116,8 @@
       homeConfigurations.${username} = home-manager.lib.homeManagerConfiguration {
         extraSpecialArgs = {
           hostName = "NixOS";
-          inherit nixpkgs username users;
+          inherit nixpkgs username;
+          users = usersNixOS;
           vsCodeMarketplace = vsCodeMarketplaceLinux;
         };
         modules = [
@@ -1108,7 +1125,7 @@
             _module.args = {
               hostName = "NixOS";
               managedUsername = username;
-              managedUser = users.${username};
+              managedUser = usersNixOS.${username};
             };
           }
           sops-nix.homeManagerModules.sops
