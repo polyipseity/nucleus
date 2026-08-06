@@ -73,11 +73,11 @@ Type-specific fields (nested objects keyed by `type`; all fields required when `
 
 | `type`      | Group      | Fields                                                                                                                                                                                                                    |
 | ----------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"Android"` | `Android`  | `systemImage`, `userdataImage`, `gsiImage`, `gsiUrl` (all required; `gsiUrl` may be `null` to use the built-in LineageOS GSI)                                                                                             |
+| `"Android"` | `Android`  | `systemImage`, `userdataImage`, `gsiImage`, `gsiUrl`, `gappsUrl` (all required; `gsiUrl` may be `null` for Lineage-only — no GSI disk; `gappsUrl` is the MindTheGapps sideload zip URL)                                                                                             |
 | `"macOS"`  | `macOS`    | `version` (release name, e.g. `"tahoe"`)                                                                                                                                                                                 |
 | `"Windows"` | `Windows`  | `edition` (e.g. `"pro"`), `isoUrl` (`null` = Mido/Fido auto-resolve; a URL auto-downloads the installer ISO when `--windows-iso` is omitted, cached at `~/virtual machines/images/<id>-installer.iso`)                  |
 
-All common fields and every field in the matching type group are **required** — there are no optional manifest properties. `Windows.isoUrl` is the sole deliberate nullable value (`null` is valid; a URL is valid).
+All common fields and every field in the matching type group are **required** — there are no optional manifest properties. Deliberate nullable values: `Windows.isoUrl` and `Android.gsiUrl` (`null` is valid; a URL is valid for both).
 
 ## Size suffix grammar
 
@@ -201,6 +201,7 @@ Both hooks are best-effort: a VM sync/setup failure does not abort a completed s
 |---------|-------------|
 | `sync` | Manifest or Nix VM template changed; VMs already provisioned. Runs automatically after apply. |
 | `setup` | First VM, missing images/bundles, credential/config drift, new guest. Full provision (sync + build + disks). |
+| `android-config` | Android only: flash userdebug recovery, sideload MindTheGapps, install ADB keys, enable Lineage root, configure fake Wi‑Fi. Requires a running VM. |
 | `pack` / `unpack` | Copy VM tree to another host (`unpack` may recreate UTM bundles). |
 | `start` / `stop` | Runtime control. Restart after sync when port forwards changed. |
 

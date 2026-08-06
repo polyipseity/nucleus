@@ -33,7 +33,8 @@
         "systemImage": "Android-system.qcow2",
         "userdataImage": "Android.qcow2",
         "gsiImage": "Android-gsi.img",
-        "gsiUrl": "https://dl.google.com/developers/android/baklava/images/gsi/gsi_gms_arm64-exp-BP4A.251205.006-14401865-f8760221.zip"
+        "gsiUrl": null,
+        "gappsUrl": "https://github.com/MindTheGapps/16.0.0-arm64/releases/download/MindTheGapps-16.0.0-arm64-20260409_073023/MindTheGapps-16.0.0-arm64-20260409_073023.zip"
       }
     },
     {

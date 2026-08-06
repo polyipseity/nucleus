@@ -137,8 +137,18 @@
         "gsiImage": {
           "type": "string"
         },
-        "gsiUrl": {
+        "gappsUrl": {
           "type": "string"
+        },
+        "gsiUrl": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "systemImage": {
           "type": "string"
@@ -148,10 +158,11 @@
         }
       },
       "required": [
-        "systemImage",
-        "userdataImage",
+        "gappsUrl",
         "gsiImage",
-        "gsiUrl"
+        "gsiUrl",
+        "systemImage",
+        "userdataImage"
       ],
       "type": "object"
     },
