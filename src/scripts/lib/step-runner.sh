@@ -39,7 +39,7 @@ register_step() {
 
   # Validate unique id (Spec A).
   local _existing_id
-  for _existing_id in "${_STEP_IDS[@]}"; do
+  for _existing_id in ${_STEP_IDS[@]+"${_STEP_IDS[@]}"}; do
     if [ "$_existing_id" = "$_id" ]; then
       error "Duplicate step ID '$_id'"
       exit 1
@@ -48,7 +48,7 @@ register_step() {
 
   # Validate unique number (Spec A).
   local _existing_n
-  for _existing_n in "${_STEP_NUMBERS[@]}"; do
+  for _existing_n in ${_STEP_NUMBERS[@]+"${_STEP_NUMBERS[@]}"}; do
     if [ "$_existing_n" -eq "$_n" ] 2>/dev/null; then
       error "Duplicate step number $_n"
       exit 1

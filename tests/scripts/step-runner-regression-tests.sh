@@ -36,6 +36,27 @@ test_regression_step_id_format_numeric() {
     fi
 }
 
+# Bash 3.2 + set -u treats empty "${arr[@]}" as unbound; register_step must use
+# the ${arr[@]+"${arr[@]}"} pattern on first registration.
+test_regression_register_step_bash32_empty_array() {
+    local exit_code=0
+    /bin/bash -c '
+        set -euo pipefail
+        SCRIPT_DIR="'"$REPO_ROOT"'/src/scripts/lib"
+        # shellcheck source=/dev/null
+        . "'"$REPO_ROOT"'/src/scripts/lib/lib.sh"
+        # shellcheck source=/dev/null
+        . "'"$REPO_ROOT"'/src/scripts/lib/step-runner.sh"
+        register_step "first" 1 "First" true
+        register_step "second" 2 "Second" true
+    ' || exit_code=$?
+    if [ "$exit_code" -eq 0 ]; then
+        assert_pass "REGRESSION: register_step works under bash 3.2 with set -u on empty arrays"
+    else
+        assert_fail "REG-bash32-empty-array" "register_step failed under bash 3.2 + set -u (exit $exit_code)"
+    fi
+}
+
 test_regression_step_id_preserves_order() {
     local result
     result=$(
@@ -406,6 +427,7 @@ echo ""
 
 test_regression_skip_system_build_flag_removed
 test_regression_step_id_format_numeric
+test_regression_register_step_bash32_empty_array
 test_regression_step_id_preserves_order
 test_regression_scoped_sets_has_args
 test_regression_full_sets_has_args_false
