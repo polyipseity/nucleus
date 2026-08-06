@@ -19,11 +19,11 @@
       "portForwards": [
         {
           "guestPort": 5555,
-          "hostPort": 5555
+          "hostPort": 22040
         },
         {
           "guestPort": 5554,
-          "hostPort": 5554
+          "hostPort": 22041
         }
       ],
       "hostname": "Android",
@@ -52,7 +52,7 @@
       "portForwards": [
         {
           "guestPort": 22,
-          "hostPort": 2222
+          "hostPort": 22010
         }
       ],
       "hostname": "MacBook",
@@ -80,7 +80,7 @@
       "portForwards": [
         {
           "guestPort": 22,
-          "hostPort": 2222
+          "hostPort": 22020
         }
       ],
       "hostname": "NixOS",
@@ -105,7 +105,7 @@
       "portForwards": [
         {
           "guestPort": 22,
-          "hostPort": 2222
+          "hostPort": 22030
         }
       ],
       "hostname": "Windows",

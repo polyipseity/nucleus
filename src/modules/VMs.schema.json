@@ -113,6 +113,7 @@
                   "type": "integer"
                 },
                 "hostPort": {
+                  "description": "Host-side TCP port in the nucleus VM forward block (22000-22099).",
                   "minimum": 1,
                   "type": "integer"
                 }
