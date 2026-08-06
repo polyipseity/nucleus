@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Post-provision Android guest configuration: MindTheGapps install, ADB key
+# Post-provision Android guest configuration: MindTheGapps sideload, ADB key
 # install, Lineage root, and fake Wi-Fi.
 #
 # Invoked by nucleus-vm android-config after vm_init sets MANIFEST, VM_DIR, IMAGES_DIR.
@@ -19,7 +19,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 usage() {
   usage_std "$(basename "$0")" "<vm-name> <vm-index> [options]"
   cat <<'EOF'
-  --gapps               Download and install MindTheGapps on booted Lineage (requires authorized ADB).
+  --gapps               Sideload MindTheGapps in recovery (requires userdebug recovery).
   --adb-keys            Install host ~/.android/adbkey.pub into the guest adb_keys file.
   --root                Enable Lineage root for apps and adb (requires booted Lineage).
   --fake-wifi           Load virt_wifi and bring up wlan0 (requires root).
@@ -28,25 +28,17 @@ usage() {
 EOF
 }
 
-vm_android_config_run_as_root() {
-  _vacr_serial="$1"
-  _vacr_cmd="$2"
-  # check-suppress:suppression_doc: adb root is unavailable on user builds; su path below handles non-root adb.
-  adb -s "$_vacr_serial" root 2>/dev/null || true
-  sleep 2
-  if adb -s "$_vacr_serial" shell 'id -u' 2>/dev/null | grep -qx '0'; then
-    adb -s "$_vacr_serial" shell "$_vacr_cmd"
-    return 0
-  fi
-  adb -s "$_vacr_serial" shell "su -c $(printf '%q' "$_vacr_cmd")"
-}
-
-vm_android_config_remount_rw() {
-  _vacrr_serial="$1"
-  if adb -s "$_vacrr_serial" remount 2>/dev/null; then
-    return 0
-  fi
-  vm_android_config_run_as_root "$_vacrr_serial" 'mount -o rw,remount /'
+vm_android_config_print_gapps_manual_steps() {
+  cat <<'EOF'
+MindTheGapps manual workflow (--gapps):
+  1. nucleus-vm reset Android (fresh userdata) and start the VM.
+  2. Boot LineageOS Recovery — not the normal system. Stock recovery shows ADB as unauthorized until userdebug recovery is flashed (this script does that via fastboot).
+  3. Run: nucleus-vm android-config Android --gapps
+  4. When recovery shows "Signature verification failed — Install anyway?", tap Yes on the VM screen.
+  5. Select Reboot system now from recovery when sideload finishes.
+  6. Complete Lineage setup, tap Allow on the USB debugging prompt.
+  7. Run: nucleus-vm android-config Android --adb-keys --root --fake-wifi
+EOF
 }
 
 vm_android_config_gapps() {
@@ -54,21 +46,50 @@ vm_android_config_gapps() {
   _vacg_serial="$(vm_android_adb_serial "$_vacg_vm_index")"
   _vacg_url="$(jq -r ".VMs[$_vacg_vm_index].Android.gappsUrl" "$MANIFEST")"
   _vacg_zip="$IMAGES_DIR/android-gapps.zip"
-  _vacg_extract="$IMAGES_DIR/android-gapps-extract"
-  _vacg_partition=''
+  _vacg_release_tag=''
+  _vacg_state=''
 
   if [ -z "$_vacg_url" ] || [ "$_vacg_url" = "null" ]; then
     error "Android.gappsUrl is not set in the manifest"
     return 1
   fi
 
-  if ! vm_android_adb_wait_authorized "$_vacg_vm_index" 600; then
+  say "MindTheGapps installs via recovery sideload — not on a booted system."
+  vm_android_config_print_gapps_manual_steps
+
+  # check-suppress:suppression_doc: adb connect is idempotent; failure while offline is expected before recovery boots.
+  adb connect "$_vacg_serial" >/dev/null 2>&1 || true
+  _vacg_state="$(vm_android_adb_list_state "$_vacg_vm_index")"
+  if [ "$_vacg_state" = "device" ]; then
+    error "MindTheGapps requires LineageOS Recovery; guest is booted to system (device)"
+    return 1
+  fi
+  if [ "$_vacg_state" = "unauthorized" ]; then
+    say "ADB shows unauthorized on stock recovery (expected); will flash userdebug recovery via fastboot"
+  fi
+
+  vm_android_download_userdebug_recovery "$_vacg_vm_index" || return 1
+  _vacg_release_tag="$(jq -r '.tag_name' "$IMAGES_DIR/android-recovery-userdebug.tag.json")"
+  vm_android_ensure_userdebug_recovery "$_vacg_vm_index" "$_vacg_release_tag" || return 1
+
+  if ! vm_android_adb_wait_recovery "$_vacg_vm_index" 300; then
     return 1
   fi
 
-  if [ "$(vm_android_adb_list_state "$_vacg_vm_index")" != "device" ]; then
-    error "MindTheGapps install requires booted Lineage (adb state device)"
-    return 1
+  _vacg_state="$(vm_android_adb_list_state "$_vacg_vm_index")"
+  if [ "$_vacg_state" != "sideload" ]; then
+    say "entering sideload mode on $_vacg_serial..."
+    # check-suppress:suppression_doc: reboot sideload may fail when already transitioning; sideload wait below handles the next state.
+    adb -s "$_vacg_serial" reboot sideload 2>/dev/null || true
+    if ! vm_android_adb_connect "$_vacg_vm_index" 120; then
+      error "guest did not enter sideload mode; from recovery select Apply update from ADB"
+      return 1
+    fi
+    _vacg_state="$(vm_android_adb_list_state "$_vacg_vm_index")"
+    if [ "$_vacg_state" != "sideload" ]; then
+      error "guest must be in sideload mode for MindTheGapps; current state: $_vacg_state"
+      return 1
+    fi
   fi
 
   if [ ! -f "$_vacg_zip" ]; then
@@ -80,42 +101,17 @@ vm_android_config_gapps() {
     say "using cached MindTheGapps: $_vacg_zip"
   fi
 
-  say "extracting MindTheGapps on host..."
-  rm -rf "$_vacg_extract"
-  mkdir -p "$_vacg_extract"
-  run_cmd unzip -q -o "$_vacg_zip" -d "$_vacg_extract"
-
-  say "remounting system partition read-write on $_vacg_serial..."
-  vm_android_config_remount_rw "$_vacg_serial" || {
-    error "failed to remount system read-write; enable root and retry"
-    return 1
-  }
-
-  for _vacg_partition in system product system_ext; do
-    if [ -d "$_vacg_extract/$_vacg_partition" ]; then
-      say "pushing MindTheGapps $_vacg_partition/ to /$_vacg_partition/..."
-      run_cmd adb -s "$_vacg_serial" push "$_vacg_extract/$_vacg_partition/." "/$_vacg_partition/"
-    fi
-  done
-
-  if [ -d "$_vacg_extract/system_ext/priv-app/SetupWizard" ]; then
-    say "removing stock Provision app (MindTheGapps ships SetupWizard)..."
-    vm_android_config_run_as_root "$_vacg_serial" 'rm -rf /system/system_ext/priv-app/Provision'
-  fi
-
-  say "rebooting after MindTheGapps install..."
-  # check-suppress:suppression_doc: reboot may fail if the guest is already shutting down; post-reboot wait handles the next state.
-  adb -s "$_vacg_serial" reboot || true
-  if ! vm_android_adb_wait_authorized "$_vacg_vm_index" 600; then
-    error "guest did not return to authorized booted state after MindTheGapps install"
+  say "manual step: when recovery shows 'Signature verification failed — Install anyway?', tap Yes on the VM screen"
+  say "sideloading MindTheGapps to $_vacg_serial..."
+  if ! run_cmd adb -s "$_vacg_serial" sideload "$_vacg_zip"; then
+    error "adb sideload failed; confirm you tapped Install anyway on the VM if prompted"
     return 1
   fi
 
-  if ! adb -s "$_vacg_serial" shell 'pm list packages' 2>/dev/null | grep -q 'package:com.google.android.gms'; then
-    error "MindTheGapps install finished but com.google.android.gms is not present"
-    return 1
-  fi
-  say "MindTheGapps install complete on $_vacg_serial"
+  say "MindTheGapps sideload finished."
+  say "manual step: select Reboot system now from the recovery menu (or wait for an automatic reboot)"
+  say "after Lineage boots, tap Allow on the USB debugging prompt, then run:"
+  say "  nucleus-vm android-config Android --adb-keys --root --fake-wifi"
 }
 
 vm_android_config_adb_keys() {
@@ -191,7 +187,7 @@ vm_android_config() {
 
   require_command adb
   require_command curl
-  require_command unzip
+  require_command fastboot
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
