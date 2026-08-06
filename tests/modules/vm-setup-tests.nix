@@ -843,6 +843,33 @@ let
     in
     assert' (builtins.all (r: r == null) results) "VM setup script existence check failed";
 
+  test_vm_sync_subcommand_wired = assert' (
+    (lib.hasInfix "setup|sync|list" vm_setup_sh_text)
+    && (lib.hasInfix "do_sync()" vm_setup_sh_text)
+    && (lib.hasInfix "vm_sync_config_phase" vm_setup_sh_text)
+    && (lib.hasInfix "'sync'" vm_ps1_text)
+    && (lib.hasInfix "function Invoke-VMSync" windows_vm_setup_ps1_text)
+  ) "nucleus-vm sync must be wired on POSIX and Windows";
+
+  test_vm_setup_calls_sync_phase = assert' (
+    (lib.hasInfix "vm_prepare_vm_command" vm_setup_sh_text)
+    && (lib.hasInfix "vm_sync_config_phase" vm_setup_sh_text)
+    && (lib.hasInfix "vm_build_images" vm_setup_sh_text)
+  ) "setup must share vm_prepare + vm_sync_config_phase before image build";
+
+  test_vm_sync_utm_includes_registration = assert' (
+    (lib.hasInfix "vm_apply_utm_plist_and_register" vm_setup_sh_text)
+    && (lib.hasInfix "re_register_utm_bundle" vm_setup_sh_text)
+    && (lib.hasInfix "wait_for_utm_registration" vm_setup_sh_text)
+  ) "vm sync must refresh UTM plists and repair registration on drift";
+
+  test_apply_vm_sync_default_on = assert' (
+    (lib.hasInfix "vm_sync=true" apply_sh_text)
+    && (lib.hasInfix "run_vm_post_apply" apply_sh_text)
+    && (lib.hasInfix "nucleus-vm sync" apply_sh_text)
+    && (lib.hasInfix "Invoke-VMSync" (builtins.readFile ../../src/hosts/Windows/apply.ps1))
+  ) "apply must run VM config sync by default with setup as the opt-in heavy path";
+
   # Every enabled VM must be reachable by at least one known host (MacBook,
   # NixOS, Windows).  An orphaned VM (enabled but with a hosts list that
   # excludes all known hosts) would never be provisioned by any machine.
@@ -1018,6 +1045,7 @@ let
   vm_setup_sh_text =
     builtins.readFile ../../scripts/vm.sh + builtins.readFile ../../src/scripts/lib/vm.sh;
   vm_ps1_text = builtins.readFile ../../scripts/vm.ps1;
+  apply_sh_text = builtins.readFile ../../src/scripts/apply.sh;
   windows_vm_setup_ps1_text = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-VMSetup.ps1;
   readmeTemplateText = builtins.readFile ../../src/vms/templates/README.md;
   startPosixTemplateText = builtins.readFile ../../src/vms/templates/start-posix.sh;
@@ -2225,6 +2253,10 @@ let
     test_packer_templates_exist
     test_vm_templates_exist
     test_vm_setup_scripts_exist
+    test_vm_sync_subcommand_wired
+    test_vm_setup_calls_sync_phase
+    test_vm_sync_utm_includes_registration
+    test_apply_vm_sync_default_on
     test_guest_nix_nonempty
     test_nixos_guest_virtiofs_not_forced
     test_nixos_guest_qemu_guest_enabled
@@ -2396,6 +2428,10 @@ in
     test_packer_templates_exist
     test_vm_templates_exist
     test_vm_setup_scripts_exist
+    test_vm_sync_subcommand_wired
+    test_vm_setup_calls_sync_phase
+    test_vm_sync_utm_includes_registration
+    test_apply_vm_sync_default_on
     test_guest_nix_nonempty
     test_nixos_guest_virtiofs_not_forced
     test_nixos_guest_qemu_guest_enabled

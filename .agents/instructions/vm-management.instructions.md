@@ -177,12 +177,28 @@ QCOW2 enables copy-based migration between hosts without conversion.
 
 ## Apply hook
 
-`nucleus-vm setup` (and the `--vm-setup` flag for `nucleus apply`) is opt-in:
+Post-apply VM behavior:
 
-- POSIX: `src/scripts/apply.sh` passes `--vm-setup` to enable; skipped by default.
-- Windows: `src/hosts/Windows/apply.ps1` uses `-VMSetup` switch; skipped by default.
+| Step | Default | Flag |
+|------|---------|------|
+| Config sync | **on** | `--no-vm-sync` / `-NoVMSync` to skip |
+| Full provision | off | `--vm-setup` / `-VMSetup` (includes sync; do not run both) |
 
-The hook is always best-effort: a VM setup failure does not abort a completed system apply.
+- POSIX: [`src/scripts/apply.sh`](src/scripts/apply.sh) runs `nucleus-vm sync` after rebuild unless `--no-vm-sync` is set.
+- Windows: [`src/hosts/Windows/apply.ps1`](src/hosts/Windows/apply.ps1) runs `Invoke-VMSync` unless `-NoVMSync` is set.
+
+Both hooks are best-effort: a VM sync/setup failure does not abort a completed system apply.
+
+## Command taxonomy
+
+| Command | When to use |
+|---------|-------------|
+| `sync` | Manifest or Nix VM template changed; VMs already provisioned. Runs automatically after apply. |
+| `setup` | First VM, missing images/bundles, credential/config drift, new guest. Full provision (sync + build + disks). |
+| `pack` / `unpack` | Copy VM tree to another host (`unpack` may recreate UTM bundles). |
+| `start` / `stop` | Runtime control. Restart after sync when port forwards changed. |
+
+`sync` refreshes descriptors, start/stop scripts, UTM plists (with registration), and `virsh define`. It skips image build, disk creation, and GC.
 
 ## Adding a new VM
 
