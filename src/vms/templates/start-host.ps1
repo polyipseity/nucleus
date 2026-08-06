@@ -9,7 +9,7 @@ $vmDir = '__VM_DIR__'
 
 switch ('__HOST_KIND__') {
   'darwin-tart' {
-    & tart run $vmName
+    & tart run --net-softnet --net-softnet-allow=0.0.0.0/0 --net-softnet-expose '__TART_SOFTNET_EXPOSE__' $vmName
   }
   'darwin-utm' {
     if (Test-Path '/Applications/UTM.app/Contents/MacOS/utmctl') {

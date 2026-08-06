@@ -646,7 +646,9 @@ do_start() {
       case "$vm_type" in
         macOS)
           require_command tart "brew install cirruslabs/cli/tart"
-          exec tart run "$vm_name"
+          local tart_softnet_expose
+          tart_softnet_expose="$(jq -r --arg name "$vm_name" '[.VMs[] | select(.id == $name) | .portForwards[] | "\(.hostPort):\(.guestPort)"] | join(",")' "$MANIFEST")"
+          exec tart run --net-softnet --net-softnet-allow=0.0.0.0/0 --net-softnet-expose "$tart_softnet_expose" "$vm_name"
           ;;
         *)
           # UTM guests

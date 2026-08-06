@@ -343,7 +343,7 @@ vm_wait_for_guest() {
   _wg_elapsed=0
 
   # Probe host ports come from the manifest portForwards, not hard-coded
-  # 2222/5555 values: guest 22 -> SSH, guest 5555 -> ADB.  The Windows QEMU
+  # Manifest host ports come from portForwards (guest 22 -> SSH, guest 5555 -> ADB).
   # GA pipe path below is host-kind based and involves no host port.
   _wg_ssh_port="$(jq -r --arg t "$_wg_type" '[.VMs[] | select(.type == $t) | .portForwards[] | select(.guestPort == 22)][0].hostPort // empty' "$MANIFEST")"
   _wg_adb_port="$(jq -r --arg t "$_wg_type" '[.VMs[] | select(.type == $t) | .portForwards[] | select(.guestPort == 5555)][0].hostPort // empty' "$MANIFEST")"
@@ -396,12 +396,15 @@ vm_wait_for_guest() {
     done
     return 1
   elif [ "$_wg_type" = "macOS" ]; then
-    # SSH check (macOS guests in Tart expose SSH on the manifest forwarded
-    # host port for guest 22)
+    # SSH check via Tart softnet guest IP (guest SSH on port 22)
     while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
-      ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
-        -o ConnectTimeout=5 -p "$_wg_ssh_port" \
-        "${vm_guest_username:?}@localhost" true 2>/dev/null && return 0
+      # check-suppress:suppression_doc: guest IP is not available until Tart softnet assigns one; empty is expected while waiting.
+      _wg_guest_ip="$(tart ip "$_wg_name" 2>/dev/null || true)"
+      if [ -n "$_wg_guest_ip" ]; then
+        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+          -o ConnectTimeout=5 -p 22 \
+          "${vm_guest_username:?}@$_wg_guest_ip" true 2>/dev/null && return 0
+      fi
       sleep 5
       _wg_elapsed=$((_wg_elapsed + 5))
     done
@@ -432,14 +435,26 @@ vm_write_start_script() {
     return 0
   fi
 
+  _wss_tart_softnet_expose=""
+  if [ "$_wss_host_kind" = "darwin-tart" ]; then
+    _wss_tart_softnet_expose="$(printf '%s' "$_wss_doc" | jq -r '[.portForwards[] | "\(.hostPort):\(.guestPort)"] | join(",")')"
+  fi
+
   # Render .sh from template.
   if [ -f "$TEMPLATES_DIR/start-posix.sh" ]; then
-    sed -e "s|__VM_NAME__|$_wss_name|g" \
-        -e "s|__VM_DISPLAY__|$_wss_display|g" \
-        -e "s|__VM_TYPE__|$_wss_type|g" \
-        -e "s|__HOST_KIND__|$_wss_host_kind|g" \
-        -e "s|__VM_DIR__|$VM_DIR|g" \
-        "$TEMPLATES_DIR/start-posix.sh" >"$_wss_path_sh"
+    _wss_posix_sed=(
+      -e "s|__VM_NAME__|$_wss_name|g"
+      -e "s|__VM_DISPLAY__|$_wss_display|g"
+      -e "s|__VM_TYPE__|$_wss_type|g"
+      -e "s|__HOST_KIND__|$_wss_host_kind|g"
+      -e "s|__VM_DIR__|$VM_DIR|g"
+    )
+    if [ "$_wss_host_kind" = "darwin-tart" ]; then
+      _wss_posix_sed+=(-e "s|__TART_SOFTNET_EXPOSE__|$_wss_tart_softnet_expose|g")
+    else
+      _wss_posix_sed+=(-e "s|__TART_SOFTNET_EXPOSE__||g")
+    fi
+    sed "${_wss_posix_sed[@]}" "$TEMPLATES_DIR/start-posix.sh" >"$_wss_path_sh"
   else
     warn "start-posix.sh template not found at $TEMPLATES_DIR/start-posix.sh"
     printf '#!/bin/sh\nset -eu\necho "VM start script for %s"\n' "$_wss_name" >"$_wss_path_sh"
@@ -451,11 +466,18 @@ vm_write_start_script() {
   case "$_wss_host_kind" in
     darwin-tart|darwin-utm|nixos-libvirt)
       if [ -f "$TEMPLATES_DIR/start-host.ps1" ]; then
-        sed -e "s|__HOST_KIND__|$_wss_host_kind|g" \
-            -e "s|__VM_NAME__|$_wss_name|g" \
-            -e "s|__VM_DISPLAY__|$_wss_display|g" \
-            -e "s|__VM_DIR__|$VM_DIR|g" \
-            "$TEMPLATES_DIR/start-host.ps1" >"$_wss_path_ps1"
+        _wss_ps1_sed=(
+          -e "s|__HOST_KIND__|$_wss_host_kind|g"
+          -e "s|__VM_NAME__|$_wss_name|g"
+          -e "s|__VM_DISPLAY__|$_wss_display|g"
+          -e "s|__VM_DIR__|$VM_DIR|g"
+        )
+        if [ "$_wss_host_kind" = "darwin-tart" ]; then
+          _wss_ps1_sed+=(-e "s|__TART_SOFTNET_EXPOSE__|$_wss_tart_softnet_expose|g")
+        else
+          _wss_ps1_sed+=(-e "s|__TART_SOFTNET_EXPOSE__||g")
+        fi
+        sed "${_wss_ps1_sed[@]}" "$TEMPLATES_DIR/start-host.ps1" >"$_wss_path_ps1"
       else
         warn "start-host.ps1 template not found at $TEMPLATES_DIR/start-host.ps1"
         printf '# start script for %s\n' "$_wss_name" >"$_wss_path_ps1"
@@ -472,23 +494,21 @@ vm_write_start_script() {
           return 1
         fi
         # Document-driven tokens: CPU count, RAM bytes, image filenames, and
-        # the ADB/console host ports come from the JSON doc (descriptor or
-        # manifest fallback via vm_vm_json), keeping the shared start script
-        # single-source (embedded-content policy).
+        # port forwards come from the JSON doc (descriptor or manifest fallback
+        # via vm_vm_json), keeping the shared start script single-source
+        # (embedded-content policy).
         _wss_cpus="$(printf '%s' "$_wss_doc" | jq -r '.cpus')"
         _wss_ram_bytes="$(parse_size "$(printf '%s' "$_wss_doc" | jq -r '.ram')")"
         _wss_system_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.systemImage')"
         _wss_userdata_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.userdataImage')"
         _wss_gsi_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.gsiImage')"
-        _wss_adb_port="$(printf '%s' "$_wss_doc" | jq -r '.portForwards[] | select(.guestPort == 5555) | .hostPort')"
-        _wss_console_port="$(printf '%s' "$_wss_doc" | jq -r '.portForwards[] | select(.guestPort == 5554) | .hostPort')"
+        _wss_hostfwds="$(printf '%s' "$_wss_doc" | jq -r '[.portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")')"
         sed -e "s|__ANDROID_CPU_COUNT__|$_wss_cpus|g" \
             -e "s|__ANDROID_RAM_BYTES__|${_wss_ram_bytes}B|g" \
             -e "s|__ANDROID_SYSTEM_IMAGE__|$_wss_system_image|g" \
             -e "s|__ANDROID_USERDATA_IMAGE__|$_wss_userdata_image|g" \
             -e "s|__ANDROID_GSI_IMAGE__|$_wss_gsi_image|g" \
-            -e "s|__ADB_PORT__|$_wss_adb_port|g" \
-            -e "s|__ADB_CONSOLE_PORT__|$_wss_console_port|g" \
+            -e "s|__HOSTFWDS__|$_wss_hostfwds|g" \
             "$_wss_android_start" >"$_wss_path_ps1"
       else
         # Windows VM start scripts mirror Invoke-VMSetup.ps1 rendering (Git

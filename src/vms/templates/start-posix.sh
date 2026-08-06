@@ -10,7 +10,7 @@ VM_DIR="__VM_DIR__"
 HOST_KIND="__HOST_KIND__"
 case "$HOST_KIND" in
   darwin-tart)
-    exec tart run "__VM_NAME__"
+    exec tart run --net-softnet --net-softnet-allow=0.0.0.0/0 --net-softnet-expose "__TART_SOFTNET_EXPOSE__" "__VM_NAME__"
     ;;
   darwin-utm)
     if command -v utmctl >/dev/null 2>&1; then
