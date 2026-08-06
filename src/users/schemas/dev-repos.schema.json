@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "platformString": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "macos": {
+              "type": "string"
+            },
+            "nixos": {
+              "type": "string"
+            },
+            "windows": {
+              "type": "string"
+            }
+          },
+          "required": ["macos", "nixos", "windows"],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "description": "Development repository provisioning configuration.",
+  "properties": {
+    "$schema": {
+      "description": "Reference to this schema file.",
+      "type": "string"
+    },
+    "enable": {
+      "type": "boolean"
+    },
+    "gitHubUsername": {
+      "type": "string"
+    },
+    "repositories": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "symlinkFromRepoRoot": {
+            "type": "boolean"
+          },
+          "target": {
+            "$ref": "#/definitions/platformString"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": ["name"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "submoduleDirectories": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "recursive": {
+            "type": "boolean"
+          }
+        },
+        "required": ["path"],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": ["enable", "gitHubUsername", "repositories"],
+  "type": "object"
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "Windows-only user registry fields (DSC config files and description).",
+  "properties": {
+    "$schema": {
+      "description": "Reference to this schema file.",
+      "type": "string"
+    },
+    "description": {
+      "description": "Human-readable description of this user on Windows.",
+      "type": "string"
+    },
+    "dscConfigFiles": {
+      "description": "Per-user DSC configuration files to apply.",
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "type": "object"
+}

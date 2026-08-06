@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "VM guest credential secret key references.",
+  "properties": {
+    "$schema": {
+      "description": "Reference to this schema file.",
+      "type": "string"
+    },
+    "passwordSecretKey": {
+      "type": "string"
+    },
+    "usernameSecretKey": {
+      "type": "string"
+    }
+  },
+  "required": ["passwordSecretKey", "usernameSecretKey"],
+  "type": "object"
+}

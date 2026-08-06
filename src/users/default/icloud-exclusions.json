@@ -1,0 +1,5 @@
+{
+  "$schema": "../schemas/icloud-exclusions.schema.json",
+  "excludedDirNames": [],
+  "managedRoots": []
+}

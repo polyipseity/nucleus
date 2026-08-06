@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": {
+    "type": "string"
+  },
+  "description": "Per-user environment variable overrides.",
+  "properties": {
+    "$schema": {
+      "description": "Reference to this schema file.",
+      "type": "string"
+    }
+  },
+  "type": "object"
+}

@@ -1,0 +1,5 @@
+{
+  "$schema": "../schemas/windows.schema.json",
+  "description": "",
+  "dscConfigFiles": []
+}

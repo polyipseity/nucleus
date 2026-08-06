@@ -1,0 +1,9 @@
+{
+  "$schema": "../schemas/profile.schema.json",
+  "homeDirectory": {
+    "macos": "",
+    "nixos": "",
+    "windows": ""
+  },
+  "isPrimary": false
+}

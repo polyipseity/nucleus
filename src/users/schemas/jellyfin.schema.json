@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "Jellyfin media server accounts and libraries.",
+  "properties": {
+    "$schema": {
+      "description": "Reference to this schema file.",
+      "type": "string"
+    },
+    "accounts": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "isAdmin": {
+            "type": "boolean"
+          },
+          "passwordSecretKey": {
+            "type": "string"
+          },
+          "usernameSecretKey": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "passwordSecretKey", "usernameSecretKey"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "libraries": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "collectionType": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "options": {
+            "type": "object"
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": ["name", "paths"],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "type": "object"
+}

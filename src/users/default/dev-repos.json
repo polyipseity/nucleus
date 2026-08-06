@@ -1,0 +1,7 @@
+{
+  "$schema": "../schemas/dev-repos.schema.json",
+  "enable": false,
+  "gitHubUsername": "",
+  "repositories": [],
+  "submoduleDirectories": []
+}

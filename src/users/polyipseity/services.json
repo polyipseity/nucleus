@@ -1,0 +1,6 @@
+{
+  "$schema": "../schemas/services.schema.json",
+  "discord-music-rpc": {
+    "enable": true
+  }
+}

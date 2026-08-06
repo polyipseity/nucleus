@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "User profile: primary flag and per-platform home directories.",
+  "properties": {
+    "$schema": {
+      "description": "Reference to this schema file.",
+      "type": "string"
+    },
+    "homeDirectory": {
+      "additionalProperties": false,
+      "description": "Absolute home directory path per host platform.",
+      "properties": {
+        "macos": {
+          "type": "string"
+        },
+        "nixos": {
+          "type": "string"
+        },
+        "windows": {
+          "type": "string"
+        }
+      },
+      "required": ["macos", "nixos", "windows"],
+      "type": "object"
+    },
+    "isPrimary": {
+      "description": "Whether this is the primary user account.",
+      "type": "boolean"
+    }
+  },
+  "required": ["isPrimary", "homeDirectory"],
+  "type": "object"
+}

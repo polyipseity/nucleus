@@ -1,0 +1,114 @@
+{
+  "$schema": "../schemas/cloud-drives.schema.json",
+  "mounts": [
+    {
+      "displayName": "Google Drive",
+      "enable": true,
+      "extraArgs": [],
+      "id": "GoogleDrive",
+      "localPath": {
+        "macos": "clouds/GoogleDrive",
+        "nixos": "clouds/GoogleDrive",
+        "windows": "clouds\\GoogleDrive"
+      },
+      "provider": "GoogleDrive",
+      "readWrite": true,
+      "remoteName": "GoogleDrive",
+      "remotePath": "/"
+    },
+    {
+      "enable": true,
+      "extraArgs": [],
+      "iCloudService": "drive",
+      "id": "iCloud",
+      "localPath": {
+        "macos": "clouds/iCloud",
+        "nixos": "clouds/iCloud",
+        "windows": "clouds\\iCloud"
+      },
+      "provider": "iCloud",
+      "readWrite": true,
+      "remoteName": "iCloud",
+      "remotePath": "/"
+    },
+    {
+      "enable": true,
+      "extraArgs": [],
+      "id": "OneDrive",
+      "localPath": {
+        "macos": "clouds/OneDrive",
+        "nixos": "clouds/OneDrive",
+        "windows": "clouds\\OneDrive"
+      },
+      "provider": "OneDrive",
+      "readWrite": true,
+      "remoteName": "OneDrive",
+      "remotePath": "/"
+    }
+  ],
+  "replicas": [
+    {
+      "direction": "pull",
+      "displayName": "Google Drive",
+      "enable": {
+        "macos": false,
+        "nixos": false,
+        "windows": true
+      },
+      "fallbackTimer": {
+        "enable": {
+          "macos": false,
+          "nixos": false,
+          "windows": true
+        },
+        "interval": "daily"
+      },
+      "id": "GoogleDrive",
+      "localPath": {
+        "macos": "clouds/GoogleDriveReplica",
+        "nixos": "clouds/GoogleDriveReplica",
+        "windows": "clouds\\GoogleDriveReplica"
+      },
+      "provider": "GoogleDrive",
+      "remotePath": "/"
+    },
+    {
+      "direction": "pull",
+      "enable": true,
+      "fallbackTimer": {
+        "enable": true,
+        "interval": "daily"
+      },
+      "iCloudService": "drive",
+      "id": "iCloud",
+      "localPath": {
+        "macos": "clouds/iCloudReplica",
+        "nixos": "clouds/iCloudReplica",
+        "windows": "clouds\\iCloudReplica"
+      },
+      "provider": "iCloud",
+      "readWrite": {
+        "macos": true,
+        "nixos": true,
+        "windows": false
+      },
+      "remotePath": "/"
+    },
+    {
+      "direction": "pull",
+      "enable": true,
+      "fallbackTimer": {
+        "enable": true,
+        "interval": "daily"
+      },
+      "id": "OneDrive",
+      "localPath": {
+        "macos": "clouds/OneDriveReplica",
+        "nixos": "clouds/OneDriveReplica",
+        "windows": "clouds\\OneDriveReplica"
+      },
+      "provider": "OneDrive",
+      "remotePath": "/"
+    }
+  ]
+}

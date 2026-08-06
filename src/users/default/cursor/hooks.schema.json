@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "Cursor global hooks manifest (~/.cursor/hooks.json).",
+  "properties": {
+    "$schema": {
+      "description": "Reference to the JSON Schema file that validates this data file.",
+      "type": "string"
+    },
+    "hooks": {
+      "additionalProperties": {
+        "type": "array"
+      },
+      "description": "Hook event name to hook definition list.",
+      "type": "object"
+    },
+    "version": {
+      "description": "Hooks manifest schema version.",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "hooks",
+    "version"
+  ],
+  "title": "Cursor hooks configuration",
+  "type": "object"
+}

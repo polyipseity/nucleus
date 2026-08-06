@@ -1,0 +1,9 @@
+{
+  "$schema": "../schemas/profile.schema.json",
+  "homeDirectory": {
+    "macos": "/Users/polyipseity",
+    "nixos": "/home/polyipseity",
+    "windows": "C:\\Users\\polyipseity"
+  },
+  "isPrimary": true
+}

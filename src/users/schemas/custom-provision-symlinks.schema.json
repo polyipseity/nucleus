@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "Per-user custom provision symlinks with platform-specific targets.",
+  "properties": {
+    "$schema": {
+      "description": "Reference to this schema file.",
+      "type": "string"
+    },
+    "customProvisionSymlinks": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "createTargetDirectory": {
+            "type": "boolean"
+          },
+          "path": {
+            "type": "string"
+          },
+          "targets": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          }
+        },
+        "required": ["path", "targets"],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": ["customProvisionSymlinks"],
+  "type": "object"
+}

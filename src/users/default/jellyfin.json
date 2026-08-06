@@ -1,0 +1,5 @@
+{
+  "$schema": "../schemas/jellyfin.schema.json",
+  "accounts": [],
+  "libraries": []
+}

@@ -1,0 +1,21 @@
+# Ignore everything by default so unmanaged VS Code profile runtime files
+# (e.g. state.json, window.json, cache dirs) are not accidentally committed.
+*
+
+# Allow git to descend into named profile subdirectories so the rules below
+# can selectively un-ignore managed files within each profile.
+!*/
+
+# Un-ignore this file itself (the * above would otherwise match it) and the
+# managed config files within each profile directory.
+# Keep alphabetically sorted.
+!.gitignore
+!*/chatLanguageModels.json
+!*/keybindings.json
+!*/mcp.json
+!*/prompts/
+!*/prompts/**
+!*/settings.json
+!*/snippets/
+!*/snippets/**
+!*/tasks.json

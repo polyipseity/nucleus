@@ -1,0 +1,52 @@
+{
+  "$schema": "../schemas/dev-repos.schema.json",
+  "enable": true,
+  "gitHubUsername": "polyipseity",
+  "repositories": [
+    {
+      "name": "nucleus",
+      "symlinkFromRepoRoot": true,
+      "target": {
+        "macos": "dev/nucleus",
+        "nixos": "dev/nucleus",
+        "windows": "dev\\nucleus"
+      }
+    },
+    {
+      "name": "monorepo",
+      "target": {
+        "macos": "dev/monorepo",
+        "nixos": "dev/monorepo",
+        "windows": "dev\\monorepo"
+      },
+      "url": "git@github.com:polyipseity/monorepo.git"
+    },
+    {
+      "name": "monorepo-private",
+      "target": {
+        "macos": "dev/monorepo-private",
+        "nixos": "dev/monorepo-private",
+        "windows": "dev\\monorepo-private"
+      },
+      "url": "git@github.com:polyipseity/monorepo-private.git"
+    }
+  ],
+  "submoduleDirectories": [
+    {
+      "path": "dev/monorepo",
+      "recursive": false
+    },
+    {
+      "path": "dev/monorepo-private",
+      "recursive": false
+    },
+    {
+      "path": "dev/monorepo/self/obsidian-monorepo",
+      "recursive": true
+    },
+    {
+      "path": "dev/monorepo-private/orgs/*",
+      "recursive": false
+    }
+  ]
+}

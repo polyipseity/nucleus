@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "definitions": {
+    "platformBoolean": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "macos": {
+              "type": "boolean"
+            },
+            "nixos": {
+              "type": "boolean"
+            },
+            "windows": {
+              "type": "boolean"
+            }
+          },
+          "required": ["macos", "nixos", "windows"],
+          "type": "object"
+        }
+      ]
+    },
+    "platformString": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "macos": {
+              "type": "string"
+            },
+            "nixos": {
+              "type": "string"
+            },
+            "windows": {
+              "type": "string"
+            }
+          },
+          "required": ["macos", "nixos", "windows"],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "description": "Cloud drive mounts and replicas with optional per-platform overrides.",
+  "properties": {
+    "$schema": {
+      "description": "Reference to this schema file.",
+      "type": "string"
+    },
+    "mounts": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "displayName": {
+            "type": "string"
+          },
+          "enable": {
+            "$ref": "#/definitions/platformBoolean"
+          },
+          "extraArgs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "iCloudService": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "localPath": {
+            "$ref": "#/definitions/platformString"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "readWrite": {
+            "type": "boolean"
+          },
+          "remoteName": {
+            "type": "string"
+          },
+          "remotePath": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "provider"],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "replicas": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "direction": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "enable": {
+            "$ref": "#/definitions/platformBoolean"
+          },
+          "fallbackTimer": {
+            "additionalProperties": false,
+            "properties": {
+              "enable": {
+                "$ref": "#/definitions/platformBoolean"
+              },
+              "interval": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "iCloudService": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "localPath": {
+            "$ref": "#/definitions/platformString"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "readWrite": {
+            "type": "boolean"
+          },
+          "remotePath": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "provider"],
+        "type": "object"
+      },
+      "type": "array"
+    }
+  },
+  "required": ["mounts", "replicas"],
+  "type": "object"
+}

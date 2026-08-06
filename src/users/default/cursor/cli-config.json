@@ -1,0 +1,7 @@
+{
+  "$schema": "./cli-config.schema.json",
+  "permissions": {
+    "allow": [],
+    "deny": []
+  }
+}
