@@ -5,7 +5,7 @@ let
 
   logGcSystemShText = builtins.readFile ../../src/scripts/services/log-gc-system.sh;
   logGcSystemPs1Text = builtins.readFile ../../src/scripts/services/log-gc-system.ps1;
-  macosNixText = builtins.readFile ../../src/modules/macos.nix;
+  posixBaseNixText = builtins.readFile ../../src/modules/posix-base.nix;
   nixosActivationText = builtins.readFile ../../src/hosts/NixOS/activation.nix;
   schedulerText = builtins.readFile ../../src/hosts/Windows/system/scheduler.dsc.yml;
   libShText = builtins.readFile ../../src/scripts/lib/lib.sh;
@@ -18,8 +18,8 @@ assert containsRegex "Invoke-LogRotation" logGcSystemPs1Text;
 assert containsRegex "Get-NucleusSystemLogDir" logGcSystemPs1Text;
 
 # --- macOS launchd daemon ---
-assert containsRegex "launchd.daemons.\"log-gc-system\"" macosNixText;
-assert containsRegex "nucleus-log-gc-system" macosNixText;
+assert containsRegex "launchd.daemons.\"log-gc-system\"" posixBaseNixText;
+assert containsRegex "nucleus-log-gc-system" posixBaseNixText;
 
 # --- NixOS systemd timer ---
 assert containsRegex "systemd.services.\"nucleus-log-gc-system\"" nixosActivationText;

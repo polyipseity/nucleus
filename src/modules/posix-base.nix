@@ -4,6 +4,7 @@
   hostName,
   lib,
   options,
+  pkgs,
   ...
 }:
 let
@@ -83,24 +84,58 @@ in
       };
     })
 
-    (lib.optionalAttrs hasLaunchdDaemonsOption {
-      # Determinate Nix keeps nix-darwin `nix.enable = false`, so use a launchd
-      # daemon for equivalent daily store collection behavior on macOS.
-      launchd.daemons.nixStoreGc = {
-        serviceConfig = {
-          ProgramArguments = [
-            "/run/current-system/sw/bin/nix-collect-garbage"
-            "--delete-older-than"
-            "${config.modules.gc.nixStoreExpiry}"
-          ];
-          StartCalendarInterval = [
-            {
-              Hour = 12;
-              Minute = 0;
-            }
-          ];
+    (lib.optionalAttrs hasLaunchdDaemonsOption (
+      let
+        repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+        logGcSystem = pkgs.writeNucleusShellApplication {
+          name = "log-gc-system";
+          runtimeInputs = [ pkgs.jq ];
+          scriptName = "src/scripts/services/log-gc-system";
         };
-      };
-    })
+      in
+      {
+        # Determinate Nix keeps nix-darwin `nix.enable = false`, so use a launchd
+        # daemon for equivalent daily store collection behavior on macOS.
+        launchd.daemons.nixStoreGc = {
+          serviceConfig = {
+            ProgramArguments = [
+              "/run/current-system/sw/bin/nix-collect-garbage"
+              "--delete-older-than"
+              "${config.modules.gc.nixStoreExpiry}"
+            ];
+            StartCalendarInterval = [
+              {
+                Hour = 12;
+                Minute = 0;
+              }
+            ];
+          };
+        };
+
+        # Daily system log rotation — rotates root-owned system log files that
+        # user-context gc cannot write. Cross-host parity with NixOS systemd
+        # timer and Windows scheduled task.
+        launchd.daemons."log-gc-system" = {
+          serviceConfig = {
+            Label = "local.log-gc-system";
+            ProgramArguments = [
+              "/bin/sh"
+              "-c"
+              "exec ${logGcSystem}/bin/nucleus-log-gc-system"
+            ];
+            EnvironmentVariables = {
+              NUCLEUS_REPO_ROOT = repoRoot;
+            };
+            RunAtLoad = false;
+            StartCalendarInterval = [
+              {
+                Hour = 12;
+                Minute = 0;
+              }
+            ];
+          };
+        };
+      }
+    ))
   ];
 }
