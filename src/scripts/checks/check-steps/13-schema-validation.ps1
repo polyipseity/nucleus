@@ -93,13 +93,13 @@ Register-Step -Id "schema-validation" -Number 13 -Name "Schema validation (JSON/
         $f -like '*\secrets\*' -or $f -like '*/secrets/*' -or `
         $f -like '*.github\workflows\*' -or $f -like '*.github/workflows/*' -or `
         $f -like '*.github\dependabot.yml' -or $f -like '*.github/dependabot.yml' -or `
-        $f -like '*configs\vscode\*.json' -or $f -like '*configs/vscode/*.json' -or `
-        $f -like '*configs\iterm2\DynamicProfiles\*.json' -or $f -like '*configs/iterm2/DynamicProfiles/*.json' -or `
-        $f -like '*configs\obsidian\*.json' -or $f -like '*configs/obsidian/*.json' -or `
-        $f -like '*configs\qtpass\*.json' -or $f -like '*configs/qtpass/*.json' -or `
+        $f -like '*users\*\vscode\*.json' -or $f -like '*users/*/vscode/*.json' -or `
+        $f -like '*users\*\iterm2\DynamicProfiles\*.json' -or $f -like '*users/*/iterm2/DynamicProfiles/*.json' -or `
+        $f -like '*users\*\obsidian\*.json' -or $f -like '*users/*/obsidian/*.json' -or `
+        $f -like '*users\*\qtpass\*.json' -or $f -like '*users/*/qtpass/*.json' -or `
         $f -like '*configs\camilladsp\*' -or $f -like '*configs/camilladsp/*' -or `
         $f -like '*configs\camillagui-backend\*' -or $f -like '*configs/camillagui-backend/*' -or `
-        $f -like '*configs\discord-music-rpc\*' -or $f -like '*configs/discord-music-rpc/*' -or `
+        $f -like '*users\*\discord-music-rpc\*' -or $f -like '*users/*/discord-music-rpc/*' -or `
         $f -like '*configs\agents\hooks\*.json' -or $f -like '*configs/agents/hooks/*.json' -or `
         $f -like '*configs\agents\skills\*\_meta.json' -or $f -like '*configs/agents/skills/*/_meta.json' -or `
         $f -like '*ai\litellm-config.yml' -or $f -like '*ai/litellm-config.yml' -or `

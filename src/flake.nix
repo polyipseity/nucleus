@@ -78,7 +78,7 @@
       ...
     }:
     let
-      repoRoot = ./.;
+      repoRoot = ../.;
 
       loadUserRegistry =
         hostName:
