@@ -90,6 +90,24 @@ function Wait-GuestReady {
     return $false
 }
 
+function Get-VmRunningProcessNames {
+    <#
+    .SYNOPSIS
+      Returns QEMU VM names from live qemu-system* process command lines.
+    #>
+    $running = [System.Collections.Generic.List[string]]::new()
+    # check-suppress:suppression_doc: probe -- no qemu processes may exist; foreach handles empty result.
+    foreach ($proc in Get-CimInstance Win32_Process -Filter "Name LIKE 'qemu-system%'" -ErrorAction SilentlyContinue) {
+        if ($proc.CommandLine -match '-name\s+(\S+)') {
+            $name = $Matches[1]
+            if (-not $running.Contains($name)) {
+                $running.Add($name)
+            }
+        }
+    }
+    return $running.ToArray()
+}
+
 function Invoke-VMSetup {
   <#
   .SYNOPSIS
@@ -461,12 +479,9 @@ function Invoke-VMSetup {
             [Parameter(Mandatory)]
             [string]$VmDisplay
         )
-        # check-suppress:suppression_doc: probe -- no qemu processes may exist; foreach handles empty result.
-        foreach ($proc in Get-CimInstance Win32_Process -Filter "Name LIKE 'qemu-system%'" -ErrorAction SilentlyContinue) {
-            if ($proc.CommandLine -match '-name\s+(\S+)') {
-                if ($Matches[1] -eq $VmName -or $Matches[1] -eq $VmDisplay) {
-                    return $true
-                }
+        foreach ($name in Get-VmRunningProcessNames) {
+            if ($name -eq $VmName -or $name -eq $VmDisplay) {
+                return $true
             }
         }
         return $false

@@ -1577,6 +1577,8 @@ let
         (lib.hasInfix ''$qemuImg create -f qcow2 -b "..\images\$($vm.type).base.qcow2" -F qcow2'' windows_vm_setup_ps1_text)
         && (lib.hasInfix "Copy-Item $prebuilt $basePath" windows_vm_setup_ps1_text)
         && (lib.hasInfix "Test-VmProcessRunning -VmName $vm.id -VmDisplay $vm.name" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "function Get-VmRunningProcessNames" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Get-VmRunningProcessNames" vm_ps1_text)
         && (lib.hasInfix "Get-VmQcow2VirtualSize -ImagePath $diskPath" windows_vm_setup_ps1_text)
         && (lib.hasInfix "$qemuImg resize $diskPath $diskBytes" windows_vm_setup_ps1_text)
         && (lib.hasInfix ''Join-Path -Path $dataDir -ChildPath "$($vm.id).qcow2"'' windows_vm_setup_ps1_text)

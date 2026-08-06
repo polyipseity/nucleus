@@ -218,15 +218,12 @@ function Invoke-VmSetup {
 
 function Get-VmRunningNameList {
   # Detect running VMs from QEMU processes (Windows uses QEMU).
-  # Matches process command lines containing -name qemu-<vmname>.
-  $running = @()
-  $procs = Get-CimInstance Win32_Process -Filter "Name = 'qemu-system-x86_64w.exe'" -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: VM may not be running; failure to find processes is expected
-  foreach ($p in $procs) {
-    if ($p.CommandLine -match '-name\s+(?:qemu-)?(\S+)') {
-      $running += $Matches[1]
-    }
+  $module = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
+  if (-not (Test-Path $module)) {
+    return @()
   }
-  return $running
+  . $module
+  return @(Get-VmRunningProcessNames)
 }
 
 function Invoke-VmList {
