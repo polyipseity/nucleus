@@ -1363,6 +1363,46 @@ vm_android_fastboot_serial() {
   printf 'tcp:localhost:%s\n' "$(vm_android_fastboot_host_port "$1")"
 }
 
+# vm_android_fastboot_list_state VM_INDEX
+#   Return fastboot state for the manifest serial: fastboot or offline.
+vm_android_fastboot_list_state() {
+  _afls_vm_index="$1"
+  _afls_serial="$(vm_android_fastboot_serial "$_afls_vm_index")"
+  _afls_state="$(fastboot devices 2>/dev/null | awk -v serial="$_afls_serial" '$1 == serial { print $2; exit }')"
+  if [ -n "$_afls_state" ]; then
+    printf '%s\n' "$_afls_state"
+    return 0
+  fi
+  printf 'offline\n'
+}
+
+# vm_android_fastboot_wait VM_INDEX [TIMEOUT]
+#   Wait until fastboot reports the manifest serial as fastboot.
+vm_android_fastboot_wait() {
+  _afw_vm_index="$1"
+  _afw_timeout="${2:-180}"
+  _afw_serial="$(vm_android_fastboot_serial "$_afw_vm_index")"
+  _afw_elapsed=0
+  _afw_last_hint=-30
+
+  say "waiting for fastboot on $_afw_serial (timeout ${_afw_timeout}s)..."
+
+  while [ "$_afw_elapsed" -lt "$_afw_timeout" ]; do
+    if [ "$(vm_android_fastboot_list_state "$_afw_vm_index")" = "fastboot" ]; then
+      return 0
+    fi
+    if [ "$_afw_elapsed" -ge "$((_afw_last_hint + 30))" ]; then
+      say "manual step: in recovery, open Advanced → Reboot to fastboot (or Enter fastboot)"
+      _afw_last_hint="$_afw_elapsed"
+    fi
+    sleep 5
+    _afw_elapsed=$((_afw_elapsed + 5))
+  done
+
+  error "timed out waiting for fastboot on $_afw_serial; enter fastboot from recovery and retry"
+  return 1
+}
+
 vm_android_adb_get_state() {
   _aas_serial="$(vm_android_adb_serial "$1")"
   adb -s "$_aas_serial" get-state 2>/dev/null || printf 'unknown\n'
@@ -1443,6 +1483,160 @@ vm_android_adb_connect() {
     sleep 5
     _aac_elapsed=$((_aac_elapsed + 5))
   done
+  return 1
+}
+
+# vm_android_recovery_asset_suffix VM_INDEX
+#   jqssun recovery image name suffix (arm64only or x86_64) for this guest.
+vm_android_recovery_asset_suffix() {
+  _aras_vm_index="$1"
+  _aras_type="$(jq -r ".VMs[$_aras_vm_index].type" "$MANIFEST")"
+  case "$(vm_derive_arch "$_aras_type")" in
+    aarch64) printf 'arm64only\n' ;;
+    *) printf 'x86_64\n' ;;
+  esac
+}
+
+# vm_android_download_userdebug_recovery VM_INDEX
+#   Download and cache the jqssun userdebug recovery image for sideloading GApps.
+vm_android_download_userdebug_recovery() {
+  _adur_vm_index="$1"
+  _adur_suffix="$(vm_android_recovery_asset_suffix "$_adur_vm_index")"
+  _adur_img="$IMAGES_DIR/android-recovery-userdebug.img"
+  _adur_release_json="$IMAGES_DIR/android-lineage-release.json"
+  _adur_asset_name="recovery_${_adur_suffix}-userdebug.img"
+
+  run_with_backoff "download LineageOS release metadata" \
+    curl -fsSL -o "$_adur_release_json" \
+    "https://api.github.com/repos/jqssun/android-lineage-qemu/releases/latest" \
+    || { error "failed to fetch latest LineageOS release info"; return 1; }
+
+  _adur_tag="$(jq -r '.tag_name' "$_adur_release_json")"
+  if [ -z "$_adur_tag" ] || [ "$_adur_tag" = "null" ]; then
+    error "no release tag in LineageOS release metadata"
+    return 1
+  fi
+
+  if [ -f "$_adur_img" ]; then
+    _adur_cached_tag="$(jq -r '.tag_name // empty' "$IMAGES_DIR/android-recovery-userdebug.tag.json" 2>/dev/null || true)"
+    if [ "$_adur_cached_tag" = "$_adur_tag" ]; then
+      say "using cached userdebug recovery: $_adur_img"
+      return 0
+    fi
+    say "jqssun release changed ($_adur_cached_tag → $_adur_tag); re-downloading userdebug recovery..."
+    rm -f "$_adur_img"
+  else
+    say "downloading userdebug recovery ($_adur_asset_name)..."
+  fi
+
+  _adur_dl_url="$(jq -r --arg name "$_adur_asset_name" \
+    '.assets[] | select(.name == $name) | .browser_download_url' "$_adur_release_json")"
+  if [ -z "$_adur_dl_url" ] || [ "$_adur_dl_url" = "null" ]; then
+    error "no $_adur_asset_name found in latest jqssun release"
+    return 1
+  fi
+
+  run_with_backoff "download userdebug recovery" \
+    curl -fL -o "$_adur_img" "$_adur_dl_url" \
+    || { error "failed to download userdebug recovery from $_adur_dl_url"; return 1; }
+
+  jq -n --arg tag "$_adur_tag" '{tag_name: $tag}' > "$IMAGES_DIR/android-recovery-userdebug.tag.json"
+  say "userdebug recovery ready: $_adur_img"
+  return 0
+}
+
+# vm_android_ensure_userdebug_recovery VM_INDEX RELEASE_TAG
+#   Flash the cached userdebug recovery via fastboot when the release tag changed.
+vm_android_ensure_userdebug_recovery() {
+  _aeur_vm_index="$1"
+  _aeur_release_tag="$2"
+  _aeur_img="$IMAGES_DIR/android-recovery-userdebug.img"
+  _aeur_marker="$IMAGES_DIR/android-recovery-userdebug.flashed"
+  _aeur_fb_serial="$(vm_android_fastboot_serial "$_aeur_vm_index")"
+  _aeur_adb_serial="$(vm_android_adb_serial "$_aeur_vm_index")"
+
+  if [ ! -f "$_aeur_img" ]; then
+    error "userdebug recovery image missing: $_aeur_img"
+    return 1
+  fi
+
+  if [ -f "$_aeur_marker" ] && grep -qx "$_aeur_release_tag" "$_aeur_marker" 2>/dev/null; then
+    _aeur_adb_state="$(vm_android_adb_list_state "$_aeur_vm_index")"
+    if [ "$_aeur_adb_state" = "recovery" ] || [ "$_aeur_adb_state" = "sideload" ]; then
+      say "userdebug recovery already flashed for release $_aeur_release_tag"
+      return 0
+    fi
+    say "userdebug recovery was flashed but ADB state is $_aeur_adb_state; re-flashing..."
+  fi
+
+  say "flashing userdebug recovery for MindTheGapps sideload..."
+  _aeur_adb_state="$(vm_android_adb_list_state "$_aeur_vm_index")"
+  case "$_aeur_adb_state" in
+    recovery|sideload)
+      say "rebooting to fastboot via ADB..."
+      # check-suppress:suppression_doc: reboot fastboot may fail when already in fastboot; fastboot wait below is authoritative.
+      adb -s "$_aeur_adb_serial" reboot fastboot 2>/dev/null || true
+      ;;
+    unauthorized)
+      say "stock recovery reports ADB unauthorized (expected until userdebug recovery is flashed)"
+      say "manual step: in recovery, open Advanced → Reboot to fastboot (or Enter fastboot)"
+      ;;
+    *)
+      say "manual step: boot LineageOS Recovery, then Advanced → Reboot to fastboot (or Enter fastboot)"
+      ;;
+  esac
+
+  if ! vm_android_fastboot_wait "$_aeur_vm_index" 180; then
+    return 1
+  fi
+
+  if ! fastboot -s "$_aeur_fb_serial" flash recovery "$_aeur_img"; then
+    error "fastboot flash recovery failed on $_aeur_fb_serial; enter fastboot from recovery (Advanced → Enter fastboot) and retry"
+    return 1
+  fi
+
+  # check-suppress:suppression_doc: fastboot reboot after flash is best-effort; guest may already be rebooting to recovery.
+  fastboot -s "$_aeur_fb_serial" reboot 2>/dev/null || true
+  printf '%s\n' "$_aeur_release_tag" > "$_aeur_marker"
+  say "userdebug recovery flashed; guest should return to recovery"
+}
+
+# vm_android_adb_wait_recovery VM_INDEX [TIMEOUT]
+#   Wait until ADB reports recovery or sideload (no booted-system RSA authorization).
+vm_android_adb_wait_recovery() {
+  _awr_vm_index="$1"
+  _awr_timeout="${2:-300}"
+  _awr_serial="$(vm_android_adb_serial "$_awr_vm_index")"
+  _awr_elapsed=0
+  _awr_last_hint=-30
+
+  say "waiting for recovery ADB on $_awr_serial (timeout ${_awr_timeout}s)..."
+
+  while [ "$_awr_elapsed" -lt "$_awr_timeout" ]; do
+    # check-suppress:suppression_doc: adb connect is idempotent; failure while the guest is still booting is expected in the retry loop.
+    adb connect "$_awr_serial" >/dev/null 2>&1 || true
+    _awr_state="$(vm_android_adb_list_state "$_awr_vm_index")"
+    case "$_awr_state" in
+      recovery|sideload) return 0 ;;
+      unauthorized)
+        if [ "$_awr_elapsed" -ge "$((_awr_last_hint + 30))" ]; then
+          say "ADB shows unauthorized — stock recovery cannot sideload until userdebug recovery is flashed via fastboot"
+          _awr_last_hint="$_awr_elapsed"
+        fi
+        ;;
+      device)
+        if [ "$_awr_elapsed" -ge "$((_awr_last_hint + 30))" ]; then
+          say "guest is booted to system; boot LineageOS Recovery instead (power off → hold Vol- or use Reboot to recovery)"
+          _awr_last_hint="$_awr_elapsed"
+        fi
+        ;;
+    esac
+    sleep 5
+    _awr_elapsed=$((_awr_elapsed + 5))
+  done
+
+  _awr_final="$(vm_android_adb_list_state "$_awr_vm_index")"
+  error "timed out waiting for recovery ADB on $_awr_serial (state: $_awr_final); boot the VM into LineageOS Recovery"
   return 1
 }
 
