@@ -1,5 +1,5 @@
 # Declarative rclone mounts and pull-only replicas per user.
-# Per-user config in users.json under "cloudDrives" key.
+# Per-user config in src/users/ under "cloudDrives" domain files.
 # Requires FUSE (FUSE-T on macOS, fuse3 on NixOS) and rclone remote configured.
 args@{
   config,

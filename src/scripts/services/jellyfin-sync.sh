@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Reads per-user jellyfin declarations from src/modules/users.json, resolves
+# Reads per-user jellyfin declarations from src/users/, resolves
 # credentials from SOPS secrets, and applies them to a running Jellyfin server
 # via its HTTP API.
 
@@ -119,10 +119,26 @@ _jfs_body_from_response() {
   printf '%s' "$1" | sed 's/HTTPSTATUS:[0-9][0-9][0-9]$//'
 }
 
-# Converge Jellyfin user accounts declared in src/modules/users.json.
+_jfs_registry_platform() {
+  case "$(resolve_nucleus_host)" in
+    MacBook) printf '%s\n' macos ;;
+    NixOS) printf '%s\n' nixos ;;
+    *) printf '%s\n' macos ;;
+  esac
+}
+
+_jfs_load_users_registry() {
+  if [ ! -d "$REPO_ROOT/src/users" ]; then
+    return 1
+  fi
+  "$REPO_ROOT/src/scripts/lib/load-user-registry.sh" \
+    --platform "$(_jfs_registry_platform)" \
+    --repo-root "$REPO_ROOT"
+}
+
+# Converge Jellyfin user accounts declared in src/users/.
 _jfs_sync_accounts() {
-  _jfsa_users_json="$REPO_ROOT/src/modules/users.json"
-  if [ ! -f "$_jfsa_users_json" ]; then
+  if ! _jfsa_users_registry="$(_jfs_load_users_registry)"; then
     return
   fi
 
@@ -141,7 +157,7 @@ _jfs_sync_accounts() {
         usernameSecretKey: .usernameSecretKey,
         passwordSecretKey: .passwordSecretKey
       }
-  ' "$_jfsa_users_json" > "$_jfsa_specs_file"
+  ' <<< "$_jfsa_users_registry" > "$_jfsa_specs_file"
 
   if [ ! -s "$_jfsa_specs_file" ]; then
     rm -f "$_jfsa_specs_file" "$_jfsa_resolved_file"
@@ -160,9 +176,9 @@ _jfs_sync_accounts() {
       continue
     fi
 
-    _jfsa_secret_file="$REPO_ROOT/src/secrets/users-${_jfsa_owner}.yml"
+    _jfsa_secret_file="$REPO_ROOT/src/secrets/users/${_jfsa_owner}.yml"
     if [ ! -f "$_jfsa_secret_file" ]; then
-      printf '%s\n' "jellyfin: missing users-${_jfsa_owner}.yml; skipping account declaration '${_jfsa_id}'" >&2
+      printf '%s\n' "jellyfin: missing users/${_jfsa_owner}.yml; skipping account declaration '${_jfsa_id}'" >&2
       continue
     fi
 
@@ -174,7 +190,7 @@ _jfs_sync_accounts() {
     _jfsa_username="$(printf '%s' "$_jfsa_secret_json" | jq -r --arg key "$_jfsa_user_key" '.[$key] // empty')"
     _jfsa_password="$(printf '%s' "$_jfsa_secret_json" | jq -r --arg key "$_jfsa_pass_key" '.[$key] // empty')"
     if [ -z "$_jfsa_username" ] || [ -z "$_jfsa_password" ]; then
-      printf '%s\n' "jellyfin: missing secret values for account declaration '${_jfsa_id}' in users-${_jfsa_owner}.yml" >&2
+      printf '%s\n' "jellyfin: missing secret values for account declaration '${_jfsa_id}' in users/${_jfsa_owner}.yml" >&2
       continue
     fi
 
@@ -362,10 +378,9 @@ _jfs_sync_accounts() {
   rm -f "$_jfsa_resolved_file"
 }
 
-# Converge Jellyfin library folders declared in src/modules/users.json.
+# Converge Jellyfin library folders declared in src/users/.
 _jfs_sync_libraries() {
-  _jfsl_users_json="$REPO_ROOT/src/modules/users.json"
-  if [ ! -f "$_jfsl_users_json" ]; then
+  if ! _jfsl_users_registry="$(_jfs_load_users_registry)"; then
     return
   fi
 
@@ -398,11 +413,11 @@ _jfs_sync_libraries() {
         paths: (.paths // []),
         options: .options
       }
-  ' "$_jfsl_users_json" > "$_jfsl_specs_file"
+  ' <<< "$_jfsl_users_registry" > "$_jfsl_specs_file"
 
   while IFS= read -r _jfsl_spec; do
     _jfsl_owner="$(printf '%s' "$_jfsl_spec" | jq -r '.owner')"
-    _jfsl_secret_file="$REPO_ROOT/src/secrets/users-${_jfsl_owner}.yml"
+    _jfsl_secret_file="$REPO_ROOT/src/secrets/users/${_jfsl_owner}.yml"
     if [ ! -f "$_jfsl_secret_file" ]; then
       continue
     fi
@@ -414,7 +429,7 @@ _jfs_sync_libraries() {
     jq -cr --arg owner "$_jfsl_owner" '
       .[$owner].jellyfin.accounts // [] | .[]
       | {owner: $owner} + .
-    ' "$_jfsl_users_json" 2>/dev/null | while IFS= read -r _jfsl_account; do
+    ' <<< "$_jfsl_users_registry" 2>/dev/null | while IFS= read -r _jfsl_account; do
       _jfsl_user_key="$(printf '%s' "$_jfsl_account" | jq -r '.usernameSecretKey // empty')"
       _jfsl_pass_key="$(printf '%s' "$_jfsl_account" | jq -r '.passwordSecretKey // empty')"
       if [ -z "$_jfsl_user_key" ] || [ -z "$_jfsl_pass_key" ]; then

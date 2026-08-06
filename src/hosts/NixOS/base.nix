@@ -17,6 +17,7 @@ let
       lib
       username
       ;
+    hostName = "NixOS";
   };
 in
 {

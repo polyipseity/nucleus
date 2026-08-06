@@ -67,38 +67,23 @@ Register-Step -Id "service-registry" -Number 14 -Name "Service registry validati
     }
   }
 
-  # Validate that service names in users.json services blocks exist in services.json.
-  $usersJson = Join-Path $r "src\modules\users.json"
-  if (Test-Path $usersJson) {
-    $users = Get-Content $usersJson -Raw | ConvertFrom-Json -AsHashtable
-    foreach ($username in $users.Keys) {
-      if ($username -like '$*') { continue }
-      $userEntry = $users[$username]
-      if ($userEntry.ContainsKey('services')) {
-        foreach ($svcKey in $userEntry.services.Keys) {
-          if (-not $svc.ContainsKey($svcKey)) {
-            Write-ErrorMessage "${usersJson}: user '$username' references unknown service '$svcKey'"
-            $svcErrors++
-          }
-        }
-      }
-    }
-  }
-
-  # Windows users.json
-  $winUsersJson = Join-Path $r "src\hosts\Windows\users.json"
-  if (Test-Path $winUsersJson) {
-    $winUsers = (Get-Content $winUsersJson -Raw | ConvertFrom-Json -AsHashtable).users
-    if ($winUsers) {
-      foreach ($username in $winUsers.Keys) {
-        $userEntry = $winUsers[$username]
-        if ($userEntry.ContainsKey('services')) {
-          foreach ($svcKey in $userEntry.services.Keys) {
-            if (-not $svc.ContainsKey($svcKey)) {
-              Write-ErrorMessage "${winUsersJson}: user '$username' references unknown service '$svcKey'"
-              $svcErrors++
-            }
-          }
+  # Validate that service names in per-user services.json files exist in services.json.
+  $usersRoot = Join-Path $r "src\users"
+  if (Test-Path $usersRoot) {
+    foreach ($servicesFile in Get-ChildItem -Path $usersRoot -Directory | ForEach-Object {
+        $candidate = Join-Path $_.FullName 'services.json'
+        if (Test-Path $candidate) { Get-Item $candidate }
+      }) {
+      $username = $servicesFile.Directory.Name
+      if ($username -in @('default', 'schemas')) { continue }
+      $userServices = Get-Content $servicesFile.FullName -Raw | ConvertFrom-Json -AsHashtable
+      foreach ($svcKey in $userServices.Keys) {
+        if ($svcKey -like '$*') { continue }
+        $svcEntry = $userServices[$svcKey]
+        if ($svcEntry -isnot [hashtable]) { continue }
+        if ($svcEntry.ContainsKey('enable') -and -not $svc.ContainsKey($svcKey)) {
+          Write-ErrorMessage "$($servicesFile.FullName): user '$username' references unknown service '$svcKey'"
+          $svcErrors++
         }
       }
     }

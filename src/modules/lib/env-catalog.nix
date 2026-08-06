@@ -14,12 +14,13 @@
 #   { default?, macOS?, NixOS?, Windows? }
 # - `default` applies to any OS not explicitly keyed.
 # - If an OS key is absent AND `default` is absent, the OS is not applicable.
-# Use: import ./lib/env-catalog.nix { inherit config pkgs lib username; }
+# Use: import ./lib/env-catalog.nix { inherit config pkgs lib username hostName; }
 # Returns: { catalog, allVars, systemVars, macOSAllVars, resolveValue, ... }
 {
   pkgs,
   lib,
   username,
+  hostName,
   ...
 }:
 let
@@ -28,7 +29,11 @@ let
 
   # ── Shared values used by multiple catalog entries ──────────────────
 
-  allUsers = builtins.fromJSON (builtins.readFile ../users.json);
+  allUsers = import ./users-registry.nix {
+    lib = pkgs.lib;
+    repoRoot = ../../..;
+    inherit hostName;
+  };
   effectiveUsername = username;
   effectiveUser =
     if builtins.hasAttr effectiveUsername allUsers then allUsers.${effectiveUsername} else { };
@@ -36,11 +41,19 @@ let
   resolvedHomeDirectory =
     if pkgs.stdenv.isDarwin then "/Users/${effectiveUsername}" else "/home/${effectiveUsername}";
 
-  passwordStoreDir =
-    if effectiveUser ? passwordStore && effectiveUser.passwordStore ? path then
-      builtins.replaceStrings [ "~" ] [ resolvedHomeDirectory ] effectiveUser.passwordStore.path
+  passwordStorePathRaw =
+    if effectiveUser ? passwordStore && effectiveUser.passwordStore ? path && effectiveUser.passwordStore.path != "" then
+      effectiveUser.passwordStore.path
     else
-      "${resolvedHomeDirectory}/.password-store";
+      "~/.password-store";
+
+  passwordStoreDir = builtins.replaceStrings [ "~" ] [ resolvedHomeDirectory ] passwordStorePathRaw;
+
+  passwordStoreDirWindows =
+    let
+      withProfile = builtins.replaceStrings [ "~/" "~" ] [ "%USERPROFILE%\\" "%USERPROFILE%" ] passwordStorePathRaw;
+    in
+    builtins.replaceStrings [ "/" ] [ "\\" ] withProfile;
 
   servicesJSON = builtins.fromJSON (builtins.readFile ../services.json);
   litellmEndpoint = servicesJSON.litellm.network.default;
@@ -215,10 +228,10 @@ let
     PASSWORD_STORE_DIR = {
       values = {
         default = passwordStoreDir;
-        Windows = "%USERPROFILE%\\dev\\monorepo-private\\self\\passwords";
+        Windows = passwordStoreDirWindows;
       };
       userSpecific = true;
-      why = "pass/QtPass/gopass password store location from users.json. Windows uses literal %USERPROFILE% for User-scope DSC.";
+      why = "pass/QtPass/gopass password store location from src/users/<username>/password-store.json. Windows uses literal %USERPROFILE% for User-scope DSC.";
     };
     GOPASS_CONFIG_COUNT = {
       values = {
@@ -237,10 +250,10 @@ let
     GOPASS_CONFIG_VALUE_1 = {
       values = {
         default = passwordStoreDir;
-        Windows = "%USERPROFILE%\\dev\\monorepo-private\\self\\passwords";
+        Windows = passwordStoreDirWindows;
       };
       userSpecific = true;
-      why = "gopass config override value for password store path. Windows uses literal %USERPROFILE% for User-scope DSC.";
+      why = "gopass config override value for password store path from src/users/<username>/password-store.json. Windows uses literal %USERPROFILE% for User-scope DSC.";
     };
 
     # ── Host identity ────────────────────────────────────────────────

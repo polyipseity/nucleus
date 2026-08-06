@@ -86,6 +86,7 @@ in
             lib
             username
             ;
+          hostName = "NixOS";
         };
         resolveValue' = name: envVars'.resolveValue name "NixOS";
       in

@@ -7,6 +7,7 @@
   lib,
   pkgs,
   username,
+  hostName,
   ...
 }:
 let
@@ -17,6 +18,7 @@ let
       pkgs
       lib
       username
+      hostName
       ;
   };
 in

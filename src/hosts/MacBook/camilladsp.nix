@@ -45,6 +45,7 @@ let
       lib
       username
       ;
+    hostName = "MacBook";
   };
   resolveValue = name: envVars.resolveValue name "macOS";
   daemonEnv = lib.filterAttrs (_name: value: value != null) {

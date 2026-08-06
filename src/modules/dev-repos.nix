@@ -1,4 +1,4 @@
-# Provisions dev repos in ~/dev from per-user config in users.json.
+# Provisions dev repos in ~/dev from per-user config in src/users/.
 args@{
   config,
   lib,

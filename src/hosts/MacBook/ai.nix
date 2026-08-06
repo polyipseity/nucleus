@@ -26,6 +26,7 @@ let
       lib
       username
       ;
+    hostName = "MacBook";
   };
   resolveValue = name: envVars.resolveValue name "macOS";
   # Daemon env vars from the centralized catalog.

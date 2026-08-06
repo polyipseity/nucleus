@@ -4,7 +4,7 @@
 #
 # Usage: nucleus-replica-reset [--dry-run] [--replica-id ID] [--repo-root PATH]
 #
-# Env vars: NUCLEUS_REPO_ROOT — repo checkout used to find users.json when
+# Env vars: NUCLEUS_REPO_ROOT — repo checkout used to find src/users/ when
 # --repo-root is not given.
 #
 # Safety: local-only by design — never modifies remote data.  With --dry-run
@@ -25,7 +25,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 # WHY: NUCLEUS_REPO_ROOT lets non-standard checkouts (e.g. CI or a workspace
-# copy) locate users.json without assuming cwd.
+# copy) locate the user registry without assuming cwd.
 repo_root="${NUCLEUS_REPO_ROOT:-}"
 
 # usage — Print the help text.
@@ -86,15 +86,32 @@ if [ -z "$repo_root" ]; then
 else
   REPO_ROOT="$repo_root"
 fi
-USERS_JSON="$REPO_ROOT/src/modules/users.json"
 
-if [ ! -f "$USERS_JSON" ]; then
-  error "users registry not found at $USERS_JSON"
+_registry_platform() {
+  case "$(resolve_nucleus_host)" in
+    MacBook) printf '%s\n' macos ;;
+    NixOS) printf '%s\n' nixos ;;
+    *) printf '%s\n' macos ;;
+  esac
+}
+
+_load_users_registry() {
+  "$REPO_ROOT/src/scripts/lib/load-user-registry.sh" \
+    --platform "$(_registry_platform)" \
+    --repo-root "$REPO_ROOT"
+}
+
+USERS_REGISTRY_ROOT="$REPO_ROOT/src/users"
+
+if [ ! -d "$USERS_REGISTRY_ROOT" ]; then
+  error "users registry root not found at $USERS_REGISTRY_ROOT"
 fi
 
 if ! command -v jq >/dev/null 2>&1; then
-  error "jq not found; cannot parse users.json"
+  error "jq not found; cannot parse user registry"
 fi
+
+USERS_REGISTRY="$(_load_users_registry)"
 
 username="$(id -un)"
 current_os="$(uname -s)"
@@ -114,8 +131,8 @@ replica_lines="$({
         (.iCloudService // "drive")
       ]
     | @tsv
-  ' "$USERS_JSON"
-} || true)" # check-suppress:suppression_doc: jq query may fail if users.json is missing; empty result handled by [ -z ] check downstream.
+  ' <<< "$USERS_REGISTRY"
+} || true)" # check-suppress:suppression_doc: jq query may fail if user registry is missing; empty result handled by [ -z ] check downstream.
 
 if [ -z "$replica_lines" ]; then
   say "no enabled replicas for user '$username'"

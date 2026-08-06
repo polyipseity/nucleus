@@ -30,7 +30,7 @@
   'system/remote-desktop.dsc.yml', 'system/packages.dsc.yml').
   Filenames are resolved relative to $ConfigDir.
 
-  Per-user DSC files can be declared in users.json under each
+  Per-user DSC files can be declared in src/users/<username>/windows.json under each
   user's dscConfigFiles array.  apply.ps1 appends those files for every user
   listed in -Users (de-duplicated, preserving order) so each managed user can
   declare their own user-level DSC configs without editing script code.
@@ -88,7 +88,7 @@
   for each configured user. False skips provisioning without error.
 
 .PARAMETER EnableCustomProvisionSymlinkParity
-  Enable managed custom symlink provisioning from users.json. Each link is created only
+  Enable managed custom symlink provisioning from src/users/. Each link is created only
   for entries that declare a Windows target and receives delete-protection ACLs.
   False removes only previously managed custom symlinks.
 
@@ -465,53 +465,9 @@ if (Test-Path -Path $healthCheckScript) {
   & $healthCheckScript -MinFreeGB $MinFreeDiskGB -NoSecretHealth
 }
 
-# Load the user registry from src/hosts/Windows/users.json. This declarative
+# Load the user registry from src/users/ domain files. This declarative
 # configuration defines all users managed by this Windows host (primary and
-# secondary) and mirrors the Nix users/default.nix module structure. Validate
-# that all users in -Users parameter are registered in this registry.
-$userRegistryPath = Join-Path -Path $PSScriptRoot -ChildPath "users.json"
-$userRegistry = & (Join-Path -Path $resolvedModuleDir -ChildPath "Load-UserRegistry.ps1") -RegistryPath $userRegistryPath
-$registeredUserNames = @($userRegistry.users.name)
-$selectedUserRecords = @($userRegistry.users | Where-Object { $Users -contains $_.name })
-
-# Validate that all explicitly provided users exist in the registry.
-foreach ($user in $Users) {
-  if ($user -notin $registeredUserNames) {
-    Write-Error "User '$user' not found in registry. Registered users: $($registeredUserNames -join ', ')" -ErrorAction Stop
-    exit 1
-  }
-}
-
-# Build effective DSC file list from explicit -ConfigFiles plus optional
-# per-user extensions declared in users.json (`dscConfigFiles`).  This keeps
-# DSC selection declarative and user-scoped while preserving the canonical
-# system/user baseline defaults.
-$effectiveConfigFiles = @($ConfigFiles)
-foreach ($configuredUser in $userRegistry.users) {
-  if ($configuredUser.name -notin $Users) {
-    continue
-  }
-
-  foreach ($userConfigFile in @($configuredUser.dscConfigFiles)) {
-    if ([string]::IsNullOrWhiteSpace($userConfigFile)) {
-      continue
-    }
-    # Prevent path traversal: entries must be plain filenames relative to user/.
-    if ($userConfigFile -match '[\\/]|\.\.') {
-      throw "User '$($configuredUser.name)' dscConfigFiles entry '$userConfigFile' contains path separators or '..'; entries must be plain filenames relative to the user/ directory"
-    }
-    $resolvedConfigFile = "user/$userConfigFile"
-    if ($resolvedConfigFile -notin $effectiveConfigFiles) {
-      $effectiveConfigFiles += $resolvedConfigFile
-    }
-  }
-}
-
-if (-not $userRegistry.primaryUser) {
-  Write-Error "No primary user marked (isPrimary=true) in user registry" -ErrorAction Stop
-  exit 1
-}
-
+# secondary). Validate that all users in -Users parameter are registered.
 $resolvedConfigDir = (Resolve-Path -Path $ConfigDir).Path
 $machineSshHostKeyPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key"
 $primarySshKeyPath = Join-Path -Path $HOME -ChildPath ".ssh\ssh_personal_$PrimaryUsername"
@@ -575,11 +531,51 @@ $secretsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\secrets"
 $wallpaperAssetsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\assets\wallpapers"
 $machineSshHostKeyPubPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key.pub"
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\")).Path
+
+$userRegistry = & (Join-Path -Path $resolvedModuleDir -ChildPath "Load-UserRegistry.ps1") -RepoRoot $repoRoot
+$registeredUserNames = @($userRegistry.users.name)
+$selectedUserRecords = @($userRegistry.users | Where-Object { $Users -contains $_.name })
+
+# Validate that all explicitly provided users exist in the registry.
+foreach ($user in $Users) {
+  if ($user -notin $registeredUserNames) {
+    Write-Error "User '$user' not found in registry. Registered users: $($registeredUserNames -join ', ')" -ErrorAction Stop
+    exit 1
+  }
+}
+
+# Build effective DSC file list from explicit -ConfigFiles plus optional
+# per-user extensions declared in the user registry (`dscConfigFiles`).  This keeps
+# DSC selection declarative and user-scoped while preserving the canonical
+# system/user baseline defaults.
+$effectiveConfigFiles = @($ConfigFiles)
+foreach ($configuredUser in $userRegistry.users) {
+  if ($configuredUser.name -notin $Users) {
+    continue
+  }
+
+  foreach ($userConfigFile in @($configuredUser.dscConfigFiles)) {
+    if ([string]::IsNullOrWhiteSpace($userConfigFile)) {
+      continue
+    }
+    # Prevent path traversal: entries must be plain filenames relative to user/.
+    if ($userConfigFile -match '[\\/]|\.\.') {
+      throw "User '$($configuredUser.name)' dscConfigFiles entry '$userConfigFile' contains path separators or '..'; entries must be plain filenames relative to the user/ directory"
+    }
+    $resolvedConfigFile = "user/$userConfigFile"
+    if ($resolvedConfigFile -notin $effectiveConfigFiles) {
+      $effectiveConfigFiles += $resolvedConfigFile
+    }
+  }
+}
+
+if (-not $userRegistry.primaryUser) {
+  Write-Error "No primary user marked (isPrimary=true) in user registry" -ErrorAction Stop
+  exit 1
+}
 # WHY: QtPass stores settings in platform-native stores (registry on Windows), so Method 1 (symlink) does not apply.
 # check-suppress:config-method: method 3 (merge) -- QtPass shared settings JSON source of truth shared with POSIX activation
-$qtPassSettingsPath = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\qtpass\qtpass.json"
 # check-suppress:config-method: method 3 (merge) -- Picard defaults INI merged via Sync-PicardConfig on Windows
-$picardDefaultsPath = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\picard\Picard.ini"
 $sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
 
 # Expose the repo root to any subprocesses (e.g. DSC script resources) that
@@ -627,7 +623,7 @@ if ($EnableHostAgeKeyRegistration) {
 }
 
 # Materialize user-scoped secrets once before DSC resources run.
-$secretPreflightFiles = @("git-identities.yml", "gpg-personal.yml", "ssh-personal.yml")
+$secretPreflightFiles = @("gpg-personal.yml", "ssh-personal.yml")
 foreach ($secretFile in $secretPreflightFiles) {
   $secretPath = Join-Path -Path $secretsDir -ChildPath $secretFile
   if (-not (Test-Path -Path $secretPath)) {
@@ -640,7 +636,7 @@ foreach ($secretFile in $secretPreflightFiles) {
 
 if ($EnableSecretsParity) {
   Sync-SecretCatalog -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
-  # Materialize per-user secrets from src/secrets/users-<username>.yml when present.
+  # Materialize per-user secrets from src/secrets/users/<username>.yml when present.
   # No-op when the file does not exist so bootstrap runs continue uninterrupted.
   Sync-UserSecret `
     -RepoRoot $repoRoot `
@@ -800,15 +796,15 @@ if ($userDevRepos -and $userDevRepos.repositories) {
 Sync-AgentsConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity
 Sync-AgentsSkillManifest -RepoRoot $repoRoot -Enabled:$EnableAgentsSkillsParity
 Sync-AgentsClawHubSkillManifest -RepoRoot $repoRoot -Enabled:$EnableAgentsClawHubSkillsParity
-Sync-CursorConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity
+Sync-CursorConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity -Username $Users[0]
 Sync-VSCodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity -Username $Users[0]
 Sync-VSCodeExtensionManifest -Enabled:$EnableVsCodeExtensionsParity
 Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
 Set-VSCodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
-Sync-ObsidianConfig -Enabled:$EnableObsidianParity -Users $selectedUserRecords
-Sync-PicardConfig -Enabled:$EnablePicardParity -Users $selectedUserRecords -DefaultsFilePath $picardDefaultsPath
-Sync-QtPassConfig -Enabled:$EnableQtPassParity -SettingsPath $qtPassSettingsPath -Users $selectedUserRecords
+Sync-ObsidianConfig -Enabled:$EnableObsidianParity -Users $selectedUserRecords -RepoRoot $repoRoot
+Sync-PicardConfig -Enabled:$EnablePicardParity -Users $selectedUserRecords -RepoRoot $repoRoot
+Sync-QtPassConfig -Enabled:$EnableQtPassParity -Users $selectedUserRecords -RepoRoot $repoRoot
 # Default to false if devReposEnabled not yet set (user not in registry or no repos configured).
 if ($null -eq $EnableDevReposParity) {
   $EnableDevReposParity = $devReposEnabled
@@ -824,7 +820,7 @@ Sync-UvConfig -Enabled:$EnableShellParity
 Sync-NextestConfig -Enabled:$EnableShellParity
 # check-suppress:config-method: method 1 (writable symlink) -- direnvrc cross-platform base config.
 Sync-DirenvConfig -Enabled:$EnableShellParity
-Sync-StarshipConfig -Enabled:$EnableShellParity
+Sync-StarshipConfig -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoot
 if ($EnableCloudDrivesParity) {
   foreach ($userRecord in $selectedUserRecords) {
     Sync-CloudDrive -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
@@ -841,7 +837,7 @@ Sync-CustomProvisionSymlink -Enabled:$EnableCustomProvisionSymlinkParity -UserRe
   $discordMusicRPCConfigDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath "discord-music-rpc"
   $null = New-Item -Path $discordMusicRPCConfigDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
   $discordMusicRPCConfig = Join-Path -Path $discordMusicRPCConfigDir -ChildPath "config.yaml"
-  $discordMusicRPCConfigSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\discord-music-rpc\config.yaml"
+  $discordMusicRPCConfigSource = Resolve-UserConfigFile -User $Users[0] -ConfigName 'discord-music-rpc' -RelativePath 'config.yaml' -RepoRoot $repoRoot
   if (Test-Path -Path $discordMusicRPCConfig) { Remove-Item -Path $discordMusicRPCConfig -Force }
   New-Item -Path $discordMusicRPCConfig -ItemType SymbolicLink -Target $discordMusicRPCConfigSource -Force > $null
 Sync-DiscordMusicRPC -Enabled:$EnableDiscordMusicRPCParity
@@ -909,7 +905,7 @@ if ($NoAISync) {
   }
 }
 
-# Converge enabled cloud replicas from users.json as the final post-apply step.
+# Converge enabled cloud replicas from src/users/ as the final post-apply step.
 # This is best-effort: replica sync can be long-running and should not
 # retroactively fail a completed configuration convergence.
 

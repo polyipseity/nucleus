@@ -91,7 +91,7 @@ function Resolve-ICloudServiceForRemote {
     Resolves the configured iCloud service for a remote from the user registry.
 
   .DESCRIPTION
-    Reads src/hosts/Windows/users.json and returns the single configured
+    Reads the assembled user registry from src/users/ and returns the single configured
     iCloud service (`drive` or `photos`) for the current user's matching remote.
     If there is no explicit entry, or multiple entries disagree, the function
     defaults the remote config to `drive` and lets mount commands override per
@@ -114,27 +114,27 @@ function Resolve-ICloudServiceForRemote {
     [string]$RemoteName
   )
 
-  $registryPath = Join-Path $RepoRoot 'src\hosts\Windows\users.json'
-  if (-not (Test-Path -Path $registryPath -PathType Leaf)) {
+  $loadUserRegistryScript = Join-Path $RepoRoot 'src\hosts\Windows\modules\Load-UserRegistry.ps1'
+  if (-not (Test-Path -Path $loadUserRegistryScript -PathType Leaf)) {
     return 'drive'
   }
 
-  $registry = Get-Content -Path $registryPath -Raw | ConvertFrom-Json -AsHashtable
-  $users = $registry.users
-  if (-not $users) {
+  $userRegistry = & $loadUserRegistryScript -RepoRoot $RepoRoot
+  $users = $userRegistry.users
+  if (-not $users -or $users.Count -eq 0) {
     return 'drive'
   }
 
   $currentUsername = $env:USERNAME
-  if (-not $users.ContainsKey($currentUsername)) {
-    $primaryEntry = $users.GetEnumerator() | Where-Object { $_.Value.isPrimary -eq $true } | Select-Object -First 1
-    if ($null -eq $primaryEntry) {
+  $userRecord = @($users | Where-Object { $_.name -eq $currentUsername }) | Select-Object -First 1
+  if ($null -eq $userRecord) {
+    $userRecord = $userRegistry.primaryUser
+    if ($null -eq $userRecord) {
       return 'drive'
     }
-    $currentUsername = $primaryEntry.Key
   }
 
-  $userCloudDrives = $users[$currentUsername].cloudDrives
+  $userCloudDrives = $userRecord.cloudDrives
   if ($null -eq $userCloudDrives) {
     return 'drive'
   }

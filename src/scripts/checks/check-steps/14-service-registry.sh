@@ -11,8 +11,7 @@ run_14_service_registry() {
   cd "$_repo_root" || return 1
   local _svc_errors=0
   local _svc_json="src/modules/services.json"
-  local _users_json="src/modules/users.json"
-  local _win_users_json="src/hosts/Windows/users.json"
+  local _users_root="src/users"
   local _svc_names
 
   if [ ! -f "$_svc_json" ]; then
@@ -92,35 +91,25 @@ run_14_service_registry() {
       (.value.justification | tostring)
     ] | @tsv' "$_svc_json")
 
-  # Validate service names in users.json services blocks exist in services.json.
+  # Validate service names in per-user services.json files exist in services.json.
   _svc_names=$(jq -r 'to_entries[].key' "$_svc_json")
-  if [ -f "$_users_json" ]; then
-    while IFS=$'\t' read -r _username _svc_name _has_enable; do
-      if ! echo "$_svc_names" | grep -qxF "$_svc_name"; then
-        error "$_users_json: user '$_username' references unknown service '$_svc_name'"
-        _svc_errors=$((_svc_errors + 1))
-      fi
-    done < <(jq -r '
-      to_entries[] | select(.key | startswith("$") | not) |
-      .key as $user |
-      (.value.services // {}) | to_entries[] |
-      select(.value.enable != null) |
-      [$user, .key, "true"] | @tsv' "$_users_json")
-  fi
-
-  # Windows users.json
-  if [ -f "$_win_users_json" ]; then
-    while IFS=$'\t' read -r _username _svc_name _has_enable; do
-      if ! echo "$_svc_names" | grep -qxF "$_svc_name"; then
-        error "$_win_users_json: user '$_username' references unknown service '$_svc_name'"
-        _svc_errors=$((_svc_errors + 1))
-      fi
-    done < <(jq -r '
-      .users // {} | to_entries[] |
-      .key as $user |
-      (.value.services // {}) | to_entries[] |
-      select(.value.enable != null) |
-      [$user, .key, "true"] | @tsv' "$_win_users_json")
+  if [ -d "$_users_root" ]; then
+    for _user_services in "$_users_root"/*/services.json; do
+      [ -f "$_user_services" ] || continue
+      _username="$(basename "$(dirname "$_user_services")")"
+      case "$_username" in
+        default | schemas) continue ;;
+      esac
+      while IFS=$'\t' read -r _svc_name; do
+        if ! echo "$_svc_names" | grep -qxF "$_svc_name"; then
+          error "$_user_services: user '$_username' references unknown service '$_svc_name'"
+          _svc_errors=$((_svc_errors + 1))
+        fi
+      done < <(jq -r '
+        to_entries[] | select(.key | startswith("$") | not) |
+        select(.value.enable != null) |
+        .key' "$_user_services")
+    done
   fi
 
   if [ "$_svc_errors" -gt 0 ]; then

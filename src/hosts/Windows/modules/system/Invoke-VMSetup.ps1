@@ -350,23 +350,23 @@ function Invoke-VMSetup {
             throw 'vm-setup: could not determine the per-user VM secret owner (set NUCLEUS_VM_SECRET_OWNER to override).'
         }
 
-        $userRegistryPath = Join-Path $RepoRoot 'src\modules\users.json'
-        if (-not (Test-Path -LiteralPath $userRegistryPath -PathType Leaf)) {
-            throw "vm-setup: users registry not found: $userRegistryPath"
+        $loadUserRegistryScript = Join-Path $RepoRoot 'src\hosts\Windows\modules\Load-UserRegistry.ps1'
+        if (-not (Test-Path -LiteralPath $loadUserRegistryScript -PathType Leaf)) {
+            throw "vm-setup: user registry loader not found: $loadUserRegistryScript"
         }
 
-        $userRegistry = Get-Content -Path $userRegistryPath -Raw | ConvertFrom-Json
-        $userProperty = $userRegistry.PSObject.Properties[$secretOwner]
-        if ($null -eq $userProperty -or $null -eq $userProperty.Value) {
-            throw "vm-setup: user '$secretOwner' is missing from $userRegistryPath"
+        $usersRegistry = & $loadUserRegistryScript -RepoRoot $RepoRoot
+        $userRecord = @($usersRegistry.users | Where-Object { $_.name -eq $secretOwner }) | Select-Object -First 1
+        if ($null -eq $userRecord) {
+            throw "vm-setup: user '$secretOwner' is missing from the user registry"
         }
 
-        $vmGuestRef = $userProperty.Value.vmGuest
+        $vmGuestRef = $userRecord.vmGuest
         if ($null -eq $vmGuestRef -or [string]::IsNullOrWhiteSpace([string]$vmGuestRef.usernameSecretKey) -or [string]::IsNullOrWhiteSpace([string]$vmGuestRef.passwordSecretKey)) {
-            throw "vm-setup: vmGuest secret-key references are missing for user '$secretOwner' in $userRegistryPath"
+            throw "vm-setup: vmGuest secret-key references are missing for user '$secretOwner' in the user registry"
         }
 
-        $secretFile = Join-Path $RepoRoot "src\secrets\users-$secretOwner.yml"
+        $secretFile = Join-Path $RepoRoot "src\secrets\users\$secretOwner.yml"
         if (-not (Test-Path -LiteralPath $secretFile -PathType Leaf)) {
             throw "vm-setup: per-user VM secret file not found: $secretFile"
         }

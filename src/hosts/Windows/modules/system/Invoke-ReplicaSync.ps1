@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-  Synchronize enabled cloud replicas declared in src/modules/users.json.
+  Synchronize enabled cloud replicas declared in src/users/.
 
 .DESCRIPTION
   Windows counterpart to scripts/replica-sync.sh. Reads per-user replica
-  definitions from src/modules/users.json and performs pull-only replica
+  definitions from src/users/ and performs pull-only replica
   convergence (`rclone sync remote -> local`).
 
   Replica policy is strict:
@@ -52,12 +52,12 @@ function Invoke-ReplicaSync {
   }
 
   $resolvedRepoRoot = (Resolve-Path -Path $RepoRoot).Path
-  $usersJsonPath = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\users.json"
+  $loadUserRegistryScript = Join-Path -Path $resolvedRepoRoot -ChildPath "src\hosts\Windows\modules\Load-UserRegistry.ps1"
+  if (-not (Test-Path -Path $loadUserRegistryScript -PathType Leaf)) {
+    throw "replica-sync: user registry loader not found at '$loadUserRegistryScript'."
+  }
   # check-suppress:config-method: method 4 (runtime direct read) -- consumed only by nucleus-owned scripts, not by third-party apps.
   $gcConfigPath = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\configs\cloud\replica-gc.json"
-  if (-not (Test-Path -Path $usersJsonPath -PathType Leaf)) {
-    throw "replica-sync: users registry not found at '$usersJsonPath'."
-  }
   if (-not (Test-Path -Path $gcConfigPath -PathType Leaf)) {
     throw "replica-sync: gc config not found at '$gcConfigPath'."
   }
@@ -78,7 +78,7 @@ function Invoke-ReplicaSync {
     }
   }
 
-  $usersConfig = Get-Content -Raw -Path $usersJsonPath | ConvertFrom-Json
+  $usersRegistry = & $loadUserRegistryScript -RepoRoot $resolvedRepoRoot
   $gcConfig = Get-Content -Raw -Path $gcConfigPath | ConvertFrom-Json
   $isWindowsHost = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)
   # check-suppress:suppression_doc: probe -- icacls may not be available on non-Windows hosts; $null check handles absence.
@@ -100,13 +100,13 @@ function Invoke-ReplicaSync {
   }
 
   $username = [System.Environment]::UserName
-  $userConfigProperty = $usersConfig.PSObject.Properties | Where-Object { $_.Name -eq $username } | Select-Object -First 1
-  if ($null -eq $userConfigProperty) {
-    Write-Output "replica-sync: no user entry for '$username' in users.json; skipping"
+  $userRecord = @($usersRegistry.users | Where-Object { $_.name -eq $username }) | Select-Object -First 1
+  if ($null -eq $userRecord) {
+    Write-Output "replica-sync: no user entry for '$username' in user registry; skipping"
     return
   }
 
-  $replicas = @($userConfigProperty.Value.cloudDrives.replicas | Where-Object {
+  $replicas = @($userRecord.cloudDrives.replicas | Where-Object {
       $_.enable -eq $true
     })
 

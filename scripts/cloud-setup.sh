@@ -17,20 +17,20 @@ fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
-# Reads the configured iCloud service for a remote from src/modules/users.json.
+# Reads the configured iCloud service for a remote from the assembled user registry.
 # Args: $1 — repo root; $2 — remote name.
 # Output: `drive` or `photos`.
 # WHY: `rclone config create ... iclouddrive --all` asks which Apple service to
 # use. The repository already declares per-user cloud-drive intent, so use that
 # as the source of truth and skip the extra prompt.
 resolve_icloud_service_for_remote() {
-  # Reads users.json to determine iCloud service type (drive/photos) for a
+  # Reads the user registry to determine iCloud service type (drive/photos) for a
   # remote, avoiding the interactive prompt from `rclone config create`.
   _ics_repo_root="$1"
   _ics_remote_name="$2"
-  _ics_users_json="$_ics_repo_root/src/modules/users.json"
+  _ics_registry="$3"
 
-  if [ ! -f "$_ics_users_json" ] || ! command -v jq >/dev/null 2>&1; then
+  if [ -z "$_ics_registry" ] || ! command -v jq >/dev/null 2>&1; then
     printf '%s\n' 'drive'
     return 0
   fi
@@ -49,7 +49,7 @@ resolve_icloud_service_for_remote() {
         | unique
         | .[]
       ' \
-      "$_ics_users_json"
+      <<< "$_ics_registry"
   } 2>/dev/null)"
 
   _ics_service_count="$(printf '%s\n' "$_ics_services" | /usr/bin/awk 'NF { count += 1 } END { print count + 0 }')"
@@ -91,13 +91,13 @@ collect_missing_remotes() {
   printf '%s\n' "$_missing"
 }
 
-# Collect enabled mount service IDs from src/modules/users.json for this user.
-# Args: $1 — absolute users.json path.
+# Collect enabled mount service IDs from the user registry for this user.
+# Args: $1 — assembled user registry JSON.
 # Output: tab-separated rows: <mount id> <remoteName>
 collect_configured_mount_service_ids() {
-  _ccmsi_users_json="$1"
+  _ccmsi_registry="$1"
 
-  if [ ! -f "$_ccmsi_users_json" ] || ! command -v jq >/dev/null 2>&1; then
+  if [ -z "$_ccmsi_registry" ] || ! command -v jq >/dev/null 2>&1; then
     return 0
   fi
 
@@ -110,16 +110,16 @@ collect_configured_mount_service_ids() {
       | [.id, .remoteName]
       | @tsv
     ' \
-    # check-suppress:suppression_doc: users.json may be empty or malformed; empty result is handled.
-    "$_ccmsi_users_json" 2>/dev/null || true
+    # check-suppress:suppression_doc: user registry may be empty or malformed; empty result is handled.
+    <<< "$_ccmsi_registry" 2>/dev/null || true
 }
 
 # Restart managed cloud mount services so refreshed remote descriptions and
 # credentials are reflected immediately in mounted volumes.
-# Args: $1 — absolute users.json path.
+# Args: $1 — assembled user registry JSON.
 restart_cloud_mount_services() {
-  _rcms_users_json="$1"
-  _rcms_mount_rows="$(collect_configured_mount_service_ids "$_rcms_users_json")"
+  _rcms_registry="$1"
+  _rcms_mount_rows="$(collect_configured_mount_service_ids "$_rcms_registry")"
   if [ -z "$_rcms_mount_rows" ]; then
     return 0
   fi
@@ -252,7 +252,7 @@ remote_provider_create_args() {
       printf '%s\n' 'acknowledge_abuse' 'true'
       ;;
     iclouddrive)
-      _rpca_service="$(resolve_icloud_service_for_remote "$_rpca_repo_root" "$_rpca_remote_name")"
+      _rpca_service="$(resolve_icloud_service_for_remote "$_rpca_repo_root" "$_rpca_remote_name" "${USERS_REGISTRY:-}")"
       printf '%s\n' 'service' "$_rpca_service" '--all'
       ;;
     *)           return 0 ;;
@@ -264,7 +264,20 @@ if ! command -v rclone >/dev/null 2>&1; then
 fi
 
 repo_root="$(derive_repo_root)"
-USERS_JSON="$repo_root/src/modules/users.json"
+
+_registry_platform() {
+  case "$(resolve_nucleus_host)" in
+    MacBook) printf '%s\n' macos ;;
+    NixOS) printf '%s\n' nixos ;;
+    *) printf '%s\n' macos ;;
+  esac
+}
+
+if [ -d "$repo_root/src/users" ] && command -v jq >/dev/null 2>&1; then
+  USERS_REGISTRY="$("$repo_root/src/scripts/lib/load-user-registry.sh" --platform "$(_registry_platform)" --repo-root "$repo_root")"
+else
+  USERS_REGISTRY=""
+fi
 
 required_remotes="GoogleDrive iCloud OneDrive"
 missing_remotes="$(collect_missing_remotes "$required_remotes")" || {
@@ -389,12 +402,12 @@ if rclone listremotes | grep -Fxq 'GoogleDrive:'; then
   fi
 fi
 
-# Sync display names from users.json to rclone config descriptions.
+# Sync display names from the user registry to rclone config descriptions.
 # WHY: rclone description field drives Finder labels and desktop display names.
-# When users.json declares a displayName, propagate it to rclone config so
+# When the registry declares a displayName, propagate it to rclone config so
 # the mount shows correct labels in Finder and on desktop.
-if [ -f "$USERS_JSON" ] && command -v jq >/dev/null 2>&1; then
-  say "syncing display names from users.json to rclone config..."
+if [ -n "$USERS_REGISTRY" ] && command -v jq >/dev/null 2>&1; then
+  say "syncing display names from user registry to rclone config..."
   _username="$(id -un)"
   _display_names="$({
     jq -r \
@@ -410,7 +423,7 @@ if [ -f "$USERS_JSON" ] && command -v jq >/dev/null 2>&1; then
         | [.remoteName, .displayName]
         | @tsv
       ' \
-      "$USERS_JSON"
+      <<< "$USERS_REGISTRY"
   # check-suppress:suppression_doc: token/URL may not be resolvable; best-effort extraction with downstream guards.
   } 2>/dev/null || true)"
 
@@ -448,8 +461,8 @@ EOF
   fi
 fi
 
-if [ -f "$USERS_JSON" ]; then
-  restart_cloud_mount_services "$USERS_JSON"
+if [ -n "$USERS_REGISTRY" ]; then
+  restart_cloud_mount_services "$USERS_REGISTRY"
 fi
 
 if [ "$apply" = true ]; then

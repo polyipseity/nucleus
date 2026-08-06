@@ -6,7 +6,7 @@
 #
 # Commands: setup|sync|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options].
 # Guest credentials are resolved from the per-user SOPS secret file referenced
-# by users.json vmGuest keys; see resolve_vm_guest_credentials.
+# by src/users/ vm-guest keys; see resolve_vm_guest_credentials.
 #
 # Environment variables read: NUCLEUS_VM_SECRET_OWNER, USER, NUCLEUS_REPO_ROOT,
 # NUCLEUS_HOST (see lib.sh derive_repo_root / resolve_nucleus_host).
@@ -44,7 +44,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # current_vm_secret_owner
 #   Determines which user owns the SOPS VM secrets: NUCLEUS_VM_SECRET_OWNER
 #   (explicit override), then $USER, then `id -un` as last resort. WHY: the
-#   owner selects the per-user secret file src/secrets/users-<owner>.yml, so
+#   owner selects the per-user secret file src/secrets/users/<owner>.yml, so
 #   resolution order is override -> session user -> system user. Outputs the
 #   owner name on stdout; returns 1 when none can be determined.
 current_vm_secret_owner() {
@@ -68,14 +68,13 @@ current_vm_secret_owner() {
 
 # resolve_vm_guest_credentials
 #   Resolves the VM guest username/password from the per-user SOPS secret file
-#   referenced by users.json vmGuest secret-key entries, setting the globals
+#   referenced by src/users/ vmGuest secret-key entries, setting the globals
 #   vm_secret_owner, vm_guest_username, vm_guest_password. WHY: credentials
 #   stay out of the manifest and are decrypted only at runtime, so the
 #   plaintext never touches disk or the flake. Returns 1 with an error message
 #   on any failure so callers can degrade gracefully (see do_setup).
 resolve_vm_guest_credentials() {
   _rvgc_owner=''
-  _rvgc_users_json="$REPO_ROOT/src/modules/users.json"
   _rvgc_secret_file=''
 
   if _rvgc_owner="$(current_vm_secret_owner)"; then
@@ -94,21 +93,22 @@ resolve_vm_guest_credentials() {
     return 1
   fi
 
-  if [ ! -f "$_rvgc_users_json" ]; then
-    error "users registry not found: $_rvgc_users_json"
+  _rvgc_platform="$(case "$(resolve_nucleus_host)" in MacBook) echo macos ;; NixOS) echo nixos ;; *) echo macos ;; esac)"
+  if ! _rvgc_users_registry="$("$REPO_ROOT/src/scripts/lib/load-user-registry.sh" --platform "$_rvgc_platform" --repo-root "$REPO_ROOT")"; then
+    error "failed to assemble user registry from $REPO_ROOT/src/users"
     return 1
   fi
 
-  _rvgc_secret_file="$REPO_ROOT/src/secrets/users-${_rvgc_owner}.yml"
+  _rvgc_secret_file="$REPO_ROOT/src/secrets/users/${_rvgc_owner}.yml"
   if [ ! -f "$_rvgc_secret_file" ]; then
     error "per-user VM secret file not found: $_rvgc_secret_file"
     return 1
   fi
 
-  _rvgc_username_key="$(jq -r --arg owner "$_rvgc_owner" '.[ $owner ].vmGuest.usernameSecretKey // empty' "$_rvgc_users_json")"
-  _rvgc_password_key="$(jq -r --arg owner "$_rvgc_owner" '.[ $owner ].vmGuest.passwordSecretKey // empty' "$_rvgc_users_json")"
+  _rvgc_username_key="$(jq -r --arg owner "$_rvgc_owner" '.[ $owner ].vmGuest.usernameSecretKey // empty' <<< "$_rvgc_users_registry")"
+  _rvgc_password_key="$(jq -r --arg owner "$_rvgc_owner" '.[ $owner ].vmGuest.passwordSecretKey // empty' <<< "$_rvgc_users_registry")"
   if [ -z "$_rvgc_username_key" ] || [ -z "$_rvgc_password_key" ]; then
-    error "vmGuest secret-key references are missing for user $_rvgc_owner in $_rvgc_users_json"
+    error "vmGuest secret-key references are missing for user $_rvgc_owner in user registry"
     return 1
   fi
 

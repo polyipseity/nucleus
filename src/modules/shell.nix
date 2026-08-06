@@ -16,6 +16,7 @@
   username,
   nucleusApps,
   users ? null,
+  hostName,
   ...
 }:
 let
@@ -29,6 +30,7 @@ let
       pkgs
       lib
       username
+      hostName
       ;
   };
 
@@ -40,22 +42,21 @@ let
   mergedSessionVariables = envVarsHelpers.allVars;
 
   # Keep iCloud exclusion names and managed root paths in one declarative source
-  # (users.json) so activation-time recursive marking and interactive shell hooks
+  # (src/users/) so activation-time recursive marking and interactive shell hooks
   # converge on the same directory-name and managed-root policy.
   # Only Mobile Documents subpaths are valid managed roots here: the ignore xattr
   # is a native iCloud File Provider mechanism and must not be applied to legacy
   # convenience aliases like ~/Downloads/iCloud or ~/clouds/iCloud.
   _iCloudCfg =
     let
-      allUsers = builtins.fromJSON (builtins.readFile ./users.json);
-      effectiveUsers = if users != null then users else allUsers;
       currentUser = config.home.username;
       perUser =
         if
-          builtins.hasAttr currentUser effectiveUsers
-          && builtins.hasAttr "iCloudExclusions" effectiveUsers.${currentUser}
+          users != null
+          && builtins.hasAttr currentUser users
+          && builtins.hasAttr "iCloudExclusions" users.${currentUser}
         then
-          effectiveUsers.${currentUser}.iCloudExclusions
+          users.${currentUser}.iCloudExclusions
         else
           { };
       normalizeRoot = root: lib.removeSuffix "/." root;

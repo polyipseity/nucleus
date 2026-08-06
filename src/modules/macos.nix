@@ -6,6 +6,7 @@
   username,
   nucleusApps,
   users ? null,
+  hostName,
   ...
 }:
 let
@@ -16,6 +17,16 @@ let
   # which runs as the user and does not inherit the sudo-level env var, can still
   # locate the repo root.
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+
+  userOverlay = import ./lib/users-overlay.nix;
+
+  linearmouseConfigFile = userOverlay.selectUserConfigFile {
+    configName = "linearmouse";
+    relativePath = "linearmouse.json";
+    effectiveUsername = config.home.username;
+    inherit repoRoot;
+  };
+
   liveICloudDownloads = "${config.home.homeDirectory}/Library/Mobile Documents/com~apple~CloudDocs/Downloads";
 
   # Sub-module imports extracted from this file for focused maintainability.
@@ -31,6 +42,7 @@ let
       pkgs
       lib
       username
+      hostName
       ;
   };
 
@@ -360,7 +372,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # check-suppress:config-method: method 1 (writable symlink) -- linearmouse/linearmouse.json deployed via linearmouse-config.sh
     # -------------------------------------------------------------------------
     macos-configure-linearmouse = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      "${activationBundle}/src/scripts/hosts/MacBook/macos-configure-linearmouse.sh" "${repoRoot}"
+      "${activationBundle}/src/scripts/hosts/MacBook/macos-configure-linearmouse.sh" ${lib.escapeShellArg linearmouseConfigFile}
     '';
 
     # -------------------------------------------------------------------------
@@ -429,12 +441,12 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # directories (e.g., node_modules, .venv) from syncing across devices.
     #
     # Scope guard:
-    #   1. Managed roots come from the centralized users.json registry.
+    #   1. Managed roots come from the centralized src/users/ registry.
     #   2. At evaluation time we discard any root outside Library/Mobile Documents.
     #   3. At runtime we recurse only inside those native iCloud directories.
     #   4. find -prune stops descent into excluded directories, keeping scans fast.
     #
-    # Configuration: excludedDirNames from users.json (e.g., ["node_modules"])
+    # Configuration: excludedDirNames from src/users/ (e.g., ["node_modules"])
     # Source: https://developer.apple.com/documentation/fileprovider
     # -------------------------------------------------------------------------
     macos-configure-icloud-exclusions = lib.hm.dag.entryAfter [ "cloud-drives-setup" ] ''

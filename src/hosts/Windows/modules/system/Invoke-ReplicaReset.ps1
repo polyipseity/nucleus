@@ -3,7 +3,7 @@
   Reset local replica sync state for manual troubleshooting.
 
 .DESCRIPTION
-  Clears only local state for enabled replicas declared in src/modules/users.json:
+  Clears only local state for enabled replicas declared in src/users/:
     - Legacy marker files under %USERPROFILE%\.config\nucleus\state\replica-*\<id>.seeded
     - Local replica data under each replica localPath
     - Local rclone cache directories related to sync/bisync
@@ -47,21 +47,21 @@ function Invoke-ReplicaReset {
   $isMacOSHost = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::OSX)
 
   $resolvedRepoRoot = (Resolve-Path -Path $RepoRoot).Path
-  $usersJsonPath = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\users.json"
-  if (-not (Test-Path -Path $usersJsonPath -PathType Leaf)) {
-    throw "replica-reset: users registry not found at '$usersJsonPath'."
+  $loadUserRegistryScript = Join-Path -Path $resolvedRepoRoot -ChildPath "src\hosts\Windows\modules\Load-UserRegistry.ps1"
+  if (-not (Test-Path -Path $loadUserRegistryScript -PathType Leaf)) {
+    throw "replica-reset: user registry loader not found at '$loadUserRegistryScript'."
   }
 
-  $usersConfig = Get-Content -Raw -Path $usersJsonPath | ConvertFrom-Json
+  $usersRegistry = & $loadUserRegistryScript -RepoRoot $resolvedRepoRoot
   $username = [System.Environment]::UserName
 
-  $userConfigProperty = $usersConfig.PSObject.Properties | Where-Object { $_.Name -eq $username } | Select-Object -First 1
-  if ($null -eq $userConfigProperty) {
-    Write-Output "replica-reset: no user entry for '$username' in users.json; skipping"
+  $userRecord = @($usersRegistry.users | Where-Object { $_.name -eq $username }) | Select-Object -First 1
+  if ($null -eq $userRecord) {
+    Write-Output "replica-reset: no user entry for '$username' in user registry; skipping"
     return
   }
 
-  $replicas = @($userConfigProperty.Value.cloudDrives.replicas | Where-Object {
+  $replicas = @($userRecord.cloudDrives.replicas | Where-Object {
       $_.enable -eq $true -and -not [string]::IsNullOrWhiteSpace($_.remoteName)
     })
 

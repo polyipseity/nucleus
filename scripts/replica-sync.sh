@@ -4,7 +4,7 @@
 # nucleus-replica-sync.
 #
 # Commands: [--dry-run] [--replica-id ID] [--repo-root PATH]. Syncs every
-# enabled replica declared in src/modules/users.json (cloudDrives.replicas)
+# enabled replica declared in src/users/ cloud-drives (replicas)
 # for the current user.
 #
 # Environment variables read: NUCLEUS_REPO_ROOT (repo-root fallback),
@@ -12,7 +12,7 @@
 # present, so encrypted rclone configs can be decrypted), USER.
 #
 # Prerequisites: rclone with the replicas' remotes configured, jq, and the
-# users.json / replica-gc.json registries. Exits 1 when any replica fails or
+# users registry / replica-gc.json registries. Exits 1 when any replica fails or
 # when required registries/tools are missing.
 
 set -euo pipefail
@@ -34,7 +34,7 @@ repo_root="${NUCLEUS_REPO_ROOT:-}"
 # usage
 #   Prints the CLI synopsis and accepted options to stdout.
 usage() {
-  usage_std "replica-sync.sh" "[--dry-run] [--replica-id ID] [--repo-root PATH]" "Synchronize enabled cloud replicas declared in src/modules/users.json. Pull-only: remote -> local."
+  usage_std "replica-sync.sh" "[--dry-run] [--replica-id ID] [--repo-root PATH]" "Synchronize enabled cloud replicas declared in src/users/. Pull-only: remote -> local."
 }
 
 dry_run=false
@@ -86,14 +86,29 @@ if [ -z "$repo_root" ]; then
 else
   REPO_ROOT="$repo_root"
 fi
-USERS_JSON="$REPO_ROOT/src/modules/users.json"
+
+_registry_platform() {
+  case "$(resolve_nucleus_host)" in
+    MacBook) printf '%s\n' macos ;;
+    NixOS) printf '%s\n' nixos ;;
+    *) printf '%s\n' macos ;;
+  esac
+}
+
+_load_users_registry() {
+  "$REPO_ROOT/src/scripts/lib/load-user-registry.sh" \
+    --platform "$(_registry_platform)" \
+    --repo-root "$REPO_ROOT"
+}
+
+USERS_REGISTRY_ROOT="$REPO_ROOT/src/users"
 # check-suppress:config-method: method 4 (runtime direct read) -- replica-gc.json is consumed only by
 # nucleus-owned scripts at runtime, not by third-party apps. No deployment
 # step needed; the script reads directly from the repo tree via $REPO_ROOT.
 REPLICA_GC_CONFIG_JSON="$REPO_ROOT/src/modules/configs/cloud/replica-gc.json"
 
-if [ ! -f "$USERS_JSON" ]; then
-  error "users registry not found at $USERS_JSON"
+if [ ! -d "$USERS_REGISTRY_ROOT" ]; then
+  error "users registry root not found at $USERS_REGISTRY_ROOT"
 fi
 
 if [ ! -f "$REPLICA_GC_CONFIG_JSON" ]; then
@@ -101,8 +116,10 @@ if [ ! -f "$REPLICA_GC_CONFIG_JSON" ]; then
 fi
 
 if ! command -v jq >/dev/null 2>&1; then
-  error "jq not found; cannot parse users.json"
+  error "jq not found; cannot parse user registry"
 fi
+
+USERS_REGISTRY="$(_load_users_registry)"
 
 # WHY: rclone configs may be pass-encrypted; RCLONE_CONFIG_PASS lets rclone
 # decrypt them at runtime. The pass file is only exported when present, so
@@ -144,8 +161,8 @@ replica_lines="$({
         (.displayName // .id)
       ]
     | @tsv
-  ' "$USERS_JSON"
-} || true)" # check-suppress:suppression_doc: jq query may fail if users.json is missing; empty result handled by [ -z ] check downstream.
+  ' <<< "$USERS_REGISTRY"
+} || true)" # check-suppress:suppression_doc: jq query may fail if user registry is missing; empty result handled by [ -z ] check downstream.
 
 # check-suppress:suppression_doc: rclone remote may not be configured yet; probe expected to fail.
 if [ -z "$replica_lines" ]; then

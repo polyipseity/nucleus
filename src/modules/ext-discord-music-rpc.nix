@@ -4,10 +4,30 @@ args@{
   config,
   lib,
   pkgs,
+  managedUsername ? null,
+  username ? null,
   ...
 }:
 let
-  # Per-user service enable flag from users.json (default: enabled).
+  effectiveUsername =
+    if managedUsername != null then
+      managedUsername
+    else if username != null then
+      username
+    else
+      config.home.username;
+
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+
+  userOverlay = import ./lib/users-overlay.nix;
+
+  discordMusicRpcConfigFile = userOverlay.selectUserConfigFile {
+    configName = "discord-music-rpc";
+    relativePath = "config.yaml";
+    inherit effectiveUsername repoRoot;
+  };
+
+  # Per-user service enable flag from src/users/ services.json (default: enabled).
   services = args.users.${config.home.username}.services or { };
   userEnable = services."discord-music-rpc".enable or true;
 
@@ -81,7 +101,7 @@ in
       # writable symlink is safe: repo-managed settings are preserved.
       # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
       home.file.".config/discord-music-rpc/config.yaml".source =
-        config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/discord-music-rpc/config.yaml";
+        config.lib.file.mkOutOfStoreSymlink discordMusicRpcConfigFile;
     }
 
     # macOS: launchd agent keeps the tray app running persistently after login.
