@@ -465,26 +465,6 @@ do_setup() {
   nuc_done
 }
 
-# Query hypervisors for currently running VM names.
-# Outputs one name per line; empty output means nothing is running.
-# WHY: state is read from the live hypervisor rather than the manifest, so
-# list/status reflect reality (e.g. VMs started outside nucleus).
-vm_get_running_names() {
-  case "$(uname -s)" in
-    Darwin)
-      tart list 2>/dev/null | awk 'NR>1{print $2}'
-      utmctl list 2>/dev/null | awk 'NR>1{print $3}'
-      ;;
-    Linux)
-      virsh list --name 2>/dev/null
-      ;;
-    MINGW*|MSYS*|CYGWIN*)
-      # Runtime detection on Windows is handled by PowerShell.
-      return 0
-      ;;
-  esac
-}
-
 # Annotate a VM name with its running state.
 # Returns "running", "stopped", or "unknown".
 _vm_state() {

@@ -1106,6 +1106,21 @@ let
       )
       "scripts/vm.sh must resize grow-only: resize_and_mark_image never shrinks, vm_resize_vm guards shrink with --allow-shrink, rejects running VMs, and targets data/<id>.qcow2";
 
+  # Running-state detection must distinguish registered catalog entries from
+  # actually running VMs on macOS (utmctl Status, tart JSON .Running).
+  test_vm_running_state_detection =
+    assert'
+      (
+        (lib.hasInfix "vm_parse_utm_running_names_from_list" vm_setup_sh_text)
+        && (lib.hasInfix "vm_parse_tart_running_names_from_json" vm_setup_sh_text)
+        && (lib.hasInfix "tart list --format json" vm_setup_sh_text)
+        && (lib.hasInfix "if ($2 != \"stopped\") print $3" vm_setup_sh_text)
+        && (lib.hasInfix "vm_get_utm_registered_names" vm_setup_sh_text)
+        && (lib.hasInfix "vm_get_tart_registered_names" vm_setup_sh_text)
+        && (lib.hasInfix "vm_get_running_names()" vm_setup_sh_text)
+      )
+      "vm running detection must filter utmctl Status and tart JSON Running; registration helpers stay separate from running probes";
+
   # The resize subcommand must be wired into the CLI: usage synopsis,
   # dispatch, size parsing via parse_size, and the --allow-shrink flag.
   test_vm_resize_cli_subcommand =

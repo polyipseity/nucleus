@@ -276,6 +276,82 @@ vm_guest_config_fingerprint() {
   } | vm_sha256_input
 }
 
+# vm_parse_utm_registered_names_from_list
+#   Parse utmctl list table output on stdin; emit registered VM names (one per
+#   line). WHY: registration lists every catalog entry regardless of Status.
+vm_parse_utm_registered_names_from_list() {
+  awk 'NR > 1 { print $3 }'
+}
+
+# vm_parse_utm_running_names_from_list
+#   Parse utmctl list table output on stdin; emit names whose Status is not
+#   stopped (starting, started, pausing, paused, resuming, stopping).
+vm_parse_utm_running_names_from_list() {
+  awk 'NR > 1 { sub(/ +$/, "", $2); if ($2 != "stopped") print $3 }'
+}
+
+# vm_parse_tart_registered_names_from_list
+#   Parse tart list table output on stdin; emit catalog names (one per line).
+#   WHY: the name column is existence in Tart's store, not running state.
+vm_parse_tart_registered_names_from_list() {
+  awk 'NR > 1 { print $2 }'
+}
+
+# vm_parse_tart_running_names_from_json
+#   Parse tart list --format json on stdin; emit names with Running == true.
+#   WHY: table layout changes across Tart releases; JSON .Running is stable.
+vm_parse_tart_running_names_from_json() {
+  require_command jq
+  jq -r '.[] | select(.Running == true) | .Name'
+}
+
+# vm_get_utm_registered_names
+#   Registered UTM VM names from the live hypervisor (not running state).
+vm_get_utm_registered_names() {
+  if [ ! -x "${UTMCTL:-/Applications/UTM.app/Contents/MacOS/utmctl}" ]; then
+    return 0
+  fi
+  "$UTMCTL" list 2>/dev/null | vm_parse_utm_registered_names_from_list
+}
+
+# vm_get_tart_registered_names
+#   Registered Tart VM/image names from the live hypervisor (not running state).
+vm_get_tart_registered_names() {
+  command -v tart >/dev/null 2>&1 || return 0
+  tart list 2>/dev/null | vm_parse_tart_registered_names_from_list
+}
+
+# vm_get_running_names
+#   Query hypervisors for currently running VM names. Outputs one name per line;
+#   empty output means nothing is running. WHY: state is read from the live
+#   hypervisor rather than the manifest, so list/status reflect reality (e.g.
+#   VMs started outside nucleus).
+vm_get_running_names() {
+  case "$(uname -s)" in
+    Darwin)
+      if command -v tart >/dev/null 2>&1; then
+        local _vgrn_tart_json _vgrn_tart_status
+        _vgrn_tart_json="$(tart list --format json 2>&1)" || _vgrn_tart_status=$?
+        if [ "${_vgrn_tart_status:-0}" -ne 0 ]; then
+          error "tart list --format json failed; upgrade Tart to a release that supports --format json"
+          return 1
+        fi
+        printf '%s\n' "$_vgrn_tart_json" | vm_parse_tart_running_names_from_json
+      fi
+      if [ -x "${UTMCTL:-/Applications/UTM.app/Contents/MacOS/utmctl}" ]; then
+        "$UTMCTL" list 2>/dev/null | vm_parse_utm_running_names_from_list
+      fi
+      ;;
+    Linux)
+      virsh list --name 2>/dev/null
+      ;;
+    MINGW*|MSYS*|CYGWIN*)
+      # Runtime detection on Windows is handled by PowerShell.
+      return 0
+      ;;
+  esac
+}
+
 # wait_for_utm_registration NAME
 #   Polls utmctl list until VM NAME appears or timeout is reached.
 wait_for_utm_registration() {
@@ -284,7 +360,7 @@ wait_for_utm_registration() {
   _wfur_max_attempts=15
 
   while [ "$_wfur_attempt" -le "$_wfur_max_attempts" ]; do
-    if "$UTMCTL" list | awk 'NR > 1 { print $3 }' | grep -qxF "$_wfur_name"; then
+    if vm_get_utm_registered_names | grep -qxF "$_wfur_name"; then
       return 0
     fi
     sleep 1
@@ -1500,7 +1576,7 @@ vm_apply_utm_plist_and_register() {
     cp "$_vupt_template" "$_ap_config_plist"
     chmod +w "$_ap_config_plist"
     say "refreshed UTM bundle config: $_ap_bundle"
-    if ! "$UTMCTL" list | awk 'NR > 1 { print $3 }' | grep -qxF "$_ap_name"; then
+    if ! vm_get_utm_registered_names | grep -qxF "$_ap_name"; then
       say "opening UTM bundle in place: $_ap_bundle"
       if open "$_ap_bundle"; then
         if wait_for_utm_registration "$_ap_name"; then
@@ -1667,7 +1743,7 @@ vm_setup_tart() {
   fi
 
   # Verify the tart VM was created in phase 1.
-  if ! tart list 2>/dev/null | awk 'NR > 1 { print $2 }' | grep -qxF "$vm_name"; then
+  if ! vm_get_tart_registered_names | grep -qxF "$vm_name"; then
     warn "tart VM '$vm_name' not found; Packer build may have failed or was skipped"
     return
   fi
@@ -2723,7 +2799,7 @@ vm_build_macos() {
   fi
 
   # Check if tart VM already exists.
-  if tart list 2>/dev/null | awk 'NR > 1 { print $2 }' | grep -qxF "$_name"; then
+  if vm_get_tart_registered_names | grep -qxF "$_name"; then
     if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker"; then
       say "tart VM '$_name' already exists for the current guest credentials (owner=$vm_secret_owner, username=$vm_guest_username)"
       return 0
@@ -2999,7 +3075,7 @@ gc_tart_vms() {
   _gct_expected="$1"
   command -v tart >/dev/null 2>&1 || return
 
-  tart list 2>/dev/null | awk 'NR>1{print $2}' | while IFS= read -r _gct_name; do
+  vm_get_tart_registered_names | while IFS= read -r _gct_name; do
     [ -z "$_gct_name" ] && continue
     if ! printf '%s\n' "$_gct_expected" | grep -qxF "$_gct_name"; then
       say "GC — removing non-provisioned Tart VM: $_gct_name"
@@ -3372,7 +3448,7 @@ vm_unpack_vms() {
           fi
           cp "$_uv_plist_template" "$_uv_bundle/config.plist"
           chmod +w "$_uv_bundle/config.plist"
-          if ! "$UTMCTL" list | awk 'NR > 1 { print $3 }' | grep -qxF "$_uv_name"; then
+          if ! vm_get_utm_registered_names | grep -qxF "$_uv_name"; then
             say "opening UTM bundle in place: $_uv_bundle"
             if open "$_uv_bundle"; then
               if wait_for_utm_registration "$_uv_name"; then
