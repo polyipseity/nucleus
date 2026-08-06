@@ -219,7 +219,8 @@ usage() {
 Android android-config flags (after VM name; omit all flags to print the manual):
   --gapps               Sideload MindTheGapps in recovery (enter fastboot first; tap Install anyway when prompted).
   --adb-keys            Install host ~/.android/adbkey.pub into guest adb_keys.
-  --magisk              Install and configure Magisk (patch boot, flash, Magisk su).
+  --magisk              Install Magisk on booted Lineage (patch boot, flash, Magisk su).
+  --root                Enable rooted debugging (dev options, Local terminal, adb root).
   --fake-wifi           Create wlan0 via virt_wifi on eth0 (requires Magisk).
   --fake-wifi-revert    Remove persisted fake Wi-Fi and restore eth0.
 EOF
@@ -312,7 +313,7 @@ for arg in "${vm_args[@]}"; do
       case "$action" in
         android-config)
           case "$arg" in
-            --gapps|--adb-keys|--magisk|--fake-wifi|--fake-wifi-revert|-h|--help)
+            --gapps|--adb-keys|--magisk|--root|--fake-wifi|--fake-wifi-revert|-h|--help)
               filtered_vm_args+=("$arg")
               ;;
             *) warn "ignoring unknown flag after subcommand: $arg" ;;
