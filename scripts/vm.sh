@@ -171,7 +171,7 @@ usage() {
   stop <vm>                Stop a VM.
   upgrade <vm>             Re-download+replace OS image (Android only; error for others).
   reset <vm>               Factory-reset VM user state (Android only; error for others).
-  android-config <vm>      Android post-provision: GApps sideload, ADB keys, root, fake Wi-Fi.
+  android-config <vm>      Android post-provision: GApps sideload, ADB keys, Magisk, fake Wi-Fi.
                            Run without flags to print the manual workflow.
   resize <vm> <size>       Grow-only resize of the writable disk (data/<vm>.qcow2)
                           to an explicit size (e.g. 64GB). Pass --allow-shrink to
@@ -219,8 +219,8 @@ usage() {
 Android android-config flags (after VM name; omit all flags to print the manual):
   --gapps               Sideload MindTheGapps in recovery (enter fastboot first; tap Install anyway when prompted).
   --adb-keys            Install host ~/.android/adbkey.pub into guest adb_keys.
-  --root                Enable Lineage root for apps and adb.
-  --fake-wifi           Load virt_wifi and bring up wlan0.
+  --magisk              Install and configure Magisk (patch boot, flash, Magisk su).
+  --fake-wifi           Load virt_wifi and bring up wlan0 (requires Magisk).
   --fake-wifi-revert    Remove persisted fake Wi-Fi and unload virt_wifi.
 EOF
 }
@@ -312,7 +312,7 @@ for arg in "${vm_args[@]}"; do
       case "$action" in
         android-config)
           case "$arg" in
-            --gapps|--adb-keys|--root|--fake-wifi|--fake-wifi-revert|-h|--help)
+            --gapps|--adb-keys|--magisk|--fake-wifi|--fake-wifi-revert|-h|--help)
               filtered_vm_args+=("$arg")
               ;;
             *) warn "ignoring unknown flag after subcommand: $arg" ;;
