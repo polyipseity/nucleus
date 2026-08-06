@@ -16,21 +16,17 @@ function Sync-QtPassConfig {
   .PARAMETER Enabled
     True applies the managed values. False removes the managed QtPass values.
 
-  .PARAMETER SettingsPath
-    Absolute path to the file containing the shared QtPass settings (typically
-    derived from the Nix qtpass.json source of truth). Callers
-    must pass this path explicitly so they are aware of the cross-platform
-    source of truth being applied.
-
   .PARAMETER Users
-    Mandatory: array of managed user records from Load-UserRegistry.ps1. Each
-    user can optionally include qtpass.settings overrides.
+    Mandatory: array of managed user records from Load-UserRegistry.ps1.
+
+  .PARAMETER RepoRoot
+    Absolute path to the repository root.
 
   .EXAMPLE
-    Sync-QtPassConfig -Enabled:$true -SettingsPath 'C:\Users\admin\nucleus\settings.json' -Users $userRegistry.users
+    Sync-QtPassConfig -Enabled:$true -Users $userRegistry.users -RepoRoot $env:NUCLEUS_REPO_ROOT
 
   .EXAMPLE
-    Sync-QtPassConfig -Enabled:$false -SettingsPath 'C:\Users\admin\nucleus\settings.json' -Users $userRegistry.users
+    Sync-QtPassConfig -Enabled:$false -Users $userRegistry.users -RepoRoot $env:NUCLEUS_REPO_ROOT
 
   .NOTES
     Environment variables: (none)
@@ -42,24 +38,11 @@ function Sync-QtPassConfig {
     [bool]$Enabled,
 
     [Parameter(Mandatory = $true)]
-    [string]$SettingsPath,
+    [object[]]$Users,
 
     [Parameter(Mandatory = $true)]
-    [object[]]$Users
+    [string]$RepoRoot
   )
-
-  function Copy-Hashtable {
-    param(
-      [Parameter(Mandatory = $true)]
-      [hashtable]$Source
-    )
-
-    $copy = @{}
-    foreach ($entry in $Source.GetEnumerator()) {
-      $copy[$entry.Key] = $entry.Value
-    }
-    return $copy
-  }
 
   function ConvertTo-Hashtable {
     param(
@@ -98,25 +81,11 @@ function Sync-QtPassConfig {
   function Get-QtPassDesiredState {
     param(
       [Parameter(Mandatory = $true)]
-      [hashtable]$DefaultSettings,
-
-      [Parameter(Mandatory = $true)]
-      [object]$UserRecord
+      [string]$Username
     )
 
-    $effectiveSettings = Copy-Hashtable -Source $DefaultSettings
-    $userQtPass = ConvertTo-Hashtable -InputObject $UserRecord.qtpass
-
-    if ($null -ne $userQtPass -and $userQtPass.ContainsKey('settings')) {
-      $userOverrides = ConvertTo-Hashtable -InputObject $userQtPass.settings
-      if ($null -ne $userOverrides) {
-        foreach ($entry in $userOverrides.GetEnumerator()) {
-          $effectiveSettings[$entry.Key] = $entry.Value
-        }
-      }
-    }
-
-    return $effectiveSettings
+    $settingsPath = Resolve-UserConfigFile -User $Username -ConfigName 'qtpass' -RelativePath 'qtpass.json' -RepoRoot $RepoRoot
+    return ConvertTo-Hashtable -InputObject (Get-Content -Path $settingsPath -Raw | ConvertFrom-Json)
   }
 
   function Get-QtPassRegistryHive {
@@ -181,16 +150,10 @@ function Sync-QtPassConfig {
     }
   }
 
-  if (-not (Test-Path -LiteralPath $SettingsPath -PathType Leaf)) {
-    throw "QtPass settings file not found: $SettingsPath"
-  }
-
-  $defaultSettings = ConvertTo-Hashtable -InputObject (Get-Content -Path $SettingsPath -Raw | ConvertFrom-Json)
-
   foreach ($userRecord in $Users) {
     $username = [string]$userRecord.name
     $userHome = [string]$userRecord.homeDirectory
-    $effectiveSettings = Get-QtPassDesiredState -DefaultSettings $defaultSettings -UserRecord $userRecord
+    $effectiveSettings = Get-QtPassDesiredState -Username $username
     $managedSettingNames = @($effectiveSettings.Keys | Sort-Object)
     $hiveInfo = Get-QtPassRegistryHive -UserHome $userHome -Username $username
     $qtPassRegistryPath = Join-Path -Path $hiveInfo.HiveRoot -ChildPath 'Software\IJHack\QtPass'

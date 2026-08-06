@@ -258,7 +258,7 @@ function Resolve-UserConfigSource {
     per-user file wins when it exists; throws when neither exists (fail-fast, no
     silent fallback).
   .PARAMETER User
-    Username from the user registry (src/hosts/Windows/users.json).
+    Username from the assembled user registry (src/users/).
   .PARAMETER ConfigName
     Config directory name under src/users/.
   .PARAMETER Extension
@@ -294,4 +294,78 @@ function Resolve-UserConfigSource {
   if (Test-Path -Path $perUser -PathType Leaf) { return $perUser }
   if (Test-Path -Path $default -PathType Leaf) { return $default }
   throw "Resolve-UserConfigSource: no source found for user '$User', config '$ConfigName', extension '$Extension' (tried '$perUser' and '$default')"
+}
+
+function Resolve-UserConfigFile {
+  <#
+  .SYNOPSIS
+    Resolves a non-host-specific per-user overlay config file.
+
+  .DESCRIPTION
+    Looks up src/users/<User>/<ConfigName>/<RelativePath> under the repo,
+    falling back to src/users/default/<ConfigName>/<RelativePath>. The per-user
+    file wins when it exists; throws when neither exists (fail-fast, no silent
+    fallback). Mirrors selectUserConfigFile in src/modules/lib/users-overlay.nix.
+  .PARAMETER User
+    Username from the user registry.
+  .PARAMETER ConfigName
+    Config directory name under src/users/.
+  .PARAMETER RelativePath
+    Path within the config directory, e.g. "settings.json" or "Picard.ini".
+  .PARAMETER RepoRoot
+    Absolute path to the repository root ($env:NUCLEUS_REPO_ROOT).
+  .EXAMPLE
+    Resolve-UserConfigFile -User "polyipseity" -ConfigName "starship" -RelativePath "starship.toml" -RepoRoot $env:NUCLEUS_REPO_ROOT
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$User,
+
+    [Parameter(Mandatory)]
+    [string]$ConfigName,
+
+    [Parameter(Mandatory)]
+    [string]$RelativePath,
+
+    [Parameter(Mandatory)]
+    [string]$RepoRoot
+  )
+
+  $perUser = Join-Path -Path $RepoRoot -ChildPath "src\users\$User\$ConfigName\$RelativePath"
+  $default = Join-Path -Path $RepoRoot -ChildPath "src\users\default\$ConfigName\$RelativePath"
+  if (Test-Path -Path $perUser -PathType Leaf) { return $perUser }
+  if (Test-Path -Path $default -PathType Leaf) { return $default }
+  throw "Resolve-UserConfigFile: no source found for user '$User', config '$ConfigName', relative path '$RelativePath' (tried '$perUser' and '$default')"
+}
+
+function Resolve-UserConfigDir {
+  <#
+  .SYNOPSIS
+    Resolves the per-user overlay config directory for an app.
+
+  .DESCRIPTION
+    Returns src/users/<User>/<ConfigName> when it exists, otherwise
+    src/users/default/<ConfigName>. Mirrors selectUserConfigDir in
+    src/modules/lib/users-overlay.nix.
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$User,
+
+    [Parameter(Mandatory)]
+    [string]$ConfigName,
+
+    [Parameter(Mandatory)]
+    [string]$RepoRoot
+  )
+
+  $perUser = Join-Path -Path $RepoRoot -ChildPath "src\users\$User\$ConfigName"
+  $default = Join-Path -Path $RepoRoot -ChildPath "src\users\default\$ConfigName"
+  if (Test-Path -Path $perUser -PathType Container) { return $perUser }
+  if (Test-Path -Path $default -PathType Container) { return $default }
+  throw "Resolve-UserConfigDir: no source found for user '$User', config '$ConfigName' (tried '$perUser' and '$default')"
 }

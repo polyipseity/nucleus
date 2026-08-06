@@ -218,6 +218,13 @@ let
     else
       { };
 
+  userOverlay = import ./lib/users-overlay.nix;
+
+  vscodeConfigDir = userOverlay.selectUserConfigDir {
+    configName = "vscode";
+    inherit effectiveUsername repoRoot;
+  };
+
   # Utility: resolve app-scoped per-user settings overrides consistently.
   # This keeps the common `defaults // user.settings` pattern centralized.
   userAppSettings =
@@ -326,7 +333,7 @@ in
     # symlink-vscode-config
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
     # Replaces VS Code's per-channel config files with symlinks into the live
-    # repo tree (src/modules/configs/vscode/) so that every VS Code write
+    # repo tree (src/users/<user>/vscode/) so that every VS Code write
     # (settings change, keybinding edit, MCP server addition, Copilot memory)
     # appears immediately as an unstaged git diff.
     #
@@ -358,6 +365,7 @@ in
     symlink-vscode-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/editors/symlink-vscode-config.sh" \
         "${repoRoot}" \
+        "${vscodeConfigDir}" \
         "${stableBaseDir}" \
         "${insidersBaseDir}" \
         "${vsCodeKeybindingsFile}" \

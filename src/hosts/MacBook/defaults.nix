@@ -623,7 +623,7 @@ in
       # Source: https://iterm2.com/documentation.html
       "com.googlecode.iterm2" = {
         # Set the default profile GUID to the Dynamic Profile defined in
-        # check-suppress:config-method: method 1 (writable symlink) -- src/modules/configs/iterm2/DynamicProfiles/default-profile.json via iterm2.nix
+        # check-suppress:config-method: method 1 (writable symlink) -- src/users/default/iterm2/DynamicProfiles/default-profile.json via iterm2.nix
         # This key (KEY_DEFAULT_GUID) tells iTerm2 which profile to use for
         # new windows/tabs when no other profile is explicitly selected.
         # Source: ITAddressBookMgr.h

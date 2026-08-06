@@ -4,18 +4,24 @@ function Sync-StarshipConfig {
     Deploys a repository-managed starship.toml writable symlink.
 
   .DESCRIPTION
-    Creates a symbolic link from %USERPROFILE%\.config\starship.toml to
-    src\modules\configs\starship.toml in the repository (Method 1).
+    Creates a symbolic link from %USERPROFILE%\.config\starship.toml to the
+    per-user overlay starship.toml in the repository (Method 1).
     Edits in the repo take effect immediately without re-running apply.
 
   .PARAMETER Enabled
     True applies the managed config. False removes the managed symlink.
 
-  .EXAMPLE
-    Sync-StarshipConfig -Enabled:$true
+  .PARAMETER User
+    Username for overlay resolution under src/users/.
+
+  .PARAMETER RepoRoot
+    Absolute path to the repository root.
 
   .EXAMPLE
-    Sync-StarshipConfig -Enabled:$false
+    Sync-StarshipConfig -Enabled:$true -User 'polyipseity' -RepoRoot $env:NUCLEUS_REPO_ROOT
+
+  .EXAMPLE
+    Sync-StarshipConfig -Enabled:$false -User 'polyipseity' -RepoRoot $env:NUCLEUS_REPO_ROOT
 
   .NOTES
     Environment variables: NUCLEUS_REPO_ROOT — must be set by caller.
@@ -24,10 +30,15 @@ function Sync-StarshipConfig {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory = $true)]
-    [bool]$Enabled
+    [bool]$Enabled,
+
+    [Parameter(Mandatory = $true)]
+    [string]$User,
+
+    [Parameter(Mandatory = $true)]
+    [string]$RepoRoot
   )
 
-  `$configRelPath = 'src\modules\configs\starship\starship.toml'
   $destPath = Join-Path $env:USERPROFILE '.config\starship.toml'
 
   if (-not $Enabled) {
@@ -38,12 +49,11 @@ function Sync-StarshipConfig {
     return
   }
 
-  $repoRoot = $env:NUCLEUS_REPO_ROOT
-  if ([string]::IsNullOrWhiteSpace($repoRoot)) {
-    throw 'Sync-StarshipConfig: NUCLEUS_REPO_ROOT is not set. Run via apply.ps1 which exports this variable.'
+  if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+    throw 'Sync-StarshipConfig: RepoRoot is not set. Run via apply.ps1 which exports NUCLEUS_REPO_ROOT.'
   }
 
-  $sourcePath = Join-Path $repoRoot $configRelPath
+  $sourcePath = Resolve-UserConfigFile -User $User -ConfigName 'starship' -RelativePath 'starship.toml' -RepoRoot $RepoRoot
   if (-not (Test-Path -Path $sourcePath -PathType Leaf)) {
     throw "Sync-StarshipConfig: source config not found at $sourcePath"
   }

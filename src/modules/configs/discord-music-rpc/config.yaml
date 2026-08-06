@@ -1,5 +1,5 @@
 discord:
-  status_type: song
+  status_type: artist
   show_progress: true
   show_source_logo: true
   show_urls: true
@@ -10,15 +10,15 @@ spotify:
   client_secret: null
   redirect_uri: http://localhost:8888/callback
 lastfm:
-  enabled: true
+  enabled: false
   username: null
   api_key: null
 plex:
-  enabled: true
+  enabled: false
   server_url: null
   token: null
   libraries: []
 soundcloud:
-  enabled: true
+  enabled: false
 youtube:
-  enabled: true
+  enabled: false

@@ -12,9 +12,14 @@
   config,
   lib,
   pkgs,
+  managedUsername ? null,
+  username ? null,
   ...
 }:
 let
+  effectiveUsername =
+    if managedUsername != null then managedUsername else if username != null then username else config.home.username;
+
   # Pinned iTerm2 zsh shell integration script placed at
   # ~/.iterm2_shell_integration.zsh via home.file.  The script enables command
   # marks, command history, directory reporting, and in-terminal image display
@@ -27,6 +32,13 @@ let
   };
   # Root of the nucleus repository, set by apply.sh at activation time.
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+
+  userOverlay = import ./lib/users-overlay.nix;
+
+  iterm2DynamicProfilesDir = "${userOverlay.selectUserConfigDir {
+    configName = "iterm2";
+    inherit effectiveUsername repoRoot;
+  }}/DynamicProfiles";
 in
 lib.mkIf pkgs.stdenv.isDarwin {
   home.file = {
@@ -41,7 +53,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
     # check-suppress:config-method: method 1 (writable symlink) -- via config.lib.file.mkOutOfStoreSymlink.
     # See .agents/instructions/app-config-policy.instructions.md
     "Library/Application Support/iTerm2/DynamicProfiles".source =
-      config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/modules/configs/iterm2/DynamicProfiles";
+      config.lib.file.mkOutOfStoreSymlink iterm2DynamicProfilesDir;
   };
 
   # Source iTerm2 shell integration when the script is present.  The test-e

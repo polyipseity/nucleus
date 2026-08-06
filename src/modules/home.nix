@@ -43,22 +43,14 @@ let
     else
       "${resolvedHomeDirectory}/.password-store";
 
-  # Shared per-user app override accessor used by JSON-backed and native-format
-  # app configs.  Keeping the attr-path checks in one place avoids each app
-  # re-implementing the same defensive merge logic.
-  userAppSettings =
-    appName:
-    if
-      builtins.hasAttr appName effectiveUser
-      && builtins.isAttrs effectiveUser.${appName}
-      && builtins.hasAttr "settings" effectiveUser.${appName}
-      && builtins.isAttrs effectiveUser.${appName}.settings
-    then
-      effectiveUser.${appName}.settings
-    else
-      { };
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
-  managedAppSettings = appName: defaults: defaults // (userAppSettings appName);
+  userOverlay = import ./lib/users-overlay.nix;
+
+  selectUserAppConfigFile = configName: relativePath:
+    userOverlay.selectUserConfigFile {
+      inherit configName effectiveUsername repoRoot relativePath;
+    };
 
   # check-suppress:config-method: method 3 (merge) -- qtpass.nix returns declarative merged settings applied via platform-native stores (macOS defaults, Linux INI); imported module, not a deployed file
   qtpassModule = import ./configs/qtpass/qtpass.nix {
@@ -67,8 +59,9 @@ let
       lib
       pkgs
       passwordStoreDir
-      userAppSettings
       ;
+    qtPassDefaultSettings =
+      builtins.fromJSON (builtins.readFile (selectUserAppConfigFile "qtpass" "qtpass.json"));
   };
 
   # Obsidian reads its global app settings directly from obsidian.json, but the
@@ -84,9 +77,8 @@ let
   # WHY: checkSlowStartup is not configured: checkSlowStartup is localStorage-backed
   # and vault-specific. It cannot be declaratively managed via obsidian.json.
   # check-suppress:config-method: method 3 (merge) -- see the activation entry below for full rationale.
-  obsidianDefaultSettings = builtins.fromJSON (builtins.readFile ./configs/obsidian/obsidian.json);
-
-  obsidianManagedSettings = managedAppSettings "obsidian" obsidianDefaultSettings;
+  obsidianManagedSettings =
+    builtins.fromJSON (builtins.readFile (selectUserAppConfigFile "obsidian" "obsidian.json"));
   obsidianManagedSettingsJson = builtins.toJSON obsidianManagedSettings;
 
   # Out-of-store symlink paths protected across activation cycles.
@@ -103,34 +95,9 @@ let
   managedSymlinkPathsJson = builtins.toJSON managedSymlinkPaths;
 
   # Picard baseline defaults are sourced from the canonical native INI file.
-  # We apply these defaults with merge-overwrite semantics, then layer
-  # user-specific [setting] overrides from users.json.
+  # We apply these defaults with merge-overwrite semantics.
   # check-suppress:config-method: method 3 (merge) -- Picard INI defaults are merged with user overrides.
-  picardDefaultsIniText = builtins.readFile ./configs/picard/Picard.ini;
-  picardUserSettings = userAppSettings "picard";
-
-  renderIniScalarValue =
-    value:
-    if builtins.isBool value then
-      if value then "true" else "false"
-    else if builtins.isInt value then
-      toString value
-    else
-      value;
-
-  renderPicardIniCommand =
-    confVar: section: name: value:
-    let
-      renderedValue = renderIniScalarValue value;
-      valueArg = lib.escapeShellArg renderedValue;
-    in
-    ''_upsert_ini_key "${confVar}" "${section}" "${name}" ${valueArg}'';
-
-  picardOverrideCommands = builtins.concatStringsSep "\n" (
-    lib.mapAttrsToList (
-      name: value: renderPicardIniCommand "$_picard_conf" "setting" name value
-    ) picardUserSettings
-  );
+  picardDefaultsIniText = builtins.readFile (selectUserAppConfigFile "picard" "Picard.ini");
 
   # Path to the checked-out dotfiles/ directory at the root of this repo.
   dotfilesRoot = ../dotfiles;
@@ -142,7 +109,7 @@ in
     configPassEnabled = lib.mkOption {
       type = lib.types.bool;
       default = false;
-      description = "Whether a managed rclone config passphrase secret exists for this user. Set to true by secrets.nix when src/secrets/users-<username>.yml is present and contains the rclone_config_pass key.";
+      description = "Whether a managed rclone config passphrase secret exists for this user. Set to true by secrets.nix when src/secrets/users/<username>.yml is present and contains the rclone_config_pass key.";
     };
     configPassSecretPath = lib.mkOption {
       type = lib.types.str;
@@ -226,7 +193,7 @@ in
       "${activationBundle}/src/scripts/configs/merge-picard-ini.sh" \
         "${pkgs.gawk}/bin/awk" \
         ${lib.escapeShellArg picardDefaultsIniText} \
-        ${lib.escapeShellArg picardOverrideCommands}
+        ""
     '';
 
     # Obsidian stores app-global settings in obsidian.json alongside dynamic

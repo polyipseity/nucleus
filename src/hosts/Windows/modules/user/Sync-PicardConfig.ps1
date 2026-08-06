@@ -18,19 +18,16 @@ function Sync-PicardConfig {
     True applies managed values. False removes only managed Picard keys.
 
   .PARAMETER Users
-    Mandatory: array of managed user records from Load-UserRegistry.ps1. Each
-    user can optionally include picard.settings overrides.
+    Mandatory: array of managed user records from Load-UserRegistry.ps1.
 
-  .PARAMETER DefaultsFilePath
-    Mandatory: absolute path to the canonical defaults Picard.ini file in the
-    repository. The module applies all defaults from this file first, then
-    overlays user-specific [setting] overrides.
+  .PARAMETER RepoRoot
+    Absolute path to the repository root.
 
   .EXAMPLE
-    Sync-PicardConfig -Enabled:$true -Users $userRegistry.users -DefaultsFilePath 'C:\Users\admin\nucleus\src\modules\configs\picard\Picard.ini'
+    Sync-PicardConfig -Enabled:$true -Users $userRegistry.users -RepoRoot $env:NUCLEUS_REPO_ROOT
 
   .EXAMPLE
-    Sync-PicardConfig -Enabled:$false -Users $userRegistry.users -DefaultsFilePath 'C:\Users\admin\nucleus\src\modules\configs\picard\Picard.ini'
+    Sync-PicardConfig -Enabled:$false -Users $userRegistry.users -RepoRoot $env:NUCLEUS_REPO_ROOT
 
   .NOTES
     Environment variables: (none)
@@ -45,42 +42,8 @@ function Sync-PicardConfig {
     [object[]]$Users,
 
     [Parameter(Mandatory = $true)]
-    [string]$DefaultsFilePath
+    [string]$RepoRoot
   )
-
-  function ConvertTo-PlainObject {
-    param(
-      [Parameter(Mandatory = $false)]
-      [AllowNull()]
-      [object]$InputObject
-    )
-
-    if ($null -eq $InputObject) {
-      return $null
-    }
-
-    if ($InputObject -is [System.Collections.IDictionary]) {
-      $hash = @{}
-      foreach ($key in $InputObject.Keys) {
-        $hash[$key] = ConvertTo-PlainObject -InputObject $InputObject[$key]
-      }
-      return $hash
-    }
-
-    if ($InputObject -is [pscustomobject]) {
-      $hash = @{}
-      foreach ($property in $InputObject.PSObject.Properties) {
-        $hash[$property.Name] = ConvertTo-PlainObject -InputObject $property.Value
-      }
-      return $hash
-    }
-
-    if ($InputObject -is [System.Collections.IEnumerable] -and $InputObject -isnot [string]) {
-      return @($InputObject | ForEach-Object { ConvertTo-PlainObject -InputObject $_ })
-    }
-
-    return $InputObject
-  }
 
   function ConvertTo-PicardIniValue {
     param(
@@ -149,8 +112,6 @@ function Sync-PicardConfig {
         continue
       }
 
-      # Keep everything after the first '=' verbatim to preserve native INI
-      # serialized values such as @Variant(...) payloads.
       $value = $line.Substring($separator + 1)
       $pairs.Add([pscustomobject]@{
           Section = $section
@@ -160,27 +121,6 @@ function Sync-PicardConfig {
     }
 
     return @($pairs)
-  }
-
-  function Get-PicardSettingOverride {
-    param(
-      [Parameter(Mandatory = $true)]
-      [object]$UserRecord
-    )
-
-    $effectiveSettings = @{}
-
-    $userPicard = ConvertTo-PlainObject -InputObject $UserRecord.picard
-    if ($null -ne $userPicard -and $userPicard.ContainsKey('settings')) {
-      $userOverrides = ConvertTo-PlainObject -InputObject $userPicard.settings
-      if ($null -ne $userOverrides) {
-        foreach ($entry in $userOverrides.GetEnumerator()) {
-          $effectiveSettings[$entry.Key] = $entry.Value
-        }
-      }
-    }
-
-    return $effectiveSettings
   }
 
   function _write_ini_file {
@@ -313,24 +253,19 @@ function Sync-PicardConfig {
     return @($result)
   }
 
-  $defaultPairs = Get-PicardDefaultPairsFromFile -Path $DefaultsFilePath
-  $defaultSettingNames = @(
-    $defaultPairs |
-      Where-Object { $_.Section -eq 'setting' } |
-      ForEach-Object { $_.Key } |
-      Sort-Object -Unique
-  )
-
   foreach ($userRecord in $Users) {
     $username = [string]$userRecord.name
     $userHome = [string]$userRecord.homeDirectory
     $configPath = Join-Path -Path $userHome -ChildPath 'AppData\Roaming\MusicBrainz\Picard.ini'
-
-    $userSettingOverrides = Get-PicardSettingOverride -UserRecord $userRecord
-    $managedSettingNames = @(
-      $defaultSettingNames + @($userSettingOverrides.Keys) |
-      Sort-Object -Unique
+    $defaultsFilePath = Resolve-UserConfigFile -User $username -ConfigName 'picard' -RelativePath 'Picard.ini' -RepoRoot $RepoRoot
+    $defaultPairs = Get-PicardDefaultPairsFromFile -Path $defaultsFilePath
+    $defaultSettingNames = @(
+      $defaultPairs |
+        Where-Object { $_.Section -eq 'setting' } |
+        ForEach-Object { $_.Key } |
+        Sort-Object -Unique
     )
+    $managedSettingNames = $defaultSettingNames
 
     $existingLines = @()
     if (Test-Path -LiteralPath $configPath -PathType Leaf) {
@@ -342,11 +277,6 @@ function Sync-PicardConfig {
 
       foreach ($pair in $defaultPairs) {
         $updatedLines = _upsert_ini_key -Lines $updatedLines -Section $pair.Section -Key $pair.Key -Value $pair.Value
-      }
-
-      foreach ($settingName in @($userSettingOverrides.Keys | Sort-Object)) {
-        $settingValue = ConvertTo-PicardIniValue -Value $userSettingOverrides[$settingName] -KeyName $settingName
-        $updatedLines = _upsert_ini_key -Lines $updatedLines -Section 'setting' -Key $settingName -Value $settingValue
       }
 
       _write_ini_file -Path $configPath -Lines $updatedLines

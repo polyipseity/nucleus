@@ -1,18 +1,17 @@
 # QtPass settings baseline (screenshot-verified): shared across all platforms
-# unless overridden by platform-specific or per-user settings.
-# Platform overrides: hideOnClose=false on macOS; user overrides from flake.nix.
+# unless overridden by platform-specific settings in the per-user overlay file.
 #
 # This module returns the merged settings and the shell-command fragments for
 # applying them via `defaults` (macOS) or INI-file manipulation (Linux).
 #
 # Dependencies:
 #   - passwordStoreDir: resolved path to the password store root.
-#   - userAppSettings: (appName -> attrset) helper that reads per-user overrides.
+#   - qtPassDefaultSettings: parsed baseline from the per-user overlay JSON file.
 {
   lib,
   pkgs,
   passwordStoreDir,
-  userAppSettings,
+  qtPassDefaultSettings,
   ...
 }:
 let
@@ -21,8 +20,6 @@ let
   # activation. QtPass settings are merged into platform-native stores
   # (macOS: defaults, Linux: INI, Windows: registry), so Method 1 (symlink)
   # does not apply.
-  qtPassDefaultSettings = builtins.fromJSON (builtins.readFile ./qtpass.json);
-
   qtPassPlatformSettings = lib.optionalAttrs pkgs.stdenv.isDarwin {
     # macOS keeps Hide on close disabled, per the requested platform-specific
     # exception to the shared QtPass baseline.
@@ -30,7 +27,7 @@ let
   };
 
   qtPassManagedSettings =
-    (qtPassDefaultSettings // qtPassPlatformSettings // (userAppSettings "qtpass"))
+    (qtPassDefaultSettings // qtPassPlatformSettings)
     // {
       passStore = "${lib.removeSuffix "/" passwordStoreDir}/";
     };

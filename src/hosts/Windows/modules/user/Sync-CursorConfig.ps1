@@ -8,7 +8,7 @@
     - per-file symlinks rules\*.mdc -> instructions\*.instructions.md
     - per-file symlinks agents\*.md -> agents\*.agent.md
     - per-file symlinks commands\*.md -> prompts\*.prompt.md
-    - per-entry symlinks from src\modules\configs\cursor\ (hooks.json, mcp.json, …)
+    - per-entry symlinks from src\users\<user>\cursor\ (hooks.json, mcp.json, …)
 
   Requires Sync-AgentsConfig and Sync-AgentsSkillManifest to have run first.
 
@@ -18,8 +18,11 @@
 .PARAMETER Enabled
   Whether cursor config symlinks should be managed.
 
+.PARAMETER Username
+  Username for overlay resolution under src/users/.
+
 .EXAMPLE
-  Sync-CursorConfig -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$true
+  Sync-CursorConfig -RepoRoot 'C:\Users\guest\repos\nucleus' -Enabled:$true -Username 'polyipseity'
 
 .NOTES
   Exit codes: 0 on success; non-zero on failure
@@ -30,13 +33,15 @@ function Sync-CursorConfig {
     [Parameter(Mandatory)]
     [string]$RepoRoot,
     [Parameter(Mandatory)]
-    [bool]$Enabled
+    [bool]$Enabled,
+    [Parameter(Mandatory)]
+    [string]$Username
   )
 
   $label = 'cursor-config'
   $agentsDir = Join-Path -Path $HOME -ChildPath '.agents'
   $cursorDir = Join-Path -Path $HOME -ChildPath '.cursor'
-  $cursorSource = Join-Path -Path $RepoRoot -ChildPath 'src\modules\configs\cursor'
+  $cursorSource = Resolve-UserConfigDir -User $Username -ConfigName 'cursor' -RepoRoot $RepoRoot
   $managedBridgeDirs = @('rules', 'agents', 'commands', 'skills')
 
   . (Join-Path -Path $PSScriptRoot -ChildPath '..\Set-ManagedSymlinkDeleteProtection.ps1')

@@ -16,7 +16,7 @@
 #
 # IDE test runner: editors default to `cargo test`.  Configure:
 # - VS Code: managed via rust-analyzer.runnables.test.overrideCommand in
-#   src/modules/configs/vscode/settings.json
+#   src/users/default/vscode/settings.json
 # - RustRover: Settings -> Build Tools -> Cargo -> Test Runner -> cargo-nextest
 # - Zed: add "nextest": true to project .zed/settings.json
 #

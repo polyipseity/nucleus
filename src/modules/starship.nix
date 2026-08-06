@@ -1,11 +1,32 @@
 # Starship cross-shell prompt — shared config for all hosts.
-{ pkgs, config, ... }: {
+{
+  config,
+  pkgs,
+  managedUsername ? null,
+  username ? null,
+  ...
+}:
+let
+  effectiveUsername =
+    if managedUsername != null then managedUsername else if username != null then username else config.home.username;
+
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+
+  userOverlay = import ./lib/users-overlay.nix;
+
+  starshipConfigFile = userOverlay.selectUserConfigFile {
+    configName = "starship";
+    relativePath = "starship.toml";
+    inherit effectiveUsername repoRoot;
+  };
+in
+{
   home.packages = [ pkgs.starship ];
 
   home.file.".config/starship.toml".source =
     config.lib.file.mkOutOfStoreSymlink
       # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without reactivation since starship reads ~/.config/starship.toml at shell start. Windows: deployed via Deploy-WritableSymlink in ConfigHelpers.ps1 (same method).
-      "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/starship/starship.toml";
+      starshipConfigFile;
 
   # STARSHIP_CACHE and STARSHIP_CONFIG are defined in the centralized env var
   # catalog (src/modules/lib/env-catalog.nix) and injected via shell.nix's

@@ -9,18 +9,18 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/symlink-hardening.sh"
 
 _vsym_repo_root="$1"
-_vsym_stable_base="$2"
-_vsym_insiders_base="$3"
-_vsym_keybindings_file="$4"
-_vsym_chat_language_models_file="$5"
-_vsym_jq_bin="$6"
+_vsym_config_dir="$2"
+_vsym_stable_base="$3"
+_vsym_insiders_base="$4"
+_vsym_keybindings_file="$5"
+_vsym_chat_language_models_file="$6"
+_vsym_jq_bin="$7"
 
 if [ -z "$_vsym_repo_root" ] || [ ! -d "$_vsym_repo_root" ]; then
   _vsym_repo_root="${NUCLEUS_REPO_ROOT:?VS Code: NUCLEUS_REPO_ROOT not set; run via apply.sh}"
 fi
 
-_vsym_config_dir="$_vsym_repo_root/src/modules/configs/vscode"
-if [ ! -d "$_vsym_config_dir" ]; then
+if [ -z "$_vsym_config_dir" ] || [ ! -d "$_vsym_config_dir" ]; then
   echo "VS Code: config dir not found: $_vsym_config_dir" >&2
   exit 1
 fi

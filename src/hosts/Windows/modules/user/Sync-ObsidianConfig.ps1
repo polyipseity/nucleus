@@ -18,14 +18,16 @@ function Sync-ObsidianConfig {
     True applies the managed values. False removes only the managed Obsidian keys.
 
   .PARAMETER Users
-    Mandatory: array of managed user records from Load-UserRegistry.ps1. Each
-    user can optionally include obsidian.settings overrides.
+    Mandatory: array of managed user records from Load-UserRegistry.ps1.
+
+  .PARAMETER RepoRoot
+    Absolute path to the repository root.
 
   .EXAMPLE
-    Sync-ObsidianConfig -Enabled:$true -Users $userRegistry.users
+    Sync-ObsidianConfig -Enabled:$true -Users $userRegistry.users -RepoRoot $env:NUCLEUS_REPO_ROOT
 
   .EXAMPLE
-    Sync-ObsidianConfig -Enabled:$false -Users $userRegistry.users
+    Sync-ObsidianConfig -Enabled:$false -Users $userRegistry.users -RepoRoot $env:NUCLEUS_REPO_ROOT
 
   .NOTES
     Environment variables: (none)
@@ -37,7 +39,10 @@ function Sync-ObsidianConfig {
     [bool]$Enabled,
 
     [Parameter(Mandatory = $true)]
-    [object[]]$Users
+    [object[]]$Users,
+
+    [Parameter(Mandatory = $true)]
+    [string]$RepoRoot
   )
 
   function Copy-Hashtable {
@@ -132,43 +137,23 @@ function Sync-ObsidianConfig {
   function Get-ObsidianDesiredState {
     param(
       [Parameter(Mandatory = $true)]
-      [object]$UserRecord
+      [string]$Username
     )
 
-    # Load default settings from repository obsidian.json configuration.
-    # WHY: nativeMenus is not configured: nativeMenus is stored per-vault in the
-    # .obsidian/appearance.json file inside each vault, not in obsidian.json. We
-    # cannot manage vault-specific files without hardcoding vault paths, which is
-    # not declaratively manageable.
-    #
-    # WHY: checkSlowStartup is not configured: checkSlowStartup is stored in
-    # localStorage and is also vault-specific. It cannot be declaratively managed
-    # via obsidian.json.
-    $defaultSettings = @{
-      cli = $true
-      updateDisabled = $true
+    $settingsPath = Resolve-UserConfigFile -User $Username -ConfigName 'obsidian' -RelativePath 'obsidian.json' -RepoRoot $RepoRoot
+    $defaultSettings = ConvertTo-Hashtable -InputObject (Get-Content -Path $settingsPath -Raw | ConvertFrom-Json)
+    if ($defaultSettings -isnot [hashtable]) {
+      throw "Obsidian overlay config '$settingsPath' must be a JSON object at the top level."
     }
 
-    $effectiveSettings = Copy-Hashtable -Source $defaultSettings
-    $userObsidian = ConvertTo-Hashtable -InputObject $UserRecord.obsidian
-
-    if ($null -ne $userObsidian -and $userObsidian.ContainsKey('settings')) {
-      $userOverrides = ConvertTo-Hashtable -InputObject $userObsidian.settings
-      if ($null -ne $userOverrides) {
-        foreach ($entry in $userOverrides.GetEnumerator()) {
-          $effectiveSettings[$entry.Key] = $entry.Value
-        }
-      }
-    }
-
-    return $effectiveSettings
+    return $defaultSettings
   }
 
   foreach ($userRecord in $Users) {
     $username = [string]$userRecord.name
     $userHome = [string]$userRecord.homeDirectory
     $configPath = Join-Path -Path $userHome -ChildPath 'AppData\Roaming\obsidian\obsidian.json'
-    $managedSettings = Get-ObsidianDesiredState -UserRecord $userRecord
+    $managedSettings = Get-ObsidianDesiredState -Username $username
     $managedSettingNames = @($managedSettings.Keys | Sort-Object)
 
     if ($Enabled) {

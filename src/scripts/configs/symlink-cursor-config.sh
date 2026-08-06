@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Bridges ~/.cursor/ to ~/.agents/ (shared agent assets) and
-# src/modules/configs/cursor/ (Cursor-native JSON/hooks).
+# src/users/<user>/cursor/ (Cursor-native JSON/hooks).
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -8,8 +8,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/symlink-convergence.sh"
 
 _scc_repo_root="$1"
-_scc_cursor_relative="${2:-src/modules/configs/cursor}"
-_scc_cursor_source="$_scc_repo_root/$_scc_cursor_relative"
+_scc_cursor_source="${2:?cursor-config: overlay config dir not provided}"
 _scc_label="cursor-config"
 
 _scc_agents_dir="$HOME/.agents"
@@ -125,7 +124,7 @@ _scc_converge_mapped_file_symlinks \
   "$_scc_agents_dir/prompts" ".prompt.md" \
   "$_scc_cursor_dir/commands" ".md"
 
-# Class B: Cursor-native entries from src/modules/configs/cursor/.
+# Class B: Cursor-native entries from the overlay-selected cursor config dir.
 _scc_managed_bridge_dirs="rules agents commands skills"
 _nucleus_remove_stale_symlinks \
   "$_scc_cursor_dir" "$_scc_cursor_source" "$_scc_label" "$_scc_managed_bridge_dirs"

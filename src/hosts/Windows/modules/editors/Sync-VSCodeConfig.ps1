@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Replaces VS Code's per-channel config files and directories with symlinks
-  into the live repo tree (src/modules/configs/vscode/) so every VS Code write
+  into the live repo tree (src/users/<user>/vscode/) so every VS Code write
   appears immediately as an unstaged git diff rather than being silently managed
   away by a deployment layer.
 
@@ -92,7 +92,7 @@ function Sync-VSCodeConfig {
     [string]$Username = [System.Environment]::UserName
   )
 
-  $vsConfigDir = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\vscode"
+  $vsConfigDir = Resolve-UserConfigDir -User $Username -ConfigName 'vscode' -RepoRoot $RepoRoot
   if ($Enabled -and -not (Test-Path -LiteralPath $vsConfigDir -PathType Container)) {
     throw "VS Code config directory not found: $vsConfigDir"
   }

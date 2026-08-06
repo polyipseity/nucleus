@@ -16,11 +16,11 @@ let
   # matching the src/users/<username>/ → src/users/default/ convention in
   # AGENTS.md.  Delegates to the generic overlay selector so future configs
   # reuse the same mechanism.
-  selectUserOverlayFile = import ./lib/users-overlay.nix;
+  userOverlay = import ./lib/users-overlay.nix;
 
   selectUserGitFile =
     ext:
-    selectUserOverlayFile {
+    userOverlay.selectUserConfigSource {
       configName = "git";
       inherit ext hostName effectiveUsername;
       repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
