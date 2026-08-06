@@ -216,13 +216,11 @@ usage() {
   -h|--help                     Show usage.
 
 Android android-config flags (after VM name):
-  --recovery            Flash userdebug recovery from the latest jqssun release.
-  --gapps               Download and sideload MindTheGapps.
+  --gapps               Download and install MindTheGapps on booted Lineage.
   --adb-keys            Install host ~/.android/adbkey.pub into guest adb_keys.
   --root                Enable Lineage root for apps and adb.
   --fake-wifi           Load virt_wifi and bring up wlan0.
   --fake-wifi-revert    Remove persisted fake Wi-Fi and unload virt_wifi.
-  --all                 Recovery, GApps, adb-keys, root, and fake Wi-Fi pipeline.
 EOF
 }
 
@@ -313,7 +311,7 @@ for arg in "${vm_args[@]}"; do
       case "$action" in
         android-config)
           case "$arg" in
-            --recovery|--gapps|--adb-keys|--root|--fake-wifi|--fake-wifi-revert|--all|-h|--help)
+            --gapps|--adb-keys|--root|--fake-wifi|--fake-wifi-revert|-h|--help)
               filtered_vm_args+=("$arg")
               ;;
             *) warn "ignoring unknown flag after subcommand: $arg" ;;
