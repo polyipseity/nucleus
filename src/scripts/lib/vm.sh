@@ -1368,6 +1368,61 @@ vm_android_adb_get_state() {
   adb -s "$_aas_serial" get-state 2>/dev/null || printf 'unknown\n'
 }
 
+# vm_android_adb_list_state VM_INDEX
+#   Return adb devices state for the manifest serial: device, unauthorized,
+#   offline, recovery, sideload, or unknown.
+vm_android_adb_list_state() {
+  _als_vm_index="$1"
+  _als_serial="$(vm_android_adb_serial "$_als_vm_index")"
+  _als_devices_state="$(adb devices 2>/dev/null | awk -v serial="$_als_serial" '$1 == serial { print $2; exit }')"
+  if [ -n "$_als_devices_state" ]; then
+    printf '%s\n' "$_als_devices_state"
+    return 0
+  fi
+  vm_android_adb_get_state "$_als_vm_index"
+}
+
+# vm_android_adb_wait_authorized VM_INDEX [TIMEOUT]
+#   Wait until the guest reports an authorized booted system (adb state device).
+vm_android_adb_wait_authorized() {
+  _awa_vm_index="$1"
+  _awa_timeout="${2:-600}"
+  _awa_serial="$(vm_android_adb_serial "$_awa_vm_index")"
+  _awa_elapsed=0
+  _awa_last_unauth_msg=-30
+
+  say "waiting for authorized ADB on $_awa_serial (timeout ${_awa_timeout}s)..."
+
+  while [ "$_awa_elapsed" -lt "$_awa_timeout" ]; do
+    # check-suppress:suppression_doc: adb connect is idempotent; failure while the guest is still booting is expected in the retry loop.
+    adb connect "$_awa_serial" >/dev/null 2>&1 || true
+    _awa_state="$(vm_android_adb_list_state "$_awa_vm_index")"
+    case "$_awa_state" in
+      device) return 0 ;;
+      unauthorized)
+        if [ "$_awa_elapsed" -ge "$((_awa_last_unauth_msg + 30))" ]; then
+          say "ADB unauthorized — boot LineageOS, enable USB debugging, and tap Allow on the device"
+          _awa_last_unauth_msg="$_awa_elapsed"
+        fi
+        ;;
+      recovery|sideload)
+        error "guest is in $_awa_state mode; boot LineageOS to the home screen first"
+        return 1
+        ;;
+    esac
+    sleep 5
+    _awa_elapsed=$((_awa_elapsed + 5))
+  done
+
+  _awa_final="$(vm_android_adb_list_state "$_awa_vm_index")"
+  if [ "$_awa_final" = "unauthorized" ]; then
+    error "timed out waiting for ADB authorization on $_awa_serial; boot LineageOS and tap Allow USB debugging"
+  else
+    error "timed out waiting for authorized ADB on $_awa_serial"
+  fi
+  return 1
+}
+
 # vm_android_adb_connect VM_INDEX [TIMEOUT]
 #   Connect ADB and wait until the guest reports device, recovery, or sideload.
 vm_android_adb_connect() {
@@ -1381,7 +1436,7 @@ vm_android_adb_connect() {
   while [ "$_aac_elapsed" -lt "$_aac_timeout" ]; do
     # check-suppress:suppression_doc: adb connect is idempotent; failure while the guest is still booting is expected in the retry loop.
     adb connect "$_aac_serial" >/dev/null 2>&1 || true
-    _aac_state="$(vm_android_adb_get_state "$_aac_vm_index")"
+    _aac_state="$(vm_android_adb_list_state "$_aac_vm_index")"
     case "$_aac_state" in
       device|recovery|sideload) return 0 ;;
     esac
@@ -1389,31 +1444,6 @@ vm_android_adb_connect() {
     _aac_elapsed=$((_aac_elapsed + 5))
   done
   return 1
-}
-
-# vm_android_download_recovery
-#   Download recovery_arm64only-userdebug.img from the latest jqssun release.
-vm_android_download_recovery() {
-  _adr_recovery="$IMAGES_DIR/android-recovery-userdebug.img"
-  if [ -f "$_adr_recovery" ]; then
-    printf '%s\n' "$_adr_recovery"
-    return 0
-  fi
-  say "downloading userdebug recovery image..."
-  run_with_backoff "download LineageOS release metadata" \
-    curl -fsSL -o "$IMAGES_DIR/android-lineage-release.json" \
-    "https://api.github.com/repos/jqssun/android-lineage-qemu/releases/latest" \
-    || { error "failed to fetch latest LineageOS release info"; return 1; }
-  _adr_dl_url="$(jq -r '.assets[] | select(.name == "recovery_arm64only-userdebug.img") | .browser_download_url' "$IMAGES_DIR/android-lineage-release.json")"
-  if [ -z "$_adr_dl_url" ] || [ "$_adr_dl_url" = "null" ]; then
-    error "recovery_arm64only-userdebug.img not found in latest jqssun release"
-    return 1
-  fi
-  run_with_backoff "download recovery image" \
-    curl -fL -o "$_adr_recovery" "$_adr_dl_url" \
-    || { error "failed to download recovery image"; return 1; }
-  rm -f "$IMAGES_DIR/android-lineage-release.json"
-  printf '%s\n' "$_adr_recovery"
 }
 
 # android (qemu/lineageos) image build
