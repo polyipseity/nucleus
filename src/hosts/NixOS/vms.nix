@@ -116,6 +116,26 @@ let
   # AC97 sound device for Android VM audio output.
   androidSound = vm: if vm.type != "Android" then "" else "<sound model='ac97'/>";
 
+  # passt port-forward ranges derived from the manifest portForwards so the
+  # libvirt domain XML always matches VMs.json (host ports in 22000-22099).
+  portForwardRanges =
+    vm:
+    lib.concatMapStrings (pf: ''
+      <portForward proto='tcp'>
+        <range start='${toString pf.hostPort}' to='${toString pf.guestPort}'/>
+      </portForward>
+    '') vm.portForwards;
+
+  # User-mode network interface with passt backend for manifest-driven port
+  # forwarding (replaces the default libvirt NAT network).
+  networkInterface =
+    vm:
+    "<interface type='user'>\n"
+    + "      <backend type='passt'/>\n"
+    + "      <model type='virtio'/>\n"
+    + (portForwardRanges vm)
+    + "    </interface>";
+
   # Libvirt domain XML template.  Indented strings in Nix strip the common
   # leading whitespace (6 spaces here), producing a 0-based XML document.
   mkDomainXml =
@@ -134,6 +154,7 @@ let
         "__VM_ANDROID_DISKS__"
         "__VM_ANDROID_INPUT__"
         "__VM_ANDROID_SOUND__"
+        "__VM_NETWORK_INTERFACE__"
       ]
       [
         vm.id
@@ -148,6 +169,7 @@ let
         (androidDisks vm)
         (androidInput vm)
         (androidSound vm)
+        (networkInterface vm)
       ]
       # check-suppress:config-method: method 4 (runtime direct read) -- builtins.readFile embeds at eval time
       (builtins.readFile ../../modules/configs/vms/nixos-domain.xml);
@@ -193,8 +215,10 @@ in
   #   virt-viewer:   SPICE/VNC client for connecting to guest consoles.
   #   qemu_kvm:      CLI tools including qemu-img for QCOW2 disk management.
   #   virtiofsd:     VirtioFS daemon for zero-copy host→guest directory shares.
+  #   passt:         userspace network backend for libvirt user-mode port forwards.
   # Source: https://mynixos.com/nixpkgs/option/environment.systemPackages
   environment.systemPackages = with pkgs; [
+    passt
     qemu_kvm
     virt-manager
     virt-viewer

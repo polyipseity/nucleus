@@ -17,10 +17,7 @@
       <target dev='vda' bus='virtio'/>
     </disk>
     __VM_ANDROID_DISKS__
-    <interface type='network'>
-      <source network='default'/>
-      <model type='virtio'/>
-    </interface>
+    __VM_NETWORK_INTERFACE__
     <video>
       <model type='__VM_VIDEO_MODEL__'/>
     </video>
