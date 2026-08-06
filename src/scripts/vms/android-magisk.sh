@@ -283,7 +283,7 @@ vm_android_magisk_stage_patch_kit() {
     chmod 755 "$_amspk_out/$_amspk_dst_name"
   done
 
-  rm -rf "$_amspk_out/lib"
+  rm -rf "${_amspk_out:?}/lib"
   chmod 755 "$_amspk_out/boot_patch.sh"
   chmod 644 "$_amspk_out/stub.apk"
 }

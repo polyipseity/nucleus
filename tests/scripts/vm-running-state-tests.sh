@@ -12,14 +12,6 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
 _failures=0
 
-assert_eq() {
-  local _expected="$1" _actual="$2" _label="$3"
-  if [ "$_expected" != "$_actual" ]; then
-    echo "FAIL: $_label: expected '$_expected', got '$_actual'"
-    _failures=$((_failures + 1))
-  fi
-}
-
 assert_lines_eq() {
   local _expected="$1" _actual="$2" _label="$3"
   local _norm_expected _norm_actual
