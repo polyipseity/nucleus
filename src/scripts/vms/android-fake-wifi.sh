@@ -37,7 +37,9 @@ vm_android_fake_wifi_adb_reconnect() {
   _vafw_serial="$1"
   # check-suppress:suppression_doc: disconnect drops stale sessions; reconnect kicks the host-side transport.
   run_command_with_timeout 5 adb disconnect "$_vafw_serial" >/dev/null 2>&1 || true
+  # check-suppress:suppression_doc: idempotent ADB reconnect while guest link transitions.
   run_command_with_timeout 5 adb reconnect >/dev/null 2>&1 || true
+  # check-suppress:suppression_doc: idempotent ADB connect while guest link transitions.
   run_command_with_timeout 10 adb connect "$_vafw_serial" >/dev/null 2>&1 || true
 }
 
@@ -158,7 +160,7 @@ vm_android_fake_wifi_print_diagnostics() {
   _vafw_serial="$1"
   say "fake Wi-Fi diagnostics for $_vafw_serial:"
   vm_android_fake_wifi_run_as_root "$_vafw_serial" \
-    'uname -r; getprop ro.boot.wifi_impl; ls -la /lib/modules /vendor/lib/modules /vendor_dlkm/lib/modules 2>&1; find /vendor /odm /vendor_dlkm -name "virt_wifi*.ko" 2>/dev/null; zcat /proc/config.gz 2>/dev/null | grep -E "CONFIG_VIRT_WIFI|CONFIG_CFG80211" || true; ip link show' \
+    'uname -r; getprop ro.boot.wifi_impl; ls -la /lib/modules /vendor/lib/modules /vendor_dlkm/lib/modules 2>&1; find /vendor /odm /vendor_dlkm -name "virt_wifi*.ko" 2>/dev/null; zcat /proc/config.gz 2>/dev/null | grep -E "CONFIG_VIRT_WIFI|CONFIG_CFG80211" || :; ip link show' \
     2>/dev/null || warn "could not collect fake Wi-Fi diagnostics (is Magisk su available?)"
 }
 

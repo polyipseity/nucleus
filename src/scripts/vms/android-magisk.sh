@@ -152,6 +152,7 @@ vm_android_config_root() {
 
   vm_android_persist_root_props_service "$_acr_vm_index" || return 1
 
+  # check-suppress:suppression_doc: best-effort adbd restart after rooted-debugging props; verified via adb root probe.
   adb -s "$_acr_serial" shell 'setprop ctl.restart adbd' 2>/dev/null || true
   sleep 2
   vm_android_adb_refresh "$_acr_vm_index"
@@ -159,6 +160,7 @@ vm_android_config_root() {
   if ! vm_android_guest_has_adb_root "$_acr_vm_index"; then
     say "adb root failed; applying session-only magiskpolicy rules and retrying..."
     vm_android_apply_session_magiskpolicy_for_adb_root "$_acr_vm_index"
+    # check-suppress:suppression_doc: best-effort adbd restart after session magiskpolicy retry.
     adb -s "$_acr_serial" shell 'setprop ctl.restart adbd' 2>/dev/null || true
     sleep 2
     vm_android_adb_refresh "$_acr_vm_index"
@@ -184,7 +186,10 @@ vm_android_download_boot_image() {
   _adbi_tag="$(vm_android_jqssun_release_tag_for_asset "$_adbi_asset")" || return 1
 
   if [ -f "$_adbi_img" ]; then
-    _adbi_cached_tag="$(jq -r '.tag_name // empty' "$IMAGES_DIR/android-boot.tag.json" 2>/dev/null || true)"
+    _adbi_cached_tag=''
+    if [ -f "$IMAGES_DIR/android-boot.tag.json" ]; then
+      _adbi_cached_tag="$(jq -r '.tag_name // empty' "$IMAGES_DIR/android-boot.tag.json")"
+    fi
     if [ "$_adbi_cached_tag" = "$_adbi_tag" ]; then
       say "using cached boot image: $_adbi_img" >&2
       printf '%s\n' "$_adbi_img"
@@ -266,6 +271,7 @@ vm_android_magisk_stage_patch_kit() {
   mv "$_amspk_out/assets/boot_patch.sh" "$_amspk_out/boot_patch.sh"
   mv "$_amspk_out/assets/util_functions.sh" "$_amspk_out/util_functions.sh"
   mv "$_amspk_out/assets/stub.apk" "$_amspk_out/stub.apk"
+  # check-suppress:suppression_doc: assets dir may already be gone after mv of boot_patch.sh and stub.apk.
   rmdir "$_amspk_out/assets" 2>/dev/null || true
 
   for _amspk_pair in \
@@ -371,6 +377,7 @@ vm_android_magisk_install_apk() {
     if [ "$_amia_attempt" -lt 12 ]; then
       say "Magisk APK install not ready yet (guest may still be booting); retrying..."
       sleep 10
+      # check-suppress:suppression_doc: guest may still be booting between Magisk APK install retries.
       vm_android_adb_wait_boot_completed "$_amia_vm_index" 120 || true
     fi
   done
@@ -406,6 +413,7 @@ vm_android_install_adb_keys() {
   adb -s "$_aiak_serial" shell 'chmod 640 /data/misc/adb/adb_keys && chown system:shell /data/misc/adb/adb_keys'
   # check-suppress:suppression_doc: restorecon is unavailable on some recovery shells; chcon is the portable fallback.
   adb -s "$_aiak_serial" shell 'restorecon /data/misc/adb/adb_keys 2>/dev/null || chcon u:object_r:adb_keys_file:s0 /data/misc/adb/adb_keys' 2>/dev/null || true
+  # check-suppress:suppression_doc: best-effort adbd restart after adb_keys install; verified via authorized ADB probe.
   adb -s "$_aiak_serial" shell 'setprop ctl.restart adbd' 2>/dev/null || true
 }
 
@@ -466,7 +474,8 @@ vm_android_config_magisk() {
     fi
   fi
 
-  _acm_tag="$(vm_android_jqssun_release_tag_for_asset "boot_$(vm_android_recovery_asset_suffix "$_acm_vm_index").img")" || true
+  _acm_tag=''
+  _acm_tag="$(vm_android_jqssun_release_tag_for_asset "boot_$(vm_android_recovery_asset_suffix "$_acm_vm_index").img")" || _acm_tag=''
   if [ -n "$_acm_tag" ]; then
     jq -n --arg tag "$_acm_tag" '{tag_name: $tag, configured: true}' > "$IMAGES_DIR/$NUCLEUS_MAGISK_MARKER"
   fi

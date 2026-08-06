@@ -144,7 +144,9 @@ run_command_with_timeout() {
     _rcwt_elapsed=0
     while kill -0 "$_rcwt_pid" 2>/dev/null; do
       if [ "$_rcwt_elapsed" -ge "$_rcwt_timeout" ]; then
+        # check-suppress:suppression_doc: timed-out process may already be dead; kill failure must not abort exit 124 path.
         kill "$_rcwt_pid" 2>/dev/null || true
+        # check-suppress:suppression_doc: wait after kill on timed-out process may fail harmlessly.
         wait "$_rcwt_pid" 2>/dev/null || true
         exit 124
       fi

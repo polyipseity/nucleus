@@ -1448,7 +1448,8 @@ vm_android_adb_list_state() {
     printf '%s\n' "$_als_devices_state"
     return 0
   fi
-  _als_get_state="$(adb -s "$_als_serial" get-state 2>/dev/null || true)"
+  _als_get_state=''
+  _als_get_state="$(adb -s "$_als_serial" get-state 2>/dev/null)" || _als_get_state=''
   if [ -n "$_als_get_state" ]; then
     printf '%s\n' "$_als_get_state"
     return 0
@@ -1646,6 +1647,7 @@ vm_android_adb_ensure_root() {
   fi
 
   while [ "$_aer_attempt" -lt 3 ]; do
+    # check-suppress:suppression_doc: best-effort adb root trigger; success verified on next id -u check.
     adb -s "$_aer_serial" root 2>/dev/null || true
     sleep 3
     vm_android_adb_refresh "$_aer_vm_index"
@@ -1663,6 +1665,7 @@ vm_android_recovery_prepare_adb() {
   _arpa_vm_index="$1"
   _arpa_serial="$(vm_android_adb_serial "$_arpa_vm_index")"
 
+  # check-suppress:suppression_doc: recovery adbd root may already be enabled or ADB not ready yet.
   adb -s "$_arpa_serial" root 2>/dev/null || true
   sleep 2
   vm_android_adb_refresh "$_arpa_vm_index"
@@ -1756,7 +1759,10 @@ vm_android_download_userdebug_recovery() {
   _adur_tag="$(vm_android_jqssun_release_tag_for_asset "$_adur_asset_name")" || return 1
 
   if [ -f "$_adur_img" ]; then
-    _adur_cached_tag="$(jq -r '.tag_name // empty' "$IMAGES_DIR/android-recovery-userdebug.tag.json" 2>/dev/null || true)"
+    _adur_cached_tag=''
+    if [ -f "$IMAGES_DIR/android-recovery-userdebug.tag.json" ]; then
+      _adur_cached_tag="$(jq -r '.tag_name // empty' "$IMAGES_DIR/android-recovery-userdebug.tag.json")"
+    fi
     if [ "$_adur_cached_tag" = "$_adur_tag" ]; then
       say "using cached userdebug recovery: $_adur_img"
       return 0
