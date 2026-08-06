@@ -891,6 +891,12 @@ let
     && (lib.hasInfix "vm_build_images" vm_setup_sh_text)
   ) "setup must share vm_prepare + vm_sync_config_phase before image build";
 
+  test_vm_warn_running_returns_success_when_idle = assert' (
+    (lib.hasInfix "vm_warn_running_vms_needing_restart" vm_setup_sh_text)
+    && (lib.hasInfix "_wrvnr_running=\"\$(vm_get_running_names)\" || return 0" vm_setup_sh_text)
+    && (lib.hasInfix "[ -n \"\$_wrvnr_running\" ] || return 0" vm_setup_sh_text)
+  ) "vm_warn_running_vms_needing_restart must not abort setup under set -e when no VMs are running";
+
   test_vm_sync_utm_includes_registration = assert' (
     (lib.hasInfix "vm_apply_utm_plist_and_register" vm_setup_sh_text)
     && (lib.hasInfix "re_register_utm_bundle" vm_setup_sh_text)

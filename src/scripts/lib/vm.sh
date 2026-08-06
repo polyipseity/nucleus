@@ -1819,8 +1819,8 @@ vm_sync_libvirt_vms() {
 vm_warn_running_vms_needing_restart() {
   local _wrvnr_running _wrvnr_name
 
-  _wrvnr_running="$(vm_get_running_names)"
-  [ -n "$_wrvnr_running" ] || return
+  _wrvnr_running="$(vm_get_running_names)" || return 0
+  [ -n "$_wrvnr_running" ] || return 0
   printf '%s\n' "$_wrvnr_running" | while IFS= read -r _wrvnr_name; do
     [ -z "$_wrvnr_name" ] && continue
     warn "VM '$_wrvnr_name' is running; stop and restart it for config changes (e.g. port forwards) to take effect"
