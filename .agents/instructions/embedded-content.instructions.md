@@ -33,7 +33,7 @@ Content with analogous semantics across platforms MUST be a single shared file, 
 - Shared files live in `src/scripts/` (or `src/vms/templates/` for VM templates).
 - Platform divergence inside a shared file uses runtime conditionals (`$IsWindows`, `$IsMacOS`, `$IsLinux` in PowerShell content) or `__TOKEN__` values supplied per consumer.
 - A per-platform file is allowed only when the language differs or the semantics genuinely differ; the difference must be cited in a comment at both the file and its consumer.
-- Registry of shared files (keep current as new shared files land): `src/scripts/shell/profile.ps1` (profile body), `src/scripts/vms/start-android-vm.ps1` (Android QEMU start), `src/vms/templates/*` (VM templates).
+- Registry of shared files (keep current as new shared files land): `src/scripts/shell/profile.ps1` (profile body), `src/scripts/vms/start-android-vm.ps1` (Android QEMU start), `src/scripts/vms/android-fake-wifi-guest-setup.sh` and `src/scripts/vms/android-fake-wifi-guest-revert.sh` (Android guest Magisk scripts), `src/vms/templates/*` (VM templates).
 
 ## Token convention
 

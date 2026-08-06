@@ -24,101 +24,12 @@ usage() {
 # Guest script run under su to load virt_wifi and create wlan0 from the virtio ethernet NIC.
 # Lineage virtio targets use eth0 only; rename it so ConnectivityService treats wlan0 as Wi-Fi.
 vm_android_fake_wifi_guest_setup_script() {
-  cat <<'EOF'
-#!/system/bin/sh
-set -eu
-
-# virt_wifi advertises an open BSS named VirtWifi; Android must associate or ADB stays offline.
-_join_virt_wifi() {
-  svc wifi enable 2>/dev/null || true
-  cmd wifi set-wifi-enabled enabled 2>/dev/null || true
-  sleep 1
-  cmd wifi connect-network VirtWifi open 2>/dev/null \
-    || cmd -w wifi connect-network VirtWifi open 2>/dev/null || true
-  sleep 2
-}
-
-_apply_setup() {
-  if ip link show wlan0 2>/dev/null | grep -q wlan0; then
-    ip link set wlan0 up 2>/dev/null || true
-    _join_virt_wifi
-    return 0
-  fi
-
-  _modprobe_ok=0
-  for _moddir in /vendor/lib/modules /odm/lib/modules /vendor_dlkm/lib/modules; do
-    if [ -d "$_moddir" ] && modprobe -d "$_moddir" virt_wifi 2>/dev/null; then
-      _modprobe_ok=1
-      break
-    fi
-  done
-  if [ "$_modprobe_ok" -eq 0 ]; then
-    modprobe virt_wifi 2>/dev/null || true
-  fi
-  if [ ! -d /sys/module/virt_wifi ]; then
-    echo "virt_wifi: module not loaded (checked /vendor/lib/modules, /odm/lib/modules, /vendor_dlkm/lib/modules)" >&2
-    exit 1
-  fi
-
-  _eth=''
-  for _iface in eth0 eth1; do
-    if ip link show "$_iface" 2>/dev/null | grep -q "$_iface"; then
-      _eth="$_iface"
-      break
-    fi
-  done
-  if [ -z "$_eth" ]; then
-    _eth="$(ip -o link show 2>/dev/null | awk -F': ' '/: eth/ {print $2; exit}')"
-  fi
-  if [ -z "$_eth" ]; then
-    echo "virt_wifi: no ethernet interface found" >&2
-    exit 1
-  fi
-
-  ip link set "$_eth" down
-  ip link set "$_eth" name wifi_eth
-  ip link set wifi_eth up
-  ip link add link wifi_eth name wlan0 type virt_wifi
-  ip link set wlan0 up
-  _join_virt_wifi
-}
-
-# Live enable via ADB must return before link changes: eth0 carries the forwarded ADB port.
-if [ "${NUCLEUS_FAKE_WIFI_ASYNC:-0}" = "1" ]; then
-  ( sleep 1; _apply_setup ) &
-  exit 0
-fi
-_apply_setup
-EOF
+  cat "$SCRIPT_DIR/android-fake-wifi-guest-setup.sh"
 }
 
 # Guest script run under su to tear down virt_wifi and restore eth0.
 vm_android_fake_wifi_guest_revert_script() {
-  cat <<'EOF'
-#!/system/bin/sh
-set -eu
-
-_revert_links() {
-  if ip link show wlan0 2>/dev/null | grep -q wlan0; then
-    ip link set wlan0 down 2>/dev/null || true
-    ip link delete wlan0 2>/dev/null || true
-  fi
-  if ip link show wifi_eth 2>/dev/null | grep -q wifi_eth; then
-    ip link set wifi_eth down 2>/dev/null || true
-    ip link set wifi_eth name eth0 2>/dev/null || true
-    ip link set eth0 up 2>/dev/null || true
-  fi
-  if [ -d /sys/module/virt_wifi ]; then
-    rmmod virt_wifi 2>/dev/null || true
-  fi
-}
-
-if [ "${NUCLEUS_FAKE_WIFI_ASYNC:-0}" = "1" ]; then
-  ( sleep 1; _revert_links ) &
-  exit 0
-fi
-_revert_links
-EOF
+  cat "$SCRIPT_DIR/android-fake-wifi-guest-revert.sh"
 }
 
 # TCP ADB can list "device" while shell hangs until disconnect+reconnect.
