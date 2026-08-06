@@ -313,6 +313,7 @@
         }:
         let
           inherit (pkgs) lib;
+          repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
           thisScriptTree = pkgs.callPackage ./modules/lib/script-tree.nix { };
         in
         pkgs.runCommand "${name}-nucleus-app"
@@ -331,6 +332,10 @@
               # Reuse pre-built + shellchecked script tree (src/scripts/).
               cp -r --no-preserve=mode ${thisScriptTree}/. "$out/"
               chmod -R +x "$out/src/"
+            ''}
+
+            ${lib.optionalString (repoRoot != "") ''
+              printf '%s\n' '${lib.escapeShellArg repoRoot}' > "$out/.nucleus-repo-root"
             ''}
 
             ${
