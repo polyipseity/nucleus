@@ -1026,8 +1026,12 @@ vm_write_descriptor() {
       disks: (
         if $vm.type == "Android" then
           [
-            {role: "system", path: ("images/" + $vm.type + "-system.qcow2")},
-            {role: "gsi", path: ("images/" + $vm.type + "-gsi.img")},
+            {role: "system", path: ("images/" + $vm.type + "-system.qcow2")}
+          ]
+          + (if ($vm.Android.gsiUrl != null) then
+              [{role: "gsi", path: ("images/" + $vm.type + "-gsi.img")}]
+            else [] end)
+          + [
             {role: "userdata", path: ("data/" + $vm.id + ".qcow2")}
           ]
         else
@@ -1341,6 +1345,75 @@ vm_link_android_userdata_to_utm_bundle() {
   return 0
 }
 
+# --- Android guest configuration (adb / fastboot) ---
+
+vm_android_adb_host_port() {
+  jq -r --argjson i "$1" '.VMs[$i].portForwards[] | select(.guestPort == 5555) | .hostPort' "$MANIFEST"
+}
+
+vm_android_fastboot_host_port() {
+  jq -r --argjson i "$1" '.VMs[$i].portForwards[] | select(.guestPort == 5554) | .hostPort' "$MANIFEST"
+}
+
+vm_android_adb_serial() {
+  printf 'localhost:%s\n' "$(vm_android_adb_host_port "$1")"
+}
+
+vm_android_fastboot_serial() {
+  printf 'tcp:localhost:%s\n' "$(vm_android_fastboot_host_port "$1")"
+}
+
+vm_android_adb_get_state() {
+  _aas_serial="$(vm_android_adb_serial "$1")"
+  adb -s "$_aas_serial" get-state 2>/dev/null || printf 'unknown\n'
+}
+
+# vm_android_adb_connect VM_INDEX [TIMEOUT]
+#   Connect ADB and wait until the guest reports device, recovery, or sideload.
+vm_android_adb_connect() {
+  _aac_vm_index="$1"
+  _aac_timeout="${2:-150}"
+  _aac_serial="$(vm_android_adb_serial "$_aac_vm_index")"
+  _aac_elapsed=0
+
+  while [ "$_aac_elapsed" -lt "$_aac_timeout" ]; do
+    # check-suppress:suppression_doc: adb connect is idempotent; failure while the guest is still booting is expected in the retry loop.
+    adb connect "$_aac_serial" >/dev/null 2>&1 || true
+    _aac_state="$(vm_android_adb_get_state "$_aac_vm_index")"
+    case "$_aac_state" in
+      device|recovery|sideload) return 0 ;;
+    esac
+    sleep 5
+    _aac_elapsed=$((_aac_elapsed + 5))
+  done
+  return 1
+}
+
+# vm_android_download_recovery
+#   Download recovery_arm64only-userdebug.img from the latest jqssun release.
+vm_android_download_recovery() {
+  _adr_recovery="$IMAGES_DIR/android-recovery-userdebug.img"
+  if [ -f "$_adr_recovery" ]; then
+    printf '%s\n' "$_adr_recovery"
+    return 0
+  fi
+  say "downloading userdebug recovery image..."
+  run_with_backoff "download LineageOS release metadata" \
+    curl -fsSL -o "$IMAGES_DIR/android-lineage-release.json" \
+    "https://api.github.com/repos/jqssun/android-lineage-qemu/releases/latest" \
+    || { error "failed to fetch latest LineageOS release info"; return 1; }
+  _adr_dl_url="$(jq -r '.assets[] | select(.name == "recovery_arm64only-userdebug.img") | .browser_download_url' "$IMAGES_DIR/android-lineage-release.json")"
+  if [ -z "$_adr_dl_url" ] || [ "$_adr_dl_url" = "null" ]; then
+    error "recovery_arm64only-userdebug.img not found in latest jqssun release"
+    return 1
+  fi
+  run_with_backoff "download recovery image" \
+    curl -fL -o "$_adr_recovery" "$_adr_dl_url" \
+    || { error "failed to download recovery image"; return 1; }
+  rm -f "$IMAGES_DIR/android-lineage-release.json"
+  printf '%s\n' "$_adr_recovery"
+}
+
 # android (qemu/lineageos) image build
 
 vm_build_android() {
@@ -1463,7 +1536,7 @@ vm_build_android() {
       say "GSI system image already exists: $_bai_gsi_img"
     fi
   else
-    say "no GSI URL set; using built-in LineageOS GSI"
+    say "no GSI URL set; skipping GSI download (Lineage-only)"
   fi
 
   # Re-link refresh: when this build replaced a canonical disk (system image
@@ -1929,12 +2002,18 @@ vm_setup_utm() {
       if ! vm_link_android_userdata_to_utm_bundle "$vm_name" "$vm_index" "$data_dir"; then
         return 1
       fi
+      _gsi_url="$(jq -r ".VMs[$vm_index].Android.gsiUrl" "$MANIFEST")"
       _gsi_file="$data_dir/$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")"
-      if [ -f "$_android_gsi" ]; then
-        cp "$_android_gsi" "$_gsi_file"
-        say "copied Android GSI image: $_gsi_file"
+      if [ -n "$_gsi_url" ] && [ "$_gsi_url" != "null" ]; then
+        if [ -f "$_android_gsi" ]; then
+          cp "$_android_gsi" "$_gsi_file"
+          say "copied Android GSI image: $_gsi_file"
+        elif [ -f "$_gsi_file" ]; then
+          warn "Android GSI image removed from images dir; removing stale bundle copy: $_gsi_file"
+          rm -f "$_gsi_file"
+        fi
       elif [ -f "$_gsi_file" ]; then
-        warn "Android GSI image removed from images dir; removing stale bundle copy: $_gsi_file"
+        warn "Android gsiUrl is null; removing stale GSI from bundle: $_gsi_file"
         rm -f "$_gsi_file"
       fi
     else
@@ -3174,7 +3253,10 @@ vm_gc_disk_keep_set() {
         .id + ".qcow2",
         .type + ".qcow2",
         .type + ".base.qcow2",
-        (if .Android then (.Android.systemImage, .Android.gsiImage) else empty end)
+        (if .Android then
+          (.Android.systemImage,
+           (if .Android.gsiUrl != null then .Android.gsiImage else empty end))
+        else empty end)
       ] | .[]
     ' "$MANIFEST"
   else
@@ -3463,13 +3545,14 @@ vm_unpack_vms() {
             _uv_android_system="$IMAGES_DIR/$(jq -r '.Android.systemImage' "$_uv_desc")"
             _uv_android_userdata="$VM_DIR/data/$(jq -r '.Android.userdataImage' "$_uv_desc")"
             _uv_android_gsi="$IMAGES_DIR/$(jq -r '.Android.gsiImage' "$_uv_desc")"
+            _uv_gsi_url="$(jq -r '.Android.gsiUrl' "$_uv_desc")"
             if [ ! -f "$_uv_android_userdata" ]; then
               warn "unpack — Android userdata missing: $_uv_android_userdata; skipping bundle for '$_uv_name'"
               continue
             fi
             cp "$_uv_android_system" "$_uv_bundle/Data/disk-main.qcow2"
             ln -f "$_uv_android_userdata" "$_uv_bundle/Data/$(basename "$_uv_android_userdata")"
-            if [ -f "$_uv_android_gsi" ]; then
+            if [ -n "$_uv_gsi_url" ] && [ "$_uv_gsi_url" != "null" ] && [ -f "$_uv_android_gsi" ]; then
               cp "$_uv_android_gsi" "$_uv_bundle/Data/$(basename "$_uv_android_gsi")"
             fi
           else
@@ -3515,11 +3598,12 @@ vm_unpack_vms() {
             _uv_android_system="$IMAGES_DIR/$(jq -r '.Android.systemImage' "$_uv_desc")"
             _uv_android_userdata="$VM_DIR/data/$(jq -r '.Android.userdataImage' "$_uv_desc")"
             _uv_android_gsi="$IMAGES_DIR/$(jq -r '.Android.gsiImage' "$_uv_desc")"
+            _uv_gsi_url="$(jq -r '.Android.gsiUrl' "$_uv_desc")"
             if [ ! -f "$_uv_android_system" ] || [ ! -f "$_uv_android_userdata" ]; then
               warn "unpack — Android images missing for '$_uv_name': $_uv_android_system, $_uv_android_userdata"
               continue
             fi
-            if [ -f "$_uv_android_gsi" ]; then
+            if [ -n "$_uv_gsi_url" ] && [ "$_uv_gsi_url" != "null" ] && [ -f "$_uv_android_gsi" ]; then
               say "unpack — Android GSI present: $_uv_android_gsi"
             fi
           else
