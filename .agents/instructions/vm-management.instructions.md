@@ -141,6 +141,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - Build tool: Packer + `tart-cli` plugin pulling `ghcr.io/cirruslabs/macos-<version>-base:latest` from GHCR.
 - Start command (after build): `tart run --net-softnet --net-softnet-expose <hostPort>:<guestPort> <id>` (rendered from manifest). Host-local SSH uses `tart ip <id>` + guest port `22`, not `localhost:<hostPort>`.
 - No UTM bundle is created for macOS guests; they remain Tart-managed.
+- **Running vs registered:** `tart list` (name column) and `vm_get_tart_registered_names` report catalog entries (local VMs and OCI images), including stopped ones. Running state uses `tart list --format json` and `.Running == true` via `vm_get_running_names`.
 
 ## macOS — UTM
 
@@ -153,6 +154,11 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - Network: **Emulated** (QEMU user/slirp) — required for `PortForward` to work; vmnet-shared silently drops forwards.
 
 - `utmctl` CLI path: `/Applications/UTM.app/Contents/MacOS/utmctl`.
+- **Running vs registered:** `utmctl list` (via `vm_get_utm_registered_names`) returns every registered VM regardless of `Status`. Running state filters `Status != stopped` (`starting`, `started`, `pausing`, `paused`, `resuming`, `stopping`) via `vm_get_running_names`.
+
+## Running state source of truth
+
+`vm_get_running_names` (POSIX) and `Get-VmRunningProcessNames` (Windows) are the single probes for sync warnings, setup base-refresh skips, `list`/`status`, `pack`, and `resize` guards. Do not use registration helpers or unfiltered `utmctl list` / `tart list` name columns for running checks.
 
 ## NixOS — libvirt/KVM
 
