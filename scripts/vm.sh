@@ -172,6 +172,7 @@ usage() {
   upgrade <vm>             Re-download+replace OS image (Android only; error for others).
   reset <vm>               Factory-reset VM user state (Android only; error for others).
   android-config <vm>      Android post-provision: GApps sideload, ADB keys, root, fake Wi-Fi.
+                           Run without flags to print the manual workflow.
   resize <vm> <size>       Grow-only resize of the writable disk (data/<vm>.qcow2)
                           to an explicit size (e.g. 64GB). Pass --allow-shrink to
                           shrink instead.
@@ -215,8 +216,8 @@ usage() {
   --repo-root PATH              Override the repository root path.
   -h|--help                     Show usage.
 
-Android android-config flags (after VM name):
-  --gapps               Sideload MindTheGapps in recovery (tap Install anyway when prompted).
+Android android-config flags (after VM name; omit all flags to print the manual):
+  --gapps               Sideload MindTheGapps in recovery (enter fastboot first; tap Install anyway when prompted).
   --adb-keys            Install host ~/.android/adbkey.pub into guest adb_keys.
   --root                Enable Lineage root for apps and adb.
   --fake-wifi           Load virt_wifi and bring up wlan0.

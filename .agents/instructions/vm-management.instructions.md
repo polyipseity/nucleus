@@ -203,7 +203,7 @@ Both hooks are best-effort: a VM sync/setup failure does not abort a completed s
 |---------|-------------|
 | `sync` | Manifest or Nix VM template changed; VMs already provisioned. Runs automatically after apply. |
 | `setup` | First VM, missing images/bundles, credential/config drift, new guest. Full provision (sync + build + disks). |
-| `android-config` | Android only: sideload MindTheGapps in recovery, install ADB keys, enable Lineage root, configure fake Wi‑Fi. `--gapps` requires LineageOS Recovery (tap **Install anyway** on signature failure). `--adb-keys` / `--root` / `--fake-wifi` require booted Lineage with authorized ADB (tap **Allow** on first connect after reset). |
+| `android-config` | Android only: sideload MindTheGapps in recovery, install ADB keys, enable Lineage root, configure fake Wi‑Fi. Run without flags to print the manual workflow. `--gapps` requires recovery → **Advanced → Enter fastboot** before the host can flash userdebug recovery (stock recovery ADB stays unauthorized). Tap **Install anyway** on signature failure. `--adb-keys` / `--root` / `--fake-wifi` require booted Lineage with authorized ADB (tap **Allow** on first connect after reset). |
 | `pack` / `unpack` | Copy VM tree to another host (`unpack` may recreate UTM bundles). |
 | `start` / `stop` | Runtime control. Restart after sync when port forwards changed. |
 
