@@ -1376,6 +1376,8 @@ vm_android_adb_connect() {
   _aac_serial="$(vm_android_adb_serial "$_aac_vm_index")"
   _aac_elapsed=0
 
+  say "waiting for ADB on $_aac_serial (timeout ${_aac_timeout}s)..."
+
   while [ "$_aac_elapsed" -lt "$_aac_timeout" ]; do
     # check-suppress:suppression_doc: adb connect is idempotent; failure while the guest is still booting is expected in the retry loop.
     adb connect "$_aac_serial" >/dev/null 2>&1 || true

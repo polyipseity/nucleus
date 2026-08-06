@@ -879,6 +879,8 @@ let
     && (lib.hasInfix "Android.gsiUrl != null" vm_setup_sh_text)
     && (lib.hasInfix "modprobe virt_wifi" android_fake_wifi_sh_text)
     && (lib.hasInfix "Android.gappsUrl" android_config_sh_text)
+    && (lib.hasInfix "--fake-wifi-revert|--all" vm_setup_sh_text)
+    && (lib.hasInfix "filtered_vm_args[0]" vm_setup_sh_text)
   ) "nucleus-vm android-config must be wired with GSI-null guards and fake Wi-Fi support";
 
   test_android_tools_provisioned_all_hosts = assert' (

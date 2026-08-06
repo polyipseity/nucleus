@@ -309,7 +309,19 @@ for arg in "${vm_args[@]}"; do
     --headful) windows_headless=false ;;
     --no-headful) windows_headless=true ;;
     --) break ;;
-    -*) warn "ignoring unknown flag after subcommand: $arg" ;;
+    -*)
+      case "$action" in
+        android-config)
+          case "$arg" in
+            --recovery|--gapps|--adb-keys|--root|--fake-wifi|--fake-wifi-revert|--all|-h|--help)
+              filtered_vm_args+=("$arg")
+              ;;
+            *) warn "ignoring unknown flag after subcommand: $arg" ;;
+          esac
+          ;;
+        *) warn "ignoring unknown flag after subcommand: $arg" ;;
+      esac
+      ;;
     *) filtered_vm_args+=("$arg") ;;
   esac
 done
@@ -833,13 +845,13 @@ do_android_config() {
   NUCLEUS_HOST="$(resolve_nucleus_host)"
   require_command jq
 
-  if [ "${#vm_args[@]}" -eq 0 ]; then
+  if [ "${#filtered_vm_args[@]}" -eq 0 ]; then
     error "android-config requires a VM name"
     usage >&2
     exit 1
   fi
 
-  local vm_name="${vm_args[0]}"
+  local vm_name="${filtered_vm_args[0]}"
   local vm_type vm_index
   local resolved
   resolved="$(resolve_target_vm "$vm_name")" || exit 1
@@ -854,24 +866,17 @@ do_android_config() {
   VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
   IMAGES_DIR="$VM_DIR/images"
 
-  if ! resolve_vm_guest_credentials; then
-    error "cannot configure '$vm_name' — guest credential resolution failed"
-    exit 1
-  fi
-  vm_guest_credentials_fingerprint="$(vm_guest_credentials_hash)"
-
   vm_init "$REPO_ROOT" "$VM_DIR" "$IMAGES_DIR" "$TEMPLATES_DIR" "$dry_run" \
     "$windows_iso" "$windows_iso_source" "$windows_iso_retries" \
-    "$windows_headless" "$accelerator" "$vm_secret_owner" "$vm_guest_username" \
-    "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
+    "$windows_headless" "$accelerator" "" "" "" "" \
     "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
     "$accept_gsi_license" "false" "false" \
     "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force"
 
   local config_flags=()
   local _i=1
-  while [ "$_i" -lt "${#vm_args[@]}" ]; do
-    config_flags+=("${vm_args[$_i]}")
+  while [ "$_i" -lt "${#filtered_vm_args[@]}" ]; do
+    config_flags+=("${filtered_vm_args[$_i]}")
     _i=$((_i + 1))
   done
 

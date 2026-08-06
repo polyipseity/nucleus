@@ -213,6 +213,10 @@ vm_android_config() {
   _vac_do_fake_wifi_revert=false
   _vac_do_all=false
 
+  require_command adb
+  require_command fastboot
+  require_command curl
+
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --recovery) _vac_do_recovery=true ;;
@@ -229,6 +233,7 @@ vm_android_config() {
   done
 
   if [ "$_vac_do_all" = true ]; then
+    say "running android-config --all for '$_vac_vm_name'..."
     vm_android_config_all "$_vac_vm_name" "$_vac_vm_index"
     return $?
   fi
@@ -240,10 +245,6 @@ vm_android_config() {
     usage >&2
     return 1
   fi
-
-  require_command adb
-  require_command fastboot
-  require_command curl
 
   _vac_serial="$(vm_android_adb_serial "$_vac_vm_index")"
 
