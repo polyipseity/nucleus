@@ -9,15 +9,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
 . "$SCRIPT_DIR/../lib/require-command.sh"
-
-nucleus_log_dir() {
-  case "$(uname -s)" in
-    Darwin) printf '%s\n' "${HOME}/Library/Logs/nucleus" ;;
-    Linux)  printf '%s\n' "${HOME}/.local/state/nucleus/log" ;;
-    *)      printf '%s\n' "${HOME}/.local/state/nucleus/log" ;;
-  esac
-}
 
 # --- Argument parsing ---
 ws_port="${WS_PORT:-1234}"

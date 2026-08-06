@@ -258,6 +258,12 @@ let
     scriptName = "src/scripts/services/sccache-gc";
   };
 
+  logGcUser = pkgs.writeNucleusShellApplication {
+    name = "log-gc-user";
+    runtimeInputs = [ pkgs.jq ];
+    scriptName = "src/scripts/services/log-gc-user";
+  };
+
   # guiEnvAgent — launchd login agent that manages GUI-environment PATH and
   # env vars.  All Nix-computed values are passed as CLI args to the script.
   guiEnvAgent = pkgs.writeNucleusShellApplication {
@@ -582,6 +588,28 @@ lib.mkIf pkgs.stdenv.isDarwin {
   };
 
   # --------------------------------------------------------------------------
+  # Daily user log rotation LaunchAgent
+  # Rotates user-scope nucleus logs daily at noon. Cross-host parity with
+  # NixOS systemd user timer and Windows scheduled task.
+  launchd.agents."log-gc-user" = {
+    enable = true;
+    config = {
+      Label = "local.log-gc-user";
+      ProgramArguments = [ "${logGcUser}/bin/nucleus-log-gc-user" ];
+      EnvironmentVariables = {
+        NUCLEUS_REPO_ROOT = repoRoot;
+      };
+      RunAtLoad = false;
+      StartCalendarInterval = [
+        {
+          Hour = 12;
+          Minute = 0;
+        }
+      ];
+    };
+  };
+
+  # --------------------------------------------------------------------------
   # BetterDisplay heartbeat LaunchAgent (macOS-only)
   # Persistent daemon that polls the HeadlessDisplay virtual screen every
   # 30 seconds and reconnects it if BetterDisplay marks it as disconnected.
@@ -749,8 +777,8 @@ lib.mkIf pkgs.stdenv.isDarwin {
       ];
       RunAtLoad = true;
       KeepAlive = true;
-      StandardOutPath = "${config.home.homeDirectory}/Library/Logs/nucleus/service-watchdog/stdout.log";
-      StandardErrorPath = "${config.home.homeDirectory}/Library/Logs/nucleus/service-watchdog/stderr.log";
+      StandardOutPath = "${config.nucleus.logging.logDir}/service-watchdog/stdout.log";
+      StandardErrorPath = "${config.nucleus.logging.logDir}/service-watchdog/stderr.log";
       EnvironmentVariables = {
         NUCLEUS_SERVICES_JSON = builtins.path {
           path = ./services.json;
