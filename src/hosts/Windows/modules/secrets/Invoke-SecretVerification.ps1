@@ -116,10 +116,17 @@ function Invoke-SecretVerification {
   $sshPublicKeyPath = Join-Path -Path $sshDir -ChildPath "ssh_personal_$PrimaryUsername.pub"
 
   $sopsTestFiles = @(
-    (Join-Path -Path $SecretsDir -ChildPath "git-identities.yml"),
     (Join-Path -Path $SecretsDir -ChildPath "gpg-personal.yml"),
     (Join-Path -Path $SecretsDir -ChildPath "ssh-personal.yml")
   )
+  $usersSecretsDir = Join-Path -Path $SecretsDir -ChildPath "users"
+  if (Test-Path -Path $usersSecretsDir) {
+    $userSecretFiles = Get-ChildItem -Path $usersSecretsDir -Filter "*.yml" -File -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- users dir may have no .yml files; null check below handles absence
+    if ($null -ne $userSecretFiles) {
+      $userSecretFiles = $userSecretFiles | Select-Object -ExpandProperty FullName
+      $sopsTestFiles += $userSecretFiles
+    }
+  }
   if (Test-Path -Path $WallpaperAssetsDir) {
     $wallpaperSopsFiles = Get-ChildItem -Path $WallpaperAssetsDir -Filter "*.sops" -File -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- wallpaper dir may have no .sops files; null check below handles absence
     if ($null -ne $wallpaperSopsFiles) {

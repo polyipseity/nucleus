@@ -5,7 +5,7 @@
 .DESCRIPTION
   Applies the users.json jellyfin.accounts declarations against the host-shared
   Jellyfin server via its HTTP API. Each account declaration references secret
-  keys inside src/secrets/users-<username>.yml so plaintext credentials never
+  keys inside src/secrets/users/<username>.yml so plaintext credentials never
   live in users.json.
 
   API behavior source (upstream Jellyfin):
@@ -113,9 +113,9 @@ function Sync-JellyfinAccount {
       continue
     }
 
-    $secretFile = Join-Path $RepoRoot "src\secrets\users-$($userRecord.name).yml"
+    $secretFile = Join-Path $RepoRoot "src\secrets\users\$($userRecord.name).yml"
     if (-not (Test-Path -LiteralPath $secretFile -PathType Leaf)) {
-      Write-Warning "jellyfin: users-$($userRecord.name).yml not found; skipping account declarations for this user."
+      Write-Warning "jellyfin: users/$($userRecord.name).yml not found; skipping account declarations for this user."
       continue
     }
 

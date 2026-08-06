@@ -130,13 +130,13 @@ check_secret_health() {
     export SOPS_AGE_KEY_FILE
   fi
 
-  for secret_file in "$REPO_ROOT"/src/secrets/users-*.yml; do
+  for secret_file in "$REPO_ROOT"/src/secrets/users/*.yml; do
     if [ -f "$secret_file" ] && ! sops -d "$secret_file" >/dev/null; then
       error "unable to decrypt secret file with current identities: $secret_file"
     fi
   done
 
-  for secret_file in "$REPO_ROOT/src/secrets/git-identities.yml" "$REPO_ROOT/src/secrets/gpg-personal.yml" "$REPO_ROOT/src/secrets/ssh-personal.yml"; do
+  for secret_file in "$REPO_ROOT/src/secrets/gpg-personal.yml" "$REPO_ROOT/src/secrets/ssh-personal.yml"; do
     if [ ! -f "$secret_file" ]; then
       error "expected secret file missing: $secret_file"
     fi

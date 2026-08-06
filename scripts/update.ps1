@@ -78,7 +78,6 @@ if (-not $NoSops -and -not (Get-Command -Name 'sops.exe' -ErrorAction SilentlyCo
 $sopsConfig = Join-Path -Path $repoRoot -ChildPath '.sops.yaml'
 
 $secretFiles = @(
-  (Join-Path -Path $repoRoot -ChildPath 'src\secrets\git-identities.yml'),
   (Join-Path -Path $repoRoot -ChildPath 'src\secrets\gpg-personal.yml'),
   (Join-Path -Path $repoRoot -ChildPath 'src\secrets\ssh-personal.yml')
 )
@@ -90,6 +89,16 @@ foreach ($secretFile in $secretFiles) {
     throw "nucleus: failed to rewrap secret file '$secretFile'."
   }
 }
+
+  $usersSecretsDir = Join-Path -Path $repoRoot -ChildPath 'src\secrets\users'
+  if (Test-Path -Path $usersSecretsDir) {
+    Get-ChildItem -Path $usersSecretsDir -Filter '*.yml' -File | ForEach-Object {
+      & sops --config $sopsConfig updatekeys --yes $_.FullName
+      if ($LASTEXITCODE -ne 0) {
+        throw "nucleus: failed to rewrap per-user secret file '$($_.FullName)'."
+      }
+    }
+  }
 
   $wallpaperDir = Join-Path -Path $repoRoot -ChildPath 'src\assets\wallpapers'
   if (Test-Path -Path $wallpaperDir) {

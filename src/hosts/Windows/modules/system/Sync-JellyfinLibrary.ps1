@@ -34,7 +34,7 @@ function Sync-JellyfinLibrary {
     host-shared Jellyfin server.
 
     Authentication uses the same per-user secret pattern as Sync-JellyfinAccount:
-    credentials are resolved from each user's src\secrets\users-<name>.yml via
+    credentials are resolved from each user's src\secrets\users\<name>.yml via
     Get-Secret and tried against /Users/AuthenticateByName.  Startup bootstrap
     is attempted when no existing credential works.
 
@@ -117,9 +117,9 @@ function Sync-JellyfinLibrary {
       continue
     }
 
-    $secretFile = Join-Path $RepoRoot "src\secrets\users-$($userRecord.name).yml"
+    $secretFile = Join-Path $RepoRoot "src\secrets\users\$($userRecord.name).yml"
     if (-not (Test-Path -LiteralPath $secretFile -PathType Leaf)) {
-      Write-Warning "jellyfin/library: users-$($userRecord.name).yml not found; skipping library declarations for this user."
+      Write-Warning "jellyfin/library: users/$($userRecord.name).yml not found; skipping library declarations for this user."
       continue
     }
 

@@ -4,8 +4,7 @@ function Sync-SecretCatalog {
     Materializes personal SSH/GPG secrets for users that have secrets defined.
 
   .DESCRIPTION
-    Iterates over three SOPS-encrypted secret files (sorted):
-      - git-identities.yml
+    Iterates over two SOPS-encrypted secret files (sorted):
       - gpg-personal.yml
       - ssh-personal.yml
 
@@ -50,7 +49,7 @@ function Sync-SecretCatalog {
     return
   }
 
-  foreach ($secretFileName in @("git-identities.yml", "gpg-personal.yml", "ssh-personal.yml")) {
+  foreach ($secretFileName in @("gpg-personal.yml", "ssh-personal.yml")) {
     $secretPath = Join-Path -Path $SecretsDir -ChildPath $secretFileName
     if (-not (Test-Path -Path $secretPath)) {
       Write-Output "$($PSStyle.Foreground.Yellow)Required secret file was not found: $secretPath$($PSStyle.Reset)"

@@ -4,7 +4,7 @@ function Sync-UserSecret {
     Materializes per-user SOPS secrets to the nucleus secrets directory.
 
   .DESCRIPTION
-    Decrypts src/secrets/users-<username>.yml (when present) and writes individual
+    Decrypts src/secrets/users/<username>.yml (when present) and writes individual
     secret values to $HOME\.config\nucleus\secrets\.
 
   .PARAMETER RepoRoot
@@ -40,10 +40,13 @@ function Sync-UserSecret {
     [string]$PrimaryUsername
   )
 
-  $userSecretFile = Join-Path $RepoRoot "src\secrets\users-$PrimaryUsername.yml"
+  $userSecretFile = Join-Path $RepoRoot "src\secrets\users\$PrimaryUsername.yml"
   if (-not (Test-Path -Path $userSecretFile -PathType Leaf)) {
     return
   }
+
+  Sync-SecretFile -FilePath $userSecretFile -GpgExe $GpgExe -HostKeyPath $HostKeyPath `
+    -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe -PrimaryUsername $PrimaryUsername
 
   $secrets = Get-Secret -FilePath $userSecretFile -GpgExe $GpgExe `
     -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe

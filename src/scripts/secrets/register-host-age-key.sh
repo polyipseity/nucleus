@@ -86,8 +86,7 @@ if ! grep -qF "$_rak_age_pub" "$_rak_sops_yaml"; then
 fi
 
 for _rak_secret in \
-    "$_rak_repo_root/src/secrets/users-"*.yml \
-    "$_rak_repo_root/src/secrets/git-identities.yml" \
+    "$_rak_repo_root"/src/secrets/users/*.yml \
     "$_rak_repo_root/src/secrets/gpg-personal.yml" \
     "$_rak_repo_root/src/secrets/ssh-personal.yml"; do
   if [ ! -f "$_rak_secret" ]; then

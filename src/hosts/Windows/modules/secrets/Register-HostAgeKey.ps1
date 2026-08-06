@@ -147,10 +147,17 @@ function Register-HostAgeKey {
 
   # Rewrap the three core secret YAMLs so the new machine recipient can decrypt them.
   $sopsFiles = @(
-    (Join-Path -Path $SecretsDir -ChildPath "git-identities.yml"),
     (Join-Path -Path $SecretsDir -ChildPath "gpg-personal.yml"),
     (Join-Path -Path $SecretsDir -ChildPath "ssh-personal.yml")
   )
+  $usersSecretsDir = Join-Path -Path $SecretsDir -ChildPath "users"
+  if (Test-Path -Path $usersSecretsDir) {
+    $userSecretFiles = Get-ChildItem -Path $usersSecretsDir -Filter "*.yml" -File |
+      Select-Object -ExpandProperty FullName
+    if ($null -ne $userSecretFiles) {
+      $sopsFiles += $userSecretFiles
+    }
+  }
   # Dynamically include wallpaper blobs so new wallpapers are automatically rewrapped.
   if (Test-Path -Path $WallpaperAssetsDir) {
     $wallpaperBlobs = Get-ChildItem -Path $WallpaperAssetsDir -Filter "*.sops" -File |

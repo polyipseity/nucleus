@@ -32,16 +32,16 @@ let
   # signing key follow the same SOPS lifecycle as SSH/GPG material.
   gitIdentitySecretName = "git_identity_${primaryUsername}";
 
-  # Per-user secrets file: src/secrets/users-<username>.yml.
-  # May not exist until the user manually runs `sops edit src/secrets/users-<username>.yml`.
+  # Per-user secrets file: src/secrets/users/<username>.yml.
+  # May not exist until the user manually runs `sops edit src/secrets/users/<username>.yml`.
   # All downstream consumers guard on hasUserSecretFile / configPassEnabled so
   # activation succeeds even when the file has not been created yet.
   # WHY: key name is unscoped: the file itself is already user-scoped
-  # (src/secrets/users-<username>.yml), so repeating the username in every
+  # (src/secrets/users/<username>.yml), so repeating the username in every
   # key adds noise without improving isolation.
   rcloneConfigPassSecretName = "rclone_config_pass";
   rcloneConfigPassPath = "${config.home.homeDirectory}/.config/nucleus/secrets/rclone-config-pass";
-  userSecretFilePath = ../secrets + "/users-${primaryUsername}.yml";
+  userSecretFilePath = ../secrets/users + "/${primaryUsername}.yml";
   hasUserSecretFile = builtins.pathExists userSecretFilePath;
 
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
@@ -108,10 +108,10 @@ lib.mkIf isPrimaryUser {
   };
 
   # --------------------------------------------------------------------------
-  # Git identity
+  # Git identity (per-user secrets file)
   # --------------------------------------------------------------------------
-  sops.secrets."${gitIdentitySecretName}" = {
-    sopsFile = ../secrets/git-identities.yml;
+  sops.secrets."${gitIdentitySecretName}" = lib.mkIf hasUserSecretFile {
+    sopsFile = userSecretFilePath;
   };
 
   # --------------------------------------------------------------------------
@@ -170,7 +170,10 @@ lib.mkIf isPrimaryUser {
   # --------------------------------------------------------------------------
   home.activation.wait-for-sops-secrets = lib.hm.dag.entryAfter [ "sops-nix" ] ''
     "${activationBundle}/src/scripts/secrets/wait-for-sops-secrets.sh" "${
-      config.sops.secrets.${gitIdentitySecretName}.path
+      if hasUserSecretFile then
+        config.sops.secrets.${gitIdentitySecretName}.path
+      else
+        config.sops.secrets.${sshSecretName}.path
     }"
   '';
 
@@ -195,11 +198,13 @@ lib.mkIf isPrimaryUser {
   #      git config --file creates the file if absent and overwrites values
   #      idempotently on repeated activation runs.
   # --------------------------------------------------------------------------
-  home.activation.git-identity = lib.hm.dag.entryAfter [ "wait-for-sops-secrets" ] ''
-    "${activationBundle}/src/scripts/secrets/configure-git-identity.sh" "${
-      config.sops.secrets.${gitIdentitySecretName}.path
-    }" "${pkgs.git}/bin/git"
-  '';
+  home.activation.git-identity = lib.mkIf hasUserSecretFile (
+    lib.hm.dag.entryAfter [ "wait-for-sops-secrets" ] ''
+      "${activationBundle}/src/scripts/secrets/configure-git-identity.sh" "${
+        config.sops.secrets.${gitIdentitySecretName}.path
+      }" "${pkgs.git}/bin/git"
+    ''
+  );
 
   # --------------------------------------------------------------------------
   # gpg-import
@@ -279,37 +284,9 @@ lib.mkIf isPrimaryUser {
   # by each registered backend after gpg-import and ssh-key-adopt have completed.
   #
   # Covers:
-  #   - src/secrets/git-identities.yml
   #   - src/secrets/gpg-personal.yml
   #   - src/secrets/ssh-personal.yml
-  #   - src/assets/wallpapers/*.sops  (enumerated dynamically via builtins.readDir)
-  # All use the same .sops.yaml key groups (age_devices + primary_gpg).
-  #
-  # Five checks (in order):
-  #   1. Materialization sanity: all sops-nix secret paths exist and are
-  #      non-empty.  Guards against silent sops-nix failures.
-  #   2. GPG key presence: managed primary fingerprint is in the keyring.
-  #      Complements gpg-import — catches keyring state divergence.
-  #   3. GPG SOPS recipient check: extract the fp: value from each SOPS file's
-  #      plaintext sops.pgp[].fp metadata and verify that fingerprint is present
-  #      in the secret keyring.  SOPS records the encryption subkey fingerprint
-  #      (not the primary key fingerprint) in the fp: field; comparing the primary
-  #      fingerprint directly produces false failures when SOPS chose a subkey.
-  #      YAML SOPS files store fp as "    fp: HEX" (unquoted); binary SOPS files
-  #      (e.g. wallpaper blobs) use JSON format with "\"fp\": \"HEX\""; both
-  #      formats are handled by the extraction logic below.
-  #      Combined with check 2 (primary key in keyring), this confirms we have the
-  #      private key material to decrypt once the passphrase is provided.
-
-  # --------------------------------------------------------------------------
-  # verify-secret-decryption
-  # Post-activation health check that verifies ALL SOPS files can be decrypted
-  # by each registered backend after gpg-import and ssh-key-adopt have completed.
-  #
-  # Covers:
-  #   - src/secrets/git-identities.yml
-  #   - src/secrets/gpg-personal.yml
-  #   - src/secrets/ssh-personal.yml
+  #   - src/secrets/users/<username>.yml (when present)
   #   - src/assets/wallpapers/*.sops  (enumerated dynamically via builtins.readDir)
   # All use the same .sops.yaml key groups (age_devices + primary_gpg).
   #
@@ -370,10 +347,6 @@ lib.mkIf isPrimaryUser {
       # store-path construction.
       allSopsFiles = [
         {
-          path = ../secrets/git-identities.yml;
-          displayName = "git-identities.yml";
-        }
-        {
           path = ../secrets/gpg-personal.yml;
           displayName = "gpg-personal.yml";
         }
@@ -391,14 +364,21 @@ lib.mkIf isPrimaryUser {
         displayName = "${primaryUsername}.yml";
       };
     in
-    lib.hm.dag.entryAfter [ "git-identity" "gpg-import" "ssh-key-adopt" ] ''
+    lib.hm.dag.entryAfter (
+      [ "gpg-import" "ssh-key-adopt" ] ++ lib.optionals hasUserSecretFile [ "git-identity" ]
+    ) ''
       "${activationBundle}/src/scripts/secrets/verify-secret-decryption.sh" \
         "${pkgs.jq}/bin/jq" \
         "${pkgs.gnupg}/bin/gpg" \
         "${pkgs.ssh-to-age}/bin/ssh-to-age" \
         "${config.home.homeDirectory}/.gnupg" \
         '${builtins.toJSON allSopsFiles}' \
-        "${config.sops.secrets.${gitIdentitySecretName}.path}" \
+        "${
+          if hasUserSecretFile then
+            config.sops.secrets.${gitIdentitySecretName}.path
+          else
+            config.sops.secrets.${sshSecretName}.path
+        }" \
         "${config.sops.secrets.${sshSecretName}.path}" \
         "${config.sops.secrets.${sshPublicSecretName}.path}" \
         "${config.sops.secrets.${gpgSecretName}.path}" \
