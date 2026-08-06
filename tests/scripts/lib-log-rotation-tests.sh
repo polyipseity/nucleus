@@ -182,6 +182,41 @@ test_unwritable_file_skips() {
     chmod 644 "$logfile"
 }
 
+# ---------------------------------------------------------------------------
+# Test 11: rotate_logs_in_directory — rotates *.log in subdirectories
+# ---------------------------------------------------------------------------
+test_rotate_subdirectory() {
+    local dir="$TEST_DIR/subrotatedir"
+    mkdir -p "$dir/subsvc"
+    echo "small" > "$dir/subsvc/small.log"
+    for _ in 1 2 3 4 5 6 7 8 9 10; do printf 'abcdefghij'; done > "$dir/subsvc/large.log"
+    rotate_logs_in_directory "$dir" 50 2 false
+    if [ -f "$dir/subsvc/large.log.1" ] && [ "$(wc -c < "$dir/subsvc/large.log")" -eq 0 ]; then
+        assert_pass "rotate_logs_in_directory: rotates *.log in subdirectories"
+    else
+        assert_fail "rotate_logs_in_directory: rotates *.log in subdirectories" \
+            "subdir archive missing or active log not truncated"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# Test 12: expire_logs_in_directory — deletes old archives but keeps active logs
+# ---------------------------------------------------------------------------
+test_expire_old_archives() {
+    local dir="$TEST_DIR/expiredir"
+    mkdir -p "$dir"
+    echo "active" > "$dir/combined.log"
+    echo "old archive" > "$dir/combined.log.1"
+    touch -t 202001010000 "$dir/combined.log.1"
+    expire_logs_in_directory "$dir" 7d
+    if [ -f "$dir/combined.log" ] && [ ! -f "$dir/combined.log.1" ]; then
+        assert_pass "expire_logs_in_directory: deletes old archives but keeps active logs"
+    else
+        assert_fail "expire_logs_in_directory: deletes old archives but keeps active logs" \
+            "active exists=$([ -f "$dir/combined.log" ] && echo yes || echo no) .1 exists=$([ -f "$dir/combined.log.1" ] && echo yes || echo no)"
+    fi
+}
+
 # ---- run all tests ----
 echo "Testing lib.sh log rotation functions"
 echo ""
@@ -196,6 +231,8 @@ test_rotate_directory
 test_rotate_missing_dir
 test_missing_file_noop
 test_unwritable_file_skips
+test_rotate_subdirectory
+test_expire_old_archives
 
 echo ""
 echo "============================================================"

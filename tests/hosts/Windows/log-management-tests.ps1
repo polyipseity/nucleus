@@ -91,7 +91,7 @@ Describe 'Invoke-LogRotation' {
     (Get-Item -LiteralPath $logFile).Length | Should -BeGreaterThan 0
   }
 
-  It 'rotates a file exceeding MaxSize' {
+  It 'rotates a file exceeding MaxSize via copy-truncate' {
     $logFile = Join-Path $Script:LogDir 'test.log'
     # Create a file larger than 10 bytes.
     $content = 'a' * 100
@@ -99,9 +99,10 @@ Describe 'Invoke-LogRotation' {
 
     Invoke-LogRotation -Path $Script:LogDir -MaxSize 10 -MaxFiles 2 -Compress:$false
 
-    # Original should be renamed to .1.log
     $archive = Join-Path $Script:LogDir 'test.1.log'
     (Test-Path -LiteralPath $archive -PathType Leaf) | Should -Be $true
+    (Test-Path -LiteralPath $logFile -PathType Leaf) | Should -Be $true
+    (Get-Item -LiteralPath $logFile).Length | Should -Be 0
   }
 
   It 'shifts existing archives' {
@@ -137,6 +138,19 @@ Describe 'Invoke-LogRotation' {
     (Test-Path -LiteralPath "$Script:LogDir\test.4.log" -PathType Leaf) | Should -Be $false
   }
 
+  It 'rotates logs in subdirectories' {
+    $subDir = Join-Path $Script:LogDir 'subsvc'
+    New-Item -Path $subDir -ItemType Directory -Force > $null
+    $logFile = Join-Path $subDir 'combined.log'
+    Set-Content -Path $logFile -Value ('a' * 100)
+
+    Invoke-LogRotation -Path $Script:LogDir -MaxSize 10 -MaxFiles 2 -Compress:$false
+
+  $archive = Join-Path $subDir 'combined.1.log'
+    (Test-Path -LiteralPath $archive -PathType Leaf) | Should -Be $true
+    (Get-Item -LiteralPath $logFile).Length | Should -Be 0
+  }
+
   It 'does not rotate files without .log extension' {
     $nonLog = Join-Path $Script:LogDir 'data.txt'
     Set-Content -Path $nonLog -Value ('a' * 100)
@@ -146,6 +160,33 @@ Describe 'Invoke-LogRotation' {
     # txt file should be untouched
     (Test-Path -LiteralPath $nonLog -PathType Leaf) | Should -Be $true
     (Test-Path -LiteralPath "$Script:LogDir\data.1.txt" -PathType Leaf) | Should -Be $false
+  }
+}
+
+Describe 'Invoke-LogExpiry' {
+  BeforeEach {
+    $dir = Join-Path $Script:TestDir ([System.IO.Path]::GetRandomFileName())
+    New-Item -Path $dir -ItemType Directory -Force > $null
+    $Script:ExpiryDir = $dir
+  }
+
+  AfterEach {
+    if (Test-Path -LiteralPath $Script:ExpiryDir -PathType Container) {
+      Remove-Item -LiteralPath $Script:ExpiryDir -Recurse -Force
+    }
+  }
+
+  It 'deletes old rotated archives but keeps active logs' {
+    $active = Join-Path $Script:ExpiryDir 'combined.log'
+    $archive = Join-Path $Script:ExpiryDir 'combined.1.log'
+    Set-Content -Path $active -Value 'active'
+    Set-Content -Path $archive -Value 'old'
+    (Get-Item -LiteralPath $archive).LastWriteTime = (Get-Date).AddDays(-30)
+
+    Invoke-LogExpiry -Path $Script:ExpiryDir -Expiry '7d'
+
+    (Test-Path -LiteralPath $active -PathType Leaf) | Should -Be $true
+    (Test-Path -LiteralPath $archive -PathType Leaf) | Should -Be $false
   }
 }
 
