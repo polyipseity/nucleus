@@ -74,6 +74,7 @@ test_adb_list_state_unauthorized() {
   cat > "$_af_bin/adb" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
+  *disconnect*) exit 0 ;;
   *devices*) printf '%s\n' 'List of devices attached' 'localhost:22040	unauthorized' '' ;;
   *connect*) exit 0 ;;
   *get-state*) exit 1 ;;
@@ -93,6 +94,7 @@ test_wait_authorized_fails_on_unauthorized() {
   cat > "$_af_bin/adb" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
+  *disconnect*) exit 0 ;;
   *devices*) printf '%s\n' 'List of devices attached' 'localhost:22040	unauthorized' '' ;;
   *connect*) exit 0 ;;
   *get-state*) exit 1 ;;
@@ -124,6 +126,7 @@ test_wait_recovery_succeeds_on_recovery() {
   cat > "$_af_bin/adb" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
+  *disconnect*) exit 0 ;;
   *devices*) printf '%s\n' 'List of devices attached' 'localhost:22040	recovery' '' ;;
   *connect*) exit 0 ;;
   *get-state*) printf 'recovery\n' ;;
@@ -154,6 +157,10 @@ test_no_flags_prints_manual() {
     echo "FAIL: expected manual workflow with Enter fastboot step"
     _failures=$((_failures + 1))
   fi
+  if ! grep -q 'Enable ADB' "$_tmp/out.txt"; then
+    echo "FAIL: expected manual workflow with Enable ADB step"
+    _failures=$((_failures + 1))
+  fi
 }
 
 test_gapps_rejects_booted_device_state() {
@@ -163,6 +170,7 @@ test_gapps_rejects_booted_device_state() {
   cat > "$_af_bin/adb" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
+  *disconnect*) exit 0 ;;
   *devices*) printf '%s\n' 'List of devices attached' 'localhost:22040	device' '' ;;
   *connect*) exit 0 ;;
   *get-state*) printf 'device\n' ;;
@@ -202,6 +210,7 @@ test_gapps_unauthorized_flashes_recovery() {
   _af_recovery="$_tmp/vm/images/android-recovery-userdebug.img"
   printf 'PK\x03\x04' > "$_af_zip"
   printf 'recovery\n' > "$_af_recovery"
+  printf 'test-release\n' > "$_tmp/vm/images/android-recovery-userdebug.flashed"
 
   _af_flash_log="$_tmp/flash.log"
   _af_sideload_log="$_tmp/sideload.log"
@@ -213,6 +222,7 @@ test_gapps_unauthorized_flashes_recovery() {
 #!/usr/bin/env bash
 _af_state="\$(cat "$_af_state_file")"
 case "\$*" in
+  *disconnect*) exit 0 ;;
   *devices*) printf '%s\n' 'List of devices attached' "localhost:22040	\$_af_state" '' ;;
   *connect*) exit 0 ;;
   *get-state*) printf '%s\n' "\$_af_state" ;;
@@ -226,7 +236,8 @@ EOF
   cat > "$_af_bin/fastboot" <<EOF
 #!/usr/bin/env bash
 case "\$*" in
-  *getvar*) exit 0 ;;
+  *getvar*is-userspace*) printf 'is-userspace: yes\n'; exit 0 ;;
+  *getvar*version*) exit 0 ;;
   devices) printf '%s\n' 'tcp:localhost:22041	fastboot' '' ;;
   *flash*) echo "flash \$*" >> "$_af_flash_log"; exit 0 ;;
   *reboot*) printf 'recovery\n' > "$_af_state_file"; exit 0 ;;
@@ -266,8 +277,8 @@ EOF
     echo "FAIL: expected fastboot flash recovery when unauthorized"
     _failures=$((_failures + 1))
   fi
-  if ! grep -q 'Enter fastboot' "$_tmp/out.txt"; then
-    echo "FAIL: expected Enter fastboot guidance in output"
+  if ! grep -q 'Enable ADB' "$_tmp/out.txt"; then
+    echo "FAIL: expected Enable ADB guidance after fastboot flash"
     _failures=$((_failures + 1))
   fi
 }
@@ -280,7 +291,6 @@ test_gapps_sideload_path() {
   printf 'PK\x03\x04' > "$_af_zip"
   printf 'recovery\n' > "$_af_recovery"
   jq -n --arg tag 'test-release' '{tag_name: $tag}' > "$_tmp/vm/images/android-recovery-userdebug.tag.json"
-  printf 'test-release\n' > "$_tmp/vm/images/android-recovery-userdebug.flashed"
 
   _af_sideload_log="$_tmp/sideload.log"
   _af_bin="$_tmp/bin"
@@ -288,9 +298,11 @@ test_gapps_sideload_path() {
   cat > "$_af_bin/adb" <<EOF
 #!/usr/bin/env bash
 case "\$*" in
+  *disconnect*) exit 0 ;;
   *devices*) printf '%s\n' 'List of devices attached' 'localhost:22040	sideload' '' ;;
   *connect*) exit 0 ;;
   *get-state*) printf 'sideload\n' ;;
+  *getprop*ro.debuggable*) printf '1\n' ;;
   *sideload*) echo "sideload \$*" >> "$_af_sideload_log"; exit 0 ;;
   *reboot*) exit 0 ;;
 esac
@@ -333,12 +345,57 @@ EOF
     echo "FAIL: --gapps sideload path should succeed in sideload state"
     _failures=$((_failures + 1))
   fi
+  if ! grep -q 'already in sideload mode' "$_tmp/out.txt"; then
+    echo "FAIL: expected already-in-sideload detection"
+    _failures=$((_failures + 1))
+  fi
+  if ! grep -q 'userdebug recovery is active on the guest' "$_tmp/out.txt"; then
+    echo "FAIL: expected guest userdebug recovery detection"
+    _failures=$((_failures + 1))
+  fi
   if [ ! -f "$_af_sideload_log" ]; then
     echo "FAIL: expected adb sideload to run"
     _failures=$((_failures + 1))
   fi
   if ! grep -q 'Install anyway' "$_tmp/out.txt"; then
     echo "FAIL: expected manual Install anyway instructions"
+    _failures=$((_failures + 1))
+  fi
+}
+
+test_adb_keys_in_recovery() {
+  setup_fixture
+  _af_push_log="$_tmp/push.log"
+  _af_home="$_tmp/home"
+  mkdir -p "$_af_home/.android"
+  printf 'test-adb-key\n' > "$_af_home/.android/adbkey.pub"
+  _af_bin="$_tmp/bin"
+  mkdir -p "$_af_bin"
+  cat > "$_af_bin/adb" <<EOF
+#!/usr/bin/env bash
+case "\$*" in
+  *disconnect*) exit 0 ;;
+  *devices*) printf '%s\n' 'List of devices attached' 'localhost:22040	recovery' '' ;;
+  *connect*) exit 0 ;;
+  *get-state*) printf 'recovery\n' ;;
+  *root*) exit 0 ;;
+  *push*) echo "push \$*" >> "$_af_push_log"; exit 0 ;;
+  *shell*) exit 0 ;;
+esac
+exit 0
+EOF
+  chmod +x "$_af_bin/adb"
+  cat > "$_af_bin/fastboot" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "$_af_bin/fastboot"
+  HOME="$_af_home" PATH="$_af_bin:$PATH" vm_android_config Android 0 --adb-keys || {
+    echo "FAIL: --adb-keys should succeed in recovery"
+    _failures=$((_failures + 1))
+  }
+  if [ ! -f "$_af_push_log" ]; then
+    echo "FAIL: expected adb push for adb-keys in recovery"
     _failures=$((_failures + 1))
   fi
 }
@@ -351,7 +408,8 @@ test_fastboot_probe_uses_getvar() {
   cat > "$_af_bin/fastboot" <<EOF
 #!/usr/bin/env bash
 case "\$*" in
-  *getvar*) echo "getvar \$*" >> "$_af_probe_log"; exit 0 ;;
+  *getvar*is-userspace*) echo "getvar \$*" >> "$_af_probe_log"; printf 'is-userspace: yes\n'; exit 0 ;;
+  *getvar*version*) echo "getvar \$*" >> "$_af_probe_log"; printf 'version: test\n'; exit 0 ;;
 esac
 exit 1
 EOF
@@ -359,8 +417,32 @@ EOF
   PATH="$_af_bin:$PATH"
   export PATH
   assert_eq "fastboot" "$(vm_android_fastboot_list_state 0)" "fastboot probe via getvar"
-  if ! grep -q 'getvar version' "$_af_probe_log"; then
-    echo "FAIL: expected fastboot getvar version probe"
+  if ! grep -q 'getvar is-userspace' "$_af_probe_log"; then
+    echo "FAIL: expected fastboot getvar is-userspace probe"
+    _failures=$((_failures + 1))
+  fi
+}
+
+test_fastboot_wait_detects_existing_fastboot() {
+  setup_fixture
+  _af_bin="$_tmp/bin"
+  mkdir -p "$_af_bin"
+  cat > "$_af_bin/fastboot" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  *getvar*is-userspace*) printf 'is-userspace: yes\n'; exit 0 ;;
+esac
+exit 1
+EOF
+  chmod +x "$_af_bin/fastboot"
+  PATH="$_af_bin:$PATH"
+  export PATH
+  if ! vm_android_fastboot_wait 0 5 >"$_tmp/out.txt" 2>&1; then
+    echo "FAIL: fastboot_wait should succeed when guest is already in fastboot"
+    _failures=$((_failures + 1))
+  fi
+  if ! grep -q 'guest already in fastboot' "$_tmp/out.txt"; then
+    echo "FAIL: expected immediate fastboot detection"
     _failures=$((_failures + 1))
   fi
 }
@@ -373,6 +455,8 @@ test_no_flags_prints_manual
 test_gapps_rejects_booted_device_state
 test_gapps_unauthorized_flashes_recovery
 test_gapps_sideload_path
+test_adb_keys_in_recovery
+test_fastboot_wait_detects_existing_fastboot
 
 if [ "$_failures" -gt 0 ]; then
   echo "android-config-tests: $_failures failure(s)"
