@@ -171,7 +171,7 @@ usage() {
   stop <vm>                Stop a VM.
   upgrade <vm>             Re-download+replace OS image (Android only; error for others).
   reset <vm>               Factory-reset VM user state (Android only; error for others).
-  android-config <vm>      Android post-provision: recovery, GApps, ADB keys, root, fake Wi-Fi.
+  android-config <vm>      Android post-provision: GApps sideload, ADB keys, root, fake Wi-Fi.
   resize <vm> <size>       Grow-only resize of the writable disk (data/<vm>.qcow2)
                           to an explicit size (e.g. 64GB). Pass --allow-shrink to
                           shrink instead.
@@ -216,7 +216,7 @@ usage() {
   -h|--help                     Show usage.
 
 Android android-config flags (after VM name):
-  --gapps               Download and install MindTheGapps on booted Lineage.
+  --gapps               Sideload MindTheGapps in recovery (tap Install anyway when prompted).
   --adb-keys            Install host ~/.android/adbkey.pub into guest adb_keys.
   --root                Enable Lineage root for apps and adb.
   --fake-wifi           Load virt_wifi and bring up wlan0.
