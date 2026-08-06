@@ -48,7 +48,8 @@ setup_fixture() {
         "userdataImage": "Android.qcow2",
         "gsiImage": "Android-gsi.img",
         "gsiUrl": null,
-        "gappsUrl": "https://example.invalid/gapps.zip"
+        "gappsUrl": "https://example.invalid/gapps.zip",
+        "magiskUrl": "https://example.invalid/Magisk.apk"
       }
     }
   ]
@@ -157,8 +158,24 @@ test_no_flags_prints_manual() {
     echo "FAIL: expected manual workflow with Enter fastboot step"
     _failures=$((_failures + 1))
   fi
-  if ! grep -q 'Enable ADB' "$_tmp/out.txt"; then
-    echo "FAIL: expected manual workflow with Enable ADB step"
+  if ! grep -q 'Magisk' "$_tmp/out.txt"; then
+    echo "FAIL: expected manual workflow to mention Magisk"
+    _failures=$((_failures + 1))
+  fi
+}
+
+test_root_flag_rejected() {
+  setup_fixture
+  set +e
+  vm_android_config Android 0 --root 2>"$_tmp/err.txt"
+  _af_status=$?
+  set -e
+  if [ "$_af_status" -eq 0 ]; then
+    echo "FAIL: --root should be rejected in favor of --magisk"
+    _failures=$((_failures + 1))
+  fi
+  if ! grep -q -- '--magisk' "$_tmp/err.txt"; then
+    echo "FAIL: --root rejection should mention --magisk"
     _failures=$((_failures + 1))
   fi
 }
@@ -302,7 +319,8 @@ case "\$*" in
   *devices*) printf '%s\n' 'List of devices attached' 'localhost:22040	sideload' '' ;;
   *connect*) exit 0 ;;
   *get-state*) printf 'sideload\n' ;;
-  *getprop*ro.debuggable*) printf '1\n' ;;
+  *getprop*ro.build.type*) printf 'userdebug\n' ;;
+  *getprop*ro.debuggable*) printf '0\n' ;;
   *sideload*) echo "sideload \$*" >> "$_af_sideload_log"; exit 0 ;;
   *reboot*) exit 0 ;;
 esac
@@ -349,7 +367,7 @@ EOF
     echo "FAIL: expected already-in-sideload detection"
     _failures=$((_failures + 1))
   fi
-  if ! grep -q 'userdebug recovery is active on the guest' "$_tmp/out.txt"; then
+  if ! grep -q 'ro.build.type=userdebug' "$_tmp/out.txt"; then
     echo "FAIL: expected guest userdebug recovery detection"
     _failures=$((_failures + 1))
   fi
@@ -378,7 +396,10 @@ case "\$*" in
   *devices*) printf '%s\n' 'List of devices attached' 'localhost:22040	recovery' '' ;;
   *connect*) exit 0 ;;
   *get-state*) printf 'recovery\n' ;;
-  *root*) exit 0 ;;
+  *getprop*) exit 0 ;;
+  *setprop*) exit 0 ;;
+  *' root') exit 0 ;;
+  *shell*id*) printf '0\n' ;;
   *push*) echo "push \$*" >> "$_af_push_log"; exit 0 ;;
   *shell*) exit 0 ;;
 esac
@@ -400,6 +421,171 @@ EOF
   fi
 }
 
+test_magisk_stage_patch_kit_layout() {
+  setup_fixture
+  _af_apk_root="$_tmp/magisk-apk-root"
+  _af_apk="$_tmp/magisk-mini.apk"
+  mkdir -p "$_af_apk_root/assets" "$_af_apk_root/lib/arm64-v8a"
+  printf '#!/system/bin/sh\n' > "$_af_apk_root/assets/boot_patch.sh"
+  printf 'util\n' > "$_af_apk_root/assets/util_functions.sh"
+  printf 'apk\n' > "$_af_apk_root/assets/stub.apk"
+  printf 'magisk\n' > "$_af_apk_root/lib/arm64-v8a/libmagisk.so"
+  printf 'boot\n' > "$_af_apk_root/lib/arm64-v8a/libmagiskboot.so"
+  printf 'init\n' > "$_af_apk_root/lib/arm64-v8a/libmagiskinit.so"
+  printf 'ld\n' > "$_af_apk_root/lib/arm64-v8a/libinit-ld.so"
+  (
+    cd "$_af_apk_root"
+    zip -qr "$_af_apk" assets lib
+  )
+  _af_stage="$_tmp/magisk-stage"
+  if ! vm_android_magisk_stage_patch_kit "$_af_apk" 0 "$_af_stage"; then
+    echo "FAIL: vm_android_magisk_stage_patch_kit should succeed for a minimal APK"
+    _failures=$((_failures + 1))
+    return
+  fi
+  for _af_bin in magisk magiskboot magiskinit init-ld boot_patch.sh stub.apk; do
+    if [ ! -f "$_af_stage/$_af_bin" ]; then
+      echo "FAIL: staged patch kit missing $_af_bin"
+      _failures=$((_failures + 1))
+    fi
+  done
+}
+
+test_magisk_download_stdout_is_path_only() {
+  setup_fixture
+  _af_apk="$IMAGES_DIR/android-magisk.apk"
+  _af_boot="$IMAGES_DIR/android-boot.img"
+  printf 'cached\n' > "$_af_apk"
+  printf 'boot\n' > "$_af_boot"
+  jq -n --arg tag 'test-tag' '{tag_name: $tag}' > "$IMAGES_DIR/android-boot.tag.json"
+
+  _af_bin="$_tmp/bin"
+  mkdir -p "$_af_bin"
+  cat > "$_af_bin/curl" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  *boot_arm64only.img*) printf 'location: https://github.com/jqssun/android-lineage-qemu/releases/download/test-tag/boot_arm64only.img\n' ;;
+esac
+exit 0
+EOF
+  chmod +x "$_af_bin/curl"
+  PATH="$_af_bin:$PATH"
+  export PATH
+
+  _af_apk_out="$(vm_android_download_magisk_apk 0)"
+  if [ "$_af_apk_out" != "$_af_apk" ]; then
+    echo "FAIL: download_magisk_apk stdout should be only the APK path"
+    _failures=$((_failures + 1))
+  fi
+  if printf '%s' "$_af_apk_out" | grep -q 'vm:'; then
+    echo "FAIL: download_magisk_apk stdout must not include say() log lines"
+    _failures=$((_failures + 1))
+  fi
+
+  _af_boot_out="$(vm_android_download_boot_image 0)"
+  if [ "$_af_boot_out" != "$_af_boot" ]; then
+    echo "FAIL: download_boot_image stdout should be only the boot image path"
+    _failures=$((_failures + 1))
+  fi
+  if printf '%s' "$_af_boot_out" | grep -q 'vm:'; then
+    echo "FAIL: download_boot_image stdout must not include say() log lines"
+    _failures=$((_failures + 1))
+  fi
+}
+
+test_android_config_magisk_configures_existing_su() {
+  setup_fixture
+  _af_shell_log="$_tmp/shell.log"
+  _af_bin="$_tmp/bin"
+  mkdir -p "$_af_bin"
+  cat > "$_af_bin/adb" <<EOF
+#!/usr/bin/env bash
+case "\$*" in
+  *disconnect*) exit 0 ;;
+  *devices*) printf '%s\n' 'List of devices attached' 'localhost:22040	device' '' ;;
+  *connect*) exit 0 ;;
+  *get-state*) printf 'device\n' ;;
+  *getprop*ro.build.display.id*) printf 'lineage_test\n' ;;
+  *shell*settings*) echo "settings \$*" >> "$_af_shell_log"; exit 0 ;;
+  *shell*su\ -c*) echo "su \$*" >> "$_af_shell_log"; printf '0\n'; exit 0 ;;
+  *push*) exit 0 ;;
+  *shell*) exit 0 ;;
+esac
+exit 0
+EOF
+  chmod +x "$_af_bin/adb"
+  cat > "$_af_bin/fastboot" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "$_af_bin/fastboot"
+  cat > "$_af_bin/unzip" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "$_af_bin/unzip"
+  PATH="$_af_bin:$PATH"
+  export PATH
+
+  if ! vm_android_config Android 0 --magisk >"$_tmp/out.txt" 2>&1; then
+    echo "FAIL: --magisk should succeed when Magisk su is already available"
+    _failures=$((_failures + 1))
+  fi
+  if ! grep -q 'settings put global adb_enabled' "$_af_shell_log"; then
+    echo "FAIL: --magisk should enable USB debugging via settings put global"
+    _failures=$((_failures + 1))
+  fi
+  if ! grep -q 'Magisk su ready' "$_tmp/out.txt"; then
+    echo "FAIL: --magisk should report Magisk su ready"
+    _failures=$((_failures + 1))
+  fi
+  if grep -q 'nucleus-adb-root' "$_tmp/out.txt" || grep -q 'adb root' "$_tmp/out.txt"; then
+    echo "FAIL: --magisk must not install or enable adb root on user builds"
+    _failures=$((_failures + 1))
+  fi
+}
+
+test_wait_boot_completed_waits_for_sys_boot_completed() {
+  setup_fixture
+  _af_boot_file="$_tmp/boot_completed"
+  printf '0' > "$_af_boot_file"
+  _af_bin="$_tmp/bin"
+  mkdir -p "$_af_bin"
+  cat > "$_af_bin/adb" <<EOF
+#!/usr/bin/env bash
+case "\$*" in
+  *disconnect*) exit 0 ;;
+  *devices*) printf '%s\n' 'List of devices attached' 'localhost:22040	device' '' ;;
+  *connect*) exit 0 ;;
+  *get-state*) printf 'device\n' ;;
+  *shell*getprop*sys.boot_completed*) cat "$_af_boot_file"; exit 0 ;;
+esac
+exit 0
+EOF
+  chmod +x "$_af_bin/adb"
+  PATH="$_af_bin:$PATH"
+  export PATH
+
+  set +e
+  vm_android_adb_wait_boot_completed 0 3 >"$_tmp/out.txt" 2>&1
+  _af_status=$?
+  set -e
+  if [ "$_af_status" -eq 0 ]; then
+    echo "FAIL: wait_boot_completed should block while sys.boot_completed is 0"
+    _failures=$((_failures + 1))
+  fi
+  if ! grep -q 'still booting' "$_tmp/out.txt"; then
+    echo "FAIL: expected still-booting hint while sys.boot_completed is 0"
+    _failures=$((_failures + 1))
+  fi
+
+  printf '1' > "$_af_boot_file"
+  if ! vm_android_adb_wait_boot_completed 0 5; then
+    echo "FAIL: wait_boot_completed should succeed when sys.boot_completed is 1"
+    _failures=$((_failures + 1))
+  fi
+}
+
 test_fastboot_probe_uses_getvar() {
   setup_fixture
   _af_bin="$_tmp/bin"
@@ -408,8 +594,8 @@ test_fastboot_probe_uses_getvar() {
   cat > "$_af_bin/fastboot" <<EOF
 #!/usr/bin/env bash
 case "\$*" in
-  *getvar*is-userspace*) echo "getvar \$*" >> "$_af_probe_log"; printf 'is-userspace: yes\n'; exit 0 ;;
-  *getvar*version*) echo "getvar \$*" >> "$_af_probe_log"; printf 'version: test\n'; exit 0 ;;
+  *getvar*is-userspace*) echo "getvar \$*" >> "$_af_probe_log"; printf 'is-userspace: yes\n' >&2; exit 0 ;;
+  *getvar*version*) echo "getvar \$*" >> "$_af_probe_log"; printf 'version: test\n' >&2; exit 0 ;;
 esac
 exit 1
 EOF
@@ -430,7 +616,7 @@ test_fastboot_wait_detects_existing_fastboot() {
   cat > "$_af_bin/fastboot" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
-  *getvar*is-userspace*) printf 'is-userspace: yes\n'; exit 0 ;;
+  *getvar*is-userspace*) printf 'is-userspace: yes\n' >&2; exit 0 ;;
 esac
 exit 1
 EOF
@@ -452,10 +638,16 @@ test_adb_list_state_unauthorized
 test_wait_authorized_fails_on_unauthorized
 test_wait_recovery_succeeds_on_recovery
 test_no_flags_prints_manual
+test_root_flag_rejected
 test_gapps_rejects_booted_device_state
 test_gapps_unauthorized_flashes_recovery
 test_gapps_sideload_path
 test_adb_keys_in_recovery
+test_magisk_stage_patch_kit_layout
+test_magisk_download_stdout_is_path_only
+test_wait_boot_completed_waits_for_sys_boot_completed
+test_android_config_magisk_configures_existing_su
+test_fastboot_probe_uses_getvar
 test_fastboot_wait_detects_existing_fastboot
 
 if [ "$_failures" -gt 0 ]; then

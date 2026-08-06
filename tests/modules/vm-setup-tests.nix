@@ -481,6 +481,7 @@ let
         "gappsUrl"
         "gsiImage"
         "gsiUrl"
+        "magiskUrl"
         "systemImage"
         "userdataImage"
       ];
@@ -546,7 +547,7 @@ let
         builtins.toString (builtins.map (v: v.name) badEditions)
       }";
 
-  # Android VMs must declare gsiUrl (string or null) and a non-null string gappsUrl.
+  # Android VMs must declare gsiUrl (string or null), gappsUrl, and magiskUrl strings.
   test_android_gsi_url_type =
     let
       androidVms = builtins.filter (vm: vm.type == "Android") manifest.VMs;
@@ -566,6 +567,13 @@ let
           || !builtins.isString vm.Android.gappsUrl
           || vm.Android.gappsUrl == ""
       ) androidVms;
+      badMagiskUrls = builtins.filter (
+        vm:
+          !(vm ? Android)
+          || !builtins.hasAttr "magiskUrl" vm.Android
+          || !builtins.isString vm.Android.magiskUrl
+          || vm.Android.magiskUrl == ""
+      ) androidVms;
     in
     assert' (badGsiUrls == [ ])
       "Android VMs must declare gsiUrl as string or null; bad entries: ${
@@ -574,6 +582,10 @@ let
       && assert' (badGappsUrls == [ ])
       "Android VMs must declare a non-empty string gappsUrl; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badGappsUrls)
+      }"
+      && assert' (badMagiskUrls == [ ])
+      "Android VMs must declare a non-empty string magiskUrl; bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badMagiskUrls)
       }";
 
   # The Android group must only appear on VMs with type Android.
@@ -879,6 +891,11 @@ let
     && (lib.hasInfix "Android.gsiUrl != null" vm_setup_sh_text)
     && (lib.hasInfix "modprobe virt_wifi" android_fake_wifi_sh_text)
     && (lib.hasInfix "Android.gappsUrl" android_config_sh_text)
+    && (lib.hasInfix "Android.magiskUrl" android_magisk_sh_text)
+    && (lib.hasInfix "android-magisk.sh" android_config_sh_text)
+    && (lib.hasInfix "vm_android_config_magisk" android_magisk_sh_text)
+    && (lib.hasInfix "vm_android_magisk_guest_patch_boot" android_magisk_sh_text)
+    && (lib.hasInfix "--magisk" android_config_sh_text)
     && (lib.hasInfix "vm_android_adb_wait_authorized" vm_setup_sh_text)
     && (lib.hasInfix "vm_android_adb_poll_state" vm_setup_sh_text)
     && (lib.hasInfix "vm_android_adb_wait_sideload" vm_setup_sh_text)
@@ -1116,6 +1133,7 @@ let
   start_android_ps1_text = builtins.readFile ../../src/scripts/vms/start-android-vm.ps1;
   android_config_sh_text = builtins.readFile ../../src/scripts/vms/android-config.sh;
   android_fake_wifi_sh_text = builtins.readFile ../../src/scripts/vms/android-fake-wifi.sh;
+  android_magisk_sh_text = builtins.readFile ../../src/scripts/vms/android-magisk.sh;
   flake_nix_text = builtins.readFile ../../flake.nix;
   windows_system_packages_dsc_text = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
   test_macos_packer_exit_check = assert' (lib.hasInfix "_packer_status=0" vm_setup_sh_text) "scripts/vm.sh must capture packer exit status (_packer_status=0)";

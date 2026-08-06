@@ -30,8 +30,7 @@ test_enable_runs_virt_wifi() {
 #!/usr/bin/env bash
 echo "\$*" >> "$_afw_log"
 case "\$*" in
-  *root*) echo "restarting adbd as root"; exit 0 ;;
-  *"id -u"*) echo "0"; exit 0 ;;
+  *shell*su\ -c*) exit 0 ;;
   *"ip link show wlan0"*) echo "3: wlan0: <BROADCAST,MULTICAST,UP>"; exit 0 ;;
   *modprobe*) exit 0 ;;
   *service.d*) exit 0 ;;
@@ -47,8 +46,8 @@ EOF
     echo "FAIL: enable should succeed with mock adb"
     _failures=$((_failures + 1))
   fi
-  assert_contains "$_afw_log" "modprobe virt_wifi" "enable loads virt_wifi"
-  assert_contains "$_afw_log" "ip link set wlan0 up" "enable brings up wlan0"
+  assert_contains "$_afw_log" "modprobe\ virt_wifi" "enable loads virt_wifi"
+  assert_contains "$_afw_log" "ip\ link\ set\ wlan0\ up" "enable brings up wlan0"
 }
 
 test_revert_removes_service_script() {
@@ -59,8 +58,7 @@ test_revert_removes_service_script() {
 #!/usr/bin/env bash
 echo "\$*" >> "$_afw_log"
 case "\$*" in
-  *root*) echo "restarting adbd as root"; exit 0 ;;
-  *"id -u"*) echo "0"; exit 0 ;;
+  *shell*su\ -c*) exit 0 ;;
   *rm\ -f*) exit 0 ;;
   *wlan0\ down*) exit 0 ;;
   *rmmod*) exit 0 ;;
@@ -77,7 +75,7 @@ EOF
     _failures=$((_failures + 1))
   fi
   assert_contains "$_afw_log" "nucleus-fake-wifi.sh" "revert removes persist script"
-  assert_contains "$_afw_log" "rmmod virt_wifi" "revert unloads virt_wifi"
+  assert_contains "$_afw_log" "rmmod\ virt_wifi" "revert unloads virt_wifi via su"
 }
 
 test_enable_runs_virt_wifi
