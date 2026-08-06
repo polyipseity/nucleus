@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Post-provision Android guest configuration: MindTheGapps sideload, ADB key
-# install, Lineage root, and fake Wi-Fi.
+# install, Magisk root, and fake Wi-Fi.
 #
 # Invoked by nucleus-vm android-config after vm_init sets MANIFEST, VM_DIR, IMAGES_DIR.
 #
 # Usage: android-config.sh <vm-name> <vm-index> [--gapps] [--adb-keys]
-#        [--root] [--fake-wifi] [--fake-wifi-revert]
+#        [--magisk] [--fake-wifi] [--fake-wifi-revert]
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -15,14 +15,16 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/vm.sh"
 # shellcheck source=android-fake-wifi.sh
 . "$SCRIPT_DIR/android-fake-wifi.sh"
+# shellcheck source=android-magisk.sh
+. "$SCRIPT_DIR/android-magisk.sh"
 
 usage() {
   usage_std "$(basename "$0")" "<vm-name> <vm-index> [options]"
   cat <<'EOF'
   --gapps               Sideload MindTheGapps in recovery (requires userdebug recovery).
   --adb-keys            Install host ~/.android/adbkey.pub (recovery or booted system).
-  --root                Enable Lineage root for apps and adb (booted system only).
-  --fake-wifi           Load virt_wifi and bring up wlan0 (booted system only).
+  --magisk              Install and configure Magisk on booted Lineage (user build).
+  --fake-wifi           Load virt_wifi and bring up wlan0 (requires Magisk su).
   --fake-wifi-revert    Remove persisted fake Wi-Fi and unload virt_wifi.
   -h|--help             Show usage.
 EOF
@@ -30,26 +32,30 @@ EOF
 
 vm_android_config_print_manual() {
   cat <<'EOF'
-Android post-provision manual workflow:
+Android post-provision manual workflow (jqssun LineageOS 23 user system):
 
-GApps (--gapps) — recovery sideload, not on a booted system:
+The shipped system image is a user build — Developer options do not show Lineage
+"Root access" or "Rooted debugging". Root is provided by Magisk instead.
+
+Recovery (GApps and optional ADB keys):
   1. nucleus-vm reset Android (fresh userdata) and start the VM.
   2. Boot LineageOS Recovery (not the normal system). Factory-reset from recovery if needed.
   3. In recovery: Advanced → Enter fastboot.
   4. Run: nucleus-vm android-config Android --gapps
-     (flashes userdebug recovery via fastboot, waits for recovery ADB, sideloads MindTheGapps)
-  5. After the flash, in recovery: Advanced → Enable ADB (required before sideload can proceed).
+     (flashes userdebug recovery, waits for recovery ADB, sideloads MindTheGapps)
+  5. After the flash, in recovery: Advanced → Enable ADB (required before sideload proceeds).
   6. When recovery shows "Signature verification failed — Install anyway?", tap Yes on the VM screen.
-  7. Select Reboot system now from recovery when sideload finishes.
+  7. Select Reboot system now when sideload finishes.
+  8. Optional in recovery: nucleus-vm android-config Android --adb-keys
+     (pre-authorizes the host key before first boot; skip if you will tap Allow on boot)
 
-Recovery-capable (--adb-keys only):
-  8. In recovery with ADB enabled: nucleus-vm android-config Android --adb-keys
-     (persists the host key before first boot; optional if you will tap Allow on boot)
-
-Booted system only (--root, --fake-wifi):
-  9. Complete Lineage setup, tap Allow on the USB debugging prompt.
- 10. Run: nucleus-vm android-config Android --root --fake-wifi
-     (--root and --fake-wifi require a booted system; they do not work in recovery)
+Booted system (Magisk and fake Wi-Fi):
+  9. Complete Lineage setup wizard. Enable USB debugging and tap Allow on the prompt.
+ 10. Run: nucleus-vm android-config Android --magisk
+     (patches boot.img on the booted guest, flashes via fastboot, installs Magisk; uses Magisk su for automation)
+ 11. Open the Magisk app on the VM. If it shows an environment-fix prompt, tap OK and allow the reboot, then re-run --magisk.
+ 12. Run: nucleus-vm android-config Android --fake-wifi
+     (requires Magisk su from step 10)
 
 Run without flags to show this guide: nucleus-vm android-config Android
 EOF
@@ -114,7 +120,7 @@ vm_android_config_gapps() {
   say "MindTheGapps sideload finished."
   say "manual step: select Reboot system now from the recovery menu"
   say "optional in recovery: nucleus-vm android-config Android --adb-keys"
-  say "after Lineage boots: nucleus-vm android-config Android --root --fake-wifi"
+  say "after Lineage boots: nucleus-vm android-config Android --magisk --fake-wifi"
 }
 
 vm_android_config_adb_keys() {
@@ -128,36 +134,44 @@ vm_android_config_adb_keys() {
     return 1
   fi
 
-  if ! vm_android_adb_connect "$_vaca_vm_index" 600; then
-    _vaca_state="$(vm_android_adb_poll_state "$_vaca_vm_index")"
-    if [ "$_vaca_state" = "unauthorized" ]; then
+  _vaca_state="$(vm_android_adb_poll_state "$_vaca_vm_index")"
+  case "$_vaca_state" in
+    recovery|sideload)
+      if ! vm_android_adb_wait_recovery "$_vaca_vm_index" 300; then
+        return 1
+      fi
+      ;;
+    device)
+      if ! vm_android_adb_wait_authorized "$_vaca_vm_index" 600; then
+        return 1
+      fi
+      ;;
+    unauthorized)
       error "ADB unauthorized; enable ADB in recovery (Advanced → Enable ADB) or tap Allow on booted Lineage"
-    else
+      return 1
+      ;;
+    *)
       error "ADB not reachable for key install (state: $_vaca_state)"
-    fi
-    return 1
-  fi
+      return 1
+      ;;
+  esac
 
   _vaca_state="$(vm_android_adb_poll_state "$_vaca_vm_index")"
   case "$_vaca_state" in
     recovery|sideload)
-      # check-suppress:suppression_doc: adb root is unavailable on user builds; userdebug recovery may already run adbd as root.
-      adb -s "$_vaca_serial" root 2>/dev/null || true
-      sleep 2
-      adb -s "$_vaca_serial" push "$_vaca_pubkey" /data/misc/adb/adb_keys
-      adb -s "$_vaca_serial" shell 'chmod 640 /data/misc/adb/adb_keys && chown system:shell /data/misc/adb/adb_keys'
+      vm_android_recovery_prepare_adb "$_vaca_vm_index"
+      if ! vm_android_adb_ensure_root "$_vaca_vm_index"; then
+        error "recovery ADB root is required to install adb_keys (enable ADB in recovery, then retry)"
+        return 1
+      fi
+      vm_android_install_adb_keys "$_vaca_vm_index" "$_vaca_pubkey"
       ;;
     device)
-      # check-suppress:suppression_doc: adb root is unavailable on user builds; su path below handles non-root adb.
-      adb -s "$_vaca_serial" root 2>/dev/null || true
-      sleep 2
-      if adb -s "$_vaca_serial" shell 'id -u' 2>/dev/null | grep -qx '0'; then
-        adb -s "$_vaca_serial" push "$_vaca_pubkey" /data/misc/adb/adb_keys
-        adb -s "$_vaca_serial" shell 'chmod 640 /data/misc/adb/adb_keys && chown system:shell /data/misc/adb/adb_keys'
-      else
-        adb -s "$_vaca_serial" push "$_vaca_pubkey" /sdcard/nucleus-adbkey.pub
-        adb -s "$_vaca_serial" shell "su -c 'mkdir -p /data/misc/adb && cp /sdcard/nucleus-adbkey.pub /data/misc/adb/adb_keys && chmod 640 /data/misc/adb/adb_keys && chown system:shell /data/misc/adb/adb_keys && rm -f /sdcard/nucleus-adbkey.pub'"
+      if ! vm_android_guest_has_magisk_su "$_vaca_vm_index"; then
+        error "booted adb-keys requires Magisk su (run --magisk first) or recovery --adb-keys before first boot"
+        return 1
       fi
+      vm_android_install_adb_keys_via_su "$_vaca_vm_index" "$_vaca_pubkey"
       ;;
     *)
       error "guest must be in recovery or booted system for adb-keys; current state: $_vaca_state"
@@ -167,33 +181,6 @@ vm_android_config_adb_keys() {
   say "installed host ADB key on $_vaca_serial ($_vaca_state)"
 }
 
-vm_android_config_root() {
-  _vacr_vm_index="$1"
-  _vacr_serial="$(vm_android_adb_serial "$_vacr_vm_index")"
-
-  if ! vm_android_adb_wait_authorized "$_vacr_vm_index" 600; then
-    return 1
-  fi
-
-  if [ "$(vm_android_adb_poll_state "$_vacr_vm_index")" != "device" ]; then
-    error "Lineage root requires booted system (adb state device), got: $(vm_android_adb_poll_state "$_vacr_vm_index")"
-    return 1
-  fi
-
-  _vacr_build_key='display.id'
-  _vacr_build="$(adb -s "$_vacr_serial" shell getprop "ro.build.${_vacr_build_key}" 2>/dev/null | tr -d '\r')"
-  if printf '%s' "$_vacr_build" | grep -qi 'gsi'; then
-    error "Lineage root is unavailable on Google GSI builds (detected: $_vacr_build); boot Lineage only"
-    return 1
-  fi
-
-  adb -s "$_vacr_serial" shell 'settings put global adb_enabled 1'
-  adb -s "$_vacr_serial" shell 'setprop persist.sys.root_access 3'
-  # check-suppress:suppression_doc: adbd restart is best-effort; root access may already be active on Lineage.
-  adb -s "$_vacr_serial" shell 'setprop ctl.restart adbd' 2>/dev/null || true
-  say "enabled Lineage root (apps and adb) on $_vacr_serial"
-}
-
 vm_android_config() {
   _vac_vm_name="$1"
   _vac_vm_index="$2"
@@ -201,19 +188,30 @@ vm_android_config() {
 
   _vac_do_gapps=false
   _vac_do_adb_keys=false
-  _vac_do_root=false
+  _vac_do_magisk=false
   _vac_do_fake_wifi=false
   _vac_do_fake_wifi_revert=false
 
   require_command adb
   require_command curl
   require_command fastboot
+  require_command unzip
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --gapps) _vac_do_gapps=true ;;
       --adb-keys) _vac_do_adb_keys=true ;;
-      --root) _vac_do_root=true ;;
+      --adb-debug)
+        error "unknown flag: --adb-debug (did you mean --adb-keys?)"
+        usage >&2
+        return 1
+        ;;
+      --root)
+        error "unknown flag: --root (use --magisk; jqssun ships a user build, not Lineage developer root)"
+        usage >&2
+        return 1
+        ;;
+      --magisk) _vac_do_magisk=true ;;
       --fake-wifi) _vac_do_fake_wifi=true ;;
       --fake-wifi-revert) _vac_do_fake_wifi_revert=true ;;
       -h|--help) usage; return 0 ;;
@@ -223,7 +221,7 @@ vm_android_config() {
   done
 
   if [ "$_vac_do_gapps" = false ] && [ "$_vac_do_adb_keys" = false ] \
-    && [ "$_vac_do_root" = false ] && [ "$_vac_do_fake_wifi" = false ] \
+    && [ "$_vac_do_magisk" = false ] && [ "$_vac_do_fake_wifi" = false ] \
     && [ "$_vac_do_fake_wifi_revert" = false ]; then
     vm_android_config_print_manual
     return 0
@@ -237,11 +235,15 @@ vm_android_config() {
   if [ "$_vac_do_adb_keys" = true ]; then
     vm_android_config_adb_keys "$_vac_vm_index" || return 1
   fi
-  if [ "$_vac_do_root" = true ]; then
-    vm_android_config_root "$_vac_vm_index" || return 1
+  if [ "$_vac_do_magisk" = true ]; then
+    vm_android_config_magisk "$_vac_vm_index" || return 1
   fi
   if [ "$_vac_do_fake_wifi" = true ]; then
     vm_android_adb_wait_authorized "$_vac_vm_index" 600 || { error "fake Wi-Fi requires booted Lineage with authorized ADB"; return 1; }
+    if ! vm_android_guest_has_magisk_su "$_vac_vm_index"; then
+      error "fake Wi-Fi requires Magisk su; run --magisk first"
+      return 1
+    fi
     vm_android_fake_wifi_enable "$_vac_serial" || return 1
   fi
   if [ "$_vac_do_fake_wifi_revert" = true ]; then
