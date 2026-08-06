@@ -128,6 +128,19 @@ function Invoke-LogRotation {
   foreach ($file in $logFiles) {
     if ($file.Length -le $MaxSize) { continue }
 
+    $isWritable = $false
+    try {
+      $writeStream = [System.IO.File]::OpenWrite($file.FullName)
+      $writeStream.Close()
+      $isWritable = $true
+    } catch {
+      $isWritable = $false
+    }
+    if (-not $isWritable) {
+      Write-Warning "log-rotation: skipping unwritable '$($file.FullName)'"
+      continue
+    }
+
     $baseName = $file.BaseName
     $dir = $file.DirectoryName
 

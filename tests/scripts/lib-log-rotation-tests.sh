@@ -165,6 +165,23 @@ test_missing_file_noop() {
     fi
 }
 
+# ---------------------------------------------------------------------------
+# Test 10: rotate_log_file — skips unwritable files without error
+# ---------------------------------------------------------------------------
+test_unwritable_file_skips() {
+    local logfile="$TEST_DIR/unwritable.log"
+    for _ in 1 2 3; do printf 'abcdefghij'; done > "$logfile"
+    chmod 444 "$logfile"
+    rotate_log_file "$logfile" 10 2 false 2>/dev/null || true  # check-suppress:suppression_doc: rotation must not abort when the log file is read-only
+    if [ -f "$logfile" ] && [ ! -f "$logfile.1" ]; then
+        assert_pass "rotate_log_file: skips unwritable files without error"
+    else
+        assert_fail "rotate_log_file: skips unwritable files without error" \
+            "file missing or archive created unexpectedly"
+    fi
+    chmod 644 "$logfile"
+}
+
 # ---- run all tests ----
 echo "Testing lib.sh log rotation functions"
 echo ""
@@ -178,6 +195,7 @@ test_maxfiles_zero_truncates
 test_rotate_directory
 test_rotate_missing_dir
 test_missing_file_noop
+test_unwritable_file_skips
 
 echo ""
 echo "============================================================"

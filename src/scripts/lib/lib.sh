@@ -203,6 +203,12 @@ rotate_log_file() {
   _rlf_size=$(wc -c < "$_rlf_logfile")
   [ "$_rlf_size" -le "$_rlf_maxsize" ] && return 0
 
+  _rlf_logdir=$(dirname -- "$_rlf_logfile")
+  if [ ! -w "$_rlf_logfile" ] || [ ! -w "$_rlf_logdir" ]; then
+    warn "skipping log rotation for unwritable '$_rlf_logfile'"
+    return 0
+  fi
+
   if [ "$_rlf_maxfiles" -gt 0 ]; then
     # Remove oldest archive
     rm -f "$_rlf_logfile.$_rlf_maxfiles" "$_rlf_logfile.$_rlf_maxfiles.gz"
@@ -216,8 +222,14 @@ rotate_log_file() {
     done
 
     # Copy-truncate: copy to archive, then truncate in-place
-    cp "$_rlf_logfile" "$_rlf_logfile.1"
-    : > "$_rlf_logfile"
+    if ! cp "$_rlf_logfile" "$_rlf_logfile.1"; then
+      warn "failed to rotate '$_rlf_logfile': archive copy failed"
+      return 0
+    fi
+    if ! : > "$_rlf_logfile"; then
+      warn "failed to rotate '$_rlf_logfile': truncate failed"
+      return 0
+    fi
 
     # Compress the newest archive if requested
     if [ "$_rlf_compress" = "true" ]; then
