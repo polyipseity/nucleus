@@ -20,9 +20,9 @@ usage() {
   usage_std "$(basename "$0")" "<vm-name> <vm-index> [options]"
   cat <<'EOF'
   --gapps               Sideload MindTheGapps in recovery (requires userdebug recovery).
-  --adb-keys            Install host ~/.android/adbkey.pub into the guest adb_keys file.
-  --root                Enable Lineage root for apps and adb (requires booted Lineage).
-  --fake-wifi           Load virt_wifi and bring up wlan0 (requires root).
+  --adb-keys            Install host ~/.android/adbkey.pub (recovery or booted system).
+  --root                Enable Lineage root for apps and adb (booted system only).
+  --fake-wifi           Load virt_wifi and bring up wlan0 (booted system only).
   --fake-wifi-revert    Remove persisted fake Wi-Fi and unload virt_wifi.
   -h|--help             Show usage.
 EOF
@@ -35,15 +35,21 @@ Android post-provision manual workflow:
 GApps (--gapps) — recovery sideload, not on a booted system:
   1. nucleus-vm reset Android (fresh userdata) and start the VM.
   2. Boot LineageOS Recovery (not the normal system). Factory-reset from recovery if needed.
-  3. In recovery: Advanced → Enter fastboot. Stock recovery ADB stays unauthorized until the userdebug recovery image is flashed — fastboot is required, not ADB.
+  3. In recovery: Advanced → Enter fastboot.
   4. Run: nucleus-vm android-config Android --gapps
-     (waits for fastboot, flashes userdebug recovery, reboots to recovery, sideloads MindTheGapps)
-  5. When recovery shows "Signature verification failed — Install anyway?", tap Yes on the VM screen.
-  6. Select Reboot system now from recovery when sideload finishes.
+     (flashes userdebug recovery via fastboot, waits for recovery ADB, sideloads MindTheGapps)
+  5. After the flash, in recovery: Advanced → Enable ADB (required before sideload can proceed).
+  6. When recovery shows "Signature verification failed — Install anyway?", tap Yes on the VM screen.
+  7. Select Reboot system now from recovery when sideload finishes.
 
-After first boot to Lineage:
-  7. Complete setup and tap Allow on the USB debugging prompt.
-  8. Run: nucleus-vm android-config Android --adb-keys --root --fake-wifi
+Recovery-capable (--adb-keys only):
+  8. In recovery with ADB enabled: nucleus-vm android-config Android --adb-keys
+     (persists the host key before first boot; optional if you will tap Allow on boot)
+
+Booted system only (--root, --fake-wifi):
+  9. Complete Lineage setup, tap Allow on the USB debugging prompt.
+ 10. Run: nucleus-vm android-config Android --root --fake-wifi
+     (--root and --fake-wifi require a booted system; they do not work in recovery)
 
 Run without flags to show this guide: nucleus-vm android-config Android
 EOF
@@ -54,7 +60,6 @@ vm_android_config_gapps() {
   _vacg_serial="$(vm_android_adb_serial "$_vacg_vm_index")"
   _vacg_url="$(jq -r ".VMs[$_vacg_vm_index].Android.gappsUrl" "$MANIFEST")"
   _vacg_zip="$IMAGES_DIR/android-gapps.zip"
-  _vacg_release_tag=''
   _vacg_state=''
 
   if [ -z "$_vacg_url" ] || [ "$_vacg_url" = "null" ]; then
@@ -62,38 +67,30 @@ vm_android_config_gapps() {
     return 1
   fi
 
-  # check-suppress:suppression_doc: adb connect is idempotent; failure while offline is expected before recovery boots.
-  adb connect "$_vacg_serial" >/dev/null 2>&1 || true
-  _vacg_state="$(vm_android_adb_list_state "$_vacg_vm_index")"
+  _vacg_state="$(vm_android_adb_poll_state "$_vacg_vm_index")"
   if [ "$_vacg_state" = "device" ]; then
     error "MindTheGapps requires LineageOS Recovery; guest is booted to system (device)"
     return 1
   fi
 
   vm_android_download_userdebug_recovery "$_vacg_vm_index" || return 1
-  _vacg_release_tag="$(jq -r '.tag_name' "$IMAGES_DIR/android-recovery-userdebug.tag.json")"
-  vm_android_ensure_userdebug_recovery "$_vacg_vm_index" "$_vacg_release_tag" || return 1
+  vm_android_ensure_userdebug_recovery "$_vacg_vm_index" || return 1
 
   if ! vm_android_adb_wait_recovery "$_vacg_vm_index" 300; then
-    _vacg_state="$(vm_android_adb_list_state "$_vacg_vm_index")"
-    if [ "$_vacg_state" = "unauthorized" ]; then
-      error "ADB still unauthorized after userdebug recovery flash; boot recovery, enter fastboot (Advanced → Enter fastboot), and retry --gapps"
-    fi
     return 1
   fi
 
-  _vacg_state="$(vm_android_adb_list_state "$_vacg_vm_index")"
-  if [ "$_vacg_state" != "sideload" ]; then
-    say "entering sideload mode on $_vacg_serial..."
-    # check-suppress:suppression_doc: reboot sideload may fail when already transitioning; sideload wait below handles the next state.
-    adb -s "$_vacg_serial" reboot sideload 2>/dev/null || true
-    if ! vm_android_adb_connect "$_vacg_vm_index" 120; then
-      error "guest did not enter sideload mode; from userdebug recovery select Apply update from ADB"
-      return 1
+  if vm_android_adb_wait_sideload "$_vacg_vm_index" 15; then
+    say "guest already in sideload mode on $_vacg_serial"
+  else
+    _vacg_state="$(vm_android_adb_poll_state "$_vacg_vm_index")"
+    if [ "$_vacg_state" = "recovery" ]; then
+      say "entering sideload mode on $_vacg_serial..."
+      # check-suppress:suppression_doc: reboot sideload may fail when already transitioning; sideload wait below handles the next state.
+      adb -s "$_vacg_serial" reboot sideload 2>/dev/null || true
     fi
-    _vacg_state="$(vm_android_adb_list_state "$_vacg_vm_index")"
-    if [ "$_vacg_state" != "sideload" ]; then
-      error "guest must be in sideload mode for MindTheGapps; current state: $_vacg_state"
+    if ! vm_android_adb_wait_sideload "$_vacg_vm_index" 120; then
+      error "guest did not enter sideload mode; from recovery select Apply update from ADB"
       return 1
     fi
   fi
@@ -115,42 +112,59 @@ vm_android_config_gapps() {
   fi
 
   say "MindTheGapps sideload finished."
-  say "manual step: select Reboot system now from the recovery menu (or wait for an automatic reboot)"
-  say "after Lineage boots, tap Allow on the USB debugging prompt, then run:"
-  say "  nucleus-vm android-config Android --adb-keys --root --fake-wifi"
+  say "manual step: select Reboot system now from the recovery menu"
+  say "optional in recovery: nucleus-vm android-config Android --adb-keys"
+  say "after Lineage boots: nucleus-vm android-config Android --root --fake-wifi"
 }
 
 vm_android_config_adb_keys() {
   _vaca_vm_index="$1"
   _vaca_serial="$(vm_android_adb_serial "$_vaca_vm_index")"
   _vaca_pubkey="${HOME}/.android/adbkey.pub"
+  _vaca_state=''
 
   if [ ! -f "$_vaca_pubkey" ]; then
     error "host ADB public key not found: $_vaca_pubkey (run adb once to generate keys)"
     return 1
   fi
 
-  if ! vm_android_adb_wait_authorized "$_vaca_vm_index" 600; then
+  if ! vm_android_adb_connect "$_vaca_vm_index" 600; then
+    _vaca_state="$(vm_android_adb_poll_state "$_vaca_vm_index")"
+    if [ "$_vaca_state" = "unauthorized" ]; then
+      error "ADB unauthorized; enable ADB in recovery (Advanced → Enable ADB) or tap Allow on booted Lineage"
+    else
+      error "ADB not reachable for key install (state: $_vaca_state)"
+    fi
     return 1
   fi
 
-  if [ "$(vm_android_adb_list_state "$_vaca_vm_index")" != "device" ]; then
-    error "guest must be booted to system (adb state device), got: $(vm_android_adb_list_state "$_vaca_vm_index")"
-    return 1
-  fi
-
-  # check-suppress:suppression_doc: adb root is unavailable on user builds; su path below handles non-root adb.
-  adb -s "$_vaca_serial" root 2>/dev/null || true
-  sleep 2
-
-  if adb -s "$_vaca_serial" shell 'id -u' 2>/dev/null | grep -qx '0'; then
-    adb -s "$_vaca_serial" push "$_vaca_pubkey" /data/misc/adb/adb_keys
-    adb -s "$_vaca_serial" shell 'chmod 640 /data/misc/adb/adb_keys && chown system:shell /data/misc/adb/adb_keys'
-  else
-    adb -s "$_vaca_serial" push "$_vaca_pubkey" /sdcard/nucleus-adbkey.pub
-    adb -s "$_vaca_serial" shell "su -c 'mkdir -p /data/misc/adb && cp /sdcard/nucleus-adbkey.pub /data/misc/adb/adb_keys && chmod 640 /data/misc/adb/adb_keys && chown system:shell /data/misc/adb/adb_keys && rm -f /sdcard/nucleus-adbkey.pub'"
-  fi
-  say "installed host ADB key on $_vaca_serial"
+  _vaca_state="$(vm_android_adb_poll_state "$_vaca_vm_index")"
+  case "$_vaca_state" in
+    recovery|sideload)
+      # check-suppress:suppression_doc: adb root is unavailable on user builds; userdebug recovery may already run adbd as root.
+      adb -s "$_vaca_serial" root 2>/dev/null || true
+      sleep 2
+      adb -s "$_vaca_serial" push "$_vaca_pubkey" /data/misc/adb/adb_keys
+      adb -s "$_vaca_serial" shell 'chmod 640 /data/misc/adb/adb_keys && chown system:shell /data/misc/adb/adb_keys'
+      ;;
+    device)
+      # check-suppress:suppression_doc: adb root is unavailable on user builds; su path below handles non-root adb.
+      adb -s "$_vaca_serial" root 2>/dev/null || true
+      sleep 2
+      if adb -s "$_vaca_serial" shell 'id -u' 2>/dev/null | grep -qx '0'; then
+        adb -s "$_vaca_serial" push "$_vaca_pubkey" /data/misc/adb/adb_keys
+        adb -s "$_vaca_serial" shell 'chmod 640 /data/misc/adb/adb_keys && chown system:shell /data/misc/adb/adb_keys'
+      else
+        adb -s "$_vaca_serial" push "$_vaca_pubkey" /sdcard/nucleus-adbkey.pub
+        adb -s "$_vaca_serial" shell "su -c 'mkdir -p /data/misc/adb && cp /sdcard/nucleus-adbkey.pub /data/misc/adb/adb_keys && chmod 640 /data/misc/adb/adb_keys && chown system:shell /data/misc/adb/adb_keys && rm -f /sdcard/nucleus-adbkey.pub'"
+      fi
+      ;;
+    *)
+      error "guest must be in recovery or booted system for adb-keys; current state: $_vaca_state"
+      return 1
+      ;;
+  esac
+  say "installed host ADB key on $_vaca_serial ($_vaca_state)"
 }
 
 vm_android_config_root() {
@@ -161,8 +175,8 @@ vm_android_config_root() {
     return 1
   fi
 
-  if [ "$(vm_android_adb_list_state "$_vacr_vm_index")" != "device" ]; then
-    error "guest must be booted to Lineage (adb state device), got: $(vm_android_adb_list_state "$_vacr_vm_index")"
+  if [ "$(vm_android_adb_poll_state "$_vacr_vm_index")" != "device" ]; then
+    error "Lineage root requires booted system (adb state device), got: $(vm_android_adb_poll_state "$_vacr_vm_index")"
     return 1
   fi
 
@@ -227,11 +241,11 @@ vm_android_config() {
     vm_android_config_root "$_vac_vm_index" || return 1
   fi
   if [ "$_vac_do_fake_wifi" = true ]; then
-    vm_android_adb_wait_authorized "$_vac_vm_index" 600 || { error "ADB not reachable for fake Wi-Fi"; return 1; }
+    vm_android_adb_wait_authorized "$_vac_vm_index" 600 || { error "fake Wi-Fi requires booted Lineage with authorized ADB"; return 1; }
     vm_android_fake_wifi_enable "$_vac_serial" || return 1
   fi
   if [ "$_vac_do_fake_wifi_revert" = true ]; then
-    vm_android_adb_wait_authorized "$_vac_vm_index" 600 || { error "ADB not reachable for fake Wi-Fi revert"; return 1; }
+    vm_android_adb_wait_authorized "$_vac_vm_index" 600 || { error "fake Wi-Fi revert requires booted Lineage with authorized ADB"; return 1; }
     vm_android_fake_wifi_revert "$_vac_serial" || return 1
   fi
 
