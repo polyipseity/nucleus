@@ -170,9 +170,9 @@ See the `check_secret_health()` function in `scripts/health-check.sh` for the im
 
 ## CWD independence — all `nucleus-*` commands must work from any working directory
 
-Repository root resolution goes through `derive_repo_root()` in `src/scripts/lib.sh` (priority order: `NUCLEUS_REPO_ROOT` environment variable → `SCRIPT_DIR` offset checks → `git rev-parse` fallback).
+Repository root resolution goes through `derive_repo_root()` in `src/scripts/lib/lib.sh` (priority order: `NUCLEUS_REPO_ROOT` environment variable → `SCRIPT_DIR` offset walk checking `src/flake.nix`, then `.nucleus-repo-root` marker in the store tree → `git rev-parse` fallback).
 
-The `mkNucleusCommand` wrapper in `src/modules/shell.nix` must export `NUCLEUS_REPO_ROOT` before invoking `nix run` so the environment variable is inherited by the derivation's script.
+`writeNucleusShellApplication` in `src/flake.nix` bakes `.nucleus-repo-root` into each nucleus app store tree at build time from eval-time `NUCLEUS_REPO_ROOT` (forwarded by `apply.sh` through `run_nix_as_root`). Store-installed `nucleus-*` commands resolve the canonical checkout via this marker when cwd is outside the repo.
 
 Scripts must not assume the current working directory is inside the repository. Use `derive_repo_root()` or the `NUCLEUS_REPO_ROOT` environment variable for any path that resolves files relative to the repo root. Script-specific `--repo-root` flags (e.g. `replica-sync.sh`) are acceptable as additional manual overrides but must not be the sole mechanism for normal operation.
 
