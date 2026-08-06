@@ -183,8 +183,9 @@ check_log_health() {
       continue
     fi
 
-    for dir in "$log_dir" "$system_log_dir"; do
-      for log_file in "$dir/$svc"/*.log; do
+    while IFS= read -r subdir; do
+      [ -n "$subdir" ] || continue
+      for log_file in "$log_dir/$subdir"/*.log; do
         [ -f "$log_file" ] || continue
 
         # Check file size against rotation threshold
@@ -202,7 +203,25 @@ check_log_health() {
           failures=$((failures + 1))
         fi
       done
-    done
+    done <<< "$(jq -r --arg svc "$svc" '.[$svc].logging.dirs.user[]? // empty' "$services_json")"
+
+    while IFS= read -r subdir; do
+      [ -n "$subdir" ] || continue
+      for log_file in "$system_log_dir/$subdir"/*.log; do
+        [ -f "$log_file" ] || continue
+
+        size=$(wc -c < "$log_file")
+        threshold=$((max_size * 80 / 100))
+        if [ "$size" -gt "$threshold" ]; then
+          warn "'$log_file' ($size bytes) exceeds 80% of rotation max ($max_size bytes)"
+        fi
+
+        if [ "$sanitize" = "true" ] && head -n 5 "$log_file" | tr -d '[:print:][:space:]' | grep -q .; then
+          warn "'$log_file' contains control characters despite sanitize=true"
+          failures=$((failures + 1))
+        fi
+      done
+    done <<< "$(jq -r --arg svc "$svc" '.[$svc].logging.dirs.system[]? // empty' "$services_json")"
   # WHY: JSON meta keys ($schema, $comment) are excluded from the service
   # enumeration so they are not treated as services.
   done <<< "$(jq -r 'to_entries[] | select(.key | startswith("$") | not) | .key' "$services_json" | sort)"

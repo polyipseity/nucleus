@@ -889,20 +889,37 @@ get_unit() {
   ' "$SERVICES_JSON"
 }
 
+# service_log_dirs — Print declared logging.dirs paths for a service.
+# Args: $1 — service key. Output: absolute directory paths, one per line.
+service_log_dirs() {
+  local svc="$1"
+  local log_root system_root subdir
+
+  log_root="$(nucleus_log_dir)"
+  system_root="$(nucleus_system_log_dir)"
+
+  while IFS= read -r subdir; do
+    [ -n "$subdir" ] && printf '%s\n' "$log_root/$subdir"
+  done <<< "$(jq -r --arg svc "$svc" '.[$svc].logging.dirs.user[]? // empty' "$SERVICES_JSON")"
+
+  while IFS= read -r subdir; do
+    [ -n "$subdir" ] && printf '%s\n' "$system_root/$subdir"
+  done <<< "$(jq -r --arg svc "$svc" '.[$svc].logging.dirs.system[]? // empty' "$SERVICES_JSON")"
+}
+
 # service_log_files — Print all log file paths for a service (user + system dirs).
 # Args: $1 — service key. Output: absolute .log paths, one per line.
-# WHY: user and system daemons write to different roots; probing both keeps
-# a single call sufficient for either domain.
+# WHY: logging.dirs declares every subdirectory a service writes to (e.g.
+# jellyfin-app for application logs separate from launchd capture).
 service_log_files() {
   local svc="$1"
-  local user_dir system_dir
-  user_dir="$(nucleus_log_dir)/$svc"
-  system_dir="$(nucleus_system_log_dir)/$svc"
-  for d in "$user_dir" "$system_dir"; do
+  local d
+
+  while IFS= read -r d; do
     if [ -d "$d" ]; then
       find "$d" -name '*.log' -type f 2>/dev/null
     fi
-  done
+  done < <(service_log_dirs "$svc")
 }
 
 # service_has_logs — Check if a service has any accessible log output.

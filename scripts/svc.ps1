@@ -326,16 +326,33 @@ function Get-EventLogConfig {
   return $eventLog
 }
 
+function Get-ServiceLogDirs {
+  param([string]$ServiceKey)
+  $entry = $RegistryRaw[$ServiceKey]
+  $dirs = @()
+  if ($entry.ContainsKey('logging') -and $entry.logging.ContainsKey('dirs')) {
+    if ($entry.logging.dirs.user) {
+      foreach ($subdir in $entry.logging.dirs.user) {
+        $dirs += Join-Path (Get-NucleusLogDir) $subdir
+      }
+    }
+    if ($entry.logging.dirs.system) {
+      foreach ($subdir in $entry.logging.dirs.system) {
+        $dirs += Join-Path (Get-NucleusSystemLogDir) $subdir
+      }
+    }
+  }
+  return $dirs
+}
+
 function Get-ServiceLogFile {
   param([string]$ServiceKey)
   $files = @()
-  $userDir = Join-Path (Get-NucleusLogDir) $ServiceKey
-  $systemDir = Join-Path (Get-NucleusSystemLogDir) $ServiceKey
-  if (Test-Path -LiteralPath $userDir -PathType Container) {
-    $files += Get-ChildItem -LiteralPath $userDir -Filter '*.log' -File | Select-Object -ExpandProperty FullName
-  }
-  if (Test-Path -LiteralPath $systemDir -PathType Container) {
-    $files += Get-ChildItem -LiteralPath $systemDir -Filter '*.log' -File | Select-Object -ExpandProperty FullName
+  foreach ($dir in (Get-ServiceLogDirs -ServiceKey $ServiceKey)) {
+    if (Test-Path -LiteralPath $dir -PathType Container) {
+      $files += Get-ChildItem -LiteralPath $dir -Recurse -Filter '*.log' -File -ErrorAction SilentlyContinue |
+        Select-Object -ExpandProperty FullName
+    }
   }
   return $files | Sort-Object
 }
