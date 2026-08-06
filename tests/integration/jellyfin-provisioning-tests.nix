@@ -16,14 +16,22 @@ let
   nixosJellyfinText = builtins.readFile ../../src/hosts/NixOS/jellyfin.nix;
   linuxText = builtins.readFile ../../src/modules/linux.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
-  usersRegistry = builtins.fromJSON (builtins.readFile ../../src/modules/users.json);
+  usersRegistry = import ../../src/modules/lib/users-registry.nix {
+    lib = import <nixpkgs/lib>;
+    repoRoot = ../..;
+    hostName = "MacBook";
+  };
+  windowsUsersRegistry = import ../../src/modules/lib/users-registry.nix {
+    lib = import <nixpkgs/lib>;
+    repoRoot = ../..;
+    hostName = "Windows";
+  };
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
   windowsCaddyTrustText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-CaddyLocalCA.ps1;
   caddyTrustScriptText = builtins.readFile ../../src/scripts/services/caddy-trust.sh;
   windowsCaddyServiceText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-CaddyService.ps1;
   windowsJellyfinAccountText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinAccount.ps1;
   windowsJellyfinLibraryText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinLibrary.ps1;
-  windowsUsersRegistry = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
   windowsSystemPackagesText = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
   jellyfinSyncScript = builtins.readFile ../../src/scripts/services/jellyfin-sync.sh;
 
@@ -82,7 +90,7 @@ let
 
   test_polyipseity_declared_as_jellyfin_admin = assert' (
     hasAdminAccount (usersRegistry.polyipseity.jellyfin.accounts or [ ])
-    && hasAdminAccount (windowsUsersRegistry.users.polyipseity.jellyfin.accounts or [ ])
+    && hasAdminAccount (windowsUsersRegistry.polyipseity.jellyfin.accounts or [ ])
   ) "polyipseity Jellyfin account must be declared as admin on POSIX and Windows user registries";
 
   test_jellyfin_admin_flag_defaults_false_in_sync_logic = assert' (
@@ -122,20 +130,20 @@ let
     (builtins.length libs) >= 2
     && builtins.any (n: n == "music videos") names
     && builtins.any (n: n == "playlists") names
-  ) "polyipseity must declare jellyfin libraries for music videos and playlists in POSIX users.json";
+  ) "polyipseity must declare jellyfin libraries for music videos and playlists in src/users/ registry";
 
   test_windows_polyipseity_library_declared_in_users_json =
     assert'
       (
         let
-          libs = windowsUsersRegistry.users.polyipseity.jellyfin.libraries or [ ];
+          libs = windowsUsersRegistry.polyipseity.jellyfin.libraries or [ ];
           names = builtins.map (lib: lib.name or "") libs;
         in
         (builtins.length libs) >= 2
         && builtins.any (n: n == "music videos") names
         && builtins.any (n: n == "playlists") names
       )
-      "polyipseity must declare jellyfin libraries for music videos and playlists in Windows users.json";
+      "polyipseity must declare jellyfin libraries for music videos and playlists in Windows-assembled src/users/ registry";
 
   test_windows_library_module_wired = assert' (
     containsRegex "Sync-JellyfinLibrary" windowsApplyText

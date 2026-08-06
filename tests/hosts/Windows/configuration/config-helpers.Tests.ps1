@@ -50,6 +50,58 @@ Describe 'Resolve-UserConfigSource' {
     }
 }
 
+Describe 'Resolve-UserConfigFile' {
+    BeforeAll {
+        . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\src\hosts\Windows\modules\ConfigHelpers.ps1')
+        $script:testDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-cfgfile-" + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $script:testDir -Force > $null
+    }
+    AfterAll {
+        Remove-Item -Path $script:testDir -Recurse -Force
+    }
+
+    It 'returns the per-user overlay file when it exists' {
+        $user = 'alice'
+        $path = Join-Path $script:testDir "src/users/$user/starship/starship.toml"
+        New-Item -ItemType Directory -Path (Split-Path -Path $path -Parent) -Force > $null
+        Set-Content -Path $path -Value 'per-user content' -NoNewline
+        $defaultPath = Join-Path $script:testDir "src/users/default/starship/starship.toml"
+        New-Item -ItemType Directory -Path (Split-Path -Path $defaultPath -Parent) -Force > $null
+        Set-Content -Path $defaultPath -Value 'default content' -NoNewline
+        $resolved = Resolve-UserConfigFile -User $user -ConfigName 'starship' -RelativePath 'starship.toml' -RepoRoot $script:testDir
+        $resolved | Should -Be $path
+    }
+
+    It 'falls back to the default overlay file when the per-user file is missing' {
+        $defaultPath = Join-Path $script:testDir "src/users/default/obsidian/obsidian.json"
+        New-Item -ItemType Directory -Path (Split-Path -Path $defaultPath -Parent) -Force > $null
+        Set-Content -Path $defaultPath -Value '{}' -NoNewline
+        $resolved = Resolve-UserConfigFile -User 'bob' -ConfigName 'obsidian' -RelativePath 'obsidian.json' -RepoRoot $script:testDir
+        $resolved | Should -Be $defaultPath
+    }
+}
+
+Describe 'Resolve-UserConfigDir' {
+    BeforeAll {
+        . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\src\hosts\Windows\modules\ConfigHelpers.ps1')
+        $script:testDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-cfgdir-" + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $script:testDir -Force > $null
+    }
+    AfterAll {
+        Remove-Item -Path $script:testDir -Recurse -Force
+    }
+
+    It 'returns the per-user config directory when it exists' {
+        $user = 'alice'
+        $path = Join-Path $script:testDir "src/users/$user/vscode"
+        New-Item -ItemType Directory -Path $path -Force > $null
+        $defaultPath = Join-Path $script:testDir "src/users/default/vscode"
+        New-Item -ItemType Directory -Path $defaultPath -Force > $null
+        $resolved = Resolve-UserConfigDir -User $user -ConfigName 'vscode' -RepoRoot $script:testDir
+        $resolved | Should -Be $path
+    }
+}
+
 Describe 'Deploy-WritableSymlink' {
     BeforeAll {
         . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\src\hosts\Windows\modules\ConfigHelpers.ps1')

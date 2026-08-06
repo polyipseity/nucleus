@@ -3,9 +3,23 @@
 let
   inherit (import ../lib.nix) assert' containsRegex;
 
+  lib = import <nixpkgs/lib>;
+  repoRoot = ../..;
+  usersMacOS = import ../../src/modules/lib/users-registry.nix {
+    inherit lib repoRoot;
+    hostName = "MacBook";
+  };
+  usersWindows = import ../../src/modules/lib/users-registry.nix {
+    inherit lib repoRoot;
+    hostName = "Windows";
+  };
+  polyipseityMacOS = usersMacOS.polyipseity;
+  polyipseityWindows = usersWindows.polyipseity;
+  posixUsersText = builtins.toJSON polyipseityMacOS;
+  windowsUsersText = builtins.toJSON polyipseityWindows;
+  polyipseityCloudDrivesText = builtins.readFile ../../src/users/polyipseity/cloud-drives.json;
+
   moduleText = builtins.readFile ../../src/modules/cloud-drives.nix;
-  posixUsersText = builtins.readFile ../../src/modules/users.json;
-  windowsUsersText = builtins.readFile ../../src/hosts/Windows/users.json;
   flakeText = builtins.readFile ../../src/flake.nix;
   shellScriptText = builtins.readFile ../../scripts/cloud-setup.sh;
   pwshScriptText = builtins.readFile ../../scripts/cloud-setup.ps1;
@@ -105,11 +119,11 @@ let
 
   # Test 17: Both user registries pin the current iCloud entries to drive
   test_user_registries_define_icloud_service = assert' (
-    containsRegex ''"iCloudService": "drive"'' posixUsersText
-    && containsRegex ''"iCloudService": "drive"'' windowsUsersText
+    containsRegex ''"iCloudService":"drive"'' posixUsersText
+    && containsRegex ''"iCloudService":"drive"'' windowsUsersText
   ) "POSIX and Windows user registries must define the current iCloud service explicitly";
 
-  # Test 18: cloud-setup app ships jq so the shell helper can read users.json
+  # Test 18: cloud-setup app ships jq so the shell helper can read src/users/
   test_cloud_setup_runtime_has_jq = assert' (
     containsRegex "mkCloudSetupApp" flakeText && containsRegex "pkgs\\.jq" flakeText
   ) "cloud-setup app runtime must include jq for user-config lookup";
@@ -202,20 +216,26 @@ let
     containsRegex ''"fuse-t"'' macbookHomebrewText && !containsRegex ''"macfuse"'' macbookHomebrewText
   ) "macOS Homebrew packages must use fuse-t instead of macfuse for cloud mounts";
 
-  # Test 31: users.json preserves GoogleDrive remote id while exposing a human-readable display name
+  # Test 31: cloud-drives preserves GoogleDrive remote id while exposing a human-readable display name
   test_google_drive_display_name = assert' (
-    containsRegex ''"id": "GoogleDrive"'' posixUsersText
-    && containsRegex ''"remoteName": "GoogleDrive"'' posixUsersText
-    && containsRegex ''"displayName": "Google Drive"'' posixUsersText
+    containsRegex ''"id": "GoogleDrive"'' polyipseityCloudDrivesText
+    && containsRegex ''"remoteName": "GoogleDrive"'' polyipseityCloudDrivesText
+    && containsRegex ''"displayName": "Google Drive"'' polyipseityCloudDrivesText
   ) "GoogleDrive mount must keep remoteName=GoogleDrive while setting displayName=Google Drive";
 
-  # Test 32: users.json keeps iCloud replica explicitly enabled
-  test_icloud_replica_enabled = assert' (
-    containsRegex ''"id": "iCloud"'' posixUsersText
-    && containsRegex ''"localPath": "clouds/iCloudReplica"'' posixUsersText
-    && containsRegex ''"direction": "pull"'' posixUsersText
-    && containsRegex ''"enable": true'' posixUsersText
-  ) "iCloud replica entry must remain enabled for local replica convergence";
+  # Test 32: cloud-drives keeps iCloud replica explicitly enabled
+  test_icloud_replica_enabled =
+    let
+      icloudReplica =
+        builtins.head (
+          builtins.filter (replica: (replica.id or "") == "iCloud") polyipseityMacOS.cloudDrives.replicas
+        );
+    in
+    assert' (
+      icloudReplica.enable == true
+      && icloudReplica.localPath == "clouds/iCloudReplica"
+      && icloudReplica.direction == "pull"
+    ) "iCloud replica entry must remain enabled for local replica convergence";
 
   # Test 33: flake exports nucleus-replica-sync command
   test_flake_has_replica_command = assert' (
@@ -260,7 +280,7 @@ let
   # Test 38: Windows parity includes a replica sync module and scripts entrypoint
   test_windows_replica_sync_entrypoints = assert' (
     containsRegex "function Invoke-ReplicaSync" windowsReplicaModuleText
-    && containsRegex ''src\\modules\\users\.json'' windowsReplicaModuleText
+    && (containsRegex "Load-UserRegistry.ps1" windowsReplicaModuleText || containsRegex "src\\\\users" windowsReplicaModuleText)
     && containsRegex "Invoke-ReplicaSync" replicaSyncPwshText
   ) "Windows must include Invoke-ReplicaSync module and scripts/replica-sync.ps1 wrapper";
 
@@ -313,12 +333,12 @@ let
   test_replica_pull_only_policy = assert' (
     containsRegex "unsupported direction" replicaSyncShellText
     && containsRegex "pull-only by policy" replicaSyncShellText
-    && containsRegex ''"direction": "pull"'' posixUsersText
-    && containsRegex ''"direction": "pull"'' windowsUsersText
-    && !containsRegex ''"direction": "bidirectional"'' posixUsersText
-    && !containsRegex ''"direction": "bidirectional"'' windowsUsersText
-    && !containsRegex ''"direction": "push"'' posixUsersText
-    && !containsRegex ''"direction": "push"'' windowsUsersText
+    && containsRegex ''"direction":"pull"'' posixUsersText
+    && containsRegex ''"direction":"pull"'' windowsUsersText
+    && !containsRegex ''"direction":"bidirectional"'' posixUsersText
+    && !containsRegex ''"direction":"bidirectional"'' windowsUsersText
+    && !containsRegex ''"direction":"push"'' posixUsersText
+    && !containsRegex ''"direction":"push"'' windowsUsersText
     && !(containsRegex "rclone bisync" replicaSyncShellText)
     && !(containsRegex "--resync" replicaSyncShellText)
     && !(containsRegex "--check-access" replicaSyncShellText)
@@ -410,11 +430,11 @@ let
   test_mounts_read_write_matrix =
     assert'
       (
-        containsRegex ''"id": "GoogleDrive"'' posixUsersText
-        && containsRegex ''"id": "iCloud"'' posixUsersText
-        && containsRegex ''"id": "OneDrive"'' posixUsersText
-        && containsRegex ''"readWrite": true'' posixUsersText
-        && containsRegex ''"readWrite": true'' windowsUsersText
+        containsRegex ''"id":"GoogleDrive"'' posixUsersText
+        && containsRegex ''"id":"iCloud"'' posixUsersText
+        && containsRegex ''"id":"OneDrive"'' posixUsersText
+        && containsRegex ''"readWrite":true'' posixUsersText
+        && containsRegex ''"readWrite":true'' windowsUsersText
       )
       "Cloud mount matrix must keep GoogleDrive/iCloud/OneDrive readWrite=true across POSIX and Windows registries";
 
@@ -480,19 +500,34 @@ let
 
   # Test 59: GoogleDrive replica sets displayName in both registries
   test_replica_displayName_in_configs = assert' (
-    containsRegex ''"id": "GoogleDrive"'' posixUsersText
-    && containsRegex ''"displayName": "Google Drive"'' posixUsersText
-    && containsRegex ''"displayName": "Google Drive"'' windowsUsersText
+    containsRegex ''"id":"GoogleDrive"'' posixUsersText
+    && containsRegex ''"displayName":"Google Drive"'' posixUsersText
+    && containsRegex ''"displayName":"Google Drive"'' windowsUsersText
   ) "GoogleDrive replica must set displayName=\"Google Drive\" in both POSIX and Windows registries";
 
   # Test 60: POSIX iCloud replica sets readWrite=true (macOS symlink exception)
-  test_icloud_replica_readwrite_posix = assert' (containsRegex ''"replicas".*"id": "iCloud"[^}]*"readWrite": true'' posixUsersText) "POSIX iCloud replica must set readWrite=true for macOS symlink exception";
+  test_icloud_replica_readwrite_posix =
+    let
+      icloudReplica =
+        builtins.head (
+          builtins.filter (replica: (replica.id or "") == "iCloud") polyipseityMacOS.cloudDrives.replicas
+        );
+    in
+    assert' (
+      icloudReplica.readWrite or false == true
+    ) "POSIX iCloud replica must set readWrite=true for macOS symlink exception";
 
   # Test 61: Windows iCloud replica does NOT set readWrite (managed directories, not symlinks)
-  test_icloud_replica_readwrite_windows = assert' (
-    containsRegex ''"id": "iCloud"'' windowsUsersText
-    && !(containsRegex ''"replicas".*"id": "iCloud"[^}]*"readWrite": true'' windowsUsersText)
-  ) "Windows iCloud replica must NOT set readWrite (uses managed real directories, not symlinks)";
+  test_icloud_replica_readwrite_windows =
+    let
+      icloudReplica =
+        builtins.head (
+          builtins.filter (replica: (replica.id or "") == "iCloud") polyipseityWindows.cloudDrives.replicas
+        );
+    in
+    assert' (
+      !(icloudReplica ? readWrite) || icloudReplica.readWrite == false
+    ) "Windows iCloud replica must not enable readWrite (uses managed real directories, not symlinks)";
 
   # Test 62: replica runner scripts conditionally lock read-only based on readWrite flag
   test_replica_conditional_readonly_locking = assert' (

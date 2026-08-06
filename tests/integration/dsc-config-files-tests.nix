@@ -3,14 +3,19 @@
 # Validates that user-level DSC configs (context-manual.dsc.yml,
 # context-pdf-opt.dsc.yml, env.dsc.yml, explorer.dsc.yml, screen-saver.dsc.yml,
 # shell.dsc.yml, wallpaper.dsc.yml in the user/ folder) are declared per-user
-# via users.json dscConfigFiles, not as universal defaults in apply.ps1.
+# via src/users/<username>/windows.json dscConfigFiles, not as universal defaults
+# in apply.ps1.
 #
 # Also validates that apply.ps1 prepends "user/" to each dscConfigFiles entry
 # and prevents path-traversal escape.
 #
 let
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
-  windowsUsersRegistry = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
+  usersRegistry = import ../../src/modules/lib/users-registry.nix {
+    lib = import <nixpkgs/lib>;
+    repoRoot = ../..;
+    hostName = "Windows";
+  };
 
   inherit (import ../lib.nix) assert' containsRegex;
 
@@ -25,8 +30,9 @@ let
     "wallpaper.dsc.yml"
   ];
 
-  # The primary user from the registry.
-  primaryUsers = builtins.filter (u: u.isPrimary or false) windowsUsersRegistry.users;
+  primaryUserNames = builtins.filter (name: usersRegistry.${name}.isPrimary or false) (
+    builtins.attrNames usersRegistry
+  );
 
   # ---------------------------------------------------------------------------
   # apply.ps1 default ConfigFiles assertions
@@ -48,9 +54,9 @@ let
 
   # Test 3: ConfigFiles param doc must describe per-user extension mechanism.
   test_param_doc_describes_per_user = assert' (
-    containsRegex ''Per-user DSC files can be declared in users\.json'' windowsApplyText
+    (containsRegex ''src/users'' windowsApplyText || containsRegex "dscConfigFiles" windowsApplyText)
     && containsRegex "dscConfigFiles" windowsApplyText
-  ) "ConfigFiles param doc must describe per-user extension via users.json dscConfigFiles";
+  ) "ConfigFiles param doc must describe per-user extension via src/users/ dscConfigFiles";
 
   # Test 4: Deduplication mechanism must exist in apply.ps1.
   test_deduplication_mechanism = assert' (
@@ -59,26 +65,26 @@ let
   ) "apply.ps1 must deduplicate per-user dscConfigFiles against effectiveConfigFiles";
 
   # ---------------------------------------------------------------------------
-  # users.json primary user dscConfigFiles assertions
+  # src/users/ primary user dscConfigFiles assertions
   # ---------------------------------------------------------------------------
 
   # Test 5: Exactly one primary user must exist.
   test_exactly_one_primary_user = assert' (
-    builtins.length primaryUsers == 1
-  ) "users.json must have exactly one primary user (isPrimary=true)";
+    builtins.length primaryUserNames == 1
+  ) "src/users/ registry must have exactly one primary user (isPrimary=true)";
 
   # Test 6: Primary user must have dscConfigFiles array declared.
   test_primary_user_has_dsc_config = assert' (
     let
-      user = builtins.head primaryUsers;
+      user = usersRegistry.${builtins.head primaryUserNames};
     in
     builtins.hasAttr "dscConfigFiles" user && user.dscConfigFiles or [ ] != [ ]
   ) "Primary user must have a non-empty dscConfigFiles array";
 
-  # Test 7: Primary user must have all 3 user-level DSC files (bare filenames).
+  # Test 7: Primary user must have all 7 user-level DSC files (bare filenames).
   test_primary_user_files_complete = assert' (
     let
-      user = builtins.head primaryUsers;
+      user = usersRegistry.${builtins.head primaryUserNames};
     in
     builtins.all (f: builtins.elem f (user.dscConfigFiles or [ ])) expectedUserDscFiles
   ) "Primary user's dscConfigFiles must include all 7 user-level DSC files";
@@ -86,7 +92,7 @@ let
   # Test 8: Primary user must not have system-level files in dscConfigFiles.
   test_primary_user_no_system_files = assert' (
     let
-      user = builtins.head primaryUsers;
+      user = usersRegistry.${builtins.head primaryUserNames};
     in
     !builtins.elem "system/scheduler.dsc.yml" (user.dscConfigFiles or [ ])
     && !builtins.elem "system/developer-mode.dsc.yml" (user.dscConfigFiles or [ ])
@@ -103,7 +109,7 @@ let
   # Test 9: Primary user files must be in alphabetical order.
   test_primary_user_files_alphabetical = assert' (
     let
-      user = builtins.head primaryUsers;
+      user = usersRegistry.${builtins.head primaryUserNames};
     in
     user.dscConfigFiles == builtins.sort builtins.lessThan user.dscConfigFiles
   ) "Primary user's dscConfigFiles must be sorted alphabetically";

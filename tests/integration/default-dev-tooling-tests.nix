@@ -28,7 +28,7 @@ let
   windowsShellProfileText = builtins.readFile ../../src/scripts/shell/profile.ps1;
   envCatalogText = builtins.readFile ../../src/modules/lib/env-catalog.nix;
   windowsUserEnvText = builtins.readFile ../../src/hosts/Windows/user/env.dsc.yml;
-  vscodeSettingsText = builtins.readFile ../../src/modules/configs/vscode/settings.json;
+  vscodeSettingsText = builtins.readFile ../../src/users/default/vscode/settings.json;
   managedPathsText = builtins.readFile ../../src/modules/lib/managed-paths.nix;
   initZshText = builtins.readFile ../../src/scripts/shell/init.zsh;
   initRustupScriptText = builtins.readFile ../../src/scripts/packages/init-rustup.sh;

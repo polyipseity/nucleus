@@ -1,16 +1,13 @@
 <#
 .SYNOPSIS
-    Verifies VM guest credentials resolve from the POSIX-canonical user
-    registry (src\modules\users.json), and that the Windows-variant
-    registry (src\hosts\Windows\users.json) no longer declares vmGuest
-    or the non-canonical vscode casing.
+    Verifies VM guest credentials resolve from src/users/<username>/vm-guest.json
+    via Load-UserRegistry.ps1 / load-user-registry.sh.
 .DESCRIPTION
-    Static analysis tests (parse files, do not execute).  Guarantees the
-    credential-unification invariant from the VM manifest refactor:
-    Resolve-VMGuestCredential reads the same canonical registry as vm.sh
-    (src\modules\users.json, top-level user keys without a .users wrapper),
-    the Windows-variant registry and schema drop vmGuest entirely, and both
-    registries use the canonical vsCode casing for settings overrides.
+    Static analysis tests (parse files, do not execute). Guarantees the
+    credential-unification invariant from the user-registry refactor:
+    Resolve-VMGuestCredential reads the assembled src/users/ registry,
+    vm-guest.json declares secret-key references for polyipseity, and
+    vm.sh uses load-user-registry.sh.
 .NOTES
     Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/system/vm-guest-credential.Tests.ps1 -Passthru"
     Exit codes: 0 on success; 1 on failure
@@ -21,31 +18,24 @@ BeforeAll {
 
   $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
   $InvokeVMSetupPath = Join-Path $RepoRoot "src\hosts\Windows\modules\system\Invoke-VMSetup.ps1"
-  $WindowsUsersJsonPath = Join-Path $RepoRoot "src\hosts\Windows\users.json"
-  $WindowsUsersSchemaPath = Join-Path $RepoRoot "src\hosts\Windows\users.schema.json"
-  $CanonicalUsersJsonPath = Join-Path $RepoRoot "src\modules\users.json"
+  $VmGuestJsonPath = Join-Path $RepoRoot "src\users\polyipseity\vm-guest.json"
+  $VmShPath = Join-Path $RepoRoot "scripts\vm.sh"
+  $LoadUserRegistryPath = Join-Path $RepoRoot "src\scripts\lib\load-user-registry.sh"
 
-  # Resolve paths through this closure so PSUseDeclaredVarsMoreThanAssignments
-  # sees the path variables read within the BeforeAll scriptblock (It blocks
-  # are sibling scopes).
   function Get-VMSetupText { return Get-Content -Raw -Path $InvokeVMSetupPath }
-  function Get-WindowsUsersJson { return Get-Content -Raw -Path $WindowsUsersJsonPath | ConvertFrom-Json }
-  function Get-WindowsUsersSchema { return Get-Content -Raw -Path $WindowsUsersSchemaPath | ConvertFrom-Json }
-  function Get-CanonicalUsersJson { return Get-Content -Raw -Path $CanonicalUsersJsonPath | ConvertFrom-Json }
+  function Get-VmGuestJson { return Get-Content -Raw -Path $VmGuestJsonPath | ConvertFrom-Json }
+  function Get-VmShText { return Get-Content -Raw -Path $VmShPath }
+  function Get-LoadUserRegistryText { return Get-Content -Raw -Path $LoadUserRegistryPath }
 }
 
-Describe "Resolve-VMGuestCredential reads the POSIX-canonical user registry" {
-  It "references the canonical src\modules\users.json registry" {
-    (Get-VMSetupText) | Should -Match 'src\\modules\\users\.json'
+Describe "Resolve-VMGuestCredential reads the assembled src/users/ registry" {
+  It "loads the user registry via Load-UserRegistry.ps1" {
+    (Get-VMSetupText) | Should -Match 'Load-UserRegistry\.ps1'
   }
 
-  It "no longer references the Windows-variant registry path" {
+  It "does not reference the removed users.json monolith paths" {
+    (Get-VMSetupText) | Should -Not -Match 'src\\modules\\users\.json'
     (Get-VMSetupText) | Should -Not -Match 'src\\hosts\\Windows\\users\.json'
-  }
-
-  It "accesses top-level user keys without the .users wrapper" {
-    (Get-VMSetupText) | Should -Match '\$userRegistry\.PSObject\.Properties\[\$secretOwner\]'
-    (Get-VMSetupText) | Should -Not -Match '\$userRegistry\.users\.PSObject\.Properties'
   }
 
   It "keeps the vmGuest secret-key reference error message" {
@@ -53,34 +43,34 @@ Describe "Resolve-VMGuestCredential reads the POSIX-canonical user registry" {
   }
 }
 
-Describe "Windows-variant user registry drops vmGuest" {
-  It "src\hosts\Windows\users.json declares no vmGuest key" {
-    $registry = Get-WindowsUsersJson
-    $registry.users.polyipseity.PSObject.Properties.Name | Should -Not -Contain 'vmGuest'
+Describe "polyipseity vm-guest.json declares secret-key references" {
+  It "src\users\polyipseity\vm-guest.json declares usernameSecretKey" {
+    $vmGuest = Get-VmGuestJson
+    $vmGuest.usernameSecretKey | Should -Be 'vm_guest_username'
   }
 
-  It "src\hosts\Windows\users.schema.json declares no vmGuest property" {
-    $schema = Get-WindowsUsersSchema
-    $schema.properties.users.additionalProperties.properties.PSObject.Properties.Name | Should -Not -Contain 'vmGuest'
+  It "src\users\polyipseity\vm-guest.json declares passwordSecretKey" {
+    $vmGuest = Get-VmGuestJson
+    $vmGuest.passwordSecretKey | Should -Be 'vm_guest_password'
   }
 }
 
-Describe "Canonical vsCode casing across user registries" {
-  It "src\modules\users.json uses canonical vsCode casing" {
-    $registry = Get-CanonicalUsersJson
-    $registry.polyipseity.PSObject.Properties.Name | Should -Contain 'vsCode'
-    $registry.polyipseity.PSObject.Properties.Name | Should -Not -Contain 'vscode' -CaseSensitive
+Describe "POSIX vm.sh uses load-user-registry.sh" {
+  It "references load-user-registry.sh" {
+    (Get-VmShText) | Should -Match 'load-user-registry\.sh'
   }
 
-  It "src\hosts\Windows\users.json uses canonical vsCode casing" {
-    $registry = Get-WindowsUsersJson
-    $registry.users.polyipseity.PSObject.Properties.Name | Should -Contain 'vsCode'
-    $registry.users.polyipseity.PSObject.Properties.Name | Should -Not -Contain 'vscode' -CaseSensitive
+  It "references src/users" {
+    (Get-VmShText) | Should -Match 'src/users'
   }
 
-  It "src\hosts\Windows\users.schema.json uses canonical vsCode casing" {
-    $schema = Get-WindowsUsersSchema
-    $schema.properties.users.additionalProperties.properties.PSObject.Properties.Name | Should -Contain 'vsCode'
-    $schema.properties.users.additionalProperties.properties.PSObject.Properties.Name | Should -Not -Contain 'vscode' -CaseSensitive
+  It "does not reference the removed users.json monolith" {
+    (Get-VmShText) | Should -Not -Match 'src/modules/users\.json'
+  }
+}
+
+Describe "load-user-registry.sh assembles vmGuest from domain files" {
+  It "merges vm-guest.json domain files" {
+    (Get-LoadUserRegistryText) | Should -Match 'vm-guest\.json'
   }
 }

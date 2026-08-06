@@ -33,14 +33,14 @@ Describe "Windows config method documentation" {
     }
 
     Context "apply.ps1 path references have method labels" {
-        It "Should have a # check-suppress:config-method comment near qtpassSettingsPath" {
+        It "Should have a # check-suppress:config-method comment near Sync-QtPassConfig call" {
             $applyContent = Get-Content -Path (Join-Path $PSScriptRoot '..\..\..\src\hosts\Windows\apply.ps1') -Raw
-            Test-ConfigMethodLabel -Content $applyContent -Pattern 'qtpassSettingsPath' | Should -Be $true
+            Test-ConfigMethodLabel -Content $applyContent -Pattern 'Sync-QtPassConfig' | Should -Be $true
         }
 
-        It "Should have a # check-suppress:config-method comment near picardDefaultsPath" {
+        It "Should have a # check-suppress:config-method comment near Sync-PicardConfig call" {
             $applyContent = Get-Content -Path (Join-Path $PSScriptRoot '..\..\..\src\hosts\Windows\apply.ps1') -Raw
-            Test-ConfigMethodLabel -Content $applyContent -Pattern 'picardDefaultsPath' | Should -Be $true
+            Test-ConfigMethodLabel -Content $applyContent -Pattern 'Sync-PicardConfig' | Should -Be $true
         }
 
         It "Should have a # check-suppress:config-method comment near Sync-BunConfig call" {

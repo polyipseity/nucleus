@@ -25,7 +25,7 @@ let
     };
     creation_rules = [
       {
-        path_regex = "src/secrets/users-.*\\.yml$";
+        path_regex = "src/secrets/users/.*\\.yml$";
         key_groups = [ { age = "age_devices"; } ];
       }
       {
@@ -92,10 +92,10 @@ let
     let
       rules = mockSopsConfig.creation_rules;
       hasUserSecretsPath = any (
-        rule: builtins.match ".*src/secrets/users-.*\\.yml.*" rule.path_regex != null
+        rule: builtins.match ".*src/secrets/users/.*\\.yml.*" rule.path_regex != null
       ) rules;
     in
-    assert' hasUserSecretsPath "Creation rules must cover src/secrets/users-*.yml files";
+    assert' hasUserSecretsPath "Creation rules must cover src/secrets/users/*.yml files";
 
   # === TEST: Wallpapers directory covered by creation rules ===
   test_wallpapers_dir_covered =
@@ -239,7 +239,7 @@ builtins.seq (builtins.deepSeq allTests null) {
     "5: Creation rules are defined"
     "6: Creation rules have correct structure"
     "7: src/secrets/ directory is covered"
-    "8: Per-user src/secrets/users-*.yml files are covered"
+    "8: Per-user src/secrets/users/*.yml files are covered"
     "9: src/assets/wallpapers/ directory is covered"
     "10: Mock secret file has sops metadata and payload"
     "11: Secret payload contains expected fields"

@@ -1123,9 +1123,9 @@ let
   nixos_domain_xml_text = builtins.readFile ../../src/modules/configs/vms/nixos-domain.xml;
   utmConfigPlistText = builtins.readFile ../../src/modules/configs/vms/utm-config.plist.xml;
   vms_json_text = builtins.readFile ../../src/modules/VMs.json;
-  users_json_text = builtins.readFile ../../src/modules/users.json;
-  windows_users_json_text = builtins.readFile ../../src/hosts/Windows/users.json;
-  user_secret_text = builtins.readFile ../../src/secrets/users-polyipseity.yml;
+  load_user_registry_sh_text = builtins.readFile ../../src/scripts/lib/load-user-registry.sh;
+  vm_guest_json_text = builtins.readFile ../../src/users/polyipseity/vm-guest.json;
+  user_secret_text = builtins.readFile ../../src/secrets/users/polyipseity.yml;
   vms_windows_packer_text = builtins.readFile ../../src/vms/windows/packer.pkr.hcl;
   vms_windows_autounattend_text = builtins.readFile ../../src/vms/windows/Autounattend.xml;
   vms_macos_packer_text = builtins.readFile ../../src/vms/macos/packer.pkr.hcl;
@@ -1369,31 +1369,28 @@ let
 
   # Guest credential policy: username/password must resolve from per-user SOPS
   # secrets via vmGuest secret-key references and stay wired across all guest
-  # build paths.  vmGuest lives only in the POSIX-canonical registry
-  # (src/modules/users.json); the Windows-variant registry must not redeclare it.
+  # build paths. vmGuest lives in src/users/<username>/vm-guest.json and is
+  # assembled by load-user-registry.sh / users-registry.nix.
   test_guest_credentials_policy_in_user_registries =
     assert'
       (
-        (lib.hasInfix "\"vmGuest\"" users_json_text)
-        && (lib.hasInfix "\"usernameSecretKey\": \"vm_guest_username\"" users_json_text)
-        && (lib.hasInfix "\"passwordSecretKey\": \"vm_guest_password\"" users_json_text)
-        && !(lib.hasInfix "\"vmGuest\"" windows_users_json_text)
-        && !(lib.hasInfix "\"usernameSecretKey\": \"vm_guest_username\"" windows_users_json_text)
-        && !(lib.hasInfix "\"passwordSecretKey\": \"vm_guest_password\"" windows_users_json_text)
+        (lib.hasInfix "\"usernameSecretKey\": \"vm_guest_username\"" vm_guest_json_text)
+        && (lib.hasInfix "\"passwordSecretKey\": \"vm_guest_password\"" vm_guest_json_text)
       )
-      "POSIX user registry must declare vmGuest secret-key references; Windows-variant registry must not";
+      "polyipseity vm-guest.json must declare vmGuest secret-key references";
 
   test_guest_credentials_policy_in_user_secrets = assert' (
     (lib.hasInfix "vm_guest_username:" user_secret_text)
     && (lib.hasInfix "vm_guest_password:" user_secret_text)
-  ) "users-polyipseity.yml must contain secret-backed VM guest username/password keys";
+  ) "users/polyipseity.yml must contain secret-backed VM guest username/password keys";
 
   test_guest_credentials_policy_in_vm_setup_sh =
     assert'
       (
         (lib.hasInfix "resolve_vm_guest_credentials" vm_setup_sh_text)
-        && (lib.hasInfix "src/modules/users.json" vm_setup_sh_text)
-        && (lib.hasInfix "users-\${_rvgc_owner}.yml" vm_setup_sh_text)
+        && (lib.hasInfix "load-user-registry.sh" vm_setup_sh_text)
+        && (lib.hasInfix "src/users" vm_setup_sh_text)
+        && (lib.hasInfix "users/\${_rvgc_owner}.yml" vm_setup_sh_text)
         && (lib.hasInfix "vmGuest.usernameSecretKey" vm_setup_sh_text)
         && (lib.hasInfix "vmGuest.passwordSecretKey" vm_setup_sh_text)
         && (lib.hasInfix "sops --decrypt --output-type json" vm_setup_sh_text)
@@ -1416,8 +1413,8 @@ let
     assert'
       (
         (lib.hasInfix "Resolve-VMGuestCredential" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "src\\modules\\users.json" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "src\\secrets\\users-$secretOwner.yml" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Load-UserRegistry.ps1" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "src\\secrets\\users\\$secretOwner.yml" windows_vm_setup_ps1_text)
         && (lib.hasInfix "vmGuest secret-key references" windows_vm_setup_ps1_text)
         && (lib.hasInfix "--decrypt --output-type json" windows_vm_setup_ps1_text)
         && (lib.hasInfix "-GuestAccountName $guestUsername -GuestSecret $guestPassword" windows_vm_setup_ps1_text)

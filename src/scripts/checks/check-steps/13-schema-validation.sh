@@ -38,7 +38,7 @@ run_13_schema_validation() {
     case "$_f" in
       *.schema.json|*/vendor/*|*/secrets/*|*/.github/workflows/*|*/.github/dependabot.yml)
         continue ;;
-      */configs/vscode/*.json|*/configs/iterm2/DynamicProfiles/*.json|*/configs/obsidian/*.json|*/configs/qtpass/*.json|*/configs/camilladsp/*|*/configs/camillagui-backend/*|*/configs/discord-music-rpc/*|*/configs/agents/hooks/*.json|*/configs/agents/skills/*/_meta.json|*/ai/litellm-config.yml|*/.sops.yaml)
+      */users/*/vscode/*.json|*/users/*/iterm2/DynamicProfiles/*.json|*/users/*/obsidian/*.json|*/users/*/qtpass/*.json|*/configs/camilladsp/*|*/configs/camillagui-backend/*|*/users/*/discord-music-rpc/*|*/configs/agents/hooks/*.json|*/configs/agents/skills/*/_meta.json|*/ai/litellm-config.yml|*/.sops.yaml)
         continue ;;
     esac
     local _sf_nobase="${_f##*/}"

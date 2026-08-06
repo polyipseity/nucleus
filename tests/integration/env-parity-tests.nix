@@ -13,6 +13,7 @@ let
   envVars = import ../../src/modules/lib/env-catalog.nix {
     inherit config pkgs lib;
     username = "test";
+    hostName = "MacBook";
   };
 
   # Build manifest directly from catalog, avoiding toJSON/fromJSON round-trip.

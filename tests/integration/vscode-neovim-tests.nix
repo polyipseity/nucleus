@@ -7,7 +7,7 @@ let
   editorsText = builtins.readFile ../../src/modules/editors.nix;
   windowsExtensionsText = builtins.readFile ../../src/hosts/Windows/modules/editors/Sync-VSCodeExtensionManifest.ps1;
   lockfileText = builtins.readFile ../../src/lockfiles/lockfile.json;
-  settingsText = builtins.readFile ../../src/modules/configs/vscode/settings.json;
+  settingsText = builtins.readFile ../../src/users/default/vscode/settings.json;
   macosDefaultsText = builtins.readFile ../../src/hosts/MacBook/defaults.nix;
   macosActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
 

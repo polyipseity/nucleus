@@ -1,6 +1,6 @@
 # tests/modules/icloud-exclusions-tests.nix — macOS iCloud exclusion hook wiring.
 #
-# Verifies users.json exclusion names and shell/macos module wiring.
+# Verifies src/users/ exclusion names and shell/macos module wiring.
 
 let
   lib = import <nixpkgs/lib>;
@@ -9,29 +9,33 @@ let
   # The zsh hook functions (chpwd, precmd, mkdir wrapper) live in an external
   # script embedded into shell.nix's initContent via builtins.readFile.
   icloudHooksText = builtins.readFile ../../src/scripts/hosts/MacBook/macos-install-icloud-hooks.zsh;
-  users = builtins.fromJSON (builtins.readFile ../../src/modules/users.json);
+  usersRegistry = import ../../src/modules/lib/users-registry.nix {
+    inherit lib;
+    repoRoot = ../..;
+    hostName = "MacBook";
+  };
 
   inherit (import ../lib.nix) assert';
 
-  user = users.polyipseity;
+  user = usersRegistry.polyipseity;
   excludedDirNames = user.iCloudExclusions.excludedDirNames;
   managedRoots = user.iCloudExclusions.managedRoots;
 
   test_exclusion_list_exists = assert' (
     (builtins.length excludedDirNames) > 0
-  ) "users.json must define a non-empty iCloudExclusions.excludedDirNames list";
+  ) "src/users/ registry must define a non-empty iCloudExclusions.excludedDirNames list";
 
   test_managed_roots_centralized = assert' (
     managedRoots == [
       "Library/Mobile Documents/com~apple~CloudDocs"
       "Library/Mobile Documents/iCloud~md~obsidian"
     ]
-  ) "users.json must define the exact centralized iCloudExclusions.managedRoots list for polyipseity";
+  ) "src/users/ registry must define the exact centralized iCloudExclusions.managedRoots list for polyipseity";
 
   test_managed_roots_are_mobile_documents_only = assert' (builtins.all
     (root: lib.hasPrefix "Library/Mobile Documents/" root)
     managedRoots
-  ) "users.json iCloudExclusions.managedRoots must stay inside Library/Mobile Documents only";
+  ) "src/users/ iCloudExclusions.managedRoots must stay inside Library/Mobile Documents only";
 
   test_plain_mobile_documents_root_is_rejected =
     assert'
@@ -55,11 +59,11 @@ let
     && (builtins.elem ".hypothesis" excludedDirNames)
     && (builtins.elem ".ruff_cache" excludedDirNames)
     && (builtins.elem "__pycache__" excludedDirNames)
-  ) "users.json iCloudExclusions list must include expected Python cache/venv directories";
+  ) "src/users/ iCloudExclusions list must include expected Python cache/venv directories";
 
   test_required_node_dirs_present = assert' (
     (builtins.elem "node_modules" excludedDirNames) && (builtins.elem ".pnpm-store" excludedDirNames)
-  ) "users.json iCloudExclusions list must include expected Node cache/dependency directories";
+  ) "src/users/ iCloudExclusions list must include expected Node cache/dependency directories";
 
   test_shell_uses_chpwd_hook = assert' (
     (lib.hasInfix "macos-install-icloud-hooks.zsh" shellModuleText)

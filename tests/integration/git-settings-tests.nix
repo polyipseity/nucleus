@@ -88,7 +88,8 @@ assert !(containsRegex "symlinks = true" macbookGlobalGitText);
 assert containsRegex "home\.file" posixGitText;
 assert containsRegex "mkOutOfStoreSymlink.*gitconfig" posixGitText;
 assert containsRegex "configFile\.\"git/ignore\"" posixGitText;
-assert containsRegex "selectUserOverlayFile" posixGitText;
+assert containsRegex "userOverlay" posixGitText;
+assert containsRegex "selectUserConfigSource" posixGitText;
 assert containsRegex "configName = \"git\"" posixGitText;
 # The generic overlay selector lives in src/modules/lib/users-overlay.nix.
 assert containsRegex "builtins\.pathExists" usersOverlayText;

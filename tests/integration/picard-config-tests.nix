@@ -3,24 +3,18 @@ let
   linuxModuleText = builtins.readFile ../../src/modules/linux.nix;
   macosModuleText = builtins.readFile ../../src/modules/macos.nix;
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
-  windowsLoadUserRegistryText = builtins.readFile ../../src/hosts/Windows/modules/Load-UserRegistry.ps1;
   windowsPicardConfigText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-PicardConfig.ps1;
-  picardDefaultsIniText = builtins.readFile ../../src/modules/configs/picard/Picard.ini;
+  picardDefaultsIniText = builtins.readFile ../../src/users/default/picard/Picard.ini;
   picardMergeScriptText = builtins.readFile ../../src/scripts/configs/merge-picard-ini.sh;
   picardMergeAwkText = builtins.readFile ../../src/scripts/configs/merge-picard-ini.awk;
-
-  usersRegistry = builtins.fromJSON (builtins.readFile ../../src/modules/users.json);
-  windowsUsersRegistry = builtins.fromJSON (builtins.readFile ../../src/hosts/Windows/users.json);
+  usersOverlayText = builtins.readFile ../../src/modules/lib/users-overlay.nix;
 
   inherit (import ../lib.nix) assert' containsRegex;
 
   test_posix_picard_ini_merge_overwrite_wiring = assert' (
     containsRegex "merge-picard-ini" homeText
-    && containsRegex ''builtins\.readFile ./configs/picard/Picard\.ini'' homeText
+    && containsRegex "selectUserAppConfigFile \"picard\" \"Picard.ini\"" homeText
     && containsRegex "_apply_picard_defaults_from_file" picardMergeScriptText
-    && containsRegex "_upsert_ini_key" homeText
-    && containsRegex "picardOverrideCommands" homeText
-    && containsRegex ''renderPicardIniCommand "\$_picard_conf" "setting"'' homeText
     && containsRegex "Always preserve unmanaged keys and sections" homeText
   ) "home.nix must merge-overwrite managed Picard settings into native Picard.ini";
 
@@ -28,19 +22,16 @@ let
     assert'
       (
         containsRegex "EnablePicardParity" windowsApplyText
-        && containsRegex ''Sync-PicardConfig -Enabled:\$EnablePicardParity -Users \$selectedUserRecords -DefaultsFilePath \$picardDefaultsPath'' windowsApplyText
+        && containsRegex ''Sync-PicardConfig -Enabled:\$EnablePicardParity -Users \$selectedUserRecords -RepoRoot \$repoRoot'' windowsApplyText
         && containsRegex "function Sync-PicardConfig" windowsPicardConfigText
-        && containsRegex ''[[]string[]]\$DefaultsFilePath'' windowsPicardConfigText
+        && containsRegex "Resolve-UserConfigFile" windowsPicardConfigText
         && containsRegex "Get-PicardDefaultPairsFromFile" windowsPicardConfigText
-        && containsRegex "Get-PicardSettingOverride" windowsPicardConfigText
         && containsRegex ''AppData\\Roaming\\MusicBrainz\\Picard\.ini'' windowsPicardConfigText
         && containsRegex "_upsert_ini_key" windowsPicardConfigText
-        && containsRegex "-Section 'setting'" windowsPicardConfigText
         && containsRegex "_remove_managed_ini_keys" windowsPicardConfigText
         && containsRegex "unmanaged keys/sections" windowsPicardConfigText
-        && containsRegex ''picard[ \t]*=[ \t]*ConvertTo-PlainObject'' windowsLoadUserRegistryText
       )
-      "Windows apply path must converge Picard.ini via merge-overwrite module and user registry mapping";
+      "Windows apply path must converge Picard.ini via merge-overwrite module";
 
   test_canonical_picard_defaults_file = assert' (
     containsRegex "[[]application[]]" picardDefaultsIniText
@@ -50,16 +41,10 @@ let
     && containsRegex ''user_profiles=@Invalid\(\)'' picardDefaultsIniText
   ) "Canonical Picard defaults file must exist and include expected native INI sections";
 
-  test_users_registry_exposes_picard_settings = assert' (
-    builtins.hasAttr "picard" usersRegistry.polyipseity
-    && builtins.hasAttr "settings" usersRegistry.polyipseity.picard
-    && builtins.hasAttr "picard" windowsUsersRegistry.users.polyipseity
-    && builtins.hasAttr "settings" windowsUsersRegistry.users.polyipseity.picard
-  ) "Both POSIX and Windows user registries must expose picard.settings override maps";
+  test_users_overlay_exposes_picard_selector = assert' (
+    containsRegex "selectUserConfigFile" usersOverlayText
+  ) "users-overlay.nix must expose selectUserConfigFile for per-user Picard baselines";
 
-  # AWK -v interprets escape sequences in its value argument, which corrupts
-  # Picard's @Variant(\0\0\0\b…) serialized Qt values.  The fix passes value
-  # through ENVIRON so AWK reads raw bytes without escape processing.
   test_posix_picard_ini_awk_environ_escape =
     assert'
       (
@@ -69,10 +54,6 @@ let
       )
       "merge-picard-ini.sh _upsert_ini_key must pass value via ENVIRON to prevent AWK from interpreting Qt @Variant escape sequences";
 
-  # On Linux, Picard's .desktop file registers audio MIME types.  Without
-  # explicit xdg.mimeApps overrides the default handler depends on installation
-  # order.  linux.nix must pin VLC as the default for all audio MIME types
-  # that Picard claims so double-clicking audio opens the player, not the tagger.
   test_linux_audio_mime_handler_prevents_picard =
     assert'
       (
@@ -82,10 +63,6 @@ let
       )
       "linux.nix must set VLC as default for audio MIME types to prevent Picard from claiming media file handlers";
 
-  # Newly created build/cache directories inside iCloud-managed roots are not
-  # excluded automatically.  A launchd agent reruns iCloud exclusion marking on
-  # an hourly StartInterval timer to close the drift window between
-  # home-manager activations; the activation hook covers the immediate case.
   test_macos_icloud_exclusions_daily_schedule = assert' (
     containsRegex "icloud-exclusions" macosModuleText
     && containsRegex ''local\.icloud-exclusions'' macosModuleText
@@ -97,7 +74,7 @@ let
     test_posix_picard_ini_merge_overwrite_wiring
     test_windows_picard_ini_merge_overwrite_wiring
     test_canonical_picard_defaults_file
-    test_users_registry_exposes_picard_settings
+    test_users_overlay_exposes_picard_selector
     test_posix_picard_ini_awk_environ_escape
     test_linux_audio_mime_handler_prevents_picard
     test_macos_icloud_exclusions_daily_schedule

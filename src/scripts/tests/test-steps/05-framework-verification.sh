@@ -36,6 +36,7 @@ run_05_framework_verification() {
 
   say "--- documentation consistency tests ---"
   bash "$_test_dir/documentation-consistency-tests.sh" || _exit_code=1
+  bash "$_test_dir/load-user-registry-tests.sh" || _exit_code=1
 
   return "$_exit_code"
 }

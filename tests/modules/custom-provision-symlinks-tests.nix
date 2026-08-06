@@ -6,8 +6,17 @@ let
   homeText = builtins.readFile ../../src/modules/home.nix;
   customModuleText = builtins.readFile ../../src/modules/custom-provision-symlinks.nix;
   activationDagText = builtins.readFile ../../src/modules/lib/activation-dag.nix;
-  posixUsersText = builtins.readFile ../../src/modules/users.json;
-  windowsUsersText = builtins.readFile ../../src/hosts/Windows/users.json;
+  customSymlinksText = builtins.readFile ../../src/users/polyipseity/custom-provision-symlinks.json;
+  usersMacOS = import ../../src/modules/lib/users-registry.nix {
+    lib = import <nixpkgs/lib>;
+    repoRoot = ../..;
+    hostName = "MacBook";
+  };
+  usersWindows = import ../../src/modules/lib/users-registry.nix {
+    lib = import <nixpkgs/lib>;
+    repoRoot = ../..;
+    hostName = "Windows";
+  };
   windowsRegistryLoaderText = builtins.readFile ../../src/hosts/Windows/modules/Load-UserRegistry.ps1;
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
 
@@ -35,14 +44,13 @@ let
       "Shared activation DAG and custom-provision-symlinks module must keep all custom symlink activation steps";
 
   test_polyipseity_data_mapping_in_registries = assert' (
-    containsRegex ''"customProvisionSymlinks"'' posixUsersText
-    && containsRegex ''"path": "data"'' posixUsersText
-    && containsRegex ''"macos": "Library/Mobile Documents/com~apple~CloudDocs/data"'' posixUsersText
-    && containsRegex ''"linux": "clouds/GoogleDrive/data"'' posixUsersText
-    && containsRegex ''"windows": "clouds\\\\GoogleDrive\\\\data"'' posixUsersText
-    && containsRegex ''"customProvisionSymlinks"'' windowsUsersText
-    && containsRegex ''"path": "data"'' windowsUsersText
-    && containsRegex ''"windows": "clouds\\\\GoogleDrive\\\\data"'' windowsUsersText
+    containsRegex ''"customProvisionSymlinks"'' customSymlinksText
+    && containsRegex ''"path": "data"'' customSymlinksText
+    && containsRegex ''"macos": "Library/Mobile Documents/com~apple~CloudDocs/data"'' customSymlinksText
+    && containsRegex ''"linux": "clouds/GoogleDrive/data"'' customSymlinksText
+    && containsRegex ''"windows": "clouds\\\\GoogleDrive\\\\data"'' customSymlinksText
+    && (usersMacOS.polyipseity.customProvisionSymlinks != [ ])
+    && (usersWindows.polyipseity.customProvisionSymlinks != [ ])
   ) "polyipseity must map ~/data to native iCloud on macOS and Google Drive elsewhere";
 
   test_windows_apply_wires_custom_symlinks = assert' (
