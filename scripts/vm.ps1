@@ -519,16 +519,14 @@ function Invoke-VmUnpack {
       $androidTemplate = Join-Path $RepoRoot 'src\scripts\vms\start-android-vm.ps1'
       if (Test-Path -LiteralPath $androidTemplate -PathType Leaf) {
         $ramBytes = ConvertFrom-SizeString $vmDoc.ram
-        $adbPort = @($vmDoc.portForwards | Where-Object { $_.guestPort -eq 5555 } | Select-Object -First 1 -ExpandProperty hostPort)
-        $adbConsolePort = @($vmDoc.portForwards | Where-Object { $_.guestPort -eq 5554 } | Select-Object -First 1 -ExpandProperty hostPort)
+        $hostFwds = @($vmDoc.portForwards | ForEach-Object { "hostfwd=tcp::$($_.hostPort)-:$($_.guestPort)" }) -join ','
         $content = (Get-Content -LiteralPath $androidTemplate -Raw)
         $content = $content.Replace('__ANDROID_CPU_COUNT__', [string]$vmDoc.cpus)
         $content = $content.Replace('__ANDROID_RAM_BYTES__', "$ramBytes" + 'B')
         $content = $content.Replace('__ANDROID_SYSTEM_IMAGE__', [string]$vmDoc.Android.systemImage)
         $content = $content.Replace('__ANDROID_USERDATA_IMAGE__', [string]$vmDoc.Android.userdataImage)
         $content = $content.Replace('__ANDROID_GSI_IMAGE__', [string]$vmDoc.Android.gsiImage)
-        $content = $content.Replace('__ADB_PORT__', [string]$adbPort)
-        $content = $content.Replace('__ADB_CONSOLE_PORT__', [string]$adbConsolePort)
+        $content = $content.Replace('__HOSTFWDS__', $hostFwds)
         Write-VmUnpackFile -Path $startPs1Path -Content $content -Perform $perform
       } else {
         Write-NucleusWarning "unpack — shared Android start script not found: $androidTemplate"

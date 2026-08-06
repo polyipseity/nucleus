@@ -87,13 +87,34 @@ test_start_host_ps1_render() {
     -e "s|__HOST_KIND__|darwin-tart|g" \
     -e "s|__VM_NAME__|testvm|g" \
     -e "s|__VM_DISPLAY__|Test VM|g" \
-    -e "s|__VM_DIR__|/virtual machines|g"
+    -e "s|__VM_DIR__|/virtual machines|g" \
+    -e "s|__TART_SOFTNET_EXPOSE__|22010:22|g"
   assert_no_tokens "$_tmp/start-testvm.ps1" "start-host.ps1 (darwin-tart)"
   assert_contains "switch ('darwin-tart')" "$_tmp/start-testvm.ps1" "start-host.ps1 (darwin-tart)"
+  assert_contains '--net-softnet' "$_tmp/start-testvm.ps1" "start-host.ps1 (darwin-tart)"
+  assert_contains '--net-softnet-expose' "$_tmp/start-testvm.ps1" "start-host.ps1 (darwin-tart)"
+  assert_contains '22010:22' "$_tmp/start-testvm.ps1" "start-host.ps1 (darwin-tart)"
   # shellcheck disable=SC2016 # reason: literal $ in single quotes is intentional for grep -F needle matching of rendered PowerShell
-  assert_contains '& tart run $vmName' "$_tmp/start-testvm.ps1" "start-host.ps1 (darwin-tart)"
+  assert_contains '& tart run --net-softnet' "$_tmp/start-testvm.ps1" "start-host.ps1 (darwin-tart)"
   # shellcheck disable=SC2016 # reason: literal $ in single quotes is intentional for grep -F needle matching of rendered PowerShell
   assert_contains '$vmName = '\''testvm'\''' "$_tmp/start-testvm.ps1" "start-host.ps1 (darwin-tart)"
+}
+
+test_start_posix_sh_darwin_tart_render() {
+  render_template start-posix.sh "$_tmp/start-testvm.sh" \
+    -e "s|__HOST_KIND__|darwin-tart|g" \
+    -e "s|__VM_NAME__|testvm|g" \
+    -e "s|__VM_DISPLAY__|Test VM|g" \
+    -e "s|__VM_TYPE__|macOS|g" \
+    -e "s|__VM_DIR__|/virtual machines|g" \
+    -e "s|__TART_SOFTNET_EXPOSE__|22010:22|g"
+  assert_no_tokens "$_tmp/start-testvm.sh" "start-posix.sh (darwin-tart)"
+  assert_contains 'HOST_KIND="darwin-tart"' "$_tmp/start-testvm.sh" "start-posix.sh (darwin-tart)"
+  assert_contains '--net-softnet' "$_tmp/start-testvm.sh" "start-posix.sh (darwin-tart)"
+  assert_contains '--net-softnet-expose' "$_tmp/start-testvm.sh" "start-posix.sh (darwin-tart)"
+  assert_contains '22010:22' "$_tmp/start-testvm.sh" "start-posix.sh (darwin-tart)"
+  assert_contains 'exec tart run --net-softnet' "$_tmp/start-testvm.sh" "start-posix.sh (darwin-tart)"
+  assert_contains '"testvm"' "$_tmp/start-testvm.sh" "start-posix.sh (darwin-tart)"
 }
 
 test_stop_posix_sh_render() {
@@ -197,7 +218,7 @@ write_fixture_manifest() { # write_fixture_manifest <path> — Android (enabled)
       "cpus": 4,
       "ram": "8GB",
       "diskSize": "64GB",
-      "portForwards": [{"guestPort": 5555, "hostPort": 5555}, {"guestPort": 5554, "hostPort": 5554}],
+      "portForwards": [{"guestPort": 5555, "hostPort": 22040}, {"guestPort": 5554, "hostPort": 22041}],
       "macAddressPrefix": "52",
       "Android": {
         "systemImage": "Android-system.qcow2",
@@ -205,6 +226,19 @@ write_fixture_manifest() { # write_fixture_manifest <path> — Android (enabled)
         "gsiImage": "Android-gsi.img",
         "gsiUrl": "https://example.invalid/gsi.zip"
       }
+    },
+    {
+      "id": "MacBook",
+      "name": "MacBook",
+      "type": "macOS",
+      "enabled": false,
+      "hosts": ["MacBook"],
+      "cpus": 4,
+      "ram": "8GB",
+      "diskSize": "128GB",
+      "portForwards": [{"guestPort": 22, "hostPort": 22010}],
+      "macAddressPrefix": "52",
+      "macOS": {"version": "tahoe"}
     },
     {
       "id": "NixOS",
@@ -239,7 +273,7 @@ EOF
 test_descriptor_fixture_render() {
   local _vm_dir="$_tmp/render/vm" _images_dir="$_tmp/render/vm/images" _vms_dir="$_tmp/render/vms"
   local _manifest="$_tmp/render/manifest.json"
-  local _android_doc _nixos_doc _windows_doc
+  local _android_doc _nixos_doc _windows_doc _macos_doc
 
   mkdir -p "$_vm_dir" "$_images_dir" "$_vms_dir"
   write_fixture_manifest "$_manifest"
@@ -252,6 +286,7 @@ test_descriptor_fixture_render() {
   _android_doc="$(cat "$_vm_dir/Android.vm.json")"
   _nixos_doc="$(cat "$_vm_dir/NixOS.vm.json")"
   _windows_doc="$(cat "$_vm_dir/Windows.vm.json")"
+  _macos_doc="$(cat "$_vm_dir/MacBook.vm.json")"
 
   # windows-qemu renders (PowerShell-first): Android renders the shared
   # start-android-vm.ps1 with descriptor-driven tokens (cpus/ram/images/ports);
@@ -266,7 +301,7 @@ test_descriptor_fixture_render() {
   assert_contains "Join-Path \$imagesDir 'Android-system.qcow2'" "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 systemImage token"
   assert_contains "'-smp', '4'," "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 cpus token"
   assert_contains "'-m', '8000000000B'" "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 ram token"
-  assert_contains "hostfwd=tcp::5555-:5555,hostfwd=tcp::5554-:5554" "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 portForwards token"
+  assert_contains "hostfwd=tcp::22040-:5555,hostfwd=tcp::22041-:5554" "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 portForwards token"
   assert_no_tokens "$_vm_dir/scripts/start-Windows.ps1" "start-windows.ps1 (windows-qemu)"
   assert_no_tokens "$_vm_dir/scripts/start-Windows.sh" "start-windows-host.sh (windows-qemu)"
   assert_contains "-smp 4" "$_vm_dir/scripts/start-Windows.ps1" "start-windows.ps1 cpus token"
@@ -310,6 +345,16 @@ test_descriptor_fixture_render() {
   assert_no_tokens "$_vm_dir/scripts/stop-NixOS.sh" "stop-posix.sh (NixOS, darwin-utm)"
   assert_no_tokens "$_vm_dir/scripts/stop-NixOS.ps1" "stop-host.ps1 (NixOS, darwin-utm)"
   assert_contains 'exec utmctl stop "NixOS"' "$_vm_dir/scripts/stop-NixOS.sh" "stop-NixOS.sh utmctl dispatch"
+
+  # darwin-tart renders: posix .sh + host-dispatcher .ps1 with softnet expose.
+  vm_write_start_script "$_macos_doc" darwin-tart
+  assert_no_tokens "$_vm_dir/scripts/start-MacBook.sh" "start-posix.sh (MacBook, darwin-tart)"
+  assert_no_tokens "$_vm_dir/scripts/start-MacBook.ps1" "start-host.ps1 (MacBook, darwin-tart)"
+  assert_contains 'HOST_KIND="darwin-tart"' "$_vm_dir/scripts/start-MacBook.sh" "start-MacBook.sh host kind"
+  assert_contains "switch ('darwin-tart')" "$_vm_dir/scripts/start-MacBook.ps1" "start-MacBook.ps1 host kind"
+  assert_contains '--net-softnet-expose' "$_vm_dir/scripts/start-MacBook.sh" "start-MacBook.sh softnet expose"
+  assert_contains '22010:22' "$_vm_dir/scripts/start-MacBook.sh" "start-MacBook.sh portForwards render"
+  assert_contains '22010:22' "$_vm_dir/scripts/start-MacBook.ps1" "start-MacBook.ps1 portForwards render"
 
   # pack/unpack wrappers are refreshed for the whole tree.
   vm_write_pack_unpack_scripts
@@ -358,7 +403,8 @@ test_unpack_dry_run() {
   assert_contains "[dry-run] recreate UTM bundle" "$_out" "dry-run UTM bundle (enabled Android)"
   assert_contains "descriptor 'NixOS' is disabled; scripts rendered, no bundle/domain" "$_out" "disabled gate (NixOS)"
   assert_contains "descriptor 'Windows' is disabled; scripts rendered, no bundle/domain" "$_out" "disabled gate (Windows)"
-  assert_contains "regenerated wrappers for 3 descriptor(s)" "$_out" "unpack summary count"
+  assert_contains "descriptor 'MacBook' is disabled; scripts rendered, no bundle/domain" "$_out" "disabled gate (MacBook)"
+  assert_contains "regenerated wrappers for 4 descriptor(s)" "$_out" "unpack summary count"
   assert_contains "unpack — dry-run: nothing was regenerated; pass --force to perform" "$_out" "dry-run completion message"
 
   # Dry-run plans without writing any helper script file or bundle; the
@@ -377,6 +423,7 @@ test_unpack_dry_run() {
 }
 
 test_start_host_ps1_render
+test_start_posix_sh_darwin_tart_render
 test_stop_posix_sh_render
 test_stop_host_ps1_windows_golden
 test_descriptor_fixture_render

@@ -589,16 +589,14 @@ function Invoke-VMSetup {
                 throw "vm-setup: shared Android VM start script not found: $androidStartPath"
             }
             $ramBytes = ConvertFrom-SizeString $Vm.ram
-            $adbPort = [string](@($Vm.portForwards | Where-Object { $_.guestPort -eq 5555 } | Select-Object -First 1).hostPort)
-            $consolePort = [string](@($Vm.portForwards | Where-Object { $_.guestPort -eq 5554 } | Select-Object -First 1).hostPort)
+            $hostFwds = ($Vm.portForwards | ForEach-Object { "hostfwd=tcp::$($_.hostPort)-:$($_.guestPort)" }) -join ','
             $template = Get-Content -Path $androidStartPath -Raw
             $content = $template.Replace('__ANDROID_CPU_COUNT__', [string]$Vm.cpus)
             $content = $content.Replace('__ANDROID_RAM_BYTES__', "${ramBytes}B")
             $content = $content.Replace('__ANDROID_SYSTEM_IMAGE__', [string]$Vm.Android.systemImage)
             $content = $content.Replace('__ANDROID_USERDATA_IMAGE__', [string]$Vm.Android.userdataImage)
             $content = $content.Replace('__ANDROID_GSI_IMAGE__', [string]$Vm.Android.gsiImage)
-            $content = $content.Replace('__ADB_PORT__', $adbPort)
-            $content = $content.Replace('__ADB_CONSOLE_PORT__', $consolePort)
+            $content = $content.Replace('__HOSTFWDS__', $hostFwds)
             $startPs1 = Join-Path $ScriptsDir "start-$($Vm.id).ps1"
             if ($DryRun) {
                 Write-Information "vm-setup: [dry-run] Write start script: $startPs1"

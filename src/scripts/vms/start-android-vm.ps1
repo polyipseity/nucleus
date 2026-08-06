@@ -96,9 +96,9 @@ if (Test-Path -LiteralPath $diskGsi -PathType Leaf) {
   ))
 }
 
-# Network (ADB port forwarding).
+# Network (port forwarding from manifest portForwards).
 $qemuArgs.AddRange(@(
-  '-netdev', 'user,id=net0,hostfwd=tcp::__ADB_PORT__-:5555,hostfwd=tcp::__ADB_CONSOLE_PORT__-:5554',
+  '-netdev', 'user,id=net0,__HOSTFWDS__',
   '-device', 'virtio-net-pci,netdev=net0'
 ))
 
@@ -126,6 +126,6 @@ $qemuArgs.AddRange(@(
 # --- Launch QEMU ---
 Write-Output "Starting Android VM: $($qemu.Source)"
 Write-Output "  CPUs: __ANDROID_CPU_COUNT__  RAM: __ANDROID_RAM_BYTES__  Accel: tcg"
-Write-Output "  ADB:   localhost:__ADB_PORT__ -> guest:5555 (emulator) / localhost:__ADB_CONSOLE_PORT__ -> guest:5554 (console)"
+Write-Output "  Port forwards: __HOSTFWDS__"
 
 Start-Process -FilePath $qemu.Source -ArgumentList $qemuArgs -Wait -NoNewWindow
