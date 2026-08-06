@@ -33,35 +33,28 @@ EOF
 
 vm_android_config_print_manual() {
   cat <<'EOF'
-Android post-provision manual workflow (jqssun LineageOS 23 user system):
+Android post-provision (jqssun LineageOS 23 user build)
 
-The shipped system image is a user build — Lineage "Root access" and "Rooted
-debugging" are hidden until --root sets ro.debuggable and persist.sys.root_access.
-Magisk provides su; --root additionally enables host adb root.
+Flags: --gapps --adb-keys --magisk --root --fake-wifi --fake-wifi-revert
 
-Recovery (GApps and optional ADB keys):
-  1. nucleus-vm reset Android (fresh userdata) and start the VM.
-  2. Boot LineageOS Recovery (not the normal system). Factory-reset from recovery if needed.
-  3. In recovery: Advanced → Enter fastboot.
-  4. Run: nucleus-vm android-config Android --gapps
-     (flashes userdebug recovery, waits for recovery ADB, sideloads MindTheGapps)
-  5. After the flash, in recovery: Advanced → Enable ADB (required before sideload proceeds).
-  6. When recovery shows "Signature verification failed — Install anyway?", tap Yes on the VM screen.
-  7. Select Reboot system now when sideload finishes.
-  8. Optional in recovery: nucleus-vm android-config Android --adb-keys
-     (pre-authorizes the host key before first boot; skip if you will tap Allow on boot)
+--magisk installs Magisk su. --root enables Developer options, Local terminal,
+and host adb root (ro.debuggable + persist.sys.root_access). --fake-wifi needs Magisk su.
 
-Booted system (Magisk, rooted debugging, and fake Wi-Fi):
-  9. Complete Lineage setup wizard. Enable USB debugging and tap Allow on the prompt.
- 10. Run: nucleus-vm android-config Android --magisk
-     (patches boot.img on the booted guest, flashes via fastboot, installs Magisk)
- 11. Open the Magisk app on the VM. If it shows an environment-fix prompt, tap OK and allow the reboot, then re-run --magisk.
- 12. Run: nucleus-vm android-config Android --root
-     (dev options, Local terminal, ro.debuggable, Lineage root access, adb root)
- 13. Run: nucleus-vm android-config Android --fake-wifi
-     (requires Magisk su from step 10)
+Recovery (GApps, optional ADB keys):
+  1. nucleus-vm reset Android; start VM; boot LineageOS Recovery (factory-reset if needed).
+  2. Recovery → Advanced → Enter fastboot.
+  3. nucleus-vm android-config Android --gapps
+  4. Recovery → Advanced → Enable ADB.
+  5. Tap Install anyway when sideload asks about signature verification.
+  6. Reboot system now.
+  7. Optional: nucleus-vm android-config Android --adb-keys (skip if you will tap Allow on first boot).
 
-Run without flags to show this guide: nucleus-vm android-config Android
+Booted system:
+  8. Finish setup wizard; enable USB debugging; tap Allow.
+  9. nucleus-vm android-config Android --magisk
+ 10. Open Magisk app; complete environment-fix if prompted; re-run --magisk if needed.
+ 11. nucleus-vm android-config Android --root
+ 12. nucleus-vm android-config Android --fake-wifi
 EOF
 }
 
@@ -114,17 +107,15 @@ vm_android_config_gapps() {
     say "using cached MindTheGapps: $_vacg_zip"
   fi
 
-  say "manual step: when recovery shows 'Signature verification failed — Install anyway?', tap Yes on the VM screen"
+  say "tap Install anyway on the VM if sideload asks about signature verification"
   say "sideloading MindTheGapps to $_vacg_serial..."
   if ! run_cmd adb -s "$_vacg_serial" sideload "$_vacg_zip"; then
-    error "adb sideload failed; confirm you tapped Install anyway on the VM if prompted"
+    error "adb sideload failed; tap Install anyway on the VM if prompted, then retry"
     return 1
   fi
 
-  say "MindTheGapps sideload finished."
-  say "manual step: select Reboot system now from the recovery menu"
-  say "optional in recovery: nucleus-vm android-config Android --adb-keys"
-  say "after Lineage boots: nucleus-vm android-config Android --magisk --root --fake-wifi"
+  say "MindTheGapps sideload finished"
+  say "next: reboot system; then --magisk, --root, --fake-wifi"
 }
 
 vm_android_config_adb_keys() {
@@ -186,6 +177,9 @@ vm_android_config_adb_keys() {
       ;;
   esac
   say "installed host ADB key on $_vaca_serial ($_vaca_state)"
+  case "$_vaca_state" in
+    recovery|sideload) say "next: reboot system, then --magisk, --root, --fake-wifi" ;;
+  esac
 }
 
 vm_android_config() {
