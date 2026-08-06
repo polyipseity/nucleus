@@ -26,6 +26,12 @@ let
     scriptName = "src/scripts/services/sccache-gc";
   };
 
+  logGcUser = pkgs.writeNucleusShellApplication {
+    name = "log-gc-user";
+    runtimeInputs = [ pkgs.jq ];
+    scriptName = "src/scripts/services/log-gc-user";
+  };
+
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 lib.mkIf pkgs.stdenv.isLinux {
@@ -299,6 +305,34 @@ lib.mkIf pkgs.stdenv.isLinux {
       OnCalendar = "12:00:00";
       Persistent = true;
       Unit = "sccache-gc.service";
+    };
+    Install = {
+      WantedBy = [ "timers.target" ];
+    };
+  };
+
+  # --------------------------------------------------------------------------
+  # Daily user log rotation — rotates user-scope nucleus logs at noon.
+  # Cross-host parity with macOS launchd agent and Windows scheduled task.
+  systemd.user.services."log-gc-user" = {
+    Unit = {
+      Description = "Daily user log rotation for nucleus services";
+    };
+    Service = {
+      Type = "oneshot";
+      ExecStart = "${logGcUser}/bin/nucleus-log-gc-user";
+      Environment = "NUCLEUS_REPO_ROOT=${repoRoot}";
+    };
+  };
+
+  systemd.user.timers."log-gc-user" = {
+    Unit = {
+      Description = "Daily user log rotation timer";
+    };
+    Timer = {
+      OnCalendar = "12:00:00";
+      Persistent = true;
+      Unit = "log-gc-user.service";
     };
     Install = {
       WantedBy = [ "timers.target" ];

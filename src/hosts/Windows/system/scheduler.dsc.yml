@@ -117,3 +117,31 @@ properties:
         Enabled: true
         RunWithHighestPrivileges: true
         RunOnlyIfLoggedOn: false
+
+    - resource: Microsoft.Windows.Settings/TaskScheduler
+      directives:
+        description: >-
+          Daily user log rotation at 12:00 local time. Mirrors macOS launchd
+          agent and NixOS systemd user timer for user-scope nucleus logs.
+      settings:
+        TaskPath: \nucleus\
+        TaskName: log-gc-user
+        TaskDescriptionLiteral: Daily user log rotation for nucleus services
+        Action: |
+          $RepoRoot = $env:NUCLEUS_REPO_ROOT
+          if (-not $RepoRoot) {
+            Write-Output "log-gc-user: NUCLEUS_REPO_ROOT not set; run via apply.ps1"
+            exit 1
+          }
+          $LogGcScript = Join-Path $RepoRoot "src\scripts\services\log-gc-user.ps1"
+          if (-not (Test-Path -LiteralPath $LogGcScript -PathType Leaf)) {
+            Write-Output "log-gc-user: src/scripts/services/log-gc-user.ps1 not found"
+            exit 1
+          }
+          & $LogGcScript
+        Trigger: Daily
+        AtTime: 12:00
+        DaysInterval: 1
+        Enabled: true
+        RunWithHighestPrivileges: false
+        RunOnlyIfLoggedOn: true
