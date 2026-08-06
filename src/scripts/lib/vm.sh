@@ -1363,13 +1363,26 @@ vm_android_fastboot_serial() {
   printf 'tcp:localhost:%s\n' "$(vm_android_fastboot_host_port "$1")"
 }
 
+# vm_android_fastboot_probe SERIAL GETVAR_NAME
+#   Return 0 when fastboot answers GETVAR_NAME within the probe timeout.
+vm_android_fastboot_probe() {
+  _afp_serial="$1"
+  _afp_getvar="$2"
+  _afp_out=''
+
+  _afp_out="$(run_command_with_timeout 8 fastboot -s "$_afp_serial" getvar "$_afp_getvar" 2>/dev/null)" || return 1
+  printf '%s' "$_afp_out" | grep -q "^${_afp_getvar}:"
+}
+
 # vm_android_fastboot_list_state VM_INDEX
 #   Return fastboot state for the manifest serial: fastboot or offline.
 #   TCP fastboot (QEMU/jqssun) never appears in `fastboot devices`; probe with getvar.
 vm_android_fastboot_list_state() {
   _afls_vm_index="$1"
   _afls_serial="$(vm_android_fastboot_serial "$_afls_vm_index")"
-  if fastboot -s "$_afls_serial" getvar version >/dev/null 2>&1; then
+
+  if vm_android_fastboot_probe "$_afls_serial" is-userspace \
+    || vm_android_fastboot_probe "$_afls_serial" version; then
     printf 'fastboot\n'
     return 0
   fi
@@ -1384,6 +1397,11 @@ vm_android_fastboot_wait() {
   _afw_serial="$(vm_android_fastboot_serial "$_afw_vm_index")"
   _afw_elapsed=0
   _afw_last_hint=-30
+
+  if [ "$(vm_android_fastboot_list_state "$_afw_vm_index")" = "fastboot" ]; then
+    say "guest already in fastboot on $_afw_serial"
+    return 0
+  fi
 
   say "waiting for fastboot on $_afw_serial (timeout ${_afw_timeout}s)..."
 
@@ -1408,6 +1426,17 @@ vm_android_adb_get_state() {
   adb -s "$_aas_serial" get-state 2>/dev/null || printf 'unknown\n'
 }
 
+# vm_android_adb_refresh VM_INDEX
+#   Reset the TCP ADB session so adb devices reflects the current guest mode.
+vm_android_adb_refresh() {
+  _afr_vm_index="$1"
+  _afr_serial="$(vm_android_adb_serial "$_afr_vm_index")"
+  # check-suppress:suppression_doc: disconnect clears stale unauthorized/recovery entries on network ADB.
+  adb disconnect "$_afr_serial" >/dev/null 2>&1 || true
+  # check-suppress:suppression_doc: connect is idempotent; failure while the guest is still booting is expected.
+  adb connect "$_afr_serial" >/dev/null 2>&1 || true
+}
+
 # vm_android_adb_list_state VM_INDEX
 #   Return adb devices state for the manifest serial: device, unauthorized,
 #   offline, recovery, sideload, or unknown.
@@ -1419,7 +1448,19 @@ vm_android_adb_list_state() {
     printf '%s\n' "$_als_devices_state"
     return 0
   fi
-  vm_android_adb_get_state "$_als_vm_index"
+  _als_get_state="$(adb -s "$_als_serial" get-state 2>/dev/null || true)"
+  if [ -n "$_als_get_state" ]; then
+    printf '%s\n' "$_als_get_state"
+    return 0
+  fi
+  printf 'offline\n'
+}
+
+# vm_android_adb_poll_state VM_INDEX
+#   Refresh the TCP session and return the current adb state.
+vm_android_adb_poll_state() {
+  vm_android_adb_refresh "$1"
+  vm_android_adb_list_state "$1"
 }
 
 # vm_android_adb_wait_authorized VM_INDEX [TIMEOUT]
@@ -1434,9 +1475,7 @@ vm_android_adb_wait_authorized() {
   say "waiting for authorized ADB on $_awa_serial (timeout ${_awa_timeout}s)..."
 
   while [ "$_awa_elapsed" -lt "$_awa_timeout" ]; do
-    # check-suppress:suppression_doc: adb connect is idempotent; failure while the guest is still booting is expected in the retry loop.
-    adb connect "$_awa_serial" >/dev/null 2>&1 || true
-    _awa_state="$(vm_android_adb_list_state "$_awa_vm_index")"
+    _awa_state="$(vm_android_adb_poll_state "$_awa_vm_index")"
     case "$_awa_state" in
       device) return 0 ;;
       unauthorized)
@@ -1446,20 +1485,59 @@ vm_android_adb_wait_authorized() {
         fi
         ;;
       recovery|sideload)
-        error "guest is in $_awa_state mode; boot LineageOS to the home screen first"
-        return 1
+        if [ "$_awa_elapsed" -ge "$((_awa_last_unauth_msg + 30))" ]; then
+          say "guest is in $_awa_state; boot LineageOS system for this step (Reboot system now from recovery)"
+          _awa_last_unauth_msg="$_awa_elapsed"
+        fi
         ;;
     esac
     sleep 5
     _awa_elapsed=$((_awa_elapsed + 5))
   done
 
-  _awa_final="$(vm_android_adb_list_state "$_awa_vm_index")"
+  _awa_final="$(vm_android_adb_poll_state "$_awa_vm_index")"
   if [ "$_awa_final" = "unauthorized" ]; then
     error "timed out waiting for ADB authorization on $_awa_serial; boot LineageOS and tap Allow USB debugging"
   else
     error "timed out waiting for authorized ADB on $_awa_serial"
   fi
+  return 1
+}
+
+# vm_android_adb_wait_sideload VM_INDEX [TIMEOUT]
+#   Wait until ADB reports sideload (refreshes the TCP session each poll).
+vm_android_adb_wait_sideload() {
+  _aws_vm_index="$1"
+  _aws_timeout="${2:-120}"
+  _aws_serial="$(vm_android_adb_serial "$_aws_vm_index")"
+  _aws_elapsed=0
+  _aws_last_hint=-15
+
+  say "waiting for sideload ADB on $_aws_serial (timeout ${_aws_timeout}s)..."
+
+  while [ "$_aws_elapsed" -lt "$_aws_timeout" ]; do
+    _aws_state="$(vm_android_adb_poll_state "$_aws_vm_index")"
+    case "$_aws_state" in
+      sideload) return 0 ;;
+      recovery)
+        if [ "$_aws_elapsed" -ge "$((_aws_last_hint + 15))" ]; then
+          say "manual step: in recovery, select Apply update from ADB to enter sideload mode"
+          _aws_last_hint="$_aws_elapsed"
+        fi
+        ;;
+      unauthorized)
+        if [ "$_aws_elapsed" -ge "$((_aws_last_hint + 15))" ]; then
+          say "ADB unauthorized — enable ADB in recovery (Advanced → Enable ADB)"
+          _aws_last_hint="$_aws_elapsed"
+        fi
+        ;;
+    esac
+    sleep 2
+    _aws_elapsed=$((_aws_elapsed + 2))
+  done
+
+  _aws_final="$(vm_android_adb_poll_state "$_aws_vm_index")"
+  error "timed out waiting for sideload ADB on $_aws_serial (state: $_aws_final)"
   return 1
 }
 
@@ -1474,9 +1552,7 @@ vm_android_adb_connect() {
   say "waiting for ADB on $_aac_serial (timeout ${_aac_timeout}s)..."
 
   while [ "$_aac_elapsed" -lt "$_aac_timeout" ]; do
-    # check-suppress:suppression_doc: adb connect is idempotent; failure while the guest is still booting is expected in the retry loop.
-    adb connect "$_aac_serial" >/dev/null 2>&1 || true
-    _aac_state="$(vm_android_adb_list_state "$_aac_vm_index")"
+    _aac_state="$(vm_android_adb_poll_state "$_aac_vm_index")"
     case "$_aac_state" in
       device|recovery|sideload) return 0 ;;
     esac
@@ -1594,13 +1670,28 @@ vm_android_download_userdebug_recovery() {
   return 0
 }
 
-# vm_android_ensure_userdebug_recovery VM_INDEX RELEASE_TAG
-#   Flash the cached userdebug recovery via fastboot when the release tag changed.
+# vm_android_guest_has_userdebug_recovery VM_INDEX
+#   True when recovery/sideload ADB reports ro.debuggable=1 (guest has userdebug recovery).
+vm_android_guest_has_userdebug_recovery() {
+  _aghur_vm_index="$1"
+  _aghur_serial="$(vm_android_adb_serial "$_aghur_vm_index")"
+  _aghur_state="$(vm_android_adb_poll_state "$_aghur_vm_index")"
+  _aghur_debuggable=''
+
+  case "$_aghur_state" in
+    recovery|sideload)
+      _aghur_debuggable="$(adb -s "$_aghur_serial" shell getprop ro.debuggable 2>/dev/null | tr -d '\r\n')"
+      [ "$_aghur_debuggable" = "1" ] && return 0
+      ;;
+  esac
+  return 1
+}
+
+# vm_android_ensure_userdebug_recovery VM_INDEX
+#   Flash the cached userdebug recovery via fastboot unless the guest already reports userdebug.
 vm_android_ensure_userdebug_recovery() {
   _aeur_vm_index="$1"
-  _aeur_release_tag="$2"
   _aeur_img="$IMAGES_DIR/android-recovery-userdebug.img"
-  _aeur_marker="$IMAGES_DIR/android-recovery-userdebug.flashed"
   _aeur_fb_serial="$(vm_android_fastboot_serial "$_aeur_vm_index")"
 
   if [ ! -f "$_aeur_img" ]; then
@@ -1608,27 +1699,19 @@ vm_android_ensure_userdebug_recovery() {
     return 1
   fi
 
-  if [ -f "$_aeur_marker" ] && grep -qx "$_aeur_release_tag" "$_aeur_marker" 2>/dev/null; then
-    _aeur_adb_state="$(vm_android_adb_list_state "$_aeur_vm_index")"
-    case "$_aeur_adb_state" in
-      recovery|sideload)
-        say "userdebug recovery already flashed for release $_aeur_release_tag"
-        return 0
-        ;;
-      unauthorized)
-        say "userdebug recovery was flashed but ADB is still unauthorized; re-flashing via fastboot..."
-        ;;
-      *)
-        say "userdebug recovery was flashed but ADB state is $_aeur_adb_state; re-flashing via fastboot..."
-        ;;
-    esac
-  fi
+  # Fastboot mode has no ADB — probe fastboot before any adb connect/disconnect.
+  if [ "$(vm_android_fastboot_list_state "$_aeur_vm_index")" = "fastboot" ]; then
+    say "guest already in fastboot on $_aeur_fb_serial"
+  elif vm_android_guest_has_userdebug_recovery "$_aeur_vm_index"; then
+    say "userdebug recovery is active on the guest (ro.debuggable=1)"
+    return 0
+  else
+    say "flashing userdebug recovery for MindTheGapps sideload..."
+    say "manual step: in LineageOS Recovery, open Advanced → Enter fastboot (stock recovery cannot flash over ADB)"
 
-  say "flashing userdebug recovery for MindTheGapps sideload..."
-  say "manual step: in LineageOS Recovery, open Advanced → Enter fastboot (do not use ADB — stock recovery stays unauthorized)"
-
-  if ! vm_android_fastboot_wait "$_aeur_vm_index" 180; then
-    return 1
+    if ! vm_android_fastboot_wait "$_aeur_vm_index" 180; then
+      return 1
+    fi
   fi
 
   if ! fastboot -s "$_aeur_fb_serial" flash recovery "$_aeur_img"; then
@@ -1638,8 +1721,8 @@ vm_android_ensure_userdebug_recovery() {
 
   # check-suppress:suppression_doc: fastboot reboot after flash is best-effort; guest may already be rebooting to recovery.
   fastboot -s "$_aeur_fb_serial" reboot 2>/dev/null || true
-  printf '%s\n' "$_aeur_release_tag" > "$_aeur_marker"
-  say "userdebug recovery flashed; waiting for recovery to boot..."
+  say "userdebug recovery flashed; guest should reboot to recovery"
+  say "manual step: in recovery, enable ADB (Advanced → Enable ADB) before sideload can continue"
   sleep 10
 }
 
@@ -1655,20 +1738,18 @@ vm_android_adb_wait_recovery() {
   say "waiting for recovery ADB on $_awr_serial (timeout ${_awr_timeout}s)..."
 
   while [ "$_awr_elapsed" -lt "$_awr_timeout" ]; do
-    # check-suppress:suppression_doc: adb connect is idempotent; failure while the guest is still booting is expected in the retry loop.
-    adb connect "$_awr_serial" >/dev/null 2>&1 || true
-    _awr_state="$(vm_android_adb_list_state "$_awr_vm_index")"
+    _awr_state="$(vm_android_adb_poll_state "$_awr_vm_index")"
     case "$_awr_state" in
       recovery|sideload) return 0 ;;
       unauthorized)
         if [ "$_awr_elapsed" -ge "$((_awr_last_hint + 30))" ]; then
-          say "ADB still unauthorized — enter fastboot (Advanced → Enter fastboot) so userdebug recovery can be flashed, or retry after flash completes"
+          say "ADB unauthorized — in userdebug recovery, enable ADB (Advanced → Enable ADB)"
           _awr_last_hint="$_awr_elapsed"
         fi
         ;;
       device)
         if [ "$_awr_elapsed" -ge "$((_awr_last_hint + 30))" ]; then
-          say "guest is booted to system; boot LineageOS Recovery instead (power off → hold Vol- or use Reboot to recovery)"
+          say "guest is booted to system; boot LineageOS Recovery instead (power off → Reboot to recovery)"
           _awr_last_hint="$_awr_elapsed"
         fi
         ;;
@@ -1677,8 +1758,12 @@ vm_android_adb_wait_recovery() {
     _awr_elapsed=$((_awr_elapsed + 5))
   done
 
-  _awr_final="$(vm_android_adb_list_state "$_awr_vm_index")"
-  error "timed out waiting for recovery ADB on $_awr_serial (state: $_awr_final); boot the VM into LineageOS Recovery"
+  _awr_final="$(vm_android_adb_poll_state "$_awr_vm_index")"
+  if [ "$_awr_final" = "unauthorized" ]; then
+    error "timed out waiting for recovery ADB on $_awr_serial; enable ADB in recovery (Advanced → Enable ADB)"
+  else
+    error "timed out waiting for recovery ADB on $_awr_serial (state: $_awr_final); boot LineageOS Recovery"
+  fi
   return 1
 }
 
