@@ -73,7 +73,7 @@ Type-specific fields (nested objects keyed by `type`; all fields required when `
 
 | `type`      | Group      | Fields                                                                                                                                                                                                                    |
 | ----------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"Android"` | `Android`  | `systemImage`, `userdataImage`, `gsiImage`, `gsiUrl`, `gappsUrl` (all required; `gsiUrl` may be `null` for Lineage-only — no GSI disk; `gappsUrl` is the MindTheGapps sideload zip URL)                                                                                             |
+| `"Android"` | `Android`  | `systemImage`, `userdataImage`, `gsiImage`, `gsiUrl`, `gappsUrl` (all required; `gsiUrl` may be `null` for Lineage-only — no GSI disk; `gappsUrl` is the MindTheGapps zip URL for booted-system install)                                                                                             |
 | `"macOS"`  | `macOS`    | `version` (release name, e.g. `"tahoe"`)                                                                                                                                                                                 |
 | `"Windows"` | `Windows`  | `edition` (e.g. `"pro"`), `isoUrl` (`null` = Mido/Fido auto-resolve; a URL auto-downloads the installer ISO when `--windows-iso` is omitted, cached at `~/virtual machines/images/<id>-installer.iso`)                  |
 
@@ -122,7 +122,7 @@ Guest port forwards are declared in the `portForwards` array of each VM entry: n
 | Tart (macOS) | `--net-softnet-expose hostPort:guestPort` | Use `tart ip <name>` + SSH guest port `22` (softnet-expose does not bind loopback) |
 | Android | Same as QEMU host backend | `adb connect localhost:<hostPort for guest 5555>` |
 
-**Host tooling:** `adb` and `fastboot` are required for `nucleus-vm android-config`. POSIX hosts install them via `pkgs.android-tools` in `src/modules/core.nix` (`nucleus-apply`); the `nucleus-vm` flake app also bundles `android-tools` in its runtime inputs. Windows installs `Google.PlatformTools` via WinGet DSC (`src/hosts/Windows/system/packages.dsc.yml`).
+**Host tooling:** `adb` is required for `nucleus-vm android-config`. POSIX hosts install it via `pkgs.android-tools` in `src/modules/core.nix` (`nucleus-apply`); the `nucleus-vm` flake app also bundles `android-tools` in its runtime inputs. Windows installs `Google.PlatformTools` via WinGet DSC (`src/hosts/Windows/system/packages.dsc.yml`).
 
 ## Disk format
 
@@ -203,7 +203,7 @@ Both hooks are best-effort: a VM sync/setup failure does not abort a completed s
 |---------|-------------|
 | `sync` | Manifest or Nix VM template changed; VMs already provisioned. Runs automatically after apply. |
 | `setup` | First VM, missing images/bundles, credential/config drift, new guest. Full provision (sync + build + disks). |
-| `android-config` | Android only: flash userdebug recovery, sideload MindTheGapps, install ADB keys, enable Lineage root, configure fake Wi‑Fi. Requires a running VM. |
+| `android-config` | Android only: install MindTheGapps on booted Lineage, install ADB keys, enable Lineage root, configure fake Wi‑Fi. Requires a running VM booted to Lineage with authorized ADB (tap Allow on first connect after reset). |
 | `pack` / `unpack` | Copy VM tree to another host (`unpack` may recreate UTM bundles). |
 | `start` / `stop` | Runtime control. Restart after sync when port forwards changed. |
 
