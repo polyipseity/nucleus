@@ -1365,12 +1365,12 @@ vm_android_fastboot_serial() {
 
 # vm_android_fastboot_list_state VM_INDEX
 #   Return fastboot state for the manifest serial: fastboot or offline.
+#   TCP fastboot (QEMU/jqssun) never appears in `fastboot devices`; probe with getvar.
 vm_android_fastboot_list_state() {
   _afls_vm_index="$1"
   _afls_serial="$(vm_android_fastboot_serial "$_afls_vm_index")"
-  _afls_state="$(fastboot devices 2>/dev/null | awk -v serial="$_afls_serial" '$1 == serial { print $2; exit }')"
-  if [ -n "$_afls_state" ]; then
-    printf '%s\n' "$_afls_state"
+  if fastboot -s "$_afls_serial" getvar version >/dev/null 2>&1; then
+    printf 'fastboot\n'
     return 0
   fi
   printf 'offline\n'
@@ -1392,7 +1392,7 @@ vm_android_fastboot_wait() {
       return 0
     fi
     if [ "$_afw_elapsed" -ge "$((_afw_last_hint + 30))" ]; then
-      say "manual step: in recovery, open Advanced → Reboot to fastboot (or Enter fastboot)"
+      say "manual step: in LineageOS Recovery, open Advanced → Enter fastboot"
       _afw_last_hint="$_afw_elapsed"
     fi
     sleep 5
@@ -1497,25 +1497,81 @@ vm_android_recovery_asset_suffix() {
   esac
 }
 
+# vm_android_jqssun_release_tag_for_asset ASSET_NAME
+#   Resolve the current jqssun release tag via the releases/latest/download redirect.
+vm_android_jqssun_release_tag_for_asset() {
+  _jrta_asset="$1"
+  _jrta_location=''
+  _jrta_tag=''
+
+  if [ -z "$_jrta_asset" ]; then
+    error "jqssun asset name is required"
+    return 1
+  fi
+
+  _jrta_location="$(
+    curl -fsI "https://github.com/jqssun/android-lineage-qemu/releases/latest/download/$_jrta_asset" \
+      | awk 'tolower($1) == "location:" { print $2; exit }' | tr -d '\r\n'
+  )" || {
+    error "failed to resolve jqssun release redirect for $_jrta_asset"
+    return 1
+  }
+
+  if [ -z "$_jrta_location" ]; then
+    error "failed to resolve jqssun release redirect for $_jrta_asset (no Location header)"
+    return 1
+  fi
+
+  _jrta_tag="$(printf '%s' "$_jrta_location" | sed -n 's|.*/releases/download/\([^/]*\)/.*|\1|p')"
+  if [ -z "$_jrta_tag" ]; then
+    error "failed to parse jqssun release tag from redirect for $_jrta_asset"
+    return 1
+  fi
+
+  printf '%s\n' "$_jrta_tag"
+}
+
+# vm_android_jqssun_asset_url TAG ASSET_SUBSTRING
+#   Find a release asset download URL on GitHub without the REST API.
+vm_android_jqssun_asset_url() {
+  _jau_tag="$1"
+  _jau_substring="$2"
+  _jau_page=''
+  _jau_path=''
+
+  if [ -z "$_jau_tag" ] || [ -z "$_jau_substring" ]; then
+    error "jqssun release tag and asset substring are required"
+    return 1
+  fi
+
+  _jau_page="$(curl -fsSL "https://github.com/jqssun/android-lineage-qemu/releases/expanded_assets/$_jau_tag")" \
+    || { error "failed to fetch jqssun release asset list for $_jau_tag"; return 1; }
+
+  _jau_path="$(
+    printf '%s' "$_jau_page" \
+      | grep -oE "href=\"/jqssun/android-lineage-qemu/releases/download/[^\"]*${_jau_substring}[^\"]*\"" \
+      | head -1 \
+      | sed -n 's/href="\([^"]*\)"/\1/p'
+  )"
+  if [ -z "$_jau_path" ]; then
+    error "no jqssun asset matching '$_jau_substring' in release $_jau_tag"
+    return 1
+  fi
+
+  printf 'https://github.com%s\n' "$_jau_path"
+}
+
 # vm_android_download_userdebug_recovery VM_INDEX
 #   Download and cache the jqssun userdebug recovery image for sideloading GApps.
 vm_android_download_userdebug_recovery() {
   _adur_vm_index="$1"
   _adur_suffix="$(vm_android_recovery_asset_suffix "$_adur_vm_index")"
   _adur_img="$IMAGES_DIR/android-recovery-userdebug.img"
-  _adur_release_json="$IMAGES_DIR/android-lineage-release.json"
   _adur_asset_name="recovery_${_adur_suffix}-userdebug.img"
+  _adur_dl_url="https://github.com/jqssun/android-lineage-qemu/releases/latest/download/$_adur_asset_name"
+  _adur_tag=''
 
-  run_with_backoff "download LineageOS release metadata" \
-    curl -fsSL -o "$_adur_release_json" \
-    "https://api.github.com/repos/jqssun/android-lineage-qemu/releases/latest" \
-    || { error "failed to fetch latest LineageOS release info"; return 1; }
-
-  _adur_tag="$(jq -r '.tag_name' "$_adur_release_json")"
-  if [ -z "$_adur_tag" ] || [ "$_adur_tag" = "null" ]; then
-    error "no release tag in LineageOS release metadata"
-    return 1
-  fi
+  _adur_tag="$(vm_android_jqssun_release_tag_for_asset "$_adur_asset_name")" || return 1
 
   if [ -f "$_adur_img" ]; then
     _adur_cached_tag="$(jq -r '.tag_name // empty' "$IMAGES_DIR/android-recovery-userdebug.tag.json" 2>/dev/null || true)"
@@ -1527,13 +1583,6 @@ vm_android_download_userdebug_recovery() {
     rm -f "$_adur_img"
   else
     say "downloading userdebug recovery ($_adur_asset_name)..."
-  fi
-
-  _adur_dl_url="$(jq -r --arg name "$_adur_asset_name" \
-    '.assets[] | select(.name == $name) | .browser_download_url' "$_adur_release_json")"
-  if [ -z "$_adur_dl_url" ] || [ "$_adur_dl_url" = "null" ]; then
-    error "no $_adur_asset_name found in latest jqssun release"
-    return 1
   fi
 
   run_with_backoff "download userdebug recovery" \
@@ -1553,7 +1602,6 @@ vm_android_ensure_userdebug_recovery() {
   _aeur_img="$IMAGES_DIR/android-recovery-userdebug.img"
   _aeur_marker="$IMAGES_DIR/android-recovery-userdebug.flashed"
   _aeur_fb_serial="$(vm_android_fastboot_serial "$_aeur_vm_index")"
-  _aeur_adb_serial="$(vm_android_adb_serial "$_aeur_vm_index")"
 
   if [ ! -f "$_aeur_img" ]; then
     error "userdebug recovery image missing: $_aeur_img"
@@ -1562,43 +1610,37 @@ vm_android_ensure_userdebug_recovery() {
 
   if [ -f "$_aeur_marker" ] && grep -qx "$_aeur_release_tag" "$_aeur_marker" 2>/dev/null; then
     _aeur_adb_state="$(vm_android_adb_list_state "$_aeur_vm_index")"
-    if [ "$_aeur_adb_state" = "recovery" ] || [ "$_aeur_adb_state" = "sideload" ]; then
-      say "userdebug recovery already flashed for release $_aeur_release_tag"
-      return 0
-    fi
-    say "userdebug recovery was flashed but ADB state is $_aeur_adb_state; re-flashing..."
+    case "$_aeur_adb_state" in
+      recovery|sideload)
+        say "userdebug recovery already flashed for release $_aeur_release_tag"
+        return 0
+        ;;
+      unauthorized)
+        say "userdebug recovery was flashed but ADB is still unauthorized; re-flashing via fastboot..."
+        ;;
+      *)
+        say "userdebug recovery was flashed but ADB state is $_aeur_adb_state; re-flashing via fastboot..."
+        ;;
+    esac
   fi
 
   say "flashing userdebug recovery for MindTheGapps sideload..."
-  _aeur_adb_state="$(vm_android_adb_list_state "$_aeur_vm_index")"
-  case "$_aeur_adb_state" in
-    recovery|sideload)
-      say "rebooting to fastboot via ADB..."
-      # check-suppress:suppression_doc: reboot fastboot may fail when already in fastboot; fastboot wait below is authoritative.
-      adb -s "$_aeur_adb_serial" reboot fastboot 2>/dev/null || true
-      ;;
-    unauthorized)
-      say "stock recovery reports ADB unauthorized (expected until userdebug recovery is flashed)"
-      say "manual step: in recovery, open Advanced → Reboot to fastboot (or Enter fastboot)"
-      ;;
-    *)
-      say "manual step: boot LineageOS Recovery, then Advanced → Reboot to fastboot (or Enter fastboot)"
-      ;;
-  esac
+  say "manual step: in LineageOS Recovery, open Advanced → Enter fastboot (do not use ADB — stock recovery stays unauthorized)"
 
   if ! vm_android_fastboot_wait "$_aeur_vm_index" 180; then
     return 1
   fi
 
   if ! fastboot -s "$_aeur_fb_serial" flash recovery "$_aeur_img"; then
-    error "fastboot flash recovery failed on $_aeur_fb_serial; enter fastboot from recovery (Advanced → Enter fastboot) and retry"
+    error "fastboot flash recovery failed on $_aeur_fb_serial; confirm Advanced → Enter fastboot is active on the VM"
     return 1
   fi
 
   # check-suppress:suppression_doc: fastboot reboot after flash is best-effort; guest may already be rebooting to recovery.
   fastboot -s "$_aeur_fb_serial" reboot 2>/dev/null || true
   printf '%s\n' "$_aeur_release_tag" > "$_aeur_marker"
-  say "userdebug recovery flashed; guest should return to recovery"
+  say "userdebug recovery flashed; waiting for recovery to boot..."
+  sleep 10
 }
 
 # vm_android_adb_wait_recovery VM_INDEX [TIMEOUT]
@@ -1620,7 +1662,7 @@ vm_android_adb_wait_recovery() {
       recovery|sideload) return 0 ;;
       unauthorized)
         if [ "$_awr_elapsed" -ge "$((_awr_last_hint + 30))" ]; then
-          say "ADB shows unauthorized — stock recovery cannot sideload until userdebug recovery is flashed via fastboot"
+          say "ADB still unauthorized — enter fastboot (Advanced → Enter fastboot) so userdebug recovery can be flashed, or retry after flash completes"
           _awr_last_hint="$_awr_elapsed"
         fi
         ;;
@@ -1679,15 +1721,11 @@ vm_build_android() {
     else
       say "downloading LineageOS base image for '$_bai_vm_name'..."
     fi
-    run_with_backoff "download LineageOS release metadata" \
-      curl -fsSL -o "$IMAGES_DIR/android-lineage-release.json" \
-      "https://api.github.com/repos/jqssun/android-lineage-qemu/releases/latest" \
-      || { error "failed to fetch latest LineageOS release info"; return 1; }
-    _bai_dl_url="$(jq -r '.assets[] | select(.name | test("UTM-VM-lineage-.*-virtio_arm64only\\.zip")) | .browser_download_url' "$IMAGES_DIR/android-lineage-release.json" | head -1)"
-    if [ -z "$_bai_dl_url" ] || [ "$_bai_dl_url" = "null" ]; then
-      error "no LineageOS UTM zip found in latest release assets"
-      return 1
-    fi
+    _bai_suffix="$(vm_android_recovery_asset_suffix "$_bai_vm_index")"
+    _bai_tag="$(vm_android_jqssun_release_tag_for_asset "boot_${_bai_suffix}.img")" \
+      || { error "failed to resolve latest jqssun release tag"; return 1; }
+    _bai_dl_url="$(vm_android_jqssun_asset_url "$_bai_tag" "UTM-VM-lineage-.*virtio_${_bai_suffix}.zip")" \
+      || { error "no LineageOS UTM zip found in jqssun release $_bai_tag"; return 1; }
     run_with_backoff "download LineageOS zip" \
       curl -fL -o "$IMAGES_DIR/android-lineage.zip" "$_bai_dl_url" \
       || { error "failed to download LineageOS zip"; return 1; }
@@ -1707,7 +1745,7 @@ vm_build_android() {
     fi
     run_cmd cp "$_bai_qcow2" "$_bai_system_img"
     _bai_system_replaced=true
-    rm -rf "$_bai_extract_dir" "$IMAGES_DIR/android-lineage.zip" "$IMAGES_DIR/android-lineage-release.json"
+    rm -rf "$_bai_extract_dir" "$IMAGES_DIR/android-lineage.zip"
     validate_qcow2_image "$_bai_system_img" "Android system image for $_bai_vm_name" "$(parse_size "$(jq -r ".VMs[$_bai_vm_index].minImageSize" "$MANIFEST")")" || return 1
     say "system image ready: $_bai_system_img"
   else
