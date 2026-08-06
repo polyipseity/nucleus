@@ -1,7 +1,7 @@
 ---
 description: "Use when adding, updating, or reviewing AI model selections in src/modules/ai/models.json, VS Code chatLanguageModels host files, scripts/ai-sync.sh, src/hosts/Windows/modules/Invoke-AISync.ps1, or src/modules/ai/default.nix. Covers host-name key convention, hardware constraints per host, quantization guidance, required cross-file sync steps, and tool-calling verification requirements."
 name: "AI Model Selection"
-applyTo: "src/modules/ai/**, src/modules/configs/vscode/chatLanguageModels.*.json, src/hosts/*/ai.nix, scripts/ai-sync.sh, scripts/ai-sync.ps1, src/hosts/Windows/modules/system/Invoke-AISync.ps1, src/hosts/Windows/modules/system/Sync-LiteLLMService.ps1, src/modules/ai/litellm-config.yml"
+applyTo: "src/modules/ai/**, src/users/*/vscode/chatLanguageModels.*.json, src/hosts/*/ai.nix, scripts/ai-sync.sh, scripts/ai-sync.ps1, src/hosts/Windows/modules/system/Invoke-AISync.ps1, src/hosts/Windows/modules/system/Sync-LiteLLMService.ps1, src/modules/ai/litellm-config.yml"
 ---
 
 # AI Model Selection
@@ -33,9 +33,9 @@ These are the authoritative assumptions for model size budgeting. Update this ta
 When changing model selections, update all of the following in the **same change** so editor/runtime behavior stays aligned:
 
 1. `src/modules/ai/models.json` host model lists.
-2. `src/modules/configs/vscode/chatLanguageModels.mac.json`
-3. `src/modules/configs/vscode/chatLanguageModels.nixos.json`
-4. `src/modules/configs/vscode/chatLanguageModels.windows.json`
+2. `src/users/default/vscode/chatLanguageModels.mac.json`
+3. `src/users/default/vscode/chatLanguageModels.nixos.json`
+4. `src/users/default/vscode/chatLanguageModels.windows.json`
 5. Manifest comment block in `src/modules/ai/default.nix`.
 
 Rule: each host's `chatLanguageModels.<host>.json` IDs must be a subset of that host key in `models.json` (or exactly match). Never leave stale editor entries for models no longer present in the host manifest.

@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing agents configuration, skill management, or ClawHub provisioning. Covers ~/.agents directory layout, bundled vs. fetched skill licensing rules, permission patterns, and the install-bun-packages/sync-clawhub-skills activation DAG."
 name: "Agents and Skills"
-applyTo: "src/modules/agents.nix, src/modules/cursor.nix, src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1, src/hosts/Windows/modules/user/Sync-AgentsClawHubSkill.ps1, src/hosts/Windows/modules/user/Sync-CursorConfig.ps1, src/hosts/Windows/modules/setup/Invoke-BunSetup.ps1, src/modules/configs/agents/**, src/modules/configs/cursor/**, src/scripts/agents/**/*.sh, src/scripts/configs/symlink-cursor-config.sh"
+applyTo: "src/modules/agents.nix, src/modules/cursor.nix, src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1, src/hosts/Windows/modules/user/Sync-AgentsClawHubSkill.ps1, src/hosts/Windows/modules/user/Sync-CursorConfig.ps1, src/hosts/Windows/modules/setup/Invoke-BunSetup.ps1, src/modules/configs/agents/**, src/users/*/cursor/**, src/scripts/agents/**/*.sh, src/scripts/configs/symlink-cursor-config.sh"
 ---
 
 # Agents and Skills
@@ -28,9 +28,9 @@ Cursor reads different path names than Copilot/OpenCode. Shared content stays in
 | `rules/*.mdc` | `~/.agents/instructions/*.instructions.md` | Per-file symlink (Cursor requires `.mdc` extension) |
 | `agents/*.md` | `~/.agents/agents/*.agent.md` | Per-file symlink |
 | `commands/*.md` | `~/.agents/prompts/*.prompt.md` | Per-file symlink |
-| `hooks.json`, `mcp.json`, … | `src/modules/configs/cursor/` | Per-entry symlink (Cursor-native only) |
+| `hooks.json`, `mcp.json`, … | `src/users/default/cursor/` | Per-entry symlink (Cursor-native only) |
 
-Edit shared rules/agents/prompts/skills under `src/modules/configs/agents/`, not under `~/.cursor/`. Edit Cursor-native JSON under `src/modules/configs/cursor/`.
+Edit shared rules/agents/prompts/skills under `src/modules/configs/agents/`, not under `~/.cursor/`. Edit Cursor-native JSON under `src/users/default/cursor/`.
 
 The per-subdir layout replaces an older whole-dir symlink scheme. The old scheme forced every clawhub download into the tracked repo tree; the real-dir layout lets the `skills/` subtree be writable without any writes entering Git.
 

@@ -39,7 +39,7 @@ When adding a VM, set `hostname` (and matching `name`) in `src/modules/VMs.json`
 
 VM guest credentials must come from per-user SOPS secrets (`src/secrets/users-<username>.yml`), not from host login or defaults.
 
-- Keys: `vm_guest_username`, `vm_guest_password` — referenced via `vmGuest` object (`usernameSecretKey`, `passwordSecretKey`) in `src/modules/users.json` (POSIX) or `src/hosts/Windows/users.json` (Windows).
+- Keys: `vm_guest_username`, `vm_guest_password` — referenced via `vmGuest` object (`usernameSecretKey`, `passwordSecretKey`) in `src/users/<username>/vm-guest.json`, assembled by `load-user-registry.sh` / `users-registry.nix`.
 - Each setup script (`vm.sh` / `Invoke-VMSetup.ps1`) resolves the current user, reads the `vmGuest` reference, decrypts the secret, and passes credentials into guest builders/templates.
 - All guest paths (NixOS: `guest.nix` + `packer.pkr.hcl`; Windows: `Autounattend.xml` + `packer.pkr.hcl`; macOS: `packer.pkr.hcl`) must consume injected credentials.
 - Credential drift must invalidate stale VM artifacts so changing secret-backed values rebuilds rather than reusing stale disks.

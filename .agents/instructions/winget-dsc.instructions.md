@@ -11,9 +11,9 @@ applyTo: "src/hosts/Windows/**/*.yml"
 DSC files in this repo split into two categories:
 
 - **System files** (`system/*.dsc.yml`): applied universally to every user on the machine. Currently: `scheduler`, `developer-mode`, `firewall`, `taskbar`, `computer-name`, `long-paths`, `storage-sense`, `font-substitutes`, `remote-desktop`, `packages`.
-- **User files** (`user/*.dsc.yml`): applied per-user based on each user's `dscConfigFiles` list in `src/hosts/Windows/users.json`. Currently: `wallpaper`, `screen-saver`, `explorer`, `shell`, `env`, `context-manual`, `context-pdf-opt`.
+- **User files** (`user/*.dsc.yml`): applied per-user based on each user's `dscConfigFiles` list in `src/users/<username>/windows.json`. Currently: `wallpaper`, `screen-saver`, `explorer`, `shell`, `env`, `context-manual`, `context-pdf-opt`.
 
-Mapping: system files are always applied; user files must be explicitly listed per user. See `src/hosts/Windows/users.json` for the active user-to-file mapping.
+Mapping: system files are always applied; user files must be explicitly listed per user. See `src/users/polyipseity/windows.json` (and `src/users/default/windows.json` fallback) for the active user-to-file mapping.
 
 ## File location and purpose
 

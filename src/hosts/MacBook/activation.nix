@@ -235,7 +235,7 @@ in
     "${activationBundle}/src/scripts/configs/disable-steam-autostart.sh"
 
     # ---- jellyfin-sync -----------------------------------------------------------
-    # Converge Jellyfin accounts and libraries declared in src/modules/users.json
+    # Converge Jellyfin accounts and libraries declared in src/users/
     # with a running Jellyfin server.
     #
     # WHY: subprocess invocation (not readFile + replaceStrings): the activation

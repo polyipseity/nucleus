@@ -86,7 +86,7 @@ Additional module files live under these subdirectories:
 - `apply.ps1` — orchestration entry point. Dot-sources `modules/*.ps1`, applies WinGet DSC YAML.
 - `modules/` — reusable PowerShell logic: `setup/` (bootstrap installers), `system/` (daemon services, scheduled tasks), `user/` (Sync-\* profile/config scripts), `editors/` (editor configs), `scripts/` (shared scripts), `secrets/` (secret provisioning), `wallpapers/` (wallpaper assets).
 - `system/*.dsc.yml` — DSC configs applied system-wide.
-- `user/*.dsc.yml` — Per-user DSC configs listed in `users.json`.
+- `user/*.dsc.yml` — Per-user DSC configs listed in `src/users/<username>/windows.json` (`dscConfigFiles`).
 - `source-builds.json` — Source build definitions for packages not available via WinGet.
 
 ## DSC architecture
@@ -94,6 +94,6 @@ Additional module files live under these subdirectories:
 | Category | Scope                                         | Directory          |
 | -------- | --------------------------------------------- | ------------------ |
 | System   | Always applied to all users                   | `system/*.dsc.yml` |
-| User     | Per-user via `dscConfigFiles` in `users.json` | `user/*.dsc.yml`   |
+| User     | Per-user via `dscConfigFiles` in `src/users/<username>/windows.json` | `user/*.dsc.yml`   |
 
 List the respective directories for the current set of DSC files.

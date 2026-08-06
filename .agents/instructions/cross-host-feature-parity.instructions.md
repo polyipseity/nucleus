@@ -228,7 +228,7 @@ Timing values are specified directly at their point of use. Find or change a ret
 | Cloud drive caches           | `src/modules/cloud-drives.nix`                                                                                                                                                                                                              |
 | AI/LLM timeouts              | `scripts/ai-sync.sh`, `scripts/gc.sh`                                                                                                                                                                                                       |
 | Declarative-diff GC items    | `scripts/gc.sh`, `scripts/gc.ps1`                                                                                                                                                                                                           |
-| App-level timeouts           | `src/modules/editors.nix`, `src/modules/configs/picard/Picard.ini`                                                                                                                                                                          |
+| App-level timeouts           | `src/modules/editors.nix`, `src/users/default/picard/Picard.ini`                                                                                                                                                                          |
 
 Runtime overrides via `--expiry`/`NUCLEUS_GC_EXPIRY` etc. have precedence: CLI flag > per-tool env var > master flag/env > Nix config default > `7d`. When changing a timing value, update the actual configuration in the source file listed above. No separate timing manifest needs updating.
 
