@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Unit tests for android-config.sh flag parsing and manifest port resolution.
+# Unit tests for android-config.sh flag parsing, ADB authorization, and GApps install.
 #
 # Run with: bash tests/scripts/android-config-tests.sh
 set -euo pipefail
@@ -20,13 +20,6 @@ trap 'rm -rf "$_tmp"' EXIT
 assert_eq() {
   if [ "$1" != "$2" ]; then
     echo "FAIL: $3: expected '$1', got '$2'"
-    _failures=$((_failures + 1))
-  fi
-}
-
-assert_ne() {
-  if [ "$1" = "$2" ]; then
-    echo "FAIL: $3: expected values to differ, both were '$1'"
     _failures=$((_failures + 1))
   fi
 }
@@ -74,6 +67,56 @@ test_adb_port_resolution() {
   assert_eq "tcp:localhost:22041" "$(vm_android_fastboot_serial 0)" "fastboot serial"
 }
 
+test_adb_list_state_unauthorized() {
+  setup_fixture
+  _af_bin="$_tmp/bin"
+  mkdir -p "$_af_bin"
+  cat > "$_af_bin/adb" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  *devices*) printf '%s\n' 'List of devices attached' 'localhost:22040	unauthorized' '' ;;
+  *connect*) exit 0 ;;
+  *get-state*) exit 1 ;;
+esac
+exit 0
+EOF
+  chmod +x "$_af_bin/adb"
+  PATH="$_af_bin:$PATH"
+  export PATH
+  assert_eq "unauthorized" "$(vm_android_adb_list_state 0)" "adb devices unauthorized state"
+}
+
+test_wait_authorized_fails_on_unauthorized() {
+  setup_fixture
+  _af_bin="$_tmp/bin"
+  mkdir -p "$_af_bin"
+  cat > "$_af_bin/adb" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  *devices*) printf '%s\n' 'List of devices attached' 'localhost:22040	unauthorized' '' ;;
+  *connect*) exit 0 ;;
+  *get-state*) exit 1 ;;
+esac
+exit 0
+EOF
+  chmod +x "$_af_bin/adb"
+  PATH="$_af_bin:$PATH"
+  export PATH
+
+  set +e
+  vm_android_adb_wait_authorized 0 1 2>"$_tmp/err.txt"
+  _af_status=$?
+  set -e
+  if [ "$_af_status" -eq 0 ]; then
+    echo "FAIL: vm_android_adb_wait_authorized should fail when unauthorized"
+    _failures=$((_failures + 1))
+  fi
+  if ! grep -q 'ADB authorization' "$_tmp/err.txt"; then
+    echo "FAIL: expected ADB authorization timeout error"
+    _failures=$((_failures + 1))
+  fi
+}
+
 test_requires_at_least_one_flag() {
   setup_fixture
   set +e
@@ -90,25 +133,70 @@ test_requires_at_least_one_flag() {
   fi
 }
 
+test_gapps_rejects_recovery_state() {
+  setup_fixture
+  _af_bin="$_tmp/bin"
+  mkdir -p "$_af_bin"
+  cat > "$_af_bin/adb" <<'EOF'
+#!/usr/bin/env bash
+case "$*" in
+  *devices*) printf '%s\n' 'List of devices attached' 'localhost:22040	recovery' '' ;;
+  *connect*) exit 0 ;;
+  *get-state*) printf 'recovery\n' ;;
+esac
+exit 0
+EOF
+  chmod +x "$_af_bin/adb"
+  PATH="$_af_bin:$PATH"
+  export PATH
+
+  set +e
+  vm_android_config Android 0 --gapps 2>"$_tmp/err.txt"
+  _af_status=$?
+  set -e
+  if [ "$_af_status" -eq 0 ]; then
+    echo "FAIL: --gapps should fail when guest is in recovery"
+    _failures=$((_failures + 1))
+  fi
+  if ! grep -q 'home screen' "$_tmp/err.txt"; then
+    echo "FAIL: expected recovery-state error message"
+    _failures=$((_failures + 1))
+  fi
+}
+
 test_gapps_cached_zip_skips_download() {
   setup_fixture
   mkdir -p "$_tmp/vm/images"
   _af_zip="$_tmp/vm/images/android-gapps.zip"
-  printf 'cached\n' > "$_af_zip"
+  _af_extract="$_tmp/vm/images/android-gapps-extract"
+  printf 'PK\x03\x04' > "$_af_zip"
+  mkdir -p "$_af_extract/system/priv-app"
+  printf 'app\n' > "$_af_extract/system/priv-app/placeholder"
 
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"
   cat > "$_af_bin/adb" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
-  *connect*) echo "connected"; exit 0 ;;
-  *get-state*) echo "sideload"; exit 0 ;;
-  *sideload*) exit 0 ;;
+  *devices*) printf '%s\n' 'List of devices attached' 'localhost:22040	device' '' ;;
+  *connect*) exit 0 ;;
+  *get-state*) printf 'device\n' ;;
+  *remount*) exit 0 ;;
+  *root*) exit 0 ;;
+  *push*) exit 0 ;;
   *reboot*) exit 0 ;;
+  *shell*) printf 'package:com.google.android.gms\n' ;;
 esac
 exit 0
 EOF
   chmod +x "$_af_bin/adb"
+  cat > "$_af_bin/unzip" <<EOF
+#!/usr/bin/env bash
+mkdir -p "$_af_extract/system/priv-app"
+printf 'app\n' > "$_af_extract/system/priv-app/placeholder"
+exit 0
+EOF
+  chmod +x "$_af_bin/unzip"
   PATH="$_af_bin:$PATH"
   export PATH
 
@@ -131,7 +219,10 @@ EOF
 }
 
 test_adb_port_resolution
+test_adb_list_state_unauthorized
+test_wait_authorized_fails_on_unauthorized
 test_requires_at_least_one_flag
+test_gapps_rejects_recovery_state
 test_gapps_cached_zip_skips_download
 
 if [ "$_failures" -gt 0 ]; then
