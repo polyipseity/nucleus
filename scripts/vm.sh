@@ -980,5 +980,6 @@ do_unpack() {
 # ---------------------------------------------------------------------------
 
 case "$action" in
-  setup|sync|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack) "do_$action" ;;
+  setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) "do_$action" ;;
+  android-config) do_android_config ;;
 esac

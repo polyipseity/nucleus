@@ -872,6 +872,7 @@ let
   test_vm_android_config_subcommand_wired = assert' (
     (lib.hasInfix "android-config" vm_setup_sh_text)
     && (lib.hasInfix "do_android_config" vm_setup_sh_text)
+    && (lib.hasInfix "android-config) do_android_config" vm_setup_sh_text)
     && (lib.hasInfix "android-config.sh" vm_setup_sh_text)
     && (lib.hasInfix "'android-config'" vm_ps1_text)
     && (lib.hasInfix "vm_android_adb_host_port" vm_setup_sh_text)
