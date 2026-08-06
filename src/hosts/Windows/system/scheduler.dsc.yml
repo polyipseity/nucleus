@@ -72,7 +72,17 @@ properties:
           TaskName: sccache-gc
           TaskDescriptionLiteral: Daily sccache compilation cache clearing
           Action: |
-            sccache --clear
+            $RepoRoot = $env:NUCLEUS_REPO_ROOT
+            if (-not $RepoRoot) {
+              Write-Output "sccache-gc: NUCLEUS_REPO_ROOT not set; run via apply.ps1"
+              exit 1
+            }
+            $SccacheGcScript = Join-Path $RepoRoot "src\scripts\services\sccache-gc.ps1"
+            if (-not (Test-Path -LiteralPath $SccacheGcScript -PathType Leaf)) {
+              Write-Output "sccache-gc: src/scripts/services/sccache-gc.ps1 not found"
+              exit 1
+            }
+            & $SccacheGcScript
           Trigger: Daily
           AtTime: 12:00
           DaysInterval: 1

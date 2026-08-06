@@ -177,6 +177,39 @@ nucleus_system_log_dir() {
   esac
 }
 
+# sccache_cache_dir — Resolve the local sccache disk cache directory.
+# Honors SCCACHE_DIR when set; otherwise uses platform defaults from upstream
+# sccache Local.md.
+sccache_cache_dir() {
+  if [ -n "${SCCACHE_DIR:-}" ]; then
+    printf '%s\n' "$SCCACHE_DIR"
+    return 0
+  fi
+  case "$(uname -s)" in
+    Darwin) printf '%s\n' "${HOME}/Library/Caches/Mozilla.sccache" ;;
+    Linux)  printf '%s\n' "${XDG_CACHE_HOME:-$HOME/.cache}/sccache" ;;
+    *)      printf '%s\n' "${XDG_CACHE_HOME:-$HOME/.cache}/sccache" ;;
+  esac
+}
+
+# clear_sccache_cache — Stop the sccache server and delete local cache files.
+# sccache has no --clear flag; disk cache must be removed directly.
+clear_sccache_cache() {
+  if ! command -v sccache >/dev/null 2>&1; then
+    warn "sccache unavailable; skipping sccache cache gc"
+    return 0
+  fi
+
+  say "sccache: clearing cache"
+  # check-suppress:suppression_doc: sccache server may not be running; stop is best-effort before cache removal.
+  sccache --stop-server 2>/dev/null || true
+
+  _csc_cache_dir="$(sccache_cache_dir)"
+  if [ -d "$_csc_cache_dir" ]; then
+    rm -rf -- "${_csc_cache_dir:?}"/*
+  fi
+}
+
 # Strip ANSI escapes, \r, and control chars (keep tab, newline).
 log_sanitize() {
   # Strip ANSI escape sequences and OSC sequences, remove \r, strip

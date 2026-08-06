@@ -473,16 +473,7 @@ gc_ollama_models_if_available() {
 }
 
 gc_sccache_cache_if_available() {
-  if ! command -v sccache >/dev/null 2>&1; then
-    say "sccache unavailable; skipping sccache cache gc"
-    return 0
-  fi
-  say "sccache: clearing cache"
-  if [ "$dry_run" = true ]; then
-    dry_run "would run 'sccache --clear'"
-  elif ! sccache --clear; then
-    warn "sccache --clear failed; continuing GC workflow"
-  fi
+  clear_sccache_cache
 }
 
 gc_vm_artifacts_if_present() {

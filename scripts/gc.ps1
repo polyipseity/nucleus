@@ -391,6 +391,7 @@ function Clear-GitCache {
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpaper.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-AISync.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-LogManagement.ps1")
+. (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-SccacheManagement.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ManagedPaths.ps1")
 
 # ---- Step 1: stale wallpaper gc ----------------------------------------
@@ -473,14 +474,7 @@ if (-not $NoOllamaGc) {
 
 # ---- Step 7b: sccache cache clearing ----------------------------------------
 if (-not $NoSccacheGc) {
-  # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
-  $sccacheCmd = Get-Command -Name "sccache" -ErrorAction SilentlyContinue
-  if ($null -eq $sccacheCmd) {
-    Write-NucleusInfo "sccache not installed; skipping sccache cache gc"
-  } else {
-    Write-NucleusInfo "sccache: clearing cache"
-    & $sccacheCmd --clear
-  }
+  Clear-SccacheCache
 }
 
 # ---- Step 7: stale VM artifact removal ------------------------------------
