@@ -68,12 +68,12 @@ Describe "Windows VM disk-model parity (P8)" {
     $content = Get-VmSetupPs1Content
     $content | Should -Match ([regex]::Escape('Copy-Item $prebuilt $basePath'))
     $content | Should -Match ([regex]::Escape('Test-VmProcessRunning -VmName $vm.id -VmDisplay $vm.name'))
-    $content | Should -Match ([regex]::Escape('function Get-VmRunningProcessNames'))
+    $content | Should -Match ([regex]::Escape('function Get-VmRunningProcessNameList'))
   }
 
   It "list/status share the same QEMU running-process probe as sync" {
     $vmPs1 = Get-VmPs1Content
-    $vmPs1 | Should -Match ([regex]::Escape('Get-VmRunningProcessNames'))
+    $vmPs1 | Should -Match ([regex]::Escape('Get-VmRunningProcessNameList'))
     $vmPs1 | Should -Not -Match ([regex]::Escape("Name = 'qemu-system-x86_64w.exe'"))
   }
 

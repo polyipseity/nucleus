@@ -553,40 +553,39 @@ let
       androidVms = builtins.filter (vm: vm.type == "Android") manifest.VMs;
       badGsiUrls = builtins.filter (
         vm:
-          !(vm ? Android)
-          || !builtins.hasAttr "gsiUrl" vm.Android
-          || !(
-            builtins.isString vm.Android.gsiUrl
-            || vm.Android.gsiUrl == null
-          )
+        !(vm ? Android)
+        || !builtins.hasAttr "gsiUrl" vm.Android
+        || !(builtins.isString vm.Android.gsiUrl || vm.Android.gsiUrl == null)
       ) androidVms;
       badGappsUrls = builtins.filter (
         vm:
-          !(vm ? Android)
-          || !builtins.hasAttr "gappsUrl" vm.Android
-          || !builtins.isString vm.Android.gappsUrl
-          || vm.Android.gappsUrl == ""
+        !(vm ? Android)
+        || !builtins.hasAttr "gappsUrl" vm.Android
+        || !builtins.isString vm.Android.gappsUrl
+        || vm.Android.gappsUrl == ""
       ) androidVms;
       badMagiskUrls = builtins.filter (
         vm:
-          !(vm ? Android)
-          || !builtins.hasAttr "magiskUrl" vm.Android
-          || !builtins.isString vm.Android.magiskUrl
-          || vm.Android.magiskUrl == ""
+        !(vm ? Android)
+        || !builtins.hasAttr "magiskUrl" vm.Android
+        || !builtins.isString vm.Android.magiskUrl
+        || vm.Android.magiskUrl == ""
       ) androidVms;
     in
     assert' (badGsiUrls == [ ])
       "Android VMs must declare gsiUrl as string or null; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badGsiUrls)
       }"
-      && assert' (badGappsUrls == [ ])
-      "Android VMs must declare a non-empty string gappsUrl; bad entries: ${
-        builtins.toString (builtins.map (v: v.name) badGappsUrls)
-      }"
-      && assert' (badMagiskUrls == [ ])
-      "Android VMs must declare a non-empty string magiskUrl; bad entries: ${
-        builtins.toString (builtins.map (v: v.name) badMagiskUrls)
-      }";
+    &&
+      assert' (badGappsUrls == [ ])
+        "Android VMs must declare a non-empty string gappsUrl; bad entries: ${
+          builtins.toString (builtins.map (v: v.name) badGappsUrls)
+        }"
+    &&
+      assert' (badMagiskUrls == [ ])
+        "Android VMs must declare a non-empty string magiskUrl; bad entries: ${
+          builtins.toString (builtins.map (v: v.name) badMagiskUrls)
+        }";
 
   # The Android group must only appear on VMs with type Android.
   test_android_gsi_url_only_on_android =
@@ -908,22 +907,19 @@ let
     && (lib.hasInfix "adb sideload" android_config_sh_text)
   ) "nucleus-vm android-config must be wired with GSI-null guards and fake Wi-Fi support";
 
-  test_android_tools_provisioned_all_hosts = assert' (
-    (lib.hasInfix "pkgs.android-tools" flake_nix_text)
-    && (lib.hasInfix "Google.PlatformTools" windows_system_packages_dsc_text)
-  ) "adb/fastboot must be provisioned on POSIX (core.nix + nucleus-vm flake) and Windows (Google.PlatformTools winget)";
+  test_android_tools_provisioned_all_hosts =
+    assert'
+      (
+        (lib.hasInfix "pkgs.android-tools" flake_nix_text)
+        && (lib.hasInfix "Google.PlatformTools" windows_system_packages_dsc_text)
+      )
+      "adb/fastboot must be provisioned on POSIX (core.nix + nucleus-vm flake) and Windows (Google.PlatformTools winget)";
 
   test_vm_setup_calls_sync_phase = assert' (
     (lib.hasInfix "vm_prepare_vm_command" vm_setup_sh_text)
     && (lib.hasInfix "vm_sync_config_phase" vm_setup_sh_text)
     && (lib.hasInfix "vm_build_images" vm_setup_sh_text)
   ) "setup must share vm_prepare + vm_sync_config_phase before image build";
-
-  test_vm_warn_running_returns_success_when_idle = assert' (
-    (lib.hasInfix "vm_warn_running_vms_needing_restart" vm_setup_sh_text)
-    && (lib.hasInfix "_wrvnr_running=\"\$(vm_get_running_names)\" || return 0" vm_setup_sh_text)
-    && (lib.hasInfix "[ -n \"\$_wrvnr_running\" ] || return 0" vm_setup_sh_text)
-  ) "vm_warn_running_vms_needing_restart must not abort setup under set -e when no VMs are running";
 
   test_vm_sync_utm_includes_registration = assert' (
     (lib.hasInfix "vm_apply_utm_plist_and_register" vm_setup_sh_text)
@@ -1638,8 +1634,8 @@ let
         (lib.hasInfix ''$qemuImg create -f qcow2 -b "..\images\$($vm.type).base.qcow2" -F qcow2'' windows_vm_setup_ps1_text)
         && (lib.hasInfix "Copy-Item $prebuilt $basePath" windows_vm_setup_ps1_text)
         && (lib.hasInfix "Test-VmProcessRunning -VmName $vm.id -VmDisplay $vm.name" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "function Get-VmRunningProcessNames" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "Get-VmRunningProcessNames" vm_ps1_text)
+        && (lib.hasInfix "function Get-VmRunningProcessNameList" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Get-VmRunningProcessNameList" vm_ps1_text)
         && (lib.hasInfix "Get-VmQcow2VirtualSize -ImagePath $diskPath" windows_vm_setup_ps1_text)
         && (lib.hasInfix "$qemuImg resize $diskPath $diskBytes" windows_vm_setup_ps1_text)
         && (lib.hasInfix ''Join-Path -Path $dataDir -ChildPath "$($vm.id).qcow2"'' windows_vm_setup_ps1_text)

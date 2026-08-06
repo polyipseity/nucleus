@@ -90,7 +90,7 @@ function Wait-GuestReady {
     return $false
 }
 
-function Get-VmRunningProcessNames {
+function Get-VmRunningProcessNameList {
     <#
     .SYNOPSIS
       Returns QEMU VM names from live qemu-system* process command lines.
@@ -479,7 +479,7 @@ function Invoke-VMSetup {
             [Parameter(Mandatory)]
             [string]$VmDisplay
         )
-        foreach ($name in Get-VmRunningProcessNames) {
+        foreach ($name in Get-VmRunningProcessNameList) {
             if ($name -eq $VmName -or $name -eq $VmDisplay) {
                 return $true
             }

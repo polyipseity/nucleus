@@ -224,7 +224,7 @@ function Get-VmRunningNameList {
     return @()
   }
   . $module
-  return @(Get-VmRunningProcessNames)
+  return @(Get-VmRunningProcessNameList)
 }
 
 function Invoke-VmList {

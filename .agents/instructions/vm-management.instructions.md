@@ -160,7 +160,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 
 ## Running state source of truth
 
-`vm_get_running_names` (POSIX) and `Get-VmRunningProcessNames` (Windows) are the single probes for sync warnings, setup base-refresh skips, `list`/`status`, `pack`, and `resize` guards. Do not use registration helpers or unfiltered `utmctl list` / `tart list` name columns for running checks.
+`vm_get_running_names` (POSIX) and `Get-VmRunningProcessNameList` (Windows) are the single probes for sync warnings, setup base-refresh skips, `list`/`status`, `pack`, and `resize` guards. Do not use registration helpers or unfiltered `utmctl list` / `tart list` name columns for running checks.
 
 ## NixOS — libvirt/KVM
 
