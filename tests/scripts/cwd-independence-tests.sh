@@ -139,6 +139,180 @@ test_script_help_from_outside() {
     done
 }
 
+# Build a store-layout simulation tree (scripts/ + src/scripts/lib only).
+make_store_layout_tree() {
+    local marker_path="${1:-}"
+    local tmp
+    tmp="$(mktemp -d)"
+    mkdir -p "$tmp/scripts" "$tmp/src/scripts/lib"
+    cp "$REPO_ROOT/src/scripts/lib/lib.sh" "$tmp/src/scripts/lib/lib.sh"
+    if [ -n "$marker_path" ]; then
+        printf '%s\n' "$marker_path" > "$tmp/.nucleus-repo-root"
+    fi
+    printf '%s\n' "$tmp"
+}
+
+# Test 7: store layout with marker resolves from outside repo (scripts depth)
+test_store_layout_marker_from_scripts() {
+    local tmp result
+    tmp="$(make_store_layout_tree "$REPO_ROOT")"
+    trap 'rm -rf "$tmp"' RETURN
+
+    result=$(
+        cd /tmp
+        SCRIPT_DIR="$tmp/scripts" \
+        NUCLEUS_REPO_ROOT="" \
+        bash -euo pipefail -c '
+            . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
+            derive_repo_root
+        '
+    ) || true  # check-suppress:suppression_doc: test probe -- capturing output; exit code is discarded so set -e doesn't abort test
+    if [ "$result" = "$REPO_ROOT" ]; then
+        assert_pass "store layout with marker from /tmp with SCRIPT_DIR at scripts depth"
+    else
+        assert_fail "store layout with marker from /tmp with SCRIPT_DIR at scripts depth" "Expected '$REPO_ROOT', got '$result'"
+    fi
+}
+
+# Test 8: store layout with marker resolves from outside repo (src/scripts depth)
+test_store_layout_marker_from_src_scripts() {
+    local tmp result
+    tmp="$(make_store_layout_tree "$REPO_ROOT")"
+    trap 'rm -rf "$tmp"' RETURN
+
+    result=$(
+        cd /tmp
+        SCRIPT_DIR="$tmp/src/scripts" \
+        NUCLEUS_REPO_ROOT="" \
+        bash -euo pipefail -c '
+            . "$SCRIPT_DIR/lib/lib.sh"
+            derive_repo_root
+        '
+    ) || true  # check-suppress:suppression_doc: test probe -- capturing output; exit code is discarded so set -e doesn't abort test
+    if [ "$result" = "$REPO_ROOT" ]; then
+        assert_pass "store layout with marker from /tmp with SCRIPT_DIR at src/scripts depth"
+    else
+        assert_fail "store layout with marker from /tmp with SCRIPT_DIR at src/scripts depth" "Expected '$REPO_ROOT', got '$result'"
+    fi
+}
+
+# Test 9: store layout without marker fails cleanly
+test_store_layout_without_marker_fails() {
+    local tmp derr_output
+    tmp="$(make_store_layout_tree)"
+    trap 'rm -rf "$tmp"' RETURN
+
+    derr_output=$(
+        cd /tmp
+        SCRIPT_DIR="$tmp/scripts" \
+        NUCLEUS_REPO_ROOT="" \
+        bash -euo pipefail -c '
+            . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
+            derive_repo_root
+        ' 2>&1
+    ) || true  # check-suppress:suppression_doc: test probe -- capturing output; exit code is discarded so set -e doesn't abort test
+    if echo "$derr_output" | grep -q "cannot determine nucleus repository root"; then
+        assert_pass "store layout without marker fails cleanly"
+    else
+        assert_fail "store layout without marker fails cleanly" "Output: '$derr_output'"
+    fi
+}
+
+# Test 10: stale marker (bogus absolute path) fails cleanly
+test_store_layout_stale_marker_fails() {
+    local tmp derr_output
+    tmp="$(make_store_layout_tree "/nonexistent/nucleus-repo-root")"
+    trap 'rm -rf "$tmp"' RETURN
+
+    derr_output=$(
+        cd /tmp
+        SCRIPT_DIR="$tmp/scripts" \
+        NUCLEUS_REPO_ROOT="" \
+        bash -euo pipefail -c '
+            . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
+            derive_repo_root
+        ' 2>&1
+    ) || true  # check-suppress:suppression_doc: test probe -- capturing output; exit code is discarded so set -e doesn't abort test
+    if echo "$derr_output" | grep -q "cannot determine nucleus repository root"; then
+        assert_pass "store layout with stale marker fails cleanly"
+    else
+        assert_fail "store layout with stale marker fails cleanly" "Output: '$derr_output'"
+    fi
+}
+
+# Test 11: relative marker value fails cleanly
+test_store_layout_relative_marker_fails() {
+    local tmp derr_output
+    tmp="$(make_store_layout_tree "./foo")"
+    trap 'rm -rf "$tmp"' RETURN
+
+    derr_output=$(
+        cd /tmp
+        SCRIPT_DIR="$tmp/scripts" \
+        NUCLEUS_REPO_ROOT="" \
+        bash -euo pipefail -c '
+            . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
+            derive_repo_root
+        ' 2>&1
+    ) || true  # check-suppress:suppression_doc: test probe -- capturing output; exit code is discarded so set -e doesn't abort test
+    if echo "$derr_output" | grep -q "cannot determine nucleus repository root"; then
+        assert_pass "store layout with relative marker fails cleanly"
+    else
+        assert_fail "store layout with relative marker fails cleanly" "Output: '$derr_output'"
+    fi
+}
+
+# Test 12: empty marker file fails cleanly
+test_store_layout_empty_marker_fails() {
+    local tmp derr_output
+    tmp="$(make_store_layout_tree "")"
+    printf '' > "$tmp/.nucleus-repo-root"
+    trap 'rm -rf "$tmp"' RETURN
+
+    derr_output=$(
+        cd /tmp
+        SCRIPT_DIR="$tmp/scripts" \
+        NUCLEUS_REPO_ROOT="" \
+        bash -euo pipefail -c '
+            . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
+            derive_repo_root
+        ' 2>&1
+    ) || true  # check-suppress:suppression_doc: test probe -- capturing output; exit code is discarded so set -e doesn't abort test
+    if echo "$derr_output" | grep -q "cannot determine nucleus repository root"; then
+        assert_pass "store layout with empty marker fails cleanly"
+    else
+        assert_fail "store layout with empty marker fails cleanly" "Output: '$derr_output'"
+    fi
+}
+
+# Test 13: optional e2e probe against store-installed nucleus-update
+test_store_installed_nucleus_update_help() {
+    local nucleus_update_path result
+    if ! command -v nucleus-update >/dev/null 2>&1; then
+        assert_pass "store-installed nucleus-update e2e probe skipped (nucleus-update not installed)"
+        return 0
+    fi
+    nucleus_update_path="$(command -v nucleus-update)"
+    case "$nucleus_update_path" in
+        /nix/store/*)
+            ;;
+        *)
+            assert_pass "store-installed nucleus-update e2e probe skipped (nucleus-update not in /nix/store: $nucleus_update_path)"
+            return 0
+            ;;
+    esac
+
+    result=$(
+        cd /tmp
+        env -u NUCLEUS_REPO_ROOT nucleus-update --help 2>/dev/null
+    ) || true  # check-suppress:suppression_doc: test probe -- capturing output; exit code is discarded so set -e doesn't abort test
+    if [ -n "$result" ]; then
+        assert_pass "store-installed nucleus-update --help from /tmp without NUCLEUS_REPO_ROOT"
+    else
+        assert_fail "store-installed nucleus-update --help from /tmp without NUCLEUS_REPO_ROOT" "No output or non-zero exit (wrapper: $nucleus_update_path)"
+    fi
+}
+
 # Run all tests
 test_derive_repo_root_from_outside_cwd
 test_derive_repo_root_from_src_scripts
@@ -146,6 +320,13 @@ test_env_var_priority
 test_derive_repo_root_fails_cleanly
 test_env_var_symlink_resolution
 test_script_help_from_outside
+test_store_layout_marker_from_scripts
+test_store_layout_marker_from_src_scripts
+test_store_layout_without_marker_fails
+test_store_layout_stale_marker_fails
+test_store_layout_relative_marker_fails
+test_store_layout_empty_marker_fails
+test_store_installed_nucleus_update_help
 
 # Summary
 echo ""
