@@ -97,12 +97,30 @@ All size fields (`ram`, `diskSize`, `minImageSize`) are suffixed size strings ma
 
 ## Port forwarding
 
-Guest port forwards are declared in the `portForwards` array of each VM entry: non-empty `{guestPort, hostPort}` pairs mapping a guest port to a host port. All host-side forwards (UTM forwards, QEMU `hostfwd` rules, Packer, start scripts) and guest-readiness probes are derived from this array — never hard-code host ports in production code.
+Guest port forwards are declared in the `portForwards` array of each VM entry: non-empty `{guestPort, hostPort}` pairs mapping a guest port to a host port. All host-side forwards (UTM, QEMU `hostfwd`, Packer, Tart softnet-expose, libvirt passt) and guest-readiness probes are derived from this array — never hard-code host ports in production code.
 
-- Non-Android VMs (`macOS`, `NixOS`, `Windows`) declare a `guestPort: 22` SSH entry; Android declares ADB `5555` and console `5554` entries instead (Android must not also claim host port `2222` — when Android and NixOS run together the second VM would fail to start with "Could not set up host forwarding rule" because host 2222 is already taken).
-- UTM rendering: for non-Android VMs the `guestPort: 22` entry is rendered as the base forward and other entries as additional forwards; Android renders all its entries into the forward list (no base/additional split).
-- QEMU/Packer render one `hostfwd=tcp::<hostPort>-:<guestPort>` rule per entry.
-- Guest-readiness probes per type: `NixOS` tries QEMU guest agent first (`guest-ping` on the `qga-<id>` pipe) then falls back to SSH on the guest-22 host port; `Windows` uses QEMU guest agent only; `macOS` uses SSH on the guest-22 host port; `Android` uses `adb connect localhost:<hostPort>` on the guest-5555 host port (with an SSH fallback).
+**Reserved host port block:** `22000–22099` (nucleus VM forward range). Every `hostPort` must be unique across all VMs so concurrent guests do not collide.
+
+| VM | Host port(s) | Guest port | Service |
+|----|-------------|------------|---------|
+| MacBook | `22010` | `22` | SSH |
+| NixOS | `22020` | `22` | SSH |
+| Windows | `22030` | `22` | SSH |
+| Android | `22040` | `5555` | ADB |
+| Android | `22041` | `5554` | Emulator console |
+
+- Non-Android VMs declare exactly one `guestPort: 22` SSH entry. Android declares `guestPort: 5555` (ADB) and `guestPort: 5554` (emulator console) and must not declare `guestPort: 22`.
+- UTM, QEMU/Packer, and libvirt render every `portForwards` entry generically (no per-type branching).
+- QEMU/Packer: `hostfwd=tcp::<hostPort>-:<guestPort>` per entry.
+- Guest-readiness probes resolve the manifest host port by `guestPort` (`22` for SSH, `5555` for ADB) — never by literal host port number.
+
+| Backend | Forward mechanism | Host-local access |
+|---------|-------------------|-------------------|
+| UTM (Emulated) | `PortForward` plist dicts from manifest | `localhost:<hostPort>` |
+| Windows QEMU | `hostfwd` in start scripts | `localhost:<hostPort>` |
+| libvirt/KVM | passt `<portForward><range start='hostPort' to='guestPort'/></portForward>` | `localhost:<hostPort>` |
+| Tart (macOS) | `--net-softnet-expose hostPort:guestPort` | Use `tart ip <name>` + SSH guest port `22` (softnet-expose does not bind loopback) |
+| Android | Same as QEMU host backend | `adb connect localhost:<hostPort for guest 5555>` |
 
 ## Disk format
 
@@ -121,7 +139,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - VM backend: Tart CLI (Apple Virtualization.framework); macOS host only.
 - VM store: `~/virtual machines/tart/vms/<id>/` — Tart's storage root (`~/.tart`) is symlinked to `~/virtual machines/tart` by `nucleus-vm setup` so Tart artifacts co-locate with UTM bundles for unified backup.
 - Build tool: Packer + `tart-cli` plugin pulling `ghcr.io/cirruslabs/macos-<version>-base:latest` from GHCR.
-- Start command (after build): `tart run <id>`.
+- Start command (after build): `tart run --net-softnet --net-softnet-expose <hostPort>:<guestPort> <id>` (rendered from manifest). Host-local SSH uses `tart ip <id>` + guest port `22`, not `localhost:<hostPort>`.
 - No UTM bundle is created for macOS guests; they remain Tart-managed.
 
 ## macOS — UTM
@@ -132,16 +150,17 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - Disk pre-created in `Images/disk-main.qcow2` by copying the pre-built image from the images directory.
 - After provisioning, UTM opens each bundle automatically.
 - VirtioFS shared directory: configured via `Sharing.DirectoryShare` in the Nix-generated config.plist.
-- Network: Shared (NAT) mode on all VMs.
+- Network: **Emulated** (QEMU user/slirp) — required for `PortForward` to work; vmnet-shared silently drops forwards.
 
 - `utmctl` CLI path: `/Applications/UTM.app/Contents/MacOS/utmctl`.
 
 ## NixOS — libvirt/KVM
 
 - VM infrastructure declared in `src/hosts/NixOS/vms.nix` (system module).
-- Package: `qemu_kvm`, `virt-manager`, `virt-viewer`, `virtiofsd` in `environment.systemPackages`.
+- Package: `qemu_kvm`, `virt-manager`, `virt-viewer`, `virtiofsd`, `passt` in `environment.systemPackages`.
 - User groups: `kvm` and `libvirtd` added to the managed user via `lib.mkAfter` in `vms.nix`.
 - Domain XML pre-generated at `/etc/nucleus/vms/<name>-domain.xml` by `src/hosts/NixOS/vms.nix` at NixOS activation time; `vm.sh setup` calls `virsh define` on the pre-generated file (idempotent).
+- Domain XML uses passt user-mode networking with `<portForward>` ranges derived from manifest `portForwards` (`start` = host port, `to` = guest port).
 - VirtioFS shared directory: uses `virtiofsd` daemon; configured in the XML domain definition.
 - SPICE display + clipboard sharing enabled by default.
 - OVMF firmware (UEFI) and swtpm (TPM 2.0) enabled for Windows 11 compatibility.

@@ -201,14 +201,14 @@ test_step25_behavioral_rejects_port() {
   local _tmpdir _exit_code
   _tmpdir=$(mktemp -d) || return 1
   mkdir -p "$_tmpdir/src"
-  printf 'hostfwd=tcp::2222-:22\n' > "$_tmpdir/src/fixture.sh"
+  printf 'hostfwd=tcp::22020-:22\n' > "$_tmpdir/src/fixture.sh"
   _exit_code=0
   run_step25 true "$_tmpdir" "src/fixture.sh" || _exit_code=$?
   rm -rf "$_tmpdir"
   if [ "$_exit_code" -ne 0 ]; then
     return 0
   fi
-  echo "FAIL: step 25 should reject hostfwd=tcp::2222 in scoped mode"
+  echo "FAIL: step 25 should reject hostfwd=tcp::22020 in scoped mode"
   return 1
 }
 

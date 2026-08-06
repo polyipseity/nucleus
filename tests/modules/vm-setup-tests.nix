@@ -358,6 +358,50 @@ let
         builtins.toString (builtins.map (v: v.name) badPorts)
       }";
 
+  # Every hostPort must live in the nucleus VM forward block (22000-22099).
+  test_port_forwards_host_range =
+    let
+      allHostPorts = builtins.concatLists (
+        builtins.map (vm: builtins.map (pf: pf.hostPort) vm.portForwards) manifest.VMs
+      );
+      badHostPorts = builtins.filter (p: p < 22000 || p > 22099) allHostPorts;
+    in
+    assert' (badHostPorts == [ ])
+      "Every portForwards hostPort must be in 22000-22099; bad values: ${builtins.toString badHostPorts}";
+
+  # hostPort values must be globally unique across all VMs.
+  test_port_forwards_host_unique =
+    let
+      allHostPorts = builtins.concatLists (
+        builtins.map (vm: builtins.map (pf: pf.hostPort) vm.portForwards) manifest.VMs
+      );
+    in
+    assert' (builtins.length allHostPorts == builtins.length (lib.unique allHostPorts))
+      "Every portForwards hostPort must be globally unique; duplicates: ${builtins.toString allHostPorts}";
+
+  # Guest-port semantics: SSH VMs expose guest 22 only; Android exposes 5555+5554, not 22.
+  test_port_forwards_guest_semantics =
+    let
+      badSshVms = builtins.filter (
+        vm:
+        vm.type != "Android"
+        && (builtins.length (builtins.filter (pf: pf.guestPort == 22) vm.portForwards) != 1)
+      ) manifest.VMs;
+      badAndroidVms = builtins.filter (
+        vm:
+        vm.type == "Android"
+        && (
+          builtins.any (pf: pf.guestPort == 22) vm.portForwards
+          || builtins.length (builtins.filter (pf: pf.guestPort == 5555) vm.portForwards) != 1
+          || builtins.length (builtins.filter (pf: pf.guestPort == 5554) vm.portForwards) != 1
+        )
+      ) manifest.VMs;
+    in
+    assert' (badSshVms == [ ] && badAndroidVms == [ ])
+      "Non-Android VMs must have exactly one guestPort-22 entry; Android must have guestPort 5555 and 5554 and no guestPort 22; bad SSH VMs: ${
+        builtins.toString (builtins.map (v: v.name) badSshVms)
+      }; bad Android VMs: ${builtins.toString (builtins.map (v: v.name) badAndroidVms)}";
+
   # hostname must be a non-empty string (guest OS identity).
   test_hostname_nonempty =
     let
@@ -984,6 +1028,7 @@ let
   stopHostPs1TemplateText = builtins.readFile ../../src/vms/templates/stop-host.ps1;
   macbook_vms_nix_text = builtins.readFile ../../src/hosts/MacBook/vms.nix;
   nixos_vms_nix_text = builtins.readFile ../../src/hosts/NixOS/vms.nix;
+  nixos_domain_xml_text = builtins.readFile ../../src/modules/configs/vms/nixos-domain.xml;
   utmConfigPlistText = builtins.readFile ../../src/modules/configs/vms/utm-config.plist.xml;
   vms_json_text = builtins.readFile ../../src/modules/VMs.json;
   users_json_text = builtins.readFile ../../src/modules/users.json;
@@ -1592,8 +1637,7 @@ let
       "vm.sh and Invoke-VMSetup.ps1 must require an explicit minImageSize floor at every image validation call site (no 10 GB fallback defaults)";
 
   # The shared Android start script must expose manifest-driven tokens for CPU
-  # count, RAM, image filenames, and the ADB/console ports instead of hardcoded
-  # values.
+  # count, RAM, image filenames, and port forwards instead of hardcoded values.
   test_android_start_script_tokens =
     assert'
       (
@@ -1602,10 +1646,9 @@ let
         && (lib.hasInfix "__ANDROID_SYSTEM_IMAGE__" start_android_ps1_text)
         && (lib.hasInfix "__ANDROID_USERDATA_IMAGE__" start_android_ps1_text)
         && (lib.hasInfix "__ANDROID_GSI_IMAGE__" start_android_ps1_text)
-        && (lib.hasInfix "__ADB_PORT__" start_android_ps1_text)
-        && (lib.hasInfix "__ADB_CONSOLE_PORT__" start_android_ps1_text)
+        && (lib.hasInfix "__HOSTFWDS__" start_android_ps1_text)
       )
-      "start-android-vm.ps1 must expose __ANDROID_CPU_COUNT__/__ANDROID_RAM_BYTES__/__ANDROID_SYSTEM_IMAGE__/__ANDROID_USERDATA_IMAGE__/__ANDROID_GSI_IMAGE__/__ADB_PORT__/__ADB_CONSOLE_PORT__ tokens for manifest-driven rendering";
+      "start-android-vm.ps1 must expose __ANDROID_CPU_COUNT__/__ANDROID_RAM_BYTES__/__ANDROID_SYSTEM_IMAGE__/__ANDROID_USERDATA_IMAGE__/__ANDROID_GSI_IMAGE__/__HOSTFWDS__ tokens for manifest-driven rendering";
 
   test_android_start_script_no_legacy_literals =
     assert'
@@ -1641,10 +1684,9 @@ let
         && (lib.hasInfix "s|__ANDROID_SYSTEM_IMAGE__|" vm_setup_sh_text)
         && (lib.hasInfix "s|__ANDROID_USERDATA_IMAGE__|" vm_setup_sh_text)
         && (lib.hasInfix "s|__ANDROID_GSI_IMAGE__|" vm_setup_sh_text)
-        && (lib.hasInfix "s|__ADB_PORT__|" vm_setup_sh_text)
-        && (lib.hasInfix "s|__ADB_CONSOLE_PORT__|" vm_setup_sh_text)
+        && (lib.hasInfix "s|__HOSTFWDS__|" vm_setup_sh_text)
       )
-      "vm.sh must render Android start-script tokens (CPU/RAM/images/ports) via a sed chain after copying the shared file";
+      "vm.sh must render Android start-script tokens (CPU/RAM/images/portForwards) via a sed chain after copying the shared file";
 
   # Local Mido compatibility adjustments must be applied at runtime from a
   # repository-owned patch file, not by editing the vendored submodule files.
@@ -1735,8 +1777,9 @@ let
       "src/modules/configs/vms/utm-config.plist.xml must not add a QEMU GA chardev: UTM's app sandbox denies binding unix sockets in /tmp (EPERM on boot) and UTM's own bundles omit it";
   # UTM's QEMU backend only emits hostfwd= for Mode=Emulated (user/slirp
   # networking); for Mode=Shared (vmnet-shared) the PortForward array is
-  # silently ignored, so SSH (2222) and ADB (5555) become unreachable.  The
-  # template must stay on Emulated so vm.sh's guest-wait checks actually work.
+  # silently ignored, so manifest port forwards (host ports 22000-22099)
+  # become unreachable.  The template must stay on Emulated so vm.sh's
+  # guest-wait checks actually work.
   test_macbook_utm_emulated_network_for_port_forward =
     assert'
       (
@@ -1744,26 +1787,25 @@ let
         && (lib.hasInfix "<string>Emulated</string>" utmConfigPlistText)
         && !(lib.hasInfix "<string>Shared</string>" utmConfigPlistText)
         && (lib.hasInfix "<key>PortForward</key>" utmConfigPlistText)
-        && (lib.hasInfix "__VM_BASE_PORT_FORWARD__" utmConfigPlistText)
-        && (lib.hasInfix "__VM_ADDITIONAL_PORT_FORWARDS__" utmConfigPlistText)
+        && (lib.hasInfix "__VM_PORT_FORWARDS__" utmConfigPlistText)
+        && !(lib.hasInfix "__VM_BASE_PORT_FORWARD__" utmConfigPlistText)
+        && !(lib.hasInfix "__VM_ADDITIONAL_PORT_FORWARDS__" utmConfigPlistText)
       )
-      "src/modules/configs/vms/utm-config.plist.xml must use Mode=Emulated (not Shared) so UTM forwards ports 2222/5555 via hostfwd; vmnet-shared silently drops PortForward";
-  # Android must not claim host port 2222: its manifest portForwards expose ADB
-  # and SSH on host ports 5555/5554, and a base 2222->22 forward would collide
-  # with NixOS when both VMs run at once ("Could not set up host forwarding
-  # rule" on the second start).  The base forward derives from the manifest
-  # portForwards (the guestPort-22 entry) so each VM only binds its own host
-  # ports.
-  test_macbook_utm_android_no_2222_collision =
+      "src/modules/configs/vms/utm-config.plist.xml must use Mode=Emulated (not Shared) so UTM forwards manifest portForwards via hostfwd; vmnet-shared silently drops PortForward";
+  # UTM port forwards must map every manifest portForwards entry without
+  # guestPort-based branching (each VM binds only its own host ports from
+  # VMs.json, so concurrent VMs cannot collide on the same host port).
+  test_macbook_utm_port_forwards_from_manifest =
     assert'
       (
         (lib.hasInfix "vm.portForwards" macbook_vms_nix_text)
-        && (lib.hasInfix "guestPort == 22" macbook_vms_nix_text)
-        && (lib.hasInfix "guestPort != 22" macbook_vms_nix_text)
+        && (lib.hasInfix "portForwardEntries" macbook_vms_nix_text)
+        && !(lib.hasInfix "guestPort == 22" macbook_vms_nix_text)
+        && !(lib.hasInfix "guestPort != 22" macbook_vms_nix_text)
         && !(lib.hasInfix "<integer>2222</integer>" macbook_vms_nix_text)
-        && (lib.hasInfix "__VM_BASE_PORT_FORWARD__\n                __VM_ADDITIONAL_PORT_FORWARDS__" utmConfigPlistText)
+        && (lib.hasInfix "__VM_PORT_FORWARDS__" utmConfigPlistText)
       )
-      "src/hosts/MacBook/vms.nix must derive base/additional UTM port forwards from the manifest portForwards (base = guestPort-22 entry) so Android (5555/5554 only) never collides on host port 2222";
+      "src/hosts/MacBook/vms.nix must render all manifest portForwards via portForwardEntries into __VM_PORT_FORWARDS__ without guestPort-based branching";
   test_macbook_utm_display_card_validity = assert' (
     (lib.hasInfix "displayCard = vm: if vm.type == \"Windows\" then \"virtio-vga\" else \"virtio-gpu-pci\";" macbook_vms_nix_text)
     && !(lib.hasInfix "virtio-ramfb" macbook_vms_nix_text)
@@ -1853,10 +1895,13 @@ let
     && (lib.hasInfix "__VM_DISPLAY__" startPosixTemplateText)
     && (lib.hasInfix "__HOST_KIND__" startPosixTemplateText)
     && (lib.hasInfix "__VM_DIR__" startPosixTemplateText)
+    && (lib.hasInfix "__TART_SOFTNET_EXPOSE__" startPosixTemplateText)
     && (lib.hasInfix "darwin-tart" startPosixTemplateText)
     && (lib.hasInfix "darwin-utm" startPosixTemplateText)
     && (lib.hasInfix "nixos-libvirt" startPosixTemplateText)
     && (lib.hasInfix "tart run" startPosixTemplateText)
+    && (lib.hasInfix "--net-softnet" startPosixTemplateText)
+    && (lib.hasInfix "--net-softnet-expose" startPosixTemplateText)
     && (lib.hasInfix "utmctl" startPosixTemplateText)
     && (lib.hasInfix "virsh start" startPosixTemplateText)
     && (lib.hasInfix "virt-viewer" startPosixTemplateText)
@@ -1876,7 +1921,10 @@ let
         && (lib.hasInfix "darwin-tart" startHostPs1TemplateText)
         && (lib.hasInfix "darwin-utm" startHostPs1TemplateText)
         && (lib.hasInfix "nixos-libvirt" startHostPs1TemplateText)
+        && (lib.hasInfix "__TART_SOFTNET_EXPOSE__" startHostPs1TemplateText)
         && (lib.hasInfix "tart run" startHostPs1TemplateText)
+        && (lib.hasInfix "--net-softnet" startHostPs1TemplateText)
+        && (lib.hasInfix "--net-softnet-expose" startHostPs1TemplateText)
         && (lib.hasInfix "utmctl" startHostPs1TemplateText)
         && (lib.hasInfix "virsh start" startHostPs1TemplateText)
         && (lib.hasInfix "virt-viewer" startHostPs1TemplateText)
@@ -1931,6 +1979,17 @@ let
         && (lib.hasInfix "stop-host.ps1" vm_setup_sh_text)
       )
       "vm.sh must render start-host.ps1/stop-posix.sh/stop-host.ps1 via sed token chains that cover all template placeholders";
+
+  # Tart softnet expose must be rendered from manifest portForwards for darwin-tart.
+  test_vm_tart_softnet_expose_render_chain =
+    assert'
+      (
+        (lib.hasInfix "s|__TART_SOFTNET_EXPOSE__|" vm_setup_sh_text)
+        && (lib.hasInfix "join(\",\")" vm_setup_sh_text)
+        && (lib.hasInfix "tart ip" vm_setup_sh_text)
+        && (lib.hasInfix "--net-softnet-expose" vm_setup_sh_text)
+      )
+      "vm.sh must render __TART_SOFTNET_EXPOSE__ from portForwards for darwin-tart and probe macOS guests via tart ip";
 
   test_vm_start_windows_template_content =
     assert'
@@ -2045,6 +2104,20 @@ let
       )
       "src/modules/configs/vms/utm-config.plist.xml must emit __VM_ANDROID_DRIVES__ inside the Drive array so Android dict entries are valid array elements";
 
+  # NixOS libvirt domain XML must render manifest portForwards via passt user
+  # networking (<range start= host-to-guest mapping), not legacy libvirt NAT or
+  # <host port= forwarding syntax.
+  test_nixos_port_forwards_from_manifest =
+    assert'
+      (
+        (lib.hasInfix "vm.portForwards" nixos_vms_nix_text)
+        && (lib.hasInfix "passt" nixos_vms_nix_text)
+        && (lib.hasInfix "__VM_NETWORK_INTERFACE__" nixos_domain_xml_text)
+        && (lib.hasInfix "<range start=" nixos_vms_nix_text)
+        && !(lib.hasInfix "<host port=" nixos_vms_nix_text)
+      )
+      "src/hosts/NixOS/vms.nix must render all manifest portForwards via passt portForwardRanges into __VM_NETWORK_INTERFACE__ using <range start= host-to-guest mapping";
+
   # NixOS libvirt domain XML must attach the GSI disk only when the Android
   # group's gsiUrl is set, mirroring the MacBook UTM template.  The image name
   # comes from the manifest Android group, never a hardcoded android-* literal.
@@ -2132,6 +2205,9 @@ let
     test_vm_id_nonempty_and_filesystem_safe
     test_vm_id_uniqueness
     test_port_forwards_shape
+    test_port_forwards_host_range
+    test_port_forwards_host_unique
+    test_port_forwards_guest_semantics
     test_hostname_nonempty
     test_min_image_size_pattern
     test_mac_address_prefix_nonempty
@@ -2195,7 +2271,7 @@ let
     test_macbook_utm_plist_correctness
     test_macbook_utm_no_qemu_guest_agent
     test_macbook_utm_emulated_network_for_port_forward
-    test_macbook_utm_android_no_2222_collision
+    test_macbook_utm_port_forwards_from_manifest
     test_macbook_utm_display_card_validity
     test_macbook_utm_firmware_contract
     test_macbook_utm_data_dir_disk_path
@@ -2211,6 +2287,7 @@ let
     test_vm_stop_posix_template_content
     test_vm_stop_host_ps1_template_content
     test_vm_host_templates_render_chains
+    test_vm_tart_softnet_expose_render_chain
     test_vm_directory_readme_generation
     test_windows_vm_directory_readme_generation
     test_vm_setup_generates_helper_scripts
@@ -2218,6 +2295,7 @@ let
     test_vm_enabled_policy_wiring
     test_macbook_android_gsi_conditional
     test_utm_android_drives_inside_drive_array
+    test_nixos_port_forwards_from_manifest
     test_nixos_android_gsi_conditional
     test_nixos_android_disk_paths
     test_macbook_macos_version_tahoe
@@ -2298,6 +2376,9 @@ in
     test_vm_id_nonempty_and_filesystem_safe
     test_vm_id_uniqueness
     test_port_forwards_shape
+    test_port_forwards_host_range
+    test_port_forwards_host_unique
+    test_port_forwards_guest_semantics
     test_hostname_nonempty
     test_min_image_size_pattern
     test_mac_address_prefix_nonempty
@@ -2361,7 +2442,7 @@ in
     test_macbook_utm_plist_correctness
     test_macbook_utm_no_qemu_guest_agent
     test_macbook_utm_emulated_network_for_port_forward
-    test_macbook_utm_android_no_2222_collision
+    test_macbook_utm_port_forwards_from_manifest
     test_macbook_utm_display_card_validity
     test_macbook_utm_firmware_contract
     test_macbook_utm_data_dir_disk_path
@@ -2377,6 +2458,7 @@ in
     test_vm_stop_posix_template_content
     test_vm_stop_host_ps1_template_content
     test_vm_host_templates_render_chains
+    test_vm_tart_softnet_expose_render_chain
     test_vm_directory_readme_generation
     test_windows_vm_directory_readme_generation
     test_vm_setup_generates_helper_scripts
@@ -2384,6 +2466,7 @@ in
     test_vm_enabled_policy_wiring
     test_macbook_android_gsi_conditional
     test_utm_android_drives_inside_drive_array
+    test_nixos_port_forwards_from_manifest
     test_nixos_android_gsi_conditional
     test_nixos_android_disk_paths
     test_macbook_macos_version_tahoe

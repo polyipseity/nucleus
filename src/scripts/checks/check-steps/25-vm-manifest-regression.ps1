@@ -54,8 +54,8 @@ Register-Step -Id "vm-manifest-regression" -Number 25 -Name "VM manifest regress
     # unrelated field). `power.sleep.display` (macOS power management) is allowed.
     @{ Label = '.display manifest property reference'; Pattern = '\.display([^A-Za-z0-9_]|$)|vm\.display([^A-Za-z0-9_]|$)|"display"'; Allow = 'power\.sleep\.display'; Files = $scanFiles },
     # G5: no hard-coded host-side ports — guest port forwards must come from the
-    # manifest portForwards (2222/5555/5554 host refs belong only in manifest/tests/docs).
-    @{ Label = 'hard-coded host-side port (2222/5555/5554)'; Pattern = 'hostfwd=tcp::(2222|5555|5554)|localhost:(2222|5555|5554)|-p (2222|5555|5554)|::(2222|5555|5554)-:|<integer>(2222|5555|5554)</integer>'; Allow = '^$'; Files = $scanFiles },
+    # manifest portForwards (22000-22099 host refs belong only in manifest/tests/docs).
+    @{ Label = 'hard-coded host-side port (22000-22099)'; Pattern = 'hostfwd=tcp::220[0-9]{2}|localhost:220[0-9]{2}|-p 220[0-9]{2}|::220[0-9]{2}-:|<integer>220[0-9]{2}</integer>'; Allow = '^$'; Files = $scanFiles },
     # G6: no invalid suffix forms KB/KiB — except the parser doc comments (excluded
     # by scope above) and the pre-existing health-check message (df -Pk reports 1K
     # blocks, i.e. KiB).

@@ -134,7 +134,7 @@ variable "autounattend_path" {
 
 variable "hostfwd" {
   type        = string
-  description = "Comma-separated QEMU hostfwd rules (e.g. 'hostfwd=tcp::2222-:22') derived from the VMs.json portForwards of the VM being built."
+  description = "Comma-separated QEMU hostfwd rules (e.g. 'hostfwd=tcp::22030-:22') derived from the VMs.json portForwards of the VM being built."
 }
 
 variable "guest_hostname" {

@@ -103,9 +103,9 @@ run_25_vm_manifest_regression() {
   fi
 
   # G5: no hard-coded host-side ports — guest port forwards must come from the
-  # manifest portForwards (2222/5555/5554 host refs belong only in manifest/tests/docs).
+  # manifest portForwards (22000-22099 host refs belong only in manifest/tests/docs).
   if [ "${#_scan_files[@]}" -gt 0 ]; then
-    _s25_gate 'hostfwd=tcp::(2222|5555|5554)|localhost:(2222|5555|5554)|-p (2222|5555|5554)|::(2222|5555|5554)-:|<integer>(2222|5555|5554)</integer>' '' "${_scan_files[@]}"
+    _s25_gate 'hostfwd=tcp::220[0-9]{2}|localhost:220[0-9]{2}|-p 220[0-9]{2}|::220[0-9]{2}-:|<integer>220[0-9]{2}</integer>' '' "${_scan_files[@]}"
   fi
 
   # G6: no invalid suffix forms KB/KiB — except the parser doc comments (excluded

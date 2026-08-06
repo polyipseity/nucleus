@@ -56,7 +56,7 @@ Guest OS converge happens automatically after provisioning (Packer, guest.nix, o
 Automation channels used during provisioning:
 
 1. QEMU guest agent (virtio-serial named pipe — all QEMU-based VMs)
-2. SSH port forwarding (host/guest ports from `VMs.json` `portForwards`, per VM)
+2. Port forwarding tokens from `VMs.json` `portForwards`: `__HOSTFWDS__` (QEMU), `__VM_PORT_FORWARDS__` (UTM plist), `__TART_SOFTNET_EXPOSE__` (Tart), libvirt passt ranges (NixOS domain XML)
 3. Tart guest agent (macOS guests only)
 
 ## Moving VMs between hosts

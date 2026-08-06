@@ -107,7 +107,7 @@ test_descriptor_writer() {
       "cpus": 4,
       "ram": "8GB",
       "diskSize": "64GB",
-      "portForwards": [{"guestPort": 5555, "hostPort": 5555}, {"guestPort": 5554, "hostPort": 5554}],
+      "portForwards": [{"guestPort": 5555, "hostPort": 22040}, {"guestPort": 5554, "hostPort": 22041}],
       "macAddressPrefix": "52",
       "Android": {
         "systemImage": "Android-system.qcow2",
@@ -169,8 +169,8 @@ EOF
       ram: "8GB",
       diskSize: "64GB",
       portForwards: [
-        {guestPort: 5555, hostPort: 5555},
-        {guestPort: 5554, hostPort: 5554}
+        {guestPort: 5555, hostPort: 22040},
+        {guestPort: 5554, hostPort: 22041}
       ],
       uuid: "6d612a86-bee4-b0a6-59b8-b3affd6f1fbc",
       mac: "52:dd:a9:e1:f8:66",
