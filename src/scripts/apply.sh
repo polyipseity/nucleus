@@ -17,7 +17,7 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
 # Usage
 usage() {
-  usage_std 'apply.sh' '[--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--target-user=<name>] [--username=<name>] [--vm-setup|--no-vm-setup]' \
+  usage_std 'apply.sh' '[--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--target-user=<name>] [--username=<name>] [--vm-sync|--no-vm-sync] [--vm-setup|--no-vm-setup]' \
     'Dispatch the Nix apply command for the current host.'
   exit 0
 }
@@ -25,6 +25,7 @@ usage() {
 # Flag parsing
 ai_sync=true
 replica_sync=false
+vm_sync=true
 vm_setup=false
 target_user=""
 
@@ -34,6 +35,8 @@ while [ "$#" -gt 0 ]; do
     --no-ai-sync) ai_sync=false ;;
     --replica-sync) replica_sync=true ;;
     --no-replica-sync) replica_sync=false ;;
+    --vm-sync) vm_sync=true ;;
+    --no-vm-sync) vm_sync=false ;;
     --vm-setup) vm_setup=true ;;
     --no-vm-setup) vm_setup=false ;;
     --target-user)
@@ -154,22 +157,28 @@ run_ai_sync() {
   fi
 }
 
-run_vm_setup() {
-  # Call nucleus-vm setup to provision virtual machine disk images and
-  # register VMs after the system configuration has been applied.
-  if [ "$vm_setup" = false ]; then
-    printf '%s\n' "nucleus-vm: --vm-setup not set; skipping post-apply VM provisioning"
-    return
-  fi
-
+run_vm_post_apply() {
   if ! command -v nucleus-vm >/dev/null 2>&1; then
-    printf '%s\n' "nucleus-vm: nucleus-vm not found in PATH; skipping VM setup"
+    printf '%s\n' "nucleus-vm: nucleus-vm not found in PATH; skipping post-apply VM step"
     return
   fi
 
-  printf '%s\n' "nucleus-vm: running post-apply VM provisioning..."
-  if ! nucleus-vm setup --accept-gsi-license; then
-    printf '%s\n' "nucleus-vm: nucleus-vm setup exited with an error; VM setup incomplete (system apply succeeded)" >&2
+  if [ "$vm_setup" = true ]; then
+    printf '%s\n' "nucleus-vm: running post-apply VM provisioning (setup)..."
+    if ! nucleus-vm setup --accept-gsi-license; then
+      printf '%s\n' "nucleus-vm: nucleus-vm setup exited with an error; VM setup incomplete (system apply succeeded)" >&2
+    fi
+    return
+  fi
+
+  if [ "$vm_sync" = false ]; then
+    printf '%s\n' "nucleus-vm: --no-vm-sync set; skipping post-apply VM config refresh"
+    return
+  fi
+
+  printf '%s\n' "nucleus-vm: running post-apply VM config refresh (sync)..."
+  if ! nucleus-vm sync; then
+    printf '%s\n' "nucleus-vm: nucleus-vm sync exited with an error; VM sync incomplete (system apply succeeded)" >&2
   fi
 }
 
@@ -297,7 +306,7 @@ case "$(uname -s)" in
       NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/services/jellyfin-sync.sh"
     run_ai_sync
     run_replica_sync
-    run_vm_setup
+    run_vm_post_apply
     run_manual_display MacBook
     ;;
   Linux)
@@ -319,7 +328,7 @@ case "$(uname -s)" in
       NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/services/jellyfin-sync.sh"
       run_ai_sync
       run_replica_sync
-      run_vm_setup
+      run_vm_post_apply
       run_gc
       run_gc
       run_manual_display NixOS
@@ -336,7 +345,7 @@ case "$(uname -s)" in
       NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/services/jellyfin-sync.sh"
       run_ai_sync
       run_replica_sync
-      run_vm_setup
+      run_vm_post_apply
       run_gc
       run_manual_display NixOS
     fi

@@ -4,7 +4,7 @@
 # previously scattered across vm-setup.sh (now vm.sh) and host-specific scripts.
 # VMs are defined in src/modules/VMs.json (the canonical manifest).
 #
-# Commands: setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack [vm...] [options].
+# Commands: setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack [vm...] [options].
 # Guest credentials are resolved from the per-user SOPS secret file referenced
 # by users.json vmGuest keys; see resolve_vm_guest_credentials.
 #
@@ -160,9 +160,11 @@ vm_guest_credentials_hash() {
 # ---------------------------------------------------------------------------
 
 usage() {
-  usage_std "$(basename "$0")" "setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack [vm...] [options]"
+  usage_std "$(basename "$0")" "setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack [vm...] [options]"
   cat <<'EOF'
-  setup                    Build images and provision VMs (full lifecycle).
+  sync [vm...]             Refresh VM config (scripts, UTM plists, virsh define).
+                          Non-destructive; runs automatically after nucleus-apply.
+  setup [vm...]            Full provision: config sync + image build + disk/bundle setup.
   list                     List all VMs from manifest with runtime status.
   status [vm...]           Show runtime status of specified VMs (all if omitted).
   start <vm>               Start a VM.
@@ -268,7 +270,7 @@ while [ "$#" -gt 0 ]; do
     --mido-script) NUCLEUS_MIDO_SCRIPT="$2"; shift 2 ;;
     --json) json_output=true; shift ;;
     --repo-root) repo_root_override="$2"; shift 2 ;;
-    setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack)
+    setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack)
       action="$1"; shift
       vm_args=("$@")
       break
@@ -302,7 +304,7 @@ for arg in "${vm_args[@]}"; do
   esac
 done
 
-[ -z "$action" ] && { error "missing action (setup, list, status, start, stop, upgrade, reset, gc, resize, pack, unpack)" ; usage >&2 ; exit 1; }
+[ -z "$action" ] && { error "missing action (setup, sync, list, status, start, stop, upgrade, reset, gc, resize, pack, unpack)" ; usage >&2 ; exit 1; }
 
 # Validate scalars
 # WHY: validating before dispatch fails fast with a precise message instead
@@ -359,12 +361,10 @@ resolve_target_vm() {
 # Subcommand implementations
 # ---------------------------------------------------------------------------
 
-# do_setup
-#   Full lifecycle: resolve credentials, init the runtime, build images, run
-#   host-specific provisioners, then optionally GC. WHY: credential failure
-#   degrades to no-drift-detection instead of aborting, so a missing secret
-#   file cannot block provisioning of VMs that need no guest access.
-do_setup() {
+# vm_prepare_vm_command
+#   Shared preamble for setup and sync: resolve manifest, init runtime, ensure
+#   VM directories exist, and write the directory README.
+vm_prepare_vm_command() {
   require_command jq
 
   REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
@@ -375,26 +375,20 @@ do_setup() {
   VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
   IMAGES_DIR="$VM_DIR/images"
 
-  # Auto-detect QEMU accelerator if not specified
   if [ -z "$accelerator" ]; then
     case "$(uname -s)" in
       Darwin)
         if [ "$(uname -m)" = "arm64" ]; then
-          # WHY: Hypervisor.framework on Apple Silicon only accelerates AArch64
-          # guests; qemu-system-x86_64 -accel hvf fails instantly.
           accelerator='tcg'
         else
           accelerator='hvf'
         fi
         ;;
-      # WHY: KVM is the only practical accelerator for Linux guests; tcg is
-      # the portable fallback for hosts without hardware virtualization.
       Linux)  accelerator='kvm' ;;
       *)      accelerator='tcg' ;;
     esac
   fi
 
-  # Resolve guest credentials
   if ! resolve_vm_guest_credentials; then
     say "guest credential resolution failed; proceeding without drift detection"
     vm_secret_owner=''
@@ -406,7 +400,6 @@ do_setup() {
     export NUCLEUS_VM_GUEST_USERNAME="$vm_guest_username"
     export NUCLEUS_VM_GUEST_PASSWORD="$vm_guest_password"
 
-    # Export SSH public key for NixOS guest provisioning (guest.nix uses it for authorized_keys).
     vm_guest_ssh_public_key="$(resolve_vm_guest_ssh_key)" || true  # check-suppress:suppression_doc: resolve_vm_guest_ssh_key may fail when no guest SSH key exists; an empty value skips key provisioning
     if [ -n "$vm_guest_ssh_public_key" ]; then
       export NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY="$vm_guest_ssh_public_key"
@@ -425,27 +418,25 @@ do_setup() {
 
   mkdir -p "$VM_DIR" "$IMAGES_DIR" "$VM_DIR/scripts"
   write_vm_directory_readme
+}
 
-  # Write self-describing descriptors for EVERY manifest guest (enabled or
-  # disabled, host-matched or not) so scripts/ and unpack can serve disabled
-  # VMs without a live manifest.
-  vm_write_descriptors
+# do_sync
+#   Non-destructive config refresh: descriptors, scripts, UTM plist +
+#   registration, and libvirt define.  Skips image build and disk work.
+do_sync() {
+  vm_prepare_vm_command
+  vm_sync_config_phase
+  nuc_done
+}
 
-  # Prune stale helper scripts from previous runs, then write the complete
-  # all-guests set (start/stop + pack/unpack, both .sh and .ps1 variants).
-  # WHY: leftover scripts from renamed or removed VMs would otherwise be
-  # picked up by do_start/do_stop; the all-guests pass regenerates every
-  # current manifest guest regardless of enable/host-match state.
-  for f in "$VM_DIR/scripts"/*.sh "$VM_DIR/scripts"/*.ps1; do
-    [ -f "$f" ] || continue
-    rm -f "$f"
-  done
-  vm_write_all_guest_scripts
-
-  # Darwin-specific environment setup
-  if [ "$(uname -s)" = "Darwin" ]; then
-    ensure_tart_vm_dir
-  fi
+# do_setup
+#   Full lifecycle: resolve credentials, init the runtime, build images, run
+#   host-specific provisioners, then optionally GC. WHY: credential failure
+#   degrades to no-drift-detection instead of aborting, so a missing secret
+#   file cannot block provisioning of VMs that need no guest access.
+do_setup() {
+  vm_prepare_vm_command
+  vm_sync_config_phase
 
   vm_build_images
 
@@ -944,5 +935,5 @@ do_unpack() {
 # ---------------------------------------------------------------------------
 
 case "$action" in
-  setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) "do_$action" ;;
+  setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) "do_$action" ;;
 esac
