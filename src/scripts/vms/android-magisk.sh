@@ -10,6 +10,8 @@ set -euo pipefail
 NUCLEUS_MAGISK_MARKER='android-magisk.tag.json'
 NUCLEUS_MAGISK_PATCH_REMOTE='/data/local/tmp/nucleus-magisk-patch'
 NUCLEUS_MAGISK_STOCK_BOOT_REMOTE='/data/local/tmp/nucleus-stock-boot.img'
+NUCLEUS_ROOT_PROPS_SERVICE='/data/adb/service.d/nucleus-root-props.sh'
+NUCLEUS_LOCAL_TERMINAL_PACKAGE='com.android.terminal'
 
 # vm_android_magisk_apk_lib_dir VM_INDEX
 #   Magisk APK lib/ subdirectory for this guest CPU ABI.
@@ -51,6 +53,122 @@ vm_android_guest_has_magisk_su() {
   fi
 
   adb -s "$_agms_serial" shell 'su -c id -u' 2>/dev/null | tr -d '\r' | grep -qx '0'
+}
+
+# vm_android_guest_has_adb_root VM_INDEX
+#   True when host adb root yields shell uid 0.
+vm_android_guest_has_adb_root() {
+  vm_android_adb_ensure_root "$1"
+}
+
+# vm_android_root_props_boot_script
+#   Guest Magisk service.d script that re-applies ro.debuggable each boot.
+vm_android_root_props_boot_script() {
+  cat <<'EOF'
+#!/system/bin/sh
+resetprop ro.debuggable 1
+# persist.sys.root_access is already persist.*; rewrite is idempotent.
+resetprop persist.sys.root_access 3
+EOF
+}
+
+# vm_android_enable_local_terminal VM_INDEX
+#   Enable the Developer-options Local terminal toggle (com.android.terminal).
+vm_android_enable_local_terminal() {
+  _aelt_vm_index="$1"
+  _aelt_serial="$(vm_android_adb_serial "$_aelt_vm_index")"
+
+  if ! adb -s "$_aelt_serial" shell "su -c $(printf '%q' "pm path $NUCLEUS_LOCAL_TERMINAL_PACKAGE")" 2>/dev/null \
+    | tr -d '\r' | grep -q '^package:'; then
+    error "Local terminal package $NUCLEUS_LOCAL_TERMINAL_PACKAGE is not installed on the guest"
+    return 1
+  fi
+
+  if ! adb -s "$_aelt_serial" shell "su -c $(printf '%q' "cmd package set-application-enabled-setting $NUCLEUS_LOCAL_TERMINAL_PACKAGE 1 0")"; then
+    error "failed to enable Local terminal ($NUCLEUS_LOCAL_TERMINAL_PACKAGE)"
+    return 1
+  fi
+
+  if ! adb -s "$_aelt_serial" shell "su -c $(printf '%q' "cmd package get-application-enabled-setting $NUCLEUS_LOCAL_TERMINAL_PACKAGE")" 2>/dev/null \
+    | tr -d '\r' | grep -qx '1'; then
+    error "Local terminal ($NUCLEUS_LOCAL_TERMINAL_PACKAGE) is not enabled after apply"
+    return 1
+  fi
+}
+
+# vm_android_apply_session_magiskpolicy_for_adb_root VM_INDEX
+#   Session-only SELinux rules when Lineage adb root still fails on user builds.
+vm_android_apply_session_magiskpolicy_for_adb_root() {
+  _asmp_vm_index="$1"
+  _asmp_serial="$(vm_android_adb_serial "$_asmp_vm_index")"
+
+  adb -s "$_asmp_serial" shell "su -c $(printf '%q' "magiskpolicy --live 'allow adbd adbd process setcurrent'")"
+  adb -s "$_asmp_serial" shell "su -c $(printf '%q' "magiskpolicy --live 'allow adbd su process dyntransition'")"
+}
+
+# vm_android_persist_root_props_service VM_INDEX
+#   Install nucleus-root-props.sh under Magisk service.d.
+vm_android_persist_root_props_service() {
+  _aprps_vm_index="$1"
+  _aprps_serial="$(vm_android_adb_serial "$_aprps_vm_index")"
+  _aprps_persist_cmd="mkdir -p /data/adb/service.d && cat > $NUCLEUS_ROOT_PROPS_SERVICE <<'EOF'
+$(vm_android_root_props_boot_script)
+EOF
+chmod 755 $NUCLEUS_ROOT_PROPS_SERVICE"
+
+  if ! adb -s "$_aprps_serial" shell "su -c $(printf '%q' "$_aprps_persist_cmd")"; then
+    error "failed to persist root props boot script at $NUCLEUS_ROOT_PROPS_SERVICE"
+    return 1
+  fi
+}
+
+# vm_android_config_root VM_INDEX
+#   Enable dev options, Local terminal, Lineage root access, and host adb root.
+vm_android_config_root() {
+  _acr_vm_index="$1"
+  _acr_serial="$(vm_android_adb_serial "$_acr_vm_index")"
+
+  if ! vm_android_adb_wait_authorized "$_acr_vm_index" 600; then
+    return 1
+  fi
+
+  if [ "$(vm_android_adb_poll_state "$_acr_vm_index")" != "device" ]; then
+    error "rooted debugging requires booted system (adb state device), got: $(vm_android_adb_poll_state "$_acr_vm_index")"
+    return 1
+  fi
+
+  if ! vm_android_guest_has_magisk_su "$_acr_vm_index"; then
+    error "rooted debugging requires Magisk su; run --magisk first"
+    return 1
+  fi
+
+  vm_android_enable_usb_debugging "$_acr_vm_index"
+  vm_android_enable_local_terminal "$_acr_vm_index"
+
+  if ! adb -s "$_acr_serial" shell "su -c $(printf '%q' 'resetprop ro.debuggable 1 && resetprop persist.sys.root_access 3')"; then
+    error "failed to apply ro.debuggable and persist.sys.root_access on guest"
+    return 1
+  fi
+
+  vm_android_persist_root_props_service "$_acr_vm_index" || return 1
+
+  adb -s "$_acr_serial" shell 'setprop ctl.restart adbd' 2>/dev/null || true
+  sleep 2
+  vm_android_adb_refresh "$_acr_vm_index"
+
+  if ! vm_android_guest_has_adb_root "$_acr_vm_index"; then
+    say "adb root failed; applying session-only magiskpolicy rules and retrying..."
+    vm_android_apply_session_magiskpolicy_for_adb_root "$_acr_vm_index"
+    adb -s "$_acr_serial" shell 'setprop ctl.restart adbd' 2>/dev/null || true
+    sleep 2
+    vm_android_adb_refresh "$_acr_vm_index"
+    if ! vm_android_guest_has_adb_root "$_acr_vm_index"; then
+      error "adb root is not available after applying rooted-debugging props; verify ro.debuggable=1 and persist.sys.root_access=3 on the guest"
+      return 1
+    fi
+  fi
+
+  say "rooted debugging enabled on $_acr_serial (adb root ready)"
 }
 
 # vm_android_download_boot_image VM_INDEX
@@ -318,8 +436,6 @@ vm_android_config_magisk() {
     return 1
   fi
 
-  vm_android_enable_usb_debugging "$_acm_vm_index"
-
   if vm_android_guest_has_magisk_su "$_acm_vm_index"; then
     say "Magisk su is already available on $_acm_serial"
   else
@@ -351,12 +467,10 @@ vm_android_config_magisk() {
     fi
   fi
 
-  vm_android_enable_usb_debugging "$_acm_vm_index"
-
   _acm_tag="$(vm_android_jqssun_release_tag_for_asset "boot_$(vm_android_recovery_asset_suffix "$_acm_vm_index").img")" || true
   if [ -n "$_acm_tag" ]; then
     jq -n --arg tag "$_acm_tag" '{tag_name: $tag, configured: true}' > "$IMAGES_DIR/$NUCLEUS_MAGISK_MARKER"
   fi
 
-  say "Magisk installed and configured on $_acm_serial (Magisk su ready)"
+  say "Magisk installed on $_acm_serial"
 }
