@@ -168,7 +168,7 @@ vm_android_config_root() {
     fi
   fi
 
-  say "rooted debugging enabled on $_acr_serial (adb root ready)"
+  say "rooted debugging enabled on $_acr_serial; next: --fake-wifi"
 }
 
 # vm_android_download_boot_image VM_INDEX
@@ -332,8 +332,7 @@ vm_android_magisk_flash_boot() {
   _amfb_serial="$(vm_android_adb_serial "$_amfb_vm_index")"
   _amfb_fb_serial="$(vm_android_fastboot_serial "$_amfb_vm_index")"
 
-  say "manual step: on the VM, open LineageOS Recovery → Advanced → Enter fastboot (if not already in fastboot)"
-  say "rebooting guest to fastboot on $_amfb_serial..."
+  say "rebooting to fastboot on $_amfb_serial (VM: Recovery → Advanced → Enter fastboot if needed)..."
   # check-suppress:suppression_doc: reboot bootloader may fail when already in fastboot; fastboot_wait handles the next state.
   adb -s "$_amfb_serial" reboot bootloader 2>/dev/null || true
 
@@ -348,7 +347,7 @@ vm_android_magisk_flash_boot() {
 
   # check-suppress:suppression_doc: fastboot reboot after flash is best-effort; guest may already be rebooting.
   fastboot -s "$_amfb_fb_serial" reboot 2>/dev/null || true
-  say "flashed Magisk boot image; guest should reboot to system"
+  say "flashed Magisk boot image; waiting for system boot..."
 }
 
 # vm_android_magisk_install_apk VM_INDEX MAGISK_APK
@@ -450,7 +449,7 @@ vm_android_config_magisk() {
     fi
 
     vm_android_magisk_install_apk "$_acm_vm_index" "$_acm_apk" || return 1
-    say "manual step: open the Magisk app on the VM; if it shows an environment-fix prompt, tap OK and allow the reboot"
+    say "next: open Magisk app on VM; complete environment-fix if prompted, then re-run --magisk"
 
     _acm_wait=0
     while [ "$_acm_wait" -lt 120 ]; do
@@ -462,7 +461,7 @@ vm_android_config_magisk() {
     done
 
     if ! vm_android_guest_has_magisk_su "$_acm_vm_index"; then
-      error "Magisk su is not available after boot flash; open the Magisk app on the VM (environment-fix prompt appears only after opening it), complete setup, then retry --magisk"
+      error "Magisk su not available; open Magisk app on VM, then retry --magisk"
       return 1
     fi
   fi
@@ -472,5 +471,5 @@ vm_android_config_magisk() {
     jq -n --arg tag "$_acm_tag" '{tag_name: $tag, configured: true}' > "$IMAGES_DIR/$NUCLEUS_MAGISK_MARKER"
   fi
 
-  say "Magisk installed on $_acm_serial"
+  say "Magisk installed on $_acm_serial; next: --root"
 }
