@@ -258,6 +258,12 @@ let
     scriptName = "src/scripts/services/sccache-gc";
   };
 
+  logGcSystem = pkgs.writeNucleusShellApplication {
+    name = "log-gc-system";
+    runtimeInputs = [ pkgs.jq ];
+    scriptName = "src/scripts/services/log-gc-system";
+  };
+
   # guiEnvAgent — launchd login agent that manages GUI-environment PATH and
   # env vars.  All Nix-computed values are passed as CLI args to the script.
   guiEnvAgent = pkgs.writeNucleusShellApplication {
@@ -571,6 +577,32 @@ lib.mkIf pkgs.stdenv.isDarwin {
     config = {
       Label = "local.sccache-gc";
       ProgramArguments = [ "${sccacheGc}/bin/nucleus-sccache-gc" ];
+      RunAtLoad = false;
+      StartCalendarInterval = [
+        {
+          Hour = 12;
+          Minute = 0;
+        }
+      ];
+    };
+  };
+
+  # --------------------------------------------------------------------------
+  # Daily system log rotation LaunchDaemon
+  # Rotates root-owned system log files that user-context gc cannot write
+  # (linux-builder, service-watchdog). Cross-host parity with NixOS systemd
+  # timer and Windows scheduled task.
+  launchd.daemons."log-gc-system" = {
+    serviceConfig = {
+      Label = "local.log-gc-system";
+      ProgramArguments = [
+        "/bin/sh"
+        "-c"
+        "exec ${logGcSystem}/bin/nucleus-log-gc-system"
+      ];
+      EnvironmentVariables = {
+        NUCLEUS_REPO_ROOT = repoRoot;
+      };
       RunAtLoad = false;
       StartCalendarInterval = [
         {

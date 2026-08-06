@@ -26,6 +26,14 @@ let
   };
 
   activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
+
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+
+  logGcSystem = pkgs.writeNucleusShellApplication {
+    name = "log-gc-system";
+    runtimeInputs = [ pkgs.jq ];
+    scriptName = "src/scripts/services/log-gc-system";
+  };
 in
 {
   # ---------------------------------------------------------------------------
@@ -76,6 +84,28 @@ in
       Type = "simple";
     };
     wantedBy = [ "multi-user.target" ];
+  };
+
+  # ---------------------------------------------------------------------------
+  # Daily system log rotation — rotates /var/log/nucleus as root because
+  # user-context gc cannot write root-owned service logs.
+  # ---------------------------------------------------------------------------
+  systemd.services."nucleus-log-gc-system" = {
+    description = "Daily system log rotation for nucleus services";
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${logGcSystem}/bin/nucleus-log-gc-system";
+      Environment = "NUCLEUS_REPO_ROOT=${repoRoot}";
+    };
+  };
+
+  systemd.timers."nucleus-log-gc-system" = {
+    description = "Daily system log rotation timer";
+    timerConfig = {
+      OnCalendar = "12:00:00";
+      Persistent = true;
+    };
+    wantedBy = [ "timers.target" ];
   };
 
   # ---------------------------------------------------------------------------
