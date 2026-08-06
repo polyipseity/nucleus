@@ -1422,6 +1422,241 @@ vm_build_one_image() {
   esac
 }
 
+# vm_prune_and_write_all_guest_scripts
+#   Removes stale scripts/ helpers then regenerates the full all-guests set.
+vm_prune_and_write_all_guest_scripts() {
+  for _pwgas_f in "$VM_DIR/scripts"/*.sh "$VM_DIR/scripts"/*.ps1; do
+    [ -f "$_pwgas_f" ] || continue
+    rm -f "$_pwgas_f"
+  done
+  vm_write_all_guest_scripts
+}
+
+# vm_validate_utm_plist_template NAME
+#   Validates the Nix-rendered UTM plist template for NAME.  On success sets
+#   _vupt_template to the template path and returns 0.
+vm_validate_utm_plist_template() {
+  local _vupt_name="$1"
+
+  _vupt_template="${HOME}/.local/share/nucleus/vms/${_vupt_name}-config.plist"
+  if [ ! -f "$_vupt_template" ]; then
+    warn "UTM config template not found at $_vupt_template; apply the macOS config first"
+    return 1
+  fi
+  if grep -qE 'virtio-ramfb-gl|<key>DirectorySharing</key>|<key>ReadOnlySharing</key>|<key>SharedDirectories</key>' "$_vupt_template"; then
+    warn "stale UTM template detected at $_vupt_template; run home-manager switch (or nucleus apply) before vm sync"
+    return 1
+  fi
+  _required_utm_keys='
+<key>IconCustom</key>
+<key>Sound</key>
+<key>ClipboardSharing</key>
+<key>DirectoryShareReadOnly</key>
+<key>DownscalingFilter</key>
+<key>UpscalingFilter</key>
+<key>NativeResolution</key>
+<key>MacAddress</key>
+<key>IsolateFromHost</key>
+<key>PortForward</key>
+<key>AdditionalArguments</key>
+<key>BalloonDevice</key>
+<key>DebugLog</key>
+<key>PS2Controller</key>
+<key>RNGDevice</key>
+<key>RTCLocalTime</key>
+<key>TPMDevice</key>
+<key>MaximumUsbShare</key>
+<key>UsbBusSupport</key>
+<key>UsbSharing</key>
+<key>CPUFlagsAdd</key>
+<key>CPUFlagsRemove</key>
+<key>ForceMulticore</key>
+<key>JITCacheSize</key>'
+  _missing_utm_keys=''
+  for _required_utm_key in $_required_utm_keys; do
+    if ! grep -Fq "$_required_utm_key" "$_vupt_template"; then
+      _missing_utm_keys="$_missing_utm_keys ${_required_utm_key#<key>}"
+    fi
+  done
+  if [ -n "$_missing_utm_keys" ]; then
+    warn "stale or incomplete UTM template detected at $_vupt_template (missing key(s):$_missing_utm_keys); run home-manager switch (or nucleus apply) before vm sync"
+    return 1
+  fi
+  return 0
+}
+
+# vm_apply_utm_plist_and_register NAME BUNDLE LEGACY_DISPLAY_CONFIG TEMPLATE_DRIFT_CONFIG
+#   Copies the managed plist into an existing UTM bundle and ensures UTM has
+#   the VM registered (open on first import; re-register on config drift).
+vm_apply_utm_plist_and_register() {
+  local _ap_name="$1" _ap_bundle="$2" _ap_legacy_display="$3" _ap_template_drift="$4"
+  local _ap_config_plist="$_ap_bundle/config.plist"
+
+  if ! vm_validate_utm_plist_template "$_ap_name"; then
+    return 1
+  fi
+
+  if [ "$dry_run" = false ]; then
+    cp "$_vupt_template" "$_ap_config_plist"
+    chmod +w "$_ap_config_plist"
+    say "refreshed UTM bundle config: $_ap_bundle"
+    if ! "$UTMCTL" list | awk 'NR > 1 { print $3 }' | grep -qxF "$_ap_name"; then
+      say "opening UTM bundle in place: $_ap_bundle"
+      if open "$_ap_bundle"; then
+        if wait_for_utm_registration "$_ap_name"; then
+          say "UTM VM opened and registered: $_ap_name"
+        else
+          warn "UTM did not register VM '$_ap_name' within timeout; open UTM and retry vm sync"
+        fi
+      else
+        warn "opening $_ap_bundle failed; ensure UTM can access the managed VM directory and retry"
+      fi
+    elif [ "$_ap_legacy_display" = true ] || [ "$_ap_template_drift" = true ]; then
+      say "repairing stale UTM runtime registration for $_ap_name"
+      if re_register_utm_bundle "$_ap_name" "$_ap_bundle"; then
+        say "stale UTM registration repaired: $_ap_name"
+      fi
+    else
+      say "UTM VM already registered: $_ap_name"
+    fi
+  else
+    dry_run "refresh UTM bundle $_ap_bundle from $_vupt_template"
+  fi
+}
+
+# vm_sync_utm — Config-only UTM refresh: plist copy + registration when the
+#   bundle already exists.  Skips disk/image work (use vm_setup_utm for that).
+vm_sync_utm() {
+  local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
+  local vm_display bundle config_plist legacy_display_config template_drift_config
+
+  if [ "$vm_type" = "macOS" ]; then
+    return
+  fi
+
+  vm_display=$(jq -r ".VMs[$vm_index].name" "$MANIFEST")
+  bundle="$VM_DIR/${vm_name}.utm"
+  config_plist="$bundle/config.plist"
+  legacy_display_config=false
+  template_drift_config=false
+
+  if [ ! -d "$bundle" ]; then
+    say "UTM bundle not found for '$vm_display'; run 'nucleus-vm setup' to create it"
+    return
+  fi
+
+  say "syncing UTM VM '$vm_display'..."
+  if [ -f "$config_plist" ] && grep -qE '<string>(vga|std|virtio-ramfb|virtio-ramfb-gl)</string>' "$config_plist"; then
+    legacy_display_config=true
+    say "detected legacy display config in existing bundle; VM will be re-registered to refresh runtime state: $vm_name"
+  fi
+  if [ -f "$config_plist" ] && vm_validate_utm_plist_template "$vm_name" \
+    && ! cmp -s "$_vupt_template" "$config_plist"; then
+    template_drift_config=true
+    say "detected config drift in existing bundle; VM will be re-registered to refresh runtime state: $vm_name"
+  elif [ ! -f "$config_plist" ]; then
+    vm_validate_utm_plist_template "$vm_name" || return
+  fi
+
+  vm_apply_utm_plist_and_register "$vm_name" "$bundle" "$legacy_display_config" "$template_drift_config"
+}
+
+vm_sync_utm_vms() {
+  if [ ! -d /Applications/UTM.app ]; then
+    say "UTM not found at /Applications/UTM.app; skipping macOS VM sync"
+    return
+  fi
+
+  vm_for_each vm_sync_utm
+  say "macOS VM sync complete"
+}
+
+# vm_sync_libvirt — Config-only libvirt refresh: virsh define from the
+#   Nix-installed domain XML.  Skips disk/overlay provisioning.
+vm_sync_libvirt() {
+  local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
+  local _xml_file
+
+  _xml_file="/etc/nucleus/vms/${vm_name}-domain.xml"
+  if [ ! -f "$_xml_file" ]; then
+    warn "domain XML not found at $_xml_file; apply the NixOS config first"
+    return
+  fi
+
+  if [ "$dry_run" = false ]; then
+    if virsh define "$_xml_file"; then
+      say "VM '$vm_name' defined/updated in libvirt"
+    else
+      warn "virsh define failed for '$vm_name'; check libvirtd status"
+    fi
+  else
+    dry_run "virsh define $_xml_file"
+  fi
+}
+
+vm_sync_libvirt_vms() {
+  if ! command -v virsh >/dev/null 2>&1; then
+    say "virsh not found in PATH; libvirtd may not be enabled yet"
+    say "apply the NixOS configuration first so vms.nix activates libvirtd"
+    return
+  fi
+
+  if virsh net-list --all 2>/dev/null | grep -q "default"; then
+    if ! virsh net-list 2>/dev/null | grep -q "default.*active"; then
+      say "starting libvirt default network..."
+      if ! run_cmd virsh net-start default; then
+        warn "failed to start libvirt default network; guest networking may be unavailable until it is started manually"
+      fi
+      if ! run_cmd virsh net-autostart default; then
+        warn "failed to mark libvirt default network for autostart; future boots may require manual recovery"
+      fi
+    fi
+  fi
+
+  vm_for_each vm_sync_libvirt
+  say "NixOS VM sync complete"
+}
+
+# vm_warn_running_vms_needing_restart
+#   Warn when VMs are running so the user knows to restart for config changes.
+vm_warn_running_vms_needing_restart() {
+  local _wrvnr_running _wrvnr_name
+
+  _wrvnr_running="$(vm_get_running_names)"
+  [ -n "$_wrvnr_running" ] || return
+  printf '%s\n' "$_wrvnr_running" | while IFS= read -r _wrvnr_name; do
+    [ -z "$_wrvnr_name" ] && continue
+    warn "VM '$_wrvnr_name' is running; stop and restart it for config changes (e.g. port forwards) to take effect"
+  done
+}
+
+# vm_sync_config_phase — Non-destructive config refresh shared by nucleus-vm
+#   sync and the first phase of nucleus-vm setup.
+vm_sync_config_phase() {
+  vm_write_descriptors
+  vm_prune_and_write_all_guest_scripts
+
+  if [ "$(uname -s)" = "Darwin" ]; then
+    ensure_tart_vm_dir
+  fi
+
+  case "$(uname -s)" in
+    Darwin)
+      vm_sync_utm_vms
+      ;;
+    Linux)
+      if [ -f /etc/NIXOS ]; then
+        vm_sync_libvirt_vms
+      fi
+      ;;
+    MINGW*|MSYS*|CYGWIN*)
+      say "Windows VM sync: start/stop scripts refreshed (no hypervisor domain to define)"
+      ;;
+  esac
+
+  vm_warn_running_vms_needing_restart
+}
+
 # Tart VM setup callback for vm_for_each
 
 vm_setup_tart() {
@@ -1450,7 +1685,7 @@ vm_setup_utm() {
   local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display bundle data_dir disk_file
   local disk_credential_marker disk_config_marker config_plist bundle_exists legacy_display_config
-  local template_drift_config _plist_template _prebuilt _prebuilt_valid _prebuilt_min_size _prebuilt_disk_bytes
+  local template_drift_config _prebuilt _prebuilt_valid _prebuilt_min_size _prebuilt_disk_bytes
   local _android_system _android_userdata _android_gsi _userdata_file _gsi_file _base_link
   local _guest_config_fingerprint
 
@@ -1489,58 +1724,13 @@ vm_setup_utm() {
     fi
   fi
 
-  # Use the Nix-generated UTM config.plist written to ~/.local/share/nucleus/
-  # at Home Manager activation time (run nucleus-apply first).
-  _plist_template="${HOME}/.local/share/nucleus/vms/${vm_name}-config.plist"
-  if [ ! -f "$_plist_template" ]; then
-    warn "UTM config template not found at $_plist_template; apply the macOS config first"
-    return
-  fi
-  # Detect stale templates from older schema/value generations and fail fast
-  # with a concrete action instead of copying a known-invalid plist.
-  if grep -qE 'virtio-ramfb-gl|<key>DirectorySharing</key>|<key>ReadOnlySharing</key>|<key>SharedDirectories</key>' "$_plist_template"; then
-    warn "stale UTM template detected at $_plist_template; run home-manager switch (or nucleus apply) before vm-setup"
-    return
-  fi
-  _required_utm_keys='
-<key>IconCustom</key>
-<key>Sound</key>
-<key>ClipboardSharing</key>
-<key>DirectoryShareReadOnly</key>
-<key>DownscalingFilter</key>
-<key>UpscalingFilter</key>
-<key>NativeResolution</key>
-<key>MacAddress</key>
-<key>IsolateFromHost</key>
-<key>PortForward</key>
-<key>AdditionalArguments</key>
-<key>BalloonDevice</key>
-<key>DebugLog</key>
-<key>PS2Controller</key>
-<key>RNGDevice</key>
-<key>RTCLocalTime</key>
-<key>TPMDevice</key>
-<key>MaximumUsbShare</key>
-<key>UsbBusSupport</key>
-<key>UsbSharing</key>
-<key>CPUFlagsAdd</key>
-<key>CPUFlagsRemove</key>
-<key>ForceMulticore</key>
-<key>JITCacheSize</key>'
-  _missing_utm_keys=''
-  for _required_utm_key in $_required_utm_keys; do
-    if ! grep -Fq "$_required_utm_key" "$_plist_template"; then
-      _missing_utm_keys="$_missing_utm_keys ${_required_utm_key#<key>}"
-    fi
-  done
-  if [ -n "$_missing_utm_keys" ]; then
-    warn "stale or incomplete UTM template detected at $_plist_template (missing key(s):$_missing_utm_keys); run home-manager switch (or nucleus apply) before vm-setup"
+  if ! vm_validate_utm_plist_template "$vm_name"; then
     return
   fi
   # Detect config drift in already-registered bundles. UTM can keep runtime
   # state from the registered entry, so we re-register when the on-disk
   # bundle config no longer matches the managed template.
-  if [ "$bundle_exists" = true ] && [ -f "$config_plist" ] && ! cmp -s "$_plist_template" "$config_plist"; then
+  if [ "$bundle_exists" = true ] && [ -f "$config_plist" ] && ! cmp -s "$_vupt_template" "$config_plist"; then
     template_drift_config=true
     say "detected config drift in existing bundle; VM will be re-registered to refresh runtime state: $vm_name"
   fi
@@ -1656,36 +1846,13 @@ vm_setup_utm() {
       ln -f "$IMAGES_DIR/${vm_type}.base.qcow2" "$_base_link"
       say "linked base image into UTM bundle: $_base_link"
     fi
-    cp "$_plist_template" "$config_plist"
-    # Nix store files are read-only (mode 0444).  Make the bundle-local copy
-    # writable so UTM can update the plist after import if needed.
-    chmod +w "$config_plist"
-    if [ "$bundle_exists" = true ]; then
-      say "refreshed UTM bundle config: $bundle"
-    else
+    if [ "$bundle_exists" != true ]; then
       say "UTM bundle created: $bundle"
     fi
-    if ! "$UTMCTL" list | awk 'NR > 1 { print $3 }' | grep -qxF "$vm_name"; then
-      say "opening UTM bundle in place: $bundle"
-      if open "$bundle"; then
-        if wait_for_utm_registration "$vm_name"; then
-          say "UTM VM opened and registered: $vm_name"
-        else
-          warn "UTM did not register VM '$vm_name' within timeout; open UTM and retry vm-setup"
-        fi
-      else
-        warn "opening $bundle failed; ensure UTM can access the managed VM directory and retry"
-      fi
-    elif [ "$legacy_display_config" = true ] || [ "$template_drift_config" = true ]; then
-      say "repairing stale UTM runtime registration for $vm_name"
-      if re_register_utm_bundle "$vm_name" "$bundle"; then
-        say "stale UTM registration repaired: $vm_name"
-      fi
-    else
-      say "UTM VM already registered: $vm_name"
-    fi
+    vm_apply_utm_plist_and_register "$vm_name" "$bundle" "$legacy_display_config" "$template_drift_config"
   else
-    dry_run "create UTM bundle $bundle from $_plist_template"
+    dry_run "provision UTM bundle disks for $bundle"
+    vm_apply_utm_plist_and_register "$vm_name" "$bundle" "$legacy_display_config" "$template_drift_config"
   fi
 }
 
@@ -1768,23 +1935,7 @@ vm_setup_libvirt() {
     fi
   fi
 
-  # Define/update the libvirt domain from the Nix-generated XML (idempotent).
-  # The file is installed at apply time by environment.etc in vms.nix.
-  _xml_file="/etc/nucleus/vms/${vm_name}-domain.xml"
-  if [ ! -f "$_xml_file" ]; then
-    warn "domain XML not found at $_xml_file; apply the NixOS config first"
-    return
-  fi
-
-  if [ "$dry_run" = false ]; then
-    if virsh define "$_xml_file"; then
-      say "VM '$vm_name' defined/updated in libvirt"
-    else
-      warn "virsh define failed for '$vm_name'; check libvirtd status"
-    fi
-  else
-    dry_run "virsh define $_xml_file"
-  fi
+  vm_sync_libvirt "$vm_name" "$vm_type" "$vm_hosts" "$vm_index"
 }
 
 # Phase 1 — Build images (if absent)
