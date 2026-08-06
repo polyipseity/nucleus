@@ -1,0 +1,362 @@
+#!/usr/bin/env bash
+# Install and configure Magisk on the jqssun LineageOS Android guest (user build).
+# Stages Magisk's boot_patch.sh kit from the APK, patches boot.img on the booted
+# guest via ADB, flashes via fastboot, and installs the Magisk APK. Automation
+# uses Magisk su (not adb root) on user builds.
+#
+# Usage: sourced by android-config.sh; not invoked directly.
+set -euo pipefail
+
+NUCLEUS_MAGISK_MARKER='android-magisk.tag.json'
+NUCLEUS_MAGISK_PATCH_REMOTE='/data/local/tmp/nucleus-magisk-patch'
+NUCLEUS_MAGISK_STOCK_BOOT_REMOTE='/data/local/tmp/nucleus-stock-boot.img'
+
+# vm_android_magisk_apk_lib_dir VM_INDEX
+#   Magisk APK lib/ subdirectory for this guest CPU ABI.
+vm_android_magisk_apk_lib_dir() {
+  _amal_vm_index="$1"
+  _amal_type="$(jq -r ".VMs[$_amal_vm_index].type" "$MANIFEST")"
+
+  case "$(vm_derive_arch "$_amal_type")" in
+    aarch64) printf 'arm64-v8a\n' ;;
+    x86_64) printf 'x86_64\n' ;;
+    arm) printf 'armeabi-v7a\n' ;;
+    i386|x86) printf 'x86\n' ;;
+    *)
+      error "unsupported guest architecture for Magisk patching: $(vm_derive_arch "$_amal_type")"
+      return 1
+      ;;
+  esac
+}
+
+# vm_android_enable_usb_debugging VM_INDEX
+#   Enable Developer options and USB debugging via settings (booted system).
+vm_android_enable_usb_debugging() {
+  _aeud_vm_index="$1"
+  _aeud_serial="$(vm_android_adb_serial "$_aeud_vm_index")"
+
+  adb -s "$_aeud_serial" shell 'settings put global development_settings_enabled 1'
+  adb -s "$_aeud_serial" shell 'settings put global adb_enabled 1'
+  sleep 2
+}
+
+# vm_android_guest_has_magisk_su VM_INDEX
+#   True when Magisk su is available on a booted guest.
+vm_android_guest_has_magisk_su() {
+  _agms_vm_index="$1"
+  _agms_serial="$(vm_android_adb_serial "$_agms_vm_index")"
+
+  if [ "$(vm_android_adb_poll_state "$_agms_vm_index")" != "device" ]; then
+    return 1
+  fi
+
+  adb -s "$_agms_serial" shell 'su -c id -u' 2>/dev/null | tr -d '\r' | grep -qx '0'
+}
+
+# vm_android_download_boot_image VM_INDEX
+#   Cache the jqssun boot image matching this guest architecture.
+vm_android_download_boot_image() {
+  _adbi_vm_index="$1"
+  _adbi_suffix="$(vm_android_recovery_asset_suffix "$_adbi_vm_index")"
+  _adbi_asset="boot_${_adbi_suffix}.img"
+  _adbi_img="$IMAGES_DIR/android-boot.img"
+  _adbi_dl_url="https://github.com/jqssun/android-lineage-qemu/releases/latest/download/$_adbi_asset"
+  _adbi_tag=''
+
+  _adbi_tag="$(vm_android_jqssun_release_tag_for_asset "$_adbi_asset")" || return 1
+
+  if [ -f "$_adbi_img" ]; then
+    _adbi_cached_tag="$(jq -r '.tag_name // empty' "$IMAGES_DIR/android-boot.tag.json" 2>/dev/null || true)"
+    if [ "$_adbi_cached_tag" = "$_adbi_tag" ]; then
+      say "using cached boot image: $_adbi_img" >&2
+      printf '%s\n' "$_adbi_img"
+      return 0
+    fi
+    say "jqssun release changed ($_adbi_cached_tag → $_adbi_tag); re-downloading boot image..." >&2
+    rm -f "$_adbi_img"
+  else
+    say "downloading boot image ($_adbi_asset)..." >&2
+  fi
+
+  run_with_backoff "download boot image" \
+    curl -fL -o "$_adbi_img" "$_adbi_dl_url" \
+    || { error "failed to download boot image from $_adbi_dl_url"; return 1; }
+
+  jq -n --arg tag "$_adbi_tag" '{tag_name: $tag}' > "$IMAGES_DIR/android-boot.tag.json"
+  say "boot image ready: $_adbi_img" >&2
+  printf '%s\n' "$_adbi_img"
+}
+
+# vm_android_download_magisk_apk VM_INDEX
+#   Download and cache the Magisk APK from Android.magiskUrl in the manifest.
+vm_android_download_magisk_apk() {
+  _adma_vm_index="$1"
+  _adma_url="$(jq -r ".VMs[$_adma_vm_index].Android.magiskUrl" "$MANIFEST")"
+  _adma_apk="$IMAGES_DIR/android-magisk.apk"
+
+  if [ -z "$_adma_url" ] || [ "$_adma_url" = "null" ]; then
+    error "Android.magiskUrl is not set in the manifest"
+    return 1
+  fi
+
+  if [ -f "$_adma_apk" ]; then
+    say "using cached Magisk APK: $_adma_apk" >&2
+    printf '%s\n' "$_adma_apk"
+    return 0
+  fi
+
+  say "downloading Magisk APK..." >&2
+  run_with_backoff "download Magisk APK" \
+    curl -fL -o "$_adma_apk" "$_adma_url" \
+    || { error "failed to download Magisk from $_adma_url"; return 1; }
+  say "Magisk APK ready: $_adma_apk" >&2
+  printf '%s\n' "$_adma_apk"
+}
+
+# vm_android_magisk_stage_patch_kit MAGISK_APK VM_INDEX OUT_DIR
+#   Extract Magisk boot_patch.sh and guest-native binaries from the APK zip layout.
+vm_android_magisk_stage_patch_kit() {
+  _amspk_apk="$1"
+  _amspk_vm_index="$2"
+  _amspk_out="$3"
+  _amspk_lib="$(vm_android_magisk_apk_lib_dir "$_amspk_vm_index")" || return 1
+  _amspk_lib_dir="$_amspk_out/lib/$_amspk_lib"
+
+  require_command unzip
+
+  rm -rf "$_amspk_out"
+  mkdir -p "$_amspk_out"
+
+  if ! unzip -qo "$_amspk_apk" \
+    assets/boot_patch.sh \
+    assets/util_functions.sh \
+    assets/stub.apk \
+    "lib/$_amspk_lib/libmagisk.so" \
+    "lib/$_amspk_lib/libmagiskboot.so" \
+    "lib/$_amspk_lib/libmagiskinit.so" \
+    "lib/$_amspk_lib/libinit-ld.so" \
+    -d "$_amspk_out"; then
+    error "failed to extract Magisk patch kit from $_amspk_apk (lib/$_amspk_lib)"
+    return 1
+  fi
+
+  if [ ! -f "$_amspk_out/assets/boot_patch.sh" ]; then
+    error "Magisk APK is missing assets/boot_patch.sh ($_amspk_apk)"
+    return 1
+  fi
+
+  mv "$_amspk_out/assets/boot_patch.sh" "$_amspk_out/boot_patch.sh"
+  mv "$_amspk_out/assets/util_functions.sh" "$_amspk_out/util_functions.sh"
+  mv "$_amspk_out/assets/stub.apk" "$_amspk_out/stub.apk"
+  rmdir "$_amspk_out/assets" 2>/dev/null || true
+
+  for _amspk_pair in \
+    'libmagisk.so:magisk' \
+    'libmagiskboot.so:magiskboot' \
+    'libmagiskinit.so:magiskinit' \
+    'libinit-ld.so:init-ld'; do
+    _amspk_src_name="${_amspk_pair%%:*}"
+    _amspk_dst_name="${_amspk_pair##*:}"
+    if [ ! -f "$_amspk_lib_dir/$_amspk_src_name" ]; then
+      error "Magisk APK is missing lib/$_amspk_lib/$_amspk_src_name"
+      return 1
+    fi
+    cp -f "$_amspk_lib_dir/$_amspk_src_name" "$_amspk_out/$_amspk_dst_name"
+    chmod 755 "$_amspk_out/$_amspk_dst_name"
+  done
+
+  rm -rf "$_amspk_out/lib"
+  chmod 755 "$_amspk_out/boot_patch.sh"
+  chmod 644 "$_amspk_out/stub.apk"
+}
+
+# vm_android_magisk_guest_patch_boot VM_INDEX BOOT_IMG OUT_IMG MAGISK_APK
+#   Patch boot.img on the booted guest using Magisk's boot_patch.sh (APK lib/*.so layout).
+vm_android_magisk_guest_patch_boot() {
+  _amgp_vm_index="$1"
+  _amgp_boot="$2"
+  _amgp_out="$3"
+  _amgp_apk="$4"
+  _amgp_serial="$(vm_android_adb_serial "$_amgp_vm_index")"
+  _amgp_stage="$IMAGES_DIR/android-magisk-patch-kit"
+  _amgp_remote_out="$NUCLEUS_MAGISK_PATCH_REMOTE/new-boot.img"
+
+  vm_android_magisk_stage_patch_kit "$_amgp_apk" "$_amgp_vm_index" "$_amgp_stage" || return 1
+
+  say "patching boot image with Magisk on guest $_amgp_serial..."
+  adb -s "$_amgp_serial" shell "rm -rf $NUCLEUS_MAGISK_PATCH_REMOTE $NUCLEUS_MAGISK_STOCK_BOOT_REMOTE"
+  adb -s "$_amgp_serial" push "$_amgp_stage/." "$NUCLEUS_MAGISK_PATCH_REMOTE/"
+  adb -s "$_amgp_serial" push "$_amgp_boot" "$NUCLEUS_MAGISK_STOCK_BOOT_REMOTE"
+  adb -s "$_amgp_serial" shell \
+    "chmod 755 $NUCLEUS_MAGISK_PATCH_REMOTE/magisk $NUCLEUS_MAGISK_PATCH_REMOTE/magiskboot $NUCLEUS_MAGISK_PATCH_REMOTE/magiskinit $NUCLEUS_MAGISK_PATCH_REMOTE/init-ld $NUCLEUS_MAGISK_PATCH_REMOTE/boot_patch.sh"
+
+  if ! adb -s "$_amgp_serial" shell \
+    "cd $NUCLEUS_MAGISK_PATCH_REMOTE && BOOTMODE=true sh ./boot_patch.sh $NUCLEUS_MAGISK_STOCK_BOOT_REMOTE"; then
+    error "Magisk boot_patch.sh failed on guest"
+    return 1
+  fi
+
+  if ! adb -s "$_amgp_serial" pull "$_amgp_remote_out" "$_amgp_out"; then
+    error "failed to pull patched boot image from guest (expected $_amgp_remote_out)"
+    return 1
+  fi
+
+  # check-suppress:suppression_doc: remote cleanup is best-effort after a successful pull.
+  adb -s "$_amgp_serial" shell "rm -rf $NUCLEUS_MAGISK_PATCH_REMOTE $NUCLEUS_MAGISK_STOCK_BOOT_REMOTE" 2>/dev/null || true
+  say "patched boot image: $_amgp_out"
+}
+
+# vm_android_magisk_flash_boot VM_INDEX PATCHED_BOOT_IMG
+#   Flash a Magisk-patched boot image via fastboot.
+vm_android_magisk_flash_boot() {
+  _amfb_vm_index="$1"
+  _amfb_img="$2"
+  _amfb_serial="$(vm_android_adb_serial "$_amfb_vm_index")"
+  _amfb_fb_serial="$(vm_android_fastboot_serial "$_amfb_vm_index")"
+
+  say "manual step: on the VM, open LineageOS Recovery → Advanced → Enter fastboot (if not already in fastboot)"
+  say "rebooting guest to fastboot on $_amfb_serial..."
+  # check-suppress:suppression_doc: reboot bootloader may fail when already in fastboot; fastboot_wait handles the next state.
+  adb -s "$_amfb_serial" reboot bootloader 2>/dev/null || true
+
+  if ! vm_android_fastboot_wait "$_amfb_vm_index" 180; then
+    return 1
+  fi
+
+  if ! fastboot -s "$_amfb_fb_serial" flash boot "$_amfb_img"; then
+    error "fastboot flash boot failed on $_amfb_fb_serial"
+    return 1
+  fi
+
+  # check-suppress:suppression_doc: fastboot reboot after flash is best-effort; guest may already be rebooting.
+  fastboot -s "$_amfb_fb_serial" reboot 2>/dev/null || true
+  say "flashed Magisk boot image; guest should reboot to system"
+}
+
+# vm_android_magisk_install_apk VM_INDEX MAGISK_APK
+#   Install the Magisk manager APK on a booted, authorized guest.
+vm_android_magisk_install_apk() {
+  _amia_vm_index="$1"
+  _amia_apk="$2"
+  _amia_serial="$(vm_android_adb_serial "$_amia_vm_index")"
+
+  if ! vm_android_adb_wait_boot_completed "$_amia_vm_index" 600; then
+    return 1
+  fi
+
+  say "installing Magisk APK on $_amia_serial..."
+  _amia_attempt=0
+  while [ "$_amia_attempt" -lt 12 ]; do
+    if adb -s "$_amia_serial" install -r "$_amia_apk"; then
+      return 0
+    fi
+    _amia_attempt=$((_amia_attempt + 1))
+    if [ "$_amia_attempt" -lt 12 ]; then
+      say "Magisk APK install not ready yet (guest may still be booting); retrying..."
+      sleep 10
+      vm_android_adb_wait_boot_completed "$_amia_vm_index" 120 || true
+    fi
+  done
+  error "failed to install Magisk APK; tap Allow USB debugging and retry"
+  return 1
+}
+
+# vm_android_install_adb_keys_via_su VM_INDEX PUBKEY_PATH
+#   Install host adbkey.pub via Magisk su on a booted user build.
+vm_android_install_adb_keys_via_su() {
+  _aiakvs_vm_index="$1"
+  _aiakvs_pubkey="$2"
+  _aiakvs_serial="$(vm_android_adb_serial "$_aiakvs_vm_index")"
+  _aiakvs_remote='/sdcard/nucleus-adbkey.pub'
+
+  if ! vm_android_guest_has_magisk_su "$_aiakvs_vm_index"; then
+    error "Magisk su is required to install adb_keys on a booted user build"
+    return 1
+  fi
+
+  adb -s "$_aiakvs_serial" push "$_aiakvs_pubkey" "$_aiakvs_remote"
+  adb -s "$_aiakvs_serial" shell "su -c $(printf '%q' "mkdir -p /data/misc/adb && cp $_aiakvs_remote /data/misc/adb/adb_keys && chmod 640 /data/misc/adb/adb_keys && chown system:shell /data/misc/adb/adb_keys && restorecon /data/misc/adb/adb_keys 2>/dev/null || chcon u:object_r:adb_keys_file:s0 /data/misc/adb/adb_keys && rm -f $_aiakvs_remote && setprop ctl.restart adbd")"
+}
+
+# vm_android_install_adb_keys VM_INDEX PUBKEY_PATH
+#   Push host adbkey.pub to /data/misc/adb/adb_keys with correct owner, mode, and SELinux context.
+vm_android_install_adb_keys() {
+  _aiak_vm_index="$1"
+  _aiak_pubkey="$2"
+  _aiak_serial="$(vm_android_adb_serial "$_aiak_vm_index")"
+
+  adb -s "$_aiak_serial" push "$_aiak_pubkey" /data/misc/adb/adb_keys
+  adb -s "$_aiak_serial" shell 'chmod 640 /data/misc/adb/adb_keys && chown system:shell /data/misc/adb/adb_keys'
+  # check-suppress:suppression_doc: restorecon is unavailable on some recovery shells; chcon is the portable fallback.
+  adb -s "$_aiak_serial" shell 'restorecon /data/misc/adb/adb_keys 2>/dev/null || chcon u:object_r:adb_keys_file:s0 /data/misc/adb/adb_keys' 2>/dev/null || true
+  adb -s "$_aiak_serial" shell 'setprop ctl.restart adbd' 2>/dev/null || true
+}
+
+# vm_android_config_magisk VM_INDEX
+#   Full Magisk install + configure pipeline for booted Lineage (jqssun user build).
+vm_android_config_magisk() {
+  _acm_vm_index="$1"
+  _acm_serial="$(vm_android_adb_serial "$_acm_vm_index")"
+  _acm_boot=''
+  _acm_apk=''
+  _acm_patched="$IMAGES_DIR/android-boot-magisk-patched.img"
+  _acm_tag=''
+  _acm_build=''
+
+  if ! vm_android_adb_wait_authorized "$_acm_vm_index" 600; then
+    return 1
+  fi
+
+  if [ "$(vm_android_adb_poll_state "$_acm_vm_index")" != "device" ]; then
+    error "Magisk requires booted system (adb state device), got: $(vm_android_adb_poll_state "$_acm_vm_index")"
+    return 1
+  fi
+
+  _acm_build="$(vm_android_shell_getprop "$_acm_vm_index" ro.build.display.id)"
+  if printf '%s' "$_acm_build" | grep -qi 'gsi'; then
+    error "Magisk install targets Lineage only (detected: $_acm_build); boot Lineage, not GSI"
+    return 1
+  fi
+
+  vm_android_enable_usb_debugging "$_acm_vm_index"
+
+  if vm_android_guest_has_magisk_su "$_acm_vm_index"; then
+    say "Magisk su is already available on $_acm_serial"
+  else
+    _acm_boot="$(vm_android_download_boot_image "$_acm_vm_index")" || return 1
+    _acm_apk="$(vm_android_download_magisk_apk "$_acm_vm_index")" || return 1
+    vm_android_magisk_guest_patch_boot "$_acm_vm_index" "$_acm_boot" "$_acm_patched" "$_acm_apk" || return 1
+    vm_android_magisk_flash_boot "$_acm_vm_index" "$_acm_patched" || return 1
+
+    if ! vm_android_adb_wait_boot_completed "$_acm_vm_index" 900; then
+      error "timed out waiting for boot after Magisk flash; complete setup wizard and tap Allow USB debugging"
+      return 1
+    fi
+
+    vm_android_magisk_install_apk "$_acm_vm_index" "$_acm_apk" || return 1
+    say "manual step: open the Magisk app on the VM; if it shows an environment-fix prompt, tap OK and allow the reboot"
+
+    _acm_wait=0
+    while [ "$_acm_wait" -lt 120 ]; do
+      if vm_android_guest_has_magisk_su "$_acm_vm_index"; then
+        break
+      fi
+      sleep 5
+      _acm_wait=$((_acm_wait + 5))
+    done
+
+    if ! vm_android_guest_has_magisk_su "$_acm_vm_index"; then
+      error "Magisk su is not available after boot flash; open the Magisk app on the VM (environment-fix prompt appears only after opening it), complete setup, then retry --magisk"
+      return 1
+    fi
+  fi
+
+  vm_android_enable_usb_debugging "$_acm_vm_index"
+
+  _acm_tag="$(vm_android_jqssun_release_tag_for_asset "boot_$(vm_android_recovery_asset_suffix "$_acm_vm_index").img")" || true
+  if [ -n "$_acm_tag" ]; then
+    jq -n --arg tag "$_acm_tag" '{tag_name: $tag, configured: true}' > "$IMAGES_DIR/$NUCLEUS_MAGISK_MARKER"
+  fi
+
+  say "Magisk installed and configured on $_acm_serial (Magisk su ready)"
+}
