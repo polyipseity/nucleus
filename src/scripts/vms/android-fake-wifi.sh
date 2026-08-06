@@ -20,13 +20,6 @@ usage() {
 vm_android_fake_wifi_run_as_root() {
   _vafw_serial="$1"
   _vafw_cmd="$2"
-  if adb -s "$_vafw_serial" root 2>/dev/null | grep -q 'restarting'; then
-    sleep 2
-  fi
-  if adb -s "$_vafw_serial" shell "id -u" 2>/dev/null | grep -qx '0'; then
-    adb -s "$_vafw_serial" shell "$_vafw_cmd"
-    return 0
-  fi
   adb -s "$_vafw_serial" shell "su -c $(printf '%q' "$_vafw_cmd")"
 }
 
