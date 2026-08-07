@@ -16,7 +16,7 @@ Some fields accept either a plain string or a host map. Host maps use keys `MacB
 | Shell | `src/scripts/lib/load-user-registry.sh --host MacBook\|NixOS\|Windows` |
 | PowerShell | `src/hosts/Windows/modules/Load-UserRegistry.ps1` |
 
-`custom-provision-symlinks.json` keeps its `targets` map intact in the registry; POSIX and Windows activation code resolves the right host entry when creating symlinks.
+`symlinks.json` keeps its `targets` map intact in the registry; POSIX and Windows activation code resolves the right host entry when creating symlinks.
 
 ### Jellyfin union at sync time
 

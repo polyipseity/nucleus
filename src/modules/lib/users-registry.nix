@@ -2,7 +2,7 @@
 # src/users/<username>/ domain JSON files with src/users/default/ fallback.
 #
 # Host-keyed fields (homeDirectory, localPath, target, enable) resolve to
-# scalars for the requested hostName. customProvisionSymlinks.targets maps are
+# scalars for the requested hostName. symlinks.targets maps are
 # left intact.
 {
   lib,
@@ -110,8 +110,7 @@ let
     let
       profile = resolveProfile (loadMergedDomain username "profile.json");
       cloudDrives = resolveCloudDrives (loadMergedDomain username "cloud-drives.json");
-      customProvisionSymlinks =
-        (loadMergedDomain username "custom-provision-symlinks.json").customProvisionSymlinks or [ ];
+      symlinks = (loadMergedDomain username "symlinks.json").symlinks or [ ];
       devRepos = resolveDevRepos (loadMergedDomain username "dev-repos.json");
       envVars = loadMergedDomain username "env-vars.json";
       iCloudExclusions = loadMergedDomain username "icloud-exclusions.json";
@@ -127,7 +126,7 @@ let
       cloudDrives = {
         inherit (cloudDrives) mounts replicas replicaGc;
       };
-      inherit customProvisionSymlinks;
+      inherit symlinks;
       devRepos = {
         inherit (devRepos)
           enable

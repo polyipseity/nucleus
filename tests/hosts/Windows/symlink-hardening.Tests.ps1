@@ -4,7 +4,7 @@
 .DESCRIPTION
     Validates that every module using managed symlinks (Sync-VSCodeConfig,
     Sync-AgentsConfig, Sync-AgentsSkill, Sync-DevRepo,
-    Sync-CustomProvisionSymlink) correctly applies and removes delete
+    Sync-Symlink) correctly applies and removes delete
     protection via icacls ACL deny entries, and uses SupportsShouldProcess
     for all destructive operations.
 .NOTES
@@ -22,7 +22,7 @@ BeforeAll {
     "src/hosts/Windows/modules/editors/Sync-VSCodeConfig.ps1"
     "src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1"
     "src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1"
-    "src/hosts/Windows/modules/user/Sync-CustomProvisionSymlink.ps1"
+    "src/hosts/Windows/modules/user/Sync-Symlink.ps1"
     "src/hosts/Windows/modules/user/Sync-DevRepo.ps1"
   )
 
@@ -126,23 +126,23 @@ Describe "Symlink Hardening - Windows" {
     }
   }
 
-  Context "Sync-CustomProvisionSymlink" {
+  Context "Sync-Symlink" {
     It "should contain Set-ManagedSymlinkDeleteProtection" {
-      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-CustomProvisionSymlink.ps1"
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-Symlink.ps1"
       $content = Get-Content -Path $modulePath -Raw
       $content | Should -Match "Set-ManagedSymlinkDeleteProtection"
     }
 
     It "should contain Remove-ManagedSymlinkDeleteProtection" {
-      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-CustomProvisionSymlink.ps1"
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-Symlink.ps1"
       $content = Get-Content -Path $modulePath -Raw
       $content | Should -Match "Remove-ManagedSymlinkDeleteProtection"
     }
 
-    It "should protect managed custom symlinks" {
-      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-CustomProvisionSymlink.ps1"
+    It "should protect managed symlinks" {
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-Symlink.ps1"
       $content = Get-Content -Path $modulePath -Raw
-      $content | Should -Match "Sync-CustomProvisionSymlink"
+      $content | Should -Match "Sync-Symlink"
     }
   }
 
@@ -153,7 +153,7 @@ Describe "Symlink Hardening - Windows" {
         "src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1",
         "src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1",
         "src/hosts/Windows/modules/user/Sync-CursorConfig.ps1",
-        "src/hosts/Windows/modules/user/Sync-CustomProvisionSymlink.ps1",
+        "src/hosts/Windows/modules/user/Sync-Symlink.ps1",
         "src/hosts/Windows/modules/user/Sync-DevRepo.ps1"
       )
 

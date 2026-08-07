@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Finalize custom-provision-symlinks: protect each managed symlink and persist
+# Finalize symlinks: protect each managed symlink and persist
 # the manifest.
 
 set -euo pipefail
@@ -17,9 +17,9 @@ mkdir -p "$_nucleus_manifest_dir"
 printf '%s\n' "$_nucleus_symlink_entries_json" | "$_nucleus_jq_bin" -r '.[]' | while IFS= read -r _nucleus_link_path; do
   [ -n "$_nucleus_link_path" ] || continue
   if [ -L "$_nucleus_link_path" ]; then
-    _nucleus_protect_symlink "customProvisionSymlinks" "$_nucleus_link_path"
+    _nucleus_protect_symlink "symlinks" "$_nucleus_link_path"
   else
-    echo "customProvisionSymlinks: warning — expected managed symlink at $_nucleus_link_path." >&2
+    echo "symlinks: warning — expected managed symlink at $_nucleus_link_path." >&2
   fi
 done
 

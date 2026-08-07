@@ -128,7 +128,7 @@ in
     ./cloud-drives.nix
     ./core.nix
     ./cursor.nix
-    ./custom-provision-symlinks.nix
+    ./symlinks.nix
     ./dev-repos.nix
     ./editors.nix
     ./ext-discord-music-rpc.nix

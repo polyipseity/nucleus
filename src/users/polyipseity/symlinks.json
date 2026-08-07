@@ -1,6 +1,6 @@
 {
-  "$schema": "../default/custom-provision-symlinks.schema.json",
-  "customProvisionSymlinks": [
+  "$schema": "../default/symlinks.schema.json",
+  "symlinks": [
     {
       "createTargetDirectory": true,
       "path": "data",

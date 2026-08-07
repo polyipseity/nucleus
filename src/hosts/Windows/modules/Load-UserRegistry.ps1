@@ -132,7 +132,7 @@ function Read-DomainJson {
   return $plain
 }
 
-function Merge-Hashtables {
+function Merge-Hashtable {
   param(
     [hashtable]$Base,
     [hashtable]$Override
@@ -144,7 +144,7 @@ function Merge-Hashtables {
   }
   foreach ($key in $Override.Keys) {
     if ($merged.ContainsKey($key) -and $merged[$key] -is [hashtable] -and $Override[$key] -is [hashtable]) {
-      $merged[$key] = Merge-Hashtables -Base $merged[$key] -Override $Override[$key]
+      $merged[$key] = Merge-Hashtable -Base $merged[$key] -Override $Override[$key]
     }
     else {
       $merged[$key] = $Override[$key]
@@ -163,7 +163,7 @@ function Read-MergedDomain {
 
   $defaultPath = Join-Path -Path $DefaultRoot -ChildPath $FileName
   $userPath = Join-Path -Path $UsersRoot -ChildPath (Join-Path $Username $FileName)
-  return Merge-Hashtables -Base (Read-DomainJson -Path $defaultPath) -Override (Read-DomainJson -Path $userPath)
+  return Merge-Hashtable -Base (Read-DomainJson -Path $defaultPath) -Override (Read-DomainJson -Path $userPath)
 }
 
 function Resolve-CloudDriveItem {
@@ -187,7 +187,7 @@ function Resolve-CloudDriveItem {
   return $resolved
 }
 
-function Resolve-CloudDrives {
+function Resolve-CloudDrive {
   param([hashtable]$CloudDrives)
 
   $mounts = @()
@@ -216,7 +216,7 @@ function Resolve-CloudDrives {
   }
 }
 
-function Resolve-DevRepos {
+function Resolve-DevRepo {
   param([hashtable]$DevRepos)
 
   $repositories = @()
@@ -242,21 +242,21 @@ function Resolve-DevRepos {
   }
 }
 
-function Assemble-UserRecord {
+function Build-UserRecord {
   param(
     [Parameter(Mandatory)]
     [string]$Username
   )
 
-  $profile = Read-MergedDomain -Username $Username -FileName 'profile.json'
+  $userProfile = Read-MergedDomain -Username $Username -FileName 'profile.json'
   $homeDirectory = $null
-  if ($profile.ContainsKey('homeDirectory')) {
-    $homeDirectory = Resolve-HostValue -Value $profile['homeDirectory']
+  if ($userProfile.ContainsKey('homeDirectory')) {
+    $homeDirectory = Resolve-HostValue -Value $userProfile['homeDirectory']
   }
 
-  $cloudDrives = Resolve-CloudDrives -CloudDrives (Read-MergedDomain -Username $Username -FileName 'cloud-drives.json')
-  $customProvision = Read-MergedDomain -Username $Username -FileName 'custom-provision-symlinks.json'
-  $devRepos = Resolve-DevRepos -DevRepos (Read-MergedDomain -Username $Username -FileName 'dev-repos.json')
+  $cloudDrives = Resolve-CloudDrive -CloudDrives (Read-MergedDomain -Username $Username -FileName 'cloud-drives.json')
+  $symlinksDomain = Read-MergedDomain -Username $Username -FileName 'symlinks.json'
+  $devRepos = Resolve-DevRepo -DevRepos (Read-MergedDomain -Username $Username -FileName 'dev-repos.json')
   $envVars = Read-MergedDomain -Username $Username -FileName 'env-vars.json'
   $icloud = Read-MergedDomain -Username $Username -FileName 'icloud-exclusions.json'
   $jellyfin = Read-MergedDomain -Username $Username -FileName 'jellyfin.json'
@@ -267,10 +267,10 @@ function Assemble-UserRecord {
 
   return @{
     name                    = $Username
-    isPrimary               = [bool]($profile['isPrimary'])
+    isPrimary               = [bool]($userProfile['isPrimary'])
     homeDirectory           = [string]$homeDirectory
     cloudDrives             = $cloudDrives
-    customProvisionSymlinks = @($customProvision['customProvisionSymlinks'])
+    symlinks                = @($symlinksDomain['symlinks'])
     devRepos                = $devRepos
     envVars                 = $envVars
     iCloudExclusions        = @{
@@ -306,7 +306,7 @@ foreach ($entry in Get-ChildItem -Path $UsersRoot -Directory) {
     continue
   }
 
-  $record = Assemble-UserRecord -Username $name
+  $record = Build-UserRecord -Username $name
   if ([string]::IsNullOrWhiteSpace($record.homeDirectory)) {
     Write-Error "User '$name' missing required 'homeDirectory'" -ErrorAction Stop
     exit 1

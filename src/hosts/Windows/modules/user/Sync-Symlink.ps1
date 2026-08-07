@@ -1,11 +1,10 @@
-function Sync-CustomProvisionSymlink {
+function Sync-Symlink {
   <#
   .SYNOPSIS
-    Provision managed custom symlinks for configured Windows users.
+    Provision managed symlinks for configured Windows users.
 
   .DESCRIPTION
-    Converges the per-user customProvisionSymlinks registry entries defined in
-    src/hosts/Windows/users.json.
+    Converges the per-user symlinks registry entries defined in src/users/.
 
     For each user record, the function:
       1. Selects entries that define a Windows target.
@@ -19,18 +18,18 @@ function Sync-CustomProvisionSymlink {
     left alone with a warning so unmanaged user data is never overwritten.
 
   .PARAMETER Enabled
-    Whether managed custom symlink provisioning is enabled. Mandatory: callers
-    must explicitly choose the enabled or cleanup path.
+    Whether managed symlink provisioning is enabled. Mandatory: callers must
+    explicitly choose the enabled or cleanup path.
 
   .PARAMETER UserRecords
-    Array of user records loaded from src/hosts/Windows/users.json. Each record
-    may contain a customProvisionSymlinks array using the shared schema.
+    Array of user records loaded from the user registry. Each record may contain
+    a symlinks array using the shared schema.
 
   .EXAMPLE
-    Sync-CustomProvisionSymlink -Enabled:$true -UserRecords @(@{ name = 'admin'; homeDirectory = 'C:\Users\admin'; customProvisionSymlinks = @() })
+    Sync-Symlink -Enabled:$true -UserRecords @(@{ name = 'admin'; homeDirectory = 'C:\Users\admin'; symlinks = @() })
 
   .EXAMPLE
-    Sync-CustomProvisionSymlink -Enabled:$false -UserRecords @(@{ name = 'admin'; homeDirectory = 'C:\Users\admin'; customProvisionSymlinks = @() })
+    Sync-Symlink -Enabled:$false -UserRecords @(@{ name = 'admin'; homeDirectory = 'C:\Users\admin'; symlinks = @() })
 
   .NOTES
     Environment variables: USERDOMAIN, USERNAME — used for delete-protection ACLs.
@@ -100,7 +99,7 @@ function Sync-CustomProvisionSymlink {
       return @($loaded | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     }
     catch {
-      Write-Warning "Sync-CustomProvisionSymlink: manifest at $ManifestPath was unreadable and will be rebuilt."
+      Write-Warning "Sync-Symlink: manifest at $ManifestPath was unreadable and will be rebuilt."
       return @()
     }
   }
@@ -109,17 +108,17 @@ function Sync-CustomProvisionSymlink {
     $username = [string]$userRecord.name
     $homeDirectory = [string]$userRecord.homeDirectory
     if ([string]::IsNullOrWhiteSpace($homeDirectory)) {
-      Write-Warning "Sync-CustomProvisionSymlink: skipping user '$username' because homeDirectory is missing."
+      Write-Warning "Sync-Symlink: skipping user '$username' because homeDirectory is missing."
       continue
     }
 
     $manifestDir = Join-Path -Path $homeDirectory -ChildPath '.config\nucleus'
-    $manifestPath = Join-Path -Path $manifestDir -ChildPath 'custom-provision-symlinks.json'
+    $manifestPath = Join-Path -Path $manifestDir -ChildPath 'symlinks.json'
     $previousManagedPaths = @(Get-ManifestPathList -ManifestPath $manifestPath)
 
     foreach ($previousPath in $previousManagedPaths) {
       if (Test-ManagedSymlink -Path $previousPath) {
-        Remove-ManagedSymlinkDeleteProtection -Context "Sync-CustomProvisionSymlink" -Path $previousPath
+        Remove-ManagedSymlinkDeleteProtection -Context "Sync-Symlink" -Path $previousPath
       }
     }
 
@@ -137,7 +136,7 @@ function Sync-CustomProvisionSymlink {
 
     New-Item -ItemType Directory -Path $manifestDir -Force > $null
 
-    $configuredEntries = @($userRecord.customProvisionSymlinks | Where-Object { $_ })
+    $configuredEntries = @($userRecord.symlinks | Where-Object { $_ })
     $desiredEntries = @()
     foreach ($entry in $configuredEntries) {
       $linkRelativePath = [string]$entry.path
@@ -176,7 +175,7 @@ function Sync-CustomProvisionSymlink {
         $isReparsePoint = ($existingItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
 
         if (-not $isReparsePoint) {
-          Write-Warning "Sync-CustomProvisionSymlink: keeping unmanaged path $($entry.LinkPath) for user '$username' because it is not a symlink."
+          Write-Warning "Sync-Symlink: keeping unmanaged path $($entry.LinkPath) for user '$username' because it is not a symlink."
           continue
         }
 
@@ -189,7 +188,7 @@ function Sync-CustomProvisionSymlink {
         }
 
         if ($normalizedCurrentTarget -eq $entry.TargetPath) {
-          Set-ManagedSymlinkDeleteProtection -Context "Sync-CustomProvisionSymlink" -Path $entry.LinkPath
+          Set-ManagedSymlinkDeleteProtection -Context "Sync-Symlink" -Path $entry.LinkPath
           continue
         }
 
@@ -198,10 +197,10 @@ function Sync-CustomProvisionSymlink {
 
       try {
         New-Item -ItemType SymbolicLink -Path $entry.LinkPath -Target $entry.TargetPath -Force -ErrorAction Stop > $null
-        Set-ManagedSymlinkDeleteProtection -Context "Sync-CustomProvisionSymlink" -Path $entry.LinkPath
+        Set-ManagedSymlinkDeleteProtection -Context "Sync-Symlink" -Path $entry.LinkPath
       }
       catch {
-        Write-Warning "Sync-CustomProvisionSymlink: failed to create symlink $($entry.LinkPath) -> $($entry.TargetPath) for user '$username' : $_"
+        Write-Warning "Sync-Symlink: failed to create symlink $($entry.LinkPath) -> $($entry.TargetPath) for user '$username' : $_"
       }
     }
 

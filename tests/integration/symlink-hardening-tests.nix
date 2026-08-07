@@ -5,7 +5,7 @@ let
   editorsText = builtins.readFile ../../src/modules/editors.nix;
   agentsText = builtins.readFile ../../src/modules/agents.nix;
   devReposText = builtins.readFile ../../src/modules/dev-repos.nix;
-  customProvisionSymlinksText = builtins.readFile ../../src/modules/custom-provision-symlinks.nix;
+  symlinksText = builtins.readFile ../../src/modules/symlinks.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
   finderSidebarText = builtins.readFile ../../src/modules/macos/finder-sidebar.nix;
   agentsHelpersText = builtins.readFile ../../src/scripts/lib/symlink-hardening.sh;
@@ -58,12 +58,12 @@ rec {
     true;
 
   # =========================================================================
-  # Assertion 5: Custom provision symlink protection in custom-provision-symlinks.nix
+  # Assertion 5: Symlink protection in symlinks.nix
   # =========================================================================
-  customProvisionSymlinkProtection =
-    assert containsRegex "activationBundle" customProvisionSymlinksText;
-    assert containsRegex "finalize-symlinks" customProvisionSymlinksText;
-    assert containsRegex "custom-provision-symlinks\.json" customProvisionSymlinksText;
+  symlinksProtection =
+    assert containsRegex "activationBundle" symlinksText;
+    assert containsRegex "finalize-symlinks" symlinksText;
+    assert containsRegex "symlinks\.json" symlinksText;
     assert containsRegex "chflags -h uchg" agentsHelpersText;
     assert containsRegex "chattr -h \\+i" agentsHelpersText;
     true;
@@ -100,13 +100,13 @@ rec {
       vsCodePs1Path = ../../src/hosts/Windows/modules/editors/Sync-VSCodeConfig.ps1;
       agentsConfigPs1Path = ../../src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1;
       agentsSkillPs1Path = ../../src/hosts/Windows/modules/user/Sync-AgentsSkillManifest.ps1;
-      customProvisionPs1Path = ../../src/hosts/Windows/modules/user/Sync-CustomProvisionSymlink.ps1;
+      symlinksPs1Path = ../../src/hosts/Windows/modules/user/Sync-Symlink.ps1;
       devRepoPs1Path = ../../src/hosts/Windows/modules/user/Sync-DevRepo.ps1;
     in
     assert builtins.pathExists vsCodePs1Path;
     assert builtins.pathExists agentsConfigPs1Path;
     assert builtins.pathExists agentsSkillPs1Path;
-    assert builtins.pathExists customProvisionPs1Path;
+    assert builtins.pathExists symlinksPs1Path;
     assert builtins.pathExists devRepoPs1Path;
     true;
 
@@ -152,7 +152,7 @@ rec {
         agentsConfigProtection
         skillsProtection
         devReposProtection
-        customProvisionSymlinkProtection
+        symlinksProtection
         raycastAliasProtection
         finderSidebarRewrite
         shouldProcessCompliance
@@ -174,7 +174,7 @@ rec {
       "VS Code"
       "Agents Config"
       "Skills"
-      "Custom Provision Symlinks"
+      "Symlinks"
       "Dev Repos"
       "Dev Repos Logging"
       "Raycast Aliases"

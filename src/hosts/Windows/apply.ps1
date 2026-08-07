@@ -87,10 +87,10 @@
   Enable managed cloud drive mount directory provisioning and rclone remote verification
   for each configured user. False skips provisioning without error.
 
-.PARAMETER EnableCustomProvisionSymlinkParity
-  Enable managed custom symlink provisioning from src/users/. Each link is created only
+.PARAMETER EnableSymlinkParity
+  Enable managed symlink provisioning from src/users/. Each link is created only
   for entries that declare a Windows target and receives delete-protection ACLs.
-  False removes only previously managed custom symlinks.
+  False removes only previously managed symlinks.
 
 .PARAMETER EnableGitSshParity
   Enable managed user-level Git/SSH parity convergence and block cleanup logic.
@@ -301,7 +301,7 @@ $EnableAgentsSkillsParity = -not $noUserStateParity
 $EnableAgentsClawHubSkillsParity = -not $noUserStateParity
 $EnableBunParity = -not $noUserStateParity
 $EnableCloudDrivesParity = -not $noUserStateParity
-$EnableCustomProvisionSymlinkParity = -not $noUserStateParity
+$EnableSymlinkParity = -not $noUserStateParity
 $EnableGitSshParity = -not $noUserStateParity
 $EnablePicardParity = -not $noUserStateParity
 $EnableObsidianParity = -not $noUserStateParity
@@ -434,7 +434,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsSkillManifest.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-CursorConfig.ps1")
-. (Join-Path -Path $userModuleDir -ChildPath "Sync-CustomProvisionSymlink.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-Symlink.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DevRepo.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DiscordMusicRPC.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-CamillaDSPService.ps1")
@@ -831,7 +831,7 @@ Sync-CaddyService -RepoRoot $repoRoot -Enabled:`$true
 Sync-CaddyLocalCA -RepoRoot $repoRoot -Enabled:$true
 Sync-JellyfinAccount -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
 Sync-JellyfinLibrary -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
-Sync-CustomProvisionSymlink -Enabled:$EnableCustomProvisionSymlinkParity -UserRecords $selectedUserRecords
+Sync-Symlink -Enabled:$EnableSymlinkParity -UserRecords $selectedUserRecords
 # check-suppress:config-method: method 1 (writable symlink) -- symlink config so edits take effect immediately.
   $discordMusicRPCConfigDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath "discord-music-rpc"
   $null = New-Item -Path $discordMusicRPCConfigDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded

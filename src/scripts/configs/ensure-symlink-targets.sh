@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create target directories for custom-provision-symlinks entries.
+# Create target directories for symlinks entries.
 
 set -euo pipefail
 

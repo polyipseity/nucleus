@@ -13,7 +13,7 @@ if [ -f "$_cps_manifest_path" ]; then
   while IFS= read -r _cps_link_path; do
     [ -n "$_cps_link_path" ] || continue
     if [ -L "$_cps_link_path" ]; then
-      _nucleus_unprotect_symlink "customProvisionSymlinks" "$_cps_link_path"
+      _nucleus_unprotect_symlink "symlinks" "$_cps_link_path"
     fi
   done < <("$_cps_jq_bin" -r '.[]' "$_cps_manifest_path")
 fi

@@ -9,7 +9,7 @@ let
   users = args.users or { };
   currentUsername = config.home.username;
   currentUserHome = config.home.homeDirectory;
-  userConfig = users.${currentUsername}.customProvisionSymlinks or [ ];
+  userConfig = users.${currentUsername}.symlinks or [ ];
 
   hostKey =
     if pkgs.stdenv.isDarwin then
@@ -56,10 +56,10 @@ let
             target = targetForEntry entry;
           in
           target != null && target != ""
-        ) config.nucleus.customProvisionSymlinks
+        ) config.nucleus.symlinks
       );
 
-  managedSymlinkManifestPath = "${currentUserHome}/.config/nucleus/custom-provision-symlinks.json";
+  managedSymlinkManifestPath = "${currentUserHome}/.config/nucleus/symlinks.json";
   managedSymlinkManifestJson = builtins.toJSON (
     map (entry: entry.linkAbsolutePath) selectedSymlinksResolved
   );
@@ -67,7 +67,7 @@ let
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 {
-  options.nucleus.customProvisionSymlinks = lib.mkOption {
+  options.nucleus.symlinks = lib.mkOption {
     type = lib.types.listOf (
       lib.types.submodule {
         options = {
@@ -107,7 +107,7 @@ in
       }
     );
     default = userConfig;
-    description = "Per-user custom symlinks whose targets can differ by host. Empty by default.";
+    description = "Per-user symlinks whose targets can differ by host. Empty by default.";
   };
 
   config = {
@@ -118,28 +118,26 @@ in
       }) selectedSymlinksResolved
     );
 
-    home.activation.ensure-custom-provision-symlink-targets =
-      lib.hm.dag.entryBefore [ "prepare-custom-provision-symlinks" ]
-        ''
-          "${activationBundle}/src/scripts/configs/ensure-symlink-targets.sh" \
-            "${managedSymlinkManifestPath}" \
-            '${
-              builtins.toJSON (
-                map (entry: entry.linkAbsolutePath) (
-                  builtins.filter (entry: entry.createTargetDirectory) selectedSymlinksResolved
-                )
-              )
-            }' \
-            "${pkgs.jq}/bin/jq"
-        '';
+    home.activation.ensure-symlink-targets = lib.hm.dag.entryBefore [ "prepare-symlinks" ] ''
+      "${activationBundle}/src/scripts/configs/ensure-symlink-targets.sh" \
+        "${managedSymlinkManifestPath}" \
+        '${
+          builtins.toJSON (
+            map (entry: entry.linkAbsolutePath) (
+              builtins.filter (entry: entry.createTargetDirectory) selectedSymlinksResolved
+            )
+          )
+        }' \
+        "${pkgs.jq}/bin/jq"
+    '';
 
-    home.activation.prepare-custom-provision-symlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
+    home.activation.prepare-symlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/provision-symlinks.sh" \
         "${managedSymlinkManifestPath}" \
         "${pkgs.jq}/bin/jq"
     '';
 
-    home.activation.finalize-custom-provision-symlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    home.activation.finalize-symlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/finalize-symlinks.sh" \
         "${managedSymlinkManifestPath}" \
         "${pkgs.jq}/bin/jq" \

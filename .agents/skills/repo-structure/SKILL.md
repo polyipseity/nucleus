@@ -34,7 +34,7 @@ Load this skill via `skill: "repo-structure"` when exploring the repository layo
 | AI agents          | `agents.nix`, `agent-env-vars.nix`, `agent-host-shell.nix`                                   |
 | Env var catalog    | `lib/env-catalog.nix` (catalog + resolution), `lib/managed-paths.nix` (PATH components)      |
 | Terminal & shell   | `terminal-activations.nix`                                                                   |
-| Other              | `custom-provision-symlinks.nix`                                                              |
+| Other              | `symlinks.nix`                                                              |
 
 Note: `services.json` in `src/modules/` is a data file (service registry), not a Nix module. Host-specific modules (`ntfs-3g.nix`, `camilladsp.nix`, `jellyfin.nix`) live under their host directory.
 

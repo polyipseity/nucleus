@@ -130,7 +130,7 @@ _lur_assemble_user() {
 
   _profile="$(_lur_merge_json "$_default_root/profile.json" "$_au_user_dir/profile.json" | _lur_strip_schema | _lur_resolve_profile)"
   _cloud_drives="$(_lur_merge_json "$_default_root/cloud-drives.json" "$_au_user_dir/cloud-drives.json" | _lur_strip_schema | _lur_resolve_cloud_drives)"
-  _custom_symlinks="$(_lur_merge_json "$_default_root/custom-provision-symlinks.json" "$_au_user_dir/custom-provision-symlinks.json" | _lur_strip_schema | jq '.customProvisionSymlinks // []')"
+  _symlinks="$(_lur_merge_json "$_default_root/symlinks.json" "$_au_user_dir/symlinks.json" | _lur_strip_schema | jq '.symlinks // []')"
   _dev_repos="$(_lur_merge_json "$_default_root/dev-repos.json" "$_au_user_dir/dev-repos.json" | _lur_strip_schema | _lur_resolve_dev_repos)"
   _env_vars="$(_lur_merge_json "$_default_root/env-vars.json" "$_au_user_dir/env-vars.json" | _lur_strip_schema)"
   _icloud="$(_lur_merge_json "$_default_root/icloud-exclusions.json" "$_au_user_dir/icloud-exclusions.json" | _lur_strip_schema)"
@@ -143,7 +143,7 @@ _lur_assemble_user() {
   jq -n \
     --argjson profile "$_profile" \
     --argjson cloudDrives "$_cloud_drives" \
-    --argjson customProvisionSymlinks "$_custom_symlinks" \
+    --argjson symlinks "$_symlinks" \
     --argjson devRepos "$_dev_repos" \
     --argjson envVars "$_env_vars" \
     --argjson iCloudExclusions "$_icloud" \
@@ -156,7 +156,7 @@ _lur_assemble_user() {
       isPrimary: ($profile.isPrimary // false),
       homeDirectory: ($profile.homeDirectory // null),
       cloudDrives: $cloudDrives,
-      customProvisionSymlinks: $customProvisionSymlinks,
+      symlinks: $symlinks,
       devRepos: $devRepos,
       envVars: $envVars,
       iCloudExclusions: $iCloudExclusions,

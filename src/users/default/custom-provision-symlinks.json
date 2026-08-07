@@ -1,4 +1,0 @@
-{
-  "$schema": "./custom-provision-symlinks.schema.json",
-  "customProvisionSymlinks": []
-}
