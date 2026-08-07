@@ -1,4 +1,4 @@
 # Direnv base configuration (cross-platform).
 # Host-specific overrides go in ~/.config/direnv/lib/*.sh — they are auto-sourced
 # before this file by direnv's lib loading mechanism.
-# See: src/modules/configs/direnv/lib/apple-sdk-override.sh (POSIX only)
+# See: src/users/default/direnv/lib/apple-sdk-override.sh (POSIX only)
