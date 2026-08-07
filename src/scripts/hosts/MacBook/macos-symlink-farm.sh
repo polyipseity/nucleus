@@ -28,7 +28,9 @@ NUCLEUS_VERBOSE="${NUCLEUS_VERBOSE:-}"
 
 _log() {
   printf '[%s] symlink-farm: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >> "$LOG_FILE"
-  [ -n "$NUCLEUS_VERBOSE" ] && printf 'symlink-farm: %s\n' "$*"
+  if [ -n "$NUCLEUS_VERBOSE" ]; then
+    printf 'symlink-farm: %s\n' "$*"
+  fi
 }
 
 # Ensure farm directory exists
