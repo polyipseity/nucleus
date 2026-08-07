@@ -17,7 +17,7 @@ applyTo: "src/modules/cloud-drives.nix, src/modules/macos.nix, src/hosts/Windows
 
 - Keep mount/replica local paths under managed user home paths (for example `~/clouds/*` or `%USERPROFILE%\clouds\*`).
 - Managed mount/replica paths must be real directories by default on all hosts.
-- If legacy symlinks/reparse points are found in managed cloud paths, migrate them to managed directories in-place during apply/setup.
+- If a managed mount/replica path is a symlink or reparse point, apply/setup must fail with a clear error; fix the path manually and re-apply.
 
 ### macOS-only iCloud exception
 
