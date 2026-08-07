@@ -33,6 +33,29 @@ let
     lib.flatten (lib.mapAttrsToList (_: svc: svc.logging.dirs.user or [ ]) macosServices)
   );
 
+  usersDir = ../../users;
+  usersOverlay = builtins.readDir usersDir;
+  replicaSyncUserLogDirs = lib.unique (
+    lib.flatten (
+      map (userName:
+        let
+          cloudDrivesPath = "${usersDir}/${userName}/cloud-drives.json";
+          cloudDrivesCfg =
+            if builtins.pathExists cloudDrivesPath then
+              builtins.fromJSON (builtins.readFile cloudDrivesPath)
+            else
+              { replicas = []; };
+          scheduledReplicas = builtins.filter (
+            replica: (replica.fallbackTimer.enable or true)
+          ) (cloudDrivesCfg.replicas or []);
+        in
+        map (replica: "replica-sync-${replica.id}") scheduledReplicas
+      ) (lib.filter (name: usersOverlay.${name} == "directory" && name != "default") (builtins.attrNames usersOverlay))
+    )
+  );
+
+  userLogDirsWithReplicas = lib.unique (userLogDirs ++ replicaSyncUserLogDirs);
+
   chownLogDirs = lib.unique (
     lib.flatten (
       lib.mapAttrsToList (
@@ -93,7 +116,7 @@ in
     "${activationBundle}/src/scripts/services/log-dirs-init.sh" \
       "${config.nucleus.logging.systemLogDir}" \
       "${builtins.toString systemLogDirs}" \
-      "${builtins.toString userLogDirs}" \
+      "${builtins.toString userLogDirsWithReplicas}" \
       "${builtins.toString chownLogDirs}" \
       "${macBookUserLogDirSuffix}"
   '';
@@ -217,7 +240,7 @@ in
     "${activationBundle}/src/scripts/services/log-dirs-init.sh" \
       "${config.nucleus.logging.systemLogDir}" \
       "${builtins.toString systemLogDirs}" \
-      "${builtins.toString userLogDirs}" \
+      "${builtins.toString userLogDirsWithReplicas}" \
       "${builtins.toString chownLogDirs}" \
       "${macBookUserLogDirSuffix}"
     # check-suppress:suppression_doc: /dev/console may not exist; guards below handle empty/root.
