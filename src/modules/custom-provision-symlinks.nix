@@ -74,7 +74,7 @@ in
           createTargetDirectory = lib.mkOption {
             type = lib.types.bool;
             default = false;
-            description = "Whether to create the selected platform target directory before linking.";
+            description = "Whether to create the selected host target directory before linking.";
           };
           path = lib.mkOption {
             type = lib.types.str;
@@ -83,17 +83,17 @@ in
           targets = lib.mkOption {
             type = lib.types.submodule {
               options = {
-                linux = lib.mkOption {
+                MacBook = lib.mkOption {
                   type = lib.types.nullOr lib.types.str;
                   default = null;
-                  description = "Linux target path for this symlink, absolute or relative to the managed user's home directory.";
+                  description = "MacBook target path for this symlink, absolute or relative to the managed user's home directory.";
                 };
-                macos = lib.mkOption {
+                NixOS = lib.mkOption {
                   type = lib.types.nullOr lib.types.str;
                   default = null;
-                  description = "macOS target path for this symlink, absolute or relative to the managed user's home directory.";
+                  description = "NixOS target path for this symlink, absolute or relative to the managed user's home directory.";
                 };
-                windows = lib.mkOption {
+                Windows = lib.mkOption {
                   type = lib.types.nullOr lib.types.str;
                   default = null;
                   description = "Windows target path for this symlink; consumed by the Windows apply modules using the same user-registry schema.";
@@ -101,13 +101,13 @@ in
               };
             };
             default = { };
-            description = "Per-platform symlink target map. Leave platforms null when the symlink should not exist there.";
+            description = "Per-host symlink target map. Leave hosts null when the symlink should not exist there.";
           };
         };
       }
     );
     default = userConfig;
-    description = "Per-user custom symlinks whose targets can differ by platform. Empty by default.";
+    description = "Per-user custom symlinks whose targets can differ by host. Empty by default.";
   };
 
   config = {

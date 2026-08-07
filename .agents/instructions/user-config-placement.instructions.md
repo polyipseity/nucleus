@@ -22,9 +22,7 @@ Structured nucleus data (`profile.json`, `cloud-drives.json`, …) assembled by 
 
 `cloud-drives.json` includes `replicaGc` (per-provider GC rules for replica sync) alongside `mounts` and `replicas`.
 
-### Dual-scope apps
-
-Split explicitly when an app supports both machine-wide and per-user scopes. Git is canonical: system scope in `src/modules/configs/git/`, user scope in `src/users/default/git/`.
+Registry domains deep-merge `default/` with `src/users/<username>/` (user wins on conflicts; arrays replace wholesale). Fields that differ by host use maps keyed by `MacBook`, `NixOS`, and `Windows`; loaders resolve them to scalars for the current host.
 
 ## First-level overlay merge rule
 
@@ -49,15 +47,17 @@ Every app tree under `src/users/` MUST be consumed only through overlay selector
 | First-level name list | `mkUserOverlay` → `listFirstLevelEntries` | `Get-UserConfigFirstLevelEntries` | `list_user_config_first_level_entries` |
 | Wallpaper encrypted blobs | `wallpaper-paths.nix` → `listEncryptedWallpaperBlobs` | `Get-WallpaperEncryptedBlobs` | `list_wallpaper_encrypted_blobs` |
 | Wallpaper unencrypted files | `wallpaper-paths.nix` → `listUnencryptedWallpaperFiles` | `Get-WallpaperUnencryptedFiles` | `list_wallpaper_unencrypted_files` |
-| Registry JSON | `users-registry.nix` | `Load-UserRegistry.ps1` | `load-user-registry.sh` |
+| Registry JSON | `users-registry.nix` (`hostName`) | `Load-UserRegistry.ps1` | `load-user-registry.sh --host` |
 
 Allowed hardcoded `src/users/default/` references: inside the selector implementations themselves, registry loaders, and tests that assert default baseline content.
+
+### Dual-scope apps
+
+Split explicitly when an app supports both machine-wide and per-user scopes. Git is canonical: system scope in `src/modules/configs/git/`, user scope in `src/users/default/git/`.
 
 ## Wallpapers
 
 Per-user homedir assets under `src/users/default/wallpapers/` + `src/users/<username>/wallpapers/`. The config folder has exactly two first-level entries:
-
-| Subdirectory | Contents | Deploy method |
 |--------------|----------|---------------|
 | `encrypted/` | SOPS blobs (`*.sops`) | Method 2: decrypt → `~/Pictures/wallpapers/` |
 | `wallpapers/` | Unencrypted images | Method 1: writable symlink → `~/Pictures/wallpapers/` |

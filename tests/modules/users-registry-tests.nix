@@ -46,17 +46,17 @@ let
     &&
       (googleDriveReplica usersWindows.polyipseity.cloudDrives.replicas).localPath
       == "clouds\\GoogleDriveReplica"
-  ) "users-registry.nix must resolve platform-keyed cloud drive localPath values";
+  ) "users-registry.nix must resolve host-keyed cloud drive localPath values";
 
   test_resolves_replica_enable_per_platform = assert' (
     (googleDriveReplica usersMacOS.polyipseity.cloudDrives.replicas).enable == false
     && (googleDriveReplica usersWindows.polyipseity.cloudDrives.replicas).enable == true
-  ) "users-registry.nix must resolve platform-keyed replica enable flags";
+  ) "users-registry.nix must resolve host-keyed replica enable flags";
 
   test_resolves_replica_readwrite_per_platform = assert' (
     (icloudReplica usersMacOS.polyipseity.cloudDrives.replicas).readWrite == true
     && (icloudReplica usersWindows.polyipseity.cloudDrives.replicas).readWrite == false
-  ) "users-registry.nix must resolve platform-keyed replica readWrite flags";
+  ) "users-registry.nix must resolve host-keyed replica readWrite flags";
 
   test_assembles_vm_guest_domain = assert' (
     usersMacOS.polyipseity.vmGuest.usernameSecretKey == "vm_guest_username"

@@ -22,14 +22,14 @@ let
 
   test_home_imports_custom_module = assert' (containsRegex ''\./custom-provision-symlinks\.nix'' homeText) "home.nix must import the custom provision symlink module";
 
-  test_custom_module_declares_platform_targets = assert' (
+  test_custom_module_declares_host_targets = assert' (
     containsRegex ''options\.nucleus\.customProvisionSymlinks'' customModuleText
     && containsRegex "mkOutOfStoreSymlink" customModuleText
-    && containsRegex ''"macos"'' customModuleText
-    && containsRegex ''"linux"'' customModuleText
-    && containsRegex "windows = lib\\.mkOption" customModuleText
+    && containsRegex ''"MacBook"'' customModuleText
+    && containsRegex ''"NixOS"'' customModuleText
+    && containsRegex "Windows = lib\\.mkOption" customModuleText
     && containsRegex ''custom-provision-symlinks\.json'' customModuleText
-  ) "custom provision symlink module must declare platform targets and managed manifest wiring";
+  ) "custom provision symlink module must declare host targets and managed manifest wiring";
 
   test_activation_dag_keeps_custom_symlinks =
     assert'
@@ -46,9 +46,9 @@ let
   test_polyipseity_data_mapping_in_registries = assert' (
     containsRegex ''"customProvisionSymlinks"'' customSymlinksText
     && containsRegex ''"path": "data"'' customSymlinksText
-    && containsRegex ''"macos": "Library/Mobile Documents/com~apple~CloudDocs/data"'' customSymlinksText
-    && containsRegex ''"linux": "clouds/GoogleDrive/data"'' customSymlinksText
-    && containsRegex ''"windows": "clouds\\\\GoogleDrive\\\\data"'' customSymlinksText
+    && containsRegex ''"MacBook": "Library/Mobile Documents/com~apple~CloudDocs/data"'' customSymlinksText
+    && containsRegex ''"NixOS": "clouds/GoogleDrive/data"'' customSymlinksText
+    && containsRegex ''"Windows": "clouds\\\\GoogleDrive\\\\data"'' customSymlinksText
     && (usersMacOS.polyipseity.customProvisionSymlinks != [ ])
     && (usersWindows.polyipseity.customProvisionSymlinks != [ ])
   ) "polyipseity must map ~/data to native iCloud on macOS and Google Drive elsewhere";
@@ -61,7 +61,7 @@ let
 
   allTests = [
     test_home_imports_custom_module
-    test_custom_module_declares_platform_targets
+    test_custom_module_declares_host_targets
     test_activation_dag_keeps_custom_symlinks
     test_polyipseity_data_mapping_in_registries
     test_windows_apply_wires_custom_symlinks
