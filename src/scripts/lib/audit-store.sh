@@ -97,7 +97,7 @@ audit_nix_store_closures() {
 
   _as_closures_tmp="$(_audit_store_tmpfile)"
   _as_closures_err="$(_audit_store_tmpfile)"
-  if ! nix path-info --json --all --closure-size >"$_as_closures_tmp" 2>"$_as_closures_err"; then
+  if ! nix path-info --json-format 1 --json --all --closure-size >"$_as_closures_tmp" 2>"$_as_closures_err"; then
     error "nix path-info --json --all --closure-size failed; see output below"
     cat "$_as_closures_err" >&2
     rm -f "$_as_closures_tmp" "$_as_closures_err"
@@ -212,7 +212,7 @@ audit_linux_builder_store() {
     return 1
   fi
 
-  _as_builder_remote='command -v nix >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && nix path-info --json --all --closure-size | jq -r '"'"'
+  _as_builder_remote='command -v nix >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && nix path-info --json-format 1 --json --all --closure-size | jq -r '"'"'
     def hsize:
       if . < 1000 then "\(.) B"
       elif . < 1000000 then "\((. / 1000) | floor) kB"
