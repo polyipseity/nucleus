@@ -21,6 +21,10 @@ let
         {
           environment.systemPackages = [ pkgs.jq ];
           nix.settings = {
+            experimental-features = [
+              "flakes"
+              "nix-command"
+            ];
             auto-optimise-store = true;
             extra-substituters = [ "https://nix-community.cachix.org" ];
             extra-trusted-public-keys = [

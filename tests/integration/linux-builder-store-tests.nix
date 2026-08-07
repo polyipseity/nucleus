@@ -13,7 +13,8 @@ assert containsRegex "builders-use-substitutes = true" nixCustomConfText;
 assert containsRegex "darwin\\.linux-builder\\.override" linuxBuilderText;
 assert containsRegex "nix-community\\.cachix\\.org" linuxBuilderText;
 assert containsRegex "nix\\.gc" linuxBuilderText;
-assert containsRegex "auto-optimise-store = true" linuxBuilderText;
+assert containsRegex "experimental-features" linuxBuilderText;
+assert containsRegex "nix-command" linuxBuilderText;
 
 {
   success = true;
