@@ -31,6 +31,18 @@ let
     runtimeInputs = [ pkgs.jq ];
     scriptName = "src/scripts/services/log-gc-system";
   };
+
+  nixStoreGc = pkgs.writeNucleusShellApplication {
+    name = "nix-store-gc";
+    runtimeInputs = [ pkgs.nix ];
+    scriptName = "src/scripts/services/nix-store-gc";
+  };
+
+  gcWeekly = pkgs.writeNucleusShellApplication {
+    name = "gc-weekly";
+    runtimeInputs = [ ];
+    scriptName = "src/scripts/services/gc-sweep";
+  };
 in
 {
   # ---------------------------------------------------------------------------
@@ -103,6 +115,58 @@ in
     description = "Daily system log rotation timer";
     timerConfig = {
       OnCalendar = "12:00:00";
+      Persistent = true;
+    };
+    wantedBy = [ "timers.target" ];
+  };
+
+  # ---------------------------------------------------------------------------
+  # Daily Nix store GC — intersection generation prune + collect-garbage.
+  # ---------------------------------------------------------------------------
+  systemd.services."nucleus-nix-store-gc" = {
+    description = "Daily Nix store garbage collection";
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${nixStoreGc}/bin/nucleus-nix-store-gc";
+      Environment = [
+        "NUCLEUS_GC_EXPIRY=${config.modules.gc.expiry}"
+        "NUCLEUS_GC_NIX_EXPIRY=${config.modules.gc.nixStoreExpiry}"
+        "NUCLEUS_GC_GENERATIONS_KEEP=${toString config.modules.gc.generationsKeep}"
+        "NUCLEUS_GC_SYSTEM_GENERATIONS_KEEP=${toString config.modules.gc.systemGenerationsKeep}"
+      ];
+    };
+  };
+
+  systemd.timers."nucleus-nix-store-gc" = {
+    description = "Daily Nix store garbage collection timer";
+    timerConfig = {
+      OnCalendar = "12:00:00";
+      Persistent = true;
+    };
+    wantedBy = [ "timers.target" ];
+  };
+
+  # ---------------------------------------------------------------------------
+  # Weekly garbage collection — full gc.sh as root with user steps via sudo -u.
+  # ---------------------------------------------------------------------------
+  systemd.services."nucleus-gc-weekly" = {
+    description = "Weekly garbage collection (VM, build, cache artifacts)";
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${gcWeekly}/bin/nucleus-gc-weekly";
+      Environment = [
+        "NUCLEUS_GC_EXPIRY=${config.modules.gc.expiry}"
+        "NUCLEUS_GC_GENERATIONS_KEEP=${toString config.modules.gc.generationsKeep}"
+        "NUCLEUS_REPO_ROOT=${repoRoot}"
+        "NUCLEUS_USERNAME=${username}"
+      ];
+    };
+  };
+
+  systemd.timers."nucleus-gc-weekly" = {
+    description = "Weekly garbage collection timer";
+    timerConfig = {
+      OnCalendar = "Sun *-*-* 12:00:00";
       Persistent = true;
     };
     wantedBy = [ "timers.target" ];

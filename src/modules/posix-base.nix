@@ -5,6 +5,7 @@
   lib,
   options,
   pkgs,
+  username,
   ...
 }:
 let
@@ -63,10 +64,8 @@ in
       system.activationScripts.gitconfig = lib.mkAfter gitconfigActivation;
 
       nix.gc = {
-        automatic = true;
-        # Run store collection at local noon every day.
-        dates = "12:00";
-        options = "--delete-older-than ${config.modules.gc.nixStoreExpiry}";
+        # Daily store GC is handled by nucleus-nix-store-gc (activation.nix timer).
+        automatic = false;
       };
 
       nix.optimise = {
@@ -86,6 +85,16 @@ in
           runtimeInputs = [ pkgs.jq ];
           scriptName = "src/scripts/services/log-gc-system";
         };
+        nixStoreGc = pkgs.writeNucleusShellApplication {
+          name = "nix-store-gc";
+          runtimeInputs = [ pkgs.nix ];
+          scriptName = "src/scripts/services/nix-store-gc";
+        };
+        gcWeekly = pkgs.writeNucleusShellApplication {
+          name = "gc-weekly";
+          runtimeInputs = [ ];
+          scriptName = "src/scripts/services/gc-sweep";
+        };
       in
       {
         # Determinate Nix keeps nix-darwin `nix.enable = false`, so use launchd
@@ -93,10 +102,16 @@ in
         launchd.daemons.nixStoreGc = {
           serviceConfig = {
             ProgramArguments = [
-              "/run/current-system/sw/bin/nix-collect-garbage"
-              "--delete-older-than"
-              "${config.modules.gc.nixStoreExpiry}"
+              "/bin/sh"
+              "-c"
+              "exec ${nixStoreGc}/bin/nucleus-nix-store-gc"
             ];
+            EnvironmentVariables = {
+              NUCLEUS_GC_EXPIRY = config.modules.gc.expiry;
+              NUCLEUS_GC_NIX_EXPIRY = config.modules.gc.nixStoreExpiry;
+              NUCLEUS_GC_GENERATIONS_KEEP = toString config.modules.gc.generationsKeep;
+              NUCLEUS_GC_SYSTEM_GENERATIONS_KEEP = toString config.modules.gc.systemGenerationsKeep;
+            };
             StartCalendarInterval = [
               {
                 Hour = 12;
@@ -142,6 +157,27 @@ in
               {
                 Hour = 12;
                 Minute = 0;
+              }
+            ];
+          };
+        };
+
+        launchd.daemons.gc-weekly = {
+          serviceConfig = {
+            Label = "local.gc-weekly";
+            ProgramArguments = [ "${gcWeekly}/bin/nucleus-gc-weekly" ];
+            EnvironmentVariables = {
+              NUCLEUS_GC_EXPIRY = config.modules.gc.expiry;
+              NUCLEUS_GC_GENERATIONS_KEEP = toString config.modules.gc.generationsKeep;
+              NUCLEUS_REPO_ROOT = repoRoot;
+              NUCLEUS_USERNAME = username;
+            };
+            RunAtLoad = false;
+            StartCalendarInterval = [
+              {
+                Hour = 12;
+                Minute = 0;
+                Weekday = 0;
               }
             ];
           };

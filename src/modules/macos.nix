@@ -256,12 +256,6 @@ let
     scriptName = "src/scripts/services/ds-store-gc";
   };
 
-  gcWeekly = pkgs.writeNucleusShellApplication {
-    name = "gc-weekly";
-    runtimeInputs = [ ];
-    scriptName = "src/scripts/services/gc-sweep";
-  };
-
   sccacheGc = pkgs.writeNucleusShellApplication {
     name = "sccache-gc";
     runtimeInputs = [ pkgs.sccache ];
@@ -550,32 +544,6 @@ lib.mkIf pkgs.stdenv.isDarwin {
     macos-configure-headless-display = lib.hm.dag.entryAfter [ "macos-install-nightlight" ] ''
       "${activationBundle}/src/scripts/hosts/MacBook/macos-configure-headless-display.sh"
     '';
-  };
-
-  # --------------------------------------------------------------------------
-  # Weekly garbage collection LaunchAgent
-  # Performs bounded GC on every Sunday at noon to reclaim stale VM
-  # artifacts, build outputs, and tool caches that accumulate across weeks.
-  launchd.agents."gc-weekly" = {
-    enable = true;
-    config = {
-      Label = "local.gc-weekly";
-      ProgramArguments = [ "${gcWeekly}/bin/nucleus-gc-weekly" ];
-      EnvironmentVariables = {
-        NUCLEUS_GC_EXPIRY = config.modules.gc.expiry;
-        NUCLEUS_REPO_ROOT = repoRoot;
-      };
-      # Do not run on every agent reload during apply/bootstrap apply; weekly
-      # Sunday maintenance at noon is sufficient for accumulated artifact cleanup.
-      RunAtLoad = false;
-      StartCalendarInterval = [
-        {
-          Hour = 12;
-          Minute = 0;
-          Weekday = 0; # Sunday (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
-        }
-      ];
-    };
   };
 
   # --------------------------------------------------------------------------

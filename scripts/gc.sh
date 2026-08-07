@@ -212,6 +212,29 @@ hm_expiry="${hm_expiry_arg:-${NUCLEUS_GC_HM_EXPIRY:-${expiry_arg:-${NUCLEUS_GC_E
 nix_expiry="${nix_expiry_arg:-${NUCLEUS_GC_NIX_EXPIRY:-${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}}}"
 system_expiry="${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}"
 
+_gc_user_only_pass=false
+_gc_root_scheduler=false
+if [ "${NUCLEUS_GC_USER_ONLY:-}" = true ]; then
+  _gc_user_only_pass=true
+  system_gc=false
+  hm_gc=false
+  nix_artifacts_gc=false
+  nix_gc=false
+  journald_gc=false
+elif [ "$(id -u)" -eq 0 ] && [ -n "${NUCLEUS_USERNAME:-}" ]; then
+  _gc_root_scheduler=true
+fi
+
+_gc_dispatch_user_gc() {
+  sudo -u "$NUCLEUS_USERNAME" -H env \
+    NUCLEUS_GC_USER_ONLY=true \
+    NUCLEUS_REPO_ROOT="$REPO_ROOT" \
+    REPO_ROOT="$REPO_ROOT" \
+    "$0" "$@"
+}
+
+_gc_skip_user_steps=false
+
 # Resolve generation-count values with the same precedence pattern (default: 7).
 generations_keep="${generations_keep_arg:-${NUCLEUS_GC_GENERATIONS_KEEP:-7}}"
 system_generations_keep="${system_generations_keep_arg:-${NUCLEUS_GC_SYSTEM_GENERATIONS_KEEP:-${generations_keep}}}"
@@ -665,8 +688,13 @@ if [ "$nix_gc" = true ]; then
   fi
 fi
 
+if [ "$_gc_root_scheduler" = true ]; then
+  _gc_dispatch_user_gc "$@"
+  _gc_skip_user_steps=true
+fi
+
 # Step 3: stale wallpaper gc (independent of Nix).
-if [ "$wallpaper_gc" = true ]; then
+if [ "$_gc_skip_user_steps" != true ] && [ "$wallpaper_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would remove stale wallpapers"
   else
@@ -675,7 +703,7 @@ if [ "$wallpaper_gc" = true ]; then
 fi
 
 # Step 4: tool cache gc (independent of Nix, runs last).
-if [ "$tool_cache_gc" = true ]; then
+if [ "$_gc_skip_user_steps" != true ] && [ "$tool_cache_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would clear tool caches"
   else
@@ -683,7 +711,7 @@ if [ "$tool_cache_gc" = true ]; then
   fi
 fi
 # Step 5: remove stale .git boilerplate (sample hooks, description) from ~/dev.
-if [ "$git_template_gc" = true ]; then
+if [ "$_gc_skip_user_steps" != true ] && [ "$git_template_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would remove stale .git template boilerplate from ~/dev"
   else
@@ -691,7 +719,7 @@ if [ "$git_template_gc" = true ]; then
   fi
 fi
 # Step 6: remove stale .git cache/state files and run git gc --auto in ~/dev.
-if [ "$git_cache_gc" = true ]; then
+if [ "$_gc_skip_user_steps" != true ] && [ "$git_cache_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would remove stale .git cache/state files in ~/dev"
   else
@@ -699,7 +727,7 @@ if [ "$git_cache_gc" = true ]; then
   fi
 fi
 # Step 7: remove orphaned Ollama models not declared in the manifest.
-if [ "$ollama_gc" = true ]; then
+if [ "$_gc_skip_user_steps" != true ] && [ "$ollama_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would gc stale Ollama models"
   else
@@ -708,7 +736,7 @@ if [ "$ollama_gc" = true ]; then
 fi
 
 # Step 7b: clear sccache compilation cache.
-if [ "$sccache_gc" = true ]; then
+if [ "$_gc_skip_user_steps" != true ] && [ "$sccache_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would clear sccache cache"
   else
@@ -717,7 +745,7 @@ if [ "$sccache_gc" = true ]; then
 fi
 
 # Step 8: remove stale VM artifacts (temporary builds, orphaned images).
-if [ "$vm_gc" = true ]; then
+if [ "$_gc_skip_user_steps" != true ] && [ "$vm_gc" = true ]; then
   gc_vm_artifacts_if_present
 fi
 
@@ -748,7 +776,7 @@ gc_logs() {
 }
 
 # Step 9: rotate managed log files via copy-truncate (preserves inodes).
-if [ "$log_gc" = true ]; then
+if [ "$_gc_skip_user_steps" != true ] && [ "$log_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would rotate managed logs"
   else

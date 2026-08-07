@@ -11,15 +11,6 @@ let
   # systemd services).
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
-  # Wrapper that resolves the nucleus repo root at runtime so the systemd unit
-  # works regardless of the checkout location. Uses eval-time fallback for
-  # contexts where NUCLEUS_REPO_ROOT may not be inherited.
-  gcWeekly = pkgs.writeNucleusShellApplication {
-    name = "gc-weekly";
-    runtimeInputs = [ ];
-    scriptName = "src/scripts/services/gc-sweep";
-  };
-
   sccacheGc = pkgs.writeNucleusShellApplication {
     name = "sccache-gc";
     runtimeInputs = [ pkgs.sccache ];
@@ -241,42 +232,6 @@ lib.mkIf pkgs.stdenv.isLinux {
       OnCalendar = "12:00:00";
       Persistent = true;
       Unit = "nix-index-update.service";
-    };
-    Install = {
-      WantedBy = [ "timers.target" ];
-    };
-  };
-
-  # --------------------------------------------------------------------------
-  # Weekly garbage collection — runs on Sunday at noon to reclaim stale VM
-  # artifacts, build outputs, and tool caches that accumulate across weeks.
-  systemd.user.services."gc-weekly" = {
-    Unit = {
-      Description = "Weekly garbage collection (VM, build, cache artifacts)";
-      After = [ "network-online.target" ];
-      Wants = [ "network-online.target" ];
-    };
-    Service = {
-      Type = "oneshot";
-      ExecStart = "${gcWeekly}/bin/nucleus-gc-weekly";
-      Environment = [
-        "NUCLEUS_GC_EXPIRY=${config.modules.gc.expiry}"
-        "NUCLEUS_REPO_ROOT=${repoRoot}"
-      ];
-    };
-  };
-
-  systemd.user.timers."gc-weekly" = {
-    Unit = {
-      Description = "Weekly garbage collection timer";
-    };
-    Timer = {
-      # Fire every Sunday at 12:00 local time. Persistent=true ensures the timer
-      # catches up on the next login when the machine was off at the scheduled
-      # time, preventing stale artifacts from accumulating indefinitely.
-      OnCalendar = "Sun *-*-* 12:00:00";
-      Persistent = true;
-      Unit = "gc-weekly.service";
     };
     Install = {
       WantedBy = [ "timers.target" ];
