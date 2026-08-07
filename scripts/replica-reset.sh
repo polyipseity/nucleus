@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Removes legacy per-replica state markers and local rclone cache directories
-# so the next replica-sync run starts from a clean local state.
+# Removes local replica data and rclone cache directories so the next
+# replica-sync run starts from a clean local state.
 #
 # Usage: nucleus-replica-reset [--dry-run] [--replica-id ID] [--repo-root PATH]
 #
@@ -144,12 +144,6 @@ run_local_cmd() {
   "$@"
 }
 
-# WHY: these dirs hold seeding markers from the pre-unified-sync layouts;
-# they are removed so a stale marker cannot make the next sync skip seeding.
-legacy_replica_state_dirs="
-$HOME/.config/nucleus/state/replica-bisync
-$HOME/.config/nucleus/state/replica-sync
-"
 local_failures=0
 
 # WHY: the replica list is materialized to a temp file (rather than piped or
@@ -162,15 +156,6 @@ while IFS="$(printf '\t')" read -r id local_path provider icloud_service; do
   if [ -n "$replica_id_filter" ] && [ "$id" != "$replica_id_filter" ]; then
     continue
   fi
-
-  for state_dir in $legacy_replica_state_dirs; do
-    state_marker="$state_dir/$id.seeded"
-    if [ -f "$state_marker" ]; then
-      if ! run_local_cmd rm -f "$state_marker"; then
-        local_failures=$((local_failures + 1))
-      fi
-    fi
-  done
 
   local_root="$HOME/$local_path"
 

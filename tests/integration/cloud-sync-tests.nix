@@ -390,7 +390,6 @@ let
     && containsRegex "Resolve-NucleusRepoRoot" replicaResetPwshText
     && containsRegex "Invoke-ReplicaReset" replicaResetPwshText
     && containsRegex "derive_repo_root" replicaResetShellText
-    && containsRegex "legacy" replicaResetShellText
     && containsRegex "clearing local replica data" replicaResetShellText
     && containsRegex "expected iCloud drive symlink" replicaResetShellText
     && !containsRegex ''mkdir -p "\\$local_root"'' replicaResetShellText

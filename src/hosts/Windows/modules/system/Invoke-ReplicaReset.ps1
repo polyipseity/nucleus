@@ -4,7 +4,6 @@
 
 .DESCRIPTION
   Clears only local state for enabled replicas declared in src/users/:
-    - Legacy marker files under %USERPROFILE%\.config\nucleus\state\replica-*\<id>.seeded
     - Local replica data under each replica localPath
     - Local rclone cache directories related to sync/bisync
 
@@ -17,8 +16,8 @@
   Print planned reset actions without changing local state.
 
 .PARAMETER ReplicaId
-  Optional replica id filter; when provided only matching marker and local
-  replica cleanup is applied. Cache reset remains global because old rclone
+  Optional replica id filter; when provided only matching local replica
+  cleanup is applied. Cache reset remains global because old rclone
   cache files are not reliably attributable to one replica id.
 
 .EXAMPLE
@@ -78,11 +77,6 @@ function Invoke-ReplicaReset {
     }
   }
 
-  $legacyReplicaStateDirs = @(
-    (Join-Path -Path $HOME -ChildPath ".config\nucleus\state\replica-bisync"),
-    (Join-Path -Path $HOME -ChildPath ".config\nucleus\state\replica-sync")
-  )
-
   foreach ($replica in $replicas) {
     $id = [string]$replica.id
     $localPath = [string]$replica.localPath
@@ -93,17 +87,6 @@ function Invoke-ReplicaReset {
     }
 
     $localRoot = Join-Path -Path $HOME -ChildPath $localPath
-    foreach ($stateDir in $legacyReplicaStateDirs) {
-      $stateMarker = Join-Path -Path $stateDir -ChildPath "$id.seeded"
-      if (Test-Path -Path $stateMarker -PathType Leaf) {
-        if ($DryRun) {
-          Write-Output "replica-reset: [dry-run] Remove-Item -Path '$stateMarker' -Force"
-        }
-        else {
-          Remove-Item -Path $stateMarker -Force
-        }
-      }
-    }
 
     # macOS iCloud Drive replicas are represented as symlinks to CloudDocs.
     # Never recurse into the symlink target during reset; remove only link.
