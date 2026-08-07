@@ -86,7 +86,6 @@ function Sync-VSCodeExtensionManifest {
     'mark-hansen.hledger-vscode',
     'mkhl.direnv',
     'ms-azuretools.vscode-containers',
-    'ms-azuretools.vscode-docker',
     'ms-ceintl.vscode-language-pack-zh-hant',
     'ms-python.debugpy',
     'ms-python.python',

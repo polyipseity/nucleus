@@ -91,7 +91,6 @@ let
     (mkMktx "mkhl" "direnv")
     # ms-azuretools
     [ pkgs.vscode-extensions.ms-azuretools.vscode-containers ]
-    [ pkgs.vscode-extensions.ms-azuretools.vscode-docker ]
     # ms-ceintl
     [ pkgs.vscode-extensions.ms-ceintl.vscode-language-pack-zh-hant ]
     # ms-python
