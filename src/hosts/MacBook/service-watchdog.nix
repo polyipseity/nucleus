@@ -17,10 +17,7 @@ let
   # Bundle services.json into the nix store so launchd-rooted daemons
   # can read it — they cannot access iCloud Drive paths even through
   # the ~/dev/nucleus symlink (macOS sandbox restriction).
-  servicesJson = builtins.path {
-    path = ../../modules/services.json;
-    name = "nucleus-services-json";
-  };
+  servicesJson = import ../../modules/lib/services-json-path.nix { };
 
   envVars = import ../../modules/lib/env-catalog.nix {
     inherit

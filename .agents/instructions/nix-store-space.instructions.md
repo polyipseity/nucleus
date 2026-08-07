@@ -50,7 +50,7 @@ Each `writeNucleusShellApplication` with `bundleDefault = true` previously `cp -
 | NixOS | ext4 on `/` | No reflink into store; VM golden→base may use reflink only on CoW-capable Linux hosts |
 | Windows | No Nix store | N/A |
 
-**D3 — Automator / `.app` bundles must copy:** [`equaliser`](../../src/hosts/MacBook/) and [`camillagui-backend`](../../src/hosts/MacBook/camilladsp.nix) ship `.app` bundles that copy dependencies into the bundle. This is required for macOS app isolation; document cost, do not symlink into bundles.
+**D3 — Automator / `.app` bundles must copy:** [`equaliser`](../../src/flake.nix) (`stdenv.mkDerivation` copies `*.app` from the DMG into `$out/Applications/`) and [`camillagui-backend`](../../src/hosts/MacBook/camilladsp.nix) ship self-contained `.app` bundles. Symlinking store paths into bundles breaks macOS app isolation and code signing expectations — accept the store/runtime copy cost.
 
 ## E3: `sharedPackages` in system + home profiles
 

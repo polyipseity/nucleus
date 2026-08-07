@@ -34,9 +34,8 @@ in
       # Bundle the script + lib dependencies so SCRIPT_DIR-relative sourcing works.
       scriptsBundle = pkgs.runCommand "nucleus-jellyfin-scripts" { preferLocalBuild = true; } ''
         mkdir -p "$out/services" "$out/lib"
-        cp ${../../scripts/services/jellyfin-sync.sh} "$out/services/jellyfin-sync.sh"
-        cp ${../../scripts/lib/lib.sh} "$out/lib/lib.sh"
-        chmod +x "$out/services/jellyfin-sync.sh"
+        ln -s ${../../scripts/services/jellyfin-sync.sh} "$out/services/jellyfin-sync.sh"
+        ln -s ${../../scripts/lib/lib.sh} "$out/lib/lib.sh"
       '';
     in
     ''

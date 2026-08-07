@@ -20,10 +20,7 @@ let
   # Bundle services.json into the nix store so the systemd watchdog can
   # read it without needing NUCLEUS_REPO_ROOT.  Same approach as the
   # macOS launchd watchdog (MacBook/service-watchdog.nix).
-  servicesJson = builtins.path {
-    path = ../../modules/services.json;
-    name = "nucleus-services-json";
-  };
+  servicesJson = import ../../modules/lib/services-json-path.nix { };
 
   activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
 
