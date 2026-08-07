@@ -8,14 +8,6 @@
 - Verify CamillaDSP loopback: `arecord -l | grep Loopback`. If missing, reboot after `nucleus-apply`.
 - Caddy local-CA trust runs automatically. If missing: `sudo caddy trust --address 127.0.0.1:2019`.
 
-## One-time migrations (deferred)
-
-Run once on each NixOS host before applying a nucleus revision that removes in-code migration handlers.
-
-1. `nucleus-apply` (final run with handlers still present).
-2. Cloud mounts: verify replica/mount paths under `~/clouds/**` match the current layout (real directories, native iCloud symlinks where configured).
-3. Replica state: `nucleus-replica-reset` to clear pre-unified-sync seed markers.
-
 ## command shortcuts
 
 - `-g`, `-ga`, `-gb`, `-gc`, `-gca`, `-gcl`, `-gco`, `-gd`, `-gf`, `-gff`, `-gl`, `-gp`, `-gpl`, `-gplf`, `-gs`, `-gst`, `-gsw` — git commands
