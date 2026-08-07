@@ -96,14 +96,20 @@ audit_nix_store_closures() {
   fi
 
   _as_closures_tmp="$(_audit_store_tmpfile)"
-  if ! nix path-info --json --all --closure-size >"$_as_closures_tmp" 2>&1; then
+  _as_closures_err="$(_audit_store_tmpfile)"
+  if ! nix path-info --json --all --closure-size >"$_as_closures_tmp" 2>"$_as_closures_err"; then
     error "nix path-info --json --all --closure-size failed; see output below"
-    cat "$_as_closures_tmp" >&2
+    cat "$_as_closures_err" >&2
+    rm -f "$_as_closures_tmp" "$_as_closures_err"
+    return 1
+  fi
+  rm -f "$_as_closures_err"
+
+  if ! _audit_store_top_closures_jq <"$_as_closures_tmp"; then
+    error "failed to parse nix path-info JSON output"
     rm -f "$_as_closures_tmp"
     return 1
   fi
-
-  _audit_store_top_closures_jq <"$_as_closures_tmp"
   rm -f "$_as_closures_tmp"
 }
 
