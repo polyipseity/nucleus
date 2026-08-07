@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Print a Nix store space baseline report: closure sizes, generation count,
-# GC roots, stale result symlinks, and linux-builder VM store usage (macOS).
+# Print a Nix store baseline report: closure sizes, generation count, GC roots,
+# stale result symlinks, and linux-builder VM store usage (macOS).
 set -euo pipefail
 
 _self="$0"
@@ -15,7 +15,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 usage() {
-  usage_std "$(basename "$0")" "[--help]" "Print Nix store space audit baseline metrics."
+  usage_std "$(basename "$0")" "[--help]" "Print Nix store audit baseline metrics."
 }
 
 while [ "$#" -gt 0 ]; do
@@ -34,7 +34,7 @@ done
 
 REPO_ROOT="$(derive_repo_root)"
 export REPO_ROOT
-# shellcheck source=../src/scripts/lib/audit-store-space.sh
-. "$SCRIPT_DIR/../src/scripts/lib/audit-store-space.sh"
-audit_store_space_report
+# shellcheck source=../src/scripts/lib/audit-store.sh
+. "$SCRIPT_DIR/../src/scripts/lib/audit-store.sh"
+audit_store_report
 nuc_done

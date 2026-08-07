@@ -256,9 +256,9 @@ fi
 if [ "$store_audit" = true ] && command -v nix >/dev/null 2>&1; then
   require_command jq
   export REPO_ROOT
-  # shellcheck source=../src/scripts/lib/audit-store-space.sh
-  . "$SCRIPT_DIR/../src/scripts/lib/audit-store-space.sh"
-  audit_store_space_report
+  # shellcheck source=../src/scripts/lib/audit-store.sh
+  . "$SCRIPT_DIR/../src/scripts/lib/audit-store.sh"
+  audit_store_report
 fi
 
 nuc_done

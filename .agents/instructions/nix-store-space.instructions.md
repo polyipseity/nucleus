@@ -31,8 +31,8 @@ MacBook `/nix` lives on a dedicated APFS volume (Determinate installer). `min-fr
 
 | `bundleDefault` | Behavior |
 | --------------- | -------- |
-| `false` (default) | Thin wrapper only; for `scriptName` wrappers, symlink a single script from shared `script-tree` |
-| `true` (explicit opt-in) | Symlink full shared `scripts-bundle` + `script-tree` — required when runtime needs `SCRIPT_DIR`-relative `src/scripts/lib/` or sibling scripts under `scripts/` |
+| `false` (default) | Thin wrapper with a single-script symlink plus `script-tree/src` at `$out/src` for `lib.sh` resolution |
+| `true` (explicit opt-in) | Symlink full shared `scripts-bundle` + `script-tree` — required when runtime needs sibling scripts under `scripts/` (e.g. `mkCheckPwshPackage`) |
 
 The `nucleusApp` helper does **not** override this default — each call site opts in explicitly when needed.
 
@@ -105,7 +105,7 @@ Each `writeNucleusShellApplication` with `bundleDefault = true` previously `cp -
 
 `nucleus-health-check` runs the store audit **by default** before apply/update. Opt out with `--no-store-audit` or `NUCLEUS_HEALTH_CHECK_NO_STORE_AUDIT=1`.
 
-Manual entry point: [`scripts/audit-store-space.sh`](../../scripts/audit-store-space.sh) (sources [`audit-store-space.sh`](../../src/scripts/lib/audit-store-space.sh)).
+Manual entry point: [`scripts/audit-store.sh`](../../scripts/audit-store.sh) (sources [`audit-store.sh`](../../src/scripts/lib/audit-store.sh)). Managed command: `nucleus-audit-store`.
 
 Report sections:
 

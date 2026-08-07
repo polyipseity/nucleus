@@ -1,17 +1,17 @@
 # shellcheck shell=bash
-# Store-space audit helpers for nucleus hosts.
+# Store audit helpers for nucleus hosts.
 #
 # Source from entry-point scripts after sourcing lib.sh and setting REPO_ROOT.
 #
 # Functions print a human-readable baseline report to stdout. Privileged sections
 # (generations on Darwin, linux-builder VM) request sudo or fail with actionable
-# errors. Other sections are best-effort when tools are missing.
+# errors. Other sections fail when required tools or data are unavailable.
 #
 # Environment variables:
 #   REPO_ROOT  Repository root (required).
 
 [ -n "${REPO_ROOT:-}" ] || {
-  printf '%s\n' "audit-store-space: REPO_ROOT is not set" >&2
+  printf '%s\n' "audit-store: REPO_ROOT is not set" >&2
   return 1
 }
 
@@ -69,7 +69,19 @@ _audit_store_linux_builder_ready() {
 }
 
 _audit_store_top_closures_jq() {
-  jq -r 'to_entries | sort_by(.value.closureSize) | reverse | .[0:20][] | "\(.value.closureSize)\t\(.key)"'
+  jq -r '
+    def hsize:
+      if . < 1000 then "\(.) B"
+      elif . < 1000000 then "\((. / 1000) | floor) kB"
+      elif . < 1000000000 then "\((. / 1000000) | floor) MB"
+      else "\((. / 1000000000) | floor) GB"
+      end;
+    to_entries
+    | sort_by(.value.closureSize)
+    | reverse
+    | .[0:20][]
+    | "\(.value.closureSize | hsize)\t\(.key)"
+  '
 }
 
 audit_nix_store_closures() {
@@ -130,16 +142,16 @@ audit_nix_generations() {
 audit_nix_gc_roots() {
   _audit_store_section "gc roots (nix-store --print-roots)"
   if ! command -v nix-store >/dev/null 2>&1; then
-    warn "nix-store unavailable; skipping gc root audit"
-    return 0
+    error "nix-store unavailable; cannot audit gc roots"
+    return 1
   fi
 
   _as_roots_tmp="$(_audit_store_tmpfile)"
   if ! nix-store --print-roots >"$_as_roots_tmp" 2>&1; then
-    warn "nix-store --print-roots failed"
+    error "nix-store --print-roots failed; see output below"
     cat "$_as_roots_tmp" >&2
     rm -f "$_as_roots_tmp"
-    return 0
+    return 1
   fi
 
   _as_root_count="$(wc -l <"$_as_roots_tmp" | tr -d ' ')"
@@ -194,7 +206,15 @@ audit_linux_builder_store() {
     return 1
   fi
 
-  _as_builder_remote='command -v nix >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && nix path-info --json --all --closure-size | jq -r '"'"'to_entries | sort_by(.value.closureSize) | reverse | .[0:15][] | "\(.value.closureSize)\t\(.key)"'"'"''
+  _as_builder_remote='command -v nix >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && nix path-info --json --all --closure-size | jq -r '"'"'
+    def hsize:
+      if . < 1000 then "\(.) B"
+      elif . < 1000000 then "\((. / 1000) | floor) kB"
+      elif . < 1000000000 then "\((. / 1000000) | floor) MB"
+      else "\((. / 1000000000) | floor) GB"
+      end;
+    to_entries | sort_by(.value.closureSize) | reverse | .[0:15][] | "\(.value.closureSize | hsize)\t\(.key)"
+  '"'"''
 
   _as_builder_tmp="$(_audit_store_tmpfile)"
   _as_builder_attempt=1
@@ -219,7 +239,7 @@ audit_linux_builder_store() {
   return 1
 }
 
-audit_store_space_report() {
+audit_store_report() {
   audit_nix_store_closures
   audit_nix_generations
   audit_nix_gc_roots
