@@ -39,6 +39,5 @@
       "type": "array"
     }
   },
-  "required": ["customProvisionSymlinks"],
   "type": "object"
 }

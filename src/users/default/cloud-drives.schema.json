@@ -196,6 +196,5 @@
       "type": "object"
     }
   },
-  "required": ["mounts", "replicas"],
   "type": "object"
 }

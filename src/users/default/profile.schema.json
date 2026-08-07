@@ -29,6 +29,5 @@
       "type": "boolean"
     }
   },
-  "required": ["isPrimary", "homeDirectory"],
   "type": "object"
 }

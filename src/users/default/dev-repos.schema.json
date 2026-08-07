@@ -77,6 +77,5 @@
       "type": "array"
     }
   },
-  "required": ["enable", "gitHubUsername", "repositories"],
   "type": "object"
 }
