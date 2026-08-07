@@ -6,7 +6,7 @@
 # hosts via:
 #
 #   nix run github:nix-community/nixos-generators -- \
-#     --format qcow           \  # qcow-efi on aarch64 hosts (UTM/virt machine)
+#     --format-path ./src/vms/nixos/formats/qcow-btrfs.nix \  # qcow-efi-btrfs on aarch64 hosts
 #     --system x86_64-linux   \  # or aarch64-linux on Apple Silicon
 #     --configuration ./src/vms/nixos/guest.nix \
 #     -o <output-dir>
@@ -16,8 +16,8 @@
 # inline during a Packer QEMU build.
 #
 # Do NOT declare fileSystems, boot.loader, or hardware-configuration here:
-# nixos-generators injects the correct disk/bootloader setup automatically for
-# the chosen format (qcow = BIOS + ext4, qcow-efi = UEFI + ext4).
+# nixos-generators format modules inject the correct disk/bootloader setup for
+# qcow-btrfs (BIOS/hybrid) and qcow-efi-btrfs (UEFI + Btrfs root).
 #
 # Excludes:
 # - src/hosts/NixOS/ai.nix — no AI models inside VMs

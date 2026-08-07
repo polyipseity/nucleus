@@ -264,6 +264,12 @@ vm_guest_config_fingerprint() {
   _gcf_imports="$(grep -oE '(\.\./)+src/[A-Za-z0-9_./-]+\.nix' "$VMS_DIR/nixos/guest.nix" | sort -u)"
   {
     printf '%s\n' "$_gcf_imports"
+    if [ -d "$VMS_DIR/nixos/formats" ]; then
+      find "$VMS_DIR/nixos/formats" -type f | sort
+    fi
+    if [ -d "$VMS_DIR/nixos/disk-image" ]; then
+      find "$VMS_DIR/nixos/disk-image" -type f | sort
+    fi
     if [ -f "$REPO_ROOT/src/flake.lock" ]; then
       cat "$REPO_ROOT/src/flake.lock"
     fi
@@ -2581,20 +2587,6 @@ vm_setup_libvirt() {
 
 # Phase 1 — Build images (if absent)
 
-# Detect host architecture for nixos-generators format selection.
-#   aarch64/arm64 → qcow-efi  (UTM on Apple Silicon uses UEFI/virt machine)
-#   x86_64/amd64  → qcow      (BIOS mode, matches q35/SeaBIOS on x86_64 hosts)
-case "$(uname -m)" in
-  aarch64|arm64)
-    _nixos_system='aarch64-linux'
-    _nixos_format='qcow-efi'
-    ;;
-  *)
-    _nixos_system='x86_64-linux'
-    _nixos_format='qcow'
-    ;;
-esac
-
 # vm_build_nixos NAME DISK_BYTES
 #   Builds the NixOS guest image via nixos-generators (pinned as a flake
 #   input in src/flake.nix).  On macOS this requires an aarch64-linux builder;
@@ -2606,6 +2598,20 @@ esac
 vm_build_nixos() {
   _name="$1"
   _disk_bytes="$2"
+
+  # Detect host architecture for nixos-generators format selection.
+  #   aarch64/arm64 → qcow-efi-btrfs  (UTM on Apple Silicon uses UEFI/virt machine)
+  #   x86_64/amd64  → qcow-btrfs      (BIOS/hybrid mode on x86_64 hosts)
+  case "$(uname -m)" in
+    aarch64|arm64)
+      _nixos_system='aarch64-linux'
+      _nixos_format_path="$VMS_DIR/nixos/formats/qcow-efi-btrfs.nix"
+      ;;
+    *)
+      _nixos_system='x86_64-linux'
+      _nixos_format_path="$VMS_DIR/nixos/formats/qcow-btrfs.nix"
+      ;;
+  esac
   _out="$IMAGES_DIR/${_name}.qcow2"
   _marker="$(vm_guest_credentials_marker_path "$_name")"
   _config_marker="$(vm_guest_config_marker_path "$_name")"
@@ -2645,17 +2651,17 @@ vm_build_nixos() {
     return 1
   fi
 
-  say "building NixOS image (system=$_nixos_system, format=$_nixos_format)..."
+  say "building NixOS image (system=$_nixos_system, format=$(basename "$_nixos_format_path" .nix))..."
 
   if [ "$dry_run" = true ]; then
-    dry_run "nix run $REPO_ROOT/src#nixos-generators -- --format $_nixos_format --system $_nixos_system --configuration $_guest_nix -o <tmpdir>"
+    dry_run "nix run $REPO_ROOT/src#nixos-generators -- --format-path $_nixos_format_path --system $_nixos_system --configuration $_guest_nix -o <tmpdir>"
     return 0
   fi
 
   _tmpdir="$(mktemp -d)"
   _out_link="$_tmpdir/result"
   nix run "$REPO_ROOT/src#nixos-generators" -- \
-    --format "$_nixos_format" \
+    --format-path "$_nixos_format_path" \
     --system "$_nixos_system" \
     --configuration "$_guest_nix" \
     -o "$_out_link"

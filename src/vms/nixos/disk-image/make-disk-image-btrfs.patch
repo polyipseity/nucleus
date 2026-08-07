@@ -1,0 +1,44 @@
+--- a/make-disk-image.nix
++++ b/make-disk-image.nix
+@@ -207,8 +207,8 @@ assert (
+   "In deterministic mode with a ext4 partition, rootFSUID must be non-null, by default, it is equal to rootGPUID."
+ );
+ assert (
+-  lib.assertMsg (partitionTableType != "none" -> fsType == "ext4")
+-  "to produce a partition table, we need to use -E offset flag which is support only for fsType = ext4"
++  lib.assertMsg (partitionTableType != "none" -> fsType == "ext4" || fsType == "btrfs")
++  "partitioned disk images support ext4 and btrfs root filesystems"
+ );
+ assert (
+   lib.assertMsg
+@@ -364,6 +364,7 @@ let
+       util-linux
+       parted
+       e2fsprogs
++      btrfs-progs
+       lkl
+       config.system.build.nixos-install
+       nixos-enter
+@@ -570,7 +571,14 @@ else
+ # Get start & length of the root partition in sectors to $START and $SECTORS.
+ eval $(partx $diskImage -o START,SECTORS --nr ${rootPartition} --pairs)
+
+-mkfs.${fsType} -b ${blockSize} -F -L ${label} $diskImage -E offset=$(sectorsToBytes $START) $(sectorsToKilobytes $SECTORS)K
++if [ "${fsType}" = "btrfs" ]; then
++  loopdev=$(losetup -f --show -P "$diskImage")
++  mkfs.btrfs -f -L ${label} "''${loopdev}p${rootPartition}"
++  losetup -d "$loopdev"
++else
++  mkfs.${fsType} -b ${blockSize} -F -L ${label} $diskImage -E offset=$(sectorsToBytes $START) $(sectorsToKilobytes $SECTORS)K
++fi
+ ''
+ else
+ ''
+@@ -617,6 +625,7 @@ buildImage = pkgs.vmTools.runInLinuxVM (
+       buildInputs = with pkgs; [
+         util-linux
+         e2fsprogs
++        btrfs-progs
+         dosfstools
+       ];
+       postVM = moveOrConvertImage + createHydraBuildProducts + postVM;
