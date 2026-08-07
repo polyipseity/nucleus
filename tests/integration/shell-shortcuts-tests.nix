@@ -10,6 +10,8 @@ let
   macManualText = builtins.readFile ../../src/hosts/MacBook/MANUAL.md;
   nixosManualText = builtins.readFile ../../src/hosts/NixOS/MANUAL.md;
   windowsManualText = builtins.readFile ../../src/hosts/Windows/MANUAL.md;
+  scriptsBundleText = builtins.readFile ../../src/modules/lib/scripts-bundle.nix;
+  scriptTreeText = builtins.readFile ../../src/modules/lib/script-tree.nix;
 
   inherit (import ../lib.nix) assert';
 
@@ -101,20 +103,35 @@ let
     ]
   ) "shared shell profile must mirror curated shell shortcuts";
 
+  test_write_nucleus_shell_application_defaults_bundle_false = assert' (
+    lib.hasInfix "bundleDefault ? false" flakeText
+    && lib.hasInfix "scripts-bundle.nix" flakeText
+    && lib.hasInfix "ln -s \${thisScriptsBundle}/scripts" flakeText
+    && lib.hasInfix "ln -s \${thisScriptTree}/src" flakeText
+  ) "writeNucleusShellApplication must default bundleDefault to false and symlink shared bundles";
+
+  test_script_tree_and_scripts_bundle_skip_build_time_shellcheck = assert' (
+    !lib.hasInfix "shellcheck" scriptTreeText
+    && !lib.hasInfix "shellcheck" scriptsBundleText
+    && lib.hasInfix "nucleus-scripts-bundle" scriptsBundleText
+    && lib.hasInfix "nucleus-script-tree" scriptTreeText
+  ) "shared script bundles must not shellcheck at derivation build time";
+
   test_posix_shell_exposes_managed_commands = assert' (
-    lib.hasInfix "nucleus-ai = writeNucleusShellApplication pkgs {" flakeText
-    && lib.hasInfix "nucleus-apply = writeNucleusShellApplication pkgs {" flakeText
-    && lib.hasInfix "nucleus-bootstrap = writeNucleusShellApplication pkgs {" flakeText
+    lib.hasInfix "nucleusApp = args: writeNucleusShellApplication pkgs (args // { bundleDefault = true; })" flakeText
+    && lib.hasInfix "nucleus-ai = nucleusApp {" flakeText
+    && lib.hasInfix "nucleus-apply = nucleusApp {" flakeText
+    && lib.hasInfix "nucleus-bootstrap = nucleusApp {" flakeText
     && lib.hasInfix "nucleus-check-pwsh = mkCheckPwshPackage pkgs;" flakeText
-    && lib.hasInfix "nucleus-check-sh = writeNucleusShellApplication pkgs {" flakeText
-    && lib.hasInfix "nucleus-cloud-setup = writeNucleusShellApplication pkgs {" flakeText
-    && lib.hasInfix "nucleus-gc = writeNucleusShellApplication pkgs {" flakeText
-    && lib.hasInfix "nucleus-gs-pdf-opt = writeNucleusShellApplication pkgs {" flakeText
-    && lib.hasInfix "nucleus-health-check = writeNucleusShellApplication pkgs {" flakeText
-    && lib.hasInfix "nucleus-replica-reset = writeNucleusShellApplication pkgs {" flakeText
-    && lib.hasInfix "nucleus-replica-sync = writeNucleusShellApplication pkgs {" flakeText
-    && lib.hasInfix "nucleus-update = writeNucleusShellApplication pkgs {" flakeText
-    && lib.hasInfix "nucleus-vm = writeNucleusShellApplication pkgs {" flakeText
+    && lib.hasInfix "nucleus-check-sh = nucleusApp {" flakeText
+    && lib.hasInfix "nucleus-cloud-setup = nucleusApp {" flakeText
+    && lib.hasInfix "nucleus-gc = nucleusApp {" flakeText
+    && lib.hasInfix "nucleus-gs-pdf-opt = nucleusApp {" flakeText
+    && lib.hasInfix "nucleus-health-check = nucleusApp {" flakeText
+    && lib.hasInfix "nucleus-replica-reset = nucleusApp {" flakeText
+    && lib.hasInfix "nucleus-replica-sync = nucleusApp {" flakeText
+    && lib.hasInfix "nucleus-update = nucleusApp {" flakeText
+    && lib.hasInfix "nucleus-vm = nucleusApp {" flakeText
   ) "flake.nix must expose the managed nucleus command set";
 
   test_windows_shell_exposes_managed_commands = assert' (
@@ -166,6 +183,8 @@ let
     test_zsh_aliases_include_bun_shortcuts
     test_posix_pwsh_shortcuts_match_shell_aliases
     test_windows_pwsh_shortcuts_match_shell_aliases
+    test_write_nucleus_shell_application_defaults_bundle_false
+    test_script_tree_and_scripts_bundle_skip_build_time_shellcheck
     test_posix_shell_exposes_managed_commands
     test_windows_shell_exposes_managed_commands
     test_manuals_document_curated_shortcuts_and_commands

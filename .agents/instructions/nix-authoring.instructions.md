@@ -99,9 +99,9 @@ Always use `pkgs.writeNucleusShellApplication` instead of `pkgs.writeShellApplic
 
 `writeNucleusShellApplication` provides:
 
-- `bundleDefault = true` — mirrors the full `scripts/` tree into the derivation, enabling `SCRIPT_DIR`-based relative sourcing of libraries under `src/scripts/lib/` at runtime.
-- `scriptName` — references a script by its subdirectory path (e.g., `"services/jellyfin-daemon"` resolves to `src/scripts/services/jellyfin-daemon.sh`). The script receives `$@` from the wrapper; pass values as positional args at the call site.
-- `text` — inline the script body directly instead of referencing an external file. Skips the script mirror (no bundle), sets up `PATH` from `runtimeInputs`, and appends the text content to the wrapper. Use when the script body is trivial or when a shared script cannot be reused due to host-specific values.
+- `bundleDefault` — defaults to `false`. When `true`, symlinks the shared `nucleus-scripts-bundle` (`scripts/`) and `nucleus-script-tree` (`src/scripts/`) derivations into `$out` (store-deduplicated). Opt in only when runtime needs `SCRIPT_DIR`-relative `src/scripts/lib/` sourcing or sibling scripts under `scripts/` (e.g. `nucleus-apply`, `mkCheckPwshPackage`). When `false` and `text == null`, only the single `scriptName` target is symlinked into `$out`.
+- `scriptName` — references a script by its subdirectory path (e.g., `"services/jellyfin-daemon"` resolves to `src/scripts/services/jellyfin-daemon.sh` when under `src/scripts/`, or `scripts/gc` for user CLIs). The script receives `$@` from the wrapper; pass values as positional args at the call site.
+- `text` — inline the script body directly instead of referencing an external file. Does not bundle trees regardless of `bundleDefault`; sets up `PATH` from `runtimeInputs`, and appends the text content to the wrapper. Use when the script body is trivial or when a shared script cannot be reused due to host-specific values.
 - `extraEnv` — injects Nix-computed values as environment variables into the wrapper script. Values are automatically shell-escaped. **Prefer positional args for standalone scripts** (see "CLI-arg-first pattern" below). Use `extraEnv` when the script body is a **shared body sourced by multiple callers** (see "Shared script body pattern" below) — the env var contract stays uniform across callers, avoiding dual-parsing of `$1` and env-var fallbacks in the shared code. Environment variables are opaque to shellcheck, bypass PATH isolation, and cannot be forwarded through exec wrappers; these drawbacks are acceptable for shared bodies where args are not the natural interface.
 
 `writeShellApplication` (from nixpkgs) does not support `bundleDefault`, `extraEnv`, or `text`. Scripts built with it cannot source sibling libraries via `SCRIPT_DIR`-relative paths, leading to silent breakage when a script evolves to need library access.
@@ -145,7 +145,9 @@ This avoids:
 - A `text` wrapper that duplicates the `extraEnv` mechanism and bypasses `writeNucleusShellApplication`'s PATH setup.
 - Breaking the `source`-based caller if the wrapper were changed to pass args instead.
 
-Do NOT use `text` to wrap a shared-body script with inline env var assignments — that duplicates `extraEnv`. If the script body exists as a file under `src/scripts/`, reference it via `scriptName` (with `extraEnv` for values) or `bundleDefault` + `scriptName` (with args for standalone invocation). Reserve `text` for truly inline scripts or host-specific wrappers without a shared body.
+Do NOT use `text` to wrap a shared-body script with inline env var assignments — that duplicates `extraEnv`. If the script body exists as a file under `src/scripts/`, reference it via `scriptName` (with `extraEnv` for values) or set `bundleDefault = true` with `scriptName` (with args for standalone invocation) when the script sources `src/scripts/lib/`. Reserve `text` for truly inline scripts or host-specific wrappers without a shared body.
+
+Shellcheck for bundled scripts runs in `nucleus-check-sh` / CI (`script-tree.nix` and per-app derivations do not shellcheck at build time). See [`nix-store-space.instructions.md`](nix-store-space.instructions.md) for store-space policy.
 
 ### Env-var fallback pattern for scripts with callers that use positional args
 

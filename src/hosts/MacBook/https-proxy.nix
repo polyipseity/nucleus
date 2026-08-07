@@ -41,6 +41,7 @@ let
 
   proxyDaemon = pkgs.writeNucleusShellApplication {
     name = "https-proxy-daemon";
+    bundleDefault = true;
     runtimeInputs = [ pkgs.caddy ];
     scriptName = "src/scripts/services/https-proxy-daemon";
   };

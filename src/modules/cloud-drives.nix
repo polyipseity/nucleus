@@ -217,7 +217,6 @@ let
     pkgs.writeNucleusShellApplication {
       name = "cloud-mount-${mount.id}";
       runtimeInputs = [ pkgs.rclone ];
-      bundleDefault = false;
       text = ''
         exec ${../scripts/services/rclone-mount.sh} \
           "${mount.remoteName}" \
@@ -242,7 +241,6 @@ let
     pkgs.writeNucleusShellApplication {
       name = "cloud-replica-scheduled-sync-${replica.id}";
       runtimeInputs = [ ];
-      bundleDefault = false;
       text = ''
         exec ${../scripts/services/replica-scheduled-sync.sh} \
           "${lib.escapeShellArg replica.id}" \
