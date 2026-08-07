@@ -19,7 +19,18 @@
 #
 # mkUserOverlay: binds effectiveUsername/repoRoot/hostName to the selectors.
 let
-  lib = import <nixpkgs/lib>;
+  uniqueStrings =
+    strings:
+    builtins.attrNames (
+      builtins.listToAttrs (map (name: {
+        inherit name;
+        value = true;
+      }) strings)
+    );
+
+  dropStrings =
+    n: strings:
+    if n <= 0 || strings == [ ] then strings else dropStrings (n - 1) (builtins.tail strings);
 in
 rec {
   selectUserConfigSource =
@@ -70,7 +81,7 @@ rec {
         else
           [ ];
     in
-    lib.unique ((readNames perUserDir) ++ (readNames defaultDir));
+    uniqueStrings ((readNames perUserDir) ++ (readNames defaultDir));
 
   selectUserConfigFile =
     {
@@ -80,9 +91,9 @@ rec {
       repoRoot,
     }:
     let
-      segments = lib.splitString "/" relativePath;
+      segments = builtins.splitString "/" relativePath;
       firstSegment = builtins.head segments;
-      restSegments = lib.drop 1 segments;
+      restSegments = dropStrings 1 segments;
       entryRoot = selectUserConfigFirstLevelEntry {
         inherit
           configName
@@ -95,7 +106,7 @@ rec {
         if restSegments == [ ] then
           entryRoot
         else
-          "${entryRoot}/${lib.concatStringsSep "/" restSegments}";
+          "${entryRoot}/${builtins.concatStringsSep "/" restSegments}";
     in
     if builtins.pathExists resolvedPath then
       resolvedPath
