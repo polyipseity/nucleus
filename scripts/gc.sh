@@ -24,6 +24,7 @@ usage() {
   --git-template-gc|--no-git-template-gc  Control stale .git hooks/description cleanup (default: --git-template-gc).
   --git-cache-gc|--no-git-cache-gc  Control stale .git cache/state cleanup and git gc --auto (default: --git-cache-gc).
   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
+  --nix-artifacts-gc|--no-nix-artifacts-gc  Control stale result symlink cleanup (default: --nix-artifacts-gc).
   --nix-gc|--no-nix-gc                      Control nix-collect-garbage (default: --nix-gc).
   --ollama-gc|--no-ollama-gc          Control stale Ollama model removal (default: --ollama-gc).
   --sccache-gc|--no-sccache-gc        Control sccache cache clearing (default: --sccache-gc).
@@ -47,6 +48,7 @@ tool_cache_gc=true
 git_template_gc=true
 git_cache_gc="${NUCLEUS_GC_GIT_CACHE_GC:-true}"
 hm_gc=true
+nix_artifacts_gc=true
 nix_gc=true
 ollama_gc=true
 sccache_gc=true
@@ -88,6 +90,12 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-hm-gc)
       hm_gc=false
+      ;;
+    --nix-artifacts-gc)
+      nix_artifacts_gc=true
+      ;;
+    --no-nix-artifacts-gc)
+      nix_artifacts_gc=false
       ;;
     --nix-gc)
       nix_gc=true
@@ -211,6 +219,15 @@ expire_hm_generations_if_available() {
 run_nix_gc_if_available() {
   # Expiry controlled by --nix-expiry / $nix_expiry.
   nix-collect-garbage --delete-older-than "$nix_expiry"
+}
+
+gc_nix_build_artifacts_if_present() {
+  _cnba_options=""
+  if [ "$dry_run" = true ]; then
+    _cnba_options="--dry-run"
+  fi
+  # shellcheck source=../src/scripts/cleanup-nix-build-artifacts.sh
+  . "$SCRIPT_DIR/../src/scripts/cleanup-nix-build-artifacts.sh"
 }
 
 gc_stale_wallpapers() {
@@ -574,6 +591,15 @@ if [ "$hm_gc" = true ]; then
     dry_run "would expire HM generations older than $hm_expiry_hm_format"
   else
     expire_hm_generations_if_available
+  fi
+fi
+
+# Step 1b: remove stale Nix build result symlinks before store GC.
+if [ "$nix_artifacts_gc" = true ]; then
+  if [ "$dry_run" = true ]; then
+    dry_run "would remove stale Nix build result symlinks"
+  else
+    gc_nix_build_artifacts_if_present
   fi
 fi
 

@@ -32,6 +32,9 @@ let
     keep-outputs = true;
     lazy-trees = true;
     eval-cores = 0;
+    # GC pressure thresholds (512 GB–first sizing; shared across hosts).
+    min-free = 40 * 1024 * 1024 * 1024;
+    max-free = 96 * 1024 * 1024 * 1024;
   };
 
   gitconfigActivation = ''

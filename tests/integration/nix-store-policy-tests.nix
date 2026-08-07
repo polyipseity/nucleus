@@ -18,6 +18,10 @@ assert containsRegex "lazy-trees = true" posixBaseText;
 assert containsRegex "eval-cores = 0" posixBaseText;
 assert containsRegex "lazy-trees = true" nixCustomConfText;
 assert containsRegex "eval-cores = 0" nixCustomConfText;
+assert containsRegex "min-free = 42949672960" nixCustomConfText;
+assert containsRegex "max-free = 103079215104" nixCustomConfText;
+assert containsRegex "min-free = 40 \\* 1024" posixBaseText;
+assert containsRegex "max-free = 96 \\* 1024" posixBaseText;
 
 {
   success = true;
