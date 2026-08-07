@@ -173,17 +173,13 @@ let
     else
       "$HOME/.config/Code - Insiders/User";
 
-  # Select the per-host keybindings source file so that platform-specific
-  # shortcuts (Cmd on macOS vs Ctrl on NixOS/Linux) are tracked independently
-  # without cross-host pollution in a shared repo file.
+  # Per-host VS Code overlay files use canonical hostName suffixes
+  # (MacBook, NixOS, Windows) — same pattern as chatLanguageModels.
+  vsCodeHostFile = name: "${name}.${hostName}.json";
   # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-  vsCodeKeybindingsFile = if isDarwin then "keybindings.mac.json" else "keybindings.nixos.json";
-
-  # Select the per-host Copilot chat model list so that each machine only
-  # surfaces the Ollama models that fit within its VRAM budget.
+  vsCodeKeybindingsFile = vsCodeHostFile "keybindings";
   # check-suppress:config-method: method 3 (merge) -- name-keyed merge preserves VS Code-added model entries while refreshing repo entries.
-  vsCodeChatLanguageModelsFile = # check-suppress:config-method: method 3 (merge)
-    "chatLanguageModels.${hostName}.json";
+  vsCodeChatLanguageModelsFile = vsCodeHostFile "chatLanguageModels";
 
   # Python script that inserts a workspace trust entry for ~/dev into VS Code's
   # SQLite state database (globalStorage/state.vscdb) for both stable and

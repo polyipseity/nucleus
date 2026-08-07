@@ -23,6 +23,11 @@ rec {
   vsCodeProtection =
     assert containsRegex "symlink-vscode-config" editorsText;
     assert containsRegex "bridge-vscode-extensions" editorsText;
+    assert containsRegex "vsCodeHostFile = name:" editorsText;
+    assert containsRegex "vsCodeKeybindingsFile = vsCodeHostFile \"keybindings\"" editorsText;
+    assert containsRegex "vsCodeChatLanguageModelsFile = vsCodeHostFile \"chatLanguageModels\""
+      editorsText;
+    assert !(containsRegex "keybindings\\.mac\\.json" editorsText);
     assert containsRegex "chflags -h uchg" agentsHelpersText;
     assert containsRegex "chattr -h \\+i" agentsHelpersText;
     assert containsRegex "chflags -h nouchg" agentsHelpersText;

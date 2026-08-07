@@ -30,10 +30,10 @@ function Sync-VSCodeConfig {
     (Code - Insiders) channels, creates a symlink from the VS Code User data
     directory into $RepoRoot\src\modules\configs\vscode\.
 
-    keybindings uses a Windows-specific repo source file
-    (keybindings.windows.json) so that Windows key shortcuts are tracked
-    independently from macOS (keybindings.mac.json) and NixOS
-    (keybindings.nixos.json) without cross-host pollution in a shared file.
+    keybindings uses a host-specific repo source file
+    (keybindings.Windows.json) so that Windows key shortcuts are tracked
+    independently from MacBook (keybindings.MacBook.json) and NixOS
+    (keybindings.NixOS.json) without cross-host pollution in a shared file.
     chatLanguageModels.Windows.json is managed by a name-keyed merge-overwrite
     (Merge-VSChatLanguageModel) instead of a symlink, so that VS Code can
     write model updates back without breaking the repo link.
@@ -135,12 +135,14 @@ function Sync-VSCodeConfig {
     (Join-Path -Path $appDataRoaming -ChildPath "Code - Insiders\User")
   )
 
+  $vscodeHostName = 'Windows'
+
   # Managed single files: ordered hashtable of repo file name -> channel-side
   # file name.  chatLanguageModels is managed separately via
   # Merge-VSChatLanguageModel (name-keyed merge, not a symlink).
   $managedFiles = [ordered]@{
     # check-suppress:config-method: method 1 (writable symlink) -- VS Code reads its keybindings from a known path
-    "keybindings.windows.json"        = "keybindings.json"
+    "keybindings.$vscodeHostName.json" = "keybindings.json"
     # check-suppress:config-method: method 1 (writable symlink) -- read by Copilot MCP extension
     "mcp.json"                        = "mcp.json"
     # check-suppress:config-method: method 1 (writable symlink) -- VS Code reads settings on startup
@@ -337,7 +339,7 @@ function Sync-VSCodeConfig {
         }
       }
       # check-suppress:config-method: method 3 (merge) -- name-keyed merge preserves VS Code-added model entries while refreshing repo entries.
-      $repoFile = Get-VSCodeRepoFileTarget -RelativePath 'chatLanguageModels.Windows.json'
+      $repoFile = Get-VSCodeRepoFileTarget -RelativePath "chatLanguageModels.$vscodeHostName.json"
       Merge-VSChatLanguageModel -RepoFile $repoFile -DestFile $chatLmPath
     }
   }
