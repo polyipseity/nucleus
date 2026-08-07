@@ -265,16 +265,8 @@ fi
 
 repo_root="$(derive_repo_root)"
 
-_registry_platform() {
-  case "$(resolve_nucleus_host)" in
-    MacBook) printf '%s\n' macos ;;
-    NixOS) printf '%s\n' nixos ;;
-    *) printf '%s\n' macos ;;
-  esac
-}
-
 if [ -d "$repo_root/src/users" ] && command -v jq >/dev/null 2>&1; then
-  USERS_REGISTRY="$("$repo_root/src/scripts/lib/load-user-registry.sh" --platform "$(_registry_platform)" --repo-root "$repo_root")"
+  USERS_REGISTRY="$("$repo_root/src/scripts/lib/load-user-registry.sh" --host "$(resolve_nucleus_host)" --repo-root "$repo_root")"
 else
   USERS_REGISTRY=""
 fi

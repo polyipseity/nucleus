@@ -5,7 +5,7 @@
 # Outputs the assembled registry as JSON on stdout (username-keyed object).
 #
 # Usage:
-#   load-user-registry.sh [--platform macos|nixos|windows] [--repo-root PATH]
+#   load-user-registry.sh [--host MacBook|NixOS|Windows] [--repo-root PATH]
 #
 # Environment:
 #   NUCLEUS_REPO_ROOT  Repository root when --repo-root is omitted.
@@ -16,13 +16,13 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck source=lib.sh
 . "${SCRIPT_DIR}/lib.sh"
 
-_platform="macos"
+_hostName="MacBook"
 _repo_root=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --platform)
-      _platform="${2:?--platform requires a value}"
+    --host)
+      _hostName="${2:?--host requires a value}"
       shift 2
       ;;
     --repo-root)
@@ -30,7 +30,7 @@ while [ "$#" -gt 0 ]; do
       shift 2
       ;;
     -h | --help)
-      usage_std "load-user-registry.sh" "[--platform macos|nixos|windows] [--repo-root PATH]" \
+      usage_std "load-user-registry.sh" "[--host MacBook|NixOS|Windows] [--repo-root PATH]" \
         "Assemble user registry JSON from src/users/ domain files."
       exit 0
       ;;
@@ -77,67 +77,47 @@ _lur_strip_schema() {
 }
 
 _lur_resolve_cloud_drives() {
-  jq --arg platform "$_platform" '
-    def resolve_scalar($p):
-      if type == "object" and (keys | all(. == "macos" or . == "nixos" or . == "windows" or . == "linux")) then
-        if has($p) then .[$p]
-        elif has("linux") then .linux
-        elif has("macos") then .macos
-        elif has("nixos") then .nixos
-        elif has("windows") then .windows
-        else null
-        end
+  jq --arg host "$_hostName" '
+    def resolve_scalar($h):
+      if type == "object" and (keys | all(. == "MacBook" or . == "NixOS" or . == "Windows")) then
+        .[$h]
       else
         .
       end;
-    def resolve_item($p):
+    def resolve_item($h):
       . as $item
-      | ($item | if has("localPath") then .localPath = (.localPath | resolve_scalar($p)) else . end)
-      | (if has("enable") then .enable = (.enable | resolve_scalar($p)) else . end)
-      | (if has("readWrite") then .readWrite = (.readWrite | resolve_scalar($p)) else . end)
+      | ($item | if has("localPath") then .localPath = (.localPath | resolve_scalar($h)) else . end)
+      | (if has("enable") then .enable = (.enable | resolve_scalar($h)) else . end)
+      | (if has("readWrite") then .readWrite = (.readWrite | resolve_scalar($h)) else . end)
       | (if has("fallbackTimer") and (.fallbackTimer | type) == "object" and (.fallbackTimer | has("enable")) then
-          .fallbackTimer.enable = (.fallbackTimer.enable | resolve_scalar($p))
+          .fallbackTimer.enable = (.fallbackTimer.enable | resolve_scalar($h))
         else
           .
         end);
     {
-      mounts: ((.mounts // []) | map(resolve_item($platform))),
-      replicas: ((.replicas // []) | map(resolve_item($platform))),
+      mounts: ((.mounts // []) | map(resolve_item($host))),
+      replicas: ((.replicas // []) | map(resolve_item($host))),
       replicaGc: (.replicaGc // {})
     }
   '
 }
 
 _lur_resolve_dev_repos() {
-  jq --arg platform "$_platform" '
-    def resolve_scalar($p):
-      if type == "object" and (keys | all(. == "macos" or . == "nixos" or . == "windows" or . == "linux")) then
-        if has($p) then .[$p]
-        elif has("linux") then .linux
-        elif has("macos") then .macos
-        elif has("nixos") then .nixos
-        elif has("windows") then .windows
-        else null
-        end
+  jq --arg host "$_hostName" '
+    def resolve_scalar($h):
+      if type == "object" and (keys | all(. == "MacBook" or . == "NixOS" or . == "Windows")) then
+        .[$h]
       else
         .
       end;
-    .repositories = ((.repositories // []) | map(if has("target") then .target = (.target | resolve_scalar($platform)) else . end))
+    .repositories = ((.repositories // []) | map(if has("target") then .target = (.target | resolve_scalar($host)) else . end))
   '
 }
 
 _lur_resolve_profile() {
-  jq --arg platform "$_platform" '
+  jq --arg host "$_hostName" '
     if has("homeDirectory") and ((.homeDirectory | type) == "object") then
-      .homeDirectory = (
-        if (.homeDirectory | has($platform)) then .homeDirectory[$platform]
-        elif (.homeDirectory | has("linux")) then .homeDirectory.linux
-        elif (.homeDirectory | has("macos")) then .homeDirectory.macos
-        elif (.homeDirectory | has("nixos")) then .homeDirectory.nixos
-        elif (.homeDirectory | has("windows")) then .homeDirectory.windows
-        else null
-        end
-      )
+      .homeDirectory = .homeDirectory[$host]
     else
       .
     end

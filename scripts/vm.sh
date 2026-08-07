@@ -93,8 +93,7 @@ resolve_vm_guest_credentials() {
     return 1
   fi
 
-  _rvgc_platform="$(case "$(resolve_nucleus_host)" in MacBook) echo macos ;; NixOS) echo nixos ;; *) echo macos ;; esac)"
-  if ! _rvgc_users_registry="$("$REPO_ROOT/src/scripts/lib/load-user-registry.sh" --platform "$_rvgc_platform" --repo-root "$REPO_ROOT")"; then
+  if ! _rvgc_users_registry="$("$REPO_ROOT/src/scripts/lib/load-user-registry.sh" --host "$(resolve_nucleus_host)" --repo-root "$REPO_ROOT")"; then
     error "failed to assemble user registry from $REPO_ROOT/src/users"
     return 1
   fi

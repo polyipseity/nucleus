@@ -119,20 +119,12 @@ _jfs_body_from_response() {
   printf '%s' "$1" | sed 's/HTTPSTATUS:[0-9][0-9][0-9]$//'
 }
 
-_jfs_registry_platform() {
-  case "$(resolve_nucleus_host)" in
-    MacBook) printf '%s\n' macos ;;
-    NixOS) printf '%s\n' nixos ;;
-    *) printf '%s\n' macos ;;
-  esac
-}
-
 _jfs_load_users_registry() {
   if [ ! -d "$REPO_ROOT/src/users" ]; then
     return 1
   fi
   "$REPO_ROOT/src/scripts/lib/load-user-registry.sh" \
-    --platform "$(_jfs_registry_platform)" \
+    --host "$(resolve_nucleus_host)" \
     --repo-root "$REPO_ROOT"
 }
 

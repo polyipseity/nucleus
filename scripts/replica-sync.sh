@@ -87,17 +87,9 @@ else
   REPO_ROOT="$repo_root"
 fi
 
-_registry_platform() {
-  case "$(resolve_nucleus_host)" in
-    MacBook) printf '%s\n' macos ;;
-    NixOS) printf '%s\n' nixos ;;
-    *) printf '%s\n' macos ;;
-  esac
-}
-
 _load_users_registry() {
   "$REPO_ROOT/src/scripts/lib/load-user-registry.sh" \
-    --platform "$(_registry_platform)" \
+    --host "$(resolve_nucleus_host)" \
     --repo-root "$REPO_ROOT"
 }
 
