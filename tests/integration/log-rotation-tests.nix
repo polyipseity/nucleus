@@ -47,22 +47,15 @@ assert containsRegex "Invoke-LogRotation" gcPs1Text;
 assert containsRegex "Get-NucleusLogDir" gcPs1Text;
 assert containsRegex "NUCLEUS_GC_NO_LOG_GC" gcPs1Text;
 
-# --- scripts/gc.sh: git-template-gc flags ---
-assert containsRegex "--git-template-gc.*--no-git-template-gc" gcShText;
-assert containsRegex "git_template_gc=true" gcShText;
-assert containsRegex "gc_git_templates_if_present\\(\\)" gcShText;
-assert containsRegex "stale \.git boilerplate" gcShText;
-assert containsRegex "rm.*hooks.*\\.sample" gcShText;
-assert containsRegex "rm.*description" gcShText;
-assert containsRegex "find.*dev_root.*-name.*\\.git" gcShText;
+# --- scripts/gc.sh: git-cache-gc flags ---
+assert containsRegex "--git-cache-gc.*--no-git-cache-gc" gcShText;
+assert containsRegex "git_cache_gc" gcShText;
+assert containsRegex "gc_git_cache_if_present\\(\\)" gcShText;
 
-# --- scripts/gc.ps1: -NoGitTemplateGc switch and Clear-GitTemplateBatch ---
-assert containsRegex "NoGitTemplateGc" gcPs1Text;
-assert containsRegex "Clear-GitTemplateBatch" gcPs1Text;
-assert containsRegex "NUCLEUS_GC_NO_GIT_TEMPLATE_GC" gcPs1Text;
-assert containsRegex "\\.sample" gcPs1Text;
-assert containsRegex "Git template boilerplate" gcPs1Text;
-assert containsRegex "description" gcPs1Text;
+# --- scripts/gc.ps1: -NoGitCacheGc switch and Clear-GitCache ---
+assert containsRegex "NoGitCacheGc" gcPs1Text;
+assert containsRegex "Clear-GitCache" gcPs1Text;
+assert containsRegex "NUCLEUS_GC_NO_GIT_CACHE_GC" gcPs1Text;
 
 # --- src/modules/services.schema.json: loggingEntry defaults ---
 assert containsRegex ''"default": 10000000'' servicesSchemaText;

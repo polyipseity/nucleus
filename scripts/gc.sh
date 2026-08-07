@@ -21,7 +21,6 @@ usage() {
   usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
   --tool-cache-gc|--no-tool-cache-gc  Control bun/cargo/rustc/uv cache gc (default: --tool-cache-gc).
-  --git-template-gc|--no-git-template-gc  Control stale .git hooks/description cleanup (default: --git-template-gc).
   --git-cache-gc|--no-git-cache-gc  Control stale .git cache/state cleanup and git gc --auto (default: --git-cache-gc).
   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
   --system-gc|--no-system-gc                Control system profile generation expiration (default: --system-gc).
@@ -49,7 +48,6 @@ EOF
 REPO_ROOT="$(derive_repo_root)"
 
 tool_cache_gc=true
-git_template_gc=true
 git_cache_gc="${NUCLEUS_GC_GIT_CACHE_GC:-true}"
 hm_gc=true
 system_gc=true
@@ -80,12 +78,6 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-tool-cache-gc)
       tool_cache_gc=false
-      ;;
-    --git-template-gc)
-      git_template_gc=true
-      ;;
-    --no-git-template-gc)
-      git_template_gc=false
       ;;
     --git-cache-gc)
       git_cache_gc=true
@@ -421,34 +413,11 @@ gc_tool_caches_if_available() {
   fi
 }
 
-gc_git_templates_if_present() {
-  # Remove boilerplate files from existing .git directories under ~/dev that
-  # were created before init.templateDir was configured.  Cleans sample hook
-  # scripts and the legacy description file from every .git found.
-  #
-  # The preventative init.templateDir setting (in git.nix /
-  # Sync-GitAndSshConfig.ps1) stops new repos from getting these files, but
-  # existing repos need a one-time sweep.  After this, git-init and git-clone
-  # on all three platforms will create clean minimal .git dirs.
-  dev_root="$HOME/dev"
-  if [ ! -d "$dev_root" ]; then
-    return 0
-  fi
-
-  while IFS= read -r -d '' gitdir; do
-    # check-suppress:suppression_doc: glob may match nothing; rm -f errors are non-fatal
-    rm -f "$gitdir/hooks/"*.sample 2>/dev/null || true
-    # check-suppress:suppression_doc: description may already be absent; rm -f errors are non-fatal
-    rm -f "$gitdir/description" 2>/dev/null || true
-  done < <(find "$dev_root" -name ".git" -type d -print0 2>/dev/null)
-}
-
 gc_git_cache_if_present() {
   # Remove stale .git cache and state files from repos under ~/dev.
-  # Complements gc_git_templates_if_present() with deeper cleanup: gitk
-  # cache, gc.log, stale lock files, abandoned merge/rebase/bisect state,
-  # deprecated directories (branches/, remotes/), refs/original/, and
-  # delegated cleanup via `git gc --auto`.
+  # Deeper cleanup: gitk cache, gc.log, stale lock files, abandoned
+  # merge/rebase/bisect state, deprecated directories (branches/, remotes/),
+  # refs/original/, and delegated cleanup via `git gc --auto`.
   #
   # Active operation detection (MERGE_HEAD, rebase-merge/, BISECT_LOG, etc.)
   # is done per-repo; state file removal is skipped for repos with
@@ -710,15 +679,7 @@ if [ "$_gc_skip_user_steps" != true ] && [ "$tool_cache_gc" = true ]; then
     gc_tool_caches_if_available
   fi
 fi
-# Step 5: remove stale .git boilerplate (sample hooks, description) from ~/dev.
-if [ "$_gc_skip_user_steps" != true ] && [ "$git_template_gc" = true ]; then
-  if [ "$dry_run" = true ]; then
-    dry_run "would remove stale .git template boilerplate from ~/dev"
-  else
-    gc_git_templates_if_present
-  fi
-fi
-# Step 6: remove stale .git cache/state files and run git gc --auto in ~/dev.
+# Step 5: remove stale .git cache/state files and run git gc --auto in ~/dev.
 if [ "$_gc_skip_user_steps" != true ] && [ "$git_cache_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would remove stale .git cache/state files in ~/dev"
