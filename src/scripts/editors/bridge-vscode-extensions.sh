@@ -20,8 +20,7 @@ insiders_extensions="$HOME/.vscode-insiders/extensions"
 # to the immutable Nix store prevents that with EACCES.
 #
 # Algorithm:
-#   1. Migrate the old whole-directory Nix-store symlink (if present) to
-#      a real writable directory so VS Code can write files inside it.
+#   1. Fail if CHANNEL_EXTENSIONS is a symlink (fix manually per MANUAL.md).
 #   2. Add a per-extension symlink for every entry under source_extensions.
 #      Correct symlinks → no-op; wrong symlinks → replaced; non-symlinks
 #      (user-installed extensions) → left untouched.
@@ -34,16 +33,13 @@ insiders_extensions="$HOME/.vscode-insiders/extensions"
 setup_extension_dir() {
   _sed_dir="$1"
 
-  # Step 1: migrate old whole-directory symlink to a real writable directory.
-  # The previous approach linked the entire extensions/ dir to the Nix store,
-  # which made VS Code's extensions.json writes fail with EACCES.
   if [ -L "$_sed_dir" ]; then
-    _nucleus_unprotect_symlink "VS Code" "$_sed_dir"
-    rm "$_sed_dir"
+    echo "VS Code extensions: $_sed_dir is a symlink; remove it, recreate a directory, and re-apply" >&2
+    return 1
   fi
   mkdir -p "$_sed_dir"
 
-  # Step 2: add a per-extension symlink for each Nix-managed extension.
+  # Add a per-extension symlink for each Nix-managed extension.
   # Trailing-slash glob only matches actual directories (and symlinked dirs);
   # the -d guard handles the empty-source no-op without error.
   for _sed_src in "$source_extensions"/*/; do
