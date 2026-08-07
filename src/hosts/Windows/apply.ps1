@@ -429,7 +429,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-SourceBuild.ps1")
 . (Join-Path -Path $setupModuleDir -ChildPath "Invoke-UvSetup.ps1")
 # user/: per-user home convergence (git/SSH, shell, agents, dev repos, apps).
-. (Join-Path -Path $userModuleDir -ChildPath "Sync-CloudDrive.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-CloudDriveCatalog.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsClawHubSkillManifest.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsSkillManifest.ps1")
@@ -822,7 +822,7 @@ Sync-DirenvConfig -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoo
 Sync-StarshipConfig -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoot
 if ($EnableCloudDrivesParity) {
   foreach ($userRecord in $selectedUserRecords) {
-    Sync-CloudDrive -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
+    Sync-CloudDriveCatalog -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
   }
 }
 # Ensure all nucleus log subdirectories exist before starting services.

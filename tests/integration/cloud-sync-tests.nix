@@ -29,7 +29,7 @@ let
   replicaResetPwshText = builtins.readFile ../../scripts/replica-reset.ps1;
   applyScriptText = builtins.readFile ../../src/scripts/apply.sh;
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
-  windowsCloudDriveModuleText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-CloudDrive.ps1;
+  windowsCloudDriveModuleText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-CloudDriveCatalog.ps1;
   # Shared shell-parity profile: single source consumed by pwsh.nix (POSIX,
   # eval-time embed) and Sync-ShellProfile.ps1 (Windows, runtime read-back).
   shellProfileText = builtins.readFile ../../src/scripts/shell/profile.ps1;

@@ -47,7 +47,7 @@ Content with analogous semantics across platforms MUST be a single shared file, 
 
 Each exception requires an inline `# check-suppress:embedded-content:` comment naming the exception letter and giving the reason:
 
-1. **Data-driven/generated content** — per-entry loops and JSON-derived text (vhost blocks in `Sync-CaddyService.ps1`, rclone wrapper in `Sync-CloudDrive.ps1`, PATH snippets, `$virtiofsArgs` in `Invoke-VMSetup.ps1`, host-kind heredocs in `vm.sh`). The loop structure IS the script expression.
+1. **Data-driven/generated content** — per-entry loops and JSON-derived text (vhost blocks in `Sync-CaddyService.ps1`, rclone wrapper in `Sync-CloudDriveCatalog.ps1`, PATH snippets, `$virtiofsArgs` in `Invoke-VMSetup.ps1`, host-kind heredocs in `vm.sh`). The loop structure IS the script expression.
 2. **Trivial static content** — under 10 lines (`.cmd` wrapper in `Invoke-AgentHostShellSetup.ps1`, README fallback in `Invoke-VMSetup.ps1`, ssh block and ignore template in `Sync-GitAndSshConfig.ps1`).
 3. **C# interop** — `Add-Type` P/Invoke classes stay inline up to 25 lines (`Sync-UserPath.ps1`, `CamillaDSP-autoconfig.ps1`); beyond that extract to `modules/scripts/*.cs` and read via `Get-Content -Raw` + `Add-Type -TypeDefinition`. **Quarterly check (D5)**: re-measure the `Add-Type` blocks in `Sync-UserPath.ps1` and `CamillaDSP-autoconfig.ps1`; any block over 25 lines must be extracted to `modules/scripts/*.cs` in the same review.
 4. **Split-pattern** — static body extracted to a file, dynamic Nix/PowerShell wrapper stays inline (see `nix-authoring.instructions.md`, "Inline code extraction boundaries").
