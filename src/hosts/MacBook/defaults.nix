@@ -4,11 +4,10 @@
 # during `darwin-rebuild switch`.  They are grouped below by subsystem.
 {
   username,
-  managedUsername ? null,
   ...
 }:
 let
-  effectiveUsername = if managedUsername != null then managedUsername else username;
+  effectiveUsername = username;
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
   overlay = (import ../../modules/lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot;
