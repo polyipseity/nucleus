@@ -21,6 +21,7 @@ properties:
             Write-Output "gc: NUCLEUS_REPO_ROOT not set; run via apply.ps1"
             exit 1
           }
+          $env:NUCLEUS_GC_EXPIRY = '7d'
           $GcScript = Join-Path $RepoRoot "scripts\gc.ps1"
           $ModuleDir = Join-Path $RepoRoot "src\hosts\Windows\modules"
           & $GcScript -ModuleDir $ModuleDir -RepoRoot $RepoRoot
@@ -105,6 +106,7 @@ properties:
             Write-Output "log-gc-system: NUCLEUS_REPO_ROOT not set; run via apply.ps1"
             exit 1
           }
+          $env:NUCLEUS_GC_EXPIRY = '7d'
           $LogGcScript = Join-Path $RepoRoot "src\scripts\services\log-gc-system.ps1"
           if (-not (Test-Path -LiteralPath $LogGcScript -PathType Leaf)) {
             Write-Output "log-gc-system: src/scripts/services/log-gc-system.ps1 not found"
@@ -133,6 +135,7 @@ properties:
             Write-Output "log-gc-user: NUCLEUS_REPO_ROOT not set; run via apply.ps1"
             exit 1
           }
+          $env:NUCLEUS_GC_EXPIRY = '7d'
           $LogGcScript = Join-Path $RepoRoot "src\scripts\services\log-gc-user.ps1"
           if (-not (Test-Path -LiteralPath $LogGcScript -PathType Leaf)) {
             Write-Output "log-gc-user: src/scripts/services/log-gc-user.ps1 not found"

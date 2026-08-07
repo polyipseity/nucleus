@@ -95,7 +95,10 @@ in
     serviceConfig = {
       Type = "oneshot";
       ExecStart = "${logGcSystem}/bin/nucleus-log-gc-system";
-      Environment = "NUCLEUS_REPO_ROOT=${repoRoot}";
+      Environment = [
+        "NUCLEUS_GC_EXPIRY=${config.modules.gc.expiry}"
+        "NUCLEUS_REPO_ROOT=${repoRoot}"
+      ];
     };
   };
 

@@ -102,6 +102,8 @@ All nucleus-managed services use persistent-daemon semantics by default: auto-st
 | `dev-spotlight-exclusions` | launchd `agent`, StartCalendarInterval (daily 12:00) | — (N/A)                                                | — (N/A)                            | macOS-only; Spotlight metadata markers                                                   |
 | `icloud-exclusions`        | launchd `agent`, StartInterval=3600                  | — (N/A)                                                | — (N/A)                            | macOS-only; iCloud ignore xattr drift correction                                         |
 
+- **`gc-weekly` log overlap:** runs full `gc.sh` including log rotate/expire; daily `log-gc-user` / `log-gc-system` cover the same paths — overlap is intentional and idempotent.
+
 ### Explicit recovery settings removed
 
 Service configurations do not set explicit rate-limiting or restart-interval settings (`ThrottleInterval` on macOS, `RestartSec` on NixOS, `RestartCount`/`RestartInterval` on Windows). Platform defaults are sufficient because the internal loop pattern handles keepalive pacing — the service manager only needs crash recovery (launchd's default throttle is shorter than the explicit 30 s; systemd's default `RestartSec` is 100 ms; Windows scheduled tasks do not restart automatically — the internal loop handles keepalive).

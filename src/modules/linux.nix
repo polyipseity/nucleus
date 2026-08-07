@@ -259,7 +259,10 @@ lib.mkIf pkgs.stdenv.isLinux {
     Service = {
       Type = "oneshot";
       ExecStart = "${gcWeekly}/bin/nucleus-gc-weekly";
-      Environment = "NUCLEUS_REPO_ROOT=${repoRoot}";
+      Environment = [
+        "NUCLEUS_GC_EXPIRY=${config.modules.gc.expiry}"
+        "NUCLEUS_REPO_ROOT=${repoRoot}"
+      ];
     };
   };
 
@@ -321,7 +324,10 @@ lib.mkIf pkgs.stdenv.isLinux {
     Service = {
       Type = "oneshot";
       ExecStart = "${logGcUser}/bin/nucleus-log-gc-user";
-      Environment = "NUCLEUS_REPO_ROOT=${repoRoot}";
+      Environment = [
+        "NUCLEUS_GC_EXPIRY=${config.modules.gc.expiry}"
+        "NUCLEUS_REPO_ROOT=${repoRoot}"
+      ];
     };
   };
 

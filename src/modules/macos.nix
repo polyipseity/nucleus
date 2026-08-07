@@ -562,6 +562,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       Label = "local.gc-weekly";
       ProgramArguments = [ "${gcWeekly}/bin/nucleus-gc-weekly" ];
       EnvironmentVariables = {
+        NUCLEUS_GC_EXPIRY = config.modules.gc.expiry;
         NUCLEUS_REPO_ROOT = repoRoot;
       };
       # Do not run on every agent reload during apply/bootstrap apply; weekly
@@ -607,6 +608,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       Label = "local.log-gc-user";
       ProgramArguments = [ "${logGcUser}/bin/nucleus-log-gc-user" ];
       EnvironmentVariables = {
+        NUCLEUS_GC_EXPIRY = config.modules.gc.expiry;
         NUCLEUS_REPO_ROOT = repoRoot;
       };
       RunAtLoad = false;

@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Weekly garbage collection for Nix VM artifacts, build outputs, and caches.
+# Also runs log rotate/expire (gc.sh step 9); daily log-gc-* jobs cover the
+# same paths — overlap is intentional and idempotent.
 set -eu
 
 # shellcheck disable=SC2034 # reason: reserved for future lib sourcing

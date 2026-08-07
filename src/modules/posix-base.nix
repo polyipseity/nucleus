@@ -124,6 +124,7 @@ in
               "exec ${logGcSystem}/bin/nucleus-log-gc-system"
             ];
             EnvironmentVariables = {
+              NUCLEUS_GC_EXPIRY = config.modules.gc.expiry;
               NUCLEUS_REPO_ROOT = repoRoot;
             };
             RunAtLoad = false;

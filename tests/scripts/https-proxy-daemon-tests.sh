@@ -6,9 +6,10 @@ set -euo pipefail
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
-NUCLEUS_REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+export NUCLEUS_REPO_ROOT="$REPO_ROOT"
 
-. "$NUCLEUS_REPO_ROOT/src/scripts/lib/lib.sh"
+. "$REPO_ROOT/src/scripts/lib/lib.sh"
 
 TEST_DIR=$(mktemp -d)
 trap 'rm -rf "$TEST_DIR"' EXIT
@@ -28,7 +29,7 @@ test_caddy_state_dir_from_system_log_dir() {
 }
 
 test_daemon_creates_caddy_state_dirs() {
-  export NUCLEUS_REPO_ROOT="$NUCLEUS_REPO_ROOT"
+  export NUCLEUS_REPO_ROOT="$REPO_ROOT"
   export NUCLEUS_SYSTEM_LOG_DIR="$TEST_DIR/proxy/logs"
   unset NUCLEUS_LOG_DIR
 

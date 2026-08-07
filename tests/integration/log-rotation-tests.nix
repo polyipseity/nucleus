@@ -10,6 +10,12 @@ let
   servicesSchemaText = builtins.readFile ../../src/modules/services.schema.json;
   loggingNixText = builtins.readFile ../../src/modules/logging.nix;
   healthCheckShText = builtins.readFile ../../scripts/health-check.sh;
+  posixBaseNixText = builtins.readFile ../../src/modules/posix-base.nix;
+  macosNixText = builtins.readFile ../../src/modules/macos.nix;
+  linuxNixText = builtins.readFile ../../src/modules/linux.nix;
+  nixosActivationText = builtins.readFile ../../src/hosts/NixOS/activation.nix;
+  schedulerDscText = builtins.readFile ../../src/hosts/Windows/system/scheduler.dsc.yml;
+  gcSweepShText = builtins.readFile ../../src/scripts/services/gc-sweep.sh;
 in
 
 # --- src/scripts/lib.sh: log rotation functions ---
@@ -73,6 +79,16 @@ assert containsRegex "runtime source: services\\.json" loggingNixText;
 # --- scripts/health-check.sh: reads schema for logging defaults ---
 assert containsRegex "services\.schema\.json" healthCheckShText;
 assert containsRegex "definitions\.loggingEntry\.properties\.maxSize\.default" healthCheckShText;
+
+# --- schedulers wire modules.gc.expiry as NUCLEUS_GC_EXPIRY ---
+assert containsRegex "NUCLEUS_GC_EXPIRY = config.modules.gc.expiry" posixBaseNixText;
+assert containsRegex "NUCLEUS_GC_EXPIRY = config.modules.gc.expiry" macosNixText;
+assert containsRegex "NUCLEUS_GC_EXPIRY=\$\{config.modules.gc.expiry\}" linuxNixText;
+assert containsRegex "NUCLEUS_GC_EXPIRY=\$\{config.modules.gc.expiry\}" nixosActivationText;
+assert containsRegex "NUCLEUS_GC_EXPIRY = '7d'" schedulerDscText;
+
+# --- gc-sweep documents intentional overlap with daily log GC ---
+assert containsRegex "overlap is intentional and idempotent" gcSweepShText;
 {
   success = true;
   message = "Log rotation content assertions passed";
