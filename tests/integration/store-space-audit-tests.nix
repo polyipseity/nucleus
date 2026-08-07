@@ -8,8 +8,11 @@ let
   instructionsText = builtins.readFile ../../.agents/instructions/nix-store-space.instructions.md;
 in
 
-assert containsRegex "audit_nix_store_du" auditLibText;
-assert containsRegex "nix store du -S" auditLibText;
+assert containsRegex "audit_nix_store_closures" auditLibText;
+assert containsRegex "nix path-info --json --all --closure-size" auditLibText;
+assert containsRegex "_audit_store_run_privileged" auditLibText;
+assert containsRegex "launchctl kickstart -k system/" auditLibText;
+assert containsRegex "linux-builder ssh attempt" auditLibText;
 assert containsRegex "audit_nix_generations" auditLibText;
 assert containsRegex "audit_nix_gc_roots" auditLibText;
 assert containsRegex "nix-store --print-roots" auditLibText;
