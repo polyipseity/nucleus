@@ -1,7 +1,7 @@
 # src/modules/lib/users-registry.nix — Assemble per-user registry records from
 # src/users/<username>/ domain JSON files with src/users/default/ fallback.
 #
-# Platform-keyed fields (homeDirectory, localPath, target, enable) resolve to
+# Host-keyed fields (homeDirectory, localPath, target, enable) resolve to
 # scalars for the requested hostName. customProvisionSymlinks.targets maps are
 # left intact.
 {
@@ -10,19 +10,10 @@
   hostName,
 }:
 let
-  platform =
-    {
-      MacBook = "macos";
-      NixOS = "nixos";
-      Windows = "windows";
-    }
-    .${hostName} or (throw "users-registry.nix: unsupported hostName '${hostName}'");
-
-  platformKeys = [
-    "linux"
-    "macos"
-    "nixos"
-    "windows"
+  hostKeys = [
+    "MacBook"
+    "NixOS"
+    "Windows"
   ];
 
   usersRoot = repoRoot + "/src/users";
@@ -41,50 +32,42 @@ let
 
   mergeRecords = default: user: lib.recursiveUpdate default user;
 
-  isPlatformMap =
+  isHostMap =
     value:
     builtins.isAttrs value
     && value != { }
-    && builtins.all (name: builtins.elem name platformKeys) (builtins.attrNames value);
+    && builtins.all (name: builtins.elem name hostKeys) (builtins.attrNames value);
 
-  resolvePlatformValue =
+  resolveHostValue =
     value:
-    if isPlatformMap value then
-      if builtins.hasAttr platform value then
-        value.${platform}
-      else if builtins.hasAttr "linux" value then
-        value.linux
-      else if builtins.hasAttr "macos" value then
-        value.macos
-      else if builtins.hasAttr "nixos" value then
-        value.nixos
-      else if builtins.hasAttr "windows" value then
-        value.windows
+    if isHostMap value then
+      if builtins.hasAttr hostName value then
+        value.${hostName}
       else
-        builtins.head (lib.attrValues value)
+        builtins.throw "users-registry.nix: host map missing key '${hostName}'"
     else
       value;
 
-  resolveScalar =
-    value: if builtins.isAttrs value && isPlatformMap value then resolvePlatformValue value else value;
+  resolveHostScalar =
+    value: if builtins.isAttrs value && isHostMap value then resolveHostValue value else value;
 
   resolveCloudDriveItem =
     item:
     item
     // lib.optionalAttrs (item ? localPath) {
-      localPath = resolveScalar item.localPath;
+      localPath = resolveHostScalar item.localPath;
     }
     // lib.optionalAttrs (item ? enable) {
-      enable = resolveScalar item.enable;
+      enable = resolveHostScalar item.enable;
     }
     // lib.optionalAttrs (item ? readWrite) {
-      readWrite = resolveScalar item.readWrite;
+      readWrite = resolveHostScalar item.readWrite;
     }
     // lib.optionalAttrs (item ? fallbackTimer && builtins.isAttrs item.fallbackTimer) {
       fallbackTimer =
         item.fallbackTimer
         // lib.optionalAttrs (item.fallbackTimer ? enable) {
-          enable = resolveScalar item.fallbackTimer.enable;
+          enable = resolveHostScalar item.fallbackTimer.enable;
         };
     };
 
@@ -105,7 +88,7 @@ let
         repo:
         repo
         // lib.optionalAttrs (repo ? target) {
-          target = resolveScalar repo.target;
+          target = resolveHostScalar repo.target;
         }
       ) (devRepos.repositories or [ ]);
     };
@@ -114,7 +97,7 @@ let
     profile:
     profile
     // lib.optionalAttrs (profile ? homeDirectory) {
-      homeDirectory = resolvePlatformValue profile.homeDirectory;
+      homeDirectory = resolveHostValue profile.homeDirectory;
     };
 
   loadDomain = username: fileName: readJsonFile (usersRoot + "/${username}/${fileName}");

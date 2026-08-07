@@ -1,4 +1,4 @@
-# Per-user symlinks with platform-specific targets.
+# Per-user symlinks with per-host targets.
 args@{
   config,
   lib,
@@ -11,11 +11,11 @@ let
   currentUserHome = config.home.homeDirectory;
   userConfig = users.${currentUsername}.customProvisionSymlinks or [ ];
 
-  platformKey =
+  hostKey =
     if pkgs.stdenv.isDarwin then
-      "macos"
+      "MacBook"
     else if pkgs.stdenv.isLinux then
-      "linux"
+      "NixOS"
     else
       null;
 
@@ -34,10 +34,10 @@ let
 
   targetForEntry =
     entry:
-    if platformKey == null || !(entry ? targets) || !builtins.isAttrs entry.targets then
+    if hostKey == null || !(entry ? targets) || !builtins.isAttrs entry.targets then
       null
-    else if builtins.hasAttr platformKey entry.targets then
-      entry.targets.${platformKey}
+    else if builtins.hasAttr hostKey entry.targets then
+      entry.targets.${hostKey}
     else
       null;
 
