@@ -214,20 +214,21 @@ run_nix_gc_if_available() {
 }
 
 gc_stale_wallpapers() {
-  # Keep the decrypted wallpaper output directory in sync with declarative
-  # sources so stale files do not accumulate across apply cycles.
+  # Keep the decrypted wallpaper output directory in sync with overlay sources
+  # so stale files do not accumulate across apply cycles.
   current_user="${USER:-$(id -un)}"
-  assets_dir="$REPO_ROOT/src/assets/wallpapers/$current_user"
   output_dir="$HOME/Pictures/wallpapers"
+  script_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+  # shellcheck source=../src/scripts/lib/resolve-user-config.sh
+  . "$script_dir/../src/scripts/lib/resolve-user-config.sh"
+  export NUCLEUS_REPO_ROOT="$REPO_ROOT"
 
-  if [ ! -d "$assets_dir" ] || [ ! -d "$output_dir" ]; then
+  if [ ! -d "$output_dir" ]; then
     return 0
   fi
 
   for candidate in "$output_dir"/*; do
-    if [ ! -f "$candidate" ]; then
-      continue
-    fi
+    [ ! -f "$candidate" ] && continue
 
     candidate_name=$(basename "$candidate")
     case "$candidate_name" in
@@ -236,7 +237,7 @@ gc_stale_wallpapers() {
         ;;
     esac
 
-    if [ ! -e "$assets_dir/$candidate_name.sops" ]; then
+    if ! resolve_user_config_file "$current_user" "wallpapers" "${candidate_name}.sops" >/dev/null 2>&1; then
       if ! rm -f "$candidate" 2>/dev/null; then
         # Non-fatal: some files under ~/Pictures may be protected by Finder
         # metadata/ACL flags (for example iCloud-managed placeholders). GC

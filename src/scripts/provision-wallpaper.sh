@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Self-contained wallpaper provisioning script.
-# CLI args: is_darwin pictures_dir desktoppr_bin coreutils_bin wallpapers_dir current_user sops_symlink_path wallpaper_items_json jq_bin
+# CLI args: is_darwin pictures_dir desktoppr_bin coreutils_bin repo_root current_user sops_symlink_path wallpaper_items_json jq_bin
 set -eu
 
 
@@ -8,7 +8,7 @@ _is_darwin="$1"
 _pictures_dir="$2"
 _desktoppr_bin="$3"
 _coreutils_bin="$4"
-_wallpapers_dir="$5"
+_repo_root="$5"
 _current_user="$6"
 _sops_symlink_path="$7"
 
@@ -123,16 +123,21 @@ wallpaper_provision_copy_items() {
 }
 
 wallpaper_post_copy_teardown() {
-  # Stale gc: remove decrypted files that no longer have a matching
+  # Stale gc: remove decrypted files that no longer have a matching overlay
   # .sops source so the gallery does not show deleted assets.
+  _script_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+  # shellcheck source=../lib/resolve-user-config.sh
+  . "$_script_dir/../lib/resolve-user-config.sh"
+  export NUCLEUS_REPO_ROOT="$_repo_root"
+
   for decryptedFile in "$_pictures_dir"/*; do
     [ -e "$decryptedFile" ] || continue
     [ -f "$decryptedFile" ] || continue
     case "$decryptedFile" in *.xml) continue;; esac
     baseName="$(basename "$decryptedFile")"
-    if [ ! -e "${_wallpapers_dir}/${_current_user}/$baseName.sops" ]; then
+    if ! resolve_user_config_file "$_current_user" "wallpapers" "${baseName}.sops" >/dev/null 2>&1; then
       rm -f "$decryptedFile"
-      echo "provision-wallpaper: removed stale wallpaper $baseName (no matching .sops source)."
+      echo "provision-wallpaper: removed stale wallpaper $baseName (no matching overlay .sops source)."
     fi
   done
 

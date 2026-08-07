@@ -7,7 +7,7 @@
   order, each independently skippable:
 
     1. Remove stale decrypted wallpaper files under %USERPROFILE%\Pictures\wallpapers
-       that no longer have a matching *.sops blob in src/assets/wallpapers/.
+       that no longer have a matching overlay *.sops blob under src/users/*/wallpapers/.
     2. GC bun/cargo/rustc/uv caches and the nucleus repo-local .direnv
        environment. cargo-cache remains the authoritative gc path for the
        Cargo registry/git/advisory-db cache when present; rustc-specific temp
@@ -388,6 +388,7 @@ function Clear-GitCache {
 }
 
 # Load only the modules required by this script.
+. (Join-Path -Path $resolvedModuleDir -ChildPath "ConfigHelpers.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpaper.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-AISync.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-LogManagement.ps1")
@@ -396,9 +397,8 @@ function Clear-GitCache {
 
 # ---- Step 1: stale wallpaper gc ----------------------------------------
 if (-not $NoWallpaperGc) {
-  $wallpaperAssetsDir = Join-Path -Path $resolvedRepoRoot -ChildPath "src\assets\wallpapers"
-  $wallpaperOutputDir = Join-Path -Path $env:USERPROFILE   -ChildPath "Pictures\wallpapers"
-  Remove-StaleWallpaper -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutputDir
+  $wallpaperOutputDir = Join-Path -Path $env:USERPROFILE -ChildPath "Pictures\wallpapers"
+  Remove-StaleWallpaper -RepoRoot $resolvedRepoRoot -User $env:USERNAME -OutputDir $wallpaperOutputDir
 }
 
 # ---- Step 2: tool cache gc -------------------------------------------------

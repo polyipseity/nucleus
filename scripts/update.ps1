@@ -100,13 +100,12 @@ foreach ($secretFile in $secretFiles) {
     }
   }
 
-  $wallpaperDir = Join-Path -Path $repoRoot -ChildPath 'src\assets\wallpapers'
-  if (Test-Path -Path $wallpaperDir) {
-    Get-ChildItem -Path $wallpaperDir -Filter '*.sops' -File | ForEach-Object {
-      & sops --config $sopsConfig updatekeys --yes $_.FullName
-      if ($LASTEXITCODE -ne 0) {
-        throw "nucleus: failed to rewrap wallpaper blob '$($_.FullName)'."
-      }
+  $wallpaperList = @(Get-ChildItem -Path (Join-Path -Path $repoRoot -ChildPath 'src\users') -Recurse -Filter '*.sops' -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.FullName -match '[\\/]wallpapers[\\/]' })
+  foreach ($encryptedWallpaper in $wallpaperList) {
+    & sops --config $sopsConfig updatekeys --yes $encryptedWallpaper.FullName
+    if ($LASTEXITCODE -ne 0) {
+      throw "nucleus: failed to rewrap wallpaper blob '$($encryptedWallpaper.FullName)'."
     }
   }
 

@@ -148,16 +148,16 @@ rewrap_sops_files() {
     sops --config "$sops_config" updatekeys --yes "$encrypted_file"
   done
 
-  wallpaper_dir="$REPO_ROOT/src/assets/wallpapers"
-  # WHY: wallpapers are encrypted assets too (src/assets/wallpapers/*.sops)
+  # WHY: overlay wallpapers are encrypted too (src/users/*/wallpapers/*.sops)
   # and would otherwise rot against the updated recipient set.
-  if [ -d "$wallpaper_dir" ]; then
-    for encrypted_wallpaper in "$wallpaper_dir"/*.sops; do
-      if [ -f "$encrypted_wallpaper" ]; then
-        sops --config "$sops_config" updatekeys --yes "$encrypted_wallpaper"
-      fi
-    done
-  fi
+  _update_wallpaper_list="$(mktemp)"
+  find "$REPO_ROOT/src/users" -path '*/wallpapers/*.sops' -type f > "$_update_wallpaper_list"
+  while IFS= read -r encrypted_wallpaper; do
+    if [ -f "$encrypted_wallpaper" ]; then
+      sops --config "$sops_config" updatekeys --yes "$encrypted_wallpaper"
+    fi
+  done < "$_update_wallpaper_list"
+  rm -f "$_update_wallpaper_list"
 }
 
 if [ "$flake" = true ]; then

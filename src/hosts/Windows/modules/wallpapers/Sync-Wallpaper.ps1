@@ -6,10 +6,11 @@ function Sync-Wallpaper {
 
   .DESCRIPTION
     Materializes SOPS-encrypted wallpaper blobs for each user in the $Users
-    list. For each user, the *.sops files in $AssetsDir/$User are decrypted
-    to that user's Pictures\wallpapers directory using Get-DecryptedBlob.
-    The output filename is the blob's base name with the .sops extension
-    stripped.
+    list. For each user, merged first-level overlay entries under
+    src/users/<user>/wallpapers/ (with src/users/default/wallpapers/ fallback)
+    are decrypted to that user's Pictures\wallpapers directory using
+    Get-DecryptedBlob. The output filename is the blob's base name with the
+    .sops extension stripped.
 
     For each user, the home directory is resolved via the registry and the
     wallpaper directory is set to $userHome\Pictures\wallpapers\. The
@@ -20,12 +21,7 @@ function Sync-Wallpaper {
     Invoke-WingetConfiguration as the __NUCLEUS_ACTIVE_WALLPAPER__ token.
 
     No-op (returns $null with a warning) when:
-      - $AssetsDir does not exist, or
-      - No user subdirectories matching $Users exist in $AssetsDir.
-
-  .PARAMETER AssetsDir
-    Absolute path to the directory containing user subdirectories with
-    SOPS-encrypted wallpaper blobs.
+      - No overlay wallpaper blobs exist for any user in $Users.
 
   .PARAMETER GpgExe
     Absolute path to the gpg executable.
@@ -37,9 +33,11 @@ function Sync-Wallpaper {
     Path to the primary user's managed SSH private key used as the final
     fallback age decryption identity.
 
+  .PARAMETER RepoRoot
+    Absolute path to the nucleus repository root.
+
   .PARAMETER Users
     Array of usernames for which wallpapers should be materialized.
-    Only user subdirectories matching names in this list are processed.
 
   .PARAMETER SopsExe
     Absolute path to the sops executable.
@@ -50,7 +48,7 @@ function Sync-Wallpaper {
 
   .EXAMPLE
     Sync-Wallpaper `
-        -AssetsDir 'C:\Users\admin\nucleus\src\assets\wallpapers' `
+        -RepoRoot 'C:\Users\admin\nucleus' `
         -GpgExe 'gpg.exe' `
         -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
         -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" `
@@ -61,7 +59,7 @@ function Sync-Wallpaper {
   [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '')]
   param(
     [Parameter(Mandatory = $true)]
-    [string]$AssetsDir,
+    [string]$RepoRoot,
 
     [Parameter(Mandatory = $true)]
     [string]$GpgExe,
@@ -78,25 +76,19 @@ function Sync-Wallpaper {
     [Parameter(Mandatory = $true)]
     [string]$SopsExe
   )
-  if (-not (Test-Path -Path $AssetsDir)) {
-    Write-Output "$($PSStyle.Foreground.Yellow)Wallpaper assets directory not found at $AssetsDir; skipping wallpaper sync.$($PSStyle.Reset)"
-    return $null
-  }
-
-  $userDirs = @(Get-ChildItem -Path $AssetsDir -Directory | Where-Object { $Users -contains $_.Name } | Sort-Object Name)
-  if ($userDirs.Count -eq 0) {
-    Write-Output "$($PSStyle.Foreground.Yellow)No user subdirectories matching specified users found in $AssetsDir; skipping wallpaper sync.$($PSStyle.Reset)"
-    return $null
-  }
 
   $activeWallpaperPath = $null
 
-  foreach ($userDir in $userDirs) {
-    $user = $userDir.Name
-    $wallpaperFiles = @(Get-ChildItem -Path $userDir.FullName -Filter "*.sops" | Sort-Object Name)
+  foreach ($user in ($Users | Sort-Object)) {
+    $overlayEntries = @(Get-UserConfigFirstLevelEntries -User $user -ConfigName 'wallpapers' -RepoRoot $RepoRoot)
+    $wallpaperFiles = @(
+      $overlayEntries |
+        Where-Object { $_.EndsWith('.sops', [System.StringComparison]::OrdinalIgnoreCase) } |
+        Sort-Object
+    )
 
     if ($wallpaperFiles.Count -eq 0) {
-      Write-Output "$($PSStyle.Foreground.Yellow)No wallpaper blobs (*.sops) found in $userDir.FullName; skipping.$($PSStyle.Reset)"
+      Write-Output "$($PSStyle.Foreground.Yellow)No wallpaper blobs (*.sops) found in overlay for user $user; skipping.$($PSStyle.Reset)"
       continue
     }
 
@@ -107,8 +99,9 @@ function Sync-Wallpaper {
       New-Item -ItemType Directory -Path $outputDir -Force > $null
     }
 
-    foreach ($wallpaperFile in $wallpaperFiles) {
-      $outputName = [System.IO.Path]::GetFileNameWithoutExtension($wallpaperFile.Name)
+    foreach ($wallpaperBlobName in $wallpaperFiles) {
+      $wallpaperFilePath = Resolve-UserConfigFirstLevelEntry -User $user -ConfigName 'wallpapers' -EntryName $wallpaperBlobName -RepoRoot $RepoRoot
+      $outputName = [System.IO.Path]::GetFileNameWithoutExtension($wallpaperBlobName)
       $outputPath = Join-Path -Path $outputDir -ChildPath $outputName
 
       if (Test-Path -LiteralPath $outputPath) {
@@ -119,7 +112,7 @@ function Sync-Wallpaper {
       }
 
       Write-Output "$($PSStyle.Foreground.Cyan)Materializing wallpaper for $user`: $outputName$($PSStyle.Reset)"
-      Get-DecryptedBlob -FilePath $wallpaperFile.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -OutputPath $outputPath -SopsExe $SopsExe
+      Get-DecryptedBlob -FilePath $wallpaperFilePath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -OutputPath $outputPath -SopsExe $SopsExe
 
       if (Test-Path -LiteralPath $outputPath) {
         $decryptedWallpaper = Get-Item -LiteralPath $outputPath -Force
@@ -130,6 +123,11 @@ function Sync-Wallpaper {
         $activeWallpaperPath = $outputPath
       }
     }
+  }
+
+  if (-not $activeWallpaperPath) {
+    Write-Output "$($PSStyle.Foreground.Yellow)No overlay wallpaper blobs found for specified users; skipping wallpaper sync.$($PSStyle.Reset)"
+    return $null
   }
 
   Write-Output "$($PSStyle.Foreground.Green)Wallpaper sync complete.$($PSStyle.Reset)"

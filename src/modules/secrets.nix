@@ -287,7 +287,7 @@ lib.mkIf isPrimaryUser {
   #   - src/secrets/gpg-personal.yml
   #   - src/secrets/ssh-personal.yml
   #   - src/secrets/users/<username>.yml (when present)
-  #   - src/assets/wallpapers/*.sops  (enumerated dynamically via builtins.readDir)
+  #   - src/users/<username>/wallpapers/*.sops  (overlay merge with default)
   # All use the same .sops.yaml key groups (age_devices + primary_gpg).
   #
   # Five checks (in order):
@@ -334,11 +334,37 @@ lib.mkIf isPrimaryUser {
   # --------------------------------------------------------------------------
   home.activation.verify-secret-decryption =
     let
-      wallpaperDir = ../assets/wallpapers;
-      # Enumerate every *.sops blob in the wallpapers directory at eval time
-      # so new wallpapers are automatically included in the health check.
-      wallpaperSopsNames = lib.filter (n: lib.hasSuffix ".sops" n) (
-        builtins.attrNames (builtins.readDir wallpaperDir)
+      overlayLib = import ./lib/users-overlay.nix;
+      usersRoot = ../../. + "/src/users";
+      managedUserNames =
+        lib.filter (name: name != "default") (
+          builtins.attrNames (
+            lib.filterAttrs (_: type: type == "directory") (builtins.readDir usersRoot)
+          )
+        );
+      listWallpaperBlobsForUser =
+        userName:
+        let
+          entries = overlayLib.listUserConfigFirstLevelEntries {
+            configName = "wallpapers";
+            effectiveUsername = userName;
+            repoRoot = ../../.;
+          };
+        in
+        lib.filter (name: lib.hasSuffix ".sops" name) entries;
+      wallpaperSopsFiles = lib.flatten (
+        map (
+          userName:
+          map (blobName: {
+            path = overlayLib.selectUserConfigFirstLevelEntry {
+              configName = "wallpapers";
+              entryName = blobName;
+              effectiveUsername = userName;
+              repoRoot = ../../.;
+            };
+            displayName = "${userName}/${blobName}";
+          }) (listWallpaperBlobsForUser userName)
+        ) managedUserNames
       );
       # Build list of SOPS files with their paths and display names.
       # WHY: regular paths instead of builtins.path: Avoid creating derivation
@@ -355,10 +381,7 @@ lib.mkIf isPrimaryUser {
           displayName = "ssh-personal.yml";
         }
       ]
-      ++ map (n: {
-        path = wallpaperDir + "/${n}";
-        displayName = n;
-      }) wallpaperSopsNames
+      ++ wallpaperSopsFiles
       ++ lib.optional hasUserSecretFile {
         path = userSecretFilePath;
         displayName = "${primaryUsername}.yml";

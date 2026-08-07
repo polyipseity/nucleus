@@ -10,7 +10,7 @@ keys:
   primary_gpg: &primary_gpg F45098829935F40E47717018FBA5C89B3E700B7339A67CD0E1AD1361C25E7CFD
 
 creation_rules:
-  - path_regex: src[/\\]assets[/\\]wallpapers[/\\].*\.(gif|jpeg|jpg|png|sops|webp)$
+  - path_regex: src[/\\]users[/\\].*[/\\]wallpapers[/\\].*\.(gif|jpeg|jpg|png|sops|webp)$
     key_groups:
       - age: *age_devices
         pgp:

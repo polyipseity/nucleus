@@ -60,9 +60,9 @@ function Register-HostAgeKey {
     Absolute path to the directory containing the SOPS secret YAML files
     (src/secrets).
 
-  .PARAMETER WallpaperAssetsDir
-    Absolute path to the directory containing wallpaper SOPS blobs
-    (src/assets/wallpapers).
+  .PARAMETER RepoRoot
+    Absolute path to the nucleus repository root (overlay wallpapers enumerated
+    from src/users/<user>/wallpapers/).
 
   .EXAMPLE
     Register-HostAgeKey `
@@ -70,7 +70,7 @@ function Register-HostAgeKey {
       -SopsExe 'C:\...\sops.exe' `
       -SopsYamlPath 'C:\...\nucleus\.sops.yaml' `
       -SecretsDir 'C:\...\nucleus\src\secrets' `
-      -WallpaperAssetsDir 'C:\...\nucleus\src\assets\wallpapers'
+      -RepoRoot 'C:\...\nucleus'
 
   .NOTES
     Environment variables: (none)
@@ -91,7 +91,7 @@ function Register-HostAgeKey {
     [string]$SecretsDir,
 
     [Parameter(Mandatory = $true)]
-    [string]$WallpaperAssetsDir
+    [string]$RepoRoot
   )
 
   if (-not (Test-Path -Path $MachineSshHostKeyPubPath)) {
@@ -158,12 +158,13 @@ function Register-HostAgeKey {
       $sopsFiles += $userSecretFiles
     }
   }
-  # Dynamically include wallpaper blobs so new wallpapers are automatically rewrapped.
-  if (Test-Path -Path $WallpaperAssetsDir) {
-    $wallpaperBlobs = Get-ChildItem -Path $WallpaperAssetsDir -Filter "*.sops" -File |
-      Select-Object -ExpandProperty FullName
-    if ($null -ne $wallpaperBlobs) {
-      $sopsFiles += $wallpaperBlobs
+  # Dynamically include overlay wallpaper blobs so new wallpapers are automatically rewrapped.
+  $usersRoot = Join-Path -Path $RepoRoot -ChildPath 'src\users'
+  if (Test-Path -Path $usersRoot) {
+    $wallpaperBlobs = @(Get-ChildItem -Path $usersRoot -Recurse -Filter '*.sops' -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName -match '[\\/]wallpapers[\\/]' })
+    if ($wallpaperBlobs.Count -gt 0) {
+      $sopsFiles += @($wallpaperBlobs | Select-Object -ExpandProperty FullName)
     }
   }
 
@@ -181,6 +182,6 @@ function Register-HostAgeKey {
 
   Write-Output "$($PSStyle.Foreground.FromName('Green'))sops: machine age key registered and SOPS files rewrapped.$($PSStyle.Reset)"
   Write-Output "$($PSStyle.Formatting.Warning)sops: Commit the changes before deploying to other machines:$($PSStyle.Reset)"
-  Write-Output "$($PSStyle.Formatting.Warning)sops:   git add .sops.yaml src/secrets src/assets/wallpapers$($PSStyle.Reset)"
+  Write-Output "$($PSStyle.Formatting.Warning)sops:   git add .sops.yaml src/secrets src/users$($PSStyle.Reset)"
   Write-Output "$($PSStyle.Formatting.Warning)sops:   git commit -m `"chore: register $(hostname) machine age key`"$($PSStyle.Reset)"
 }

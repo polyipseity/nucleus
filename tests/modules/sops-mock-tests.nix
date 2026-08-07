@@ -33,7 +33,7 @@ let
         key_groups = [ { age = "age_devices"; } ];
       }
       {
-        path_regex = "src/assets/wallpapers/.*";
+        path_regex = "src/users/.*/wallpapers/.*";
         key_groups = [ { age = "age_devices"; } ];
       }
     ];
@@ -102,10 +102,10 @@ let
     let
       rules = mockSopsConfig.creation_rules;
       hasWallpapersPath = any (
-        rule: builtins.match ".*src/assets/wallpapers.*" rule.path_regex != null
+        rule: builtins.match ".*src/users/.*/wallpapers.*" rule.path_regex != null
       ) rules;
     in
-    assert' hasWallpapersPath "Creation rules must cover src/assets/wallpapers/ directory";
+    assert' hasWallpapersPath "Creation rules must cover src/users/*/wallpapers/ overlay paths";
 
   # === TEST: Mock secret file structure ===
   test_mock_secret_structure =
@@ -240,7 +240,7 @@ builtins.seq (builtins.deepSeq allTests null) {
     "6: Creation rules have correct structure"
     "7: src/secrets/ directory is covered"
     "8: Per-user src/secrets/users/*.yml files are covered"
-    "9: src/assets/wallpapers/ directory is covered"
+    "9: src/users/*/wallpapers/ overlay paths are covered"
     "10: Mock secret file has sops metadata and payload"
     "11: Secret payload contains expected fields"
     "12: Age key count is sufficient (≥1)"

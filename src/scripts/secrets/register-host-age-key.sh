@@ -104,9 +104,9 @@ done
 # parse time).  Read from a temp-file list rather than a pipe so that a
 # `sops updatekeys` failure exits the outer script via set -eu; exit 1
 # inside a pipe subshell would be silently swallowed.
-if [ -d "$_rak_repo_root/src/assets/wallpapers" ]; then
+if [ -d "$_rak_repo_root/src/users" ]; then
   _rak_wallpaper_list="$(mktemp)"
-  find "$_rak_repo_root/src/assets/wallpapers" -name "*.sops" -type f \
+  find "$_rak_repo_root/src/users" -path '*/wallpapers/*.sops' -type f \
     > "$_rak_wallpaper_list"
   while IFS= read -r _rak_wallpaper; do
     if ! sops updatekeys --yes "$_rak_wallpaper"; then
@@ -125,5 +125,5 @@ fi
 
 printf 'sops: machine age key registered and SOPS files rewrapped.\n'
 printf 'sops: Commit the changes before deploying to other machines:\n'
-printf 'sops:   git add .sops.yaml src/secrets src/assets/wallpapers\n'
+printf 'sops:   git add .sops.yaml src/secrets src/users\n'
 printf 'sops:   git commit -m "chore: register <hostname> machine age key"\n'

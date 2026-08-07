@@ -528,7 +528,6 @@ $prekExe = if ($prekCandidates.Count -gt 0) {
 # both Register-HostAgeKey and the pre-flight loop reference the same
 # resolved paths without duplicate definitions later in the script.
 $secretsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\secrets"
-$wallpaperAssetsDir = Join-Path -Path $PSScriptRoot -ChildPath "..\..\assets\wallpapers"
 $machineSshHostKeyPubPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key.pub"
 $repoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\")).Path
 
@@ -619,7 +618,7 @@ if ($EnableHostAgeKeyRegistration) {
     -SopsExe $sopsExe `
     -SopsYamlPath $sopsYamlPath `
     -SecretsDir $secretsDir `
-    -WallpaperAssetsDir $wallpaperAssetsDir
+    -RepoRoot $repoRoot
 }
 
 # Materialize user-scoped secrets once before DSC resources run.
@@ -682,10 +681,10 @@ Invoke-SecretVerification `
   -HostKeyPath $machineSshHostKeyPath `
   -PrimaryUsername $PrimaryUsername `
   -SecretsDir $secretsDir `
-  -WallpaperAssetsDir $wallpaperAssetsDir
+  -RepoRoot $repoRoot
 
-$activeWallpaperPath = Sync-Wallpaper -AssetsDir $wallpaperAssetsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
-Remove-StaleWallpaper -AssetsDir $wallpaperAssetsDir -OutputDir $wallpaperOutputDir
+$activeWallpaperPath = Sync-Wallpaper -RepoRoot $repoRoot -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
+Remove-StaleWallpaper -RepoRoot $repoRoot -User $PrimaryUsername -OutputDir $wallpaperOutputDir
 
 # Generate locked DSC from lockfile before applying.
 $lockfilePath = Join-Path -Path $PSScriptRoot -ChildPath "..\..\lockfiles\lockfile.json"
@@ -858,7 +857,7 @@ if ($EnableHostAgeKeyRegistration) {
     -SopsExe $sopsExe `
     -SopsYamlPath $sopsYamlPath `
     -SecretsDir $secretsDir `
-    -WallpaperAssetsDir $wallpaperAssetsDir
+    -RepoRoot $repoRoot
 }
 Sync-WindowsRDP -Enabled:$EnableRdpParity
 Sync-PowerPolicy -Enabled:$EnablePowerParity

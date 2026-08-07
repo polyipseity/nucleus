@@ -67,9 +67,9 @@ function Invoke-SecretVerification {
     Absolute path to the directory containing the SOPS secret YAML files
     (src/secrets).
 
-  .PARAMETER WallpaperAssetsDir
-    Absolute path to the directory containing wallpaper SOPS blobs
-    (src/assets/wallpapers).
+  .PARAMETER RepoRoot
+    Absolute path to the nucleus repository root (overlay wallpapers enumerated
+    from src/users/<user>/wallpapers/).
 
   .EXAMPLE
     Invoke-SecretVerification `
@@ -77,7 +77,7 @@ function Invoke-SecretVerification {
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
       -PrimaryUsername 'admin' `
       -SecretsDir '.\src\secrets' `
-      -WallpaperAssetsDir '.\src\assets\wallpapers'
+      -RepoRoot '.\'
 
   .NOTES
     Environment variables: (none)
@@ -98,7 +98,7 @@ function Invoke-SecretVerification {
     [string]$SecretsDir,
 
     [Parameter(Mandatory = $true)]
-    [string]$WallpaperAssetsDir
+    [string]$RepoRoot
   )
 
   if (-not (Test-PrimaryUser -PrimaryUsername $PrimaryUsername -Quiet)) {
@@ -127,11 +127,12 @@ function Invoke-SecretVerification {
       $sopsTestFiles += $userSecretFiles
     }
   }
-  if (Test-Path -Path $WallpaperAssetsDir) {
-    $wallpaperSopsFiles = Get-ChildItem -Path $WallpaperAssetsDir -Filter "*.sops" -File -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- wallpaper dir may have no .sops files; null check below handles absence
-    if ($null -ne $wallpaperSopsFiles) {
-      $wallpaperSopsFiles = $wallpaperSopsFiles | Select-Object -ExpandProperty FullName
-      $sopsTestFiles += $wallpaperSopsFiles
+  $usersRoot = Join-Path -Path $RepoRoot -ChildPath 'src\users'
+  if (Test-Path -Path $usersRoot) {
+    $wallpaperSopsFiles = @(Get-ChildItem -Path $usersRoot -Recurse -Filter '*.sops' -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName -match '[\\/]wallpapers[\\/]' })
+    if ($wallpaperSopsFiles.Count -gt 0) {
+      $sopsTestFiles += @($wallpaperSopsFiles | Select-Object -ExpandProperty FullName)
     }
   }
 

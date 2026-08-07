@@ -1,40 +1,48 @@
-# Decrypts SOPS-encrypted wallpaper blobs from assets/wallpapers/<user>/
-# into ~/Pictures/wallpapers/ with a 10-minute rotating slideshow
-# on macOS (desktoppr folder mode) and GNOME (wallpaper-gallery.xml).
+# Decrypts SOPS-encrypted wallpaper blobs from src/users/<user>/wallpapers/
+# (first-level overlay merge with src/users/default/wallpapers/) into
+# ~/Pictures/wallpapers/ with a 10-minute rotating slideshow on macOS
+# (desktoppr folder mode) and GNOME (wallpaper-gallery.xml).
 # Activation runs after gpg-import so the keyring import has already
 # happened before wallpaper decryption attempts.
-# Multi-user aware: discovers user subdirectories dynamically, uses
+# Multi-user aware: discovers managed users from users-registry, uses
 # config.home.username for current-user wallpaper provisioning.
 {
   config,
   lib,
   pkgs,
+  users ? { },
   ...
 }:
 let
-  wallpapersDir = ../assets/wallpapers;
+  repoRoot = ../../.;
+  overlayLib = import ./lib/users-overlay.nix;
 
-  # Get all user subdirectories (each is a username).
-  userDirs = lib.attrNames (
-    lib.filterAttrs (_: type: type == "directory") (builtins.readDir wallpapersDir)
-  );
+  managedUserNames = builtins.attrNames users;
 
   # Convert a wallpaper filename into a stable secret key suffix so sops-nix
   # keys remain path-safe while still being traceable to the source file.
   sanitizeSecretSuffix =
     value: lib.replaceStrings [ " " "(" ")" "." "-" ] [ "_" "" "" "_" "_" ] value;
 
-  # For each user, collect their wallpaper blobs from their subdirectory.
-  wallpaperBlobsForUser =
+  listWallpaperBlobsForUser =
     userName:
-    lib.attrNames (
-      lib.filterAttrs (name: type: type == "regular" && lib.hasSuffix ".sops" name) (
-        builtins.readDir (wallpapersDir + "/${userName}")
-      )
-    );
+    let
+      entries = overlayLib.listUserConfigFirstLevelEntries {
+        configName = "wallpapers";
+        effectiveUsername = userName;
+        repoRoot = repoRoot;
+      };
+    in
+    lib.filter (name: lib.hasSuffix ".sops" name) entries;
 
-  currentUsername = config.home.username;
-  currentUserHome = config.home.homeDirectory;
+  wallpaperBlobPath =
+    userName: blobName:
+    overlayLib.selectUserConfigFirstLevelEntry {
+      configName = "wallpapers";
+      entryName = blobName;
+      effectiveUsername = userName;
+      repoRoot = repoRoot;
+    };
 
   # Build normalized wallpaper item metadata for a user once so secret
   # generation and activation wiring share the same source of truth.
@@ -49,7 +57,10 @@ let
         inherit blobName wallpaperName;
         secretName = "wallpaper_${sanitizeSecretSuffix wallpaperName}_${userName}";
       }
-    ) (wallpaperBlobsForUser userName);
+    ) (listWallpaperBlobsForUser userName);
+
+  usersWithWallpapers =
+    lib.filter (userName: (listWallpaperBlobsForUser userName) != [ ]) managedUserNames;
 
   # Generate wallpaper secrets for a given user.
   mkWallpaperSecretsForUser =
@@ -64,17 +75,20 @@ let
           format = "binary";
           mode = "0400";
           sopsFile = builtins.path {
-            path = wallpapersDir + "/${userName}/${item.blobName}";
+            path = wallpaperBlobPath userName item.blobName;
             name = "wallpaper-${sanitizeSecretSuffix item.blobName}";
           };
         };
       }) items
     );
 
-  # Generate wallpaper secrets for ALL user directories.
-  wallpaperSecrets = lib.foldl' lib.recursiveUpdate { } (map mkWallpaperSecretsForUser userDirs);
+  # Generate wallpaper secrets for all managed users with overlay wallpapers.
+  wallpaperSecrets = lib.foldl' lib.recursiveUpdate { } (map mkWallpaperSecretsForUser usersWithWallpapers);
 
-  # Items list for the activation script - use current user's secrets.
+  currentUsername = config.home.username;
+  currentUserHome = config.home.homeDirectory;
+
+  # Items list for the activation script - use current user's merged overlay.
   wallpaperItemsForCurrentUser = mkWallpaperItemsForUser currentUsername;
 
   # desktoppr is darwin-only; keep this reference lazy so Linux evaluation
@@ -86,12 +100,8 @@ in
 {
   assertions = [
     {
-      assertion = builtins.pathExists wallpapersDir;
-      message = "wallpapers: required wallpapers directory is missing.";
-    }
-    {
-      assertion = builtins.elem currentUsername userDirs;
-      message = "wallpapers: current user has no managed wallpaper directory.";
+      assertion = (listWallpaperBlobsForUser currentUsername) != [ ];
+      message = "wallpapers: current user has no managed wallpaper blobs in the user overlay.";
     }
   ];
 
@@ -103,7 +113,7 @@ in
       "${currentUserHome}/Pictures/wallpapers" \
       "${desktopprBinPath}" \
       "${pkgs.coreutils}" \
-      "${wallpapersDir}" \
+      "${repoRoot}" \
       "${currentUsername}" \
       "${config.sops.defaultSymlinkPath}" \
       '${
