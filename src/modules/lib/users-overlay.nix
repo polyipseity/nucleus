@@ -62,9 +62,12 @@ rec {
     }:
     let
       prefix = repoRoot + "/";
+      hasRepoPrefix =
+        absolutePath:
+        builtins.substring 0 (builtins.stringLength prefix) absolutePath == prefix;
       toRepoRelPath =
         absolutePath:
-        if builtins.hasPrefix prefix absolutePath then
+        if hasRepoPrefix absolutePath then
           builtins.substring (builtins.stringLength prefix) (
             builtins.stringLength absolutePath - builtins.stringLength prefix
           ) absolutePath
