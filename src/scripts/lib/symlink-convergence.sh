@@ -37,7 +37,7 @@ _nucleus_remove_stale_symlinks() {
 }
 
 # _nucleus_converge_symlinks SOURCE_DIR TARGET_DIR LABEL FIND_TYPE \
-#   CONFLICT_TEST CONFLICT_MSG_SUFFIX [SKIP_NAMES] [CONFLICT_MODE]
+#   CONFLICT_TEST CONFLICT_MSG_SUFFIX [SKIP_NAMES]
 #
 # Creates or updates symlinks in TARGET_DIR for each entry in SOURCE_DIR.
 # FIND_TYPE is a find(1) type qualifier (e.g. "-type d") or "" for all entry
@@ -45,8 +45,6 @@ _nucleus_remove_stale_symlinks() {
 # the target path when it exists as a non-symlink.  On conflict the message
 # "LABEL: LINK_PATH CONFLICT_MSG_SUFFIX" is printed before exit(1).
 # SKIP_NAMES is a space-separated list of basenames to skip.
-# CONFLICT_MODE is "fail" (default, exit with error) or "backup" (move
-# conflicting path to NAME.backup.TIMESTAMP and replace with symlink).
 _nucleus_converge_symlinks() {
   _ncs_source="$1"
   _ncs_target="$2"
@@ -55,7 +53,6 @@ _nucleus_converge_symlinks() {
   _ncs_conflict_test="$5"
   _ncs_conflict_msg_suffix="$6"
   _ncs_skips="${7:-}"
-  _ncs_conflict_mode="${8:-fail}"
   # shellcheck disable=SC2086 # reason: $_ncs_find_type is a space-separated find type flag list, word splitting intentional
   find "$_ncs_source" -mindepth 1 -maxdepth 1 $_ncs_find_type | while IFS= read -r _ncs_entry; do
     _ncs_name="$(basename "$_ncs_entry")"
@@ -73,17 +70,8 @@ _nucleus_converge_symlinks() {
       _nucleus_protect_symlink "$_ncs_label" "$_ncs_link"
       echo "$_ncs_label: updated $_ncs_target/$_ncs_name -> $_ncs_entry"
     elif test "$_ncs_conflict_test" "$_ncs_link"; then
-      if [ "$_ncs_conflict_mode" = "backup" ]; then
-        _ncs_backup="${_ncs_link}.backup.$(date +%Y%m%d%H%M%S)"
-        mv "$_ncs_link" "$_ncs_backup"
-        echo "$_ncs_label: backed up $_ncs_link -> $_ncs_backup"
-        ln -s "$_ncs_entry" "$_ncs_link"
-        _nucleus_protect_symlink "$_ncs_label" "$_ncs_link"
-        echo "$_ncs_label: linked $_ncs_target/$_ncs_name -> $_ncs_entry"
-      else
-        echo "$_ncs_label: $_ncs_link $_ncs_conflict_msg_suffix" >&2
-        exit 1
-      fi
+      echo "$_ncs_label: $_ncs_link $_ncs_conflict_msg_suffix" >&2
+      exit 1
     else
       ln -s "$_ncs_entry" "$_ncs_link"
       _nucleus_protect_symlink "$_ncs_label" "$_ncs_link"
@@ -93,7 +81,7 @@ _nucleus_converge_symlinks() {
 }
 
 # _nucleus_converge_overlay_entry SOURCE_PATH TARGET_LINK LABEL CONFLICT_TEST \
-#   CONFLICT_MSG_SUFFIX [CONFLICT_MODE]
+#   CONFLICT_MSG_SUFFIX
 #
 # Symlinks one overlay-resolved first-level config entry (file or directory)
 # into TARGET_LINK. Requires resolve-user-config.sh at the call site when using
@@ -104,7 +92,6 @@ _nucleus_converge_overlay_entry() {
   _coe_label="$3"
   _coe_conflict_test="$4"
   _coe_conflict_msg_suffix="$5"
-  _coe_conflict_mode="${6:-fail}"
   if [ -L "$_coe_link" ]; then
     if [ "$(readlink "$_coe_link")" = "$_coe_source" ]; then
       return 0
@@ -115,17 +102,8 @@ _nucleus_converge_overlay_entry() {
     _nucleus_protect_symlink "$_coe_label" "$_coe_link"
     echo "$_coe_label: updated $_coe_link -> $_coe_source"
   elif test "$_coe_conflict_test" "$_coe_link"; then
-    if [ "$_coe_conflict_mode" = "backup" ]; then
-      _coe_backup="${_coe_link}.backup.$(date +%Y%m%d%H%M%S)"
-      mv "$_coe_link" "$_coe_backup"
-      echo "$_coe_label: backed up $_coe_link -> $_coe_backup"
-      ln -s "$_coe_source" "$_coe_link"
-      _nucleus_protect_symlink "$_coe_label" "$_coe_link"
-      echo "$_coe_label: linked $_coe_link -> $_coe_source"
-    else
-      echo "$_coe_label: $_coe_link $_coe_conflict_msg_suffix" >&2
-      exit 1
-    fi
+    echo "$_coe_label: $_coe_link $_coe_conflict_msg_suffix" >&2
+    exit 1
   else
     ln -s "$_coe_source" "$_coe_link"
     _nucleus_protect_symlink "$_coe_label" "$_coe_link"
@@ -183,6 +161,7 @@ _nucleus_remove_stale_merged_symlinks() {
       [ "$_rsm_cname" = "$_rsm_skip" ] && continue 2
     done
     _rsm_ctarget="$(readlink "$_rsm_candidate")"
+    # check-suppress:suppression_doc: registry lookup may fail for unmanaged child names; empty expected skips stale cleanup.
     _rsm_expected="$(resolve_user_config_first_level_entry "$_rsm_username" "$_rsm_config_name" "$_rsm_cname" 2>/dev/null || true)"
     if [ -n "$_rsm_expected" ] && [ "$_rsm_ctarget" = "$_rsm_expected" ]; then
       if [ ! -e "$_rsm_ctarget" ] && [ ! -L "$_rsm_ctarget" ]; then
