@@ -18,6 +18,12 @@ Some fields accept either a plain string or a host map. Host maps use keys `MacB
 
 `custom-provision-symlinks.json` keeps its `targets` map intact in the registry; POSIX and Windows activation code resolves the right host entry when creating symlinks.
 
+### Jellyfin union at sync time
+
+`jellyfin.json` follows the same per-user deep merge as other registry domains: each real user's effective payload is `default/jellyfin.json` merged with `src/users/<username>/jellyfin.json` (arrays replace wholesale). The default file is empty (`accounts: []`, `libraries: []`) but still participates in that merge.
+
+Jellyfin sync on the host is different: activation scripts union every user's merged `accounts` and `libraries` into one shared Jellyfin instance (dedup by account id and library name at sync time). See `src/scripts/services/jellyfin-sync.sh` and the Windows `Sync-Jellyfin*` modules.
+
 ## Homedir app trees (directories)
 
 Folders such as `agents/`, `cursor/`, `git/`, and `wallpapers/` use a different rule: only first-level names participate in overlay. If `users/<user>/cursor/hooks.json` exists, it replaces `default/cursor/hooks.json` as a whole. You cannot override a single file inside `default/cursor/` without replacing the entire first-level entry (for example the whole `hooks/` directory).

@@ -22,7 +22,7 @@ Structured nucleus data (`profile.json`, `cloud-drives.json`, …) assembled by 
 
 `cloud-drives.json` includes `replicaGc` (per-provider GC rules for replica sync) alongside `mounts` and `replicas`.
 
-Registry domains deep-merge `default/` with `src/users/<username>/` (user wins on conflicts; arrays replace wholesale). Fields that differ by host use maps keyed by `MacBook`, `NixOS`, and `Windows`; loaders resolve them to scalars for the current host.
+Registry domains deep-merge `default/` with `src/users/<username>/` (user wins on conflicts; arrays replace wholesale). Fields that differ by host use maps keyed by `MacBook`, `NixOS`, and `Windows`; loaders resolve them to scalars for the current host. Jellyfin sync unions merged accounts and libraries across all users on the host — see `src/users/README.md` (Jellyfin union at sync time).
 
 ## First-level overlay merge rule
 
