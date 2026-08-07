@@ -459,7 +459,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeConfig.ps1")
 # wallpapers/: wallpaper materialization and stale-file cleanup.
 . (Join-Path -Path $wallpapersModuleDir -ChildPath "Remove-StaleWallpaper.ps1")
-. (Join-Path -Path $wallpapersModuleDir -ChildPath "Sync-Wallpaper.ps1")
+. (Join-Path -Path $wallpapersModuleDir -ChildPath "Sync-WallpaperInventory.ps1")
 $healthCheckScript = Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\scripts\health-check.ps1"
 if (Test-Path -Path $healthCheckScript) {
   & $healthCheckScript -MinFreeGB $MinFreeDiskGB -NoSecretHealth
@@ -683,7 +683,7 @@ Invoke-SecretVerification `
   -SecretsDir $secretsDir `
   -RepoRoot $repoRoot
 
-$activeWallpaperPath = Sync-Wallpaper -RepoRoot $repoRoot -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
+$activeWallpaperPath = Sync-WallpaperInventory -RepoRoot $repoRoot -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
 Remove-StaleWallpaper -RepoRoot $repoRoot -User $PrimaryUsername -OutputDir $wallpaperOutputDir
 
 # Generate locked DSC from lockfile before applying.

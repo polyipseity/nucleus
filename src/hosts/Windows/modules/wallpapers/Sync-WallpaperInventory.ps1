@@ -1,4 +1,4 @@
-function Sync-Wallpaper {
+function Sync-WallpaperInventory {
   <#
   .SYNOPSIS
     Materializes overlay wallpapers for each managed user and returns the path
@@ -37,7 +37,7 @@ function Sync-Wallpaper {
               when no wallpapers were found.
 
   .EXAMPLE
-    Sync-Wallpaper `
+    Sync-WallpaperInventory `
         -RepoRoot 'C:\Users\admin\nucleus' `
         -GpgExe 'gpg.exe' `
         -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
@@ -123,7 +123,7 @@ function Sync-Wallpaper {
         -RepoRoot $RepoRoot `
         -TargetPath $outputPath
       if (Test-Path -LiteralPath $outputPath) {
-        Set-ManagedSymlinkDeleteProtection -Context 'Sync-Wallpaper' -Path $outputPath
+        Set-ManagedSymlinkDeleteProtection -Context 'Sync-WallpaperInventory' -Path $outputPath
         if (-not $activeWallpaperPath) {
           $activeWallpaperPath = $outputPath
         }
