@@ -18,7 +18,12 @@
 }:
 let
   effectiveUsername =
-    if managedUsername != null then managedUsername else if username != null then username else config.home.username;
+    if managedUsername != null then
+      managedUsername
+    else if username != null then
+      username
+    else
+      config.home.username;
 
   # Pinned iTerm2 zsh shell integration script placed at
   # ~/.iterm2_shell_integration.zsh via home.file.  The script enables command
@@ -33,12 +38,11 @@ let
   # Root of the nucleus repository, set by apply.sh at activation time.
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
-  userOverlay = import ./lib/users-overlay.nix;
-
-  iterm2DynamicProfilesDir = "${userOverlay.selectUserConfigDir {
-    configName = "iterm2";
+  overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot;
-  }}/DynamicProfiles";
+  };
+
+  iterm2DynamicProfilesDir = "${overlay.selectDir "iterm2"}/DynamicProfiles";
 in
 lib.mkIf pkgs.stdenv.isDarwin {
   home.file = {

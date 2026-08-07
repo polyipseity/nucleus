@@ -45,12 +45,11 @@ let
 
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
-  userOverlay = import ./lib/users-overlay.nix;
+  overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
+    inherit effectiveUsername repoRoot;
+  };
 
-  selectUserAppConfigFile = configName: relativePath:
-    userOverlay.selectUserConfigFile {
-      inherit configName effectiveUsername repoRoot relativePath;
-    };
+  selectUserAppConfigFile = configName: relativePath: overlay.selectFile configName relativePath;
 
   # check-suppress:config-method: method 3 (merge) -- qtpass.nix returns declarative merged settings applied via platform-native stores (macOS defaults, Linux INI); imported module, not a deployed file
   qtpassModule = import ./configs/qtpass/qtpass.nix {
@@ -60,8 +59,9 @@ let
       pkgs
       passwordStoreDir
       ;
-    qtPassDefaultSettings =
-      builtins.fromJSON (builtins.readFile (selectUserAppConfigFile "qtpass" "qtpass.json"));
+    qtPassDefaultSettings = builtins.fromJSON (
+      builtins.readFile (selectUserAppConfigFile "qtpass" "qtpass.json")
+    );
   };
 
   # Obsidian reads its global app settings directly from obsidian.json, but the
@@ -77,8 +77,9 @@ let
   # WHY: checkSlowStartup is not configured: checkSlowStartup is localStorage-backed
   # and vault-specific. It cannot be declaratively managed via obsidian.json.
   # check-suppress:config-method: method 3 (merge) -- see the activation entry below for full rationale.
-  obsidianManagedSettings =
-    builtins.fromJSON (builtins.readFile (selectUserAppConfigFile "obsidian" "obsidian.json"));
+  obsidianManagedSettings = builtins.fromJSON (
+    builtins.readFile (selectUserAppConfigFile "obsidian" "obsidian.json")
+  );
   obsidianManagedSettingsJson = builtins.toJSON obsidianManagedSettings;
 
   # Out-of-store symlink paths protected across activation cycles.

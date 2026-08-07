@@ -14,12 +14,19 @@
   lib,
   pkgs,
   username,
+  managedUsername ? null,
   nucleusApps,
   users ? null,
   hostName,
   ...
 }:
 let
+  effectiveUsername = if managedUsername != null then managedUsername else config.home.username;
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+  overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
+    inherit effectiveUsername repoRoot hostName;
+  };
+
   # Dedicated alias/env fragments keep list-like attrsets isolated so sort order
   # can be audited without scanning unrelated shell options.
   shellAliases = import ./shell/aliases.nix { };
@@ -177,7 +184,7 @@ in
   # Source: https://bun.sh/docs/runtime/bunfig#install
   home.file.".bunfig.toml" = {
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/bun/bunfig.toml";
+    source = config.lib.file.mkOutOfStoreSymlink (overlay.selectFile "bun" "bunfig.toml");
   };
 
   # Global Cargo configuration: per-platform linker selection.
@@ -189,13 +196,13 @@ in
   #   Windows → rust-lld bundled with Rust    (zero-install, lld-link)
   home.file.".cargo/config.toml" = {
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/cargo/config.toml";
+    source = config.lib.file.mkOutOfStoreSymlink (overlay.selectFile "cargo" "config.toml");
   };
 
   # Global nextest configuration: test runner UI settings.
   home.file.".config/nextest/config.toml" = {
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/nextest/config.toml";
+    source = config.lib.file.mkOutOfStoreSymlink (overlay.selectFile "nextest" "config.toml");
   };
 
   # ---------------------------------------------------------------------------
@@ -222,13 +229,15 @@ in
   # at the start of use_flake, so referencing it from the override is safe.
   home.file.".config/direnv/direnvrc" = {
     # check-suppress:config-method: method 1 (writable symlink) -- cross-platform base config.
-    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/direnv/direnvrc";
+    source = config.lib.file.mkOutOfStoreSymlink (overlay.selectFile "direnv" "direnvrc");
   };
 
   # Host-specific apple-sdk _nix() override, auto-sourced by direnv before direnvrc.
   home.file.".config/direnv/lib/apple-sdk-override.sh" = {
     # check-suppress:config-method: method 1 (writable symlink) -- POSIX-only; Windows deploys only the base config.
-    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/direnv/lib/apple-sdk-override.sh";
+    source = config.lib.file.mkOutOfStoreSymlink (
+      overlay.selectFile "direnv" "lib/apple-sdk-override.sh"
+    );
   };
 
   # Global uv configuration: exact pinning and supply-chain hardening.
@@ -237,7 +246,7 @@ in
   # Source: https://docs.astral.sh/uv/reference/settings/#exclude-newer
   home.file."${config.xdg.configHome}/uv/uv.toml" = {
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/uv/uv.toml";
+    source = config.lib.file.mkOutOfStoreSymlink (overlay.selectFile "uv" "uv.toml");
   };
 
   # ---------------------------------------------------------------------------

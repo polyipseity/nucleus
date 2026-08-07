@@ -8,17 +8,20 @@
 }:
 let
   effectiveUsername =
-    if managedUsername != null then managedUsername else if username != null then username else config.home.username;
+    if managedUsername != null then
+      managedUsername
+    else if username != null then
+      username
+    else
+      config.home.username;
 
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
-  userOverlay = import ./lib/users-overlay.nix;
-
-  starshipConfigFile = userOverlay.selectUserConfigFile {
-    configName = "starship";
-    relativePath = "starship.toml";
+  overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot;
   };
+
+  starshipConfigFile = overlay.selectFile "starship" "starship.toml";
 in
 {
   home.packages = [ pkgs.starship ];

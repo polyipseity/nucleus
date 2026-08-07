@@ -19,13 +19,11 @@ let
 
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
-  userOverlay = import ./lib/users-overlay.nix;
-
-  discordMusicRpcConfigFile = userOverlay.selectUserConfigFile {
-    configName = "discord-music-rpc";
-    relativePath = "config.yaml";
+  overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot;
   };
+
+  discordMusicRpcConfigFile = overlay.selectFile "discord-music-rpc" "config.yaml";
 
   # Per-user service enable flag from src/users/ services.json (default: enabled).
   services = args.users.${config.home.username}.services or { };

@@ -1,5 +1,5 @@
 # Declarative ~/.agents directory layout with per-entry symlinks into
-# src/modules/configs/agents/ (skills/ managed by skills).
+# src/users/<username>/agents/ (skills/ managed by install-agent-skills).
 # The repo root is baked at build time from $NUCLEUS_REPO_ROOT for out-of-store
 # symlink sources and lib runtime-sourcing paths.
 {
@@ -15,11 +15,13 @@ let
   # one used for mkOutOfStoreSymlink — if NUCLEUS_REPO_ROOT is unset,
   # both symlink targets and lib sourcing will fail identically.
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
-
-  # Keep path fragments centralized so activation entries reference one source
-  # of truth for the repo-hosted agents configuration tree.
-  agentsConfigRelativePath = "src/modules/configs/agents";
-  clawhubManifestRelativePath = "${agentsConfigRelativePath}/clawhub-skills.json";
+  effectiveUsername = config.home.username;
+  overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
+    inherit effectiveUsername repoRoot;
+  };
+  clawhubManifestRelativePath = overlay.toRepoRelPath (
+    overlay.selectFile "agents" "clawhub-skills.json"
+  );
 
   managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };
 
@@ -51,19 +53,19 @@ in
     # -------------------------------------------------------------------------
     # symlink-agent-config
     # Creates ~/.agents/ as a real directory and populates it with per-entry
-    # symlinks for every top-level entry in src/modules/configs/agents/ except
+    # symlinks for every top-level entry in the resolved agents overlay dir except
     # skills/ (which is managed by install-agent-skills so fetched ClawHub downloads
     # land in a real, untracked directory rather than inside the repo tree).
     # -------------------------------------------------------------------------
     symlink-agent-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      "${activationBundle}/src/scripts/agents/symlink-agent-config.sh" "${repoRoot}" "${agentsConfigRelativePath}"
+      "${activationBundle}/src/scripts/agents/symlink-agent-config.sh" "${repoRoot}" "${effectiveUsername}"
     '';
 
     # -------------------------------------------------------------------------
     # install-agent-skills
     # Creates ~/.agents/skills/ as a real (writable) directory, then creates a
     # per-skill symlink inside it for every skill subdirectory committed to
-    # src/modules/configs/agents/skills/ (bundled / AGPL-compatible skills).
+    # the resolved agents overlay skills/ tree (bundled / AGPL-compatible skills).
     #
     # Fetched skills (non-AGPL / ClawHub-managed) are downloaded directly into
     # ~/.agents/skills/<name>/ by the post-apply sync step in apply.sh; they
@@ -73,14 +75,14 @@ in
     #   1. Bundled per-skill symlinks can coexist with fetched real dirs.
     #   2. ClawHub can write into ~/.agents/skills/ without the writes landing
     #      inside the tracked repo tree (which would happen with a whole-dir
-    #      symlink back to src/modules/configs/agents/skills/).
+    #      symlink back to the resolved agents overlay skills/ tree).
     #
     # Conflict safety: if a committed skill name collides with an existing real
     # directory in ~/.agents/skills/ (e.g. a fetched download), the activation
     # fails fast rather than silently overwriting the downloaded content.
     # -------------------------------------------------------------------------
     install-agent-skills = lib.hm.dag.entryAfter [ "symlink-agent-config" ] ''
-      "${activationBundle}/src/scripts/agents/install-agent-skills.sh" "${repoRoot}"
+      "${activationBundle}/src/scripts/agents/install-agent-skills.sh" "${repoRoot}" "${effectiveUsername}"
     '';
 
     # -------------------------------------------------------------------------
@@ -182,7 +184,7 @@ in
     # sync-clawhub-skills
     # Converges fetched skills (non-AGPL-compatible, downloaded at apply time
     # via ClawHub) with the declarative manifest in
-    # src/modules/configs/agents/clawhub-skills.json.
+    # declarative manifest in the resolved agents clawhub-skills.json overlay file.
     #
     # Why after install-bun-packages: requires the ClawHub CLI, which is
     # installed by install-bun-packages.  Ordering ensures ClawHub is present

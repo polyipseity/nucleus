@@ -218,12 +218,11 @@ let
     else
       { };
 
-  userOverlay = import ./lib/users-overlay.nix;
-
-  vscodeConfigDir = userOverlay.selectUserConfigDir {
-    configName = "vscode";
+  overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot;
   };
+
+  vscodeConfigDir = overlay.selectDir "vscode";
 
   # Utility: resolve app-scoped per-user settings overrides consistently.
   # This keeps the common `defaults // user.settings` pattern centralized.

@@ -20,12 +20,11 @@ let
 
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
-  userOverlay = import ./lib/users-overlay.nix;
-
-  cursorConfigDir = userOverlay.selectUserConfigDir {
-    configName = "cursor";
+  overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot;
   };
+
+  cursorConfigDir = overlay.selectDir "cursor";
 
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in

@@ -4,10 +4,17 @@
   lib,
   pkgs,
   username,
+  managedUsername ? null,
   hostName,
   ...
 }:
 let
+  effectiveUsername = if managedUsername != null then managedUsername else config.home.username;
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+  overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
+    inherit effectiveUsername repoRoot;
+  };
+
   managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };
   envVars = import ./lib/env-catalog.nix {
     inherit
@@ -76,7 +83,9 @@ in
   # scripts/PSScriptAnalyzerSettings.test.psd1 (Method 3).
   home.file.".config/powershell/PSScriptAnalyzerSettings.psd1" = {
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-    source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/pwsh/PSScriptAnalyzerSettings.psd1";
+    source = config.lib.file.mkOutOfStoreSymlink (
+      overlay.selectFile "pwsh" "PSScriptAnalyzerSettings.psd1"
+    );
   };
 
   # Install PSScriptAnalyzer for PowerShell linting if pwsh is available.

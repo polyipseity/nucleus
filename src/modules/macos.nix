@@ -18,14 +18,12 @@ let
   # locate the repo root.
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
-  userOverlay = import ./lib/users-overlay.nix;
-
-  linearmouseConfigFile = userOverlay.selectUserConfigFile {
-    configName = "linearmouse";
-    relativePath = "linearmouse.json";
+  overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
     effectiveUsername = config.home.username;
     inherit repoRoot;
   };
+
+  linearmouseConfigFile = overlay.selectFile "linearmouse" "linearmouse.json";
 
   liveICloudDownloads = "${config.home.homeDirectory}/Library/Mobile Documents/com~apple~CloudDocs/Downloads";
 
