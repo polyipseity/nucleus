@@ -1,5 +1,9 @@
 # Per-host log root paths from services.json $logging.
-{ lib, pkgs, hostName ? null, ... }:
+{
+  pkgs,
+  hostName ? null,
+  ...
+}:
 let
   servicesJSON = builtins.fromJSON (builtins.readFile ../services.json);
   hostKey =
