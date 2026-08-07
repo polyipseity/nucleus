@@ -3,7 +3,6 @@
 # All settings are applied by nix-darwin via the `defaults write` mechanism
 # during `darwin-rebuild switch`.  They are grouped below by subsystem.
 {
-  config,
   username,
   managedUsername ? null,
   ...
