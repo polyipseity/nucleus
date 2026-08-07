@@ -341,12 +341,9 @@ lib.mkIf isPrimaryUser {
         overlayLib = overlayLib;
       };
       usersRoot = ../../. + "/src/users";
-      managedUserNames =
-        lib.filter (name: name != "default") (
-          builtins.attrNames (
-            lib.filterAttrs (_: type: type == "directory") (builtins.readDir usersRoot)
-          )
-        );
+      managedUserNames = lib.filter (name: name != "default") (
+        builtins.attrNames (lib.filterAttrs (_: type: type == "directory") (builtins.readDir usersRoot))
+      );
       wallpaperSopsFiles = lib.flatten (
         map (
           userName:

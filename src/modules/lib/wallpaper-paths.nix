@@ -12,16 +12,10 @@ let
     ".png"
     ".webp"
   ];
-  isWallpaperImage =
-    name:
-    lib.any (ext: lib.hasSuffix ext name) wallpaperImageExtensions;
+  isWallpaperImage = name: lib.any (ext: lib.hasSuffix ext name) wallpaperImageExtensions;
   isEncryptedBlob = name: lib.hasSuffix ".sops" name;
   listDirNames =
-    dir:
-    if builtins.pathExists dir then
-      builtins.attrNames (builtins.readDir dir)
-    else
-      [ ];
+    dir: if builtins.pathExists dir then builtins.attrNames (builtins.readDir dir) else [ ];
   overlayArgs = {
     configName = "wallpapers";
     inherit repoRoot;

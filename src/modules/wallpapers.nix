@@ -43,8 +43,9 @@ let
       }
     ) (wallpaperPaths.listEncryptedWallpaperBlobs userName);
 
-  usersWithWallpapers =
-    lib.filter (userName: (wallpaperPaths.listEncryptedWallpaperBlobs userName) != [ ]) managedUserNames;
+  usersWithWallpapers = lib.filter (
+    userName: (wallpaperPaths.listEncryptedWallpaperBlobs userName) != [ ]
+  ) managedUserNames;
 
   # Generate wallpaper secrets for a given user.
   mkWallpaperSecretsForUser =
@@ -67,7 +68,9 @@ let
     );
 
   # Generate wallpaper secrets for all managed users with overlay wallpapers.
-  wallpaperSecrets = lib.foldl' lib.recursiveUpdate { } (map mkWallpaperSecretsForUser usersWithWallpapers);
+  wallpaperSecrets = lib.foldl' lib.recursiveUpdate { } (
+    map mkWallpaperSecretsForUser usersWithWallpapers
+  );
 
   currentUsername = config.home.username;
   currentUserHome = config.home.homeDirectory;

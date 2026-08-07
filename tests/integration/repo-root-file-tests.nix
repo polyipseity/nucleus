@@ -14,17 +14,11 @@ let
     && containsRegex "builtins\.getEnv \"NUCLEUS_REPO_ROOT\"" repoRootFileModuleText
   ) "repo-root-file.nix must materialize /etc/nucleus/repo-root from NUCLEUS_REPO_ROOT";
 
-  test_macbook_imports_repo_root_file = assert' (
-    containsRegex "\.\./\.\./modules/repo-root-file\.nix" macbookDefaultText
-  ) "MacBook must import repo-root-file.nix";
+  test_macbook_imports_repo_root_file = assert' (containsRegex "\.\./\.\./modules/repo-root-file\.nix" macbookDefaultText) "MacBook must import repo-root-file.nix";
 
-  test_nixos_imports_repo_root_file = assert' (
-    containsRegex "\.\./\.\./modules/repo-root-file\.nix" nixosDefaultText
-  ) "NixOS must import repo-root-file.nix";
+  test_nixos_imports_repo_root_file = assert' (containsRegex "\.\./\.\./modules/repo-root-file\.nix" nixosDefaultText) "NixOS must import repo-root-file.nix";
 
-  test_sudo_preserves_nucleus_repo_root = assert' (
-    containsRegex "env_keep.*NUCLEUS_REPO_ROOT" posixSecurityText
-  ) "posix-security.nix must preserve NUCLEUS_REPO_ROOT through sudo";
+  test_sudo_preserves_nucleus_repo_root = assert' (containsRegex "env_keep.*NUCLEUS_REPO_ROOT" posixSecurityText) "posix-security.nix must preserve NUCLEUS_REPO_ROOT through sudo";
 
   test_derive_repo_root_reads_system_file = assert' (
     containsRegex "/etc/nucleus/repo-root" libShText

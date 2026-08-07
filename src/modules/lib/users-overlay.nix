@@ -22,10 +22,12 @@ let
   uniqueStrings =
     strings:
     builtins.attrNames (
-      builtins.listToAttrs (map (name: {
-        inherit name;
-        value = true;
-      }) strings)
+      builtins.listToAttrs (
+        map (name: {
+          inherit name;
+          value = true;
+        }) strings
+      )
     );
 
   dropStrings =
@@ -74,12 +76,7 @@ rec {
     let
       perUserDir = "${repoRoot}/src/users/${effectiveUsername}/${configName}";
       defaultDir = "${repoRoot}/src/users/default/${configName}";
-      readNames =
-        dir:
-        if builtins.pathExists dir then
-          builtins.attrNames (builtins.readDir dir)
-        else
-          [ ];
+      readNames = dir: if builtins.pathExists dir then builtins.attrNames (builtins.readDir dir) else [ ];
     in
     uniqueStrings ((readNames perUserDir) ++ (readNames defaultDir));
 
@@ -122,8 +119,7 @@ rec {
     let
       prefix = repoRoot + "/";
       hasRepoPrefix =
-        absolutePath:
-        builtins.substring 0 (builtins.stringLength prefix) absolutePath == prefix;
+        absolutePath: builtins.substring 0 (builtins.stringLength prefix) absolutePath == prefix;
       toRepoRelPath =
         absolutePath:
         if hasRepoPrefix absolutePath then
