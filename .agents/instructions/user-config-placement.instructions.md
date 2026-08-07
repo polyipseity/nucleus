@@ -8,19 +8,33 @@ applyTo: "src/modules/configs/**, src/users/**, src/modules/**/*.nix, src/hosts/
 
 ### Machine-wide singleton — `src/modules/configs/`
 
-One configuration location for the entire host. Adding a second managed nucleus user does not require a second repo file. Examples: system gitconfig, camilladsp, camillagui-backend, replica-gc.json, ssh/sshd, VM templates.
+One configuration location for the entire host. Adding a second managed nucleus user does not require a second repo file. Examples: system gitconfig, camilladsp, camillagui-backend, ssh/sshd, VM templates.
 
 ### Per-user homedir — `src/users/default/` + `src/users/<username>/`
 
-One config instance per OS user via homedir symlink. `default/` is the fallback template; `<username>/` wins when present. Symlink-per-user deployment always belongs here, even when all users currently share identical content via `default/`.
+One config instance per OS user via homedir deployment (usually writable symlink; wallpapers use read-only copy — see below). `default/` is the fallback template; per-user entries override at the first level only (see overlay merge rule).
+
+Examples: `agents/`, `cursor/`, `direnv/`, `plasma/desktop/`, `autocorrect/wordlist.txt`, `wallpapers/*.sops`.
 
 ### Registry domains — `src/users/default/*.json`
 
-Structured nucleus data (`profile.json`, `cloud-drives.json`, …) assembled by `users-registry.nix`. Same per-user-over-default merge semantics as app trees, but loaded via the registry loaders — not third-party app files.
+Structured nucleus data (`profile.json`, `cloud-drives.json`, …) assembled by `users-registry.nix`. Schema files are co-located as `src/users/default/<domain>.schema.json`; per-user domain JSON uses `"$schema": "../default/<domain>.schema.json"`.
+
+`cloud-drives.json` includes `replicaGc` (per-provider GC rules for replica sync) alongside `mounts` and `replicas`.
 
 ### Dual-scope apps
 
 Split explicitly when an app supports both machine-wide and per-user scopes. Git is canonical: system scope in `src/modules/configs/git/`, user scope in `src/users/default/git/`.
+
+## First-level overlay merge rule
+
+Within an app config folder (e.g. `plasma/`, `cursor/`, `wallpapers/`), **only first-level files and directories** participate in overlay. Deeper paths never merge independently.
+
+- `selectFile "plasma" "desktop/nucleus-manual.desktop"` — first-level key is `desktop/`; if `users/<user>/plasma/desktop/` exists, the entire directory wins; otherwise use `default/plasma/desktop/`.
+- `selectFile "direnv" "lib/apple-sdk-override.sh"` — first-level key is `lib/`; user `direnv/lib/` overrides the whole default `lib/` tree.
+- `wallpapers/foo.png.sops` — each `.sops` blob is a first-level file; user file with the same name overrides default; union otherwise.
+
+Directory-wide iteration uses `listFirstLevelEntries` / `list_user_config_first_level_entries` and resolves each entry with `selectFirstLevelEntry` / `resolve_user_config_first_level_entry`.
 
 ## Overlay coverage rule
 
@@ -29,11 +43,16 @@ Every app tree under `src/users/` MUST be consumed only through overlay selector
 | Mechanism | POSIX | Windows | Shell scripts |
 |-----------|-------|---------|---------------|
 | Host-specific file | `mkUserOverlay` → `selectSource` | `Resolve-UserConfigSource` | N/A |
-| Single file | `mkUserOverlay` → `selectFile` | `Resolve-UserConfigFile` / `Deploy-UserWritableSymlink` | `resolve-user-config.sh` |
-| Directory tree | `mkUserOverlay` → `selectDir` | `Resolve-UserConfigDir` | `resolve_user_config_dir` |
+| File path (any depth) | `mkUserOverlay` → `selectFile` | `Resolve-UserConfigFile` / `Deploy-UserWritableSymlink` | `resolve_user_config_file` |
+| First-level entry | `mkUserOverlay` → `selectFirstLevelEntry` | `Resolve-UserConfigFirstLevelEntry` | `resolve_user_config_first_level_entry` |
+| First-level name list | `mkUserOverlay` → `listFirstLevelEntries` | `Get-UserConfigFirstLevelEntries` | `list_user_config_first_level_entries` |
 | Registry JSON | `users-registry.nix` | `Load-UserRegistry.ps1` | `load-user-registry.sh` |
 
 Allowed hardcoded `src/users/default/` references: inside the selector implementations themselves, registry loaders, and tests that assert default baseline content.
+
+## Wallpapers
+
+Per-user homedir assets under `src/users/default/wallpapers/` + `src/users/<username>/wallpapers/`. Blobs are optionally SOPS-encrypted (`.sops` extension). Deployment is **Method 2** (read-only copy to `~/Pictures/wallpapers/`) — desktop APIs require materialized files, not repo symlinks.
 
 ## Anti-patterns
 
@@ -41,6 +60,7 @@ Allowed hardcoded `src/users/default/` references: inside the selector implement
 - Hardcoded `src/users/default/...` in deployment modules or activation scripts.
 - Duplicate file in both `configs/` and `users/`.
 - Mixing machine and user scope in one directory tree.
+- Second-level overlay overrides (e.g. overriding a single file inside `default/plasma/desktop/` without replacing the whole `desktop/` first-level entry).
 
 ## Related instructions
 
