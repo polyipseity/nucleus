@@ -108,6 +108,8 @@ let
     && lib.hasInfix "scripts-bundle.nix" flakeText
     && lib.hasInfix "ln -s \${thisScriptsBundle}/scripts" flakeText
     && lib.hasInfix "ln -s \${thisScriptTree}/src" flakeText
+    && lib.hasInfix "&& pwd)/\${scriptName}.sh" flakeText
+    && !lib.hasInfix "pwd -P)/\${scriptName}.sh" flakeText
   ) "writeNucleusShellApplication must default bundleDefault to false and symlink shared bundles";
 
   test_script_tree_and_scripts_bundle_skip_build_time_shellcheck = assert' (
@@ -115,6 +117,7 @@ let
     && !lib.hasInfix "shellcheck" scriptsBundleText
     && lib.hasInfix "nucleus-scripts-bundle" scriptsBundleText
     && lib.hasInfix "nucleus-script-tree" scriptTreeText
+    && lib.hasInfix "ln -s \${scriptTree}/src" scriptsBundleText
   ) "shared script bundles must not shellcheck at derivation build time";
 
   test_posix_shell_exposes_managed_commands = assert' (

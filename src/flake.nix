@@ -358,7 +358,9 @@
           inherit (pkgs) lib;
           repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
           thisScriptTree = pkgs.callPackage ./modules/lib/script-tree.nix { };
-          thisScriptsBundle = pkgs.callPackage ./modules/lib/scripts-bundle.nix { };
+          thisScriptsBundle = pkgs.callPackage ./modules/lib/scripts-bundle.nix {
+            scriptTree = thisScriptTree;
+          };
           singleScriptSource =
             if lib.hasPrefix "src/scripts/" scriptName then
               "${thisScriptTree}/${scriptName}.sh"
@@ -427,7 +429,9 @@
                       *) _self="$(CDPATH="" cd -- "$(dirname -- "$_self")" && pwd -P)/$_target" ;;
                     esac
                   done
-                  _script="$(CDPATH="" cd -- "$(dirname -- "$_self")/.." && pwd -P)/${scriptName}.sh"
+                  # Use logical pwd (not -P) so $0 stays under $out/scripts and
+                  # SCRIPT_DIR/../src resolves to the sibling script-tree symlink.
+                  _script="$(CDPATH="" cd -- "$(dirname -- "$_self")/.." && pwd)/${scriptName}.sh"
                   exec "$_script" "$@"
                   WRAPPER
                   chmod +x "$out/bin/nucleus-${name}"
@@ -491,7 +495,7 @@
                 *) _self="$(CDPATH="" cd -- "$(dirname -- "$_self")" && pwd -P)/$_target" ;;
               esac
             done
-            _script_dir="$(CDPATH="" cd -- "$(dirname -- "$_self")/../scripts" && pwd -P)"
+            _script_dir="$(CDPATH="" cd -- "$(dirname -- "$_self")/../scripts" && pwd)"
             # Use -File (not -Command): -File binds positional parameters directly,
             # which works with check-pwsh.ps1's [Parameter(Position=0)] $Paths.
             # -Command would require array-literal construction and shell quoting.
