@@ -96,7 +96,7 @@ All nucleus-managed services use persistent-daemon semantics by default: auto-st
 
 | Service                    | macOS                                                | NixOS                                                  | Windows                            | Rationale                                                                                |
 | -------------------------- | ---------------------------------------------------- | ------------------------------------------------------ | ---------------------------------- | ---------------------------------------------------------------------------------------- |
-| `gc-weekly`                | launchd `agent`, StartCalendarInterval (Sun 12:00)   | systemd `timer`, user (Sun 12:00, `Persistent=true`)   | scheduled task (Weekly, Sun 12:00) | Weekly 7-day sleep loop in a daemon is wasteful; periodic oneshot is the natural pattern |
+| `gc-weekly`                | launchd `daemon`, StartCalendarInterval (Sun 12:00)  | systemd `timer`, system (Sun 12:00, `Persistent=true`) | scheduled task (Weekly, Sun 12:00) | Runs full `gc.sh` as root; user homedir steps via `sudo -u` |
 | `nix-index-update`         | launchd `agent`, StartCalendarInterval (daily 12:00) | systemd `timer`, user (daily 12:00, `Persistent=true`) | — (N/A)                            | Daily rebuild with freshness guard; not applicable on Windows (no nix ecosystem)         |
 | `dev-ds-store-gc`          | launchd `agent`, StartCalendarInterval (daily 12:00) | — (N/A)                                                | — (N/A)                            | macOS-only; Finder `.DS_Store` cleanup                                                   |
 | `dev-spotlight-exclusions` | launchd `agent`, StartCalendarInterval (daily 12:00) | — (N/A)                                                | — (N/A)                            | macOS-only; Spotlight metadata markers                                                   |
@@ -223,7 +223,7 @@ Timing values are specified directly at their point of use. Find or change a ret
 
 | Category                     | Source files                                                                                                                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Nix store GC, HM expiry      | `src/modules/posix-base.nix`, `scripts/gc.sh`                                                                                                                                                                                               |
+| Nix store GC, HM expiry      | `src/modules/posix-base.nix`, `src/scripts/services/nix-store-gc.sh`, `scripts/gc.sh`, `src/modules/lib/gc-options.nix` |
 | macOS timers & defaults      | `src/modules/macos.nix`, `src/hosts/MacBook/defaults.nix`                                                                                                                                                                                   |
 | Linux timers & timeouts      | `src/modules/linux.nix`, `src/modules/posix-security.nix`                                                                                                                                                                                   |
 | Windows schedules & timeouts | `src/hosts/Windows/system.dsc.yml`, `src/hosts/Windows/system-packages.dsc.yml`, `src/hosts/Windows/user.dsc.yml`, `src/hosts/Windows/user-env.dsc.yml`, `src/hosts/Windows/user-context.dsc.yml`, `src/hosts/Windows/modules/system/*.ps1` |
@@ -232,7 +232,7 @@ Timing values are specified directly at their point of use. Find or change a ret
 | Declarative-diff GC items    | `scripts/gc.sh`, `scripts/gc.ps1`                                                                                                                                                                                                           |
 | App-level timeouts           | `src/modules/editors.nix`, `src/users/default/picard/Picard.ini`                                                                                                                                                                          |
 
-Runtime overrides via `--expiry`/`NUCLEUS_GC_EXPIRY` etc. have precedence: CLI flag > per-tool env var > master flag/env > Nix config default > `7d`. When changing a timing value, update the actual configuration in the source file listed above. No separate timing manifest needs updating.
+Runtime overrides via `--expiry`/`NUCLEUS_GC_EXPIRY` and `--generations-keep`/`NUCLEUS_GC_GENERATIONS_KEEP` etc. have precedence: CLI flag > per-tool env var > master flag/env > Nix config default > `7d` / `7`. When changing a timing value, update the actual configuration in the source file listed above. No separate timing manifest needs updating.
 
 ## Provisioned symlink policy
 

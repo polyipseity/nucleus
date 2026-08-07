@@ -21,7 +21,11 @@ Managed in [`posix-base.nix`](../../src/modules/posix-base.nix) (NixOS `nix.sett
 
 **Not the same as** [`health-check.sh`](../../scripts/health-check.sh) `--min-free-bytes` (default 10 GB system-wide disk warning).
 
-Age-based store GC is canonical: `nix-collect-garbage --delete-older-than` via [`posix-base.nix`](../../src/modules/posix-base.nix), [`gc.sh`](../../scripts/gc.sh), and `home-manager expire-generations`. Never use `nix-collect-garbage -d`.
+Age-based store GC is canonical: `nix-collect-garbage --delete-older-than` via [`posix-base.nix`](../../src/modules/posix-base.nix), [`nix-store-gc.sh`](../../src/scripts/services/nix-store-gc.sh), and [`gc.sh`](../../scripts/gc.sh). Never use `nix-collect-garbage -d`.
+
+**Generation retention (intersection):** system and Home Manager profile generations are pruned with the same helper ([`expire-profile-generations.sh`](../../src/scripts/lib/expire-profile-generations.sh)): keep only generations that are **both** among the newest `generationsKeep` (default **7**) **and** newer than `expiry` (default **7d**). Configured in [`gc-options.nix`](../../src/modules/lib/gc-options.nix); overridden via `NUCLEUS_GC_GENERATIONS_KEEP` / `NUCLEUS_GC_EXPIRY` and matching `nucleus-gc` flags.
+
+**Scheduling:** daily `nixStoreGc` (system daemon / NixOS timer) runs `nix-store-gc.sh`; weekly `gc-weekly` runs full `gc.sh` as **root** with user homedir steps via `sudo -u $NUCLEUS_USERNAME`. There is no user-scope `gc-weekly` on macOS or NixOS.
 
 MacBook `/nix` lives on a dedicated APFS volume (Determinate installer). `min-free` / `max-free` apply to that volume's free space.
 
@@ -110,10 +114,14 @@ Manual entry points: `nix run .#audit-store`, `nucleus-audit-store`, [`scripts/a
 Report sections:
 
 - `nix path-info --json-format 1 --json --all --closure-size` top closures (via jq)
+- Grouped closure totals by store path prefix (darwin-system, home-manager-generation, …)
 - System generation count (`nix-env --list-generations` / privileged `darwin-rebuild --list-generations`)
-- GC roots (`nix-store --gc --print-roots`)
+- Generation reclaim hint (intersection of `generationsKeep` + `expiry`; points to `nucleus-gc`)
+- GC roots bucketed by category (`direnv`, `home-manager`, `nix-profile`, `flake-registry`, `other`)
 - Stale `result` symlinks (repo scan)
 - Linux-builder VM store size (MacBook only; starts VM via launchd when needed)
+
+**Operational note:** duplicate nucleus checkouts (e.g. iCloud + `~/dev/...`) each pin `.direnv/flake-inputs` GC roots — consolidate checkouts or run `nucleus-gc` after removing stale repos to reclaim store space.
 
 ## Linux builder (G8)
 
