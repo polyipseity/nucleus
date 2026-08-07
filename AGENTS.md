@@ -139,6 +139,7 @@
 - This codebase has zero tolerance for backwards-compatibility shims, deprecation layers, or migration glue. When renaming, restructuring, or removing something, do it in one commit — no aliases, no fallbacks, no compat wrappers.
 - Broken downstream consumers (own configs, templates, scripts) are fixed in the same commit, not patched later.
 - If a change would be painful without a compat layer, the correct response is to make the change smaller and more local, not to add a compat shim.
+- **No in-code migration cleanup.** Never leave migration logic in permanent scripts, activation hooks, or modules (for example: detecting an old path and deleting it, dual-read fallbacks, or "rename then remove legacy" blocks). Migrations are one-time: update every reference in the same breaking commit and implement only the new path going forward. Stale on-disk artifacts on already-deployed hosts are outside permanent code — remove them manually, document a one-off step in host `MANUAL.md` activation-tail output when non-obvious, or let the next apply overwrite managed state; do not encode one-time cleanup in scripts that run forever.
 
 ## Security and Activation Invariants
 
