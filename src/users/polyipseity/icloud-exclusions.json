@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/icloud-exclusions.schema.json",
+  "$schema": "../default/icloud-exclusions.schema.json",
   "excludedDirNames": [
     ".direnv",
     ".hypothesis",

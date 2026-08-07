@@ -298,7 +298,7 @@ if (-not (Test-Path -Path $UsersRoot -PathType Container)) {
 $userList = @()
 foreach ($entry in Get-ChildItem -Path $UsersRoot -Directory) {
   $name = $entry.Name
-  if ($name -eq 'default' -or $name -eq 'schemas') {
+  if ($name -eq 'default') {
     continue
   }
 

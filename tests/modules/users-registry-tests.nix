@@ -28,9 +28,9 @@ let
 
   test_discovers_polyipseity_user = assert' (builtins.elem "polyipseity" userNames) "users-registry.nix must discover polyipseity from src/users/";
 
-  test_excludes_default_and_schemas_dirs = assert' (
-    !(builtins.elem "default" userNames) && !(builtins.elem "schemas" userNames)
-  ) "users-registry.nix must not treat default/ or schemas/ as users";
+  test_excludes_default_dir = assert' (
+    !(builtins.elem "default" userNames)
+  ) "users-registry.nix must not treat default/ as a user";
 
   test_merges_default_and_user_profile = assert' (
     usersMacOS.polyipseity.isPrimary == true
@@ -74,7 +74,7 @@ let
 
   allTests = [
     test_discovers_polyipseity_user
-    test_excludes_default_and_schemas_dirs
+    test_excludes_default_dir
     test_merges_default_and_user_profile
     test_resolves_cloud_drive_local_path_per_platform
     test_resolves_replica_enable_per_platform

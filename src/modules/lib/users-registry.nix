@@ -30,7 +30,7 @@ let
   readDirNames =
     path: builtins.attrNames (lib.filterAttrs (_: t: t == "directory") (builtins.readDir path));
 
-  userNames = lib.filter (name: name != "default" && name != "schemas") (readDirNames usersRoot);
+  userNames = lib.filter (name: name != "default") (readDirNames usersRoot);
 
   readJsonFile =
     path:

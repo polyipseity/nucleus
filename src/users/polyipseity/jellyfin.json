@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/jellyfin.schema.json",
+  "$schema": "../default/jellyfin.schema.json",
   "accounts": [
     {
       "id": "polyipseity",

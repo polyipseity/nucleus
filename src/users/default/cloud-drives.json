@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/cloud-drives.schema.json",
+  "$schema": "./cloud-drives.schema.json",
   "mounts": [],
   "replicas": []
 }

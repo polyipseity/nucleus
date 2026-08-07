@@ -193,7 +193,7 @@ for _username in "$_users_root"/*; do
   [ -d "$_username" ] || continue
   _name="$(basename "$_username")"
   case "$_name" in
-    default | schemas) continue ;;
+    default) continue ;;
   esac
   _user_json="$(_lur_assemble_user "$_name")"
   _result="$(echo "$_result" | jq --arg name "$_name" --argjson user "$_user_json" '. + {($name): $user}')"

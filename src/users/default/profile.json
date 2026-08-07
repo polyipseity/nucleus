@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/profile.schema.json",
+  "$schema": "./profile.schema.json",
   "homeDirectory": {
     "macos": "",
     "nixos": "",

@@ -75,7 +75,7 @@ Register-Step -Id "service-registry" -Number 14 -Name "Service registry validati
         if (Test-Path $candidate) { Get-Item $candidate }
       }) {
       $username = $servicesFile.Directory.Name
-      if ($username -in @('default', 'schemas')) { continue }
+      if ($username -eq 'default') { continue }
       $userServices = Get-Content $servicesFile.FullName -Raw | ConvertFrom-Json -AsHashtable
       foreach ($svcKey in $userServices.Keys) {
         if ($svcKey -like '$*') { continue }

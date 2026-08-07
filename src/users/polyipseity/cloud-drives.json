@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/cloud-drives.schema.json",
+  "$schema": "../default/cloud-drives.schema.json",
   "mounts": [
     {
       "displayName": "Google Drive",

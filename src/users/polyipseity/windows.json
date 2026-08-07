@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/windows.schema.json",
+  "$schema": "../default/windows.schema.json",
   "description": "Primary user receiving secret materialization and full configuration",
   "dscConfigFiles": [
     "context-manual.dsc.yml",

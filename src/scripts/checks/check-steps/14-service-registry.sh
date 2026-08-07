@@ -98,7 +98,7 @@ run_14_service_registry() {
       [ -f "$_user_services" ] || continue
       _username="$(basename "$(dirname "$_user_services")")"
       case "$_username" in
-        default | schemas) continue ;;
+        default) continue ;;
       esac
       while IFS=$'\t' read -r _svc_name; do
         if ! echo "$_svc_names" | grep -qxF "$_svc_name"; then

@@ -25,13 +25,13 @@ test_discovers_polyipseity() {
   fi
 }
 
-test_excludes_default_and_schemas() {
+test_excludes_default_dir() {
   local registry
   registry="$(run_loader macos)"
-  if echo "$registry" | jq -e 'has("default") or has("schemas")' >/dev/null; then
-    assert_fail "excludes default and schemas directories" "registry contains reserved directory name"
+  if echo "$registry" | jq -e 'has("default")' >/dev/null; then
+    assert_fail "excludes default directory" "registry contains reserved directory name"
   else
-    assert_pass "excludes default and schemas directories"
+    assert_pass "excludes default directory"
   fi
 }
 
@@ -90,7 +90,7 @@ main() {
   }
 
   test_discovers_polyipseity
-  test_excludes_default_and_schemas
+  test_excludes_default_dir
   test_merges_vm_guest_secret_keys
   test_resolves_google_drive_replica_enable_per_platform
   test_resolves_icloud_replica_readwrite_per_platform

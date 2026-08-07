@@ -1,5 +1,5 @@
 {
-  "$schema": "../schemas/dev-repos.schema.json",
+  "$schema": "./dev-repos.schema.json",
   "enable": false,
   "gitHubUsername": "",
   "repositories": [],
