@@ -25,8 +25,9 @@ assert containsRegex "audit-store.sh" auditCliText;
 assert containsRegex "audit-store.sh" instructionsText;
 assert containsRegex "audit-store.sh" healthCheckText;
 assert containsRegex "audit_store_report" healthCheckText;
-assert containsRegex "--no-store-audit" healthCheckText;
-assert containsRegex "NUCLEUS_HEALTH_CHECK_NO_STORE_AUDIT" healthCheckText;
+assert containsRegex "store_audit=false" healthCheckText;
+assert containsRegex "--store-audit" healthCheckText;
+assert containsRegex "NUCLEUS_HEALTH_CHECK_STORE_AUDIT" healthCheckText;
 
 {
   success = true;

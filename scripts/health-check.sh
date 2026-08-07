@@ -5,14 +5,13 @@
 #
 # Commands: [--min-free-bytes N] [--secret-health|--no-secret-health]
 # [--log-health] [--store-audit|--no-store-audit]. Disk and connectivity checks
-# always run; --log-health is opt-in because it reads the services.json
-# registries; store audit runs by default on Nix hosts (opt out with
-# --no-store-audit).
+# always run; --log-health and store audit are opt-in because they read
+# services.json registries or scan the full Nix store (nix path-info --all).
 #
 # Environment variables read: SOPS_AGE_KEY_FILE (exported when the machine
 # age key exists so sops finds it), NUCLEUS_REPO_ROOT (via derive_repo_root),
 # NUCLEUS_LOG_DIR / NUCLEUS_SYSTEM_LOG_DIR (via lib.sh),
-# NUCLEUS_HEALTH_CHECK_NO_STORE_AUDIT.
+# NUCLEUS_HEALTH_CHECK_STORE_AUDIT.
 #
 # Prerequisites: curl, sops, and (for --log-health or store audit) jq. Exits 1
 # fails — log checks are aggregated first — and exits 0 when all pass.
@@ -42,10 +41,10 @@ REPO_ROOT="$(derive_repo_root)"
 min_free_bytes=10000000000
 secret_health=true
 log_health=false
-store_audit=true
+store_audit=false
 
-if [ "${NUCLEUS_HEALTH_CHECK_NO_STORE_AUDIT:-}" = "1" ]; then
-  store_audit=false
+if [ "${NUCLEUS_HEALTH_CHECK_STORE_AUDIT:-}" = "1" ]; then
+  store_audit=true
 fi
 
 while [ "$#" -gt 0 ]; do

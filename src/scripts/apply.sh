@@ -27,8 +27,12 @@ ai_sync=true
 replica_sync=false
 vm_sync=true
 vm_setup=false
-store_audit=true
+store_audit=false
 target_user=""
+
+if [ "${NUCLEUS_HEALTH_CHECK_STORE_AUDIT:-}" = "1" ]; then
+  store_audit=true
+fi
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -138,8 +142,8 @@ start_sudo_keepalive() {
 
 run_health_check() {
   _rhc_args=()
-  if [ "$store_audit" = false ]; then
-    _rhc_args+=(--no-store-audit)
+  if [ "$store_audit" = true ]; then
+    _rhc_args+=(--store-audit)
   fi
   run_nix run "$REPO_ROOT/src#health-check" "${_rhc_args[@]}"
 }
