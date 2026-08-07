@@ -12,7 +12,7 @@
 # Safety:
 #   - Only operates on symlinks (-L), never touches regular files.
 #   - Only GCs symlinks pointing to /nix/store/* (ignores non-Nix symlinks).
-#   - Marker file (.nucleus-symlink-farm) identifies farm-managed state.
+#   - Marker file (.nucleus-symlink-farm) is skipped during farm GC sweeps.
 set -eu
 
 FARM_DIR="/usr/local/bin"
@@ -35,27 +35,6 @@ _log() {
 
 # Ensure farm directory exists
 /bin/mkdir -p "$FARM_DIR"
-
-# If marker doesn't exist, sweep all stale Nix store symlinks (first-run GC).
-if [ ! -f "$FARM_DIR/$FARM_MARKER" ]; then
-  _gc_count=0
-  for link in "$FARM_DIR"/*; do
-    if [ -L "$link" ]; then
-      target="$(readlink "$link")"
-      case "$target" in
-        /nix/store/*)
-          /bin/rm "$link"
-          _log "first-run GC removed $link → $target"
-          _gc_count=$((_gc_count + 1))
-          ;;
-      esac
-    fi
-  done
-  if [ "$_gc_count" -gt 0 ]; then
-    _log "first-run GC complete: $_gc_count symlinks removed"
-  fi
-  : > "$FARM_DIR/$FARM_MARKER"
-fi
 
 # Parse current farm entries into an indexed array.
 IFS=' ' read -r -a entries <<< "$1"

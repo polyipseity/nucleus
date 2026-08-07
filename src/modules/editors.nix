@@ -334,17 +334,11 @@ in
     # Both stable (Code) and insiders (Code - Insiders) channels are handled
     # so both app variants share the same repo-backed config.
     #
-    # Migration safety:
-    #   - Correct symlink     → no-op.
-    #   - Wrong symlink       → remove, create correct symlink.  Handles the
-    #                           transition from old home.file Nix-store symlinks.
-    #   - Real non-empty file → copy to repo if repo target is absent/empty
-    #                           (preserves local VS Code edits on first run),
-    #                           then replace with symlink.
-    #   - Real non-empty dir  → copy each file from it to the repo dir when
-    #                           the repo does not yet contain that filename
-    #                           (no-clobber), then replace with symlink.
-    #   - Absent              → create symlink (parent dirs created as needed).
+    # Symlink policy:
+    #   - Correct symlink → no-op.
+    #   - Wrong symlink → remove, create correct symlink.
+    #   - Real file or directory at target path → fail; fix manually and re-apply.
+    #   - Absent → create symlink (parent dirs created as needed).
     #
     # Repo root is resolved from $NUCLEUS_REPO_ROOT (set by apply.sh before invoking
     # darwin-rebuild / nixos-rebuild and forwarded through sudo).

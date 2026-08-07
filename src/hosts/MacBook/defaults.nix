@@ -599,11 +599,7 @@ in
       # LinearMouse: configure menu bar visibility, battery indicator,
       # dock visibility, and launch-at-login behavior.
       #
-      # Domain source and migration context:
-      # https://github.com/linearmouse/linearmouse/wiki
-      # Runtime writes in src/modules/macos.nix target both
-      # org.linearmouse.LinearMouse and com.lujjjh.LinearMouse because both
-      # domains can appear on migrated installs.
+      # Domain source: https://github.com/linearmouse/linearmouse/wiki
       # Screenshot configurations:
       #   - showInMenuBar: false (menu bar icon hidden declaratively via
       #     CustomUserPreferences)
@@ -611,14 +607,6 @@ in
       #   - showInDock: true (app icon visible in Dock)
       #   - launchAtLogin: true (app auto-starts at login)
       #   - Also: disable automatic update checks (Sparkle preferences)
-      "com.lujjjh.LinearMouse" = {
-        showInMenuBar = false;
-        showBattery = "always";
-        showInDock = true;
-        launchAtLogin = true;
-        SUEnableAutomaticChecks = false;
-        SUAutomaticallyUpdate = false;
-      };
       "org.linearmouse.LinearMouse" = {
         showInMenuBar = false;
         showBattery = "always";
