@@ -58,6 +58,8 @@ Split explicitly when an app supports both machine-wide and per-user scopes. Git
 ## Wallpapers
 
 Per-user homedir assets under `src/users/default/wallpapers/` + `src/users/<username>/wallpapers/`. The config folder has exactly two first-level entries:
+
+| Subdirectory | Contents | Deploy method |
 |--------------|----------|---------------|
 | `encrypted/` | SOPS blobs (`*.sops`) | Method 2: decrypt → `~/Pictures/wallpapers/` |
 | `wallpapers/` | Unencrypted images | Method 1: writable symlink → `~/Pictures/wallpapers/` |
