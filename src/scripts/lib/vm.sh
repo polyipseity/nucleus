@@ -13,6 +13,18 @@
 # it to vm_init() and pass it from the caller. Suppressing SC2153 is
 # FORBIDDEN — it hides the violation.
 
+# copy_with_reflink SRC DST
+#   Copy SRC to DST using a CoW reflink when supported (APFS, btrfs, xfs);
+#   otherwise fall back to plain cp. Uses cp -L to follow symlink sources.
+copy_with_reflink() {
+  _cwr_src="$1"
+  _cwr_dst="$2"
+  if cp -L --reflink=auto "$_cwr_src" "$_cwr_dst" 2>/dev/null; then
+    return 0
+  fi
+  cp -L "$_cwr_src" "$_cwr_dst"
+}
+
 # vm_init — Initialize all shared config variables from explicit
 # positional parameters. Called after sourcing so shellcheck can trace every
 # variable assignment through the function call.
@@ -1243,7 +1255,7 @@ vm_ensure_base_and_overlay() {
       warn "base image is invalid for '$_ebao_name'; recreating from pre-built image"
       rm -f "$_ebao_base"
     fi
-    cp "$_ebao_prebuilt" "$_ebao_base"
+    copy_with_reflink "$_ebao_prebuilt" "$_ebao_base"
     say "created base image: $_ebao_base"
   fi
 
@@ -1280,7 +1292,7 @@ vm_ensure_base_and_overlay() {
         say "VM '$_ebao_name' is running; skipping base refresh from pre-built image (applies on next setup)"
       else
         say "guest credential/config drift detected for '$_ebao_name'; refreshing base from pre-built image (overlay preserved)"
-        cp "$_ebao_prebuilt" "$_ebao_base"
+        copy_with_reflink "$_ebao_prebuilt" "$_ebao_base"
         printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_ebao_cred_marker"
         if [ -n "$_ebao_config_fp" ]; then
           printf '%s\n' "$_ebao_config_fp" >"$_ebao_config_marker"
@@ -2691,7 +2703,7 @@ vm_build_nixos() {
     return 1
   fi
   # -L follows symlinks so we copy the actual disk image bytes.
-  cp -L "$_img" "$_out"
+  copy_with_reflink "$_img" "$_out"
   chmod u+w "$_out"
 
   # WHY: nixos-generators defaults to a small virtual disk (~4 GiB) for qcow
@@ -3918,7 +3930,7 @@ vm_unpack_ensure_base_overlay() {
     mkdir -p "$VM_DIR/data"
     if [ ! -f "$_uebo_base" ]; then
       say "unpack — restoring base image from prebuilt: $_uebo_base"
-      cp "$_uebo_prebuilt" "$_uebo_base"
+      copy_with_reflink "$_uebo_prebuilt" "$_uebo_base"
     fi
     if [ ! -f "$_uebo_overlay" ]; then
       say "unpack — recreating absent overlay disk: $_uebo_overlay"

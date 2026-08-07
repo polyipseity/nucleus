@@ -3,6 +3,14 @@
 # CLI args: is_darwin pictures_dir desktoppr_bin coreutils_bin repo_root current_user sops_symlink_path wallpaper_items_json jq_bin
 set -eu
 
+copy_with_reflink() {
+  _cwr_src="$1"
+  _cwr_dst="$2"
+  if cp -L --reflink=auto "$_cwr_src" "$_cwr_dst" 2>/dev/null; then
+    return 0
+  fi
+  cp -L "$_cwr_src" "$_cwr_dst"
+}
 
 _is_darwin="$1"
 _pictures_dir="$2"
@@ -108,7 +116,7 @@ wallpaper_provision_copy_items() {
     # so GUI consumers can read a normal file under ~/Pictures.
     if [ -L "$_targetFile" ] || [ ! -f "$_targetFile" ] || ! cmp -s "$_secretPath" "$_targetFile"; then
       _tmpTarget="$(mktemp)"
-      cp "$_secretPath" "$_tmpTarget"
+      copy_with_reflink "$_secretPath" "$_tmpTarget"
       # 444: managed wallpaper content must not be modified outside
       # activation; GUI consumers and desktoppr need only read access.
       chmod 444 "$_tmpTarget"
