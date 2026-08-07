@@ -4,15 +4,13 @@
 
 .DESCRIPTION
   Creates and maintains the `nucleus-litellm` native Windows SCM service
-  that starts the LiteLLM AI gateway proxy at boot as SYSTEM.  Replaces the
-  legacy per-user NucleusLiteLLM scheduled task.
+  that starts the LiteLLM AI gateway proxy at boot as SYSTEM.
 
   The wrapper script under %ProgramData%\nucleus\litellm\ reads API keys from
   %ProgramData%\nucleus\secrets\ and the litellm config from a symlink.
   Secrets are materialised by apply.ps1 via SOPS decryption of system.yml.
 
-  On disable the function removes both the SCM service and any stale scheduled
-  task.
+  On disable the function removes the SCM service.
 
 .NOTES
   Environment variables:
@@ -58,14 +56,6 @@ function Sync-LiteLLMService {
 
   $ErrorActionPreference = "Stop"
   $serviceName = 'nucleus-litellm'
-  $oldTaskName = 'NucleusLiteLLM'
-
-  # check-suppress:suppression_doc: probe -- legacy task may not exist; $null check handles missing task.
-  $existingTask = Get-ScheduledTask -TaskName $oldTaskName -ErrorAction SilentlyContinue
-  if ($null -ne $existingTask) {
-    Unregister-ScheduledTask -TaskName $oldTaskName -Confirm:$false
-    Write-Output "litellm: removed legacy scheduled task '$oldTaskName'"
-  }
 
   if (-not $Enabled) {
     # check-suppress:suppression_doc: probe whether service exists; Get-Service throws when absent.

@@ -257,15 +257,6 @@ function Sync-GitAndSshConfig {
         New-Item -ItemType Directory -Path $emptyTemplateDir -Force > $null
       }
 
-      # Remove legacy layering artifacts from pre-symlink deployments: the
-      # machine-scoped ProgramData ignore-global and the per-profile ignore-user
-      # overlay are superseded by the single symlinked <Host>.gitignore.
-      foreach ($legacyIgnore in @((Join-Path $env:ProgramData 'nucleus\git\ignore-global'), (Join-Path $userGitConfigDir 'ignore-user'))) {
-        if (Test-Path -Path $legacyIgnore) {
-          Remove-Item -Path $legacyIgnore -Force
-        }
-      }
-
       # Per-user identity lives in the include file referenced by [include] path
       # in <Host>.gitconfig; the symlinked .gitconfig is never written.  The
       # include file is also writable when the config itself is read-only.

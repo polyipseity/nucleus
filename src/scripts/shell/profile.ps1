@@ -712,7 +712,7 @@ if ($IsWindows) {
     if (-not (Test-Path -Path $scriptPath -PathType Leaf)) {
       throw "nucleus-apply: script not found at $scriptPath"
     }
-    & $scriptPath -ModuleDir $moduleDir -PrimaryUsername $username -Users @($username) @Args
+    & $scriptPath -ModuleDir $moduleDir -Users @($username) @Args
   }
   function nucleus-cloud-setup {
     # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract

@@ -517,28 +517,6 @@ function Resolve-WallpaperUnencryptedFile {
   return Resolve-UserConfigFile -User $User -ConfigName 'wallpapers' -RelativePath "wallpapers/$FileName" -RepoRoot $RepoRoot
 }
 
-function Resolve-UserConfigDir {
-  <#
-  .SYNOPSIS
-    Deprecated: use Get-UserConfigFirstLevelEntryList and Resolve-UserConfigFirstLevelEntry.
-  #>
-  [CmdletBinding()]
-  [OutputType([string])]
-  param(
-    [Parameter(Mandatory)]
-    [string]$User,
-
-    [Parameter(Mandatory)]
-    [string]$ConfigName,
-
-    [Parameter(Mandatory)]
-    [string]$RepoRoot
-  )
-
-  $null = $User, $ConfigName, $RepoRoot  # check-suppress:SuppressMessageAttribute: PSReviewUnusedParameter -- deprecated stub retains signature for callers that still reference it
-  throw "Resolve-UserConfigDir is removed; use Get-UserConfigFirstLevelEntryList and Resolve-UserConfigFirstLevelEntry instead."
-}
-
 function Deploy-UserWritableSymlink {
   <#
   .SYNOPSIS

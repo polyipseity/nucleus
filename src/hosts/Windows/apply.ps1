@@ -40,10 +40,6 @@
   Mandatory: caller must explicitly pass the module directory so they are
   aware of which modules will be loaded and executed.
 
-.PARAMETER PrimaryUsername
-  Username allowed to materialize user-scoped secrets. Defaults to the
-  current interactive user. Deprecated: use -Users instead.
-
 .PARAMETER Users
   Array of usernames to configure. Mandatory: each user in this list gets
   their secrets materialized, SSH keys adopted, and home directory state
@@ -189,7 +185,7 @@
 
 .EXAMPLE
   # Apply while explicitly scoping secret materialization to one user:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -PrimaryUsername 'admin'
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin')
 
 .EXAMPLE
   # Apply while skipping the post-apply Ollama model sync:
@@ -233,7 +229,6 @@ param(
   [switch]$Help,
   [Parameter(Mandatory)]
   [string]$ModuleDir,
-  [string]$PrimaryUsername = [System.Environment]::UserName,
   [Parameter(Mandatory)]
   [string[]]$Users,
   [switch]$NoOptionalParity,
@@ -251,6 +246,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$primaryUser = $Users[0]
+
 # If -ParamsJson was provided (by self-elevation), deserialize all parameters
 # from the temp JSON file instead of from command-line arguments.
 if ($ParamsJson -and (Test-Path $ParamsJson)) {
@@ -259,7 +256,6 @@ if ($ParamsJson -and (Test-Path $ParamsJson)) {
   $ConfigFiles = [string[]]$p.ConfigFiles
   $ModuleDir = $p.ModuleDir
   $Users = [string[]]$p.Users
-  $PrimaryUsername = $p.PrimaryUsername
   $NoOptionalParity = [bool]$p.NoOptionalParity
   $NoSecretsParity = [bool]$p.NoSecretsParity
   $NoUserStateParity = [bool]$p.NoUserStateParity
@@ -338,7 +334,6 @@ if (-not $Elevated) {
     ConfigFiles      = $ConfigFiles
     ModuleDir        = $ModuleDir
     Users            = $Users
-    PrimaryUsername   = $PrimaryUsername
     NoOptionalParity  = $NoOptionalParity
     NoSecretsParity   = $NoSecretsParity
     NoUserStateParity = $NoUserStateParity
@@ -470,7 +465,7 @@ if (Test-Path -Path $healthCheckScript) {
 # secondary). Validate that all users in -Users parameter are registered.
 $resolvedConfigDir = (Resolve-Path -Path $ConfigDir).Path
 $machineSshHostKeyPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key"
-$primarySshKeyPath = Join-Path -Path $HOME -ChildPath ".ssh\ssh_personal_$PrimaryUsername"
+$primarySshKeyPath = Join-Path -Path $HOME -ChildPath ".ssh\ssh_personal_$primaryUser"
 
 # Resolve managed executables before running any decryption/materialization.
 # check-suppress:suppression_doc: probe -- SOPS WinGet package directory may not exist; $null check handles absence.
@@ -643,7 +638,7 @@ if ($EnableSecretsParity) {
     -HostKeyPath $machineSshHostKeyPath `
     -PrimarySshKeyPath $primarySshKeyPath `
     -SopsExe $sopsExe `
-    -PrimaryUsername $PrimaryUsername
+    -PrimaryUsername $primaryUser
 }
 else {
   Remove-ManagedSecret -Users $Users
@@ -679,12 +674,12 @@ $wallpaperOutputDir = Join-Path -Path $HOME -ChildPath "Pictures\wallpapers"
 Invoke-SecretVerification `
   -GpgExe $gpgExe `
   -HostKeyPath $machineSshHostKeyPath `
-  -PrimaryUsername $PrimaryUsername `
+  -PrimaryUsername $primaryUser `
   -SecretsDir $secretsDir `
   -RepoRoot $repoRoot
 
 $activeWallpaperPath = Sync-WallpaperInventory -RepoRoot $repoRoot -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
-Remove-StaleWallpaper -RepoRoot $repoRoot -User $PrimaryUsername -OutputDir $wallpaperOutputDir
+Remove-StaleWallpaper -RepoRoot $repoRoot -User $primaryUser -OutputDir $wallpaperOutputDir
 
 # Generate locked DSC from lockfile before applying.
 $lockfilePath = Join-Path -Path $PSScriptRoot -ChildPath "..\..\lockfiles\lockfile.json"
