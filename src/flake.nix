@@ -611,6 +611,13 @@
           ];
         };
 
+      mkAuditStoreApp =
+        pkgs:
+        mkApp pkgs {
+          name = "audit-store";
+          runtimeInputs = [ pkgs.jq ];
+        };
+
       # Build cloud setup helper app for POSIX hosts.
       # Does NOT inject nixpkgs `pkgs.nix` into PATH — scripts/cloud-setup.sh
       # uses nix --option which should use the host nix binary so host-specific
@@ -880,6 +887,7 @@
             type = "app";
             program = "${darwin.packages.${systems.mac}.darwin-rebuild}/bin/darwin-rebuild";
           };
+          audit-store = mkAuditStoreApp pkgsMac;
           gc = mkGcApp pkgsMac;
           health-check = mkHealthCheckApp pkgsMac;
           nixos-generators = nixos-generators.apps.${systems.mac}.default;
@@ -901,6 +909,7 @@
           check-pwsh = mkCheckPwshApp pkgsLinux;
           check-sh = mkCheckShApp pkgsLinux (mkTreefmtWrapper systems.linux pkgsLinux);
           cloud-setup = mkCloudSetupApp pkgsLinux;
+          audit-store = mkAuditStoreApp pkgsLinux;
           gc = mkGcApp pkgsLinux;
           health-check = mkHealthCheckApp pkgsLinux;
           home-manager = {

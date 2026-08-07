@@ -105,7 +105,7 @@ Each `writeNucleusShellApplication` with `bundleDefault = true` previously `cp -
 
 `nucleus-health-check` and `nucleus-apply` run the store audit only when opted in: `--store-audit` or `NUCLEUS_HEALTH_CHECK_STORE_AUDIT=1`.
 
-Manual entry points: `nucleus-audit-store`, [`scripts/audit-store.sh`](../../scripts/audit-store.sh) (sources [`audit-store.sh`](../../src/scripts/lib/audit-store.sh)).
+Manual entry points: `nix run .#audit-store`, `nucleus-audit-store`, [`scripts/audit-store.sh`](../../scripts/audit-store.sh) (sources [`audit-store.sh`](../../src/scripts/lib/audit-store.sh)).
 
 Report sections:
 
