@@ -194,7 +194,7 @@ The Apple SDK is enhanced with symlinks for Xcode toolchain shims that nixpkgs d
 - `src/modules/lib/apple-sdk-tools.nix` maps xcrun shim names to nixpkgs derivations (or null). Returns `allTools` and `symlinkFarmTools` (filtered non-null). Attribute names containing `+` must be quoted: `"c++"`, `"clang++"`, `"flex++"`, `"c++filt"`.
 - `src/modules/lib/apple-sdk-enhanced.nix` uses `pkgs.symlinkJoin` to merge the original apple-sdk with a `runCommand` layer adding `usr/bin/` symlinks from the tool mapping.
 - Nix environment module (`env-catalog.nix`) sets `DEVELOPER_DIR` and `SDKROOT` to the enhanced derivation.
-- `src/hosts/MacBook/activation.nix` runs `macos-remove-command-line-tools.sh` then `xcode-select --switch` on the enhanced SDK.
+- `src/hosts/MacBook/activation.nix` runs `macos-remove-command-line-tools.sh` (install tree only; receipts are SIP-protected) then `xcode-select --switch` on the enhanced SDK.
 
 ## macOS defaults domain synchronization
 
