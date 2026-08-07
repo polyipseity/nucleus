@@ -72,8 +72,8 @@ function Sync-Wallpaper {
   $activeWallpaperPath = $null
 
   foreach ($user in ($Users | Sort-Object)) {
-    $wallpaperFiles = @(Get-WallpaperEncryptedBlobs -User $user -RepoRoot $RepoRoot)
-    $unencryptedFiles = @(Get-WallpaperUnencryptedFiles -User $user -RepoRoot $RepoRoot)
+    $wallpaperFiles = @(Get-WallpaperEncryptedBlobList -User $user -RepoRoot $RepoRoot)
+    $unencryptedFiles = @(Get-WallpaperUnencryptedFileList -User $user -RepoRoot $RepoRoot)
 
     if ($wallpaperFiles.Count -eq 0 -and $unencryptedFiles.Count -eq 0) {
       Write-Output "$($PSStyle.Foreground.Yellow)No overlay wallpaper sources found for user $user; skipping.$($PSStyle.Reset)"

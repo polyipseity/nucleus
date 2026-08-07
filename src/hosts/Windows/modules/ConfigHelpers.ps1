@@ -391,7 +391,7 @@ function Resolve-UserConfigFirstLevelEntry {
   throw "Resolve-UserConfigFirstLevelEntry: no source found for user '$User', config '$ConfigName', entry '$EntryName' (tried '$perUser' and '$default')"
 }
 
-function Get-UserConfigFirstLevelEntries {
+function Get-UserConfigFirstLevelEntryList {
   <#
   .SYNOPSIS
     Lists first-level overlay entry names for a per-user config directory.
@@ -418,7 +418,7 @@ function Get-UserConfigFirstLevelEntries {
       [void]$names.Add($child.Name)
     }
   }
-  return @($names)
+  return [string[]]@($names)
 }
 
 function Test-WallpaperImageName {
@@ -435,7 +435,7 @@ function Test-WallpaperImageName {
   }
 }
 
-function Get-WallpaperEncryptedBlobs {
+function Get-WallpaperEncryptedBlobList {
   <#
   .SYNOPSIS
     Lists *.sops blob names under the wallpapers/encrypted overlay entry.
@@ -451,7 +451,7 @@ function Get-WallpaperEncryptedBlobs {
   )
 
   $encryptedDir = Resolve-UserConfigFirstLevelEntry -User $User -ConfigName 'wallpapers' -EntryName 'encrypted' -RepoRoot $RepoRoot
-  return @(
+  return [string[]]@(
     Get-ChildItem -LiteralPath $encryptedDir -File -Force |
       Where-Object { $_.Name.EndsWith('.sops', [System.StringComparison]::OrdinalIgnoreCase) } |
       ForEach-Object { $_.Name } |
@@ -459,7 +459,7 @@ function Get-WallpaperEncryptedBlobs {
   )
 }
 
-function Get-WallpaperUnencryptedFiles {
+function Get-WallpaperUnencryptedFileList {
   <#
   .SYNOPSIS
     Lists unencrypted wallpaper image names under wallpapers/wallpapers/.
@@ -475,7 +475,7 @@ function Get-WallpaperUnencryptedFiles {
   )
 
   $wallpapersDir = Resolve-UserConfigFirstLevelEntry -User $User -ConfigName 'wallpapers' -EntryName 'wallpapers' -RepoRoot $RepoRoot
-  return @(
+  return [string[]]@(
     Get-ChildItem -LiteralPath $wallpapersDir -File -Force |
       Where-Object { Test-WallpaperImageName -FileName $_.Name } |
       ForEach-Object { $_.Name } |
@@ -520,7 +520,7 @@ function Resolve-WallpaperUnencryptedFile {
 function Resolve-UserConfigDir {
   <#
   .SYNOPSIS
-    Deprecated: use Get-UserConfigFirstLevelEntries and Resolve-UserConfigFirstLevelEntry.
+    Deprecated: use Get-UserConfigFirstLevelEntryList and Resolve-UserConfigFirstLevelEntry.
   #>
   [CmdletBinding()]
   [OutputType([string])]
@@ -535,7 +535,8 @@ function Resolve-UserConfigDir {
     [string]$RepoRoot
   )
 
-  throw "Resolve-UserConfigDir is removed; use Get-UserConfigFirstLevelEntries and Resolve-UserConfigFirstLevelEntry instead."
+  $null = $User, $ConfigName, $RepoRoot  # check-suppress:SuppressMessageAttribute: PSReviewUnusedParameter -- deprecated stub retains signature for callers that still reference it
+  throw "Resolve-UserConfigDir is removed; use Get-UserConfigFirstLevelEntryList and Resolve-UserConfigFirstLevelEntry instead."
 }
 
 function Deploy-UserWritableSymlink {

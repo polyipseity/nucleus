@@ -326,7 +326,7 @@ function Get-EventLogConfig {
   return $eventLog
 }
 
-function Get-ServiceLogDirs {
+function Get-ServiceLogDirList {
   param([string]$ServiceKey)
   $entry = $RegistryRaw[$ServiceKey]
   $dirs = @()
@@ -348,7 +348,7 @@ function Get-ServiceLogDirs {
 function Get-ServiceLogFile {
   param([string]$ServiceKey)
   $files = @()
-  foreach ($dir in (Get-ServiceLogDirs -ServiceKey $ServiceKey)) {
+  foreach ($dir in (Get-ServiceLogDirList -ServiceKey $ServiceKey)) {
     if (Test-Path -LiteralPath $dir -PathType Container) {
       $files += Get-ChildItem -LiteralPath $dir -Recurse -Filter '*.log' -File -ErrorAction SilentlyContinue |
         Select-Object -ExpandProperty FullName

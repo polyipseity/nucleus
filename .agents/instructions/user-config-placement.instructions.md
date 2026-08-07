@@ -44,9 +44,9 @@ Every app tree under `src/users/` MUST be consumed only through overlay selector
 | Host-specific file | `mkUserOverlay` → `selectSource` | `Resolve-UserConfigSource` | N/A |
 | File path (any depth) | `mkUserOverlay` → `selectFile` | `Resolve-UserConfigFile` / `Deploy-UserWritableSymlink` | `resolve_user_config_file` |
 | First-level entry | `mkUserOverlay` → `selectFirstLevelEntry` | `Resolve-UserConfigFirstLevelEntry` | `resolve_user_config_first_level_entry` |
-| First-level name list | `mkUserOverlay` → `listFirstLevelEntries` | `Get-UserConfigFirstLevelEntries` | `list_user_config_first_level_entries` |
-| Wallpaper encrypted blobs | `wallpaper-paths.nix` → `listEncryptedWallpaperBlobs` | `Get-WallpaperEncryptedBlobs` | `list_wallpaper_encrypted_blobs` |
-| Wallpaper unencrypted files | `wallpaper-paths.nix` → `listUnencryptedWallpaperFiles` | `Get-WallpaperUnencryptedFiles` | `list_wallpaper_unencrypted_files` |
+| First-level name list | `mkUserOverlay` → `listFirstLevelEntries` | `Get-UserConfigFirstLevelEntryList` | `list_user_config_first_level_entries` |
+| Wallpaper encrypted blobs | `wallpaper-paths.nix` → `listEncryptedWallpaperBlobs` | `Get-WallpaperEncryptedBlobList` | `list_wallpaper_encrypted_blobs` |
+| Wallpaper unencrypted files | `wallpaper-paths.nix` → `listUnencryptedWallpaperFiles` | `Get-WallpaperUnencryptedFileList` | `list_wallpaper_unencrypted_files` |
 | Registry JSON | `users-registry.nix` (`hostName`) | `Load-UserRegistry.ps1` | `load-user-registry.sh --host` |
 
 Allowed hardcoded `src/users/default/` references: inside the selector implementations themselves, registry loaders, and tests that assert default baseline content.

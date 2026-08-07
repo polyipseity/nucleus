@@ -42,7 +42,7 @@ function Sync-CursorConfig {
   $agentsDir = Join-Path -Path $HOME -ChildPath '.agents'
   $cursorDir = Join-Path -Path $HOME -ChildPath '.cursor'
   $managedBridgeDirs = @('rules', 'agents', 'commands', 'skills')
-  $cursorEntryNames = Get-UserConfigFirstLevelEntries -User $Username -ConfigName 'cursor' -RepoRoot $RepoRoot
+  $cursorEntryNames = Get-UserConfigFirstLevelEntryList -User $Username -ConfigName 'cursor' -RepoRoot $RepoRoot
 
   . (Join-Path -Path $PSScriptRoot -ChildPath '..\Set-ManagedSymlinkDeleteProtection.ps1')
 

@@ -32,6 +32,7 @@ function Expand-NucleusLogPathTemplate {
     Expands ~ and %ENV% templates in log path strings.
   #>
   [CmdletBinding()]
+  [OutputType([string])]
   param(
     [Parameter(Mandatory)]
     [string]$Template
@@ -145,12 +146,13 @@ function ConvertTo-SanitizedText {
   }
 }
 
-function Parse-NucleusExpiryDays {
+function ConvertFrom-NucleusExpiryDuration {
   <#
   .SYNOPSIS
     Parses duration strings like 7d or 24h into whole-day counts.
   #>
   [CmdletBinding()]
+  [OutputType([int])]
   param(
     [string]$Expiry = '7d'
   )
@@ -182,7 +184,7 @@ function Invoke-LogExpiry {
 
   if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return }
 
-  $days = Parse-NucleusExpiryDays -Expiry $Expiry
+  $days = ConvertFrom-NucleusExpiryDuration -Expiry $Expiry
   if ($days -le 0) { return }
 
   $cutoff = (Get-Date).AddDays(-$days)

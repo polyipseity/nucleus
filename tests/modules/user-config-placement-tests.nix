@@ -17,7 +17,7 @@ assert containsRegex "listFirstLevelEntries" usersOverlayText;
 assert containsRegex "selectFirstLevelEntry" usersOverlayText;
 assert containsRegex "list_user_config_first_level_entries" resolveUserConfigText;
 assert containsRegex "resolve_user_config_first_level_entry" resolveUserConfigText;
-assert containsRegex "Get-UserConfigFirstLevelEntries" configHelpersText;
+assert containsRegex "Get-UserConfigFirstLevelEntryList" configHelpersText;
 assert containsRegex "Deploy-UserWritableSymlink" configHelpersText;
 assert
   containsRegex "src/modules/configs/git/" gitSystemText

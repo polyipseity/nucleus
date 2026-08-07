@@ -107,7 +107,7 @@ Describe 'Resolve-UserConfigFirstLevelEntry' {
         $defaultDir = Join-Path $script:testDir "src/users/default/cursor"
         New-Item -ItemType Directory -Path $defaultDir -Force > $null
         Set-Content -Path (Join-Path $defaultDir 'hooks.json') -Value '{}' -NoNewline
-        $entries = Get-UserConfigFirstLevelEntries -User 'bob' -ConfigName 'cursor' -RepoRoot $script:testDir
+        $entries = Get-UserConfigFirstLevelEntryList -User 'bob' -ConfigName 'cursor' -RepoRoot $script:testDir
         $entries | Should -Contain 'hooks.json'
     }
 }
@@ -155,7 +155,7 @@ Describe 'Wallpaper path helpers' {
     }
 
     It 'lists encrypted wallpaper blobs' {
-        $blobs = Get-WallpaperEncryptedBlobs -User 'alice' -RepoRoot $script:testDir
+        $blobs = Get-WallpaperEncryptedBlobList -User 'alice' -RepoRoot $script:testDir
         $blobs | Should -Contain 'foo.png.sops'
     }
 
@@ -165,7 +165,7 @@ Describe 'Wallpaper path helpers' {
     }
 
     It 'lists unencrypted wallpaper files from default overlay' {
-        $files = Get-WallpaperUnencryptedFiles -User 'bob' -RepoRoot $script:testDir
+        $files = Get-WallpaperUnencryptedFileList -User 'bob' -RepoRoot $script:testDir
         $files | Should -Contain 'bar.jpg'
     }
 

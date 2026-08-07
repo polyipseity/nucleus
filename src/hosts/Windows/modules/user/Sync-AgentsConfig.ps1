@@ -112,7 +112,7 @@ function Sync-AgentsConfig {
     return
   }
 
-  $entryNames = Get-UserConfigFirstLevelEntries -User $User -ConfigName 'agents' -RepoRoot $RepoRoot
+  $entryNames = Get-UserConfigFirstLevelEntryList -User $User -ConfigName 'agents' -RepoRoot $RepoRoot
   if ($entryNames.Count -eq 0) {
     Write-Error "agents-config: Sync-AgentsConfig: no agents overlay entries found for user '$User'"
     return
