@@ -24,6 +24,7 @@ usage() {
   --git-template-gc|--no-git-template-gc  Control stale .git hooks/description cleanup (default: --git-template-gc).
   --git-cache-gc|--no-git-cache-gc  Control stale .git cache/state cleanup and git gc --auto (default: --git-cache-gc).
   --hm-gc|--no-hm-gc                        Control home-manager generation expiration (default: --hm-gc).
+  --system-gc|--no-system-gc                Control system profile generation expiration (default: --system-gc).
   --nix-artifacts-gc|--no-nix-artifacts-gc  Control stale result symlink cleanup (default: --nix-artifacts-gc).
   --nix-gc|--no-nix-gc                      Control nix-collect-garbage (default: --nix-gc).
   --ollama-gc|--no-ollama-gc          Control stale Ollama model removal (default: --ollama-gc).
@@ -36,8 +37,11 @@ usage() {
   --log-max-files <count>             Number of rotated archives to keep (default: 4).
   --log-compress <true|false>         Compress rotated logs (default: true).
   --expiry <duration>                       Master expiry override (e.g. "14d"). Per-tool flags win (default: "7d").
+  --generations-keep <count>                Master generation-count override (default: 7). Per-scope flags win.
   --hm-expiry <duration>                    Home Manager generation expiry duration in nix format (e.g. "7d").
+  --hm-generations-keep <count>             Home Manager generations to keep (intersection with --hm-expiry).
   --nix-expiry <duration>                   Nix store GC --delete-older-than duration (e.g. "7d", "30d").
+  --system-generations-keep <count>         System profile generations to keep (intersection with expiry).
   --dry-run|--no-dry-run                    Print actions without executing (default: --no-dry-run).
 EOF
 }
@@ -48,6 +52,7 @@ tool_cache_gc=true
 git_template_gc=true
 git_cache_gc="${NUCLEUS_GC_GIT_CACHE_GC:-true}"
 hm_gc=true
+system_gc=true
 nix_artifacts_gc=true
 nix_gc=true
 ollama_gc=true
@@ -60,6 +65,9 @@ dry_run=false
 hm_expiry_arg=""
 nix_expiry_arg=""
 expiry_arg=""
+generations_keep_arg=""
+system_generations_keep_arg=""
+hm_generations_keep_arg=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -90,6 +98,12 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-hm-gc)
       hm_gc=false
+      ;;
+    --system-gc)
+      system_gc=true
+      ;;
+    --no-system-gc)
+      system_gc=false
       ;;
     --nix-artifacts-gc)
       nix_artifacts_gc=true
@@ -155,12 +169,24 @@ while [ "$#" -gt 0 ]; do
       expiry_arg="$2"
       shift
       ;;
+    --generations-keep)
+      generations_keep_arg="$2"
+      shift
+      ;;
     --hm-expiry)
       hm_expiry_arg="$2"
       shift
       ;;
+    --hm-generations-keep)
+      hm_generations_keep_arg="$2"
+      shift
+      ;;
     --nix-expiry)
       nix_expiry_arg="$2"
+      shift
+      ;;
+    --system-generations-keep)
+      system_generations_keep_arg="$2"
       shift
       ;;
     --dry-run)
@@ -178,42 +204,69 @@ while [ "$#" -gt 0 ]; do
   shift
 done
 
-nix_expiry_to_hm() {
-  # Convert nix duration format to date format compatible with
-  # home-manager expire-generations.
-  #   "7d"  → "-7 days"
-  #   "14d" → "-14 days"
-  #   "4w"  → "-4 weeks"
-  local input="$1"
-  local num="${input%[a-zA-Z]*}"
-  local unit="${input##*[0-9]}"
-  case "$unit" in
-    d) printf '%s\n' "-${num} days" ;;
-    w) printf '%s\n' "-${num} weeks" ;;
-    *) printf '%s\n' "-${input}" ;;
-  esac
-}
+# shellcheck source=../src/scripts/lib/expire-profile-generations.sh
+. "$SCRIPT_DIR/../src/scripts/lib/expire-profile-generations.sh"
 
 # Resolve expiry values with precedence: CLI flag > per-tool env > master flag > master env > default (7d).
 hm_expiry="${hm_expiry_arg:-${NUCLEUS_GC_HM_EXPIRY:-${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}}}"
 nix_expiry="${nix_expiry_arg:-${NUCLEUS_GC_NIX_EXPIRY:-${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}}}"
-hm_expiry_hm_format="$(nix_expiry_to_hm "$hm_expiry")"
+system_expiry="${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}"
 
-expire_hm_generations_if_available() {
-  # Home Manager generations are GC roots: nix-collect-garbage cannot reclaim
-  # store paths still referenced by live generations.  Expiring generations
-  # before running Nix store GC releases those roots so the subsequent
-  # collection can reclaim more.  The expiry window is controlled by
-  # --hm-expiry / $hm_expiry.
-  # Best-effort: hosts without a managed Home Manager profile will not have
-  # home-manager in PATH.
-  if ! command -v home-manager >/dev/null 2>&1; then
-    # Existence probe — tool absent is expected and benign on some hosts.
-    say "home-manager unavailable; skipping generation expiry"
+# Resolve generation-count values with the same precedence pattern (default: 7).
+generations_keep="${generations_keep_arg:-${NUCLEUS_GC_GENERATIONS_KEEP:-7}}"
+system_generations_keep="${system_generations_keep_arg:-${NUCLEUS_GC_SYSTEM_GENERATIONS_KEEP:-${generations_keep}}}"
+hm_generations_keep="${hm_generations_keep_arg:-${NUCLEUS_GC_HM_GENERATIONS_KEEP:-${generations_keep}}}"
+
+_gc_run_as_target_user() {
+  if [ "$(id -u)" -eq 0 ] && [ -n "${NUCLEUS_USERNAME:-}" ]; then
+    sudo -u "$NUCLEUS_USERNAME" -H "$@"
+  else
+    "$@"
+  fi
+}
+
+expire_system_profile_generations() {
+  _esp_profile=""
+  if ! _esp_profile="$(resolve_system_profile)"; then
+    say "no system profile found; skipping system generation expiry"
     return 0
   fi
 
-  home-manager expire-generations "$hm_expiry_hm_format"
+  _esp_use_sudo=false
+  if [ "$(uname -s)" = "Darwin" ] && [ "$(id -u)" -ne 0 ]; then
+    _esp_use_sudo=true
+  fi
+
+  NUCLEUS_GC_PROFILE_SUDO="$_esp_use_sudo" \
+    expire_profile_generations_intersection \
+      "$_esp_profile" \
+      "$system_generations_keep" \
+      "$system_expiry" \
+      "$dry_run"
+}
+
+expire_hm_profile_generations_body() {
+  # shellcheck source=../src/scripts/lib/lib.sh
+  . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
+  # shellcheck source=../src/scripts/lib/expire-profile-generations.sh
+  . "$SCRIPT_DIR/../src/scripts/lib/expire-profile-generations.sh"
+  _ehm_profile=""
+  if ! _ehm_profile="$(resolve_hm_profile)"; then
+    say "no Home Manager profile found; skipping HM generation expiry"
+    return 0
+  fi
+  NUCLEUS_GC_PROFILE_SUDO=false \
+    expire_profile_generations_intersection \
+      "$_ehm_profile" \
+      "$hm_generations_keep" \
+      "$hm_expiry" \
+      "$dry_run"
+}
+
+expire_hm_profile_generations() {
+  export hm_generations_keep hm_expiry dry_run SCRIPT_DIR
+  export -f expire_hm_profile_generations_body
+  _gc_run_as_target_user bash -c "expire_hm_profile_generations_body"
 }
 
 run_nix_gc_if_available() {
@@ -584,17 +637,17 @@ gc_vm_artifacts_if_present() {
   fi
 }
 
-# Step 1: expire HM generations before Nix store GC so the store can reclaim
-# paths that were previously held alive as generation GC roots.
-if [ "$hm_gc" = true ]; then
-  if [ "$dry_run" = true ]; then
-    dry_run "would expire HM generations older than $hm_expiry_hm_format"
-  else
-    expire_hm_generations_if_available
-  fi
+# Step 1: expire system profile generations before store GC.
+if [ "$system_gc" = true ]; then
+  expire_system_profile_generations
 fi
 
-# Step 1b: remove stale Nix build result symlinks before store GC.
+# Step 1b: expire HM profile generations before store GC.
+if [ "$hm_gc" = true ]; then
+  expire_hm_profile_generations
+fi
+
+# Step 1c: remove stale Nix build result symlinks before store GC.
 if [ "$nix_artifacts_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would remove stale Nix build result symlinks"
