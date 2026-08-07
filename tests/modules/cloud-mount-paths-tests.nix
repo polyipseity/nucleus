@@ -3,18 +3,15 @@
 let
   inherit (import ../lib.nix) assert' containsRegex;
 
-  # Symlink replacement is implemented by the cloud-drives-setup service script,
-  # wired into the module's activation hook; the module itself is declarative.
   setupScript = builtins.readFile ../../src/scripts/services/cloud-drives-setup.sh;
 
-  test_mount_paths_replace_symlinks = assert' (
-    containsRegex "replaced legacy symlink" setupScript
-    && containsRegex "readlink" setupScript
-    && containsRegex "rm \"\\$" setupScript
-    && containsRegex "managed directory" setupScript
-  ) "mount paths must replace symlinks with managed directories";
+  test_mount_paths_fail_on_symlinks = assert' (
+    containsRegex "is a symlink; fix manually and re-apply" setupScript
+    && containsRegex "_cd_ensure_real_directory" setupScript
+    && containsRegex "mkdir -p" setupScript
+  ) "mount paths must fail when a managed directory path is a symlink";
 
-  allTests = [ test_mount_paths_replace_symlinks ];
+  allTests = [ test_mount_paths_fail_on_symlinks ];
 in
 builtins.seq (builtins.deepSeq allTests null) {
   success = true;

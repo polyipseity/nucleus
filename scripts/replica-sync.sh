@@ -364,9 +364,7 @@ gc_local_macos_artifacts() {
 
 # ensure_macos_icloud_replica_symlink RELATIVE_PATH
 #   Ensures ~/RELATIVE_PATH is a symlink to ~/Library/Mobile Documents, the
-#   native iCloud Drive mount. WHY: the replica path must resolve into the
-#   natively-synced iCloud tree — a real directory there would be a separate,
-#   non-synced copy. Existing directories are backed up before replacement.
+#   native iCloud Drive mount.
 ensure_macos_icloud_replica_symlink() {
   _relative_path="$1"
   _native_target="$HOME/Library/Mobile Documents"
@@ -382,26 +380,13 @@ ensure_macos_icloud_replica_symlink() {
     if [ "$_current_target" = "$_native_target" ]; then
       return 0
     fi
-    if [ "$dry_run" = true ]; then
-      dry_run "would update iCloudReplica symlink $_replica_path -> $_native_target (was $_current_target)"
-      return 0
-    fi
-    rm "$_replica_path"
-    ln -s "$_native_target" "$_replica_path"
-    say "[iCloud] updated iCloudReplica symlink $_replica_path -> $_native_target (was $_current_target)"
-    return 0
+    error "[iCloud] $_replica_path must symlink to $_native_target (found $_current_target); fix manually and re-run sync"
+    return 1
   fi
 
   if [ -e "$_replica_path" ]; then
-    _backup_path="$_replica_path.pre-native-icloud.$(date +%Y%m%d%H%M%S)"
-    if [ "$dry_run" = true ]; then
-      dry_run "would move $_replica_path to $_backup_path and create symlink -> $_native_target"
-      return 0
-    fi
-    mv "$_replica_path" "$_backup_path"
-    ln -s "$_native_target" "$_replica_path"
-    say "[iCloud] migrated $_replica_path to native iCloud symlink target $_native_target (backup: $_backup_path)"
-    return 0
+    error "[iCloud] $_replica_path exists and is not the native iCloud symlink; fix manually and re-run sync"
+    return 1
   fi
 
   if [ "$dry_run" = true ]; then

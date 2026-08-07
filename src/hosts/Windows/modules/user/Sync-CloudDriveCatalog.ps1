@@ -53,18 +53,6 @@ function Sync-CloudDriveCatalog {
     $replicas = @($cloudDrivesConfig.replicas | Where-Object { $_ })
 
     # ------------------------------------------------------------------
-    # Legacy cleanup — remove old Servy-managed mount services
-    # ------------------------------------------------------------------
-    # check-suppress:suppression_doc: probe whether legacy mount services exist; Get-Service throws when absent.
-    $oldMountServices = Get-Service -Name 'nucleus-cloud-mount-*' -ErrorAction SilentlyContinue
-    foreach ($oldSvc in $oldMountServices) {
-        # check-suppress:suppression_doc: probe -- service may already be stopped; harmless to skip.
-        Stop-Service -Name $oldSvc.Name -ErrorAction SilentlyContinue
-        sc.exe delete $oldSvc.Name
-        Write-Verbose "cloud-drives: cleaned up legacy Servy service '$($oldSvc.Name)'"
-    }
-
-    # ------------------------------------------------------------------
     # Mounts
     # ------------------------------------------------------------------
     $enabledMounts = $mounts | Where-Object { $_.enable -eq $true }
@@ -77,9 +65,7 @@ function Sync-CloudDriveCatalog {
             # Enforce real directory mountpoints on Windows for parity with
             # POSIX hosts and to avoid stale symlink/junction targets.
             if ($mountPathIsReparsePoint -or -not $existingMountPath.PSIsContainer) {
-                Remove-Item -LiteralPath $localPath -Recurse -Force
-                New-Item -ItemType Directory -Path $localPath -Force > $null
-                Write-Verbose "cloud-drives: replaced legacy mount reparse/non-directory path with managed directory $localPath"
+                throw "cloud-drives: mount path '$localPath' is not a managed directory; fix manually and re-apply"
             }
         }
         else {
@@ -230,9 +216,7 @@ function Sync-CloudDriveCatalog {
             # Keep Windows replica targets as managed directories. The macOS-only
             # iCloudReplica symlink exception does not apply on Windows.
             if ($replicaPathIsReparsePoint -or -not $existingReplicaPath.PSIsContainer) {
-                Remove-Item -LiteralPath $localPath -Recurse -Force
-                New-Item -ItemType Directory -Path $localPath -Force > $null
-                Write-Verbose "cloud-drives: replaced legacy replica reparse/non-directory path with managed directory $localPath"
+                throw "cloud-drives: replica path '$localPath' is not a managed directory; fix manually and re-apply"
             }
         }
         else {
