@@ -27,6 +27,7 @@
     ./camillagui-backend.nix
     ../../modules/camillagui-backend.nix
     ./defaults.nix
+    ./filesystem-scope.nix
     ./homebrew.nix
     ./https-proxy.nix
     ../../modules/https-proxy.nix

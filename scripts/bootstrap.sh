@@ -241,7 +241,7 @@ ensure_macos_nix_mount() {
     fi
   fi
 
-  error "Reboot once to materialize /nix, then re-run bootstrap.sh."
+  error "Reboot once to materialize /nix, then re-run bootstrap.sh. See src/hosts/MacBook/MANUAL.md."
 }
 
 load_bootstrap_versions
