@@ -26,6 +26,8 @@ if [ "$(uname -s)" = "Darwin" ] && [ -n "$_user_log_subdirs" ]; then
       _user_log_root="${_console_user}/nucleus/logs"
     elif [ "${_user_log_root#\~/}" != "$_user_log_root" ]; then
       _user_log_root="${_console_user}${_user_log_root#~}"
+    elif [ "${_user_log_root#/}" = "$_user_log_root" ]; then
+      _user_log_root="${_console_user}/${_user_log_root}"
     fi
     for subdir in $_user_log_subdirs; do
       /bin/mkdir -p "$_user_log_root/$subdir"

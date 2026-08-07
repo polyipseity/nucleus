@@ -46,7 +46,7 @@ let
   # repo-local scripts.
   activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
 
-  macBookUserLogDir = servicesJSON."$logging".MacBook.logDir;
+  macBookUserLogDirSuffix = lib.removePrefix "~/" servicesJSON."$logging".MacBook.logDir;
 
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
@@ -95,7 +95,7 @@ in
       "${builtins.toString systemLogDirs}" \
       "${builtins.toString userLogDirs}" \
       "${builtins.toString chownLogDirs}" \
-      "${macBookUserLogDir}"
+      "${macBookUserLogDirSuffix}"
   '';
 
   # ---------------------------------------------------------------------------
@@ -219,7 +219,7 @@ in
       "${builtins.toString systemLogDirs}" \
       "${builtins.toString userLogDirs}" \
       "${builtins.toString chownLogDirs}" \
-      "${macBookUserLogDir}"
+      "${macBookUserLogDirSuffix}"
     # check-suppress:suppression_doc: /dev/console may not exist; guards below handle empty/root.
     _camilladsp_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     if [ -n "$_camilladsp_user" ] && [ "$_camilladsp_user" != "/Users/root" ]; then
