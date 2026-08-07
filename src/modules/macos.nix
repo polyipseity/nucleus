@@ -795,7 +795,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       StandardOutPath = "${config.nucleus.logging.logDir}/service-watchdog/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.logDir}/service-watchdog/stderr.log";
       EnvironmentVariables = {
-        NUCLEUS_SERVICES_JSON = import ../lib/services-json-path.nix { };
+        NUCLEUS_SERVICES_JSON = import ./lib/services-json-path.nix { };
         NUCLEUS_REPO_ROOT = builtins.getEnv "NUCLEUS_REPO_ROOT";
       };
     };
