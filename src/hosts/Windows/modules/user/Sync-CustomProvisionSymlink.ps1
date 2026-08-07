@@ -146,7 +146,7 @@ function Sync-CustomProvisionSymlink {
       }
 
       $targets = $entry.targets
-      $windowsTarget = if ($targets -and $targets.windows) { [string]$targets.windows } else { '' }
+      $windowsTarget = if ($targets -and $targets.Windows) { [string]$targets.Windows } else { '' }
       if ([string]::IsNullOrWhiteSpace($windowsTarget)) {
         continue
       }

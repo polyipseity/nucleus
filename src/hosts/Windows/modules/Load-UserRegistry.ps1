@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Assembles per-user configuration by deep-merging src/users/default/ with
-  src/users/<username>/ domain files, then resolving platform-keyed fields for
+  src/users/<username>/ domain files, then resolving host-keyed fields for
   Windows.
 
 .PARAMETER RepoRoot
@@ -26,12 +26,12 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$Platform = 'windows'
+$HostName = 'Windows'
 $UsersRoot = Join-Path -Path $RepoRoot -ChildPath 'src\users'
 $DefaultRoot = Join-Path -Path $UsersRoot -ChildPath 'default'
-$PlatformKeys = @('linux', 'macos', 'nixos', 'windows')
+$HostKeys = @('MacBook', 'NixOS', 'Windows')
 
-function Test-PlatformMap {
+function Test-HostMap {
   param([object]$Value)
 
   if ($null -eq $Value) {
@@ -54,7 +54,7 @@ function Test-PlatformMap {
   }
 
   foreach ($key in $keys) {
-    if ($PlatformKeys -notcontains [string]$key) {
+    if ($HostKeys -notcontains [string]$key) {
       return $false
     }
   }
@@ -62,10 +62,10 @@ function Test-PlatformMap {
   return $true
 }
 
-function Resolve-PlatformValue {
+function Resolve-HostValue {
   param([object]$Value)
 
-  if (-not (Test-PlatformMap -Value $Value)) {
+  if (-not (Test-HostMap -Value $Value)) {
     return $Value
   }
 
@@ -73,13 +73,11 @@ function Resolve-PlatformValue {
     $Value = ConvertTo-PlainObject -InputObject $Value
   }
 
-  foreach ($key in @($Platform, 'linux', 'macos', 'nixos', 'windows')) {
-    if ($Value.ContainsKey($key)) {
-      return $Value[$key]
-    }
+  if ($Value.ContainsKey($HostName)) {
+    return $Value[$HostName]
   }
 
-  return ($Value.Values | Select-Object -First 1)
+  throw "Load-UserRegistry: host map missing key '$HostName'"
 }
 
 function ConvertTo-PlainObject {
@@ -177,13 +175,13 @@ function Resolve-CloudDriveItem {
   }
 
   if ($resolved.ContainsKey('localPath')) {
-    $resolved['localPath'] = Resolve-PlatformValue -Value $resolved['localPath']
+    $resolved['localPath'] = Resolve-HostValue -Value $resolved['localPath']
   }
   if ($resolved.ContainsKey('enable')) {
-    $resolved['enable'] = Resolve-PlatformValue -Value $resolved['enable']
+    $resolved['enable'] = Resolve-HostValue -Value $resolved['enable']
   }
   if ($resolved.ContainsKey('fallbackTimer') -and $resolved['fallbackTimer'] -is [hashtable] -and $resolved['fallbackTimer'].ContainsKey('enable')) {
-    $resolved['fallbackTimer']['enable'] = Resolve-PlatformValue -Value $resolved['fallbackTimer']['enable']
+    $resolved['fallbackTimer']['enable'] = Resolve-HostValue -Value $resolved['fallbackTimer']['enable']
   }
 
   return $resolved
@@ -231,7 +229,7 @@ function Resolve-DevRepos {
       $resolvedRepo[$key] = $repo[$key]
     }
     if ($resolvedRepo.ContainsKey('target')) {
-      $resolvedRepo['target'] = Resolve-PlatformValue -Value $resolvedRepo['target']
+      $resolvedRepo['target'] = Resolve-HostValue -Value $resolvedRepo['target']
     }
     $repositories += $resolvedRepo
   }
@@ -253,7 +251,7 @@ function Assemble-UserRecord {
   $profile = Read-MergedDomain -Username $Username -FileName 'profile.json'
   $homeDirectory = $null
   if ($profile.ContainsKey('homeDirectory')) {
-    $homeDirectory = Resolve-PlatformValue -Value $profile['homeDirectory']
+    $homeDirectory = Resolve-HostValue -Value $profile['homeDirectory']
   }
 
   $cloudDrives = Resolve-CloudDrives -CloudDrives (Read-MergedDomain -Username $Username -FileName 'cloud-drives.json')
