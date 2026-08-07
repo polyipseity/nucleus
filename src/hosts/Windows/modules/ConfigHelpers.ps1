@@ -302,10 +302,10 @@ function Resolve-UserConfigFile {
     Resolves a non-host-specific per-user overlay config file.
 
   .DESCRIPTION
-    Looks up src/users/<User>/<ConfigName>/<RelativePath> under the repo,
-    falling back to src/users/default/<ConfigName>/<RelativePath>. The per-user
-    file wins when it exists; throws when neither exists (fail-fast, no silent
-    fallback). Mirrors selectUserConfigFile in src/modules/lib/users-overlay.nix.
+    Resolves first-level overlay entries independently: the first path segment
+    selects the overlay key (file or directory); remaining segments are resolved
+    inside that entry without further overlay merging. Mirrors
+    selectUserConfigFile in src/modules/lib/users-overlay.nix.
   .PARAMETER User
     Username from the user registry.
   .PARAMETER ConfigName
@@ -333,22 +333,98 @@ function Resolve-UserConfigFile {
     [string]$RepoRoot
   )
 
-  $perUser = Join-Path -Path $RepoRoot -ChildPath "src\users\$User\$ConfigName\$RelativePath"
-  $default = Join-Path -Path $RepoRoot -ChildPath "src\users\default\$ConfigName\$RelativePath"
-  if (Test-Path -Path $perUser -PathType Leaf) { return $perUser }
-  if (Test-Path -Path $default -PathType Leaf) { return $default }
-  throw "Resolve-UserConfigFile: no source found for user '$User', config '$ConfigName', relative path '$RelativePath' (tried '$perUser' and '$default')"
+  $perUserRoot = Join-Path -Path $RepoRoot -ChildPath "src\users\$User\$ConfigName"
+  $defaultRoot = Join-Path -Path $RepoRoot -ChildPath "src\users\default\$ConfigName"
+  $firstSegment = $RelativePath
+  $restPath = ''
+  if ($RelativePath.Contains('/')) {
+    $segments = $RelativePath.Split('/', [System.StringSplitOptions]::RemoveEmptyEntries)
+    $firstSegment = $segments[0]
+    if ($segments.Length -gt 1) {
+      $restPath = ($segments[1..($segments.Length - 1)] -join '/').Replace('/', [System.IO.Path]::DirectorySeparatorChar)
+    }
+  } elseif ($RelativePath.Contains('\')) {
+    $segments = $RelativePath.Split('\', [System.StringSplitOptions]::RemoveEmptyEntries)
+    $firstSegment = $segments[0]
+    if ($segments.Length -gt 1) {
+      $restPath = ($segments[1..($segments.Length - 1)] -join [System.IO.Path]::DirectorySeparatorChar)
+    }
+  }
+
+  $perUserEntry = Join-Path -Path $perUserRoot -ChildPath $firstSegment
+  $defaultEntry = Join-Path -Path $defaultRoot -ChildPath $firstSegment
+  $entryRoot = if (Test-Path -LiteralPath $perUserEntry) { $perUserEntry } elseif (Test-Path -LiteralPath $defaultEntry) { $defaultEntry } else { $null }
+  if ($null -eq $entryRoot) {
+    throw "Resolve-UserConfigFile: no first-level entry for user '$User', config '$ConfigName', relative path '$RelativePath' (tried '$perUserEntry' and '$defaultEntry')"
+  }
+
+  $resolved = if ([string]::IsNullOrEmpty($restPath)) { $entryRoot } else { Join-Path -Path $entryRoot -ChildPath $restPath }
+  if (Test-Path -LiteralPath $resolved) { return $resolved }
+  throw "Resolve-UserConfigFile: no source found for user '$User', config '$ConfigName', relative path '$RelativePath' (resolved '$resolved')"
+}
+
+function Resolve-UserConfigFirstLevelEntry {
+  <#
+  .SYNOPSIS
+    Resolves one first-level overlay entry under a per-user config directory.
+  #>
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$User,
+
+    [Parameter(Mandatory)]
+    [string]$ConfigName,
+
+    [Parameter(Mandatory)]
+    [string]$EntryName,
+
+    [Parameter(Mandatory)]
+    [string]$RepoRoot
+  )
+
+  $perUser = Join-Path -Path $RepoRoot -ChildPath "src\users\$User\$ConfigName\$EntryName"
+  $default = Join-Path -Path $RepoRoot -ChildPath "src\users\default\$ConfigName\$EntryName"
+  if (Test-Path -LiteralPath $perUser) { return $perUser }
+  if (Test-Path -LiteralPath $default) { return $default }
+  throw "Resolve-UserConfigFirstLevelEntry: no source found for user '$User', config '$ConfigName', entry '$EntryName' (tried '$perUser' and '$default')"
+}
+
+function Get-UserConfigFirstLevelEntries {
+  <#
+  .SYNOPSIS
+    Lists first-level overlay entry names for a per-user config directory.
+  #>
+  [CmdletBinding()]
+  [OutputType([string[]])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$User,
+
+    [Parameter(Mandatory)]
+    [string]$ConfigName,
+
+    [Parameter(Mandatory)]
+    [string]$RepoRoot
+  )
+
+  $names = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+  $perUser = Join-Path -Path $RepoRoot -ChildPath "src\users\$User\$ConfigName"
+  $default = Join-Path -Path $RepoRoot -ChildPath "src\users\default\$ConfigName"
+  foreach ($root in @($perUser, $default)) {
+    if (-not (Test-Path -LiteralPath $root -PathType Container)) { continue }
+    foreach ($child in Get-ChildItem -LiteralPath $root -Force) {
+      [void]$names.Add($child.Name)
+    }
+  }
+  return @($names)
 }
 
 function Resolve-UserConfigDir {
   <#
   .SYNOPSIS
-    Resolves the per-user overlay config directory for an app.
-
-  .DESCRIPTION
-    Returns src/users/<User>/<ConfigName> when it exists, otherwise
-    src/users/default/<ConfigName>. Mirrors selectUserConfigDir in
-    src/modules/lib/users-overlay.nix.
+    Deprecated: use Get-UserConfigFirstLevelEntries and Resolve-UserConfigFirstLevelEntry.
   #>
   [CmdletBinding()]
   [OutputType([string])]
@@ -363,11 +439,7 @@ function Resolve-UserConfigDir {
     [string]$RepoRoot
   )
 
-  $perUser = Join-Path -Path $RepoRoot -ChildPath "src\users\$User\$ConfigName"
-  $default = Join-Path -Path $RepoRoot -ChildPath "src\users\default\$ConfigName"
-  if (Test-Path -Path $perUser -PathType Container) { return $perUser }
-  if (Test-Path -Path $default -PathType Container) { return $default }
-  throw "Resolve-UserConfigDir: no source found for user '$User', config '$ConfigName' (tried '$perUser' and '$default')"
+  throw "Resolve-UserConfigDir is removed; use Get-UserConfigFirstLevelEntries and Resolve-UserConfigFirstLevelEntry instead."
 }
 
 function Deploy-UserWritableSymlink {

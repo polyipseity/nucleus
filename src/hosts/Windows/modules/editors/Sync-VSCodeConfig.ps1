@@ -92,12 +92,18 @@ function Sync-VSCodeConfig {
     [string]$Username = [System.Environment]::UserName
   )
 
-  $vsConfigDir = Resolve-UserConfigDir -User $Username -ConfigName 'vscode' -RepoRoot $RepoRoot
-  if ($Enabled -and -not (Test-Path -LiteralPath $vsConfigDir -PathType Container)) {
-    throw "VS Code config directory not found: $vsConfigDir"
+
+  . (Join-Path -Path $PSScriptRoot -ChildPath '..\Set-ManagedSymlinkDeleteProtection.ps1')
+
+  function Get-VSCodeRepoFileTarget {
+    param([Parameter(Mandatory)][string]$RelativePath)
+    return Resolve-UserConfigFile -User $Username -ConfigName 'vscode' -RelativePath $RelativePath -RepoRoot $RepoRoot
   }
 
-  . (Join-Path -Path $PSScriptRoot -ChildPath "..\Set-ManagedSymlinkDeleteProtection.ps1")
+  function Get-VSCodeRepoDirTarget {
+    param([Parameter(Mandatory)][string]$EntryName)
+    return Resolve-UserConfigFirstLevelEntry -User $Username -ConfigName 'vscode' -EntryName $EntryName -RepoRoot $RepoRoot
+  }
 
   # Symlinks on Windows require Developer Mode or an elevated session.  Check
   # once upfront so the failure message is actionable rather than cryptic.
@@ -201,7 +207,7 @@ function Sync-VSCodeConfig {
     # --- Managed files ---
     foreach ($repoFileName in $managedFiles.Keys) {
       $linkFileName = $managedFiles[$repoFileName]
-      $repoTarget = Join-Path -Path $vsConfigDir -ChildPath $repoFileName
+      $repoTarget = Get-VSCodeRepoFileTarget -RelativePath $repoFileName
       $linkPath   = Join-Path -Path $channelDir  -ChildPath $linkFileName
 
       if (-not $Enabled) {
@@ -259,7 +265,7 @@ function Sync-VSCodeConfig {
 
     # --- Managed directories ---
     foreach ($alias in $managedDirs.Keys) {
-      $repoTarget = Join-Path -Path $vsConfigDir  -ChildPath $alias
+      $repoTarget = Get-VSCodeRepoDirTarget -EntryName $alias
       $linkPath   = Join-Path -Path $channelDir   -ChildPath $managedDirs[$alias]
 
       if (-not $Enabled) {
@@ -327,7 +333,7 @@ function Sync-VSCodeConfig {
         }
       }
       # check-suppress:config-method: method 3 (merge) -- name-keyed merge preserves VS Code-added model entries while refreshing repo entries.
-      $repoFile = Join-Path -Path $vsConfigDir -ChildPath "chatLanguageModels.windows.json"
+      $repoFile = Get-VSCodeRepoFileTarget -RelativePath 'chatLanguageModels.windows.json'
       Merge-VSChatLanguageModel -RepoFile $repoFile -DestFile $chatLmPath
     }
   }

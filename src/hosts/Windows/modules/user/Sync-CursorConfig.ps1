@@ -41,8 +41,8 @@ function Sync-CursorConfig {
   $label = 'cursor-config'
   $agentsDir = Join-Path -Path $HOME -ChildPath '.agents'
   $cursorDir = Join-Path -Path $HOME -ChildPath '.cursor'
-  $cursorSource = Resolve-UserConfigDir -User $Username -ConfigName 'cursor' -RepoRoot $RepoRoot
   $managedBridgeDirs = @('rules', 'agents', 'commands', 'skills')
+  $cursorEntryNames = Get-UserConfigFirstLevelEntries -User $Username -ConfigName 'cursor' -RepoRoot $RepoRoot
 
   . (Join-Path -Path $PSScriptRoot -ChildPath '..\Set-ManagedSymlinkDeleteProtection.ps1')
 
@@ -167,8 +167,14 @@ function Sync-CursorConfig {
         $isManagedBridge = $managedBridgeDirs -contains $child.Name
         $isManagedNative = $false
         if (-not $isManagedBridge) {
-          $expectedNative = Join-Path -Path $cursorSource -ChildPath $child.Name
-          $isManagedNative = [string]::Equals($target, $expectedNative, [System.StringComparison]::OrdinalIgnoreCase)
+          $expectedNative = $null
+          # check-suppress:suppression_doc: overlay entry may have been removed; stale cleanup is best-effort.
+          try {
+            $expectedNative = Resolve-UserConfigFirstLevelEntry -User $Username -ConfigName 'cursor' -EntryName $child.Name -RepoRoot $RepoRoot
+          } catch {
+            $expectedNative = $null
+          }
+          $isManagedNative = $null -ne $expectedNative -and [string]::Equals($target, $expectedNative, [System.StringComparison]::OrdinalIgnoreCase)
         }
         if ($isManagedBridge -or $isManagedNative) {
           Remove-ManagedSymlinkDeleteProtection -Context $label -Path $child.FullName
@@ -205,8 +211,8 @@ function Sync-CursorConfig {
     return
   }
 
-  if (-not (Test-Path -LiteralPath $cursorSource -PathType Container)) {
-    Write-Error "$label`: cursor config dir not found: $cursorSource"
+  if ($cursorEntryNames.Count -eq 0) {
+    Write-Error "$label`: no cursor overlay entries found for user '$Username'"
     return
   }
 
@@ -235,8 +241,14 @@ function Sync-CursorConfig {
       $isSymlink = ($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
         -and $child.LinkType -eq 'SymbolicLink'
       if ($isSymlink) {
-        $expectedSource = Join-Path -Path $cursorSource -ChildPath $child.Name
-        if ([string]::Equals($child.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $expectedSource = $null
+        # check-suppress:suppression_doc: overlay entry may have been removed; stale cleanup is best-effort.
+        try {
+          $expectedSource = Resolve-UserConfigFirstLevelEntry -User $Username -ConfigName 'cursor' -EntryName $child.Name -RepoRoot $RepoRoot
+        } catch {
+          $expectedSource = $null
+        }
+        if ($null -ne $expectedSource -and [string]::Equals($child.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
           if (-not (Test-Path -LiteralPath $expectedSource)) {
             Remove-ManagedSymlinkDeleteProtection -Context $label -Path $child.FullName
             Remove-Item -LiteralPath $child.FullName -Force
@@ -247,27 +259,27 @@ function Sync-CursorConfig {
     }
   }
 
-  $sourceEntries = Get-ChildItem -LiteralPath $cursorSource -Force
-  foreach ($entry in $sourceEntries) {
-    if ($managedBridgeDirs -contains $entry.Name) { continue }
-    $linkPath = Join-Path -Path $cursorDir -ChildPath $entry.Name
+  foreach ($entryName in $cursorEntryNames) {
+    if ($managedBridgeDirs -contains $entryName) { continue }
+    $entryPath = Resolve-UserConfigFirstLevelEntry -User $Username -ConfigName 'cursor' -EntryName $entryName -RepoRoot $RepoRoot
+    $linkPath = Join-Path -Path $cursorDir -ChildPath $entryName
     if (Test-Path -LiteralPath $linkPath) {
       $linkItem = Get-Item -LiteralPath $linkPath -Force
       $isSymlink = ($linkItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
         -and $linkItem.LinkType -eq 'SymbolicLink'
       if ($isSymlink) {
-        if ([string]::Equals($linkItem.Target, $entry.FullName, [System.StringComparison]::OrdinalIgnoreCase)) {
+        if ([string]::Equals($linkItem.Target, $entryPath, [System.StringComparison]::OrdinalIgnoreCase)) {
           continue
         }
         Remove-ManagedSymlinkDeleteProtection -Context $label -Path $linkPath
         Remove-Item -LiteralPath $linkPath -Force
       } else {
-        Write-Error "$label`: $linkPath is not a managed symlink — merge wanted content into $($entry.FullName) and remove it, then re-run apply."
+        Write-Error "$label`: $linkPath is not a managed symlink — merge wanted content into $entryPath and remove it, then re-run apply."
         return
       }
     }
-    New-Item -ItemType SymbolicLink -Path $linkPath -Target $entry.FullName > $null
+    New-Item -ItemType SymbolicLink -Path $linkPath -Target $entryPath > $null
     Set-ManagedSymlinkDeleteProtection -Context $label -Path $linkPath
-    Write-Output "$label`: linked $linkPath -> $($entry.FullName)"
+    Write-Output "$label`: linked $linkPath -> $entryPath"
   }
 }

@@ -42,7 +42,7 @@ let
     inherit effectiveUsername repoRoot;
   };
 
-  iterm2DynamicProfilesDir = "${overlay.selectDir "iterm2"}/DynamicProfiles";
+  iterm2DynamicProfilesDir = overlay.selectFirstLevelEntry "iterm2" "DynamicProfiles";
 in
 lib.mkIf pkgs.stdenv.isDarwin {
   home.file = {

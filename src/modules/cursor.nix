@@ -20,12 +20,6 @@ let
 
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
-  overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
-    inherit effectiveUsername repoRoot;
-  };
-
-  cursorConfigDir = overlay.selectDir "cursor";
-
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 {
@@ -44,7 +38,7 @@ in
           "install-agent-skills"
         ]
         ''
-          "${activationBundle}/src/scripts/configs/symlink-cursor-config.sh" "${repoRoot}" "${cursorConfigDir}"
+          "${activationBundle}/src/scripts/configs/symlink-cursor-config.sh" "${repoRoot}" "${effectiveUsername}"
         '';
   };
 }

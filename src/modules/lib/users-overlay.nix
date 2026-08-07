@@ -1,19 +1,26 @@
 # src/modules/lib/users-overlay.nix — Per-user homedir overlay path selection.
 #
-# App trees under src/users/<username>/ override src/users/default/<app>/ when
-# present. Registry JSON domains use users-registry.nix instead.
+# App trees under src/users/<username>/ merge with src/users/default/<app>/ at
+# first level only: each first-level file or directory is resolved independently;
+# deeper paths inherit the chosen first-level entry in whole. Registry JSON
+# domains use users-registry.nix instead.
 #
 # selectUserConfigSource: host-specific files at
 #   src/users/<username>/<config>/<Host>.<ext>
 # with src/users/default/<config>/<Host>.<ext> fallback.
 #
-# selectUserConfigFile: non-host-specific files at
-#   src/users/<username>/<config>/<relativePath>
-# with src/users/default/<config>/<relativePath> fallback.
+# selectUserConfigFirstLevelEntry: one first-level name under <config>/.
 #
-# selectUserConfigDir: per-user config root directory with default fallback.
+# selectUserConfigFile: relative paths where the first segment selects the
+# first-level overlay entry; remaining segments are resolved inside that entry.
+#
+# listUserConfigFirstLevelEntries: union of first-level names from user and
+# default config dirs (user wins on name collision at resolve time).
 #
 # mkUserOverlay: binds effectiveUsername/repoRoot/hostName to the selectors.
+let
+  lib = import <nixpkgs/lib>;
+in
 rec {
   selectUserConfigSource =
     {
@@ -29,6 +36,42 @@ rec {
     in
     if builtins.pathExists perUser then perUser else default;
 
+  selectUserConfigFirstLevelEntry =
+    {
+      configName,
+      entryName,
+      effectiveUsername,
+      repoRoot,
+    }:
+    let
+      perUser = "${repoRoot}/src/users/${effectiveUsername}/${configName}/${entryName}";
+      default = "${repoRoot}/src/users/default/${configName}/${entryName}";
+    in
+    if builtins.pathExists perUser then
+      perUser
+    else if builtins.pathExists default then
+      default
+    else
+      builtins.throw "selectUserConfigFirstLevelEntry: no source for '${configName}/${entryName}' (user '${effectiveUsername}')";
+
+  listUserConfigFirstLevelEntries =
+    {
+      configName,
+      effectiveUsername,
+      repoRoot,
+    }:
+    let
+      perUserDir = "${repoRoot}/src/users/${effectiveUsername}/${configName}";
+      defaultDir = "${repoRoot}/src/users/default/${configName}";
+      readNames =
+        dir:
+        if builtins.pathExists dir then
+          builtins.attrNames (builtins.readDir dir)
+        else
+          [ ];
+    in
+    lib.unique ((readNames perUserDir) ++ (readNames defaultDir));
+
   selectUserConfigFile =
     {
       configName,
@@ -37,22 +80,27 @@ rec {
       repoRoot,
     }:
     let
-      perUser = "${repoRoot}/src/users/${effectiveUsername}/${configName}/${relativePath}";
-      default = "${repoRoot}/src/users/default/${configName}/${relativePath}";
+      segments = lib.splitString "/" relativePath;
+      firstSegment = builtins.head segments;
+      restSegments = lib.drop 1 segments;
+      entryRoot = selectUserConfigFirstLevelEntry {
+        inherit
+          configName
+          effectiveUsername
+          repoRoot
+          ;
+        entryName = firstSegment;
+      };
+      resolvedPath =
+        if restSegments == [ ] then
+          entryRoot
+        else
+          "${entryRoot}/${lib.concatStringsSep "/" restSegments}";
     in
-    if builtins.pathExists perUser then perUser else default;
-
-  selectUserConfigDir =
-    {
-      configName,
-      effectiveUsername,
-      repoRoot,
-    }:
-    let
-      perUser = "${repoRoot}/src/users/${effectiveUsername}/${configName}";
-      default = "${repoRoot}/src/users/default/${configName}";
-    in
-    if builtins.pathExists perUser then perUser else default;
+    if builtins.pathExists resolvedPath then
+      resolvedPath
+    else
+      builtins.throw "selectUserConfigFile: no source for '${configName}/${relativePath}' (resolved '${resolvedPath}')";
 
   mkUserOverlay =
     {
@@ -73,27 +121,29 @@ rec {
           ) absolutePath
         else
           absolutePath;
+      overlayArgs = {
+        inherit effectiveUsername repoRoot;
+      };
     in
     {
       inherit toRepoRelPath;
       selectFile =
         configName: relativePath:
         selectUserConfigFile {
-          inherit
-            configName
-            relativePath
-            effectiveUsername
-            repoRoot
-            ;
+          inherit configName relativePath;
+          inherit (overlayArgs) effectiveUsername repoRoot;
         };
-      selectDir =
+      selectFirstLevelEntry =
+        configName: entryName:
+        selectUserConfigFirstLevelEntry {
+          inherit configName entryName;
+          inherit (overlayArgs) effectiveUsername repoRoot;
+        };
+      listFirstLevelEntries =
         configName:
-        selectUserConfigDir {
-          inherit
-            configName
-            effectiveUsername
-            repoRoot
-            ;
+        listUserConfigFirstLevelEntries {
+          inherit configName;
+          inherit (overlayArgs) effectiveUsername repoRoot;
         };
       selectSource =
         configName: ext:

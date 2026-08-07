@@ -91,3 +91,105 @@ _nucleus_converge_symlinks() {
     fi
   done
 }
+
+# _nucleus_converge_overlay_entry SOURCE_PATH TARGET_LINK LABEL CONFLICT_TEST \
+#   CONFLICT_MSG_SUFFIX [CONFLICT_MODE]
+#
+# Symlinks one overlay-resolved first-level config entry (file or directory)
+# into TARGET_LINK. Requires resolve-user-config.sh at the call site when using
+# merged iteration helpers below.
+_nucleus_converge_overlay_entry() {
+  _coe_source="$1"
+  _coe_link="$2"
+  _coe_label="$3"
+  _coe_conflict_test="$4"
+  _coe_conflict_msg_suffix="$5"
+  _coe_conflict_mode="${6:-fail}"
+  if [ -L "$_coe_link" ]; then
+    if [ "$(readlink "$_coe_link")" = "$_coe_source" ]; then
+      return 0
+    fi
+    _nucleus_unprotect_symlink "$_coe_label" "$_coe_link"
+    rm "$_coe_link"
+    ln -s "$_coe_source" "$_coe_link"
+    _nucleus_protect_symlink "$_coe_label" "$_coe_link"
+    echo "$_coe_label: updated $_coe_link -> $_coe_source"
+  elif test "$_coe_conflict_test" "$_coe_link"; then
+    if [ "$_coe_conflict_mode" = "backup" ]; then
+      _coe_backup="${_coe_link}.backup.$(date +%Y%m%d%H%M%S)"
+      mv "$_coe_link" "$_coe_backup"
+      echo "$_coe_label: backed up $_coe_link -> $_coe_backup"
+      ln -s "$_coe_source" "$_coe_link"
+      _nucleus_protect_symlink "$_coe_label" "$_coe_link"
+      echo "$_coe_label: linked $_coe_link -> $_coe_source"
+    else
+      echo "$_coe_label: $_coe_link $_coe_conflict_msg_suffix" >&2
+      exit 1
+    fi
+  else
+    ln -s "$_coe_source" "$_coe_link"
+    _nucleus_protect_symlink "$_coe_label" "$_coe_link"
+    echo "$_coe_label: linked $_coe_link -> $_coe_source"
+  fi
+}
+
+# _nucleus_converge_merged_config_symlinks USERNAME CONFIG_NAME REPO_ROOT \
+#   TARGET_DIR LABEL FIND_TYPE CONFLICT_TEST CONFLICT_MSG_SUFFIX [SKIP_NAMES]
+#
+# Converges first-level merged overlay entries into TARGET_DIR. Skips SKIP_NAMES.
+# Requires resolve-user-config.sh to be sourced before symlink-convergence.sh.
+_nucleus_converge_merged_config_symlinks() {
+  _cmc_username="$1"
+  _cmc_config_name="$2"
+  _cmc_repo_root="$3"
+  _cmc_target="$4"
+  _cmc_label="$5"
+  _cmc_find_type="$6"
+  _cmc_conflict_test="$7"
+  _cmc_conflict_msg_suffix="$8"
+  _cmc_skips="${9:-}"
+  export NUCLEUS_REPO_ROOT="$_cmc_repo_root"
+  while IFS= read -r _cmc_entry_name; do
+    [ -n "$_cmc_entry_name" ] || continue
+    for _cmc_skip in $_cmc_skips; do
+      [ "$_cmc_entry_name" = "$_cmc_skip" ] && continue 2
+    done
+    _cmc_source="$(resolve_user_config_first_level_entry "$_cmc_username" "$_cmc_config_name" "$_cmc_entry_name")"
+    if [ -n "$_cmc_find_type" ] && [ ! -d "$_cmc_source" ]; then
+      continue
+    fi
+    if [ -z "$_cmc_find_type" ] || [ -d "$_cmc_source" ]; then
+      _nucleus_converge_overlay_entry \
+        "$_cmc_source" "$_cmc_target/$_cmc_entry_name" "$_cmc_label" \
+        "$_cmc_conflict_test" "$_cmc_conflict_msg_suffix"
+    fi
+  done <<EOF
+$(list_user_config_first_level_entries "$_cmc_username" "$_cmc_config_name")
+EOF
+}
+
+# _nucleus_remove_stale_merged_symlinks TARGET_DIR USERNAME CONFIG_NAME LABEL [SKIP_NAMES]
+_nucleus_remove_stale_merged_symlinks() {
+  _rsm_target="$1"
+  _rsm_username="$2"
+  _rsm_config_name="$3"
+  _rsm_repo_root="$4"
+  _rsm_label="$5"
+  _rsm_skips="${6:-}"
+  export NUCLEUS_REPO_ROOT="$_rsm_repo_root"
+  find "$_rsm_target" -mindepth 1 -maxdepth 1 -type l | while IFS= read -r _rsm_candidate; do
+    _rsm_cname="$(basename "$_rsm_candidate")"
+    for _rsm_skip in $_rsm_skips; do
+      [ "$_rsm_cname" = "$_rsm_skip" ] && continue 2
+    done
+    _rsm_ctarget="$(readlink "$_rsm_candidate")"
+    _rsm_expected="$(resolve_user_config_first_level_entry "$_rsm_username" "$_rsm_config_name" "$_rsm_cname" 2>/dev/null || true)"
+    if [ -n "$_rsm_expected" ] && [ "$_rsm_ctarget" = "$_rsm_expected" ]; then
+      if [ ! -e "$_rsm_ctarget" ] && [ ! -L "$_rsm_ctarget" ]; then
+        _nucleus_unprotect_symlink "$_rsm_label" "$_rsm_candidate"
+        rm "$_rsm_candidate"
+        echo "$_rsm_label: removed stale symlink for $_rsm_cname (source removed)"
+      fi
+    fi
+  done
+}

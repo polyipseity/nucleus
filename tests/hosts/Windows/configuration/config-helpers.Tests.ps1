@@ -81,7 +81,7 @@ Describe 'Resolve-UserConfigFile' {
     }
 }
 
-Describe 'Resolve-UserConfigDir' {
+Describe 'Resolve-UserConfigFirstLevelEntry' {
     BeforeAll {
         . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\src\hosts\Windows\modules\ConfigHelpers.ps1')
         $script:testDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-cfgdir-" + [guid]::NewGuid().ToString('N'))
@@ -91,14 +91,24 @@ Describe 'Resolve-UserConfigDir' {
         Remove-Item -Path $script:testDir -Recurse -Force
     }
 
-    It 'returns the per-user config directory when it exists' {
+    It 'returns the per-user first-level entry when it exists' {
         $user = 'alice'
-        $path = Join-Path $script:testDir "src/users/$user/vscode"
-        New-Item -ItemType Directory -Path $path -Force > $null
-        $defaultPath = Join-Path $script:testDir "src/users/default/vscode"
-        New-Item -ItemType Directory -Path $defaultPath -Force > $null
-        $resolved = Resolve-UserConfigDir -User $user -ConfigName 'vscode' -RepoRoot $script:testDir
+        $path = Join-Path $script:testDir "src/users/$user/vscode/settings.json"
+        New-Item -ItemType Directory -Path (Split-Path -Path $path -Parent) -Force > $null
+        Set-Content -Path $path -Value '{}' -NoNewline
+        $defaultPath = Join-Path $script:testDir "src/users/default/vscode/settings.json"
+        New-Item -ItemType Directory -Path (Split-Path -Path $defaultPath -Parent) -Force > $null
+        Set-Content -Path $defaultPath -Value '{}' -NoNewline
+        $resolved = Resolve-UserConfigFirstLevelEntry -User $user -ConfigName 'vscode' -EntryName 'settings.json' -RepoRoot $script:testDir
         $resolved | Should -Be $path
+    }
+
+    It 'lists merged first-level entry names' {
+        $defaultDir = Join-Path $script:testDir "src/users/default/cursor"
+        New-Item -ItemType Directory -Path $defaultDir -Force > $null
+        Set-Content -Path (Join-Path $defaultDir 'hooks.json') -Value '{}' -NoNewline
+        $entries = Get-UserConfigFirstLevelEntries -User 'bob' -ConfigName 'cursor' -RepoRoot $script:testDir
+        $entries | Should -Contain 'hooks.json'
     }
 }
 

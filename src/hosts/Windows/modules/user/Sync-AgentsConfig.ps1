@@ -66,7 +66,6 @@ function Sync-AgentsConfig {
     [bool]$Enabled
   )
 
-  $agentsSource = Resolve-UserConfigDir -User $User -ConfigName 'agents' -RepoRoot $RepoRoot
   $agentsDir    = Join-Path -Path $HOME     -ChildPath ".agents"
 
   . (Join-Path -Path $PSScriptRoot -ChildPath "..\Set-ManagedSymlinkDeleteProtection.ps1")
@@ -95,8 +94,14 @@ function Sync-AgentsConfig {
         $isSymlink = ($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
                        -and $child.LinkType -eq 'SymbolicLink'
         if ($isSymlink) {
-          $targetPath = Join-Path -Path $agentsSource -ChildPath $child.Name
-          if ([string]::Equals($child.Target, $targetPath, [System.StringComparison]::OrdinalIgnoreCase)) {
+          $expectedSource = $null
+          # check-suppress:suppression_doc: overlay entry may have been removed; cleanup is best-effort.
+          try {
+            $expectedSource = Resolve-UserConfigFirstLevelEntry -User $User -ConfigName 'agents' -EntryName $child.Name -RepoRoot $RepoRoot
+          } catch {
+            $expectedSource = $null
+          }
+          if ($null -ne $expectedSource -and [string]::Equals($child.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
             Remove-ManagedSymlinkDeleteProtection -Context "agents-config" -Path $child.FullName
             Remove-Item -LiteralPath $child.FullName -Force
             Write-Output "agents-config: removed managed agents subdir symlink: $($child.FullName)"
@@ -107,12 +112,13 @@ function Sync-AgentsConfig {
     return
   }
 
-  if (-not (Test-Path -LiteralPath $agentsSource -PathType Container)) {
-    Write-Error "agents-config: Sync-AgentsConfig: agents config dir not found: $agentsSource"
+  $entryNames = Get-UserConfigFirstLevelEntries -User $User -ConfigName 'agents' -RepoRoot $RepoRoot
+  if ($entryNames.Count -eq 0) {
+    Write-Error "agents-config: Sync-AgentsConfig: no agents overlay entries found for user '$User'"
     return
   }
 
-  # Migration: remove the old whole-dir symlink if it still points to the managed
+  # Migration: remove the old whole-dir symlink if it still points into the managed
   # source.  All old-scheme symlinks at $agentsDir were created by this function;
   # user-created symlinks at this path are not expected.
   if (Test-Path -LiteralPath $agentsDir) {
@@ -131,17 +137,21 @@ function Sync-AgentsConfig {
     Write-Output "agents-config: Sync-AgentsConfig: created $agentsDir"
   }
 
-  # Remove stale per-subdir symlinks: any symlink in ~/.agents\ that once pointed
-  # into $agentsSource but whose source entry no longer exists there.
+  # Remove stale per-subdir symlinks whose resolved overlay entry no longer exists.
   $existingChildren = Get-ChildItem -LiteralPath $agentsDir -Force
   foreach ($child in $existingChildren) {
     if ($child.Name -eq "skills") { continue }  # managed by Sync-AgentsSkillManifest
     $isSymlink = ($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
                    -and $child.LinkType -eq 'SymbolicLink'
     if ($isSymlink) {
-      $expectedSource = Join-Path -Path $agentsSource -ChildPath $child.Name
-      if ([string]::Equals($child.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
-        # Managed symlink: remove if the source entry no longer exists.
+      $expectedSource = $null
+      # check-suppress:suppression_doc: overlay entry may have been removed; stale symlink cleanup is best-effort.
+      try {
+        $expectedSource = Resolve-UserConfigFirstLevelEntry -User $User -ConfigName 'agents' -EntryName $child.Name -RepoRoot $RepoRoot
+      } catch {
+        $expectedSource = $null
+      }
+      if ($null -ne $expectedSource -and [string]::Equals($child.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
         if (-not (Test-Path -LiteralPath $expectedSource)) {
           Remove-ManagedSymlinkDeleteProtection -Context "agents-config" -Path $child.FullName
           Remove-Item -LiteralPath $child.FullName -Force
@@ -151,18 +161,18 @@ function Sync-AgentsConfig {
     }
   }
 
-  # Create or update per-entry symlinks for every top-level source entry except
+  # Create or update per-entry symlinks for every merged first-level entry except
   # skills\ (managed independently by Sync-AgentsSkillManifest).
-  $sourceEntries = Get-ChildItem -LiteralPath $agentsSource -Force
-  foreach ($entry in $sourceEntries) {
-    if ($entry.Name -eq "skills") { continue }  # owned by Sync-AgentsSkillManifest
-    $linkPath = Join-Path -Path $agentsDir -ChildPath $entry.Name
+  foreach ($entryName in $entryNames) {
+    if ($entryName -eq "skills") { continue }  # owned by Sync-AgentsSkillManifest
+    $entryPath = Resolve-UserConfigFirstLevelEntry -User $User -ConfigName 'agents' -EntryName $entryName -RepoRoot $RepoRoot
+    $linkPath = Join-Path -Path $agentsDir -ChildPath $entryName
     if (Test-Path -LiteralPath $linkPath) {
       $linkItem = Get-Item -LiteralPath $linkPath -Force
       $isSymlink = ($linkItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
                      -and $linkItem.LinkType -eq 'SymbolicLink'
       if ($isSymlink) {
-        if ([string]::Equals($linkItem.Target, $entry.FullName, [System.StringComparison]::OrdinalIgnoreCase)) {
+        if ([string]::Equals($linkItem.Target, $entryPath, [System.StringComparison]::OrdinalIgnoreCase)) {
           continue  # Correct symlink — no-op.
         }
         # Wrong target (e.g. leftover from a previous checkout path): replace.
@@ -170,12 +180,12 @@ function Sync-AgentsConfig {
         Remove-Item -LiteralPath $linkPath -Force
       } else {
         # Real file or directory: fail fast to prevent silent data loss.
-        Write-Error "agents-config: Sync-AgentsConfig: $linkPath is not a managed symlink — merge any wanted content into $($entry.FullName) and remove it, then re-run apply."
+        Write-Error "agents-config: Sync-AgentsConfig: $linkPath is not a managed symlink — merge any wanted content into $entryPath and remove it, then re-run apply."
         return
       }
     }
-    New-Item -ItemType SymbolicLink -Path $linkPath -Target $entry.FullName > $null
+    New-Item -ItemType SymbolicLink -Path $linkPath -Target $entryPath > $null
     Set-ManagedSymlinkDeleteProtection -Context "agents-config" -Path $linkPath
-    Write-Output "agents-config: Sync-AgentsConfig: linked $linkPath -> $($entry.FullName)"
+    Write-Output "agents-config: Sync-AgentsConfig: linked $linkPath -> $entryPath"
   }
 }

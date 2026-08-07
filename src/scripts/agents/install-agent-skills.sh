@@ -13,8 +13,7 @@ _ask_username="$2"
 if [ -n "$_ask_repo_root" ]; then
   export NUCLEUS_REPO_ROOT="$_ask_repo_root"
 fi
-_ask_agents_dir="$(resolve_user_config_dir "$_ask_username" "agents")"
-_ask_skills_source="$_ask_agents_dir/skills"
+_ask_skills_source="$(resolve_user_config_first_level_entry "$_ask_username" "agents" "skills")"
 if [ ! -d "$_ask_skills_source" ]; then
   echo "skills: skills source dir not found: $_ask_skills_source" >&2
   exit 1

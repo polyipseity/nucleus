@@ -5,10 +5,14 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/symlink-hardening.sh"
+. "$SCRIPT_DIR/../lib/resolve-user-config.sh"
 . "$SCRIPT_DIR/../lib/symlink-convergence.sh"
 
 _scc_repo_root="$1"
-_scc_cursor_source="${2:?cursor-config: overlay config dir not provided}"
+_scc_username="$2"
+if [ -n "$_scc_repo_root" ]; then
+  export NUCLEUS_REPO_ROOT="$_scc_repo_root"
+fi
 _scc_label="cursor-config"
 
 _scc_agents_dir="$HOME/.agents"
@@ -16,11 +20,6 @@ _scc_cursor_dir="$HOME/.cursor"
 
 if [ ! -d "$_scc_agents_dir" ]; then
   echo "$_scc_label: $HOME/.agents not found — run symlink-agent-config first." >&2
-  exit 1
-fi
-
-if [ ! -d "$_scc_cursor_source" ]; then
-  echo "$_scc_label: cursor config dir not found: $_scc_cursor_source" >&2
   exit 1
 fi
 
@@ -124,13 +123,13 @@ _scc_converge_mapped_file_symlinks \
   "$_scc_agents_dir/prompts" ".prompt.md" \
   "$_scc_cursor_dir/commands" ".md"
 
-# Class B: Cursor-native entries from the overlay-selected cursor config dir.
+# Class B: Cursor-native entries from the first-level merged cursor overlay.
 _scc_managed_bridge_dirs="rules agents commands skills"
-_nucleus_remove_stale_symlinks \
-  "$_scc_cursor_dir" "$_scc_cursor_source" "$_scc_label" "$_scc_managed_bridge_dirs"
+_nucleus_remove_stale_merged_symlinks \
+  "$_scc_cursor_dir" "$_scc_username" "cursor" "$_scc_repo_root" "$_scc_label" "$_scc_managed_bridge_dirs"
 
-_nucleus_converge_symlinks \
-  "$_scc_cursor_source" "$_scc_cursor_dir" "$_scc_label" \
+_nucleus_converge_merged_config_symlinks \
+  "$_scc_username" "cursor" "$_scc_repo_root" "$_scc_cursor_dir" "$_scc_label" \
   "" "-e" \
   "is not a managed symlink — merge any wanted content into the source entry and remove it, then re-run apply." \
   "$_scc_managed_bridge_dirs"

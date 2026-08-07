@@ -218,12 +218,6 @@ let
     else
       { };
 
-  overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
-    inherit effectiveUsername repoRoot;
-  };
-
-  vscodeConfigDir = overlay.selectDir "vscode";
-
   # Utility: resolve app-scoped per-user settings overrides consistently.
   # This keeps the common `defaults // user.settings` pattern centralized.
   userAppSettings =
@@ -364,7 +358,7 @@ in
     symlink-vscode-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/editors/symlink-vscode-config.sh" \
         "${repoRoot}" \
-        "${vscodeConfigDir}" \
+        "${effectiveUsername}" \
         "${stableBaseDir}" \
         "${insidersBaseDir}" \
         "${vsCodeKeybindingsFile}" \

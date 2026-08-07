@@ -4,18 +4,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/symlink-hardening.sh"
-. "$SCRIPT_DIR/../lib/symlink-convergence.sh"
 . "$SCRIPT_DIR/../lib/resolve-user-config.sh"
+. "$SCRIPT_DIR/../lib/symlink-convergence.sh"
 
 _as_repo_root="$1"
 _as_username="$2"
 if [ -n "$_as_repo_root" ]; then
   export NUCLEUS_REPO_ROOT="$_as_repo_root"
-fi
-_as_agents_source="$(resolve_user_config_dir "$_as_username" "agents")"
-if [ ! -d "$_as_agents_source" ]; then
-  echo "agents-config: agents config dir not found: $_as_agents_source" >&2
-  exit 1
 fi
 
 _as_agents_dir="$HOME/.agents"
@@ -30,11 +25,11 @@ elif [ -e "$_as_agents_dir" ] && [ ! -d "$_as_agents_dir" ]; then
   exit 1
 fi
 
-_nucleus_remove_stale_symlinks \
-  "$_as_agents_dir" "$_as_agents_source" "agents-config" "skills"
+_nucleus_remove_stale_merged_symlinks \
+  "$_as_agents_dir" "$_as_username" "agents" "$_as_repo_root" "agents-config" "skills"
 
-_nucleus_converge_symlinks \
-  "$_as_agents_source" "$_as_agents_dir" "agents-config" \
+_nucleus_converge_merged_config_symlinks \
+  "$_as_username" "agents" "$_as_repo_root" "$_as_agents_dir" "agents-config" \
   "" "-e" \
   "is not a managed symlink — merge any wanted content into the source entry and remove it, then re-run apply." \
   "skills"
