@@ -12,6 +12,7 @@ in
 assert containsRegex "audit_nix_store_closures" auditLibText;
 assert containsRegex "nix path-info --json-format 1 --json --all --closure-size" auditLibText;
 assert containsRegex "def hsize:" auditLibText;
+assert containsRegex "audit_store_acquire_privileges" auditLibText;
 assert containsRegex "_audit_store_run_privileged" auditLibText;
 assert containsRegex "launchctl kickstart -k system/" auditLibText;
 assert containsRegex "_audit_store_top_closures_jq 15" auditLibText;

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Print a Nix store baseline report: closure sizes, generation count, GC roots,
 # stale result symlinks, and linux-builder VM store usage (macOS).
+# On macOS, prompts for sudo once at start (generations + linux-builder).
 set -euo pipefail
 
 _self="$0"

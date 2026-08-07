@@ -3,9 +3,8 @@
 #
 # Source from entry-point scripts after sourcing lib.sh and setting REPO_ROOT.
 #
-# Functions print a human-readable baseline report to stdout. Privileged sections
-# (generations on Darwin, linux-builder VM) request sudo or fail with actionable
-# errors. Other sections fail when required tools or data are unavailable.
+# Privileged sections (generations on Darwin, linux-builder VM launchd) call
+# audit_store_acquire_privileges at the start of audit_store_report.
 #
 # Environment variables:
 #   REPO_ROOT  Repository root (required).
@@ -23,8 +22,39 @@ _audit_store_section() {
   say "=== $1 ==="
 }
 
-_audit_store_interactive() {
-  [ -t 0 ] && [ -z "${CI:-}" ]
+_audit_store_privileges_required() {
+  [ "$(uname -s)" = "Darwin" ]
+}
+
+_audit_store_start_sudo_keepalive() {
+  sudo -v
+
+  _as_script_pid=$$
+  {
+    while true; do
+      sleep 55
+      kill -0 "$_as_script_pid" 2>/dev/null || exit
+      sudo -n true
+    done
+  } </dev/null >/dev/null 2>&1 &
+  SUDO_KEEPALIVE_PID=$!
+
+  # check-suppress:suppression_doc: trap cleanup for sudo keepalive; subprocess may have already exited.
+  trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true' EXIT INT TERM
+}
+
+# Acquire sudo once on macOS before slow store scans and privileged audits.
+# Skips when already root or when a caller (e.g. nucleus-apply) refreshed sudo.
+audit_store_acquire_privileges() {
+  if ! _audit_store_privileges_required || [ "$(id -u)" -eq 0 ]; then
+    return 0
+  fi
+
+  if sudo -n true 2>/dev/null; then
+    return 0
+  fi
+
+  _audit_store_start_sudo_keepalive
 }
 
 _audit_store_run_privileged() {
@@ -33,17 +63,7 @@ _audit_store_run_privileged() {
     return
   fi
 
-  if _audit_store_interactive; then
-    sudo "$@"
-    return
-  fi
-
-  if sudo -n "$@" 2>/dev/null; then
-    return
-  fi
-
-  error "privileged store audit requires sudo; re-run with 'sudo nucleus-health-check' or pass --no-store-audit"
-  return 1
+  sudo "$@"
 }
 
 _audit_store_linux_builder_ready() {
@@ -55,13 +75,8 @@ _audit_store_linux_builder_ready() {
 
   say "linux-builder launchd job not running; attempting: sudo launchctl kickstart -k system/${_as_lb_label}"
 
-  if ! _audit_store_interactive && ! sudo -n true 2>/dev/null; then
-    error "linux-builder is not running; run 'sudo launchctl kickstart -k system/${_as_lb_label}' then retry, or pass --no-store-audit"
-    return 1
-  fi
-
-  if ! sudo launchctl kickstart -k "system/${_as_lb_label}" 2>/dev/null; then
-    error "failed to start linux-builder; run 'sudo launchctl kickstart -k system/${_as_lb_label}' then retry, or pass --no-store-audit"
+  if ! sudo launchctl kickstart -k "system/${_as_lb_label}"; then
+    error "failed to start linux-builder; run 'sudo launchctl kickstart -k system/${_as_lb_label}' then retry"
     return 1
   fi
 
@@ -245,11 +260,12 @@ audit_linux_builder_store() {
   error "linux-builder store audit failed after 3 attempts; see output below"
   cat "$_as_builder_err" >&2
   rm -f "$_as_builder_out" "$_as_builder_err"
-  error "start the builder with 'sudo launchctl kickstart -k system/org.nixos.linux-builder' or pass --no-store-audit"
+  error "start the builder with 'sudo launchctl kickstart -k system/org.nixos.linux-builder' then retry"
   return 1
 }
 
 audit_store_report() {
+  audit_store_acquire_privileges
   audit_nix_store_closures
   audit_nix_generations
   audit_nix_gc_roots
