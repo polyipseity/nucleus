@@ -61,12 +61,27 @@ section() { printf '\n=== [%s] %s ===\n' "$1" "$2"; }
 # nuc_done — Print a completion message to stdout.
 nuc_done() { printf '%s\n' "$_nuc_prefix: done"; }
 
-# Resolution order: NUCLEUS_REPO_ROOT env var, SCRIPT_DIR+offset auto-discovery, then git rev-parse.
+# Resolution order: NUCLEUS_REPO_ROOT env var, /etc/nucleus/repo-root, SCRIPT_DIR+offset, then git rev-parse.
 derive_repo_root() {
   if [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ]; then
     NUCLEUS_REPO_ROOT="$(CDPATH='' cd -- "$NUCLEUS_REPO_ROOT" && pwd -P)"
     printf '%s\n' "$NUCLEUS_REPO_ROOT"
     return 0
+  fi
+  _drr_system_file="${NUCLEUS_REPO_ROOT_SYSTEM_FILE:-/etc/nucleus/repo-root}"
+  if [ -f "$_drr_system_file" ]; then
+    # WHY: sudo/su reset the environment; /etc/nucleus/repo-root (materialized at
+    # apply time) gives all-process repo-root availability on POSIX hosts.
+    IFS= read -r _drr_system_root < "$_drr_system_file" \
+      || _drr_system_root="" # check-suppress:suppression_doc: unreadable system file treated as absent.
+    case "$_drr_system_root" in
+      /*) ;;
+      *) _drr_system_root="" ;; # reject empty/relative system file paths
+    esac
+    if [ -n "$_drr_system_root" ] && [ -f "$_drr_system_root/src/flake.nix" ]; then
+      printf '%s\n' "$_drr_system_root"
+      return 0
+    fi
   fi
   # Resolve SCRIPT_DIR to the physical path before traversal so symlink chains
   # (e.g. /Users -> /System/Volumes/Data/Users, iCloud Drive) do not interfere
