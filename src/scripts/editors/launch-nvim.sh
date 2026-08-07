@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Create deterministic /etc/nucleus-bin/nvim symlink for vscode-neovim.
+# Create deterministic /etc/nucleus/bin/nvim symlink for vscode-neovim.
 # When the arg is empty, resolve at runtime from /dev/console (macOS).
 set -euo pipefail
 
@@ -15,6 +15,12 @@ if [ -z "$_nvim_path" ]; then
 fi
 
 if [ -n "$_nvim_path" ] && [ -x "$_nvim_path" ]; then
-  /bin/mkdir -p /etc/nucleus-bin
-  /bin/ln -sfn "$_nvim_path" /etc/nucleus-bin/nvim
+  /bin/mkdir -p /etc/nucleus/bin
+  /bin/ln -sfn "$_nvim_path" /etc/nucleus/bin/nvim
+  if [ -e /etc/nucleus-bin/nvim ] || [ -d /etc/nucleus-bin ]; then
+    /bin/rm -f /etc/nucleus-bin/nvim
+    if [ -d /etc/nucleus-bin ] && [ -z "$(/bin/ls -A /etc/nucleus-bin)" ]; then
+      /bin/rmdir /etc/nucleus-bin
+    fi
+  fi
 fi

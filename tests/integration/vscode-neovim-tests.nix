@@ -29,7 +29,10 @@ let
     && lib.hasInfix "com.microsoft.VSCodeInsiders" macosDefaultsText
   ) "MacBook defaults.nix must disable ApplePressAndHold for both VS Code stable and Insiders";
 
-  test_neovim_launcher_symlink = assert' (lib.hasInfix "nvimLauncher" macosActivationText) "MacBook activation.nix must have nvimLauncher section creating /etc/nucleus-bin/nvim";
+  test_neovim_launcher_symlink = assert' (
+    lib.hasInfix "launch-nvim.sh" macosActivationText
+    && lib.hasInfix "/etc/nucleus/bin/nvim" (builtins.readFile ../../src/scripts/editors/launch-nvim.sh)
+  ) "launch-nvim.sh must create /etc/nucleus/bin/nvim and MacBook activation.nix must invoke it";
 
   test_editor_line_numbers_in_settings = assert' (lib.hasInfix "\"editor.lineNumbers\": \"relative\"" settingsText) "settings.json must set editor.lineNumbers to relative";
 
@@ -45,10 +48,10 @@ let
       (
         lib.hasInfix "vscode-neovim.neovimExecutablePaths.darwin" settingsText
         && lib.hasInfix "vscode-neovim.neovimExecutablePaths.linux" settingsText
-        && lib.hasInfix "/etc/nucleus-bin/nvim" settingsText
+        && lib.hasInfix "/etc/nucleus/bin/nvim" settingsText
         && !lib.hasInfix "vscode-neovim.neovimExecutablePaths.win32" settingsText
       )
-      "settings.json must have vscode-neovim neovimExecutablePaths with /etc/nucleus-bin/nvim for darwin/linux and no win32 entry";
+      "settings.json must have vscode-neovim neovimExecutablePaths with /etc/nucleus/bin/nvim for darwin/linux and no win32 entry";
 in
 builtins.seq
   (builtins.deepSeq {

@@ -433,8 +433,8 @@
       "command": "vscode-neovim.escape"
     }
   },
-  "vscode-neovim.neovimExecutablePaths.darwin": "/etc/nucleus-bin/nvim",
-  "vscode-neovim.neovimExecutablePaths.linux": "/etc/nucleus-bin/nvim",
+  "vscode-neovim.neovimExecutablePaths.darwin": "/etc/nucleus/bin/nvim",
+  "vscode-neovim.neovimExecutablePaths.linux": "/etc/nucleus/bin/nvim",
   "window.autoDetectColorScheme": true,
   "workbench.browser.enableChatTools": true,
   "workbench.colorTheme": "Solarized Light",

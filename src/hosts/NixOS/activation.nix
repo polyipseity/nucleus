@@ -38,7 +38,7 @@ in
 {
   # ---------------------------------------------------------------------------
   # nixos-launch-nvim.sh
-  # Creates a deterministic symlink at /etc/nucleus-bin/nvim that
+  # Creates a deterministic symlink at /etc/nucleus/bin/nvim that
   # vscode-neovim can use (the extension does not expand ${userHome} or ~).
   # Resolves the nvim path from the home-manager profile directory so that no
   # username is hardcoded, matching Home Manager's useUserPackages = true layout.
