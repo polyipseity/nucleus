@@ -76,19 +76,17 @@ function Sync-AgentsSkillManifest {
     return
   }
 
-  # Migration: if ~/.agents\skills\ is the old whole-dir symlink pointing at
-  # $skillsSource, remove it so a real directory can be created in its place.
   if (Test-Path -LiteralPath $skillsDir) {
     $skillsDirItem = Get-Item -LiteralPath $skillsDir -Force
     $isWholeDirSymlink = ($skillsDirItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
                            -and $skillsDirItem.LinkType -eq 'SymbolicLink'
     if ($isWholeDirSymlink) {
-      Remove-Item -LiteralPath $skillsDir -Force
-      Write-Output "skills: Sync-AgentsSkillManifest: migrated ~/.agents\skills from symlink to real directory"
+      Write-Error "skills: Sync-AgentsSkillManifest: $skillsDir is a whole-dir symlink — remove it manually and re-run apply."
+      return
     }
   }
 
-    # Ensure ~/.agents\skills\ exists as a real (writable) directory so fetched
+  # Ensure ~/.agents\skills\ exists as a real (writable) directory so fetched
   # clawhub downloads can land here without entering the tracked repo tree.
   if (-not (Test-Path -LiteralPath $skillsDir -PathType Container)) {
     New-Item -ItemType Directory -Path $skillsDir -Force > $null

@@ -13,12 +13,8 @@
   whole-dir symlink) lets clawhub write into ~/.agents\skills\ without those
   writes landing inside the tracked repo tree.
 
-  Migration: if %USERPROFILE%\.agents is the old whole-dir symlink pointing at
-  src\modules\configs\agents\, it is removed automatically and the per-subdir
-  layout is created in its place.
-
-  Migration safety:
-    - Old whole-dir symlink  -> removed automatically; real directory created.
+  Conflict handling:
+    - Whole-dir symlink at ~/.agents  -> fail fast (remove manually).
     - Correct per-subdir symlink  -> no-op.
     - Wrong per-subdir symlink    -> remove and recreate.
     - Real path at sub-entry      -> fail fast (no silent overwrite).
@@ -118,16 +114,13 @@ function Sync-AgentsConfig {
     return
   }
 
-  # Migration: remove the old whole-dir symlink if it still points into the managed
-  # source.  All old-scheme symlinks at $agentsDir were created by this function;
-  # user-created symlinks at this path are not expected.
   if (Test-Path -LiteralPath $agentsDir) {
     $agentsDirItem = Get-Item -LiteralPath $agentsDir -Force
     $isWholeDirSymlink = ($agentsDirItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
                            -and $agentsDirItem.LinkType -eq 'SymbolicLink'
     if ($isWholeDirSymlink) {
-      Remove-Item -LiteralPath $agentsDir -Force
-      Write-Output "agents-config: Sync-AgentsConfig: migrated from whole-dir symlink to per-subdir layout"
+      Write-Error "agents-config: Sync-AgentsConfig: $agentsDir is a whole-dir symlink — remove it manually and re-run apply so per-subdir symlinks can be created."
+      return
     }
   }
 
