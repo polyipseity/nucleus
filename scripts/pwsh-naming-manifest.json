@@ -8,8 +8,9 @@
     "Sync-AgentsClawHubSkillManifest": "src/hosts/Windows/modules/user/Sync-AgentsClawHubSkillManifest.ps1",
     "Sync-SecretCatalog": "src/hosts/Windows/modules/secrets/Sync-SecretCatalog.ps1",
     "Sync-VSCodeExtensionManifest": "src/hosts/Windows/modules/editors/Sync-VSCodeExtensionManifest.ps1",
-    "Sync-VSCodeSettingManifest": "src/hosts/Windows/modules/editors/Sync-VSCodeSettingManifest.ps1"
+    "Sync-VSCodeSettingManifest": "src/hosts/Windows/modules/editors/Sync-VSCodeSettingManifest.ps1",
+    "Sync-DevRepoCatalog": "src/hosts/Windows/modules/user/Sync-DevRepoCatalog.ps1"
   },
-  "forbiddenNames": ["Sync-Symlink"],
+  "forbiddenNames": ["Sync-Symlink", "Sync-DevRepo"],
   "allowedBareSingular": []
 }

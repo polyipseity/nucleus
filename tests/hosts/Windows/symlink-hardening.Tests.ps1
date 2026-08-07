@@ -3,7 +3,7 @@
     Pester coverage for Windows managed symlink delete-protection.
 .DESCRIPTION
     Validates that every module using managed symlinks (Sync-VSCodeConfig,
-    Sync-AgentsConfig, Sync-AgentsSkill, Sync-DevRepo,
+    Sync-AgentsConfig, Sync-AgentsSkill, Sync-DevRepoCatalog,
     Sync-SymlinkManifest) correctly applies and removes delete
     protection via icacls ACL deny entries, and uses SupportsShouldProcess
     for all destructive operations.
@@ -23,7 +23,7 @@ BeforeAll {
     "src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1"
     "src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1"
     "src/hosts/Windows/modules/user/Sync-SymlinkManifest.ps1"
-    "src/hosts/Windows/modules/user/Sync-DevRepo.ps1"
+    "src/hosts/Windows/modules/user/Sync-DevRepoCatalog.ps1"
   )
 
   # Verify all module files exist
@@ -112,17 +112,17 @@ Describe "Symlink Hardening - Windows" {
     }
   }
 
-  Context "Sync-DevRepo" {
+  Context "Sync-DevRepoCatalog" {
     It "should contain Set-ManagedSymlinkDeleteProtection" {
-      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-DevRepo.ps1"
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-DevRepoCatalog.ps1"
       $content = Get-Content -Path $modulePath -Raw
       $content | Should -Match "Set-ManagedSymlinkDeleteProtection"
     }
 
     It "should protect newly created dev repo symlinks" {
-      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-DevRepo.ps1"
+      $modulePath = Join-Path -Path $PSScriptRoot -ChildPath "../../src/hosts/Windows/modules/user/Sync-DevRepoCatalog.ps1"
       $content = Get-Content -Path $modulePath -Raw
-      $content | Should -Match "Sync-DevRepo"
+      $content | Should -Match "Sync-DevRepoCatalog"
     }
   }
 
@@ -154,7 +154,7 @@ Describe "Symlink Hardening - Windows" {
         "src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1",
         "src/hosts/Windows/modules/user/Sync-CursorConfig.ps1",
         "src/hosts/Windows/modules/user/Sync-SymlinkManifest.ps1",
-        "src/hosts/Windows/modules/user/Sync-DevRepo.ps1"
+        "src/hosts/Windows/modules/user/Sync-DevRepoCatalog.ps1"
       )
 
       foreach ($relativePath in $modulePaths) {

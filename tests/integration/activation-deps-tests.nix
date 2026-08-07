@@ -124,13 +124,13 @@ let
       steps = [
         "Sync-GitAndSshConfig" # Must be first
         "Invoke-JITSecretMaterialization" # After Git config
-        "Sync-DevRepo" # After secrets materialized
+        "Sync-DevRepoCatalog" # After secrets materialized
       ];
       # Verify step count and order
       correctOrder =
         (builtins.elemAt steps 0 == "Sync-GitAndSshConfig")
         && (builtins.elemAt steps 1 == "Invoke-JITSecretMaterialization")
-        && (builtins.elemAt steps 2 == "Sync-DevRepo");
+        && (builtins.elemAt steps 2 == "Sync-DevRepoCatalog");
     in
     assert' (
       correctOrder && (builtins.length steps == 3)

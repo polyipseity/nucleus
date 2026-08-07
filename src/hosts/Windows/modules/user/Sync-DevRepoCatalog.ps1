@@ -1,4 +1,4 @@
-function Sync-DevRepo {
+function Sync-DevRepoCatalog {
   <#
   .SYNOPSIS
     Provision development repositories in ~/dev on Windows.
@@ -35,10 +35,10 @@ function Sync-DevRepo {
       @{ name = 'nucleus'; target = 'dev\nucleus'; symlink = 'C:\path\to\repo' }
       @{ name = 'monorepo'; target = 'dev\monorepo'; url = 'git@github.com:user/monorepo.git' }
     )
-    Sync-DevRepo -Enabled:$true -Repositories $repos
+    Sync-DevRepoCatalog -Enabled:$true -Repositories $repos
 
   .EXAMPLE
-    Sync-DevRepo -Enabled:$false
+    Sync-DevRepoCatalog -Enabled:$false
 
   .NOTES
     Environment variables: USERDOMAIN, USERNAME — used for delete-protection ACLs.
@@ -53,12 +53,12 @@ function Sync-DevRepo {
   )
 
   if (-not $Enabled) {
-    Write-Verbose "Sync-DevRepo: provisioning is disabled."
+    Write-Verbose "Sync-DevRepoCatalog: provisioning is disabled."
     return
   }
 
   if ($Repositories.Count -eq 0) {
-    Write-Verbose "Sync-DevRepo: no repositories configured for this user."
+    Write-Verbose "Sync-DevRepoCatalog: no repositories configured for this user."
     return
   }
 
@@ -71,10 +71,10 @@ function Sync-DevRepo {
   if (-not (Test-Path -PathType Container -Path $devDir)) {
     try {
       New-Item -ItemType Directory -Path $devDir -Force > $null
-      Write-Verbose "Sync-DevRepo: created dev directory at $devDir"
+      Write-Verbose "Sync-DevRepoCatalog: created dev directory at $devDir"
     }
     catch {
-      Write-Warning "Sync-DevRepo: failed to create dev directory $devDir : $_"
+      Write-Warning "Sync-DevRepoCatalog: failed to create dev directory $devDir : $_"
       return
     }
   }
@@ -99,12 +99,12 @@ function Sync-DevRepo {
         # Requires admin or developer mode on Windows 10+.
         if ($PSCmdlet.ShouldProcess($SymlinkPath, "Create symlink to $SymlinkTarget")) {
           New-Item -ItemType SymbolicLink -Path $SymlinkPath -Target $SymlinkTarget -Force -ErrorAction Stop > $null
-          Set-ManagedSymlinkDeleteProtection -Context "Sync-DevRepo" -Path $SymlinkPath
-          Write-Verbose "Sync-DevRepo: created symlink $SymlinkPath -> $SymlinkTarget"
+          Set-ManagedSymlinkDeleteProtection -Context "Sync-DevRepoCatalog" -Path $SymlinkPath
+          Write-Verbose "Sync-DevRepoCatalog: created symlink $SymlinkPath -> $SymlinkTarget"
         }
       }
       catch {
-        Write-Warning "Sync-DevRepo: failed to create symlink for $RepoName : $_"
+        Write-Warning "Sync-DevRepoCatalog: failed to create symlink for $RepoName : $_"
       }
     }
   }
@@ -151,15 +151,15 @@ function Sync-DevRepo {
         if ($currentRemote -ne $RepoUrl) {
           $remoteUpdate = Invoke-GitCommand -Arguments @('-C', $RepoTarget, 'remote', 'set-url', 'origin', $RepoUrl)
           if ($remoteUpdate.Succeeded) {
-            Write-Verbose "Sync-DevRepo: updated remote for $RepoName to $RepoUrl"
+            Write-Verbose "Sync-DevRepoCatalog: updated remote for $RepoName to $RepoUrl"
           }
           else {
-            Write-Warning "Sync-DevRepo: failed to update remote for $RepoName (soft fail, exit $($remoteUpdate.ExitCode)): $($remoteUpdate.Output)"
+            Write-Warning "Sync-DevRepoCatalog: failed to update remote for $RepoName (soft fail, exit $($remoteUpdate.ExitCode)): $($remoteUpdate.Output)"
           }
         }
       }
       catch {
-        Write-Warning "Sync-DevRepo: error checking remote for $RepoName : $_"
+        Write-Warning "Sync-DevRepoCatalog: error checking remote for $RepoName : $_"
       }
 
       # Ensure direct submodules are initialized.
@@ -182,17 +182,17 @@ function Sync-DevRepo {
             if (-not (Test-Path -Path $submoduleGitDir)) {
               $submoduleInit = Invoke-GitCommand -Arguments @('-C', $RepoTarget, 'submodule', 'update', '--init', $submodulePath)
               if ($submoduleInit.Succeeded) {
-                Write-Verbose "Sync-DevRepo: initialized direct submodule $submodulePath in $RepoName"
+                Write-Verbose "Sync-DevRepoCatalog: initialized direct submodule $submodulePath in $RepoName"
               }
               else {
-                Write-Warning "Sync-DevRepo: failed to initialize direct submodule $submodulePath in $RepoName (soft fail, exit $($submoduleInit.ExitCode)): $($submoduleInit.Output)"
+                Write-Warning "Sync-DevRepoCatalog: failed to initialize direct submodule $submodulePath in $RepoName (soft fail, exit $($submoduleInit.ExitCode)): $($submoduleInit.Output)"
               }
             }
           }
         }
       }
       catch {
-        Write-Warning "Sync-DevRepo: error initializing submodules for $RepoName : $_"
+        Write-Warning "Sync-DevRepoCatalog: error initializing submodules for $RepoName : $_"
       }
 
       return
@@ -205,12 +205,12 @@ function Sync-DevRepo {
         $targetHasContents = (Get-ChildItem -Path $RepoTarget -ErrorAction Stop | Measure-Object).Count -gt 0
       }
       catch {
-        Write-Warning "Sync-DevRepo: unable to inspect $RepoTarget before clone (soft fail): $_"
+        Write-Warning "Sync-DevRepoCatalog: unable to inspect $RepoTarget before clone (soft fail): $_"
         return
       }
     }
     if ((Test-Path -Path $RepoTarget) -and $targetHasContents) {
-      Write-Warning "Sync-DevRepo: $RepoTarget exists but is not a git repo (soft fail)"
+      Write-Warning "Sync-DevRepoCatalog: $RepoTarget exists but is not a git repo (soft fail)"
       return
     }
 
@@ -222,7 +222,7 @@ function Sync-DevRepo {
 
       $cloneResult = Invoke-GitCommand -Arguments @('clone', $RepoUrl, $RepoTarget)
       if ($cloneResult.Succeeded) {
-        Write-Verbose "Sync-DevRepo: cloned $RepoName to $RepoTarget"
+        Write-Verbose "Sync-DevRepoCatalog: cloned $RepoName to $RepoTarget"
 
         # Initialize direct submodules after clone.
         try {
@@ -238,31 +238,31 @@ function Sync-DevRepo {
             foreach ($submodulePath in $submodulePaths) {
               $submoduleInit = Invoke-GitCommand -Arguments @('-C', $RepoTarget, 'submodule', 'update', '--init', $submodulePath)
               if ($submoduleInit.Succeeded) {
-                Write-Verbose "Sync-DevRepo: initialized direct submodule $submodulePath in $RepoName"
+                Write-Verbose "Sync-DevRepoCatalog: initialized direct submodule $submodulePath in $RepoName"
               }
               else {
-                Write-Warning "Sync-DevRepo: failed to initialize direct submodule $submodulePath in $RepoName (soft fail, exit $($submoduleInit.ExitCode)): $($submoduleInit.Output)"
+                Write-Warning "Sync-DevRepoCatalog: failed to initialize direct submodule $submodulePath in $RepoName (soft fail, exit $($submoduleInit.ExitCode)): $($submoduleInit.Output)"
               }
             }
           }
         }
         catch {
-          Write-Warning "Sync-DevRepo: error initializing submodules after clone for $RepoName : $_"
+          Write-Warning "Sync-DevRepoCatalog: error initializing submodules after clone for $RepoName : $_"
         }
       }
       else {
-        Write-Warning "Sync-DevRepo: failed to clone $RepoName from $RepoUrl (soft fail, exit $($cloneResult.ExitCode)): $($cloneResult.Output)"
+        Write-Warning "Sync-DevRepoCatalog: failed to clone $RepoName from $RepoUrl (soft fail, exit $($cloneResult.ExitCode)): $($cloneResult.Output)"
       }
     }
     catch {
-      Write-Warning "Sync-DevRepo: error during clone of $RepoName : $_"
+      Write-Warning "Sync-DevRepoCatalog: error during clone of $RepoName : $_"
     }
   }
 
   # Provision repositories from the passed list.
   foreach ($repo in $Repositories) {
     if ($null -eq $repo -or $null -eq $repo.name -or $null -eq $repo.target) {
-      Write-Warning "Sync-DevRepo: repository entry missing required 'name' or 'target' field (skipping)"
+      Write-Warning "Sync-DevRepoCatalog: repository entry missing required 'name' or 'target' field (skipping)"
       continue
     }
 
@@ -277,9 +277,9 @@ function Sync-DevRepo {
       Initialize-RepositoryWithSubmodule -RepoUrl $repo.url -RepoTarget $repoTarget -RepoName $repoName
     }
     else {
-      Write-Warning "Sync-DevRepo: repository '$repoName' has neither 'symlink' nor 'url' configured (skipping)"
+      Write-Warning "Sync-DevRepoCatalog: repository '$repoName' has neither 'symlink' nor 'url' configured (skipping)"
     }
   }
 
-  Write-Verbose "Sync-DevRepo: completed provisioning dev repositories"
+  Write-Verbose "Sync-DevRepoCatalog: completed provisioning dev repositories"
 }

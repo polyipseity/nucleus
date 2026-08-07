@@ -435,7 +435,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-AgentsSkillManifest.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-CursorConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-SymlinkManifest.ps1")
-. (Join-Path -Path $userModuleDir -ChildPath "Sync-DevRepo.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-DevRepoCatalog.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DiscordMusicRPC.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-CamillaDSPService.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-CamillaDSPHeartbeatService.ps1")
@@ -811,7 +811,7 @@ if ($null -eq $EnableDevReposParity) {
 
 # Keep dev repo provisioning after Git/SSH config so clones see the same
 # secret/key ordering across macOS, NixOS, and Windows.
-Sync-DevRepo -Enabled:$EnableDevReposParity -Repositories $devRepositories
+Sync-DevRepoCatalog -Enabled:$EnableDevReposParity -Repositories $devRepositories
 Sync-ShellProfile -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoot
 # check-suppress:config-method: method 1 (writable symlink) -- bun and uv configs symlinked to repo files.
 Sync-BunConfig -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoot
