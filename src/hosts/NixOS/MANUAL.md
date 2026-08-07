@@ -27,6 +27,7 @@
 - `nucleus-cloud-setup` — configure cloud remotes and re-apply
 - `nucleus-gc` — run Nix garbage collection; VM step keeps every manifest guest (enabled or not, any host) and manifest-referenced disks — use `nucleus-vm gc --gc-disabled` to narrow to enabled+current-host only
 - `nucleus-gs-pdf-opt` — optimize PDF files with Ghostscript (keeps .bak backup by default; use `--rm-bak` to remove)
+- `nucleus-audit-store` — print Nix store audit baseline metrics
 - `nucleus-health-check` — run health checks
 - `nucleus-replica-sync` — pull cloud replicas
 - `nucleus-replica-reset` — reset local replica state

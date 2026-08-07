@@ -108,6 +108,7 @@ let
     && lib.hasInfix "scripts-bundle.nix" flakeText
     && lib.hasInfix "ln -s \${thisScriptsBundle}/scripts" flakeText
     && lib.hasInfix "ln -s \${thisScriptTree}/src" flakeText
+    && lib.hasInfix "ln -s \${thisScriptTree}/src \"\$out/src\"" flakeText
     && lib.hasInfix "&& pwd)/\${scriptName}.sh" flakeText
     && !lib.hasInfix "pwd -P)/\${scriptName}.sh" flakeText
   ) "writeNucleusShellApplication must default bundleDefault to false and symlink shared bundles";
@@ -123,6 +124,7 @@ let
   test_posix_shell_exposes_managed_commands = assert' (
     lib.hasInfix "nucleusApp = args: writeNucleusShellApplication pkgs args;" flakeText
     && lib.hasInfix "nucleus-ai = nucleusApp {" flakeText
+    && lib.hasInfix "nucleus-audit-store = nucleusApp {" flakeText
     && lib.hasInfix "nucleus-apply = nucleusApp {" flakeText
     && lib.hasInfix "nucleus-bootstrap = nucleusApp {" flakeText
     && lib.hasInfix "nucleus-check-pwsh = mkCheckPwshPackage pkgs;" flakeText

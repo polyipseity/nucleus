@@ -22,14 +22,12 @@ let
 
   sccacheGc = pkgs.writeNucleusShellApplication {
     name = "sccache-gc";
-    bundleDefault = true;
     runtimeInputs = [ pkgs.sccache ];
     scriptName = "src/scripts/services/sccache-gc";
   };
 
   logGcUser = pkgs.writeNucleusShellApplication {
     name = "log-gc-user";
-    bundleDefault = true;
     runtimeInputs = [ pkgs.jq ];
     scriptName = "src/scripts/services/log-gc-user";
   };

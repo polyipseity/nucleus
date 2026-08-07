@@ -38,7 +38,7 @@ declare -a BATCH_PACKAGES=(
 	nucleus-apply nucleus-ai nucleus-bootstrap nucleus-bump-lockfile
 	nucleus-check nucleus-test nucleus-check-packer nucleus-check-pwsh
 	nucleus-check-sh nucleus-cloud-setup nucleus-config nucleus-gc
-	nucleus-gs-pdf-opt nucleus-health-check nucleus-replica-reset
+	nucleus-gs-pdf-opt nucleus-health-check nucleus-audit-store nucleus-replica-reset
 	nucleus-replica-sync nucleus-svc nucleus-update nucleus-vm
 )
 
@@ -79,6 +79,7 @@ run_binary() {
 declare -A APP_TO_PKG=(
 	[apply]=nucleus-apply
 	[ai]=nucleus-ai
+	[audit-store]=nucleus-audit-store
 	[bootstrap]=nucleus-bootstrap
 	[bump-lockfile]=nucleus-bump-lockfile
 	[check]=nucleus-check
@@ -114,7 +115,7 @@ test_app_help() {
 
 # App commands (names match `nix run ./src#<name>`)
 APP_COMMANDS=(
-	apply ai bootstrap bump-lockfile check test
+	apply ai audit-store bootstrap bump-lockfile check test
 	check-packer check-sh cloud-setup config
 	gc health-check replica-reset replica-sync update svc vm
 )

@@ -385,6 +385,7 @@
             ${lib.optionalString (!bundleDefault && text == null) ''
               mkdir -p "$(dirname "$out/${scriptName}.sh")"
               ln -s ${singleScriptSource} "$out/${scriptName}.sh"
+              ln -s ${thisScriptTree}/src "$out/src"
             ''}
 
             ${lib.optionalString (repoRoot != "") ''
@@ -453,15 +454,13 @@
           program = "${pkg}/bin/nucleus-${args.name}";
         };
 
-      # App wrapper for `nix run .#apply`. Sibling scripts (secrets/*,
-      # install-prek-hooks) are bundled via bundleDefault on writeNucleusShellApplication,
-      # so apply.sh resolves them via $_ash_script_dir as before.
+      # App wrapper for `nix run .#apply`. apply.sh resolves sibling src/scripts/*
+      # via $_ash_script_dir; thin wrappers symlink script-tree/src for lib access.
       mkApplyApp = pkgs: {
         type = "app";
         program = "${
           writeNucleusShellApplication pkgs {
             name = "apply";
-            bundleDefault = true;
             scriptName = "src/scripts/apply";
             runtimeInputs = [
               pkgs.curl
@@ -581,6 +580,7 @@
             pkgs.curl
             pkgs.git
             pkgs.gnupg
+            pkgs.jq
             pkgs.sops
           ];
         };
@@ -706,7 +706,6 @@
         {
           nucleus-apply = nucleusApp {
             name = "apply";
-            bundleDefault = true;
             scriptName = "src/scripts/apply";
             runtimeInputs = [
               pkgs.curl
@@ -720,22 +719,22 @@
           };
           nucleus-ai = nucleusApp {
             name = "ai";
-            bundleDefault = true;
+            runtimeInputs = [ pkgs.jq ];
+          };
+          nucleus-audit-store = nucleusApp {
+            name = "audit-store";
             runtimeInputs = [ pkgs.jq ];
           };
           nucleus-bootstrap = nucleusApp {
             name = "bootstrap";
-            bundleDefault = true;
             runtimeInputs = [ ];
           };
           nucleus-bump-lockfile = nucleusApp {
             name = "bump-lockfile";
-            bundleDefault = true;
             runtimeInputs = [ pkgs.jq ];
           };
           nucleus-check = nucleusApp {
             name = "check";
-            bundleDefault = true;
             runtimeInputs = [
               pkgs.bash
               pkgs.git
@@ -750,7 +749,6 @@
           };
           nucleus-check-packer = nucleusApp {
             name = "check-packer";
-            bundleDefault = true;
             runtimeInputs = [
               pkgs.bash
               pkgs.packer
@@ -759,7 +757,6 @@
           nucleus-check-pwsh = mkCheckPwshPackage pkgs;
           nucleus-check-sh = nucleusApp {
             name = "check-sh";
-            bundleDefault = true;
             runtimeInputs = [
               pkgs.bash
               pkgs.git
@@ -768,12 +765,10 @@
           };
           nucleus-cleanup-nix = nucleusApp {
             name = "cleanup-nix";
-            bundleDefault = true;
             runtimeInputs = [ pkgs.bash ];
           };
           nucleus-cloud-setup = nucleusApp {
             name = "cloud-setup";
-            bundleDefault = true;
             runtimeInputs = [
               pkgs.git
               pkgs.jq
@@ -782,17 +777,14 @@
           };
           nucleus-config = nucleusApp {
             name = "config";
-            bundleDefault = true;
             runtimeInputs = [ pkgs.jq ];
           };
           nucleus-gs-pdf-opt = nucleusApp {
             name = "gs-pdf-opt";
-            bundleDefault = true;
             runtimeInputs = [ pkgs.ghostscript ];
           };
           nucleus-gc = nucleusApp {
             name = "gc";
-            bundleDefault = true;
             runtimeInputs = [
               pkgs.jq
               pkgs.gnugrep
@@ -801,7 +793,6 @@
           };
           nucleus-health-check = nucleusApp {
             name = "health-check";
-            bundleDefault = true;
             runtimeInputs = [
               pkgs.curl
               pkgs.git
@@ -812,7 +803,6 @@
           };
           nucleus-replica-reset = nucleusApp {
             name = "replica-reset";
-            bundleDefault = true;
             runtimeInputs = [
               pkgs.git
               pkgs.jq
@@ -820,7 +810,6 @@
           };
           nucleus-replica-sync = nucleusApp {
             name = "replica-sync";
-            bundleDefault = true;
             runtimeInputs = [
               pkgs.git
               pkgs.jq
@@ -829,18 +818,15 @@
           };
           nucleus-svc = nucleusApp {
             name = "svc";
-            bundleDefault = true;
             runtimeInputs = [ pkgs.jq ];
           };
           nucleus-service-watchdog = nucleusApp {
             name = "service-watchdog";
-            bundleDefault = true;
             scriptName = "src/scripts/services/service-watchdog";
             runtimeInputs = [ pkgs.jq ];
           };
           nucleus-test = nucleusApp {
             name = "test";
-            bundleDefault = true;
             runtimeInputs = [
               pkgs.bash
               pkgs.findutils
@@ -851,7 +837,6 @@
           };
           nucleus-update = nucleusApp {
             name = "update";
-            bundleDefault = true;
             runtimeInputs = [
               pkgs.gnupg
               pkgs.sops
@@ -859,7 +844,6 @@
           };
           nucleus-vm = nucleusApp {
             name = "vm";
-            bundleDefault = true;
             runtimeInputs = [
               pkgs.android-tools
               pkgs.jq

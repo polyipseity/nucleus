@@ -83,7 +83,6 @@ in
       let
         logGcSystem = pkgs.writeNucleusShellApplication {
           name = "log-gc-system";
-          bundleDefault = true;
           runtimeInputs = [ pkgs.jq ];
           scriptName = "src/scripts/services/log-gc-system";
         };
