@@ -21,7 +21,7 @@
     },
     {
       "direction": "pull",
-      "enable": false,
+      "enable": true,
       "fallbackTimer": {
         "enable": true,
         "interval": "daily"
