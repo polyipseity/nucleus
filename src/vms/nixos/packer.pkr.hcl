@@ -138,11 +138,11 @@ build {
   provisioner "shell" {
     timeout = "60m"
     inline = [
-      # Partition: MBR with swap + ext4 root
+      # Partition: MBR with swap + Btrfs root (parity with qcow-btrfs guest format)
       "parted -s /dev/vda -- mklabel msdos",
-      "parted -s /dev/vda -- mkpart primary ext4 1MiB -2GiB",
+      "parted -s /dev/vda -- mkpart primary btrfs 1MiB -2GiB",
       "parted -s /dev/vda -- mkpart primary linux-swap -2GiB 100%",
-      "mkfs.ext4 -F /dev/vda1",
+      "mkfs.btrfs -f /dev/vda1",
       "mkswap /dev/vda2",
       # Mount
       "mount /dev/vda1 /mnt",
