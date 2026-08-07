@@ -33,9 +33,9 @@ These are the authoritative assumptions for model size budgeting. Update this ta
 When changing model selections, update all of the following in the **same change** so editor/runtime behavior stays aligned:
 
 1. `src/modules/ai/models.json` host model lists.
-2. `src/users/default/vscode/chatLanguageModels.mac.json`
-3. `src/users/default/vscode/chatLanguageModels.nixos.json`
-4. `src/users/default/vscode/chatLanguageModels.windows.json`
+2. `src/users/default/vscode/chatLanguageModels.MacBook.json`
+3. `src/users/default/vscode/chatLanguageModels.NixOS.json`
+4. `src/users/default/vscode/chatLanguageModels.Windows.json`
 5. Manifest comment block in `src/modules/ai/default.nix`.
 
 Rule: each host's `chatLanguageModels.<host>.json` IDs must be a subset of that host key in `models.json` (or exactly match). Never leave stale editor entries for models no longer present in the host manifest.

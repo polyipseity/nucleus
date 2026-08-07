@@ -3,6 +3,7 @@
 # extensions managed by symlink-vscode-extensions on all backends.
 {
   lib,
+  hostName,
   managedUser ? null,
   managedUsername ? null,
   pkgs,
@@ -181,11 +182,9 @@ let
 
   # Select the per-host Copilot chat model list so that each machine only
   # surfaces the Ollama models that fit within its VRAM budget.
-  # mac: gemma4:e4b + qwen3:14b (24 GB unified memory allows both).
-  # nixos/other: qwen3:8b only (discrete GPU capped at 6 GB VRAM).
   # check-suppress:config-method: method 3 (merge) -- name-keyed merge preserves VS Code-added model entries while refreshing repo entries.
   vsCodeChatLanguageModelsFile = # check-suppress:config-method: method 3 (merge)
-    if isDarwin then "chatLanguageModels.mac.json" else "chatLanguageModels.nixos.json";
+    "chatLanguageModels.${hostName}.json";
 
   # Python script that inserts a workspace trust entry for ~/dev into VS Code's
   # SQLite state database (globalStorage/state.vscdb) for both stable and

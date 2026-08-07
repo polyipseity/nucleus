@@ -34,7 +34,7 @@ function Sync-VSCodeConfig {
     (keybindings.windows.json) so that Windows key shortcuts are tracked
     independently from macOS (keybindings.mac.json) and NixOS
     (keybindings.nixos.json) without cross-host pollution in a shared file.
-    chatLanguageModels.windows.json is managed by a name-keyed merge-overwrite
+    chatLanguageModels.Windows.json is managed by a name-keyed merge-overwrite
     (Merge-VSChatLanguageModel) instead of a symlink, so that VS Code can
     write model updates back without breaking the repo link.
 
@@ -92,6 +92,10 @@ function Sync-VSCodeConfig {
     [string]$Username = [System.Environment]::UserName
   )
 
+
+  if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+    throw 'Sync-VSCodeConfig: RepoRoot must not be empty.'
+  }
 
   . (Join-Path -Path $PSScriptRoot -ChildPath '..\Set-ManagedSymlinkDeleteProtection.ps1')
 
@@ -333,7 +337,7 @@ function Sync-VSCodeConfig {
         }
       }
       # check-suppress:config-method: method 3 (merge) -- name-keyed merge preserves VS Code-added model entries while refreshing repo entries.
-      $repoFile = Get-VSCodeRepoFileTarget -RelativePath 'chatLanguageModels.windows.json'
+      $repoFile = Get-VSCodeRepoFileTarget -RelativePath 'chatLanguageModels.Windows.json'
       Merge-VSChatLanguageModel -RepoFile $repoFile -DestFile $chatLmPath
     }
   }
