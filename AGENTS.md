@@ -109,6 +109,7 @@
 
 ## Core Conventions
 
+- Host block-level filesystem scope (managed vs OS defaults, bootstrap-only steps) lives in `.agents/instructions/host-filesystem-scope.instructions.md`.
 - Prefer declarative state (`src/modules/*.nix`, WinGet DSC YAML) over imperative scripts.
 - Config deployment follows priority-ordered methods defined in `.agents/instructions/app-config-policy.instructions.md`: writable symlink (default) > read-only > merge > runtime direct read. Any deviation from the default must have a code comment explaining why.
 - Git scope terminology is canonical: "global" means machine-wide (`git --system`), "user" means per-user (`git --global`). Never use "global" for `--global`. See `.agents/instructions/git-scope-terminology.instructions.md`.
