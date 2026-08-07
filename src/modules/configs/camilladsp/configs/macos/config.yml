@@ -58,7 +58,7 @@ processors:
       channels: 2
       clip_limit: 0
       factor: 3.5
-      makeup_gain: 0
+      makeup_gain: 12
       monitor_channels: null
       process_channels: null
       release: 0.25
