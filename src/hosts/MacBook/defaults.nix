@@ -2,8 +2,19 @@
 #
 # All settings are applied by nix-darwin via the `defaults write` mechanism
 # during `darwin-rebuild switch`.  They are grouped below by subsystem.
-{ ... }:
+{
+  config,
+  username,
+  managedUsername ? null,
+  ...
+}:
 let
+  effectiveUsername = if managedUsername != null then managedUsername else username;
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+  overlay = (import ../../modules/lib/users-overlay.nix).mkUserOverlay {
+    inherit effectiveUsername repoRoot;
+  };
+
   # ---------------------------------------------------------------------------
   # Input method definitions
   # The HIToolbox AppleEnabledInputSources list must be a complete ordered set;
@@ -32,9 +43,9 @@ let
 
   # ---------------------------------------------------------------------------
   # Autocorrect suppression word list
-  # Loaded from src/modules/configs/autocorrect/wordlist.txt: one word per line, sorted
-  # alphabetically. Identity substitutions (word → word) prevent macOS from
-  # autocorrecting technical terms and product names.
+  # Loaded from src/users/default/autocorrect/wordlist.txt (per-user overlay):
+  # one word per line, sorted alphabetically. Identity substitutions (word → word)
+  # prevent macOS from autocorrecting technical terms and product names.
   # check-suppress:config-method: method 3 (merge / defaults-based) -- not Method 1 (symlink) because macOS
   # NSUserDictionaryReplacementItems is managed via the `defaults` system
   # preference store, not a file path. There is no file to symlink. The value
@@ -45,7 +56,7 @@ let
   autocorrectWords = builtins.filter (w: w != "") (
     builtins.filter builtins.isString (
       # check-suppress:config-method: method 4 (runtime embedded at eval time) -- wordlist.txt is read at Nix evaluation time and embedded into the Nix store. No deployment step needed.
-      builtins.split "\n" (builtins.readFile ../../modules/configs/autocorrect/wordlist.txt)
+      builtins.split "\n" (builtins.readFile (overlay.selectFile "autocorrect" "wordlist.txt"))
     )
   );
 in
@@ -114,7 +125,7 @@ in
         # This key is not available as a typed nix-darwin NSGlobalDomain
         # option, so it is declared as a custom preference payload.
         # Source: https://developer.apple.com/documentation/foundation/userdefaults
-        # Word list is loaded from src/modules/configs/autocorrect/wordlist.txt — edit that
+        # Word list is loaded from src/users/default/autocorrect/wordlist.txt — edit that
         # file to add or remove terms. All entries are identity substitutions
         # (word → word) so macOS leaves them unchanged instead of autocorrecting.
         NSUserDictionaryReplacementItems = builtins.map (w: {

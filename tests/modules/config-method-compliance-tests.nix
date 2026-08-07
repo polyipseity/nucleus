@@ -56,6 +56,8 @@ assert !(containsRegex "ignore-global" gitText);
 assert containsRegex "\\.gitconfig" posixBaseText;
 assert !(containsRegex "system\\.gitconfig" posixBaseText);
 assert containsRegex "wordlist\\.txt" defaultsText;
+assert containsRegex "mkUserOverlay" defaultsText;
+assert containsRegex "selectFile" defaultsText;
 assert containsRegex "camilladsp/configs" homeText;
 assert containsRegex "camillagui-backend/config" homeText;
 assert containsRegex "linearmouse\\.json" macosText;
