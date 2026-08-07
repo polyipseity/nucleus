@@ -92,14 +92,6 @@ ensure_tart_vm_dir() {
   _etd_target="$VM_DIR/tart"
   _etd_default="$HOME/.tart"
 
-  # WHY: same-commit rename of the co-location target (.tart -> tart/).  Tart
-  # reads only the fixed ~/.tart default, so the symlink target inside the
-  # managed directory is arbitrary; moving an existing store preserves
-  # Tart-managed guest data with no compat layer.
-  if [ -d "$VM_DIR/.tart" ] && [ ! -e "$_etd_target" ]; then
-    mv "$VM_DIR/.tart" "$_etd_target"
-  fi
-
   mkdir -p "$_etd_target"
 
   if [ -L "$_etd_default" ]; then
@@ -107,25 +99,15 @@ ensure_tart_vm_dir() {
     _etd_current="$(readlink "$_etd_default" 2>/dev/null || true)"
     if [ "$_etd_current" = "$_etd_target" ]; then
       say "tart storage already linked: $_etd_default -> $_etd_target"
-    elif [ "$_etd_current" = "$VM_DIR/.tart" ]; then
-      # WHY: repoint a pre-rename symlink to the renamed target so an existing
-      # setup keeps working after the same-commit .tart -> tart/ move.
-      ln -sfn "$_etd_target" "$_etd_default"
-      say "repointed tart storage link: $_etd_default -> $_etd_target"
-    else
-      warn "$_etd_default is a symlink to $_etd_current (expected $_etd_target); not relinking"
+      return 0
     fi
-    return 0
+    echo "tart: $_etd_default is a symlink to $_etd_current (expected $_etd_target); fix manually and retry" >&2
+    return 1
   fi
 
-  if [ -d "$_etd_default" ]; then
-    # WHY: migrate existing ~/.tart to VM_DIR on first run so existing VMs are
-    # not lost when this policy was introduced.
-    # Use rsync --no-specials to skip Unix socket files (e.g. control.sock)
-    # which cp -a cannot copy and which are not persistent data.
-    say "migrating ~/.tart to $_etd_target..."
-    rsync -a --no-specials --no-devices "$_etd_default/" "$_etd_target/"
-    rm -rf "$_etd_default"
+  if [ -e "$_etd_default" ]; then
+    echo "tart: $_etd_default exists and is not a symlink to $_etd_target; fix manually and retry" >&2
+    return 1
   fi
 
   ln -s "$_etd_target" "$_etd_default"
@@ -2156,11 +2138,11 @@ vm_validate_utm_plist_template() {
   return 0
 }
 
-# vm_apply_utm_plist_and_register NAME BUNDLE LEGACY_DISPLAY_CONFIG TEMPLATE_DRIFT_CONFIG
+# vm_apply_utm_plist_and_register NAME BUNDLE TEMPLATE_DRIFT_CONFIG
 #   Copies the managed plist into an existing UTM bundle and ensures UTM has
 #   the VM registered (open on first import; re-register on config drift).
 vm_apply_utm_plist_and_register() {
-  local _ap_name="$1" _ap_bundle="$2" _ap_legacy_display="$3" _ap_template_drift="$4"
+  local _ap_name="$1" _ap_bundle="$2" _ap_template_drift="$3"
   local _ap_config_plist="$_ap_bundle/config.plist"
 
   if ! vm_validate_utm_plist_template "$_ap_name"; then
@@ -2182,7 +2164,7 @@ vm_apply_utm_plist_and_register() {
       else
         warn "opening $_ap_bundle failed; ensure UTM can access the managed VM directory and retry"
       fi
-    elif [ "$_ap_legacy_display" = true ] || [ "$_ap_template_drift" = true ]; then
+    elif [ "$_ap_template_drift" = true ]; then
       say "repairing stale UTM runtime registration for $_ap_name"
       if re_register_utm_bundle "$_ap_name" "$_ap_bundle"; then
         say "stale UTM registration repaired: $_ap_name"
@@ -2199,7 +2181,7 @@ vm_apply_utm_plist_and_register() {
 #   bundle already exists.  Skips disk/image work (use vm_setup_utm for that).
 vm_sync_utm() {
   local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
-  local vm_display bundle config_plist legacy_display_config template_drift_config
+  local vm_display bundle config_plist template_drift_config
 
   if [ "$vm_type" = "macOS" ]; then
     return
@@ -2208,7 +2190,6 @@ vm_sync_utm() {
   vm_display=$(jq -r ".VMs[$vm_index].name" "$MANIFEST")
   bundle="$VM_DIR/${vm_name}.utm"
   config_plist="$bundle/config.plist"
-  legacy_display_config=false
   template_drift_config=false
 
   if [ ! -d "$bundle" ]; then
@@ -2217,10 +2198,6 @@ vm_sync_utm() {
   fi
 
   say "syncing UTM VM '$vm_display'..."
-  if [ -f "$config_plist" ] && grep -qE '<string>(vga|std|virtio-ramfb|virtio-ramfb-gl)</string>' "$config_plist"; then
-    legacy_display_config=true
-    say "detected legacy display config in existing bundle; VM will be re-registered to refresh runtime state: $vm_name"
-  fi
   if [ -f "$config_plist" ] && vm_validate_utm_plist_template "$vm_name" \
     && ! cmp -s "$_vupt_template" "$config_plist"; then
     template_drift_config=true
@@ -2234,7 +2211,7 @@ vm_sync_utm() {
       || return 1
   fi
 
-  vm_apply_utm_plist_and_register "$vm_name" "$bundle" "$legacy_display_config" "$template_drift_config"
+  vm_apply_utm_plist_and_register "$vm_name" "$bundle" "$template_drift_config"
 }
 
 vm_sync_utm_vms() {
@@ -2360,7 +2337,7 @@ vm_setup_tart() {
 vm_setup_utm() {
   local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display bundle data_dir disk_file
-  local disk_credential_marker disk_config_marker config_plist bundle_exists legacy_display_config
+  local disk_credential_marker disk_config_marker config_plist bundle_exists template_drift_config
   local template_drift_config _prebuilt _prebuilt_valid _prebuilt_min_size _prebuilt_disk_bytes
   local _android_system _android_userdata _android_gsi _userdata_file _gsi_file _base_link
   local _guest_config_fingerprint
@@ -2386,7 +2363,6 @@ vm_setup_utm() {
   fi
   config_plist="$bundle/config.plist"
   bundle_exists=false
-  legacy_display_config=false
   template_drift_config=false
 
   say "configuring UTM VM '$vm_display'..."
@@ -2394,10 +2370,6 @@ vm_setup_utm() {
   if [ -d "$bundle" ]; then
     bundle_exists=true
     say "UTM bundle already exists: $bundle; refreshing config.plist"
-    if [ -f "$config_plist" ] && grep -qE '<string>(vga|std|virtio-ramfb|virtio-ramfb-gl)</string>' "$config_plist"; then
-      legacy_display_config=true
-      say "detected legacy display config in existing bundle; VM will be re-registered to refresh runtime state: $vm_name"
-    fi
   fi
 
   if ! vm_validate_utm_plist_template "$vm_name"; then
@@ -2518,10 +2490,10 @@ vm_setup_utm() {
     if [ "$bundle_exists" != true ]; then
       say "UTM bundle created: $bundle"
     fi
-    vm_apply_utm_plist_and_register "$vm_name" "$bundle" "$legacy_display_config" "$template_drift_config"
+    vm_apply_utm_plist_and_register "$vm_name" "$bundle" "$template_drift_config"
   else
     dry_run "provision UTM bundle disks for $bundle"
-    vm_apply_utm_plist_and_register "$vm_name" "$bundle" "$legacy_display_config" "$template_drift_config"
+    vm_apply_utm_plist_and_register "$vm_name" "$bundle" "$template_drift_config"
   fi
 }
 

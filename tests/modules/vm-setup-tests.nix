@@ -1965,17 +1965,15 @@ let
     && (lib.hasInfix "<key>IconCustom</key>" vm_setup_sh_text)
     && (lib.hasInfix "<key>UsbBusSupport</key>" vm_setup_sh_text)
   ) "scripts/vm.sh must block incomplete UTM templates missing required keys";
-  test_macbook_utm_legacy_display_reregistration =
+  test_macbook_utm_template_drift_reregistration =
     assert'
       (
         (lib.hasInfix "re_register_utm_bundle" vm_setup_sh_text)
-        && (lib.hasInfix "detected legacy display config in existing bundle" vm_setup_sh_text)
-        && (lib.hasInfix "<string>(vga|std|virtio-ramfb|virtio-ramfb-gl)</string>" vm_setup_sh_text)
         && (lib.hasInfix "detected config drift in existing bundle" vm_setup_sh_text)
-        && (lib.hasInfix "cmp -s \"$_plist_template\" \"$config_plist\"" vm_setup_sh_text)
+        && (lib.hasInfix "cmp -s \"$_vupt_template\" \"$config_plist\"" vm_setup_sh_text)
         && (lib.hasInfix "repairing stale UTM runtime registration" vm_setup_sh_text)
       )
-      "scripts/vm.sh must re-register UTM VMs when legacy display configs or template drift are detected so refreshed config.plist values take effect";
+      "scripts/vm.sh must re-register UTM VMs when template drift is detected so refreshed config.plist values take effect";
   test_vm_readme_template_content =
     assert'
       (
@@ -2258,11 +2256,10 @@ let
       (
         (lib.hasInfix "ensure_tart_vm_dir" vm_setup_sh_text)
         && (lib.hasInfix "_etd_target=\"\$VM_DIR/tart\"" vm_setup_sh_text)
-        && (lib.hasInfix "mv \"\$VM_DIR/.tart\"" vm_setup_sh_text)
         && (lib.hasInfix "linked tart storage" vm_setup_sh_text)
-        && (lib.hasInfix "rsync" vm_setup_sh_text)
+        && !(lib.hasInfix "rsync" vm_setup_sh_text)
       )
-      "scripts/vm.sh must link ~/.tart -> ~/virtual machines/tart (migrating an existing .tart store with mv) so Tart artifacts co-locate with UTM bundles for backup";
+      "scripts/vm.sh must link ~/.tart -> ~/virtual machines/tart without migrating existing stores in-script";
 
   test_macbook_macos_version_tahoe =
     assert'
@@ -2399,7 +2396,7 @@ let
     test_macbook_utm_uses_direct_bundle_open
     test_macbook_utm_refreshes_existing_bundle
     test_macbook_utm_stale_template_guard
-    test_macbook_utm_legacy_display_reregistration
+    test_macbook_utm_template_drift_reregistration
     test_vm_readme_template_content
     test_vm_start_posix_template_content
     test_vm_start_windows_template_content
@@ -2578,7 +2575,7 @@ in
     test_macbook_utm_uses_direct_bundle_open
     test_macbook_utm_refreshes_existing_bundle
     test_macbook_utm_stale_template_guard
-    test_macbook_utm_legacy_display_reregistration
+    test_macbook_utm_template_drift_reregistration
     test_vm_readme_template_content
     test_vm_start_posix_template_content
     test_vm_start_windows_template_content
