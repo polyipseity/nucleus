@@ -17,6 +17,11 @@
   The script is idempotent: re-running it re-applies all DSC resources and
   converges any drift from the desired state.
 
+  Filesystem scope: the system volume NTFS layout is an OS default nucleus does
+  not repartition or reformat at apply. Managed storage-related policy includes
+  WinFsp (packages.dsc.yml), Storage Sense (storage-sense.dsc.yml), and long
+  paths (long-paths.dsc.yml). See .agents/instructions/host-filesystem-scope.instructions.md.
+
 .PARAMETER ConfigDir
   Directory that contains the DSC YAML files.  Defaults to the directory
   containing this script ($PSScriptRoot).
