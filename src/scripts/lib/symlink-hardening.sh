@@ -76,7 +76,6 @@ _nucleus_resolve_repo_root() {
 
 # ensure_file_symlink TARGET LINK
 # Creates LINK as a symlink pointing to TARGET (a file).
-# Handles migration from real files/directories and old wrong symlinks.
 ensure_file_symlink() {
   _efs_target="$1"
   _efs_link="$2"
@@ -85,11 +84,9 @@ ensure_file_symlink() {
     [ "$(readlink "$_efs_link")" = "$_efs_target" ] && return 0
     _nucleus_unprotect_symlink "VS Code" "$_efs_link"
     rm "$_efs_link"
-  elif [ -f "$_efs_link" ]; then
-    if [ ! -s "$_efs_target" ]; then
-      cp "$_efs_link" "$_efs_target"
-    fi
-    rm "$_efs_link"
+  elif [ -e "$_efs_link" ]; then
+    echo "ensure_file_symlink: $_efs_link exists and is not a symlink to $_efs_target; fix manually and re-apply" >&2
+    return 1
   fi
 
   mkdir -p "$(dirname "$_efs_link")"
@@ -107,14 +104,9 @@ ensure_dir_symlink() {
     [ "$(readlink "$_eds_link")" = "$_eds_target" ] && return 0
     _nucleus_unprotect_symlink "VS Code" "$_eds_link"
     rm "$_eds_link"
-  elif [ -d "$_eds_link" ]; then
-    find "$_eds_link" -maxdepth 1 -mindepth 1 -type f | while IFS= read -r _f; do
-      _fname="$(basename "$_f")"
-      if [ ! -e "$_eds_target/$_fname" ]; then
-        cp "$_f" "$_eds_target/$_fname"
-      fi
-    done
-    rm -rf "$_eds_link"
+  elif [ -e "$_eds_link" ]; then
+    echo "ensure_dir_symlink: $_eds_link exists and is not a symlink to $_eds_target; fix manually and re-apply" >&2
+    return 1
   fi
 
   mkdir -p "$(dirname "$_eds_link")"
