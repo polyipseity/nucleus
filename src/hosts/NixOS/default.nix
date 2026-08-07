@@ -18,6 +18,7 @@
     ./camillagui-backend.nix
     ../../modules/camillagui-backend.nix
     ./desktop.nix
+    ./filesystems.nix
     ./hardware/cpu.nix
     ./hardware/disks.nix
     ./hardware/gpu.nix

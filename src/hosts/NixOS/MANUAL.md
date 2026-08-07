@@ -1,6 +1,6 @@
 # nixos manual steps
 
-- After first install, generate hardware config: `sudo nixos-generate-config --dir /tmp/nixos-generate-config`. Compare with `src/hosts/NixOS/hardware/{cpu,gpu,disks}.nix` and copy host-specific facts (filesystem UUIDs, swap, kernel modules, device paths). Rebuild to confirm no missing references.
+- After first install (Btrfs root per `src/hosts/NixOS/hardware/disks.nix`), generate hardware config: `sudo nixos-generate-config --dir /tmp/nixos-generate-config`. Compare with `src/hosts/NixOS/hardware/{cpu,gpu,disks}.nix` and merge host-specific facts (filesystem UUIDs, EFI `/boot`, swap, kernel modules, device paths). Uncomment the `/boot` vfat entry in `disks.nix` when merging. Rebuild to confirm no missing references.
 - Generate `rclone_config_pass` in `src/secrets/users-<username>.yml` via `openssl rand -hex 64`, commit, re-run `nucleus-apply`. If remotes exist without encryption, delete `~/.config/rclone/rclone.conf` first.
 - Run `nucleus-cloud-setup` and complete `rclone config` for GoogleDrive, iCloud, and OneDrive.
 - Open MusicBrainz Picard, sign in, and add AcoustID API key under Options.
