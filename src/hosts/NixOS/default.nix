@@ -11,6 +11,7 @@
     ../../modules/posix-security.nix
     ../../modules/posix-sops.nix
     ../../modules/posix-user-shell.nix
+    ../../modules/repo-root-file.nix
     ./ai.nix
     ./base.nix
     ./camilladsp.nix

@@ -19,6 +19,7 @@
     ../../modules/posix-security.nix
     ../../modules/posix-sops.nix
     ../../modules/posix-user-shell.nix
+    ../../modules/repo-root-file.nix
     ./activation.nix
     ./ai.nix
     ./base.nix
