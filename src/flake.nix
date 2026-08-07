@@ -339,8 +339,8 @@
       vsCodeMarketplaceMac = nix-vscode-extensions.extensions.${systems.mac}.vscode-marketplace;
       vsCodeMarketplaceLinux = nix-vscode-extensions.extensions.${systems.linux}.vscode-marketplace;
 
-      # Unified shell app builder. Uses scriptTree for src/scripts/ and
-      # copies scripts/ (user CLIs) separately. Creates a thin wrapper at
+      # Unified shell app builder. Uses script-tree for src/scripts/ and
+      # scripts-bundle for scripts/ (user CLIs). Creates a thin wrapper at
       # $out/bin/nucleus-${name} that sets PATH from runtimeInputs and execs
       # the real script via repo-root-relative path resolution.
       writeNucleusShellApplication =
@@ -350,7 +350,7 @@
           scriptName ? "scripts/${name}",
           runtimeInputs ? [ ],
           extraEnv ? { },
-          bundleDefault ? true,
+          bundleDefault ? false,
           text ? null,
           meta ? { },
         }:
@@ -358,23 +358,31 @@
           inherit (pkgs) lib;
           repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
           thisScriptTree = pkgs.callPackage ./modules/lib/script-tree.nix { };
+          thisScriptsBundle = pkgs.callPackage ./modules/lib/scripts-bundle.nix { };
+          singleScriptSource =
+            if lib.hasPrefix "src/scripts/" scriptName then
+              "${thisScriptTree}/${scriptName}.sh"
+            else if lib.hasPrefix "scripts/" scriptName then
+              "${thisScriptsBundle}/${scriptName}.sh"
+            else
+              throw "writeNucleusShellApplication ${name}: scriptName must start with scripts/ or src/scripts/, got ${scriptName}";
         in
         pkgs.runCommand "${name}-nucleus-app"
           {
             strictDeps = true; # hermetic build
-            nativeBuildInputs = [ pkgs.shellcheck ];
           }
           ''
-            mkdir -p "$out/bin" "$out/scripts"
+            mkdir -p "$out/bin"
 
             ${lib.optionalString bundleDefault ''
-              # Mirror user-facing CLIs from scripts/.
-              cp -r --no-preserve=mode ${../scripts}/. "$out/scripts/"
-              chmod -R +x "$out/scripts/"
+              # Symlink shared bundles (deduplicated store paths).
+              ln -s ${thisScriptsBundle}/scripts "$out/scripts"
+              ln -s ${thisScriptTree}/src "$out/src"
+            ''}
 
-              # Reuse pre-built + shellchecked script tree (src/scripts/).
-              cp -r --no-preserve=mode ${thisScriptTree}/. "$out/"
-              chmod -R +x "$out/src/"
+            ${lib.optionalString (!bundleDefault && text == null) ''
+              mkdir -p "$(dirname "$out/${scriptName}.sh")"
+              ln -s ${singleScriptSource} "$out/${scriptName}.sh"
             ''}
 
             ${lib.optionalString (repoRoot != "") ''
@@ -397,7 +405,6 @@
                   }${text}
                   WRAPPER
                   chmod +x "$out/bin/nucleus-${name}"
-                  shellcheck -x -S style "$out/bin/nucleus-${name}"
                 ''
               else
                 ''
@@ -424,7 +431,6 @@
                   exec "$_script" "$@"
                   WRAPPER
                   chmod +x "$out/bin/nucleus-${name}"
-                  shellcheck -x -S style "$out/bin/nucleus-${name}"
                 ''
             }
           ''
@@ -444,14 +450,14 @@
         };
 
       # App wrapper for `nix run .#apply`. Sibling scripts (secrets/*,
-      # install-prek-hooks) are bundled automatically by writeNucleusShellApplication's
-      # default mirror, so apply.sh resolves them via $_ash_script_dir as
-      # before.
+      # install-prek-hooks) are bundled via bundleDefault on writeNucleusShellApplication,
+      # so apply.sh resolves them via $_ash_script_dir as before.
       mkApplyApp = pkgs: {
         type = "app";
         program = "${
           writeNucleusShellApplication pkgs {
             name = "apply";
+            bundleDefault = true;
             scriptName = "src/scripts/apply";
             runtimeInputs = [
               pkgs.curl
@@ -687,148 +693,154 @@
 
       # Build the full set of nucleus app packages for a given package set.
       # Used by home-manager (home.packages) and flake packages output.
-      mkNucleusApps = pkgs: treefmtWrapper: {
-        nucleus-apply = writeNucleusShellApplication pkgs {
-          name = "apply";
-          scriptName = "src/scripts/apply";
-          runtimeInputs = [
-            pkgs.curl
-            pkgs.git
-            pkgs.jq
-            pkgs.openssh
-            pkgs.prek
-            pkgs.sops
-            pkgs.ssh-to-age
-          ];
+      # All user-facing CLIs source src/scripts/lib via SCRIPT_DIR-relative paths.
+      mkNucleusApps =
+        pkgs: treefmtWrapper:
+        let
+          nucleusApp = args: writeNucleusShellApplication pkgs (args // { bundleDefault = true; });
+        in
+        {
+          nucleus-apply = nucleusApp {
+            name = "apply";
+            scriptName = "src/scripts/apply";
+            runtimeInputs = [
+              pkgs.curl
+              pkgs.git
+              pkgs.jq
+              pkgs.openssh
+              pkgs.prek
+              pkgs.sops
+              pkgs.ssh-to-age
+            ];
+          };
+          nucleus-ai = nucleusApp {
+            name = "ai";
+            runtimeInputs = [ pkgs.jq ];
+          };
+          nucleus-bootstrap = nucleusApp {
+            name = "bootstrap";
+            runtimeInputs = [ ];
+          };
+          nucleus-bump-lockfile = nucleusApp {
+            name = "bump-lockfile";
+            runtimeInputs = [ pkgs.jq ];
+          };
+          nucleus-check = nucleusApp {
+            name = "check";
+            runtimeInputs = [
+              pkgs.bash
+              pkgs.git
+              pkgs.jq
+              pkgs.nixf
+              pkgs.packer
+              pkgs.powershell
+              pkgs.check-jsonschema
+              treefmtWrapper
+              pkgs.yq-go
+            ];
+          };
+          nucleus-check-packer = nucleusApp {
+            name = "check-packer";
+            runtimeInputs = [
+              pkgs.bash
+              pkgs.packer
+            ];
+          };
+          nucleus-check-pwsh = mkCheckPwshPackage pkgs;
+          nucleus-check-sh = nucleusApp {
+            name = "check-sh";
+            runtimeInputs = [
+              pkgs.bash
+              pkgs.git
+              treefmtWrapper
+            ];
+          };
+          nucleus-cleanup-nix = nucleusApp {
+            name = "cleanup-nix";
+            runtimeInputs = [ pkgs.bash ];
+          };
+          nucleus-cloud-setup = nucleusApp {
+            name = "cloud-setup";
+            runtimeInputs = [
+              pkgs.git
+              pkgs.jq
+              pkgs.rclone
+            ];
+          };
+          nucleus-config = nucleusApp {
+            name = "config";
+            runtimeInputs = [ pkgs.jq ];
+          };
+          nucleus-gs-pdf-opt = nucleusApp {
+            name = "gs-pdf-opt";
+            runtimeInputs = [ pkgs.ghostscript ];
+          };
+          nucleus-gc = nucleusApp {
+            name = "gc";
+            runtimeInputs = [
+              pkgs.jq
+              pkgs.gnugrep
+              pkgs.home-manager
+            ];
+          };
+          nucleus-health-check = nucleusApp {
+            name = "health-check";
+            runtimeInputs = [
+              pkgs.curl
+              pkgs.git
+              pkgs.gnupg
+              pkgs.sops
+            ];
+          };
+          nucleus-replica-reset = nucleusApp {
+            name = "replica-reset";
+            runtimeInputs = [
+              pkgs.git
+              pkgs.jq
+            ];
+          };
+          nucleus-replica-sync = nucleusApp {
+            name = "replica-sync";
+            runtimeInputs = [
+              pkgs.git
+              pkgs.jq
+              pkgs.rclone
+            ];
+          };
+          nucleus-svc = nucleusApp {
+            name = "svc";
+            runtimeInputs = [ pkgs.jq ];
+          };
+          nucleus-service-watchdog = nucleusApp {
+            name = "service-watchdog";
+            scriptName = "src/scripts/services/service-watchdog";
+            runtimeInputs = [ pkgs.jq ];
+          };
+          nucleus-test = nucleusApp {
+            name = "test";
+            runtimeInputs = [
+              pkgs.bash
+              pkgs.findutils
+              pkgs.git
+              pkgs.powershell
+              treefmtWrapper
+            ];
+          };
+          nucleus-update = nucleusApp {
+            name = "update";
+            runtimeInputs = [
+              pkgs.gnupg
+              pkgs.sops
+            ];
+          };
+          nucleus-vm = nucleusApp {
+            name = "vm";
+            runtimeInputs = [
+              pkgs.android-tools
+              pkgs.jq
+            ];
+          };
         };
-        nucleus-ai = writeNucleusShellApplication pkgs {
-          name = "ai";
-          runtimeInputs = [ pkgs.jq ];
-        };
-        nucleus-bootstrap = writeNucleusShellApplication pkgs {
-          name = "bootstrap";
-          runtimeInputs = [ ];
-        };
-        nucleus-bump-lockfile = writeNucleusShellApplication pkgs {
-          name = "bump-lockfile";
-          runtimeInputs = [ pkgs.jq ];
-        };
-        nucleus-check = writeNucleusShellApplication pkgs {
-          name = "check";
-          runtimeInputs = [
-            pkgs.bash
-            pkgs.git
-            pkgs.jq
-            pkgs.nixf
-            pkgs.packer
-            pkgs.powershell
-            pkgs.check-jsonschema
-            treefmtWrapper
-            pkgs.yq-go
-          ];
-        };
-        nucleus-check-packer = writeNucleusShellApplication pkgs {
-          name = "check-packer";
-          runtimeInputs = [
-            pkgs.bash
-            pkgs.packer
-          ];
-        };
-        nucleus-check-pwsh = mkCheckPwshPackage pkgs;
-        nucleus-check-sh = writeNucleusShellApplication pkgs {
-          name = "check-sh";
-          runtimeInputs = [
-            pkgs.bash
-            pkgs.git
-            treefmtWrapper
-          ];
-        };
-        nucleus-cleanup-nix = writeNucleusShellApplication pkgs {
-          name = "cleanup-nix";
-          runtimeInputs = [ pkgs.bash ];
-        };
-        nucleus-cloud-setup = writeNucleusShellApplication pkgs {
-          name = "cloud-setup";
-          runtimeInputs = [
-            pkgs.git
-            pkgs.jq
-            pkgs.rclone
-          ];
-        };
-        nucleus-config = writeNucleusShellApplication pkgs {
-          name = "config";
-          runtimeInputs = [ pkgs.jq ];
-        };
-        nucleus-gs-pdf-opt = writeNucleusShellApplication pkgs {
-          name = "gs-pdf-opt";
-          runtimeInputs = [ pkgs.ghostscript ];
-        };
-        nucleus-gc = writeNucleusShellApplication pkgs {
-          name = "gc";
-          runtimeInputs = [
-            pkgs.jq
-            pkgs.gnugrep
-            pkgs.home-manager
-          ];
-        };
-        nucleus-health-check = writeNucleusShellApplication pkgs {
-          name = "health-check";
-          runtimeInputs = [
-            pkgs.curl
-            pkgs.git
-            pkgs.gnupg
-            pkgs.sops
-          ];
-        };
-        nucleus-replica-reset = writeNucleusShellApplication pkgs {
-          name = "replica-reset";
-          runtimeInputs = [
-            pkgs.git
-            pkgs.jq
-          ];
-        };
-        nucleus-replica-sync = writeNucleusShellApplication pkgs {
-          name = "replica-sync";
-          runtimeInputs = [
-            pkgs.git
-            pkgs.jq
-            pkgs.rclone
-          ];
-        };
-        nucleus-svc = writeNucleusShellApplication pkgs {
-          name = "svc";
-          runtimeInputs = [ pkgs.jq ];
-        };
-        nucleus-service-watchdog = writeNucleusShellApplication pkgs {
-          name = "service-watchdog";
-          scriptName = "src/scripts/services/service-watchdog";
-          runtimeInputs = [ pkgs.jq ];
-        };
-        nucleus-test = writeNucleusShellApplication pkgs {
-          name = "test";
-          runtimeInputs = [
-            pkgs.bash
-            pkgs.findutils
-            pkgs.git
-            pkgs.powershell
-            treefmtWrapper
-          ];
-        };
-        nucleus-update = writeNucleusShellApplication pkgs {
-          name = "update";
-          runtimeInputs = [
-            pkgs.gnupg
-            pkgs.sops
-          ];
-        };
-        nucleus-vm = writeNucleusShellApplication pkgs {
-          name = "vm";
-          runtimeInputs = [
-            pkgs.android-tools
-            pkgs.jq
-          ];
-        };
-      };
 
       nucleusAppsMac = mkNucleusApps pkgsMac (mkTreefmtWrapper systems.mac pkgsMac);
       nucleusAppsLinux = mkNucleusApps pkgsLinux (mkTreefmtWrapper systems.linux pkgsLinux);
