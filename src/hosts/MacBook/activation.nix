@@ -150,7 +150,7 @@ in
   #   configureNvimLauncher            — macOS-specific neovim launcher
   #   configureUtmRendererPrefs        — UTM Apple Core OpenGL (CGL) renderer for Android guest
   #   disableSpotlight                 — disable all Spotlight hotkeys + service
-  #   removeCommandLineTools           — delete Apple CLT tree + pkgutil receipts
+  #   removeCommandLineTools           — delete Apple CLT install tree (not receipts)
   #   configureXcodeSelect             — xcode-select --switch to apple-sdk-enhanced
   # ---------------------------------------------------------------------------
   system.activationScripts.postActivation.text = lib.mkBefore ''
@@ -160,11 +160,11 @@ in
 
     # ---- configure-xcode-select --------------------------------------------------
     # Point the system developer directory at the Nix apple-sdk store path so
-    # xcrun (invoked by rustc/cargo for SDK discovery) works without Apple CLT.
-    # CLT is removed by remove-command-line-tools above on each apply; this
-    # switch is the system-level hook for non-shell process trees (launchd, GUI
-    # tasks).  Without both steps, native-code builds outside a Nix devShell can
-    # trigger the CLT installation dialog or Software Update CLT offers.
+    # xcrun (invoked by rustc/cargo for SDK discovery) works without Xcode CLT
+    # installed.  remove-command-line-tools above deletes the CLT tree when
+    # present; this switch is the system-level hook for non-shell process trees.
+    # Without both steps, native-code builds outside a Nix devShell can trigger
+    # the CLT installation dialog.
     # WHY: xcode-select --switch (not just DEVELOPER_DIR):
     #   DEVELOPER_DIR only helps processes that inherit the shell environment.
     #   launchd services, VS Code tasks with non-shell exec, and other non-shell
