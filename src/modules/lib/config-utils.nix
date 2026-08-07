@@ -1,7 +1,7 @@
 # src/modules/lib/config-utils.nix — Shared config deployment helpers.
 #
-# Every config in src/modules/configs/ should use these helpers to ensure
-# consistent deployment semantics across all POSIX hosts.
+# Machine-wide configs in src/modules/configs/ and per-user homedir configs in
+# src/users/ should use these helpers for consistent deployment semantics.
 # See .agents/instructions/app-config-policy.instructions.md for the
 # priority ordering and "why not #1" comment rule.
 {
@@ -65,4 +65,22 @@ in
   deployMerge = name: mergeScript: {
     home.activation."mergeConfig_${name}" = lib.hm.dag.entryAfter [ "writeBoundary" ] mergeScript;
   };
+
+  # ---------------------------------------------------------------------------
+  # deployUserWritableSymlink — Method 1 for per-user homedir configs.
+  # Resolves the source via mkUserOverlay, then delegates to deployWritableSymlink.
+  # ---------------------------------------------------------------------------
+  deployUserWritableSymlink =
+    name:
+    {
+      configName,
+      relativePath,
+      targetRelPath,
+      overlay,
+    }:
+    let
+      absoluteSource = overlay.selectFile configName relativePath;
+      repoRelPath = overlay.toRepoRelPath absoluteSource;
+    in
+    deployWritableSymlink name repoRelPath targetRelPath;
 }

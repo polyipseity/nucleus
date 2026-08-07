@@ -369,3 +369,39 @@ function Resolve-UserConfigDir {
   if (Test-Path -Path $default -PathType Container) { return $default }
   throw "Resolve-UserConfigDir: no source found for user '$User', config '$ConfigName' (tried '$perUser' and '$default')"
 }
+
+function Deploy-UserWritableSymlink {
+  <#
+  .SYNOPSIS
+    Resolves a per-user overlay config file and deploys it as a writable symlink.
+
+  .DESCRIPTION
+    Combines Resolve-UserConfigFile with Deploy-WritableSymlink so Sync-* scripts
+    do not hardcode src/users/default paths.
+  #>
+  [CmdletBinding()]
+  [OutputType([hashtable])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Name,
+
+    [Parameter(Mandatory)]
+    [string]$User,
+
+    [Parameter(Mandatory)]
+    [string]$ConfigName,
+
+    [Parameter(Mandatory)]
+    [string]$RelativePath,
+
+    [Parameter(Mandatory)]
+    [string]$RepoRoot,
+
+    [Parameter(Mandatory)]
+    [string]$TargetPath
+  )
+
+  $sourcePath = Resolve-UserConfigFile -User $User -ConfigName $ConfigName -RelativePath $RelativePath -RepoRoot $RepoRoot
+  $repoRelPath = $sourcePath.Substring($RepoRoot.Length).TrimStart([char[]]@('\', '/'))
+  return Deploy-WritableSymlink -Name $Name -RepoRoot $RepoRoot -RepoRelPath $repoRelPath -TargetPath $TargetPath
+}
