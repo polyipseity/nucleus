@@ -14,6 +14,9 @@ assert containsRegex "nix path-info --json-format 1 --json --all --closure-size"
 assert containsRegex "def hsize:" auditLibText;
 assert containsRegex "_audit_store_run_privileged" auditLibText;
 assert containsRegex "launchctl kickstart -k system/" auditLibText;
+assert containsRegex "_audit_store_top_closures_jq 15" auditLibText;
+assert containsRegex "linux-builder guest: nix not in PATH" auditLibText;
+assert containsRegex "extra-experimental-features nix-command" auditLibText;
 assert containsRegex "linux-builder ssh attempt" auditLibText;
 assert containsRegex "audit_nix_generations" auditLibText;
 assert containsRegex "audit_nix_gc_roots" auditLibText;

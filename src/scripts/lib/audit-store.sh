@@ -69,7 +69,8 @@ _audit_store_linux_builder_ready() {
 }
 
 _audit_store_top_closures_jq() {
-  jq -r '
+  _as_top_limit="${1:-20}"
+  jq -r --argjson top "$_as_top_limit" '
     def hsize:
       if . < 1000 then "\(.) B"
       elif . < 1000000 then "\((. / 1000) | floor) kB"
@@ -79,7 +80,7 @@ _audit_store_top_closures_jq() {
     to_entries
     | sort_by(.value.closureSize)
     | reverse
-    | .[0:20][]
+    | .[0:$top][]
     | "\(.value.closureSize | hsize)\t\(.key)"
   '
 }
@@ -208,26 +209,29 @@ audit_linux_builder_store() {
     return 1
   fi
 
+  if ! command -v jq >/dev/null 2>&1; then
+    error "jq unavailable; cannot audit linux-builder store"
+    return 1
+  fi
+
   if ! _audit_store_linux_builder_ready; then
     return 1
   fi
 
-  _as_builder_remote='command -v nix >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && nix path-info --json-format 1 --json --all --closure-size | jq -r '"'"'
-    def hsize:
-      if . < 1000 then "\(.) B"
-      elif . < 1000000 then "\((. / 1000) | floor) kB"
-      elif . < 1000000000 then "\((. / 1000000) | floor) MB"
-      else "\((. / 1000000000) | floor) GB"
-      end;
-    to_entries | sort_by(.value.closureSize) | reverse | .[0:15][] | "\(.value.closureSize | hsize)\t\(.key)"
-  '"'"''
+  _as_builder_remote='command -v nix >/dev/null 2>&1 || { printf "%s\n" "linux-builder guest: nix not in PATH" >&2; exit 127; }; exec nix --extra-experimental-features nix-command path-info --json-format 1 --json --all --closure-size'
 
-  _as_builder_tmp="$(_audit_store_tmpfile)"
+  _as_builder_out="$(_audit_store_tmpfile)"
+  _as_builder_err="$(_audit_store_tmpfile)"
   _as_builder_attempt=1
   while [ "$_as_builder_attempt" -le 3 ]; do
-    if ssh -o BatchMode=yes -o ConnectTimeout=5 builder@linux-builder "$_as_builder_remote" >"$_as_builder_tmp" 2>&1; then
-      cat "$_as_builder_tmp"
-      rm -f "$_as_builder_tmp"
+    if ssh -o BatchMode=yes -o ConnectTimeout=5 builder@linux-builder "$_as_builder_remote" >"$_as_builder_out" 2>"$_as_builder_err"; then
+      if ! _audit_store_top_closures_jq 15 <"$_as_builder_out"; then
+        error "failed to parse linux-builder nix path-info JSON output"
+        cat "$_as_builder_err" >&2
+        rm -f "$_as_builder_out" "$_as_builder_err"
+        return 1
+      fi
+      rm -f "$_as_builder_out" "$_as_builder_err"
       return 0
     fi
 
@@ -239,8 +243,8 @@ audit_linux_builder_store() {
   done
 
   error "linux-builder store audit failed after 3 attempts; see output below"
-  cat "$_as_builder_tmp" >&2
-  rm -f "$_as_builder_tmp"
+  cat "$_as_builder_err" >&2
+  rm -f "$_as_builder_out" "$_as_builder_err"
   error "start the builder with 'sudo launchctl kickstart -k system/org.nixos.linux-builder' or pass --no-store-audit"
   return 1
 }
