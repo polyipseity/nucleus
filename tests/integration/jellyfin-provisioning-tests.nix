@@ -30,7 +30,7 @@ let
   windowsCaddyTrustText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-CaddyLocalCA.ps1;
   caddyTrustScriptText = builtins.readFile ../../src/scripts/services/caddy-trust.sh;
   windowsCaddyServiceText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-CaddyService.ps1;
-  windowsJellyfinAccountText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinAccount.ps1;
+  windowsJellyfinAccountText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinAccountCatalog.ps1;
   windowsJellyfinLibraryText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinLibrary.ps1;
   windowsSystemPackagesText = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
   jellyfinSyncScript = builtins.readFile ../../src/scripts/services/jellyfin-sync.sh;

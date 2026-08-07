@@ -23,7 +23,7 @@
   Exit codes:
     This module does not emit exit codes.
 #>
-function Sync-JellyfinAccount {
+function Sync-JellyfinAccountCatalog {
   <#
   .SYNOPSIS
     Converges Jellyfin accounts declared in users.json.
@@ -64,7 +64,7 @@ function Sync-JellyfinAccount {
     Jellyfin API base URL. Defaults to http://127.0.0.1:8096 (or read from services.json).
 
   .EXAMPLE
-    Sync-JellyfinAccount -RepoRoot 'C:\Users\admin\nucleus' -UserRecords $records `
+    Sync-JellyfinAccountCatalog -RepoRoot 'C:\Users\admin\nucleus' -UserRecords $records `
       -GpgExe 'C:\Program Files\GnuPG\bin\gpg.exe' `
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
       -PrimarySshKeyPath 'C:\Users\admin\.ssh\ssh_personal_admin' `

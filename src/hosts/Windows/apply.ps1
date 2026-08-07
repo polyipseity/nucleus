@@ -406,7 +406,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $systemModuleDir -ChildPath "ConvertFrom-WingetLockfileToDsc.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-WingetConfiguration.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-CaddyLocalCA.ps1")
-. (Join-Path -Path $systemModuleDir -ChildPath "Sync-JellyfinAccount.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Sync-JellyfinAccountCatalog.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-JellyfinLibrary.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-CaddyService.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-LiteLLMService.ps1")
@@ -829,7 +829,7 @@ if ($EnableCloudDrivesParity) {
 Invoke-EnsureLogDir -ServicesJson (Join-Path -Path $repoRoot -ChildPath "src\modules\services.json")
 Sync-CaddyService -RepoRoot $repoRoot -Enabled:`$true
 Sync-CaddyLocalCA -RepoRoot $repoRoot -Enabled:$true
-Sync-JellyfinAccount -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
+Sync-JellyfinAccountCatalog -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
 Sync-JellyfinLibrary -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
 Sync-SymlinkManifest -Enabled:$EnableSymlinkParity -UserRecords $selectedUserRecords
 # check-suppress:config-method: method 1 (writable symlink) -- symlink config so edits take effect immediately.
