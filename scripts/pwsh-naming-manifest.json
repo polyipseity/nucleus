@@ -11,8 +11,9 @@
     "Sync-VSCodeSettingManifest": "src/hosts/Windows/modules/editors/Sync-VSCodeSettingManifest.ps1",
     "Sync-DevRepoCatalog": "src/hosts/Windows/modules/user/Sync-DevRepoCatalog.ps1",
     "Sync-CloudDriveCatalog": "src/hosts/Windows/modules/user/Sync-CloudDriveCatalog.ps1",
-    "Sync-JellyfinAccountCatalog": "src/hosts/Windows/modules/system/Sync-JellyfinAccountCatalog.ps1"
+    "Sync-JellyfinAccountCatalog": "src/hosts/Windows/modules/system/Sync-JellyfinAccountCatalog.ps1",
+    "Sync-JellyfinLibraryCatalog": "src/hosts/Windows/modules/system/Sync-JellyfinLibraryCatalog.ps1"
   },
-  "forbiddenNames": ["Sync-Symlink", "Sync-DevRepo", "Sync-CloudDrive", "Sync-JellyfinAccount"],
+  "forbiddenNames": ["Sync-Symlink", "Sync-DevRepo", "Sync-CloudDrive", "Sync-JellyfinAccount", "Sync-JellyfinLibrary"],
   "allowedBareSingular": []
 }

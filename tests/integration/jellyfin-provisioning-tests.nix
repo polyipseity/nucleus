@@ -31,7 +31,7 @@ let
   caddyTrustScriptText = builtins.readFile ../../src/scripts/services/caddy-trust.sh;
   windowsCaddyServiceText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-CaddyService.ps1;
   windowsJellyfinAccountText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinAccountCatalog.ps1;
-  windowsJellyfinLibraryText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinLibrary.ps1;
+  windowsJellyfinLibraryText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-JellyfinLibraryCatalog.ps1;
   windowsSystemPackagesText = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
   jellyfinSyncScript = builtins.readFile ../../src/scripts/services/jellyfin-sync.sh;
 
@@ -149,10 +149,10 @@ let
       "polyipseity must declare jellyfin libraries for music videos and playlists in Windows-assembled src/users/ registry";
 
   test_windows_library_module_wired = assert' (
-    containsRegex "Sync-JellyfinLibrary" windowsApplyText
-    && containsRegex "function Sync-JellyfinLibrary" windowsJellyfinLibraryText
+    containsRegex "Sync-JellyfinLibraryCatalog" windowsApplyText
+    && containsRegex "function Sync-JellyfinLibraryCatalog" windowsJellyfinLibraryText
     && containsRegex "Library/VirtualFolders" windowsJellyfinLibraryText
-  ) "Windows apply flow must import and call Sync-JellyfinLibrary module";
+  ) "Windows apply flow must import and call Sync-JellyfinLibraryCatalog module";
 
   allTests = [
     test_core_installs_jellyfin

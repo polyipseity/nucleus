@@ -407,7 +407,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-WingetConfiguration.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-CaddyLocalCA.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-JellyfinAccountCatalog.ps1")
-. (Join-Path -Path $systemModuleDir -ChildPath "Sync-JellyfinLibrary.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Sync-JellyfinLibraryCatalog.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-CaddyService.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-LiteLLMService.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-ReplicaSyncScheduledTask.ps1")
@@ -830,7 +830,7 @@ Invoke-EnsureLogDir -ServicesJson (Join-Path -Path $repoRoot -ChildPath "src\mod
 Sync-CaddyService -RepoRoot $repoRoot -Enabled:`$true
 Sync-CaddyLocalCA -RepoRoot $repoRoot -Enabled:$true
 Sync-JellyfinAccountCatalog -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
-Sync-JellyfinLibrary -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
+Sync-JellyfinLibraryCatalog -RepoRoot $repoRoot -UserRecords $selectedUserRecords -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
 Sync-SymlinkManifest -Enabled:$EnableSymlinkParity -UserRecords $selectedUserRecords
 # check-suppress:config-method: method 1 (writable symlink) -- symlink config so edits take effect immediately.
   $discordMusicRPCConfigDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath "discord-music-rpc"

@@ -6,7 +6,7 @@
   Reads per-user jellyfin.libraries declarations, resolves ~ paths against
   each user's homeDirectory, resolves account credentials from per-user SOPS
   secrets, merges specs by name (first writer wins), and applies them via the
-  Jellyfin HTTP API.  Runs after Sync-JellyfinAccount so accounts exist before
+  Jellyfin HTTP API.  Runs after Sync-JellyfinAccountCatalog so accounts exist before
   library provisioning attempts authentication.
 
   API behavior source (upstream Jellyfin):
@@ -22,7 +22,7 @@
   Exit codes:
     This module does not emit exit codes.
 #>
-function Sync-JellyfinLibrary {
+function Sync-JellyfinLibraryCatalog {
   <#
   .SYNOPSIS
     Converges Jellyfin library folders declared in users.json.
@@ -33,7 +33,7 @@ function Sync-JellyfinLibrary {
     merges specs by library name (first writer wins), and applies them to the
     host-shared Jellyfin server.
 
-    Authentication uses the same per-user secret pattern as Sync-JellyfinAccount:
+    Authentication uses the same per-user secret pattern as Sync-JellyfinAccountCatalog:
     credentials are resolved from each user's src\secrets\users\<name>.yml via
     Get-Secret and tried against /Users/AuthenticateByName.  Startup bootstrap
     is attempted when no existing credential works.
@@ -65,7 +65,7 @@ function Sync-JellyfinLibrary {
     Jellyfin API base URL. Defaults to http://127.0.0.1:8096 (or read from services.json).
 
   .EXAMPLE
-    Sync-JellyfinLibrary -RepoRoot 'C:\Users\admin\nucleus' -UserRecords $records `
+    Sync-JellyfinLibraryCatalog -RepoRoot 'C:\Users\admin\nucleus' -UserRecords $records `
       -GpgExe 'C:\Program Files\GnuPG\bin\gpg.exe' `
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
       -PrimarySshKeyPath 'C:\Users\admin\.ssh\ssh_personal_admin' `
