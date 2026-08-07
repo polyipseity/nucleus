@@ -730,7 +730,7 @@ wevtutil sl Application /ms:209715200 2>$null  # check-suppress:suppression_doc:
 # rustup toolchain management runs after WinGet DSC has installed Rustlang.Rustup.
 # Must run before Invoke-CargoBinstallSetup so the stable toolchain (and its
 # cargo binary) are available for compilation fallback.
-Invoke-RustupSetup
+Invoke-RustupSetup -User $Users[0] -RepoRoot $repoRoot
 Invoke-ScoopSetup
 # cargo-binstall managed packages run after Invoke-ScoopSetup has installed
 # cargo-binstall from Scoop and prepended the shims directory to PATH.
@@ -793,7 +793,7 @@ if ($userDevRepos -and $userDevRepos.repositories) {
   }
 }
 
-Sync-AgentsConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity
+Sync-AgentsConfig -RepoRoot $repoRoot -User $Users[0] -Enabled:$EnableAgentsConfigParity
 Sync-AgentsSkillManifest -RepoRoot $repoRoot -Enabled:$EnableAgentsSkillsParity
 Sync-AgentsClawHubSkillManifest -RepoRoot $repoRoot -Enabled:$EnableAgentsClawHubSkillsParity
 Sync-CursorConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity -Username $Users[0]
@@ -813,13 +813,13 @@ if ($null -eq $EnableDevReposParity) {
 # Keep dev repo provisioning after Git/SSH config so clones see the same
 # secret/key ordering across macOS, NixOS, and Windows.
 Sync-DevRepo -Enabled:$EnableDevReposParity -Repositories $devRepositories
-Sync-ShellProfile -Enabled:$EnableShellParity
+Sync-ShellProfile -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoot
 # check-suppress:config-method: method 1 (writable symlink) -- bun and uv configs symlinked to repo files.
-Sync-BunConfig -Enabled:$EnableShellParity
-Sync-UvConfig -Enabled:$EnableShellParity
-Sync-NextestConfig -Enabled:$EnableShellParity
+Sync-BunConfig -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoot
+Sync-UvConfig -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoot
+Sync-NextestConfig -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoot
 # check-suppress:config-method: method 1 (writable symlink) -- direnvrc cross-platform base config.
-Sync-DirenvConfig -Enabled:$EnableShellParity
+Sync-DirenvConfig -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoot
 Sync-StarshipConfig -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoot
 if ($EnableCloudDrivesParity) {
   foreach ($userRecord in $selectedUserRecords) {

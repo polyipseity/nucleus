@@ -24,11 +24,22 @@ function Invoke-RustupSetup {
     Exit codes: 0 on success; non-zero on failure.
   #>
   [CmdletBinding()]
-  param()
+  param(
+    [Parameter(Mandatory = $false)]
+    [string]$User,
 
-  # Derive repo root from script location (src/hosts/Windows/modules/setup/ -> repo root is 5 levels up).
-  $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
-  $lockfilePath = Join-Path $repoRoot "lockfiles\lockfile.json"
+    [Parameter(Mandatory = $false)]
+    [string]$RepoRoot
+  )
+
+  if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+    $RepoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
+  }
+  if ([string]::IsNullOrWhiteSpace($User)) {
+    $User = $env:USERNAME
+  }
+
+  $lockfilePath = Join-Path $RepoRoot "lockfiles\lockfile.json"
 
   # Read version-pinning data from the consolidated lockfile.
   $lockfile = @{}
@@ -136,20 +147,11 @@ function Invoke-RustupSetup {
 
   # check-suppress:config-method: method 1 (writable symlink) -- cargo config symlinked to repo file.
   # Mirrors the POSIX shell.nix deployment of cargo/config.toml.
-  $cargoConfigRelPath = 'src\modules\configs\cargo\config.toml'
   $cargoConfigDir = "$env:USERPROFILE\.cargo"
   $cargoConfigPath = "$cargoConfigDir\config.toml"
   if (-not (Test-Path -Path $cargoConfigDir)) {
     $null = New-Item -ItemType Directory -Path $cargoConfigDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
   }
-  $cargoSourcePath = Join-Path $repoRoot $cargoConfigRelPath
-  if (-not (Test-Path -Path $cargoSourcePath -PathType Leaf)) {
-    Write-Error "cargo-config: source config not found at $cargoSourcePath"
-    return
-  }
-  if (Test-Path -Path $cargoConfigPath) {
-    Remove-Item -Path $cargoConfigPath -Force
-  }
-  New-Item -Path $cargoConfigPath -ItemType SymbolicLink -Target $cargoSourcePath -Force > $null
-  Write-Output "cargo-config: symlinked $cargoConfigPath"
+  $result = Deploy-UserWritableSymlink -Name 'cargo' -User $User -ConfigName 'cargo' -RelativePath 'config.toml' -RepoRoot $RepoRoot -TargetPath $cargoConfigPath
+  Write-Output $result.Message
 }

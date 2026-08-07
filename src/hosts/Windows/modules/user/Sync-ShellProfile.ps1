@@ -55,7 +55,13 @@ function Sync-ShellProfile {
   #>
   param(
     [Parameter(Mandatory)]
-    [bool]$Enabled
+    [bool]$Enabled,
+
+    [Parameter(Mandatory = $false)]
+    [string]$User,
+
+    [Parameter(Mandatory = $false)]
+    [string]$RepoRoot
   )
 
   # ref: comment-annotations.instructions.md -- Category 2 sentinel convention
@@ -157,28 +163,24 @@ function Sync-ShellProfile {
   }
 
   # Provisioned PSScriptAnalyzerSettings reference copy (method 1 writable
-  # symlink), mirroring POSIX pwsh.nix deployment:
-  # home.file.".config/powershell/PSScriptAnalyzerSettings.psd1" ->
-  # src/modules/configs/pwsh/PSScriptAnalyzerSettings.psd1. PSSA does not
-  # auto-discover this path; it is a -Settings passthrough convenience.
+  # symlink), mirroring POSIX pwsh.nix deployment.
   $currentUserHostProfile = $PROFILE.CurrentUserCurrentHost
   if (-not [string]::IsNullOrWhiteSpace($currentUserHostProfile)) {
     $profileDirectory = Split-Path -Path $currentUserHostProfile -Parent
     $settingsPath = Join-Path $profileDirectory 'PSScriptAnalyzerSettings.psd1'
+    if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+      $RepoRoot = $env:NUCLEUS_REPO_ROOT
+    }
+    if ([string]::IsNullOrWhiteSpace($User)) {
+      $User = $env:USERNAME
+    }
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild; mirrors pwsh.nix POSIX deployment.
-    $settingsSource = Join-Path $env:NUCLEUS_REPO_ROOT 'src\modules\configs\pwsh\PSScriptAnalyzerSettings.psd1'
     if ($Enabled) {
-      if (-not (Test-Path -Path $settingsSource -PathType Leaf)) {
-        throw "Sync-ShellProfile: source settings file not found at $settingsSource"
+      if ([string]::IsNullOrWhiteSpace($RepoRoot)) {
+        throw 'Sync-ShellProfile: NUCLEUS_REPO_ROOT is not set. Run via apply.ps1 which exports this variable.'
       }
-      if (-not (Test-Path -Path $profileDirectory -PathType Container)) {
-        New-Item -Path $profileDirectory -ItemType Directory -Force > $null
-      }
-      if (Test-Path -Path $settingsPath) {
-        Remove-Item -Path $settingsPath -Force
-      }
-      New-Item -Path $settingsPath -ItemType SymbolicLink -Target $settingsSource -Force > $null
-      Write-Output "$($PSStyle.Foreground.Cyan)Sync-ShellProfile: symlinked $settingsPath$($PSStyle.Reset)"
+      $result = Deploy-UserWritableSymlink -Name 'pwsh-pssa' -User $User -ConfigName 'pwsh' -RelativePath 'PSScriptAnalyzerSettings.psd1' -RepoRoot $RepoRoot -TargetPath $settingsPath
+      Write-Output "$($PSStyle.Foreground.Cyan)$($result.Message)$($PSStyle.Reset)"
     }
     elseif (Test-Path -Path $settingsPath -PathType Leaf) {
       Remove-Item -Path $settingsPath -Force

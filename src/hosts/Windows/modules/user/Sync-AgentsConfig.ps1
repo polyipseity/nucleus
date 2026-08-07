@@ -58,14 +58,15 @@ function Sync-AgentsConfig {
   param(
     [Parameter(Mandatory)]
     [string]$RepoRoot,
+
+    [Parameter(Mandatory)]
+    [string]$User,
+
     [Parameter(Mandatory)]
     [bool]$Enabled
   )
 
-  # The managed source is the live agents config tree in the repo.  Coding agents
-  # write through per-subdir symlinks directly into the repo checkout so every
-  # change appears as an unstaged git diff.
-  $agentsSource = Join-Path -Path $RepoRoot -ChildPath "src\modules\configs\agents"
+  $agentsSource = Resolve-UserConfigDir -User $User -ConfigName 'agents' -RepoRoot $RepoRoot
   $agentsDir    = Join-Path -Path $HOME     -ChildPath ".agents"
 
   . (Join-Path -Path $PSScriptRoot -ChildPath "..\Set-ManagedSymlinkDeleteProtection.ps1")

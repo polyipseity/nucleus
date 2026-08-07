@@ -41,7 +41,7 @@
 
   Related settings files (all intentionally separate — no deduplication):
     scripts/PSScriptAnalyzerSettings.check.psd1                   — pre-commit/lint (excludes slow rules)
-    src/modules/configs/pwsh/PSScriptAnalyzerSettings.psd1       — interactive profile
+    src/users/default/pwsh/PSScriptAnalyzerSettings.psd1       — interactive profile
     .agents/skills/pssa-rule-benchmark/PSScriptAnalyzerSettings.psd1 — benchmarking
 #>
 @{

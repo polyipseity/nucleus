@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Creates per-skill directory symlinks in ~/.agents/skills/ for each
-  subdirectory under src/modules/configs/agents/skills/. Bundled skills
+  subdirectory under the resolved agents overlay skills/ tree. Bundled skills
   (MIT-0/MIT/Apache) are committed to the repo; fetched skills are synced
   separately by the post-apply step.
 

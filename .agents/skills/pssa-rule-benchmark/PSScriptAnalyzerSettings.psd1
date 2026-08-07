@@ -11,7 +11,7 @@
   Related settings files (all intentionally separate — no deduplication):
     scripts/PSScriptAnalyzerSettings.check.psd1         — pre-commit/lint (excludes slow rules)
     scripts/PSScriptAnalyzerSettings.test.psd1          — full-coverage test runs
-    src/modules/configs/pwsh/PSScriptAnalyzerSettings.psd1 — interactive profile
+    src/users/default/pwsh/PSScriptAnalyzerSettings.psd1 — interactive profile
 #>
 @{
     Severity = @('Error', 'Warning', 'Information')
