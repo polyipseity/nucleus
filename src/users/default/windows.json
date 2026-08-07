@@ -1,5 +1,13 @@
 {
   "$schema": "./windows.schema.json",
-  "description": "",
-  "dscConfigFiles": []
+  "description": "Primary user receiving secret materialization and full configuration",
+  "dscConfigFiles": [
+    "context-manual.dsc.yml",
+    "context-pdf-opt.dsc.yml",
+    "env.dsc.yml",
+    "wallpaper.dsc.yml",
+    "screen-saver.dsc.yml",
+    "explorer.dsc.yml",
+    "shell.dsc.yml"
+  ]
 }

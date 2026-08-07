@@ -1,5 +1,5 @@
 {
   "$schema": "./vm-guest.schema.json",
-  "passwordSecretKey": "",
-  "usernameSecretKey": ""
+  "passwordSecretKey": "vm_guest_password",
+  "usernameSecretKey": "vm_guest_username"
 }
