@@ -17,7 +17,7 @@ let
   polyipseityWindows = usersWindows.polyipseity;
   posixUsersText = builtins.toJSON polyipseityMacOS;
   windowsUsersText = builtins.toJSON polyipseityWindows;
-  polyipseityCloudDrivesText = builtins.readFile ../../src/users/polyipseity/cloud-drives.json;
+  defaultCloudDrivesText = builtins.readFile ../../src/users/default/cloud-drives.json;
 
   moduleText = builtins.readFile ../../src/modules/cloud-drives.nix;
   flakeText = builtins.readFile ../../src/flake.nix;
@@ -218,23 +218,23 @@ let
 
   # Test 31: cloud-drives preserves GoogleDrive remote id while exposing a human-readable name
   test_google_drive_name = assert' (
-    containsRegex ''"id": "GoogleDrive"'' polyipseityCloudDrivesText
-    && containsRegex ''"remoteName": "GoogleDrive"'' polyipseityCloudDrivesText
-    && containsRegex ''"name": "Google Drive"'' polyipseityCloudDrivesText
+    containsRegex ''"id": "GoogleDrive"'' defaultCloudDrivesText
+    && containsRegex ''"remoteName": "GoogleDrive"'' defaultCloudDrivesText
+    && containsRegex ''"name": "Google Drive"'' defaultCloudDrivesText
   ) "GoogleDrive mount must keep remoteName=GoogleDrive while setting name=Google Drive";
 
-  # Test 32: cloud-drives keeps iCloud replica explicitly enabled
-  test_icloud_replica_enabled =
+  # Test 32: cloud-drives keeps iCloud replica declared but disabled by default
+  test_icloud_replica_disabled =
     let
       icloudReplica = builtins.head (
         builtins.filter (replica: (replica.id or "") == "iCloud") polyipseityMacOS.cloudDrives.replicas
       );
     in
     assert' (
-      icloudReplica.enable == true
+      icloudReplica.enable == false
       && icloudReplica.localPath == "clouds/iCloudReplica"
       && icloudReplica.direction == "pull"
-    ) "iCloud replica entry must remain enabled for local replica convergence";
+    ) "iCloud replica entry must remain declared with enable=false by default";
 
   # Test 33: flake exports nucleus-replica-sync command
   test_flake_has_replica_command = assert' (
@@ -567,7 +567,7 @@ let
     test_cloud_setup_recreates_stale_remotes
     test_macos_uses_fuse_t
     test_google_drive_name
-    test_icloud_replica_enabled
+    test_icloud_replica_disabled
     test_flake_has_replica_command
     test_flake_has_replica_app
     test_apply_runs_replica_sync

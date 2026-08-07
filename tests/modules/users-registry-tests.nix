@@ -50,8 +50,8 @@ let
 
   test_resolves_replica_enable_per_platform = assert' (
     (googleDriveReplica usersMacOS.polyipseity.cloudDrives.replicas).enable == false
-    && (googleDriveReplica usersWindows.polyipseity.cloudDrives.replicas).enable == true
-  ) "users-registry.nix must resolve host-keyed replica enable flags";
+    && (googleDriveReplica usersWindows.polyipseity.cloudDrives.replicas).enable == false
+  ) "users-registry.nix must resolve replica enable flags from default cloud-drives policy";
 
   test_resolves_replica_readwrite_per_platform = assert' (
     (icloudReplica usersMacOS.polyipseity.cloudDrives.replicas).readWrite == true
