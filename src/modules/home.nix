@@ -45,6 +45,8 @@ let
 
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
+  loggingPaths = import ./lib/logging-paths.nix { inherit pkgs; };
+
   overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot;
   };
@@ -227,7 +229,7 @@ in
     # The launchd StandardErrorPath/StandardOutPath option types require an
     # absolute path and do not expand ~.
     nucleus.logging.logDir = lib.mkDefault (
-      builtins.replaceStrings [ "~" ] [ config.home.homeDirectory ] config.nucleus.logging.logDir
+      builtins.replaceStrings [ "~" ] [ config.home.homeDirectory ] loggingPaths.logDirTemplate
     );
 
     # Allow Home Manager to manage its own activation and generation GC.
