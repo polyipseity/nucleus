@@ -43,7 +43,7 @@ let
 
   # ---------------------------------------------------------------------------
   # Autocorrect suppression word list
-  # Loaded from src/users/default/autocorrect/wordlist.txt (per-user overlay):
+  # Loaded from src/users/<user>/autocorrect/wordlist.txt (overlay; default is empty):
   # one word per line, sorted alphabetically. Identity substitutions (word → word)
   # prevent macOS from autocorrecting technical terms and product names.
   # check-suppress:config-method: method 3 (merge / defaults-based) -- not Method 1 (symlink) because macOS
@@ -125,8 +125,9 @@ in
         # This key is not available as a typed nix-darwin NSGlobalDomain
         # option, so it is declared as a custom preference payload.
         # Source: https://developer.apple.com/documentation/foundation/userdefaults
-        # Word list is loaded from src/users/default/autocorrect/wordlist.txt — edit that
-        # file to add or remove terms. All entries are identity substitutions
+        # Word list is loaded from the per-user autocorrect overlay — edit
+        # src/users/<username>/autocorrect/wordlist.txt (default template is empty).
+        # All entries are identity substitutions
         # (word → word) so macOS leaves them unchanged instead of autocorrecting.
         NSUserDictionaryReplacementItems = builtins.map (w: {
           replace = w;
