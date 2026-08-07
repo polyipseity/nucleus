@@ -8,6 +8,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+# Negative derive_repo_root probes must not see host-managed /etc/nucleus/repo-root.
+_NO_SYSTEM_REPO_ROOT_FILE="/nonexistent/nucleus-cwd-independence-test-isolation"
 
 # Simulate sudo/su env_reset: strip nucleus env vars and root-like identity.
 simulate_elevated_stripped_env() {
@@ -79,6 +81,7 @@ test_derive_repo_root_fails_cleanly() {
     derr_output=$(
         SCRIPT_DIR="/tmp" \
         NUCLEUS_REPO_ROOT="" \
+        NUCLEUS_REPO_ROOT_SYSTEM_FILE="$_NO_SYSTEM_REPO_ROOT_FILE" \
         bash -euo pipefail -c '
             cd /tmp
             . "'"$REPO_ROOT"'/src/scripts/lib/lib.sh"
@@ -215,6 +218,7 @@ test_store_layout_without_marker_fails() {
         cd /tmp
         SCRIPT_DIR="$tmp/scripts" \
         NUCLEUS_REPO_ROOT="" \
+        NUCLEUS_REPO_ROOT_SYSTEM_FILE="$_NO_SYSTEM_REPO_ROOT_FILE" \
         bash -euo pipefail -c '
             . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
             derive_repo_root
@@ -237,6 +241,7 @@ test_store_layout_stale_marker_fails() {
         cd /tmp
         SCRIPT_DIR="$tmp/scripts" \
         NUCLEUS_REPO_ROOT="" \
+        NUCLEUS_REPO_ROOT_SYSTEM_FILE="$_NO_SYSTEM_REPO_ROOT_FILE" \
         bash -euo pipefail -c '
             . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
             derive_repo_root
@@ -259,6 +264,7 @@ test_store_layout_relative_marker_fails() {
         cd /tmp
         SCRIPT_DIR="$tmp/scripts" \
         NUCLEUS_REPO_ROOT="" \
+        NUCLEUS_REPO_ROOT_SYSTEM_FILE="$_NO_SYSTEM_REPO_ROOT_FILE" \
         bash -euo pipefail -c '
             . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
             derive_repo_root
@@ -282,6 +288,7 @@ test_store_layout_empty_marker_fails() {
         cd /tmp
         SCRIPT_DIR="$tmp/scripts" \
         NUCLEUS_REPO_ROOT="" \
+        NUCLEUS_REPO_ROOT_SYSTEM_FILE="$_NO_SYSTEM_REPO_ROOT_FILE" \
         bash -euo pipefail -c '
             . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
             derive_repo_root
