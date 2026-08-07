@@ -421,6 +421,102 @@ function Get-UserConfigFirstLevelEntries {
   return @($names)
 }
 
+function Test-WallpaperImageName {
+  [CmdletBinding()]
+  [OutputType([bool])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$FileName
+  )
+
+  switch -Regex ($FileName) {
+    '\.(gif|jpe?g|png|webp)$' { return $true }
+    default { return $false }
+  }
+}
+
+function Get-WallpaperEncryptedBlobs {
+  <#
+  .SYNOPSIS
+    Lists *.sops blob names under the wallpapers/encrypted overlay entry.
+  #>
+  [CmdletBinding()]
+  [OutputType([string[]])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$User,
+
+    [Parameter(Mandatory)]
+    [string]$RepoRoot
+  )
+
+  $encryptedDir = Resolve-UserConfigFirstLevelEntry -User $User -ConfigName 'wallpapers' -EntryName 'encrypted' -RepoRoot $RepoRoot
+  return @(
+    Get-ChildItem -LiteralPath $encryptedDir -File -Force |
+      Where-Object { $_.Name.EndsWith('.sops', [System.StringComparison]::OrdinalIgnoreCase) } |
+      ForEach-Object { $_.Name } |
+      Sort-Object
+  )
+}
+
+function Get-WallpaperUnencryptedFiles {
+  <#
+  .SYNOPSIS
+    Lists unencrypted wallpaper image names under wallpapers/wallpapers/.
+  #>
+  [CmdletBinding()]
+  [OutputType([string[]])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$User,
+
+    [Parameter(Mandatory)]
+    [string]$RepoRoot
+  )
+
+  $wallpapersDir = Resolve-UserConfigFirstLevelEntry -User $User -ConfigName 'wallpapers' -EntryName 'wallpapers' -RepoRoot $RepoRoot
+  return @(
+    Get-ChildItem -LiteralPath $wallpapersDir -File -Force |
+      Where-Object { Test-WallpaperImageName -FileName $_.Name } |
+      ForEach-Object { $_.Name } |
+      Sort-Object
+  )
+}
+
+function Resolve-WallpaperEncryptedBlob {
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$User,
+
+    [Parameter(Mandatory)]
+    [string]$BlobName,
+
+    [Parameter(Mandatory)]
+    [string]$RepoRoot
+  )
+
+  return Resolve-UserConfigFile -User $User -ConfigName 'wallpapers' -RelativePath "encrypted/$BlobName" -RepoRoot $RepoRoot
+}
+
+function Resolve-WallpaperUnencryptedFile {
+  [CmdletBinding()]
+  [OutputType([string])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$User,
+
+    [Parameter(Mandatory)]
+    [string]$FileName,
+
+    [Parameter(Mandatory)]
+    [string]$RepoRoot
+  )
+
+  return Resolve-UserConfigFile -User $User -ConfigName 'wallpapers' -RelativePath "wallpapers/$FileName" -RepoRoot $RepoRoot
+}
+
 function Resolve-UserConfigDir {
   <#
   .SYNOPSIS

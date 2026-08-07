@@ -65,8 +65,43 @@ test_missing_file_fails() {
   fi
 }
 
+test_wallpaper_encrypted_blob_path() {
+  local resolved expected
+  resolved="$(resolve_wallpaper_encrypted_blob polyipseity "(2026-04-07) sweet mushroom.png.sops")"
+  expected="$REPO_ROOT/src/users/polyipseity/wallpapers/encrypted/(2026-04-07) sweet mushroom.png.sops"
+  if [ "$resolved" = "$expected" ]; then
+    assert_pass "resolves wallpaper encrypted blob path"
+  else
+    assert_fail "resolves wallpaper encrypted blob path" "got $resolved"
+  fi
+}
+
+test_list_wallpaper_encrypted_blobs() {
+  local blobs
+  blobs="$(list_wallpaper_encrypted_blobs polyipseity)"
+  if echo "$blobs" | grep -qx '(2026-04-07) sweet mushroom.png.sops'; then
+    assert_pass "lists wallpaper encrypted blobs"
+  else
+    assert_fail "lists wallpaper encrypted blobs" "got: $blobs"
+  fi
+}
+
+test_default_wallpaper_unencrypted_dir() {
+  local resolved expected
+  resolved="$(resolve_user_config_first_level_entry polyipseity wallpapers wallpapers)"
+  expected="$REPO_ROOT/src/users/default/wallpapers/wallpapers"
+  if [ "$resolved" = "$expected" ]; then
+    assert_pass "resolves default wallpapers/wallpapers directory"
+  else
+    assert_fail "resolves default wallpapers/wallpapers directory" "got $resolved"
+  fi
+}
+
 test_default_starship_file
 test_nested_path_uses_first_level_directory
 test_list_first_level_entries_union
 test_first_level_entry_resolves_directory
 test_missing_file_fails
+test_wallpaper_encrypted_blob_path
+test_list_wallpaper_encrypted_blobs
+test_default_wallpaper_unencrypted_dir

@@ -101,3 +101,46 @@ resolve_user_config_file() {
 resolve_user_config_first_level_entry() {
   _resolve_user_config_first_level_entry "$@"
 }
+
+_wallpaper_image_name() {
+  case "${1,,}" in
+    *.gif | *.jpeg | *.jpg | *.png | *.webp) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+list_wallpaper_encrypted_blobs() {
+  local username="$1"
+  local encrypted_dir entry base
+
+  encrypted_dir="$(resolve_user_config_first_level_entry "$username" "wallpapers" "encrypted")"
+  for entry in "$encrypted_dir"/*; do
+    [ -e "$entry" ] || continue
+    base="$(basename "$entry")"
+    case "$base" in
+      *.sops) printf '%s\n' "$base" ;;
+    esac
+  done
+}
+
+list_wallpaper_unencrypted_files() {
+  local username="$1"
+  local wallpapers_dir entry base
+
+  wallpapers_dir="$(resolve_user_config_first_level_entry "$username" "wallpapers" "wallpapers")"
+  for entry in "$wallpapers_dir"/*; do
+    [ -f "$entry" ] || continue
+    base="$(basename "$entry")"
+    if _wallpaper_image_name "$base"; then
+      printf '%s\n' "$base"
+    fi
+  done
+}
+
+resolve_wallpaper_encrypted_blob() {
+  resolve_user_config_file "$1" "wallpapers" "encrypted/$2"
+}
+
+resolve_wallpaper_unencrypted_file() {
+  resolve_user_config_file "$1" "wallpapers" "wallpapers/$2"
+}
