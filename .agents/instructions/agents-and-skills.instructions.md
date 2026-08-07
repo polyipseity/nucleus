@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing agents configuration, skill management, or ClawHub provisioning. Covers ~/.agents directory layout, bundled vs. fetched skill licensing rules, permission patterns, and the install-bun-packages/sync-clawhub-skills activation DAG."
 name: "Agents and Skills"
-applyTo: "src/modules/agents.nix, src/modules/cursor.nix, src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1, src/hosts/Windows/modules/user/Sync-AgentsClawHubSkill.ps1, src/hosts/Windows/modules/user/Sync-CursorConfig.ps1, src/hosts/Windows/modules/setup/Invoke-BunSetup.ps1, src/modules/configs/agents/**, src/users/*/cursor/**, src/scripts/agents/**/*.sh, src/scripts/configs/symlink-cursor-config.sh"
+applyTo: "src/modules/agents.nix, src/modules/cursor.nix, src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1, src/hosts/Windows/modules/user/Sync-AgentsClawHubSkill.ps1, src/hosts/Windows/modules/user/Sync-CursorConfig.ps1, src/hosts/Windows/modules/setup/Invoke-BunSetup.ps1, src/users/*/agents/**, src/users/*/cursor/**, src/scripts/agents/**/*.sh, src/scripts/configs/symlink-cursor-config.sh"
 ---
 
 # Agents and Skills
@@ -12,15 +12,15 @@ The `~/.agents/` directory is the runtime home for all agent configuration, prom
 
 | Path                                  | Owner                                              | Purpose                                                                                            |
 | ------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `~/.agents/`                          | `symlink-agent-config` activation                  | Real directory; per-subdir symlinks for every `src/modules/configs/agents/` entry except `skills/` |
+| `~/.agents/`                          | `symlink-agent-config` activation                  | Real directory; per-subdir symlinks for every resolved `src/users/<user>/agents/` entry except `skills/` |
 | `~/.agents/hooks/`                    | `symlink-agent-config` activation                  | VS Code Copilot hook configs (e.g. `PreToolUse`/`PostToolUse`), loaded via `chat.hookFilesLocations` (`~/.agents/hooks`) |
 | `~/.agents/skills/`                   | `install-agent-skills` activation                  | Real directory; per-skill symlinks for bundled skills + real dirs for fetched skills               |
-| `~/.agents/skills/<name>/` (symlink)  | `install-agent-skills`                             | Bundled skill committed to `src/modules/configs/agents/skills/<name>/`                             |
+| `~/.agents/skills/<name>/` (symlink)  | `install-agent-skills`                             | Bundled skill committed to `src/users/default/agents/skills/<name>/`                             |
 | `~/.agents/skills/<name>/` (real dir) | `sync-clawhub-skills` / `Sync-AgentsClawHubSkills` | Fetched skill downloaded by ClawHub; contains a `.clawhub/origin.json` marker                      |
 
 ## Cursor bridge (`~/.cursor/`)
 
-Cursor reads different path names than Copilot/OpenCode. Shared content stays in `src/modules/configs/agents/` (provisioned to `~/.agents/`). The `symlink-cursor-config` activation / `Sync-CursorConfig` bridges into `~/.cursor/`:
+Cursor reads different path names than Copilot/OpenCode. Shared content stays in `src/users/default/agents/` (provisioned to `~/.agents/` via per-user overlay). The `symlink-cursor-config` activation / `Sync-CursorConfig` bridges into `~/.cursor/`:
 
 | `~/.cursor/` | Source (`~/.agents/` or repo) | Mechanism |
 | ------------ | ----------------------------- | --------- |
@@ -30,17 +30,17 @@ Cursor reads different path names than Copilot/OpenCode. Shared content stays in
 | `commands/*.md` | `~/.agents/prompts/*.prompt.md` | Per-file symlink |
 | `hooks.json`, `mcp.json`, … | `src/users/default/cursor/` | Per-entry symlink (Cursor-native only) |
 
-Edit shared rules/agents/prompts/skills under `src/modules/configs/agents/`, not under `~/.cursor/`. Edit Cursor-native JSON under `src/users/default/cursor/`.
+Edit shared rules/agents/prompts/skills under `src/users/default/agents/` (or per-user overrides under `src/users/<username>/agents/`), not under `~/.cursor/`. Edit Cursor-native JSON under `src/users/default/cursor/`.
 
 The per-subdir layout replaces an older whole-dir symlink scheme. The old scheme forced every clawhub download into the tracked repo tree; the real-dir layout lets the `skills/` subtree be writable without any writes entering Git.
 
-The phrase "global agent instructions" (or "user agent instructions", "provisioned global agent instructions") refers to `src/modules/configs/agents/` — the actual source files for agent customizations. Files in `~/.agents/` are per-entry symlinks into this directory, not the source of truth. Always edit files under `src/modules/configs/agents/` rather than editing `~/.agents/` directly; changes there would be overwritten on the next apply.
+The phrase "global agent instructions" (or "user agent instructions", "provisioned global agent instructions") refers to `src/users/default/agents/` — the actual source files for agent customizations. Files in `~/.agents/` are per-entry symlinks into the resolved overlay directory, not the source of truth. Always edit files under `src/users/default/agents/` (or per-user overrides) rather than editing `~/.agents/` directly; changes there would be overwritten on the next apply.
 
 ## Bundled vs. fetched skills
 
-**Bundled**: AGPL-compatible license → commit all skill files to `src/modules/configs/agents/skills/<name>/`. The `install-agent-skills` activation creates a symlink at `~/.agents/skills/<name>` that points into the store.
+**Bundled**: AGPL-compatible license → commit all skill files to `src/users/default/agents/skills/<name>/`. The `install-agent-skills` activation creates a symlink at `~/.agents/skills/<name>` that points into the store.
 
-**Fetched**: non-AGPL-compatible license → never commit; list the skill slug in `src/modules/configs/agents/clawhub-skills.json` under `"skills"`. The `sync-clawhub-skills` activation runs the fetched skill convergence logic inline, downloading skills at apply time via the ClawHub CLI.
+**Fetched**: non-AGPL-compatible license → never commit; list the skill slug in `src/users/default/agents/clawhub-skills.json` under `"skills"`. The `sync-clawhub-skills` activation runs the fetched skill convergence logic inline, downloading skills at apply time via the ClawHub CLI.
 
 The `.clawhub/origin.json` marker written by ClawHub during install is the **sole** reliable signal that a directory in `~/.agents/skills/` is a fetched download. Stale cleanup must check for this marker before removing any directory; directories without it (bundled symlinks, user content) are never removed.
 

@@ -70,8 +70,8 @@ Rules:
 3. The convention MUST be documented in the lib file's header comment and in the deployment module's comment block.
 4. When a host does not deploy the application at all (e.g., no direnv on a host), document as N/A per the cross-host parity policy.
 
-Example: `src/modules/configs/direnv/lib/apple-sdk-override.sh` — a macOS-specific `_nix()` override auto-sourced by direnv. Deployed on POSIX hosts via the shared `shell.nix`; Windows deploys only the base `direnvrc`.
+Example: `src/users/default/direnv/lib/apple-sdk-override.sh` — a macOS-specific `_nix()` override auto-sourced by direnv. Deployed on POSIX hosts via the shared `shell.nix`; Windows deploys only the base `direnvrc`.
 
 ### User-scoped configs
 
-User-scoped configs live in `src/users/<username>/<config>/` (per-user) with `src/users/default/<config>/` as defaults-fallback. The mechanism is generic — file selection goes through `src/modules/lib/users-overlay.nix` (POSIX) and `Resolve-UserConfigSource` in `src/hosts/Windows/modules/ConfigHelpers.ps1` (Windows), so any future config reuses the same per-user-over-default lookup. These paths are OUTSIDE the step-19 config-method-compliance scan (`src/modules/configs/**` only) — no `# check-suppress:config-method` annotations are required for `src/users/**` reference sites, but the same method-1 writable-symlink rule still applies.
+Per-user homedir configs live in `src/users/<username>/<config>/` with `src/users/default/<config>/` as defaults-fallback. Placement rules and overlay coverage requirements are in `user-config-placement.instructions.md`. File selection goes through `mkUserOverlay` in `src/modules/lib/users-overlay.nix` (POSIX), `Resolve-UserConfig*` / `Deploy-UserWritableSymlink` in `ConfigHelpers.ps1` (Windows), and `resolve-user-config.sh` (POSIX activation scripts). Registry JSON domains use `users-registry.nix` instead. These paths are OUTSIDE the step-19 config-method-compliance scan (`src/modules/configs/**` only) — no `# check-suppress:config-method` annotations are required for `src/users/**` reference sites, but the same method-1 writable-symlink rule still applies.

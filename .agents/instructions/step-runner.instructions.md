@@ -197,8 +197,8 @@ Step 13 validation rules:
       - src/modules/configs/iterm2/DynamicProfiles/*.json
       - src/modules/configs/obsidian/*.json
       - src/modules/configs/qtpass/*.json
-      - src/modules/configs/camilladsp/**, src/modules/configs/camillagui-backend/**, src/modules/configs/discord-music-rpc/**
-      - src/modules/configs/agents/skills/*/_meta.json (ClawHub skill metadata, generated/managed)
+      - src/modules/configs/camilladsp/**, src/modules/configs/camillagui-backend/**
+      - src/users/default/agents/skills/*/_meta.json (ClawHub skill metadata, generated/managed)
       - src/modules/ai/litellm-config.yml
       - .sops.yaml
     (Registered in .agents/instructions/allow-and-deny-lists.instructions.md)

@@ -5,7 +5,8 @@
 - Root `AGENTS.md` is the workspace-wide source of truth. Do not add `.github/copilot-instructions.md`.
 - `src/` contains the Nix-based declarative configuration: `flake.nix`, `hosts/` (per-machine configs), and `modules/` (shared logic).
   - `src/flake.lock` is the Nix-mandated lockfile location — Nix requires `flake.lock` adjacent to `flake.nix`. The canonical lockfile storage is under `src/lockfiles/` but `flake.lock` cannot be moved there due to this Nix limitation. It is not duplicated; the `src/lockfiles/` directory holds all other lockfiles (`lockfile.json`, etc.) alongside a symlinked copy of `flake.lock` for organizational consistency.
-- `src/users/` contains per-user configuration overlays organized by domain JSON files: `src/users/<username>/<domain>.json` per user, with `src/users/default/` providing fallback defaults when a user's own file does not exist. Domain schemas live in `src/users/schemas/`. App-specific trees (for example `cursor/`, `vscode/`) still use `src/users/<username>/<app>/…` paths selected via `src/modules/lib/users-overlay.nix` (POSIX) and `Resolve-UserConfigSource` in `ConfigHelpers.ps1` (Windows). Runtime assembly of domain JSON into a username-keyed registry uses `src/modules/lib/users-registry.nix` (Nix eval) and `src/scripts/lib/load-user-registry.sh` / `Load-UserRegistry.ps1` (shell/PowerShell).
+- `src/users/` contains per-user configuration overlays: registry domain JSON (`src/users/<username>/<domain>.json` with `src/users/default/` fallback and `src/users/schemas/`), plus per-user homedir app trees (`vscode/`, `agents/`, `direnv/`, …) resolved via `mkUserOverlay` in `users-overlay.nix` (POSIX) and `Resolve-UserConfig*` in `ConfigHelpers.ps1` (Windows). See `user-config-placement.instructions.md` for the `configs/` vs `users/` placement rule. Runtime assembly of domain JSON uses `users-registry.nix` (Nix), `load-user-registry.sh` / `Load-UserRegistry.ps1` (shell/PowerShell).
+- `src/modules/configs/` holds machine-wide singleton configs only (system paths, service configs, runtime read by nucleus-owned scripts) — not per-user homedir deployments.
 - Use single-file modules only in `src/modules/`. Do not create `src/modules/<name>/` directories. The only allowed exceptions are `src/modules/macos/` (daemon-refresh.nix, finder-sidebar.nix, preference-gc.nix) and `src/modules/env/` (centralized env var introspection module).
 - `scripts/` contains user-facing automation helpers with paired `.sh`/`.ps1` entry points: bootstrap, check, cloud-setup, gc, health-check, replica-sync, replica-reset, update, vm-setup, ai-sync, and others.
 - `src/scripts/` contains Nix-internal scripts organized into domain subdirectories:
@@ -87,7 +88,7 @@
 ### Rust
 
 - `cargo-nextest` is the managed Rust test runner. See
-  `src/modules/configs/nextest/config.toml` (limitations section at top) for known
+  `src/users/default/nextest/config.toml` (limitations section at top) for known
   limitations.
 
 - Discover commands from the repository itself; never assume a default stack.
