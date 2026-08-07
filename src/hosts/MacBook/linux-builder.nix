@@ -17,8 +17,9 @@ let
   pkg = pkgs.darwin.linux-builder.override {
     modules = [
       (
-        { ... }:
+        { pkgs, ... }:
         {
+          environment.systemPackages = [ pkgs.jq ];
           nix.settings = {
             auto-optimise-store = true;
             extra-substituters = [ "https://nix-community.cachix.org" ];

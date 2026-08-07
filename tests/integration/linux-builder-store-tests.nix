@@ -7,6 +7,8 @@ let
   nixCustomConfText = builtins.readFile ../../src/modules/configs/nix/nix.custom.conf;
 in
 
+assert containsRegex "environment\\.systemPackages" linuxBuilderText;
+assert containsRegex "pkgs\\.jq" linuxBuilderText;
 assert containsRegex "builders-use-substitutes = true" nixCustomConfText;
 assert containsRegex "darwin\\.linux-builder\\.override" linuxBuilderText;
 assert containsRegex "nix-community\\.cachix\\.org" linuxBuilderText;
