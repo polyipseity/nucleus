@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # Creates ~/.agents/skills/ as a real directory then populates it with
-# per-skill symlinks for every skill subdirectory committed to
-# src/modules/configs/agents/skills/.
+# per-skill symlinks for every skill subdirectory in the resolved agents overlay.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/symlink-hardening.sh"
 . "$SCRIPT_DIR/../lib/symlink-convergence.sh"
+. "$SCRIPT_DIR/../lib/resolve-user-config.sh"
 
 _ask_repo_root="$1"
-_ask_skills_source="$_ask_repo_root/src/modules/configs/agents/skills"
+_ask_username="$2"
+_ask_agents_dir="$(resolve_user_config_dir "$_ask_username" "agents")"
+_ask_skills_source="$_ask_agents_dir/skills"
 if [ ! -d "$_ask_skills_source" ]; then
   echo "skills: skills source dir not found: $_ask_skills_source" >&2
   exit 1

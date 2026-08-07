@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Sets up ~/.agents/ with per-entry symlinks into
-# src/modules/configs/agents/.
+# Sets up ~/.agents/ with per-entry symlinks into the resolved agents overlay dir.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../lib/symlink-hardening.sh"
 . "$SCRIPT_DIR/../lib/symlink-convergence.sh"
+. "$SCRIPT_DIR/../lib/resolve-user-config.sh"
 
 _as_repo_root="$1"
-_as_agents_relative="$2"
-_as_agents_source="$_as_repo_root/src/modules/configs/agents"
+_as_username="$2"
+_as_agents_source="$(resolve_user_config_dir "$_as_username" "agents")"
 if [ ! -d "$_as_agents_source" ]; then
   echo "agents-config: agents config dir not found: $_as_agents_source" >&2
   exit 1
@@ -41,7 +41,7 @@ _nucleus_converge_symlinks \
 # mkOutOfStoreSymlink) so the link still works after the repo root path
 # changes between rebuilds.
 mkdir -p "$HOME/.config/opencode"
-_as_opencode_source="$_as_repo_root/$_as_agents_relative/opencode.user.jsonc"
+_as_opencode_source="$(resolve_user_config_file "$_as_username" "agents" "opencode.user.jsonc")"
 _as_opencode_link="$HOME/.config/opencode/opencode.jsonc"
 if [ -L "$_as_opencode_link" ]; then
   if [ "$(readlink "$_as_opencode_link")" != "$_as_opencode_source" ]; then
