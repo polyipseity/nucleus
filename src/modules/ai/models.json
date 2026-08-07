@@ -3,7 +3,6 @@
   "models": {
     "MacBook": [
       "devstral-small-2:24b",
-      "magistral:24b",
       "qwen2.5:1.5b"
     ],
     "NixOS": [

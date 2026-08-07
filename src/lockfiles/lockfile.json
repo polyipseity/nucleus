@@ -71,11 +71,6 @@
         "tag": "24b"
       },
       {
-        "digest": "sha256:27bcbbf6d32417d3a8a12d5eb9bd55fda6e5591807e2b02aaaf4423899925afc",
-        "name": "magistral",
-        "tag": "24b"
-      },
-      {
         "digest": "sha256:65ec06548149b04c096a120e4a6da9d4017ea809c91734ea5631e89f96ddc57b",
         "name": "qwen2.5",
         "tag": "1.5b"

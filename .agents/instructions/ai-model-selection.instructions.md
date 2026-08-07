@@ -85,7 +85,6 @@ Ordered by preference under the high-param-count policy.
 | `qwen3.6:27b`      | 17 GB  | vision tools thinking       | 27B; 256K ctx; agentic coding focus; slight excess OK           |
 | `gemma4:26b`       | 18 GB  | vision tools thinking       | MoE 26B/4B active; frontier benchmarks; slight excess OK        |
 | `devstral:24b`     | 14 GB  | tools                       | 24B; 128K ctx; coding agent SWE-bench #1 open-source (46.8%)    |
-| `magistral:24b`    | 14 GB  | tools thinking              | 24B; 40K effective ctx (128K window); reasoning specialist      |
 | `gemma4:e4b`       | 9.6 GB | vision tools thinking audio | Current; MoE 4B active; QAT; Apple Silicon Metal                |
 | `qwen3:14b`        | 9.3 GB | tools thinking              | Current; 14B dense; 40K ctx                                     |
 | `qwen3.5:27b-int4` | 16 GB  | tools thinking              | 27B int4 text-only; just fits budget; no vision                 |

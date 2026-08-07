@@ -12,15 +12,6 @@
 				"vision": false
 			},
 			{
-				"id": "ollama_chat/magistral:24b",
-				"maxInputTokens": 32768,
-				"maxOutputTokens": 8192,
-				"name": "Magistral 24B",
-				"toolCalling": true,
-				"url": "http://127.0.0.1:4000/v1",
-				"vision": false
-			},
-			{
 				"id": "ollama_chat/qwen2.5:1.5b",
 				"maxInputTokens": 32768,
 				"maxOutputTokens": 8192,

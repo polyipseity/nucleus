@@ -40,14 +40,6 @@ model_list:
         max_input_tokens: 32768
         max_output_tokens: 8192
 
-  - model_name: ollama_chat/magistral:24b
-    litellm_params:
-      model: ollama_chat/magistral:24b
-      api_base: http://127.0.0.1:11434
-      model_info:
-        max_input_tokens: 32768
-        max_output_tokens: 8192
-
   - model_name: ollama_chat/qwen2.5:1.5b
     litellm_params:
       model: ollama_chat/qwen2.5:1.5b
