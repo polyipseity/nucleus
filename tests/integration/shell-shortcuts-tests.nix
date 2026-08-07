@@ -121,7 +121,7 @@ let
   ) "shared script bundles must not shellcheck at derivation build time";
 
   test_posix_shell_exposes_managed_commands = assert' (
-    lib.hasInfix "nucleusApp = args: writeNucleusShellApplication pkgs (args // { bundleDefault = true; })" flakeText
+    lib.hasInfix "nucleusApp = args: writeNucleusShellApplication pkgs args;" flakeText
     && lib.hasInfix "nucleus-ai = nucleusApp {" flakeText
     && lib.hasInfix "nucleus-apply = nucleusApp {" flakeText
     && lib.hasInfix "nucleus-bootstrap = nucleusApp {" flakeText
