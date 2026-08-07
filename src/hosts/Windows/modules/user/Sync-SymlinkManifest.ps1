@@ -1,4 +1,4 @@
-function Sync-Symlink {
+function Sync-SymlinkManifest {
   <#
   .SYNOPSIS
     Provision managed symlinks for configured Windows users.
@@ -26,10 +26,10 @@ function Sync-Symlink {
     a symlinks array using the shared schema.
 
   .EXAMPLE
-    Sync-Symlink -Enabled:$true -UserRecords @(@{ name = 'admin'; homeDirectory = 'C:\Users\admin'; symlinks = @() })
+    Sync-SymlinkManifest -Enabled:$true -UserRecords @(@{ name = 'admin'; homeDirectory = 'C:\Users\admin'; symlinks = @() })
 
   .EXAMPLE
-    Sync-Symlink -Enabled:$false -UserRecords @(@{ name = 'admin'; homeDirectory = 'C:\Users\admin'; symlinks = @() })
+    Sync-SymlinkManifest -Enabled:$false -UserRecords @(@{ name = 'admin'; homeDirectory = 'C:\Users\admin'; symlinks = @() })
 
   .NOTES
     Environment variables: USERDOMAIN, USERNAME — used for delete-protection ACLs.
@@ -99,7 +99,7 @@ function Sync-Symlink {
       return @($loaded | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     }
     catch {
-      Write-Warning "Sync-Symlink: manifest at $ManifestPath was unreadable and will be rebuilt."
+      Write-Warning "Sync-SymlinkManifest: manifest at $ManifestPath was unreadable and will be rebuilt."
       return @()
     }
   }
@@ -108,7 +108,7 @@ function Sync-Symlink {
     $username = [string]$userRecord.name
     $homeDirectory = [string]$userRecord.homeDirectory
     if ([string]::IsNullOrWhiteSpace($homeDirectory)) {
-      Write-Warning "Sync-Symlink: skipping user '$username' because homeDirectory is missing."
+      Write-Warning "Sync-SymlinkManifest: skipping user '$username' because homeDirectory is missing."
       continue
     }
 
@@ -118,7 +118,7 @@ function Sync-Symlink {
 
     foreach ($previousPath in $previousManagedPaths) {
       if (Test-ManagedSymlink -Path $previousPath) {
-        Remove-ManagedSymlinkDeleteProtection -Context "Sync-Symlink" -Path $previousPath
+        Remove-ManagedSymlinkDeleteProtection -Context "Sync-SymlinkManifest" -Path $previousPath
       }
     }
 
@@ -175,7 +175,7 @@ function Sync-Symlink {
         $isReparsePoint = ($existingItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
 
         if (-not $isReparsePoint) {
-          Write-Warning "Sync-Symlink: keeping unmanaged path $($entry.LinkPath) for user '$username' because it is not a symlink."
+          Write-Warning "Sync-SymlinkManifest: keeping unmanaged path $($entry.LinkPath) for user '$username' because it is not a symlink."
           continue
         }
 
@@ -188,7 +188,7 @@ function Sync-Symlink {
         }
 
         if ($normalizedCurrentTarget -eq $entry.TargetPath) {
-          Set-ManagedSymlinkDeleteProtection -Context "Sync-Symlink" -Path $entry.LinkPath
+          Set-ManagedSymlinkDeleteProtection -Context "Sync-SymlinkManifest" -Path $entry.LinkPath
           continue
         }
 
@@ -197,10 +197,10 @@ function Sync-Symlink {
 
       try {
         New-Item -ItemType SymbolicLink -Path $entry.LinkPath -Target $entry.TargetPath -Force -ErrorAction Stop > $null
-        Set-ManagedSymlinkDeleteProtection -Context "Sync-Symlink" -Path $entry.LinkPath
+        Set-ManagedSymlinkDeleteProtection -Context "Sync-SymlinkManifest" -Path $entry.LinkPath
       }
       catch {
-        Write-Warning "Sync-Symlink: failed to create symlink $($entry.LinkPath) -> $($entry.TargetPath) for user '$username' : $_"
+        Write-Warning "Sync-SymlinkManifest: failed to create symlink $($entry.LinkPath) -> $($entry.TargetPath) for user '$username' : $_"
       }
     }
 

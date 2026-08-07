@@ -52,7 +52,7 @@ let
 
   test_windows_apply_wires_symlinks = assert' (
     containsRegex "symlinks" windowsRegistryLoaderText
-    && containsRegex "Sync-Symlink" windowsApplyText
+    && containsRegex "Sync-SymlinkManifest" windowsApplyText
     && containsRegex "EnableSymlinkParity" windowsApplyText
   ) "Windows apply flow must load, expose, and run symlink parity";
 

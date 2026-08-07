@@ -100,7 +100,7 @@ rec {
       vsCodePs1Path = ../../src/hosts/Windows/modules/editors/Sync-VSCodeConfig.ps1;
       agentsConfigPs1Path = ../../src/hosts/Windows/modules/user/Sync-AgentsConfig.ps1;
       agentsSkillPs1Path = ../../src/hosts/Windows/modules/user/Sync-AgentsSkillManifest.ps1;
-      symlinksPs1Path = ../../src/hosts/Windows/modules/user/Sync-Symlink.ps1;
+      symlinksPs1Path = ../../src/hosts/Windows/modules/user/Sync-SymlinkManifest.ps1;
       devRepoPs1Path = ../../src/hosts/Windows/modules/user/Sync-DevRepo.ps1;
     in
     assert builtins.pathExists vsCodePs1Path;
