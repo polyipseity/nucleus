@@ -56,6 +56,7 @@ There is no formal documentation tool for POSIX sh or Bash; `#` comments are the
 
 MANUAL.md files are concise post-apply checklists. They must contain only steps that cannot be safely automated.
 
+- **Ongoing operations only — never one-off migrations.** `MANUAL.md` is not a migration runbook. One-off path moves and cleanup must be executed on affected hosts before the breaking commit lands; do not add deferred migration sections or checklists to `MANUAL.md` (see [AGENTS.md#no-backwards-compatibility](../../../AGENTS.md#no-backwards-compatibility)).
 - Keep formatting minimal: title plus short bullet lists. Prefer direct actions with concrete names in backticks.
 - Include a `command shortcuts` section (complete set, names starting with `-` like `-g`, `-ga`) and a separate `nucleus commands` section.
 - Group permission-grant steps by category (e.g. Accessibility, Screen Recording); each permission appears once with all apps that need it.
