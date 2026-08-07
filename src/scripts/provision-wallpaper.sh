@@ -122,23 +122,56 @@ wallpaper_provision_copy_items() {
   fi
 }
 
+wallpaper_provision_symlink_unencrypted() {
+  _script_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+  # shellcheck source=../lib/resolve-user-config.sh
+  . "$_script_dir/../lib/resolve-user-config.sh"
+  # shellcheck source=../lib/symlink-hardening.sh
+  . "$_script_dir/../lib/symlink-hardening.sh"
+  export NUCLEUS_REPO_ROOT="$_repo_root"
+
+  while IFS= read -r _fileName; do
+    [ -n "$_fileName" ] || continue
+    _sourcePath="$(resolve_wallpaper_unencrypted_file "$_current_user" "$_fileName")"
+    _targetFile="$_pictures_dir/$_fileName"
+    case "$_targetFile" in
+      "$_pictures_dir"/*) ;;
+      *)
+        fail_wallpaper_provision "provision-wallpaper: refusing to write wallpaper outside $_pictures_dir: $_targetFile"
+        ;;
+    esac
+    ensure_file_symlink "$_sourcePath" "$_targetFile"
+  done < <(list_wallpaper_unencrypted_files "$_current_user")
+}
+
 wallpaper_post_copy_teardown() {
   # Stale gc: remove decrypted files that no longer have a matching overlay
   # .sops source so the gallery does not show deleted assets.
   _script_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
   # shellcheck source=../lib/resolve-user-config.sh
   . "$_script_dir/../lib/resolve-user-config.sh"
+  # shellcheck source=../lib/symlink-hardening.sh
+  . "$_script_dir/../lib/symlink-hardening.sh"
   export NUCLEUS_REPO_ROOT="$_repo_root"
 
   for decryptedFile in "$_pictures_dir"/*; do
     [ -e "$decryptedFile" ] || continue
-    [ -f "$decryptedFile" ] || continue
     case "$decryptedFile" in *.xml) continue;; esac
     baseName="$(basename "$decryptedFile")"
-    if ! resolve_wallpaper_encrypted_blob "$_current_user" "${baseName}.sops" >/dev/null 2>&1; then
-      rm -f "$decryptedFile"
-      echo "provision-wallpaper: removed stale wallpaper $baseName (no matching overlay .sops source)."
+    if [ -L "$decryptedFile" ]; then
+      if ! resolve_wallpaper_unencrypted_file "$_current_user" "$baseName" >/dev/null 2>&1; then
+        _nucleus_unprotect_symlink "provision-wallpaper" "$decryptedFile"
+        rm -f "$decryptedFile"
+        echo "provision-wallpaper: removed stale wallpaper symlink $baseName (no matching overlay source)."
+      fi
+      continue
     fi
+    [ -f "$decryptedFile" ] || continue
+    if resolve_wallpaper_encrypted_blob "$_current_user" "${baseName}.sops" >/dev/null 2>&1; then
+      continue
+    fi
+    rm -f "$decryptedFile"
+    echo "provision-wallpaper: removed stale wallpaper $baseName (no matching overlay source)."
   done
 
   # Apply gallery / slideshow mode.
@@ -151,10 +184,11 @@ wallpaper_post_copy_teardown() {
   hasWallpapers=0
   for img in "$_pictures_dir"/*; do
     [ -e "$img" ] || continue
-    [ -f "$img" ] || continue
     case "$img" in *.xml) continue;; esac
-    hasWallpapers=1
-    break
+    if [ -f "$img" ] || [ -L "$img" ]; then
+      hasWallpapers=1
+      break
+    fi
   done
 
   if [ "$hasWallpapers" -ne 1 ]; then
@@ -185,6 +219,9 @@ wallpaper_post_copy_teardown() {
     for img in "$_pictures_dir"/*; do
       [ -e "$img" ] || continue
       case "$img" in *.xml) continue;; esac
+      if [ ! -f "$img" ] && [ ! -L "$img" ]; then
+        continue
+      fi
 
       if [ -z "$firstImg" ]; then
         firstImg="$img"
@@ -235,4 +272,5 @@ wallpaper_post_copy_teardown() {
 # Entry point
 wallpaper_pre_copy_setup
 wallpaper_provision_copy_items "$8" "$9" "$_sops_symlink_path"
+wallpaper_provision_symlink_unencrypted
 wallpaper_post_copy_teardown

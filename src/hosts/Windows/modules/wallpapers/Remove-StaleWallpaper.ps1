@@ -1,24 +1,22 @@
 function Remove-StaleWallpaper {
   <#
   .SYNOPSIS
-    Removes decrypted wallpaper files that no longer have a matching *.sops
-    overlay source blob in the repository.
+    Removes deployed wallpaper files that no longer have a matching overlay source.
 
   .DESCRIPTION
-    Compares files in $OutputDir against merged overlay wallpaper blobs for
-    $User under src/users/<user>/wallpapers/encrypted/ (with default fallback).
-    Any non-XML file in $OutputDir whose name is absent from the overlay set is
-    deleted. This keeps Windows wallpaper state aligned with the declarative
-    user-overlay inventory and prevents stale gallery entries.
+    Compares files in $OutputDir against merged overlay wallpaper inventory for
+    $User under src/users/<user>/wallpapers/encrypted/ and
+    wallpapers/wallpapers/. Any non-XML file absent from the overlay set is
+    deleted.
 
   .PARAMETER OutputDir
-    Directory containing decrypted wallpaper files.
+    Directory containing deployed wallpaper files.
 
   .PARAMETER RepoRoot
     Absolute path to the nucleus repository root.
 
   .PARAMETER User
-    Username whose overlay wallpaper inventory defines managed blobs.
+    Username whose overlay wallpaper inventory defines managed sources.
 
   .EXAMPLE
     Remove-StaleWallpaper -RepoRoot 'C:\nucleus' -User 'admin' -OutputDir "$HOME\Pictures\wallpapers"
@@ -43,27 +41,31 @@ function Remove-StaleWallpaper {
   foreach ($blobName in @(Get-WallpaperEncryptedBlobs -User $User -RepoRoot $RepoRoot)) {
     [void]$managedWallpaperSet.Add([System.IO.Path]::GetFileNameWithoutExtension($blobName))
   }
+  foreach ($fileName in @(Get-WallpaperUnencryptedFiles -User $User -RepoRoot $RepoRoot)) {
+    [void]$managedWallpaperSet.Add($fileName)
+  }
 
   if ($managedWallpaperSet.Count -eq 0) {
     return
   }
 
   # check-suppress:suppression_doc: probe -- output dir may not exist or have no files; empty result handled.
-  $decryptedWallpapers = Get-ChildItem -LiteralPath $OutputDir -File -ErrorAction SilentlyContinue
-  foreach ($decryptedWallpaper in $decryptedWallpapers) {
-    if ($decryptedWallpaper.Extension -eq ".xml") {
+  $deployedWallpapers = Get-ChildItem -LiteralPath $OutputDir -Force -ErrorAction SilentlyContinue |
+    Where-Object { -not $_.PSIsContainer }
+  foreach ($deployedWallpaper in $deployedWallpapers) {
+    if ($deployedWallpaper.Extension -eq ".xml") {
       continue
     }
 
-    if (-not $managedWallpaperSet.ContainsKey($decryptedWallpaper.Name)) {
+    if (-not $managedWallpaperSet.Contains($deployedWallpaper.Name)) {
       try {
-        if ($PSCmdlet.ShouldProcess($decryptedWallpaper.FullName, 'Remove')) {
-          Remove-Item -Path $decryptedWallpaper.FullName -Force -ErrorAction Stop
-          Write-Output "Removed stale wallpaper: $($decryptedWallpaper.Name)"
+        if ($PSCmdlet.ShouldProcess($deployedWallpaper.FullName, 'Remove')) {
+          Remove-Item -Path $deployedWallpaper.FullName -Force -ErrorAction Stop
+          Write-Output "Removed stale wallpaper: $($deployedWallpaper.Name)"
         }
       }
       catch {
-        Write-Warning "wallpapers: failed to remove stale wallpaper '$($decryptedWallpaper.Name)': $_"
+        Write-Warning "wallpapers: failed to remove stale wallpaper '$($deployedWallpaper.Name)': $_"
       }
     }
   }

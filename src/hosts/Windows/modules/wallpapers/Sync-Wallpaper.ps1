@@ -1,27 +1,17 @@
 function Sync-Wallpaper {
   <#
   .SYNOPSIS
-    Decrypts all SOPS-encrypted wallpaper blobs for each managed user and returns
-    the path of the first decrypted file (the active wallpaper).
+    Materializes overlay wallpapers for each managed user and returns the path
+    of the first deployed file (the active wallpaper).
 
   .DESCRIPTION
-    Materializes SOPS-encrypted wallpaper blobs for each user in the $Users
-    list. For each user, merged overlay entries under
-    src/users/<user>/wallpapers/encrypted/ (with src/users/default/wallpapers/encrypted/
-    fallback) are decrypted to that user's Pictures\wallpapers directory using
-    Get-DecryptedBlob. The output filename is the blob's base name with the
-    .sops extension stripped.
+    Decrypts SOPS blobs from src/users/<user>/wallpapers/encrypted/ and symlinks
+    unencrypted images from wallpapers/wallpapers/ into each user's
+    Pictures\wallpapers directory.
 
-    For each user, the home directory is resolved via the registry and the
-    wallpaper directory is set to $userHome\Pictures\wallpapers\. The
-    directory is created automatically if it does not exist.
-
-    The function returns the path of the first successfully decrypted
-    wallpaper so the caller can pass it to
-    Invoke-WingetConfiguration as the __NUCLEUS_ACTIVE_WALLPAPER__ token.
-
-    No-op (returns $null with a warning) when:
-      - No overlay wallpaper blobs exist for any user in $Users.
+    The function returns the path of the first successfully deployed wallpaper
+    so the caller can pass it to Invoke-WingetConfiguration as the
+    __NUCLEUS_ACTIVE_WALLPAPER__ token.
 
   .PARAMETER GpgExe
     Absolute path to the gpg executable.
@@ -43,7 +33,7 @@ function Sync-Wallpaper {
     Absolute path to the sops executable.
 
   .OUTPUTS
-    [string]  Absolute path to the first decrypted wallpaper file, or $null
+    [string]  Absolute path to the first deployed wallpaper file, or $null
               when no wallpapers were found.
 
   .EXAMPLE
@@ -77,13 +67,16 @@ function Sync-Wallpaper {
     [string]$SopsExe
   )
 
+  . (Join-Path -Path $PSScriptRoot -ChildPath '..\Set-ManagedSymlinkDeleteProtection.ps1')
+
   $activeWallpaperPath = $null
 
   foreach ($user in ($Users | Sort-Object)) {
     $wallpaperFiles = @(Get-WallpaperEncryptedBlobs -User $user -RepoRoot $RepoRoot)
+    $unencryptedFiles = @(Get-WallpaperUnencryptedFiles -User $user -RepoRoot $RepoRoot)
 
-    if ($wallpaperFiles.Count -eq 0) {
-      Write-Output "$($PSStyle.Foreground.Yellow)No wallpaper blobs (*.sops) found in overlay for user $user; skipping.$($PSStyle.Reset)"
+    if ($wallpaperFiles.Count -eq 0 -and $unencryptedFiles.Count -eq 0) {
+      Write-Output "$($PSStyle.Foreground.Yellow)No overlay wallpaper sources found for user $user; skipping.$($PSStyle.Reset)"
       continue
     }
 
@@ -118,10 +111,28 @@ function Sync-Wallpaper {
         $activeWallpaperPath = $outputPath
       }
     }
+
+    foreach ($fileName in $unencryptedFiles) {
+      $outputPath = Join-Path -Path $outputDir -ChildPath $fileName
+      Write-Output "$($PSStyle.Foreground.Cyan)Linking unencrypted wallpaper for $user`: $fileName$($PSStyle.Reset)"
+      $null = Deploy-UserWritableSymlink `
+        -Name "wallpaper-$fileName" `
+        -User $user `
+        -ConfigName 'wallpapers' `
+        -RelativePath "wallpapers/$fileName" `
+        -RepoRoot $RepoRoot `
+        -TargetPath $outputPath
+      if (Test-Path -LiteralPath $outputPath) {
+        Set-ManagedSymlinkDeleteProtection -Context 'Sync-Wallpaper' -Path $outputPath
+        if (-not $activeWallpaperPath) {
+          $activeWallpaperPath = $outputPath
+        }
+      }
+    }
   }
 
   if (-not $activeWallpaperPath) {
-    Write-Output "$($PSStyle.Foreground.Yellow)No overlay wallpaper blobs found for specified users; skipping wallpaper sync.$($PSStyle.Reset)"
+    Write-Output "$($PSStyle.Foreground.Yellow)No overlay wallpaper sources found for specified users; skipping wallpaper sync.$($PSStyle.Reset)"
     return $null
   }
 

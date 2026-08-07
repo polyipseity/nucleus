@@ -228,7 +228,7 @@ gc_stale_wallpapers() {
   fi
 
   for candidate in "$output_dir"/*; do
-    [ ! -f "$candidate" ] && continue
+    [ -e "$candidate" ] || continue
 
     candidate_name=$(basename "$candidate")
     case "$candidate_name" in
@@ -237,13 +237,26 @@ gc_stale_wallpapers() {
         ;;
     esac
 
-    if ! resolve_wallpaper_encrypted_blob "$current_user" "${candidate_name}.sops" >/dev/null 2>&1; then
-      if ! rm -f "$candidate" 2>/dev/null; then
-        # Non-fatal: some files under ~/Pictures may be protected by Finder
-        # metadata/ACL flags (for example iCloud-managed placeholders). GC
-        # should continue pruning other files even if one deletion is denied.
-        warn "failed to remove stale wallpaper '$candidate'"
+    if [ -L "$candidate" ]; then
+      if ! resolve_wallpaper_unencrypted_file "$current_user" "$candidate_name" >/dev/null 2>&1; then
+        if ! rm -f "$candidate" 2>/dev/null; then
+          warn "failed to remove stale wallpaper symlink '$candidate'"
+        fi
       fi
+      continue
+    fi
+
+    [ -f "$candidate" ] || continue
+
+    if resolve_wallpaper_encrypted_blob "$current_user" "${candidate_name}.sops" >/dev/null 2>&1; then
+      continue
+    fi
+
+    if ! rm -f "$candidate" 2>/dev/null; then
+      # Non-fatal: some files under ~/Pictures may be protected by Finder
+      # metadata/ACL flags (for example iCloud-managed placeholders). GC
+      # should continue pruning other files even if one deletion is denied.
+      warn "failed to remove stale wallpaper '$candidate'"
     fi
   done
 }
