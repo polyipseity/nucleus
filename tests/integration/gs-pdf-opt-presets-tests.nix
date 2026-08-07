@@ -8,7 +8,7 @@ let
   nixosServicesText = builtins.readFile ../../src/hosts/NixOS/services.nix;
   windowsDscText = builtins.readFile ../../src/hosts/Windows/user/context-pdf-opt.dsc.yml;
   nautilusScriptText = builtins.readFile ../../src/scripts/integrations/configure-file-manager-pdf-opt.sh;
-  plasmaDesktopText = builtins.readFile ../../src/modules/configs/plasma/nucleus-gs-pdf-opt.desktop;
+  plasmaDesktopText = builtins.readFile ../../src/users/default/plasma/desktop/nucleus-gs-pdf-opt.desktop;
 
   inherit (import ../lib.nix) assert';
 

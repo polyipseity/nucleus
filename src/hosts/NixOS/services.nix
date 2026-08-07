@@ -7,9 +7,23 @@
   config,
   lib,
   pkgs,
+  managedUsername ? null,
+  username ? null,
   ...
 }:
 let
+  effectiveUsername =
+    if managedUsername != null then
+      managedUsername
+    else if username != null then
+      username
+    else
+      config.home.username;
+  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
+  overlay = (import ../../modules/lib/users-overlay.nix).mkUserOverlay {
+    inherit effectiveUsername repoRoot;
+  };
+
   openManualScript = pkgs.writeNucleusShellApplication {
     name = "open-manual";
     runtimeInputs = [ pkgs.xdg-utils ];
@@ -87,13 +101,13 @@ lib.mkIf pkgs.stdenv.isLinux {
     # Dolphin: right-click → open nucleus manual
     ".local/share/kio/servicemenus/nucleus-manual.desktop" = {
       # check-suppress:config-method: method 1 (writable symlink) -- repo edits take effect without rebuild.
-      source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/plasma/nucleus-manual.desktop";
+      source = config.lib.file.mkOutOfStoreSymlink (overlay.selectFile "plasma" "desktop/nucleus-manual.desktop");
     };
 
     # Dolphin: right-click → optimize PDF (5 presets as sub-actions)
     ".local/share/kio/servicemenus/nucleus-gs-pdf-opt.desktop" = {
       # check-suppress:config-method: method 1 (writable symlink) -- the GS PDF Opt preset file can be updated in-place; no rebuild needed after adding/changing presets.
-      source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/plasma/nucleus-gs-pdf-opt.desktop";
+      source = config.lib.file.mkOutOfStoreSymlink (overlay.selectFile "plasma" "desktop/nucleus-gs-pdf-opt.desktop");
     };
   };
 }
