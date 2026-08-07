@@ -17,7 +17,7 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 
 # Usage
 usage() {
-  usage_std 'apply.sh' '[--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--target-user=<name>] [--username=<name>] [--vm-sync|--no-vm-sync] [--vm-setup|--no-vm-setup]' \
+  usage_std 'apply.sh' '[--ai-sync|--no-ai-sync] [--replica-sync|--no-replica-sync] [--store-audit|--no-store-audit] [--target-user=<name>] [--username=<name>] [--vm-sync|--no-vm-sync] [--vm-setup|--no-vm-setup]' \
     'Dispatch the Nix apply command for the current host.'
   exit 0
 }
@@ -27,6 +27,7 @@ ai_sync=true
 replica_sync=false
 vm_sync=true
 vm_setup=false
+store_audit=true
 target_user=""
 
 while [ "$#" -gt 0 ]; do
@@ -39,6 +40,8 @@ while [ "$#" -gt 0 ]; do
     --no-vm-sync) vm_sync=false ;;
     --vm-setup) vm_setup=true ;;
     --no-vm-setup) vm_setup=false ;;
+    --store-audit) store_audit=true ;;
+    --no-store-audit) store_audit=false ;;
     --target-user)
       target_user="$2"; shift
       if [ -z "$target_user" ]; then
@@ -131,6 +134,14 @@ start_sudo_keepalive() {
 
   # check-suppress:suppression_doc: trap cleanup for sudo keepalive; subprocess may have already exited.
   trap 'kill "$SUDO_KEEPALIVE_PID" 2>/dev/null || true' EXIT INT TERM
+}
+
+run_health_check() {
+  _rhc_args=()
+  if [ "$store_audit" = false ]; then
+    _rhc_args+=(--no-store-audit)
+  fi
+  run_nix run "$REPO_ROOT/src#health-check" "${_rhc_args[@]}"
 }
 
 run_ai_sync() {
@@ -296,7 +307,7 @@ case "$(uname -s)" in
     start_sudo_keepalive
     "$_ash_script_dir/secrets/generate-ssh-host-key.sh"
     "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
-    run_nix run "$REPO_ROOT/src#health-check"
+    run_health_check
     # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
     # while running as root (which otherwise produces ownership warnings).
     run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --impure --flake "$REPO_ROOT/src#macbook"
@@ -319,7 +330,7 @@ case "$(uname -s)" in
       start_sudo_keepalive
       "$_ash_script_dir/secrets/generate-ssh-host-key.sh"
       "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
-      run_nix run "$REPO_ROOT/src#health-check"
+      run_health_check
       # Keep root invocations on root-owned HOME for consistent Nix behavior.
       run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
       run_terminal_activations
@@ -337,7 +348,7 @@ case "$(uname -s)" in
       # no sudo required — keepalive is not started.
       # The profile name must match the homeConfigurations key in flake.nix.
       target_username="${target_user:-${NUCLEUS_USERNAME:-$(id -un)}}"
-      run_nix run "$REPO_ROOT/src#health-check"
+      run_health_check
       run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
       run_terminal_activations
       "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
