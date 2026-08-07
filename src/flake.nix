@@ -168,6 +168,24 @@
               xevd = prev.xevd.overrideAttrs (_: {
                 doCheck = !prev.stdenv.isDarwin;
               });
+              # WHY: nixpkgs frei0r 3.2.1 unconditionally depends on gavl → libdrm,
+              # which breaks ffmpeg-full eval on Darwin. Gate gavl to Linux and disable
+              # it via CMake until nixpkgs merges https://github.com/NixOS/nixpkgs/pull/549747.
+              frei0r = prev.frei0r.overrideAttrs (oldAttrs: {
+                buildInputs = [
+                  prev.cairo
+                  prev.opencv
+                ]
+                ++ prev.lib.optionals prev.config.cudaSupport [
+                  prev.cudaPackages.cuda_cudart
+                ]
+                ++ prev.lib.optionals prev.stdenv.hostPlatform.isLinux [
+                  prev.gavl
+                ];
+                cmakeFlags = (oldAttrs.cmakeFlags or [ ]) ++ [
+                  (prev.lib.cmakeBool "WITHOUT_GAVL" (!prev.stdenv.hostPlatform.isLinux))
+                ];
+              });
             })
             (_final: prev: {
               equaliser = prev.stdenv.mkDerivation rec {
