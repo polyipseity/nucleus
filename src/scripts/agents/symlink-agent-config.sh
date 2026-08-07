@@ -9,6 +9,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _as_repo_root="$1"
 _as_username="$2"
+if [ -n "$_as_repo_root" ]; then
+  export NUCLEUS_REPO_ROOT="$_as_repo_root"
+fi
 _as_agents_source="$(resolve_user_config_dir "$_as_username" "agents")"
 if [ ! -d "$_as_agents_source" ]; then
   echo "agents-config: agents config dir not found: $_as_agents_source" >&2

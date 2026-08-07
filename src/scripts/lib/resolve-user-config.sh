@@ -11,7 +11,7 @@ _resolve_user_config_repo_root() {
   local script_dir
   script_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
   local candidate
-  candidate="$(CDPATH='' cd -- "$script_dir/../../../.." && pwd -P)"
+  candidate="$(CDPATH='' cd -- "$script_dir/../../.." && pwd -P)"
   if [ -f "$candidate/src/flake.nix" ]; then
     printf '%s' "$candidate"
     return 0

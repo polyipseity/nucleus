@@ -10,6 +10,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _ask_repo_root="$1"
 _ask_username="$2"
+if [ -n "$_ask_repo_root" ]; then
+  export NUCLEUS_REPO_ROOT="$_ask_repo_root"
+fi
 _ask_agents_dir="$(resolve_user_config_dir "$_ask_username" "agents")"
 _ask_skills_source="$_ask_agents_dir/skills"
 if [ ! -d "$_ask_skills_source" ]; then
