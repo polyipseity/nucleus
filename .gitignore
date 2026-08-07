@@ -344,4 +344,23 @@ __marimo__/
 !/src/modules/lib/
 !/src/scripts/lib/
 !/src/users/*/direnv/lib/
+
+# Wallpaper encrypted overlay: ignore decrypted/runtime artifacts; track .sops only.
+src/users/*/wallpapers/encrypted/**
+!src/users/*/wallpapers/encrypted/**/
+!src/users/*/wallpapers/encrypted/**/*.sops
+!src/users/default/wallpapers/encrypted/.gitkeep
+
+# VS Code profiles: ignore runtime state; allow managed profile files only.
+src/users/*/vscode/profiles/*
+!src/users/*/vscode/profiles/*/
+!src/users/*/vscode/profiles/*/chatLanguageModels.json
+!src/users/*/vscode/profiles/*/keybindings.json
+!src/users/*/vscode/profiles/*/mcp.json
+!src/users/*/vscode/profiles/*/prompts/
+!src/users/*/vscode/profiles/*/prompts/**
+!src/users/*/vscode/profiles/*/settings.json
+!src/users/*/vscode/profiles/*/snippets/
+!src/users/*/vscode/profiles/*/snippets/**
+!src/users/*/vscode/profiles/*/tasks.json
 # }
