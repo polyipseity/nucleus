@@ -160,11 +160,7 @@ in
   };
 
   # Ensure the builder's working directory exists before the daemon starts.
-  # Also migrates from the old path used by nix-darwin before v5.
   system.activationScripts.preActivation.text = ''
-    if [ -e /var/lib/darwin-builder ] && [ ! -e ${workDir} ]; then
-      mv /var/lib/darwin-builder ${workDir}
-    fi
     mkdir -p ${workDir}
     mkdir -p /var/root/.ssh
     chmod 700 /var/root/.ssh
