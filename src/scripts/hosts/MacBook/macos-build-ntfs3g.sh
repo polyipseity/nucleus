@@ -42,6 +42,13 @@ INSTALL_HOOK_PATCH_PATH="${12:?ntfs-3g build: missing installHookPatchPath arg}"
 
 export CC CXX CPPFLAGS LDFLAGS
 
+_sdk_dev_dir="$(/usr/bin/xcode-select -p)"
+_sdk_candidate="$_sdk_dev_dir/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
+if [ -d "$_sdk_candidate" ]; then
+  export SDKROOT="$_sdk_candidate"
+fi
+unset _sdk_dev_dir _sdk_candidate
+
 FINGERPRINT_FILE="/usr/local/share/ntfs-3g/.build-fingerprint"
 LOG_FILE="/Users/Shared/nucleus/logs/ntfs-3g-build.log"
 
