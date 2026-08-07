@@ -62,6 +62,7 @@ Some environment variables need different treatment per OS — this table docume
 
 | Var                 | macOS         | NixOS      | Windows | Rationale                                                                                                                           |
 | ------------------- | ------------- | ---------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `NUCLEUS_REPO_ROOT` | `/etc/nucleus/repo-root` + session/GUI env | `/etc/nucleus/repo-root` + `environment.variables` | Machine registry via `apply.ps1` | All-process repo root for out-of-store symlinks and cwd-independent `nucleus-*` commands (including under `sudo`). POSIX `/etc` file is parity with Windows Machine scope. |
 | `NIX_SSL_CERT_FILE` | daemon env    | —          | —       | macOS has no system CA bundle in a standard location; NixOS ships `/etc/ssl/certs/ca-certificates.crt` in the system profile.       |
 | `NUCLEUS_HOST`      | daemon env    | daemon env | —       | Identifies which host the daemon runs on; not meaningful on Windows since daemons are managed differently.                          |
 | `OLLAMA_HOST`       | gui-env agent | —          | —       | macOS Ollama daemon binds to default port; CLI clients route through LiteLLM proxy via gui-env. NixOS uses the systemd service env. |
