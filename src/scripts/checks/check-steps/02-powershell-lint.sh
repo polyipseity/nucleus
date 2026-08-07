@@ -17,6 +17,9 @@ run_02_powershell_lint() {
     pwsh -NoLogo -NoProfile -NonInteractive -Command "& scripts/check-pwsh.ps1 -Settings scripts/PSScriptAnalyzerSettings.check.psd1 -Scoped -Paths @(${_ps_paths%,})" || _ps_exit=$?
   elif ! $_has_args; then
     pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -Settings scripts/PSScriptAnalyzerSettings.check.psd1 || _ps_exit=$?
+    if [ "$_ps_exit" -eq 0 ]; then
+      pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh-naming.ps1 || _ps_exit=$?
+    fi
   else
     say "skipping (no PowerShell scripts to check)."
     return 2

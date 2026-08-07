@@ -1,0 +1,14 @@
+{
+  "$schema": "./pwsh-naming-manifest.schema.json",
+  "requiredNames": {
+    "Get-ManifestPathList": "src/hosts/Windows/modules/user/Sync-Symlink.ps1",
+    "Get-VmRunningNameList": "scripts/vm.ps1",
+    "Sync-AgentsSkillManifest": "src/hosts/Windows/modules/user/Sync-AgentsSkillManifest.ps1",
+    "Sync-AgentsClawHubSkillManifest": "src/hosts/Windows/modules/user/Sync-AgentsClawHubSkillManifest.ps1",
+    "Sync-SecretCatalog": "src/hosts/Windows/modules/secrets/Sync-SecretCatalog.ps1",
+    "Sync-VSCodeExtensionManifest": "src/hosts/Windows/modules/editors/Sync-VSCodeExtensionManifest.ps1",
+    "Sync-VSCodeSettingManifest": "src/hosts/Windows/modules/editors/Sync-VSCodeSettingManifest.ps1"
+  },
+  "forbiddenNames": [],
+  "allowedBareSingular": []
+}
