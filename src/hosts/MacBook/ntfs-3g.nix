@@ -20,6 +20,8 @@
 { lib, pkgs, ... }:
 let
   activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
+  appleSdkEnhanced = import ../../modules/lib/apple-sdk-enhanced.nix { inherit pkgs lib; };
+  sdkRoot = "${appleSdkEnhanced}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
   # Pinned source for the polyipseity/ext.ntfs-3g fork (edge branch).
   ntfs3gSrc = pkgs.fetchFromGitHub {
     owner = "polyipseity";
@@ -53,8 +55,10 @@ let
 
   # Build parameters (extracted for fingerprint-based rebuild detection).
   cppFlags = "-I/usr/local/include/fuse/fuse";
-  ldFlags = "-L/usr/local/lib -lfuse-t -Wl,-rpath,/usr/local/lib";
-  configureFlags = "--with-fuse=external --prefix=/usr/local --disable-crypto";
+  # fuse-t is linked only during make/install — not during ./configure, where
+  # -lfuse-t in LDFLAGS breaks autoconf link probes under nix clang wrappers.
+  linkFlags = "-L/usr/local/lib -lfuse-t -Wl,-rpath,/usr/local/lib";
+  configureFlags = "--with-fuse=external --prefix=/usr/local --disable-crypto --disable-plugins";
   clangBin = "${pkgs.llvmPackages.clang}/bin/clang";
   clangxxBin = "${pkgs.llvmPackages.clang}/bin/clang++";
   buildFingerprint = builtins.hashString "sha256" (
@@ -65,8 +69,9 @@ let
       clangBin
       clangxxBin
       cppFlags
-      ldFlags
+      linkFlags
       configureFlags
+      sdkRoot
       cryptoPatchPath
       rootbindirPatchPath
       installHookPatchPath
@@ -83,10 +88,11 @@ in
       "${clangBin}" \
       "${clangxxBin}" \
       "${cppFlags}" \
-      "${ldFlags}" \
+      "${linkFlags}" \
       "${configureFlags}" \
       "${cryptoPatchPath}" \
       "${rootbindirPatchPath}" \
-      "${installHookPatchPath}"
+      "${installHookPatchPath}" \
+      "${sdkRoot}"
   '';
 }

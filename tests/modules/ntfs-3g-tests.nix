@@ -101,7 +101,21 @@ let
     containsRegex "cryptoPatchPath" nixText
     && containsRegex "rootbindirPatchPath" nixText
     && containsRegex "installHookPatchPath" nixText
-  ) "buildFingerprint must reference all patch file paths (not inline code)";
+    && containsRegex "sdkRoot" nixText
+    && containsRegex "linkFlags" nixText
+  ) "buildFingerprint must reference all patch file paths, sdkRoot, and linkFlags";
+
+  # Test 13b: configure disables external reparse plugins (no libdl probe on Darwin).
+  test_configure_disables_plugins = assert' (containsRegex "--disable-plugins" nixText) "ntfs-3g configureFlags must pass --disable-plugins";
+
+  # Test 13c: build script receives eval-time SDKROOT and defers fuse-t link flags to make.
+  test_build_script_sdk_and_link_flags = assert' (
+    containsRegex "SDK_ROOT=" buildScriptText
+    && containsRegex "LINK_FLAGS=" buildScriptText
+    && containsRegex "export SDKROOT=" buildScriptText
+    && containsRegex "LDFLAGS=" buildScriptText
+    && containsRegex "export LDFLAGS=.*LINK_FLAGS" buildScriptText
+  ) "macos-build-ntfs3g.sh must set SDKROOT from Nix and apply fuse-t LDFLAGS only for make";
 
   # === Build script structure: log capture and error handling ===
 
@@ -162,6 +176,8 @@ in
     test_uses_patch_command
     test_references_install_hook_patch
     test_fingerprint_includes_patch_paths
+    test_configure_disables_plugins
+    test_build_script_sdk_and_link_flags
     test_log_file_path_defined
     test_log_dir_created
     test_output_redirected_to_log

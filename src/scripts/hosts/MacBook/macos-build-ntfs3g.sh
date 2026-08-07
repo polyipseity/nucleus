@@ -2,8 +2,8 @@
 # ---- buildNtfs3g ----------------------------------------------------------
 # Build polyipseity/ext.ntfs-3g from source.
 # Arguments: fingerprint buildToolsPath aclocalPath ntfs3gSrc cc cxx cppFlags
-#            ldFlags configureFlags cryptoPatchPath rootbindirPatchPath
-#            installHookPatchPath
+#            linkFlags configureFlags cryptoPatchPath rootbindirPatchPath
+#            installHookPatchPath sdkRoot
 #
 # Previously these were passed as env vars from the Nix activation block.
 # CC/CXX/CPPFLAGS/LDFLAGS are exported here so ./configure and make resolve
@@ -34,20 +34,15 @@ NTFS3G_SRC="${4:?ntfs-3g build: missing ntfs3gSrc arg}"
 CC="${5:?ntfs-3g build: missing cc arg}"
 CXX="${6:?ntfs-3g build: missing cxx arg}"
 CPPFLAGS="${7:?ntfs-3g build: missing cppFlags arg}"
-LDFLAGS="${8:?ntfs-3g build: missing ldFlags arg}"
+LINK_FLAGS="${8:?ntfs-3g build: missing linkFlags arg}"
 CONFIGURE_FLAGS="${9:?ntfs-3g build: missing configureFlags arg}"
 CRYPTO_PATCH_PATH="${10:?ntfs-3g build: missing cryptoPatchPath arg}"
 ROOTBINDIR_PATCH_PATH="${11:?ntfs-3g build: missing rootbindirPatchPath arg}"
 INSTALL_HOOK_PATCH_PATH="${12:?ntfs-3g build: missing installHookPatchPath arg}"
+SDK_ROOT="${13:?ntfs-3g build: missing sdkRoot arg}"
 
-export CC CXX CPPFLAGS LDFLAGS
-
-_sdk_dev_dir="$(/usr/bin/xcode-select -p)"
-_sdk_candidate="$_sdk_dev_dir/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk"
-if [ -d "$_sdk_candidate" ]; then
-  export SDKROOT="$_sdk_candidate"
-fi
-unset _sdk_dev_dir _sdk_candidate
+export CC CXX CPPFLAGS
+export SDKROOT="$SDK_ROOT"
 
 FINGERPRINT_FILE="/usr/local/share/ntfs-3g/.build-fingerprint"
 LOG_FILE="/Users/Shared/nucleus/logs/ntfs-3g-build.log"
@@ -86,9 +81,13 @@ if ! [ -x /usr/local/bin/ntfs-3g ] \
     autoconf --force
 
     echo "ntfs-3g: configuring..."
+  # WHY: keep fuse-t out of LDFLAGS during configure — autoconf link probes
+  # fail when every test binary must link fuse-t under nix clang wrappers.
+    LDFLAGS=
     ./configure "$CONFIGURE_FLAGS"
 
     echo "ntfs-3g: building..."
+    export LDFLAGS="$LINK_FLAGS"
     make -j"$(sysctl -n hw.ncpu)"
     echo "ntfs-3g: installing..."
     make install
