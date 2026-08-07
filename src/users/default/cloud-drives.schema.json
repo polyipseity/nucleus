@@ -47,6 +47,47 @@
           "type": "object"
         }
       ]
+    },
+    "replicaGcProviderRules": {
+      "additionalProperties": false,
+      "description": "GC rules for a single cloud provider.",
+      "properties": {
+        "blockedRoots": {
+          "description": "Root directory names to exclude from GC scanning entirely.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "dirs": {
+          "description": "Directory names to delete from each sync root.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "files": {
+          "description": "File patterns to delete from each sync root.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "remoteExcludes": {
+          "description": "Glob patterns to exclude from remote-side operations.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "blockedRoots",
+        "dirs",
+        "files",
+        "remoteExcludes"
+      ],
+      "type": "object"
     }
   },
   "description": "Cloud drive mounts and replicas with optional per-platform overrides.",
@@ -146,6 +187,13 @@
         "type": "object"
       },
       "type": "array"
+    },
+    "replicaGc": {
+      "additionalProperties": {
+        "$ref": "#/definitions/replicaGcProviderRules"
+      },
+      "description": "Per-provider GC rules for cloud drive replicas.",
+      "type": "object"
     }
   },
   "required": ["mounts", "replicas"],

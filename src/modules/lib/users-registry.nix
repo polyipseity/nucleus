@@ -94,6 +94,7 @@ let
     // {
       mounts = map resolveCloudDriveItem (cloudDrives.mounts or [ ]);
       replicas = map resolveCloudDriveItem (cloudDrives.replicas or [ ]);
+      replicaGc = cloudDrives.replicaGc or { };
     };
 
   resolveDevRepos =
@@ -141,7 +142,7 @@ let
       inherit (profile) isPrimary;
       homeDirectory = profile.homeDirectory or null;
       cloudDrives = {
-        inherit (cloudDrives) mounts replicas;
+        inherit (cloudDrives) mounts replicas replicaGc;
       };
       inherit customProvisionSymlinks;
       devRepos = {

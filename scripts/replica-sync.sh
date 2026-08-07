@@ -12,7 +12,7 @@
 # present, so encrypted rclone configs can be decrypted), USER.
 #
 # Prerequisites: rclone with the replicas' remotes configured, jq, and the
-# users registry / replica-gc.json registries. Exits 1 when any replica fails or
+# users registry registries. Exits 1 when any replica fails or
 # when required registries/tools are missing.
 
 set -euo pipefail
@@ -102,17 +102,9 @@ _load_users_registry() {
 }
 
 USERS_REGISTRY_ROOT="$REPO_ROOT/src/users"
-# check-suppress:config-method: method 4 (runtime direct read) -- replica-gc.json is consumed only by
-# nucleus-owned scripts at runtime, not by third-party apps. No deployment
-# step needed; the script reads directly from the repo tree via $REPO_ROOT.
-REPLICA_GC_CONFIG_JSON="$REPO_ROOT/src/modules/configs/cloud/replica-gc.json"
 
 if [ ! -d "$USERS_REGISTRY_ROOT" ]; then
   error "users registry root not found at $USERS_REGISTRY_ROOT"
-fi
-
-if [ ! -f "$REPLICA_GC_CONFIG_JSON" ]; then
-  error "gc config not found at $REPLICA_GC_CONFIG_JSON"
 fi
 
 if ! command -v jq >/dev/null 2>&1; then
@@ -132,13 +124,17 @@ fi
 
 # load_provider_gc_entries PROVIDER FIELD
 #   Reads a GC-config field (files|dirs|remoteExcludes|blockedRoots) for a
-#   provider from replica-gc.json. WHY: per-provider cleanup/exclusion policy
-#   is data, not code — adding a provider needs no script change.
+#   provider from the user registry cloudDrives.replicaGc domain. WHY:
+#   per-provider cleanup/exclusion policy is data, not code — adding a
+#   provider needs no script change.
 load_provider_gc_entries() {
   _provider="$1"
   _field="$2"
 
-  jq -r --arg provider "$_provider" --arg field "$_field" '((.[$provider] // {})[$field] // [])[]' "$REPLICA_GC_CONFIG_JSON"
+  echo "$USERS_REGISTRY" | jq -r --arg username "$username" --arg provider "$_provider" --arg field "$_field" '
+    ((.[$username].cloudDrives.replicaGc // {})[$provider] // {})[$field] // []
+    | .[]
+  '
 }
 
 username="$(id -un)"

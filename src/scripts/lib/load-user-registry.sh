@@ -102,7 +102,8 @@ _lur_resolve_cloud_drives() {
         end);
     {
       mounts: ((.mounts // []) | map(resolve_item($platform))),
-      replicas: ((.replicas // []) | map(resolve_item($platform)))
+      replicas: ((.replicas // []) | map(resolve_item($platform))),
+      replicaGc: (.replicaGc // {})
     }
   '
 }

@@ -206,9 +206,15 @@ function Resolve-CloudDrives {
     }
   }
 
+  $replicaGc = @{}
+  if ($CloudDrives.ContainsKey('replicaGc') -and $null -ne $CloudDrives['replicaGc']) {
+    $replicaGc = $CloudDrives['replicaGc']
+  }
+
   return @{
-    mounts   = $mounts
-    replicas = $replicas
+    mounts    = $mounts
+    replicas  = $replicas
+    replicaGc = $replicaGc
   }
 }
 

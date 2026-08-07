@@ -56,11 +56,6 @@ function Invoke-ReplicaSync {
   if (-not (Test-Path -Path $loadUserRegistryScript -PathType Leaf)) {
     throw "replica-sync: user registry loader not found at '$loadUserRegistryScript'."
   }
-  # check-suppress:config-method: method 4 (runtime direct read) -- consumed only by nucleus-owned scripts, not by third-party apps.
-  $gcConfigPath = Join-Path -Path $resolvedRepoRoot -ChildPath "src\modules\configs\cloud\replica-gc.json"
-  if (-not (Test-Path -Path $gcConfigPath -PathType Leaf)) {
-    throw "replica-sync: gc config not found at '$gcConfigPath'."
-  }
 
   # check-suppress:suppression_doc: probe -- rclone may not be installed; $null check handles absence.
   $rcloneCmd = Get-Command -Name "rclone" -ErrorAction SilentlyContinue
@@ -79,7 +74,6 @@ function Invoke-ReplicaSync {
   }
 
   $usersRegistry = & $loadUserRegistryScript -RepoRoot $resolvedRepoRoot
-  $gcConfig = Get-Content -Raw -Path $gcConfigPath | ConvertFrom-Json
   $isWindowsHost = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)
   # check-suppress:suppression_doc: probe -- icacls may not be available on non-Windows hosts; $null check handles absence.
   $icaclsCmd = Get-Command -Name "icacls" -ErrorAction SilentlyContinue
@@ -140,12 +134,9 @@ function Invoke-ReplicaSync {
 
   function Get-ReplicaGcConfig {
     param([Parameter(Mandatory)][string]$Provider)
-    # Explicit reference to suppress false-positive PSAvoidUsingUnusedParameters
-    # ($Provider is used via closure in Where-Object below).
-    $null = $Provider  # check-suppress:suppression_doc: Provider variable discarded, used for drive qualification only
 
-    $providerProperty = $gcConfig.PSObject.Properties | Where-Object { $_.Name -eq $Provider } | Select-Object -First 1
-    if ($null -eq $providerProperty) {
+    $replicaGc = $userRecord['cloudDrives']['replicaGc']
+    if ($null -eq $replicaGc -or -not ($replicaGc -is [hashtable]) -or -not $replicaGc.ContainsKey($Provider)) {
       return [pscustomobject]@{
         Files = @()
         Directories = @()
@@ -154,12 +145,21 @@ function Invoke-ReplicaSync {
       }
     }
 
-    $providerValue = $providerProperty.Value
+    $providerValue = $replicaGc[$Provider]
+    if ($null -eq $providerValue) {
+      return [pscustomobject]@{
+        Files = @()
+        Directories = @()
+        RemoteExcludes = @()
+        BlockedRoots = @()
+      }
+    }
+
     return [pscustomobject]@{
-      Files = @($providerValue.files | ForEach-Object { [string]$_ })
-      Directories = @($providerValue.dirs | ForEach-Object { [string]$_ })
-      RemoteExcludes = @($providerValue.remoteExcludes | ForEach-Object { [string]$_ })
-      BlockedRoots = @($providerValue.blockedRoots | ForEach-Object { [string]$_ })
+      Files = @(@($providerValue['files']) | ForEach-Object { [string]$_ })
+      Directories = @(@($providerValue['dirs']) | ForEach-Object { [string]$_ })
+      RemoteExcludes = @(@($providerValue['remoteExcludes']) | ForEach-Object { [string]$_ })
+      BlockedRoots = @(@($providerValue['blockedRoots']) | ForEach-Object { [string]$_ })
     }
   }
 

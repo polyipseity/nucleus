@@ -36,7 +36,7 @@ let
   windowsReplicaModuleText = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-ReplicaSync.ps1;
   windowsReplicaResetModuleText = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-ReplicaReset.ps1;
   windowsReplicaScheduleModuleText = builtins.readFile ../../src/hosts/Windows/modules/system/Sync-ReplicaSyncScheduledTask.ps1;
-  replicaGcConfigText = builtins.readFile ../../src/modules/configs/cloud/replica-gc.json;
+  replicaGcConfigText = builtins.readFile ../../src/users/default/cloud-drives.json;
   homeNixText = builtins.readFile ../../src/modules/home.nix;
   macosText = builtins.readFile ../../src/modules/macos.nix;
   finderSidebarText = builtins.readFile ../../src/modules/macos/finder-sidebar.nix;
@@ -411,10 +411,10 @@ let
     && containsRegex ''"blockedRoots"'' replicaGcConfigText
     && !containsRegex ''"macOSMetadata"'' replicaGcConfigText
     && !containsRegex ''"oneDrive"'' replicaGcConfigText
-    && containsRegex ''replica-gc\.json'' replicaSyncShellText
+    && containsRegex ''cloudDrives\.replicaGc'' replicaSyncShellText
     && containsRegex "load_provider_gc_entries" replicaSyncShellText
-    && containsRegex ''replica-gc\.json'' windowsReplicaModuleText
     && containsRegex "Get-ReplicaGcConfig" windowsReplicaModuleText
+    && containsRegex ''userRecord.*replicaGc'' windowsReplicaModuleText
   ) "replica metadata exclusion and GC patterns must be centralized in one shared config";
 
   # Test 49: Replica runners lock local replica trees as read-only between sync runs
