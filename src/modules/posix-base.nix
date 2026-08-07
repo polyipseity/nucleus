@@ -11,19 +11,7 @@ let
   hasLaunchdDaemonsOption = options ? launchd && options.launchd ? daemons;
 in
 {
-  options.modules.gc = {
-    expiry = lib.mkOption {
-      type = lib.types.str;
-      default = "7d";
-      description = "Master expiry override. Per-tool options win.";
-    };
-    nixStoreExpiry = lib.mkOption {
-      type = lib.types.str;
-      default = config.modules.gc.expiry;
-      defaultText = lib.literalExpression "config.modules.gc.expiry";
-      description = "Duration for nix-collect-garbage --delete-older-than. Defaults to the master expiry value.";
-    };
-  };
+  imports = [ ./lib/gc-options.nix ];
 
   config = lib.mkMerge [
     {
