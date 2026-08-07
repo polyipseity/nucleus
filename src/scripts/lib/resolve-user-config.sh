@@ -44,29 +44,37 @@ _resolve_user_config_first_level_entry() {
   return 1
 }
 
+_list_user_config_seen_entry() {
+  local candidate="$1"
+  local seen_entry
+
+  for seen_entry in ${_luc_seen_entries+"${_luc_seen_entries[@]}"}; do
+    if [ "$seen_entry" = "$candidate" ]; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 list_user_config_first_level_entries() {
   local username="$1"
   local config_name="$2"
-  local repo_root per_user_dir default_dir entry
+  local repo_root per_user_dir default_dir entry entry_name
+  _luc_seen_entries=()
 
   repo_root="$(_resolve_user_config_repo_root)"
   per_user_dir="${repo_root}/src/users/${username}/${config_name}"
   default_dir="${repo_root}/src/users/default/${config_name}"
 
-  {
-    if [ -d "$per_user_dir" ]; then
-      for entry in "$per_user_dir"/*; do
-        [ -e "$entry" ] || continue
-        basename "$entry"
-      done
+  for entry in "$per_user_dir"/* "$default_dir"/*; do
+    [ -e "$entry" ] || continue
+    entry_name="$(basename "$entry")"
+    if _list_user_config_seen_entry "$entry_name"; then
+      continue
     fi
-    if [ -d "$default_dir" ]; then
-      for entry in "$default_dir"/*; do
-        [ -e "$entry" ] || continue
-        basename "$entry"
-      done
-    fi
-  } | awk '!seen[$0]++'
+    _luc_seen_entries+=("$entry_name")
+    printf '%s\n' "$entry_name"
+  done
 }
 
 resolve_user_config_file() {
