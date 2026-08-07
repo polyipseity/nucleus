@@ -37,20 +37,27 @@ let
   usersOverlay = builtins.readDir usersDir;
   replicaSyncUserLogDirs = lib.unique (
     lib.flatten (
-      map (userName:
-        let
-          cloudDrivesPath = "${usersDir}/${userName}/cloud-drives.json";
-          cloudDrivesCfg =
-            if builtins.pathExists cloudDrivesPath then
-              builtins.fromJSON (builtins.readFile cloudDrivesPath)
-            else
-              { replicas = []; };
-          scheduledReplicas = builtins.filter (
-            replica: (replica.fallbackTimer.enable or true)
-          ) (cloudDrivesCfg.replicas or []);
-        in
-        map (replica: "replica-sync-${replica.id}") scheduledReplicas
-      ) (lib.filter (name: usersOverlay.${name} == "directory" && name != "default") (builtins.attrNames usersOverlay))
+      map
+        (
+          userName:
+          let
+            cloudDrivesPath = "${usersDir}/${userName}/cloud-drives.json";
+            cloudDrivesCfg =
+              if builtins.pathExists cloudDrivesPath then
+                builtins.fromJSON (builtins.readFile cloudDrivesPath)
+              else
+                { replicas = [ ]; };
+            scheduledReplicas = builtins.filter (replica: (replica.fallbackTimer.enable or true)) (
+              cloudDrivesCfg.replicas or [ ]
+            );
+          in
+          map (replica: "replica-sync-${replica.id}") scheduledReplicas
+        )
+        (
+          lib.filter (name: usersOverlay.${name} == "directory" && name != "default") (
+            builtins.attrNames usersOverlay
+          )
+        )
     )
   );
 
@@ -143,13 +150,21 @@ in
   #   configureNvimLauncher            — macOS-specific neovim launcher
   #   configureUtmRendererPrefs        — UTM Apple Core OpenGL (CGL) renderer for Android guest
   #   disableSpotlight                 — disable all Spotlight hotkeys + service
+  #   removeCommandLineTools           — delete Apple CLT tree + pkgutil receipts
+  #   configureXcodeSelect             — xcode-select --switch to apple-sdk-enhanced
   # ---------------------------------------------------------------------------
   system.activationScripts.postActivation.text = lib.mkBefore ''
+    # ---- remove-command-line-tools -----------------------------------------------
+    "${activationBundle}/src/scripts/hosts/MacBook/macos-remove-command-line-tools.sh" \
+      "${config.nucleus.logging.systemLogDir}/command-line-tools.log"
+
     # ---- configure-xcode-select --------------------------------------------------
     # Point the system developer directory at the Nix apple-sdk store path so
-    # xcrun (invoked by rustc/cargo for SDK discovery) works without Xcode CLT
-    # installed.  Without this, every native-code build outside a Nix devShell
-    # triggers the CLT installation dialog.
+    # xcrun (invoked by rustc/cargo for SDK discovery) works without Apple CLT.
+    # CLT is removed by remove-command-line-tools above on each apply; this
+    # switch is the system-level hook for non-shell process trees (launchd, GUI
+    # tasks).  Without both steps, native-code builds outside a Nix devShell can
+    # trigger the CLT installation dialog or Software Update CLT offers.
     # WHY: xcode-select --switch (not just DEVELOPER_DIR):
     #   DEVELOPER_DIR only helps processes that inherit the shell environment.
     #   launchd services, VS Code tasks with non-shell exec, and other non-shell
