@@ -29,7 +29,10 @@ _vsym_keybindings="$(resolve_user_config_file "$_vsym_username" "vscode" "$_vsym
 _vsym_chat_lm_repo="$(resolve_user_config_file "$_vsym_username" "vscode" "$_vsym_chat_language_models_file")"
 _vsym_snippets="$(resolve_user_config_first_level_entry "$_vsym_username" "vscode" "snippets")"
 _vsym_prompts="$(resolve_user_config_first_level_entry "$_vsym_username" "vscode" "prompts")"
-_vsym_profiles="$(resolve_user_config_first_level_entry "$_vsym_username" "vscode" "profiles")"
+_vsym_profiles=""
+if _vsym_profiles_candidate="$(resolve_user_config_first_level_entry "$_vsym_username" "vscode" "profiles" 2>/dev/null)"; then
+  _vsym_profiles="$_vsym_profiles_candidate"
+fi
 _vsym_copilot_memories="$(resolve_user_config_first_level_entry "$_vsym_username" "vscode" "copilot-memories")"
 
 for _vsym_base_dir in "$_vsym_stable_base" "$_vsym_insiders_base"; do
@@ -64,7 +67,9 @@ for _vsym_base_dir in "$_vsym_stable_base" "$_vsym_insiders_base"; do
   ensure_file_symlink "$_vsym_tasks" "$_vsym_base_dir/tasks.json"
   ensure_dir_symlink "$_vsym_snippets" "$_vsym_base_dir/snippets"
   ensure_dir_symlink "$_vsym_prompts" "$_vsym_base_dir/prompts"
-  ensure_dir_symlink "$_vsym_profiles" "$_vsym_base_dir/profiles"
+  if [ -n "$_vsym_profiles" ] && [ -e "$_vsym_profiles" ]; then
+    ensure_dir_symlink "$_vsym_profiles" "$_vsym_base_dir/profiles"
+  fi
   # Copilot Chat stores memories under a deep per-extension subpath;
   # the repo uses a flat alias so the directory is easy to navigate.
   ensure_dir_symlink "$_vsym_copilot_memories" \
