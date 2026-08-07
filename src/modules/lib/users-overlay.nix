@@ -33,6 +33,9 @@ let
   dropStrings =
     n: strings:
     if n <= 0 || strings == [ ] then strings else dropStrings (n - 1) (builtins.tail strings);
+
+  splitRelativePath =
+    relativePath: builtins.filter builtins.isString (builtins.split "/" relativePath);
 in
 rec {
   selectUserConfigSource =
@@ -88,7 +91,7 @@ rec {
       repoRoot,
     }:
     let
-      segments = builtins.splitString "/" relativePath;
+      segments = splitRelativePath relativePath;
       firstSegment = builtins.head segments;
       restSegments = dropStrings 1 segments;
       entryRoot = selectUserConfigFirstLevelEntry {
