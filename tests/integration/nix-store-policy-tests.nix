@@ -14,7 +14,10 @@ assert containsRegex "nix\\.optimise" posixBaseText;
 assert containsRegex "nixStoreOptimise" posixBaseText;
 assert containsRegex "auto-optimise-store = true" nixCustomConfText;
 assert containsRegex "keep-derivations = true" nixCustomConfText;
-assert containsRegex "keep-outputs = true" nixCustomConfText;
+assert containsRegex "lazy-trees = true" posixBaseText;
+assert containsRegex "eval-cores = 0" posixBaseText;
+assert containsRegex "lazy-trees = true" nixCustomConfText;
+assert containsRegex "eval-cores = 0" nixCustomConfText;
 
 {
   success = true;

@@ -30,6 +30,8 @@ let
     # workflows so GC does not prune still-useful build context.
     keep-derivations = true;
     keep-outputs = true;
+    lazy-trees = true;
+    eval-cores = 0;
   };
 
   gitconfigActivation = ''
