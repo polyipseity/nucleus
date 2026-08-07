@@ -38,16 +38,11 @@ function Sync-VSCodeConfig {
     (Merge-VSChatLanguageModel) instead of a symlink, so that VS Code can
     write model updates back without breaking the repo link.
 
-    Migration safety applied to each item:
+    Conflict handling applied to each item:
       Correct symlink     — no-op.
-      Wrong symlink       — remove, create correct symlink.  Handles the
-                            transition from the old managed-key settings file.
-      Real non-empty file — copy content to the repo target when the repo
-                            target is absent or empty (preserves any pre-existing
-                            VS Code edits), then replace with symlink.
-      Real non-empty dir  — copy each top-level file to the repo dir without
-                            overwriting existing content (repo is source of
-                            truth), then replace the directory with a symlink.
+      Wrong symlink       — remove, create correct symlink.
+      Real file or dir    — fail fast (merge wanted content into the repo
+                            target and remove the conflict, then re-run apply).
       Absent              — create symlink (parent directories created as
                             needed).
 
@@ -246,17 +241,8 @@ function Sync-VSCodeConfig {
           Remove-ManagedSymlinkDeleteProtection -Context "vscode-config" -Path $linkPath
           Remove-Item -LiteralPath $linkPath -Force
         } else {
-          # Real file: migrate content to repo target when the repo target does
-          # not yet contain meaningful content so pre-existing VS Code edits are
-          # not silently discarded on first activation.
-          $repoContent = $null
-          if (Test-Path -LiteralPath $repoTarget) {
-            $repoContent = Get-Content -LiteralPath $repoTarget -Raw -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- guarded by Test-Path above; race-condition guard for file deleted between check and read
-          }
-          if ([string]::IsNullOrEmpty($repoContent)) {
-            Copy-Item -LiteralPath $linkPath -Destination $repoTarget -Force
-          }
-          Remove-Item -LiteralPath $linkPath -Force
+          Write-Error "vscode-config: Sync-VSCodeConfig: $linkPath is not a managed symlink — merge any wanted content into $repoTarget and remove it, then re-run apply."
+          return
         }
       }
 
@@ -299,17 +285,8 @@ function Sync-VSCodeConfig {
           Remove-ManagedSymlinkDeleteProtection -Context "vscode-config" -Path $linkPath
           Remove-Item -LiteralPath $linkPath -Force
         } else {
-          # Real directory: copy each top-level file to the repo dir without
-          # overwriting existing repo content; repo is the source of truth.
-          # check-suppress:suppression_doc: probe -- directory may be empty or inaccessible; ForEach-Object handles absent results gracefully
-          Get-ChildItem -LiteralPath $linkPath -File -ErrorAction SilentlyContinue |
-            ForEach-Object {
-            $destFile = Join-Path -Path $repoTarget -ChildPath $_.Name
-            if (-not (Test-Path -LiteralPath $destFile)) {
-              Copy-Item -LiteralPath $_.FullName -Destination $destFile -Force
-            }
-          }
-          Remove-Item -LiteralPath $linkPath -Recurse -Force
+          Write-Error "vscode-config: Sync-VSCodeConfig: $linkPath is not a managed symlink — merge any wanted content into $repoTarget and remove it, then re-run apply."
+          return
         }
       }
 
