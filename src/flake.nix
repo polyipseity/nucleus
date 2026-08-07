@@ -250,6 +250,19 @@
                 };
               };
             })
+            (_final: prev: {
+              # Darwin fixup runs strip -S over all of $out/lib (including
+              # site-packages). cctools/llvm-strip mis-handles .ico COFF data and
+              # inflates icons to hundreds of MB. Remove once nixpkgs closes
+              # https://github.com/NixOS/nixpkgs/pull/539458 (darwin stdenv
+              # stripExclude for *.ico / *.cur).
+              litellm = prev.litellm.overridePythonAttrs (_: {
+                stripExclude = [
+                  "*.ico"
+                  "*.cur"
+                ];
+              });
+            })
             (
               _final: prev:
               let
