@@ -1123,7 +1123,6 @@ let
   nixos_domain_xml_text = builtins.readFile ../../src/modules/configs/vms/nixos-domain.xml;
   utmConfigPlistText = builtins.readFile ../../src/modules/configs/vms/utm-config.plist.xml;
   vms_json_text = builtins.readFile ../../src/modules/VMs.json;
-  load_user_registry_sh_text = builtins.readFile ../../src/scripts/lib/load-user-registry.sh;
   vm_guest_json_text = builtins.readFile ../../src/users/polyipseity/vm-guest.json;
   user_secret_text = builtins.readFile ../../src/secrets/users/polyipseity.yml;
   vms_windows_packer_text = builtins.readFile ../../src/vms/windows/packer.pkr.hcl;
@@ -1371,13 +1370,10 @@ let
   # secrets via vmGuest secret-key references and stay wired across all guest
   # build paths. vmGuest lives in src/users/<username>/vm-guest.json and is
   # assembled by load-user-registry.sh / users-registry.nix.
-  test_guest_credentials_policy_in_user_registries =
-    assert'
-      (
-        (lib.hasInfix "\"usernameSecretKey\": \"vm_guest_username\"" vm_guest_json_text)
-        && (lib.hasInfix "\"passwordSecretKey\": \"vm_guest_password\"" vm_guest_json_text)
-      )
-      "polyipseity vm-guest.json must declare vmGuest secret-key references";
+  test_guest_credentials_policy_in_user_registries = assert' (
+    (lib.hasInfix "\"usernameSecretKey\": \"vm_guest_username\"" vm_guest_json_text)
+    && (lib.hasInfix "\"passwordSecretKey\": \"vm_guest_password\"" vm_guest_json_text)
+  ) "polyipseity vm-guest.json must declare vmGuest secret-key references";
 
   test_guest_credentials_policy_in_user_secrets = assert' (
     (lib.hasInfix "vm_guest_username:" user_secret_text)

@@ -1,5 +1,10 @@
 # Logging paths, rotation, and sanitization shared across service modules.
-{ lib, pkgs, hostName ? null, ... }:
+{
+  lib,
+  pkgs,
+  hostName ? null,
+  ...
+}:
 let
   inherit (lib) mkOption types;
   loggingPaths = import ./lib/logging-paths.nix { inherit lib pkgs hostName; };

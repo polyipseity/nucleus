@@ -26,11 +26,9 @@ let
     hideOnClose = false;
   };
 
-  qtPassManagedSettings =
-    (qtPassDefaultSettings // qtPassPlatformSettings)
-    // {
-      passStore = "${lib.removeSuffix "/" passwordStoreDir}/";
-    };
+  qtPassManagedSettings = (qtPassDefaultSettings // qtPassPlatformSettings) // {
+    passStore = "${lib.removeSuffix "/" passwordStoreDir}/";
+  };
 
   renderQtPassValue =
     value:

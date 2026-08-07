@@ -18,20 +18,17 @@ let
     && containsRegex "Always preserve unmanaged keys and sections" homeText
   ) "home.nix must merge-overwrite managed Picard settings into native Picard.ini";
 
-  test_windows_picard_ini_merge_overwrite_wiring =
-    assert'
-      (
-        containsRegex "EnablePicardParity" windowsApplyText
-        && containsRegex ''Sync-PicardConfig -Enabled:\$EnablePicardParity -Users \$selectedUserRecords -RepoRoot \$repoRoot'' windowsApplyText
-        && containsRegex "function Sync-PicardConfig" windowsPicardConfigText
-        && containsRegex "Resolve-UserConfigFile" windowsPicardConfigText
-        && containsRegex "Get-PicardDefaultPairsFromFile" windowsPicardConfigText
-        && containsRegex ''AppData\\Roaming\\MusicBrainz\\Picard\.ini'' windowsPicardConfigText
-        && containsRegex "_upsert_ini_key" windowsPicardConfigText
-        && containsRegex "_remove_managed_ini_keys" windowsPicardConfigText
-        && containsRegex "unmanaged keys/sections" windowsPicardConfigText
-      )
-      "Windows apply path must converge Picard.ini via merge-overwrite module";
+  test_windows_picard_ini_merge_overwrite_wiring = assert' (
+    containsRegex "EnablePicardParity" windowsApplyText
+    && containsRegex ''Sync-PicardConfig -Enabled:\$EnablePicardParity -Users \$selectedUserRecords -RepoRoot \$repoRoot'' windowsApplyText
+    && containsRegex "function Sync-PicardConfig" windowsPicardConfigText
+    && containsRegex "Resolve-UserConfigFile" windowsPicardConfigText
+    && containsRegex "Get-PicardDefaultPairsFromFile" windowsPicardConfigText
+    && containsRegex ''AppData\\Roaming\\MusicBrainz\\Picard\.ini'' windowsPicardConfigText
+    && containsRegex "_upsert_ini_key" windowsPicardConfigText
+    && containsRegex "_remove_managed_ini_keys" windowsPicardConfigText
+    && containsRegex "unmanaged keys/sections" windowsPicardConfigText
+  ) "Windows apply path must converge Picard.ini via merge-overwrite module";
 
   test_canonical_picard_defaults_file = assert' (
     containsRegex "[[]application[]]" picardDefaultsIniText
@@ -41,9 +38,7 @@ let
     && containsRegex ''user_profiles=@Invalid\(\)'' picardDefaultsIniText
   ) "Canonical Picard defaults file must exist and include expected native INI sections";
 
-  test_users_overlay_exposes_picard_selector = assert' (
-    containsRegex "selectUserConfigFile" usersOverlayText
-  ) "users-overlay.nix must expose selectUserConfigFile for per-user Picard baselines";
+  test_users_overlay_exposes_picard_selector = assert' (containsRegex "selectUserConfigFile" usersOverlayText) "users-overlay.nix must expose selectUserConfigFile for per-user Picard baselines";
 
   test_posix_picard_ini_awk_environ_escape =
     assert'

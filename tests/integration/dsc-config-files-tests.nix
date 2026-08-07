@@ -54,7 +54,7 @@ let
 
   # Test 3: ConfigFiles param doc must describe per-user extension mechanism.
   test_param_doc_describes_per_user = assert' (
-    (containsRegex ''src/users'' windowsApplyText || containsRegex "dscConfigFiles" windowsApplyText)
+    (containsRegex "src/users" windowsApplyText || containsRegex "dscConfigFiles" windowsApplyText)
     && containsRegex "dscConfigFiles" windowsApplyText
   ) "ConfigFiles param doc must describe per-user extension via src/users/ dscConfigFiles";
 

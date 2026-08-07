@@ -135,7 +135,9 @@ assert containsRegex ''"cloud-drive".*justification'' servicesJsonText;
 assert containsRegex "Service registry validation" svcRegistryShText;
 assert containsRegex ''services\.json'' svcRegistryShText;
 assert containsRegex "justification" svcRegistryShText;
-assert (containsRegex "load-user-registry" svcRegistryShText || containsRegex "src/users" svcRegistryShText);
+assert (
+  containsRegex "load-user-registry" svcRegistryShText || containsRegex "src/users" svcRegistryShText
+);
 
 # Verdict ordering: "validation passed" must follow "justification" (not precede it)
 assert containsRegex "justification.*validation passed" svcRegistryShText;
@@ -144,7 +146,10 @@ assert containsRegex "justification.*validation passed" svcRegistryShText;
 assert containsRegex "Service registry validation" svcRegistryPs1Text;
 assert containsRegex ''services\.json'' svcRegistryPs1Text;
 assert containsRegex "justification" svcRegistryPs1Text;
-assert (containsRegex "Load-UserRegistry" svcRegistryPs1Text || containsRegex ''src\\users'' svcRegistryPs1Text);
+assert (
+  containsRegex "Load-UserRegistry" svcRegistryPs1Text
+  || containsRegex ''src\\users'' svcRegistryPs1Text
+);
 
 # Verdict ordering: "validation passed" must follow "justification" (not precede it)
 assert containsRegex "justification.*validation passed" svcRegistryPs1Text;

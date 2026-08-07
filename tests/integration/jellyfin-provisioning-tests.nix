@@ -122,15 +122,18 @@ let
 
   test_posix_library_sync_passes_repo_root = assert' (containsRegex "NUCLEUS_REPO_ROOT=.*sh.*jellyfin-sync\\.sh" applyScriptText) "apply.sh must pass NUCLEUS_REPO_ROOT environment variable to jellyfin-sync.sh";
 
-  test_posix_polyipseity_library_declared_in_users_json = assert' (
-    let
-      libs = usersRegistry.polyipseity.jellyfin.libraries or [ ];
-      names = builtins.map (lib: lib.name or "") libs;
-    in
-    (builtins.length libs) >= 2
-    && builtins.any (n: n == "music videos") names
-    && builtins.any (n: n == "playlists") names
-  ) "polyipseity must declare jellyfin libraries for music videos and playlists in src/users/ registry";
+  test_posix_polyipseity_library_declared_in_users_json =
+    assert'
+      (
+        let
+          libs = usersRegistry.polyipseity.jellyfin.libraries or [ ];
+          names = builtins.map (lib: lib.name or "") libs;
+        in
+        (builtins.length libs) >= 2
+        && builtins.any (n: n == "music videos") names
+        && builtins.any (n: n == "playlists") names
+      )
+      "polyipseity must declare jellyfin libraries for music videos and playlists in src/users/ registry";
 
   test_windows_polyipseity_library_declared_in_users_json =
     assert'

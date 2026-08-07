@@ -16,8 +16,7 @@ let
       NixOS = "nixos";
       Windows = "windows";
     }
-    .${hostName}
-    or (throw "users-registry.nix: unsupported hostName '${hostName}'");
+    .${hostName} or (throw "users-registry.nix: unsupported hostName '${hostName}'");
 
   platformKeys = [
     "linux"
@@ -27,14 +26,14 @@ let
   ];
 
   usersRoot = repoRoot + "/src/users";
-  defaultRoot = usersRoot + "/default";
 
-  readDirNames = path:
-    builtins.attrNames (lib.filterAttrs (_: t: t == "directory") (builtins.readDir path));
+  readDirNames =
+    path: builtins.attrNames (lib.filterAttrs (_: t: t == "directory") (builtins.readDir path));
 
   userNames = lib.filter (name: name != "default" && name != "schemas") (readDirNames usersRoot);
 
-  readJsonFile = path:
+  readJsonFile =
+    path:
     if builtins.pathExists path then
       removeAttrs (builtins.fromJSON (builtins.readFile path)) [ "$schema" ]
     else
@@ -42,12 +41,14 @@ let
 
   mergeRecords = default: user: lib.recursiveUpdate default user;
 
-  isPlatformMap = value:
+  isPlatformMap =
+    value:
     builtins.isAttrs value
     && value != { }
     && builtins.all (name: builtins.elem name platformKeys) (builtins.attrNames value);
 
-  resolvePlatformValue = value:
+  resolvePlatformValue =
+    value:
     if isPlatformMap value then
       if builtins.hasAttr platform value then
         value.${platform}
@@ -64,10 +65,11 @@ let
     else
       value;
 
-  resolveScalar = value:
-  if builtins.isAttrs value && isPlatformMap value then resolvePlatformValue value else value;
+  resolveScalar =
+    value: if builtins.isAttrs value && isPlatformMap value then resolvePlatformValue value else value;
 
-  resolveCloudDriveItem = item:
+  resolveCloudDriveItem =
+    item:
     item
     // lib.optionalAttrs (item ? localPath) {
       localPath = resolveScalar item.localPath;
@@ -86,14 +88,16 @@ let
         };
     };
 
-  resolveCloudDrives = cloudDrives:
+  resolveCloudDrives =
+    cloudDrives:
     cloudDrives
     // {
       mounts = map resolveCloudDriveItem (cloudDrives.mounts or [ ]);
       replicas = map resolveCloudDriveItem (cloudDrives.replicas or [ ]);
     };
 
-  resolveDevRepos = devRepos:
+  resolveDevRepos =
+    devRepos:
     devRepos
     // {
       repositories = map (
@@ -105,19 +109,20 @@ let
       ) (devRepos.repositories or [ ]);
     };
 
-  resolveProfile = profile:
+  resolveProfile =
+    profile:
     profile
     // lib.optionalAttrs (profile ? homeDirectory) {
       homeDirectory = resolvePlatformValue profile.homeDirectory;
     };
 
-  loadDomain = username: fileName:
-    readJsonFile (usersRoot + "/${username}/${fileName}");
+  loadDomain = username: fileName: readJsonFile (usersRoot + "/${username}/${fileName}");
 
-  loadMergedDomain = username: fileName:
-    mergeRecords (loadDomain "default" fileName) (loadDomain username fileName);
+  loadMergedDomain =
+    username: fileName: mergeRecords (loadDomain "default" fileName) (loadDomain username fileName);
 
-  assembleUser = username:
+  assembleUser =
+    username:
     let
       profile = resolveProfile (loadMergedDomain username "profile.json");
       cloudDrives = resolveCloudDrives (loadMergedDomain username "cloud-drives.json");
@@ -140,7 +145,12 @@ let
       };
       inherit customProvisionSymlinks;
       devRepos = {
-        inherit (devRepos) enable gitHubUsername repositories submoduleDirectories;
+        inherit (devRepos)
+          enable
+          gitHubUsername
+          repositories
+          submoduleDirectories
+          ;
       };
       envVars = envVars;
       iCloudExclusions = {

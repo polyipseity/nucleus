@@ -25,12 +25,15 @@ let
     (builtins.length excludedDirNames) > 0
   ) "src/users/ registry must define a non-empty iCloudExclusions.excludedDirNames list";
 
-  test_managed_roots_centralized = assert' (
-    managedRoots == [
-      "Library/Mobile Documents/com~apple~CloudDocs"
-      "Library/Mobile Documents/iCloud~md~obsidian"
-    ]
-  ) "src/users/ registry must define the exact centralized iCloudExclusions.managedRoots list for polyipseity";
+  test_managed_roots_centralized =
+    assert'
+      (
+        managedRoots == [
+          "Library/Mobile Documents/com~apple~CloudDocs"
+          "Library/Mobile Documents/iCloud~md~obsidian"
+        ]
+      )
+      "src/users/ registry must define the exact centralized iCloudExclusions.managedRoots list for polyipseity";
 
   test_managed_roots_are_mobile_documents_only = assert' (builtins.all
     (root: lib.hasPrefix "Library/Mobile Documents/" root)

@@ -364,25 +364,31 @@ lib.mkIf isPrimaryUser {
         displayName = "${primaryUsername}.yml";
       };
     in
-    lib.hm.dag.entryAfter (
-      [ "gpg-import" "ssh-key-adopt" ] ++ lib.optionals hasUserSecretFile [ "git-identity" ]
-    ) ''
-      "${activationBundle}/src/scripts/secrets/verify-secret-decryption.sh" \
-        "${pkgs.jq}/bin/jq" \
-        "${pkgs.gnupg}/bin/gpg" \
-        "${pkgs.ssh-to-age}/bin/ssh-to-age" \
-        "${config.home.homeDirectory}/.gnupg" \
-        '${builtins.toJSON allSopsFiles}' \
-        "${
-          if hasUserSecretFile then
-            config.sops.secrets.${gitIdentitySecretName}.path
-          else
-            config.sops.secrets.${sshSecretName}.path
-        }" \
-        "${config.sops.secrets.${sshSecretName}.path}" \
-        "${config.sops.secrets.${sshPublicSecretName}.path}" \
-        "${config.sops.secrets.${gpgSecretName}.path}" \
-        "${config.home.homeDirectory}/.config/nucleus/managed-gpg-keys" \
-        "${sshPublicKeyPath}"
-    '';
+    lib.hm.dag.entryAfter
+      (
+        [
+          "gpg-import"
+          "ssh-key-adopt"
+        ]
+        ++ lib.optionals hasUserSecretFile [ "git-identity" ]
+      )
+      ''
+        "${activationBundle}/src/scripts/secrets/verify-secret-decryption.sh" \
+          "${pkgs.jq}/bin/jq" \
+          "${pkgs.gnupg}/bin/gpg" \
+          "${pkgs.ssh-to-age}/bin/ssh-to-age" \
+          "${config.home.homeDirectory}/.gnupg" \
+          '${builtins.toJSON allSopsFiles}' \
+          "${
+            if hasUserSecretFile then
+              config.sops.secrets.${gitIdentitySecretName}.path
+            else
+              config.sops.secrets.${sshSecretName}.path
+          }" \
+          "${config.sops.secrets.${sshSecretName}.path}" \
+          "${config.sops.secrets.${sshPublicSecretName}.path}" \
+          "${config.sops.secrets.${gpgSecretName}.path}" \
+          "${config.home.homeDirectory}/.config/nucleus/managed-gpg-keys" \
+          "${sshPublicKeyPath}"
+      '';
 }

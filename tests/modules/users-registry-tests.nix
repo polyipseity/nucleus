@@ -20,15 +20,13 @@ let
 
   userNames = builtins.attrNames usersMacOS;
 
-  googleDriveReplica = replica:
-    builtins.head (builtins.filter (entry: (entry.id or "") == "GoogleDrive") replica);
+  googleDriveReplica =
+    replica: builtins.head (builtins.filter (entry: (entry.id or "") == "GoogleDrive") replica);
 
-  icloudReplica = replica:
-    builtins.head (builtins.filter (entry: (entry.id or "") == "iCloud") replica);
+  icloudReplica =
+    replica: builtins.head (builtins.filter (entry: (entry.id or "") == "iCloud") replica);
 
-  test_discovers_polyipseity_user = assert' (
-    builtins.elem "polyipseity" userNames
-  ) "users-registry.nix must discover polyipseity from src/users/";
+  test_discovers_polyipseity_user = assert' (builtins.elem "polyipseity" userNames) "users-registry.nix must discover polyipseity from src/users/";
 
   test_excludes_default_and_schemas_dirs = assert' (
     !(builtins.elem "default" userNames) && !(builtins.elem "schemas" userNames)
@@ -45,8 +43,9 @@ let
       googleDrive = builtins.head (builtins.filter (m: (m.id or "") == "GoogleDrive") mounts);
     in
     googleDrive.localPath == "clouds/GoogleDrive"
-    && (googleDriveReplica usersWindows.polyipseity.cloudDrives.replicas).localPath
-    == "clouds\\GoogleDriveReplica"
+    &&
+      (googleDriveReplica usersWindows.polyipseity.cloudDrives.replicas).localPath
+      == "clouds\\GoogleDriveReplica"
   ) "users-registry.nix must resolve platform-keyed cloud drive localPath values";
 
   test_resolves_replica_enable_per_platform = assert' (

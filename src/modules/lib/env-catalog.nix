@@ -42,7 +42,11 @@ let
     if pkgs.stdenv.isDarwin then "/Users/${effectiveUsername}" else "/home/${effectiveUsername}";
 
   passwordStorePathRaw =
-    if effectiveUser ? passwordStore && effectiveUser.passwordStore ? path && effectiveUser.passwordStore.path != "" then
+    if
+      effectiveUser ? passwordStore
+      && effectiveUser.passwordStore ? path
+      && effectiveUser.passwordStore.path != ""
+    then
       effectiveUser.passwordStore.path
     else
       "~/.password-store";
@@ -51,7 +55,9 @@ let
 
   passwordStoreDirWindows =
     let
-      withProfile = builtins.replaceStrings [ "~/" "~" ] [ "%USERPROFILE%\\" "%USERPROFILE%" ] passwordStorePathRaw;
+      withProfile =
+        builtins.replaceStrings [ "~/" "~" ] [ "%USERPROFILE%\\" "%USERPROFILE%" ]
+          passwordStorePathRaw;
     in
     builtins.replaceStrings [ "/" ] [ "\\" ] withProfile;
 

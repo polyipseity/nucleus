@@ -226,10 +226,9 @@ let
   # Test 32: cloud-drives keeps iCloud replica explicitly enabled
   test_icloud_replica_enabled =
     let
-      icloudReplica =
-        builtins.head (
-          builtins.filter (replica: (replica.id or "") == "iCloud") polyipseityMacOS.cloudDrives.replicas
-        );
+      icloudReplica = builtins.head (
+        builtins.filter (replica: (replica.id or "") == "iCloud") polyipseityMacOS.cloudDrives.replicas
+      );
     in
     assert' (
       icloudReplica.enable == true
@@ -280,7 +279,10 @@ let
   # Test 38: Windows parity includes a replica sync module and scripts entrypoint
   test_windows_replica_sync_entrypoints = assert' (
     containsRegex "function Invoke-ReplicaSync" windowsReplicaModuleText
-    && (containsRegex "Load-UserRegistry.ps1" windowsReplicaModuleText || containsRegex "src\\\\users" windowsReplicaModuleText)
+    && (
+      containsRegex "Load-UserRegistry.ps1" windowsReplicaModuleText
+      || containsRegex "src\\\\users" windowsReplicaModuleText
+    )
     && containsRegex "Invoke-ReplicaSync" replicaSyncPwshText
   ) "Windows must include Invoke-ReplicaSync module and scripts/replica-sync.ps1 wrapper";
 
@@ -508,10 +510,9 @@ let
   # Test 60: POSIX iCloud replica sets readWrite=true (macOS symlink exception)
   test_icloud_replica_readwrite_posix =
     let
-      icloudReplica =
-        builtins.head (
-          builtins.filter (replica: (replica.id or "") == "iCloud") polyipseityMacOS.cloudDrives.replicas
-        );
+      icloudReplica = builtins.head (
+        builtins.filter (replica: (replica.id or "") == "iCloud") polyipseityMacOS.cloudDrives.replicas
+      );
     in
     assert' (
       icloudReplica.readWrite or false == true
@@ -520,10 +521,9 @@ let
   # Test 61: Windows iCloud replica does NOT set readWrite (managed directories, not symlinks)
   test_icloud_replica_readwrite_windows =
     let
-      icloudReplica =
-        builtins.head (
-          builtins.filter (replica: (replica.id or "") == "iCloud") polyipseityWindows.cloudDrives.replicas
-        );
+      icloudReplica = builtins.head (
+        builtins.filter (replica: (replica.id or "") == "iCloud") polyipseityWindows.cloudDrives.replicas
+      );
     in
     assert' (
       !(icloudReplica ? readWrite) || icloudReplica.readWrite == false
