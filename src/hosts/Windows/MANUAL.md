@@ -9,6 +9,18 @@
 - Caddy local-CA trust runs automatically. If missing: run `caddy trust --address 127.0.0.1:2019` in an elevated PowerShell.
 - Starship prompt is active in all shells. Requires a Nerd Font (configured automatically via `CaskaydiaCove Nerd Font`).
 
+## One-time migrations (deferred)
+
+Run once on each Windows host before applying a nucleus revision that removes in-code migration handlers.
+
+1. `nucleus-apply` (final run with handlers still present).
+2. Agents layout: if `%USERPROFILE%\.agents` is a whole-directory symlink into the repo, remove it; re-apply to get per-subdir symlinks.
+3. VS Code config: resolve any real files blocking managed symlink targets under `%APPDATA%\Code\User` before apply.
+4. Git ignore layering: remove `%ProgramData%\nucleus\git\ignore-global` and `%USERPROFILE%\.config\git\ignore-user` if present.
+5. Cloud drives: remove legacy `nucleus-cloud-mount-*` Servy services and reparse/symlink mount paths; re-apply.
+6. LiteLLM: unregister scheduled task `NucleusLiteLLM` if present (superseded by SCM service `nucleus-litellm`).
+7. Replica state: run `nucleus-replica-reset` to clear pre-unified-sync seed markers.
+
 ## command shortcuts
 
 - `-g`, `-ga`, `-gb`, `-gc`, `-gca`, `-gcl`, `-gco`, `-gd`, `-gf`, `-gff`, `-gl`, `-gp`, `-gpl`, `-gplf`, `-gs`, `-gst`, `-gsw` — git commands

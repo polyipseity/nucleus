@@ -21,6 +21,22 @@
 - Caddy local-CA trust runs automatically. If missing: `sudo caddy trust --address 127.0.0.1:2019`.
 - Nix commands may wait on a `nixpkgs-weekly/0.1` fetch from flakehub (multiple "waiting for another Nix process" or "unpacking" lines). This is machine-level config — the global registry maps `nixpkgs` to flakehub and `/etc/nix/nix.conf` sets `extra-nix-path` — not part of `src/flake.lock`. It is a one-time cold-cache cost; later runs are instant.
 
+## One-time migrations
+
+Run once before upgrading to a nucleus revision that removes in-code migration handlers. Order matters.
+
+1. `nucleus-apply` (final run with migration handlers still present).
+2. Remove orphan `/etc` paths if present: `sudo rm -rf /etc/nucleus-bin`.
+3. Linux builder workdir: `sudo test -e /var/lib/darwin-builder && sudo mv /var/lib/darwin-builder /var/lib/linux-builder`.
+4. Tart storage: verify `readlink ~/.tart` points at `~/virtual machines/tart`; if `~/.tart` is still a directory, run `nucleus-vm sync` or move contents manually into `~/virtual machines/tart` and replace with a symlink.
+5. UTM VMs: `nucleus-vm sync` for each managed VM so display plists match current templates.
+6. VS Code extensions dirs: if `~/.vscode/extensions` or `~/.vscode-insiders/extensions` is a symlink, remove it and recreate an empty directory (`mkdir -p`); re-run `nucleus-apply` to restore per-extension symlinks.
+7. Cloud mounts: verify `~/clouds/**` mount points are real directories, not symlinks to old `/Volumes` indirection.
+8. Replica state: `nucleus-replica-reset` to clear pre-unified-sync seed markers.
+9. Git dev repos: `find ~/dev -name .git -type d -exec rm -f {}/description {}/hooks/*.sample \;` (or run `nucleus-gc` once before handler removal).
+10. LinearMouse: after apply, optionally `defaults delete com.lujjjh.LinearMouse` if the old bundle-ID domain remains; managed prefs use `org.linearmouse.LinearMouse` only.
+11. Removed Nucleus app bundles/workflows: confirm `NucleusGSPDFOpt.app`, `NucleusManual.app`, and old `OptimizePDF-*` / `GSPDFOpt` Automator workflows are absent from their deploy locations.
+
 ## command shortcuts
 
 - `-g`, `-ga`, `-gb`, `-gc`, `-gca`, `-gcl`, `-gco`, `-gd`, `-gf`, `-gff`, `-gl`, `-gp`, `-gpl`, `-gplf`, `-gs`, `-gst`, `-gsw` — git commands
