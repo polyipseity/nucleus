@@ -36,10 +36,6 @@ run_19_config_method_compliance() {
       case "$_basename" in
         .gitkeep|.gitignore|*.schema.json) exit 0 ;;
       esac
-      # Skip agent customization files (consumed as a directory via Method 4)  # ref: allow-and-deny-lists.instructions.md#A2 -- agents/* consumed as directory
-      case "$_f" in
-        */configs/agents/*) exit 0 ;;
-      esac
       _result_file="$_tmpdir/${_basename}.result"
       _relpath="${_f#*configs/}"
       # Check for disallowed config methods

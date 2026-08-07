@@ -12,7 +12,7 @@
     - .md prose: instruction docs cite {{TOKEN}} as the prohibited form
       (embedded-content.instructions.md) and AI prompt files use
       {{LANE_SCOPE}} as a prompt-harness variable
-      (src/modules/configs/agents/prompts/maintain.prompt.md).
+      (src/users/default/agents/prompts/maintain.prompt.md).
     - tests/: Pester assertions and Nix test messages reference {{TOKEN}} as
       the negative-assertion target by design.
 

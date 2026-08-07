@@ -48,8 +48,8 @@ assert containsRegex "# check-suppress:config-method: method 1" nixosServicesTex
 # ignore-global/assembly mechanism is gone.
 assert containsRegex "\\.gitconfig" gitText;
 assert containsRegex "git/ignore" gitText;
-assert containsRegex "configName = \"git\"" gitText;
-assert containsRegex "src/users/default" usersOverlayText;
+assert containsRegex "selectSource \"git\"" gitText;
+assert containsRegex "mkUserOverlay" usersOverlayText;
 assert !(containsRegex "system\\.gitignore" gitText);
 assert !(containsRegex "ignore-global" gitText);
 # Phase 2: global gitconfig is per-host (${hostName}.gitconfig), no more system.gitconfig.
@@ -70,7 +70,8 @@ assert containsRegex "direnvrc" shellText;
 assert containsRegex "lib/apple-sdk-override\.sh" shellText;
 assert containsRegex "uv\\.toml" shellText;
 assert containsRegex "nextest/config\\.toml" shellText;
-assert containsRegex "mkOutOfStoreSymlink.*NUCLEUS_REPO_ROOT" shellText;
+assert containsRegex "mkUserOverlay" shellText;
+assert containsRegex "selectFile" shellText;
 assert containsRegex "agents/" agentsText;
 {
   success = true;

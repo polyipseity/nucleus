@@ -4,7 +4,7 @@ let
   envVarsText = builtins.readFile ../../src/modules/lib/env-catalog.nix;
   windowsSystemDscText = builtins.readFile ../../src/hosts/Windows/system/env.dsc.yml;
   rootOpenCodeConfigText = builtins.readFile ../../opencode.jsonc;
-  userOpenCodeConfigText = builtins.readFile ../../src/modules/configs/agents/opencode.user.jsonc;
+  userOpenCodeConfigText = builtins.readFile ../../src/users/default/agents/opencode.user.jsonc;
 in
 assert containsRegex "OPENCODE_DISABLE_AUTOUPDATE" envVarsText;
 assert containsRegex "OPENCODE_DISABLE_AUTOUPDATE" windowsSystemDscText;

@@ -100,8 +100,8 @@ Register-Step -Id "schema-validation" -Number 13 -Name "Schema validation (JSON/
         $f -like '*configs\camilladsp\*' -or $f -like '*configs/camilladsp/*' -or `
         $f -like '*configs\camillagui-backend\*' -or $f -like '*configs/camillagui-backend/*' -or `
         $f -like '*users\*\discord-music-rpc\*' -or $f -like '*users/*/discord-music-rpc/*' -or `
-        $f -like '*configs\agents\hooks\*.json' -or $f -like '*configs/agents/hooks/*.json' -or `
-        $f -like '*configs\agents\skills\*\_meta.json' -or $f -like '*configs/agents/skills/*/_meta.json' -or `
+        $f -like '*users\*\agents\hooks\*.json' -or $f -like '*users/*/agents/hooks/*.json' -or `
+        $f -like '*users\*\agents\skills\*\_meta.json' -or $f -like '*users/*/agents/skills/*/_meta.json' -or `
         $f -like '*ai\litellm-config.yml' -or $f -like '*ai/litellm-config.yml' -or `
         $f -like '*\.sops.yaml' -or $f -like '*/.sops.yaml') { $skipFile = $true }
     if (-not $skipFile) {
