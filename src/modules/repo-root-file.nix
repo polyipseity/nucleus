@@ -7,6 +7,5 @@ in
 {
   environment.etc."nucleus/repo-root" = lib.mkIf (repoRoot != "") {
     text = repoRoot + "\n";
-    mode = "0444";
   };
 }
