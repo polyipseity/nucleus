@@ -215,29 +215,9 @@ let
       )
       "All macOS workflow Info.plist files must use com.adobe.pdf UTI (not public.item) in NSSendFileTypes";
 
-  # Phase 1: Self-pruning framework known lists.
-
-  test_macos_has_removed_services =
-    assert'
-      (
-        lib.hasInfix "removedNucleusAppBundles" macAppBundlesText
-        && lib.hasInfix "NucleusGSPDFOpt.app" macAppBundlesText
-        && lib.hasInfix "com.nucleus.GSPDFOpt" macAppBundlesText
-        && lib.hasInfix "NucleusManual.app" macAppBundlesText
-        && lib.hasInfix "com.nucleus.OpenNucleusManual" macAppBundlesText
-      )
-      "macOS app-bundles.nix must define removedNucleusAppBundles containing the old single-preset and NucleusManual app bundle metadata";
-
   test_macos_has_current_app_dirs = assert' (lib.hasInfix "currentNucleusAppBundles" macAppBundlesText) "macOS app-bundles.nix must define currentNucleusAppBundles";
 
-  test_macos_has_removed_quick_actions =
-    assert'
-      (
-        lib.hasInfix "removedNucleusWorkflows" macAutomatorWorkflowsText
-        && lib.hasInfix "OptimizePDF-default.workflow" macAutomatorWorkflowsText
-        && lib.hasInfix "com.nucleus.OptimizePDF-default" macAutomatorWorkflowsText
-      )
-      "macOS automator-workflows.nix must define removedNucleusWorkflows containing old workflow naming metadata";
+  test_macos_has_current_workflows = assert' (lib.hasInfix "currentNucleusWorkflows" macAutomatorWorkflowsText) "macOS automator-workflows.nix must define currentNucleusWorkflows";
 
   allTests = [
     test_all_5_presets_in_macos
@@ -252,9 +232,8 @@ let
     test_no_old_gs_labels_in_windows
     test_windows_presets_sorted
     test_windows_scoped_to_pdf
-    test_macos_has_removed_services
     test_macos_has_current_app_dirs
-    test_macos_has_removed_quick_actions
+    test_macos_has_current_workflows
     test_app_bundles_alphabetically_sorted
     test_macos_workflows_scoped_to_pdf
   ];

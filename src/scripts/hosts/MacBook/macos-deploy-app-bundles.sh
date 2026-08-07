@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy and prune macOS app bundles via LaunchServices.
+# Deploy macOS app bundles via LaunchServices.
 # Tokens are substituted at build time by Nix.
 set -eu
 
@@ -10,30 +10,8 @@ LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Versions/A/Framewo
 APP_DIR="$HOME/Applications"
 
 _vsd_jq_bin="$1"
-_vsd_removed_bundles_json="$2"
-_vsd_current_bundles_json="$3"
+_vsd_current_bundles_json="$2"
 
-# ── Phase 1a: Prune removed app bundles ───────────────────────────
-while IFS= read -r _vsd_entry; do
-  [ -z "$_vsd_entry" ] && continue
-  _vsd_app_dir="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.appDir')"
-  _vsd_bundle_id="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.bundleId')"
-  _vsd_menu_item="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.menuItem')"
-  _vsd_message="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.message')"
-
-  # Delete NSServicesStatus key unconditionally.
-  /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"$_vsd_bundle_id - $_vsd_menu_item - $_vsd_message\"" \
-    ~/Library/Preferences/pbs.plist 2>/dev/null || true  # check-suppress:suppression_doc: key may not exist on first apply
-
-  _vsd_app_path="$APP_DIR/$_vsd_app_dir"
-  if [ -d "$_vsd_app_path" ]; then
-    "$LSREGISTER" -u "$_vsd_app_path" 2>/dev/null || true  # check-suppress:suppression_doc: app may not be deployed yet
-    chmod -R +w "$_vsd_app_path" 2>/dev/null || true  # check-suppress:suppression_doc: dir may not exist on first apply
-    rm -rf "$_vsd_app_path"
-  fi
-done < <(printf '%s\n' "$_vsd_removed_bundles_json" | "$_vsd_jq_bin" -r -c '.[]')
-
-# ── Phase 2: Deploy app bundles (in declaration order) ────────────
 while IFS= read -r _vsd_entry; do
   [ -z "$_vsd_entry" ] && continue
   _vsd_app_dir="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.appDir')"

@@ -62,60 +62,6 @@ let
   # Baked at eval time from NUCLEUS_REPO_ROOT (set by apply.sh).
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
-  # Known list of historically-removed Automator workflows (old workflow naming).
-  # When a workflow is removed, add its metadata here and delete its
-  # workflow directory and pbs enablement key.
-  # Entries can be removed after all machines have applied once after
-  # the removal commit.
-  removedNucleusWorkflows = [
-    {
-      dir = "OptimizePDF-default.workflow";
-      bundleId = "com.nucleus.OptimizePDF-default";
-      enablementKey = "com.nucleus.OptimizePDF-default - optimize PDF - default - runWorkflowAsService";
-    }
-    {
-      dir = "OptimizePDF-ebook.workflow";
-      bundleId = "com.nucleus.OptimizePDF-ebook";
-      enablementKey = "com.nucleus.OptimizePDF-ebook - optimize PDF - ebook - runWorkflowAsService";
-    }
-    {
-      dir = "OptimizePDF-prepress.workflow";
-      bundleId = "com.nucleus.OptimizePDF-prepress";
-      enablementKey = "com.nucleus.OptimizePDF-prepress - optimize PDF - prepress - runWorkflowAsService";
-    }
-    {
-      dir = "OptimizePDF-printer.workflow";
-      bundleId = "com.nucleus.OptimizePDF-printer";
-      enablementKey = "com.nucleus.OptimizePDF-printer - optimize PDF - printer - runWorkflowAsService";
-    }
-    {
-      dir = "OptimizePDF-screen.workflow";
-      bundleId = "com.nucleus.OptimizePDF-screen";
-      enablementKey = "com.nucleus.OptimizePDF-screen - optimize PDF - screen - runWorkflowAsService";
-    }
-    # Legacy keys from historical naming conventions.
-    # Entries without dir skip directory removal (only delete NSServicesStatus key).
-    {
-      # Initial GSPDFOpt naming — replaced by per-preset workflows.
-      enablementKey = "com.nucleus.GSPDFOpt-default - Optimize PDF - default - runWorkflowAsService";
-    }
-    { enablementKey = "com.nucleus.GSPDFOpt-ebook - Optimize PDF - ebook - runWorkflowAsService"; }
-    {
-      enablementKey = "com.nucleus.GSPDFOpt-prepress - Optimize PDF - prepress - runWorkflowAsService";
-    }
-    { enablementKey = "com.nucleus.GSPDFOpt-printer - Optimize PDF - printer - runWorkflowAsService"; }
-    { enablementKey = "com.nucleus.GSPDFOpt-screen - Optimize PDF - screen - runWorkflowAsService"; }
-    {
-      # (null) bundle-ID period (ca741218..3702ef93) — before workflow Info.plist
-      # had CFBundleIdentifier set.
-      enablementKey = "(null) - optimize PDF - default - runWorkflowAsService";
-    }
-    { enablementKey = "(null) - optimize PDF - ebook - runWorkflowAsService"; }
-    { enablementKey = "(null) - optimize PDF - prepress - runWorkflowAsService"; }
-    { enablementKey = "(null) - optimize PDF - printer - runWorkflowAsService"; }
-    { enablementKey = "(null) - optimize PDF - screen - runWorkflowAsService"; }
-  ];
-
   # Currently deployed Automator workflows. Add new workflows here.
   # Each entry has:
   #   - dir: workflow directory name in ~/Library/Services/
@@ -230,14 +176,6 @@ in
             source = "${wf.source}";
             presentationModesDict = mkPresentationModes wf.presentationModes;
           }) currentNucleusWorkflows
-        )
-      }' \
-      '${
-        builtins.toJSON (
-          map (wf: {
-            enablementKey = wf.enablementKey;
-            dir = wf.dir or null;
-          }) removedNucleusWorkflows
         )
       }'
   '';

@@ -1,33 +1,13 @@
 #!/usr/bin/env bash
-# Deploy and prune macOS Automator workflow bundles.
-# Consumes jq binary and workflow JSON arrays at activation time.
+# Deploy macOS Automator workflow bundles.
+# Consumes jq binary and workflow JSON array at activation time.
 set -eu
 
 
 _vsd_jq_bin="$1"
 _vsd_current_workflows_json="$2"
-_vsd_removed_workflows_json="$3"
 _vsd_services_dir="$HOME/Library/Services"
 
-# ── Phase 1b: Prune removed Automator workflows ────────────────────
-# First pass: delete all NSServicesStatus keys (entries may or may not have dir).
-while IFS= read -r _vsd_entry; do
-  [ -z "$_vsd_entry" ] && continue
-  _vsd_key="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.enablementKey')"
-  /usr/libexec/PlistBuddy -c "Delete :NSServicesStatus:\"$_vsd_key\"" \
-    ~/Library/Preferences/pbs.plist 2>/dev/null || true  # check-suppress:suppression_doc: key may not exist on first apply
-  # Second pass: remove workflow dirs for entries that have one.
-  _vsd_dir="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.dir // empty')"
-  if [ -n "$_vsd_dir" ]; then
-    _vsd_wf_path="$_vsd_services_dir/$_vsd_dir"
-    if [ -d "$_vsd_wf_path" ]; then
-      chmod -R +w "$_vsd_wf_path" 2>/dev/null || true  # check-suppress:suppression_doc: dir may not exist on first apply
-      rm -rf "$_vsd_wf_path"
-    fi
-  fi
-done < <(printf '%s\n' "$_vsd_removed_workflows_json" | "$_vsd_jq_bin" -r -c '.[]')
-
-# ── Phase 3: Deploy Automator workflows (in declaration order) ────
 while IFS= read -r _vsd_entry; do
   [ -z "$_vsd_entry" ] && continue
   _vsd_dir="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.dir')"
