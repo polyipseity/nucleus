@@ -134,7 +134,8 @@ in
     home.activation.prepare-symlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/provision-symlinks.sh" \
         "${managedSymlinkManifestPath}" \
-        "${pkgs.jq}/bin/jq"
+        "${pkgs.jq}/bin/jq" \
+        '${managedSymlinkManifestJson}'
     '';
 
     home.activation.finalize-symlinks = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
