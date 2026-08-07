@@ -1,5 +1,29 @@
 {
   "$schema": "./icloud-exclusions.schema.json",
-  "excludedDirNames": [],
-  "managedRoots": []
+  "excludedDirNames": [
+    ".direnv",
+    ".hypothesis",
+    ".mypy_cache",
+    ".next",
+    ".nox",
+    ".npm",
+    ".parcel-cache",
+    ".pnpm-store",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".tox",
+    ".turbo",
+    ".venv",
+    ".yarn",
+    "__pycache__",
+    "build",
+    "dist",
+    "node_modules",
+    "target",
+    "venv"
+  ],
+  "managedRoots": [
+    "Library/Mobile Documents/com~apple~CloudDocs",
+    "Library/Mobile Documents/iCloud~md~obsidian"
+  ]
 }
