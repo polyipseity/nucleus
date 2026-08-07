@@ -84,7 +84,7 @@ When adding or renaming standalone PowerShell entry points, use PascalCase and a
 
 The `scripts/` directory is the exception: helper scripts there keep the paired shell basename so the `.sh` and `.ps1` entry points stay aligned. That means `bootstrap.sh` pairs with `bootstrap.ps1`, `check-sh.sh` pairs with `check-pwsh.ps1`, and the existing `check-pwsh.ps1` name is intentional because it checks PowerShell rather than shell.
 
-For reusable Windows modules under `src/hosts/Windows/modules/`, keep the file name aligned with the exported function name and prefer a single exported `Verb-Noun` function per file. If a module is renamed, update the dot-sourcing paths in `src/hosts/Windows/apply.ps1` in the same change.
+For reusable Windows modules under `src/hosts/Windows/modules/`, keep the file name aligned with the exported function name and prefer a single exported `Verb-Noun` function per file. If a module is renamed, update the dot-sourcing paths in `src/hosts/Windows/apply.ps1` in the same change. Collection-operating functions must use collection-indicating singular nouns — see [pwsh-lint-policy.instructions.md](pwsh-lint-policy.instructions.md) (`PSUseSingularNouns`, anti–naive-de-pluralization).
 
 If a PowerShell file exports multiple functions or none, keep it in `src/hosts/Windows/modules/` as a utility module and give the filename a scope that describes the shared purpose of the file.
 
@@ -176,14 +176,13 @@ Repository root resolution goes through `derive_repo_root()` in `src/scripts/lib
 
 Scripts must not assume the current working directory is inside the repository. Use `derive_repo_root()` or the `NUCLEUS_REPO_ROOT` environment variable for any path that resolves files relative to the repo root. Script-specific `--repo-root` flags (e.g. `replica-sync.sh`) are acceptable as additional manual overrides but must not be the sole mechanism for normal operation.
 
-## PowerShell Linting
+## PowerShell linting
 
-Always suppress the `PSUseBOMForUnicodeEncodedFile` lint rule when:
+PSScriptAnalyzer settings live in `scripts/PSScriptAnalyzerSettings.check.psd1` (fast pre-commit) and `scripts/PSScriptAnalyzerSettings.test.psd1` (full test runs). `scripts/check-pwsh.ps1` loads these settings; do not configure rule exclusions in the checker script itself.
 
-- Running the PowerShell analyzer (`Invoke-ScriptAnalyzer`)
-- Configuring suppressions in `scripts/check-pwsh.ps1`
+Always exclude `PSUseBOMForUnicodeEncodedFile` in settings files — UTF-8 without BOM is the repository standard (`.editorconfig`).
 
-This rule should be consistently suppressed across the repository's PowerShell scripts since UTF-8 without BOM is the standard encoding for the codebase and enforced by `.editorconfig` and other repository policies.
+Verb-Noun and collection-singular naming policy: [pwsh-lint-policy.instructions.md](pwsh-lint-policy.instructions.md). Semantic naming manifest: `scripts/pwsh-naming-manifest.json`, validated by `scripts/check-pwsh-naming.ps1`.
 
 ## Runtime configuration (`nucleus-config`)
 

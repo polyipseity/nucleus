@@ -113,11 +113,44 @@ This is not an exemption — use inline suppression with a documented reason as 
 
 **`Add-ShellAlias` helper**: Functions that create aliases via `New-Item -Path Function:` use the PSFunction provider path and produce no `FunctionDefinitionAst`. The helper itself (`Add-ShellAlias`) uses the approved verb `Add-`. This is the canonical way to create function aliases without triggering the rule.
 
+**`nucleus-*` CLI wrappers** (`nucleus-apply`, `nucleus-check-pwsh`, etc. in `src/scripts/shell/profile.ps1`): These intentionally use the fixed `nucleus-<command>` contract as the function name. They trigger `PSUseApprovedVerbs` because `nucleus` is not an approved verb. Add the attribute INSIDE the function body immediately before `param()` with a documented reason. Prefer `Add-ShellAlias` for new shell aliases that do not need the exact `nucleus-*` name.
+
 ### `PSUseSingularNouns` — always use singular nouns
 
 **Trigger:** Function or cmdlet name using a plural noun, e.g. `Get-VmRunningNames`.
 
 **Root cause:** PowerShell convention requires function names to use singular nouns. PSSA's `PSUseSingularNouns` rule flags any function whose noun part appears grammatically plural (typically ending in 's', 'es', 'ies', or irregular plurals).
+
+**Semantic audit required:** Passing `scripts/check-pwsh.ps1` (PSSA) is necessary but not sufficient. A function can pass PSSA while still misrepresenting its contract. After fixing PSSA findings, run `scripts/check-pwsh-naming.ps1` and apply the decision tree below. Never rename only to silence PSSA without checking whether the function operates on a collection.
+
+### Anti-pattern: naive de-pluralization
+
+PSSA flags plural nouns; the tempting fix is to drop the trailing `s`. That is **wrong** when the function operates on or returns multiple items.
+
+| Wrong (naive de-pluralization) | Right (collection-indicating singular) | Why |
+| ------------------------------ | -------------------------------------- | --- |
+| `Sync-Symlinks` → `Sync-Symlink` | `Sync-Symlinks` → `Sync-SymlinkManifest` | Manifest-driven multi-symlink convergence |
+| `Get-ServiceLogDirs` → `Get-ServiceLogDir` | `Get-ServiceLogDirs` → `Get-ServiceLogDirList` | Returns an array of log directory paths |
+| `Get-WallpaperEncryptedBlobs` → `Get-WallpaperEncryptedBlob` | `Get-WallpaperEncryptedBlobs` → `Get-WallpaperEncryptedBlobList` | Returns `string[]` of blob names |
+
+**Rule:** Never satisfy `PSUseSingularNouns` by dropping the plural suffix alone when the function's contract is collection-oriented. Pick a collection-indicating singular noun from the table below.
+
+### Naming decision tree
+
+1. Does PSSA flag a plural noun? If yes, go to step 2. If no, still check step 3 for semantic correctness.
+2. Does the function return or operate on **multiple homogeneous items** (array parameter, foreach over registry entries, manifest list)? If yes → use a **collection-indicating singular noun** (`List`, `Manifest`, `Catalog`, `Inventory`, etc.). If no → use a **bare singular noun**.
+3. Does the function converge **one logical config surface** (single app config file, single service, single domain object)? If yes → bare singular or `*Config` / `*Service` suffix is correct even if internal loops exist.
+4. When in doubt, prefer a collection suffix over a bare singular. Bare singular for multi-item operations is almost always wrong.
+
+### `Sync-*` suffix selection guide
+
+| Suffix | Use when | Examples |
+| ------ | -------- | -------- |
+| `*Manifest` | A manifest JSON file drives the item list | `Sync-SymlinkManifest`, `Sync-VSCodeExtensionManifest` |
+| `*Catalog` | Registry/domain arrays of entries (homogeneous or heterogeneous) | `Sync-DevRepoCatalog`, `Sync-CloudDriveCatalog`, `Sync-SecretCatalog` |
+| `*Inventory` | Materialized asset set across users or files | `Sync-WallpaperInventory` |
+| `*Config` | Single app/config tree convergence | `Sync-AgentsConfig`, `Sync-CursorConfig` |
+| `*Service` | Single Windows service entity | `Sync-CaddyService`, `Sync-LiteLLMService` |
 
 **Fix — two cases:**
 

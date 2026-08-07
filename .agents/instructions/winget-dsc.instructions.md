@@ -238,4 +238,4 @@ See [Imperative fallback safety (Windows)](cross-host-feature-parity.instruction
 
 ## Naming
 
-- Avoid repository-brand prefixes (e.g. `nucleus*`) in new PowerShell function names and filenames unless needed for cross-module disambiguation or external integration points. Use descriptive verb-noun patterns (e.g. `Sync-Wallpapers` instead of `Sync-NucleusWallpapers`).
+- Avoid repository-brand prefixes (e.g. `nucleus*`) in new PowerShell function names and filenames unless needed for cross-module disambiguation or external integration points. Use descriptive verb-noun patterns (e.g. `Sync-WallpaperInventory` instead of `Sync-NucleusWallpapers`).
