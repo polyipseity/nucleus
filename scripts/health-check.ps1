@@ -9,6 +9,8 @@
     3. presence of decrypt-capable tooling (sops + gpg) when available
     4. log directory accessibility, file sizes, and sanitization (optional)
 
+  Nix store audit is POSIX-only (no Nix store on Windows) and is not run here.
+
 .PARAMETER MinFreeBytes
   Minimum free disk space (bytes) required on the system drive (default: 10000000000).
 

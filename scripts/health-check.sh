@@ -4,14 +4,17 @@
 # secret files.
 #
 # Commands: [--min-free-bytes N] [--secret-health|--no-secret-health]
-# [--log-health]. Disk and connectivity checks always run; --log-health is
-# opt-in because it reads the services.json registries.
+# [--log-health] [--store-audit|--no-store-audit]. Disk and connectivity checks
+# always run; --log-health is opt-in because it reads the services.json
+# registries; store audit runs by default on Nix hosts (opt out with
+# --no-store-audit).
 #
 # Environment variables read: SOPS_AGE_KEY_FILE (exported when the machine
 # age key exists so sops finds it), NUCLEUS_REPO_ROOT (via derive_repo_root),
-# NUCLEUS_LOG_DIR / NUCLEUS_SYSTEM_LOG_DIR (via lib.sh).
+# NUCLEUS_LOG_DIR / NUCLEUS_SYSTEM_LOG_DIR (via lib.sh),
+# NUCLEUS_HEALTH_CHECK_NO_STORE_AUDIT.
 #
-# Prerequisites: curl, sops, and (for --log-health) jq. Exits 1 when a check
+# Prerequisites: curl, sops, and (for --log-health or store audit) jq. Exits 1
 # fails — log checks are aggregated first — and exits 0 when all pass.
 
 set -euo pipefail
@@ -39,6 +42,11 @@ REPO_ROOT="$(derive_repo_root)"
 min_free_bytes=10000000000
 secret_health=true
 log_health=false
+store_audit=true
+
+if [ "${NUCLEUS_HEALTH_CHECK_NO_STORE_AUDIT:-}" = "1" ]; then
+  store_audit=false
+fi
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -64,6 +72,12 @@ while [ "$#" -gt 0 ]; do
     --log-health)
       log_health=true
       require_command jq
+      ;;
+    --store-audit)
+      store_audit=true
+      ;;
+    --no-store-audit)
+      store_audit=false
       ;;
     *)
       error "unsupported argument '$1'"
@@ -238,6 +252,13 @@ if [ "$secret_health" = true ]; then
 fi
 if [ "$log_health" = true ]; then
   check_log_health
+fi
+if [ "$store_audit" = true ] && command -v nix >/dev/null 2>&1; then
+  require_command jq
+  export REPO_ROOT
+  # shellcheck source=../src/scripts/lib/audit-store-space.sh
+  . "$SCRIPT_DIR/../src/scripts/lib/audit-store-space.sh"
+  audit_store_space_report
 fi
 
 nuc_done

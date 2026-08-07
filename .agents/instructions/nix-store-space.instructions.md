@@ -27,12 +27,14 @@ MacBook `/nix` lives on a dedicated APFS volume (Determinate installer). `min-fr
 
 ## `bundleDefault` policy
 
-`writeNucleusShellApplication` in [`flake.nix`](../../src/flake.nix) defaults to **`bundleDefault = false`**.
+`writeNucleusShellApplication` in [`flake.nix`](../../src/flake.nix) defaults to **`bundleDefault = false`**. Pass **`bundleDefault = true`** only at call sites that require the full `scripts-bundle` + `script-tree` layout.
 
 | `bundleDefault` | Behavior |
 | --------------- | -------- |
 | `false` (default) | Thin wrapper only; for `scriptName` wrappers, symlink a single script from shared `script-tree` |
-| `true` (opt-in) | Symlink full shared `scripts-bundle` + `script-tree` — required when runtime needs `SCRIPT_DIR`-relative `src/scripts/lib/` or sibling scripts under `scripts/` |
+| `true` (explicit opt-in) | Symlink full shared `scripts-bundle` + `script-tree` — required when runtime needs `SCRIPT_DIR`-relative `src/scripts/lib/` or sibling scripts under `scripts/` |
+
+The `nucleusApp` helper does **not** override this default — each call site opts in explicitly when needed.
 
 See [`nix-authoring.instructions.md`](nix-authoring.instructions.md) for call-site guidance.
 
@@ -101,13 +103,17 @@ Each `writeNucleusShellApplication` with `bundleDefault = true` previously `cp -
 
 ## Store audit helpers
 
-Run [`audit-store-space.sh`](../../src/scripts/lib/audit-store-space.sh) (sourced from `nucleus-health-check` or manually) for:
+`nucleus-health-check` runs the store audit **by default** before apply/update. Opt out with `--no-store-audit` or `NUCLEUS_HEALTH_CHECK_NO_STORE_AUDIT=1`.
 
-- `nix store du -S` top closures
-- System generation count (`nix-env --list-generations` / `darwin-rebuild --list-generations`)
+Manual entry point: [`scripts/audit-store-space.sh`](../../scripts/audit-store-space.sh) (sources [`audit-store-space.sh`](../../src/scripts/lib/audit-store-space.sh)).
+
+Report sections:
+
+- `nix path-info --json --all --closure-size` top closures (via jq)
+- System generation count (`nix-env --list-generations` / privileged `darwin-rebuild --list-generations`)
 - GC roots (`nix-store --print-roots`)
-- Stale `result` symlinks (via `cleanup-nix-build-artifacts.sh`)
-- Linux-builder VM store size (MacBook only, when VM is reachable)
+- Stale `result` symlinks (repo scan)
+- Linux-builder VM store size (MacBook only; starts VM via launchd when needed)
 
 ## Linux builder (G8)
 
