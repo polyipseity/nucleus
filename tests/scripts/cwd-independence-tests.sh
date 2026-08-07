@@ -9,6 +9,13 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/test-lib.sh"
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
+# Simulate sudo/su env_reset: strip nucleus env vars and root-like identity.
+simulate_elevated_stripped_env() {
+    env -u NUCLEUS_REPO_ROOT -u NUCLEUS_HOST -u NIX_CONFIG \
+        HOME=/var/root USER=root LOGNAME=root \
+        "$@"
+}
+
 # Test 1: derive_repo_root works from outside the repo when SCRIPT_DIR points inside it
 test_derive_repo_root_from_outside_cwd() {
     local result
@@ -129,7 +136,7 @@ test_script_help_from_outside() {
         local result
         result=$(
             cd /tmp
-            NUCLEUS_REPO_ROOT="$NUCLEUS_REPO_ROOT" bash "$script" --help 2>/dev/null
+            NUCLEUS_REPO_ROOT="" bash "$script" --help 2>/dev/null
         ) || true  # check-suppress:suppression_doc: test probe -- capturing output; exit code is discarded so set -e doesn't abort test
         if [ -n "$result" ]; then
             assert_pass "$name --help from /tmp"
@@ -146,6 +153,8 @@ make_store_layout_tree() {
     tmp="$(mktemp -d)"
     mkdir -p "$tmp/scripts" "$tmp/src/scripts/lib"
     cp "$REPO_ROOT/src/scripts/lib/lib.sh" "$tmp/src/scripts/lib/lib.sh"
+    cp "$REPO_ROOT/src/scripts/lib/macos-launch-services.sh" "$tmp/src/scripts/lib/macos-launch-services.sh"
+    cp "$REPO_ROOT/scripts/svc.sh" "$tmp/scripts/svc.sh"
     if [ -n "$marker_path" ]; then
         printf '%s\n' "$marker_path" > "$tmp/.nucleus-repo-root"
     fi
@@ -313,6 +322,167 @@ test_store_installed_nucleus_update_help() {
     fi
 }
 
+# Test 14: system file tier resolves from stripped elevated env
+test_system_file_resolves_from_stripped_env() {
+    local system_file result
+    system_file="$(mktemp)"
+    trap 'rm -f "$system_file"' RETURN
+    printf '%s\n' "$REPO_ROOT" > "$system_file"
+
+    result=$(
+        cd /tmp
+        simulate_elevated_stripped_env \
+            NUCLEUS_REPO_ROOT_SYSTEM_FILE="$system_file" \
+            bash -euo pipefail -c '
+                . "'"$REPO_ROOT"'/src/scripts/lib/lib.sh"
+                derive_repo_root
+            '
+    ) || true  # check-suppress:suppression_doc: test probe -- capturing output; exit code is discarded so set -e doesn't abort test
+    if [ "$result" = "$REPO_ROOT" ]; then
+        assert_pass "system file tier resolves from stripped elevated env"
+    else
+        assert_fail "system file tier resolves from stripped elevated env" "Expected '$REPO_ROOT', got '$result'"
+    fi
+}
+
+# Test 15: stale system file path fails cleanly
+test_system_file_stale_fails() {
+    local system_file derr_output
+    system_file="$(mktemp)"
+    trap 'rm -f "$system_file"' RETURN
+    printf '%s\n' "/nonexistent/nucleus-repo-root" > "$system_file"
+
+    derr_output=$(
+        cd /tmp
+        simulate_elevated_stripped_env \
+            NUCLEUS_REPO_ROOT_SYSTEM_FILE="$system_file" \
+            bash -euo pipefail -c '
+                . "'"$REPO_ROOT"'/src/scripts/lib/lib.sh"
+                derive_repo_root
+            ' 2>&1
+    ) || true  # check-suppress:suppression_doc: test probe -- capturing output; exit code is discarded so set -e doesn't abort test
+    if echo "$derr_output" | grep -q "cannot determine nucleus repository root"; then
+        assert_pass "stale system file fails cleanly"
+    else
+        assert_fail "stale system file fails cleanly" "Output: '$derr_output'"
+    fi
+}
+
+# Test 16: relative system file path fails cleanly
+test_system_file_relative_fails() {
+    local system_file derr_output
+    system_file="$(mktemp)"
+    trap 'rm -f "$system_file"' RETURN
+    printf '%s\n' "./foo" > "$system_file"
+
+    derr_output=$(
+        cd /tmp
+        simulate_elevated_stripped_env \
+            NUCLEUS_REPO_ROOT_SYSTEM_FILE="$system_file" \
+            bash -euo pipefail -c '
+                . "'"$REPO_ROOT"'/src/scripts/lib/lib.sh"
+                derive_repo_root
+            ' 2>&1
+    ) || true  # check-suppress:suppression_doc: test probe -- capturing output; exit code is discarded so set -e doesn't abort test
+    if echo "$derr_output" | grep -q "cannot determine nucleus repository root"; then
+        assert_pass "relative system file path fails cleanly"
+    else
+        assert_fail "relative system file path fails cleanly" "Output: '$derr_output'"
+    fi
+}
+
+# Test 17: store layout svc list from stripped elevated env (user domain only)
+test_store_layout_svc_list_from_stripped_env() {
+    local tmp system_file result
+    tmp="$(make_store_layout_tree "$REPO_ROOT")"
+    system_file="$(mktemp)"
+    trap 'rm -rf "$tmp"; rm -f "$system_file"' RETURN
+    printf '%s\n' "$REPO_ROOT" > "$system_file"
+
+    result=$(
+        cd /tmp
+        simulate_elevated_stripped_env \
+            NUCLEUS_REPO_ROOT_SYSTEM_FILE="$system_file" \
+            SVC_DOMAIN_FILTER=user \
+            bash "$tmp/scripts/svc.sh" list 2>/dev/null
+    ) || true  # check-suppress:suppression_doc: test probe -- capturing output; exit code is discarded so set -e doesn't abort test
+    if [ -n "$result" ]; then
+        assert_pass "store layout svc list from stripped elevated env"
+    else
+        assert_fail "store layout svc list from stripped elevated env" "No output or non-zero exit"
+    fi
+}
+
+# Test 18: optional e2e store-installed nucleus-svc list from stripped elevated env
+test_store_installed_nucleus_svc_list() {
+    local nucleus_svc_path etc_root result
+    if ! command -v nucleus-svc >/dev/null 2>&1; then
+        assert_pass "store-installed nucleus-svc list e2e probe skipped (nucleus-svc not installed)"
+        return 0
+    fi
+    nucleus_svc_path="$(command -v nucleus-svc)"
+    case "$nucleus_svc_path" in
+        /nix/store/*|/etc/profiles/*)
+            ;;
+        *)
+            assert_pass "store-installed nucleus-svc list e2e probe skipped (not in store/profile: $nucleus_svc_path)"
+            return 0
+            ;;
+    esac
+    if [ ! -f /etc/nucleus/repo-root ]; then
+        assert_pass "store-installed nucleus-svc list e2e probe skipped (/etc/nucleus/repo-root not materialized — run nucleus-apply)"
+        return 0
+    fi
+    etc_root="$(head -n 1 /etc/nucleus/repo-root)"
+    if [ -z "$etc_root" ] || [ ! -f "$etc_root/src/flake.nix" ]; then
+        assert_pass "store-installed nucleus-svc list e2e probe skipped (/etc/nucleus/repo-root invalid or stale — run nucleus-apply)"
+        return 0
+    fi
+
+    result=$(
+        cd /tmp
+        simulate_elevated_stripped_env \
+            SVC_DOMAIN_FILTER=user \
+            nucleus-svc list 2>/dev/null
+    ) || true  # check-suppress:suppression_doc: test probe -- capturing output; exit code is discarded so set -e doesn't abort test
+    if [ -n "$result" ]; then
+        assert_pass "store-installed nucleus-svc list from /tmp with stripped elevated env"
+    else
+        assert_fail "store-installed nucleus-svc list from /tmp with stripped elevated env" "No output or non-zero exit (wrapper: $nucleus_svc_path)"
+    fi
+}
+
+# Test 19: optional live sudo probe for nucleus-svc list
+test_live_sudo_nucleus_svc_list() {
+    local result
+    if ! command -v sudo >/dev/null 2>&1; then
+        assert_pass "live sudo nucleus-svc list probe skipped (sudo not available)"
+        return 0
+    fi
+    if ! sudo -n true 2>/dev/null; then
+        assert_pass "live sudo nucleus-svc list probe skipped (no passwordless sudo)"
+        return 0
+    fi
+    if ! command -v nucleus-svc >/dev/null 2>&1; then
+        assert_pass "live sudo nucleus-svc list probe skipped (nucleus-svc not installed)"
+        return 0
+    fi
+    if [ ! -f /etc/nucleus/repo-root ]; then
+        assert_pass "live sudo nucleus-svc list probe skipped (/etc/nucleus/repo-root not materialized — run nucleus-apply)"
+        return 0
+    fi
+
+    result=$(
+        cd /tmp
+        sudo -n env -u NUCLEUS_REPO_ROOT SVC_DOMAIN_FILTER=user nucleus-svc list 2>/dev/null
+    ) || true  # check-suppress:suppression_doc: test probe -- capturing output; exit code is discarded so set -e doesn't abort test
+    if [ -n "$result" ]; then
+        assert_pass "live sudo nucleus-svc list from /tmp without NUCLEUS_REPO_ROOT"
+    else
+        assert_fail "live sudo nucleus-svc list from /tmp without NUCLEUS_REPO_ROOT" "No output or non-zero exit"
+    fi
+}
+
 # Run all tests
 test_derive_repo_root_from_outside_cwd
 test_derive_repo_root_from_src_scripts
@@ -327,6 +497,12 @@ test_store_layout_stale_marker_fails
 test_store_layout_relative_marker_fails
 test_store_layout_empty_marker_fails
 test_store_installed_nucleus_update_help
+test_system_file_resolves_from_stripped_env
+test_system_file_stale_fails
+test_system_file_relative_fails
+test_store_layout_svc_list_from_stripped_env
+test_store_installed_nucleus_svc_list
+test_live_sudo_nucleus_svc_list
 
 # Summary
 echo ""
