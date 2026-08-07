@@ -135,7 +135,7 @@ wallpaper_post_copy_teardown() {
     [ -f "$decryptedFile" ] || continue
     case "$decryptedFile" in *.xml) continue;; esac
     baseName="$(basename "$decryptedFile")"
-    if ! resolve_user_config_file "$_current_user" "wallpapers" "${baseName}.sops" >/dev/null 2>&1; then
+    if ! resolve_wallpaper_encrypted_blob "$_current_user" "${baseName}.sops" >/dev/null 2>&1; then
       rm -f "$decryptedFile"
       echo "provision-wallpaper: removed stale wallpaper $baseName (no matching overlay .sops source)."
     fi

@@ -162,7 +162,7 @@ function Register-HostAgeKey {
   $usersRoot = Join-Path -Path $RepoRoot -ChildPath 'src\users'
   if (Test-Path -Path $usersRoot) {
     $wallpaperBlobs = @(Get-ChildItem -Path $usersRoot -Recurse -Filter '*.sops' -File -ErrorAction SilentlyContinue |
-      Where-Object { $_.FullName -match '[\\/]wallpapers[\\/]' })
+      Where-Object { $_.FullName -match '[\\/]wallpapers[\\/]encrypted[\\/]' })
     if ($wallpaperBlobs.Count -gt 0) {
       $sopsFiles += @($wallpaperBlobs | Select-Object -ExpandProperty FullName)
     }

@@ -287,7 +287,7 @@ lib.mkIf isPrimaryUser {
   #   - src/secrets/gpg-personal.yml
   #   - src/secrets/ssh-personal.yml
   #   - src/secrets/users/<username>.yml (when present)
-  #   - src/users/<username>/wallpapers/*.sops  (overlay merge with default)
+  #   - src/users/<username>/wallpapers/encrypted/*.sops  (overlay merge with default)
   # All use the same .sops.yaml key groups (age_devices + primary_gpg).
   #
   # Five checks (in order):
@@ -335,6 +335,11 @@ lib.mkIf isPrimaryUser {
   home.activation.verify-secret-decryption =
     let
       overlayLib = import ./lib/users-overlay.nix;
+      wallpaperPaths = import ./lib/wallpaper-paths.nix {
+        inherit lib;
+        repoRoot = ../../.;
+        overlayLib = overlayLib;
+      };
       usersRoot = ../../. + "/src/users";
       managedUserNames =
         lib.filter (name: name != "default") (
@@ -342,28 +347,13 @@ lib.mkIf isPrimaryUser {
             lib.filterAttrs (_: type: type == "directory") (builtins.readDir usersRoot)
           )
         );
-      listWallpaperBlobsForUser =
-        userName:
-        let
-          entries = overlayLib.listUserConfigFirstLevelEntries {
-            configName = "wallpapers";
-            effectiveUsername = userName;
-            repoRoot = ../../.;
-          };
-        in
-        lib.filter (name: lib.hasSuffix ".sops" name) entries;
       wallpaperSopsFiles = lib.flatten (
         map (
           userName:
           map (blobName: {
-            path = overlayLib.selectUserConfigFirstLevelEntry {
-              configName = "wallpapers";
-              entryName = blobName;
-              effectiveUsername = userName;
-              repoRoot = ../../.;
-            };
+            path = wallpaperPaths.encryptedBlobPath userName blobName;
             displayName = "${userName}/${blobName}";
-          }) (listWallpaperBlobsForUser userName)
+          }) (wallpaperPaths.listEncryptedWallpaperBlobs userName)
         ) managedUserNames
       );
       # Build list of SOPS files with their paths and display names.

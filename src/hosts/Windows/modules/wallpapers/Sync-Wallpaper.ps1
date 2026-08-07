@@ -6,9 +6,9 @@ function Sync-Wallpaper {
 
   .DESCRIPTION
     Materializes SOPS-encrypted wallpaper blobs for each user in the $Users
-    list. For each user, merged first-level overlay entries under
-    src/users/<user>/wallpapers/ (with src/users/default/wallpapers/ fallback)
-    are decrypted to that user's Pictures\wallpapers directory using
+    list. For each user, merged overlay entries under
+    src/users/<user>/wallpapers/encrypted/ (with src/users/default/wallpapers/encrypted/
+    fallback) are decrypted to that user's Pictures\wallpapers directory using
     Get-DecryptedBlob. The output filename is the blob's base name with the
     .sops extension stripped.
 
@@ -80,12 +80,7 @@ function Sync-Wallpaper {
   $activeWallpaperPath = $null
 
   foreach ($user in ($Users | Sort-Object)) {
-    $overlayEntries = @(Get-UserConfigFirstLevelEntries -User $user -ConfigName 'wallpapers' -RepoRoot $RepoRoot)
-    $wallpaperFiles = @(
-      $overlayEntries |
-        Where-Object { $_.EndsWith('.sops', [System.StringComparison]::OrdinalIgnoreCase) } |
-        Sort-Object
-    )
+    $wallpaperFiles = @(Get-WallpaperEncryptedBlobs -User $user -RepoRoot $RepoRoot)
 
     if ($wallpaperFiles.Count -eq 0) {
       Write-Output "$($PSStyle.Foreground.Yellow)No wallpaper blobs (*.sops) found in overlay for user $user; skipping.$($PSStyle.Reset)"
@@ -100,7 +95,7 @@ function Sync-Wallpaper {
     }
 
     foreach ($wallpaperBlobName in $wallpaperFiles) {
-      $wallpaperFilePath = Resolve-UserConfigFirstLevelEntry -User $user -ConfigName 'wallpapers' -EntryName $wallpaperBlobName -RepoRoot $RepoRoot
+      $wallpaperFilePath = Resolve-WallpaperEncryptedBlob -User $user -BlobName $wallpaperBlobName -RepoRoot $RepoRoot
       $outputName = [System.IO.Path]::GetFileNameWithoutExtension($wallpaperBlobName)
       $outputPath = Join-Path -Path $outputDir -ChildPath $outputName
 

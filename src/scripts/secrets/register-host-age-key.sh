@@ -106,7 +106,7 @@ done
 # inside a pipe subshell would be silently swallowed.
 if [ -d "$_rak_repo_root/src/users" ]; then
   _rak_wallpaper_list="$(mktemp)"
-  find "$_rak_repo_root/src/users" -path '*/wallpapers/*.sops' -type f \
+  find "$_rak_repo_root/src/users" -path '*/wallpapers/encrypted/*.sops' -type f \
     > "$_rak_wallpaper_list"
   while IFS= read -r _rak_wallpaper; do
     if ! sops updatekeys --yes "$_rak_wallpaper"; then

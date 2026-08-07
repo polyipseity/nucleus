@@ -5,8 +5,8 @@ function Remove-StaleWallpaper {
     overlay source blob in the repository.
 
   .DESCRIPTION
-    Compares files in $OutputDir against merged first-level overlay wallpaper
-    names for $User under src/users/<user>/wallpapers/ (with default fallback).
+    Compares files in $OutputDir against merged overlay wallpaper blobs for
+    $User under src/users/<user>/wallpapers/encrypted/ (with default fallback).
     Any non-XML file in $OutputDir whose name is absent from the overlay set is
     deleted. This keeps Windows wallpaper state aligned with the declarative
     user-overlay inventory and prevents stale gallery entries.
@@ -40,10 +40,8 @@ function Remove-StaleWallpaper {
   }
 
   $managedWallpaperSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-  foreach ($entryName in @(Get-UserConfigFirstLevelEntries -User $User -ConfigName 'wallpapers' -RepoRoot $RepoRoot)) {
-    if ($entryName.EndsWith('.sops', [System.StringComparison]::OrdinalIgnoreCase)) {
-      [void]$managedWallpaperSet.Add([System.IO.Path]::GetFileNameWithoutExtension($entryName))
-    }
+  foreach ($blobName in @(Get-WallpaperEncryptedBlobs -User $User -RepoRoot $RepoRoot)) {
+    [void]$managedWallpaperSet.Add([System.IO.Path]::GetFileNameWithoutExtension($blobName))
   }
 
   if ($managedWallpaperSet.Count -eq 0) {

@@ -101,7 +101,7 @@ foreach ($secretFile in $secretFiles) {
   }
 
   $wallpaperList = @(Get-ChildItem -Path (Join-Path -Path $repoRoot -ChildPath 'src\users') -Recurse -Filter '*.sops' -File -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -match '[\\/]wallpapers[\\/]' })
+    Where-Object { $_.FullName -match '[\\/]wallpapers[\\/]encrypted[\\/]' })
   foreach ($encryptedWallpaper in $wallpaperList) {
     & sops --config $sopsConfig updatekeys --yes $encryptedWallpaper.FullName
     if ($LASTEXITCODE -ne 0) {

@@ -237,7 +237,7 @@ gc_stale_wallpapers() {
         ;;
     esac
 
-    if ! resolve_user_config_file "$current_user" "wallpapers" "${candidate_name}.sops" >/dev/null 2>&1; then
+    if ! resolve_wallpaper_encrypted_blob "$current_user" "${candidate_name}.sops" >/dev/null 2>&1; then
       if ! rm -f "$candidate" 2>/dev/null; then
         # Non-fatal: some files under ~/Pictures may be protected by Finder
         # metadata/ACL flags (for example iCloud-managed placeholders). GC

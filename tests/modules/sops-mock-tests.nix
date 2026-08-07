@@ -33,7 +33,7 @@ let
         key_groups = [ { age = "age_devices"; } ];
       }
       {
-        path_regex = "src/users/.*/wallpapers/.*";
+        path_regex = "src/users/.*/wallpapers/encrypted/.*";
         key_groups = [ { age = "age_devices"; } ];
       }
     ];
@@ -102,7 +102,7 @@ let
     let
       rules = mockSopsConfig.creation_rules;
       hasWallpapersPath = any (
-        rule: builtins.match ".*src/users/.*/wallpapers.*" rule.path_regex != null
+        rule: builtins.match ".*src/users/.*/wallpapers/encrypted.*" rule.path_regex != null
       ) rules;
     in
     assert' hasWallpapersPath "Creation rules must cover src/users/*/wallpapers/ overlay paths";

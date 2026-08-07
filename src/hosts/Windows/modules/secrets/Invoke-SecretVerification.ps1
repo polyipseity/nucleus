@@ -130,7 +130,7 @@ function Invoke-SecretVerification {
   $usersRoot = Join-Path -Path $RepoRoot -ChildPath 'src\users'
   if (Test-Path -Path $usersRoot) {
     $wallpaperSopsFiles = @(Get-ChildItem -Path $usersRoot -Recurse -Filter '*.sops' -File -ErrorAction SilentlyContinue |
-      Where-Object { $_.FullName -match '[\\/]wallpapers[\\/]' })
+      Where-Object { $_.FullName -match '[\\/]wallpapers[\\/]encrypted[\\/]' })
     if ($wallpaperSopsFiles.Count -gt 0) {
       $sopsTestFiles += @($wallpaperSopsFiles | Select-Object -ExpandProperty FullName)
     }
