@@ -1,4 +1,4 @@
-# Static assertions for Apple CLT removal during MacBook activation.
+# Static assertions for Apple CLT install-tree removal during MacBook activation.
 
 let
   lib = import <nixpkgs/lib>;
@@ -13,9 +13,9 @@ assert lib.hasInfix "remove-command-line-tools" beforeXcodeSelect;
 assert lib.hasInfix "command-line-tools.log" activationNix;
 
 assert lib.hasInfix "CommandLineTools" cltScriptSh;
-assert lib.hasInfix "pkgutil --forget" cltScriptSh;
 assert lib.hasInfix "rm -rf" cltScriptSh;
 assert lib.hasInfix "command-line-tools:" cltScriptSh;
+assert !lib.hasInfix "pkgutil --forget" cltScriptSh;
 assert !lib.hasInfix "/Applications/Xcode" cltScriptSh;
 assert !lib.hasInfix "rm -rf /Library/Developer" cltScriptSh;
 
