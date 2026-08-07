@@ -217,6 +217,33 @@ test_expire_old_archives() {
     fi
 }
 
+# ---------------------------------------------------------------------------
+# Test 13: nucleus_expand_log_path — expands ~/ and bare ~
+# ---------------------------------------------------------------------------
+test_expand_log_path_tilde() {
+    local expanded
+    expanded="$(nucleus_expand_log_path '~/nucleus/logs')"
+    if [ "$expanded" = "${HOME}/nucleus/logs" ]; then
+        assert_pass "nucleus_expand_log_path: expands ~/ prefix to HOME"
+    else
+        assert_fail "nucleus_expand_log_path: expands ~/ prefix to HOME" "got '$expanded'"
+    fi
+
+    expanded="$(nucleus_expand_log_path '~')"
+    if [ "$expanded" = "${HOME}" ]; then
+        assert_pass "nucleus_expand_log_path: expands bare ~ to HOME"
+    else
+        assert_fail "nucleus_expand_log_path: expands bare ~ to HOME" "got '$expanded'"
+    fi
+
+    expanded="$(nucleus_expand_log_path '/var/log/nucleus')"
+    if [ "$expanded" = '/var/log/nucleus' ]; then
+        assert_pass "nucleus_expand_log_path: leaves absolute paths unchanged"
+    else
+        assert_fail "nucleus_expand_log_path: leaves absolute paths unchanged" "got '$expanded'"
+    fi
+}
+
 # ---- run all tests ----
 echo "Testing lib.sh log rotation functions"
 echo ""
@@ -233,6 +260,7 @@ test_missing_file_noop
 test_unwritable_file_skips
 test_rotate_subdirectory
 test_expire_old_archives
+test_expand_log_path_tilde
 
 echo ""
 echo "============================================================"

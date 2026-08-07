@@ -19,7 +19,8 @@ let
 in
 
 # --- src/scripts/lib.sh: log rotation functions ---
-assert containsRegex "rotate_log_file\\(\\)" libShText;
+assert containsRegex "case \"\\\$_nelp_path\" in" libShText;
+assert containsRegex "nucleus_expand_log_path" libShText;
 assert containsRegex "Copy-truncate a single log file" libShText;
 assert containsRegex "rotate_logs_in_directory\\(\\)" libShText;
 assert containsRegex "Iterate over all \\\*.log files" libShText;

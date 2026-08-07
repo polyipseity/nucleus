@@ -226,11 +226,17 @@ nucleus_services_json_path() {
 # Expand ~ in POSIX log path templates.
 nucleus_expand_log_path() {
   _nelp_path="$1"
-  if [ "${_nelp_path#~}" != "$_nelp_path" ]; then
-    printf '%s\n' "${HOME}${_nelp_path#~}"
-  else
-    printf '%s\n' "$_nelp_path"
-  fi
+  case "$_nelp_path" in
+    '~')
+      printf '%s\n' "${HOME}"
+      ;;
+    '~'/*)
+      printf '%s\n' "${HOME}/${_nelp_path:2}"
+      ;;
+    *)
+      printf '%s\n' "$_nelp_path"
+      ;;
+  esac
 }
 
 # Read logDir or systemLogDir from services.json $logging for the current host.
