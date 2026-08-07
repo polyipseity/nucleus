@@ -12,9 +12,9 @@ One configuration location for the entire host. Adding a second managed nucleus 
 
 ### Per-user homedir — `src/users/default/` + `src/users/<username>/`
 
-One config instance per OS user via homedir deployment (usually writable symlink; wallpapers use read-only copy — see below). `default/` is the fallback template; per-user entries override at the first level only (see overlay merge rule).
+One config instance per OS user via homedir deployment (usually writable symlink). `default/` is the fallback template; per-user entries override at the first level only (see overlay merge rule).
 
-Examples: `agents/`, `cursor/`, `direnv/`, `plasma/desktop/`, `autocorrect/wordlist.txt`, `wallpapers/*.sops`.
+Examples: `agents/`, `cursor/`, `direnv/`, `plasma/desktop/`, `autocorrect/wordlist.txt`, `wallpapers/encrypted/*.sops`, `wallpapers/wallpapers/*.png`.
 
 ### Registry domains — `src/users/default/*.json`
 
@@ -32,7 +32,8 @@ Within an app config folder (e.g. `plasma/`, `cursor/`, `wallpapers/`), **only f
 
 - `selectFile "plasma" "desktop/nucleus-manual.desktop"` — first-level key is `desktop/`; if `users/<user>/plasma/desktop/` exists, the entire directory wins; otherwise use `default/plasma/desktop/`.
 - `selectFile "direnv" "lib/apple-sdk-override.sh"` — first-level key is `lib/`; user `direnv/lib/` overrides the whole default `lib/` tree.
-- `wallpapers/foo.png.sops` — each `.sops` blob is a first-level file; user file with the same name overrides default; union otherwise.
+- `wallpapers/encrypted/foo.png.sops` — first-level key is `encrypted/`; user `wallpapers/encrypted/` overrides the whole default `encrypted/` tree.
+- `wallpapers/wallpapers/foo.png` — first-level key is `wallpapers/`; user `wallpapers/wallpapers/` overrides the whole default `wallpapers/` tree.
 
 Directory-wide iteration uses `listFirstLevelEntries` / `list_user_config_first_level_entries` and resolves each entry with `selectFirstLevelEntry` / `resolve_user_config_first_level_entry`.
 
@@ -46,13 +47,22 @@ Every app tree under `src/users/` MUST be consumed only through overlay selector
 | File path (any depth) | `mkUserOverlay` → `selectFile` | `Resolve-UserConfigFile` / `Deploy-UserWritableSymlink` | `resolve_user_config_file` |
 | First-level entry | `mkUserOverlay` → `selectFirstLevelEntry` | `Resolve-UserConfigFirstLevelEntry` | `resolve_user_config_first_level_entry` |
 | First-level name list | `mkUserOverlay` → `listFirstLevelEntries` | `Get-UserConfigFirstLevelEntries` | `list_user_config_first_level_entries` |
+| Wallpaper encrypted blobs | `wallpaper-paths.nix` → `listEncryptedWallpaperBlobs` | `Get-WallpaperEncryptedBlobs` | `list_wallpaper_encrypted_blobs` |
+| Wallpaper unencrypted files | `wallpaper-paths.nix` → `listUnencryptedWallpaperFiles` | `Get-WallpaperUnencryptedFiles` | `list_wallpaper_unencrypted_files` |
 | Registry JSON | `users-registry.nix` | `Load-UserRegistry.ps1` | `load-user-registry.sh` |
 
 Allowed hardcoded `src/users/default/` references: inside the selector implementations themselves, registry loaders, and tests that assert default baseline content.
 
 ## Wallpapers
 
-Per-user homedir assets under `src/users/default/wallpapers/` + `src/users/<username>/wallpapers/`. Blobs are optionally SOPS-encrypted (`.sops` extension). Deployment is **Method 2** (read-only copy to `~/Pictures/wallpapers/`) — desktop APIs require materialized files, not repo symlinks.
+Per-user homedir assets under `src/users/default/wallpapers/` + `src/users/<username>/wallpapers/`. The config folder has exactly two first-level entries:
+
+| Subdirectory | Contents | Deploy method |
+|--------------|----------|---------------|
+| `encrypted/` | SOPS blobs (`*.sops`) | Method 2: decrypt → `~/Pictures/wallpapers/` |
+| `wallpapers/` | Unencrypted images | Method 1: writable symlink → `~/Pictures/wallpapers/` |
+
+Default empty subdirs ship with `.gitkeep`. Root `.gitignore` ignores decrypted/runtime artifacts under `encrypted/` while tracking `*.sops` blobs only; unencrypted images under `wallpapers/wallpapers/` are tracked intentionally.
 
 ## Anti-patterns
 
