@@ -100,7 +100,7 @@
       "items": {
         "additionalProperties": false,
         "properties": {
-          "displayName": {
+          "name": {
             "type": "string"
           },
           "enable": {
@@ -146,7 +146,7 @@
           "direction": {
             "type": "string"
           },
-          "displayName": {
+          "name": {
             "type": "string"
           },
           "enable": {
@@ -177,7 +177,7 @@
             "type": "string"
           },
           "readWrite": {
-            "type": "boolean"
+            "$ref": "#/definitions/hostBoolean"
           },
           "remotePath": {
             "type": "string"

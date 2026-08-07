@@ -216,12 +216,12 @@ let
     containsRegex ''"fuse-t"'' macbookHomebrewText && !containsRegex ''"macfuse"'' macbookHomebrewText
   ) "macOS Homebrew packages must use fuse-t instead of macfuse for cloud mounts";
 
-  # Test 31: cloud-drives preserves GoogleDrive remote id while exposing a human-readable display name
-  test_google_drive_display_name = assert' (
+  # Test 31: cloud-drives preserves GoogleDrive remote id while exposing a human-readable name
+  test_google_drive_name = assert' (
     containsRegex ''"id": "GoogleDrive"'' polyipseityCloudDrivesText
     && containsRegex ''"remoteName": "GoogleDrive"'' polyipseityCloudDrivesText
-    && containsRegex ''"displayName": "Google Drive"'' polyipseityCloudDrivesText
-  ) "GoogleDrive mount must keep remoteName=GoogleDrive while setting displayName=Google Drive";
+    && containsRegex ''"name": "Google Drive"'' polyipseityCloudDrivesText
+  ) "GoogleDrive mount must keep remoteName=GoogleDrive while setting name=Google Drive";
 
   # Test 32: cloud-drives keeps iCloud replica explicitly enabled
   test_icloud_replica_enabled =
@@ -414,7 +414,7 @@ let
     && containsRegex ''cloudDrives\.replicaGc'' replicaSyncShellText
     && containsRegex "load_provider_gc_entries" replicaSyncShellText
     && containsRegex "Get-ReplicaGcConfig" windowsReplicaModuleText
-    && containsRegex ''userRecord.*replicaGc'' windowsReplicaModuleText
+    && containsRegex "userRecord.*replicaGc" windowsReplicaModuleText
   ) "replica metadata exclusion and GC patterns must be centralized in one shared config";
 
   # Test 49: Replica runners lock local replica trees as read-only between sync runs
@@ -472,12 +472,12 @@ let
     && containsRegex "default = false" moduleText
   ) "replicaSubmodule must declare readWrite option of type bool defaulting to false";
 
-  # Test 55: replica displayName option exists with nullOr str type and defaults to null
-  test_replica_displayName_option = assert' (
-    containsRegex "displayName = lib\\.mkOption" moduleText
+  # Test 55: replica name option exists with nullOr str type and defaults to null
+  test_replica_name_option = assert' (
+    containsRegex "name = lib\\.mkOption" moduleText
     && containsRegex "type = lib\\.types\\.nullOr lib\\.types\\.str" moduleText
     && containsRegex "default = null" moduleText
-  ) "replicaSubmodule must declare displayName option of type nullOr str defaulting to null";
+  ) "replicaSubmodule must declare name option of type nullOr str defaulting to null";
 
   # Test 56: replica direction is restricted to pull-only
   test_replica_direction_restricted = assert' (
@@ -500,12 +500,12 @@ let
     && !(containsRegex ''replicaSubmodule = lib[.]types[.]submodule \{.*remoteName = lib[.]mkOption'' moduleText)
   ) "remoteName option must be removed from replicaSubmodule (mounts may still declare it)";
 
-  # Test 59: GoogleDrive replica sets displayName in both registries
-  test_replica_displayName_in_configs = assert' (
+  # Test 59: GoogleDrive replica sets name in both registries
+  test_replica_name_in_configs = assert' (
     containsRegex ''"id":"GoogleDrive"'' posixUsersText
-    && containsRegex ''"displayName":"Google Drive"'' posixUsersText
-    && containsRegex ''"displayName":"Google Drive"'' windowsUsersText
-  ) "GoogleDrive replica must set displayName=\"Google Drive\" in both POSIX and Windows registries";
+    && containsRegex ''"name":"Google Drive"'' posixUsersText
+    && containsRegex ''"name":"Google Drive"'' windowsUsersText
+  ) "GoogleDrive replica must set name=\"Google Drive\" in both POSIX and Windows registries";
 
   # Test 60: POSIX iCloud replica sets readWrite=true (macOS symlink exception)
   test_icloud_replica_readwrite_posix =
@@ -566,7 +566,7 @@ let
     test_cloud_mounts_use_fskit_backend
     test_cloud_setup_recreates_stale_remotes
     test_macos_uses_fuse_t
-    test_google_drive_display_name
+    test_google_drive_name
     test_icloud_replica_enabled
     test_flake_has_replica_command
     test_flake_has_replica_app
@@ -590,11 +590,11 @@ let
     test_cloud_setup_acknowledge_abuse
     test_cloud_setup_pwsh_acknowledge_abuse
     test_replica_readWrite_option
-    test_replica_displayName_option
+    test_replica_name_option
     test_replica_direction_restricted
     test_replica_realtime_removed
     test_replica_remoteName_removed
-    test_replica_displayName_in_configs
+    test_replica_name_in_configs
     test_icloud_replica_readwrite_posix
     test_icloud_replica_readwrite_windows
     test_replica_conditional_readonly_locking

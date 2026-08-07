@@ -146,7 +146,7 @@ replica_lines="$({
         (.iCloudService // "drive"),
         (.filtersFile // ""),
         (.readWrite // false),
-        (.displayName // .id)
+        (.name // .id)
       ]
     | @tsv
   ' <<< "$USERS_REGISTRY"

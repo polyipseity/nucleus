@@ -480,7 +480,7 @@ function Invoke-ReplicaSync {
     }
 
     $readWrite = if ($null -ne $replica.readWrite) { [bool]$replica.readWrite } else { $false }
-    $displayName = if ($null -ne $replica.displayName) { [string]$replica.displayName } else { $id }
+    $displayName = if ($null -ne $replica.name) { [string]$replica.name } else { $id }
 
     $provider = [string]$replica.provider
     $iCloudService = [string]$replica.iCloudService

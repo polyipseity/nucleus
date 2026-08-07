@@ -61,10 +61,10 @@ let
         default = [ ];
         description = "Extra command-line arguments to pass to rclone mount (non-iCloud providers only).";
       };
-      displayName = lib.mkOption {
+      name = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
         default = null;
-        description = "Optional human-readable display label for UI surfaces (for example Finder volume names on macOS).";
+        description = "Optional human-readable label for UI surfaces (for example Finder volume names on macOS).";
       };
       id = lib.mkOption {
         type = lib.types.str;
@@ -108,10 +108,10 @@ let
         default = "pull";
         description = "Replica direction. Pull is the supported policy (remote -> local); non-pull values are rejected by replica-sync runners.";
       };
-      displayName = lib.mkOption {
+      name = lib.mkOption {
         type = lib.types.nullOr lib.types.str;
         default = null;
-        description = "Optional human-readable display label for log messages and UI surfaces (e.g., \"Google Drive\"). When null, the replica `id` is used.";
+        description = "Optional human-readable label for log messages and UI surfaces (e.g., \"Google Drive\"). When null, the replica `id` is used.";
       };
       enable = lib.mkOption {
         type = lib.types.bool;
@@ -183,7 +183,7 @@ let
         "--option"
         "backend=fskit"
       ];
-      mountVolumeLabel = if mount.displayName != null then mount.displayName else mount.id;
+      mountVolumeLabel = if mount.name != null then mount.name else mount.id;
       volumeNameArgs = lib.optionals pkgs.stdenv.isDarwin [
         "--volname"
         mountVolumeLabel
@@ -343,7 +343,7 @@ in
               builtins.toJSON (
                 map (r: {
                   localPath = r.localPath;
-                  displayName = if r.displayName != null then r.displayName else r.id;
+                  name = if r.name != null then r.name else r.id;
                   isSpecialICloud =
                     pkgs.stdenv.isDarwin
                     && r.provider == "iCloud"

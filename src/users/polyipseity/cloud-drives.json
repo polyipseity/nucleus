@@ -2,7 +2,7 @@
   "$schema": "../default/cloud-drives.schema.json",
   "mounts": [
     {
-      "displayName": "Google Drive",
+      "name": "Google Drive",
       "enable": true,
       "extraArgs": [],
       "id": "GoogleDrive",
@@ -49,7 +49,7 @@
   "replicas": [
     {
       "direction": "pull",
-      "displayName": "Google Drive",
+      "name": "Google Drive",
       "enable": {
         "MacBook": false,
         "NixOS": false,

@@ -102,7 +102,7 @@ collect_configured_mount_service_ids() {
   fi
 
   _ccmsi_username="$(id -un)"
-  jq -r \
+  { jq -r \
     --arg username "$_ccmsi_username" \
     '
       ((.[$username].cloudDrives.mounts // [])[]?)
@@ -110,8 +110,7 @@ collect_configured_mount_service_ids() {
       | [.id, .remoteName]
       | @tsv
     ' \
-    # check-suppress:suppression_doc: user registry may be empty or malformed; empty result is handled.
-    <<< "$_ccmsi_registry" 2>/dev/null || true
+    <<< "$_ccmsi_registry"; } 2>/dev/null || true # check-suppress:suppression_doc: user registry may be empty or malformed; empty result is handled.
 }
 
 # Restart managed cloud mount services so refreshed remote descriptions and
@@ -396,7 +395,7 @@ fi
 
 # Sync display names from the user registry to rclone config descriptions.
 # WHY: rclone description field drives Finder labels and desktop display names.
-# When the registry declares a displayName, propagate it to rclone config so
+# When the registry declares a name, propagate it to rclone config so
 # the mount shows correct labels in Finder and on desktop.
 if [ -n "$USERS_REGISTRY" ] && command -v jq >/dev/null 2>&1; then
   say "syncing display names from user registry to rclone config..."
@@ -411,8 +410,8 @@ if [ -n "$USERS_REGISTRY" ] && command -v jq >/dev/null 2>&1; then
         ]
         | unique_by(.remoteName)
         | .[]
-        | select(.displayName != null and .remoteName != null)
-        | [.remoteName, .displayName]
+        | select(.name != null and .remoteName != null)
+        | [.remoteName, .name]
         | @tsv
       ' \
       <<< "$USERS_REGISTRY"
@@ -439,7 +438,7 @@ if [ -n "$USERS_REGISTRY" ] && command -v jq >/dev/null 2>&1; then
         continue
       fi
 
-      # Update rclone config description field with displayName value.
+      # Update rclone config description field with name value.
       # WHY: rclone config update is idempotent and non-destructive; only
       # updates the single 'description' field, leaving all other config intact.
       if rclone config update "$remote_name" description "$display_name"; then
