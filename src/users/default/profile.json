@@ -1,9 +1,9 @@
 {
   "$schema": "./profile.schema.json",
   "homeDirectory": {
-    "MacBook": "",
-    "NixOS": "",
-    "Windows": ""
+    "MacBook": "/Users/shared",
+    "NixOS": "/home/shared",
+    "Windows": "C:\\Users\\shared"
   },
   "isPrimary": false
 }
