@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
   "definitions": {
-    "platformString": {
+    "hostString": {
       "oneOf": [
         {
           "type": "string"
@@ -10,17 +10,17 @@
         {
           "additionalProperties": false,
           "properties": {
-            "macos": {
+            "MacBook": {
               "type": "string"
             },
-            "nixos": {
+            "NixOS": {
               "type": "string"
             },
-            "windows": {
+            "Windows": {
               "type": "string"
             }
           },
-          "required": ["macos", "nixos", "windows"],
+          "required": ["MacBook", "NixOS", "Windows"],
           "type": "object"
         }
       ]
@@ -49,7 +49,7 @@
             "type": "boolean"
           },
           "target": {
-            "$ref": "#/definitions/platformString"
+            "$ref": "#/definitions/hostString"
           },
           "url": {
             "type": "string"
