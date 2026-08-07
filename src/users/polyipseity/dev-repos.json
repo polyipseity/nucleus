@@ -7,26 +7,26 @@
       "name": "nucleus",
       "symlinkFromRepoRoot": true,
       "target": {
-        "macos": "dev/nucleus",
-        "nixos": "dev/nucleus",
-        "windows": "dev\\nucleus"
+        "MacBook": "dev/nucleus",
+        "NixOS": "dev/nucleus",
+        "Windows": "dev\\nucleus"
       }
     },
     {
       "name": "monorepo",
       "target": {
-        "macos": "dev/monorepo",
-        "nixos": "dev/monorepo",
-        "windows": "dev\\monorepo"
+        "MacBook": "dev/monorepo",
+        "NixOS": "dev/monorepo",
+        "Windows": "dev\\monorepo"
       },
       "url": "git@github.com:polyipseity/monorepo.git"
     },
     {
       "name": "monorepo-private",
       "target": {
-        "macos": "dev/monorepo-private",
-        "nixos": "dev/monorepo-private",
-        "windows": "dev\\monorepo-private"
+        "MacBook": "dev/monorepo-private",
+        "NixOS": "dev/monorepo-private",
+        "Windows": "dev\\monorepo-private"
       },
       "url": "git@github.com:polyipseity/monorepo-private.git"
     }

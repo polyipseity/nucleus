@@ -1,9 +1,9 @@
 {
   "$schema": "./profile.schema.json",
   "homeDirectory": {
-    "macos": "",
-    "nixos": "",
-    "windows": ""
+    "MacBook": "",
+    "NixOS": "",
+    "Windows": ""
   },
   "isPrimary": false
 }

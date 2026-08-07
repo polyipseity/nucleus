@@ -7,9 +7,9 @@
       "extraArgs": [],
       "id": "GoogleDrive",
       "localPath": {
-        "macos": "clouds/GoogleDrive",
-        "nixos": "clouds/GoogleDrive",
-        "windows": "clouds\\GoogleDrive"
+        "MacBook": "clouds/GoogleDrive",
+        "NixOS": "clouds/GoogleDrive",
+        "Windows": "clouds\\GoogleDrive"
       },
       "provider": "GoogleDrive",
       "readWrite": true,
@@ -22,9 +22,9 @@
       "iCloudService": "drive",
       "id": "iCloud",
       "localPath": {
-        "macos": "clouds/iCloud",
-        "nixos": "clouds/iCloud",
-        "windows": "clouds\\iCloud"
+        "MacBook": "clouds/iCloud",
+        "NixOS": "clouds/iCloud",
+        "Windows": "clouds\\iCloud"
       },
       "provider": "iCloud",
       "readWrite": true,
@@ -36,9 +36,9 @@
       "extraArgs": [],
       "id": "OneDrive",
       "localPath": {
-        "macos": "clouds/OneDrive",
-        "nixos": "clouds/OneDrive",
-        "windows": "clouds\\OneDrive"
+        "MacBook": "clouds/OneDrive",
+        "NixOS": "clouds/OneDrive",
+        "Windows": "clouds\\OneDrive"
       },
       "provider": "OneDrive",
       "readWrite": true,
@@ -51,23 +51,23 @@
       "direction": "pull",
       "displayName": "Google Drive",
       "enable": {
-        "macos": false,
-        "nixos": false,
-        "windows": true
+        "MacBook": false,
+        "NixOS": false,
+        "Windows": true
       },
       "fallbackTimer": {
         "enable": {
-          "macos": false,
-          "nixos": false,
-          "windows": true
+          "MacBook": false,
+          "NixOS": false,
+          "Windows": true
         },
         "interval": "daily"
       },
       "id": "GoogleDrive",
       "localPath": {
-        "macos": "clouds/GoogleDriveReplica",
-        "nixos": "clouds/GoogleDriveReplica",
-        "windows": "clouds\\GoogleDriveReplica"
+        "MacBook": "clouds/GoogleDriveReplica",
+        "NixOS": "clouds/GoogleDriveReplica",
+        "Windows": "clouds\\GoogleDriveReplica"
       },
       "provider": "GoogleDrive",
       "remotePath": "/"
@@ -82,15 +82,15 @@
       "iCloudService": "drive",
       "id": "iCloud",
       "localPath": {
-        "macos": "clouds/iCloudReplica",
-        "nixos": "clouds/iCloudReplica",
-        "windows": "clouds\\iCloudReplica"
+        "MacBook": "clouds/iCloudReplica",
+        "NixOS": "clouds/iCloudReplica",
+        "Windows": "clouds\\iCloudReplica"
       },
       "provider": "iCloud",
       "readWrite": {
-        "macos": true,
-        "nixos": true,
-        "windows": false
+        "MacBook": true,
+        "NixOS": true,
+        "Windows": false
       },
       "remotePath": "/"
     },
@@ -103,9 +103,9 @@
       },
       "id": "OneDrive",
       "localPath": {
-        "macos": "clouds/OneDriveReplica",
-        "nixos": "clouds/OneDriveReplica",
-        "windows": "clouds\\OneDriveReplica"
+        "MacBook": "clouds/OneDriveReplica",
+        "NixOS": "clouds/OneDriveReplica",
+        "Windows": "clouds\\OneDriveReplica"
       },
       "provider": "OneDrive",
       "remotePath": "/"

@@ -5,9 +5,9 @@
       "createTargetDirectory": true,
       "path": "data",
       "targets": {
-        "linux": "clouds/GoogleDrive/data",
-        "macos": "Library/Mobile Documents/com~apple~CloudDocs/data",
-        "windows": "clouds\\GoogleDrive\\data"
+        "NixOS": "clouds/GoogleDrive/data",
+        "MacBook": "Library/Mobile Documents/com~apple~CloudDocs/data",
+        "Windows": "clouds\\GoogleDrive\\data"
       }
     }
   ]
