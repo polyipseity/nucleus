@@ -98,7 +98,7 @@ in
   sops.secrets = wallpaperSecrets;
 
   home.activation.provision-wallpapers = lib.hm.dag.entryAfter [ "sops-nix" ] ''
-    "${activationBundle}/src/scripts/provision-wallpaper.sh" \
+    "${activationBundle}/src/scripts/configs/provision-wallpaper.sh" \
       "${if pkgs.stdenv.isDarwin then "1" else "0"}" \
       "${currentUserHome}/Pictures/wallpapers" \
       "${desktopprBinPath}" \

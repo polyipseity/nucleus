@@ -11,7 +11,7 @@
 - `scripts/` contains user-facing automation helpers with paired `.sh`/`.ps1` entry points: bootstrap, check, cloud-setup, gc, health-check, replica-sync, replica-reset, update, vm-setup, ai-sync, and others.
 - `src/scripts/` contains Nix-internal scripts organized into domain subdirectories:
   - `apply.sh` — POSIX apply dispatcher (kept in root)
-  - `cleanup-nix-build-artifacts.sh`, `install-prek-hooks.sh`, `provision-wallpaper.sh` — ungrouped root scripts
+  - `cleanup-nix-build-artifacts.sh`, `install-prek-hooks.sh` — ungrouped root scripts
   - `services/` — persistent daemon/service scripts (camilladsp-daemon, camilladsp-heartbeat,
     caddy-trust, cloud-drives-setup, gc-weekly, jellyfin-sync, rclone-mount,
     replica-scheduled-sync, service-watchdog)
@@ -20,7 +20,7 @@
     handler registration, and the shared lib.sh
   - `secrets/` — secret provisioning helpers
   - `shell/` — shell integration scripts (zsh init, PowerShell init, completion installation)
-  - `configs/` — app config/install scripts and merge helpers (INI merge, JSON merge, GPG config)
+  - `configs/` — app config/install scripts and merge helpers (INI merge, JSON merge, GPG config, wallpaper provisioning)
   - `packages/` — package-manager installer scripts (init-rustup, install-cargo-binstall-packages,
     install-uv-tools, install-bun-packages, install-pwsh-module)
   - `editors/` — editor-specific scripts (VS Code workspace trust, extension symlink bridge,
