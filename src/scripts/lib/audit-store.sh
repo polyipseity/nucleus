@@ -140,15 +140,15 @@ audit_nix_generations() {
 }
 
 audit_nix_gc_roots() {
-  _audit_store_section "gc roots (nix-store --print-roots)"
+  _audit_store_section "gc roots (nix-store --gc --print-roots)"
   if ! command -v nix-store >/dev/null 2>&1; then
     error "nix-store unavailable; cannot audit gc roots"
     return 1
   fi
 
   _as_roots_tmp="$(_audit_store_tmpfile)"
-  if ! nix-store --print-roots >"$_as_roots_tmp" 2>&1; then
-    error "nix-store --print-roots failed; see output below"
+  if ! nix-store --gc --print-roots >"$_as_roots_tmp" 2>&1; then
+    error "nix-store --gc --print-roots failed; see output below"
     cat "$_as_roots_tmp" >&2
     rm -f "$_as_roots_tmp"
     return 1

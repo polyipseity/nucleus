@@ -111,7 +111,7 @@ Report sections:
 
 - `nix path-info --json --all --closure-size` top closures (via jq)
 - System generation count (`nix-env --list-generations` / privileged `darwin-rebuild --list-generations`)
-- GC roots (`nix-store --print-roots`)
+- GC roots (`nix-store --gc --print-roots`)
 - Stale `result` symlinks (repo scan)
 - Linux-builder VM store size (MacBook only; starts VM via launchd when needed)
 

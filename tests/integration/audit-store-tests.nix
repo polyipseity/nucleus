@@ -17,7 +17,7 @@ assert containsRegex "launchctl kickstart -k system/" auditLibText;
 assert containsRegex "linux-builder ssh attempt" auditLibText;
 assert containsRegex "audit_nix_generations" auditLibText;
 assert containsRegex "audit_nix_gc_roots" auditLibText;
-assert containsRegex "nix-store --print-roots failed" auditLibText;
+assert containsRegex "nix-store --gc --print-roots" auditLibText;
 assert containsRegex "audit_stale_result_symlinks" auditLibText;
 assert containsRegex "audit_linux_builder_store" auditLibText;
 assert containsRegex "audit_store_report" auditLibText;
