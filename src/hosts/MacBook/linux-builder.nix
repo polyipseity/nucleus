@@ -14,7 +14,27 @@
   ...
 }:
 let
-  pkg = pkgs.darwin.linux-builder;
+  pkg = pkgs.darwin.linux-builder.override {
+    modules = [
+      (
+        { ... }:
+        {
+          nix.settings = {
+            auto-optimise-store = true;
+            extra-substituters = [ "https://nix-community.cachix.org" ];
+            extra-trusted-public-keys = [
+              "nix-community.cachix.org-1:mB9FSh9qf2dCimDSUo8Zy7bkq5CX+/rkCWyvRCYg3Fs="
+            ];
+          };
+          nix.gc = {
+            automatic = true;
+            dates = "12:00";
+            options = "--delete-older-than 7d";
+          };
+        }
+      )
+    ];
+  };
   workDir = "/var/lib/linux-builder";
   # Nix 2.34.x ssh-ng master sessions fail against darwin linux-builder; the
   # ssh:// builder path works. Keep registration on ssh:// until upstream
