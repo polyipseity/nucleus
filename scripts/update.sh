@@ -136,16 +136,11 @@ rewrap_sops_files() {
   # .sops.yaml key declarations after machine additions/removals.
   sops_config="$REPO_ROOT/.sops.yaml"
 
-  for user_secret_file in "$REPO_ROOT"/src/secrets/users/*.yml; do
-    if [ -f "$user_secret_file" ]; then
-      sops --config "$sops_config" updatekeys --yes "$user_secret_file"
-    fi
-  done
-
   for encrypted_file in \
-    "$REPO_ROOT/src/secrets/gpg-personal.yml" \
-    "$REPO_ROOT/src/secrets/ssh-personal.yml"; do
-    sops --config "$sops_config" updatekeys --yes "$encrypted_file"
+    "$REPO_ROOT"/src/secrets/users/*.yml; do
+    if [ -f "$encrypted_file" ]; then
+      sops --config "$sops_config" updatekeys --yes "$encrypted_file"
+    fi
   done
 
   # WHY: overlay wallpapers are encrypted too (src/users/*/wallpapers/encrypted/*.sops)

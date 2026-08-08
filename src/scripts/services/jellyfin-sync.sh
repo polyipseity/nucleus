@@ -174,7 +174,11 @@ _jfs_sync_accounts() {
       continue
     fi
 
-    if ! _jfsa_secret_json="$(sops --decrypt --output-type json "$_jfsa_secret_file")"; then
+    if ! _jfsa_secret_json="$("$REPO_ROOT/src/scripts/secrets/decrypt-sops.sh" \
+      --repo-root "$REPO_ROOT" \
+      --sops-file "$_jfsa_secret_file" \
+      --sops-bin "${_JFS_SOPS_PATH:-$(command -v sops)}" \
+      --gpg-bin "$(command -v gpg)")"; then
       printf '%s\n' "jellyfin: failed to decrypt $_jfsa_secret_file; skipping account declaration '${_jfsa_id}'" >&2
       continue
     fi
@@ -414,7 +418,11 @@ _jfs_sync_libraries() {
       continue
     fi
 
-    if ! _jfsl_secret_json="$(sops --decrypt --output-type json "$_jfsl_secret_file")"; then
+    if ! _jfsl_secret_json="$("$REPO_ROOT/src/scripts/secrets/decrypt-sops.sh" \
+      --repo-root "$REPO_ROOT" \
+      --sops-file "$_jfsl_secret_file" \
+      --sops-bin "${_JFS_SOPS_PATH:-$(command -v sops)}" \
+      --gpg-bin "$(command -v gpg)")"; then
       continue
     fi
 

@@ -111,7 +111,11 @@ resolve_vm_guest_credentials() {
     return 1
   fi
 
-  if ! _rvgc_secret_json="$(sops --decrypt --output-type json "$_rvgc_secret_file")"; then
+  if ! _rvgc_secret_json="$("$REPO_ROOT/src/scripts/secrets/decrypt-sops.sh" \
+    --repo-root "$REPO_ROOT" \
+    --sops-file "$_rvgc_secret_file" \
+    --sops-bin "$(command -v sops)" \
+    --gpg-bin "$(command -v gpg)")"; then
     error "failed to decrypt per-user VM secret file: $_rvgc_secret_file"
     return 1
   fi

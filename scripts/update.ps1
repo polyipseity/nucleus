@@ -77,19 +77,7 @@ if (-not $NoSops -and -not (Get-Command -Name 'sops.exe' -ErrorAction SilentlyCo
 
 $sopsConfig = Join-Path -Path $repoRoot -ChildPath '.sops.yaml'
 
-$secretFiles = @(
-  (Join-Path -Path $repoRoot -ChildPath 'src\secrets\gpg-personal.yml'),
-  (Join-Path -Path $repoRoot -ChildPath 'src\secrets\ssh-personal.yml')
-)
-
 if (-not $NoSops) {
-foreach ($secretFile in $secretFiles) {
-  & sops --config $sopsConfig updatekeys --yes $secretFile
-  if ($LASTEXITCODE -ne 0) {
-    throw "nucleus: failed to rewrap secret file '$secretFile'."
-  }
-}
-
   $usersSecretsDir = Join-Path -Path $repoRoot -ChildPath 'src\secrets\users'
   if (Test-Path -Path $usersSecretsDir) {
     Get-ChildItem -Path $usersSecretsDir -Filter '*.yml' -File | ForEach-Object {
