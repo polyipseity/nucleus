@@ -72,5 +72,5 @@
     - **ADB unauthorized**: boot LineageOS first, tap **Allow** on the USB debugging prompt, then run `nucleus-vm android-config Android --adb-keys` to persist the host key for this userdata image.
     - **Play Integrity**: QEMU VMs are detected as emulator environments, so `MEETS_STRONG`/`DEVICE_INTEGRITY` are impossible (they require hardware-backed attestation; the VM has no TPM, `TPMDevice=false`). Banking, Google Wallet, and DRM apps will not work; ordinary GMS apps run on an uncertified device.
 - `nucleus-vm resize <id> <size>` — grow the writable runtime disk `data/<id>.qcow2` (grow-only; shrinking requires `--allow-shrink`)
-- `nucleus-vm pack` — strip trivially regenerable artifacts (UTM bundles, generated start/stop scripts, `images/<type>.base.qcow2` copies) so the tree copies as-is to another host; dry-run by default, `--force` performs
+- `nucleus-vm pack` — strip trivially regenerable artifacts (UTM bundles, generated start/stop scripts, `src/<type>/overlay backing.qcow2` copies) so the tree copies as-is to another host; dry-run by default, `--force` performs
 - `nucleus-vm unpack` — regenerate platform artifacts (start/stop scripts, UTM bundles) from `<id>.vm.json` descriptors after copying a packed tree

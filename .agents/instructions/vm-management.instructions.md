@@ -75,7 +75,7 @@ Type-specific fields (nested objects keyed by `type`; all fields required when `
 | ----------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `"Android"` | `Android`  | `systemImage`, `userdataImage`, `gsiImage`, `gsiUrl`, `gappsUrl` (all required; `gsiUrl` may be `null` for Lineage-only — no GSI disk; `gappsUrl` is the MindTheGapps zip URL for recovery sideload)                                                                                             |
 | `"macOS"`  | `macOS`    | `version` (release name, e.g. `"tahoe"`)                                                                                                                                                                                 |
-| `"Windows"` | `Windows`  | `edition` (e.g. `"pro"`), `isoUrl` (`null` = Mido/Fido auto-resolve; a URL auto-downloads the installer ISO when `--windows-iso` is omitted, cached at `~/virtual machines/images/<id>-installer.iso`)                  |
+| `"Windows"` | `Windows`  | `edition` (e.g. `"pro"`), `isoUrl` (`null` = Mido/Fido auto-resolve; a URL auto-downloads the installer ISO when `--windows-iso` is omitted, cached at `~/virtual machines/src/Windows/installer.iso`)                  |
 
 All common fields and every field in the matching type group are **required** — there are no optional manifest properties. Deliberate nullable values: `Windows.isoUrl` and `Android.gsiUrl` (`null` is valid; a URL is valid for both).
 
@@ -142,13 +142,13 @@ Guest port forwards are declared in the `portForwards` array of each VM entry: n
 
 ## Disk format
 
-QCOW2 throughout all three platforms. Stored at:
+QCOW2 throughout all three platforms. Runtime disks live under `data/`; per-type source payloads and pre-built goldens live under `src/<type>/`:
 
-- macOS: `~/virtual machines/<id>.utm/Data/disk-main.qcow2`
-- NixOS: `~/virtual machines/<id>.qcow2`
-- Windows: `%USERPROFILE%\virtual machines\<id>.qcow2`
+- macOS runtime: `~/virtual machines/data/<id>.qcow2` (UTM bundle exposes `~/virtual machines/<id>.utm/Data/disk-main.qcow2` as a hard link)
+- NixOS runtime: `~/virtual machines/data/<id>.qcow2`
+- Windows runtime: `%USERPROFILE%\virtual machines\data\<id>.qcow2`
 
-Pre-built images land in `~/virtual machines/images/<id>.qcow2` (Windows: `%USERPROFILE%\virtual machines\images\<id>.qcow2`). `nucleus-vm setup` builds these images in phase 1 (if absent) and copies them to the disk location in phase 2.
+Pre-built golden images land in `~/virtual machines/src/<type>/prebuilt image.qcow2` (Windows: `%USERPROFILE%\virtual machines\src\<type>\prebuilt image.qcow2`). `nucleus-vm setup` builds these in phase 1 (if absent) and copies them to `src/<type>/overlay backing.qcow2` before creating the `data/<id>.qcow2` overlay in phase 2.
 
 QCOW2 enables copy-based migration between hosts without conversion.
 
@@ -166,7 +166,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - VM backend: UTM 4.x QEMU backend.
 - Bundle location: `~/virtual machines/<id>.utm/`
 - Config template: `config.plist` pre-generated at `~/.local/share/nucleus/vms/<id>-config.plist` by `src/hosts/MacBook/vms.nix` at Home Manager activation time; `vm.sh setup` copies it into the bundle.
-- Disk pre-created in `Images/disk-main.qcow2` by copying the pre-built image from the images directory.
+- Disk pre-created in `Images/disk-main.qcow2` by copying or linking from `src/<type>/` (system image for Android; overlay chain for non-Android).
 - After provisioning, UTM opens each bundle automatically.
 - VirtioFS shared directory: configured via `Sharing.DirectoryShare` in the Nix-generated config.plist.
 - Network: **Emulated** (QEMU user/slirp) — required for `PortForward` to work; vmnet-shared silently drops forwards.
@@ -220,6 +220,7 @@ Both hooks are best-effort: a VM sync/setup failure does not abort a completed s
 | `sync` | Manifest or Nix VM template changed; VMs already provisioned. Runs automatically after apply. |
 | `setup` | First VM, missing images/bundles, credential/config drift, new guest. Full provision (sync + build + disks). |
 | `android-config` | Android only: sideload MindTheGapps in recovery (`--gapps`), install ADB keys in recovery or booted system (`--adb-keys`), install Magisk (`--magisk`, booted only), enable rooted debugging (`--root`, booted only; requires Magisk su), configure fake Wi‑Fi (`--fake-wifi`, booted only; requires Magisk su). Run without flags to print the manual. Recovery flow: **Enter fastboot** → `--gapps` → **Enable ADB** → sideload → reboot → boot system → **Allow USB debugging** → `--magisk` → `--root` → `--fake-wifi`. |
+| `gc` | Remove stale VM artifacts not listed in `VMs.json`. Default preserves `data/` runtime disks; pass `--gc-data` to also GC orphaned overlays. Pass `--gc-disabled` to narrow the keep-set to enabled guests on the current host. |
 | `pack` / `unpack` | Copy VM tree to another host (`unpack` may recreate UTM bundles). |
 | `start` / `stop` | Runtime control. Restart after sync when port forwards changed. |
 
@@ -265,7 +266,7 @@ Both hooks are best-effort: a VM sync/setup failure does not abort a completed s
 **Windows 11 guest (all hosts)** (`nucleus-vm setup --windows-iso /path/to/Win11.iso`):
 
 - Uses Packer with `src/vms/windows/packer.pkr.hcl` and QEMU builder.
-- Requires a Windows 11 ISO path via `--windows-iso` **or** a `Windows.isoUrl` field in the `VMs.json` windows entry. When `Windows.isoUrl` is set, the ISO is downloaded automatically to `~/virtual machines/images/<id>-installer.iso` on first run (subsequent runs reuse the cache).
+- Requires a Windows 11 ISO path via `--windows-iso` **or** a `Windows.isoUrl` field in the `VMs.json` windows entry. When `Windows.isoUrl` is set, the ISO is downloaded automatically to `~/virtual machines/src/Windows/installer.iso` on first run (subsequent runs reuse the cache).
 - On macOS/Linux, falls back from Mido to Fido URL resolver via `pwsh` (`Fido.ps1 -GetUrl`) + `curl`.
 - On Windows, auto-detects WHPX accelerator when `tcg` is default; upgrades automatically. Pass `-Accelerator tcg` to suppress.
 - SATA disk during build → VirtIO drivers installed post-install → final image is VirtIO-disk ready.
@@ -287,5 +288,5 @@ Guest configuration is not automatic after first boot. `nucleus-vm setup` builds
 1. Remove the entry from `src/modules/VMs.json`.
 2. Manually delete the disk image and registration:
    - macOS: delete `<name>.utm` bundle from UTM document store.
-   - NixOS: run `virsh undefine <name>` then delete `~/virtual machines/<name>.qcow2`.
-   - Windows: delete `%USERPROFILE%\virtual machines\<name>.qcow2` and the start script.
+   - NixOS: run `virsh undefine <name>` then delete `~/virtual machines/data/<name>.qcow2`.
+   - Windows: delete `%USERPROFILE%\virtual machines\data\<name>.qcow2` and the start script.

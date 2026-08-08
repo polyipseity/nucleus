@@ -42,5 +42,5 @@
     - **Magisk / root / fake Wi-Fi**: `nucleus-vm android-config Android --magisk`, then `--root`, then `--fake-wifi`. Re-run after userdata reset. Open the Magisk app after `--magisk` if prompted for environment fix.
     - **ADB unauthorized**: boot LineageOS, tap **Allow**, then `nucleus-vm android-config Android --adb-keys`.
 - `nucleus-vm resize <id> <size>` — grow the writable runtime disk `data/<id>.qcow2` (grow-only; shrinking requires `--allow-shrink`)
-- `nucleus-vm pack` — strip trivially regenerable artifacts (generated start/stop scripts, `images/<type>.base.qcow2` copies) so the tree copies as-is to another host; dry-run by default, `--force` performs
+- `nucleus-vm pack` — strip trivially regenerable artifacts (generated start/stop scripts, `src/<type>/overlay backing.qcow2` copies) so the tree copies as-is to another host; dry-run by default, `--force` performs
 - `nucleus-vm unpack` — regenerate platform artifacts (start/stop scripts, libvirt domains) from `<id>.vm.json` descriptors after copying a packed tree
