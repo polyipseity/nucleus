@@ -128,10 +128,7 @@ function Resolve-ICloudServiceForRemote {
   $currentUsername = $env:USERNAME
   $userRecord = @($users | Where-Object { $_.name -eq $currentUsername }) | Select-Object -First 1
   if ($null -eq $userRecord) {
-    $userRecord = $userRegistry.primaryUser
-    if ($null -eq $userRecord) {
-      return 'drive'
-    }
+    return 'drive'
   }
 
   $userCloudDrives = $userRecord.cloudDrives

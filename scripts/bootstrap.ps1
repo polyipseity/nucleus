@@ -339,6 +339,9 @@ if ($Apply) {
     $defaultModuleDir = Join-Path -Path $PSScriptRoot -ChildPath "..\src\platforms\Windows\modules"
     $effectiveApplyArgs += @("-ModuleDir", $defaultModuleDir)
   }
+  if ($applyArgsText -notmatch "(?i)(^|\s)-Users(\s|$)") {
+    $effectiveApplyArgs += @("-Users", @($env:USERNAME))
+  }
 
   # Cross-platform CLI parity: forward flags that apply.ps1 accepts.
   if ($NoAISync) { $effectiveApplyArgs += "-NoAISync" }
