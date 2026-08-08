@@ -48,10 +48,22 @@ test_materialize_skips_jit_keys() {
   fi
 }
 
+test_derive_host_age_key_uses_shared_group() {
+  local script_text
+  script_text="$(<"$REPO_ROOT/src/scripts/secrets/derive-host-age-key.sh")"
+  # shellcheck disable=SC2016 # reason: literal chown pattern in string match
+  if [[ "$script_text" == *'chown "root:${_dha_group}"'* && "$script_text" == *"chmod 0640"* ]]; then
+    assert_pass "derive-host-age-key shares machine age key via nucleus-sops group"
+  else
+    assert_fail "derive-host-age-key shares machine age key via nucleus-sops group" "expected root:group ownership and mode 0640"
+  fi
+}
+
 test_list_secret_users_sorted
 test_decrypt_sops_script_exists
 test_materialize_script_exists
 test_materialize_skips_jit_keys
+test_derive_host_age_key_uses_shared_group
 
 echo ""
 echo "============================================================"

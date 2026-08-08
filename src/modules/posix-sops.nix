@@ -3,10 +3,13 @@
   pkgs,
   lib,
   username,
+  users ? { },
   ...
 }:
 let
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
+  managedUserNames = builtins.attrNames users;
+  sopsGroup = "nucleus-sops";
 in
 {
   # ---------------------------------------------------------------------------
@@ -21,8 +24,8 @@ in
   #   regular user; ssh-to-age must read the private key to derive the age
   #   identity and fails with "permission denied" in that context.  System
   #   activation runs as root and CAN read the host key, so we derive the age
-  #   identity there and write it to a user-readable path:
-  #   /etc/sops/age/machine.txt is owned by username (mode 0600) and is
+  #   identity there and write it to a group-readable path:
+  #   /etc/sops/age/machine.txt is owned root:nucleus-sops (mode 0640) and is
   #   referenced via sops.age.keyFile in secrets.nix.
   #
   #   The system-level sops-nix instance (this module) keeps sshKeyPaths
@@ -33,17 +36,23 @@ in
   #   produce identical output.  We always overwrite to keep the file current
   #   if the host key is ever rotated.
   # ---------------------------------------------------------------------------
+  users.groups.${sopsGroup} = { };
+
+  users.users = lib.genAttrs managedUserNames (_name: {
+    extraGroups = lib.mkAfter [ sopsGroup ];
+  });
+
   system.activationScripts =
     if pkgs.stdenv.isDarwin then
       {
         postActivation.text = lib.mkBefore ''
-          "${activationBundle}/src/scripts/secrets/derive-host-age-key.sh" "${pkgs.ssh-to-age}/bin/ssh-to-age" "${username}"
+          "${activationBundle}/src/scripts/secrets/derive-host-age-key.sh" "${pkgs.ssh-to-age}/bin/ssh-to-age" "${sopsGroup}"
         '';
       }
     else
       {
         nixos-derive-host-age-key.text = ''
-          "${activationBundle}/src/scripts/secrets/derive-host-age-key.sh" "${pkgs.ssh-to-age}/bin/ssh-to-age" "${username}"
+          "${activationBundle}/src/scripts/secrets/derive-host-age-key.sh" "${pkgs.ssh-to-age}/bin/ssh-to-age" "${sopsGroup}"
         '';
       };
 

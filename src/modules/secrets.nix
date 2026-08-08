@@ -22,7 +22,7 @@ let
 in
 {
   # Machine age key derived from /etc/ssh/ssh_host_ed25519_key by
-  # deriveHostAgeKey in posix-sops.nix. keyFile avoids the permission issue
+  # deriveHostAgeKey in posix-sops.nix (root:nucleus-sops, mode 0640).
   # with sshKeyPaths (0600 root:wheel). gnupgHome is intentionally absent:
   # sops-nix rejects setting both keyFile and gnupgHome simultaneously.
   sops.age.keyFile = "/etc/sops/age/machine.txt";
