@@ -805,8 +805,8 @@ do_verify() {
 #   svc endpoint <service> [<endpoint-name>]
 # Args: service_names[0] — service; service_names[1] — optional endpoint key.
 # Reads the raw services.json (not platform-filtered) since endpoints are universal.
-# WHY: endpoints are host-independent (the same host:port on every platform),
-# so filtering by PLATFORM would hide valid data.
+# WHY: endpoints are host-independent (the same host:port on every host),
+# so filtering by host would hide valid data.
 do_endpoint() {
   local svc_name="${service_names[0]:-}"
   local endpoint_name="${service_names[1]:-}"

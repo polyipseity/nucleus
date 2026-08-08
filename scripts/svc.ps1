@@ -165,14 +165,14 @@ function Resolve-ServiceName {
 
 function Get-ServiceStatus {
   param(
-    [hashtable]$Platform
+    [hashtable]$HostEntry
   )
 
-  $type = $Platform.type
+  $type = $HostEntry.type
 
   switch ($type) {
     'native' {
-      $svcName = $Platform.service
+      $svcName = $HostEntry.service
       try {
         $svc = Get-Service -Name $svcName -ErrorAction Stop
         $running = $svc.Status -eq 'Running'
@@ -194,7 +194,7 @@ function Get-ServiceStatus {
       }
     }
     'schtask' {
-      $taskPath = $Platform.taskPath
+      $taskPath = $HostEntry.taskPath
       try {
         $task = Get-ScheduledTask -TaskPath (Split-Path $taskPath -Parent) -TaskName (Split-Path $taskPath -Leaf) -ErrorAction Stop
         $enabled = $task.State -ne 'Disabled'
@@ -217,16 +217,16 @@ function Get-ServiceStatus {
 function Invoke-ServiceAction {
   param(
     [string]$Action,
-    [hashtable]$Platform
+    [hashtable]$HostEntry
   )
 
-  $type = $Platform.type
+  $type = $HostEntry.type
 
   switch ($type) {
     'native' {
-      $svcName = $Platform.service
+      $svcName = $HostEntry.service
       switch ($Action) {
-        'status'  { return Get-ServiceStatus -Platform $Platform }
+        'status'  { return Get-ServiceStatus -HostEntry $HostEntry }
         'start'   { Start-Service -Name $svcName -ErrorAction Stop; return $true }
         'stop'    { Stop-Service -Name $svcName -ErrorAction Stop -Force; return $true }
         'restart' { Restart-Service -Name $svcName -ErrorAction Stop -Force; return $true }
@@ -235,11 +235,11 @@ function Invoke-ServiceAction {
       }
     }
     'schtask' {
-      $taskPath = $Platform.taskPath
+      $taskPath = $HostEntry.taskPath
       $taskName = Split-Path $taskPath -Leaf
       $taskParent = Split-Path $taskPath -Parent
       switch ($Action) {
-        'status'  { return Get-ServiceStatus -Platform $Platform }
+        'status'  { return Get-ServiceStatus -HostEntry $HostEntry }
         'start'   { Start-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
         'stop'    { Stop-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction Stop; return $true }
         'restart' { Stop-ScheduledTask -TaskPath $taskParent -TaskName $taskName -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort stop before start -- task may not be running
@@ -465,7 +465,7 @@ switch ($Action) {
         $hasError = $true
         continue
       }
-      $status = Get-ServiceStatus -Platform $resolved[$key].hostEntry
+      $status = Get-ServiceStatus -HostEntry $resolved[$key].hostEntry
       $status.displayName = $resolved[$key].displayName
       $results[$key] = $status
     }
@@ -483,7 +483,7 @@ switch ($Action) {
         $hasError = $true
         continue
       }
-      $status = Get-ServiceStatus -Platform $resolved[$key].hostEntry
+      $status = Get-ServiceStatus -HostEntry $resolved[$key].hostEntry
       $status.displayName = $resolved[$key].displayName
       $results[$key] = $status
     }
@@ -513,7 +513,7 @@ switch ($Action) {
       }
 
       try {
-        $result = Invoke-ServiceAction -Action $Action -Platform $plat
+        $result = Invoke-ServiceAction -Action $Action -HostEntry $plat
         if ($result -ne $true) {
           Write-NucleusError "$key — action '$Action' failed"
           $overallExit = 1
@@ -537,7 +537,7 @@ switch ($Action) {
         $hasInactive = $true
         continue
       }
-      $status = Get-ServiceStatus -Platform $resolved[$key].hostEntry
+      $status = Get-ServiceStatus -HostEntry $resolved[$key].hostEntry
       if ($status.running) {
         $pidStr = if ($status.pid) { " (pid $($status.pid))" } else { '' }
         Write-Output "svc: verify $key — active$pidStr"
