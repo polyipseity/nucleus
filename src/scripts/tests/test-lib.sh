@@ -13,13 +13,15 @@ _self="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 
 # shellcheck source=../lib/lib.sh
-. "$SCRIPT_DIR/../lib/lib.sh"
-
-# shellcheck source=../lib/step-runner.sh
-. "$SCRIPT_DIR/../lib/step-runner.sh"
+NUCLEUS_LIB_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/../lib" && pwd)"
+cd "$NUCLEUS_LIB_DIR" || exit
+# shellcheck disable=SC1091 # reason: literal ./ source path — variable paths break BASH_SOURCE in sourced files
+. ./lib.sh
+# shellcheck disable=SC1091 # reason: literal ./ source path — variable paths break BASH_SOURCE in sourced files
+. ./step-runner.sh
 
 # Test-specific defaults
-FAIL_FAST=true
+export FAIL_FAST=true
 quiet_mode=false
 REPO_ROOT=$(derive_repo_root)
 cd "$REPO_ROOT" || exit
@@ -40,11 +42,11 @@ parse_args() {
         shift
         ;;
       --fail-fast)
-        FAIL_FAST=true
+        export FAIL_FAST=true
         shift
         ;;
       --no-fail-fast)
-        FAIL_FAST=false
+        export FAIL_FAST=false
         shift
         ;;
       --skip-steps=*)

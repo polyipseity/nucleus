@@ -25,9 +25,8 @@ run_16_package_manager_enforcement() {
 
   # Ban bare `pip install` and `npm install`.
   # ref: allow-and-deny-lists.instructions.md#A1 -- orchestrator/config files contain pip/npm patterns in comments; self-refs are dynamic
-  local _self_sh _self_ps1
-  _self_sh="$(basename "${BASH_SOURCE[0]}")"
-  _self_ps1="$(basename "${BASH_SOURCE[0]}" .sh).ps1"
+  local _self_sh="16-package-manager-enforcement.sh"
+  local _self_ps1="16-package-manager-enforcement.ps1"
   # Convert from grep -rn --include (directory traversal without gitignore) to
   # find | filter_gitignored | xargs grep so gitignored files are excluded.
   # Keep explicit --exclude for files that legitimately contain the pattern

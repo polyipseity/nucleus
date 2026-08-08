@@ -1,10 +1,15 @@
-#!/usr/bin/env bash
+# shellcheck shell=bash
 # Dynamic loader for check step files.
 # Sources all *.sh files in the check-steps directory.
+# Eval emits literal `. ./NN-name.sh` lines so BASH_SOURCE resolves in each step.
 
-# shellcheck disable=SC1090 # reason: dynamic glob — checked files are static .sh files individually shellchecked via nix build
 _self="${BASH_SOURCE[0]:-$0}"
-STEP_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)/check-steps"
-for _step_file in "$STEP_DIR"/*.sh; do
-  . "$_step_file"
-done
+_CHECKS_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
+# shellcheck disable=SC2016 # reason: eval body must emit literal dot-source lines for BASH_SOURCE
+eval "$( {
+  printf 'cd %q || exit\n' "$_CHECKS_DIR/check-steps"
+  for _step_file in "$_CHECKS_DIR/check-steps"/*.sh; do
+    [ -f "$_step_file" ] || continue
+    printf '. ./%q\n' "$(basename "$_step_file")"
+  done
+} )"

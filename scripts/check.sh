@@ -38,10 +38,15 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 
 # shellcheck source=../src/scripts/checks/check-lib.sh
 _ORCH_SCRIPT_DIR="$SCRIPT_DIR"
-. "$_ORCH_SCRIPT_DIR/../src/scripts/checks/check-lib.sh"
-# shellcheck source=../src/scripts/checks/check-steps.sh
-. "$_ORCH_SCRIPT_DIR/../src/scripts/checks/check-steps.sh"
+_NUCLEUS_CHECKS_DIR="$(CDPATH='' cd -- "$_ORCH_SCRIPT_DIR/../src/scripts/checks" && pwd)"
+cd "$_NUCLEUS_CHECKS_DIR" || exit
+# shellcheck disable=SC1091 # reason: literal ./ source path — variable paths break BASH_SOURCE in sourced files
+. ./check-lib.sh
+cd "$_NUCLEUS_CHECKS_DIR" || exit
+# shellcheck disable=SC1091 # reason: literal ./ source path — variable paths break BASH_SOURCE in sourced files
+. ./check-steps.sh
 
+cd "$REPO_ROOT" || exit
 parse_args "$@"
 preflight_check
 run_all_steps
