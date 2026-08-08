@@ -33,7 +33,7 @@ let
   resolvedHomeDirectory =
     if effectiveUser ? homeDirectory then
       effectiveUser.homeDirectory
-    else if pkgs.stdenv.isDarwin then
+    else if hostName == "MacBook" then
       "/Users/${effectiveUsername}"
     else
       "/home/${effectiveUsername}";
@@ -46,7 +46,7 @@ let
 
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
-  loggingPaths = import ./lib/logging-paths.nix { inherit pkgs; };
+  loggingPaths = import ./lib/logging-paths.nix { inherit pkgs hostName; };
 
   overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot;
