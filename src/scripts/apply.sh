@@ -314,7 +314,7 @@ case "$(uname -s)" in
     run_health_check
     # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
     # while running as root (which otherwise produces ownership warnings).
-    run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --impure --flake "$REPO_ROOT/src#macbook"
+    run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --impure --flake "$REPO_ROOT/src#MacBook"
     run_terminal_activations
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
     run_caddy_local_ca_trust sudo
@@ -336,7 +336,7 @@ case "$(uname -s)" in
       "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
       run_health_check
       # Keep root invocations on root-owned HOME for consistent Nix behavior.
-      run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#nixos"
+      run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#NixOS"
       run_terminal_activations
       "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
       run_caddy_local_ca_trust sudo

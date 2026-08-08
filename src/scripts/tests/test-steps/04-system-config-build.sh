@@ -10,10 +10,10 @@ run_04_system_config_build() {
 
   local _attr=""
   case "$(uname)" in
-    Darwin) _attr="darwinConfigurations.macbook.system" ;;
+    Darwin) _attr="darwinConfigurations.MacBook.system" ;;
     Linux)
       if [ -d /etc/nixos ]; then
-        _attr="nixosConfigurations.nixos.config.system.build.toplevel"
+        _attr="nixosConfigurations.NixOS.config.system.build.toplevel"
       else
         _attr="homeConfigurations.polyipseity.activationPackage"
       fi

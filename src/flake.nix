@@ -935,7 +935,7 @@
       # Home Manager is embedded as a nix-darwin module so that the single
       # `darwin-rebuild switch` command activates both system and user config.
       # -----------------------------------------------------------------------
-      darwinConfigurations.macbook = darwin.lib.darwinSystem {
+      darwinConfigurations.MacBook = darwin.lib.darwinSystem {
         # Reuse the shared package set so allowUnfree policy from mkPkgs is
         # applied consistently to both system and embedded Home Manager evals.
         pkgs = pkgsMac;
@@ -986,7 +986,7 @@
       # nixosConfigurations — NixOS host for the generic Linux machine.
       # Same Home Manager embedding pattern as the Darwin host.
       # -----------------------------------------------------------------------
-      nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
+      nixosConfigurations.NixOS = nixpkgs.lib.nixosSystem {
         # Keep NixOS evaluation aligned with the same pinned package set and
         # unfree policy used by the rest of the flake outputs.
         pkgs = pkgsLinux;
