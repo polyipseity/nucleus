@@ -2,13 +2,17 @@
 # Derive age secret identity from SSH host key and write to /etc/sops/age/machine.txt.
 # Invoked from system activation (runs as root).
 #
-# The machine age key is shared among all managed users via nucleus-sops group
-# membership (root:nucleus-sops, mode 0640). Personal SSH keys remain the
-# per-user decrypt fallback via decrypt-sops.sh manifest scan.
+# Owner spec (arg 2):
+#   user:<name>  — single-user readable file (mode 0600), used on nix-darwin.
+#   group:<name> — root:group shared file (mode 0640), used on NixOS for all
+#                  managed users in nucleus-sops.
+#
+# Personal SSH keys remain the per-user decrypt fallback via decrypt-sops.sh
+# manifest scan.
 set -euo pipefail
 
 _dha_ssh_to_age_bin="$1"
-_dha_group="${2:-nucleus-sops}"
+_dha_owner_spec="$2"
 
 age_dir="/etc/sops/age"
 age_key_file="$age_dir/machine.txt"
@@ -31,7 +35,19 @@ else
     echo "sops: ssh-to-age failed (exit $derived_age_key_exit) reading $host_ssh_key; $age_key_file not written." >&2
   else
     printf '%s\n' "$derived_age_key" > "$age_key_file"
-    chown "root:${_dha_group}" "$age_key_file"
-    chmod 0640 "$age_key_file"
+    case "$_dha_owner_spec" in
+      group:*)
+        chown "root:${_dha_owner_spec#group:}" "$age_key_file"
+        chmod 0640 "$age_key_file"
+        ;;
+      user:*)
+        chown "${_dha_owner_spec#user:}" "$age_key_file"
+        chmod 0600 "$age_key_file"
+        ;;
+      *)
+        echo "sops: invalid owner spec '$_dha_owner_spec'; expected user:<name> or group:<name>" >&2
+        exit 1
+        ;;
+    esac
   fi
 fi

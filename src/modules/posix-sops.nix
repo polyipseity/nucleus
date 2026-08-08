@@ -10,6 +10,7 @@ let
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
   managedUserNames = builtins.attrNames users;
   sopsGroup = "nucleus-sops";
+  machineAgeOwnerSpec = if pkgs.stdenv.isDarwin then "user:${username}" else "group:${sopsGroup}";
 in
 {
   # ---------------------------------------------------------------------------
@@ -25,8 +26,9 @@ in
   #   identity and fails with "permission denied" in that context.  System
   #   activation runs as root and CAN read the host key, so we derive the age
   #   identity there and write it to a group-readable path:
-  #   /etc/sops/age/machine.txt is owned root:nucleus-sops (mode 0640) and is
-  #   referenced via sops.age.keyFile in secrets.nix.
+  #   /etc/sops/age/machine.txt is owned root:nucleus-sops (mode 0640) on NixOS
+  #   or by the primary user (mode 0600) on nix-darwin, and is referenced via
+  #   sops.age.keyFile in secrets.nix.
   #
   #   The system-level sops-nix instance (this module) keeps sshKeyPaths
   #   because system activation already runs as root.
@@ -36,23 +38,25 @@ in
   #   produce identical output.  We always overwrite to keep the file current
   #   if the host key is ever rotated.
   # ---------------------------------------------------------------------------
-  users.groups.${sopsGroup} = { };
+  users.groups.${sopsGroup} = lib.mkIf (!pkgs.stdenv.isDarwin) { };
 
-  users.users = lib.genAttrs managedUserNames (_name: {
-    extraGroups = lib.mkAfter [ sopsGroup ];
-  });
+  users.users = lib.mkIf (!pkgs.stdenv.isDarwin) (
+    lib.genAttrs managedUserNames (_name: {
+      extraGroups = lib.mkAfter [ sopsGroup ];
+    })
+  );
 
   system.activationScripts =
     if pkgs.stdenv.isDarwin then
       {
         postActivation.text = lib.mkBefore ''
-          "${activationBundle}/src/scripts/secrets/derive-host-age-key.sh" "${pkgs.ssh-to-age}/bin/ssh-to-age" "${sopsGroup}"
+          "${activationBundle}/src/scripts/secrets/derive-host-age-key.sh" "${pkgs.ssh-to-age}/bin/ssh-to-age" "${machineAgeOwnerSpec}"
         '';
       }
     else
       {
         nixos-derive-host-age-key.text = ''
-          "${activationBundle}/src/scripts/secrets/derive-host-age-key.sh" "${pkgs.ssh-to-age}/bin/ssh-to-age" "${sopsGroup}"
+          "${activationBundle}/src/scripts/secrets/derive-host-age-key.sh" "${pkgs.ssh-to-age}/bin/ssh-to-age" "${machineAgeOwnerSpec}"
         '';
       };
 
