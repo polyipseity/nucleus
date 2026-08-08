@@ -58,8 +58,8 @@ function Sync-SecretFile {
   .PARAMETER Username
     Username whose home directory receives materialized payloads.
 
-  .PARAMETER PrimarySshKeyPath
-    Optional transition fallback passed through to Get-Secret.
+  .PARAMETER SshKeyFallbackPath
+    Optional SSH private key path used when machine age key and user manifests are unavailable.
 
   .EXAMPLE
     Sync-SecretFile -FilePath '.\polyipseity.yml' -GpgExe 'gpg.exe' `
@@ -90,7 +90,7 @@ function Sync-SecretFile {
     [Parameter(Mandatory = $true)]
     [string]$Username,
 
-    [string]$PrimarySshKeyPath
+    [string]$SshKeyFallbackPath
   )
 
   $userHome = Resolve-SecretUserHomedir -Username $Username
@@ -116,6 +116,16 @@ function Sync-SecretFile {
     New-Item -ItemType Directory -Path $configDir -Force > $null
   }
 
+  $previousGpgHome = $env:GNUPGHOME
+  $targetGpgHome = Join-Path -Path $userHome -ChildPath '.gnupg'
+  if ($Username -ne $env:USERNAME) {
+    if (-not (Test-Path -Path $targetGpgHome)) {
+      New-Item -ItemType Directory -Path $targetGpgHome -Force > $null
+    }
+    $env:GNUPGHOME = $targetGpgHome
+  }
+
+  try {
   $rclonePassDir = Split-Path -Path $rclonePassPath -Parent
   if (-not (Test-Path -Path $rclonePassDir)) {
     New-Item -ItemType Directory -Path $rclonePassDir -Force > $null
@@ -150,8 +160,8 @@ function Sync-SecretFile {
     RepoRoot           = $RepoRoot
     SopsExe            = $SopsExe
   }
-  if (-not [string]::IsNullOrWhiteSpace($PrimarySshKeyPath)) {
-    $getSecretParams['PrimarySshKeyPath'] = $PrimarySshKeyPath
+  if (-not [string]::IsNullOrWhiteSpace($SshKeyFallbackPath)) {
+    $getSecretParams['PrimarySshKeyPath'] = $SshKeyFallbackPath
   }
   $jsonSecrets = Get-Secret @getSecretParams
 
@@ -300,5 +310,16 @@ function Sync-SecretFile {
       Sort-Object -Unique |
       Out-File -FilePath $managedSshKeyPathsManifest -Encoding ascii
     & $restrictAcl -Path $managedSshKeyPathsManifest
+  }
+  }
+  finally {
+    if ($Username -ne $env:USERNAME) {
+      if ($null -ne $previousGpgHome) {
+        $env:GNUPGHOME = $previousGpgHome
+      }
+      else {
+        Remove-Item -Path Env:GNUPGHOME -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: restore prior unset GNUPGHOME after cross-user materialization
+      }
+    }
   }
 }

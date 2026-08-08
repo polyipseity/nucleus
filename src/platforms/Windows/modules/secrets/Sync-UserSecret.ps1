@@ -12,8 +12,8 @@ function Sync-UserSecret {
     Absolute path to the gpg executable.
   .PARAMETER HostKeyPath
     Path to this machine's SSH host private key.
-  .PARAMETER PrimarySshKeyPath
-    Optional transition fallback passed through to Sync-SecretFile.
+  .PARAMETER SshKeyFallbackPath
+    Optional SSH private key path used when machine age key and user manifests are unavailable.
   .PARAMETER SopsExe
     Absolute path to the sops executable.
   .PARAMETER Username
@@ -35,7 +35,7 @@ function Sync-UserSecret {
     [Parameter(Mandatory = $true)]
     [string]$Username,
 
-    [string]$PrimarySshKeyPath
+    [string]$SshKeyFallbackPath
   )
 
   $userSecretFile = Join-Path $RepoRoot "src\secrets\users\$Username.yml"
@@ -51,8 +51,8 @@ function Sync-UserSecret {
     SopsExe     = $SopsExe
     Username    = $Username
   }
-  if (-not [string]::IsNullOrWhiteSpace($PrimarySshKeyPath)) {
-    $syncParams['PrimarySshKeyPath'] = $PrimarySshKeyPath
+  if (-not [string]::IsNullOrWhiteSpace($SshKeyFallbackPath)) {
+    $syncParams['SshKeyFallbackPath'] = $SshKeyFallbackPath
   }
 
   Sync-SecretFile @syncParams
