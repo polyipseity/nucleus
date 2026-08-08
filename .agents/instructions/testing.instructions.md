@@ -55,7 +55,7 @@ cd src && nix flake check
 
 ```powershell
 # Run Pester tests for DSC validation
-Invoke-Pester -Path tests/hosts/Windows/ -Verbose
+Invoke-Pester -Path tests/platforms/Windows/modules/ -Verbose
 ```
 
 ---
@@ -171,7 +171,7 @@ These patterns have been learned from fixing real test failures:
 
 ### Pester Test Structure
 
-**File location:** `tests/hosts/Windows/**/*.Tests.ps1`
+**File location:** `tests/platforms/Windows/modules/**/*.Tests.ps1`
 
 **Test categories:**
 
@@ -203,10 +203,10 @@ Describe "Security Settings" {
 
 ```powershell
 # Run all Windows tests (requires admin)
-Invoke-Pester -Path tests/hosts/Windows/ -Verbose
+Invoke-Pester -Path tests/platforms/Windows/modules/ -Verbose
 
 # Run a single test file
-Invoke-Pester -Path tests/hosts/Windows/config-method.Tests.ps1
+Invoke-Pester -Path tests/platforms/Windows/modules/config-method.Tests.ps1
 ```
 
 ### DSC Dry-Run Validation
@@ -246,8 +246,8 @@ Commit atomically: test + implementation in one commit.
 
 **Pester tests:**
 
-- `tests/hosts/Windows/<area>/<feature>.Tests.ps1` — tests for a feature or DSC resource group
-- Example: `tests/hosts/Windows/svc-windows.Tests.ps1` for machine-scoped DSC invariants
+- `tests/platforms/Windows/modules/<area>/<feature>.Tests.ps1` — tests for a feature or DSC resource group
+- Example: `tests/platforms/Windows/modules/svc-windows.Tests.ps1` for machine-scoped DSC invariants
 
 ### Example patterns
 
@@ -267,7 +267,7 @@ Describe "Windows Package Installation" {
 
 Learned from authoring `tests/scripts/` check-step tests; applies to test scripts, not production code.
 
-- **Assert-Pass style, not Pester**: functional tests under `tests/scripts/check-steps/` (e.g. `09-schema-validation-tests.ps1`) are plain `pwsh -NoProfile -File` scripts with explicit PASS/FAIL output — `Invoke-Pester` discovers 0 tests in them. Run them directly and check the exit code; they are wired into `05-framework-verification.ps1`.
+- **Assert-Pass style, not Pester**: functional tests under `tests/scripts/check-steps/` (e.g. `09-schema-validation-tests.ps1`) are plain `pwsh -NoProfile -File` scripts with explicit PASS/FAIL output — `Invoke-Pester` discovers 0 tests in them. Run them directly and check the exit code; they are wired into test step 5 (`script-and-framework-tests`) via auto-discovery.
 - **PowerShell gotchas**:
   - `exit` inside a function/script is NOT catchable by `try/catch` — `ExitException` propagates and kills the script. Tests of exit-based rejection must spawn a subprocess (`pwsh -NoProfile -Command $scriptText`) and check `$LASTEXITCODE` plus output.
   - `Write-ErrorMessage`/`Write-Message` are defined by `test-lib.ps1`, not `step-runner.ps1`. Tests asserting these are UNDEFINED (`CommandNotFoundException` catch) pass standalone but FAIL in-suite because test-lib defines them — and the test's `exit 1` really runs.

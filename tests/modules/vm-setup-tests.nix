@@ -627,8 +627,8 @@ let
 
   # Deterministic identity derivation, imported from the shared library.
   # UUIDs/MACs are pure SHA-256 functions of the VM id (runtime truth in
-  # src/hosts/MacBook/vms.nix); the shell twin
-  # (tests/scripts/vm-disk-model-tests.sh) is pinned to the same vectors.
+  # src/hosts/MacBook/vms.nix); the Windows Pester twin
+  # (tests/platforms/Windows/modules/system/vm-disk-model-parity.Tests.ps1) is pinned to the same vectors.
   mkUuid = vmIdentity.mkUuid;
 
   # UUID must be 36 characters long (8-4-4-4-12 hex with dashes).

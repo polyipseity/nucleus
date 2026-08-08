@@ -8,7 +8,7 @@
 # The same derivation is re-implemented in shell (vm_mk_uuid/vm_mk_mac_address
 # in src/scripts/lib/vm.sh) and PowerShell (src/platforms/Windows/modules/system/
 # Invoke-VMSetup.ps1); tests pin both twins against the known vectors here
-# (tests/modules/vm-setup-tests.nix and tests/scripts/vm-disk-model-tests.sh).
+# (tests/modules/vm-setup-tests.nix and tests/platforms/Windows/modules/system/vm-disk-model-parity.Tests.ps1).
 let
   # Format a SHA-256 hex digest as an 8-4-4-4-12 UUID.
   uuidFromDigest =
