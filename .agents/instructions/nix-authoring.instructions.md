@@ -90,7 +90,7 @@ if [ -n "$_path_prepend" ]; then
 fi
 ```
 
-See `src/scripts/services/jellyfin-sync.sh` and its callers (`src/hosts/MacBook/activation.nix`, `src/hosts/NixOS/jellyfin.nix`) for the canonical implementation.
+See `src/scripts/services/jellyfin-sync.sh` and its POSIX orchestration caller (`src/scripts/apply.sh`; Windows: `src/hosts/Windows/apply.ps1` via `Sync-Jellyfin*`) for the canonical implementation.
 
 **Comments must never contain token placeholder strings.** Since `builtins.replaceStrings` replaces all occurrences, any token string (e.g. `__NUCLEUS_REPO_ROOT__`) appearing in a comment will also be substituted, leaving meaningless text.
 

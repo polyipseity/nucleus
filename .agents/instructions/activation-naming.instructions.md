@@ -13,7 +13,7 @@ All activation entry names — `home.activation.*`, `system.activationScripts.*`
 - **kebab-case only.** Use hyphens to separate words: `cloud-drives-setup`, not `cloudDrivesSetup` or `cloud_drives_setup`.
 - **verb-first.** Start every name with a verb or action word: `provision-dev-repos`, `install-pwsh-yaml`, `merge-obsidian-json`.
 - **Host-prefixed when OS-specific.** If the activation only applies to one OS, prefix with `macos-` or `nixos-`:
-  - `macos-configure-finder-sidebar`, `nixos-sync-jellyfin`
+  - `macos-configure-finder-sidebar`, `nixos-launch-nvim`
 - **No prefix when cross-platform.** If the activation applies to multiple operating systems, no host prefix:
   - `cloud-drives-setup`, `provision-dev-repos`, `wait-for-sops-secrets`
 - **No `nucleus-` prefix.** The project name is redundant — all activations in this repo are nucleus-specific.

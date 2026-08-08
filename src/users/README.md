@@ -22,7 +22,7 @@ Some fields accept either a plain string or a host map. Host maps use keys `MacB
 
 `jellyfin.json` follows the same per-user deep merge as other registry domains: each real user's effective payload is `default/jellyfin.json` merged with `src/users/<username>/jellyfin.json` (arrays replace wholesale). The default file is empty (`accounts: []`, `libraries: []`) but still participates in that merge.
 
-Jellyfin sync on the host is different: activation scripts union every user's merged `accounts` and `libraries` into one shared Jellyfin instance (dedup by account id and library name at sync time). See `src/scripts/services/jellyfin-sync.sh` and the Windows `Sync-Jellyfin*` modules.
+Jellyfin sync on the host is different: `src/scripts/apply.sh` (POSIX) and `src/hosts/Windows/apply.ps1` union every user's merged `accounts` and `libraries` into one shared Jellyfin instance (dedup by account id and library name at sync time). See `src/scripts/services/jellyfin-sync.sh` and the Windows `Sync-Jellyfin*` modules.
 
 ## Homedir app trees (directories)
 
