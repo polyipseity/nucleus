@@ -470,7 +470,7 @@ function Get-AndroidShellGetprop {
   return (($value | Out-String) -replace "`r`n", '').Trim()
 }
 
-function Invoke-AndroidAdbEnsureRoot {
+function Test-AndroidGuestShellIsRoot {
   param(
     [Parameter(Mandatory)]
     [object]$Vm
@@ -478,34 +478,7 @@ function Invoke-AndroidAdbEnsureRoot {
 
   $serial = Get-AndroidAdbSerial -Vm $Vm
   $uid = & adb -s $serial shell 'id -u' 2>$null
-  if ((($uid | Out-String) -replace "`r", '').Trim() -eq '0') {
-    return $true
-  }
-
-  for ($attempt = 0; $attempt -lt 3; $attempt++) {
-    # check-suppress:suppression_doc: best-effort adb root trigger; success verified on next id -u check.
-    & adb -s $serial root 2>$null
-    Start-Sleep -Seconds 3
-    Invoke-AndroidAdbRefresh -Vm $Vm
-    $uid = & adb -s $serial shell 'id -u' 2>$null
-    if ((($uid | Out-String) -replace "`r", '').Trim() -eq '0') {
-      return $true
-    }
-  }
-  return $false
-}
-
-function Invoke-AndroidRecoveryPrepareAdb {
-  param(
-    [Parameter(Mandatory)]
-    [object]$Vm
-  )
-
-  $serial = Get-AndroidAdbSerial -Vm $Vm
-  # check-suppress:suppression_doc: recovery adbd root may already be enabled or ADB not ready yet.
-  & adb -s $serial root 2>$null
-  Start-Sleep -Seconds 2
-  Invoke-AndroidAdbRefresh -Vm $Vm
+  return ((($uid | Out-String) -replace "`r", '').Trim() -eq '0')
 }
 
 function Get-AndroidRecoveryAssetSuffix {

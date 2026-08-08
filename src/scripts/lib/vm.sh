@@ -1723,40 +1723,13 @@ vm_android_shell_getprop() {
   adb -s "$_asgp_serial" shell getprop "$_asgp_name" 2>/dev/null | tr -d '\r\n'
 }
 
-# vm_android_adb_ensure_root VM_INDEX
-#   Restart adbd as root when the guest allows it; return 0 when shell uid is 0.
-vm_android_adb_ensure_root() {
-  _aer_vm_index="$1"
-  _aer_serial="$(vm_android_adb_serial "$_aer_vm_index")"
-  _aer_attempt=0
+# vm_android_guest_shell_is_root VM_INDEX
+#   True when adb shell runs as uid 0 (recovery native root shell).
+vm_android_guest_shell_is_root() {
+  _agsr_vm_index="$1"
+  _agsr_serial="$(vm_android_adb_serial "$_agsr_vm_index")"
 
-  if adb -s "$_aer_serial" shell 'id -u' 2>/dev/null | tr -d '\r' | grep -qx '0'; then
-    return 0
-  fi
-
-  while [ "$_aer_attempt" -lt 3 ]; do
-    # check-suppress:suppression_doc: best-effort adb root trigger; success verified on next id -u check.
-    adb -s "$_aer_serial" root 2>/dev/null || true
-    sleep 3
-    vm_android_adb_refresh "$_aer_vm_index"
-    if adb -s "$_aer_serial" shell 'id -u' 2>/dev/null | tr -d '\r' | grep -qx '0'; then
-      return 0
-    fi
-    _aer_attempt=$((_aer_attempt + 1))
-  done
-  return 1
-}
-
-# vm_android_recovery_prepare_adb VM_INDEX
-#   Restart adbd as root in userdebug recovery (Advanced → Enable ADB must be on).
-vm_android_recovery_prepare_adb() {
-  _arpa_vm_index="$1"
-  _arpa_serial="$(vm_android_adb_serial "$_arpa_vm_index")"
-
-  # check-suppress:suppression_doc: recovery adbd root may already be enabled or ADB not ready yet.
-  adb -s "$_arpa_serial" root 2>/dev/null || true
-  sleep 2
-  vm_android_adb_refresh "$_arpa_vm_index"
+  adb -s "$_agsr_serial" shell 'id -u' 2>/dev/null | tr -d '\r' | grep -qx '0'
 }
 
 # vm_android_recovery_asset_suffix VM_INDEX
