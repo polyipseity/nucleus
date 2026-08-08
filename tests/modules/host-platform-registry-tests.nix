@@ -59,27 +59,23 @@ let
 
   serviceNames = builtins.filter (n: builtins.substring 0 1 n != "$") (builtins.attrNames services);
 
-  test_services_host_platform_refs = assert' (
-    builtins.all (
-      svcName:
-      let
-        hosts = services.${svcName}.hosts or { };
-      in
-      builtins.all (
-        host: hp.validateHostPlatformRef host hosts.${host}.platform == null
-      ) (builtins.attrNames hosts)
-    ) serviceNames
-  ) "every services.json host platform ref must match host-platform-registry.json";
+  test_services_host_platform_refs = assert' (builtins.all (
+    svcName:
+    let
+      hosts = services.${svcName}.hosts or { };
+    in
+    builtins.all (host: hp.validateHostPlatformRef host hosts.${host}.platform == null) (
+      builtins.attrNames hosts
+    )
+  ) serviceNames) "every services.json host platform ref must match host-platform-registry.json";
 
-  test_services_hosts_have_no_flags = assert' (
-    builtins.all (
-      svcName:
-      let
-        hosts = services.${svcName}.hosts or { };
-      in
-      builtins.all (host: !(hosts.${host} ? flags)) (builtins.attrNames hosts)
-    ) serviceNames
-  ) "services.json host entries must not contain flags";
+  test_services_hosts_have_no_flags = assert' (builtins.all (
+    svcName:
+    let
+      hosts = services.${svcName}.hosts or { };
+    in
+    builtins.all (host: !(hosts.${host} ? flags)) (builtins.attrNames hosts)
+  ) serviceNames) "services.json host entries must not contain flags";
 
 in
 {

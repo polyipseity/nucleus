@@ -21,14 +21,14 @@ _glob_has_file() {
 # ---- Verify POSIX check step files ----
 test_posix_check_step_files_exist() {
     local missing=0
-    for n in $(seq -w 1 25); do
+    for n in $(seq -w 1 26); do
         if ! _glob_has_file "$REPO_ROOT/src/scripts/checks/check-steps/$n"*.sh; then
             assert_fail "POSIX check step $n" "Missing step file for number $n"
             ((missing++))
         fi
     done
     if [ "$missing" -eq 0 ]; then
-        assert_pass "All 25 POSIX check step files exist"
+        assert_pass "All 26 POSIX check step files exist"
     fi
 }
 
@@ -73,11 +73,11 @@ test_posix_check_step_sequential_numbers() {
         sed -n 's/.*register_step "[^"]*" \([0-9]\+\).*/\1/p' "$f" | head -1
     done | sort -n)
     local expected
-    expected=$(seq 1 25)
+    expected=$(seq 1 26)
     if [ "$numbers" = "$expected" ]; then
-        assert_pass "POSIX check step numbers are sequential 1-25"
+        assert_pass "POSIX check step numbers are sequential 1-26"
     else
-        assert_fail "POSIX check step numbers" "Expected 1-25 sequential, got: $numbers"
+        assert_fail "POSIX check step numbers" "Expected 1-26 sequential, got: $numbers"
     fi
 }
 
@@ -113,14 +113,14 @@ test_posix_test_step_has_register_step() {
 # ---- Verify Windows step files exist ----
 test_windows_check_step_files_exist() {
     local missing=0
-    for n in $(seq -w 1 25); do
+    for n in $(seq -w 1 26); do
         if ! _glob_has_file "$REPO_ROOT/src/scripts/checks/check-steps/$n"*.ps1; then
             assert_fail "Windows check step $n" "Missing step file for number $n"
             ((missing++))
         fi
     done
     if [ "$missing" -eq 0 ]; then
-        assert_pass "All 25 Windows check step files exist"
+        assert_pass "All 26 Windows check step files exist"
     fi
 }
 
