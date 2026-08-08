@@ -218,6 +218,52 @@ validate_qcow2_image() {
   return 0
 }
 
+# vm_resolve_guest_ssh_public_key USERNAME REPO_ROOT
+#   Prints the first readable SSH public key under ~/.ssh per
+#   src/modules/vm-guest-ssh-public-key-paths.json. Static id_*.pub paths are
+#   tried before username templates (ssh_personal_{username}.pub, etc.).
+#   Returns 1 when no key exists.
+vm_resolve_guest_ssh_public_key() {
+  _vrgspk_username="$1"
+  _vrgspk_repo_root="$2"
+
+  if [ -z "$_vrgspk_repo_root" ]; then
+    error 'vm_resolve_guest_ssh_public_key requires repo root'
+    return 1
+  fi
+
+  _vrgspk_manifest="$_vrgspk_repo_root/src/modules/vm-guest-ssh-public-key-paths.json"
+  if [ ! -f "$_vrgspk_manifest" ]; then
+    error "guest SSH public key manifest not found: $_vrgspk_manifest"
+    return 1
+  fi
+
+  _vrgspk_ssh_dir="$HOME/.ssh"
+
+  while IFS= read -r _vrgspk_rel; do
+    [ -z "$_vrgspk_rel" ] && continue
+    _vrgspk_key_path="$_vrgspk_ssh_dir/$_vrgspk_rel"
+    if [ -f "$_vrgspk_key_path" ] && [ -r "$_vrgspk_key_path" ]; then
+      cat "$_vrgspk_key_path"
+      return 0
+    fi
+  done < <(jq -r '.staticRelativePaths[]' "$_vrgspk_manifest")
+
+  if [ -n "$_vrgspk_username" ]; then
+    while IFS= read -r _vrgspk_tpl; do
+      [ -z "$_vrgspk_tpl" ] && continue
+      _vrgspk_rel="${_vrgspk_tpl//\{username\}/$_vrgspk_username}"
+      _vrgspk_key_path="$_vrgspk_ssh_dir/$_vrgspk_rel"
+      if [ -f "$_vrgspk_key_path" ] && [ -r "$_vrgspk_key_path" ]; then
+        cat "$_vrgspk_key_path"
+        return 0
+      fi
+    done < <(jq -r '.usernameRelativePathTemplates[]' "$_vrgspk_manifest")
+  fi
+
+  return 1
+}
+
 # vm_guest_credentials_marker_path NAME [DISK_PATH]
 #   Returns the sidecar marker path storing the guest-credential fingerprint
 #   used when building/provisioning the VM image or runtime disk.

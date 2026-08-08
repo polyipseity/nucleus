@@ -128,22 +128,6 @@ resolve_vm_guest_credentials() {
   return 0
 }
 
-# resolve_vm_guest_ssh_key
-#   Prints the first readable SSH public key found in the standard ~/.ssh
-#   locations. WHY: the key is injected into the NixOS guest's authorized_keys
-#   during provisioning so key auth works without shipping the private key.
-#   Returns 1 when no key exists; do_setup then falls back to password auth.
-resolve_vm_guest_ssh_key() {
-  local _key_path=''
-  for _key_path in "$HOME/.ssh/id_ed25519.pub" "$HOME/.ssh/id_ecdsa.pub" "$HOME/.ssh/id_rsa.pub" "$HOME/.ssh/id_ecdsa_sk.pub"; do
-    if [ -f "$_key_path" ] && [ -r "$_key_path" ]; then
-      cat "$_key_path"
-      return 0
-    fi
-  done
-  return 1
-}
-
 # vm_guest_credentials_hash
 #   Prints a SHA-256 fingerprint of the resolved guest credentials. WHY: the
 #   fingerprint lets provisioning detect when SOPS secrets changed and the
@@ -429,7 +413,7 @@ vm_prepare_vm_command() {
     export NUCLEUS_VM_GUEST_USERNAME="$vm_guest_username"
     export NUCLEUS_VM_GUEST_PASSWORD="$vm_guest_password"
 
-    vm_guest_ssh_public_key="$(resolve_vm_guest_ssh_key)" || true  # check-suppress:suppression_doc: resolve_vm_guest_ssh_key may fail when no guest SSH key exists; an empty value skips key provisioning
+    vm_guest_ssh_public_key="$(vm_resolve_guest_ssh_public_key "$vm_guest_username" "$REPO_ROOT")" || true  # check-suppress:suppression_doc: vm_resolve_guest_ssh_public_key may fail when no guest SSH key exists; an empty value skips key provisioning
     if [ -n "$vm_guest_ssh_public_key" ]; then
       export NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY="$vm_guest_ssh_public_key"
     else
