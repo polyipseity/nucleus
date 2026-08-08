@@ -138,6 +138,8 @@ Guest port forwards are declared in the `portForwards` array of each VM entry: n
 
 **Flags (both hosts):** `--gapps`, `--adb-keys`, `--magisk`, `--root`, `--fake-wifi`, `--fake-wifi-revert`. Omit all flags to print the manual.
 
+**Privileged access policy:** Booted `android-config` uses Magisk `su` only (`adb shell su -c …`). Recovery `--adb-keys` uses the recovery shell when `id -u` is `0` (Advanced → Enable ADB). **`adb root` is never used.** `--root` sets `persist.sys.root_access=3` only; `ro.debuggable` must remain `0` on jqssun user builds.
+
 **Change checklist:** update `VMs.json` + `VMs.schema.json`, `vm.sh`, `vm.ps1`, Windows modules, `tests/scripts/android-config-tests.sh`, `tests/scripts/android-config-tests.ps1`, `tests/integration/android-config-parity-tests.nix`, `tests/modules/vm-setup-tests.nix`, and all three `MANUAL.md` files in the same change.
 
 **Platform exceptions (WHY):** MacBook UTM renderer prefs and freeze workarounds (`utm-android-freeze.instructions.md`); NixOS uses libvirt/KVM; Windows uses QEMU (`start-android-vm.ps1`). Recovery/booted workflow steps are shared; host-specific setup notes differ only in `MANUAL.md`.
