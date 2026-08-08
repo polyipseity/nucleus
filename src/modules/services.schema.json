@@ -29,18 +29,18 @@
         "description": "Named network endpoints exposed by this service (omit for services with no network interface, e.g. Unix-socket-only).",
         "type": "object"
       },
-      "platforms": {
+      "hosts": {
         "additionalProperties": false,
         "minProperties": 1,
         "properties": {
-          "macos": {
-            "$ref": "#/definitions/platformEntry"
+          "MacBook": {
+            "$ref": "#/definitions/hostEntry"
           },
-          "nixos": {
-            "$ref": "#/definitions/platformEntry"
+          "NixOS": {
+            "$ref": "#/definitions/hostEntry"
           },
-          "windows": {
-            "$ref": "#/definitions/platformEntry"
+          "Windows": {
+            "$ref": "#/definitions/hostEntry"
           }
         },
         "type": "object"
@@ -48,7 +48,7 @@
     },
     "required": [
       "displayName",
-      "platforms"
+      "hosts"
     ],
     "type": "object"
   },
@@ -266,8 +266,8 @@
       ],
       "type": "object"
     },
-    "platformEntry": {
-      "description": "Platform-specific service configuration",
+    "serviceRuntimeEntry": {
+      "description": "Service runtime configuration for one host",
       "oneOf": [
         {
           "$ref": "#/definitions/launchctlEntry"
@@ -285,6 +285,28 @@
           "$ref": "#/definitions/omittedEntry"
         }
       ]
+    },
+    "hostEntry": {
+      "allOf": [
+        {
+          "properties": {
+            "platform": {
+              "$ref": "#/definitions/platformKey"
+            }
+          },
+          "required": [ "platform" ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/definitions/serviceRuntimeEntry"
+        }
+      ],
+      "description": "Host-specific service configuration with platform reference"
+    },
+    "platformKey": {
+      "description": "OS-family platform key referenced by host entries",
+      "enum": [ "macOS", "NixOS", "Windows" ],
+      "type": "string"
     },
     "schtaskEntry": {
       "properties": {

@@ -33,20 +33,23 @@
         "protocol": "tcp"
       }
     },
-    "platforms": {
-      "macos": {
+    "hosts": {
+      "MacBook": {
         "domain": "system",
         "runAsUser": true,
         "service": "org.nixos.httpsProxy",
-        "type": "launchctl"
+        "type": "launchctl",
+        "platform": "macOS"
       },
-      "nixos": {
+      "NixOS": {
         "justification": "Integrated into services.caddy in NixOS host config via nucleus.httpsProxy.virtualHosts; not a separate managed service.",
-        "type": "omitted"
+        "type": "omitted",
+        "platform": "NixOS"
       },
-      "windows": {
+      "Windows": {
         "service": "nucleus-caddy",
-        "type": "native"
+        "type": "native",
+        "platform": "Windows"
       }
     }
   },
@@ -71,46 +74,52 @@
         "protocol": "tcp"
       }
     },
-    "platforms": {
-      "macos": {
+    "hosts": {
+      "MacBook": {
         "domain": "system",
         "justification": "System-wide audio processor independent of login session",
         "runAsUser": true,
         "service": "local.camilladsp",
-        "type": "launchctl"
+        "type": "launchctl",
+        "platform": "macOS"
       },
-      "nixos": {
+      "NixOS": {
         "justification": "System-wide audio processor independent of login session",
         "scope": "system",
         "service": "camilladsp.service",
-        "type": "systemctl"
+        "type": "systemctl",
+        "platform": "NixOS"
       },
-      "windows": {
+      "Windows": {
         "taskPath": "\\NucleusCamillaDSP",
-        "type": "schtask"
+        "type": "schtask",
+        "platform": "Windows"
       }
     }
   },
   "camilladsp-heartbeat": {
     "description": "Periodic config re-push for CamillaDSP audio device recovery",
     "displayName": "CamillaDSP Heartbeat",
-    "platforms": {
-      "macos": {
+    "hosts": {
+      "MacBook": {
         "domain": "system",
         "justification": "Launchd daemon with internal 5s loop; runs as console user for audio device access.",
         "runAsUser": true,
         "service": "local.camilladsp-heartbeat",
-        "type": "launchctl"
+        "type": "launchctl",
+        "platform": "macOS"
       },
-      "nixos": {
+      "NixOS": {
         "justification": "Persistent systemd service with internal 5s loop; restarts config after device reconnection.",
         "scope": "system",
         "service": "camilladsp-heartbeat.service",
-        "type": "systemctl"
+        "type": "systemctl",
+        "platform": "NixOS"
       },
-      "windows": {
+      "Windows": {
         "taskPath": "\\NucleusCamillaDSPHeartbeat",
-        "type": "schtask"
+        "type": "schtask",
+        "platform": "Windows"
       }
     }
   },
@@ -140,23 +149,26 @@
         "protocol": "https"
       }
     },
-    "platforms": {
-      "macos": {
+    "hosts": {
+      "MacBook": {
         "domain": "system",
         "justification": "System-wide web GUI daemon independent of login session",
         "runAsUser": true,
         "service": "local.camillagui-backend",
-        "type": "launchctl"
+        "type": "launchctl",
+        "platform": "macOS"
       },
-      "nixos": {
+      "NixOS": {
         "justification": "System-wide web GUI daemon independent of login session",
         "scope": "system",
         "service": "camillagui-backend.service",
-        "type": "systemctl"
+        "type": "systemctl",
+        "platform": "NixOS"
       },
-      "windows": {
+      "Windows": {
         "taskPath": "\\NucleusCamillaGUI",
-        "type": "schtask"
+        "type": "schtask",
+        "platform": "Windows"
       }
     }
   },
@@ -166,26 +178,29 @@
     "logging": {
       "capture": "all"
     },
-    "platforms": {
-      "macos": {
+    "hosts": {
+      "MacBook": {
         "domain": "user",
         "justification": "Per-user FUSE mount namespace bound to login session",
         "prefixMatch": true,
         "service": "local.cloud-mount.",
-        "type": "launchctl"
+        "type": "launchctl",
+        "platform": "macOS"
       },
-      "nixos": {
+      "NixOS": {
         "justification": "Per-user FUSE mount namespace bound to login session",
         "prefixMatch": true,
         "scope": "user",
         "service": "cloud-mount-",
-        "type": "systemctl"
+        "type": "systemctl",
+        "platform": "NixOS"
       },
-      "windows": {
+      "Windows": {
         "justification": "Per-user FUSE mount via scheduled task at logon; replaced Servy for user-context isolation.",
         "prefixMatch": true,
         "taskPath": "\\NucleusCloudMount",
-        "type": "schtask"
+        "type": "schtask",
+        "platform": "Windows"
       }
     }
   },
@@ -202,22 +217,25 @@
         "protocol": "http"
       }
     },
-    "platforms": {
-      "macos": {
+    "hosts": {
+      "MacBook": {
         "domain": "user",
         "justification": "Requires GUI session (tray app with NSMenu)",
         "service": "local.discord-music-rpc",
-        "type": "launchctl"
+        "type": "launchctl",
+        "platform": "macOS"
       },
-      "nixos": {
+      "NixOS": {
         "justification": "Requires GUI session (tray app with NSMenu)",
         "scope": "user",
         "service": "discord-music-rpc.service",
-        "type": "systemctl"
+        "type": "systemctl",
+        "platform": "NixOS"
       },
-      "windows": {
+      "Windows": {
         "taskPath": "\\NucleusDiscordMusicRPC",
-        "type": "schtask"
+        "type": "schtask",
+        "platform": "Windows"
       }
     }
   },
@@ -249,21 +267,24 @@
         "protocol": "https"
       }
     },
-    "platforms": {
-      "macos": {
+    "hosts": {
+      "MacBook": {
         "domain": "system",
         "runAsUser": true,
         "service": "org.nixos.jellyfin",
-        "type": "launchctl"
+        "type": "launchctl",
+        "platform": "macOS"
       },
-      "nixos": {
+      "NixOS": {
         "scope": "system",
         "service": "jellyfin.service",
-        "type": "systemctl"
+        "type": "systemctl",
+        "platform": "NixOS"
       },
-      "windows": {
+      "Windows": {
         "service": "JellyfinServer",
-        "type": "native"
+        "type": "native",
+        "platform": "Windows"
       }
     }
   },
@@ -286,19 +307,22 @@
         "protocol": "tcp"
       }
     },
-    "platforms": {
-      "macos": {
+    "hosts": {
+      "MacBook": {
         "domain": "system",
         "service": "org.nixos.linux-builder",
-        "type": "launchctl"
+        "type": "launchctl",
+        "platform": "macOS"
       },
-      "nixos": {
+      "NixOS": {
         "justification": "NixOS runs Linux natively; no builder VM required.",
-        "type": "omitted"
+        "type": "omitted",
+        "platform": "NixOS"
       },
-      "windows": {
+      "Windows": {
         "justification": "Nix is not the primary build platform on Windows.",
-        "type": "omitted"
+        "type": "omitted",
+        "platform": "Windows"
       }
     }
   },
@@ -322,22 +346,25 @@
         "protocol": "http"
       }
     },
-    "platforms": {
-      "macos": {
+    "hosts": {
+      "MacBook": {
         "domain": "system",
         "runAsUser": true,
         "service": "local.litellm",
-        "type": "launchctl"
+        "type": "launchctl",
+        "platform": "macOS"
       },
-      "nixos": {
+      "NixOS": {
         "scope": "system",
         "service": "litellm.service",
-        "type": "systemctl"
+        "type": "systemctl",
+        "platform": "NixOS"
       },
-      "windows": {
+      "Windows": {
         "justification": "Native Windows SCM service runs as SYSTEM; SOPS-decrypted API keys stored in %ProgramData%\\nucleus\\secrets\\ for SYSTEM access.",
         "service": "nucleus-litellm",
-        "type": "native"
+        "type": "native",
+        "platform": "Windows"
       }
     }
   },
@@ -363,21 +390,24 @@
         "protocol": "http"
       }
     },
-    "platforms": {
-      "macos": {
+    "hosts": {
+      "MacBook": {
         "domain": "system",
         "runAsUser": true,
         "service": "local.ollama",
-        "type": "launchctl"
+        "type": "launchctl",
+        "platform": "macOS"
       },
-      "nixos": {
+      "NixOS": {
         "scope": "system",
         "service": "ollama.service",
-        "type": "systemctl"
+        "type": "systemctl",
+        "platform": "NixOS"
       },
-      "windows": {
+      "Windows": {
         "service": "ollama",
-        "type": "native"
+        "type": "native",
+        "platform": "Windows"
       }
     }
   },
@@ -397,18 +427,21 @@
         "protocol": "tcp"
       }
     },
-    "platforms": {
-      "macos": {
+    "hosts": {
+      "MacBook": {
         "justification": "macOS uses built-in Screen Sharing / VNC protocol instead of RDP.",
-        "type": "omitted"
+        "type": "omitted",
+        "platform": "macOS"
       },
-      "nixos": {
+      "NixOS": {
         "justification": "Linux hosts typically use VNC or similar remote-access protocols; no RDP server configured.",
-        "type": "omitted"
+        "type": "omitted",
+        "platform": "NixOS"
       },
-      "windows": {
+      "Windows": {
         "service": "TermService",
-        "type": "native"
+        "type": "native",
+        "platform": "Windows"
       }
     }
   },
@@ -424,20 +457,23 @@
         "user": []
       }
     },
-    "platforms": {
-      "macos": {
+    "hosts": {
+      "MacBook": {
         "domain": "system",
         "service": "local.service-watchdog",
-        "type": "launchctl"
+        "type": "launchctl",
+        "platform": "macOS"
       },
-      "nixos": {
+      "NixOS": {
         "scope": "system",
         "service": "nucleus-service-watchdog.service",
-        "type": "systemctl"
+        "type": "systemctl",
+        "platform": "NixOS"
       },
-      "windows": {
+      "Windows": {
         "taskPath": "\\nucleus\\service-watchdog",
-        "type": "schtask"
+        "type": "schtask",
+        "platform": "Windows"
       }
     }
   },
@@ -453,20 +489,23 @@
         ]
       }
     },
-    "platforms": {
-      "macos": {
+    "hosts": {
+      "MacBook": {
         "domain": "user",
         "justification": "User-scope watchdog monitors user-domain launchd agents (launchctl gui/<uid>); must run in user context to access user-scope services.",
         "service": "local.service-watchdog-user",
-        "type": "launchctl"
+        "type": "launchctl",
+        "platform": "macOS"
       },
-      "nixos": {
+      "NixOS": {
         "justification": "User-scope watchdog not needed on NixOS — the system watchdog covers both scopes via systemctl --user",
-        "type": "omitted"
+        "type": "omitted",
+        "platform": "NixOS"
       },
-      "windows": {
+      "Windows": {
         "justification": "User-scope watchdog not needed on Windows — scheduled task runs with system scope",
-        "type": "omitted"
+        "type": "omitted",
+        "platform": "Windows"
       }
     }
   },
@@ -479,23 +518,26 @@
         "provider": "OpenSSH"
       }
     },
-    "platforms": {
-      "macos": {
+    "hosts": {
+      "MacBook": {
         "domain": "user",
         "justification": "User key material in per-user ssh-agent process",
         "service": "com.openssh.ssh-agent",
-        "type": "launchctl"
+        "type": "launchctl",
+        "platform": "macOS"
       },
-      "nixos": {
+      "NixOS": {
         "justification": "Standalone OpenSSH ssh-agent via programs.ssh.startAgent; user-scoped to isolate key material per login session.",
         "scope": "user",
         "service": "ssh-agent.service",
-        "type": "systemctl"
+        "type": "systemctl",
+        "platform": "NixOS"
       },
-      "windows": {
+      "Windows": {
         "justification": "Runs as SYSTEM SCM service; per-user isolation handled by OpenSSH's per-user ssh-agent.exe spawned on demand.",
         "service": "ssh-agent",
-        "type": "native"
+        "type": "native",
+        "platform": "Windows"
       }
     }
   },
@@ -515,21 +557,24 @@
         "protocol": "tcp"
       }
     },
-    "platforms": {
-      "macos": {
+    "hosts": {
+      "MacBook": {
         "domain": "system",
         "service": "com.openssh.sshd",
         "socketActivated": true,
-        "type": "launchctl"
+        "type": "launchctl",
+        "platform": "macOS"
       },
-      "nixos": {
+      "NixOS": {
         "scope": "system",
         "service": "sshd.service",
-        "type": "systemctl"
+        "type": "systemctl",
+        "platform": "NixOS"
       },
-      "windows": {
+      "Windows": {
         "service": "sshd",
-        "type": "native"
+        "type": "native",
+        "platform": "Windows"
       }
     }
   }
