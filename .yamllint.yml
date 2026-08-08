@@ -1,5 +1,5 @@
 ---
-# ref: https://json.schemastore.org/yamllint.json -- published schema (Spec G step 13)
+# ref: https://json.schemastore.org/yamllint.json -- published schema (Spec G step 9)
 $schema: https://json.schemastore.org/yamllint.json
 extends: default
 

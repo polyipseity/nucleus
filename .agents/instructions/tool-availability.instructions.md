@@ -10,6 +10,7 @@ Scripts and tests in this repository assume all required tools are installed. Sk
 
 ## Policy
 
+- **Provisioning and preflight are always separate concerns.** Provisioning installs or deploys tools (`nucleus-bootstrap`, `nucleus-apply`, `lockfile.json` PowerShell modules, `core.nix` / WinGet DSC). Preflight (`preflight_check`, `Test-Prerequisite`, `require_command`, `Assert-ToolAvailable`) verifies tools are present before check/test work runs and hard-fails if missing. Repo-managed provisioning never exempts a tool from preflight; preflight never installs tools inline.
 - **Do not guard tool use with silent skip.** If a script needs a tool and it is missing, the script must fail loudly — not silently skip work.
 - **No `command -v <tool> || return 0` / `exit 0` patterns.** If a tool is mandatory for a section of work, do not silently skip that section when the tool is absent.
 - **No `Test-CommandAvailable` / `Get-Command -ErrorAction SilentlyContinue` gating that exits successfully on absence.** Unconditional execution is the default; missing tools produce clear errors.

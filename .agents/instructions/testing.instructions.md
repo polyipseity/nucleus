@@ -125,7 +125,7 @@ Prohibited patterns:
 - `success = true` with only counting references (`builtins.length allTests` or `all_tests`) — the tests are referenced for the count but never evaluated. Without the `deepSeq` wrapper the example above is exactly this silent no-op.
 - 1-arg `builtins.seq (builtins.deepSeq <tests>)` — a partial application (lambda) in WHNF; `seq` forces nothing. See "Deadnix-reported unused bindings" below for the correct 2-arg form.
 
-Check step 24 (`nix-test-eval`) enforces this in `scripts/check.sh`; test step 1 evaluates every file with `nix-instantiate --eval --strict`.
+Check step 1 (`nix-test-eval` guard in `src/scripts/lib/nix-test-eval.sh`) enforces this before `nix-instantiate --eval --strict` runs in test step 1.
 
 ### Layer 3: Module Import Validation
 
@@ -228,8 +228,8 @@ winget configure --what-if .\src\hosts\Windows\user-context.dsc.yml
 
 ### When to Write Tests
 
-- New feature or breaking change: tests required (logic tests for Nix, Pester for DSC).
-- Bug fix: add a case that reproduces the bug, then verify the fix passes.
+- Contract-breaking change (module options, service registry schema, cross-host parity): add or update Nix logic tests or Windows source/contract Pester tests.
+- Bug fix: add a case that reproduces the bug when the regression is non-obvious; skip one-off migration guards.
 
 ### Test-Driven Development (TDD) Workflow
 
@@ -273,8 +273,8 @@ Learned from authoring `tests/scripts/` check-step tests; applies to test script
   - Explicit-skip test files reading `$script:failed` must initialize it (`$script:failed = $false`) after the `$testFile = ...` line or they crash under StrictMode when sourced in-suite.
   - `test.ps1` fail-fast kills the process before any summary — zero stdout. Use `--no-fail-fast` when debugging.
 - **Comment content in test files**:
-  - Comments in test `.sh` files must NEVER contain `__TOKEN__`-delimited names — step 20 (`20-activation-token-placeholder`) greps `^\s*#.*__[A-Z][A-Z_]*__` and in scoped mode scans staged files including `tests/`. Refer to them as "double-underscore tokens" or `start-<VM_NAME>.sh` style.
-  - Never put both fragments of a same-line step regex in one comment — step 21's `Assert-ToolAvailable`/`-InstallCommand` regex is SAME-LINE, so a comment containing both fragments on one line fails the prek scoped hook.
+  - Comments in test `.sh` files must NEVER contain `__TOKEN__`-delimited names — step 16 (`16-activation-token-placeholder`) greps `^\s*#.*__[A-Z][A-Z_]*__` and in scoped mode scans staged files including `tests/`. Refer to them as "double-underscore tokens" or `start-<VM_NAME>.sh` style.
+  - Never put both fragments of a same-line step regex in one comment — step 17's `Assert-ToolAvailable`/`-InstallCommand` regex is SAME-LINE, so a comment containing both fragments on one line fails the prek scoped hook.
 - **Test script mechanics**:
   - `.sh` test scripts with shebangs MUST be executable (`chmod +x`; pre-commit hook `check-shebang-scripts-are-executable`); `.ps1` test files stay `644`.
   - `test-lib.sh`/`check-lib.sh`/`step-runner.sh` derive `REPO_ROOT` themselves — do NOT add `REPO_ROOT="$REPO_ROOT"` env-prefixes or `# shellcheck disable=SC2030,SC2031` self-assignment pairs. `bash -c` children in tests use parent-spliced paths only (e.g. `. "'"$REPO_ROOT"'/src/scripts/lib/step-runner.sh"`).
@@ -285,7 +285,7 @@ Learned from authoring `tests/scripts/` check-step tests; applies to test script
 
 ## CI Integration
 
-Tests run automatically on push, pull request, and manual dispatch. CI runs `nix flake check`, Nix unit tests, PowerShell syntax check, and shell script check. Windows-specific tests not run in CI (uses Linux runners); run locally before commit.
+Tests run on push, pull request, and manual dispatch. POSIX CI runs `nix run ./src#test` (Nix eval, framework tests, nucleus-apps smoke, system build). Windows CI runs `bootstrap.ps1` (provisions Pester and other pwsh modules), then `test.ps1` including step 6 (`windows-pester`). Pester is lockfile-pinned and preflight-checked like other tools — provisioning and preflight are separate (see `tool-availability.instructions.md`).
 
 ---
 
@@ -297,4 +297,4 @@ Before committing changes, verify:
 - [ ] Flake checks pass: `cd src && nix flake check`
 - [ ] Shell syntax passes: `nix run ./src#check-sh`
 - [ ] PowerShell syntax passes: `nix run ./src#check-pwsh`
-- [ ] (Windows only) Pester tests pass: `Invoke-Pester tests/hosts/Windows/`
+- [ ] (Windows only) Pester tests pass: `pwsh -File scripts/test.ps1 --skip-steps=nix-tests,system-config-build` or step 6 only
