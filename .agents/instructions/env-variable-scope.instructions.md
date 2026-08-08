@@ -8,7 +8,7 @@ Every environment variable set by this repo must default to all-process availabi
 
 ## Centralized registry
 
-All Nix-side env vars are declared in `src/modules/lib/env-catalog.nix`. The catalog entries specify value, allowed hosts, and rationale. Helper functions (`allVars`, `systemVars`, `macOSAllVars`) consume the catalog into platform-specific formats.
+All Nix-side env vars are declared in `src/modules/lib/env-catalog.nix`. The catalog entries specify value, allowed hosts, and rationale. Helper functions (`allVars`, `systemVars`, `macBookAllVars`) consume the catalog into host-specific formats.
 
 ### Registry locations
 
@@ -22,15 +22,15 @@ All Nix-side env vars are declared in `src/modules/lib/env-catalog.nix`. The cat
 
 **Nix-side registry** (`src/modules/lib/env-catalog.nix`):
 
-- Declares every var in a single `catalog` attrset with `values` (per-OS attrset: `default`, `macOS`, `NixOS`, `Windows`), `why`, and optional `userSpecific`.
-- Pure helper functions (`allVars`, `systemVars`, `macOSAllVars`, `toJsonManifest`) transform the catalog into platform-specific formats.
+- Declares every var in a single `catalog` attrset with `values` (per-host attrset: `default`, `MacBook`, `NixOS`, `Windows`), `why`, and optional `userSpecific`.
+- Pure helper functions (`allVars`, `systemVars`, `macBookAllVars`, `toJsonManifest`) transform the catalog into host-specific formats.
 - Managed PATH components and helpers (`pathComponents`, `toShellPrependPath`, `toShellAppendPath`, `toPowerShellPrependSnippet`, `toPowerShellAppendSnippet`) live in `src/modules/lib/managed-paths.nix`, mirroring `ManagedPaths.ps1` on Windows.
   > **Invariant**: `pathComponents.prepend` and `pathComponents.append` are always declared as separate lists. Consumers MUST handle both symmetrically — never assume either is empty. Comments MUST describe the conceptual role (before-system-default vs. after-system-default), not the current contents.
 - Daemon env var consumption uses `resolveValue` directly in each daemon file.
 - Consumed by: `shell.nix` (via `home.sessionPath`, `home.sessionVariables`), `macos.nix` (gui-env LaunchAgent, macos-gui-env-path activation), `hosts/NixOS/base.nix`, `hosts/NixOS/ai.nix`, and daemon files in `hosts/MacBook/`.
 - The `env/default.nix` Home Manager module exposes `config._nucleus.envVars` for introspection.
 - **Overriding per host**: use the `override` attr in the catalog entry (e.g., NixOS vs macOS vs Windows).
-- **User-specific vars**: set `userSpecific = true` in the catalog entry for vars whose value depends on the logged-in user (e.g. `PASSWORD_STORE_DIR`). These are excluded from `systemVars` (system-wide env) and only set via home-manager session variables and the macOS LaunchAgent (`macOSAllVars`).
+- **User-specific vars**: set `userSpecific = true` in the catalog entry for vars whose value depends on the logged-in user (e.g. `PASSWORD_STORE_DIR`). These are excluded from `systemVars` (system-wide env) and only set via home-manager session variables and the macOS LaunchAgent (`macBookAllVars`).
 
 **Windows parallel registry** (WinGet DSC v3):
 
@@ -46,8 +46,8 @@ All Nix-side env vars are declared in `src/modules/lib/env-catalog.nix`. The cat
 ### Adding a new variable
 
 1. **Nix-side catalog**: add an entry in `src/modules/lib/env-catalog.nix` `catalog` attrset.
-   - Set `values = { default = ...; macOS = ...; NixOS = ...; Windows = ...; }`, `why`.
-   - Use `values.default` for the primary value, per-OS keys for OS-specific overrides.
+   - Set `values = { default = ...; MacBook = ...; NixOS = ...; Windows = ...; }`, `why`.
+   - Use `values.default` for the primary value, per-host keys for host-specific overrides.
    - If the value depends on the logged-in user, set `userSpecific = true`.
 2. **Windows DSC**: if the var applies to Windows:
    - If `userSpecific = true`, add a DSC `Environment` resource in `src/hosts/Windows/user/env.dsc.yml` (User scope).
