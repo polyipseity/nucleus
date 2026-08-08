@@ -31,7 +31,7 @@ copy_with_reflink() {
 vm_init() {
   REPO_ROOT="$1"
   VM_DIR="$2"
-  IMAGES_DIR="$3"
+  SRC_DIR="$3"
   TEMPLATES_DIR="$4"
   dry_run="$5"
   windows_iso="$6"
@@ -53,6 +53,45 @@ vm_init() {
   NUCLEUS_HOST="${22}"
   gc_disabled_mode="${23}"
   force="${24}"
+  gc_data_mode="${25}"
+}
+
+VM_PREBUILT_IMAGE='prebuilt image.qcow2'
+VM_OVERLAY_BACKING='overlay backing.qcow2'
+VM_PACKER_BUILD_DIR='Packer'
+VM_ANDROID_RECOVERY_IMG='recovery userdebug.img'
+VM_ANDROID_RECOVERY_TAG='recovery userdebug.tag.json'
+export VM_ANDROID_BOOT_IMG='boot.img'
+export VM_ANDROID_BOOT_TAG='boot.tag.json'
+export VM_ANDROID_MAGISK_APK='Magisk.apk'
+export VM_ANDROID_BOOT_MAGISK_PATCHED='boot Magisk patched.img'
+export VM_ANDROID_GAPPS_ZIP='GApps.zip'
+export VM_ANDROID_MAGISK_PATCH_KIT='Magisk patch kit'
+VM_ANDROID_LINEAGE_ZIP='Lineage download.zip'
+VM_ANDROID_LINEAGE_EXTRACT='Lineage extract'
+VM_ANDROID_GSI_DOWNLOAD_ZIP='GSI download.zip'
+VM_WINDOWS_INSTALLER_ISO='installer.iso'
+export VM_WINDOWS_VIRTIO_ISO='virtio guest tools.iso'
+VM_PREBUILT_MARKER_BASE='prebuilt image'
+
+vm_type_src_dir() {
+  printf '%s/%s\n' "$SRC_DIR" "$1"
+}
+
+vm_src_path() {
+  printf '%s/%s\n' "$(vm_type_src_dir "$1")" "$2"
+}
+
+vm_overlay_backing_rel_path() {
+  printf '../src/%s/%s\n' "$1" "$VM_OVERLAY_BACKING"
+}
+
+vm_ensure_type_src_dirs() {
+  local _vetsd_type
+  while IFS= read -r _vetsd_type; do
+    [ -n "$_vetsd_type" ] || continue
+    mkdir -p "$(vm_type_src_dir "$_vetsd_type")"
+  done < <(jq -r '.VMs[].type' "$MANIFEST" | sort -u)
 }
 
 # write_vm_directory_readme
@@ -67,10 +106,10 @@ write_vm_directory_readme() {
   fi
 
   _wvdr_vm_dir_short="$HOME/virtual machines"
-  _wvdr_images_dir_short="$HOME/virtual machines/images"
+  _wvdr_src_dir_short="$HOME/virtual machines/src"
   if [ -f "$TEMPLATES_DIR/README.md" ]; then
     sed -e "s|__VM_DIR_DISPLAY__|$_wvdr_vm_dir_short|g" \
-        -e "s|__IMAGES_DIR_DISPLAY__|$_wvdr_images_dir_short|g" \
+        -e "s|__SRC_DIR_DISPLAY__|$_wvdr_src_dir_short|g" \
         "$TEMPLATES_DIR/README.md" >"$_wvdr_readme"
     say "wrote VM directory guide: $_wvdr_readme (template)"
   else
@@ -188,7 +227,8 @@ vm_guest_credentials_marker_path() {
   if [ -n "$_vgcm_disk_path" ]; then
     printf '%s.vm-guest-credentials-sha256\n' "$_vgcm_disk_path"
   else
-    printf '%s/%s.vm-guest-credentials-sha256\n' "$IMAGES_DIR" "$_vgcm_name"
+    _vgcm_type="$(jq -r --arg n "$_vgcm_name" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
+    vm_src_path "$_vgcm_type" "${VM_PREBUILT_MARKER_BASE}.vm-guest-credentials-sha256"
   fi
 }
 
@@ -238,7 +278,8 @@ vm_guest_config_marker_path() {
   if [ -n "$_vgcmp_disk_path" ]; then
     printf '%s.vm-guest-config-sha256\n' "$_vgcmp_disk_path"
   else
-    printf '%s/%s.vm-guest-config-sha256\n' "$IMAGES_DIR" "$_vgcmp_name"
+    _vgcmp_type="$(jq -r --arg n "$_vgcmp_name" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
+    vm_src_path "$_vgcmp_type" "${VM_PREBUILT_MARKER_BASE}.vm-guest-config-sha256"
   fi
 }
 
@@ -1026,17 +1067,17 @@ vm_write_descriptor() {
       disks: (
         if $vm.type == "Android" then
           [
-            {role: "system", path: ("images/" + $vm.type + "-system.qcow2")}
+            {role: "system", path: ("src/" + $vm.type + "/" + $vm.Android.systemImage)}
           ]
           + (if ($vm.Android.gsiUrl != null) then
-              [{role: "gsi", path: ("images/" + $vm.type + "-gsi.img")}]
+              [{role: "gsi", path: ("src/" + $vm.type + "/" + $vm.Android.gsiImage)}]
             else [] end)
           + [
             {role: "userdata", path: ("data/" + $vm.id + ".qcow2")}
           ]
         else
           [
-            {role: "base", path: ("images/" + $vm.type + ".base.qcow2")},
+            {role: "base", path: ("src/" + $vm.type + "/overlay backing.qcow2")},
             {role: "runtime", path: ("data/" + $vm.id + ".qcow2")}
           ]
         end
@@ -1197,9 +1238,9 @@ vm_resize_vm() {
 
 # vm_ensure_base_and_overlay NAME PREBUILT MIN_SIZE DISK_BYTES CRED_MARKER CONFIG_MARKER CONFIG_FP
 #   Ensures the base/overlay disk pair for NAME under the managed layout:
-#     images/<type>.base.qcow2 — pristine base copied from PREBUILT
-#     data/<name>.qcow2        — writable overlay backing ../images/<type>.base.qcow2
-#   PREBUILT is the build-phase golden image (images/<id>.qcow2); MIN_SIZE and
+#     src/<type>/overlay backing.qcow2 — pristine base copied from PREBUILT
+#     data/<name>.qcow2                 — writable overlay backing ../src/<type>/overlay backing.qcow2
+#   PREBUILT is the build-phase golden image (src/<type>/prebuilt image.qcow2); MIN_SIZE and
 #   DISK_BYTES are parsed manifest bytes (minImageSize, diskSize).  CRED_MARKER
 #   and CONFIG_MARKER are sidecar marker paths; CONFIG_FP is the guest-config
 #   fingerprint (empty for non-NixOS guests).  Cases:
@@ -1222,8 +1263,9 @@ vm_ensure_base_and_overlay() {
     error "VM '$_ebao_name' not found in manifest; cannot provision base/overlay"
     return 1
   fi
-  _ebao_base="$IMAGES_DIR/${_ebao_type}.base.qcow2"
+  _ebao_base="$(vm_src_path "$_ebao_type" "$VM_OVERLAY_BACKING")"
   _ebao_overlay="$VM_DIR/data/${_ebao_name}.qcow2"
+  _ebao_backing_rel="$(vm_overlay_backing_rel_path "$_ebao_type")"
 
   # Case 1 — base missing or invalid: recreate from the prebuilt golden.
   _ebao_base_valid=false
@@ -1258,7 +1300,7 @@ vm_ensure_base_and_overlay() {
       say "recreating runtime overlay for '$_ebao_name' (--force)"
       rm -f "$_ebao_overlay"
     fi
-    if ! qemu-img create -f qcow2 -b "../images/${_ebao_type}.base.qcow2" -F qcow2 "$_ebao_overlay" >/dev/null; then
+    if ! qemu-img create -f qcow2 -b "$_ebao_backing_rel" -F qcow2 "$_ebao_overlay" >/dev/null; then
       error "failed to create runtime overlay: $_ebao_overlay"
       return 1
     fi
@@ -1266,7 +1308,7 @@ vm_ensure_base_and_overlay() {
     if [ -n "$_ebao_config_fp" ]; then
       printf '%s\n' "$_ebao_config_fp" >"$_ebao_config_marker"
     fi
-    say "created runtime overlay: $_ebao_overlay (backing ../images/${_ebao_type}.base.qcow2)"
+    say "created runtime overlay: $_ebao_overlay (backing $_ebao_backing_rel)"
   fi
 
   # Case 4 — credential/config drift: replace the base from the prebuilt
@@ -1751,7 +1793,8 @@ vm_android_jqssun_asset_url() {
 vm_android_download_userdebug_recovery() {
   _adur_vm_index="$1"
   _adur_suffix="$(vm_android_recovery_asset_suffix "$_adur_vm_index")"
-  _adur_img="$IMAGES_DIR/android-recovery-userdebug.img"
+  _adur_img="$(vm_src_path Android "$VM_ANDROID_RECOVERY_IMG")"
+  _adur_tag_file="$(vm_src_path Android "$VM_ANDROID_RECOVERY_TAG")"
   _adur_asset_name="recovery_${_adur_suffix}-userdebug.img"
   _adur_dl_url="https://github.com/jqssun/android-lineage-qemu/releases/latest/download/$_adur_asset_name"
   _adur_tag=''
@@ -1760,8 +1803,8 @@ vm_android_download_userdebug_recovery() {
 
   if [ -f "$_adur_img" ]; then
     _adur_cached_tag=''
-    if [ -f "$IMAGES_DIR/android-recovery-userdebug.tag.json" ]; then
-      _adur_cached_tag="$(jq -r '.tag_name // empty' "$IMAGES_DIR/android-recovery-userdebug.tag.json")"
+    if [ -f "$_adur_tag_file" ]; then
+      _adur_cached_tag="$(jq -r '.tag_name // empty' "$_adur_tag_file")"
     fi
     if [ "$_adur_cached_tag" = "$_adur_tag" ]; then
       say "using cached userdebug recovery: $_adur_img"
@@ -1777,7 +1820,7 @@ vm_android_download_userdebug_recovery() {
     curl -fL -o "$_adur_img" "$_adur_dl_url" \
     || { error "failed to download userdebug recovery from $_adur_dl_url"; return 1; }
 
-  jq -n --arg tag "$_adur_tag" '{tag_name: $tag}' > "$IMAGES_DIR/android-recovery-userdebug.tag.json"
+  jq -n --arg tag "$_adur_tag" '{tag_name: $tag}' > "$_adur_tag_file"
   say "userdebug recovery ready: $_adur_img"
   return 0
 }
@@ -1807,7 +1850,7 @@ vm_android_guest_has_userdebug_recovery() {
 #   Flash the cached userdebug recovery via fastboot unless the guest already reports userdebug.
 vm_android_ensure_userdebug_recovery() {
   _aeur_vm_index="$1"
-  _aeur_img="$IMAGES_DIR/android-recovery-userdebug.img"
+  _aeur_img="$(vm_src_path Android "$VM_ANDROID_RECOVERY_IMG")"
   _aeur_fb_serial="$(vm_android_fastboot_serial "$_aeur_vm_index")"
 
   if [ ! -f "$_aeur_img" ]; then
@@ -1893,6 +1936,7 @@ vm_build_android() {
   _bai_accept_gsi_license="$3"
   _bai_upgrade_android="$4"
   _bai_reset_userdata="$5"
+  vm_ensure_type_src_dirs
   # The Android userdata disk size comes from the manifest (diskSize),
   # parsed to exact bytes; a hardcoded size here would silently ignore
   # VMs.json.
@@ -1900,10 +1944,10 @@ vm_build_android() {
   _bai_gsi_url="$(jq -r ".VMs[$_bai_vm_index].Android.gsiUrl" "$MANIFEST")"
   # Image filenames come from the manifest Android group (systemImage /
   # userdataImage / gsiImage) so VMs.json is the single source of truth.
-  _bai_system_img="$IMAGES_DIR/$(jq -r ".VMs[$_bai_vm_index].Android.systemImage" "$MANIFEST")"
+  _bai_system_img="$(vm_src_path Android "$(jq -r ".VMs[$_bai_vm_index].Android.systemImage" "$MANIFEST")")"
   # The canonical userdata disk is data/<id>.qcow2 (per-guest writable overlay).
   _bai_userdata_img="$VM_DIR/data/${_bai_vm_name}.qcow2"
-  _bai_gsi_img="$IMAGES_DIR/$(jq -r ".VMs[$_bai_vm_index].Android.gsiImage" "$MANIFEST")"
+  _bai_gsi_img="$(vm_src_path Android "$(jq -r ".VMs[$_bai_vm_index].Android.gsiImage" "$MANIFEST")")"
   # Set when this run replaces a canonical disk (system image re-download or
   # userdata reset), so the end-of-build bundle refresh knows to re-link.
   _bai_system_replaced=false
@@ -1929,14 +1973,15 @@ vm_build_android() {
       || { error "failed to resolve latest jqssun release tag"; return 1; }
     _bai_dl_url="$(vm_android_jqssun_asset_url "$_bai_tag" "UTM-VM-lineage-.*virtio_${_bai_suffix}.zip")" \
       || { error "no LineageOS UTM zip found in jqssun release $_bai_tag"; return 1; }
+    _bai_lineage_zip="$(vm_src_path Android "$VM_ANDROID_LINEAGE_ZIP")"
     run_with_backoff "download LineageOS zip" \
-      curl -fL -o "$IMAGES_DIR/android-lineage.zip" "$_bai_dl_url" \
+      curl -fL -o "$_bai_lineage_zip" "$_bai_dl_url" \
       || { error "failed to download LineageOS zip"; return 1; }
     say "extracting LineageOS system image..."
-    _bai_extract_dir="$IMAGES_DIR/android-lineage-extract"
+    _bai_extract_dir="$(vm_src_path Android "$VM_ANDROID_LINEAGE_EXTRACT")"
     rm -rf "$_bai_extract_dir"
     mkdir -p "$_bai_extract_dir"
-    run_cmd unzip -q "$IMAGES_DIR/android-lineage.zip" -d "$_bai_extract_dir"
+    run_cmd unzip -q "$_bai_lineage_zip" -d "$_bai_extract_dir"
     # UTM bundle layouts differ across versions (vda.qcow2 in UTM 1-3,
     # disk-main.qcow2 in UTM 4); pick the largest qcow2 as the system image.
     # tr strips the whitespace wc -c pads its output with (macOS pads; Linux
@@ -1948,7 +1993,7 @@ vm_build_android() {
     fi
     run_cmd cp "$_bai_qcow2" "$_bai_system_img"
     _bai_system_replaced=true
-    rm -rf "$_bai_extract_dir" "$IMAGES_DIR/android-lineage.zip"
+    rm -rf "$_bai_extract_dir" "$_bai_lineage_zip"
     validate_qcow2_image "$_bai_system_img" "Android system image for $_bai_vm_name" "$(parse_size "$(jq -r ".VMs[$_bai_vm_index].minImageSize" "$MANIFEST")")" || return 1
     say "system image ready: $_bai_system_img"
   else
@@ -1986,7 +2031,7 @@ vm_build_android() {
     say "GSI license: https://developer.android.com/license"
     if [ ! -f "$_bai_gsi_img" ]; then
       say "downloading GSI system image..."
-      _bai_gsi_zip="$IMAGES_DIR/android-gsi.zip"
+      _bai_gsi_zip="$(vm_src_path Android "$VM_ANDROID_GSI_DOWNLOAD_ZIP")"
       run_with_backoff "download GSI zip" \
         curl -fL -o "$_bai_gsi_zip" "$_bai_gsi_url" \
         || { error "failed to download GSI zip from $_bai_gsi_url"; return 1; }
@@ -2393,11 +2438,11 @@ vm_setup_utm() {
   # ${vm_name}.qcow2 convention.  Image filenames come from the manifest
   # Android group (systemImage / userdataImage / gsiImage).
   if [ "$vm_type" = "Android" ]; then
-    _android_system="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.systemImage" "$MANIFEST")"
+    _android_system="$(vm_src_path Android "$(jq -r ".VMs[$vm_index].Android.systemImage" "$MANIFEST")")"
     # The canonical userdata disk is data/<id>.qcow2 (per-guest writable
     # overlay); the bundle exposes it via a hard link (G1a write-through).
     _android_userdata="$VM_DIR/data/${vm_name}.qcow2"
-    _android_gsi="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")"
+    _android_gsi="$(vm_src_path Android "$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")")"
   fi
 
   # Require a pre-built image only when the bundle does not already have a
@@ -2405,11 +2450,11 @@ vm_setup_utm() {
   if [ "$vm_type" = "Android" ]; then
     _prebuilt="$_android_system"
   else
-    _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
+    _prebuilt="$(vm_src_path "$vm_type" "$VM_PREBUILT_IMAGE")"
   fi
   _prebuilt_valid=false
   if [ ! -f "$disk_file" ] && [ ! -f "$_prebuilt" ]; then
-    _build_tmp="$IMAGES_DIR/${vm_name}-build"
+    _build_tmp="$(vm_src_path "$vm_type" "$VM_PACKER_BUILD_DIR")"
     if [ -d "$_build_tmp" ]; then
       warn "image not ready for '$vm_name'; build appears in progress at $_build_tmp"
     else
@@ -2489,8 +2534,8 @@ vm_setup_utm() {
       fi
       ln -f "$VM_DIR/data/${vm_name}.qcow2" "$disk_file"
       say "linked runtime overlay into UTM bundle: $disk_file"
-      _base_link="$data_dir/${vm_type}.base.qcow2"
-      ln -f "$IMAGES_DIR/${vm_type}.base.qcow2" "$_base_link"
+      _base_link="$data_dir/$(basename "$(vm_src_path "$vm_type" "$VM_OVERLAY_BACKING")")"
+      ln -f "$(vm_src_path "$vm_type" "$VM_OVERLAY_BACKING")" "$_base_link"
       say "linked base image into UTM bundle: $_base_link"
     fi
     if [ "$bundle_exists" != true ]; then
@@ -2531,9 +2576,9 @@ vm_setup_libvirt() {
   # filenames come from the manifest Android group (systemImage / userdataImage
   # / gsiImage).
   if [ "$vm_type" = "Android" ]; then
-    _android_system="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.systemImage" "$MANIFEST")"
+    _android_system="$(vm_src_path Android "$(jq -r ".VMs[$vm_index].Android.systemImage" "$MANIFEST")")"
     _android_userdata="$VM_DIR/data/${vm_name}.qcow2"
-    _android_gsi="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")"
+    _android_gsi="$(vm_src_path Android "$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")")"
     if [ ! -f "$_android_system" ] || [ ! -f "$_android_userdata" ]; then
       warn "Android images not found: $_android_system and $_android_userdata; skipping '$vm_name'"
       return
@@ -2545,7 +2590,7 @@ vm_setup_libvirt() {
       return
     fi
   else
-    _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
+    _prebuilt="$(vm_src_path "$vm_type" "$VM_PREBUILT_IMAGE")"
     _prebuilt_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
     _prebuilt_disk_bytes="$(parse_size "$(jq -r ".VMs[$vm_index].diskSize" "$MANIFEST")")"
     if [ ! -f "$_prebuilt" ]; then
@@ -2578,7 +2623,7 @@ vm_setup_libvirt() {
     if [ "$vm_type" = "Android" ]; then
       dry_run "use Android images in domain XML: $_android_system, $_android_userdata"
     else
-      dry_run "ensure base/overlay: $IMAGES_DIR/${vm_type}.base.qcow2 + $disk_path"
+      dry_run "ensure base/overlay: $(vm_src_path "$vm_type" "$VM_OVERLAY_BACKING") + $disk_path"
     fi
   fi
 
@@ -2612,7 +2657,9 @@ vm_build_nixos() {
       _nixos_format_path="$VMS_DIR/nixos/formats/qcow-btrfs.nix"
       ;;
   esac
-  _out="$IMAGES_DIR/${_name}.qcow2"
+  _vm_type="$(jq -r --arg n "$_name" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
+  vm_ensure_type_src_dirs
+  _out="$(vm_src_path "$_vm_type" "$VM_PREBUILT_IMAGE")"
   _marker="$(vm_guest_credentials_marker_path "$_name")"
   _config_marker="$(vm_guest_config_marker_path "$_name")"
   _min_size="$(parse_size "$(jq -r ".VMs[] | select(.id == \"$_name\") | .minImageSize" "$MANIFEST")")"
@@ -2968,7 +3015,9 @@ vm_build_windows() {
   _name="$1"
   _disk_bytes="$2"
   _edition="$3"
-  _out="$IMAGES_DIR/${_name}.qcow2"
+  _vm_type="$(jq -r --arg n "$_name" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
+  vm_ensure_type_src_dirs
+  _out="$(vm_src_path "$_vm_type" "$VM_PREBUILT_IMAGE")"
   _marker="$(vm_guest_credentials_marker_path "$_name")"
   _min_size="$(parse_size "$(jq -r ".VMs[] | select(.id == \"$_name\") | .minImageSize" "$MANIFEST")")"
   _hostfwd="$(jq -r --arg n "$_name" '[.VMs[] | select(.id == $n) | .portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")' "$MANIFEST")"
@@ -2995,7 +3044,7 @@ vm_build_windows() {
 
   # Resolve from cache first when --windows-iso is omitted.
   if [ -z "$_iso" ]; then
-    _cached_iso="$IMAGES_DIR/${_name}-installer.iso"
+    _cached_iso="$(vm_src_path "$_vm_type" "$VM_WINDOWS_INSTALLER_ISO")"
     if [ -f "$_cached_iso" ]; then
       say "using cached Windows installer: $_cached_iso"
       _iso="$_cached_iso"
@@ -3006,7 +3055,7 @@ vm_build_windows() {
   if [ -z "$_iso" ] && [ "$windows_iso_source" != "mido" ]; then
     _iso_url="$(jq -r ".VMs[] | select(.id == \"$_name\") | .Windows.isoUrl // empty" "$MANIFEST")"
     if [ -n "$_iso_url" ]; then
-      _cached_iso="$IMAGES_DIR/${_name}-installer.iso"
+      _cached_iso="$(vm_src_path "$_vm_type" "$VM_WINDOWS_INSTALLER_ISO")"
       say "downloading Windows installer from Windows.isoUrl..."
       if [ "$dry_run" = false ]; then
         if run_with_backoff 'Windows.isoUrl download' curl -fL -o "$_cached_iso" "$_iso_url"; then
@@ -3029,7 +3078,7 @@ vm_build_windows() {
   # Source: https://github.com/QubesOS/qvm-create-windows-qube
   #         https://github.com/pbatard/Fido
   if [ -z "$_iso" ]; then
-    _cached_iso="$IMAGES_DIR/${_name}-installer.iso"
+    _cached_iso="$(vm_src_path "$_vm_type" "$VM_WINDOWS_INSTALLER_ISO")"
     if [ "$dry_run" = false ]; then
       case "$windows_iso_source" in
         url)
@@ -3096,7 +3145,7 @@ vm_build_windows() {
   fi
 
   _packer_dir="$VMS_DIR/windows"
-  _tmp_out="$IMAGES_DIR/${_name}-build"
+  _tmp_out="$(vm_src_path "$_vm_type" "$VM_PACKER_BUILD_DIR")"
   _ssh_timeout='3h'
   if [ "$accelerator" = 'tcg' ]; then
     # WHY: x86_64 Windows setup under software emulation can take much longer
@@ -3237,7 +3286,7 @@ EOF
     # WHY: Packer qemu builder requires a non-existent output_directory.
     # Use a fresh temp tree per attempt so a failed try cannot poison the next
     # firmware/boot-strategy combination.
-    _attempt_tmpdir="$(mktemp -d "${IMAGES_DIR}/.${_name}.${_firmware_mode}.${_boot_strategy}.XXXXXX")"
+    _attempt_tmpdir="$(mktemp -d "$(vm_src_path "$_vm_type" ".${_name}.${_firmware_mode}.${_boot_strategy}.XXXXXX")")"
     _tmp_out="$_attempt_tmpdir/output"
     _packer_log="$_attempt_tmpdir/packer.log"
     _autounattend_rendered="$_attempt_tmpdir/Autounattend.xml"
@@ -3427,22 +3476,22 @@ vm_build_macos() {
 #   Removes orphaned dot-prefixed Packer build temporary directories that may
 #   have been left behind by interrupted or crashed builds.
 prune_stale_build_dirs() {
-  if [ ! -d "$IMAGES_DIR" ]; then
+  if [ ! -d "$SRC_DIR" ]; then
     return 0
   fi
 
-  for _dir in "$IMAGES_DIR"/.??*; do
-    if [ "$_dir" = "$IMAGES_DIR/." ] || [ "$_dir" = "$IMAGES_DIR/.." ]; then
-      continue
-    fi
-    if [ -d "$_dir" ]; then
+  for _psbd_type_dir in "$SRC_DIR"/*/; do
+    [ -d "$_psbd_type_dir" ] || continue
+    for _dir in "$_psbd_type_dir"/.[!.]*/; do
+      [ -d "$_dir" ] || continue
       say "removing stale temporary build directory: $_dir"
       rm -rf "$_dir"
-    fi
+    done
   done
 }
 
 vm_build_images() {
+  vm_ensure_type_src_dirs
   prune_stale_build_dirs
   vm_for_each vm_build_one_image
 }
@@ -3569,7 +3618,7 @@ vm_setup_windows_qemu() {
   # overlay backing images/<type>.base.qcow2 (base = copy of the prebuilt
   # golden); credential drift refreshes the base from the prebuilt while
   # preserving the overlay, and growth is grow-only.
-  _prebuilt="$IMAGES_DIR/${vm_name}.qcow2"
+  _prebuilt="$(vm_src_path "$vm_type" "$VM_PREBUILT_IMAGE")"
   _prebuilt_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
   _prebuilt_disk_bytes="$(parse_size "$(jq -r ".VMs[$vm_index].diskSize" "$MANIFEST")")"
   if [ ! -f "$_prebuilt" ]; then
@@ -3589,7 +3638,7 @@ vm_setup_windows_qemu() {
     fi
     say "runtime overlay ready: $disk_path"
   else
-    dry_run "ensure base/overlay: $IMAGES_DIR/${vm_type}.base.qcow2 + $disk_path"
+    dry_run "ensure base/overlay: $(vm_src_path "$vm_type" "$VM_OVERLAY_BACKING") + $disk_path"
   fi
 }
 
@@ -3691,52 +3740,61 @@ gc_libvirt_vms() {
   done
 }
 
+# vm_gc_src_keep_set_for_type TYPE EXPECTED_NAMES — Print canonical src/<type>/
+#   filenames that must be preserved for expected VMs of TYPE.
+vm_gc_src_keep_set_for_type() {
+  _gcsksft_type="$1"
+  _gcsksft_expected="$2"
+
+  jq -r \
+    --arg type "$_gcsksft_type" \
+    --arg expected "$_gcsksft_expected" \
+    --arg prebuilt "$VM_PREBUILT_IMAGE" \
+    --arg backing "$VM_OVERLAY_BACKING" \
+    '
+    .VMs[] |
+    select(.type == $type) |
+    select(.id as $id | ($expected | split("\n") | contains([$id]))) |
+    [
+      $prebuilt,
+      $backing,
+      (if .Android then
+        (.Android.systemImage,
+         (if .Android.gsiUrl != null then .Android.gsiImage else empty end))
+      else empty end)
+    ] | .[]
+  ' "$MANIFEST"
+}
+
 # vm_gc_disk_keep_set DIR EXPECTED_NAMES — Print the full filenames (with
 #   extension) of every disk image under DIR that must be preserved for the
-#   expected VMs.  images/ keeps prebuilt goldens (<id>.qcow2), type bases
-#   (<type>.base.qcow2), and Android system/GSI images; data/ keeps runtime
-#   overlays (<id>.qcow2) and the Android userdata image.  Matching by full
-#   filename, not a basename-stripped id, keeps type-prefixed artifacts
-#   (Android-system.qcow2, NixOS.base.qcow2) inside the keep-set.
+#   expected VMs.  data/ keeps runtime overlays (<id>.qcow2) when gc_data_mode
+#   is enabled.
 vm_gc_disk_keep_set() {
   _gcdks_dir="$1"
   _gcdks_expected="$2"
 
-  if [ "$_gcdks_dir" = "$IMAGES_DIR" ]; then
-    jq -r --arg expected "$_gcdks_expected" '
-      .VMs[] |
-      select(.id as $id | ($expected | split("\n") | contains([$id]))) |
-      [
-        .id + ".qcow2",
-        .type + ".qcow2",
-        .type + ".base.qcow2",
-        (if .Android then
-          (.Android.systemImage,
-           (if .Android.gsiUrl != null then .Android.gsiImage else empty end))
-        else empty end)
-      ] | .[]
-    ' "$MANIFEST"
-  else
-    jq -r --arg expected "$_gcdks_expected" '
-      .VMs[] |
-      select(.id as $id | ($expected | split("\n") | contains([$id]))) |
-      [
-        .id + ".qcow2",
-        (if .Android then .Android.userdataImage else empty end)
-      ] | .[]
-    ' "$MANIFEST"
-  fi
+  jq -r --arg expected "$_gcdks_expected" '
+    .VMs[] |
+    select(.id as $id | ($expected | split("\n") | contains([$id]))) |
+    [
+      .id + ".qcow2",
+      (if .Android then .Android.userdataImage else empty end)
+    ] | .[]
+  ' "$MANIFEST"
 }
 
 # vm_gc_orphan_disks EXPECTED_NAMES — Remove disk images not in the
-#   manifest-derived keep-set for the expected VMs (see vm_gc_disk_keep_set).
+#   manifest-derived keep-set for the expected VMs (see vm_gc_src_keep_set_for_type
+#   and vm_gc_disk_keep_set).
 vm_gc_orphan_disks() {
   _gcod_expected="$1"
 
-  for _gcod_dir in "$VM_DIR/data" "$IMAGES_DIR"; do
-    [ -d "$_gcod_dir" ] || continue
-    _gcod_keep="$(vm_gc_disk_keep_set "$_gcod_dir" "$_gcod_expected")" || return
-    for _gcod_path in "$_gcod_dir"/*.qcow2; do
+  for _gcod_type_dir in "$SRC_DIR"/*/; do
+    [ -d "$_gcod_type_dir" ] || continue
+    _gcod_type="$(basename "$_gcod_type_dir")"
+    _gcod_keep="$(vm_gc_src_keep_set_for_type "$_gcod_type" "$_gcod_expected")" || return
+    for _gcod_path in "$_gcod_type_dir"*.qcow2; do
       [ -f "$_gcod_path" ] || continue
       _gcod_name="$(basename "$_gcod_path")"
       if ! printf '%s\n' "$_gcod_keep" | grep -qxF "$_gcod_name"; then
@@ -3747,49 +3805,73 @@ vm_gc_orphan_disks() {
       fi
     done
   done
+
+  if [ "$gc_data_mode" = true ]; then
+    _gcod_data_dir="$VM_DIR/data"
+    if [ -d "$_gcod_data_dir" ]; then
+      _gcod_keep="$(vm_gc_disk_keep_set "$_gcod_data_dir" "$_gcod_expected")" || return
+      for _gcod_path in "$_gcod_data_dir"/*.qcow2; do
+        [ -f "$_gcod_path" ] || continue
+        _gcod_name="$(basename "$_gcod_path")"
+        if ! printf '%s\n' "$_gcod_keep" | grep -qxF "$_gcod_name"; then
+          say "GC — removing non-provisioned disk image: $_gcod_path"
+          if [ "$dry_run" = false ]; then
+            rm -f "$_gcod_path"
+          fi
+        fi
+      done
+    fi
+  fi
 }
 
 # vm_gc_orphan_markers EXPECTED_NAMES — Remove guest marker files (credential
-#   and config fingerprints) that are no longer meaningful.  data/ markers are
-#   sidecars of runtime overlays: they are removed when their disk image is
-#   gone.  images/ markers are name-based and gate a prebuilt golden or a tart
-#   registration; tart VMs keep their disks in tart's store, so their markers
-#   stay live while the guest remains in the expected set.
+#   and config fingerprints) that are no longer meaningful.  src/<type>/
+#   markers gate the prebuilt golden; data/ sidecar markers are removed when
+#   their disk image is gone (only when gc_data_mode is enabled).
 vm_gc_orphan_markers() {
   _gcom_expected="$1"
 
-  for _gcom_dir in "$VM_DIR/data" "$IMAGES_DIR"; do
-    [ -d "$_gcom_dir" ] || continue
-    for _gcom_marker in "$_gcom_dir"/*.vm-guest-credentials-sha256 "$_gcom_dir"/*.vm-guest-config-sha256; do
+  for _gcom_type_dir in "$SRC_DIR"/*/; do
+    [ -d "$_gcom_type_dir" ] || continue
+    _gcom_type="$(basename "$_gcom_type_dir")"
+    _gcom_type_expected=false
+    if jq -e --arg type "$_gcom_type" --arg expected "$_gcom_expected" '
+      .VMs[] |
+      select(.type == $type) |
+      select(.id as $id | ($expected | split("\n") | contains([$id])))
+    ' "$MANIFEST" >/dev/null 2>&1; then
+      _gcom_type_expected=true
+    fi
+    for _gcom_marker in \
+      "$_gcom_type_dir/${VM_PREBUILT_MARKER_BASE}.vm-guest-credentials-sha256" \
+      "$_gcom_type_dir/${VM_PREBUILT_MARKER_BASE}.vm-guest-config-sha256"; do
+      [ -f "$_gcom_marker" ] || continue
+      if [ "$_gcom_type_expected" != true ]; then
+        say "GC — removing orphaned guest marker: $_gcom_marker"
+        if [ "$dry_run" = false ]; then
+          rm -f "$_gcom_marker"
+        fi
+      fi
+    done
+  done
+
+  if [ "$gc_data_mode" = true ]; then
+    _gcom_data_dir="$VM_DIR/data"
+    [ -d "$_gcom_data_dir" ] || return 0
+    for _gcom_marker in "$_gcom_data_dir"/*.vm-guest-credentials-sha256 "$_gcom_data_dir"/*.vm-guest-config-sha256; do
       [ -f "$_gcom_marker" ] || continue
       case "$_gcom_marker" in
         *.vm-guest-credentials-sha256) _gcom_base="${_gcom_marker%.vm-guest-credentials-sha256}" ;;
         *) _gcom_base="${_gcom_marker%.vm-guest-config-sha256}" ;;
       esac
-      case "$_gcom_base" in
-        *.qcow2)
-          # data/ sidecar marker: remove when its disk image is gone.
-          if [ ! -f "$_gcom_base" ]; then
-            say "GC — removing orphaned guest marker: $_gcom_marker"
-            if [ "$dry_run" = false ]; then
-              rm -f "$_gcom_marker"
-            fi
-          fi
-          ;;
-        *)
-          # images/ name-based marker: gates a prebuilt golden or a tart
-          # registration, so it stays live while the guest is expected.
-          _gcom_name="$(basename "$_gcom_base")"
-          if ! printf '%s\n' "$_gcom_expected" | grep -qxF "$_gcom_name"; then
-            say "GC — removing orphaned guest marker: $_gcom_marker"
-            if [ "$dry_run" = false ]; then
-              rm -f "$_gcom_marker"
-            fi
-          fi
-          ;;
-      esac
+      if [ ! -f "$_gcom_base" ]; then
+        say "GC — removing orphaned guest marker: $_gcom_marker"
+        if [ "$dry_run" = false ]; then
+          rm -f "$_gcom_marker"
+        fi
+      fi
     done
-  done
+  fi
 }
 
 # vm_gc_orphan_descriptors EXPECTED_NAMES — Remove VM descriptors
@@ -3819,8 +3901,8 @@ vm_gc_orphan_descriptors() {
 #   are a pure function of kept inputs plus a trivial command (no downloads,
 #   no build time) plus transient junk: UTM bundles (rebuilt by setup from
 #   the plist template + ln -f + open), generated start/stop scripts
-#   (sed-rendered), images/<type>.base.qcow2 (cp from the kept prebuilt),
-#   and images/*-build/ + stale dot-dirs (Packer junk).  Everything else —
+#   (sed-rendered), src/<type>/overlay backing.qcow2 (cp from the kept prebuilt),
+#   and src/<type>/Packer/ + stale dot-dirs (Packer junk).  Everything else —
 #   data overlays, Android userdata, prebuilt goldens + markers, installer
 #   ISOs, descriptors, runtime markers, tart store, README, and the
 #   pack/unpack wrappers — is payload or data and stays.
@@ -3860,25 +3942,33 @@ vm_pack_vms() {
     done
   fi
 
-  # images/<type>.base.qcow2 — trivial cp from the kept prebuilt golden.
-  for _pv_base in "$IMAGES_DIR"/*.base.qcow2; do
-    [ -f "$_pv_base" ] || continue
-    say "pack — removing regenerable base image: $_pv_base"
-    if [ "$dry_run" = false ]; then
-      rm -f "$_pv_base"
+  # src/<type>/overlay backing.qcow2 — trivial cp from the kept prebuilt golden.
+  for _pv_type_dir in "$SRC_DIR"/*/; do
+    [ -d "$_pv_type_dir" ] || continue
+    _pv_backing="$_pv_type_dir$VM_OVERLAY_BACKING"
+    if [ -f "$_pv_backing" ]; then
+      say "pack — removing regenerable overlay backing: $_pv_backing"
+      if [ "$dry_run" = false ]; then
+        rm -f "$_pv_backing"
+      fi
     fi
+    _pv_packer="$_pv_type_dir$VM_PACKER_BUILD_DIR"
+    if [ -d "$_pv_packer" ]; then
+      say "pack — removing transient Packer directory: $_pv_packer"
+      if [ "$dry_run" = false ]; then
+        rm -rf "$_pv_packer"
+      fi
+    fi
+    for _pv_dot in "$_pv_type_dir"/.[!.]*/; do
+      [ -d "$_pv_dot" ] || continue
+      say "pack — removing transient build directory: $_pv_dot"
+      if [ "$dry_run" = false ]; then
+        rm -rf "$_pv_dot"
+      fi
+    done
   done
 
-  # images/*-build/ + stale dot-dirs (transient Packer junk).
-  for _pv_build in "$IMAGES_DIR"/*-build/ "$IMAGES_DIR"/.[!.]*/; do
-    [ -d "$_pv_build" ] || continue
-    say "pack — removing transient build directory: $_pv_build"
-    if [ "$dry_run" = false ]; then
-      rm -rf "$_pv_build"
-    fi
-  done
-
-  say "pack — summary: stripped regenerable wrappers; payload retained (images, data, descriptors, tart/, README)"
+  say "pack — summary: stripped regenerable wrappers; payload retained (src, data, descriptors, tart/, README)"
   say "pack — next: copy the packed tree to the target host, then run 'nucleus-vm unpack' or 'nucleus-vm setup' there"
   if [ "$dry_run" = true ]; then
     say "pack — dry-run: nothing was removed; pass --force to perform"
@@ -3886,18 +3976,19 @@ vm_pack_vms() {
 }
 
 # vm_unpack_ensure_base_overlay NAME TYPE
-#   Restores the base/overlay disk pair after pack.  The base copy
-#   (images/<type>.base.qcow2) is a trivial cp from the kept prebuilt golden
-#   (images/<type>.qcow2) — pack removes the copy, never the golden; the
+#   Restores the base/overlay disk pair after pack.  The overlay backing copy
+#   (src/<type>/overlay backing.qcow2) is a trivial cp from the kept prebuilt golden
+#   (src/<type>/prebuilt image.qcow2) — pack removes the copy, never the golden; the
 #   overlay (data/<name>.qcow2) is recreated only when absent — never rebuilt
 #   (its content is user data by design).  Returns 1 when the golden is
 #   missing (packed trees always carry it, so this signals a broken tree).
 vm_unpack_ensure_base_overlay() {
   _uebo_name="$1"
   _uebo_type="$2"
-  _uebo_prebuilt="$IMAGES_DIR/${_uebo_type}.qcow2"
-  _uebo_base="$IMAGES_DIR/${_uebo_type}.base.qcow2"
+  _uebo_prebuilt="$(vm_src_path "$_uebo_type" "$VM_PREBUILT_IMAGE")"
+  _uebo_base="$(vm_src_path "$_uebo_type" "$VM_OVERLAY_BACKING")"
   _uebo_overlay="$VM_DIR/data/${_uebo_name}.qcow2"
+  _uebo_backing_rel="$(vm_overlay_backing_rel_path "$_uebo_type")"
 
   if [ ! -f "$_uebo_prebuilt" ]; then
     warn "unpack — prebuilt golden missing: $_uebo_prebuilt (re-provision or copy it back)"
@@ -3912,10 +4003,10 @@ vm_unpack_ensure_base_overlay() {
     fi
     if [ ! -f "$_uebo_overlay" ]; then
       say "unpack — recreating absent overlay disk: $_uebo_overlay"
-      # Relative backing path (../images/<type>.base.qcow2), mirroring
+      # Relative backing path (../src/<type>/overlay backing.qcow2), mirroring
       # vm_ensure_base_and_overlay, so the tree stays relocatable between
       # hosts (an absolute path would pin it to this machine).
-      qemu-img create -f qcow2 -b "../images/${_uebo_type}.base.qcow2" -F qcow2 "$_uebo_overlay" >/dev/null
+      qemu-img create -f qcow2 -b "$_uebo_backing_rel" -F qcow2 "$_uebo_overlay" >/dev/null
     else
       say "unpack — keeping existing overlay disk: $_uebo_overlay"
     fi
@@ -3995,13 +4086,13 @@ vm_unpack_vms() {
           fi
           mkdir -p "$_uv_bundle/Data"
           if [ "$_uv_type" = "Android" ]; then
-            # Android: system/GSI come from images/ (kept prebuilts, read
+            # Android: system/GSI come from src/<type>/ (kept prebuilts, read
             # only — copied like setup so writes never corrupt the golden);
             # userdata comes from data/<id>.qcow2 (payload) and is linked
             # (G1a write-through), mirroring vm_setup_utm.
-            _uv_android_system="$IMAGES_DIR/$(jq -r '.Android.systemImage' "$_uv_desc")"
+            _uv_android_system="$(vm_src_path "$_uv_type" "$(jq -r '.Android.systemImage' "$_uv_desc")")"
             _uv_android_userdata="$VM_DIR/data/$(jq -r '.Android.userdataImage' "$_uv_desc")"
-            _uv_android_gsi="$IMAGES_DIR/$(jq -r '.Android.gsiImage' "$_uv_desc")"
+            _uv_android_gsi="$(vm_src_path "$_uv_type" "$(jq -r '.Android.gsiImage' "$_uv_desc")")"
             _uv_gsi_url="$(jq -r '.Android.gsiUrl' "$_uv_desc")"
             if [ ! -f "$_uv_android_userdata" ]; then
               warn "unpack — Android userdata missing: $_uv_android_userdata; skipping bundle for '$_uv_name'"
@@ -4018,7 +4109,7 @@ vm_unpack_vms() {
             if ! vm_unpack_ensure_base_overlay "$_uv_name" "$_uv_type"; then
               continue
             fi
-            ln -f "$IMAGES_DIR/${_uv_type}.base.qcow2" "$_uv_bundle/Data/${_uv_type}.base.qcow2"
+            ln -f "$(vm_src_path "$_uv_type" "$VM_OVERLAY_BACKING")" "$_uv_bundle/Data/$(basename "$(vm_src_path "$_uv_type" "$VM_OVERLAY_BACKING")")"
             ln -f "$VM_DIR/data/${_uv_name}.qcow2" "$_uv_bundle/Data/disk-main.qcow2"
           fi
           cp "$_uv_plist_template" "$_uv_bundle/config.plist"
@@ -4052,9 +4143,9 @@ vm_unpack_vms() {
           if [ "$_uv_type" = "Android" ]; then
             # Android images are referenced directly by the domain XML
             # (mirrors vm_setup_libvirt); just validate the payload exists.
-            _uv_android_system="$IMAGES_DIR/$(jq -r '.Android.systemImage' "$_uv_desc")"
+            _uv_android_system="$(vm_src_path "$_uv_type" "$(jq -r '.Android.systemImage' "$_uv_desc")")"
             _uv_android_userdata="$VM_DIR/data/$(jq -r '.Android.userdataImage' "$_uv_desc")"
-            _uv_android_gsi="$IMAGES_DIR/$(jq -r '.Android.gsiImage' "$_uv_desc")"
+            _uv_android_gsi="$(vm_src_path "$_uv_type" "$(jq -r '.Android.gsiImage' "$_uv_desc")")"
             _uv_gsi_url="$(jq -r '.Android.gsiUrl' "$_uv_desc")"
             if [ ! -f "$_uv_android_system" ] || [ ! -f "$_uv_android_userdata" ]; then
               warn "unpack — Android images missing for '$_uv_name': $_uv_android_system, $_uv_android_userdata"
