@@ -35,6 +35,7 @@ _audit_violation() {
 _f1_hits=$(
   rg -n 'currentOs|CURRENT_OS|macOSAllVars|usersMacOS|NUCLEUS_PLATFORM|\bPLATFORM=' \
     --glob '!src/scripts/checks/check-steps/26-host-os-naming.*' \
+    --glob '!src/scripts/checks/host-platform-audit.sh' \
     --glob '!**/*.instructions.md' \
     2>/dev/null || true
 )
