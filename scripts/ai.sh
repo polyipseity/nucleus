@@ -141,17 +141,14 @@ do_sync() {
   done
 
   # Determine the active model profile.
-  # WHY: the default is derived from the OS (macOS → MacBook, else NixOS) so
-  # the CLI works with zero config; explicit overrides (flag, then env) win.
+  # WHY: the default is the resolved nucleus host so the CLI works with zero
+  # config; explicit overrides (flag, then env) win.
   if [ -n "$_sync_profile_override" ]; then
     profile="$_sync_profile_override"
   elif [ -n "${NUCLEUS_AI_SYNC_PROFILE:-}" ]; then
     profile="$NUCLEUS_AI_SYNC_PROFILE"
   else
-    case "$(uname)" in
-      Darwin) profile="MacBook" ;;
-      *)      profile="NixOS"   ;;
-    esac
+    profile="$HOST"
   fi
 
   # Fail fast if jq is unavailable.
