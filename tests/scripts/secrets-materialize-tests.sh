@@ -66,6 +66,24 @@ test_materialize_skips_jit_key_prefixes() {
   fi
 }
 
+test_decrypt_sops_skips_unreadable_host_key() {
+  # shellcheck disable=SC2016 # reason: literal grep pattern for decrypt-sops host-key guard
+  if grep -Fq '[ -r "$_ds_host_key_path" ]' "$REPO_ROOT/src/scripts/secrets/decrypt-sops.sh"; then
+    assert_pass "decrypt-sops skips unreadable machine SSH host key"
+  else
+    assert_fail "decrypt-sops skips unreadable machine SSH host key" "expected -r host-key guard"
+  fi
+}
+
+test_materialize_replaces_stale_ssh_symlinks() {
+  # shellcheck disable=SC2016 # reason: literal grep pattern for materialize symlink cleanup
+  if grep -Fq 'rm -f "$_mus_ssh_target"' "$MATERIALIZE_SCRIPT"; then
+    assert_pass "materialize-user-secrets replaces stale SSH symlinks before write"
+  else
+    assert_fail "materialize-user-secrets replaces stale SSH symlinks before write" "missing rm -f guard"
+  fi
+}
+
 test_derive_host_age_key_skips_without_host_key() {
   if [ -f /etc/ssh/ssh_host_ed25519_key ]; then
     assert_pass "derive-host-age-key skip-without-host-key (skipped: host key present on runner)"
@@ -89,6 +107,8 @@ EOF
 test_list_secret_users_sorted
 test_materialize_exits_clean_without_user_secret_file
 test_materialize_skips_jit_key_prefixes
+test_decrypt_sops_skips_unreadable_host_key
+test_materialize_replaces_stale_ssh_symlinks
 test_derive_host_age_key_skips_without_host_key
 
 echo ""

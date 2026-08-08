@@ -51,7 +51,10 @@ let
   ) "Shell aliases and env vars should be strings";
 
   # Test 8: Verify sops keys are present in the config
-  test_sops_keys_configured = assert' (containsRegex "sops\.age\.keyFile = \"/etc/sops/age/machine\.txt\";" secretsModuleText) "SOPS keys must be configured for secret decryption";
+  test_sops_keys_configured = assert' (
+    containsRegex "sops\\.age\\.keyFile = \"/etc/sops/age/machine\\.txt\";" secretsModuleText
+    && containsRegex "sops\\.age\\.sshKeyPaths = \\[ \\];" secretsModuleText
+  ) "SOPS keys must use derived machine age key and skip root-only host SSH paths";
 
   # Test 9: Verify all options have descriptions (required for maintainability)
   test_all_options_have_descriptions = assert' (
