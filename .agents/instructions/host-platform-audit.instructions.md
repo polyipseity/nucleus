@@ -121,6 +121,21 @@ rg -n 'configs/(macos|nixos|windows)/|config-(macos|nixos|windows)\.' src/ scrip
 
 `src/modules/configs/vms/nixos-domain.xml` is the canonical filename (guest artifact, lowercase `nixos` prefix). Tests must not reference `NixOS-domain.xml`.
 
+### F9 — Host identity bypass (must be zero hits)
+
+| Rule | Pattern | Rationale |
+| ---- | ------- | --------- |
+| **F9a** | `current_os=` or `currentOs` in `scripts/` | Legacy OS variable; use host helpers |
+| **F9b** | `case "$(uname)"` assigning `MacBook`/`NixOS` outside allowlist | Host bypass |
+| **F9c** | `IsOSPlatform` variables named `*Host` in `src/hosts/Windows/modules/` | OS check masquerading as host |
+
+F9b allowlist (runtime kind / boundary only): `src/scripts/lib/lib.sh`, `src/scripts/apply.sh`, `src/scripts/lib/vm.sh`.
+
+```bash
+rg -n 'current_os=|currentOs' scripts/
+rg -n '\w+Host\s*=.*IsOSPlatform' src/hosts/Windows/modules/
+```
+
 ## Classification (check step 27)
 
 | Result | Meaning |

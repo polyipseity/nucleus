@@ -133,6 +133,54 @@ if [ "$_a_missing" -eq 0 ]; then
   _audit_pass "A host-keyed config inventory"
 fi
 
+# ── F9: host identity bypass (current_os, uname→host, IsOSPlatform *Host) ─
+_f9a_hits=$(rg -n 'current_os=|currentOs' scripts/ 2>/dev/null || true)
+if [ -n "$_f9a_hits" ]; then
+  _audit_violation "F9a legacy current_os/currentOs in scripts/:${_f9a_hits}"
+else
+  _audit_pass "F9a no legacy current_os in scripts/"
+fi
+
+_f9b_allowlist=(
+  'src/scripts/lib/lib.sh'
+  'src/scripts/apply.sh'
+  'src/scripts/lib/vm.sh'
+)
+_f9b_hits=$(
+  {
+    rg -l 'case "\$\(uname' scripts/ src/scripts/ 2>/dev/null || true
+  } | while IFS= read -r _f; do
+    [ -z "$_f" ] && continue
+    if ! rg -q 'MacBook|NixOS' "$_f" 2>/dev/null; then
+      continue
+    fi
+    _allowed=false
+    for _b in "${_f9b_allowlist[@]}"; do
+      if [ "$_f" = "$_b" ]; then
+        _allowed=true
+        break
+      fi
+    done
+    if [ "$_allowed" = false ]; then
+      rg -n 'case "\$\(uname|MacBook|NixOS' "$_f" 2>/dev/null || true
+    fi
+  done
+)
+if [ -n "$_f9b_hits" ]; then
+  _audit_violation "F9b uname→host outside allowlist:${_f9b_hits}"
+else
+  _audit_pass "F9b uname→host boundary"
+fi
+
+_f9c_hits=$(
+  rg -n '\w+Host\s*=.*IsOSPlatform' src/hosts/Windows/modules/ 2>/dev/null || true
+)
+if [ -n "$_f9c_hits" ]; then
+  _audit_violation "F9c IsOSPlatform *Host in Windows modules:${_f9c_hits}"
+else
+  _audit_pass "F9c no IsOSPlatform *Host"
+fi
+
 # ── C: stdenv/uname outside boundary allowlist (WARN) ───────────────
 _boundary_globs=(
   'src/scripts/lib/lib.sh'
