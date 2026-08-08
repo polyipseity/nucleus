@@ -14,8 +14,15 @@
   start:   Start a VM (not yet implemented).
   stop:    Stop a VM (not yet implemented).
   upgrade: Upgrade an Android VM image (not yet implemented on Windows).
-  reset:   Reset an Android VM image (not yet implemented on Windows).
-  android-config: Android post-provision (recovery, GApps, ADB keys, root, fake Wi-Fi). Delegates to nucleus-vm.
+  reset:   Factory-reset an Android VM userdata disk (data/<id>.qcow2).
+  android-config: Android post-provision (recovery, GApps, ADB keys, Magisk, root, fake Wi-Fi).
+    Flags (after VM name; omit all flags to print the manual):
+      --gapps               Sideload MindTheGapps in recovery (enter fastboot first).
+      --adb-keys            Install host ~/.android/adbkey.pub into guest adb_keys.
+      --magisk              Install Magisk on booted Lineage (patch boot, flash, Magisk su).
+      --root                Enable rooted debugging (dev options, Local terminal, adb root).
+      --fake-wifi           Create wlan0 via virt_wifi on eth0 (requires Magisk su).
+      --fake-wifi-revert    Remove persisted fake Wi-Fi and restore eth0.
   resize:  Grow-only resize of the writable disk (data/<id>.qcow2) to an
            explicit size (e.g. 64GB); pass --allow-shrink to shrink instead.
   gc:      Remove stale VM artifacts. Delegates to Invoke-VMSetup -Gc.
@@ -357,16 +364,45 @@ function Invoke-VmReset {
   }
 
   $vmName = $SubcommandArgs[0]
-  $module = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
-  if (-not (Test-Path $module)) {
-    Write-NucleusError "Invoke-VMSetup module not found at $module"
+  $acceptGsiLicense = $false
+  for ($i = 1; $i -lt $SubcommandArgs.Length; $i++) {
+    switch ($SubcommandArgs[$i]) {
+      '--accept-gsi-license' { $acceptGsiLicense = $true }
+      default { Write-NucleusWarning "ignoring unknown flag for reset: $($SubcommandArgs[$i])" }
+    }
+  }
+
+  $manifest = Get-VmManifest
+  $vm = $manifest.VMs | Where-Object { $_.id -eq $vmName }
+  if (-not $vm) {
+    Write-NucleusError "VM '$vmName' not found in manifest"
     exit 1
   }
-  . $module
+  if ([string]$vm.type -ne 'Android') {
+    Write-NucleusError "reset is only supported for Android VMs ('$vmName' is type $($vm.type))"
+    exit 1
+  }
 
+  $setupModule = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
+  if (-not (Test-Path $setupModule)) {
+    Write-NucleusError "Invoke-VMSetup module not found at $setupModule"
+    exit 1
+  }
+  . $setupModule
   Resolve-VMGuestCredential -RepoRoot $RepoRoot > $null
+
+  $androidModule = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\VmAndroid.ps1'
+  $configModule = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-AndroidConfig.ps1'
+  if (-not (Test-Path $androidModule) -or -not (Test-Path $configModule)) {
+    Write-NucleusError "Android modules not found at $androidModule or $configModule"
+    exit 1
+  }
+  . $androidModule
+  . $configModule
+
+  $vmDir = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
   Write-NucleusInfo "resetting Android VM '$vmName' on Windows..."
-  Write-NucleusWarning "Android reset on Windows is not yet fully implemented"
+  Invoke-AndroidReset -RepoRoot $RepoRoot -VmName $vmName -Manifest $manifest -VmDir $vmDir -AcceptGsiLicense:$acceptGsiLicense
 }
 
 function Invoke-VmAndroidConfig {
@@ -375,8 +411,34 @@ function Invoke-VmAndroidConfig {
     exit 1
   }
 
-  & nucleus-vm android-config @SubcommandArgs
-  exit $LASTEXITCODE
+  $vmName = $SubcommandArgs[0]
+  $configFlags = @()
+  if ($SubcommandArgs.Length -gt 1) {
+    $configFlags = $SubcommandArgs[1..($SubcommandArgs.Length - 1)]
+  }
+
+  $manifest = Get-VmManifest
+  $vm = $manifest.VMs | Where-Object { $_.id -eq $vmName }
+  if (-not $vm) {
+    Write-NucleusError "VM '$vmName' not found in manifest"
+    exit 1
+  }
+  if ([string]$vm.type -ne 'Android') {
+    Write-NucleusError "android-config is only supported for Android VMs ('$vmName' is type $($vm.type))"
+    exit 1
+  }
+
+  $androidModule = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\VmAndroid.ps1'
+  $configModule = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-AndroidConfig.ps1'
+  if (-not (Test-Path $androidModule) -or -not (Test-Path $configModule)) {
+    Write-NucleusError "Android modules not found at $androidModule or $configModule"
+    exit 1
+  }
+  . $androidModule
+  . $configModule
+
+  $vmDir = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
+  Invoke-AndroidConfig -RepoRoot $RepoRoot -VmName $vmName -Manifest $manifest -VmDir $vmDir -ConfigFlags $configFlags
 }
 
 function Invoke-VmResize {
