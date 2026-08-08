@@ -25,7 +25,7 @@ The suite validates configuration logic, module composition, package parity, she
 | Check steps | 27 | 18 |
 | Test orchestrator | 5 | 5 POSIX / 6 Windows |
 | Nix test files | 75 | 24 |
-| `tests/scripts` shell tests | 64 | ~18 (after orphan cleanup) |
+| `tests/scripts` shell tests | 64 | 18 |
 | Windows Pester | 31 | 15 |
 
 ## Provisioning vs preflight
