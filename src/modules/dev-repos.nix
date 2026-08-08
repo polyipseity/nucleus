@@ -104,11 +104,8 @@ in
     home.activation.provision-dev-repos =
       lib.hm.dag.entryAfter
         [
-          "git-identity"
-          "gpg-import"
-          "ssh-key-adopt"
+          "materialize-user-secrets"
           "verify-secret-decryption"
-          "wait-for-sops-secrets"
           "writeBoundary"
         ]
         ''

@@ -24,11 +24,12 @@ let
     containsRegex "\./shell\.nix" homeModuleText && containsRegex "programs\.zsh" shellModuleText
   ) "All hosts must import shell.nix for consistent shell config";
 
-  # Test 3: Verify SOPS imports are guarded by isPrimary check
-  test_sops_primary_user_only = assert' (
-    containsRegex "isPrimaryUser" secretsModuleText
-    && containsRegex "lib\.mkIf isPrimaryUser" secretsModuleText
-  ) "SOPS modules should only apply to primary user";
+  # Test 3: Verify per-user secrets materialize from config.home.username
+  test_sops_per_user_materialization = assert' (
+    containsRegex "materialize-user-secrets" secretsModuleText
+    && containsRegex "config\.home\.username" secretsModuleText
+    && containsRegex "hasUserSecretFile" secretsModuleText
+  ) "SOPS modules should materialize per-user secrets when a user file exists";
 
   # Test 4: Verify home-manager is properly embedded in system configs
   test_home_manager_embedded = assert' (
@@ -103,7 +104,7 @@ let
   allTests = [
     test_posix_hosts_import_core
     test_all_hosts_import_shell
-    test_sops_primary_user_only
+    test_sops_per_user_materialization
     test_home_manager_embedded
     test_security_parity
     test_wallpaper_module_imported
