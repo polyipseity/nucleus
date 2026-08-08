@@ -109,7 +109,7 @@ function Invoke-CamillaDSPSetup {
     # check-suppress:config-method: method 1 (writable symlink) -- camilladsp/configs/Windows/default.yml deployed alongside config.yml
     $configDir = Join-Path -Path $HOME -ChildPath ".config\camilladsp\configs"
     $configPath = Join-Path -Path $configDir -ChildPath "config.yml"
-    $configSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\camilladsp\configs\windows\config.yml"
+    $configSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\camilladsp\configs\Windows\config.yml"
     if (-not (Test-Path $configDir)) {
       $null = New-Item -ItemType Directory -Path $configDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
     }
