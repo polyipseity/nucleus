@@ -36,6 +36,11 @@
   - **macOS guest**: not automated (Apple EULA restricts redistribution).
   - **NixOS guest**: automatic; `nixos-generators` builds the image.
   - **Windows 11 guest**: ISO auto-downloaded (Fido-style); fallback `--windows-iso /path/to/Win11.iso` (download from <https://www.microsoft.com/software-download/windows11>).
+  - **Android guest** (LineageOS): libvirt/KVM; ADB at `localhost:22040`. Run `nucleus-vm android-config Android` without flags for the full guide.
+    - **Google services (MindTheGapps)**: sideload in **LineageOS Recovery** via `nucleus-vm android-config Android --gapps` (recovery → **Advanced → Enter fastboot** → run `--gapps` → **Enable ADB** → sideload).
+    - **First boot**: after `nucleus-vm reset Android`, boot **LineageOS Recovery**, run `--gapps`, then reboot. After Lineage boots, tap **Allow** on USB debugging, then run `--magisk`, `--root`, and `--fake-wifi` (booted system only).
+    - **Magisk / root / fake Wi-Fi**: `nucleus-vm android-config Android --magisk`, then `--root`, then `--fake-wifi`. Re-run after userdata reset. Open the Magisk app after `--magisk` if prompted for environment fix.
+    - **ADB unauthorized**: boot LineageOS, tap **Allow**, then `nucleus-vm android-config Android --adb-keys`.
 - `nucleus-vm resize <id> <size>` — grow the writable runtime disk `data/<id>.qcow2` (grow-only; shrinking requires `--allow-shrink`)
 - `nucleus-vm pack` — strip trivially regenerable artifacts (generated start/stop scripts, `images/<type>.base.qcow2` copies) so the tree copies as-is to another host; dry-run by default, `--force` performs
 - `nucleus-vm unpack` — regenerate platform artifacts (start/stop scripts, libvirt domains) from `<id>.vm.json` descriptors after copying a packed tree

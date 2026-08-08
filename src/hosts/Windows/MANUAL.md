@@ -35,3 +35,8 @@
 - `nucleus-vm setup` — build and provision VMs from `src/modules/VMs.json`. Requires QEMU (managed by Scoop). Guest converge is automatic; run `.\src\hosts\Windows\apply.ps1` inside the guest for manual re-converge.
   - **NixOS guest**: uses Packer (ISO auto-downloaded).
   - **Windows 11 guest**: ISO auto-resolved; fallback `-WindowsIso C:\path\to\Win11.iso` (download from <https://www.microsoft.com/software-download/windows11>). Use `-Accelerator whpx` if Windows HyperVisor Platform is enabled. Run `start-<name>.ps1` in `%USERPROFILE%\virtual machines\`.
+  - **Android guest** (LineageOS): QEMU backend via `start-android-vm.ps1`; ADB at `localhost:22040`. Run `nucleus-vm android-config Android` without flags for the full guide.
+    - **Google services (MindTheGapps)**: sideload in **LineageOS Recovery** via `nucleus-vm android-config Android --gapps` (recovery → **Advanced → Enter fastboot** → run `--gapps` → **Enable ADB** → sideload).
+    - **First boot**: after `nucleus-vm reset Android`, boot **LineageOS Recovery**, run `--gapps`, then reboot. After Lineage boots, tap **Allow** on USB debugging, then run `--magisk`, `--root`, and `--fake-wifi` (booted system only).
+    - **Magisk / root / fake Wi-Fi**: `nucleus-vm android-config Android --magisk`, then `--root`, then `--fake-wifi`. Re-run after userdata reset. Open the Magisk app after `--magisk` if prompted for environment fix.
+    - **ADB unauthorized**: boot LineageOS, tap **Allow**, then `nucleus-vm android-config Android --adb-keys`.
