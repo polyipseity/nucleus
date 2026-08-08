@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Smoke tests for check-pwsh.ps1.
-# Tests basic functionality: syntax validation, -SkipStep, -Paths, error handling.
+# Smoke tests for check-pwsh.ps1 CLI (-SkipStep, -Paths).
+# Uses -SkipStep PSSA for syntax-only probes; check step 2 runs syntax on pre-commit.
+# PSScriptAnalyzer runs in test step 2 (-SkipStep Syntax).
 
 set -euo pipefail
 

@@ -1,6 +1,6 @@
-# Smoke tests for check-pwsh.ps1.
-# Uses -SkipStep PSSA so only syntax validation and CLI behavior are exercised here;
-# full PSScriptAnalyzer lint runs in check step 2 (powershell-lint).
+# Smoke tests for check-pwsh.ps1 CLI (-SkipStep, -Paths).
+# Uses -SkipStep PSSA for syntax-only probes; check step 2 runs syntax on pre-commit.
+# PSScriptAnalyzer runs in test step 2 (-SkipStep Syntax).
 
 #Requires -Version 7.4
 

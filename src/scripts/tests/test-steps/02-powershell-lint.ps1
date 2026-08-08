@@ -1,7 +1,9 @@
-Register-Step -Id "powershell-lint-test" -Number 2 -Name "PowerShell lint smoke" -Action {
+Register-Step -Id "powershell-lint-test" -Number 2 -Name "PowerShell lint (PSSA)" -Action {
   param($RepoRoot)
 
-  $testScript = Join-Path -Path $RepoRoot -ChildPath 'tests' -AdditionalChildPath 'scripts' -AdditionalChildPath 'check-pwsh-tests.ps1'
-  & $testScript
+  $pwshScript = Join-Path -Path $RepoRoot -ChildPath 'scripts\check-pwsh.ps1'
+  $settings = Join-Path -Path $RepoRoot -ChildPath 'scripts\PSScriptAnalyzerSettings.test.psd1'
+
+  & $pwshScript -SkipStep Syntax -Settings $settings
   return ($LASTEXITCODE -eq 0)
 }
