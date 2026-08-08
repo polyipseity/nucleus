@@ -1,0 +1,13 @@
+{
+  "$schema": "./vm-guest-ssh-public-key-paths.schema.json",
+  "staticRelativePaths": [
+    "id_ed25519.pub",
+    "id_ecdsa.pub",
+    "id_rsa.pub",
+    "id_ecdsa_sk.pub"
+  ],
+  "usernameRelativePathTemplates": [
+    "ssh_personal_{username}.pub",
+    "ssh_personal_{username}_rsa.pub"
+  ]
+}

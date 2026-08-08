@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "Relative paths under ~/.ssh scanned when resolving the host SSH public key injected into NixOS guest authorized_keys.",
+  "properties": {
+    "$schema": {
+      "description": "Reference to the JSON Schema file that validates this data file.",
+      "type": "string"
+    },
+    "staticRelativePaths": {
+      "description": "Standard OpenSSH public key filenames, tried before username-scoped nucleus keys.",
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    },
+    "usernameRelativePathTemplates": {
+      "description": "Username-scoped public key paths; {username} is replaced with the resolved VM guest username from SOPS.",
+      "items": {
+        "minLength": 1,
+        "pattern": "\\{username\\}",
+        "type": "string"
+      },
+      "minItems": 1,
+      "type": "array"
+    }
+  },
+  "required": [
+    "staticRelativePaths",
+    "usernameRelativePathTemplates"
+  ],
+  "type": "object"
+}
