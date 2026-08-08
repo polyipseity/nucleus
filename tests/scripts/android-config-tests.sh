@@ -4,8 +4,10 @@
 # Run with: bash tests/scripts/android-config-tests.sh
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
+NUCLEUS_ANDROID_CONFIG_DIR="$REPO_ROOT/src/scripts/vms"
+export NUCLEUS_ANDROID_CONFIG_DIR
 # shellcheck source=../../src/scripts/lib/lib.sh
 . "$REPO_ROOT/src/scripts/lib/lib.sh"
 # shellcheck source=../../src/scripts/lib/vm.sh
@@ -168,11 +170,10 @@ test_no_flags_prints_manual() {
   fi
 }
 
-test_root_enables_debuggable_and_root_access() {
+test_root_applies_persist_root_access() {
   setup_fixture
   _af_shell_log="$_tmp/shell.log"
   : > "$_af_shell_log"
-  _af_root_attempts=0
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"
   cat > "$_af_bin/adb" <<EOF
@@ -182,21 +183,18 @@ case "\$*" in
   *devices*) printf '%s\n' 'List of devices attached' 'localhost:22040	device' '' ;;
   *connect*) exit 0 ;;
   *get-state*) printf 'device\n' ;;
-  *' root')
-    _af_root_attempts=\$((_af_root_attempts + 1))
-    echo "root \$*" >> "$_af_shell_log"
-    exit 0
-    ;;
   *shell*settings*) echo "settings \$*" >> "$_af_shell_log"; exit 0 ;;
-  *shell*su\ -c*pm\ path*) echo "su \$*" >> "$_af_shell_log"; printf 'package:/system/app/Terminal/Terminal.apk\n'; exit 0 ;;
-  *shell*su\ -c*com.android.terminal*) echo "su \$*" >> "$_af_shell_log"; printf '1\n'; exit 0 ;;
-  *shell*su\ -c*resetprop*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
-  *shell*su\ -c*nucleus-root-props*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
-  *shell*su\ -c*service.d*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
-  *shell*su\ -c*magiskpolicy*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
-  *shell*su\ -c*) echo "su \$*" >> "$_af_shell_log"; printf '0\n'; exit 0 ;;
-  *shell*id*) printf '0\n'; exit 0 ;;
-  *shell*setprop*) echo "setprop \$*" >> "$_af_shell_log"; exit 0 ;;
+  *shell*su*getprop*persist.sys.root_access*) echo "su \$*" >> "$_af_shell_log"; printf '3\n'; exit 0 ;;
+  *shell*su*getprop*ro.debuggable*) echo "su \$*" >> "$_af_shell_log"; printf '0\n'; exit 0 ;;
+  *shell*su*pm*path*) echo "su \$*" >> "$_af_shell_log"; printf 'package:/apex/com.android.virt/priv-app/VmTerminalApp.apk\n'; exit 0 ;;
+  *shell*su*pm*enable*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
+  *shell*su*pm*list*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
+  *shell*su*resetprop*persist*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
+  *shell*su*service.d*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
+  *shell*su*id*u*) echo "su \$*" >> "$_af_shell_log"; printf '0\n'; exit 0 ;;
+  *shell*su*) echo "su \$*" >> "$_af_shell_log"; printf '0\n'; exit 0 ;;
+  *shell*am\ start*) exit 0 ;;
+  *logcat*) exit 0 ;;
   *push*) exit 0 ;;
   *shell*) exit 0 ;;
 esac
@@ -211,20 +209,27 @@ EOF
   PATH="$_af_bin:$PATH"
   export PATH
 
-  if ! vm_android_config Android 0 --root >"$_tmp/out.txt" 2>&1; then
-    echo "FAIL: --root should succeed when Magisk su and adb root are available"
+  if ! vm_android_config Android 0 --root >"$_tmp/out.txt" 2>"$_tmp/err.txt"; then
+    echo "FAIL: --root should succeed when Magisk su is available"
+    if [ -s "$_tmp/err.txt" ]; then
+      sed 's/^/  /' "$_tmp/err.txt"
+    fi
     _failures=$((_failures + 1))
   fi
   if ! grep -q 'settings put global development_settings_enabled' "$_af_shell_log"; then
     echo "FAIL: --root should enable Developer options via settings put global"
     _failures=$((_failures + 1))
   fi
-  if ! grep -q 'com.android.terminal' "$_af_shell_log"; then
-    echo "FAIL: --root should enable Local terminal (com.android.terminal)"
+  if ! grep -q 'com.android.virtualization.terminal' "$_af_shell_log"; then
+    echo "FAIL: --root should enable terminal (com.android.virtualization.terminal)"
     _failures=$((_failures + 1))
   fi
-  if ! grep -q 'resetprop ro.debuggable 1' "$_af_shell_log"; then
-    echo "FAIL: --root should apply resetprop ro.debuggable 1"
+  if ! grep -q 'resetprop persist.sys.root_access 3' "$_af_shell_log"; then
+    echo "FAIL: --root should apply resetprop persist.sys.root_access 3"
+    _failures=$((_failures + 1))
+  fi
+  if grep -q 'resetprop ro.debuggable 1' "$_af_shell_log"; then
+    echo "FAIL: --root must not set ro.debuggable to 1"
     _failures=$((_failures + 1))
   fi
   if ! grep -q 'nucleus-root-props.sh' "$_af_shell_log"; then
@@ -453,8 +458,6 @@ case "\$*" in
   *connect*) exit 0 ;;
   *get-state*) printf 'recovery\n' ;;
   *getprop*) exit 0 ;;
-  *setprop*) exit 0 ;;
-  *' root') exit 0 ;;
   *shell*id*) printf '0\n' ;;
   *push*) echo "push \$*" >> "$_af_push_log"; exit 0 ;;
   *shell*) exit 0 ;;
@@ -597,8 +600,8 @@ EOF
     echo "FAIL: --magisk should report Magisk installed"
     _failures=$((_failures + 1))
   fi
-  if grep -q 'nucleus-adb-root' "$_tmp/out.txt" || grep -q 'nucleus-root-props' "$_af_shell_log" || grep -q 'adb root' "$_af_shell_log"; then
-    echo "FAIL: --magisk must not install root props or enable adb root"
+  if grep -q 'nucleus-adb-root' "$_tmp/out.txt" || grep -q 'resetprop ro.debuggable 1' "$_af_shell_log"; then
+    echo "FAIL: --magisk must not install ro.debuggable props"
     _failures=$((_failures + 1))
   fi
 }
@@ -696,7 +699,7 @@ test_adb_list_state_unauthorized
 test_wait_authorized_fails_on_unauthorized
 test_wait_recovery_succeeds_on_recovery
 test_no_flags_prints_manual
-test_root_enables_debuggable_and_root_access
+test_root_applies_persist_root_access
 test_gapps_rejects_booted_device_state
 test_gapps_unauthorized_flashes_recovery
 test_gapps_sideload_path

@@ -7,6 +7,7 @@ let
   vmSetupShText = builtins.readFile ../../scripts/vm.sh;
   vmPs1Text = builtins.readFile ../../scripts/vm.ps1;
   androidConfigShText = builtins.readFile ../../src/scripts/vms/android-config.sh;
+  androidMagiskShText = builtins.readFile ../../src/scripts/vms/android-magisk.sh;
   invokeAndroidConfigPs1Text = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-AndroidConfig.ps1;
   coreNixText = builtins.readFile ../../src/modules/core.nix;
   flakeNixText = builtins.readFile ../../src/flake.nix;
@@ -73,6 +74,18 @@ let
     && (lib.hasInfix "vm_android_config_print_manual" androidConfigShText)
   ) "POSIX vm.sh must wire android-config.sh";
 
+  test_no_adb_root_in_android_config_sources = assert' (
+    !(lib.hasInfix "adb root" androidConfigShText)
+    && !(lib.hasInfix "adb root" androidMagiskShText)
+    && !(lib.hasInfix "adb_ensure_root" androidConfigShText)
+    && !(lib.hasInfix "adb_ensure_root" androidMagiskShText)
+    && !(lib.hasInfix "recovery_prepare_adb" androidConfigShText)
+    && !(lib.hasInfix "GuestHasAdbRoot" invokeAndroidConfigPs1Text)
+    && !(lib.hasInfix "AdbEnsureRoot" invokeAndroidConfigPs1Text)
+    && !(lib.hasInfix "RecoveryPrepareAdb" invokeAndroidConfigPs1Text)
+    && !(lib.hasInfix "MagiskpolicyForAdbRoot" invokeAndroidConfigPs1Text)
+  ) "android-config sources must not reference adb root helpers";
+
   allTests = [
     test_windows_android_config_native
     test_android_config_flags_paired
@@ -80,6 +93,7 @@ let
     test_windows_profile_no_sh_scripts
     test_manuals_document_android_config
     test_posix_android_config_wired
+    test_no_adb_root_in_android_config_sources
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {
