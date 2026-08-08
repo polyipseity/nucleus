@@ -261,7 +261,8 @@ nucleus_expand_log_path() {
       printf '%s\n' "${HOME}"
       ;;
     '~'/*)
-      printf '%s\n' "${HOME}/${_nelp_path:2}"
+      _nelp_suffix="${_nelp_path#~/}"
+      printf '%s\n' "${HOME}/${_nelp_suffix}"
       ;;
     *)
       printf '%s\n' "$_nelp_path"
