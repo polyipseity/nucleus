@@ -267,8 +267,8 @@ let
 
   # Test 37: macOS replica runner must skip the iCloud replica entry to avoid native-path permission churn
   test_macos_skips_icloud_replica = assert' (
-    containsRegex ''"[$]current_os"'' replicaSyncShellText
-    && containsRegex ''"Darwin"'' replicaSyncShellText
+    containsRegex ''"[$]host"'' replicaSyncShellText
+    && containsRegex ''"MacBook"'' replicaSyncShellText
     && containsRegex ''"[$]provider" = "iCloud"'' replicaSyncShellText
     && containsRegex ''"[$]id" = "iCloud"'' replicaSyncShellText
     && containsRegex "ensure_macos_icloud_replica_symlink" replicaSyncShellText
