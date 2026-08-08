@@ -31,6 +31,7 @@ usage() {
   --sccache-gc|--no-sccache-gc        Control sccache cache clearing (default: --sccache-gc).
   --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper gc (default: --wallpaper-gc).
   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
+  --vm-data-gc|--no-vm-data-gc        Also GC data/ runtime overlays during VM gc (default: --no-vm-data-gc).
   --log-gc|--no-log-gc                Control log rotation (default: --log-gc).
   --journald-gc|--no-journald-gc        Control journald log vacuum (default: --journald-gc).
   --log-max-size <bytes>              Log rotation max file size before rotation (default: 10000000).
@@ -59,6 +60,7 @@ ollama_gc=true
 sccache_gc=true
 wallpaper_gc=true
 vm_gc=true
+vm_data_gc=false
 log_gc=true
 journald_gc=true
 dry_run=false
@@ -140,6 +142,12 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-vm-gc)
       vm_gc=false
+      ;;
+    --vm-data-gc)
+      vm_data_gc=true
+      ;;
+    --no-vm-data-gc)
+      vm_data_gc=false
       ;;
     --log-gc)
       log_gc=true
@@ -582,7 +590,7 @@ gc_vm_artifacts_if_present() {
   # per manifest guest (vm_write_all_guest_scripts) and stripped by pack;
   # descriptor staleness is owned by vm_gc_orphan_descriptors.
   vm_dir="${HOME}/virtual machines"
-  images_dir="$vm_dir/images"
+  src_dir="$vm_dir/src"
   manifest="$REPO_ROOT/src/modules/VMs.json"
 
   # If VM directories do not exist, there is nothing to clean.
@@ -590,8 +598,8 @@ gc_vm_artifacts_if_present() {
     return 0
   fi
 
-  # If the VM images directory does not exist, there is nothing to clean.
-  if [ ! -d "$images_dir" ]; then
+  # If the VM src directory does not exist, there is nothing to clean.
+  if [ ! -d "$src_dir" ]; then
     return 0
   fi
 
@@ -609,30 +617,35 @@ gc_vm_artifacts_if_present() {
     return 0
   fi
 
-  # Remove temporary Packer build directories.
-  for build_dir in "$images_dir"/*-build; do
-    if [ -d "$build_dir" ]; then
+  # Remove temporary Packer build directories under src/<type>/Packer/.
+  for _gc_type_dir in "$src_dir"/*/; do
+    [ -d "$_gc_type_dir" ] || continue
+    _gc_packer_dir="${_gc_type_dir}Packer"
+    if [ -d "$_gc_packer_dir" ]; then
       if [ "$dry_run" = true ]; then
-        dry_run "would remove temporary VM build directory '$(basename "$build_dir")'"
-      elif rm -rf -- "$build_dir" 2>/dev/null; then
-        say "removed temporary VM build directory '$(basename "$build_dir")'"
+        dry_run "would remove temporary VM Packer directory '$(basename "$_gc_type_dir")/Packer'"
+      elif rm -rf -- "$_gc_packer_dir" 2>/dev/null; then
+        say "removed temporary VM Packer directory '$(basename "$_gc_type_dir")/Packer'"
       else
-        warn "failed to remove temporary VM build directory '$build_dir'"
+        warn "failed to remove temporary VM Packer directory '$_gc_packer_dir'"
       fi
     fi
   done
 
   # Remove leftover Packer temporary build directories (dot-prefixed, from interrupted runs).
-  for _gc_packer_tmp in "$images_dir"/.??*; do
-    [ -d "$_gc_packer_tmp" ] || continue
-    if [ "$dry_run" = true ]; then
-      dry_run "would remove stale Packer temporary build directory: ${_gc_packer_tmp##*/}"
-    else
-      warn "removing stale Packer temporary build directory: ${_gc_packer_tmp##*/}"
-      rm -rf -- "$_gc_packer_tmp"
-    fi
+  for _gc_type_dir in "$src_dir"/*/; do
+    [ -d "$_gc_type_dir" ] || continue
+    for _gc_packer_tmp in "$_gc_type_dir"/.??*; do
+      [ -d "$_gc_packer_tmp" ] || continue
+      if [ "$dry_run" = true ]; then
+        dry_run "would remove stale Packer temporary build directory: $(basename "$_gc_type_dir")/${_gc_packer_tmp##*/}"
+      else
+        warn "removing stale Packer temporary build directory: $(basename "$_gc_type_dir")/${_gc_packer_tmp##*/}"
+        rm -rf -- "$_gc_packer_tmp"
+      fi
+    done
   done
-  unset _gc_packer_tmp
+  unset _gc_type_dir _gc_packer_dir _gc_packer_tmp
 
   # Delegate the destructive disk/script/descriptor GC to the single source of
   # truth (default keep-set preserves every manifest guest; --gc-disabled
@@ -640,11 +653,14 @@ gc_vm_artifacts_if_present() {
   if [ ! -f "$REPO_ROOT/scripts/vm.sh" ]; then
     error "vm.sh not found at '$REPO_ROOT/scripts/vm.sh'; cannot gc VM artifacts"
   fi
+  _gc_vm_extra_args=()
   if [ "$dry_run" = true ]; then
-    "$REPO_ROOT/scripts/vm.sh" gc --dry-run
-  else
-    "$REPO_ROOT/scripts/vm.sh" gc
+    _gc_vm_extra_args+=(--dry-run)
   fi
+  if [ "$vm_data_gc" = true ]; then
+    _gc_vm_extra_args+=(--gc-data)
+  fi
+  "$REPO_ROOT/scripts/vm.sh" gc "${_gc_vm_extra_args[@]}"
 }
 
 # Step 1: expire system profile generations before store GC.

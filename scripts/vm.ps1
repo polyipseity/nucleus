@@ -29,8 +29,8 @@
            Default GC preserves disabled VM entries; pass --gc-disabled
            to clear them too.
   pack:    Strip trivially regenerable artifacts (generated start/stop
-           scripts, images/<type>.base.qcow2 copies, images/*-build/ + stale
-           dot-dirs) so the tree can be copied as-is to another host.
+           scripts, src/<type>/overlay backing.qcow2 copies, src/<type>/Packer/ +
+           stale dot-dirs) so the tree can be copied as-is to another host.
            Dry-run by default; pass --force to perform. Refuses while any
            VM is running.
   unpack:  Regenerate per-platform VM artifacts (start/stop scripts +
@@ -513,23 +513,28 @@ function Invoke-VmResize {
 }
 
 function Invoke-VmGc {
-  $module = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
-  if (-not (Test-Path $module)) {
-    Write-NucleusWarning "Invoke-VMSetup module not found at $module"
-    exit 1
-  }
-  . $module
-
   $gcDisabled = $false
+  $gcData = $false
   foreach ($arg in $SubcommandArgs) {
     switch ($arg) {
       '--gc-disabled' { $gcDisabled = $true }
       '--no-gc-disabled' { $gcDisabled = $false }
+      '--gc-data' { $gcData = $true }
+      '--no-gc-data' { $gcData = $false }
       default { Write-NucleusWarning "ignoring unknown flag for gc: $arg" }
     }
   }
 
-  Invoke-VMSetup -RepoRoot $RepoRoot -Gc -GcDisabled:$gcDisabled
+  $vmSh = Join-Path $RepoRoot 'scripts\vm.sh'
+  if (-not (Test-Path -LiteralPath $vmSh -PathType Leaf)) {
+    Write-NucleusError "vm.sh not found at $vmSh"
+    exit 1
+  }
+  $gcArgs = @('gc')
+  if ($gcDisabled) { $gcArgs += '--gc-disabled' }
+  if ($gcData) { $gcArgs += '--gc-data' }
+  & bash $vmSh @gcArgs
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 function Invoke-VmPack {
@@ -547,7 +552,7 @@ function Invoke-VmPack {
   }
 
   $vmDir = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
-  $imagesDir = Join-Path $vmDir 'images'
+  $srcDir = Join-Path $vmDir 'src'
 
   if (-not $perform) {
     Write-NucleusInfo 'pack (dry-run): pass --force to remove regenerable artifacts'
@@ -562,21 +567,31 @@ function Invoke-VmPack {
     }
   }
 
-  if (Test-Path -LiteralPath $imagesDir -PathType Container) {
-    # images/<type>.base.qcow2 — trivial cp from the kept prebuilt golden.
-    Get-ChildItem -LiteralPath $imagesDir -Filter '*.base.qcow2' -File -ErrorAction SilentlyContinue | ForEach-Object {
-      Write-NucleusInfo "pack — removing regenerable base image: $($_.FullName)"
-      if ($perform) { Remove-Item -LiteralPath $_.FullName -Force }
-    }
+  if (Test-Path -LiteralPath $srcDir -PathType Container) {
+    # src/<type>/overlay backing.qcow2 — trivial cp from the kept prebuilt golden.
+    Get-ChildItem -LiteralPath $srcDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+      $backing = Join-Path $_.FullName 'overlay backing.qcow2'
+      if (Test-Path -LiteralPath $backing -PathType Leaf) {
+        Write-NucleusInfo "pack — removing regenerable overlay backing: $backing"
+        if ($perform) { Remove-Item -LiteralPath $backing -Force }
+      }
 
-    # images/*-build/ + stale dot-dirs (transient Packer junk).
-    Get-ChildItem -LiteralPath $imagesDir -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -like '*-build' -or $_.Name -match '^\..+' } | ForEach-Object {
-      Write-NucleusInfo "pack — removing transient build directory: $($_.FullName)"
-      if ($perform) { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
+      $packerDir = Join-Path $_.FullName 'Packer'
+      if (Test-Path -LiteralPath $packerDir -PathType Container) {
+        Write-NucleusInfo "pack — removing transient Packer directory: $packerDir"
+        if ($perform) { Remove-Item -LiteralPath $packerDir -Recurse -Force }
+      }
+
+      Get-ChildItem -LiteralPath $_.FullName -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -like '*-build' -or $_.Name -match '^\..+' } |
+        ForEach-Object {
+          Write-NucleusInfo "pack — removing transient build directory: $($_.FullName)"
+          if ($perform) { Remove-Item -LiteralPath $_.FullName -Recurse -Force }
+        }
     }
   }
 
-  Write-NucleusInfo 'pack — summary: stripped regenerable wrappers; payload retained (images, data, descriptors, README)'
+  Write-NucleusInfo 'pack — summary: stripped regenerable wrappers; payload retained (src, data, descriptors, README)'
   Write-NucleusInfo "pack — next: copy the tree to the target host, then run 'nucleus-vm unpack' or 'nucleus-vm setup' there"
   if (-not $perform) {
     Write-NucleusInfo 'pack — dry-run: nothing was removed; pass --force to perform'

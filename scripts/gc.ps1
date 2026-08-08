@@ -431,7 +431,7 @@ if (-not $NoSccacheGc) {
 # ---- Step 6: stale VM artifact removal ------------------------------------
 if (-not $NoVMGc) {
   $vmDir = Join-Path $env:USERPROFILE "virtual machines"
-  $imagesDir = Join-Path $vmDir "images"
+  $srcDir = Join-Path $vmDir "src"
   $manifest = Join-Path $resolvedRepoRoot "src\modules\VMs.json"
 
   # If VM directories do not exist, there is nothing to clean.
@@ -439,33 +439,40 @@ if (-not $NoVMGc) {
     Write-NucleusInfo "VM directory not found; skipping VM artifact gc"
   } elseif (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) {
     Write-NucleusWarning "manifest '$manifest' not found; skipping VM artifact gc"
-  } elseif (Test-Path -LiteralPath $imagesDir -PathType Container) {
-    # Remove temporary Packer build directories.
-    # check-suppress:suppression_doc: probe -- temporary build directories may not exist; ForEach-Object handles empty result.
-    Get-ChildItem -LiteralPath $imagesDir -Filter "*-build" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-      Remove-VMGcItem -Item $_ -Label "temporary VM build directory" -Recurse
+  } elseif (Test-Path -LiteralPath $srcDir -PathType Container) {
+    # Remove temporary Packer build directories under src/<type>/Packer/.
+    # check-suppress:suppression_doc: probe -- type directories may not exist; ForEach-Object handles empty result.
+    Get-ChildItem -LiteralPath $srcDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+      $packerDir = Join-Path $_.FullName 'Packer'
+      if (Test-Path -LiteralPath $packerDir -PathType Container) {
+        Remove-VMGcItem -Item (Get-Item -LiteralPath $packerDir) -Label "temporary VM Packer directory" -Recurse
+      }
     }
 
     # Remove leftover Packer temporary build directories (dot-prefixed, from interrupted runs).
     # check-suppress:suppression_doc: probe -- stale temporary directories may not exist; Where-Object handles empty result.
-    Get-ChildItem -LiteralPath $imagesDir -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^\..+' } | ForEach-Object {
-      Remove-VMGcItem -Item $_ -Label "stale Packer temporary build directory" -Recurse
+    Get-ChildItem -LiteralPath $srcDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+      Get-ChildItem -LiteralPath $_.FullName -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^\..+' } |
+        ForEach-Object {
+          Remove-VMGcItem -Item $_ -Label "stale Packer temporary build directory" -Recurse
+        }
     }
 
-    # WHY: keep-set has one source of truth in Invoke-VMSetup.ps1 — the old
+    # WHY: keep-set has one source of truth in src/scripts/lib/vm.sh — the old
     # enabled-only name sweep deleted non-regenerable goldens/bases of
     # disabled/other-host guests (e.g. Android-system.qcow2, Windows.qcow2);
-    # Invoke-VMSetup -Gc preserves every manifest guest by default
-    # (-GcDisabled narrows). Start/stop scripts are regenerated for every
-    # manifest guest (Pass B) and stripped by pack; descriptor staleness is
-    # owned by Invoke-GcOrphanDescriptor. gc.ps1 has no -DryRun mode, so none
-    # is passed (the module accepts -DryRun for direct use).
-    $vmSetupModule = Join-Path $resolvedRepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
-    if (-not (Test-Path -LiteralPath $vmSetupModule -PathType Leaf)) {
-      Write-NucleusWarning "Invoke-VMSetup module not found at $vmSetupModule; skipping VM artifact gc"
+    # vm.sh gc preserves every manifest guest by default (--gc-disabled narrows).
+    # Start/stop scripts are regenerated for every manifest guest and stripped
+    # by pack; descriptor staleness is owned by vm_gc_orphan_descriptors.
+    $vmSh = Join-Path $resolvedRepoRoot 'scripts\vm.sh'
+    if (-not (Test-Path -LiteralPath $vmSh -PathType Leaf)) {
+      Write-NucleusWarning "vm.sh not found at $vmSh; skipping VM artifact gc"
     } else {
-      . $vmSetupModule
-      Invoke-VMSetup -RepoRoot $resolvedRepoRoot -Gc -GcDisabled:$false
+      & bash $vmSh gc
+      if ($LASTEXITCODE -ne 0) {
+        Write-NucleusWarning "vm.sh gc exited with code $LASTEXITCODE"
+      }
     }
   }
 }

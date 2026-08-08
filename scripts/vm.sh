@@ -179,9 +179,10 @@ usage() {
                           descriptors). Default GC preserves disabled VM entries and every
                           manifest-referenced image (goldens, bases, Android system/GSI/
                           userdata); pass --gc-disabled to clear disabled entries too.
+                          Pass --gc-data to also GC data/ runtime overlays.
   pack                     Strip trivially regenerable artifacts (UTM bundles, generated
-                          start/stop scripts, images/<type>.base.qcow2 copies, and
-                          images/*-build/ + stale dot-dirs) so the tree can be copied
+                          start/stop scripts, src/<type>/overlay backing.qcow2 copies, and
+                          src/<type>/Packer/ + stale dot-dirs) so the tree can be copied
                           as-is to another host. Dry-run by default; pass --force to
                           perform. Refuses while any VM is running.
   unpack                   Regenerate per-platform VM artifacts (start/stop scripts +
@@ -204,6 +205,8 @@ usage() {
   --gc|--no-gc                  Run GC after setup (default: --no-gc).
   --gc-disabled|--no-gc-disabled  Also clear disabled VM entries during GC
                                 (default: --no-gc-disabled).
+  --gc-data|--no-gc-data        Also GC data/ runtime overlays during GC
+                                (default: --no-gc-data).
   --force                       Recreate invalid runtime overlays during setup, and
                                 perform pack removals (default: off; invalid overlays
                                 are skipped with a pointer to 'nucleus-vm reset <vm>').
@@ -240,6 +243,7 @@ windows_headless=true
 accelerator=''
 gc_mode=false
 gc_disabled_mode=false
+gc_data_mode=false
 force=false
 allow_shrink=false
 vm_dir_override=''
@@ -272,6 +276,8 @@ while [ "$#" -gt 0 ]; do
     --no-gc) gc_mode=false; shift ;;
     --gc-disabled) gc_disabled_mode=true; shift ;;
     --no-gc-disabled) gc_disabled_mode=false; shift ;;
+    --gc-data) gc_data_mode=true; shift ;;
+    --no-gc-data) gc_data_mode=false; shift ;;
     --force) force=true; shift ;;
     --allow-shrink) allow_shrink=true; shift ;;
     --vm-dir-override) vm_dir_override="$2"; shift 2 ;;
@@ -301,6 +307,8 @@ for arg in "${vm_args[@]}"; do
     --no-gc) gc_mode=false ;;
     --gc-disabled) gc_disabled_mode=true ;;
     --no-gc-disabled) gc_disabled_mode=false ;;
+    --gc-data) gc_data_mode=true ;;
+    --no-gc-data) gc_data_mode=false ;;
     --force) force=true ;;
     --allow-shrink) allow_shrink=true ;;
     --accept-gsi-license) accept_gsi_license=true ;;
@@ -394,7 +402,7 @@ vm_prepare_vm_command() {
   export NUCLEUS_HOST
 
   VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
-  IMAGES_DIR="$VM_DIR/images"
+  SRC_DIR="$VM_DIR/src"
 
   if [ -z "$accelerator" ]; then
     case "$(uname -s)" in
@@ -429,15 +437,17 @@ vm_prepare_vm_command() {
     fi
   fi
 
-  vm_init "$REPO_ROOT" "$VM_DIR" "$IMAGES_DIR" "$TEMPLATES_DIR" "$dry_run" \
+  vm_init "$REPO_ROOT" "$VM_DIR" "$SRC_DIR" "$TEMPLATES_DIR" "$dry_run" \
     "$windows_iso" "$windows_iso_source" "$windows_iso_retries" \
     "$windows_headless" "$accelerator" "$vm_secret_owner" "$vm_guest_username" \
     "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
     "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
     "$accept_gsi_license" "false" "false" \
-    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force"
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force" \
+    "$gc_data_mode"
 
-  mkdir -p "$VM_DIR" "$IMAGES_DIR" "$VM_DIR/scripts"
+  mkdir -p "$VM_DIR" "$SRC_DIR" "$VM_DIR/scripts"
+  vm_ensure_type_src_dirs
   write_vm_directory_readme
 }
 
@@ -767,7 +777,7 @@ do_upgrade() {
   fi
 
   VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
-  IMAGES_DIR="$VM_DIR/images"
+  SRC_DIR="$VM_DIR/src"
 
   if ! resolve_vm_guest_credentials; then
     error "cannot upgrade '$vm_name' — guest credential resolution failed"
@@ -775,13 +785,14 @@ do_upgrade() {
   fi
   vm_guest_credentials_fingerprint="$(vm_guest_credentials_hash)"
 
-  vm_init "$REPO_ROOT" "$VM_DIR" "$IMAGES_DIR" "$TEMPLATES_DIR" "$dry_run" \
+  vm_init "$REPO_ROOT" "$VM_DIR" "$SRC_DIR" "$TEMPLATES_DIR" "$dry_run" \
     "$windows_iso" "$windows_iso_source" "$windows_iso_retries" \
     "$windows_headless" "$accelerator" "$vm_secret_owner" "$vm_guest_username" \
     "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
     "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
     "$accept_gsi_license" "true" "false" \
-    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force"
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force" \
+    "$gc_data_mode"
 
   vm_build_android "$vm_name" "$vm_index" "$accept_gsi_license" "true" "false"
   say "upgrade complete for '$vm_name'"
@@ -816,7 +827,7 @@ do_reset() {
   fi
 
   VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
-  IMAGES_DIR="$VM_DIR/images"
+  SRC_DIR="$VM_DIR/src"
 
   if ! resolve_vm_guest_credentials; then
     error "cannot reset '$vm_name' — guest credential resolution failed"
@@ -824,13 +835,14 @@ do_reset() {
   fi
   vm_guest_credentials_fingerprint="$(vm_guest_credentials_hash)"
 
-  vm_init "$REPO_ROOT" "$VM_DIR" "$IMAGES_DIR" "$TEMPLATES_DIR" "$dry_run" \
+  vm_init "$REPO_ROOT" "$VM_DIR" "$SRC_DIR" "$TEMPLATES_DIR" "$dry_run" \
     "$windows_iso" "$windows_iso_source" "$windows_iso_retries" \
     "$windows_headless" "$accelerator" "$vm_secret_owner" "$vm_guest_username" \
     "$vm_guest_password" "$vm_guest_credentials_fingerprint" \
     "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
     "$accept_gsi_license" "false" "true" \
-    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force"
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force" \
+    "$gc_data_mode"
 
   vm_build_android "$vm_name" "$vm_index" "$accept_gsi_license" "false" "true"
   say "reset complete for '$vm_name'"
@@ -863,14 +875,15 @@ do_android_config() {
   fi
 
   VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
-  IMAGES_DIR="$VM_DIR/images"
+  SRC_DIR="$VM_DIR/src"
 
-  vm_init "$REPO_ROOT" "$VM_DIR" "$IMAGES_DIR" "$TEMPLATES_DIR" "$dry_run" \
+  vm_init "$REPO_ROOT" "$VM_DIR" "$SRC_DIR" "$TEMPLATES_DIR" "$dry_run" \
     "$windows_iso" "$windows_iso_source" "$windows_iso_retries" \
     "$windows_headless" "$accelerator" "" "" "" "" \
     "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
     "$accept_gsi_license" "false" "false" \
-    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force"
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force" \
+    "$gc_data_mode"
 
   local config_flags=()
   local _i=1
@@ -908,7 +921,6 @@ do_resize() {
   disk_bytes="$(parse_size "$size_arg")" || exit 1
 
   VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
-  IMAGES_DIR="$VM_DIR/images"
 
   vm_resize_vm "$vm_name" "$disk_bytes" "$allow_shrink"
   nuc_done
@@ -924,9 +936,17 @@ do_gc() {
   NUCLEUS_HOST="$(resolve_nucleus_host)"
 
   VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
-  IMAGES_DIR="$VM_DIR/images"
+  SRC_DIR="$VM_DIR/src"
 
   require_command jq
+
+  vm_init "$REPO_ROOT" "$VM_DIR" "$SRC_DIR" "$TEMPLATES_DIR" "$dry_run" \
+    "$windows_iso" "$windows_iso_source" "$windows_iso_retries" \
+    "$windows_headless" "$accelerator" "" "" "" "" \
+    "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
+    "$accept_gsi_license" "false" "false" \
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force" \
+    "$gc_data_mode"
 
   vm_gc_vms
   nuc_done
@@ -934,7 +954,7 @@ do_gc() {
 
 # do_pack
 #   Strips trivially regenerable artifacts (UTM bundles, generated
-#   start/stop scripts, images/<type>.base.qcow2 copies, images/*-build/ +
+#   start/stop scripts, src/<type>/overlay backing.qcow2 copies, src/<type>/Packer/ +
 #   stale dot-dirs) so the VM tree can be copied as-is to another host.
 #   WHY: pack complements setup — setup regenerates the wrappers, pack
 #   strips them into a compact payload for transfer.  Default is dry-run;
@@ -945,12 +965,22 @@ do_pack() {
   NUCLEUS_HOST="$(resolve_nucleus_host)"
 
   VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
-  IMAGES_DIR="$VM_DIR/images"
+  SRC_DIR="$VM_DIR/src"
 
   # Pack is dry-run by default; --force performs the removals.
   if [ "$force" != true ]; then
     dry_run=true
   fi
+
+  require_command jq
+
+  vm_init "$REPO_ROOT" "$VM_DIR" "$SRC_DIR" "$TEMPLATES_DIR" "$dry_run" \
+    "$windows_iso" "$windows_iso_source" "$windows_iso_retries" \
+    "$windows_headless" "$accelerator" "" "" "" "" \
+    "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
+    "$accept_gsi_license" "false" "false" \
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force" \
+    "$gc_data_mode"
 
   vm_pack_vms
   nuc_done
@@ -971,9 +1001,17 @@ do_unpack() {
   NUCLEUS_HOST="$(resolve_nucleus_host)"
 
   VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
-  IMAGES_DIR="$VM_DIR/images"
+  SRC_DIR="$VM_DIR/src"
 
   require_command jq
+
+  vm_init "$REPO_ROOT" "$VM_DIR" "$SRC_DIR" "$TEMPLATES_DIR" "$dry_run" \
+    "$windows_iso" "$windows_iso_source" "$windows_iso_retries" \
+    "$windows_headless" "$accelerator" "" "" "" "" \
+    "$NUCLEUS_MIDO_PATCH_FILE" "$NUCLEUS_MIDO_SCRIPT" \
+    "$accept_gsi_license" "false" "false" \
+    "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force" \
+    "$gc_data_mode"
 
   vm_unpack_vms
   nuc_done
