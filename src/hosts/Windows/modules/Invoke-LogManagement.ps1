@@ -14,9 +14,7 @@
     0 on success; 1 on error.
 #>
 
-function Get-NucleusHostKey {
-  return 'Windows'
-}
+. (Join-Path $PSScriptRoot 'Get-NucleusHostPlatform.ps1')
 
 function Get-NucleusServicesJsonPath {
   $repoRoot = $env:NUCLEUS_REPO_ROOT

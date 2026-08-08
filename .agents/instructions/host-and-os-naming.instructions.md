@@ -35,7 +35,7 @@ applyTo: "src/modules/**/*.json, src/modules/**/*.nix, scripts/**/*.{sh,ps1}, sr
 | ------- | --------------- | ---------------- |
 | Nix | `host-platform.nix` → `platformForHost`, `flagsForHost` | `flagsForPlatform` |
 | POSIX shell | `resolve_nucleus_host` | `nucleus_platform_for_host`, `nucleus_flag_for_host` |
-| PowerShell | `Get-NucleusHostKey` (Windows = `Windows`) | read `host-platform-registry.json` |
+| PowerShell | `Get-NucleusHostKey` (`$env:NUCLEUS_HOST` or `Windows`) | `Get-NucleusPlatformForHost`, `Test-NucleusPlatformFlag` in `Get-NucleusHostPlatform.ps1` |
 
 ## SSOT files
 
