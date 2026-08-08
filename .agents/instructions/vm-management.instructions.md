@@ -238,7 +238,6 @@ Both hooks are best-effort: a VM sync/setup failure does not abort a completed s
 
 - Uses `nix run github:nix-community/nixos-generators` to build from `src/vms/nixos/guest.nix`.
 - Architecture-aware Btrfs formats: `qcow-efi-btrfs` (UEFI) on aarch64 hosts (UTM on Apple Silicon), `qcow-btrfs` (BIOS/hybrid) on x86_64. Format modules live in `src/vms/nixos/formats/`.
-- Existing `images/NixOS.qcow2` goldens built with ext4 are invalid after this switch — run `nucleus-vm setup` to rebuild (config fingerprint drift also triggers rebuild).
 - No Packer required; just `nix` command which is always present.
 
 **NixOS guest on Windows**:
