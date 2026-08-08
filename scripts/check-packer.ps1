@@ -11,7 +11,7 @@
     2. packer init + packer validate — verify each template directory resolves
        plugins and produces a valid plan.
 
-  The macOS template (src/vms/macos/) uses the Tart plugin and is only validated
+  The macOS template (src/vms/macOS/) uses the Tart plugin and is only validated
   on macOS hosts.
 
 .PARAMETER Paths
@@ -22,7 +22,7 @@
   pwsh -File scripts/check-packer.ps1
 
 .EXAMPLE
-  pwsh -File scripts/check-packer.ps1 src/vms/nixos/template.pkr.hcl
+  pwsh -File scripts/check-packer.ps1 src/vms/NixOS/template.pkr.hcl
 
 .NOTES
   Environment variables: NUCLEUS_REPO_ROOT.
@@ -64,7 +64,7 @@ Set-Location -Path $repoRoot
 $packerWindowsTemplate = if ($WindowsTemplateOverride) {
   $WindowsTemplateOverride
 } else {
-  Join-Path -Path $repoRoot -ChildPath 'src/vms/windows/packer.pkr.hcl'
+  Join-Path -Path $repoRoot -ChildPath 'src/vms/Windows/packer.pkr.hcl'
 }
 
 function Get-EffectiveChecksum {
@@ -185,9 +185,9 @@ function Test-PackerDir {
     }
     # Required -var flags depend on the template directory
     $varArgs = switch -Wildcard ($Dir) {
-      '*nixos'   { @('guest_username=dummy', 'guest_password=dummy', 'guest_hostname=dummy', 'nixos_iso_url=https://dummy.iso', "nixos_iso_checksum=$nixosDigest") }
-      '*windows' { @('windows_iso=dummy.iso', 'hostfwd=dummy', 'guest_hostname=dummy') }
-      '*macos'   { @('macos_version=14.0', 'vm_name=dummy', 'cpus=2', 'memory_gib=4', 'disk_size_gib=40', 'guest_username=dummy', 'guest_password=dummy', 'ssh_username=dummy', 'ssh_password=dummy', 'tart_image_ref=dummy', 'vm_hostname=dummy') }
+      '*NixOS'   { @('guest_username=dummy', 'guest_password=dummy', 'guest_hostname=dummy', 'nixos_iso_url=https://dummy.iso', "nixos_iso_checksum=$nixosDigest") }
+      '*Windows' { @('windows_iso=dummy.iso', 'hostfwd=dummy', 'guest_hostname=dummy') }
+      '*macOS'   { @('macos_version=14.0', 'vm_name=dummy', 'cpus=2', 'memory_gib=4', 'disk_size_gib=40', 'guest_username=dummy', 'guest_password=dummy', 'ssh_username=dummy', 'ssh_password=dummy', 'tart_image_ref=dummy', 'vm_hostname=dummy') }
       default    { @() }
     }
     $validateArgs = @('validate') + ($varArgs | ForEach-Object { @('-var', $_) }) + @('.')
@@ -216,8 +216,8 @@ function Test-PackerDir {
   }
 }
 
-Test-PackerDir -Dir 'src/vms/nixos'
-Test-PackerDir -Dir 'src/vms/windows'
+Test-PackerDir -Dir 'src/vms/NixOS'
+Test-PackerDir -Dir 'src/vms/Windows'
 
 # macOS template uses the Tart plugin which is macOS-only.
 $isMacOSHost = [System.Runtime.InteropServices.RuntimeInformation]::OSDescription -match 'darwin|macOS'
@@ -228,7 +228,7 @@ if (-not $isMacOSHost) {
 }
 
 if ($isMacOSHost) {
-  Test-PackerDir -Dir 'src/vms/macos'
+  Test-PackerDir -Dir 'src/vms/macOS'
 } else {
   Write-Output 'Skipping macOS Packer template validation (requires Tart plugin on macOS)'
 }

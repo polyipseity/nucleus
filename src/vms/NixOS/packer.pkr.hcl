@@ -1,4 +1,4 @@
-# src/vms/nixos/packer.pkr.hcl — Packer template for building a NixOS QCOW2 image.
+# src/vms/NixOS/packer.pkr.hcl — Packer template for building a NixOS QCOW2 image.
 #
 # Used by src/hosts/Windows/modules/system/Invoke-VMSetup.ps1 on Windows hosts
 # to build the NixOS guest image via QEMU. On macOS/NixOS hosts,
@@ -6,7 +6,7 @@
 # needed).
 #
 # Usage (from repo root):
-#   cd src/vms/nixos && packer init . && packer build \
+#   cd src/vms/NixOS && packer init . && packer build \
 #     [-var accelerator=whpx] \
 #     -var guest_username=<username> \
 #     -var guest_password=<password> \
@@ -134,7 +134,7 @@ build {
   sources = ["source.qemu.nixos"]
 
   # Partition, format, and install NixOS onto /dev/vda.
-  # The configuration mirrors src/vms/nixos/guest.nix used by nixos-generators.
+  # The configuration mirrors src/vms/NixOS/guest.nix used by nixos-generators.
   provisioner "shell" {
     timeout = "60m"
     inline = [

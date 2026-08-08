@@ -7,7 +7,7 @@
   Phase 1 (build): builds pre-built QCOW2 images using Packer for each VM
   declared in src\modules\VMs.json, if absent at
   %USERPROFILE%\virtual machines\src\<type>\prebuilt image.qcow2.  For NixOS guests on
-  Windows, Packer downloads the NixOS ISO automatically (src\vms\nixos\packer.pkr.hcl).
+  Windows, Packer downloads the NixOS ISO automatically (src\vms\NixOS\packer.pkr.hcl).
   For Windows 11 guests, a local ISO is required (-WindowsIso).
 
   Phase 2 (provision): creates QEMU start scripts and places disk images for
@@ -1358,7 +1358,7 @@ function Test-Qcow2Image {
 # On macOS/NixOS, scripts/vm.sh uses nixos-generators directly (faster,
 # no Packer needed).  On Windows, Packer with the QEMU builder downloads the
 # NixOS minimal ISO and runs a shell provisioner to install NixOS
-# (src\vms\nixos\packer.pkr.hcl).
+# (src\vms\NixOS\packer.pkr.hcl).
 function Invoke-BuildNixosImage {
     [CmdletBinding()]
     param(
@@ -1400,7 +1400,7 @@ function Invoke-BuildNixosImage {
         return
     }
 
-    $packerDir = Join-Path $VmsDir 'nixos'
+    $packerDir = Join-Path $VmsDir 'NixOS'
     $tmpOutput = Get-VmSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PACKER_BUILD_DIR
 
     Write-Information "vm-setup: building NixOS image for '$VmName' (accelerator=$Accelerator)..."
@@ -1693,7 +1693,7 @@ function Invoke-BuildWindowsImage {
         return
     }
 
-    $packerDir = Join-Path $VmsDir 'windows'
+    $packerDir = Join-Path $VmsDir 'Windows'
     $tmpOutput = Get-VmSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PACKER_BUILD_DIR
 
     # check-suppress:suppression_doc: This repository currently standardizes Windows guest runtime on BIOS
@@ -1776,15 +1776,15 @@ function Invoke-BuildWindowsImage {
         foreach ($attempt in $buildAttempts) {
             if ($attempt.Firmware -eq 'efi') {
                 if ($Headful) {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'Windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
                 } else {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'Windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
                 }
             } else {
                 if ($Headful) {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'Windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
                 } else {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
+                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'Windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
                 }
             }
         }
@@ -1812,7 +1812,7 @@ function Invoke-BuildWindowsImage {
             New-Item -ItemType Directory -Path $attemptTempDir -Force > $null
             $tmpOutput = Join-Path $attemptTempDir 'output'
             $packerLog = Join-Path $attemptTempDir 'packer.log'
-            $autounattendTemplate = Join-Path $VmsDir 'windows\Autounattend.xml'
+            $autounattendTemplate = Join-Path $VmsDir 'Windows\Autounattend.xml'
             $autounattendRendered = Join-Path $attemptTempDir 'Autounattend.xml'
             $autounattendContent = Get-Content -Path $autounattendTemplate -Raw
             $autounattendContent = $autounattendContent.Replace('__NUCLEUS_GUEST_USERNAME__', $GuestAccountName)

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Autounattend.xml — Windows 11 unattended installation answer file.
-     Used by Packer (src/vms/windows/packer.pkr.hcl) via the floppy_files
+     Used by Packer (src/vms/Windows/packer.pkr.hcl) via the floppy_files
      mechanism; Windows Setup reads this from A:\ automatically.
 
      Key choices:

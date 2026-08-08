@@ -29,7 +29,7 @@ Age-based store GC is canonical: `nix-collect-garbage --delete-older-than` via [
 
 MacBook `/nix` lives on a dedicated APFS volume (Determinate installer). `min-free` / `max-free` apply to that volume's free space.
 
-NixOS `/nix` lives on a dedicated Btrfs subvolume `@nix` ([`disks.nix`](../../src/hosts/NixOS/hardware/disks.nix), [`btrfs-options.nix`](../../src/hosts/NixOS/btrfs-options.nix)) with `compress-force=zstd` and `noatime`. Guest images use the same layout ([`src/vms/nixos/formats/`](../../src/vms/nixos/formats/)).
+NixOS `/nix` lives on a dedicated Btrfs subvolume `@nix` ([`disks.nix`](../../src/hosts/NixOS/hardware/disks.nix), [`btrfs-options.nix`](../../src/hosts/NixOS/btrfs-options.nix)) with `compress-force=zstd` and `noatime`. Guest images use the same layout ([`src/vms/NixOS/formats/`](../../src/vms/NixOS/formats/)).
 
 ## Btrfs compression and measurement
 

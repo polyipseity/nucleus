@@ -1,7 +1,7 @@
 ---
 description: "Use when editing host disk layout, root filesystem declarations, removable-drive mount policy, or bootstrap-only filesystem steps on MacBook, NixOS, or Windows."
 name: "Host Filesystem Scope"
-applyTo: "src/hosts/**, scripts/bootstrap.*, src/vms/nixos/**"
+applyTo: "src/hosts/**, scripts/bootstrap.*, src/vms/NixOS/**"
 ---
 
 # Host filesystem scope
@@ -39,5 +39,5 @@ After bare-metal install, run `nixos-generate-config` and merge host-specific fa
 | ---- | ------- | --------- |
 | MacBook | APFS (+ HFS+ legacy local folders) | macOS platform default; not configurable via nix-darwin |
 | NixOS | Btrfs (`subvol=@` + `subvol=@nix`, `compress-force=zstd`, `noatime`) | snapshots, compression, scrubbing |
-| NixOS guest | Btrfs (`subvol=@` + `subvol=@nix`, `compress-force=zstd`) | parity with host; see [`src/vms/nixos/formats/`](../../src/vms/nixos/formats/) |
+| NixOS guest | Btrfs (`subvol=@` + `subvol=@nix`, `compress-force=zstd`) | parity with host; see [`src/vms/NixOS/formats/`](../../src/vms/NixOS/formats/) |
 | Windows | NTFS | platform default; well supported for dev workloads |

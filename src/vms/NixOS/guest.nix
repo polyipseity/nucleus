@@ -1,4 +1,4 @@
-# src/vms/nixos/guest.nix — NixOS guest configuration for nixos-generators.
+# src/vms/NixOS/guest.nix — NixOS guest configuration for nixos-generators.
 #
 # Builds a development-ready NixOS system suitable for use as a QEMU/KVM or UTM
 # VM guest, with full parity to the NixOS host configuration (excluding AI models
@@ -6,13 +6,13 @@
 # hosts via:
 #
 #   nix run github:nix-community/nixos-generators -- \
-#     --format-path ./src/vms/nixos/formats/qcow-btrfs.nix \  # qcow-efi-btrfs on aarch64 hosts
+#     --format-path ./src/vms/NixOS/formats/qcow-btrfs.nix \  # qcow-efi-btrfs on aarch64 hosts
 #     --system x86_64-linux   \  # or aarch64-linux on Apple Silicon
-#     --configuration ./src/vms/nixos/guest.nix \
+#     --configuration ./src/vms/NixOS/guest.nix \
 #     -o <output-dir>
 #
 # On Windows hosts, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1 uses
-# src/vms/nixos/packer.pkr.hcl instead, which generates a similar configuration
+# src/vms/NixOS/packer.pkr.hcl instead, which generates a similar configuration
 # inline during a Packer QEMU build.
 #
 # Do NOT declare fileSystems, boot.loader, or hardware-configuration here:
@@ -42,7 +42,7 @@ in
 {
   imports = [
     "${modulesPath}/profiles/qemu-guest.nix"
-    # WHY: relative to src/vms/nixos/, repo files are three levels up (../../../src).
+    # WHY: relative to src/vms/NixOS/, repo files are three levels up (../../../src).
     # Shared POSIX modules from src/modules/
     ../../../src/modules/core.nix
     ../../../src/modules/gnupg.nix

@@ -1,4 +1,4 @@
-# src/vms/macos/packer.pkr.hcl — Packer template for building a macOS guest using
+# src/vms/macOS/packer.pkr.hcl — Packer template for building a macOS guest using
 # the Packer Tart plugin.  Only runs on Apple Silicon macOS hosts; Tart uses
 # Apple's Virtualization.framework which is not available on other platforms.
 #
@@ -6,7 +6,7 @@
 # for use as the nucleus macOS guest declared in src/modules/VMs.json.
 #
 # Usage (from repo root):
-#   cd src/vms/macos && packer init . && packer build \
+#   cd src/vms/macOS && packer init . && packer build \
 #     [-var macos_version=tahoe]                 \
 #     [-var vm_name=MacBook]                     \
 #     .

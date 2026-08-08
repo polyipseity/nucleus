@@ -1,4 +1,4 @@
-# vms/nixos/disk-image/make-btrfs-disk-image.nix — Btrfs-capable fork of nixpkgs make-disk-image.nix.
+# vms/NixOS/disk-image/make-btrfs-disk-image.nix — Btrfs-capable fork of nixpkgs make-disk-image.nix.
 #
 # Upstream make-disk-image.nix only supports partitioned layouts with ext4
 # (mkfs.ext4 -E offset=...). Nucleus guest images use hybrid/EFI partition

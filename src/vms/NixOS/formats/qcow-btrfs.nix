@@ -1,4 +1,4 @@
-# vms/nixos/formats/qcow-btrfs.nix — qcow2 BIOS/hybrid guest image with Btrfs root.
+# vms/NixOS/formats/qcow-btrfs.nix — qcow2 BIOS/hybrid guest image with Btrfs root.
 {
   config,
   lib,

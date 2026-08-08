@@ -75,7 +75,7 @@ fi
 #
 # Filter the known checksum-none warning (windows template only). WHY:
 # Microsoft publishes no stable Windows 11 ISO checksums, so
-# src/vms/windows/packer.pkr.hcl intentionally sets iso_checksum to "none"
+# src/vms/Windows/packer.pkr.hcl intentionally sets iso_checksum to "none"
 # (see the variable description at line 39 and check-suppress comment at
 # line 228). The packer validate exit code below is still enforced -- only
 # the expected warning text is hidden. The filter is authorized by the
@@ -96,7 +96,7 @@ _filter_known_packer_warnings() {
 # consumers. When iso_checksum resolves to "none" without the annotation,
 # validation fails.
 check_packer_validate_annotations() {
-  local tpl="$REPO_ROOT/src/vms/windows/packer.pkr.hcl"
+  local tpl="$REPO_ROOT/src/vms/Windows/packer.pkr.hcl"
   [ -f "$tpl" ] || return 0
   local content line effective varname violations=0
   content=$(< "$tpl")
@@ -141,13 +141,13 @@ validate_dir() {
   say "validating $dir..."
   local vars=()
   case "$dir" in
-    *nixos)
+    *NixOS)
       vars=(-var guest_username=dummy -var guest_password=dummy -var guest_hostname=dummy -var nixos_iso_url=https://dummy.iso -var "nixos_iso_checksum=$_nixos_digest")
       ;;
-    *windows)
+    *Windows)
       vars=(-var windows_iso=dummy.iso -var hostfwd=dummy -var guest_hostname=dummy)
       ;;
-    *macos)
+    *macOS)
       vars=(-var macos_version=14.0 -var vm_name=dummy -var cpus=2 -var memory_gib=4 -var disk_size_gib=40 -var guest_username=dummy -var guest_password=dummy -var ssh_username=dummy -var ssh_password=dummy -var tart_image_ref=dummy -var vm_hostname=dummy)
       ;;
   esac
@@ -160,12 +160,12 @@ validate_dir() {
 # Uses temp exit files for race-free aggregation (same pattern as check.sh).
 _pkr_tmpdir=$(mktemp -d) || { error "failed to create temp directory for packer validation"; exit 1; }
 
-{ _vd_exit=0; validate_dir src/vms/nixos || _vd_exit=$?; echo "$_vd_exit" > "$_pkr_tmpdir/exit-nixos"; } &
-{ _vd_exit=0; validate_dir src/vms/windows || _vd_exit=$?; echo "$_vd_exit" > "$_pkr_tmpdir/exit-windows"; } &
+{ _vd_exit=0; validate_dir src/vms/NixOS || _vd_exit=$?; echo "$_vd_exit" > "$_pkr_tmpdir/exit-nixos"; } &
+{ _vd_exit=0; validate_dir src/vms/Windows || _vd_exit=$?; echo "$_vd_exit" > "$_pkr_tmpdir/exit-windows"; } &
 
 # macOS template uses the Tart plugin which is macOS-only.
 if [ "$(uname)" = "Darwin" ]; then
-  { _vd_exit=0; validate_dir src/vms/macos || _vd_exit=$?; echo "$_vd_exit" > "$_pkr_tmpdir/exit-macos"; } &
+  { _vd_exit=0; validate_dir src/vms/macOS || _vd_exit=$?; echo "$_vd_exit" > "$_pkr_tmpdir/exit-macos"; } &
 else
   say "skipping macOS Packer template validation (requires Tart plugin on macOS)"
 fi

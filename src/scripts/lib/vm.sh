@@ -348,14 +348,14 @@ vm_guest_config_marker_matches() {
 #   import list captures all configuration source; flake.lock pins the
 #   nixos-generators revision.  Returns 1 when no SHA-256 tool is available.
 vm_guest_config_fingerprint() {
-  _gcf_imports="$(grep -oE '(\.\./)+src/[A-Za-z0-9_./-]+\.nix' "$VMS_DIR/nixos/guest.nix" | sort -u)"
+  _gcf_imports="$(grep -oE '(\.\./)+src/[A-Za-z0-9_./-]+\.nix' "$VMS_DIR/NixOS/guest.nix" | sort -u)"
   {
     printf '%s\n' "$_gcf_imports"
-    if [ -d "$VMS_DIR/nixos/formats" ]; then
-      find "$VMS_DIR/nixos/formats" -type f | sort
+    if [ -d "$VMS_DIR/NixOS/formats" ]; then
+      find "$VMS_DIR/NixOS/formats" -type f | sort
     fi
-    if [ -d "$VMS_DIR/nixos/disk-image" ]; then
-      find "$VMS_DIR/nixos/disk-image" -type f | sort
+    if [ -d "$VMS_DIR/NixOS/disk-image" ]; then
+      find "$VMS_DIR/NixOS/disk-image" -type f | sort
     fi
     if [ -f "$REPO_ROOT/src/flake.lock" ]; then
       cat "$REPO_ROOT/src/flake.lock"
@@ -2669,11 +2669,11 @@ vm_build_nixos() {
   case "$(uname -m)" in
     aarch64|arm64)
       _nixos_system='aarch64-linux'
-      _nixos_format_path="$VMS_DIR/nixos/formats/qcow-efi-btrfs.nix"
+      _nixos_format_path="$VMS_DIR/NixOS/formats/qcow-efi-btrfs.nix"
       ;;
     *)
       _nixos_system='x86_64-linux'
-      _nixos_format_path="$VMS_DIR/nixos/formats/qcow-btrfs.nix"
+      _nixos_format_path="$VMS_DIR/NixOS/formats/qcow-btrfs.nix"
       ;;
   esac
   _vm_type="$(jq -r --arg n "$_name" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
@@ -2711,7 +2711,7 @@ vm_build_nixos() {
     fi
   fi
 
-  _guest_nix="$VMS_DIR/nixos/guest.nix"
+  _guest_nix="$VMS_DIR/NixOS/guest.nix"
   if [ ! -f "$_guest_nix" ]; then
     error "nixos guest config not found: $_guest_nix"
     return 1
@@ -2801,7 +2801,7 @@ download_windows_iso_mido() {
   # Keep vendor submodules immutable by patching a temporary copy only.
   # This preserves a clean submodule tree while allowing fast compatibility
   # updates when Microsoft changes download-link HTML structures.
-  _mido_patch_file="${NUCLEUS_MIDO_PATCH_FILE:-$REPO_ROOT/src/vms/windows/patches/mido-iso-link.patch}"
+  _mido_patch_file="${NUCLEUS_MIDO_PATCH_FILE:-$REPO_ROOT/src/vms/Windows/patches/mido-iso-link.patch}"
   _mido_script_tmp=''
   _mido_exec_script="$_mido_script"
   if [ -f "$_mido_patch_file" ]; then
@@ -3029,7 +3029,7 @@ download_windows_iso_fido_url_nonwindows() {
 
 # vm_build_windows NAME DISK_BYTES
 #   Builds the Windows 11 guest image using Packer and the Autounattend.xml
-#   answer file at src/vms/windows/Autounattend.xml.
+#   answer file at src/vms/Windows/Autounattend.xml.
 vm_build_windows() {
   _name="$1"
   _disk_bytes="$2"
@@ -3163,7 +3163,7 @@ vm_build_windows() {
     return 1
   fi
 
-  _packer_dir="$VMS_DIR/windows"
+  _packer_dir="$VMS_DIR/Windows"
   _tmp_out="$(vm_src_path "$_vm_type" "$VM_PACKER_BUILD_DIR")"
   _ssh_timeout='3h'
   if [ "$accelerator" = 'tcg' ]; then
@@ -3262,7 +3262,7 @@ bios legacy 3h'
       [ -n "$_firmware_mode" ] || continue
       _pv="-var windows_iso=$_iso -var guest_username=$vm_guest_username -var guest_password=<redacted>"
       _pv="$_pv -var hostfwd=$_hostfwd -var guest_hostname=$_guest_hostname"
-      _pv="$_pv -var autounattend_path=$VMS_DIR/windows/Autounattend.xml"
+      _pv="$_pv -var autounattend_path=$VMS_DIR/Windows/Autounattend.xml"
       _pv="$_pv -var accelerator=$accelerator"
       _pv="$_pv -var firmware_mode=$_firmware_mode -var boot_strategy=$_boot_strategy"
       _pv="$_pv -var ssh_timeout=$_attempt_timeout -var headless=$windows_headless"
@@ -3310,7 +3310,7 @@ EOF
     _packer_log="$_attempt_tmpdir/packer.log"
     _autounattend_rendered="$_attempt_tmpdir/Autounattend.xml"
     perl -pe "s/__NUCLEUS_GUEST_USERNAME__/${vm_guest_username}/g; s/__NUCLEUS_GUEST_PASSWORD__/${vm_guest_password}/g; s/__GUEST_HOSTNAME__/$_guest_hostname/g" \
-      "$VMS_DIR/windows/Autounattend.xml" >"$_autounattend_rendered"
+      "$VMS_DIR/Windows/Autounattend.xml" >"$_autounattend_rendered"
     say "writing Packer debug log for this attempt: $_packer_log"
 
     _attempt_status=0
@@ -3452,7 +3452,7 @@ vm_build_macos() {
     rm -f "$_marker"
   fi
 
-  _packer_dir="$VMS_DIR/macos"
+  _packer_dir="$VMS_DIR/macOS"
   # Tart accepts only whole GiB: `tart create --disk-size` is decimal GB
   # (UInt64 * 1000^3) and the Packer Tart plugin passes memory as GiB*1024 MB
   # to `tart set --memory`.  Round UP from exact manifest bytes so allocated

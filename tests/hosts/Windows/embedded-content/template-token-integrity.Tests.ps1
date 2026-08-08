@@ -14,7 +14,7 @@
     - src/vms/templates/start-windows.ps1 (12 tokens, Windows start script)
     - src/vms/templates/start-windows-host.sh (11 tokens, Git Bash/MSYS start script)
     - src/vms/templates/README.md (2 tokens, VM directory guide)
-    - src/vms/windows/Autounattend.xml (3 tokens, Windows guest unattended setup)
+    - src/vms/Windows/Autounattend.xml (3 tokens, Windows guest unattended setup)
     - src/scripts/vms/start-android-vm.ps1 (7 tokens, Android QEMU start script)
     - src/vms/templates/stop-host.ps1 (2 tokens, host-kind stop script)
 

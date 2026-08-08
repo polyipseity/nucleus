@@ -1,4 +1,4 @@
-# vms/nixos/formats/qcow-efi-btrfs.nix — qcow2 UEFI guest image with Btrfs root.
+# vms/NixOS/formats/qcow-efi-btrfs.nix — qcow2 UEFI guest image with Btrfs root.
 {
   config,
   lib,

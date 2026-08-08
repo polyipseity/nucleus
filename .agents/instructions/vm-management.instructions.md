@@ -30,10 +30,10 @@ VM guest OSes must use the same hostname as the corresponding host OS. The canon
 
 The manifest `hostname` is the single source of truth. Guest files consume it through env/var/token plumbing and must not hard-code a hostname:
 
-- `src/vms/nixos/guest.nix` — `networking.hostName = builtins.getEnv "NUCLEUS_VM_GUEST_HOSTNAME"` (and the flake attr `hostName`)
-- `src/vms/nixos/packer.pkr.hcl` — `guest_hostname` var rendered into `networking.hostName`
-- `src/vms/macos/packer.pkr.hcl` — `vm_hostname` var applied via `scutil` (HostName/ComputerName/LocalHostName)
-- `src/vms/windows/Autounattend.xml` — `<ComputerName>__GUEST_HOSTNAME__</ComputerName>`
+- `src/vms/NixOS/guest.nix` — `networking.hostName = builtins.getEnv "NUCLEUS_VM_GUEST_HOSTNAME"` (and the flake attr `hostName`)
+- `src/vms/NixOS/packer.pkr.hcl` — `guest_hostname` var rendered into `networking.hostName`
+- `src/vms/macOS/packer.pkr.hcl` — `vm_hostname` var applied via `scutil` (HostName/ComputerName/LocalHostName)
+- `src/vms/Windows/Autounattend.xml` — `<ComputerName>__GUEST_HOSTNAME__</ComputerName>`
 
 When adding a VM, set `hostname` (and matching `name`) in `src/modules/VMs.json`; do not edit hostname literals in guest files.
 
@@ -247,10 +247,10 @@ Both hooks are best-effort: a VM sync/setup failure does not abort a completed s
 
 | File                                                  | Purpose                                                        |
 | ----------------------------------------------------- | -------------------------------------------------------------- |
-| `src/vms/nixos/guest.nix`                             | NixOS guest configuration for `nixos-generators` (macOS/NixOS) |
-| `src/vms/nixos/packer.pkr.hcl`                        | Packer template for NixOS guest on Windows hosts               |
-| `src/vms/windows/packer.pkr.hcl`                      | Packer template for Windows 11 guest on all hosts              |
-| `src/vms/windows/Autounattend.xml`                    | Windows 11 answer file (unattended install, TPM bypass, WinRM) |
+| `src/vms/NixOS/guest.nix`                             | NixOS guest configuration for `nixos-generators` (macOS/NixOS) |
+| `src/vms/NixOS/packer.pkr.hcl`                        | Packer template for NixOS guest on Windows hosts               |
+| `src/vms/Windows/packer.pkr.hcl`                      | Packer template for Windows 11 guest on all hosts              |
+| `src/vms/Windows/Autounattend.xml`                    | Windows 11 answer file (unattended install, TPM bypass, WinRM) |
 | `scripts/vm.sh`                                       | Unified build+provision script for macOS and NixOS hosts       |
 | `scripts/vm.ps1`                                      | Windows wrapper calling `Invoke-VMSetup.ps1`                   |
 | `src/hosts/Windows/modules/system/Invoke-VMSetup.ps1` | Build + provision logic for Windows hosts                      |
@@ -259,19 +259,19 @@ Both hooks are best-effort: a VM sync/setup failure does not abort a completed s
 
 **NixOS guest on macOS/NixOS**:
 
-- Uses `nix run github:nix-community/nixos-generators` to build from `src/vms/nixos/guest.nix`.
-- Architecture-aware Btrfs formats: `qcow-efi-btrfs` (UEFI) on aarch64 hosts (UTM on Apple Silicon), `qcow-btrfs` (BIOS/hybrid) on x86_64. Format modules live in `src/vms/nixos/formats/`. Both use `@`/`@nix` subvolumes and `compress-force=zstd` (shared with host via `src/hosts/NixOS/btrfs-options.nix`). Packer installs on Windows use the same layout.
+- Uses `nix run github:nix-community/nixos-generators` to build from `src/vms/NixOS/guest.nix`.
+- Architecture-aware Btrfs formats: `qcow-efi-btrfs` (UEFI) on aarch64 hosts (UTM on Apple Silicon), `qcow-btrfs` (BIOS/hybrid) on x86_64. Format modules live in `src/vms/NixOS/formats/`. Both use `@`/`@nix` subvolumes and `compress-force=zstd` (shared with host via `src/hosts/NixOS/btrfs-options.nix`). Packer installs on Windows use the same layout.
 - No Packer required; just `nix` command which is always present.
 
 **NixOS guest on Windows**:
 
-- Uses Packer with `src/vms/nixos/packer.pkr.hcl` and QEMU builder.
+- Uses Packer with `src/vms/NixOS/packer.pkr.hcl` and QEMU builder.
 - Downloads NixOS minimal ISO, boots via QEMU, sets root password, SSH-installs NixOS.
 - `whpx` accelerator strongly recommended (Windows Hypervisor Platform); `tcg` works but is very slow.
 
 **Windows 11 guest (all hosts)** (`nucleus-vm setup --windows-iso /path/to/Win11.iso`):
 
-- Uses Packer with `src/vms/windows/packer.pkr.hcl` and QEMU builder.
+- Uses Packer with `src/vms/Windows/packer.pkr.hcl` and QEMU builder.
 - Requires a Windows 11 ISO path via `--windows-iso` **or** a `Windows.isoUrl` field in the `VMs.json` windows entry. When `Windows.isoUrl` is set, the ISO is downloaded automatically to `~/virtual machines/src/Windows/installer.iso` on first run (subsequent runs reuse the cache).
 - On macOS/Linux, falls back from Mido to Fido URL resolver via `pwsh` (`Fido.ps1 -GetUrl`) + `curl`.
 - On Windows, auto-detects WHPX accelerator when `tcg` is default; upgrades automatically. Pass `-Accelerator tcg` to suppress.

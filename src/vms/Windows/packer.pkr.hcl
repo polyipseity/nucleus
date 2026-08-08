@@ -1,11 +1,11 @@
-# src/vms/windows/packer.pkr.hcl — Packer template for building a Windows 11 QCOW2 image.
+# src/vms/Windows/packer.pkr.hcl — Packer template for building a Windows 11 QCOW2 image.
 #
 # Builds an unattended Windows 11 installation using QEMU.  The resulting
 # QCOW2 disk image is pre-configured with VirtIO drivers, OpenSSH, and qemu-ga,
 # ready for use as the Windows VM guest declared in src/modules/VMs.json.
 #
 # Usage (from repo root):
-#   cd src/vms/windows && packer init . && packer build \
+#   cd src/vms/Windows && packer init . && packer build \
 #     -var windows_iso=/path/to/Windows11.iso \
 #     [-var accelerator=hvf]                  \
 #     .
