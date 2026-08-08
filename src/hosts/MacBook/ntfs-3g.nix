@@ -80,7 +80,7 @@ let
 in
 {
   system.activationScripts.postActivation.text = lib.mkBefore ''
-    "${activationBundle}/src/scripts/hosts/MacBook/macos-build-ntfs3g.sh" \
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-build-ntfs3g.sh" \
       "${buildFingerprint}" \
       "${buildToolsPath}" \
       "${aclocalPath}" \

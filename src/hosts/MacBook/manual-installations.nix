@@ -34,5 +34,5 @@ in
   # Declarative Nix daemon support for x86_64-darwin is configured separately
   # in base.nix via `nix.extraOptions` / `extra-platforms`.
   # ---------------------------------------------------------------------------
-  system.activationScripts.postActivation.text = lib.mkBefore ''"${activationBundle}/src/scripts/hosts/MacBook/macos-install-rosetta.sh"'';
+  system.activationScripts.postActivation.text = lib.mkBefore ''"${activationBundle}/src/hosts/MacBook/scripts/macos-install-rosetta.sh"'';
 }

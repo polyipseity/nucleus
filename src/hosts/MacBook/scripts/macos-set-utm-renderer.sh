@@ -26,8 +26,8 @@
 # ref: https://github.com/utmapp/UTM/issues/5886 -- guest kernel trace: virtio-gpu queue fills when client stalls
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-# shellcheck source=../../lib/macos-console-user.sh
-. "$SCRIPT_DIR/../../lib/macos-console-user.sh"
+# shellcheck source=../../../scripts/lib/macos-console-user.sh
+. "$SCRIPT_DIR/../../../scripts/lib/macos-console-user.sh"
 
 if _nucleus_resolve_console_user; then
   if [ -d "/Applications/UTM.app" ]; then

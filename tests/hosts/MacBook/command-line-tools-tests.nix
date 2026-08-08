@@ -4,7 +4,7 @@ let
   lib = import <nixpkgs/lib>;
 
   activationNix = builtins.readFile ../../../src/hosts/MacBook/activation.nix;
-  cltScriptSh = builtins.readFile ../../../src/scripts/hosts/MacBook/macos-remove-command-line-tools.sh;
+  cltScriptSh = builtins.readFile ../../../src/hosts/MacBook/scripts/macos-remove-command-line-tools.sh;
   beforeXcodeSelect = lib.elemAt (lib.splitString "configure-xcode-select" activationNix) 0;
 in
 

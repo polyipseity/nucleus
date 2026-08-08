@@ -155,7 +155,7 @@ in
   # ---------------------------------------------------------------------------
   system.activationScripts.postActivation.text = lib.mkBefore ''
     # ---- remove-command-line-tools -----------------------------------------------
-    "${activationBundle}/src/scripts/hosts/MacBook/macos-remove-command-line-tools.sh" \
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-remove-command-line-tools.sh" \
       "${config.nucleus.logging.systemLogDir}/command-line-tools.log"
 
     # ---- configure-xcode-select --------------------------------------------------
@@ -177,15 +177,15 @@ in
     # Create/update symlinks in /usr/local/bin for tools that GUI apps resolve
     # via PATH directly (without xcrun).  Only operates on Nix store symlinks
     # and leaves regular files and non-Nix symlinks untouched.
-    "${activationBundle}/src/scripts/hosts/MacBook/macos-symlink-farm.sh" \
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-symlink-farm.sh" \
       "${symlinkFarmEntries}" \
       "${config.nucleus.logging.systemLogDir}/symlink-farm.log"
 
     # ---- configure-battery-policy ------------------------------------------------
-    "${activationBundle}/src/scripts/hosts/MacBook/macos-configure-battery-policy.sh"
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-battery-policy.sh"
 
     # ---- configure-charge-limit --------------------------------------------------
-    "${activationBundle}/src/scripts/hosts/MacBook/macos-charge-limit.sh"
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-charge-limit.sh"
 
     # ---- configure-ssh-access -----------------------------------------------------
     # Allow all users to connect via SSH by removing the macOS access-control
@@ -200,12 +200,12 @@ in
     fi
 
     # ---- configure-middle-click -------------------------------------------------
-    "${activationBundle}/src/scripts/hosts/MacBook/macos-enable-middle-click.sh"
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-enable-middle-click.sh"
 
     # ---- configure-mounty-login-item ---------------------------------------------
-    "${activationBundle}/src/scripts/hosts/MacBook/macos-register-mounty-login-item.sh"
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-register-mounty-login-item.sh"
     # ---- configure-linearmouse-preferences --------------------------------------
-    "${activationBundle}/src/scripts/hosts/MacBook/macos-set-linearmouse-prefs.sh"
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-set-linearmouse-prefs.sh"
     # ---- configure-utm-renderer-prefs -------------------------------------------
     # Pin UTM's global renderer backend to Apple Core OpenGL (CGL) in the
     # sandboxed app container so the Android (LineageOS) guest UI appears
@@ -217,12 +217,12 @@ in
     # See .agents/instructions/utm-android-freeze.instructions.md.
     # Runs unconditionally: the pref is a global UTM setting, harmless when no
     # Android VM is enabled, and idempotent when already set.
-    "${activationBundle}/src/scripts/hosts/MacBook/macos-set-utm-renderer.sh"
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-set-utm-renderer.sh"
     # ---- configure-gimp-scroll-sensitivity ---------------------------------------
     "${activationBundle}/src/scripts/configs/configure-gimp-scroll-sensitivity.sh"
 
     # ---- configure-mission-control-spans-displays ----------------------------------
-    "${activationBundle}/src/scripts/hosts/MacBook/macos-configure-mission-control.sh"
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-mission-control.sh"
 
     # ---- configure-monitor-color-profile ------------------------------------------
     # Clears the ColorSync device-profile cache so that newly connected monitors
@@ -240,10 +240,10 @@ in
     fi
 
     # ---- clear-finder-cache -------------------------------------------------------
-    "${activationBundle}/src/scripts/hosts/MacBook/macos-clear-finder-cache.sh"
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-clear-finder-cache.sh"
 
     # ---- disable-spotlight -------------------------------------------------------
-    "${activationBundle}/src/scripts/hosts/MacBook/macos-disable-spotlight.sh"
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-disable-spotlight.sh"
 
     # ---- launcher -----------------------------------------------------------
     # Pass empty arg to trigger runtime resolution from /dev/console (macOS).
@@ -267,7 +267,7 @@ in
     # ---- homebrew-pin-verify ----------------------------------------------
     # Warning-only check that installed Homebrew versions match lockfile.
     # Never fails activation.
-    "${activationBundle}/src/scripts/hosts/MacBook/macos-verify-homebrew-pin.sh" "${repoRoot}"
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-verify-homebrew-pin.sh" "${repoRoot}"
 
     # ---- disableSteamAutoStartup ------------------------------------------------
     "${activationBundle}/src/scripts/configs/disable-steam-autostart.sh"

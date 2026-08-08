@@ -5,8 +5,8 @@
 # sometimes reset com.apple.spaces user defaults.
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-# shellcheck source=../../lib/macos-console-user.sh
-. "$SCRIPT_DIR/../../lib/macos-console-user.sh"
+# shellcheck source=../../../scripts/lib/macos-console-user.sh
+. "$SCRIPT_DIR/../../../scripts/lib/macos-console-user.sh"
 
 if _nucleus_resolve_console_user; then
       if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/defaults write com.apple.spaces spans-displays -bool true; then

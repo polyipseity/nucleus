@@ -47,7 +47,7 @@ in
   #       the system service table so a genuine load failure (e.g. missing
   #       plist) is still caught.
   # ---------------------------------------------------------------------------
-  system.activationScripts.postActivation.text = lib.mkBefore ''"${activationBundle}/src/scripts/hosts/MacBook/macos-setup-networking.sh"'';
+  system.activationScripts.postActivation.text = lib.mkBefore ''"${activationBundle}/src/hosts/MacBook/scripts/macos-setup-networking.sh"'';
 
   # Hostname values are intentionally titlecase to match the machine identity
   # and preserve local discovery semantics on macOS.
