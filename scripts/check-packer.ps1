@@ -34,7 +34,7 @@ param(
   [string[]]$Paths = @(),
 
   # Test seam: point the packer_validate annotation check at a different
-  # template file (used by tests/scripts/check-packer-annotation-tests.ps1).
+  # template file (packer_validate annotation is enforced by check-packer itself).
   [string]$WindowsTemplateOverride = '',
 
   # Test seam: run only the packer_validate annotation check, then exit.

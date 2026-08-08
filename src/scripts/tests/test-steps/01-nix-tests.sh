@@ -18,7 +18,7 @@ run_01_nix_tests() {
   fi
 
   if [ "$_exit_code" -eq 0 ]; then
-    bash "$_repo_root/tests/scripts/check-steps/24-nix-test-eval-tests.sh" || _exit_code=1
+    bash "$_repo_root/tests/scripts/check-steps/nix-test-eval-tests.sh" || _exit_code=1
   fi
 
   if [ "$_exit_code" -ne 0 ]; then

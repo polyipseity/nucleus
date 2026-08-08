@@ -7,7 +7,7 @@
   Write-NucleusWarning, Write-NucleusDryRun, and Write-NucleusDone
   by importing the module directly.
 
-  Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/Format-NucleusOutput.tests.ps1 -Passthru"
+  Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/Format-NucleusOutput.Tests.ps1 -Passthru"
 #>
 
 BeforeAll {

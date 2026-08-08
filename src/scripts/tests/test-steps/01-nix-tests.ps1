@@ -9,7 +9,7 @@ Register-Step -Id "nix-tests" -Number 1 -Name "Nix test suite" -Action {
     return 1
   }
 
-  $testScript = Join-Path -Path $RepoRoot -ChildPath 'tests/scripts/check-steps/24-nix-test-eval-tests.ps1'
+  $testScript = Join-Path -Path $RepoRoot -ChildPath 'tests/scripts/check-steps/nix-test-eval-tests.ps1'
   & $testScript
   if ($LASTEXITCODE -ne 0) { return 1 }
 
