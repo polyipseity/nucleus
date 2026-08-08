@@ -145,6 +145,14 @@ nucleus_nix_locked() {
 # Default value if parse_args hasn't been called
 HAS_ARGS=${HAS_ARGS:-false}
 
+_step_now_ms() {
+  if [ "$(uname -s)" = Darwin ]; then
+    echo $(( $(date +%s) * 1000 ))
+  else
+    date +%s%3N
+  fi
+}
+
 # --- _run_step wrapper ---
 # Owns ALL orchestration I/O: timing, section headers, exit file writing, fail-fast.
 # Step functions receive params and write messages to stdout/stderr only.
@@ -152,7 +160,7 @@ _run_step() {
   local _n="$1" _name="$2" _func="$3"; shift 3
   local _step_start_ms _elapsed_ms _exit_code
 
-  _step_start_ms=$(date +%s%3N)
+  _step_start_ms=$(_step_now_ms)
 
   # 1. Write section header + step name
   printf '\n=== [%s] %s ===\n' "$_n" "$_name" > "$_wave_tmpdir/step-$_n.out"
@@ -167,7 +175,7 @@ _run_step() {
 
   # 3. Write exit code and timing (framework owns these files)
   printf '%s' "$_exit_code" > "$_wave_tmpdir/step-$_n.exit"
-  _elapsed_ms=$(($(date +%s%3N) - _step_start_ms))
+  _elapsed_ms=$(($(_step_now_ms) - _step_start_ms))
   printf '%s' "$_elapsed_ms" > "$_wave_tmpdir/step-$_n.time"
 
   # 4. Fail-fast check (framework-level concern, not step-level)
@@ -183,13 +191,13 @@ _run_skipped_step() {
   local _n="$1" _name="$2" _id="$3"
   local _step_start_ms _elapsed_ms
 
-  _step_start_ms=$(date +%s%3N)
+  _step_start_ms=$(_step_now_ms)
 
   printf '\n=== [%s] %s === SKIPPED (--skip-steps: %s)\n' "$_n" "$_name" "$_id" > "$_wave_tmpdir/step-$_n.out"
   printf '%s' "$_name" > "$_wave_tmpdir/step-$_n.name"
   # Exit code 2 = skipped step (rendered as SKIP, not a failure).
   printf '%s' "2" > "$_wave_tmpdir/step-$_n.exit"
-  _elapsed_ms=$(($(date +%s%3N) - _step_start_ms))
+  _elapsed_ms=$(($(_step_now_ms) - _step_start_ms))
   printf '%s' "$_elapsed_ms" > "$_wave_tmpdir/step-$_n.time"
 }
 
