@@ -7,7 +7,7 @@
 #
 # Sources:
 # - https://jellyfin.org/docs/general/post-install/networking/reverse-proxy/
-{ lib, pkgs, ... }:
+{ ... }:
 let
   jellyfinHttpPort = 8096;
 in
@@ -22,27 +22,4 @@ in
     listenPort = 8920;
     upstreamPort = jellyfinHttpPort;
   };
-
-  # Activation script: converge Jellyfin accounts and libraries after the
-  # Jellyfin service is running.  Mirrors the Darwin postActivation fragment but
-  # uses a named script (nixos-specific option).
-  #
-  # Runs via a bundled script tree so the script can resolve its lib/
-  # dependencies at runtime via SCRIPT_DIR.
-  system.activationScripts.nixos-sync-jellyfin = lib.mkAfter (
-    let
-      # Bundle the script + lib dependencies so SCRIPT_DIR-relative sourcing works.
-      scriptsBundle = pkgs.runCommand "nucleus-jellyfin-scripts" { preferLocalBuild = true; } ''
-        mkdir -p "$out/services" "$out/lib"
-        ln -s ${../../scripts/services/jellyfin-sync.sh} "$out/services/jellyfin-sync.sh"
-        ln -s ${../../scripts/lib/lib.sh} "$out/lib/lib.sh"
-      '';
-    in
-    ''
-      ${scriptsBundle}/services/jellyfin-sync.sh \
-        --repo-root ${lib.escapeShellArg (builtins.getEnv "NUCLEUS_REPO_ROOT")} \
-        --jq-path "${pkgs.jq}/bin/jq" \
-        --sops-path "${pkgs.sops}/bin/sops"
-    ''
-  );
 }

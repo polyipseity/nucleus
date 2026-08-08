@@ -272,20 +272,6 @@ in
     # ---- disableSteamAutoStartup ------------------------------------------------
     "${activationBundle}/src/scripts/configs/disable-steam-autostart.sh"
 
-    # ---- jellyfin-sync -----------------------------------------------------------
-    # Converge Jellyfin accounts and libraries declared in src/users/
-    # with a running Jellyfin server.
-    #
-    # WHY: subprocess invocation (not readFile + replaceStrings): the activation
-    # bundle already contains the full scripts/ tree.  The repo root is passed
-    # as a CLI arg.  jq and sops are pinned via --jq-path/--sops-path so the
-    # script does not depend on the activation environment's PATH.
-    # SOPS_AGE_KEY_FILE defaults to /etc/sops/age/machine.txt.
-    "${activationBundle}/src/scripts/services/jellyfin-sync.sh" \
-      ${lib.optionalString (repoRoot != "") "--repo-root ${lib.escapeShellArg repoRoot} "}\
-      --jq-path "${pkgs.jq}/bin/jq" \
-      --sops-path "${pkgs.sops}/bin/sops"
-
     # ---- verifyNucleusServices ---------------------------------------------------
     # Warn-only verification that all managed services are running.
     # Failing to start a service should not block activation, but the warning
