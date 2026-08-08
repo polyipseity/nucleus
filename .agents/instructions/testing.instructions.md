@@ -297,5 +297,6 @@ Before committing changes, verify:
 - [ ] All Nix tests pass: `find tests/modules tests/integration tests/hosts -name '*.nix' -exec nix-instantiate --eval {} +`
 - [ ] Flake checks pass: `cd src && nix flake check`
 - [ ] Shell syntax passes: `nix run ./src#check-sh`
-- [ ] PowerShell syntax passes: `nix run ./src#check-pwsh`
+- [ ] PowerShell syntax passes on pre-commit path: `pwsh -File scripts/check-pwsh.ps1 -SkipStep PSSA`
+- [ ] PowerShell PSSA passes on pre-push path: `pwsh -File scripts/check-pwsh.ps1 -SkipStep Syntax -Settings scripts/PSScriptAnalyzerSettings.test.psd1`
 - [ ] (Windows only) Pester tests pass: `pwsh -File scripts/test.ps1 --skip-steps=nix-tests,system-config-build` or step 6 only

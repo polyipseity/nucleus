@@ -179,7 +179,14 @@ Scripts must not assume the current working directory is inside the repository. 
 
 ## PowerShell linting
 
-PSScriptAnalyzer settings live in `scripts/PSScriptAnalyzerSettings.check.psd1` (fast pre-commit) and `scripts/PSScriptAnalyzerSettings.test.psd1` (full test runs). `scripts/check-pwsh.ps1` loads these settings; do not configure rule exclusions in the checker script itself.
+`scripts/check-pwsh.ps1` splits work across the check and test pipelines because PSScriptAnalyzer is slow:
+
+| Pipeline | Step | Flags | What runs |
+| -------- | ---- | ----- | --------- |
+| `check` (pre-commit) | 2 `powershell-lint` | `-SkipStep PSSA` | Parser syntax validation only; full-repo runs also call `check-pwsh-naming.ps1` |
+| `test` (pre-push) | 2 `powershell-lint-test` | `-SkipStep Syntax -Settings PSScriptAnalyzerSettings.test.psd1` | PSScriptAnalyzer only (full rule set) |
+
+Standalone `nucleus-check-pwsh` runs both phases (no `-SkipStep`). Settings files: `scripts/PSScriptAnalyzerSettings.check.psd1` (when PSSA runs outside the test pipeline) and `scripts/PSScriptAnalyzerSettings.test.psd1` (test step 2). Do not configure rule exclusions in the checker script itself.
 
 Always exclude `PSUseBOMForUnicodeEncodedFile` in settings files — UTF-8 without BOM is the repository standard (`.editorconfig`).
 

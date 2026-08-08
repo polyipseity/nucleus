@@ -168,7 +168,7 @@ Cross-platform equivalence:
 
 | Group | Steps | IDs |
 | ----- | ----- | --- |
-| Format and lint | 01–03 | `code-formatting`, `powershell-lint`, `packer-validate` |
+| Format and lint | 01–03 | `code-formatting`, `powershell-lint` (syntax only; `-SkipStep PSSA`), `packer-validate` |
 | Nix | 04–05 | `nix-flake-eval`, `nix-lint` |
 | Data and schema | 06–10 | `lockfile-validation`, `locked-dsc-validation`, `schema-validation`, `service-registry`, `yaml-structural` |
 | Repository policy | 11–14 | `package-manager-enforcement`, `suppression-audit`, `online-determinism`, `repository-policy` |
