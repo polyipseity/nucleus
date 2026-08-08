@@ -12,7 +12,7 @@
 # /bin/sh wrapper; this watchdog recovers any that get stuck at boot.
 # See .agents/instructions/macos-launchd-sip.instructions.md.
 #
-# Reads services.json, filters to the current platform, skips socket-activated
+# Reads services.json, filters to the current host, skips socket-activated
 # and prefix-match services, and recovers each non-running service via
 # bootout+bootstrap (launchctl) or reset-failed+restart (systemctl).
 
@@ -53,7 +53,7 @@ usage() {
   Options:
   -h|--help     Show usage.
   --domain <d>  Filter to only check services in this domain (user/system).
-                When omitted, checks all services for the current platform.
+                When omitted, checks all services for the current host.
   --oneshot     Run once and exit (no persistent loop).
 EOF
 }

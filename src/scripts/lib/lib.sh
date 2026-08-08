@@ -295,12 +295,12 @@ nucleus_log_path_from_json() {
   fi
 }
 
-# Platform-aware user log directory.
+# Host-aware user log directory.
 nucleus_log_dir() {
   nucleus_log_path_from_json logDir
 }
 
-# Platform-aware system log directory.
+# Host-aware system log directory.
 nucleus_system_log_dir() {
   nucleus_log_path_from_json systemLogDir
 }
