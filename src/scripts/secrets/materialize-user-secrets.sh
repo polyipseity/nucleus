@@ -89,6 +89,8 @@ while IFS= read -r _mus_key; do
       _mus_ssh_target="$_mus_ssh_dir/$_mus_relative_path"
       _mus_ssh_target_dir="$(dirname -- "$_mus_ssh_target")"
       mkdir -p "$_mus_ssh_target_dir"
+      # Replace stale sops-nix symlinks from older generations before writing.
+      rm -f "$_mus_ssh_target"
       printf '%s' "$_mus_value" > "$_mus_ssh_target"
       case "$_mus_relative_path" in
         *.pub)

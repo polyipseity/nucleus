@@ -98,8 +98,8 @@ _ds_clear_age_env() {
   unset SOPS_AGE_KEY_FILE
 }
 
-# Step 1: machine SSH host key, then derived machine age key.
-if [ -f "$_ds_host_key_path" ]; then
+# Step 1: machine SSH host key (only when readable), then derived machine age key.
+if [ -r "$_ds_host_key_path" ]; then
   SOPS_AGE_SSH_PRIVATE_KEY_FILE="$_ds_host_key_path"
   export SOPS_AGE_SSH_PRIVATE_KEY_FILE
   if _ds_decrypt_with_env; then
