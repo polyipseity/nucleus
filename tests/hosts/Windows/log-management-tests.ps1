@@ -263,8 +263,8 @@ $ensureLogDirPath = Join-Path \$PSScriptRoot '../../../src/hosts/Windows/modules
     $stub = @'
 {
   "no-log-svc": {
-    "platforms": {
-      "windows": { "type": "service" }
+    "hosts": {
+      "Windows": { "platform": "Windows", "type": "service" }
     }
   }
 }
