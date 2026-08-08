@@ -8,10 +8,11 @@ run_04_system_config_build() {
   local _has_args="$1" _repo_root="$2"; shift 2
   local _exit_code=0
 
-  local _attr=""
-  case "$(uname)" in
-    Darwin) _attr="darwinConfigurations.MacBook.system" ;;
-    Linux)
+  local _host=""
+  _host="$(resolve_nucleus_host)"
+  case "$_host" in
+    MacBook) _attr="darwinConfigurations.MacBook.system" ;;
+    NixOS)
       if [ -d /etc/nixos ]; then
         _attr="nixosConfigurations.NixOS.config.system.build.toplevel"
       else
@@ -19,7 +20,7 @@ run_04_system_config_build() {
       fi
       ;;
     *)
-      say "system config build: unsupported OS ($(uname)), skipping."
+      say "system config build: unsupported host ($_host), skipping."
       return 2
       ;;
   esac
