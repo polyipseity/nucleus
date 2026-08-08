@@ -49,10 +49,14 @@ hooks = [
   ] },
 ]
 
-[[repos]]
-repo = "https://github.com/python-jsonschema/check-jsonschema.git"
-rev = "566da04e213ef56343b4c1eb5a303da9cf1c0a8d"
-hooks = [{ id = "check-dependabot" }, { id = "check-github-workflows" }]
+# check-jsonschema workflow/dependabot hooks disabled: repo-check step 08 (schema-validation)
+# already validates .github/workflows/*.yml and dependabot.yml via check-jsonschema
+# builtin schemas on every commit. Keeping both caused duplicate validation when those
+# files change.
+# [[repos]]
+# repo = "https://github.com/python-jsonschema/check-jsonschema.git"
+# rev = "566da04e213ef56343b4c1eb5a303da9cf1c0a8d"
+# hooks = [{ id = "check-dependabot" }, { id = "check-github-workflows" }]
 
 [[repos]]
 repo = "local"
