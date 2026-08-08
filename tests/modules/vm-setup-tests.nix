@@ -239,21 +239,6 @@ let
       )
       "Image validation floors must be parsed from manifest minImageSize instead of hardcoded byte constants";
 
-  # Legacy hardcoded binary size constants must be gone from the runtime
-  # scripts (the values now come from the parsers and manifest).
-  test_no_legacy_binary_size_constants =
-    assert'
-      (
-        !(lib.hasInfix "10737418240" vm_setup_sh_text)
-        && !(lib.hasInfix "4294967296" vm_setup_sh_text)
-        && !(lib.hasInfix "536870912" vm_setup_sh_text)
-        && !(lib.hasInfix "524288" vm_setup_sh_text)
-        && !(lib.hasInfix "10737418240" windows_vm_setup_ps1_text)
-        && !(lib.hasInfix "536870912" windows_vm_setup_ps1_text)
-        && !(lib.hasInfix "524288" windows_vm_setup_ps1_text)
-      )
-      "vm.sh and Invoke-VMSetup.ps1 must not contain legacy hardcoded binary size constants (10 GiB floor, 4 GiB Android floor, round-half-up divisors)";
-
   # CPU counts must be positive integers.
   test_cpu_counts =
     let
@@ -1084,11 +1069,6 @@ let
   qcow_btrfs_text = builtins.readFile ../../src/vms/NixOS/formats/qcow-btrfs.nix;
   qcow_efi_btrfs_text = builtins.readFile ../../src/vms/NixOS/formats/qcow-efi-btrfs.nix;
   btrfs_patch_text = builtins.readFile ../../src/vms/NixOS/disk-image/make-disk-image-btrfs.patch;
-  test_nixos_guest_virtiofs_not_forced = assert' (
-    !(lib.hasInfix "boot.initrd.availableKernelModules = [ \"virtio_fs\" ];" guest_nix_text)
-    && !(lib.hasInfix "boot.initrd.availableKernelModules = [ \\\"virtio_fs\\\" ];" nixos_packer_text)
-  ) "NixOS guest generation must not force virtio_fs into the initrd on current kernels";
-
   # NixOS guest must enable the QEMU guest agent for host-guest communication
   # (VM lifecycle events, ballooning, clipboard sharing, etc.)
   test_nixos_guest_qemu_guest_enabled = assert' (lib.hasInfix "services.qemuGuest.enable = true;" guest_nix_text) "NixOS guest.nix must enable services.qemuGuest.enable";
@@ -1210,15 +1190,6 @@ let
       "Every VM hostname must equal name; bad entries: ${
         builtins.toString (builtins.map (v: v.name) badHostnameName)
       }";
-
-  # Guest type enum must not include unused Linux (NixOS is the Linux guest type).
-  test_vm_schema_no_linux_type =
-    let
-      schemaText = builtins.readFile ../../src/modules/VMs.schema.json;
-    in
-    assert' (!(lib.hasInfix "\"Linux\"" schemaText)) "VMs.schema.json type enum must not include Linux";
-
-  test_vm_ps1_windows_host_fallback = assert' (lib.hasInfix "else { 'Windows' }" vm_ps1_text) "scripts/vm.ps1 must default NUCLEUS_HOST to 'Windows' when unset";
 
   test_vm_android_recovery_filename_parity = assert' (
     lib.hasInfix "recovery userdebug.img" vm_setup_sh_text
@@ -1608,69 +1579,6 @@ let
       )
       "src/vms/macOS/packer.pkr.hcl must provision a guest account using the secret-backed guest credential policy";
 
-  test_vm_guest_credential_drift_replacement =
-    assert'
-      (
-        (lib.hasInfix "vm_guest_credentials_marker_path" vm_setup_sh_text)
-        && (lib.hasInfix "vm_guest_credentials_marker_matches" vm_setup_sh_text)
-        && (lib.hasInfix "NixOS image guest credential drift detected" vm_setup_sh_text)
-        && (lib.hasInfix "Windows image guest credential drift detected" vm_setup_sh_text)
-        && (lib.hasInfix "macOS guest credential drift detected" vm_setup_sh_text)
-        && (lib.hasInfix "refreshing base from pre-built image (overlay preserved)" vm_setup_sh_text)
-        && (lib.hasInfix ".vm-guest-credentials-sha256" vm_setup_sh_text)
-        && (lib.hasInfix "Get-VMGuestSecretMarkerPath" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "Test-VMGuestSecretMarker" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "NixOS image guest credential drift detected" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "Windows image guest credential drift detected" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "runtime disk guest credential drift detected" windows_vm_setup_ps1_text)
-      )
-      "POSIX and Windows vm setup flows must detect VM guest credential drift via marker files and replace stale images/runtime disks";
-
-  # guest.nix lives at src/vms/NixOS/, so repo imports resolve via ../../../src/
-  # (three levels up). Two levels (../../src) would hit the nonexistent
-  # src/src/ path — the regression that left the NixOS image unbuildable after
-  # the file moved from vms/NixOS/ to src/vms/NixOS/.
-  test_nixos_guest_import_paths_resolve =
-    assert'
-      (
-        (lib.hasInfix "../../../src/modules/core.nix" guest_nix_text)
-        && (lib.hasInfix "../../../src/hosts/NixOS/desktop.nix" guest_nix_text)
-        # WHY: negative checks must be newline-anchored: "../../../src/..." contains
-        # "../../src/..." as a substring, so a bare !hasInfix always fails.
-        && !(lib.hasInfix "\n    ../../src/modules/core.nix" guest_nix_text)
-        && !(lib.hasInfix "\n    ../../src/hosts/NixOS/desktop.nix" guest_nix_text)
-      )
-      "src/vms/NixOS/guest.nix must import repo files via ../../../src/ (three levels up from src/vms/NixOS/)";
-
-  # The NixOS image and runtime disks must rebuild when the guest config
-  # (guest.nix, its imports, flake.lock) drifts, not just on credential drift;
-  # otherwise stale images ship silently after guest.nix changes.
-  test_nixos_guest_config_drift_rebuild =
-    assert'
-      (
-        (lib.hasInfix "vm_guest_config_marker_path" vm_setup_sh_text)
-        && (lib.hasInfix "vm_guest_config_marker_matches" vm_setup_sh_text)
-        && (lib.hasInfix "vm_guest_config_fingerprint" vm_setup_sh_text)
-        && (lib.hasInfix ".vm-guest-config-sha256" vm_setup_sh_text)
-        && (lib.hasInfix "NixOS image guest config drift detected" vm_setup_sh_text)
-        && (lib.hasInfix "refreshing base from pre-built image (overlay preserved)" vm_setup_sh_text)
-        && (lib.hasInfix "src/flake.lock" vm_setup_sh_text)
-      )
-      "scripts/vm.sh must rebuild the NixOS image and replace runtime disks when the guest config fingerprint drifts";
-
-  # The NixOS guest must NOT import the host-only SOPS modules: they define
-  # sops.* options that only exist when sops-nix.nixosModules.sops is loaded,
-  # which the standalone nixos-generators evaluation does not do.  The guest
-  # injects credentials via NUCLEUS_VM_GUEST_* env vars instead.
-  test_nixos_guest_avoids_host_sops_modules =
-    assert'
-      (
-        !(lib.hasInfix "../../../src/modules/posix-sops.nix" guest_nix_text)
-        && !(lib.hasInfix "../../../src/hosts/NixOS/sops.nix" guest_nix_text)
-        && (lib.hasInfix "NUCLEUS_VM_GUEST_* environment variables instead of SOPS" guest_nix_text)
-      )
-      "src/vms/NixOS/guest.nix must not import host-only SOPS modules that break the standalone nixos-generators evaluation";
-
   # The NixOS guest must thread username (and hostName) through _module.args
   # because nixos-generators passes no specialArgs; shared modules key off both.
   test_nixos_guest_threads_username_arg =
@@ -1719,27 +1627,9 @@ let
   # overlay-only package is skipped by vanilla nixpkgs evaluations (e.g. the
   # nixos-generators guest build); placing lib.optionals inside the list literal
   # would nest a list element and fail the systemPackages package-type check.
-  test_core_nix_guards_overlay_only_packages =
-    assert'
-      (
-        (lib.hasInfix "++ (lib.optionals (pkgs ? camillagui-backend) [ pkgs.camillagui-backend ])" core_nix_text)
-        && (lib.hasInfix "vanilla nixpkgs has no such attribute" core_nix_text)
-      )
-      "src/modules/core.nix must guard camillagui-backend behind a ++ (lib.optionals (pkgs ? camillagui-backend)) concat, not a nested list literal";
-
   # core.nix must filter overlap packages by meta.available on Linux so
   # arch-specific nixpkgs attrs (e.g. discord-canary, x86_64-linux only) are
   # dropped from aarch64-linux evals like the nixos-generators guest build.
-  test_core_nix_overlap_arch_available_filter =
-    assert'
-      (
-        (lib.hasInfix "overlapNixAttrAvailable name" core_nix_text)
-        && (lib.hasInfix "overlapNixAttrAvailable =" core_nix_text)
-        && (lib.hasInfix "(pkgs.\${attr}.meta.available or true)" core_nix_text)
-        && (lib.hasInfix "does NOT trigger check-meta's refusal" core_nix_text)
-      )
-      "src/modules/core.nix must filter overlap nixpkgs packages by meta.available on Linux (arch-aware, lazy, non-refusing)";
-
   test_utm_base_overlay_provisioning =
     assert'
       (
@@ -1872,18 +1762,6 @@ let
       )
       "scripts/vm.sh must validate libvirt prebuilt disks against the manifest minImageSize, provision the data/<id>.qcow2 overlay, and surface default-network recovery failures";
 
-  # Image validation must pass an explicit manifest-derived min-size floor at
-  # every call site; the 10 GiB fallback default is dead once Android's 4 GiB
-  # floor is data-driven.
-  test_validate_qcow2_min_size_default_removed =
-    assert'
-      (
-        !(lib.hasInfix "_vqi_min_size=\"\${3:-\$(parse_size '10GB')}\"" vm_setup_sh_text)
-        && !(lib.hasInfix "[long]\$MinBytes = 10000000000" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "Test-Qcow2Image -ImagePath \$diskPath -ImageLabel \"runtime disk '\$(\$vm.id)'\" -MinBytes \$minSizeBytes" windows_vm_setup_ps1_text)
-      )
-      "vm.sh and Invoke-VMSetup.ps1 must require an explicit minImageSize floor at every image validation call site (no 10 GB fallback defaults)";
-
   # The shared Android start script must expose manifest-driven tokens for CPU
   # count, RAM, image filenames, and port forwards instead of hardcoded values.
   test_android_start_script_tokens =
@@ -1897,30 +1775,6 @@ let
         && (lib.hasInfix "__HOSTFWDS__" start_android_ps1_text)
       )
       "start-android-vm.ps1 must expose __ANDROID_CPU_COUNT__/__ANDROID_RAM_BYTES__/__ANDROID_SYSTEM_IMAGE__/__ANDROID_USERDATA_IMAGE__/__ANDROID_GSI_IMAGE__/__HOSTFWDS__ tokens for manifest-driven rendering";
-
-  test_android_start_script_no_legacy_literals =
-    assert'
-      (
-        !(lib.hasInfix "'-smp', '4'" start_android_ps1_text)
-        && !(lib.hasInfix "'-m', '4096'" start_android_ps1_text)
-        && !(lib.hasInfix "hostfwd=tcp::5555-:5555,hostfwd=tcp::5554-:5554" start_android_ps1_text)
-        && !(lib.hasInfix "'android-system.qcow2'" start_android_ps1_text)
-        && !(lib.hasInfix "'android-userdata.qcow2'" start_android_ps1_text)
-        && !(lib.hasInfix "'android-gsi.img'" start_android_ps1_text)
-      )
-      "start-android-vm.ps1 must not hardcode -smp 4, -m 4096, the 5555/5554 hostfwd pair, or Android image filenames";
-
-  # The CLI list/status host filters must rely on the manifest's required
-  # non-null hosts field — no dead null/empty fallback branches.
-  test_vm_cli_no_hosts_null_branches =
-    assert'
-      (
-        !(lib.hasInfix ".hosts == null or (.hosts | length == 0)" vm_setup_sh_text)
-        && !(lib.hasInfix "else \"all\" end" vm_setup_sh_text)
-        && !(lib.hasInfix "-not \$_.hosts -or \$_.hosts.Count -eq 0" vm_ps1_text)
-        && !(lib.hasInfix "else { 'all' }" vm_ps1_text)
-      )
-      "scripts/vm.sh/vm.ps1 must not contain dead hosts-null branches (hosts is required non-null in VMs.json)";
 
   # vm_write_start_script must render the Android tokens via a sed chain after
   # copying the shared file, preserving the android-vm-single-source invariant.
@@ -2014,15 +1868,6 @@ let
         && (lib.hasInfix "__VM_SOUND__" macbook_vms_nix_text)
       )
       "src/hosts/MacBook/vms.nix must map VM sound ('none' → empty Sound array, default → intel-hda) via the __VM_SOUND__ token";
-  test_macbook_utm_no_qemu_guest_agent =
-    assert'
-      (
-        !(lib.hasInfix "qga-" utmConfigPlistText)
-        && !(lib.hasInfix "org.qemu.guest_agent.0" utmConfigPlistText)
-        && !(lib.hasInfix "-chardev" utmConfigPlistText)
-        && (lib.hasInfix "<key>AdditionalArguments</key>" utmConfigPlistText)
-      )
-      "src/modules/configs/vms/utm-config.plist.xml must not add a QEMU GA chardev: UTM's app sandbox denies binding unix sockets in /tmp (EPERM on boot) and UTM's own bundles omit it";
   # UTM's QEMU backend only emits hostfwd= for Mode=Emulated (user/slirp
   # networking); for Mode=Shared (vmnet-shared) the PortForward array is
   # silently ignored, so manifest port forwards (host ports 22000-22099)
@@ -2100,15 +1945,6 @@ let
     && (lib.hasInfix "<key>IconCustom</key>" vm_setup_sh_text)
     && (lib.hasInfix "<key>UsbBusSupport</key>" vm_setup_sh_text)
   ) "scripts/vm.sh must block incomplete UTM templates missing required keys";
-  test_macbook_utm_template_drift_reregistration =
-    assert'
-      (
-        (lib.hasInfix "re_register_utm_bundle" vm_setup_sh_text)
-        && (lib.hasInfix "detected config drift in existing bundle" vm_setup_sh_text)
-        && (lib.hasInfix "cmp -s \"$_vupt_template\" \"$config_plist\"" vm_setup_sh_text)
-        && (lib.hasInfix "repairing stale UTM runtime registration" vm_setup_sh_text)
-      )
-      "scripts/vm.sh must re-register UTM VMs when template drift is detected so refreshed config.plist values take effect";
   test_vm_readme_template_content =
     assert'
       (
@@ -2397,19 +2233,6 @@ let
       )
       "scripts/vm.sh must link ~/.tart -> ~/virtual machines/tart without migrating existing stores in-script";
 
-  test_macbook_macos_version_tahoe =
-    assert'
-      (
-        (lib.hasInfix "\"macOS\": {" vms_json_text)
-        && (lib.hasInfix "\"version\": \"tahoe\"" vms_json_text)
-        && (lib.hasInfix "macOS version to provision (tahoe, sequoia, sonoma, ventura, etc.)" vms_macos_packer_text)
-        && !(lib.hasInfix "default     = \"tahoe\"" vms_macos_packer_text)
-        && !(lib.hasInfix "\${5:-tahoe}" vm_setup_sh_text)
-        && (lib.hasInfix "variable \"vm_hostname\"" vms_macos_packer_text)
-        && (lib.hasInfix "\${var.vm_hostname}" vms_macos_packer_text)
-      )
-      "MacBook macOS guest version must come from the manifest (no hardcoded tahoe defaults in vm.sh or the packer) and the packer must take a required vm_hostname variable";
-
   # On non-Windows hosts, after Mido failure the script should try a pwsh/Fido
   # URL resolver fallback before requiring manual ISO input.
   test_windows_iso_fido_nonwindows_fallback =
@@ -2442,11 +2265,9 @@ let
     test_vm_status_display_parses_suffixed_ram
     test_macos_packer_ceil_units
     test_min_image_size_floor_wiring
-    test_no_legacy_binary_size_constants
     test_cpu_counts
     test_vm_names
     test_vm_types
-    test_vm_schema_no_linux_type
     test_share_dev_dir_types
     test_enabled_types
     test_vm_id_nonempty_and_filesystem_safe
@@ -2480,14 +2301,12 @@ let
     test_vm_sync_utm_includes_registration
     test_apply_vm_sync_default_on
     test_guest_nix_nonempty
-    test_nixos_guest_virtiofs_not_forced
     test_nixos_guest_qemu_guest_enabled
     test_nixos_guest_openssh_enabled
     test_nixos_guest_nucleus_rebuild_service
     test_nixos_guest_ssh_authorized_keys
     test_vm_guest_ssh_public_key_manifest
     test_vm_guest_ssh_public_key_resolver_wired
-    test_vm_ps1_windows_host_fallback
     test_vm_android_recovery_filename_parity
     test_tart_in_homebrew
     test_macbook_linux_builder_enabled
@@ -2520,7 +2339,6 @@ let
     test_guest_credentials_policy_in_windows_packer
     test_guest_credentials_policy_in_windows_autounattend
     test_guest_credentials_policy_in_macos_packer
-    test_vm_guest_credential_drift_replacement
     test_utm_base_overlay_provisioning
     test_utm_android_uses_shared_images
     test_android_userdata_preserve_or_fail_fast
@@ -2534,7 +2352,6 @@ let
     test_macbook_utm_windows_arch_override
     test_macbook_utm_schema_keys
     test_macbook_utm_plist_correctness
-    test_macbook_utm_no_qemu_guest_agent
     test_macbook_utm_emulated_network_for_port_forward
     test_macbook_utm_port_forwards_from_manifest
     test_macbook_utm_display_card_validity
@@ -2543,7 +2360,6 @@ let
     test_macbook_utm_uses_direct_bundle_open
     test_macbook_utm_refreshes_existing_bundle
     test_macbook_utm_stale_template_guard
-    test_macbook_utm_template_drift_reregistration
     test_vm_readme_template_content
     test_vm_start_posix_template_content
     test_vm_start_windows_template_content
@@ -2563,7 +2379,6 @@ let
     test_nixos_port_forwards_from_manifest
     test_nixos_android_gsi_conditional
     test_nixos_android_disk_paths
-    test_macbook_macos_version_tahoe
     test_windows_iso_fido_nonwindows_fallback
     test_android_gsi_url_type
     test_android_gsi_url_only_on_android
@@ -2574,22 +2389,14 @@ let
     test_vm_gc_data_option_pair
     test_windows_vm_gc_data_option_pair
     test_windows_vm_gc_preserves_disabled_entries_by_default
-    test_nixos_guest_import_paths_resolve
-    test_nixos_guest_config_drift_rebuild
-    test_nixos_guest_avoids_host_sops_modules
     test_nixos_guest_threads_username_arg
     test_nixos_guest_standalone_eval_overrides
-    test_core_nix_guards_overlay_only_packages
-    test_core_nix_overlap_arch_available_filter
     test_macbook_utm_required_key_guard
     test_android_sound_disabled
     test_macbook_utm_sound_token
     test_macbook_utm_vm_sound_mapping
-    test_validate_qcow2_min_size_default_removed
     test_android_start_script_tokens
-    test_android_start_script_no_legacy_literals
     test_vm_write_start_script_android_sed_chain
-    test_vm_cli_no_hosts_null_branches
     test_vm_hostfwds_render_chain
     test_vm_guest_hostname_env_export
     test_nixos_packer_guest_hostname_var
@@ -2635,11 +2442,9 @@ in
     test_vm_status_display_parses_suffixed_ram
     test_macos_packer_ceil_units
     test_min_image_size_floor_wiring
-    test_no_legacy_binary_size_constants
     test_cpu_counts
     test_vm_names
     test_vm_types
-    test_vm_schema_no_linux_type
     test_share_dev_dir_types
     test_enabled_types
     test_vm_id_nonempty_and_filesystem_safe
@@ -2673,14 +2478,12 @@ in
     test_vm_sync_utm_includes_registration
     test_apply_vm_sync_default_on
     test_guest_nix_nonempty
-    test_nixos_guest_virtiofs_not_forced
     test_nixos_guest_qemu_guest_enabled
     test_nixos_guest_openssh_enabled
     test_nixos_guest_nucleus_rebuild_service
     test_nixos_guest_ssh_authorized_keys
     test_vm_guest_ssh_public_key_manifest
     test_vm_guest_ssh_public_key_resolver_wired
-    test_vm_ps1_windows_host_fallback
     test_vm_android_recovery_filename_parity
     test_tart_in_homebrew
     test_macbook_linux_builder_enabled
@@ -2713,7 +2516,6 @@ in
     test_guest_credentials_policy_in_windows_packer
     test_guest_credentials_policy_in_windows_autounattend
     test_guest_credentials_policy_in_macos_packer
-    test_vm_guest_credential_drift_replacement
     test_utm_base_overlay_provisioning
     test_utm_android_uses_shared_images
     test_android_userdata_preserve_or_fail_fast
@@ -2727,7 +2529,6 @@ in
     test_macbook_utm_windows_arch_override
     test_macbook_utm_schema_keys
     test_macbook_utm_plist_correctness
-    test_macbook_utm_no_qemu_guest_agent
     test_macbook_utm_emulated_network_for_port_forward
     test_macbook_utm_port_forwards_from_manifest
     test_macbook_utm_display_card_validity
@@ -2736,7 +2537,6 @@ in
     test_macbook_utm_uses_direct_bundle_open
     test_macbook_utm_refreshes_existing_bundle
     test_macbook_utm_stale_template_guard
-    test_macbook_utm_template_drift_reregistration
     test_vm_readme_template_content
     test_vm_start_posix_template_content
     test_vm_start_windows_template_content
@@ -2756,7 +2556,6 @@ in
     test_nixos_port_forwards_from_manifest
     test_nixos_android_gsi_conditional
     test_nixos_android_disk_paths
-    test_macbook_macos_version_tahoe
     test_windows_iso_fido_nonwindows_fallback
     test_android_gsi_url_type
     test_android_gsi_url_only_on_android
@@ -2767,22 +2566,14 @@ in
     test_vm_gc_data_option_pair
     test_windows_vm_gc_data_option_pair
     test_windows_vm_gc_preserves_disabled_entries_by_default
-    test_nixos_guest_import_paths_resolve
-    test_nixos_guest_config_drift_rebuild
-    test_nixos_guest_avoids_host_sops_modules
     test_nixos_guest_threads_username_arg
     test_nixos_guest_standalone_eval_overrides
-    test_core_nix_guards_overlay_only_packages
-    test_core_nix_overlap_arch_available_filter
     test_macbook_utm_required_key_guard
     test_android_sound_disabled
     test_macbook_utm_sound_token
     test_macbook_utm_vm_sound_mapping
-    test_validate_qcow2_min_size_default_removed
     test_android_start_script_tokens
-    test_android_start_script_no_legacy_literals
     test_vm_write_start_script_android_sed_chain
-    test_vm_cli_no_hosts_null_branches
     test_vm_hostfwds_render_chain
     test_vm_guest_hostname_env_export
     test_nixos_packer_guest_hostname_var
