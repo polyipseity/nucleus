@@ -7,7 +7,10 @@
 # Environment: none required beyond a working adb in PATH.
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+SCRIPT_DIR="${NUCLEUS_ANDROID_CONFIG_DIR:-}"
+if [ -z "$SCRIPT_DIR" ]; then
+  SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+fi
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
 

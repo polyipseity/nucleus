@@ -2,7 +2,7 @@
 # Install and configure Magisk on the jqssun LineageOS Android guest (user build).
 # Stages Magisk's boot_patch.sh kit from the APK, patches boot.img on the booted
 # guest via ADB, flashes via fastboot, and installs the Magisk APK. Automation
-# uses Magisk su (not adb root) on user builds.
+# uses Magisk su on user builds.
 #
 # Usage: sourced by android-config.sh; not invoked directly.
 set -euo pipefail
@@ -11,7 +11,7 @@ NUCLEUS_MAGISK_MARKER='android-magisk.tag.json'
 NUCLEUS_MAGISK_PATCH_REMOTE='/data/local/tmp/nucleus-magisk-patch'
 NUCLEUS_MAGISK_STOCK_BOOT_REMOTE='/data/local/tmp/nucleus-stock-boot.img'
 NUCLEUS_ROOT_PROPS_SERVICE='/data/adb/service.d/nucleus-root-props.sh'
-NUCLEUS_LOCAL_TERMINAL_PACKAGE='com.android.terminal'
+NUCLEUS_TERMINAL_PACKAGES='com.android.virtualization.terminal com.android.terminal'
 
 # vm_android_magisk_apk_lib_dir VM_INDEX
 #   Magisk APK lib/ subdirectory for this guest CPU ABI.
@@ -55,55 +55,119 @@ vm_android_guest_has_magisk_su() {
   adb -s "$_agms_serial" shell 'su -c id -u' 2>/dev/null | tr -d '\r' | grep -qx '0'
 }
 
-# vm_android_guest_has_adb_root VM_INDEX
-#   True when host adb root yields shell uid 0.
-vm_android_guest_has_adb_root() {
-  vm_android_adb_ensure_root "$1"
+# vm_android_su_getprop VM_INDEX NAME
+#   Read a getprop value via Magisk su on a booted guest.
+vm_android_su_getprop() {
+  _asugp_vm_index="$1"
+  _asugp_name="$2"
+  _asugp_serial="$(vm_android_adb_serial "$_asugp_vm_index")"
+
+  adb -s "$_asugp_serial" shell "su -c $(printf '%q' "getprop $_asugp_name")" 2>/dev/null | tr -d '\r\n'
 }
 
 # vm_android_root_props_boot_script
-#   Guest Magisk service.d script that re-applies ro.debuggable each boot.
+#   Guest Magisk service.d script that re-applies persist.sys.root_access each boot.
 vm_android_root_props_boot_script() {
   cat <<'EOF'
 #!/system/bin/sh
-resetprop ro.debuggable 1
 # persist.sys.root_access is already persist.*; rewrite is idempotent.
 resetprop persist.sys.root_access 3
 EOF
 }
 
-# vm_android_enable_local_terminal VM_INDEX
-#   Enable the Developer-options Local terminal toggle (com.android.terminal).
-vm_android_enable_local_terminal() {
-  _aelt_vm_index="$1"
-  _aelt_serial="$(vm_android_adb_serial "$_aelt_vm_index")"
+# vm_android_resolve_terminal_package VM_INDEX
+#   Return the first installed terminal package candidate on the guest.
+vm_android_resolve_terminal_package() {
+  _artp_vm_index="$1"
+  _artp_serial="$(vm_android_adb_serial "$_artp_vm_index")"
+  _artp_pkg=''
 
-  if ! adb -s "$_aelt_serial" shell "su -c $(printf '%q' "pm path $NUCLEUS_LOCAL_TERMINAL_PACKAGE")" 2>/dev/null \
-    | tr -d '\r' | grep -q '^package:'; then
-    error "Local terminal package $NUCLEUS_LOCAL_TERMINAL_PACKAGE is not installed on the guest"
+  for _artp_pkg in $NUCLEUS_TERMINAL_PACKAGES; do
+    if adb -s "$_artp_serial" shell "su -c $(printf '%q' "pm path $_artp_pkg")" 2>/dev/null \
+      | tr -d '\r' | grep -q '^package:'; then
+      printf '%s\n' "$_artp_pkg"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# vm_android_enable_terminal VM_INDEX
+#   Enable the Developer-options terminal package shipped on jqssun (pm enable via su).
+vm_android_enable_terminal() {
+  _aet_vm_index="$1"
+  _aet_serial="$(vm_android_adb_serial "$_aet_vm_index")"
+  _aet_pkg=''
+  _aet_listing=''
+
+  _aet_pkg="$(vm_android_resolve_terminal_package "$_aet_vm_index")" || {
+    _aet_listing="$(adb -s "$_aet_serial" shell "su -c $(printf '%q' 'pm list packages | grep -i terminal')" 2>/dev/null | tr -d '\r')"
+    error "no terminal package found (tried:$NUCLEUS_TERMINAL_PACKAGES); pm list: ${_aet_listing:-<empty>}"
+    return 1
+  }
+
+  if ! adb -s "$_aet_serial" shell "su -c $(printf '%q' "pm enable $_aet_pkg")"; then
+    error "failed to enable terminal package $_aet_pkg"
     return 1
   fi
 
-  if ! adb -s "$_aelt_serial" shell "su -c $(printf '%q' "cmd package set-application-enabled-setting $NUCLEUS_LOCAL_TERMINAL_PACKAGE 1 0")"; then
-    error "failed to enable Local terminal ($NUCLEUS_LOCAL_TERMINAL_PACKAGE)"
-    return 1
-  fi
-
-  if ! adb -s "$_aelt_serial" shell "su -c $(printf '%q' "cmd package get-application-enabled-setting $NUCLEUS_LOCAL_TERMINAL_PACKAGE")" 2>/dev/null \
-    | tr -d '\r' | grep -qx '1'; then
-    error "Local terminal ($NUCLEUS_LOCAL_TERMINAL_PACKAGE) is not enabled after apply"
+  if adb -s "$_aet_serial" shell "su -c $(printf '%q' "pm list packages -d")" 2>/dev/null \
+    | tr -d '\r' | grep -q "package:$_aet_pkg"; then
+    error "terminal package $_aet_pkg is still disabled after pm enable"
     return 1
   fi
 }
 
-# vm_android_apply_session_magiskpolicy_for_adb_root VM_INDEX
-#   Session-only SELinux rules when Lineage adb root still fails on user builds.
-vm_android_apply_session_magiskpolicy_for_adb_root() {
-  _asmp_vm_index="$1"
-  _asmp_serial="$(vm_android_adb_serial "$_asmp_vm_index")"
+# vm_android_restore_ro_debuggable_user VM_INDEX
+#   Repair ro.debuggable=1 left by a prior broken --root run (must stay 0 on user builds).
+vm_android_restore_ro_debuggable_user() {
+  _ardu_vm_index="$1"
+  _ardu_serial="$(vm_android_adb_serial "$_ardu_vm_index")"
+  _ardu_debuggable=''
 
-  adb -s "$_asmp_serial" shell "su -c $(printf '%q' "magiskpolicy --live 'allow adbd adbd process setcurrent'")"
-  adb -s "$_asmp_serial" shell "su -c $(printf '%q' "magiskpolicy --live 'allow adbd su process dyntransition'")"
+  _ardu_debuggable="$(vm_android_su_getprop "$_ardu_vm_index" ro.debuggable)"
+  if [ "$_ardu_debuggable" = '1' ]; then
+    say "repairing ro.debuggable (was 1; restoring 0 for user build)..."
+    if ! adb -s "$_ardu_serial" shell "su -c $(printf '%q' 'resetprop ro.debuggable 0')"; then
+      error "failed to restore ro.debuggable to 0"
+      return 1
+    fi
+  fi
+}
+
+# vm_android_verify_root_props_via_su VM_INDEX
+#   Confirm persist.sys.root_access=3 and ro.debuggable=0 via Magisk su getprop.
+vm_android_verify_root_props_via_su() {
+  _avrps_vm_index="$1"
+  _avrps_root_access=''
+  _avrps_debuggable=''
+
+  _avrps_root_access="$(vm_android_su_getprop "$_avrps_vm_index" persist.sys.root_access)"
+  if [ "$_avrps_root_access" != '3' ]; then
+    error "persist.sys.root_access is $_avrps_root_access (expected 3) after --root"
+    return 1
+  fi
+
+  _avrps_debuggable="$(vm_android_su_getprop "$_avrps_vm_index" ro.debuggable)"
+  if [ "$_avrps_debuggable" != '0' ]; then
+    error "ro.debuggable is $_avrps_debuggable (expected 0) after --root; re-run --root to repair"
+    return 1
+  fi
+}
+
+# vm_android_smoke_test_dev_options VM_INDEX
+#   Open Developer options and fail when Settings cannot set logd persist properties.
+vm_android_smoke_test_dev_options() {
+  _astdo_vm_index="$1"
+  _astdo_serial="$(vm_android_adb_serial "$_astdo_vm_index")"
+
+  # check-suppress:suppression_doc: Developer options activity may be unavailable on headless/recovery paths; logcat probe below is the real pass/fail signal.
+  adb -s "$_astdo_serial" shell 'am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS' >/dev/null 2>&1 || true
+  sleep 2
+  if adb -s "$_astdo_serial" logcat -d -t 30 2>/dev/null | grep -q 'failed to set system property'; then
+    error "Developer options smoke test failed (Settings property write error); ro.debuggable must stay 0"
+    return 1
+  fi
 }
 
 # vm_android_persist_root_props_service VM_INDEX
@@ -123,7 +187,7 @@ chmod 755 $NUCLEUS_ROOT_PROPS_SERVICE"
 }
 
 # vm_android_config_root VM_INDEX
-#   Enable dev options, Local terminal, Lineage root access, and host adb root.
+#   Enable dev options, terminal app, and Lineage persist.sys.root_access (Magisk su only).
 vm_android_config_root() {
   _acr_vm_index="$1"
   _acr_serial="$(vm_android_adb_serial "$_acr_vm_index")"
@@ -142,33 +206,24 @@ vm_android_config_root() {
     return 1
   fi
 
-  vm_android_enable_usb_debugging "$_acr_vm_index"
-  vm_android_enable_local_terminal "$_acr_vm_index"
+  vm_android_restore_ro_debuggable_user "$_acr_vm_index" || return 1
+  vm_android_enable_usb_debugging "$_acr_vm_index" || return 1
+  vm_android_enable_terminal "$_acr_vm_index" || return 1
 
-  if ! adb -s "$_acr_serial" shell "su -c $(printf '%q' 'resetprop ro.debuggable 1 && resetprop persist.sys.root_access 3')"; then
-    error "failed to apply ro.debuggable and persist.sys.root_access on guest"
+  if ! adb -s "$_acr_serial" shell "su -c $(printf '%q' 'resetprop persist.sys.root_access 3')"; then
+    error "failed to apply persist.sys.root_access on guest"
     return 1
   fi
 
   vm_android_persist_root_props_service "$_acr_vm_index" || return 1
+  vm_android_verify_root_props_via_su "$_acr_vm_index" || return 1
 
-  # check-suppress:suppression_doc: best-effort adbd restart after rooted-debugging props; verified via adb root probe.
-  adb -s "$_acr_serial" shell 'setprop ctl.restart adbd' 2>/dev/null || true
-  sleep 2
-  vm_android_adb_refresh "$_acr_vm_index"
-
-  if ! vm_android_guest_has_adb_root "$_acr_vm_index"; then
-    say "adb root failed; applying session-only magiskpolicy rules and retrying..."
-    vm_android_apply_session_magiskpolicy_for_adb_root "$_acr_vm_index"
-    # check-suppress:suppression_doc: best-effort adbd restart after session magiskpolicy retry.
-    adb -s "$_acr_serial" shell 'setprop ctl.restart adbd' 2>/dev/null || true
-    sleep 2
-    vm_android_adb_refresh "$_acr_vm_index"
-    if ! vm_android_guest_has_adb_root "$_acr_vm_index"; then
-      error "adb root is not available after applying rooted-debugging props; verify ro.debuggable=1 and persist.sys.root_access=3 on the guest"
-      return 1
-    fi
+  if ! vm_android_guest_has_magisk_su "$_acr_vm_index"; then
+    error "Magisk su not available after rooted debugging apply"
+    return 1
   fi
+
+  vm_android_smoke_test_dev_options "$_acr_vm_index" || return 1
 
   say "rooted debugging enabled on $_acr_serial; next: --fake-wifi"
 }

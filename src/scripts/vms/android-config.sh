@@ -8,7 +8,11 @@
 #        [--magisk] [--root] [--fake-wifi] [--fake-wifi-revert]
 set -euo pipefail
 
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+SCRIPT_DIR="${NUCLEUS_ANDROID_CONFIG_DIR:-}"
+if [ -z "$SCRIPT_DIR" ]; then
+  SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+fi
+export NUCLEUS_ANDROID_CONFIG_DIR="$SCRIPT_DIR"
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
 # shellcheck source=../lib/vm.sh
@@ -37,8 +41,8 @@ Android post-provision (jqssun LineageOS 23 user build)
 
 Flags: --gapps --adb-keys --magisk --root --fake-wifi --fake-wifi-revert
 
---magisk installs Magisk su. --root enables Developer options, Local terminal,
-and host adb root (ro.debuggable + persist.sys.root_access). --fake-wifi needs Magisk su.
+--magisk installs Magisk su. --root enables Developer options, terminal app,
+and persist.sys.root_access (ro.debuggable stays 0). --fake-wifi needs Magisk su.
 
 Recovery (GApps, optional ADB keys):
   1. nucleus-vm reset Android; start VM; boot LineageOS Recovery (factory-reset if needed).
@@ -154,22 +158,18 @@ vm_android_config_adb_keys() {
   _vaca_state="$(vm_android_adb_poll_state "$_vaca_vm_index")"
   case "$_vaca_state" in
     recovery|sideload)
-      vm_android_recovery_prepare_adb "$_vaca_vm_index"
-      if ! vm_android_adb_ensure_root "$_vaca_vm_index"; then
-        error "recovery ADB root is required to install adb_keys (enable ADB in recovery, then retry)"
+      if ! vm_android_guest_shell_is_root "$_vaca_vm_index"; then
+        error "recovery adb-keys requires root shell (Advanced → Enable ADB)"
         return 1
       fi
       vm_android_install_adb_keys "$_vaca_vm_index" "$_vaca_pubkey"
       ;;
     device)
-      if vm_android_guest_has_adb_root "$_vaca_vm_index"; then
-        vm_android_install_adb_keys "$_vaca_vm_index" "$_vaca_pubkey"
-      elif vm_android_guest_has_magisk_su "$_vaca_vm_index"; then
-        vm_android_install_adb_keys_via_su "$_vaca_vm_index" "$_vaca_pubkey"
-      else
-        error "booted adb-keys requires adb root or Magisk su (run --magisk and --root first) or recovery --adb-keys before first boot"
+      if ! vm_android_guest_has_magisk_su "$_vaca_vm_index"; then
+        error "booted adb-keys requires Magisk su (run --magisk first) or recovery --adb-keys before first boot"
         return 1
       fi
+      vm_android_install_adb_keys_via_su "$_vaca_vm_index" "$_vaca_pubkey"
       ;;
     *)
       error "guest must be in recovery or booted system for adb-keys; current state: $_vaca_state"
