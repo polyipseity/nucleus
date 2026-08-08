@@ -158,7 +158,7 @@ let
     vm:
     builtins.replaceStrings
       [
-        "__VM_NAME__"
+        "__VM_ID__"
         "__VM_DISPLAY__"
         "__VM_DISPLAY_CARD__"
         "__VM_DIR_SHARE_MODE__"

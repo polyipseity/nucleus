@@ -10,7 +10,7 @@
     <array>
         <dict>
             <key>Identifier</key>
-            <string>__VM_NAME__-disk-main</string>
+            <string>__VM_ID__-disk-main</string>
             <key>ImageName</key>
             <string>disk-main.qcow2</string>
             <key>ImageType</key>

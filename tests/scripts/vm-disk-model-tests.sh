@@ -223,7 +223,8 @@ EOF
 
 # Stub: the running-VM probe lives in scripts/vm.sh, not the lib; unit tests
 # control it directly.
-vm_get_running_names() {
+# shellcheck disable=SC2329 # reason: default stub overridden per test; shellcheck cannot trace indirect calls
+vm_get_running_ids() {
   printf ''
 }
 
@@ -303,7 +304,7 @@ EOF
 
   # Case 4b: running VM → base refresh skipped.
   # shellcheck disable=SC2329 # reason: stub invoked indirectly by vm_ensure_base_and_overlay's running-VM guard; shellcheck cannot trace the call
-  vm_get_running_names() { printf 'NixOS\n'; }
+  vm_get_running_ids() { printf 'NixOS\n'; }
   printf 'stale-again\n' > "$_cred_marker"
   _before_hash="$(vm_sha256_input < "$_base")"
   vm_ensure_base_and_overlay NixOS "$_prebuilt" 0 16777216 "$_cred_marker" "$_config_marker" "" >/dev/null 2>&1
@@ -311,7 +312,7 @@ EOF
   assert_eq "$_before_hash" "$_after_hash" "base not refreshed while VM is running"
   assert_eq "stale-again" "$(tr -d '\r\n' <"$_cred_marker")" "credential marker not refreshed while VM is running"
   # shellcheck disable=SC2329 # reason: stub restored to empty after indirect use by vm_ensure_base_and_overlay
-  vm_get_running_names() { printf ''; }
+  vm_get_running_ids() { printf ''; }
 
   # Case 5: grow-only auto-grow (never shrink).
   vm_ensure_base_and_overlay NixOS "$_prebuilt" 0 33554432 "$_cred_marker" "$_config_marker" "" >/dev/null 2>&1
@@ -392,7 +393,7 @@ EOF
 
   # Running VM rejection.
   # shellcheck disable=SC2329 # reason: stub invoked indirectly by vm_resize_vm's running-VM guard; shellcheck cannot trace the call
-  vm_get_running_names() { printf 'NixOS\n'; }
+  vm_get_running_ids() { printf 'NixOS\n'; }
   if vm_resize_vm NixOS 33554432 false >/dev/null 2>&1; then
     echo "FAIL: resize while running should fail"
     _failures=$((_failures + 1))
@@ -400,7 +401,7 @@ EOF
   _new_size="$(qemu-img info --output=json "$_disk" | jq -r '."virtual-size" // 0')"
   assert_eq "16777216" "$_new_size" "disk unchanged while VM running"
   # shellcheck disable=SC2329 # reason: stub restored to empty after indirect use by vm_resize_vm
-  vm_get_running_names() { printf ''; }
+  vm_get_running_ids() { printf ''; }
 
   # Android userdata resize targets data/<id>.qcow2.
   _disk="$_vm_dir/data/Android.qcow2"
@@ -556,7 +557,7 @@ EOF
   vm_write_descriptors
   : > "$_vm_dir/stale.vm.json"
 
-  _expected="$(vm_get_manifest_vm_names)"
+  _expected="$(vm_get_manifest_vm_ids)"
   vm_gc_orphan_disks "$_expected"
   vm_gc_orphan_markers "$_expected"
   vm_gc_orphan_descriptors "$_expected"
@@ -598,7 +599,7 @@ EOF
 
   # --gc-disabled narrows the expected set to enabled-and-host-matched VMs
   # (Android, NixOS on host NixOS): disabled/unmatched src/ artifacts are cleared.
-  _expected="$(vm_get_expected_vm_names)"
+  _expected="$(vm_get_expected_vm_ids)"
   vm_gc_orphan_disks "$_expected"
   vm_gc_orphan_markers "$_expected"
   vm_gc_orphan_descriptors "$_expected"
@@ -775,13 +776,13 @@ EOF
 
   # Running-VM refusal: pack aborts (non-zero) while any VM is running.
   # shellcheck disable=SC2329 # reason: stub invoked indirectly by vm_pack_vms's running-VM guard; shellcheck cannot trace the call
-  vm_get_running_names() { printf 'NixOS\n'; }
+  vm_get_running_ids() { printf 'NixOS\n'; }
   if vm_pack_vms >/dev/null 2>&1; then
     echo "FAIL: pack must refuse while a VM is running"
     _failures=$((_failures + 1))
   fi
   # shellcheck disable=SC2329 # reason: stub restored to empty after indirect use by vm_pack_vms
-  vm_get_running_names() { printf ''; }
+  vm_get_running_ids() { printf ''; }
 }
 
 # test_windows_qemu_provisioning
@@ -1078,8 +1079,8 @@ test_gc_dispatcher() {
 }
 
 # test_expected_vm_names_edge_cases
-#   Direct unit tests for vm_get_manifest_vm_names (all guests) vs
-#   vm_get_expected_vm_names (enabled + current-host only).
+#   Direct unit tests for vm_get_manifest_vm_ids (all guests) vs
+#   vm_get_expected_vm_ids (enabled + current-host only).
 test_expected_vm_names_edge_cases() {
   local _manifest="$_tmp/names/manifest.json" _names _sorted
 
@@ -1166,25 +1167,25 @@ EOF
     "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
     "$_tmp/names/vms" "$_manifest" "NixOS" "false" "false" "false"
 
-  _names="$(vm_get_manifest_vm_names | sort | tr '\n' ' ')"
+  _names="$(vm_get_manifest_vm_ids | sort | tr '\n' ' ')"
   assert_eq "AllHosts DisabledGuest EmptyHosts NixOnly NoEnabledField NoHostsField " "$_names" "manifest names include all guests"
 
-  _names="$(vm_get_expected_vm_names | sort | tr '\n' ' ')"
+  _names="$(vm_get_expected_vm_ids | sort | tr '\n' ' ')"
   assert_eq "AllHosts NixOnly " "$_names" "expected names are enabled-and-host-matched only"
 
   # Host with no manifest match → empty expected set.
   NUCLEUS_HOST="NonexistentHost"
-  _names="$(vm_get_expected_vm_names | tr '\n' ' ')"
+  _names="$(vm_get_expected_vm_ids | tr '\n' ' ')"
   assert_eq "" "$_names" "expected names empty when NUCLEUS_HOST matches no enabled guest"
 
   # Unset/empty NUCLEUS_HOST → no host match.
   NUCLEUS_HOST=""
-  _names="$(vm_get_expected_vm_names | tr '\n' ' ')"
+  _names="$(vm_get_expected_vm_ids | tr '\n' ' ')"
   assert_eq "" "$_names" "expected names empty when NUCLEUS_HOST is unset"
 
   # Manifest names unchanged regardless of NUCLEUS_HOST.
   NUCLEUS_HOST="NixOS"
-  _sorted="$(vm_get_manifest_vm_names | wc -l | tr -d ' ')"
+  _sorted="$(vm_get_manifest_vm_ids | wc -l | tr -d ' ')"
   assert_eq "6" "$_sorted" "manifest names count stable across NUCLEUS_HOST changes"
 }
 

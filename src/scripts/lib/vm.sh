@@ -579,19 +579,19 @@ vm_wait_for_guest() {
 # vm_write_start_script DOC HOST_KIND
 # Args:
 #   $1 — JSON document for the VM: the self-describing descriptor when present
-#        (vm_vm_json NAME), otherwise the manifest entry.  Fields read:
+#        (vm_vm_json VM_ID), otherwise the manifest entry.  Fields read:
 #        id/name/type/cpus/ram/portForwards (+ the Android group when present).
 #   $2 — host runtime kind (darwin-utm|darwin-tart|nixos-libvirt|windows-qemu)
 # Writes a host-side helper script to start the VM runtime from ~/virtual machines.
 vm_write_start_script() {
   _wss_doc="$1"
   _wss_host_kind="$2"
-  _wss_name="$(printf '%s' "$_wss_doc" | jq -r '.id')"
+  _wss_id="$(printf '%s' "$_wss_doc" | jq -r '.id')"
   _wss_display="$(printf '%s' "$_wss_doc" | jq -r '.name')"
   _wss_type="$(printf '%s' "$_wss_doc" | jq -r '.type')"
   mkdir -p "$VM_DIR/scripts"
-  _wss_path_sh="$VM_DIR/scripts/start-${_wss_name}.sh"
-  _wss_path_ps1="$VM_DIR/scripts/start-${_wss_name}.ps1"
+  _wss_path_sh="$VM_DIR/scripts/start-${_wss_id}.sh"
+  _wss_path_ps1="$VM_DIR/scripts/start-${_wss_id}.ps1"
 
   if [ "$dry_run" = true ]; then
     dry_run "write start helper scripts: $_wss_path_sh, $_wss_path_ps1"
@@ -606,7 +606,7 @@ vm_write_start_script() {
   # Render .sh from template.
   if [ -f "$TEMPLATES_DIR/start-posix.sh" ]; then
     _wss_posix_sed=(
-      -e "s|__VM_NAME__|$_wss_name|g"
+      -e "s|__VM_NAME__|$_wss_id|g"
       -e "s|__VM_DISPLAY__|$_wss_display|g"
       -e "s|__VM_TYPE__|$_wss_type|g"
       -e "s|__HOST_KIND__|$_wss_host_kind|g"
@@ -620,7 +620,7 @@ vm_write_start_script() {
     sed "${_wss_posix_sed[@]}" "$TEMPLATES_DIR/start-posix.sh" >"$_wss_path_sh"
   else
     warn "start-posix.sh template not found at $TEMPLATES_DIR/start-posix.sh"
-    printf '#!/bin/sh\nset -eu\necho "VM start script for %s"\n' "$_wss_name" >"$_wss_path_sh"
+    printf '#!/bin/sh\nset -eu\necho "VM start script for %s"\n' "$_wss_id" >"$_wss_path_sh"
   fi
   chmod 755 "$_wss_path_sh"
 
@@ -631,7 +631,7 @@ vm_write_start_script() {
       if [ -f "$TEMPLATES_DIR/start-host.ps1" ]; then
         _wss_ps1_sed=(
           -e "s|__HOST_KIND__|$_wss_host_kind|g"
-          -e "s|__VM_NAME__|$_wss_name|g"
+          -e "s|__VM_NAME__|$_wss_id|g"
           -e "s|__VM_DISPLAY__|$_wss_display|g"
           -e "s|__VM_DIR__|$VM_DIR|g"
         )
@@ -643,7 +643,7 @@ vm_write_start_script() {
         sed "${_wss_ps1_sed[@]}" "$TEMPLATES_DIR/start-host.ps1" >"$_wss_path_ps1"
       else
         warn "start-host.ps1 template not found at $TEMPLATES_DIR/start-host.ps1"
-        printf '# start script for %s\n' "$_wss_name" >"$_wss_path_ps1"
+        printf '# start script for %s\n' "$_wss_id" >"$_wss_path_ps1"
       fi
       ;;
     windows-qemu)
@@ -684,7 +684,7 @@ vm_write_start_script() {
         # so rendered start scripts stay relocatable across hosts and users
         # (the templates cd/Push-Location to the tree root before invoking
         # QEMU).  Mirrors Invoke-VMSetup.ps1 and the descriptor disks array.
-        _wss_disk_path="data/${_wss_name}.qcow2"
+        _wss_disk_path="data/${_wss_id}.qcow2"
         _wss_qemu_arch="x86_64"
         if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
           _wss_qemu_arch="aarch64"
@@ -697,7 +697,7 @@ vm_write_start_script() {
         fi
         if [ -f "$TEMPLATES_DIR/start-windows.ps1" ]; then
           sed -e "s|__QEMU_SYSTEM__|$_wss_qemu_system|g" \
-              -e "s|__VM_NAME__|$_wss_name|g" \
+              -e "s|__VM_NAME__|$_wss_id|g" \
               -e "s|__VM_DISPLAY__|$_wss_display|g" \
               -e "s|__MACHINE__|$_wss_machine|g" \
               -e "s|__CPU__|host|g" \
@@ -711,11 +711,11 @@ vm_write_start_script() {
               "$TEMPLATES_DIR/start-windows.ps1" >"$_wss_path_ps1"
         else
           warn "start-windows.ps1 template not found at $TEMPLATES_DIR/start-windows.ps1"
-          printf '# start script for %s\n' "$_wss_name" >"$_wss_path_ps1"
+          printf '# start script for %s\n' "$_wss_id" >"$_wss_path_ps1"
         fi
         if [ -f "$TEMPLATES_DIR/start-windows-host.sh" ]; then
           sed -e "s|__QEMU_SYSTEM__|$_wss_qemu_system|g" \
-              -e "s|__VM_NAME__|$_wss_name|g" \
+              -e "s|__VM_NAME__|$_wss_id|g" \
               -e "s|__VM_DISPLAY__|$_wss_display|g" \
               -e "s|__MACHINE__|$_wss_machine|g" \
               -e "s|__CPU__|host|g" \
@@ -751,11 +751,11 @@ vm_write_start_script() {
 vm_write_stop_script() {
   _wst_doc="$1"
   _wst_host_kind="$2"
-  _wst_name="$(printf '%s' "$_wst_doc" | jq -r '.id')"
+  _wst_id="$(printf '%s' "$_wst_doc" | jq -r '.id')"
   _wst_display="$(printf '%s' "$_wst_doc" | jq -r '.name')"
   mkdir -p "$VM_DIR/scripts"
-  _wst_path_sh="$VM_DIR/scripts/stop-${_wst_name}.sh"
-  _wst_path_ps1="$VM_DIR/scripts/stop-${_wst_name}.ps1"
+  _wst_path_sh="$VM_DIR/scripts/stop-${_wst_id}.sh"
+  _wst_path_ps1="$VM_DIR/scripts/stop-${_wst_id}.ps1"
 
   if [ "$dry_run" = true ]; then
     dry_run "write stop helper scripts: $_wst_path_sh, $_wst_path_ps1"
@@ -768,12 +768,12 @@ vm_write_stop_script() {
     darwin-tart|darwin-utm|nixos-libvirt)
       if [ -f "$TEMPLATES_DIR/stop-posix.sh" ]; then
         sed -e "s|__HOST_KIND__|$_wst_host_kind|g" \
-            -e "s|__VM_NAME__|$_wst_name|g" \
+            -e "s|__VM_NAME__|$_wst_id|g" \
             -e "s|__VM_DISPLAY__|$_wst_display|g" \
             "$TEMPLATES_DIR/stop-posix.sh" >"$_wst_path_sh"
       else
         warn "stop-posix.sh template not found at $TEMPLATES_DIR/stop-posix.sh"
-        printf '#!/bin/sh\nset -eu\necho "stop script for %s"\n' "$_wst_name" >"$_wst_path_sh"
+        printf '#!/bin/sh\nset -eu\necho "stop script for %s"\n' "$_wst_id" >"$_wst_path_sh"
       fi
       ;;
     windows-qemu)
@@ -799,11 +799,11 @@ vm_write_stop_script() {
     darwin-tart|darwin-utm|nixos-libvirt|windows-qemu)
       if [ -f "$TEMPLATES_DIR/stop-host.ps1" ]; then
         sed -e "s|__HOST_KIND__|$_wst_host_kind|g" \
-            -e "s|__VM_NAME__|$_wst_name|g" \
+            -e "s|__VM_NAME__|$_wst_id|g" \
             "$TEMPLATES_DIR/stop-host.ps1" >"$_wst_path_ps1"
       else
         warn "stop-host.ps1 template not found at $TEMPLATES_DIR/stop-host.ps1"
-        printf '# stop script for %s\n' "$_wst_name" >"$_wst_path_ps1"
+        printf '# stop script for %s\n' "$_wst_id" >"$_wst_path_ps1"
       fi
       ;;
     *)
@@ -905,50 +905,50 @@ EOF
 # vm_for_each CALLBACK [ARGS...]
 #   Iterates VMs in MANIFEST, skipping disabled or host-mismatched entries.
 #   For each enabled VM, calls CALLBACK with positional args:
-#     vm_name vm_type vm_hosts vm_index [ARGS...]
+#     vm_id vm_type vm_hosts vm_index [ARGS...]
 vm_for_each() {
   local _callback="$1"
   shift
-  local _count _i _vm_name _vm_type _vm_enabled _vm_hosts
+  local _count _i _vm_id _vm_type _vm_enabled _vm_hosts
   _count="$(jq '.VMs | length' "$MANIFEST")"
   _i=0
   while [ "$_i" -lt "$_count" ]; do
-    _vm_name="$(jq -r ".VMs[$_i].id" "$MANIFEST")"
+    _vm_id="$(jq -r ".VMs[$_i].id" "$MANIFEST")"
     _vm_type="$(jq -r ".VMs[$_i].type" "$MANIFEST")"
     _vm_enabled="$(jq -r ".VMs[$_i].enabled" "$MANIFEST")"
 
     case "$_vm_enabled" in
       true|false) ;;
       *)
-        warn "VM '$_vm_name' has invalid enabled value '$_vm_enabled'; expected boolean true/false in manifest"
+        warn "VM '$_vm_id' has invalid enabled value '$_vm_enabled'; expected boolean true/false in manifest"
         _i=$((_i + 1))
         continue
         ;;
     esac
 
     if [ "$_vm_enabled" != "true" ]; then
-      say "VM '$_vm_name' is disabled in manifest; skipping"
+      say "VM '$_vm_id' is disabled in manifest; skipping"
       _i=$((_i + 1))
       continue
     fi
 
     _vm_hosts="$(jq -c ".VMs[$_i].hosts" "$MANIFEST")"
     if ! should_include_host "$_vm_hosts"; then
-      say "VM '$_vm_name' is not available on host '$NUCLEUS_HOST' (hosts: $_vm_hosts); skipping"
+      say "VM '$_vm_id' is not available on host '$NUCLEUS_HOST' (hosts: $_vm_hosts); skipping"
       _i=$((_i + 1))
       continue
     fi
 
-    "$_callback" "$_vm_name" "$_vm_type" "$_vm_hosts" "$_i" "$@"
+    "$_callback" "$_vm_id" "$_vm_type" "$_vm_hosts" "$_i" "$@"
     _i=$((_i + 1))
   done
 }
 
-# vm_get_expected_vm_names
+# vm_get_expected_vm_ids
 #   Prints a newline-separated list of VM names from the manifest that are
 #   enabled and match the current host.  Reuses the same filter logic as
 #   vm_for_each but without the callback dispatch.
-vm_get_expected_vm_names() {
+vm_get_expected_vm_ids() {
   if [ -z "$NUCLEUS_HOST" ]; then
     return 0
   fi
@@ -960,25 +960,25 @@ vm_get_expected_vm_names() {
   ' "$MANIFEST"
 }
 
-# vm_get_manifest_vm_names
+# vm_get_manifest_vm_ids
 #   Prints a newline-separated list of ALL VM names present in the manifest,
 #   regardless of enabled state or host match.  Used by default GC so only
 #   entries absent from VMs.json entirely are cleared; disabled entries are
 #   preserved unless --gc-disabled is passed.
-vm_get_manifest_vm_names() {
+vm_get_manifest_vm_ids() {
   jq -r '.VMs[] | .id' "$MANIFEST"
 }
 
-# vm_descriptor_path NAME
+# vm_descriptor_path VM_ID
 #   Prints the path of the self-describing descriptor for a VM:
-#   <VM_DIR>/<NAME>.vm.json.
+#   <VM_DIR>/<VM_ID>.vm.json.
 vm_descriptor_path() {
   printf '%s/%s.vm.json\n' "$VM_DIR" "$1"
 }
 
-# vm_vm_json NAME
+# vm_vm_json VM_ID
 #   Prints the JSON document used to render a VM's artifacts: the
-#   self-describing descriptor (<VM_DIR>/<NAME>.vm.json) when present, else
+#   self-describing descriptor (<VM_DIR>/<VM_ID>.vm.json) when present, else
 #   the manifest entry.  Descriptor-first so unpack (and setup on a
 #   descriptor-carrying tree) renders from the packed/authoritative source;
 #   the manifest fallback keeps a fresh tree working before descriptors are
@@ -1240,18 +1240,18 @@ resize_and_mark_image() {
 #   destroy data beyond the new end) and refuses while the VM is running.
 #   Prints the old and new virtual sizes.
 vm_resize_vm() {
-  local _rvm_name="$1" _rvm_size_bytes="$2" _rvm_allow_shrink="$3"
+  local _rvm_id="$1" _rvm_size_bytes="$2" _rvm_allow_shrink="$3"
   local _rvm_type _rvm_disk _rvm_old_size _rvm_running _rvm_qemu_args
 
-  _rvm_type="$(jq -r --arg name "$_rvm_name" '.VMs[] | select(.id == $name) | .type // empty' "$MANIFEST")"
+  _rvm_type="$(jq -r --arg name "$_rvm_id" '.VMs[] | select(.id == $name) | .type // empty' "$MANIFEST")"
   if [ -z "$_rvm_type" ]; then
-    error "VM '$_rvm_name' not found in manifest"
+    error "VM '$_rvm_id' not found in manifest"
     return 1
   fi
 
-  _rvm_disk="$VM_DIR/data/${_rvm_name}.qcow2"
+  _rvm_disk="$VM_DIR/data/${_rvm_id}.qcow2"
   if [ ! -f "$_rvm_disk" ]; then
-    error "writable disk not found for '$_rvm_name': $_rvm_disk (run 'nucleus-vm setup' first)"
+    error "writable disk not found for '$_rvm_id': $_rvm_disk (run 'nucleus-vm setup' first)"
     return 1
   fi
 
@@ -1263,8 +1263,8 @@ vm_resize_vm() {
   fi
 
   _rvm_running="$(vm_get_running_names)"
-  if printf '%s\n' "$_rvm_running" | grep -qxF "$_rvm_name"; then
-    error "VM '$_rvm_name' is running; stop it before resizing"
+  if printf '%s\n' "$_rvm_running" | grep -qxF "$_rvm_id"; then
+    error "VM '$_rvm_id' is running; stop it before resizing"
     return 1
   fi
 
@@ -1277,7 +1277,7 @@ vm_resize_vm() {
     return 1
   fi
 
-  say "resized '$_rvm_name' disk: $_rvm_old_size -> $_rvm_size_bytes bytes"
+  say "resized '$_rvm_id' disk: $_rvm_old_size -> $_rvm_size_bytes bytes"
 }
 
 # base/overlay provisioning helper
@@ -1950,7 +1950,7 @@ vm_android_adb_wait_recovery() {
 # android (qemu/lineageos) image build
 
 vm_build_android() {
-  _bai_vm_name="$1"
+  _bai_vm_id="$1"
   _bai_vm_index="$2"
   _bai_accept_gsi_license="$3"
   _bai_upgrade_android="$4"
@@ -1965,7 +1965,7 @@ vm_build_android() {
   # userdataImage / gsiImage) so VMs.json is the single source of truth.
   _bai_system_img="$(vm_src_path Android "$(jq -r ".VMs[$_bai_vm_index].Android.systemImage" "$MANIFEST")")"
   # The canonical userdata disk is data/<id>.qcow2 (per-guest writable overlay).
-  _bai_userdata_img="$VM_DIR/data/${_bai_vm_name}.qcow2"
+  _bai_userdata_img="$VM_DIR/data/${_bai_vm_id}.qcow2"
   _bai_gsi_img="$(vm_src_path Android "$(jq -r ".VMs[$_bai_vm_index].Android.gsiImage" "$MANIFEST")")"
   # Set when this run replaces a canonical disk (system image re-download or
   # userdata reset), so the end-of-build bundle refresh knows to re-link.
@@ -1975,17 +1975,17 @@ vm_build_android() {
   # shareDevDir is unsupported on Android (no host filesystem sharing via QEMU).
   _bai_share_dev_dir="$(jq -r ".VMs[$_bai_vm_index].shareDevDir // false" "$MANIFEST")"
   if [ "$_bai_share_dev_dir" = "true" ]; then
-    error "shareDevDir is not supported for Android VM '$_bai_vm_name'; Android does not support host filesystem sharing via QEMU"
+    error "shareDevDir is not supported for Android VM '$_bai_vm_id'; Android does not support host filesystem sharing via QEMU"
     exit 1
   fi
 
   # Step 1: Download and extract LineageOS base system image
   if [ ! -f "$_bai_system_img" ] || [ "$_bai_upgrade_android" = "true" ]; then
     if [ "$_bai_upgrade_android" = "true" ] && [ -f "$_bai_system_img" ]; then
-      say "upgrading Android system image for '$_bai_vm_name' (re-downloading)..."
+      say "upgrading Android system image for '$_bai_vm_id' (re-downloading)..."
       rm -f "$_bai_system_img"
     else
-      say "downloading LineageOS base image for '$_bai_vm_name'..."
+      say "downloading LineageOS base image for '$_bai_vm_id'..."
     fi
     _bai_suffix="$(vm_android_recovery_asset_suffix "$_bai_vm_index")"
     _bai_tag="$(vm_android_jqssun_release_tag_for_asset "boot_${_bai_suffix}.img")" \
@@ -2013,28 +2013,28 @@ vm_build_android() {
     run_cmd cp "$_bai_qcow2" "$_bai_system_img"
     _bai_system_replaced=true
     rm -rf "$_bai_extract_dir" "$_bai_lineage_zip"
-    validate_qcow2_image "$_bai_system_img" "Android system image for $_bai_vm_name" "$(parse_size "$(jq -r ".VMs[$_bai_vm_index].minImageSize" "$MANIFEST")")" || return 1
+    validate_qcow2_image "$_bai_system_img" "Android system image for $_bai_vm_id" "$(parse_size "$(jq -r ".VMs[$_bai_vm_index].minImageSize" "$MANIFEST")")" || return 1
     say "system image ready: $_bai_system_img"
   else
     say "system image already exists: $_bai_system_img"
   fi
 
   # Step 2: Create userdata disk (skip if exists, unless reset requested)
-  _bai_bundle_userdata="$VM_DIR/${_bai_vm_name}.utm/Data/$(jq -r ".VMs[$_bai_vm_index].Android.userdataImage" "$MANIFEST")"
+  _bai_bundle_userdata="$VM_DIR/${_bai_vm_id}.utm/Data/$(jq -r ".VMs[$_bai_vm_index].Android.userdataImage" "$MANIFEST")"
   mkdir -p "$VM_DIR/data"
   if [ ! -f "$_bai_userdata_img" ] || [ "$_bai_reset_userdata" = "true" ]; then
     if [ "$_bai_reset_userdata" = "true" ] && [ -f "$_bai_userdata_img" ]; then
       say "resetting Android userdata disk..."
       rm -f "$_bai_userdata_img"
     elif [ ! -f "$_bai_userdata_img" ] && [ -f "$_bai_bundle_userdata" ]; then
-      error "Android userdata for '$_bai_vm_name' exists only in the UTM bundle ($_bai_bundle_userdata); move it manually to $_bai_userdata_img and re-run"
+      error "Android userdata for '$_bai_vm_id' exists only in the UTM bundle ($_bai_bundle_userdata); move it manually to $_bai_userdata_img and re-run"
       return 1
     fi
     if [ ! -f "$_bai_userdata_img" ]; then
       say "creating userdata disk (${_bai_disk_bytes} bytes)..."
       run_cmd qemu-img create -f qcow2 "$_bai_userdata_img" "$_bai_disk_bytes"
       _bai_userdata_replaced=true
-      validate_qcow2_image "$_bai_userdata_img" "Android userdata disk for $_bai_vm_name" "$(parse_size "$(jq -r ".VMs[$_bai_vm_index].minImageSize" "$MANIFEST")")" || return 1
+      validate_qcow2_image "$_bai_userdata_img" "Android userdata disk for $_bai_vm_id" "$(parse_size "$(jq -r ".VMs[$_bai_vm_index].minImageSize" "$MANIFEST")")" || return 1
       say "userdata disk ready: $_bai_userdata_img"
     fi
   else
@@ -2044,7 +2044,7 @@ vm_build_android() {
   # Step 3: GSI system image (optional, when the Android group's gsiUrl is set)
   if [ -n "$_bai_gsi_url" ] && [ "$_bai_gsi_url" != "null" ]; then
     if [ "$_bai_accept_gsi_license" != "true" ]; then
-      error "GSI license not accepted for '$_bai_vm_name'; see https://developer.android.com/license"
+      error "GSI license not accepted for '$_bai_vm_id'; see https://developer.android.com/license"
       exit 1
     fi
     say "GSI license: https://developer.android.com/license"
@@ -2078,10 +2078,10 @@ vm_build_android() {
   # provisioning pass, which would otherwise refresh these links.
   if [ "$dry_run" = false ]; then
     if [ "$_bai_system_replaced" = true ] || [ "$_bai_userdata_replaced" = true ]; then
-      _bai_bundle_dir="$VM_DIR/${_bai_vm_name}.utm/Data"
+      _bai_bundle_dir="$VM_DIR/${_bai_vm_id}.utm/Data"
       if [ -d "$_bai_bundle_dir" ]; then
         if [ "$_bai_userdata_replaced" = true ]; then
-          vm_link_android_userdata_to_utm_bundle "$_bai_vm_name" "$_bai_vm_index" "$_bai_bundle_dir" \
+          vm_link_android_userdata_to_utm_bundle "$_bai_vm_id" "$_bai_vm_index" "$_bai_bundle_dir" \
             || return 1
         fi
         if [ "$_bai_system_replaced" = true ]; then
@@ -2095,20 +2095,20 @@ vm_build_android() {
     fi
   fi
 
-  say "Android image build complete for '$_bai_vm_name'"
+  say "Android image build complete for '$_bai_vm_id'"
 }
 
 # Image build callback for vm_for_each
 
 vm_build_one_image() {
-  local _vm_name="$1" _vm_type="$2" _vm_hosts="$3" _vm_index="$4"
+  local _vm_id="$1" _vm_type="$2" _vm_hosts="$3" _vm_index="$4"
   local _vm_disk_bytes _vm_ram_bytes
   _vm_disk_bytes="$(parse_size "$(jq -r ".VMs[$_vm_index].diskSize" "$MANIFEST")")"
 
   # Per-VM guest hostname: guest builds (nixos-generators, packer) read it via
   # NUCLEUS_VM_GUEST_HOSTNAME so each VM's declared hostname reaches the guest.
   local _vm_guest_hostname
-  _vm_guest_hostname="$(jq -r --arg n "$_vm_name" '.VMs[] | select(.id == $n) | .hostname // empty' "$MANIFEST")"
+  _vm_guest_hostname="$(jq -r --arg n "$_vm_id" '.VMs[] | select(.id == $n) | .hostname // empty' "$MANIFEST")"
   export NUCLEUS_VM_GUEST_HOSTNAME="$_vm_guest_hostname"
 
   case "$_vm_type" in
@@ -2116,31 +2116,31 @@ vm_build_one_image() {
       # check-suppress:suppression_doc: best-effort -- a prerequisite-missing or build failure for one
       # VM type must not abort builds for the remaining VMs; the build
       # function prints a specific error before returning non-zero.
-      vm_build_nixos "$_vm_name" "$_vm_disk_bytes" \
-        || say "NixOS image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
+      vm_build_nixos "$_vm_id" "$_vm_disk_bytes" \
+        || say "NixOS image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
       ;;
     Windows)
       _vm_edition="$(jq -r ".VMs[$_vm_index].Windows.edition" "$MANIFEST")"
       # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
-      vm_build_windows "$_vm_name" "$_vm_disk_bytes" "$_vm_edition" \
-        || say "Windows image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
+      vm_build_windows "$_vm_id" "$_vm_disk_bytes" "$_vm_edition" \
+        || say "Windows image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
       ;;
     macOS)
       _vm_macos_ver="$(jq -r ".VMs[$_vm_index].macOS.version" "$MANIFEST")"
       _vm_ram_bytes="$(parse_size "$(jq -r ".VMs[$_vm_index].ram" "$MANIFEST")")"
       _vm_cpus="$(jq -r ".VMs[$_vm_index].cpus" "$MANIFEST")"
       # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
-      vm_build_macos "$_vm_name" "$_vm_disk_bytes" "$_vm_ram_bytes" "$_vm_cpus" "$_vm_macos_ver" \
-        || say "macOS image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
+      vm_build_macos "$_vm_id" "$_vm_disk_bytes" "$_vm_ram_bytes" "$_vm_cpus" "$_vm_macos_ver" \
+        || say "macOS image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
       ;;
     Android)
       # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
-      vm_build_android "$_vm_name" "$_vm_index" \
+      vm_build_android "$_vm_id" "$_vm_index" \
         "$accept_gsi_license" "$upgrade_android" "$reset_userdata" \
-        || say "Android image build skipped for '$_vm_name' (prerequisite missing or build failed; see above)"
+        || say "Android image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
       ;;
     *)
-      say "skipping build for '$_vm_name' (unsupported type: $_vm_type)"
+      say "skipping build for '$_vm_id' (unsupported type: $_vm_type)"
       ;;
   esac
 }
@@ -2250,7 +2250,7 @@ vm_apply_utm_plist_and_register() {
 # vm_sync_utm — Config-only UTM refresh: plist copy + registration when the
 #   bundle already exists.  Skips disk/image work (use vm_setup_utm for that).
 vm_sync_utm() {
-  local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
+  local vm_id="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display bundle config_plist template_drift_config
 
   if [ "$vm_type" = "macOS" ]; then
@@ -2258,7 +2258,7 @@ vm_sync_utm() {
   fi
 
   vm_display=$(jq -r ".VMs[$vm_index].name" "$MANIFEST")
-  bundle="$VM_DIR/${vm_name}.utm"
+  bundle="$VM_DIR/${vm_id}.utm"
   config_plist="$bundle/config.plist"
   template_drift_config=false
 
@@ -2268,20 +2268,20 @@ vm_sync_utm() {
   fi
 
   say "syncing UTM VM '$vm_display'..."
-  if [ -f "$config_plist" ] && vm_validate_utm_plist_template "$vm_name" \
+  if [ -f "$config_plist" ] && vm_validate_utm_plist_template "$vm_id" \
     && ! cmp -s "$_vupt_template" "$config_plist"; then
     template_drift_config=true
-    say "detected config drift in existing bundle; VM will be re-registered to refresh runtime state: $vm_name"
+    say "detected config drift in existing bundle; VM will be re-registered to refresh runtime state: $vm_id"
   elif [ ! -f "$config_plist" ]; then
-    vm_validate_utm_plist_template "$vm_name" || return
+    vm_validate_utm_plist_template "$vm_id" || return
   fi
 
   if [ "$vm_type" = "Android" ]; then
-    vm_link_android_userdata_to_utm_bundle "$vm_name" "$vm_index" "$bundle/Data" \
+    vm_link_android_userdata_to_utm_bundle "$vm_id" "$vm_index" "$bundle/Data" \
       || return 1
   fi
 
-  vm_apply_utm_plist_and_register "$vm_name" "$bundle" "$template_drift_config"
+  vm_apply_utm_plist_and_register "$vm_id" "$bundle" "$template_drift_config"
 }
 
 vm_sync_utm_vms() {
@@ -2297,10 +2297,10 @@ vm_sync_utm_vms() {
 # vm_sync_libvirt — Config-only libvirt refresh: virsh define from the
 #   Nix-installed domain XML.  Skips disk/overlay provisioning.
 vm_sync_libvirt() {
-  local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
+  local vm_id="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local _xml_file
 
-  _xml_file="/etc/nucleus/vms/${vm_name}-domain.xml"
+  _xml_file="/etc/nucleus/vms/${vm_id}-domain.xml"
   if [ ! -f "$_xml_file" ]; then
     warn "domain XML not found at $_xml_file; apply the NixOS config first"
     return
@@ -2308,9 +2308,9 @@ vm_sync_libvirt() {
 
   if [ "$dry_run" = false ]; then
     if virsh define "$_xml_file"; then
-      say "VM '$vm_name' defined/updated in libvirt"
+      say "VM '$vm_id' defined/updated in libvirt"
     else
-      warn "virsh define failed for '$vm_name'; check libvirtd status"
+      warn "virsh define failed for '$vm_id'; check libvirtd status"
     fi
   else
     dry_run "virsh define $_xml_file"
@@ -2383,29 +2383,29 @@ vm_sync_config_phase() {
 # Tart VM setup callback for vm_for_each
 
 vm_setup_tart() {
-  local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
+  local vm_id="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
 
   if [ "$vm_type" != "macOS" ]; then
     return
   fi
 
   # Verify the tart VM was created in phase 1.
-  if ! vm_get_tart_registered_names | grep -qxF "$vm_name"; then
-    warn "tart VM '$vm_name' not found; Packer build may have failed or was skipped"
+  if ! vm_get_tart_registered_names | grep -qxF "$vm_id"; then
+    warn "tart VM '$vm_id' not found; Packer build may have failed or was skipped"
     return
   fi
 
   if [ "$dry_run" = false ]; then
-    say "tart VM ready: $vm_name (start with: tart run $vm_name)"
+    say "tart VM ready: $vm_id (start with: tart run $vm_id)"
   else
-    dry_run "verify tart VM registration: $vm_name"
+    dry_run "verify tart VM registration: $vm_id"
   fi
 }
 
 # UTM VM setup callback for vm_for_each
 
 vm_setup_utm() {
-  local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
+  local vm_id="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display bundle data_dir disk_file
   local disk_credential_marker disk_config_marker config_plist bundle_exists template_drift_config
   local template_drift_config _prebuilt _prebuilt_valid _prebuilt_min_size _prebuilt_disk_bytes
@@ -2416,15 +2416,15 @@ vm_setup_utm() {
 
   # macOS guests are provisioned via tart (vm_setup_tart_vms), not UTM.
   if [ "$vm_type" = "macOS" ]; then
-    say "macOS guest '$vm_name' stays on Tart runtime; skipping UTM bundle provisioning for this VM"
+    say "macOS guest '$vm_id' stays on Tart runtime; skipping UTM bundle provisioning for this VM"
     return
   fi
 
-  bundle="$VM_DIR/${vm_name}.utm"
+  bundle="$VM_DIR/${vm_id}.utm"
   data_dir="$bundle/Data"
   disk_file="$data_dir/disk-main.qcow2"
-  disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_name" "$disk_file")"
-  disk_config_marker="$(vm_guest_config_marker_path "$vm_name" "$disk_file")"
+  disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_id" "$disk_file")"
+  disk_config_marker="$(vm_guest_config_marker_path "$vm_id" "$disk_file")"
   # WHY: only NixOS guests have a Nix-managed guest config to fingerprint;
   # Windows/macOS are built by Packer with separate templates.
   _guest_config_fingerprint=''
@@ -2442,7 +2442,7 @@ vm_setup_utm() {
     say "UTM bundle already exists: $bundle; refreshing config.plist"
   fi
 
-  if ! vm_validate_utm_plist_template "$vm_name"; then
+  if ! vm_validate_utm_plist_template "$vm_id"; then
     return
   fi
   # Detect config drift in already-registered bundles. UTM can keep runtime
@@ -2450,17 +2450,17 @@ vm_setup_utm() {
   # bundle config no longer matches the managed template.
   if [ "$bundle_exists" = true ] && [ -f "$config_plist" ] && ! cmp -s "$_vupt_template" "$config_plist"; then
     template_drift_config=true
-    say "detected config drift in existing bundle; VM will be re-registered to refresh runtime state: $vm_name"
+    say "detected config drift in existing bundle; VM will be re-registered to refresh runtime state: $vm_id"
   fi
   # Android uses the shared android-* images (system + userdata, optional GSI)
   # rather than a single <Name>.qcow2 pre-built image; other guests keep the
-  # ${vm_name}.qcow2 convention.  Image filenames come from the manifest
+  # ${vm_id}.qcow2 convention.  Image filenames come from the manifest
   # Android group (systemImage / userdataImage / gsiImage).
   if [ "$vm_type" = "Android" ]; then
     _android_system="$(vm_src_path Android "$(jq -r ".VMs[$vm_index].Android.systemImage" "$MANIFEST")")"
     # The canonical userdata disk is data/<id>.qcow2 (per-guest writable
     # overlay); the bundle exposes it via a hard link (G1a write-through).
-    _android_userdata="$VM_DIR/data/${vm_name}.qcow2"
+    _android_userdata="$VM_DIR/data/${vm_id}.qcow2"
     _android_gsi="$(vm_src_path Android "$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")")"
   fi
 
@@ -2475,7 +2475,7 @@ vm_setup_utm() {
   if [ ! -f "$disk_file" ] && [ ! -f "$_prebuilt" ]; then
     _build_tmp="$(vm_src_path "$vm_type" "$VM_PACKER_BUILD_DIR")"
     if [ -d "$_build_tmp" ]; then
-      warn "image not ready for '$vm_name'; build appears in progress at $_build_tmp"
+      warn "image not ready for '$vm_id'; build appears in progress at $_build_tmp"
     else
       warn "image not found: $_prebuilt; build failed or type not supported"
     fi
@@ -2485,10 +2485,10 @@ vm_setup_utm() {
   _prebuilt_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
   _prebuilt_disk_bytes="$(parse_size "$(jq -r ".VMs[$vm_index].diskSize" "$MANIFEST")")"
   if [ -f "$_prebuilt" ]; then
-    if validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}" "$_prebuilt_min_size"; then
+    if validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_id}" "$_prebuilt_min_size"; then
       _prebuilt_valid=true
     else
-      warn "pre-built image is invalid for '$vm_name': $_prebuilt"
+      warn "pre-built image is invalid for '$vm_id': $_prebuilt"
       return
     fi
   fi
@@ -2503,24 +2503,24 @@ vm_setup_utm() {
         return
       fi
       _replace_runtime=false
-      if [ -f "$disk_file" ] && ! validate_qcow2_image "$disk_file" "existing UTM runtime disk for ${vm_name}" "$_prebuilt_min_size"; then
-        warn "existing Android runtime disk is invalid for '$vm_name'; replacing from pre-built image"
+      if [ -f "$disk_file" ] && ! validate_qcow2_image "$disk_file" "existing UTM runtime disk for ${vm_id}" "$_prebuilt_min_size"; then
+        warn "existing Android runtime disk is invalid for '$vm_id'; replacing from pre-built image"
         rm -f "$disk_file"
         _replace_runtime=true
       fi
       if [ ! -f "$disk_file" ]; then
         if [ "$_prebuilt_valid" != true ]; then
-          warn "cannot create the $vm_name Android runtime disk because no valid system image is available: $_android_system"
+          warn "cannot create the $vm_id Android runtime disk because no valid system image is available: $_android_system"
           return
         fi
         cp "$_android_system" "$disk_file"
         say "copied Android system image: $disk_file"
       elif [ "$_replace_runtime" = true ]; then
-        warn "replacement was requested for '$vm_name' but the Android runtime disk still exists; leaving it untouched"
+        warn "replacement was requested for '$vm_id' but the Android runtime disk still exists; leaving it untouched"
       else
         say "preserving existing Android system disk: $disk_file"
       fi
-      if ! vm_link_android_userdata_to_utm_bundle "$vm_name" "$vm_index" "$data_dir"; then
+      if ! vm_link_android_userdata_to_utm_bundle "$vm_id" "$vm_index" "$data_dir"; then
         return 1
       fi
       _gsi_url="$(jq -r ".VMs[$vm_index].Android.gsiUrl" "$MANIFEST")"
@@ -2547,11 +2547,11 @@ vm_setup_utm() {
       # path — non-Android backing resolution through the bundle link is
       # assumed working only (user-confirmed 2026-08-04; live-verified only
       # for Android userdata, which has no backing chain).
-      if ! vm_ensure_base_and_overlay "$vm_name" "$_prebuilt" "$_prebuilt_min_size" \
+      if ! vm_ensure_base_and_overlay "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
           "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
         return
       fi
-      ln -f "$VM_DIR/data/${vm_name}.qcow2" "$disk_file"
+      ln -f "$VM_DIR/data/${vm_id}.qcow2" "$disk_file"
       say "linked runtime overlay into UTM bundle: $disk_file"
       _base_link="$data_dir/$(basename "$(vm_src_path "$vm_type" "$VM_OVERLAY_BACKING")")"
       ln -f "$(vm_src_path "$vm_type" "$VM_OVERLAY_BACKING")" "$_base_link"
@@ -2560,17 +2560,17 @@ vm_setup_utm() {
     if [ "$bundle_exists" != true ]; then
       say "UTM bundle created: $bundle"
     fi
-    vm_apply_utm_plist_and_register "$vm_name" "$bundle" "$template_drift_config"
+    vm_apply_utm_plist_and_register "$vm_id" "$bundle" "$template_drift_config"
   else
     dry_run "provision UTM bundle disks for $bundle"
-    vm_apply_utm_plist_and_register "$vm_name" "$bundle" "$template_drift_config"
+    vm_apply_utm_plist_and_register "$vm_id" "$bundle" "$template_drift_config"
   fi
 }
 
 # Libvirt VM setup callback for vm_for_each
 
 vm_setup_libvirt() {
-  local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
+  local vm_id="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display disk_path disk_credential_marker disk_config_marker _prebuilt
   local _prebuilt_min_size _prebuilt_disk_bytes
   local _android_system _android_userdata _android_gsi
@@ -2578,9 +2578,9 @@ vm_setup_libvirt() {
 
   vm_display=$(jq -r ".VMs[$vm_index].name" "$MANIFEST")
 
-  disk_path="$VM_DIR/data/${vm_name}.qcow2"
-  disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_name" "$disk_path")"
-  disk_config_marker="$(vm_guest_config_marker_path "$vm_name" "$disk_path")"
+  disk_path="$VM_DIR/data/${vm_id}.qcow2"
+  disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_id" "$disk_path")"
+  disk_config_marker="$(vm_guest_config_marker_path "$vm_id" "$disk_path")"
   # WHY: only NixOS guests have a Nix-managed guest config to fingerprint.
   _guest_config_fingerprint=''
   if [ "$vm_type" = "NixOS" ]; then
@@ -2596,16 +2596,16 @@ vm_setup_libvirt() {
   # / gsiImage).
   if [ "$vm_type" = "Android" ]; then
     _android_system="$(vm_src_path Android "$(jq -r ".VMs[$vm_index].Android.systemImage" "$MANIFEST")")"
-    _android_userdata="$VM_DIR/data/${vm_name}.qcow2"
+    _android_userdata="$VM_DIR/data/${vm_id}.qcow2"
     _android_gsi="$(vm_src_path Android "$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")")"
     if [ ! -f "$_android_system" ] || [ ! -f "$_android_userdata" ]; then
-      warn "Android images not found: $_android_system and $_android_userdata; skipping '$vm_name'"
+      warn "Android images not found: $_android_system and $_android_userdata; skipping '$vm_id'"
       return
     fi
     _android_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
-    if ! validate_qcow2_image "$_android_system" "Android system image for ${vm_name}" "$_android_min_size" \
-      || ! validate_qcow2_image "$_android_userdata" "Android userdata disk for ${vm_name}" "$_android_min_size"; then
-      warn "Android images are invalid for '$vm_name'"
+    if ! validate_qcow2_image "$_android_system" "Android system image for ${vm_id}" "$_android_min_size" \
+      || ! validate_qcow2_image "$_android_userdata" "Android userdata disk for ${vm_id}" "$_android_min_size"; then
+      warn "Android images are invalid for '$vm_id'"
       return
     fi
   else
@@ -2613,11 +2613,11 @@ vm_setup_libvirt() {
     _prebuilt_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
     _prebuilt_disk_bytes="$(parse_size "$(jq -r ".VMs[$vm_index].diskSize" "$MANIFEST")")"
     if [ ! -f "$_prebuilt" ]; then
-      warn "image not found: $_prebuilt; skipping '$vm_name'"
+      warn "image not found: $_prebuilt; skipping '$vm_id'"
       return
     fi
-    if ! validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}" "$_prebuilt_min_size"; then
-      warn "pre-built image is invalid for '$vm_name': $_prebuilt"
+    if ! validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_id}" "$_prebuilt_min_size"; then
+      warn "pre-built image is invalid for '$vm_id': $_prebuilt"
       return
     fi
   fi
@@ -2632,7 +2632,7 @@ vm_setup_libvirt() {
       # Base/overlay provisioning: data/<id>.qcow2 is the canonical writable
       # overlay backing images/<type>.base.qcow2; the domain XML references
       # the data/ path (see vms.nix).
-      if ! vm_ensure_base_and_overlay "$vm_name" "$_prebuilt" "$_prebuilt_min_size" \
+      if ! vm_ensure_base_and_overlay "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
           "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
         return
       fi
@@ -2646,12 +2646,12 @@ vm_setup_libvirt() {
     fi
   fi
 
-  vm_sync_libvirt "$vm_name" "$vm_type" "$vm_hosts" "$vm_index"
+  vm_sync_libvirt "$vm_id" "$vm_type" "$vm_hosts" "$vm_index"
 }
 
 # Phase 1 — Build images (if absent)
 
-# vm_build_nixos NAME DISK_BYTES
+# vm_build_nixos VM_ID DISK_BYTES
 #   Builds the NixOS guest image via nixos-generators (pinned as a flake
 #   input in src/flake.nix).  On macOS this requires an aarch64-linux builder;
 #   enable nix.linux-builder.enable in the macOS host config so the Nix daemon
@@ -2660,7 +2660,7 @@ vm_setup_libvirt() {
 #   cache; hostname-specific ones (e.g. etc-hostname) are configuration-specific
 #   and cannot be cached.
 vm_build_nixos() {
-  _name="$1"
+  _vm_id="$1"
   _disk_bytes="$2"
 
   # Detect host architecture for nixos-generators format selection.
@@ -2676,12 +2676,12 @@ vm_build_nixos() {
       _nixos_format_path="$VMS_DIR/NixOS/formats/qcow-btrfs.nix"
       ;;
   esac
-  _vm_type="$(jq -r --arg n "$_name" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
+  _vm_type="$(jq -r --arg n "$_vm_id" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
   vm_ensure_type_src_dirs
   _out="$(vm_src_path "$_vm_type" "$VM_PREBUILT_IMAGE")"
-  _marker="$(vm_guest_credentials_marker_path "$_name")"
-  _config_marker="$(vm_guest_config_marker_path "$_name")"
-  _min_size="$(parse_size "$(jq -r ".VMs[] | select(.id == \"$_name\") | .minImageSize" "$MANIFEST")")"
+  _marker="$(vm_guest_credentials_marker_path "$_vm_id")"
+  _config_marker="$(vm_guest_config_marker_path "$_vm_id")"
+  _min_size="$(parse_size "$(jq -r ".VMs[] | select(.id == \"$_vm_id\") | .minImageSize" "$MANIFEST")")"
 
   # WHY: rebuild when the guest config (guest.nix + imports + flake.lock)
   # drifts too, not just on credential drift; otherwise config edits silently
@@ -3027,20 +3027,20 @@ download_windows_iso_fido_url_nonwindows() {
   return 0
 }
 
-# vm_build_windows NAME DISK_BYTES
+# vm_build_windows VM_ID DISK_BYTES
 #   Builds the Windows 11 guest image using Packer and the Autounattend.xml
 #   answer file at src/vms/Windows/Autounattend.xml.
 vm_build_windows() {
-  _name="$1"
+  _vm_id="$1"
   _disk_bytes="$2"
   _edition="$3"
-  _vm_type="$(jq -r --arg n "$_name" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
+  _vm_type="$(jq -r --arg n "$_vm_id" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
   vm_ensure_type_src_dirs
   _out="$(vm_src_path "$_vm_type" "$VM_PREBUILT_IMAGE")"
-  _marker="$(vm_guest_credentials_marker_path "$_name")"
-  _min_size="$(parse_size "$(jq -r ".VMs[] | select(.id == \"$_name\") | .minImageSize" "$MANIFEST")")"
-  _hostfwd="$(jq -r --arg n "$_name" '[.VMs[] | select(.id == $n) | .portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")' "$MANIFEST")"
-  _guest_hostname="$(jq -r --arg n "$_name" '.VMs[] | select(.id == $n) | .hostname // empty' "$MANIFEST")"
+  _marker="$(vm_guest_credentials_marker_path "$_vm_id")"
+  _min_size="$(parse_size "$(jq -r ".VMs[] | select(.id == \"$_vm_id\") | .minImageSize" "$MANIFEST")")"
+  _hostfwd="$(jq -r --arg n "$_vm_id" '[.VMs[] | select(.id == $n) | .portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")' "$MANIFEST")"
+  _guest_hostname="$(jq -r --arg n "$_vm_id" '.VMs[] | select(.id == $n) | .hostname // empty' "$MANIFEST")"
 
   if [ -f "$_out" ]; then
     if validate_qcow2_image "$_out" "existing Windows image" "$_min_size"; then
@@ -3072,7 +3072,7 @@ vm_build_windows() {
 
   # Resolve via Windows.isoUrl next when allowed by source mode.
   if [ -z "$_iso" ] && [ "$windows_iso_source" != "mido" ]; then
-    _iso_url="$(jq -r ".VMs[] | select(.id == \"$_name\") | .Windows.isoUrl // empty" "$MANIFEST")"
+    _iso_url="$(jq -r ".VMs[] | select(.id == \"$_vm_id\") | .Windows.isoUrl // empty" "$MANIFEST")"
     if [ -n "$_iso_url" ]; then
       _cached_iso="$(vm_src_path "$_vm_type" "$VM_WINDOWS_INSTALLER_ISO")"
       say "downloading Windows installer from Windows.isoUrl..."
@@ -3291,7 +3291,7 @@ EOF
     packer init .
   ) || _packer_init_status=$?
   if [ "$_packer_init_status" -ne 0 ]; then
-    error "Packer init for Windows VM '$_name' failed (exit $_packer_init_status)"
+    error "Packer init for Windows VM '$_vm_id' failed (exit $_packer_init_status)"
     return "$_packer_init_status"
   fi
 
@@ -3305,7 +3305,7 @@ EOF
     # WHY: Packer qemu builder requires a non-existent output_directory.
     # Use a fresh temp tree per attempt so a failed try cannot poison the next
     # firmware/boot-strategy combination.
-    _attempt_tmpdir="$(mktemp -d "$(vm_src_path "$_vm_type" ".${_name}.${_firmware_mode}.${_boot_strategy}.XXXXXX")")"
+    _attempt_tmpdir="$(mktemp -d "$(vm_src_path "$_vm_type" ".${_vm_id}.${_firmware_mode}.${_boot_strategy}.XXXXXX")")"
     _tmp_out="$_attempt_tmpdir/output"
     _packer_log="$_attempt_tmpdir/packer.log"
     _autounattend_rendered="$_attempt_tmpdir/Autounattend.xml"
@@ -3383,7 +3383,7 @@ $_build_attempts
 EOF
 
   if [ "$_packer_status" -ne 0 ]; then
-    error "Packer build for Windows VM '$_name' failed (exit $_packer_status)"
+    error "Packer build for Windows VM '$_vm_id' failed (exit $_packer_status)"
     return "$_packer_status"
   fi
   _built="$_built_tmpdir/output/windows.qcow2"
@@ -3406,7 +3406,7 @@ EOF
   say "Windows 11 image ready: $_out"
 }
 
-# vm_build_macos NAME DISK_BYTES RAM_BYTES CPUS MACOS_VERSION
+# vm_build_macos VM_ID DISK_BYTES RAM_BYTES CPUS MACOS_VERSION
 #   Builds the macOS guest VM using the Packer Tart plugin.  Requires tart
 #   and packer to be installed; only runs on Darwin hosts (Tart uses Apple
 #   Virtualization.framework which is not available on other platforms).
@@ -3414,12 +3414,12 @@ EOF
 #   the ~/.tart symlink created by ensure_tart_vm_dir).
 #   Source: https://github.com/cirruslabs/packer-plugin-tart
 vm_build_macos() {
-  _name="$1"
+  _vm_id="$1"
   _disk_bytes="$2"
   _ram_bytes="$3"
   _cpus="$4"
   _macos_version="$5"
-  _marker="$(vm_guest_credentials_marker_path "$_name")"
+  _marker="$(vm_guest_credentials_marker_path "$_vm_id")"
 
   # Tart requires Apple Virtualization.framework — macOS host only.
   if [ "$(uname -s)" != "Darwin" ]; then
@@ -3438,15 +3438,15 @@ vm_build_macos() {
   fi
 
   # Check if tart VM already exists.
-  if vm_get_tart_registered_names | grep -qxF "$_name"; then
+  if vm_get_tart_registered_names | grep -qxF "$_vm_id"; then
     if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker"; then
-      say "tart VM '$_name' already exists for the current guest credentials (owner=$vm_secret_owner, username=$vm_guest_username)"
+      say "tart VM '$_vm_id' already exists for the current guest credentials (owner=$vm_secret_owner, username=$vm_guest_username)"
       return 0
     fi
 
-    say "macOS guest credential drift detected; rebuilding tart VM '$_name'"
-    if ! tart delete "$_name"; then
-      error "failed to delete stale tart VM '$_name' before rebuild"
+    say "macOS guest credential drift detected; rebuilding tart VM '$_vm_id'"
+    if ! tart delete "$_vm_id"; then
+      error "failed to delete stale tart VM '$_vm_id' before rebuild"
       return 1
     fi
     rm -f "$_marker"
@@ -3463,7 +3463,7 @@ vm_build_macos() {
   say "building macOS $_macos_version VM via Packer Tart (disk=$_disk_gib GiB, mem=$_mem_gib GiB, cpus=$_cpus)..."
 
   if [ "$dry_run" = true ]; then
-    dry_run "cd $_packer_dir && packer build -var vm_name=$_name -var macos_version=$_macos_version -var guest_username=$vm_guest_username -var guest_password=<redacted> -var vm_hostname=$NUCLEUS_VM_GUEST_HOSTNAME -var disk_size_gib=$_disk_gib -var memory_gib=$_mem_gib -var cpus=$_cpus ."
+    dry_run "cd $_packer_dir && packer build -var vm_name=$_vm_id -var macos_version=$_macos_version -var guest_username=$vm_guest_username -var guest_password=<redacted> -var vm_hostname=$NUCLEUS_VM_GUEST_HOSTNAME -var disk_size_gib=$_disk_gib -var memory_gib=$_mem_gib -var cpus=$_cpus ."
     return 0
   fi
 
@@ -3472,7 +3472,7 @@ vm_build_macos() {
     cd "$_packer_dir"
     packer init .
     packer build \
-      -var "vm_name=$_name" \
+      -var "vm_name=$_vm_id" \
       -var "macos_version=$_macos_version" \
       -var "guest_username=$vm_guest_username" \
       -var "guest_password=$vm_guest_password" \
@@ -3484,11 +3484,11 @@ vm_build_macos() {
   ) || _packer_status=$?
 
   if [ "$_packer_status" -ne 0 ]; then
-    error "Packer build for macOS VM '$_name' failed (exit $_packer_status)"
+    error "Packer build for macOS VM '$_vm_id' failed (exit $_packer_status)"
     return "$_packer_status"
   fi
   resize_and_mark_image '' "$_marker"
-  say "macOS VM '$_name' built and registered in tart"
+  say "macOS VM '$_vm_id' built and registered in tart"
 }
 
 # prune_stale_build_dirs
@@ -3578,7 +3578,7 @@ vm_setup_libvirt_vms() {
 #   PowerShell vm-setup Pass A); Android guests get a standalone
 #   data/<id>.qcow2 userdata disk (system/GSI images are referenced directly).
 vm_setup_windows_qemu() {
-  local vm_name="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
+  local vm_id="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display disk_path disk_credential_marker disk_config_marker _prebuilt
   local _prebuilt_min_size _prebuilt_disk_bytes
   local _android_userdata _android_disk_bytes _android_virtual_size
@@ -3586,9 +3586,9 @@ vm_setup_windows_qemu() {
 
   vm_display=$(jq -r ".VMs[$vm_index].name" "$MANIFEST")
 
-  disk_path="$VM_DIR/data/${vm_name}.qcow2"
-  disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_name" "$disk_path")"
-  disk_config_marker="$(vm_guest_config_marker_path "$vm_name" "$disk_path")"
+  disk_path="$VM_DIR/data/${vm_id}.qcow2"
+  disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_id" "$disk_path")"
+  disk_config_marker="$(vm_guest_config_marker_path "$vm_id" "$disk_path")"
   # WHY: only NixOS guests have a Nix-managed guest config to fingerprint.
   _guest_config_fingerprint=''
 
@@ -3599,32 +3599,32 @@ vm_setup_windows_qemu() {
   # directly).  The build phase creates it when missing, so this only fills
   # gaps and grows it grow-only (never shrinks).
   if [ "$vm_type" = "Android" ]; then
-    _android_userdata="$VM_DIR/data/${vm_name}.qcow2"
+    _android_userdata="$VM_DIR/data/${vm_id}.qcow2"
     _android_disk_bytes="$(parse_size "$(jq -r ".VMs[$vm_index].diskSize" "$MANIFEST")")"
     if [ "$dry_run" = false ]; then
       mkdir -p "$VM_DIR/data"
       if [ ! -f "$_android_userdata" ]; then
         if command -v qemu-img >/dev/null 2>&1; then
-          say "creating Android userdata disk for '$vm_name' (${_android_disk_bytes} bytes)"
+          say "creating Android userdata disk for '$vm_id' (${_android_disk_bytes} bytes)"
           if ! qemu-img create -f qcow2 "$_android_userdata" "$_android_disk_bytes" >/dev/null; then
             error "failed to create Android userdata disk: $_android_userdata"
             return
           fi
         else
-          warn "qemu-img not found; cannot create Android userdata disk for '$vm_name'"
+          warn "qemu-img not found; cannot create Android userdata disk for '$vm_id'"
         fi
       else
         say "Android userdata disk already exists: $_android_userdata"
         if command -v qemu-img >/dev/null 2>&1; then
           _android_virtual_size="$(qemu-img info --output=json "$_android_userdata" | jq -r '."virtual-size" // 0')"
           if [ -n "$_android_virtual_size" ] && [ "$_android_virtual_size" -lt "$_android_disk_bytes" ]; then
-            say "growing Android userdata disk for '$vm_name' from $_android_virtual_size to $_android_disk_bytes bytes (grow-only)"
+            say "growing Android userdata disk for '$vm_id' from $_android_virtual_size to $_android_disk_bytes bytes (grow-only)"
             if ! qemu-img resize "$_android_userdata" "$_android_disk_bytes" >/dev/null; then
               error "failed to grow Android userdata disk: $_android_userdata"
             fi
           fi
         else
-          warn "qemu-img not found; cannot grow Android userdata disk for '$vm_name'"
+          warn "qemu-img not found; cannot grow Android userdata disk for '$vm_id'"
         fi
       fi
     else
@@ -3641,17 +3641,17 @@ vm_setup_windows_qemu() {
   _prebuilt_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
   _prebuilt_disk_bytes="$(parse_size "$(jq -r ".VMs[$vm_index].diskSize" "$MANIFEST")")"
   if [ ! -f "$_prebuilt" ]; then
-    warn "image not found: $_prebuilt; skipping '$vm_name'"
+    warn "image not found: $_prebuilt; skipping '$vm_id'"
     return
   fi
-  if ! validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_name}" "$_prebuilt_min_size"; then
-    warn "pre-built image is invalid for '$vm_name': $_prebuilt"
+  if ! validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_id}" "$_prebuilt_min_size"; then
+    warn "pre-built image is invalid for '$vm_id': $_prebuilt"
     return
   fi
 
   if [ "$dry_run" = false ]; then
     mkdir -p "$VM_DIR"
-    if ! vm_ensure_base_and_overlay "$vm_name" "$_prebuilt" "$_prebuilt_min_size" \
+    if ! vm_ensure_base_and_overlay "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
         "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
       return
     fi
@@ -3679,10 +3679,10 @@ vm_gc_vms() {
   # WHY: default GC keeps disabled entries; only names absent from the
   # manifest are orphans.  --gc-disabled opts into clearing disabled entries.
   if [ "$gc_disabled_mode" = true ]; then
-    _gcv_expected="$(vm_get_expected_vm_names)" || return
+    _gcv_expected="$(vm_get_expected_vm_ids)" || return
     say "GC — including disabled VM entries (--gc-disabled)..."
   else
-    _gcv_expected="$(vm_get_manifest_vm_names)" || return
+    _gcv_expected="$(vm_get_manifest_vm_ids)" || return
   fi
 
   say "GC — scanning for non-provisioned VM artifacts..."

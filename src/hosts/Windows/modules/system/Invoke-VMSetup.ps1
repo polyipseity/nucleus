@@ -41,11 +41,11 @@ function Wait-GuestReady {
     Wait for a QEMU guest to become ready via the guest agent.
 
   .DESCRIPTION
-    Polls the QEMU Guest Agent named pipe (qga-<VmName>) with guest-ping
+    Polls the QEMU Guest Agent named pipe (qga-<VmId>) with guest-ping
     commands until the guest responds or the timeout expires.
 
-  .PARAMETER VmName
-    Name of the VM whose guest agent pipe to poll.
+  .PARAMETER VmId
+    ID of the VM whose guest agent pipe to poll.
 
   .PARAMETER TimeoutSeconds
     Maximum seconds to wait before returning $false. Defaults to 150.
@@ -54,7 +54,7 @@ function Wait-GuestReady {
     System.Boolean.  $true if the guest responded, $false on timeout.
 
   .EXAMPLE
-    Wait-GuestReady -VmName 'nixos-vm' -TimeoutSeconds 120
+    Wait-GuestReady -VmId 'NixOS' -TimeoutSeconds 120
 
   .NOTES
     Environment variables:
@@ -67,11 +67,11 @@ function Wait-GuestReady {
     [OutputType([bool])]
     param(
         [Parameter(Mandatory)]
-        [string]$VmName,
+        [string]$VmId,
         [int]$TimeoutSeconds = 150
     )
 
-    $pipe = "\\.\pipe\qga-$VmName"
+    $pipe = "\\.\pipe\qga-$VmId"
     $timer = [System.Diagnostics.Stopwatch]::StartNew()
     while ($timer.Elapsed.TotalSeconds -lt $TimeoutSeconds) {
         try {
@@ -84,7 +84,7 @@ function Wait-GuestReady {
             $response = $reader.ReadLine()
             if ($response -match '"return"\s*:\s*{}') { return $true }
         } catch {
-            Write-Debug "Guest ping to $VmName timed out; retrying..."
+            Write-Debug "Guest ping to $VmId timed out; retrying..."
         }
         Start-Sleep -Seconds 5
     }
@@ -761,7 +761,7 @@ function Invoke-VMSetup {
         if (Test-Path -LiteralPath $ps1TemplatePath -PathType Leaf) {
             $ps1Template = Get-Content -Path $ps1TemplatePath -Raw
             $startContentPs1 = $ps1Template.Replace('__QEMU_SYSTEM__', $qemuSystem)
-            $startContentPs1 = $startContentPs1.Replace('__VM_NAME__', $Vm.id)
+            $startContentPs1 = $startContentPs1.Replace('__VM_ID__', $Vm.id)
             $startContentPs1 = $startContentPs1.Replace('__VM_DISPLAY__', $Vm.name)
             $startContentPs1 = $startContentPs1.Replace('__MACHINE__', $machine)
             $startContentPs1 = $startContentPs1.Replace('__CPU__', $cpu)
@@ -779,7 +779,7 @@ function Invoke-VMSetup {
         if (Test-Path -LiteralPath $shTemplatePath -PathType Leaf) {
             $shTemplate = Get-Content -Path $shTemplatePath -Raw
             $startContentSh = $shTemplate.Replace('__QEMU_SYSTEM__', $qemuSystem)
-            $startContentSh = $startContentSh.Replace('__VM_NAME__', $Vm.id)
+            $startContentSh = $startContentSh.Replace('__VM_ID__', $Vm.id)
             $startContentSh = $startContentSh.Replace('__VM_DISPLAY__', $Vm.name)
             $startContentSh = $startContentSh.Replace('__MACHINE__', $machine)
             $startContentSh = $startContentSh.Replace('__CPU__', $cpu)
@@ -826,7 +826,7 @@ function Invoke-VMSetup {
             return
         }
         $template = Get-Content -Path $stopTemplatePath -Raw
-        $content = $template.Replace('__HOST_KIND__', 'windows-qemu').Replace('__VM_NAME__', $Vm.id)
+        $content = $template.Replace('__HOST_KIND__', 'windows-qemu').Replace('__VM_ID__', $Vm.id)
         Set-Content -Path $stopPs1 -Value $content -Encoding UTF8
         Write-Information "vm-setup: stop script written: $stopPs1"
     }

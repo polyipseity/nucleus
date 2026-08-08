@@ -36,7 +36,7 @@ try {
         -vga __VGA__ `
         -display __DISPLAY_BACKEND__ `
         -rtc base=localtime `
-        -chardev pipe,id=qga,path=\.\pipe\qga-__VM_NAME__ `
+        -chardev pipe,id=qga,path=\.\pipe\qga-__VM_ID__ `
         -device virtio-serial `
         -device virtserialport,chardev=qga,name=org.qemu.guest_agent.0 `
         -usb -device usb-tablet

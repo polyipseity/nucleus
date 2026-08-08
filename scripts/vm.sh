@@ -355,16 +355,16 @@ resolve_manifest() {
   fi
 }
 
-# resolve_target_vm ID — look up a VM by id in the manifest, print
+# resolve_target_vm VM_ID — look up a VM by id in the manifest, print
 # "type<tab>index" or exit with error.
 # WHY: the index is the manifest position used to address the VM in build
 # commands, not a runtime identifier.
 resolve_target_vm() {
-  local _rtv_name="$1"
-  _rtv_type="$(jq -r --arg name "$_rtv_name" '.VMs[] | select(.id == $name) | .type // empty' "$MANIFEST")"
-  _rtv_index="$(jq --arg name "$_rtv_name" '[.VMs[] | .id] | index($name)' "$MANIFEST")"
+  local _rtv_id="$1"
+  _rtv_type="$(jq -r --arg id "$_rtv_id" '.VMs[] | select(.id == $id) | .type // empty' "$MANIFEST")"
+  _rtv_index="$(jq --arg id "$_rtv_id" '[.VMs[] | .id] | index($id)' "$MANIFEST")"
   if [ -z "$_rtv_type" ] || [ "$_rtv_index" = "null" ]; then
-    error "VM '$_rtv_name' not found in manifest"
+    error "VM '$_rtv_id' not found in manifest"
     return 1
   fi
   printf '%s\t%s\n' "$_rtv_type" "$_rtv_index"
@@ -503,7 +503,7 @@ do_list() {
   require_command jq
 
   local running_names
-  running_names="$(vm_get_running_names)" || true  # check-suppress:suppression_doc: vm_get_running_names may exit non-zero when no VMs match; the empty list is handled downstream
+  running_names="$(vm_get_running_ids)" || true  # check-suppress:suppression_doc: vm_get_running_ids may exit non-zero when no VMs match; the empty list is handled downstream
 
   if $json_output; then
     # Annotate each VM with its state.
@@ -538,7 +538,7 @@ do_status() {
   require_command jq
 
   local running_names
-  running_names="$(vm_get_running_names)" || true  # check-suppress:suppression_doc: vm_get_running_names may exit non-zero when no VMs match; the empty list is handled downstream
+  running_names="$(vm_get_running_ids)" || true  # check-suppress:suppression_doc: vm_get_running_ids may exit non-zero when no VMs match; the empty list is handled downstream
 
   # Build base filter: enabled VMs matching the current host.
   # Names are passed via --argjson when filtering specific VMs.
@@ -610,15 +610,15 @@ do_start() {
     exit 1
   fi
 
-  local vm_name="${filtered_vm_args[0]}"
+  local vm_id="${filtered_vm_args[0]}"
   local resolved
-  resolved="$(resolve_target_vm "$vm_name")" || exit 1
+  resolved="$(resolve_target_vm "$vm_id")" || exit 1
 
   VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
 
-  local start_script="$VM_DIR/scripts/start-${vm_name}.sh"
+  local start_script="$VM_DIR/scripts/start-${vm_id}.sh"
   if [ -f "$start_script" ] && [ -x "$start_script" ]; then
-    say "starting VM '$vm_name' via generated script..."
+    say "starting VM '$vm_id' via generated script..."
     exec "$start_script"
   fi
 
@@ -633,33 +633,33 @@ do_start() {
         macOS)
           require_command tart "brew install cirruslabs/cli/tart"
           local tart_softnet_expose
-          tart_softnet_expose="$(jq -r --arg name "$vm_name" '[.VMs[] | select(.id == $name) | .portForwards[] | "\(.hostPort):\(.guestPort)"] | join(",")' "$MANIFEST")"
-          exec tart run --net-softnet --net-softnet-allow=0.0.0.0/0 --net-softnet-expose "$tart_softnet_expose" "$vm_name"
+          tart_softnet_expose="$(jq -r --arg id "$vm_id" '[.VMs[] | select(.id == $id) | .portForwards[] | "\(.hostPort):\(.guestPort)"] | join(",")' "$MANIFEST")"
+          exec tart run --net-softnet --net-softnet-allow=0.0.0.0/0 --net-softnet-expose "$tart_softnet_expose" "$vm_id"
           ;;
         *)
           # UTM guests
           if command -v utmctl >/dev/null 2>&1; then
-            exec utmctl start "$vm_name"
+            exec utmctl start "$vm_id"
           fi
-          local bundle="$VM_DIR/${vm_name}.utm"
+          local bundle="$VM_DIR/${vm_id}.utm"
           if [ -d "$bundle" ]; then
             exec open "$bundle"
           fi
-          error "cannot start '$vm_name': no generated script, utmctl not found, and no UTM bundle at $bundle"
+          error "cannot start '$vm_id': no generated script, utmctl not found, and no UTM bundle at $bundle"
           exit 1
           ;;
       esac
       ;;
     Linux)
       require_command virsh
-      exec virsh start "$vm_name"
+      exec virsh start "$vm_id"
       ;;
     MINGW*|MSYS*|CYGWIN*)
-      local win_script="$VM_DIR/scripts/start-${vm_name}.ps1"
+      local win_script="$VM_DIR/scripts/start-${vm_id}.ps1"
       if [ -f "$win_script" ]; then
         exec pwsh -File "$win_script"
       fi
-      error "cannot start '$vm_name': no start script at $win_script"
+      error "cannot start '$vm_id': no start script at $win_script"
       exit 1
       ;;
   esac
@@ -681,15 +681,15 @@ do_stop() {
     exit 1
   fi
 
-  local vm_name="${filtered_vm_args[0]}"
+  local vm_id="${filtered_vm_args[0]}"
   local resolved
-  resolved="$(resolve_target_vm "$vm_name")" || exit 1
+  resolved="$(resolve_target_vm "$vm_id")" || exit 1
 
   VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
 
-  local stop_script="$VM_DIR/scripts/stop-${vm_name}.sh"
+  local stop_script="$VM_DIR/scripts/stop-${vm_id}.sh"
   if [ -f "$stop_script" ] && [ -x "$stop_script" ]; then
-    say "stopping VM '$vm_name' via generated script..."
+    say "stopping VM '$vm_id' via generated script..."
     exec "$stop_script"
   fi
 
@@ -703,29 +703,29 @@ do_stop() {
       case "$vm_type" in
         macOS)
           require_command tart
-          exec tart stop "$vm_name"
+          exec tart stop "$vm_id"
           ;;
         *)
           require_command utmctl
-          exec utmctl stop "$vm_name"
+          exec utmctl stop "$vm_id"
           ;;
       esac
       ;;
     Linux)
       require_command virsh
-      if virsh shutdown "$vm_name" 2>/dev/null; then
-        say "ACPI shutdown signal sent to '$vm_name'"
+      if virsh shutdown "$vm_id" 2>/dev/null; then
+        say "ACPI shutdown signal sent to '$vm_id'"
       else
         warn "virsh shutdown failed; trying virsh destroy..."
-        exec virsh destroy "$vm_name"
+        exec virsh destroy "$vm_id"
       fi
       ;;
     MINGW*|MSYS*|CYGWIN*)
-      local win_script="$VM_DIR/scripts/stop-${vm_name}.ps1"
+      local win_script="$VM_DIR/scripts/stop-${vm_id}.ps1"
       if [ -f "$win_script" ]; then
         exec pwsh -File "$win_script"
       fi
-      error "cannot stop '$vm_name': no stop script at $win_script"
+      error "cannot stop '$vm_id': no stop script at $win_script"
       exit 1
       ;;
   esac
@@ -748,15 +748,15 @@ do_upgrade() {
     exit 1
   fi
 
-  local vm_name="${filtered_vm_args[0]}"
+  local vm_id="${filtered_vm_args[0]}"
   local vm_type vm_index
   local resolved
-  resolved="$(resolve_target_vm "$vm_name")" || exit 1
+  resolved="$(resolve_target_vm "$vm_id")" || exit 1
   vm_type="$(printf '%s' "$resolved" | cut -f1)"
   vm_index="$(printf '%s' "$resolved" | cut -f2)"
 
   if [ "$vm_type" != "Android" ]; then
-    error "upgrade is only supported for Android VMs ('$vm_name' is type $vm_type)"
+    error "upgrade is only supported for Android VMs ('$vm_id' is type $vm_type)"
     exit 1
   fi
 
@@ -764,7 +764,7 @@ do_upgrade() {
   SRC_DIR="$VM_DIR/src"
 
   if ! resolve_vm_guest_credentials; then
-    error "cannot upgrade '$vm_name' — guest credential resolution failed"
+    error "cannot upgrade '$vm_id' — guest credential resolution failed"
     exit 1
   fi
   vm_guest_credentials_fingerprint="$(vm_guest_credentials_hash)"
@@ -778,8 +778,8 @@ do_upgrade() {
     "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force" \
     "$gc_data_mode"
 
-  vm_build_android "$vm_name" "$vm_index" "$accept_gsi_license" "true" "false"
-  say "upgrade complete for '$vm_name'"
+  vm_build_android "$vm_id" "$vm_index" "$accept_gsi_license" "true" "false"
+  say "upgrade complete for '$vm_id'"
 }
 
 # do_reset
@@ -798,15 +798,15 @@ do_reset() {
     exit 1
   fi
 
-  local vm_name="${filtered_vm_args[0]}"
+  local vm_id="${filtered_vm_args[0]}"
   local vm_type vm_index
   local resolved
-  resolved="$(resolve_target_vm "$vm_name")" || exit 1
+  resolved="$(resolve_target_vm "$vm_id")" || exit 1
   vm_type="$(printf '%s' "$resolved" | cut -f1)"
   vm_index="$(printf '%s' "$resolved" | cut -f2)"
 
   if [ "$vm_type" != "Android" ]; then
-    error "reset is only supported for Android VMs ('$vm_name' is type $vm_type)"
+    error "reset is only supported for Android VMs ('$vm_id' is type $vm_type)"
     exit 1
   fi
 
@@ -814,7 +814,7 @@ do_reset() {
   SRC_DIR="$VM_DIR/src"
 
   if ! resolve_vm_guest_credentials; then
-    error "cannot reset '$vm_name' — guest credential resolution failed"
+    error "cannot reset '$vm_id' — guest credential resolution failed"
     exit 1
   fi
   vm_guest_credentials_fingerprint="$(vm_guest_credentials_hash)"
@@ -828,8 +828,8 @@ do_reset() {
     "$VMS_DIR" "$MANIFEST" "$NUCLEUS_HOST" "$gc_disabled_mode" "$force" \
     "$gc_data_mode"
 
-  vm_build_android "$vm_name" "$vm_index" "$accept_gsi_license" "false" "true"
-  say "reset complete for '$vm_name'"
+  vm_build_android "$vm_id" "$vm_index" "$accept_gsi_license" "false" "true"
+  say "reset complete for '$vm_id'"
 }
 
 # do_android_config
@@ -846,15 +846,15 @@ do_android_config() {
     exit 1
   fi
 
-  local vm_name="${filtered_vm_args[0]}"
+  local vm_id="${filtered_vm_args[0]}"
   local vm_type vm_index
   local resolved
-  resolved="$(resolve_target_vm "$vm_name")" || exit 1
+  resolved="$(resolve_target_vm "$vm_id")" || exit 1
   vm_type="$(printf '%s' "$resolved" | cut -f1)"
   vm_index="$(printf '%s' "$resolved" | cut -f2)"
 
   if [ "$vm_type" != "Android" ]; then
-    error "android-config is only supported for Android VMs ('$vm_name' is type $vm_type)"
+    error "android-config is only supported for Android VMs ('$vm_id' is type $vm_type)"
     exit 1
   fi
 
@@ -878,7 +878,7 @@ do_android_config() {
 
   # shellcheck source=../src/scripts/vms/android-config.sh
   . "$REPO_ROOT/src/scripts/vms/android-config.sh"
-  vm_android_config "$vm_name" "$vm_index" "${config_flags[@]}"
+  vm_android_config "$vm_id" "$vm_index" "${config_flags[@]}"
 }
 
 # do_resize
@@ -899,14 +899,14 @@ do_resize() {
     exit 1
   fi
 
-  local vm_name="${filtered_vm_args[0]}"
+  local vm_id="${filtered_vm_args[0]}"
   local size_arg="${filtered_vm_args[1]}"
   local disk_bytes
   disk_bytes="$(parse_size "$size_arg")" || exit 1
 
   VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
 
-  vm_resize_vm "$vm_name" "$disk_bytes" "$allow_shrink"
+  vm_resize_vm "$vm_id" "$disk_bytes" "$allow_shrink"
   nuc_done
 }
 

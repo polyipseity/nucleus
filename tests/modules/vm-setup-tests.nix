@@ -748,11 +748,11 @@ let
       vmDir = "${homeDir}/virtual machines";
     in
     "<domain type='kvm'>"
-    + "\n  <name>${vm.name}</name>"
+    + "\n  <name>${vm.id}</name>"
     + "\n  <memory unit='B'>${toString (size.parse vm.ram)}</memory>"
     + "\n  <vcpu>${toString vm.cpus}</vcpu>"
     + "\n  <devices>"
-    + "\n    <source file='${vmDir}/data/${vm.name}.qcow2'/>"
+    + "\n    <source file='${vmDir}/data/${vm.id}.qcow2'/>"
     + "\n  </devices>"
     + "\n</domain>";
 
@@ -783,7 +783,7 @@ let
     let
       results = builtins.map (
         vm:
-        assert' (lib.hasInfix "virtual machines/data/${vm.name}.qcow2" (mkDomainXml vm)) "Domain XML for VM '${vm.name}' must use lowercase 'virtual machines' in disk path"
+        assert' (lib.hasInfix "virtual machines/data/${vm.id}.qcow2" (mkDomainXml vm)) "Domain XML for VM '${vm.id}' must use lowercase 'virtual machines' in disk path"
       ) manifest.VMs;
     in
     assert' (builtins.all (r: r == null) results) "Domain XML disk path check failed";
@@ -971,10 +971,10 @@ let
   # VMs.json entirely are cleared.  --gc-disabled opts into clearing disabled
   # entries, narrowing the expected set to enabled-and-host-matched VMs.
   test_vm_gc_preserves_disabled_entries_by_default = assert' (
-    (lib.hasInfix "vm_get_manifest_vm_names" vm_setup_sh_text)
+    (lib.hasInfix "vm_get_manifest_vm_ids" vm_setup_sh_text)
     && (lib.hasInfix "if [ \"\$gc_disabled_mode\" = true ]" vm_setup_sh_text)
     && (lib.hasInfix "gc_disabled_mode=false" vm_setup_sh_text)
-    && (lib.hasInfix "_gcv_expected=\"\$(vm_get_manifest_vm_names)\"" vm_setup_sh_text)
+    && (lib.hasInfix "_gcv_expected=\"\$(vm_get_manifest_vm_ids)\"" vm_setup_sh_text)
   ) "vm-setup GC must preserve disabled VM entries by default and clear them only with --gc-disabled";
 
   # The --gc-disabled/--no-gc-disabled option pair must be accepted in both
@@ -1277,7 +1277,7 @@ let
         && (lib.hasInfix "_rvm_disk=\"$VM_DIR/data/\${_rvm_name}.qcow2\"" vm_setup_sh_text)
         && (lib.hasInfix "shrink requires --allow-shrink" vm_setup_sh_text)
         && (lib.hasInfix "_rvm_qemu_args=(--shrink)" vm_setup_sh_text)
-        && (lib.hasInfix "vm_get_running_names" vm_setup_sh_text)
+        && (lib.hasInfix "vm_get_running_ids" vm_setup_sh_text)
       )
       "scripts/vm.sh must resize grow-only: resize_and_mark_image never shrinks, vm_resize_vm guards shrink with --allow-shrink, rejects running VMs, and targets data/<id>.qcow2";
 
@@ -2110,7 +2110,7 @@ let
       "src/vms/templates/README.md must contain all expected documentation sections and __TOKEN__ placeholders, with no {{TOKEN}} style";
 
   test_vm_start_posix_template_content = assert' (
-    (lib.hasInfix "__VM_NAME__" startPosixTemplateText)
+    (lib.hasInfix "__VM_ID__" startPosixTemplateText)
     && (lib.hasInfix "__VM_DISPLAY__" startPosixTemplateText)
     && (lib.hasInfix "__HOST_KIND__" startPosixTemplateText)
     && (lib.hasInfix "__VM_DIR__" startPosixTemplateText)
@@ -2133,7 +2133,7 @@ let
     assert'
       (
         (lib.hasInfix "__HOST_KIND__" startHostPs1TemplateText)
-        && (lib.hasInfix "__VM_NAME__" startHostPs1TemplateText)
+        && (lib.hasInfix "__VM_ID__" startHostPs1TemplateText)
         && (lib.hasInfix "__VM_DISPLAY__" startHostPs1TemplateText)
         && (lib.hasInfix "__VM_DIR__" startHostPs1TemplateText)
         && (lib.hasInfix "switch ('__HOST_KIND__')" startHostPs1TemplateText)
@@ -2155,7 +2155,7 @@ let
     assert'
       (
         (lib.hasInfix "__HOST_KIND__" stopPosixShTemplateText)
-        && (lib.hasInfix "__VM_NAME__" stopPosixShTemplateText)
+        && (lib.hasInfix "__VM_ID__" stopPosixShTemplateText)
         && (lib.hasInfix "__VM_DISPLAY__" stopPosixShTemplateText)
         && (lib.hasInfix "case \"$HOST_KIND\"" stopPosixShTemplateText)
         && (lib.hasInfix "tart stop" stopPosixShTemplateText)
@@ -2171,7 +2171,7 @@ let
     assert'
       (
         (lib.hasInfix "__HOST_KIND__" stopHostPs1TemplateText)
-        && (lib.hasInfix "__VM_NAME__" stopHostPs1TemplateText)
+        && (lib.hasInfix "__VM_ID__" stopHostPs1TemplateText)
         && (lib.hasInfix "#Requires -Version 7.4" stopHostPs1TemplateText)
         && (lib.hasInfix "tart stop" stopHostPs1TemplateText)
         && (lib.hasInfix "utmctl stop" stopHostPs1TemplateText)
@@ -2190,7 +2190,7 @@ let
     assert'
       (
         (lib.hasInfix "s|__HOST_KIND__|" vm_setup_sh_text)
-        && (lib.hasInfix "s|__VM_NAME__|" vm_setup_sh_text)
+        && (lib.hasInfix "s|__VM_ID__|" vm_setup_sh_text)
         && (lib.hasInfix "s|__VM_DISPLAY__|" vm_setup_sh_text)
         && (lib.hasInfix "s|__VM_DIR__|" vm_setup_sh_text)
         && (lib.hasInfix "start-host.ps1" vm_setup_sh_text)
@@ -2234,7 +2234,7 @@ let
     assert'
       (
         (lib.hasInfix "__QEMU_SYSTEM__" startWindowsHostTemplateText)
-        && (lib.hasInfix "__VM_NAME__" startWindowsHostTemplateText)
+        && (lib.hasInfix "__VM_ID__" startWindowsHostTemplateText)
         && (lib.hasInfix "__VM_DISPLAY__" startWindowsHostTemplateText)
         && (lib.hasInfix "__MACHINE__" startWindowsHostTemplateText)
         && (lib.hasInfix "__CPU__" startWindowsHostTemplateText)

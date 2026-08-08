@@ -9,7 +9,7 @@ set -euo pipefail
 HOST_KIND="__HOST_KIND__"
 case "$HOST_KIND" in
   darwin-tart)
-    exec tart stop "__VM_NAME__"
+    exec tart stop "__VM_ID__"
     ;;
   darwin-utm)
     if command -v utmctl >/dev/null 2>&1; then
@@ -19,11 +19,11 @@ case "$HOST_KIND" in
     exit 1
     ;;
   nixos-libvirt)
-    if virsh shutdown "__VM_NAME__" 2>/dev/null; then
-      echo "ACPI shutdown signal sent to __VM_NAME__"
+    if virsh shutdown "__VM_ID__" 2>/dev/null; then
+      echo "ACPI shutdown signal sent to __VM_ID__"
     else
       echo "virsh shutdown failed; trying virsh destroy..." >&2
-      exec virsh destroy "__VM_NAME__"
+      exec virsh destroy "__VM_ID__"
     fi
     ;;
   *)

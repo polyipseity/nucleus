@@ -236,7 +236,7 @@ function Get-VmRunningNameList {
 
 function Invoke-VmList {
   $manifest = Get-VmManifest
-  $hostName = if ($env:NUCLEUS_HOST) { $env:NUCLEUS_HOST } else { 'windows' }
+  $hostName = if ($env:NUCLEUS_HOST) { $env:NUCLEUS_HOST } else { 'Windows' }
   $runningNameList = Get-VmRunningNameList
 
   # Filter to enabled VMs matching the current host
@@ -254,7 +254,7 @@ function Invoke-VmList {
 
 function Invoke-VmStatus {
   $manifest = Get-VmManifest
-  $hostName = if ($env:NUCLEUS_HOST) { $env:NUCLEUS_HOST } else { 'windows' }
+  $hostName = if ($env:NUCLEUS_HOST) { $env:NUCLEUS_HOST } else { 'Windows' }
   $runningNameList = Get-VmRunningNameList
 
   # Filter to enabled VMs matching the current host
@@ -669,7 +669,7 @@ function Invoke-VmUnpack {
       if (Test-Path -LiteralPath $startPs1Template -PathType Leaf) {
         $content = (Get-Content -LiteralPath $startPs1Template -Raw)
         $content = $content.Replace('__QEMU_SYSTEM__', $qemuSystem)
-        $content = $content.Replace('__VM_NAME__', $vmId)
+        $content = $content.Replace('__VM_ID__', $vmId)
         $content = $content.Replace('__VM_DISPLAY__', [string]$vmDoc.name)
         $content = $content.Replace('__MACHINE__', $machine)
         $content = $content.Replace('__CPU__', 'host')
@@ -689,7 +689,7 @@ function Invoke-VmUnpack {
       if (Test-Path -LiteralPath $startShTemplate -PathType Leaf) {
         $content = (Get-Content -LiteralPath $startShTemplate -Raw)
         $content = $content.Replace('__QEMU_SYSTEM__', $qemuSystem)
-        $content = $content.Replace('__VM_NAME__', $vmId)
+        $content = $content.Replace('__VM_ID__', $vmId)
         $content = $content.Replace('__VM_DISPLAY__', [string]$vmDoc.name)
         $content = $content.Replace('__MACHINE__', $machine)
         $content = $content.Replace('__CPU__', 'host')
@@ -712,7 +712,7 @@ function Invoke-VmUnpack {
     if (Test-Path -LiteralPath $stopPs1Template -PathType Leaf) {
       $content = (Get-Content -LiteralPath $stopPs1Template -Raw)
       $content = $content.Replace('__HOST_KIND__', 'windows-qemu')
-      $content = $content.Replace('__VM_NAME__', $vmId)
+      $content = $content.Replace('__VM_ID__', $vmId)
       Write-VmUnpackFile -Path $stopPs1Path -Content $content -Perform $perform
     } else {
       Write-NucleusWarning "unpack — stop-host.ps1 template not found: $stopPs1Template"

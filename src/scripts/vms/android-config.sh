@@ -183,7 +183,7 @@ vm_android_config_adb_keys() {
 }
 
 vm_android_config() {
-  _vac_vm_name="$1"
+  _vac_vm_id="$1"
   _vac_vm_index="$2"
   shift 2
 
@@ -253,7 +253,7 @@ vm_android_config() {
     vm_android_fake_wifi_revert "$_vac_serial" || return 1
   fi
 
-  say "android-config complete for '$_vac_vm_name'"
+  say "android-config complete for '$_vac_vm_id'"
 }
 
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then

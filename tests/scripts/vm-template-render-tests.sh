@@ -85,7 +85,7 @@ trap 'rm -rf "$_tmp"' EXIT
 test_start_host_ps1_render() {
   render_template start-host.ps1 "$_tmp/start-testvm.ps1" \
     -e "s|__HOST_KIND__|darwin-tart|g" \
-    -e "s|__VM_NAME__|testvm|g" \
+    -e "s|__VM_ID__|testvm|g" \
     -e "s|__VM_DISPLAY__|Test VM|g" \
     -e "s|__VM_DIR__|/virtual machines|g" \
     -e "s|__TART_SOFTNET_EXPOSE__|22010:22|g"
@@ -103,7 +103,7 @@ test_start_host_ps1_render() {
 test_start_posix_sh_darwin_tart_render() {
   render_template start-posix.sh "$_tmp/start-testvm.sh" \
     -e "s|__HOST_KIND__|darwin-tart|g" \
-    -e "s|__VM_NAME__|testvm|g" \
+    -e "s|__VM_ID__|testvm|g" \
     -e "s|__VM_DISPLAY__|Test VM|g" \
     -e "s|__VM_TYPE__|macOS|g" \
     -e "s|__VM_DIR__|/virtual machines|g" \
@@ -120,7 +120,7 @@ test_start_posix_sh_darwin_tart_render() {
 test_stop_posix_sh_render() {
   render_template stop-posix.sh "$_tmp/stop-testvm.sh" \
     -e "s|__HOST_KIND__|darwin-utm|g" \
-    -e "s|__VM_NAME__|testvm|g" \
+    -e "s|__VM_ID__|testvm|g" \
     -e "s|__VM_DISPLAY__|Test VM|g"
   assert_no_tokens "$_tmp/stop-testvm.sh" "stop-posix.sh (darwin-utm)"
   assert_contains 'HOST_KIND="darwin-utm"' "$_tmp/stop-testvm.sh" "stop-posix.sh (darwin-utm)"
@@ -131,7 +131,7 @@ test_stop_posix_sh_render() {
 test_stop_host_ps1_windows_golden() {
   render_template stop-host.ps1 "$_tmp/stop-winvm.ps1" \
     -e "s|__HOST_KIND__|windows-qemu|g" \
-    -e "s|__VM_NAME__|winvm|g"
+    -e "s|__VM_ID__|winvm|g"
   assert_no_tokens "$_tmp/stop-winvm.ps1" "stop-host.ps1 (windows-qemu)"
 
   # Byte-for-byte golden comparison against the canonical content (formerly a

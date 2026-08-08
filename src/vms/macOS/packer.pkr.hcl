@@ -8,7 +8,7 @@
 # Usage (from repo root):
 #   cd src/vms/macOS && packer init . && packer build \
 #     [-var macos_version=tahoe]                 \
-#     [-var vm_name=MacBook]                     \
+#     [-var vm_id=MacBook]                       \
 #     .
 #
 # Prerequisites:
@@ -16,9 +16,9 @@
 #   - packer installed (pkgs.packer in baseSharedPackages)
 #   - Apple Silicon Mac (Tart requires Virtualization.framework)
 #
-# The resulting VM is stored in ~/virtual machines/tart/vms/<vm_name>/
+# The resulting VM is stored in ~/virtual machines/tart/vms/<vm_id>/
 # (via the ~/.tart symlink created by nucleus-vm setup).
-# Start with: tart run <vm_name> [--no-graphics]
+# Start with: tart run <vm_id> [--no-graphics]
 #
 # Source: https://github.com/cirruslabs/packer-plugin-tart
 #         https://github.com/cirruslabs/tart
@@ -32,10 +32,10 @@ variable "macos_version" {
   description = "macOS version to provision (tahoe, sequoia, sonoma, ventura, etc.)."
 }
 
-variable "vm_name" {
+variable "vm_id" {
   type        = string
   default     = "MacBook"
-  description = "Name of the tart VM to create (stored in ~/virtual machines/tart/vms/<vm_name> via ~/.tart symlink)."
+  description = "ID of the tart VM to create (stored in ~/virtual machines/tart/vms/<vm_id> via ~/.tart symlink)."
 }
 
 variable "cpus" {
@@ -105,7 +105,7 @@ packer {
 source "tart-cli" "macos" {
   # vm_base_name comes from lockfile vm-setup.tart-images section (passed via -var).
   vm_base_name = var.tart_image_ref
-  vm_name      = var.vm_name
+  vm_name      = var.vm_id
 
   cpu_count    = var.cpus
   memory_gb    = var.memory_gib
