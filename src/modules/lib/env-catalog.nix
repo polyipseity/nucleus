@@ -39,7 +39,7 @@ let
     if builtins.hasAttr effectiveUsername allUsers then allUsers.${effectiveUsername} else { };
 
   resolvedHomeDirectory =
-    if pkgs.stdenv.isDarwin then "/Users/${effectiveUsername}" else "/home/${effectiveUsername}";
+    if hostName == "MacBook" then "/Users/${effectiveUsername}" else "/home/${effectiveUsername}";
 
   passwordStorePathRaw =
     if
