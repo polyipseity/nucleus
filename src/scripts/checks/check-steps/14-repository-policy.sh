@@ -3,6 +3,11 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
+_REPOSITORY_POLICY_STEP_DIR="$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_REPOSITORY_POLICY_STEP_SH="$(basename "${BASH_SOURCE[0]}")"
+_REPOSITORY_POLICY_STEP_PS1="${_REPOSITORY_POLICY_STEP_SH%.sh}.ps1"
+readonly _REPOSITORY_POLICY_STEP_DIR _REPOSITORY_POLICY_STEP_SH _REPOSITORY_POLICY_STEP_PS1
+
 register_step "repository-policy" 14 "Repository policy" run_14_repository_policy
 
 run_14_repository_policy() {
@@ -131,8 +136,7 @@ run_14_preflight_install_command_policy() {
   local _s21_errors=0
   # Exclude this check's own sibling file: its source contains the literal pattern text.
   # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; self-refs are dynamic
-  local _s21_self_ps1
-  _s21_self_ps1="$(basename "${BASH_SOURCE[0]}" .sh).ps1"
+  local _s21_self_ps1="$_REPOSITORY_POLICY_STEP_PS1"
 
   # Collect PowerShell files
   local _ps1_files=()
@@ -194,8 +198,7 @@ run_14_embedded_content_enforcement() {
   local _s18_errors=0
   # Exclude this check's own file: its source contains the literal heredoc-detection patterns.
   # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
-  local _s18_self_sh
-  _s18_self_sh="$(basename "${BASH_SOURCE[0]}")"
+  local _s18_self_sh="$_REPOSITORY_POLICY_STEP_SH"
 
   # Embedded-content policy scope for POSIX: src/scripts/** (see .agents/instructions/embedded-content.instructions.md).
   local _sh_files=()
@@ -214,8 +217,7 @@ run_14_embedded_content_enforcement() {
 
   if [ "${#_sh_files[@]}" -gt 0 ]; then
     # Heredoc detector lives in a sibling .awk file (shellcheck policy: extract awk programs >10 lines).
-    local _s18_awk_path
-    _s18_awk_path="$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/14-repository-policy.awk"
+    local _s18_awk_path="$_REPOSITORY_POLICY_STEP_DIR/14-repository-policy.awk"
 
     local _s18_violation
     while IFS= read -r _s18_violation; do
