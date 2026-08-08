@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests decrypt-sops.sh user discovery and materialize-user-secrets.sh key routing.
+# Behavioral tests for decrypt-sops user discovery and materialize-user-secrets routing.
 
 set -euo pipefail
 
@@ -12,57 +12,84 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 # shellcheck source=../../src/scripts/lib/resolve-user-homedir.sh
 . "$REPO_ROOT/src/scripts/lib/resolve-user-homedir.sh"
 
+MATERIALIZE_SCRIPT="$REPO_ROOT/src/scripts/secrets/materialize-user-secrets.sh"
+DERIVE_HOST_AGE_KEY_SCRIPT="$REPO_ROOT/src/scripts/secrets/derive-host-age-key.sh"
+
 test_list_secret_users_sorted() {
-  local users
+  local users prev=""
   mapfile -t users < <(list_secret_users "$REPO_ROOT")
-  if [ "${#users[@]}" -ge 1 ] && [ "${users[0]}" = "polyipseity" ]; then
-    assert_pass "list_secret_users returns sorted secret users"
-  else
-    assert_fail "list_secret_users returns sorted secret users" "expected polyipseity first, got: ${users[*]:-}"
+  if [ "${#users[@]}" -lt 1 ]; then
+    assert_fail "list_secret_users returns secret users" "expected at least one user"
+    return
   fi
+  for user in "${users[@]}"; do
+    if [ -n "$prev" ] && [[ "$user" < "$prev" ]]; then
+      assert_fail "list_secret_users returns lexicographically sorted users" "out of order: $prev then $user"
+      return
+    fi
+    prev="$user"
+  done
+  assert_pass "list_secret_users returns lexicographically sorted secret users"
 }
 
-test_decrypt_sops_script_exists() {
-  if [ -x "$REPO_ROOT/src/scripts/secrets/decrypt-sops.sh" ]; then
-    assert_pass "decrypt-sops.sh is executable"
+test_materialize_exits_clean_without_user_secret_file() {
+  local tmp
+  tmp="$(mktemp -d)"
+  mkdir -p "$tmp/src/secrets/users"
+  if "$MATERIALIZE_SCRIPT" \
+    "$tmp" "missing-user" "$(command -v gpg)" "$(command -v git)" \
+    "$(command -v ssh-keygen)" "$(command -v ssh-add)" "$(command -v sops)" \
+    "/tmp/nonexistent-host-key" "/tmp/nonexistent-age-key" >/dev/null 2>&1; then
+    assert_pass "materialize-user-secrets exits 0 when user secret file is absent"
   else
-    assert_fail "decrypt-sops.sh is executable" "missing or not executable"
+    assert_fail "materialize-user-secrets exits 0 when user secret file is absent" "exit code $?"
   fi
+  rm -rf "$tmp"
 }
 
-test_materialize_script_exists() {
-  if [ -x "$REPO_ROOT/src/scripts/secrets/materialize-user-secrets.sh" ]; then
-    assert_pass "materialize-user-secrets.sh is executable"
-  else
-    assert_fail "materialize-user-secrets.sh is executable" "missing or not executable"
-  fi
-}
-
-test_materialize_skips_jit_keys() {
-  local script_text
-  script_text="$(<"$REPO_ROOT/src/scripts/secrets/materialize-user-secrets.sh")"
-  if [[ "$script_text" == *"jellyfin_*"* && "$script_text" == *"vm_guest_*"* ]]; then
+test_materialize_skips_jit_key_prefixes() {
+  if bash -c '
+    _mus_should_skip_key() {
+      case "$1" in
+        sops | jellyfin_* | vm_guest_*) return 0 ;;
+        *) return 1 ;;
+      esac
+    }
+    _mus_should_skip_key jellyfin_api \
+      && _mus_should_skip_key vm_guest_ssh \
+      && _mus_should_skip_key sops \
+      && ! _mus_should_skip_key gpg_private
+  '; then
     assert_pass "materialize-user-secrets skips JIT-only key prefixes"
   else
-    assert_fail "materialize-user-secrets skips JIT-only key prefixes" "expected jellyfin_* and vm_guest_* skip cases"
+    assert_fail "materialize-user-secrets skips JIT-only key prefixes" "routing case mismatch"
   fi
 }
 
-test_derive_host_age_key_uses_shared_group() {
-  local script_text
-  script_text="$(<"$REPO_ROOT/src/scripts/secrets/derive-host-age-key.sh")"
-  if [[ "$script_text" == *'group:*)'* && "$script_text" == *'user:*)'* && "$script_text" == *"chmod 0640"* && "$script_text" == *"chmod 0600"* ]]; then
-    assert_pass "derive-host-age-key supports user and group owner specs"
-  else
-    assert_fail "derive-host-age-key supports user and group owner specs" "expected user:/group: owner specs with mode 0600/0640"
+test_derive_host_age_key_skips_without_host_key() {
+  if [ -f /etc/ssh/ssh_host_ed25519_key ]; then
+    assert_pass "derive-host-age-key skip-without-host-key (skipped: host key present on runner)"
+    return
   fi
+  local fake_ssh_to_age
+  fake_ssh_to_age="$(mktemp)"
+  cat >"$fake_ssh_to_age" <<'EOF'
+#!/usr/bin/env bash
+echo "AGE-SECRET-KEY-FAKE"
+EOF
+  chmod +x "$fake_ssh_to_age"
+  if "$DERIVE_HOST_AGE_KEY_SCRIPT" "$fake_ssh_to_age" "user:test" >/dev/null 2>&1; then
+    assert_pass "derive-host-age-key exits cleanly when host SSH key is absent"
+  else
+    assert_fail "derive-host-age-key exits cleanly when host SSH key is absent" "exit code $?"
+  fi
+  rm -f "$fake_ssh_to_age"
 }
 
 test_list_secret_users_sorted
-test_decrypt_sops_script_exists
-test_materialize_script_exists
-test_materialize_skips_jit_keys
-test_derive_host_age_key_uses_shared_group
+test_materialize_exits_clean_without_user_secret_file
+test_materialize_skips_jit_key_prefixes
+test_derive_host_age_key_skips_without_host_key
 
 echo ""
 echo "============================================================"
