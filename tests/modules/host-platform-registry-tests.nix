@@ -55,6 +55,32 @@ let
   test_validate_host_platform_ref_fail =
     (builtins.tryEval (hp.validateHostPlatformRef "MacBook" "NixOS")).success == false;
 
+  services = builtins.fromJSON (builtins.readFile ../../src/modules/services.json);
+
+  serviceNames = builtins.filter (n: builtins.substring 0 1 n != "$") (builtins.attrNames services);
+
+  test_services_host_platform_refs = assert' (
+    builtins.all (
+      svcName:
+      let
+        hosts = services.${svcName}.hosts or { };
+      in
+      builtins.all (
+        host: hp.validateHostPlatformRef host hosts.${host}.platform == null
+      ) (builtins.attrNames hosts)
+    ) serviceNames
+  ) "every services.json host platform ref must match host-platform-registry.json";
+
+  test_services_hosts_have_no_flags = assert' (
+    builtins.all (
+      svcName:
+      let
+        hosts = services.${svcName}.hosts or { };
+      in
+      builtins.all (host: !(hosts.${host} ? flags)) (builtins.attrNames hosts)
+    ) serviceNames
+  ) "services.json host entries must not contain flags";
+
 in
 {
   ok =
@@ -67,5 +93,7 @@ in
     && test_flags_for_host_derived == null
     && test_hosts_have_no_flags_attr == null
     && test_validate_host_platform_ref_ok == null
-    && test_validate_host_platform_ref_fail;
+    && test_validate_host_platform_ref_fail
+    && test_services_host_platform_refs == null
+    && test_services_hosts_have_no_flags == null;
 }
