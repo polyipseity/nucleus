@@ -1,4 +1,4 @@
-# windows manual steps
+# Windows manual steps
 
 - Generate `rclone_config_pass` in `src/secrets/users-<username>.yml` via `openssl rand -hex 64`, commit, re-run `nucleus-apply`. If remotes exist without encryption, delete `%USERPROFILE%\.config\rclone\rclone.conf` first.
 - Run `nucleus-cloud-setup` in PowerShell and complete `rclone config` for GoogleDrive, iCloud, and OneDrive.
