@@ -44,6 +44,8 @@ VM guest credentials must come from per-user SOPS secrets (`src/secrets/users-<u
 - All guest paths (NixOS: `guest.nix` + `packer.pkr.hcl`; Windows: `Autounattend.xml` + `packer.pkr.hcl`; macOS: `packer.pkr.hcl`) must consume injected credentials.
 - Credential drift must invalidate stale VM artifacts so changing secret-backed values rebuilds rather than reusing stale disks.
 
+Guest SSH public keys for NixOS `authorized_keys` are resolved from `src/modules/vm-guest-ssh-public-key-paths.json` (static `id_*.pub` paths first, then `ssh_personal_{username}.pub` templates aligned with `secrets.nix` and `50-nucleus.conf`). POSIX `vm_resolve_guest_ssh_public_key` in `src/scripts/lib/vm.sh` and Windows `Get-VmGuestSshPublicKey` read that manifest and export `NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY` for `guest.nix`.
+
 When changing credential policy, update `tests/modules/vm-setup-tests.nix` in the same commit.
 
 ## VM manifest
