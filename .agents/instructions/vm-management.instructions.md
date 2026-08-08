@@ -124,6 +124,22 @@ Guest port forwards are declared in the `portForwards` array of each VM entry: n
 
 **Host tooling:** `adb` and `fastboot` are required for `nucleus-vm android-config`. POSIX hosts install them via `pkgs.android-tools` in `src/modules/core.nix` (`nucleus-apply`); the `nucleus-vm` flake app also bundles `android-tools` in its runtime inputs. Windows installs `Google.PlatformTools` via WinGet DSC (`src/hosts/Windows/system/packages.dsc.yml`).
 
+## android-config cross-host parity
+
+`android-config` is a paired native implementation — not bash delegation on Windows. See `cross-host-feature-parity.instructions.md` (What parity means).
+
+| Layer | POSIX | Windows |
+|-------|-------|---------|
+| CLI entry | `scripts/vm.sh` → `do_android_config` | `scripts/vm.ps1` → `Invoke-AndroidConfig` |
+| Implementation | `src/scripts/vms/android-config.sh` (+ magisk, fake-wifi) | `src/hosts/Windows/modules/system/Invoke-AndroidConfig.ps1` (+ `VmAndroid.ps1`) |
+| Reset prerequisite | `scripts/vm.sh` `do_reset` | `Invoke-AndroidReset` in `Invoke-AndroidConfig.ps1` |
+
+**Flags (both hosts):** `--gapps`, `--adb-keys`, `--magisk`, `--root`, `--fake-wifi`, `--fake-wifi-revert`. Omit all flags to print the manual.
+
+**Change checklist:** update `VMs.json` + `VMs.schema.json`, `vm.sh`, `vm.ps1`, Windows modules, `tests/scripts/android-config-tests.sh`, `tests/scripts/android-config-tests.ps1`, `tests/integration/android-config-parity-tests.nix`, `tests/modules/vm-setup-tests.nix`, and all three `MANUAL.md` files in the same change.
+
+**Platform exceptions (WHY):** MacBook UTM renderer prefs and freeze workarounds (`utm-android-freeze.instructions.md`); NixOS uses libvirt/KVM; Windows uses QEMU (`start-android-vm.ps1`). Recovery/booted workflow steps are shared; host-specific setup notes differ only in `MANUAL.md`.
+
 ## Disk format
 
 QCOW2 throughout all three platforms. Stored at:
