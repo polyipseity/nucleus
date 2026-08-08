@@ -240,7 +240,7 @@ Commit atomically: test + implementation in one commit.
 **Nix tests:**
 
 - `tests/<area>/<topic>-tests.nix` — logic tests organized by scope
-- Examples: `tests/modules/core-tests.nix`, `tests/integration/cloud-sync-tests.nix`, `tests/hosts/MacBook/alttab-settings-tests.nix`
+- Examples: `tests/modules/core-tests.nix`, `tests/integration/env-parity-tests.nix`, `tests/hosts/MacBook/command-line-tools-tests.nix`
 
 **Pester tests:**
 
