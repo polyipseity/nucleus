@@ -5,19 +5,26 @@
 # evaluation; mkDefault placeholders keep flake checks green while allowing
 # real machine values to override these defaults later.
 #
-# First install: partition with a Btrfs root (subvolume @, compress=zstd,
-# noatime). Run nixos-generate-config after install and merge host-specific
-# facts (UUIDs, EFI /boot, swap, bootloader device paths) into this file.
-# See MANUAL.md.
-{ lib, ... }: {
+# First install: partition with Btrfs, create subvolumes @ (root) and @nix
+# (/nix), mount @ at /mnt and @nix at /mnt/nix, then nixos-install. Run
+# nixos-generate-config after install and merge host-specific facts (UUIDs,
+# EFI /boot, swap, bootloader device paths) into this file. See MANUAL.md.
+{ lib, ... }:
+let
+  btrfsOptions = import ../btrfs-options.nix { };
+in
+{
   fileSystems."/" = lib.mkDefault {
     device = "/dev/disk/by-label/nixos";
     fsType = "btrfs";
-    options = [
-      "subvol=@"
-      "compress=zstd"
-      "noatime"
-    ];
+    options = btrfsOptions.root;
+  };
+
+  fileSystems."/nix" = lib.mkDefault {
+    device = "/dev/disk/by-label/nixos";
+    fsType = "btrfs";
+    options = btrfsOptions.nix;
+    neededForBoot = true;
   };
 
   # Uncomment and set device after install when merging hardware-configuration.nix:

@@ -38,6 +38,6 @@ After bare-metal install, run `nixos-generate-config` and merge host-specific fa
 | Host | Root FS | Rationale |
 | ---- | ------- | --------- |
 | MacBook | APFS (+ HFS+ legacy local folders) | macOS platform default; not configurable via nix-darwin |
-| NixOS | Btrfs (`subvol=@`, `compress=zstd`, `noatime`) | snapshots, compression, scrubbing |
-| NixOS guest | Btrfs (qcow-btrfs / qcow-efi-btrfs) | parity with host; see [`src/vms/nixos/formats/`](../../src/vms/nixos/formats/) |
+| NixOS | Btrfs (`subvol=@` + `subvol=@nix`, `compress-force=zstd`, `noatime`) | snapshots, compression, scrubbing |
+| NixOS guest | Btrfs (`subvol=@` + `subvol=@nix`, `compress-force=zstd`) | parity with host; see [`src/vms/nixos/formats/`](../../src/vms/nixos/formats/) |
 | Windows | NTFS | platform default; well supported for dev workloads |
