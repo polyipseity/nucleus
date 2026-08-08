@@ -701,6 +701,12 @@ if ($IsWindows) {
     param()
     Invoke-NucleusRepoScript 'scripts\ai.ps1' @Args
   }
+  function nucleus-audit-store {
+    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
+    param()
+    Invoke-NucleusRepoScript 'scripts\audit-store.ps1' @Args
+  }
   function nucleus-apply {
     # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
@@ -868,6 +874,12 @@ Register-ArgumentCompleter -CommandName nucleus-ai -ScriptBlock {
     @('--help', 'sync', 'list', 'status', 'endpoint', 'config') |
       Where-Object { $_ -like "$wordToComplete*" }
   }
+}
+
+Register-ArgumentCompleter -CommandName nucleus-audit-store -ScriptBlock {
+  param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
+  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
+  @('--help', '-h') | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-replica-sync -ScriptBlock {
