@@ -299,6 +299,13 @@
         },
         {
           "$ref": "#/definitions/serviceRuntimeEntry"
+        },
+        {
+          "propertyNames": {
+            "not": {
+              "enum": [ "darwin", "flags", "linux", "posix", "win32" ]
+            }
+          }
         }
       ],
       "description": "Host-specific service configuration with platform reference"
