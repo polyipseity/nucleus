@@ -23,7 +23,7 @@ Every script in the bundle:
 
 **Adding a new script to the bundle:**
 
-1. Create the script in `src/scripts/` (cross-platform) or `src/scripts/hosts/<Host>/` (host-specific).
+1. Create the script in `src/scripts/` (cross-platform), `src/platforms/<Platform>/scripts/` (platform-specific), or `src/hosts/<Host>/scripts/` (host-only).
 2. Follow the SCRIPT_DIR + lib sourcing pattern (see below).
 3. It is automatically included — no manual registration needed.
 4. Invoke from Nix as `"${activationBundle}/src/scripts/<path>.sh" <pos-arg1> <pos-arg2>`.

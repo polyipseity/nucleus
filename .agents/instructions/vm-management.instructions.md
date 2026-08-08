@@ -86,7 +86,7 @@ All common fields and every field in the matching type group are **required** �
 
 ## Size suffix grammar
 
-All size fields (`ram`, `diskSize`, `minImageSize`) are suffixed size strings matching the grammar below. The grammar is case-sensitive and identical across all three platform parsers (`src/modules/lib/size.nix`, `src/scripts/lib/size.sh`, `src/hosts/Windows/modules/SizeStrings.ps1`); a malformed string aborts provisioning with an error rather than coercing.
+All size fields (`ram`, `diskSize`, `minImageSize`) are suffixed size strings matching the grammar below. The grammar is case-sensitive and identical across all three platform parsers (`src/modules/lib/size.nix`, `src/scripts/lib/size.sh`, `src/platforms/Windows/modules/SizeStrings.ps1`); a malformed string aborts provisioning with an error rather than coercing.
 
 ```
 ^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$
@@ -136,7 +136,7 @@ Guest port forwards are declared in the `portForwards` array of each VM entry: n
 | Layer | POSIX | Windows |
 |-------|-------|---------|
 | CLI entry | `scripts/vm.sh` → `do_android_config` | `scripts/vm.ps1` → `Invoke-AndroidConfig` |
-| Implementation | `src/scripts/vms/android-config.sh` (+ magisk, fake-wifi) | `src/hosts/Windows/modules/system/Invoke-AndroidConfig.ps1` (+ `VMAndroid.ps1`) |
+| Implementation | `src/scripts/vms/android-config.sh` (+ magisk, fake-wifi) | `src/platforms/Windows/modules/system/Invoke-AndroidConfig.ps1` (+ `VMAndroid.ps1`) |
 | Reset prerequisite | `scripts/vm.sh` `do_reset` | `Invoke-AndroidReset` in `Invoke-AndroidConfig.ps1` |
 
 **Flags (both hosts):** `--gapps`, `--adb-keys`, `--magisk`, `--root`, `--fake-wifi`, `--fake-wifi-revert`. Omit all flags to print the manual.
@@ -254,7 +254,7 @@ Both hooks are best-effort: a VM sync/setup failure does not abort a completed s
 | `src/vms/Windows/Autounattend.xml`                    | Windows 11 answer file (unattended install, TPM bypass, WinRM) |
 | `scripts/vm.sh`                                       | Unified build+provision script for macOS and NixOS hosts       |
 | `scripts/vm.ps1`                                      | Windows wrapper calling `Invoke-VMSetup.ps1`                   |
-| `src/hosts/Windows/modules/system/Invoke-VMSetup.ps1` | Build + provision logic for Windows hosts                      |
+| `src/platforms/Windows/modules/system/Invoke-VMSetup.ps1` | Build + provision logic for Windows hosts                      |
 
 ### Build strategies
 

@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or modifying scripts, tests, or automation that depends on external tool availability. Covers the ban on silent skip-guards and the required hard-fail policy."
 name: "Tool Availability Policy"
-applyTo: "scripts/**, src/scripts/**, tests/**/*.sh, tests/**/*.ps1, src/hosts/Windows/modules/**/*.ps1"
+applyTo: "scripts/**, src/scripts/**, tests/**/*.sh, tests/**/*.ps1, src/platforms/Windows/modules/**/*.ps1"
 ---
 
 # Tool Availability Policy
@@ -65,6 +65,6 @@ This policy applies to:
 - **All check scripts** under `scripts/` (`.sh`, `.ps1`)
 - **All test files** under `tests/` (`.sh`, `.ps1`)
 - **All internal scripts** under `src/scripts/` (`.sh`)
-- **All Windows module scripts** under `src/hosts/Windows/modules/` (`.ps1`)
+- **All Windows module scripts** under `src/platforms/Windows/modules/` (`.ps1`)
 
 The `nucleus-check-sh` and `nucleus-check-pwsh` validators reject scripts that contain `command -v` (or equivalent) in a skip-guard pattern. Review new dependencies against this policy before adding them. Violations in existing files must be removed when encountered during maintenance; they are not grandfathered.

@@ -1,4 +1,4 @@
-# modules/macos/finder-sidebar.nix — Finder sidebar favorites automation.
+# platforms/macOS/modules/finder-sidebar.nix — Finder sidebar favorites automation.
 #
 # Provides Nix-level helpers for deterministic Finder sidebar state via
 # mysides.  Used by macos.nix activation hooks.

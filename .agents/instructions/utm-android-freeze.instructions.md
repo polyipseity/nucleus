@@ -1,7 +1,7 @@
 ---
 description: "Use when debugging Android (LineageOS) VM display freezes on UTM for the MacBook host, or editing UTM renderer provisioning (macos-set-utm-renderer.sh, vms.nix, activation.nix, MANUAL.md). Covers the confirmed root cause, the audio-disable workaround, diagnostics, state-preserving recovery, and mitigations."
 name: "UTM Android Freeze"
-applyTo: "src/scripts/hosts/MacBook/macos-set-utm-renderer.sh, src/hosts/MacBook/vms.nix, src/hosts/MacBook/activation.nix, src/hosts/MacBook/MANUAL.md"
+applyTo: "src/hosts/MacBook/scripts/macos-set-utm-renderer.sh, src/hosts/MacBook/vms.nix, src/hosts/MacBook/activation.nix, src/hosts/MacBook/MANUAL.md"
 ---
 
 # UTM Android freeze — findings (2026-08-03)

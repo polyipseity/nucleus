@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or modifying application settings and configurations. Covers storage location selection, per-user override patterns, cross-platform parity, and testing requirements."
 name: "App Configuration Management"
-applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/modules/configs/**, src/hosts/Windows/modules/**/*.ps1, src/flake.nix, src/users/**/*.json, tests/modules/*-tests.nix, tests/integration/*-tests.nix, tests/hosts/**/*-tests.nix"
+applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/modules/configs/**, src/platforms/Windows/modules/**/*.ps1, src/flake.nix, src/users/**/*.json, tests/modules/*-tests.nix, tests/integration/*-tests.nix, tests/hosts/**/*-tests.nix"
 ---
 
 ## Storage location rule
@@ -10,7 +10,7 @@ Choose app config storage based on how the app reads it, not on arbitrary prefer
 
 ### Separate JSON file (app reads JSON directly)
 
-Use a separate JSON file under `src/modules/configs/<app>/` only if the app reads that file directly. Symlink the file to the app's config path from activation code (macOS: `src/modules/macos.nix`; Windows: DSC or modules).
+Use a separate JSON file under `src/modules/configs/<app>/` only if the app reads that file directly. Symlink the file to the app's config path from activation code (macOS: `src/platforms/macOS/modules/default.nix`; Windows: DSC or modules).
 
 ### Native config format (app does NOT read JSON)
 

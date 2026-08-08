@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or modifying package manager installations, configuration, or setup scripts. Covers supply chain delay defaults enforced across all managed package managers."
 name: "Supply Chain Hardening"
-applyTo: "src/modules/shell*.nix, src/modules/agents.nix, src/modules/pwsh.nix, src/hosts/Windows/user/env.dsc.yml, src/hosts/Windows/modules/**/*.ps1, scripts/check.sh, scripts/check.ps1, scripts/bump-lockfile.sh, scripts/bump-lockfile.ps1, src/lockfiles/lifecycle-allowlist.json"
+applyTo: "src/modules/shell*.nix, src/modules/agents.nix, src/modules/pwsh.nix, src/hosts/Windows/user/env.dsc.yml, src/platforms/Windows/modules/**/*.ps1, scripts/check.sh, scripts/check.ps1, scripts/bump-lockfile.sh, scripts/bump-lockfile.ps1, src/lockfiles/lifecycle-allowlist.json"
 ---
 
 All managed package managers in this repository MUST have a minimum release age delay configured to limit exposure to newly published (potentially compromised) package versions.
@@ -10,8 +10,8 @@ All managed package managers in this repository MUST have a minimum release age 
 
 | Package manager | Mechanism        | Setting                                                                    | File(s)                                                                         |
 | --------------- | ---------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| **bun**         | `~/.bunfig.toml` | `[install] minimumReleaseAge = 432000` (5 days in seconds), `exact = true` | `src/modules/shell.nix`, `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` |
-| **uv**          | `uv.toml`        | `exclude-newer = "P5D"` (ISO 8601 duration) + `add-bounds = "exact"`       | `src/modules/shell.nix`, `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` |
+| **bun**         | `~/.bunfig.toml` | `[install] minimumReleaseAge = 432000` (5 days in seconds), `exact = true` | `src/modules/shell.nix`, `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` |
+| **uv**          | `uv.toml`        | `exclude-newer = "P5D"` (ISO 8601 duration) + `add-bounds = "exact"`       | `src/modules/shell.nix`, `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` |
 
 ## Package managers without delay features
 
@@ -61,7 +61,7 @@ With the `--online` flag (requires network), additional checks run: 4. **Freshne
 When adding a NEW package manager to this repository, you MUST:
 
 1. Check whether it supports a minimum-release-age / exclude-newer / install-delay configuration option or environment variable.
-2. If yes: configure it with `"5 days"` (or equivalent) in every shell layer — POSIX (`src/modules/shell.nix`) and Windows (`src/hosts/Windows/modules/user/Sync-ShellProfile.ps1`).
+2. If yes: configure it with `"5 days"` (or equivalent) in every shell layer — POSIX (`src/modules/shell.nix`) and Windows (`src/platforms/Windows/modules/user/Sync-ShellProfile.ps1`).
 3. If no: add a note to this table explaining why, and rely on lockfile pinning.
 4. If an existing package manager gains a delay feature in an upstream update, add it and remove the "no delay feature" note.
 5. Check whether the package manager supports an `--ignore-scripts` equivalent or `--no-build` equivalent. If yes, configure it in `src/modules/agents.nix`.

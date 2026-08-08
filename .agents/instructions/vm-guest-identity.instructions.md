@@ -1,7 +1,7 @@
 ---
 description: "Use when editing VM CLI, manifest consumers, template tokens, or scripts that reference guest id, name, type, or hostname."
 name: "VM Guest Identity"
-applyTo: "scripts/vm.*, src/scripts/lib/vm.sh, src/scripts/vms/**, src/hosts/*/vms.nix, src/modules/VMs.json, src/vms/**, tests/modules/vm-setup-tests.nix, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1, src/hosts/Windows/modules/system/Invoke-AndroidConfig.ps1"
+applyTo: "scripts/vm.*, src/scripts/lib/vm.sh, src/scripts/vms/**, src/hosts/*/vms.nix, src/modules/VMs.json, src/vms/**, tests/modules/vm-setup-tests.nix, src/platforms/Windows/modules/system/Invoke-VMSetup.ps1, src/platforms/Windows/modules/system/Invoke-AndroidConfig.ps1"
 ---
 
 # VM guest identity (id, name, type, hostname)

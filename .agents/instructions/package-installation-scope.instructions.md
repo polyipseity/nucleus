@@ -39,7 +39,7 @@ Direct developer invocation of any of the above in an interactive shell session 
 Each blocked tool is overridden as a shell function that intercepts the command and prints a helpful error pointing to the devShell.
 
 - **POSIX (zsh)** — `src/scripts/shell/init.zsh`: functions for `bun`, `cargo`, `rustc`, `uv`, `python`, `python3`, `pip`, `pip3`, `npm`, `npx`, `node`, `corepack` in `programs.zsh.initContent`. Flow: check `$DIRENV_DIR` → invoke devShell-scoped binary → check fallback tool bundle path → error. Pure educational blocks (`npm`/`npx`/`node`/`corepack`, `pip`/`pip3`, `python`/`python3`) skip the pass-through flow and print a ban message directly.
-- **PowerShell (POSIX and Windows)** — `src/scripts/shell/profile.ps1`: the single shared shell-parity profile. POSIX gets it embedded by `src/modules/pwsh.nix` at Nix eval time; Windows gets it written into the managed profile block by `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` at runtime. Same flow via `$env:DIRENV_DIR` then the fallback tool bundle path.
+- **PowerShell (POSIX and Windows)** — `src/scripts/shell/profile.ps1`: the single shared shell-parity profile. POSIX gets it embedded by `src/modules/pwsh.nix` at Nix eval time; Windows gets it written into the managed profile block by `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` at runtime. Same flow via `$env:DIRENV_DIR` then the fallback tool bundle path.
 
 User-scope bin dir PATH wiring is declared via `home.sessionPath` (→ `~/.zshenv`), not `initContent` PATH guards. This ensures directories survive direnv deactivation.
 
@@ -57,7 +57,7 @@ On POSIX, `pkgs.rust-bin.fromRustupToolchainFile` (rust-overlay) assembles a Nix
 ## Adding or changing blocked tools
 
 1. Add the blocking shell function to `src/modules/shell.nix` (`initContent`), following the existing `bun`/`cargo`/`rustc`/`uv` pattern.
-2. Add the equivalent PowerShell function to `src/scripts/shell/profile.ps1` — the single shared shell-parity profile consumed by both `src/modules/pwsh.nix` (POSIX, embedded at eval time) and `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` (Windows, managed block).
+2. Add the equivalent PowerShell function to `src/scripts/shell/profile.ps1` — the single shared shell-parity profile consumed by both `src/modules/pwsh.nix` (POSIX, embedded at eval time) and `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` (Windows, managed block).
 4. Update this instruction file.
 5. If the tool is also a devShell tool, add it to `devShells.default` in `src/flake.nix` (alphabetically sorted in the `packages` list).
 
@@ -73,7 +73,7 @@ On POSIX, `pkgs.rust-bin.fromRustupToolchainFile` (rust-overlay) assembles a Nix
 
 - **Python tools**: Always use `uv tool install` for isolated, per-tool virtual environments. Never `pip install --system`.
 - **Rust tools**: Prefer devShell for development, `cargo-binstall` for prebuilt binaries, `cargo install` as fallback. Installs to `~/.cargo/bin`.
-- **JavaScript tools**: Only `bun install -g` for globally callable JS CLI tools (not dev dependencies). Managed via `src/modules/agents.nix` (POSIX) or `src/hosts/Windows/modules/setup/Invoke-BunSetup.ps1` (Windows). Never `npm install -g`.
+- **JavaScript tools**: Only `bun install -g` for globally callable JS CLI tools (not dev dependencies). Managed via `src/modules/agents.nix` (POSIX) or `src/platforms/Windows/modules/setup/Invoke-BunSetup.ps1` (Windows). Never `npm install -g`.
 
 ## Overlapping package classification
 

@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing agents configuration, skill management, or ClawHub provisioning. Covers ~/.agents directory layout, bundled vs. fetched skill licensing rules, permission patterns, and the install-bun-packages/sync-clawhub-skills activation DAG."
 name: "Agents and Skills"
-applyTo: "src/modules/agents.nix, src/modules/cursor.nix, src/hosts/Windows/modules/user/Sync-AgentsSkill.ps1, src/hosts/Windows/modules/user/Sync-AgentsClawHubSkill.ps1, src/hosts/Windows/modules/user/Sync-CursorConfig.ps1, src/hosts/Windows/modules/setup/Invoke-BunSetup.ps1, src/users/*/agents/**, src/users/*/cursor/**, src/scripts/agents/**/*.sh, src/scripts/configs/symlink-cursor-config.sh"
+applyTo: "src/modules/agents.nix, src/modules/cursor.nix, src/platforms/Windows/modules/user/Sync-AgentsSkill.ps1, src/platforms/Windows/modules/user/Sync-AgentsClawHubSkill.ps1, src/platforms/Windows/modules/user/Sync-CursorConfig.ps1, src/platforms/Windows/modules/setup/Invoke-BunSetup.ps1, src/users/*/agents/**, src/users/*/cursor/**, src/scripts/agents/**/*.sh, src/scripts/configs/symlink-cursor-config.sh"
 ---
 
 # Agents and Skills
@@ -73,7 +73,7 @@ ClawHub is installed and managed declaratively by the `install-bun-packages` Hom
 
 ### Windows
 
-ClawHub is managed by `Invoke-BunSetup` in `src/hosts/Windows/modules/Invoke-BunSetup.ps1`, which is called by `apply.ps1` before `Sync-AgentsClawHubSkills`. `Invoke-BunSetup` manages a `$desiredPackages` list (currently `@mariozechner/pi-coding-agent` and `clawhub`) and writes a manifest to `%USERPROFILE%\.config\nucleus\bun-packages.json`. Applied in this order: WinGet DSC → `Invoke-BunSetup` (bun global packages) → `Sync-AgentsSkills` (bundled skill symlinks) → `Sync-AgentsClawHubSkills` (fetched skill downloads).
+ClawHub is managed by `Invoke-BunSetup` in `src/platforms/Windows/modules/Invoke-BunSetup.ps1`, which is called by `apply.ps1` before `Sync-AgentsClawHubSkills`. `Invoke-BunSetup` manages a `$desiredPackages` list (currently `@mariozechner/pi-coding-agent` and `clawhub`) and writes a manifest to `%USERPROFILE%\.config\nucleus\bun-packages.json`. Applied in this order: WinGet DSC → `Invoke-BunSetup` (bun global packages) → `Sync-AgentsSkills` (bundled skill symlinks) → `Sync-AgentsClawHubSkills` (fetched skill downloads).
 
 ## Authoring rules
 

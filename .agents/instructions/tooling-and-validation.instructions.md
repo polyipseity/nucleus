@@ -61,7 +61,7 @@ Choose the right vehicle:
   - **Data integrity** (7-10): Lockfile validation, locked DSC validation, schema validation, service registry.
   - **Policy/verification** (11-18): YAML structural, package manager enforcement, error suppression, online determinism, config method compliance, activation token placeholder, preflight install-command policy, embedded-content enforcement.
 - On Windows (check.ps1), steps 1, 4-5 are stubs (POSIX/Nix-only tools).
-- Pre-flight tool validation runs at the start of both scripts (before `$_step=0`). On POSIX this uses `require_command` from `src/scripts/lib.sh`; on Windows it uses `Ensure-Tool` from `src/hosts/Windows/modules/Ensure-Tool.psm1`.
+- Pre-flight tool validation runs at the start of both scripts (before `$_step=0`). On POSIX this uses `require_command` from `src/scripts/lib.sh`; on Windows it uses `Ensure-Tool` from `src/platforms/Windows/modules/Ensure-Tool.psm1`.
 - **Provisioning and preflight are separate:** provisioning (`nucleus-bootstrap`, `nucleus-apply`, `lockfile.json` pwsh modules, `core.nix`, WinGet DSC) installs tools; preflight only verifies presence and hard-fails if missing. Never install tools inside check/test preflight blocks.
 - When adding new tools to the check suite, add them to both: (a) the pre-flight block, and (b) provisioning (`src/modules/core.nix` / WinGet DSC / `lockfile.json` pwsh section / bootstrap).
 

@@ -1,7 +1,7 @@
 ---
 description: "Use when deciding whether a config belongs in src/modules/configs/ or src/users/, or when wiring per-user homedir overlay selectors."
 name: "User Config Placement"
-applyTo: "src/modules/configs/**, src/users/**, src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/Windows/modules/**/*.ps1, AGENTS.md"
+applyTo: "src/modules/configs/**, src/users/**, src/modules/**/*.nix, src/hosts/**/*.nix, src/platforms/Windows/modules/**/*.ps1, AGENTS.md"
 ---
 
 ## Placement taxonomy

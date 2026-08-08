@@ -37,7 +37,7 @@ Each DSC file covers exactly one Windows subsystem or functional concern. Do not
 - `src/hosts/Windows/user/context-manual.dsc.yml` — right-click "open nucleus manual" entries.
 - `src/hosts/Windows/user/context-pdf-opt.dsc.yml` — right-click "optimize PDF" presets.
 - They are applied in-order by `src/hosts/Windows/apply.ps1`.
-- Reusable Windows helper logic is loaded from `src/hosts/Windows/modules/*.ps1`; DSC files should remain state declarations rather than script logic.
+- Reusable Windows helper logic is loaded from `src/platforms/Windows/modules/*.ps1`; DSC files should remain state declarations rather than script logic.
 
 ## DSC v3 document structure
 
@@ -86,11 +86,11 @@ Within each group, sort entries alphabetically by the `settings.id` (for package
 
 `winget configure` resolves each `resource: Module/Resource` identifier against the PowerShell Gallery and **auto-installs** the required module if it is not already present in `$env:PSModulePath`. No separate install step is needed — any `PSDscResources/Script` entry will cause WinGet to download and install the `PSDscResources` module automatically before invoking the resource.
 
-Use `PSDscResources/Script` only for imperative steps that cannot be expressed by any declarative resource type. Prefer moving complex logic to `src/hosts/Windows/modules/*.ps1` (dot-sourced by `apply.ps1`) so the DSC file stays a state declaration rather than a script host.
+Use `PSDscResources/Script` only for imperative steps that cannot be expressed by any declarative resource type. Prefer moving complex logic to `src/platforms/Windows/modules/*.ps1` (dot-sourced by `apply.ps1`) so the DSC file stays a state declaration rather than a script host.
 
 **When PATH is not guaranteed during DSC execution:** DSC resources run in a fresh PowerShell session where `$env:PATH` may not include user-level tool directories (for example `~\.cargo\bin` from a prior `rustup init` call). Any `PSDscResources/Script` block that invokes a user-installed binary must prepend the relevant path explicitly in `SetScript` and `TestScript`. If that cannot be done reliably, do not add the resource — document the gap and rely on a graceful probe in `apply.ps1` or a `scripts/gc.ps1`-style script instead.
 
-**cargo-cache is managed via cargo-binstall, not `system/packages.dsc.yml`:** `cargo-cache` has no WinGet package ID and is not in Scoop. It is installed declaratively by `Invoke-CargoBinstallSetup` (in `src/hosts/Windows/modules/Invoke-CargoBinstallSetup.ps1`) which runs after the DSC step in `apply.ps1`. `scripts/gc.ps1` probes for the binary gracefully and skips pruning when it is absent.
+**cargo-cache is managed via cargo-binstall, not `system/packages.dsc.yml`:** `cargo-cache` has no WinGet package ID and is not in Scoop. It is installed declaratively by `Invoke-CargoBinstallSetup` (in `src/platforms/Windows/modules/Invoke-CargoBinstallSetup.ps1`) which runs after the DSC step in `apply.ps1`. `scripts/gc.ps1` probes for the binary gracefully and skips pruning when it is absent.
 
 ## PSDscResources/Script resource
 
@@ -148,9 +148,9 @@ Do **not** use a Script block for operations where PATH is unreliable, state is 
 When adding a new tool or capability, choose the package manager in this order:
 
 1. **WinGet (`system/packages.dsc.yml`)** — preferred for any package with a WinGet ID. Declarative, `--what-if`-capable, and centrally tracked.
-2. **Scoop (`src/hosts/Windows/modules/Invoke-ScoopSetup.ps1`)** — for portable CLI utilities that have no WinGet ID but exist in a Scoop bucket. Scoop is the user-space fallback: it requires no admin rights and installs to `%USERPROFILE%\scoop\`.
-3. **cargo binstall (`src/hosts/Windows/modules/Invoke-CargoBinstallSetup.ps1`)** — for Rust CLI tools not available in WinGet or Scoop. cargo-binstall downloads prebuilt binaries without requiring a local Rust toolchain.
-4. **bun (`src/hosts/Windows/modules/Invoke-BunSetup.ps1`)** — last resort for JS/npm-only tools absent from WinGet, Scoop, and cargo-binstall. `bun install -g` places binaries in `%USERPROFILE%\.bun\bin`. Bun itself is installed via WinGet (`Oven-sh.Bun` in `system/packages.dsc.yml`).
+2. **Scoop (`src/platforms/Windows/modules/Invoke-ScoopSetup.ps1`)** — for portable CLI utilities that have no WinGet ID but exist in a Scoop bucket. Scoop is the user-space fallback: it requires no admin rights and installs to `%USERPROFILE%\scoop\`.
+3. **cargo binstall (`src/platforms/Windows/modules/Invoke-CargoBinstallSetup.ps1`)** — for Rust CLI tools not available in WinGet or Scoop. cargo-binstall downloads prebuilt binaries without requiring a local Rust toolchain.
+4. **bun (`src/platforms/Windows/modules/Invoke-BunSetup.ps1`)** — last resort for JS/npm-only tools absent from WinGet, Scoop, and cargo-binstall. `bun install -g` places binaries in `%USERPROFILE%\.bun\bin`. Bun itself is installed via WinGet (`Oven-sh.Bun` in `system/packages.dsc.yml`).
 
 The equivalent hierarchy on POSIX hosts is: `nixpkgs > cargo binstall > bun`.
 
@@ -185,7 +185,7 @@ Install Scoop itself via WinGet (package ID `Scoop.Scoop`). Scoop requires `Git.
 
 Do **not** use `PSDscResources/Script` for Scoop bucket or app management after a fresh `Scoop.Scoop` install. Reason: `scoop` lives at `~\scoop\shims\scoop.ps1` which is not on PATH in the DSC execution session immediately after WinGet installs Scoop — the same PATH-guarantee constraint that excludes cargo-cache.
 
-Instead, manage Scoop buckets and apps in a dedicated module `src/hosts/Windows/modules/Invoke-ScoopSetup.ps1` dot-sourced and called by `apply.ps1` **after** the DSC run completes, so `~\scoop\shims` is resolvable by then.
+Instead, manage Scoop buckets and apps in a dedicated module `src/platforms/Windows/modules/Invoke-ScoopSetup.ps1` dot-sourced and called by `apply.ps1` **after** the DSC run completes, so `~\scoop\shims` is resolvable by then.
 
 ### Idempotency in Scoop operations
 
@@ -209,7 +209,7 @@ if (-not (Test-Path $cbBin)) {
 
 ### cargo binstall for Rust tools
 
-After Scoop installs cargo-binstall, `src/hosts/Windows/modules/Invoke-CargoBinstallSetup.ps1` manages Rust CLI tools that have no WinGet or Scoop equivalent (e.g. `cargo-cache`, `pay-respects`). It maintains a desired-state list and a manifest at `~\.config\nucleus\cargo-binstall-packages.json`; on each apply it installs additions via `cargo binstall --no-confirm` and removes deletions via `cargo uninstall`.
+After Scoop installs cargo-binstall, `src/platforms/Windows/modules/Invoke-CargoBinstallSetup.ps1` manages Rust CLI tools that have no WinGet or Scoop equivalent (e.g. `cargo-cache`, `pay-respects`). It maintains a desired-state list and a manifest at `~\.config\nucleus\cargo-binstall-packages.json`; on each apply it installs additions via `cargo binstall --no-confirm` and removes deletions via `cargo uninstall`.
 
 
 

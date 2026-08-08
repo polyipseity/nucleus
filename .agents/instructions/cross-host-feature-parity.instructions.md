@@ -6,7 +6,7 @@ applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/Windows/**/*.yml, 
 
 ## Goal
 
-Default to parity-first changes: apply new capabilities to as many hosts as practical in the same change. Avoid one-host features unless there is a concrete platform constraint. Keep host orchestration thin and push reusable behavior into shared modules (`src/modules/*.nix` and `src/hosts/Windows/modules/*.ps1`) or declarative state files (`src/hosts/Windows/*.dsc.yml`).
+Default to parity-first changes: apply new capabilities to as many hosts as practical in the same change. Avoid one-host features unless there is a concrete platform constraint. Keep host orchestration thin and push reusable behavior into shared modules (`src/modules/*.nix` and `src/platforms/Windows/modules/*.ps1`) or declarative state files (`src/hosts/Windows/*.dsc.yml`).
 
 Avoid special-casing in module logic. When a feature requires per-host differences, refactor shared behavior into parameterized abstractions rather than adding `if-else` branches or duplicating files.
 
@@ -19,7 +19,7 @@ Parity does **not** mean delegating Windows work to bash, `sh`, or `.sh` scripts
 **Implementation pattern (default):**
 
 - POSIX (macOS + NixOS): bash in `scripts/*.sh` or `src/scripts/**/*.sh`
-- Windows: PowerShell in `scripts/*.ps1` or `src/hosts/Windows/modules/**/*.ps1`
+- Windows: PowerShell in `scripts/*.ps1` or `src/platforms/Windows/modules/**/*.ps1`
 - Shared content in the same language: single file in `src/scripts/` per `embedded-content.instructions.md`
 - Windows prohibition: no `Invoke-NucleusRepoScript` with `.sh` paths; no `bash`/`sh` subprocess calls from Windows runtime code (`profile.ps1`, `vm.ps1`, `apply.ps1`, Windows modules)
 
@@ -31,7 +31,7 @@ For every new capability, evaluate all three hosts before coding:
 
 1. macOS (`src/hosts/MacBook/` + shared modules)
 2. NixOS (`src/hosts/NixOS/` + shared modules)
-3. Windows (`src/hosts/Windows/` + `src/hosts/Windows/modules/`)
+3. Windows (`src/hosts/Windows/` + `src/platforms/Windows/modules/`)
 
 If a capability can exist on more than one host, implement those hosts in the same change whenever feasible.
 
@@ -47,7 +47,7 @@ When a config file's application has a native extension-point mechanism that aut
 
 - **POSIX shared behavior** (macOS and NixOS): centralize in `src/modules/*.nix`.
 - **Windows declarative state**: prefer DSC YAML files (`system.dsc.yml`, `system-packages.dsc.yml`, `user.dsc.yml`, `user-env.dsc.yml`, `user-context.dsc.yml`) when a WinGet DSC resource can represent it.
-- **Windows reusable imperative logic**: keep in `src/hosts/Windows/modules/*.ps1`; keep `src/hosts/Windows/apply.ps1` orchestration-only.
+- **Windows reusable imperative logic**: keep in `src/platforms/Windows/modules/*.ps1`; keep `src/hosts/Windows/apply.ps1` orchestration-only.
 - If a Windows parity feature cannot be represented declaratively, implement it in a reusable module with an explicit cleanup/deconfiguration path so the feature can be safely disabled later.
 
 ## Imperative fallback safety (Windows)
@@ -204,12 +204,12 @@ All hosts use the OS-native SSH agent and server, with no custom service definit
 - When adding a Windows CLI package to `system-packages.dsc.yml`, check whether POSIX hosts should also receive it through `core.nix`.
 - When adding a package that exists in both nixpkgs and Homebrew, add it to `overlappingPackages` in `src/modules/core.nix` (not spread across host files). See `package-installation-scope.instructions.md` (Overlapping package classification) for category, platform, and add-workflow rules.
 - Remove duplicate declarations from `src/hosts/NixOS/desktop.nix` when a package is already delivered via `core.nix`'s `sharedPackages`.
-- Windows source builds use git hash pinning. When a tool must be compiled from source on Windows, pin by git commit hash, not a tag or branch. Document the build steps in a reusable `Build-<Tool>.ps1` module under `src/hosts/Windows/modules/` and wire it into the activation DAG in `apply.ps1`.
+- Windows source builds use git hash pinning. When a tool must be compiled from source on Windows, pin by git commit hash, not a tag or branch. Document the build steps in a reusable `Build-<Tool>.ps1` module under `src/platforms/Windows/modules/` and wire it into the activation DAG in `apply.ps1`.
 
 ## Secrets and wallpaper parity
 
-- POSIX secrets: `src/modules/secrets.nix`; Windows: `src/hosts/Windows/modules/secrets/Sync-SecretCatalog.ps1` wired by `apply.ps1`.
-- POSIX wallpapers: `src/modules/wallpapers.nix`; Windows: `src/hosts/Windows/modules/sync-wallpaper.ps1` + `user.dsc.yml`.
+- POSIX secrets: `src/modules/secrets.nix`; Windows: `src/platforms/Windows/modules/secrets/Sync-SecretCatalog.ps1` wired by `apply.ps1`.
+- POSIX wallpapers: `src/modules/wallpapers.nix`; Windows: `src/platforms/Windows/modules/wallpapers/Sync-WallpaperInventory.ps1` + `user.dsc.yml`.
 - Stale cleanup rules must be preserved on every host implementation.
 
 ## Cloud-drive parity
@@ -218,7 +218,7 @@ See `cloud-drives-and-finder.instructions.md` for the full cloud-drive policy. K
 
 ## Cross-platform script deduplication
 
-Scripts under `hosts/<Host>/` must implement a feature that is semantically host-specific. If the feature could apply to any POSIX host, the script belongs in a non-host subdirectory (`services/`, `configs/`, `packages/`, `editors/`, `secrets/`, `shell/`, `agents/`, `lib/`, or root of `src/scripts/`).
+Scripts under `src/hosts/<Host>/scripts/` or `src/platforms/<Platform>/scripts/` must implement a feature that is semantically host- or platform-specific. If the feature could apply to any POSIX host, the script belongs in a non-host subdirectory (`services/`, `configs/`, `packages/`, `editors/`, `secrets/`, `shell/`, `agents/`, `lib/`, or root of `src/scripts/`).
 
 When the same feature exists on both macOS and NixOS with host-specific implementations, the scripts SHOULD be merged into a single POSIX-compatible script using `builtins.replaceStrings` token substitution (preferred) or `case "$(uname)"` dispatch in the script body. Merged scripts MUST NOT use the `macos-` or `nixos-` prefix; they use natural names per the naming rule. After merging, delete the original host-specific scripts — no backwards-compatibility shims.
 
@@ -240,9 +240,9 @@ Timing values are specified directly at their point of use. Find or change a ret
 | Category                     | Source files                                                                                                                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Nix store GC, HM expiry      | `src/modules/posix-base.nix`, `src/scripts/services/nix-store-gc.sh`, `scripts/gc.sh`, `src/modules/lib/gc-options.nix` |
-| macOS timers & defaults      | `src/modules/macos.nix`, `src/hosts/MacBook/defaults.nix`                                                                                                                                                                                   |
-| Linux timers & timeouts      | `src/modules/linux.nix`, `src/modules/posix-security.nix`                                                                                                                                                                                   |
-| Windows schedules & timeouts | `src/hosts/Windows/system.dsc.yml`, `src/hosts/Windows/system-packages.dsc.yml`, `src/hosts/Windows/user.dsc.yml`, `src/hosts/Windows/user-env.dsc.yml`, `src/hosts/Windows/user-context.dsc.yml`, `src/hosts/Windows/modules/system/*.ps1` |
+| macOS timers & defaults      | `src/platforms/macOS/modules/default.nix`, `src/hosts/MacBook/defaults.nix`                                                                                                                                                                                   |
+| Linux timers & timeouts      | `src/platforms/NixOS/modules/default.nix`, `src/modules/posix-security.nix`                                                                                                                                                                                   |
+| Windows schedules & timeouts | `src/hosts/Windows/system.dsc.yml`, `src/hosts/Windows/system-packages.dsc.yml`, `src/hosts/Windows/user.dsc.yml`, `src/hosts/Windows/user-env.dsc.yml`, `src/hosts/Windows/user-context.dsc.yml`, `src/platforms/Windows/modules/system/*.ps1` |
 | Cloud drive caches           | `src/modules/cloud-drives.nix`                                                                                                                                                                                                              |
 | AI/LLM timeouts              | `scripts/ai-sync.sh`, `scripts/gc.sh`                                                                                                                                                                                                       |
 | Declarative-diff GC items    | `scripts/gc.sh`, `scripts/gc.ps1`                                                                                                                                                                                                           |
@@ -262,6 +262,6 @@ When a symlink exists on both POSIX and Windows, writability semantics MUST matc
 
 ### macOS /usr/local/bin symlink farm
 
-`src/scripts/hosts/MacBook/macos-symlink-farm.sh` manages `/usr/local/bin` symlinks for Nix store entries. It reads `__nucleus_symlink_farm` (space-separated `target->name` pairs), creates/updates symlinks, and GCs stale Nix store entries. Safety: only removes symlinks (`-L`), never regular files, never non-Nix symlinks.
+`src/hosts/MacBook/scripts/macos-symlink-farm.sh` manages `/usr/local/bin` symlinks for Nix store entries. It reads `__nucleus_symlink_farm` (space-separated `target->name` pairs), creates/updates symlinks, and GCs stale Nix store entries. Safety: only removes symlinks (`-L`), never regular files, never non-Nix symlinks.
 
 The `__nucleus_symlink_farm` env var is generated in `src/hosts/MacBook/activation.nix` from `appleSdkTools.symlinkFarmTools` plus any extra entries.

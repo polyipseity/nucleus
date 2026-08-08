@@ -15,7 +15,8 @@ Load this skill via `skill: "repo-structure"` when exploring the repository layo
 
 - `src/flake.nix` — Nix flake entry point. Imports host configs (`src/hosts/*/`) and shared modules (`src/modules/`). Defines `nixosConfigurations`, `darwinConfigurations`, home-manager configs, and `nucleus-*` app packages.
 - `src/hosts/` — per-machine configs: `MacBook/` (macOS + nix-darwin), `NixOS/` (Linux), `Windows/` (WinGet DSC YAML + PowerShell apply).
-- `src/modules/` — shared Nix modules used across hosts. List `src/modules/*.nix` for the current set.
+- `src/platforms/` — platform-specific logic shared across hosts on that OS family: `macOS/`, `NixOS/`, `Windows/` (modules, scripts).
+- `src/modules/` — cross-host shared Nix modules. List `src/modules/*.nix` for the current set.
 - `src/scripts/` — shell scripts called by Nix activation or `nucleus-*` apps.
 - `scripts/` — user-facing automation helpers with paired `.sh`/`.ps1` entry points.
 - `tests/` — Nix logic tests + Windows Pester DSC validation.
@@ -25,7 +26,6 @@ Load this skill via `skill: "repo-structure"` when exploring the repository layo
 | Category           | Modules                                                                                      |
 | ------------------ | -------------------------------------------------------------------------------------------- |
 | Base system        | `core.nix`, `posix-base.nix`, `posix-security.nix`, `posix-sops.nix`, `posix-user-shell.nix` |
-| OS-specific        | `macos.nix`, `linux.nix`                                                                     |
 | User environment   | `home.nix`, `shell.nix`, `pwsh.nix`, `starship.nix`, `iterm2.nix`                            |
 | Developer tools    | `dev-repos.nix`, `editors.nix`, `git.nix`                                                    |
 | Security & secrets | `gnupg.nix`, `secrets.nix`                                                                   |
@@ -47,9 +47,10 @@ Additional module files live under these subdirectories:
 - `configs/` — Per-application declarative configs (agents, autocorrect, bun, camilladsp, camillagui-backend, cargo, cloud, direnv, discord-music-rpc, git, iterm2, linearmouse, nextest, nix, obsidian, picard, plasma, pwsh, qtpass, ssh, starship, uv, vms, vscode)
 - `env/` — Env var catalog introspection module (`default.nix`)
 - `lib/` — Support functions (activation-bundle, activation-dag, config-utils, env-catalog, managed-paths, apple-sdk-\*)
-- `macos/` — macOS-specific activation helpers (finder-sidebar, preference-gc)
 - `shell/` — Shell aliases (`aliases.nix`)
 - `users/` — User data helpers (`default.nix`)
+
+OS-specific modules live under `src/platforms/<Platform>/modules/` (`macOS/modules/default.nix`, `NixOS/modules/default.nix`).
 
 ## Hosts
 
@@ -58,7 +59,7 @@ Additional module files live under these subdirectories:
 - `default.nix` — nix-darwin entry. Imports modules, defines services, system defaults.
 - `defaults.nix` — macOS `defaults write` settings (NSGlobalDomain, dock, Finder, etc.).
 - `activation.nix` — nix-darwin activation hooks (Spotlight disable, login items, shell profile).
-- `services.nix` — macOS Services (.app bundles for right-click menus). Self-pruning via home.activation. Relies on `macos/daemon-refresh.nix`.
+- `services.nix` — macOS Services (.app bundles for right-click menus). Self-pruning via home.activation. Daemon refresh via `src/scripts/lib/macos-launch-services.sh`.
 - `homebrew.nix` — Homebrew packages and taps.
 - `cloud-drives.nix` — Cloud drive mount NFS paths.
 - `base.nix` — Common config shared with NixOS.
@@ -83,8 +84,8 @@ Additional module files live under these subdirectories:
 
 ### Windows (`src/hosts/Windows/`)
 
-- `apply.ps1` — orchestration entry point. Dot-sources `modules/*.ps1`, applies WinGet DSC YAML.
-- `modules/` — reusable PowerShell logic: `setup/` (bootstrap installers), `system/` (daemon services, scheduled tasks), `user/` (Sync-\* profile/config scripts), `editors/` (editor configs), `scripts/` (shared scripts), `secrets/` (secret provisioning), `wallpapers/` (wallpaper assets).
+- `apply.ps1` — orchestration entry point. Dot-sources `src/platforms/Windows/modules/*.ps1`, applies WinGet DSC YAML.
+- `modules/` — reusable PowerShell logic lives under `src/platforms/Windows/modules/`: `setup/` (bootstrap installers), `system/` (daemon services, scheduled tasks), `user/` (Sync-* profile/config scripts), `editors/` (editor configs), `scripts/` (shared scripts), `secrets/` (secret provisioning), `wallpapers/` (wallpaper assets).
 - `system/*.dsc.yml` — DSC configs applied system-wide.
 - `user/*.dsc.yml` — Per-user DSC configs listed in `src/users/<username>/windows.json` (`dscConfigFiles`).
 - `source-builds.json` — Source build definitions for packages not available via WinGet.

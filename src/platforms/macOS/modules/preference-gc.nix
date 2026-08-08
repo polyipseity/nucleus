@@ -1,4 +1,4 @@
-# modules/macos/preference-gc.nix — Managed macOS preference domain GC.
+# platforms/macOS/modules/preference-gc.nix — Managed macOS preference domain GC.
 #
 # Provides the domain list and drift-reset script for purging stale user
 # preference state before declarative re-assertion.

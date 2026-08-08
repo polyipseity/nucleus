@@ -1,7 +1,7 @@
 ---
 description: "Use when creating or editing nucleus-* commands and their subcommands. Covers output format, message conventions, help text, structured JSON output, and PowerShell equivalents."
 name: "Nucleus Output Format"
-applyTo: "scripts/**/*.sh, scripts/**/*.ps1, src/scripts/**/*.sh, src/hosts/Windows/modules/**/*.ps1"
+applyTo: "scripts/**/*.sh, scripts/**/*.ps1, src/scripts/**/*.sh, src/platforms/Windows/modules/**/*.ps1"
 ---
 
 # Nucleus Command Output Format Standard
@@ -103,7 +103,7 @@ Same prefix convention: `"<cmd>: <message>"`, `"<cmd>: error: <message>"`, `"<cm
 
 ### Shared module
 
-Use `Format-NucleusOutput.psm1` from `src/hosts/Windows/modules/` which provides:
+Use `Format-NucleusOutput.psm1` from `src/platforms/Windows/modules/` which provides:
 
 - `Write-NucleusInfo <message>`
 - `Write-NucleusError <message>`

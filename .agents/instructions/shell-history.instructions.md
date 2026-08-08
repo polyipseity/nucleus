@@ -1,7 +1,7 @@
 ---
 description: "Use when editing shell history exclusion features across managed shells (zsh, PowerShell, cmd.exe). Lists enabled features, file locations, and per-shell equivalents."
 name: "Shell History Exclusion"
-applyTo: "src/modules/shell.nix, src/modules/pwsh.nix, src/scripts/shell/init.zsh, src/scripts/shell/profile.ps1, src/hosts/Windows/modules/user/Sync-ShellProfile.ps1, src/hosts/Windows/user/shell.dsc.yml"
+applyTo: "src/modules/shell.nix, src/modules/pwsh.nix, src/scripts/shell/init.zsh, src/scripts/shell/profile.ps1, src/platforms/Windows/modules/user/Sync-ShellProfile.ps1, src/hosts/Windows/user/shell.dsc.yml"
 ---
 
 # Shell History Exclusion Features
@@ -19,7 +19,7 @@ All managed shells now exclude two types of history entries:
 
 - **zsh**: `src/scripts/shell/init.zsh`, embedded by `src/modules/shell.nix` (`initContent`)
 - **PowerShell (POSIX)**: `src/scripts/shell/profile.ps1` (PSReadLine block), embedded by `src/modules/pwsh.nix` at Nix eval time
-- **PowerShell (Windows)**: same `src/scripts/shell/profile.ps1` (PSReadLine block), read back into the managed block by `src/hosts/Windows/modules/user/Sync-ShellProfile.ps1` at runtime
+- **PowerShell (Windows)**: same `src/scripts/shell/profile.ps1` (PSReadLine block), read back into the managed block by `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` at runtime
 - **cmd.exe**: documented limitation in `src/hosts/Windows/user/shell.dsc.yml`
 
 ## Adding a new shell

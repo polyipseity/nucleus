@@ -16,8 +16,9 @@ applyTo: "src/**/*.nix"
   - See `AGENTS.md` Repository Shape section for the naming rule (two-track policy: verb-first for action scripts, entity-first for service scripts, with table in `scripts-and-permissions.instructions.md`) and full subdirectory listing.
 - `src/scripts/apply.sh` is the POSIX apply dispatcher behind `nix run .#apply` (kept in root).
 - `src/hosts/<Host>/` contains host entrypoints and host-only fragments. Current Nix hosts are `MacBook` and `NixOS`; `Windows/` is WinGet DSC-managed (no `.nix` files).
-- `src/modules/*.nix` contains shared modules reused across hosts and Home Manager. Keep host-specific hardware/runtime details in host files, not shared modules.
-- **Subagent path reminder**: when asking a subagent to extract or reference a file from a Nix module, the path must be relative to the Nix file's directory, not the repo root. For `src/modules/*.nix`, that means `../scripts/...`; for `src/hosts/MacBook/*.nix`, `../../scripts/...`.
+- `src/platforms/<Platform>/` contains platform-specific modules and scripts shared across hosts on that OS family (`macOS/`, `NixOS/`, `Windows/modules/`).
+- `src/modules/*.nix` contains cross-host shared modules reused across hosts and Home Manager. Keep host-specific hardware/runtime details in host files, not shared modules.
+- **Subagent path reminder**: when asking a subagent to extract or reference a file from a Nix module, the path must be relative to the Nix file's directory, not the repo root. For `src/modules/*.nix`, that means `../scripts/...`; for `src/platforms/<Platform>/modules/*.nix`, `../../../scripts/...` (cross-platform scripts) or `../../scripts/...` (platform scripts); for `src/hosts/<Host>/*.nix`, `../../scripts/...`.
 
 ## Flake conventions
 
@@ -49,9 +50,9 @@ Instead, create a small import wrapper script under `src/scripts/lib/` that sour
 
 See `src/scripts/lib/import-symlink-hardening.sh` for the canonical pattern.
 
-The only exception is standalone scripts under `src/scripts/` that are not libraries (e.g. scripts executed for their side effects, like `src/scripts/hosts/MacBook/macos-configure-preflight-privacy.sh`). These may be run directly via `builtins.readFile` without an import wrapper.
+The only exception is standalone scripts under `src/scripts/` that are not libraries (e.g. scripts executed for their side effects, like `src/platforms/macOS/scripts/macos-configure-preflight-privacy.sh`). These may be run directly via `builtins.readFile` without an import wrapper.
 
-A second exception covers **thin library wrappers** (scripts that only source a library and call functions, with no loops or conditionals): embed the library via `${builtins.readFile <lib-path>}` in the activation block and call the functions inline. This is already practiced in `macos.nix`, `home.nix`, and `config-utils.nix` (see `scripts-and-permissions.instructions.md` — "When a script needs its own file" for the full policy).
+A second exception covers **thin library wrappers** (scripts that only source a library and call functions, with no loops or conditionals): embed the library via `${builtins.readFile <lib-path>}` in the activation block and call the functions inline. This is already practiced in `src/platforms/macOS/modules/default.nix`, `home.nix`, and `config-utils.nix` (see `scripts-and-permissions.instructions.md` — "When a script needs its own file" for the full policy).
 
 ## Activation script value injection
 
@@ -99,8 +100,8 @@ Always use `pkgs.writeNucleusShellApplication` instead of `pkgs.writeShellApplic
 
 `writeNucleusShellApplication` provides:
 
-- `bundleDefault` — defaults to `false`. When `true`, symlinks the shared `nucleus-scripts-bundle` (`scripts/`) and `nucleus-script-tree` (`src/scripts/`) derivations into `$out` (store-deduplicated). Opt in only when runtime needs sibling scripts under `scripts/` (e.g. `mkCheckPwshPackage`). When `false` and `text == null`, the entry script is symlinked into `$out` and `script-tree/src` is symlinked to `$out/src` so `SCRIPT_DIR/../src/scripts/lib/` resolves. The `nucleusApp` helper in `flake.nix` does not override this default — pass `bundleDefault = true` explicitly at call sites that need the full `scripts-bundle`.
-- `scriptName` — references a script by its subdirectory path (e.g., `"services/jellyfin-daemon"` resolves to `src/scripts/services/jellyfin-daemon.sh` when under `src/scripts/`, or `scripts/gc` for user CLIs). The script receives `$@` from the wrapper; pass values as positional args at the call site.
+- `bundleDefault` — defaults to `false`. When `true`, symlinks the shared `nucleus-scripts-bundle` (`scripts/`) and `nucleus-script-tree` (`src/`) derivations into `$out` (store-deduplicated). Opt in only when runtime needs sibling scripts under `scripts/` (e.g. `mkCheckPwshPackage`). When `false` and `text == null`, the entry script is symlinked into `$out` and `script-tree/src` is symlinked to `$out/src` so `SCRIPT_DIR/../src/scripts/lib/` resolves. The `nucleusApp` helper in `flake.nix` does not override this default — pass `bundleDefault = true` explicitly at call sites that need the full `scripts-bundle`.
+- `scriptName` — repo-root-relative path without `.sh` suffix. Paths under `scripts/` resolve via `scripts-bundle` (e.g. `"scripts/gc"` for user CLIs). All other paths resolve via `script-tree` (e.g. `"src/scripts/services/jellyfin-daemon"`, `"src/platforms/macOS/scripts/macos-gc-preferences"`, `"src/hosts/MacBook/scripts/macos-daemonize-linux-builder"`). The script receives `$@` from the wrapper; pass values as positional args at the call site.
 - `text` — inline the script body directly instead of referencing an external file. Does not bundle trees regardless of `bundleDefault`; sets up `PATH` from `runtimeInputs`, and appends the text content to the wrapper. Use when the script body is trivial or when a shared script cannot be reused due to host-specific values.
 - `extraEnv` — injects Nix-computed values as environment variables into the wrapper script. Values are automatically shell-escaped. **Prefer positional args for standalone scripts** (see "CLI-arg-first pattern" below). Use `extraEnv` when the script body is a **shared body sourced by multiple callers** (see "Shared script body pattern" below) — the env var contract stays uniform across callers, avoiding dual-parsing of `$1` and env-var fallbacks in the shared code. Environment variables are opaque to shellcheck, bypass PATH isolation, and cannot be forwarded through exec wrappers; these drawbacks are acceptable for shared bodies where args are not the natural interface.
 
@@ -136,7 +137,7 @@ extraEnv = {
   NIX_STORE_BIN = "${pkgs.nix}/bin/nix";
   MANAGED_PREF_DOMAINS = builtins.concatStringsSep " " resetUserPreferenceDomains;
 };
-scriptName = "hosts/MacBook/macos-gc-preferences";
+scriptName = "src/platforms/macOS/scripts/macos-gc-preferences";
 ```
 
 This avoids:
@@ -202,7 +203,7 @@ The Apple SDK is enhanced with symlinks for Xcode toolchain shims that nixpkgs d
 
 - When adding a new managed macOS defaults domain in either:
   - `src/hosts/MacBook/defaults.nix` (`system.defaults.*` or `system.defaults.CustomUserPreferences.<domain>`), or
-  - `src/modules/macos.nix` (user activation `defaults write` hooks), you must update `resetUserPreferenceDomains` in `src/modules/macos.nix` in the same change.
+  - `src/platforms/macOS/modules/default.nix` (user activation `defaults write` hooks), you must update `resetUserPreferenceDomains` in `src/platforms/macOS/modules/preference-gc.nix` in the same change.
 - Keep `resetUserPreferenceDomains` alphabetically sorted.
 - If the managed domain is `NSGlobalDomain`, also account for the on-disk `.GlobalPreferences` alias used by macOS preference plist storage.
 - Do not add a new managed domain without updating the purge list; that creates preference drift where manual user overrides can survive declarative rebuilds.
@@ -276,7 +277,7 @@ When running as root via launchd without `UserName`, `HOME` is unset. Scripts wi
 
 Home Manager's launchd module runs `setupLaunchAgents` after `entryAfter [ "writeBoundary" ]`, registering or updating user-scope LaunchAgents from the new generation. On macOS 26, `launchctl bootstrap` can spuriously fail with "Input/output error". Since HM uses `cmp -s` to compare old vs. new plists, an agent that failed registration is skipped on subsequent activations (its plist is unchanged on disk).
 
-The `macos-ensure-launchagents` block in `src/modules/macos.nix` (`home.activation.macos-ensure-launchagents = lib.hm.dag.entryAfter [ "setupLaunchAgents" ]`) re-verifies all HM-managed agents after `setupLaunchAgents` runs. For each unregistered agent it: `bootout` (best-effort) → `sleep 1` → `bootstrap` → `kickstart -p`.
+The `macos-ensure-launchagents` block in `src/platforms/macOS/modules/default.nix` (`home.activation.macos-ensure-launchagents = lib.hm.dag.entryAfter [ "setupLaunchAgents" ]`) re-verifies all HM-managed agents after `setupLaunchAgents` runs. For each unregistered agent it: `bootout` (best-effort) → `sleep 1` → `bootstrap` → `kickstart -p`.
 
 Any activation step that must run after launchd agents are registered should use `entryAfter [ "setupLaunchAgents" ]`.
 
@@ -330,7 +331,7 @@ The `apply.sh` dispatcher calls `generate_ssh_host_key_if_needed` then `register
 - Requires primary GPG key in keyring (`gpg --import` before first apply); fails with clear error and hint if GPG unavailable.
 - `ssh-to-age`, `sops`, `openssh`, `git` provided by `mkApplyApp` `runtimeInputs` in `flake.nix`; no separate install needed.
 
-Windows equivalent: `Register-HostAgeKey` in `src/hosts/Windows/modules/secrets/Register-HostAgeKey.ps1`, called when `$EnableHostAgeKeyRegistration` is `$true`.
+Windows equivalent: `Register-HostAgeKey` in `src/platforms/Windows/modules/secrets/Register-HostAgeKey.ps1`, called when `$EnableHostAgeKeyRegistration` is `$true`.
 
 ## Pre-provision key adoption semantics
 

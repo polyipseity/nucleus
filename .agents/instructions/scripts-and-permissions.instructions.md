@@ -1,5 +1,5 @@
 ---
-description: "Use when adding or editing files under scripts/, src/scripts/, or src/hosts/Windows/modules/. Covers script placement, newline policy, cross-platform behavior, runtime detection, and permission expectations."
+description: "Use when adding or editing files under scripts/, src/scripts/, or src/platforms/Windows/modules/. Covers script placement, newline policy, cross-platform behavior, runtime detection, and permission expectations."
 name: "Scripts and Permissions"
 applyTo: "scripts/**, src/scripts/**, src/**/*.ps1"
 ---
@@ -24,7 +24,7 @@ applyTo: "scripts/**, src/scripts/**, src/**/*.ps1"
 - If a script becomes application code rather than repo automation, move it into the appropriate source tree instead of leaving it in `scripts/`.
 - Detect a script's runtime from its extension, shebang, adjacent config files, and the commands it invokes before adding stack-specific script guidance.
 - `src/scripts/apply.sh` (the Nix apply dispatcher) lives under `src/` because it is embedded in the flake as `apps.apply`; it follows the same doc and line-ending rules as `scripts/` shell scripts.
-- **Host-specific placement rule**: scripts under `hosts/<Host>/` must implement a semantically host-specific feature. Cross-platform features belong in non-host subdirectories (`services/`, `configs/`, `packages/`, `editors/`, `secrets/`, `shell/`, `agents/`, `lib/`, `integrations/`). See [cross-host-feature-parity.instructions.md](cross-host-feature-parity.instructions.md) for the script deduplication policy.
+- **Host-specific placement rule**: scripts under `src/hosts/<Host>/scripts/` must implement a semantically host-specific feature; scripts under `src/platforms/<Platform>/scripts/` implement platform-shared behavior for that OS family. Cross-platform features belong in non-host subdirectories (`services/`, `configs/`, `packages/`, `editors/`, `secrets/`, `shell/`, `agents/`, `lib/`, `integrations/`). See [cross-host-feature-parity.instructions.md](cross-host-feature-parity.instructions.md) for the script deduplication policy.
 
 ## Per-directory naming patterns
 
@@ -46,7 +46,8 @@ Non-host subdirectories follow a two-track convention:
 | `secrets/`              |             `<verb>-<target>.sh` | What action?     |
 | `services/`             |             `<entity>-<role>.sh` | Which component? |
 | `shell/`                | `init.*` or `<verb>-<target>.sh` | Varies           |
-| `hosts/<Host>/`         | `<prefix>-<verb>-<target>.<ext>` | What action?     |
+| `src/hosts/<Host>/scripts/` | `<prefix>-<verb>-<target>.<ext>` | What action?     |
+| `src/platforms/<Platform>/scripts/` | `<prefix>-<verb>-<target>.<ext>` | What action?     |
 
 `<prefix>` is `macos-` for MacBook, `nixos-` for NixOS, etc.
 
@@ -84,17 +85,17 @@ When adding or renaming standalone PowerShell entry points, use PascalCase and a
 
 The `scripts/` directory is the exception: helper scripts there keep the paired shell basename so the `.sh` and `.ps1` entry points stay aligned. That means `bootstrap.sh` pairs with `bootstrap.ps1`, `check-sh.sh` pairs with `check-sh.ps1`, and `check-pwsh.ps1` is a separate entry point for PowerShell linting (PSScriptAnalyzer) — not the Windows twin of `check-sh.sh`.
 
-For reusable Windows modules under `src/hosts/Windows/modules/`, keep the file name aligned with the exported function name and prefer a single exported `Verb-Noun` function per file. If a module is renamed, update the dot-sourcing paths in `src/hosts/Windows/apply.ps1` in the same change. Collection-operating functions must use collection-indicating singular nouns — see [pwsh-lint-policy.instructions.md](pwsh-lint-policy.instructions.md) (`PSUseSingularNouns`, anti–naive-de-pluralization).
+For reusable Windows modules under `src/platforms/Windows/modules/`, keep the file name aligned with the exported function name and prefer a single exported `Verb-Noun` function per file. If a module is renamed, update the dot-sourcing paths in `src/hosts/Windows/apply.ps1` in the same change. Collection-operating functions must use collection-indicating singular nouns — see [pwsh-lint-policy.instructions.md](pwsh-lint-policy.instructions.md) (`PSUseSingularNouns`, anti–naive-de-pluralization).
 
-If a PowerShell file exports multiple functions or none, keep it in `src/hosts/Windows/modules/` as a utility module and give the filename a scope that describes the shared purpose of the file.
+If a PowerShell file exports multiple functions or none, keep it in `src/platforms/Windows/modules/` as a utility module and give the filename a scope that describes the shared purpose of the file.
 
 ### PowerShell here-string extraction
 
 The no-embedding invariant, shared cross-platform content rule, token convention, and exceptions are canonical in [embedded-content.instructions.md](embedded-content.instructions.md). This section keeps the mechanical details:
 
-When extracting inline PowerShell here-strings from `src/hosts/Windows/modules/` into standalone scripts:
+When extracting inline PowerShell here-strings from `src/platforms/Windows/modules/` into standalone scripts:
 
-- Extract the script body to `src/hosts/Windows/modules/scripts/<name>.ps1`.
+- Extract the script body to `src/platforms/Windows/modules/scripts/<name>.ps1`.
 - In the caller, read it with: `Get-Content -Raw (Join-Path -Path $PSScriptRoot -ChildPath "..\scripts\<name>.ps1")`
 - From any module subdirectory (`user/`, `system/`, `editors/`), `..\scripts\` resolves to `modules/scripts/`.
 - For double-quote here-strings (`@"..."@`) with expanded variables, use token replacement: `$content = (Get-Content -Raw ...) -replace '__TOKEN__', $value`.
@@ -122,7 +123,7 @@ Rules:
 ## Line endings and permissions
 
 - Respect `.editorconfig` and `.gitattributes` for line endings. New script extensions need explicit policy before widespread use.
-- Every `.sh`, `.ps1`, and `.bat` script file anywhere in the repository must have its executable bit tracked in Git, regardless of location (`scripts/`, `src/scripts/`, `src/hosts/Windows/`, `src/hosts/Windows/modules/`, or elsewhere). This applies to Windows scripts too — Git stores the executable bit independent of CRLF line endings, and many CI environments and tooling wrappers check the mode before invoking scripts. Set it with `git update-index --chmod=+x <path>` when adding or renaming any script. Verify the stored mode with `git ls-files --stage <path>` (mode `100755` is correct; `100644` is not). Non-script data files such as `bootstrap-versions.env`, `.yml`, `.json`, and `.nix` files must remain `100644`.
+- Every `.sh`, `.ps1`, and `.bat` script file anywhere in the repository must have its executable bit tracked in Git, regardless of location (`scripts/`, `src/scripts/`, `src/hosts/Windows/`, `src/platforms/Windows/modules/`, or elsewhere). This applies to Windows scripts too — Git stores the executable bit independent of CRLF line endings, and many CI environments and tooling wrappers check the mode before invoking scripts. Set it with `git update-index --chmod=+x <path>` when adding or renaming any script. Verify the stored mode with `git ls-files --stage <path>` (mode `100755` is correct; `100644` is not). Non-script data files such as `bootstrap-versions.env`, `.yml`, `.json`, and `.nix` files must remain `100644`.
 - If you add a new script extension or change placement conventions, update the related config and any tests in the same change.
 
 ## Sorting
@@ -197,11 +198,11 @@ Adding a new toggle: add a default entry to the `DEFAULTS`/`$Defaults` map in bo
 All program/daemon/service killing, refresh, and restart operations must go through centralized library functions:
 
 - **macOS**: `src/scripts/lib/macos-launch-services.sh` (`refresh_*` functions)
-- **Windows**: `src/hosts/Windows/modules/Set-NucleusService.ps1`
+- **Windows**: `src/platforms/Windows/modules/Set-NucleusService.ps1`
 
 Do not inline killall/Stop-Service commands in activation blocks or individual scripts. This ensures a single point of control per OS and prevents redundant kills in the same activation run.
 
-For macOS activation blocks that need daemon refresh, use wrapper scripts under `src/scripts/hosts/MacBook/` that source the library and call the appropriate `refresh_*` function. Activate them via `builtins.readFile`.
+For macOS activation blocks that need daemon refresh, use wrapper scripts under `src/platforms/macOS/scripts/` (or `src/scripts/lib/macos-launch-services.sh` directly when inlined) that source the library and call the appropriate `refresh_*` function. Invoke via the activation bundle subprocess pattern.
 
 ## When a script needs its own file
 

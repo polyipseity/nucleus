@@ -20,7 +20,7 @@ Where content files live and how consumers read them:
 | --- | --- | --- | --- |
 | POSIX, Nix eval time | `src/scripts/`, `src/modules/configs/` | `builtins.readFile` | `__TOKEN__` via `builtins.replaceStrings` |
 | POSIX, sh runtime | adjacent under `src/scripts/` | SCRIPT_DIR-relative read (`# shellcheck source=`) | `__TOKEN__` via `sed` |
-| Windows, PowerShell runtime | `src/hosts/Windows/modules/scripts/<name>` (Windows-only) or shared `src/scripts/` | `Get-Content -Raw (Join-Path -Path $PSScriptRoot -ChildPath '..\scripts\<name>')` | `__TOKEN__` via `-replace '__TOKEN__', $value` |
+| Windows, PowerShell runtime | `src/platforms/Windows/modules/scripts/<name>` (Windows-only) or shared `src/scripts/` | `Get-Content -Raw (Join-Path -Path $PSScriptRoot -ChildPath '..\scripts\<name>')` | `__TOKEN__` via `-replace '__TOKEN__', $value` |
 | VM templates (shared) | `src/vms/templates/` | `Get-Content -Raw` + `.Replace` (Windows), `sed` (POSIX) | `__TOKEN__` |
 | App configs | `src/modules/configs/` | `ConfigHelpers.ps1` methods; Nix `home.file` | — |
 

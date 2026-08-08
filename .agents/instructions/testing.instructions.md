@@ -1,7 +1,7 @@
 ---
 description: "Use when implementing new features, modules, or changes that require test coverage. Mandates test-driven development (TDD) practices for Nix and Windows DSC configurations. Covers test structure, CI integration, and validation patterns."
 name: "Testing Guidelines"
-applyTo: "tests/**, src/hosts/Windows/**/*.yml, src/hosts/Windows/modules/**/*.ps1, tests/scripts/**, scripts/check.sh, scripts/check.ps1, scripts/test.sh, scripts/test.ps1, .github/workflows/**"
+applyTo: "tests/**, src/hosts/Windows/**/*.yml, src/platforms/Windows/modules/**/*.ps1, tests/scripts/**, scripts/check.sh, scripts/check.ps1, scripts/test.sh, scripts/test.ps1, .github/workflows/**"
 ---
 
 # Test-Driven Development Practices
@@ -14,6 +14,8 @@ applyTo: "tests/**, src/hosts/Windows/**/*.yml, src/hosts/Windows/modules/**/*.p
 - **Pester tests** (Windows): Runtime validation of DSC resources
 
 Tests must accompany every feature or breaking change. Ensure tests pass locally before submitting PRs.
+
+**Tests mirror `src/`:** `tests/hosts/<Host>/`, `tests/platforms/<Platform>/`, `tests/modules/` (cross-host shared), plus `tests/integration/` and `tests/scripts/`. Rule: `src/<layer>/...` → `tests/<layer>/...`.
 
 ---
 

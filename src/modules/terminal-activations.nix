@@ -18,7 +18,7 @@
 #      declarative option, a Home Manager activation entry, or a system
 #      activation script that runs inside the rebuild.
 #   3. The technical constraint is documented inline with a `# WHY:` comment
-#      at the call site (see: src/modules/macos.nix for the established
+#      at the call site (see: src/platforms/macOS/modules/default.nix for the established
 #      pattern).
 #
 # If a command does not need TCC-sensitive context (FDA, Accessibility,
