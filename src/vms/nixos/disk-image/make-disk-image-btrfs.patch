@@ -34,7 +34,47 @@
  ''
  else
  ''
-@@ -617,6 +625,7 @@ buildImage = pkgs.vmTools.runInLinuxVM (
+@@ -580,11 +588,38 @@ else
+     }
+
+     echo "copying staging root to image..."
+-    cptofs -p ${lib.optionalString (partitionTableType != "none") "-P ${rootPartition}"} \
+-           -t ${fsType} \
+-           -i $diskImage \
+-           $root${lib.optionalString onlyNixStore builtins.storeDir}/* / ||
+-      (echo >&2 "ERROR: cptofs failed. diskSize might be too small for closure."; exit 1)
++    if [ "${fsType}" = "btrfs" ]; then
++      # WHY: cptofs lands on btrfs top-level (subvolid=5). Copy into @/@nix subvolumes to match bare-metal install.
++      loopdev=$(losetup -f --show -P "$diskImage")
++      partdev="''${loopdev}p${rootPartition}"
++      btrfs_mnt="$TMPDIR/btrfs-top"
++      root_mnt="$TMPDIR/btrfs-root"
++      nix_mnt="$TMPDIR/btrfs-nix"
++      mkdir -p "$btrfs_mnt" "$root_mnt" "$nix_mnt"
++      mount -t btrfs "$partdev" "$btrfs_mnt"
++      btrfs subvolume create "$btrfs_mnt/@"
++      btrfs subvolume create "$btrfs_mnt/@nix"
++      umount "$btrfs_mnt"
++      mount -o subvol=@ "$partdev" "$root_mnt"
++      mount -o subvol=@nix "$partdev" "$nix_mnt"
++      mkdir -p "$root_mnt/nix"
++      rsync -a --exclude=nix/ "$root"/ "$root_mnt"/
++      rsync -a "$root/nix/" "$nix_mnt"/
++      btrfs subvolume set-default "$(btrfs subvolume id "$root_mnt")" "$partdev"
++      umount "$nix_mnt"
++      umount "$root_mnt"
++      losetup -d "$loopdev"
++    else
++      cptofs -p ${lib.optionalString (partitionTableType != "none") "-P ${rootPartition}"} \
++             -t ${fsType} \
++             -i $diskImage \
++             $root${lib.optionalString onlyNixStore builtins.storeDir}/* / ||
++        (echo >&2 "ERROR: cptofs failed. diskSize might be too small for closure."; exit 1)
++    fi
+   '';
+
+   moveOrConvertImage = ''
+@@ -617,6 +652,7 @@ buildImage = pkgs.vmTools.runInLinuxVM (
        buildInputs = with pkgs; [
          util-linux
          e2fsprogs

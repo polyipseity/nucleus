@@ -3,7 +3,8 @@
 # Upstream make-disk-image.nix only supports partitioned layouts with ext4
 # (mkfs.ext4 -E offset=...). Nucleus guest images use hybrid/EFI partition
 # tables with a Btrfs root, so this wrapper patches the upstream module at eval
-# time. Delete this fork once nixpkgs accepts partitioned Btrfs images upstream.
+# time. For btrfs, staging is copied into @/@nix subvolumes (not cptofs onto
+# subvolid=5). Delete this fork once nixpkgs accepts partitioned Btrfs images upstream.
 { modulesPath, pkgs, ... }@args:
 let
   upstreamPath = "${toString modulesPath}/../lib/make-disk-image.nix";
