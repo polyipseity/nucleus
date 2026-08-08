@@ -82,6 +82,18 @@ done
 REPO_ROOT="$(derive_repo_root)"
 export NUCLEUS_REPO_ROOT="$REPO_ROOT"
 
+# Prefer the live checkout when nucleus-apply dispatches a store snapshot.
+# WHY: store-bundled apply.sh can lag behind git pull until the next rebuild.
+_aar_self="$(CDPATH='' cd -P -- "$(dirname -- "$0")" && pwd)/$(basename -- "$0")"
+_aar_live="$REPO_ROOT/src/scripts/apply.sh"
+if [ -f "$_aar_live" ]; then
+  _aar_live_resolved="$(CDPATH='' cd -P -- "$(dirname -- "$_aar_live")" && pwd)/$(basename -- "$_aar_live")"
+  if [ "$_aar_self" != "$_aar_live_resolved" ]; then
+    exec "$_aar_live" "$@"
+  fi
+fi
+unset _aar_self _aar_live _aar_live_resolved
+
 # Augment PATH with the user Nix profile bin directory so Nix-managed binaries
 # (e.g. ssh-to-age, sops) are available when the script is invoked directly
 # rather than through `nix run .#apply` (which adds them via runtimeInputs).
