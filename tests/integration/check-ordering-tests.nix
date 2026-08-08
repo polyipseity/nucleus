@@ -1,5 +1,5 @@
-# tests/integration/check-ordering-tests.nix — Verify that all 26 check step files
-# exist for both POSIX and Windows with consecutive 1-26 numbering and matching
+# tests/integration/check-ordering-tests.nix — Verify that all 27 check step files
+# exist for both POSIX and Windows with consecutive 1-27 numbering and matching
 # inline register_step / Register-Step calls.
 
 let
@@ -32,23 +32,23 @@ let
   checkSh = f: (shStepNumStr f) == (fileStepNumStr f);
   checkPs1 = f: (ps1StepNumStr f) == (fileStepNumStr f);
 
-  # Expected step numbers as strings: "1", "2", ..., "26"
-  expectedNums = builtins.genList (i: toString (i + 1)) 26;
+  # Expected step numbers as strings: "1", "2", ..., "27"
+  expectedNums = builtins.genList (i: toString (i + 1)) 27;
 in
 
 # ---- POSIX step files ----
 
-assert builtins.length shFiles == 26;
+assert builtins.length shFiles == 27;
 assert map shStepNumStr shFiles == expectedNums;
 assert builtins.all checkSh shFiles;
 
 # ---- Windows step files ----
 
-assert builtins.length ps1Files == 26;
+assert builtins.length ps1Files == 27;
 assert map ps1StepNumStr ps1Files == expectedNums;
 assert builtins.all checkPs1 ps1Files;
 
 {
   success = true;
-  message = "All 26 POSIX and 26 Windows check step files validated: consecutive 1-26 numbering with matching inline register_step/Register-Step calls. Windows step 1 uses 'Code formatting and linting (treefmt equivalent)'.";
+  message = "All 27 POSIX and 27 Windows check step files validated: consecutive 1-27 numbering with matching inline register_step/Register-Step calls. Windows step 1 uses 'Code formatting and linting (treefmt equivalent)'.";
 }
