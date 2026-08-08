@@ -4,6 +4,20 @@ name: "Host and OS naming"
 applyTo: "src/modules/**/*.json, src/modules/**/*.nix, scripts/**/*.{sh,ps1}, src/scripts/**/*.{sh,ps1}"
 ---
 
+## Directory placement
+
+| Layer | Path | Keys | Contents |
+| ----- | ---- | ---- | -------- |
+| **Host** | `src/hosts/<Host>/` | `MacBook`, `NixOS`, `Windows` | Flake system config, `MANUAL.md`, patches, host-only `scripts/`, Windows `apply.ps1` + DSC YAML |
+| **Platform** | `src/platforms/<Platform>/` | `macOS`, `NixOS`, `Windows` | HM platform `modules/`, platform `scripts/`, Windows PowerShell `modules/` |
+| **Shared** | `src/modules/`, `src/scripts/` | — | Cross-host Nix modules and POSIX scripts only |
+
+**Exceptions** (stay outside `hosts/` and `platforms/`): `src/modules/configs/` (machine-wide singleton configs), `src/users/` (per-user overlays).
+
+**Tests mirror `src/`:** `tests/hosts/<Host>/`, `tests/platforms/<Platform>/`, `tests/modules/` (shared), plus `tests/integration/` and `tests/scripts/`.
+
+**Dependency rules:** `src/hosts/<Host>/` may import same host, any `src/platforms/<Platform>/`, `src/modules/`, `src/scripts/`. `src/platforms/<Platform>/` may import same platform, `src/modules/`, `src/scripts/` — never `src/hosts/<OtherHost>/`.
+
 ## Three layers
 
 | Layer | Values | Role |

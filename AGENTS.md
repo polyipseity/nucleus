@@ -3,11 +3,13 @@
 ## Repository Shape
 
 - Root `AGENTS.md` is the workspace-wide source of truth. Do not add `.github/copilot-instructions.md`.
-- `src/` contains the Nix-based declarative configuration: `flake.nix`, `hosts/` (per-machine configs), and `modules/` (shared logic).
+- `src/` contains the Nix-based declarative configuration: `flake.nix`, `hosts/` (per-machine configs), `platforms/` (per-platform logic), and `modules/` (cross-host shared logic).
   - `src/flake.lock` is the Nix-mandated lockfile location — Nix requires `flake.lock` adjacent to `flake.nix`. The canonical lockfile storage is under `src/lockfiles/` but `flake.lock` cannot be moved there due to this Nix limitation. It is not duplicated; the `src/lockfiles/` directory holds all other lockfiles (`lockfile.json`, etc.) alongside a symlinked copy of `flake.lock` for organizational consistency.
-- `src/users/` contains per-user configuration overlays: registry domain JSON (`src/users/<username>/<domain>.json` with `src/users/default/` fallback; schemas co-located as `src/users/default/<domain>.schema.json`), plus per-user homedir app trees (`vscode/`, `agents/`, `direnv/`, …) resolved via `mkUserOverlay` in `users-overlay.nix` (POSIX) and `Resolve-UserConfig*` in `ConfigHelpers.ps1` (Windows). See `user-config-placement.instructions.md` for the `configs/` vs `users/` placement rule. Runtime assembly of domain JSON uses `users-registry.nix` (Nix), `load-user-registry.sh` / `Load-UserRegistry.ps1` (shell/PowerShell).
-- `src/modules/configs/` holds machine-wide singleton configs only (system paths, service configs, runtime read by nucleus-owned scripts) — not per-user homedir deployments.
-- Use single-file modules only in `src/modules/`. Do not create `src/modules/<name>/` directories. The only allowed exceptions are `src/modules/macos/` (daemon-refresh.nix, finder-sidebar.nix, preference-gc.nix) and `src/modules/env/` (centralized env var introspection module).
+- `src/hosts/<Host>/` — host-specific deployment: flake system config (`MacBook/`, `NixOS/`), Windows `apply.ps1` + DSC YAML (`Windows/`), host-only activation scripts (`<Host>/scripts/`).
+- `src/platforms/<Platform>/` — platform-specific logic shared across hosts on that OS family: Home Manager modules (`modules/`), activation scripts (`scripts/`), Windows PowerShell modules (`Windows/modules/`). Keys: `macOS`, `NixOS`, `Windows` (canonical capitalization from `host-platform-registry.json`).
+- `src/modules/` — cross-host shared Nix modules only (`home.nix`, `core.nix`, `lib/`, …). Use single-file modules; the only allowed subdirectory exception is `src/modules/env/` (centralized env var introspection).
+- **Layout exceptions** (do not move under `hosts/` or `platforms/`): `src/modules/configs/` (machine-wide singleton configs with host-keyed variants) and `src/users/` (per-user overlays — registry domain JSON, homedir app trees). See `user-config-placement.instructions.md` and `app-config-policy.instructions.md`.
+- `src/users/` contains per-user configuration overlays: registry domain JSON (`src/users/<username>/<domain>.json` with `src/users/default/` fallback; schemas co-located as `src/users/default/<domain>.schema.json`), plus per-user homedir app trees (`vscode/`, `agents/`, `direnv/`, …) resolved via `mkUserOverlay` in `users-overlay.nix` (POSIX) and `Resolve-UserConfig*` in `ConfigHelpers.ps1` (Windows). Runtime assembly of domain JSON uses `users-registry.nix` (Nix), `load-user-registry.sh` / `Load-UserRegistry.ps1` (shell/PowerShell).
 - `scripts/` contains user-facing automation helpers with paired `.sh`/`.ps1` entry points: bootstrap, check, cloud-setup, gc, health-check, replica-sync, replica-reset, update, vm-setup, ai-sync, and others.
 - `src/scripts/` contains Nix-internal scripts organized into domain subdirectories:
   - `apply.sh` — POSIX apply dispatcher (kept in root)
@@ -25,30 +27,21 @@
     install-uv-tools, install-bun-packages, install-pwsh-module)
   - `editors/` — editor-specific scripts (VS Code workspace trust, extension symlink bridge,
     config symlinks, neovim init)
-  - `hosts/` — host-specific scripts: `MacBook/` (macOS) and `NixOS/`.
   - `integrations/` — file-manager and desktop-environment integration scripts
     (open-host-manual, file-manager-pdf-opt)
   - `agents/` — AI agent setup scripts (agent-skills, agents-symlink, sync-clawhub-skills)
   - **Naming rule**:
-    - Files under `hosts/MacBook/` MUST start with `macos-` followed by a verb-first name: `macos-<verb>-<target>.<ext>`; entry name = filename.
-    - Files under `hosts/NixOS/` MUST start with `nixos-` followed by a verb-first name: `nixos-<verb>-<target>.<ext>`; entry name = filename.
+    - Files under `src/hosts/<Host>/scripts/` or `src/platforms/<Platform>/scripts/` MUST use the platform prefix (`macos-`, `nixos-`) followed by a verb-first name: `<prefix><verb>-<target>.<ext>`; entry name = filename.
     - All other subdirs follow a two-track convention: **verb-first** for action scripts, **entity-first** for service scripts (see `.agents/instructions/scripts-and-permissions.instructions.md` for the full per-directory table).
     - Rule does not apply to runtime-only scripts or wrapped derivations. Library scripts in
-      `lib/` that are host-specific MUST still use the host prefix (e.g., `macos-`). Generic
+      `lib/` that are platform-specific MUST still use the platform prefix (e.g., `macos-`). Generic
       cross-platform lib scripts may use natural names.
-  - **Placement policy for `hosts/`**:
-    1. **Host-specific scripts belong in `hosts/<Host>/`.** If a script is macOS-only,
-       NixOS-only, or Linux-only, place it under the corresponding `hosts/<Host>/`
-       directory with the appropriate prefix (`macos-` or `nixos-`).
-    2. **Cross-platform scripts → never in `hosts/`.** If a script is cross-platform
-       (no OS-specific commands, no host-specific semantics), it must never go under
-       `hosts/<Host>/`. It belongs in a non-host folder (`services/`, `configs/`,
-       `packages/`, `editors/`, `lib/`, `secrets/`, `shell/`, `agents/`, `integrations/`, or the root
-       of `src/scripts/`).
-    - The `hosts/<Host>/` directory exists for host-specific scripts only.
-    - Library scripts (`lib/`) are exempt from the host-specific placement rule — they stay
-      in `lib/` regardless of platform specificity.
-- `tests/` contains automated tests: `tests/modules/`, `tests/integration/`, and `tests/hosts/<host>/` for Nix logic tests, `tests/hosts/Windows/` for Pester DSC validation. All changes require corresponding tests; see `.agents/instructions/testing.instructions.md`.
+  - **Placement policy for activation scripts**:
+    1. **Host-specific scripts** → `src/hosts/<Host>/scripts/` (wired only from that host's flake config).
+    2. **Platform-specific scripts** → `src/platforms/<Platform>/scripts/` (wired from HM platform modules).
+    3. **Cross-platform scripts** → `src/scripts/` only (`services/`, `configs/`, `lib/`, …).
+    - Library scripts (`lib/`) are exempt from host/platform placement — they stay in `lib/`.
+- `tests/` mirrors `src/` layout: `tests/hosts/<Host>/`, `tests/platforms/<Platform>/`, `tests/modules/` (cross-host shared), plus `tests/integration/` and `tests/scripts/`. Rule: `src/<layer>/...` → `tests/<layer>/...`. All changes require corresponding tests; see `.agents/instructions/testing.instructions.md`.
 - No `docs/` directory exists or may be created. Repository documentation lives in `.agents/instructions/*.instructions.md`, `src/hosts/<Host>/MANUAL.md`, or inline comments.
 - Keep this file short and durable. Put file-type and workflow-specific rules in `.agents/instructions/*.instructions.md`, reusable workflows in `.agents/prompts/*.prompt.md`, and skill assets in `.agents/skills/<skill>/`.
 - Inspect the on-disk tree before assuming source files, tests, or runnable commands exist in a given location.
@@ -114,8 +107,8 @@
 - Config deployment follows priority-ordered methods defined in `.agents/instructions/app-config-policy.instructions.md`: writable symlink (default) > read-only > merge > runtime direct read. Any deviation from the default must have a code comment explaining why.
 - Git scope terminology is canonical: "global" means machine-wide (`git --system`), "user" means per-user (`git --global`). Never use "global" for `--global`. See `.agents/instructions/git-scope-terminology.instructions.md`.
 - Keep POSIX shared behavior in shared modules, not duplicated per-host.
-- Centralize all daemon and service restarts per OS and restart each daemon at most once per activation run. macOS daemon refreshes go in `src/modules/macos/daemon-refresh.nix`; Windows SCM operations go in `src/hosts/Windows/modules/Set-NucleusService.ps1`; cross-platform shell helpers go in `src/scripts/lib.sh`.
-- Design for cross-host parity first; see `.agents/instructions/cross-host-feature-parity.instructions.md` for the full policy. Parity means the same user-visible contract (CLI flags, behavior, provisioning, docs, tests) across MacBook, NixOS, and Windows — not running bash on Windows. Windows uses native PowerShell (`scripts/*.ps1`, `src/hosts/Windows/modules/*.ps1`); POSIX uses bash (`scripts/*.sh`, `src/scripts/**/*.sh`). Paired entry points (`foo.sh` + `foo.ps1`) or shared declarative data (`*.json` + schema) consumed by both sides are the default pattern.
+- Centralize all daemon and service restarts per OS and restart each daemon at most once per activation run. macOS daemon refresh helpers live in `src/scripts/lib/macos-daemon-refresh.sh`; Windows SCM operations go in `src/platforms/Windows/modules/Set-NucleusService.ps1`; cross-platform shell helpers go in `src/scripts/lib.sh`.
+- Design for cross-host parity first; see `.agents/instructions/cross-host-feature-parity.instructions.md` for the full policy. Parity means the same user-visible contract (CLI flags, behavior, provisioning, docs, tests) across MacBook, NixOS, and Windows — not running bash on Windows. Windows uses native PowerShell (`scripts/*.ps1`, `src/platforms/Windows/modules/*.ps1`); POSIX uses bash (`scripts/*.sh`, `src/scripts/**/*.sh`). Paired entry points (`foo.sh` + `foo.ps1`) or shared declarative data (`*.json` + schema) consumed by both sides are the default pattern.
 - All services use persistent-daemon semantics by default (auto-start + auto-restart). See `cross-host-feature-parity.instructions.md` (Service firing policy section) for the default policy and per-service classification.
 - Sort unordered lists/blocks alphabetically; preserve semantic/load order where required.
 - Service entry lists (currentNucleusAppBundles, currentNucleusWorkflows,
@@ -159,6 +152,6 @@ See `.agents/instructions/package-installation-scope.instructions.md` for packag
 
 - Pre-flight: verify target paths and explicitly list files to be changed.
 - When adding new fragments (`.json`, `.md`, `.nix`, `.ps1`), verify wiring (`imports`, `readFile`, dot-sourcing).
-- Keep reusable Windows PowerShell logic in `src/hosts/Windows/modules/`; keep `src/hosts/Windows/apply.ps1` orchestration-focused.
+- Keep reusable Windows PowerShell logic in `src/platforms/Windows/modules/`; keep `src/hosts/Windows/apply.ps1` orchestration-focused.
 - Before modifying any file that has cross-references (imports, callers, grep patterns), first run an exhaustive search of all references and report them. Do not start edits until the full reference map is known.
 - The root `.gitignore` is a hard invariant: never edit it, stage its changes, or remove entries that look stale — even when a path it ignores no longer exists. Escalate any perceived need to the user instead. User-scope git ignore files (`src/users/*/git/*.gitignore`) are symlinked into `~/.config/git/ignore` (see `.agents/instructions/git-scope-terminology.instructions.md`). Other `.gitignore` files require explicit user request. Untracked build pollution (e.g. `node_modules/` from `bun install`) must be removed immediately, never silenced with gitignore edits.
