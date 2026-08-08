@@ -1187,6 +1187,21 @@ let
   android_magisk_sh_text = builtins.readFile ../../src/scripts/vms/android-magisk.sh;
   flake_nix_text = builtins.readFile ../../src/flake.nix;
   windows_system_packages_dsc_text = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
+  guest_ssh_public_key_manifest_text = builtins.readFile ../../src/modules/vm-guest-ssh-public-key-paths.json;
+
+  test_vm_guest_ssh_public_key_manifest = assert' (
+    lib.hasInfix "ssh_personal_{username}.pub" guest_ssh_public_key_manifest_text
+    && lib.hasInfix "id_ed25519.pub" guest_ssh_public_key_manifest_text
+  ) "vm-guest-ssh-public-key-paths.json must list static and username-scoped SSH public key paths";
+
+  test_vm_guest_ssh_public_key_resolver_wired = assert' (
+    (lib.hasInfix "vm_resolve_guest_ssh_public_key" vm_setup_sh_text)
+    && !(lib.hasInfix "resolve_vm_guest_ssh_key" vm_setup_sh_text)
+    && (lib.hasInfix "vm-guest-ssh-public-key-paths.json" vm_setup_sh_text)
+    && (lib.hasInfix "Get-VmGuestSshPublicKey" windows_vm_setup_ps1_text)
+    && !(lib.hasInfix "function Resolve-VMGuestSshKey" windows_vm_setup_ps1_text)
+  ) "POSIX and Windows VM setup must resolve guest SSH keys via the shared manifest";
+
   test_macos_packer_exit_check = assert' (lib.hasInfix "_packer_status=0" vm_setup_sh_text) "scripts/vm.sh must capture packer exit status (_packer_status=0)";
 
   # nixos-generators' -o flag expects a non-existent symlink path, not a
@@ -2443,6 +2458,8 @@ let
     test_nixos_guest_openssh_enabled
     test_nixos_guest_nucleus_rebuild_service
     test_nixos_guest_ssh_authorized_keys
+    test_vm_guest_ssh_public_key_manifest
+    test_vm_guest_ssh_public_key_resolver_wired
     test_tart_in_homebrew
     test_macbook_linux_builder_enabled
     test_macbook_linux_builder_machines_file
@@ -2630,6 +2647,8 @@ in
     test_nixos_guest_openssh_enabled
     test_nixos_guest_nucleus_rebuild_service
     test_nixos_guest_ssh_authorized_keys
+    test_vm_guest_ssh_public_key_manifest
+    test_vm_guest_ssh_public_key_resolver_wired
     test_tart_in_homebrew
     test_macbook_linux_builder_enabled
     test_macbook_linux_builder_machines_file
