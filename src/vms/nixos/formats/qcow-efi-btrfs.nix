@@ -6,6 +6,10 @@
   modulesPath,
   ...
 }:
+let
+  btrfsOptions = import ../../../hosts/NixOS/btrfs-options.nix { };
+  rootDevice = "/dev/disk/by-label/nixos";
+in
 {
   imports = [
     "${toString modulesPath}/profiles/qemu-guest.nix"
@@ -23,9 +27,17 @@
 
   config = {
     fileSystems."/" = {
-      device = "/dev/disk/by-label/nixos";
+      device = rootDevice;
       autoResize = true;
       fsType = "btrfs";
+      options = btrfsOptions.root;
+    };
+
+    fileSystems."/nix" = {
+      device = rootDevice;
+      fsType = "btrfs";
+      options = btrfsOptions.nix;
+      neededForBoot = true;
     };
 
     fileSystems."/boot" = {

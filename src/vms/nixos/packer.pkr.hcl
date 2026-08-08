@@ -142,10 +142,16 @@ build {
       "parted -s /dev/vda -- mklabel msdos",
       "parted -s /dev/vda -- mkpart primary btrfs 1MiB -2GiB",
       "parted -s /dev/vda -- mkpart primary linux-swap -2GiB 100%",
-      "mkfs.btrfs -f /dev/vda1",
+      "mkfs.btrfs -f -L nixos /dev/vda1",
       "mkswap /dev/vda2",
-      # Mount
+      # @/@nix subvolume layout (parity with qcow-btrfs and NixOS host disks.nix)
       "mount /dev/vda1 /mnt",
+      "btrfs subvolume create /mnt/@",
+      "btrfs subvolume create /mnt/@nix",
+      "umount /mnt",
+      "mount -o subvol=@ /dev/vda1 /mnt",
+      "mkdir -p /mnt/nix",
+      "mount -o subvol=@nix /dev/vda1 /mnt/nix",
       "swapon /dev/vda2",
       # Generate hardware configuration
       "nixos-generate-config --root /mnt",
@@ -157,6 +163,13 @@ build {
           imports = [ ./hardware-configuration.nix "$${modulesPath}/profiles/qemu-guest.nix" ];
           boot.loader.grub.enable = true;
           boot.loader.grub.device = "/dev/vda";
+          fileSystems."/".options = [ "subvol=@" "compress-force=zstd" "noatime" ];
+          fileSystems."/nix" = {
+            device = "/dev/disk/by-label/nixos";
+            fsType = "btrfs";
+            options = [ "subvol=@nix" "compress-force=zstd" "noatime" ];
+            neededForBoot = true;
+          };
       networking.hostName = "${var.guest_hostname}";
           users.users."${var.guest_username}" = {
             isNormalUser = true;
