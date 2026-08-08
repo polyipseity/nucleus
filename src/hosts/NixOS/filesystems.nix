@@ -1,10 +1,12 @@
 # hosts/NixOS/filesystems.nix — Filesystem driver and removable-mount policy.
-{ ... }: {
+{ pkgs, ... }: {
   boot.supportedFilesystems = [
     "ntfs"
     "vfat"
   ];
   boot.initrd.supportedFilesystems = [ "btrfs" ];
+
+  environment.systemPackages = [ pkgs.duperemove ];
 
   # NTFS read/write for removable drives is handled by GNOME's built-in
   # udisks2 and GVFS, using ntfs-3g (FUSE) — active via boot.supportedFilesystems

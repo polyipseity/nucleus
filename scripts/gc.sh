@@ -26,6 +26,7 @@ usage() {
   --system-gc|--no-system-gc                Control system profile generation expiration (default: --system-gc).
   --nix-artifacts-gc|--no-nix-artifacts-gc  Control stale result symlink cleanup (default: --nix-artifacts-gc).
   --nix-gc|--no-nix-gc                      Control nix-collect-garbage (default: --nix-gc).
+  --duperemove-gc|--no-duperemove-gc        Control btrfs duperemove on /nix/store (default: --duperemove-gc; root weekly GC only).
   --ollama-gc|--no-ollama-gc          Control stale Ollama model removal (default: --ollama-gc).
   --sccache-gc|--no-sccache-gc        Control sccache cache clearing (default: --sccache-gc).
   --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper gc (default: --wallpaper-gc).
@@ -53,6 +54,7 @@ hm_gc=true
 system_gc=true
 nix_artifacts_gc=true
 nix_gc=true
+duperemove_gc=true
 ollama_gc=true
 sccache_gc=true
 wallpaper_gc=true
@@ -108,6 +110,12 @@ while [ "$#" -gt 0 ]; do
       ;;
     --no-nix-gc)
       nix_gc=false
+      ;;
+    --duperemove-gc)
+      duperemove_gc=true
+      ;;
+    --no-duperemove-gc)
+      duperemove_gc=false
       ;;
     --ollama-gc)
       ollama_gc=true
@@ -212,6 +220,7 @@ if [ "${NUCLEUS_GC_USER_ONLY:-}" = true ]; then
   hm_gc=false
   nix_artifacts_gc=false
   nix_gc=false
+  duperemove_gc=false
   journald_gc=false
 elif [ "$(id -u)" -eq 0 ] && [ -n "${NUCLEUS_USERNAME:-}" ]; then
   _gc_root_scheduler=true
@@ -287,6 +296,15 @@ expire_hm_profile_generations() {
 run_nix_gc_if_available() {
   # Expiry controlled by --nix-expiry / $nix_expiry.
   nix-collect-garbage --delete-older-than "$nix_expiry"
+}
+
+gc_duperemove_store_if_available() {
+  _dds_script="$REPO_ROOT/src/scripts/services/duperemove-store.sh"
+  if [ ! -f "$_dds_script" ]; then
+    error "duperemove-store.sh not found at $_dds_script"
+    return 1
+  fi
+  NUCLEUS_GC_DRY_RUN="$dry_run" "$_dds_script"
 }
 
 gc_nix_build_artifacts_if_present() {
@@ -655,6 +673,11 @@ if [ "$nix_gc" = true ]; then
   else
     run_nix_gc_if_available
   fi
+fi
+
+# Step 2b: btrfs block dedup on /nix/store (root weekly GC only).
+if [ "$_gc_root_scheduler" = true ] && [ "$duperemove_gc" = true ]; then
+  gc_duperemove_store_if_available
 fi
 
 if [ "$_gc_root_scheduler" = true ]; then
