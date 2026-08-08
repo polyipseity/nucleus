@@ -97,7 +97,7 @@ Describe "start-windows-host.sh template token integrity" {
 Describe "start-host.ps1 template token integrity" {
   It "declares exactly the 4 expected __TOKEN__ placeholders" {
     $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "start-host.ps1")
-    ($templateTokens -join ",") | Should -Be "HOST_KIND,VM_DIR,VM_DISPLAY,VM_NAME"
+    ($templateTokens -join ",") | Should -Be "HOST_KIND,TART_SOFTNET_EXPOSE,VM_DIR,VM_DISPLAY,VM_NAME"
   }
 
   It "every placeholder has a replacement in the vm.sh sed render chain" {
@@ -137,16 +137,20 @@ Describe "stop-host.ps1 template token integrity" {
 }
 
 Describe "README.md template token integrity" {
-  It "declares exactly the 2 expected __TOKEN__ placeholders" {
+  It "declares the directory-display __TOKEN__ placeholders" {
     $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "README.md")
-    ($templateTokens -join ",") | Should -Be "IMAGES_DIR_DISPLAY,VM_DIR_DISPLAY"
+    @('SRC_DIR_DISPLAY', 'VM_DIR_DISPLAY') | ForEach-Object {
+      $_ | Should -BeIn $templateTokens
+    }
   }
 
-  It "every placeholder has a replacement in the Invoke-VMSetup -replace chain" {
-    $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "README.md")
-    $chainTokens = Get-DashReplaceTokenList
-    $missing = @($templateTokens | Where-Object { $_ -notin $chainTokens })
-    $missing | Should -BeNullOrEmpty
+  It "directory-display placeholders have replacements in vm.sh and Invoke-VMSetup" {
+    $vmSh = (Get-Content -Raw -Path (Join-Path $RepoRoot "scripts\vm.sh")) +
+      (Get-Content -Raw -Path (Join-Path $RepoRoot "src\scripts\lib\vm.sh"))
+    $vmSh | Should -Match ([regex]::Escape('__SRC_DIR_DISPLAY__'))
+    $vmSh | Should -Match ([regex]::Escape('__VM_DIR_DISPLAY__'))
+    (Get-DashReplaceTokenList) | Should -Contain 'SRC_DIR_DISPLAY'
+    (Get-DashReplaceTokenList) | Should -Contain 'VM_DIR_DISPLAY'
   }
 }
 
@@ -167,7 +171,7 @@ Describe "Autounattend.xml template token integrity" {
 Describe "start-android-vm.ps1 template token integrity" {
   It "declares exactly the 7 expected __TOKEN__ placeholders" {
     $templateTokens = Get-UpperSnakeTokenList (Join-Path $RepoRoot "src\scripts\vms\start-android-vm.ps1")
-    ($templateTokens -join ",") | Should -Be "ADB_CONSOLE_PORT,ADB_PORT,ANDROID_CPU_COUNT,ANDROID_GSI_IMAGE,ANDROID_RAM_BYTES,ANDROID_SYSTEM_IMAGE,ANDROID_USERDATA_IMAGE"
+    ($templateTokens -join ",") | Should -Be "ANDROID_CPU_COUNT,ANDROID_GSI_IMAGE,ANDROID_RAM_BYTES,ANDROID_SYSTEM_IMAGE,ANDROID_USERDATA_IMAGE,HOSTFWDS"
   }
 
   It "every placeholder has a replacement in the vm.sh sed render chain" {

@@ -235,7 +235,7 @@ let
         (lib.hasInfix "_prebuilt_min_size=\"\$(parse_size \"\$(jq -r \".VMs[\$vm_index].minImageSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
         && (lib.hasInfix "validate_qcow2_image \"\$_bai_system_img\" \"Android system image for \$_bai_vm_name\" \"\$(parse_size \"\$(jq -r \".VMs[\$_bai_vm_index].minImageSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
         && (lib.hasInfix "validate_qcow2_image \"\$_bai_userdata_img\" \"Android userdata disk for \$_bai_vm_name\" \"\$(parse_size \"\$(jq -r \".VMs[\$_bai_vm_index].minImageSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
-        && (lib.hasInfix "Test-Qcow2Image -ImagePath \$prebuilt -ImageLabel \"pre-built image '\$(\$vm.id)'\" -MinBytes \$minSizeBytes" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Test-Qcow2Image -ImagePath \$prebuilt -ImageLabel \"pre-built image '\$(\$vm.type)'\" -MinBytes \$minSizeBytes" windows_vm_setup_ps1_text)
       )
       "Image validation floors must be parsed from manifest minImageSize instead of hardcoded byte constants";
 
@@ -572,20 +572,26 @@ let
         || vm.Android.magiskUrl == ""
       ) androidVms;
     in
-    assert' (badGsiUrls == [ ])
-      "Android VMs must declare gsiUrl as string or null; bad entries: ${
-        builtins.toString (builtins.map (v: v.name) badGsiUrls)
-      }"
-    &&
-      assert' (badGappsUrls == [ ])
-        "Android VMs must declare a non-empty string gappsUrl; bad entries: ${
-          builtins.toString (builtins.map (v: v.name) badGappsUrls)
+    builtins.seq
+      (assert' (badGsiUrls == [ ])
+        "Android VMs must declare gsiUrl as string or null; bad entries: ${
+          builtins.toString (builtins.map (v: v.name) badGsiUrls)
         }"
-    &&
-      assert' (badMagiskUrls == [ ])
-        "Android VMs must declare a non-empty string magiskUrl; bad entries: ${
-          builtins.toString (builtins.map (v: v.name) badMagiskUrls)
-        }";
+      )
+      (
+        builtins.seq
+          (assert' (badGappsUrls == [ ])
+            "Android VMs must declare a non-empty string gappsUrl; bad entries: ${
+              builtins.toString (builtins.map (v: v.name) badGappsUrls)
+            }"
+          )
+          (
+            assert' (badMagiskUrls == [ ])
+              "Android VMs must declare a non-empty string magiskUrl; bad entries: ${
+                builtins.toString (builtins.map (v: v.name) badMagiskUrls)
+              }"
+          )
+      );
 
   # The Android group must only appear on VMs with type Android.
   test_android_gsi_url_only_on_android =
@@ -900,7 +906,7 @@ let
     && (lib.hasInfix "'android-config'" vm_ps1_text)
     && (lib.hasInfix "vm_android_adb_host_port" vm_setup_sh_text)
     && (lib.hasInfix "Android.gsiUrl != null" vm_setup_sh_text)
-    && (lib.hasInfix "modprobe virt_wifi" android_fake_wifi_sh_text)
+    && (lib.hasInfix "virt_wifi" android_fake_wifi_sh_text)
     && (lib.hasInfix "Android.gappsUrl" android_config_sh_text)
     && (lib.hasInfix "Android.magiskUrl" android_magisk_sh_text)
     && (lib.hasInfix "android-magisk.sh" android_config_sh_text)
@@ -983,6 +989,28 @@ let
     && (lib.hasInfix "--gc-disabled|--no-gc-disabled" vm_setup_sh_text)
   ) "vm.sh must accept the --gc-disabled/--no-gc-disabled option pair in both parse loops and usage";
 
+  # GC must skip data/ runtime overlays by default; --gc-data opts into sweeping
+  # orphaned data/ disks and their sidecar markers.
+  test_vm_gc_data_skips_data_by_default = assert' (
+    (lib.hasInfix "gc_data_mode=false" vm_setup_sh_text)
+    && (lib.hasInfix "if [ \"\$gc_data_mode\" = true ]" vm_setup_sh_text)
+    && (lib.hasInfix "SRC_DIR=\"\$VM_DIR/src\"" vm_setup_sh_text)
+  ) "vm-setup GC must preserve data/ runtime overlays by default and sweep them only with --gc-data";
+
+  test_vm_gc_data_option_pair = assert' (
+    (lib.hasInfix "--gc-data) gc_data_mode=true; shift ;;" vm_setup_sh_text)
+    && (lib.hasInfix "--no-gc-data) gc_data_mode=false; shift ;;" vm_setup_sh_text)
+    && (lib.hasInfix "--gc-data) gc_data_mode=true ;;" vm_setup_sh_text)
+    && (lib.hasInfix "--no-gc-data) gc_data_mode=false ;;" vm_setup_sh_text)
+    && (lib.hasInfix "--gc-data|--no-gc-data" vm_setup_sh_text)
+  ) "vm.sh must accept the --gc-data/--no-gc-data option pair in both parse loops and usage";
+
+  test_windows_vm_gc_data_option_pair = assert' (
+    (lib.hasInfix "[switch]\$GcData" windows_vm_setup_ps1_text)
+    && (lib.hasInfix "'--gc-data' { \$gcData = \$true }" vm_ps1_text)
+    && (lib.hasInfix "'--no-gc-data' { \$gcData = \$false }" vm_ps1_text)
+  ) "Windows vm-setup GC must preserve data/ by default and sweep it only with --gc-data/-GcData";
+
   # Windows vm-setup must mirror POSIX GC: preserve disabled entries by
   # default, clear them only with -GcDisabled (--gc-disabled/--no-gc-disabled).
   test_windows_vm_gc_preserves_disabled_entries_by_default =
@@ -996,10 +1024,11 @@ let
       "Windows vm-setup GC must preserve disabled VM entries by default and clear them only with --gc-disabled/-GcDisabled";
 
   # GC keep-sets must preserve every manifest-referenced disk image: prebuilt
-  # goldens, type bases, Android system/GSI images under images/, and runtime
-  # overlays under data/.  Matching by full filename (with extension) keeps
-  # type-prefixed artifacts (Android-system.qcow2, NixOS.base.qcow2) from
-  # being orphaned by a basename-stripped guest-id comparison.
+  # goldens, overlay backing copies, Android system/GSI images under src/<type>/,
+  # and runtime overlays under data/ when --gc-data is enabled. Matching by full
+  # filename (with extension) keeps canonical artifacts (prebuilt image.qcow2,
+  # overlay backing.qcow2, system image.qcow2) from being orphaned by a
+  # basename-stripped guest-id comparison.
   test_vm_gc_keep_set_preserves_manifest_images = assert' (
     (lib.hasInfix "vm_gc_disk_keep_set" vm_setup_sh_text)
     && (lib.hasInfix ".Android.systemImage" vm_setup_sh_text)
@@ -1017,18 +1046,24 @@ let
     && (lib.hasInfix "vm_gc_orphan_descriptors \"\$_gcv_expected\"" vm_setup_sh_text)
   ) "vm-setup GC must remove orphaned VM descriptors for guests absent from the expected set";
 
-  # images/ name-based markers gate prebuilt goldens AND tart registrations,
+  # src/<type>/ prebuilt markers gate prebuilt goldens AND tart registrations,
   # so they are removed only when the guest leaves the expected set; data/
-  # sidecar markers are removed when their disk image is gone.
-  test_vm_gc_marker_expected_set_semantics = assert' (
-    (lib.hasInfix "\"\$VM_DIR/data\"" vm_setup_sh_text)
-    && (lib.hasInfix "grep -qxF \"\$_gcom_name\"" vm_setup_sh_text)
-  ) "vm-setup marker GC must key images/ name-based markers to the expected set";
+  # sidecar markers are removed when their disk image is gone (only with --gc-data).
+  test_vm_gc_marker_expected_set_semantics =
+    assert'
+      (
+        (lib.hasInfix "vm_gc_orphan_markers" vm_setup_sh_text)
+        && (lib.hasInfix "for _gcom_type_dir in \"\$SRC_DIR\"/*/" vm_setup_sh_text)
+        && (lib.hasInfix "VM_PREBUILT_MARKER_BASE}.vm-guest-credentials-sha256" vm_setup_sh_text)
+        && (lib.hasInfix "if [ \"\$gc_data_mode\" = true ]" vm_setup_sh_text)
+      )
+      "vm-setup marker GC must key src/<type>/ prebuilt markers to the expected set and sweep data/ markers only with --gc-data";
 
   # Windows vm-setup must mirror POSIX keep-set semantics: match full disk
   # filenames against per-directory keep-sets and sweep config markers too.
   test_windows_vm_gc_keep_set = assert' (
-    (lib.hasInfix "Get-VMGcDiskKeepSet" windows_vm_setup_ps1_text)
+    (lib.hasInfix "Get-VMGcSrcKeepSetForType" windows_vm_setup_ps1_text)
+    && (lib.hasInfix "Get-VMGcDataDiskKeepSet" windows_vm_setup_ps1_text)
     && (lib.hasInfix "\$disk.Name -notin \$keep" windows_vm_setup_ps1_text)
     && (lib.hasInfix "vm-guest-config-sha256" windows_vm_setup_ps1_text)
   ) "Windows vm-setup GC must match full filenames against keep-sets and sweep config markers";
@@ -1047,6 +1082,7 @@ let
   core_nix_text = builtins.readFile ../../src/modules/core.nix;
   nixos_packer_text = builtins.readFile ../../src/vms/nixos/packer.pkr.hcl;
   nixos_disks_nix_text = builtins.readFile ../../src/hosts/NixOS/hardware/disks.nix;
+  btrfs_options_nix_text = builtins.readFile ../../src/hosts/NixOS/btrfs-options.nix;
   qcow_btrfs_text = builtins.readFile ../../src/vms/nixos/formats/qcow-btrfs.nix;
   qcow_efi_btrfs_text = builtins.readFile ../../src/vms/nixos/formats/qcow-efi-btrfs.nix;
   btrfs_patch_text = builtins.readFile ../../src/vms/nixos/disk-image/make-disk-image-btrfs.patch;
@@ -1140,7 +1176,7 @@ let
   nixos_domain_xml_text = builtins.readFile ../../src/modules/configs/vms/nixos-domain.xml;
   utmConfigPlistText = builtins.readFile ../../src/modules/configs/vms/utm-config.plist.xml;
   vms_json_text = builtins.readFile ../../src/modules/VMs.json;
-  vm_guest_json_text = builtins.readFile ../../src/users/polyipseity/vm-guest.json;
+  vm_guest_json_text = builtins.readFile ../../src/users/default/vm-guest.json;
   user_secret_text = builtins.readFile ../../src/secrets/users/polyipseity.yml;
   vms_windows_packer_text = builtins.readFile ../../src/vms/windows/packer.pkr.hcl;
   vms_windows_autounattend_text = builtins.readFile ../../src/vms/windows/Autounattend.xml;
@@ -1149,7 +1185,7 @@ let
   android_config_sh_text = builtins.readFile ../../src/scripts/vms/android-config.sh;
   android_fake_wifi_sh_text = builtins.readFile ../../src/scripts/vms/android-fake-wifi.sh;
   android_magisk_sh_text = builtins.readFile ../../src/scripts/vms/android-magisk.sh;
-  flake_nix_text = builtins.readFile ../../flake.nix;
+  flake_nix_text = builtins.readFile ../../src/flake.nix;
   windows_system_packages_dsc_text = builtins.readFile ../../src/hosts/Windows/system/packages.dsc.yml;
   test_macos_packer_exit_check = assert' (lib.hasInfix "_packer_status=0" vm_setup_sh_text) "scripts/vm.sh must capture packer exit status (_packer_status=0)";
 
@@ -1175,14 +1211,19 @@ let
   test_nixos_host_disks_btrfs_root = assert' (lib.hasInfix ''fsType = "btrfs";'' nixos_disks_nix_text) "src/hosts/NixOS/hardware/disks.nix must declare a Btrfs root filesystem";
 
   test_nixos_btrfs_subvolume_layout = assert' (
-    (lib.hasInfix "compress-force=zstd" nixos_disks_nix_text)
-    && (lib.hasInfix "subvol=@nix" nixos_disks_nix_text)
+    (lib.hasInfix "compress-force=zstd" btrfs_options_nix_text)
+    && (lib.hasInfix "subvol=@nix" btrfs_options_nix_text)
+    && (lib.hasInfix "subvol=@" btrfs_options_nix_text)
+    && (lib.hasInfix "btrfsOptions.root" nixos_disks_nix_text)
+    && (lib.hasInfix "btrfsOptions.nix" nixos_disks_nix_text)
     && (lib.hasInfix ''fileSystems."/nix"'' nixos_disks_nix_text)
-    && (lib.hasInfix "compress-force=zstd" qcow_btrfs_text)
-    && (lib.hasInfix "subvol=@nix" qcow_btrfs_text)
+    && (lib.hasInfix "btrfs-options.nix" qcow_btrfs_text)
+    && (lib.hasInfix "btrfsOptions.root" qcow_btrfs_text)
+    && (lib.hasInfix "btrfsOptions.nix" qcow_btrfs_text)
     && (lib.hasInfix ''fileSystems."/nix"'' qcow_btrfs_text)
-    && (lib.hasInfix "compress-force=zstd" qcow_efi_btrfs_text)
-    && (lib.hasInfix "subvol=@nix" qcow_efi_btrfs_text)
+    && (lib.hasInfix "btrfs-options.nix" qcow_efi_btrfs_text)
+    && (lib.hasInfix "btrfsOptions.root" qcow_efi_btrfs_text)
+    && (lib.hasInfix "btrfsOptions.nix" qcow_efi_btrfs_text)
     && (lib.hasInfix ''fileSystems."/nix"'' qcow_efi_btrfs_text)
     && (lib.hasInfix "compress-force=zstd" nixos_packer_text)
     && (lib.hasInfix "subvol=@nix" nixos_packer_text)
@@ -1235,13 +1276,13 @@ let
   test_vm_resize_cli_subcommand =
     assert'
       (
-        (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
+        (lib.hasInfix "setup|sync|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
         && (lib.hasInfix "resize <vm> <size>" vm_setup_sh_text)
         && (lib.hasInfix "--allow-shrink) allow_shrink=true" vm_setup_sh_text)
         && (lib.hasInfix "do_resize() {" vm_setup_sh_text)
         && (lib.hasInfix "disk_bytes=\"\$(parse_size \"$size_arg\")\" || exit 1" vm_setup_sh_text)
         && (lib.hasInfix "vm_resize_vm \"$vm_name\" \"$disk_bytes\" \"$allow_shrink\"" vm_setup_sh_text)
-        && (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) \"do_$action\" ;;") vm_setup_sh_text
+        && (lib.hasInfix "setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) \"do_$action\" ;;") vm_setup_sh_text
       )
       "scripts/vm.sh must wire the resize subcommand (usage, dispatch, parse_size, --allow-shrink) to vm_resize_vm";
 
@@ -1250,7 +1291,7 @@ let
   test_vm_resize_windows_twin =
     assert'
       (
-        (lib.hasInfix "reset', 'resize', 'gc', 'pack', 'unpack'" vm_ps1_text)
+        (lib.hasInfix "reset', 'android-config', 'resize', 'gc', 'pack', 'unpack'" vm_ps1_text)
         && (lib.hasInfix "'resize'  { Invoke-VmResize }" vm_ps1_text)
         && (lib.hasInfix "function Invoke-VmResize {" vm_ps1_text)
         && (lib.hasInfix "'--allow-shrink' { $allowShrink = $true }" vm_ps1_text)
@@ -1264,9 +1305,9 @@ let
   test_vm_pack_cli_subcommand =
     assert'
       (
-        (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
+        (lib.hasInfix "setup|sync|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
         && (lib.hasInfix "pack                     Strip trivially regenerable artifacts" vm_setup_sh_text)
-        && (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) \"do_$action\" ;;" vm_setup_sh_text)
+        && (lib.hasInfix "setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) \"do_$action\" ;;" vm_setup_sh_text)
         && (lib.hasInfix "do_pack() {" vm_setup_sh_text)
         && (lib.hasInfix "if [ \"$force\" != true ]; then" vm_setup_sh_text)
         && (lib.hasInfix "vm_pack_vms" vm_setup_sh_text)
@@ -1274,8 +1315,8 @@ let
       "scripts/vm.sh must wire the pack subcommand (usage, dispatch, do_pack with dry-run-by-default, vm_pack_vms)";
 
   # pack's keep-set must exactly match the trivially-regenerable rule: only
-  # UTM bundles, generated start/stop scripts, images/<type>.base.qcow2
-  # copies, and *-build/ + stale dot-dirs are removed; everything else stays.
+  # UTM bundles, generated start/stop scripts, src/<type>/overlay backing.qcow2
+  # copies, and src/<type>/Packer/ + stale dot-dirs are removed; everything else stays.
   test_vm_pack_removal_set =
     assert'
       (
@@ -1284,13 +1325,13 @@ let
         && (lib.hasInfix "removing regenerable start/stop script" vm_setup_sh_text)
         && (lib.hasInfix "scripts/start-*.sh" vm_setup_sh_text)
         && (lib.hasInfix "scripts/stop-*.ps1" vm_setup_sh_text)
-        && (lib.hasInfix "removing regenerable base image" vm_setup_sh_text)
-        && (lib.hasInfix "\"$IMAGES_DIR\"/*.base.qcow2" vm_setup_sh_text)
-        && (lib.hasInfix "removing transient build directory" vm_setup_sh_text)
-        && (lib.hasInfix "\"$IMAGES_DIR\"/*-build/" vm_setup_sh_text)
+        && (lib.hasInfix "removing regenerable overlay backing" vm_setup_sh_text)
+        && (lib.hasInfix "$VM_OVERLAY_BACKING" vm_setup_sh_text)
+        && (lib.hasInfix "removing transient Packer directory" vm_setup_sh_text)
+        && (lib.hasInfix "$VM_PACKER_BUILD_DIR" vm_setup_sh_text)
         && (lib.hasInfix "cannot pack while a VM is running" vm_setup_sh_text)
       )
-      "vm_pack_vms must remove only trivially regenerable artifacts (UTM bundles, start/stop scripts, base copies, *-build/ + dot-dirs) and refuse while a VM is running";
+      "vm_pack_vms must remove only trivially regenerable artifacts (UTM bundles, start/stop scripts, overlay backing copies, Packer/ + dot-dirs) and refuse while a VM is running";
 
   # pack must refuse while any VM is running and print next steps.
   test_vm_pack_next_steps = assert' (
@@ -1318,7 +1359,7 @@ let
     assert'
       (
         (lib.hasInfix "unpack                   Regenerate per-platform VM artifacts" vm_setup_sh_text)
-        && (lib.hasInfix "setup|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) \"do_$action\" ;;" vm_setup_sh_text)
+        && (lib.hasInfix "setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) \"do_$action\" ;;" vm_setup_sh_text)
         && (lib.hasInfix "do_unpack() {" vm_setup_sh_text)
         && (lib.hasInfix "vm_unpack_vms() {" vm_setup_sh_text)
         && (lib.hasInfix "\"$VM_DIR\"/*.vm.json" vm_setup_sh_text)
@@ -1664,29 +1705,30 @@ let
       (
         (lib.hasInfix "vm_ensure_base_and_overlay \"\$vm_name\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
         && (lib.hasInfix "linked runtime overlay into UTM bundle: \$disk_file" vm_setup_sh_text)
-        && (lib.hasInfix "_base_link=\"\$data_dir/\${vm_type}.base.qcow2\"" vm_setup_sh_text)
+        && (lib.hasInfix "_base_link=\"\$data_dir/\$(basename \"\$(vm_src_path \"\$vm_type\" \"\$VM_OVERLAY_BACKING\")\")\"" vm_setup_sh_text)
         && (lib.hasInfix "linked base image into UTM bundle: \$_base_link" vm_setup_sh_text)
       )
-      "scripts/vm.sh must provision UTM runtime disks as base/overlay pairs (images/<type>.base.qcow2 base + data/<id>.qcow2 overlay hard-linked into the bundle)";
+      "scripts/vm.sh must provision UTM runtime disks as base/overlay pairs (src/<type>/overlay backing.qcow2 base + data/<id>.qcow2 overlay hard-linked into the bundle)";
 
   # Windows vm-setup must mirror POSIX base/overlay provisioning: the runtime
-  # disk is a qcow2 overlay data/<id>.qcow2 backed by images/<type>.base.qcow2
+  # disk is a qcow2 overlay data/<id>.qcow2 backed by src/<type>/overlay backing.qcow2
   # (backing path tree-root-relative), the base is a cp of the kept prebuilt
   # golden refreshed only while the VM is stopped, growth is grow-only via
   # qemu-img resize, and Android userdata is a standalone data/ qcow2.
   test_windows_base_overlay_parity =
     assert'
       (
-        (lib.hasInfix ''$qemuImg create -f qcow2 -b "..\images\$($vm.type).base.qcow2" -F qcow2'' windows_vm_setup_ps1_text)
-        && (lib.hasInfix "Copy-Item $prebuilt $basePath" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "Test-VmProcessRunning -VmName $vm.id -VmDisplay $vm.name" windows_vm_setup_ps1_text)
+        (lib.hasInfix "Get-VmOverlayBackingRelPath -Type $vm.type" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "& \$qemuImg create -f qcow2 -b \$backingRel -F qcow2 \$diskPath" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Copy-Item \$prebuilt \$basePath" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Test-VmProcessRunning -VmName \$vm.id -VmDisplay \$vm.name" windows_vm_setup_ps1_text)
         && (lib.hasInfix "function Get-VmRunningProcessNameList" windows_vm_setup_ps1_text)
         && (lib.hasInfix "Get-VmRunningProcessNameList" vm_ps1_text)
-        && (lib.hasInfix "Get-VmQcow2VirtualSize -ImagePath $diskPath" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "$qemuImg resize $diskPath $diskBytes" windows_vm_setup_ps1_text)
-        && (lib.hasInfix ''Join-Path -Path $dataDir -ChildPath "$($vm.id).qcow2"'' windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Get-VmQcow2VirtualSize -ImagePath \$diskPath" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "\$qemuImg resize \$diskPath \$diskBytes" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "vm.id).qcow2" windows_vm_setup_ps1_text)
       )
-      "Windows vm-setup must provision data/<id>.qcow2 overlays over images/<type>.base.qcow2 (tree-root-relative backing, running-VM-guarded base refresh, grow-only resize, Android standalone userdata)";
+      "Windows vm-setup must provision data/<id>.qcow2 overlays over src/<type>/overlay backing.qcow2 (tree-root-relative backing, running-VM-guarded base refresh, grow-only resize, Android standalone userdata)";
 
   # The POSIX Windows/QEMU vm-setup callback must provision base/overlay
   # disks for Windows guests (parity with the PowerShell Pass A): the
@@ -1705,9 +1747,9 @@ let
   test_utm_android_uses_shared_images =
     assert'
       (
-        (lib.hasInfix ''_android_system="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.systemImage" "$MANIFEST")"'' vm_setup_sh_text)
+        (lib.hasInfix ''_android_system="$(vm_src_path Android "$(jq -r ".VMs[$vm_index].Android.systemImage" "$MANIFEST")")"'' vm_setup_sh_text)
         && (lib.hasInfix "_android_userdata=\"\$VM_DIR/data/\${vm_name}.qcow2\"" vm_setup_sh_text)
-        && (lib.hasInfix ''_android_gsi="$IMAGES_DIR/$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")"'' vm_setup_sh_text)
+        && (lib.hasInfix ''_android_gsi="$(vm_src_path Android "$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")")"'' vm_setup_sh_text)
         && (lib.hasInfix ''_prebuilt="$_android_system"'' vm_setup_sh_text)
         && (lib.hasInfix "_prebuilt_min_size=\"\$(parse_size \"\$(jq -r \".VMs[\$vm_index].minImageSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
         && (lib.hasInfix "copied Android system image" vm_setup_sh_text)
@@ -1771,10 +1813,10 @@ let
         && (lib.hasInfix "_bai_userdata_replaced=false" vm_setup_sh_text)
         && (lib.hasInfix "_bai_system_replaced=true" vm_setup_sh_text)
         && (lib.hasInfix "_bai_userdata_replaced=true" vm_setup_sh_text)
-        && (lib.hasInfix "refreshed Android userdata link in UTM bundle" vm_setup_sh_text)
+        && (lib.hasInfix "vm_link_android_userdata_to_utm_bundle \"\$_bai_vm_name\" \"\$_bai_vm_index\" \"\$_bai_bundle_dir\"" vm_setup_sh_text)
         && (lib.hasInfix "refreshed Android system disk in UTM bundle" vm_setup_sh_text)
         && (lib.hasInfix "if [ \"\$dry_run\" = false ]; then" vm_setup_sh_text)
-        && (lib.hasInfix "\"\$VM_DIR/\${_bai_vm_name}.utm/Data\"" vm_setup_sh_text)
+        && (lib.hasInfix "_bai_bundle_dir=\"\$VM_DIR/\${_bai_vm_name}.utm/Data\"" vm_setup_sh_text)
       )
       "vm_build_android must re-link the UTM bundle's Android userdata/system disks after replacing a canonical disk (system re-download or userdata reset) so do_upgrade/do_reset do not leave stale bundle inodes";
 
@@ -2009,7 +2051,7 @@ let
       "scripts/vm.sh must refresh config.plist for existing UTM bundles so schema fixes apply without deleting bundles";
   test_macbook_utm_stale_template_guard = assert' (
     (lib.hasInfix "stale UTM template detected" vm_setup_sh_text)
-    && (lib.hasInfix "run home-manager switch (or nucleus apply) before vm-setup" vm_setup_sh_text)
+    && (lib.hasInfix "run home-manager switch (or nucleus apply) before vm sync" vm_setup_sh_text)
   ) "scripts/vm.sh must fail fast on stale UTM templates and print the recovery action";
   test_macbook_utm_required_key_guard = assert' (
     (lib.hasInfix "_required_utm_keys" vm_setup_sh_text)
@@ -2032,8 +2074,8 @@ let
       (
         (lib.hasInfix "nucleus-vm setup" readmeTemplateText)
         && (lib.hasInfix "## Layout" readmeTemplateText)
-        && (lib.hasInfix "<name>-build/" readmeTemplateText)
-        && (lib.hasInfix "<name>-installer.iso" readmeTemplateText)
+        && (lib.hasInfix "<type>/Packer/" readmeTemplateText)
+        && (lib.hasInfix "installer.iso" readmeTemplateText)
         && (lib.hasInfix "## Start commands" readmeTemplateText)
         && (lib.hasInfix "start-<id>.sh" readmeTemplateText)
         && (lib.hasInfix "start-<id>.ps1" readmeTemplateText)
@@ -2048,7 +2090,7 @@ let
         && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
         && (lib.hasInfix "## Troubleshooting" readmeTemplateText)
         && (lib.hasInfix "__VM_DIR_DISPLAY__" readmeTemplateText)
-        && (lib.hasInfix "__IMAGES_DIR_DISPLAY__" readmeTemplateText)
+        && (lib.hasInfix "__SRC_DIR_DISPLAY__" readmeTemplateText)
         && (!lib.hasInfix "{{" readmeTemplateText)
         && (lib.hasInfix "## Notes" readmeTemplateText)
       )
@@ -2212,8 +2254,9 @@ let
         (lib.hasInfix "write_vm_directory_readme" vm_setup_sh_text)
         && (lib.hasInfix "wrote VM directory guide" vm_setup_sh_text)
         && (lib.hasInfix "TEMPLATES_DIR/README.md" vm_setup_sh_text)
+        && (lib.hasInfix "__SRC_DIR_DISPLAY__" vm_setup_sh_text)
         && (lib.hasInfix "__VM_DIR_DISPLAY__" readmeTemplateText)
-        && (lib.hasInfix "__IMAGES_DIR_DISPLAY__" readmeTemplateText)
+        && (lib.hasInfix "__SRC_DIR_DISPLAY__" readmeTemplateText)
         && (lib.hasInfix "## Start commands" readmeTemplateText)
         && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
         && (lib.hasInfix "UTM bundle" readmeTemplateText)
@@ -2287,22 +2330,22 @@ let
   # comes from the manifest Android group, never a hardcoded android-* literal.
   test_nixos_android_gsi_conditional = assert' (
     (lib.hasInfix "vm.Android.gsiUrl != null" nixos_vms_nix_text)
-    && (lib.hasInfix "images/\${vm.Android.gsiImage}" nixos_vms_nix_text)
+    && (lib.hasInfix "src/Android/\${vm.Android.gsiImage}" nixos_vms_nix_text)
   ) "src/hosts/NixOS/vms.nix must render the GSI disk only when vm.Android.gsiUrl is non-null";
 
-  # NixOS Android system/GSI disks must live under images/ inside the VM
+  # NixOS Android system/GSI disks must live under src/Android/ inside the VM
   # directory, named from the manifest Android group; the userdata disk is the
   # canonical data/<id>.qcow2 overlay.  Bare ${vmDir}/android-* paths would
-  # break the cross-host images/data layout.
+  # break the cross-host src/data layout.
   test_nixos_android_disk_paths =
     assert'
       (
-        (lib.hasInfix "images/\${vm.Android.systemImage}" nixos_vms_nix_text)
+        (lib.hasInfix "src/Android/\${vm.Android.systemImage}" nixos_vms_nix_text)
         && (lib.hasInfix "\${vmDir}/data/\${vm.id}.qcow2" nixos_vms_nix_text)
         && !(lib.hasInfix "\${vmDir}/android-system.qcow2" nixos_vms_nix_text)
         && !(lib.hasInfix "\${vmDir}/android-userdata.qcow2" nixos_vms_nix_text)
       )
-      "src/hosts/NixOS/vms.nix must place Android system/GSI under \${vmDir}/images/ from the manifest Android group and userdata under \${vmDir}/data/<id>.qcow2, never at the bare VM directory root";
+      "src/hosts/NixOS/vms.nix must place Android system/GSI under \${vmDir}/src/Android/ from the manifest Android group and userdata under \${vmDir}/data/<id>.qcow2, never at the bare VM directory root";
 
   test_macbook_tart_storage_link =
     assert'
@@ -2481,6 +2524,9 @@ let
     test_enabled_vm_not_orphaned
     test_vm_gc_preserves_disabled_entries_by_default
     test_vm_gc_disabled_option_pair
+    test_vm_gc_data_skips_data_by_default
+    test_vm_gc_data_option_pair
+    test_windows_vm_gc_data_option_pair
     test_windows_vm_gc_preserves_disabled_entries_by_default
     test_nixos_guest_import_paths_resolve
     test_nixos_guest_config_drift_rebuild
@@ -2665,6 +2711,9 @@ in
     test_enabled_vm_not_orphaned
     test_vm_gc_preserves_disabled_entries_by_default
     test_vm_gc_disabled_option_pair
+    test_vm_gc_data_skips_data_by_default
+    test_vm_gc_data_option_pair
+    test_windows_vm_gc_data_option_pair
     test_windows_vm_gc_preserves_disabled_entries_by_default
     test_nixos_guest_import_paths_resolve
     test_nixos_guest_config_drift_rebuild

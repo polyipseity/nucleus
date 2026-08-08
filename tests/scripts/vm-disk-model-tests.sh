@@ -90,10 +90,10 @@ test_real_helper_vectors() {
 }
 
 test_descriptor_writer() {
-  local _vm_dir="$_tmp/vm" _images_dir="$_tmp/vm/images" _vms_dir="$_tmp/vms"
+  local _vm_dir="$_tmp/vm" _src_dir="$_tmp/vm/src" _vms_dir="$_tmp/vms"
   local _manifest="$_tmp/manifest.json" _android_desc _nixos_desc _windows_desc
 
-  mkdir -p "$_vm_dir" "$_images_dir" "$_vms_dir"
+  mkdir -p "$_vm_dir" "$_src_dir" "$_vms_dir"
 
   cat > "$_manifest" <<'EOF'
 {
@@ -110,9 +110,9 @@ test_descriptor_writer() {
       "portForwards": [{"guestPort": 5555, "hostPort": 22040}, {"guestPort": 5554, "hostPort": 22041}],
       "macAddressPrefix": "52",
       "Android": {
-        "systemImage": "Android-system.qcow2",
+        "systemImage": "system image.qcow2",
         "userdataImage": "Android.qcow2",
-        "gsiImage": "Android-gsi.img",
+        "gsiImage": "GSI.img",
         "gsiUrl": "https://example.invalid/gsi.zip",
         "gappsUrl": "https://example.invalid/gapps.zip"
       }
@@ -146,9 +146,9 @@ test_descriptor_writer() {
 }
 EOF
 
-  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_src_dir" "$REPO_ROOT/src/vms/templates" \
     "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
-    "$_vms_dir" "$_manifest" "MacBook" "false" "false"
+    "$_vms_dir" "$_manifest" "MacBook" "false" "false" "false"
 
   vm_write_descriptors
 
@@ -179,15 +179,15 @@ EOF
       machine: "virt",
       uefi: true,
       disks: [
-        {role: "system", path: "images/Android-system.qcow2"},
-        {role: "gsi", path: "images/Android-gsi.img"},
+        {role: "system", path: "src/Android/system image.qcow2"},
+        {role: "gsi", path: "src/Android/GSI.img"},
         {role: "userdata", path: "data/Android.qcow2"}
       ],
       createdBy: "nucleus-vm",
       Android: {
-        systemImage: "Android-system.qcow2",
+        systemImage: "system image.qcow2",
         userdataImage: "Android.qcow2",
-        gsiImage: "Android-gsi.img",
+        gsiImage: "GSI.img",
         gsiUrl: "https://example.invalid/gsi.zip",
         gappsUrl: "https://example.invalid/gapps.zip"
       }
@@ -203,7 +203,7 @@ EOF
   assert_eq "q35" "$(jq -r .machine "$_windows_desc")" "descriptor Windows machine"
   assert_eq "false" "$(jq -r .uefi "$_windows_desc")" "descriptor Windows uefi"
   assert_eq "base,runtime" "$(jq -r '.disks | map(.role) | join(",")' "$_windows_desc")" "descriptor Windows disk roles"
-  assert_eq "images/Windows.base.qcow2,data/Windows.qcow2" "$(jq -r '.disks | map(.path) | join(",")' "$_windows_desc")" "descriptor Windows disk paths"
+  assert_eq "src/Windows/overlay backing.qcow2,data/Windows.qcow2" "$(jq -r '.disks | map(.path) | join(",")' "$_windows_desc")" "descriptor Windows disk paths"
   assert_eq "pro" "$(jq -r .Windows.edition "$_windows_desc")" "descriptor Windows group preserved"
 
   # NixOS arch follows the host; uuid and layout are host-independent. A
@@ -211,7 +211,7 @@ EOF
   assert_eq "cdf51633-aff8-ffbd-4feb-c43ff4de3f1c" "$(jq -r .uuid "$_nixos_desc")" "descriptor NixOS uuid"
   assert_eq "false" "$(jq -r .enabled "$_nixos_desc")" "descriptor written for disabled VM"
   assert_eq "base,runtime" "$(jq -r '.disks | map(.role) | join(",")' "$_nixos_desc")" "descriptor NixOS disk roles"
-  assert_eq "images/NixOS.base.qcow2,data/NixOS.qcow2" "$(jq -r '.disks | map(.path) | join(",")' "$_nixos_desc")" "descriptor NixOS disk paths"
+  assert_eq "src/NixOS/overlay backing.qcow2,data/NixOS.qcow2" "$(jq -r '.disks | map(.path) | join(",")' "$_nixos_desc")" "descriptor NixOS disk paths"
 
   # Emitted descriptors must validate against the repo schema.
   if ! check-jsonschema --schemafile "$REPO_ROOT/src/modules/vm-descriptor.schema.json" \
@@ -234,12 +234,12 @@ vm_get_running_names() {
 require_command qemu-img
 
 test_base_overlay_provisioning() {
-  local _vm_dir="$_tmp/p2/vm" _images_dir="$_tmp/p2/vm/images" _vms_dir="$_tmp/p2/vms"
+  local _vm_dir="$_tmp/p2/vm" _src_dir="$_tmp/p2/vm/src" _vms_dir="$_tmp/p2/vms"
   local _manifest="$_tmp/p2/manifest.json"
   local _prebuilt _base _overlay _cred_marker _config_marker
   local _before_hash _after_hash _virtual_size
 
-  mkdir -p "$_vm_dir" "$_images_dir" "$_vms_dir"
+  mkdir -p "$_vm_dir" "$_src_dir/NixOS" "$_vms_dir"
 
   cat > "$_manifest" <<'EOF'
 {
@@ -260,13 +260,13 @@ test_base_overlay_provisioning() {
 }
 EOF
 
-  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_src_dir" "$REPO_ROOT/src/vms/templates" \
     "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
-    "$_vms_dir" "$_manifest" "NixOS" "false" "false"
+    "$_vms_dir" "$_manifest" "NixOS" "false" "false" "false"
   vm_guest_credentials_fingerprint="test-fingerprint"
 
-  _prebuilt="$_images_dir/NixOS.qcow2"
-  _base="$_images_dir/NixOS.base.qcow2"
+  _prebuilt="$_src_dir/NixOS/prebuilt image.qcow2"
+  _base="$_src_dir/NixOS/overlay backing.qcow2"
   _overlay="$_vm_dir/data/NixOS.qcow2"
   _cred_marker="$(vm_guest_credentials_marker_path NixOS "$_overlay")"
   _config_marker="$(vm_guest_config_marker_path NixOS "$_overlay")"
@@ -279,7 +279,7 @@ EOF
 
   # Case 2: overlay missing → created with a RELATIVE backing path + markers.
   assert_eq "0" "$([ -f "$_overlay" ] && echo 0 || echo 1)" "overlay created"
-  assert_eq "1" "$(qemu-img info "$_overlay" | grep -cF 'backing file: ../images/NixOS.base.qcow2')" "overlay relative backing path"
+  assert_eq "1" "$(qemu-img info "$_overlay" | grep -cF 'backing file: ../src/NixOS/overlay backing.qcow2')" "overlay relative backing path"
   assert_eq "test-fingerprint" "$(tr -d '\r\n' <"$_cred_marker")" "credential marker written on overlay create"
 
   # Case 3: overlay invalid → preserved without --force, recreated with it.
@@ -327,11 +327,11 @@ EOF
 #   shrink rejected without --allow-shrink, shrink allowed with the flag,
 #   running-VM rejection, and Android resizing data/<id>.qcow2.
 test_resize_vm() {
-  local _vm_dir="$_tmp/resize/vm" _images_dir="$_tmp/resize/vm/images" _vms_dir="$_tmp/resize/vms"
+  local _vm_dir="$_tmp/resize/vm" _src_dir="$_tmp/resize/vm/src" _vms_dir="$_tmp/resize/vms"
   local _manifest="$_tmp/resize/manifest.json"
   local _disk _old_size _new_size
 
-  mkdir -p "$_vm_dir" "$_images_dir" "$_vms_dir" "$_vm_dir/data"
+  mkdir -p "$_vm_dir" "$_src_dir" "$_vms_dir" "$_vm_dir/data"
 
   cat > "$_manifest" <<'EOF'
 {
@@ -347,7 +347,7 @@ test_resize_vm() {
       "diskSize": "64GB",
       "portForwards": [],
       "macAddressPrefix": "52",
-      "Android": {"systemImage": "Android-system.qcow2", "userdataImage": "Android.qcow2", "gsiImage": "Android-gsi.img", "gsiUrl": "https://example.invalid/gsi.zip", "gappsUrl": "https://example.invalid/gapps.zip"}
+      "Android": {"systemImage": "system image.qcow2", "userdataImage": "Android.qcow2", "gsiImage": "GSI.img", "gsiUrl": "https://example.invalid/gsi.zip", "gappsUrl": "https://example.invalid/gapps.zip"}
     },
     {
       "id": "NixOS",
@@ -365,9 +365,9 @@ test_resize_vm() {
 }
 EOF
 
-  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_src_dir" "$REPO_ROOT/src/vms/templates" \
     "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
-    "$_vms_dir" "$_manifest" "NixOS" "false" "false"
+    "$_vms_dir" "$_manifest" "NixOS" "false" "false" "false"
 
   # Grow allowed.
   _disk="$_vm_dir/data/NixOS.qcow2"
@@ -420,11 +420,11 @@ EOF
 #   resize_and_mark_image grows to DISK_BYTES but never shrinks below the
 #   current virtual size.
 test_resize_and_mark_image_grow_only() {
-  local _vm_dir="$_tmp/rmi/vm" _images_dir="$_tmp/rmi/vm/images" _vms_dir="$_tmp/rmi/vms"
+  local _vm_dir="$_tmp/rmi/vm" _src_dir="$_tmp/rmi/vm/src" _vms_dir="$_tmp/rmi/vms"
   local _manifest="$_tmp/rmi/manifest.json"
   local _img _marker _virtual_size
 
-  mkdir -p "$_vm_dir" "$_images_dir" "$_vms_dir"
+  mkdir -p "$_vm_dir" "$_src_dir" "$_vms_dir"
 
   cat > "$_manifest" <<'EOF'
 { "VMs": [] }
@@ -432,8 +432,8 @@ EOF
 
   vm_guest_credentials_fingerprint="test-fingerprint"
 
-  _img="$_images_dir/Test.qcow2"
-  _marker="$_images_dir/Test.vm-guest-credentials-sha256"
+  _img="$_src_dir/Test.qcow2"
+  _marker="$_src_dir/Test.vm-guest-credentials-sha256"
   qemu-img create -f qcow2 "$_img" 16M >/dev/null
 
   resize_and_mark_image "$_img" "$_marker" 33554432
@@ -454,11 +454,12 @@ EOF
 #   un-expected guests, and orphaned descriptors.  --gc-disabled narrows the
 #   expected set and clears disabled entries too.
 test_gc_keep_set() {
-  local _vm_dir="$_tmp/gc/vm" _images_dir="$_tmp/gc/vm/images" _vms_dir="$_tmp/gc/vms"
+  local _vm_dir="$_tmp/gc/vm" _src_dir="$_tmp/gc/vm/src" _vms_dir="$_tmp/gc/vms"
   local _manifest="$_tmp/gc/manifest.json"
   local _expected _keep
 
-  mkdir -p "$_vm_dir" "$_images_dir" "$_vm_dir/data" "$_vms_dir"
+  mkdir -p "$_vm_dir" "$_src_dir/Android" "$_src_dir/NixOS" "$_src_dir/macOS" "$_src_dir/Windows" \
+    "$_vm_dir/data" "$_vms_dir"
 
   cat > "$_manifest" <<'EOF'
 {
@@ -475,9 +476,9 @@ test_gc_keep_set() {
       "portForwards": [],
       "macAddressPrefix": "52",
       "Android": {
-        "systemImage": "Android-system.qcow2",
+        "systemImage": "system image.qcow2",
         "userdataImage": "Android.qcow2",
-        "gsiImage": "Android-gsi.img",
+        "gsiImage": "GSI.img",
         "gsiUrl": "https://example.invalid/gsi.zip",
         "gappsUrl": "https://example.invalid/gapps.zip"
       }
@@ -522,34 +523,34 @@ test_gc_keep_set() {
 }
 EOF
 
-  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_src_dir" "$REPO_ROOT/src/vms/templates" \
     "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
-    "$_vms_dir" "$_manifest" "NixOS" "false" "false"
+    "$_vms_dir" "$_manifest" "NixOS" "false" "false" "false"
 
   # Files that must survive default GC (host NixOS; manifest holds all four
-  # guests): Android system/GSI/userdata, NixOS golden+base+overlay, macOS
-  # base (type-prefixed keep), Windows golden (disabled entry preserved).
-  : > "$_images_dir/Android-system.qcow2"
-  : > "$_images_dir/Android-gsi.img"
-  : > "$_images_dir/NixOS.qcow2"
-  : > "$_images_dir/NixOS.base.qcow2"
-  : > "$_images_dir/macOS.base.qcow2"
-  : > "$_images_dir/Windows.qcow2"
+  # guests): Android system/GSI/userdata, NixOS prebuilt+overlay backing, macOS
+  # overlay backing, Windows prebuilt (disabled entry preserved).
+  : > "$_src_dir/Android/system image.qcow2"
+  : > "$_src_dir/Android/GSI.img"
+  : > "$_src_dir/NixOS/prebuilt image.qcow2"
+  : > "$_src_dir/NixOS/overlay backing.qcow2"
+  : > "$_src_dir/macOS/overlay backing.qcow2"
+  : > "$_src_dir/Windows/prebuilt image.qcow2"
   : > "$_vm_dir/data/Android.qcow2"
   : > "$_vm_dir/data/NixOS.qcow2"
   : > "$_vm_dir/data/Windows.qcow2"
 
-  # Stale disk images in both directories.
-  : > "$_images_dir/stale.qcow2"
+  # Stale disk images: src/ is swept by default; data/ is preserved unless --gc-data.
+  : > "$_src_dir/NixOS/stale.qcow2"
   : > "$_vm_dir/data/stale.qcow2"
 
-  # Sidecar markers (data/) and name-based markers (images/).
+  # Sidecar markers (data/) and prebuilt markers (src/<type>/).
   : > "$_vm_dir/data/NixOS.qcow2.vm-guest-credentials-sha256"
   : > "$_vm_dir/data/stale.qcow2.vm-guest-credentials-sha256"
-  : > "$_images_dir/NixOS.vm-guest-credentials-sha256"
-  : > "$_images_dir/Android.vm-guest-config-sha256"
-  : > "$_images_dir/MacBook.vm-guest-credentials-sha256"
-  : > "$_images_dir/Windows.vm-guest-credentials-sha256"
+  : > "$_src_dir/NixOS/prebuilt image.vm-guest-credentials-sha256"
+  : > "$_src_dir/Android/prebuilt image.vm-guest-config-sha256"
+  : > "$_src_dir/macOS/prebuilt image.vm-guest-credentials-sha256"
+  : > "$_src_dir/Windows/prebuilt image.vm-guest-credentials-sha256"
 
   # Descriptors for every guest plus one stale entry.
   vm_write_descriptors
@@ -560,22 +561,26 @@ EOF
   vm_gc_orphan_markers "$_expected"
   vm_gc_orphan_descriptors "$_expected"
 
-  for _keep in Android-system.qcow2 NixOS.qcow2 NixOS.base.qcow2 macOS.base.qcow2 Windows.qcow2; do
-    assert_file_exists "$_images_dir/$_keep" "default GC kept image images/$_keep"
-  done
-  assert_file_exists "$_images_dir/Android-gsi.img" "default GC kept Android GSI image"
+  assert_file_exists "$_src_dir/Android/system image.qcow2" "default GC kept Android system image"
+  assert_file_exists "$_src_dir/Android/GSI.img" "default GC kept Android GSI image"
+  assert_file_exists "$_src_dir/NixOS/prebuilt image.qcow2" "default GC kept NixOS prebuilt"
+  assert_file_exists "$_src_dir/NixOS/overlay backing.qcow2" "default GC kept NixOS overlay backing"
+  assert_file_exists "$_src_dir/macOS/overlay backing.qcow2" "default GC kept macOS overlay backing"
+  assert_file_exists "$_src_dir/Windows/prebuilt image.qcow2" "default GC kept Windows prebuilt"
   for _keep in Android.qcow2 NixOS.qcow2 Windows.qcow2; do
     assert_file_exists "$_vm_dir/data/$_keep" "default GC kept overlay data/$_keep"
   done
-  assert_file_missing "$_images_dir/stale.qcow2" "default GC removed stale image images/stale.qcow2"
-  assert_file_missing "$_vm_dir/data/stale.qcow2" "default GC removed stale overlay data/stale.qcow2"
+  assert_file_missing "$_src_dir/NixOS/stale.qcow2" "default GC removed stale src image"
+  assert_file_exists "$_vm_dir/data/stale.qcow2" "default GC preserved stale data overlay without --gc-data"
 
-  # Sidecar markers follow their disk; name-based markers survive while the
-  # guest is expected (including macOS/tart, which has no local qcow2 base).
   assert_file_exists "$_vm_dir/data/NixOS.qcow2.vm-guest-credentials-sha256" "default GC kept live sidecar marker"
-  assert_file_missing "$_vm_dir/data/stale.qcow2.vm-guest-credentials-sha256" "default GC removed orphaned sidecar marker"
-  for _keep in NixOS.vm-guest-credentials-sha256 Android.vm-guest-config-sha256 MacBook.vm-guest-credentials-sha256 Windows.vm-guest-credentials-sha256; do
-    assert_file_exists "$_images_dir/$_keep" "default GC kept live name-based marker $_keep"
+  assert_file_exists "$_vm_dir/data/stale.qcow2.vm-guest-credentials-sha256" "default GC preserved orphaned sidecar marker without --gc-data"
+  for _keep in \
+    "NixOS/prebuilt image.vm-guest-credentials-sha256" \
+    "Android/prebuilt image.vm-guest-config-sha256" \
+    "macOS/prebuilt image.vm-guest-credentials-sha256" \
+    "Windows/prebuilt image.vm-guest-credentials-sha256"; do
+    assert_file_exists "$_src_dir/$_keep" "default GC kept live prebuilt marker $_keep"
   done
 
   for _keep in Android.vm.json NixOS.vm.json MacBook.vm.json Windows.vm.json; do
@@ -583,41 +588,50 @@ EOF
   done
   assert_file_missing "$_vm_dir/stale.vm.json" "default GC removed orphaned descriptor stale.vm.json"
 
+  # --gc-data sweeps orphaned data/ overlays and their sidecar markers.
+  gc_data_mode=true
+  vm_gc_orphan_disks "$_expected"
+  vm_gc_orphan_markers "$_expected"
+  gc_data_mode=false
+  assert_file_missing "$_vm_dir/data/stale.qcow2" "gc-data removed stale data overlay"
+  assert_file_missing "$_vm_dir/data/stale.qcow2.vm-guest-credentials-sha256" "gc-data removed orphaned sidecar marker"
+
   # --gc-disabled narrows the expected set to enabled-and-host-matched VMs
-  # (Android, NixOS on host NixOS): disabled-entries artifacts are cleared.
+  # (Android, NixOS on host NixOS): disabled/unmatched src/ artifacts are cleared.
   _expected="$(vm_get_expected_vm_names)"
   vm_gc_orphan_disks "$_expected"
   vm_gc_orphan_markers "$_expected"
   vm_gc_orphan_descriptors "$_expected"
 
-  assert_file_missing "$_images_dir/Windows.qcow2" "gc-disabled removed disabled prebuilt images/Windows.qcow2"
-  assert_file_missing "$_images_dir/macOS.base.qcow2" "gc-disabled removed disabled base images/macOS.base.qcow2"
-  assert_file_missing "$_vm_dir/data/Windows.qcow2" "gc-disabled removed disabled overlay data/Windows.qcow2"
-  assert_file_missing "$_images_dir/Windows.vm-guest-credentials-sha256" "gc-disabled removed disabled name-based marker"
-  assert_file_missing "$_images_dir/MacBook.vm-guest-credentials-sha256" "gc-disabled removed tart marker for un-expected guest"
+  assert_file_missing "$_src_dir/Windows/prebuilt image.qcow2" "gc-disabled removed disabled prebuilt"
+  assert_file_missing "$_src_dir/macOS/overlay backing.qcow2" "gc-disabled removed MacBook overlay backing"
+  assert_file_exists "$_vm_dir/data/Windows.qcow2" "gc-disabled preserved data overlay without --gc-data"
+  assert_file_missing "$_src_dir/Windows/prebuilt image.vm-guest-credentials-sha256" "gc-disabled removed disabled prebuilt marker"
+  assert_file_missing "$_src_dir/macOS/prebuilt image.vm-guest-credentials-sha256" "gc-disabled removed tart marker for un-expected guest"
   assert_file_missing "$_vm_dir/Windows.vm.json" "gc-disabled removed disabled descriptor Windows.vm.json"
   assert_file_missing "$_vm_dir/MacBook.vm.json" "gc-disabled removed disabled descriptor MacBook.vm.json"
-  for _keep in Android-system.qcow2 NixOS.qcow2 NixOS.base.qcow2; do
-    assert_file_exists "$_images_dir/$_keep" "gc-disabled kept image images/$_keep"
-  done
+  assert_file_exists "$_src_dir/Android/system image.qcow2" "gc-disabled kept Android system image"
+  assert_file_exists "$_src_dir/NixOS/prebuilt image.qcow2" "gc-disabled kept NixOS prebuilt"
+  assert_file_exists "$_src_dir/NixOS/overlay backing.qcow2" "gc-disabled kept NixOS overlay backing"
   assert_file_exists "$_vm_dir/data/Android.qcow2" "gc-disabled kept Android userdata"
   assert_file_exists "$_vm_dir/data/NixOS.qcow2" "gc-disabled kept NixOS overlay"
 }
 
 # test_pack_keep_set
 #   Pack strips exactly the trivially regenerable set — UTM bundles, generated
-#   start/stop scripts (BOTH variants), images/<type>.base.qcow2 copies, and
-#   images/*-build/ + stale dot-dirs — while keeping the payload: goldens +
+#   start/stop scripts (BOTH variants), src/<type>/overlay backing.qcow2 copies, and
+#   src/<type>/Packer/ + stale dot-dirs — while keeping the payload: goldens +
 #   markers, Android system/GSI, installer ISOs, data/ overlays (incl. Android
 #   userdata), descriptors, tart store, README, and pack/unpack wrappers.
 #   Dry-run prints removals without deleting; --force performs.  Refuses
 #   while any VM is running.
 test_pack_keep_set() {
-  local _vm_dir="$_tmp/pack/vm" _images_dir="$_tmp/pack/vm/images" _vms_dir="$_tmp/pack/vms"
+  local _vm_dir="$_tmp/pack/vm" _src_dir="$_tmp/pack/vm/src" _vms_dir="$_tmp/pack/vms"
   local _manifest="$_tmp/pack/manifest.json"
   local _out
 
-  mkdir -p "$_vm_dir" "$_images_dir" "$_vm_dir/data" "$_vms_dir" "$_vm_dir/scripts"
+  mkdir -p "$_vm_dir" "$_src_dir/Android" "$_src_dir/NixOS" "$_src_dir/Windows" \
+    "$_vm_dir/data" "$_vms_dir" "$_vm_dir/scripts"
 
   cat > "$_manifest" <<'EOF'
 {
@@ -634,9 +648,9 @@ test_pack_keep_set() {
       "portForwards": [],
       "macAddressPrefix": "52",
       "Android": {
-        "systemImage": "Android-system.qcow2",
+        "systemImage": "system image.qcow2",
         "userdataImage": "Android.qcow2",
-        "gsiImage": "Android-gsi.img",
+        "gsiImage": "GSI.img",
         "gsiUrl": "https://example.invalid/gsi.zip",
         "gappsUrl": "https://example.invalid/gapps.zip"
       }
@@ -657,19 +671,19 @@ test_pack_keep_set() {
 }
 EOF
 
-  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_src_dir" "$REPO_ROOT/src/vms/templates" \
     "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
-    "$_vms_dir" "$_manifest" "NixOS" "false" "false"
+    "$_vms_dir" "$_manifest" "NixOS" "false" "false" "false"
 
   # Keep-set payload: goldens + markers, Android system/GSI, installer ISOs,
   # data/ overlays (incl. Android userdata), descriptors, tart store, README,
   # pack/unpack wrappers (BOTH variants).
-  : > "$_images_dir/Android-system.qcow2"
-  : > "$_images_dir/Android-gsi.img"
-  : > "$_images_dir/NixOS.qcow2"
-  : > "$_images_dir/NixOS.qcow2.vm-guest-credentials-sha256"
-  : > "$_images_dir/NixOS-installer.iso"
-  : > "$_images_dir/virtio-win.iso"
+  : > "$_src_dir/Android/system image.qcow2"
+  : > "$_src_dir/Android/GSI.img"
+  : > "$_src_dir/NixOS/prebuilt image.qcow2"
+  : > "$_src_dir/NixOS/prebuilt image.vm-guest-credentials-sha256"
+  : > "$_src_dir/Windows/installer.iso"
+  : > "$_src_dir/Windows/virtio guest tools.iso"
   : > "$_vm_dir/data/Android.qcow2"
   : > "$_vm_dir/data/NixOS.qcow2"
   vm_write_descriptors
@@ -681,15 +695,15 @@ EOF
   : > "$_vm_dir/scripts/unpack.ps1"
 
   # Removed set: UTM bundles, generated start/stop scripts (BOTH variants),
-  # base copies, *-build/ + stale dot-dirs.
+  # overlay backing copies, Packer/ + stale dot-dirs.
   mkdir -p "$_vm_dir/Android.utm/Data" "$_vm_dir/NixOS.utm"
   : > "$_vm_dir/Android.utm/Data/Android.qcow2"
   : > "$_vm_dir/scripts/start-NixOS.sh"
   : > "$_vm_dir/scripts/stop-NixOS.sh"
   : > "$_vm_dir/scripts/start-NixOS.ps1"
   : > "$_vm_dir/scripts/stop-NixOS.ps1"
-  : > "$_images_dir/NixOS.base.qcow2"
-  mkdir -p "$_images_dir/NixOS-build" "$_images_dir/.packer-tmp"
+  : > "$_src_dir/NixOS/overlay backing.qcow2"
+  mkdir -p "$_src_dir/NixOS/Packer" "$_src_dir/NixOS/.packer-tmp"
 
   # Dry-run: prints removals, removes nothing.
   dry_run=true
@@ -698,15 +712,17 @@ EOF
     || { echo "FAIL: pack dry-run did not print UTM bundle removal"; _failures=$((_failures + 1)); }
   printf '%s\n' "$_out" | grep -q "removing regenerable start/stop script" \
     || { echo "FAIL: pack dry-run did not print start/stop script removal"; _failures=$((_failures + 1)); }
-  printf '%s\n' "$_out" | grep -q "removing regenerable base image" \
-    || { echo "FAIL: pack dry-run did not print base image removal"; _failures=$((_failures + 1)); }
+  printf '%s\n' "$_out" | grep -q "removing regenerable overlay backing" \
+    || { echo "FAIL: pack dry-run did not print overlay backing removal"; _failures=$((_failures + 1)); }
+  printf '%s\n' "$_out" | grep -q "removing transient Packer directory" \
+    || { echo "FAIL: pack dry-run did not print Packer directory removal"; _failures=$((_failures + 1)); }
   printf '%s\n' "$_out" | grep -q "removing transient build directory" \
     || { echo "FAIL: pack dry-run did not print build directory removal"; _failures=$((_failures + 1)); }
   assert_file_exists "$_vm_dir/Android.utm/Data/Android.qcow2" "pack dry-run kept Android bundle userdata"
   assert_file_exists "$_vm_dir/scripts/start-NixOS.sh" "pack dry-run kept start script"
-  assert_file_exists "$_images_dir/NixOS.base.qcow2" "pack dry-run kept base copy"
-  if [ ! -d "$_images_dir/NixOS-build" ]; then
-    echo "FAIL: pack dry-run kept build dir images/NixOS-build"
+  assert_file_exists "$_src_dir/NixOS/overlay backing.qcow2" "pack dry-run kept overlay backing copy"
+  if [ ! -d "$_src_dir/NixOS/Packer" ]; then
+    echo "FAIL: pack dry-run kept Packer dir src/NixOS/Packer"
     _failures=$((_failures + 1))
   fi
   assert_file_exists "$_vm_dir/scripts/pack.sh" "pack dry-run kept pack wrapper"
@@ -726,19 +742,22 @@ EOF
   assert_file_missing "$_vm_dir/scripts/stop-NixOS.sh" "pack removed stop script"
   assert_file_missing "$_vm_dir/scripts/start-NixOS.ps1" "pack removed start ps1"
   assert_file_missing "$_vm_dir/scripts/stop-NixOS.ps1" "pack removed stop ps1"
-  assert_file_missing "$_images_dir/NixOS.base.qcow2" "pack removed base copy"
-  if [ -d "$_images_dir/NixOS-build" ]; then
-    echo "FAIL: pack removed build dir images/NixOS-build"
+  assert_file_missing "$_src_dir/NixOS/overlay backing.qcow2" "pack removed overlay backing copy"
+  if [ -d "$_src_dir/NixOS/Packer" ]; then
+    echo "FAIL: pack removed Packer dir src/NixOS/Packer"
     _failures=$((_failures + 1))
   fi
-  if [ -d "$_images_dir/.packer-tmp" ]; then
-    echo "FAIL: pack removed stale dot-dir images/.packer-tmp"
+  if [ -d "$_src_dir/NixOS/.packer-tmp" ]; then
+    echo "FAIL: pack removed stale dot-dir src/NixOS/.packer-tmp"
     _failures=$((_failures + 1))
   fi
 
-  for _keep in Android-system.qcow2 Android-gsi.img NixOS.qcow2 NixOS.qcow2.vm-guest-credentials-sha256 NixOS-installer.iso virtio-win.iso; do
-    assert_file_exists "$_images_dir/$_keep" "pack kept image images/$_keep"
-  done
+  assert_file_exists "$_src_dir/Android/system image.qcow2" "pack kept Android system image"
+  assert_file_exists "$_src_dir/Android/GSI.img" "pack kept Android GSI image"
+  assert_file_exists "$_src_dir/NixOS/prebuilt image.qcow2" "pack kept NixOS prebuilt"
+  assert_file_exists "$_src_dir/NixOS/prebuilt image.vm-guest-credentials-sha256" "pack kept NixOS prebuilt marker"
+  assert_file_exists "$_src_dir/Windows/installer.iso" "pack kept Windows installer ISO"
+  assert_file_exists "$_src_dir/Windows/virtio guest tools.iso" "pack kept virtio guest tools ISO"
   for _keep in Android.qcow2 NixOS.qcow2; do
     assert_file_exists "$_vm_dir/data/$_keep" "pack kept overlay data/$_keep"
   done
@@ -773,12 +792,12 @@ EOF
 #   auto-grow); Android guests get a standalone data/<id>.qcow2 userdata disk
 #   created at the manifest disk size and grown grow-only.
 test_windows_qemu_provisioning() {
-  local _vm_dir="$_tmp/wq/vm" _images_dir="$_tmp/wq/vm/images" _vms_dir="$_tmp/wq/vms"
+  local _vm_dir="$_tmp/wq/vm" _src_dir="$_tmp/wq/vm/src" _vms_dir="$_tmp/wq/vms"
   local _manifest="$_tmp/wq/manifest.json"
   local _prebuilt _base _overlay _cred_marker _config_marker
   local _before_hash _after_hash _virtual_size _android_data
 
-  mkdir -p "$_vm_dir" "$_images_dir" "$_vms_dir"
+  mkdir -p "$_vm_dir" "$_src_dir/Windows" "$_vms_dir"
 
   cat > "$_manifest" <<'EOF'
 {
@@ -801,13 +820,13 @@ test_windows_qemu_provisioning() {
 }
 EOF
 
-  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_src_dir" "$REPO_ROOT/src/vms/templates" \
     "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
-    "$_vms_dir" "$_manifest" "Windows" "false" "false"
+    "$_vms_dir" "$_manifest" "Windows" "false" "false" "false"
   vm_guest_credentials_fingerprint="test-fingerprint"
 
-  _prebuilt="$_images_dir/Windows.qcow2"
-  _base="$_images_dir/Windows.base.qcow2"
+  _prebuilt="$_src_dir/Windows/prebuilt image.qcow2"
+  _base="$_src_dir/Windows/overlay backing.qcow2"
   _overlay="$_vm_dir/data/Windows.qcow2"
   _cred_marker="$(vm_guest_credentials_marker_path Windows "$_overlay")"
   _config_marker="$(vm_guest_config_marker_path Windows "$_overlay")"
@@ -819,7 +838,7 @@ EOF
   vm_setup_windows_qemu Windows Windows '["Windows"]' 0 >/dev/null 2>&1
   assert_eq "0" "$([ -f "$_base" ] && echo 0 || echo 1)" "windows-qemu base created from prebuilt"
   assert_eq "0" "$([ -f "$_overlay" ] && echo 0 || echo 1)" "windows-qemu overlay created"
-  assert_eq "1" "$(qemu-img info "$_overlay" | grep -cF 'backing file: ../images/Windows.base.qcow2')" "windows-qemu overlay relative backing path"
+  assert_eq "1" "$(qemu-img info "$_overlay" | grep -cF 'backing file: ../src/Windows/overlay backing.qcow2')" "windows-qemu overlay relative backing path"
   assert_eq "test-fingerprint" "$(tr -d '\r\n' <"$_cred_marker")" "windows-qemu credential marker written on overlay create"
 
   # Invalid overlay: preserved without --force, recreated with it.
@@ -873,9 +892,9 @@ EOF
       "portForwards": [],
       "macAddressPrefix": "52",
       "Android": {
-        "systemImage": "Android-system.qcow2",
+        "systemImage": "system image.qcow2",
         "userdataImage": "Android.qcow2",
-        "gsiImage": "Android-gsi.img",
+        "gsiImage": "GSI.img",
         "gsiUrl": "https://example.invalid/gsi.zip",
         "gappsUrl": "https://example.invalid/gapps.zip"
       }
@@ -898,13 +917,14 @@ EOF
   assert_eq "128000000" "$_virtual_size" "windows-qemu android userdata grown grow-only"
 }
 
-# _gcd_populate_fixture VM_DIR IMAGES_DIR VMS_DIR MANIFEST
+# _gcd_populate_fixture VM_DIR SRC_DIR VMS_DIR MANIFEST
 #   Shared sandbox layout for dispatcher GC tests: four-guest manifest,
-#   manifest-referenced images/overlays/markers/descriptors, plus stale orphans.
+#   manifest-referenced src/data artifacts/markers/descriptors, plus stale orphans.
 _gcd_populate_fixture() {
-  local _vm_dir="$1" _images_dir="$2" _vms_dir="$3" _manifest="$4"
+  local _vm_dir="$1" _src_dir="$2" _vms_dir="$3" _manifest="$4"
 
-  mkdir -p "$_vm_dir" "$_images_dir" "$_vm_dir/data" "$_vms_dir"
+  mkdir -p "$_vm_dir" "$_src_dir/Android" "$_src_dir/NixOS" "$_src_dir/macOS" "$_src_dir/Windows" \
+    "$_vm_dir/data" "$_vms_dir"
 
   cat > "$_manifest" <<'EOF'
 {
@@ -921,9 +941,9 @@ _gcd_populate_fixture() {
       "portForwards": [],
       "macAddressPrefix": "52",
       "Android": {
-        "systemImage": "Android-system.qcow2",
+        "systemImage": "system image.qcow2",
         "userdataImage": "Android.qcow2",
-        "gsiImage": "Android-gsi.img",
+        "gsiImage": "GSI.img",
         "gsiUrl": "https://example.invalid/gsi.zip",
         "gappsUrl": "https://example.invalid/gapps.zip"
       }
@@ -968,27 +988,27 @@ _gcd_populate_fixture() {
 }
 EOF
 
-  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_src_dir" "$REPO_ROOT/src/vms/templates" \
     "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
-    "$_vms_dir" "$_manifest" "NixOS" "false" "false"
+    "$_vms_dir" "$_manifest" "NixOS" "false" "false" "false"
 
-  : > "$_images_dir/Android-system.qcow2"
-  : > "$_images_dir/Android-gsi.img"
-  : > "$_images_dir/NixOS.qcow2"
-  : > "$_images_dir/NixOS.base.qcow2"
-  : > "$_images_dir/macOS.base.qcow2"
-  : > "$_images_dir/Windows.qcow2"
+  : > "$_src_dir/Android/system image.qcow2"
+  : > "$_src_dir/Android/GSI.img"
+  : > "$_src_dir/NixOS/prebuilt image.qcow2"
+  : > "$_src_dir/NixOS/overlay backing.qcow2"
+  : > "$_src_dir/macOS/overlay backing.qcow2"
+  : > "$_src_dir/Windows/prebuilt image.qcow2"
   : > "$_vm_dir/data/Android.qcow2"
   : > "$_vm_dir/data/NixOS.qcow2"
   : > "$_vm_dir/data/Windows.qcow2"
-  : > "$_images_dir/stale.qcow2"
+  : > "$_src_dir/NixOS/stale.qcow2"
   : > "$_vm_dir/data/stale.qcow2"
   : > "$_vm_dir/data/NixOS.qcow2.vm-guest-credentials-sha256"
   : > "$_vm_dir/data/stale.qcow2.vm-guest-credentials-sha256"
-  : > "$_images_dir/NixOS.vm-guest-credentials-sha256"
-  : > "$_images_dir/Android.vm-guest-config-sha256"
-  : > "$_images_dir/MacBook.vm-guest-credentials-sha256"
-  : > "$_images_dir/Windows.vm-guest-credentials-sha256"
+  : > "$_src_dir/NixOS/prebuilt image.vm-guest-credentials-sha256"
+  : > "$_src_dir/Android/prebuilt image.vm-guest-config-sha256"
+  : > "$_src_dir/macOS/prebuilt image.vm-guest-credentials-sha256"
+  : > "$_src_dir/Windows/prebuilt image.vm-guest-credentials-sha256"
   vm_write_descriptors
   : > "$_vm_dir/stale.vm.json"
 }
@@ -997,26 +1017,28 @@ EOF
 #   Behavioral tests for vm_gc_vms (the dispatcher): default keep-set preserves
 #   disabled and other-host guests; --gc-disabled narrows; dry_run is a no-op.
 test_gc_dispatcher() {
-  local _vm_dir _images_dir _vms_dir _manifest
+  local _vm_dir _src_dir _vms_dir _manifest
 
   # Scenario A — default: all manifest guests preserved, stale removed.
   _vm_dir="$_tmp/gcd-a/vm"
-  _images_dir="$_tmp/gcd-a/vm/images"
+  _src_dir="$_tmp/gcd-a/vm/src"
   _vms_dir="$_tmp/gcd-a/vms"
   _manifest="$_tmp/gcd-a/manifest.json"
-  _gcd_populate_fixture "$_vm_dir" "$_images_dir" "$_vms_dir" "$_manifest"
+  _gcd_populate_fixture "$_vm_dir" "$_src_dir" "$_vms_dir" "$_manifest"
   gc_disabled_mode=false
   dry_run=false
   vm_gc_vms
-  for _keep in Android-system.qcow2 NixOS.qcow2 NixOS.base.qcow2 macOS.base.qcow2 Windows.qcow2; do
-    assert_file_exists "$_images_dir/$_keep" "dispatcher default kept images/$_keep"
-  done
-  assert_file_exists "$_images_dir/Android-gsi.img" "dispatcher default kept Android GSI"
+  assert_file_exists "$_src_dir/Android/system image.qcow2" "dispatcher default kept Android system image"
+  assert_file_exists "$_src_dir/NixOS/prebuilt image.qcow2" "dispatcher default kept NixOS prebuilt"
+  assert_file_exists "$_src_dir/NixOS/overlay backing.qcow2" "dispatcher default kept NixOS overlay backing"
+  assert_file_exists "$_src_dir/macOS/overlay backing.qcow2" "dispatcher default kept macOS overlay backing"
+  assert_file_exists "$_src_dir/Windows/prebuilt image.qcow2" "dispatcher default kept Windows prebuilt"
+  assert_file_exists "$_src_dir/Android/GSI.img" "dispatcher default kept Android GSI"
   for _keep in Android.qcow2 NixOS.qcow2 Windows.qcow2; do
     assert_file_exists "$_vm_dir/data/$_keep" "dispatcher default kept data/$_keep"
   done
-  assert_file_missing "$_images_dir/stale.qcow2" "dispatcher default removed stale image"
-  assert_file_missing "$_vm_dir/data/stale.qcow2" "dispatcher default removed stale overlay"
+  assert_file_missing "$_src_dir/NixOS/stale.qcow2" "dispatcher default removed stale src image"
+  assert_file_exists "$_vm_dir/data/stale.qcow2" "dispatcher default preserved stale data overlay without --gc-data"
   assert_file_missing "$_vm_dir/stale.vm.json" "dispatcher default removed stale descriptor"
   for _keep in Android.vm.json NixOS.vm.json MacBook.vm.json Windows.vm.json; do
     assert_file_exists "$_vm_dir/$_keep" "dispatcher default kept descriptor $_keep"
@@ -1024,33 +1046,33 @@ test_gc_dispatcher() {
 
   # Scenario B — gc-disabled: Windows + other-host MacBook artifacts cleared.
   _vm_dir="$_tmp/gcd-b/vm"
-  _images_dir="$_tmp/gcd-b/vm/images"
+  _src_dir="$_tmp/gcd-b/vm/src"
   _vms_dir="$_tmp/gcd-b/vms"
   _manifest="$_tmp/gcd-b/manifest.json"
-  _gcd_populate_fixture "$_vm_dir" "$_images_dir" "$_vms_dir" "$_manifest"
+  _gcd_populate_fixture "$_vm_dir" "$_src_dir" "$_vms_dir" "$_manifest"
   gc_disabled_mode=true
   dry_run=false
   vm_gc_vms
-  assert_file_missing "$_images_dir/Windows.qcow2" "dispatcher gc-disabled removed Windows golden"
-  assert_file_missing "$_images_dir/macOS.base.qcow2" "dispatcher gc-disabled removed MacBook base"
-  assert_file_missing "$_vm_dir/data/Windows.qcow2" "dispatcher gc-disabled removed Windows overlay"
+  assert_file_missing "$_src_dir/Windows/prebuilt image.qcow2" "dispatcher gc-disabled removed Windows prebuilt"
+  assert_file_missing "$_src_dir/macOS/overlay backing.qcow2" "dispatcher gc-disabled removed MacBook overlay backing"
+  assert_file_exists "$_vm_dir/data/Windows.qcow2" "dispatcher gc-disabled preserved data overlay without --gc-data"
   assert_file_missing "$_vm_dir/Windows.vm.json" "dispatcher gc-disabled removed Windows descriptor"
   assert_file_missing "$_vm_dir/MacBook.vm.json" "dispatcher gc-disabled removed MacBook descriptor"
-  for _keep in Android-system.qcow2 NixOS.qcow2 NixOS.base.qcow2; do
-    assert_file_exists "$_images_dir/$_keep" "dispatcher gc-disabled kept images/$_keep"
-  done
+  assert_file_exists "$_src_dir/Android/system image.qcow2" "dispatcher gc-disabled kept Android system image"
+  assert_file_exists "$_src_dir/NixOS/prebuilt image.qcow2" "dispatcher gc-disabled kept NixOS prebuilt"
+  assert_file_exists "$_src_dir/NixOS/overlay backing.qcow2" "dispatcher gc-disabled kept NixOS overlay backing"
   assert_file_exists "$_vm_dir/data/NixOS.qcow2" "dispatcher gc-disabled kept NixOS overlay"
 
   # Scenario C — dry_run: nothing removed.
   _vm_dir="$_tmp/gcd-c/vm"
-  _images_dir="$_tmp/gcd-c/vm/images"
+  _src_dir="$_tmp/gcd-c/vm/src"
   _vms_dir="$_tmp/gcd-c/vms"
   _manifest="$_tmp/gcd-c/manifest.json"
-  _gcd_populate_fixture "$_vm_dir" "$_images_dir" "$_vms_dir" "$_manifest"
+  _gcd_populate_fixture "$_vm_dir" "$_src_dir" "$_vms_dir" "$_manifest"
   gc_disabled_mode=false
   dry_run=true
   vm_gc_vms
-  assert_file_exists "$_images_dir/stale.qcow2" "dispatcher dry-run preserved stale image"
+  assert_file_exists "$_src_dir/NixOS/stale.qcow2" "dispatcher dry-run preserved stale src image"
   assert_file_exists "$_vm_dir/data/stale.qcow2" "dispatcher dry-run preserved stale overlay"
   assert_file_exists "$_vm_dir/stale.vm.json" "dispatcher dry-run preserved stale descriptor"
 }
@@ -1140,9 +1162,9 @@ test_expected_vm_names_edge_cases() {
 }
 EOF
 
-  vm_init "$REPO_ROOT" "$_tmp/names/vm" "$_tmp/names/vm/images" "$REPO_ROOT/src/vms/templates" \
+  vm_init "$REPO_ROOT" "$_tmp/names/vm" "$_tmp/names/vm/src" "$REPO_ROOT/src/vms/templates" \
     "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
-    "$_tmp/names/vms" "$_manifest" "NixOS" "false" "false"
+    "$_tmp/names/vms" "$_manifest" "NixOS" "false" "false" "false"
 
   _names="$(vm_get_manifest_vm_names | sort | tr '\n' ' ')"
   assert_eq "AllHosts DisabledGuest EmptyHosts NixOnly NoEnabledField NoHostsField " "$_names" "manifest names include all guests"
@@ -1166,12 +1188,12 @@ EOF
   assert_eq "6" "$_sorted" "manifest names count stable across NUCLEUS_HOST changes"
 }
 
-# _android_userdata_init_fixture VM_DIR IMAGES_DIR VMS_DIR MANIFEST
+# _android_userdata_init_fixture VM_DIR SRC_DIR VMS_DIR MANIFEST
 #   Minimal Android manifest + vm_init for userdata link tests.
 _android_userdata_init_fixture() {
-  local _vm_dir="$1" _images_dir="$2" _vms_dir="$3" _manifest="$4"
+  local _vm_dir="$1" _src_dir="$2" _vms_dir="$3" _manifest="$4"
 
-  mkdir -p "$_vm_dir" "$_images_dir" "$_vms_dir" "$_vm_dir/data"
+  mkdir -p "$_vm_dir" "$_src_dir" "$_vms_dir" "$_vm_dir/data"
 
   cat > "$_manifest" <<'EOF'
 {
@@ -1189,9 +1211,9 @@ _android_userdata_init_fixture() {
       "portForwards": [],
       "macAddressPrefix": "52",
       "Android": {
-        "systemImage": "Android-system.qcow2",
+        "systemImage": "system image.qcow2",
         "userdataImage": "Android.qcow2",
-        "gsiImage": "Android-gsi.img",
+        "gsiImage": "GSI.img",
         "gsiUrl": "https://example.invalid/gsi.zip",
         "gappsUrl": "https://example.invalid/gapps.zip"
       }
@@ -1200,16 +1222,16 @@ _android_userdata_init_fixture() {
 }
 EOF
 
-  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_src_dir" "$REPO_ROOT/src/vms/templates" \
     "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
-    "$_vms_dir" "$_manifest" "MacBook" "false" "false"
+    "$_vms_dir" "$_manifest" "MacBook" "false" "false" "false"
 }
 
 test_android_userdata_link_idempotent() {
-  local _vm_dir="$_tmp/aul/vm" _images_dir="$_tmp/aul/vm/images" _vms_dir="$_tmp/aul/vms"
+  local _vm_dir="$_tmp/aul/vm" _src_dir="$_tmp/aul/vm/src" _vms_dir="$_tmp/aul/vms"
   local _manifest="$_tmp/aul/manifest.json"
 
-  _android_userdata_init_fixture "$_vm_dir" "$_images_dir" "$_vms_dir" "$_manifest"
+  _android_userdata_init_fixture "$_vm_dir" "$_src_dir" "$_vms_dir" "$_manifest"
   : > "$_vm_dir/data/Android.qcow2"
   mkdir -p "$_vm_dir/Android.utm/Data"
 
@@ -1230,10 +1252,10 @@ test_android_userdata_link_idempotent() {
 }
 
 test_android_userdata_bundle_only_fails() {
-  local _vm_dir="$_tmp/aub/vm" _images_dir="$_tmp/aub/vm/images" _vms_dir="$_tmp/aub/vms"
+  local _vm_dir="$_tmp/aub/vm" _src_dir="$_tmp/aub/vm/src" _vms_dir="$_tmp/aub/vms"
   local _manifest="$_tmp/aub/manifest.json"
 
-  _android_userdata_init_fixture "$_vm_dir" "$_images_dir" "$_vms_dir" "$_manifest"
+  _android_userdata_init_fixture "$_vm_dir" "$_src_dir" "$_vms_dir" "$_manifest"
   mkdir -p "$_vm_dir/Android.utm/Data"
   printf 'bundle-only-data' > "$_vm_dir/Android.utm/Data/Android.qcow2"
 
@@ -1246,10 +1268,10 @@ test_android_userdata_bundle_only_fails() {
 }
 
 test_android_userdata_canonical_wins_over_standalone_bundle() {
-  local _vm_dir="$_tmp/auc/vm" _images_dir="$_tmp/auc/vm/images" _vms_dir="$_tmp/auc/vms"
+  local _vm_dir="$_tmp/auc/vm" _src_dir="$_tmp/auc/vm/src" _vms_dir="$_tmp/auc/vms"
   local _manifest="$_tmp/auc/manifest.json"
 
-  _android_userdata_init_fixture "$_vm_dir" "$_images_dir" "$_vms_dir" "$_manifest"
+  _android_userdata_init_fixture "$_vm_dir" "$_src_dir" "$_vms_dir" "$_manifest"
   printf 'canonical-data' > "$_vm_dir/data/Android.qcow2"
   mkdir -p "$_vm_dir/Android.utm/Data"
   printf 'stale-bundle' > "$_vm_dir/Android.utm/Data/Android.qcow2"
@@ -1265,10 +1287,10 @@ test_android_userdata_canonical_wins_over_standalone_bundle() {
 }
 
 test_descriptor_null_gsi_url() {
-  local _vm_dir="$_tmp/null-gsi-vm" _images_dir="$_tmp/null-gsi-vm/images" _vms_dir="$_tmp/vms-null"
+  local _vm_dir="$_tmp/null-gsi-vm" _src_dir="$_tmp/null-gsi-vm/src" _vms_dir="$_tmp/vms-null"
   local _manifest="$_tmp/manifest-null-gsi.json" _android_desc
 
-  mkdir -p "$_vm_dir" "$_images_dir" "$_vms_dir"
+  mkdir -p "$_vm_dir" "$_src_dir" "$_vms_dir"
   cat > "$_manifest" <<'EOF'
 {
   "VMs": [
@@ -1284,9 +1306,9 @@ test_descriptor_null_gsi_url() {
       "portForwards": [{"guestPort": 5555, "hostPort": 22040}],
       "macAddressPrefix": "52",
       "Android": {
-        "systemImage": "Android-system.qcow2",
+        "systemImage": "system image.qcow2",
         "userdataImage": "Android.qcow2",
-        "gsiImage": "Android-gsi.img",
+        "gsiImage": "GSI.img",
         "gsiUrl": null,
         "gappsUrl": "https://example.invalid/gapps.zip"
       }
@@ -1295,9 +1317,9 @@ test_descriptor_null_gsi_url() {
 }
 EOF
 
-  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_src_dir" "$REPO_ROOT/src/vms/templates" \
     "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
-    "$_vms_dir" "$_manifest" "MacBook" "false" "false"
+    "$_vms_dir" "$_manifest" "MacBook" "false" "false" "false"
 
   vm_write_descriptors
   _android_desc="$_vm_dir/Android.vm.json"

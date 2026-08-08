@@ -44,9 +44,9 @@ setup_fixture() {
       ],
       "macAddressPrefix": "52",
       "Android": {
-        "systemImage": "Android-system.qcow2",
+        "systemImage": "system image.qcow2",
         "userdataImage": "Android.qcow2",
-        "gsiImage": "Android-gsi.img",
+        "gsiImage": "GSI.img",
         "gsiUrl": null,
         "gappsUrl": "https://example.invalid/gapps.zip",
         "magiskUrl": "https://example.invalid/Magisk.apk"
@@ -55,9 +55,9 @@ setup_fixture() {
   ]
 }
 EOF
-  vm_init "$REPO_ROOT" "$_tmp/vm" "$_tmp/vm/images" "$REPO_ROOT/src/vms/templates" \
+  vm_init "$REPO_ROOT" "$_tmp/vm" "$_tmp/vm/src" "$REPO_ROOT/src/vms/templates" \
     "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
-    "$REPO_ROOT/src/vms" "$_af_manifest" "MacBook" "false" "false"
+    "$REPO_ROOT/src/vms" "$_af_manifest" "MacBook" "false" "false" "false"
 }
 
 test_adb_port_resolution() {
@@ -279,12 +279,11 @@ EOF
 
 test_gapps_unauthorized_flashes_recovery() {
   setup_fixture
-  mkdir -p "$_tmp/vm/images"
-  _af_zip="$_tmp/vm/images/android-gapps.zip"
-  _af_recovery="$_tmp/vm/images/android-recovery-userdebug.img"
+  mkdir -p "$_tmp/vm/src/Android"
+  _af_zip="$_tmp/vm/src/Android/GApps.zip"
+  _af_recovery="$_tmp/vm/src/Android/recovery userdebug.img"
   printf 'PK\x03\x04' > "$_af_zip"
   printf 'recovery\n' > "$_af_recovery"
-  printf 'test-release\n' > "$_tmp/vm/images/android-recovery-userdebug.flashed"
 
   _af_flash_log="$_tmp/flash.log"
   _af_sideload_log="$_tmp/sideload.log"
@@ -359,12 +358,12 @@ EOF
 
 test_gapps_sideload_path() {
   setup_fixture
-  mkdir -p "$_tmp/vm/images"
-  _af_zip="$_tmp/vm/images/android-gapps.zip"
-  _af_recovery="$_tmp/vm/images/android-recovery-userdebug.img"
+  mkdir -p "$_tmp/vm/src/Android"
+  _af_zip="$_tmp/vm/src/Android/GApps.zip"
+  _af_recovery="$_tmp/vm/src/Android/recovery userdebug.img"
   printf 'PK\x03\x04' > "$_af_zip"
   printf 'recovery\n' > "$_af_recovery"
-  jq -n --arg tag 'test-release' '{tag_name: $tag}' > "$_tmp/vm/images/android-recovery-userdebug.tag.json"
+  jq -n --arg tag 'test-release' '{tag_name: $tag}' > "$_tmp/vm/src/Android/recovery userdebug.tag.json"
 
   _af_sideload_log="$_tmp/sideload.log"
   _af_bin="$_tmp/bin"
@@ -510,11 +509,12 @@ test_magisk_stage_patch_kit_layout() {
 
 test_magisk_download_stdout_is_path_only() {
   setup_fixture
-  _af_apk="$IMAGES_DIR/android-magisk.apk"
-  _af_boot="$IMAGES_DIR/android-boot.img"
+  mkdir -p "$SRC_DIR/Android"
+  _af_apk="$SRC_DIR/Android/Magisk.apk"
+  _af_boot="$SRC_DIR/Android/boot.img"
   printf 'cached\n' > "$_af_apk"
   printf 'boot\n' > "$_af_boot"
-  jq -n --arg tag 'test-tag' '{tag_name: $tag}' > "$IMAGES_DIR/android-boot.tag.json"
+  jq -n --arg tag 'test-tag' '{tag_name: $tag}' > "$SRC_DIR/Android/boot.tag.json"
 
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"

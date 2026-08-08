@@ -2,7 +2,7 @@
 .SYNOPSIS
     Verifies Windows-side VM disk-model parity (P8): Invoke-VMSetup.ps1 and
     scripts/vm.ps1 must provision writable runtime disks as data/<id>.qcow2
-    qcow2 overlays over images/<type>.base.qcow2 (base = cp of the prebuilt
+    qcow2 overlays over src/<type>/overlay backing.qcow2 (base = cp of the prebuilt
     golden, backing path tree-root-relative), mirroring vm_ensure_base_and_overlay
     in src/scripts/lib/vm.sh. GC keep-sets, grow-only resize, running-VM guards,
     and Android standalone userdata must match the POSIX disk model.
@@ -12,7 +12,7 @@
 
     - The writable runtime disk is data/<id>.qcow2, rendered RELATIVE in
       generated start scripts (templates re-anchor to the tree root first).
-    - The base image is images/<type>.base.qcow2, a cp of the kept prebuilt
+    - The base image is src/<type>/overlay backing.qcow2, a cp of the kept prebuilt
       golden, refreshed on guest-credential drift while the VM is stopped.
     - Overlay growth is grow-only (never shrinks below the manifest size).
     - Android userdata is a standalone qcow2 under data/ (no base).
@@ -41,13 +41,15 @@ BeforeAll {
 }
 
 Describe "Windows VM disk-model parity (P8)" {
-  It "GC orphan sweeps limit the keep-set to data/ + images/" {
-    (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('@($dataDir, $imagesDir)'))
+  It "GC orphan sweeps src/ always and data/ only with -GcData" {
+    $content = Get-VmSetupPs1Content
+    $content | Should -Match ([regex]::Escape('Get-ChildItem -LiteralPath $srcDir -Directory'))
+    $content | Should -Match ([regex]::Escape('if ($GcData -and (Test-Path -LiteralPath $dataDir'))
   }
 
-  It "gc.ps1 Step 7 delegates VM-artifact GC to Invoke-VMSetup -Gc" {
+  It "gc.ps1 Step 6 delegates VM-artifact GC to vm.sh gc" {
     $content = Get-GcPs1Content
-    $content | Should -Match ([regex]::Escape('Invoke-VMSetup -RepoRoot $resolvedRepoRoot -Gc'))
+    $content | Should -Match ([regex]::Escape('& bash $vmSh gc'))
     $content | Should -Not -Match ([regex]::Escape('$_.enabled -eq $true'))
     $content | Should -Not -Match ([regex]::Escape('-Filter "*.qcow2"'))
   }
@@ -60,8 +62,9 @@ Describe "Windows VM disk-model parity (P8)" {
     (Get-VmPs1Content) | Should -Match ([regex]::Escape('$diskPath = Join-Path ''data'' "$vmId.qcow2"'))
   }
 
-  It "overlay backing path is tree-root-relative (..\images\<type>.base.qcow2)" {
-    (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('$qemuImg create -f qcow2 -b "..\images\$($vm.type).base.qcow2" -F qcow2'))
+  It "overlay backing path is tree-root-relative (..\src\<type>\overlay backing.qcow2)" {
+    (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('Get-VmOverlayBackingRelPath -Type $vm.type'))
+    (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('& $qemuImg create -f qcow2 -b $backingRel -F qcow2 $diskPath'))
   }
 
   It "base refresh copies the prebuilt golden and guards against running VMs" {
@@ -90,7 +93,7 @@ Describe "Windows VM disk-model parity (P8)" {
   It "pack refuses while a VM runs and retains the data/ payload" {
     $content = Get-VmPs1Content
     $content | Should -Match ([regex]::Escape('Get-VmRunningNameList'))
-    $content | Should -Match ([regex]::Escape('payload retained (images, data, descriptors, README)'))
+    $content | Should -Match ([regex]::Escape('payload retained (src, data, descriptors, README)'))
   }
 
   It "POSIX lib mirrors the relative data/ path and base/overlay provisioning" {

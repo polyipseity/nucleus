@@ -221,9 +221,9 @@ write_fixture_manifest() { # write_fixture_manifest <path> — Android (enabled)
       "portForwards": [{"guestPort": 5555, "hostPort": 22040}, {"guestPort": 5554, "hostPort": 22041}],
       "macAddressPrefix": "52",
       "Android": {
-        "systemImage": "Android-system.qcow2",
+        "systemImage": "system image.qcow2",
         "userdataImage": "Android.qcow2",
-        "gsiImage": "Android-gsi.img",
+        "gsiImage": "GSI.img",
         "gsiUrl": "https://example.invalid/gsi.zip",
         "gappsUrl": "https://example.invalid/gapps.zip"
       }
@@ -272,16 +272,16 @@ EOF
 }
 
 test_descriptor_fixture_render() {
-  local _vm_dir="$_tmp/render/vm" _images_dir="$_tmp/render/vm/images" _vms_dir="$_tmp/render/vms"
+  local _vm_dir="$_tmp/render/vm" _src_dir="$_tmp/render/vm/src" _vms_dir="$_tmp/render/vms"
   local _manifest="$_tmp/render/manifest.json"
   local _android_doc _nixos_doc _windows_doc _macos_doc
 
-  mkdir -p "$_vm_dir" "$_images_dir" "$_vms_dir"
+  mkdir -p "$_vm_dir" "$_src_dir" "$_vms_dir"
   write_fixture_manifest "$_manifest"
 
-  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_src_dir" "$REPO_ROOT/src/vms/templates" \
     "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
-    "$_vms_dir" "$_manifest" "MacBook" "false" "false"
+    "$_vms_dir" "$_manifest" "MacBook" "false" "false" "false"
   vm_write_descriptors
 
   _android_doc="$(cat "$_vm_dir/Android.vm.json")"
@@ -299,7 +299,7 @@ test_descriptor_fixture_render() {
   assert_no_tokens "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 (Android, windows-qemu)"
   assert_no_tokens "$_vm_dir/scripts/start-Android.sh" "start-posix.sh (Android, windows-qemu)"
   # shellcheck disable=SC2016 # reason: literal $ in single quotes is intentional for grep -F needle matching of rendered PowerShell
-  assert_contains "Join-Path \$imagesDir 'Android-system.qcow2'" "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 systemImage token"
+  assert_contains "Join-Path \$androidSrcDir 'system image.qcow2'" "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 systemImage token"
   assert_contains "'-smp', '4'," "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 cpus token"
   assert_contains "'-m', '8000000000B'" "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 ram token"
   assert_contains "hostfwd=tcp::22040-:5555,hostfwd=tcp::22041-:5554" "$_vm_dir/scripts/start-Android.ps1" "start-android-vm.ps1 portForwards token"
@@ -366,28 +366,28 @@ test_descriptor_fixture_render() {
 }
 
 test_unpack_dry_run() {
-  local _vm_dir="$_tmp/unpack/vm" _images_dir="$_tmp/unpack/vm/images" _vms_dir="$_tmp/unpack/vms"
+  local _vm_dir="$_tmp/unpack/vm" _src_dir="$_tmp/unpack/vm/src" _vms_dir="$_tmp/unpack/vms"
   local _manifest="$_tmp/unpack/manifest.json" _home_fixture="$_tmp/unpack/home"
   local _out="$_tmp/unpack/out.txt"
 
-  mkdir -p "$_vm_dir" "$_vm_dir/data" "$_images_dir" "$_vms_dir" \
+  mkdir -p "$_vm_dir" "$_vm_dir/data" "$_src_dir/Android" "$_src_dir/NixOS" "$_src_dir/Windows" "$_vms_dir" \
     "$_home_fixture/.local/share/nucleus/vms"
   write_fixture_manifest "$_manifest"
   # Fixture payload: userdata overlay, Android system/GSI goldens, non-Android
   # prebuilt goldens, and the Nix-rendered UTM plist templates — a packed tree
   # with the target config applied. Dry-run must not touch any of them.
   : >"$_vm_dir/data/Android.qcow2"
-  : >"$_images_dir/Android-system.qcow2"
-  : >"$_images_dir/Android-gsi.img"
-  : >"$_images_dir/NixOS.qcow2"
-  : >"$_images_dir/Windows.qcow2"
+  : >"$_src_dir/Android/system image.qcow2"
+  : >"$_src_dir/Android/GSI.img"
+  : >"$_src_dir/NixOS/prebuilt image.qcow2"
+  : >"$_src_dir/Windows/prebuilt image.qcow2"
   : >"$_home_fixture/.local/share/nucleus/vms/Android-config.plist"
   : >"$_home_fixture/.local/share/nucleus/vms/NixOS-config.plist"
   : >"$_home_fixture/.local/share/nucleus/vms/Windows-config.plist"
 
-  vm_init "$REPO_ROOT" "$_vm_dir" "$_images_dir" "$REPO_ROOT/src/vms/templates" \
+  vm_init "$REPO_ROOT" "$_vm_dir" "$_src_dir" "$REPO_ROOT/src/vms/templates" \
     "false" "" "" "" "" "" "" "" "" "" "" "" "false" "false" "false" \
-    "$_vms_dir" "$_manifest" "MacBook" "false" "false"
+    "$_vms_dir" "$_manifest" "MacBook" "false" "false" "false"
   vm_write_descriptors
 
   # Dry-run unpack on a Darwin/UTM host: HOME points at the fixture so the
@@ -419,7 +419,7 @@ test_unpack_dry_run() {
     _failures=$((_failures + 1))
   fi
   # Fixture disks must be untouched (no base copies, no new overlays).
-  assert_file_missing "$_images_dir/NixOS.base.qcow2" "dry-run must not restore base images"
+  assert_file_missing "$_src_dir/NixOS/overlay backing.qcow2" "dry-run must not restore overlay backing images"
   assert_file_missing "$_vm_dir/data/NixOS.qcow2" "dry-run must not recreate overlays"
 }
 
