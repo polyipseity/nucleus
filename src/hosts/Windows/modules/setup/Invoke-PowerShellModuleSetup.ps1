@@ -13,6 +13,7 @@ function Invoke-PowerShellModuleSetup {
     non-nucleus workflows, so removal would be destructive.
 
     Currently managed:
+      - Pester — required by scripts/test.ps1 for Windows Pester test suites
       - powershell-yaml — required by scripts/check.ps1 for locked DSC validation
       - PSScriptAnalyzer — (managed via Nix HM activation on POSIX, installed
         here for Windows parity)
@@ -31,7 +32,7 @@ function Invoke-PowerShellModuleSetup {
   param()
 
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
-  $lockfilePath = Join-Path $repoRoot "lockfiles\lockfile.json"
+  $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
 
   if (-not (Test-Path $lockfilePath)) {
     Write-Warning "Invoke-PowerShellModuleSetup: lockfile.json not found at $lockfilePath"

@@ -30,6 +30,7 @@ let
 
   lockfile = builtins.fromJSON (builtins.readFile ../lockfiles/lockfile.json);
   pwshAnalyzerVersion = lockfile.pwsh.PSScriptAnalyzer or null;
+  pwshPesterVersion = lockfile.pwsh.Pester or null;
   pwshYamlVersion = lockfile.pwsh."powershell-yaml" or null;
 
   profileContent =
@@ -87,6 +88,15 @@ in
       overlay.selectFile "pwsh" "PSScriptAnalyzerSettings.psd1"
     );
   };
+
+  # Install Pester for Windows Pester test suites if pwsh is available.
+  # This enables Invoke-Pester in src/scripts/tests/test-steps/06-windows-pester.ps1.
+  home.activation.install-pwsh-pester = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    "${activationBundle}/src/scripts/packages/install-pwsh-module.sh" \
+      "${pkgs.powershell}/bin/pwsh" \
+      "Pester" \
+      "${pwshPesterVersion}"
+  '';
 
   # Install PSScriptAnalyzer for PowerShell linting if pwsh is available.
   # This enables the lint phase in scripts/check-pwsh.ps1.

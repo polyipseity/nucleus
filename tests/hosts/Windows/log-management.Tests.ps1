@@ -6,7 +6,7 @@
   Tests Invoke-LogRotation, Get-NucleusLogDir, Get-NucleusSystemLogDir,
   and ConvertTo-SanitizedText from the Invoke-LogManagement module.
 
-  Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/log-management-tests.ps1 -Passthru"
+  Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/log-management.Tests.ps1 -Passthru"
 #>
 
 BeforeAll {

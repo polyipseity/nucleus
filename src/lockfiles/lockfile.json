@@ -102,6 +102,7 @@
     ]
   },
   "pwsh": {
+    "Pester": "5.6.1",
     "PSScriptAnalyzer": "1.25.0",
     "powershell-yaml": "0.4.12"
   },

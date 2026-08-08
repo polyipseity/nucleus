@@ -7,7 +7,7 @@
   and Invoke-ServiceAction functions by sourcing the function definitions
   from svc.ps1 with a mock $Registry.
 
-  Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/svc-windows-tests.ps1 -Passthru"
+  Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/svc-windows.Tests.ps1 -Passthru"
 #>
 
 BeforeAll {

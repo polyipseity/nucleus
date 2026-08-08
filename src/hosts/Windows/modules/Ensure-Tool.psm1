@@ -11,6 +11,8 @@
 
     POLICY: This module MUST NOT accept an InstallCommand parameter — preflight
     checks must fail hard on missing tools, not suggest ad-hoc installation.
+    Provisioning and preflight are separate: bootstrap/apply installs tools;
+    preflight only verifies presence (see tool-availability.instructions.md).
     Tools must be provisioned via bootstrap or nucleus-apply, not per-check
     install commands.
 

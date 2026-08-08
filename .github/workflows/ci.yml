@@ -66,6 +66,16 @@ jobs:
         with:
           use-flakehub: false
 
+      - name: Install Nix (Windows)
+        if: runner.os == 'Windows'
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25
+
+      - name: Cache Nix store (Windows)
+        if: runner.os == 'Windows'
+        uses: DeterminateSystems/magic-nix-cache-action@908b263ff629f4cc17666315b7fd3ec127c6244d
+        with:
+          use-flakehub: false
+
       - name: Setup Packer CLI (Windows)
         if: runner.os == 'Windows'
         uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789
@@ -84,6 +94,10 @@ jobs:
           PACKER_GITHUB_API_TOKEN: ${{ github.token }}
         # --no-fail-fast: CI should accumulate all failures for visibility.
         run: nix run ./src#check -- --no-fail-fast
+
+      - name: Provision bootstrap dependencies (Windows)
+        if: runner.os == 'Windows'
+        run: pwsh -NoLogo -NoProfile -NonInteractive -File scripts/bootstrap.ps1
 
       - name: Run repository checks (Windows)
         if: runner.os == 'Windows'

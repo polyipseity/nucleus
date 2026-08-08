@@ -22,6 +22,7 @@ function Write-ErrorMessage { Write-Output "test: error: $args" }
 
 $modulesPath = Join-Path $RepoRoot 'src\hosts\Windows\modules'
 Import-Module (Join-Path $modulesPath 'Ensure-Tool.psm1') -Force
+Assert-ToolAvailable -Name 'Pester' -Type 'Module'
 Assert-ToolAvailable -Name 'PSScriptAnalyzer' -Type 'Module'
 
 # Override Read-Argument for test-specific flags
@@ -87,6 +88,7 @@ function Read-Argument {
 
 # Override Test-Prerequisite for test-specific tools
 function Test-Prerequisite {
+  Assert-ToolAvailable -Name 'Pester' -Type 'Module'
   Assert-ToolAvailable -Name 'PSScriptAnalyzer' -Type 'Module'
 }
 

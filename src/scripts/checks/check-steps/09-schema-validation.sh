@@ -36,7 +36,7 @@ run_09_schema_validation() {
     # + app-owned formats with no published JSON schema (vscode:// URIs are not
     # fetchable by check-jsonschema; other formats have no published schema).
     case "$_f" in
-      *.schema.json|*/vendor/*|*/secrets/*|*/.github/workflows/*|*/.github/dependabot.yml)
+      *.schema.json|*/vendor/*|*/secrets/*|.github/workflows/*|*/.github/workflows/*|*/.github/dependabot.yml|.github/dependabot.yml)
         continue ;;
       */users/*/vscode/*.json|*/users/*/iterm2/DynamicProfiles/*.json|*/users/*/obsidian/*.json|*/users/*/qtpass/*.json|*/configs/camilladsp/*|*/configs/camillagui-backend/*|*/users/*/discord-music-rpc/*|*/users/*/agents/hooks/*.json|*/users/*/agents/skills/*/_meta.json|*/ai/litellm-config.yml|*/.sops.yaml)
         continue ;;

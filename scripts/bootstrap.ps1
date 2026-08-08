@@ -314,6 +314,14 @@ foreach ($package in $BootstrapPackageVersions.GetEnumerator()) {
   Invoke-WingetPackageInstall -Id $package.Key -Version $package.Value
 }
 
+# Provisioning: install lockfile-pinned PowerShell modules (Pester, PSScriptAnalyzer,
+# powershell-yaml). Preflight in check.ps1/test.ps1 only asserts availability.
+$moduleSetupPath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\setup\Invoke-PowerShellModuleSetup.ps1'
+if (Test-Path -Path $moduleSetupPath) {
+  . $moduleSetupPath
+  Invoke-PowerShellModuleSetup
+}
+
 Invoke-RepositoryDirenvAllowIfAvailable
 
 if ($Apply) {
