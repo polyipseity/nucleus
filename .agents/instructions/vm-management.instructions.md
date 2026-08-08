@@ -24,6 +24,7 @@ VM guest OSes must use the same hostname as the corresponding host OS. The canon
 
 | Guest OS | `hostname` in VMs.json |
 | -------- | ---------------------- |
+| Android  | `Android`              |
 | macOS    | `MacBook`              |
 | NixOS    | `NixOS`                |
 | Windows  | `Windows`              |
@@ -46,7 +47,7 @@ VM guest credentials must come from per-user SOPS secrets (`src/secrets/users-<u
 - All guest paths (NixOS: `guest.nix` + `packer.pkr.hcl`; Windows: `Autounattend.xml` + `packer.pkr.hcl`; macOS: `packer.pkr.hcl`) must consume injected credentials.
 - Credential drift must invalidate stale VM artifacts so changing secret-backed values rebuilds rather than reusing stale disks.
 
-Guest SSH public keys for NixOS `authorized_keys` are resolved from `src/modules/vm-guest-ssh-public-key-paths.json` (static `id_*.pub` paths first, then `ssh_personal_{username}.pub` templates aligned with `secrets.nix` and `50-nucleus.conf`). POSIX `vm_resolve_guest_ssh_public_key` in `src/scripts/lib/vm.sh` and Windows `Get-VmGuestSshPublicKey` read that manifest and export `NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY` for `guest.nix`.
+Guest SSH public keys for NixOS `authorized_keys` are resolved from `src/modules/vm-guest-ssh-public-key-paths.json` (static `id_*.pub` paths first, then `ssh_personal_{username}.pub` templates aligned with `secrets.nix` and `50-nucleus.conf`). POSIX `vm_resolve_guest_ssh_public_key` in `src/scripts/lib/vm.sh` and Windows `Get-VMGuestSshPublicKey` read that manifest and export `NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY` for `guest.nix`.
 
 When changing credential policy, update `tests/modules/vm-setup-tests.nix` in the same commit.
 
@@ -135,7 +136,7 @@ Guest port forwards are declared in the `portForwards` array of each VM entry: n
 | Layer | POSIX | Windows |
 |-------|-------|---------|
 | CLI entry | `scripts/vm.sh` → `do_android_config` | `scripts/vm.ps1` → `Invoke-AndroidConfig` |
-| Implementation | `src/scripts/vms/android-config.sh` (+ magisk, fake-wifi) | `src/hosts/Windows/modules/system/Invoke-AndroidConfig.ps1` (+ `VmAndroid.ps1`) |
+| Implementation | `src/scripts/vms/android-config.sh` (+ magisk, fake-wifi) | `src/hosts/Windows/modules/system/Invoke-AndroidConfig.ps1` (+ `VMAndroid.ps1`) |
 | Reset prerequisite | `scripts/vm.sh` `do_reset` | `Invoke-AndroidReset` in `Invoke-AndroidConfig.ps1` |
 
 **Flags (both hosts):** `--gapps`, `--adb-keys`, `--magisk`, `--root`, `--fake-wifi`, `--fake-wifi-revert`. Omit all flags to print the manual.
@@ -165,7 +166,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - Build tool: Packer + `tart-cli` plugin pulling `ghcr.io/cirruslabs/macos-<version>-base:latest` from GHCR.
 - Start command (after build): `tart run --net-softnet --net-softnet-expose <hostPort>:<guestPort> <id>` (rendered from manifest). Host-local SSH uses `tart ip <id>` + guest port `22`, not `localhost:<hostPort>`.
 - No UTM bundle is created for macOS guests; they remain Tart-managed.
-- **Running vs registered:** `tart list` (name column) and `vm_get_tart_registered_names` report catalog entries (local VMs and OCI images), including stopped ones. Running state uses `tart list --format json` and `.Running == true` via `vm_get_running_names`.
+- **Running vs registered:** `tart list` (name column) and `vm_get_tart_registered_names` report catalog entries (local VMs and OCI images), including stopped ones. Running state uses `tart list --format json` and `.Running == true` via `vm_get_running_ids`.
 
 ## macOS — UTM
 
@@ -178,11 +179,11 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - Network: **Emulated** (QEMU user/slirp) — required for `PortForward` to work; vmnet-shared silently drops forwards.
 
 - `utmctl` CLI path: `/Applications/UTM.app/Contents/MacOS/utmctl`.
-- **Running vs registered:** `utmctl list` (via `vm_get_utm_registered_names`) returns every registered VM regardless of `Status`. Running state filters `Status != stopped` (`starting`, `started`, `pausing`, `paused`, `resuming`, `stopping`) via `vm_get_running_names`.
+- **Running vs registered:** `utmctl list` (via `vm_get_utm_registered_names`) returns every registered VM regardless of `Status`. Running state filters `Status != stopped` (`starting`, `started`, `pausing`, `paused`, `resuming`, `stopping`) via `vm_get_running_ids`.
 
 ## Running state source of truth
 
-`vm_get_running_names` (POSIX) and `Get-VmRunningProcessNameList` (Windows) are the single probes for sync warnings, setup base-refresh skips, `list`/`status`, `pack`, and `resize` guards. Do not use registration helpers or unfiltered `utmctl list` / `tart list` name columns for running checks.
+`vm_get_running_ids` (POSIX) and `Get-VMRunningProcessNameList` (Windows) are the single probes for sync warnings, setup base-refresh skips, `list`/`status`, `pack`, and `resize` guards. Do not use registration helpers or unfiltered `utmctl list` / `tart list` name columns for running checks.
 
 ## NixOS — libvirt/KVM
 
@@ -272,7 +273,7 @@ Both hooks are best-effort: a VM sync/setup failure does not abort a completed s
 **Windows 11 guest (all hosts)** (`nucleus-vm setup --windows-iso /path/to/Win11.iso`):
 
 - Uses Packer with `src/vms/Windows/packer.pkr.hcl` and QEMU builder.
-- Requires a Windows 11 ISO path via `--windows-iso` **or** a `Windows.isoUrl` field in the `VMs.json` windows entry. When `Windows.isoUrl` is set, the ISO is downloaded automatically to `~/virtual machines/src/Windows/installer.iso` on first run (subsequent runs reuse the cache).
+- Requires a Windows 11 ISO path via `--windows-iso` **or** a `Windows.isoUrl` field in the `VMs.json` `Windows` entry. When `Windows.isoUrl` is set, the ISO is downloaded automatically to `~/virtual machines/src/Windows/installer.iso` on first run (subsequent runs reuse the cache).
 - On macOS/Linux, falls back from Mido to Fido URL resolver via `pwsh` (`Fido.ps1 -GetUrl`) + `curl`.
 - On Windows, auto-detects WHPX accelerator when `tcg` is default; upgrades automatically. Pass `-Accelerator tcg` to suppress.
 - SATA disk during build → VirtIO drivers installed post-install → final image is VirtIO-disk ready.
