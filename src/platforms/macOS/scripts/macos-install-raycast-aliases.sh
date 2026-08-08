@@ -6,7 +6,7 @@
 set -eu
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../../lib/symlink-hardening.sh"
+. "$SCRIPT_DIR/../../../scripts/lib/symlink-hardening.sh"
 
 _ray_alias_dir="$HOME/Applications/Nucleus App Aliases"
 mkdir -p "$_ray_alias_dir"

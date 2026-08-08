@@ -15,7 +15,7 @@ let
   # instead of relying only on mocked activation maps.
   agentsModuleText = builtins.readFile ../../src/modules/agents.nix;
   shellModuleText = builtins.readFile ../../src/modules/shell.nix;
-  macosModuleText = builtins.readFile ../../src/modules/macos.nix;
+  macosModuleText = builtins.readFile ../../src/platforms/macOS/modules/default.nix;
   activationDagModuleText = builtins.readFile ../../src/modules/lib/activation-dag.nix;
   macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
   middleClickScriptText = builtins.readFile ../../src/scripts/hosts/MacBook/macos-enable-middle-click.sh;

@@ -7,7 +7,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../../lib/macos-console-user.sh"
+. "$SCRIPT_DIR/../../../scripts/lib/macos-console-user.sh"
 
 if [ -x "/opt/homebrew/bin/nightlight" ]; then
   NL_BIN="/opt/homebrew/bin/nightlight"

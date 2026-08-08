@@ -1,21 +1,21 @@
-# tests/modules/icloud-exclusions-tests.nix — macOS iCloud exclusion hook wiring.
+# tests/platforms/macOS/modules/icloud-exclusions-tests.nix — macOS iCloud exclusion hook wiring.
 #
 # Verifies src/users/ exclusion names and shell/macos module wiring.
 
 let
   lib = import <nixpkgs/lib>;
-  macosModuleText = builtins.readFile ../../src/modules/macos.nix;
-  shellModuleText = builtins.readFile ../../src/modules/shell.nix;
+  macosModuleText = builtins.readFile ../../../src/platforms/macOS/modules/default.nix;
+  shellModuleText = builtins.readFile ../../../src/modules/shell.nix;
   # The zsh hook functions (chpwd, precmd, mkdir wrapper) live in an external
   # script embedded into shell.nix's initContent via builtins.readFile.
-  icloudHooksText = builtins.readFile ../../src/scripts/hosts/MacBook/macos-install-icloud-hooks.zsh;
-  usersRegistry = import ../../src/modules/lib/users-registry.nix {
+  icloudHooksText = builtins.readFile ../../../src/platforms/macOS/scripts/macos-install-icloud-hooks.zsh;
+  usersRegistry = import ../../../src/modules/lib/users-registry.nix {
     inherit lib;
-    repoRoot = ../..;
+    repoRoot = ../../..;
     hostName = "MacBook";
   };
 
-  inherit (import ../lib.nix) assert';
+  inherit (import ../../../lib.nix) assert';
 
   user = usersRegistry.polyipseity;
   excludedDirNames = user.iCloudExclusions.excludedDirNames;

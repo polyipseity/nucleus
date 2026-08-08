@@ -13,8 +13,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 MANAGED_PREF_DOMAINS="${MANAGED_PREF_DOMAINS:-${1:?usage: gc-managed-preferences.sh <space-separated-domains>}}"
 export NIX_STORE_BIN="${NIX_STORE_BIN:-nix}"
 
-# shellcheck source=../hosts/MacBook/macos-gc-preferences.sh
-. "$SCRIPT_DIR/../hosts/MacBook/macos-gc-preferences.sh"
+# shellcheck source=../../platforms/macOS/scripts/macos-gc-preferences.sh
+. "$SCRIPT_DIR/../../platforms/macOS/scripts/macos-gc-preferences.sh"
 
 refresh_cfprefsd
 wait_for_daemons

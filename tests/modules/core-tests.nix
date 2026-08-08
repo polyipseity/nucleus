@@ -6,7 +6,7 @@ let
 
   # === NIX-INDEX SCHEDULE INVARIANTS ===
   linuxText = builtins.readFile ../../src/modules/linux.nix;
-  macosText = builtins.readFile ../../src/modules/macos.nix;
+  macosText = builtins.readFile ../../src/platforms/macOS/modules/default.nix;
   coreModuleText = builtins.readFile ../../src/modules/core.nix;
 
   test_core_accepts_treefmt_package = assert' (

@@ -1,24 +1,24 @@
 let
-  inherit (import ../lib.nix) containsRegex;
+  inherit (import ../../../lib.nix) containsRegex;
 
   # Read consumer source files
-  agentsText = builtins.readFile ../../src/modules/agents.nix;
-  defaultsText = builtins.readFile ../../src/hosts/MacBook/defaults.nix;
-  editorsText = builtins.readFile ../../src/modules/editors.nix;
-  gitText = builtins.readFile ../../src/modules/git.nix;
-  usersOverlayText = builtins.readFile ../../src/modules/lib/users-overlay.nix;
-  homeText = builtins.readFile ../../src/modules/home.nix;
-  macosText = builtins.readFile ../../src/modules/macos.nix;
-  posixBaseText = builtins.readFile ../../src/modules/posix-base.nix;
-  pwshText = builtins.readFile ../../src/modules/pwsh.nix;
-  shellText = builtins.readFile ../../src/modules/shell.nix;
+  agentsText = builtins.readFile ../../../src/modules/agents.nix;
+  defaultsText = builtins.readFile ../../../src/hosts/MacBook/defaults.nix;
+  editorsText = builtins.readFile ../../../src/modules/editors.nix;
+  gitText = builtins.readFile ../../../src/modules/git.nix;
+  usersOverlayText = builtins.readFile ../../../src/modules/lib/users-overlay.nix;
+  homeText = builtins.readFile ../../../src/modules/home.nix;
+  macosText = builtins.readFile ../../../src/platforms/macOS/modules/default.nix;
+  posixBaseText = builtins.readFile ../../../src/modules/posix-base.nix;
+  pwshText = builtins.readFile ../../../src/modules/pwsh.nix;
+  shellText = builtins.readFile ../../../src/modules/shell.nix;
   # Host-specific files
-  macbookBaseText = builtins.readFile ../../src/hosts/MacBook/base.nix;
-  macbookLinuxBuilderText = builtins.readFile ../../src/hosts/MacBook/linux-builder.nix;
-  macbookSecurityText = builtins.readFile ../../src/hosts/MacBook/security.nix;
-  nixosServicesText = builtins.readFile ../../src/hosts/NixOS/services.nix;
+  macbookBaseText = builtins.readFile ../../../src/hosts/MacBook/base.nix;
+  macbookLinuxBuilderText = builtins.readFile ../../../src/hosts/MacBook/linux-builder.nix;
+  macbookSecurityText = builtins.readFile ../../../src/hosts/MacBook/security.nix;
+  nixosServicesText = builtins.readFile ../../../src/hosts/NixOS/services.nix;
   # Config definition files
-  qtpassText = builtins.readFile ../../src/modules/configs/qtpass/qtpass.nix;
+  qtpassText = builtins.readFile ../../../src/modules/configs/qtpass/qtpass.nix;
 in
 # Verify method comments exist on all consumer files.
 # method 1 (writable symlink) consumers:

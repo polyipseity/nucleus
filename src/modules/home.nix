@@ -138,7 +138,7 @@ in
     ./git.nix
     ./linux.nix
     ./logging.nix
-    ./macos.nix
+    ../platforms/macOS/modules
     ./pwsh.nix
     ./secrets.nix
     ./starship.nix

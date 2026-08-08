@@ -6,7 +6,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-. "$SCRIPT_DIR/../../lib/macos-finder-sidebar.sh"
+. "$SCRIPT_DIR/../../../scripts/lib/macos-finder-sidebar.sh"
 
 _favorites_json="$1"
 _jq_bin="$2"
