@@ -98,7 +98,7 @@
         builtins.filter (name: users.${name}.isPrimary) (builtins.attrNames users)
       );
 
-      # home-manager.users attrset: each user gets home.nix; primary also gets sops-nix.
+      # home-manager.users attrset: each user gets home.nix and sops-nix.
       mkHomeManagerUsers =
         hostName: userModulesPath: hostUsers:
         builtins.mapAttrs (name: user: {
@@ -112,10 +112,8 @@
               };
             }
             userModulesPath
-          ]
-          ++ (builtins.filter (m: m != null) [
-            (if user.isPrimary then sops-nix.homeManagerModules.sops else null)
-          ]);
+            sops-nix.homeManagerModules.sops
+          ];
         }) hostUsers;
 
       # Supported architectures.
