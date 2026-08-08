@@ -1,0 +1,40 @@
+{
+  "$schema": "./host-platform-registry.schema.json",
+  "hosts": {
+    "MacBook": {
+      "platform": "macOS"
+    },
+    "NixOS": {
+      "platform": "NixOS"
+    },
+    "Windows": {
+      "platform": "Windows"
+    }
+  },
+  "platforms": {
+    "macOS": {
+      "flags": {
+        "darwin": true,
+        "linux": false,
+        "posix": true,
+        "win32": false
+      }
+    },
+    "NixOS": {
+      "flags": {
+        "darwin": false,
+        "linux": true,
+        "posix": true,
+        "win32": false
+      }
+    },
+    "Windows": {
+      "flags": {
+        "darwin": false,
+        "linux": false,
+        "posix": false,
+        "win32": true
+      }
+    }
+  }
+}

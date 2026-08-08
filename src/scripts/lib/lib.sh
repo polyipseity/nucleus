@@ -206,12 +206,48 @@ sha256_of_file() {
 }
 
 # Platform-aware host key for services.json $logging lookups.
+# Deprecated alias — use resolve_nucleus_host instead.
 nucleus_host_key() {
-  case "$(uname -s)" in
-    Darwin) printf '%s\n' MacBook ;;
-    Linux)  printf '%s\n' NixOS ;;
-    *)      printf '%s\n' NixOS ;;
-  esac
+  resolve_nucleus_host
+}
+
+# Path to host-platform-registry.json in the nucleus repo.
+nucleus_host_platform_registry_path() {
+  _nhprp_repo="${NUCLEUS_REPO_ROOT:-}"
+  if [ -z "$_nhprp_repo" ]; then
+    _nhprp_repo="$(derive_repo_root)" || return 1
+  fi
+  printf '%s\n' "$_nhprp_repo/src/modules/host-platform-registry.json"
+}
+
+# Read platform key for a host from host-platform-registry.json.
+nucleus_platform_for_host() {
+  _npfh_host="${1:-}"
+  if [ -z "$_npfh_host" ]; then
+    _npfh_host="$(resolve_nucleus_host)"
+  fi
+  require_command jq
+  _npfh_json="$(nucleus_host_platform_registry_path)" || return 1
+  _npfh_platform="$(jq -r --arg h "$_npfh_host" '.hosts[$h].platform // empty' "$_npfh_json")"
+  if [ -z "$_npfh_platform" ]; then
+    printf '%s\n' "nucleus_platform_for_host: unknown host '$_npfh_host'" >&2
+    return 1
+  fi
+  printf '%s\n' "$_npfh_platform"
+}
+
+# Test whether a platform flag is set for a host (via registry platforms section).
+nucleus_flag_for_host() {
+  _nffh_host="${1:-}"
+  _nffh_flag="${2:-}"
+  if [ -z "$_nffh_host" ] || [ -z "$_nffh_flag" ]; then
+    printf '%s\n' "nucleus_flag_for_host: host and flag are required" >&2
+    return 1
+  fi
+  require_command jq
+  _nffh_json="$(nucleus_host_platform_registry_path)" || return 1
+  _nffh_platform="$(nucleus_platform_for_host "$_nffh_host")" || return 1
+  jq -e --arg p "$_nffh_platform" --arg f "$_nffh_flag" '.platforms[$p].flags[$f] == true' "$_nffh_json" >/dev/null
 }
 
 # Path to services.json in the nucleus repo.
@@ -254,7 +290,7 @@ nucleus_log_path_from_json() {
 
   require_command jq
   _nlpfj_json="$(nucleus_services_json_path)" || return 1
-  _nlpfj_host="$(nucleus_host_key)"
+  _nlpfj_host="$(resolve_nucleus_host)"
   _nlpfj_template="$(jq -r --arg h "$_nlpfj_host" --arg f "$_nlpfj_field" '.["$logging"][$h][$f] // empty' "$_nlpfj_json")"
   [ -n "$_nlpfj_template" ] || return 1
 

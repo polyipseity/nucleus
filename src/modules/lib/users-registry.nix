@@ -10,11 +10,9 @@
   hostName,
 }:
 let
-  hostKeys = [
-    "MacBook"
-    "NixOS"
-    "Windows"
-  ];
+  hp = import ./host-platform.nix { };
+
+  hostKeys = hp.hostKeys;
 
   usersRoot = repoRoot + "/src/users";
 

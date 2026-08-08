@@ -1,0 +1,74 @@
+{
+  "$id": "https://nucleus.local/host-platform-registry.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "Canonical host and platform registry. Hosts reference platforms; platforms own implementation flags.",
+  "properties": {
+    "$schema": {
+      "description": "Reference to the JSON Schema file that validates this data file.",
+      "type": "string"
+    },
+    "hosts": {
+      "additionalProperties": false,
+      "description": "Physical machine identities keyed by host name. Each host references exactly one platform.",
+      "properties": {
+        "MacBook": { "$ref": "#/definitions/hostRef" },
+        "NixOS": { "$ref": "#/definitions/hostRef" },
+        "Windows": { "$ref": "#/definitions/hostRef" }
+      },
+      "required": [ "MacBook", "NixOS", "Windows" ],
+      "type": "object"
+    },
+    "platforms": {
+      "additionalProperties": false,
+      "description": "OS-family platforms. Flags live here only — never on host entries.",
+      "properties": {
+        "macOS": { "$ref": "#/definitions/platformDef" },
+        "NixOS": { "$ref": "#/definitions/platformDef" },
+        "Windows": { "$ref": "#/definitions/platformDef" }
+      },
+      "required": [ "macOS", "NixOS", "Windows" ],
+      "type": "object"
+    }
+  },
+  "required": [ "hosts", "platforms" ],
+  "type": "object",
+  "definitions": {
+    "hostRef": {
+      "additionalProperties": false,
+      "description": "Host entry references a platform by name. Must not include flags.",
+      "properties": {
+        "platform": {
+          "$ref": "#/definitions/platformKey"
+        }
+      },
+      "required": [ "platform" ],
+      "type": "object"
+    },
+    "platformDef": {
+      "additionalProperties": false,
+      "properties": {
+        "flags": {
+          "$ref": "#/definitions/platformFlags"
+        }
+      },
+      "required": [ "flags" ],
+      "type": "object"
+    },
+    "platformFlags": {
+      "additionalProperties": false,
+      "properties": {
+        "darwin": { "type": "boolean" },
+        "linux": { "type": "boolean" },
+        "posix": { "type": "boolean" },
+        "win32": { "type": "boolean" }
+      },
+      "required": [ "darwin", "linux", "posix", "win32" ],
+      "type": "object"
+    },
+    "platformKey": {
+      "enum": [ "macOS", "NixOS", "Windows" ],
+      "type": "string"
+    }
+  }
+}
