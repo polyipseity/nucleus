@@ -25,7 +25,12 @@ in
   # deriveHostAgeKey in posix-sops.nix (root:nucleus-sops, mode 0640).
   # with sshKeyPaths (0600 root:wheel). gnupgHome is intentionally absent:
   # sops-nix rejects setting both keyFile and gnupgHome simultaneously.
-  sops.age.keyFile = "/etc/sops/age/machine.txt";
+  # sshKeyPaths must be empty: the host private key is root-only; HM reads
+  # the derived identity from keyFile instead (same contract as posix-sops.nix).
+  sops.age = {
+    keyFile = "/etc/sops/age/machine.txt";
+    sshKeyPaths = [ ];
+  };
 
   # Propagate rclone config passphrase availability to shell.nix and
   # cloud-drives.nix via nucleus.rclone options so those modules do not need
