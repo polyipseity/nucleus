@@ -16,7 +16,7 @@ $VmPs1Path = Join-Path $RepoRoot "scripts\vm.ps1"
 $VmShPath = Join-Path $RepoRoot "scripts\vm.sh"
 $ProfilePath = Join-Path $RepoRoot "src\scripts\shell\profile.ps1"
 $InvokeAndroidConfigPath = Join-Path $RepoRoot "src\hosts\Windows\modules\system\Invoke-AndroidConfig.ps1"
-$VmAndroidPath = Join-Path $RepoRoot "src\hosts\Windows\modules\system\VmAndroid.ps1"
+$VmAndroidPath = Join-Path $RepoRoot "src\hosts\Windows\modules\system\VMAndroid.ps1"
 $CheckShPs1Path = Join-Path $RepoRoot "scripts\check-sh.ps1"
 
 function Get-VmPs1Content { return Get-Content -Raw -Path $VmPs1Path }
@@ -29,10 +29,10 @@ BeforeAll {
 }
 
 Describe "Windows android-config native implementation" {
-  It "vm.ps1 dot-sources Invoke-AndroidConfig.ps1 and VmAndroid.ps1" {
+  It "vm.ps1 dot-sources Invoke-AndroidConfig.ps1 and VMAndroid.ps1" {
     $content = Get-VmPs1Content
     $content | Should -Match ([regex]::Escape("Invoke-AndroidConfig.ps1"))
-    $content | Should -Match ([regex]::Escape("VmAndroid.ps1"))
+    $content | Should -Match ([regex]::Escape("VMAndroid.ps1"))
     $content | Should -Match "Invoke-AndroidConfig\s+-RepoRoot"
   }
 
@@ -73,7 +73,7 @@ Describe "Windows profile shellcheck delegation" {
 }
 
 Describe "Android module files exist" {
-  It "Invoke-AndroidConfig.ps1 and VmAndroid.ps1 are present" {
+  It "Invoke-AndroidConfig.ps1 and VMAndroid.ps1 are present" {
     Test-Path -LiteralPath $InvokeAndroidConfigPath -PathType Leaf | Should -Be $true
     Test-Path -LiteralPath $VmAndroidPath -PathType Leaf | Should -Be $true
   }

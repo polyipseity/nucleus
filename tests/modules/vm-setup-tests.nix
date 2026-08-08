@@ -1179,6 +1179,7 @@ let
   vms_windows_packer_text = builtins.readFile ../../src/vms/Windows/packer.pkr.hcl;
   vms_windows_autounattend_text = builtins.readFile ../../src/vms/Windows/Autounattend.xml;
   vms_macos_packer_text = builtins.readFile ../../src/vms/macOS/packer.pkr.hcl;
+  windows_vm_android_ps1_text = builtins.readFile ../../src/hosts/Windows/modules/system/VMAndroid.ps1;
   start_android_ps1_text = builtins.readFile ../../src/scripts/vms/start-android-vm.ps1;
   android_config_sh_text = builtins.readFile ../../src/scripts/vms/android-config.sh;
   android_fake_wifi_sh_text = builtins.readFile ../../src/scripts/vms/android-fake-wifi.sh;
@@ -1196,9 +1197,35 @@ let
     (lib.hasInfix "vm_resolve_guest_ssh_public_key" vm_setup_sh_text)
     && !(lib.hasInfix "resolve_vm_guest_ssh_key" vm_setup_sh_text)
     && (lib.hasInfix "vm-guest-ssh-public-key-paths.json" vm_setup_sh_text)
-    && (lib.hasInfix "Get-VmGuestSshPublicKey" windows_vm_setup_ps1_text)
+    && (lib.hasInfix "Get-VMGuestSshPublicKey" windows_vm_setup_ps1_text)
     && !(lib.hasInfix "function Resolve-VMGuestSshKey" windows_vm_setup_ps1_text)
   ) "POSIX and Windows VM setup must resolve guest SSH keys via the shared manifest";
+
+  # hostname must equal display name (guest OS identity contract).
+  test_hostname_equals_name =
+    let
+      badHostnameName = builtins.filter (vm: vm.hostname != vm.name) manifest.VMs;
+    in
+    assert' (badHostnameName == [ ])
+      "Every VM hostname must equal name; bad entries: ${
+        builtins.toString (builtins.map (v: v.name) badHostnameName)
+      }";
+
+  # Guest type enum must not include unused Linux (NixOS is the Linux guest type).
+  test_vm_schema_no_linux_type =
+    let
+      schemaText = builtins.readFile ../../src/modules/VMs.schema.json;
+    in
+    assert' (!(lib.hasInfix "\"Linux\"" schemaText)) "VMs.schema.json type enum must not include Linux";
+
+  test_vm_ps1_windows_host_fallback = assert' (lib.hasInfix "else { 'Windows' }" vm_ps1_text) "scripts/vm.ps1 must default NUCLEUS_HOST to 'Windows' when unset";
+
+  test_vm_android_recovery_filename_parity = assert' (
+    lib.hasInfix "recovery userdebug.img" vm_setup_sh_text
+    && lib.hasInfix "recovery userdebug.tag.json" vm_setup_sh_text
+    && lib.hasInfix "recovery userdebug.img" windows_vm_android_ps1_text
+    && lib.hasInfix "recovery userdebug.tag.json" windows_vm_android_ps1_text
+  ) "POSIX vm.sh and Windows VMAndroid.ps1 must share Android recovery cache filenames";
 
   test_macos_packer_exit_check = assert' (lib.hasInfix "_packer_status=0" vm_setup_sh_text) "scripts/vm.sh must capture packer exit status (_packer_status=0)";
 
@@ -1300,17 +1327,17 @@ let
       "scripts/vm.sh must wire the resize subcommand (usage, dispatch, parse_size, --allow-shrink) to vm_resize_vm";
 
   # The Windows twin must mirror the resize subcommand: ValidateSet, dispatch,
-  # Invoke-VmResize with --allow-shrink, and ConvertFrom-SizeString parsing.
+  # Invoke-VMResize with --allow-shrink, and ConvertFrom-SizeString parsing.
   test_vm_resize_windows_twin =
     assert'
       (
         (lib.hasInfix "reset', 'android-config', 'resize', 'gc', 'pack', 'unpack'" vm_ps1_text)
-        && (lib.hasInfix "'resize'  { Invoke-VmResize }" vm_ps1_text)
-        && (lib.hasInfix "function Invoke-VmResize {" vm_ps1_text)
+        && (lib.hasInfix "'resize'  { Invoke-VMResize }" vm_ps1_text)
+        && (lib.hasInfix "function Invoke-VMResize {" vm_ps1_text)
         && (lib.hasInfix "'--allow-shrink' { $allowShrink = $true }" vm_ps1_text)
         && (lib.hasInfix "ConvertFrom-SizeString $sizeArg" vm_ps1_text)
       )
-      "scripts/vm.ps1 must mirror the resize subcommand (ValidateSet, dispatch, Invoke-VmResize, --allow-shrink)";
+      "scripts/vm.ps1 must mirror the resize subcommand (ValidateSet, dispatch, Invoke-VMResize, --allow-shrink)";
 
   # The pack subcommand must be wired into the CLI: usage synopsis, dispatch,
   # do_pack with dry-run-by-default (--force performs), the running-VM refusal,
@@ -1353,17 +1380,17 @@ let
   ) "vm_pack_vms must print next steps (nucleus-vm unpack or nucleus-vm setup on the target)";
 
   # The Windows twin must mirror the pack subcommand: ValidateSet, dispatch,
-  # Invoke-VmPack with dry-run-by-default (--force performs), and running-VM refusal.
+  # Invoke-VMPack with dry-run-by-default (--force performs), and running-VM refusal.
   test_vm_pack_windows_twin =
     assert'
       (
         (lib.hasInfix "'gc', 'pack', 'unpack'" vm_ps1_text)
-        && (lib.hasInfix "'pack'    { Invoke-VmPack }" vm_ps1_text)
-        && (lib.hasInfix "function Invoke-VmPack {" vm_ps1_text)
+        && (lib.hasInfix "'pack'    { Invoke-VMPack }" vm_ps1_text)
+        && (lib.hasInfix "function Invoke-VMPack {" vm_ps1_text)
         && (lib.hasInfix "'--force' { $perform = $true }" vm_ps1_text)
         && (lib.hasInfix "cannot pack while a VM is running" vm_ps1_text)
       )
-      "scripts/vm.ps1 must mirror the pack subcommand (ValidateSet, dispatch, Invoke-VmPack with --force)";
+      "scripts/vm.ps1 must mirror the pack subcommand (ValidateSet, dispatch, Invoke-VMPack with --force)";
 
   # The unpack subcommand must be wired into the CLI: usage synopsis + body,
   # dispatch, do_unpack, and vm_unpack_vms regenerating from descriptors
@@ -1403,16 +1430,16 @@ let
   ) "vm.sh must provide vm_vm_json with descriptor-first, manifest-fallback JSON for VM rendering";
 
   # The Windows twin must mirror the unpack subcommand: ValidateSet, dispatch,
-  # Invoke-VmUnpack with --dry-run support.
+  # Invoke-VMUnpack with --dry-run support.
   test_vm_unpack_windows_twin =
     assert'
       (
         (lib.hasInfix "'gc', 'pack', 'unpack'" vm_ps1_text)
-        && (lib.hasInfix "'unpack'  { Invoke-VmUnpack }" vm_ps1_text)
-        && (lib.hasInfix "function Invoke-VmUnpack {" vm_ps1_text)
+        && (lib.hasInfix "'unpack'  { Invoke-VMUnpack }" vm_ps1_text)
+        && (lib.hasInfix "function Invoke-VMUnpack {" vm_ps1_text)
         && (lib.hasInfix "'--dry-run' { $perform = $false }" vm_ps1_text)
       )
-      "scripts/vm.ps1 must mirror the unpack subcommand (ValidateSet, dispatch, Invoke-VmUnpack with --dry-run)";
+      "scripts/vm.ps1 must mirror the unpack subcommand (ValidateSet, dispatch, Invoke-VMUnpack with --dry-run)";
 
   # The Packer failure branch for the macOS build must print a human-readable
   # error and return the captured exit code.
@@ -1731,13 +1758,13 @@ let
   test_windows_base_overlay_parity =
     assert'
       (
-        (lib.hasInfix "Get-VmOverlayBackingRelPath -Type $vm.type" windows_vm_setup_ps1_text)
+        (lib.hasInfix "Get-VMOverlayBackingRelPath -Type $vm.type" windows_vm_setup_ps1_text)
         && (lib.hasInfix "& \$qemuImg create -f qcow2 -b \$backingRel -F qcow2 \$diskPath" windows_vm_setup_ps1_text)
         && (lib.hasInfix "Copy-Item \$prebuilt \$basePath" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "Test-VmProcessRunning -VmName \$vm.id -VmDisplay \$vm.name" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "function Get-VmRunningProcessNameList" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "Get-VmRunningProcessNameList" vm_ps1_text)
-        && (lib.hasInfix "Get-VmQcow2VirtualSize -ImagePath \$diskPath" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Test-VMProcessRunning -VmId \$vm.id -VmDisplay \$vm.name" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "function Get-VMRunningProcessNameList" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Get-VMRunningProcessNameList" vm_ps1_text)
+        && (lib.hasInfix "Get-VMQcow2VirtualSize -ImagePath \$diskPath" windows_vm_setup_ps1_text)
         && (lib.hasInfix "\$qemuImg resize \$diskPath \$diskBytes" windows_vm_setup_ps1_text)
         && (lib.hasInfix "vm.id).qcow2" windows_vm_setup_ps1_text)
       )
@@ -2419,6 +2446,7 @@ let
     test_cpu_counts
     test_vm_names
     test_vm_types
+    test_vm_schema_no_linux_type
     test_share_dev_dir_types
     test_enabled_types
     test_vm_id_nonempty_and_filesystem_safe
@@ -2428,6 +2456,7 @@ let
     test_port_forwards_host_unique
     test_port_forwards_guest_semantics
     test_hostname_nonempty
+    test_hostname_equals_name
     test_min_image_size_pattern
     test_mac_address_prefix_nonempty
     test_group_key_equals_type
@@ -2458,6 +2487,8 @@ let
     test_nixos_guest_ssh_authorized_keys
     test_vm_guest_ssh_public_key_manifest
     test_vm_guest_ssh_public_key_resolver_wired
+    test_vm_ps1_windows_host_fallback
+    test_vm_android_recovery_filename_parity
     test_tart_in_homebrew
     test_macbook_linux_builder_enabled
     test_macbook_linux_builder_machines_file
@@ -2608,6 +2639,7 @@ in
     test_cpu_counts
     test_vm_names
     test_vm_types
+    test_vm_schema_no_linux_type
     test_share_dev_dir_types
     test_enabled_types
     test_vm_id_nonempty_and_filesystem_safe
@@ -2617,6 +2649,7 @@ in
     test_port_forwards_host_unique
     test_port_forwards_guest_semantics
     test_hostname_nonempty
+    test_hostname_equals_name
     test_min_image_size_pattern
     test_mac_address_prefix_nonempty
     test_group_key_equals_type
@@ -2647,6 +2680,8 @@ in
     test_nixos_guest_ssh_authorized_keys
     test_vm_guest_ssh_public_key_manifest
     test_vm_guest_ssh_public_key_resolver_wired
+    test_vm_ps1_windows_host_fallback
+    test_vm_android_recovery_filename_parity
     test_tart_in_homebrew
     test_macbook_linux_builder_enabled
     test_macbook_linux_builder_machines_file

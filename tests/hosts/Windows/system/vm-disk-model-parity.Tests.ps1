@@ -44,7 +44,7 @@ Describe "Windows VM disk-model parity (P8)" {
   It "GC orphan sweeps src/ always and data/ only with -GcData" {
     $content = Get-VmSetupPs1Content
     $content | Should -Match ([regex]::Escape('Get-ChildItem -LiteralPath $srcDir -Directory'))
-    $content | Should -Match ([regex]::Escape('if ($GcData -and (Test-Path -LiteralPath $dataDir'))
+    $content | Should -Match ([regex]::Escape('if ($gcDataEnabled -and (Test-Path -LiteralPath $dataDir'))
   }
 
   It "gc.ps1 Step 6 delegates VM-artifact GC to vm.sh gc" {
@@ -63,26 +63,26 @@ Describe "Windows VM disk-model parity (P8)" {
   }
 
   It "overlay backing path is tree-root-relative (..\src\<type>\overlay backing.qcow2)" {
-    (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('Get-VmOverlayBackingRelPath -Type $vm.type'))
+    (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('Get-VMOverlayBackingRelPath -Type $vm.type'))
     (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('& $qemuImg create -f qcow2 -b $backingRel -F qcow2 $diskPath'))
   }
 
   It "base refresh copies the prebuilt golden and guards against running VMs" {
     $content = Get-VmSetupPs1Content
     $content | Should -Match ([regex]::Escape('Copy-Item $prebuilt $basePath'))
-    $content | Should -Match ([regex]::Escape('Test-VmProcessRunning -VmName $vm.id -VmDisplay $vm.name'))
-    $content | Should -Match ([regex]::Escape('function Get-VmRunningProcessNameList'))
+    $content | Should -Match ([regex]::Escape('Test-VMProcessRunning -VmId $vm.id -VmDisplay $vm.name'))
+    $content | Should -Match ([regex]::Escape('function Get-VMRunningProcessNameList'))
   }
 
   It "list/status share the same QEMU running-process probe as sync" {
     $vmPs1 = Get-VmPs1Content
-    $vmPs1 | Should -Match ([regex]::Escape('Get-VmRunningProcessNameList'))
+    $vmPs1 | Should -Match ([regex]::Escape('Get-VMRunningProcessNameList'))
     $vmPs1 | Should -Not -Match ([regex]::Escape("Name = 'qemu-system-x86_64w.exe'"))
   }
 
   It "overlay growth is grow-only via qemu-img resize" {
     $content = Get-VmSetupPs1Content
-    $content | Should -Match ([regex]::Escape('Get-VmQcow2VirtualSize -ImagePath $diskPath'))
+    $content | Should -Match ([regex]::Escape('Get-VMQcow2VirtualSize -ImagePath $diskPath'))
     $content | Should -Match ([regex]::Escape('$qemuImg resize $diskPath $diskBytes'))
   }
 
@@ -92,13 +92,13 @@ Describe "Windows VM disk-model parity (P8)" {
 
   It "pack refuses while a VM runs and retains the data/ payload" {
     $content = Get-VmPs1Content
-    $content | Should -Match ([regex]::Escape('Get-VmRunningNameList'))
+    $content | Should -Match ([regex]::Escape('Get-VMRunningIdList'))
     $content | Should -Match ([regex]::Escape('payload retained (src, data, descriptors, README)'))
   }
 
   It "POSIX lib mirrors the relative data/ path and base/overlay provisioning" {
     $content = Get-VmShLibContent
-    $content | Should -Match ([regex]::Escape('_wss_disk_path="data/${_wss_name}.qcow2"'))
+    $content | Should -Match ([regex]::Escape('_wss_disk_path="data/${_wss_id}.qcow2"'))
     $content | Should -Match ([regex]::Escape('vm_ensure_base_and_overlay'))
   }
 

@@ -20,7 +20,7 @@ let
   test_windows_android_config_native = assert' (
     (lib.hasInfix "Invoke-AndroidConfig" vmPs1Text)
     && (lib.hasInfix "Invoke-AndroidConfig.ps1" vmPs1Text)
-    && (lib.hasInfix "VmAndroid.ps1" vmPs1Text)
+    && (lib.hasInfix "VMAndroid.ps1" vmPs1Text)
     && !(lib.hasInfix "& nucleus-vm android-config" vmPs1Text)
     && !(lib.hasInfix "vm.sh android-config" vmPs1Text)
   ) "vm.ps1 must use native Invoke-AndroidConfig without bash or nucleus-vm recursion";

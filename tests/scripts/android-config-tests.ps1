@@ -1,5 +1,5 @@
 #Requires -Version 7.4
-# Unit tests for Windows android-config helpers (VmAndroid.ps1 / Invoke-AndroidConfig.ps1).
+# Unit tests for Windows android-config helpers (VMAndroid.ps1 / Invoke-AndroidConfig.ps1).
 #
 # Run with: pwsh -NoProfile -File tests/scripts/android-config-tests.ps1
 
@@ -9,7 +9,7 @@ param()
 $script:passCount = 0
 $script:failCount = 0
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$vmAndroidModule = Join-Path $repoRoot 'src\hosts\Windows\modules\system\VmAndroid.ps1'
+$vmAndroidModule = Join-Path $repoRoot 'src\hosts\Windows\modules\system\VMAndroid.ps1'
 $configModule = Join-Path $repoRoot 'src\hosts\Windows\modules\system\Invoke-AndroidConfig.ps1'
 
 function Assert-Pass {
@@ -88,14 +88,14 @@ function Test-ResolveAndroidVmIndex {
     )
   }
 
-  $index = Resolve-AndroidVmIndex -Manifest $manifest -VmName 'Android'
+  $index = Resolve-AndroidVmIndex -Manifest $manifest -VmId 'Android'
   if ($index -eq 1) {
     Assert-Pass 'Resolve-AndroidVmIndex finds Android VM'
   } else {
     Assert-Fail 'Resolve-AndroidVmIndex' "expected 1, got $index"
   }
 
-  $missing = Resolve-AndroidVmIndex -Manifest $manifest -VmName 'Missing'
+  $missing = Resolve-AndroidVmIndex -Manifest $manifest -VmId 'Missing'
   if ($missing -eq -1) {
     Assert-Pass 'Resolve-AndroidVmIndex returns -1 for missing VM'
   } else {
@@ -115,7 +115,7 @@ function Test-NoFlagsShowsManual {
   }
 
   $script:manualShown = $false
-  Invoke-AndroidConfig -RepoRoot $repoRoot -VmName 'Android' -Manifest $manifest -VmDir 'C:\tmp' -ConfigFlags @()
+  Invoke-AndroidConfig -RepoRoot $repoRoot -VmId 'Android' -Manifest $manifest -VmDir 'C:\tmp' -ConfigFlags @()
   if ($script:manualShown) {
     Assert-Pass 'Invoke-AndroidConfig with no flags shows manual'
   } else {
@@ -135,7 +135,7 @@ function Test-UnknownFlagRejected {
 
   $script:errored = $false
   try {
-    Invoke-AndroidConfig -RepoRoot $repoRoot -VmName 'Android' -Manifest $manifest -VmDir 'C:\tmp' -ConfigFlags @('--adb-debug')
+    Invoke-AndroidConfig -RepoRoot $repoRoot -VmId 'Android' -Manifest $manifest -VmDir 'C:\tmp' -ConfigFlags @('--adb-debug')
   } catch {
     $null = $_
   }

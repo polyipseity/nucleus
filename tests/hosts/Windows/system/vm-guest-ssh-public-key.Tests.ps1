@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Verifies Get-VmGuestSshPublicKey resolves keys from the shared manifest.
+    Verifies Get-VMGuestSshPublicKey resolves keys from the shared manifest.
 .DESCRIPTION
     Runtime tests with a temporary USERPROFILE/.ssh fixture. Paths come from
     src/modules/vm-guest-ssh-public-key-paths.json.
@@ -13,8 +13,8 @@ BeforeAll {
     $ErrorActionPreference = 'Stop'
 
     $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..\..\..\')
-    $GetVmGuestSshPublicKeyPath = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Get-VmGuestSshPublicKey.ps1'
-    . $GetVmGuestSshPublicKeyPath
+    $GetVMGuestSshPublicKeyPath = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Get-VMGuestSshPublicKey.ps1'
+    . $GetVMGuestSshPublicKeyPath
 
     $FixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-vm-guest-ssh-$([Guid]::NewGuid().ToString())"
     $FixtureSshDir = Join-Path $FixtureRoot '.ssh'
@@ -35,36 +35,36 @@ AfterAll {
     Remove-Item -LiteralPath $FixtureRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-Describe 'Get-VmGuestSshPublicKey' {
+Describe 'Get-VMGuestSshPublicKey' {
     It 'prefers static id_ed25519.pub over username templates' {
-        $result = Get-VmGuestSshPublicKey -RepoRoot $RepoRoot -Username 'testuser'
+        $result = Get-VMGuestSshPublicKey -RepoRoot $RepoRoot -Username 'testuser'
         $result | Should -Be $StaticKey
     }
 
     It 'resolves ssh_personal_{username}.pub when static keys are absent' {
         Remove-Item -LiteralPath (Join-Path $FixtureSshDir 'id_ed25519.pub') -Force
-        $result = Get-VmGuestSshPublicKey -RepoRoot $RepoRoot -Username 'testuser'
+        $result = Get-VMGuestSshPublicKey -RepoRoot $RepoRoot -Username 'testuser'
         $result | Should -Be $PersonalKey
     }
 
     It 'returns $null when no keys exist' {
         Remove-Item -LiteralPath (Join-Path $FixtureSshDir 'ssh_personal_testuser.pub') -Force
-        $result = Get-VmGuestSshPublicKey -RepoRoot $RepoRoot -Username 'testuser'
+        $result = Get-VMGuestSshPublicKey -RepoRoot $RepoRoot -Username 'testuser'
         $result | Should -BeNullOrEmpty
     }
 
     It 'skips username templates when Username is empty' {
         Set-Content -Path (Join-Path $FixtureSshDir 'ssh_personal_testuser.pub') -Value $PersonalKey -NoNewline
-        $result = Get-VmGuestSshPublicKey -RepoRoot $RepoRoot -Username ''
+        $result = Get-VMGuestSshPublicKey -RepoRoot $RepoRoot -Username ''
         $result | Should -BeNullOrEmpty
     }
 }
 
 Describe 'Invoke-VMSetup wiring' {
-    It 'dot-sources Get-VmGuestSshPublicKey.ps1' {
+    It 'dot-sources Get-VMGuestSshPublicKey.ps1' {
         $invokeVmSetupPath = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
         $text = Get-Content -Raw -Path $invokeVmSetupPath
-        $text | Should -Match 'Get-VmGuestSshPublicKey\.ps1'
+        $text | Should -Match 'Get-VMGuestSshPublicKey\.ps1'
     }
 
     It 'does not define Resolve-VMGuestSshKey inline' {
