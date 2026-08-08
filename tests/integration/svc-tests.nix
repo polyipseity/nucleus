@@ -13,7 +13,7 @@ let
 
   # Parsed services.json for structural assertions
   parsedServices = builtins.fromJSON servicesJsonText;
-  serviceNames = builtins.filter (n: n != "\$schema") (builtins.attrNames parsedServices);
+  serviceNames = builtins.filter (n: parsedServices.${n} ? hosts) (builtins.attrNames parsedServices);
 
   # Tail-recursive list helpers
   all =
@@ -60,7 +60,7 @@ assert containsRegex "do_action" svcShText;
 assert containsRegex "do_logs" svcShText;
 assert containsRegex "do_log_paths" svcShText;
 assert containsRegex "do_log_config" svcShText;
-assert containsRegex "get_platform_services" svcShText;
+assert containsRegex "get_host_services" svcShText;
 assert containsRegex "get_capture" svcShText;
 assert containsRegex "get_unit" svcShText;
 assert containsRegex "service_log_files" svcShText;
@@ -105,7 +105,7 @@ assert containsRegex "[{]1,-24}" svcPs1Text;
 assert containsRegex ''type == "object"'' svcShText;
 assert containsRegex "value: .displayName" svcShText;
 assert containsRegex "awk -v label=" svcShText;
-assert containsRegex "jq -c '.platform'" svcShText;
+assert containsRegex "jq -c '.hostEntry'" svcShText;
 assert containsRegex "filtered_service_names" svcShText;
 
 # --- svc.ps1 bug-fix assertions ---
@@ -122,9 +122,9 @@ assert containsRegex "nucleus-svc" flakeText;
 assert containsRegex ''name = "svc"'' flakeText;
 
 # --- services.json scope assertions ---
-# ollama and litellm are system-wide on macOS.
-assert containsRegex ''"ollama".*"macos".*"system"'' servicesJsonText;
-assert containsRegex ''"litellm".*"macos".*"system"'' servicesJsonText;
+# ollama and litellm are system-wide on MacBook.
+assert containsRegex ''"ollama".*"MacBook".*"system"'' servicesJsonText;
+assert containsRegex ''"litellm".*"MacBook".*"system"'' servicesJsonText;
 
 # User-scoped entries must have justification.
 assert containsRegex ''"discord-music-rpc".*justification'' servicesJsonText;
@@ -167,28 +167,28 @@ assert containsRegex "endpoint_name" svcShText;
 assert containsRegex "json_output" svcShText;
 assert containsRegex ''\$Json'' svcPs1Text;
 
-# --- Structural: each service has at least one non-omitted platform ---
+# --- Structural: each service has at least one non-omitted host ---
 assert all (
   name:
   let
     entry = parsedServices.${name};
-    platforms = builtins.attrNames entry.platforms;
+    hosts = builtins.attrNames entry.hosts;
   in
-  any (p: entry.platforms.${p}.type != "omitted") platforms
+  any (h: entry.hosts.${h}.type != "omitted") hosts
 ) serviceNames;
 
-# --- Structural: all host platform keys are valid (macos, nixos, windows) ---
+# --- Structural: all host keys are valid (MacBook, NixOS, Windows) ---
 assert all (
   name:
   let
     entry = parsedServices.${name};
-    knownPlatforms = [
-      "macos"
-      "nixos"
-      "windows"
+    knownHosts = [
+      "MacBook"
+      "NixOS"
+      "Windows"
     ];
   in
-  all (p: any (kp: kp == p) knownPlatforms) (builtins.attrNames entry.platforms)
+  all (h: any (kh: kh == h) knownHosts) (builtins.attrNames entry.hosts)
 ) serviceNames;
 
 # --- Schema reference integrity ---

@@ -3,7 +3,7 @@
 let
   lib = import <nixpkgs/lib>;
   repoRoot = ../..;
-  usersMacOS = import ../../src/modules/lib/users-registry.nix {
+  usersMacBook = import ../../src/modules/lib/users-registry.nix {
     inherit lib repoRoot;
     hostName = "MacBook";
   };
@@ -18,7 +18,7 @@ let
 
   inherit (import ../lib.nix) assert';
 
-  userNames = builtins.attrNames usersMacOS;
+  userNames = builtins.attrNames usersMacBook;
 
   googleDriveReplica =
     replica: builtins.head (builtins.filter (entry: (entry.id or "") == "GoogleDrive") replica);
@@ -33,13 +33,13 @@ let
   ) "users-registry.nix must not treat default/ as a user";
 
   test_merges_default_and_user_profile = assert' (
-    usersMacOS.polyipseity.isPrimary == true
-    && usersMacOS.polyipseity.homeDirectory == "/Users/polyipseity"
+    usersMacBook.polyipseity.isPrimary == true
+    && usersMacBook.polyipseity.homeDirectory == "/Users/polyipseity"
   ) "users-registry.nix must merge profile.json default + polyipseity overrides";
 
   test_resolves_cloud_drive_local_path_per_platform = assert' (
     let
-      mounts = usersMacOS.polyipseity.cloudDrives.mounts;
+      mounts = usersMacBook.polyipseity.cloudDrives.mounts;
       googleDrive = builtins.head (builtins.filter (m: (m.id or "") == "GoogleDrive") mounts);
     in
     googleDrive.localPath == "clouds/GoogleDrive"
@@ -49,18 +49,18 @@ let
   ) "users-registry.nix must resolve host-keyed cloud drive localPath values";
 
   test_resolves_replica_enable_per_platform = assert' (
-    (googleDriveReplica usersMacOS.polyipseity.cloudDrives.replicas).enable == false
+    (googleDriveReplica usersMacBook.polyipseity.cloudDrives.replicas).enable == false
     && (googleDriveReplica usersWindows.polyipseity.cloudDrives.replicas).enable == false
   ) "users-registry.nix must resolve replica enable flags from default cloud-drives policy";
 
   test_resolves_replica_readwrite_per_platform = assert' (
-    (icloudReplica usersMacOS.polyipseity.cloudDrives.replicas).readWrite == true
+    (icloudReplica usersMacBook.polyipseity.cloudDrives.replicas).readWrite == true
     && (icloudReplica usersWindows.polyipseity.cloudDrives.replicas).readWrite == false
   ) "users-registry.nix must resolve host-keyed replica readWrite flags";
 
   test_assembles_vm_guest_domain = assert' (
-    usersMacOS.polyipseity.vmGuest.usernameSecretKey == "vm_guest_username"
-    && usersMacOS.polyipseity.vmGuest.passwordSecretKey == "vm_guest_password"
+    usersMacBook.polyipseity.vmGuest.usernameSecretKey == "vm_guest_username"
+    && usersMacBook.polyipseity.vmGuest.passwordSecretKey == "vm_guest_password"
   ) "users-registry.nix must assemble vmGuest from src/users/<username>/vm-guest.json";
 
   test_assembles_windows_dsc_config_files = assert' (

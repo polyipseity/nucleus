@@ -7,7 +7,7 @@ let
   symlinksModuleText = builtins.readFile ../../src/modules/symlinks.nix;
   activationDagText = builtins.readFile ../../src/modules/lib/activation-dag.nix;
   polyipseitySymlinksText = builtins.readFile ../../src/users/polyipseity/symlinks.json;
-  usersMacOS = import ../../src/modules/lib/users-registry.nix {
+  usersMacBook = import ../../src/modules/lib/users-registry.nix {
     lib = import <nixpkgs/lib>;
     repoRoot = ../..;
     hostName = "MacBook";
@@ -46,7 +46,7 @@ let
     && containsRegex ''"MacBook": "Library/Mobile Documents/com~apple~CloudDocs/data"'' polyipseitySymlinksText
     && containsRegex ''"NixOS": "clouds/GoogleDrive/data"'' polyipseitySymlinksText
     && containsRegex ''"Windows": "clouds\\\\GoogleDrive\\\\data"'' polyipseitySymlinksText
-    && (usersMacOS.polyipseity.symlinks != [ ])
+    && (usersMacBook.polyipseity.symlinks != [ ])
     && (usersWindows.polyipseity.symlinks != [ ])
   ) "polyipseity must map ~/data to native iCloud on macOS and Google Drive elsewhere";
 

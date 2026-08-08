@@ -16,11 +16,11 @@ let
   watchdogDirs = services.service-watchdog.logging.dirs;
 
   # Verify runAsUser fields.
-  camillaRunAsUser = services.camilladsp.platforms.macos.runAsUser;
-  camillaGuiRunAsUser = services.camillagui-backend.platforms.macos.runAsUser;
-  caddyRunAsUser = services.caddy.platforms.macos.runAsUser;
-  jellyfinRunAsUser = services.jellyfin.platforms.macos.runAsUser;
-  litellmRunAsUser = services.litellm.platforms.macos.runAsUser;
+  camillaRunAsUser = services.camilladsp.hosts.MacBook.runAsUser;
+  camillaGuiRunAsUser = services.camillagui-backend.hosts.MacBook.runAsUser;
+  caddyRunAsUser = services.caddy.hosts.MacBook.runAsUser;
+  jellyfinRunAsUser = services.jellyfin.hosts.MacBook.runAsUser;
+  litellmRunAsUser = services.litellm.hosts.MacBook.runAsUser;
 
   # --- Tests ---
   test_camilladsp_dirs = assert' (

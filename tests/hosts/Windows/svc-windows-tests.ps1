@@ -29,24 +29,24 @@ BeforeAll {
       displayName = 'Ollama'
       description = 'LLM inference server'
       network     = @{ default = @{ host = '127.0.0.1'; port = 11434; protocol = 'http' } }
-      platform    = @{ type = 'native'; service = 'ollama' }
+      hostEntry   = @{ type = 'native'; service = 'ollama' }
     }
     'sshd' = @{
       displayName = 'SSH Server'
       description = 'Remote shell access via SSH'
       network     = @{ default = @{ host = '0.0.0.0'; port = 22; protocol = 'tcp' } }
-      platform    = @{ type = 'native'; service = 'sshd' }
+      hostEntry   = @{ type = 'native'; service = 'sshd' }
     }
     'cloud-drive' = @{
       displayName = 'Cloud Drive Mounts'
       description = 'rclone FUSE cloud drive mounts'
-      platform    = @{ type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'cloud-mount-' }
+      hostEntry   = @{ type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'cloud-mount-' }
     }
     'camilladsp' = @{
       displayName = 'CamillaDSP'
       description = 'Audio processor'
       network     = @{ websocket = @{ host = '127.0.0.1'; port = 1234; protocol = 'tcp' } }
-      platform    = @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      hostEntry   = @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
     }
   }
 
@@ -56,25 +56,25 @@ BeforeAll {
       displayName = 'Ollama'
       description = 'LLM inference server'
       network     = @{ default = @{ host = '127.0.0.1'; port = 11434; protocol = 'http' } }
-      platforms   = @{ windows = @{ type = 'native'; service = 'ollama'; logging = @{ capture = 'all' } } }
+      hosts       = @{ Windows = @{ platform = 'Windows'; type = 'native'; service = 'ollama'; logging = @{ capture = 'all' } } }
       logging     = @{ maxSize = 10000000 }
     }
     'sshd' = @{
       displayName = 'SSH Server'
       description = 'Remote shell access via SSH'
       network     = @{ default = @{ host = '0.0.0.0'; port = 22; protocol = 'tcp' } }
-      platforms   = @{ windows = @{ type = 'native'; service = 'sshd' } }
+      hosts       = @{ Windows = @{ platform = 'Windows'; type = 'native'; service = 'sshd' } }
     }
     'cloud-drive' = @{
       displayName = 'Cloud Drive Mounts'
       description = 'rclone FUSE cloud drive mounts'
-      platforms   = @{ windows = @{ type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'cloud-mount-'; logging = @{ capture = 'stderr' } } }
+      hosts       = @{ Windows = @{ platform = 'Windows'; type = 'schtask'; taskPath = '\NucleusCloudMount'; prefixMatch = $true; service = 'cloud-mount-'; logging = @{ capture = 'stderr' } } }
     }
     'camilladsp' = @{
       displayName = 'CamillaDSP'
       description = 'Audio processor'
       network     = @{ websocket = @{ host = '127.0.0.1'; port = 1234; protocol = 'tcp' } }
-      platforms   = @{ windows = @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' } }
+      hosts       = @{ Windows = @{ platform = 'Windows'; type = 'schtask'; taskPath = '\NucleusCamillaDSP' } }
     }
   }
 
@@ -86,8 +86,9 @@ BeforeAll {
   Mock Get-WinEvent { return @() }
   Mock ConvertTo-SanitizedText { process { $_ } }
 
-  # Script-scoped platform (constant for Windows).
-  $Script:Platform = 'windows'
+  # Script-scoped host (constant for Windows).
+  $Script:NucleusHost = 'Windows'
+  $NucleusHost = $Script:NucleusHost
 
   # Dot-source the function definitions.
   . ([scriptblock]::Create($functionCode))
@@ -128,7 +129,7 @@ Describe 'Format-StatusTable' {
     $Script:Json = $true
     $results = @{
       'ollama'  = @{ status = 'active'; running = $true; pid = 12345 }
-      'ERROR:unknown' = @{ displayName = 'unknown'; platform = @{ error = 'service not found' } }
+      'ERROR:unknown' = @{ displayName = 'unknown'; hostEntry = @{ error = 'service not found' } }
     }
     $output = Format-StatusTable -Results $results
     $output | Should -Not -Match 'ERROR'
@@ -137,7 +138,7 @@ Describe 'Format-StatusTable' {
   It 'replaces ERROR: prefix with n/a in table mode' {
     $Script:Json = $false
     $results = @{
-      'ERROR:unknown' = @{ displayName = 'unknown'; platform = @{ error = 'service not found' } }
+      'ERROR:unknown' = @{ displayName = 'unknown'; hostEntry = @{ error = 'service not found' } }
     }
     $output = Format-StatusTable -Results $results
     $output | Should -Match 'unknown'
@@ -187,7 +188,7 @@ Describe 'Resolve-ServiceName' {
   It 'returns ERROR: for unknown service' {
     $resolved = Resolve-ServiceName -Names @('nonexistent')
     $resolved.Keys | Should -Contain 'ERROR:nonexistent'
-    $resolved['ERROR:nonexistent'].platform.error | Should -Be 'service not found in registry'
+    $resolved['ERROR:nonexistent'].hostEntry.error | Should -Be 'service not found in registry'
   }
 
   It 'resolves multiple services' {
@@ -211,7 +212,7 @@ Describe 'Resolve-ServiceName' {
 
       $resolved = Resolve-ServiceName -Names @('cloud-drive')
       $resolved.Keys | Should -Contain 'cloud-drive/cloud-mount-work'
-      $resolved['cloud-drive/cloud-mount-work'].platform.type | Should -Be 'schtask'
+      $resolved['cloud-drive/cloud-mount-work'].hostEntry.type | Should -Be 'schtask'
     }
 
     It 'creates no-matches entry when no tasks match prefix' {
@@ -333,7 +334,7 @@ Describe 'Dispatch' {
       Write-Debug "Invoke-Dispatch: Action=$Action ServiceName=$($ServiceName -join ',')"
       $Registry = $Script:Registry
       $RegistryRaw = $Script:RegistryRaw
-      $Platform = $Script:Platform
+      $NucleusHost = $Script:NucleusHost
       $Json = $Script:Json
       . ([scriptblock]::Create($dispatchSwitchText))
     }
@@ -436,7 +437,7 @@ Describe 'Dispatch' {
     }
 
     It 'routes logs without service name to Show-ServiceList' {
-      Mock Get-PlatformService { return @('ollama') }
+      Mock Get-HostService { return @('ollama') }
       Mock Get-CaptureMode { return 'all' }
       Mock Test-ServiceHasLog { return $true }
       Mock Show-ServiceList { }
@@ -639,9 +640,9 @@ Describe 'Invoke-ServiceAction' {
 # Log helper functions
 # ---------------------------------------------------------------------------
 
-Describe 'Get-PlatformService' {
+Describe 'Get-HostService' {
   It 'returns sorted service names' {
-    $result = Get-PlatformService
+    $result = Get-HostService
     $result.Count | Should -Be 4
     $result[0] | Should -Be 'camilladsp'
     $result[-1] | Should -Be 'sshd'

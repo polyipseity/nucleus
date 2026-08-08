@@ -214,8 +214,8 @@ $ensureLogDirPath = Join-Path \$PSScriptRoot '../../../src/hosts/Windows/modules
     $stub = @'
 {
   "test-svc": {
-    "platforms": {
-      "windows": { "type": "service" }
+    "hosts": {
+      "Windows": { "platform": "Windows", "type": "service" }
     },
     "logging": {
       "dirs": { "system": ["test-svc"], "user": [] }
@@ -239,8 +239,8 @@ $ensureLogDirPath = Join-Path \$PSScriptRoot '../../../src/hosts/Windows/modules
     $stub = @'
 {
   "test-user-svc": {
-    "platforms": {
-      "windows": { "type": "service" }
+    "hosts": {
+      "Windows": { "platform": "Windows", "type": "service" }
     },
     "logging": {
       "dirs": { "system": [], "user": ["test-user-svc"] }

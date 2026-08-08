@@ -666,19 +666,19 @@ if [[ -f "$SVC_SH" ]]; then
 fi
 
 # jq unit test: do_log_config filter resolves fields correctly (Fix 1 regression)
-# shellcheck disable=SC2016 # reason: $svc/$platform are jq variables, not shell variables
+# shellcheck disable=SC2016 # reason: $svc/$host are jq variables, not shell variables
 JQ_FILTER='{
-  capture: (.[$svc].platforms[$platform].logging.capture // .[$svc].logging.capture // "all"),
-  maxSize: (.[$svc].platforms[$platform].logging.maxSize // .[$svc].logging.maxSize // 10000000),
-  maxFiles: (.[$svc].platforms[$platform].logging.maxFiles // .[$svc].logging.maxFiles // 4),
-  compress: (.[$svc].platforms[$platform].logging.compress // .[$svc].logging.compress // true),
-  sanitize: (.[$svc].platforms[$platform].logging.sanitize // .[$svc].logging.sanitize // true),
-  level: (.[$svc].platforms[$platform].logging.level // .[$svc].logging.level // null),
-  eventLog: (.[$svc].platforms[$platform].logging.eventLog // .[$svc].logging.eventLog // null)
+  capture: (.[$svc].hosts[$host].logging.capture // .[$svc].logging.capture // "all"),
+  maxSize: (.[$svc].hosts[$host].logging.maxSize // .[$svc].logging.maxSize // 10000000),
+  maxFiles: (.[$svc].hosts[$host].logging.maxFiles // .[$svc].logging.maxFiles // 4),
+  compress: (.[$svc].hosts[$host].logging.compress // .[$svc].logging.compress // true),
+  sanitize: (.[$svc].hosts[$host].logging.sanitize // .[$svc].logging.sanitize // true),
+  level: (.[$svc].hosts[$host].logging.level // .[$svc].logging.level // null),
+  eventLog: (.[$svc].hosts[$host].logging.eventLog // .[$svc].logging.eventLog // null)
 }'
 SVC_FIXTURE='{
-  "with-platform": {
-    "platforms": { "macos": { "logging": { "capture": "none", "maxSize": 5000000 } } },
+  "with-host": {
+    "hosts": { "MacBook": { "platform": "macOS", "logging": { "capture": "none", "maxSize": 5000000 } } },
     "logging": { "capture": "stderr", "maxFiles": 2 }
   },
   "with-top-level": {
@@ -686,63 +686,63 @@ SVC_FIXTURE='{
   },
   "with-no-logging": {},
   "with-level": {
-    "platforms": { "linux": { "logging": { "level": "debug" } } }
+    "hosts": { "NixOS": { "platform": "NixOS", "logging": { "level": "debug" } } }
   },
   "with-eventlog": {
-    "platforms": { "windows": { "logging": { "eventLog": "Application" } } }
+    "hosts": { "Windows": { "platform": "Windows", "logging": { "eventLog": "Application" } } }
   }
 }'
 
-result=$(echo "$SVC_FIXTURE" | jq -r --arg svc "with-platform" --arg platform "macos" "$JQ_FILTER | .capture")
+result=$(echo "$SVC_FIXTURE" | jq -r --arg svc "with-host" --arg host "MacBook" "$JQ_FILTER | .capture")
 if [[ "$result" == "none" ]]; then
     assert_pass "jq do_log_config: platform-specific capture takes precedence"
 else
     assert_fail "jq do_log_config: platform-specific capture takes precedence" "got '$result'"
 fi
 
-result=$(echo "$SVC_FIXTURE" | jq -r --arg svc "with-platform" --arg platform "macos" "$JQ_FILTER | .maxSize")
+result=$(echo "$SVC_FIXTURE" | jq -r --arg svc "with-host" --arg host "MacBook" "$JQ_FILTER | .maxSize")
 if [[ "$result" == "5000000" ]]; then
-    assert_pass "jq do_log_config: platform maxSize is used"
+    assert_pass "jq do_log_config: host maxSize is used"
 else
-    assert_fail "jq do_log_config: platform maxSize is used" "got '$result'"
+    assert_fail "jq do_log_config: host maxSize is used" "got '$result'"
 fi
 
-result=$(echo "$SVC_FIXTURE" | jq -r --arg svc "with-platform" --arg platform "macos" "$JQ_FILTER | .maxFiles")
+result=$(echo "$SVC_FIXTURE" | jq -r --arg svc "with-host" --arg host "MacBook" "$JQ_FILTER | .maxFiles")
 if [[ "$result" == "2" ]]; then
     assert_pass "jq do_log_config: top-level maxFiles fallback works"
 else
     assert_fail "jq do_log_config: top-level maxFiles fallback works" "got '$result'"
 fi
 
-result=$(echo "$SVC_FIXTURE" | jq -r --arg svc "with-top-level" --arg platform "macos" "$JQ_FILTER | .capture")
+result=$(echo "$SVC_FIXTURE" | jq -r --arg svc "with-top-level" --arg host "MacBook" "$JQ_FILTER | .capture")
 if [[ "$result" == "stderr" ]]; then
     assert_pass "jq do_log_config: top-level capture fallback works"
 else
     assert_fail "jq do_log_config: top-level capture fallback works" "got '$result'"
 fi
 
-result=$(echo "$SVC_FIXTURE" | jq -r --arg svc "with-no-logging" --arg platform "macos" "$JQ_FILTER | .capture")
+result=$(echo "$SVC_FIXTURE" | jq -r --arg svc "with-no-logging" --arg host "MacBook" "$JQ_FILTER | .capture")
 if [[ "$result" == "all" ]]; then
     assert_pass "jq do_log_config: default capture is all"
 else
     assert_fail "jq do_log_config: default capture is all" "got '$result'"
 fi
 
-result=$(echo "$SVC_FIXTURE" | jq -r --arg svc "with-platform" --arg platform "linux" "$JQ_FILTER | .capture")
+result=$(echo "$SVC_FIXTURE" | jq -r --arg svc "with-host" --arg host "NixOS" "$JQ_FILTER | .capture")
 if [[ "$result" == "stderr" ]]; then
-    assert_pass "jq do_log_config: non-matching platform falls back to top-level"
+    assert_pass "jq do_log_config: non-matching host falls back to top-level"
 else
-    assert_fail "jq do_log_config: non-matching platform falls back to top-level" "got '$result'"
+    assert_fail "jq do_log_config: non-matching host falls back to top-level" "got '$result'"
 fi
 
-result=$(echo "$SVC_FIXTURE" | jq -r --arg svc "with-level" --arg platform "macos" "$JQ_FILTER | .level")
+result=$(echo "$SVC_FIXTURE" | jq -r --arg svc "with-level" --arg host "MacBook" "$JQ_FILTER | .level")
 if [[ "$result" == "null" ]]; then
     assert_pass "jq do_log_config: level defaults to null"
 else
     assert_fail "jq do_log_config: level defaults to null" "got '$result'"
 fi
 
-result=$(echo "$SVC_FIXTURE" | jq -r --arg svc "with-no-logging" --arg platform "macos" "$JQ_FILTER | .compress")
+result=$(echo "$SVC_FIXTURE" | jq -r --arg svc "with-no-logging" --arg host "MacBook" "$JQ_FILTER | .compress")
 if [[ "$result" == "true" ]]; then
     assert_pass "jq do_log_config: compress defaults to true"
 else

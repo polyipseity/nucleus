@@ -27,9 +27,9 @@ let
       inherit name;
       hasNixOsEntry = entry.values ? NixOS || entry.values ? default;
       hasWindowsEntry = entry.values ? Windows || entry.values ? default;
-      hasMacOsEntry = entry.values ? macOS || entry.values ? default;
+      hasMacBookEntry = entry.values ? MacBook || entry.values ? default;
       nixosValue = envVars.resolveValue name "NixOS";
-      macosValue = envVars.resolveValue name "macOS";
+      macBookValue = envVars.resolveValue name "MacBook";
       windowsValue = envVars.resolveValue name "Windows";
       userSpecific = entry ? userSpecific && entry.userSpecific;
       why = entry.why;

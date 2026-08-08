@@ -5,7 +5,7 @@ let
 
   lib = import <nixpkgs/lib>;
   repoRoot = ../..;
-  usersMacOS = import ../../src/modules/lib/users-registry.nix {
+  usersMacBook = import ../../src/modules/lib/users-registry.nix {
     inherit lib repoRoot;
     hostName = "MacBook";
   };
@@ -13,9 +13,9 @@ let
     inherit lib repoRoot;
     hostName = "Windows";
   };
-  polyipseityMacOS = usersMacOS.polyipseity;
+  polyipseityMacBook = usersMacBook.polyipseity;
   polyipseityWindows = usersWindows.polyipseity;
-  posixUsersText = builtins.toJSON polyipseityMacOS;
+  posixUsersText = builtins.toJSON polyipseityMacBook;
   windowsUsersText = builtins.toJSON polyipseityWindows;
   defaultCloudDrivesText = builtins.readFile ../../src/users/default/cloud-drives.json;
 
@@ -227,7 +227,7 @@ let
   test_icloud_replica_disabled =
     let
       icloudReplica = builtins.head (
-        builtins.filter (replica: (replica.id or "") == "iCloud") polyipseityMacOS.cloudDrives.replicas
+        builtins.filter (replica: (replica.id or "") == "iCloud") polyipseityMacBook.cloudDrives.replicas
       );
     in
     assert' (
@@ -510,7 +510,7 @@ let
   test_icloud_replica_readwrite_posix =
     let
       icloudReplica = builtins.head (
-        builtins.filter (replica: (replica.id or "") == "iCloud") polyipseityMacOS.cloudDrives.replicas
+        builtins.filter (replica: (replica.id or "") == "iCloud") polyipseityMacBook.cloudDrives.replicas
       );
     in
     assert' (
