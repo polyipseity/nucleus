@@ -693,7 +693,7 @@ if ($IsWindows) {
     # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
-    Invoke-NucleusRepoScript 'scripts\check-sh.sh' @Args
+    Invoke-NucleusRepoScript 'scripts\check-sh.ps1' @Args
   }
   function nucleus-ai {
     # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract

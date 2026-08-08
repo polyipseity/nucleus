@@ -39,6 +39,11 @@ Describe "Windows Package Installation" {
                 Test-NucleusWingetPackageInstalled -Id $tool.id | Should -Be $true
             }
         }
+
+        It 'Should have shellcheck available from the ShellCheck installation' {
+            # check-suppress:suppression_doc: probe -- command may not be installed; WHY: Get-Command returns null when command is not found; Should handles absence.
+            Get-Command -Name shellcheck -ErrorAction SilentlyContinue | Should -Not -BeNullOrEmpty
+        }
     }
 
     Context "Developer runtimes and editors" {
