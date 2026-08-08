@@ -96,6 +96,8 @@ if ($Help -or -not $Action) {
 
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Get-Item $PSScriptRoot).Parent.FullName }
 $ManifestPath = Join-Path $RepoRoot 'src\modules\VMs.json'
+if (-not $env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT = $RepoRoot }
+. (Join-Path $RepoRoot 'src\hosts\Windows\modules\Get-NucleusHostPlatform.ps1')
 . (Join-Path $RepoRoot 'src\hosts\Windows\modules\SizeStrings.ps1')
 
 # ---------------------------------------------------------------------------
@@ -248,7 +250,7 @@ function Get-VMRunningIdList {
 
 function Invoke-VMList {
   $manifest = Get-VMManifest
-  $hostName = if ($env:NUCLEUS_HOST) { $env:NUCLEUS_HOST } else { 'Windows' }
+  $hostName = Get-NucleusHostKey
   $runningNameList = Get-VMRunningIdList
 
   # Filter to enabled VMs matching the current host
@@ -266,7 +268,7 @@ function Invoke-VMList {
 
 function Invoke-VMStatus {
   $manifest = Get-VMManifest
-  $hostName = if ($env:NUCLEUS_HOST) { $env:NUCLEUS_HOST } else { 'Windows' }
+  $hostName = Get-NucleusHostKey
   $runningNameList = Get-VMRunningIdList
 
   # Filter to enabled VMs matching the current host
