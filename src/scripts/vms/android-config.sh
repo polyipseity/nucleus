@@ -41,8 +41,8 @@ Android post-provision (jqssun LineageOS 23 user build)
 
 Flags: --gapps --adb-keys --magisk --root --fake-wifi --fake-wifi-revert
 
---magisk installs Magisk su. --root enables Developer options, terminal app,
-and persist.sys.root_access (ro.debuggable stays 0). --fake-wifi needs Magisk su.
+--magisk installs Magisk su. --root enables Developer options and
+persist.sys.root_access (ro.debuggable stays 0; Magisk su for automation). --fake-wifi needs Magisk su.
 
 Recovery (GApps, optional ADB keys):
   1. nucleus-vm reset Android; start VM; boot LineageOS Recovery (factory-reset if needed).

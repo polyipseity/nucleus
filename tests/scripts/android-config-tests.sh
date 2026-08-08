@@ -186,11 +186,9 @@ case "\$*" in
   *shell*settings*) echo "settings \$*" >> "$_af_shell_log"; exit 0 ;;
   *shell*su*getprop*persist.sys.root_access*) echo "su \$*" >> "$_af_shell_log"; printf '3\n'; exit 0 ;;
   *shell*su*getprop*ro.debuggable*) echo "su \$*" >> "$_af_shell_log"; printf '0\n'; exit 0 ;;
-  *shell*su*pm*path*) echo "su \$*" >> "$_af_shell_log"; printf 'package:/apex/com.android.virt/priv-app/VmTerminalApp.apk\n'; exit 0 ;;
-  *shell*su*pm*enable*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
-  *shell*su*pm*list*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
   *shell*su*resetprop*persist*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
   *shell*su*service.d*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
+  *shell*su*settings*) echo "su \$*" >> "$_af_shell_log"; exit 0 ;;
   *shell*su*id*u*) echo "su \$*" >> "$_af_shell_log"; printf '0\n'; exit 0 ;;
   *shell*su*) echo "su \$*" >> "$_af_shell_log"; printf '0\n'; exit 0 ;;
   *shell*am\ start*) exit 0 ;;
@@ -216,12 +214,8 @@ EOF
     fi
     _failures=$((_failures + 1))
   fi
-  if ! grep -q 'settings put global development_settings_enabled' "$_af_shell_log"; then
-    echo "FAIL: --root should enable Developer options via settings put global"
-    _failures=$((_failures + 1))
-  fi
-  if ! grep -q 'com.android.virtualization.terminal' "$_af_shell_log"; then
-    echo "FAIL: --root should enable terminal (com.android.virtualization.terminal)"
+  if ! grep -q 'development_settings_enabled' "$_af_shell_log"; then
+    echo "FAIL: --root should enable Developer options via settings"
     _failures=$((_failures + 1))
   fi
   if ! grep -q 'resetprop persist.sys.root_access 3' "$_af_shell_log"; then

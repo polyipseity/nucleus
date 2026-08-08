@@ -20,7 +20,7 @@
       --gapps               Sideload MindTheGapps in recovery (enter fastboot first).
       --adb-keys            Install host ~/.android/adbkey.pub into guest adb_keys.
       --magisk              Install Magisk on booted Lineage (patch boot, flash, Magisk su).
-      --root                Enable rooted debugging (dev options, terminal, persist.sys.root_access).
+      --root                Enable rooted debugging (dev options, persist.sys.root_access).
       --fake-wifi           Create wlan0 via virt_wifi on eth0 (requires Magisk su).
       --fake-wifi-revert    Remove persisted fake Wi-Fi and restore eth0.
   resize:  Grow-only resize of the writable disk (data/<id>.qcow2) to an

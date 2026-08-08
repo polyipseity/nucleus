@@ -26,10 +26,6 @@ $script:AndroidGsiDownloadZip = 'GSI download.zip'
 $script:AndroidNucleusMagiskPatchRemote = '/data/local/tmp/nucleus-magisk-patch'
 $script:AndroidNucleusMagiskStockBootRemote = '/data/local/tmp/nucleus-stock-boot.img'
 $script:AndroidNucleusRootPropsService = '/data/adb/service.d/nucleus-root-props.sh'
-$script:AndroidNucleusTerminalPackages = @(
-  'com.android.virtualization.terminal'
-  'com.android.terminal'
-)
 $script:AndroidNucleusFakeWifiService = '/data/adb/service.d/nucleus-fake-wifi.sh'
 $script:AndroidNucleusFakeWifiAdbProbeS = 3
 $script:AndroidNucleusFakeWifiAsyncKickoffS = 5
@@ -104,9 +100,13 @@ function Invoke-AndroidEnableUsbDebugging {
   param([Parameter(Mandatory)][object]$Vm)
 
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  & adb -s $serial shell 'settings put global development_settings_enabled 1'
-  & adb -s $serial shell 'settings put global adb_enabled 1'
+  & adb -s $serial shell "su -c 'settings put global development_settings_enabled 1 && settings put global adb_enabled 1'"
+  if ($LASTEXITCODE -ne 0) {
+    Write-NucleusError 'failed to enable Developer options and USB debugging via settings'
+    return $false
+  }
   Start-Sleep -Seconds 2
+  return $true
 }
 
 function Test-AndroidGuestHasMagiskSu {
@@ -136,46 +136,6 @@ function Get-AndroidRootPropsBootScript {
 # persist.sys.root_access is already persist.*; rewrite is idempotent.
 resetprop persist.sys.root_access 3
 '@
-}
-
-function Resolve-AndroidTerminalPackage {
-  param([Parameter(Mandatory)][object]$Vm)
-
-  $serial = Get-AndroidAdbSerial -Vm $Vm
-  foreach ($pkg in $script:AndroidNucleusTerminalPackages) {
-    $pathOut = & adb -s $serial shell "su -c pm path $pkg" 2>$null
-    if ((($pathOut | Out-String) -match '^package:')) {
-      return $pkg
-    }
-  }
-  return $null
-}
-
-function Invoke-AndroidEnableTerminal {
-  param([Parameter(Mandatory)][object]$Vm)
-
-  $serial = Get-AndroidAdbSerial -Vm $Vm
-  $pkg = Resolve-AndroidTerminalPackage -Vm $Vm
-  if (-not $pkg) {
-    $listing = & adb -s $serial shell "su -c 'pm list packages | grep -i terminal'" 2>$null
-    $listingText = (($listing | Out-String) -replace "`r", '').Trim()
-    if (-not $listingText) { $listingText = '<empty>' }
-    Write-NucleusError "no terminal package found (tried: $($script:AndroidNucleusTerminalPackages -join ', ')); pm list: $listingText"
-    return $false
-  }
-
-  & adb -s $serial shell "su -c pm enable $pkg"
-  if ($LASTEXITCODE -ne 0) {
-    Write-NucleusError "failed to enable terminal package $pkg"
-    return $false
-  }
-
-  $disabled = & adb -s $serial shell "su -c 'pm list packages -d'" 2>$null
-  if ((($disabled | Out-String) -match "package:$pkg")) {
-    Write-NucleusError "terminal package $pkg is still disabled after pm enable"
-    return $false
-  }
-  return $true
 }
 
 function Invoke-AndroidRestoreRoDebuggableUser {
@@ -268,8 +228,7 @@ function Invoke-AndroidConfigRoot {
   }
 
   if (-not (Invoke-AndroidRestoreRoDebuggableUser -Vm $Vm)) { return $false }
-  Invoke-AndroidEnableUsbDebugging -Vm $Vm
-  if (-not (Invoke-AndroidEnableTerminal -Vm $Vm)) { return $false }
+  if (-not (Invoke-AndroidEnableUsbDebugging -Vm $Vm)) { return $false }
 
   $serial = Get-AndroidAdbSerial -Vm $Vm
   & adb -s $serial shell 'su -c resetprop persist.sys.root_access 3'
@@ -288,7 +247,7 @@ function Invoke-AndroidConfigRoot {
 
   if (-not (Test-AndroidDevOptionsSmoke -Vm $Vm)) { return $false }
 
-  Write-NucleusInfo "rooted debugging enabled on $serial; next: --fake-wifi"
+  Write-NucleusInfo "rooted debugging enabled on $serial (Magisk su, persist.sys.root_access=3); next: --fake-wifi"
   return $true
 }
 
@@ -880,8 +839,8 @@ Android post-provision (jqssun LineageOS 23 user build)
 
 Flags: --gapps --adb-keys --magisk --root --fake-wifi --fake-wifi-revert
 
---magisk installs Magisk su. --root enables Developer options, Local terminal,
-and persist.sys.root_access (ro.debuggable stays 0). --fake-wifi needs Magisk su.
+--magisk installs Magisk su. --root enables Developer options and
+persist.sys.root_access (ro.debuggable stays 0; Magisk su for automation). --fake-wifi needs Magisk su.
 
 Recovery (GApps, optional ADB keys):
   1. nucleus-vm reset Android; start VM; boot LineageOS Recovery (factory-reset if needed).

@@ -912,7 +912,6 @@ let
     && (lib.hasInfix "android-magisk.sh" android_config_sh_text)
     && (lib.hasInfix "vm_android_config_magisk" android_magisk_sh_text)
     && (lib.hasInfix "vm_android_config_root" android_magisk_sh_text)
-    && (lib.hasInfix "com.android.terminal" android_magisk_sh_text)
     && (lib.hasInfix "vm_android_magisk_guest_patch_boot" android_magisk_sh_text)
     && (lib.hasInfix "--magisk" android_config_sh_text)
     && (lib.hasInfix "--root" android_config_sh_text)

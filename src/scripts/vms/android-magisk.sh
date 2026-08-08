@@ -11,7 +11,6 @@ NUCLEUS_MAGISK_MARKER='android-magisk.tag.json'
 NUCLEUS_MAGISK_PATCH_REMOTE='/data/local/tmp/nucleus-magisk-patch'
 NUCLEUS_MAGISK_STOCK_BOOT_REMOTE='/data/local/tmp/nucleus-stock-boot.img'
 NUCLEUS_ROOT_PROPS_SERVICE='/data/adb/service.d/nucleus-root-props.sh'
-NUCLEUS_TERMINAL_PACKAGES='com.android.virtualization.terminal com.android.terminal'
 
 # vm_android_magisk_apk_lib_dir VM_INDEX
 #   Magisk APK lib/ subdirectory for this guest CPU ABI.
@@ -32,13 +31,15 @@ vm_android_magisk_apk_lib_dir() {
 }
 
 # vm_android_enable_usb_debugging VM_INDEX
-#   Enable Developer options and USB debugging via settings (booted system).
+#   Enable Developer options and USB debugging via settings (booted system, via Magisk su).
 vm_android_enable_usb_debugging() {
   _aeud_vm_index="$1"
   _aeud_serial="$(vm_android_adb_serial "$_aeud_vm_index")"
 
-  adb -s "$_aeud_serial" shell 'settings put global development_settings_enabled 1'
-  adb -s "$_aeud_serial" shell 'settings put global adb_enabled 1'
+  if ! adb -s "$_aeud_serial" shell "su -c $(printf '%q' 'settings put global development_settings_enabled 1 && settings put global adb_enabled 1')"; then
+    error "failed to enable Developer options and USB debugging via settings"
+    return 1
+  fi
   sleep 2
 }
 
@@ -73,49 +74,6 @@ vm_android_root_props_boot_script() {
 # persist.sys.root_access is already persist.*; rewrite is idempotent.
 resetprop persist.sys.root_access 3
 EOF
-}
-
-# vm_android_resolve_terminal_package VM_INDEX
-#   Return the first installed terminal package candidate on the guest.
-vm_android_resolve_terminal_package() {
-  _artp_vm_index="$1"
-  _artp_serial="$(vm_android_adb_serial "$_artp_vm_index")"
-  _artp_pkg=''
-
-  for _artp_pkg in $NUCLEUS_TERMINAL_PACKAGES; do
-    if adb -s "$_artp_serial" shell "su -c $(printf '%q' "pm path $_artp_pkg")" 2>/dev/null \
-      | tr -d '\r' | grep -q '^package:'; then
-      printf '%s\n' "$_artp_pkg"
-      return 0
-    fi
-  done
-  return 1
-}
-
-# vm_android_enable_terminal VM_INDEX
-#   Enable the Developer-options terminal package shipped on jqssun (pm enable via su).
-vm_android_enable_terminal() {
-  _aet_vm_index="$1"
-  _aet_serial="$(vm_android_adb_serial "$_aet_vm_index")"
-  _aet_pkg=''
-  _aet_listing=''
-
-  _aet_pkg="$(vm_android_resolve_terminal_package "$_aet_vm_index")" || {
-    _aet_listing="$(adb -s "$_aet_serial" shell "su -c $(printf '%q' 'pm list packages | grep -i terminal')" 2>/dev/null | tr -d '\r')"
-    error "no terminal package found (tried:$NUCLEUS_TERMINAL_PACKAGES); pm list: ${_aet_listing:-<empty>}"
-    return 1
-  }
-
-  if ! adb -s "$_aet_serial" shell "su -c $(printf '%q' "pm enable $_aet_pkg")"; then
-    error "failed to enable terminal package $_aet_pkg"
-    return 1
-  fi
-
-  if adb -s "$_aet_serial" shell "su -c $(printf '%q' "pm list packages -d")" 2>/dev/null \
-    | tr -d '\r' | grep -q "package:$_aet_pkg"; then
-    error "terminal package $_aet_pkg is still disabled after pm enable"
-    return 1
-  fi
 }
 
 # vm_android_restore_ro_debuggable_user VM_INDEX
@@ -187,7 +145,7 @@ chmod 755 $NUCLEUS_ROOT_PROPS_SERVICE"
 }
 
 # vm_android_config_root VM_INDEX
-#   Enable dev options, terminal app, and Lineage persist.sys.root_access (Magisk su only).
+#   Enable dev options and Lineage persist.sys.root_access (Magisk su only).
 vm_android_config_root() {
   _acr_vm_index="$1"
   _acr_serial="$(vm_android_adb_serial "$_acr_vm_index")"
@@ -208,7 +166,6 @@ vm_android_config_root() {
 
   vm_android_restore_ro_debuggable_user "$_acr_vm_index" || return 1
   vm_android_enable_usb_debugging "$_acr_vm_index" || return 1
-  vm_android_enable_terminal "$_acr_vm_index" || return 1
 
   if ! adb -s "$_acr_serial" shell "su -c $(printf '%q' 'resetprop persist.sys.root_access 3')"; then
     error "failed to apply persist.sys.root_access on guest"
@@ -225,7 +182,7 @@ vm_android_config_root() {
 
   vm_android_smoke_test_dev_options "$_acr_vm_index" || return 1
 
-  say "rooted debugging enabled on $_acr_serial; next: --fake-wifi"
+  say "rooted debugging enabled on $_acr_serial (Magisk su, persist.sys.root_access=3); next: --fake-wifi"
 }
 
 # vm_android_download_boot_image VM_INDEX
