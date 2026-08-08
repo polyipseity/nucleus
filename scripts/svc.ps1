@@ -75,7 +75,7 @@ if ($Help -or -not $Action) {
 
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Get-Item $PSScriptRoot).Parent.FullName }
 $ServicesJson = Join-Path $RepoRoot "src\modules\services.json"
-$Platform = "windows"
+$NucleusHost = 'Windows'
 
 # Read and parse registry
 if (-not (Test-Path $ServicesJson)) {
@@ -87,12 +87,12 @@ $RegistryRaw = Get-Content $ServicesJson -Raw | ConvertFrom-Json -AsHashtable
 $Registry = @{}
 foreach ($svc in $RegistryRaw.Keys) {
   $entry = $RegistryRaw[$svc]
-  if ($entry -is [hashtable] -and $entry.platforms.ContainsKey($Platform) -and $entry.platforms[$Platform].type -ne 'omitted') {
+  if ($entry -is [hashtable] -and $entry.hosts.ContainsKey($NucleusHost) -and $entry.hosts[$NucleusHost].type -ne 'omitted') {
     $Registry[$svc] = @{
       displayName = $entry.displayName
       description = $entry.description
       network     = if ($entry.PSObject.Properties.Name -contains 'network') { $entry.network } else { $null }
-      platform    = $entry.platforms[$Platform]
+      hostEntry   = $entry.hosts[$NucleusHost]
     }
   }
 }
@@ -114,7 +114,7 @@ function Resolve-ServiceName {
   if ($Names.Count -eq 0) {
     # Return all non-prefix services
     foreach ($key in $Registry.Keys) {
-      $plat = $Registry[$key].platform
+      $plat = $Registry[$key].hostEntry
       if (-not $plat.prefixMatch) {
         $results[$key] = $Registry[$key]
       }
@@ -124,7 +124,7 @@ function Resolve-ServiceName {
 
   foreach ($name in $Names) {
     if ($Registry.ContainsKey($name)) {
-      $plat = $Registry[$name].platform
+      $plat = $Registry[$name].hostEntry
       if ($plat.prefixMatch) {
         # Expand prefix match
         $prefix = $plat.service
@@ -135,13 +135,13 @@ function Resolve-ServiceName {
               $taskName = if ($t.TaskPath -eq '\') { $t.TaskName } else { "$($t.TaskPath)$($t.TaskName)" }
               $results["$name/$($t.TaskName)"] = @{
                 displayName = "$name ($($t.TaskName))"
-                platform    = @{ type = 'schtask'; taskPath = $taskName }
+                hostEntry   = @{ type = 'schtask'; taskPath = $taskName }
               }
             }
             if ($matched.Count -eq 0) {
               $results["$name/*"] = @{
                 displayName = "$name (no matches)"
-                platform    = @{ type = 'schtask'; taskPath = $prefix }
+                hostEntry   = @{ type = 'schtask'; taskPath = $prefix }
               }
             }
           }
@@ -152,7 +152,7 @@ function Resolve-ServiceName {
     } else {
       $results["ERROR:$name"] = @{
         displayName = $name
-        platform    = @{ error = "service not found in registry" }
+        hostEntry   = @{ error = "service not found in registry" }
       }
     }
   }
@@ -292,24 +292,24 @@ function Format-StatusTable {
 # Log helpers
 # ---------------------------------------------------------------------------
 
-function Get-PlatformService {
+function Get-HostService {
   $Registry.Keys | Sort-Object
 }
 
 function Get-LogEntry {
   param([string]$ServiceKey)
   $entry = $RegistryRaw[$ServiceKey]
-  $platLog = if ($entry.platforms[$Platform].ContainsKey('logging')) { $entry.platforms[$Platform].logging } else { $null }
+  $hostLog = if ($entry.hosts[$NucleusHost].ContainsKey('logging')) { $entry.hosts[$NucleusHost].logging } else { $null }
   $topLog = if ($entry.ContainsKey('logging')) { $entry.logging } else { $null }
-  return @{ platform = $platLog; top = $topLog }
+  return @{ host = $hostLog; top = $topLog }
 }
 
 function Get-CaptureMode {
   param([string]$ServiceKey)
   $logEntry = Get-LogEntry -ServiceKey $ServiceKey
-  $platLog = $logEntry.platform
+  $hostLog = $logEntry.host
   $topLog = $logEntry.top
-  if ($platLog -and $platLog.ContainsKey('capture')) { return $platLog.capture }
+  if ($hostLog -and $hostLog.ContainsKey('capture')) { return $hostLog.capture }
   if ($topLog -and $topLog.ContainsKey('capture')) { return $topLog.capture }
   return 'all'
 }
@@ -318,8 +318,8 @@ function Get-EventLogConfig {
   param([string]$ServiceKey)
   $entry = $RegistryRaw[$ServiceKey]
   $eventLog = $null
-  if ($entry.platforms[$Platform].ContainsKey('logging') -and $entry.platforms[$Platform].logging.ContainsKey('eventLog')) {
-    $eventLog = $entry.platforms[$Platform].logging.eventLog
+  if ($entry.hosts[$NucleusHost].ContainsKey('logging') -and $entry.hosts[$NucleusHost].logging.ContainsKey('eventLog')) {
+    $eventLog = $entry.hosts[$NucleusHost].logging.eventLog
   } elseif ($entry.ContainsKey('logging') -and $entry.logging.ContainsKey('eventLog')) {
     $eventLog = $entry.logging.eventLog
   }
@@ -420,7 +420,7 @@ function Show-ServiceLog {
 }
 
 function Show-ServiceList {
-  foreach ($svc in (Get-PlatformService)) {
+  foreach ($svc in (Get-HostService)) {
     $capture = Get-CaptureMode -ServiceKey $svc
     $hasLog = Test-ServiceHasLog -ServiceKey $svc
     Write-Output ("  {0,-25} capture={1,-7}{2}" -f $svc, $capture, $(if (-not $hasLog) { ' (no logs yet)' } else { '' }))
@@ -430,17 +430,17 @@ function Show-ServiceList {
 function Show-LogConfig {
   param([string]$ServiceKey, [switch]$JsonOut)
   $lp = Get-LogEntry -ServiceKey $ServiceKey
-  $platLog = $lp.platform
+  $hostLog = $lp.host
   $topLog = $lp.top
   $config = @{
-    capture  = if ($platLog -and $platLog.ContainsKey('capture')) { $platLog.capture } elseif ($topLog -and $topLog.ContainsKey('capture')) { $topLog.capture } else { 'all' }
-    maxSize  = if ($platLog -and $platLog.ContainsKey('maxSize')) { $platLog.maxSize } elseif ($topLog -and $topLog.ContainsKey('maxSize')) { $topLog.maxSize } else { 10000000 } # bytes
-    maxFiles = if ($platLog -and $platLog.ContainsKey('maxFiles')) { $platLog.maxFiles } elseif ($topLog -and $topLog.ContainsKey('maxFiles')) { $topLog.maxFiles } else { 4 }
-    compress = if ($platLog -and $platLog.ContainsKey('compress')) { $platLog.compress } elseif ($topLog -and $topLog.ContainsKey('compress')) { $topLog.compress } else { $true }
-    sanitize = if ($platLog -and $platLog.ContainsKey('sanitize')) { $platLog.sanitize } elseif ($topLog -and $topLog.ContainsKey('sanitize')) { $topLog.sanitize } else { $true }
-    level    = if ($platLog -and $platLog.ContainsKey('level')) { $platLog.level } elseif ($topLog -and $topLog.ContainsKey('level')) { $topLog.level } else { $null }
+    capture  = if ($hostLog -and $hostLog.ContainsKey('capture')) { $hostLog.capture } elseif ($topLog -and $topLog.ContainsKey('capture')) { $topLog.capture } else { 'all' }
+    maxSize  = if ($hostLog -and $hostLog.ContainsKey('maxSize')) { $hostLog.maxSize } elseif ($topLog -and $topLog.ContainsKey('maxSize')) { $topLog.maxSize } else { 10000000 } # bytes
+    maxFiles = if ($hostLog -and $hostLog.ContainsKey('maxFiles')) { $hostLog.maxFiles } elseif ($topLog -and $topLog.ContainsKey('maxFiles')) { $topLog.maxFiles } else { 4 }
+    compress = if ($hostLog -and $hostLog.ContainsKey('compress')) { $hostLog.compress } elseif ($topLog -and $topLog.ContainsKey('compress')) { $topLog.compress } else { $true }
+    sanitize = if ($hostLog -and $hostLog.ContainsKey('sanitize')) { $hostLog.sanitize } elseif ($topLog -and $topLog.ContainsKey('sanitize')) { $topLog.sanitize } else { $true }
+    level    = if ($hostLog -and $hostLog.ContainsKey('level')) { $hostLog.level } elseif ($topLog -and $topLog.ContainsKey('level')) { $topLog.level } else { $null }
   }
-  $eventLogEntry = if ($platLog -and $platLog.ContainsKey('eventLog')) { $platLog.eventLog } elseif ($topLog -and $topLog.ContainsKey('eventLog')) { $topLog.eventLog } else { $null }
+  $eventLogEntry = if ($hostLog -and $hostLog.ContainsKey('eventLog')) { $hostLog.eventLog } elseif ($topLog -and $topLog.ContainsKey('eventLog')) { $topLog.eventLog } else { $null }
   if ($eventLogEntry) { $config.eventLog = $eventLogEntry }
   if ($JsonOut) {
     $obj = @{}
@@ -465,7 +465,7 @@ switch ($Action) {
         $hasError = $true
         continue
       }
-      $status = Get-ServiceStatus -Platform $resolved[$key].platform
+      $status = Get-ServiceStatus -Platform $resolved[$key].hostEntry
       $status.displayName = $resolved[$key].displayName
       $results[$key] = $status
     }
@@ -479,11 +479,11 @@ switch ($Action) {
     $hasError = $false
     foreach ($key in $resolved.Keys) {
       if ($key -like 'ERROR:*') {
-        Write-NucleusWarning "$($resolved[$key].displayName) — $($resolved[$key].platform.error)"
+        Write-NucleusWarning "$($resolved[$key].displayName) — $($resolved[$key].hostEntry.error)"
         $hasError = $true
         continue
       }
-      $status = Get-ServiceStatus -Platform $resolved[$key].platform
+      $status = Get-ServiceStatus -Platform $resolved[$key].hostEntry
       $status.displayName = $resolved[$key].displayName
       $results[$key] = $status
     }
@@ -505,7 +505,7 @@ switch ($Action) {
         continue
       }
 
-      $plat = $resolved[$key].platform
+      $plat = $resolved[$key].hostEntry
       if ($plat.prefixMatch) {
         Write-NucleusError "$key — prefix-match services require exact name; use list/status first"
         $overallExit = 1
@@ -533,11 +533,11 @@ switch ($Action) {
     $hasInactive = $false
     foreach ($key in $resolved.Keys) {
       if ($key -like 'ERROR:*') {
-        Write-NucleusWarning "$($resolved[$key].displayName) — $($resolved[$key].platform.error)"
+        Write-NucleusWarning "$($resolved[$key].displayName) — $($resolved[$key].hostEntry.error)"
         $hasInactive = $true
         continue
       }
-      $status = Get-ServiceStatus -Platform $resolved[$key].platform
+      $status = Get-ServiceStatus -Platform $resolved[$key].hostEntry
       if ($status.running) {
         $pidStr = if ($status.pid) { " (pid $($status.pid))" } else { '' }
         Write-Output "svc: verify $key — active$pidStr"
@@ -614,7 +614,7 @@ switch ($Action) {
     if ($parsedServices.Count -eq 0) {
       if ($Json) {
         $list = [ordered]@{}
-        foreach ($svc in (Get-PlatformService)) {
+        foreach ($svc in (Get-HostService)) {
           $list[$svc] = @{ capture = Get-CaptureMode -ServiceKey $svc; hasLogs = Test-ServiceHasLog -ServiceKey $svc }
         }
         Write-Output ($list | ConvertTo-Json -Compress)
@@ -638,7 +638,7 @@ switch ($Action) {
   }
 
   'log-paths' {
-    $targets = if ($ServiceName.Count -gt 0) { $ServiceName } else { Get-PlatformService }
+    $targets = if ($ServiceName.Count -gt 0) { $ServiceName } else { Get-HostService }
     $hasError = $false
     foreach ($svc in $targets) {
       if (-not $Registry.ContainsKey($svc)) {
@@ -653,7 +653,7 @@ switch ($Action) {
   }
 
   'log-config' {
-    $targets = if ($ServiceName.Count -gt 0) { $ServiceName } else { Get-PlatformService }
+    $targets = if ($ServiceName.Count -gt 0) { $ServiceName } else { Get-HostService }
     $hasError = $false
     foreach ($svc in $targets) {
       if (-not $Registry.ContainsKey($svc)) {

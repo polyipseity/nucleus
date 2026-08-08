@@ -61,11 +61,9 @@ REPO_ROOT="$(derive_repo_root)"
 SERVICES_JSON="$REPO_ROOT/src/modules/services.json"
 HOST="$(resolve_nucleus_host)"
 
-# Map resolve_nucleus_host output to services.json platform key
 case "$HOST" in
-  MacBook) PLATFORM="macos" ;;
-  NixOS)   PLATFORM="nixos" ;;
-  *)       error "unsupported host '$HOST'" ;;
+  MacBook|NixOS) ;;
+  *) error "unsupported host '$HOST'" ;;
 esac
 
 # Detect sudo availability for system-domain service access.
@@ -84,21 +82,21 @@ fi
 
 # Helpers
 
-# read_registry — Parse services.json and return JSON filtered to current platform.
+# read_registry — Parse services.json and return JSON filtered to current host.
 # Output: compact JSON on stdout; exits non-zero if the file or jq is missing.
-# WHY: platform filtering happens here so every caller sees a uniform registry
+# WHY: host filtering happens here so every caller sees a uniform registry
 # shape and never repeats the filter logic.
 read_registry() {
   if [ ! -f "$SERVICES_JSON" ]; then
     error "services registry not found at $SERVICES_JSON"
   fi
   require_command jq
-  jq -c --arg platform "$PLATFORM" '
+  jq -c --arg host "$HOST" '
     to_entries | map(
       select(.value | type == "object")
-      | select(.value.platforms | has($platform))
-      | select(.value.platforms[$platform].type != "omitted")
-      | {key: .key, value: {displayName: .value.displayName, description: .value.description, network: .value.network, platform: .value.platforms[$platform]}}
+      | select(.value.hosts | has($host))
+      | select(.value.hosts[$host].type != "omitted")
+      | {key: .key, value: {displayName: .value.displayName, description: .value.description, network: .value.network, hostEntry: .value.hosts[$host]}}
     ) | from_entries
   ' "$SERVICES_JSON"
 }
@@ -128,7 +126,7 @@ resolve_service_names() {
       else
         printf '%s\t%s\t%s\t%s\n' "$key" "$display" "$plat_json" "$key"
       fi
-    done < <(echo "$registry" | jq -r 'to_entries[] | [.key, .value.displayName, (.value.platform | tojson)] | @tsv')
+    done < <(echo "$registry" | jq -r 'to_entries[] | [.key, .value.displayName, (.value.hostEntry | tojson)] | @tsv')
     return
   fi
 
@@ -137,15 +135,15 @@ resolve_service_names() {
     entry=$(echo "$registry" | jq -c --arg name "$name" '.[$name] // empty')
     if [ -n "$entry" ]; then
       local prefix_match
-      prefix_match=$(echo "$entry" | jq -r '.platform.prefixMatch // false')
+      prefix_match=$(echo "$entry" | jq -r '.hostEntry.prefixMatch // false')
       if [ "$prefix_match" = "true" ]; then
         local prefix
-        prefix=$(echo "$entry" | jq -r '.platform.service')
+        prefix=$(echo "$entry" | jq -r '.hostEntry.service')
         local entries
-        entries=$(expand_prefix "$name" "$prefix" "$(echo "$entry" | jq -c '.platform')")
+        entries=$(expand_prefix "$name" "$prefix" "$(echo "$entry" | jq -c '.hostEntry')")
         printf '%s\n' "$entries"
       else
-        printf '%s\n' "$name	$(echo "$entry" | jq -r '.displayName')	$(echo "$entry" | jq -c '.platform')	$name"
+        printf '%s\n' "$name	$(echo "$entry" | jq -r '.displayName')	$(echo "$entry" | jq -c '.hostEntry')	$name"
       fi
     else
       printf '%s\n' "ERROR:unknown	$name	{\"error\":\"service not found in registry\"}	ERROR:unknown"
@@ -161,8 +159,8 @@ resolve_service_names() {
 # for services whose full ids are only knowable at runtime.
 expand_prefix() {
   local name="$1" prefix="$2" plat_json="$3"
-  case "$PLATFORM" in
-    macos)
+  case "$HOST" in
+    MacBook)
       local sudo_prefix=""
       local domain
       domain=$(echo "$plat_json" | jq -r '.domain // "user"')
@@ -184,7 +182,7 @@ expand_prefix() {
         done <<< "$matches"
       fi
       ;;
-    nixos)
+    NixOS)
       local scope_flag=""
       [ "$(echo "$plat_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
       local matches
@@ -745,21 +743,21 @@ do_action() {
     fi
 
     local prefix_match
-    prefix_match=$(echo "$entry" | jq -r '.platform.prefixMatch // false')
+    prefix_match=$(echo "$entry" | jq -r '.hostEntry.prefixMatch // false')
     if [ "$prefix_match" = "true" ]; then
       # For actions on prefix-match services, user must specify exact service name
-      warn "$svc_name — prefix-match services (like $(echo "$entry" | jq -r '.platform.service')*) require exact name; use list or status to discover"
+      warn "$svc_name — prefix-match services (like $(echo "$entry" | jq -r '.hostEntry.service')*) require exact name; use list or status to discover"
       overall_exit=1
       continue
     fi
 
-    if ! svc_action "$action" "$svc_name" "$(echo "$entry" | jq '.platform')"; then
+    if ! svc_action "$action" "$svc_name" "$(echo "$entry" | jq '.hostEntry')"; then
       warn "$svc_name — action $action failed"
       overall_exit=1
     fi
     if "$verbose_mode" && [ "$action" = "start" ] || [ "$action" = "restart" ]; then
       local _v_status
-      _v_status=$(svc_status "$svc_name" "$(echo "$entry" | jq '.platform')")
+      _v_status=$(svc_status "$svc_name" "$(echo "$entry" | jq '.hostEntry')")
       local _v_running _v_pid
       _v_running=$(echo "$_v_status" | jq -r '.running')
       _v_pid=$(echo "$_v_status" | jq -r '.pid // "-"')
@@ -854,27 +852,27 @@ do_endpoint() {
 # Log subcommand helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
-# get_platform_services — Sorted list of services defined for the current platform.
+# get_host_services — Sorted list of services defined for the current host.
 # Output: one service key per line, sorted; $… metadata keys excluded.
 # WHY: sorting keeps logs/log-paths output deterministic, and the $ prefix
 # marks registry metadata entries that are not real services.
-get_platform_services() {
-  jq -r --arg platform "$PLATFORM" '
+get_host_services() {
+  jq -r --arg host "$HOST" '
     to_entries[]
     | select(.key | startswith("$") | not)
-    | select(.value.platforms[$platform] != null)
+    | select(.value.hosts[$host] != null)
     | .key
   ' "$SERVICES_JSON" | sort
 }
 
 # get_capture — Resolve the capture mode for a service.
 # Args: $1 — service key. Output: all|stdout|stderr on stdout.
-# WHY: platform-specific logging config overrides the top-level default so
+# WHY: host-specific logging config overrides the top-level default so
 # hosts can differ without duplicating the whole logging block.
 get_capture() {
   local svc="$1"
-  jq -r --arg svc "$svc" --arg platform "$PLATFORM" '
-    (.[$svc].platforms[$platform].logging.capture // .[$svc].logging.capture // "all")
+  jq -r --arg svc "$svc" --arg host "$HOST" '
+    (.[$svc].hosts[$host].logging.capture // .[$svc].logging.capture // "all")
   ' "$SERVICES_JSON"
 }
 
@@ -885,7 +883,7 @@ get_capture() {
 get_unit() {
   local svc="$1"
   jq -r --arg svc "$svc" '
-    (.[$svc].platforms.nixos.service // "")
+    (.[$svc].hosts.NixOS.service // "")
   ' "$SERVICES_JSON"
 }
 
@@ -931,7 +929,7 @@ service_has_logs() {
   if [ -n "$(service_log_files "$svc")" ]; then
     return 0
   fi
-  if [ "$PLATFORM" = "nixos" ]; then
+  if [ "$HOST" = "NixOS" ]; then
     local unit
     unit="$(get_unit "$svc")"
     if [ -n "$unit" ] && command -v journalctl >/dev/null 2>&1; then
@@ -1011,7 +1009,7 @@ do_logs() {
         "$first" || printf ',',
         first=false
         printf '  "%s"' "$svc"
-      done <<< "$(get_platform_services)"
+      done <<< "$(get_host_services)"
       printf '\n]\n'
     else
       printf 'Available services:\n\n'
@@ -1023,21 +1021,21 @@ do_logs() {
         else
           printf '  %-25s capture=%-7s (no logs yet)\n' "$svc" "$capture"
         fi
-      done <<< "$(get_platform_services)"
+      done <<< "$(get_host_services)"
     fi
     return
   fi
 
   for svc in "${service_names[@]}"; do
-    if ! get_platform_services | grep -qx "$svc"; then
+    if ! get_host_services | grep -qx "$svc"; then
       error "logs: unknown service '$svc'"
       exit 1
     fi
-    case "$PLATFORM" in
-      macos)
+    case "$HOST" in
+      MacBook)
         show_file_logs "$svc" "$lines" "$raw" || warn "$svc — no log files found"
         ;;
-      nixos)
+      NixOS)
         local unit
         unit="$(get_unit "$svc")"
         if [ -n "$unit" ] && command -v journalctl >/dev/null 2>&1; then
@@ -1062,7 +1060,7 @@ do_log_paths() {
   else
     while IFS= read -r svc; do
       service_log_files "$svc"
-    done <<< "$(get_platform_services)"
+    done <<< "$(get_host_services)"
   fi
 }
 
@@ -1087,20 +1085,20 @@ do_log_config() {
   if [ "${#service_names[@]}" -gt 0 ]; then
     targets=("${service_names[@]}")
   else
-    while IFS= read -r svc; do targets+=("$svc"); done <<< "$(get_platform_services)"
+    while IFS= read -r svc; do targets+=("$svc"); done <<< "$(get_host_services)"
   fi
 
   for svc in "${targets[@]}"; do
     local entry
-    entry=$(jq -c --arg svc "$svc" --arg platform "$PLATFORM" '
+    entry=$(jq -c --arg svc "$svc" --arg host "$HOST" '
       {
-        capture: (.[$svc].platforms[$platform].logging.capture // .[$svc].logging.capture // "all"),
-        maxSize: (.[$svc].platforms[$platform].logging.maxSize // .[$svc].logging.maxSize // 10000000), # bytes
-        maxFiles: (.[$svc].platforms[$platform].logging.maxFiles // .[$svc].logging.maxFiles // 4),
-        compress: (.[$svc].platforms[$platform].logging.compress // .[$svc].logging.compress // true),
-        sanitize: (.[$svc].platforms[$platform].logging.sanitize // .[$svc].logging.sanitize // true),
-        level: (.[$svc].platforms[$platform].logging.level // .[$svc].logging.level // null),
-        eventLog: (.[$svc].platforms[$platform].logging.eventLog // .[$svc].logging.eventLog // null)
+        capture: (.[$svc].hosts[$host].logging.capture // .[$svc].logging.capture // "all"),
+        maxSize: (.[$svc].hosts[$host].logging.maxSize // .[$svc].logging.maxSize // 10000000), # bytes
+        maxFiles: (.[$svc].hosts[$host].logging.maxFiles // .[$svc].logging.maxFiles // 4),
+        compress: (.[$svc].hosts[$host].logging.compress // .[$svc].logging.compress // true),
+        sanitize: (.[$svc].hosts[$host].logging.sanitize // .[$svc].logging.sanitize // true),
+        level: (.[$svc].hosts[$host].logging.level // .[$svc].logging.level // null),
+        eventLog: (.[$svc].hosts[$host].logging.eventLog // .[$svc].logging.eventLog // null)
       }
     ' "$SERVICES_JSON")
     if $json_output; then

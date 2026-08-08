@@ -35,7 +35,7 @@ if (-not (Test-Path $ServicesJson)) {
 }
 
 $RegistryRaw = Get-Content $ServicesJson -Raw | ConvertFrom-Json -AsHashtable
-$Platform = "windows"
+$NucleusHost = 'Windows'
 
 # ── Filter to watchdog-managed services ────────────────────────────────────
 # Exclude: omitted, socket-activated, prefix-match (handled by svc.ps1).
@@ -43,19 +43,19 @@ $Services = @()
 foreach ($key in $RegistryRaw.Keys) {
   $entry = $RegistryRaw[$key]
   if ($entry -isnot [hashtable]) { continue }
-  if (-not $entry.platforms.ContainsKey($Platform)) { continue }
+  if (-not $entry.hosts.ContainsKey($NucleusHost)) { continue }
 
-  $plat = $entry.platforms[$Platform]
-  if ($plat.type -eq "omitted") { continue }
-  if ($plat.socketActivated) { continue }
-  if ($plat.prefixMatch) { continue }
+  $hostEntry = $entry.hosts[$NucleusHost]
+  if ($hostEntry.type -eq "omitted") { continue }
+  if ($hostEntry.socketActivated) { continue }
+  if ($hostEntry.prefixMatch) { continue }
 
   $Services += @{
     key         = $key
     displayName = $entry.displayName
-    type        = $plat.type
-    service     = $plat.service
-    taskPath    = $plat.taskPath
+    type        = $hostEntry.type
+    service     = $hostEntry.service
+    taskPath    = $hostEntry.taskPath
   }
 }
 

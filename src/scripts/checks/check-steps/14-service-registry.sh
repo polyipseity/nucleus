@@ -18,18 +18,18 @@ run_14_service_registry() {
     error "services.json not found at $_svc_json"
     _svc_errors=$((_svc_errors + 1))
   else
-    # Check each entry has displayName and platforms
-    while IFS=$'\t' read -r _name _has_display _has_platforms _platform_count; do
+    # Check each entry has displayName and hosts
+    while IFS=$'\t' read -r _name _has_display _has_hosts _host_count; do
       if [ "$_has_display" != "true" ]; then
         error "services.json: '$_name' missing displayName"
         _svc_errors=$((_svc_errors + 1))
       fi
-      if [ "$_has_platforms" != "true" ]; then
-        error "services.json: '$_name' missing platforms"
+      if [ "$_has_hosts" != "true" ]; then
+        error "services.json: '$_name' missing hosts"
         _svc_errors=$((_svc_errors + 1))
       fi
-      if [ "$_platform_count" -lt 1 ]; then
-        error "services.json: '$_name' has no platform entries"
+      if [ "$_host_count" -lt 1 ]; then
+        error "services.json: '$_name' has no host entries"
         _svc_errors=$((_svc_errors + 1))
       fi
     done < <(jq -r '
@@ -37,31 +37,39 @@ run_14_service_registry() {
       [
         .key,
         (.value | has("displayName") and (.displayName | type == "string") and (.displayName | length > 0) | tostring),
-        (.value | has("platforms") and (.platforms | type == "object") | tostring),
-        (.value.platforms | if type == "object" then (keys | length) else 0 end | tostring)
+        (.value | has("hosts") and (.hosts | type == "object") | tostring),
+        (.value.hosts | if type == "object" then (keys | length) else 0 end | tostring)
       ] | @tsv' "$_svc_json")
 
-    # Validate each platform entry has valid type and required fields
-    while IFS=$'\t' read -r _name _platform _type _has_required; do
+    # Validate each host entry has valid type, platform ref, and required fields
+    while IFS=$'\t' read -r _name _host _type _platform _has_required; do
       case "$_type" in
         launchctl|systemctl|native|schtask|omitted) ;;
         *)
-          error "services.json: '$_name' platform '$_platform' has invalid type '$_type'"
+          error "services.json: '$_name' host '$_host' has invalid type '$_type'"
+          _svc_errors=$((_svc_errors + 1))
+          ;;
+      esac
+      case "$_platform" in
+        macOS|NixOS|Windows) ;;
+        *)
+          error "services.json: '$_name' host '$_host' has invalid platform '$_platform'"
           _svc_errors=$((_svc_errors + 1))
           ;;
       esac
       if [ "$_has_required" != "true" ]; then
-        error "services.json: '$_name' platform '$_platform' missing required fields for type '$_type'"
+        error "services.json: '$_name' host '$_host' missing required fields for type '$_type'"
         _svc_errors=$((_svc_errors + 1))
       fi
     done < <(jq -r '
       to_entries[] | select(.value | type == "object") | select(.key | startswith("$") | not) |
       .key as $name |
-      (.value.platforms // {}) | to_entries[] |
+      (.value.hosts // {}) | to_entries[] |
       [
         $name,
         .key,
         (.value.type // "missing"),
+        (.value.platform // "missing"),
         (
           if .value.type == "launchctl" then (.value.service | type == "string" and length > 0)
           elif .value.type == "systemctl" then (.value.service | type == "string" and length > 0)
@@ -74,16 +82,16 @@ run_14_service_registry() {
       ] | @tsv' "$_svc_json")
   fi
 
-  # Validate user-scoped platform entries have justification.
-  while IFS=$'\t' read -r _name _platform _domain_scope _value; do
+  # Validate user-scoped host entries have justification.
+  while IFS=$'\t' read -r _name _host _domain_scope _value; do
     if [ "$_domain_scope" = "user" ] && { [ "$_value" = "null" ] || [ -z "$_value" ]; }; then
-      error "services.json: '$_name' platform '$_platform' is user-scoped but missing justification"
+      error "services.json: '$_name' host '$_host' is user-scoped but missing justification"
       _svc_errors=$((_svc_errors + 1))
     fi
   done < <(jq -r '
     to_entries[] | select(.value | type == "object") | select(.key | startswith("$") | not) |
     .key as $name |
-    (.value.platforms // {}) | to_entries[] |
+    (.value.hosts // {}) | to_entries[] |
     [
       $name,
       .key,

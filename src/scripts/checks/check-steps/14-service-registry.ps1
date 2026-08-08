@@ -22,45 +22,49 @@ Register-Step -Id "service-registry" -Number 14 -Name "Service registry validati
       Write-ErrorMessage "services.json: '$svcName' missing displayName"
       $svcErrors++
     }
-    if (-not $entry.ContainsKey('platforms') -or $entry.platforms.Count -eq 0) {
-      Write-ErrorMessage "services.json: '$svcName' missing or empty platforms"
+    if (-not $entry.ContainsKey('hosts') -or $entry.hosts.Count -eq 0) {
+      Write-ErrorMessage "services.json: '$svcName' missing or empty hosts"
       $svcErrors++
     } else {
-      foreach ($plat in $entry.platforms.Keys) {
-        $pEntry = $entry.platforms[$plat]
-        $type = $pEntry.type
+      foreach ($hostName in $entry.hosts.Keys) {
+        $hEntry = $entry.hosts[$hostName]
+        $type = $hEntry.type
         if ($type -notin @('launchctl', 'systemctl', 'native', 'schtask', 'omitted')) {
-          Write-ErrorMessage "services.json: '$svcName' platform '$plat' has invalid type '$type'"
+          Write-ErrorMessage "services.json: '$svcName' host '$hostName' has invalid type '$type'"
+          $svcErrors++
+        }
+        if ($hEntry.platform -notin @('macOS', 'NixOS', 'Windows')) {
+          Write-ErrorMessage "services.json: '$svcName' host '$hostName' has invalid platform '$($hEntry.platform)'"
           $svcErrors++
         }
         $hasRequired = switch ($type) {
-          'launchctl' { -not [string]::IsNullOrEmpty($pEntry.service) }
-          'systemctl' { -not [string]::IsNullOrEmpty($pEntry.service) }
-          'native' { -not [string]::IsNullOrEmpty($pEntry.service) }
-          'schtask' { -not [string]::IsNullOrEmpty($pEntry.taskPath) }
-          'omitted' { -not [string]::IsNullOrEmpty($pEntry.justification) }
+          'launchctl' { -not [string]::IsNullOrEmpty($hEntry.service) }
+          'systemctl' { -not [string]::IsNullOrEmpty($hEntry.service) }
+          'native' { -not [string]::IsNullOrEmpty($hEntry.service) }
+          'schtask' { -not [string]::IsNullOrEmpty($hEntry.taskPath) }
+          'omitted' { -not [string]::IsNullOrEmpty($hEntry.justification) }
           default { $false }
         }
         if (-not $hasRequired) {
-          Write-ErrorMessage "services.json: '$svcName' platform '$plat' missing required fields for type '$type'"
+          Write-ErrorMessage "services.json: '$svcName' host '$hostName' missing required fields for type '$type'"
           $svcErrors++
         }
       }
     }
   }
 
-  # Validate user-scoped platform entries have justification.
+  # Validate user-scoped host entries have justification.
   foreach ($svcName in $svc.Keys) {
     if ($svcName -like '$*') { continue }
     $entry = $svc[$svcName]
     if ($entry -isnot [hashtable]) { continue }
-    if ($entry.ContainsKey('platforms')) {
-      foreach ($plat in $entry.platforms.Keys) {
-        $pEntry = $entry.platforms[$plat]
-        $domainScope = if ($pEntry.ContainsKey('domain')) { $pEntry.domain } elseif ($pEntry.ContainsKey('scope')) { $pEntry.scope } else { $null }
-        $hasJustification = $pEntry.ContainsKey('justification') -and -not [string]::IsNullOrEmpty($pEntry.justification)
+    if ($entry.ContainsKey('hosts')) {
+      foreach ($hostName in $entry.hosts.Keys) {
+        $hEntry = $entry.hosts[$hostName]
+        $domainScope = if ($hEntry.ContainsKey('domain')) { $hEntry.domain } elseif ($hEntry.ContainsKey('scope')) { $hEntry.scope } else { $null }
+        $hasJustification = $hEntry.ContainsKey('justification') -and -not [string]::IsNullOrEmpty($hEntry.justification)
         if ($domainScope -eq 'user' -and -not $hasJustification) {
-          Write-ErrorMessage "services.json: '$svcName' platform '$plat' is user-scoped but missing justification"
+          Write-ErrorMessage "services.json: '$svcName' host '$hostName' is user-scoped but missing justification"
           $svcErrors++
         }
       }

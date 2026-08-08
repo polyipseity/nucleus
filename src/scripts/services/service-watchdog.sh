@@ -94,8 +94,7 @@ fi
 HOST="$(resolve_nucleus_host)"
 
 case "$HOST" in
-  MacBook) PLATFORM="macos" ;;
-  NixOS)   PLATFORM="nixos" ;;
+  MacBook|NixOS) ;;
   *)
     # Windows watchdog is handled by service-watchdog.ps1; exit silently.
     exit 0
@@ -104,17 +103,17 @@ esac
 
 require_command jq
 
-# Read services for this platform, excluding socket-activated and prefix-match.
+# Read services for this host, excluding socket-activated and prefix-match.
 read_watchdog_services() {
-  jq -c --arg platform "$PLATFORM" '
+  jq -c --arg host "$HOST" '
     to_entries[]
     | select(.value | type == "object")
-    | select(.value.platforms | has($platform))
-    | select(.value.platforms[$platform].type != "omitted")
-    | select(.value.platforms[$platform].socketActivated // false | not)
-    | select(.value.platforms[$platform].prefixMatch // false | not)
+    | select(.value.hosts | has($host))
+    | select(.value.hosts[$host].type != "omitted")
+    | select(.value.hosts[$host].socketActivated // false | not)
+    | select(.value.hosts[$host].prefixMatch // false | not)
     | select(.key != "service-watchdog")
-    | {key: .key, displayName: .value.displayName, platform: .value.platforms[$platform]}
+    | {key: .key, displayName: .value.displayName, hostEntry: .value.hosts[$host]}
   ' "$SERVICES_JSON"
 }
 
@@ -240,15 +239,15 @@ _run_watchdog_iteration() {
 
     # If --domain was specified, skip services that don't match.
     if [ -n "$watchdog_domain" ]; then
-      svc_domain=$(echo "$entry" | jq -r '.platform.domain // "user"')
+      svc_domain=$(echo "$entry" | jq -r '.hostEntry.domain // "user"')
       if [ "$svc_domain" != "$watchdog_domain" ]; then
         continue
       fi
     fi
 
-    case "$PLATFORM" in
-      macos) check_service_macos "$key" "$(echo "$entry" | jq -c '.platform')" ;;
-      nixos) check_service_nixos "$key" "$(echo "$entry" | jq -c '.platform')" ;;
+    case "$HOST" in
+      MacBook) check_service_macos "$key" "$(echo "$entry" | jq -c '.hostEntry')" ;;
+      NixOS) check_service_nixos "$key" "$(echo "$entry" | jq -c '.hostEntry')" ;;
     esac
   done < <(read_watchdog_services)
 }

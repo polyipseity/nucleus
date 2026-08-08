@@ -12,7 +12,7 @@
 let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   linuxServices = lib.filterAttrs (
-    _: svc: svc ? platforms.nixos && svc.platforms.nixos ? type && svc.platforms.nixos.type != "omitted"
+    _: svc: svc ? hosts.NixOS && svc.hosts.NixOS ? type && svc.hosts.NixOS.type != "omitted"
   ) servicesJSON;
   linuxSystemLogDirs = lib.unique (
     lib.flatten (lib.mapAttrsToList (_: svc: svc.logging.dirs.system or [ ]) linuxServices)
