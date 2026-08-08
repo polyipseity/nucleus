@@ -52,6 +52,10 @@ function Invoke-ReplicaSync {
   }
 
   $resolvedRepoRoot = (Resolve-Path -Path $RepoRoot).Path
+  if ([string]::IsNullOrWhiteSpace($env:NUCLEUS_REPO_ROOT)) {
+    $env:NUCLEUS_REPO_ROOT = $resolvedRepoRoot
+  }
+  . (Join-Path -Path $resolvedRepoRoot -ChildPath 'src\hosts\Windows\modules\Get-NucleusHostPlatform.ps1')
   $loadUserRegistryScript = Join-Path -Path $resolvedRepoRoot -ChildPath "src\hosts\Windows\modules\Load-UserRegistry.ps1"
   if (-not (Test-Path -Path $loadUserRegistryScript -PathType Leaf)) {
     throw "replica-sync: user registry loader not found at '$loadUserRegistryScript'."
@@ -74,7 +78,7 @@ function Invoke-ReplicaSync {
   }
 
   $usersRegistry = & $loadUserRegistryScript -RepoRoot $resolvedRepoRoot
-  $isWindowsHost = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::Windows)
+  $isWindowsHost = (Get-NucleusHostKey) -eq 'Windows'
   # check-suppress:suppression_doc: probe -- icacls may not be available on non-Windows hosts; $null check handles absence.
   $icaclsCmd = Get-Command -Name "icacls" -ErrorAction SilentlyContinue
   # check-suppress:suppression_doc: probe -- attrib may not be available on non-Windows hosts; $null check handles absence.

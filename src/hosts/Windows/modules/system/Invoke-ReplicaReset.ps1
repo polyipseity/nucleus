@@ -43,9 +43,14 @@ function Invoke-ReplicaReset {
   )
 
   $ErrorActionPreference = "Stop"
-  $isMacOSHost = [System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([System.Runtime.InteropServices.OSPlatform]::OSX)
 
   $resolvedRepoRoot = (Resolve-Path -Path $RepoRoot).Path
+  if ([string]::IsNullOrWhiteSpace($env:NUCLEUS_REPO_ROOT)) {
+    $env:NUCLEUS_REPO_ROOT = $resolvedRepoRoot
+  }
+  . (Join-Path -Path $resolvedRepoRoot -ChildPath 'src\hosts\Windows\modules\Get-NucleusHostPlatform.ps1')
+  $isMacOSHost = (Get-NucleusHostKey) -eq 'MacBook'
+
   $loadUserRegistryScript = Join-Path -Path $resolvedRepoRoot -ChildPath "src\hosts\Windows\modules\Load-UserRegistry.ps1"
   if (-not (Test-Path -Path $loadUserRegistryScript -PathType Leaf)) {
     throw "replica-reset: user registry loader not found at '$loadUserRegistryScript'."
