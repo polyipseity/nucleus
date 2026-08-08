@@ -339,10 +339,9 @@
       vsCodeMarketplaceMac = nix-vscode-extensions.extensions.${systems.mac}.vscode-marketplace;
       vsCodeMarketplaceLinux = nix-vscode-extensions.extensions.${systems.linux}.vscode-marketplace;
 
-      # Unified shell app builder. Uses script-tree for src/scripts/ and
-      # scripts-bundle for scripts/ (user CLIs). Creates a thin wrapper at
-      # $out/bin/nucleus-${name} that sets PATH from runtimeInputs and execs
-      # the real script via repo-root-relative path resolution.
+      # Unified shell app builder. Uses script-tree for repo-root-relative script
+      # paths (src/scripts/, src/platforms/, src/hosts/) and scripts-bundle for
+      # scripts/ (user CLIs). Creates a thin wrapper at $out/bin/nucleus-${name}
       writeNucleusShellApplication =
         pkgs:
         {
@@ -362,12 +361,10 @@
             scriptTree = thisScriptTree;
           };
           singleScriptSource =
-            if lib.hasPrefix "src/scripts/" scriptName then
-              "${thisScriptTree}/${scriptName}.sh"
-            else if lib.hasPrefix "scripts/" scriptName then
+            if lib.hasPrefix "scripts/" scriptName then
               "${thisScriptsBundle}/${scriptName}.sh"
             else
-              throw "writeNucleusShellApplication ${name}: scriptName must start with scripts/ or src/scripts/, got ${scriptName}";
+              "${thisScriptTree}/${scriptName}.sh";
         in
         pkgs.runCommand "${name}-nucleus-app"
           {
