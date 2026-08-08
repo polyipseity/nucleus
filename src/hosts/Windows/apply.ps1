@@ -49,8 +49,8 @@
   Array of usernames to configure. Mandatory: each user in this list gets
   their secrets materialized, SSH keys adopted, and home directory state
   converged. Callers must explicitly pass this list so they are aware of
-  which user profiles will be modified. The first user in the list is used
-  for secrets materialization.
+  which user profiles will be modified. The current Windows session user must
+  appear in this list for user-state parity steps.
   Example: -Users @('admin', 'guest')
 
   Note: For full multi-user support where each user gets their own secrets,
@@ -145,9 +145,8 @@
 
 .PARAMETER EnableDevReposParity
   Enable provisioning of development repositories (nucleus symlink, monorepo,
-  and monorepo-private) in %USERPROFILE%\dev. Defaults to enabled for
-  polyipseity, disabled for other users. Each user can provision their own
-  repos using their GitHub username via the Home Manager dev-repos module.
+  and monorepo-private) in %USERPROFILE%\dev. Defaults to enabled when the
+  current user's devRepos.enable is true in the user registry.
   False skips provisioning without error.
 
 .PARAMETER EnableVsCodeWorkspaceTrustParity
@@ -250,8 +249,6 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-
-$primaryUser = $Users[0]
 
 # If -ParamsJson was provided (by self-elevation), deserialize all parameters
 # from the temp JSON file instead of from command-line arguments.
@@ -382,7 +379,6 @@ if (-not $Elevated) {
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-LogManagement.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Resolve-Executable.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Test-ArchivingStack.ps1")
-. (Join-Path -Path $resolvedModuleDir -ChildPath "Test-PrimaryUser.ps1")
 # secrets/: decryption, SOPS age key management, and secret materialization.
 # ConvertFrom-SshEd25519PublicKeyToAgePubKey must be loaded before any file that
 # calls it (Register-HostAgeKey, Invoke-SecretVerification).
@@ -469,7 +465,6 @@ if (Test-Path -Path $healthCheckScript) {
 # secondary). Validate that all users in -Users parameter are registered.
 $resolvedConfigDir = (Resolve-Path -Path $ConfigDir).Path
 $machineSshHostKeyPath = Join-Path -Path $env:ProgramData -ChildPath "ssh\ssh_host_ed25519_key"
-$primarySshKeyPath = Join-Path -Path $HOME -ChildPath ".ssh\ssh_personal_$primaryUser"
 
 # Resolve managed executables before running any decryption/materialization.
 # check-suppress:suppression_doc: probe -- SOPS WinGet package directory may not exist; $null check handles absence.
@@ -571,6 +566,16 @@ if (-not $userRegistry.primaryUser) {
   Write-Error "No primary user marked (isPrimary=true) in user registry" -ErrorAction Stop
   exit 1
 }
+
+$primaryUser = $userRegistry.primaryUser.name
+$sessionUser = [Environment]::UserName
+if ($Users -notcontains $sessionUser) {
+  Write-Error "apply: current user '$sessionUser' must be included in -Users ($($Users -join ', '))" -ErrorAction Stop
+  exit 1
+}
+$primarySshKeyPath = Join-Path -Path $userRegistry.primaryUser.homeDirectory -ChildPath ".ssh\ssh_personal_$primaryUser"
+$sessionUserRecord = @($userRegistry.users | Where-Object { $_.name -eq $sessionUser }) | Select-Object -First 1
+$sessionWallpaperOutputDir = Join-Path -Path $sessionUserRecord.homeDirectory -ChildPath "Pictures\wallpapers"
 # WHY: QtPass stores settings in platform-native stores (registry on Windows), so Method 1 (symlink) does not apply.
 # check-suppress:config-method: method 3 (merge) -- QtPass shared settings JSON source of truth shared with POSIX activation
 # check-suppress:config-method: method 3 (merge) -- Picard defaults INI merged via Sync-PicardConfig on Windows
@@ -622,6 +627,11 @@ if ($EnableHostAgeKeyRegistration) {
 
 if ($EnableSecretsParity) {
   foreach ($user in $Users) {
+    $userRecord = @($userRegistry.users | Where-Object { $_.name -eq $user }) | Select-Object -First 1
+    $targetSshKeyPath = Join-Path -Path $userRecord.homeDirectory -ChildPath ".ssh\ssh_personal_$user"
+    if (-not (Test-Path -Path $targetSshKeyPath -PathType Leaf)) {
+      $targetSshKeyPath = $primarySshKeyPath
+    }
     $syncUserSecretParams = @{
       RepoRoot    = $repoRoot
       GpgExe      = $gpgExe
@@ -629,8 +639,8 @@ if ($EnableSecretsParity) {
       SopsExe     = $sopsExe
       Username    = $user
     }
-    if (-not [string]::IsNullOrWhiteSpace($primarySshKeyPath)) {
-      $syncUserSecretParams['PrimarySshKeyPath'] = $primarySshKeyPath
+    if (-not [string]::IsNullOrWhiteSpace($targetSshKeyPath)) {
+      $syncUserSecretParams['SshKeyFallbackPath'] = $targetSshKeyPath
     }
     Sync-UserSecret @syncUserSecretParams
   }
@@ -671,20 +681,25 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
 
 # Materialize decrypted wallpapers ahead of DSC so user/wallpaper.dsc.yml can resolve an
 # explicit active wallpaper path deterministically.
-$wallpaperOutputDir = Join-Path -Path $HOME -ChildPath "Pictures\wallpapers"
 
 # Post-materialization health check: verify all SOPS files are decryptable by
 # both the GPG and personal SSH age backends, and that managed artefacts exist.
 # Mirrors the POSIX verify-secret-decryption Home Manager activation.
-Invoke-SecretVerification `
-  -GpgExe $gpgExe `
-  -HostKeyPath $machineSshHostKeyPath `
-  -Username $primaryUser `
-  -SecretsDir $secretsDir `
-  -RepoRoot $repoRoot
+foreach ($user in $Users) {
+  $userSecretFile = Join-Path -Path $secretsDir -ChildPath "users\$user.yml"
+  if (-not (Test-Path -Path $userSecretFile -PathType Leaf)) {
+    continue
+  }
+  Invoke-SecretVerification `
+    -GpgExe $gpgExe `
+    -HostKeyPath $machineSshHostKeyPath `
+    -Username $user `
+    -SecretsDir $secretsDir `
+    -RepoRoot $repoRoot
+}
 
 $activeWallpaperPath = Sync-WallpaperInventory -RepoRoot $repoRoot -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
-Remove-StaleWallpaper -RepoRoot $repoRoot -User $primaryUser -OutputDir $wallpaperOutputDir
+Remove-StaleWallpaper -RepoRoot $repoRoot -User $sessionUser -OutputDir $sessionWallpaperOutputDir
 
 # Generate locked DSC from lockfile before applying.
 $lockfilePath = Join-Path -Path $PSScriptRoot -ChildPath "..\..\lockfiles\lockfile.json"
@@ -729,7 +744,7 @@ wevtutil sl Application /ms:209715200 2>$null  # check-suppress:suppression_doc:
 # rustup toolchain management runs after WinGet DSC has installed Rustlang.Rustup.
 # Must run before Invoke-CargoBinstallSetup so the stable toolchain (and its
 # cargo binary) are available for compilation fallback.
-Invoke-RustupSetup -User $Users[0] -RepoRoot $repoRoot
+Invoke-RustupSetup -User $sessionUser -RepoRoot $repoRoot
 Invoke-ScoopSetup
 # cargo-binstall managed packages run after Invoke-ScoopSetup has installed
 # cargo-binstall from Scoop and prepended the shims directory to PATH.
@@ -792,11 +807,11 @@ if ($userDevRepos -and $userDevRepos.repositories) {
   }
 }
 
-Sync-AgentsConfig -RepoRoot $repoRoot -User $Users[0] -Enabled:$EnableAgentsConfigParity
+Sync-AgentsConfig -RepoRoot $repoRoot -User $sessionUser -Enabled:$EnableAgentsConfigParity
 Sync-AgentsSkillManifest -RepoRoot $repoRoot -Enabled:$EnableAgentsSkillsParity
 Sync-AgentsClawHubSkillManifest -RepoRoot $repoRoot -Enabled:$EnableAgentsClawHubSkillsParity
-Sync-CursorConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity -Username $Users[0]
-Sync-VSCodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity -Username $Users[0]
+Sync-CursorConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity -Username $sessionUser
+Sync-VSCodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity -Username $sessionUser
 Sync-VSCodeExtensionManifest -Enabled:$EnableVsCodeExtensionsParity
 Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
 Set-VSCodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
@@ -812,14 +827,14 @@ if ($null -eq $EnableDevReposParity) {
 # Keep dev repo provisioning after Git/SSH config so clones see the same
 # secret/key ordering across macOS, NixOS, and Windows.
 Sync-DevRepoCatalog -Enabled:$EnableDevReposParity -Repositories $devRepositories
-Sync-ShellProfile -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoot
+Sync-ShellProfile -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
 # check-suppress:config-method: method 1 (writable symlink) -- bun and uv configs symlinked to repo files.
-Sync-BunConfig -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoot
-Sync-UvConfig -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoot
-Sync-NextestConfig -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoot
+Sync-BunConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
+Sync-UvConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
+Sync-NextestConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
 # check-suppress:config-method: method 1 (writable symlink) -- direnvrc cross-platform base config.
-Sync-DirenvConfig -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoot
-Sync-StarshipConfig -Enabled:$EnableShellParity -User $Users[0] -RepoRoot $repoRoot
+Sync-DirenvConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
+Sync-StarshipConfig -Enabled:$EnableShellParity -User $sessionUser -RepoRoot $repoRoot
 if ($EnableCloudDrivesParity) {
   foreach ($userRecord in $selectedUserRecords) {
     Sync-CloudDriveCatalog -UserConfig $userRecord -HomeDirectory $userRecord.homeDirectory
@@ -836,7 +851,7 @@ Sync-SymlinkManifest -Enabled:$EnableSymlinkParity -UserRecords $selectedUserRec
   $discordMusicRPCConfigDir = Join-Path -Path $env:LOCALAPPDATA -ChildPath "discord-music-rpc"
   $null = New-Item -Path $discordMusicRPCConfigDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
   $discordMusicRPCConfig = Join-Path -Path $discordMusicRPCConfigDir -ChildPath "config.yaml"
-  $discordMusicRPCConfigSource = Resolve-UserConfigFile -User $Users[0] -ConfigName 'discord-music-rpc' -RelativePath 'config.yaml' -RepoRoot $repoRoot
+  $discordMusicRPCConfigSource = Resolve-UserConfigFile -User $sessionUser -ConfigName 'discord-music-rpc' -RelativePath 'config.yaml' -RepoRoot $repoRoot
   if (Test-Path -Path $discordMusicRPCConfig) { Remove-Item -Path $discordMusicRPCConfig -Force }
   New-Item -Path $discordMusicRPCConfig -ItemType SymbolicLink -Target $discordMusicRPCConfigSource -Force > $null
 Sync-DiscordMusicRPC -Enabled:$EnableDiscordMusicRPCParity
