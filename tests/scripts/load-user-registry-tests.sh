@@ -35,6 +35,17 @@ test_excludes_default_dir() {
   fi
 }
 
+test_merges_is_primary_and_primary_user() {
+  local registry
+  registry="$(run_loader MacBook)"
+  if [ "$(echo "$registry" | jq -r '.polyipseity.isPrimary')" = "true" ] \
+    && [ "$(echo "$registry" | jq -r '.primaryUser')" = "polyipseity" ]; then
+    assert_pass "merges isPrimary and exposes primaryUser"
+  else
+    assert_fail "merges isPrimary and exposes primaryUser" "unexpected isPrimary/primaryUser values"
+  fi
+}
+
 test_merges_vm_guest_secret_keys() {
   local registry
   registry="$(run_loader MacBook)"
@@ -91,6 +102,7 @@ main() {
 
   test_discovers_polyipseity
   test_excludes_default_dir
+  test_merges_is_primary_and_primary_user
   test_merges_vm_guest_secret_keys
   test_resolves_google_drive_replica_enable_per_host
   test_resolves_icloud_replica_readwrite_per_host

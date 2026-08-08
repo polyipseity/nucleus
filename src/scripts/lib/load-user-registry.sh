@@ -180,4 +180,9 @@ for _username in "$_users_root"/*; do
   _result="$(echo "$_result" | jq --arg name "$_name" --argjson user "$_user_json" '. + {($name): $user}')"
 done
 
+_result="$(echo "$_result" | jq '
+  ([keys[] as $k | select(.[$k].isPrimary == true) | $k]) as $primaries |
+  . + { primaryUser: (if ($primaries | length) == 1 then $primaries[0] else null end) }
+')"
+
 echo "$_result"

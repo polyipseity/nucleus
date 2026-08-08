@@ -49,11 +49,17 @@ let
     && containsRegex ''mkHomeManagerUsers "[^"]*" \./modules/home\.nix'' flakeText
   ) "Wallpaper module must be imported by all hosts";
 
-  # Test 7: Verify dev-repos module is imported for primary user only
-  test_dev_repos_primary_only = assert' (containsRegex "\./dev-repos\.nix" homeModuleText) "dev-repos should only apply to primary user";
+  # Test 7: Verify dev-repos module is imported in shared home.nix
+  test_dev_repos_imported_in_home = assert' (containsRegex "\./dev-repos\.nix" homeModuleText) "dev-repos module must be imported in shared home.nix";
 
-  # Test 8: Verify all hosts handle username derivation correctly
-  test_username_derivation = assert' (containsRegex "isPrimary" flakeText) "Username must be correctly derived from user registry";
+  # Test 8: Verify HM sops-nix applies to all managed users
+  test_sops_all_managed_users = assert' (
+    containsRegex "sops-nix\.homeManagerModules\.sops" flakeText
+    && !(containsRegex "if user\.isPrimary then sops-nix" flakeText)
+  ) "sops-nix must apply to all managed users, not only isPrimary";
+
+  # Test 9: Verify all hosts handle username derivation correctly
+  test_username_derivation = assert' (containsRegex "builtins\\.filter \\(name: users\\.\\$\\{name\\}\\.isPrimary\\)" flakeText) "Username must be correctly derived from user registry";
 
   # Test 9: Verify specialArgs are passed correctly to all modules
   test_special_args_passed = assert' (
@@ -108,7 +114,8 @@ let
     test_home_manager_embedded
     test_security_parity
     test_wallpaper_module_imported
-    test_dev_repos_primary_only
+    test_dev_repos_imported_in_home
+    test_sops_all_managed_users
     test_username_derivation
     test_special_args_passed
     test_config_merge_structure
