@@ -2,7 +2,7 @@
 
 ## Overview
 
-The suite validates configuration logic, module composition, package parity, shell entry scripts, and Windows source/contract tests. Nix tests live in `tests/modules/` and `tests/integration/`; MacBook host tests in `tests/hosts/MacBook/`; Windows Pester suites in `tests/hosts/Windows/`.
+The suite validates configuration logic, module composition, package parity, shell entry scripts, and Windows source/contract tests. Layout mirrors `src/`: cross-host Nix tests in `tests/modules/` and `tests/integration/`; host tests in `tests/hosts/<Host>/`; platform tests in `tests/platforms/<Platform>/` (Windows Pester under `tests/platforms/Windows/modules/`).
 
 ## Pipelines
 
