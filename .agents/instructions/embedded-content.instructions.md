@@ -40,8 +40,7 @@ Content with analogous semantics across platforms MUST be a single shared file, 
 - Placeholders are `__UPPER_SNAKE__` on ALL platforms. The `{{TOKEN}}` form is prohibited everywhere (including POSIX files).
 - Token completeness: every token in a shared content file MUST be replaced by every consumer, or have a documented default in the consumer.
 - Registry of tokens per file lives with the file (header comment listing its tokens).
-- Comments must never contain `__UPPER_SNAKE__`-delimited names — check step 20 (`20-activation-token-placeholder`) greps `^\s*#.*__[A-Z][A-Z_]*__` and in scoped mode scans staged `*.sh`/`*.zsh` including `tests/` and `src/vms/templates/*.sh`. Refer to placeholders without delimiters (`start-<VM_NAME>.sh` style).
-- Grep gate: `\{\{[A-Za-z_]` must return zero matches across tracked files.
+- Comments must never contain `__UPPER_SNAKE__`-delimited names — check step 16 (`16-activation-token-placeholder`) greps `^\s*#.*__[A-Z][A-Z_]*__` and in scoped mode scans staged `*.sh`/`*.zsh` including `tests/` and `src/vms/templates/*.sh`. Refer to placeholders without delimiters (`start-<VM_NAME>.sh` style).
 
 ## Exceptions
 

@@ -1,5 +1,18 @@
 Register-Step -Id "nix-tests" -Number 1 -Name "Nix test suite" -Action {
-  param()
+  param($RepoRoot)
+
+  $lib = Join-Path -Path $RepoRoot -ChildPath 'src/scripts/lib/nix-test-eval.ps1'
+  . $lib
+  try {
+    Invoke-NixTestEval -HasArgs $false -RepoRoot $RepoRoot | Out-Null
+  } catch {
+    return 1
+  }
+
+  $testScript = Join-Path -Path $RepoRoot -ChildPath 'tests/scripts/check-steps/24-nix-test-eval-tests.ps1'
+  & $testScript
+  if ($LASTEXITCODE -ne 0) { return 1 }
+
   Write-Message "skipping (requires Nix toolchain — not available on Windows)."
   return 2
 }

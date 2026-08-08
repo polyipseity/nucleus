@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Functional regression test for step 17 (suppression audit).
+# Functional regression test for step 13 (suppression audit).
 # Verifies the grep pipeline and the bare '|| true' detection distinguish
 # documented from undocumented suppressions. Runs in <1s with no external
 # dependencies beyond POSIX tools.
@@ -10,7 +10,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 
-# Replicates the core grep pipeline from step 17:
+# Replicates the core grep pipeline from step 13:
 #   grep -Hn -E "shellcheck disable=|check-suppress:" "$file" # suppression_doc: test file documents the pipeline
 #     | grep -v -E "reason:|suppression_doc:"
 #     | sed "s/^/undoc_supp:/"
@@ -109,7 +109,7 @@ test_self_referencing_grep_pattern_with_reason_not_flagged() {
     rm -f "$tmpfile"
 }
 
-# Replicates the bare '|| true' detection pass from step 17 (sh twin): flags a
+# Replicates the bare '|| true' detection pass from step 13 (sh twin): flags a
 # bare '|| true' unless documented by '# check-suppress:suppression_doc:' on the
 # same or preceding line. Comment-only lines are skipped. The tests/ exemption is
 # the caller's path guard, replicated by _s17_is_exempt.
@@ -243,7 +243,7 @@ test_no_suppressions_passes() {
 
 # ---- Run tests ----
 echo ""
-echo "Testing suppression audit (step 17) grep pipeline..."
+echo "Testing suppression audit (step 13) grep pipeline..."
 echo ""
 
 test_undocumented_shellcheck_suppression_fails

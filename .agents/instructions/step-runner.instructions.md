@@ -1,5 +1,5 @@
 ---
-description: "Use when implementing or modifying the step-runner framework used by the check and test pipelines. Covers step registration, --skip-steps semantics, removed flags, skip message format, PS1 parallelism, and step 13 $schema enforcement."
+description: "Use when implementing or modifying the step-runner framework used by the check and test pipelines. Covers step registration, --skip-steps semantics, removed flags, skip message format, PS1 parallelism, and step 9 $schema enforcement."
 name: "Step-Runner Framework"
 applyTo: "src/scripts/lib/step-runner.sh, src/scripts/lib/step-runner.ps1, scripts/check.sh, scripts/check.ps1, scripts/test.sh, scripts/test.ps1, tests/scripts/**"
 ---
@@ -164,10 +164,10 @@ Cross-platform equivalence:
   - No step on either platform says "passed" when it didn't run any checks
 ```
 
-## Spec G: Step 13 `$schema` enforcement
+## Spec G: Step 9 `$schema` enforcement
 
 ```
-Step 13 validation rules:
+Step 9 validation rules:
   For every JSON and YAML file in scope (except exceptions):
 
   1. `$schema` presence check:
@@ -219,4 +219,4 @@ Step 13 validation rules:
 
 - `testing.instructions.md` — Test structure, CI integration, and validation patterns for the test pipeline.
 - `tooling-and-validation.instructions.md` — Repository tooling, build commands, and validation hooks.
-- `allow-and-deny-lists.instructions.md` — Step 13 EXCEPTION_LIST registry and exclude-list policy.
+- `allow-and-deny-lists.instructions.md` — Step 9 EXCEPTION_LIST registry and exclude-list policy.

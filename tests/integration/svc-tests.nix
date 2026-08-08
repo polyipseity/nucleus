@@ -7,8 +7,8 @@ let
   svcShText = builtins.readFile ../../scripts/svc.sh;
   svcPs1Text = builtins.readFile ../../scripts/svc.ps1;
   flakeText = builtins.readFile ../../src/flake.nix;
-  svcRegistryShText = builtins.readFile ../../src/scripts/checks/check-steps/14-service-registry.sh;
-  svcRegistryPs1Text = builtins.readFile ../../src/scripts/checks/check-steps/14-service-registry.ps1;
+  svcRegistryShText = builtins.readFile ../../src/scripts/checks/check-steps/10-service-registry.sh;
+  svcRegistryPs1Text = builtins.readFile ../../src/scripts/checks/check-steps/10-service-registry.ps1;
   windowsShellProfileText = builtins.readFile ../../src/scripts/shell/profile.ps1;
 
   # Parsed services.json for structural assertions

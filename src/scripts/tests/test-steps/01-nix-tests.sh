@@ -11,6 +11,21 @@ run_01_nix_tests() {
 
   _tmp_failed=$(mktemp) || { error "failed to create temp file"; return 1; }
 
+  # shellcheck source=../../lib/nix-test-eval.sh
+  . "$_repo_root/src/scripts/lib/nix-test-eval.sh"
+  if ! run_nix_test_eval false "$_repo_root"; then
+    _exit_code=1
+  fi
+
+  if [ "$_exit_code" -eq 0 ]; then
+    bash "$_repo_root/tests/scripts/check-steps/24-nix-test-eval-tests.sh" || _exit_code=1
+  fi
+
+  if [ "$_exit_code" -ne 0 ]; then
+    rm -f "$_tmp_failed"
+    return "$_exit_code"
+  fi
+
   # WHY: nix-instantiate evals contend on the shared SQLite eval cache when
   # test steps 1/3/4 run concurrently; hold the nix lock for the whole eval
   # phase so cross-step nix invocations serialize (internal xargs -P

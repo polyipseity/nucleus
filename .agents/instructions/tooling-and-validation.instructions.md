@@ -54,24 +54,24 @@ Choose the right vehicle:
 
 ### Check script structure
 
-- Both `scripts/check.sh` (POSIX) and `scripts/check.ps1` (Windows) organize check steps into five groups. Step numbers follow the `src/scripts/checks/check-steps/<nn>-*.sh|.ps1` file names — that file list is the source of truth:
+- Both `scripts/check.sh` (POSIX) and `scripts/check.ps1` (Windows) organize check steps into groups. Step numbers follow the `src/scripts/checks/check-steps/<nn>-*.sh|.ps1` file names — that file list is the source of truth (18 steps):
   - **Toolchain checks** (1-3): Shell script formatting/linting (treefmt), PowerShell syntax, Packer templates.
-  - **Nix checks** (4-6): Flake evaluation, nix lint (nixf-tidy), stale Nix build artifacts.
-  - **Test suites** (7-10): Shell validation, CWD independence, nix search path, port utilities.
-  - **Data integrity** (11-14): Lockfile validation, locked DSC validation, schema validation, service registry.
-  - **Policy/verification** (15-23): YAML structural, package manager enforcement, error suppression, online determinism, config method compliance, activation token placeholder, preflight install-command policy, embedded-content enforcement, legacy token syntax.
-- On Windows (check.ps1), steps 1, 4-6, 8-11 are stubs (POSIX/Nix-only tools).
+  - **Nix checks** (4-5): Flake evaluation, nix lint (nixf-tidy).
+  - **Test suites** (6): Shell validation.
+  - **Data integrity** (7-10): Lockfile validation, locked DSC validation, schema validation, service registry.
+  - **Policy/verification** (11-18): YAML structural, package manager enforcement, error suppression, online determinism, config method compliance, activation token placeholder, preflight install-command policy, embedded-content enforcement.
+- On Windows (check.ps1), steps 1, 4-5 are stubs (POSIX/Nix-only tools).
 - Pre-flight tool validation runs at the start of both scripts (before `$_step=0`). On POSIX this uses `require_command` from `src/scripts/lib.sh`; on Windows it uses `Ensure-Tool` from `src/hosts/Windows/modules/Ensure-Tool.psm1`.
-- Tool provisioning is handled by `nucleus-apply` (POSIX: `home.packages` in `src/modules/core.nix`; Windows: WinGet DSC). The pre-flight block is a safety net only — `nix profile install` and similar ad-hoc provisioning are banned.
-- When adding new tools to the check suite, add them to both: (a) the pre-flight block, and (b) `src/modules/core.nix` (POSIX) or WinGet DSC (Windows).
+- **Provisioning and preflight are separate:** provisioning (`nucleus-bootstrap`, `nucleus-apply`, `lockfile.json` pwsh modules, `core.nix`, WinGet DSC) installs tools; preflight only verifies presence and hard-fails if missing. Never install tools inside check/test preflight blocks.
+- When adding new tools to the check suite, add them to both: (a) the pre-flight block, and (b) provisioning (`src/modules/core.nix` / WinGet DSC / `lockfile.json` pwsh section / bootstrap).
 
 ### Check mode taxonomy
 
 Checks in both `scripts/check.sh` and `scripts/check.ps1` are classified into three categories:
 
-- **Always-run checks**: These cannot meaningfully accept path filtering — they validate whole-repo invariants. They execute unconditionally in both `--full` and `--scoped` modes, with no `$HAS_ARGS` guard. Examples: stale Nix build artifacts (step 6), test suites (steps 7-10), locked DSC validation (step 12), service registry validation (step 14), config method compliance (step 19).
-- **Conditional checks**: These run only when certain file types are present in the changed set (scoped mode), or always in `--full` mode. Examples: Nix flake evaluation (step 4 — in `--full` mode it always evaluates the flake; in `--scoped` mode only when .nix files are in scope), lockfile validation (step 11, matches `*/lockfile.json`/`*/lifecycle-allowlist.json`), package manager enforcement (step 16, matches `*.sh|*.ps1|*.nix`).
-- **Path-scopable checks**: These operate per-file or per-file-type and accept path filtering in `--scoped` mode. They produce valid results when given only the changed file subset. Examples: Shell script formatting/linting (step 1), PowerShell syntax (step 2), Packer validation (step 3), Nix lint/nixf-tidy (step 5), schema validation (step 13), YAML structural validation (step 15), undocumented error suppression (step 17), activation token placeholder (step 20).
+- **Always-run checks**: These cannot meaningfully accept path filtering — they validate whole-repo invariants. They execute unconditionally in both `--full` and `--scoped` modes, with no `$HAS_ARGS` guard. Examples: shell validation (step 6), locked DSC validation (step 8), service registry validation (step 10), config method compliance (step 15).
+- **Conditional checks**: These run only when certain file types are present in the changed set (scoped mode), or always in `--full` mode. Examples: Nix flake evaluation (step 4 — in `--full` mode it always evaluates the flake; in `--scoped` mode only when .nix files are in scope), lockfile validation (step 7, matches `*/lockfile.json`/`*/lifecycle-allowlist.json`), package manager enforcement (step 12, matches `*.sh|*.ps1|*.nix`).
+- **Path-scopable checks**: These operate per-file or per-file-type and accept path filtering in `--scoped` mode. They produce valid results when given only the changed file subset. Examples: Shell script formatting/linting (step 1), PowerShell syntax (step 2), Packer validation (step 3), Nix lint/nixf-tidy (step 5), schema validation (step 9), YAML structural validation (step 11), undocumented error suppression (step 13), activation token placeholder (step 16).
 
 **Source of truth**: The check-step file names under `src/scripts/checks/check-steps/` and their header docstrings are the canonical step-by-step reference. Update both check scripts when changing the taxonomy.
 
@@ -79,11 +79,11 @@ Checks in both `scripts/check.sh` and `scripts/check.ps1` are classified into th
 
 Check steps receive scoped file sets when prek passes staged files as args:
 
-- **POSIX**: step functions receive `$1=_has_args`, `$2=_repo_root`, remaining args = scoped files. Scoped skip pattern (steps 11, 16): loop the scoped files for a type match; if none, print `==== N: Name ==== SKIPPED (no X files to check)` and `return 0`.
+- **POSIX**: step functions receive `$1=_has_args`, `$2=_repo_root`, remaining args = scoped files. Scoped skip pattern (steps 7, 12): loop the scoped files for a type match; if none, print `==== N: Name ==== SKIPPED (no X files to check)` and `return 0`.
 - **PowerShell**: steps are splatted with named params `param($HasArgs, $RepoRoot, $PositionalArgs)` (step-runner.ps1). Skip check: count matching `$PositionalArgs`; if none, emit `... SKIPPED ...` and `return $true`.
-- **Scoped-mode `$null` trap**: building a scoped file list as an if-EXPRESSION pipeline-enumerates branch output — an empty scoped list enumerates away to `$null`, so `.Count` throws under StrictMode (steps 21/22 hit this). Wrap the whole outer if-expression in `@(...)` (e.g. `$ps1Files = @(if ($HasArgs) {...} else {...})`) with a `# WHY:` comment.
+- **Scoped-mode `$null` trap**: building a scoped file list as an if-EXPRESSION pipeline-enumerates branch output — an empty scoped list enumerates away to `$null`, so `.Count` throws under StrictMode (steps 17/18 hit this). Wrap the whole outer if-expression in `@(...)` (e.g. `$ps1Files = @(if ($HasArgs) {...} else {...})`) with a `# WHY:` comment.
 - Per-step explicit-skip tests live in `tests/scripts/check-steps/<nn>-<step>-explicit-skip.sh|.ps1`, wired into `05-framework-verification.sh|.ps1` in numeric order. `.sh` tests may source the real step file and invoke `run_NN_* true "$REPO_ROOT" <file>` to assert SKIPPED behavior (grep-based assertions, `# shellcheck disable=SC2016` for literal patterns). New `.sh` tests `chmod +x`; `.ps1` stay `644`.
-- End-to-end scoped check: `scripts/check.sh README.md` → steps 11+16 SKIP, exit 0; `scripts/check.sh src/modules/core.nix` → step 16 runs its scan, exit 0.
+- End-to-end scoped check: `scripts/check.sh README.md` → steps 7+12 SKIP, exit 0; `scripts/check.sh src/modules/core.nix` → step 12 runs its scan, exit 0.
 
 - For every detected stack, document what to run and where commands are defined.
 - **Nix check-and-format (pre-commit hook)**: `check.sh` accepts `--format` to auto-fix Nix files (treefmt runs nixfmt-rfc-style for Nix formatting when invoked in-place). The flag is passed by `prek-hooks.py` when `args = ["--format"]` in `prek.toml`. `treefmt` on PATH for pre-commit comes from the flake `mkTreefmtWrapper` via `bootstrap-deps` (pre-apply) and `core.nix` `sharedPackages` (post-apply); `mkCheckApp` also bundles the same wrapper in runtimeInputs. No separate `format-nix` hook exists.

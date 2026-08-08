@@ -45,4 +45,4 @@ applyTo: "src/modules/**/*.json, src/modules/**/*.nix, scripts/**/*.{sh,ps1}, sr
 
 ## Audit
 
-Full usage matrix, per-surface inventory, grep patterns, and PASS/WARN/VIOLATION rules: [`host-platform-audit.instructions.md`](host-platform-audit.instructions.md). Automated by check step 27 (`host-platform-audit`).
+Host vs platform vs implementation naming is enforced by service-registry validation (check step 10) and documented in this file.
