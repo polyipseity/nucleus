@@ -34,7 +34,7 @@ Provisioning host (`hosts[]`, `NUCLEUS_HOST`: `MacBook`, `NixOS`, `Windows`) is 
 ## Naming conventions in code
 
 - Locals/parameters holding manifest `id`: `vm_id`, `$vmId`, `-VmId` — not `vm_name` / `$vmName` / `-VmName`.
-- Functions returning lists of manifest `id`: `vm_get_manifest_vm_ids`, `vm_get_expected_vm_ids`, `vm_get_running_ids`, `Get-VMRunningIds` — not `*names*`.
+- Functions returning lists of manifest `id`: `vm_get_manifest_vm_ids`, `vm_get_expected_vm_ids`, `vm_get_running_ids`, `Get-VMRunningIdList`, `Get-VMRunningProcessNameList` — not `*names*`.
 - Path helpers: `vm_descriptor_path VM_ID`, `vm_vm_json VM_ID`.
 
 ## Path layout
