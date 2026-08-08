@@ -18,6 +18,16 @@ The suite validates configuration logic, module composition, package parity, she
 - Preflight: `Assert-ToolAvailable Pester` in `test-lib.ps1` (separate from provisioning).
 - CI: Windows job runs `bootstrap.ps1`, installs Nix for env-parity manifest materialization, then `test.ps1`.
 
+## Metrics
+
+| Metric | Before | After |
+| ------ | ------ | ----- |
+| Check steps | 27 | 18 |
+| Test orchestrator | 5 | 5 POSIX / 6 Windows |
+| Nix test files | 75 | 24 |
+| `tests/scripts` shell tests | 64 | ~18 (after orphan cleanup) |
+| Windows Pester | 31 | 15 |
+
 ## Provisioning vs preflight
 
 Provisioning installs tools; preflight verifies they exist before check/test runs. Repo-managed tools (Pester, PSScriptAnalyzer, `powershell-yaml`) still require preflight declaration. See `tool-availability.instructions.md`.

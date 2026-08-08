@@ -82,7 +82,6 @@ Check steps receive scoped file sets when prek passes staged files as args:
 - **POSIX**: step functions receive `$1=_has_args`, `$2=_repo_root`, remaining args = scoped files. Scoped skip pattern (steps 7, 12): loop the scoped files for a type match; if none, print `==== N: Name ==== SKIPPED (no X files to check)` and `return 0`.
 - **PowerShell**: steps are splatted with named params `param($HasArgs, $RepoRoot, $PositionalArgs)` (step-runner.ps1). Skip check: count matching `$PositionalArgs`; if none, emit `... SKIPPED ...` and `return $true`.
 - **Scoped-mode `$null` trap**: building a scoped file list as an if-EXPRESSION pipeline-enumerates branch output — an empty scoped list enumerates away to `$null`, so `.Count` throws under StrictMode (steps 17/18 hit this). Wrap the whole outer if-expression in `@(...)` (e.g. `$ps1Files = @(if ($HasArgs) {...} else {...})`) with a `# WHY:` comment.
-- Per-step explicit-skip tests live in `tests/scripts/check-steps/<nn>-<step>-explicit-skip.sh|.ps1`, wired into `05-framework-verification.sh|.ps1` in numeric order. `.sh` tests may source the real step file and invoke `run_NN_* true "$REPO_ROOT" <file>` to assert SKIPPED behavior (grep-based assertions, `# shellcheck disable=SC2016` for literal patterns). New `.sh` tests `chmod +x`; `.ps1` stay `644`.
 - End-to-end scoped check: `scripts/check.sh README.md` → steps 7+12 SKIP, exit 0; `scripts/check.sh src/modules/core.nix` → step 12 runs its scan, exit 0.
 
 - For every detected stack, document what to run and where commands are defined.

@@ -125,7 +125,7 @@ Prohibited patterns:
 - `success = true` with only counting references (`builtins.length allTests` or `all_tests`) — the tests are referenced for the count but never evaluated. Without the `deepSeq` wrapper the example above is exactly this silent no-op.
 - 1-arg `builtins.seq (builtins.deepSeq <tests>)` — a partial application (lambda) in WHNF; `seq` forces nothing. See "Deadnix-reported unused bindings" below for the correct 2-arg form.
 
-Check step 1 (`nix-test-eval` guard in `src/scripts/lib/nix-test-eval.sh`) enforces this before `nix-instantiate --eval --strict` runs in test step 1.
+Test step 1 (`nix-test-eval` guard in `src/scripts/lib/nix-test-eval.sh` / `src/scripts/lib/nix-test-eval.ps1`) enforces this before `nix-instantiate --eval --strict` runs.
 
 ### Layer 3: Module Import Validation
 
@@ -204,7 +204,7 @@ Describe "Security Settings" {
 Invoke-Pester -Path tests/hosts/Windows/ -Verbose
 
 # Run a single test file
-Invoke-Pester -Path tests/hosts/Windows/packages/package-installation.Tests.ps1
+Invoke-Pester -Path tests/hosts/Windows/config-method.Tests.ps1
 ```
 
 ### DSC Dry-Run Validation
@@ -245,7 +245,7 @@ Commit atomically: test + implementation in one commit.
 **Pester tests:**
 
 - `tests/hosts/Windows/<area>/<feature>.Tests.ps1` — tests for a feature or DSC resource group
-- Example: `tests/hosts/Windows/system/system-policy.Tests.ps1` for machine-scoped DSC invariants
+- Example: `tests/hosts/Windows/svc-windows.Tests.ps1` for machine-scoped DSC invariants
 
 ### Example patterns
 
@@ -265,12 +265,11 @@ Describe "Windows Package Installation" {
 
 Learned from authoring `tests/scripts/` check-step tests; applies to test scripts, not production code.
 
-- **Assert-Pass style, not Pester**: functional tests under `tests/scripts/check-steps/` (e.g. `17-suppression-audit-tests.ps1`) are plain `pwsh -NoProfile -File` scripts with explicit PASS/FAIL output — `Invoke-Pester` discovers 0 tests in them. Run them directly and check the exit code; they are wired into `05-framework-verification.ps1`.
+- **Assert-Pass style, not Pester**: functional tests under `tests/scripts/check-steps/` (e.g. `09-schema-validation-tests.ps1`) are plain `pwsh -NoProfile -File` scripts with explicit PASS/FAIL output — `Invoke-Pester` discovers 0 tests in them. Run them directly and check the exit code; they are wired into `05-framework-verification.ps1`.
 - **PowerShell gotchas**:
   - `exit` inside a function/script is NOT catchable by `try/catch` — `ExitException` propagates and kills the script. Tests of exit-based rejection must spawn a subprocess (`pwsh -NoProfile -Command $scriptText`) and check `$LASTEXITCODE` plus output.
   - `Write-ErrorMessage`/`Write-Message` are defined by `test-lib.ps1`, not `step-runner.ps1`. Tests asserting these are UNDEFINED (`CommandNotFoundException` catch) pass standalone but FAIL in-suite because test-lib defines them — and the test's `exit 1` really runs.
   - `& script.ps1` does NOT set `$LASTEXITCODE` (only native commands do); reading it before any native command throws under StrictMode.
-  - Explicit-skip test files reading `$script:failed` must initialize it (`$script:failed = $false`) after the `$testFile = ...` line or they crash under StrictMode when sourced in-suite.
   - `test.ps1` fail-fast kills the process before any summary — zero stdout. Use `--no-fail-fast` when debugging.
 - **Comment content in test files**:
   - Comments in test `.sh` files must NEVER contain `__TOKEN__`-delimited names — step 16 (`16-activation-token-placeholder`) greps `^\s*#.*__[A-Z][A-Z_]*__` and in scoped mode scans staged files including `tests/`. Refer to them as "double-underscore tokens" or `start-<VM_NAME>.sh` style.
