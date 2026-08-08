@@ -10,6 +10,21 @@ Default to parity-first changes: apply new capabilities to as many hosts as prac
 
 Avoid special-casing in module logic. When a feature requires per-host differences, refactor shared behavior into parameterized abstractions rather than adding `if-else` branches or duplicating files.
 
+## What parity means
+
+Parity means the same capability is available on every host where it is practical, with the same CLI surface (subcommands, flags, exit codes, error messages where feasible), the same declarative data (`*.json` + schema) as SSOT when applicable, the same host tooling provisioned per platform, and the same docs (`MANUAL.md` on all hosts) and tests (paired unit tests + Nix wiring).
+
+Parity does **not** mean delegating Windows work to bash, `sh`, or `.sh` scripts; byte-identical implementation files across platforms; or identical platform primitives (launchd vs systemd vs SCM) — those differences are documented exceptions with WHY.
+
+**Implementation pattern (default):**
+
+- POSIX (macOS + NixOS): bash in `scripts/*.sh` or `src/scripts/**/*.sh`
+- Windows: PowerShell in `scripts/*.ps1` or `src/hosts/Windows/modules/**/*.ps1`
+- Shared content in the same language: single file in `src/scripts/` per `embedded-content.instructions.md`
+- Windows prohibition: no `Invoke-NucleusRepoScript` with `.sh` paths; no `bash`/`sh` subprocess calls from Windows runtime code (`profile.ps1`, `vm.ps1`, `apply.ps1`, Windows modules)
+
+**Exception:** generated `.sh` wrappers in VM trees (`pack.sh`, `start-*.sh`) exist for cross-host folder copy — Windows runs `.ps1` twins locally; nucleus Windows code does not execute those `.sh` files.
+
 ## Feature scope triage
 
 For every new capability, evaluate all three hosts before coding:

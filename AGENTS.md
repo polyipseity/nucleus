@@ -115,7 +115,7 @@
 - Git scope terminology is canonical: "global" means machine-wide (`git --system`), "user" means per-user (`git --global`). Never use "global" for `--global`. See `.agents/instructions/git-scope-terminology.instructions.md`.
 - Keep POSIX shared behavior in shared modules, not duplicated per-host.
 - Centralize all daemon and service restarts per OS and restart each daemon at most once per activation run. macOS daemon refreshes go in `src/modules/macos/daemon-refresh.nix`; Windows SCM operations go in `src/hosts/Windows/modules/Set-NucleusService.ps1`; cross-platform shell helpers go in `src/scripts/lib.sh`.
-- Design for cross-host parity first; see `.agents/instructions/cross-host-feature-parity.instructions.md` for the full policy.
+- Design for cross-host parity first; see `.agents/instructions/cross-host-feature-parity.instructions.md` for the full policy. Parity means the same user-visible contract (CLI flags, behavior, provisioning, docs, tests) across MacBook, NixOS, and Windows — not running bash on Windows. Windows uses native PowerShell (`scripts/*.ps1`, `src/hosts/Windows/modules/*.ps1`); POSIX uses bash (`scripts/*.sh`, `src/scripts/**/*.sh`). Paired entry points (`foo.sh` + `foo.ps1`) or shared declarative data (`*.json` + schema) consumed by both sides are the default pattern.
 - All services use persistent-daemon semantics by default (auto-start + auto-restart). See `cross-host-feature-parity.instructions.md` (Service firing policy section) for the default policy and per-service classification.
 - Sort unordered lists/blocks alphabetically; preserve semantic/load order where required.
 - Service entry lists (currentNucleusAppBundles, currentNucleusWorkflows,

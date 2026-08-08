@@ -82,7 +82,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 When adding or renaming standalone PowerShell entry points, use PascalCase and an approved `Verb-Noun` form for the filename, for example `Get-SystemInventory.ps1` or `Backup-Database.ps1`.
 
-The `scripts/` directory is the exception: helper scripts there keep the paired shell basename so the `.sh` and `.ps1` entry points stay aligned. That means `bootstrap.sh` pairs with `bootstrap.ps1`, `check-sh.sh` pairs with `check-pwsh.ps1`, and the existing `check-pwsh.ps1` name is intentional because it checks PowerShell rather than shell.
+The `scripts/` directory is the exception: helper scripts there keep the paired shell basename so the `.sh` and `.ps1` entry points stay aligned. That means `bootstrap.sh` pairs with `bootstrap.ps1`, `check-sh.sh` pairs with `check-sh.ps1`, and `check-pwsh.ps1` is a separate entry point for PowerShell linting (PSScriptAnalyzer) — not the Windows twin of `check-sh.sh`.
 
 For reusable Windows modules under `src/hosts/Windows/modules/`, keep the file name aligned with the exported function name and prefer a single exported `Verb-Noun` function per file. If a module is renamed, update the dot-sourcing paths in `src/hosts/Windows/apply.ps1` in the same change. Collection-operating functions must use collection-indicating singular nouns — see [pwsh-lint-policy.instructions.md](pwsh-lint-policy.instructions.md) (`PSUseSingularNouns`, anti–naive-de-pluralization).
 
