@@ -147,7 +147,7 @@ PSSA flags plural nouns; the tempting fix is to drop the trailing `s`. That is *
 | Suffix | Use when | Examples |
 | ------ | -------- | -------- |
 | `*Manifest` | A manifest JSON file drives the item list | `Sync-SymlinkManifest`, `Sync-VSCodeExtensionManifest` |
-| `*Catalog` | Registry/domain arrays of entries (homogeneous or heterogeneous) | `Sync-DevRepoCatalog`, `Sync-CloudDriveCatalog`, `Sync-SecretCatalog` |
+| `*Catalog` | Registry/domain arrays of entries (homogeneous or heterogeneous) | `Sync-DevRepoCatalog`, `Sync-CloudDriveCatalog` |
 | `*Inventory` | Materialized asset set across users or files | `Sync-WallpaperInventory` |
 | `*Config` | Single app/config tree convergence | `Sync-AgentsConfig`, `Sync-CursorConfig` |
 | `*Service` | Single Windows service entity | `Sync-CaddyService`, `Sync-LiteLLMService` |
