@@ -20,6 +20,32 @@ run_26_host_os_naming() {
     _errors=$((_errors + 1))
   fi
 
+  # services.json host entries must not contain flag keys (flags live on platforms only)
+  if jq -e '
+    to_entries[]
+    | select(.key | startswith("$") | not)
+    | select(.value.hosts? // {} | length > 0)
+    | .value.hosts
+    | to_entries[]
+    | select(.value | has("flags") or has("darwin") or has("posix") or has("linux") or has("win32"))
+  ' src/modules/services.json >/dev/null 2>&1; then
+    error "services.json: host entries must not contain flags — use platform refs in host-platform-registry.json"
+    _errors=$((_errors + 1))
+  fi
+
+  # services.json host platform refs must match host-platform-registry.json
+  if jq -e --slurpfile reg src/modules/host-platform-registry.json '
+    ($reg[0].hosts) as $regHosts |
+    to_entries[]
+    | select(.key | startswith("$") | not)
+    | .value.hosts // {}
+    | to_entries[]
+    | select(.value.platform != $regHosts[.key].platform)
+  ' src/modules/services.json >/dev/null 2>&1; then
+    error "services.json: host platform ref does not match host-platform-registry.json"
+    _errors=$((_errors + 1))
+  fi
+
   # host-platform-registry hosts must not contain flags
   if jq -e '
     .hosts
