@@ -116,8 +116,12 @@ function Invoke-AISync {
   $env:OLLAMA_HOST = if ($svc.ollama.network.default) { "$($svc.ollama.network.default.host):$($svc.ollama.network.default.port)" } else { '127.0.0.1:11434' }
 
   # Determine the active model profile.  NUCLEUS_AI_SYNC_PROFILE env var overrides
-  # the default Windows profile, enabling cross-platform testing on Windows.
-  $profileName = if ($env:NUCLEUS_AI_SYNC_PROFILE) { $env:NUCLEUS_AI_SYNC_PROFILE } else { "Windows" }
+  # the resolved host key, enabling cross-platform testing on Windows.
+  if ([string]::IsNullOrWhiteSpace($env:NUCLEUS_REPO_ROOT)) {
+    $env:NUCLEUS_REPO_ROOT = $resolvedRepoRoot
+  }
+  . (Join-Path -Path $resolvedRepoRoot -ChildPath 'src\hosts\Windows\modules\Get-NucleusHostPlatform.ps1')
+  $profileName = if ($env:NUCLEUS_AI_SYNC_PROFILE) { $env:NUCLEUS_AI_SYNC_PROFILE } else { Get-NucleusHostKey }
 
   # check-suppress:suppression_doc: probe -- ollama may not be installed; $null check handles absence.
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue

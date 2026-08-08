@@ -83,6 +83,8 @@ if ($Help -or -not $Action) {
 # ---------------------------------------------------------------------------
 
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Get-Item $PSScriptRoot).Parent.FullName }
+if (-not $env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT = $RepoRoot }
+. (Join-Path $RepoRoot 'src\hosts\Windows\modules\Get-NucleusHostPlatform.ps1')
 $ModelsJson = Join-Path $RepoRoot "src\modules\ai\models.json"
 $ServicesJson = Join-Path $RepoRoot "src\modules\services.json"
 
@@ -160,10 +162,10 @@ function Invoke-AiStatus {
 
   # Read manifest
   $desiredCount = 0
-  $profileName = "Windows"
+  $profileName = Get-NucleusHostKey
   if (Test-Path -LiteralPath $ModelsJson) {
     $manifest = Get-Content -Raw -Path $ModelsJson | ConvertFrom-Json
-    $profileName = if ($env:NUCLEUS_AI_SYNC_PROFILE) { $env:NUCLEUS_AI_SYNC_PROFILE } else { "Windows" }
+    $profileName = if ($env:NUCLEUS_AI_SYNC_PROFILE) { $env:NUCLEUS_AI_SYNC_PROFILE } else { Get-NucleusHostKey }
     if ($manifest.models.PSObject.Properties.Name -contains $profileName) {
       $desiredCount = @($manifest.models.$profileName).Count
     }
@@ -276,7 +278,7 @@ function Invoke-AiConfig {
   }
 
   # Get active profile
-  $activeProfile = if ($env:NUCLEUS_AI_SYNC_PROFILE) { $env:NUCLEUS_AI_SYNC_PROFILE } else { "Windows" }
+  $activeProfile = if ($env:NUCLEUS_AI_SYNC_PROFILE) { $env:NUCLEUS_AI_SYNC_PROFILE } else { Get-NucleusHostKey }
 
   # Model counts per profile
   $modelCounts = [ordered]@{}
