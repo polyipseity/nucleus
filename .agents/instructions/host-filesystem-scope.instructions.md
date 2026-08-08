@@ -41,8 +41,3 @@ After bare-metal install, run `nixos-generate-config` and merge host-specific fa
 | NixOS | Btrfs (`subvol=@`, `compress=zstd`, `noatime`) | snapshots, compression, scrubbing |
 | NixOS guest | Btrfs (qcow-btrfs / qcow-efi-btrfs) | parity with host; see [`src/vms/nixos/formats/`](../../src/vms/nixos/formats/) |
 | Windows | NTFS | platform default; well supported for dev workloads |
-
-## Migration notes
-
-- Prebuilt `images/NixOS.qcow2` goldens built with ext4 are invalid after the Btrfs guest switch — run `nucleus-vm setup` to rebuild (config fingerprint drift also triggers rebuild).
-- Bare-metal NixOS hosts still on ext4 require reinstall or offline conversion before applying the Btrfs `disks.nix` template; nucleus provides no automated migration.
