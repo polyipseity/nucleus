@@ -45,8 +45,8 @@ test_step09_github_exceptions_handle_dot_prefix() {
 }
 
 test_step09_exempts_app_configs_without_schema() {
-  # Matches: app-owned formats (vscode, camilladsp, agents/hooks, litellm, sops) in exception list
-  if grep -q 'configs/vscode.*configs/camilladsp.*configs/agents/hooks.*sops' "$TEST_FILE"; then
+  # Matches: app-owned formats in exception list (users/* overlays + camilladsp + hooks + sops)
+  if grep -q 'users/\*/vscode.*configs/camilladsp.*agents/hooks.*\.sops\.yaml' "$TEST_FILE"; then
     return 0
   fi
   echo "FAIL: step 8 should exempt app-owned config formats without published schemas"

@@ -38,7 +38,7 @@ if ($content -match 'schema.json|vendor|secrets') {
   Assert-Fail -Name 'step09_ps1_exception_list' -Reason 'step 8 PS1 should have exception list'
 }
 
-if ($content -match 'configs/agents/hooks') {
+if ($content -match 'users/\*/agents/hooks') {
   Assert-Pass -Name 'step09_ps1_hooks_exemption' -Reason 'step 8 PS1 exempts agents/hooks JSON from $schema check'
 } else {
   Assert-Fail -Name 'step09_ps1_hooks_exemption' -Reason 'step 8 PS1 should exempt agents/hooks JSON from $schema check'
