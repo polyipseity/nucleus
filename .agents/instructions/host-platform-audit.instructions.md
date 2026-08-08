@@ -126,7 +126,7 @@ rg -n 'configs/(macos|nixos|windows)/|config-(macos|nixos|windows)\.' src/ scrip
 | Rule | Pattern | Rationale |
 | ---- | ------- | --------- |
 | **F9a** | `current_os=` or `currentOs` in `scripts/` | Legacy OS variable; use host helpers |
-| **F9b** | `case "$(uname)"` assigning `MacBook`/`NixOS` outside allowlist | Host bypass |
+| **F9b** | `Darwin)`/`Linux)` uname arms assigning `MacBook`/`NixOS` outside allowlist | Host bypass |
 | **F9c** | `IsOSPlatform` variables named `*Host` in `src/hosts/Windows/modules/` | OS check masquerading as host |
 
 F9b allowlist (runtime kind / boundary only): `src/scripts/lib/lib.sh`, `src/scripts/apply.sh`, `src/scripts/lib/vm.sh`.

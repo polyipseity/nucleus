@@ -148,12 +148,10 @@ _f9b_allowlist=(
 )
 _f9b_hits=$(
   {
-    rg -l 'case "\$\(uname' scripts/ src/scripts/ 2>/dev/null || true
-  } | while IFS= read -r _f; do
-    [ -z "$_f" ] && continue
-    if ! rg -q 'MacBook|NixOS' "$_f" 2>/dev/null; then
-      continue
-    fi
+    rg -n 'Darwin\).*(MacBook|NixOS)|Linux\).*(MacBook|NixOS)' scripts/ src/scripts/ 2>/dev/null || true
+  } | while IFS= read -r _line; do
+    [ -z "$_line" ] && continue
+    _f="${_line%%:*}"
     _allowed=false
     for _b in "${_f9b_allowlist[@]}"; do
       if [ "$_f" = "$_b" ]; then
@@ -162,7 +160,7 @@ _f9b_hits=$(
       fi
     done
     if [ "$_allowed" = false ]; then
-      rg -n 'case "\$\(uname|MacBook|NixOS' "$_f" 2>/dev/null || true
+      printf '%s\n' "$_line"
     fi
   done
 )
