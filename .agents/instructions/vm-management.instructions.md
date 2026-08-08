@@ -16,6 +16,8 @@ applyTo: "scripts/vm-setup.*, src/hosts/*/vms.nix, src/modules/VMs.json, src/sec
 
 macOS guest uses Tart (Apple Virtualization.framework) exclusively; automated Tart→UTM runtime handoff is not supported (format mismatch, no tooling).
 
+Guest `id` vs `name` vs `type` vs `hostname`: see [`vm-guest-identity.instructions.md`](vm-guest-identity.instructions.md).
+
 ## Hostname convention
 
 VM guest OSes must use the same hostname as the corresponding host OS. The canonical values are declared in the `hostname` field of each entry in `src/modules/VMs.json` (identical to `name` for every VM today):
@@ -58,7 +60,7 @@ Required fields for each VM entry:
 | ------------------ | ------- | ----------------------------------------------------------------- |
 | `id`               | string  | Machine-readable key used for files, domains, UUID/MAC derivation, and CLI selection |
 | `name`             | string  | Human-readable label shown in UTM/virt-manager and CLI tables     |
-| `type`             | string  | Guest OS family: `"Android"`, `"NixOS"`, `"Windows"`, `"macOS"`, `"Linux"` |
+| `type`             | string  | Guest OS family: `"Android"`, `"NixOS"`, `"Windows"`, `"macOS"` |
 | `enabled`          | bool    | Whether the VM is provisioned                                     |
 | `hosts`            | array   | Hosts that provision this VM (`"MacBook"`, `"NixOS"`, `"Windows"`); non-empty |
 | `cpus`             | int     | Number of virtual CPUs                                            |
