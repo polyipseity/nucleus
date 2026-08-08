@@ -23,7 +23,7 @@ let
     scriptName = "src/scripts/services/log-gc-user";
   };
 
-  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
+  activationBundle = pkgs.callPackage ../../../modules/lib/script-tree.nix { };
 in
 lib.mkIf pkgs.stdenv.isLinux {
   # Home Manager exposes GNOME settings via `dconf.*` (not `programs.dconf`).

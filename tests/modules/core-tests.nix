@@ -5,7 +5,7 @@ let
   inherit (import ../lib.nix) assert' containsRegex;
 
   # === NIX-INDEX SCHEDULE INVARIANTS ===
-  linuxText = builtins.readFile ../../src/modules/linux.nix;
+  linuxText = builtins.readFile ../../src/platforms/NixOS/modules/default.nix;
   macosText = builtins.readFile ../../src/platforms/macOS/modules/default.nix;
   coreModuleText = builtins.readFile ../../src/modules/core.nix;
 

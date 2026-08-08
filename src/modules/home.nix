@@ -136,7 +136,7 @@ in
     ./ext-discord-music-rpc.nix
     ./fonts.nix
     ./git.nix
-    ./linux.nix
+    ../platforms/NixOS/modules
     ./logging.nix
     ../platforms/macOS/modules
     ./pwsh.nix
