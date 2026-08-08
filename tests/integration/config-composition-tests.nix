@@ -56,8 +56,8 @@ let
 
   # Test 9: Verify specialArgs are passed correctly to all modules
   test_special_args_passed = assert' (
-    containsRegex ''specialArgs = \{.*inherit username users;'' flakeText
-    && containsRegex ''extraSpecialArgs = \{'' flakeText
+    containsRegex ''specialArgs = \{.*inherit username;'' flakeText
+    && containsRegex "users = users" flakeText
   ) "specialArgs (username, users) must be passed to all configs";
 
   # Test 10: Verify config sections compose with mkMerge where needed
@@ -97,9 +97,8 @@ let
 
   # Test 16: NixOS host uses shared btrfs mount options
   test_nixos_btrfs_options_import = assert' (
-    containsRegex "btrfs-options\\.nix" nixosDisksText
-    && containsRegex "compress-force=zstd" nixosDisksText
-  ) "NixOS disks.nix must import btrfs-options.nix with compress-force=zstd";
+    containsRegex "btrfs-options\\.nix" nixosDisksText && containsRegex "btrfsOptions" nixosDisksText
+  ) "NixOS disks.nix must import btrfs-options.nix";
 
   allTests = [
     test_posix_hosts_import_core

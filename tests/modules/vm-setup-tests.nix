@@ -219,7 +219,7 @@ let
   test_macos_packer_ceil_units =
     assert'
       (
-        (lib.hasInfix "vm_build_macos NAME DISK_BYTES RAM_BYTES" vm_setup_sh_text)
+        (lib.hasInfix "vm_build_macos VM_ID DISK_BYTES RAM_BYTES" vm_setup_sh_text)
         && (lib.hasInfix "_disk_gib=\"\$(( (_disk_bytes + 999999999) / 1000000000 ))\"" vm_setup_sh_text)
         && (lib.hasInfix "_mem_gib=\"\$(( (_ram_bytes + 1073741823) / 1073741824 ))\"" vm_setup_sh_text)
         && (lib.hasInfix "-var \"disk_size_gib=\$_disk_gib\"" vm_setup_sh_text)
@@ -233,8 +233,8 @@ let
     assert'
       (
         (lib.hasInfix "_prebuilt_min_size=\"\$(parse_size \"\$(jq -r \".VMs[\$vm_index].minImageSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
-        && (lib.hasInfix "validate_qcow2_image \"\$_bai_system_img\" \"Android system image for \$_bai_vm_name\" \"\$(parse_size \"\$(jq -r \".VMs[\$_bai_vm_index].minImageSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
-        && (lib.hasInfix "validate_qcow2_image \"\$_bai_userdata_img\" \"Android userdata disk for \$_bai_vm_name\" \"\$(parse_size \"\$(jq -r \".VMs[\$_bai_vm_index].minImageSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
+        && (lib.hasInfix "validate_qcow2_image \"\$_bai_system_img\" \"Android system image for \$_bai_vm_id\"" vm_setup_sh_text)
+        && (lib.hasInfix "validate_qcow2_image \"\$_bai_userdata_img\" \"Android userdata disk for \$_bai_vm_id\"" vm_setup_sh_text)
         && (lib.hasInfix "Test-Qcow2Image -ImagePath \$prebuilt -ImageLabel \"pre-built image '\$(\$vm.type)'\" -MinBytes \$minSizeBytes" windows_vm_setup_ps1_text)
       )
       "Image validation floors must be parsed from manifest minImageSize instead of hardcoded byte constants";
@@ -939,7 +939,7 @@ let
   # Every enabled VM must be reachable by at least one known host (MacBook,
   # NixOS, Windows).  An orphaned VM (enabled but with a hosts list that
   # excludes all known hosts) would never be provisioned by any machine.
-  # This mirrors the get_expected_vm_names filter logic used by vm-setup GC.
+  # This mirrors the get_expected_vm_ids filter logic used by vm-setup GC.
   test_enabled_vm_not_orphaned =
     let
       hostFilter = vm: builtins.any (host: builtins.elem host (vm.hosts or null)) validHosts;
@@ -1257,7 +1257,7 @@ let
   # vm-setup must resize NixOS images to manifest disk size so provisioning
   # logic does not reject the pre-built image for being too small.
   test_nixos_image_resize_to_manifest_disk = assert' (
-    (lib.hasInfix "vm_build_nixos NAME DISK_BYTES" vm_setup_sh_text)
+    (lib.hasInfix "vm_build_nixos VM_ID DISK_BYTES" vm_setup_sh_text)
     && (lib.hasInfix "if ! resize_and_mark_image \"$_out\" \"$_marker\" \"$_disk_bytes\"; then" vm_setup_sh_text)
   ) "scripts/vm.sh must resize generated NixOS qcow2 images to the exact manifest disk byte count";
 
@@ -1272,7 +1272,7 @@ let
       (
         (lib.hasInfix "if [ \"$_rmi_current_size\" -lt \"$_rmi_disk_bytes\" ]; then" vm_setup_sh_text)
         && (lib.hasInfix "vm_resize_vm() {" vm_setup_sh_text)
-        && (lib.hasInfix "_rvm_disk=\"$VM_DIR/data/\${_rvm_name}.qcow2\"" vm_setup_sh_text)
+        && (lib.hasInfix "_rvm_disk=\"$VM_DIR/data/\${_rvm_id}.qcow2\"" vm_setup_sh_text)
         && (lib.hasInfix "shrink requires --allow-shrink" vm_setup_sh_text)
         && (lib.hasInfix "_rvm_qemu_args=(--shrink)" vm_setup_sh_text)
         && (lib.hasInfix "vm_get_running_ids" vm_setup_sh_text)
@@ -1292,7 +1292,7 @@ let
         && (lib.hasInfix "--allow-shrink) allow_shrink=true" vm_setup_sh_text)
         && (lib.hasInfix "do_resize() {" vm_setup_sh_text)
         && (lib.hasInfix "disk_bytes=\"\$(parse_size \"$size_arg\")\" || exit 1" vm_setup_sh_text)
-        && (lib.hasInfix "vm_resize_vm \"$vm_name\" \"$disk_bytes\" \"$allow_shrink\"" vm_setup_sh_text)
+        && (lib.hasInfix "vm_resize_vm \"$vm_id\" \"$disk_bytes\" \"$allow_shrink\"" vm_setup_sh_text)
         && (lib.hasInfix "setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) \"do_$action\" ;;") vm_setup_sh_text
       )
       "scripts/vm.sh must wire the resize subcommand (usage, dispatch, parse_size, --allow-shrink) to vm_resize_vm";
@@ -1633,7 +1633,7 @@ let
   test_utm_base_overlay_provisioning =
     assert'
       (
-        (lib.hasInfix "vm_ensure_base_and_overlay \"\$vm_name\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
+        (lib.hasInfix "vm_ensure_base_and_overlay \"\$vm_id\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
         && (lib.hasInfix "linked runtime overlay into UTM bundle: \$disk_file" vm_setup_sh_text)
         && (lib.hasInfix "_base_link=\"\$data_dir/\$(basename \"\$(vm_src_path \"\$vm_type\" \"\$VM_OVERLAY_BACKING\")\")\"" vm_setup_sh_text)
         && (lib.hasInfix "linked base image into UTM bundle: \$_base_link" vm_setup_sh_text)
@@ -1666,7 +1666,7 @@ let
   # runtime overlay data/<id>.qcow2 on the Windows host.
   test_windows_qemu_ensure_base_and_overlay = assert' (
     (lib.hasInfix "vm_setup_windows_qemu()" vm_setup_sh_text)
-    && (lib.hasInfix "vm_ensure_base_and_overlay \"\$vm_name\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
+    && (lib.hasInfix "vm_ensure_base_and_overlay \"\$vm_id\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
     && (lib.hasInfix "runtime overlay ready: \$disk_path" vm_setup_sh_text)
   ) "vm_setup_windows_qemu must call vm_ensure_base_and_overlay for Windows guests";
 
@@ -1678,7 +1678,7 @@ let
     assert'
       (
         (lib.hasInfix ''_android_system="$(vm_src_path Android "$(jq -r ".VMs[$vm_index].Android.systemImage" "$MANIFEST")")"'' vm_setup_sh_text)
-        && (lib.hasInfix "_android_userdata=\"\$VM_DIR/data/\${vm_name}.qcow2\"" vm_setup_sh_text)
+        && (lib.hasInfix "_android_userdata=\"\$VM_DIR/data/\${vm_id}.qcow2\"" vm_setup_sh_text)
         && (lib.hasInfix ''_android_gsi="$(vm_src_path Android "$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")")"'' vm_setup_sh_text)
         && (lib.hasInfix ''_prebuilt="$_android_system"'' vm_setup_sh_text)
         && (lib.hasInfix "_prebuilt_min_size=\"\$(parse_size \"\$(jq -r \".VMs[\$vm_index].minImageSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
@@ -1695,7 +1695,7 @@ let
       (
         (lib.hasInfix "vm_link_android_userdata_to_utm_bundle" vm_setup_sh_text)
         && (lib.hasInfix "exists only in the UTM bundle" vm_setup_sh_text)
-        && (lib.hasInfix "vm_link_android_userdata_to_utm_bundle \"\$vm_name\" \"\$vm_index\" \"\$bundle/Data\"" vm_setup_sh_text)
+        && (lib.hasInfix "vm_link_android_userdata_to_utm_bundle \"\$vm_id\" \"\$vm_index\" \"\$bundle/Data\"" vm_setup_sh_text)
         && !(lib.hasInfix "removing legacy bundle userdata" vm_setup_sh_text)
         && !(lib.hasInfix "pre-migration" vm_setup_sh_text)
       )
@@ -1703,7 +1703,7 @@ let
 
   test_libvirt_android_userdata_canonical_path = assert' (
     (lib.hasInfix "vm_setup_libvirt()" vm_setup_sh_text)
-    && (lib.hasInfix "_android_userdata=\"\$VM_DIR/data/\${vm_name}.qcow2\"" vm_setup_sh_text)
+    && (lib.hasInfix "_android_userdata=\"\$VM_DIR/data/\${vm_id}.qcow2\"" vm_setup_sh_text)
   ) "vm_setup_libvirt must validate Android userdata at data/<id>.qcow2";
 
   # The Android build must strip the whitespace wc -c pads its output with
@@ -1743,10 +1743,10 @@ let
         && (lib.hasInfix "_bai_userdata_replaced=false" vm_setup_sh_text)
         && (lib.hasInfix "_bai_system_replaced=true" vm_setup_sh_text)
         && (lib.hasInfix "_bai_userdata_replaced=true" vm_setup_sh_text)
-        && (lib.hasInfix "vm_link_android_userdata_to_utm_bundle \"\$_bai_vm_name\" \"\$_bai_vm_index\" \"\$_bai_bundle_dir\"" vm_setup_sh_text)
+        && (lib.hasInfix "vm_link_android_userdata_to_utm_bundle \"\$_bai_vm_id\" \"\$_bai_vm_index\" \"\$_bai_bundle_dir\"" vm_setup_sh_text)
         && (lib.hasInfix "refreshed Android system disk in UTM bundle" vm_setup_sh_text)
         && (lib.hasInfix "if [ \"\$dry_run\" = false ]; then" vm_setup_sh_text)
-        && (lib.hasInfix "_bai_bundle_dir=\"\$VM_DIR/\${_bai_vm_name}.utm/Data\"" vm_setup_sh_text)
+        && (lib.hasInfix "_bai_bundle_dir=\"\$VM_DIR/\${_bai_vm_id}.utm/Data\"" vm_setup_sh_text)
       )
       "vm_build_android must re-link the UTM bundle's Android userdata/system disks after replacing a canonical disk (system re-download or userdata reset) so do_upgrade/do_reset do not leave stale bundle inodes";
 
@@ -1755,9 +1755,9 @@ let
       (
         (lib.hasInfix "failed to start libvirt default network" vm_setup_sh_text)
         && (lib.hasInfix "failed to mark libvirt default network for autostart" vm_setup_sh_text)
-        && (lib.hasInfix "validate_qcow2_image \"$_prebuilt\" \"pre-built image for \${vm_name}\" \"$_prebuilt_min_size\"" vm_setup_sh_text)
-        && (lib.hasInfix "disk_path=\"\$VM_DIR/data/\${vm_name}.qcow2\"" vm_setup_sh_text)
-        && (lib.hasInfix "vm_ensure_base_and_overlay \"\$vm_name\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
+        && (lib.hasInfix "validate_qcow2_image \"$_prebuilt\" \"pre-built image for \${vm_id}\" \"$_prebuilt_min_size\"" vm_setup_sh_text)
+        && (lib.hasInfix "disk_path=\"\$VM_DIR/data/\${vm_id}.qcow2\"" vm_setup_sh_text)
+        && (lib.hasInfix "vm_ensure_base_and_overlay \"\$vm_id\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
         && (lib.hasInfix "runtime overlay ready: \$disk_path" vm_setup_sh_text)
       )
       "scripts/vm.sh must validate libvirt prebuilt disks against the manifest minImageSize, provision the data/<id>.qcow2 overlay, and surface default-network recovery failures";

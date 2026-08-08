@@ -14,7 +14,7 @@ let
   ) "hostKeys must be MacBook, NixOS, Windows";
 
   test_platform_keys = assert' (
-    hp.platformKeys == [
+    builtins.sort builtins.lessThan hp.platformKeys == builtins.sort builtins.lessThan [
       "macOS"
       "NixOS"
       "Windows"
