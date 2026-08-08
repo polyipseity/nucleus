@@ -78,6 +78,21 @@ let
     && containsRegex "src/hosts/NixOS/MANUAL\.md" nixosServicesText
   ) "Each host must reference its MANUAL.md path";
 
+  hostFilesystemScopeText = builtins.readFile ../../.agents/instructions/host-filesystem-scope.instructions.md;
+
+  # Test 13: NixOS host imports explicit filesystem policy module
+  test_nixos_imports_filesystems_module = assert' (containsRegex "\./filesystems\.nix" nixosDefaultText) "NixOS host must import filesystems.nix for explicit NTFS/Btrfs support";
+
+  # Test 14: MacBook documents filesystem scope without managing disk layout
+  test_macbook_filesystem_scope_module = assert' (containsRegex "\./filesystem-scope\.nix" macbookDefaultText) "MacBook host must import filesystem-scope.nix";
+
+  # Test 15: Host filesystem scope instruction covers all three hosts
+  test_host_filesystem_scope_instruction = assert' (
+    containsRegex "MacBook" hostFilesystemScopeText
+    && containsRegex "NixOS" hostFilesystemScopeText
+    && containsRegex "Windows" hostFilesystemScopeText
+  ) "host-filesystem-scope.instructions.md must document MacBook, NixOS, and Windows";
+
   allTests = [
     test_posix_hosts_import_core
     test_all_hosts_import_shell
@@ -91,6 +106,9 @@ let
     test_config_merge_structure
     test_import_order_correctness
     test_manual_md_paths
+    test_nixos_imports_filesystems_module
+    test_macbook_filesystem_scope_module
+    test_host_filesystem_scope_instruction
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {

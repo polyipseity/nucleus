@@ -812,6 +812,18 @@ let
           cond = builtins.pathExists ../../src/vms/macos/packer.pkr.hcl;
           msg = "src/vms/macos/packer.pkr.hcl must exist for macOS Tart builds";
         }
+        {
+          cond = builtins.pathExists ../../src/vms/nixos/formats/qcow-btrfs.nix;
+          msg = "src/vms/nixos/formats/qcow-btrfs.nix must exist for x86_64 NixOS guest builds";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/nixos/formats/qcow-efi-btrfs.nix;
+          msg = "src/vms/nixos/formats/qcow-efi-btrfs.nix must exist for aarch64 NixOS guest builds";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/nixos/disk-image/make-btrfs-disk-image.nix;
+          msg = "src/vms/nixos/disk-image/make-btrfs-disk-image.nix must exist for Btrfs guest images";
+        }
       ];
       results = builtins.map (c: assert' c.cond c.msg) checks;
     in
@@ -1033,6 +1045,7 @@ let
   guest_nix_text = builtins.readFile ../../src/vms/nixos/guest.nix;
   core_nix_text = builtins.readFile ../../src/modules/core.nix;
   nixos_packer_text = builtins.readFile ../../src/vms/nixos/packer.pkr.hcl;
+  nixos_disks_nix_text = builtins.readFile ../../src/hosts/NixOS/hardware/disks.nix;
   test_nixos_guest_virtiofs_not_forced = assert' (
     !(lib.hasInfix "boot.initrd.availableKernelModules = [ \"virtio_fs\" ];" guest_nix_text)
     && !(lib.hasInfix "boot.initrd.availableKernelModules = [ \\\"virtio_fs\\\" ];" nixos_packer_text)
@@ -1147,6 +1160,25 @@ let
         && (lib.hasInfix "find -L \"$_out_link\"" vm_setup_sh_text)
       )
       "scripts/vm.sh must give nixos-generators a non-existent output link path and resolve the resulting symlink";
+
+  test_nixos_guest_btrfs_format_paths = assert' (
+    (lib.hasInfix "formats/qcow-btrfs.nix" vm_setup_sh_text)
+    && (lib.hasInfix "formats/qcow-efi-btrfs.nix" vm_setup_sh_text)
+    && (lib.hasInfix "--format-path" vm_setup_sh_text)
+    && !(lib.hasInfix "--format qcow\"" vm_setup_sh_text)
+  ) "scripts/vm.sh must build NixOS guests with qcow-btrfs / qcow-efi-btrfs format modules";
+
+  test_nixos_host_disks_btrfs_root = assert' (lib.hasInfix ''fsType = "btrfs";'' nixos_disks_nix_text) "src/hosts/NixOS/hardware/disks.nix must declare a Btrfs root filesystem";
+
+  test_nixos_guest_documents_btrfs_formats = assert' (
+    (lib.hasInfix "qcow-btrfs" guest_nix_text)
+    && (lib.hasInfix "qcow-efi-btrfs" guest_nix_text)
+    && !(lib.hasInfix "ext4" guest_nix_text)
+  ) "src/vms/nixos/guest.nix must document Btrfs qcow format modules instead of ext4";
+
+  test_nixos_packer_btrfs_root = assert' (
+    (lib.hasInfix "mkfs.btrfs" nixos_packer_text) && !(lib.hasInfix "mkfs.ext4" nixos_packer_text)
+  ) "src/vms/nixos/packer.pkr.hcl must format the root partition as Btrfs";
 
   # nixos-generators produces a small default qcow2 unless resized explicitly.
   # vm-setup must resize NixOS images to manifest disk size so provisioning
@@ -2356,6 +2388,10 @@ let
     test_macbook_builders_machines
     test_macos_packer_exit_check
     test_nixos_generators_output_link_handling
+    test_nixos_guest_btrfs_format_paths
+    test_nixos_host_disks_btrfs_root
+    test_nixos_guest_documents_btrfs_formats
+    test_nixos_packer_btrfs_root
     test_nixos_image_resize_to_manifest_disk
     test_macos_packer_failure_message
     test_windows_packer_failure_message
@@ -2535,6 +2571,10 @@ in
     test_macbook_builders_machines
     test_macos_packer_exit_check
     test_nixos_generators_output_link_handling
+    test_nixos_guest_btrfs_format_paths
+    test_nixos_host_disks_btrfs_root
+    test_nixos_guest_documents_btrfs_formats
+    test_nixos_packer_btrfs_root
     test_nixos_image_resize_to_manifest_disk
     test_macos_packer_failure_message
     test_windows_packer_failure_message
