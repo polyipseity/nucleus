@@ -14,9 +14,9 @@
   Expects disk images with filenames from the manifest Android group
   (rendered by vm.sh via __ANDROID_SYSTEM_IMAGE__ / __ANDROID_USERDATA_IMAGE__ /
   __ANDROID_GSI_IMAGE__ tokens):
-    - <systemImage>   (system partition, vda)   under ~\virtual machines\images\
+    - <systemImage>   (system partition, vda)   under ~\virtual machines\src\Android\
     - <userdataImage> (userdata partition, vdb) under ~\virtual machines\data\
-    - <gsiImage>      (optional GSI system image, vdc) under ~\virtual machines\images\
+    - <gsiImage>      (optional GSI system image, vdc) under ~\virtual machines\src\Android\
 
   Firmware path defaults to the edk2-aarch64 UEFI image bundled with QEMU's
   standard installation layout (Scoop/manual).
@@ -34,20 +34,20 @@ $ErrorActionPreference = 'Stop'
 $qemu = Get-Command 'qemu-system-aarch64.exe' -ErrorAction Stop
 
 # --- Paths ---
-# System/GSI images live under images/ (read-only payload); the writable
+# System/GSI images live under src/Android/ (read-only payload); the writable
 # userdata disk lives under data/ (canonical disk-model layout: every VM's
 # writable disk is data/<id>.qcow2).
-$imagesDir   = Join-Path $env:USERPROFILE 'virtual machines\images'
-$dataDir     = Join-Path $env:USERPROFILE 'virtual machines\data'
+$androidSrcDir = Join-Path $env:USERPROFILE 'virtual machines\src\Android'
+$dataDir       = Join-Path $env:USERPROFILE 'virtual machines\data'
 $firmwareDir = if (Get-Command 'qemu-img.exe' -ErrorAction SilentlyContinue) { # check-suppress:suppression_doc: qemu-img.exe is optional -- fallback to qemu dir
                  Split-Path (Get-Command 'qemu-img.exe').Source -Parent
                } else {
                  Split-Path $qemu.Source -Parent
                }
 
-$diskSystem   = Join-Path $imagesDir '__ANDROID_SYSTEM_IMAGE__'
+$diskSystem   = Join-Path $androidSrcDir '__ANDROID_SYSTEM_IMAGE__'
 $diskUserdata = Join-Path $dataDir '__ANDROID_USERDATA_IMAGE__'
-$diskGsi      = Join-Path $imagesDir '__ANDROID_GSI_IMAGE__'
+$diskGsi      = Join-Path $androidSrcDir '__ANDROID_GSI_IMAGE__'
 $uefiCode     = Join-Path $firmwareDir 'edk2-aarch64-code.fd'
 $uefiVars     = Join-Path $firmwareDir 'edk2-arm-vars.fd'
 

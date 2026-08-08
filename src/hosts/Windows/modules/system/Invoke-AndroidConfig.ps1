@@ -11,6 +11,18 @@
 #>
 
 $script:AndroidNucleusMagiskMarker = 'android-magisk.tag.json'
+$script:AndroidVmType = 'Android'
+$script:AndroidRecoveryImg = 'recovery userdebug.img'
+$script:AndroidRecoveryTag = 'recovery userdebug.tag.json'
+$script:AndroidBootImg = 'boot.img'
+$script:AndroidBootTag = 'boot.tag.json'
+$script:AndroidMagiskApk = 'Magisk.apk'
+$script:AndroidBootMagiskPatched = 'boot Magisk patched.img'
+$script:AndroidGappsZip = 'GApps.zip'
+$script:AndroidMagiskPatchKit = 'Magisk patch kit'
+$script:AndroidLineageZip = 'Lineage download.zip'
+$script:AndroidLineageExtract = 'Lineage extract'
+$script:AndroidGsiDownloadZip = 'GSI download.zip'
 $script:AndroidNucleusMagiskPatchRemote = '/data/local/tmp/nucleus-magisk-patch'
 $script:AndroidNucleusMagiskStockBootRemote = '/data/local/tmp/nucleus-stock-boot.img'
 $script:AndroidNucleusRootPropsService = '/data/adb/service.d/nucleus-root-props.sh'
@@ -19,6 +31,15 @@ $script:AndroidNucleusFakeWifiService = '/data/adb/service.d/nucleus-fake-wifi.s
 $script:AndroidNucleusFakeWifiAdbProbeS = 3
 $script:AndroidNucleusFakeWifiAsyncKickoffS = 5
 $script:AndroidNucleusFakeWifiAsyncGraceS = 3
+
+function Get-AndroidTypeSrcDir {
+  param(
+    [Parameter(Mandatory)]
+    [string]$SrcDir
+  )
+
+  return (Join-Path $SrcDir $script:AndroidVmType)
+}
 
 function Get-AndroidGuestScriptPath {
   param(
@@ -220,18 +241,19 @@ function Invoke-AndroidConfigRoot {
 function Get-AndroidBootImagePath {
   param(
     [Parameter(Mandatory)][object]$Vm,
-    [Parameter(Mandatory)][string]$ImagesDir
+    [Parameter(Mandatory)][string]$SrcDir
   )
 
+  $androidSrcDir = Get-AndroidTypeSrcDir -SrcDir $SrcDir
   $suffix = Get-AndroidRecoveryAssetSuffix -Vm $Vm
   $asset = "boot_${suffix}.img"
-  $img = Join-Path $ImagesDir 'android-boot.img'
+  $img = Join-Path $androidSrcDir $script:AndroidBootImg
   $downloadUrl = "https://github.com/jqssun/android-lineage-qemu/releases/latest/download/$asset"
 
   $tag = Get-AndroidJqssunReleaseTagForAsset -AssetName $asset
   if (-not $tag) { return $null }
 
-  $tagFile = Join-Path $ImagesDir 'android-boot.tag.json'
+  $tagFile = Join-Path $androidSrcDir $script:AndroidBootTag
   if (Test-Path -LiteralPath $img -PathType Leaf) {
     $cachedTag = ''
     if (Test-Path -LiteralPath $tagFile -PathType Leaf) {
@@ -265,11 +287,12 @@ function Get-AndroidBootImagePath {
 function Get-AndroidMagiskApkPath {
   param(
     [Parameter(Mandatory)][object]$Vm,
-    [Parameter(Mandatory)][string]$ImagesDir
+    [Parameter(Mandatory)][string]$SrcDir
   )
 
+  $androidSrcDir = Get-AndroidTypeSrcDir -SrcDir $SrcDir
   $url = [string]$Vm.Android.magiskUrl
-  $apk = Join-Path $ImagesDir 'android-magisk.apk'
+  $apk = Join-Path $androidSrcDir $script:AndroidMagiskApk
   if ([string]::IsNullOrWhiteSpace($url) -or $url -eq 'null') {
     Write-NucleusError 'Android.magiskUrl is not set in the manifest'
     return $null
@@ -373,11 +396,12 @@ function Invoke-AndroidMagiskGuestPatchBoot {
     [Parameter(Mandatory)][string]$BootImg,
     [Parameter(Mandatory)][string]$OutImg,
     [Parameter(Mandatory)][string]$MagiskApk,
-    [Parameter(Mandatory)][string]$ImagesDir
+    [Parameter(Mandatory)][string]$SrcDir
   )
 
+  $androidSrcDir = Get-AndroidTypeSrcDir -SrcDir $SrcDir
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  $stage = Join-Path $ImagesDir 'android-magisk-patch-kit'
+  $stage = Join-Path $androidSrcDir $script:AndroidMagiskPatchKit
   $remoteOut = "$($script:AndroidNucleusMagiskPatchRemote)/new-boot.img"
 
   if (-not (Expand-AndroidMagiskPatchKit -MagiskApk $MagiskApk -Vm $Vm -OutDir $stage)) {
@@ -499,11 +523,12 @@ function Invoke-AndroidInstallAdbKey {
 function Invoke-AndroidConfigMagisk {
   param(
     [Parameter(Mandatory)][object]$Vm,
-    [Parameter(Mandatory)][string]$ImagesDir
+    [Parameter(Mandatory)][string]$SrcDir
   )
 
+  $androidSrcDir = Get-AndroidTypeSrcDir -SrcDir $SrcDir
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  $patched = Join-Path $ImagesDir 'android-boot-magisk-patched.img'
+  $patched = Join-Path $androidSrcDir $script:AndroidBootMagiskPatched
 
   if (-not (Wait-AndroidAdbAuthorized -Vm $Vm -TimeoutSeconds 600)) { return $false }
 
@@ -523,11 +548,11 @@ function Invoke-AndroidConfigMagisk {
     Write-NucleusInfo "Magisk su is already available on $serial"
   }
   else {
-    $boot = Get-AndroidBootImagePath -Vm $Vm -ImagesDir $ImagesDir
+    $boot = Get-AndroidBootImagePath -Vm $Vm -SrcDir $SrcDir
     if (-not $boot) { return $false }
-    $apk = Get-AndroidMagiskApkPath -Vm $Vm -ImagesDir $ImagesDir
+    $apk = Get-AndroidMagiskApkPath -Vm $Vm -SrcDir $SrcDir
     if (-not $apk) { return $false }
-    if (-not (Invoke-AndroidMagiskGuestPatchBoot -Vm $Vm -BootImg $boot -OutImg $patched -MagiskApk $apk -ImagesDir $ImagesDir)) { return $false }
+    if (-not (Invoke-AndroidMagiskGuestPatchBoot -Vm $Vm -BootImg $boot -OutImg $patched -MagiskApk $apk -SrcDir $SrcDir)) { return $false }
     if (-not (Invoke-AndroidMagiskFlashBoot -Vm $Vm -PatchedBootImg $patched)) { return $false }
     if (-not (Wait-AndroidAdbBootCompleted -Vm $Vm -TimeoutSeconds 900)) {
       Write-NucleusError 'timed out waiting for boot after Magisk flash; complete setup wizard and tap Allow USB debugging'
@@ -551,7 +576,7 @@ function Invoke-AndroidConfigMagisk {
   $suffix = Get-AndroidRecoveryAssetSuffix -Vm $Vm
   $tag = Get-AndroidJqssunReleaseTagForAsset -AssetName "boot_${suffix}.img"
   if ($tag) {
-    $marker = Join-Path $ImagesDir $script:AndroidNucleusMagiskMarker
+    $marker = Join-Path $androidSrcDir $script:AndroidNucleusMagiskMarker
     (@{ tag_name = $tag; configured = $true } | ConvertTo-Json -Compress) | Set-Content -LiteralPath $marker -Encoding UTF8
   }
 
@@ -825,12 +850,13 @@ Booted system:
 function Invoke-AndroidConfigGapp {
   param(
     [Parameter(Mandatory)][object]$Vm,
-    [Parameter(Mandatory)][string]$ImagesDir
+    [Parameter(Mandatory)][string]$SrcDir
   )
 
+  $androidSrcDir = Get-AndroidTypeSrcDir -SrcDir $SrcDir
   $serial = Get-AndroidAdbSerial -Vm $Vm
   $gappsUrl = [string]$Vm.Android.gappsUrl
-  $gappsZip = Join-Path $ImagesDir 'android-gapps.zip'
+  $gappsZip = Join-Path $androidSrcDir $script:AndroidGappsZip
 
   if ([string]::IsNullOrWhiteSpace($gappsUrl) -or $gappsUrl -eq 'null') {
     Write-NucleusError 'Android.gappsUrl is not set in the manifest'
@@ -843,8 +869,8 @@ function Invoke-AndroidConfigGapp {
     return $false
   }
 
-  if (-not (Invoke-AndroidDownloadUserdebugRecovery -Vm $Vm -ImagesDir $ImagesDir)) { return $false }
-  if (-not (Invoke-AndroidEnsureUserdebugRecovery -Vm $Vm -ImagesDir $ImagesDir)) { return $false }
+  if (-not (Invoke-AndroidDownloadUserdebugRecovery -Vm $Vm -ImagesDir $androidSrcDir)) { return $false }
+  if (-not (Invoke-AndroidEnsureUserdebugRecovery -Vm $Vm -ImagesDir $androidSrcDir)) { return $false }
   if (-not (Wait-AndroidAdbRecovery -Vm $Vm -TimeoutSeconds 300)) { return $false }
 
   if (Wait-AndroidAdbSideload -Vm $Vm -TimeoutSeconds 15) {
@@ -1000,7 +1026,7 @@ function Invoke-AndroidConfig {
     exit 1
   }
 
-  $imagesDir = Join-Path $VmDir 'images'
+  $srcDir = Join-Path $VmDir 'src'
 
   $doGapps = $false
   $doAdbKeys = $false
@@ -1044,13 +1070,13 @@ function Invoke-AndroidConfig {
   }
 
   if ($doGapps) {
-    if (-not (Invoke-AndroidConfigGapp -Vm $vm -ImagesDir $imagesDir)) { exit 1 }
+    if (-not (Invoke-AndroidConfigGapp -Vm $vm -SrcDir $srcDir)) { exit 1 }
   }
   if ($doAdbKeys) {
     if (-not (Invoke-AndroidConfigAdbKey -Vm $vm)) { exit 1 }
   }
   if ($doMagisk) {
-    if (-not (Invoke-AndroidConfigMagisk -Vm $vm -ImagesDir $imagesDir)) { exit 1 }
+    if (-not (Invoke-AndroidConfigMagisk -Vm $vm -SrcDir $srcDir)) { exit 1 }
   }
   if ($doRoot) {
     if (-not (Invoke-AndroidConfigRoot -Vm $vm)) { exit 1 }
@@ -1113,7 +1139,8 @@ function Invoke-AndroidReset {
     exit 1
   }
 
-  $imagesDir = Join-Path $VmDir 'images'
+  $srcDir = Join-Path $VmDir 'src'
+  $androidSrcDir = Get-AndroidTypeSrcDir -SrcDir $srcDir
   $dataDir = Join-Path $VmDir 'data'
   . (Join-Path $RepoRoot 'src\hosts\Windows\modules\SizeStrings.ps1')
   $minSizeBytes = [long](ConvertFrom-SizeString $vm.minImageSize)
@@ -1124,9 +1151,9 @@ function Invoke-AndroidReset {
   $gsiImageName = [string]$vm.Android.gsiImage
   $gsiUrl = [string]$vm.Android.gsiUrl
 
-  $systemImg = Join-Path $imagesDir $systemImageName
+  $systemImg = Join-Path $androidSrcDir $systemImageName
   $userdataImg = Join-Path $dataDir "$VmName.qcow2"
-  $gsiImg = Join-Path $imagesDir $gsiImageName
+  $gsiImg = Join-Path $androidSrcDir $gsiImageName
 
   if (-not (Test-Path -LiteralPath $dataDir)) {
     New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
@@ -1141,7 +1168,7 @@ function Invoke-AndroidReset {
     $dlUrl = Get-AndroidJqssunAssetUrl -Tag $tag -AssetSubstring "UTM-VM-lineage-.*virtio_${suffix}.zip"
     if (-not $dlUrl) { exit 1 }
 
-    $zipPath = Join-Path $imagesDir 'android-lineage.zip'
+    $zipPath = Join-Path $androidSrcDir $script:AndroidLineageZip
     try {
       Invoke-WebRequest -Uri $dlUrl -OutFile $zipPath -UseBasicParsing
     }
@@ -1150,7 +1177,7 @@ function Invoke-AndroidReset {
       exit 1
     }
 
-    $extractDir = Join-Path $imagesDir 'android-lineage-extract'
+    $extractDir = Join-Path $androidSrcDir $script:AndroidLineageExtract
     if (Test-Path -LiteralPath $extractDir) { Remove-Item -LiteralPath $extractDir -Recurse -Force }
     New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
     Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir -Force
@@ -1212,7 +1239,7 @@ function Invoke-AndroidReset {
     Write-NucleusInfo 'GSI license: https://developer.android.com/license'
     if (-not (Test-Path -LiteralPath $gsiImg -PathType Leaf)) {
       Write-NucleusInfo 'downloading GSI system image...'
-      $gsiZip = Join-Path $imagesDir 'android-gsi.zip'
+      $gsiZip = Join-Path $androidSrcDir $script:AndroidGsiDownloadZip
       try {
         Invoke-WebRequest -Uri $gsiUrl -OutFile $gsiZip -UseBasicParsing
       }

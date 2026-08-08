@@ -179,7 +179,8 @@ vm_android_download_boot_image() {
   _adbi_vm_index="$1"
   _adbi_suffix="$(vm_android_recovery_asset_suffix "$_adbi_vm_index")"
   _adbi_asset="boot_${_adbi_suffix}.img"
-  _adbi_img="$IMAGES_DIR/android-boot.img"
+  _adbi_img="$(vm_src_path Android "$VM_ANDROID_BOOT_IMG")"
+  _adbi_tag_file="$(vm_src_path Android "$VM_ANDROID_BOOT_TAG")"
   _adbi_dl_url="https://github.com/jqssun/android-lineage-qemu/releases/latest/download/$_adbi_asset"
   _adbi_tag=''
 
@@ -187,8 +188,8 @@ vm_android_download_boot_image() {
 
   if [ -f "$_adbi_img" ]; then
     _adbi_cached_tag=''
-    if [ -f "$IMAGES_DIR/android-boot.tag.json" ]; then
-      _adbi_cached_tag="$(jq -r '.tag_name // empty' "$IMAGES_DIR/android-boot.tag.json")"
+    if [ -f "$_adbi_tag_file" ]; then
+      _adbi_cached_tag="$(jq -r '.tag_name // empty' "$_adbi_tag_file")"
     fi
     if [ "$_adbi_cached_tag" = "$_adbi_tag" ]; then
       say "using cached boot image: $_adbi_img" >&2
@@ -205,7 +206,7 @@ vm_android_download_boot_image() {
     curl -fL -o "$_adbi_img" "$_adbi_dl_url" \
     || { error "failed to download boot image from $_adbi_dl_url"; return 1; }
 
-  jq -n --arg tag "$_adbi_tag" '{tag_name: $tag}' > "$IMAGES_DIR/android-boot.tag.json"
+  jq -n --arg tag "$_adbi_tag" '{tag_name: $tag}' > "$_adbi_tag_file"
   say "boot image ready: $_adbi_img" >&2
   printf '%s\n' "$_adbi_img"
 }
@@ -215,7 +216,7 @@ vm_android_download_boot_image() {
 vm_android_download_magisk_apk() {
   _adma_vm_index="$1"
   _adma_url="$(jq -r ".VMs[$_adma_vm_index].Android.magiskUrl" "$MANIFEST")"
-  _adma_apk="$IMAGES_DIR/android-magisk.apk"
+  _adma_apk="$(vm_src_path Android "$VM_ANDROID_MAGISK_APK")"
 
   if [ -z "$_adma_url" ] || [ "$_adma_url" = "null" ]; then
     error "Android.magiskUrl is not set in the manifest"
@@ -302,7 +303,7 @@ vm_android_magisk_guest_patch_boot() {
   _amgp_out="$3"
   _amgp_apk="$4"
   _amgp_serial="$(vm_android_adb_serial "$_amgp_vm_index")"
-  _amgp_stage="$IMAGES_DIR/android-magisk-patch-kit"
+  _amgp_stage="$(vm_src_path Android "$VM_ANDROID_MAGISK_PATCH_KIT")"
   _amgp_remote_out="$NUCLEUS_MAGISK_PATCH_REMOTE/new-boot.img"
 
   vm_android_magisk_stage_patch_kit "$_amgp_apk" "$_amgp_vm_index" "$_amgp_stage" || return 1
@@ -424,7 +425,7 @@ vm_android_config_magisk() {
   _acm_serial="$(vm_android_adb_serial "$_acm_vm_index")"
   _acm_boot=''
   _acm_apk=''
-  _acm_patched="$IMAGES_DIR/android-boot-magisk-patched.img"
+  _acm_patched="$(vm_src_path Android "$VM_ANDROID_BOOT_MAGISK_PATCHED")"
   _acm_tag=''
   _acm_build=''
 
@@ -477,7 +478,7 @@ vm_android_config_magisk() {
   _acm_tag=''
   _acm_tag="$(vm_android_jqssun_release_tag_for_asset "boot_$(vm_android_recovery_asset_suffix "$_acm_vm_index").img")" || _acm_tag=''
   if [ -n "$_acm_tag" ]; then
-    jq -n --arg tag "$_acm_tag" '{tag_name: $tag, configured: true}' > "$IMAGES_DIR/$NUCLEUS_MAGISK_MARKER"
+    jq -n --arg tag "$_acm_tag" '{tag_name: $tag, configured: true}' > "$(vm_src_path Android "$NUCLEUS_MAGISK_MARKER")"
   fi
 
   say "Magisk installed on $_acm_serial; next: --root"

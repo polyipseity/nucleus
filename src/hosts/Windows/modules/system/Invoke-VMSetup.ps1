@@ -6,7 +6,7 @@
   Combines the former Invoke-VMBuild and Invoke-VMSetup into one module.
   Phase 1 (build): builds pre-built QCOW2 images using Packer for each VM
   declared in src\modules\VMs.json, if absent at
-  %USERPROFILE%\virtual machines\images\<name>.qcow2.  For NixOS guests on
+  %USERPROFILE%\virtual machines\src\<type>\prebuilt image.qcow2.  For NixOS guests on
   Windows, Packer downloads the NixOS ISO automatically (src\vms\nixos\packer.pkr.hcl).
   For Windows 11 guests, a local ISO is required (-WindowsIso).
 
@@ -106,6 +106,48 @@ function Get-VmRunningProcessNameList {
         }
     }
     return $running.ToArray()
+}
+
+$VM_PREBUILT_IMAGE = 'prebuilt image.qcow2'
+$VM_OVERLAY_BACKING = 'overlay backing.qcow2'
+$VM_PACKER_BUILD_DIR = 'Packer'
+$VM_WINDOWS_INSTALLER_ISO = 'installer.iso'
+$VM_PREBUILT_MARKER_BASE = 'prebuilt image'
+
+function Get-VmTypeSrcDir {
+    param(
+        [Parameter(Mandatory)]
+        [string]$SrcDir,
+
+        [Parameter(Mandatory)]
+        [string]$Type
+    )
+
+    return Join-Path $SrcDir $Type
+}
+
+function Get-VmSrcPath {
+    param(
+        [Parameter(Mandatory)]
+        [string]$SrcDir,
+
+        [Parameter(Mandatory)]
+        [string]$Type,
+
+        [Parameter(Mandatory)]
+        [string]$Leaf
+    )
+
+    return Join-Path (Get-VmTypeSrcDir -SrcDir $SrcDir -Type $Type) $Leaf
+}
+
+function Get-VmOverlayBackingRelPath {
+    param(
+        [Parameter(Mandatory)]
+        [string]$Type
+    )
+
+    return "../src/$Type/$VM_OVERLAY_BACKING"
 }
 
 function Invoke-VMSetup {
@@ -220,18 +262,42 @@ function Invoke-VMSetup {
         # disabled entries too.
         [switch]$GcDisabled,
 
+        # Also GC orphaned runtime disks in data/ (default GC preserves data/).
+        [switch]$GcData,
+
         # Config-only refresh: descriptors and start/stop scripts.  Skips image
         # build and disk provisioning.  Used by nucleus-vm sync and apply.
         [switch]$SyncOnly
     )
 
     $ErrorActionPreference = 'Stop'
+    $gcDataEnabled = [bool]$GcData
 
-    function Get-VMGcDiskKeepSet {
+    function Get-VMGcSrcKeepSetForType {
         param(
             [Parameter(Mandatory)]
-            [string]$Dir,
+            [string]$Type,
 
+            [Parameter(Mandatory)]
+            [string[]]$ExpectedNames
+        )
+
+        $keep = @($VM_PREBUILT_IMAGE, $VM_OVERLAY_BACKING)
+        foreach ($vm in $vmDef.VMs) {
+            if ($vm.type -ne $Type) { continue }
+            if ($vm.id -notin $ExpectedNames) { continue }
+            if ($null -ne $vm.Android) {
+                $keep += [string]$vm.Android.systemImage
+                if ($null -ne $vm.Android.gsiUrl) {
+                    $keep += [string]$vm.Android.gsiImage
+                }
+            }
+        }
+        return @($keep | Sort-Object -Unique)
+    }
+
+    function Get-VMGcDataDiskKeepSet {
+        param(
             [Parameter(Mandatory)]
             [string[]]$ExpectedNames
         )
@@ -239,36 +305,56 @@ function Invoke-VMSetup {
         $keep = @()
         foreach ($vm in $vmDef.VMs) {
             if ($vm.id -notin $ExpectedNames) { continue }
-            if ($Dir -eq $imagesDir) {
-                $keep += "$($vm.id).qcow2"
-                $keep += "$($vm.type).qcow2"
-                $keep += "$($vm.type).base.qcow2"
-                if ($null -ne $vm.Android) {
-                    $keep += [string]$vm.Android.systemImage
-                    $keep += [string]$vm.Android.gsiImage
-                }
-            }
-            else {
-                $keep += "$($vm.id).qcow2"
-                if ($null -ne $vm.Android) {
-                    $keep += [string]$vm.Android.userdataImage
-                }
+            $keep += "$($vm.id).qcow2"
+            if ($null -ne $vm.Android) {
+                $keep += [string]$vm.Android.userdataImage
             }
         }
         return @($keep | Sort-Object -Unique)
     }
 
+    function Test-VMTypeExpected {
+        param(
+            [Parameter(Mandatory)]
+            [string]$Type,
+
+            [Parameter(Mandatory)]
+            [string[]]$ExpectedNames
+        )
+
+        foreach ($vm in $vmDef.VMs) {
+            if ($vm.type -eq $Type -and $vm.id -in $ExpectedNames) {
+                return $true
+            }
+        }
+        return $false
+    }
+
     function Invoke-GcOrphanDisk {
         param([string[]] $ExpectedNames)
-        $dirs = @($dataDir, $imagesDir) | Where-Object { Test-Path $_ -PathType Container }
-        foreach ($dir in $dirs) {
-            $keep = @(Get-VMGcDiskKeepSet -Dir $dir -ExpectedNames $ExpectedNames)
+        if (Test-Path -LiteralPath $srcDir -PathType Container) {
+            foreach ($typeDir in Get-ChildItem -LiteralPath $srcDir -Directory -ErrorAction SilentlyContinue) {
+                $keep = @(Get-VMGcSrcKeepSetForType -Type $typeDir.Name -ExpectedNames $ExpectedNames)
+                # check-suppress:suppression_doc: probe -- no disk images may exist; foreach handles empty result.
+                foreach ($disk in Get-ChildItem -LiteralPath $typeDir.FullName -Filter '*.qcow2' -ErrorAction SilentlyContinue) {
+                    if ($disk.Name -notin $keep) {
+                        Write-Information "vm-setup: GC — removing non-provisioned disk image: $($disk.FullName)"
+                        if (-not $DryRun) {
+                            Remove-Item -LiteralPath $disk.FullName -Force -ErrorAction Continue
+                        }
+                    }
+                }
+            }
+        }
+
+        if ($gcDataEnabled -and (Test-Path -LiteralPath $dataDir -PathType Container)) {
+            $keep = @(Get-VMGcDataDiskKeepSet -ExpectedNames $ExpectedNames)
             # check-suppress:suppression_doc: probe -- no disk images may exist; foreach handles empty result.
-            foreach ($disk in Get-ChildItem "$dir\*.qcow2" -ErrorAction SilentlyContinue) {
+            foreach ($disk in Get-ChildItem -LiteralPath $dataDir -Filter '*.qcow2' -ErrorAction SilentlyContinue) {
                 if ($disk.Name -notin $keep) {
                     Write-Information "vm-setup: GC — removing non-provisioned disk image: $($disk.FullName)"
                     if (-not $DryRun) {
-                        Remove-Item -Path $disk.FullName -Force -ErrorAction Continue
+                        Remove-Item -LiteralPath $disk.FullName -Force -ErrorAction Continue
                     }
                 }
             }
@@ -276,18 +362,40 @@ function Invoke-VMSetup {
     }
 
     function Invoke-GcOrphanMarker {
-        $dirs = @($dataDir, $imagesDir) | Where-Object { Test-Path $_ -PathType Container }
-        foreach ($dir in $dirs) {
+        param([string[]] $ExpectedNames)
+
+        if (Test-Path -LiteralPath $srcDir -PathType Container) {
+            foreach ($typeDir in Get-ChildItem -LiteralPath $srcDir -Directory -ErrorAction SilentlyContinue) {
+                if (Test-VMTypeExpected -Type $typeDir.Name -ExpectedNames $ExpectedNames) {
+                    continue
+                }
+                foreach ($markerName in @(
+                    "$VM_PREBUILT_MARKER_BASE.vm-guest-credentials-sha256"
+                    "$VM_PREBUILT_MARKER_BASE.vm-guest-config-sha256"
+                )) {
+                    $markerPath = Join-Path $typeDir.FullName $markerName
+                    if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
+                        continue
+                    }
+                    Write-Information "vm-setup: GC — removing orphaned guest marker: $markerPath"
+                    if (-not $DryRun) {
+                        Remove-Item -LiteralPath $markerPath -Force -ErrorAction Continue
+                    }
+                }
+            }
+        }
+
+        if ($gcDataEnabled -and (Test-Path -LiteralPath $dataDir -PathType Container)) {
             # check-suppress:suppression_doc: probe -- no credential markers may exist; foreach handles empty result.
             foreach ($marker in @(
-                Get-ChildItem "$dir\*.vm-guest-credentials-sha256" -ErrorAction SilentlyContinue
-                Get-ChildItem "$dir\*.vm-guest-config-sha256" -ErrorAction SilentlyContinue
+                Get-ChildItem -LiteralPath $dataDir -Filter '*.vm-guest-credentials-sha256' -ErrorAction SilentlyContinue
+                Get-ChildItem -LiteralPath $dataDir -Filter '*.vm-guest-config-sha256' -ErrorAction SilentlyContinue
             )) {
                 $basePath = $marker.FullName -replace '\.vm-guest-(credentials|config)-sha256$'
-                if (-not (Test-Path $basePath -PathType Leaf)) {
+                if (-not (Test-Path -LiteralPath $basePath -PathType Leaf)) {
                     Write-Information "vm-setup: GC — removing orphaned credential marker: $($marker.FullName)"
                     if (-not $DryRun) {
-                        Remove-Item -Path $marker.FullName -Force -ErrorAction Continue
+                        Remove-Item -LiteralPath $marker.FullName -Force -ErrorAction Continue
                     }
                 }
             }
@@ -547,13 +655,15 @@ function Invoke-VMSetup {
 
         if ($Vm.type -eq 'Android') {
             $disks = @(
-                @{ role = 'system'; path = "images/$($Vm.type)-system.qcow2" },
-                @{ role = 'gsi'; path = "images/$($Vm.type)-gsi.img" },
-                @{ role = 'userdata'; path = "data/$($Vm.id).qcow2" }
+                @{ role = 'system'; path = "src/$($Vm.type)/$($Vm.Android.systemImage)" }
             )
+            if ($null -ne $Vm.Android.gsiUrl) {
+                $disks += @{ role = 'gsi'; path = "src/$($Vm.type)/$($Vm.Android.gsiImage)" }
+            }
+            $disks += @{ role = 'userdata'; path = "data/$($Vm.id).qcow2" }
         } else {
             $disks = @(
-                @{ role = 'base'; path = "images/$($Vm.type).base.qcow2" },
+                @{ role = 'base'; path = "src/$($Vm.type)/$VM_OVERLAY_BACKING" },
                 @{ role = 'runtime'; path = "data/$($Vm.id).qcow2" }
             )
         }
@@ -775,7 +885,7 @@ function Invoke-VMSetup {
     $vmsDir      = Join-Path $RepoRoot 'src\vms'
     $templatesDir = Join-Path $vmsDir 'templates'
     $vmDir       = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
-    $imagesDir   = Join-Path $vmDir 'images'
+    $srcDir      = Join-Path $vmDir 'src'
     $dataDir     = Join-Path $vmDir 'data'
     try {
         $guestCredential = Resolve-VMGuestCredential -RepoRoot $RepoRoot
@@ -810,13 +920,19 @@ function Invoke-VMSetup {
 
     if (-not $DryRun) {
         New-Item -ItemType Directory -Path $vmDir     -Force > $null
-        New-Item -ItemType Directory -Path $imagesDir -Force > $null
+        New-Item -ItemType Directory -Path $srcDir  -Force > $null
         New-Item -ItemType Directory -Path $dataDir   -Force > $null
+        foreach ($vmType in @($vmDef.VMs | ForEach-Object { $_.type } | Sort-Object -Unique)) {
+            New-Item -ItemType Directory -Path (Get-VmTypeSrcDir -SrcDir $srcDir -Type $vmType) -Force > $null
+        }
         New-Item -ItemType Directory -Path (Join-Path $vmDir 'scripts') -Force > $null
     } else {
         Write-Information "vm-setup: [dry-run] New-Item Directory $vmDir"
-        Write-Information "vm-setup: [dry-run] New-Item Directory $imagesDir"
+        Write-Information "vm-setup: [dry-run] New-Item Directory $srcDir"
         Write-Information "vm-setup: [dry-run] New-Item Directory $dataDir"
+        foreach ($vmType in @($vmDef.VMs | ForEach-Object { $_.type } | Sort-Object -Unique)) {
+            Write-Information "vm-setup: [dry-run] New-Item Directory $(Get-VmTypeSrcDir -SrcDir $srcDir -Type $vmType)"
+        }
         Write-Information "vm-setup: [dry-run] New-Item Directory $(Join-Path $vmDir 'scripts')"
     }
 
@@ -826,10 +942,10 @@ function Invoke-VMSetup {
         Write-Information "vm-setup: [dry-run] Write VM directory guide: $vmReadmePath"
     } elseif (Test-Path -LiteralPath $vmReadmeTemplate -PathType Leaf) {
         $vmDirShort = $vmDir -replace [regex]::Escape($env:USERPROFILE), '%USERPROFILE%'
-        $imagesDirShort = "$vmDirShort\images"
+        $srcDirShort = "$vmDirShort\src"
         (Get-Content -Path $vmReadmeTemplate -Raw) `
             -replace '__VM_DIR_DISPLAY__', $vmDirShort `
-            -replace '__IMAGES_DIR_DISPLAY__', $imagesDirShort `
+            -replace '__SRC_DIR_DISPLAY__', $srcDirShort `
             | Set-Content -Path $vmReadmePath -Encoding UTF8
         Write-Information "vm-setup: VM directory guide written: $vmReadmePath (template)"
     } else {
@@ -925,15 +1041,17 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     # Phase 1 — Build images (if absent)
     # -------------------------------------------------------------------------
 
-    # Prune orphaned dot-prefixed Packer build temp dirs from the images dir.
-    if (Test-Path -LiteralPath $imagesDir -PathType Container) {
-        # check-suppress:suppression_doc: probe -- no stale temp directories may exist; Where-Object handles empty result.
-        Get-ChildItem -LiteralPath $imagesDir -Directory -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -like '.*' } |
-            ForEach-Object {
-                Remove-Item $_.FullName -Recurse -Force
-                Write-Information "vm-setup: removing stale temporary build directory: $($_.Name)"
-            }
+    # Prune orphaned dot-prefixed Packer build temp dirs under src/<type>/.
+    if (Test-Path -LiteralPath $srcDir -PathType Container) {
+        foreach ($typeDir in Get-ChildItem -LiteralPath $srcDir -Directory -ErrorAction SilentlyContinue) {
+            # check-suppress:suppression_doc: probe -- no stale temp directories may exist; Where-Object handles empty result.
+            Get-ChildItem -LiteralPath $typeDir.FullName -Directory -ErrorAction SilentlyContinue |
+                Where-Object { $_.Name -like '.*' } |
+                ForEach-Object {
+                    Remove-Item $_.FullName -Recurse -Force
+                    Write-Information "vm-setup: removing stale temporary build directory: $($typeDir.Name)/$($_.Name)"
+                }
+        }
     }
 
     foreach ($vm in $vmDef.VMs) {
@@ -960,7 +1078,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 $env:NUCLEUS_VM_GUEST_HOSTNAME = $vm.hostname
                 Invoke-BuildNixosImage -VmName $vm.id -Accelerator $Accelerator `
                     -DiskBytes $diskBytes -MinSize $minSizeBytes `
-                    -VmsDir $vmsDir -ImagesDir $imagesDir `
+                    -VmsDir $vmsDir -SrcDir $srcDir `
                     -GuestAccountName $guestUsername -GuestSecret $guestPassword `
                     -GuestSecretHash $guestSecretHash `
                     -DryRun:$DryRun
@@ -981,14 +1099,14 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                         -GuestSecretHash $guestSecretHash `
                     -MinSize $minSizeBytes -GuestHostname $vm.hostname -HostFwds $hostFwds `
                     -Headful:$Headful `
-                    -VmsDir $vmsDir -ImagesDir $imagesDir -DryRun:$DryRun
+                    -VmsDir $vmsDir -SrcDir $srcDir -DryRun:$DryRun
             }
             'Android' {
                 # Android system/GSI images are fetched from the manifest
                 # Android group (gsiUrl) and cannot be automated here; the
                 # writable data/<id>.qcow2 userdata disk is provisioned in
                 # Phase 2.
-                Write-Information "vm-setup: Android image must be obtained from the manifest Android group (gsiUrl); place system/GSI images under $imagesDir"
+                Write-Information "vm-setup: Android image must be obtained from the manifest Android group (gsiUrl); place system/GSI images under $(Get-VmTypeSrcDir -SrcDir $srcDir -Type 'Android')"
             }
             'macOS' {
                 Write-Information "vm-setup: macOS image must be obtained manually (licensing restricts automation)"
@@ -1026,19 +1144,19 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
 
         # Pass A — disk provisioning (enabled-only, mirroring
         # vm_ensure_base_and_overlay): the writable runtime disk is a qcow2
-        # overlay over images/<type>.base.qcow2 (base = cp of the prebuilt
+        # overlay over src/<type>/overlay backing.qcow2 (base = cp of the prebuilt
         # golden) created with a tree-root-relative backing path.  Android's
         # userdata disk is a standalone qcow2 (no base).
         Write-Information "vm-setup: configuring VM '$($vm.name)'..."
 
         $minSizeBytes = ConvertFrom-SizeString $vm.minImageSize
-        $prebuilt = Join-Path -Path $imagesDir -ChildPath "$($vm.id).qcow2"
-        $prebuiltValid = (Test-Path $prebuilt) -and (Test-Qcow2Image -ImagePath $prebuilt -ImageLabel "pre-built image '$($vm.id)'" -MinBytes $minSizeBytes)
+        $prebuilt = Get-VmSrcPath -SrcDir $srcDir -Type $vm.type -Leaf $VM_PREBUILT_IMAGE
+        $prebuiltValid = (Test-Path $prebuilt) -and (Test-Qcow2Image -ImagePath $prebuilt -ImageLabel "pre-built image '$($vm.type)'" -MinBytes $minSizeBytes)
 
         if ($vm.type -eq 'Android') {
             # Android userdata: standalone writable qcow2 created at the
             # manifest disk size (system/GSI images are read-only payload
-            # under images/).  Mirrors the POSIX Android provisioning branch.
+            # under src/<type>/).  Mirrors the POSIX Android provisioning branch.
             $userdataPath = Join-Path -Path $dataDir -ChildPath "$($vm.id).qcow2"
             if (-not (Test-Path -LiteralPath $userdataPath -PathType Leaf)) {
                 $diskBytes = ConvertFrom-SizeString $vm.diskSize
@@ -1062,7 +1180,8 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         }
 
         $diskPath = Join-Path -Path $dataDir -ChildPath "$($vm.id).qcow2"
-        $basePath = Join-Path -Path $imagesDir -ChildPath "$($vm.type).base.qcow2"
+        $basePath = Get-VmSrcPath -SrcDir $srcDir -Type $vm.type -Leaf $VM_OVERLAY_BACKING
+        $backingRel = Get-VmOverlayBackingRelPath -Type $vm.type
         $diskCredentialMarker = Get-VMGuestSecretMarkerPath -BasePath $diskPath
 
         # Base/overlay provisioning (mirrors vm_ensure_base_and_overlay):
@@ -1111,7 +1230,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 if ($null -eq $qemuImg) {
                     Write-Warning "vm-setup: qemu-img not found; cannot create overlay for '$($vm.id)'"
                 } else {
-                    & $qemuImg create -f qcow2 -b "..\images\$($vm.type).base.qcow2" -F qcow2 $diskPath
+                    & $qemuImg create -f qcow2 -b $backingRel -F qcow2 $diskPath
                     if ($LASTEXITCODE -ne 0) {
                         Write-Warning "vm-setup: qemu-img create failed for overlay: $diskPath"
                     }
@@ -1119,7 +1238,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 Set-Content -Path $diskCredentialMarker -Value $guestSecretHash -Encoding UTF8
             } else {
                 Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$basePath'"
-                Write-Information "vm-setup: [dry-run] qemu-img create -f qcow2 -b '..\images\$($vm.type).base.qcow2' -F qcow2 '$diskPath'"
+                Write-Information "vm-setup: [dry-run] qemu-img create -f qcow2 -b '$backingRel' -F qcow2 '$diskPath'"
                 Write-Information "vm-setup: [dry-run] Set-Content '$diskCredentialMarker' '$guestSecretHash'"
             }
         } else {
@@ -1166,7 +1285,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             $expectedNames = @($vmDef.VMs | ForEach-Object { $_.id })
         }
         Invoke-GcOrphanDisk -ExpectedNames $expectedNames
-        Invoke-GcOrphanMarker
+        Invoke-GcOrphanMarker -ExpectedNames $expectedNames
         Invoke-GcOrphanDescriptor -ExpectedNames $expectedNames
         Write-Information 'vm-setup: GC — done'
     }
@@ -1268,19 +1387,20 @@ function Invoke-BuildNixosImage {
         [string]$DiskBytes,
         [string]$MinSize,
         [string]$VmsDir,
-        [string]$ImagesDir,
+        [string]$SrcDir,
         [string]$GuestAccountName,
         [string]$GuestSecret,
         [string]$GuestSecretHash,
         [switch]$DryRun
     )
 
-    $outPath = Join-Path $ImagesDir "$VmName.qcow2"
+    $vmType = 'NixOS'
+    $outPath = Get-VmSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PREBUILT_IMAGE
     $credentialMarkerPath = Get-VMGuestSecretMarkerPath -BasePath $outPath
     if (Test-Path $outPath) {
         if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing NixOS image' -MinBytes $MinSize) {
             if (Test-VMGuestSecretMarker -ExpectedHash $GuestSecretHash -MarkerPath $credentialMarkerPath) {
-                Write-Information "vm-setup: NixOS image already built for the current guest credentials (username=$GuestAccountName): $outPath"
+                Write-Information "vm-setup: NixOS image already built for '$VmName' with the current guest credentials (username=$GuestAccountName): $outPath"
                 return
             }
             Write-Warning "vm-setup: NixOS image guest credential drift detected; rebuilding image: $outPath"
@@ -1301,9 +1421,9 @@ function Invoke-BuildNixosImage {
     }
 
     $packerDir = Join-Path $VmsDir 'nixos'
-    $tmpOutput = Join-Path $ImagesDir "${VmName}-build"
+    $tmpOutput = Get-VmSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PACKER_BUILD_DIR
 
-    Write-Information "vm-setup: building NixOS image (accelerator=$Accelerator)..."
+    Write-Information "vm-setup: building NixOS image for '$VmName' (accelerator=$Accelerator)..."
 
     if ($DryRun) {
         Write-Information "vm-setup: [dry-run] Remove stale temporary output directory if present: $tmpOutput"
@@ -1369,10 +1489,8 @@ function Invoke-FidoWindowsIso {
     param(
         # Absolute path to the repository root (for locating vendor/Fido).
         [string]$RepoRoot,
-        # Directory where the downloaded ISO will be placed.
-        [string]$ImagesDir,
-        # VM name — used to name the cached ISO file.
-        [string]$VmName,
+        # Directory where the downloaded ISO will be placed (src/Windows/).
+        [string]$TypeSrcDir,
         # Windows edition to download (passed to Fido -Ed parameter).
         [string]$Edition = 'Pro',
         # Retry attempts for transient network errors.
@@ -1386,7 +1504,7 @@ function Invoke-FidoWindowsIso {
         return ''
     }
 
-    $cachedIso = Join-Path $ImagesDir "$VmName-installer.iso"
+    $cachedIso = Join-Path $TypeSrcDir $VM_WINDOWS_INSTALLER_ISO
 
     if ($DryRun) {
         Write-Information "vm-setup: [dry-run] & '$fidoScript' -Win 11 -Ed $Edition -Lang English -Arch x64 -Download -NoPrompt"
@@ -1471,7 +1589,7 @@ function Invoke-BuildWindowsImage {
         [int]$WindowsIsoRetries = 0,
         [string]$Accelerator,
         [string]$VmsDir,
-        [string]$ImagesDir,
+        [string]$SrcDir,
         [string]$RepoRoot = (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))))),
         [string]$WindowsEdition = 'Pro',
         [string]$GuestAccountName,
@@ -1484,7 +1602,9 @@ function Invoke-BuildWindowsImage {
         [switch]$DryRun
     )
 
-    $outPath = Join-Path $ImagesDir "$VmName.qcow2"
+    $vmType = 'Windows'
+    $windowsTypeSrcDir = Get-VmTypeSrcDir -SrcDir $SrcDir -Type $vmType
+    $outPath = Get-VmSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PREBUILT_IMAGE
     $credentialMarkerPath = Get-VMGuestSecretMarkerPath -BasePath $outPath
     if (Test-Path $outPath) {
         if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing Windows image' -MinBytes $MinSize) {
@@ -1508,7 +1628,7 @@ function Invoke-BuildWindowsImage {
 
     Write-Information "vm-setup: Windows ISO fallback order: cached installer -> Windows.isoUrl -> downloader ($WindowsIsoSource mode)"
 
-    $cachedIso = Join-Path $ImagesDir "$VmName-installer.iso"
+    $cachedIso = Get-VmSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_WINDOWS_INSTALLER_ISO
     if (-not $WindowsIso -and (Test-Path $cachedIso)) {
         Write-Information "vm-setup: using cached Windows installer: $cachedIso"
         $WindowsIso = $cachedIso
@@ -1567,8 +1687,7 @@ function Invoke-BuildWindowsImage {
     if (-not $WindowsIso -and $WindowsIsoSource -ne 'Url') {
         $WindowsIso = Invoke-FidoWindowsIso `
             -RepoRoot $RepoRoot `
-            -ImagesDir $ImagesDir `
-            -VmName $VmName `
+            -TypeSrcDir $windowsTypeSrcDir `
             -Edition $WindowsEdition `
             -Retries $WindowsIsoRetries `
             -DryRun:$DryRun
@@ -1595,7 +1714,7 @@ function Invoke-BuildWindowsImage {
     }
 
     $packerDir = Join-Path $VmsDir 'windows'
-    $tmpOutput = Join-Path $ImagesDir "${VmName}-build"
+    $tmpOutput = Get-VmSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PACKER_BUILD_DIR
 
     # check-suppress:suppression_doc: This repository currently standardizes Windows guest runtime on BIOS
     # (for example src/hosts/MacBook/vms.nix keeps UEFIBoot=false and
@@ -1709,7 +1828,7 @@ function Invoke-BuildWindowsImage {
             # check-suppress:suppression_doc: Packer qemu builder requires output_directory to not already exist.
             # Use a fresh temp tree per attempt so a failed try cannot poison the
             # next firmware/boot-strategy combination.
-            $attemptTempDir = Join-Path $ImagesDir ('.{0}.{1}.{2}.{3}' -f $VmName, $attempt.Firmware, $attempt.Boot, ([guid]::NewGuid().ToString('N')))
+            $attemptTempDir = Join-Path $windowsTypeSrcDir ('.{0}.{1}.{2}.{3}' -f $VmName, $attempt.Firmware, $attempt.Boot, ([guid]::NewGuid().ToString('N')))
             New-Item -ItemType Directory -Path $attemptTempDir -Force > $null
             $tmpOutput = Join-Path $attemptTempDir 'output'
             $packerLog = Join-Path $attemptTempDir 'packer.log'

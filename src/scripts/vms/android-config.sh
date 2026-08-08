@@ -2,7 +2,7 @@
 # Post-provision Android guest configuration: MindTheGapps sideload, ADB key
 # install, Magisk root, and fake Wi-Fi.
 #
-# Invoked by nucleus-vm android-config after vm_init sets MANIFEST, VM_DIR, IMAGES_DIR.
+# Invoked by nucleus-vm android-config after vm_init sets MANIFEST, VM_DIR, SRC_DIR.
 #
 # Usage: android-config.sh <vm-name> <vm-index> [--gapps] [--adb-keys]
 #        [--magisk] [--root] [--fake-wifi] [--fake-wifi-revert]
@@ -62,7 +62,7 @@ vm_android_config_gapps() {
   _vacg_vm_index="$1"
   _vacg_serial="$(vm_android_adb_serial "$_vacg_vm_index")"
   _vacg_url="$(jq -r ".VMs[$_vacg_vm_index].Android.gappsUrl" "$MANIFEST")"
-  _vacg_zip="$IMAGES_DIR/android-gapps.zip"
+  _vacg_zip="$(vm_src_path Android "$VM_ANDROID_GAPPS_ZIP")"
   _vacg_state=''
 
   if [ -z "$_vacg_url" ] || [ "$_vacg_url" = "null" ]; then

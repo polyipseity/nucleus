@@ -4,9 +4,9 @@
 # and virt-manager.  Guest VMs are declared in src/modules/VMs.json and
 # provisioned by scripts/vm.sh (run via `nucleus-vm setup`).
 #
-# Disk images are stored at ~/virtual machines/<name>.qcow2 in QCOW2 format,
-# enabling copy-based migration to UTM (macOS) or QEMU (Windows) without
-# conversion.  The directory is local-only and excluded from cloud sync.
+# Disk images are stored under ~/virtual machines/data/ and ~/virtual machines/src/
+# in QCOW2 format, enabling copy-based migration to UTM (macOS) or QEMU (Windows)
+# without conversion.  The directory is local-only and excluded from cloud sync.
 #
 # VirtioFS (virtiofsd) provides zero-copy host-directory sharing between the
 # NixOS host and Linux guests.  Each guest mounts the shared ~/dev tree at
@@ -72,7 +72,7 @@ let
     else
       "<disk type='file' device='disk'>\n"
       + "      <driver name='qemu' type='qcow2'/>\n"
-      + "      <source file='${vmDir}/images/${vm.Android.systemImage}'/>\n"
+      + "      <source file='${vmDir}/src/Android/${vm.Android.systemImage}'/>\n"
       + "      <target dev='vda' bus='virtio'/>\n"
       + "    </disk>\n"
       + "    <disk type='file' device='disk'>\n"
@@ -83,7 +83,7 @@ let
       + lib.optionalString ((vm ? Android) && vm.Android.gsiUrl != null) (
         "<disk type='file' device='disk'>\n"
         + "      <driver name='qemu' type='raw'/>\n"
-        + "      <source file='${vmDir}/images/${vm.Android.gsiImage}'/>\n"
+        + "      <source file='${vmDir}/src/Android/${vm.Android.gsiImage}'/>\n"
         + "      <target dev='vdc' bus='virtio'/>\n"
         + "      <readonly/>\n"
         + "    </disk>"
