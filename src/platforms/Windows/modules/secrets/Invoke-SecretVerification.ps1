@@ -60,8 +60,8 @@ function Invoke-SecretVerification {
     Path to this machine's SSH host private key (used only for the host-key
     existence advisory check).
 
-  .PARAMETER PrimaryUsername
-    Canonical primary username whose materialized files are inspected.
+  .PARAMETER Username
+    Username whose materialized secret artefacts are inspected.
 
   .PARAMETER SecretsDir
     Absolute path to the directory containing the SOPS secret YAML files
@@ -75,7 +75,7 @@ function Invoke-SecretVerification {
     Invoke-SecretVerification `
       -GpgExe 'C:\Program Files\GnuPG\bin\gpg.exe' `
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
-      -PrimaryUsername 'admin' `
+      -Username 'admin' `
       -SecretsDir '.\src\secrets' `
       -RepoRoot '.\'
 
@@ -92,7 +92,7 @@ function Invoke-SecretVerification {
     [string]$HostKeyPath,
 
     [Parameter(Mandatory = $true)]
-    [string]$PrimaryUsername,
+    [string]$Username,
 
     [Parameter(Mandatory = $true)]
     [string]$SecretsDir,
@@ -101,27 +101,31 @@ function Invoke-SecretVerification {
     [string]$RepoRoot
   )
 
-  if (-not (Test-PrimaryUser -PrimaryUsername $PrimaryUsername -Quiet)) {
-    return
-  }
-
   Write-Output "$($PSStyle.Foreground.Cyan)verification: running post-apply secret verification...$($PSStyle.Foreground.Default)"
 
-  $configDir = Join-Path -Path $HOME -ChildPath ".config\nucleus"
-  $managedGpgKeysManifest = Join-Path -Path $configDir -ChildPath "managed-gpg-keys"
-  $managedSshKeysManifest = Join-Path -Path $configDir -ChildPath "managed-ssh-keys"
-  $gitIdentityPath = Join-Path -Path $configDir -ChildPath "git-identity.env"
-  $sshDir = Join-Path -Path $HOME -ChildPath ".ssh"
-  $sshKeyPath = Join-Path -Path $sshDir -ChildPath "ssh_personal_$PrimaryUsername"
-  $sshPublicKeyPath = Join-Path -Path $sshDir -ChildPath "ssh_personal_$PrimaryUsername.pub"
+  $userHome = Resolve-SecretUserHomedir -Username $Username
+  if ([string]::IsNullOrWhiteSpace($userHome)) {
+    throw "verification: ERROR — could not resolve home directory for user '$Username'."
+  }
 
-  $sopsTestFiles = @(
-    (Join-Path -Path $SecretsDir -ChildPath "gpg-personal.yml"),
-    (Join-Path -Path $SecretsDir -ChildPath "ssh-personal.yml")
-  )
-  $usersSecretsDir = Join-Path -Path $SecretsDir -ChildPath "users"
+  $configDir = Join-Path -Path $userHome -ChildPath '.config\nucleus'
+  $managedGpgKeysManifest = Join-Path -Path $configDir -ChildPath 'managed-gpg-keys'
+  $managedSshKeysManifest = Join-Path -Path $configDir -ChildPath 'managed-ssh-keys'
+  $managedSshKeyPathsManifest = Join-Path -Path $configDir -ChildPath 'managed-ssh-key-paths'
+  $gitIdentityPath = Join-Path -Path $configDir -ChildPath 'git-identity.env'
+  $sshDir = Join-Path -Path $userHome -ChildPath '.ssh'
+  $sshKeyPath = Join-Path -Path $sshDir -ChildPath "ssh_personal_$Username"
+  $sshPublicKeyPath = Join-Path -Path $sshDir -ChildPath "ssh_personal_$Username.pub"
+
+  $sopsTestFiles = @()
+  $systemYmlPath = Join-Path -Path $SecretsDir -ChildPath 'system.yml'
+  if (Test-Path -Path $systemYmlPath -PathType Leaf) {
+    $sopsTestFiles += $systemYmlPath
+  }
+
+  $usersSecretsDir = Join-Path -Path $SecretsDir -ChildPath 'users'
   if (Test-Path -Path $usersSecretsDir) {
-    $userSecretFiles = Get-ChildItem -Path $usersSecretsDir -Filter "*.yml" -File -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- users dir may have no .yml files; null check below handles absence
+    $userSecretFiles = Get-ChildItem -Path $usersSecretsDir -Filter '*.yml' -File -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- users dir may have no .yml files; null check below handles absence
     if ($null -ne $userSecretFiles) {
       $userSecretFiles = $userSecretFiles | Select-Object -ExpandProperty FullName
       $sopsTestFiles += $userSecretFiles
@@ -140,7 +144,7 @@ function Invoke-SecretVerification {
   # 1. Materialization sanity: key files must exist and be non-empty.
   # -------------------------------------------------------------------------
   Write-Output "$($PSStyle.Foreground.BrightBlack)verification: [1/5] checking secret materialization...$($PSStyle.Foreground.Default)"
-  $sanityPaths = @($sshKeyPath, $sshPublicKeyPath, $managedGpgKeysManifest, $managedSshKeysManifest, $gitIdentityPath)
+  $sanityPaths = @($sshKeyPath, $sshPublicKeyPath, $managedGpgKeysManifest, $managedSshKeysManifest, $managedSshKeyPathsManifest, $gitIdentityPath)
   foreach ($sanityPath in $sanityPaths) {
     if (-not (Test-Path -Path $sanityPath) -or (Get-Item -Path $sanityPath).Length -eq 0) {
       throw "verification: ERROR — managed secret artefact missing or empty: $sanityPath"

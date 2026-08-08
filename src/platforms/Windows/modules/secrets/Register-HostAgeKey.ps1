@@ -145,11 +145,8 @@ function Register-HostAgeKey {
           "verify the marker comment is present and the file encoding is UTF-8."
   }
 
-  # Rewrap the three core secret YAMLs so the new machine recipient can decrypt them.
-  $sopsFiles = @(
-    (Join-Path -Path $SecretsDir -ChildPath "gpg-personal.yml"),
-    (Join-Path -Path $SecretsDir -ChildPath "ssh-personal.yml")
-  )
+  # Rewrap per-user secret YAMLs so the new machine recipient can decrypt them.
+  $sopsFiles = @()
   $usersSecretsDir = Join-Path -Path $SecretsDir -ChildPath "users"
   if (Test-Path -Path $usersSecretsDir) {
     $userSecretFiles = Get-ChildItem -Path $usersSecretsDir -Filter "*.yml" -File |

@@ -1,11 +1,10 @@
 function Sync-UserSecret {
   <#
   .SYNOPSIS
-    Materializes per-user SOPS secrets to the nucleus secrets directory.
+    Materializes per-user SOPS secrets for one managed user.
 
   .DESCRIPTION
-    Decrypts src/secrets/users/<username>.yml (when present) and writes individual
-    secret values to $HOME\.config\nucleus\secrets\.
+    Decrypts src/secrets/users/<username>.yml (when present) via Sync-SecretFile.
 
   .PARAMETER RepoRoot
     Absolute path to the repository root.
@@ -14,10 +13,10 @@ function Sync-UserSecret {
   .PARAMETER HostKeyPath
     Path to this machine's SSH host private key.
   .PARAMETER PrimarySshKeyPath
-    Path to the primary user's managed SSH private key.
+    Optional transition fallback passed through to Sync-SecretFile.
   .PARAMETER SopsExe
     Absolute path to the sops executable.
-  .PARAMETER PrimaryUsername
+  .PARAMETER Username
     Username whose per-user secrets file to materialize.
   #>
   param(
@@ -31,54 +30,32 @@ function Sync-UserSecret {
     [string]$HostKeyPath,
 
     [Parameter(Mandatory = $true)]
-    [string]$PrimarySshKeyPath,
-
-    [Parameter(Mandatory = $true)]
     [string]$SopsExe,
 
     [Parameter(Mandatory = $true)]
-    [string]$PrimaryUsername
+    [string]$Username,
+
+    [string]$PrimarySshKeyPath
   )
 
-  $userSecretFile = Join-Path $RepoRoot "src\secrets\users\$PrimaryUsername.yml"
+  $userSecretFile = Join-Path $RepoRoot "src\secrets\users\$Username.yml"
   if (-not (Test-Path -Path $userSecretFile -PathType Leaf)) {
     return
   }
 
-  Sync-SecretFile -FilePath $userSecretFile -GpgExe $GpgExe -HostKeyPath $HostKeyPath `
-    -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe -PrimaryUsername $PrimaryUsername
-
-  $secrets = Get-Secret -FilePath $userSecretFile -GpgExe $GpgExe `
-    -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe
-
-  $secretDir = Join-Path $HOME '.config\nucleus\secrets'
-  if (-not (Test-Path -Path $secretDir -PathType Container)) {
-    New-Item -ItemType Directory -Path $secretDir -Force > $null
+  $syncParams = @{
+    FilePath    = $userSecretFile
+    GpgExe      = $GpgExe
+    HostKeyPath = $HostKeyPath
+    RepoRoot    = $RepoRoot
+    SopsExe     = $SopsExe
+    Username    = $Username
+  }
+  if (-not [string]::IsNullOrWhiteSpace($PrimarySshKeyPath)) {
+    $syncParams['PrimarySshKeyPath'] = $PrimarySshKeyPath
   }
 
-  $rclonePassKey = 'rclone_config_pass'
-  $rclonePassValue = $secrets.$rclonePassKey
-  if (-not [string]::IsNullOrWhiteSpace($rclonePassValue)) {
-    $rclonePassFile = Join-Path $secretDir 'rclone-config-pass'
-    $existing = if (Test-Path -Path $rclonePassFile -PathType Leaf) {
-      Get-Content -Path $rclonePassFile -Raw -Encoding UTF8
-    }
-    else {
-      $null
-    }
-    if ($existing -ne $rclonePassValue) {
-      [System.IO.File]::WriteAllText($rclonePassFile, $rclonePassValue, [System.Text.UTF8Encoding]::new($false))
-      # Restrict to owner-read-only so the passphrase stays local.
-      $acl = Get-Acl -Path $rclonePassFile
-      $acl.SetAccessRuleProtection($true, $false)
-      $currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-      $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
-        $currentIdentity, 'Read', 'Allow'
-      )
-      $acl.SetAccessRule($rule)
-      Set-Acl -Path $rclonePassFile -AclObject $acl
-    }
-  }
+  Sync-SecretFile @syncParams
 
-  Write-Output "$($PSStyle.Foreground.Green)user-secrets: per-user secret materialization complete.$($PSStyle.Reset)"
+  Write-Output "$($PSStyle.Foreground.Green)user-secrets: per-user secret materialization complete for '$Username'.$($PSStyle.Reset)"
 }

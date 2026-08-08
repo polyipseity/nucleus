@@ -100,7 +100,18 @@ function Sync-WallpaperInventory {
       }
 
       Write-Output "$($PSStyle.Foreground.Cyan)Materializing wallpaper for $user`: $outputName$($PSStyle.Reset)"
-      Get-DecryptedBlob -FilePath $wallpaperFilePath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -OutputPath $outputPath -SopsExe $SopsExe
+      $getDecryptedBlobParams = @{
+        FilePath    = $wallpaperFilePath
+        GpgExe      = $GpgExe
+        HostKeyPath = $HostKeyPath
+        RepoRoot    = $RepoRoot
+        OutputPath  = $outputPath
+        SopsExe     = $SopsExe
+      }
+      if (-not [string]::IsNullOrWhiteSpace($PrimarySshKeyPath)) {
+        $getDecryptedBlobParams['PrimarySshKeyPath'] = $PrimarySshKeyPath
+      }
+      Get-DecryptedBlob @getDecryptedBlobParams
 
       if (Test-Path -LiteralPath $outputPath) {
         $decryptedWallpaper = Get-Item -LiteralPath $outputPath -Force

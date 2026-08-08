@@ -1,3 +1,184 @@
+function Resolve-SecretUserHomedir {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Username
+  )
+
+  if ($Username -eq $env:USERNAME -and -not [string]::IsNullOrWhiteSpace($HOME)) {
+    return $HOME
+  }
+
+  $candidate = Join-Path -Path $env:SystemDrive -ChildPath "Users\$Username"
+  if (Test-Path -LiteralPath $candidate -PathType Container) {
+    return $candidate
+  }
+
+  $userProfileRecord = Get-CimInstance -ClassName Win32_UserProfile -ErrorAction SilentlyContinue |  # check-suppress:suppression_doc: probe -- profile may not exist for every username; Where-Object filters to matches
+    Where-Object { $_.LocalPath -match "\\$([regex]::Escape($Username))$" } |
+    Select-Object -First 1
+  if ($null -ne $userProfileRecord -and -not [string]::IsNullOrWhiteSpace($userProfileRecord.LocalPath)) {
+    return $userProfileRecord.LocalPath
+  }
+
+  return $null
+}
+
+function Get-SecretUserName {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$RepoRoot
+  )
+
+  $usersDir = Join-Path -Path $RepoRoot -ChildPath 'src\secrets\users'
+  if (-not (Test-Path -LiteralPath $usersDir -PathType Container)) {
+    return @()
+  }
+
+  return @(Get-ChildItem -LiteralPath $usersDir -Filter '*.yml' -File |
+    ForEach-Object { $_.BaseName } |
+    Sort-Object)
+}
+
+function Get-SecretUserSshPrivateKeyPath {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$RepoRoot
+  )
+
+  $paths = [System.Collections.Generic.List[string]]::new()
+  foreach ($username in (Get-SecretUserName -RepoRoot $RepoRoot)) {
+    $userHome = Resolve-SecretUserHomedir -Username $username
+    if ([string]::IsNullOrWhiteSpace($userHome)) {
+      continue
+    }
+
+    $manifest = Join-Path -Path $userHome -ChildPath '.config\nucleus\managed-ssh-key-paths'
+    if (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) {
+      continue
+    }
+
+    foreach ($line in (Get-Content -LiteralPath $manifest)) {
+      $trimmed = $line.Trim()
+      if (-not [string]::IsNullOrWhiteSpace($trimmed)) {
+        $paths.Add($trimmed)
+      }
+    }
+  }
+
+  return @($paths)
+}
+
+function Invoke-SopsDecrypt {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$SopsExe,
+
+    [Parameter(Mandatory = $true)]
+    [string[]]$SopsArgs,
+
+    [Parameter(Mandatory = $true)]
+    [string]$GpgExe,
+
+    [Parameter(Mandatory = $true)]
+    [string]$HostKeyPath,
+
+    [Parameter(Mandatory = $true)]
+    [string]$RepoRoot,
+
+    [string]$MachineAgeKeyPath = (Join-Path -Path $env:ProgramData -ChildPath 'nucleus\sops\age\machine.txt'),
+
+    [string]$PrimarySshKeyPath
+  )
+
+  $clearAgeEnv = {
+    # check-suppress:suppression_doc: cleanup-after-failure in finally block; env var may not be set.
+    Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction Ignore
+    # check-suppress:suppression_doc: cleanup-after-failure in finally block; env var may not be set.
+    Remove-Item Env:SOPS_AGE_KEY_FILE -ErrorAction Ignore
+  }
+
+  if (Test-Path -Path $HostKeyPath) {
+    Write-Output "$($PSStyle.Foreground.Green)Found machine SSH key. Trying machine-key decryption first...$($PSStyle.Reset)"
+    $env:SOPS_AGE_SSH_PRIVATE_KEY_FILE = $HostKeyPath
+    try {
+      $output = & $SopsExe @SopsArgs
+      if ($LASTEXITCODE -eq 0) {
+        return $output
+      }
+
+      Write-Output "$($PSStyle.Foreground.Yellow)Machine-key decryption failed. Trying machine age key file...$($PSStyle.Reset)"
+    }
+    finally {
+      & $clearAgeEnv
+    }
+  }
+
+  if (Test-Path -LiteralPath $MachineAgeKeyPath -PathType Leaf) {
+    Write-Output "$($PSStyle.Foreground.Green)Found machine age key file. Trying machine-age decryption...$($PSStyle.Reset)"
+    $env:SOPS_AGE_KEY_FILE = $MachineAgeKeyPath
+    try {
+      $output = & $SopsExe @SopsArgs
+      if ($LASTEXITCODE -eq 0) {
+        return $output
+      }
+
+      Write-Output "$($PSStyle.Foreground.Yellow)Machine-age decryption failed. Trying user SSH keys...$($PSStyle.Reset)"
+    }
+    finally {
+      & $clearAgeEnv
+    }
+  }
+
+  foreach ($userSshKeyPath in (Get-SecretUserSshPrivateKeyPath -RepoRoot $RepoRoot)) {
+    if (-not (Test-Path -LiteralPath $userSshKeyPath -PathType Leaf)) {
+      continue
+    }
+
+    Write-Output "$($PSStyle.Foreground.Green)Trying user SSH key: $userSshKeyPath$($PSStyle.Reset)"
+    $env:SOPS_AGE_SSH_PRIVATE_KEY_FILE = $userSshKeyPath
+    try {
+      $output = & $SopsExe @SopsArgs
+      if ($LASTEXITCODE -eq 0) {
+        return $output
+      }
+    }
+    finally {
+      & $clearAgeEnv
+    }
+  }
+
+  if (-not [string]::IsNullOrWhiteSpace($PrimarySshKeyPath) -and (Test-Path -Path $PrimarySshKeyPath)) {
+    Write-Output "$($PSStyle.Foreground.Green)Found primary SSH key. Trying primary-ssh decryption...$($PSStyle.Reset)"
+    $env:SOPS_AGE_SSH_PRIVATE_KEY_FILE = $PrimarySshKeyPath
+    try {
+      $output = & $SopsExe @SopsArgs
+      if ($LASTEXITCODE -eq 0) {
+        return $output
+      }
+
+      Write-Output "$($PSStyle.Foreground.Yellow)Primary-ssh decryption failed. Falling back to GPG keyring...$($PSStyle.Reset)"
+    }
+    finally {
+      & $clearAgeEnv
+    }
+  }
+
+  $secretKeyInfo = & $GpgExe --list-secret-keys --with-colons
+  $hasGpgSecretKeys = ($secretKeyInfo -and ($secretKeyInfo -match "^(sec|ssb):"))
+  if ($hasGpgSecretKeys) {
+    Write-Output "$($PSStyle.Foreground.Cyan)Decrypting with GPG keyring...$($PSStyle.Reset)"
+    $output = & $SopsExe @SopsArgs
+    if ($LASTEXITCODE -eq 0) {
+      return $output
+    }
+  }
+  else {
+    Write-Output "$($PSStyle.Foreground.Yellow)No GPG secret keys detected.$($PSStyle.Reset)"
+  }
+
+  return $null
+}
+
 function Get-Secret {
   <#
   .SYNOPSIS
@@ -7,11 +188,12 @@ function Get-Secret {
   .DESCRIPTION
     Attempts decryption in priority order:
       1. Machine SSH key (age recipient derived from this machine's SSH host key).
-         The key path is passed via the SOPS_AGE_SSH_PRIVATE_KEY_FILE env var
-         and cleared in a `finally` block so it is never left in the environment.
-      2. GPG keyring.
-      3. Primary personal SSH key (age recipient derived from
-         ssh_personal_<user>.pub).
+      2. Machine age key file when present.
+      3. Each private SSH key listed in every user's
+         ~/.config/nucleus/managed-ssh-key-paths manifest (users sorted by
+         src/secrets/users/*.yml filename).
+      4. Optional primary personal SSH key during transition.
+      5. GPG keyring.
 
     The decrypted payload is parsed from JSON and returned as a PowerShell
     object so callers can access named fields with dot notation.
@@ -26,9 +208,12 @@ function Get-Secret {
     Path to this machine's SSH host private key backing the age recipient.
     When the file does not exist, machine-key decryption is skipped.
 
+  .PARAMETER RepoRoot
+    Absolute path to the nucleus repository root (enumerates src/secrets/users).
+
   .PARAMETER PrimarySshKeyPath
-    Path to the primary user's managed SSH private key used as the final
-    fallback age decryption identity.
+    Optional transition fallback: path to a managed SSH private key tried after
+    user manifests and before the GPG keyring.
 
   .PARAMETER SopsExe
     Absolute path to the sops executable.
@@ -39,7 +224,7 @@ function Get-Secret {
   .EXAMPLE
     $secrets = Get-Secret -FilePath '.\secrets.yml' -GpgExe 'gpg.exe' `
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
-      -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" -SopsExe 'sops.exe'
+      -RepoRoot 'C:\Users\admin\nucleus' -SopsExe 'sops.exe'
   #>
   param(
     [Parameter(Mandatory = $true)]
@@ -52,60 +237,26 @@ function Get-Secret {
     [string]$HostKeyPath,
 
     [Parameter(Mandatory = $true)]
-    [string]$PrimarySshKeyPath,
+    [string]$RepoRoot,
 
     [Parameter(Mandatory = $true)]
-    [string]$SopsExe
+    [string]$SopsExe,
+
+    [string]$PrimarySshKeyPath
   )
 
-  $sopsArgs = @("--decrypt", "--output-format", "json", $FilePath)
+  $sopsArgs = @('--decrypt', '--output-type', 'json', $FilePath)
+  $decryptedOutput = Invoke-SopsDecrypt `
+    -SopsExe $SopsExe `
+    -SopsArgs $sopsArgs `
+    -GpgExe $GpgExe `
+    -HostKeyPath $HostKeyPath `
+    -RepoRoot $RepoRoot `
+    -PrimarySshKeyPath $PrimarySshKeyPath
 
-  if (Test-Path -Path $HostKeyPath) {
-    Write-Output "$($PSStyle.Foreground.Green)Found machine SSH key. Trying machine-key decryption first...$($PSStyle.Reset)"
-    $env:SOPS_AGE_SSH_PRIVATE_KEY_FILE = $HostKeyPath
-
-    try {
-      return (& $SopsExe @sopsArgs | ConvertFrom-Json)
-    }
-    catch {
-      Write-Output "$($PSStyle.Foreground.Yellow)Machine-key decryption failed. Falling back to GPG keyring...$($PSStyle.Reset)"
-    }
-    finally {
-      # check-suppress:suppression_doc: cleanup-after-failure in finally block; env var may not be set.
-      Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction Ignore
-    }
+  if ($null -eq $decryptedOutput) {
+    throw "Unable to decrypt '$FilePath'. Machine SSH key, machine age key, user SSH keys, and GPG keyring were unavailable or failed."
   }
 
-  $secretKeyInfo = & $GpgExe --list-secret-keys --with-colons
-  $hasGpgSecretKeys = ($secretKeyInfo -and ($secretKeyInfo -match "^(sec|ssb):"))
-  if ($hasGpgSecretKeys) {
-    try {
-      Write-Output "$($PSStyle.Foreground.Cyan)Decrypting with GPG keyring...$($PSStyle.Reset)"
-      return (& $SopsExe @sopsArgs | ConvertFrom-Json)
-    }
-    catch {
-      Write-Output "$($PSStyle.Foreground.Yellow)GPG decryption failed. Trying primary SSH key fallback...$($PSStyle.Reset)"
-    }
-  }
-  else {
-    Write-Output "$($PSStyle.Foreground.Yellow)No GPG secret keys detected. Trying primary SSH key fallback...$($PSStyle.Reset)"
-  }
-
-  if (Test-Path -Path $PrimarySshKeyPath) {
-    Write-Output "$($PSStyle.Foreground.Green)Found primary SSH key. Trying primary-ssh decryption...$($PSStyle.Reset)"
-    $env:SOPS_AGE_SSH_PRIVATE_KEY_FILE = $PrimarySshKeyPath
-
-    try {
-      return (& $SopsExe @sopsArgs | ConvertFrom-Json)
-    }
-    catch {
-      throw "Primary-ssh decryption failed for '$FilePath' after machine-key and GPG attempts."
-    }
-    finally {
-      # check-suppress:suppression_doc: cleanup-after-failure in finally block; env var may not be set.
-      Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction Ignore
-    }
-  }
-
-  throw "Unable to decrypt '$FilePath'. Machine SSH key, GPG keyring, and primary SSH key were unavailable or failed."
+  return ($decryptedOutput | ConvertFrom-Json)
 }

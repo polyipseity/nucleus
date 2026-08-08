@@ -6,7 +6,6 @@
     "Get-VMRunningIdList": "scripts/vm.ps1",
     "Sync-AgentsSkillManifest": "src/platforms/Windows/modules/user/Sync-AgentsSkillManifest.ps1",
     "Sync-AgentsClawHubSkillManifest": "src/platforms/Windows/modules/user/Sync-AgentsClawHubSkillManifest.ps1",
-    "Sync-SecretCatalog": "src/platforms/Windows/modules/secrets/Sync-SecretCatalog.ps1",
     "Sync-VSCodeExtensionManifest": "src/platforms/Windows/modules/editors/Sync-VSCodeExtensionManifest.ps1",
     "Sync-VSCodeSettingManifest": "src/platforms/Windows/modules/editors/Sync-VSCodeSettingManifest.ps1",
     "Sync-DevRepoCatalog": "src/platforms/Windows/modules/user/Sync-DevRepoCatalog.ps1",

@@ -91,7 +91,6 @@ function Sync-JellyfinAccountCatalog {
     [Parameter(Mandatory)]
     [string]$HostKeyPath,
 
-    [Parameter(Mandatory)]
     [string]$PrimarySshKeyPath,
 
     [Parameter(Mandatory)]
@@ -120,7 +119,17 @@ function Sync-JellyfinAccountCatalog {
     }
 
     try {
-      $secrets = Get-Secret -FilePath $secretFile -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe
+      $getSecretParams = @{
+        FilePath    = $secretFile
+        GpgExe      = $GpgExe
+        HostKeyPath = $HostKeyPath
+        RepoRoot    = $RepoRoot
+        SopsExe     = $SopsExe
+      }
+      if (-not [string]::IsNullOrWhiteSpace($PrimarySshKeyPath)) {
+        $getSecretParams['PrimarySshKeyPath'] = $PrimarySshKeyPath
+      }
+      $secrets = Get-Secret @getSecretParams
     }
     catch {
       Write-Warning "jellyfin: failed to decrypt $secretFile; skipping account declarations for $($userRecord.name): $($_.Exception.Message)"

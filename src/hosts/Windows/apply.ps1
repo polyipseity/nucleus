@@ -387,13 +387,12 @@ if (-not $Elevated) {
 # ConvertFrom-SshEd25519PublicKeyToAgePubKey must be loaded before any file that
 # calls it (Register-HostAgeKey, Invoke-SecretVerification).
 . (Join-Path -Path $secretsModuleDir -ChildPath "ConvertFrom-SshEd25519PublicKeyToAgePubKey.ps1")
-. (Join-Path -Path $secretsModuleDir -ChildPath "Get-DecryptedBlob.ps1")
 . (Join-Path -Path $secretsModuleDir -ChildPath "Get-Secret.ps1")
+. (Join-Path -Path $secretsModuleDir -ChildPath "Get-DecryptedBlob.ps1")
 . (Join-Path -Path $secretsModuleDir -ChildPath "Invoke-JITSecretMaterialization.ps1")
 . (Join-Path -Path $secretsModuleDir -ChildPath "Invoke-SecretVerification.ps1")
 . (Join-Path -Path $secretsModuleDir -ChildPath "Register-HostAgeKey.ps1")
 . (Join-Path -Path $secretsModuleDir -ChildPath "Remove-ManagedSecret.ps1")
-. (Join-Path -Path $secretsModuleDir -ChildPath "Sync-SecretCatalog.ps1")
 . (Join-Path -Path $secretsModuleDir -ChildPath "Sync-SecretFile.ps1")
 . (Join-Path -Path $secretsModuleDir -ChildPath "Sync-UserSecret.ps1")
 # system/: machine-level services and infrastructure (WinGet, SSH host, RDP, power, AI).
@@ -621,29 +620,20 @@ if ($EnableHostAgeKeyRegistration) {
     -RepoRoot $repoRoot
 }
 
-# Materialize user-scoped secrets once before DSC resources run.
-$secretPreflightFiles = @("gpg-personal.yml", "ssh-personal.yml")
-foreach ($secretFile in $secretPreflightFiles) {
-  $secretPath = Join-Path -Path $secretsDir -ChildPath $secretFile
-  if (-not (Test-Path -Path $secretPath)) {
-    throw "Required secret file was not found: $secretPath"
-  }
-
-  # Fail fast if current machine identities cannot decrypt managed secrets.
-  Get-Secret -FilePath $secretPath -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe > $null
-}
-
 if ($EnableSecretsParity) {
-  Sync-SecretCatalog -SecretsDir $secretsDir -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
-  # Materialize per-user secrets from src/secrets/users/<username>.yml when present.
-  # No-op when the file does not exist so bootstrap runs continue uninterrupted.
-  Sync-UserSecret `
-    -RepoRoot $repoRoot `
-    -GpgExe $gpgExe `
-    -HostKeyPath $machineSshHostKeyPath `
-    -PrimarySshKeyPath $primarySshKeyPath `
-    -SopsExe $sopsExe `
-    -PrimaryUsername $primaryUser
+  foreach ($user in $Users) {
+    $syncUserSecretParams = @{
+      RepoRoot    = $repoRoot
+      GpgExe      = $gpgExe
+      HostKeyPath = $machineSshHostKeyPath
+      SopsExe     = $sopsExe
+      Username    = $user
+    }
+    if (-not [string]::IsNullOrWhiteSpace($primarySshKeyPath)) {
+      $syncUserSecretParams['PrimarySshKeyPath'] = $primarySshKeyPath
+    }
+    Sync-UserSecret @syncUserSecretParams
+  }
 }
 else {
   Remove-ManagedSecret -Users $Users
@@ -656,7 +646,17 @@ $systemSecretsDir = Join-Path -Path $env:ProgramData -ChildPath "nucleus\secrets
 $null = New-Item -Path $systemSecretsDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
 $systemYmlPath = Join-Path -Path $secretsDir -ChildPath "system.yml"
 if (Test-Path -Path $systemYmlPath -PathType Leaf) {
-  $systemSecrets = Get-Secret -FilePath $systemYmlPath -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -PrimarySshKeyPath $primarySshKeyPath -SopsExe $sopsExe
+  $getSystemSecretParams = @{
+    FilePath    = $systemYmlPath
+    GpgExe      = $gpgExe
+    HostKeyPath = $machineSshHostKeyPath
+    RepoRoot    = $repoRoot
+    SopsExe     = $sopsExe
+  }
+  if (-not [string]::IsNullOrWhiteSpace($primarySshKeyPath)) {
+    $getSystemSecretParams['PrimarySshKeyPath'] = $primarySshKeyPath
+  }
+  $systemSecrets = Get-Secret @getSystemSecretParams
   foreach ($key in @('ai_openrouter_api_key', 'ai_opencode_go_api_key', 'ai_opencode_zen_api_key')) {
     $value = $systemSecrets.$key
     if (-not [string]::IsNullOrWhiteSpace($value)) {
@@ -679,7 +679,7 @@ $wallpaperOutputDir = Join-Path -Path $HOME -ChildPath "Pictures\wallpapers"
 Invoke-SecretVerification `
   -GpgExe $gpgExe `
   -HostKeyPath $machineSshHostKeyPath `
-  -PrimaryUsername $primaryUser `
+  -Username $primaryUser `
   -SecretsDir $secretsDir `
   -RepoRoot $repoRoot
 

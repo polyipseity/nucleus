@@ -1,31 +1,30 @@
 function Invoke-JITSecretMaterialization {
   <#
   .SYNOPSIS
-    Materializes specific named secret files on demand (JIT).
+    Materializes specific per-user secret files on demand (JIT).
 
   .DESCRIPTION
-    For each name in $SecretNames, resolves the corresponding .yml file under
-    $SecretsDir (appending .yml if omitted) and calls Sync-SecretFile.
-    Throws if a requested file does not exist.
+    For each name in $SecretNames, resolves src/secrets/users/<name>.yml and
+    calls Sync-SecretFile. Throws if a requested file does not exist.
 
-  .PARAMETER SecretsDir
-    Absolute path to SOPS-encrypted YAML files directory.
+  .PARAMETER RepoRoot
+    Absolute path to the nucleus repository root.
   .PARAMETER SecretNames
-    Names of the secret files to materialize (without .yml extension).
+    Usernames whose per-user secret files should be materialized.
   .PARAMETER GpgExe
     Absolute path to the gpg executable.
   .PARAMETER HostKeyPath
     Path to this machine's SSH host private key.
   .PARAMETER PrimarySshKeyPath
-    Path to the primary user's managed SSH private key.
+    Optional transition fallback passed through to Sync-SecretFile.
   .PARAMETER SopsExe
     Absolute path to the sops executable.
-  .PARAMETER PrimaryUsername
-    Canonical primary username.
+  .PARAMETER Username
+    Username whose home directory receives materialized payloads.
   #>
   param(
     [Parameter(Mandatory = $true)]
-    [string]$SecretsDir,
+    [string]$RepoRoot,
 
     [Parameter(Mandatory = $true)]
     [string[]]$SecretNames,
@@ -37,27 +36,34 @@ function Invoke-JITSecretMaterialization {
     [string]$HostKeyPath,
 
     [Parameter(Mandatory = $true)]
-    [string]$PrimarySshKeyPath,
-
-    [Parameter(Mandatory = $true)]
     [string]$SopsExe,
 
     [Parameter(Mandatory = $true)]
-    [string]$PrimaryUsername
+    [string]$Username,
+
+    [string]$PrimarySshKeyPath
   )
 
-  if (-not (Test-PrimaryUser -PrimaryUsername $PrimaryUsername)) {
-    return
-  }
-
   foreach ($secretName in $SecretNames) {
-    $normalizedSecretFile = if ($secretName.EndsWith(".yml")) { $secretName } else { "$secretName.yml" }
-    $secretPath = Join-Path -Path $SecretsDir -ChildPath $normalizedSecretFile
+    $normalizedUserFile = if ($secretName.EndsWith('.yml')) { $secretName } else { "$secretName.yml" }
+    $secretPath = Join-Path -Path $RepoRoot -ChildPath (Join-Path -Path 'src\secrets\users' -ChildPath $normalizedUserFile)
 
     if (-not (Test-Path -Path $secretPath)) {
       throw "Requested JIT secret file was not found: $secretPath"
     }
 
-    Sync-SecretFile -FilePath $secretPath -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe -PrimaryUsername $PrimaryUsername
+    $syncParams = @{
+      FilePath    = $secretPath
+      GpgExe      = $GpgExe
+      HostKeyPath = $HostKeyPath
+      RepoRoot    = $RepoRoot
+      SopsExe     = $SopsExe
+      Username    = $Username
+    }
+    if (-not [string]::IsNullOrWhiteSpace($PrimarySshKeyPath)) {
+      $syncParams['PrimarySshKeyPath'] = $PrimarySshKeyPath
+    }
+
+    Sync-SecretFile @syncParams
   }
 }

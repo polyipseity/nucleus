@@ -3,8 +3,8 @@
     Per-file SOPS secret materialization for managed SSH/GPG payloads.
 
 .DESCRIPTION
-    Decrypts one SOPS file and converges only managed SSH/GPG payloads for the
-    configured primary user.  Also maintains managed-key manifest files in
+    Decrypts one SOPS file and converges prefix-driven payloads for the
+    configured user.  Also maintains managed-key manifest files in
     ~/.config/nucleus/ to enable rotation detection and agent flush on rotation,
     mirroring the POSIX gpg-import and ssh-key-adopt Home Manager activations.
 
@@ -19,44 +19,26 @@ function Sync-SecretFile {
     Decrypts one SOPS secret file and materializes its payloads on disk.
 
   .DESCRIPTION
-    Calls Get-Secrets to decrypt $FilePath, then processes five
-    username-scoped flat keys:
+    Calls Get-Secret to decrypt $FilePath once, then processes prefix-driven
+    keys:
 
-    ssh_personal_${username}
-      Written to $HOME\.ssh\ssh_personal_${username} using ASCII encoding
-      (no BOM, no trailing newline). The file is only overwritten when content
-      changes.
-
-    ssh_personal_${username}_pub
-      Written to $HOME\.ssh\ssh_personal_${username}.pub using ASCII encoding
-      (no BOM, no trailing newline). The file is only overwritten when content
-      changes.  The SHA-256 fingerprint is recorded in
-      $HOME\.config\nucleus\managed-ssh-keys for rotation detection; the
-      SSH agent is flushed (ssh-add -D) when the fingerprint changes.
-
-    ssh_personal_${username}_rsa
-      Written to $HOME\.ssh\ssh_personal_${username}_rsa using ASCII encoding
-      (no BOM, no trailing newline). The file is only overwritten when content
-      changes.
-
-    ssh_personal_${username}_rsa_pub
-      Written to $HOME\.ssh\ssh_personal_${username}_rsa.pub using ASCII
-      encoding (no BOM, no trailing newline). The file is only overwritten when
-      content changes.
-
-    gpg_personal_${username}
+    gpg_*
       Imported into the current GPG keyring via stdin (`gpg --batch --import -`).
-      No temporary plaintext files are created.  The managed primary fingerprint
-      is recorded in $HOME\.config\nucleus\managed-gpg-keys immediately after a
-      successful import so the key is tracked even if ownertrust enforcement
-      fails transiently.
+      The managed primary fingerprint is recorded in
+      $HOME\.config\nucleus\managed-gpg-keys.
 
-    git_identity_${username}
-      Written to $HOME\.config\nucleus\git-identity.env so Git identity can be
-      converged from SOPS-managed values instead of static mappings.
+    ssh_*
+      Prefix is stripped and the remainder is written under $HOME\.ssh\
+      (for example ssh_ssh_personal_admin -> ssh_personal_admin). Private key
+      paths are recorded in $HOME\.config\nucleus\managed-ssh-key-paths.
+      Public keys update $HOME\.config\nucleus\managed-ssh-keys for rotation
+      detection and SSH agent flush.
 
-    $HOME\.ssh is created if it does not already exist.
-    $HOME\.config\nucleus is created if it does not already exist.
+    git_identity
+      Written to $HOME\.config\nucleus\git-identity.env.
+
+    rclone_config_pass
+      Written to $HOME\.config\nucleus\secrets\rclone-config-pass.
 
   .PARAMETER FilePath
     Absolute path to the SOPS-encrypted YAML file.
@@ -67,21 +49,23 @@ function Sync-SecretFile {
   .PARAMETER HostKeyPath
     Path to this machine's SSH host private key used as the age decryption key.
 
-  .PARAMETER PrimarySshKeyPath
-    Path to the primary user's managed SSH private key used as the final
-    fallback age decryption identity.
+  .PARAMETER RepoRoot
+    Absolute path to the nucleus repository root.
 
   .PARAMETER SopsExe
     Absolute path to the sops executable.
 
-  .PARAMETER PrimaryUsername
-    Canonical primary username allowed to materialize/import secrets.
+  .PARAMETER Username
+    Username whose home directory receives materialized payloads.
+
+  .PARAMETER PrimarySshKeyPath
+    Optional transition fallback passed through to Get-Secret.
 
   .EXAMPLE
-    Sync-SecretFile -FilePath '.\ssh-personal.yml' -GpgExe 'gpg.exe' `
+    Sync-SecretFile -FilePath '.\polyipseity.yml' -GpgExe 'gpg.exe' `
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
-      -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" -SopsExe 'sops.exe' `
-      -PrimaryUsername 'admin'
+      -RepoRoot 'C:\Users\admin\nucleus' -SopsExe 'sops.exe' `
+      -Username 'polyipseity'
 
   .NOTES
     Environment variables: (none)
@@ -98,184 +82,93 @@ function Sync-SecretFile {
     [string]$HostKeyPath,
 
     [Parameter(Mandatory = $true)]
-    [string]$PrimarySshKeyPath,
+    [string]$RepoRoot,
 
     [Parameter(Mandatory = $true)]
     [string]$SopsExe,
 
     [Parameter(Mandatory = $true)]
-    [string]$PrimaryUsername
+    [string]$Username,
+
+    [string]$PrimarySshKeyPath
   )
 
-  if (-not (Test-PrimaryUser -PrimaryUsername $PrimaryUsername -Quiet)) {
-    return
+  $userHome = Resolve-SecretUserHomedir -Username $Username
+  if ([string]::IsNullOrWhiteSpace($userHome)) {
+    throw "secrets: could not resolve home directory for user '$Username'."
   }
 
   $secretFileInfo = Get-Item -Path $FilePath
-  $gpgSecretName = "gpg_personal_$PrimaryUsername"
-  $gitIdentityConfigDir = Join-Path -Path $HOME -ChildPath ".config\nucleus"
-  $gitIdentityPath = Join-Path -Path $gitIdentityConfigDir -ChildPath "git-identity.env"
-  $gitIdentitySecretName = "git_identity_$PrimaryUsername"
-  # Manifest files record managed key fingerprints for rotation detection,
-  # mirroring the POSIX gpg-import and ssh-key-adopt Home Manager activations.
-  $managedGpgKeysManifest = Join-Path -Path $gitIdentityConfigDir -ChildPath 'managed-gpg-keys'
-  $managedSshKeysManifest = Join-Path -Path $gitIdentityConfigDir -ChildPath 'managed-ssh-keys'
-  $sshDir = Join-Path -Path $HOME -ChildPath ".ssh"
-  $sshPublicSecretName = "ssh_personal_${PrimaryUsername}_pub"
-  $sshRsaPublicSecretName = "ssh_personal_${PrimaryUsername}_rsa_pub"
-  $sshRsaSecretName = "ssh_personal_${PrimaryUsername}_rsa"
-  $sshSecretName = "ssh_personal_$PrimaryUsername"
+  $configDir = Join-Path -Path $userHome -ChildPath '.config\nucleus'
+  $gitIdentityPath = Join-Path -Path $configDir -ChildPath 'git-identity.env'
+  $managedGpgKeysManifest = Join-Path -Path $configDir -ChildPath 'managed-gpg-keys'
+  $managedSshKeysManifest = Join-Path -Path $configDir -ChildPath 'managed-ssh-keys'
+  $managedSshKeyPathsManifest = Join-Path -Path $configDir -ChildPath 'managed-ssh-key-paths'
+  $rclonePassPath = Join-Path -Path $configDir -ChildPath 'secrets\rclone-config-pass'
+  $sshDir = Join-Path -Path $userHome -ChildPath '.ssh'
+  $managedSshPrivateKeyPaths = [System.Collections.Generic.List[string]]::new()
 
   if (-not (Test-Path -Path $sshDir)) {
     New-Item -ItemType Directory -Path $sshDir -Force > $null
   }
 
-  if (-not (Test-Path -Path $gitIdentityConfigDir)) {
-    New-Item -ItemType Directory -Path $gitIdentityConfigDir -Force > $null
+  if (-not (Test-Path -Path $configDir)) {
+    New-Item -ItemType Directory -Path $configDir -Force > $null
   }
 
-  # Script block that removes inherited ACEs and grants only the current user
-  # FullControl on a file.  Removing inherited entries eliminates the default
-  # Users/Everyone grants that make private key and config material world-readable.
-  # Mirrors POSIX chmod 600.  Called unconditionally so the ACL is idempotent
-  # across apply runs even when file content has not changed.
+  $rclonePassDir = Split-Path -Path $rclonePassPath -Parent
+  if (-not (Test-Path -Path $rclonePassDir)) {
+    New-Item -ItemType Directory -Path $rclonePassDir -Force > $null
+  }
+
   $restrictAcl = {
     param([string]$Path)
     $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
-    # /inheritance:r removes inherited ACEs; /grant:r replaces any existing rule.
-    # Soft-failure: icacls may not be available on non-NTFS volumes or in some
-    # sandboxed environments; warn and continue rather than aborting the apply.
     & icacls.exe $Path /inheritance:r /grant:r "${currentUser}:(F)" > $null
     if ($LASTEXITCODE -ne 0) {
       Write-Warning "secrets: could not restrict ACL on $Path (icacls exit $LASTEXITCODE)"
     }
   }
 
+  $restrictAclReadOnly = {
+    param([string]$Path)
+    $acl = Get-Acl -Path $Path
+    $acl.SetAccessRuleProtection($true, $false)
+    $currentIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
+    $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+      $currentIdentity, 'Read', 'Allow'
+    )
+    $acl.SetAccessRule($rule)
+    Set-Acl -Path $Path -AclObject $acl
+  }
+
   Write-Output "$($PSStyle.Foreground.Cyan)Processing secrets from: $($secretFileInfo.Name)$($PSStyle.Reset)"
-  $jsonSecrets = Get-Secret -FilePath $secretFileInfo.FullName -GpgExe $GpgExe -HostKeyPath $HostKeyPath -PrimarySshKeyPath $PrimarySshKeyPath -SopsExe $SopsExe
-
-  if ($null -ne $jsonSecrets.PSObject.Properties[$sshSecretName]) {
-    $sshKeyPath = Join-Path -Path $sshDir -ChildPath $sshSecretName
-    $sshKeyValue = [string]$jsonSecrets.$sshSecretName
-    $existingValue = if (Test-Path -Path $sshKeyPath) {
-      Get-Content -Path $sshKeyPath -Raw
-    }
-    else {
-      ""
-    }
-
-    if ($existingValue -ne $sshKeyValue) {
-      $sshKeyValue | Out-File -FilePath $sshKeyPath -Encoding ascii -NoNewline
-      Write-Output "$($PSStyle.Foreground.Cyan)  Updated SSH key: $sshSecretName$($PSStyle.Reset)"
-    }
-    # Restrict ACL unconditionally so idempotent re-applies re-lock the key even
-    # when content is unchanged.  Mirrors POSIX chmod 600.
-    & $restrictAcl -Path $sshKeyPath
+  $getSecretParams = @{
+    FilePath           = $secretFileInfo.FullName
+    GpgExe             = $GpgExe
+    HostKeyPath        = $HostKeyPath
+    RepoRoot           = $RepoRoot
+    SopsExe            = $SopsExe
   }
+  if (-not [string]::IsNullOrWhiteSpace($PrimarySshKeyPath)) {
+    $getSecretParams['PrimarySshKeyPath'] = $PrimarySshKeyPath
+  }
+  $jsonSecrets = Get-Secret @getSecretParams
 
-  if ($null -ne $jsonSecrets.PSObject.Properties[$sshPublicSecretName]) {
-    $sshPublicKeyPath = Join-Path -Path $sshDir -ChildPath "${sshSecretName}.pub"
-    $sshPublicKeyValue = [string]$jsonSecrets.$sshPublicSecretName
-    $existingPublicValue = if (Test-Path -Path $sshPublicKeyPath) {
-      Get-Content -Path $sshPublicKeyPath -Raw
-    }
-    else {
-      ""
-    }
+  foreach ($property in $jsonSecrets.PSObject.Properties) {
+    $secretKey = $property.Name
+    $secretValue = [string]$property.Value
 
-    if ($existingPublicValue -ne $sshPublicKeyValue) {
-      $sshPublicKeyValue | Out-File -FilePath $sshPublicKeyPath -Encoding ascii -NoNewline
-      Write-Output "$($PSStyle.Foreground.Cyan)  Updated SSH public key: $sshPublicSecretName$($PSStyle.Reset)"
-    }
-
-    # Track the SHA-256 fingerprint of the SSH public key for rotation
-    # detection and SSH agent flush on rotation.  Mirrors the POSIX
-    # ssh-key-adopt Home Manager activation in secrets.nix.
-    try {
-      $sshKeyParts = $sshPublicKeyValue.Trim() -split '\s+'
-      if ($sshKeyParts.Length -ge 2) {
-        $sshKeyBytes = [System.Convert]::FromBase64String($sshKeyParts[1])
-        $sha256Hasher = [System.Security.Cryptography.SHA256]::Create()
-        $hashBytes = $sha256Hasher.ComputeHash($sshKeyBytes)
-        $newSshFingerprint = 'SHA256:' + [System.Convert]::ToBase64String($hashBytes).TrimEnd('=')
-
-        $oldSshFingerprint = if (Test-Path -Path $managedSshKeysManifest) {
-          (Get-Content -Path $managedSshKeysManifest -Raw).Trim()
-        }
-        else {
-          ''
-        }
-
-        if ($oldSshFingerprint -ne $newSshFingerprint) {
-          # Flush SSH agent when fingerprint changes, including on first provision
-          # (absent manifest → empty $oldSshFingerprint differs from new key).
-          # This evicts any pre-placed key already loaded in the agent before
-          # the managed key was materialized.  Soft-failure so apply proceeds
-          # even when no agent is running.  Parity with POSIX ssh-key-adopt behavior.
-          $sshAddCommand = Get-Command 'ssh-add' -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- ssh-add may not be installed; $null check below handles absence
-          if ($null -ne $sshAddCommand) {
-            # 2>$null is intentional: ssh-add -D emits "Could not connect to
-            # your authentication agent" when no agent is running.  That
-            # failure is benign — nothing to flush — and the noise would
-            # obscure the meaningful rotation log line below.
-            & $sshAddCommand.Source -D *> $null
-            Write-Output "$($PSStyle.Foreground.Cyan)  Flushed SSH agent due to key rotation ($oldSshFingerprint -> $newSshFingerprint)$($PSStyle.Reset)"
-          }
-        }
-
-        $newSshFingerprint | Out-File -FilePath $managedSshKeysManifest -Encoding ascii -NoNewline
-        # Restrict ACL unconditionally; manifest contains key fingerprints that
-        # should not be world-readable.  Mirrors POSIX chmod 600.
-        & $restrictAcl -Path $managedSshKeysManifest
+    if ($secretKey.StartsWith('gpg_')) {
+      if ([string]::IsNullOrWhiteSpace($secretValue)) {
+        continue
       }
-    }
-    catch {
-      Write-Warning "secrets: could not update SSH fingerprint manifest: $_"
-    }
-  }
 
-  if ($null -ne $jsonSecrets.PSObject.Properties[$sshRsaSecretName]) {
-    $sshRsaKeyPath = Join-Path -Path $sshDir -ChildPath $sshRsaSecretName
-    $sshRsaKeyValue = [string]$jsonSecrets.$sshRsaSecretName
-    $existingRsaValue = if (Test-Path -Path $sshRsaKeyPath) {
-      Get-Content -Path $sshRsaKeyPath -Raw
-    }
-    else {
-      ""
-    }
-
-    if ($existingRsaValue -ne $sshRsaKeyValue) {
-      $sshRsaKeyValue | Out-File -FilePath $sshRsaKeyPath -Encoding ascii -NoNewline
-      Write-Output "$($PSStyle.Foreground.Cyan)  Updated SSH key: $sshRsaSecretName$($PSStyle.Reset)"
-    }
-    # Restrict ACL unconditionally.  Mirrors POSIX chmod 600.
-    & $restrictAcl -Path $sshRsaKeyPath
-  }
-
-  if ($null -ne $jsonSecrets.PSObject.Properties[$sshRsaPublicSecretName]) {
-    $sshRsaPublicKeyPath = Join-Path -Path $sshDir -ChildPath "${sshRsaSecretName}.pub"
-    $sshRsaPublicKeyValue = [string]$jsonSecrets.$sshRsaPublicSecretName
-    $existingRsaPublicValue = if (Test-Path -Path $sshRsaPublicKeyPath) {
-      Get-Content -Path $sshRsaPublicKeyPath -Raw
-    }
-    else {
-      ""
-    }
-
-    if ($existingRsaPublicValue -ne $sshRsaPublicKeyValue) {
-      $sshRsaPublicKeyValue | Out-File -FilePath $sshRsaPublicKeyPath -Encoding ascii -NoNewline
-      Write-Output "$($PSStyle.Foreground.Cyan)  Updated SSH public key: $sshRsaPublicSecretName$($PSStyle.Reset)"
-    }
-  }
-
-  if ($null -ne $jsonSecrets.PSObject.Properties[$gpgSecretName]) {
-    $gpgKeyValue = [string]$jsonSecrets.$gpgSecretName
-    if (-not [string]::IsNullOrWhiteSpace($gpgKeyValue)) {
       $firstFingerprint = $null
-      $showOnlyOutput = $gpgKeyValue | & $GpgExe --batch --import-options show-only --dry-run --with-colons --import -
+      $showOnlyOutput = $secretValue | & $GpgExe --batch --import-options show-only --dry-run --with-colons --import -
       foreach ($line in $showOnlyOutput) {
-        if ($line -like "fpr:*") {
-          $parts = $line -split ":"
+        if ($line -like 'fpr:*') {
+          $parts = $line -split ':'
           if ($parts.Length -ge 10 -and -not [string]::IsNullOrWhiteSpace($parts[9])) {
             $firstFingerprint = $parts[9]
             break
@@ -283,51 +176,129 @@ function Sync-SecretFile {
         }
       }
 
-      $gpgKeyValue | & $GpgExe --batch --import - > $null
+      $secretValue | & $GpgExe --batch --import - > $null
       if ($LASTEXITCODE -ne 0) {
-        throw "Failed to import GPG material '$gpgSecretName'. Exit code: $LASTEXITCODE"
+        throw "Failed to import GPG material '$secretKey'. Exit code: $LASTEXITCODE"
       }
 
       if ([string]::IsNullOrWhiteSpace($firstFingerprint)) {
         throw "Imported GPG key material but no managed primary fingerprint was detected for ownertrust enforcement."
       }
 
-      # Write the manifest before ownertrust so the key is tracked even if
-      # ownertrust enforcement fails transiently (e.g. GnuPG 2.5 + Kyber IPC
-      # edge cases on first bootstrap).  Mirrors the POSIX gpg-import order in
-      # secrets.nix.
       $firstFingerprint | Out-File -FilePath $managedGpgKeysManifest -Encoding ascii -NoNewline
-      # Restrict ACL unconditionally; manifest contains the managed GPG
-      # fingerprint and must not be world-readable.  Mirrors POSIX chmod 600.
       & $restrictAcl -Path $managedGpgKeysManifest
 
-      # Ownertrust is best-effort: demote failure to a warning so a transient
-      # GnuPG IPC error doesn't abort the whole apply run.  The key is already
-      # in the keyring and tracked in the manifest at this point.
       "${firstFingerprint}:6:" | & $GpgExe --import-ownertrust > $null
       if ($LASTEXITCODE -ne 0) {
         Write-Warning "secrets: ownertrust enforcement for '$firstFingerprint' exited $LASTEXITCODE — key imported and manifest updated, ownertrust may need a retry"
       }
 
-      Write-Output "$($PSStyle.Foreground.Cyan)  Imported GPG material: $gpgSecretName$($PSStyle.Reset)"
+      Write-Output "$($PSStyle.Foreground.Cyan)  Imported GPG material: $secretKey$($PSStyle.Reset)"
+      continue
+    }
+
+    if ($secretKey.StartsWith('ssh_')) {
+      $relativeSshPath = $secretKey.Substring(4)
+      $sshKeyPath = Join-Path -Path $sshDir -ChildPath $relativeSshPath
+      $sshKeyParent = Split-Path -Path $sshKeyPath -Parent
+      if (-not (Test-Path -Path $sshKeyParent)) {
+        New-Item -ItemType Directory -Path $sshKeyParent -Force > $null
+      }
+
+      $existingValue = if (Test-Path -Path $sshKeyPath) {
+        Get-Content -Path $sshKeyPath -Raw
+      }
+      else {
+        ''
+      }
+
+      if ($existingValue -ne $secretValue) {
+        $secretValue | Out-File -FilePath $sshKeyPath -Encoding ascii -NoNewline
+        Write-Output "$($PSStyle.Foreground.Cyan)  Updated SSH key: $relativeSshPath$($PSStyle.Reset)"
+      }
+
+      & $restrictAcl -Path $sshKeyPath
+
+      if (-not $relativeSshPath.EndsWith('.pub')) {
+        $managedSshPrivateKeyPaths.Add($sshKeyPath)
+      }
+      else {
+        try {
+          $sshKeyParts = $secretValue.Trim() -split '\s+'
+          if ($sshKeyParts.Length -ge 2) {
+            $sshKeyBytes = [System.Convert]::FromBase64String($sshKeyParts[1])
+            $sha256Hasher = [System.Security.Cryptography.SHA256]::Create()
+            $hashBytes = $sha256Hasher.ComputeHash($sshKeyBytes)
+            $newSshFingerprint = 'SHA256:' + [System.Convert]::ToBase64String($hashBytes).TrimEnd('=')
+
+            $oldSshFingerprint = if (Test-Path -Path $managedSshKeysManifest) {
+              (Get-Content -Path $managedSshKeysManifest -Raw).Trim()
+            }
+            else {
+              ''
+            }
+
+            if ($oldSshFingerprint -ne $newSshFingerprint) {
+              $sshAddCommand = Get-Command 'ssh-add' -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- ssh-add may not be installed; $null check below handles absence
+              if ($null -ne $sshAddCommand) {
+                & $sshAddCommand.Source -D *> $null
+                Write-Output "$($PSStyle.Foreground.Cyan)  Flushed SSH agent due to key rotation ($oldSshFingerprint -> $newSshFingerprint)$($PSStyle.Reset)"
+              }
+            }
+
+            $newSshFingerprint | Out-File -FilePath $managedSshKeysManifest -Encoding ascii -NoNewline
+            & $restrictAcl -Path $managedSshKeysManifest
+          }
+        }
+        catch {
+          Write-Warning "secrets: could not update SSH fingerprint manifest: $_"
+        }
+      }
+
+      continue
+    }
+
+    if ($secretKey -eq 'git_identity') {
+      $existingIdentityValue = if (Test-Path -Path $gitIdentityPath) {
+        Get-Content -Path $gitIdentityPath -Raw
+      }
+      else {
+        ''
+      }
+
+      if ($existingIdentityValue -ne $secretValue) {
+        $secretValue | Out-File -FilePath $gitIdentityPath -Encoding ascii -NoNewline
+        Write-Output "$($PSStyle.Foreground.Cyan)  Updated Git identity payload: $secretKey$($PSStyle.Reset)"
+      }
+
+      & $restrictAcl -Path $gitIdentityPath
+      continue
+    }
+
+    if ($secretKey -eq 'rclone_config_pass') {
+      if ([string]::IsNullOrWhiteSpace($secretValue)) {
+        continue
+      }
+
+      $existingRclonePass = if (Test-Path -Path $rclonePassPath -PathType Leaf) {
+        Get-Content -Path $rclonePassPath -Raw -Encoding UTF8
+      }
+      else {
+        $null
+      }
+
+      if ($existingRclonePass -ne $secretValue) {
+        [System.IO.File]::WriteAllText($rclonePassPath, $secretValue, [System.Text.UTF8Encoding]::new($false))
+        & $restrictAclReadOnly -Path $rclonePassPath
+        Write-Output "$($PSStyle.Foreground.Cyan)  Updated rclone config passphrase$($PSStyle.Reset)"
+      }
     }
   }
 
-  if ($null -ne $jsonSecrets.PSObject.Properties[$gitIdentitySecretName]) {
-    $gitIdentityValue = [string]$jsonSecrets.$gitIdentitySecretName
-    $existingIdentityValue = if (Test-Path -Path $gitIdentityPath) {
-      Get-Content -Path $gitIdentityPath -Raw
-    }
-    else {
-      ""
-    }
-
-    if ($existingIdentityValue -ne $gitIdentityValue) {
-      $gitIdentityValue | Out-File -FilePath $gitIdentityPath -Encoding ascii -NoNewline
-      Write-Output "$($PSStyle.Foreground.Cyan)  Updated Git identity payload: $gitIdentitySecretName$($PSStyle.Reset)"
-    }
-    # Restrict ACL unconditionally; git-identity.env contains name/email and
-    # should not be world-readable.  Mirrors POSIX chmod 600.
-    & $restrictAcl -Path $gitIdentityPath
+  if ($managedSshPrivateKeyPaths.Count -gt 0) {
+    $managedSshPrivateKeyPaths |
+      Sort-Object -Unique |
+      Out-File -FilePath $managedSshKeyPathsManifest -Encoding ascii
+    & $restrictAcl -Path $managedSshKeyPathsManifest
   }
 }

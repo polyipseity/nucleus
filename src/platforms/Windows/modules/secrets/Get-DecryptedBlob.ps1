@@ -5,7 +5,7 @@ function Get-DecryptedBlob {
     $OutputPath.
 
   .DESCRIPTION
-    Uses the same machine-ssh -> gpg -> primary-ssh fallback chain as
+    Uses the same machine-ssh -> machine-age -> user-ssh -> gpg fallback chain as
     Get-Secret, but writes raw decrypted bytes to a file via `sops --output`.
     Used for binary assets such as wallpaper images.
 
@@ -18,9 +18,12 @@ function Get-DecryptedBlob {
   .PARAMETER HostKeyPath
     Path to this machine's SSH host private key backing the age recipient.
 
+  .PARAMETER RepoRoot
+    Absolute path to the nucleus repository root (enumerates src/secrets/users).
+
   .PARAMETER PrimarySshKeyPath
-    Path to the primary user's managed SSH private key used as the final
-    fallback age decryption identity.
+    Optional transition fallback: path to a managed SSH private key tried after
+    user manifests and before the GPG keyring.
 
   .PARAMETER OutputPath
     Destination path where the decrypted bytes will be written.
@@ -31,7 +34,7 @@ function Get-DecryptedBlob {
   .EXAMPLE
     Get-DecryptedBlob -FilePath '.\wallpaper.jpg.sops' -GpgExe 'gpg.exe' `
       -HostKeyPath 'C:\ProgramData\ssh\ssh_host_ed25519_key' `
-      -PrimarySshKeyPath "C:\Users\admin\.ssh\ssh_personal_admin" `
+      -RepoRoot 'C:\Users\admin\nucleus' `
       -OutputPath 'C:\Users\admin\Pictures\wallpaper.jpg' -SopsExe 'sops.exe'
   #>
   param(
@@ -45,65 +48,27 @@ function Get-DecryptedBlob {
     [string]$HostKeyPath,
 
     [Parameter(Mandatory = $true)]
-    [string]$PrimarySshKeyPath,
+    [string]$RepoRoot,
 
     [Parameter(Mandatory = $true)]
     [string]$OutputPath,
 
     [Parameter(Mandatory = $true)]
-    [string]$SopsExe
+    [string]$SopsExe,
+
+    [string]$PrimarySshKeyPath
   )
 
-  $sopsArgs = @("--decrypt", "--output", $OutputPath, $FilePath)
+  $sopsArgs = @('--decrypt', '--output', $OutputPath, $FilePath)
+  $decryptedOutput = Invoke-SopsDecrypt `
+    -SopsExe $SopsExe `
+    -SopsArgs $sopsArgs `
+    -GpgExe $GpgExe `
+    -HostKeyPath $HostKeyPath `
+    -RepoRoot $RepoRoot `
+    -PrimarySshKeyPath $PrimarySshKeyPath
 
-  if (Test-Path -Path $HostKeyPath) {
-    $env:SOPS_AGE_SSH_PRIVATE_KEY_FILE = $HostKeyPath
-
-    try {
-      & $SopsExe @sopsArgs
-      if ($LASTEXITCODE -eq 0) {
-        return
-      }
-
-      Write-Output "Machine-key decryption failed for '$FilePath'. Falling back to GPG keyring..."
-    }
-    finally {
-      # check-suppress:suppression_doc: cleanup-after-failure in finally block; env var may not be set.
-      Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction Ignore
-    }
+  if ($null -eq $decryptedOutput) {
+    throw "Failed to decrypt blob '$FilePath'. Machine SSH key, machine age key, user SSH keys, and GPG keyring were unavailable or failed."
   }
-
-  $secretKeyInfo = & $GpgExe --list-secret-keys --with-colons
-  $hasGpgSecretKeys = ($secretKeyInfo -and ($secretKeyInfo -match "^(sec|ssb):"))
-  if ($hasGpgSecretKeys) {
-    & $SopsExe @sopsArgs
-    if ($LASTEXITCODE -eq 0) {
-      return
-    }
-
-    Write-Output "GPG decryption failed for '$FilePath'. Trying primary SSH key fallback..."
-  }
-  else {
-    Write-Output "No GPG secret keys detected. Trying primary SSH key fallback for '$FilePath'..."
-  }
-
-  if (Test-Path -Path $PrimarySshKeyPath) {
-    Write-Output "Found primary SSH key. Trying primary-ssh decryption for '$FilePath'..."
-    $env:SOPS_AGE_SSH_PRIVATE_KEY_FILE = $PrimarySshKeyPath
-
-    try {
-      & $SopsExe @sopsArgs
-      if ($LASTEXITCODE -eq 0) {
-        return
-      }
-
-      throw "Primary-ssh decryption failed for '$FilePath' after machine-key and GPG attempts."
-    }
-    finally {
-      # check-suppress:suppression_doc: cleanup-after-failure in finally block; env var may not be set.
-      Remove-Item Env:SOPS_AGE_SSH_PRIVATE_KEY_FILE -ErrorAction Ignore
-    }
-  }
-
-  throw "Failed to decrypt blob '$FilePath'. Machine SSH key, GPG keyring, and primary SSH key were unavailable or failed."
 }
