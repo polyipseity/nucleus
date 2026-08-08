@@ -17,7 +17,7 @@
             "description": "Android guest configuration. Required when type is Android; forbidden for every other type. All inner properties are required.",
             "properties": {
               "gsiImage": {
-                "description": "GSI image filename under the shared VM images directory.",
+                "description": "GSI image filename under src/<type>/ (e.g. src/Android/GSI.img).",
                 "type": "string"
               },
               "gappsUrl": {
@@ -40,11 +40,11 @@
                 ]
               },
               "systemImage": {
-                "description": "System image filename under the shared VM images directory.",
+                "description": "System image filename under src/<type>/ (e.g. src/Android/system image.qcow2).",
                 "type": "string"
               },
               "userdataImage": {
-                "description": "Userdata image filename under the shared VM images directory.",
+                "description": "Userdata image filename under data/ (writable runtime disk).",
                 "type": "string"
               }
             },
