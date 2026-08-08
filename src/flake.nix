@@ -363,6 +363,8 @@
               "${thisScriptsBundle}/${scriptName}.sh"
             else
               "${thisScriptTree}/${scriptName}.sh";
+          repoRootFile =
+            if repoRoot != "" then pkgs.writeText "nucleus-repo-root" (repoRoot + "\n") else null;
         in
         pkgs.runCommand "${name}-nucleus-app"
           {
@@ -383,8 +385,8 @@
               ln -s ${thisScriptTree}/src "$out/src"
             ''}
 
-            ${lib.optionalString (repoRoot != "") ''
-              printf '%s\n' '${lib.escapeShellArg repoRoot}' > "$out/.nucleus-repo-root"
+            ${lib.optionalString (repoRootFile != null) ''
+              cp ${repoRootFile} "$out/.nucleus-repo-root"
             ''}
 
             ${
@@ -427,7 +429,34 @@
                   done
                   # Use logical pwd (not -P) so $0 stays under $out/scripts and
                   # SCRIPT_DIR/../src resolves to the sibling script-tree symlink.
-                  _script="$(CDPATH="" cd -- "$(dirname -- "$_self")/.." && pwd)/${scriptName}.sh"
+                  _store_root="$(CDPATH="" cd -- "$(dirname -- "$_self")/.." && pwd)"
+                  _store_script="$_store_root/${scriptName}.sh"
+                  _script="$_store_script"
+                  _repo_root=""
+                  if [ -n "''${NUCLEUS_REPO_ROOT:-}" ] && [ -f "''${NUCLEUS_REPO_ROOT}/src/flake.nix" ]; then
+                    _repo_root="$NUCLEUS_REPO_ROOT"
+                  elif [ -f /etc/nucleus/repo-root ]; then
+                    IFS= read -r _repo_root < /etc/nucleus/repo-root || _repo_root=""
+                    case "$_repo_root" in
+                      /*) ;;
+                      *) _repo_root="" ;;
+                    esac
+                    if [ -n "$_repo_root" ] && [ ! -f "$_repo_root/src/flake.nix" ]; then
+                      _repo_root=""
+                    fi
+                  elif [ -f "$_store_root/.nucleus-repo-root" ]; then
+                    IFS= read -r _repo_root < "$_store_root/.nucleus-repo-root" || _repo_root=""
+                    case "$_repo_root" in
+                      /*) ;;
+                      *) _repo_root="" ;;
+                    esac
+                    if [ -n "$_repo_root" ] && [ ! -f "$_repo_root/src/flake.nix" ]; then
+                      _repo_root=""
+                    fi
+                  fi
+                  if [ -n "$_repo_root" ] && [ -f "$_repo_root/${scriptName}.sh" ]; then
+                    _script="$_repo_root/${scriptName}.sh"
+                  fi
                   exec "$_script" "$@"
                   WRAPPER
                   chmod +x "$out/bin/nucleus-${name}"
