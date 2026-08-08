@@ -1,0 +1,234 @@
+# shellcheck shell=bash
+# shellcheck source=../check-lib.sh
+# (provides say, error, warn, require_command, derive_repo_root, register_step)
+. "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
+
+register_step "repository-policy" 14 "Repository policy" run_14_repository_policy
+
+run_14_repository_policy() {
+  local _has_args="$1" _repo_root="$2"; shift 2
+  local _files=("$@")
+  local _failed=0
+
+  say "--- config method compliance ---"
+  run_14_config_method_compliance "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+
+  say "--- activation token placeholder ---"
+  run_14_activation_token_placeholder "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+
+  say "--- preflight install command policy ---"
+  run_14_preflight_install_command_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+
+  say "--- embedded content enforcement ---"
+  run_14_embedded_content_enforcement "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+
+  if [ "$_failed" -ne 0 ]; then
+    error "repository policy check failed"
+    return 1
+  fi
+  say "repository policy passed."
+  return 0
+}
+
+run_14_config_method_compliance() {
+  local _has_args="$1" _repo_root="$2"; shift 2
+  local _files=("$@")
+  cd "$_repo_root" || return 1
+  local _cfg_errors=0
+  local _cfg_dir="src/modules/configs"
+  local _cfg_par_tmpdir
+  _cfg_par_tmpdir=$(mktemp -d) || { error "failed to create temp dir"; _cfg_errors=$((_cfg_errors + 1)); }
+
+  # Single-pass: collect all config file basenames, run one grep across src/
+  local _cfg_patterns
+  _cfg_patterns=$(mktemp) || { error "failed to create temp file"; _cfg_errors=$((_cfg_errors + 1)); }
+  find "$_cfg_dir" -type f -exec basename {} \; | sort -u > "$_cfg_patterns"
+  # ref: allow-and-deny-lists.instructions.md#B1 -- structural invariants; vendored code and config methods are different concerns
+  find src/ \( -name '*.nix' -o -name '*.ps1' -o -name '*.sh' \) -not -path '*/vendor/*' -not -path '*/configs/*' -print \
+    | filter_gitignored \
+    | xargs grep -n -F -f "$_cfg_patterns" 2>/dev/null \
+    || true  # check-suppress:suppression_doc: xargs grep exits 1 when no config basename collisions are found; no match is the expected state
+  rm -f "$_cfg_patterns"
+
+  # Check for configs. method usage
+  # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
+  find "$_cfg_dir" -type f -print0 \
+    | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+      _tmpdir="$1"
+      _f="$2"
+      _basename=$(basename "$_f")
+      # Skip infrastructure files and Nix modules inside configs/  # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
+      case "$_basename" in
+        .gitkeep|.gitignore|*.schema.json) exit 0 ;;
+      esac
+      _result_file="$_tmpdir/${_basename}.result"
+      _relpath="${_f#*configs/}"
+      # Check for disallowed config methods
+      if grep -q "^[^#]*configs\." "$_f" 2>/dev/null; then
+        echo "ERROR:$_relpath uses configs. method" >> "$_result_file"
+      fi
+    ' _ "$_cfg_par_tmpdir"
+
+  # Aggregate results
+  local _result_file _eline
+  for _result_file in "$_cfg_par_tmpdir"/*.result; do
+    [ -f "$_result_file" ] || continue
+    while IFS= read -r _eline; do
+      case "$_eline" in
+        ERROR:*)
+          _cfg_errors=$((_cfg_errors + 1))
+          error "${_eline#ERROR:}"
+          ;;
+      esac
+    done < "$_result_file"
+  done
+  rm -rf -- "$_cfg_par_tmpdir"
+
+  if [ "$_cfg_errors" -gt 0 ]; then
+    error "config method compliance check failed with $_cfg_errors error(s)"
+    return 1
+  fi
+  say "config method compliance passed."
+  return 0
+}
+
+run_14_activation_token_placeholder() {
+  local _has_args="$1" _repo_root="$2"; shift 2
+  local _files=("$@")
+  cd "$_repo_root" || return 1
+  local _act_temp
+  _act_temp="$(mktemp)" || { error "failed to create temp file"; return 1; }
+
+  if $_has_args; then
+    for _f in "${_files[@]}"; do
+      case "$_f" in *.sh|*.zsh) printf '%s\0' "$_f" ;; esac
+    done | xargs -0 -P "$PARALLEL_JOBS" grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' 2>/dev/null > "$_act_temp" || true  # check-suppress:suppression_doc: grep exits 1 when no token placeholders are found; an empty result file is the clean state
+  else
+    find src/scripts -type f \( -name '*.sh' -o -name '*.zsh' \) -print0 \
+      | xargs -0 -P "$PARALLEL_JOBS" grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' 2>/dev/null > "$_act_temp" || true  # check-suppress:suppression_doc: grep exits 1 when no token placeholders are found; an empty result file is the clean state
+  fi
+
+  if [ -s "$_act_temp" ]; then
+    error "token placeholder strings found in script comments:"
+    sort -u "$_act_temp" | while IFS= read -r _line; do
+      error "  $_line"
+    done
+    rm -f "$_act_temp"
+    return 1
+  else
+    say "no token placeholder strings in script comments."
+  fi
+
+  rm -f "$_act_temp"
+  return 0
+}
+
+run_14_preflight_install_command_policy() {
+  local _has_args="$1" _repo_root="$2"; shift 2
+  local _files=("$@")
+  cd "$_repo_root" || return 1
+
+  local _s21_errors=0
+  # Exclude this check's own sibling file: its source contains the literal pattern text.
+  # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; self-refs are dynamic
+  local _s21_self_ps1
+  _s21_self_ps1="$(basename "${BASH_SOURCE[0]}" .sh).ps1"
+
+  # Collect PowerShell files
+  local _ps1_files=()
+  if $_has_args; then
+    if [ ${#PS1_FILES[@]} -gt 0 ]; then
+      # Drop this check's own sibling file from the scoped set
+      for _f in "${PS1_FILES[@]}"; do
+        [ "$(basename "$_f")" = "$_s21_self_ps1" ] || _ps1_files+=("$_f")
+      done
+    fi
+  else
+    # Find all .ps1 files outside vendor/ and this check's own sibling
+    while IFS= read -r -d '' _f; do
+      _ps1_files+=("$_f")
+    done < <(find . -name '*.ps1' -not -name "$_s21_self_ps1" -not -path './vendor/*' -not -path './.git/*' -print0)
+    # Apply gitignore filter as a second pass (find -print0 uses null separators,
+    # which filter_gitignored doesn't support directly)
+    mapfile -t _ps1_files < <(printf '%s\n' "${_ps1_files[@]}" | filter_gitignored)
+  fi
+
+  if [ "${#_ps1_files[@]}" -gt 0 ]; then
+    local _s21_tmpdir
+    _s21_tmpdir=$(mktemp -d) || { error "failed to create temp dir"; _s21_errors=$((_s21_errors + 1)); }
+
+    # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
+    printf '%s\0' "${_ps1_files[@]}" \
+      | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+        _f="$2"
+        _out="$1/$(echo "$_f" | tr "/" "_").out"
+        grep -Hn "Assert-ToolAvailable.*-InstallCommand" "$_f" >> "$_out" 2>/dev/null || true  # check-suppress:suppression_doc: grep exits 1 when a file has no InstallCommand matches; an empty .out file is the clean state
+      ' _ "$_s21_tmpdir"
+
+    local _f _err
+    for _f in "$_s21_tmpdir"/*.out; do
+      [ -f "$_f" ] || continue
+      while IFS= read -r _err; do
+        _s21_errors=$((_s21_errors + 1))
+        error "$_err"
+      done < "$_f"
+    done
+
+    rm -rf -- "$_s21_tmpdir"
+
+    if [ "$_s21_errors" -gt 0 ]; then
+      say "  Remove -InstallCommand parameters from Assert-ToolAvailable calls — preflight checks must hard-fail, not suggest install."
+      return 1
+    fi
+  fi
+
+  say "no preflight InstallCommand violations found."
+  return 0
+}
+
+run_14_embedded_content_enforcement() {
+  local _has_args="$1" _repo_root="$2"; shift 2
+  local _files=("$@")
+  cd "$_repo_root" || return 1
+
+  local _s18_errors=0
+  # Exclude this check's own file: its source contains the literal heredoc-detection patterns.
+  # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
+  local _s18_self_sh
+  _s18_self_sh="$(basename "${BASH_SOURCE[0]}")"
+
+  # Embedded-content policy scope for POSIX: src/scripts/** (see .agents/instructions/embedded-content.instructions.md).
+  local _sh_files=()
+  if $_has_args; then
+    for _f in "${_files[@]}"; do
+      case "$_f" in
+        src/scripts/*.sh) [ "$(basename "$_f")" = "$_s18_self_sh" ] || _sh_files+=("$_f") ;;
+      esac
+    done
+  else
+    while IFS= read -r -d '' _f; do
+      _sh_files+=("$_f")
+    done < <(find src/scripts -type f -name '*.sh' -not -name "$_s18_self_sh" -print0)
+    mapfile -t _sh_files < <(printf '%s\n' "${_sh_files[@]}" | filter_gitignored)
+  fi
+
+  if [ "${#_sh_files[@]}" -gt 0 ]; then
+    # Heredoc detector lives in a sibling .awk file (shellcheck policy: extract awk programs >10 lines).
+    local _s18_awk_path
+    _s18_awk_path="$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/14-repository-policy.awk"
+
+    local _s18_violation
+    while IFS= read -r _s18_violation; do
+      _s18_errors=$((_s18_errors + 1))
+      error "$_s18_violation"
+    done < <(awk -f "$_s18_awk_path" "${_sh_files[@]}")
+  fi
+
+  if [ "$_s18_errors" -gt 0 ]; then
+    say "  Extract heredocs above 30 content lines to shared files — see .agents/instructions/embedded-content.instructions.md."
+    return 1
+  fi
+
+  say "no embedded-content heredoc violations found."
+  return 0
+}

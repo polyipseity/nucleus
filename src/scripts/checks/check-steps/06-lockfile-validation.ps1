@@ -1,4 +1,4 @@
-Register-Step -Id "lockfile-validation" -Number 7 -Name "Lockfile validation" -Action {
+Register-Step -Id "lockfile-validation" -Number 6 -Name "Lockfile validation" -Action {
   param($HasArgs, $RepoRoot, $PositionalArgs)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
@@ -7,7 +7,7 @@ Register-Step -Id "lockfile-validation" -Number 7 -Name "Lockfile validation" -A
   if ($HasArgs) {
     $hasLfFiles = @($PositionalArgs | Where-Object { $_ -match '(lockfile|lifecycle-allowlist)\.json$' }).Count -gt 0
     if (-not $hasLfFiles) {
-      Write-Message "==== 7: Lockfile validation ==== SKIPPED (no lockfile files to check)"
+      Write-Message "==== 6: Lockfile validation ==== SKIPPED (no lockfile files to check)"
       return 2
     }
   }

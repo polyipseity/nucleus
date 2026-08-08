@@ -3,9 +3,9 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "yaml-structural" 11 "YAML structural validation" run_11_yaml_structural
+register_step "yaml-structural" 10 "YAML structural validation" run_10_yaml_structural
 
-run_11_yaml_structural() {
+run_10_yaml_structural() {
   local _has_args="$1" _repo_root="$2"; shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
@@ -51,7 +51,7 @@ run_11_yaml_structural() {
       done < "$_yaml_par_tmpdir/yaml_results.txt"
     fi
   else
-    say "==== 11: YAML structural validation ==== SKIPPED (no YAML files to check)"
+    say "==== 10: YAML structural validation ==== SKIPPED (no YAML files to check)"
     rm -rf -- "$_yaml_par_tmpdir"
     return 2
   fi

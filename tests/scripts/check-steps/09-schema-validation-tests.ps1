@@ -1,10 +1,10 @@
-# Test: step 9 schema-validation PS1 must enforce $schema presence (Spec G)
+# Test: step 8 schema-validation PS1 must enforce $schema presence (Spec G)
 
 $ErrorActionPreference = 'Stop'
 $PSStyle.OutputRendering = 'PlainText'
 
 $repoRoot = Split-Path -Path (Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent) -Parent
-$testFile = Join-Path -Path $repoRoot -ChildPath 'src/scripts/checks/check-steps/09-schema-validation.ps1'
+$testFile = Join-Path -Path $repoRoot -ChildPath 'src/scripts/checks/check-steps/08-schema-validation.ps1'
 $script:failed = $false
 
 function Assert-Pass {
@@ -21,27 +21,27 @@ function Assert-Fail {
 $content = Get-Content -Path $testFile -Raw
 
 if ($content -match 'Missing.*`\$schema') {
-  Assert-Pass -Name 'step09_ps1_missing_schema' -Reason 'step 9 PS1 checks for missing $schema'
+  Assert-Pass -Name 'step09_ps1_missing_schema' -Reason 'step 8 PS1 checks for missing $schema'
 } else {
-  Assert-Fail -Name 'step09_ps1_missing_schema' -Reason 'step 9 PS1 should check for missing $schema'
+  Assert-Fail -Name 'step09_ps1_missing_schema' -Reason 'step 8 PS1 should check for missing $schema'
 }
 
 if ($content -match 'Invalid.*`\$schema') {
-  Assert-Pass -Name 'step09_ps1_format_check' -Reason 'step 9 PS1 checks for invalid $schema format'
+  Assert-Pass -Name 'step09_ps1_format_check' -Reason 'step 8 PS1 checks for invalid $schema format'
 } else {
-  Assert-Fail -Name 'step09_ps1_format_check' -Reason 'step 9 PS1 should check for invalid $schema format'
+  Assert-Fail -Name 'step09_ps1_format_check' -Reason 'step 8 PS1 should check for invalid $schema format'
 }
 
 if ($content -match 'schema.json|vendor|secrets') {
-  Assert-Pass -Name 'step09_ps1_exception_list' -Reason 'step 9 PS1 has exception list'
+  Assert-Pass -Name 'step09_ps1_exception_list' -Reason 'step 8 PS1 has exception list'
 } else {
-  Assert-Fail -Name 'step09_ps1_exception_list' -Reason 'step 9 PS1 should have exception list'
+  Assert-Fail -Name 'step09_ps1_exception_list' -Reason 'step 8 PS1 should have exception list'
 }
 
 if ($content -match 'configs/agents/hooks') {
-  Assert-Pass -Name 'step09_ps1_hooks_exemption' -Reason 'step 9 PS1 exempts agents/hooks JSON from $schema check'
+  Assert-Pass -Name 'step09_ps1_hooks_exemption' -Reason 'step 8 PS1 exempts agents/hooks JSON from $schema check'
 } else {
-  Assert-Fail -Name 'step09_ps1_hooks_exemption' -Reason 'step 9 PS1 should exempt agents/hooks JSON from $schema check'
+  Assert-Fail -Name 'step09_ps1_hooks_exemption' -Reason 'step 8 PS1 should exempt agents/hooks JSON from $schema check'
 }
 
 if ($script:failed) { exit 1 } else { exit 0 }

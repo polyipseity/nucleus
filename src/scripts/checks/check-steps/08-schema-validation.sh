@@ -3,9 +3,9 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "schema-validation" 9 "Schema validation (JSON/YAML)" run_09_schema_validation
+register_step "schema-validation" 8 "Schema validation (JSON/YAML)" run_08_schema_validation
 
-run_09_schema_validation() {
+run_08_schema_validation() {
   local _has_args="$1" _repo_root="$2"; shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1

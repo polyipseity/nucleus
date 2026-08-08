@@ -1,5 +1,5 @@
 ---
-description: "Use when implementing or modifying the step-runner framework used by the check and test pipelines. Covers step registration, --skip-steps semantics, removed flags, skip message format, PS1 parallelism, and step 9 $schema enforcement."
+description: "Use when implementing or modifying the step-runner framework used by the check and test pipelines. Covers step registration, --skip-steps semantics, removed flags, skip message format, PS1 parallelism, and step 8 $schema enforcement."
 name: "Step-Runner Framework"
 applyTo: "src/scripts/lib/step-runner.sh, src/scripts/lib/step-runner.ps1, scripts/check.sh, scripts/check.ps1, scripts/test.sh, scripts/test.ps1, tests/scripts/**"
 ---
@@ -164,10 +164,21 @@ Cross-platform equivalence:
   - No step on either platform says "passed" when it didn't run any checks
 ```
 
-## Spec G: Step 9 `$schema` enforcement
+## Check step groups
+
+| Group | Steps | IDs |
+| ----- | ----- | --- |
+| Format and lint | 01–03 | `code-formatting`, `powershell-lint`, `packer-validate` |
+| Nix | 04–05 | `nix-flake-eval`, `nix-lint` |
+| Data and schema | 06–10 | `lockfile-validation`, `locked-dsc-validation`, `schema-validation`, `service-registry`, `yaml-structural` |
+| Repository policy | 11–14 | `package-manager-enforcement`, `suppression-audit`, `online-determinism`, `repository-policy` |
+
+Shell entry-script validation (`script-validation-tests.sh`) runs in test step 5 (`script-and-framework-tests`), not in the check pipeline.
+
+## Spec G: Step 8 `$schema` enforcement
 
 ```
-Step 9 validation rules:
+Step 8 validation rules:
   For every JSON and YAML file in scope (except exceptions):
 
   1. `$schema` presence check:
@@ -219,4 +230,4 @@ Step 9 validation rules:
 
 - `testing.instructions.md` — Test structure, CI integration, and validation patterns for the test pipeline.
 - `tooling-and-validation.instructions.md` — Repository tooling, build commands, and validation hooks.
-- `allow-and-deny-lists.instructions.md` — Step 9 EXCEPTION_LIST registry and exclude-list policy.
+- `allow-and-deny-lists.instructions.md` — Step 8 EXCEPTION_LIST registry and exclude-list policy.

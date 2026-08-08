@@ -1,0 +1,253 @@
+Register-Step -Id "repository-policy" -Number 14 -Name "Repository policy" -Action {
+  param($HasArgs, $RepoRoot, $PositionalArgs)
+
+  $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
+  $failed = $false
+
+  Write-Message "--- config method compliance ---"
+
+  $cfgDir = Join-Path -Path $r -ChildPath "src\modules\configs"
+  $cfgErrors = 0
+
+  # Single-pass: collect all config file basenames, run one Select-String across src/
+  $cfgFiles = Get-ChildItem -Path $cfgDir -Recurse -File
+  $srcFiles = Get-ChildItem -Path (Join-Path $r "src") -Recurse -Include '*.nix', '*.ps1', '*.sh' |
+    Where-Object { $_.FullName -notmatch '[\/]vendor[\/]' -and $_.FullName -notmatch '[\/]configs[\/]' } |
+    Select-GitIgnored  # ref: allow-and-deny-lists.instructions.md#B1 -- structural invariants; vendored code and config methods are different concerns; gitignore filter applied on top
+  # WHY: raw basenames with -SimpleMatch mirror the .sh twin's grep -F -f semantics; [regex]::Escape here would make dotted basenames (e.g. system.gitconfig) match literally and never be found
+  $cfgPatterns = @($cfgFiles | ForEach-Object { $_.Name } | Sort-Object -Unique)
+  # WHY: Select-GitIgnored returns path strings; piping strings to Select-String searches them as content, so -Path is required to read the actual files
+  $cfgSelectOutput = Select-String -Path $srcFiles -Pattern $cfgPatterns -SimpleMatch
+  # Single-pass: collect all check-suppress:config-method lines for preceding-line checking
+  $cfgMethodOutput = Select-String -Path $srcFiles -Pattern '# check-suppress:config-method'
+  # WHY: refs may use a ${hostName} template (e.g. git/${hostName}.gitconfig) that no
+  # raw basename substring-matches; gather those lines for per-file resolution below.
+  $cfgTemplateOutput = Select-String -Path $srcFiles -Pattern '${hostName}' -SimpleMatch
+
+  $parallelJobs = [Environment]::ProcessorCount
+
+  # WHY: $using: is only valid inside the -Parallel scriptblock; -ThrottleLimit is
+  # evaluated in the caller scope, so it takes the plain variable (canonical order:
+  # scriptblock first, then -ThrottleLimit)
+  $cfgFileErrors = $cfgFiles | ForEach-Object -Parallel {
+    $basename = $_.Name
+
+    # Skip infrastructure files and Nix modules inside configs/  # ref: allow-and-deny-lists.instructions.md#A2 -- infrastructure files are not configs
+    if ($basename -in '.gitkeep', '.gitignore') { return $null }
+    if ($basename -like '*.schema.json') { return $null }
+
+    # Skip agent customization files (consumed as a directory via Method 4)  # ref: allow-and-deny-lists.instructions.md#A2 -- agents/* consumed as directory
+    $relPath = $_.FullName.Substring($using:cfgDir.Length + 1) -replace '\\', '/'
+    if ($relPath -like 'agents/*') { return $null }
+
+    # Check against cached Select-String output -- relative path first, then basename
+    $refs = @($using:cfgSelectOutput | Where-Object { $_.Line -match [regex]::Escape($relPath) })
+    if ($refs.Count -eq 0) {
+      $refs = @($using:cfgSelectOutput | Where-Object { $_.Line -match [regex]::Escape($basename) })
+    }
+    if ($refs.Count -eq 0) {
+      # WHY: ${hostName}.gitconfig references every host's config (MacBook/NixOS/Windows.gitconfig);
+      # match template lines by the basename's extension suffix.
+      $dotIndex = $basename.IndexOf('.')
+      if ($dotIndex -gt 0) {
+        $templateSuffix = [regex]::Escape($basename.Substring($dotIndex))
+        $refs = @($using:cfgTemplateOutput | Where-Object { $_.Line -match ('\$\{hostName\}' + $templateSuffix) })
+      }
+    }
+
+    if ($refs.Count -eq 0) {
+      return "$relPath : no references found in src/ (excluding configs/) -- orphaned config?"
+    }
+
+    $hasMethod = $false
+    foreach ($ref in $refs) {
+      if ($ref.Line -match '# check-suppress:config-method') {
+        $hasMethod = $true
+        break
+      }
+      # Check preceding line using cached check-suppress:config-method output
+      if ($ref.LineNumber -gt 1) {
+        $prevLineNum = $ref.LineNumber - 1
+        $prevMatch = $using:cfgMethodOutput | Where-Object { $_.Path -eq $ref.Path -and $_.LineNumber -eq $prevLineNum }
+        if ($prevMatch) {
+          $hasMethod = $true
+          break
+        }
+      }
+    }
+    if (-not $hasMethod) {
+      return "$relPath : referenced but no '# check-suppress:config-method' comment found on or before reference lines"
+    }
+
+    return $null
+  } -ThrottleLimit $parallelJobs
+
+  foreach ($cfe in $cfgFileErrors) {
+    if ($cfe) {
+      Write-ErrorMessage $cfe
+      $cfgErrors++
+    }
+  }
+
+  if ($cfgErrors -gt 0) {
+    Write-ErrorMessage "config method compliance check failed with $cfgErrors error(s)"
+    $failed = $true
+  } else {
+    Write-Message "config method compliance passed."
+  }
+
+  Write-Message "--- activation token placeholder ---"
+
+  $actPattern = '^\s*#.*__[A-Z][A-Z_]*__'
+  $actViolations = @()
+
+  if ($HasArgs) {
+    $actFiles = $PositionalArgs | Where-Object { $_ -like '*.sh' -or $_ -like '*.zsh' }
+    if ($actFiles.Count -gt 0) {
+      $actViolations += Select-String -Path $actFiles -Pattern $actPattern | ForEach-Object { "$($_.Path):$($_.LineNumber)" }
+    }
+  } else {
+    $actFiles = Get-ChildItem -Recurse -Path (Join-Path $r "src\scripts") -Include '*.sh', '*.zsh' | ForEach-Object { $_.FullName }
+    $actViolations += Select-String -Path $actFiles -Pattern $actPattern | ForEach-Object { "$($_.Path):$($_.LineNumber)" }
+  }
+
+  if ($actViolations.Count -gt 0) {
+    foreach ($av in ($actViolations | Sort-Object -Unique)) { Write-ErrorMessage $av }
+    Write-ErrorMessage "token placeholder strings found in script comments"
+    $failed = $true
+  } else {
+    Write-Message "no token placeholder strings in script comments."
+  }
+
+  Write-Message "--- preflight install command policy ---"
+
+  $preflightViolations = @()
+
+  # Find all .ps1 files
+  # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
+  $ps1Files = @(if ($HasArgs) {
+    if ($script:PS1_FILES) { $script:PS1_FILES } else { @($PositionalArgs | Where-Object { $_ -like '*.ps1' }) }
+  } else {
+    @(Get-ChildItem -Recurse -Path $r -Include '*.ps1' | Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' } | ForEach-Object { $_.FullName } | Select-GitIgnored)  # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; gitignore filter applied on top
+  })
+
+  if ($ps1Files.Count -gt 0) {
+    # Exclude this check's own file: its source contains the literal pattern text.
+    # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; self-refs are dynamic
+    $selfLeaf = Split-Path -Leaf $PSCommandPath
+    $selMatches = Select-String -Path $ps1Files -Pattern 'Assert-ToolAvailable.*-InstallCommand' -AllMatches |
+      Where-Object { (Split-Path -Leaf $_.Path) -ne $selfLeaf }
+    foreach ($m in $selMatches) {
+      $preflightViolations += "$($m.Path):$($m.LineNumber) ($($m.Line.Trim()))"
+    }
+  }
+
+  if ($preflightViolations.Count -gt 0) {
+    foreach ($v in $preflightViolations) {
+      Write-Error "check: error: $v"
+    }
+    Write-Output "check:   Remove -InstallCommand parameters from Assert-ToolAvailable calls — preflight checks must hard-fail, not suggest install."
+    $failed = $true
+  } else {
+    Write-Output "check: no preflight InstallCommand violations found."
+  }
+
+  Write-Message "--- embedded content enforcement ---"
+
+  $embeddedViolations = @()
+  $embeddedSelfLeaf = Split-Path -Leaf $PSCommandPath
+
+  # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count checks below under StrictMode; the @() wrapper forces an array
+  $embeddedPs1Files = @(if ($HasArgs) {
+    if ($script:PS1_FILES) { $script:PS1_FILES } else { @($PositionalArgs | Where-Object { $_ -like '*.ps1' }) }
+  } else {
+    @(Get-ChildItem -Recurse -Path $r -Include '*.ps1' | Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' } | ForEach-Object { $_.FullName } | Select-GitIgnored)  # ref: allow-and-deny-lists.instructions.md#C5 -- structural invariant; gitignore filter applied on top
+  })
+
+  $writeCommands = @('Set-Content', 'Add-Content', 'Out-File', 'Tee-Object')
+
+  foreach ($file in $embeddedPs1Files) {
+    # Exclude this check's own file: its source contains the literal here-string patterns.
+    # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
+    if ((Split-Path -Leaf $file) -eq $embeddedSelfLeaf) { continue }
+
+    $tokens = $null
+    $parseErrors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseFile($file, [ref]$tokens, [ref]$parseErrors)
+    if ($parseErrors.Count -gt 0) { continue }  # syntax errors are reported by the lint step
+
+    $hereStrings = $ast.FindAll({
+      param($node)
+      ($node -is [System.Management.Automation.Language.StringConstantExpressionAst]) -and
+      ([string]$node.StringConstantType -like '*HereString')
+    }, $true)
+
+    $fileLines = @(Get-Content -Path $file)
+
+    foreach ($hs in $hereStrings) {
+      # Content lines = all lines minus the opener line and the closer line.
+      $contentLines = ($hs.Extent.Text -split "`r?`n").Count - 2
+      if ($contentLines -le 10) { continue }
+
+      # C# interop (policy exception 3) is exempt up to 25 lines via Add-Type.
+      $isAddType = $false
+      $isDiskWrite = $false
+      $node = $hs.Parent
+      while ($null -ne $node) {
+        if ($node -is [System.Management.Automation.Language.CommandAst]) {
+          $cmdName = $node.GetCommandName()
+          if ($cmdName -eq 'Add-Type') { $isAddType = $true }
+          elseif ($writeCommands -contains $cmdName) { $isDiskWrite = $true }
+        } elseif ($node -is [System.Management.Automation.Language.InvokeMemberExpressionAst]) {
+          $member = $node.Member
+          if (($member -is [System.Management.Automation.Language.StringConstantExpressionAst]) -and ($member.Value -match '^(WriteAll|AppendAll)')) { $isDiskWrite = $true }
+        }
+        # Pipeline form `@"..."@ | Set-Content` puts the command at the same level as the here-string.
+        if ($node -is [System.Management.Automation.Language.PipelineAst]) {
+          foreach ($elem in $node.PipelineElements) {
+            if ($elem -is [System.Management.Automation.Language.CommandAst]) {
+              $sibName = $elem.GetCommandName()
+              if ($writeCommands -contains $sibName) { $isDiskWrite = $true }
+            }
+          }
+        }
+        $node = $node.Parent
+      }
+
+      if ($isAddType) {
+        if ($contentLines -le 25) { continue }
+      } elseif (-not $isDiskWrite) {
+        continue  # not file content (e.g., script text executed in a subprocess)
+      }
+
+      # Inline policy citation (within 10 lines above) exempts the call site.
+      $cited = $false
+      $startIdx = [Math]::Max(0, $hs.Extent.StartLineNumber - 11)
+      $endIdx = $hs.Extent.StartLineNumber - 1
+      for ($i = $startIdx; $i -lt $endIdx; $i++) {
+        if ($fileLines[$i] -match 'check-suppress:embedded-content') { $cited = $true; break }
+      }
+      if ($cited) { continue }
+
+      $embeddedViolations += "${file}:$($hs.Extent.StartLineNumber): here-string with $contentLines content lines (limit 10) — extract to a shared file per the embedded-content policy"
+    }
+  }
+
+  if ($embeddedViolations.Count -gt 0) {
+    foreach ($v in $embeddedViolations) {
+      Write-Error "check: error: $v"
+    }
+    Write-Output "check:   Extract here-strings above 10 content lines to shared files — see .agents/instructions/embedded-content.instructions.md."
+    $failed = $true
+  } else {
+    Write-Output "check: no embedded-content violations found."
+  }
+
+  if ($failed) {
+    Write-ErrorMessage "repository policy check failed"
+    return $false
+  }
+
+  Write-Message "repository policy passed."
+  return $true
+}

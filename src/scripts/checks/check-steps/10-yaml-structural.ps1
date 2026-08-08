@@ -1,4 +1,4 @@
-Register-Step -Id "yaml-structural" -Number 11 -Name "YAML structural validation" -Action {
+Register-Step -Id "yaml-structural" -Number 10 -Name "YAML structural validation" -Action {
   param($HasArgs, $RepoRoot, $PositionalArgs)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
@@ -36,7 +36,7 @@ Register-Step -Id "yaml-structural" -Number 11 -Name "YAML structural validation
   }
 
   if ($yamlFiles.Count -eq 0) {
-    Write-Message "==== 11: YAML structural validation ==== SKIPPED (no YAML files to check)"
+    Write-Message "==== 10: YAML structural validation ==== SKIPPED (no YAML files to check)"
     return 2
   }
 

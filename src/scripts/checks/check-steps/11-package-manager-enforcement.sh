@@ -3,9 +3,9 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "package-manager-enforcement" 12 "Package manager usage enforcement" run_12_package_manager_enforcement
+register_step "package-manager-enforcement" 11 "Package manager usage enforcement" run_11_package_manager_enforcement
 
-run_12_package_manager_enforcement() {
+run_11_package_manager_enforcement() {
   local _has_args="$1" _repo_root="$2"; shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
@@ -18,15 +18,15 @@ run_12_package_manager_enforcement() {
       case "$_f" in *.sh|*.ps1|*.nix) _has_shell_files=1; break ;; esac
     done
     if [ "$_has_shell_files" -eq 0 ]; then
-      say "==== 12: Package manager usage enforcement ==== SKIPPED (no shell files to check)"
+      say "==== 11: Package manager usage enforcement ==== SKIPPED (no shell files to check)"
       return 2
     fi
   fi
 
   # Ban bare `pip install` and `npm install`.
   # ref: allow-and-deny-lists.instructions.md#A1 -- orchestrator/config files contain pip/npm patterns in comments; self-refs are dynamic
-  local _self_sh="12-package-manager-enforcement.sh"
-  local _self_ps1="12-package-manager-enforcement.ps1"
+  local _self_sh="11-package-manager-enforcement.sh"
+  local _self_ps1="11-package-manager-enforcement.ps1"
   # Convert from grep -rn --include (directory traversal without gitignore) to
   # find | filter_gitignored | xargs grep so gitignored files are excluded.
   # Keep explicit --exclude for files that legitimately contain the pattern

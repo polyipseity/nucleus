@@ -37,8 +37,8 @@ Hard rules:
 
 | Family | Sites | Check id | Canonical form | Machine consumer |
 | --- | --- | --- | --- | --- |
-| `# Inline by embedded-content policy exception N (name).` | 10 + 1 detector | `embedded-content` | `# check-suppress:embedded-content: exception N (name) -- <reason>` | step 18 `.ps1` (regex `'check-suppress:embedded-content'`) |
-| `# Method N (name) -- <why>` (legacy form) | 68 → 71 sites | `config-method` | `# check-suppress:config-method: method N (name) -- <reason>` (lowercase `method N`) | step 15 `.ps1` (regex `'# check-suppress:config-method'`); `.sh` twin has no `# Method` regex (checks `configs\.` method usage only) |
+| `# Inline by embedded-content policy exception N (name).` | 10 + 1 detector | `embedded-content` | `# check-suppress:embedded-content: exception N (name) -- <reason>` | step 14 `repository-policy` `.ps1` (regex `'check-suppress:embedded-content'`) |
+| `# Method N (name) -- <why>` (legacy form) | 68 → 71 sites | `config-method` | `# check-suppress:config-method: method N (name) -- <reason>` (lowercase `method N`) | step 14 `repository-policy` `.ps1` (regex `'# check-suppress:config-method'`); `.sh` twin has no `# Method` regex (checks `configs\.` method usage only) |
 | `# check-suppress:SuppressMessageAttribute: <rule> -- <just>` / bare rule lists | 18 | `SuppressMessageAttribute` | `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | step 13 `Get-UndocSuppViolation -CheckId 'SuppressMessageAttribute'` |
 | `# check-suppress:suppression_doc: <just>` | 542 | `suppression_doc` | unchanged (plain form) | step 13 regex `# check-suppress:$CheckId[\s:]` |
 | `# check-suppress:packer_validate: ...` | 1 | `packer_validate` | unchanged form (implemented) | `scripts/check-packer.ps1` + `scripts/check-packer.sh` (read the comment; suppress the checksum warning when present; fail when `iso_checksum = "none"` lacks the annotation) |
@@ -79,8 +79,8 @@ Dividers (`# --- section ---`), DSC structural headers (`# WinGet DSC v3 -`, `# 
 | `suppression_doc` | generic suppression documentation | step 13 `.ps1` + `.sh` twin |
 | `SuppressMessageAttribute` | PSSA rule-name suppression comments | step 13 `Get-UndocSuppViolation` |
 | `packer_validate` | packer checksum annotations | `scripts/check-packer.ps1` + `scripts/check-packer.sh` |
-| `embedded-content` | embedded-content policy exceptions | step 18 `.ps1` |
-| `config-method` | config deployment method annotations | step 15 `.ps1` + `.sh` twin |
+| `embedded-content` | embedded-content policy exceptions | step 14 `repository-policy` `.ps1` |
+| `config-method` | config deployment method annotations | step 14 `repository-policy` `.ps1` + `.sh` twin |
 
 Rule: any new tool-enforced marker MUST register a check id AND a machine consumer in this registry before use.
 
@@ -104,8 +104,8 @@ Rule: any new tool-enforced marker MUST register a check id AND a machine consum
 | `# WHY [^:]` = 0 | no-colon WHY | documented only |
 | `# TODO[^:]` = 0 | no-colon TODO | documented only |
 | `# undoc-supp:` = 0 | deprecated annotation format (migrated to `suppression_doc`) | documented only |
-| bare `Inline by embedded-content` = 0 | migrated annotations | step 18 (updated regex) |
-| capital `# Method` = 0 | lowercase method | step 15 (updated regex) |
+| bare `Inline by embedded-content` = 0 | migrated annotations | step 14 `repository-policy` (updated regex) |
+| capital `# Method` = 0 | lowercase method | step 14 `repository-policy` (updated regex) |
 | no `—` after `# check-suppress:` | no em dash in markers | documented only |
 | no `—` after `# ref:` | no em dash in refs | documented only |
 | `# ref:.*reason:` = 0 | no reason keyword in refs | documented only |

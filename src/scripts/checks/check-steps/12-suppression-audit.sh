@@ -3,9 +3,9 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "suppression-audit" 13 "Undocumented error suppression" run_13_suppression_audit
+register_step "suppression-audit" 12 "Suppression audit" run_12_suppression_audit
 
-run_13_suppression_audit() {
+run_12_suppression_audit() {
   local _has_args="$1" _repo_root="$2"; shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
@@ -72,7 +72,7 @@ run_13_suppression_audit() {
       say "no undocumented error suppressions found."
     fi
   else
-    say "==== 13: Suppression audit ==== SKIPPED (no script files to check)"
+    say "==== 12: Suppression audit ==== SKIPPED (no script files to check)"
     rm -rf -- "$_step17_tmpdir"
     return 2
   fi
