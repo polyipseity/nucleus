@@ -23,7 +23,7 @@ properties:
           }
           $env:NUCLEUS_GC_EXPIRY = '7d'
           $GcScript = Join-Path $RepoRoot "scripts\gc.ps1"
-          $ModuleDir = Join-Path $RepoRoot "src\hosts\Windows\modules"
+          $ModuleDir = Join-Path $RepoRoot "src\platforms\Windows\modules"
           & $GcScript -ModuleDir $ModuleDir -RepoRoot $RepoRoot
         Trigger: Weekly
         DaysOfWeek: Sunday

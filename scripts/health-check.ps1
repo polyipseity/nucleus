@@ -54,7 +54,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
 if ($Help) {
@@ -152,8 +152,8 @@ function Test-LogHealth {
 
   $userDir = "$env:LOCALAPPDATA\nucleus\logs"
   $systemDir = "$env:ProgramData\nucleus\logs"
-  if (Test-Path "$PSScriptRoot\..\src\hosts\Windows\modules\Invoke-LogManagement.ps1") {
-    . "$PSScriptRoot\..\src\hosts\Windows\modules\Invoke-LogManagement.ps1"
+  if (Test-Path "$PSScriptRoot\..\src\platforms\Windows\modules\Invoke-LogManagement.ps1") {
+    . "$PSScriptRoot\..\src\platforms\Windows\modules\Invoke-LogManagement.ps1"
     $userDir = Get-NucleusLogDir
     $systemDir = Get-NucleusSystemLogDir
   }

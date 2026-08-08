@@ -32,7 +32,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
 function Resolve-NucleusRoot {
@@ -114,7 +114,7 @@ function Resolve-ICloudServiceForRemote {
     [string]$RemoteName
   )
 
-  $loadUserRegistryScript = Join-Path $RepoRoot 'src\hosts\Windows\modules\Load-UserRegistry.ps1'
+  $loadUserRegistryScript = Join-Path $RepoRoot 'src\platforms\Windows\modules\Load-UserRegistry.ps1'
   if (-not (Test-Path -Path $loadUserRegistryScript -PathType Leaf)) {
     return 'drive'
   }

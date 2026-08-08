@@ -6,7 +6,7 @@
 # a guest's id is a breaking identity change.
 #
 # The same derivation is re-implemented in shell (vm_mk_uuid/vm_mk_mac_address
-# in src/scripts/lib/vm.sh) and PowerShell (src/hosts/Windows/modules/system/
+# in src/scripts/lib/vm.sh) and PowerShell (src/platforms/Windows/modules/system/
 # Invoke-VMSetup.ps1); tests pin both twins against the known vectors here
 # (tests/modules/vm-setup-tests.nix and tests/scripts/vm-disk-model-tests.sh).
 let

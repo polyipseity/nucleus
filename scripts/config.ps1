@@ -25,7 +25,7 @@ param(
   [string[]]$Arguments
 )
 
-$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
 $configFile = Join-Path -Path $HOME -ChildPath ".local/state/nucleus/config.json"

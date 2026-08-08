@@ -1,5 +1,5 @@
 # Size string parsing shared by VM provisioning.  src/scripts/lib/size.sh and
-# src/hosts/Windows/modules/SizeStrings.ps1 implement the IDENTICAL grammar;
+# src/platforms/Windows/modules/SizeStrings.ps1 implement the IDENTICAL grammar;
 # keep all three in sync (see test_size_grammar_parity_across_implementations).
 #
 # Grammar: ^([0-9]+) ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$

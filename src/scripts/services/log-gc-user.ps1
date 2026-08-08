@@ -8,7 +8,7 @@ if ([string]::IsNullOrWhiteSpace($repoRoot)) {
   Write-Error 'log-gc-user: NUCLEUS_REPO_ROOT not set'
 }
 
-$moduleDir = Join-Path -Path $repoRoot -ChildPath 'src\hosts\Windows\modules'
+$moduleDir = Join-Path -Path $repoRoot -ChildPath 'src\platforms\Windows\modules'
 $schemaPath = Join-Path -Path $repoRoot -ChildPath 'src\modules\services.schema.json'
 . (Join-Path -Path $moduleDir -ChildPath 'Invoke-LogManagement.ps1')
 

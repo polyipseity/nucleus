@@ -9,8 +9,8 @@ param()
 $script:passCount = 0
 $script:failCount = 0
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$vmAndroidModule = Join-Path $repoRoot 'src\hosts\Windows\modules\system\VMAndroid.ps1'
-$configModule = Join-Path $repoRoot 'src\hosts\Windows\modules\system\Invoke-AndroidConfig.ps1'
+$vmAndroidModule = Join-Path $repoRoot 'src\platforms\Windows\modules\system\VMAndroid.ps1'
+$configModule = Join-Path $repoRoot 'src\platforms\Windows\modules\system\Invoke-AndroidConfig.ps1'
 
 function Assert-Pass {
   param([string]$Name)

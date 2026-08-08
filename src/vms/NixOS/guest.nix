@@ -11,7 +11,7 @@
 #     --configuration ./src/vms/NixOS/guest.nix \
 #     -o <output-dir>
 #
-# On Windows hosts, src/hosts/Windows/modules/system/Invoke-VMSetup.ps1 uses
+# On Windows hosts, src/platforms/Windows/modules/system/Invoke-VMSetup.ps1 uses
 # src/vms/NixOS/packer.pkr.hcl instead, which generates a similar configuration
 # inline during a Packer QEMU build.
 #

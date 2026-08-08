@@ -60,7 +60,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
 if ($Help -or -not $Action) {
@@ -98,7 +98,7 @@ foreach ($svc in $RegistryRaw.Keys) {
 }
 
 # Load log management helpers
-. (Join-Path -Path $RepoRoot -ChildPath "src\hosts\Windows\modules\Invoke-LogManagement.ps1")
+. (Join-Path -Path $RepoRoot -ChildPath "src\platforms\Windows\modules\Invoke-LogManagement.ps1")
 
 # ---------------------------------------------------------------------------
 # Resolve service names (expand prefix matches)

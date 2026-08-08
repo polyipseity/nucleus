@@ -20,7 +20,7 @@ function Write-Message { Write-Output "test: $args" }
 function Write-WarningMessage { Write-Output "test: warning: $args" }
 function Write-ErrorMessage { Write-Output "test: error: $args" }
 
-$modulesPath = Join-Path $RepoRoot 'src\hosts\Windows\modules'
+$modulesPath = Join-Path $RepoRoot 'src\platforms\Windows\modules'
 Import-Module (Join-Path $modulesPath 'Ensure-Tool.psm1') -Force
 Assert-ToolAvailable -Name 'Pester' -Type 'Module'
 Assert-ToolAvailable -Name 'PSScriptAnalyzer' -Type 'Module'

@@ -1,19 +1,19 @@
 {
   "$schema": "./pwsh-naming-manifest.schema.json",
   "requiredNames": {
-    "Get-ManifestPathList": "src/hosts/Windows/modules/user/Sync-SymlinkManifest.ps1",
-    "Sync-SymlinkManifest": "src/hosts/Windows/modules/user/Sync-SymlinkManifest.ps1",
+    "Get-ManifestPathList": "src/platforms/Windows/modules/user/Sync-SymlinkManifest.ps1",
+    "Sync-SymlinkManifest": "src/platforms/Windows/modules/user/Sync-SymlinkManifest.ps1",
     "Get-VMRunningIdList": "scripts/vm.ps1",
-    "Sync-AgentsSkillManifest": "src/hosts/Windows/modules/user/Sync-AgentsSkillManifest.ps1",
-    "Sync-AgentsClawHubSkillManifest": "src/hosts/Windows/modules/user/Sync-AgentsClawHubSkillManifest.ps1",
-    "Sync-SecretCatalog": "src/hosts/Windows/modules/secrets/Sync-SecretCatalog.ps1",
-    "Sync-VSCodeExtensionManifest": "src/hosts/Windows/modules/editors/Sync-VSCodeExtensionManifest.ps1",
-    "Sync-VSCodeSettingManifest": "src/hosts/Windows/modules/editors/Sync-VSCodeSettingManifest.ps1",
-    "Sync-DevRepoCatalog": "src/hosts/Windows/modules/user/Sync-DevRepoCatalog.ps1",
-    "Sync-CloudDriveCatalog": "src/hosts/Windows/modules/user/Sync-CloudDriveCatalog.ps1",
-    "Sync-JellyfinAccountCatalog": "src/hosts/Windows/modules/system/Sync-JellyfinAccountCatalog.ps1",
-    "Sync-JellyfinLibraryCatalog": "src/hosts/Windows/modules/system/Sync-JellyfinLibraryCatalog.ps1",
-    "Sync-WallpaperInventory": "src/hosts/Windows/modules/wallpapers/Sync-WallpaperInventory.ps1"
+    "Sync-AgentsSkillManifest": "src/platforms/Windows/modules/user/Sync-AgentsSkillManifest.ps1",
+    "Sync-AgentsClawHubSkillManifest": "src/platforms/Windows/modules/user/Sync-AgentsClawHubSkillManifest.ps1",
+    "Sync-SecretCatalog": "src/platforms/Windows/modules/secrets/Sync-SecretCatalog.ps1",
+    "Sync-VSCodeExtensionManifest": "src/platforms/Windows/modules/editors/Sync-VSCodeExtensionManifest.ps1",
+    "Sync-VSCodeSettingManifest": "src/platforms/Windows/modules/editors/Sync-VSCodeSettingManifest.ps1",
+    "Sync-DevRepoCatalog": "src/platforms/Windows/modules/user/Sync-DevRepoCatalog.ps1",
+    "Sync-CloudDriveCatalog": "src/platforms/Windows/modules/user/Sync-CloudDriveCatalog.ps1",
+    "Sync-JellyfinAccountCatalog": "src/platforms/Windows/modules/system/Sync-JellyfinAccountCatalog.ps1",
+    "Sync-JellyfinLibraryCatalog": "src/platforms/Windows/modules/system/Sync-JellyfinLibraryCatalog.ps1",
+    "Sync-WallpaperInventory": "src/platforms/Windows/modules/wallpapers/Sync-WallpaperInventory.ps1"
   },
   "forbiddenNames": ["Sync-Symlink", "Sync-DevRepo", "Sync-CloudDrive", "Sync-JellyfinAccount", "Sync-JellyfinLibrary", "Sync-Wallpaper"],
   "allowedBareSingular": [

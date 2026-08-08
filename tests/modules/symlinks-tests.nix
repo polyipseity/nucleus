@@ -17,7 +17,7 @@ let
     repoRoot = ../..;
     hostName = "Windows";
   };
-  windowsRegistryLoaderText = builtins.readFile ../../src/hosts/Windows/modules/Load-UserRegistry.ps1;
+  windowsRegistryLoaderText = builtins.readFile ../../src/platforms/Windows/modules/Load-UserRegistry.ps1;
   windowsApplyText = builtins.readFile ../../src/hosts/Windows/apply.ps1;
 
   test_home_imports_symlinks_module = assert' (containsRegex ''\./symlinks\.nix'' homeText) "home.nix must import the symlinks module";

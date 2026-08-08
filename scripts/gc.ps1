@@ -36,7 +36,7 @@
 
 .PARAMETER ModuleDir
   Path to the Windows helper module directory. When omitted, auto-derives
-  from RepoRoot as src\hosts\Windows\modules so callers can skip it when
+  from RepoRoot as src\platforms\Windows\modules so callers can skip it when
   RepoRoot is provided (default: '').
 
 .PARAMETER NoNixGc
@@ -88,8 +88,8 @@
   Nix store GC --delete-older-than duration (e.g. "7d", "30d") (default: "7d"). Accepted but ignored on Windows (POSIX-only).
 
 .EXAMPLE
-  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus"
-  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -RepoRoot "C:\Users\admin\nucleus" -NoToolCacheGc
+  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -RepoRoot "C:\Users\admin\nucleus"
+  .\scripts\gc.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -RepoRoot "C:\Users\admin\nucleus" -NoToolCacheGc
 
 .NOTES
   Environment variables: NUCLEUS_GC_MODULE_DIR, NUCLEUS_GC_NO_NIX, NUCLEUS_GC_NO_HM, NUCLEUS_GC_NO_TOOL_CACHE_GC, NUCLEUS_GC_NO_GIT_CACHE_GC, NUCLEUS_GC_NO_OLLAMA_GC, NUCLEUS_GC_NO_SCOOP_GC, NUCLEUS_GC_NO_SCCACHE_GC, NUCLEUS_GC_NO_WALLPAPER_GC, NUCLEUS_GC_NO_VM_GC, NUCLEUS_GC_EXPIRY, NUCLEUS_GC_HM_EXPIRY, NUCLEUS_GC_NIX_EXPIRY, NUCLEUS_REPO_ROOT.
@@ -121,7 +121,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
 if ($Help) {
@@ -148,7 +148,7 @@ $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) {
   }
 }
 if ([string]::IsNullOrWhiteSpace($ModuleDir)) {
-  $ModuleDir = Join-Path $RepoRoot 'src\hosts\Windows\modules'
+  $ModuleDir = Join-Path $RepoRoot 'src\platforms\Windows\modules'
 }
 
 # -NoNixGc, -NoHmGc, and -NoJournaldGc are accepted but ignored on Windows

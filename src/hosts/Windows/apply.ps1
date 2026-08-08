@@ -55,8 +55,8 @@
 
   Note: For full multi-user support where each user gets their own secrets,
   SSH keys, and home directory state, run apply.ps1 separately for each user:
-    .\apply.ps1 -ModuleDir "C:\path\to\src\hosts\Windows\modules" -Users @('admin')
-    .\apply.ps1 -ModuleDir "C:\path\to\src\hosts\Windows\modules" -Users @('guest')
+    .\apply.ps1 -ModuleDir "C:\path\to\src\platforms\Windows\modules" -Users @('admin')
+    .\apply.ps1 -ModuleDir "C:\path\to\src\platforms\Windows\modules" -Users @('guest')
   This ensures each user gets properly isolated secret materialization.
 
 .PARAMETER EnableAgentsConfigParity
@@ -182,35 +182,35 @@
 
 .EXAMPLE
   # Apply with explicit module directory and user list:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin')
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin')
 
 .EXAMPLE
   # Apply only the user-level DSC file:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -ConfigFiles @('user/wallpaper.dsc.yml')
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin') -ConfigFiles @('user/wallpaper.dsc.yml')
 
 .EXAMPLE
   # Apply while explicitly scoping secret materialization to one user:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin')
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin')
 
 .EXAMPLE
   # Apply while skipping the post-apply Ollama model sync:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -NoAISync
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin') -NoAISync
 
 .EXAMPLE
   # Apply and opt in to immediate post-apply replica sync:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -ReplicaSync
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin') -ReplicaSync
 
 .EXAMPLE
   # Apply while disabling machine age key auto-registration in .sops.yaml:
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -EnableHostAgeKeyRegistration:$false
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin') -EnableHostAgeKeyRegistration:$false
 
 .EXAMPLE
   # Apply while disabling managed VS Code settings parity (cleanup only):
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin') -EnableVsCodeSettingsParity:$false
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin') -EnableVsCodeSettingsParity:$false
 
 .EXAMPLE
   # Apply while disabling managed remote-access parity (cleanup only):
-  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\hosts\Windows\modules" -Users @('admin', 'guest') -EnableRemoteAccessParity:$false
+  .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin', 'guest') -EnableRemoteAccessParity:$false
 
 .NOTES
   Environment variables:

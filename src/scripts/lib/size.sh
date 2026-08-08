@@ -6,7 +6,7 @@
 #   optional space between the number and the prefix is allowed.  The grammar
 #   is case-sensitive (KB/KiB are invalid).  Invalid strings print an error and
 #   return non-zero.  Keep in sync with src/modules/lib/size.nix and
-#   src/hosts/Windows/modules/SizeStrings.ps1.
+#   src/platforms/Windows/modules/SizeStrings.ps1.
 parse_size() {
   # The regex lives in a variable: an unquoted space + quantifier inside a
   # literal =~ RHS confuses shellcheck 0.11's parser (SC1072/SC1073).

@@ -18,7 +18,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$modulePath = Join-Path $PSScriptRoot '..\..\..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+$modulePath = Join-Path $PSScriptRoot '..\..\..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
 # ── Resolve repo root ──────────────────────────────────────────────────────

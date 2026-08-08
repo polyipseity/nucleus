@@ -5,7 +5,7 @@
 # - POSIX (macOS, NixOS): embedded by src/modules/pwsh.nix after init.ps1 via
 #   builtins.readFile.  The __NUCLEUS_*__ tokens are replaced with empty strings,
 #   leaving the `if ($IsWindows)` blocks inert.
-# - Windows: read by src/hosts/Windows/modules/user/Sync-ShellProfile.ps1, which
+# - Windows: read by src/platforms/Windows/modules/user/Sync-ShellProfile.ps1, which
 #   substitutes __NUCLEUS_PREPEND_PATH__/__NUCLEUS_APPEND_PATH__ with the managed
 #   PATH snippets and __NUCLEUS_LLVM_BIN_DIR__ with the LLVM bin directory, then
 #   writes the result into the user's PowerShell profile managed block.
@@ -707,7 +707,7 @@ if ($IsWindows) {
     param()
     $repoRoot = Resolve-NucleusRepoRoot
     $scriptPath = Join-Path $repoRoot 'src\hosts\Windows\apply.ps1'
-    $moduleDir = Join-Path $repoRoot 'src\hosts\Windows\modules'
+    $moduleDir = Join-Path $repoRoot 'src\platforms\Windows\modules'
     $username = [System.Environment]::UserName
     if (-not (Test-Path -Path $scriptPath -PathType Leaf)) {
       throw "nucleus-apply: script not found at $scriptPath"

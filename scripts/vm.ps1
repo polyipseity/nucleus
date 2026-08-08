@@ -85,7 +85,7 @@ $null = $SubcommandArgs  # check-suppress:suppression_doc: splatting variable, d
 
 $ErrorActionPreference = 'Stop'
 
-$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
 if ($Help -or -not $Action) {
@@ -97,8 +97,8 @@ if ($Help -or -not $Action) {
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Get-Item $PSScriptRoot).Parent.FullName }
 $ManifestPath = Join-Path $RepoRoot 'src\modules\VMs.json'
 if (-not $env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT = $RepoRoot }
-. (Join-Path $RepoRoot 'src\hosts\Windows\modules\Get-NucleusHostPlatform.ps1')
-. (Join-Path $RepoRoot 'src\hosts\Windows\modules\SizeStrings.ps1')
+. (Join-Path $RepoRoot 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1')
+. (Join-Path $RepoRoot 'src\platforms\Windows\modules\SizeStrings.ps1')
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -117,7 +117,7 @@ function Get-VMManifest {
 # ---------------------------------------------------------------------------
 
 function Invoke-VMSync {
-  $module = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
+  $module = Join-Path $RepoRoot 'src\platforms\Windows\modules\system\Invoke-VMSetup.ps1'
   if (-not (Test-Path $module)) {
     Write-NucleusWarning "Invoke-VMSetup module not found at $module"
     exit 1
@@ -158,7 +158,7 @@ function Invoke-VMSync {
 }
 
 function Invoke-VMSetup {
-  $module = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
+  $module = Join-Path $RepoRoot 'src\platforms\Windows\modules\system\Invoke-VMSetup.ps1'
   if (-not (Test-Path $module)) {
     Write-NucleusWarning "Invoke-VMSetup module not found at $module"
     exit 1
@@ -240,7 +240,7 @@ function Invoke-VMSetup {
 
 function Get-VMRunningIdList {
   # Detect running VMs from QEMU processes (Windows uses QEMU).
-  $module = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
+  $module = Join-Path $RepoRoot 'src\platforms\Windows\modules\system\Invoke-VMSetup.ps1'
   if (-not (Test-Path $module)) {
     return @()
   }
@@ -359,7 +359,7 @@ function Invoke-VMUpgrade {
   }
 
   $vmName = $SubcommandArgs[0]
-  $module = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
+  $module = Join-Path $RepoRoot 'src\platforms\Windows\modules\system\Invoke-VMSetup.ps1'
   if (-not (Test-Path $module)) {
     Write-NucleusError "Invoke-VMSetup module not found at $module"
     exit 1
@@ -397,7 +397,7 @@ function Invoke-VMReset {
     exit 1
   }
 
-  $setupModule = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
+  $setupModule = Join-Path $RepoRoot 'src\platforms\Windows\modules\system\Invoke-VMSetup.ps1'
   if (-not (Test-Path $setupModule)) {
     Write-NucleusError "Invoke-VMSetup module not found at $setupModule"
     exit 1
@@ -405,8 +405,8 @@ function Invoke-VMReset {
   . $setupModule
   Resolve-VMGuestCredential -RepoRoot $RepoRoot > $null
 
-  $androidModule = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\VMAndroid.ps1'
-  $configModule = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-AndroidConfig.ps1'
+  $androidModule = Join-Path $RepoRoot 'src\platforms\Windows\modules\system\VMAndroid.ps1'
+  $configModule = Join-Path $RepoRoot 'src\platforms\Windows\modules\system\Invoke-AndroidConfig.ps1'
   if (-not (Test-Path $androidModule) -or -not (Test-Path $configModule)) {
     Write-NucleusError "Android modules not found at $androidModule or $configModule"
     exit 1
@@ -442,8 +442,8 @@ function Invoke-VMAndroidConfig {
     exit 1
   }
 
-  $androidModule = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\VMAndroid.ps1'
-  $configModule = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-AndroidConfig.ps1'
+  $androidModule = Join-Path $RepoRoot 'src\platforms\Windows\modules\system\VMAndroid.ps1'
+  $configModule = Join-Path $RepoRoot 'src\platforms\Windows\modules\system\Invoke-AndroidConfig.ps1'
   if (-not (Test-Path $androidModule) -or -not (Test-Path $configModule)) {
     Write-NucleusError "Android modules not found at $androidModule or $configModule"
     exit 1

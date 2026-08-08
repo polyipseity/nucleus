@@ -20,11 +20,18 @@ Register-Step -Id "windows-pester" -Number 6 -Name "Windows Pester tests" -Actio
   }
   [System.IO.File]::WriteAllText($manifestFile, $json)
 
-  $windowsTestRoot = Join-Path $RepoRoot 'tests\hosts\Windows'
+  $windowsTestRoots = @(
+    (Join-Path $RepoRoot 'tests\platforms\Windows')
+    (Join-Path $RepoRoot 'tests\hosts\Windows')
+  )
   $testFiles = @(
-    Get-ChildItem -Path $windowsTestRoot -Recurse -File |
-      Where-Object { $_.Name -like '*.Tests.ps1' -or $_.Name -like '*.tests.ps1' } |
-      ForEach-Object { $_.FullName }
+    foreach ($root in $windowsTestRoots) {
+      if (Test-Path $root) {
+        Get-ChildItem -Path $root -Recurse -File |
+          Where-Object { $_.Name -like '*.Tests.ps1' -or $_.Name -like '*.tests.ps1' } |
+          ForEach-Object { $_.FullName }
+      }
+    }
   )
 
   if ($testFiles.Count -eq 0) {

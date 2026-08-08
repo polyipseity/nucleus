@@ -1,6 +1,6 @@
 # src/vms/NixOS/packer.pkr.hcl — Packer template for building a NixOS QCOW2 image.
 #
-# Used by src/hosts/Windows/modules/system/Invoke-VMSetup.ps1 on Windows hosts
+# Used by src/platforms/Windows/modules/system/Invoke-VMSetup.ps1 on Windows hosts
 # to build the NixOS guest image via QEMU. On macOS/NixOS hosts,
 # scripts/vm-setup.sh uses nixos-generators directly (faster, no Packer
 # needed).

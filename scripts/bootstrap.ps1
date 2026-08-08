@@ -76,7 +76,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
 # Refuse to run as Administrator — privilege escalation is managed internally
@@ -316,7 +316,7 @@ foreach ($package in $BootstrapPackageVersions.GetEnumerator()) {
 
 # Provisioning: install lockfile-pinned PowerShell modules (Pester, PSScriptAnalyzer,
 # powershell-yaml). Preflight in check.ps1/test.ps1 only asserts availability.
-$moduleSetupPath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\setup\Invoke-PowerShellModuleSetup.ps1'
+$moduleSetupPath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\setup\Invoke-PowerShellModuleSetup.ps1'
 if (Test-Path -Path $moduleSetupPath) {
   . $moduleSetupPath
   Invoke-PowerShellModuleSetup
@@ -336,7 +336,7 @@ if ($Apply) {
   $effectiveApplyArgs = @($ApplyArgs)
   $applyArgsText = ($effectiveApplyArgs -join " ")
   if ($applyArgsText -notmatch "(?i)(^|\s)-ModuleDir(\s|$)") {
-    $defaultModuleDir = Join-Path -Path $PSScriptRoot -ChildPath "..\src\hosts\Windows\modules"
+    $defaultModuleDir = Join-Path -Path $PSScriptRoot -ChildPath "..\src\platforms\Windows\modules"
     $effectiveApplyArgs += @("-ModuleDir", $defaultModuleDir)
   }
 

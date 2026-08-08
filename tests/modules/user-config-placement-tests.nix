@@ -8,7 +8,7 @@ let
   gitSystemText = builtins.readFile ../../src/modules/configs/git/MacBook.gitconfig;
   gitUserText = builtins.readFile ../../src/modules/git.nix;
   resolveUserConfigText = builtins.readFile ../../src/scripts/lib/resolve-user-config.sh;
-  configHelpersText = builtins.readFile ../../src/hosts/Windows/modules/ConfigHelpers.ps1;
+  configHelpersText = builtins.readFile ../../src/platforms/Windows/modules/ConfigHelpers.ps1;
 in
 assert containsRegex "mkUserOverlay" usersOverlayText;
 assert containsRegex "mkUserOverlay" shellText;

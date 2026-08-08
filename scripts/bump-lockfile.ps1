@@ -63,7 +63,7 @@ $repoRoot = if ($env:NUCLEUS_REPO_ROOT) {
   (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
 }
 
-$modulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
 $lockfileRel = 'src/lockfiles/lockfile.json'

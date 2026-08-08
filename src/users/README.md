@@ -14,7 +14,7 @@ Some fields accept either a plain string or a host map. Host maps use keys `MacB
 |--------|-------------|
 | Nix | `src/modules/lib/users-registry.nix` (`hostName` argument) |
 | Shell | `src/scripts/lib/load-user-registry.sh --host MacBook\|NixOS\|Windows` |
-| PowerShell | `src/hosts/Windows/modules/Load-UserRegistry.ps1` |
+| PowerShell | `src/platforms/Windows/modules/Load-UserRegistry.ps1` |
 
 `symlinks.json` keeps its `targets` map intact in the registry; POSIX and Windows activation code resolves the right host entry when creating symlinks.
 

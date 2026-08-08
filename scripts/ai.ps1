@@ -69,7 +69,7 @@ $ErrorActionPreference = 'Stop'
 # Used inside functions below via closure (PSSA cannot track)
 $null = $DryRun, $GcOnly, $AiProfile, $Json  # check-suppress:suppression_doc: splatting variables, declared for parameter binding
 
-$fmtModulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+$fmtModulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $fmtModulePath -Force -DisableNameChecking
 
 if ($Help -or -not $Action) {
@@ -84,7 +84,7 @@ if ($Help -or -not $Action) {
 
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Get-Item $PSScriptRoot).Parent.FullName }
 if (-not $env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT = $RepoRoot }
-. (Join-Path $RepoRoot 'src\hosts\Windows\modules\Get-NucleusHostPlatform.ps1')
+. (Join-Path $RepoRoot 'src\platforms\Windows\modules\Get-NucleusHostPlatform.ps1')
 $ModelsJson = Join-Path $RepoRoot "src\modules\ai\models.json"
 $ServicesJson = Join-Path $RepoRoot "src\modules\services.json"
 
@@ -93,7 +93,7 @@ $ServicesJson = Join-Path $RepoRoot "src\modules\services.json"
 # ---------------------------------------------------------------------------
 
 function Invoke-AiSync {
-  $modulePath = Join-Path $RepoRoot "src\hosts\Windows\modules\system\Invoke-AISync.ps1"
+  $modulePath = Join-Path $RepoRoot "src\platforms\Windows\modules\system\Invoke-AISync.ps1"
 
   if (-not (Test-Path -LiteralPath $modulePath)) {
     throw "ai: sync module not found at '$modulePath'."

@@ -22,5 +22,5 @@ function Write-Message { Write-Output "check: $args" }
 function Write-WarningMessage { Write-Output "check: warning: $args" }
 function Write-ErrorMessage { Write-Output "check: error: $args" }
 
-$modulesPath = Join-Path $RepoRoot 'src\hosts\Windows\modules'
+$modulesPath = Join-Path $RepoRoot 'src\platforms\Windows\modules'
 Import-Module (Join-Path $modulesPath 'Ensure-Tool.psm1') -Force

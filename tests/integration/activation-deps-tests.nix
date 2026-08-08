@@ -21,7 +21,7 @@ let
   middleClickScriptText = builtins.readFile ../../src/hosts/MacBook/scripts/macos-enable-middle-click.sh;
   spotlightScriptText = builtins.readFile ../../src/hosts/MacBook/scripts/macos-disable-spotlight.sh;
   gimpScrollSensitivityScriptText = builtins.readFile ../../src/scripts/configs/configure-gimp-scroll-sensitivity.sh;
-  windowsGitSshModuleText = builtins.readFile ../../src/hosts/Windows/modules/user/Sync-GitAndSshConfig.ps1;
+  windowsGitSshModuleText = builtins.readFile ../../src/platforms/Windows/modules/user/Sync-GitAndSshConfig.ps1;
   macbookUserGitconfigText = builtins.readFile ../../src/users/default/git/MacBook.gitconfig;
   nixosUserGitconfigText = builtins.readFile ../../src/users/default/git/NixOS.gitconfig;
   discordMusicRpcModuleText = builtins.readFile ../../src/modules/ext-discord-music-rpc.nix;

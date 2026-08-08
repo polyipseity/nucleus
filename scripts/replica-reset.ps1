@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Thin scripts/ entrypoint wrapper around `Invoke-ReplicaReset` from
-  `src/hosts/Windows/modules/system/Invoke-ReplicaReset.ps1`.
+  `src/platforms/Windows/modules/system/Invoke-ReplicaReset.ps1`.
 
 .PARAMETER DryRun
   Print planned reset actions without modifying local state (default: $false).
@@ -30,7 +30,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$fmtModulePath = Join-Path $PSScriptRoot '..\src\hosts\Windows\modules\Format-NucleusOutput.psm1'
+$fmtModulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $fmtModulePath -Force -DisableNameChecking
 
 function Resolve-NucleusRepoRoot {
@@ -50,7 +50,7 @@ function Resolve-NucleusRepoRoot {
 }
 
 $repoRoot = Resolve-NucleusRepoRoot
-$modulePath = Join-Path -Path $repoRoot -ChildPath 'src\hosts\Windows\modules\system\Invoke-ReplicaReset.ps1'
+$modulePath = Join-Path -Path $repoRoot -ChildPath 'src\platforms\Windows\modules\system\Invoke-ReplicaReset.ps1'
 
 if (-not (Test-Path -LiteralPath $modulePath)) {
   throw "replica-reset: module not found at '$modulePath'."

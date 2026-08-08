@@ -71,7 +71,7 @@ let
   # Phase 2 — VM sizes are suffixed strings (kB/MB/GB/TB and kiB/MiB/GiB/TiB)
   # ---------------------------------------------------------------------------
   # The Nix parser (src/modules/lib/size.nix) is the reference implementation;
-  # src/scripts/lib/size.sh and src/hosts/Windows/modules/SizeStrings.ps1 must
+  # src/scripts/lib/size.sh and src/platforms/Windows/modules/SizeStrings.ps1 must
   # accept and reject exactly the same inputs.  Grammar parity is enforced
   # textually by test_size_grammar_parity_across_implementations; functional
   # acceptance/rejection is pinned on the reference parser below.
@@ -147,7 +147,7 @@ let
     "8MBK"
   ];
   size_sh_text = builtins.readFile ../../src/scripts/lib/size.sh;
-  size_ps_text = builtins.readFile ../../src/hosts/Windows/modules/SizeStrings.ps1;
+  size_ps_text = builtins.readFile ../../src/platforms/Windows/modules/SizeStrings.ps1;
   vms_schema_text = builtins.readFile ../../src/modules/VMs.schema.json;
 
   test_size_parser_accepts = assert' (builtins.all (f: size.parse f.input == f.bytes)
@@ -1141,7 +1141,7 @@ let
     builtins.readFile ../../scripts/vm.sh + builtins.readFile ../../src/scripts/lib/vm.sh;
   vm_ps1_text = builtins.readFile ../../scripts/vm.ps1;
   apply_sh_text = builtins.readFile ../../src/scripts/apply.sh;
-  windows_vm_setup_ps1_text = builtins.readFile ../../src/hosts/Windows/modules/system/Invoke-VMSetup.ps1;
+  windows_vm_setup_ps1_text = builtins.readFile ../../src/platforms/Windows/modules/system/Invoke-VMSetup.ps1;
   readmeTemplateText = builtins.readFile ../../src/vms/templates/README.md;
   startPosixTemplateText = builtins.readFile ../../src/vms/templates/start-posix.sh;
   startWindowsTemplateText = builtins.readFile ../../src/vms/templates/start-windows.ps1;
@@ -1159,7 +1159,7 @@ let
   vms_windows_packer_text = builtins.readFile ../../src/vms/Windows/packer.pkr.hcl;
   vms_windows_autounattend_text = builtins.readFile ../../src/vms/Windows/Autounattend.xml;
   vms_macos_packer_text = builtins.readFile ../../src/vms/macOS/packer.pkr.hcl;
-  windows_vm_android_ps1_text = builtins.readFile ../../src/hosts/Windows/modules/system/VMAndroid.ps1;
+  windows_vm_android_ps1_text = builtins.readFile ../../src/platforms/Windows/modules/system/VMAndroid.ps1;
   start_android_ps1_text = builtins.readFile ../../src/scripts/vms/start-android-vm.ps1;
   android_config_sh_text = builtins.readFile ../../src/scripts/vms/android-config.sh;
   android_fake_wifi_sh_text = builtins.readFile ../../src/scripts/vms/android-fake-wifi.sh;
