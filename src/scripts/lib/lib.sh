@@ -205,12 +205,6 @@ sha256_of_file() {
   openssl dgst -sha256 "$_sof_file" | awk '{ print $2 }'
 }
 
-# Platform-aware host key for services.json $logging lookups.
-# Deprecated alias — use resolve_nucleus_host instead.
-nucleus_host_key() {
-  resolve_nucleus_host
-}
-
 # Path to host-platform-registry.json in the nucleus repo.
 nucleus_host_platform_registry_path() {
   _nhprp_repo="${NUCLEUS_REPO_ROOT:-}"
