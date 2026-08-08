@@ -103,6 +103,7 @@ All nucleus-managed services use persistent-daemon semantics by default: auto-st
 | `icloud-exclusions`        | launchd `agent`, StartInterval=3600                  | — (N/A)                                                | — (N/A)                            | macOS-only; iCloud ignore xattr drift correction                                         |
 
 - **`gc-weekly` log overlap:** runs full `gc.sh` including log rotate/expire; daily `log-gc-user` / `log-gc-system` cover the same paths — overlap is intentional and idempotent.
+- **`duperemove` (NixOS only):** weekly root `gc.sh` runs btrfs block dedup on `/nix/store` after `nix-collect-garbage`. No macOS/Windows parity — those hosts have no Nix store on btrfs.
 
 ### Explicit recovery settings removed
 

@@ -1,7 +1,7 @@
 ---
 description: "Use when changing Nix store policy, GC thresholds, script bundling, or store-space audits in nucleus. Documents rejected approaches, host filesystem limits, bundleDefault policy, and GC semantics."
 name: "Nix Store Space"
-applyTo: "src/modules/posix-base.nix, src/modules/configs/nix/**, src/flake.nix, src/modules/lib/script-tree.nix, scripts/gc.sh, scripts/cleanup-nix.sh, src/scripts/cleanup-nix-build-artifacts.sh"
+applyTo: "src/modules/posix-base.nix, src/modules/configs/nix/**, src/flake.nix, src/modules/lib/script-tree.nix, scripts/gc.sh, scripts/cleanup-nix.sh, src/scripts/cleanup-nix-build-artifacts.sh, src/scripts/services/duperemove-store.sh"
 ---
 
 # Nix store space policy
@@ -25,9 +25,16 @@ Age-based store GC is canonical: `nix-collect-garbage --delete-older-than` via [
 
 **Generation retention (intersection):** system and Home Manager profile generations are pruned with the same helper ([`expire-profile-generations.sh`](../../src/scripts/lib/expire-profile-generations.sh)): keep only generations that are **both** among the newest `generationsKeep` (default **7**) **and** newer than `expiry` (default **7d**). Configured in [`gc-options.nix`](../../src/modules/lib/gc-options.nix); overridden via `NUCLEUS_GC_GENERATIONS_KEEP` / `NUCLEUS_GC_EXPIRY` and matching `nucleus-gc` flags.
 
-**Scheduling:** daily `nixStoreGc` (system daemon / NixOS timer) runs `nix-store-gc.sh`; weekly `gc-weekly` runs full `gc.sh` as **root** with user homedir steps via `sudo -u $NUCLEUS_USERNAME`. There is no user-scope `gc-weekly` on macOS or NixOS.
+**Scheduling:** daily `nixStoreGc` (system daemon / NixOS timer) runs `nix-store-gc.sh`; weekly `gc-weekly` runs full `gc.sh` as **root** with user homedir steps via `sudo -u $NUCLEUS_USERNAME`. Weekly root GC also runs `duperemove` on btrfs `/nix/store` ([`duperemove-store.sh`](../../src/scripts/services/duperemove-store.sh)). There is no user-scope `gc-weekly` on macOS or NixOS.
 
 MacBook `/nix` lives on a dedicated APFS volume (Determinate installer). `min-free` / `max-free` apply to that volume's free space.
+
+NixOS `/nix` lives on a dedicated Btrfs subvolume `@nix` ([`disks.nix`](../../src/hosts/NixOS/hardware/disks.nix), [`btrfs-options.nix`](../../src/hosts/NixOS/btrfs-options.nix)) with `compress-force=zstd` and `noatime`. Guest images use the same layout ([`src/vms/nixos/formats/`](../../src/vms/nixos/formats/)).
+
+## Btrfs compression and measurement
+
+- Mount options: `compress-force=zstd` on both `@` and `@nix` (forces compression on substituted binary-cache paths; plain `compress=zstd` often skips them — see [nix#3550](https://github.com/NixOS/nix/issues/3550)).
+- **`df` / `du` under-report btrfs usage** when compression is active; use `compsize /nix/store` or `btdu` for accurate space accounting.
 
 ## `bundleDefault` policy
 
@@ -53,7 +60,7 @@ Each `writeNucleusShellApplication` with `bundleDefault = true` previously `cp -
 | Host | Store FS | Reflink at runtime |
 | ---- | -------- | ------------------ |
 | MacBook | APFS (`/nix` volume) | Yes — `copy_with_reflink` in `lib.sh` for wallpaper and VM images when source and dest share a CoW volume |
-| NixOS | ext4 on `/` | No reflink into store; VM golden→base may use reflink only on CoW-capable Linux hosts |
+| NixOS | Btrfs `@nix` subvolume | Yes — `copy_with_reflink` for wallpaper and VM qcow copies on the same btrfs partition |
 | Windows | No Nix store | N/A |
 
 **D3 — Automator / `.app` bundles must copy:** [`equaliser`](../../src/flake.nix) (`stdenv.mkDerivation` copies `*.app` from the DMG into `$out/Applications/`) and [`camillagui-backend`](../../src/hosts/MacBook/camilladsp.nix) ship self-contained `.app` bundles. Symlinking store paths into bundles breaks macOS app isolation and code signing expectations — accept the store/runtime copy cost.
@@ -73,6 +80,13 @@ Each `writeNucleusShellApplication` with `bundleDefault = true` previously `cp -
 | A8 | Content-addressed script bundles | Experimental; premature |
 | E3 | "Fix" dual `sharedPackages` | Investigated — intentional design |
 
+## Active btrfs maintenance (NixOS)
+
+| ID | Item | Policy |
+| ---- | ---- | ------ |
+| F2 | btrfs + `duperemove` | Weekly via `gc-weekly` → `gc.sh` step 2b → [`duperemove-store.sh`](../../src/scripts/services/duperemove-store.sh) on `/nix/store` (`--hashfile=/var/lib/duperemove/hashfile`). Package: [`filesystems.nix`](../../src/hosts/NixOS/filesystems.nix). Opt out: `nucleus-gc --no-duperemove-gc`. |
+| F4 | `@nix` subvolume + `noatime` | Provisioned on NixOS host and guest images; not a separate block device. |
+
 ## Not applicable to nucleus provisioning
 
 ### Filesystem / store stack
@@ -80,9 +94,7 @@ Each `writeNucleusShellApplication` with `bundleDefault = true` previously `cp -
 | ID | Item | Why not applicable |
 | ---- | ---- | ------------------ |
 | F1 | "Enable APFS clones" as repo action | Mac `/nix` already APFS via installer |
-| F2 | btrfs + `duperemove` | No btrfs in repo; NixOS uses ext4 |
 | F3 | ZFS online dedup | No ZFS in repo |
-| F4 | Separate `/nix` partition + `noatime` | Not provisioned |
 | F5 | CoW FS for Nix store reflink ingestion | Requires upstream Nix support (not shipped) |
 
 ### Upstream-only
@@ -101,7 +113,6 @@ Each `writeNucleusShellApplication` with `bundleDefault = true` previously `cp -
 
 | ID | Item | Why not applicable |
 | ---- | ---- | ------------------ |
-| D1-NixOS | Wallpaper reflink on NixOS | ext4 — no reflink |
 | D2-Win | VM reflink on Windows | NTFS — no APFS-style reflink |
 | D4 | Windows wallpaper hardlink/reflink | NTFS; symlink path sufficient |
 
