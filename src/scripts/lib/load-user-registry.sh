@@ -16,7 +16,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 # shellcheck source=lib.sh
 . "${SCRIPT_DIR}/lib.sh"
 
-_hostName="MacBook"
+_hostName="$(resolve_nucleus_host)"
 _repo_root=""
 
 while [ "$#" -gt 0 ]; do
