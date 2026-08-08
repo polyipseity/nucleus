@@ -22,6 +22,75 @@
   Exit codes:
     This module does not emit exit codes.
 #>
+function ConvertTo-JellyfinLibraryOptionsCanonical {
+  param(
+    [AllowNull()]
+    $Options
+  )
+
+  if ($null -eq $Options) {
+    return $null
+  }
+
+  $typeOption = @($Options.TypeOptions | Where-Object { $_ }) | Select-Object -First 1
+  $imageOptions = @()
+  foreach ($imageOption in @($typeOption.ImageOptions | Where-Object { $_ })) {
+    $entry = @{
+      Type  = [string]$imageOption.Type
+      Limit = [int]$imageOption.Limit
+    }
+    if ($null -ne $imageOption.MinWidth) {
+      $entry.MinWidth = [int]$imageOption.MinWidth
+    }
+    $imageOptions += $entry
+  }
+
+  return @{
+    Enabled                               = [bool]$Options.Enabled
+    EnableRealtimeMonitor                 = [bool]$Options.EnableRealtimeMonitor
+    EnableEmbeddedTitles                  = [bool]$Options.EnableEmbeddedTitles
+    EnableEmbeddedExtrasTitles            = [bool]$Options.EnableEmbeddedExtrasTitles
+    AllowEmbeddedSubtitles                = [string]$Options.AllowEmbeddedSubtitles
+    MetadataSavers                        = @()
+    SaveLocalMetadata                     = [bool]$Options.SaveLocalMetadata
+    EnableChapterImageExtraction          = [bool]$Options.EnableChapterImageExtraction
+    ExtractChapterImagesDuringLibraryScan = [bool]$Options.ExtractChapterImagesDuringLibraryScan
+    EnableTrickplayImageExtraction        = [bool]$Options.EnableTrickplayImageExtraction
+    ExtractTrickplayImagesDuringLibraryScan = [bool]$Options.ExtractTrickplayImagesDuringLibraryScan
+    SaveTrickplayWithMedia                = [bool]$Options.SaveTrickplayWithMedia
+    TypeOptions                           = @(
+      @{
+        Type              = 'MusicVideo'
+        ImageFetchers     = @($typeOption.ImageFetchers | Where-Object { $_ })
+        ImageFetcherOrder = @($typeOption.ImageFetcherOrder | Where-Object { $_ })
+        MetadataFetchers  = @()
+        ImageOptions      = $imageOptions
+      }
+    )
+  }
+}
+
+function Test-JellyfinLibraryOptionsMatch {
+  param(
+    [AllowNull()]
+    $Current,
+
+    [Parameter(Mandatory)]
+    $Desired
+  )
+
+  if ($null -eq $Current) {
+    return $false
+  }
+
+  $currentCanonical = ConvertTo-JellyfinLibraryOptionsCanonical -Options $Current
+  $desiredCanonical = ConvertTo-JellyfinLibraryOptionsCanonical -Options $Desired
+  return (
+    ($currentCanonical | ConvertTo-Json -Depth 20 -Compress) -eq
+    ($desiredCanonical | ConvertTo-Json -Depth 20 -Compress)
+  )
+}
+
 function Sync-JellyfinLibraryCatalog {
   <#
   .SYNOPSIS
@@ -416,6 +485,9 @@ function Sync-JellyfinLibraryCatalog {
     }
     else {
       # Update existing library options.
+      if (Test-JellyfinLibraryOptionsMatch -Current $existing.LibraryOptions -Desired $libraryOptions) {
+        continue
+      }
       $itemId = [string]$existing.ItemId
       if ([string]::IsNullOrWhiteSpace($itemId)) {
         $itemId = [string]$existing.Id

@@ -374,6 +374,41 @@ _jfs_sync_accounts() {
   rm -f "$_jfsa_resolved_file"
 }
 
+# Normalize LibraryOptions to the POST payload shape for drift comparison.
+_jfs_library_options_match() {
+  local _jfsl_current="$1"
+  local _jfsl_desired="$2"
+  jq -en --argjson current "$_jfsl_current" --argjson desired "$_jfsl_desired" '
+    def normalize:
+      {
+        Enabled: (.Enabled // false),
+        EnableRealtimeMonitor: (.EnableRealtimeMonitor // false),
+        EnableEmbeddedTitles: (.EnableEmbeddedTitles // false),
+        EnableEmbeddedExtrasTitles: (.EnableEmbeddedExtrasTitles // false),
+        AllowEmbeddedSubtitles: (.AllowEmbeddedSubtitles // "AllowAll"),
+        MetadataSavers: (.MetadataSavers // []),
+        SaveLocalMetadata: (.SaveLocalMetadata // false),
+        EnableChapterImageExtraction: (.EnableChapterImageExtraction // false),
+        ExtractChapterImagesDuringLibraryScan: (.ExtractChapterImagesDuringLibraryScan // false),
+        EnableTrickplayImageExtraction: (.EnableTrickplayImageExtraction // false),
+        ExtractTrickplayImagesDuringLibraryScan: (.ExtractTrickplayImagesDuringLibraryScan // false),
+        SaveTrickplayWithMedia: (.SaveTrickplayWithMedia // false),
+        TypeOptions: (
+          .TypeOptions // []
+          | map({
+              Type,
+              ImageFetchers: (.ImageFetchers // []),
+              ImageFetcherOrder: (.ImageFetcherOrder // []),
+              MetadataFetchers: (.MetadataFetchers // []),
+              ImageOptions: (.ImageOptions // [])
+            })
+        )
+      };
+    def asObject: if type == "object" then . else {} end;
+    ($current | asObject | normalize) == ($desired | asObject | normalize)
+  '
+}
+
 # Converge Jellyfin library folders declared in src/users/.
 _jfs_sync_libraries() {
   if ! _jfsl_users_registry="$(_jfs_load_users_registry)"; then
@@ -670,6 +705,15 @@ _jfs_sync_libraries() {
         printf '%s\n' "jellyfin/library: failed to create library '$_jfsl_name' (HTTP $_jfsl_create_status)" >&2
       fi
     else
+      _jfsl_current_options="$(printf '%s' "$_jfsl_folders_body" | jq -c --arg name "$_jfsl_name" '
+        map(select(.Name == $name))
+        | .[0]
+        | .LibraryOptions // null
+      ')"
+      if [ "$_jfsl_current_options" != "null" ] \
+        && _jfs_library_options_match "$_jfsl_current_options" "$_jfsl_library_options"; then
+        continue
+      fi
       _jfsl_update_payload="$(jq -cn --arg id "$_jfsl_existing_item_id" --argjson options "$_jfsl_library_options" '{Id:$id,LibraryOptions:$options}')"
       _jfsl_update_response="$(_jfs_api_request POST '/Library/VirtualFolders/LibraryOptions' "$_jfsl_admin_token" "$_jfsl_update_payload")"
       _jfsl_update_status="$(_jfs_status_from_response "$_jfsl_update_response")"
