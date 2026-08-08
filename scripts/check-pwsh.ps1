@@ -20,8 +20,10 @@
   -Settings scripts/PSScriptAnalyzerSettings.test.psd1
 
 .PARAMETER SkipStep
-  Step names to skip. Currently only 'PSSA' is recognized — bypasses the
-  PSScriptAnalyzer lint. Unknown step names cause an error.
+  Step names to skip. Recognized values:
+  - `PSSA` — skip PSScriptAnalyzer lint (syntax-only; used by check step 2 on pre-commit).
+  - `Syntax` — skip parser syntax validation (PSSA-only; used by test step 2 on pre-push).
+  Unknown step names cause an error.
 
 .PARAMETER Scoped
   If specified and no paths are given, skip Git discovery (no files to check).
@@ -36,6 +38,9 @@
 
 .EXAMPLE
   nix run ./src#check-pwsh -- -SkipStep PSSA
+
+.EXAMPLE
+  nix run ./src#check-pwsh -- -SkipStep Syntax -Settings scripts/PSScriptAnalyzerSettings.test.psd1
 
 .EXAMPLE
   nix run ./src#check-pwsh -- -Settings scripts/PSScriptAnalyzerSettings.check.psd1 src/hosts/Windows/apply.ps1
@@ -74,6 +79,7 @@ $knownStepNames = [System.Collections.Generic.HashSet[string]]::new(
   [System.StringComparer]::OrdinalIgnoreCase
 )
 $null = $knownStepNames.Add('PSSA')  # check-suppress:suppression_doc: Add returns collection count, discarded
+$null = $knownStepNames.Add('Syntax')  # check-suppress:suppression_doc: Add returns collection count, discarded
 $unknownNames = @($SkipStep | Where-Object { $_ -notin $knownStepNames })
 if ($unknownNames.Count -gt 0) {
   throw "Unknown -SkipStep value(s): $($unknownNames -join ', '). Valid values: $($knownStepNames -join ', ')"
@@ -88,30 +94,35 @@ foreach ($t in $SkipStep) {
 # ---------------------------------------------------------------------------
 # Syntax validation.
 # ---------------------------------------------------------------------------
-$parseErrors = @($Paths | Sort-Object -Unique | ForEach-Object -Parallel {
-  $path = $_
-  if (-not (Test-Path -Path $path)) {
-    return
+$skipSyntax = $skipStepSet -contains 'Syntax'
+if (-not $skipSyntax) {
+  $parseErrors = @($Paths | Sort-Object -Unique | ForEach-Object -Parallel {
+    $path = $_
+    if (-not (Test-Path -Path $path)) {
+      return
+    }
+
+    $tokens = $null
+    $errors = $null
+    [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)  # check-suppress:suppression_doc: ParseFile returns AST, discarded; only token/error refs needed
+
+    if ($errors) {
+      $errors
+    }
+  } -ThrottleLimit ([System.Environment]::ProcessorCount) | Where-Object { $_ -ne $null })
+
+  if ($parseErrors.Count -gt 0) {
+    foreach ($parseError in $parseErrors) {
+      Write-Output ('{0}:{1}:{2}: {3}' -f $parseError.Extent.File, $parseError.Extent.StartLineNumber, $parseError.Extent.StartColumnNumber, $parseError.Message)
+    }
+
+    throw 'PowerShell syntax check failed.'
   }
 
-  $tokens = $null
-  $errors = $null
-  [void][System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)  # check-suppress:suppression_doc: ParseFile returns AST, discarded; only token/error refs needed
-
-  if ($errors) {
-    $errors
-  }
-} -ThrottleLimit ([System.Environment]::ProcessorCount) | Where-Object { $_ -ne $null })
-
-if ($parseErrors.Count -gt 0) {
-  foreach ($parseError in $parseErrors) {
-    Write-Output ('{0}:{1}:{2}: {3}' -f $parseError.Extent.File, $parseError.Extent.StartLineNumber, $parseError.Extent.StartColumnNumber, $parseError.Message)
-  }
-
-  throw 'PowerShell syntax check failed.'
+  Write-Output ("PowerShell syntax check passed for {0} files." -f $Paths.Count)
+} else {
+  Write-Output 'PowerShell syntax check skipped (-SkipStep Syntax).'
 }
-
-Write-Output ("PowerShell syntax check passed for {0} files." -f $Paths.Count)
 
 # ---------------------------------------------------------------------------
 # PSScriptAnalyzer lint.
