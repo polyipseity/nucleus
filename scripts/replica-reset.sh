@@ -106,7 +106,7 @@ fi
 USERS_REGISTRY="$(_load_users_registry)"
 
 username="$(id -un)"
-current_os="$(uname -s)"
+host="$(resolve_nucleus_host)"
 # check-suppress:suppression_doc: rclone remote may not be configured; best-effort unmount.
 # WHY: the query filters to enabled replicas that name a remote — a replica
 # without a configured remote has nothing to reset, and disabled replicas
@@ -162,7 +162,7 @@ while IFS="$(printf '\t')" read -r id local_path provider icloud_service; do
   # macOS iCloud Drive replicas are represented as symlinks to the native
   # CloudDocs path. Never recurse into that target during reset; only remove
   # the symlink itself so remotes and native-managed content remain untouched.
-  if [ "$current_os" = "Darwin" ] && [ "$provider" = "iCloud" ] && [ "$icloud_service" = "drive" ]; then
+  if [ "$host" = "MacBook" ] && [ "$provider" = "iCloud" ] && [ "$icloud_service" = "drive" ]; then
     if [ -L "$local_root" ]; then
       if ! run_local_cmd rm -f "$local_root"; then
         local_failures=$((local_failures + 1))

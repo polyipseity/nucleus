@@ -130,7 +130,7 @@ load_provider_gc_entries() {
 }
 
 username="$(id -un)"
-current_os="$(uname -s)"
+host="$(resolve_nucleus_host)"
 
 replica_lines="$({
   jq -r --arg username "$username" '
@@ -471,7 +471,7 @@ while IFS="$(printf '\t')" read -r id direction local_path remote_path provider 
   # WHY: native iCloud already syncs this tree (via the replica symlink), so
   # pulling it again through the rclone iCloud remote would double-sync and
   # fight the daemon.
-  if [ "$current_os" = "Darwin" ] && [ "$provider" = "iCloud" ] && [ "$id" = "iCloud" ]; then
+  if [ "$host" = "MacBook" ] && [ "$provider" = "iCloud" ] && [ "$id" = "iCloud" ]; then
     if ! ensure_macos_icloud_replica_symlink "$local_path"; then
       failures=$((failures + 1))
     fi
