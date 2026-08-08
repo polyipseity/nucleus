@@ -4,7 +4,7 @@ $schema: https://json.schemastore.org/yamllint.json
 extends: default
 
 ignore: |
-  src/users/default/discord-music-rpc/config.yaml
+  src/users/*/discord-music-rpc/config.yaml
   src/secrets/
   vendor/**
 
