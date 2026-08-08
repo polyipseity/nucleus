@@ -577,14 +577,14 @@ function Invoke-AndroidDownloadUserdebugRecovery {
   )
 
   $suffix = Get-AndroidRecoveryAssetSuffix -Vm $Vm
-  $img = Join-Path $ImagesDir 'android-recovery-userdebug.img'
+  $img = Join-Path $ImagesDir 'recovery userdebug.img'
   $assetName = "recovery_${suffix}-userdebug.img"
   $downloadUrl = "https://github.com/jqssun/android-lineage-qemu/releases/latest/download/$assetName"
 
   $tag = Get-AndroidJqssunReleaseTagForAsset -AssetName $assetName
   if (-not $tag) { return $false }
 
-  $tagFile = Join-Path $ImagesDir 'android-recovery-userdebug.tag.json'
+  $tagFile = Join-Path $ImagesDir 'recovery userdebug.tag.json'
   if (Test-Path -LiteralPath $img -PathType Leaf) {
     $cachedTag = ''
     if (Test-Path -LiteralPath $tagFile -PathType Leaf) {
@@ -644,7 +644,7 @@ function Invoke-AndroidEnsureUserdebugRecovery {
     [string]$ImagesDir
   )
 
-  $img = Join-Path $ImagesDir 'android-recovery-userdebug.img'
+  $img = Join-Path $ImagesDir 'recovery userdebug.img'
   $fbSerial = Get-AndroidFastbootSerial -Vm $Vm
 
   if (-not (Test-Path -LiteralPath $img -PathType Leaf)) {
