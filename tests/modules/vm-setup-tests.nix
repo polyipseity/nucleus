@@ -1494,7 +1494,7 @@ let
         && (lib.hasInfix "users/\${_rvgc_owner}.yml" vm_setup_sh_text)
         && (lib.hasInfix "vmGuest.usernameSecretKey" vm_setup_sh_text)
         && (lib.hasInfix "vmGuest.passwordSecretKey" vm_setup_sh_text)
-        && (lib.hasInfix "sops --decrypt --output-type json" vm_setup_sh_text)
+        && (lib.hasInfix "decrypt-sops.sh" vm_setup_sh_text)
         && (lib.hasInfix "NUCLEUS_VM_GUEST_USERNAME" vm_setup_sh_text)
         && (lib.hasInfix "NUCLEUS_VM_GUEST_PASSWORD" vm_setup_sh_text)
       )
