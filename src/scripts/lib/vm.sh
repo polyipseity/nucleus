@@ -408,12 +408,12 @@ vm_get_tart_registered_names() {
   tart list 2>/dev/null | vm_parse_tart_registered_names_from_list
 }
 
-# vm_get_running_names
-#   Query hypervisors for currently running VM names. Outputs one name per line;
+# vm_get_running_ids
+#   Query hypervisors for currently running VM ids. Outputs one id per line;
 #   empty output means nothing is running. WHY: state is read from the live
 #   hypervisor rather than the manifest, so list/status reflect reality (e.g.
 #   VMs started outside nucleus).
-vm_get_running_names() {
+vm_get_running_ids() {
   case "$(uname -s)" in
     Darwin)
       if command -v tart >/dev/null 2>&1; then
@@ -606,7 +606,7 @@ vm_write_start_script() {
   # Render .sh from template.
   if [ -f "$TEMPLATES_DIR/start-posix.sh" ]; then
     _wss_posix_sed=(
-      -e "s|__VM_NAME__|$_wss_id|g"
+      -e "s|__VM_ID__|$_wss_id|g"
       -e "s|__VM_DISPLAY__|$_wss_display|g"
       -e "s|__VM_TYPE__|$_wss_type|g"
       -e "s|__HOST_KIND__|$_wss_host_kind|g"
@@ -631,7 +631,7 @@ vm_write_start_script() {
       if [ -f "$TEMPLATES_DIR/start-host.ps1" ]; then
         _wss_ps1_sed=(
           -e "s|__HOST_KIND__|$_wss_host_kind|g"
-          -e "s|__VM_NAME__|$_wss_id|g"
+          -e "s|__VM_ID__|$_wss_id|g"
           -e "s|__VM_DISPLAY__|$_wss_display|g"
           -e "s|__VM_DIR__|$VM_DIR|g"
         )
@@ -697,7 +697,7 @@ vm_write_start_script() {
         fi
         if [ -f "$TEMPLATES_DIR/start-windows.ps1" ]; then
           sed -e "s|__QEMU_SYSTEM__|$_wss_qemu_system|g" \
-              -e "s|__VM_NAME__|$_wss_id|g" \
+              -e "s|__VM_ID__|$_wss_id|g" \
               -e "s|__VM_DISPLAY__|$_wss_display|g" \
               -e "s|__MACHINE__|$_wss_machine|g" \
               -e "s|__CPU__|host|g" \
@@ -715,7 +715,7 @@ vm_write_start_script() {
         fi
         if [ -f "$TEMPLATES_DIR/start-windows-host.sh" ]; then
           sed -e "s|__QEMU_SYSTEM__|$_wss_qemu_system|g" \
-              -e "s|__VM_NAME__|$_wss_id|g" \
+              -e "s|__VM_ID__|$_wss_id|g" \
               -e "s|__VM_DISPLAY__|$_wss_display|g" \
               -e "s|__MACHINE__|$_wss_machine|g" \
               -e "s|__CPU__|host|g" \
@@ -768,7 +768,7 @@ vm_write_stop_script() {
     darwin-tart|darwin-utm|nixos-libvirt)
       if [ -f "$TEMPLATES_DIR/stop-posix.sh" ]; then
         sed -e "s|__HOST_KIND__|$_wst_host_kind|g" \
-            -e "s|__VM_NAME__|$_wst_id|g" \
+            -e "s|__VM_ID__|$_wst_id|g" \
             -e "s|__VM_DISPLAY__|$_wst_display|g" \
             "$TEMPLATES_DIR/stop-posix.sh" >"$_wst_path_sh"
       else
@@ -799,7 +799,7 @@ vm_write_stop_script() {
     darwin-tart|darwin-utm|nixos-libvirt|windows-qemu)
       if [ -f "$TEMPLATES_DIR/stop-host.ps1" ]; then
         sed -e "s|__HOST_KIND__|$_wst_host_kind|g" \
-            -e "s|__VM_NAME__|$_wst_id|g" \
+            -e "s|__VM_ID__|$_wst_id|g" \
             "$TEMPLATES_DIR/stop-host.ps1" >"$_wst_path_ps1"
       else
         warn "stop-host.ps1 template not found at $TEMPLATES_DIR/stop-host.ps1"
@@ -1262,7 +1262,7 @@ vm_resize_vm() {
     return 1
   fi
 
-  _rvm_running="$(vm_get_running_names)"
+  _rvm_running="$(vm_get_running_ids)"
   if printf '%s\n' "$_rvm_running" | grep -qxF "$_rvm_id"; then
     error "VM '$_rvm_id' is running; stop it before resizing"
     return 1
@@ -1363,7 +1363,7 @@ vm_ensure_base_and_overlay() {
   if [ -f "$_ebao_overlay" ]; then
     if ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_ebao_cred_marker" \
       || { [ -n "$_ebao_config_fp" ] && ! vm_guest_config_marker_matches "$_ebao_config_fp" "$_ebao_config_marker"; }; then
-      _ebao_running="$(vm_get_running_names)"
+      _ebao_running="$(vm_get_running_ids)"
       if printf '%s\n' "$_ebao_running" | grep -qxF "$_ebao_name"; then
         say "VM '$_ebao_name' is running; skipping base refresh from pre-built image (applies on next setup)"
       else
@@ -2345,7 +2345,7 @@ vm_sync_libvirt_vms() {
 vm_warn_running_vms_needing_restart() {
   local _wrvnr_running _wrvnr_name
 
-  _wrvnr_running="$(vm_get_running_names)" || return 0
+  _wrvnr_running="$(vm_get_running_ids)" || return 0
   [ -n "$_wrvnr_running" ] || return 0
   printf '%s\n' "$_wrvnr_running" | while IFS= read -r _wrvnr_name; do
     [ -z "$_wrvnr_name" ] && continue
@@ -3148,7 +3148,7 @@ vm_build_windows() {
 
   if [ -z "$_iso" ]; then
     error "--windows-iso PATH is required for Windows 11 builds"
-    error "alternatively add 'Windows.isoUrl': '<url>' to the VMs.json windows entry"
+    error "alternatively add 'Windows.isoUrl': '<url>' to the VMs.json Windows entry"
     error "download from: https://www.microsoft.com/software-download/windows11"
     return 1
   fi
@@ -3927,7 +3927,7 @@ vm_gc_orphan_descriptors() {
 #   pack/unpack wrappers — is payload or data and stays.
 vm_pack_vms() {
   local _pv_running
-  _pv_running="$(vm_get_running_names)"
+  _pv_running="$(vm_get_running_ids)"
   if [ -n "$_pv_running" ]; then
     error "cannot pack while a VM is running: $(printf '%s' "$_pv_running" | tr '\n' ' ')"
     return 1
