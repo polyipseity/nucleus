@@ -3,7 +3,7 @@
   "requiredNames": {
     "Get-ManifestPathList": "src/hosts/Windows/modules/user/Sync-SymlinkManifest.ps1",
     "Sync-SymlinkManifest": "src/hosts/Windows/modules/user/Sync-SymlinkManifest.ps1",
-    "Get-VmRunningNameList": "scripts/vm.ps1",
+    "Get-VMRunningIdList": "scripts/vm.ps1",
     "Sync-AgentsSkillManifest": "src/hosts/Windows/modules/user/Sync-AgentsSkillManifest.ps1",
     "Sync-AgentsClawHubSkillManifest": "src/hosts/Windows/modules/user/Sync-AgentsClawHubSkillManifest.ps1",
     "Sync-SecretCatalog": "src/hosts/Windows/modules/secrets/Sync-SecretCatalog.ps1",

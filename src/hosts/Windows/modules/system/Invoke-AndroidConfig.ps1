@@ -7,7 +7,7 @@
   android-fake-wifi.sh, plus Invoke-AndroidReset (vm_build_android reset path).
 
 .NOTES
-  Dot-sources VmAndroid.ps1. Requires Format-NucleusOutput in caller scope.
+  Dot-sources VMAndroid.ps1. Requires Format-NucleusOutput in caller scope.
 #>
 
 $script:AndroidNucleusMagiskMarker = 'android-magisk.tag.json'
@@ -992,11 +992,11 @@ function Resolve-AndroidVmIndex {
     [Parameter(Mandatory)]
     [object]$Manifest,
     [Parameter(Mandatory)]
-    [string]$VmName
+    [string]$VmId
   )
 
   for ($i = 0; $i -lt @($Manifest.VMs).Count; $i++) {
-    if ([string]$Manifest.VMs[$i].id -eq $VmName) {
+    if ([string]$Manifest.VMs[$i].id -eq $VmId) {
       return $i
     }
   }
@@ -1012,7 +1012,7 @@ function Invoke-AndroidConfig {
     [Parameter(Mandatory)]
     [string]$RepoRoot,
     [Parameter(Mandatory)]
-    [string]$VmName,
+    [string]$VmId,
     [Parameter(Mandatory)]
     [object]$Manifest,
     [Parameter(Mandatory)]
@@ -1021,15 +1021,15 @@ function Invoke-AndroidConfig {
     [string[]]$ConfigFlags = @()
   )
 
-  $vmIndex = Resolve-AndroidVmIndex -Manifest $Manifest -VmName $VmName
+  $vmIndex = Resolve-AndroidVmIndex -Manifest $Manifest -VmId $VmId
   if ($vmIndex -lt 0) {
-    Write-NucleusError "VM '$VmName' not found in manifest"
+    Write-NucleusError "VM '$VmId' not found in manifest"
     exit 1
   }
 
   $vm = $Manifest.VMs[$vmIndex]
   if ([string]$vm.type -ne 'Android') {
-    Write-NucleusError "android-config is only supported for Android VMs ('$VmName' is type $($vm.type))"
+    Write-NucleusError "android-config is only supported for Android VMs ('$VmId' is type $($vm.type))"
     exit 1
   }
 
@@ -1109,7 +1109,7 @@ function Invoke-AndroidConfig {
     if (-not (Invoke-AndroidFakeWifiRevert -Serial $serial -RepoRoot $RepoRoot)) { exit 1 }
   }
 
-  Write-NucleusInfo "android-config complete for '$VmName'"
+  Write-NucleusInfo "android-config complete for '$VmId'"
 }
 
 function Invoke-AndroidReset {
@@ -1121,7 +1121,7 @@ function Invoke-AndroidReset {
     [Parameter(Mandatory)]
     [string]$RepoRoot,
     [Parameter(Mandatory)]
-    [string]$VmName,
+    [string]$VmId,
     [Parameter(Mandatory)]
     [object]$Manifest,
     [Parameter(Mandatory)]
@@ -1129,20 +1129,20 @@ function Invoke-AndroidReset {
     [switch]$AcceptGsiLicense
   )
 
-  $vmIndex = Resolve-AndroidVmIndex -Manifest $Manifest -VmName $VmName
+  $vmIndex = Resolve-AndroidVmIndex -Manifest $Manifest -VmId $VmId
   if ($vmIndex -lt 0) {
-    Write-NucleusError "VM '$VmName' not found in manifest"
+    Write-NucleusError "VM '$VmId' not found in manifest"
     exit 1
   }
 
   $vm = $Manifest.VMs[$vmIndex]
   if ([string]$vm.type -ne 'Android') {
-    Write-NucleusError "reset is only supported for Android VMs ('$VmName' is type $($vm.type))"
+    Write-NucleusError "reset is only supported for Android VMs ('$VmId' is type $($vm.type))"
     exit 1
   }
 
   if ($vm.shareDevDir -eq $true) {
-    Write-NucleusError "shareDevDir is not supported for Android VM '$VmName'; Android does not support host filesystem sharing via QEMU"
+    Write-NucleusError "shareDevDir is not supported for Android VM '$VmId'; Android does not support host filesystem sharing via QEMU"
     exit 1
   }
 
@@ -1159,7 +1159,7 @@ function Invoke-AndroidReset {
   $gsiUrl = [string]$vm.Android.gsiUrl
 
   $systemImg = Join-Path $androidSrcDir $systemImageName
-  $userdataImg = Join-Path $dataDir "$VmName.qcow2"
+  $userdataImg = Join-Path $dataDir "$VmId.qcow2"
   $gsiImg = Join-Path $androidSrcDir $gsiImageName
 
   if (-not (Test-Path -LiteralPath $dataDir)) {
@@ -1168,7 +1168,7 @@ function Invoke-AndroidReset {
 
   # Step 1: ensure system image exists (download if missing; reset does not force upgrade)
   if (-not (Test-Path -LiteralPath $systemImg -PathType Leaf)) {
-    Write-NucleusInfo "downloading LineageOS base image for '$VmName'..."
+    Write-NucleusInfo "downloading LineageOS base image for '$VmId'..."
     $suffix = Get-AndroidRecoveryAssetSuffix -Vm $vm
     $tag = Get-AndroidJqssunReleaseTagForAsset -AssetName "boot_${suffix}.img"
     if (-not $tag) { exit 1 }
@@ -1199,7 +1199,7 @@ function Invoke-AndroidReset {
 
     Copy-Item -LiteralPath $largestQcow2.FullName -Destination $systemImg -Force
     Remove-Item -LiteralPath $extractDir, $zipPath -Recurse -Force -ErrorAction SilentlyContinue
-    if (-not (Test-AndroidQcow2Image -ImagePath $systemImg -Label "Android system image for $VmName" -MinVirtualSize $minSizeBytes)) {
+    if (-not (Test-AndroidQcow2Image -ImagePath $systemImg -Label "Android system image for $VmId" -MinVirtualSize $minSizeBytes)) {
       exit 1
     }
     Write-NucleusInfo "system image ready: $systemImg"
@@ -1209,13 +1209,13 @@ function Invoke-AndroidReset {
   }
 
   # Step 2: reset userdata disk
-  $bundleUserdata = Join-Path $VmDir "$VmName.utm\Data\$userdataImageName"
+  $bundleUserdata = Join-Path $VmDir "$VmId.utm\Data\$userdataImageName"
   if (Test-Path -LiteralPath $userdataImg -PathType Leaf) {
     Write-NucleusInfo 'resetting Android userdata disk...'
     Remove-Item -LiteralPath $userdataImg -Force
   }
   elseif (Test-Path -LiteralPath $bundleUserdata -PathType Leaf) {
-    Write-NucleusError "Android userdata for '$VmName' exists only in the UTM bundle ($bundleUserdata); move it manually to $userdataImg and re-run"
+    Write-NucleusError "Android userdata for '$VmId' exists only in the UTM bundle ($bundleUserdata); move it manually to $userdataImg and re-run"
     exit 1
   }
 
@@ -1231,7 +1231,7 @@ function Invoke-AndroidReset {
       Write-NucleusError "failed to create Android userdata disk: $userdataImg"
       exit 1
     }
-    if (-not (Test-AndroidQcow2Image -ImagePath $userdataImg -Label "Android userdata disk for $VmName" -MinVirtualSize $minSizeBytes)) {
+    if (-not (Test-AndroidQcow2Image -ImagePath $userdataImg -Label "Android userdata disk for $VmId" -MinVirtualSize $minSizeBytes)) {
       exit 1
     }
     Write-NucleusInfo "userdata disk ready: $userdataImg"
@@ -1240,7 +1240,7 @@ function Invoke-AndroidReset {
   # Step 3: optional GSI image
   if (-not [string]::IsNullOrWhiteSpace($gsiUrl) -and $gsiUrl -ne 'null') {
     if (-not $AcceptGsiLicense) {
-      Write-NucleusError "GSI license not accepted for '$VmName'; see https://developer.android.com/license"
+      Write-NucleusError "GSI license not accepted for '$VmId'; see https://developer.android.com/license"
       exit 1
     }
     Write-NucleusInfo 'GSI license: https://developer.android.com/license'
@@ -1283,5 +1283,5 @@ function Invoke-AndroidReset {
     Write-NucleusInfo 'no GSI URL set; skipping GSI download (Lineage-only)'
   }
 
-  Write-NucleusInfo "reset complete for '$VmName'"
+  Write-NucleusInfo "reset complete for '$VmId'"
 }

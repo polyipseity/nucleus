@@ -1,4 +1,4 @@
-function Get-VmGuestSshPublicKey {
+function Get-VMGuestSshPublicKey {
     <#
     .SYNOPSIS
       Resolves the host SSH public key for NixOS guest authorized_keys injection.

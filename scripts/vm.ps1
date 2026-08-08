@@ -102,7 +102,7 @@ $ManifestPath = Join-Path $RepoRoot 'src\modules\VMs.json'
 # Helpers
 # ---------------------------------------------------------------------------
 
-function Get-VmManifest {
+function Get-VMManifest {
   if (-not (Test-Path $ManifestPath)) {
     Write-NucleusError "VM manifest not found at $ManifestPath"
     exit 1
@@ -114,13 +114,12 @@ function Get-VmManifest {
 # Subcommand implementations
 # ---------------------------------------------------------------------------
 
-function Invoke-VmSync {
+function Invoke-VMSync {
   $module = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
   if (-not (Test-Path $module)) {
     Write-NucleusWarning "Invoke-VMSetup module not found at $module"
     exit 1
   }
-  . $module
 
   $invokeArgs = @{ RepoRoot = $RepoRoot }
   $i = 0
@@ -146,16 +145,22 @@ function Invoke-VmSync {
     $i++
   }
 
-  Invoke-VMSync @invokeArgs
+  & {
+    param(
+      [string]$ModulePath,
+      [hashtable]$InvokeArgs
+    )
+    . $ModulePath
+    Invoke-VMSync @InvokeArgs
+  } -ModulePath $module -InvokeArgs $invokeArgs
 }
 
-function Invoke-VmSetup {
+function Invoke-VMSetup {
   $module = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
   if (-not (Test-Path $module)) {
     Write-NucleusWarning "Invoke-VMSetup module not found at $module"
     exit 1
   }
-  . $module
 
   $invokeArgs = @{ RepoRoot = $RepoRoot }
 
@@ -221,23 +226,30 @@ function Invoke-VmSetup {
     $i++
   }
 
-  Invoke-VMSetup @invokeArgs
+  & {
+    param(
+      [string]$ModulePath,
+      [hashtable]$InvokeArgs
+    )
+    . $ModulePath
+    Invoke-VMSetup @InvokeArgs
+  } -ModulePath $module -InvokeArgs $invokeArgs
 }
 
-function Get-VmRunningNameList {
+function Get-VMRunningIdList {
   # Detect running VMs from QEMU processes (Windows uses QEMU).
   $module = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-VMSetup.ps1'
   if (-not (Test-Path $module)) {
     return @()
   }
   . $module
-  return @(Get-VmRunningProcessNameList)
+  return @(Get-VMRunningProcessNameList)
 }
 
-function Invoke-VmList {
-  $manifest = Get-VmManifest
+function Invoke-VMList {
+  $manifest = Get-VMManifest
   $hostName = if ($env:NUCLEUS_HOST) { $env:NUCLEUS_HOST } else { 'Windows' }
-  $runningNameList = Get-VmRunningNameList
+  $runningNameList = Get-VMRunningIdList
 
   # Filter to enabled VMs matching the current host
   $vms = $manifest.VMs | Where-Object {
@@ -252,10 +264,10 @@ function Invoke-VmList {
   }
 }
 
-function Invoke-VmStatus {
-  $manifest = Get-VmManifest
+function Invoke-VMStatus {
+  $manifest = Get-VMManifest
   $hostName = if ($env:NUCLEUS_HOST) { $env:NUCLEUS_HOST } else { 'Windows' }
-  $runningNameList = Get-VmRunningNameList
+  $runningNameList = Get-VMRunningIdList
 
   # Filter to enabled VMs matching the current host
   $vms = $manifest.VMs | Where-Object {
@@ -272,7 +284,7 @@ function Invoke-VmStatus {
   }
 }
 
-function Invoke-VmStart {
+function Invoke-VMStart {
   if ($SubcommandArgs.Length -eq 0) {
     Write-NucleusError 'start requires a VM name'
     exit 1
@@ -288,7 +300,7 @@ function Invoke-VmStart {
     return
   }
 
-  $manifest = Get-VmManifest
+  $manifest = Get-VMManifest
   $vm = $manifest.VMs | Where-Object { $_.id -eq $vmName }
   if (-not $vm) {
     Write-NucleusError "VM '$vmName' not found in manifest"
@@ -299,7 +311,7 @@ function Invoke-VmStart {
   exit 1
 }
 
-function Invoke-VmStop {
+function Invoke-VMStop {
   if ($SubcommandArgs.Length -eq 0) {
     Write-NucleusError 'stop requires a VM name'
     exit 1
@@ -315,7 +327,7 @@ function Invoke-VmStop {
     return
   }
 
-  $manifest = Get-VmManifest
+  $manifest = Get-VMManifest
   $vm = $manifest.VMs | Where-Object { $_.id -eq $vmName }
   if (-not $vm) {
     Write-NucleusError "VM '$vmName' not found in manifest"
@@ -338,7 +350,7 @@ function Invoke-VmStop {
   exit 1
 }
 
-function Invoke-VmUpgrade {
+function Invoke-VMUpgrade {
   if ($SubcommandArgs.Length -eq 0) {
     Write-NucleusError 'upgrade requires a VM name'
     exit 1
@@ -357,7 +369,7 @@ function Invoke-VmUpgrade {
   Write-NucleusWarning "Android upgrade on Windows is not yet fully implemented"
 }
 
-function Invoke-VmReset {
+function Invoke-VMReset {
   if ($SubcommandArgs.Length -eq 0) {
     Write-NucleusError 'reset requires a VM name'
     exit 1
@@ -372,7 +384,7 @@ function Invoke-VmReset {
     }
   }
 
-  $manifest = Get-VmManifest
+  $manifest = Get-VMManifest
   $vm = $manifest.VMs | Where-Object { $_.id -eq $vmName }
   if (-not $vm) {
     Write-NucleusError "VM '$vmName' not found in manifest"
@@ -391,7 +403,7 @@ function Invoke-VmReset {
   . $setupModule
   Resolve-VMGuestCredential -RepoRoot $RepoRoot > $null
 
-  $androidModule = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\VmAndroid.ps1'
+  $androidModule = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\VMAndroid.ps1'
   $configModule = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-AndroidConfig.ps1'
   if (-not (Test-Path $androidModule) -or -not (Test-Path $configModule)) {
     Write-NucleusError "Android modules not found at $androidModule or $configModule"
@@ -402,10 +414,10 @@ function Invoke-VmReset {
 
   $vmDir = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
   Write-NucleusInfo "resetting Android VM '$vmName' on Windows..."
-  Invoke-AndroidReset -RepoRoot $RepoRoot -VmName $vmName -Manifest $manifest -VmDir $vmDir -AcceptGsiLicense:$acceptGsiLicense
+  Invoke-AndroidReset -RepoRoot $RepoRoot -VmId $vmName -Manifest $manifest -VmDir $vmDir -AcceptGsiLicense:$acceptGsiLicense
 }
 
-function Invoke-VmAndroidConfig {
+function Invoke-VMAndroidConfig {
   if ($SubcommandArgs.Length -eq 0) {
     Write-NucleusError 'android-config requires a VM name'
     exit 1
@@ -417,7 +429,7 @@ function Invoke-VmAndroidConfig {
     $configFlags = $SubcommandArgs[1..($SubcommandArgs.Length - 1)]
   }
 
-  $manifest = Get-VmManifest
+  $manifest = Get-VMManifest
   $vm = $manifest.VMs | Where-Object { $_.id -eq $vmName }
   if (-not $vm) {
     Write-NucleusError "VM '$vmName' not found in manifest"
@@ -428,7 +440,7 @@ function Invoke-VmAndroidConfig {
     exit 1
   }
 
-  $androidModule = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\VmAndroid.ps1'
+  $androidModule = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\VMAndroid.ps1'
   $configModule = Join-Path $RepoRoot 'src\hosts\Windows\modules\system\Invoke-AndroidConfig.ps1'
   if (-not (Test-Path $androidModule) -or -not (Test-Path $configModule)) {
     Write-NucleusError "Android modules not found at $androidModule or $configModule"
@@ -438,10 +450,10 @@ function Invoke-VmAndroidConfig {
   . $configModule
 
   $vmDir = if ($env:VM_DIR_OVERRIDE) { $env:VM_DIR_OVERRIDE } else { Join-Path $env:USERPROFILE 'virtual machines' }
-  Invoke-AndroidConfig -RepoRoot $RepoRoot -VmName $vmName -Manifest $manifest -VmDir $vmDir -ConfigFlags $configFlags
+  Invoke-AndroidConfig -RepoRoot $RepoRoot -VmId $vmName -Manifest $manifest -VmDir $vmDir -ConfigFlags $configFlags
 }
 
-function Invoke-VmResize {
+function Invoke-VMResize {
   if ($SubcommandArgs.Length -lt 2) {
     Write-NucleusError 'resize requires a VM name and a size (e.g. "nucleus-vm resize NixOS 64GB")'
     exit 1
@@ -457,7 +469,7 @@ function Invoke-VmResize {
     }
   }
 
-  $manifest = Get-VmManifest
+  $manifest = Get-VMManifest
   $vm = $manifest.VMs | Where-Object { $_.id -eq $vmName }
   if (-not $vm) {
     Write-NucleusError "VM '$vmName' not found in manifest"
@@ -473,7 +485,7 @@ function Invoke-VmResize {
     exit 1
   }
 
-  if ($vmName -in (Get-VmRunningNameList)) {
+  if ($vmName -in (Get-VMRunningIdList)) {
     Write-NucleusError "VM '$vmName' is running; stop it before resizing"
     exit 1
   }
@@ -512,7 +524,7 @@ function Invoke-VmResize {
   Write-NucleusInfo "resized '$vmName' disk: $oldBytes -> $diskBytes bytes"
 }
 
-function Invoke-VmGc {
+function Invoke-VMGc {
   $gcDisabled = $false
   $gcData = $false
   foreach ($arg in $SubcommandArgs) {
@@ -537,7 +549,7 @@ function Invoke-VmGc {
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
-function Invoke-VmPack {
+function Invoke-VMPack {
   $perform = $false
   foreach ($arg in $SubcommandArgs) {
     switch ($arg) {
@@ -546,7 +558,7 @@ function Invoke-VmPack {
     }
   }
 
-  if (@(Get-VmRunningNameList).Count -gt 0) {
+  if (@(Get-VMRunningIdList).Count -gt 0) {
     Write-NucleusError 'cannot pack while a VM is running; stop all VMs first'
     exit 1
   }
@@ -598,7 +610,7 @@ function Invoke-VmPack {
   }
 }
 
-function Invoke-VmUnpack {
+function Invoke-VMUnpack {
   $perform = $true
   foreach ($arg in $SubcommandArgs) {
     switch ($arg) {
@@ -773,17 +785,17 @@ function Write-VmUnpackFile {
 # ---------------------------------------------------------------------------
 
 switch ($Action) {
-  'setup'   { Invoke-VmSetup }
-  'sync'    { Invoke-VmSync }
-  'list'    { Invoke-VmList }
-  'status'  { Invoke-VmStatus }
-  'start'   { Invoke-VmStart }
-  'stop'    { Invoke-VmStop }
-  'upgrade' { Invoke-VmUpgrade }
-  'reset'   { Invoke-VmReset }
-  'android-config' { Invoke-VmAndroidConfig }
-  'resize'  { Invoke-VmResize }
-  'gc'      { Invoke-VmGc }
-  'pack'    { Invoke-VmPack }
-  'unpack'  { Invoke-VmUnpack }
+  'setup'   { Invoke-VMSetup }
+  'sync'    { Invoke-VMSync }
+  'list'    { Invoke-VMList }
+  'status'  { Invoke-VMStatus }
+  'start'   { Invoke-VMStart }
+  'stop'    { Invoke-VMStop }
+  'upgrade' { Invoke-VMUpgrade }
+  'reset'   { Invoke-VMReset }
+  'android-config' { Invoke-VMAndroidConfig }
+  'resize'  { Invoke-VMResize }
+  'gc'      { Invoke-VMGc }
+  'pack'    { Invoke-VMPack }
+  'unpack'  { Invoke-VMUnpack }
 }

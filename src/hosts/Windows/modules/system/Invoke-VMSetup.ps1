@@ -34,7 +34,7 @@
     Exit codes:
       This module does not emit exit codes.
 #>
-. (Join-Path $PSScriptRoot 'Get-VmGuestSshPublicKey.ps1')
+. (Join-Path $PSScriptRoot 'Get-VMGuestSshPublicKey.ps1')
 function Wait-GuestReady {
   <#
   .SYNOPSIS
@@ -91,7 +91,7 @@ function Wait-GuestReady {
     return $false
 }
 
-function Get-VmRunningProcessNameList {
+function Get-VMRunningProcessNameList {
     <#
     .SYNOPSIS
       Returns QEMU VM names from live qemu-system* process command lines.
@@ -115,7 +115,7 @@ $VM_PACKER_BUILD_DIR = 'Packer'
 $VM_WINDOWS_INSTALLER_ISO = 'installer.iso'
 $VM_PREBUILT_MARKER_BASE = 'prebuilt image'
 
-function Get-VmTypeSrcDir {
+function Get-VMTypeSrcDir {
     param(
         [Parameter(Mandatory)]
         [string]$SrcDir,
@@ -127,7 +127,7 @@ function Get-VmTypeSrcDir {
     return Join-Path $SrcDir $Type
 }
 
-function Get-VmSrcPath {
+function Get-VMSrcPath {
     param(
         [Parameter(Mandatory)]
         [string]$SrcDir,
@@ -139,10 +139,10 @@ function Get-VmSrcPath {
         [string]$Leaf
     )
 
-    return Join-Path (Get-VmTypeSrcDir -SrcDir $SrcDir -Type $Type) $Leaf
+    return Join-Path (Get-VMTypeSrcDir -SrcDir $SrcDir -Type $Type) $Leaf
 }
 
-function Get-VmOverlayBackingRelPath {
+function Get-VMOverlayBackingRelPath {
     param(
         [Parameter(Mandatory)]
         [string]$Type
@@ -168,7 +168,7 @@ function Invoke-VMSetup {
     Path to the Windows 11 ISO. Optional when Windows.isoUrl is set in VMs.json;
     the URL is used to auto-download the installer on first run.
 
-  .PARAMETER NixosOnly
+  .PARAMETER NixOSOnly
     Build and provision only the NixOS guest.
 
   .PARAMETER WindowsOnly
@@ -198,7 +198,7 @@ function Invoke-VMSetup {
     Invoke-VMSetup -RepoRoot 'C:\Users\admin\nucleus'
 
   .EXAMPLE
-    Invoke-VMSetup -RepoRoot 'C:\Users\admin\nucleus' -NixosOnly -Headful
+    Invoke-VMSetup -RepoRoot 'C:\Users\admin\nucleus' -NixOSOnly -Headful
 
   .EXAMPLE
     Invoke-VMSetup -RepoRoot 'C:\Users\admin\nucleus' -WindowsOnly -WindowsIso 'C:\ISOs\Win11_23H2.iso'
@@ -226,7 +226,7 @@ function Invoke-VMSetup {
         [string]$WindowsIso = '',
 
         # Build and provision only the NixOS guest.
-        [switch]$NixosOnly,
+        [switch]$NixOSOnly,
 
         # Build and provision only the Windows 11 guest.
         [switch]$WindowsOnly,
@@ -559,23 +559,23 @@ function Invoke-VMSetup {
         }
     }
 
-    function Test-VmProcessRunning {
+    function Test-VMProcessRunning {
         param(
             [Parameter(Mandatory)]
-            [string]$VmName,
+            [string]$VmId,
 
             [Parameter(Mandatory)]
             [string]$VmDisplay
         )
-        foreach ($name in Get-VmRunningProcessNameList) {
-            if ($name -eq $VmName -or $name -eq $VmDisplay) {
+        foreach ($name in Get-VMRunningProcessNameList) {
+            if ($name -eq $VmId -or $name -eq $VmDisplay) {
                 return $true
             }
         }
         return $false
     }
 
-    function Get-VmQcow2VirtualSize {
+    function Get-VMQcow2VirtualSize {
         param(
             [Parameter(Mandatory)]
             [string]$ImagePath
@@ -594,7 +594,7 @@ function Invoke-VMSetup {
         }
     }
 
-    function Invoke-VmWriteDescriptor {
+    function Invoke-VMWriteDescriptor {
         param(
             [Parameter(Mandatory)]
             $Vm,
@@ -674,7 +674,7 @@ function Invoke-VMSetup {
         Write-Information "vm-setup: VM descriptor written: $descriptorPath"
     }
 
-    function Invoke-VmWriteStartHelper {
+    function Invoke-VMWriteStartHelper {
         param(
             [Parameter(Mandatory)]
             $Vm,
@@ -803,7 +803,7 @@ function Invoke-VMSetup {
         }
     }
 
-    function Invoke-VmWriteStopHelper {
+    function Invoke-VMWriteStopHelper {
         param(
             [Parameter(Mandatory)]
             $Vm,
@@ -831,7 +831,7 @@ function Invoke-VMSetup {
         Write-Information "vm-setup: stop script written: $stopPs1"
     }
 
-    function Invoke-VmWritePackUnpackHelper {
+    function Invoke-VMWritePackUnpackHelper {
         param(
             [Parameter(Mandatory)]
             [string]$ScriptsDir
@@ -887,7 +887,7 @@ function Invoke-VMSetup {
         $guestSecretHash = $guestCredential.Hash
 
         # Export SSH public key for NixOS guest provisioning (guest.nix uses it for authorized_keys).
-        $sshPublicKey = Get-VmGuestSshPublicKey -RepoRoot $RepoRoot -Username $guestCredential.AccountName
+        $sshPublicKey = Get-VMGuestSshPublicKey -RepoRoot $RepoRoot -Username $guestCredential.AccountName
         if ($null -ne $sshPublicKey) {
             $env:NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY = $sshPublicKey
             Write-Information "vm-setup: SSH public key exported for NixOS guest provisioning"
@@ -903,7 +903,7 @@ function Invoke-VMSetup {
         New-Item -ItemType Directory -Path $srcDir  -Force > $null
         New-Item -ItemType Directory -Path $dataDir   -Force > $null
         foreach ($vmType in @($vmDef.VMs | ForEach-Object { $_.type } | Sort-Object -Unique)) {
-            New-Item -ItemType Directory -Path (Get-VmTypeSrcDir -SrcDir $srcDir -Type $vmType) -Force > $null
+            New-Item -ItemType Directory -Path (Get-VMTypeSrcDir -SrcDir $srcDir -Type $vmType) -Force > $null
         }
         New-Item -ItemType Directory -Path (Join-Path $vmDir 'scripts') -Force > $null
     } else {
@@ -911,7 +911,7 @@ function Invoke-VMSetup {
         Write-Information "vm-setup: [dry-run] New-Item Directory $srcDir"
         Write-Information "vm-setup: [dry-run] New-Item Directory $dataDir"
         foreach ($vmType in @($vmDef.VMs | ForEach-Object { $_.type } | Sort-Object -Unique)) {
-            Write-Information "vm-setup: [dry-run] New-Item Directory $(Get-VmTypeSrcDir -SrcDir $srcDir -Type $vmType)"
+            Write-Information "vm-setup: [dry-run] New-Item Directory $(Get-VMTypeSrcDir -SrcDir $srcDir -Type $vmType)"
         }
         Write-Information "vm-setup: [dry-run] New-Item Directory $(Join-Path $vmDir 'scripts')"
     }
@@ -996,18 +996,18 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     }
 
     foreach ($vm in $vmDef.VMs) {
-        Invoke-VmWriteDescriptor -Vm $vm -RepoRoot $RepoRoot
-        Invoke-VmWriteStartHelper -Vm $vm -QemuDir $scoopQemuDir -ScriptsDir $scriptsDir -TemplatesDir $templatesDir
-        Invoke-VmWriteStopHelper -Vm $vm -ScriptsDir $scriptsDir -TemplatesDir $templatesDir
+        Invoke-VMWriteDescriptor -Vm $vm -RepoRoot $RepoRoot
+        Invoke-VMWriteStartHelper -Vm $vm -QemuDir $scoopQemuDir -ScriptsDir $scriptsDir -TemplatesDir $templatesDir
+        Invoke-VMWriteStopHelper -Vm $vm -ScriptsDir $scriptsDir -TemplatesDir $templatesDir
         Write-Information "vm-sync: VM '$($vm.name)' scripts ready"
     }
 
-    Invoke-VmWritePackUnpackHelper -ScriptsDir $scriptsDir
+    Invoke-VMWritePackUnpackHelper -ScriptsDir $scriptsDir
 
     foreach ($vm in $vmDef.VMs) {
         if (-not (Test-VMEnabled -Vm $vm)) { continue }
         if (-not (Test-VMHostMatch -Vm $vm)) { continue }
-        if (Test-VmProcessRunning -VmName $vm.id -VmDisplay $vm.name) {
+        if (Test-VMProcessRunning -VmId $vm.id -VmDisplay $vm.name) {
             Write-Warning "vm-sync: VM '$($vm.id)' is running; stop and restart it for config changes (e.g. port forwards) to take effect"
         }
     }
@@ -1047,8 +1047,8 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             continue
         }
 
-        # Apply -NixosOnly / -WindowsOnly filter.
-        if ($NixosOnly   -and $vm.type -ne 'NixOS')   { continue }
+        # Apply -NixOSOnly / -WindowsOnly filter.
+        if ($NixOSOnly   -and $vm.type -ne 'NixOS')   { continue }
         if ($WindowsOnly -and $vm.type -ne 'Windows') { continue }
 
         switch ($vm.type) {
@@ -1086,7 +1086,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 # Android group (gsiUrl) and cannot be automated here; the
                 # writable data/<id>.qcow2 userdata disk is provisioned in
                 # Phase 2.
-                Write-Information "vm-setup: Android image must be obtained from the manifest Android group (gsiUrl); place system/GSI images under $(Get-VmTypeSrcDir -SrcDir $srcDir -Type 'Android')"
+                Write-Information "vm-setup: Android image must be obtained from the manifest Android group (gsiUrl); place system/GSI images under $(Get-VMTypeSrcDir -SrcDir $srcDir -Type 'Android')"
             }
             'macOS' {
                 Write-Information "vm-setup: macOS image must be obtained manually (licensing restricts automation)"
@@ -1118,8 +1118,8 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             continue
         }
 
-        # Apply -NixosOnly / -WindowsOnly filter.
-        if ($NixosOnly   -and $vm.type -ne 'NixOS')   { continue }
+        # Apply -NixOSOnly / -WindowsOnly filter.
+        if ($NixOSOnly   -and $vm.type -ne 'NixOS')   { continue }
         if ($WindowsOnly -and $vm.type -ne 'Windows') { continue }
 
         # Pass A — disk provisioning (enabled-only, mirroring
@@ -1130,7 +1130,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         Write-Information "vm-setup: configuring VM '$($vm.name)'..."
 
         $minSizeBytes = ConvertFrom-SizeString $vm.minImageSize
-        $prebuilt = Get-VmSrcPath -SrcDir $srcDir -Type $vm.type -Leaf $VM_PREBUILT_IMAGE
+        $prebuilt = Get-VMSrcPath -SrcDir $srcDir -Type $vm.type -Leaf $VM_PREBUILT_IMAGE
         $prebuiltValid = (Test-Path $prebuilt) -and (Test-Qcow2Image -ImagePath $prebuilt -ImageLabel "pre-built image '$($vm.type)'" -MinBytes $minSizeBytes)
 
         if ($vm.type -eq 'Android') {
@@ -1160,8 +1160,8 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         }
 
         $diskPath = Join-Path -Path $dataDir -ChildPath "$($vm.id).qcow2"
-        $basePath = Get-VmSrcPath -SrcDir $srcDir -Type $vm.type -Leaf $VM_OVERLAY_BACKING
-        $backingRel = Get-VmOverlayBackingRelPath -Type $vm.type
+        $basePath = Get-VMSrcPath -SrcDir $srcDir -Type $vm.type -Leaf $VM_OVERLAY_BACKING
+        $backingRel = Get-VMOverlayBackingRelPath -Type $vm.type
         $diskCredentialMarker = Get-VMGuestSecretMarkerPath -BasePath $diskPath
 
         # Base/overlay provisioning (mirrors vm_ensure_base_and_overlay):
@@ -1175,7 +1175,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                     if ($prebuiltValid) {
                         Write-Warning "vm-setup: $($vm.type) runtime disk guest credential drift detected for '$($vm.id)'; refreshing base image from pre-built image (overlay preserved)"
                         if (-not $DryRun) {
-                            if (-not (Test-VmProcessRunning -VmName $vm.id -VmDisplay $vm.name)) {
+                            if (-not (Test-VMProcessRunning -VmId $vm.id -VmDisplay $vm.name)) {
                                 Copy-Item $prebuilt $basePath -Force
                                 Set-Content -Path $diskCredentialMarker -Value $guestSecretHash -Encoding UTF8
                             } else {
@@ -1228,7 +1228,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         # Grow-only auto-grow: bring the overlay's virtual size up to the
         # manifest disk size (never shrink).  Mirrors vm_ensure_base_and_overlay.
         $diskBytes = ConvertFrom-SizeString $vm.diskSize
-        $overlaySize = Get-VmQcow2VirtualSize -ImagePath $diskPath
+        $overlaySize = Get-VMQcow2VirtualSize -ImagePath $diskPath
         if ($overlaySize -gt 0 -and $diskBytes -gt $overlaySize) {
             Write-Information "vm-setup: growing overlay '$($vm.id)' from $overlaySize to $diskBytes bytes (grow-only)"
             if (-not $DryRun) {
@@ -1375,7 +1375,7 @@ function Invoke-BuildNixosImage {
     )
 
     $vmType = 'NixOS'
-    $outPath = Get-VmSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PREBUILT_IMAGE
+    $outPath = Get-VMSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PREBUILT_IMAGE
     $credentialMarkerPath = Get-VMGuestSecretMarkerPath -BasePath $outPath
     if (Test-Path $outPath) {
         if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing NixOS image' -MinBytes $MinSize) {
@@ -1401,7 +1401,7 @@ function Invoke-BuildNixosImage {
     }
 
     $packerDir = Join-Path $VmsDir 'NixOS'
-    $tmpOutput = Get-VmSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PACKER_BUILD_DIR
+    $tmpOutput = Get-VMSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PACKER_BUILD_DIR
 
     Write-Information "vm-setup: building NixOS image for '$VmName' (accelerator=$Accelerator)..."
 
@@ -1583,8 +1583,8 @@ function Invoke-BuildWindowsImage {
     )
 
     $vmType = 'Windows'
-    $windowsTypeSrcDir = Get-VmTypeSrcDir -SrcDir $SrcDir -Type $vmType
-    $outPath = Get-VmSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PREBUILT_IMAGE
+    $windowsTypeSrcDir = Get-VMTypeSrcDir -SrcDir $SrcDir -Type $vmType
+    $outPath = Get-VMSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PREBUILT_IMAGE
     $credentialMarkerPath = Get-VMGuestSecretMarkerPath -BasePath $outPath
     if (Test-Path $outPath) {
         if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing Windows image' -MinBytes $MinSize) {
@@ -1608,7 +1608,7 @@ function Invoke-BuildWindowsImage {
 
     Write-Information "vm-setup: Windows ISO fallback order: cached installer -> Windows.isoUrl -> downloader ($WindowsIsoSource mode)"
 
-    $cachedIso = Get-VmSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_WINDOWS_INSTALLER_ISO
+    $cachedIso = Get-VMSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_WINDOWS_INSTALLER_ISO
     if (-not $WindowsIso -and (Test-Path $cachedIso)) {
         Write-Information "vm-setup: using cached Windows installer: $cachedIso"
         $WindowsIso = $cachedIso
@@ -1677,7 +1677,7 @@ function Invoke-BuildWindowsImage {
         if ($WindowsIsoSource -eq 'Url') {
             Write-Information 'vm-setup: windowsIsoSource=Url selected and no cached URL-based installer was resolved'
         }
-        Write-Information 'vm-setup: alternatively set "Windows": { "isoUrl": "<url>" } on the VMs.json windows entry'
+        Write-Information 'vm-setup: alternatively set "Windows": { "isoUrl": "<url>" } on the VMs.json Windows entry'
         Write-Information 'vm-setup: download from: https://www.microsoft.com/software-download/windows11'
         return
     }
@@ -1694,7 +1694,7 @@ function Invoke-BuildWindowsImage {
     }
 
     $packerDir = Join-Path $VmsDir 'Windows'
-    $tmpOutput = Get-VmSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PACKER_BUILD_DIR
+    $tmpOutput = Get-VMSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PACKER_BUILD_DIR
 
     # check-suppress:suppression_doc: This repository currently standardizes Windows guest runtime on BIOS
     # (for example src/hosts/MacBook/vms.nix keeps UEFIBoot=false and
