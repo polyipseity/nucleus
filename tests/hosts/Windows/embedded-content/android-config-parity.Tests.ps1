@@ -9,21 +9,23 @@
     Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/embedded-content/android-config-parity.Tests.ps1 -Passthru"
 #>
 
+$ErrorActionPreference = "Stop"
+
+$RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
+$VmPs1Path = Join-Path $RepoRoot "scripts\vm.ps1"
+$VmShPath = Join-Path $RepoRoot "scripts\vm.sh"
+$ProfilePath = Join-Path $RepoRoot "src\scripts\shell\profile.ps1"
+$InvokeAndroidConfigPath = Join-Path $RepoRoot "src\hosts\Windows\modules\system\Invoke-AndroidConfig.ps1"
+$VmAndroidPath = Join-Path $RepoRoot "src\hosts\Windows\modules\system\VmAndroid.ps1"
+$CheckShPs1Path = Join-Path $RepoRoot "scripts\check-sh.ps1"
+
+function Get-VmPs1Content { return Get-Content -Raw -Path $VmPs1Path }
+function Get-VmShContent { return Get-Content -Raw -Path $VmShPath }
+function Get-ProfileContent { return Get-Content -Raw -Path $ProfilePath }
+function Get-InvokeAndroidConfigContent { return Get-Content -Raw -Path $InvokeAndroidConfigPath }
+
 BeforeAll {
-  $ErrorActionPreference = "Stop"
-
-  $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
-  $VmPs1Path = Join-Path $RepoRoot "scripts\vm.ps1"
-  $VmShPath = Join-Path $RepoRoot "scripts\vm.sh"
-  $ProfilePath = Join-Path $RepoRoot "src\scripts\shell\profile.ps1"
-  $InvokeAndroidConfigPath = Join-Path $RepoRoot "src\hosts\Windows\modules\system\Invoke-AndroidConfig.ps1"
-  $VmAndroidPath = Join-Path $RepoRoot "src\hosts\Windows\modules\system\VmAndroid.ps1"
-  $CheckShPs1Path = Join-Path $RepoRoot "scripts\check-sh.ps1"
-
-  function Get-VmPs1Content { return Get-Content -Raw -Path $VmPs1Path }
-  function Get-VmShContent { return Get-Content -Raw -Path $VmShPath }
-  function Get-ProfileContent { return Get-Content -Raw -Path $ProfilePath }
-  function Get-InvokeAndroidConfigContent { return Get-Content -Raw -Path $InvokeAndroidConfigPath }
+  # No variable assignments here; all vars are at script scope for PSScriptAnalyzer visibility.
 }
 
 Describe "Windows android-config native implementation" {

@@ -10,6 +10,8 @@ Register-Step -Id "framework-verification" -Number 5 -Name "Framework verificati
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
   & (Join-Path -Path $testDir -ChildPath 'check-step-file-structure-tests.ps1')
   if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
+  & (Join-Path -Path $testDir -ChildPath 'android-config-tests.ps1')
+  if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
 
   Write-Message "--- step-specific tests ---"
   & (Join-Path -Path $testDir -ChildPath 'check-steps' -AdditionalChildPath '01-code-formatting-tests.ps1')

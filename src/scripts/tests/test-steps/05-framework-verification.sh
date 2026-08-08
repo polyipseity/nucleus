@@ -17,6 +17,8 @@ run_05_framework_verification() {
   bash "$_test_dir/vm-template-render-tests.sh" || _exit_code=1
   bash "$_test_dir/vm-disk-model-tests.sh" || _exit_code=1
   bash "$_test_dir/gui-env-tests.sh" || _exit_code=1
+  bash "$_test_dir/android-config-tests.sh" || _exit_code=1
+  bash "$_test_dir/android-fake-wifi-tests.sh" || _exit_code=1
 
   say "--- step-specific tests ---"
   bash "$_test_dir/check-steps/01-code-formatting-tests.sh" || _exit_code=1
