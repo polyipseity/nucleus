@@ -25,6 +25,9 @@ assert containsRegex "NUCLEUS_USERNAME=" nixosActivationText;
 assert containsRegex "expire_profile_generations_intersection" nixStoreGcShText;
 assert containsRegex "NUCLEUS_GC_USER_ONLY" gcShText;
 assert containsRegex "_gc_dispatch_user_gc" gcShText;
+assert containsRegex "duperemove-gc" gcShText;
+assert containsRegex "gc_duperemove_store_if_available" gcShText;
+assert (builtins.pathExists ../../src/scripts/services/duperemove-store.sh);
 
 {
   success = true;

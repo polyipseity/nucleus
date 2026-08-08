@@ -1046,6 +1046,9 @@ let
   core_nix_text = builtins.readFile ../../src/modules/core.nix;
   nixos_packer_text = builtins.readFile ../../src/vms/nixos/packer.pkr.hcl;
   nixos_disks_nix_text = builtins.readFile ../../src/hosts/NixOS/hardware/disks.nix;
+  qcow_btrfs_text = builtins.readFile ../../src/vms/nixos/formats/qcow-btrfs.nix;
+  qcow_efi_btrfs_text = builtins.readFile ../../src/vms/nixos/formats/qcow-efi-btrfs.nix;
+  btrfs_patch_text = builtins.readFile ../../src/vms/nixos/disk-image/make-disk-image-btrfs.patch;
   test_nixos_guest_virtiofs_not_forced = assert' (
     !(lib.hasInfix "boot.initrd.availableKernelModules = [ \"virtio_fs\" ];" guest_nix_text)
     && !(lib.hasInfix "boot.initrd.availableKernelModules = [ \\\"virtio_fs\\\" ];" nixos_packer_text)
@@ -1169,6 +1172,23 @@ let
   ) "scripts/vm.sh must build NixOS guests with qcow-btrfs / qcow-efi-btrfs format modules";
 
   test_nixos_host_disks_btrfs_root = assert' (lib.hasInfix ''fsType = "btrfs";'' nixos_disks_nix_text) "src/hosts/NixOS/hardware/disks.nix must declare a Btrfs root filesystem";
+
+  test_nixos_btrfs_subvolume_layout = assert' (
+    (lib.hasInfix "compress-force=zstd" nixos_disks_nix_text)
+    && (lib.hasInfix "subvol=@nix" nixos_disks_nix_text)
+    && (lib.hasInfix ''fileSystems."/nix"'' nixos_disks_nix_text)
+    && (lib.hasInfix "compress-force=zstd" qcow_btrfs_text)
+    && (lib.hasInfix "subvol=@nix" qcow_btrfs_text)
+    && (lib.hasInfix ''fileSystems."/nix"'' qcow_btrfs_text)
+    && (lib.hasInfix "compress-force=zstd" qcow_efi_btrfs_text)
+    && (lib.hasInfix "subvol=@nix" qcow_efi_btrfs_text)
+    && (lib.hasInfix ''fileSystems."/nix"'' qcow_efi_btrfs_text)
+    && (lib.hasInfix "compress-force=zstd" nixos_packer_text)
+    && (lib.hasInfix "subvol=@nix" nixos_packer_text)
+    && (lib.hasInfix "btrfs subvolume create /mnt/@nix" nixos_packer_text)
+    && (lib.hasInfix "btrfs subvolume create" btrfs_patch_text)
+    && (lib.hasInfix "rsync -a --exclude=nix/" btrfs_patch_text)
+  ) "NixOS host and guest images must use @/@nix btrfs layout with compress-force=zstd";
 
   test_nixos_guest_documents_btrfs_formats = assert' (
     (lib.hasInfix "qcow-btrfs" guest_nix_text)
@@ -2390,6 +2410,7 @@ let
     test_nixos_generators_output_link_handling
     test_nixos_guest_btrfs_format_paths
     test_nixos_host_disks_btrfs_root
+    test_nixos_btrfs_subvolume_layout
     test_nixos_guest_documents_btrfs_formats
     test_nixos_packer_btrfs_root
     test_nixos_image_resize_to_manifest_disk
@@ -2573,6 +2594,7 @@ in
     test_nixos_generators_output_link_handling
     test_nixos_guest_btrfs_format_paths
     test_nixos_host_disks_btrfs_root
+    test_nixos_btrfs_subvolume_layout
     test_nixos_guest_documents_btrfs_formats
     test_nixos_packer_btrfs_root
     test_nixos_image_resize_to_manifest_disk

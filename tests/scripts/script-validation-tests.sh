@@ -182,6 +182,17 @@ test_vm_gc_delegation() {
     fi
 }
 
+# Test 13: Verify gc.sh delegates btrfs duperemove to duperemove-store.sh
+test_duperemove_gc_delegation() {
+    local script="$1"
+
+    if grep -Fq 'gc_duperemove_store_if_available' "$script" && grep -Fq 'duperemove-store.sh' "$script"; then
+        assert_pass "duperemove GC delegation: $(basename "$script")"
+    else
+        assert_fail "duperemove GC delegation: $(basename "$script")" "Missing duperemove-store.sh delegation"
+    fi
+}
+
 # Run Tests on All Scripts
 
 # Temp dir for parallel test results
@@ -354,6 +365,7 @@ if [[ -f "$GC_SH" ]]; then
     test_usage_std_present "$GC_SH"
     test_help_handler "$GC_SH"
     test_vm_gc_delegation "$GC_SH"
+    test_duperemove_gc_delegation "$GC_SH"
 fi
 echo "$TESTS_PASSED" > "$_tt_tmpdir/gc.pass"
 echo "$TESTS_FAILED" > "$_tt_tmpdir/gc.fail"

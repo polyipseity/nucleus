@@ -93,6 +93,14 @@ let
     && containsRegex "Windows" hostFilesystemScopeText
   ) "host-filesystem-scope.instructions.md must document MacBook, NixOS, and Windows";
 
+  nixosDisksText = builtins.readFile ../../src/hosts/NixOS/hardware/disks.nix;
+
+  # Test 16: NixOS host uses shared btrfs mount options
+  test_nixos_btrfs_options_import = assert' (
+    containsRegex "btrfs-options\\.nix" nixosDisksText
+    && containsRegex "compress-force=zstd" nixosDisksText
+  ) "NixOS disks.nix must import btrfs-options.nix with compress-force=zstd";
+
   allTests = [
     test_posix_hosts_import_core
     test_all_hosts_import_shell
@@ -109,6 +117,7 @@ let
     test_nixos_imports_filesystems_module
     test_macbook_filesystem_scope_module
     test_host_filesystem_scope_instruction
+    test_nixos_btrfs_options_import
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {
