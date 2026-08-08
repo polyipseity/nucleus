@@ -26,7 +26,10 @@ $script:AndroidGsiDownloadZip = 'GSI download.zip'
 $script:AndroidNucleusMagiskPatchRemote = '/data/local/tmp/nucleus-magisk-patch'
 $script:AndroidNucleusMagiskStockBootRemote = '/data/local/tmp/nucleus-stock-boot.img'
 $script:AndroidNucleusRootPropsService = '/data/adb/service.d/nucleus-root-props.sh'
-$script:AndroidNucleusLocalTerminalPackage = 'com.android.terminal'
+$script:AndroidNucleusTerminalPackages = @(
+  'com.android.virtualization.terminal'
+  'com.android.terminal'
+)
 $script:AndroidNucleusFakeWifiService = '/data/adb/service.d/nucleus-fake-wifi.sh'
 $script:AndroidNucleusFakeWifiAdbProbeS = 3
 $script:AndroidNucleusFakeWifiAsyncKickoffS = 5
@@ -115,51 +118,111 @@ function Test-AndroidGuestHasMagiskSu {
   return ((($uid | Out-String) -replace "`r", '').Trim() -eq '0')
 }
 
-function Test-AndroidGuestHasAdbRoot {
-  param([Parameter(Mandatory)][object]$Vm)
-  return (Invoke-AndroidAdbEnsureRoot -Vm $Vm)
+function Get-AndroidSuGetprop {
+  param(
+    [Parameter(Mandatory)][object]$Vm,
+    [Parameter(Mandatory)][string]$Name
+  )
+
+  $serial = Get-AndroidAdbSerial -Vm $Vm
+  $value = & adb -s $serial shell "su -c getprop $Name" 2>$null
+  if (-not $value) { return '' }
+  return (($value | Out-String) -replace "`r`n", '').Trim()
 }
 
 function Get-AndroidRootPropsBootScript {
   return @'
 #!/system/bin/sh
-resetprop ro.debuggable 1
 # persist.sys.root_access is already persist.*; rewrite is idempotent.
 resetprop persist.sys.root_access 3
 '@
 }
 
-function Invoke-AndroidEnableLocalTerminal {
+function Resolve-AndroidTerminalPackage {
   param([Parameter(Mandatory)][object]$Vm)
 
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  $pkg = $script:AndroidNucleusLocalTerminalPackage
-  $pathOut = & adb -s $serial shell "su -c pm path $pkg" 2>$null
-  if (-not (($pathOut | Out-String) -match '^package:')) {
-    Write-NucleusError "Local terminal package $pkg is not installed on the guest"
+  foreach ($pkg in $script:AndroidNucleusTerminalPackages) {
+    $pathOut = & adb -s $serial shell "su -c pm path $pkg" 2>$null
+    if ((($pathOut | Out-String) -match '^package:')) {
+      return $pkg
+    }
+  }
+  return $null
+}
+
+function Invoke-AndroidEnableTerminal {
+  param([Parameter(Mandatory)][object]$Vm)
+
+  $serial = Get-AndroidAdbSerial -Vm $Vm
+  $pkg = Resolve-AndroidTerminalPackage -Vm $Vm
+  if (-not $pkg) {
+    $listing = & adb -s $serial shell "su -c 'pm list packages | grep -i terminal'" 2>$null
+    $listingText = (($listing | Out-String) -replace "`r", '').Trim()
+    if (-not $listingText) { $listingText = '<empty>' }
+    Write-NucleusError "no terminal package found (tried: $($script:AndroidNucleusTerminalPackages -join ', ')); pm list: $listingText"
     return $false
   }
 
-  & adb -s $serial shell "su -c cmd package set-application-enabled-setting $pkg 1 0"
+  & adb -s $serial shell "su -c pm enable $pkg"
   if ($LASTEXITCODE -ne 0) {
-    Write-NucleusError "failed to enable Local terminal ($pkg)"
+    Write-NucleusError "failed to enable terminal package $pkg"
     return $false
   }
 
-  $enabled = & adb -s $serial shell "su -c cmd package get-application-enabled-setting $pkg" 2>$null
-  if ((($enabled | Out-String) -replace "`r", '').Trim() -ne '1') {
-    Write-NucleusError "Local terminal ($pkg) is not enabled after apply"
+  $disabled = & adb -s $serial shell "su -c 'pm list packages -d'" 2>$null
+  if ((($disabled | Out-String) -match "package:$pkg")) {
+    Write-NucleusError "terminal package $pkg is still disabled after pm enable"
     return $false
   }
   return $true
 }
 
-function Invoke-AndroidApplySessionMagiskpolicyForAdbRoot {
+function Invoke-AndroidRestoreRoDebuggableUser {
   param([Parameter(Mandatory)][object]$Vm)
 
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  & adb -s $serial shell "su -c magiskpolicy --live 'allow adbd adbd process setcurrent'"
-  & adb -s $serial shell "su -c magiskpolicy --live 'allow adbd su process dyntransition'"
+  $debuggable = Get-AndroidSuGetprop -Vm $Vm -Name 'ro.debuggable'
+  if ($debuggable -eq '1') {
+    Write-NucleusInfo 'repairing ro.debuggable (was 1; restoring 0 for user build)...'
+    & adb -s $serial shell "su -c resetprop ro.debuggable 0"
+    if ($LASTEXITCODE -ne 0) {
+      Write-NucleusError 'failed to restore ro.debuggable to 0'
+      return $false
+    }
+  }
+  return $true
+}
+
+function Test-AndroidRootPropsViaSu {
+  param([Parameter(Mandatory)][object]$Vm)
+
+  $rootAccess = Get-AndroidSuGetprop -Vm $Vm -Name 'persist.sys.root_access'
+  if ($rootAccess -ne '3') {
+    Write-NucleusError "persist.sys.root_access is $rootAccess (expected 3) after --root"
+    return $false
+  }
+
+  $debuggable = Get-AndroidSuGetprop -Vm $Vm -Name 'ro.debuggable'
+  if ($debuggable -ne '0') {
+    Write-NucleusError "ro.debuggable is $debuggable (expected 0) after --root; re-run --root to repair"
+    return $false
+  }
+  return $true
+}
+
+function Test-AndroidDevOptionsSmoke {
+  param([Parameter(Mandatory)][object]$Vm)
+
+  $serial = Get-AndroidAdbSerial -Vm $Vm
+  & adb -s $serial shell 'am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS' 2>$null | Out-Null
+  Start-Sleep -Seconds 2
+  $log = & adb -s $serial logcat -d -t 30 2>$null
+  if ((($log | Out-String) -match 'failed to set system property')) {
+    Write-NucleusError 'Developer options smoke test failed (Settings property write error); ro.debuggable must stay 0'
+    return $false
+  }
+  return $true
 }
 
 function Invoke-AndroidPersistRootPropsService {
@@ -204,35 +267,26 @@ function Invoke-AndroidConfigRoot {
     return $false
   }
 
+  if (-not (Invoke-AndroidRestoreRoDebuggableUser -Vm $Vm)) { return $false }
   Invoke-AndroidEnableUsbDebugging -Vm $Vm
-  if (-not (Invoke-AndroidEnableLocalTerminal -Vm $Vm)) { return $false }
+  if (-not (Invoke-AndroidEnableTerminal -Vm $Vm)) { return $false }
 
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  & adb -s $serial shell "su -c resetprop ro.debuggable 1 && resetprop persist.sys.root_access 3"
+  & adb -s $serial shell 'su -c resetprop persist.sys.root_access 3'
   if ($LASTEXITCODE -ne 0) {
-    Write-NucleusError 'failed to apply ro.debuggable and persist.sys.root_access on guest'
+    Write-NucleusError 'failed to apply persist.sys.root_access on guest'
     return $false
   }
 
   if (-not (Invoke-AndroidPersistRootPropsService -Vm $Vm)) { return $false }
+  if (-not (Test-AndroidRootPropsViaSu -Vm $Vm)) { return $false }
 
-  # check-suppress:suppression_doc: best-effort adbd restart after rooted-debugging props; verified via adb root probe.
-  & adb -s $serial shell 'setprop ctl.restart adbd' 2>$null
-  Start-Sleep -Seconds 2
-  Invoke-AndroidAdbRefresh -Vm $Vm
-
-  if (-not (Test-AndroidGuestHasAdbRoot -Vm $Vm)) {
-    Write-NucleusInfo 'adb root failed; applying session-only magiskpolicy rules and retrying...'
-    Invoke-AndroidApplySessionMagiskpolicyForAdbRoot -Vm $Vm
-    # check-suppress:suppression_doc: best-effort adbd restart after session magiskpolicy retry.
-    & adb -s $serial shell 'setprop ctl.restart adbd' 2>$null
-    Start-Sleep -Seconds 2
-    Invoke-AndroidAdbRefresh -Vm $Vm
-    if (-not (Test-AndroidGuestHasAdbRoot -Vm $Vm)) {
-      Write-NucleusError 'adb root is not available after applying rooted-debugging props; verify ro.debuggable=1 and persist.sys.root_access=3 on the guest'
-      return $false
-    }
+  if (-not (Test-AndroidGuestHasMagiskSu -Vm $Vm)) {
+    Write-NucleusError 'Magisk su not available after rooted debugging apply'
+    return $false
   }
+
+  if (-not (Test-AndroidDevOptionsSmoke -Vm $Vm)) { return $false }
 
   Write-NucleusInfo "rooted debugging enabled on $serial; next: --fake-wifi"
   return $true
@@ -827,7 +881,7 @@ Android post-provision (jqssun LineageOS 23 user build)
 Flags: --gapps --adb-keys --magisk --root --fake-wifi --fake-wifi-revert
 
 --magisk installs Magisk su. --root enables Developer options, Local terminal,
-and host adb root (ro.debuggable + persist.sys.root_access). --fake-wifi needs Magisk su.
+and persist.sys.root_access (ro.debuggable stays 0). --fake-wifi needs Magisk su.
 
 Recovery (GApps, optional ADB keys):
   1. nucleus-vm reset Android; start VM; boot LineageOS Recovery (factory-reset if needed).
@@ -948,24 +1002,18 @@ function Invoke-AndroidConfigAdbKey {
   $state = Get-AndroidAdbPollState -Vm $Vm
   switch ($state) {
     { $_ -in @('recovery', 'sideload') } {
-      Invoke-AndroidRecoveryPrepareAdb -Vm $Vm
-      if (-not (Invoke-AndroidAdbEnsureRoot -Vm $Vm)) {
-        Write-NucleusError 'recovery ADB root is required to install adb_keys (enable ADB in recovery, then retry)'
+      if (-not (Test-AndroidGuestShellIsRoot -Vm $Vm)) {
+        Write-NucleusError 'recovery adb-keys requires root shell (Advanced → Enable ADB)'
         return $false
       }
       if (-not (Invoke-AndroidInstallAdbKey -Vm $Vm -PubkeyPath $pubkey)) { return $false }
     }
     'device' {
-      if (Test-AndroidGuestHasAdbRoot -Vm $Vm) {
-        if (-not (Invoke-AndroidInstallAdbKey -Vm $Vm -PubkeyPath $pubkey)) { return $false }
-      }
-      elseif (Test-AndroidGuestHasMagiskSu -Vm $Vm) {
-        if (-not (Invoke-AndroidInstallAdbKeyViaSu -Vm $Vm -PubkeyPath $pubkey)) { return $false }
-      }
-      else {
-        Write-NucleusError 'booted adb-keys requires adb root or Magisk su (run --magisk and --root first) or recovery --adb-keys before first boot'
+      if (-not (Test-AndroidGuestHasMagiskSu -Vm $Vm)) {
+        Write-NucleusError 'booted adb-keys requires Magisk su (run --magisk first) or recovery --adb-keys before first boot'
         return $false
       }
+      if (-not (Invoke-AndroidInstallAdbKeyViaSu -Vm $Vm -PubkeyPath $pubkey)) { return $false }
     }
     default {
       Write-NucleusError "guest must be in recovery or booted system for adb-keys; current state: $state"
