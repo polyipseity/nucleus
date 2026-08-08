@@ -1171,7 +1171,7 @@ let
   stopHostPs1TemplateText = builtins.readFile ../../src/vms/templates/stop-host.ps1;
   macbook_vms_nix_text = builtins.readFile ../../src/hosts/MacBook/vms.nix;
   nixos_vms_nix_text = builtins.readFile ../../src/hosts/NixOS/vms.nix;
-  nixos_domain_xml_text = builtins.readFile ../../src/modules/configs/vms/NixOS-domain.xml;
+  nixos_domain_xml_text = builtins.readFile ../../src/modules/configs/vms/nixos-domain.xml;
   utmConfigPlistText = builtins.readFile ../../src/modules/configs/vms/utm-config.plist.xml;
   vms_json_text = builtins.readFile ../../src/modules/VMs.json;
   vm_guest_json_text = builtins.readFile ../../src/users/default/vm-guest.json;
