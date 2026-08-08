@@ -42,3 +42,7 @@ applyTo: "src/modules/**/*.json, src/modules/**/*.nix, scripts/**/*.{sh,ps1}, sr
 - `src/modules/host-platform-registry.json` — host → platform refs; platform → flags
 - `src/modules/services.json` — per-service `hosts.*` with required `platform` field
 - `src/modules/lib/env-catalog.nix` — `values.MacBook|NixOS|Windows`
+
+## Audit
+
+Full usage matrix, per-surface inventory, grep patterns, and PASS/WARN/VIOLATION rules: [`host-platform-audit.instructions.md`](host-platform-audit.instructions.md). Automated by check step 27 (`host-platform-audit`).
