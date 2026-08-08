@@ -165,7 +165,6 @@
             "description": "Guest operating system type.",
             "enum": [
               "Android",
-              "Linux",
               "NixOS",
               "Windows",
               "macOS"

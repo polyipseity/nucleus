@@ -272,7 +272,6 @@ let
   # VM types must be one of the known values.
   validTypes = [
     "Android"
-    "Linux"
     "macOS"
     "NixOS"
     "Windows"
