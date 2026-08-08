@@ -10,6 +10,7 @@
   users ? null,
   managedUsername ? null,
   managedUser ? null,
+  hostName,
   ...
 }:
 let
@@ -248,17 +249,17 @@ in
       })
       (
         let
-          configName = if pkgs.stdenv.isDarwin then "macos" else "linux";
+          configName = hostName;
         in
         {
           # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-          # camilladsp/configs/macos/default.yml — Method 1 (writable symlink) consumed via directory symlink above
-          # check-suppress:config-method: method 1 (writable symlink) -- camilladsp/configs/linux/default.yml consumed via directory symlink above
+          # camilladsp/configs/MacBook/default.yml — Method 1 (writable symlink) consumed via directory symlink above
+          # check-suppress:config-method: method 1 (writable symlink) -- camilladsp/configs/NixOS/default.yml consumed via directory symlink above
           ".config/camilladsp/configs".source =
             config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/camilladsp/configs/${configName}";
           # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-          # camillagui-backend/config-macos.yml — Method 1 (writable symlink) consumed via dynamic configName above
-          # check-suppress:config-method: method 1 (writable symlink) -- camillagui-backend/config-linux.yml consumed via dynamic configName above
+          # camillagui-backend/config-MacBook.yml — Method 1 (writable symlink) consumed via dynamic configName above
+          # check-suppress:config-method: method 1 (writable symlink) -- camillagui-backend/config-NixOS.yml consumed via dynamic configName above
           ".config/camillagui-backend/config.yml".source =
             config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/camillagui-backend/config-${configName}.yml";
         }

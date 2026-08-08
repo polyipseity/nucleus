@@ -38,7 +38,7 @@ in
       inherit (envLib)
         allVars
         systemVars
-        macOSAllVars
+        macBookAllVars
         toJsonManifest
         getAllNixVarNames
         resolveValue
@@ -48,7 +48,7 @@ in
         ;
       inherit (envLib)
         passwordStoreDir
-        currentOs
+        currentHost
         ;
     };
   };

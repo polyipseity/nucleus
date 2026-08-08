@@ -28,7 +28,7 @@ let
       ;
     hostName = "MacBook";
   };
-  resolveValue = name: envVars.resolveValue name "macOS";
+  resolveValue = name: envVars.resolveValue name "MacBook";
   # Daemon env vars from the centralized catalog.
   # Provides NIX_SSL_CERT_FILE (HTTPS) and NUCLEUS_HOST (host identity).
   litellmEnv = lib.filterAttrs (_name: value: value != null) {

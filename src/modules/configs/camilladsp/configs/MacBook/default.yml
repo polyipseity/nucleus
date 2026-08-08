@@ -1,0 +1,36 @@
+---
+description: null
+devices:
+  adjust_period: null
+  capture:
+    channels: 2
+    device: BlackHole 2ch
+    format: null
+    labels: null
+    type: CoreAudio
+  capture_samplerate: null
+  chunksize: 1024
+  enable_rate_adjust: null
+  multithreaded: null
+  playback:
+    channels: 2
+    device: "\u5916\u7F6E\u8033\u7B52"
+    exclusive: null
+    format: null
+    type: CoreAudio
+  queuelimit: null
+  rate_measure_interval: null
+  resampler: null
+  samplerate: 96000
+  silence_threshold: null
+  silence_timeout: null
+  stop_on_rate_change: null
+  target_level: null
+  volume_limit: null
+  volume_ramp_time: null
+  worker_threads: null
+filters: {}
+mixers: null
+pipeline: null
+processors: null
+title: null

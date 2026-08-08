@@ -56,7 +56,7 @@ let
       ;
     hostName = "MacBook";
   };
-  resolveValue = name: envVars.resolveValue name "macOS";
+  resolveValue = name: envVars.resolveValue name "MacBook";
   daemonEnv = lib.filterAttrs (_name: value: value != null) {
     NIX_SSL_CERT_FILE = resolveValue "NIX_SSL_CERT_FILE";
     NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";

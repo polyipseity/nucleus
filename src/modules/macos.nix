@@ -813,7 +813,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
       "${managedPaths.toShellPrependPath}" \
       "${managedPaths.toShellAppendPath}" \
       "${mkManagedDedupSet config.home.homeDirectory}" \
-      ${lib.escapeShellArg envVars.macOSAllVars} \
+      ${lib.escapeShellArg envVars.macBookAllVars} \
       "${managedPaths.toLaunchctlConfigPath config.home.homeDirectory}"
   '';
 
@@ -826,7 +826,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
   # login-time coverage before the first activation.
   #
   # The var list for non-PATH vars is generated from the centralized catalog
-  # — see src/modules/lib/env-catalog.nix (macOSAllVars).  All vars with a macOS
+  # — see src/modules/lib/env-catalog.nix (macBookAllVars).  All vars with a MacBook
   # value (both user and non-user) are included — safe because macOS launchd
   # GUI domains are per-user.
   #
@@ -843,7 +843,7 @@ lib.mkIf pkgs.stdenv.isDarwin {
         (managedPaths.toAbsolutePrependPath config.home.homeDirectory)
         (managedPaths.toAbsoluteAppendPath config.home.homeDirectory)
         (mkManagedDedupSet config.home.homeDirectory)
-        envVars.macOSAllVars
+        envVars.macBookAllVars
       ];
       # One-shot at login; gui-env-path activation step covers subsequent applies.
       RunAtLoad = true;

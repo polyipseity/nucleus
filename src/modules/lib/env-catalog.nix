@@ -1,7 +1,7 @@
 # modules/lib/env-catalog.nix — Centralized environment variable catalog.
 #
 # This file contains the catalog of all managed environment variables and
-# the resolution logic for rendering them per-OS.  It internally imports
+# the resolution logic for rendering them per-host.  It internally imports
 # managed-paths.nix for PATH-related catalog entries but does NOT re-export
 # those bindings — callers should import managed-paths.nix directly for
 # PATH-specific needs.
@@ -11,11 +11,11 @@
 # has `username` available via specialArgs or as a local binding — use it.
 #
 # Each catalog entry uses a `values` attrset:
-#   { default?, macOS?, NixOS?, Windows? }
-# - `default` applies to any OS not explicitly keyed.
-# - If an OS key is absent AND `default` is absent, the OS is not applicable.
+#   { default?, MacBook?, NixOS?, Windows? }
+# - `default` applies to any host not explicitly keyed.
+# - If a host key is absent AND `default` is absent, the host is not applicable.
 # Use: import ./lib/env-catalog.nix { inherit config pkgs lib username hostName; }
-# Returns: { catalog, allVars, systemVars, macOSAllVars, resolveValue, ... }
+# Returns: { catalog, allVars, systemVars, macBookAllVars, resolveValue, ... }
 {
   pkgs,
   lib,
@@ -67,7 +67,7 @@ let
 
   # ── Catalog ─────────────────────────────────────────────────────────
   # Each entry:
-  #   values:  attrset { default?, macOS?, NixOS?, Windows? }
+  #   values:  attrset { default?, MacBook?, NixOS?, Windows? }
   #   why:     inline justification
   #   userSpecific: true if the value depends on the logged-in user (default false)
   catalog = {
@@ -152,19 +152,19 @@ let
     # ── macOS-specific developer toolchain ───────────────────────────
     DEVELOPER_DIR = {
       values = {
-        macOS = "${appleSdkEnhanced}";
+        MacBook = "${appleSdkEnhanced}";
       };
       why = "Enhanced apple-sdk with real tool symlinks, so xcrun resolves python3, git, make, etc. without Xcode CLT.";
     };
     SDKROOT = {
       values = {
-        macOS = "${appleSdkEnhanced}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
+        MacBook = "${appleSdkEnhanced}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
       };
       why = "Explicit SDKROOT avoids second xcrun invocation when DEVELOPER_DIR is set.";
     };
     LIBRARY_PATH = {
       values = {
-        macOS = "${pkgs.libiconv}/lib";
+        MacBook = "${pkgs.libiconv}/lib";
       };
       why = "Rustup-managed cargo on macOS needs libiconv in LIBRARY_PATH for crates with C deps.";
     };
@@ -178,7 +178,7 @@ let
     # ── Editors ──────────────────────────────────────────────────────
     EDITOR = {
       values = {
-        macOS = "nvim";
+        MacBook = "nvim";
         NixOS = null;
         Windows = "nvim";
       };
@@ -186,7 +186,7 @@ let
     };
     VISUAL = {
       values = {
-        macOS = "nvim";
+        MacBook = "nvim";
         NixOS = null;
         Windows = "nvim";
       };
@@ -265,7 +265,7 @@ let
     # ── Host identity ────────────────────────────────────────────────
     NUCLEUS_HOST = {
       values = {
-        macOS = "MacBook";
+        MacBook = "MacBook";
         NixOS = "NixOS";
         Windows = "Windows";
       };
@@ -275,7 +275,7 @@ let
     # ── macOS-specific: repo root ───────────────────────────────────
     NUCLEUS_REPO_ROOT = {
       values = {
-        macOS = builtins.getEnv "NUCLEUS_REPO_ROOT";
+        MacBook = builtins.getEnv "NUCLEUS_REPO_ROOT";
       };
       why = "Repo root for out-of-store symlinks. Baked into store script at build time from apply.sh; activation hook overrides for repo-move edge case.";
     };
@@ -287,7 +287,7 @@ let
     # Set by gui-env-path (activation) and gui-env (login agent) in macos.nix.
     PATH = {
       values = {
-        macOS = managedPaths.toShellAppendPath;
+        MacBook = managedPaths.toShellAppendPath;
       };
       excludeFromAll = true;
       userSpecific = true;
@@ -328,11 +328,11 @@ let
     };
   };
 
-  # ── Resolve value for an entry on a given OS ─────────────────────
-  # Returns the OS-specific value, or `default` if no OS key exists, or null
-  # if neither the OS key nor `default` is present (OS not applicable).
+  # ── Resolve value for an entry on a given host ───────────────────
+  # Returns the host-specific value, or `default` if no host key exists, or null
+  # if neither the host key nor `default` is present (host not applicable).
   resolveValue =
-    name: os:
+    name: host:
     let
       entry = catalog.${name};
       userOverride =
@@ -340,23 +340,23 @@ let
           effectiveUser.envVars.${name}
         else
           null;
-      osValue =
-        if entry.values ? ${os} then
-          entry.values.${os}
+      hostValue =
+        if entry.values ? ${host} then
+          entry.values.${host}
         else if entry.values ? default then
           entry.values.default
         else
           null;
     in
-    if userOverride != null then userOverride else osValue;
+    if userOverride != null then userOverride else hostValue;
 
-  # ── Determine current OS name ────────────────────────────────────
-  currentOs = if pkgs.stdenv.isDarwin then "macOS" else "NixOS";
+  # ── Current host name (from caller) ──────────────────────────────
+  currentHost = hostName;
 
   # ── Generic filter over attrNames ────────────────────────────────
-  # Takes predicate (name, entry -> bool) and target OS for value resolution.
+  # Takes predicate (name, entry -> bool) and target host for value resolution.
   filterAttrsByEntry =
-    pred: os:
+    pred: host:
     builtins.listToAttrs (
       builtins.concatMap (
         name:
@@ -367,7 +367,7 @@ let
           [
             {
               inherit name;
-              value = resolveValue name os;
+              value = resolveValue name host;
             }
           ]
         else
@@ -377,11 +377,11 @@ let
 
   # ── allVars ───────────────────────────────────────────────────────
   # All vars for current POSIX host, excluding PATH (handled separately
-  # via activation/profile).  OS applicability is implicit from resolveValue.
+  # via activation/profile).  Host applicability is implicit from resolveValue.
   allVars = filterAttrsByEntry (
     name: entry:
-    (!entry ? excludeFromAll || !entry.excludeFromAll) && resolveValue name currentOs != null
-  ) currentOs;
+    (!entry ? excludeFromAll || !entry.excludeFromAll) && resolveValue name currentHost != null
+  ) currentHost;
 
   # ── systemVars ───────────────────────────────────────────────────
   # Non-user-specific vars for NixOS environment.variables.
@@ -389,25 +389,25 @@ let
     name: entry: (!entry ? userSpecific || !entry.userSpecific) && resolveValue name "NixOS" != null
   ) "NixOS";
 
-  # ── macOSAllVars ─────────────────────────────────────────────────
-  # All macOS vars (both user and non-user) for the gui-env LaunchAgent.
+  # ── macBookAllVars ───────────────────────────────────────────────
+  # All MacBook vars (both user and non-user) for the gui-env LaunchAgent.
   # PATH is excluded (handled separately via activation/agent scripts).
-  macOSAllVars =
+  macBookAllVars =
     let
-      os = "macOS";
+      host = "MacBook";
       relevant = builtins.filter (
         name:
         let
           entry = catalog.${name};
         in
-        (!entry ? excludeFromAll || !entry.excludeFromAll) && resolveValue name os != null
+        (!entry ? excludeFromAll || !entry.excludeFromAll) && resolveValue name host != null
       ) (builtins.attrNames catalog);
     in
     builtins.concatStringsSep "\n" (
       builtins.map (
         name:
         let
-          val = resolveValue name os;
+          val = resolveValue name host;
         in
         if val != null then "/bin/launchctl setenv ${name} ${lib.strings.escapeShellArg val}" else ""
       ) relevant
@@ -425,10 +425,10 @@ let
         userSpecific = entry ? userSpecific && entry.userSpecific;
         why = entry.why;
         hasNixOsEntry = entry.values ? NixOS || entry.values ? default;
-        hasMacOsEntry = entry.values ? macOS || entry.values ? default;
+        hasMacBookEntry = entry.values ? MacBook || entry.values ? default;
         hasWindowsEntry = entry.values ? Windows || entry.values ? default;
         nixosValue = resolveValue name "NixOS";
-        macosValue = resolveValue name "macOS";
+        macBookValue = resolveValue name "MacBook";
         windowsValue = resolveValue name "Windows";
       }
     ) (builtins.attrNames catalog)
@@ -442,11 +442,11 @@ in
     catalog
     allVars
     systemVars
-    macOSAllVars
+    macBookAllVars
     toJsonManifest
     getAllNixVarNames
     resolveValue
     passwordStoreDir
-    currentOs
+    currentHost
     ;
 }

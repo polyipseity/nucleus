@@ -52,9 +52,9 @@ let
       [
         managedPaths.toPowerShellPrependSnippet
         managedPaths.toPowerShellAppendSnippet
-        (envVars.resolveValue "CC" envVars.currentOs)
-        (envVars.resolveValue "CXX" envVars.currentOs)
-        (envVars.resolveValue "LD" envVars.currentOs)
+        (envVars.resolveValue "CC" envVars.currentHost)
+        (envVars.resolveValue "CXX" envVars.currentHost)
+        (envVars.resolveValue "LD" envVars.currentHost)
         "${managedPaths.defaultDevTools}"
         (lib.concatStringsSep " " agentEnv.agentEnvVarNames)
         agentEnv.devinPosixPath
