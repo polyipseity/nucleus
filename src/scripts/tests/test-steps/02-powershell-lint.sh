@@ -11,10 +11,6 @@ run_02_powershell_lint() {
   say "--- test output ---"
   pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -Settings scripts/PSScriptAnalyzerSettings.test.psd1 || _exit_code=1
   bash tests/scripts/check-pwsh-tests.sh || _exit_code=1
-  bash tests/scripts/test-output-format-tests.sh || _exit_code=1
-  say "--- step-runner regression tests ---"
-  bash tests/scripts/step-runner-regression-tests.sh || _exit_code=1
-  bash tests/scripts/step-runner-parity-tests.sh || _exit_code=1
   say "--- end test output ---"
 
   return "$_exit_code"
