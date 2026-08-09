@@ -26,7 +26,7 @@ Proceed automatically with best-effort defaults and available context.
    - Optional body (each line wrapped to 72 chars or fewer; bullets allowed)
    - Footer (`BREAKING CHANGE` / `Refs` / `Ticket`), including `${input:extra}` when provided
 
-   Prefer tooling-enforced rules; default to Conventional Commits when unclear. After composing, proceed to step 3 for commitlint validation.
+   Prefer tooling-enforced rules; default to Conventional Commits when unclear. If the commit is rejected by commitlint, rewrap and retry with a fresh `git commit`. NEVER use `git commit --amend` — the commit was not created, so `--amend` would modify whatever HEAD currently points to (a pre-existing commit), potentially destroying history. After composing, proceed to step 3 for commitlint validation.
 
 3. **Validate with commitlint**
    Before running `git commit`, validate the message with commitlint:

@@ -6,6 +6,17 @@ applyTo: "src/modules/agents.nix, src/modules/cursor.nix, src/platforms/Windows/
 
 # Agents and Skills
 
+## Repo vs user overlay
+
+| Tree | Path | Role |
+| ---- | ---- | ---- |
+| **Repo policy** | `.agents/` | Project-specific instructions, repo-tied skills, OpenCode/Copilot workspace loading |
+| **User overlay** | `src/users/default/agents/` | Global agent config provisioned to `~/.agents/` |
+
+Repo `.agents/skills/` holds **project-tied** skills (`pssa-rule-benchmark`, `sf-symbols`). User overlay `src/users/default/agents/skills/` holds **workflow** skills (`checkpoint`, `asciinema`, `chronicler`, `humanizer`).
+
+`.agents/agents/.gitkeep` is an intentional empty placeholder for the `.opencode/agents` symlink and VS Code `chat.agentFilesLocations`. Real agent definitions live in `src/users/default/agents/agents/`.
+
 ## Directory layout
 
 The `~/.agents/` directory is the runtime home for all agent configuration, prompts, skills, and hooks. It is a real (writable) directory, **not** a whole-dir symlink into the repo tree.

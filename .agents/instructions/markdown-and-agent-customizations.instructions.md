@@ -32,8 +32,9 @@ Use this file for markdown guidance only. Keep policy canonical in `AGENTS.md` a
 
 ## Mirroring and safety
 
-- `commit-staged.prompt.md` is mirrored between:
-  - `.agents/prompts/commit-staged.prompt.md`
-  - `.opencode/commands/commit-staged.prompt.md` Update both in the same change unless intentional divergence is documented.
+- `commit-staged.prompt.md` is intentionally duplicated in three locations; body content must match (frontmatter tool-specific keys such as `disable-model-invocation` may differ per consumer):
+  - `.agents/prompts/commit-staged.prompt.md` (repo / OpenCode)
+  - `.opencode/commands/commit-staged.prompt.md` (symlink to repo copy)
+  - `src/users/default/agents/prompts/commit-staged.prompt.md` (user overlay / Cursor)
 - Do not add `.github/copilot-instructions.md`; root `AGENTS.md` is canonical.
 - Avoid broad cosmetic rename sweeps unless all dependent references are updated atomically.
