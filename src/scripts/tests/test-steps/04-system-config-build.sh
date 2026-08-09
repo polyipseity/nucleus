@@ -10,6 +10,7 @@ run_04_system_config_build() {
 
   local _host=""
   _host="$(resolve_nucleus_host)"
+  export NUCLEUS_REPO_ROOT="$_repo_root"
   case "$_host" in
     MacBook) _attr="darwinConfigurations.MacBook.system" ;;
     NixOS)
@@ -28,9 +29,9 @@ run_04_system_config_build() {
   # WHY: the system build contends on the SQLite eval cache and flakehub
   # fetch lock when it overlaps with the other nix steps (01/03); serialize it.
   if [ "$quiet_mode" = true ]; then
-    nucleus_nix_locked nix build --no-link --keep-going --print-out-paths "./src#$_attr" >/dev/null || _exit_code=$?
+    nucleus_nix_locked nix build --impure --no-link --keep-going --print-out-paths "./src#$_attr" >/dev/null || _exit_code=$?
   else
-    nucleus_nix_locked nix build --no-link --keep-going --print-out-paths "./src#$_attr" || _exit_code=$?
+    nucleus_nix_locked nix build --impure --no-link --keep-going --print-out-paths "./src#$_attr" || _exit_code=$?
   fi
 
   return "$_exit_code"
