@@ -29,7 +29,7 @@ Broad cleanup rule:
 - Merge results, then run another parallel pass for remaining hotspots.
 - Stop when only minor/cosmetic improvements remain.
 
-For repo-specific script simplification patterns, see the repo's `scripts-simplify.instructions.md`.
+For repo-specific script simplification patterns, see the repo's `scripts-and-permissions.instructions.md`.
 
 Guidance-file rule (`AGENTS.md`, `.agents/**`):
 

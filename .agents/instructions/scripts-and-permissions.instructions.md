@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing files under scripts/, src/scripts/, or src/platforms/Windows/modules/. Covers script placement, newline policy, cross-platform behavior, runtime detection, and permission expectations."
 name: "Scripts and Permissions"
-applyTo: "scripts/**, src/scripts/**, src/**/*.ps1"
+applyTo: "scripts/**, src/scripts/**, src/scripts/lib/**, src/**/*.ps1, src/platforms/Windows/modules/scripts/**, src/modules/**/*.nix, src/hosts/**/*.nix"
 ---
 
 # Scripts and Executable Permissions
@@ -228,3 +228,30 @@ A script under `src/scripts/` earns its own file when it falls into one of these
 2. **Trivial one-command** — script whose entire logic is a single command or a few simple commands with minimal/no control flow (no loops, no conditionals on runtime state, no data transformation).
 
 See `nix-authoring.instructions.md` ("Inline code extraction boundaries") for the complementary Nix-side policy on what stays inline.
+
+## Simplification patterns
+
+Apply these patterns when maintaining scripts under `src/scripts/`:
+
+- **Tiny libs (<20 lines, single caller)**: When a lib file provides only 1-2 variable definitions or one small function used by a single caller, inline the content directly into the caller and delete the lib file.
+- **Trivial scripts (<10 lines, simple if/command check)**: Inline into the parent Nix activation string via `${builtins.readFile ...}` instead of maintaining a separate file.
+- **Console user boilerplate (MacBook scripts)**: When multiple scripts independently probe `/dev/console` for UID/username, extract into a shared function under `src/scripts/lib/macos-console-user.sh`.
+- **Service script helper duplication**: When two daemon scripts define identical small functions (e.g., `require_command`), extract to `src/scripts/lib/require-command.sh` and prepend at Nix build time.
+- **Shared symlink convergence logic**: When scripts share structural overlap (iterate find results → remove stale → create missing), extract into `src/scripts/lib/symlink-convergence.sh`.
+- **Nix prepend pattern**: For scripts built via `pkgs.writeShellScript` or activation strings, prepend lib content at build time: `(builtins.readFile ../scripts/lib/foo.sh) + (builtins.readFile ../scripts/main-script.sh)` — avoids runtime sourcing path dependency.
+
+## Library purity
+
+Library files (under `src/scripts/lib/`) are pure function/constant definitions. The same rules apply by analogy to Windows PowerShell helper modules under `src/platforms/Windows/modules/scripts/`.
+
+1. **No top-level side effects on import.** A lib file must define functions and variables only — never execute commands at import time. No `set -eu` at the top level (only inside function bodies). No auto-invocation at end of file.
+
+2. **No Nix placeholders.** Lib files must never contain `__TOKEN__`-style placeholders intended for Nix `builtins.replaceStrings`. All data must enter via function parameters.
+
+3. **Nix must not `builtins.readFile` lib files.** Nix modules must source lib files at runtime (`. "$REPO_ROOT/src/scripts/lib/..."`) rather than inlining their content at build time.
+
+4. **Data from Nix goes to the consumer script first, then to lib via function args.** The consumer (activation script, service script, or standalone Nix-derived script) receives data from Nix through its own parameters or token substitution, then passes it to lib functions as arguments.
+
+### Exception
+
+A lib file may be embedded via `builtins.readFile` when it contains a clean function definition (no tokens, no env var dependencies) and is being wrapped into a standalone script (e.g., a launchd daemon script) that will execute independently. The embedded lib must remain pure — all external inputs must arrive as function arguments from the wrapping code.
