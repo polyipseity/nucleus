@@ -34,18 +34,9 @@
 - Schema files live alongside their data files (e.g., `src/modules/VMs.schema.json` for `src/modules/VMs.json`).
 - Configuration files (JSONC) that already embed `$schema` do not need additional mappings.
 
-### Pre-flight dependency policy (check scripts)
+### Pre-flight and check discovery
 
-- Every external tool used by any check in `scripts/check.sh` or `scripts/check.ps1` MUST be declared in the pre-flight block.
-- A missing tool causes an immediate hard failure — checks MUST NEVER silently skip steps due to unavailable dependencies.
-- The pre-flight block is the single source of truth for all tool requirements.
-- To add a new check that requires a new tool: add it to pre-flight first, then provision it on all target hosts (`src/modules/core.nix` for POSIX, `Ensure-Tool` / bootstrap for Windows).
-
-### Dynamic file discovery in check/test scripts
-
-- Check scripts (`scripts/check.sh`, `scripts/check.ps1`) and test scripts (`scripts/test.sh`) MUST auto-discover the files they validate rather than hard-coding file lists.
-- Adding a new schema-validation pair, test directory, or file type must NOT require editing the check/test script — it must be automatically picked up via discovery patterns (inline `$schema`, `find` on `tests/`, etc.).
-- Exceptions are allowed only for files that lack an inline `$schema` and use built-in schemas (e.g., GitHub workflow files with `--builtin-schema vendor.github-workflows`).
+Check/test preflight, tool-availability policy, scoped-mode conventions, and dynamic file discovery are documented in `.agents/instructions/tooling-and-validation.instructions.md`. Every external tool used by `scripts/check.sh` or `scripts/check.ps1` must be declared in the pre-flight block; missing tools hard-fail — checks never silently skip.
 
 ## Build and Validation
 
@@ -55,13 +46,7 @@
   `src/users/default/nextest/config.toml` (limitations section at top) for known
   limitations.
 
-- Discover commands from the repository itself; never assume a default stack.
-- Validate changed files before finishing work:
-  - Nix syntax/eval: `nix-instantiate --parse <file.nix>` or `nix flake check` from `src/`
-  - PowerShell parse checks: `nix shell nixpkgs#powershell -c pwsh ...`
-- PowerShell naming policy: `.agents/instructions/pwsh-lint-policy.instructions.md` (Verb-Noun, collection-singular nouns, semantic manifest in `scripts/pwsh-naming-manifest.json`)
-  - WinGet DSC what-if: `winget configure --what-if .\src\hosts\Windows\system.dsc.yml`, `.\src\hosts\Windows\system-packages.dsc.yml`, `.\src\hosts\Windows\user.dsc.yml`, `.\src\hosts\Windows\user-env.dsc.yml`, `.\src\hosts\Windows\user-context.dsc.yml`
-- All `nucleus-*` commands are expected to run from any directory: `nucleus-ai-sync`, `nucleus-apply`, `nucleus-audit-store`, `nucleus-bootstrap`, `nucleus-bump-lockfile`, `nucleus-check-pwsh`, `nucleus-check-sh`, `nucleus-cloud-setup`, `nucleus-gc`, `nucleus-health-check`, `nucleus-replica-reset`, `nucleus-replica-sync`, `nucleus-update`, `nucleus-vm`.
+- Discover commands from the repository itself; never assume a default stack. Validation commands and check-step taxonomy: `.agents/instructions/tooling-and-validation.instructions.md`.
 - Hard rule: never filter or truncate `nucleus-apply` output (no `grep`, `head`, `tail`, or similar). Run it directly and capture the full combined stdout+stderr. When reviewing output, ignore the direnv environment variable dump (`direnv: export +AR +AR_FOR_BUILD ...`) that sometimes appears at the end — it is irrelevant noise from `.envrc` re-evaluation. If the output ends abruptly (no clear success/failure end marker, partial lines, or incomplete direnv dump) or the exit code is non-zero, do NOT re-run — instead, read the last visible activation step name and diagnose the failure there.
 - Known upstream caveat: `builtins.derivation`/`options.json` contextless-source warning is upstream, not a local regression unless concrete local breakage is shown.
 
