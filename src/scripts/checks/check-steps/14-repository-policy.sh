@@ -281,10 +281,20 @@ run_14_agents_policy() {
     if [ -z "$_apply" ]; then
       _agents_errors=$((_agents_errors + 1))
       error "${_instr#./}: missing applyTo frontmatter field"
+    elif [ "$_apply" = '**' ]; then
+      _agents_errors=$((_agents_errors + 1))
+      error "${_instr#./}: applyTo must not be \"**\" — use scripts/**, src/**, tests/** or narrower"
     fi
   done < <(find .agents/instructions -type f -name '*.instructions.md' -print0)
 
-  local _stale_pattern='vm-guest-identity|activation-naming|app-config-management|host-and-os-naming|repo-structure'
+  local _deleted_manifest=".agents/deleted-instructions.json"
+  if [ ! -f "$_deleted_manifest" ]; then
+    _agents_errors=$((_agents_errors + 1))
+    error "missing $_deleted_manifest"
+  fi
+  local _stale_pattern
+  _stale_pattern=$(jq -r '.stems | map(. + ".instructions.md") | join("|")' "$_deleted_manifest")
+
   local _stale_hits
   _stale_hits=$(mktemp) || { error "failed to create temp file"; return 1; }
   grep -RIn -E "$_stale_pattern" \
@@ -292,6 +302,7 @@ run_14_agents_policy() {
     --exclude='14-repository-policy.sh' \
     --exclude='14-repository-policy.ps1' \
     --exclude='agents-policy-tests.sh' \
+    --exclude='deleted-instructions.json' \
     . 2>/dev/null > "$_stale_hits" || true  # check-suppress:suppression_doc: grep exits 1 when no stale instruction references remain; empty output is the expected clean state
   if [ -s "$_stale_hits" ]; then
     _agents_errors=$((_agents_errors + 1))
@@ -303,6 +314,25 @@ run_14_agents_policy() {
     say "no stale .agents instruction references found."
   fi
   rm -f "$_stale_hits"
+
+  local _agents_md="AGENTS.md"
+  local _missing_link
+  _missing_link=$(mktemp) || { error "failed to create temp file"; return 1; }
+  grep -oE '\.agents/instructions/[a-z0-9-]+\.instructions\.md' "$_agents_md" 2>/dev/null \
+    | sort -u \
+    | while IFS= read -r _link; do
+        [ -f "$_link" ] || echo "$_link"
+      done > "$_missing_link" || true  # check-suppress:suppression_doc: grep exits 1 when AGENTS.md has no instruction links; empty missing-link file is valid
+  if [ -s "$_missing_link" ]; then
+    _agents_errors=$((_agents_errors + 1))
+    error "AGENTS.md references missing instruction files:"
+    while IFS= read -r _line; do
+      error "  $_line"
+    done < "$_missing_link"
+  else
+    say "AGENTS.md instruction links resolve."
+  fi
+  rm -f "$_missing_link"
 
   if [ "$_agents_errors" -gt 0 ]; then
     error "agents policy check failed with $_agents_errors error(s)"

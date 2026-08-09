@@ -293,23 +293,48 @@ Register-Step -Id "repository-policy" -Number 14 -Name "Repository policy" -Acti
     if ($content -notmatch '(?m)^applyTo:\s*') {
       Write-ErrorMessage "$($instr.FullName): missing applyTo frontmatter field"
       $failed = $true
+    } elseif ($content -match '(?m)^applyTo:\s*"\*\*"') {
+      Write-ErrorMessage "$($instr.FullName): applyTo must not be `"**`" — use scripts/**, src/**, tests/** or narrower"
+      $failed = $true
     }
   }
 
-  $stalePattern = 'vm-guest-identity|activation-naming|app-config-management|host-and-os-naming|repo-structure'
-  $staleHits = Get-ChildItem -Path $r -Recurse -File |
-    Where-Object {
-      $_.FullName -notmatch '[\\/]\.git[\\/]' -and
-      $_.Name -notin @('14-repository-policy.sh', '14-repository-policy.ps1', 'agents-policy-tests.sh')
-    } |
-    Select-String -Pattern $stalePattern -SimpleMatch:$false
-  if ($staleHits) {
-    foreach ($hit in $staleHits) {
-      Write-ErrorMessage "stale .agents reference: $($hit.Path):$($hit.LineNumber): $($hit.Line.Trim())"
+  $deletedManifest = Join-Path $r '.agents\deleted-instructions.json'
+  if (-not (Test-Path -LiteralPath $deletedManifest)) {
+    Write-ErrorMessage "missing $deletedManifest"
+    $failed = $true
+  } else {
+    $stems = (Get-Content -LiteralPath $deletedManifest -Raw | ConvertFrom-Json).stems
+    $stalePattern = ($stems | ForEach-Object { "{0}.instructions.md" -f $_ }) -join '|'
+    $staleHits = Get-ChildItem -Path $r -Recurse -File |
+      Where-Object {
+        $_.FullName -notmatch '[\\/]\.git[\\/]' -and
+        $_.Name -notin @('14-repository-policy.sh', '14-repository-policy.ps1', 'agents-policy-tests.sh', 'deleted-instructions.json')
+      } |
+      Select-String -Pattern $stalePattern
+    if ($staleHits) {
+      foreach ($hit in $staleHits) {
+        Write-ErrorMessage "stale .agents reference: $($hit.Path):$($hit.LineNumber): $($hit.Line.Trim())"
+      }
+      $failed = $true
+    } else {
+      Write-Output 'check: no stale .agents instruction references found.'
+    }
+  }
+
+  $agentsMd = Join-Path $r 'AGENTS.md'
+  $missingLinks = Select-String -Path $agentsMd -Pattern '\.agents/instructions/[a-z0-9-]+\.instructions\.md' -AllMatches |
+    ForEach-Object { $_.Matches } |
+    ForEach-Object { $_.Value } |
+    Sort-Object -Unique |
+    Where-Object { -not (Test-Path -LiteralPath (Join-Path $r ($_ -replace '/', '\'))) }
+  if ($missingLinks) {
+    foreach ($link in $missingLinks) {
+      Write-ErrorMessage "AGENTS.md references missing instruction file: $link"
     }
     $failed = $true
   } else {
-    Write-Output 'check: no stale .agents instruction references found.'
+    Write-Output 'check: AGENTS.md instruction links resolve.'
   }
 
   if ($failed) {

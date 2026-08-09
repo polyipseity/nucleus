@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "deleted-instructions.schema.json",
+  "title": "Deleted .agents instruction stems",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "stems"],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "stems": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9-]+$"
+      },
+      "uniqueItems": true,
+      "minItems": 1
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "./deleted-instructions.schema.json",
+  "stems": [
+    "activation-naming",
+    "app-config-management",
+    "host-and-os-naming",
+    "library-purity",
+    "macos-launchd-sip",
+    "repo-structure",
+    "scripts-simplify",
+    "spotlight-disable",
+    "terminal-activations",
+    "tool-availability",
+    "utm-android-freeze",
+    "vm-guest-identity"
+  ]
+}
