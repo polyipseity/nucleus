@@ -60,7 +60,7 @@ done
 # stuck in penalty box (EX_CONFIG). Attempt a fresh bootstrap to recover.
 # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons with
 # non-root UserName; the /bin/sh wrapper avoids this. See
-# .agents/instructions/macos-launchd-sip.instructions.md.
+# .agents/instructions/macos-service-hardening.instructions.md.
 if [ "$_ct_mode" = "sudo" ]; then
   printf '%s\n' "caddy-trust: attempting launchd service recovery via bootout/bootstrap..." >&2
   # check-suppress:suppression_doc: HTTPS proxy service may not be loaded; bootout on absent service exits 1.

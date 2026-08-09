@@ -327,7 +327,7 @@ svc_status() {
 # On macOS 26+, SIP blocks unsigned Nix store binaries for system daemons
 # with non-root UserName, producing exit 78 at boot. All MacBook daemons use
 # /bin/sh wrapper to pass SIP gate
-# (.agents/instructions/macos-launchd-sip.instructions.md).
+# (.agents/instructions/macos-service-hardening.instructions.md).
 recover_launchctl_service() {
   local domain="$1" svc_id="$2" sudo_prefix="$3"
   local target

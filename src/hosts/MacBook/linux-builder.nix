@@ -141,7 +141,7 @@ in
     serviceConfig = {
       # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
       # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
-      # passes SIP gate. See .agents/instructions/macos-launchd-sip.instructions.md.
+      # passes SIP gate. See .agents/instructions/macos-service-hardening.instructions.md.
       # Upstream <https://github.com/nix-darwin/nix-darwin/issues/1219> tracks
       # making launchd services show descriptive names; do not revisit until
       # that issue is resolved.

@@ -24,7 +24,7 @@ in
     # /tmp/ works for testing; /Library/Logs/ is blocked.
     # The same SIP restriction also blocks unsigned binary execution at boot;
     # all MacBook daemons work around it via /bin/sh wrapper
-    # (.agents/instructions/macos-launchd-sip.instructions.md).
+    # (.agents/instructions/macos-service-hardening.instructions.md).
     systemLogDir = mkOption {
       type = types.str;
       default = loggingPaths.systemLogDir;

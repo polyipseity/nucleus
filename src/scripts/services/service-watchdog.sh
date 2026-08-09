@@ -10,7 +10,7 @@
 # On macOS 26+, SIP blocks unsigned Nix store binaries for system daemons
 # with non-root UserName (exit 78 / EX_CONFIG). All MacBook daemons use
 # /bin/sh wrapper; this watchdog recovers any that get stuck at boot.
-# See .agents/instructions/macos-launchd-sip.instructions.md.
+# See .agents/instructions/macos-service-hardening.instructions.md.
 #
 # Reads services.json, filters to the current host, skips socket-activated
 # and prefix-match services, and recovers each non-running service via
