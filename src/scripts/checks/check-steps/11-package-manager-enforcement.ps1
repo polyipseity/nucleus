@@ -19,29 +19,40 @@ Register-Step -Id "package-manager-enforcement" -Number 11 -Name "Package manage
   # ref: allow-and-deny-lists.instructions.md#A1 -- orchestrator/config files contain pip/npm patterns in comments; self-refs are dynamic
   $selfPs1 = $MyInvocation.MyCommand.Name
   $selfSh = [System.IO.Path]::ChangeExtension($selfPs1, '.sh')
-  $pipViolations = Select-String -Path @(
-    Get-ChildItem -Recurse -Path "$r\scripts", "$r\src", "$r\tests" `
-      -Include *.sh, *.ps1, *.nix `
-      -Exclude check.sh, check.ps1, shell.nix, $selfPs1, $selfSh `
-      | ForEach-Object { $_.FullName }
-  ) -Pattern '(^|[^a-z])pip install([^-]|$)' `
-    | Where-Object { $_.Line -notmatch 'uv pip install' }
+  $excludeNames = @('check.sh', 'check.ps1', 'shell.nix', $selfPs1, $selfSh)
 
-  if ($pipViolations) {
-    Write-ErrorMessage "bare pip install detected (use uv pip install instead)"
-    $violations++
+  if ($HasArgs) {
+    # WHY: if-statement output is pipeline-enumerated — an empty else branch yields $null, crashing the .Count checks below under StrictMode; the @() wrapper forces an array
+    $shFiles = @(if ($script:SH_FILES) { $script:SH_FILES } else { $PositionalArgs | Where-Object { $_ -like '*.sh' } })
+    $ps1Files = @(if ($script:PS1_FILES) { $script:PS1_FILES } else { $PositionalArgs | Where-Object { $_ -like '*.ps1' } })
+    $nixFiles = @(if ($script:NIX_FILES) { $script:NIX_FILES } else { $PositionalArgs | Where-Object { $_ -like '*.nix' } })
+    $grepFiles = @($shFiles + $ps1Files + $nixFiles | Where-Object {
+        $excludeNames -notcontains [System.IO.Path]::GetFileName($_)
+      })
+  } else {
+    $grepFiles = @(
+      Get-ChildItem -Recurse -Path "$r\scripts", "$r\src", "$r\tests" `
+        -Include *.sh, *.ps1, *.nix `
+        -Exclude check.sh, check.ps1, shell.nix, $selfPs1, $selfSh `
+        | ForEach-Object { $_.FullName }
+    )
   }
 
-  $npmViolations = Select-String -Path @(
-    Get-ChildItem -Recurse -Path "$r\scripts", "$r\src", "$r\tests" `
-      -Include *.sh, *.ps1, *.nix `
-      -Exclude check.sh, check.ps1, shell.nix, $selfPs1, $selfSh `
-      | ForEach-Object { $_.FullName }
-  ) -Pattern '(^|[^a-z])npm install([^-]|$)'
+  if ($grepFiles.Count -gt 0) {
+    $pipViolations = Select-String -Path $grepFiles -Pattern '(^|[^a-z])pip install([^-]|$)' `
+      | Where-Object { $_.Line -notmatch 'uv pip install' }
 
-  if ($npmViolations) {
-    Write-ErrorMessage "bare npm install detected (use bun or nix instead)"
-    $violations++
+    if ($pipViolations) {
+      Write-ErrorMessage "bare pip install detected (use uv pip install instead)"
+      $violations++
+    }
+
+    $npmViolations = Select-String -Path $grepFiles -Pattern '(^|[^a-z])npm install([^-]|$)'
+
+    if ($npmViolations) {
+      Write-ErrorMessage "bare npm install detected (use bun or nix instead)"
+      $violations++
+    }
   }
 
   # Self-pruning: verify excluded files still justify their exclusion (A1)

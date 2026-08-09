@@ -27,28 +27,48 @@ run_11_package_manager_enforcement() {
   # ref: allow-and-deny-lists.instructions.md#A1 -- orchestrator/config files contain pip/npm patterns in comments; self-refs are dynamic
   local _self_sh="11-package-manager-enforcement.sh"
   local _self_ps1="11-package-manager-enforcement.ps1"
-  # Convert from grep -rn --include (directory traversal without gitignore) to
-  # find | filter_gitignored | xargs grep so gitignored files are excluded.
-  # Keep explicit --exclude for files that legitimately contain the pattern
-  # (check.sh, check.ps1, shell.nix, self-refs). Removed patterns that are now
-  # covered by gitignore (e.g., result, secrets/, .direnv/).
-  if find scripts/ src/ tests/ \( -name '*.sh' -o -name '*.ps1' -o -name '*.nix' \) -print \
-    | filter_gitignored \
-    | grep -v -E '(check\.sh|check\.ps1|shell\.nix|'"$_self_sh"'|'"$_self_ps1"')$' \
-    | xargs grep -n -E '(^|[^a-z])pip install([^-]|$)' 2>/dev/null \
-    | grep -v 'uv pip install' \
-    | grep . >/dev/null 2>&1; then
-    error "bare pip install detected (use uv pip install instead)"
-    _violations=$((_violations + 1))
+  local _grep_files=()
+  if $_has_args; then
+    [ ${#SH_FILES[@]} -gt 0 ] && _grep_files+=("${SH_FILES[@]}")
+    [ ${#PS1_FILES[@]} -gt 0 ] && _grep_files+=("${PS1_FILES[@]}")
+    [ ${#NIX_FILES[@]} -gt 0 ] && _grep_files+=("${NIX_FILES[@]}")
+    local _filtered=()
+    local _f
+    for _f in "${_grep_files[@]}"; do
+      case "$(basename "$_f")" in
+        check.sh|check.ps1|shell.nix|"$_self_sh"|"$_self_ps1") continue ;;
+      esac
+      _filtered+=("$_f")
+    done
+    _grep_files=("${_filtered[@]}")
+  else
+    # Convert from grep -rn --include (directory traversal without gitignore) to
+    # find | filter_gitignored | xargs grep so gitignored files are excluded.
+    # Keep explicit --exclude for files that legitimately contain the pattern
+    # (check.sh, check.ps1, shell.nix, self-refs). Removed patterns that are now
+    # covered by gitignore (e.g., result, secrets/, .direnv/).
+    mapfile -t _grep_files < <(
+      find scripts/ src/ tests/ \( -name '*.sh' -o -name '*.ps1' -o -name '*.nix' \) -print \
+        | filter_gitignored \
+        | grep -v -E '(check\.sh|check\.ps1|shell\.nix|'"$_self_sh"'|'"$_self_ps1"')$'
+    )
   fi
 
-  if find scripts/ src/ tests/ \( -name '*.sh' -o -name '*.ps1' -o -name '*.nix' \) -print \
-    | filter_gitignored \
-    | grep -v -E '(check\.sh|check\.ps1|shell\.nix|'"$_self_sh"'|'"$_self_ps1"')$' \
-    | xargs grep -n -E '(^|[^a-z])npm install([^-]|$)' 2>/dev/null \
-    | grep . >/dev/null 2>&1; then
-    error "bare npm install detected (use bun or nix instead)"
-    _violations=$((_violations + 1))
+  if [ "${#_grep_files[@]}" -gt 0 ]; then
+    if printf '%s\0' "${_grep_files[@]}" \
+      | xargs -0 grep -n -E '(^|[^a-z])pip install([^-]|$)' 2>/dev/null \
+      | grep -v 'uv pip install' \
+      | grep . >/dev/null 2>&1; then
+      error "bare pip install detected (use uv pip install instead)"
+      _violations=$((_violations + 1))
+    fi
+
+    if printf '%s\0' "${_grep_files[@]}" \
+      | xargs -0 grep -n -E '(^|[^a-z])npm install([^-]|$)' 2>/dev/null \
+      | grep . >/dev/null 2>&1; then
+      error "bare npm install detected (use bun or nix instead)"
+      _violations=$((_violations + 1))
+    fi
   fi
 
   # Self-pruning: verify excluded files still justify their exclusion (A1)
