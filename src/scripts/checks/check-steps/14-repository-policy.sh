@@ -27,6 +27,9 @@ run_14_repository_policy() {
   say "--- embedded content enforcement ---"
   run_14_embedded_content_enforcement "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
+  say "--- agents policy ---"
+  run_14_agents_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+
   if [ "$_failed" -ne 0 ]; then
     error "repository policy check failed"
     return 1
@@ -232,5 +235,79 @@ run_14_embedded_content_enforcement() {
   fi
 
   say "no embedded-content heredoc violations found."
+  return 0
+}
+
+_strip_prompt_frontmatter() {
+  awk 'BEGIN{fm=0} /^---$/ {fm++; if (fm == 1) next; if (fm == 2) {fm = 3; next}} fm == 1 || fm == 2 {next} {print}' "$1"
+}
+
+run_14_agents_policy() {
+  local _repo_root="$2"
+  cd "$_repo_root" || return 1
+  local _agents_errors=0
+
+  local _repo_commit_staged=".agents/prompts/commit-staged.prompt.md"
+  local _user_commit_staged="src/users/default/agents/prompts/commit-staged.prompt.md"
+  local _repo_body _user_body
+  _repo_body=$(_strip_prompt_frontmatter "$_repo_commit_staged")
+  _user_body=$(_strip_prompt_frontmatter "$_user_commit_staged")
+  if [ "$_repo_body" != "$_user_body" ]; then
+    _agents_errors=$((_agents_errors + 1))
+    error "commit-staged.prompt.md body mismatch between repo and user overlay"
+  else
+    say "commit-staged prompt bodies match."
+  fi
+
+  local _instr
+  while IFS= read -r -d '' _instr; do
+    if ! awk 'NR==1 && $0=="---" {found=1; exit} END{exit !found}' "$_instr"; then
+      _agents_errors=$((_agents_errors + 1))
+      error "${_instr#./}: missing YAML frontmatter opener"
+      continue
+    fi
+    local _desc _name _apply
+    _desc=$(awk '/^---$/{n++; next} n==1 && /^description:/{sub(/^description: */, ""); gsub(/^"|"$/, ""); print; exit}' "$_instr")
+    _name=$(awk '/^---$/{n++; next} n==1 && /^name:/{sub(/^name: */, ""); gsub(/^"|"$/, ""); print; exit}' "$_instr")
+    _apply=$(awk '/^---$/{n++; next} n==1 && /^applyTo:/{sub(/^applyTo: */, ""); gsub(/^"|"$/, ""); print; exit}' "$_instr")
+    if [[ ! "$_desc" =~ ^Use\ when ]]; then
+      _agents_errors=$((_agents_errors + 1))
+      error "${_instr#./}: description must start with \"Use when\""
+    fi
+    if [ -z "$_name" ]; then
+      _agents_errors=$((_agents_errors + 1))
+      error "${_instr#./}: missing name frontmatter field"
+    fi
+    if [ -z "$_apply" ]; then
+      _agents_errors=$((_agents_errors + 1))
+      error "${_instr#./}: missing applyTo frontmatter field"
+    fi
+  done < <(find .agents/instructions -type f -name '*.instructions.md' -print0)
+
+  local _stale_pattern='vm-guest-identity|activation-naming|app-config-management|host-and-os-naming|repo-structure'
+  local _stale_hits
+  _stale_hits=$(mktemp) || { error "failed to create temp file"; return 1; }
+  grep -RIn -E "$_stale_pattern" \
+    --exclude-dir='.git' \
+    --exclude='14-repository-policy.sh' \
+    --exclude='14-repository-policy.ps1' \
+    --exclude='agents-policy-tests.sh' \
+    . 2>/dev/null > "$_stale_hits" || true  # check-suppress:suppression_doc: grep exits 1 when no stale instruction references remain; empty output is the expected clean state
+  if [ -s "$_stale_hits" ]; then
+    _agents_errors=$((_agents_errors + 1))
+    error "stale .agents instruction references found:"
+    while IFS= read -r _line; do
+      error "  $_line"
+    done < "$_stale_hits"
+  else
+    say "no stale .agents instruction references found."
+  fi
+  rm -f "$_stale_hits"
+
+  if [ "$_agents_errors" -gt 0 ]; then
+    error "agents policy check failed with $_agents_errors error(s)"
+    return 1
+  fi
+  say "agents policy passed."
   return 0
 }

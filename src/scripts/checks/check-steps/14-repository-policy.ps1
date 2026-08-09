@@ -243,6 +243,75 @@ Register-Step -Id "repository-policy" -Number 14 -Name "Repository policy" -Acti
     Write-Output "check: no embedded-content violations found."
   }
 
+  Write-Message "--- agents policy ---"
+
+  $repoCommitStaged = Join-Path $r '.agents\prompts\commit-staged.prompt.md'
+  $userCommitStaged = Join-Path $r 'src\users\default\agents\prompts\commit-staged.prompt.md'
+  function Get-PromptBodyWithoutFrontmatter {
+    param([string]$Path)
+    $lines = Get-Content -LiteralPath $Path
+    $inFrontmatter = $false
+    $frontmatterCount = 0
+    $body = [System.Collections.Generic.List[string]]::new()
+    foreach ($line in $lines) {
+      if ($line -eq '---') {
+        $frontmatterCount++
+        if ($frontmatterCount -eq 1) { $inFrontmatter = $true; continue }
+        if ($frontmatterCount -eq 2) { $inFrontmatter = $false; continue }
+      }
+      if (-not $inFrontmatter -and $frontmatterCount -ge 2) {
+        $body.Add($line) | Out-Null
+      }
+    }
+    return ($body -join "`n")
+  }
+  $repoBody = Get-PromptBodyWithoutFrontmatter -Path $repoCommitStaged
+  $userBody = Get-PromptBodyWithoutFrontmatter -Path $userCommitStaged
+  if ($repoBody -ne $userBody) {
+    Write-ErrorMessage 'commit-staged.prompt.md body mismatch between repo and user overlay'
+    $failed = $true
+  } else {
+    Write-Output 'check: commit-staged prompt bodies match.'
+  }
+
+  $instructionFiles = Get-ChildItem -Path (Join-Path $r '.agents\instructions') -Filter '*.instructions.md' -File
+  foreach ($instr in $instructionFiles) {
+    $content = Get-Content -LiteralPath $instr.FullName -Raw
+    if ($content -notmatch '(?ms)\A---\s*\r?\n.*?\r?\n---') {
+      Write-ErrorMessage "$($instr.FullName): missing YAML frontmatter"
+      $failed = $true
+      continue
+    }
+    if ($content -notmatch '(?m)^description:\s*"Use when') {
+      Write-ErrorMessage "$($instr.FullName): description must start with \"Use when\""
+      $failed = $true
+    }
+    if ($content -notmatch '(?m)^name:\s*') {
+      Write-ErrorMessage "$($instr.FullName): missing name frontmatter field"
+      $failed = $true
+    }
+    if ($content -notmatch '(?m)^applyTo:\s*') {
+      Write-ErrorMessage "$($instr.FullName): missing applyTo frontmatter field"
+      $failed = $true
+    }
+  }
+
+  $stalePattern = 'vm-guest-identity|activation-naming|app-config-management|host-and-os-naming|repo-structure'
+  $staleHits = Get-ChildItem -Path $r -Recurse -File |
+    Where-Object {
+      $_.FullName -notmatch '[\\/]\.git[\\/]' -and
+      $_.Name -notin @('14-repository-policy.sh', '14-repository-policy.ps1', 'agents-policy-tests.sh')
+    } |
+    Select-String -Pattern $stalePattern -SimpleMatch:$false
+  if ($staleHits) {
+    foreach ($hit in $staleHits) {
+      Write-ErrorMessage "stale .agents reference: $($hit.Path):$($hit.LineNumber): $($hit.Line.Trim())"
+    }
+    $failed = $true
+  } else {
+    Write-Output 'check: no stale .agents instruction references found.'
+  }
+
   if ($failed) {
     Write-ErrorMessage "repository policy check failed"
     return $false

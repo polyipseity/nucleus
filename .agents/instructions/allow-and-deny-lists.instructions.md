@@ -1,5 +1,5 @@
 ---
-description: "Canonical registry of all hard-coded denylists and allowlists. Policy: eliminate (T1), self-prune (T2), or track (T3). Review quarterly."
+description: "Use when authoring or reviewing hard-coded denylists and allowlists. Canonical registry; policy: eliminate (T1), self-prune (T2), or track (T3). Review quarterly."
 name: "Allow and Deny List Policy"
 applyTo: "**"
 ---
