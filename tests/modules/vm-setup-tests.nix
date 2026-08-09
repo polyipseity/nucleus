@@ -1155,7 +1155,7 @@ let
   utmConfigPlistText = builtins.readFile ../../src/modules/configs/vms/utm-config.plist.xml;
   vms_json_text = builtins.readFile ../../src/modules/VMs.json;
   vm_guest_json_text = builtins.readFile ../../src/users/default/vm-guest.json;
-  user_secret_text = builtins.readFile ../../src/secrets/users/polyipseity.yml;
+  user_secret_text = builtins.readFile ../fixtures/user-registry/src/secrets/users/test-user.yml;
   vms_windows_packer_text = builtins.readFile ../../src/vms/Windows/packer.pkr.hcl;
   vms_windows_autounattend_text = builtins.readFile ../../src/vms/Windows/Autounattend.xml;
   vms_macos_packer_text = builtins.readFile ../../src/vms/macOS/packer.pkr.hcl;
@@ -1478,12 +1478,12 @@ let
   test_guest_credentials_policy_in_user_registries = assert' (
     (lib.hasInfix "\"usernameSecretKey\": \"vm_guest_username\"" vm_guest_json_text)
     && (lib.hasInfix "\"passwordSecretKey\": \"vm_guest_password\"" vm_guest_json_text)
-  ) "polyipseity vm-guest.json must declare vmGuest secret-key references";
+  ) "default vm-guest.json must declare vmGuest secret-key references";
 
   test_guest_credentials_policy_in_user_secrets = assert' (
     (lib.hasInfix "vm_guest_username:" user_secret_text)
     && (lib.hasInfix "vm_guest_password:" user_secret_text)
-  ) "users/polyipseity.yml must contain secret-backed VM guest username/password keys";
+  ) "fixture test-user.yml must contain secret-backed VM guest username/password keys";
 
   test_guest_credentials_policy_in_vm_setup_sh =
     assert'

@@ -6,7 +6,7 @@
     Static analysis tests (parse files, do not execute). Guarantees the
     credential-unification invariant from the user-registry refactor:
     Resolve-VMGuestCredential reads the assembled src/users/ registry,
-    vm-guest.json declares secret-key references for polyipseity, and
+    vm-guest.json declares secret-key references for the fixture user, and
     vm.sh uses load-user-registry.sh.
 .NOTES
     Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/system/vm-guest-credential.Tests.ps1 -Passthru"
@@ -18,7 +18,7 @@ BeforeAll {
 
   $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
   $InvokeVMSetupPath = Join-Path $RepoRoot "src\platforms\Windows\modules\system\Invoke-VMSetup.ps1"
-  $VmGuestJsonPath = Join-Path $RepoRoot "src\users\polyipseity\vm-guest.json"
+  $VmGuestJsonPath = Join-Path $RepoRoot "src\users\default\vm-guest.json"
   $VmShPath = Join-Path $RepoRoot "scripts\vm.sh"
   $LoadUserRegistryPath = Join-Path $RepoRoot "src\scripts\lib\load-user-registry.sh"
 
@@ -43,13 +43,13 @@ Describe "Resolve-VMGuestCredential reads the assembled src/users/ registry" {
   }
 }
 
-Describe "polyipseity vm-guest.json declares secret-key references" {
-  It "src\users\polyipseity\vm-guest.json declares usernameSecretKey" {
+Describe "default vm-guest.json declares secret-key references" {
+  It "src\users\default\vm-guest.json declares usernameSecretKey" {
     $vmGuest = Get-VmGuestJson
     $vmGuest.usernameSecretKey | Should -Be 'vm_guest_username'
   }
 
-  It "src\users\polyipseity\vm-guest.json declares passwordSecretKey" {
+  It "src\users\default\vm-guest.json declares passwordSecretKey" {
     $vmGuest = Get-VmGuestJson
     $vmGuest.passwordSecretKey | Should -Be 'vm_guest_password'
   }

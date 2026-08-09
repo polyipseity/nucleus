@@ -4,20 +4,17 @@
 
 let
   lib = import <nixpkgs/lib>;
+  fixtures = import ../../../fixtures/fixtures.nix { };
+  inherit (fixtures) fixtureUsername loadFixtureRegistry;
+
   macosModuleText = builtins.readFile ../../../../src/platforms/macOS/modules/default.nix;
   shellModuleText = builtins.readFile ../../../../src/modules/shell.nix;
-  # The zsh hook functions (chpwd, precmd, mkdir wrapper) live in an external
-  # script embedded into shell.nix's initContent via builtins.readFile.
   icloudHooksText = builtins.readFile ../../../../src/platforms/macOS/scripts/macos-install-icloud-hooks.zsh;
-  usersRegistry = import ../../../../src/modules/lib/users-registry.nix {
-    inherit lib;
-    repoRoot = ../../../..;
-    hostName = "MacBook";
-  };
+  usersRegistry = loadFixtureRegistry "MacBook";
 
   inherit (import ../../../lib.nix) assert';
 
-  user = usersRegistry.polyipseity;
+  user = usersRegistry.${fixtureUsername};
   excludedDirNames = user.iCloudExclusions.excludedDirNames;
   managedRoots = user.iCloudExclusions.managedRoots;
 
@@ -33,7 +30,7 @@ let
           "Library/Mobile Documents/iCloud~md~obsidian"
         ]
       )
-      "src/users/ registry must define the exact centralized iCloudExclusions.managedRoots list for polyipseity";
+      "src/users/ registry must define the exact centralized iCloudExclusions.managedRoots list for test-user";
 
   test_managed_roots_are_mobile_documents_only = assert' (builtins.all
     (root: lib.hasPrefix "Library/Mobile Documents/" root)
