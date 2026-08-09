@@ -1,7 +1,7 @@
 ---
 description: "Use when adding, renaming, or reviewing activation entries, or adding or editing activation scripts in Nix modules. Covers naming conventions, the activation bundle architecture, inline activation rules, standalone script patterns (for launchd/systemd), prohibited patterns, and conventions."
 name: "Activation Script Conventions"
-applyTo: "src/**/*.nix, src/hosts/**/services/*.nix, src/scripts/**/*.sh"
+applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/**/services/*.nix, src/scripts/**/*.sh, src/modules/terminal-activations.nix, src/hosts/Windows/apply.ps1, src/platforms/Windows/modules/system/Sync-TerminalActivation.ps1"
 ---
 
 # Activation scripts and naming
@@ -207,3 +207,19 @@ text = ''
 ### Exception documentation
 
 Every exception to these rules must have an inline `# WHY:` comment in the Nix expression explaining the technical constraint that prevents using the standard pattern.
+
+## Terminal activations (last resort)
+
+Terminal activations (`nucleus.terminalActivations`) are a **LAST RESORT**. Never add a new entry unless **all three** criteria are met:
+
+1. **TCC constraint**: the command MUST run in the user's terminal context (outside sudo/Nix activation) — typically because macOS TCC grants (Full Disk Access, Accessibility) are required and would be lost inside the sudo process tree during `darwin-rebuild switch`.
+2. **No alternative**: the command cannot be refactored into a Nix declarative option, a Home Manager activation entry, or a system activation script that runs inside the rebuild.
+3. **Documented constraint**: the technical constraint is documented inline with a `# WHY: terminal-activations (last resort):` comment at the call site.
+
+If a command does not need TCC-sensitive context (FDA, Accessibility, Screen Recording, Automation), it **SHOULD** run as a normal Nix/Home Manager activation entry. Terminal activations are inherently imperative (eval'd from a manifest file) and bypass the declarative Nix model — each use erodes reproducibility.
+
+Every `nucleus.terminalActivations` entry in `.nix` files must have a `# WHY: terminal-activations (last resort):` comment immediately before it, explaining why the Nix activation path cannot work for that specific command.
+
+macOS `darwin-rebuild switch` runs as root (via sudo). Activation scripts executing inside that process tree lose macOS TCC grants. Terminal activations escape the sudo process tree, so TCC grants are inherited from the user's shell session. On Linux and Windows there is no TCC concept — if a terminal activation is added for a non-macOS host, it must have an equally compelling reason documented.
+
+See `src/modules/terminal-activations.nix` for the canonical module definition and policy text.
