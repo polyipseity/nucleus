@@ -26,10 +26,11 @@ run_01_nix_tests() {
     return "$_exit_code"
   fi
 
-  # WHY: nix-instantiate evals contend on the shared SQLite eval cache when
-  # test steps 1/4/5 run concurrently; hold the nix lock for the whole eval
-  # phase so cross-step nix invocations serialize (internal xargs -P
-  # parallelism is preserved).
+  # WHY: nix-instantiate evals contend on the shared SQLite eval cache and
+  # ~/.cache/nix/flake-registry.json when test steps 1/4/5 run concurrently;
+  # hold the nix lock for the whole eval phase so cross-step nix invocations
+  # serialize. Evals run serially (xargs -P 1) because parallel imports of
+  # <nixpkgs> race on flake-registry updates.
   nucleus_nix_locked _run_01_eval_phase "$_tmp_failed"
 
   if [ -s "$_tmp_failed" ]; then
@@ -45,7 +46,7 @@ run_01_nix_tests() {
   return "$_exit_code"
 }
 
-# Runs the parallel nix-instantiate phase under the nix lock (see
+# Runs the serial nix-instantiate phase under the nix lock (see
 # nucleus_nix_locked in step-runner.sh). Failures are recorded in the temp
 # file passed as $1; the lock wrapper's exit status is not a test verdict.
 _run_01_eval_phase() {
@@ -53,7 +54,7 @@ _run_01_eval_phase() {
 
   if [ "$quiet_mode" = true ]; then
     # shellcheck disable=SC2016 # reason: $1/$2 are sh -c positional params, not shell expansion
-    printf '%s\0' "${TEST_NIX_FILES_ARR[@]}" | xargs -0 -P "$PARALLEL_JOBS" -I{} sh -c '
+    printf '%s\0' "${TEST_NIX_FILES_ARR[@]}" | xargs -0 -P 1 -I{} sh -c '
           f="$1"; tmp="$2"
           if out=$(nix-instantiate --eval --strict "$f" 2>&1); then
             true
@@ -65,7 +66,7 @@ _run_01_eval_phase() {
         ' _ {} "$_tmp_failed"
   else
     # shellcheck disable=SC2016 # reason: $1/$2 are sh -c positional params, not shell expansion
-    printf '%s\0' "${TEST_NIX_FILES_ARR[@]}" | xargs -0 -P "$PARALLEL_JOBS" -I{} sh -c '
+    printf '%s\0' "${TEST_NIX_FILES_ARR[@]}" | xargs -0 -P 1 -I{} sh -c '
           f="$1"
           echo "Testing: $f" >&2
           if ! nix-instantiate --eval --strict "$f"; then
