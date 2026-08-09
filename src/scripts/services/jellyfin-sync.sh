@@ -25,31 +25,31 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    --repo-root)
-      REPO_ROOT="$2"
-      shift 2
-      ;;
-    --jellyfin-base-url)
-      JELLYFIN_BASE_URL="$2"
-      shift 2
-      ;;
-    --jq-path)
-      _JFS_JQ_PATH="$2"
-      shift 2
-      ;;
-    --sops-path)
-      _JFS_SOPS_PATH="$2"
-      shift 2
-      ;;
-    *)
-      printf '%s: unknown argument: %s\n' "$(basename "$0")" "$1" >&2
-      usage >&2
-      exit 1
-      ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --repo-root)
+    REPO_ROOT="$2"
+    shift 2
+    ;;
+  --jellyfin-base-url)
+    JELLYFIN_BASE_URL="$2"
+    shift 2
+    ;;
+  --jq-path)
+    _JFS_JQ_PATH="$2"
+    shift 2
+    ;;
+  --sops-path)
+    _JFS_SOPS_PATH="$2"
+    shift 2
+    ;;
+  *)
+    printf '%s: unknown argument: %s\n' "$(basename "$0")" "$1" >&2
+    usage >&2
+    exit 1
+    ;;
   esac
 done
 
@@ -149,7 +149,7 @@ _jfs_sync_accounts() {
         usernameSecretKey: .usernameSecretKey,
         passwordSecretKey: .passwordSecretKey
       }
-  ' <<< "$_jfsa_users_registry" > "$_jfsa_specs_file"
+  ' <<<"$_jfsa_users_registry" >"$_jfsa_specs_file"
 
   if [ ! -s "$_jfsa_specs_file" ]; then
     rm -f "$_jfsa_specs_file" "$_jfsa_resolved_file"
@@ -196,8 +196,8 @@ _jfs_sync_accounts() {
       --arg username "$_jfsa_username" \
       --arg password "$_jfsa_password" \
       --argjson isAdmin "$_jfsa_is_admin_spec" \
-      '{owner:$owner,id:$id,username:$username,password:$password,isAdmin:$isAdmin}' >> "$_jfsa_resolved_file"
-  done < "$_jfsa_specs_file"
+      '{owner:$owner,id:$id,username:$username,password:$password,isAdmin:$isAdmin}' >>"$_jfsa_resolved_file"
+  done <"$_jfsa_specs_file"
 
   rm -f "$_jfsa_specs_file"
   if [ ! -s "$_jfsa_resolved_file" ]; then
@@ -250,7 +250,7 @@ _jfs_sync_accounts() {
       _jfsa_admin_token="$_jfsa_token"
       break
     fi
-  done < "$_jfsa_resolved_file"
+  done <"$_jfsa_resolved_file"
 
   if [ -z "$_jfsa_admin_token" ]; then
     _jfsa_bootstrap_account="$(head -n 1 "$_jfsa_resolved_file")"
@@ -369,7 +369,7 @@ _jfs_sync_accounts() {
     else
       printf '%s\n' "jellyfin: failed to update password for account '$_jfsa_username' (HTTP $_jfsa_password_status)" >&2
     fi
-  done < "$_jfsa_resolved_file"
+  done <"$_jfsa_resolved_file"
 
   rm -f "$_jfsa_resolved_file"
 }
@@ -444,7 +444,7 @@ _jfs_sync_libraries() {
         paths: (.paths // []),
         options: .options
       }
-  ' <<< "$_jfsl_users_registry" > "$_jfsl_specs_file"
+  ' <<<"$_jfsl_users_registry" >"$_jfsl_specs_file"
 
   while IFS= read -r _jfsl_spec; do
     _jfsl_owner="$(printf '%s' "$_jfsl_spec" | jq -r '.owner')"
@@ -464,7 +464,7 @@ _jfs_sync_libraries() {
     jq -cr --arg owner "$_jfsl_owner" '
       .[$owner].jellyfin.accounts // [] | .[]
       | {owner: $owner} + .
-    ' <<< "$_jfsl_users_registry" 2>/dev/null | while IFS= read -r _jfsl_account; do
+    ' <<<"$_jfsl_users_registry" 2>/dev/null | while IFS= read -r _jfsl_account; do
       _jfsl_user_key="$(printf '%s' "$_jfsl_account" | jq -r '.usernameSecretKey // empty')"
       _jfsl_pass_key="$(printf '%s' "$_jfsl_account" | jq -r '.passwordSecretKey // empty')"
       if [ -z "$_jfsl_user_key" ] || [ -z "$_jfsl_pass_key" ]; then
@@ -477,7 +477,7 @@ _jfs_sync_libraries() {
       fi
       printf '%s\n' "$(jq -cn --arg owner "$_jfsl_owner" --arg username "$_jfsl_username" --arg password "$_jfsl_password" '{owner:$owner,username:$username,password:$password}')"
     done
-  done < "$_jfsl_specs_file" > "$_jfsl_creds_file"
+  done <"$_jfsl_specs_file" >"$_jfsl_creds_file"
 
   if [ ! -s "$_jfsl_specs_file" ]; then
     rm -f "$_jfsl_specs_file" "$_jfsl_creds_file"
@@ -503,8 +503,8 @@ _jfs_sync_libraries() {
       --arg collectionType "$_jfsl_collection_type" \
       --argjson paths "$_jfsl_resolved_paths_json" \
       --argjson options "$_jfsl_options" \
-      '{owner:$owner,name:$name,collectionType:$collectionType,paths:$paths,options:$options}' >> "$_jfsl_resolved_file"
-  done < "$_jfsl_specs_file"
+      '{owner:$owner,name:$name,collectionType:$collectionType,paths:$paths,options:$options}' >>"$_jfsl_resolved_file"
+  done <"$_jfsl_specs_file"
 
   rm -f "$_jfsl_specs_file"
 
@@ -515,13 +515,13 @@ _jfs_sync_libraries() {
 
   _jfsl_merged_file="$(mktemp)"
   _jfsl_merge_input="$(mktemp)"
-  while IFS= read -r _jfsl_line; do printf '%s\n' "$_jfsl_line"; done < "$_jfsl_resolved_file" > "$_jfsl_merge_input"
+  while IFS= read -r _jfsl_line; do printf '%s\n' "$_jfsl_line"; done <"$_jfsl_resolved_file" >"$_jfsl_merge_input"
   jq -s '
     group_by(.name | ascii_downcase)
     | map(.[0])
     | to_entries
     | map(.value)
-  ' "$_jfsl_merge_input" > "$_jfsl_merged_file" 2>/dev/null || cat "$_jfsl_resolved_file" > "$_jfsl_merged_file"
+  ' "$_jfsl_merge_input" >"$_jfsl_merged_file" 2>/dev/null || cat "$_jfsl_resolved_file" >"$_jfsl_merged_file"
   rm -f "$_jfsl_merge_input"
 
   rm -f "$_jfsl_resolved_file"
@@ -569,7 +569,7 @@ _jfs_sync_libraries() {
       _jfsl_admin_token="$_jfsl_token"
       break
     fi
-  done < "$_jfsl_creds_file"
+  done <"$_jfsl_creds_file"
 
   if [ -z "$_jfsl_admin_token" ]; then
     _jfsl_bootstrap_cred="$(head -n 1 "$_jfsl_creds_file")"
@@ -690,10 +690,10 @@ _jfs_sync_libraries() {
     if [ -z "$_jfsl_existing_item_id" ]; then
       _jfsl_query_params="name=$(printf '%s' "$_jfsl_name" | jq -sRr @uri)&collectionType=$(printf '%s' "$_jfsl_collection_type" | jq -sRr @uri)"
       _jfsl_paths_file="$(mktemp)"
-      printf '%s' "$_jfsl_paths" | jq -r '.[]' > "$_jfsl_paths_file"
+      printf '%s' "$_jfsl_paths" | jq -r '.[]' >"$_jfsl_paths_file"
       while IFS= read -r _jfsl_path; do
         _jfsl_query_params="$_jfsl_query_params&paths=$(printf '%s' "$_jfsl_path" | jq -sRr @uri)"
-      done < "$_jfsl_paths_file"
+      done <"$_jfsl_paths_file"
       rm -f "$_jfsl_paths_file"
       _jfsl_create_payload="$(jq -cn --argjson options "$_jfsl_library_options" --argjson paths "$_jfsl_paths" '{LibraryOptions:$options,Paths:$paths,RefreshLibrary:true}')"
       _jfsl_create_response="$(_jfs_api_request POST "/Library/VirtualFolders?${_jfsl_query_params}" "$_jfsl_admin_token" "$_jfsl_create_payload")"
@@ -710,8 +710,8 @@ _jfs_sync_libraries() {
         | .[0]
         | .LibraryOptions // null
       ')"
-      if [ "$_jfsl_current_options" != "null" ] \
-        && _jfs_library_options_match "$_jfsl_current_options" "$_jfsl_library_options"; then
+      if [ "$_jfsl_current_options" != "null" ] &&
+        _jfs_library_options_match "$_jfsl_current_options" "$_jfsl_library_options"; then
         continue
       fi
       _jfsl_update_payload="$(jq -cn --arg id "$_jfsl_existing_item_id" --argjson options "$_jfsl_library_options" '{Id:$id,LibraryOptions:$options}')"

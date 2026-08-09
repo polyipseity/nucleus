@@ -21,18 +21,18 @@ cd "$(dirname "$0")/.." || exit 1
 
 # shellcheck disable=SC1001 # reason: Windows named-pipe path must keep backslashes verbatim (unquoted per original; bash would otherwise consume them)
 '__QEMU_SYSTEM__' \
-    -name '__VM_DISPLAY__' \
-    -machine __MACHINE__ \
-    -cpu __CPU__ \
-    -smp __CPUS__ \
-    -m __RAM_BYTES__B \
-    -drive file='__DISK_PATH__',format=qcow2,if=virtio \
-    -netdev user,id=net0,__HOSTFWDS__ \
-    -device virtio-net-pci,netdev=net0 \
-    -vga __VGA__ \
-    -display __DISPLAY_BACKEND__ \
-    -rtc base=localtime \
-    -chardev pipe,id=qga,path=\\.\pipe\qga-__VM_ID__ \
-    -device virtio-serial \
-    -device virtserialport,chardev=qga,name=org.qemu.guest_agent.0 \
-    -usb -device usb-tablet
+  -name '__VM_DISPLAY__' \
+  -machine __MACHINE__ \
+  -cpu __CPU__ \
+  -smp __CPUS__ \
+  -m __RAM_BYTES__B \
+  -drive file='__DISK_PATH__',format=qcow2,if=virtio \
+  -netdev user,id=net0,__HOSTFWDS__ \
+  -device virtio-net-pci,netdev=net0 \
+  -vga __VGA__ \
+  -display __DISPLAY_BACKEND__ \
+  -rtc base=localtime \
+  -chardev pipe,id=qga,path=\\.\pipe\qga-__VM_ID__ \
+  -device virtio-serial \
+  -device virtserialport,chardev=qga,name=org.qemu.guest_agent.0 \
+  -usb -device usb-tablet

@@ -4,7 +4,6 @@
 
 set -euo pipefail
 
-
 _wss_sentinel="$1"
 _wss_deadline=30
 _wss_waited=0

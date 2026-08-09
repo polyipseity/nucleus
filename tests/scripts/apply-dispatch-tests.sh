@@ -43,9 +43,9 @@ test_scripts_apply_delegates_to_src() {
 
 test_nucleus_wrappers_prefer_live_checkout() {
   # shellcheck disable=SC2016 # reason: literal grep pattern for flake.nix wrapper dispatch
-  if grep -Fq '/etc/nucleus/repo-root' "$FLAKE_NIX" \
-    && grep -Fq '_repo_root/${scriptName}.sh' "$FLAKE_NIX" \
-    && grep -Fq 'writeText "nucleus-repo-root"' "$FLAKE_NIX"; then
+  if grep -Fq '/etc/nucleus/repo-root' "$FLAKE_NIX" &&
+    grep -Fq '_repo_root/${scriptName}.sh' "$FLAKE_NIX" &&
+    grep -Fq 'writeText "nucleus-repo-root"' "$FLAKE_NIX"; then
     assert_pass "flake nucleus wrappers prefer live checkout scripts"
   else
     assert_fail "flake nucleus wrappers prefer live checkout scripts" "missing live-script dispatch or marker fix"

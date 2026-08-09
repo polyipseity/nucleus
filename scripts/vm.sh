@@ -21,8 +21,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
@@ -101,8 +101,8 @@ resolve_vm_guest_credentials() {
     return 1
   fi
 
-  _rvgc_username_key="$(jq -r --arg owner "$_rvgc_owner" '.[ $owner ].vmGuest.usernameSecretKey // empty' <<< "$_rvgc_users_registry")"
-  _rvgc_password_key="$(jq -r --arg owner "$_rvgc_owner" '.[ $owner ].vmGuest.passwordSecretKey // empty' <<< "$_rvgc_users_registry")"
+  _rvgc_username_key="$(jq -r --arg owner "$_rvgc_owner" '.[ $owner ].vmGuest.usernameSecretKey // empty' <<<"$_rvgc_users_registry")"
+  _rvgc_password_key="$(jq -r --arg owner "$_rvgc_owner" '.[ $owner ].vmGuest.passwordSecretKey // empty' <<<"$_rvgc_users_registry")"
   if [ -z "$_rvgc_username_key" ] || [ -z "$_rvgc_password_key" ]; then
     error "vmGuest secret-key references are missing for user $_rvgc_owner in user registry"
     return 1
@@ -247,35 +247,109 @@ vm_args=()
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    -h|--help) usage; exit 0 ;;
-    --dry-run) dry_run=true; shift ;;
-    --accept-gsi-license) accept_gsi_license=true; shift ;;
-    --no-accept-gsi-license) accept_gsi_license=false; shift ;;
-    --windows-iso) windows_iso="$2"; shift 2 ;;
-    --windows-iso-source) windows_iso_source="$2"; shift 2 ;;
-    --windows-iso-retries) windows_iso_retries="$2"; shift 2 ;;
-    --headful) windows_headless=false; shift ;;
-    --no-headful) windows_headless=true; shift ;;
-    --accelerator) accelerator="$2"; shift 2 ;;
-    --gc) gc_mode=true; shift ;;
-    --no-gc) gc_mode=false; shift ;;
-    --gc-disabled) gc_disabled_mode=true; shift ;;
-    --no-gc-disabled) gc_disabled_mode=false; shift ;;
-    --gc-data) gc_data_mode=true; shift ;;
-    --no-gc-data) gc_data_mode=false; shift ;;
-    --force) force=true; shift ;;
-    --allow-shrink) allow_shrink=true; shift ;;
-    --vm-dir-override) vm_dir_override="$2"; shift 2 ;;
-    --mido-patch-file) NUCLEUS_MIDO_PATCH_FILE="$2"; shift 2 ;;
-    --mido-script) NUCLEUS_MIDO_SCRIPT="$2"; shift 2 ;;
-    --json) json_output=true; shift ;;
-    --repo-root) repo_root_override="$2"; shift 2 ;;
-    setup|sync|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack)
-      action="$1"; shift
-      vm_args=("$@")
-      break
-      ;;
-    *) error "unsupported argument '$1'" ; usage >&2 ; exit 1 ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --dry-run)
+    dry_run=true
+    shift
+    ;;
+  --accept-gsi-license)
+    accept_gsi_license=true
+    shift
+    ;;
+  --no-accept-gsi-license)
+    accept_gsi_license=false
+    shift
+    ;;
+  --windows-iso)
+    windows_iso="$2"
+    shift 2
+    ;;
+  --windows-iso-source)
+    windows_iso_source="$2"
+    shift 2
+    ;;
+  --windows-iso-retries)
+    windows_iso_retries="$2"
+    shift 2
+    ;;
+  --headful)
+    windows_headless=false
+    shift
+    ;;
+  --no-headful)
+    windows_headless=true
+    shift
+    ;;
+  --accelerator)
+    accelerator="$2"
+    shift 2
+    ;;
+  --gc)
+    gc_mode=true
+    shift
+    ;;
+  --no-gc)
+    gc_mode=false
+    shift
+    ;;
+  --gc-disabled)
+    gc_disabled_mode=true
+    shift
+    ;;
+  --no-gc-disabled)
+    gc_disabled_mode=false
+    shift
+    ;;
+  --gc-data)
+    gc_data_mode=true
+    shift
+    ;;
+  --no-gc-data)
+    gc_data_mode=false
+    shift
+    ;;
+  --force)
+    force=true
+    shift
+    ;;
+  --allow-shrink)
+    allow_shrink=true
+    shift
+    ;;
+  --vm-dir-override)
+    vm_dir_override="$2"
+    shift 2
+    ;;
+  --mido-patch-file)
+    NUCLEUS_MIDO_PATCH_FILE="$2"
+    shift 2
+    ;;
+  --mido-script)
+    NUCLEUS_MIDO_SCRIPT="$2"
+    shift 2
+    ;;
+  --json)
+    json_output=true
+    shift
+    ;;
+  --repo-root)
+    repo_root_override="$2"
+    shift 2
+    ;;
+  setup | sync | list | status | start | stop | upgrade | reset | android-config | gc | resize | pack | unpack)
+    action="$1"
+    shift
+    vm_args=("$@")
+    break
+    ;;
+  *)
+    error "unsupported argument '$1'"
+    usage >&2
+    exit 1
+    ;;
   esac
 done
 
@@ -286,54 +360,58 @@ done
 filtered_vm_args=()
 for arg in "${vm_args[@]}"; do
   case "$arg" in
-    --json) json_output=true ;;
-    --dry-run) dry_run=true ;;
-    --gc) gc_mode=true ;;
-    --no-gc) gc_mode=false ;;
-    --gc-disabled) gc_disabled_mode=true ;;
-    --no-gc-disabled) gc_disabled_mode=false ;;
-    --gc-data) gc_data_mode=true ;;
-    --no-gc-data) gc_data_mode=false ;;
-    --force) force=true ;;
-    --allow-shrink) allow_shrink=true ;;
-    --accept-gsi-license) accept_gsi_license=true ;;
-    --no-accept-gsi-license) accept_gsi_license=false ;;
-    --headful) windows_headless=false ;;
-    --no-headful) windows_headless=true ;;
-    --) break ;;
-    -*)
-      case "$action" in
-        android-config)
-          case "$arg" in
-            --gapps|--adb-keys|--magisk|--root|--fake-wifi|--fake-wifi-revert|-h|--help)
-              filtered_vm_args+=("$arg")
-              ;;
-            *) warn "ignoring unknown flag after subcommand: $arg" ;;
-          esac
-          ;;
-        *) warn "ignoring unknown flag after subcommand: $arg" ;;
+  --json) json_output=true ;;
+  --dry-run) dry_run=true ;;
+  --gc) gc_mode=true ;;
+  --no-gc) gc_mode=false ;;
+  --gc-disabled) gc_disabled_mode=true ;;
+  --no-gc-disabled) gc_disabled_mode=false ;;
+  --gc-data) gc_data_mode=true ;;
+  --no-gc-data) gc_data_mode=false ;;
+  --force) force=true ;;
+  --allow-shrink) allow_shrink=true ;;
+  --accept-gsi-license) accept_gsi_license=true ;;
+  --no-accept-gsi-license) accept_gsi_license=false ;;
+  --headful) windows_headless=false ;;
+  --no-headful) windows_headless=true ;;
+  --) break ;;
+  -*)
+    case "$action" in
+    android-config)
+      case "$arg" in
+      --gapps | --adb-keys | --magisk | --root | --fake-wifi | --fake-wifi-revert | -h | --help)
+        filtered_vm_args+=("$arg")
+        ;;
+      *) warn "ignoring unknown flag after subcommand: $arg" ;;
       esac
       ;;
-    *) filtered_vm_args+=("$arg") ;;
+    *) warn "ignoring unknown flag after subcommand: $arg" ;;
+    esac
+    ;;
+  *) filtered_vm_args+=("$arg") ;;
   esac
 done
 
-[ -z "$action" ] && { error "missing action (setup, sync, list, status, start, stop, upgrade, reset, android-config, gc, resize, pack, unpack)" ; usage >&2 ; exit 1; }
+[ -z "$action" ] && {
+  error "missing action (setup, sync, list, status, start, stop, upgrade, reset, android-config, gc, resize, pack, unpack)"
+  usage >&2
+  exit 1
+}
 
 # Validate scalars
 # WHY: validating before dispatch fails fast with a precise message instead
 # of surfacing the same error deep inside a subcommand build.
 case "$windows_iso_source" in
-  auto|url|mido|'') ;;
-  *)
-    error "invalid --windows-iso-source value: $windows_iso_source; expected one of: auto, url, mido"
-    ;;
+auto | url | mido | '') ;;
+*)
+  error "invalid --windows-iso-source value: $windows_iso_source; expected one of: auto, url, mido"
+  ;;
 esac
 
 case "$windows_iso_retries" in
-  ''|*[!0-9]*)
-    error "invalid --windows-iso-retries value: $windows_iso_retries; expected a non-negative integer"
-    ;;
+'' | *[!0-9]*)
+  error "invalid --windows-iso-retries value: $windows_iso_retries; expected a non-negative integer"
+  ;;
 esac
 
 # ---------------------------------------------------------------------------
@@ -391,15 +469,15 @@ vm_prepare_vm_command() {
 
   if [ -z "$accelerator" ]; then
     case "$(uname -s)" in
-      Darwin)
-        if [ "$(uname -m)" = "arm64" ]; then
-          accelerator='tcg'
-        else
-          accelerator='hvf'
-        fi
-        ;;
-      Linux)  accelerator='kvm' ;;
-      *)      accelerator='tcg' ;;
+    Darwin)
+      if [ "$(uname -m)" = "arm64" ]; then
+        accelerator='tcg'
+      else
+        accelerator='hvf'
+      fi
+      ;;
+    Linux) accelerator='kvm' ;;
+    *) accelerator='tcg' ;;
     esac
   fi
 
@@ -414,7 +492,7 @@ vm_prepare_vm_command() {
     export NUCLEUS_VM_GUEST_USERNAME="$vm_guest_username"
     export NUCLEUS_VM_GUEST_PASSWORD="$vm_guest_password"
 
-    vm_guest_ssh_public_key="$(vm_resolve_guest_ssh_public_key "$vm_guest_username" "$REPO_ROOT")" || true  # check-suppress:suppression_doc: vm_resolve_guest_ssh_public_key may fail when no guest SSH key exists; an empty value skips key provisioning
+    vm_guest_ssh_public_key="$(vm_resolve_guest_ssh_public_key "$vm_guest_username" "$REPO_ROOT")" || true # check-suppress:suppression_doc: vm_resolve_guest_ssh_public_key may fail when no guest SSH key exists; an empty value skips key provisioning
     if [ -n "$vm_guest_ssh_public_key" ]; then
       export NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY="$vm_guest_ssh_public_key"
     else
@@ -458,20 +536,20 @@ do_setup() {
 
   # Host-specific provisioners
   case "$(uname -s)" in
-    Darwin)
-      vm_setup_tart_vms
-      vm_setup_utm_vms
-      ;;
-    Linux)
-      if [ -f /etc/NIXOS ]; then
-        vm_setup_libvirt_vms
-      else
-        say "unsupported Linux host"
-      fi
-      ;;
-    MINGW*|MSYS*|CYGWIN*)
-      vm_setup_windows_qemu_vms
-      ;;
+  Darwin)
+    vm_setup_tart_vms
+    vm_setup_utm_vms
+    ;;
+  Linux)
+    if [ -f /etc/NIXOS ]; then
+      vm_setup_libvirt_vms
+    else
+      say "unsupported Linux host"
+    fi
+    ;;
+  MINGW* | MSYS* | CYGWIN*)
+    vm_setup_windows_qemu_vms
+    ;;
   esac
 
   if [ "$gc_mode" = true ]; then
@@ -504,7 +582,7 @@ do_list() {
   require_command jq
 
   local running_names
-  running_names="$(vm_get_running_ids)" || true  # check-suppress:suppression_doc: vm_get_running_ids may exit non-zero when no VMs match; the empty list is handled downstream
+  running_names="$(vm_get_running_ids)" || true # check-suppress:suppression_doc: vm_get_running_ids may exit non-zero when no VMs match; the empty list is handled downstream
 
   if $json_output; then
     # Annotate each VM with its state.
@@ -539,7 +617,7 @@ do_status() {
   require_command jq
 
   local running_names
-  running_names="$(vm_get_running_ids)" || true  # check-suppress:suppression_doc: vm_get_running_ids may exit non-zero when no VMs match; the empty list is handled downstream
+  running_names="$(vm_get_running_ids)" || true # check-suppress:suppression_doc: vm_get_running_ids may exit non-zero when no VMs match; the empty list is handled downstream
 
   # Build base filter: enabled VMs matching the current host.
   # Names are passed via --argjson when filtering specific VMs.
@@ -561,12 +639,12 @@ do_status() {
 
   if $json_output; then
     if [ -n "$names_json" ]; then
-      jq -c --arg host "$NUCLEUS_HOST" --argjson names "$names_json" "$base_filter" "$MANIFEST" | \
+      jq -c --arg host "$NUCLEUS_HOST" --argjson names "$names_json" "$base_filter" "$MANIFEST" |
         jq -c --arg running "$running_names" '
           [.[] | .state = (if $running| split("\n") | index(.id) then "running" else "stopped" end)]
         '
     else
-      jq -c --arg host "$NUCLEUS_HOST" "$base_filter" "$MANIFEST" | \
+      jq -c --arg host "$NUCLEUS_HOST" "$base_filter" "$MANIFEST" |
         jq -c --arg running "$running_names" '
           [.[] | .state = (if $running| split("\n") | index(.id) then "running" else "stopped" end)]
         '
@@ -587,7 +665,7 @@ do_status() {
     fi | while IFS=$'\t' read -r name type enabled hosts cpus ram id; do
       local ram_bytes ram_gib
       ram_bytes="$(parse_size "$ram")"
-      ram_gib="$(( (ram_bytes + 500000000) / 1000000000 ))"
+      ram_gib="$(((ram_bytes + 500000000) / 1000000000))"
       local state
       state="$(_vm_state "$id" "$running_names")"
       printf '%-20s %-12s %-10s %-8s %-8s %-8s %-10s\n' "$name" "$type" "$enabled" "$state" "$hosts" "$cpus" "${ram_gib}G"
@@ -629,40 +707,40 @@ do_start() {
   vm_index="$(printf '%s' "$resolved" | cut -f2)"
 
   case "$(uname -s)" in
-    Darwin)
-      case "$vm_type" in
-        macOS)
-          require_command tart "brew install cirruslabs/cli/tart"
-          local tart_softnet_expose
-          tart_softnet_expose="$(jq -r --arg id "$vm_id" '[.VMs[] | select(.id == $id) | .portForwards[] | "\(.hostPort):\(.guestPort)"] | join(",")' "$MANIFEST")"
-          exec tart run --net-softnet --net-softnet-allow=0.0.0.0/0 --net-softnet-expose "$tart_softnet_expose" "$vm_id"
-          ;;
-        *)
-          # UTM guests
-          if command -v utmctl >/dev/null 2>&1; then
-            exec utmctl start "$vm_id"
-          fi
-          local bundle="$VM_DIR/${vm_id}.utm"
-          if [ -d "$bundle" ]; then
-            exec open "$bundle"
-          fi
-          error "cannot start '$vm_id': no generated script, utmctl not found, and no UTM bundle at $bundle"
-          exit 1
-          ;;
-      esac
+  Darwin)
+    case "$vm_type" in
+    macOS)
+      require_command tart "brew install cirruslabs/cli/tart"
+      local tart_softnet_expose
+      tart_softnet_expose="$(jq -r --arg id "$vm_id" '[.VMs[] | select(.id == $id) | .portForwards[] | "\(.hostPort):\(.guestPort)"] | join(",")' "$MANIFEST")"
+      exec tart run --net-softnet --net-softnet-allow=0.0.0.0/0 --net-softnet-expose "$tart_softnet_expose" "$vm_id"
       ;;
-    Linux)
-      require_command virsh
-      exec virsh start "$vm_id"
-      ;;
-    MINGW*|MSYS*|CYGWIN*)
-      local win_script="$VM_DIR/scripts/start-${vm_id}.ps1"
-      if [ -f "$win_script" ]; then
-        exec pwsh -File "$win_script"
+    *)
+      # UTM guests
+      if command -v utmctl >/dev/null 2>&1; then
+        exec utmctl start "$vm_id"
       fi
-      error "cannot start '$vm_id': no start script at $win_script"
+      local bundle="$VM_DIR/${vm_id}.utm"
+      if [ -d "$bundle" ]; then
+        exec open "$bundle"
+      fi
+      error "cannot start '$vm_id': no generated script, utmctl not found, and no UTM bundle at $bundle"
       exit 1
       ;;
+    esac
+    ;;
+  Linux)
+    require_command virsh
+    exec virsh start "$vm_id"
+    ;;
+  MINGW* | MSYS* | CYGWIN*)
+    local win_script="$VM_DIR/scripts/start-${vm_id}.ps1"
+    if [ -f "$win_script" ]; then
+      exec pwsh -File "$win_script"
+    fi
+    error "cannot start '$vm_id': no start script at $win_script"
+    exit 1
+    ;;
   esac
 }
 
@@ -700,35 +778,35 @@ do_stop() {
   vm_index="$(printf '%s' "$resolved" | cut -f2)"
 
   case "$(uname -s)" in
-    Darwin)
-      case "$vm_type" in
-        macOS)
-          require_command tart
-          exec tart stop "$vm_id"
-          ;;
-        *)
-          require_command utmctl
-          exec utmctl stop "$vm_id"
-          ;;
-      esac
+  Darwin)
+    case "$vm_type" in
+    macOS)
+      require_command tart
+      exec tart stop "$vm_id"
       ;;
-    Linux)
-      require_command virsh
-      if virsh shutdown "$vm_id" 2>/dev/null; then
-        say "ACPI shutdown signal sent to '$vm_id'"
-      else
-        warn "virsh shutdown failed; trying virsh destroy..."
-        exec virsh destroy "$vm_id"
-      fi
+    *)
+      require_command utmctl
+      exec utmctl stop "$vm_id"
       ;;
-    MINGW*|MSYS*|CYGWIN*)
-      local win_script="$VM_DIR/scripts/stop-${vm_id}.ps1"
-      if [ -f "$win_script" ]; then
-        exec pwsh -File "$win_script"
-      fi
-      error "cannot stop '$vm_id': no stop script at $win_script"
-      exit 1
-      ;;
+    esac
+    ;;
+  Linux)
+    require_command virsh
+    if virsh shutdown "$vm_id" 2>/dev/null; then
+      say "ACPI shutdown signal sent to '$vm_id'"
+    else
+      warn "virsh shutdown failed; trying virsh destroy..."
+      exec virsh destroy "$vm_id"
+    fi
+    ;;
+  MINGW* | MSYS* | CYGWIN*)
+    local win_script="$VM_DIR/scripts/stop-${vm_id}.ps1"
+    if [ -f "$win_script" ]; then
+      exec pwsh -File "$win_script"
+    fi
+    error "cannot stop '$vm_id': no stop script at $win_script"
+    exit 1
+    ;;
   esac
 }
 
@@ -1007,6 +1085,6 @@ do_unpack() {
 # ---------------------------------------------------------------------------
 
 case "$action" in
-  setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) "do_$action" ;;
-  android-config) do_android_config ;;
+setup | sync | list | status | start | stop | upgrade | reset | gc | resize | pack | unpack) "do_$action" ;;
+android-config) do_android_config ;;
 esac

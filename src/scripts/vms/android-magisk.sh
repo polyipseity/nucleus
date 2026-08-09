@@ -19,14 +19,14 @@ vm_android_magisk_apk_lib_dir() {
   _amal_type="$(jq -r ".VMs[$_amal_vm_index].type" "$MANIFEST")"
 
   case "$(vm_derive_arch "$_amal_type")" in
-    aarch64) printf 'arm64-v8a\n' ;;
-    x86_64) printf 'x86_64\n' ;;
-    arm) printf 'armeabi-v7a\n' ;;
-    i386|x86) printf 'x86\n' ;;
-    *)
-      error "unsupported guest architecture for Magisk patching: $(vm_derive_arch "$_amal_type")"
-      return 1
-      ;;
+  aarch64) printf 'arm64-v8a\n' ;;
+  x86_64) printf 'x86_64\n' ;;
+  arm) printf 'armeabi-v7a\n' ;;
+  i386 | x86) printf 'x86\n' ;;
+  *)
+    error "unsupported guest architecture for Magisk patching: $(vm_derive_arch "$_amal_type")"
+    return 1
+    ;;
   esac
 }
 
@@ -215,10 +215,13 @@ vm_android_download_boot_image() {
   fi
 
   run_with_backoff "download boot image" \
-    curl -fL -o "$_adbi_img" "$_adbi_dl_url" \
-    || { error "failed to download boot image from $_adbi_dl_url"; return 1; }
+    curl -fL -o "$_adbi_img" "$_adbi_dl_url" ||
+    {
+      error "failed to download boot image from $_adbi_dl_url"
+      return 1
+    }
 
-  jq -n --arg tag "$_adbi_tag" '{tag_name: $tag}' > "$_adbi_tag_file"
+  jq -n --arg tag "$_adbi_tag" '{tag_name: $tag}' >"$_adbi_tag_file"
   say "boot image ready: $_adbi_img" >&2
   printf '%s\n' "$_adbi_img"
 }
@@ -243,8 +246,11 @@ vm_android_download_magisk_apk() {
 
   say "downloading Magisk APK..." >&2
   run_with_backoff "download Magisk APK" \
-    curl -fL -o "$_adma_apk" "$_adma_url" \
-    || { error "failed to download Magisk from $_adma_url"; return 1; }
+    curl -fL -o "$_adma_apk" "$_adma_url" ||
+    {
+      error "failed to download Magisk from $_adma_url"
+      return 1
+    }
   say "Magisk APK ready: $_adma_apk" >&2
   printf '%s\n' "$_adma_apk"
 }
@@ -490,7 +496,7 @@ vm_android_config_magisk() {
   _acm_tag=''
   _acm_tag="$(vm_android_jqssun_release_tag_for_asset "boot_$(vm_android_recovery_asset_suffix "$_acm_vm_index").img")" || _acm_tag=''
   if [ -n "$_acm_tag" ]; then
-    jq -n --arg tag "$_acm_tag" '{tag_name: $tag, configured: true}' > "$(vm_src_path Android "$NUCLEUS_MAGISK_MARKER")"
+    jq -n --arg tag "$_acm_tag" '{tag_name: $tag, configured: true}' >"$(vm_src_path Android "$NUCLEUS_MAGISK_MARKER")"
   fi
 
   say "Magisk installed on $_acm_serial; next: --root"

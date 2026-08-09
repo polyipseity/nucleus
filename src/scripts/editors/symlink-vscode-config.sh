@@ -51,7 +51,7 @@ for _vsym_base_dir in "$_vsym_stable_base" "$_vsym_insiders_base"; do
     # shellcheck disable=SC2016 # reason: jq filter body must not be expanded by shell
     if ! "$_vsym_jq_bin" -s \
       '.[0] as $existing | reduce .[1][] as $item ($existing; (map(.name) | index($item.name)) as $idx | if $idx then .[$idx] = $item else . + [$item] end)' \
-      "$_chat_lm_path" "$_vsym_chat_lm_repo" > "$_chat_lm_path.tmp" 2>"$_chat_lm_path.jqerr"; then
+      "$_chat_lm_path" "$_vsym_chat_lm_repo" >"$_chat_lm_path.tmp" 2>"$_chat_lm_path.jqerr"; then
       echo "VS Code: warning — jq merge failed for $_chat_lm_path, keeping existing." >&2
       cat "$_chat_lm_path.jqerr" >&2
       rm -f "$_chat_lm_path.tmp" "$_chat_lm_path.jqerr"

@@ -33,7 +33,7 @@ fi
 
 _scs_slugs_file="$(mktemp)"
 if [ "$_scs_do_sync" = true ]; then
-  "$_scs_jq_bin" -r '.skills[]?' "$_scs_manifest" > "$_scs_slugs_file"
+  "$_scs_jq_bin" -r '.skills[]?' "$_scs_manifest" >"$_scs_slugs_file"
 
   if [ ! -s "$_scs_slugs_file" ]; then
     echo "clawhub: no fetched skills in manifest; skipping"
@@ -93,7 +93,7 @@ if [ "$_scs_do_sync" = true ]; then
     else
       echo "clawhub: clawhub install failed for '$_scs_slug' (system apply succeeded)" >&2
     fi
-  done < "$_scs_slugs_file"
+  done <"$_scs_slugs_file"
 
   # Stale cleanup: remove real directories in ~/.agents/skills/ that have
   # a .clawhub/origin.json marker (written by ClawHub at install time,
@@ -101,7 +101,7 @@ if [ "$_scs_do_sync" = true ]; then
   # Directories without this marker (bundled symlinks or user content) are
   # never touched.
   _scs_stale_list="$(mktemp)"
-  find "$_scs_skills_dir" -mindepth 1 -maxdepth 1 -type d > "$_scs_stale_list"
+  find "$_scs_skills_dir" -mindepth 1 -maxdepth 1 -type d >"$_scs_stale_list"
   while IFS= read -r _scs_candidate; do
     [ -z "$_scs_candidate" ] && continue
     _scs_name="$(basename "$_scs_candidate")"
@@ -113,7 +113,7 @@ if [ "$_scs_do_sync" = true ]; then
       chmod -R u+w "$_scs_candidate"
       rm -rf "$_scs_candidate"
     fi
-  done < "$_scs_stale_list"
+  done <"$_scs_stale_list"
   rm -f "$_scs_stale_list"
   echo "clawhub: fetched skill sync complete"
 fi

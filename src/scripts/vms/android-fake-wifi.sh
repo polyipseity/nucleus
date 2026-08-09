@@ -149,8 +149,8 @@ vm_android_fake_wifi_wait_for_ready() {
   sleep "$NUCLEUS_FAKE_WIFI_ASYNC_GRACE_S"
   _vafw_elapsed=$NUCLEUS_FAKE_WIFI_ASYNC_GRACE_S
   while [ "$_vafw_elapsed" -lt "$_vafw_timeout" ]; do
-    if vm_android_fake_wifi_adb_ensure_after_link_change "$_vafw_serial" \
-      && vm_android_fake_wifi_wlan0_up "$_vafw_serial"; then
+    if vm_android_fake_wifi_adb_ensure_after_link_change "$_vafw_serial" &&
+      vm_android_fake_wifi_wlan0_up "$_vafw_serial"; then
       return 0
     fi
     sleep 1
@@ -253,9 +253,13 @@ if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   _serial="$2"
 
   case "$_action" in
-    enable) vm_android_fake_wifi_enable "$_serial" ;;
-    revert) vm_android_fake_wifi_revert "$_serial" ;;
-    -h|--help) usage ;;
-    *) error "unsupported action '$_action' (expected enable or revert)" ; usage >&2 ; exit 1 ;;
+  enable) vm_android_fake_wifi_enable "$_serial" ;;
+  revert) vm_android_fake_wifi_revert "$_serial" ;;
+  -h | --help) usage ;;
+  *)
+    error "unsupported action '$_action' (expected enable or revert)"
+    usage >&2
+    exit 1
+    ;;
   esac
 fi

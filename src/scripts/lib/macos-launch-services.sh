@@ -64,10 +64,10 @@ launchctl_bootstrap_domain() {
 # plist on next access.  No-op on non-macOS.
 refresh_cfprefsd() {
   case "$(uname -s)" in
-    Darwin)
-      # check-suppress:suppression_doc: cfprefsd may not be running; killall exits 1 for absent processes.
-      /usr/bin/killall -KILL cfprefsd 2>/dev/null || true
-      ;;
+  Darwin)
+    # check-suppress:suppression_doc: cfprefsd may not be running; killall exits 1 for absent processes.
+    /usr/bin/killall -KILL cfprefsd 2>/dev/null || true
+    ;;
   esac
 }
 
@@ -76,10 +76,10 @@ refresh_cfprefsd() {
 # new/changed services appear in menus.  No-op on non-macOS.
 refresh_pbs() {
   case "$(uname -s)" in
-    Darwin)
-      # check-suppress:suppression_doc: pbs may not be running; killall exits 1 for absent processes.
-      /usr/bin/killall -KILL pbs 2>/dev/null || true
-      ;;
+  Darwin)
+    # check-suppress:suppression_doc: pbs may not be running; killall exits 1 for absent processes.
+    /usr/bin/killall -KILL pbs 2>/dev/null || true
+    ;;
   esac
 }
 
@@ -88,10 +88,10 @@ refresh_pbs() {
 # picking up newly registered .app bundles.  No-op on non-macOS.
 refresh_lsd() {
   case "$(uname -s)" in
-    Darwin)
-      # check-suppress:suppression_doc: lsd may have already been killed by a previous step; best-effort db rebuild.
-      /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -domain user 2>/dev/null || true
-      ;;
+  Darwin)
+    # check-suppress:suppression_doc: lsd may have already been killed by a previous step; best-effort db rebuild.
+    /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -domain user 2>/dev/null || true
+    ;;
   esac
 }
 
@@ -99,10 +99,10 @@ refresh_lsd() {
 # No-op on non-macOS.
 refresh_finder() {
   case "$(uname -s)" in
-    Darwin)
-      # check-suppress:suppression_doc: Finder may not be running on headless session; killall exits 1 for absent processes.
-      /usr/bin/killall Finder 2>/dev/null || true
-      ;;
+  Darwin)
+    # check-suppress:suppression_doc: Finder may not be running on headless session; killall exits 1 for absent processes.
+    /usr/bin/killall Finder 2>/dev/null || true
+    ;;
   esac
 }
 
@@ -110,10 +110,10 @@ refresh_finder() {
 # No-op on non-macOS.
 refresh_dock() {
   case "$(uname -s)" in
-    Darwin)
-      # check-suppress:suppression_doc: Dock may not be running on headless session; killall exits 1 for absent processes.
-      /usr/bin/killall Dock 2>/dev/null || true # check-suppress:suppression_doc: Dock may not be running (headless/SSH session); only restarted when console user is active
-      ;;
+  Darwin)
+    # check-suppress:suppression_doc: Dock may not be running on headless session; killall exits 1 for absent processes.
+    /usr/bin/killall Dock 2>/dev/null || true # check-suppress:suppression_doc: Dock may not be running (headless/SSH session); only restarted when console user is active
+    ;;
   esac
 }
 # refresh_tiswitcher — Refresh TISwitcher (input-source switcher daemon).
@@ -121,9 +121,9 @@ refresh_dock() {
 # the whole input-method pipeline.
 refresh_tiswitcher() {
   case "$(uname -s)" in
-    Darwin)
-      /usr/bin/killall -HUP TISwitcher 2>/dev/null || true # check-suppress:suppression_doc: TISwitcher may not be running; only restarted when needed
-      ;;
+  Darwin)
+    /usr/bin/killall -HUP TISwitcher 2>/dev/null || true # check-suppress:suppression_doc: TISwitcher may not be running; only restarted when needed
+    ;;
   esac
 }
 
@@ -131,20 +131,20 @@ refresh_tiswitcher() {
 # WindowManager (Spaces) on macOS.
 refresh_system_ui() {
   case "$(uname -s)" in
-    Darwin)
-      for _sui_proc in SystemUIServer WindowManager; do
-        /usr/bin/killall "$_sui_proc" 2>/dev/null || true # check-suppress:suppression_doc: proc may not be running; only restarted when needed
-      done
-      ;;
+  Darwin)
+    for _sui_proc in SystemUIServer WindowManager; do
+      /usr/bin/killall "$_sui_proc" 2>/dev/null || true # check-suppress:suppression_doc: proc may not be running; only restarted when needed
+    done
+    ;;
   esac
 }
 
 # refresh_shared_filelistd — Restart sharedfilelistd (Finder sidebar daemon).
 refresh_shared_filelistd() {
   case "$(uname -s)" in
-    Darwin)
-      /usr/bin/killall sharedfilelistd 2>/dev/null || true # check-suppress:suppression_doc: sharedfilelistd may not be running; only restarted when needed
-      ;;
+  Darwin)
+    /usr/bin/killall sharedfilelistd 2>/dev/null || true # check-suppress:suppression_doc: sharedfilelistd may not be running; only restarted when needed
+    ;;
   esac
 }
 
@@ -152,9 +152,9 @@ refresh_shared_filelistd() {
 # Preserves window state. Preferred over killall for desktop refreshes.
 refresh_finder_launchd() {
   case "$(uname -s)" in
-    Darwin)
-      /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder" 2>/dev/null || true # check-suppress:suppression_doc: Finder may not be running or user may be in headless/SSH session
-      ;;
+  Darwin)
+    /bin/launchctl kickstart -k "gui/$UID/com.apple.Finder" 2>/dev/null || true # check-suppress:suppression_doc: Finder may not be running or user may be in headless/SSH session
+    ;;
   esac
 }
 
@@ -176,16 +176,16 @@ refresh_desktop_services() {
 # No-op on non-macOS.
 refresh_services_menu() {
   case "$(uname -s)" in
-    Darwin)
-      # check-suppress:suppression_doc: see refresh_cfprefsd -- daemon may not be running.
-      /usr/bin/killall -KILL cfprefsd 2>/dev/null || true
-      # check-suppress:suppression_doc: see refresh_lsd -- LS db may already be fresh.
-      /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -domain user 2>/dev/null || true
-      # check-suppress:suppression_doc: see refresh_pbs -- pasteboard server may not be running.
-      /usr/bin/killall -KILL pbs 2>/dev/null || true
-      /bin/sleep 1
-      # check-suppress:suppression_doc: see refresh_finder -- Finder may not be running.
-      /usr/bin/killall Finder 2>/dev/null || true
-      ;;
+  Darwin)
+    # check-suppress:suppression_doc: see refresh_cfprefsd -- daemon may not be running.
+    /usr/bin/killall -KILL cfprefsd 2>/dev/null || true
+    # check-suppress:suppression_doc: see refresh_lsd -- LS db may already be fresh.
+    /System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister -kill -domain user 2>/dev/null || true
+    # check-suppress:suppression_doc: see refresh_pbs -- pasteboard server may not be running.
+    /usr/bin/killall -KILL pbs 2>/dev/null || true
+    /bin/sleep 1
+    # check-suppress:suppression_doc: see refresh_finder -- Finder may not be running.
+    /usr/bin/killall Finder 2>/dev/null || true
+    ;;
   esac
 }

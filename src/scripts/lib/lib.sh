@@ -37,7 +37,7 @@ _nuc_prefix="$(basename "$0")"
 # Strip .sh extension for cleaner prefix (e.g., "svc:" instead of "svc.sh:")
 _nuc_prefix="${_nuc_prefix%.sh}"
 case "$_nuc_prefix" in
-  nucleus-*) _nuc_prefix="${_nuc_prefix#nucleus-}" ;;
+nucleus-*) _nuc_prefix="${_nuc_prefix#nucleus-}" ;;
 esac
 
 # Output helpers — use these instead of raw printf/echo.
@@ -47,7 +47,10 @@ esac
 say() { printf '%s\n' "$_nuc_prefix: $*"; }
 
 # error — Print an error message to stderr and return 1.
-error() { printf '%s\n' "$_nuc_prefix: error: $*" >&2; return 1; }
+error() {
+  printf '%s\n' "$_nuc_prefix: error: $*" >&2
+  return 1
+}
 
 # warn — Print a warning message to stderr.
 warn() { printf '%s\n' "$_nuc_prefix: warning: $*" >&2; }
@@ -72,11 +75,11 @@ derive_repo_root() {
   if [ -f "$_drr_system_file" ]; then
     # WHY: sudo/su reset the environment; /etc/nucleus/repo-root (materialized at
     # apply time) gives all-process repo-root availability on POSIX hosts.
-    IFS= read -r _drr_system_root < "$_drr_system_file" \
-      || _drr_system_root="" # check-suppress:suppression_doc: unreadable system file treated as absent.
+    IFS= read -r _drr_system_root <"$_drr_system_file" ||
+      _drr_system_root="" # check-suppress:suppression_doc: unreadable system file treated as absent.
     case "$_drr_system_root" in
-      /*) ;;
-      *) _drr_system_root="" ;; # reject empty/relative system file paths
+    /*) ;;
+    *) _drr_system_root="" ;; # reject empty/relative system file paths
     esac
     if [ -n "$_drr_system_root" ] && [ -f "$_drr_system_root/src/flake.nix" ]; then
       printf '%s\n' "$_drr_system_root"
@@ -98,11 +101,11 @@ derive_repo_root() {
         # WHY: store-installed apps bundle scripts/ + src/scripts/ but not
         # src/flake.nix; the marker (baked from NUCLEUS_REPO_ROOT at build time)
         # points at the canonical checkout.
-        IFS= read -r _drr_marker_root < "$_drr_candidate/.nucleus-repo-root" \
-          || _drr_marker_root="" # check-suppress:suppression_doc: unreadable marker treated as absent.
+        IFS= read -r _drr_marker_root <"$_drr_candidate/.nucleus-repo-root" ||
+          _drr_marker_root="" # check-suppress:suppression_doc: unreadable marker treated as absent.
         case "$_drr_marker_root" in
-          /*) ;;
-          *) _drr_marker_root="" ;; # reject empty/relative marker paths
+        /*) ;;
+        *) _drr_marker_root="" ;; # reject empty/relative marker paths
         esac
         if [ -n "$_drr_marker_root" ] && [ -f "$_drr_marker_root/src/flake.nix" ]; then
           printf '%s\n' "$_drr_marker_root"
@@ -129,9 +132,9 @@ resolve_nucleus_host() {
     return 0
   fi
   case "$(uname -s)" in
-    Darwin) printf '%s\n' "MacBook" ;;
-    Linux)  printf '%s\n' "NixOS" ;;
-    *)      printf '%s\n' "Unknown" ;;
+  Darwin) printf '%s\n' "MacBook" ;;
+  Linux) printf '%s\n' "NixOS" ;;
+  *) printf '%s\n' "Unknown" ;;
   esac
 }
 
@@ -257,16 +260,16 @@ nucleus_services_json_path() {
 nucleus_expand_log_path() {
   _nelp_path="$1"
   case "$_nelp_path" in
-    '~')
-      printf '%s\n' "${HOME}"
-      ;;
-    '~'/*)
-      _nelp_suffix="${_nelp_path#~/}"
-      printf '%s\n' "${HOME}/${_nelp_suffix}"
-      ;;
-    *)
-      printf '%s\n' "$_nelp_path"
-      ;;
+  '~')
+    printf '%s\n' "${HOME}"
+    ;;
+  '~'/*)
+    _nelp_suffix="${_nelp_path#~/}"
+    printf '%s\n' "${HOME}/${_nelp_suffix}"
+    ;;
+  *)
+    printf '%s\n' "$_nelp_path"
+    ;;
   esac
 }
 
@@ -321,9 +324,9 @@ sccache_cache_dir() {
     return 0
   fi
   case "$(uname -s)" in
-    Darwin) printf '%s\n' "${HOME}/Library/Caches/Mozilla.sccache" ;;
-    Linux)  printf '%s\n' "${XDG_CACHE_HOME:-$HOME/.cache}/sccache" ;;
-    *)      printf '%s\n' "${XDG_CACHE_HOME:-$HOME/.cache}/sccache" ;;
+  Darwin) printf '%s\n' "${HOME}/Library/Caches/Mozilla.sccache" ;;
+  Linux) printf '%s\n' "${XDG_CACHE_HOME:-$HOME/.cache}/sccache" ;;
+  *) printf '%s\n' "${XDG_CACHE_HOME:-$HOME/.cache}/sccache" ;;
   esac
 }
 
@@ -350,10 +353,10 @@ log_sanitize() {
   # Strip ANSI escape sequences and OSC sequences, remove \r, strip
   # control chars except tab (\x09) and newline (\x0A).
   sed -e 's/\x1b\[[0-9;]*[a-zA-Z]//g' \
-      -e 's/\x1b\][^\x07\x1b]*\x07//g' \
-      -e 's/\x1b[PX^_].*\x1b\\//g' \
-      -e 's/\r//g' \
-      -e "s/[\x00-\x08\x0B\x0C\x0E-\x1F]//g"
+    -e 's/\x1b\][^\x07\x1b]*\x07//g' \
+    -e 's/\x1b[PX^_].*\x1b\\//g' \
+    -e 's/\r//g' \
+    -e "s/[\x00-\x08\x0B\x0C\x0E-\x1F]//g"
 }
 
 # rotate_log_file — Copy-truncate a single log file if it exceeds MAXSIZE.
@@ -368,7 +371,7 @@ rotate_log_file() {
 
   [ -f "$_rlf_logfile" ] || return 0
 
-  _rlf_size=$(wc -c < "$_rlf_logfile")
+  _rlf_size=$(wc -c <"$_rlf_logfile")
   [ "$_rlf_size" -le "$_rlf_maxsize" ] && return 0
 
   _rlf_logdir=$(dirname -- "$_rlf_logfile")
@@ -394,7 +397,7 @@ rotate_log_file() {
       warn "failed to rotate '$_rlf_logfile': archive copy failed"
       return 0
     fi
-    if ! : > "$_rlf_logfile"; then
+    if ! : >"$_rlf_logfile"; then
       warn "failed to rotate '$_rlf_logfile': truncate failed"
       return 0
     fi
@@ -406,7 +409,7 @@ rotate_log_file() {
     fi
   else
     # maxfiles=0: just truncate, keep no archives
-    : > "$_rlf_logfile"
+    : >"$_rlf_logfile"
   fi
 }
 
@@ -429,9 +432,9 @@ rotate_logs_in_directory() {
 parse_expiry_days() {
   _ped_exp="${1:-7d}"
   case "$_ped_exp" in
-    *d) printf '%s\n' "${_ped_exp%d}" ;;
-    *h) printf '%s\n' $(( (${_ped_exp%h} + 23) / 24 )) ;;
-    *)  printf '%s\n' 7 ;;
+  *d) printf '%s\n' "${_ped_exp%d}" ;;
+  *h) printf '%s\n' $(((${_ped_exp%h} + 23) / 24)) ;;
+  *) printf '%s\n' 7 ;;
   esac
 }
 
@@ -493,7 +496,7 @@ kill_processes_on_port() {
 # Returns 0 when port appears in LISTEN state, 1 on timeout.
 wait_for_port() {
   _wfp_port="$1"
-  _wfp_host="${2:-}"       # unused on macOS/Linux
+  _wfp_host="${2:-}" # unused on macOS/Linux
   _wfp_timeout="${3:-5}"
 
   require_command lsof

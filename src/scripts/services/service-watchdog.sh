@@ -31,8 +31,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
@@ -63,25 +63,25 @@ watchdog_domain=""
 watchdog_oneshot=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    --domain)
-      if [ -z "${2:-}" ]; then
-        printf 'error: --domain requires an argument\n' >&2
-        exit 1
-      fi
-      watchdog_domain="$2"
-      shift
-      ;;
-    --oneshot)
-      watchdog_oneshot=true
-      ;;
-    *)
-      printf 'error: unknown option: %s\n' "$1" >&2
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --domain)
+    if [ -z "${2:-}" ]; then
+      printf 'error: --domain requires an argument\n' >&2
       exit 1
-      ;;
+    fi
+    watchdog_domain="$2"
+    shift
+    ;;
+  --oneshot)
+    watchdog_oneshot=true
+    ;;
+  *)
+    printf 'error: unknown option: %s\n' "$1" >&2
+    exit 1
+    ;;
   esac
   shift
 done
@@ -94,11 +94,11 @@ fi
 HOST="$(resolve_nucleus_host)"
 
 case "$HOST" in
-  MacBook|NixOS) ;;
-  *)
-    # Windows watchdog is handled by service-watchdog.ps1; exit silently.
-    exit 0
-    ;;
+MacBook | NixOS) ;;
+*)
+  # Windows watchdog is handled by service-watchdog.ps1; exit silently.
+  exit 0
+  ;;
 esac
 
 require_command jq
@@ -163,38 +163,38 @@ check_service_macos() {
   print_out=$($sudo_prefix launchctl print "$target" 2>/dev/null || true)
 
   case "$print_out" in
-    *"state = running"*)
-      # Service is healthy — nothing to do.
-      return 0
-      ;;
-    *"state = spawn scheduled"*)
-      recover_launchctl "$svc" "$domain" "$svc_id"
-      log_restart "$svc_id" "spawn scheduled"
-      ;;
-    *"state = waiting"*)
-      recover_launchctl "$svc" "$domain" "$svc_id"
-      log_restart "$svc_id" "waiting"
-      ;;
-    # Exit 78 (EX_CONFIG): non-retryable, launchd sets penalty box — needs bootout+bootstrap.
-    # Exit 126 (transient): shell cannot exec; does NOT trigger penalty box.
-    *"last exit code = 78"*)
-      recover_launchctl "$svc" "$domain" "$svc_id"
-      log_restart "$svc_id" "EX_CONFIG"
-      ;;
-    *"Service is not found"*|"")
-      # Service not loaded — try bootstrapping.
-      local plist=""
-      if [ "$domain" = "system" ]; then
-        plist="/Library/LaunchDaemons/$svc_id.plist"
-      else
-        plist="${HOME:-}/Library/LaunchAgents/$svc_id.plist"
-      fi
-      if [ -f "$plist" ]; then
-        # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
-        $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null || true
-        log_restart "$svc_id" "not found — bootstrap"
-      fi
-      ;;
+  *"state = running"*)
+    # Service is healthy — nothing to do.
+    return 0
+    ;;
+  *"state = spawn scheduled"*)
+    recover_launchctl "$svc" "$domain" "$svc_id"
+    log_restart "$svc_id" "spawn scheduled"
+    ;;
+  *"state = waiting"*)
+    recover_launchctl "$svc" "$domain" "$svc_id"
+    log_restart "$svc_id" "waiting"
+    ;;
+  # Exit 78 (EX_CONFIG): non-retryable, launchd sets penalty box — needs bootout+bootstrap.
+  # Exit 126 (transient): shell cannot exec; does NOT trigger penalty box.
+  *"last exit code = 78"*)
+    recover_launchctl "$svc" "$domain" "$svc_id"
+    log_restart "$svc_id" "EX_CONFIG"
+    ;;
+  *"Service is not found"* | "")
+    # Service not loaded — try bootstrapping.
+    local plist=""
+    if [ "$domain" = "system" ]; then
+      plist="/Library/LaunchDaemons/$svc_id.plist"
+    else
+      plist="${HOME:-}/Library/LaunchAgents/$svc_id.plist"
+    fi
+    if [ -f "$plist" ]; then
+      # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
+      $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null || true
+      log_restart "$svc_id" "not found — bootstrap"
+    fi
+    ;;
   esac
 }
 
@@ -214,18 +214,18 @@ check_service_nixos() {
   is_active=$(systemctl $scope_flag is-active "$svc_id" 2>/dev/null || true)
 
   case "$is_active" in
-    active|activating|reloading)
-      # Service is healthy — nothing to do.
-      return 0
-      ;;
-    inactive|dead|failed|not-found|"")
-      # Stuck or missing — reset limits and restart.
-      # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
-      systemctl $scope_flag reset-failed "$svc_id" 2>/dev/null || true
-      # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
-      systemctl $scope_flag restart "$svc_id" 2>/dev/null || true
-      log_restart "$svc_id" "state=$is_active"
-      ;;
+  active | activating | reloading)
+    # Service is healthy — nothing to do.
+    return 0
+    ;;
+  inactive | dead | failed | not-found | "")
+    # Stuck or missing — reset limits and restart.
+    # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
+    systemctl $scope_flag reset-failed "$svc_id" 2>/dev/null || true
+    # check-suppress:suppression_doc: service may not be loaded or may fail transiently during recovery.
+    systemctl $scope_flag restart "$svc_id" 2>/dev/null || true
+    log_restart "$svc_id" "state=$is_active"
+    ;;
   esac
 }
 
@@ -246,8 +246,8 @@ _run_watchdog_iteration() {
     fi
 
     case "$HOST" in
-      MacBook) check_service_macos "$key" "$(echo "$entry" | jq -c '.hostEntry')" ;;
-      NixOS) check_service_nixos "$key" "$(echo "$entry" | jq -c '.hostEntry')" ;;
+    MacBook) check_service_macos "$key" "$(echo "$entry" | jq -c '.hostEntry')" ;;
+    NixOS) check_service_nixos "$key" "$(echo "$entry" | jq -c '.hostEntry')" ;;
     esac
   done < <(read_watchdog_services)
 }

@@ -24,8 +24,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
@@ -70,31 +70,31 @@ VERIFY=false
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --sections)
-      shift
-      SECTIONS="$1"
-      ;;
-    --verify)
-      VERIFY=true
-      ;;
-    --help)
-      usage
-      exit 0
-      ;;
-    *)
-      error "unknown flag: $1"
-      exit 1
-      ;;
+  --sections)
+    shift
+    SECTIONS="$1"
+    ;;
+  --verify)
+    VERIFY=true
+    ;;
+  --help)
+    usage
+    exit 0
+    ;;
+  *)
+    error "unknown flag: $1"
+    exit 1
+    ;;
   esac
   shift
 done
 
 section_enabled() {
   local name="$1"
-  [ -z "$SECTIONS" ] && return 0  # no filter = all enabled
+  [ -z "$SECTIONS" ] && return 0 # no filter = all enabled
   case ",$SECTIONS," in
-    *",$name,"*) return 0 ;;
-    *) return 1 ;;
+  *",$name,"*) return 0 ;;
+  *) return 1 ;;
   esac
 }
 
@@ -174,13 +174,13 @@ if section_enabled uv; then
     fi
     ver="${ver#v}"
     [ -n "$pkg" ] && [ -n "$ver" ] && uv_installed["$pkg"]="$ver"
-  # check-suppress:suppression_doc: uv may not be installed yet; empty tool list is expected.
+    # check-suppress:suppression_doc: uv may not be installed yet; empty tool list is expected.
   done < <(uv tool list 2>/dev/null || true)
 
   while IFS= read -r key; do
     [ -z "$key" ] && continue
     if printf '%s\n' "$data" | jq -e --arg k "$key" '(.uv[$k] | type) == "object"' >/dev/null; then
-      continue  # VCS hash-pin entry — no CLI query can update the rev
+      continue # VCS hash-pin entry — no CLI query can update the rev
     fi
     old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.uv // {})[$k] // empty')
     [ -z "$old" ] && continue
@@ -267,13 +267,13 @@ if section_enabled vscode; then
     while IFS= read -r line; do
       [ -z "$line" ] && continue
       case "$line" in
-        *@*)
-          pkg="${line%%@*}"
-          ver="${line#*@}"
-          [ -n "$pkg" ] && [ -n "$ver" ] && vscode_exts["$pkg"]="$ver"
-          ;;
+      *@*)
+        pkg="${line%%@*}"
+        ver="${line#*@}"
+        [ -n "$pkg" ] && [ -n "$ver" ] && vscode_exts["$pkg"]="$ver"
+        ;;
       esac
-    done <<< "$vscode_output"
+    done <<<"$vscode_output"
 
     while IFS= read -r key; do
       [ -z "$key" ] && continue
@@ -443,7 +443,7 @@ fi
 tmpfile=$(mktemp "$LOCKFILE_ABS.tmp.XXXXXX")
 trap 'rm -f "$tmpfile"' EXIT
 
-printf '%s\n' "$data" > "$tmpfile"
+printf '%s\n' "$data" >"$tmpfile"
 mv -- "$tmpfile" "$LOCKFILE_ABS"
 
 say "wrote $LOCKFILE_REL"

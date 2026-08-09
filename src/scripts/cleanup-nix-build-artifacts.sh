@@ -23,8 +23,11 @@ _cnba_options="${_cnba_options:-}"
 _cnba_dry_run=false
 for _cnba_opt in $_cnba_options; do
   case "$_cnba_opt" in
-    --dry-run) _cnba_dry_run=true ;;
-    *) printf '%s\n' "cleanup-nix-build-artifacts: unknown option: $_cnba_opt" >&2; return 1 ;;
+  --dry-run) _cnba_dry_run=true ;;
+  *)
+    printf '%s\n' "cleanup-nix-build-artifacts: unknown option: $_cnba_opt" >&2
+    return 1
+    ;;
   esac
 done
 

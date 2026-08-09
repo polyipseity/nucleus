@@ -13,18 +13,18 @@ _nucleus_protect_symlink() {
   _nps_context="$1"
   _nps_path="$2"
   case "$(uname -s)" in
-    Darwin)
-      if ! /usr/bin/chflags -h uchg "$_nps_path"; then
-        echo "$_nps_context: warning — could not protect symlink $_nps_path with uchg." >&2
+  Darwin)
+    if ! /usr/bin/chflags -h uchg "$_nps_path"; then
+      echo "$_nps_context: warning — could not protect symlink $_nps_path with uchg." >&2
+    fi
+    ;;
+  Linux)
+    if command -v chattr >/dev/null; then
+      if ! chattr -h +i "$_nps_path"; then
+        echo "$_nps_context: warning — could not protect symlink $_nps_path with chattr +i." >&2
       fi
-      ;;
-    Linux)
-      if command -v chattr >/dev/null; then
-        if ! chattr -h +i "$_nps_path"; then
-          echo "$_nps_context: warning — could not protect symlink $_nps_path with chattr +i." >&2
-        fi
-      fi
-      ;;
+    fi
+    ;;
   esac
 }
 
@@ -32,18 +32,18 @@ _nucleus_unprotect_symlink() {
   _nus_context="$1"
   _nus_path="$2"
   case "$(uname -s)" in
-    Darwin)
-      if ! /usr/bin/chflags -h nouchg "$_nus_path"; then
-        echo "$_nus_context: warning — could not clear uchg from symlink $_nus_path before update." >&2
+  Darwin)
+    if ! /usr/bin/chflags -h nouchg "$_nus_path"; then
+      echo "$_nus_context: warning — could not clear uchg from symlink $_nus_path before update." >&2
+    fi
+    ;;
+  Linux)
+    if command -v chattr >/dev/null; then
+      if ! chattr -h -i "$_nus_path"; then
+        echo "$_nus_context: warning — could not clear chattr +i from symlink $_nus_path before update." >&2
       fi
-      ;;
-    Linux)
-      if command -v chattr >/dev/null; then
-        if ! chattr -h -i "$_nus_path"; then
-          echo "$_nus_context: warning — could not clear chattr +i from symlink $_nus_path before update." >&2
-        fi
-      fi
-      ;;
+    fi
+    ;;
   esac
 }
 

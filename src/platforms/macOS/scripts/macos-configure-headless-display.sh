@@ -17,7 +17,6 @@
 # No-op if BetterDisplay is not installed.
 set -euo pipefail
 
-
 BD_BIN="/Applications/BetterDisplay.app/Contents/MacOS/BetterDisplay"
 BD_APP="/Applications/BetterDisplay.app"
 DISPLAY_NAME="HeadlessDisplay"
@@ -54,9 +53,9 @@ discard_headless_displays() {
 }
 
 if [ -f "$BD_BIN" ]; then
-  if ! /usr/bin/pgrep -x "BetterDisplay" > /dev/null; then
+  if ! /usr/bin/pgrep -x "BetterDisplay" >/dev/null; then
     /usr/bin/open -g -a "$BD_APP"
-    /bin/sleep 5  # wait for the app to initialise before issuing CLI commands
+    /bin/sleep 5 # wait for the app to initialise before issuing CLI commands
   fi
 
   identifiers_json="$(_bd_cli get -identifiers -name="$DISPLAY_NAME")"
@@ -71,7 +70,7 @@ if [ -f "$BD_BIN" ]; then
     if ! create_headless_display; then
       echo "macos: failed to create BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
     fi
-    /bin/sleep 3  # wait for the virtual display to be registered
+    /bin/sleep 3 # wait for the virtual display to be registered
     identifiers_json="$(_bd_cli get -identifiers -name="$DISPLAY_NAME")"
     tag_ids="$(printf '%s\n' "$identifiers_json" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
   else
@@ -86,7 +85,7 @@ if [ -f "$BD_BIN" ]; then
       if ! create_headless_display; then
         echo "macos: failed to recreate BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
       fi
-      /bin/sleep 3  # wait for the virtual display to be registered
+      /bin/sleep 3 # wait for the virtual display to be registered
       identifiers_json="$(_bd_cli get -identifiers -name="$DISPLAY_NAME")"
       tag_ids="$(printf '%s\n' "$identifiers_json" | /usr/bin/awk -F'"' '/"tagID"/ { print $4 }' | /usr/bin/sort -u)"
     fi

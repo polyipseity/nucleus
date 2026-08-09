@@ -105,8 +105,11 @@ vm_android_config_gapps() {
   if [ ! -f "$_vacg_zip" ]; then
     say "downloading MindTheGapps..."
     run_with_backoff "download MindTheGapps" \
-      curl -fL -o "$_vacg_zip" "$_vacg_url" \
-      || { error "failed to download MindTheGapps from $_vacg_url"; return 1; }
+      curl -fL -o "$_vacg_zip" "$_vacg_url" ||
+      {
+        error "failed to download MindTheGapps from $_vacg_url"
+        return 1
+      }
   else
     say "using cached MindTheGapps: $_vacg_zip"
   fi
@@ -135,50 +138,50 @@ vm_android_config_adb_keys() {
 
   _vaca_state="$(vm_android_adb_poll_state "$_vaca_vm_index")"
   case "$_vaca_state" in
-    recovery|sideload)
-      if ! vm_android_adb_wait_recovery "$_vaca_vm_index" 300; then
-        return 1
-      fi
-      ;;
-    device)
-      if ! vm_android_adb_wait_authorized "$_vaca_vm_index" 600; then
-        return 1
-      fi
-      ;;
-    unauthorized)
-      error "ADB unauthorized; enable ADB in recovery (Advanced → Enable ADB) or tap Allow on booted Lineage"
+  recovery | sideload)
+    if ! vm_android_adb_wait_recovery "$_vaca_vm_index" 300; then
       return 1
-      ;;
-    *)
-      error "ADB not reachable for key install (state: $_vaca_state)"
+    fi
+    ;;
+  device)
+    if ! vm_android_adb_wait_authorized "$_vaca_vm_index" 600; then
       return 1
-      ;;
+    fi
+    ;;
+  unauthorized)
+    error "ADB unauthorized; enable ADB in recovery (Advanced → Enable ADB) or tap Allow on booted Lineage"
+    return 1
+    ;;
+  *)
+    error "ADB not reachable for key install (state: $_vaca_state)"
+    return 1
+    ;;
   esac
 
   _vaca_state="$(vm_android_adb_poll_state "$_vaca_vm_index")"
   case "$_vaca_state" in
-    recovery|sideload)
-      if ! vm_android_guest_shell_is_root "$_vaca_vm_index"; then
-        error "recovery adb-keys requires root shell (Advanced → Enable ADB)"
-        return 1
-      fi
-      vm_android_install_adb_keys "$_vaca_vm_index" "$_vaca_pubkey"
-      ;;
-    device)
-      if ! vm_android_guest_has_magisk_su "$_vaca_vm_index"; then
-        error "booted adb-keys requires Magisk su (run --magisk first) or recovery --adb-keys before first boot"
-        return 1
-      fi
-      vm_android_install_adb_keys_via_su "$_vaca_vm_index" "$_vaca_pubkey"
-      ;;
-    *)
-      error "guest must be in recovery or booted system for adb-keys; current state: $_vaca_state"
+  recovery | sideload)
+    if ! vm_android_guest_shell_is_root "$_vaca_vm_index"; then
+      error "recovery adb-keys requires root shell (Advanced → Enable ADB)"
       return 1
-      ;;
+    fi
+    vm_android_install_adb_keys "$_vaca_vm_index" "$_vaca_pubkey"
+    ;;
+  device)
+    if ! vm_android_guest_has_magisk_su "$_vaca_vm_index"; then
+      error "booted adb-keys requires Magisk su (run --magisk first) or recovery --adb-keys before first boot"
+      return 1
+    fi
+    vm_android_install_adb_keys_via_su "$_vaca_vm_index" "$_vaca_pubkey"
+    ;;
+  *)
+    error "guest must be in recovery or booted system for adb-keys; current state: $_vaca_state"
+    return 1
+    ;;
   esac
   say "installed host ADB key on $_vaca_serial ($_vaca_state)"
   case "$_vaca_state" in
-    recovery|sideload) say "next: reboot system, then --magisk, --root, --fake-wifi" ;;
+  recovery | sideload) say "next: reboot system, then --magisk, --root, --fake-wifi" ;;
   esac
 }
 
@@ -201,27 +204,34 @@ vm_android_config() {
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --gapps) _vac_do_gapps=true ;;
-      --adb-keys) _vac_do_adb_keys=true ;;
-      --adb-debug)
-        error "unknown flag: --adb-debug (did you mean --adb-keys?)"
-        usage >&2
-        return 1
-        ;;
-      --root) _vac_do_root=true ;;
-      --magisk) _vac_do_magisk=true ;;
-      --fake-wifi) _vac_do_fake_wifi=true ;;
-      --fake-wifi-revert) _vac_do_fake_wifi_revert=true ;;
-      -h|--help) usage; return 0 ;;
-      *) error "unsupported flag: $1" ; usage >&2 ; return 1 ;;
+    --gapps) _vac_do_gapps=true ;;
+    --adb-keys) _vac_do_adb_keys=true ;;
+    --adb-debug)
+      error "unknown flag: --adb-debug (did you mean --adb-keys?)"
+      usage >&2
+      return 1
+      ;;
+    --root) _vac_do_root=true ;;
+    --magisk) _vac_do_magisk=true ;;
+    --fake-wifi) _vac_do_fake_wifi=true ;;
+    --fake-wifi-revert) _vac_do_fake_wifi_revert=true ;;
+    -h | --help)
+      usage
+      return 0
+      ;;
+    *)
+      error "unsupported flag: $1"
+      usage >&2
+      return 1
+      ;;
     esac
     shift
   done
 
-  if [ "$_vac_do_gapps" = false ] && [ "$_vac_do_adb_keys" = false ] \
-    && [ "$_vac_do_magisk" = false ] && [ "$_vac_do_root" = false ] \
-    && [ "$_vac_do_fake_wifi" = false ] \
-    && [ "$_vac_do_fake_wifi_revert" = false ]; then
+  if [ "$_vac_do_gapps" = false ] && [ "$_vac_do_adb_keys" = false ] &&
+    [ "$_vac_do_magisk" = false ] && [ "$_vac_do_root" = false ] &&
+    [ "$_vac_do_fake_wifi" = false ] &&
+    [ "$_vac_do_fake_wifi_revert" = false ]; then
     vm_android_config_print_manual
     return 0
   fi
@@ -241,7 +251,10 @@ vm_android_config() {
     vm_android_config_root "$_vac_vm_index" || return 1
   fi
   if [ "$_vac_do_fake_wifi" = true ]; then
-    vm_android_adb_wait_authorized "$_vac_vm_index" 600 || { error "fake Wi-Fi requires booted Lineage with authorized ADB"; return 1; }
+    vm_android_adb_wait_authorized "$_vac_vm_index" 600 || {
+      error "fake Wi-Fi requires booted Lineage with authorized ADB"
+      return 1
+    }
     if ! vm_android_guest_has_magisk_su "$_vac_vm_index"; then
       error "fake Wi-Fi requires Magisk su; run --magisk first"
       return 1
@@ -249,7 +262,10 @@ vm_android_config() {
     vm_android_fake_wifi_enable "$_vac_serial" || return 1
   fi
   if [ "$_vac_do_fake_wifi_revert" = true ]; then
-    vm_android_adb_wait_authorized "$_vac_vm_index" 600 || { error "fake Wi-Fi revert requires booted Lineage with authorized ADB"; return 1; }
+    vm_android_adb_wait_authorized "$_vac_vm_index" 600 || {
+      error "fake Wi-Fi revert requires booted Lineage with authorized ADB"
+      return 1
+    }
     vm_android_fake_wifi_revert "$_vac_serial" || return 1
   fi
 

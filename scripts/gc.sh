@@ -10,8 +10,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
@@ -73,141 +73,141 @@ hm_generations_keep_arg=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    --tool-cache-gc)
-      tool_cache_gc=true
-      ;;
-    --no-tool-cache-gc)
-      tool_cache_gc=false
-      ;;
-    --git-cache-gc)
-      git_cache_gc=true
-      ;;
-    --no-git-cache-gc)
-      git_cache_gc=false
-      ;;
-    --hm-gc)
-      hm_gc=true
-      ;;
-    --no-hm-gc)
-      hm_gc=false
-      ;;
-    --system-gc)
-      system_gc=true
-      ;;
-    --no-system-gc)
-      system_gc=false
-      ;;
-    --nix-artifacts-gc)
-      nix_artifacts_gc=true
-      ;;
-    --no-nix-artifacts-gc)
-      nix_artifacts_gc=false
-      ;;
-    --nix-gc)
-      nix_gc=true
-      ;;
-    --no-nix-gc)
-      nix_gc=false
-      ;;
-    --duperemove-gc)
-      duperemove_gc=true
-      ;;
-    --no-duperemove-gc)
-      duperemove_gc=false
-      ;;
-    --ollama-gc)
-      ollama_gc=true
-      ;;
-    --no-ollama-gc)
-      ollama_gc=false
-      ;;
-    --sccache-gc)
-      sccache_gc=true
-      ;;
-    --no-sccache-gc)
-      sccache_gc=false
-      ;;
-    --wallpaper-gc)
-      wallpaper_gc=true
-      ;;
-    --no-wallpaper-gc)
-      wallpaper_gc=false
-      ;;
-    --vm-gc)
-      vm_gc=true
-      ;;
-    --no-vm-gc)
-      vm_gc=false
-      ;;
-    --vm-data-gc)
-      vm_data_gc=true
-      ;;
-    --no-vm-data-gc)
-      vm_data_gc=false
-      ;;
-    --log-gc)
-      log_gc=true
-      ;;
-    --no-log-gc)
-      log_gc=false
-      ;;
-    --journald-gc)
-      journald_gc=true
-      ;;
-    --no-journald-gc)
-      journald_gc=false
-      ;;
-    --log-max-size)
-      log_max_size="$2"
-      shift
-      ;;
-    --log-max-files)
-      log_max_files="$2"
-      shift
-      ;;
-    --log-compress)
-      log_compress="$2"
-      shift
-      ;;
-    --expiry)
-      expiry_arg="$2"
-      shift
-      ;;
-    --generations-keep)
-      generations_keep_arg="$2"
-      shift
-      ;;
-    --hm-expiry)
-      hm_expiry_arg="$2"
-      shift
-      ;;
-    --hm-generations-keep)
-      hm_generations_keep_arg="$2"
-      shift
-      ;;
-    --nix-expiry)
-      nix_expiry_arg="$2"
-      shift
-      ;;
-    --system-generations-keep)
-      system_generations_keep_arg="$2"
-      shift
-      ;;
-    --dry-run)
-      dry_run=true
-      ;;
-    --no-dry-run)
-      dry_run=false
-      ;;
-    *)
-      error "unsupported argument '$1'"
-      usage >&2
-      exit 1
-      ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --tool-cache-gc)
+    tool_cache_gc=true
+    ;;
+  --no-tool-cache-gc)
+    tool_cache_gc=false
+    ;;
+  --git-cache-gc)
+    git_cache_gc=true
+    ;;
+  --no-git-cache-gc)
+    git_cache_gc=false
+    ;;
+  --hm-gc)
+    hm_gc=true
+    ;;
+  --no-hm-gc)
+    hm_gc=false
+    ;;
+  --system-gc)
+    system_gc=true
+    ;;
+  --no-system-gc)
+    system_gc=false
+    ;;
+  --nix-artifacts-gc)
+    nix_artifacts_gc=true
+    ;;
+  --no-nix-artifacts-gc)
+    nix_artifacts_gc=false
+    ;;
+  --nix-gc)
+    nix_gc=true
+    ;;
+  --no-nix-gc)
+    nix_gc=false
+    ;;
+  --duperemove-gc)
+    duperemove_gc=true
+    ;;
+  --no-duperemove-gc)
+    duperemove_gc=false
+    ;;
+  --ollama-gc)
+    ollama_gc=true
+    ;;
+  --no-ollama-gc)
+    ollama_gc=false
+    ;;
+  --sccache-gc)
+    sccache_gc=true
+    ;;
+  --no-sccache-gc)
+    sccache_gc=false
+    ;;
+  --wallpaper-gc)
+    wallpaper_gc=true
+    ;;
+  --no-wallpaper-gc)
+    wallpaper_gc=false
+    ;;
+  --vm-gc)
+    vm_gc=true
+    ;;
+  --no-vm-gc)
+    vm_gc=false
+    ;;
+  --vm-data-gc)
+    vm_data_gc=true
+    ;;
+  --no-vm-data-gc)
+    vm_data_gc=false
+    ;;
+  --log-gc)
+    log_gc=true
+    ;;
+  --no-log-gc)
+    log_gc=false
+    ;;
+  --journald-gc)
+    journald_gc=true
+    ;;
+  --no-journald-gc)
+    journald_gc=false
+    ;;
+  --log-max-size)
+    log_max_size="$2"
+    shift
+    ;;
+  --log-max-files)
+    log_max_files="$2"
+    shift
+    ;;
+  --log-compress)
+    log_compress="$2"
+    shift
+    ;;
+  --expiry)
+    expiry_arg="$2"
+    shift
+    ;;
+  --generations-keep)
+    generations_keep_arg="$2"
+    shift
+    ;;
+  --hm-expiry)
+    hm_expiry_arg="$2"
+    shift
+    ;;
+  --hm-generations-keep)
+    hm_generations_keep_arg="$2"
+    shift
+    ;;
+  --nix-expiry)
+    nix_expiry_arg="$2"
+    shift
+    ;;
+  --system-generations-keep)
+    system_generations_keep_arg="$2"
+    shift
+    ;;
+  --dry-run)
+    dry_run=true
+    ;;
+  --no-dry-run)
+    dry_run=false
+    ;;
+  *)
+    error "unsupported argument '$1'"
+    usage >&2
+    exit 1
+    ;;
   esac
   shift
 done
@@ -269,10 +269,10 @@ expire_system_profile_generations() {
 
   NUCLEUS_GC_PROFILE_SUDO="$_esp_use_sudo" \
     expire_profile_generations_intersection \
-      "$_esp_profile" \
-      "$system_generations_keep" \
-      "$system_expiry" \
-      "$dry_run"
+    "$_esp_profile" \
+    "$system_generations_keep" \
+    "$system_expiry" \
+    "$dry_run"
 }
 
 expire_hm_profile_generations_body() {
@@ -287,10 +287,10 @@ expire_hm_profile_generations_body() {
   fi
   NUCLEUS_GC_PROFILE_SUDO=false \
     expire_profile_generations_intersection \
-      "$_ehm_profile" \
-      "$hm_generations_keep" \
-      "$hm_expiry" \
-      "$dry_run"
+    "$_ehm_profile" \
+    "$hm_generations_keep" \
+    "$hm_expiry" \
+    "$dry_run"
 }
 
 expire_hm_profile_generations() {
@@ -338,9 +338,9 @@ gc_stale_wallpapers() {
 
     candidate_name=$(basename "$candidate")
     case "$candidate_name" in
-      *.xml)
-        continue
-        ;;
+    *.xml)
+      continue
+      ;;
     esac
 
     if [ -L "$candidate" ]; then
@@ -456,7 +456,7 @@ gc_git_cache_if_present() {
         else
           rm -f "$_lockfile"
         fi
-      done < <(find ".git" -name '*.lock' ! -name 'index.lock' -type f -print0 2>/dev/null)  # ref: allow-and-deny-lists.instructions.md#A5 -- Git invariant; index.lock must never be cleaned
+      done < <(find ".git" -name '*.lock' ! -name 'index.lock' -type f -print0 2>/dev/null) # ref: allow-and-deny-lists.instructions.md#A5 -- Git invariant; index.lock must never be cleaned
 
       if [ "$active_op" = false ]; then
         while IFS= read -r -d '' _state_file; do
@@ -718,6 +718,5 @@ if [ "$journald_gc" = true ]; then
     gc_journald_if_available
   fi
 fi
-
 
 nuc_done

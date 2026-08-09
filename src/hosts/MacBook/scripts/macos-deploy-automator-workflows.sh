@@ -3,7 +3,6 @@
 # Consumes jq binary and workflow JSON array at activation time.
 set -eu
 
-
 _vsd_jq_bin="$1"
 _vsd_current_workflows_json="$2"
 _vsd_services_dir="$HOME/Library/Services"
@@ -17,7 +16,7 @@ while IFS= read -r _vsd_entry; do
 
   _vsd_wf_dir="$_vsd_services_dir/$_vsd_dir"
   mkdir -p "$_vsd_services_dir"
-  chmod -R +w "$_vsd_wf_dir" 2>/dev/null || true  # check-suppress:suppression_doc: dir may not exist on first apply
+  chmod -R +w "$_vsd_wf_dir" 2>/dev/null || true # check-suppress:suppression_doc: dir may not exist on first apply
   rm -rf "$_vsd_wf_dir"
   cp -R "$_vsd_store_path" "$_vsd_services_dir/"
 

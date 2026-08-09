@@ -12,12 +12,12 @@ _iut_desired_json="$5"
 # Desired tools as JSON object: {"tool_name": "python_version_or_null", ...}
 # Read into a temp file in "tool python_version" format.
 _iut_desired="$(mktemp)"
-printf '%s\n' "$_iut_desired_json" | "$_iut_jq_bin" -r 'to_entries[] | "\(.key) \(.value // "")"' > "$_iut_desired"
+printf '%s\n' "$_iut_desired_json" | "$_iut_jq_bin" -r 'to_entries[] | "\(.key) \(.value // "")"' >"$_iut_desired"
 
 # Build name-only list for comparison (strip version column).
 _iut_desired_names="$(mktemp)"
 # shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
-"$_iut_gawk_bin" '{print $1}' "$_iut_desired" > "$_iut_desired_names"
+"$_iut_gawk_bin" '{print $1}' "$_iut_desired" >"$_iut_desired_names"
 
 # Install required Python versions before attempting tool installs.
 # Stderr suppressed: uv emits a cosmetic "Failed to patch install name"
@@ -27,7 +27,7 @@ while IFS=' ' read -r _iut_tool _iut_python; do
   [ -z "$_iut_tool" ] && continue
   # check-suppress:suppression_doc: uv python install may fail if the Python version is already installed or unavailable on this platform; that's fine -- a real failure surfaces at tool-install time.
   [ -n "$_iut_python" ] && "$_iut_uv_bin" python install "$_iut_python" 2>/dev/null || true
-done < "$_iut_desired"
+done <"$_iut_desired"
 
 # Get actually installed uv tools from `uv tool list` (zap-style: remove
 # any installed tool absent from the desired list, regardless of prior
@@ -36,25 +36,25 @@ done < "$_iut_desired"
 # cannot be misparsed as package names.
 _iut_installed="$(mktemp)"
 # shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
-"$_iut_uv_bin" tool list 2>/dev/null | "$_iut_gawk_bin" '/^[A-Za-z0-9][A-Za-z0-9._-]*[[:space:]]+v[0-9]/{print $1}' > "$_iut_installed" || true  # check-suppress:suppression_doc: uv tool list may fail if no tool env initialised
+"$_iut_uv_bin" tool list 2>/dev/null | "$_iut_gawk_bin" '/^[A-Za-z0-9][A-Za-z0-9._-]*[[:space:]]+v[0-9]/{print $1}' >"$_iut_installed" || true # check-suppress:suppression_doc: uv tool list may fail if no tool env initialised
 
 # Tools installed but not desired: zap-style removal.
 _iut_to_remove="$(mktemp)"
 while IFS= read -r _iut_tool; do
   [ -z "$_iut_tool" ] && continue
   if ! grep -qxF "$_iut_tool" "$_iut_desired_names"; then
-    printf '%s\n' "$_iut_tool" >> "$_iut_to_remove"
+    printf '%s\n' "$_iut_tool" >>"$_iut_to_remove"
   fi
-done < "$_iut_installed"
+done <"$_iut_installed"
 
 # Desired tools not yet installed according to `uv tool list`.
 _iut_to_install="$(mktemp)"
 while IFS= read -r _iut_tool; do
   [ -z "$_iut_tool" ] && continue
   if ! grep -qxF "$_iut_tool" "$_iut_installed"; then
-    printf '%s\n' "$_iut_tool" >> "$_iut_to_install"
+    printf '%s\n' "$_iut_tool" >>"$_iut_to_install"
   fi
-done < "$_iut_desired_names"
+done <"$_iut_desired_names"
 
 # Prune tools removed from the desired list.
 while IFS= read -r _iut_tool; do
@@ -65,7 +65,7 @@ while IFS= read -r _iut_tool; do
   fi
   echo "uv: uninstalling removed tool '$_iut_tool'"
   "$_iut_uv_bin" tool uninstall "$_iut_tool"
-done < "$_iut_to_remove"
+done <"$_iut_to_remove"
 
 # Install additions.
 while IFS= read -r _iut_tool; do
@@ -86,7 +86,7 @@ while IFS= read -r _iut_tool; do
     echo "uv: installing tool '$_iut_tool'"
     "$_iut_uv_bin" tool install --no-build "$_iut_tool"
   fi
-done < "$_iut_to_install"
+done <"$_iut_to_install"
 
 if [ ! -s "$_iut_to_install" ] && [ ! -s "$_iut_to_remove" ]; then
   echo "uv: all managed tools already converged — skipping"

@@ -36,45 +36,46 @@ fi
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --ai-sync) ai_sync=true ;;
-    --no-ai-sync) ai_sync=false ;;
-    --replica-sync) replica_sync=true ;;
-    --no-replica-sync) replica_sync=false ;;
-    --vm-sync) vm_sync=true ;;
-    --no-vm-sync) vm_sync=false ;;
-    --vm-setup) vm_setup=true ;;
-    --no-vm-setup) vm_setup=false ;;
-    --store-audit) store_audit=true ;;
-    --no-store-audit) store_audit=false ;;
-    --target-user)
-      target_user="$2"; shift
-      if [ -z "$target_user" ]; then
-        printf '%s\n' "apply: --target-user requires a non-empty value" >&2
-        exit 1
-      fi
-      ;;
-    --target-user=*)
-      target_user="${1#--target-user=}"
-      if [ -z "$target_user" ]; then
-        printf '%s\n' "apply: --target-user requires a non-empty value" >&2
-        exit 1
-      fi
-      ;;
-    --username)
-      NUCLEUS_USERNAME="$2"
-      shift
-      if [ -z "$NUCLEUS_USERNAME" ]; then
-        printf '%s\n' "apply: --username requires a non-empty value" >&2
-        exit 1
-      fi
-      ;;
-    -h|--help)
-      usage
-      ;;
-    *)
-      printf '%s\n' "apply: unsupported argument '$1'" >&2
+  --ai-sync) ai_sync=true ;;
+  --no-ai-sync) ai_sync=false ;;
+  --replica-sync) replica_sync=true ;;
+  --no-replica-sync) replica_sync=false ;;
+  --vm-sync) vm_sync=true ;;
+  --no-vm-sync) vm_sync=false ;;
+  --vm-setup) vm_setup=true ;;
+  --no-vm-setup) vm_setup=false ;;
+  --store-audit) store_audit=true ;;
+  --no-store-audit) store_audit=false ;;
+  --target-user)
+    target_user="$2"
+    shift
+    if [ -z "$target_user" ]; then
+      printf '%s\n' "apply: --target-user requires a non-empty value" >&2
       exit 1
-      ;;
+    fi
+    ;;
+  --target-user=*)
+    target_user="${1#--target-user=}"
+    if [ -z "$target_user" ]; then
+      printf '%s\n' "apply: --target-user requires a non-empty value" >&2
+      exit 1
+    fi
+    ;;
+  --username)
+    NUCLEUS_USERNAME="$2"
+    shift
+    if [ -z "$NUCLEUS_USERNAME" ]; then
+      printf '%s\n' "apply: --username requires a non-empty value" >&2
+      exit 1
+    fi
+    ;;
+  -h | --help)
+    usage
+    ;;
+  *)
+    printf '%s\n' "apply: unsupported argument '$1'" >&2
+    exit 1
+    ;;
   esac
   shift
 done
@@ -100,13 +101,13 @@ unset _aar_self _aar_live _aar_live_resolved
 # The guard avoids redundant PATH modifications when already present.
 _nix_profile_bin="$HOME/.nix-profile/bin"
 case ":$PATH:" in
-  *":$_nix_profile_bin:"*) ;;
-  *)
-    if [ -d "$_nix_profile_bin" ]; then
-      PATH="$PATH:$_nix_profile_bin"
-      export PATH
-    fi
-    ;;
+*":$_nix_profile_bin:"*) ;;
+*)
+  if [ -d "$_nix_profile_bin" ]; then
+    PATH="$PATH:$_nix_profile_bin"
+    export PATH
+  fi
+  ;;
 esac
 unset _nix_profile_bin
 
@@ -281,7 +282,7 @@ run_terminal_activations() {
     return
   fi
 
-  _rta_count=$(wc -l < "$_rta_manifest")
+  _rta_count=$(wc -l <"$_rta_manifest")
   if [ "$_rta_count" -eq 0 ]; then
     rm -f "$_rta_manifest"
     return
@@ -291,13 +292,13 @@ run_terminal_activations() {
   printf '%s\n' "terminal-activations: running $(grep -c '^[^#]' "$_rta_manifest" || true) terminal-context activation(s)..."
   while IFS= read -r _rta_line; do
     case "$_rta_line" in
-      '' | '#'*) continue ;;
+    '' | '#'*) continue ;;
     esac
     printf '%s\n' "terminal-activations: $_rta_line"
     if ! eval "$_rta_line"; then
       printf '%s\n' "terminal-activations: command exited with error (continuing)" >&2
     fi
-  done < "$_rta_manifest"
+  done <"$_rta_manifest"
   rm -f "$_rta_manifest"
 }
 
@@ -314,71 +315,71 @@ run_manual_display() {
 }
 
 case "$(uname -s)" in
-  Darwin)
-    # nix-darwin manages both the system layer and the user Home Manager
-    # profile.  darwin-rebuild invokes sudo internally for system activation.
+Darwin)
+  # nix-darwin manages both the system layer and the user Home Manager
+  # profile.  darwin-rebuild invokes sudo internally for system activation.
+  if [ -n "$target_user" ]; then
+    printf '%s\n' "apply: --target-user is ignored on Darwin system rebuilds (host-level configuration selects the Home Manager user)."
+  fi
+  start_sudo_keepalive
+  "$_ash_script_dir/secrets/generate-ssh-host-key.sh"
+  "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
+  run_health_check
+  # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
+  # while running as root (which otherwise produces ownership warnings).
+  run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --impure --flake "$REPO_ROOT/src#MacBook"
+  run_terminal_activations
+  "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
+  run_caddy_local_ca_trust sudo
+  NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/services/jellyfin-sync.sh"
+  run_ai_sync
+  run_replica_sync
+  run_vm_post_apply
+  run_manual_display MacBook
+  ;;
+Linux)
+  if [ -f /etc/NIXOS ]; then
+    # NixOS: use nixos-rebuild so the system layer and the embedded
+    # home-manager module are applied in a single atomic activation.
     if [ -n "$target_user" ]; then
-      printf '%s\n' "apply: --target-user is ignored on Darwin system rebuilds (host-level configuration selects the Home Manager user)."
+      printf '%s\n' "apply: --target-user is ignored on NixOS system rebuilds (host-level configuration selects the Home Manager user)."
     fi
     start_sudo_keepalive
     "$_ash_script_dir/secrets/generate-ssh-host-key.sh"
     "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
     run_health_check
-    # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
-    # while running as root (which otherwise produces ownership warnings).
-    run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --impure --flake "$REPO_ROOT/src#MacBook"
+    # Keep root invocations on root-owned HOME for consistent Nix behavior.
+    run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#NixOS"
     run_terminal_activations
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
     run_caddy_local_ca_trust sudo
-      NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/services/jellyfin-sync.sh"
+    NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/services/jellyfin-sync.sh"
     run_ai_sync
     run_replica_sync
     run_vm_post_apply
-    run_manual_display MacBook
-    ;;
-  Linux)
-    if [ -f /etc/NIXOS ]; then
-      # NixOS: use nixos-rebuild so the system layer and the embedded
-      # home-manager module are applied in a single atomic activation.
-      if [ -n "$target_user" ]; then
-        printf '%s\n' "apply: --target-user is ignored on NixOS system rebuilds (host-level configuration selects the Home Manager user)."
-      fi
-      start_sudo_keepalive
-      "$_ash_script_dir/secrets/generate-ssh-host-key.sh"
-      "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
-      run_health_check
-      # Keep root invocations on root-owned HOME for consistent Nix behavior.
-      run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#NixOS"
-      run_terminal_activations
-      "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
-      run_caddy_local_ca_trust sudo
-      NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/services/jellyfin-sync.sh"
-      run_ai_sync
-      run_replica_sync
-      run_vm_post_apply
-      run_gc
-      run_gc
-      run_manual_display NixOS
-    else
-      # Standalone Home Manager (plain Linux or WSL): no NixOS system layer,
-      # no sudo required — keepalive is not started.
-      # The profile name must match the homeConfigurations key in flake.nix.
-      target_username="${target_user:-${NUCLEUS_USERNAME:-$(id -un)}}"
-      run_health_check
-      run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
-      run_terminal_activations
-      "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
-      run_caddy_local_ca_trust user
-      NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/services/jellyfin-sync.sh"
-      run_ai_sync
-      run_replica_sync
-      run_vm_post_apply
-      run_gc
-      run_manual_display NixOS
-    fi
-    ;;
-  *)
-    printf '%s\n' "error: unsupported OS '$(uname -s)'" >&2
-    exit 1
-    ;;
+    run_gc
+    run_gc
+    run_manual_display NixOS
+  else
+    # Standalone Home Manager (plain Linux or WSL): no NixOS system layer,
+    # no sudo required — keepalive is not started.
+    # The profile name must match the homeConfigurations key in flake.nix.
+    target_username="${target_user:-${NUCLEUS_USERNAME:-$(id -un)}}"
+    run_health_check
+    run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
+    run_terminal_activations
+    "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
+    run_caddy_local_ca_trust user
+    NUCLEUS_REPO_ROOT="$REPO_ROOT" sh "$REPO_ROOT/src/scripts/services/jellyfin-sync.sh"
+    run_ai_sync
+    run_replica_sync
+    run_vm_post_apply
+    run_gc
+    run_manual_display NixOS
+  fi
+  ;;
+*)
+  printf '%s\n' "error: unsupported OS '$(uname -s)'" >&2
+  exit 1
+  ;;
 esac

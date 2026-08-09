@@ -15,13 +15,13 @@ if ! rclone_remotes="$(rclone listremotes)"; then
 fi
 
 case "$rclone_remotes" in
-  *"$remote_name":*)
-    ;;
-  *)
-    echo "cloud-drives: rclone remote '$remote_name' not configured; mount skipped." >&2
-    echo "cloud-drives: run 'rclone config' to set up the remote, then re-run 'home-manager switch'." >&2
-    exit 0
-    ;;
+*"$remote_name":*)
+  ;;
+*)
+  echo "cloud-drives: rclone remote '$remote_name' not configured; mount skipped." >&2
+  echo "cloud-drives: run 'rclone config' to set up the remote, then re-run 'home-manager switch'." >&2
+  exit 0
+  ;;
 esac
 
 exec rclone mount \

@@ -28,7 +28,7 @@ _discover_script_tests() {
   for _f in "${_all[@]}"; do
     _base="$(basename "$_f" .sh)"
     case "$_base" in
-      nix-test-eval-tests|check-pwsh-tests) continue ;;
+    nix-test-eval-tests | check-pwsh-tests) continue ;;
     esac
     local _already=false
     for _seen_f in "${_seen[@]}"; do
@@ -47,8 +47,8 @@ _discover_script_tests() {
 
 _is_priority_script_test() {
   case "$(basename "$1")" in
-    step-runner-unit-tests.sh|test-lib-unit-tests.sh|deny-list-tests.sh) return 0 ;;
-    *) return 1 ;;
+  step-runner-unit-tests.sh | test-lib-unit-tests.sh | deny-list-tests.sh) return 0 ;;
+  *) return 1 ;;
   esac
 }
 
@@ -88,8 +88,15 @@ _run_parallel_script_tests() {
     return 0
   fi
 
-  _capture_dir=$(mktemp -d) || { error "failed to create capture dir"; return 1; }
-  _failed_list=$(mktemp) || { error "failed to create failed list"; rm -rf "$_capture_dir"; return 1; }
+  _capture_dir=$(mktemp -d) || {
+    error "failed to create capture dir"
+    return 1
+  }
+  _failed_list=$(mktemp) || {
+    error "failed to create failed list"
+    rm -rf "$_capture_dir"
+    return 1
+  }
 
   for _script in "${_scripts[@]}"; do
     say "running $(basename "$_script")"
@@ -142,7 +149,8 @@ _run_parallel_script_tests() {
 }
 
 run_05_script_and_framework_tests() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _exit_code=0
   local _test_dir="$_repo_root/tests/scripts"
   local -a _all_scripts=() _priority_scripts=() _parallel_scripts=()

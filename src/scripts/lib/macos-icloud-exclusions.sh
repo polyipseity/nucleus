@@ -24,10 +24,10 @@ apply_exclusions() {
     while IFS= read -r dir_name; do
       [ -z "$dir_name" ] && continue
       if [ "$first" -eq 1 ]; then
-        find_args=( "(" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune" )
+        find_args=("(" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune")
         first=0
       else
-        find_args+=( "-o" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune" )
+        find_args+=("-o" "-name" "$dir_name" "-exec" "/usr/bin/xattr" "-w" "com.apple.fileprovider.ignore#P" "1" "{}" ";" "-prune")
       fi
     done < <(echo "$excluded_dirs_json" | "$jq_bin" -r '.[]' 2>/dev/null)
 
@@ -35,14 +35,14 @@ apply_exclusions() {
       continue
     fi
 
-    find_args+=( ")" )
+    find_args+=(")")
 
     count_batch=$("$find_bin" "$icloud_root" -type d "${find_args[@]}" -print 2>/dev/null | /usr/bin/wc -l | /usr/bin/tr -d ' ') || count_batch=0
-    count=$(( count + count_batch ))
+    count=$((count + count_batch))
   done < <(echo "$managed_roots_json" | "$jq_bin" -r '.[]' 2>/dev/null)
 
   end_time=$(date +%s)
-  elapsed=$(( end_time - start_time ))
+  elapsed=$((end_time - start_time))
 
   if [ "$count" -gt 0 ]; then
     echo "macos: iCloud exclusion applied to $count directories in ${elapsed}s" >&2

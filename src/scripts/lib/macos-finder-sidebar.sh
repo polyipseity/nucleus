@@ -13,22 +13,22 @@ finder_ensure_directories() {
   local favorites_json="$1"
   local jq_bin="$2"
   _ensure_tmp=$(mktemp)
-  printf '%s\n' "$favorites_json" | "$jq_bin" -r '.[] | .name' > "$_ensure_tmp"
+  printf '%s\n' "$favorites_json" | "$jq_bin" -r '.[] | .name' >"$_ensure_tmp"
   while IFS= read -r _name; do
     # System-owned favorites (Applications, Desktop, Documents, Downloads,
     # Music, Movies, Pictures) always exist; managed favorites may be
     # symlinks and must not be overwritten.
     case "$_name" in
-      Applications|Desktop|Documents|Downloads|Music|Movies|Pictures)
+    Applications | Desktop | Documents | Downloads | Music | Movies | Pictures)
+      mkdir -p "$HOME/$_name"
+      ;;
+    *)
+      if [ ! -d "$HOME/$_name" ] && [ ! -L "$HOME/$_name" ]; then
         mkdir -p "$HOME/$_name"
-        ;;
-      *)
-        if [ ! -d "$HOME/$_name" ] && [ ! -L "$HOME/$_name" ]; then
-          mkdir -p "$HOME/$_name"
-        fi
-        ;;
+      fi
+      ;;
     esac
-  done < "$_ensure_tmp"
+  done <"$_ensure_tmp"
   rm -f "$_ensure_tmp"
   unset _ensure_tmp
 }
@@ -45,11 +45,11 @@ finder_pre_remove() {
   local jq_bin="$2"
   local mysides_bin="$3"
   _pr_tmp=$(mktemp)
-  printf '%s\n' "$favorites_json" | "$jq_bin" -r '.[] | .name' > "$_pr_tmp"
+  printf '%s\n' "$favorites_json" | "$jq_bin" -r '.[] | .name' >"$_pr_tmp"
   while IFS= read -r _name; do
     # check-suppress:suppression_doc: mysides is known to segfault on corrupted bookmarks; soft-fail prevents activation abort.
     "$mysides_bin" remove "$_name" >/dev/null 2>&1 || true
-  done < "$_pr_tmp"
+  done <"$_pr_tmp"
   rm -f "$_pr_tmp"
   # Default extras that reappear after daemon restarts
   # check-suppress:suppression_doc: see finder_pre_remove -- mysides segfaults.
@@ -70,13 +70,13 @@ finder_clear_all() {
   local mysides_bin="$1"
   _clear_tmp=$(mktemp)
   # check-suppress:suppression_doc: mysides list may segfault on corrupted bookmarks; soft-fail prevents activation abort.
-  "$mysides_bin" list 2>/dev/null > "$_clear_tmp" || true
+  "$mysides_bin" list 2>/dev/null >"$_clear_tmp" || true
   while IFS= read -r _line; do
     _name="${_line%% -> *}"
     [ -n "$_name" ] || continue
     # check-suppress:suppression_doc: mysides remove may segfault; soft-fail prevents activation abort.
     "$mysides_bin" remove "$_name" >/dev/null 2>&1 || true
-  done < "$_clear_tmp"
+  done <"$_clear_tmp"
   rm -f "$_clear_tmp"
   unset _clear_tmp
 }
@@ -91,7 +91,7 @@ finder_add_managed_strict() {
   local jq_bin="$2"
   local mysides_bin="$3"
   _add_tmp=$(mktemp)
-  printf '%s\n' "$favorites_json" | "$jq_bin" -r '.[] | @base64' > "$_add_tmp"
+  printf '%s\n' "$favorites_json" | "$jq_bin" -r '.[] | @base64' >"$_add_tmp"
   _add_failed=0
   while IFS= read -r _item; do
     _jq() { printf '%s\n' "$_item" | base64 -d | "$jq_bin" -r "$1"; }
@@ -101,7 +101,7 @@ finder_add_managed_strict() {
       echo "macos: failed to add Finder favorite '$_name' ($_url)." >&2
       _add_failed=1
     fi
-  done < "$_add_tmp"
+  done <"$_add_tmp"
   rm -f "$_add_tmp"
   unset _add_tmp _jq
   return "$_add_failed"
@@ -117,14 +117,14 @@ finder_add_managed_best_effort() {
   local jq_bin="$2"
   local mysides_bin="$3"
   _add_tmp=$(mktemp)
-  printf '%s\n' "$favorites_json" | "$jq_bin" -r '.[] | @base64' > "$_add_tmp"
+  printf '%s\n' "$favorites_json" | "$jq_bin" -r '.[] | @base64' >"$_add_tmp"
   while IFS= read -r _item; do
     _jq() { printf '%s\n' "$_item" | base64 -d | "$jq_bin" -r "$1"; }
     _name=$(_jq '.name')
     _url=$(_jq '.url')
     # check-suppress:suppression_doc: mysides add may segfault; best-effort add must not abort activation.
     "$mysides_bin" add "$_name" "$_url" >/dev/null 2>&1 || true
-  done < "$_add_tmp"
+  done <"$_add_tmp"
   rm -f "$_add_tmp"
   unset _add_tmp _jq
 }

@@ -5,27 +5,28 @@
 register_step "system-config-build" 4 "System config build" run_04_system_config_build
 
 run_04_system_config_build() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _exit_code=0
 
   local _host=""
   _host="$(resolve_nucleus_host)"
   export NUCLEUS_REPO_ROOT="$_repo_root"
   case "$_host" in
-    MacBook) _attr="darwinConfigurations.MacBook.system" ;;
-    NixOS)
-      if [ -d /etc/nixos ]; then
-        _attr="nixosConfigurations.NixOS.config.system.build.toplevel"
-      else
-        _primary="$(NUCLEUS_REPO_ROOT="$_repo_root" "$_repo_root/src/scripts/lib/load-user-registry.sh" \
-          --host NixOS --repo-root "$_repo_root" | jq -r '.primaryUser')"
-        _attr="homeConfigurations.${_primary}.activationPackage"
-      fi
-      ;;
-    *)
-      say "system config build: unsupported host ($_host), skipping."
-      return 2
-      ;;
+  MacBook) _attr="darwinConfigurations.MacBook.system" ;;
+  NixOS)
+    if [ -d /etc/nixos ]; then
+      _attr="nixosConfigurations.NixOS.config.system.build.toplevel"
+    else
+      _primary="$(NUCLEUS_REPO_ROOT="$_repo_root" "$_repo_root/src/scripts/lib/load-user-registry.sh" \
+        --host NixOS --repo-root "$_repo_root" | jq -r '.primaryUser')"
+      _attr="homeConfigurations.${_primary}.activationPackage"
+    fi
+    ;;
+  *)
+    say "system config build: unsupported host ($_host), skipping."
+    return 2
+    ;;
   esac
 
   # WHY: the system build contends on the SQLite eval cache and flakehub

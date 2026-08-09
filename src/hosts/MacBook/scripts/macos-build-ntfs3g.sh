@@ -46,9 +46,9 @@ export SDKROOT="$SDK_ROOT"
 FINGERPRINT_FILE="/usr/local/share/ntfs-3g/.build-fingerprint"
 LOG_FILE="/Users/Shared/nucleus/logs/ntfs-3g-build.log"
 
-if ! [ -x /usr/local/bin/ntfs-3g ] \
-   || ! [ -f "$FINGERPRINT_FILE" ] \
-   || [ "$(cat "$FINGERPRINT_FILE")" != "$CURRENT_FINGERPRINT" ]; then
+if ! [ -x /usr/local/bin/ntfs-3g ] ||
+  ! [ -f "$FINGERPRINT_FILE" ] ||
+  [ "$(cat "$FINGERPRINT_FILE")" != "$CURRENT_FINGERPRINT" ]; then
   echo "ntfs-3g: building from source... (log: $LOG_FILE)"
   export PATH="$PATH:$BUILD_TOOLS_PATH"
   export ACLOCAL_PATH="$ACLOCAL_PATH_VALUE"
@@ -68,9 +68,9 @@ if ! [ -x /usr/local/bin/ntfs-3g ] \
     # (SIP), and fix install-exec-hook to handle missing .so/.dylib files
     # on Darwin.
     echo "ntfs-3g: patching..."
-    patch -p1 < "$CRYPTO_PATCH_PATH"
-    patch -p1 < "$ROOTBINDIR_PATCH_PATH"
-    patch -p1 < "$INSTALL_HOOK_PATCH_PATH"
+    patch -p1 <"$CRYPTO_PATCH_PATH"
+    patch -p1 <"$ROOTBINDIR_PATCH_PATH"
+    patch -p1 <"$INSTALL_HOOK_PATCH_PATH"
 
     echo "ntfs-3g: running autotools..."
     libtoolize --copy --force
@@ -80,8 +80,8 @@ if ! [ -x /usr/local/bin/ntfs-3g ] \
     autoconf --force
 
     echo "ntfs-3g: configuring..."
-  # WHY: keep fuse-t out of LDFLAGS during configure — autoconf link probes
-  # fail when every test binary must link fuse-t under nix clang wrappers.
+    # WHY: keep fuse-t out of LDFLAGS during configure — autoconf link probes
+    # fail when every test binary must link fuse-t under nix clang wrappers.
     LDFLAGS=
     ./configure "$CONFIGURE_FLAGS"
 
@@ -90,17 +90,17 @@ if ! [ -x /usr/local/bin/ntfs-3g ] \
     make -j"$(sysctl -n hw.ncpu)"
     echo "ntfs-3g: installing..."
     make install
-  } >> "$LOG_FILE" 2>&1 || exit_code=$?
+  } >>"$LOG_FILE" 2>&1 || exit_code=$?
 
   if [ "${exit_code:-0}" -ne 0 ]; then
     echo "ntfs-3g: BUILD FAILED (exit ${exit_code}) — see $(/bin/realpath "$LOG_FILE")" >&2
     exit "$exit_code"
   fi
 
-  echo "=== ntfs-3g build finished at $(date) ===" >> "$LOG_FILE" 2>&1
+  echo "=== ntfs-3g build finished at $(date) ===" >>"$LOG_FILE" 2>&1
 
   echo "ntfs-3g: build complete — log at $(/bin/realpath "$LOG_FILE")"
 
   /bin/mkdir -p "$(dirname "$FINGERPRINT_FILE")"
-  echo "$CURRENT_FINGERPRINT" > "$FINGERPRINT_FILE"
+  echo "$CURRENT_FINGERPRINT" >"$FINGERPRINT_FILE"
 fi

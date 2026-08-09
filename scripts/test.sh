@@ -24,8 +24,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)

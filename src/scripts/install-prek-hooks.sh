@@ -13,14 +13,14 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 _ephi_repo_root=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --repo-root)
-      _ephi_repo_root="$2"
-      shift 2
-      ;;
-    *)
-      usage_std "$(basename "$0")" "[--repo-root <path>]" "Install prek Git hooks for a repository"
-      exit 2
-      ;;
+  --repo-root)
+    _ephi_repo_root="$2"
+    shift 2
+    ;;
+  *)
+    usage_std "$(basename "$0")" "[--repo-root <path>]" "Install prek Git hooks for a repository"
+    exit 2
+    ;;
   esac
 done
 
@@ -36,11 +36,11 @@ fi
 _ephi_git_dir=$(cd "$_ephi_repo_root" && git rev-parse --git-dir 2>/dev/null) || exit 0
 
 case "$_ephi_git_dir" in
-  /*)
-    ;;
-  *)
-    _ephi_git_dir="$_ephi_repo_root/$_ephi_git_dir"
-    ;;
+/*)
+  ;;
+*)
+  _ephi_git_dir="$_ephi_repo_root/$_ephi_git_dir"
+  ;;
 esac
 
 _ephi_hook_dir="$_ephi_git_dir/hooks"

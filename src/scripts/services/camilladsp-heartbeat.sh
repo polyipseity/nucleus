@@ -18,9 +18,18 @@ config_file="$HOME/.config/camilladsp/configs/config.yml"
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --port) shift; ws_port="${1:-$ws_port}" ;;
-    --config) shift; config_file="${1:-$config_file}" ;;
-    *) printf 'error: unknown argument: %s\n' "$1" >&2; exit 1 ;;
+  --port)
+    shift
+    ws_port="${1:-$ws_port}"
+    ;;
+  --config)
+    shift
+    config_file="${1:-$config_file}"
+    ;;
+  *)
+    printf 'error: unknown argument: %s\n' "$1" >&2
+    exit 1
+    ;;
   esac
   shift
 done

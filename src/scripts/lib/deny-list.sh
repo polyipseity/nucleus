@@ -32,20 +32,23 @@ filter_gitignored() {
   fi
   local _tmp _git_exit=0
   _tmp=$(mktemp) || return 1
-  cat > "$_tmp"
-  [ ! -s "$_tmp" ] && { rm -f "$_tmp"; return; }
+  cat >"$_tmp"
+  [ ! -s "$_tmp" ] && {
+    rm -f "$_tmp"
+    return
+  }
   # Batch check via stdin. Capture output to temp file so pipefail
   # does not interfere with the exit code check.
   # `||` (not `;`) is required: git exits 1 when nothing is ignored, and
   # without the conditional context `set -e` aborts this subshell before
   # `_git_exit=$?` captures it — leaving callers with empty file lists.
-  git check-ignore --stdin < "$_tmp" 2>/dev/null > "$_tmp.ignored" || _git_exit=$?
+  git check-ignore --stdin <"$_tmp" 2>/dev/null >"$_tmp.ignored" || _git_exit=$?
   if [ "$_git_exit" -gt 1 ]; then
     # git error (exit 128) — pass through unchanged
     cat "$_tmp"
   elif [ -s "$_tmp.ignored" ]; then
     # Some paths were ignored — subtract them from the input
-    grep -v -F -x -f "$_tmp.ignored" "$_tmp" 2>/dev/null || true  # check-suppress:suppression_doc: grep -v exits 1 when every path is ignored; an empty result is handled by the caller
+    grep -v -F -x -f "$_tmp.ignored" "$_tmp" 2>/dev/null || true # check-suppress:suppression_doc: grep -v exits 1 when every path is ignored; an empty result is handled by the caller
   else
     # Nothing ignored (exit 1 with empty output) — pass through
     cat "$_tmp"

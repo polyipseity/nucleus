@@ -29,7 +29,7 @@ _ab_parse_args() {
   _ab_end_named=false
   for _ab_arg in "$@"; do
     if [ "$_ab_end_named" = true ]; then
-      printf '%s\n' "$_ab_arg" >> "$_ab_positional_file"
+      printf '%s\n' "$_ab_arg" >>"$_ab_positional_file"
       _ab_positional_count=$((_ab_positional_count + 1))
     elif [ "$_ab_arg" = "--" ]; then
       _ab_end_named=true
@@ -37,26 +37,26 @@ _ab_parse_args() {
       # --key or --key=value
       _ab_key="${_ab_arg#--}"
       case "$_ab_key" in
-        *=*)
-          _ab_k="${_ab_key%%=*}"
-          _ab_v="${_ab_key#*=}"
-          printf '%s=%s\n' "$_ab_k" "$_ab_v" >> "$_ab_args_file"
-          ;;
-        *)
-          # --key value: read next arg as value
-          _ab_k="$_ab_key"
-          if [ $# -gt 1 ]; then
-            shift
-            _ab_v="$1"
-          else
-            _ab_v=""
-          fi
-          printf '%s=%s\n' "$_ab_k" "$_ab_v" >> "$_ab_args_file"
-          ;;
+      *=*)
+        _ab_k="${_ab_key%%=*}"
+        _ab_v="${_ab_key#*=}"
+        printf '%s=%s\n' "$_ab_k" "$_ab_v" >>"$_ab_args_file"
+        ;;
+      *)
+        # --key value: read next arg as value
+        _ab_k="$_ab_key"
+        if [ $# -gt 1 ]; then
+          shift
+          _ab_v="$1"
+        else
+          _ab_v=""
+        fi
+        printf '%s=%s\n' "$_ab_k" "$_ab_v" >>"$_ab_args_file"
+        ;;
       esac
     else
       # Positional argument
-      printf '%s\n' "$_ab_arg" >> "$_ab_positional_file"
+      printf '%s\n' "$_ab_arg" >>"$_ab_positional_file"
       _ab_positional_count=$((_ab_positional_count + 1))
     fi
     shift
@@ -68,12 +68,12 @@ _ab_get_arg() {
   _ab_key="$1"
   while IFS= read -r _ab_line; do
     case "$_ab_line" in
-      "${_ab_key}="*)
-        printf '%s\n' "${_ab_line#*=}"
-        return 0
-        ;;
+    "${_ab_key}="*)
+      printf '%s\n' "${_ab_line#*=}"
+      return 0
+      ;;
     esac
-  done < "$_ab_args_file"
+  done <"$_ab_args_file"
   return 0
 }
 
@@ -82,12 +82,12 @@ _ab_get_arg_bool() {
   _ab_key="$1"
   while IFS= read -r _ab_line; do
     case "$_ab_line" in
-      "${_ab_key}="*)
-        printf '%s\n' "1"
-        return 0
-        ;;
+    "${_ab_key}="*)
+      printf '%s\n' "1"
+      return 0
+      ;;
     esac
-  done < "$_ab_args_file"
+  done <"$_ab_args_file"
   printf '%s\n' "0"
 }
 

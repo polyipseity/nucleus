@@ -10,8 +10,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
@@ -49,21 +49,21 @@ resolve_icloud_service_for_remote() {
         | unique
         | .[]
       ' \
-      <<< "$_ics_registry"
+      <<<"$_ics_registry"
   } 2>/dev/null)"
 
   _ics_service_count="$(printf '%s\n' "$_ics_services" | /usr/bin/awk 'NF { count += 1 } END { print count + 0 }')"
   case "$_ics_service_count" in
-    1)
-      printf '%s\n' "$_ics_services" | /usr/bin/awk 'NF { print; exit }'
-      ;;
-    [2-9]*|[1-9][0-9]*)
-      warn "multiple iCloud services are configured for remote '$_ics_remote_name'; defaulting remote setup to 'drive' and letting mount commands override per entry."
-      printf '%s\n' 'drive'
-      ;;
-    *)
-      printf '%s\n' 'drive'
-      ;;
+  1)
+    printf '%s\n' "$_ics_services" | /usr/bin/awk 'NF { print; exit }'
+    ;;
+  [2-9]* | [1-9][0-9]*)
+    warn "multiple iCloud services are configured for remote '$_ics_remote_name'; defaulting remote setup to 'drive' and letting mount commands override per entry."
+    printf '%s\n' 'drive'
+    ;;
+  *)
+    printf '%s\n' 'drive'
+    ;;
   esac
 }
 
@@ -110,7 +110,7 @@ collect_configured_mount_service_ids() {
       | [.id, .remoteName]
       | @tsv
     ' \
-    <<< "$_ccmsi_registry"; } 2>/dev/null || true # check-suppress:suppression_doc: user registry may be empty or malformed; empty result is handled.
+    <<<"$_ccmsi_registry"; } 2>/dev/null || true # check-suppress:suppression_doc: user registry may be empty or malformed; empty result is handled.
 }
 
 # Restart managed cloud mount services so refreshed remote descriptions and
@@ -124,72 +124,72 @@ restart_cloud_mount_services() {
   fi
 
   case "$(uname)" in
-    Darwin)
-      _rcms_uid="$(id -u)"
-      say "restarting managed macOS cloud mount services..."
+  Darwin)
+    _rcms_uid="$(id -u)"
+    say "restarting managed macOS cloud mount services..."
 
-      while IFS="$(printf '\t')" read -r mount_id remote_name; do
-        if [ -z "$mount_id" ]; then
-          continue
-        fi
-
-        # iCloud mount restart can block for an extended period while Apple
-        # auth/session state reconciles. Skip it here so cloud-setup remains
-        # responsive; users can still restart iCloud mounts via nucleus apply.
-        if [ "$remote_name" = "iCloud" ]; then
-          say "skipping launchctl restart for iCloud mount (${mount_id}); restart via nucleus apply if needed."
-          continue
-        fi
-
-        _rcms_label="local.cloud-mount.${mount_id}"
-        _rcms_target="gui/${_rcms_uid}/${_rcms_label}"
-
-        # Both missing-service and launchctl parse failures are benign here;
-        # if the service is absent we emit a targeted hint and continue.
-        if launchctl print "$_rcms_target" >/dev/null 2>&1; then
-          if launchctl kickstart -k "$_rcms_target"; then
-            say "restarted $_rcms_label (${remote_name})"
-          else
-            warn "failed to restart $_rcms_label (${remote_name}); run nucleus apply if mount content remains stale."
-          fi
-        else
-          warn "mount service $_rcms_label (${remote_name}) is not loaded; run nucleus apply to create/load it."
-        fi
-      done <<EOF
-$_rcms_mount_rows
-EOF
-      ;;
-    Linux)
-      if ! command -v systemctl >/dev/null 2>&1; then
-        warn "systemctl not found; cannot restart user cloud mount services on Linux."
-        return 0
+    while IFS="$(printf '\t')" read -r mount_id remote_name; do
+      if [ -z "$mount_id" ]; then
+        continue
       fi
 
-      say "restarting managed Linux cloud mount services..."
+      # iCloud mount restart can block for an extended period while Apple
+      # auth/session state reconciles. Skip it here so cloud-setup remains
+      # responsive; users can still restart iCloud mounts via nucleus apply.
+      if [ "$remote_name" = "iCloud" ]; then
+        say "skipping launchctl restart for iCloud mount (${mount_id}); restart via nucleus apply if needed."
+        continue
+      fi
 
-      # Line 172 — deliberate tab-split of jq @tsv rows
-      while IFS="$(printf '\t')" read -r mount_id remote_name; do
-        if [ -z "$mount_id" ]; then
-          continue
-        fi
+      _rcms_label="local.cloud-mount.${mount_id}"
+      _rcms_target="gui/${_rcms_uid}/${_rcms_label}"
 
-        _rcms_service="cloud-mount-${mount_id}.service"
-        if systemctl --user is-active --quiet "$_rcms_service" || systemctl --user is-enabled --quiet "$_rcms_service"; then
-          if systemctl --user restart "$_rcms_service"; then
-            say "restarted $_rcms_service (${remote_name})"
-          else
-            warn "failed to restart $_rcms_service (${remote_name}); run nucleus apply if mount content remains stale."
-          fi
+      # Both missing-service and launchctl parse failures are benign here;
+      # if the service is absent we emit a targeted hint and continue.
+      if launchctl print "$_rcms_target" >/dev/null 2>&1; then
+        if launchctl kickstart -k "$_rcms_target"; then
+          say "restarted $_rcms_label (${remote_name})"
         else
-          warn "mount service $_rcms_service (${remote_name}) is not installed/enabled; run nucleus apply to create/load it."
+          warn "failed to restart $_rcms_label (${remote_name}); run nucleus apply if mount content remains stale."
         fi
-      done <<EOF
+      else
+        warn "mount service $_rcms_label (${remote_name}) is not loaded; run nucleus apply to create/load it."
+      fi
+    done <<EOF
 $_rcms_mount_rows
 EOF
-      ;;
-    *)
+    ;;
+  Linux)
+    if ! command -v systemctl >/dev/null 2>&1; then
+      warn "systemctl not found; cannot restart user cloud mount services on Linux."
       return 0
-      ;;
+    fi
+
+    say "restarting managed Linux cloud mount services..."
+
+    # Line 172 — deliberate tab-split of jq @tsv rows
+    while IFS="$(printf '\t')" read -r mount_id remote_name; do
+      if [ -z "$mount_id" ]; then
+        continue
+      fi
+
+      _rcms_service="cloud-mount-${mount_id}.service"
+      if systemctl --user is-active --quiet "$_rcms_service" || systemctl --user is-enabled --quiet "$_rcms_service"; then
+        if systemctl --user restart "$_rcms_service"; then
+          say "restarted $_rcms_service (${remote_name})"
+        else
+          warn "failed to restart $_rcms_service (${remote_name}); run nucleus apply if mount content remains stale."
+        fi
+      else
+        warn "mount service $_rcms_service (${remote_name}) is not installed/enabled; run nucleus apply to create/load it."
+      fi
+    done <<EOF
+$_rcms_mount_rows
+EOF
+    ;;
+  *)
+    return 0
+    ;;
   esac
 }
 
@@ -203,22 +203,22 @@ EOF
 apply=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    --apply)
-      apply=true
-      ;;
-    --no-apply)
-      apply=false
-      ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --apply)
+    apply=true
+    ;;
+  --no-apply)
+    apply=false
+    ;;
 
-    *)
-      error "unsupported argument '$1'"
-      usage >&2
-      exit 1
-      ;;
+  *)
+    error "unsupported argument '$1'"
+    usage >&2
+    exit 1
+    ;;
   esac
   shift
 done
@@ -226,10 +226,10 @@ done
 # Maps a known remote name to its rclone provider type string.
 remote_provider_type() {
   case "$1" in
-    GoogleDrive) printf 'drive' ;;
-    iCloud)      printf 'iclouddrive' ;;
-    OneDrive)    printf 'onedrive' ;;
-    *)           printf '' ;;
+  GoogleDrive) printf 'drive' ;;
+  iCloud) printf 'iclouddrive' ;;
+  OneDrive) printf 'onedrive' ;;
+  *) printf '' ;;
   esac
 }
 
@@ -247,14 +247,14 @@ remote_provider_create_args() {
   _rpca_repo_root="$3"
 
   case "$_rpca_provider_type" in
-    drive)
-      printf '%s\n' 'acknowledge_abuse' 'true'
-      ;;
-    iclouddrive)
-      _rpca_service="$(resolve_icloud_service_for_remote "$_rpca_repo_root" "$_rpca_remote_name" "${USERS_REGISTRY:-}")"
-      printf '%s\n' 'service' "$_rpca_service" '--all'
-      ;;
-    *)           return 0 ;;
+  drive)
+    printf '%s\n' 'acknowledge_abuse' 'true'
+    ;;
+  iclouddrive)
+    _rpca_service="$(resolve_icloud_service_for_remote "$_rpca_repo_root" "$_rpca_remote_name" "${USERS_REGISTRY:-}")"
+    printf '%s\n' 'service' "$_rpca_service" '--all'
+    ;;
+  *) return 0 ;;
   esac
 }
 
@@ -414,8 +414,8 @@ if [ -n "$USERS_REGISTRY" ] && command -v jq >/dev/null 2>&1; then
         | [.remoteName, .name]
         | @tsv
       ' \
-      <<< "$USERS_REGISTRY"
-  # check-suppress:suppression_doc: token/URL may not be resolvable; best-effort extraction with downstream guards.
+      <<<"$USERS_REGISTRY"
+    # check-suppress:suppression_doc: token/URL may not be resolvable; best-effort extraction with downstream guards.
   } 2>/dev/null || true)"
 
   if [ -n "$_display_names" ]; then

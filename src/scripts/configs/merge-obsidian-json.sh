@@ -17,15 +17,15 @@ _obsidian_merge_json() {
 }
 
 case "$(uname -s)" in
-  Darwin)
-    _obsidian_settings_path="$HOME/Library/Application Support/obsidian/obsidian.json"
-    ;;
-  Linux)
-    _obsidian_settings_path="${XDG_CONFIG_HOME:-$HOME/.config}/obsidian/obsidian.json"
-    ;;
-  *)
-    exit 0
-    ;;
+Darwin)
+  _obsidian_settings_path="$HOME/Library/Application Support/obsidian/obsidian.json"
+  ;;
+Linux)
+  _obsidian_settings_path="${XDG_CONFIG_HOME:-$HOME/.config}/obsidian/obsidian.json"
+  ;;
+*)
+  exit 0
+  ;;
 esac
 
 mkdir -p "$(dirname "$_obsidian_settings_path")"

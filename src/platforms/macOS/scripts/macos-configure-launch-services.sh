@@ -14,7 +14,7 @@ _handlers_json="$2"
 
 # Parse JSON and call register_handler for each entry
 _handlers_tmp=$(mktemp)
-printf '%s\n' "$_handlers_json" > "$_handlers_tmp"
+printf '%s\n' "$_handlers_json" >"$_handlers_tmp"
 # Use jq if available, otherwise skip gracefully
 if command -v jq >/dev/null 2>&1; then
   _handler_count=$(jq -r '. | length' "$_handlers_tmp")

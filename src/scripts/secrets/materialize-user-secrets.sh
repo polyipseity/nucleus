@@ -39,12 +39,12 @@ _mus_decrypt_json="$(
 
 _mus_should_skip_key() {
   case "$1" in
-    sops | jellyfin_* | vm_guest_*)
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
+  sops | jellyfin_* | vm_guest_*)
+    return 0
+    ;;
+  *)
+    return 1
+    ;;
   esac
 }
 
@@ -79,40 +79,40 @@ while IFS= read -r _mus_key; do
   _mus_value="$(printf '%s\n' "$_mus_decrypt_json" | "$_mus_jq_bin" -r --arg key "$_mus_key" '.[ $key ]')"
 
   case "$_mus_key" in
-    gpg_*)
-      _mus_gpg_temp="$(mktemp)"
-      printf '%s' "$_mus_value" > "$_mus_gpg_temp"
-      _mus_gpg_temp_files+=("$_mus_gpg_temp")
-      ;;
-    ssh_*)
-      _mus_relative_path="${_mus_key#ssh_}"
-      _mus_ssh_target="$_mus_ssh_dir/$_mus_relative_path"
-      _mus_ssh_target_dir="$(dirname -- "$_mus_ssh_target")"
-      mkdir -p "$_mus_ssh_target_dir"
-      # Replace stale sops-nix symlinks from older generations before writing.
-      rm -f "$_mus_ssh_target"
-      printf '%s' "$_mus_value" > "$_mus_ssh_target"
-      case "$_mus_relative_path" in
-        *.pub)
-          chmod 0644 "$_mus_ssh_target"
-          ;;
-        *)
-          chmod 0600 "$_mus_ssh_target"
-          _mus_private_ssh_paths+=("$_mus_ssh_target")
-          ;;
-      esac
-      ;;
-    git_identity)
-      _mus_git_identity_temp="$(mktemp)"
-      printf '%s' "$_mus_value" > "$_mus_git_identity_temp"
-      ;;
-    rclone_config_pass)
-      _mus_rclone_pass_path="$_mus_nucleus_secrets_dir/rclone-config-pass"
-      printf '%s' "$_mus_value" > "$_mus_rclone_pass_path"
-      chmod 0400 "$_mus_rclone_pass_path"
+  gpg_*)
+    _mus_gpg_temp="$(mktemp)"
+    printf '%s' "$_mus_value" >"$_mus_gpg_temp"
+    _mus_gpg_temp_files+=("$_mus_gpg_temp")
+    ;;
+  ssh_*)
+    _mus_relative_path="${_mus_key#ssh_}"
+    _mus_ssh_target="$_mus_ssh_dir/$_mus_relative_path"
+    _mus_ssh_target_dir="$(dirname -- "$_mus_ssh_target")"
+    mkdir -p "$_mus_ssh_target_dir"
+    # Replace stale sops-nix symlinks from older generations before writing.
+    rm -f "$_mus_ssh_target"
+    printf '%s' "$_mus_value" >"$_mus_ssh_target"
+    case "$_mus_relative_path" in
+    *.pub)
+      chmod 0644 "$_mus_ssh_target"
       ;;
     *)
+      chmod 0600 "$_mus_ssh_target"
+      _mus_private_ssh_paths+=("$_mus_ssh_target")
       ;;
+    esac
+    ;;
+  git_identity)
+    _mus_git_identity_temp="$(mktemp)"
+    printf '%s' "$_mus_value" >"$_mus_git_identity_temp"
+    ;;
+  rclone_config_pass)
+    _mus_rclone_pass_path="$_mus_nucleus_secrets_dir/rclone-config-pass"
+    printf '%s' "$_mus_value" >"$_mus_rclone_pass_path"
+    chmod 0400 "$_mus_rclone_pass_path"
+    ;;
+  *)
+    ;;
   esac
 done < <(printf '%s\n' "$_mus_decrypt_json" | "$_mus_jq_bin" -r 'keys[]')
 
@@ -133,7 +133,7 @@ fi
   for _mus_private_path in "${_mus_private_ssh_paths[@]}"; do
     printf '%s\n' "$_mus_private_path"
   done
-} > "$_mus_managed_ssh_key_paths"
+} >"$_mus_managed_ssh_key_paths"
 chmod 600 "$_mus_managed_ssh_key_paths"
 
 if [ -f "$_mus_primary_ssh_pub" ]; then

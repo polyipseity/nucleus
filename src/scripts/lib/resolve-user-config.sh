@@ -112,8 +112,8 @@ resolve_user_config_first_level_entry() {
 
 _wallpaper_image_name() {
   case "${1,,}" in
-    *.gif | *.jpeg | *.jpg | *.png | *.webp) return 0 ;;
-    *) return 1 ;;
+  *.gif | *.jpeg | *.jpg | *.png | *.webp) return 0 ;;
+  *) return 1 ;;
   esac
 }
 
@@ -126,7 +126,7 @@ list_wallpaper_encrypted_blobs() {
     [ -e "$entry" ] || continue
     base="$(basename "$entry")"
     case "$base" in
-      *.sops) printf '%s\n' "$base" ;;
+    *.sops) printf '%s\n' "$base" ;;
     esac
   done
 }

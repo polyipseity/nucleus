@@ -22,8 +22,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
@@ -42,41 +42,41 @@ replica_id_filter=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --dry-run)
-      dry_run=true
-      ;;
-    --replica-id)
-      shift
-      if [ "$#" -eq 0 ] || [ -z "$1" ]; then
-        error "--replica-id requires a value"
-        exit 1
-      fi
-      replica_id_filter="$1"
-      ;;
-    --repo-root)
-      shift
-      if [ "$#" -eq 0 ] || [ -z "$1" ]; then
-        error "--repo-root requires a value"
-        exit 1
-      fi
-      repo_root="$1"
-      ;;
-    --repo-root=*)
-      repo_root="${1#--repo-root=}"
-      if [ -z "$repo_root" ]; then
-        error "--repo-root requires a non-empty value"
-        exit 1
-      fi
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      error "unsupported argument '$1'"
-      usage >&2
+  --dry-run)
+    dry_run=true
+    ;;
+  --replica-id)
+    shift
+    if [ "$#" -eq 0 ] || [ -z "$1" ]; then
+      error "--replica-id requires a value"
       exit 1
-      ;;
+    fi
+    replica_id_filter="$1"
+    ;;
+  --repo-root)
+    shift
+    if [ "$#" -eq 0 ] || [ -z "$1" ]; then
+      error "--repo-root requires a value"
+      exit 1
+    fi
+    repo_root="$1"
+    ;;
+  --repo-root=*)
+    repo_root="${1#--repo-root=}"
+    if [ -z "$repo_root" ]; then
+      error "--repo-root requires a non-empty value"
+      exit 1
+    fi
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    error "unsupported argument '$1'"
+    usage >&2
+    exit 1
+    ;;
   esac
   shift
 done
@@ -149,7 +149,7 @@ replica_lines="$({
         (.name // .id)
       ]
     | @tsv
-  ' <<< "$USERS_REGISTRY"
+  ' <<<"$USERS_REGISTRY"
 } || true)" # check-suppress:suppression_doc: jq query may fail if user registry is missing; empty result handled by [ -z ] check downstream.
 
 # check-suppress:suppression_doc: rclone remote may not be configured yet; probe expected to fail.
@@ -183,7 +183,7 @@ record_unique_name() {
   fi
 
   if [ ! -f "$_list_file" ] || ! grep -Fxq "$_name" "$_list_file"; then
-    printf '%s\n' "$_name" >> "$_list_file"
+    printf '%s\n' "$_name" >>"$_list_file"
   fi
 }
 
@@ -238,9 +238,9 @@ build_onedrive_root_filter_file() {
   _dir_entries_file="$(mktemp)"
   _file_entries_file="$(mktemp)"
 
-  : > "$_filter_file"
+  : >"$_filter_file"
   for _pattern in $_remote_excludes; do
-    printf -- '- %s\n' "$_pattern" >> "$_filter_file"
+    printf -- '- %s\n' "$_pattern" >>"$_filter_file"
   done
 
   if [ "$dry_run" = true ]; then
@@ -311,9 +311,9 @@ build_onedrive_root_filter_file() {
       if [ -z "$_dir_name" ]; then
         continue
       fi
-      printf '+ /%s/\n' "$_dir_name" >> "$_filter_file"
-      printf '+ /%s/**\n' "$_dir_name" >> "$_filter_file"
-    done < "$_dir_entries_file"
+      printf '+ /%s/\n' "$_dir_name" >>"$_filter_file"
+      printf '+ /%s/**\n' "$_dir_name" >>"$_filter_file"
+    done <"$_dir_entries_file"
   fi
 
   if [ -f "$_file_entries_file" ]; then
@@ -321,12 +321,12 @@ build_onedrive_root_filter_file() {
       if [ -z "$_file_name" ]; then
         continue
       fi
-      printf '+ /%s\n' "$_file_name" >> "$_filter_file"
-    done < "$_file_entries_file"
+      printf '+ /%s\n' "$_file_name" >>"$_filter_file"
+    done <"$_file_entries_file"
   fi
 
   # WHY: the trailing catch-all exclude makes the filter closed-world —
-  printf '%s\n' '- **' >> "$_filter_file"
+  printf '%s\n' '- **' >>"$_filter_file"
 
   rm -f "$_dir_entries_file" "$_file_entries_file"
   printf '%s\n' "$_filter_file"
@@ -402,18 +402,18 @@ ensure_macos_icloud_replica_symlink() {
 resolve_filter_path() {
   _candidate="$1"
   case "$_candidate" in
-    "")
-      printf '%s' ""
-      ;;
-    ~/*)
-      printf '%s' "$HOME/${_candidate#~/}"
-      ;;
-    /*)
-      printf '%s' "$_candidate"
-      ;;
-    *)
-      printf '%s' "$HOME/$_candidate"
-      ;;
+  "")
+    printf '%s' ""
+    ;;
+  ~/*)
+    printf '%s' "$HOME/${_candidate#~/}"
+    ;;
+  /*)
+    printf '%s' "$_candidate"
+    ;;
+  *)
+    printf '%s' "$HOME/$_candidate"
+    ;;
   esac
 }
 
@@ -455,7 +455,7 @@ set_replica_tree_read_only() {
 failures=0
 
 replica_lines_file="$(mktemp)"
-printf '%s\n' "$replica_lines" > "$replica_lines_file"
+printf '%s\n' "$replica_lines" >"$replica_lines_file"
 
 # WHY: the replica list is staged in a temp file so the loop reads from a
 # real file descriptor — a pipeline would run the loop body in a subshell
@@ -555,7 +555,7 @@ while IFS="$(printf '\t')" read -r id direction local_path remote_path provider 
       failures=$((failures + 1))
     fi
   fi
-done < "$replica_lines_file"
+done <"$replica_lines_file"
 
 rm -f "$replica_lines_file"
 

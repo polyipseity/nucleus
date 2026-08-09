@@ -29,32 +29,32 @@ export PATH
 # Desired crates as JSON array of crate names, e.g. ["crate1","crate2"].
 # Empty array = no cargo-binstall-managed crates on this host.
 _icp_desired="$(mktemp)"
-printf '%s\n' "$_icp_desired_crates_json" | "$_icp_jq_bin" -r '.[]' > "$_icp_desired"
+printf '%s\n' "$_icp_desired_crates_json" | "$_icp_jq_bin" -r '.[]' >"$_icp_desired"
 
 # Get actually installed crates from `cargo install --list` (zap-style).
 # Output format: "crate-name vX.Y.Z:" on header lines; extract the
 # crate name (first field) from lines matching that pattern.
 _icp_installed="$(mktemp)"
 # shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
-cargo install --list 2>/dev/null | "$_icp_gawk_bin" '/^[a-zA-Z0-9_-]+ v/{print $1}' > "$_icp_installed" || true  # check-suppress:suppression_doc: cargo install --list may fail if ~/.cargo uninitialised
+cargo install --list 2>/dev/null | "$_icp_gawk_bin" '/^[a-zA-Z0-9_-]+ v/{print $1}' >"$_icp_installed" || true # check-suppress:suppression_doc: cargo install --list may fail if ~/.cargo uninitialised
 
 # Crates installed but not desired: zap-style removal.
 _icp_to_remove="$(mktemp)"
 while IFS= read -r _icp_crate; do
   [ -z "$_icp_crate" ] && continue
   if ! grep -qxF "$_icp_crate" "$_icp_desired"; then
-    printf '%s\n' "$_icp_crate" >> "$_icp_to_remove"
+    printf '%s\n' "$_icp_crate" >>"$_icp_to_remove"
   fi
-done < "$_icp_installed"
+done <"$_icp_installed"
 
 # Desired crates not yet installed.
 _icp_to_install="$(mktemp)"
 while IFS= read -r _icp_crate; do
   [ -z "$_icp_crate" ] && continue
   if ! grep -qxF "$_icp_crate" "$_icp_installed"; then
-    printf '%s\n' "$_icp_crate" >> "$_icp_to_install"
+    printf '%s\n' "$_icp_crate" >>"$_icp_to_install"
   fi
-done < "$_icp_desired"
+done <"$_icp_desired"
 
 # Remove crates not in the desired list.
 while IFS= read -r _icp_crate; do
@@ -65,7 +65,7 @@ while IFS= read -r _icp_crate; do
     exit 1
   fi
   echo "cargo-binstall: '$_icp_crate' removed"
-done < "$_icp_to_remove"
+done <"$_icp_to_remove"
 
 # Install desired crates not currently installed.
 while IFS= read -r _icp_crate; do
@@ -76,7 +76,7 @@ while IFS= read -r _icp_crate; do
     exit 1
   fi
   echo "cargo-binstall: '$_icp_crate' installed"
-done < "$_icp_to_install"
+done <"$_icp_to_install"
 
 if [ ! -s "$_icp_to_remove" ] && [ ! -s "$_icp_to_install" ]; then
   echo "cargo-binstall: all managed packages already converged — skipping"

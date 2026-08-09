@@ -132,21 +132,21 @@ _audit_store_closure_groups_jq() {
 
 _audit_store_gc_root_bucket() {
   case "$1" in
-    *direnv*|*flake-inputs*)
-      printf '%s\n' direnv
-      ;;
-    *flake-registry*|*/flakes/*)
-      printf '%s\n' flake-registry
-      ;;
-    *profiles/per-user*|*profiles/home-manager*|*nix-profile*)
-      printf '%s\n' nix-profile
-      ;;
-    *home-manager*)
-      printf '%s\n' home-manager
-      ;;
-    *)
-      printf '%s\n' other
-      ;;
+  *direnv* | *flake-inputs*)
+    printf '%s\n' direnv
+    ;;
+  *flake-registry* | */flakes/*)
+    printf '%s\n' flake-registry
+    ;;
+  *profiles/per-user* | *profiles/home-manager* | *nix-profile*)
+    printf '%s\n' nix-profile
+    ;;
+  *home-manager*)
+    printf '%s\n' home-manager
+    ;;
+  *)
+    printf '%s\n' other
+    ;;
   esac
 }
 
@@ -155,22 +155,22 @@ _audit_store_age_cutoff_epoch() {
   _as_num="${_as_age%[a-zA-Z]*}"
   _as_unit="${_as_age##*[0-9]}"
   case "$(uname -s)" in
-    Darwin)
-      case "$_as_unit" in
-        d) date -j -v-"${_as_num}"d +%s ;;
-        w) date -j -v-"${_as_num}"w +%s ;;
-        h) date -j -v-"${_as_num}"H +%s ;;
-        *) date -j -v-"${_as_num}"d +%s ;;
-      esac
-      ;;
-    *)
-      case "$_as_unit" in
-        d) date -d "${_as_num} days ago" +%s ;;
-        w) date -d "${_as_num} weeks ago" +%s ;;
-        h) date -d "${_as_num} hours ago" +%s ;;
-        *) date -d "${_as_num} days ago" +%s ;;
-      esac
-      ;;
+  Darwin)
+    case "$_as_unit" in
+    d) date -j -v-"${_as_num}"d +%s ;;
+    w) date -j -v-"${_as_num}"w +%s ;;
+    h) date -j -v-"${_as_num}"H +%s ;;
+    *) date -j -v-"${_as_num}"d +%s ;;
+    esac
+    ;;
+  *)
+    case "$_as_unit" in
+    d) date -d "${_as_num} days ago" +%s ;;
+    w) date -d "${_as_num} weeks ago" +%s ;;
+    h) date -d "${_as_num} hours ago" +%s ;;
+    *) date -d "${_as_num} days ago" +%s ;;
+    esac
+    ;;
   esac
 }
 
@@ -281,11 +281,11 @@ audit_nix_generation_reclaim_hint() {
     _as_date="$(printf '%s' "$_as_line" | awk '{print $2 " " $3}')"
     [ -z "$_as_gen" ] || [ -z "$_as_date" ] && continue
     case "$_as_gen" in
-      ''|*[!0-9]*) continue ;;
+    '' | *[!0-9]*) continue ;;
     esac
     case "$(uname -s)" in
-      Darwin) _as_epoch="$(date -j -f "%Y-%m-%d %H:%M:%S" "$_as_date" +%s 2>/dev/null || true)" ;; # check-suppress:suppression_doc: malformed generation timestamps are skipped during reclaim hint parsing
-      *) _as_epoch="$(date -d "$_as_date" +%s 2>/dev/null || true)" ;; # check-suppress:suppression_doc: malformed generation timestamps are skipped during reclaim hint parsing
+    Darwin) _as_epoch="$(date -j -f "%Y-%m-%d %H:%M:%S" "$_as_date" +%s 2>/dev/null || true)" ;; # check-suppress:suppression_doc: malformed generation timestamps are skipped during reclaim hint parsing
+    *) _as_epoch="$(date -d "$_as_date" +%s 2>/dev/null || true)" ;;                             # check-suppress:suppression_doc: malformed generation timestamps are skipped during reclaim hint parsing
     esac
     [ -n "$_as_epoch" ] || continue
     printf '%s\t%s\n' "$_as_gen" "$_as_epoch" >>"$_as_combined_tmp"
@@ -360,12 +360,12 @@ audit_stale_result_symlinks() {
   _audit_store_section "stale result symlinks (repo scan)"
   _as_stale_count=0
   while IFS= read -r -d '' _as_path; do
-  if [ -L "$_as_path" ]; then
-    _as_stale_count=$((_as_stale_count + 1))
-    say "$_as_path -> $(readlink "$_as_path")"
-  else
-    warn "non-symlink at $_as_path — not a Nix build artifact"
-  fi
+    if [ -L "$_as_path" ]; then
+      _as_stale_count=$((_as_stale_count + 1))
+      say "$_as_path -> $(readlink "$_as_path")"
+    else
+      warn "non-symlink at $_as_path — not a Nix build artifact"
+    fi
   done < <(
     find "$REPO_ROOT" \
       -path "$REPO_ROOT/.git" -prune -o \

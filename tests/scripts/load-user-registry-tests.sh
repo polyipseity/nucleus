@@ -37,8 +37,8 @@ test_excludes_default_dir() {
 test_merges_is_primary_and_primary_user() {
   local registry
   registry="$(run_loader MacBook)"
-  if [ "$(echo "$registry" | jq -r --arg user "$FIXTURE_USERNAME" '.[$user].isPrimary')" = "true" ] \
-    && [ "$(echo "$registry" | jq -r '.primaryUser')" = "$FIXTURE_USERNAME" ]; then
+  if [ "$(echo "$registry" | jq -r --arg user "$FIXTURE_USERNAME" '.[$user].isPrimary')" = "true" ] &&
+    [ "$(echo "$registry" | jq -r '.primaryUser')" = "$FIXTURE_USERNAME" ]; then
     assert_pass "merges isPrimary and exposes primaryUser"
   else
     assert_fail "merges isPrimary and exposes primaryUser" "unexpected isPrimary/primaryUser values"
@@ -48,8 +48,8 @@ test_merges_is_primary_and_primary_user() {
 test_merges_vm_guest_secret_keys() {
   local registry
   registry="$(run_loader MacBook)"
-  if [ "$(echo "$registry" | jq -r --arg user "$FIXTURE_USERNAME" '.[$user].vmGuest.usernameSecretKey')" = "vm_guest_username" ] \
-    && [ "$(echo "$registry" | jq -r --arg user "$FIXTURE_USERNAME" '.[$user].vmGuest.passwordSecretKey')" = "vm_guest_password" ]; then
+  if [ "$(echo "$registry" | jq -r --arg user "$FIXTURE_USERNAME" '.[$user].vmGuest.usernameSecretKey')" = "vm_guest_username" ] &&
+    [ "$(echo "$registry" | jq -r --arg user "$FIXTURE_USERNAME" '.[$user].vmGuest.passwordSecretKey')" = "vm_guest_password" ]; then
     assert_pass "merges vm-guest.json secret-key references"
   else
     assert_fail "merges vm-guest.json secret-key references" "unexpected vmGuest keys"
@@ -85,8 +85,8 @@ test_resolves_icloud_replica_readwrite_per_host() {
 test_exposes_windows_dsc_config_files() {
   local registry
   registry="$(run_loader Windows)"
-  if echo "$registry" | jq -e --arg user "$FIXTURE_USERNAME" '.[$user].dscConfigFiles | index("env.dsc.yml")' >/dev/null \
-    && echo "$registry" | jq -e --arg user "$FIXTURE_USERNAME" '.[$user].dscConfigFiles | index("wallpaper.dsc.yml")' >/dev/null; then
+  if echo "$registry" | jq -e --arg user "$FIXTURE_USERNAME" '.[$user].dscConfigFiles | index("env.dsc.yml")' >/dev/null &&
+    echo "$registry" | jq -e --arg user "$FIXTURE_USERNAME" '.[$user].dscConfigFiles | index("wallpaper.dsc.yml")' >/dev/null; then
     assert_pass "exposes dscConfigFiles from windows.json"
   else
     assert_fail "exposes dscConfigFiles from windows.json" "missing expected DSC files"

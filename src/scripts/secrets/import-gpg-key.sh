@@ -4,7 +4,6 @@
 
 set -euo pipefail
 
-
 _gnupghome="$1"
 _gpg_bin="$2"
 shift 2
@@ -65,7 +64,7 @@ if [ "${#current_fingerprints[@]}" -gt 0 ] && [ -f "$managed_keys_manifest" ]; t
         fi
       fi
     fi
-  done < "$managed_keys_manifest"
+  done <"$managed_keys_manifest"
 fi
 
 for _gpg_secret_path in "${_gpg_secret_paths[@]}"; do
@@ -80,7 +79,7 @@ mkdir -p "$nucleus_config_dir"
   for current_fpr in "${current_fingerprints[@]}"; do
     printf '%s\n' "$current_fpr"
   done
-} > "$managed_keys_manifest"
+} >"$managed_keys_manifest"
 chmod 600 "$managed_keys_manifest"
 
 for current_fpr in "${current_fingerprints[@]}"; do

@@ -10,7 +10,7 @@ shift 2>/dev/null || true # check-suppress:suppression_doc: expected failure whe
 pdfs=()
 for f in "$@"; do
   case "$(file --mime-type -b "$f")" in
-    application/pdf) pdfs+=("$f") ;;
+  application/pdf) pdfs+=("$f") ;;
   esac
 done
 if [ ${#pdfs[@]} -gt 0 ]; then

@@ -17,8 +17,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
@@ -42,41 +42,41 @@ replica_id_filter=""
 # never silently reset the wrong replica set.
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --dry-run)
-      dry_run=true
-      ;;
-    --replica-id)
-      shift
-      if [ "$#" -eq 0 ] || [ -z "$1" ]; then
-        error "--replica-id requires a value"
-        exit 1
-      fi
-      replica_id_filter="$1"
-      ;;
-    --repo-root)
-      shift
-      if [ "$#" -eq 0 ] || [ -z "$1" ]; then
-        error "--repo-root requires a value"
-        exit 1
-      fi
-      repo_root="$1"
-      ;;
-    --repo-root=*)
-      repo_root="${1#--repo-root=}"
-      if [ -z "$repo_root" ]; then
-        error "--repo-root requires a non-empty value"
-        exit 1
-      fi
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      error "unsupported argument '$1'"
-      usage >&2
+  --dry-run)
+    dry_run=true
+    ;;
+  --replica-id)
+    shift
+    if [ "$#" -eq 0 ] || [ -z "$1" ]; then
+      error "--replica-id requires a value"
       exit 1
-      ;;
+    fi
+    replica_id_filter="$1"
+    ;;
+  --repo-root)
+    shift
+    if [ "$#" -eq 0 ] || [ -z "$1" ]; then
+      error "--repo-root requires a value"
+      exit 1
+    fi
+    repo_root="$1"
+    ;;
+  --repo-root=*)
+    repo_root="${1#--repo-root=}"
+    if [ -z "$repo_root" ]; then
+      error "--repo-root requires a non-empty value"
+      exit 1
+    fi
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    error "unsupported argument '$1'"
+    usage >&2
+    exit 1
+    ;;
   esac
   shift
 done
@@ -123,7 +123,7 @@ replica_lines="$({
         (.iCloudService // "drive")
       ]
     | @tsv
-  ' <<< "$USERS_REGISTRY"
+  ' <<<"$USERS_REGISTRY"
 } || true)" # check-suppress:suppression_doc: jq query may fail if user registry is missing; empty result handled by [ -z ] check downstream.
 
 if [ -z "$replica_lines" ]; then
@@ -150,7 +150,7 @@ local_failures=0
 # process-substituted) so the loop below can read from a stable fd while its
 # body runs commands that also consume stdin.
 replica_lines_file="$(mktemp)"
-printf '%s\n' "$replica_lines" > "$replica_lines_file"
+printf '%s\n' "$replica_lines" >"$replica_lines_file"
 
 while IFS="$(printf '\t')" read -r id local_path provider icloud_service; do
   if [ -n "$replica_id_filter" ] && [ "$id" != "$replica_id_filter" ]; then
@@ -188,7 +188,7 @@ while IFS="$(printf '\t')" read -r id local_path provider icloud_service; do
     fi
   fi
 
-done < "$replica_lines_file"
+done <"$replica_lines_file"
 
 rm -f "$replica_lines_file"
 

@@ -3,7 +3,6 @@
 
 set -euo pipefail
 
-
 _p7zip_bin="$1"
 
 # Verify 7z CLI is available and functional using direct Nix store path.

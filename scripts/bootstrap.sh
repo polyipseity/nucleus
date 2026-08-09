@@ -16,8 +16,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
@@ -38,53 +38,53 @@ usage() {
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    --apply)
-      apply=true
-      ;;
-    --no-apply)
-      apply=false
-      ;;
-    --ai-sync)
-      ai_sync=true
-      ;;
-    --no-ai-sync)
-      ai_sync=false
-      ;;
-    --replica-sync)
-      replica_sync=true
-      ;;
-    --no-replica-sync)
-      replica_sync=false
-      ;;
-    --target-user)
-      if [ "$#" -lt 2 ] || [ -z "$2" ]; then
-        error "--target-user requires a non-empty value"
-        exit 1
-      fi
-      target_user="$2"
-      shift
-      ;;
-    --target-user=*)
-      target_user="${1#--target-user=}"
-      if [ -z "$target_user" ]; then
-        error "--target-user requires a non-empty value"
-        exit 1
-      fi
-      ;;
-    --)
-      shift
-      _apply_args="$*"
-      break
-      ;;
-    *)
-      error "unsupported argument '$1'"
-      usage >&2
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --apply)
+    apply=true
+    ;;
+  --no-apply)
+    apply=false
+    ;;
+  --ai-sync)
+    ai_sync=true
+    ;;
+  --no-ai-sync)
+    ai_sync=false
+    ;;
+  --replica-sync)
+    replica_sync=true
+    ;;
+  --no-replica-sync)
+    replica_sync=false
+    ;;
+  --target-user)
+    if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+      error "--target-user requires a non-empty value"
       exit 1
-      ;;
+    fi
+    target_user="$2"
+    shift
+    ;;
+  --target-user=*)
+    target_user="${1#--target-user=}"
+    if [ -z "$target_user" ]; then
+      error "--target-user requires a non-empty value"
+      exit 1
+    fi
+    ;;
+  --)
+    shift
+    _apply_args="$*"
+    break
+    ;;
+  *)
+    error "unsupported argument '$1'"
+    usage >&2
+    exit 1
+    ;;
   esac
   shift
 done

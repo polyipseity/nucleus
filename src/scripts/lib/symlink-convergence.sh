@@ -25,13 +25,13 @@ _nucleus_remove_stale_symlinks() {
     done
     _nrs_ctarget="$(readlink "$_nrs_candidate")"
     case "$_nrs_ctarget" in
-      "$_nrs_source"/*)
-        if [ ! -e "$_nrs_ctarget" ] && [ ! -L "$_nrs_ctarget" ]; then
-          _nucleus_unprotect_symlink "$_nrs_label" "$_nrs_candidate"
-          rm "$_nrs_candidate"
-          echo "$_nrs_label: removed stale symlink for $_nrs_cname (source removed)"
-        fi
-        ;;
+    "$_nrs_source"/*)
+      if [ ! -e "$_nrs_ctarget" ] && [ ! -L "$_nrs_ctarget" ]; then
+        _nucleus_unprotect_symlink "$_nrs_label" "$_nrs_candidate"
+        rm "$_nrs_candidate"
+        echo "$_nrs_label: removed stale symlink for $_nrs_cname (source removed)"
+      fi
+      ;;
     esac
   done
 }

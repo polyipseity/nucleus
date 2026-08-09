@@ -109,8 +109,8 @@ write_vm_directory_readme() {
   _wvdr_src_dir_short="$HOME/virtual machines/src"
   if [ -f "$TEMPLATES_DIR/README.md" ]; then
     sed -e "s|__VM_DIR_DISPLAY__|$_wvdr_vm_dir_short|g" \
-        -e "s|__SRC_DIR_DISPLAY__|$_wvdr_src_dir_short|g" \
-        "$TEMPLATES_DIR/README.md" >"$_wvdr_readme"
+      -e "s|__SRC_DIR_DISPLAY__|$_wvdr_src_dir_short|g" \
+      "$TEMPLATES_DIR/README.md" >"$_wvdr_readme"
     say "wrote VM directory guide: $_wvdr_readme (template)"
   else
     warn "README template not found at $TEMPLATES_DIR/README.md; writing minimal guide"
@@ -188,7 +188,7 @@ validate_qcow2_image() {
     return 1
   fi
 
-  _vqi_size_bytes="$(wc -c < "$_vqi_path" | tr -d '[:space:]')"
+  _vqi_size_bytes="$(wc -c <"$_vqi_path" | tr -d '[:space:]')"
   if [ -z "$_vqi_size_bytes" ] || [ "$_vqi_size_bytes" -le 0 ]; then
     error "$_vqi_label is empty or unreadable: $_vqi_path"
     return 1
@@ -196,7 +196,7 @@ validate_qcow2_image() {
 
   if command -v qemu-img >/dev/null 2>&1; then
     # check-suppress:suppression_doc: image file may not exist; probe expected to fail.
-  _vqi_info="$(qemu-img info --output=json "$_vqi_path" 2>/dev/null || true)"
+    _vqi_info="$(qemu-img info --output=json "$_vqi_path" 2>/dev/null || true)"
     if [ -z "$_vqi_info" ]; then
       error "qemu-img could not read $_vqi_label: $_vqi_path"
       return 1
@@ -415,26 +415,26 @@ vm_get_tart_registered_names() {
 #   VMs started outside nucleus).
 vm_get_running_ids() {
   case "$(uname -s)" in
-    Darwin)
-      if command -v tart >/dev/null 2>&1; then
-        local _vgrn_tart_json _vgrn_tart_status
-        _vgrn_tart_json="$(tart list --format json 2>&1)" || _vgrn_tart_status=$?
-        if [ "${_vgrn_tart_status:-0}" -ne 0 ]; then
-          error "tart list --format json failed; upgrade Tart to a release that supports --format json"
-          return 1
-        fi
-        printf '%s\n' "$_vgrn_tart_json" | vm_parse_tart_running_names_from_json
+  Darwin)
+    if command -v tart >/dev/null 2>&1; then
+      local _vgrn_tart_json _vgrn_tart_status
+      _vgrn_tart_json="$(tart list --format json 2>&1)" || _vgrn_tart_status=$?
+      if [ "${_vgrn_tart_status:-0}" -ne 0 ]; then
+        error "tart list --format json failed; upgrade Tart to a release that supports --format json"
+        return 1
       fi
-      if [ -x "${UTMCTL:-/Applications/UTM.app/Contents/MacOS/utmctl}" ]; then
-        "$UTMCTL" list 2>/dev/null | vm_parse_utm_running_names_from_list
-      fi
-      ;;
-    Linux)
-      virsh list --name 2>/dev/null
-      ;;
-    MINGW*|MSYS*|CYGWIN*)
-      return 0
-      ;;
+      printf '%s\n' "$_vgrn_tart_json" | vm_parse_tart_running_names_from_json
+    fi
+    if [ -x "${UTMCTL:-/Applications/UTM.app/Contents/MacOS/utmctl}" ]; then
+      "$UTMCTL" list 2>/dev/null | vm_parse_utm_running_names_from_list
+    fi
+    ;;
+  Linux)
+    virsh list --name 2>/dev/null
+    ;;
+  MINGW* | MSYS* | CYGWIN*)
+    return 0
+    ;;
   esac
 }
 
@@ -613,103 +613,103 @@ vm_write_start_script() {
   chmod 755 "$_wss_path_sh"
 
   case "$_wss_host_kind" in
-    darwin-tart|darwin-utm|nixos-libvirt)
-      if [ -f "$TEMPLATES_DIR/start-host.ps1" ]; then
-        _wss_ps1_sed=(
-          -e "s|__HOST_KIND__|$_wss_host_kind|g"
-          -e "s|__VM_ID__|$_wss_id|g"
-          -e "s|__VM_DISPLAY__|$_wss_display|g"
-          -e "s|__VM_DIR__|$VM_DIR|g"
-        )
-        if [ "$_wss_host_kind" = "darwin-tart" ]; then
-          _wss_ps1_sed+=(-e "s|__TART_SOFTNET_EXPOSE__|$_wss_tart_softnet_expose|g")
-        else
-          _wss_ps1_sed+=(-e "s|__TART_SOFTNET_EXPOSE__||g")
-        fi
-        sed "${_wss_ps1_sed[@]}" "$TEMPLATES_DIR/start-host.ps1" >"$_wss_path_ps1"
+  darwin-tart | darwin-utm | nixos-libvirt)
+    if [ -f "$TEMPLATES_DIR/start-host.ps1" ]; then
+      _wss_ps1_sed=(
+        -e "s|__HOST_KIND__|$_wss_host_kind|g"
+        -e "s|__VM_ID__|$_wss_id|g"
+        -e "s|__VM_DISPLAY__|$_wss_display|g"
+        -e "s|__VM_DIR__|$VM_DIR|g"
+      )
+      if [ "$_wss_host_kind" = "darwin-tart" ]; then
+        _wss_ps1_sed+=(-e "s|__TART_SOFTNET_EXPOSE__|$_wss_tart_softnet_expose|g")
       else
-        warn "start-host.ps1 template not found at $TEMPLATES_DIR/start-host.ps1"
+        _wss_ps1_sed+=(-e "s|__TART_SOFTNET_EXPOSE__||g")
+      fi
+      sed "${_wss_ps1_sed[@]}" "$TEMPLATES_DIR/start-host.ps1" >"$_wss_path_ps1"
+    else
+      warn "start-host.ps1 template not found at $TEMPLATES_DIR/start-host.ps1"
+      printf '# start script for %s\n' "$_wss_id" >"$_wss_path_ps1"
+    fi
+    ;;
+  windows-qemu)
+    if [ "$_wss_type" = "Android" ]; then
+      # WHY: the Android QEMU start script is shared cross-platform content
+      _wss_android_start="$REPO_ROOT/src/scripts/vms/start-android-vm.ps1"
+      if [ ! -f "$_wss_android_start" ]; then
+        error "shared Android VM start script not found: $_wss_android_start"
+        return 1
+      fi
+      _wss_cpus="$(printf '%s' "$_wss_doc" | jq -r '.cpus')"
+      _wss_ram_bytes="$(parse_size "$(printf '%s' "$_wss_doc" | jq -r '.ram')")"
+      _wss_system_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.systemImage')"
+      _wss_userdata_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.userdataImage')"
+      _wss_gsi_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.gsiImage')"
+      _wss_hostfwds="$(printf '%s' "$_wss_doc" | jq -r '[.portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")')"
+      sed -e "s|__ANDROID_CPU_COUNT__|$_wss_cpus|g" \
+        -e "s|__ANDROID_RAM_BYTES__|${_wss_ram_bytes}B|g" \
+        -e "s|__ANDROID_SYSTEM_IMAGE__|$_wss_system_image|g" \
+        -e "s|__ANDROID_USERDATA_IMAGE__|$_wss_userdata_image|g" \
+        -e "s|__ANDROID_GSI_IMAGE__|$_wss_gsi_image|g" \
+        -e "s|__HOSTFWDS__|$_wss_hostfwds|g" \
+        "$_wss_android_start" >"$_wss_path_ps1"
+    else
+      _wss_hostfwds="$(printf '%s' "$_wss_doc" | jq -r '[.portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")')"
+      _wss_cpus="$(printf '%s' "$_wss_doc" | jq -r '.cpus')"
+      _wss_ram_bytes="$(parse_size "$(printf '%s' "$_wss_doc" | jq -r '.ram')")"
+      # WHY: the disk path is RELATIVE (data/<id>.qcow2, tree-root-relative)
+      _wss_disk_path="data/${_wss_id}.qcow2"
+      _wss_qemu_arch="x86_64"
+      if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
+        _wss_qemu_arch="aarch64"
+      fi
+      _wss_qemu_system="$HOME/scoop/apps/qemu/current/qemu-system-${_wss_qemu_arch}.exe"
+      if [ "$_wss_qemu_arch" = "x86_64" ]; then
+        _wss_machine="q35"
+      else
+        _wss_machine="virt"
+      fi
+      if [ -f "$TEMPLATES_DIR/start-windows.ps1" ]; then
+        sed -e "s|__QEMU_SYSTEM__|$_wss_qemu_system|g" \
+          -e "s|__VM_ID__|$_wss_id|g" \
+          -e "s|__VM_DISPLAY__|$_wss_display|g" \
+          -e "s|__MACHINE__|$_wss_machine|g" \
+          -e "s|__CPU__|host|g" \
+          -e "s|__CPUS__|$_wss_cpus|g" \
+          -e "s|__RAM_BYTES__|$_wss_ram_bytes|g" \
+          -e "s|__DISK_PATH__|$_wss_disk_path|g" \
+          -e "s|__HOSTFWDS__|$_wss_hostfwds|g" \
+          -e "s|__VGA__|std|g" \
+          -e "s|__DISPLAY_BACKEND__|sdl|g" \
+          -e "s|__VIRTIOFS_ARGS__||g" \
+          "$TEMPLATES_DIR/start-windows.ps1" >"$_wss_path_ps1"
+      else
+        warn "start-windows.ps1 template not found at $TEMPLATES_DIR/start-windows.ps1"
         printf '# start script for %s\n' "$_wss_id" >"$_wss_path_ps1"
       fi
-      ;;
-    windows-qemu)
-      if [ "$_wss_type" = "Android" ]; then
-        # WHY: the Android QEMU start script is shared cross-platform content
-        _wss_android_start="$REPO_ROOT/src/scripts/vms/start-android-vm.ps1"
-        if [ ! -f "$_wss_android_start" ]; then
-          error "shared Android VM start script not found: $_wss_android_start"
-          return 1
-        fi
-        _wss_cpus="$(printf '%s' "$_wss_doc" | jq -r '.cpus')"
-        _wss_ram_bytes="$(parse_size "$(printf '%s' "$_wss_doc" | jq -r '.ram')")"
-        _wss_system_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.systemImage')"
-        _wss_userdata_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.userdataImage')"
-        _wss_gsi_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.gsiImage')"
-        _wss_hostfwds="$(printf '%s' "$_wss_doc" | jq -r '[.portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")')"
-        sed -e "s|__ANDROID_CPU_COUNT__|$_wss_cpus|g" \
-            -e "s|__ANDROID_RAM_BYTES__|${_wss_ram_bytes}B|g" \
-            -e "s|__ANDROID_SYSTEM_IMAGE__|$_wss_system_image|g" \
-            -e "s|__ANDROID_USERDATA_IMAGE__|$_wss_userdata_image|g" \
-            -e "s|__ANDROID_GSI_IMAGE__|$_wss_gsi_image|g" \
-            -e "s|__HOSTFWDS__|$_wss_hostfwds|g" \
-            "$_wss_android_start" >"$_wss_path_ps1"
+      if [ -f "$TEMPLATES_DIR/start-windows-host.sh" ]; then
+        sed -e "s|__QEMU_SYSTEM__|$_wss_qemu_system|g" \
+          -e "s|__VM_ID__|$_wss_id|g" \
+          -e "s|__VM_DISPLAY__|$_wss_display|g" \
+          -e "s|__MACHINE__|$_wss_machine|g" \
+          -e "s|__CPU__|host|g" \
+          -e "s|__CPUS__|$_wss_cpus|g" \
+          -e "s|__RAM_BYTES__|$_wss_ram_bytes|g" \
+          -e "s|__DISK_PATH__|$_wss_disk_path|g" \
+          -e "s|__HOSTFWDS__|$_wss_hostfwds|g" \
+          -e "s|__VGA__|std|g" \
+          -e "s|__DISPLAY_BACKEND__|sdl|g" \
+          "$TEMPLATES_DIR/start-windows-host.sh" >"$_wss_path_sh"
+        chmod 755 "$_wss_path_sh"
       else
-        _wss_hostfwds="$(printf '%s' "$_wss_doc" | jq -r '[.portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")')"
-        _wss_cpus="$(printf '%s' "$_wss_doc" | jq -r '.cpus')"
-        _wss_ram_bytes="$(parse_size "$(printf '%s' "$_wss_doc" | jq -r '.ram')")"
-        # WHY: the disk path is RELATIVE (data/<id>.qcow2, tree-root-relative)
-        _wss_disk_path="data/${_wss_id}.qcow2"
-        _wss_qemu_arch="x86_64"
-        if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-          _wss_qemu_arch="aarch64"
-        fi
-        _wss_qemu_system="$HOME/scoop/apps/qemu/current/qemu-system-${_wss_qemu_arch}.exe"
-        if [ "$_wss_qemu_arch" = "x86_64" ]; then
-          _wss_machine="q35"
-        else
-          _wss_machine="virt"
-        fi
-        if [ -f "$TEMPLATES_DIR/start-windows.ps1" ]; then
-          sed -e "s|__QEMU_SYSTEM__|$_wss_qemu_system|g" \
-              -e "s|__VM_ID__|$_wss_id|g" \
-              -e "s|__VM_DISPLAY__|$_wss_display|g" \
-              -e "s|__MACHINE__|$_wss_machine|g" \
-              -e "s|__CPU__|host|g" \
-              -e "s|__CPUS__|$_wss_cpus|g" \
-              -e "s|__RAM_BYTES__|$_wss_ram_bytes|g" \
-              -e "s|__DISK_PATH__|$_wss_disk_path|g" \
-              -e "s|__HOSTFWDS__|$_wss_hostfwds|g" \
-              -e "s|__VGA__|std|g" \
-              -e "s|__DISPLAY_BACKEND__|sdl|g" \
-              -e "s|__VIRTIOFS_ARGS__||g" \
-              "$TEMPLATES_DIR/start-windows.ps1" >"$_wss_path_ps1"
-        else
-          warn "start-windows.ps1 template not found at $TEMPLATES_DIR/start-windows.ps1"
-          printf '# start script for %s\n' "$_wss_id" >"$_wss_path_ps1"
-        fi
-        if [ -f "$TEMPLATES_DIR/start-windows-host.sh" ]; then
-          sed -e "s|__QEMU_SYSTEM__|$_wss_qemu_system|g" \
-              -e "s|__VM_ID__|$_wss_id|g" \
-              -e "s|__VM_DISPLAY__|$_wss_display|g" \
-              -e "s|__MACHINE__|$_wss_machine|g" \
-              -e "s|__CPU__|host|g" \
-              -e "s|__CPUS__|$_wss_cpus|g" \
-              -e "s|__RAM_BYTES__|$_wss_ram_bytes|g" \
-              -e "s|__DISK_PATH__|$_wss_disk_path|g" \
-              -e "s|__HOSTFWDS__|$_wss_hostfwds|g" \
-              -e "s|__VGA__|std|g" \
-              -e "s|__DISPLAY_BACKEND__|sdl|g" \
-              "$TEMPLATES_DIR/start-windows-host.sh" >"$_wss_path_sh"
-          chmod 755 "$_wss_path_sh"
-        else
-          warn "start-windows-host.sh template not found at $TEMPLATES_DIR/start-windows-host.sh"
-        fi
+        warn "start-windows-host.sh template not found at $TEMPLATES_DIR/start-windows-host.sh"
       fi
-      ;;
-    *)
-      error "unknown start-script host kind: $_wss_host_kind"
-      return 1
-      ;;
+    fi
+    ;;
+  *)
+    error "unknown start-script host kind: $_wss_host_kind"
+    return 1
+    ;;
   esac
   chmod 755 "$_wss_path_ps1"
 
@@ -737,45 +737,45 @@ vm_write_stop_script() {
   fi
 
   case "$_wst_host_kind" in
-    darwin-tart|darwin-utm|nixos-libvirt)
-      if [ -f "$TEMPLATES_DIR/stop-posix.sh" ]; then
-        sed -e "s|__HOST_KIND__|$_wst_host_kind|g" \
-            -e "s|__VM_ID__|$_wst_id|g" \
-            -e "s|__VM_DISPLAY__|$_wst_display|g" \
-            "$TEMPLATES_DIR/stop-posix.sh" >"$_wst_path_sh"
-      else
-        warn "stop-posix.sh template not found at $TEMPLATES_DIR/stop-posix.sh"
-        printf '#!/bin/sh\nset -eu\necho "stop script for %s"\n' "$_wst_id" >"$_wst_path_sh"
-      fi
-      ;;
-    windows-qemu)
-      # WHY: stop-posix.sh dispatches to tart/utmctl/virsh only.  QEMU guests
-      :
-      ;;
-    *)
-      error "unknown stop-script host kind: $_wst_host_kind"
-      return 1
-      ;;
+  darwin-tart | darwin-utm | nixos-libvirt)
+    if [ -f "$TEMPLATES_DIR/stop-posix.sh" ]; then
+      sed -e "s|__HOST_KIND__|$_wst_host_kind|g" \
+        -e "s|__VM_ID__|$_wst_id|g" \
+        -e "s|__VM_DISPLAY__|$_wst_display|g" \
+        "$TEMPLATES_DIR/stop-posix.sh" >"$_wst_path_sh"
+    else
+      warn "stop-posix.sh template not found at $TEMPLATES_DIR/stop-posix.sh"
+      printf '#!/bin/sh\nset -eu\necho "stop script for %s"\n' "$_wst_id" >"$_wst_path_sh"
+    fi
+    ;;
+  windows-qemu)
+    # WHY: stop-posix.sh dispatches to tart/utmctl/virsh only.  QEMU guests
+    :
+    ;;
+  *)
+    error "unknown stop-script host kind: $_wst_host_kind"
+    return 1
+    ;;
   esac
   if [ -f "$_wst_path_sh" ]; then
     chmod 755 "$_wst_path_sh"
   fi
 
   case "$_wst_host_kind" in
-    darwin-tart|darwin-utm|nixos-libvirt|windows-qemu)
-      if [ -f "$TEMPLATES_DIR/stop-host.ps1" ]; then
-        sed -e "s|__HOST_KIND__|$_wst_host_kind|g" \
-            -e "s|__VM_ID__|$_wst_id|g" \
-            "$TEMPLATES_DIR/stop-host.ps1" >"$_wst_path_ps1"
-      else
-        warn "stop-host.ps1 template not found at $TEMPLATES_DIR/stop-host.ps1"
-        printf '# stop script for %s\n' "$_wst_id" >"$_wst_path_ps1"
-      fi
-      ;;
-    *)
-      error "unknown stop-script host kind: $_wst_host_kind"
-      return 1
-      ;;
+  darwin-tart | darwin-utm | nixos-libvirt | windows-qemu)
+    if [ -f "$TEMPLATES_DIR/stop-host.ps1" ]; then
+      sed -e "s|__HOST_KIND__|$_wst_host_kind|g" \
+        -e "s|__VM_ID__|$_wst_id|g" \
+        "$TEMPLATES_DIR/stop-host.ps1" >"$_wst_path_ps1"
+    else
+      warn "stop-host.ps1 template not found at $TEMPLATES_DIR/stop-host.ps1"
+      printf '# stop script for %s\n' "$_wst_id" >"$_wst_path_ps1"
+    fi
+    ;;
+  *)
+    error "unknown stop-script host kind: $_wst_host_kind"
+    return 1
+    ;;
   esac
 
   say "wrote stop helper scripts: $_wst_path_sh, $_wst_path_ps1"
@@ -790,23 +790,23 @@ vm_write_stop_script() {
 #   every host without a live hypervisor check.
 vm_script_host_kind() {
   case "$(uname -s)" in
-    Darwin)
-      if [ "$1" = "macOS" ]; then
-        printf 'darwin-tart\n'
-      else
-        printf 'darwin-utm\n'
-      fi
-      ;;
-    Linux)
-      printf 'nixos-libvirt\n'
-      ;;
-    MINGW*|MSYS*|CYGWIN*)
-      printf 'windows-qemu\n'
-      ;;
-    *)
-      error "unsupported host for VM helper scripts: $(uname -s)"
-      return 1
-      ;;
+  Darwin)
+    if [ "$1" = "macOS" ]; then
+      printf 'darwin-tart\n'
+    else
+      printf 'darwin-utm\n'
+    fi
+    ;;
+  Linux)
+    printf 'nixos-libvirt\n'
+    ;;
+  MINGW* | MSYS* | CYGWIN*)
+    printf 'windows-qemu\n'
+    ;;
+  *)
+    error "unsupported host for VM helper scripts: $(uname -s)"
+    return 1
+    ;;
   esac
 }
 
@@ -884,12 +884,12 @@ vm_for_each() {
     _vm_enabled="$(jq -r ".VMs[$_i].enabled" "$MANIFEST")"
 
     case "$_vm_enabled" in
-      true|false) ;;
-      *)
-        warn "VM '$_vm_id' has invalid enabled value '$_vm_enabled'; expected boolean true/false in manifest"
-        _i=$((_i + 1))
-        continue
-        ;;
+    true | false) ;;
+    *)
+      warn "VM '$_vm_id' has invalid enabled value '$_vm_enabled'; expected boolean true/false in manifest"
+      _i=$((_i + 1))
+      continue
+      ;;
     esac
 
     if [ "$_vm_enabled" != "true" ]; then
@@ -987,13 +987,19 @@ vm_mk_mac_address() {
 vm_derive_arch() {
   local _vda_type="$1" _vda_host
   case "$_vda_type" in
-    Android) printf 'aarch64\n'; return 0 ;;
-    Windows) printf 'x86_64\n'; return 0 ;;
+  Android)
+    printf 'aarch64\n'
+    return 0
+    ;;
+  Windows)
+    printf 'x86_64\n'
+    return 0
+    ;;
   esac
   _vda_host="$(uname -m)"
   case "$_vda_host" in
-    arm64|aarch64) printf 'aarch64\n' ;;
-    *) printf 'x86_64\n' ;;
+  arm64 | aarch64) printf 'aarch64\n' ;;
+  *) printf 'x86_64\n' ;;
   esac
 }
 
@@ -1322,8 +1328,8 @@ vm_ensure_base_and_overlay() {
   fi
 
   if [ -f "$_ebao_overlay" ]; then
-    if ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_ebao_cred_marker" \
-      || { [ -n "$_ebao_config_fp" ] && ! vm_guest_config_marker_matches "$_ebao_config_fp" "$_ebao_config_marker"; }; then
+    if ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_ebao_cred_marker" ||
+      { [ -n "$_ebao_config_fp" ] && ! vm_guest_config_marker_matches "$_ebao_config_fp" "$_ebao_config_marker"; }; then
       _ebao_running="$(vm_get_running_ids)"
       if printf '%s\n' "$_ebao_running" | grep -qxF "$_ebao_name"; then
         say "VM '$_ebao_name' is running; skipping base refresh from pre-built image (applies on next setup)"
@@ -1428,8 +1434,8 @@ vm_android_fastboot_list_state() {
   _afls_vm_index="$1"
   _afls_serial="$(vm_android_fastboot_serial "$_afls_vm_index")"
 
-  if vm_android_fastboot_probe "$_afls_serial" is-userspace \
-    || vm_android_fastboot_probe "$_afls_serial" version; then
+  if vm_android_fastboot_probe "$_afls_serial" is-userspace ||
+    vm_android_fastboot_probe "$_afls_serial" version; then
     printf 'fastboot\n'
     return 0
   fi
@@ -1544,19 +1550,19 @@ vm_android_adb_wait_authorized() {
   while [ "$_awa_elapsed" -lt "$_awa_timeout" ]; do
     _awa_state="$(vm_android_adb_poll_state "$_awa_vm_index")"
     case "$_awa_state" in
-      device) return 0 ;;
-      unauthorized)
-        if [ "$_awa_elapsed" -ge "$((_awa_last_unauth_msg + 30))" ]; then
-          say "ADB unauthorized — boot LineageOS, enable USB debugging, and tap Allow on the device"
-          _awa_last_unauth_msg="$_awa_elapsed"
-        fi
-        ;;
-      recovery|sideload)
-        if [ "$_awa_elapsed" -ge "$((_awa_last_unauth_msg + 30))" ]; then
-          say "guest is in $_awa_state; boot LineageOS system for this step (Reboot system now from recovery)"
-          _awa_last_unauth_msg="$_awa_elapsed"
-        fi
-        ;;
+    device) return 0 ;;
+    unauthorized)
+      if [ "$_awa_elapsed" -ge "$((_awa_last_unauth_msg + 30))" ]; then
+        say "ADB unauthorized — boot LineageOS, enable USB debugging, and tap Allow on the device"
+        _awa_last_unauth_msg="$_awa_elapsed"
+      fi
+      ;;
+    recovery | sideload)
+      if [ "$_awa_elapsed" -ge "$((_awa_last_unauth_msg + 30))" ]; then
+        say "guest is in $_awa_state; boot LineageOS system for this step (Reboot system now from recovery)"
+        _awa_last_unauth_msg="$_awa_elapsed"
+      fi
+      ;;
     esac
     _awa_elapsed="$(vm_android_wait_tick "$_awa_timeout" "$_awa_elapsed" 5)"
   done
@@ -1596,27 +1602,27 @@ vm_android_adb_wait_boot_completed() {
   while [ "$_awbc_elapsed" -lt "$_awbc_timeout" ]; do
     _awbc_state="$(vm_android_adb_poll_state "$_awbc_vm_index")"
     case "$_awbc_state" in
-      device)
-        if vm_android_guest_boot_completed "$_awbc_vm_index"; then
-          return 0
-        fi
-        if [ "$_awbc_elapsed" -ge "$((_awbc_last_hint + 30))" ]; then
-          say "guest ADB is up but still booting (waiting for sys.boot_completed=1)..."
-          _awbc_last_hint="$_awbc_elapsed"
-        fi
-        ;;
-      unauthorized)
-        if [ "$_awbc_elapsed" -ge "$((_awbc_last_hint + 30))" ]; then
-          say "ADB unauthorized — boot LineageOS, enable USB debugging, and tap Allow on the device"
-          _awbc_last_hint="$_awbc_elapsed"
-        fi
-        ;;
-      recovery|sideload)
-        if [ "$_awbc_elapsed" -ge "$((_awbc_last_hint + 30))" ]; then
-          say "guest is in $_awbc_state; boot LineageOS system for this step (Reboot system now from recovery)"
-          _awbc_last_hint="$_awbc_elapsed"
-        fi
-        ;;
+    device)
+      if vm_android_guest_boot_completed "$_awbc_vm_index"; then
+        return 0
+      fi
+      if [ "$_awbc_elapsed" -ge "$((_awbc_last_hint + 30))" ]; then
+        say "guest ADB is up but still booting (waiting for sys.boot_completed=1)..."
+        _awbc_last_hint="$_awbc_elapsed"
+      fi
+      ;;
+    unauthorized)
+      if [ "$_awbc_elapsed" -ge "$((_awbc_last_hint + 30))" ]; then
+        say "ADB unauthorized — boot LineageOS, enable USB debugging, and tap Allow on the device"
+        _awbc_last_hint="$_awbc_elapsed"
+      fi
+      ;;
+    recovery | sideload)
+      if [ "$_awbc_elapsed" -ge "$((_awbc_last_hint + 30))" ]; then
+        say "guest is in $_awbc_state; boot LineageOS system for this step (Reboot system now from recovery)"
+        _awbc_last_hint="$_awbc_elapsed"
+      fi
+      ;;
     esac
     _awbc_elapsed="$(vm_android_wait_tick "$_awbc_timeout" "$_awbc_elapsed" 5)"
   done
@@ -1646,19 +1652,19 @@ vm_android_adb_wait_sideload() {
   while [ "$_aws_elapsed" -lt "$_aws_timeout" ]; do
     _aws_state="$(vm_android_adb_poll_state "$_aws_vm_index")"
     case "$_aws_state" in
-      sideload) return 0 ;;
-      recovery)
-        if [ "$_aws_elapsed" -ge "$((_aws_last_hint + 15))" ]; then
-          say "manual step: in recovery, select Apply update from ADB to enter sideload mode"
-          _aws_last_hint="$_aws_elapsed"
-        fi
-        ;;
-      unauthorized)
-        if [ "$_aws_elapsed" -ge "$((_aws_last_hint + 15))" ]; then
-          say "ADB unauthorized — enable ADB in recovery (Advanced → Enable ADB)"
-          _aws_last_hint="$_aws_elapsed"
-        fi
-        ;;
+    sideload) return 0 ;;
+    recovery)
+      if [ "$_aws_elapsed" -ge "$((_aws_last_hint + 15))" ]; then
+        say "manual step: in recovery, select Apply update from ADB to enter sideload mode"
+        _aws_last_hint="$_aws_elapsed"
+      fi
+      ;;
+    unauthorized)
+      if [ "$_aws_elapsed" -ge "$((_aws_last_hint + 15))" ]; then
+        say "ADB unauthorized — enable ADB in recovery (Advanced → Enable ADB)"
+        _aws_last_hint="$_aws_elapsed"
+      fi
+      ;;
     esac
     _aws_elapsed="$(vm_android_wait_tick "$_aws_timeout" "$_aws_elapsed" 2)"
   done
@@ -1681,7 +1687,7 @@ vm_android_adb_connect() {
   while [ "$_aac_elapsed" -lt "$_aac_timeout" ]; do
     _aac_state="$(vm_android_adb_poll_state "$_aac_vm_index")"
     case "$_aac_state" in
-      device|recovery|sideload) return 0 ;;
+    device | recovery | sideload) return 0 ;;
     esac
     _aac_elapsed="$(vm_android_wait_tick "$_aac_timeout" "$_aac_elapsed" 5)"
   done
@@ -1712,8 +1718,8 @@ vm_android_recovery_asset_suffix() {
   _aras_vm_index="$1"
   _aras_type="$(jq -r ".VMs[$_aras_vm_index].type" "$MANIFEST")"
   case "$(vm_derive_arch "$_aras_type")" in
-    aarch64) printf 'arm64only\n' ;;
-    *) printf 'x86_64\n' ;;
+  aarch64) printf 'arm64only\n' ;;
+  *) printf 'x86_64\n' ;;
   esac
 }
 
@@ -1730,8 +1736,8 @@ vm_android_jqssun_release_tag_for_asset() {
   fi
 
   _jrta_location="$(
-    curl -fsI "https://github.com/jqssun/android-lineage-qemu/releases/latest/download/$_jrta_asset" \
-      | awk 'tolower($1) == "location:" { print $2; exit }' | tr -d '\r\n'
+    curl -fsI "https://github.com/jqssun/android-lineage-qemu/releases/latest/download/$_jrta_asset" |
+      awk 'tolower($1) == "location:" { print $2; exit }' | tr -d '\r\n'
   )" || {
     error "failed to resolve jqssun release redirect for $_jrta_asset"
     return 1
@@ -1764,14 +1770,17 @@ vm_android_jqssun_asset_url() {
     return 1
   fi
 
-  _jau_page="$(curl -fsSL "https://github.com/jqssun/android-lineage-qemu/releases/expanded_assets/$_jau_tag")" \
-    || { error "failed to fetch jqssun release asset list for $_jau_tag"; return 1; }
+  _jau_page="$(curl -fsSL "https://github.com/jqssun/android-lineage-qemu/releases/expanded_assets/$_jau_tag")" ||
+    {
+      error "failed to fetch jqssun release asset list for $_jau_tag"
+      return 1
+    }
 
   _jau_path="$(
-    printf '%s' "$_jau_page" \
-      | grep -oE "href=\"/jqssun/android-lineage-qemu/releases/download/[^\"]*${_jau_substring}[^\"]*\"" \
-      | head -1 \
-      | sed -n 's/href="\([^"]*\)"/\1/p'
+    printf '%s' "$_jau_page" |
+      grep -oE "href=\"/jqssun/android-lineage-qemu/releases/download/[^\"]*${_jau_substring}[^\"]*\"" |
+      head -1 |
+      sed -n 's/href="\([^"]*\)"/\1/p'
   )"
   if [ -z "$_jau_path" ]; then
     error "no jqssun asset matching '$_jau_substring' in release $_jau_tag"
@@ -1810,10 +1819,13 @@ vm_android_download_userdebug_recovery() {
   fi
 
   run_with_backoff "download userdebug recovery" \
-    curl -fL -o "$_adur_img" "$_adur_dl_url" \
-    || { error "failed to download userdebug recovery from $_adur_dl_url"; return 1; }
+    curl -fL -o "$_adur_img" "$_adur_dl_url" ||
+    {
+      error "failed to download userdebug recovery from $_adur_dl_url"
+      return 1
+    }
 
-  jq -n --arg tag "$_adur_tag" '{tag_name: $tag}' > "$_adur_tag_file"
+  jq -n --arg tag "$_adur_tag" '{tag_name: $tag}' >"$_adur_tag_file"
   say "userdebug recovery ready: $_adur_img"
   return 0
 }
@@ -1827,14 +1839,14 @@ vm_android_guest_has_userdebug_recovery() {
   _aghur_debuggable=''
 
   case "$_aghur_state" in
-    recovery|sideload)
-      _aghur_build_type="$(vm_android_shell_getprop "$_aghur_vm_index" ro.build.type)"
-      _aghur_debuggable="$(vm_android_shell_getprop "$_aghur_vm_index" ro.debuggable)"
-      case "$_aghur_build_type" in
-        userdebug|eng) return 0 ;;
-      esac
-      [ "$_aghur_debuggable" = "1" ] && return 0
-      ;;
+  recovery | sideload)
+    _aghur_build_type="$(vm_android_shell_getprop "$_aghur_vm_index" ro.build.type)"
+    _aghur_debuggable="$(vm_android_shell_getprop "$_aghur_vm_index" ro.debuggable)"
+    case "$_aghur_build_type" in
+    userdebug | eng) return 0 ;;
+    esac
+    [ "$_aghur_debuggable" = "1" ] && return 0
+    ;;
   esac
   return 1
 }
@@ -1896,19 +1908,19 @@ vm_android_adb_wait_recovery() {
   while [ "$_awr_elapsed" -lt "$_awr_timeout" ]; do
     _awr_state="$(vm_android_adb_poll_state "$_awr_vm_index")"
     case "$_awr_state" in
-      recovery|sideload) return 0 ;;
-      unauthorized)
-        if [ "$_awr_elapsed" -ge "$((_awr_last_hint + 30))" ]; then
-          say "ADB unauthorized — in userdebug recovery, enable ADB (Advanced → Enable ADB)"
-          _awr_last_hint="$_awr_elapsed"
-        fi
-        ;;
-      device)
-        if [ "$_awr_elapsed" -ge "$((_awr_last_hint + 30))" ]; then
-          say "guest is booted to system; boot LineageOS Recovery instead (power off → Reboot to recovery)"
-          _awr_last_hint="$_awr_elapsed"
-        fi
-        ;;
+    recovery | sideload) return 0 ;;
+    unauthorized)
+      if [ "$_awr_elapsed" -ge "$((_awr_last_hint + 30))" ]; then
+        say "ADB unauthorized — in userdebug recovery, enable ADB (Advanced → Enable ADB)"
+        _awr_last_hint="$_awr_elapsed"
+      fi
+      ;;
+    device)
+      if [ "$_awr_elapsed" -ge "$((_awr_last_hint + 30))" ]; then
+        say "guest is booted to system; boot LineageOS Recovery instead (power off → Reboot to recovery)"
+        _awr_last_hint="$_awr_elapsed"
+      fi
+      ;;
     esac
     _awr_elapsed="$(vm_android_wait_tick "$_awr_timeout" "$_awr_elapsed" 5)"
   done
@@ -1953,20 +1965,29 @@ vm_build_android() {
       say "downloading LineageOS base image for '$_bai_vm_id'..."
     fi
     _bai_suffix="$(vm_android_recovery_asset_suffix "$_bai_vm_index")"
-    _bai_tag="$(vm_android_jqssun_release_tag_for_asset "boot_${_bai_suffix}.img")" \
-      || { error "failed to resolve latest jqssun release tag"; return 1; }
-    _bai_dl_url="$(vm_android_jqssun_asset_url "$_bai_tag" "UTM-VM-lineage-.*virtio_${_bai_suffix}.zip")" \
-      || { error "no LineageOS UTM zip found in jqssun release $_bai_tag"; return 1; }
+    _bai_tag="$(vm_android_jqssun_release_tag_for_asset "boot_${_bai_suffix}.img")" ||
+      {
+        error "failed to resolve latest jqssun release tag"
+        return 1
+      }
+    _bai_dl_url="$(vm_android_jqssun_asset_url "$_bai_tag" "UTM-VM-lineage-.*virtio_${_bai_suffix}.zip")" ||
+      {
+        error "no LineageOS UTM zip found in jqssun release $_bai_tag"
+        return 1
+      }
     _bai_lineage_zip="$(vm_src_path Android "$VM_ANDROID_LINEAGE_ZIP")"
     run_with_backoff "download LineageOS zip" \
-      curl -fL -o "$_bai_lineage_zip" "$_bai_dl_url" \
-      || { error "failed to download LineageOS zip"; return 1; }
+      curl -fL -o "$_bai_lineage_zip" "$_bai_dl_url" ||
+      {
+        error "failed to download LineageOS zip"
+        return 1
+      }
     say "extracting LineageOS system image..."
     _bai_extract_dir="$(vm_src_path Android "$VM_ANDROID_LINEAGE_EXTRACT")"
     rm -rf "$_bai_extract_dir"
     mkdir -p "$_bai_extract_dir"
     run_cmd unzip -q "$_bai_lineage_zip" -d "$_bai_extract_dir"
-    _bai_qcow2="$(find "$_bai_extract_dir" -type f -name '*.qcow2' -print | while IFS= read -r _f; do printf '%s %s\n' "$(wc -c < "$_f" | tr -d '[:space:]')" "$_f"; done | sort -rn | head -1 | cut -d' ' -f2-)"
+    _bai_qcow2="$(find "$_bai_extract_dir" -type f -name '*.qcow2' -print | while IFS= read -r _f; do printf '%s %s\n' "$(wc -c <"$_f" | tr -d '[:space:]')" "$_f"; done | sort -rn | head -1 | cut -d' ' -f2-)"
     if [ -z "$_bai_qcow2" ]; then
       error "no qcow2 system image found inside extracted LineageOS bundle"
       return 1
@@ -2011,8 +2032,11 @@ vm_build_android() {
       say "downloading GSI system image..."
       _bai_gsi_zip="$(vm_src_path Android "$VM_ANDROID_GSI_DOWNLOAD_ZIP")"
       run_with_backoff "download GSI zip" \
-        curl -fL -o "$_bai_gsi_zip" "$_bai_gsi_url" \
-        || { error "failed to download GSI zip from $_bai_gsi_url"; return 1; }
+        curl -fL -o "$_bai_gsi_zip" "$_bai_gsi_url" ||
+        {
+          error "failed to download GSI zip from $_bai_gsi_url"
+          return 1
+        }
       say "extracting GSI system.img..."
       run_cmd unzip -q -o "$_bai_gsi_zip" system.img -d "$(dirname "$_bai_gsi_img")"
       run_cmd mv "$(dirname "$_bai_gsi_img")/system.img" "$_bai_gsi_img"
@@ -2035,8 +2059,8 @@ vm_build_android() {
       _bai_bundle_dir="$VM_DIR/${_bai_vm_id}.utm/Data"
       if [ -d "$_bai_bundle_dir" ]; then
         if [ "$_bai_userdata_replaced" = true ]; then
-          vm_link_android_userdata_to_utm_bundle "$_bai_vm_id" "$_bai_vm_index" "$_bai_bundle_dir" \
-            || return 1
+          vm_link_android_userdata_to_utm_bundle "$_bai_vm_id" "$_bai_vm_index" "$_bai_bundle_dir" ||
+            return 1
         fi
         if [ "$_bai_system_replaced" = true ]; then
           _bai_bundle_system="$_bai_bundle_dir/disk-main.qcow2"
@@ -2064,34 +2088,34 @@ vm_build_one_image() {
   export NUCLEUS_VM_GUEST_HOSTNAME="$_vm_guest_hostname"
 
   case "$_vm_type" in
-    NixOS)
-      # check-suppress:suppression_doc: best-effort -- a prerequisite-missing or build failure for one
-      vm_build_nixos "$_vm_id" "$_vm_disk_bytes" \
-        || say "NixOS image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
-      ;;
-    Windows)
-      _vm_edition="$(jq -r ".VMs[$_vm_index].Windows.edition" "$MANIFEST")"
-      # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
-      vm_build_windows "$_vm_id" "$_vm_disk_bytes" "$_vm_edition" \
-        || say "Windows image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
-      ;;
-    macOS)
-      _vm_macos_ver="$(jq -r ".VMs[$_vm_index].macOS.version" "$MANIFEST")"
-      _vm_ram_bytes="$(parse_size "$(jq -r ".VMs[$_vm_index].ram" "$MANIFEST")")"
-      _vm_cpus="$(jq -r ".VMs[$_vm_index].cpus" "$MANIFEST")"
-      # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
-      vm_build_macos "$_vm_id" "$_vm_disk_bytes" "$_vm_ram_bytes" "$_vm_cpus" "$_vm_macos_ver" \
-        || say "macOS image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
-      ;;
-    Android)
-      # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
-      vm_build_android "$_vm_id" "$_vm_index" \
-        "$accept_gsi_license" "$upgrade_android" "$reset_userdata" \
-        || say "Android image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
-      ;;
-    *)
-      say "skipping build for '$_vm_id' (unsupported type: $_vm_type)"
-      ;;
+  NixOS)
+    # check-suppress:suppression_doc: best-effort -- a prerequisite-missing or build failure for one
+    vm_build_nixos "$_vm_id" "$_vm_disk_bytes" ||
+      say "NixOS image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
+    ;;
+  Windows)
+    _vm_edition="$(jq -r ".VMs[$_vm_index].Windows.edition" "$MANIFEST")"
+    # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
+    vm_build_windows "$_vm_id" "$_vm_disk_bytes" "$_vm_edition" ||
+      say "Windows image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
+    ;;
+  macOS)
+    _vm_macos_ver="$(jq -r ".VMs[$_vm_index].macOS.version" "$MANIFEST")"
+    _vm_ram_bytes="$(parse_size "$(jq -r ".VMs[$_vm_index].ram" "$MANIFEST")")"
+    _vm_cpus="$(jq -r ".VMs[$_vm_index].cpus" "$MANIFEST")"
+    # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
+    vm_build_macos "$_vm_id" "$_vm_disk_bytes" "$_vm_ram_bytes" "$_vm_cpus" "$_vm_macos_ver" ||
+      say "macOS image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
+    ;;
+  Android)
+    # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
+    vm_build_android "$_vm_id" "$_vm_index" \
+      "$accept_gsi_license" "$upgrade_android" "$reset_userdata" ||
+      say "Android image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
+    ;;
+  *)
+    say "skipping build for '$_vm_id' (unsupported type: $_vm_type)"
+    ;;
   esac
 }
 
@@ -2218,8 +2242,8 @@ vm_sync_utm() {
   fi
 
   say "syncing UTM VM '$vm_display'..."
-  if [ -f "$config_plist" ] && vm_validate_utm_plist_template "$vm_id" \
-    && ! cmp -s "$_vupt_template" "$config_plist"; then
+  if [ -f "$config_plist" ] && vm_validate_utm_plist_template "$vm_id" &&
+    ! cmp -s "$_vupt_template" "$config_plist"; then
     template_drift_config=true
     say "detected config drift in existing bundle; VM will be re-registered to refresh runtime state: $vm_id"
   elif [ ! -f "$config_plist" ]; then
@@ -2227,8 +2251,8 @@ vm_sync_utm() {
   fi
 
   if [ "$vm_type" = "Android" ]; then
-    vm_link_android_userdata_to_utm_bundle "$vm_id" "$vm_index" "$bundle/Data" \
-      || return 1
+    vm_link_android_userdata_to_utm_bundle "$vm_id" "$vm_index" "$bundle/Data" ||
+      return 1
   fi
 
   vm_apply_utm_plist_and_register "$vm_id" "$bundle" "$template_drift_config"
@@ -2314,17 +2338,17 @@ vm_sync_config_phase() {
   fi
 
   case "$(uname -s)" in
-    Darwin)
-      vm_sync_utm_vms
-      ;;
-    Linux)
-      if [ -f /etc/NIXOS ]; then
-        vm_sync_libvirt_vms
-      fi
-      ;;
-    MINGW*|MSYS*|CYGWIN*)
-      say "Windows VM sync: start/stop scripts refreshed (no hypervisor domain to define)"
-      ;;
+  Darwin)
+    vm_sync_utm_vms
+    ;;
+  Linux)
+    if [ -f /etc/NIXOS ]; then
+      vm_sync_libvirt_vms
+    fi
+    ;;
+  MINGW* | MSYS* | CYGWIN*)
+    say "Windows VM sync: start/stop scripts refreshed (no hypervisor domain to define)"
+    ;;
   esac
 
   vm_warn_running_vms_needing_restart
@@ -2473,7 +2497,7 @@ vm_setup_utm() {
       fi
     else
       if ! vm_ensure_base_and_overlay "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
-          "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
+        "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
         return
       fi
       ln -f "$VM_DIR/data/${vm_id}.qcow2" "$disk_file"
@@ -2523,8 +2547,8 @@ vm_setup_libvirt() {
       return
     fi
     _android_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
-    if ! validate_qcow2_image "$_android_system" "Android system image for ${vm_id}" "$_android_min_size" \
-      || ! validate_qcow2_image "$_android_userdata" "Android userdata disk for ${vm_id}" "$_android_min_size"; then
+    if ! validate_qcow2_image "$_android_system" "Android system image for ${vm_id}" "$_android_min_size" ||
+      ! validate_qcow2_image "$_android_userdata" "Android userdata disk for ${vm_id}" "$_android_min_size"; then
       warn "Android images are invalid for '$vm_id'"
       return
     fi
@@ -2548,7 +2572,7 @@ vm_setup_libvirt() {
       say "Android images referenced directly by domain XML: $_android_system, $_android_userdata"
     else
       if ! vm_ensure_base_and_overlay "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
-          "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
+        "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
         return
       fi
       say "runtime overlay ready: $disk_path"
@@ -2579,14 +2603,14 @@ vm_build_nixos() {
   _disk_bytes="$2"
 
   case "$(uname -m)" in
-    aarch64|arm64)
-      _nixos_system='aarch64-linux'
-      _nixos_format_path="$VMS_DIR/NixOS/formats/qcow-efi-btrfs.nix"
-      ;;
-    *)
-      _nixos_system='x86_64-linux'
-      _nixos_format_path="$VMS_DIR/NixOS/formats/qcow-btrfs.nix"
-      ;;
+  aarch64 | arm64)
+    _nixos_system='aarch64-linux'
+    _nixos_format_path="$VMS_DIR/NixOS/formats/qcow-efi-btrfs.nix"
+    ;;
+  *)
+    _nixos_system='x86_64-linux'
+    _nixos_format_path="$VMS_DIR/NixOS/formats/qcow-btrfs.nix"
+    ;;
   esac
   _vm_type="$(jq -r --arg n "$_vm_id" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
   vm_ensure_type_src_dirs
@@ -2600,8 +2624,8 @@ vm_build_nixos() {
 
   if [ -f "$_out" ]; then
     if validate_qcow2_image "$_out" "existing NixOS image" "$_min_size"; then
-      if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker" \
-        && vm_guest_config_marker_matches "$_config_fingerprint" "$_config_marker"; then
+      if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker" &&
+        vm_guest_config_marker_matches "$_config_fingerprint" "$_config_marker"; then
         say "NixOS image already built for the current guest credentials and config (owner=$vm_secret_owner, username=$vm_guest_username): $_out"
         return 0
       fi
@@ -2690,8 +2714,8 @@ download_windows_iso_mido() {
   fi
 
   case "$(printf '%s' "$_mido_edition" | tr '[:upper:]' '[:lower:]')" in
-    *enterprise*eval*) _mido_media='win11x64-enterprise-eval' ;;
-    *) _mido_media='win11x64' ;;
+  *enterprise*eval*) _mido_media='win11x64-enterprise-eval' ;;
+  *) _mido_media='win11x64' ;;
   esac
 
   say "downloading Windows 11 ISO via Mido (media=$_mido_media)..."
@@ -2846,8 +2870,8 @@ download_windows_iso_fido_url_nonwindows() {
   fi
 
   case "$(printf '%s' "$_fido_edition" | tr '[:upper:]' '[:lower:]')" in
-    *enterprise*) _fido_ed_query='Enterprise' ;;
-    *) _fido_ed_query='Home/Pro/Edu' ;;
+  *enterprise*) _fido_ed_query='Enterprise' ;;
+  *) _fido_ed_query='Home/Pro/Edu' ;;
   esac
 
   say "resolving Windows 11 ISO URL via Fido fallback (edition=$_fido_ed_query)..."
@@ -2970,48 +2994,48 @@ vm_build_windows() {
     _cached_iso="$(vm_src_path "$_vm_type" "$VM_WINDOWS_INSTALLER_ISO")"
     if [ "$dry_run" = false ]; then
       case "$windows_iso_source" in
-        url)
-          error "windows-iso-source=url selected and no cached/Windows.isoUrl installer was resolved"
-          ;;
-        mido)
+      url)
+        error "windows-iso-source=url selected and no cached/Windows.isoUrl installer was resolved"
+        ;;
+      mido)
+        if run_with_backoff 'Mido Windows ISO download' download_windows_iso_mido "$_cached_iso" "$_edition"; then
+          _iso="$_cached_iso"
+        fi
+        ;;
+      auto)
+        _host_uname="$(uname -s)"
+        case "$_host_uname" in
+        MINGW* | MSYS* | CYGWIN* | Windows_NT)
           if run_with_backoff 'Mido Windows ISO download' download_windows_iso_mido "$_cached_iso" "$_edition"; then
+            _iso="$_cached_iso"
+          elif run_with_backoff 'Fido Windows ISO download' download_windows_iso_fido "$_cached_iso" "$_edition"; then
             _iso="$_cached_iso"
           fi
           ;;
-        auto)
-          _host_uname="$(uname -s)"
-          case "$_host_uname" in
-            MINGW*|MSYS*|CYGWIN*|Windows_NT)
-              if run_with_backoff 'Mido Windows ISO download' download_windows_iso_mido "$_cached_iso" "$_edition"; then
-                _iso="$_cached_iso"
-              elif run_with_backoff 'Fido Windows ISO download' download_windows_iso_fido "$_cached_iso" "$_edition"; then
-                _iso="$_cached_iso"
-              fi
-              ;;
-            *)
-              if run_with_backoff 'Fido URL resolver/download' download_windows_iso_fido_url_nonwindows "$_cached_iso" "$_edition"; then
-                _iso="$_cached_iso"
-              else
-                warn "Fido URL fallback failed on $_host_uname; trying Mido as secondary fallback"
-                if run_with_backoff 'Mido Windows ISO download' download_windows_iso_mido "$_cached_iso" "$_edition"; then
-                  _iso="$_cached_iso"
-                fi
-              fi
-              ;;
-          esac
+        *)
+          if run_with_backoff 'Fido URL resolver/download' download_windows_iso_fido_url_nonwindows "$_cached_iso" "$_edition"; then
+            _iso="$_cached_iso"
+          else
+            warn "Fido URL fallback failed on $_host_uname; trying Mido as secondary fallback"
+            if run_with_backoff 'Mido Windows ISO download' download_windows_iso_mido "$_cached_iso" "$_edition"; then
+              _iso="$_cached_iso"
+            fi
+          fi
           ;;
+        esac
+        ;;
       esac
     else
       case "$windows_iso_source" in
-        url)
-          dry_run "windows-iso-source=url selected; no downloader fallback will run"
-          ;;
-        mido)
-          dry_run "would call vendor/qvm-create-windows-qube/windows/isos/mido.sh (with runtime patch copy)"
-          ;;
-        auto)
-          dry_run "non-Windows hosts: Fido URL resolver then Mido; Windows hosts: Mido then Fido"
-          ;;
+      url)
+        dry_run "windows-iso-source=url selected; no downloader fallback will run"
+        ;;
+      mido)
+        dry_run "would call vendor/qvm-create-windows-qube/windows/isos/mido.sh (with runtime patch copy)"
+        ;;
+      auto)
+        dry_run "non-Windows hosts: Fido URL resolver then Mido; Windows hosts: Mido then Fido"
+        ;;
       esac
     fi
   fi
@@ -3045,7 +3069,7 @@ vm_build_windows() {
   _display_backend=''
   if [ "$windows_headless" = 'false' ]; then
     # check-suppress:suppression_doc: QEMU binary may not be installed; display backend probe expected to fail.
-  _display_help="$(qemu-system-x86_64 -display help || true)"
+    _display_help="$(qemu-system-x86_64 -display help || true)"
     for _display_candidate in cocoa gtk sdl spice-app curses; do
       if printf '%s\n' "$_display_help" | grep -Eiq "(^|[[:space:]])${_display_candidate}([[:space:]]|$)"; then
         _display_backend="$_display_candidate"
@@ -3085,14 +3109,13 @@ vm_build_windows() {
   for _efi_dir in \
     "$_qemu_share" \
     "/etc/profiles/per-user/${USER}/share/qemu" \
-    "/Applications/UTM.app/Contents/Resources/qemu"
-  do
+    "/Applications/UTM.app/Contents/Resources/qemu"; do
     [ -n "$_efi_dir" ] || continue
     if [ -z "$_efi_code" ] && [ -f "$_efi_dir/edk2-x86_64-code.fd" ]; then
       _efi_code="$_efi_dir/edk2-x86_64-code.fd"
     fi
     if [ -z "$_efi_vars" ] && [ -f "$_efi_dir/edk2-i386-vars.fd" ]; then
-      _efi_vars_size="$(wc -c < "$_efi_dir/edk2-i386-vars.fd" | tr -d '[:space:]')"
+      _efi_vars_size="$(wc -c <"$_efi_dir/edk2-i386-vars.fd" | tr -d '[:space:]')"
       if [ -n "$_efi_vars_size" ] && [ $((_efi_vars_size % 4096)) -eq 0 ]; then
         _efi_vars="$_efi_dir/edk2-i386-vars.fd"
       fi
@@ -3311,8 +3334,8 @@ vm_build_macos() {
   fi
 
   _packer_dir="$VMS_DIR/macOS"
-  _disk_gib="$(( (_disk_bytes + 999999999) / 1000000000 ))"
-  _mem_gib="$(( (_ram_bytes + 1073741823) / 1073741824 ))"
+  _disk_gib="$(((_disk_bytes + 999999999) / 1000000000))"
+  _mem_gib="$(((_ram_bytes + 1073741823) / 1073741824))"
 
   say "building macOS $_macos_version VM via Packer Tart (disk=$_disk_gib GiB, mem=$_mem_gib GiB, cpus=$_cpus)..."
 
@@ -3497,7 +3520,7 @@ vm_setup_windows_qemu() {
   if [ "$dry_run" = false ]; then
     mkdir -p "$VM_DIR"
     if ! vm_ensure_base_and_overlay "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
-        "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
+      "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
       return
     fi
     say "runtime overlay ready: $disk_path"
@@ -3535,15 +3558,15 @@ vm_gc_vms() {
   fi
 
   case "$(uname -s)" in
-    Darwin)
-      gc_tart_vms "$_gcv_expected"
-      gc_utm_bundles "$_gcv_expected"
-      ;;
-    Linux)
-      if [ -f /etc/NIXOS ]; then
-        gc_libvirt_vms "$_gcv_expected"
-      fi
-      ;;
+  Darwin)
+    gc_tart_vms "$_gcv_expected"
+    gc_utm_bundles "$_gcv_expected"
+    ;;
+  Linux)
+    if [ -f /etc/NIXOS ]; then
+      gc_libvirt_vms "$_gcv_expected"
+    fi
+    ;;
   esac
 
   vm_gc_orphan_disks "$_gcv_expected"
@@ -3724,8 +3747,8 @@ vm_gc_orphan_markers() {
     for _gcom_marker in "$_gcom_data_dir"/*.vm-guest-credentials-sha256 "$_gcom_data_dir"/*.vm-guest-config-sha256; do
       [ -f "$_gcom_marker" ] || continue
       case "$_gcom_marker" in
-        *.vm-guest-credentials-sha256) _gcom_base="${_gcom_marker%.vm-guest-credentials-sha256}" ;;
-        *) _gcom_base="${_gcom_marker%.vm-guest-config-sha256}" ;;
+      *.vm-guest-credentials-sha256) _gcom_base="${_gcom_marker%.vm-guest-credentials-sha256}" ;;
+      *) _gcom_base="${_gcom_marker%.vm-guest-config-sha256}" ;;
       esac
       if [ ! -f "$_gcom_base" ]; then
         say "GC — removing orphaned guest marker: $_gcom_marker"
@@ -3780,7 +3803,6 @@ vm_pack_vms() {
   if [ "$dry_run" = true ]; then
     dry_run "pack mode enabled — printing planned removals (pass --force to perform)"
   fi
-
 
   for _pv_bundle in "$VM_DIR"/*.utm/; do
     [ -d "$_pv_bundle" ] || continue
@@ -3916,98 +3938,98 @@ vm_unpack_vms() {
       continue
     fi
     case "$(uname -s)" in
-      Darwin)
-        if [ "$_uv_type" = "macOS" ]; then
-          say "unpack — macOS/tart guest '$_uv_name' is managed by Tart; nothing else to regenerate"
-          continue
+    Darwin)
+      if [ "$_uv_type" = "macOS" ]; then
+        say "unpack — macOS/tart guest '$_uv_name' is managed by Tart; nothing else to regenerate"
+        continue
+      fi
+      _uv_bundle="$VM_DIR/${_uv_name}.utm"
+      _uv_plist_template="${HOME}/.local/share/nucleus/vms/${_uv_name}-config.plist"
+      if [ ! -f "$_uv_plist_template" ]; then
+        warn "unpack — UTM config template not found: $_uv_plist_template (apply the macOS config on this host first)"
+        continue
+      fi
+      say "unpack — recreating UTM bundle from descriptor: $_uv_bundle"
+      if [ "$dry_run" = false ]; then
+        if [ -e "$_uv_bundle" ]; then
+          say "unpack — removing stale UTM bundle: $_uv_bundle"
+          rm -rf "$_uv_bundle"
         fi
-        _uv_bundle="$VM_DIR/${_uv_name}.utm"
-        _uv_plist_template="${HOME}/.local/share/nucleus/vms/${_uv_name}-config.plist"
-        if [ ! -f "$_uv_plist_template" ]; then
-          warn "unpack — UTM config template not found: $_uv_plist_template (apply the macOS config on this host first)"
-          continue
+        mkdir -p "$_uv_bundle/Data"
+        if [ "$_uv_type" = "Android" ]; then
+          _uv_android_system="$(vm_src_path "$_uv_type" "$(jq -r '.Android.systemImage' "$_uv_desc")")"
+          _uv_android_userdata="$VM_DIR/data/$(jq -r '.Android.userdataImage' "$_uv_desc")"
+          _uv_android_gsi="$(vm_src_path "$_uv_type" "$(jq -r '.Android.gsiImage' "$_uv_desc")")"
+          _uv_gsi_url="$(jq -r '.Android.gsiUrl' "$_uv_desc")"
+          if [ ! -f "$_uv_android_userdata" ]; then
+            warn "unpack — Android userdata missing: $_uv_android_userdata; skipping bundle for '$_uv_name'"
+            continue
+          fi
+          cp "$_uv_android_system" "$_uv_bundle/Data/disk-main.qcow2"
+          ln -f "$_uv_android_userdata" "$_uv_bundle/Data/$(basename "$_uv_android_userdata")"
+          if [ -n "$_uv_gsi_url" ] && [ "$_uv_gsi_url" != "null" ] && [ -f "$_uv_android_gsi" ]; then
+            cp "$_uv_android_gsi" "$_uv_bundle/Data/$(basename "$_uv_android_gsi")"
+          fi
+        else
+          if ! vm_unpack_ensure_base_overlay "$_uv_name" "$_uv_type"; then
+            continue
+          fi
+          ln -f "$(vm_src_path "$_uv_type" "$VM_OVERLAY_BACKING")" "$_uv_bundle/Data/$(basename "$(vm_src_path "$_uv_type" "$VM_OVERLAY_BACKING")")"
+          ln -f "$VM_DIR/data/${_uv_name}.qcow2" "$_uv_bundle/Data/disk-main.qcow2"
         fi
-        say "unpack — recreating UTM bundle from descriptor: $_uv_bundle"
-        if [ "$dry_run" = false ]; then
-          if [ -e "$_uv_bundle" ]; then
-            say "unpack — removing stale UTM bundle: $_uv_bundle"
-            rm -rf "$_uv_bundle"
-          fi
-          mkdir -p "$_uv_bundle/Data"
-          if [ "$_uv_type" = "Android" ]; then
-            _uv_android_system="$(vm_src_path "$_uv_type" "$(jq -r '.Android.systemImage' "$_uv_desc")")"
-            _uv_android_userdata="$VM_DIR/data/$(jq -r '.Android.userdataImage' "$_uv_desc")"
-            _uv_android_gsi="$(vm_src_path "$_uv_type" "$(jq -r '.Android.gsiImage' "$_uv_desc")")"
-            _uv_gsi_url="$(jq -r '.Android.gsiUrl' "$_uv_desc")"
-            if [ ! -f "$_uv_android_userdata" ]; then
-              warn "unpack — Android userdata missing: $_uv_android_userdata; skipping bundle for '$_uv_name'"
-              continue
-            fi
-            cp "$_uv_android_system" "$_uv_bundle/Data/disk-main.qcow2"
-            ln -f "$_uv_android_userdata" "$_uv_bundle/Data/$(basename "$_uv_android_userdata")"
-            if [ -n "$_uv_gsi_url" ] && [ "$_uv_gsi_url" != "null" ] && [ -f "$_uv_android_gsi" ]; then
-              cp "$_uv_android_gsi" "$_uv_bundle/Data/$(basename "$_uv_android_gsi")"
-            fi
-          else
-            if ! vm_unpack_ensure_base_overlay "$_uv_name" "$_uv_type"; then
-              continue
-            fi
-            ln -f "$(vm_src_path "$_uv_type" "$VM_OVERLAY_BACKING")" "$_uv_bundle/Data/$(basename "$(vm_src_path "$_uv_type" "$VM_OVERLAY_BACKING")")"
-            ln -f "$VM_DIR/data/${_uv_name}.qcow2" "$_uv_bundle/Data/disk-main.qcow2"
-          fi
-          cp "$_uv_plist_template" "$_uv_bundle/config.plist"
-          chmod +w "$_uv_bundle/config.plist"
-          if ! vm_get_utm_registered_names | grep -qxF "$_uv_name"; then
-            say "opening UTM bundle in place: $_uv_bundle"
-            if open "$_uv_bundle"; then
-              if wait_for_utm_registration "$_uv_name"; then
-                say "UTM VM opened and registered: $_uv_name"
-              else
-                warn "UTM did not register VM '$_uv_name' within timeout; open UTM and retry vm-unpack"
-              fi
+        cp "$_uv_plist_template" "$_uv_bundle/config.plist"
+        chmod +w "$_uv_bundle/config.plist"
+        if ! vm_get_utm_registered_names | grep -qxF "$_uv_name"; then
+          say "opening UTM bundle in place: $_uv_bundle"
+          if open "$_uv_bundle"; then
+            if wait_for_utm_registration "$_uv_name"; then
+              say "UTM VM opened and registered: $_uv_name"
             else
-              warn "opening $_uv_bundle failed; ensure UTM can access the managed VM directory and retry"
+              warn "UTM did not register VM '$_uv_name' within timeout; open UTM and retry vm-unpack"
             fi
           else
-            say "UTM VM already registered: $_uv_name"
+            warn "opening $_uv_bundle failed; ensure UTM can access the managed VM directory and retry"
           fi
         else
-          dry_run "recreate UTM bundle $_uv_bundle (cp plist template + link disks into Data/ + open)"
+          say "UTM VM already registered: $_uv_name"
         fi
-        ;;
-      Linux)
-        _uv_xml_file="/etc/nucleus/vms/${_uv_name}-domain.xml"
-        if [ ! -f "$_uv_xml_file" ]; then
-          warn "unpack — libvirt domain XML not found: $_uv_xml_file (apply the NixOS config on this host first)"
-          continue
-        fi
-        say "unpack — defining libvirt domain from descriptor: $_uv_name"
-        if [ "$dry_run" = false ]; then
-          if [ "$_uv_type" = "Android" ]; then
-            _uv_android_system="$(vm_src_path "$_uv_type" "$(jq -r '.Android.systemImage' "$_uv_desc")")"
-            _uv_android_userdata="$VM_DIR/data/$(jq -r '.Android.userdataImage' "$_uv_desc")"
-            _uv_android_gsi="$(vm_src_path "$_uv_type" "$(jq -r '.Android.gsiImage' "$_uv_desc")")"
-            _uv_gsi_url="$(jq -r '.Android.gsiUrl' "$_uv_desc")"
-            if [ ! -f "$_uv_android_system" ] || [ ! -f "$_uv_android_userdata" ]; then
-              warn "unpack — Android images missing for '$_uv_name': $_uv_android_system, $_uv_android_userdata"
-              continue
-            fi
-            if [ -n "$_uv_gsi_url" ] && [ "$_uv_gsi_url" != "null" ] && [ -f "$_uv_android_gsi" ]; then
-              say "unpack — Android GSI present: $_uv_android_gsi"
-            fi
-          else
-            if ! vm_unpack_ensure_base_overlay "$_uv_name" "$_uv_type"; then
-              continue
-            fi
+      else
+        dry_run "recreate UTM bundle $_uv_bundle (cp plist template + link disks into Data/ + open)"
+      fi
+      ;;
+    Linux)
+      _uv_xml_file="/etc/nucleus/vms/${_uv_name}-domain.xml"
+      if [ ! -f "$_uv_xml_file" ]; then
+        warn "unpack — libvirt domain XML not found: $_uv_xml_file (apply the NixOS config on this host first)"
+        continue
+      fi
+      say "unpack — defining libvirt domain from descriptor: $_uv_name"
+      if [ "$dry_run" = false ]; then
+        if [ "$_uv_type" = "Android" ]; then
+          _uv_android_system="$(vm_src_path "$_uv_type" "$(jq -r '.Android.systemImage' "$_uv_desc")")"
+          _uv_android_userdata="$VM_DIR/data/$(jq -r '.Android.userdataImage' "$_uv_desc")"
+          _uv_android_gsi="$(vm_src_path "$_uv_type" "$(jq -r '.Android.gsiImage' "$_uv_desc")")"
+          _uv_gsi_url="$(jq -r '.Android.gsiUrl' "$_uv_desc")"
+          if [ ! -f "$_uv_android_system" ] || [ ! -f "$_uv_android_userdata" ]; then
+            warn "unpack — Android images missing for '$_uv_name': $_uv_android_system, $_uv_android_userdata"
+            continue
           fi
-          virsh define "$_uv_xml_file"
+          if [ -n "$_uv_gsi_url" ] && [ "$_uv_gsi_url" != "null" ] && [ -f "$_uv_android_gsi" ]; then
+            say "unpack — Android GSI present: $_uv_android_gsi"
+          fi
         else
-          dry_run "define libvirt domain from $_uv_xml_file"
+          if ! vm_unpack_ensure_base_overlay "$_uv_name" "$_uv_type"; then
+            continue
+          fi
         fi
-        ;;
-      MINGW*|MSYS*|CYGWIN*)
-        say "unpack — Windows host: start/stop scripts re-rendered above; no bundle/domain to regenerate for '$_uv_name'"
-        ;;
+        virsh define "$_uv_xml_file"
+      else
+        dry_run "define libvirt domain from $_uv_xml_file"
+      fi
+      ;;
+    MINGW* | MSYS* | CYGWIN*)
+      say "unpack — Windows host: start/stop scripts re-rendered above; no bundle/domain to regenerate for '$_uv_name'"
+      ;;
     esac
   done
 

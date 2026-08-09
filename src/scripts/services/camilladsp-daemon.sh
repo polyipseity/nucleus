@@ -21,11 +21,26 @@ log_file=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
-    --port) shift; ws_port="${1:-$ws_port}" ;;
-    --statefile) shift; state_file="${1:-$state_file}" ;;
-    --config) shift; config_file="${1:-$config_file}" ;;
-    --logfile) shift; log_file="${1:-}" ;;
-    *) printf 'error: unknown argument: %s\n' "$1" >&2; exit 1 ;;
+  --port)
+    shift
+    ws_port="${1:-$ws_port}"
+    ;;
+  --statefile)
+    shift
+    state_file="${1:-$state_file}"
+    ;;
+  --config)
+    shift
+    config_file="${1:-$config_file}"
+    ;;
+  --logfile)
+    shift
+    log_file="${1:-}"
+    ;;
+  *)
+    printf 'error: unknown argument: %s\n' "$1" >&2
+    exit 1
+    ;;
   esac
   shift
 done
@@ -49,8 +64,8 @@ pid=$!
 # Push initial config (retry up to ~30 s)
 if [ -f "$config_file" ]; then
   for _i in $(seq 1 60); do
-    if jq -cRs '{SetConfig: .}' "$config_file" | \
-       websocat -1 "ws://127.0.0.1:$ws_port" >/dev/null 2>&1; then
+    if jq -cRs '{SetConfig: .}' "$config_file" |
+      websocat -1 "ws://127.0.0.1:$ws_port" >/dev/null 2>&1; then
       break
     fi
     sleep 0.5

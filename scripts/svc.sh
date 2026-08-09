@@ -22,8 +22,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
@@ -62,8 +62,8 @@ SERVICES_JSON="$REPO_ROOT/src/modules/services.json"
 HOST="$(resolve_nucleus_host)"
 
 case "$HOST" in
-  MacBook|NixOS) ;;
-  *) error "unsupported host '$HOST'" ;;
+MacBook | NixOS) ;;
+*) error "unsupported host '$HOST'" ;;
 esac
 
 HAS_SUDO=false
@@ -155,40 +155,40 @@ resolve_service_names() {
 expand_prefix() {
   local name="$1" prefix="$2" plat_json="$3"
   case "$HOST" in
-    MacBook)
-      local sudo_prefix=""
-      local domain
-      domain=$(echo "$plat_json" | jq -r '.domain // "user"')
-      [ "$domain" = "system" ] && sudo_prefix="sudo"
-      local matches
-      # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
-      if [ "$domain" = "user" ] && [ "$EUID" -eq 0 ]; then
-        matches=$(launchctl asuser "$REAL_USER_UID" launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true)  # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
-      else
-        matches=$($sudo_prefix launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true)  # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
-      fi
-      if [ -z "$matches" ]; then
-        printf '%s\t%s\t%s\t%s\n' "$name" "$prefix" "$plat_json" "$name"
-      else
-        while IFS= read -r m; do
-          printf '%s\t%s\t%s\t%s\n' "$name" "$m" "{\"type\":\"launchctl\",\"service\":\"$m\",\"domain\":\"$(echo "$plat_json" | jq -r '.domain')\"}" "$m"
-        done <<< "$matches"
-      fi
-      ;;
-    NixOS)
-      local scope_flag=""
-      [ "$(echo "$plat_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
-      local matches
-      # check-suppress:suppression_doc: no matching units found is an expected empty result.
-      matches=$(systemctl $scope_flag list-units --all "$prefix*" --no-legend 2>/dev/null | awk '{ print $1 }' || true)
-      if [ -z "$matches" ]; then
-        printf '%s\t%s\t%s\t%s\n' "$name" "$prefix" "$plat_json" "$name"
-      else
-        while IFS= read -r m; do
-          printf '%s\t%s\t%s\t%s\n' "$name" "$m" "{\"type\":\"systemctl\",\"service\":\"$m\",\"scope\":\"$(echo "$plat_json" | jq -r '.scope')\"}" "$m"
-        done <<< "$matches"
-      fi
-      ;;
+  MacBook)
+    local sudo_prefix=""
+    local domain
+    domain=$(echo "$plat_json" | jq -r '.domain // "user"')
+    [ "$domain" = "system" ] && sudo_prefix="sudo"
+    local matches
+    # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
+    if [ "$domain" = "user" ] && [ "$EUID" -eq 0 ]; then
+      matches=$(launchctl asuser "$REAL_USER_UID" launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true) # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
+    else
+      matches=$($sudo_prefix launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true) # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
+    fi
+    if [ -z "$matches" ]; then
+      printf '%s\t%s\t%s\t%s\n' "$name" "$prefix" "$plat_json" "$name"
+    else
+      while IFS= read -r m; do
+        printf '%s\t%s\t%s\t%s\n' "$name" "$m" "{\"type\":\"launchctl\",\"service\":\"$m\",\"domain\":\"$(echo "$plat_json" | jq -r '.domain')\"}" "$m"
+      done <<<"$matches"
+    fi
+    ;;
+  NixOS)
+    local scope_flag=""
+    [ "$(echo "$plat_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
+    local matches
+    # check-suppress:suppression_doc: no matching units found is an expected empty result.
+    matches=$(systemctl $scope_flag list-units --all "$prefix*" --no-legend 2>/dev/null | awk '{ print $1 }' || true)
+    if [ -z "$matches" ]; then
+      printf '%s\t%s\t%s\t%s\n' "$name" "$prefix" "$plat_json" "$name"
+    else
+      while IFS= read -r m; do
+        printf '%s\t%s\t%s\t%s\n' "$name" "$m" "{\"type\":\"systemctl\",\"service\":\"$m\",\"scope\":\"$(echo "$plat_json" | jq -r '.scope')\"}" "$m"
+      done <<<"$matches"
+    fi
+    ;;
   esac
 }
 
@@ -207,95 +207,97 @@ svc_status() {
   svc_id=$(echo "$entry_json" | jq -r '.service // .taskPath // ""')
 
   case "$svc_type" in
-    launchctl)
-      local domain_flag=""
-      local domain
-      domain=$(echo "$entry_json" | jq -r '.domain // "user"')
-      [ "$domain" = "system" ] && domain_flag="sudo"
+  launchctl)
+    local domain_flag=""
+    local domain
+    domain=$(echo "$entry_json" | jq -r '.domain // "user"')
+    [ "$domain" = "system" ] && domain_flag="sudo"
 
-      local list_line running=true enabled=true pid=""
+    local list_line running=true enabled=true pid=""
+    # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
+    if [ "$domain" = "user" ] && [ "$EUID" -eq 0 ]; then
+      list_line=$(launchctl asuser "$REAL_USER_UID" launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true) # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
+    else
+      list_line=$($domain_flag launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true) # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
+    fi
+    local socket_activated
+    socket_activated=$(echo "$entry_json" | jq -r '.socketActivated // false')
+    if [ -z "$list_line" ]; then
+      running=false
+      enabled=false
+    else
+      pid=$(echo "$list_line" | awk '{ print $1 }')
+      if [ "$pid" = "-" ] || [ -z "$pid" ]; then pid=""; fi
+      local last_exit
+      last_exit=$(echo "$list_line" | awk '{ print $2 }')
+      if [ -z "$pid" ] && [ "$last_exit" != "0" ]; then
+        running=false
+      fi
+    fi
+    if [ "$running" != "true" ]; then
+      local print_out
       # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
-      if [ "$domain" = "user" ] && [ "$EUID" -eq 0 ]; then
-        list_line=$(launchctl asuser "$REAL_USER_UID" launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true)  # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
-      else
-        list_line=$($domain_flag launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true)  # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
-      fi
-      local socket_activated
-      socket_activated=$(echo "$entry_json" | jq -r '.socketActivated // false')
-      if [ -z "$list_line" ]; then
-        running=false; enabled=false
-      else
-        pid=$(echo "$list_line" | awk '{ print $1 }')
-        if [ "$pid" = "-" ] || [ -z "$pid" ]; then pid=""; fi
-        local last_exit
-        last_exit=$(echo "$list_line" | awk '{ print $2 }')
-        if [ -z "$pid" ] && [ "$last_exit" != "0" ]; then
-          running=false
-        fi
-      fi
-      if [ "$running" != "true" ]; then
-        local print_out
-        # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
-        print_out=$($domain_flag launchctl print "$(launchctl_target "$domain" "$svc_id")" 2>/dev/null || true)
-        case "$print_out" in
-          *"state = running"*)
-            running=true; enabled=true
-            pid=$(echo "$print_out" | sed -n 's/.*pid = \([0-9]*\).*/\1/p')
-            [ -z "$pid" ] && pid=""
-            ;;
-        esac
-      fi
-      local status_text state_text exit_code=""
-      if [ "$running" = true ]; then
-        status_text="active"
-      elif [ "$socket_activated" = "true" ]; then
-        status_text="listening"
-      else
-        status_text="inactive"
-        state_text=$(echo "$print_out" | sed -n 's/.*state = //p' | head -1)
-        exit_code=$(echo "$print_out" | sed -n 's/.*last exit code = //p' | head -1 | sed 's/:.*//')
-      fi
-      printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s,"state":%s,"exitCode":%s}' \
-        "$status_text" \
-        "$running" "$enabled" "${pid:-null}" \
-        "$(printf '%s' "${state_text:-null}" | jq -R . 2>/dev/null || echo null)" \
-        "${exit_code:-null}"
-      ;;
-    systemctl)
-      local scope_flag=""
-      [ "$(echo "$entry_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
+      print_out=$($domain_flag launchctl print "$(launchctl_target "$domain" "$svc_id")" 2>/dev/null || true)
+      case "$print_out" in
+      *"state = running"*)
+        running=true
+        enabled=true
+        pid=$(echo "$print_out" | sed -n 's/.*pid = \([0-9]*\).*/\1/p')
+        [ -z "$pid" ] && pid=""
+        ;;
+      esac
+    fi
+    local status_text state_text exit_code=""
+    if [ "$running" = true ]; then
+      status_text="active"
+    elif [ "$socket_activated" = "true" ]; then
+      status_text="listening"
+    else
+      status_text="inactive"
+      state_text=$(echo "$print_out" | sed -n 's/.*state = //p' | head -1)
+      exit_code=$(echo "$print_out" | sed -n 's/.*last exit code = //p' | head -1 | sed 's/:.*//')
+    fi
+    printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s,"state":%s,"exitCode":%s}' \
+      "$status_text" \
+      "$running" "$enabled" "${pid:-null}" \
+      "$(printf '%s' "${state_text:-null}" | jq -R . 2>/dev/null || echo null)" \
+      "${exit_code:-null}"
+    ;;
+  systemctl)
+    local scope_flag=""
+    [ "$(echo "$entry_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
 
-      local is_active is_enabled
+    local is_active is_enabled
+    # check-suppress:suppression_doc: unit may not exist on this system; probe expected to fail.
+    is_active=$(systemctl $scope_flag is-active "$svc_id" 2>/dev/null || true)
+    is_active="${is_active:-inactive}"
+    # check-suppress:suppression_doc: unit may not exist on this system; probe expected to fail.
+    is_enabled=$(systemctl $scope_flag is-enabled "$svc_id" 2>/dev/null || true)
+    is_enabled="${is_enabled:-disabled}"
+
+    local running=true
+    [ "$is_active" != "active" ] && running=false
+    local enabled_bool=true
+    [ "$is_enabled" != "enabled" ] && enabled_bool=false
+
+    local pid="" exit_code=""
+    if [ "$running" = true ]; then
       # check-suppress:suppression_doc: unit may not exist on this system; probe expected to fail.
-      is_active=$(systemctl $scope_flag is-active "$svc_id" 2>/dev/null || true)
-      is_active="${is_active:-inactive}"
+      pid=$(systemctl $scope_flag show -p MainPID "$svc_id" 2>/dev/null | sed 's/MainPID=//' || true)
+      [ -z "$pid" ] || [ "$pid" = "0" ] && pid=""
+    else
       # check-suppress:suppression_doc: unit may not exist on this system; probe expected to fail.
-      is_enabled=$(systemctl $scope_flag is-enabled "$svc_id" 2>/dev/null || true)
-      is_enabled="${is_enabled:-disabled}"
-
-      local running=true
-      [ "$is_active" != "active" ] && running=false
-      local enabled_bool=true
-      [ "$is_enabled" != "enabled" ] && enabled_bool=false
-
-      local pid="" exit_code=""
-      if [ "$running" = true ]; then
-        # check-suppress:suppression_doc: unit may not exist on this system; probe expected to fail.
-        pid=$(systemctl $scope_flag show -p MainPID "$svc_id" 2>/dev/null | sed 's/MainPID=//' || true)
-        [ -z "$pid" ] || [ "$pid" = "0" ] && pid=""
-      else
-        # check-suppress:suppression_doc: unit may not exist on this system; probe expected to fail.
-        exit_code=$(systemctl $scope_flag show -p ExecMainStatus "$svc_id" 2>/dev/null | sed 's/ExecMainStatus=//' || true)
-        [ -z "$exit_code" ] && exit_code=""
-      fi
-      printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s,"state":%s,"exitCode":%s}' \
-        "$is_active" "$running" "$enabled_bool" "${pid:-null}" \
-        "$(printf '%s' "$is_active" | jq -R . 2>/dev/null || echo null)" \
-        "${exit_code:-null}"
-      ;;
-    *)
-      printf '{"status":"unknown","running":false,"enabled":false,"pid":null}'
-      ;;
+      exit_code=$(systemctl $scope_flag show -p ExecMainStatus "$svc_id" 2>/dev/null | sed 's/ExecMainStatus=//' || true)
+      [ -z "$exit_code" ] && exit_code=""
+    fi
+    printf '{"status":"%s","running":%s,"enabled":%s,"pid":%s,"state":%s,"exitCode":%s}' \
+      "$is_active" "$running" "$enabled_bool" "${pid:-null}" \
+      "$(printf '%s' "$is_active" | jq -R . 2>/dev/null || echo null)" \
+      "${exit_code:-null}"
+    ;;
+  *)
+    printf '{"status":"unknown","running":false,"enabled":false,"pid":null}'
+    ;;
   esac
 }
 
@@ -322,20 +324,20 @@ recover_launchctl_service() {
   # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
   print_out=$($sudo_prefix launchctl print "$target" 2>/dev/null || true)
   case "$print_out" in
-    *"state = spawn scheduled"*|*"state = waiting"*|*"last exit code = 78"*)
-      local plist
-      if [ "$domain" = "system" ]; then
-        plist="/Library/LaunchDaemons/$svc_id.plist"
-      else
-        plist="$HOME/Library/LaunchAgents/$svc_id.plist"
-      fi
-      # check-suppress:suppression_doc: service may not be loaded; bootout on absent service exits 1.
-      $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
-      if $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null; then
-        return 0
-      fi
-      return 1
-      ;;
+  *"state = spawn scheduled"* | *"state = waiting"* | *"last exit code = 78"*)
+    local plist
+    if [ "$domain" = "system" ]; then
+      plist="/Library/LaunchDaemons/$svc_id.plist"
+    else
+      plist="$HOME/Library/LaunchAgents/$svc_id.plist"
+    fi
+    # check-suppress:suppression_doc: service may not be loaded; bootout on absent service exits 1.
+    $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
+    if $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null; then
+      return 0
+    fi
+    return 1
+    ;;
   esac
   return 1
 }
@@ -406,20 +408,20 @@ service_diagnostic() {
   svc_type=$(echo "$entry_json" | jq -r '.type')
   svc_id=$(echo "$entry_json" | jq -r '.service // ""')
   case "$svc_type" in
-    launchctl)
-      local domain sudo_prefix="" target
-      domain=$(echo "$entry_json" | jq -r '.domain // "user"')
-      [ "$domain" = "system" ] && sudo_prefix="sudo"
-      target=$(launchctl_target "$domain" "$svc_id")
-      $sudo_prefix launchctl print "$target" 2>/dev/null \
-        | awk -F'= ' '/state =/{s=$2} /last exit code/{e=$NF} END{printf "state=%s", s; if(e) printf ", exit=%s", e; printf "\n"}'
-      ;;
-    systemctl)
-      local scope_flag=""
-      [ "$(echo "$entry_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
-      systemctl $scope_flag --no-pager -l status "$svc_id" 2>&1 \
-        | sed -n 's/.*Active: //p' | head -1
-      ;;
+  launchctl)
+    local domain sudo_prefix="" target
+    domain=$(echo "$entry_json" | jq -r '.domain // "user"')
+    [ "$domain" = "system" ] && sudo_prefix="sudo"
+    target=$(launchctl_target "$domain" "$svc_id")
+    $sudo_prefix launchctl print "$target" 2>/dev/null |
+      awk -F'= ' '/state =/{s=$2} /last exit code/{e=$NF} END{printf "state=%s", s; if(e) printf ", exit=%s", e; printf "\n"}'
+    ;;
+  systemctl)
+    local scope_flag=""
+    [ "$(echo "$entry_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
+    systemctl $scope_flag --no-pager -l status "$svc_id" 2>&1 |
+      sed -n 's/.*Active: //p' | head -1
+    ;;
   esac
 }
 
@@ -457,112 +459,112 @@ svc_action() {
   svc_id=$(echo "$entry_json" | jq -r '.service // .taskPath // ""')
 
   case "$svc_type" in
-    launchctl)
-      local domain
-      domain=$(echo "$entry_json" | jq -r '.domain // "user"')
-      local sudo_prefix=""
-      [ "$domain" = "system" ] && sudo_prefix="sudo"
-      local target
-      target=$(launchctl_target "$domain" "$svc_id")
+  launchctl)
+    local domain
+    domain=$(echo "$entry_json" | jq -r '.domain // "user"')
+    local sudo_prefix=""
+    [ "$domain" = "system" ] && sudo_prefix="sudo"
+    local target
+    target=$(launchctl_target "$domain" "$svc_id")
 
-      local plist=""
-      if [ "$domain" = "system" ]; then
-        plist="/Library/LaunchDaemons/$svc_id.plist"
-      else
-        plist="$HOME/Library/LaunchAgents/$svc_id.plist"
-      fi
+    local plist=""
+    if [ "$domain" = "system" ]; then
+      plist="/Library/LaunchDaemons/$svc_id.plist"
+    else
+      plist="$HOME/Library/LaunchAgents/$svc_id.plist"
+    fi
 
-      case "$action" in
-        status)  svc_status "$name" "$entry_json" ;;
-        start)
-          cleanup_service_ports "$entry_json"
-          recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || {
-            $sudo_prefix launchctl enable "$target" >/dev/null 2>&1
-            $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 || \
-              $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" >/dev/null 2>&1
-          }
-          poll_service_ready "$name" "$entry_json" >/dev/null || {
-            local _diag
-            _diag=$(service_diagnostic "$entry_json")
-            warn "$name — started but not running ($_diag); check 'nucleus-svc logs $name'"
-            return 1
-          }
-          ;;
-        stop)    $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 ;;
-        restart)
-          cleanup_service_ports "$entry_json"
-          recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || {
-            # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
-            $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 || true
-            for _i in 1 2 3 4 5; do
-              $sudo_prefix launchctl print "$target" 2>/dev/null \
-                | grep -q "state = running" || break
-              sleep 1
-            done
-            # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
-            $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
-            sleep 0.5
-            # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
-            $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null || true
-            for _j in 1 2 3 4; do
-              $sudo_prefix launchctl print "$target" 2>/dev/null \
-                | grep -q "state = running" && break
-              sleep 0.5
-            done
-            if ! $sudo_prefix launchctl print "$target" 2>/dev/null \
-                | grep -q "state = running"; then
-              # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
-              $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 || true
-              $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 || \
-                warn "$name — restart: failed to start service after reload"
-            fi
-          }
-          poll_service_ready "$name" "$entry_json" >/dev/null || {
-            local _diag
-            _diag=$(service_diagnostic "$entry_json")
-            warn "$name — restarted but not running ($_diag); check 'nucleus-svc logs $name'"
-            return 1
-          }
-          ;;
-        enable)  $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 ;;
-        disable) $sudo_prefix launchctl disable "$target" >/dev/null 2>&1 ;;
-      esac
+    case "$action" in
+    status) svc_status "$name" "$entry_json" ;;
+    start)
+      cleanup_service_ports "$entry_json"
+      recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || {
+        $sudo_prefix launchctl enable "$target" >/dev/null 2>&1
+        $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 ||
+          $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" >/dev/null 2>&1
+      }
+      poll_service_ready "$name" "$entry_json" >/dev/null || {
+        local _diag
+        _diag=$(service_diagnostic "$entry_json")
+        warn "$name — started but not running ($_diag); check 'nucleus-svc logs $name'"
+        return 1
+      }
       ;;
-    systemctl)
-      local scope_flag=""
-      [ "$(echo "$entry_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
+    stop) $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 ;;
+    restart)
+      cleanup_service_ports "$entry_json"
+      recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || {
+        # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
+        $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 || true
+        for _i in 1 2 3 4 5; do
+          $sudo_prefix launchctl print "$target" 2>/dev/null |
+            grep -q "state = running" || break
+          sleep 1
+        done
+        # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
+        $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
+        sleep 0.5
+        # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
+        $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null || true
+        for _j in 1 2 3 4; do
+          $sudo_prefix launchctl print "$target" 2>/dev/null |
+            grep -q "state = running" && break
+          sleep 0.5
+        done
+        if ! $sudo_prefix launchctl print "$target" 2>/dev/null |
+          grep -q "state = running"; then
+          # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
+          $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 || true
+          $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 ||
+            warn "$name — restart: failed to start service after reload"
+        fi
+      }
+      poll_service_ready "$name" "$entry_json" >/dev/null || {
+        local _diag
+        _diag=$(service_diagnostic "$entry_json")
+        warn "$name — restarted but not running ($_diag); check 'nucleus-svc logs $name'"
+        return 1
+      }
+      ;;
+    enable) $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 ;;
+    disable) $sudo_prefix launchctl disable "$target" >/dev/null 2>&1 ;;
+    esac
+    ;;
+  systemctl)
+    local scope_flag=""
+    [ "$(echo "$entry_json" | jq -r '.scope // "system"')" = "user" ] && scope_flag="--user"
 
-      case "$action" in
-        status)  svc_status "$name" "$entry_json" ;;
-        start)
-          cleanup_service_ports "$entry_json"
-          systemctl $scope_flag start "$svc_id" >/dev/null 2>&1
-          poll_service_ready "$name" "$entry_json" >/dev/null || {
-            local _diag
-            _diag=$(service_diagnostic "$entry_json")
-            warn "$name — started but not running ($_diag); check 'nucleus-svc logs $name'"
-            return 1
-          }
-          ;;
-        stop)    systemctl $scope_flag stop "$svc_id" >/dev/null 2>&1 ;;
-        restart)
-          cleanup_service_ports "$entry_json"
-          systemctl $scope_flag restart "$svc_id" >/dev/null 2>&1
-          poll_service_ready "$name" "$entry_json" >/dev/null || {
-            local _diag
-            _diag=$(service_diagnostic "$entry_json")
-            warn "$name — restarted but not running ($_diag); check 'nucleus-svc logs $name'"
-            return 1
-          }
-          ;;
-        enable)  systemctl $scope_flag enable "$svc_id" >/dev/null 2>&1 ;;
-        disable) systemctl $scope_flag disable "$svc_id" >/dev/null 2>&1 ;;
-      esac
+    case "$action" in
+    status) svc_status "$name" "$entry_json" ;;
+    start)
+      cleanup_service_ports "$entry_json"
+      systemctl $scope_flag start "$svc_id" >/dev/null 2>&1
+      poll_service_ready "$name" "$entry_json" >/dev/null || {
+        local _diag
+        _diag=$(service_diagnostic "$entry_json")
+        warn "$name — started but not running ($_diag); check 'nucleus-svc logs $name'"
+        return 1
+      }
       ;;
-    *)
-      printf '{"error":"unsupported service type: %s"}' "$svc_type"
-      return 1
+    stop) systemctl $scope_flag stop "$svc_id" >/dev/null 2>&1 ;;
+    restart)
+      cleanup_service_ports "$entry_json"
+      systemctl $scope_flag restart "$svc_id" >/dev/null 2>&1
+      poll_service_ready "$name" "$entry_json" >/dev/null || {
+        local _diag
+        _diag=$(service_diagnostic "$entry_json")
+        warn "$name — restarted but not running ($_diag); check 'nucleus-svc logs $name'"
+        return 1
+      }
       ;;
+    enable) systemctl $scope_flag enable "$svc_id" >/dev/null 2>&1 ;;
+    disable) systemctl $scope_flag disable "$svc_id" >/dev/null 2>&1 ;;
+    esac
+    ;;
+  *)
+    printf '{"error":"unsupported service type: %s"}' "$svc_type"
+    return 1
+    ;;
   esac
 }
 
@@ -584,7 +586,10 @@ do_list() {
     printf '{"version":"1","services":{'
     local first=true
     while IFS=$'\t' read -r key display svc_json json_key; do
-      if echo "$key" | grep -q '^ERROR:'; then has_error=true; continue; fi
+      if echo "$key" | grep -q '^ERROR:'; then
+        has_error=true
+        continue
+      fi
       local _d_entry_domain
       _d_entry_domain=$(echo "$svc_json" | jq -r '.domain // .scope // "system"')
       if [ "$domain_filter" = "user" ] && [ "$_d_entry_domain" != "user" ]; then continue; fi
@@ -595,11 +600,12 @@ do_list() {
       "$first" || printf ','
       first=false
       printf '"%s":%s' "$json_key" "$status_json"
-    done <<< "$entries"
+    done <<<"$entries"
     printf '}}\n'
   else
     printf '%-20s %-24s %-10s %-8s %s\n' "ID" "Name" "Status" "Running" "PID"
-    printf '%.0s-' {1..80}; printf '\n'
+    printf '%.0s-' {1..80}
+    printf '\n'
     while IFS=$'\t' read -r key display svc_json json_key; do
       if echo "$key" | grep -q '^ERROR:'; then
         local err_name="${key#ERROR:}"
@@ -624,7 +630,7 @@ do_list() {
         pid="$exit_display"
       fi
       printf '%-20s %-24s %-10s %-8s %s\n' "$json_key" "$display" "$status" "$running" "$pid"
-    done <<< "$entries"
+    done <<<"$entries"
     if [ -n "$domain_filter_warning" ]; then
       printf '\n'
       warn "$domain_filter_warning"
@@ -673,7 +679,7 @@ do_status() {
       pid="$exit_display"
     fi
     printf '%-20s %-24s %-10s %-8s %s\n' "$json_key" "$display" "$status" "$running" "$pid"
-  done <<< "$entries"
+  done <<<"$entries"
   "$any_error" && return 1 || return 0
 }
 
@@ -748,7 +754,7 @@ do_verify() {
       diag=$(service_diagnostic "$svc_json")
       warn "$json_key — inactive ($diag); check 'nucleus-svc logs $json_key'"
     fi
-  done <<< "$entries"
+  done <<<"$entries"
 
   if $any_inactive; then
     return 1
@@ -853,11 +859,11 @@ service_log_dirs() {
 
   while IFS= read -r subdir; do
     [ -n "$subdir" ] && printf '%s\n' "$log_root/$subdir"
-  done <<< "$(jq -r --arg svc "$svc" '.[$svc].logging.dirs.user[]? // empty' "$SERVICES_JSON")"
+  done <<<"$(jq -r --arg svc "$svc" '.[$svc].logging.dirs.user[]? // empty' "$SERVICES_JSON")"
 
   while IFS= read -r subdir; do
     [ -n "$subdir" ] && printf '%s\n' "$system_root/$subdir"
-  done <<< "$(jq -r --arg svc "$svc" '.[$svc].logging.dirs.system[]? // empty' "$SERVICES_JSON")"
+  done <<<"$(jq -r --arg svc "$svc" '.[$svc].logging.dirs.system[]? // empty' "$SERVICES_JSON")"
 }
 
 # service_log_files — Print all log file paths for a service (user + system dirs).
@@ -909,7 +915,7 @@ show_file_logs() {
   local -a files_arr=()
   while IFS= read -r _file; do
     files_arr+=("$_file")
-  done <<< "$files"
+  done <<<"$files"
   tail -n "$lines" "${files_arr[@]}" | "$sanitize_cmd"
 }
 
@@ -944,12 +950,30 @@ do_logs() {
   local parsed_args=()
   while [ "${#service_names[@]}" -gt 0 ]; do
     case "${service_names[0]}" in
-      -n|--lines) lines="${service_names[1]}"; service_names=("${service_names[@]:2}") ;;
-      --since) since="${service_names[1]}"; service_names=("${service_names[@]:2}") ;;
-      --raw) raw=true; service_names=("${service_names[@]:1}") ;;
-      --) service_names=("${service_names[@]:1}"); break ;;
-      -*) error "logs: unknown option '${service_names[0]}'" ; exit 1 ;;
-      *) parsed_args+=("${service_names[0]}"); service_names=("${service_names[@]:1}") ;;
+    -n | --lines)
+      lines="${service_names[1]}"
+      service_names=("${service_names[@]:2}")
+      ;;
+    --since)
+      since="${service_names[1]}"
+      service_names=("${service_names[@]:2}")
+      ;;
+    --raw)
+      raw=true
+      service_names=("${service_names[@]:1}")
+      ;;
+    --)
+      service_names=("${service_names[@]:1}")
+      break
+      ;;
+    -*)
+      error "logs: unknown option '${service_names[0]}'"
+      exit 1
+      ;;
+    *)
+      parsed_args+=("${service_names[0]}")
+      service_names=("${service_names[@]:1}")
+      ;;
     esac
   done
   service_names=("${parsed_args[@]}")
@@ -962,7 +986,7 @@ do_logs() {
         "$first" || printf ',',
         first=false
         printf '  "%s"' "$svc"
-      done <<< "$(get_host_services)"
+      done <<<"$(get_host_services)"
       printf '\n]\n'
     else
       printf 'Available services:\n\n'
@@ -974,7 +998,7 @@ do_logs() {
         else
           printf '  %-25s capture=%-7s (no logs yet)\n' "$svc" "$capture"
         fi
-      done <<< "$(get_host_services)"
+      done <<<"$(get_host_services)"
     fi
     return
   fi
@@ -985,18 +1009,18 @@ do_logs() {
       exit 1
     fi
     case "$HOST" in
-      MacBook)
+    MacBook)
+      show_file_logs "$svc" "$lines" "$raw" || warn "$svc — no log files found"
+      ;;
+    NixOS)
+      local unit
+      unit="$(get_unit "$svc")"
+      if [ -n "$unit" ] && command -v journalctl >/dev/null 2>&1; then
+        show_journald_logs "$svc" "$lines" "$raw" "$since" || warn "$svc — no journald logs"
+      else
         show_file_logs "$svc" "$lines" "$raw" || warn "$svc — no log files found"
-        ;;
-      NixOS)
-        local unit
-        unit="$(get_unit "$svc")"
-        if [ -n "$unit" ] && command -v journalctl >/dev/null 2>&1; then
-          show_journald_logs "$svc" "$lines" "$raw" "$since" || warn "$svc — no journald logs"
-        else
-          show_file_logs "$svc" "$lines" "$raw" || warn "$svc — no log files found"
-        fi
-        ;;
+      fi
+      ;;
     esac
   done
 }
@@ -1013,7 +1037,7 @@ do_log_paths() {
   else
     while IFS= read -r svc; do
       service_log_files "$svc"
-    done <<< "$(get_host_services)"
+    done <<<"$(get_host_services)"
   fi
 }
 
@@ -1026,10 +1050,22 @@ do_log_config() {
   local parsed_args=()
   while [ "${#service_names[@]}" -gt 0 ]; do
     case "${service_names[0]}" in
-      --json) json_output=true; service_names=("${service_names[@]:1}") ;;
-      --) service_names=("${service_names[@]:1}"); break ;;
-      -*) error "log-config: unknown option '${service_names[0]}'" ; exit 1 ;;
-      *) parsed_args+=("${service_names[0]}"); service_names=("${service_names[@]:1}") ;;
+    --json)
+      json_output=true
+      service_names=("${service_names[@]:1}")
+      ;;
+    --)
+      service_names=("${service_names[@]:1}")
+      break
+      ;;
+    -*)
+      error "log-config: unknown option '${service_names[0]}'"
+      exit 1
+      ;;
+    *)
+      parsed_args+=("${service_names[0]}")
+      service_names=("${service_names[@]:1}")
+      ;;
     esac
   done
   service_names=("${parsed_args[@]}")
@@ -1038,7 +1074,7 @@ do_log_config() {
   if [ "${#service_names[@]}" -gt 0 ]; then
     targets=("${service_names[@]}")
   else
-    while IFS= read -r svc; do targets+=("$svc"); done <<< "$(get_host_services)"
+    while IFS= read -r svc; do targets+=("$svc"); done <<<"$(get_host_services)"
   fi
 
   for svc in "${targets[@]}"; do
@@ -1077,22 +1113,43 @@ service_names=()
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    -h|--help) usage; exit 0 ;;
-    --json) json_output=true; shift ;;
-    --verbose) verbose_mode=true; shift ;;
-    --user) domain_filter="user"; shift ;;
-    --system) domain_filter="system"; shift ;;
-    endpoint|logs|log-paths|log-config|verify)
-      action="$1"; shift
-      service_names=("$@")
-      break
-      ;;
-    list|status|start|stop|restart|enable|disable)
-      action="$1"; shift
-      service_names=("$@")
-      break
-      ;;
-    *) error "unsupported argument '$1'" ; usage >&2 ; exit 1 ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --json)
+    json_output=true
+    shift
+    ;;
+  --verbose)
+    verbose_mode=true
+    shift
+    ;;
+  --user)
+    domain_filter="user"
+    shift
+    ;;
+  --system)
+    domain_filter="system"
+    shift
+    ;;
+  endpoint | logs | log-paths | log-config | verify)
+    action="$1"
+    shift
+    service_names=("$@")
+    break
+    ;;
+  list | status | start | stop | restart | enable | disable)
+    action="$1"
+    shift
+    service_names=("$@")
+    break
+    ;;
+  *)
+    error "unsupported argument '$1'"
+    usage >&2
+    exit 1
+    ;;
   esac
 done
 
@@ -1114,8 +1171,11 @@ service_names=("${filtered_service_names[@]}")
 
 : "${SVC_DOMAIN_FILTER:=all}"
 case "$SVC_DOMAIN_FILTER" in
-  user|system|all) ;;
-  *) error "SVC_DOMAIN_FILTER=$SVC_DOMAIN_FILTER: must be user, system, or all" ; exit 1 ;;
+user | system | all) ;;
+*)
+  error "SVC_DOMAIN_FILTER=$SVC_DOMAIN_FILTER: must be user, system, or all"
+  exit 1
+  ;;
 esac
 domain_filter="${domain_filter:-$SVC_DOMAIN_FILTER}"
 
@@ -1133,14 +1193,18 @@ elif [ "$domain_filter" = "all" ] && ! $HAS_SUDO; then
   domain_filter_warning="sudo not available — skipping system-domain services (use --user or --system)"
 fi
 
-[ -z "$action" ] && { error "missing action (list, status, start, stop, restart, enable, disable, verify, endpoint, logs, log-paths, log-config)" ; usage >&2 ; exit 1; }
+[ -z "$action" ] && {
+  error "missing action (list, status, start, stop, restart, enable, disable, verify, endpoint, logs, log-paths, log-config)"
+  usage >&2
+  exit 1
+}
 
 # WHY: list/status/logs dispatch via "do_$action" because their handler names
 # match the subcommand verb; the hyphenated subcommands need explicit mapping.
 case "$action" in
-  list|status|logs) "do_$action" ;;
-  log-paths) do_log_paths ;;
-  log-config) do_log_config ;;
-  verify|endpoint) "do_$action" ;;
-  start|stop|restart|enable|disable) do_action ;;
+list | status | logs) "do_$action" ;;
+log-paths) do_log_paths ;;
+log-config) do_log_config ;;
+verify | endpoint) "do_$action" ;;
+start | stop | restart | enable | disable) do_action ;;
 esac

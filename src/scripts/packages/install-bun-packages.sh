@@ -32,7 +32,7 @@ fi
 _ibp_desired="$(mktemp)"
 printf '%s\n' \
   'clawhub' \
-  > "$_ibp_desired"
+  >"$_ibp_desired"
 
 # Get actually installed global packages from bun's authoritative package
 # registry (zap-style: remove any installed package absent from the desired
@@ -42,7 +42,7 @@ _ibp_global_json="$HOME/.bun/install/global/package.json"
 _ibp_installed="$(mktemp)"
 if [ -f "$_ibp_global_json" ]; then
   # check-suppress:suppression_doc: parse failure on a malformed or partially-written file treats the installed set as empty -- safe because desired packages will simply be re-installed on the next run.
-  "$_jq_bin" -r '.dependencies // {} | keys[]' "$_ibp_global_json" > "$_ibp_installed" || true
+  "$_jq_bin" -r '.dependencies // {} | keys[]' "$_ibp_global_json" >"$_ibp_installed" || true
 fi
 
 # Packages installed but not desired: zap-style removal.
@@ -52,9 +52,9 @@ _ibp_to_remove="$(mktemp)"
 while IFS= read -r _ibp_pkg; do
   [ -z "$_ibp_pkg" ] && continue
   if ! grep -qxF "$_ibp_pkg" "$_ibp_desired"; then
-    printf '%s\n' "$_ibp_pkg" >> "$_ibp_to_remove"
+    printf '%s\n' "$_ibp_pkg" >>"$_ibp_to_remove"
   fi
-done < "$_ibp_installed"
+done <"$_ibp_installed"
 
 # Desired packages not yet in bun's global package.json, or whose binary
 # is absent from ~/.bun/bin (re-install needed).  Binary name = last path
@@ -64,12 +64,12 @@ _ibp_to_install="$(mktemp)"
 while IFS= read -r _ibp_pkg; do
   [ -z "$_ibp_pkg" ] && continue
   _ibp_bin="${_ibp_pkg##*/}"
-  if ! grep -qxF "$_ibp_pkg" "$_ibp_installed" || \
-     { [ ! -f "$HOME/.bun/bin/$_ibp_bin" ] && \
-       [ ! -f "$HOME/.bun/bin/$_ibp_bin.cmd" ]; }; then
-    printf '%s\n' "$_ibp_pkg" >> "$_ibp_to_install"
+  if ! grep -qxF "$_ibp_pkg" "$_ibp_installed" ||
+    { [ ! -f "$HOME/.bun/bin/$_ibp_bin" ] &&
+      [ ! -f "$HOME/.bun/bin/$_ibp_bin.cmd" ]; }; then
+    printf '%s\n' "$_ibp_pkg" >>"$_ibp_to_install"
   fi
-done < "$_ibp_desired"
+done <"$_ibp_desired"
 
 # Remove packages no longer in the desired list.
 while IFS= read -r _ibp_pkg; do
@@ -79,7 +79,7 @@ while IFS= read -r _ibp_pkg; do
     echo "bun: '$_bun_bin remove -g $_ibp_pkg' failed" >&2
     exit 1
   fi
-done < "$_ibp_to_remove"
+done <"$_ibp_to_remove"
 
 # Install packages whose binary is absent from ~/.bun/bin.
 while IFS= read -r _ibp_pkg; do
@@ -90,10 +90,10 @@ while IFS= read -r _ibp_pkg; do
     exit 1
   fi
   _ibp_bin="${_ibp_pkg##*/}"
-  if [ ! -f "$HOME/.bun/bin/$_ibp_bin" ] && \
-     [ ! -f "$HOME/.bun/bin/$_ibp_bin.cmd" ]; then
+  if [ ! -f "$HOME/.bun/bin/$_ibp_bin" ] &&
+    [ ! -f "$HOME/.bun/bin/$_ibp_bin.cmd" ]; then
     echo "bun: $_ibp_pkg installed but binary '$_ibp_bin' not found in '$HOME/.bun/bin'" >&2
     exit 1
   fi
   echo "bun: $_ibp_pkg installed successfully"
-done < "$_ibp_to_install"
+done <"$_ibp_to_install"

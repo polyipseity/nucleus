@@ -8,26 +8,26 @@ set -euo pipefail
 
 HOST_KIND="__HOST_KIND__"
 case "$HOST_KIND" in
-  darwin-tart)
-    exec tart stop "__VM_ID__"
-    ;;
-  darwin-utm)
-    if command -v utmctl >/dev/null 2>&1; then
-      exec utmctl stop "__VM_DISPLAY__"
-    fi
-    echo "utmctl not found; VM may still be running" >&2
-    exit 1
-    ;;
-  nixos-libvirt)
-    if virsh shutdown "__VM_ID__" 2>/dev/null; then
-      echo "ACPI shutdown signal sent to __VM_ID__"
-    else
-      echo "virsh shutdown failed; trying virsh destroy..." >&2
-      exec virsh destroy "__VM_ID__"
-    fi
-    ;;
-  *)
-    echo "nucleus-vm: unknown host kind: __HOST_KIND__" >&2
-    exit 1
-    ;;
+darwin-tart)
+  exec tart stop "__VM_ID__"
+  ;;
+darwin-utm)
+  if command -v utmctl >/dev/null 2>&1; then
+    exec utmctl stop "__VM_DISPLAY__"
+  fi
+  echo "utmctl not found; VM may still be running" >&2
+  exit 1
+  ;;
+nixos-libvirt)
+  if virsh shutdown "__VM_ID__" 2>/dev/null; then
+    echo "ACPI shutdown signal sent to __VM_ID__"
+  else
+    echo "virsh shutdown failed; trying virsh destroy..." >&2
+    exec virsh destroy "__VM_ID__"
+  fi
+  ;;
+*)
+  echo "nucleus-vm: unknown host kind: __HOST_KIND__" >&2
+  exit 1
+  ;;
 esac

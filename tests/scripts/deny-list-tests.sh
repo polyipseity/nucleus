@@ -96,7 +96,10 @@ test_filter_no_ignore_under_errexit() {
   local result
   # `set -euo pipefail` + process substitution mirrors cache_file_lists
   # (step-runner.sh); must pass the tracked input through unchanged.
-  result=$(set -euo pipefail; printf '%s\n' "$input" | filter_gitignored) || true
+  result=$(
+    set -euo pipefail
+    printf '%s\n' "$input" | filter_gitignored
+  ) || true
   if [[ "$result" == "$input" ]]; then
     assert_pass "filter_gitignored: no-ignore input passes through under set -e"
   else

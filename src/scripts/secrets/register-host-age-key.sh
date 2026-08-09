@@ -15,14 +15,14 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 _rak_repo_root=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --repo-root)
-      _rak_repo_root="$2"
-      shift 2
-      ;;
-    *)
-      usage_std "$(basename "$0")" "[--repo-root <path>]" "Register machine age key in .sops.yaml"
-      exit 2
-      ;;
+  --repo-root)
+    _rak_repo_root="$2"
+    shift 2
+    ;;
+  *)
+    usage_std "$(basename "$0")" "[--repo-root <path>]" "Register machine age key in .sops.yaml"
+    exit 2
+    ;;
   esac
 done
 
@@ -76,7 +76,7 @@ _rak_tmp="$(mktemp)"
 awk -v age_pub="$_rak_age_pub" '
   /    # -- machine keys end; personal SSH backup key below --/ { print "    - " age_pub }
   { print }
-' "$_rak_sops_yaml" > "$_rak_tmp"
+' "$_rak_sops_yaml" >"$_rak_tmp"
 chmod 644 "$_rak_tmp"
 mv "$_rak_tmp" "$_rak_sops_yaml"
 
@@ -86,7 +86,7 @@ if ! grep -qF "$_rak_age_pub" "$_rak_sops_yaml"; then
 fi
 
 for _rak_secret in \
-    "$_rak_repo_root"/src/secrets/users/*.yml; do
+  "$_rak_repo_root"/src/secrets/users/*.yml; do
   if [ ! -f "$_rak_secret" ]; then
     continue
   fi
@@ -105,7 +105,7 @@ done
 if [ -d "$_rak_repo_root/src/users" ]; then
   _rak_wallpaper_list="$(mktemp)"
   find "$_rak_repo_root/src/users" -path '*/wallpapers/encrypted/*.sops' -type f \
-    > "$_rak_wallpaper_list"
+    >"$_rak_wallpaper_list"
   while IFS= read -r _rak_wallpaper; do
     if ! sops updatekeys --yes "$_rak_wallpaper"; then
       # Temp file is not explicitly removed here because exit 1 terminates
@@ -117,7 +117,7 @@ if [ -d "$_rak_repo_root/src/users" ]; then
       printf 'sops:   gpg --import <backup-key-file>\n' >&2
       exit 1
     fi
-  done < "$_rak_wallpaper_list"
+  done <"$_rak_wallpaper_list"
   rm -f "$_rak_wallpaper_list"
 fi
 

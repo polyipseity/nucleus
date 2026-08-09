@@ -20,14 +20,14 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      printf '%s: unknown argument: %s\n' "$(basename "$0")" "$1" >&2
-      exit 1
-      ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    printf '%s: unknown argument: %s\n' "$(basename "$0")" "$1" >&2
+    exit 1
+    ;;
   esac
 done
 

@@ -22,10 +22,10 @@ YELLOW='\033[1;33m'
 TESTS_SKIPPED=0
 
 assert_skip() {
-	local test_name="$1"
-	local reason="$2"
-	echo -e "${YELLOW}⊘${NC} $test_name: $reason"
-	((++TESTS_SKIPPED))
+  local test_name="$1"
+  local reason="$2"
+  echo -e "${YELLOW}⊘${NC} $test_name: $reason"
+  ((++TESTS_SKIPPED))
 }
 
 # --- Phase 1: Batch build all nucleus packages -------------------------------
@@ -35,41 +35,41 @@ assert_skip() {
 # All nucleus-* packages that we test. Ordered to match the smoke test tiers
 # below: app packages first (for --help), then package-only commands.
 declare -a BATCH_PACKAGES=(
-	nucleus-apply nucleus-ai nucleus-bootstrap nucleus-bump-lockfile
-	nucleus-check nucleus-test nucleus-check-packer nucleus-check-pwsh
-	nucleus-check-sh nucleus-cloud-setup nucleus-config nucleus-gc
-	nucleus-gs-pdf-opt nucleus-health-check nucleus-audit-store nucleus-replica-reset
-	nucleus-replica-sync nucleus-svc nucleus-update nucleus-vm
+  nucleus-apply nucleus-ai nucleus-bootstrap nucleus-bump-lockfile
+  nucleus-check nucleus-test nucleus-check-packer nucleus-check-pwsh
+  nucleus-check-sh nucleus-cloud-setup nucleus-config nucleus-gc
+  nucleus-gs-pdf-opt nucleus-health-check nucleus-audit-store nucleus-replica-reset
+  nucleus-replica-sync nucleus-svc nucleus-update nucleus-vm
 )
 
 echo "Building ${#BATCH_PACKAGES[@]} nucleus packages..."
 
 BUILD_JSON=$(nix build --no-link --json \
-	"${BATCH_PACKAGES[@]/#/./src#}")
+  "${BATCH_PACKAGES[@]/#/./src#}")
 echo "Build complete."
 
 # Build a map from package index → store path, preserving build order.
 declare -a PKG_PATHS
 while IFS=$'\t' read -r _idx _path; do
-		PKG_PATHS[_idx]="$_path"
+  PKG_PATHS[_idx]="$_path"
 done < <(echo "$BUILD_JSON" | jq -r 'to_entries | .[] | [.key, .value.outputs.out] | @tsv')
 
 # Run a nucleus-* binary from its store path.
 run_binary() {
-	local pkg="$1"
-	shift
-	local idx=-1
-	for i in "${!BATCH_PACKAGES[@]}"; do
-		if [ "${BATCH_PACKAGES[$i]}" = "$pkg" ]; then
-			idx=$i
-			break
-		fi
-	done
-	if [ "$idx" -lt 0 ]; then
-		echo "error: unknown package $pkg" >&2
-		return 1
-	fi
-	NUCLEUS_REPO_ROOT="$REPO_ROOT" "${PKG_PATHS[idx]}/bin/$pkg" "$@" 2>&1
+  local pkg="$1"
+  shift
+  local idx=-1
+  for i in "${!BATCH_PACKAGES[@]}"; do
+    if [ "${BATCH_PACKAGES[$i]}" = "$pkg" ]; then
+      idx=$i
+      break
+    fi
+  done
+  if [ "$idx" -lt 0 ]; then
+    echo "error: unknown package $pkg" >&2
+    return 1
+  fi
+  NUCLEUS_REPO_ROOT="$REPO_ROOT" "${PKG_PATHS[idx]}/bin/$pkg" "$@" 2>&1
 }
 
 # --- Tier 1: --help tests --------------------------------------------------
@@ -77,53 +77,53 @@ run_binary() {
 
 # Map app names (nix run names) to their corresponding package names.
 declare -A APP_TO_PKG=(
-	[apply]=nucleus-apply
-	[ai]=nucleus-ai
-	[audit-store]=nucleus-audit-store
-	[bootstrap]=nucleus-bootstrap
-	[bump-lockfile]=nucleus-bump-lockfile
-	[check]=nucleus-check
-	[test]=nucleus-test
-	[check-packer]=nucleus-check-packer
-	[check-sh]=nucleus-check-sh
-	[cloud-setup]=nucleus-cloud-setup
-	[config]=nucleus-config
-	[gc]=nucleus-gc
-	[health-check]=nucleus-health-check
-	[replica-reset]=nucleus-replica-reset
-	[replica-sync]=nucleus-replica-sync
-	[svc]=nucleus-svc
-	[update]=nucleus-update
-	[vm]=nucleus-vm
+  [apply]=nucleus-apply
+  [ai]=nucleus-ai
+  [audit - store]=nucleus-audit-store
+  [bootstrap]=nucleus-bootstrap
+  [bump - lockfile]=nucleus-bump-lockfile
+  [check]=nucleus-check
+  [test]=nucleus-test
+  [check - packer]=nucleus-check-packer
+  [check - sh]=nucleus-check-sh
+  [cloud - setup]=nucleus-cloud-setup
+  [config]=nucleus-config
+  [gc]=nucleus-gc
+  [health - check]=nucleus-health-check
+  [replica - reset]=nucleus-replica-reset
+  [replica - sync]=nucleus-replica-sync
+  [svc]=nucleus-svc
+  [update]=nucleus-update
+  [vm]=nucleus-vm
 )
 
 test_app_help() {
-	local app_name="$1"
-	local pkg="${APP_TO_PKG[$app_name]}"
-	local exit_code=0
-	local output
-	output=$(run_binary "$pkg" --help) || exit_code=$?
-	# Every nucleus-* command's --help path prints a `usage:` line (via
-	# usage_std) and exits 0 (parse_args in step-runner.sh, or the script's
-	# own dispatch). Both must hold — output alone is not a pass.
-	if [ "$exit_code" -eq 0 ] && printf '%s' "$output" | grep -q 'usage:'; then
-		assert_pass "$app_name --help"
-	else
-		assert_fail "$app_name --help" "exit=$exit_code, output: $(printf '%s' "$output" | head -3 | tr '\n' ' ')"
-	fi
+  local app_name="$1"
+  local pkg="${APP_TO_PKG[$app_name]}"
+  local exit_code=0
+  local output
+  output=$(run_binary "$pkg" --help) || exit_code=$?
+  # Every nucleus-* command's --help path prints a `usage:` line (via
+  # usage_std) and exits 0 (parse_args in step-runner.sh, or the script's
+  # own dispatch). Both must hold — output alone is not a pass.
+  if [ "$exit_code" -eq 0 ] && printf '%s' "$output" | grep -q 'usage:'; then
+    assert_pass "$app_name --help"
+  else
+    assert_fail "$app_name --help" "exit=$exit_code, output: $(printf '%s' "$output" | head -3 | tr '\n' ' ')"
+  fi
 }
 
 # App commands (names match `nix run ./src#<name>`)
 APP_COMMANDS=(
-	apply ai audit-store bootstrap bump-lockfile check test
-	check-packer check-sh cloud-setup config
-	gc health-check replica-reset replica-sync update svc vm
+  apply ai audit-store bootstrap bump-lockfile check test
+  check-packer check-sh cloud-setup config
+  gc health-check replica-reset replica-sync update svc vm
 )
 
 echo ""
 echo "=== Tier 1: --help smoke tests ==="
 for cmd in "${APP_COMMANDS[@]}"; do
-	test_app_help "$cmd"
+  test_app_help "$cmd"
 done
 
 # check-pwsh: wrapper script does `exec pwsh -File ...` which does not handle
@@ -138,9 +138,9 @@ assert_pass "nucleus-gs-pdf-opt build"
 gs_pdf_opt_exit=0
 gs_pdf_opt_output=$(run_binary nucleus-gs-pdf-opt --help 2>/dev/null) || gs_pdf_opt_exit=$?
 if [ "$gs_pdf_opt_exit" -eq 0 ] && printf '%s' "$gs_pdf_opt_output" | grep -q 'usage:'; then
-	assert_pass "nucleus-gs-pdf-opt --help"
+  assert_pass "nucleus-gs-pdf-opt --help"
 else
-	assert_fail "nucleus-gs-pdf-opt --help" "exit=$gs_pdf_opt_exit"
+  assert_fail "nucleus-gs-pdf-opt --help" "exit=$gs_pdf_opt_exit"
 fi
 
 # --- Tier 2: dry-run tests -------------------------------------------------
@@ -151,28 +151,28 @@ echo ""
 echo "=== Tier 2: dry-run tests ==="
 
 declare -A DRY_RUN_APPS=(
-	[ai]=nucleus-ai
-	[gc]=nucleus-gc
-	[replica-sync]=nucleus-replica-sync
-	[replica-reset]=nucleus-replica-reset
-	[vm]=nucleus-vm
+  [ai]=nucleus-ai
+  [gc]=nucleus-gc
+  [replica - sync]=nucleus-replica-sync
+  [replica - reset]=nucleus-replica-reset
+  [vm]=nucleus-vm
 )
 
 test_app_dry_run() {
-	local app_name="$1"
-	local pkg="${DRY_RUN_APPS[$app_name]}"
-	local exit_code=0
-	local output
-	output=$(run_binary "$pkg" --dry-run 2>&1) || exit_code=$?
-	# The command's own <prefix>: diagnostic must be present. Exit codes vary
-	# legitimately by environment (e.g. ai without Ollama), so the marker that
-	# the command's control flow actually ran is required instead of "any
-	# output" (a broken wrapper would produce none).
-	if printf '%s' "$output" | grep -q "$app_name:"; then
-		assert_pass "$app_name --dry-run (exit=$exit_code)"
-	else
-		assert_fail "$app_name --dry-run" "exit=$exit_code, no command output: $(printf '%s' "$output" | head -3 | tr '\n' ' ')"
-	fi
+  local app_name="$1"
+  local pkg="${DRY_RUN_APPS[$app_name]}"
+  local exit_code=0
+  local output
+  output=$(run_binary "$pkg" --dry-run 2>&1) || exit_code=$?
+  # The command's own <prefix>: diagnostic must be present. Exit codes vary
+  # legitimately by environment (e.g. ai without Ollama), so the marker that
+  # the command's control flow actually ran is required instead of "any
+  # output" (a broken wrapper would produce none).
+  if printf '%s' "$output" | grep -q "$app_name:"; then
+    assert_pass "$app_name --dry-run (exit=$exit_code)"
+  else
+    assert_fail "$app_name --dry-run" "exit=$exit_code, no command output: $(printf '%s' "$output" | head -3 | tr '\n' ' ')"
+  fi
 }
 
 # ai sync needs NUCLEUS_AI_SYNC_TIMEOUT=0 to avoid blocking on Ollama
@@ -189,18 +189,18 @@ echo ""
 echo "=== Tier 3: no-op read-only commands ==="
 
 test_app_noop() {
-	local app_name="$1"
-	shift
-	local args=("$@")
-	local pkg="${APP_TO_PKG[$app_name]}"
-	local exit_code=0
-	local output
-	output=$(run_binary "$pkg" "${args[@]}") || exit_code=$?
-	if [ "$exit_code" -eq 0 ]; then
-		assert_pass "$app_name ${args[*]}"
-	else
-		assert_pass "$app_name ${args[*]} (exit=$exit_code)"
-	fi
+  local app_name="$1"
+  shift
+  local args=("$@")
+  local pkg="${APP_TO_PKG[$app_name]}"
+  local exit_code=0
+  local output
+  output=$(run_binary "$pkg" "${args[@]}") || exit_code=$?
+  if [ "$exit_code" -eq 0 ]; then
+    assert_pass "$app_name ${args[*]}"
+  else
+    assert_pass "$app_name ${args[*]} (exit=$exit_code)"
+  fi
 }
 
 # config list: reads ~/.local/state/nucleus/config.json (or defaults).
@@ -246,7 +246,7 @@ if command -v pwsh >/dev/null 2>&1; then
     BEGIN{ib=0;d=0}{gsub(/\r/,"")}
     /^Register-ArgumentCompleter/{ib=1;bl=$0;d=cb($0);if(d<=0){print bl;print"";ib=0}next}
     ib{bl=bl"\n"$0;d+=cb($0);if(d<=0){print bl;print"";ib=0}}
-    END{if(ib)print bl}' "$_pwsh_comp_file" > "$_temp_pwsh_check" 2>/dev/null || true  # check-suppress:suppression_doc: probe -- file may not contain completions yet; handled by [ -s ] guard below
+    END{if(ib)print bl}' "$_pwsh_comp_file" >"$_temp_pwsh_check" 2>/dev/null || true # check-suppress:suppression_doc: probe -- file may not contain completions yet; handled by [ -s ] guard below
     if [ -s "$_temp_pwsh_check" ]; then
       if pwsh -NoProfile -NonInteractive -Command "
         \$content = Get-Content '$_temp_pwsh_check' -Raw -ErrorAction Stop
@@ -270,12 +270,12 @@ unset _pwsh_comp_file
 # --- Summary ---------------------------------------------------------------
 echo ""
 if [ "$TESTS_FAILED" -eq 0 ]; then
-	if [ "$TESTS_SKIPPED" -eq 0 ]; then
-		echo -e "${GREEN}All $TESTS_PASSED nucleus apps smoke tests passed.${NC}"
-	else
-		echo -e "${GREEN}$TESTS_PASSED passed, $TESTS_SKIPPED skipped.${NC}"
-	fi
+  if [ "$TESTS_SKIPPED" -eq 0 ]; then
+    echo -e "${GREEN}All $TESTS_PASSED nucleus apps smoke tests passed.${NC}"
+  else
+    echo -e "${GREEN}$TESTS_PASSED passed, $TESTS_SKIPPED skipped.${NC}"
+  fi
 else
-	echo -e "${RED}$TESTS_FAILED/$((TESTS_FAILED + TESTS_PASSED)) nucleus apps smoke tests FAILED.${NC}" >&2
-	exit 1
+  echo -e "${RED}$TESTS_FAILED/$((TESTS_FAILED + TESTS_PASSED)) nucleus apps smoke tests FAILED.${NC}" >&2
+  exit 1
 fi

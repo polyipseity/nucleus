@@ -4,7 +4,6 @@
 
 set -euo pipefail
 
-
 _sys_log_dir="$1"
 _log_subdirs="$2"
 if [ -n "$_sys_log_dir" ]; then
@@ -19,7 +18,7 @@ _user_log_root="${5:-}"
 _user_log_subdirs="$3"
 _chown_log_subdirs="$4"
 if [ "$(uname -s)" = "Darwin" ] && [ -n "$_user_log_subdirs" ]; then
-  _console_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"  # check-suppress:suppression_doc: /dev/console may not exist in headless/SSH sessions
+  _console_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)" # check-suppress:suppression_doc: /dev/console may not exist in headless/SSH sessions
   if [ -n "$_console_user" ] && [ "$_console_user" != "/Users/root" ]; then
     _username="${_console_user#/Users/}"
     if [ -z "$_user_log_root" ]; then
@@ -35,7 +34,7 @@ if [ "$(uname -s)" = "Darwin" ] && [ -n "$_user_log_subdirs" ]; then
     /usr/sbin/chown -R "$_username:staff" "$_user_log_root"
 
     for subdir in $_chown_log_subdirs; do
-      /usr/sbin/chown "$_username:staff" "$_sys_log_dir/$subdir" 2>/dev/null || true  # check-suppress:suppression_doc: system log subdir may not exist on first apply; best-effort ownership fix
+      /usr/sbin/chown "$_username:staff" "$_sys_log_dir/$subdir" 2>/dev/null || true # check-suppress:suppression_doc: system log subdir may not exist on first apply; best-effort ownership fix
     done
   fi
 fi

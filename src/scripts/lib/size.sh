@@ -19,14 +19,14 @@ parse_size() {
   _ps_number="${BASH_REMATCH[1]}"
   _ps_suffix="${BASH_REMATCH[2]}"
   case "$_ps_suffix" in
-    kB) _ps_factor=1000 ;;
-    MB) _ps_factor=1000000 ;;
-    GB) _ps_factor=1000000000 ;;
-    TB) _ps_factor=1000000000000 ;;
-    kiB) _ps_factor=1024 ;;
-    MiB) _ps_factor=1048576 ;;
-    GiB) _ps_factor=1073741824 ;;
-    TiB) _ps_factor=1099511627776 ;;
+  kB) _ps_factor=1000 ;;
+  MB) _ps_factor=1000000 ;;
+  GB) _ps_factor=1000000000 ;;
+  TB) _ps_factor=1000000000000 ;;
+  kiB) _ps_factor=1024 ;;
+  MiB) _ps_factor=1048576 ;;
+  GiB) _ps_factor=1073741824 ;;
+  TiB) _ps_factor=1099511627776 ;;
   esac
   _ps_bytes=$((_ps_number * _ps_factor))
   printf '%s\n' "$_ps_bytes"

@@ -16,13 +16,13 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../../../scripts/lib/macos-console-user.sh"
 
 if _nucleus_resolve_console_user; then
-      finder_cache_dir="/Users/$_nucleus_console_user/Library/Saved Application State/com.apple.finder.savedState"
-      if [ -d "$finder_cache_dir" ]; then
-        if /bin/rm -rf "$finder_cache_dir"; then
-          echo "finder: cleared cached application state from $finder_cache_dir"
-        else
-          echo "finder: failed to clear cached state at $finder_cache_dir (non-fatal; user may need manual restart)." >&2
-        fi
-      fi
-      # Process restarts handled by Home Manager's relaunchDesktopServices step.
+  finder_cache_dir="/Users/$_nucleus_console_user/Library/Saved Application State/com.apple.finder.savedState"
+  if [ -d "$finder_cache_dir" ]; then
+    if /bin/rm -rf "$finder_cache_dir"; then
+      echo "finder: cleared cached application state from $finder_cache_dir"
+    else
+      echo "finder: failed to clear cached state at $finder_cache_dir (non-fatal; user may need manual restart)." >&2
     fi
+  fi
+  # Process restarts handled by Home Manager's relaunchDesktopServices step.
+fi

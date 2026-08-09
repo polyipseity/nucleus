@@ -3,7 +3,6 @@
 # Consumes SOPS file manifest, materialized artefact paths, and tool paths at activation time.
 set -euo pipefail
 
-
 _vsd_jq_bin="$1"
 _vsd_gnupg_bin="$2"
 _vsd_ssh_to_age_bin="$3"
@@ -19,12 +18,12 @@ _vsd_ssh_adopt_manifest="$3"
 
 # --- 1. Materialization sanity check ---
 for _vsd_path in \
-    "$_vsd_git_identity_path" \
-    "$_vsd_ssh_private_key_path" \
-    "$_vsd_ssh_public_key_path" \
-    "$_vsd_gpg_manifest_path" \
-    "$_vsd_ssh_key_paths_manifest" \
-    "$_vsd_ssh_adopt_manifest"; do
+  "$_vsd_git_identity_path" \
+  "$_vsd_ssh_private_key_path" \
+  "$_vsd_ssh_public_key_path" \
+  "$_vsd_gpg_manifest_path" \
+  "$_vsd_ssh_key_paths_manifest" \
+  "$_vsd_ssh_adopt_manifest"; do
   if [ ! -s "$_vsd_path" ]; then
     echo "secrets: ERROR — managed secret artefact missing or empty at '$_vsd_path'." >&2
     exit 1
@@ -37,20 +36,20 @@ while IFS= read -r _vsd_private_key_path; do
     echo "secrets: ERROR — managed SSH private key missing or empty at '$_vsd_private_key_path'." >&2
     exit 1
   fi
-done < "$_vsd_ssh_key_paths_manifest"
+done <"$_vsd_ssh_key_paths_manifest"
 
 # --- 2. GPG key presence in keyring ---
 _vsd_gpg_manifest="$_vsd_gpg_manifest_path"
 # check-suppress:suppression_doc: GnuPG may fail if GNUPGHOME doesn't exist yet on first activation; the subsequent grep check handles empty output.
 _vsd_gpg_all_secret_fprs="$(GNUPGHOME="$_vsd_gpg_home" \
-  "$_vsd_gnupg_bin" --with-colons --no-autostart --list-secret-keys)" || true  # check-suppress:suppression_doc: GnuPG may fail on first activation
+  "$_vsd_gnupg_bin" --with-colons --no-autostart --list-secret-keys)" || true # check-suppress:suppression_doc: GnuPG may fail on first activation
 while IFS= read -r _vsd_managed_fpr; do
   [ -n "$_vsd_managed_fpr" ] || continue
   if ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_managed_fpr"; then
     echo "secrets: ERROR — managed GPG key $_vsd_managed_fpr not in keyring after materialize-user-secrets." >&2
     exit 1
   fi
-done < "$_vsd_gpg_manifest"
+done <"$_vsd_gpg_manifest"
 
 # --- 3. GPG SOPS recipient check for all SOPS files ---
 _vsd_gpg_failures=""
@@ -60,8 +59,8 @@ while IFS= read -r _vsd_entry; do
   _vsd_display_name="$(printf '%s\n' "$_vsd_entry" | "$_vsd_jq_bin" -r '.displayName')"
   # check-suppress:suppression_doc: grep may find no match; soft-fail prevents silent set -e exit, allowing [ -z ] below to report cleanly.
   _vsd_sops_gpg_fp="$(/usr/bin/grep -m1 -E '[[:space:]]fp: |"fp": ' "$_vsd_path" | /usr/bin/grep -oE '[0-9A-Fa-f]{40,}')" || true
-  if [ -z "$_vsd_sops_gpg_fp" ] || \
-      ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_sops_gpg_fp"; then
+  if [ -z "$_vsd_sops_gpg_fp" ] ||
+    ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_sops_gpg_fp"; then
     _vsd_gpg_failures="$_vsd_gpg_failures ${_vsd_display_name}"
   fi
 done < <(printf '%s\n' "$_vsd_all_sops_files_json" | "$_vsd_jq_bin" -r -c '.[]')

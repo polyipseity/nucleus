@@ -33,47 +33,47 @@ EOF
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --repo-root)
-      _ds_repo_root="$2"
-      shift 2
-      ;;
-    --sops-file)
-      _ds_sops_file="$2"
-      shift 2
-      ;;
-    --sops-bin)
-      _ds_sops_bin="$2"
-      shift 2
-      ;;
-    --gpg-bin)
-      _ds_gpg_bin="$2"
-      shift 2
-      ;;
-    --host-key-path)
-      _ds_host_key_path="$2"
-      shift 2
-      ;;
-    --machine-age-key-path)
-      _ds_machine_age_key_path="$2"
-      shift 2
-      ;;
-    --gnupg-home)
-      _ds_gnupg_home="$2"
-      shift 2
-      ;;
-    --output-type)
-      _ds_output_format="$2"
-      shift 2
-      ;;
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    *)
-      echo "decrypt-sops: unknown argument '$1'" >&2
-      usage
-      exit 2
-      ;;
+  --repo-root)
+    _ds_repo_root="$2"
+    shift 2
+    ;;
+  --sops-file)
+    _ds_sops_file="$2"
+    shift 2
+    ;;
+  --sops-bin)
+    _ds_sops_bin="$2"
+    shift 2
+    ;;
+  --gpg-bin)
+    _ds_gpg_bin="$2"
+    shift 2
+    ;;
+  --host-key-path)
+    _ds_host_key_path="$2"
+    shift 2
+    ;;
+  --machine-age-key-path)
+    _ds_machine_age_key_path="$2"
+    shift 2
+    ;;
+  --gnupg-home)
+    _ds_gnupg_home="$2"
+    shift 2
+    ;;
+  --output-type)
+    _ds_output_format="$2"
+    shift 2
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "decrypt-sops: unknown argument '$1'" >&2
+    usage
+    exit 2
+    ;;
   esac
 done
 
@@ -144,7 +144,7 @@ while IFS= read -r _ds_username; do
       exit 0
     fi
     _ds_clear_age_env
-  done < "$_ds_manifest"
+  done <"$_ds_manifest"
 done < <(list_secret_users "$_ds_repo_root")
 
 # Step 3: GPG keyring.

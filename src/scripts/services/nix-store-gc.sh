@@ -16,10 +16,10 @@ _system_generations_keep="${NUCLEUS_GC_SYSTEM_GENERATIONS_KEEP:-${_generations_k
 if _nsg_profile="$(resolve_system_profile)"; then
   NUCLEUS_GC_PROFILE_SUDO=false \
     expire_profile_generations_intersection \
-      "$_nsg_profile" \
-      "$_system_generations_keep" \
-      "$_system_expiry" \
-      false
+    "$_nsg_profile" \
+    "$_system_generations_keep" \
+    "$_system_expiry" \
+    false
 else
   say "no system profile found; skipping system generation expiry"
 fi

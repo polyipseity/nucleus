@@ -29,13 +29,16 @@ if [ -z "$repoRoot" ] || [ ! -d "$repoRoot" ]; then
 fi
 
 devDir="$HOME/dev"
-mkdir -p "$devDir" || { echo "provision-dev-repos: failed to create $devDir" >&2; exit 1; }
+mkdir -p "$devDir" || {
+  echo "provision-dev-repos: failed to create $devDir" >&2
+  exit 1
+}
 
 # Step 1: Provision configured repositories
 # Use temp file to avoid subshell isolation (while-read in pipelines
 # creates a subshell in POSIX sh, losing devReposErrors increments).
 _repoListTmp=$(mktemp)
-printf '%s\n' "$devReposJson" | "$_jqBin" -r '.repositories[] | @base64' > "$_repoListTmp"
+printf '%s\n' "$devReposJson" | "$_jqBin" -r '.repositories[] | @base64' >"$_repoListTmp"
 while IFS= read -r _item; do
   _jq() { printf '%s\n' "$_item" | base64 -d | "$_jqBin" -r "$1"; }
 
@@ -60,13 +63,13 @@ while IFS= read -r _item; do
   else
     report_error "repository '$_name' has neither symlink nor url configured"
   fi
-done < "$_repoListTmp"
+done <"$_repoListTmp"
 rm -f "$_repoListTmp"
 unset _repoListTmp _jq
 
 # Step 2: Clone submodules from specified directories (sequential processing)
 _submoduleListTmp=$(mktemp)
-printf '%s\n' "$devReposJson" | "$_jqBin" -r '.submoduleDirectories[] | @base64' > "$_submoduleListTmp"
+printf '%s\n' "$devReposJson" | "$_jqBin" -r '.submoduleDirectories[] | @base64' >"$_submoduleListTmp"
 while IFS= read -r _item; do
   _jq() { printf '%s\n' "$_item" | base64 -d | "$_jqBin" -r "$1"; }
 
@@ -77,34 +80,34 @@ while IFS= read -r _item; do
 
   # Check if path contains glob characters
   case "$_resolvedPath" in
-    *\*|*\?|*\[*)
-      # Glob pattern detected; expand it
-      _baseDir=$(dirname "$_resolvedPath")
-      _pattern=$(basename "$_resolvedPath")
-      if [ -d "$_baseDir" ]; then
-        _expandedPaths=$(expand_glob_paths "$_baseDir" "$_pattern")
-        if [ -z "$_expandedPaths" ]; then
-          # No matches for configured glob; benign no-op.
-          :
-        else
-          while IFS= read -r _matchedPath; do
-            clone_directory_submodules "$_matchedPath" "$_recursive" "${_matchedPath#"$HOME"/}"
-          done <<< "$_expandedPaths"
-        fi
+  *\* | *\? | *\[*)
+    # Glob pattern detected; expand it
+    _baseDir=$(dirname "$_resolvedPath")
+    _pattern=$(basename "$_resolvedPath")
+    if [ -d "$_baseDir" ]; then
+      _expandedPaths=$(expand_glob_paths "$_baseDir" "$_pattern")
+      if [ -z "$_expandedPaths" ]; then
+        # No matches for configured glob; benign no-op.
+        :
       else
-        report_error "base directory $_baseDir does not exist for glob pattern '$_path'"
+        while IFS= read -r _matchedPath; do
+          clone_directory_submodules "$_matchedPath" "$_recursive" "${_matchedPath#"$HOME"/}"
+        done <<<"$_expandedPaths"
       fi
-      ;;
-    *)
-      # No glob; process literal path
-      if [ -d "$_resolvedPath" ]; then
-        clone_directory_submodules "$_resolvedPath" "$_recursive" "$_path"
-      else
-        report_error "directory '$_path' does not exist"
-      fi
-      ;;
+    else
+      report_error "base directory $_baseDir does not exist for glob pattern '$_path'"
+    fi
+    ;;
+  *)
+    # No glob; process literal path
+    if [ -d "$_resolvedPath" ]; then
+      clone_directory_submodules "$_resolvedPath" "$_recursive" "$_path"
+    else
+      report_error "directory '$_path' does not exist"
+    fi
+    ;;
   esac
-done < "$_submoduleListTmp"
+done <"$_submoduleListTmp"
 rm -f "$_submoduleListTmp"
 unset _submoduleListTmp _jq
 

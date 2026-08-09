@@ -21,7 +21,7 @@ _unprotect_managed_link() {
 if [ -n "$_cps_link_paths_json" ]; then
   while IFS= read -r _cps_link_path; do
     _unprotect_managed_link "$_cps_link_path"
-  done < <("$_cps_jq_bin" -r '.[]' <<< "$_cps_link_paths_json")
+  done < <("$_cps_jq_bin" -r '.[]' <<<"$_cps_link_paths_json")
 fi
 
 if [ -f "$_cps_manifest_path" ]; then

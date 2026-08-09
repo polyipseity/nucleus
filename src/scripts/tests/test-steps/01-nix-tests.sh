@@ -5,11 +5,15 @@
 register_step "nix-tests" 1 "Nix test suite" run_01_nix_tests
 
 run_01_nix_tests() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _exit_code=0
   local _tmp_failed
 
-  _tmp_failed=$(mktemp) || { error "failed to create temp file"; return 1; }
+  _tmp_failed=$(mktemp) || {
+    error "failed to create temp file"
+    return 1
+  }
 
   # shellcheck source=../../lib/nix-test-eval.sh
   . "$_repo_root/src/scripts/lib/nix-test-eval.sh"

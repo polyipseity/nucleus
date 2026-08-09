@@ -17,8 +17,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
@@ -61,30 +61,30 @@ gs_pdf_opt() {
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      -h|--help)
-        usage
-        return 0
-        ;;
-      --preset)
-        preset="$2"
-        shift 2
-        ;;
-      --preset=*)
-        preset="${1#*=}"
-        shift
-        ;;
-      --rm-bak)
-        rm_bak=true
-        shift
-        ;;
-      -*)
-        warn "unknown option: $1"
-        return 1
-        ;;
-      *)
-        files+=("$1")
-        shift
-        ;;
+    -h | --help)
+      usage
+      return 0
+      ;;
+    --preset)
+      preset="$2"
+      shift 2
+      ;;
+    --preset=*)
+      preset="${1#*=}"
+      shift
+      ;;
+    --rm-bak)
+      rm_bak=true
+      shift
+      ;;
+    -*)
+      warn "unknown option: $1"
+      return 1
+      ;;
+    *)
+      files+=("$1")
+      shift
+      ;;
     esac
   done
 
@@ -96,11 +96,11 @@ gs_pdf_opt() {
   # WHY: presets are validated up front (never passed to gs blindly) so a
   # typo fails fast before any file is touched.
   case "$preset" in
-    default|ebook|prepress|printer|screen) ;;
-    *)
-      warn "unknown preset: $preset (valid: default, ebook, prepress, printer, screen)"
-      return 1
-      ;;
+  default | ebook | prepress | printer | screen) ;;
+  *)
+    warn "unknown preset: $preset (valid: default, ebook, prepress, printer, screen)"
+    return 1
+    ;;
   esac
 
   # Ensure TMPDIR is set for Ghostscript temp files.

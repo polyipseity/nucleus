@@ -15,14 +15,14 @@ _context="$2"
 _path="$3"
 
 case "$_action" in
-  protect)
-    _nucleus_protect_symlink "$_context" "$_path"
-    ;;
-  unprotect)
-    _nucleus_unprotect_symlink "$_context" "$_path"
-    ;;
-  *)
-    echo "managed-symlink: unknown action '$_action' (use protect|unprotect)" >&2
-    exit 1
-    ;;
+protect)
+  _nucleus_protect_symlink "$_context" "$_path"
+  ;;
+unprotect)
+  _nucleus_unprotect_symlink "$_context" "$_path"
+  ;;
+*)
+  echo "managed-symlink: unknown action '$_action' (use protect|unprotect)" >&2
+  exit 1
+  ;;
 esac

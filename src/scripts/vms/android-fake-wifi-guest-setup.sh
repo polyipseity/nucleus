@@ -6,8 +6,8 @@ _join_virt_wifi() {
   svc wifi enable 2>/dev/null || :
   cmd wifi set-wifi-enabled enabled 2>/dev/null || :
   sleep 1
-  cmd wifi connect-network VirtWifi open 2>/dev/null \
-    || cmd -w wifi connect-network VirtWifi open 2>/dev/null || :
+  cmd wifi connect-network VirtWifi open 2>/dev/null ||
+    cmd -w wifi connect-network VirtWifi open 2>/dev/null || :
   sleep 2
 }
 
@@ -58,7 +58,10 @@ _apply_setup() {
 
 # Live enable via ADB must return before link changes: eth0 carries the forwarded ADB port.
 if [ "${NUCLEUS_FAKE_WIFI_ASYNC:-0}" = "1" ]; then
-  ( sleep 1; _apply_setup ) &
+  (
+    sleep 1
+    _apply_setup
+  ) &
   exit 0
 fi
 _apply_setup

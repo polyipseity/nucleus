@@ -9,9 +9,9 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../../../scripts/lib/macos-console-user.sh"
 
 if _nucleus_resolve_console_user; then
-      if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/defaults write com.apple.spaces spans-displays -bool true; then
-        echo "power: failed to enable Mission Control spans-displays for console uid $_nucleus_console_uid." >&2
-      fi
-    else
-      echo "power: no active non-root console user; skipping spans-displays write." >&2
-    fi
+  if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/defaults write com.apple.spaces spans-displays -bool true; then
+    echo "power: failed to enable Mission Control spans-displays for console uid $_nucleus_console_uid." >&2
+  fi
+else
+  echo "power: no active non-root console user; skipping spans-displays write." >&2
+fi

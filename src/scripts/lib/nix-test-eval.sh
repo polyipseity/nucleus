@@ -5,7 +5,8 @@
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/deny-list.sh"
 
 run_nix_test_eval() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
 
@@ -19,12 +20,12 @@ run_nix_test_eval() {
   if $_has_args; then
     for _f in "${_files[@]}"; do
       case "$_f" in
-        tests/*.nix)
-          case "$(basename "$_f")" in
-            lib.nix|"$_nte_self_sh") ;;
-            *) _scan_files+=("$_f") ;;
-          esac
-          ;;
+      tests/*.nix)
+        case "$(basename "$_f")" in
+        lib.nix | "$_nte_self_sh") ;;
+        *) _scan_files+=("$_f") ;;
+        esac
+        ;;
       esac
     done
   else
@@ -44,9 +45,9 @@ run_nix_test_eval() {
 
   local _nte_file
   for _nte_file in "${_scan_files[@]}"; do
-    if grep -qE 'builtins\.length\s+(allTests|all_tests)' "$_nte_file" \
-      && grep -q 'success = true' "$_nte_file" \
-      && ! grep -qE 'builtins\.(seq|deepSeq|all|filter)|^[[:space:]]*assert[[:space:]]' "$_nte_file"; then
+    if grep -qE 'builtins\.length\s+(allTests|all_tests)' "$_nte_file" &&
+      grep -q 'success = true' "$_nte_file" &&
+      ! grep -qE 'builtins\.(seq|deepSeq|all|filter)|^[[:space:]]*assert[[:space:]]' "$_nte_file"; then
       _nte_errors=$((_nte_errors + 1))
       echo "test: error: $_nte_file: Nix tests are only counted via builtins.length but never forced — assertions are silently skipped (see .agents/instructions/testing.instructions.md)" >&2
     fi

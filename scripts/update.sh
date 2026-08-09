@@ -20,8 +20,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
@@ -46,35 +46,35 @@ sops=true
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    --flake)
-      flake=true
-      ;;
-    --no-flake)
-      flake=false
-      ;;
-    --brew)
-      brew=true
-      ;;
-    --no-brew)
-      brew=false
-      ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --flake)
+    flake=true
+    ;;
+  --no-flake)
+    flake=false
+    ;;
+  --brew)
+    brew=true
+    ;;
+  --no-brew)
+    brew=false
+    ;;
 
-    --sops)
-      sops=true
-      ;;
-    --no-sops)
-      sops=false
-      ;;
+  --sops)
+    sops=true
+    ;;
+  --no-sops)
+    sops=false
+    ;;
 
-    *)
-      error "unsupported argument '$1'"
-      usage >&2
-      exit 1
-      ;;
+  *)
+    error "unsupported argument '$1'"
+    usage >&2
+    exit 1
+    ;;
   esac
   shift
 done
@@ -146,12 +146,12 @@ rewrap_sops_files() {
   # WHY: overlay wallpapers are encrypted too (src/users/*/wallpapers/encrypted/*.sops)
   # and would otherwise rot against the updated recipient set.
   _update_wallpaper_list="$(mktemp)"
-  find "$REPO_ROOT/src/users" -path '*/wallpapers/encrypted/*.sops' -type f > "$_update_wallpaper_list"
+  find "$REPO_ROOT/src/users" -path '*/wallpapers/encrypted/*.sops' -type f >"$_update_wallpaper_list"
   while IFS= read -r encrypted_wallpaper; do
     if [ -f "$encrypted_wallpaper" ]; then
       sops --config "$sops_config" updatekeys --yes "$encrypted_wallpaper"
     fi
-  done < "$_update_wallpaper_list"
+  done <"$_update_wallpaper_list"
   rm -f "$_update_wallpaper_list"
 }
 

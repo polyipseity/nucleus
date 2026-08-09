@@ -10,8 +10,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
@@ -65,7 +65,7 @@ cmd_get() {
     merge_config
   else
     # Convert "section.key" to jq filter ".section.key // null"
-    IFS='.' read -r -a parts <<< "$1"
+    IFS='.' read -r -a parts <<<"$1"
     filter="."
     for part in "${parts[@]}"; do
       filter+=" | .\"$part\""
@@ -93,7 +93,7 @@ cmd_set() {
   raw_value="$*"
 
   # Convert dot-separated key to jq path JSON array
-  IFS='.' read -r -a parts <<< "$key"
+  IFS='.' read -r -a parts <<<"$key"
   path_json='['
   sep=''
   for part in "${parts[@]}"; do
@@ -110,7 +110,7 @@ cmd_set() {
     echo '{}' | jq --argjson path "$path_json" --arg raw "$raw_value" '
       setpath($path; ($raw | fromjson? // $raw))
     '
-  fi > "${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
+  fi >"${CONFIG_FILE}.tmp" && mv "${CONFIG_FILE}.tmp" "$CONFIG_FILE"
 }
 
 cmd_list() {
@@ -122,11 +122,22 @@ cmd_list() {
 }
 
 case "${1:-}" in
-  -h|--help) usage; exit 0 ;;
-  get) shift; cmd_get "$@" ;;
-  set) shift; cmd_set "$@" ;;
-  list) cmd_list ;;
-  *) error "unknown command '${1:-}'"
-     usage >&2
-     exit 1 ;;
+-h | --help)
+  usage
+  exit 0
+  ;;
+get)
+  shift
+  cmd_get "$@"
+  ;;
+set)
+  shift
+  cmd_set "$@"
+  ;;
+list) cmd_list ;;
+*)
+  error "unknown command '${1:-}'"
+  usage >&2
+  exit 1
+  ;;
 esac

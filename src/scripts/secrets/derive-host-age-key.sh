@@ -34,20 +34,20 @@ else
   if [ "$derived_age_key_exit" -ne 0 ] || [ -z "$derived_age_key" ]; then
     echo "sops: ssh-to-age failed (exit $derived_age_key_exit) reading $host_ssh_key; $age_key_file not written." >&2
   else
-    printf '%s\n' "$derived_age_key" > "$age_key_file"
+    printf '%s\n' "$derived_age_key" >"$age_key_file"
     case "$_dha_owner_spec" in
-      group:*)
-        chown "root:${_dha_owner_spec#group:}" "$age_key_file"
-        chmod 0640 "$age_key_file"
-        ;;
-      user:*)
-        chown "${_dha_owner_spec#user:}" "$age_key_file"
-        chmod 0600 "$age_key_file"
-        ;;
-      *)
-        echo "sops: invalid owner spec '$_dha_owner_spec'; expected user:<name> or group:<name>" >&2
-        exit 1
-        ;;
+    group:*)
+      chown "root:${_dha_owner_spec#group:}" "$age_key_file"
+      chmod 0640 "$age_key_file"
+      ;;
+    user:*)
+      chown "${_dha_owner_spec#user:}" "$age_key_file"
+      chmod 0600 "$age_key_file"
+      ;;
+    *)
+      echo "sops: invalid owner spec '$_dha_owner_spec'; expected user:<name> or group:<name>" >&2
+      exit 1
+      ;;
     esac
   fi
 fi

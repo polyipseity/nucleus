@@ -17,7 +17,10 @@ _revert_links() {
 }
 
 if [ "${NUCLEUS_FAKE_WIFI_ASYNC:-0}" = "1" ]; then
-  ( sleep 1; _revert_links ) &
+  (
+    sleep 1
+    _revert_links
+  ) &
   exit 0
 fi
 _revert_links

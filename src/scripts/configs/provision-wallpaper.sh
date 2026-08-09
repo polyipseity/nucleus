@@ -104,12 +104,12 @@ wallpaper_provision_copy_items() {
     fi
 
     case "$_targetFile" in
-      "$_pictures_dir"/*) ;;
-      *)
-        echo "provision-wallpaper: refusing to write wallpaper outside $_pictures_dir: $_targetFile" >&2
-        _nucleus_wp_failed=1
-        break
-        ;;
+    "$_pictures_dir"/*) ;;
+    *)
+      echo "provision-wallpaper: refusing to write wallpaper outside $_pictures_dir: $_targetFile" >&2
+      _nucleus_wp_failed=1
+      break
+      ;;
     esac
 
     # Copy decrypted material out of the runtime secret symlink directory
@@ -122,7 +122,7 @@ wallpaper_provision_copy_items() {
       chmod 444 "$_tmpTarget"
       mv "$_tmpTarget" "$_targetFile"
     fi
-  done < <("$_jq_bin" -r '.[] | [.secretName, .wallpaperName] | @tsv' <<< "$_items_json")
+  done < <("$_jq_bin" -r '.[] | [.secretName, .wallpaperName] | @tsv' <<<"$_items_json")
 
   if [ "$_nucleus_wp_failed" -eq 1 ]; then
     lock_wallpaper_dir
@@ -143,10 +143,10 @@ wallpaper_provision_symlink_unencrypted() {
     _sourcePath="$(resolve_wallpaper_unencrypted_file "$_current_user" "$_fileName")"
     _targetFile="$_pictures_dir/$_fileName"
     case "$_targetFile" in
-      "$_pictures_dir"/*) ;;
-      *)
-        fail_wallpaper_provision "provision-wallpaper: refusing to write wallpaper outside $_pictures_dir: $_targetFile"
-        ;;
+    "$_pictures_dir"/*) ;;
+    *)
+      fail_wallpaper_provision "provision-wallpaper: refusing to write wallpaper outside $_pictures_dir: $_targetFile"
+      ;;
     esac
     ensure_file_symlink "$_sourcePath" "$_targetFile"
   done < <(list_wallpaper_unencrypted_files "$_current_user")
@@ -164,7 +164,7 @@ wallpaper_post_copy_teardown() {
 
   for decryptedFile in "$_pictures_dir"/*; do
     [ -e "$decryptedFile" ] || continue
-    case "$decryptedFile" in *.xml) continue;; esac
+    case "$decryptedFile" in *.xml) continue ;; esac
     baseName="$(basename "$decryptedFile")"
     if [ -L "$decryptedFile" ]; then
       if ! resolve_wallpaper_unencrypted_file "$_current_user" "$baseName" >/dev/null 2>&1; then
@@ -192,7 +192,7 @@ wallpaper_post_copy_teardown() {
   hasWallpapers=0
   for img in "$_pictures_dir"/*; do
     [ -e "$img" ] || continue
-    case "$img" in *.xml) continue;; esac
+    case "$img" in *.xml) continue ;; esac
     if [ -f "$img" ] || [ -L "$img" ]; then
       hasWallpapers=1
       break
@@ -226,7 +226,7 @@ wallpaper_post_copy_teardown() {
 
     for img in "$_pictures_dir"/*; do
       [ -e "$img" ] || continue
-      case "$img" in *.xml) continue;; esac
+      case "$img" in *.xml) continue ;; esac
       if [ ! -f "$img" ] && [ ! -L "$img" ]; then
         continue
       fi
@@ -237,11 +237,11 @@ wallpaper_post_copy_teardown() {
 
       if [ -n "$prevImg" ]; then
         printf '  <transition type="overlay">\n    <duration>5.0</duration>\n    <from>%s</from>\n    <to>%s</to>\n  </transition>\n' \
-          "$prevImg" "$img" >> "$tmpXml"
+          "$prevImg" "$img" >>"$tmpXml"
       fi
 
       printf '  <static>\n    <duration>595.0</duration>\n    <file>%s</file>\n  </static>\n' \
-        "$img" >> "$tmpXml"
+        "$img" >>"$tmpXml"
       prevImg="$img"
     done
 
@@ -253,7 +253,7 @@ wallpaper_post_copy_teardown() {
       printf '  <transition type="overlay">\n    <duration>5.0</duration>\n    <from>%s</from>\n    <to>%s</to>\n  </transition>\n' \
         "$prevImg" "$firstImg"
       printf '</background>\n'
-    } > "$_xml_tmp_final"
+    } >"$_xml_tmp_final"
     # 444: the gallery descriptor is regenerated on every activation; GUI
     # consumers need only read access.  Immutability prevents accidental
     # manual edits from silently overriding managed state.

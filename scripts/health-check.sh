@@ -23,8 +23,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
@@ -49,40 +49,40 @@ fi
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    --min-free-bytes)
-      if [ "$#" -lt 2 ]; then
-        error "--min-free-bytes requires a value"
-        usage >&2
-        exit 1
-      fi
-      min_free_bytes="$2"
-      shift
-      ;;
-    --secret-health)
-      secret_health=true
-      ;;
-    --no-secret-health)
-      secret_health=false
-      ;;
-    --log-health)
-      log_health=true
-      require_command jq
-      ;;
-    --store-audit)
-      store_audit=true
-      ;;
-    --no-store-audit)
-      store_audit=false
-      ;;
-    *)
-      error "unsupported argument '$1'"
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --min-free-bytes)
+    if [ "$#" -lt 2 ]; then
+      error "--min-free-bytes requires a value"
       usage >&2
       exit 1
-      ;;
+    fi
+    min_free_bytes="$2"
+    shift
+    ;;
+  --secret-health)
+    secret_health=true
+    ;;
+  --no-secret-health)
+    secret_health=false
+    ;;
+  --log-health)
+    log_health=true
+    require_command jq
+    ;;
+  --store-audit)
+    store_audit=true
+    ;;
+  --no-store-audit)
+    store_audit=false
+    ;;
+  *)
+    error "unsupported argument '$1'"
+    usage >&2
+    exit 1
+    ;;
   esac
   shift
 done
@@ -194,7 +194,7 @@ check_log_health() {
         # Check file size against rotation threshold
         # WHY: 80% is the warning mark — services rotate at maxSize, so
         # operator action is needed before the next rotation window.
-        size=$(wc -c < "$log_file")
+        size=$(wc -c <"$log_file")
         threshold=$((max_size * 80 / 100))
         if [ "$size" -gt "$threshold" ]; then
           warn "'$log_file' ($size bytes) exceeds 80% of rotation max ($max_size bytes)"
@@ -206,14 +206,14 @@ check_log_health() {
           failures=$((failures + 1))
         fi
       done
-    done <<< "$(jq -r --arg svc "$svc" '.[$svc].logging.dirs.user[]? // empty' "$services_json")"
+    done <<<"$(jq -r --arg svc "$svc" '.[$svc].logging.dirs.user[]? // empty' "$services_json")"
 
     while IFS= read -r subdir; do
       [ -n "$subdir" ] || continue
       for log_file in "$system_log_dir/$subdir"/*.log; do
         [ -f "$log_file" ] || continue
 
-        size=$(wc -c < "$log_file")
+        size=$(wc -c <"$log_file")
         threshold=$((max_size * 80 / 100))
         if [ "$size" -gt "$threshold" ]; then
           warn "'$log_file' ($size bytes) exceeds 80% of rotation max ($max_size bytes)"
@@ -224,10 +224,10 @@ check_log_health() {
           failures=$((failures + 1))
         fi
       done
-    done <<< "$(jq -r --arg svc "$svc" '.[$svc].logging.dirs.system[]? // empty' "$services_json")"
-  # WHY: JSON meta keys ($schema, $comment) are excluded from the service
-  # enumeration so they are not treated as services.
-  done <<< "$(jq -r 'to_entries[] | select(.key | startswith("$") | not) | .key' "$services_json" | sort)"
+    done <<<"$(jq -r --arg svc "$svc" '.[$svc].logging.dirs.system[]? // empty' "$services_json")"
+    # WHY: JSON meta keys ($schema, $comment) are excluded from the service
+    # enumeration so they are not treated as services.
+  done <<<"$(jq -r 'to_entries[] | select(.key | startswith("$") | not) | .key' "$services_json" | sort)"
 
   if [ "$failures" -gt 0 ]; then
     error "log health checks failed ($failures issue(s))"

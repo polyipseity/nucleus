@@ -32,7 +32,7 @@ assert_eq() {
 
 setup_fixture() {
   _af_manifest="$_tmp/manifest.json"
-  cat > "$_af_manifest" <<'EOF'
+  cat >"$_af_manifest" <<'EOF'
 {
   "VMs": [
     {
@@ -78,7 +78,7 @@ test_adb_list_state_unauthorized() {
   setup_fixture
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"
-  cat > "$_af_bin/adb" <<'EOF'
+  cat >"$_af_bin/adb" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
   *disconnect*) exit 0 ;;
@@ -98,7 +98,7 @@ test_wait_authorized_fails_on_unauthorized() {
   setup_fixture
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"
-  cat > "$_af_bin/adb" <<'EOF'
+  cat >"$_af_bin/adb" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
   *disconnect*) exit 0 ;;
@@ -130,7 +130,7 @@ test_wait_recovery_succeeds_on_recovery() {
   setup_fixture
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"
-  cat > "$_af_bin/adb" <<'EOF'
+  cat >"$_af_bin/adb" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
   *disconnect*) exit 0 ;;
@@ -177,10 +177,10 @@ test_no_flags_prints_manual() {
 test_root_applies_persist_root_access() {
   setup_fixture
   _af_shell_log="$_tmp/shell.log"
-  : > "$_af_shell_log"
+  : >"$_af_shell_log"
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"
-  cat > "$_af_bin/adb" <<EOF
+  cat >"$_af_bin/adb" <<EOF
 #!/usr/bin/env bash
 case "\$*" in
   *disconnect*) exit 0 ;;
@@ -203,7 +203,7 @@ esac
 exit 0
 EOF
   chmod +x "$_af_bin/adb"
-  cat > "$_af_bin/fastboot" <<'EOF'
+  cat >"$_af_bin/fastboot" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
@@ -244,7 +244,7 @@ test_gapps_rejects_booted_device_state() {
   setup_fixture
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"
-  cat > "$_af_bin/adb" <<'EOF'
+  cat >"$_af_bin/adb" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
   *disconnect*) exit 0 ;;
@@ -255,7 +255,7 @@ esac
 exit 0
 EOF
   chmod +x "$_af_bin/adb"
-  cat > "$_af_bin/fastboot" <<'EOF'
+  cat >"$_af_bin/fastboot" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
   *getvar*) exit 0 ;;
@@ -285,16 +285,16 @@ test_gapps_unauthorized_flashes_recovery() {
   mkdir -p "$_tmp/vm/src/Android"
   _af_zip="$_tmp/vm/src/Android/GApps.zip"
   _af_recovery="$_tmp/vm/src/Android/recovery userdebug.img"
-  printf 'PK\x03\x04' > "$_af_zip"
-  printf 'recovery\n' > "$_af_recovery"
+  printf 'PK\x03\x04' >"$_af_zip"
+  printf 'recovery\n' >"$_af_recovery"
 
   _af_flash_log="$_tmp/flash.log"
   _af_sideload_log="$_tmp/sideload.log"
   _af_state_file="$_tmp/adb-state"
-  printf 'unauthorized\n' > "$_af_state_file"
+  printf 'unauthorized\n' >"$_af_state_file"
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"
-  cat > "$_af_bin/adb" <<EOF
+  cat >"$_af_bin/adb" <<EOF
 #!/usr/bin/env bash
 _af_state="\$(cat "$_af_state_file")"
 case "\$*" in
@@ -309,7 +309,7 @@ esac
 exit 0
 EOF
   chmod +x "$_af_bin/adb"
-  cat > "$_af_bin/fastboot" <<EOF
+  cat >"$_af_bin/fastboot" <<EOF
 #!/usr/bin/env bash
 case "\$*" in
   *getvar*is-userspace*) printf 'is-userspace: yes\n'; exit 0 ;;
@@ -321,7 +321,7 @@ esac
 exit 0
 EOF
   chmod +x "$_af_bin/fastboot"
-  cat > "$_af_bin/curl" <<'EOF'
+  cat >"$_af_bin/curl" <<'EOF'
 #!/usr/bin/env bash
 _af_out=''
 _af_head=false
@@ -364,14 +364,14 @@ test_gapps_sideload_path() {
   mkdir -p "$_tmp/vm/src/Android"
   _af_zip="$_tmp/vm/src/Android/GApps.zip"
   _af_recovery="$_tmp/vm/src/Android/recovery userdebug.img"
-  printf 'PK\x03\x04' > "$_af_zip"
-  printf 'recovery\n' > "$_af_recovery"
-  jq -n --arg tag 'test-release' '{tag_name: $tag}' > "$_tmp/vm/src/Android/recovery userdebug.tag.json"
+  printf 'PK\x03\x04' >"$_af_zip"
+  printf 'recovery\n' >"$_af_recovery"
+  jq -n --arg tag 'test-release' '{tag_name: $tag}' >"$_tmp/vm/src/Android/recovery userdebug.tag.json"
 
   _af_sideload_log="$_tmp/sideload.log"
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"
-  cat > "$_af_bin/adb" <<EOF
+  cat >"$_af_bin/adb" <<EOF
 #!/usr/bin/env bash
 case "\$*" in
   *disconnect*) exit 0 ;;
@@ -386,7 +386,7 @@ esac
 exit 0
 EOF
   chmod +x "$_af_bin/adb"
-  cat > "$_af_bin/fastboot" <<'EOF'
+  cat >"$_af_bin/fastboot" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
   *getvar*) exit 0 ;;
@@ -394,7 +394,7 @@ case "$*" in
 esac
 EOF
   chmod +x "$_af_bin/fastboot"
-  cat > "$_af_bin/curl" <<'EOF'
+  cat >"$_af_bin/curl" <<'EOF'
 #!/usr/bin/env bash
 _af_out=''
 _af_head=false
@@ -445,10 +445,10 @@ test_adb_keys_in_recovery() {
   _af_push_log="$_tmp/push.log"
   _af_home="$_tmp/home"
   mkdir -p "$_af_home/.android"
-  printf 'test-adb-key\n' > "$_af_home/.android/adbkey.pub"
+  printf 'test-adb-key\n' >"$_af_home/.android/adbkey.pub"
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"
-  cat > "$_af_bin/adb" <<EOF
+  cat >"$_af_bin/adb" <<EOF
 #!/usr/bin/env bash
 case "\$*" in
   *disconnect*) exit 0 ;;
@@ -463,7 +463,7 @@ esac
 exit 0
 EOF
   chmod +x "$_af_bin/adb"
-  cat > "$_af_bin/fastboot" <<'EOF'
+  cat >"$_af_bin/fastboot" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
@@ -483,13 +483,13 @@ test_magisk_stage_patch_kit_layout() {
   _af_apk_root="$_tmp/magisk-apk-root"
   _af_apk="$_tmp/magisk-mini.apk"
   mkdir -p "$_af_apk_root/assets" "$_af_apk_root/lib/arm64-v8a"
-  printf '#!/system/bin/sh\n' > "$_af_apk_root/assets/boot_patch.sh"
-  printf 'util\n' > "$_af_apk_root/assets/util_functions.sh"
-  printf 'apk\n' > "$_af_apk_root/assets/stub.apk"
-  printf 'magisk\n' > "$_af_apk_root/lib/arm64-v8a/libmagisk.so"
-  printf 'boot\n' > "$_af_apk_root/lib/arm64-v8a/libmagiskboot.so"
-  printf 'init\n' > "$_af_apk_root/lib/arm64-v8a/libmagiskinit.so"
-  printf 'ld\n' > "$_af_apk_root/lib/arm64-v8a/libinit-ld.so"
+  printf '#!/system/bin/sh\n' >"$_af_apk_root/assets/boot_patch.sh"
+  printf 'util\n' >"$_af_apk_root/assets/util_functions.sh"
+  printf 'apk\n' >"$_af_apk_root/assets/stub.apk"
+  printf 'magisk\n' >"$_af_apk_root/lib/arm64-v8a/libmagisk.so"
+  printf 'boot\n' >"$_af_apk_root/lib/arm64-v8a/libmagiskboot.so"
+  printf 'init\n' >"$_af_apk_root/lib/arm64-v8a/libmagiskinit.so"
+  printf 'ld\n' >"$_af_apk_root/lib/arm64-v8a/libinit-ld.so"
   (
     cd "$_af_apk_root"
     zip -qr "$_af_apk" assets lib
@@ -513,13 +513,13 @@ test_magisk_download_stdout_is_path_only() {
   mkdir -p "$SRC_DIR/Android"
   _af_apk="$SRC_DIR/Android/Magisk.apk"
   _af_boot="$SRC_DIR/Android/boot.img"
-  printf 'cached\n' > "$_af_apk"
-  printf 'boot\n' > "$_af_boot"
-  jq -n --arg tag 'test-tag' '{tag_name: $tag}' > "$SRC_DIR/Android/boot.tag.json"
+  printf 'cached\n' >"$_af_apk"
+  printf 'boot\n' >"$_af_boot"
+  jq -n --arg tag 'test-tag' '{tag_name: $tag}' >"$SRC_DIR/Android/boot.tag.json"
 
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"
-  cat > "$_af_bin/curl" <<'EOF'
+  cat >"$_af_bin/curl" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
   *boot_arm64only.img*) printf 'location: https://github.com/jqssun/android-lineage-qemu/releases/download/test-tag/boot_arm64only.img\n' ;;
@@ -554,10 +554,10 @@ EOF
 test_android_config_magisk_configures_existing_su() {
   setup_fixture
   _af_shell_log="$_tmp/shell.log"
-  : > "$_af_shell_log"
+  : >"$_af_shell_log"
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"
-  cat > "$_af_bin/adb" <<EOF
+  cat >"$_af_bin/adb" <<EOF
 #!/usr/bin/env bash
 case "\$*" in
   *disconnect*) exit 0 ;;
@@ -573,12 +573,12 @@ esac
 exit 0
 EOF
   chmod +x "$_af_bin/adb"
-  cat > "$_af_bin/fastboot" <<'EOF'
+  cat >"$_af_bin/fastboot" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
   chmod +x "$_af_bin/fastboot"
-  cat > "$_af_bin/unzip" <<'EOF'
+  cat >"$_af_bin/unzip" <<'EOF'
 #!/usr/bin/env bash
 exit 0
 EOF
@@ -607,10 +607,10 @@ EOF
 test_wait_boot_completed_waits_for_sys_boot_completed() {
   setup_fixture
   _af_boot_file="$_tmp/boot_completed"
-  printf '0' > "$_af_boot_file"
+  printf '0' >"$_af_boot_file"
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"
-  cat > "$_af_bin/adb" <<EOF
+  cat >"$_af_bin/adb" <<EOF
 #!/usr/bin/env bash
 case "\$*" in
   *disconnect*) exit 0 ;;
@@ -638,7 +638,7 @@ EOF
     _failures=$((_failures + 1))
   fi
 
-  printf '1' > "$_af_boot_file"
+  printf '1' >"$_af_boot_file"
   if ! vm_android_adb_wait_boot_completed 0 5; then
     echo "FAIL: wait_boot_completed should succeed when sys.boot_completed is 1"
     _failures=$((_failures + 1))
@@ -650,7 +650,7 @@ test_fastboot_probe_uses_getvar() {
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"
   _af_probe_log="$_tmp/fb-probe.log"
-  cat > "$_af_bin/fastboot" <<EOF
+  cat >"$_af_bin/fastboot" <<EOF
 #!/usr/bin/env bash
 case "\$*" in
   *getvar*is-userspace*) echo "getvar \$*" >> "$_af_probe_log"; printf 'is-userspace: yes\n' >&2; exit 0 ;;
@@ -672,7 +672,7 @@ test_fastboot_wait_detects_existing_fastboot() {
   setup_fixture
   _af_bin="$_tmp/bin"
   mkdir -p "$_af_bin"
-  cat > "$_af_bin/fastboot" <<'EOF'
+  cat >"$_af_bin/fastboot" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
   *getvar*is-userspace*) printf 'is-userspace: yes\n' >&2; exit 0 ;;

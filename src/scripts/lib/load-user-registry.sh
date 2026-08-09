@@ -21,23 +21,23 @@ _repo_root=""
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --host)
-      _hostName="${2:?--host requires a value}"
-      shift 2
-      ;;
-    --repo-root)
-      _repo_root="${2:?--repo-root requires a value}"
-      shift 2
-      ;;
-    -h | --help)
-      usage_std "load-user-registry.sh" "[--host MacBook|NixOS|Windows] [--repo-root PATH]" \
-        "Assemble user registry JSON from src/users/ domain files."
-      exit 0
-      ;;
-    *)
-      error "unknown argument: $1"
-      exit 1
-      ;;
+  --host)
+    _hostName="${2:?--host requires a value}"
+    shift 2
+    ;;
+  --repo-root)
+    _repo_root="${2:?--repo-root requires a value}"
+    shift 2
+    ;;
+  -h | --help)
+    usage_std "load-user-registry.sh" "[--host MacBook|NixOS|Windows] [--repo-root PATH]" \
+      "Assemble user registry JSON from src/users/ domain files."
+    exit 0
+    ;;
+  *)
+    error "unknown argument: $1"
+    exit 1
+    ;;
   esac
 done
 
@@ -174,7 +174,7 @@ for _username in "$_users_root"/*; do
   [ -d "$_username" ] || continue
   _name="$(basename "$_username")"
   case "$_name" in
-    default) continue ;;
+  default) continue ;;
   esac
   _user_json="$(_lur_assemble_user "$_name")"
   _result="$(echo "$_result" | jq --arg name "$_name" --argjson user "$_user_json" '. + {($name): $user}')"

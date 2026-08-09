@@ -3,7 +3,6 @@
 # CLI args: pwsh_bin module_name module_version
 set -euo pipefail
 
-
 _ipm_pwsh="$1"
 _ipm_module="$2"
 _ipm_version="$3"

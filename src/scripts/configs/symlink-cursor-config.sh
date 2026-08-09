@@ -77,13 +77,13 @@ _scc_converge_mapped_file_symlinks() {
     find "$_cms_target_dir" -mindepth 1 -maxdepth 1 -type l | while IFS= read -r _cms_candidate; do
       _cms_ctarget="$(readlink "$_cms_candidate")"
       case "$_cms_ctarget" in
-        "$_cms_source_dir"/*"$_cms_source_suffix")
-          if [ ! -f "$_cms_ctarget" ]; then
-            _nucleus_unprotect_symlink "$_scc_label" "$_cms_candidate"
-            rm "$_cms_candidate"
-            echo "$_scc_label: removed stale symlink $(basename "$_cms_candidate") (source removed)"
-          fi
-          ;;
+      "$_cms_source_dir"/*"$_cms_source_suffix")
+        if [ ! -f "$_cms_ctarget" ]; then
+          _nucleus_unprotect_symlink "$_scc_label" "$_cms_candidate"
+          rm "$_cms_candidate"
+          echo "$_scc_label: removed stale symlink $(basename "$_cms_candidate") (source removed)"
+        fi
+        ;;
       esac
     done
   fi

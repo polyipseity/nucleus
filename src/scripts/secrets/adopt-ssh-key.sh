@@ -5,7 +5,6 @@
 
 set -euo pipefail
 
-
 _ssh_pub_path="$1"
 _ssh_keygen_bin="$2"
 _ssh_add_bin="$3"
@@ -43,7 +42,7 @@ else
     fi
 
     mkdir -p "$nucleus_config_dir"
-    printf '%s\n' "$new_fingerprint" > "$managed_ssh_manifest"
+    printf '%s\n' "$new_fingerprint" >"$managed_ssh_manifest"
     # Restrict manifest to owner-read-only: SSH fingerprint data can be
     # used to correlate keys across systems; minimise unnecessary visibility.
     chmod 600 "$managed_ssh_manifest"

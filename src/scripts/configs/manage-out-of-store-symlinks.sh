@@ -21,8 +21,8 @@ _do_managed_paths() {
   echo "$_paths_json" | "$_jq_bin" -r '.[]' | while IFS= read -r _p; do
     [ -n "$_p" ] || continue
     case "$_action" in
-      protect) _nucleus_protect_symlink "$_context" "$_p" ;;
-      unprotect) _nucleus_unprotect_symlink "$_context" "$_p" ;;
+    protect) _nucleus_protect_symlink "$_context" "$_p" ;;
+    unprotect) _nucleus_unprotect_symlink "$_context" "$_p" ;;
     esac
   done
 }

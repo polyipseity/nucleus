@@ -23,8 +23,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
@@ -114,27 +114,27 @@ do_sync() {
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --dry-run)
-        _sync_dry_run=true
-        ;;
-      --ollama-profile)
-        _sync_profile_override="$2"
-        shift
-        ;;
-      --gc-only)
-        _sync_gc_only=true
-        ;;
-      --no-gc-only)
-        _sync_gc_only=false
-        ;;
-      --json)
-        # WHY: sync emits human progress messages, not machine data, so --json
-        ;;
-      *)
-        error "sync: unsupported argument '$1'"
-        usage >&2
-        exit 1
-        ;;
+    --dry-run)
+      _sync_dry_run=true
+      ;;
+    --ollama-profile)
+      _sync_profile_override="$2"
+      shift
+      ;;
+    --gc-only)
+      _sync_gc_only=true
+      ;;
+    --no-gc-only)
+      _sync_gc_only=false
+      ;;
+    --json)
+      # WHY: sync emits human progress messages, not machine data, so --json
+      ;;
+    *)
+      error "sync: unsupported argument '$1'"
+      usage >&2
+      exit 1
+      ;;
     esac
     shift
   done
@@ -244,18 +244,18 @@ do_list() {
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --profile)
-        _list_profile="$2"
-        shift
-        ;;
-      --json)
-        _list_json=true
-        ;;
-      *)
-        error "list: unsupported argument '$1'"
-        usage >&2
-        exit 1
-        ;;
+    --profile)
+      _list_profile="$2"
+      shift
+      ;;
+    --json)
+      _list_json=true
+      ;;
+    *)
+      error "list: unsupported argument '$1'"
+      usage >&2
+      exit 1
+      ;;
     esac
     shift
   done
@@ -272,7 +272,8 @@ do_list() {
       jq -c --arg profile "$_list_profile" '{profile: $profile, models: .models[$profile]}' "$MANIFEST"
     else
       printf 'Profile: %s\n' "$_list_profile"
-      printf '%.0s-' {1..50}; printf '\n'
+      printf '%.0s-' {1..50}
+      printf '\n'
       jq -r --arg profile "$_list_profile" '.models[$profile][] // empty' "$MANIFEST" | while IFS= read -r model; do
         printf '  %s\n' "$model"
       done
@@ -282,7 +283,8 @@ do_list() {
       jq -c '{profiles: [.models | to_entries[] | {profile: .key, models: .value}]}' "$MANIFEST"
     else
       printf '%-12s %s\n' "Profile" "Models"
-      printf '%.0s-' {1..60}; printf '\n'
+      printf '%.0s-' {1..60}
+      printf '\n'
       jq -r '.models | to_entries[] | .key' "$MANIFEST" | while IFS= read -r profile_name; do
         _models=$(jq -r --arg p "$profile_name" '.models[$p][]' "$MANIFEST" | tr '\n' ', ' | sed 's/, $//')
         printf '%-12s %s\n' "$profile_name" "$_models"
@@ -305,14 +307,14 @@ do_status() {
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --json)
-        _status_json=true
-        ;;
-      *)
-        error "status: unsupported argument '$1'"
-        usage >&2
-        exit 1
-        ;;
+    --json)
+      _status_json=true
+      ;;
+    *)
+      error "status: unsupported argument '$1'"
+      usage >&2
+      exit 1
+      ;;
     esac
     shift
   done
@@ -386,14 +388,14 @@ do_endpoint() {
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --json)
-        _endpoint_json=true
-        ;;
-      *)
-        error "endpoint: unsupported argument '$1'"
-        usage >&2
-        exit 1
-        ;;
+    --json)
+      _endpoint_json=true
+      ;;
+    *)
+      error "endpoint: unsupported argument '$1'"
+      usage >&2
+      exit 1
+      ;;
     esac
     shift
   done
@@ -409,7 +411,8 @@ do_endpoint() {
     jq -c '{ollama: .ollama.network, litellm: .litellm.network}' "$SERVICES_JSON"
   else
     printf '%-10s %-10s %s\n' "Service" "Key" "Endpoint"
-    printf '%.0s-' {1..70}; printf '\n'
+    printf '%.0s-' {1..70}
+    printf '\n'
     for _svc in ollama litellm; do
       # shellcheck disable=SC2016 # reason: jq filter uses $svc — not shell expansion
       _network=$(jq -c --arg svc "$_svc" '.[$svc].network // empty' "$SERVICES_JSON")
@@ -438,14 +441,14 @@ do_config() {
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      --json)
-        _config_json=true
-        ;;
-      *)
-        error "config: unsupported argument '$1'"
-        usage >&2
-        exit 1
-        ;;
+    --json)
+      _config_json=true
+      ;;
+    *)
+      error "config: unsupported argument '$1'"
+      usage >&2
+      exit 1
+      ;;
     esac
     shift
   done
@@ -475,7 +478,8 @@ do_config() {
 
     printf '\n'
     printf '%-12s %s\n' "Profile" "Model Count"
-    printf '%.0s-' {1..40}; printf '\n'
+    printf '%.0s-' {1..40}
+    printf '\n'
     jq -r '.models | to_entries[] | [.key, (.value | length | tostring)] | @tsv' "$MANIFEST" | while IFS=$'\t' read -r _profile_name _count; do
       printf '%-12s %s\n' "$_profile_name" "$_count"
     done
@@ -490,15 +494,22 @@ do_config() {
 # absence) so every do_* handler receives only its own remaining options.
 action="${1:-help}"
 case "$action" in
-  -h|--help|help) usage; exit 0 ;;
+-h | --help | help)
+  usage
+  exit 0
+  ;;
 esac
 shift 2>/dev/null || true # check-suppress:suppression_doc: shift fails when no args remain (subcommand-only invocation); ignored intentionally
 
 case "$action" in
-  sync)     do_sync "$@" ;;
-  list)     do_list "$@" ;;
-  status)   do_status "$@" ;;
-  endpoint) do_endpoint "$@" ;;
-  config)   do_config "$@" ;;
-  *) error "unsupported subcommand '$action'"; usage >&2; exit 1 ;;
+sync) do_sync "$@" ;;
+list) do_list "$@" ;;
+status) do_status "$@" ;;
+endpoint) do_endpoint "$@" ;;
+config) do_config "$@" ;;
+*)
+  error "unsupported subcommand '$action'"
+  usage >&2
+  exit 1
+  ;;
 esac

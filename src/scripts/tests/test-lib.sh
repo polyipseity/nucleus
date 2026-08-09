@@ -32,46 +32,48 @@ parse_args() {
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      -h|--help)
-        usage
-        exit 0
-        ;;
-      -q|--quiet)
-        # shellcheck disable=SC2034 # reason: consumed by test steps 01, 04, 05 via transitive sourcing
-        quiet_mode=true
-        shift
-        ;;
-      --fail-fast)
-        export FAIL_FAST=true
-        shift
-        ;;
-      --no-fail-fast)
-        export FAIL_FAST=false
-        shift
-        ;;
-      --skip-steps=*)
-        SKIP_STEPS=()
-        _IFS_SAVE="$IFS"; IFS=','
-        for _id in ${1#--skip-steps=}; do
-          _id="${_id## }"; _id="${_id%% }"
-          [ -n "$_id" ] || continue
-          _skip_dup=false
-          for _existing in "${SKIP_STEPS[@]}"; do
-            [ "$_existing" = "$_id" ] && _skip_dup=true && break
-          done
-          $_skip_dup || SKIP_STEPS+=("$_id")
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -q | --quiet)
+      # shellcheck disable=SC2034 # reason: consumed by test steps 01, 04, 05 via transitive sourcing
+      quiet_mode=true
+      shift
+      ;;
+    --fail-fast)
+      export FAIL_FAST=true
+      shift
+      ;;
+    --no-fail-fast)
+      export FAIL_FAST=false
+      shift
+      ;;
+    --skip-steps=*)
+      SKIP_STEPS=()
+      _IFS_SAVE="$IFS"
+      IFS=','
+      for _id in ${1#--skip-steps=}; do
+        _id="${_id## }"
+        _id="${_id%% }"
+        [ -n "$_id" ] || continue
+        _skip_dup=false
+        for _existing in "${SKIP_STEPS[@]}"; do
+          [ "$_existing" = "$_id" ] && _skip_dup=true && break
         done
-        IFS="$_IFS_SAVE"
-        shift
-        ;;
-      -*)
-        error "unsupported argument '$1'"
-        usage >&2
-        exit 1
-        ;;
-      *)
-        break
-        ;;
+        $_skip_dup || SKIP_STEPS+=("$_id")
+      done
+      IFS="$_IFS_SAVE"
+      shift
+      ;;
+    -*)
+      error "unsupported argument '$1'"
+      usage >&2
+      exit 1
+      ;;
+    *)
+      break
+      ;;
     esac
   done
 
@@ -85,14 +87,14 @@ parse_args() {
 
 # Override cache_file_lists for test-specific file caching
 cache_file_lists() {
-  TEST_NIX_FILES=$(find tests -name '*.nix' -type f ! -name 'lib.nix' -print | filter_gitignored | sort)  # ref: allow-and-deny-lists.instructions.md#A6 -- test helper library excluded from namespace of test files; gitignore filter applied on top
+  TEST_NIX_FILES=$(find tests -name '*.nix' -type f ! -name 'lib.nix' -print | filter_gitignored | sort) # ref: allow-and-deny-lists.instructions.md#A6 -- test helper library excluded from namespace of test files; gitignore filter applied on top
   # Self-pruning: verify excluded file still exists (A6)
   if [ ! -f "tests/lib.nix" ]; then
     error "stale exclusion: tests/lib.nix no longer exists — remove ! -name 'lib.nix' from find"
     return 1
   fi
   # shellcheck disable=SC2034 # reason: consumed by test step 01 (nix-tests) via transitive sourcing
-  readarray -t TEST_NIX_FILES_ARR <<< "$TEST_NIX_FILES"
+  readarray -t TEST_NIX_FILES_ARR <<<"$TEST_NIX_FILES"
 }
 
 # Override preflight_check for test-specific tools

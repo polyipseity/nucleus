@@ -23,4 +23,4 @@ printf '%s\n' "$_nucleus_symlink_entries_json" | "$_nucleus_jq_bin" -r '.[]' | w
   fi
 done
 
-printf '%s\n' "$_nucleus_manifest_json" > "$_nucleus_manifest_path"
+printf '%s\n' "$_nucleus_manifest_json" >"$_nucleus_manifest_path"

@@ -3,7 +3,6 @@
 
 set -euo pipefail
 
-
 _git_secret_path="$1"
 _git_bin="$2"
 

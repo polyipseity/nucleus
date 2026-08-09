@@ -4,7 +4,6 @@
 # CLI args: bat_bin bun_bin fd_bin gh_bin opencode_bin ruff_bin rustup_bin typst_bin uv_bin zsh_completions_src
 set -euo pipefail
 
-
 _izc_bat_bin="$1"
 _izc_bun_bin="$2"
 _izc_fd_bin="$3"
@@ -27,12 +26,12 @@ _generate_if_stale() {
   local _gen_cmd="$3"
 
   if [ -f "$_comp_file" ] && [ "$_comp_file" -nt "$_bin_path" ]; then
-    return 0  # already current, skip
+    return 0 # already current, skip
   fi
 
   echo "zsh-completions: generating ${_comp_file##*/}"
   mkdir -p "$(dirname "$_comp_file")"
-  eval "$_gen_cmd" > "$_comp_file" 2>/dev/null || {
+  eval "$_gen_cmd" >"$_comp_file" 2>/dev/null || {
     echo "  (failed, skipping)" >&2
     rm -f "$_comp_file"
   }

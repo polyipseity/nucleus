@@ -6,10 +6,10 @@
 _self="${BASH_SOURCE[0]:-$0}"
 _TESTS_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # shellcheck disable=SC2016 # reason: eval body must emit literal dot-source lines for BASH_SOURCE
-eval "$( {
+eval "$({
   printf 'cd %q || exit\n' "$_TESTS_DIR/test-steps"
   for _step_file in "$_TESTS_DIR/test-steps"/*.sh; do
     [ -f "$_step_file" ] || continue
     printf '. ./%q\n' "$(basename "$_step_file")"
   done
-} )"
+})"

@@ -27,7 +27,7 @@ LOG_FILE="${2:-$NUCLEUS_SYSTEM_LOG_DIR/symlink-farm.log}"
 NUCLEUS_VERBOSE="${NUCLEUS_VERBOSE:-}"
 
 _log() {
-  printf '[%s] symlink-farm: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >> "$LOG_FILE"
+  printf '[%s] symlink-farm: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >>"$LOG_FILE"
   if [ -n "$NUCLEUS_VERBOSE" ]; then
     printf 'symlink-farm: %s\n' "$*"
   fi
@@ -37,7 +37,7 @@ _log() {
 /bin/mkdir -p "$FARM_DIR"
 
 # Parse current farm entries into an indexed array.
-IFS=' ' read -r -a entries <<< "$1"
+IFS=' ' read -r -a entries <<<"$1"
 
 _created=0
 for entry in "${entries[@]}"; do
@@ -48,7 +48,7 @@ for entry in "${entries[@]}"; do
   if [ -L "$link_path" ]; then
     current_target="$(readlink "$link_path")"
     if [ "$current_target" = "$target" ]; then
-      continue  # already correct
+      continue # already correct
     fi
   fi
 
@@ -69,7 +69,10 @@ for link_path in "$FARM_DIR"/*; do
       # Check if link_name is in the active entries list.
       _is_active=false
       for entry in "${entries[@]}"; do
-        [ "${entry##*->}" = "$link_name" ] && { _is_active=true; break; }
+        [ "${entry##*->}" = "$link_name" ] && {
+          _is_active=true
+          break
+        }
       done
       if [ "$_is_active" = false ]; then
         /bin/rm "$link_path"

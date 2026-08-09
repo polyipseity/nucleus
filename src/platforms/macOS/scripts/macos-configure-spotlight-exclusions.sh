@@ -26,7 +26,7 @@ while IFS= read -r -d "" directory_path; do
     continue
   fi
 
-  : > "$marker_path"
+  : >"$marker_path"
   updated_count=$((updated_count + 1))
 done < <(
   /usr/bin/find "$DEV_ROOT" \( "${_find_args[@]}" \) -type d -print0

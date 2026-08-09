@@ -3,7 +3,6 @@
 # When the arg is empty, resolve at runtime from /dev/console (macOS).
 set -euo pipefail
 
-
 _nvim_path="$1"
 
 if [ -z "$_nvim_path" ]; then

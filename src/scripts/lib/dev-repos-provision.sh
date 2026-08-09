@@ -25,18 +25,18 @@ resolve_repo_path() {
   pathInput="$1"
 
   case "$pathInput" in
-    "~")
-      printf '%s\n' "$HOME"
-      ;;
-    ~/*)
-      printf '%s/%s\n' "$HOME" "${pathInput#~/}"
-      ;;
-    /*)
-      printf '%s\n' "$pathInput"
-      ;;
-    *)
-      printf '%s/%s\n' "$HOME" "$pathInput"
-      ;;
+  "~")
+    printf '%s\n' "$HOME"
+    ;;
+  ~/*)
+    printf '%s/%s\n' "$HOME" "${pathInput#~/}"
+    ;;
+  /*)
+    printf '%s\n' "$pathInput"
+    ;;
+  *)
+    printf '%s/%s\n' "$HOME" "$pathInput"
+    ;;
   esac
 }
 

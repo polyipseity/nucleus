@@ -7,8 +7,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
@@ -25,21 +25,21 @@ usage() {
 _SCOPED=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    --scoped)
-      _SCOPED=true
-      ;;
-    -*)
-      error "unsupported argument '$1'"
-      usage >&2
-      exit 1
-      ;;
-    *)
-      break
-      ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --scoped)
+    _SCOPED=true
+    ;;
+  -*)
+    error "unsupported argument '$1'"
+    usage >&2
+    exit 1
+    ;;
+  *)
+    break
+    ;;
   esac
   shift
 done
@@ -53,7 +53,7 @@ elif $_SCOPED; then
   say 'no shell scripts to check (scoped mode).'
   exit 0
 else
-  files="$(git ls-files '*.sh' ':(exclude)vendor/')" || true  # check-suppress:suppression_doc: git ls-files returns 1 when no matches found
+  files="$(git ls-files '*.sh' ':(exclude)vendor/')" || true # check-suppress:suppression_doc: git ls-files returns 1 when no matches found
   if [ -z "$files" ]; then
     say 'no shell scripts to check.'
     exit 0

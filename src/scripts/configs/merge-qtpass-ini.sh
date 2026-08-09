@@ -23,10 +23,10 @@ _update_qtpass_ini_value() {
 
   if [ -f "$_conf" ]; then
     _tmp="$(mktemp "$_conf.XXXXXX")"
-    "$_mqi_awk_bin" -f "$SCRIPT_DIR/merge-qtpass-ini.awk" -v key="$_key" -v value="$_value" "$_conf" > "$_tmp"
+    "$_mqi_awk_bin" -f "$SCRIPT_DIR/merge-qtpass-ini.awk" -v key="$_key" -v value="$_value" "$_conf" >"$_tmp"
     mv "$_tmp" "$_conf"
   else
-    cat > "$_conf" <<EOF
+    cat >"$_conf" <<EOF
 [General]
 $_key=$_value
 EOF
@@ -34,18 +34,18 @@ EOF
 }
 
 case "$(uname -s)" in
-  Darwin)
-    eval "$_mqi_darwin_commands"
-    ;;
-  Linux)
-    # QtPass upstream commonly resolves to ~/.config/IJHack/QtPass.conf.
-    _primary_conf="$HOME/.config/IJHack/QtPass.conf"
-    # Some builds may resolve via organization-domain pathing.
-    _secondary_conf="$HOME/.config/com.ijhack/QtPass.conf"
+Darwin)
+  eval "$_mqi_darwin_commands"
+  ;;
+Linux)
+  # QtPass upstream commonly resolves to ~/.config/IJHack/QtPass.conf.
+  _primary_conf="$HOME/.config/IJHack/QtPass.conf"
+  # Some builds may resolve via organization-domain pathing.
+  _secondary_conf="$HOME/.config/com.ijhack/QtPass.conf"
 
-    eval "$_mqi_linux_primary_commands"
-    if [ -f "$_secondary_conf" ]; then
-      eval "$_mqi_linux_secondary_commands"
-    fi
-    ;;
+  eval "$_mqi_linux_primary_commands"
+  if [ -f "$_secondary_conf" ]; then
+    eval "$_mqi_linux_secondary_commands"
+  fi
+  ;;
 esac

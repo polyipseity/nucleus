@@ -21,10 +21,10 @@ old_IFS="$IFS"
 IFS=:
 for __component in $PATH; do
   case ":${__nucleus_managed_set}:" in
-    *":${__component}:"*) ;;
-    *)
-      __nucleus_cleaned="${__nucleus_cleaned:+${__nucleus_cleaned}:}${__component}"
-      ;;
+  *":${__component}:"*) ;;
+  *)
+    __nucleus_cleaned="${__nucleus_cleaned:+${__nucleus_cleaned}:}${__component}"
+    ;;
   esac
 done
 IFS="$old_IFS"
@@ -42,7 +42,7 @@ for __nucleus_frag in "$__nucleus_prepend" "$__nucleus_cleaned" "$__nucleus_appe
   else
     __nucleus_path="$__nucleus_frag"
   fi
-  done
+done
 "$__nucleus_launchctl" setenv PATH "$__nucleus_path"
 
 # ── All other GUI env vars (user and non-user) ──

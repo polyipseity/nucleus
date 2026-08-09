@@ -25,10 +25,10 @@ _upsert_ini_key() {
     # literally in Picard's @Variant(…) serialized Qt values.
     # AWK -v treats the argument as a string constant and processes
     # backslash escapes; ENVIRON reads the raw bytes unchanged.
-    _UPSERT_VALUE="$_value" "$_mpi_awk_bin" -f "$SCRIPT_DIR/merge-picard-ini.awk" -v section="$_section" -v key="$_key" "$_conf" > "$_tmp"
+    _UPSERT_VALUE="$_value" "$_mpi_awk_bin" -f "$SCRIPT_DIR/merge-picard-ini.awk" -v section="$_section" -v key="$_key" "$_conf" >"$_tmp"
     mv "$_tmp" "$_conf"
   else
-    cat > "$_conf" <<EOF
+    cat >"$_conf" <<EOF
 [$_section]
 $_key=$_value
 EOF
@@ -78,7 +78,7 @@ _apply_picard_defaults_from_file() {
 _picard_conf="${XDG_CONFIG_HOME:-$HOME/.config}/MusicBrainz/Picard.ini"
 _picard_defaults_file="$(mktemp "${TMPDIR:-/tmp}/picard-defaults.XXXXXX.ini")"
 trap 'rm -f "$_picard_defaults_file"' EXIT
-printf '%s' "$_mpi_picard_defaults_ini" > "$_picard_defaults_file"
+printf '%s' "$_mpi_picard_defaults_ini" >"$_picard_defaults_file"
 
 _apply_picard_defaults_from_file "$_picard_defaults_file" "$_picard_conf"
 

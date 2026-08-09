@@ -9,7 +9,10 @@ TEST_FILE="$REPO_ROOT/src/scripts/lib/nix-test-eval.sh"
 
 run_nix_test_eval_guard() {
   # shellcheck source=../../../src/scripts/lib/nix-test-eval.sh
-  ( . "$TEST_FILE"; run_nix_test_eval "$@" >/dev/null 2>&1 )
+  (
+    . "$TEST_FILE"
+    run_nix_test_eval "$@" >/dev/null 2>&1
+  )
 }
 
 test_nix_test_eval_has_guard_function() {
@@ -64,7 +67,7 @@ test_nix_test_eval_behavioral_rejects_1arg_deepseq() {
   local _tmpdir _exit_code
   _tmpdir=$(mktemp -d) || return 1
   mkdir -p "$_tmpdir/tests"
-  cat > "$_tmpdir/tests/bad-deepseq.nix" <<'EOF'
+  cat >"$_tmpdir/tests/bad-deepseq.nix" <<'EOF'
 builtins.seq (builtins.deepSeq allTests) {
   success = true;
   testCount = builtins.length allTests;
@@ -80,7 +83,7 @@ test_nix_test_eval_behavioral_accepts_2arg_deepseq() {
   local _tmpdir _exit_code
   _tmpdir=$(mktemp -d) || return 1
   mkdir -p "$_tmpdir/tests"
-  cat > "$_tmpdir/tests/good-deepseq.nix" <<'EOF'
+  cat >"$_tmpdir/tests/good-deepseq.nix" <<'EOF'
 builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;

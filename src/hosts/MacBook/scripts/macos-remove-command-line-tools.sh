@@ -20,7 +20,7 @@ LOG_FILE="${1:-/Users/Shared/nucleus/logs/command-line-tools.log}"
 /bin/mkdir -p "$(dirname "$LOG_FILE")"
 
 _log() {
-  printf '[%s] command-line-tools: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >> "$LOG_FILE"
+  printf '[%s] command-line-tools: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >>"$LOG_FILE"
 }
 
 if [ -d "$CLT_DIR" ]; then
