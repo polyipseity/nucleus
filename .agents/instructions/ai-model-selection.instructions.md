@@ -71,33 +71,9 @@ Ollama's available quantizations for models in the relevant size range are limit
 - **MacBook default**: `q4_K_M` (default tag); use `it-qat` when the model family ships one (e.g. `gemma3:27b-it-qat`). Use `e4b-it-bf16` (16 GB) for `gemma4:e4b` when maximum quality at a single small model is desired.
 - **NixOS / Windows default**: always `q4_K_M` (default tag) — VRAM is tight; do not use q8_0 or fp16 variants.
 
-## Model size reference (verified from Ollama library)
+## Model size SSOT
 
-Sizes are download/VRAM footprint at default `q4_K_M` quantization unless noted. All tags below confirmed to exist on Ollama as of 2026-05.
-
-### MacBook candidates (≤ 16 GB target; ≤ ~18 GB acceptable — high-param preferred)
-
-Ordered by preference under the high-param-count policy.
-
-| Model tag          | Size   | Capabilities                | Notes                                                           |
-| ------------------ | ------ | --------------------------- | --------------------------------------------------------------- |
-| `qwen3.5:27b`      | 17 GB  | vision tools thinking       | **High-param pick**; 27B dense; 256K ctx; slight excess OK      |
-| `qwen3.6:27b`      | 17 GB  | vision tools thinking       | 27B; 256K ctx; agentic coding focus; slight excess OK           |
-| `gemma4:26b`       | 18 GB  | vision tools thinking       | MoE 26B/4B active; frontier benchmarks; slight excess OK        |
-| `devstral:24b`     | 14 GB  | tools                       | 24B; 128K ctx; coding agent SWE-bench #1 open-source (46.8%)    |
-| `gemma4:e4b`       | 9.6 GB | vision tools thinking audio | Current; MoE 4B active; QAT; Apple Silicon Metal                |
-| `qwen3:14b`        | 9.3 GB | tools thinking              | Current; 14B dense; 40K ctx                                     |
-| `qwen3.5:27b-int4` | 16 GB  | tools thinking              | 27B int4 text-only; just fits budget; no vision                 |
-| `qwen3:30b`        | 19 GB  | tools thinking              | MoE 30B/3B active; 256K ctx; ~3 GB over target — use cautiously |
-
-### NixOS / Windows candidates (≤ 6 GB VRAM — strict; high-param preferred)
-
-`qwen3:8b` (5.2 GB, `q4_K_M`) is the maximum-parameter model that fits within 6 GB VRAM at any Ollama-available quantization. Ollama offers no sub-`q4_K_M` variants for models in this size range. The next size up (`qwen3.5:9b-q4_K_M` = 6.6 GB, `qwen3:14b-q4_K_M` = 9.3 GB) all exceed the strict 6 GB budget. The high-param preference does not change the selection here — `qwen3:8b` is already the optimum.
-
-| Model tag    | Size   | Fits 6 GB? | Capabilities          | Notes                                                                    |
-| ------------ | ------ | ---------- | --------------------- | ------------------------------------------------------------------------ |
-| `qwen3:8b`   | 5.2 GB | Yes        | tools thinking        | Current; maximum params within budget; 40K ctx                           |
-| `qwen3.5:9b` | 6.6 GB | No         | vision tools thinking | 0.6 GB over — viable CPU-only on NixOS (MemoryMax=16G); not for GPU slot |
+Model tags, sizes, and capability metadata are authoritative in `src/modules/ai/models.json` and the manifest comment block in `src/modules/ai/default.nix`. Do not duplicate volatile size tables in this file — read those sources when evaluating fit.
 
 ## Tool-calling verification
 

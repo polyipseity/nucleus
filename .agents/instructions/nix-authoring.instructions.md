@@ -6,19 +6,7 @@ applyTo: "src/**/*.nix"
 
 # Nix Configuration Authoring
 
-## Repository layout
-
-- `src/flake.nix` is the entrypoint. Keep host identities, systems, and shared package constructors centralized there.
-- `src/scripts/` contains Nix-internal scripts organized by domain. When referencing a script from Nix:
-  - From `src/modules/*.nix`: `builtins.readFile ../scripts/<subdir>/<filename>`
-  - From `src/hosts/*/*.nix`: `builtins.readFile ../../scripts/<subdir>/<filename>`
-  - From `src/flake.nix`: `./scripts/<subdir>/<filename>`
-  - See `AGENTS.md` Repository Shape section for the naming rule (two-track policy: verb-first for action scripts, entity-first for service scripts, with table in `scripts-and-permissions.instructions.md`) and full subdirectory listing.
-- `src/scripts/apply.sh` is the POSIX apply dispatcher behind `nix run .#apply` (kept in root).
-- `src/hosts/<Host>/` contains host entrypoints and host-only fragments. Current Nix hosts are `MacBook` and `NixOS`; `Windows/` is WinGet DSC-managed (no `.nix` files).
-- `src/platforms/<Platform>/` contains platform-specific modules and scripts shared across hosts on that OS family (`macOS/`, `NixOS/`, `Windows/modules/`).
-- `src/modules/*.nix` contains cross-host shared modules reused across hosts and Home Manager. Keep host-specific hardware/runtime details in host files, not shared modules.
-- **Subagent path reminder**: when asking a subagent to extract or reference a file from a Nix module, the path must be relative to the Nix file's directory, not the repo root. For `src/modules/*.nix`, that means `../scripts/...`; for `src/platforms/<Platform>/modules/*.nix`, `../../../scripts/...` (cross-platform scripts) or `../../scripts/...` (platform scripts); for `src/hosts/<Host>/*.nix`, `../../scripts/...`.
+See `AGENTS.md` Repository Shape for the canonical repo layout. **Subagent path reminder**: when asking a subagent to extract or reference a file from a Nix module, the path must be relative to the Nix file's directory, not the repo root. For `src/modules/*.nix`, that means `../scripts/...`; for `src/platforms/<Platform>/modules/*.nix`, `../../../scripts/...` (cross-platform scripts) or `../../scripts/...` (platform scripts); for `src/hosts/<Host>/*.nix`, `../../scripts/...`.
 
 ## Flake conventions
 
