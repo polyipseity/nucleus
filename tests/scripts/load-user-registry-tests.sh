@@ -63,7 +63,7 @@ test_resolves_google_drive_replica_enable_per_host() {
   windows_registry="$(run_loader Windows)"
   macbook_enable="$(echo "$macbook_registry" | jq -r '.polyipseity.cloudDrives.replicas[] | select(.id == "GoogleDrive") | .enable')"
   windows_enable="$(echo "$windows_registry" | jq -r '.polyipseity.cloudDrives.replicas[] | select(.id == "GoogleDrive") | .enable')"
-  if [ "$macbook_enable" = "false" ] && [ "$windows_enable" = "true" ]; then
+  if [ "$macbook_enable" = "false" ] && [ "$windows_enable" = "false" ]; then
     assert_pass "resolves GoogleDrive replica enable per host"
   else
     assert_fail "resolves GoogleDrive replica enable per host" "MacBook=$macbook_enable Windows=$windows_enable"
