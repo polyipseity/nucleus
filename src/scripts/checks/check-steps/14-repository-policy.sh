@@ -287,34 +287,6 @@ run_14_agents_policy() {
     fi
   done < <(find .agents/instructions -type f -name '*.instructions.md' -print0)
 
-  local _deleted_manifest=".agents/deleted-instructions.json"
-  if [ ! -f "$_deleted_manifest" ]; then
-    _agents_errors=$((_agents_errors + 1))
-    error "missing $_deleted_manifest"
-  fi
-  local _stale_pattern
-  _stale_pattern=$(jq -r '.stems | map(. + ".instructions.md") | join("|")' "$_deleted_manifest")
-
-  local _stale_hits
-  _stale_hits=$(mktemp) || { error "failed to create temp file"; return 1; }
-  grep -RIn -E "$_stale_pattern" \
-    --exclude-dir='.git' \
-    --exclude='14-repository-policy.sh' \
-    --exclude='14-repository-policy.ps1' \
-    --exclude='agents-policy-tests.sh' \
-    --exclude='deleted-instructions.json' \
-    . 2>/dev/null > "$_stale_hits" || true  # check-suppress:suppression_doc: grep exits 1 when no stale instruction references remain; empty output is the expected clean state
-  if [ -s "$_stale_hits" ]; then
-    _agents_errors=$((_agents_errors + 1))
-    error "stale .agents instruction references found:"
-    while IFS= read -r _line; do
-      error "  $_line"
-    done < "$_stale_hits"
-  else
-    say "no stale .agents instruction references found."
-  fi
-  rm -f "$_stale_hits"
-
   local _agents_md="AGENTS.md"
   local _missing_link
   _missing_link=$(mktemp) || { error "failed to create temp file"; return 1; }

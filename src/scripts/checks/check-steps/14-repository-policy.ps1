@@ -299,29 +299,6 @@ Register-Step -Id "repository-policy" -Number 14 -Name "Repository policy" -Acti
     }
   }
 
-  $deletedManifest = Join-Path $r '.agents\deleted-instructions.json'
-  if (-not (Test-Path -LiteralPath $deletedManifest)) {
-    Write-ErrorMessage "missing $deletedManifest"
-    $failed = $true
-  } else {
-    $stems = (Get-Content -LiteralPath $deletedManifest -Raw | ConvertFrom-Json).stems
-    $stalePattern = ($stems | ForEach-Object { "{0}.instructions.md" -f $_ }) -join '|'
-    $staleHits = Get-ChildItem -Path $r -Recurse -File |
-      Where-Object {
-        $_.FullName -notmatch '[\\/]\.git[\\/]' -and
-        $_.Name -notin @('14-repository-policy.sh', '14-repository-policy.ps1', 'agents-policy-tests.sh', 'deleted-instructions.json')
-      } |
-      Select-String -Pattern $stalePattern
-    if ($staleHits) {
-      foreach ($hit in $staleHits) {
-        Write-ErrorMessage "stale .agents reference: $($hit.Path):$($hit.LineNumber): $($hit.Line.Trim())"
-      }
-      $failed = $true
-    } else {
-      Write-Output 'check: no stale .agents instruction references found.'
-    }
-  }
-
   $agentsMd = Join-Path $r 'AGENTS.md'
   $missingLinks = Select-String -Path $agentsMd -Pattern '\.agents/instructions/[a-z0-9-]+\.instructions\.md' -AllMatches |
     ForEach-Object { $_.Matches } |

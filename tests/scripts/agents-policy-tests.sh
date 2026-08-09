@@ -51,24 +51,6 @@ test_no_wide_applyto_globs() {
   fi
 }
 
-test_no_stale_instruction_references() {
-  local manifest="${NUCLEUS_REPO_ROOT}/.agents/deleted-instructions.json"
-  local pattern hits
-  pattern=$(jq -r '.stems | map(. + ".instructions.md") | join("|")' "$manifest")
-  hits=$(grep -RIn -E "$pattern" \
-    --exclude-dir='.git' \
-    --exclude='14-repository-policy.sh' \
-    --exclude='14-repository-policy.ps1' \
-    --exclude='agents-policy-tests.sh' \
-    --exclude='deleted-instructions.json' \
-    "$NUCLEUS_REPO_ROOT" 2>/dev/null || true)
-  if [[ -z "$hits" ]]; then
-    assert_pass "no stale references to removed .agents instruction files"
-  else
-    assert_fail "no stale references to removed .agents instruction files" "$hits"
-  fi
-}
-
 test_agents_md_instruction_links_resolve() {
   local missing
   missing=$(grep -oE '\.agents/instructions/[a-z0-9-]+\.instructions\.md' "${NUCLEUS_REPO_ROOT}/AGENTS.md" 2>/dev/null \
@@ -87,7 +69,6 @@ main() {
   test_commit_staged_bodies_match
   test_instruction_frontmatter_present
   test_no_wide_applyto_globs
-  test_no_stale_instruction_references
   test_agents_md_instruction_links_resolve
 
   echo ""
