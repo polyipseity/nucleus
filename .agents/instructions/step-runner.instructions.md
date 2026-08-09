@@ -175,7 +175,7 @@ Cross-platform equivalence:
 | Data and schema | 06–10 | `lockfile-validation`, `locked-dsc-validation`, `schema-validation`, `service-registry`, `yaml-structural` |
 | Repository policy | 11–14 | `package-manager-enforcement`, `suppression-audit`, `online-determinism`, `repository-policy` |
 
-Shell entry-script validation (`script-validation-tests.sh`) runs in test step 5 (`script-and-framework-tests`), not in the check pipeline.
+Shell entry-script validation (`script-validation-tests.sh`) runs in test step 5 (`script-and-framework-tests`), not in the check pipeline. Step 5 runs priority framework suites serially, then parallelizes the remaining `tests/scripts/**/*-tests.*` suites with ordered output replay; `nucleus-apps-smoke-tests.sh` is discovered there and runs under `nucleus_nix_locked` on POSIX.
 
 ## Spec G: Step 8 `$schema` enforcement
 

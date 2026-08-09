@@ -265,7 +265,7 @@ Describe "Windows Package Installation" {
 
 Learned from authoring `tests/scripts/` check-step tests; applies to test scripts, not production code.
 
-- **Assert-Pass style, not Pester**: functional tests under `tests/scripts/check-steps/` (e.g. `09-schema-validation-tests.ps1`) are plain `pwsh -NoProfile -File` scripts with explicit PASS/FAIL output — `Invoke-Pester` discovers 0 tests in them. Run them directly and check the exit code; they are wired into test step 5 (`script-and-framework-tests`) via auto-discovery.
+- **Assert-Pass style, not Pester**: functional tests under `tests/scripts/check-steps/` (e.g. `09-schema-validation-tests.ps1`) are plain `pwsh -NoProfile -File` scripts with explicit PASS/FAIL output — `Invoke-Pester` discovers 0 tests in them. Run them directly and check the exit code; they are wired into test step 5 (`script-and-framework-tests`) via auto-discovery. Step 5 runs the priority framework suites serially, then dispatches the remaining `tests/scripts/**/*-tests.*` suites in parallel with ordered output replay; `nucleus-apps-smoke-tests.sh` runs once under `nucleus_nix_locked`.
 - **PowerShell gotchas**:
   - `exit` inside a function/script is NOT catchable by `try/catch` — `ExitException` propagates and kills the script. Tests of exit-based rejection must spawn a subprocess (`pwsh -NoProfile -Command $scriptText`) and check `$LASTEXITCODE` plus output.
   - `Write-ErrorMessage`/`Write-Message` are defined by `test-lib.ps1`, not `step-runner.ps1`. Tests asserting these are UNDEFINED (`CommandNotFoundException` catch) pass standalone but FAIL in-suite because test-lib defines them — and the test's `exit 1` really runs.
@@ -283,7 +283,7 @@ Learned from authoring `tests/scripts/` check-step tests; applies to test script
 
 ## CI Integration
 
-Tests run on push, pull request, and manual dispatch. POSIX CI runs `nix run ./src#test` (Nix eval, framework tests, nucleus-apps smoke, system build). Windows CI runs `bootstrap.ps1` (provisions Pester and other pwsh modules), then `test.ps1` including step 6 (`windows-pester`). Pester is lockfile-pinned and preflight-checked like other tools — provisioning and preflight are separate (see `tooling-and-validation.instructions.md`).
+Tests run on push, pull request, and manual dispatch. POSIX CI runs `nix run ./src#test` (Nix eval, framework tests including nucleus-apps smoke via step 5 auto-discovery, system build). Windows CI runs `bootstrap.ps1` (provisions Pester and other pwsh modules), then `test.ps1` including step 6 (`windows-pester`). Pester is lockfile-pinned and preflight-checked like other tools — provisioning and preflight are separate (see `tooling-and-validation.instructions.md`).
 
 ---
 

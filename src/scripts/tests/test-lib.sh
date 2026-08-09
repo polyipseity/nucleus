@@ -37,7 +37,7 @@ parse_args() {
         exit 0
         ;;
       -q|--quiet)
-        # shellcheck disable=SC2034 # reason: consumed by test steps 01, 03, 04 via transitive sourcing
+        # shellcheck disable=SC2034 # reason: consumed by test steps 01, 04, 05 via transitive sourcing
         quiet_mode=true
         shift
         ;;
