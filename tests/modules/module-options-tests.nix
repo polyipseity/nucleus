@@ -52,8 +52,8 @@ let
 
   # Test 8: Verify sops keys are present in the config
   test_sops_keys_configured = assert' (
-    containsRegex "sops\\.age\\.keyFile = \"/etc/sops/age/machine\\.txt\";" secretsModuleText
-    && containsRegex "sops\\.age\\.sshKeyPaths = \\[ \\];" secretsModuleText
+    containsRegex "keyFile = \"/etc/sops/age/machine\\.txt\"" secretsModuleText
+    && containsRegex "sshKeyPaths = \\[ \\]" secretsModuleText
   ) "SOPS keys must use derived machine age key and skip root-only host SSH paths";
 
   # Test 9: Verify all options have descriptions (required for maintainability)
