@@ -79,19 +79,19 @@ run_binary() {
 declare -A APP_TO_PKG=(
   [apply]=nucleus-apply
   [ai]=nucleus-ai
-  [audit - store]=nucleus-audit-store
+  ["audit-store"]=nucleus-audit-store
   [bootstrap]=nucleus-bootstrap
-  [bump - lockfile]=nucleus-bump-lockfile
+  ["bump-lockfile"]=nucleus-bump-lockfile
   [check]=nucleus-check
   [test]=nucleus-test
-  [check - packer]=nucleus-check-packer
-  [check - sh]=nucleus-check-sh
-  [cloud - setup]=nucleus-cloud-setup
+  ["check-packer"]=nucleus-check-packer
+  ["check-sh"]=nucleus-check-sh
+  ["cloud-setup"]=nucleus-cloud-setup
   [config]=nucleus-config
   [gc]=nucleus-gc
-  [health - check]=nucleus-health-check
-  [replica - reset]=nucleus-replica-reset
-  [replica - sync]=nucleus-replica-sync
+  ["health-check"]=nucleus-health-check
+  ["replica-reset"]=nucleus-replica-reset
+  ["replica-sync"]=nucleus-replica-sync
   [svc]=nucleus-svc
   [update]=nucleus-update
   [vm]=nucleus-vm
@@ -99,7 +99,11 @@ declare -A APP_TO_PKG=(
 
 test_app_help() {
   local app_name="$1"
-  local pkg="${APP_TO_PKG[$app_name]}"
+  local pkg="${APP_TO_PKG[$app_name]:-}"
+  if [ -z "$pkg" ]; then
+    assert_fail "$app_name --help" "unknown app name (missing APP_TO_PKG entry)"
+    return
+  fi
   local exit_code=0
   local output
   output=$(run_binary "$pkg" --help) || exit_code=$?
@@ -153,14 +157,18 @@ echo "=== Tier 2: dry-run tests ==="
 declare -A DRY_RUN_APPS=(
   [ai]=nucleus-ai
   [gc]=nucleus-gc
-  [replica - sync]=nucleus-replica-sync
-  [replica - reset]=nucleus-replica-reset
+  ["replica-sync"]=nucleus-replica-sync
+  ["replica-reset"]=nucleus-replica-reset
   [vm]=nucleus-vm
 )
 
 test_app_dry_run() {
   local app_name="$1"
-  local pkg="${DRY_RUN_APPS[$app_name]}"
+  local pkg="${DRY_RUN_APPS[$app_name]:-}"
+  if [ -z "$pkg" ]; then
+    assert_fail "$app_name --dry-run" "unknown app name (missing DRY_RUN_APPS entry)"
+    return
+  fi
   local exit_code=0
   local output
   output=$(run_binary "$pkg" --dry-run 2>&1) || exit_code=$?
@@ -192,7 +200,11 @@ test_app_noop() {
   local app_name="$1"
   shift
   local args=("$@")
-  local pkg="${APP_TO_PKG[$app_name]}"
+  local pkg="${APP_TO_PKG[$app_name]:-}"
+  if [ -z "$pkg" ]; then
+    assert_fail "$app_name ${args[*]}" "unknown app name (missing APP_TO_PKG entry)"
+    return
+  fi
   local exit_code=0
   local output
   output=$(run_binary "$pkg" "${args[@]}") || exit_code=$?
