@@ -24,6 +24,8 @@ Structured nucleus data (`profile.json`, `cloud-drives.json`, …) assembled by 
 
 Registry domains deep-merge `default/` with `src/users/<username>/` (user wins on conflicts; arrays replace wholesale). Fields that differ by host use maps keyed by `MacBook`, `NixOS`, and `Windows`; loaders resolve them to scalars for the current host. Jellyfin sync unions merged accounts and libraries across all users on the host — see `src/users/README.md` (Jellyfin union at sync time).
 
+**Testing:** Tests exercise user overlays via fixture trees or temp dirs — never by coupling to a production `src/users/<username>/` identity. See `testing.instructions.md` (No real-user test coupling).
+
 ## First-level overlay merge rule
 
 Within an app config folder (e.g. `plasma/`, `cursor/`, `wallpapers/`), **only first-level files and directories** participate in overlay. Deeper paths never merge independently.

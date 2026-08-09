@@ -127,6 +127,27 @@ Prohibited patterns:
 
 Test step 1 (`nix-test-eval` guard in `src/scripts/lib/nix-test-eval.sh` / `src/scripts/lib/nix-test-eval.ps1`) enforces this before `nix-instantiate --eval --strict` runs.
 
+### No real-user test coupling
+
+**Hard rule:** Tests MUST NOT reference, assert on, or read files from a specific real `src/users/<username>/` directory. Every directory under `src/users/` except `default` is a production-managed identity discovered by flake, activation, and registry loaders.
+
+**Allowed patterns:**
+
+| Pattern | When to use |
+| ------- | ----------- |
+| `tests/fixtures/user-registry/` + `test-user` + `--repo-root` / Nix `repoRoot` | Registry, cloud-drives, symlinks, secrets-key wiring, any test needing a discovered user |
+| `src/users/default/` reads | Baseline template content only (`default` is not a user) |
+| Temp-dir synthetic users (`alice`, `bob`, `carol`) + `-RepoRoot` | Overlay resolution unit tests (ConfigHelpers pattern) |
+| Dynamic `primaryUser` from `load-user-registry.sh` | Integration tests that must eval the live repo (system config build) — no hardcoded username string |
+
+**Prohibited patterns:**
+
+- Hardcoded username strings matching any `src/users/<name>/` directory (other than `default`)
+- Copying production user data into test assertions (home paths, cloud paths, password-store paths from a real user)
+- Adding `src/users/test-user/` or any test-only user under production `src/users/` (auto-discovered as a real user)
+
+**Fixture conventions:** `test-user` lives only under `tests/fixtures/user-registry/src/users/`. Shared constants: `tests/lib/fixtures.nix` (`fixtureUsername`) and `tests/scripts/lib/user-registry-fixture.sh` (`FIXTURE_USERNAME`).
+
 ### Layer 3: Module Import Validation
 
 **File location:** `tests/modules/module-imports-tests.nix`
