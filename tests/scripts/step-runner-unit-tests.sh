@@ -322,26 +322,29 @@ test_nix_lock_recovers_stale() {
 test_nix_lock_serializes() {
     # Two concurrent acquisitions must not overlap: the second starts only
     # after the first releases. Use a counter file: holder increments and
-    # sleeps, second must see the held count and wait.
+    # signals ready, second must see the held count and wait.
     local result
     result=$(
         . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
         error() { echo "error: $*" >&2; }
         rm -rf "$NUCLEUS_NIX_LOCK"
-        local _counter
+        local _counter _ready_file
         _counter=$(mktemp) || exit 1
+        _ready_file=$(mktemp) || exit 1
         (
-            # shellcheck disable=SC2016 # reason: $1 is sh -c positional param, not shell expansion
-            nucleus_nix_locked sh -c 'echo 1 >> "$1"; sleep 1; echo 2 >> "$1"' _ "$_counter"
+            # shellcheck disable=SC2016 # reason: $1/$2 are sh -c positional params, not shell expansion
+            nucleus_nix_locked sh -c 'echo 1 >> "$1"; echo ready > "$2"; sleep 0.1; echo 2 >> "$1"' _ "$_counter" "$_ready_file"
         ) &
         local _holder=$!
-        sleep 0.3
+        while [ ! -s "$_ready_file" ]; do
+            sleep 0.01
+        done
         # shellcheck disable=SC2016 # reason: $1 is sh -c positional param, not shell expansion
         nucleus_nix_locked sh -c 'echo 3 >> "$1"' _ "$_counter"
         wait "$_holder"
         rm -rf "$NUCLEUS_NIX_LOCK"
         cat "$_counter"
-        rm -f "$_counter"
+        rm -f "$_counter" "$_ready_file"
     )
     # Holder writes 1, sleeps, writes 2; second must wait for release, so
     # order is strictly 1 2 3 (never 1 3 2).
