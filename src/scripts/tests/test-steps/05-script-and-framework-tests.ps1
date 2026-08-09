@@ -27,11 +27,75 @@ Register-Step -Id "script-and-framework-tests" -Number 5 -Name "Script and frame
     $ordered.Add($testFile.FullName)
   }
 
-  Write-Message '--- discovered script tests ---'
+  $prioritySet = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase)
+  foreach ($priority in $priorityNames) {
+    $null = $prioritySet.Add($priority)
+  }
+
+  $priorityScripts = [System.Collections.Generic.List[string]]::new()
+  $parallelScripts = [System.Collections.Generic.List[string]]::new()
+
   foreach ($testScript in $ordered) {
+    $base = [System.IO.Path]::GetFileNameWithoutExtension($testScript)
+    if ($prioritySet.Contains($base)) {
+      $priorityScripts.Add($testScript)
+    } else {
+      $parallelScripts.Add($testScript)
+    }
+  }
+
+  Write-Message '--- discovered script tests ---'
+
+  foreach ($testScript in $priorityScripts) {
     Write-Message "running $([System.IO.Path]::GetFileName($testScript))"
     & $testScript
     if ($LASTEXITCODE -ne 0) { $exitCode = 1 }
+  }
+
+  if ($parallelScripts.Count -gt 0) {
+    $captureDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ([System.Guid]::NewGuid().ToString())
+    New-Item -ItemType Directory -Path $captureDir -Force | Out-Null
+    $throttle = if ($env:PARALLEL_JOBS) { [int]$env:PARALLEL_JOBS } else { [System.Environment]::ProcessorCount }
+
+    foreach ($testScript in $parallelScripts) {
+      Write-Message "running $([System.IO.Path]::GetFileName($testScript))"
+    }
+
+    $parallelScripts | ForEach-Object -Parallel {
+      $script = $_
+      $captureDir = $using:captureDir
+      $base = [System.IO.Path]::GetFileName($script)
+      $captureFile = Join-Path -Path $captureDir -ChildPath "$base.out"
+      & $script *> $captureFile
+      if ($LASTEXITCODE -ne 0) {
+        New-Item -ItemType File -Path (Join-Path -Path $captureDir -ChildPath "$base.failed") -Force | Out-Null
+      }
+    } -ThrottleLimit $throttle
+
+    foreach ($testScript in $parallelScripts) {
+      $base = [System.IO.Path]::GetFileName($testScript)
+      $captureFile = Join-Path -Path $captureDir -ChildPath "$base.out"
+      if (Test-Path -LiteralPath $captureFile) {
+        Get-Content -LiteralPath $captureFile
+      }
+    }
+
+    $failed = @(Get-ChildItem -Path $captureDir -Filter '*.failed' -File -ErrorAction SilentlyContinue)
+    if ($failed.Count -gt 0) {
+      Write-ErrorMessage 'FAILED script tests:'
+      foreach ($marker in $failed) {
+        $failedBase = $marker.Name -replace '\.failed$',''
+        foreach ($testScript in $parallelScripts) {
+          if ([System.IO.Path]::GetFileName($testScript) -eq $failedBase) {
+            Write-ErrorMessage $testScript
+          }
+        }
+      }
+      $exitCode = 1
+    }
+
+    Remove-Item -LiteralPath $captureDir -Recurse -Force
   }
 
   return ($exitCode -eq 0)
