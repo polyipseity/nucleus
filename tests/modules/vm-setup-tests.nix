@@ -1949,27 +1949,17 @@ let
       (
         (lib.hasInfix "nucleus-vm setup" readmeTemplateText)
         && (lib.hasInfix "## Layout" readmeTemplateText)
-        && (lib.hasInfix "<type>/Packer/" readmeTemplateText)
+        && (lib.hasInfix "Packer/" readmeTemplateText)
         && (lib.hasInfix "installer.iso" readmeTemplateText)
         && (lib.hasInfix "## Start commands" readmeTemplateText)
         && (lib.hasInfix "start-<id>.sh" readmeTemplateText)
         && (lib.hasInfix "start-<id>.ps1" readmeTemplateText)
-        && (lib.hasInfix "## Moving VMs between hosts" readmeTemplateText)
-        && (lib.hasInfix "nucleus-vm pack" readmeTemplateText)
-        && (lib.hasInfix "nucleus-vm unpack" readmeTemplateText)
-        && (lib.hasInfix "Regenerable" readmeTemplateText)
-        && (lib.hasInfix "Payload" readmeTemplateText)
-        && (lib.hasInfix "Do not copy `.utm` bundles directly" readmeTemplateText)
-        && (lib.hasInfix "## Guest configuration" readmeTemplateText)
-        && (lib.hasInfix "## Lifecycle" readmeTemplateText)
-        && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
+        && (lib.hasInfix "vm-management.instructions.md" readmeTemplateText)
         && (lib.hasInfix "## Troubleshooting" readmeTemplateText)
         && (lib.hasInfix "__VM_DIR_DISPLAY__" readmeTemplateText)
-        && (lib.hasInfix "__SRC_DIR_DISPLAY__" readmeTemplateText)
         && (!lib.hasInfix "{{" readmeTemplateText)
-        && (lib.hasInfix "## Notes" readmeTemplateText)
       )
-      "src/vms/templates/README.md must contain all expected documentation sections and __TOKEN__ placeholders, with no {{TOKEN}} style";
+      "src/vms/templates/README.md must contain expected template sections and __TOKEN__ placeholders, with no {{TOKEN}} style";
 
   test_vm_start_posix_template_content = assert' (
     (lib.hasInfix "__VM_ID__" startPosixTemplateText)
@@ -2131,9 +2121,8 @@ let
         && (lib.hasInfix "TEMPLATES_DIR/README.md" vm_setup_sh_text)
         && (lib.hasInfix "__SRC_DIR_DISPLAY__" vm_setup_sh_text)
         && (lib.hasInfix "__VM_DIR_DISPLAY__" readmeTemplateText)
-        && (lib.hasInfix "__SRC_DIR_DISPLAY__" readmeTemplateText)
         && (lib.hasInfix "## Start commands" readmeTemplateText)
-        && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
+        && (lib.hasInfix "## Troubleshooting" readmeTemplateText)
         && (lib.hasInfix "UTM bundle" readmeTemplateText)
       )
       "scripts/vm.sh must write ~/virtual machines/README.md using the cross-host README template with placeholder substitution";
@@ -2145,7 +2134,7 @@ let
         && (lib.hasInfix "templatesDir" windows_vm_setup_ps1_text)
         && (lib.hasInfix "nucleus-vm setup" readmeTemplateText)
         && (lib.hasInfix "## Start commands" readmeTemplateText)
-        && (lib.hasInfix "## Safe cleanup" readmeTemplateText)
+        && (lib.hasInfix "## Troubleshooting" readmeTemplateText)
         && (lib.hasInfix "UTM bundle" readmeTemplateText)
       )
       "Invoke-VMSetup.ps1 must write %USERPROFILE%\\virtual machines\\README.md using the cross-host README template with placeholder substitution";
