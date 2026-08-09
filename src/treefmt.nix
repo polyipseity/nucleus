@@ -3,15 +3,9 @@
 # treefmt-nix module imported by flake.nix via mkWrapper.
 # Configures which formatters are enabled and their settings.
 #
-# Enabled: nixfmt, deadnix, yamllint, shellcheck
-# Available but disabled (uncomment to enable):
-#   shfmt   — Shell script formatting
-#   mdformat — Markdown formatting
-#   taplo   — TOML formatting
-#   typos   — Spell checker
-#   actionlint — GitHub Actions workflow linting
-#   pinact  — Pin GitHub Actions to commit hashes
-#   zizmor  — GitHub Actions security scanner
+# Enabled: nixfmt, deadnix, yamllint, shellcheck, shfmt, taplo, packer,
+#          actionlint, pinact, zizmor
+# Disabled: mdformat, typos (see WHY in programs)
 
 { ... }:
 {
@@ -31,15 +25,30 @@
       severity = "style";
     };
 
-    # Additional formatters (all explicitly disabled — enable by flipping to true):
-    shfmt.enable = false; # Shell script formatting
-    mdformat.enable = false; # Markdown formatting
-    taplo.enable = false; # TOML formatting
-    typos.enable = false; # Spell checker
-    actionlint.enable = false; # GitHub Actions workflow linting
-    pinact.enable = false; # Pin GitHub Actions to commit hashes
-    zizmor.enable = false; # GitHub Actions security scanner
+    shfmt = {
+      enable = true;
+      useEditorConfig = true;
+    };
+    taplo.enable = true;
+    packer.enable = true;
+    actionlint.enable = true;
+    pinact = {
+      enable = true;
+      update = false; # WHY: pre-commit must not hit GitHub API or bump action versions
+      verify = false; # WHY: offline check uses --no-api instead of --verify
+    };
+    zizmor.enable = true;
+
+    # WHY: fights markdownlint + prek whitespace hooks; authoring policy forbids hard-wrap reflow
+    mdformat.enable = false;
+    # WHY: high false-positive rate on domain terms, secrets blobs, and vendored symbol lists
+    typos.enable = false;
   };
+
+  settings.formatter.pinact.options = [
+    "--fix=false"
+    "--no-api"
+  ];
 
   settings.excludes = [
     # discord-music-rpc app writes its config only when the schema needs

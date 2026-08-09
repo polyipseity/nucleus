@@ -10,6 +10,7 @@
 let
   baseSharedPackages = [
     pkgs.android-tools
+    pkgs.actionlint
     pkgs.asciinema
     pkgs.bat
     pkgs.bottom
@@ -55,6 +56,7 @@ let
     pkgs.packer
     pkgs.pay-respects
     pkgs.pi-coding-agent
+    pkgs.pinact
     pkgs.powershell
     pkgs.prek
     pkgs.python3
@@ -63,13 +65,16 @@ let
     pkgs.sccache
     pkgs.rustup
     pkgs.shellcheck
+    pkgs.shfmt
     pkgs.sops
     pkgs.ssh-to-age
+    pkgs.taplo
     pkgs.ty
     pkgs.typst
     pkgs.uv
     pkgs.yamllint
     pkgs.yq-go
+    pkgs.zizmor
     pkgs.zoxide
   ];
 
