@@ -54,37 +54,39 @@ jobs:
       NIX_CONFIG: experimental-features = nix-command flakes
     steps:
       - name: Checkout repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
 
       - name: Install Nix (POSIX)
         if: runner.os != 'Windows'
-        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
 
       - name: Cache Nix store (POSIX)
         if: runner.os != 'Windows'
-        uses: DeterminateSystems/magic-nix-cache-action@908b263ff629f4cc17666315b7fd3ec127c6244d
+        uses: DeterminateSystems/magic-nix-cache-action@908b263ff629f4cc17666315b7fd3ec127c6244d # v14 # zizmor: ignore[cache-poisoning] intentional Nix store cache on trusted CI runners
         with:
           use-flakehub: false
 
       - name: Install Nix (Windows)
         if: runner.os == 'Windows'
-        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
 
       - name: Cache Nix store (Windows)
         if: runner.os == 'Windows'
-        uses: DeterminateSystems/magic-nix-cache-action@908b263ff629f4cc17666315b7fd3ec127c6244d
+        uses: DeterminateSystems/magic-nix-cache-action@908b263ff629f4cc17666315b7fd3ec127c6244d # v14 # zizmor: ignore[cache-poisoning] intentional Nix store cache on trusted CI runners
         with:
           use-flakehub: false
 
       - name: Setup Packer CLI (Windows)
         if: runner.os == 'Windows'
-        uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789
+        uses: hashicorp/setup-packer@ce93c3c08a6c2ff2275bf4b54ff0d9a75f6c9789 # v3.4.0
         with:
           version: "latest"
 
       - name: Check Nix flake inputs freshness (POSIX)
         if: runner.os != 'Windows'
-        uses: DeterminateSystems/flake-checker-action@a0f068d37b542f3150564fbf1164fec2d958ee11
+        uses: DeterminateSystems/flake-checker-action@a0f068d37b542f3150564fbf1164fec2d958ee11 # v12.0.0
         with:
           fail-mode: false
 
