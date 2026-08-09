@@ -154,7 +154,7 @@
             "type": "boolean"
           },
           "sound": {
-            "description": "UTM guest audio hardware. \"none\" disables the guest sound card (empty Sound array) — the workaround for the UTM SPICE audio teardown deadlock (see .agents/instructions/utm-android-freeze.instructions.md).",
+            "description": "UTM guest audio hardware. \"none\" disables the guest sound card (empty Sound array) — the workaround for the UTM SPICE audio teardown deadlock (see .agents/instructions/vm-management.instructions.md).",
             "enum": [
               "intel-hda",
               "none"

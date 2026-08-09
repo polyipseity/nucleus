@@ -589,7 +589,7 @@ let
 
   # Android must disable guest audio (sound == "none"): UTM's SPICE audio
   # pipeline teardown deadlocks against the CoreAudio IO thread, freezing the
-  # display (see .agents/instructions/utm-android-freeze.instructions.md).
+  # display (see .agents/instructions/vm-management.instructions.md).
   test_android_sound_disabled =
     let
       androidVms = builtins.filter (vm: vm.type == "Android") manifest.VMs;

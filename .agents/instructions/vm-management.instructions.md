@@ -186,7 +186,47 @@ Guest port forwards are declared in the `portForwards` array of each VM entry: n
 
 **Change checklist:** update `VMs.json` + `VMs.schema.json`, `vm.sh`, `vm.ps1`, Windows modules, `tests/scripts/android-config-tests.sh`, `tests/scripts/android-config-tests.ps1`, `tests/integration/android-config-parity-tests.nix`, `tests/modules/vm-setup-tests.nix`, and all three `MANUAL.md` files in the same change.
 
-**Platform exceptions (WHY):** MacBook UTM renderer prefs and freeze workarounds (`utm-android-freeze.instructions.md`); NixOS uses libvirt/KVM; Windows uses QEMU (`start-android-vm.ps1`). Recovery/booted workflow steps are shared; host-specific setup notes differ only in `MANUAL.md`.
+**Platform exceptions (WHY):** MacBook UTM renderer prefs and Android freeze workarounds (see [Android UTM freeze](#android-utm-freeze) below); NixOS uses libvirt/KVM; Windows uses QEMU (`start-android-vm.ps1`). Recovery/booted workflow steps are shared; host-specific setup notes differ only in `MANUAL.md`.
+
+## Android UTM freeze
+
+The "display freezes randomly" bug is a **client-side deadlock in UTM's SPICE client** (CocoaSpice): the SPICE main loop's GStreamer audio-pipeline teardown deadlocks against the CoreAudio IO thread, stalling all SPICE channels (display scanout, input, audio, QMP-over-spiceport). It is renderer-orthogonal: not fixed by the renderer backend, not display sleep, not virgl, not guest-side.
+
+### Root cause
+
+- **Confirmed (2026-08-03)**: two-thread AB-BA circular deadlock inside UTM.app — SPICE Main Loop in `playback_stop`/`gst_element_set_state` vs CoreAudio IO thread in UTM render callback. Guest audio idle → SPICE `playback_stop` → GStreamer sink teardown races AU call from render thread.
+- **Renderer-orthogonal**: per UTM `Documentation/Graphics.md`, ANGLE/CGL only renders INTO the IOSurface; CocoaSpice Metal ALWAYS presents to screen.
+- Guest has a parallel userspace stall: adbd wedged (`adb devices` → `offline`) while `data/Android.qcow2` mtime keeps advancing — separate from host deadlock.
+
+### Confirmed workaround (repo-managed)
+
+Disabling guest audio is the ONLY known prevention: empty `Sound` array → qemu runs `-audio none` with no `intel-hda`/`hda-duplex`. The Android `VMs.json` entry declares `"sound": "none"`; `src/hosts/MacBook/vms.nix` renders `__VM_SOUND__` to an empty Sound array. Revert only after upstream fix lands.
+
+The guest-side adb wedge persists with the workaround and is not caused by it.
+
+### References
+
+- UTM #2221 (canonical), #2364, #4781 — open bug class as of UTM 5.0.4.
+- CocoaSpice#5 — IOSurface pipe race (partial mitigation Dec 2024); not evidenced in confirmed audio-deadlock sample.
+
+### Diagnostics
+
+1. During freeze: `sample <utm-pid> 5 -mayDie` — look for SPICE Main Loop in `playback_stop`/`gst_element_set_state`.
+2. `utmctl suspend <vm>` → OSStatus -2700 means SPICE main loop frozen.
+3. adb during freeze: `adb devices` → `offline`; probe AUTH/CNXN bytes to confirm adbd wedged.
+4. Process name: `qemu-aarch64-softmmu`, not `qemu-system-aarch64`.
+5. plutil is lossy on UTM configs — use surgical text edits on `config.plist`.
+
+### Recovery ladder (state-preserving)
+
+1. **Prevent** — keep guest audio disabled (repo-managed workaround).
+2. **Controlled restart** — ONLY working recovery: quit UTM, relaunch, `nucleus-vm start Android`. Guest disk intact; RAM state lost.
+3. Device switch / `adb connect` recovery — invalid for this freeze class.
+
+### Safety invariants
+
+- Killing UTM.app is state-lossy (QEMUHelper.xpc cascade) but required for audio deadlock recovery.
+- Renderer pref (`QEMURendererBackend = 3`, CGL) is provisioned but does NOT fix the freeze.
 
 ## Disk format
 

@@ -55,7 +55,7 @@ let
   # display-channel stall in UTM's SPICE client (UTM #2221, CocoaSpice#5), so
   # CGL does not prevent freezes; UTM 5.0.4 SPICE renderer fixes and keeping
   # the VM window visible are the mitigations.  See
-  # .agents/instructions/utm-android-freeze.instructions.md.  The pref is
+  # .agents/instructions/vm-management.instructions.md.  The pref is
   # provisioned automatically by macos-set-utm-renderer.sh via activation.nix,
   # so no manual UTM settings change is needed.
   # ref: https://github.com/utmapp/UTM/blob/v5.0.3/Services/UTMQemuSystemBackends.h -- kQEMURendererBackendCGL = 3
@@ -137,7 +137,7 @@ let
   # upstream UTM fix exists as of 5.0.4, so the workaround stays until one
   # lands.  Any other value (or an absent field) keeps the intel-hda sound
   # card for the other guests.
-  # ref: .agents/instructions/utm-android-freeze.instructions.md
+  # ref: .agents/instructions/vm-management.instructions.md
   vmSound =
     vm:
     if vm.sound == "none" then

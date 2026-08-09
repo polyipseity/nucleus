@@ -214,7 +214,7 @@ in
     # "display freezes randomly" bug -- that is a renderer-orthogonal
     # client-side SPICE stall (UTM #2221, CocoaSpice#5); UTM 5.0.4 SPICE
     # renderer fixes and keeping the VM window visible are the mitigations.
-    # See .agents/instructions/utm-android-freeze.instructions.md.
+    # See .agents/instructions/vm-management.instructions.md.
     # Runs unconditionally: the pref is a global UTM setting, harmless when no
     # Android VM is enabled, and idempotent when already set.
     "${activationBundle}/src/hosts/MacBook/scripts/macos-set-utm-renderer.sh"

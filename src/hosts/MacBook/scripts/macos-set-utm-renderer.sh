@@ -14,7 +14,7 @@
 # all SPICE channels (display + QMP-over-spiceport; utmctl suspend fails with
 # "Timed out waiting for RPC").  UTM 5.0.4 (2026-08-01) ships targeted SPICE
 # renderer + memory-leak fixes; zero-cost mitigation: keep the VM window
-# visible.  Full findings in .agents/instructions/utm-android-freeze.instructions.md.
+# visible.  Full findings in .agents/instructions/vm-management.instructions.md.
 # UTM is sandboxed, so the pref lives in the app container
 # (~/Library/Containers/com.utmapp.UTM/Data/Library/Preferences/), not
 # ~/Library/Preferences; cfprefsd resolves the domain there when the write runs
