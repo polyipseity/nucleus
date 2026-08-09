@@ -91,12 +91,3 @@ function Test-Prerequisite {
   Assert-ToolAvailable -Name 'Pester' -Type 'Module'
   Assert-ToolAvailable -Name 'PSScriptAnalyzer' -Type 'Module'
 }
-
-# Override Invoke-StepPipeline with sequential execution (test steps don't parallelize well)
-function Invoke-StepPipeline {
-  Initialize-WaveTempDir
-
-  for ($i = 0; $i -lt $script:StepActions.Count; $i++) {
-    Invoke-Step -Number $script:StepNumbers[$i] -Name $script:StepNames[$i] -Action $script:StepActions[$i]
-  }
-}
