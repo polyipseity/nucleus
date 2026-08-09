@@ -11,36 +11,7 @@
 - **Layout exceptions** (do not move under `hosts/` or `platforms/`): `src/modules/configs/` (machine-wide singleton configs with host-keyed variants) and `src/users/` (per-user overlays — registry domain JSON, homedir app trees). See `user-config-placement.instructions.md` and `app-config-policy.instructions.md`.
 - `src/users/` contains per-user configuration overlays: registry domain JSON (`src/users/<username>/<domain>.json` with `src/users/default/` fallback; schemas co-located as `src/users/default/<domain>.schema.json`), plus per-user homedir app trees (`vscode/`, `agents/`, `direnv/`, …) resolved via `mkUserOverlay` in `users-overlay.nix` (POSIX) and `Resolve-UserConfig*` in `ConfigHelpers.ps1` (Windows). Runtime assembly of domain JSON uses `users-registry.nix` (Nix), `load-user-registry.sh` / `Load-UserRegistry.ps1` (shell/PowerShell).
 - `scripts/` contains user-facing automation helpers with paired `.sh`/`.ps1` entry points: bootstrap, check, cloud-setup, gc, health-check, replica-sync, replica-reset, update, vm-setup, ai-sync, and others.
-- `src/scripts/` contains Nix-internal scripts organized into domain subdirectories:
-  - `apply.sh` — POSIX apply dispatcher (kept in root)
-  - `cleanup-nix-build-artifacts.sh`, `install-prek-hooks.sh` — ungrouped root scripts
-  - `services/` — persistent daemon/service scripts (camilladsp-daemon, camilladsp-heartbeat,
-    caddy-trust, cloud-drives-setup, gc-weekly, jellyfin-sync, rclone-mount,
-    replica-scheduled-sync, service-watchdog)
-  - `lib/` — shared library scripts for symlink hardening, cloud drive setup, dev repo
-    provisioning, iCloud exclusions, VM setup, app bundle variables, LaunchServices
-    handler registration, and the shared lib.sh
-  - `secrets/` — secret provisioning helpers
-  - `shell/` — shell integration scripts (zsh init, PowerShell init, completion installation)
-  - `configs/` — app config/install scripts and merge helpers (INI merge, JSON merge, GPG config, wallpaper provisioning)
-  - `packages/` — package-manager installer scripts (init-rustup, install-cargo-binstall-packages,
-    install-uv-tools, install-bun-packages, install-pwsh-module)
-  - `editors/` — editor-specific scripts (VS Code workspace trust, extension symlink bridge,
-    config symlinks, neovim init)
-  - `integrations/` — file-manager and desktop-environment integration scripts
-    (open-host-manual, file-manager-pdf-opt)
-  - `agents/` — AI agent setup scripts (agent-skills, agents-symlink, sync-clawhub-skills)
-  - **Naming rule**:
-    - Files under `src/hosts/<Host>/scripts/` or `src/platforms/<Platform>/scripts/` MUST use the platform prefix (`macos-`, `nixos-`) followed by a verb-first name: `<prefix><verb>-<target>.<ext>`; entry name = filename.
-    - All other subdirs follow a two-track convention: **verb-first** for action scripts, **entity-first** for service scripts (see `.agents/instructions/scripts-and-permissions.instructions.md` for the full per-directory table).
-    - Rule does not apply to runtime-only scripts or wrapped derivations. Library scripts in
-      `lib/` that are platform-specific MUST still use the platform prefix (e.g., `macos-`). Generic
-      cross-platform lib scripts may use natural names.
-  - **Placement policy for activation scripts**:
-    1. **Host-specific scripts** → `src/hosts/<Host>/scripts/` (wired only from that host's flake config).
-    2. **Platform-specific scripts** → `src/platforms/<Platform>/scripts/` (wired from HM platform modules).
-    3. **Cross-platform scripts** → `src/scripts/` only (`services/`, `configs/`, `lib/`, …).
-    - Library scripts (`lib/`) are exempt from host/platform placement — they stay in `lib/`.
+- `src/scripts/` contains Nix-internal scripts organized into domain subdirectories (`services/`, `lib/`, `configs/`, `agents/`, …). See `.agents/instructions/scripts-and-permissions.instructions.md` for the full per-directory table, naming rules, and placement policy. Activation blocks use the bundle subprocess pattern — see `.agents/instructions/activation-scripts.instructions.md`.
 - `tests/` mirrors `src/` layout: `tests/hosts/<Host>/`, `tests/platforms/<Platform>/`, `tests/modules/` (cross-host shared), plus `tests/integration/` and `tests/scripts/`. Rule: `src/<layer>/...` → `tests/<layer>/...`. All changes require corresponding tests; see `.agents/instructions/testing.instructions.md`.
 - No `docs/` directory exists or may be created. Repository documentation lives in `.agents/instructions/*.instructions.md`, `src/hosts/<Host>/MANUAL.md`, or inline comments.
 - Keep this file short and durable. Put file-type and workflow-specific rules in `.agents/instructions/*.instructions.md`, reusable workflows in `.agents/prompts/*.prompt.md`, and skill assets in `.agents/skills/<skill>/`.
@@ -121,7 +92,7 @@
 - Use `.yml` for YAML files (except required `.sops.yaml`).
 - Do not hide meaningful errors (`2>/dev/null`, unconditional `|| true`, `-ErrorAction SilentlyContinue`) unless failure is expected, explicitly justified, and still checked.
 - Comment annotations (suppressions, references, rationale, sentinels) follow the unified grammar and four-category taxonomy in `.agents/instructions/comment-annotations.instructions.md`; Category 1+2 annotations must be machine-parsed, Category 3+4 must not.
-- Keep canonical hostnames and display names aligned: `MacBook`, `NixOS`, `Windows`.
+- Keep canonical hostnames and display names aligned: `MacBook`, `NixOS`, `Windows`. Host vs platform naming rules live in `.agents/instructions/cross-host-feature-parity.instructions.md` (Host vs platform naming section).
 - Prefer preview/beta/canary channels when viable; if stable is required, add a short `# WHY:` comment.
 
 ## Interaction Boundaries
