@@ -17,7 +17,9 @@ run_04_system_config_build() {
       if [ -d /etc/nixos ]; then
         _attr="nixosConfigurations.NixOS.config.system.build.toplevel"
       else
-        _attr="homeConfigurations.polyipseity.activationPackage"
+        _primary="$(NUCLEUS_REPO_ROOT="$_repo_root" "$_repo_root/src/scripts/lib/load-user-registry.sh" \
+          --host NixOS --repo-root "$_repo_root" | jq -r '.primaryUser')"
+        _attr="homeConfigurations.${_primary}.activationPackage"
       fi
       ;;
     *)
