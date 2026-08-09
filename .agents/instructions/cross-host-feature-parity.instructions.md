@@ -309,4 +309,4 @@ The `__nucleus_symlink_farm` env var is generated in `src/hosts/MacBook/activati
 
 ### Audit
 
-Host vs platform vs implementation naming is enforced by service-registry validation (check step 10) and documented in this section.
+Host vs platform vs implementation naming is enforced by service-registry validation (check step 8) and documented in this section.

@@ -1,4 +1,4 @@
-Register-Step -Id "lockfile-validation" -Number 6 -Name "Lockfile validation" -Action {
+Register-Step -Id "lockfile-validation" -Number 5 -Name "Lockfile validation" -Action {
   param($HasArgs, $RepoRoot, $PositionalArgs)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }

@@ -6,10 +6,13 @@
   With no arguments, checks all .pkr.hcl files under src/vms/. With arguments,
   checks only the provided paths.
 
-  Runs two phases:
+  Runs two phases by default:
     1. packer fmt -check — verify formatting of .pkr.hcl files.
     2. packer init + packer validate — verify each template directory resolves
        plugins and produces a valid plan.
+
+  With -ValidateOnly, phase 1 is skipped (check step 01 treefmt/packer fmt
+  covers formatting).
 
   The macOS template (src/vms/macOS/) uses the Tart plugin and is only validated
   on macOS hosts.
@@ -17,6 +20,9 @@
 .PARAMETER Paths
   Optional file paths to check. When omitted, all .pkr.hcl files under src/vms/
   are checked.
+
+.PARAMETER ValidateOnly
+  Skip the packer fmt -check phase and run template validation only.
 
 .EXAMPLE
   pwsh -File scripts/check-packer.ps1
@@ -38,7 +44,9 @@ param(
   [string]$WindowsTemplateOverride = '',
 
   # Test seam: run only the packer_validate annotation check, then exit.
-  [switch]$AnnotationCheckOnly
+  [switch]$AnnotationCheckOnly,
+
+  [switch]$ValidateOnly
 )
 
 $ErrorActionPreference = 'Stop'
@@ -139,19 +147,21 @@ if ($AnnotationCheckOnly) {
 }
 
 # ---------------------------------------------------------------------------
-# Phase 1: Formatting check
+# Phase 1: Formatting check (skipped with -ValidateOnly)
 # ---------------------------------------------------------------------------
-if ($Paths.Count -gt 0) {
-  Write-Output 'Checking Packer formatting for specified paths...'
-  & packer fmt -check $Paths
-  if ($LASTEXITCODE -ne 0) {
-    throw 'Packer formatting check failed for specified paths.'
-  }
-} else {
-  Write-Output 'Checking Packer formatting for all templates...'
-  & packer fmt -check -recursive src/vms/
-  if ($LASTEXITCODE -ne 0) {
-    throw 'Packer formatting check failed.'
+if (-not $ValidateOnly) {
+  if ($Paths.Count -gt 0) {
+    Write-Output 'Checking Packer formatting for specified paths...'
+    & packer fmt -check $Paths
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Packer formatting check failed for specified paths.'
+    }
+  } else {
+    Write-Output 'Checking Packer formatting for all templates...'
+    & packer fmt -check -recursive src/vms/
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Packer formatting check failed.'
+    }
   }
 }
 

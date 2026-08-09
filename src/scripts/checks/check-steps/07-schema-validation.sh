@@ -3,15 +3,19 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "schema-validation" 8 "Schema validation (JSON/YAML)" run_08_schema_validation
+register_step "schema-validation" 7 "Schema validation (JSON/YAML)" run_07_schema_validation
 
-run_08_schema_validation() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+run_07_schema_validation() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _jsonschema_errors=0
   local _js_tmpdir
-  _js_tmpdir=$(mktemp -d) || { error "failed to create temp directory"; return 1; }
+  _js_tmpdir=$(mktemp -d) || {
+    error "failed to create temp directory"
+    return 1
+  }
 
   # Collect file -- schema pairs into a temp manifest.
   local _js_manifest="$_js_tmpdir/manifest"
@@ -19,7 +23,7 @@ run_08_schema_validation() {
 
   if $_has_args; then
     for _sf in "${_files[@]}"; do
-      case "$_sf" in *.json|*.yml|*.yaml) _js_schema_files+=("$_sf") ;; esac
+      case "$_sf" in *.json | *.yml | *.yaml) _js_schema_files+=("$_sf") ;; esac
     done
   else
     _js_schema_files=("${CACHED_JSON_FILES[@]}")
@@ -36,53 +40,55 @@ run_08_schema_validation() {
     # + app-owned formats with no published JSON schema (vscode:// URIs are not
     # fetchable by check-jsonschema; other formats have no published schema).
     case "$_f" in
-      *.schema.json|*/vendor/*|*/secrets/*|.github/workflows/*|*/.github/workflows/*|*/.github/dependabot.yml|.github/dependabot.yml)
-        continue ;;
-      */users/*/vscode/*.json|*/users/*/iterm2/DynamicProfiles/*.json|*/users/*/obsidian/*.json|*/users/*/qtpass/*.json|*/configs/camilladsp/*|*/configs/camillagui-backend/*|*/users/*/discord-music-rpc/*|*/users/*/agents/hooks/*.json|*/users/*/agents/skills/*/_meta.json|*/ai/litellm-config.yml|*/.sops.yaml)
-        continue ;;
+    *.schema.json | */vendor/* | */secrets/* | .github/workflows/* | */.github/workflows/* | */.github/dependabot.yml | .github/dependabot.yml)
+      continue
+      ;;
+    */users/*/vscode/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */ai/litellm-config.yml | */.sops.yaml)
+      continue
+      ;;
     esac
     local _sf_nobase="${_f##*/}"
     case "$_sf_nobase" in
-      package.json|opencode.jsonc) continue ;;
+    package.json | opencode.jsonc) continue ;;
     esac
 
     case "$_f" in
-      *.json)
-        _has_schema=$(jq -r 'if type == "object" then (has("$schema") | tostring) else "false" end' "$_f" 2>/dev/null)
-        if [ "$_has_schema" = "true" ]; then
-          _schema_val=$(jq -r 'if type == "object" then (."$schema" // "") else "" end' "$_f" 2>/dev/null)
-          if [ -z "$_schema_val" ]; then
-            error "Invalid \$schema in $_f: must be a non-empty string"
-            _missing_schema=$((_missing_schema + 1))
-          fi
-        else
-          error "Missing \$schema in $_f"
+    *.json)
+      _has_schema=$(jq -r 'if type == "object" then (has("$schema") | tostring) else "false" end' "$_f" 2>/dev/null)
+      if [ "$_has_schema" = "true" ]; then
+        _schema_val=$(jq -r 'if type == "object" then (."$schema" // "") else "" end' "$_f" 2>/dev/null)
+        if [ -z "$_schema_val" ]; then
+          error "Invalid \$schema in $_f: must be a non-empty string"
           _missing_schema=$((_missing_schema + 1))
         fi
-        ;;
-      *.yml|*.yaml)
+      else
+        error "Missing \$schema in $_f"
+        _missing_schema=$((_missing_schema + 1))
+      fi
+      ;;
+    *.yml | *.yaml)
+      # shellcheck disable=SC2016 # reason: literal $schema in yq eval expression
+      _has_schema=$(yq eval 'has("$schema")' "$_f" 2>/dev/null)
+      if [ "$_has_schema" = "true" ]; then
         # shellcheck disable=SC2016 # reason: literal $schema in yq eval expression
-        _has_schema=$(yq eval 'has("$schema")' "$_f" 2>/dev/null)
-        if [ "$_has_schema" = "true" ]; then
-          # shellcheck disable=SC2016 # reason: literal $schema in yq eval expression
-          _schema_val=$(yq eval '."$schema" // ""' "$_f" 2>/dev/null)
-          if [ -z "$_schema_val" ]; then
-            error "Invalid \$schema in $_f: must be a non-empty string"
-            _missing_schema=$((_missing_schema + 1))
-          fi
-        else
-          error "Missing \$schema in $_f"
+        _schema_val=$(yq eval '."$schema" // ""' "$_f" 2>/dev/null)
+        if [ -z "$_schema_val" ]; then
+          error "Invalid \$schema in $_f: must be a non-empty string"
           _missing_schema=$((_missing_schema + 1))
         fi
-        ;;
+      else
+        error "Missing \$schema in $_f"
+        _missing_schema=$((_missing_schema + 1))
+      fi
+      ;;
     esac
   done
   _jsonschema_errors=$((_jsonschema_errors + _missing_schema))
 
   if [ "${#_js_schema_files[@]}" -gt 0 ]; then
     # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
-    printf '%s\0' "${_js_schema_files[@]}" \
-      | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+    printf '%s\0' "${_js_schema_files[@]}" |
+      xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
         _tmpdir="$1"
         _f="$2"
         _safe="$(echo "$_f" | tr "/" "_")"
@@ -108,9 +114,9 @@ run_08_schema_validation() {
         fi
       ' _ "$_js_tmpdir"
 
-    true > "$_js_manifest"
+    true >"$_js_manifest"
     for _sf in "$_js_tmpdir"/*.schema; do
-      [ -f "$_sf" ] && cat "$_sf" >> "$_js_manifest"
+      [ -f "$_sf" ] && cat "$_sf" >>"$_js_manifest"
     done
   fi
 
@@ -131,8 +137,8 @@ run_08_schema_validation() {
     '
     # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
     if [ -n "$(find "$_js_tmpdir" -maxdepth 1 -name 'g-*.sch' -print 2>/dev/null | head -1)" ]; then
-      printf '%s\0' "$_js_tmpdir"/g-*.sch \
-        | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+      printf '%s\0' "$_js_tmpdir"/g-*.sch |
+        xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
           _tmpdir="$1"
           _batch="$2"
           _schemafile=""
@@ -154,14 +160,14 @@ run_08_schema_validation() {
 
       for _st_file in "$_js_tmpdir"/*.st; do
         [ -f "$_st_file" ] || continue
-        read -r _status < "$_st_file"
+        read -r _status <"$_st_file"
         [ "$_status" = "FAIL" ] && _jsonschema_errors=$((_jsonschema_errors + 1))
       done
       for _err_file in "$_js_tmpdir"/*.err; do
         [ -s "$_err_file" ] || continue
         while IFS= read -r _line; do
           error "$_line"
-        done < "$_err_file"
+        done <"$_err_file"
       done
     fi
   fi

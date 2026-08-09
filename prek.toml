@@ -49,7 +49,7 @@ hooks = [
   ] },
 ]
 
-# check-jsonschema workflow/dependabot hooks disabled: repo-check step 08 (schema-validation)
+# check-jsonschema workflow/dependabot hooks disabled: repo-check step 07 (schema-validation)
 # already validates .github/workflows/*.yml and dependabot.yml via check-jsonschema
 # builtin schemas on every commit. Keeping both caused duplicate validation when those
 # files change.

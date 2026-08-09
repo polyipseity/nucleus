@@ -8,30 +8,31 @@ _REPOSITORY_POLICY_STEP_SH="$(basename "${BASH_SOURCE[0]}")"
 _REPOSITORY_POLICY_STEP_PS1="${_REPOSITORY_POLICY_STEP_SH%.sh}.ps1"
 readonly _REPOSITORY_POLICY_STEP_DIR _REPOSITORY_POLICY_STEP_SH _REPOSITORY_POLICY_STEP_PS1
 
-register_step "repository-policy" 14 "Repository policy" run_14_repository_policy
+register_step "repository-policy" 13 "Repository policy" run_13_repository_policy
 
-run_14_repository_policy() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+run_13_repository_policy() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _files=("$@")
   local _failed=0
 
   say "--- config method compliance ---"
-  run_14_config_method_compliance "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+  run_13_config_method_compliance "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
   say "--- activation token placeholder ---"
-  run_14_activation_token_placeholder "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+  run_13_activation_token_placeholder "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
   say "--- preflight install command policy ---"
-  run_14_preflight_install_command_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+  run_13_preflight_install_command_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
   say "--- embedded content enforcement ---"
-  run_14_embedded_content_enforcement "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+  run_13_embedded_content_enforcement "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
   say "--- agents policy ---"
-  run_14_agents_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+  run_13_agents_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
   say "--- no real-user test coupling ---"
-  run_14_no_real_user_test_coupling "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+  run_13_no_real_user_test_coupling "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
   if [ "$_failed" -ne 0 ]; then
     error "repository policy check failed"
@@ -41,30 +42,37 @@ run_14_repository_policy() {
   return 0
 }
 
-run_14_config_method_compliance() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+run_13_config_method_compliance() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _cfg_errors=0
   local _cfg_dir="src/modules/configs"
   local _cfg_par_tmpdir
-  _cfg_par_tmpdir=$(mktemp -d) || { error "failed to create temp dir"; _cfg_errors=$((_cfg_errors + 1)); }
+  _cfg_par_tmpdir=$(mktemp -d) || {
+    error "failed to create temp dir"
+    _cfg_errors=$((_cfg_errors + 1))
+  }
 
   # Single-pass: collect all config file basenames, run one grep across src/
   local _cfg_patterns
-  _cfg_patterns=$(mktemp) || { error "failed to create temp file"; _cfg_errors=$((_cfg_errors + 1)); }
-  find "$_cfg_dir" -type f -exec basename {} \; | sort -u > "$_cfg_patterns"
+  _cfg_patterns=$(mktemp) || {
+    error "failed to create temp file"
+    _cfg_errors=$((_cfg_errors + 1))
+  }
+  find "$_cfg_dir" -type f -exec basename {} \; | sort -u >"$_cfg_patterns"
   # ref: allow-and-deny-lists.instructions.md#B1 -- structural invariants; vendored code and config methods are different concerns
-  find src/ \( -name '*.nix' -o -name '*.ps1' -o -name '*.sh' \) -not -path '*/vendor/*' -not -path '*/configs/*' -print \
-    | filter_gitignored \
-    | xargs grep -n -F -f "$_cfg_patterns" 2>/dev/null \
-    || true  # check-suppress:suppression_doc: xargs grep exits 1 when no config basename collisions are found; no match is the expected state
+  find src/ \( -name '*.nix' -o -name '*.ps1' -o -name '*.sh' \) -not -path '*/vendor/*' -not -path '*/configs/*' -print |
+    filter_gitignored |
+    xargs grep -n -F -f "$_cfg_patterns" 2>/dev/null ||
+    true # check-suppress:suppression_doc: xargs grep exits 1 when no config basename collisions are found; no match is the expected state
   rm -f "$_cfg_patterns"
 
   # Check for configs. method usage
   # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
-  find "$_cfg_dir" -type f -print0 \
-    | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+  find "$_cfg_dir" -type f -print0 |
+    xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
       _tmpdir="$1"
       _f="$2"
       _basename=$(basename "$_f")
@@ -86,12 +94,12 @@ run_14_config_method_compliance() {
     [ -f "$_result_file" ] || continue
     while IFS= read -r _eline; do
       case "$_eline" in
-        ERROR:*)
-          _cfg_errors=$((_cfg_errors + 1))
-          error "${_eline#ERROR:}"
-          ;;
+      ERROR:*)
+        _cfg_errors=$((_cfg_errors + 1))
+        error "${_eline#ERROR:}"
+        ;;
       esac
-    done < "$_result_file"
+    done <"$_result_file"
   done
   rm -rf -- "$_cfg_par_tmpdir"
 
@@ -103,20 +111,24 @@ run_14_config_method_compliance() {
   return 0
 }
 
-run_14_activation_token_placeholder() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+run_13_activation_token_placeholder() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _act_temp
-  _act_temp="$(mktemp)" || { error "failed to create temp file"; return 1; }
+  _act_temp="$(mktemp)" || {
+    error "failed to create temp file"
+    return 1
+  }
 
   if $_has_args; then
     for _f in "${_files[@]}"; do
-      case "$_f" in *.sh|*.zsh) printf '%s\0' "$_f" ;; esac
-    done | xargs -0 -P "$PARALLEL_JOBS" grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' 2>/dev/null > "$_act_temp" || true  # check-suppress:suppression_doc: grep exits 1 when no token placeholders are found; an empty result file is the clean state
+      case "$_f" in *.sh | *.zsh) printf '%s\0' "$_f" ;; esac
+    done | xargs -0 -P "$PARALLEL_JOBS" grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' 2>/dev/null >"$_act_temp" || true # check-suppress:suppression_doc: grep exits 1 when no token placeholders are found; an empty result file is the clean state
   else
-    find src/scripts -type f \( -name '*.sh' -o -name '*.zsh' \) -print0 \
-      | xargs -0 -P "$PARALLEL_JOBS" grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' 2>/dev/null > "$_act_temp" || true  # check-suppress:suppression_doc: grep exits 1 when no token placeholders are found; an empty result file is the clean state
+    find src/scripts -type f \( -name '*.sh' -o -name '*.zsh' \) -print0 |
+      xargs -0 -P "$PARALLEL_JOBS" grep -Hn '^\s*#.*__[A-Z][A-Z_]*__' 2>/dev/null >"$_act_temp" || true # check-suppress:suppression_doc: grep exits 1 when no token placeholders are found; an empty result file is the clean state
   fi
 
   if [ -s "$_act_temp" ]; then
@@ -134,8 +146,9 @@ run_14_activation_token_placeholder() {
   return 0
 }
 
-run_14_preflight_install_command_policy() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+run_13_preflight_install_command_policy() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
 
@@ -165,11 +178,14 @@ run_14_preflight_install_command_policy() {
 
   if [ "${#_ps1_files[@]}" -gt 0 ]; then
     local _s21_tmpdir
-    _s21_tmpdir=$(mktemp -d) || { error "failed to create temp dir"; _s21_errors=$((_s21_errors + 1)); }
+    _s21_tmpdir=$(mktemp -d) || {
+      error "failed to create temp dir"
+      _s21_errors=$((_s21_errors + 1))
+    }
 
     # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
-    printf '%s\0' "${_ps1_files[@]}" \
-      | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+    printf '%s\0' "${_ps1_files[@]}" |
+      xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
         _f="$2"
         _out="$1/$(echo "$_f" | tr "/" "_").out"
         grep -Hn "Assert-ToolAvailable.*-InstallCommand" "$_f" >> "$_out" 2>/dev/null || true  # check-suppress:suppression_doc: grep exits 1 when a file has no InstallCommand matches; an empty .out file is the clean state
@@ -181,7 +197,7 @@ run_14_preflight_install_command_policy() {
       while IFS= read -r _err; do
         _s21_errors=$((_s21_errors + 1))
         error "$_err"
-      done < "$_f"
+      done <"$_f"
     done
 
     rm -rf -- "$_s21_tmpdir"
@@ -196,8 +212,9 @@ run_14_preflight_install_command_policy() {
   return 0
 }
 
-run_14_embedded_content_enforcement() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+run_13_embedded_content_enforcement() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
 
@@ -211,7 +228,7 @@ run_14_embedded_content_enforcement() {
   if $_has_args; then
     for _f in "${_files[@]}"; do
       case "$_f" in
-        src/scripts/*.sh) [ "$(basename "$_f")" = "$_s18_self_sh" ] || _sh_files+=("$_f") ;;
+      src/scripts/*.sh) [ "$(basename "$_f")" = "$_s18_self_sh" ] || _sh_files+=("$_f") ;;
       esac
     done
   else
@@ -223,7 +240,7 @@ run_14_embedded_content_enforcement() {
 
   if [ "${#_sh_files[@]}" -gt 0 ]; then
     # Heredoc detector lives in a sibling .awk file (shellcheck policy: extract awk programs >10 lines).
-    local _s18_awk_path="$_REPOSITORY_POLICY_STEP_DIR/14-repository-policy.awk"
+    local _s18_awk_path="$_REPOSITORY_POLICY_STEP_DIR/13-repository-policy.awk"
 
     local _s18_violation
     while IFS= read -r _s18_violation; do
@@ -245,7 +262,7 @@ _strip_prompt_frontmatter() {
   awk 'BEGIN{fm=0} /^---$/ {fm++; if (fm == 1) next; if (fm == 2) {fm = 3; next}} fm == 1 || fm == 2 {next} {print}' "$1"
 }
 
-run_14_agents_policy() {
+run_13_agents_policy() {
   local _repo_root="$2"
   cd "$_repo_root" || return 1
   local _agents_errors=0
@@ -292,18 +309,21 @@ run_14_agents_policy() {
 
   local _agents_md="AGENTS.md"
   local _missing_link
-  _missing_link=$(mktemp) || { error "failed to create temp file"; return 1; }
-  grep -oE '\.agents/instructions/[a-z0-9-]+\.instructions\.md' "$_agents_md" 2>/dev/null \
-    | sort -u \
-    | while IFS= read -r _link; do
-        [ -f "$_link" ] || echo "$_link"
-      done > "$_missing_link" || true  # check-suppress:suppression_doc: grep exits 1 when AGENTS.md has no instruction links; empty missing-link file is valid
+  _missing_link=$(mktemp) || {
+    error "failed to create temp file"
+    return 1
+  }
+  grep -oE '\.agents/instructions/[a-z0-9-]+\.instructions\.md' "$_agents_md" 2>/dev/null |
+    sort -u |
+    while IFS= read -r _link; do
+      [ -f "$_link" ] || echo "$_link"
+    done >"$_missing_link" || true # check-suppress:suppression_doc: grep exits 1 when AGENTS.md has no instruction links; empty missing-link file is valid
   if [ -s "$_missing_link" ]; then
     _agents_errors=$((_agents_errors + 1))
     error "AGENTS.md references missing instruction files:"
     while IFS= read -r _line; do
       error "  $_line"
-    done < "$_missing_link"
+    done <"$_missing_link"
   else
     say "AGENTS.md instruction links resolve."
   fi
@@ -318,8 +338,9 @@ run_14_agents_policy() {
 }
 
 # ref: testing.instructions.md (No real-user test coupling)
-run_14_no_real_user_test_coupling() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+run_13_no_real_user_test_coupling() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   cd "$_repo_root" || return 1
   local _users_root="src/users"
   local _errors=0
@@ -333,7 +354,7 @@ run_14_no_real_user_test_coupling() {
       [ -z "$_hit" ] && continue
       _errors=$((_errors + 1))
       error "tests must not reference production user '$_user': $_hit (see testing.instructions.md: No real-user test coupling)"
-    done < <(grep -rn -w "$_user" tests 2>/dev/null || true)  # check-suppress:suppression_doc: grep exits 1 when no matches; zero hits is the expected state
+    done < <(grep -rn -w "$_user" tests 2>/dev/null || true) # check-suppress:suppression_doc: grep exits 1 when no matches; zero hits is the expected state
   done
 
   if [ "$_errors" -gt 0 ]; then

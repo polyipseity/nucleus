@@ -3,10 +3,11 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "lockfile-validation" 6 "Lockfile validation" run_06_lockfile_validation
+register_step "lockfile-validation" 5 "Lockfile validation" run_05_lockfile_validation
 
-run_06_lockfile_validation() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+run_05_lockfile_validation() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _lf_errors=0
@@ -19,7 +20,11 @@ run_06_lockfile_validation() {
   if $_has_args; then
     local _f _has_lf_files=0
     for _f in "${_files[@]}"; do
-      case "$_f" in */lockfile.json|*/lifecycle-allowlist.json) _has_lf_files=1; break ;; esac
+      case "$_f" in */lockfile.json | */lifecycle-allowlist.json)
+        _has_lf_files=1
+        break
+        ;;
+      esac
     done
     if [ "$_has_lf_files" -eq 0 ]; then
       say "==== 6: Lockfile validation ==== SKIPPED (no lockfile files to check)"

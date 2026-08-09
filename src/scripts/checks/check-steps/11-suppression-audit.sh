@@ -3,15 +3,19 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "suppression-audit" 12 "Suppression audit" run_12_suppression_audit
+register_step "suppression-audit" 11 "Suppression audit" run_11_suppression_audit
 
-run_12_suppression_audit() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+run_11_suppression_audit() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _s17_errors=0
   local _step17_tmpdir
-  _step17_tmpdir=$(mktemp -d) || { error "failed to create temp dir"; _s17_errors=$((_s17_errors + 1)); }
+  _step17_tmpdir=$(mktemp -d) || {
+    error "failed to create temp dir"
+    _s17_errors=$((_s17_errors + 1))
+  }
 
   # Collect script files
   local _step17_files=()
@@ -26,8 +30,8 @@ run_12_suppression_audit() {
     # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
     # xargs passes each filename as $2; $1 is the tempdir bound in bash -c above.
     # ref: check-step-xargs-bash-c-arg-convention
-    printf '%s\0' "${_step17_files[@]}" \
-      | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+    printf '%s\0' "${_step17_files[@]}" |
+      xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
         _safe="$(echo "$2" | tr "/" "_")"
         _out="$1/${_safe}.out"
         _s17_grep_pattern="shellcheck disable=|check-suppress:"  # reason: self-reference — grep pattern literal, not a suppression
@@ -61,7 +65,7 @@ run_12_suppression_audit() {
       while IFS= read -r _err; do
         _s17_errors=$((_s17_errors + 1))
         error "$_err"
-      done < "$_f"
+      done <"$_f"
     done
 
     if [ "$_s17_errors" -gt 0 ]; then

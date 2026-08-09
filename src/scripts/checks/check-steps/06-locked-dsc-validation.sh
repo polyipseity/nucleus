@@ -3,10 +3,11 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "locked-dsc-validation" 7 "Locked DSC validation" run_07_locked_dsc_validation
+register_step "locked-dsc-validation" 6 "Locked DSC validation" run_06_locked_dsc_validation
 
-run_07_locked_dsc_validation() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+run_06_locked_dsc_validation() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _lf_errors=0
@@ -15,10 +16,13 @@ run_07_locked_dsc_validation() {
 
   # Generate locked DSC in-memory from ALL system DSC files + lockfile.
   local _dsc_par_tmpdir
-  _dsc_par_tmpdir=$(mktemp -d) || { error "failed to create temp dir"; _lf_errors=$((_lf_errors + 1)); }
+  _dsc_par_tmpdir=$(mktemp -d) || {
+    error "failed to create temp dir"
+    _lf_errors=$((_lf_errors + 1))
+  }
   # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
-  printf '%s\0' "$_dsc_system_dir"/*.dsc.yml \
-    | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+  printf '%s\0' "$_dsc_system_dir"/*.dsc.yml |
+    xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
       _tmpdir="$1"
       _f="$2"
       _safe="$(echo "$_f" | tr "/" "_")"

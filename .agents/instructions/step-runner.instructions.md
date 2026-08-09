@@ -90,8 +90,8 @@ Step 01 (code-formatting) behavior:
   Step 01 is skipped only if treefmt itself isn't available.
 
   Cross-platform:
-    - POSIX: runs treefmt binary directly
-    - PS1: runs treefmt binary directly (POSIX step covered; PS1 step matches POSIX step)
+    - POSIX: runs treefmt binary directly, plus Darwin workflow supplements and check-packer --validate-only
+    - PS1: runs native formatter/linter CLIs in treefmt-equivalent order (shfmt, yamllint, taplo, packer fmt, actionlint, pinact, zizmor, check-packer --validate-only)
     - Both produce the same output message format.
 ```
 
@@ -173,17 +173,17 @@ Cross-platform equivalence:
 
 | Group | Steps | IDs |
 | ----- | ----- | --- |
-| Format and lint | 01–03 | `code-formatting`, `powershell-lint` (syntax only; `-SkipStep PSSA`), `packer-validate` |
-| Nix | 04–05 | `nix-flake-eval`, `nix-lint` |
-| Data and schema | 06–10 | `lockfile-validation`, `locked-dsc-validation`, `schema-validation`, `service-registry`, `yaml-structural` |
-| Repository policy | 11–14 | `package-manager-enforcement`, `suppression-audit`, `online-determinism`, `repository-policy` |
+| Format and lint | 01–02 | `code-formatting` (treefmt on POSIX; native CLIs on Windows), `powershell-lint` (syntax only; `-SkipStep PSSA`) |
+| Nix | 03–04 | `nix-flake-eval`, `nix-lint` |
+| Data and schema | 05–09 | `lockfile-validation`, `locked-dsc-validation`, `schema-validation`, `service-registry`, `yaml-structural` |
+| Repository policy | 10–13 | `package-manager-enforcement`, `suppression-audit`, `online-determinism`, `repository-policy` |
 
 Shell entry-script validation (`script-validation-tests.sh`) runs in test step 5 (`script-and-framework-tests`), not in the check pipeline. Step 5 runs priority framework suites serially, then parallelizes the remaining `tests/scripts/**/*-tests.*` suites with ordered output replay; `nucleus-apps-smoke-tests.sh` is discovered there and runs under `nucleus_nix_locked` on POSIX.
 
-## Spec G: Step 8 `$schema` enforcement
+## Spec G: Step 7 `$schema` enforcement
 
 ```
-Step 8 validation rules:
+Step 7 validation rules:
   For every JSON and YAML file in scope (except exceptions):
 
   1. `$schema` presence check:

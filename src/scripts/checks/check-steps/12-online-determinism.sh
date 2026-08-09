@@ -3,10 +3,11 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "online-determinism" 13 "Online determinism checks (--online)" run_13_online_determinism
+register_step "online-determinism" 12 "Online determinism checks (--online)" run_12_online_determinism
 
-run_13_online_determinism() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+run_12_online_determinism() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
 

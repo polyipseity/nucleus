@@ -215,4 +215,4 @@ The following patterns use `# check-suppress:suppression_doc:` format and are NO
 - Empty `catch {}` — suppressing terminating errors
 - `|| true` — shell-level error suppression
 
-These are enforced by `check.ps1` step 13 and require a `# check-suppress:suppression_doc: <reason>` annotation.
+These are enforced by `check.ps1` step 11 and require a `# check-suppress:suppression_doc: <reason>` annotation.

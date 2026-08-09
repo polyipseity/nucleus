@@ -3,10 +3,11 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "service-registry" 9 "Service registry validation" run_09_service_registry
+register_step "service-registry" 8 "Service registry validation" run_08_service_registry
 
-run_09_service_registry() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+run_08_service_registry() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _svc_errors=0
@@ -81,18 +82,18 @@ run_09_service_registry() {
     # Validate each host entry has valid type, platform ref, and required fields
     while IFS=$'\t' read -r _name _host _type _platform _has_required; do
       case "$_type" in
-        launchctl|systemctl|native|schtask|omitted) ;;
-        *)
-          error "services.json: '$_name' host '$_host' has invalid type '$_type'"
-          _svc_errors=$((_svc_errors + 1))
-          ;;
+      launchctl | systemctl | native | schtask | omitted) ;;
+      *)
+        error "services.json: '$_name' host '$_host' has invalid type '$_type'"
+        _svc_errors=$((_svc_errors + 1))
+        ;;
       esac
       case "$_platform" in
-        macOS|NixOS|Windows) ;;
-        *)
-          error "services.json: '$_name' host '$_host' has invalid platform '$_platform'"
-          _svc_errors=$((_svc_errors + 1))
-          ;;
+      macOS | NixOS | Windows) ;;
+      *)
+        error "services.json: '$_name' host '$_host' has invalid platform '$_platform'"
+        _svc_errors=$((_svc_errors + 1))
+        ;;
       esac
       if [ "$_has_required" != "true" ]; then
         error "services.json: '$_name' host '$_host' missing required fields for type '$_type'"
@@ -143,7 +144,7 @@ run_09_service_registry() {
       [ -f "$_user_services" ] || continue
       _username="$(basename "$(dirname "$_user_services")")"
       case "$_username" in
-        default) continue ;;
+      default) continue ;;
       esac
       while IFS=$'\t' read -r _svc_name; do
         if ! echo "$_svc_names" | grep -qxF "$_svc_name"; then

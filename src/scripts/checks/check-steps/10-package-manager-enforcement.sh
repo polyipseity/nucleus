@@ -3,10 +3,11 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "package-manager-enforcement" 11 "Package manager usage enforcement" run_11_package_manager_enforcement
+register_step "package-manager-enforcement" 10 "Package manager usage enforcement" run_10_package_manager_enforcement
 
-run_11_package_manager_enforcement() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+run_10_package_manager_enforcement() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _violations=0
@@ -15,7 +16,11 @@ run_11_package_manager_enforcement() {
   if $_has_args; then
     local _f _has_shell_files=0
     for _f in "${_files[@]}"; do
-      case "$_f" in *.sh|*.ps1|*.nix) _has_shell_files=1; break ;; esac
+      case "$_f" in *.sh | *.ps1 | *.nix)
+        _has_shell_files=1
+        break
+        ;;
+      esac
     done
     if [ "$_has_shell_files" -eq 0 ]; then
       say "==== 11: Package manager usage enforcement ==== SKIPPED (no shell files to check)"
@@ -25,8 +30,8 @@ run_11_package_manager_enforcement() {
 
   # Ban bare `pip install` and `npm install`.
   # ref: allow-and-deny-lists.instructions.md#A1 -- orchestrator/config files contain pip/npm patterns in comments; self-refs are dynamic
-  local _self_sh="11-package-manager-enforcement.sh"
-  local _self_ps1="11-package-manager-enforcement.ps1"
+  local _self_sh="10-package-manager-enforcement.sh"
+  local _self_ps1="10-package-manager-enforcement.ps1"
   local _grep_files=()
   if $_has_args; then
     [ ${#SH_FILES[@]} -gt 0 ] && _grep_files+=("${SH_FILES[@]}")
@@ -36,7 +41,7 @@ run_11_package_manager_enforcement() {
     local _f
     for _f in "${_grep_files[@]}"; do
       case "$(basename "$_f")" in
-        check.sh|check.ps1|shell.nix|"$_self_sh"|"$_self_ps1") continue ;;
+      check.sh | check.ps1 | shell.nix | "$_self_sh" | "$_self_ps1") continue ;;
       esac
       _filtered+=("$_f")
     done
@@ -48,24 +53,24 @@ run_11_package_manager_enforcement() {
     # (check.sh, check.ps1, shell.nix, self-refs). Removed patterns that are now
     # covered by gitignore (e.g., result, secrets/, .direnv/).
     mapfile -t _grep_files < <(
-      find scripts/ src/ tests/ \( -name '*.sh' -o -name '*.ps1' -o -name '*.nix' \) -print \
-        | filter_gitignored \
-        | grep -v -E '(check\.sh|check\.ps1|shell\.nix|'"$_self_sh"'|'"$_self_ps1"')$'
+      find scripts/ src/ tests/ \( -name '*.sh' -o -name '*.ps1' -o -name '*.nix' \) -print |
+        filter_gitignored |
+        grep -v -E '(check\.sh|check\.ps1|shell\.nix|'"$_self_sh"'|'"$_self_ps1"')$'
     )
   fi
 
   if [ "${#_grep_files[@]}" -gt 0 ]; then
-    if printf '%s\0' "${_grep_files[@]}" \
-      | xargs -0 grep -n -E '(^|[^a-z])pip install([^-]|$)' 2>/dev/null \
-      | grep -v 'uv pip install' \
-      | grep . >/dev/null 2>&1; then
+    if printf '%s\0' "${_grep_files[@]}" |
+      xargs -0 grep -n -E '(^|[^a-z])pip install([^-]|$)' 2>/dev/null |
+      grep -v 'uv pip install' |
+      grep . >/dev/null 2>&1; then
       error "bare pip install detected (use uv pip install instead)"
       _violations=$((_violations + 1))
     fi
 
-    if printf '%s\0' "${_grep_files[@]}" \
-      | xargs -0 grep -n -E '(^|[^a-z])npm install([^-]|$)' 2>/dev/null \
-      | grep . >/dev/null 2>&1; then
+    if printf '%s\0' "${_grep_files[@]}" |
+      xargs -0 grep -n -E '(^|[^a-z])npm install([^-]|$)' 2>/dev/null |
+      grep . >/dev/null 2>&1; then
       error "bare npm install detected (use bun or nix instead)"
       _violations=$((_violations + 1))
     fi

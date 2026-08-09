@@ -293,8 +293,8 @@ Learned from authoring `tests/scripts/` check-step tests; applies to test script
   - `& script.ps1` does NOT set `$LASTEXITCODE` (only native commands do); reading it before any native command throws under StrictMode.
   - `test.ps1` fail-fast kills the process before any summary — zero stdout. Use `--no-fail-fast` when debugging.
 - **Comment content in test files**:
-  - Comments in test `.sh` files must NEVER contain `__TOKEN__`-delimited names — check step 14 (`repository-policy` activation-token sub-check) greps `^\s*#.*__[A-Z][A-Z_]*__` and in scoped mode scans staged files including `tests/`. Refer to them as "double-underscore tokens" or `start-<VM_NAME>.sh` style.
-  - Never put both fragments of a same-line step regex in one comment — step 14's InstallCommand sub-check regex is SAME-LINE, so a comment containing both `Assert-ToolAvailable` and `-InstallCommand` on one line fails the prek scoped hook.
+  - Comments in test `.sh` files must NEVER contain `__TOKEN__`-delimited names — check step 13 (`repository-policy` activation-token sub-check) greps `^\s*#.*__[A-Z][A-Z_]*__` and in scoped mode scans staged files including `tests/`. Refer to them as "double-underscore tokens" or `start-<VM_NAME>.sh` style.
+  - Never put both fragments of a same-line step regex in one comment — step 13's InstallCommand sub-check regex is SAME-LINE, so a comment containing both `Assert-ToolAvailable` and `-InstallCommand` on one line fails the prek scoped hook.
 - **Test script mechanics**:
   - `.sh` test scripts with shebangs MUST be executable (`chmod +x`; pre-commit hook `check-shebang-scripts-are-executable`); `.ps1` test files stay `644`.
   - `test-lib.sh`/`check-lib.sh`/`step-runner.sh` derive `REPO_ROOT` themselves — do NOT add `REPO_ROOT="$REPO_ROOT"` env-prefixes or `# shellcheck disable=SC2030,SC2031` self-assignment pairs. `bash -c` children in tests use parent-spliced paths only (e.g. `. "'"$REPO_ROOT"'/src/scripts/lib/step-runner.sh"`).

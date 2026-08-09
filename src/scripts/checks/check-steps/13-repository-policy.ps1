@@ -1,4 +1,4 @@
-Register-Step -Id "repository-policy" -Number 14 -Name "Repository policy" -Action {
+Register-Step -Id "repository-policy" -Number 13 -Name "Repository policy" -Action {
   param($HasArgs, $RepoRoot, $PositionalArgs)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }

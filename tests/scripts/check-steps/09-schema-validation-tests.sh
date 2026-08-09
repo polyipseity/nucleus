@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck shell=bash
-# Test: step 8 schema-validation must enforce $schema presence (Spec G)
+# Test: step 7 schema-validation must enforce $schema presence (Spec G)
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-TEST_FILE="$REPO_ROOT/src/scripts/checks/check-steps/08-schema-validation.sh"
+TEST_FILE="$REPO_ROOT/src/scripts/checks/check-steps/07-schema-validation.sh"
 
 test_step09_has_missing_schema_check() {
   # Matches: error "Missing \$schema in $_f"
@@ -12,7 +12,7 @@ test_step09_has_missing_schema_check() {
   if grep -q 'Missing.*$schema' "$TEST_FILE"; then
     return 0
   fi
-  echo "FAIL: step 8 should check for missing \$schema"
+  echo "FAIL: step 7 should check for missing \$schema"
   return 1
 }
 
@@ -22,7 +22,7 @@ test_step09_has_format_check() {
   if grep -q 'Invalid.*$schema.*non-empty' "$TEST_FILE"; then
     return 0
   fi
-  echo "FAIL: step 8 should check for invalid (empty) \$schema format"
+  echo "FAIL: step 7 should check for invalid (empty) \$schema format"
   return 1
 }
 
@@ -31,7 +31,7 @@ test_step09_has_exception_list() {
   if grep -q 'schema.json.*vendor.*secrets' "$TEST_FILE"; then
     return 0
   fi
-  echo "FAIL: step 8 should have exception list for \$schema check"
+  echo "FAIL: step 7 should have exception list for \$schema check"
   return 1
 }
 
@@ -40,7 +40,7 @@ test_step09_github_exceptions_handle_dot_prefix() {
   if grep -q '\*/\.github/workflows/\*' "$TEST_FILE"; then
     return 0
   fi
-  echo "FAIL: step 8 .github exception globs should match ./-prefixed paths"
+  echo "FAIL: step 7 .github exception globs should match ./-prefixed paths"
   return 1
 }
 
@@ -49,7 +49,7 @@ test_step09_exempts_app_configs_without_schema() {
   if grep -q 'users/\*/vscode.*configs/camilladsp.*agents/hooks.*\.sops\.yaml' "$TEST_FILE"; then
     return 0
   fi
-  echo "FAIL: step 8 should exempt app-owned config formats without published schemas"
+  echo "FAIL: step 7 should exempt app-owned config formats without published schemas"
   return 1
 }
 
@@ -58,7 +58,7 @@ test_step09_missing_schema_errors_counted() {
   if grep -q '_jsonschema_errors.*_missing_schema' "$TEST_FILE"; then
     return 0
   fi
-  echo "FAIL: step 8 should add missing \$schema errors to total"
+  echo "FAIL: step 7 should add missing \$schema errors to total"
   return 1
 }
 

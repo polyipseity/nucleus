@@ -7,8 +7,8 @@ _self="$0"
 if [ -h "$_self" ]; then
   _target="$(readlink "$_self")"
   case "$_target" in
-    /*) _self="$_target" ;;
-    *) _self="$(dirname "$_self")/$_target" ;;
+  /*) _self="$_target" ;;
+  *) _self="$(dirname "$_self")/$_target" ;;
   esac
 fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
@@ -18,25 +18,29 @@ REPO_ROOT=$(derive_repo_root)
 cd "$REPO_ROOT"
 
 usage() {
-  usage_std "check-packer.sh" "[path ...]" "Validate Packer template formatting and configuration. With no arguments, checks all .pkr.hcl files under src/vms/. With arguments, checks only the provided paths."
+  usage_std "check-packer.sh" "[--validate-only] [path ...]" "Validate Packer template formatting and configuration. With no arguments, checks all .pkr.hcl files under src/vms/. With arguments, checks only the provided paths. --validate-only skips the packer fmt -check phase."
 }
 
+_validate_only=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    -*)
-      error "unsupported argument '$1'"
-      usage >&2
-      exit 1
-      ;;
-    *)
-      break
-      ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --validate-only)
+    _validate_only=true
+    shift
+    ;;
+  -*)
+    error "unsupported argument '$1'"
+    usage >&2
+    exit 1
+    ;;
+  *)
+    break
+    ;;
   esac
-  shift
 done
 
 require_command packer
@@ -51,22 +55,24 @@ export PACKER_PLUGIN_CACHE_DIR="${PACKER_PLUGIN_CACHE_DIR:-$HOME/.cache/packer/p
 # Lockfile uses nixpkgo-style arch names: x86_64-linux, aarch64-linux.
 _arch="$(uname -m)"
 case "$_arch" in
-  x86_64) _nix_arch="x86_64-linux" ;;
-  arm64|aarch64) _nix_arch="aarch64-linux" ;;
-  *)
-    error "unsupported architecture '$_arch' for NixOS ISO checksum lookup"
-    exit 1
-    ;;
+x86_64) _nix_arch="x86_64-linux" ;;
+arm64 | aarch64) _nix_arch="aarch64-linux" ;;
+*)
+  error "unsupported architecture '$_arch' for NixOS ISO checksum lookup"
+  exit 1
+  ;;
 esac
 
 # Read NixOS ISO digest from lockfile for the current arch.
 _nixos_digest="$(jq -r --arg arch "$_nix_arch" '(."vm-setup"."nixos-iso" // {})[$arch].digest // "none"' "$REPO_ROOT/src/lockfiles/lockfile.json")"
 
-# Check formatting
-if [ "$#" -gt 0 ]; then
-  packer fmt -check "$@"
-else
-  packer fmt -check -recursive src/vms/
+# Check formatting (skipped with --validate-only; step 01 treefmt/packer fmt covers formatting).
+if ! $_validate_only; then
+  if [ "$#" -gt 0 ]; then
+    packer fmt -check "$@"
+  else
+    packer fmt -check -recursive src/vms/
+  fi
 fi
 
 # Validate each Packer template in its own directory (needed for plugin
@@ -99,14 +105,14 @@ check_packer_validate_annotations() {
   local tpl="$REPO_ROOT/src/vms/Windows/packer.pkr.hcl"
   [ -f "$tpl" ] || return 0
   local content line effective varname violations=0
-  content=$(< "$tpl")
+  content=$(<"$tpl")
   while IFS= read -r line; do
     case "$line" in
-      *iso_checksum[[:space:]]*=*)
-        effective=$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*iso_checksum[[:space:]]*=//; s/#.*//; s/[[:space:]]//g')
-        if [[ "$effective" =~ ^var\.([A-Za-z0-9_]+)$ ]]; then
-          varname="${BASH_REMATCH[1]}"
-          effective=$(printf '%s\n' "$content" | awk -v v="$varname" '
+    *iso_checksum[[:space:]]*=*)
+      effective=$(printf '%s\n' "$line" | sed -E 's/^[[:space:]]*iso_checksum[[:space:]]*=//; s/#.*//; s/[[:space:]]//g')
+      if [[ "$effective" =~ ^var\.([A-Za-z0-9_]+)$ ]]; then
+        varname="${BASH_REMATCH[1]}"
+        effective=$(printf '%s\n' "$content" | awk -v v="$varname" '
             $0 ~ ("variable \"" v "\"") { block=1; next }
             block && /^[[:space:]]*default[[:space:]]*=/ {
               sub(/^[[:space:]]*default[[:space:]]*=[[:space:]]*/, "")
@@ -116,18 +122,18 @@ check_packer_validate_annotations() {
             }
             block && /^\}/ { exit }
           ')
+      fi
+      case "$effective" in
+      none | '"none"' | "'none'")
+        if [[ "$line" != *'# check-suppress:packer_validate:'* ]]; then
+          error "iso_checksum resolves to 'none' without '# check-suppress:packer_validate:' annotation: $line"
+          violations=1
         fi
-        case "$effective" in
-          none|'"none"'|"'none'")
-            if [[ "$line" != *'# check-suppress:packer_validate:'* ]]; then
-              error "iso_checksum resolves to 'none' without '# check-suppress:packer_validate:' annotation: $line"
-              violations=1
-            fi
-            ;;
-        esac
         ;;
+      esac
+      ;;
     esac
-  done <<< "$content"
+  done <<<"$content"
   return "$violations"
 }
 
@@ -141,15 +147,15 @@ validate_dir() {
   say "validating $dir..."
   local vars=()
   case "$dir" in
-    *NixOS)
-      vars=(-var guest_username=dummy -var guest_password=dummy -var guest_hostname=dummy -var nixos_iso_url=https://dummy.iso -var "nixos_iso_checksum=$_nixos_digest")
-      ;;
-    *Windows)
-      vars=(-var windows_iso=dummy.iso -var hostfwd=dummy -var guest_hostname=dummy)
-      ;;
-    *macOS)
-      vars=(-var macos_version=14.0 -var vm_id=dummy -var cpus=2 -var memory_gib=4 -var disk_size_gib=40 -var guest_username=dummy -var guest_password=dummy -var ssh_username=dummy -var ssh_password=dummy -var tart_image_ref=dummy -var vm_hostname=dummy)
-      ;;
+  *NixOS)
+    vars=(-var guest_username=dummy -var guest_password=dummy -var guest_hostname=dummy -var nixos_iso_url=https://dummy.iso -var "nixos_iso_checksum=$_nixos_digest")
+    ;;
+  *Windows)
+    vars=(-var windows_iso=dummy.iso -var hostfwd=dummy -var guest_hostname=dummy)
+    ;;
+  *macOS)
+    vars=(-var macos_version=14.0 -var vm_id=dummy -var cpus=2 -var memory_gib=4 -var disk_size_gib=40 -var guest_username=dummy -var guest_password=dummy -var ssh_username=dummy -var ssh_password=dummy -var tart_image_ref=dummy -var vm_hostname=dummy)
+    ;;
   esac
   # 2>&1 into the filter: the warning goes to stderr; pipefail keeps the
   # packer validate exit code authoritative.
@@ -158,14 +164,29 @@ validate_dir() {
 
 # Parallel validation: each VM directory validates independently.
 # Uses temp exit files for race-free aggregation (same pattern as check.sh).
-_pkr_tmpdir=$(mktemp -d) || { error "failed to create temp directory for packer validation"; exit 1; }
+_pkr_tmpdir=$(mktemp -d) || {
+  error "failed to create temp directory for packer validation"
+  exit 1
+}
 
-{ _vd_exit=0; validate_dir src/vms/NixOS || _vd_exit=$?; echo "$_vd_exit" > "$_pkr_tmpdir/exit-nixos"; } &
-{ _vd_exit=0; validate_dir src/vms/Windows || _vd_exit=$?; echo "$_vd_exit" > "$_pkr_tmpdir/exit-windows"; } &
+{
+  _vd_exit=0
+  validate_dir src/vms/NixOS || _vd_exit=$?
+  echo "$_vd_exit" >"$_pkr_tmpdir/exit-nixos"
+} &
+{
+  _vd_exit=0
+  validate_dir src/vms/Windows || _vd_exit=$?
+  echo "$_vd_exit" >"$_pkr_tmpdir/exit-windows"
+} &
 
 # macOS template uses the Tart plugin which is macOS-only.
 if [ "$(uname)" = "Darwin" ]; then
-  { _vd_exit=0; validate_dir src/vms/macOS || _vd_exit=$?; echo "$_vd_exit" > "$_pkr_tmpdir/exit-macos"; } &
+  {
+    _vd_exit=0
+    validate_dir src/vms/macOS || _vd_exit=$?
+    echo "$_vd_exit" >"$_pkr_tmpdir/exit-macos"
+  } &
 else
   say "skipping macOS Packer template validation (requires Tart plugin on macOS)"
 fi
@@ -175,7 +196,7 @@ wait
 _pkr_exit=0
 for _pkr_ef in "$_pkr_tmpdir"/exit-*; do
   [ -f "$_pkr_ef" ] || continue
-  read -r _pkr_code < "$_pkr_ef"
+  read -r _pkr_code <"$_pkr_ef"
   [ "$_pkr_code" != "0" ] && _pkr_exit=$((_pkr_exit + 1))
 done
 

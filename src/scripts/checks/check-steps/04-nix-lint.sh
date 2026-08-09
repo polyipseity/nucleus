@@ -3,10 +3,11 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "nix-lint" 5 "Nix lint (nixf-tidy)" run_05_nix_lint
+register_step "nix-lint" 4 "Nix lint (nixf-tidy)" run_04_nix_lint
 
-run_05_nix_lint() {
-  local _has_args="$1" _repo_root="$2"; shift 2
+run_04_nix_lint() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _nixf_files=()
@@ -22,10 +23,13 @@ run_05_nix_lint() {
 
   if [ "${#_nixf_files[@]}" -gt 0 ]; then
     local _nixf_tmpdir
-    _nixf_tmpdir=$(mktemp -d) || { error "failed to create temp directory"; return 1; }
+    _nixf_tmpdir=$(mktemp -d) || {
+      error "failed to create temp directory"
+      return 1
+    }
     # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
-    printf '%s\0' "${_nixf_files[@]}" \
-      | xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
+    printf '%s\0' "${_nixf_files[@]}" |
+      xargs -0 -P "$PARALLEL_JOBS" -n 1 bash -c '
         tmpdir="$1"
         f="$2"
         safe_name="$(echo "$f" | tr "/" "_")"
@@ -39,19 +43,19 @@ run_05_nix_lint() {
     local _nixf_result _nixf_status _nixf_file_path
     for _nixf_result in "$_nixf_tmpdir"/*.nixf; do
       [ -f "$_nixf_result" ] || continue
-      IFS= read -r _nixf_status < "$_nixf_result"
-      IFS= read -r _nixf_file_path < "$_nixf_result"
+      IFS= read -r _nixf_status <"$_nixf_result"
+      IFS= read -r _nixf_file_path <"$_nixf_result"
       case "$_nixf_status" in
-        FAIL)
-          error "$_nixf_file_path: nixf-tidy failed"
-          _nixf_exit=$((_nixf_exit + 1))
-          ;;
-        ISSUES)
-          tail -n +3 "$_nixf_result" | jq -r '.[] | "\(.sname): \(.message)"' | while IFS= read -r _nixf_issue; do
-            error "$_nixf_file_path: $_nixf_issue"
-          done
-          _nixf_exit=$((_nixf_exit + 1))
-          ;;
+      FAIL)
+        error "$_nixf_file_path: nixf-tidy failed"
+        _nixf_exit=$((_nixf_exit + 1))
+        ;;
+      ISSUES)
+        tail -n +3 "$_nixf_result" | jq -r '.[] | "\(.sname): \(.message)"' | while IFS= read -r _nixf_issue; do
+          error "$_nixf_file_path: $_nixf_issue"
+        done
+        _nixf_exit=$((_nixf_exit + 1))
+        ;;
       esac
     done
     [ -n "$_nixf_tmpdir" ] && rm -rf -- "$_nixf_tmpdir"
