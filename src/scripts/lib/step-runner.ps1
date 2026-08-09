@@ -13,6 +13,14 @@ $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
 $script:StepNames = [System.Collections.Generic.List[string]]::new()
 $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
 
+function Format-DurationSeconds {
+  param(
+    [Parameter(Mandatory)]
+    [long]$Milliseconds
+  )
+  return ('{0:F3} s' -f ($Milliseconds / 1000.0))
+}
+
 function Register-Step {
   param(
     [Parameter(Mandatory)]
@@ -354,8 +362,7 @@ function Invoke-StepPipeline {
     $timeFile = Join-Path $script:WaveTmpDir "step-$n.time"
     $elapsedMs = 0
     if (Test-Path -LiteralPath $timeFile) { $elapsedMs = [int](Get-Content -LiteralPath $timeFile -Raw) }
-    $span = [TimeSpan]::FromMilliseconds($elapsedMs)
-    Write-Output ("step {0} finished ({1:00}:{2:00})" -f $n, [math]::Floor($span.TotalMinutes), $span.Seconds)
+    Write-Output ("step {0} finished ({1})" -f $n, (Format-DurationSeconds -Milliseconds $elapsedMs))
   }
 }
 
@@ -377,12 +384,12 @@ function Format-StepSummary {
     $totalElapsed += [int]$elapsed
 
     if ($exitCode -eq "0") {
-      "  step {0,2}  {1}  {2,5} ms  {3}" -f $n, "✓", $elapsed, $name | Write-Output
+      "  step {0,2}  {1}  {2,8}  {3}" -f $n, "✓", (Format-DurationSeconds -Milliseconds [int]$elapsed), $name | Write-Output
     } elseif ($exitCode -eq "2") {
       # Exit code 2 = skipped step; rendered as SKIP, never a failure.
-      "  step {0,2}  {1}  {2,5} ms  {3}" -f $n, "SKIP", $elapsed, $name | Write-Output
+      "  step {0,2}  {1}  {2,8}  {3}" -f $n, "SKIP", (Format-DurationSeconds -Milliseconds [int]$elapsed), $name | Write-Output
     } else {
-      "  step {0,2}  {1}  {2,5} ms  {3}" -f $n, "✗", $elapsed, $name | Write-Output
+      "  step {0,2}  {1}  {2,8}  {3}" -f $n, "✗", (Format-DurationSeconds -Milliseconds [int]$elapsed), $name | Write-Output
       $failedSteps = "$failedSteps$n "
     }
 
@@ -399,8 +406,8 @@ function Format-StepSummary {
     $wallMs = [int](Get-Content -LiteralPath $wallFile -Raw)
   }
 
-  "`n  sum of steps: {0,5} ms" -f $totalElapsed | Write-Output
-  "  wall clock:   {0,5} ms" -f $wallMs | Write-Output
+  "`n  sum of steps: {0,8}" -f (Format-DurationSeconds -Milliseconds $totalElapsed) | Write-Output
+  "  wall clock:   {0,8}" -f (Format-DurationSeconds -Milliseconds $wallMs) | Write-Output
   "`n" | Write-Output
 
   if ($failedSteps) {
