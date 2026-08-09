@@ -46,22 +46,7 @@ let
   # Linux/NixOS VMs use VirtIO GPU so UTM exposes an active display on both
   # Apple Silicon and Intel hosts.
   #
-  # Android (LineageOS) on UTM additionally requires UTM's global
-  # "Renderer backend" (pref QEMURendererBackend) to be Apple Core OpenGL
-  # (CGL), value 3; ANGLE (Metal) makes the UI not appear after boot
-  # (LineageOS wiki).  CGL is the native macOS GL backend introduced in UTM
-  # 5.x (kQEMURendererBackendCGL).  Note the recurring "display freezes
-  # randomly" bug is renderer-orthogonal -- a client-side SPICE
-  # display-channel stall in UTM's SPICE client (UTM #2221, CocoaSpice#5), so
-  # CGL does not prevent freezes; UTM 5.0.4 SPICE renderer fixes and keeping
-  # the VM window visible are the mitigations.  See
-  # .agents/instructions/vm-management.instructions.md.  The pref is
-  # provisioned automatically by macos-set-utm-renderer.sh via activation.nix,
-  # so no manual UTM settings change is needed.
-  # ref: https://github.com/utmapp/UTM/blob/v5.0.3/Services/UTMQemuSystemBackends.h -- kQEMURendererBackendCGL = 3
-  # ref: https://wiki.lineageos.org/libvirt-qemu.html -- Android UI renderer guidance
-  # ref: https://github.com/utmapp/UTM/issues/2221 -- "Display freezes randomly"; renderer-orthogonal SPICE stall
-  # ref: https://github.com/utmapp/UTM/issues/378 -- historic Android VM freeze reports
+  # Android display/renderer requirements: see vm-management.instructions.md.
   displayCard = vm: if vm.type == "Windows" then "virtio-vga" else "virtio-gpu-pci";
 
   # UTM 4.x sharing mode selector.
@@ -131,13 +116,7 @@ let
       </dict>
     '') vm.portForwards;
 
-  # Guest audio hardware per VM.  Android disables audio ("none" -> empty
-  # Sound array): the SPICE audio pipeline teardown deadlocks UTM's SPICE
-  # Main Loop against the CoreAudio IO thread, freezing the display.  No
-  # upstream UTM fix exists as of 5.0.4, so the workaround stays until one
-  # lands.  Any other value (or an absent field) keeps the intel-hda sound
-  # card for the other guests.
-  # ref: .agents/instructions/vm-management.instructions.md
+  # Android disables audio ("none") to avoid SPICE/CoreAudio deadlock; see vm-management.instructions.md.
   vmSound =
     vm:
     if vm.sound == "none" then

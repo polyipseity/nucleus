@@ -47,11 +47,6 @@ in
   home.activation.flush-services-cache =
     lib.hm.dag.entryAfter [ "deploy-automator-workflows" "macos-deploy-app-bundles" ]
       ''
-        # ── Phase 4: Flush daemon caches so changes take effect immediately ─
-        # Without these restarts, cfprefsd and pbs hold stale cached state in
-        # process memory. Finder is intentionally excluded here —
-        # relaunchDesktopServices (DAG-ordered after writeBoundary) restarts it
-        # via launchctl kickstart to preserve window state.
         "${activationBundle}/src/scripts/services/refresh-services-menu.sh"
       '';
 }
