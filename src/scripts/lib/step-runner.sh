@@ -126,11 +126,22 @@ nucleus_nix_locked() {
 HAS_ARGS=${HAS_ARGS:-false}
 
 _step_now_ms() {
-  if [ "$(uname -s)" = Darwin ]; then
-    echo $(( $(date +%s) * 1000 ))
-  else
-    date +%s%3N
+  if [ -n "${EPOCHREALTIME-}" ]; then
+    awk -v t="$EPOCHREALTIME" 'BEGIN { printf "%d\n", int(t * 1000) }'
+    return
   fi
+  case "$(uname -s)" in
+    Darwin)
+      perl -MTime::HiRes=time -e 'printf "%d\n", int(time() * 1000)'
+      ;;
+    *)
+      date +%s%3N
+      ;;
+  esac
+}
+
+_format_duration_s() {
+  awk -v ms="${1:-0}" 'BEGIN { printf "%.3f s", ms / 1000 }'
 }
 
 # --- _run_step wrapper ---
@@ -382,11 +393,11 @@ run_all_steps() {
 
   printf '%s' $(($(_step_now_ms) - _pipeline_start_ms)) > "$_wave_tmpdir/pipeline.wall_ms"
 
-  local _elapsed_ms _elapsed_s
+  local _elapsed_ms _duration_s
   for _n in "${_spawned_steps[@]}"; do
     _elapsed_ms=$(cat "$_wave_tmpdir/step-$_n.time" 2>/dev/null || echo 0)
-    _elapsed_s=$((_elapsed_ms / 1000))
-    printf 'step %s finished (%02d:%02d)\n' "$_n" "$((_elapsed_s / 60))" "$((_elapsed_s % 60))"
+    _duration_s=$(_format_duration_s "$_elapsed_ms")
+    printf 'step %s finished (%s)\n' "$_n" "$_duration_s"
   done
 }
 
@@ -394,7 +405,7 @@ run_all_steps() {
 aggregate_results() {
   local _failed_steps=""
   local _total_elapsed=0 _wall_ms=0
-  local _n _name _elapsed _exit_code
+  local _n _name _elapsed _exit_code _duration_s
 
   if [ -f "$_wave_tmpdir/pipeline.wall_ms" ]; then
     _wall_ms=$(cat "$_wave_tmpdir/pipeline.wall_ms" 2>/dev/null || echo 0)
@@ -407,13 +418,14 @@ aggregate_results() {
     _exit_code=$(cat "$_wave_tmpdir/step-$_n.exit" 2>/dev/null || echo 1)
     _elapsed=$(cat "$_wave_tmpdir/step-$_n.time" 2>/dev/null || echo 0)
     _total_elapsed=$((_total_elapsed + _elapsed))
+    _duration_s=$(_format_duration_s "$_elapsed")
 
     if [ "$_exit_code" -eq 0 ]; then
-      printf '  step %2d  ✓  %5d ms  %s\n' "$_n" "$_elapsed" "$_name"
+      printf '  step %2d  ✓  %8s  %s\n' "$_n" "$_duration_s" "$_name"
     elif [ "$_exit_code" -eq 2 ]; then
-      printf '  step %2d  SKIP %5d ms  %s\n' "$_n" "$_elapsed" "$_name"
+      printf '  step %2d  SKIP %8s  %s\n' "$_n" "$_duration_s" "$_name"
     else
-      printf '  step %2d  ✗  %5d ms  %s\n' "$_n" "$_elapsed" "$_name"
+      printf '  step %2d  ✗  %8s  %s\n' "$_n" "$_duration_s" "$_name"
       _failed_steps="$_failed_steps$_n "
     fi
 
@@ -423,8 +435,8 @@ aggregate_results() {
   done
 
   printf '\n'
-  printf '  sum of steps: %5d ms\n' "$_total_elapsed"
-  printf '  wall clock:   %5d ms\n' "$_wall_ms"
+  printf '  sum of steps: %8s\n' "$(_format_duration_s "$_total_elapsed")"
+  printf '  wall clock:   %8s\n' "$(_format_duration_s "$_wall_ms")"
   printf '\n'
 
   if [ -n "$_failed_steps" ]; then
