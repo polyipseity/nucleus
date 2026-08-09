@@ -1,0 +1,9 @@
+{
+  "$schema": "../default/profile.schema.json",
+  "homeDirectory": {
+    "MacBook": "/Users/test-user",
+    "NixOS": "/home/test-user",
+    "Windows": "C:\\Users\\test-user"
+  },
+  "isPrimary": true
+}

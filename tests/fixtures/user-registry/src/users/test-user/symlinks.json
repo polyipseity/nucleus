@@ -1,0 +1,14 @@
+{
+  "$schema": "../default/symlinks.schema.json",
+  "symlinks": [
+    {
+      "createTargetDirectory": true,
+      "path": "data",
+      "targets": {
+        "MacBook": "Library/Mobile Documents/com~fixture~test/data",
+        "NixOS": "clouds/GoogleDrive/data",
+        "Windows": "clouds\\GoogleDrive\\data"
+      }
+    }
+  ]
+}

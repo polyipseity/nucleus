@@ -146,7 +146,7 @@ Test step 1 (`nix-test-eval` guard in `src/scripts/lib/nix-test-eval.sh` / `src/
 - Copying production user data into test assertions (home paths, cloud paths, password-store paths from a real user)
 - Adding `src/users/test-user/` or any test-only user under production `src/users/` (auto-discovered as a real user)
 
-**Fixture conventions:** `test-user` lives only under `tests/fixtures/user-registry/src/users/`. Shared constants: `tests/lib/fixtures.nix` (`fixtureUsername`) and `tests/scripts/lib/user-registry-fixture.sh` (`FIXTURE_USERNAME`).
+**Fixture conventions:** `test-user` lives only under `tests/fixtures/user-registry/src/users/`. Shared constants: `tests/fixtures/fixtures.nix` (`fixtureUsername`) and `tests/scripts/user-registry-fixture.sh` (`FIXTURE_USERNAME`).
 
 ### Layer 3: Module Import Validation
 
