@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or changing capabilities across hosts (macOS, NixOS, Windows), managing GC/retention timings, or creating provisioned symlinks. Enforces cross-host parity-first design, explicit rationale for platform-specific exceptions, and consistent infrastructure conventions."
 name: "Cross-Host Feature Parity"
-applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/Windows/**/*.yml, scripts/gc.*"
+applyTo: "src/modules/**/*.json, src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/Windows/**/*.yml, scripts/**/*.{sh,ps1}, src/scripts/**/*.{sh,ps1}, scripts/gc.*"
 ---
 
 ## Goal
@@ -265,3 +265,48 @@ When a symlink exists on both POSIX and Windows, writability semantics MUST matc
 `src/hosts/MacBook/scripts/macos-symlink-farm.sh` manages `/usr/local/bin` symlinks for Nix store entries. It reads `__nucleus_symlink_farm` (space-separated `target->name` pairs), creates/updates symlinks, and GCs stale Nix store entries. Safety: only removes symlinks (`-L`), never regular files, never non-Nix symlinks.
 
 The `__nucleus_symlink_farm` env var is generated in `src/hosts/MacBook/activation.nix` from `appleSdkTools.symlinkFarmTools` plus any extra entries.
+
+## Host vs platform naming
+
+### Three layers
+
+| Layer | Values | Role |
+| ----- | ------ | ---- |
+| **Host** | `MacBook`, `NixOS`, `Windows` | Primary lookup key: services, env-catalog, config paths, flake attrs, `NUCLEUS_HOST`, user registry maps |
+| **Platform** | `macOS`, `NixOS`, `Windows` | OS-family entity; owns `flags` (`darwin`, `posix`, `linux`, `win32`); VM guest `type` |
+| **Implementation** | `uname`, `stdenv.isDarwin`, nixpkgs `system` | Boundary only — map immediately via `host-platform-registry.json` |
+
+### Rules
+
+- Host JSON entries reference platform by name only (`"platform": "macOS"`). **Never put flags on host objects.**
+- Flags live in `host-platform-registry.json` → `platforms.<PlatformKey>.flags` only.
+- Lookup host first. When flags are needed: `platformForHost(host)` → `flagsForPlatform(platform)`.
+- `services.json` uses `hosts.MacBook|NixOS|Windows`, not `platforms.macos|nixos|windows`.
+- Flake configuration attrs: `darwinConfigurations.MacBook`, `nixosConfigurations.NixOS`.
+- Env-catalog `values` keys and `resolveValue` use host names (`MacBook`, not `macOS`).
+- Config paths under `src/modules/configs/` use host directory names (`MacBook/`, `NixOS/`, `Windows/`).
+- Script prefixes (`macos-`, `nixos-`) and nixpkgs `meta.platforms` are implementation boundaries — do not rename to host keys.
+
+### Decision tree
+
+1. Is the data keyed by physical machine identity? → **Host key** (`MacBook`, `NixOS`, `Windows`).
+2. Is the data about OS-family semantics or implementation flags? → **Platform key** (`macOS`, `NixOS`, `Windows`).
+3. Is the data from nixpkgs, kernel, or third-party API? → Keep upstream naming; map at the boundary via registry helpers.
+
+### Canonical helpers
+
+| Surface | Host resolution | Platform / flags |
+| ------- | --------------- | ---------------- |
+| Nix | `host-platform.nix` → `platformForHost`, `flagsForHost` | `flagsForPlatform` |
+| POSIX shell | `resolve_nucleus_host` | `nucleus_platform_for_host`, `nucleus_flag_for_host` |
+| PowerShell | `Get-NucleusHostKey` (`$env:NUCLEUS_HOST` or `Windows`) | `Get-NucleusPlatformForHost`, `Test-NucleusPlatformFlag` in `Get-NucleusHostPlatform.ps1` |
+
+### SSOT files
+
+- `src/modules/host-platform-registry.json` — host → platform refs; platform → flags
+- `src/modules/services.json` — per-service `hosts.*` with required `platform` field
+- `src/modules/lib/env-catalog.nix` — `values.MacBook|NixOS|Windows`
+
+### Audit
+
+Host vs platform vs implementation naming is enforced by service-registry validation (check step 10) and documented in this section.
