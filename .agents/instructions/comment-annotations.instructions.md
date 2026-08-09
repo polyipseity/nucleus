@@ -1,7 +1,7 @@
 ---
 description: "Use when authoring or editing any code comment annotation in this repo: suppressions, references, rationale markers, sentinels, or structural comments. Covers the canonical grammar, the four-category taxonomy, the machine-parsing invariant, the check-id registry, and enforcement greps."
 name: "Comment Annotations"
-applyTo: "**"
+applyTo: "scripts/**, src/**, tests/**"
 ---
 
 # Comment annotations

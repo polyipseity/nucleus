@@ -1,7 +1,7 @@
 ---
 description: "Use when working with shell scripts in the repository. Covers shellcheck suppression rules: mandatory inline reason comments, SC1091 prohibition, and invocation conventions."
 name: "ShellCheck Policy"
-applyTo: "**"
+applyTo: "scripts/**/*.sh, src/scripts/**/*.sh, tests/**/*.sh"
 ---
 
 # ShellCheck policy
