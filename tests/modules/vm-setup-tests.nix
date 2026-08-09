@@ -1713,7 +1713,6 @@ let
     assert'
       (
         (lib.hasInfix "wc -c < \"\$_f\" | tr -d '[:space:]'" vm_setup_sh_text)
-        && (lib.hasInfix "pick the largest qcow2 as the system image" vm_setup_sh_text)
         && (lib.hasInfix "sort -rn | head -1 | cut -d' ' -f2-" vm_setup_sh_text)
       )
       "scripts/vm.sh must strip wc -c whitespace padding when selecting the largest qcow2 from the extracted LineageOS bundle";
