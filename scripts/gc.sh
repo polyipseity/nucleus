@@ -215,7 +215,6 @@ done
 # shellcheck source=../src/scripts/lib/expire-profile-generations.sh
 . "$SCRIPT_DIR/../src/scripts/lib/expire-profile-generations.sh"
 
-# Resolve expiry values with precedence: CLI flag > per-tool env > master flag > master env > default (7d).
 hm_expiry="${hm_expiry_arg:-${NUCLEUS_GC_HM_EXPIRY:-${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}}}"
 nix_expiry="${nix_expiry_arg:-${NUCLEUS_GC_NIX_EXPIRY:-${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}}}"
 system_expiry="${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}"
@@ -244,7 +243,6 @@ _gc_dispatch_user_gc() {
 
 _gc_skip_user_steps=false
 
-# Resolve generation-count values with the same precedence pattern (default: 7).
 generations_keep="${generations_keep_arg:-${NUCLEUS_GC_GENERATIONS_KEEP:-7}}"
 system_generations_keep="${system_generations_keep_arg:-${NUCLEUS_GC_SYSTEM_GENERATIONS_KEEP:-${generations_keep}}}"
 hm_generations_keep="${hm_generations_keep_arg:-${NUCLEUS_GC_HM_GENERATIONS_KEEP:-${generations_keep}}}"
@@ -302,7 +300,6 @@ expire_hm_profile_generations() {
 }
 
 run_nix_gc_if_available() {
-  # Expiry controlled by --nix-expiry / $nix_expiry.
   nix-collect-garbage --delete-older-than "$nix_expiry"
 }
 
@@ -325,8 +322,6 @@ gc_nix_build_artifacts_if_present() {
 }
 
 gc_stale_wallpapers() {
-  # Keep the decrypted wallpaper output directory in sync with overlay sources
-  # so stale files do not accumulate across apply cycles.
   current_user="${USER:-$(id -un)}"
   output_dir="$HOME/Pictures/wallpapers"
   script_dir="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -364,20 +359,12 @@ gc_stale_wallpapers() {
     fi
 
     if ! rm -f "$candidate" 2>/dev/null; then
-      # Non-fatal: some files under ~/Pictures may be protected by Finder
-      # metadata/ACL flags (for example iCloud-managed placeholders). GC
-      # should continue pruning other files even if one deletion is denied.
       warn "failed to remove stale wallpaper '$candidate'"
     fi
   done
 }
 
 gc_dir_contents_if_present() {
-  # Clears the contents of a cache directory while preserving the directory
-  # itself so future tool invocations do not have to recreate parent paths.
-  # Args:
-  #   $1 — cache directory path
-  #   $2 — human-readable label for logs
   cache_dir="$1"
   cache_label="$2"
 
@@ -391,12 +378,6 @@ gc_dir_contents_if_present() {
 }
 
 gc_tool_caches_if_available() {
-  # bun/cargo/rustc/uv all accumulate user-scoped caches under HOME, regardless
-  # of whether the binary came from the system profile or a direnv-loaded
-  # devShell.  Clearing those shared cache locations reclaims space for both
-  # system and devShell use without touching project-managed dependencies.
-  # rustc has no standalone cache tree; its heavy artifacts live in cargo and
-  # rustup-managed directories, which are gc'd below.
 
   cargo_home_dir="${CARGO_HOME:-$HOME/.cargo}"
   rustup_home_dir="${RUSTUP_HOME:-$HOME/.rustup}"
@@ -416,9 +397,6 @@ gc_tool_caches_if_available() {
   gc_dir_contents_if_present "$cargo_binstall_cache_dir" "cargo-binstall cache"
   gc_dir_contents_if_present "$rustup_tmp_dir" "rustup temporary cache"
 
-  # cargo-cache (github.com/matthiaskrgr/cargo-cache) reclaims space from
-  # ~/.cargo/registry, ~/.cargo/git, and advisory-db clones.  This remains the
-  # authoritative gc path when the binary is available.
   if ! command -v cargo-cache >/dev/null 2>&1; then
     say "cargo-cache unavailable; skipping cargo cache gc"
   elif [ ! -d "$cargo_home_dir" ]; then
@@ -429,9 +407,6 @@ gc_tool_caches_if_available() {
 
   gc_dir_contents_if_present "$uv_cache_dir" "uv cache"
 
-  # direnv materializes the current repository's nix devShell under .direnv.
-  # Clearing only the nucleus checkout keeps scope bounded to managed content;
-  # unrelated repositories are left untouched.
   if [ -d "$repo_direnv_dir" ]; then
     if ! rm -rf -- "$repo_direnv_dir"; then
       warn "failed to remove repo-local direnv cache '$repo_direnv_dir'"
@@ -440,14 +415,7 @@ gc_tool_caches_if_available() {
 }
 
 gc_git_cache_if_present() {
-  # Remove stale .git cache and state files from repos under ~/dev.
-  # Deeper cleanup: gitk cache, gc.log, stale lock files, abandoned
-  # merge/rebase/bisect state, deprecated directories (branches/, remotes/),
-  # refs/original/, and delegated cleanup via `git gc --auto`.
   #
-  # Active operation detection (MERGE_HEAD, rebase-merge/, BISECT_LOG, etc.)
-  # is done per-repo; state file removal is skipped for repos with
-  # in-progress operations.
   dev_root="$HOME/dev"
   if [ ! -d "$dev_root" ]; then
     return 0
@@ -458,7 +426,6 @@ gc_git_cache_if_present() {
     (
       cd "$repo_dir" 2>/dev/null || exit 0
 
-      # Detect active Git operation.
       active_op=false
       for marker in ".git/MERGE_HEAD" ".git/rebase-merge" ".git/rebase-apply" ".git/BISECT_LOG" ".git/CHERRY_PICK_HEAD" ".git/REVERT_HEAD"; do
         if [ -e "$marker" ]; then
@@ -467,7 +434,6 @@ gc_git_cache_if_present() {
         fi
       done
 
-      # Remove gitk cache.
       if [ -f ".git/gitk.cache" ]; then
         if [ "$dry_run" = true ]; then
           dry_run "would remove '.git/gitk.cache' in '$repo_dir'"
@@ -476,7 +442,6 @@ gc_git_cache_if_present() {
         fi
       fi
 
-      # Remove gc.log (allows git gc --auto to run again).
       if [ -f ".git/gc.log" ]; then
         if [ "$dry_run" = true ]; then
           dry_run "would remove '.git/gc.log' in '$repo_dir'"
@@ -485,7 +450,6 @@ gc_git_cache_if_present() {
         fi
       fi
 
-      # Remove lock files except index.lock.
       while IFS= read -r -d '' _lockfile; do
         if [ "$dry_run" = true ]; then
           dry_run "would remove lock file '$(printf '%s' "$_lockfile" | sed "s|^\./\.git/|.git/|")' in '$repo_dir'"
@@ -494,9 +458,6 @@ gc_git_cache_if_present() {
         fi
       done < <(find ".git" -name '*.lock' ! -name 'index.lock' -type f -print0 2>/dev/null)  # ref: allow-and-deny-lists.instructions.md#A5 -- Git invariant; index.lock must never be cleaned
 
-      # Remove stale state files when no active operation.
-      # Uses dynamic glob patterns to discover stale files, so new Git state
-      # files are automatically picked up without maintaining a hard-coded list.
       if [ "$active_op" = false ]; then
         while IFS= read -r -d '' _state_file; do
           _state_file="${_state_file#./}"
@@ -508,7 +469,6 @@ gc_git_cache_if_present() {
         done < <(find ".git" -type f \( -name '*_HEAD' -o -name 'BISECT_*' -o -name 'AUTO_MERGE' -o -name 'SQUASH_MSG' \) -print0 2>/dev/null)
       fi
 
-      # Remove deprecated directories if empty.
       for _dep_dir in ".git/branches" ".git/remotes"; do
         if [ -d "$_dep_dir" ]; then
           if ! find "$_dep_dir" -mindepth 1 -maxdepth 1 | head -n 1 | grep -q .; then
@@ -522,7 +482,6 @@ gc_git_cache_if_present() {
         fi
       done
 
-      # Remove refs/original/ via git update-ref (handles packed-refs).
       if git for-each-ref --format='%(refname)' refs/original/ 2>/dev/null | grep -q .; then
         if [ "$dry_run" = true ]; then
           dry_run "would remove refs/original/ in '$repo_dir'"
@@ -536,8 +495,6 @@ gc_git_cache_if_present() {
         fi
       fi
 
-      # Run git gc --auto (delegates object pruning, reflog expiry, etc.
-      # to Git).  --auto is a no-op when nothing needs gc.
       if [ "$dry_run" = true ]; then
         dry_run "would run 'git gc --auto' in '$repo_dir'"
       else
@@ -549,28 +506,16 @@ gc_git_cache_if_present() {
 }
 
 gc_ollama_models_if_available() {
-  # Remove locally installed Ollama models that are absent from the declarative
-  # manifest at src/modules/ai/models.json.  Delegates to nucleus-ai sync with
-  # --gc-only so no new pulls are attempted during GC — a GC run should only
-  # reclaim space, not trigger multi-GB model downloads.
   #
-  # The probe below checks for both ollama and jq before delegating; nucleus-ai
-  # performs the same checks internally but printing a single skip message here
-  # avoids noise from two separate absence warnings.
   if ! command -v ollama >/dev/null 2>&1; then
-    # Existence probe — tool absent is expected and benign before Ollama
-    # has been provisioned on this host.
     say "ollama unavailable; skipping ollama model gc"
     return 0
   fi
   if ! command -v jq >/dev/null 2>&1; then
-    # jq is required by nucleus-ai to parse the JSON manifest.
     say "jq unavailable; skipping ollama model gc"
     return 0
   fi
 
-  # GC must stay space-reclaim only; do not wait for a cold Ollama daemon to
-  # start because that would stall GC on hosts where the AI service is idle.
   nucleus-ai sync --gc-only
 }
 
@@ -579,31 +524,20 @@ gc_sccache_cache_if_available() {
 }
 
 gc_vm_artifacts_if_present() {
-  # Remove stale VM artifacts from ~/virtual machines that accumulate across
-  # provisioning cycles. Transient Packer build directories are removed here;
-  # the destructive keep-set logic is delegated to vm.sh gc.
   #
   # WHY: keep-set has one source of truth in src/scripts/lib/vm.sh — vm_gc_vms
-  # preserves every manifest guest by default; the old enabled-only sweep
-  # deleted non-regenerable goldens/bases of disabled/other-host guests
-  # (Android-system.qcow2, Windows.qcow2). Start/stop scripts are regenerated
-  # per manifest guest (vm_write_all_guest_scripts) and stripped by pack;
-  # descriptor staleness is owned by vm_gc_orphan_descriptors.
   vm_dir="${HOME}/virtual machines"
   src_dir="$vm_dir/src"
   manifest="$REPO_ROOT/src/modules/VMs.json"
 
-  # If VM directories do not exist, there is nothing to clean.
   if [ ! -d "$vm_dir" ]; then
     return 0
   fi
 
-  # If the VM src directory does not exist, there is nothing to clean.
   if [ ! -d "$src_dir" ]; then
     return 0
   fi
 
-  # Verify the manifest exists before sweeping or delegating.
   if [ ! -f "$manifest" ]; then
     error "manifest '$manifest' not found; skipping VM artifact gc"
   fi
@@ -611,13 +545,11 @@ gc_vm_artifacts_if_present() {
   require_command jq
 
   # WHY: an empty manifest would give vm_gc_vms an empty keep-set and delete
-  # every image; bail out instead.
   vm_count="$(jq '.VMs | length' "$manifest")"
   if [ "$vm_count" -eq 0 ]; then
     return 0
   fi
 
-  # Remove temporary Packer build directories under src/<type>/Packer/.
   for _gc_type_dir in "$src_dir"/*/; do
     [ -d "$_gc_type_dir" ] || continue
     _gc_packer_dir="${_gc_type_dir}Packer"
@@ -632,7 +564,6 @@ gc_vm_artifacts_if_present() {
     fi
   done
 
-  # Remove leftover Packer temporary build directories (dot-prefixed, from interrupted runs).
   for _gc_type_dir in "$src_dir"/*/; do
     [ -d "$_gc_type_dir" ] || continue
     for _gc_packer_tmp in "$_gc_type_dir"/.??*; do
@@ -647,9 +578,6 @@ gc_vm_artifacts_if_present() {
   done
   unset _gc_type_dir _gc_packer_dir _gc_packer_tmp
 
-  # Delegate the destructive disk/script/descriptor GC to the single source of
-  # truth (default keep-set preserves every manifest guest; --gc-disabled
-  # narrows). Repo-relative path: no PATH lookup.
   if [ ! -f "$REPO_ROOT/scripts/vm.sh" ]; then
     error "vm.sh not found at '$REPO_ROOT/scripts/vm.sh'; cannot gc VM artifacts"
   fi
@@ -663,17 +591,14 @@ gc_vm_artifacts_if_present() {
   "$REPO_ROOT/scripts/vm.sh" gc "${_gc_vm_extra_args[@]}"
 }
 
-# Step 1: expire system profile generations before store GC.
 if [ "$system_gc" = true ]; then
   expire_system_profile_generations
 fi
 
-# Step 1b: expire HM profile generations before store GC.
 if [ "$hm_gc" = true ]; then
   expire_hm_profile_generations
 fi
 
-# Step 1c: remove stale Nix build result symlinks before store GC.
 if [ "$nix_artifacts_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would remove stale Nix build result symlinks"
@@ -682,7 +607,6 @@ if [ "$nix_artifacts_gc" = true ]; then
   fi
 fi
 
-# Step 2: Nix store GC.
 if [ "$nix_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would run nix-collect-garbage --delete-older-than $nix_expiry"
@@ -691,7 +615,6 @@ if [ "$nix_gc" = true ]; then
   fi
 fi
 
-# Step 2b: btrfs block dedup on /nix/store (root weekly GC only).
 if [ "$_gc_root_scheduler" = true ] && [ "$duperemove_gc" = true ]; then
   gc_duperemove_store_if_available
 fi
@@ -701,7 +624,6 @@ if [ "$_gc_root_scheduler" = true ]; then
   _gc_skip_user_steps=true
 fi
 
-# Step 3: stale wallpaper gc (independent of Nix).
 if [ "$_gc_skip_user_steps" != true ] && [ "$wallpaper_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would remove stale wallpapers"
@@ -710,7 +632,6 @@ if [ "$_gc_skip_user_steps" != true ] && [ "$wallpaper_gc" = true ]; then
   fi
 fi
 
-# Step 4: tool cache gc (independent of Nix, runs last).
 if [ "$_gc_skip_user_steps" != true ] && [ "$tool_cache_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would clear tool caches"
@@ -718,7 +639,6 @@ if [ "$_gc_skip_user_steps" != true ] && [ "$tool_cache_gc" = true ]; then
     gc_tool_caches_if_available
   fi
 fi
-# Step 5: remove stale .git cache/state files and run git gc --auto in ~/dev.
 if [ "$_gc_skip_user_steps" != true ] && [ "$git_cache_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would remove stale .git cache/state files in ~/dev"
@@ -726,7 +646,6 @@ if [ "$_gc_skip_user_steps" != true ] && [ "$git_cache_gc" = true ]; then
     gc_git_cache_if_present
   fi
 fi
-# Step 7: remove orphaned Ollama models not declared in the manifest.
 if [ "$_gc_skip_user_steps" != true ] && [ "$ollama_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would gc stale Ollama models"
@@ -735,7 +654,6 @@ if [ "$_gc_skip_user_steps" != true ] && [ "$ollama_gc" = true ]; then
   fi
 fi
 
-# Step 7b: clear sccache compilation cache.
 if [ "$_gc_skip_user_steps" != true ] && [ "$sccache_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would clear sccache cache"
@@ -744,13 +662,11 @@ if [ "$_gc_skip_user_steps" != true ] && [ "$sccache_gc" = true ]; then
   fi
 fi
 
-# Step 8: remove stale VM artifacts (temporary builds, orphaned images).
 if [ "$_gc_skip_user_steps" != true ] && [ "$vm_gc" = true ]; then
   gc_vm_artifacts_if_present
 fi
 
 gc_logs() {
-  # Rotate managed log files via copy-truncate (preserves inodes).
   services_json="$REPO_ROOT/src/modules/services.json"
   services_schema_json="$REPO_ROOT/src/modules/services.schema.json"
   if [ ! -f "$services_json" ]; then
@@ -775,7 +691,6 @@ gc_logs() {
   fi
 }
 
-# Step 9: rotate managed log files via copy-truncate (preserves inodes).
 if [ "$_gc_skip_user_steps" != true ] && [ "$log_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would rotate managed logs"
@@ -785,13 +700,7 @@ if [ "$_gc_skip_user_steps" != true ] && [ "$log_gc" = true ]; then
 fi
 
 gc_journald_if_available() {
-  # Vacuum journald logs older than the configured expiry.
-  # Uses the master expiry ($expiry_arg -> 7d default) so journald GC is
-  # aligned with other retention windows in this script.
   #
-  # journald vacuum preserves at minimum the specified time, so on NixOS
-  # where all service logs go through journald, this ensures old logs are
-  # reclaimed on the same schedule as file-based logs.
   if ! command -v journalctl >/dev/null 2>&1; then
     say "journalctl unavailable; skipping journald vacuum"
     return 0
@@ -802,7 +711,6 @@ gc_journald_if_available() {
   journalctl --vacuum-time="$_jv_expiry" 2>/dev/null || true
 }
 
-# Step 10: vacuum journald logs (NixOS only; no-op on macOS/Windows).
 if [ "$journald_gc" = true ]; then
   if [ "$dry_run" = true ]; then
     dry_run "would vacuum journald logs older than ${expiry_arg:-${NUCLEUS_GC_EXPIRY:-7d}}"
@@ -811,7 +719,5 @@ if [ "$journald_gc" = true ]; then
   fi
 fi
 
-# Step 11: Scoop cache gc (accepted but ignored on POSIX; Windows-only).
-# This flag exists for cross-platform CLI parity with the Windows gc.ps1 script.
 
 nuc_done

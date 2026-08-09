@@ -433,7 +433,6 @@ vm_get_running_ids() {
       virsh list --name 2>/dev/null
       ;;
     MINGW*|MSYS*|CYGWIN*)
-      # Runtime detection on Windows is handled by PowerShell.
       return 0
       ;;
   esac
@@ -505,14 +504,10 @@ vm_wait_for_guest() {
   _wg_timeout="${3:-150}"
   _wg_elapsed=0
 
-  # Probe host ports come from the manifest portForwards, not hard-coded
-  # Manifest host ports come from portForwards (guest 22 -> SSH, guest 5555 -> ADB).
-  # GA pipe path below is host-kind based and involves no host port.
   _wg_ssh_port="$(jq -r --arg t "$_wg_type" '[.VMs[] | select(.type == $t) | .portForwards[] | select(.guestPort == 22)][0].hostPort // empty' "$MANIFEST")"
   _wg_adb_port="$(jq -r --arg t "$_wg_type" '[.VMs[] | select(.type == $t) | .portForwards[] | select(.guestPort == 5555)][0].hostPort // empty' "$MANIFEST")"
 
   if [ "$_wg_type" = "NixOS" ]; then
-    # Try QEMU GA via socat first
     if command -v socat >/dev/null 2>&1; then
       while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
         echo '{"execute":"guest-ping"}' | socat - "PIPE:\\\\.\\pipe\\qga-$_wg_name" 2>/dev/null && return 0
@@ -520,7 +515,6 @@ vm_wait_for_guest() {
         _wg_elapsed=$((_wg_elapsed + 5))
       done
     fi
-    # Fallback: SSH
     while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
       ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -p "$_wg_ssh_port" "$_wg_name@localhost" true 2>/dev/null && return 0
       sleep 5
@@ -528,7 +522,6 @@ vm_wait_for_guest() {
     done
     return 1
   elif [ "$_wg_type" = "Windows" ]; then
-    # QEMU GA via socat
     if command -v socat >/dev/null 2>&1; then
       while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
         echo '{"execute":"guest-ping"}' | socat - "PIPE:\\\\.\\pipe\\qga-$_wg_name" 2>/dev/null && return 0
@@ -538,8 +531,6 @@ vm_wait_for_guest() {
     fi
     return 1
   elif [ "$_wg_type" = "Android" ]; then
-    # ADB connection check (Android guests expose ADB on the manifest
-    # forwarded host port for guest 5555)
     if command -v adb >/dev/null 2>&1; then
       while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
         if adb connect "localhost:$_wg_adb_port" 2>/dev/null | grep -q 'connected'; then
@@ -549,7 +540,6 @@ vm_wait_for_guest() {
         _wg_elapsed=$((_wg_elapsed + 5))
       done
     fi
-    # Fallback: SSH on the same host port as ADB
     _wg_elapsed=0
     while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
       ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
@@ -559,7 +549,6 @@ vm_wait_for_guest() {
     done
     return 1
   elif [ "$_wg_type" = "macOS" ]; then
-    # SSH check via Tart softnet guest IP (guest SSH on port 22)
     while [ "$_wg_elapsed" -lt "$_wg_timeout" ]; do
       # check-suppress:suppression_doc: guest IP is not available until Tart softnet assigns one; empty is expected while waiting.
       _wg_guest_ip="$(tart ip "$_wg_name" 2>/dev/null || true)"
@@ -603,7 +592,6 @@ vm_write_start_script() {
     _wss_tart_softnet_expose="$(printf '%s' "$_wss_doc" | jq -r '[.portForwards[] | "\(.hostPort):\(.guestPort)"] | join(",")')"
   fi
 
-  # Render .sh from template.
   if [ -f "$TEMPLATES_DIR/start-posix.sh" ]; then
     _wss_posix_sed=(
       -e "s|__VM_ID__|$_wss_id|g"
@@ -624,8 +612,6 @@ vm_write_start_script() {
   fi
   chmod 755 "$_wss_path_sh"
 
-  # Render .ps1 from the shared host-kind dispatcher template
-  # (embedded-content policy: single shared file per platform).
   case "$_wss_host_kind" in
     darwin-tart|darwin-utm|nixos-libvirt)
       if [ -f "$TEMPLATES_DIR/start-host.ps1" ]; then
@@ -649,17 +635,11 @@ vm_write_start_script() {
     windows-qemu)
       if [ "$_wss_type" = "Android" ]; then
         # WHY: the Android QEMU start script is shared cross-platform content
-        # (embedded-content policy); render the canonical file instead of an
-        # embedded copy (which had drifted and wrote literal backticks).
         _wss_android_start="$REPO_ROOT/src/scripts/vms/start-android-vm.ps1"
         if [ ! -f "$_wss_android_start" ]; then
           error "shared Android VM start script not found: $_wss_android_start"
           return 1
         fi
-        # Document-driven tokens: CPU count, RAM bytes, image filenames, and
-        # port forwards come from the JSON doc (descriptor or manifest fallback
-        # via vm_vm_json), keeping the shared start script single-source
-        # (embedded-content policy).
         _wss_cpus="$(printf '%s' "$_wss_doc" | jq -r '.cpus')"
         _wss_ram_bytes="$(parse_size "$(printf '%s' "$_wss_doc" | jq -r '.ram')")"
         _wss_system_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.systemImage')"
@@ -674,16 +654,10 @@ vm_write_start_script() {
             -e "s|__HOSTFWDS__|$_wss_hostfwds|g" \
             "$_wss_android_start" >"$_wss_path_ps1"
       else
-        # Windows VM start scripts mirror Invoke-VMSetup.ps1 rendering (Git
-        # Bash host): the cross-host templates stay single-source and all
-        # tokens come from the JSON doc (descriptor or manifest fallback).
         _wss_hostfwds="$(printf '%s' "$_wss_doc" | jq -r '[.portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")')"
         _wss_cpus="$(printf '%s' "$_wss_doc" | jq -r '.cpus')"
         _wss_ram_bytes="$(parse_size "$(printf '%s' "$_wss_doc" | jq -r '.ram')")"
         # WHY: the disk path is RELATIVE (data/<id>.qcow2, tree-root-relative)
-        # so rendered start scripts stay relocatable across hosts and users
-        # (the templates cd/Push-Location to the tree root before invoking
-        # QEMU).  Mirrors Invoke-VMSetup.ps1 and the descriptor disks array.
         _wss_disk_path="data/${_wss_id}.qcow2"
         _wss_qemu_arch="x86_64"
         if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
@@ -762,8 +736,6 @@ vm_write_stop_script() {
     return 0
   fi
 
-  # Render .sh from the shared host-kind dispatcher template
-  # (embedded-content policy: single shared file per platform).
   case "$_wst_host_kind" in
     darwin-tart|darwin-utm|nixos-libvirt)
       if [ -f "$TEMPLATES_DIR/stop-posix.sh" ]; then
@@ -778,8 +750,6 @@ vm_write_stop_script() {
       ;;
     windows-qemu)
       # WHY: stop-posix.sh dispatches to tart/utmctl/virsh only.  QEMU guests
-      # on Windows are stopped via stop-<id>.ps1 (rendered below), so no .sh
-      # variant is written for windows-qemu hosts.
       :
       ;;
     *)
@@ -787,14 +757,10 @@ vm_write_stop_script() {
       return 1
       ;;
   esac
-  # The .sh variant does not exist for windows-qemu hosts; chmod only when
-  # present (set -euo pipefail in scripts/vm.sh would abort otherwise).
   if [ -f "$_wst_path_sh" ]; then
     chmod 755 "$_wst_path_sh"
   fi
 
-  # Render .ps1 from the shared host-kind dispatcher template
-  # (embedded-content policy: single shared file per platform).
   case "$_wst_host_kind" in
     darwin-tart|darwin-utm|nixos-libvirt|windows-qemu)
       if [ -f "$TEMPLATES_DIR/stop-host.ps1" ]; then
@@ -1313,7 +1279,6 @@ vm_ensure_base_and_overlay() {
   _ebao_overlay="$VM_DIR/data/${_ebao_name}.qcow2"
   _ebao_backing_rel="$(vm_overlay_backing_rel_path "$_ebao_type")"
 
-  # Case 1 — base missing or invalid: recreate from the prebuilt golden.
   _ebao_base_valid=false
   if [ -f "$_ebao_base" ] && validate_qcow2_image "$_ebao_base" "base image for ${_ebao_name}" "$_ebao_min_size"; then
     _ebao_base_valid=true
@@ -1335,7 +1300,6 @@ vm_ensure_base_and_overlay() {
     say "created base image: $_ebao_base"
   fi
 
-  # Cases 2/3 — overlay missing, or invalid (recreated only with --force).
   if [ ! -f "$_ebao_overlay" ] || ! validate_qcow2_image "$_ebao_overlay" "runtime overlay for ${_ebao_name}" "$_ebao_min_size"; then
     if [ -f "$_ebao_overlay" ]; then
       warn "runtime overlay is invalid for '$_ebao_name': $_ebao_overlay"
@@ -1357,9 +1321,6 @@ vm_ensure_base_and_overlay() {
     say "created runtime overlay: $_ebao_overlay (backing $_ebao_backing_rel)"
   fi
 
-  # Case 4 — credential/config drift: replace the base from the prebuilt
-  # golden (keeps the overlay's user state), refresh markers; a running VM is
-  # left untouched to avoid corrupting an active disk chain.
   if [ -f "$_ebao_overlay" ]; then
     if ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_ebao_cred_marker" \
       || { [ -n "$_ebao_config_fp" ] && ! vm_guest_config_marker_matches "$_ebao_config_fp" "$_ebao_config_marker"; }; then
@@ -1377,8 +1338,6 @@ vm_ensure_base_and_overlay() {
     fi
   fi
 
-  # Case 5 — grow-only auto-grow: never shrink the overlay below its current
-  # virtual size even when the manifest diskSize decreased.
   if [ -n "$_ebao_disk_bytes" ] && [ -f "$_ebao_overlay" ]; then
     _ebao_virtual_size="$(qemu-img info --output=json "$_ebao_overlay" | jq -r '."virtual-size" // 0')"
     if [ -n "$_ebao_virtual_size" ] && [ "$_ebao_virtual_size" -lt "$_ebao_disk_bytes" ]; then
@@ -1877,7 +1836,6 @@ vm_android_ensure_userdebug_recovery() {
     return 1
   fi
 
-  # Fastboot mode has no ADB — probe fastboot before any adb connect/disconnect.
   if [ "$(vm_android_fastboot_list_state "$_aeur_vm_index")" = "fastboot" ]; then
     say "guest already in fastboot on $_aeur_fb_serial"
   elif vm_android_guest_has_userdebug_recovery "$_aeur_vm_index"; then
@@ -1956,30 +1914,20 @@ vm_build_android() {
   _bai_upgrade_android="$4"
   _bai_reset_userdata="$5"
   vm_ensure_type_src_dirs
-  # The Android userdata disk size comes from the manifest (diskSize),
-  # parsed to exact bytes; a hardcoded size here would silently ignore
-  # VMs.json.
   _bai_disk_bytes="$(parse_size "$(jq -r ".VMs[$_bai_vm_index].diskSize" "$MANIFEST")")"
   _bai_gsi_url="$(jq -r ".VMs[$_bai_vm_index].Android.gsiUrl" "$MANIFEST")"
-  # Image filenames come from the manifest Android group (systemImage /
-  # userdataImage / gsiImage) so VMs.json is the single source of truth.
   _bai_system_img="$(vm_src_path Android "$(jq -r ".VMs[$_bai_vm_index].Android.systemImage" "$MANIFEST")")"
-  # The canonical userdata disk is data/<id>.qcow2 (per-guest writable overlay).
   _bai_userdata_img="$VM_DIR/data/${_bai_vm_id}.qcow2"
   _bai_gsi_img="$(vm_src_path Android "$(jq -r ".VMs[$_bai_vm_index].Android.gsiImage" "$MANIFEST")")"
-  # Set when this run replaces a canonical disk (system image re-download or
-  # userdata reset), so the end-of-build bundle refresh knows to re-link.
   _bai_system_replaced=false
   _bai_userdata_replaced=false
 
-  # shareDevDir is unsupported on Android (no host filesystem sharing via QEMU).
   _bai_share_dev_dir="$(jq -r ".VMs[$_bai_vm_index].shareDevDir // false" "$MANIFEST")"
   if [ "$_bai_share_dev_dir" = "true" ]; then
     error "shareDevDir is not supported for Android VM '$_bai_vm_id'; Android does not support host filesystem sharing via QEMU"
     exit 1
   fi
 
-  # Step 1: Download and extract LineageOS base system image
   if [ ! -f "$_bai_system_img" ] || [ "$_bai_upgrade_android" = "true" ]; then
     if [ "$_bai_upgrade_android" = "true" ] && [ -f "$_bai_system_img" ]; then
       say "upgrading Android system image for '$_bai_vm_id' (re-downloading)..."
@@ -2001,10 +1949,6 @@ vm_build_android() {
     rm -rf "$_bai_extract_dir"
     mkdir -p "$_bai_extract_dir"
     run_cmd unzip -q "$_bai_lineage_zip" -d "$_bai_extract_dir"
-    # UTM bundle layouts differ across versions (vda.qcow2 in UTM 1-3,
-    # disk-main.qcow2 in UTM 4); pick the largest qcow2 as the system image.
-    # tr strips the whitespace wc -c pads its output with (macOS pads; Linux
-    # does not), which would otherwise leak into the path after cut.
     _bai_qcow2="$(find "$_bai_extract_dir" -type f -name '*.qcow2' -print | while IFS= read -r _f; do printf '%s %s\n' "$(wc -c < "$_f" | tr -d '[:space:]')" "$_f"; done | sort -rn | head -1 | cut -d' ' -f2-)"
     if [ -z "$_bai_qcow2" ]; then
       error "no qcow2 system image found inside extracted LineageOS bundle"
@@ -2019,7 +1963,6 @@ vm_build_android() {
     say "system image already exists: $_bai_system_img"
   fi
 
-  # Step 2: Create userdata disk (skip if exists, unless reset requested)
   _bai_bundle_userdata="$VM_DIR/${_bai_vm_id}.utm/Data/$(jq -r ".VMs[$_bai_vm_index].Android.userdataImage" "$MANIFEST")"
   mkdir -p "$VM_DIR/data"
   if [ ! -f "$_bai_userdata_img" ] || [ "$_bai_reset_userdata" = "true" ]; then
@@ -2041,7 +1984,6 @@ vm_build_android() {
     say "userdata disk already exists: $_bai_userdata_img"
   fi
 
-  # Step 3: GSI system image (optional, when the Android group's gsiUrl is set)
   if [ -n "$_bai_gsi_url" ] && [ "$_bai_gsi_url" != "null" ]; then
     if [ "$_bai_accept_gsi_license" != "true" ]; then
       error "GSI license not accepted for '$_bai_vm_id'; see https://developer.android.com/license"
@@ -2070,12 +2012,7 @@ vm_build_android() {
     say "no GSI URL set; skipping GSI download (Lineage-only)"
   fi
 
-  # Re-link refresh: when this build replaced a canonical disk (system image
-  # re-download or userdata reset), refresh an existing UTM bundle so UTM
-  # boots the new artifacts instead of stale inodes (G1a).  Only macOS has a
   # bundle; skipped in dry-run (no real mutations).  WHY: do_upgrade and
-  # do_reset call vm_build_android directly without the vm_setup_utm_vms
-  # provisioning pass, which would otherwise refresh these links.
   if [ "$dry_run" = false ]; then
     if [ "$_bai_system_replaced" = true ] || [ "$_bai_userdata_replaced" = true ]; then
       _bai_bundle_dir="$VM_DIR/${_bai_vm_id}.utm/Data"
@@ -2105,8 +2042,6 @@ vm_build_one_image() {
   local _vm_disk_bytes _vm_ram_bytes
   _vm_disk_bytes="$(parse_size "$(jq -r ".VMs[$_vm_index].diskSize" "$MANIFEST")")"
 
-  # Per-VM guest hostname: guest builds (nixos-generators, packer) read it via
-  # NUCLEUS_VM_GUEST_HOSTNAME so each VM's declared hostname reaches the guest.
   local _vm_guest_hostname
   _vm_guest_hostname="$(jq -r --arg n "$_vm_id" '.VMs[] | select(.id == $n) | .hostname // empty' "$MANIFEST")"
   export NUCLEUS_VM_GUEST_HOSTNAME="$_vm_guest_hostname"
@@ -2114,8 +2049,6 @@ vm_build_one_image() {
   case "$_vm_type" in
     NixOS)
       # check-suppress:suppression_doc: best-effort -- a prerequisite-missing or build failure for one
-      # VM type must not abort builds for the remaining VMs; the build
-      # function prints a specific error before returning non-zero.
       vm_build_nixos "$_vm_id" "$_vm_disk_bytes" \
         || say "NixOS image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
       ;;
@@ -2389,7 +2322,6 @@ vm_setup_tart() {
     return
   fi
 
-  # Verify the tart VM was created in phase 1.
   if ! vm_get_tart_registered_names | grep -qxF "$vm_id"; then
     warn "tart VM '$vm_id' not found; Packer build may have failed or was skipped"
     return
@@ -2414,7 +2346,6 @@ vm_setup_utm() {
 
   vm_display=$(jq -r ".VMs[$vm_index].name" "$MANIFEST")
 
-  # macOS guests are provisioned via tart (vm_setup_tart_vms), not UTM.
   if [ "$vm_type" = "macOS" ]; then
     say "macOS guest '$vm_id' stays on Tart runtime; skipping UTM bundle provisioning for this VM"
     return
@@ -2426,7 +2357,6 @@ vm_setup_utm() {
   disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_id" "$disk_file")"
   disk_config_marker="$(vm_guest_config_marker_path "$vm_id" "$disk_file")"
   # WHY: only NixOS guests have a Nix-managed guest config to fingerprint;
-  # Windows/macOS are built by Packer with separate templates.
   _guest_config_fingerprint=''
   if [ "$vm_type" = "NixOS" ]; then
     _guest_config_fingerprint="$(vm_guest_config_fingerprint)"
@@ -2445,27 +2375,16 @@ vm_setup_utm() {
   if ! vm_validate_utm_plist_template "$vm_id"; then
     return
   fi
-  # Detect config drift in already-registered bundles. UTM can keep runtime
-  # state from the registered entry, so we re-register when the on-disk
-  # bundle config no longer matches the managed template.
   if [ "$bundle_exists" = true ] && [ -f "$config_plist" ] && ! cmp -s "$_vupt_template" "$config_plist"; then
     template_drift_config=true
     say "detected config drift in existing bundle; VM will be re-registered to refresh runtime state: $vm_id"
   fi
-  # Android uses the shared android-* images (system + userdata, optional GSI)
-  # rather than a single <Name>.qcow2 pre-built image; other guests keep the
-  # ${vm_id}.qcow2 convention.  Image filenames come from the manifest
-  # Android group (systemImage / userdataImage / gsiImage).
   if [ "$vm_type" = "Android" ]; then
     _android_system="$(vm_src_path Android "$(jq -r ".VMs[$vm_index].Android.systemImage" "$MANIFEST")")"
-    # The canonical userdata disk is data/<id>.qcow2 (per-guest writable
-    # overlay); the bundle exposes it via a hard link (G1a write-through).
     _android_userdata="$VM_DIR/data/${vm_id}.qcow2"
     _android_gsi="$(vm_src_path Android "$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")")"
   fi
 
-  # Require a pre-built image only when the bundle does not already have a
-  # disk. Existing bundles can refresh config.plist in-place.
   if [ "$vm_type" = "Android" ]; then
     _prebuilt="$_android_system"
   else
@@ -2496,8 +2415,6 @@ vm_setup_utm() {
   if [ "$dry_run" = false ]; then
     mkdir -p "$data_dir"
     if [ "$vm_type" = "Android" ]; then
-      # Android guests do not run the vm-guest-credentials service, so no
-      # credential markers apply; sync system/userdata/GSI into the bundle.
       if [ ! -f "$_android_userdata" ]; then
         warn "Android userdata image not found: $_android_userdata; run vm-build first"
         return
@@ -2538,15 +2455,6 @@ vm_setup_utm() {
         rm -f "$_gsi_file"
       fi
     else
-      # Base/overlay provisioning: data/<id>.qcow2 is the canonical writable
-      # overlay (backing images/<type>.base.qcow2); the bundle exposes it and
-      # the base as hard links under Data/ so UTM's ImageName drives resolve
-      # without duplicating disk storage.  G1b: qemu-img resolves a relative
-      # backing file against the OPENED path's directory, so an overlay
-      # opened via its bundle hard link resolves the backing to the bundle
-      # path — non-Android backing resolution through the bundle link is
-      # assumed working only (user-confirmed 2026-08-04; live-verified only
-      # for Android userdata, which has no backing chain).
       if ! vm_ensure_base_and_overlay "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
           "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
         return
@@ -2589,11 +2497,6 @@ vm_setup_libvirt() {
 
   say "configuring libvirt VM '$vm_display' (hosts: $vm_hosts)..."
 
-  # Require pre-built images (built in phase 1).  Android uses the shared
-  # android-* images (system + userdata, optional GSI) referenced directly by
-  # the domain XML rather than a single <Name>.qcow2 runtime copy.  Image
-  # filenames come from the manifest Android group (systemImage / userdataImage
-  # / gsiImage).
   if [ "$vm_type" = "Android" ]; then
     _android_system="$(vm_src_path Android "$(jq -r ".VMs[$vm_index].Android.systemImage" "$MANIFEST")")"
     _android_userdata="$VM_DIR/data/${vm_id}.qcow2"
@@ -2625,13 +2528,8 @@ vm_setup_libvirt() {
   if [ "$dry_run" = false ]; then
     mkdir -p "$VM_DIR"
     if [ "$vm_type" = "Android" ]; then
-      # The Android domain XML references the shared images directly; no
-      # runtime copy and no guest-credential markers apply.
       say "Android images referenced directly by domain XML: $_android_system, $_android_userdata"
     else
-      # Base/overlay provisioning: data/<id>.qcow2 is the canonical writable
-      # overlay backing images/<type>.base.qcow2; the domain XML references
-      # the data/ path (see vms.nix).
       if ! vm_ensure_base_and_overlay "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
           "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
         return
@@ -2663,9 +2561,6 @@ vm_build_nixos() {
   _vm_id="$1"
   _disk_bytes="$2"
 
-  # Detect host architecture for nixos-generators format selection.
-  #   aarch64/arm64 → qcow-efi-btrfs  (UTM on Apple Silicon uses UEFI/virt machine)
-  #   x86_64/amd64  → qcow-btrfs      (BIOS/hybrid mode on x86_64 hosts)
   case "$(uname -m)" in
     aarch64|arm64)
       _nixos_system='aarch64-linux'
@@ -2684,8 +2579,6 @@ vm_build_nixos() {
   _min_size="$(parse_size "$(jq -r ".VMs[] | select(.id == \"$_vm_id\") | .minImageSize" "$MANIFEST")")"
 
   # WHY: rebuild when the guest config (guest.nix + imports + flake.lock)
-  # drifts too, not just on credential drift; otherwise config edits silently
-  # keep shipping the stale pre-built image.
   _config_fingerprint="$(vm_guest_config_fingerprint)" || return 1
 
   if [ -f "$_out" ]; then
@@ -2732,10 +2625,6 @@ vm_build_nixos() {
     --configuration "$_guest_nix" \
     -o "$_out_link"
 
-  # nixos-generators' -o flag expects a non-existent symlink path, not an
-  # already-created directory. Use a child path inside our temp dir so the link
-  # can be created atomically, then resolve either a direct symlink-to-file or a
-  # symlinked directory containing the final QCOW2 image.
   # check-suppress:suppression_doc: symlink may not exist yet; readlink exits 1 for broken/missing links.
   _img="$(readlink "$_out_link" 2>/dev/null || true)"
   if [ -z "$_img" ] || [ ! -f "$_img" ]; then
@@ -2746,14 +2635,10 @@ vm_build_nixos() {
     rm -rf "$_tmpdir"
     return 1
   fi
-  # -L follows symlinks so we copy the actual disk image bytes.
   copy_with_reflink "$_img" "$_out"
   chmod u+w "$_out"
 
   # WHY: nixos-generators defaults to a small virtual disk (~4 GiB) for qcow
-  # outputs, but this repository declares guest disk sizes in VMs.json.
-  # Resize here so the pre-built image matches the manifest contract used by
-  # all runtime backends (UTM/libvirt/QEMU).
   if ! resize_and_mark_image "$_out" "$_marker" "$_disk_bytes"; then
     rm -rf "$_tmpdir"
     return 1
@@ -2787,10 +2672,6 @@ download_windows_iso_mido() {
     return 1
   fi
 
-  # Map edition to Mido media identifier.
-  # Consumer multi-edition ISO (win11x64) covers Home/Pro/Edu; the
-  # answer file selects the exact edition during unattended setup.
-  # Source: Mido usage in windows/isos/mido.sh
   case "$(printf '%s' "$_mido_edition" | tr '[:upper:]' '[:lower:]')" in
     *enterprise*eval*) _mido_media='win11x64-enterprise-eval' ;;
     *) _mido_media='win11x64' ;;
@@ -2798,9 +2679,6 @@ download_windows_iso_mido() {
 
   say "downloading Windows 11 ISO via Mido (media=$_mido_media)..."
 
-  # Keep vendor submodules immutable by patching a temporary copy only.
-  # This preserves a clean submodule tree while allowing fast compatibility
-  # updates when Microsoft changes download-link HTML structures.
   _mido_patch_file="${NUCLEUS_MIDO_PATCH_FILE:-$REPO_ROOT/src/vms/Windows/patches/mido-iso-link.patch}"
   _mido_script_tmp=''
   _mido_exec_script="$_mido_script"
@@ -2842,19 +2720,10 @@ EOF
   _mido_status=0
   (
     cd "$_mido_tmp"
-    # Add Mido's directory to PATH to keep the download in _mido_tmp instead
-    # of Mido's own directory.
     # WHY: mido.sh checks if its parent directory is in PATH; if so it stays
-    # in PWD.  Without this, Mido cd-s to its own directory and writes the
-    # ISO there instead of _mido_tmp.
-    # Source: path detection logic at bottom of mido.sh
     PATH="${PATH}:${_mido_tmp}:${_mido_dir}" sh "$_mido_exec_script" "$_mido_media"
   ) || _mido_status=$?
 
-  # Exit code 4 means verification failed but the ISO was downloaded as
-  # .iso.UNVERIFIED (common for newer ISOs not yet in Mido's checksum list).
-  # Accept the file and proceed; the caller can verify manually if desired.
-  # Source: Mido exit codes in the ending_summary function of mido.sh
   if [ "$_mido_status" -ne 0 ] && [ "$_mido_status" -ne 4 ]; then
     error "Mido exited with code $_mido_status"
     rm -rf "$_mido_tmp"
@@ -2899,9 +2768,6 @@ download_windows_iso_fido() {
   fi
 
   say "downloading Windows 11 ISO via Fido (edition=$_fido_edition)..."
-  # Run Fido in a temp dir so it downloads the ISO to a known location.
-  # Fido.ps1 downloads to the working directory and returns the filename.
-  # Source: https://github.com/pbatard/Fido#usage
   _fido_tmp="$(mktemp -d)"
   _fido_status=0
   (
@@ -2918,8 +2784,6 @@ download_windows_iso_fido() {
     return 1
   fi
 
-  # Use find rather than ls to safely handle any filename; Fido downloads one
-  # ISO so sort-by-time is unnecessary.
   _fido_iso="$(find "$_fido_tmp" -maxdepth 1 -name '*.iso' | head -1)"
   if [ -z "$_fido_iso" ]; then
     error "Fido: no ISO found in temp dir after download"
@@ -2976,8 +2840,6 @@ download_windows_iso_fido_url_nonwindows() {
   _fido_output_file="$_fido_tmp/fido-url.out"
   cp "$_fido_script" "$_fido_exec"
 
-  # Fido intentionally blocks non-Windows at runtime; patch only the temp copy.
-  # This keeps vendor sources immutable while still allowing CLI URL resolution.
   _fido_patch_status=0
   perl -0pi -e 's/if \(\$winver -le 6\.1\) \{/if (\$false) {/g' "$_fido_exec" || _fido_patch_status=$?
   if [ "$_fido_patch_status" -ne 0 ]; then
@@ -3054,14 +2916,11 @@ vm_build_windows() {
     rm -f "$_out" "$_marker"
   fi
 
-  # Resolve the installer ISO: use --windows-iso if provided, otherwise try the
-  # Windows.isoUrl field from VMs.json as a download source.
   _iso="$windows_iso"
   if [ -z "$_iso" ]; then
     say "Windows ISO fallback order: cached installer -> Windows.isoUrl -> downloader ($windows_iso_source mode)"
   fi
 
-  # Resolve from cache first when --windows-iso is omitted.
   if [ -z "$_iso" ]; then
     _cached_iso="$(vm_src_path "$_vm_type" "$VM_WINDOWS_INSTALLER_ISO")"
     if [ -f "$_cached_iso" ]; then
@@ -3070,7 +2929,6 @@ vm_build_windows() {
     fi
   fi
 
-  # Resolve via Windows.isoUrl next when allowed by source mode.
   if [ -z "$_iso" ] && [ "$windows_iso_source" != "mido" ]; then
     _iso_url="$(jq -r ".VMs[] | select(.id == \"$_vm_id\") | .Windows.isoUrl // empty" "$MANIFEST")"
     if [ -n "$_iso_url" ]; then
@@ -3091,11 +2949,6 @@ vm_build_windows() {
     fi
   fi
 
-  # If still no ISO resolved, attempt automatic download fallback.
-  # On Windows hosts: Mido first, then native Fido download fallback.
-  # On macOS/Linux hosts: Fido URL resolver first (via pwsh -GetUrl), then Mido.
-  # Source: https://github.com/QubesOS/qvm-create-windows-qube
-  #         https://github.com/pbatard/Fido
   if [ -z "$_iso" ]; then
     _cached_iso="$(vm_src_path "$_vm_type" "$VM_WINDOWS_INSTALLER_ISO")"
     if [ "$dry_run" = false ]; then
@@ -3168,11 +3021,6 @@ vm_build_windows() {
   _ssh_timeout='3h'
   if [ "$accelerator" = 'tcg' ]; then
     # WHY: x86_64 Windows setup under software emulation can take much longer
-    # than hardware-accelerated paths.  On Apple Silicon (arm64 host emulating
-    # x86_64 guest) QEMU tcg typically runs at 2-5% of native speed, meaning
-    # Windows PE load + installation + OOBE + FirstLogonCommands can take
-    # 10-30 real hours.  Use a very generous timeout that covers even the
-    # slowest realistic tcg speed.
     _ssh_timeout='72h'
   fi
 
@@ -3196,9 +3044,6 @@ vm_build_windows() {
   fi
 
   # WHY: This repository currently standardizes Windows guest runtime on BIOS
-  # (see src/hosts/MacBook/vms.nix UEFIBoot=false and Autounattend.xml BIOS
-  # partitioning). Keep build attempts BIOS-only by default to avoid landing in
-  # OVMF Shell loops during EFI-first boot.
   _efi_code=''
   _efi_vars=''
   _qemu_share=''
@@ -3303,8 +3148,6 @@ EOF
     say "Windows Packer attempt using firmware_mode=$_firmware_mode boot_strategy=$_boot_strategy (ssh_timeout=$_attempt_timeout)..."
 
     # WHY: Packer qemu builder requires a non-existent output_directory.
-    # Use a fresh temp tree per attempt so a failed try cannot poison the next
-    # firmware/boot-strategy combination.
     _attempt_tmpdir="$(mktemp -d "$(vm_src_path "$_vm_type" ".${_vm_id}.${_firmware_mode}.${_boot_strategy}.XXXXXX")")"
     _tmp_out="$_attempt_tmpdir/output"
     _packer_log="$_attempt_tmpdir/packer.log"
@@ -3421,7 +3264,6 @@ vm_build_macos() {
   _macos_version="$5"
   _marker="$(vm_guest_credentials_marker_path "$_vm_id")"
 
-  # Tart requires Apple Virtualization.framework — macOS host only.
   if [ "$(uname -s)" != "Darwin" ]; then
     say "macOS guest build requires a macOS host (Tart uses Virtualization.framework); skipping"
     return 0
@@ -3437,7 +3279,6 @@ vm_build_macos() {
     return 1
   fi
 
-  # Check if tart VM already exists.
   if vm_get_tart_registered_names | grep -qxF "$_vm_id"; then
     if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker"; then
       say "tart VM '$_vm_id' already exists for the current guest credentials (owner=$vm_secret_owner, username=$vm_guest_username)"
@@ -3453,10 +3294,6 @@ vm_build_macos() {
   fi
 
   _packer_dir="$VMS_DIR/macOS"
-  # Tart accepts only whole GiB: `tart create --disk-size` is decimal GB
-  # (UInt64 * 1000^3) and the Packer Tart plugin passes memory as GiB*1024 MB
-  # to `tart set --memory`.  Round UP from exact manifest bytes so allocated
-  # capacity never under-allocates the declared size.
   _disk_gib="$(( (_disk_bytes + 999999999) / 1000000000 ))"
   _mem_gib="$(( (_ram_bytes + 1073741823) / 1073741824 ))"
 
@@ -3552,7 +3389,6 @@ vm_setup_libvirt_vms() {
     return
   fi
 
-  # Ensure the libvirt default network is started so VMs can reach the host.
   if virsh net-list --all 2>/dev/null | grep -q "default"; then
     if ! virsh net-list 2>/dev/null | grep -q "default.*active"; then
       say "starting libvirt default network..."
@@ -3594,10 +3430,6 @@ vm_setup_windows_qemu() {
 
   say "configuring Windows QEMU VM '$vm_display' (hosts: $vm_hosts)..."
 
-  # Android uses a standalone writable userdata disk at data/<id>.qcow2
-  # (system/GSI images stay read-only under images/ and are referenced
-  # directly).  The build phase creates it when missing, so this only fills
-  # gaps and grows it grow-only (never shrinks).
   if [ "$vm_type" = "Android" ]; then
     _android_userdata="$VM_DIR/data/${vm_id}.qcow2"
     _android_disk_bytes="$(parse_size "$(jq -r ".VMs[$vm_index].diskSize" "$MANIFEST")")"
@@ -3633,10 +3465,6 @@ vm_setup_windows_qemu() {
     return
   fi
 
-  # Base/overlay provisioning: data/<id>.qcow2 is the canonical writable
-  # overlay backing images/<type>.base.qcow2 (base = copy of the prebuilt
-  # golden); credential drift refreshes the base from the prebuilt while
-  # preserving the overlay, and growth is grow-only.
   _prebuilt="$(vm_src_path "$vm_type" "$VM_PREBUILT_IMAGE")"
   _prebuilt_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
   _prebuilt_disk_bytes="$(parse_size "$(jq -r ".VMs[$vm_index].diskSize" "$MANIFEST")")"
@@ -3677,7 +3505,6 @@ vm_setup_windows_qemu_vms() {
 #   enabled-and-host-matched VMs.
 vm_gc_vms() {
   # WHY: default GC keeps disabled entries; only names absent from the
-  # manifest are orphans.  --gc-disabled opts into clearing disabled entries.
   if [ "$gc_disabled_mode" = true ]; then
     _gcv_expected="$(vm_get_expected_vm_ids)" || return
     say "GC — including disabled VM entries (--gc-disabled)..."
@@ -3937,10 +3764,7 @@ vm_pack_vms() {
     dry_run "pack mode enabled — printing planned removals (pass --force to perform)"
   fi
 
-  # Android userdata is canonical at data/Android.qcow2; the UTM bundle copy
-  # is a hard link (G1a), so removing bundles never loses userdata.
 
-  # UTM bundles — regenerable by setup from the descriptors (trivial).
   for _pv_bundle in "$VM_DIR"/*.utm/; do
     [ -d "$_pv_bundle" ] || continue
     say "pack — removing regenerable UTM bundle: $_pv_bundle"
@@ -3949,8 +3773,6 @@ vm_pack_vms() {
     fi
   done
 
-  # Generated start/stop helper scripts (BOTH variants) — sed-rendered,
-  # regenerable.  The pack/unpack wrappers are payload bootstrap and stay.
   if [ -d "$VM_DIR/scripts" ]; then
     for _pv_script in "$VM_DIR"/scripts/start-*.sh "$VM_DIR"/scripts/start-*.ps1 "$VM_DIR"/scripts/stop-*.sh "$VM_DIR"/scripts/stop-*.ps1; do
       [ -f "$_pv_script" ] || continue
@@ -3961,7 +3783,6 @@ vm_pack_vms() {
     done
   fi
 
-  # src/<type>/overlay backing.qcow2 — trivial cp from the kept prebuilt golden.
   for _pv_type_dir in "$SRC_DIR"/*/; do
     [ -d "$_pv_type_dir" ] || continue
     _pv_backing="$_pv_type_dir$VM_OVERLAY_BACKING"
@@ -4022,9 +3843,6 @@ vm_unpack_ensure_base_overlay() {
     fi
     if [ ! -f "$_uebo_overlay" ]; then
       say "unpack — recreating absent overlay disk: $_uebo_overlay"
-      # Relative backing path (../src/<type>/overlay backing.qcow2), mirroring
-      # vm_ensure_base_and_overlay, so the tree stays relocatable between
-      # hosts (an absolute path would pin it to this machine).
       qemu-img create -f qcow2 -b "$_uebo_backing_rel" -F qcow2 "$_uebo_overlay" >/dev/null
     else
       say "unpack — keeping existing overlay disk: $_uebo_overlay"
@@ -4073,12 +3891,9 @@ vm_unpack_vms() {
     _uv_enabled="$(jq -r '.enabled // false' "$_uv_desc")"
     _uv_host_kind="$(vm_script_host_kind "$_uv_type")" || return 1
 
-    # Scripts pass — for ALL descriptors, enabled or disabled: start/stop
-    # helper scripts (BOTH variants) from the descriptor JSON document.
     vm_write_start_script "$(cat "$_uv_desc")" "$_uv_host_kind"
     vm_write_stop_script "$(cat "$_uv_desc")" "$_uv_host_kind"
 
-    # Bundle/domain pass — only for enabled descriptors (mirrors setup).
     if [ "$_uv_enabled" != "true" ]; then
       say "unpack — descriptor '$_uv_name' is disabled; scripts rendered, no bundle/domain"
       continue
@@ -4086,8 +3901,6 @@ vm_unpack_vms() {
     case "$(uname -s)" in
       Darwin)
         if [ "$_uv_type" = "macOS" ]; then
-          # macOS/tart guests are managed by Tart's own store (kept by pack);
-          # nothing beyond the scripts pass applies here.
           say "unpack — macOS/tart guest '$_uv_name' is managed by Tart; nothing else to regenerate"
           continue
         fi
@@ -4105,10 +3918,6 @@ vm_unpack_vms() {
           fi
           mkdir -p "$_uv_bundle/Data"
           if [ "$_uv_type" = "Android" ]; then
-            # Android: system/GSI come from src/<type>/ (kept prebuilts, read
-            # only — copied like setup so writes never corrupt the golden);
-            # userdata comes from data/<id>.qcow2 (payload) and is linked
-            # (G1a write-through), mirroring vm_setup_utm.
             _uv_android_system="$(vm_src_path "$_uv_type" "$(jq -r '.Android.systemImage' "$_uv_desc")")"
             _uv_android_userdata="$VM_DIR/data/$(jq -r '.Android.userdataImage' "$_uv_desc")"
             _uv_android_gsi="$(vm_src_path "$_uv_type" "$(jq -r '.Android.gsiImage' "$_uv_desc")")"
@@ -4123,8 +3932,6 @@ vm_unpack_vms() {
               cp "$_uv_android_gsi" "$_uv_bundle/Data/$(basename "$_uv_android_gsi")"
             fi
           else
-            # Base/overlay: base cp from the kept prebuilt; overlay recreated
-            # only when absent (never rebuilt — its content is user data).
             if ! vm_unpack_ensure_base_overlay "$_uv_name" "$_uv_type"; then
               continue
             fi
@@ -4160,8 +3967,6 @@ vm_unpack_vms() {
         say "unpack — defining libvirt domain from descriptor: $_uv_name"
         if [ "$dry_run" = false ]; then
           if [ "$_uv_type" = "Android" ]; then
-            # Android images are referenced directly by the domain XML
-            # (mirrors vm_setup_libvirt); just validate the payload exists.
             _uv_android_system="$(vm_src_path "$_uv_type" "$(jq -r '.Android.systemImage' "$_uv_desc")")"
             _uv_android_userdata="$VM_DIR/data/$(jq -r '.Android.userdataImage' "$_uv_desc")"
             _uv_android_gsi="$(vm_src_path "$_uv_type" "$(jq -r '.Android.gsiImage' "$_uv_desc")")"
@@ -4189,7 +3994,6 @@ vm_unpack_vms() {
     esac
   done
 
-  # Refresh the pack/unpack wrappers once for the whole tree.
   vm_write_pack_unpack_scripts
 
   say "unpack — summary: regenerated wrappers for $_uv_desc_count descriptor(s) in $VM_DIR"

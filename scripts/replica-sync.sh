@@ -326,7 +326,6 @@ build_onedrive_root_filter_file() {
   fi
 
   # WHY: the trailing catch-all exclude makes the filter closed-world —
-  # only entries explicitly included above can be synced.
   printf '%s\n' '- **' >> "$_filter_file"
 
   rm -f "$_dir_entries_file" "$_file_entries_file"
@@ -355,8 +354,6 @@ gc_local_macos_artifacts() {
     find "$_target_dir" -type f -name "$_pattern" -delete
   done
 
-  # Note: this find-prune excludes directories for performance.
-  # For file-processing scripts, use deny-list.sh's filter_gitignored instead.
   for _dir_name in $_dir_names; do
     find "$_target_dir" -type d -name "$_dir_name" -prune -exec rm -rf -- {} +
   done
@@ -469,8 +466,6 @@ while IFS="$(printf '\t')" read -r id direction local_path remote_path provider 
   fi
 
   # WHY: native iCloud already syncs this tree (via the replica symlink), so
-  # pulling it again through the rclone iCloud remote would double-sync and
-  # fight the daemon.
   if [ "$host" = "MacBook" ] && [ "$provider" = "iCloud" ] && [ "$id" = "iCloud" ]; then
     if ! ensure_macos_icloud_replica_symlink "$local_path"; then
       failures=$((failures + 1))
@@ -485,7 +480,6 @@ while IFS="$(printf '\t')" read -r id direction local_path remote_path provider 
   provider_blocked_roots="$(load_provider_gc_entries "$provider" "blockedRoots")"
 
   # WHY: replicas are pull-only by policy — a push would overwrite cloud
-  # data with local state, which is destructive for shared content.
   if [ "$direction" != "pull" ]; then
     warn "[$display_name] unsupported direction '$direction'; replicas are pull-only by policy"
     failures=$((failures + 1))
@@ -506,8 +500,6 @@ while IFS="$(printf '\t')" read -r id direction local_path remote_path provider 
   fi
 
   # WHY: a missing filters file is a hard failure for read-only replicas —
-  # syncing without the filter could pull or delete the wrong files. The
-  # tree is re-locked before failing to restore the read-only invariant.
   if [ -n "$resolved_filters" ] && [ ! -f "$resolved_filters" ]; then
     warn "filters file '$resolved_filters' not found for replica '$display_name'"
     if [ "$read_write" != "true" ]; then
@@ -523,19 +515,13 @@ while IFS="$(printf '\t')" read -r id direction local_path remote_path provider 
   gc_local_macos_artifacts "$local_dir" "$provider_file_globs" "$provider_dir_names"
 
   # WHY: default rclone log level is INFO; ERROR keeps successful syncs
-  # quiet while still surfacing real failures in the failure counter.
   set -- --log-level ERROR
   # WHY: the iCloud remote hosts multiple services (Drive vs Documents);
-  # the manifest selects which tree this replica maps to.
   if [ "$provider" = "iCloud" ]; then
     set -- "$@" --iclouddrive-service "$icloud_service"
   fi
   if [ "$provider" = "OneDrive" ]; then
     if [ "$remote_path" = "/" ]; then
-      # Keep the defensive root probe/filter generation for Personal Vault, but
-      # let the real sync use OneDrive's default recursive listing path. For
-      # full-root pull replicas, forcing --disable ListR makes syncs
-      # pathologically slow.
       runtime_filter_file="$(build_onedrive_root_filter_file "$display_name" "$local_dir" "$remote_ref" "$provider_remote_excludes" "$provider_blocked_roots")"
       if [ -n "$resolved_filters" ]; then
         set -- "$@" --filter-from "$resolved_filters"
@@ -563,7 +549,6 @@ while IFS="$(printf '\t')" read -r id direction local_path remote_path provider 
   fi
 
   # WHY: restore the read-only invariant after the run so replica trees are
-  # snapshots again between syncs (prevents accidental edits or creation).
   if [ "$read_write" != "true" ]; then
     if ! set_replica_tree_read_only "$local_dir"; then
       warn "[$display_name] failed to lock replica tree '$local_dir'"

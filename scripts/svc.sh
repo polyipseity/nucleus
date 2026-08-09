@@ -66,15 +66,11 @@ case "$HOST" in
   *) error "unsupported host '$HOST'" ;;
 esac
 
-# Detect sudo availability for system-domain service access.
 HAS_SUDO=false
 if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
   HAS_SUDO=true
 fi
 
-# Resolve the real user UID for launchctl user-domain queries under sudo.
-# When running via sudo, $(id -u) returns 0 (root), but user-domain launchctl
-# services live under the original user's gui/<uid> context.
 REAL_USER_UID="$(id -u)"
 if [ "$EUID" -eq 0 ] && [ -n "${SUDO_UID:-}" ]; then
   REAL_USER_UID="$SUDO_UID"
@@ -114,7 +110,6 @@ resolve_service_names() {
   local names=("$@")
 
   if [ "${#names[@]}" -eq 0 ]; then
-    # Return all services, expanding prefix matches to concrete names
     while IFS=$'\t' read -r key display plat_json; do
       local prefix_match
       prefix_match=$(echo "$plat_json" | jq -r '.prefixMatch // false')
@@ -166,8 +161,6 @@ expand_prefix() {
       domain=$(echo "$plat_json" | jq -r '.domain // "user"')
       [ "$domain" = "system" ] && sudo_prefix="sudo"
       local matches
-      # When running under sudo, user-domain launchctl list shows root's
-      # user context — use launchctl asuser to query the real user's domain.
       # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
       if [ "$domain" = "user" ] && [ "$EUID" -eq 0 ]; then
         matches=$(launchctl asuser "$REAL_USER_UID" launchctl list 2>/dev/null | awk -v p="$prefix" '$3 ~ p { print $3 }' || true)  # check-suppress:suppression_doc: no matching services found is an expected empty result, not an error.
@@ -221,9 +214,6 @@ svc_status() {
       [ "$domain" = "system" ] && domain_flag="sudo"
 
       local list_line running=true enabled=true pid=""
-      # When running under sudo, user-domain launchctl list shows root's
-      # user context (gui/0/), not the original user's (gui/<SUDO_UID>/).
-      # Use launchctl asuser to query the real user's launchd domain.
       # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
       if [ "$domain" = "user" ] && [ "$EUID" -eq 0 ]; then
         list_line=$(launchctl asuser "$REAL_USER_UID" launchctl list 2>/dev/null | awk -v label="$svc_id" 'NR>1 && $3==label { print $1, $2 }' || true)  # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
@@ -243,9 +233,6 @@ svc_status() {
           running=false
         fi
       fi
-      # Fallback: if the basic check says inactive but launchctl print says
-      # the service is actually running (transient state in launchctl list),
-      # trust the authoritative print output.
       if [ "$running" != "true" ]; then
         local print_out
         # check-suppress:suppression_doc: service may not exist or may never have started; probe expected to fail.
@@ -265,7 +252,6 @@ svc_status() {
         status_text="listening"
       else
         status_text="inactive"
-        # Capture state and exit code from print output for diagnostics.
         state_text=$(echo "$print_out" | sed -n 's/.*state = //p' | head -1)
         exit_code=$(echo "$print_out" | sed -n 's/.*last exit code = //p' | head -1 | sed 's/:.*//')
       fi
@@ -345,9 +331,6 @@ recover_launchctl_service() {
       fi
       # check-suppress:suppression_doc: service may not be loaded; bootout on absent service exits 1.
       $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
-      # If bootstrap fails (e.g. launchd still cleaning up from bootout),
-      # return 1 so the caller's || block retries with the full
-      # graceful-shutdown path (SIGTERM + wait + bootout + bootstrap).
       if $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null; then
         return 0
       fi
@@ -507,26 +490,7 @@ svc_action() {
           ;;
         stop)    $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 ;;
         restart)
-          # Pre-cleanup: kill any rogue process holding the service's ports.
-          # This must run before launchd operations because bootout can only
-          # kill processes in its tracked tree.
           cleanup_service_ports "$entry_json"
-          # Three-stage restart strategy for launchctl services:
-          #   1. recover_launchctl_service — handles stuck states (EX_CONFIG,
-          #      "waiting", "spawn scheduled") via bootout+bootstrap.
-          #   2. SIGTERM — graceful shutdown for running services.
-          #   3. bootout+bootstrap — safety net that clears remaining exit
-          #      codes and re-registers the service.
-          #
-          # Stage 3 sends SIGKILL if the process is still alive after the
-          # 5s grace window.  This trade-off (forceful clear) is necessary
-          # because launchd will not retry services that exited with
-          # non-retryable codes.  The grace window gives well-behaved
-          # processes time to shut down cleanly before the hard kill.
-          #
-          # After bootstrap, the service is verified running.  If launchd
-          # fails to auto-start (transient bootstrap race), a start
-          # fallback is attempted as a safety net.
           recover_launchctl_service "$domain" "$svc_id" "$sudo_prefix" || {
             # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
             $sudo_prefix launchctl kill SIGTERM "$target" >/dev/null 2>&1 || true
@@ -537,13 +501,9 @@ svc_action() {
             done
             # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
             $sudo_prefix launchctl bootout "$target" 2>/dev/null || true
-            # Small delay between bootout and bootstrap to give launchd
-            # time to finish cleanup and avoid a bootstrap race.
             sleep 0.5
             # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
             $sudo_prefix launchctl bootstrap "$(launchctl_bootstrap_domain "$domain")" "$plist" 2>/dev/null || true
-            # Verify the service started after bootstrap.  Poll briefly
-            # and fall through to enable + start as a safety net.
             for _j in 1 2 3 4; do
               $sudo_prefix launchctl print "$target" 2>/dev/null \
                 | grep -q "state = running" && break
@@ -551,16 +511,12 @@ svc_action() {
             done
             if ! $sudo_prefix launchctl print "$target" 2>/dev/null \
                 | grep -q "state = running"; then
-              # launchd may need an explicit enable+start if bootstrap
-              # loaded the plist but a transient condition blocked
-              # KeepAlive from auto-starting the service.
               # check-suppress:suppression_doc: service may not be loaded; bootout/enable on absent service exits 1.
               $sudo_prefix launchctl enable "$target" >/dev/null 2>&1 || true
               $sudo_prefix launchctl start "$svc_id" >/dev/null 2>&1 || \
                 warn "$name — restart: failed to start service after reload"
             fi
           }
-          # Verify the service started after all recovery stages.
           poll_service_ready "$name" "$entry_json" >/dev/null || {
             local _diag
             _diag=$(service_diagnostic "$entry_json")
@@ -745,7 +701,6 @@ do_action() {
     local prefix_match
     prefix_match=$(echo "$entry" | jq -r '.hostEntry.prefixMatch // false')
     if [ "$prefix_match" = "true" ]; then
-      # For actions on prefix-match services, user must specify exact service name
       warn "$svc_name — prefix-match services (like $(echo "$entry" | jq -r '.hostEntry.service')*) require exact name; use list or status to discover"
       overall_exit=1
       continue
@@ -951,7 +906,6 @@ show_file_logs() {
   [ -z "$files" ] && return 1
   local sanitize_cmd="log_sanitize"
   "$raw" && sanitize_cmd="cat"
-  # Use array to pass multiple log files to tail without unquoted variable.
   local -a files_arr=()
   while IFS= read -r _file; do
     files_arr+=("$_file")
@@ -1000,7 +954,6 @@ do_logs() {
   done
   service_names=("${parsed_args[@]}")
 
-  # No service args: list available log sources.
   if [ "${#service_names[@]}" -eq 0 ]; then
     if $json_output; then
       printf '['
@@ -1143,7 +1096,6 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
-# Filter --json and --verbose from service_names (can appear before or after action)
 filtered_service_names=()
 for arg in "${service_names[@]}"; do
   if [ "$arg" = "--json" ]; then
@@ -1160,7 +1112,6 @@ for arg in "${service_names[@]}"; do
 done
 service_names=("${filtered_service_names[@]}")
 
-# Domain filter: CLI --user/--system overrides SVC_DOMAIN_FILTER env var.
 : "${SVC_DOMAIN_FILTER:=all}"
 case "$SVC_DOMAIN_FILTER" in
   user|system|all) ;;
@@ -1168,13 +1119,11 @@ case "$SVC_DOMAIN_FILTER" in
 esac
 domain_filter="${domain_filter:-$SVC_DOMAIN_FILTER}"
 
-# --system requires passwordless sudo
 if [ "$domain_filter" = "system" ] && ! $HAS_SUDO; then
   error "--system requires passwordless sudo"
   exit 1
 fi
 
-# Capture domain filter info/warning, emitted after the table in do_list.
 domain_filter_warning=""
 if [ "$domain_filter" = "user" ]; then
   domain_filter_warning="listing user-domain services only"

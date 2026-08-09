@@ -129,7 +129,6 @@ do_sync() {
         ;;
       --json)
         # WHY: sync emits human progress messages, not machine data, so --json
-        # is accepted for CLI parity but deliberately has no effect.
         ;;
       *)
         error "sync: unsupported argument '$1'"
@@ -140,9 +139,7 @@ do_sync() {
     shift
   done
 
-  # Determine the active model profile.
   # WHY: the default is the resolved nucleus host so the CLI works with zero
-  # config; explicit overrides (flag, then env) win.
   if [ -n "$_sync_profile_override" ]; then
     profile="$_sync_profile_override"
   elif [ -n "${NUCLEUS_AI_SYNC_PROFILE:-}" ]; then
@@ -151,7 +148,6 @@ do_sync() {
     profile="$HOST"
   fi
 
-  # Fail fast if jq is unavailable.
   if ! command -v jq >/dev/null 2>&1; then
     error "jq not found; cannot parse manifest"
   fi
@@ -165,10 +161,8 @@ do_sync() {
     exit 0
   fi
 
-  # Build the desired model list from the manifest for the active profile.
   desired_models=$(jq -r --arg profile "$profile" '.models[$profile][]' "$MANIFEST")
 
-  # Build the installed model list from `ollama list` output.
   installed_models=$(OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama list | awk 'NR>1 && $1!="" {print $1}')
 
   if [ "$_sync_gc_only" = false ]; then
@@ -189,8 +183,6 @@ do_sync() {
         fi
         if [ -f "$LOCKFILE" ]; then
           # WHY: the lockfile records expected digests so a tampered or
-          # truncated pull is caught immediately instead of silently serving
-          # a corrupted model later.
           _model_name="${model%%:*}"
           _model_tag="${model#*:}"
           [ "$_model_tag" = "$model" ] && _model_tag="latest"
@@ -210,7 +202,6 @@ do_sync() {
     done
   fi
 
-  # Remove models that are locally installed but absent from the manifest.
   printf '%s\n' "$installed_models" | while IFS= read -r model; do
     if [ -z "$model" ]; then
       continue
@@ -227,7 +218,6 @@ do_sync() {
   done
 
   # WHY: the summary names dry-run/gc-only explicitly so headless or logged
-  # runs are unambiguous about what was actually executed.
   _summary_flags=""
   if [ "$_sync_dry_run" = true ]; then
     _summary_flags=", not actually running due to --dry-run"
@@ -327,7 +317,6 @@ do_status() {
     shift
   done
 
-  # Probe ollama availability.
   _ollama_available=false
   _ollama_responding=false
 
@@ -340,7 +329,6 @@ do_status() {
   fi
 
   if [ "$_status_json" = true ]; then
-    # Build JSON output.
     _svc_json=$(jq -n --arg host "$HOST" \
       --arg ollama_available "$_ollama_available" \
       --arg ollama_responding "$_ollama_responding" \
@@ -366,7 +354,6 @@ do_status() {
     if [ "$_ollama_responding" = true ]; then
       say "ollama server: responding"
 
-      # Count desired vs installed models.
       _desired_count=$(jq -r --arg profile "$HOST" '.models[$profile] | length' "$MANIFEST")
       _installed_count=$(OLLAMA_HOST="$NUCLEUS_OLLAMA_HOST" ollama list | awk 'NR>1 && $1!="" {count++} END {print count}')
       say "desired models ($HOST profile): $_desired_count"
@@ -418,7 +405,6 @@ do_endpoint() {
     error "services registry not found at $SERVICES_JSON"
   fi
 
-  # Extract network endpoints for ollama and litellm.
   if [ "$_endpoint_json" = true ]; then
     jq -c '{ollama: .ollama.network, litellm: .litellm.network}' "$SERVICES_JSON"
   else
@@ -469,7 +455,6 @@ do_config() {
   fi
 
   if [ "$_config_json" = true ]; then
-    # Gather model counts per profile.
     _profiles_json=$(jq -c '[.models | to_entries[] | {profile: .key, count: (.value | length)}]' "$MANIFEST")
     jq -n \
       --arg host "$HOST" \
