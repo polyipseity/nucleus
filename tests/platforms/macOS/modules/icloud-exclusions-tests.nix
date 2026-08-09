@@ -4,14 +4,14 @@
 
 let
   lib = import <nixpkgs/lib>;
-  macosModuleText = builtins.readFile ../../../src/platforms/macOS/modules/default.nix;
-  shellModuleText = builtins.readFile ../../../src/modules/shell.nix;
+  macosModuleText = builtins.readFile ../../../../src/platforms/macOS/modules/default.nix;
+  shellModuleText = builtins.readFile ../../../../src/modules/shell.nix;
   # The zsh hook functions (chpwd, precmd, mkdir wrapper) live in an external
   # script embedded into shell.nix's initContent via builtins.readFile.
-  icloudHooksText = builtins.readFile ../../../src/platforms/macOS/scripts/macos-install-icloud-hooks.zsh;
-  usersRegistry = import ../../../src/modules/lib/users-registry.nix {
+  icloudHooksText = builtins.readFile ../../../../src/platforms/macOS/scripts/macos-install-icloud-hooks.zsh;
+  usersRegistry = import ../../../../src/modules/lib/users-registry.nix {
     inherit lib;
-    repoRoot = ../../..;
+    repoRoot = ../../../..;
     hostName = "MacBook";
   };
 
