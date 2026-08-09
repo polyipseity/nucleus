@@ -65,7 +65,7 @@ in
       Label = "local.litellm";
       # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
       # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
-      # passes SIP gate. See .agents/instructions/macos-service-hardening.instructions.md.
+      # ref: macos-service-hardening.instructions.md -- SIP /bin/sh wrapper
       ProgramArguments = [
         "/bin/sh"
         "-c"
@@ -90,7 +90,7 @@ in
       Label = "local.ollama";
       # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
       # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
-      # passes SIP gate. See .agents/instructions/macos-service-hardening.instructions.md.
+      # ref: macos-service-hardening.instructions.md -- SIP /bin/sh wrapper
       ProgramArguments = [
         "/bin/sh"
         "-c"

@@ -5,7 +5,6 @@
 #            linkFlags configureFlags cryptoPatchPath rootbindirPatchPath
 #            installHookPatchPath sdkRoot
 #
-# Previously these were passed as env vars from the Nix activation block.
 # CC/CXX/CPPFLAGS/LDFLAGS are exported here so ./configure and make resolve
 # them from the environment.
 #

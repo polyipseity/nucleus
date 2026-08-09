@@ -2,28 +2,12 @@
 # Keep UTM's global renderer backend pinned to Apple Core OpenGL (CGL) for the
 # console user.
 # WHY: The Android (LineageOS) guest UI only appears with a GL renderer
-# backend; ANGLE (Metal) hides the UI after boot (LineageOS wiki) and the
-# ANGLE (OpenGL) path was the historic freeze-prone default (UTM issue #378).
-# UTM 5.x added a native CGL (Apple Core OpenGL) backend (QEMURendererBackend
-# = 3, kQEMURendererBackendCGL), the maintained GL path for Android on UTM.
-# The recurring "display freezes randomly" bug is NOT renderer-dependent: it
-# is a client-side two-thread deadlock in UTM's SPICE client (SPICE main loop
-# in GStreamer audio teardown vs the CoreAudio IO thread; UTM #2221), observed
-# locally as the SPICE Main Loop blocked in playback_stop ->
-# gst_element_set_state, freezing the single glib main loop that dispatches
-# all SPICE channels (display + QMP-over-spiceport; utmctl suspend fails with
-# "Timed out waiting for RPC").  UTM 5.0.4 (2026-08-01) ships targeted SPICE
-# renderer + memory-leak fixes; zero-cost mitigation: keep the VM window
-# visible.  Full findings in .agents/instructions/vm-management.instructions.md.
+# backend; UTM 5.x CGL (QEMURendererBackend = 3) is the maintained GL path.
+# ref: vm-management.instructions.md -- Android UTM freeze and renderer policy
 # UTM is sandboxed, so the pref lives in the app container
 # (~/Library/Containers/com.utmapp.UTM/Data/Library/Preferences/), not
 # ~/Library/Preferences; cfprefsd resolves the domain there when the write runs
 # as the console user.
-# ref: https://github.com/utmapp/UTM/blob/v5.0.3/Services/UTMQemuSystemBackends.h -- kQEMURendererBackendCGL = 3
-# ref: https://wiki.lineageos.org/libvirt-qemu.html -- Android UI renderer guidance
-# ref: https://github.com/utmapp/UTM/issues/2221 -- "Display freezes randomly"; renderer-orthogonal SPICE stall
-# ref: https://github.com/utmapp/CocoaSpice/issues/5 -- scanout-texture race, read() deadlock; mitigated, not fixed
-# ref: https://github.com/utmapp/UTM/issues/5886 -- guest kernel trace: virtio-gpu queue fills when client stalls
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../../scripts/lib/macos-console-user.sh

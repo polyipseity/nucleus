@@ -1,10 +1,6 @@
 # MacBook/networking.nix — Network identity and firewall policy for the MacBook.
 #
-# WHY: postActivation.text, not a custom script name:
-#   nix-darwin (rev 8c62fba) assembles only a hardcoded fixed list of named
-#   scripts into the activate binary; custom names are silently ignored.
-#   postActivation is the correct extension point for scripts that must run
-#   after openssh.  lib.mkBefore prepends before the HM activation call.
+# ref: activation.nix -- nix-darwin postActivation hook constraint
 { lib, pkgs, ... }:
 let
   activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Unified CLI for managing VMs across all hosts (macOS, NixOS, Windows).
-# Consolidates build, provision, start, stop, and lifecycle operations
-# previously scattered across vm-setup.sh (now vm.sh) and host-specific scripts.
+# Consolidates build, provision, start, stop, and lifecycle operations.
 # VMs are defined in src/modules/VMs.json (the canonical manifest).
 #
 # Commands: setup|sync|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options].
@@ -36,9 +35,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/vm.sh"
 
 # ---------------------------------------------------------------------------
-# Transient helpers — to be migrated into vm.sh as part of the library
-# rename pass.  These resolve VM guest credentials from SOPS and compute a
-# credential fingerprint for drift detection.
+# VM guest credential helpers (SOPS owner resolution and drift fingerprint).
 # ---------------------------------------------------------------------------
 
 # current_vm_secret_owner

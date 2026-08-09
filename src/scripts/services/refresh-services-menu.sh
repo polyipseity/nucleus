@@ -5,10 +5,6 @@
 # Quick Actions immediately.
 #
 # Sourced functions: refresh_services_menu (macos-launch-services.sh)
-#
-# This is the bundle subprocess equivalent of the inline activation fragment
-# that previously used builtins.readFile + direct function call.  Sourcing the
-# lib via SCRIPT_DIR eliminates Nix eval-time file reads.
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/macos-launch-services.sh
