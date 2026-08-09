@@ -27,7 +27,7 @@ run_01_nix_tests() {
   fi
 
   # WHY: nix-instantiate evals contend on the shared SQLite eval cache when
-  # test steps 1/3/4 run concurrently; hold the nix lock for the whole eval
+  # test steps 1/4/5 run concurrently; hold the nix lock for the whole eval
   # phase so cross-step nix invocations serialize (internal xargs -P
   # parallelism is preserved).
   nucleus_nix_locked _run_01_eval_phase "$_tmp_failed"
