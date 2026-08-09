@@ -278,7 +278,6 @@ Learned from authoring `tests/scripts/` check-step tests; applies to test script
   - `.sh` test scripts with shebangs MUST be executable (`chmod +x`; pre-commit hook `check-shebang-scripts-are-executable`); `.ps1` test files stay `644`.
   - `test-lib.sh`/`check-lib.sh`/`step-runner.sh` derive `REPO_ROOT` themselves — do NOT add `REPO_ROOT="$REPO_ROOT"` env-prefixes or `# shellcheck disable=SC2030,SC2031` self-assignment pairs. `bash -c` children in tests use parent-spliced paths only (e.g. `. "'"$REPO_ROOT"'/src/scripts/lib/step-runner.sh"`).
   - `cache_file_lists()` in `step-runner.sh` fills arrays with `readarray -t`; test stubs must initialize `CACHED_*_FILES=()` first (SC2178).
-- **`test.sh` output buffering**: `test.sh` buffers ALL output until completion — the log stays 0 bytes for ~15 minutes. Run it in an async terminal and poll with `pgrep`; do not assume failure from an empty log.
 
 ---
 
