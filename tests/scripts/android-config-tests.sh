@@ -15,6 +15,10 @@ export NUCLEUS_ANDROID_CONFIG_DIR
 # shellcheck source=../../src/scripts/vms/android-config.sh
 . "$REPO_ROOT/src/scripts/vms/android-config.sh"
 
+export NUCLEUS_VM_ANDROID_REBOOT_SETTLE_SECONDS=0
+export NUCLEUS_VM_ANDROID_POLL_INTERVAL=0.1
+export NUCLEUS_VM_ANDROID_SIDLELOAD_PROBE_TIMEOUT=1
+
 _failures=0
 _tmp="$(mktemp -d)"
 trap 'rm -rf "$_tmp"' EXIT

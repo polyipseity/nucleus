@@ -1436,6 +1436,26 @@ vm_android_fastboot_list_state() {
   printf 'offline\n'
 }
 
+# vm_android_wait_tick TIMEOUT ELAPSED DEFAULT_POLL
+#   Sleep min(poll, timeout - elapsed); echo new elapsed.
+vm_android_wait_tick() {
+  _awt_timeout="$1"
+  _awt_elapsed="$2"
+  _awt_default_poll="$3"
+  _awt_poll="${NUCLEUS_VM_ANDROID_POLL_INTERVAL:-$_awt_default_poll}"
+  _awt_remain=$((_awt_timeout - _awt_elapsed))
+  if [ "$_awt_remain" -le 0 ]; then
+    printf '%s' "$_awt_elapsed"
+    return
+  fi
+  _awt_sleep="$_awt_remain"
+  if [ "$_awt_poll" -lt "$_awt_sleep" ]; then
+    _awt_sleep="$_awt_poll"
+  fi
+  sleep "$_awt_sleep"
+  printf '%s' "$((_awt_elapsed + _awt_sleep))"
+}
+
 # vm_android_fastboot_wait VM_INDEX [TIMEOUT]
 #   Wait until fastboot reports the manifest serial as fastboot.
 vm_android_fastboot_wait() {
@@ -1460,8 +1480,7 @@ vm_android_fastboot_wait() {
       say "manual step: in LineageOS Recovery, open Advanced → Enter fastboot"
       _afw_last_hint="$_afw_elapsed"
     fi
-    sleep 5
-    _afw_elapsed=$((_afw_elapsed + 5))
+    _afw_elapsed="$(vm_android_wait_tick "$_afw_timeout" "$_afw_elapsed" 5)"
   done
 
   error "timed out waiting for fastboot on $_afw_serial; enter fastboot from recovery and retry"
@@ -1539,8 +1558,7 @@ vm_android_adb_wait_authorized() {
         fi
         ;;
     esac
-    sleep 5
-    _awa_elapsed=$((_awa_elapsed + 5))
+    _awa_elapsed="$(vm_android_wait_tick "$_awa_timeout" "$_awa_elapsed" 5)"
   done
 
   _awa_final="$(vm_android_adb_poll_state "$_awa_vm_index")"
@@ -1600,8 +1618,7 @@ vm_android_adb_wait_boot_completed() {
         fi
         ;;
     esac
-    sleep 5
-    _awbc_elapsed=$((_awbc_elapsed + 5))
+    _awbc_elapsed="$(vm_android_wait_tick "$_awbc_timeout" "$_awbc_elapsed" 5)"
   done
 
   _awbc_final="$(vm_android_adb_poll_state "$_awbc_vm_index")"
@@ -1643,8 +1660,7 @@ vm_android_adb_wait_sideload() {
         fi
         ;;
     esac
-    sleep 2
-    _aws_elapsed=$((_aws_elapsed + 2))
+    _aws_elapsed="$(vm_android_wait_tick "$_aws_timeout" "$_aws_elapsed" 2)"
   done
 
   _aws_final="$(vm_android_adb_poll_state "$_aws_vm_index")"
@@ -1667,8 +1683,7 @@ vm_android_adb_connect() {
     case "$_aac_state" in
       device|recovery|sideload) return 0 ;;
     esac
-    sleep 5
-    _aac_elapsed=$((_aac_elapsed + 5))
+    _aac_elapsed="$(vm_android_wait_tick "$_aac_timeout" "$_aac_elapsed" 5)"
   done
   return 1
 }
@@ -1861,7 +1876,10 @@ vm_android_ensure_userdebug_recovery() {
   fastboot -s "$_aeur_fb_serial" reboot 2>/dev/null || true
   say "userdebug recovery flashed; guest should reboot to recovery"
   say "manual step: in recovery, enable ADB (Advanced → Enable ADB) before sideload can continue"
-  sleep 10
+  _aeur_settle="${NUCLEUS_VM_ANDROID_REBOOT_SETTLE_SECONDS:-10}"
+  if [ "$_aeur_settle" -gt 0 ]; then
+    sleep "$_aeur_settle"
+  fi
 }
 
 # vm_android_adb_wait_recovery VM_INDEX [TIMEOUT]
@@ -1892,8 +1910,7 @@ vm_android_adb_wait_recovery() {
         fi
         ;;
     esac
-    sleep 5
-    _awr_elapsed=$((_awr_elapsed + 5))
+    _awr_elapsed="$(vm_android_wait_tick "$_awr_timeout" "$_awr_elapsed" 5)"
   done
 
   _awr_final="$(vm_android_adb_poll_state "$_awr_vm_index")"

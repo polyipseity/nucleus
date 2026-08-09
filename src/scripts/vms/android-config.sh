@@ -87,7 +87,7 @@ vm_android_config_gapps() {
     return 1
   fi
 
-  if vm_android_adb_wait_sideload "$_vacg_vm_index" 15; then
+  if vm_android_adb_wait_sideload "$_vacg_vm_index" "${NUCLEUS_VM_ANDROID_SIDLELOAD_PROBE_TIMEOUT:-15}"; then
     say "guest already in sideload mode on $_vacg_serial"
   else
     _vacg_state="$(vm_android_adb_poll_state "$_vacg_vm_index")"
