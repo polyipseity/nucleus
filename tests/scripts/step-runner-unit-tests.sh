@@ -233,13 +233,49 @@ test_aggregate_results_parses_exit_files() {
         printf '%s' "0" > "$_wave_tmpdir/step-1.exit"
         printf '%s' "42" > "$_wave_tmpdir/step-1.time"
         printf '%s' "Test" > "$_wave_tmpdir/step-1.name"
+        printf '%s' "100" > "$_wave_tmpdir/pipeline.wall_ms"
         # shellcheck disable=SC2317 # reason: aggregate_results calls exit, captured in subshell
         aggregate_results 2>&1 || true
     ) 2>&1
-    if echo "$result" | grep -q "say: all checks passed."; then
+    if echo "$result" | grep -q "say: all checks passed." && echo "$result" | grep -q "wall clock:"; then
         assert_pass "aggregate_results parses exit files correctly"
     else
-        assert_fail "aggregate_results" "Expected 'all checks passed'. Got: $result"
+        assert_fail "aggregate_results" "Expected 'all checks passed' and wall clock line. Got: $result"
+    fi
+}
+
+test_run_all_steps_parallel_jobs_cap() {
+    local _log _log_contents _run_exit=0
+    _log=$(mktemp)
+    (
+        # shellcheck disable=SC2030 # reason: PARALLEL_JOBS must be set in the subshell that sources step-runner
+        export PARALLEL_JOBS=1
+        # shellcheck disable=SC1091 # reason: test harness sources step-runner from repo root
+        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+        # shellcheck disable=SC2329 # reason: invoked indirectly via register_step function name
+        step_one() {
+            echo s1-start >> "$_log"
+            sleep 0.1
+            echo s1-end >> "$_log"
+            return 0
+        }
+        # shellcheck disable=SC2329 # reason: invoked indirectly via register_step function name
+        step_two() {
+            echo s2-start >> "$_log"
+            sleep 0.1
+            echo s2-end >> "$_log"
+            return 0
+        }
+        register_step "one" 1 "One" step_one
+        register_step "two" 2 "Two" step_two
+        run_all_steps
+    ) > /dev/null 2>&1 || _run_exit=$?
+    _log_contents=$(tr -d '\n' < "$_log")
+    rm -f "$_log"
+    if [ "$_run_exit" -eq 0 ] && [ "$_log_contents" = "s1-starts1-ends2-starts2-end" ]; then
+        assert_pass "run_all_steps honors PARALLEL_JOBS=1 (sequential waves)"
+    else
+        assert_fail "parallel-jobs-cap" "Expected sequential log and exit 0, got log='$_log_contents' exit=$_run_exit"
     fi
 }
 
@@ -339,6 +375,7 @@ test_parse_args_help
 test_parse_args_scoped
 test_parse_args_positions
 test_aggregate_results_parses_exit_files
+test_run_all_steps_parallel_jobs_cap
 
 echo "--- Nix lock tests (Phase 9) ---"
 test_nix_lock_runs_command_and_returns_exit

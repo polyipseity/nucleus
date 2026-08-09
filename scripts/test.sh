@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs the full repository test suite in sequence.
+# Runs the full repository test suite with parallel step dispatch (Nix steps serialized via lock).
 #
 # Thin orchestrator — sources test-lib.sh for framework, test-steps.sh for step
 # registration, then runs the orchestration pipeline.

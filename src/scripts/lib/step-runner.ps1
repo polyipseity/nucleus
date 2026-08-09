@@ -232,22 +232,25 @@ function Save-FileListCache {
 }
 
 # --- Invoke-StepPipeline ---
-# Default: parallel dispatch via runspaces (wave-based parallelism).
+# Parallel dispatch capped at PARALLEL_JOBS (wave batches).
 function Invoke-StepPipeline {
   Initialize-WaveTempDir
   Save-FileListCache
 
-  $runspaces = [System.Collections.Generic.List[hashtable]]::new()
+  $maxJobs = if ($env:PARALLEL_JOBS) { [int]$env:PARALLEL_JOBS } else { [Environment]::ProcessorCount }
+  if ($maxJobs -lt 1) { $maxJobs = 1 }
+
+  $pipelineStart = [System.Diagnostics.Stopwatch]::StartNew()
   $totalSteps = $script:StepActions.Count
   $startedSteps = 0
+  $pendingIndices = [System.Collections.Generic.List[int]]::new()
+  $spawnedNumbers = [System.Collections.Generic.List[int]]::new()
 
   for ($i = 0; $i -lt $script:StepActions.Count; $i++) {
     $id = $script:StepIds[$i]
     $n = $script:StepNumbers[$i]
     $name = $script:StepNames[$i]
-    $action = $script:StepActions[$i]
 
-    # Check skip list.
     $skip = $false
     if ($script:SkipSteps -and $script:SkipSteps.Count -gt 0) {
       if ($script:SkipSteps -contains $id) { $skip = $true }
@@ -256,26 +259,46 @@ function Invoke-StepPipeline {
     if ($skip) {
       Invoke-SkippedStep -Number $n -Name $name -Id $id
     } else {
+      $null = $pendingIndices.Add($i)
+    }
+  }
+
+  $pos = 0
+  while ($pos -lt $pendingIndices.Count) {
+    $batchEnd = [Math]::Min($pos + $maxJobs, $pendingIndices.Count)
+    $runspaces = [System.Collections.Generic.List[hashtable]]::new()
+
+    while ($pos -lt $batchEnd) {
+      $i = $pendingIndices[$pos]
+      $pos++
+      $n = $script:StepNumbers[$i]
+      $name = $script:StepNames[$i]
+      $action = $script:StepActions[$i]
+
       $ps = [System.Management.Automation.PowerShell]::Create()
       $null = $ps.AddScript({
         param($Number, $Name, $Action, $HasArgs, $RepoRoot, $WaveTmpDir, $FAIL_FAST)
 
         $stepStart = [System.Diagnostics.Stopwatch]::StartNew()
-        "`n=== [$Number] $Name ===" | Out-File -FilePath (Join-Path $WaveTmpDir "step-$Number.out") -Encoding utf8
+        $outFile = Join-Path $WaveTmpDir "step-$Number.out"
+        "`n=== [$Number] $Name ===" | Out-File -FilePath $outFile -Encoding utf8
         $Name | Out-File -FilePath (Join-Path $WaveTmpDir "step-$Number.name") -Encoding utf8 -NoNewline
 
         $exitCode = 0
         try {
           $stepParams = @{ HasArgs = $HasArgs; RepoRoot = $RepoRoot; WaveTmpDir = $WaveTmpDir }
-          $result = & $Action @stepParams
-          # Steps signal: pass ($true), fail ($false), or skip (int 2). The return value
-          # is the LAST pipeline element. Type-check 2 because $true -eq 2 is True in PowerShell.
-          $status = @($result)[-1]
+          $stepOutput = & $Action @stepParams 2>&1
+          foreach ($line in $stepOutput) {
+            $text = if ($line -is [System.Management.Automation.ErrorRecord]) { $line.ToString() } else { "$line" }
+            Add-Content -Path $outFile -Value $text
+            Write-Error ("[step {0,2}] {1}" -f $Number, $text)
+          }
+          $status = @($stepOutput)[-1]
           if ($status -is [int] -and $status -eq 2) { $exitCode = 2 }
           elseif ($status -eq $false) { $exitCode = 1 }
         } catch {
           $exitCode = 1
-          "$_" | Out-File -FilePath (Join-Path $WaveTmpDir "step-$Number.out") -Encoding utf8 -Append
+          "$_" | Out-File -FilePath $outFile -Encoding utf8 -Append
         }
 
         "$exitCode" | Out-File -FilePath (Join-Path $WaveTmpDir "step-$Number.exit") -Encoding utf8 -NoNewline
@@ -286,45 +309,54 @@ function Invoke-StepPipeline {
           exit $exitCode
         }
       }).AddParameters(@{
-        Number    = $n
-        Name      = $name
-        Action    = $action
-        HasArgs   = $script:HAS_ARGS
-        RepoRoot  = $RepoRoot
+        Number     = $n
+        Name       = $name
+        Action     = $action
+        HasArgs    = $script:HAS_ARGS
+        RepoRoot   = $RepoRoot
         WaveTmpDir = $script:WaveTmpDir
-        FAIL_FAST = $script:FAIL_FAST
+        FAIL_FAST  = $script:FAIL_FAST
       })
       $handle = $ps.BeginInvoke()
       $null = $runspaces.Add(@{ PowerShell = $ps; AsyncResult = $handle; Number = $n })
       $startedSteps++
-      # Live progress: announce each step as it launches (main-thread output).
+      $null = $spawnedNumbers.Add($n)
       Write-Output ("[{0}/{1}] step {2} {3} started" -f $startedSteps, $totalSteps, $n, $name)
     }
-  }
 
-  # Wait for all runspaces to complete.
-  $failed = $false
-  foreach ($rs in $runspaces) {
-    try {
-      $null = $rs.PowerShell.EndInvoke($rs.AsyncResult)
-    } catch {
-      $failed = $true
-    } finally {
-      $rs.PowerShell.Dispose()
+    $batchFailed = $false
+    foreach ($rs in $runspaces) {
+      try {
+        $null = $rs.PowerShell.EndInvoke($rs.AsyncResult)
+      } catch {
+        $batchFailed = $true
+      } finally {
+        $rs.PowerShell.Dispose()
+      }
+    }
+
+    if ($batchFailed -and $script:FAIL_FAST) {
+      exit 1
+    }
+
+    foreach ($rs in $runspaces) {
+      $exitFile = Join-Path $script:WaveTmpDir "step-$($rs.Number).exit"
+      if ((Test-Path -LiteralPath $exitFile) -and (Get-Content -LiteralPath $exitFile -Raw) -notin @('0', '2') -and $script:FAIL_FAST) {
+        exit [int](Get-Content -LiteralPath $exitFile -Raw)
+      }
     }
   }
 
-  # Live progress: report elapsed time per launched step (mm:ss).
-  foreach ($rs in $runspaces) {
-    $n = $rs.Number
+  $pipelineStart.Stop()
+  "$($pipelineStart.ElapsedMilliseconds)" | Out-File -FilePath (Join-Path $script:WaveTmpDir 'pipeline.wall_ms') -Encoding utf8 -NoNewline
+
+  foreach ($n in $spawnedNumbers) {
     $timeFile = Join-Path $script:WaveTmpDir "step-$n.time"
     $elapsedMs = 0
     if (Test-Path -LiteralPath $timeFile) { $elapsedMs = [int](Get-Content -LiteralPath $timeFile -Raw) }
     $span = [TimeSpan]::FromMilliseconds($elapsedMs)
     Write-Output ("step {0} finished ({1:00}:{2:00})" -f $n, [math]::Floor($span.TotalMinutes), $span.Seconds)
   }
-
-  if ($failed) { exit 1 }
 }
 
 # --- Format-StepSummary ---
@@ -361,7 +393,14 @@ function Format-StepSummary {
     }
   }
 
-  "`n  total:   {0,5} ms" -f $totalElapsed | Write-Output
+  $wallMs = 0
+  $wallFile = Join-Path $script:WaveTmpDir 'pipeline.wall_ms'
+  if (Test-Path -LiteralPath $wallFile) {
+    $wallMs = [int](Get-Content -LiteralPath $wallFile -Raw)
+  }
+
+  "`n  sum of steps: {0,5} ms" -f $totalElapsed | Write-Output
+  "  wall clock:   {0,5} ms" -f $wallMs | Write-Output
   "`n" | Write-Output
 
   if ($failedSteps) {

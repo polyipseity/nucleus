@@ -64,7 +64,6 @@ _wave_tmpdir=""
 _wave_tmpdir_created=false
 
 _wave_cleanup_stale() {
-  # ref: step-runner.instructions.md
   local _d _pid
   for _d in "${TMPDIR:-/tmp}/nucleus-step-runner-"*; do
     [ -d "$_d" ] || continue  # check-suppress:suppression_doc: glob may expand to literal pattern when no matches; [ -d ] check filters it
@@ -94,7 +93,6 @@ _wave_cleanup() {
 NUCLEUS_NIX_LOCK="${TMPDIR:-/tmp}/nucleus-nix.lock"
 
 nucleus_nix_locked() {
-  # ref: step-runner.instructions.md
   local _lock_dir="$NUCLEUS_NIX_LOCK"
   local _lock_owner=""
   local _lock_waited=0
@@ -136,21 +134,33 @@ _step_now_ms() {
 }
 
 # --- _run_step wrapper ---
-# ref: step-runner.instructions.md
 _run_step() {
   local _n="$1" _name="$2" _func="$3"; shift 3
-  local _step_start_ms _elapsed_ms _exit_code
+  local _step_start_ms _elapsed_ms _exit_code _fifo
 
   _step_start_ms=$(_step_now_ms)
 
   printf '\n=== [%s] %s ===\n' "$_n" "$_name" > "$_wave_tmpdir/step-$_n.out"
   printf '%s' "$_name" > "$_wave_tmpdir/step-$_n.name"
 
-  if "$_func" "$HAS_ARGS" "$REPO_ROOT" "$@"; then
-    _exit_code=0
-  else
-    _exit_code=$?
-  fi >> "$_wave_tmpdir/step-$_n.out" 2>&1
+  _fifo=$(mktemp -u "${TMPDIR:-/tmp}/nucleus-step-${_n}-XXXXXX")
+  mkfifo "$_fifo"
+  (
+    if "$_func" "$HAS_ARGS" "$REPO_ROOT" "$@"; then
+      exit 0
+    else
+      exit $?
+    fi
+  ) > "$_fifo" 2>&1 &
+  local _func_pid=$!
+
+  tee -a "$_wave_tmpdir/step-$_n.out" < "$_fifo" | while IFS= read -r _line || [ -n "$_line" ]; do
+    printf '[step %2d] %s\n' "$_n" "$_line" >&2
+  done
+
+  _exit_code=0
+  wait "$_func_pid" || _exit_code=$?
+  rm -f "$_fifo"
 
   printf '%s' "$_exit_code" > "$_wave_tmpdir/step-$_n.exit"
   _elapsed_ms=$(($(_step_now_ms) - _step_start_ms))
@@ -162,7 +172,6 @@ _run_step() {
 }
 
 # --- _run_skipped_step helper ---
-# ref: step-runner.instructions.md
 _run_skipped_step() {
   local _n="$1" _name="$2" _id="$3"
   local _step_start_ms _elapsed_ms
@@ -277,7 +286,6 @@ parse_args() {
 }
 
 # --- File caching ---
-# ref: step-runner.instructions.md
 cache_file_lists() {
   # shellcheck disable=SC2034 # reason: consumed by step files (05, 13, 15, 17) via transitive sourcing
   readarray -t CACHED_NIX_FILES < <(
@@ -306,7 +314,6 @@ cache_file_lists() {
 }
 
 # --- run_all_steps ---
-# ref: step-runner.instructions.md
 run_all_steps() {
   _wave_cleanup_stale
   _wave_init
@@ -314,9 +321,15 @@ run_all_steps() {
 
   rm -f result result-*
 
-  local _i _id _skip _skip_id _total _started _n _name _spawned_steps=()
+  local _max_jobs _pipeline_start_ms
+  _max_jobs="${PARALLEL_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 2)}"
+  _pipeline_start_ms=$(_step_now_ms)
+
+  local _i _id _skip _skip_id _total _started _n _name
+  local -a _pending_indices=() _spawned_steps=()
   _total=${#_STEP_FUNCS[@]}
   _started=0
+
   for _i in "${!_STEP_FUNCS[@]}"; do
     _id="${_STEP_IDS[$_i]}"
     _n="${_STEP_NUMBERS[$_i]}"
@@ -331,13 +344,43 @@ run_all_steps() {
     if $_skip; then
       _run_skipped_step "$_n" "$_name" "$_id"
     else
-      _started=$((_started + 1))
-      _run_step "$_n" "$_name" "${_STEP_FUNCS[$_i]}" "${POSITIONAL_ARGS[@]+${POSITIONAL_ARGS[@]}}" &
-      _spawned_steps+=("$_n")
-      printf '[%d/%d] step %s %s started\n' "$_started" "$_total" "$_n" "$_name"
+      _pending_indices+=("$_i")
     fi
   done
-  wait
+
+  local _pos=0 _batch_end _batch_i _batch_pid _wait_ret _fail_fast_exit=""
+  local -a _batch_pids=()
+  while [ "$_pos" -lt "${#_pending_indices[@]}" ]; do
+    _batch_end=$((_pos + _max_jobs))
+    if [ "$_batch_end" -gt "${#_pending_indices[@]}" ]; then
+      _batch_end=${#_pending_indices[@]}
+    fi
+    _batch_pids=()
+    while [ "$_pos" -lt "$_batch_end" ]; do
+      _i="${_pending_indices[$_pos]}"
+      _pos=$((_pos + 1))
+      _n="${_STEP_NUMBERS[$_i]}"
+      _name="${_STEP_NAMES[$_i]}"
+      _started=$((_started + 1))
+      _run_step "$_n" "$_name" "${_STEP_FUNCS[$_i]}" "${POSITIONAL_ARGS[@]+${POSITIONAL_ARGS[@]}}" &
+      _batch_pids+=($!)
+      _spawned_steps+=("$_n")
+      printf '[%d/%d] step %s %s started\n' "$_started" "$_total" "$_n" "$_name"
+    done
+    _fail_fast_exit=""
+    for _batch_pid in "${_batch_pids[@]}"; do
+      _wait_ret=0
+      wait "$_batch_pid" || _wait_ret=$?
+      if [ "$_wait_ret" -ne 0 ] && [ "$_wait_ret" -ne 2 ] && $FAIL_FAST; then
+        _fail_fast_exit="$_wait_ret"
+      fi
+    done
+    if [ -n "$_fail_fast_exit" ]; then
+      exit "$_fail_fast_exit"
+    fi
+  done
+
+  printf '%s' $(($(_step_now_ms) - _pipeline_start_ms)) > "$_wave_tmpdir/pipeline.wall_ms"
 
   local _elapsed_ms _elapsed_s
   for _n in "${_spawned_steps[@]}"; do
@@ -348,12 +391,14 @@ run_all_steps() {
 }
 
 # --- aggregate_results ---
-# ref: step-runner.instructions.md
 aggregate_results() {
-  local _total_steps=${#_STEP_FUNCS[@]}
   local _failed_steps=""
-  local _total_elapsed=0
+  local _total_elapsed=0 _wall_ms=0
   local _n _name _elapsed _exit_code
+
+  if [ -f "$_wave_tmpdir/pipeline.wall_ms" ]; then
+    _wall_ms=$(cat "$_wave_tmpdir/pipeline.wall_ms" 2>/dev/null || echo 0)
+  fi
 
   printf '\n'
   for _i in "${!_STEP_FUNCS[@]}"; do
@@ -378,7 +423,8 @@ aggregate_results() {
   done
 
   printf '\n'
-  printf '  total:   %5d ms\n' "$_total_elapsed"
+  printf '  sum of steps: %5d ms\n' "$_total_elapsed"
+  printf '  wall clock:   %5d ms\n' "$_wall_ms"
   printf '\n'
 
   if [ -n "$_failed_steps" ]; then

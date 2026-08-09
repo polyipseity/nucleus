@@ -112,13 +112,15 @@ Test step 04 (system-config-build):
 ```
 Invoke-StepPipeline behavior:
   - Same wave-based parallelism as POSIX step-runner.sh.
-  - Wave grouping: steps are assigned to waves arbitrarily (all steps are independent).
-    Currently: single wave containing all steps (same as POSIX — all steps dispatch in parallel).
-  - PARALLEL_JOBS env var controls max concurrent jobs. Default: number of logical processors.
+  - Steps dispatch in waves capped at PARALLEL_JOBS concurrent steps (default: logical processor count).
+  - PARALLEL_JOBS env var controls max concurrent jobs per wave.
   - Parallel dispatch mechanism: RunspacePool (preferred — better performance, no temp files)
     Fallback: Start-Job + file-based exit code (mirrors POSIX wave pattern).
+  - Live output: each step line is prefixed [step NN] on stderr during execution; ordered
+    unprefixed replay still appears in aggregate_results / Format-StepSummary.
   - Output ordering: Steps' output is captured per-step and printed in step-number order,
     NOT in completion order. This matches POSIX behavior where aggregation prints in order.
+  - Timing summary reports sum of per-step ms and wall-clock ms (pipeline.wall_ms).
 
   Error aggregation:
     - Each step's exit code is captured independently.

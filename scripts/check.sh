@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Fast pre-commit checks. PSScriptAnalyzer (slow rules excluded) runs inline.
+# Fast pre-commit checks. PowerShell syntax only; full PSSA runs in the test pipeline (pre-push).
 #
 # Thin orchestrator — sources check-lib.sh for framework, check-steps.sh for step
 # registration, then runs the orchestration pipeline.

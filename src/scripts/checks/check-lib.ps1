@@ -9,7 +9,7 @@ Set-StrictMode -Version Latest
 $script:FAIL_FAST = $false
 $script:usageAction = {
   Write-Output "Usage: check.ps1 [--fail-fast|--no-fail-fast] [--scoped|--full] [--online] [--skip-steps=<ids>] [path ...]"
-  Write-Output "  Run all Windows-compatible repository validation checks in sequence."
+  Write-Output "  Run all Windows-compatible repository validation checks with parallel step dispatch."
   Write-Output "  Use --scoped to skip whole-repo checks (path-scoped mode), --full to force"
   Write-Output "  whole-repo checks even with paths. Default: scoped if paths given, full if not."
   Write-Output "  --fail-fast      Exit immediately on first failure (default: accumulate all)."
