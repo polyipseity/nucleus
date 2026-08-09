@@ -120,7 +120,10 @@ Invoke-StepPipeline behavior:
     unprefixed replay still appears in aggregate_results / Format-StepSummary.
   - Output ordering: Steps' output is captured per-step and printed in step-number order,
     NOT in completion order. This matches POSIX behavior where aggregation prints in order.
-  - Timing summary reports sum of per-step ms and wall-clock ms (pipeline.wall_ms).
+  - Timing summary reports sum of per-step duration and wall-clock duration as decimal
+    seconds (`%.3f s`, e.g. `4.127 s`). Internal storage remains integer milliseconds
+    (`step-N.time`, `pipeline.wall_ms`). POSIX measurement uses sub-second clocks on all
+    supported OSes (`$EPOCHREALTIME`, perl Time::HiRes on Darwin, GNU `date +%s%3N` on Linux).
 
   Error aggregation:
     - Each step's exit code is captured independently.

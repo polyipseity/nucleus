@@ -237,10 +237,41 @@ test_aggregate_results_parses_exit_files() {
         # shellcheck disable=SC2317 # reason: aggregate_results calls exit, captured in subshell
         aggregate_results 2>&1 || true
     ) 2>&1
-    if echo "$result" | grep -q "say: all checks passed." && echo "$result" | grep -q "wall clock:"; then
+    if echo "$result" | grep -q "say: all checks passed." \
+        && echo "$result" | grep -q "wall clock:" \
+        && echo "$result" | grep -qE '[0-9]+\.[0-9]{3} s'; then
         assert_pass "aggregate_results parses exit files correctly"
     else
-        assert_fail "aggregate_results" "Expected 'all checks passed' and wall clock line. Got: $result"
+        assert_fail "aggregate_results" "Expected 'all checks passed', wall clock line, and decimal-second durations. Got: $result"
+    fi
+}
+
+test_format_duration_s() {
+    local result
+    result=$(
+        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+        _format_duration_s 4127
+    )
+    if [ "$result" = "4.127 s" ]; then
+        assert_pass "_format_duration_s formats milliseconds as decimal seconds"
+    else
+        assert_fail "_format_duration_s" "Expected '4.127 s', got: $result"
+    fi
+}
+
+test_step_now_ms_sub_second_precision() {
+    local elapsed
+    elapsed=$(
+        . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+        _start=$(_step_now_ms)
+        sleep 0.05
+        _end=$(_step_now_ms)
+        echo $((_end - _start))
+    )
+    if [ "$elapsed" -ge 40 ] && [ "$elapsed" -lt 1000 ]; then
+        assert_pass "_step_now_ms measures sub-second intervals"
+    else
+        assert_fail "_step_now_ms precision" "Expected elapsed in [40, 1000) ms, got: ${elapsed}ms"
     fi
 }
 
@@ -377,6 +408,8 @@ echo "--- Legacy behavior tests ---"
 test_parse_args_help
 test_parse_args_scoped
 test_parse_args_positions
+test_format_duration_s
+test_step_now_ms_sub_second_precision
 test_aggregate_results_parses_exit_files
 test_run_all_steps_parallel_jobs_cap
 
