@@ -30,6 +30,9 @@ run_14_repository_policy() {
   say "--- agents policy ---"
   run_14_agents_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
+  say "--- no real-user test coupling ---"
+  run_14_no_real_user_test_coupling "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+
   if [ "$_failed" -ne 0 ]; then
     error "repository policy check failed"
     return 1
@@ -311,5 +314,32 @@ run_14_agents_policy() {
     return 1
   fi
   say "agents policy passed."
+  return 0
+}
+
+# ref: testing.instructions.md (No real-user test coupling)
+run_14_no_real_user_test_coupling() {
+  local _has_args="$1" _repo_root="$2"; shift 2
+  cd "$_repo_root" || return 1
+  local _users_root="src/users"
+  local _errors=0
+  local _user _hit
+
+  for _user_path in "$_users_root"/*/; do
+    [ -d "$_user_path" ] || continue
+    _user="$(basename "$_user_path")"
+    [ "$_user" = default ] && continue
+    while IFS= read -r _hit; do
+      [ -z "$_hit" ] && continue
+      _errors=$((_errors + 1))
+      error "tests must not reference production user '$_user': $_hit (see testing.instructions.md: No real-user test coupling)"
+    done < <(grep -rn -w "$_user" tests 2>/dev/null || true)  # check-suppress:suppression_doc: grep exits 1 when no matches; zero hits is the expected state
+  done
+
+  if [ "$_errors" -gt 0 ]; then
+    error "no real-user test coupling check failed with $_errors error(s)"
+    return 1
+  fi
+  say "no real-user test coupling policy passed."
   return 0
 }

@@ -314,6 +314,22 @@ Register-Step -Id "repository-policy" -Number 14 -Name "Repository policy" -Acti
     Write-Output 'check: AGENTS.md instruction links resolve.'
   }
 
+  Write-Message '--- no real-user test coupling ---'
+
+  $usersRoot = Join-Path -Path $r -ChildPath 'src\users'
+  foreach ($userDir in Get-ChildItem -Path $usersRoot -Directory) {
+    if ($userDir.Name -eq 'default') { continue }
+    $userName = $userDir.Name
+    $hits = Select-String -Path (Join-Path $r 'tests') -Pattern "\b$([regex]::Escape($userName))\b" -Recurse -ErrorAction SilentlyContinue
+    foreach ($hit in $hits) {
+      Write-ErrorMessage "tests must not reference production user '$userName': $($hit.Path):$($hit.LineNumber):$($hit.Line.Trim()) (see testing.instructions.md: No real-user test coupling)"
+      $failed = $true
+    }
+  }
+  if (-not $failed) {
+    Write-Output 'check: no real-user test coupling policy passed.'
+  }
+
   if ($failed) {
     Write-ErrorMessage "repository policy check failed"
     return $false
