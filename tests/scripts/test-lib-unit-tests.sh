@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
-# Unit tests for test-lib.sh (Phase 2: --skip-system-build removal).
+# Unit tests for test-lib.sh (--skip-system-build removal and flag parsing).
 #
-# Tests Spec D behavior: --skip-system-build is removed, step 04 runs without it.
-# These will FAIL (red phase) until test-lib.sh is updated.
+# Verifies --skip-system-build is removed and step 04 runs without it.
 
 set -euo pipefail
 
@@ -58,8 +57,7 @@ test_test_lib_usage_no_skip_system_build() {
 
 # ---- Run tests ----
 echo ""
-echo "=== Phase 2: test-lib unit tests (TDD: red phase) ==="
-echo "These tests will fail until test-lib.sh is updated."
+echo "=== Phase 2: test-lib unit tests ==="
 echo ""
 
 test_parse_args_skip_system_build_removed

@@ -1,7 +1,6 @@
 #Requires -Version 7.4
 # Unit tests for step-runner.ps1 functions in isolation (PowerShell).
-# Tests NEW behavior per Spec A (step IDs), Spec B (--skip-steps).
-# These tests will fail (TDD red phase) until the framework is updated.
+# Covers Spec A (step IDs) and Spec B (--skip-steps).
 
 [CmdletBinding()]
 param()
@@ -221,7 +220,6 @@ function Test-SkipStep-LastValueWin {
 # ---- Run tests ----
 Write-Output "`n=== Phase 1: Framework core unit tests (PS1) ==="
 Write-Output "Tests for Spec A (step IDs) and Spec B (--skip-steps)."
-Write-Output "These will FAIL (red phase) until step-runner.ps1 is updated."
 Write-Output ""
 
 Test-RegisterStep-WithId

@@ -1,8 +1,7 @@
 #Requires -Version 7.4
-# Unit tests for test-lib.ps1 (Phase 2: --skip-system-build removal).
+# Unit tests for test-lib.ps1 (--skip-system-build removal and flag parsing).
 #
-# Tests Spec D behavior: --skip-system-build is removed.
-# These will FAIL (red phase) until test-lib.ps1 is updated.
+# Verifies --skip-system-build is removed.
 
 [CmdletBinding()]
 param()
@@ -73,8 +72,7 @@ function Test-UsageNoSkipSystemBuild {
 }
 
 # ---- Run tests ----
-Write-Output "`n=== Phase 2: test-lib unit tests (PS1, TDD: red phase) ==="
-Write-Output "These tests will fail until test-lib.ps1 is updated."
+Write-Output "`n=== Phase 2: test-lib unit tests (PS1) ==="
 Write-Output ""
 
 & Test-ParseArgsSkipSystemBuildRemoved

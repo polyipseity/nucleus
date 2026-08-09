@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Unit tests for step-runner.sh functions in isolation.
-# Tests NEW behavior per Spec A (step IDs) and Spec B (--skip-steps).
-# These tests will fail (TDD red phase) until the framework is updated.
+# Covers Spec A (step IDs) and Spec B (--skip-steps).
 
 set -euo pipefail
 
@@ -11,8 +10,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
-# ---- Spec A: Step ID registration (new 4-arg form) ----
-# Tests will fail until step-runner.sh supports 4-arg register_step.
+# ---- Spec A: Step ID registration (4-arg form) ----
 
 test_register_step_with_id() {
     local result
@@ -99,7 +97,6 @@ test_register_step_duplicate_number_errors() {
 }
 
 # ---- Spec B: --skip-steps flag ----
-# Tests will fail until parse_args supports --skip-steps.
 
 test_skip_steps_equals_form() {
     local result
@@ -323,7 +320,6 @@ test_nix_lock_serializes() {
 echo ""
 echo "=== Phase 1: Framework core unit tests (POSIX) ==="
 echo "Tests for Spec A (step IDs) and Spec B (--skip-steps)."
-echo "These will FAIL (red phase) until step-runner.sh is updated."
 echo ""
 
 test_register_step_with_id
