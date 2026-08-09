@@ -13,9 +13,7 @@ applyTo: "tests/**, src/hosts/Windows/**/*.yml, src/platforms/Windows/modules/**
 - **Nix-based tests** (macOS/NixOS): Pure evaluation checks and unit tests
 - **Pester tests** (Windows): Runtime validation of DSC resources
 
-Tests must accompany every feature or breaking change. Ensure tests pass locally before submitting PRs.
-
-**Tests mirror `src/`:** `tests/hosts/<Host>/`, `tests/platforms/<Platform>/`, `tests/modules/` (cross-host shared), plus `tests/integration/` and `tests/scripts/`. Rule: `src/<layer>/...` → `tests/<layer>/...`.
+Tests must accompany every feature or breaking change. Test layout mirrors `src/` — see `AGENTS.md` (Repository Shape).
 
 ---
 
@@ -286,7 +284,7 @@ Learned from authoring `tests/scripts/` check-step tests; applies to test script
 
 ## CI Integration
 
-Tests run on push, pull request, and manual dispatch. POSIX CI runs `nix run ./src#test` (Nix eval, framework tests, nucleus-apps smoke, system build). Windows CI runs `bootstrap.ps1` (provisions Pester and other pwsh modules), then `test.ps1` including step 6 (`windows-pester`). Pester is lockfile-pinned and preflight-checked like other tools — provisioning and preflight are separate (see `tool-availability.instructions.md`).
+Tests run on push, pull request, and manual dispatch. POSIX CI runs `nix run ./src#test` (Nix eval, framework tests, nucleus-apps smoke, system build). Windows CI runs `bootstrap.ps1` (provisions Pester and other pwsh modules), then `test.ps1` including step 6 (`windows-pester`). Pester is lockfile-pinned and preflight-checked like other tools — provisioning and preflight are separate (see `tooling-and-validation.instructions.md`).
 
 ---
 

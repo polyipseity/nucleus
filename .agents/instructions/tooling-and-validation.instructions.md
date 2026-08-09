@@ -52,14 +52,25 @@ Choose the right vehicle:
 
 ## Validation guidance
 
+### Tool availability policy
+
+Scripts and tests assume all required tools are installed. Skip-guards that exit 0, return 0, or otherwise silently avoid work when a tool is unavailable are banned across all platforms and file types.
+
+- **Provisioning and preflight are always separate concerns.** Provisioning installs or deploys tools (`nucleus-bootstrap`, `nucleus-apply`, `lockfile.json` PowerShell modules, `core.nix` / WinGet DSC). Preflight (`preflight_check`, `Test-Prerequisite`, `require_command`, `Assert-ToolAvailable`) verifies tools are present before check/test work runs and hard-fails if missing. Repo-managed provisioning never exempts a tool from preflight; preflight never installs tools inline.
+- **Do not guard tool use with silent skip.** If a script needs a tool and it is missing, the script must fail loudly — not silently skip work.
+- **No `command -v <tool> || return 0` / `exit 0` patterns.** No `Test-CommandAvailable` / `Get-Command -ErrorAction SilentlyContinue` gating that exits successfully on absence. No `Get-Module -ListAvailable` skip-guards in PowerShell. No `Test-Path` skip-guards in tests.
+- **Allowed:** inline alternative selection between equivalent tools; pre-flight validation at script entry that `exit 1` on absence; configuration-driven optional features (not implicit tool-detection).
+
+Enforcement scope: `scripts/`, `tests/`, `src/scripts/`, `src/platforms/Windows/modules/`. The `nucleus-check-sh` and `nucleus-check-pwsh` validators reject skip-guard patterns.
+
 ### Check script structure
 
-- Both `scripts/check.sh` (POSIX) and `scripts/check.ps1` (Windows) organize check steps into groups. Step numbers follow the `src/scripts/checks/check-steps/<nn>-*.sh|.ps1` file names — that file list is the source of truth (18 steps):
+- Both `scripts/check.sh` (POSIX) and `scripts/check.ps1` (Windows) organize check steps into groups. Step numbers follow the `src/scripts/checks/check-steps/<nn>-*.sh|.ps1` file names — that file list is the source of truth (14 steps):
   - **Toolchain checks** (1-3): Shell script formatting/linting (treefmt), PowerShell syntax, Packer templates.
   - **Nix checks** (4-5): Flake evaluation, nix lint (nixf-tidy).
   - **Test suites** (6): Shell validation.
   - **Data integrity** (7-10): Lockfile validation, locked DSC validation, schema validation, service registry.
-  - **Policy/verification** (11-18): YAML structural, package manager enforcement, error suppression, online determinism, config method compliance, activation token placeholder, preflight install-command policy, embedded-content enforcement.
+  - **Policy/verification** (11-14): YAML structural, package manager enforcement, error suppression, online determinism, repository policy (config method, activation token, preflight install-command, embedded content, agents policy).
 - On Windows (check.ps1), steps 1, 4-5 are stubs (POSIX/Nix-only tools).
 - Pre-flight tool validation runs at the start of both scripts (before `$_step=0`). On POSIX this uses `require_command` from `src/scripts/lib.sh`; on Windows it uses `Ensure-Tool` from `src/platforms/Windows/modules/Ensure-Tool.psm1`.
 - **Provisioning and preflight are separate:** provisioning (`nucleus-bootstrap`, `nucleus-apply`, `lockfile.json` pwsh modules, `core.nix`, WinGet DSC) installs tools; preflight only verifies presence and hard-fails if missing. Never install tools inside check/test preflight blocks.
@@ -69,9 +80,9 @@ Choose the right vehicle:
 
 Checks in both `scripts/check.sh` and `scripts/check.ps1` are classified into three categories:
 
-- **Always-run checks**: These cannot meaningfully accept path filtering — they validate whole-repo invariants. They execute unconditionally in both `--full` and `--scoped` modes, with no `$HAS_ARGS` guard. Examples: locked DSC validation (step 7), service registry validation (step 9), repository policy config-method sub-check (step 14).
-- **Conditional checks**: These run only when certain file types are present in the changed set (scoped mode), or always in `--full` mode. Examples: Nix flake evaluation (step 4 — in `--full` mode it always evaluates the flake; in `--scoped` mode only when .nix files are in scope), lockfile validation (step 6, matches `*/lockfile.json`/`*/lifecycle-allowlist.json`), package manager enforcement (step 11, matches `*.sh|*.ps1|*.nix`).
-- **Path-scopable checks**: These operate per-file or per-file-type and accept path filtering in `--scoped` mode. They produce valid results when given only the changed file subset. Examples: Shell script formatting/linting (step 1), PowerShell syntax (step 2, `-SkipStep PSSA`), Packer validation (step 3), Nix lint/nixf-tidy (step 5), schema validation (step 8), YAML structural validation (step 10), undocumented error suppression (step 12), repository policy token/install-command/embedded-content sub-checks (step 14).
+- **Always-run checks**: These cannot meaningfully accept path filtering — they validate whole-repo invariants. They execute unconditionally in both `--full` and `--scoped` modes, with no `$HAS_ARGS` guard. Examples: locked DSC validation (step 7), service registry validation (step 9), repository policy sub-checks (step 14).
+- **Conditional checks**: These run only when certain file types are present in the changed set (scoped mode), or always in `--full` mode. Examples: Nix flake evaluation (step 4), lockfile validation (step 6), package manager enforcement (step 11).
+- **Path-scopable checks**: These operate per-file or per-file-type and accept path filtering in `--scoped` mode. Examples: Shell script formatting/linting (step 1), PowerShell syntax (step 2), Packer validation (step 3), Nix lint/nixf-tidy (step 5), schema validation (step 8), YAML structural validation (step 10), undocumented error suppression (step 12), repository policy token/install-command/embedded-content/agents sub-checks (step 14).
 
 **Source of truth**: The check-step file names under `src/scripts/checks/check-steps/` and their header docstrings are the canonical step-by-step reference. Update both check scripts when changing the taxonomy.
 

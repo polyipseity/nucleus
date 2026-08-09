@@ -30,4 +30,4 @@ The suite validates configuration logic, module composition, package parity, she
 
 ## Provisioning vs preflight
 
-Provisioning installs tools; preflight verifies they exist before check/test runs. Repo-managed tools (Pester, PSScriptAnalyzer, `powershell-yaml`) still require preflight declaration. See `tool-availability.instructions.md`.
+Provisioning installs tools; preflight verifies they exist before check/test runs. Repo-managed tools (Pester, PSScriptAnalyzer, `powershell-yaml`) still require preflight declaration. See `tooling-and-validation.instructions.md`.
