@@ -44,13 +44,15 @@ function Invoke-UvSetup {
     # Discord Music RPC: tray Rich Presence app for Discord.  Pinned to a VCS
     # rev via the uv section of lockfile.json (see Invoke-UvSetup).
     'discord-music-rpc'
-    # PaddleOCR: cross-platform OCR with GPU auto-detection.
-    # Managed via uv for version consistency across all hosts.
-    'paddleocr'
     # LiteLLM AI gateway proxy.  Installed with the [proxy] extra for
     # OpenAI-compatible server functionality.  The tool name in `uv tool list`
     # is `litellm` (extras are stripped from the tool registry).
     'litellm'
+    # PaddleOCR: cross-platform OCR with GPU auto-detection.
+    # Managed via uv for version consistency across all hosts.
+    'paddleocr'
+    # yamllint: no WinGet package; uv is the Windows install path (nixpkgs on POSIX).
+    'yamllint'
   )
 
   # Packages that need extras syntax during install (e.g. 'litellm[proxy]').

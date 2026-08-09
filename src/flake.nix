@@ -1117,13 +1117,19 @@
             in
             pkgsDevMac.mkShell {
               packages = [
+                pkgsDevMac.actionlint
                 pkgsDevMac.bun
                 (mkTreefmtWrapper systems.mac pkgsDevMac)
                 pkgsDevMac.packer
+                pkgsDevMac.pinact
                 pkgsDevMac.powershell
                 pkgsDevMac.prek
                 rustToolchain
+                pkgsDevMac.shfmt
+                pkgsDevMac.taplo
                 pkgsDevMac.uv
+                pkgsDevMac.yamllint
+                pkgsDevMac.zizmor
               ];
               # libiconv is required by the macOS linker when building Rust/C projects
               # (ld: library not found for -liconv). It is included in glibc on Linux
@@ -1163,13 +1169,19 @@
             in
             pkgsDevLinux.mkShell {
               packages = [
+                pkgsDevLinux.actionlint
                 pkgsDevLinux.bun
                 (mkTreefmtWrapper systems.linux pkgsDevLinux)
                 pkgsDevLinux.packer
+                pkgsDevLinux.pinact
                 pkgsDevLinux.powershell
                 pkgsDevLinux.prek
                 rustToolchain
+                pkgsDevLinux.shfmt
+                pkgsDevLinux.taplo
                 pkgsDevLinux.uv
+                pkgsDevLinux.yamllint
+                pkgsDevLinux.zizmor
               ];
               # sccache-wrapped C/C++ compilers for non-CMake projects that
               # read CC/CXX directly. CMake projects use CMAKE_C_COMPILER_LAUNCHER

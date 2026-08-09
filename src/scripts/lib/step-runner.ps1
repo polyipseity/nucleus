@@ -422,8 +422,14 @@ function Format-StepSummary {
 
 # --- Test-Prerequisite ---
 function Test-Prerequisite {
-  Assert-ToolAvailable -Name 'yamllint' -Type 'Command'
-  Assert-ToolAvailable -Name 'jq' -Type 'Command'
-  Assert-ToolAvailable -Name 'yq' -Type 'Command'
+  Assert-ToolAvailable -Name 'actionlint' -Type 'Command'
   Assert-ToolAvailable -Name 'check-jsonschema' -Type 'Command'
+  Assert-ToolAvailable -Name 'jq' -Type 'Command'
+  Assert-ToolAvailable -Name 'packer' -Type 'Command'
+  Assert-ToolAvailable -Name 'pinact' -Type 'Command'
+  Assert-ToolAvailable -Name 'shfmt' -Type 'Command'
+  Assert-ToolAvailable -Name 'taplo' -Type 'Command'
+  Assert-ToolAvailable -Name 'yamllint' -Type 'Command'
+  Assert-ToolAvailable -Name 'yq' -Type 'Command'
+  Assert-ToolAvailable -Name 'zizmor' -Type 'Command'
 }

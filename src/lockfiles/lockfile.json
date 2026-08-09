@@ -131,7 +131,8 @@
       "rev": "bba71027a684db53f3fcde5adbd3d42627241a83"
     },
     "litellm": "1.50.0",
-    "paddleocr": "2.8.0"
+    "paddleocr": "2.8.0",
+    "yamllint": "1.35.1"
   },
   "version": 2,
   "vm-setup": {

@@ -66,7 +66,7 @@ _wave_tmpdir_created=false
 _wave_cleanup_stale() {
   local _d _pid
   for _d in "${TMPDIR:-/tmp}/nucleus-step-runner-"*; do
-    [ -d "$_d" ] || continue  # check-suppress:suppression_doc: glob may expand to literal pattern when no matches; [ -d ] check filters it
+    [ -d "$_d" ] || continue # check-suppress:suppression_doc: glob may expand to literal pattern when no matches; [ -d ] check filters it
     _pid=$(cat "$_d/pid" 2>/dev/null || true)
     if [ -z "$_pid" ] || ! kill -0 "$_pid" 2>/dev/null; then
       rm -rf "$_d"
@@ -75,9 +75,12 @@ _wave_cleanup_stale() {
 }
 
 _wave_init() {
-  _wave_tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/nucleus-step-runner-XXXXXX") || { error "failed to create wave temp directory"; exit 1; }
+  _wave_tmpdir=$(mktemp -d "${TMPDIR:-/tmp}/nucleus-step-runner-XXXXXX") || {
+    error "failed to create wave temp directory"
+    exit 1
+  }
   _wave_tmpdir_created=true
-  printf '%s' "$$" > "$_wave_tmpdir/pid"
+  printf '%s' "$$" >"$_wave_tmpdir/pid"
   trap '_wave_cleanup; exit' INT TERM
   trap '_wave_cleanup' EXIT
 }
@@ -99,7 +102,7 @@ nucleus_nix_locked() {
   local _lock_ret=0
 
   while ! mkdir "$_lock_dir" 2>/dev/null; do
-    _lock_owner="$(cat "$_lock_dir/pid" 2>/dev/null || true)"  # check-suppress:suppression_doc: the pid file may be absent; an empty owner falls through to stale-lock recovery
+    _lock_owner="$(cat "$_lock_dir/pid" 2>/dev/null || true)" # check-suppress:suppression_doc: the pid file may be absent; an empty owner falls through to stale-lock recovery
     if [ -z "$_lock_owner" ] || ! kill -0 "$_lock_owner" 2>/dev/null; then
       rm -rf "$_lock_dir"
       continue
@@ -111,7 +114,7 @@ nucleus_nix_locked() {
     fi
     sleep 1
   done
-  printf '%s\n' "$BASHPID" > "$_lock_dir/pid"
+  printf '%s\n' "$BASHPID" >"$_lock_dir/pid"
 
   if "$@"; then
     _lock_ret=0
@@ -131,12 +134,12 @@ _step_now_ms() {
     return
   fi
   case "$(uname -s)" in
-    Darwin)
-      perl -MTime::HiRes=time -e 'printf "%d\n", int(time() * 1000)'
-      ;;
-    *)
-      date +%s%3N
-      ;;
+  Darwin)
+    perl -MTime::HiRes=time -e 'printf "%d\n", int(time() * 1000)'
+    ;;
+  *)
+    date +%s%3N
+    ;;
   esac
 }
 
@@ -146,13 +149,14 @@ _format_duration_s() {
 
 # --- _run_step wrapper ---
 _run_step() {
-  local _n="$1" _name="$2" _func="$3"; shift 3
+  local _n="$1" _name="$2" _func="$3"
+  shift 3
   local _step_start_ms _elapsed_ms _exit_code _fifo
 
   _step_start_ms=$(_step_now_ms)
 
-  printf '\n=== [%s] %s ===\n' "$_n" "$_name" > "$_wave_tmpdir/step-$_n.out"
-  printf '%s' "$_name" > "$_wave_tmpdir/step-$_n.name"
+  printf '\n=== [%s] %s ===\n' "$_n" "$_name" >"$_wave_tmpdir/step-$_n.out"
+  printf '%s' "$_name" >"$_wave_tmpdir/step-$_n.name"
 
   _fifo=$(mktemp -u "${TMPDIR:-/tmp}/nucleus-step-${_n}-XXXXXX")
   mkfifo "$_fifo"
@@ -162,10 +166,10 @@ _run_step() {
     else
       exit $?
     fi
-  ) > "$_fifo" 2>&1 &
+  ) >"$_fifo" 2>&1 &
   local _func_pid=$!
 
-  tee -a "$_wave_tmpdir/step-$_n.out" < "$_fifo" | while IFS= read -r _line || [ -n "$_line" ]; do
+  tee -a "$_wave_tmpdir/step-$_n.out" <"$_fifo" | while IFS= read -r _line || [ -n "$_line" ]; do
     printf '[step %2d] %s\n' "$_n" "$_line" >&2
   done
 
@@ -173,9 +177,9 @@ _run_step() {
   wait "$_func_pid" || _exit_code=$?
   rm -f "$_fifo"
 
-  printf '%s' "$_exit_code" > "$_wave_tmpdir/step-$_n.exit"
+  printf '%s' "$_exit_code" >"$_wave_tmpdir/step-$_n.exit"
   _elapsed_ms=$(($(_step_now_ms) - _step_start_ms))
-  printf '%s' "$_elapsed_ms" > "$_wave_tmpdir/step-$_n.time"
+  printf '%s' "$_elapsed_ms" >"$_wave_tmpdir/step-$_n.time"
 
   if [ "$_exit_code" -ne 0 ] && [ "$_exit_code" -ne 2 ] && $FAIL_FAST; then
     exit "$_exit_code"
@@ -189,11 +193,11 @@ _run_skipped_step() {
 
   _step_start_ms=$(_step_now_ms)
 
-  printf '\n=== [%s] %s === SKIPPED (--skip-steps: %s)\n' "$_n" "$_name" "$_id" > "$_wave_tmpdir/step-$_n.out"
-  printf '%s' "$_name" > "$_wave_tmpdir/step-$_n.name"
-  printf '%s' "2" > "$_wave_tmpdir/step-$_n.exit"
+  printf '\n=== [%s] %s === SKIPPED (--skip-steps: %s)\n' "$_n" "$_name" "$_id" >"$_wave_tmpdir/step-$_n.out"
+  printf '%s' "$_name" >"$_wave_tmpdir/step-$_n.name"
+  printf '%s' "2" >"$_wave_tmpdir/step-$_n.exit"
   _elapsed_ms=$(($(_step_now_ms) - _step_start_ms))
-  printf '%s' "$_elapsed_ms" > "$_wave_tmpdir/step-$_n.time"
+  printf '%s' "$_elapsed_ms" >"$_wave_tmpdir/step-$_n.time"
 }
 
 # --- Argument parsing ---
@@ -207,60 +211,60 @@ parse_args() {
 
   while [ "$#" -gt 0 ]; do
     case "$1" in
-      -h|--help)
-        usage
-        exit 0
-        ;;
-      --fail-fast)
-        FAIL_FAST=true
-        shift
-        ;;
-      --no-fail-fast)
-        FAIL_FAST=false
-        shift
-        ;;
-      --scoped)
-        SCOPED=true
-        shift
-        ;;
-      --full)
-        FULL=true
-        shift
-        ;;
-      --online)
-        # shellcheck disable=SC2034 # reason: consumed by check step 14 (online-determinism) via transitive sourcing
-        ONLINE=true
-        shift
-        ;;
-      --skip-steps=*)
-        SKIP_STEPS=()
-        local _val="${1#--skip-steps=}"
-        if [ -n "$_val" ]; then
-          local _old_ifs="$IFS"
-          IFS=','
-          for _part in $_val; do
-            _part="${_part## }"
-            _part="${_part%% }"
-            if [ -n "$_part" ]; then
-              local _already=false
-              for _existing in "${SKIP_STEPS[@]}"; do
-                [ "$_existing" = "$_part" ] && _already=true && break
-              done
-              $_already || SKIP_STEPS+=("$_part")
-            fi
-          done
-          IFS="$_old_ifs"
-        fi
-        shift
-        ;;
-      -*)
-        error "unsupported argument '$1'"
-        usage >&2
-        exit 1
-        ;;
-      *)
-        break
-        ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --fail-fast)
+      FAIL_FAST=true
+      shift
+      ;;
+    --no-fail-fast)
+      FAIL_FAST=false
+      shift
+      ;;
+    --scoped)
+      SCOPED=true
+      shift
+      ;;
+    --full)
+      FULL=true
+      shift
+      ;;
+    --online)
+      # shellcheck disable=SC2034 # reason: consumed by check step 12 (online-determinism) via transitive sourcing
+      ONLINE=true
+      shift
+      ;;
+    --skip-steps=*)
+      SKIP_STEPS=()
+      local _val="${1#--skip-steps=}"
+      if [ -n "$_val" ]; then
+        local _old_ifs="$IFS"
+        IFS=','
+        for _part in $_val; do
+          _part="${_part## }"
+          _part="${_part%% }"
+          if [ -n "$_part" ]; then
+            local _already=false
+            for _existing in "${SKIP_STEPS[@]}"; do
+              [ "$_existing" = "$_part" ] && _already=true && break
+            done
+            $_already || SKIP_STEPS+=("$_part")
+          fi
+        done
+        IFS="$_old_ifs"
+      fi
+      shift
+      ;;
+    -*)
+      error "unsupported argument '$1'"
+      usage >&2
+      exit 1
+      ;;
+    *)
+      break
+      ;;
     esac
   done
 
@@ -287,10 +291,10 @@ parse_args() {
   if $HAS_ARGS; then
     for _f in "$@"; do
       case "$_f" in
-        *.sh)      SH_FILES+=("$_f") ;;
-        *.ps1)     PS1_FILES+=("$_f") ;;
-        *.pkr.hcl) PKR_FILES+=("$_f") ;;
-        *.nix)     NIX_FILES+=("$_f") ;;
+      *.sh) SH_FILES+=("$_f") ;;
+      *.ps1) PS1_FILES+=("$_f") ;;
+      *.pkr.hcl) PKR_FILES+=("$_f") ;;
+      *.nix) NIX_FILES+=("$_f") ;;
       esac
     done
   fi
@@ -300,27 +304,27 @@ parse_args() {
 cache_file_lists() {
   # shellcheck disable=SC2034 # reason: consumed by step files (05, 13, 15, 17) via transitive sourcing
   readarray -t CACHED_NIX_FILES < <(
-    find . -path ./vendor -prune -false -o -name '*.nix' -print \
-    | filter_gitignored \
-    | sort
-  )  # ref: allow-and-deny-lists.instructions.md#B7 -- structural invariant; gitignore filter applied on top
+    find . -path ./vendor -prune -false -o -name '*.nix' -print |
+      filter_gitignored |
+      sort
+  ) # ref: allow-and-deny-lists.instructions.md#B7 -- structural invariant; gitignore filter applied on top
   # shellcheck disable=SC2034 # reason: consumed by step files (13, 15) via transitive sourcing
   readarray -t CACHED_YAML_FILES < <(
-    find . -not -path '*/vendor/*' \( -name '*.yml' -o -name '*.yaml' \) -print \
-    | filter_gitignored \
-    | sort
-  )  # ref: allow-and-deny-lists.instructions.md#B7 -- structural invariant; gitignore filter applied on top
+    find . -not -path '*/vendor/*' \( -name '*.yml' -o -name '*.yaml' \) -print |
+      filter_gitignored |
+      sort
+  ) # ref: allow-and-deny-lists.instructions.md#B7 -- structural invariant; gitignore filter applied on top
   # shellcheck disable=SC2034 # reason: consumed by step files (13) via transitive sourcing
   readarray -t CACHED_JSON_FILES < <(
-    find src -name '*.json' -not -path '*/vendor/*' -not -name '*.schema.json' -print \
-    | filter_gitignored \
-    | sort
-  )  # ref: allow-and-deny-lists.instructions.md#A7,#B7 -- schema files are meta; vendor is structural invariant; gitignore filter applied on top
+    find src -name '*.json' -not -path '*/vendor/*' -not -name '*.schema.json' -print |
+      filter_gitignored |
+      sort
+  ) # ref: allow-and-deny-lists.instructions.md#A7,#B7 -- schema files are meta; vendor is structural invariant; gitignore filter applied on top
   # shellcheck disable=SC2034 # reason: consumed by step files (17) via transitive sourcing
   readarray -t CACHED_SH_FILES < <(
-    find src/scripts -type f -name '*.sh' -print \
-    | filter_gitignored \
-    | sort
+    find src/scripts -type f -name '*.sh' -print |
+      filter_gitignored |
+      sort
   )
 }
 
@@ -391,7 +395,7 @@ run_all_steps() {
     fi
   done
 
-  printf '%s' $(($(_step_now_ms) - _pipeline_start_ms)) > "$_wave_tmpdir/pipeline.wall_ms"
+  printf '%s' $(($(_step_now_ms) - _pipeline_start_ms)) >"$_wave_tmpdir/pipeline.wall_ms"
 
   local _elapsed_ms _duration_s
   for _n in "${_spawned_steps[@]}"; do
@@ -451,13 +455,18 @@ aggregate_results() {
 
 # --- Pre-flight check ---
 preflight_check() {
+  require_command actionlint
+  require_command check-jsonschema
+  require_command git # required by deny-list.sh for gitignore filtering; must hard-fail rather than silently pass through
+  require_command jq
+  require_command nix
+  require_command nixf-tidy
+  require_command packer
+  require_command pinact
   require_command pwsh
+  require_command shfmt
+  require_command taplo
   require_command treefmt
   require_command yq
-  require_command jq
-  require_command nixf-tidy
-  require_command nix
-  require_command git  # required by deny-list.sh for gitignore filtering; must hard-fail rather than silently pass through
-  require_command packer
-  require_command check-jsonschema
+  require_command zizmor
 }

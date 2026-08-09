@@ -318,6 +318,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure shfmt is installed for cross-host shell formatting parity with macOS and NixOS
+      settings:
+        id: mvdan.shfmt
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure .NET 6 runtime is installed for EIDE/runtime parity with macOS and NixOS
       settings:
         id: Microsoft.DotNet.Runtime.6
@@ -473,6 +480,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure actionlint is installed for cross-host GitHub Actions workflow lint parity with macOS and NixOS
+      settings:
+        id: rhysd.actionlint
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure rustup is installed for cross-host Rust toolchain parity with macOS and NixOS
       settings:
         id: Rustlang.Rustup
@@ -529,6 +543,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure pinact is installed for cross-host GitHub Actions pin auditing parity with macOS and NixOS
+      settings:
+        id: suzuki-shunsuke.pinact
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: >-
           Steam — game distribution and launcher platform. Cross-platform parity with
           macOS (Homebrew steam cask) and NixOS (programs.steam.enable). No Steam
@@ -567,6 +588,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure taplo is installed for cross-host TOML formatting parity with macOS and NixOS
+      settings:
+        id: tamasfe.taplo
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure VLC media player is installed to mirror the macOS GUI package declaration
       settings:
         id: VideoLAN.VLC
@@ -582,6 +610,13 @@ properties:
           NixOS and macOS.
       settings:
         id: Watfaq.PowerSession
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: Ensure zizmor is installed for cross-host GitHub Actions security auditing parity with macOS and NixOS
+      settings:
+        id: zizmor.zizmor
         source: winget
 
     - resource: Microsoft.WinGet.Client/Package
