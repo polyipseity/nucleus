@@ -110,6 +110,14 @@ Describe 'Resolve-UserConfigFirstLevelEntry' {
         $entries = Get-UserConfigFirstLevelEntryList -User 'bob' -ConfigName 'cursor' -RepoRoot $script:testDir
         $entries | Should -Contain 'hooks.json'
     }
+
+    It 'resolves the cursor IDE settings overlay from the default overlay' {
+        $defaultDir = Join-Path $script:testDir "src/users/default/cursor"
+        New-Item -ItemType Directory -Path $defaultDir -Force > $null
+        Set-Content -Path (Join-Path $defaultDir 'settings.json') -Value '{}' -NoNewline
+        $resolved = Resolve-UserConfigFirstLevelEntry -User 'bob' -ConfigName 'cursor' -EntryName 'settings.json' -RepoRoot $script:testDir
+        $resolved | Should -Be (Join-Path $defaultDir 'settings.json')
+    }
 }
 
 Describe 'Deploy-WritableSymlink' {

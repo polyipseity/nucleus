@@ -1,0 +1,6 @@
+{
+  "$schema": "./settings.schema.json",
+  "cursor.aiprovider.openai.apiKey": "sk-nucleus-litellm",
+  "cursor.aiprovider.openai.baseUrl": "http://127.0.0.1:4000/v1",
+  "cursor.aiprovider.openai.model": "deepseek/deepseek-v4-flash"
+}
