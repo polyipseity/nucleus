@@ -61,6 +61,8 @@ resolves symlinks to physical paths (matching nix store resolution). See
 `scripts-and-permissions.instructions.md` (Relative pathing convention) for the
 full convention.
 
+- **jq with a file argument**: keep the closing quote of the `jq 'program'` and the `"$FILE"` argument on the SAME line. A closing single-quote on its own line followed by args on the next line is a command separator — bash splits one command into two (jq hangs reading stdin; the file becomes a new command). Add `|| return` so jq failures are visible; tests invoking jq should redirect stdin from `/dev/null` so a stdin-blocking jq fails fast instead of hanging.
+
 ## Shellcheck invocation
 
 Shell scripts are checked in three places:
