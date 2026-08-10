@@ -130,7 +130,7 @@
       "source": "https://github.com/polyipseity/ext.discord-music-rpc",
       "rev": "bba71027a684db53f3fcde5adbd3d42627241a83"
     },
-    "litellm": "1.50.0",
+    "litellm": "1.89.0",
     "paddleocr": "2.8.0",
     "yamllint": "1.35.1"
   },
