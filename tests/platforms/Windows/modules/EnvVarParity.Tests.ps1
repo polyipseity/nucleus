@@ -22,9 +22,9 @@ BeforeAll {
   # Paths and helpers must be defined inside BeforeAll: Pester v5 does not make
   # script-scope definitions visible to It blocks under Invoke-Pester.
   $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
-  $UserDscFile = Join-Path $RepoRoot "src\hosts\Windows\user\env.dsc.yml"
-  $SystemDscFile = Join-Path $RepoRoot "src\hosts\Windows\system\env.dsc.yml"
-  $ManifestFile = Join-Path $RepoRoot "result\env-parity-manifest.json"
+  $script:UserDscFile = Join-Path $RepoRoot "src\hosts\Windows\user\env.dsc.yml"
+  $script:SystemDscFile = Join-Path $RepoRoot "src\hosts\Windows\system\env.dsc.yml"
+  $script:ManifestFile = Join-Path $RepoRoot "result\env-parity-manifest.json"
   # $CatalogNixFile intentionally omitted; unused
 
   # ---- Helpers ----
@@ -81,16 +81,16 @@ BeforeAll {
 Describe "Windows env var parity with Nix catalog" {
   Context "DSC parity — user scope" {
     It "user/env.dsc.yml exists and is readable" {
-      $UserDscFile | Should -Exist
+      $script:UserDscFile | Should -Exist
     }
 
     It "catalog manifest evaluates successfully" {
-      { $script:Manifest = Get-NixCatalogManifest -ManifestPath $ManifestFile } | Should -Not -Throw
+      { $script:Manifest = Get-NixCatalogManifest -ManifestPath $script:ManifestFile } | Should -Not -Throw
       $script:Manifest | Should -Not -BeNullOrEmpty
     }
 
     It "every user-specific catalog var has a User-scope DSC entry" {
-      $dscVars = Get-DscEnvVarNameList -DscPath $UserDscFile
+      $dscVars = Get-DscEnvVarNameList -DscPath $script:UserDscFile
       $userSpecificVars = @($script:Manifest | Where-Object { $_.userSpecific -and $_.hasWindowsEntry } | ForEach-Object { $_.name })
 
       $missing = $userSpecificVars | Where-Object { $_ -notin $dscVars }
@@ -101,7 +101,7 @@ Describe "Windows env var parity with Nix catalog" {
     }
 
     It "every User-scope DSC Env resource has a Nix catalog counterpart" {
-      $dscVars = Get-DscEnvVarNameList -DscPath $UserDscFile
+      $dscVars = Get-DscEnvVarNameList -DscPath $script:UserDscFile
       $catalogNames = $script:Manifest | ForEach-Object { $_.name }
 
       $extra = $dscVars | Where-Object { $_ -notin $catalogNames }
@@ -114,11 +114,11 @@ Describe "Windows env var parity with Nix catalog" {
 
   Context "DSC parity — machine scope" {
     It "system/env.dsc.yml exists and is readable" {
-      $SystemDscFile | Should -Exist
+      $script:SystemDscFile | Should -Exist
     }
 
     It "every non-user-specific catalog var has a Machine-scope DSC entry" {
-      $dscVars = Get-DscEnvVarNameList -DscPath $SystemDscFile
+      $dscVars = Get-DscEnvVarNameList -DscPath $script:SystemDscFile
       $machineSpecificVars = @($script:Manifest | Where-Object { -not $_.userSpecific -and $_.hasWindowsEntry } | ForEach-Object { $_.name })
 
       $missing = $machineSpecificVars | Where-Object { $_ -notin $dscVars }
@@ -129,7 +129,7 @@ Describe "Windows env var parity with Nix catalog" {
     }
 
     It "every Machine-scope DSC Env resource has a Nix catalog counterpart" {
-      $dscVars = Get-DscEnvVarNameList -DscPath $SystemDscFile
+      $dscVars = Get-DscEnvVarNameList -DscPath $script:SystemDscFile
       $catalogNames = $script:Manifest | ForEach-Object { $_.name }
 
       $extra = $dscVars | Where-Object { $_ -notin $catalogNames }
@@ -149,7 +149,7 @@ Describe "Windows env var parity with Nix catalog" {
     }
 
     It "CC, CXX, LD are in system/env.dsc.yml at Machine scope" {
-      $dscVars = Get-DscEnvVarNameList -DscPath $SystemDscFile
+      $dscVars = Get-DscEnvVarNameList -DscPath $script:SystemDscFile
       $dscVars | Should -Contain "CC"
       $dscVars | Should -Contain "CXX"
       $dscVars | Should -Contain "LD"

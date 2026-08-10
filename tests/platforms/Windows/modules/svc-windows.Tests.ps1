@@ -84,22 +84,80 @@ BeforeAll {
   # Windows-only cmdlets. Each Mock below overrides its stub.
   function Get-NucleusLogDir { throw 'stub: Get-NucleusLogDir' }
   function Get-NucleusSystemLogDir { throw 'stub: Get-NucleusSystemLogDir' }
-  function Get-WinEvent { throw 'stub: Get-WinEvent' }
+  # PSSA: these stubs intentionally shadow built-in cmdlets (Pester v5 cannot
+  # Mock nonexistent commands) and are immediately replaced by Mock definitions;
+  # the inline suppressions are scoped to each stub only.
+  function Get-WinEvent {
+    # check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets -- test stub shadows built-in cmdlet for Pester Mock
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '')]
+    param()
+    throw 'stub: Get-WinEvent'
+  }
   function ConvertTo-SanitizedText { process { $_ } }
   function Get-ScheduledTask { throw 'stub: Get-ScheduledTask' }
-  function Get-CimInstance { throw 'stub: Get-CimInstance' }
-  function Get-Service { throw 'stub: Get-Service' }
-  function Start-Service { throw 'stub: Start-Service' }
-  function Stop-Service { throw 'stub: Stop-Service' }
-  function Restart-Service { throw 'stub: Restart-Service' }
+  function Get-CimInstance {
+    # check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets -- test stub shadows built-in cmdlet for Pester Mock
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '')]
+    param()
+    throw 'stub: Get-CimInstance'
+  }
+  function Get-Service {
+    # check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets -- test stub shadows built-in cmdlet for Pester Mock
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '')]
+    param()
+    throw 'stub: Get-Service'
+  }
+  function Start-Service {
+    # check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets -- test stub shadows built-in cmdlet for Pester Mock
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test stub throws; Mock supplies behavior
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '')]
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    param()
+    throw 'stub: Start-Service'
+  }
+  function Stop-Service {
+    # check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets -- test stub shadows built-in cmdlet for Pester Mock
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test stub throws; Mock supplies behavior
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '')]
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    param()
+    throw 'stub: Stop-Service'
+  }
+  function Restart-Service {
+    # check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets -- test stub shadows built-in cmdlet for Pester Mock
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test stub throws; Mock supplies behavior
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '')]
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    param()
+    throw 'stub: Restart-Service'
+  }
   # Params declared so Pester binds them for -ParameterFilter assertions.
-  function Set-Service { param([string]$Name, [string]$StartupType, [string]$ErrorAction) throw 'stub: Set-Service' }
+  function Set-Service {
+    # check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets -- test stub shadows built-in cmdlet for Pester Mock
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test stub throws; Mock supplies behavior
+    # check-suppress:SuppressMessageAttribute: PSReviewUnusedParameter -- params bind Pester -ParameterFilter assertions
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '')]
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSReviewUnusedParameter', '')]
+    param([string]$Name, [string]$StartupType, [string]$ErrorAction)
+    throw 'stub: Set-Service'
+  }
   # Write-Nucleus* helpers come from Format-NucleusOutput.psm1 (not dot-sourced
   # here); stub them to mirror production so Write-Error interception works.
   function Write-NucleusError { param([string]$Message) Write-Error "svc: error: $Message" }
   function Write-NucleusWarning { param([string]$Message) Write-Warning "svc: warning: $Message" }
-  function Start-ScheduledTask { throw 'stub: Start-ScheduledTask' }
-  function Stop-ScheduledTask { throw 'stub: Stop-ScheduledTask' }
+  function Start-ScheduledTask {
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test stub throws; Mock supplies behavior
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    param()
+    throw 'stub: Start-ScheduledTask'
+  }
+  function Stop-ScheduledTask {
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test stub throws; Mock supplies behavior
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    param()
+    throw 'stub: Stop-ScheduledTask'
+  }
   function Enable-ScheduledTask { throw 'stub: Enable-ScheduledTask' }
   function Disable-ScheduledTask { throw 'stub: Disable-ScheduledTask' }
 

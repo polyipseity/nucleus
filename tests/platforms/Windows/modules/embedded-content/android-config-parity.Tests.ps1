@@ -17,8 +17,8 @@ BeforeAll {
   $VmShPath = Join-Path $RepoRoot "scripts\vm.sh"
   $ProfilePath = Join-Path $RepoRoot "src\scripts\shell\profile.ps1"
   $InvokeAndroidConfigPath = Join-Path $RepoRoot "src\platforms\Windows\modules\system\Invoke-AndroidConfig.ps1"
-  $VmAndroidPath = Join-Path $RepoRoot "src\platforms\Windows\modules\system\VMAndroid.ps1"
-  $CheckShPs1Path = Join-Path $RepoRoot "scripts\check-sh.ps1"
+  $script:VmAndroidPath = Join-Path $RepoRoot "src\platforms\Windows\modules\system\VMAndroid.ps1"
+  $script:CheckShPs1Path = Join-Path $RepoRoot "scripts\check-sh.ps1"
 
   function Get-VmPs1Content { return Get-Content -Raw -Path $VmPs1Path }
   function Get-VmShContent { return Get-Content -Raw -Path $VmShPath }
@@ -63,8 +63,8 @@ Describe "Windows profile shellcheck delegation" {
   }
 
   It "check-sh.ps1 exists and invokes shellcheck directly" {
-    Test-Path -LiteralPath $CheckShPs1Path -PathType Leaf | Should -Be $true
-    $checkContent = Get-Content -Raw -Path $CheckShPs1Path
+    Test-Path -LiteralPath $script:CheckShPs1Path -PathType Leaf | Should -Be $true
+    $checkContent = Get-Content -Raw -Path $script:CheckShPs1Path
     $checkContent | Should -Match "shellcheck"
     # check-sh.ps1's own header mentions its POSIX counterpart in prose, so
     # assert no bash invocation of it rather than any mention.
@@ -75,6 +75,6 @@ Describe "Windows profile shellcheck delegation" {
 Describe "Android module files exist" {
   It "Invoke-AndroidConfig.ps1 and VMAndroid.ps1 are present" {
     Test-Path -LiteralPath $InvokeAndroidConfigPath -PathType Leaf | Should -Be $true
-    Test-Path -LiteralPath $VmAndroidPath -PathType Leaf | Should -Be $true
+    Test-Path -LiteralPath $script:VmAndroidPath -PathType Leaf | Should -Be $true
   }
 }
