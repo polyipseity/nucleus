@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Bridges ~/.cursor/ to ~/.agents/ (shared agent assets) and
-# src/users/<user>/cursor/ (Cursor-native JSON/hooks).
+# src/users/<user>/cursor/ (Cursor-native JSON/hooks), and symlinks the IDE
+# settings.json overlay into the Cursor User dir.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -124,12 +125,32 @@ _scc_converge_mapped_file_symlinks \
   "$_scc_cursor_dir/commands" ".md"
 
 # Class B: Cursor-native entries from the first-level merged cursor overlay.
-_scc_managed_bridge_dirs="rules agents commands skills"
+# settings.json/settings.schema.json are skipped here: they target the IDE
+# User dir (Class C), not ~/.cursor/.
+_scc_overlay_skip_names="rules agents commands skills settings.json settings.schema.json"
 _nucleus_remove_stale_merged_symlinks \
-  "$_scc_cursor_dir" "$_scc_username" "cursor" "$_scc_repo_root" "$_scc_label" "$_scc_managed_bridge_dirs"
+  "$_scc_cursor_dir" "$_scc_username" "cursor" "$_scc_repo_root" "$_scc_label" "$_scc_overlay_skip_names"
 
 _nucleus_converge_merged_config_symlinks \
   "$_scc_username" "cursor" "$_scc_repo_root" "$_scc_cursor_dir" "$_scc_label" \
   "" "-e" \
   "is not a managed symlink — merge any wanted content into the source entry and remove it, then re-run apply." \
-  "$_scc_managed_bridge_dirs"
+  "$_scc_overlay_skip_names"
+
+# Class C: Cursor IDE settings — symlink settings.json into the IDE User dir
+# (separate from ~/.cursor/, which holds CLI-side config).
+case "$(uname -s)" in
+Darwin)
+  _scc_ide_user_dir="$HOME/Library/Application Support/Cursor/User"
+  ;;
+Linux)
+  _scc_ide_user_dir="$HOME/.config/Cursor/User"
+  ;;
+*)
+  echo "$_scc_label: unsupported platform for Cursor IDE settings symlink: $(uname -s)" >&2
+  exit 1
+  ;;
+esac
+_scc_ide_settings="$(resolve_user_config_file "$_scc_username" "cursor" "settings.json")"
+# check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
+ensure_file_symlink "$_scc_ide_settings" "$_scc_ide_user_dir/settings.json"
