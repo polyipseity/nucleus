@@ -783,8 +783,12 @@ let
     let
       checks = [
         {
-          cond = builtins.pathExists ../../src/vms/NixOS/guest.nix;
-          msg = "src/vms/NixOS/guest.nix must exist for nixos-generators builds";
+          cond = builtins.pathExists ../../src/vms/NixOS/base-guest.nix;
+          msg = "src/vms/NixOS/base-guest.nix must exist for nixos-generators type builds";
+        }
+        {
+          cond = builtins.pathExists ../../src/vms/guests/NixOS/guest.nix;
+          msg = "src/vms/guests/NixOS/guest.nix must exist for per-VM guest identity";
         }
         {
           cond = builtins.pathExists ../../src/vms/NixOS/packer.pkr.hcl;
@@ -1051,17 +1055,22 @@ let
     && (lib.hasInfix "vm-guest-config-sha256" windows_vm_setup_ps1_text)
   ) "Windows vm-setup GC must match full filenames against keep-sets and sweep config markers";
 
-  # guest.nix must be non-empty (parseable as a Nix expression).
+  # base-guest.nix and guests/<id>/guest.nix must be non-empty (parseable as
+  # Nix expressions).
   test_guest_nix_nonempty =
     let
-      content = builtins.readFile ../../src/vms/NixOS/guest.nix;
+      baseContent = builtins.readFile ../../src/vms/NixOS/base-guest.nix;
+      guestContent = builtins.readFile ../../src/vms/guests/NixOS/guest.nix;
     in
-    assert' (builtins.stringLength content > 0) "src/vms/NixOS/guest.nix must not be empty";
+    assert' (
+      builtins.stringLength baseContent > 0 && builtins.stringLength guestContent > 0
+    ) "src/vms/NixOS/base-guest.nix and src/vms/guests/NixOS/guest.nix must not be empty";
 
   # The NixOS guest image must not force virtio_fs into the initrd. The share
   # is optional at runtime and some current kernels do not provide a loadable
   # virtio_fs module, which would make image generation fail before first boot.
-  guest_nix_text = builtins.readFile ../../src/vms/NixOS/guest.nix;
+  base_guest_nix_text = builtins.readFile ../../src/vms/NixOS/base-guest.nix;
+  guest_vm_nix_text = builtins.readFile ../../src/vms/guests/NixOS/guest.nix;
   core_nix_text = builtins.readFile ../../src/modules/core.nix;
   nixos_packer_text = builtins.readFile ../../src/vms/NixOS/packer.pkr.hcl;
   nixos_disks_nix_text = builtins.readFile ../../src/hosts/NixOS/hardware/disks.nix;
@@ -1071,20 +1080,20 @@ let
   btrfs_patch_text = builtins.readFile ../../src/vms/NixOS/disk-image/make-disk-image-btrfs.patch;
   # NixOS guest must enable the QEMU guest agent for host-guest communication
   # (VM lifecycle events, ballooning, clipboard sharing, etc.)
-  test_nixos_guest_qemu_guest_enabled = assert' (lib.hasInfix "services.qemuGuest.enable = true;" guest_nix_text) "NixOS guest.nix must enable services.qemuGuest.enable";
+  test_nixos_guest_qemu_guest_enabled = assert' (lib.hasInfix "services.qemuGuest.enable = true;" base_guest_nix_text) "NixOS base-guest.nix must enable services.qemuGuest.enable";
 
   # NixOS guest must enable OpenSSH for remote access and credential-free
   # host-guest communication via the QEMU SSH port forward.
-  test_nixos_guest_openssh_enabled = assert' (lib.hasInfix "services.openssh.enable = true;" guest_nix_text) "NixOS guest.nix must enable services.openssh.enable";
+  test_nixos_guest_openssh_enabled = assert' (lib.hasInfix "services.openssh.enable = true;" base_guest_nix_text) "NixOS base-guest.nix must enable services.openssh.enable";
 
   # NixOS guest must declare the nucleus-rebuild oneshot systemd service for
   # converging the guest to the latest flake-defined state.
-  test_nixos_guest_nucleus_rebuild_service = assert' (lib.hasInfix "systemd.services.nucleus-rebuild" guest_nix_text) "NixOS guest.nix must declare the nucleus-rebuild systemd service";
+  test_nixos_guest_nucleus_rebuild_service = assert' (lib.hasInfix "systemd.services.nucleus-rebuild" base_guest_nix_text) "NixOS base-guest.nix must declare the nucleus-rebuild systemd service";
 
   # NixOS guest must accept the SSH public key via the
   # NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY environment variable so the host can
   # authenticate to the guest without interactive password entry.
-  test_nixos_guest_ssh_authorized_keys = assert' (lib.hasInfix "NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY" guest_nix_text) "NixOS guest.nix must reference NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY in authorized keys";
+  test_nixos_guest_ssh_authorized_keys = assert' (lib.hasInfix "NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY" guest_vm_nix_text) "src/vms/guests/NixOS/guest.nix must reference NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY in authorized keys";
 
   # ---------------------------------------------------------------------------
   # Homebrew dependency tests
@@ -1244,10 +1253,10 @@ let
   ) "NixOS host and guest images must use @/@nix btrfs layout with compress-force=zstd";
 
   test_nixos_guest_documents_btrfs_formats = assert' (
-    (lib.hasInfix "qcow-btrfs" guest_nix_text)
-    && (lib.hasInfix "qcow-efi-btrfs" guest_nix_text)
-    && !(lib.hasInfix "ext4" guest_nix_text)
-  ) "src/vms/NixOS/guest.nix must document Btrfs qcow format modules instead of ext4";
+    (lib.hasInfix "qcow-btrfs" base_guest_nix_text)
+    && (lib.hasInfix "qcow-efi-btrfs" base_guest_nix_text)
+    && !(lib.hasInfix "ext4" base_guest_nix_text)
+  ) "src/vms/NixOS/base-guest.nix must document Btrfs qcow format modules instead of ext4";
 
   test_nixos_packer_btrfs_root = assert' (
     (lib.hasInfix "mkfs.btrfs" nixos_packer_text) && !(lib.hasInfix "mkfs.ext4" nixos_packer_text)
@@ -1501,8 +1510,8 @@ let
   test_nixos_generators_uses_exported_env_credentials =
     assert'
       (
-        (lib.hasInfix "guestUsername = builtins.getEnv \"NUCLEUS_VM_GUEST_USERNAME\"" guest_nix_text)
-        && (lib.hasInfix "guestPassword = builtins.getEnv \"NUCLEUS_VM_GUEST_PASSWORD\"" guest_nix_text)
+        (lib.hasInfix "guestUsername = builtins.getEnv \"NUCLEUS_VM_GUEST_USERNAME\"" guest_vm_nix_text)
+        && (lib.hasInfix "guestPassword = builtins.getEnv \"NUCLEUS_VM_GUEST_PASSWORD\"" guest_vm_nix_text)
         && !(lib.hasInfix "--argstr guestUsername" vm_setup_sh_text)
         && !(lib.hasInfix "--argstr guestPassword" vm_setup_sh_text)
       )
@@ -1524,10 +1533,10 @@ let
       "Invoke-VMSetup.ps1 must resolve and propagate secret-backed guest credentials to all Windows-host build paths";
 
   test_guest_credentials_policy_in_nixos_guest = assert' (
-    (lib.hasInfix "guestUsername = builtins.getEnv \"NUCLEUS_VM_GUEST_USERNAME\"" guest_nix_text)
-    && (lib.hasInfix "guestPassword = builtins.getEnv \"NUCLEUS_VM_GUEST_PASSWORD\"" guest_nix_text)
-    && (lib.hasInfix "users.users.\"\${guestUsername}\"" guest_nix_text)
-  ) "src/vms/NixOS/guest.nix must consume exported guest credentials and create a login user";
+    (lib.hasInfix "guestUsername = builtins.getEnv \"NUCLEUS_VM_GUEST_USERNAME\"" guest_vm_nix_text)
+    && (lib.hasInfix "guestPassword = builtins.getEnv \"NUCLEUS_VM_GUEST_PASSWORD\"" guest_vm_nix_text)
+    && (lib.hasInfix "users.users.\"\${guestUsername}\"" guest_vm_nix_text)
+  ) "src/vms/guests/NixOS/guest.nix must consume exported guest credentials and create a login user";
 
   test_guest_credentials_policy_in_nixos_packer =
     assert'
@@ -1582,12 +1591,12 @@ let
   test_nixos_guest_threads_username_arg =
     assert'
       (
-        (lib.hasInfix "_module.args = {" guest_nix_text)
-        && (lib.hasInfix "username = guestUsername;" guest_nix_text)
-        && (lib.hasInfix "builtins.getEnv \"NUCLEUS_VM_GUEST_HOSTNAME\"" guest_nix_text)
-        && !(lib.hasInfix "hostName = \"NixOS\";" guest_nix_text)
+        (lib.hasInfix "_module.args = {" guest_vm_nix_text)
+        && (lib.hasInfix "username = guestUsername;" guest_vm_nix_text)
+        && (lib.hasInfix "builtins.getEnv \"NUCLEUS_VM_GUEST_HOSTNAME\"" guest_vm_nix_text)
+        && !(lib.hasInfix "hostName = \"NixOS\";" guest_vm_nix_text)
       )
-      "src/vms/NixOS/guest.nix must thread username/hostName via _module.args (hostName from NUCLEUS_VM_GUEST_HOSTNAME) for standalone nixos-generators evals";
+      "src/vms/guests/NixOS/guest.nix must thread username/hostName via _module.args (hostName from NUCLEUS_VM_GUEST_HOSTNAME) for per-VM nixos-generators evals";
 
   # The per-VM guest hostname must reach every build path: exported to guest
   # builds via the NUCLEUS_VM_GUEST_HOSTNAME env var, rendered into the NixOS
@@ -1612,14 +1621,14 @@ let
   test_nixos_guest_standalone_eval_overrides =
     assert'
       (
-        (lib.hasInfix "services.gnome.gcr-ssh-agent.enable = lib.mkForce false;" guest_nix_text)
-        && (lib.hasInfix "hardware.graphics.enable32Bit = lib.mkForce false;" guest_nix_text)
-        && (lib.hasInfix "programs.steam.enable = lib.mkForce false;" guest_nix_text)
-        && (lib.hasInfix "system.stateVersion = lib.mkForce \"25.05\";" guest_nix_text)
-        && (lib.hasInfix "allowUnfree = true;" guest_nix_text)
-        && (lib.hasInfix "permittedInsecurePackages = [ \"dotnet-runtime-6.0.36\" ];" guest_nix_text)
+        (lib.hasInfix "services.gnome.gcr-ssh-agent.enable = lib.mkForce false;" base_guest_nix_text)
+        && (lib.hasInfix "hardware.graphics.enable32Bit = lib.mkForce false;" base_guest_nix_text)
+        && (lib.hasInfix "programs.steam.enable = lib.mkForce false;" base_guest_nix_text)
+        && (lib.hasInfix "system.stateVersion = lib.mkForce \"25.05\";" base_guest_nix_text)
+        && (lib.hasInfix "allowUnfree = true;" base_guest_nix_text)
+        && (lib.hasInfix "permittedInsecurePackages = [ \"dotnet-runtime-6.0.36\" ];" base_guest_nix_text)
       )
-      "src/vms/NixOS/guest.nix must force standalone-eval overrides (gcr-ssh-agent, 32-bit graphics, Steam, stateVersion, unfree/insecure policy)";
+      "src/vms/NixOS/base-guest.nix must force standalone-eval overrides (gcr-ssh-agent, 32-bit graphics, Steam, stateVersion, unfree/insecure policy)";
 
   # vm.sh must provision UTM data disks from the type system image: the data
   # disk is a qcow2 overlay over src/<type>/system image.qcow2 hard-linked into

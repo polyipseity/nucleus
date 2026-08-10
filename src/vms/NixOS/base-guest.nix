@@ -1,19 +1,25 @@
-# src/vms/NixOS/guest.nix — NixOS guest configuration for nixos-generators.
+# src/vms/NixOS/base-guest.nix — Shared NixOS guest configuration for
+# nixos-generators type builds.
 #
 # Builds a development-ready NixOS system suitable for use as a QEMU/KVM or UTM
-# VM guest, with full parity to the NixOS host configuration (excluding AI models
-# and hypervisor infrastructure).  Used by scripts/vm.sh on macOS and NixOS
-# hosts via:
+# VM guest, with full parity to the NixOS host configuration (excluding AI
+# models and hypervisor infrastructure).  This is the TYPE-scoped base: it is
+# built once per NixOS VM type into the shared read-only system image and
+# carries NO per-VM identity (no hostname, no credentials, no SSH keys).
+# Per-VM identity lives in src/vms/guests/<id>/guest.nix, which imports this
+# file and overrides the generic placeholder user via _module.args; it is
+# applied to the per-VM data disk at setup time (see vm_inject_guest).
+# Used by scripts/vm.sh on macOS and NixOS hosts via:
 #
 #   nix run github:nix-community/nixos-generators -- \
 #     --format-path ./src/vms/NixOS/formats/qcow-btrfs.nix \  # qcow-efi-btrfs on aarch64 hosts
 #     --system x86_64-linux   \  # or aarch64-linux on Apple Silicon
-#     --configuration ./src/vms/NixOS/guest.nix \
+#     --configuration ./src/vms/NixOS/base-guest.nix \
 #     -o <output-dir>
 #
-# On Windows hosts, src/platforms/Windows/modules/system/Invoke-VMSetup.ps1 uses
-# src/vms/NixOS/packer.pkr.hcl instead, which generates a similar configuration
-# inline during a Packer QEMU build.
+# On Windows hosts, src/platforms/Windows/modules/system/Invoke-VMSetup.ps1
+# uses src/vms/NixOS/packer.pkr.hcl instead, which generates a similar
+# configuration inline during a Packer QEMU build.
 #
 # Do NOT declare fileSystems, boot.loader, or hardware-configuration here:
 # nixos-generators format modules inject the correct disk/bootloader setup for
@@ -33,12 +39,9 @@
   modulesPath,
   lib,
   pkgs,
+  username,
   ...
 }:
-let
-  guestUsername = builtins.getEnv "NUCLEUS_VM_GUEST_USERNAME";
-  guestPassword = builtins.getEnv "NUCLEUS_VM_GUEST_PASSWORD";
-in
 {
   imports = [
     "${modulesPath}/profiles/qemu-guest.nix"
@@ -57,19 +60,20 @@ in
     ../../../src/hosts/NixOS/users.nix
   ];
 
-  networking.hostName = builtins.getEnv "NUCLEUS_VM_GUEST_HOSTNAME";
-
   # WHY: posix-base.nix selects its per-host gitconfig via hostName and the
   # shared user modules key off username; nixos-generators passes no
-  # specialArgs, so thread them here.  SOPS modules (posix-sops.nix,
+  # specialArgs, so thread generic placeholders here.  This is the TYPE build
+  # (no per-VM identity): the per-VM delta src/vms/guests/<id>/guest.nix
+  # overrides both with the real values from NUCLEUS_VM_GUEST_* environment
+  # variables via the same _module.args option.  SOPS modules (posix-sops.nix,
   # hosts/NixOS/sops.nix) are deliberately NOT imported: they define the
   # sops.* options that only exist when sops-nix.nixosModules.sops is loaded,
   # which nixos-generators does not do for standalone guest builds.  The
   # guest injects its credentials and hostname via NUCLEUS_VM_GUEST_*
   # environment variables instead of SOPS decryption.
   _module.args = {
-    hostName = builtins.getEnv "NUCLEUS_VM_GUEST_HOSTNAME";
-    username = guestUsername;
+    hostName = lib.mkDefault "nixos";
+    username = lib.mkDefault "nixos";
   };
 
   # VirtioFS sharing is configured after first boot when the host actually
@@ -78,13 +82,6 @@ in
   # breaks image generation before the VM ever boots.
   # Example guest-side mount after first boot:
   #   fileSystems."/home/<guest-user>/dev" = { device = "dev"; fsType = "virtiofs"; };
-
-  users.users."${guestUsername}" = {
-    isNormalUser = true;
-    extraGroups = [ "wheel" ];
-    initialPassword = guestPassword;
-    openssh.authorizedKeys.keys = [ (builtins.getEnv "NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY") ];
-  };
 
   services.qemuGuest.enable = true;
   services.openssh.enable = true;
@@ -113,9 +110,12 @@ in
     permittedInsecurePackages = [ "dotnet-runtime-6.0.36" ];
   };
 
+  # WHY: converge the guest to the latest flake-defined state after boot.  The
+  # service is user-scoped; the generic `username` arg resolves to the real
+  # per-VM user at injection time (per-VM guest.nix overrides _module.args).
   systemd.services.nucleus-rebuild =
     let
-      flakeDir = "/home/${guestUsername}/dev/nucleus/src";
+      flakeDir = "/home/${username}/dev/nucleus/src";
     in
     {
       description = "Rebuild NixOS system from nucleus flake";
@@ -124,9 +124,9 @@ in
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        User = guestUsername;
+        User = username;
         Group = "users";
-        Environment = "HOME=/home/${guestUsername}";
+        Environment = "HOME=/home/${username}";
       };
       script = ''
         ${pkgs.nixos-rebuild}/bin/nixos-rebuild switch --flake ${flakeDir}#NixOS

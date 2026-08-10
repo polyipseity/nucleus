@@ -314,7 +314,7 @@ vm_sha256_input() {
 
 # vm_guest_config_marker_path NAME [DISK_PATH]
 #   Returns the sidecar marker path storing the guest-config fingerprint
-#   (NixOS guest.nix + imports + flake.lock) for drift detection.
+#   (NixOS base-guest.nix + imports + flake.lock) for drift detection.
 vm_guest_config_marker_path() {
   _vgcmp_name="$1"
   _vgcmp_disk_path="${2:-}"
@@ -340,12 +340,12 @@ vm_guest_config_marker_matches() {
 
 # vm_guest_config_fingerprint
 #   Prints a SHA-256 fingerprint of the NixOS guest configuration: the resolved
-#   paths of every src/ import in guest.nix plus src/flake.lock.  WHY: the
+#   paths of every src/ import in base-guest.nix plus src/flake.lock.  WHY: the
 #   imported files are leaf modules (no transitive imports), so resolving the
 #   import list captures all configuration source; flake.lock pins the
 #   nixos-generators revision.  Returns 1 when no SHA-256 tool is available.
 vm_guest_config_fingerprint() {
-  _gcf_imports="$(grep -oE '(\.\./)+src/[A-Za-z0-9_./-]+\.nix' "$VMS_DIR/NixOS/guest.nix" | sort -u)"
+  _gcf_imports="$(grep -oE '(\.\./)+src/[A-Za-z0-9_./-]+\.nix' "$VMS_DIR/NixOS/base-guest.nix" | sort -u)"
   {
     printf '%s\n' "$_gcf_imports"
     if [ -d "$VMS_DIR/NixOS/formats" ]; then
@@ -2624,7 +2624,7 @@ vm_build_nixos() {
   _config_marker="$(vm_guest_config_marker_path "$_vm_id")"
   _min_size="$(parse_size "$(jq -r ".VMs[] | select(.id == \"$_vm_id\") | .minImageSize" "$MANIFEST")")"
 
-  # WHY: rebuild when the guest config (guest.nix + imports + flake.lock)
+  # WHY: rebuild when the guest config (base-guest.nix + imports + flake.lock)
   _config_fingerprint="$(vm_guest_config_fingerprint)" || return 1
 
   if [ -f "$_out" ]; then
@@ -2650,9 +2650,9 @@ vm_build_nixos() {
     fi
   fi
 
-  _guest_nix="$VMS_DIR/NixOS/guest.nix"
+  _guest_nix="$VMS_DIR/NixOS/base-guest.nix"
   if [ ! -f "$_guest_nix" ]; then
-    error "nixos guest config not found: $_guest_nix"
+    error "nixos guest base config not found: $_guest_nix"
     return 1
   fi
 

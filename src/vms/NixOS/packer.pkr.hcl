@@ -134,7 +134,7 @@ build {
   sources = ["source.qemu.nixos"]
 
   # Partition, format, and install NixOS onto /dev/vda.
-  # The configuration mirrors src/vms/NixOS/guest.nix used by nixos-generators.
+  # The configuration mirrors src/vms/NixOS/base-guest.nix used by nixos-generators.
   provisioner "shell" {
     timeout = "60m"
     inline = [

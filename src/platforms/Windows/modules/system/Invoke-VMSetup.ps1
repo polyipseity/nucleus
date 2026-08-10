@@ -886,7 +886,7 @@ function Invoke-VMSetup {
         $guestPassword = $guestCredential.Secret
         $guestSecretHash = $guestCredential.Hash
 
-        # Export SSH public key for NixOS guest provisioning (guest.nix uses it for authorized_keys).
+        # Export SSH public key for NixOS guest provisioning (guests/NixOS/guest.nix uses it for authorized_keys).
         $sshPublicKey = Get-VMGuestSshPublicKey -RepoRoot $RepoRoot -Username $guestCredential.AccountName
         if ($null -ne $sshPublicKey) {
             $env:NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY = $sshPublicKey
