@@ -16,7 +16,7 @@
 
 Describe 'Sync-GitAndSshConfig backup/restore helpers' {
     BeforeAll {
-        . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\src\platforms\Windows\modules\user\Sync-GitAndSshConfig.ps1')
+        . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\src\platforms\Windows\modules\user\Sync-GitAndSshConfig.ps1')
         $script:testDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-gitcfg-" + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $script:testDir -Force > $null
     }

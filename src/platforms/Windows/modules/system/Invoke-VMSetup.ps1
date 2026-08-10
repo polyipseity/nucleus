@@ -922,10 +922,8 @@ function Invoke-VMSetup {
         Write-Information "vm-setup: [dry-run] Write VM directory guide: $vmReadmePath"
     } elseif (Test-Path -LiteralPath $vmReadmeTemplate -PathType Leaf) {
         $vmDirShort = $vmDir -replace [regex]::Escape($env:USERPROFILE), '%USERPROFILE%'
-        $srcDirShort = "$vmDirShort\src"
         (Get-Content -Path $vmReadmeTemplate -Raw) `
             -replace '__VM_DIR_DISPLAY__', $vmDirShort `
-            -replace '__SRC_DIR_DISPLAY__', $srcDirShort `
             | Set-Content -Path $vmReadmePath -Encoding UTF8
         Write-Information "vm-setup: VM directory guide written: $vmReadmePath (template)"
     } else {

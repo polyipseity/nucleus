@@ -13,20 +13,20 @@
     Templates covered:
     - src/vms/templates/start-windows.ps1 (12 tokens, Windows start script)
     - src/vms/templates/start-windows-host.sh (11 tokens, Git Bash/MSYS start script)
-    - src/vms/templates/README.md (2 tokens, VM directory guide)
+    - src/vms/templates/README.md (1 token, VM directory guide)
     - src/vms/Windows/Autounattend.xml (3 tokens, Windows guest unattended setup)
     - src/scripts/vms/start-android-vm.ps1 (7 tokens, Android QEMU start script)
     - src/vms/templates/stop-host.ps1 (2 tokens, host-kind stop script)
 
 .NOTES
-    Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/embedded-content/template-token-integrity.Tests.ps1 -Passthru"
+    Run with: pwsh -NoProfile -Command "Invoke-Pester tests/platforms/Windows/modules/embedded-content/template-token-integrity.Tests.ps1 -Passthru"
     Exit codes: 0 on success; 1 on failure
 #>
 
 BeforeAll {
   $ErrorActionPreference = "Stop"
 
-  $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
+  $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\..\")
   $TemplatesDir = Join-Path $RepoRoot "src\vms\templates"
   $InvokeVMSetupPath = Join-Path $RepoRoot "src\platforms\Windows\modules\system\Invoke-VMSetup.ps1"
 
@@ -69,7 +69,7 @@ BeforeAll {
 Describe "start-windows.ps1 template token integrity" {
   It "declares exactly the 12 expected __TOKEN__ placeholders" {
     $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "start-windows.ps1")
-    ($templateTokens -join ",") | Should -Be "CPU,CPUS,DISK_PATH,DISPLAY_BACKEND,HOSTFWDS,MACHINE,QEMU_SYSTEM,RAM_BYTES,VGA,VIRTIOFS_ARGS,VM_DISPLAY,VM_NAME"
+    ($templateTokens -join ",") | Should -Be "CPU,CPUS,DISK_PATH,DISPLAY_BACKEND,HOSTFWDS,MACHINE,QEMU_SYSTEM,RAM_BYTES,VGA,VIRTIOFS_ARGS,VM_DISPLAY,VM_ID"
   }
 
   It "every placeholder has a replacement in the Invoke-VMSetup render chain" {
@@ -83,7 +83,7 @@ Describe "start-windows.ps1 template token integrity" {
 Describe "start-windows-host.sh template token integrity" {
   It "declares exactly the 11 expected __TOKEN__ placeholders" {
     $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "start-windows-host.sh")
-    ($templateTokens -join ",") | Should -Be "CPU,CPUS,DISK_PATH,DISPLAY_BACKEND,HOSTFWDS,MACHINE,QEMU_SYSTEM,RAM_BYTES,VGA,VM_DISPLAY,VM_NAME"
+    ($templateTokens -join ",") | Should -Be "CPU,CPUS,DISK_PATH,DISPLAY_BACKEND,HOSTFWDS,MACHINE,QEMU_SYSTEM,RAM_BYTES,VGA,VM_DISPLAY,VM_ID"
   }
 
   It "every placeholder has a replacement in the Invoke-VMSetup render chain" {
@@ -97,7 +97,7 @@ Describe "start-windows-host.sh template token integrity" {
 Describe "start-host.ps1 template token integrity" {
   It "declares exactly the 4 expected __TOKEN__ placeholders" {
     $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "start-host.ps1")
-    ($templateTokens -join ",") | Should -Be "HOST_KIND,TART_SOFTNET_EXPOSE,VM_DIR,VM_DISPLAY,VM_NAME"
+    ($templateTokens -join ",") | Should -Be "HOST_KIND,TART_SOFTNET_EXPOSE,VM_DIR,VM_DISPLAY,VM_ID"
   }
 
   It "every placeholder has a replacement in the vm.sh sed render chain" {
@@ -111,7 +111,7 @@ Describe "start-host.ps1 template token integrity" {
 Describe "stop-posix.sh template token integrity" {
   It "declares exactly the 3 expected __TOKEN__ placeholders" {
     $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "stop-posix.sh")
-    ($templateTokens -join ",") | Should -Be "HOST_KIND,VM_DISPLAY,VM_NAME"
+    ($templateTokens -join ",") | Should -Be "HOST_KIND,VM_DISPLAY,VM_ID"
   }
 
   It "every placeholder has a replacement in the vm.sh sed render chain" {
@@ -125,7 +125,7 @@ Describe "stop-posix.sh template token integrity" {
 Describe "stop-host.ps1 template token integrity" {
   It "declares exactly the 2 expected __TOKEN__ placeholders" {
     $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "stop-host.ps1")
-    ($templateTokens -join ",") | Should -Be "HOST_KIND,VM_NAME"
+    ($templateTokens -join ",") | Should -Be "HOST_KIND,VM_ID"
   }
 
   It "every placeholder has a replacement in the vm.sh sed render chain" {
@@ -139,7 +139,7 @@ Describe "stop-host.ps1 template token integrity" {
 Describe "README.md template token integrity" {
   It "declares the directory-display __TOKEN__ placeholders" {
     $templateTokens = Get-UpperSnakeTokenList (Get-TemplatePath "README.md")
-    @('SRC_DIR_DISPLAY', 'VM_DIR_DISPLAY') | ForEach-Object {
+    @('VM_DIR_DISPLAY') | ForEach-Object {
       $_ | Should -BeIn $templateTokens
     }
   }
@@ -147,9 +147,7 @@ Describe "README.md template token integrity" {
   It "directory-display placeholders have replacements in vm.sh and Invoke-VMSetup" {
     $vmSh = (Get-Content -Raw -Path (Join-Path $RepoRoot "scripts\vm.sh")) +
       (Get-Content -Raw -Path (Join-Path $RepoRoot "src\scripts\lib\vm.sh"))
-    $vmSh | Should -Match ([regex]::Escape('__SRC_DIR_DISPLAY__'))
     $vmSh | Should -Match ([regex]::Escape('__VM_DIR_DISPLAY__'))
-    (Get-DashReplaceTokenList) | Should -Contain 'SRC_DIR_DISPLAY'
     (Get-DashReplaceTokenList) | Should -Contain 'VM_DIR_DISPLAY'
   }
 }

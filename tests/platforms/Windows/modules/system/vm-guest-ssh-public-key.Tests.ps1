@@ -12,7 +12,7 @@
 BeforeAll {
     $ErrorActionPreference = 'Stop'
 
-    $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..\..\..\')
+    $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot '..\..\..\..\..\')
     $GetVMGuestSshPublicKeyPath = Join-Path $RepoRoot 'src\platforms\Windows\modules\system\Get-VMGuestSshPublicKey.ps1'
     . $GetVMGuestSshPublicKeyPath
 

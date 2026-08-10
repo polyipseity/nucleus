@@ -27,7 +27,7 @@
 BeforeAll {
   $ErrorActionPreference = "Stop"
 
-  $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
+  $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\..\")
   $AndroidStartScriptPath = Join-Path $RepoRoot "src\scripts\vms\start-android-vm.ps1"
   $VmShPath = Join-Path $RepoRoot "src\scripts\lib\vm.sh"
   $StartAndroidVMPath = Join-Path $RepoRoot "src\platforms\Windows\modules\user\Start-AndroidVM.ps1"

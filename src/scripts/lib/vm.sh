@@ -106,10 +106,8 @@ write_vm_directory_readme() {
   fi
 
   _wvdr_vm_dir_short="$HOME/virtual machines"
-  _wvdr_src_dir_short="$HOME/virtual machines/src"
   if [ -f "$TEMPLATES_DIR/README.md" ]; then
     sed -e "s|__VM_DIR_DISPLAY__|$_wvdr_vm_dir_short|g" \
-      -e "s|__SRC_DIR_DISPLAY__|$_wvdr_src_dir_short|g" \
       "$TEMPLATES_DIR/README.md" >"$_wvdr_readme"
     say "wrote VM directory guide: $_wvdr_readme (template)"
   else

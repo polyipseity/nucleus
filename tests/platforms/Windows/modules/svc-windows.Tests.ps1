@@ -7,7 +7,7 @@
   and Invoke-ServiceAction functions by sourcing the function definitions
   from svc.ps1 with a mock $Registry.
 
-  Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/svc-windows.Tests.ps1 -Passthru"
+  Run with: pwsh -NoProfile -Command "Invoke-Pester tests/platforms/Windows/modules/svc-windows.Tests.ps1 -Passthru"
 #>
 
 BeforeAll {
@@ -78,7 +78,30 @@ BeforeAll {
     }
   }
 
-  # Stubs are omitted — Pester Mock creates functions automatically when needed.
+  # Pester v5 cannot Mock commands that do not exist in the session (verified
+  # empirically), so every mocked command absent from non-Windows CI hosts needs
+  # a stub definition first — log-management helpers sourced by svc.ps1 and
+  # Windows-only cmdlets. Each Mock below overrides its stub.
+  function Get-NucleusLogDir { throw 'stub: Get-NucleusLogDir' }
+  function Get-NucleusSystemLogDir { throw 'stub: Get-NucleusSystemLogDir' }
+  function Get-WinEvent { throw 'stub: Get-WinEvent' }
+  function ConvertTo-SanitizedText { process { $_ } }
+  function Get-ScheduledTask { throw 'stub: Get-ScheduledTask' }
+  function Get-CimInstance { throw 'stub: Get-CimInstance' }
+  function Get-Service { throw 'stub: Get-Service' }
+  function Start-Service { throw 'stub: Start-Service' }
+  function Stop-Service { throw 'stub: Stop-Service' }
+  function Restart-Service { throw 'stub: Restart-Service' }
+  # Params declared so Pester binds them for -ParameterFilter assertions.
+  function Set-Service { param([string]$Name, [string]$StartupType, [string]$ErrorAction) throw 'stub: Set-Service' }
+  # Write-Nucleus* helpers come from Format-NucleusOutput.psm1 (not dot-sourced
+  # here); stub them to mirror production so Write-Error interception works.
+  function Write-NucleusError { param([string]$Message) Write-Error "svc: error: $Message" }
+  function Write-NucleusWarning { param([string]$Message) Write-Warning "svc: warning: $Message" }
+  function Start-ScheduledTask { throw 'stub: Start-ScheduledTask' }
+  function Stop-ScheduledTask { throw 'stub: Stop-ScheduledTask' }
+  function Enable-ScheduledTask { throw 'stub: Enable-ScheduledTask' }
+  function Disable-ScheduledTask { throw 'stub: Disable-ScheduledTask' }
 
   # Mock external dependencies for log functions.
   Mock Get-NucleusLogDir { return 'TestDrive:\nucleus\logs' }
@@ -235,8 +258,11 @@ Describe 'Get-ServiceStatus' {
       Mock Get-Service {
         return [PSCustomObject]@{ Status = 'Running'; StartType = 'Automatic' }
       }
+      Mock Get-CimInstance {
+        return [PSCustomObject]@{ ProcessId = 12345 }
+      }
 
-      $status = Get-ServiceStatus -Platform @{ type = 'native'; service = 'ollama' }
+      $status = Get-ServiceStatus -HostEntry @{ type = 'native'; service = 'ollama' }
       $status.status | Should -Be 'active'
       $status.running | Should -Be $true
       $status.enabled | Should -Be $true
@@ -247,7 +273,7 @@ Describe 'Get-ServiceStatus' {
         return [PSCustomObject]@{ Status = 'Stopped'; StartType = 'Manual' }
       }
 
-      $status = Get-ServiceStatus -Platform @{ type = 'native'; service = 'sshd' }
+      $status = Get-ServiceStatus -HostEntry @{ type = 'native'; service = 'sshd' }
       $status.status | Should -Be 'inactive'
       $status.running | Should -Be $false
       $status.enabled | Should -Be $false
@@ -256,7 +282,7 @@ Describe 'Get-ServiceStatus' {
     It 'returns not-found when Get-Service throws' {
       Mock Get-Service { throw 'not found' }
 
-      $status = Get-ServiceStatus -Platform @{ type = 'native'; service = 'nonexistent' }
+      $status = Get-ServiceStatus -HostEntry @{ type = 'native'; service = 'nonexistent' }
       $status.status | Should -Be 'not-found'
       $status.running | Should -Be $false
     }
@@ -268,7 +294,7 @@ Describe 'Get-ServiceStatus' {
         return [PSCustomObject]@{ State = 'Running' }
       }
 
-      $status = Get-ServiceStatus -Platform @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      $status = Get-ServiceStatus -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
       $status.status | Should -Be 'active'
       $status.running | Should -Be $true
     }
@@ -278,7 +304,7 @@ Describe 'Get-ServiceStatus' {
         return [PSCustomObject]@{ State = 'Ready' }
       }
 
-      $status = Get-ServiceStatus -Platform @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      $status = Get-ServiceStatus -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
       $status.status | Should -Be 'inactive'
       $status.running | Should -Be $false
       $status.enabled | Should -Be $true
@@ -289,7 +315,7 @@ Describe 'Get-ServiceStatus' {
         return [PSCustomObject]@{ State = 'Disabled' }
       }
 
-      $status = Get-ServiceStatus -Platform @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      $status = Get-ServiceStatus -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
       $status.status | Should -Be 'disabled'
       $status.enabled | Should -Be $false
     }
@@ -297,14 +323,14 @@ Describe 'Get-ServiceStatus' {
     It 'returns not-found when Get-ScheduledTask throws' {
       Mock Get-ScheduledTask { throw 'not found' }
 
-      $status = Get-ServiceStatus -Platform @{ type = 'schtask'; taskPath = '\Unknown' }
+      $status = Get-ServiceStatus -HostEntry @{ type = 'schtask'; taskPath = '\Unknown' }
       $status.status | Should -Be 'not-found'
     }
   }
 
   Context 'unknown type' {
     It 'returns unknown status' {
-      $status = Get-ServiceStatus -Platform @{ type = 'unsupported' }
+      $status = Get-ServiceStatus -HostEntry @{ type = 'unsupported' }
       $status.status | Should -Be 'unknown'
       $status.error | Should -Match 'unsupported type'
     }
@@ -466,45 +492,45 @@ Describe 'Dispatch' {
 
   Context 'error handling' {
     It 'endpoint with no ServiceName throws' {
-      { Invoke-Dispatch -Action endpoint } | Should -Throw 'svc: missing service name for endpoint'
+      { Invoke-Dispatch -Action endpoint } | Should -Throw 'missing service name for endpoint'
     }
 
     It "start with no ServiceName throws" {
-      { Invoke-Dispatch -Action start } | Should -Throw "svc: missing service name for 'start'"
+      { Invoke-Dispatch -Action start } | Should -Throw "missing service name for 'start'"
     }
 
     It "stop with no ServiceName throws" {
-      { Invoke-Dispatch -Action stop } | Should -Throw "svc: missing service name for 'stop'"
+      { Invoke-Dispatch -Action stop } | Should -Throw "missing service name for 'stop'"
     }
 
     It "restart with no ServiceName throws" {
-      { Invoke-Dispatch -Action restart } | Should -Throw "svc: missing service name for 'restart'"
+      { Invoke-Dispatch -Action restart } | Should -Throw "missing service name for 'restart'"
     }
 
     It "enable with no ServiceName throws" {
-      { Invoke-Dispatch -Action enable } | Should -Throw "svc: missing service name for 'enable'"
+      { Invoke-Dispatch -Action enable } | Should -Throw "missing service name for 'enable'"
     }
 
     It "disable with no ServiceName throws" {
-      { Invoke-Dispatch -Action disable } | Should -Throw "svc: missing service name for 'disable'"
+      { Invoke-Dispatch -Action disable } | Should -Throw "missing service name for 'disable'"
     }
 
     It 'logs with unknown service writes error' {
       Mock Write-Error { throw "Write-Error: $Message" }
 
-      { Invoke-Dispatch -Action logs -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc logs: unknown service*'
+      { Invoke-Dispatch -Action logs -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc: error: unknown service*'
     }
 
     It 'log-paths with unknown service writes error' {
       Mock Write-Error { throw "Write-Error: $Message" }
 
-      { Invoke-Dispatch -Action log-paths -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc log-paths: unknown service*'
+      { Invoke-Dispatch -Action log-paths -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc: error: unknown service*'
     }
 
     It 'log-config with unknown service writes error' {
       Mock Write-Error { throw "Write-Error: $Message" }
 
-      { Invoke-Dispatch -Action log-config -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc log-config: unknown service*'
+      { Invoke-Dispatch -Action log-config -ServiceName @('nonexistent') } | Should -Throw 'Write-Error: svc: error: unknown service*'
     }
   }
 
@@ -538,7 +564,7 @@ Describe 'Invoke-ServiceAction' {
     It 'starts a service and returns $true' {
       Mock Start-Service { }
 
-      $result = Invoke-ServiceAction -Action 'start' -Platform @{ type = 'native'; service = 'ollama' }
+      $result = Invoke-ServiceAction -Action 'start' -HostEntry @{ type = 'native'; service = 'ollama' }
       $result | Should -Be $true
       Should -Invoke Start-Service -Exactly 1
     }
@@ -546,7 +572,7 @@ Describe 'Invoke-ServiceAction' {
     It 'stops a service and returns $true' {
       Mock Stop-Service { }
 
-      $result = Invoke-ServiceAction -Action 'stop' -Platform @{ type = 'native'; service = 'ollama' }
+      $result = Invoke-ServiceAction -Action 'stop' -HostEntry @{ type = 'native'; service = 'ollama' }
       $result | Should -Be $true
       Should -Invoke Stop-Service -Exactly 1
     }
@@ -554,7 +580,7 @@ Describe 'Invoke-ServiceAction' {
     It 'restarts a service and returns $true' {
       Mock Restart-Service { }
 
-      $result = Invoke-ServiceAction -Action 'restart' -Platform @{ type = 'native'; service = 'ollama' }
+      $result = Invoke-ServiceAction -Action 'restart' -HostEntry @{ type = 'native'; service = 'ollama' }
       $result | Should -Be $true
       Should -Invoke Restart-Service -Exactly 1
     }
@@ -562,7 +588,7 @@ Describe 'Invoke-ServiceAction' {
     It 'enables a service and returns $true' {
       Mock Set-Service { }
 
-      $result = Invoke-ServiceAction -Action 'enable' -Platform @{ type = 'native'; service = 'ollama' }
+      $result = Invoke-ServiceAction -Action 'enable' -HostEntry @{ type = 'native'; service = 'ollama' }
       $result | Should -Be $true
       Should -Invoke Set-Service -Exactly 1 -ParameterFilter { $StartupType -eq 'Automatic' }
     }
@@ -570,7 +596,7 @@ Describe 'Invoke-ServiceAction' {
     It 'disables a service and returns $true' {
       Mock Set-Service { }
 
-      $result = Invoke-ServiceAction -Action 'disable' -Platform @{ type = 'native'; service = 'ollama' }
+      $result = Invoke-ServiceAction -Action 'disable' -HostEntry @{ type = 'native'; service = 'ollama' }
       $result | Should -Be $true
       Should -Invoke Set-Service -Exactly 1 -ParameterFilter { $StartupType -eq 'Disabled' }
     }
@@ -579,8 +605,11 @@ Describe 'Invoke-ServiceAction' {
       Mock Get-Service {
         return [PSCustomObject]@{ Status = 'Running'; StartType = 'Automatic' }
       }
+      Mock Get-CimInstance {
+        return [PSCustomObject]@{ ProcessId = 12345 }
+      }
 
-      $result = Invoke-ServiceAction -Action 'status' -Platform @{ type = 'native'; service = 'ollama' }
+      $result = Invoke-ServiceAction -Action 'status' -HostEntry @{ type = 'native'; service = 'ollama' }
       $result.status | Should -Be 'active'
     }
   }
@@ -589,7 +618,7 @@ Describe 'Invoke-ServiceAction' {
     It 'starts a scheduled task and returns $true' {
       Mock Start-ScheduledTask { }
 
-      $result = Invoke-ServiceAction -Action 'start' -Platform @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      $result = Invoke-ServiceAction -Action 'start' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
       $result | Should -Be $true
       Should -Invoke Start-ScheduledTask -Exactly 1
     }
@@ -597,7 +626,7 @@ Describe 'Invoke-ServiceAction' {
     It 'stops a scheduled task and returns $true' {
       Mock Stop-ScheduledTask { }
 
-      $result = Invoke-ServiceAction -Action 'stop' -Platform @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      $result = Invoke-ServiceAction -Action 'stop' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
       $result | Should -Be $true
       Should -Invoke Stop-ScheduledTask -Exactly 1
     }
@@ -606,7 +635,7 @@ Describe 'Invoke-ServiceAction' {
       Mock Stop-ScheduledTask { }
       Mock Start-ScheduledTask { }
 
-      $result = Invoke-ServiceAction -Action 'restart' -Platform @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      $result = Invoke-ServiceAction -Action 'restart' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
       $result | Should -Be $true
       Should -Invoke Stop-ScheduledTask -Exactly 1
       Should -Invoke Start-ScheduledTask -Exactly 1
@@ -615,7 +644,7 @@ Describe 'Invoke-ServiceAction' {
     It 'enables a scheduled task and returns $true' {
       Mock Enable-ScheduledTask { }
 
-      $result = Invoke-ServiceAction -Action 'enable' -Platform @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      $result = Invoke-ServiceAction -Action 'enable' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
       $result | Should -Be $true
       Should -Invoke Enable-ScheduledTask -Exactly 1
     }
@@ -623,7 +652,7 @@ Describe 'Invoke-ServiceAction' {
     It 'disables a scheduled task and returns $true' {
       Mock Disable-ScheduledTask { }
 
-      $result = Invoke-ServiceAction -Action 'disable' -Platform @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
+      $result = Invoke-ServiceAction -Action 'disable' -HostEntry @{ type = 'schtask'; taskPath = '\NucleusCamillaDSP' }
       $result | Should -Be $true
       Should -Invoke Disable-ScheduledTask -Exactly 1
     }
@@ -631,7 +660,7 @@ Describe 'Invoke-ServiceAction' {
 
   Context 'unsupported type' {
     It 'throws for unsupported type' {
-      { Invoke-ServiceAction -Action 'start' -Platform @{ type = 'unknown' } } | Should -Throw
+      { Invoke-ServiceAction -Action 'start' -HostEntry @{ type = 'unknown' } } | Should -Throw
     }
   }
 }

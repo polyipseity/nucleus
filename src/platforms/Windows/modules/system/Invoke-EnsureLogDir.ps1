@@ -51,6 +51,3 @@ function Invoke-EnsureLogDir {
     }
   }
 }
-
-# Keep module-level state out of global scope: only export the function.
-Export-ModuleMember -Function Invoke-EnsureLogDir

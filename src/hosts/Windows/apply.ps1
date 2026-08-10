@@ -397,7 +397,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-ReplicaSync.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-VMSetup.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-AgentHostShellSetup.ps1")
-. (Join-Path -Path \$systemModuleDir -ChildPath "Invoke-EnsureLogDir.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Invoke-EnsureLogDir.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "ConvertFrom-WingetLockfileToDsc.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-WingetConfiguration.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-CaddyLocalCA.ps1")
@@ -576,9 +576,6 @@ if ($Users -notcontains $sessionUser) {
 $primarySshKeyPath = Join-Path -Path $userRegistry.primaryUser.homeDirectory -ChildPath ".ssh\ssh_personal_$primaryUser"
 $sessionUserRecord = @($userRegistry.users | Where-Object { $_.name -eq $sessionUser }) | Select-Object -First 1
 $sessionWallpaperOutputDir = Join-Path -Path $sessionUserRecord.homeDirectory -ChildPath "Pictures\wallpapers"
-# WHY: QtPass stores settings in platform-native stores (registry on Windows), so Method 1 (symlink) does not apply.
-# check-suppress:config-method: method 3 (merge) -- QtPass shared settings JSON source of truth shared with POSIX activation
-# check-suppress:config-method: method 3 (merge) -- Picard defaults INI merged via Sync-PicardConfig on Windows
 $sopsYamlPath = Join-Path -Path $repoRoot -ChildPath ".sops.yaml"
 
 # Expose the repo root to any subprocesses (e.g. DSC script resources) that
@@ -817,7 +814,10 @@ Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
 Set-VSCodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
 Sync-ObsidianConfig -Enabled:$EnableObsidianParity -Users $selectedUserRecords -RepoRoot $repoRoot
+# check-suppress:config-method: method 3 (merge) -- Picard defaults INI merged via Sync-PicardConfig on Windows
 Sync-PicardConfig -Enabled:$EnablePicardParity -Users $selectedUserRecords -RepoRoot $repoRoot
+# WHY: QtPass stores settings in platform-native stores (registry on Windows), so Method 1 (symlink) does not apply.
+# check-suppress:config-method: method 3 (merge) -- QtPass shared settings JSON source of truth shared with POSIX activation
 Sync-QtPassConfig -Enabled:$EnableQtPassParity -Users $selectedUserRecords -RepoRoot $repoRoot
 # Default to false if devReposEnabled not yet set (user not in registry or no repos configured).
 if ($null -eq $EnableDevReposParity) {

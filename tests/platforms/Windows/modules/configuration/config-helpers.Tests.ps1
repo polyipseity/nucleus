@@ -15,7 +15,7 @@
 
 Describe 'Resolve-UserConfigSource' {
     BeforeAll {
-        . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\src\platforms\Windows\modules\ConfigHelpers.ps1')
+        . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\src\platforms\Windows\modules\ConfigHelpers.ps1')
         $script:testDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-cfghlpr-" + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $script:testDir -Force > $null
     }
@@ -52,7 +52,7 @@ Describe 'Resolve-UserConfigSource' {
 
 Describe 'Resolve-UserConfigFile' {
     BeforeAll {
-        . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\src\platforms\Windows\modules\ConfigHelpers.ps1')
+        . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\src\platforms\Windows\modules\ConfigHelpers.ps1')
         $script:testDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-cfgfile-" + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $script:testDir -Force > $null
     }
@@ -83,7 +83,7 @@ Describe 'Resolve-UserConfigFile' {
 
 Describe 'Resolve-UserConfigFirstLevelEntry' {
     BeforeAll {
-        . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\src\platforms\Windows\modules\ConfigHelpers.ps1')
+        . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\src\platforms\Windows\modules\ConfigHelpers.ps1')
         $script:testDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-cfgdir-" + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $script:testDir -Force > $null
     }
@@ -122,7 +122,7 @@ Describe 'Resolve-UserConfigFirstLevelEntry' {
 
 Describe 'Deploy-WritableSymlink' {
     BeforeAll {
-        . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\src\platforms\Windows\modules\ConfigHelpers.ps1')
+        . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\src\platforms\Windows\modules\ConfigHelpers.ps1')
         $script:symlinkDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-cfgdpl-" + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $script:symlinkDir -Force > $null
     }
@@ -148,7 +148,7 @@ Describe 'Deploy-WritableSymlink' {
 
 Describe 'Wallpaper path helpers' {
     BeforeAll {
-        . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\src\platforms\Windows\modules\ConfigHelpers.ps1')
+        . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\src\platforms\Windows\modules\ConfigHelpers.ps1')
         $script:testDir = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-wallpaper-" + [guid]::NewGuid().ToString('N'))
         New-Item -ItemType Directory -Path $script:testDir -Force > $null
         $encryptedDir = Join-Path $script:testDir 'src/users/alice/wallpapers/encrypted'

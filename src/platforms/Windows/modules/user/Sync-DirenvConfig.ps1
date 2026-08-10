@@ -15,6 +15,7 @@ function Sync-DirenvConfig {
     [string]$RepoRoot
   )
 
+  # check-suppress:config-method: method 1 (writable symlink) -- direnvrc cross-platform base config.
   $destPath = Join-Path $env:USERPROFILE '.config\direnv\direnvrc'
 
   if (-not $Enabled) {

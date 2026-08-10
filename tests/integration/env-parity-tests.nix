@@ -26,7 +26,9 @@ let
     {
       inherit name;
       hasNixOsEntry = entry.values ? NixOS || entry.values ? default;
-      hasWindowsEntry = entry.values ? Windows || entry.values ? default;
+      # Resolved-value semantics (matches env-catalog.nix allVars applicability):
+      # an explicit Windows = null excludes the var from Windows parity checks.
+      hasWindowsEntry = envVars.resolveValue name "Windows" != null;
       hasMacBookEntry = entry.values ? MacBook || entry.values ? default;
       nixosValue = envVars.resolveValue name "NixOS";
       macBookValue = envVars.resolveValue name "MacBook";

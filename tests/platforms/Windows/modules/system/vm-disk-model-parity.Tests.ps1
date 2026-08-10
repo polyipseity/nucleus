@@ -26,7 +26,7 @@
 BeforeAll {
   $ErrorActionPreference = "Stop"
 
-  $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
+  $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\..\")
   $InvokeVMSetupPath = Join-Path $RepoRoot "src\platforms\Windows\modules\system\Invoke-VMSetup.ps1"
   $VmPs1Path = Join-Path $RepoRoot "scripts\vm.ps1"
   $VmShLibPath = Join-Path $RepoRoot "src\scripts\lib\vm.sh"

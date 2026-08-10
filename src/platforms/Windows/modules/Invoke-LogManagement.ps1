@@ -37,10 +37,10 @@ function Expand-NucleusLogPathTemplate {
   )
 
   if ($Template.StartsWith('~/')) {
-    return Join-Path -Path $env:USERPROFILE -ChildPath $Template.Substring(2)
+    return Join-Path -Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile)) -ChildPath $Template.Substring(2)
   }
   if ($Template.StartsWith('~')) {
-    return $Template.Replace('~', $env:USERPROFILE)
+    return $Template.Replace('~', [Environment]::GetFolderPath([Environment+SpecialFolder]::UserProfile))
   }
   return [Environment]::ExpandEnvironmentVariables($Template)
 }
@@ -186,7 +186,9 @@ function Invoke-LogExpiry {
   if ($days -le 0) { return }
 
   $cutoff = (Get-Date).AddDays(-$days)
-  $pattern = '(\.log\.\d+(\.gz)?$|^log_.*\.log$|\.log\.gz$)'
+  # Rotation writes archives as name.N.log (see Invoke-LogRotation), so expiry must match
+  # both that naming and the legacy .log.N / dated log_* naming.
+  $pattern = '(\.log\.\d+(\.gz)?$|\.\d+\.log(\.gz)?$|^log_.*\.log$|\.log\.gz$)'
 
   Get-ChildItem -LiteralPath $Path -Recurse -File -ErrorAction SilentlyContinue | Where-Object {
     $_.Name -match $pattern -and $_.LastWriteTime -lt $cutoff

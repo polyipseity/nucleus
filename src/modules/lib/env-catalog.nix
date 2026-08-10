@@ -171,6 +171,7 @@ let
     NIX_SSL_CERT_FILE = {
       values = {
         default = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+        Windows = null;
       };
       why = "Nix-managed SSL cert bundle for all processes outside nix-daemon build environments. On NixOS, nix-daemon sets this for its own builds but GUI/CLI tools outside systemd also need it. Not applicable on Windows (no Nix store).";
     };

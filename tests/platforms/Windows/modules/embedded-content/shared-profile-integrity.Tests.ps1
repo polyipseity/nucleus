@@ -28,7 +28,7 @@
 BeforeAll {
   $ErrorActionPreference = "Stop"
 
-  $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
+  $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\..\")
   $ProfilePath = Join-Path $RepoRoot "src\scripts\shell\profile.ps1"
   $SyncShellProfilePath = Join-Path $RepoRoot "src\platforms\Windows\modules\user\Sync-ShellProfile.ps1"
   $PwshNixPath = Join-Path $RepoRoot "src\modules\pwsh.nix"

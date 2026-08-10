@@ -18,65 +18,64 @@
 $ErrorActionPreference = "Stop"
 $WarningPreference = "SilentlyContinue"
 
-# Paths
-$RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
-$UserDscFile = Join-Path $RepoRoot "src\hosts\Windows\user\env.dsc.yml"
-$SystemDscFile = Join-Path $RepoRoot "src\hosts\Windows\system\env.dsc.yml"
-$ManifestFile = Join-Path $RepoRoot "result\env-parity-manifest.json"
-# $CatalogNixFile intentionally omitted; unused
-
-# ---- Helpers ----
-
-# Parse DSC YAML and return all Environment resource names.
-function Get-DscEnvVarNameList {
-  param ([string]$DscPath)
-  if (-not (Test-Path $DscPath)) {
-    throw "DSC file not found: $DscPath"
-  }
-  $yaml = Get-Content -Raw -Path $DscPath
-  # Minimal YAML parser: extract name from Microsoft.Windows.Environment/Variable resources.
-  $resources = [regex]::Matches($yaml, '(?s)resource:\s*Microsoft\.Windows\.Environment/Variable.*?settings:\s*\n(.*?)(?=\n    - resource|\n    #|$)')
-  $names = @()
-  foreach ($match in $resources) {
-    $settingsBlock = $match.Groups[1].Value
-    $nameMatch = [regex]::Match($settingsBlock, 'name:\s*(.+)')
-    if ($nameMatch.Success) {
-      $names += $nameMatch.Groups[1].Value.Trim()
-    }
-  }
-  return $names
-}
-
-# Evaluate the Nix catalog JSON manifest (materialized by 06-windows-pester.ps1).
-function Get-NixCatalogManifest {
-  param ([string]$ManifestPath)
-  if (-not (Test-Path $ManifestPath)) {
-    throw "env-parity manifest not found at $ManifestPath — run test step 06-windows-pester to materialize it"
-  }
-  return Get-Content -Raw -Path $ManifestPath | ConvertFrom-Json
-}
-
-# Extract profile-only vars (CC, CXX, LD) from Sync-ShellProfile.ps1.
-function Get-ProfileEnvVarNameList {
-  $profilePath = Join-Path $RepoRoot "src\platforms\Windows\modules\user\Sync-ShellProfile.ps1"
-  $content = Get-Content -Raw -Path $profilePath
-  $names = @()
-  # Match $env:VARNAME patterns in the PowerShell heredoc
-  $found = [regex]::Matches($content, '\$env:(\w+)\s*=')
-  foreach ($m in $found) {
-    $names += $m.Groups[1].Value
-  }
-  return $names | Select-Object -Unique
-}
-
-# Read apply.ps1 content (used by multiple tests).
-function Get-ApplyPs1Content {
-  $applyPath = Join-Path $RepoRoot "src\hosts\Windows\apply.ps1"
-  return Get-Content -Raw -Path $applyPath
-}
-
 BeforeAll {
-  # No variable assignments here; all vars are at script scope for PSScriptAnalyzer visibility.
+  # Paths and helpers must be defined inside BeforeAll: Pester v5 does not make
+  # script-scope definitions visible to It blocks under Invoke-Pester.
+  $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
+  $UserDscFile = Join-Path $RepoRoot "src\hosts\Windows\user\env.dsc.yml"
+  $SystemDscFile = Join-Path $RepoRoot "src\hosts\Windows\system\env.dsc.yml"
+  $ManifestFile = Join-Path $RepoRoot "result\env-parity-manifest.json"
+  # $CatalogNixFile intentionally omitted; unused
+
+  # ---- Helpers ----
+
+  # Parse DSC YAML and return all Environment resource names.
+  function Get-DscEnvVarNameList {
+    param ([string]$DscPath)
+    if (-not (Test-Path $DscPath)) {
+      throw "DSC file not found: $DscPath"
+    }
+    $yaml = Get-Content -Raw -Path $DscPath
+    # Minimal YAML parser: extract name from Microsoft.Windows.Environment/Variable resources.
+    $resources = [regex]::Matches($yaml, '(?s)resource:\s*Microsoft\.Windows\.Environment/Variable.*?settings:\s*\n(.*?)(?=\n    - resource|\n    #|$)')
+    $names = @()
+    foreach ($match in $resources) {
+      $settingsBlock = $match.Groups[1].Value
+      $nameMatch = [regex]::Match($settingsBlock, 'name:\s*(.+)')
+      if ($nameMatch.Success) {
+        $names += $nameMatch.Groups[1].Value.Trim()
+      }
+    }
+    return $names
+  }
+
+  # Evaluate the Nix catalog JSON manifest (materialized by 06-windows-pester.ps1).
+  function Get-NixCatalogManifest {
+    param ([string]$ManifestPath)
+    if (-not (Test-Path $ManifestPath)) {
+      throw "env-parity manifest not found at $ManifestPath — run test step 06-windows-pester to materialize it"
+    }
+    return Get-Content -Raw -Path $ManifestPath | ConvertFrom-Json
+  }
+
+  # Extract profile-only vars (CC, CXX, LD) from Sync-ShellProfile.ps1.
+  function Get-ProfileEnvVarNameList {
+    $profilePath = Join-Path $RepoRoot "src\platforms\Windows\modules\user\Sync-ShellProfile.ps1"
+    $content = Get-Content -Raw -Path $profilePath
+    $names = @()
+    # Match $env:VARNAME patterns in the PowerShell heredoc
+    $found = [regex]::Matches($content, '\$env:(\w+)\s*=')
+    foreach ($m in $found) {
+      $names += $m.Groups[1].Value
+    }
+    return $names | Select-Object -Unique
+  }
+
+  # Read apply.ps1 content (used by multiple tests).
+  function Get-ApplyPs1Content {
+    $applyPath = Join-Path $RepoRoot "src\hosts\Windows\apply.ps1"
+    return Get-Content -Raw -Path $applyPath
+  }
 }
 
 Describe "Windows env var parity with Nix catalog" {

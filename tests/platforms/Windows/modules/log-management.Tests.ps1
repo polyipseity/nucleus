@@ -15,7 +15,7 @@ BeforeAll {
   . $modulePath
 
   # Capture functions into test scope.
-  $Script:TestDir = "$(Join-Path $env:TEMP 'nucleus-log-tests')"
+  $Script:TestDir = Join-Path ([System.IO.Path]::GetTempPath()) 'nucleus-log-tests'
 }
 
 AfterAll {
@@ -193,12 +193,12 @@ Describe 'Invoke-LogExpiry' {
 Describe 'Invoke-EnsureLogDir' {
   BeforeAll {
     # Source the function.
-$ensureLogDirPath = Join-Path \$PSScriptRoot '../../../../src/platforms/Windows/modules/system/Invoke-EnsureLogDir.ps1'
+    $ensureLogDirPath = Join-Path $PSScriptRoot '../../../../src/platforms/Windows/modules/system/Invoke-EnsureLogDir.ps1'
     . $ensureLogDirPath
 
-    $Script:TestServicesJson = Join-Path $env:TEMP 'nucleus-test-services.json'
-    $Script:TestSystemLogDir = Join-Path $env:TEMP 'nucleus-test-system-log'
-    $Script:TestUserLogDir = Join-Path $env:TEMP 'nucleus-test-user-log'
+    $Script:TestServicesJson = Join-Path ([System.IO.Path]::GetTempPath()) 'nucleus-test-services.json'
+    $Script:TestSystemLogDir = Join-Path ([System.IO.Path]::GetTempPath()) 'nucleus-test-system-log'
+    $Script:TestUserLogDir = Join-Path ([System.IO.Path]::GetTempPath()) 'nucleus-test-user-log'
   }
 
   AfterAll {
@@ -229,7 +229,7 @@ $ensureLogDirPath = Join-Path \$PSScriptRoot '../../../../src/platforms/Windows/
     Mock Get-NucleusSystemLogDir { return $Script:TestSystemLogDir }
     Mock Get-NucleusLogDir { return $Script:TestUserLogDir }
 
-  Invoke-EnsureLogDir -ServicesJson \$Script:TestServicesJson
+    Invoke-EnsureLogDir -ServicesJson $Script:TestServicesJson
 
     $expectedDir = Join-Path $Script:TestSystemLogDir 'test-svc'
     (Test-Path -LiteralPath $expectedDir -PathType Container) | Should -Be $true

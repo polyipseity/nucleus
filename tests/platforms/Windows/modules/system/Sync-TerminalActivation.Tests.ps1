@@ -3,7 +3,7 @@
 
 BeforeAll {
     # Dot-source the module to make its function available.
-    $modulePath = Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\src\platforms\Windows\modules\system\Sync-TerminalActivation.ps1'
+    $modulePath = Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\src\platforms\Windows\modules\system\Sync-TerminalActivation.ps1'
     . $modulePath
 }
 

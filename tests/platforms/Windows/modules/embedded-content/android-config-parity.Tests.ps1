@@ -6,26 +6,24 @@
     Static analysis tests (parse files, do not execute).
 
 .NOTES
-    Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/embedded-content/android-config-parity.Tests.ps1 -Passthru"
+    Run with: pwsh -NoProfile -Command "Invoke-Pester tests/platforms/Windows/modules/embedded-content/android-config-parity.Tests.ps1 -Passthru"
 #>
 
-$ErrorActionPreference = "Stop"
-
-$RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\")
-$VmPs1Path = Join-Path $RepoRoot "scripts\vm.ps1"
-$VmShPath = Join-Path $RepoRoot "scripts\vm.sh"
-$ProfilePath = Join-Path $RepoRoot "src\scripts\shell\profile.ps1"
-$InvokeAndroidConfigPath = Join-Path $RepoRoot "src\platforms\Windows\modules\system\Invoke-AndroidConfig.ps1"
-$VmAndroidPath = Join-Path $RepoRoot "src\platforms\Windows\modules\system\VMAndroid.ps1"
-$CheckShPs1Path = Join-Path $RepoRoot "scripts\check-sh.ps1"
-
-function Get-VmPs1Content { return Get-Content -Raw -Path $VmPs1Path }
-function Get-VmShContent { return Get-Content -Raw -Path $VmShPath }
-function Get-ProfileContent { return Get-Content -Raw -Path $ProfilePath }
-function Get-InvokeAndroidConfigContent { return Get-Content -Raw -Path $InvokeAndroidConfigPath }
-
 BeforeAll {
-  # No variable assignments here; all vars are at script scope for PSScriptAnalyzer visibility.
+  $ErrorActionPreference = "Stop"
+
+  $RepoRoot = Resolve-Path (Join-Path $PSScriptRoot "..\..\..\..\..\")
+  $VmPs1Path = Join-Path $RepoRoot "scripts\vm.ps1"
+  $VmShPath = Join-Path $RepoRoot "scripts\vm.sh"
+  $ProfilePath = Join-Path $RepoRoot "src\scripts\shell\profile.ps1"
+  $InvokeAndroidConfigPath = Join-Path $RepoRoot "src\platforms\Windows\modules\system\Invoke-AndroidConfig.ps1"
+  $VmAndroidPath = Join-Path $RepoRoot "src\platforms\Windows\modules\system\VMAndroid.ps1"
+  $CheckShPs1Path = Join-Path $RepoRoot "scripts\check-sh.ps1"
+
+  function Get-VmPs1Content { return Get-Content -Raw -Path $VmPs1Path }
+  function Get-VmShContent { return Get-Content -Raw -Path $VmShPath }
+  function Get-ProfileContent { return Get-Content -Raw -Path $ProfilePath }
+  function Get-InvokeAndroidConfigContent { return Get-Content -Raw -Path $InvokeAndroidConfigPath }
 }
 
 Describe "Windows android-config native implementation" {
@@ -64,11 +62,13 @@ Describe "Windows profile shellcheck delegation" {
     $content | Should -Not -Match ([regex]::Escape("scripts\check-sh.sh"))
   }
 
-  It "check-sh.ps1 exists and invokes shellcheck" {
+  It "check-sh.ps1 exists and invokes shellcheck directly" {
     Test-Path -LiteralPath $CheckShPs1Path -PathType Leaf | Should -Be $true
     $checkContent = Get-Content -Raw -Path $CheckShPs1Path
     $checkContent | Should -Match "shellcheck"
-    $checkContent | Should -Not -Match "check-sh\.sh"
+    # check-sh.ps1's own header mentions its POSIX counterpart in prose, so
+    # assert no bash invocation of it rather than any mention.
+    $checkContent | Should -Not -Match "(&|bash)[^\r\n]*check-sh\.sh"
   }
 }
 
