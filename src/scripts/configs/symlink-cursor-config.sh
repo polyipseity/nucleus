@@ -125,9 +125,9 @@ _scc_converge_mapped_file_symlinks \
   "$_scc_cursor_dir/commands" ".md"
 
 # Class B: Cursor-native entries from the first-level merged cursor overlay.
-# settings.json/settings.schema.json are skipped here: they target the IDE
-# User dir (Class C), not ~/.cursor/.
-_scc_overlay_skip_names="rules agents commands skills settings.json settings.schema.json"
+# settings.json is skipped here: it targets the IDE User dir (Class C), not
+# ~/.cursor/.
+_scc_overlay_skip_names="rules agents commands skills settings.json"
 _nucleus_remove_stale_merged_symlinks \
   "$_scc_cursor_dir" "$_scc_username" "cursor" "$_scc_repo_root" "$_scc_label" "$_scc_overlay_skip_names"
 

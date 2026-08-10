@@ -55,9 +55,9 @@ function Sync-CursorConfig {
   $agentsDir = Join-Path -Path $HOME -ChildPath '.agents'
   $cursorDir = Join-Path -Path $HOME -ChildPath '.cursor'
   $managedBridgeDirs = @('rules', 'agents', 'commands', 'skills')
-  # settings.json/settings.schema.json target the IDE User dir (Class C),
-  # not ~/.cursor/, so they are excluded from the overlay convergence below.
-  $ideSettingsSkipNames = @('settings.json', 'settings.schema.json')
+  # settings.json targets the IDE User dir (Class C), not ~/.cursor/, so it is
+  # excluded from the overlay convergence below.
+  $ideSettingsSkipNames = @('settings.json')
   $cursorEntryNames = Get-UserConfigFirstLevelEntryList -User $Username -ConfigName 'cursor' -RepoRoot $RepoRoot
 
   function Initialize-RealDirectory {
