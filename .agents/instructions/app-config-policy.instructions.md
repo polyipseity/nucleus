@@ -16,6 +16,8 @@ A symlink from the app's config path back into the repo tree. Edits through the 
 
 **Use when:** The app tolerates a symlink at its config path and does not overwrite it with auto-generated state on startup.
 
+Some apps auto-write managed state into their config at startup or on activation (e.g. `redhat.vscode-yaml` writes `yaml.disableSchemaDetection` into VS Code user `settings.json`). With a writable symlink, every auto-write re-dirties the repo working tree. Resolve by committing the auto-written key intentionally, disabling the auto-write, or switching to Method 2/3.
+
 ### Method 2 — Read-only deployment (fallback)
 
 A read-only copy (Nix store path or copied file with ReadOnly attribute) at the app's config path. Changes require editing the repo file and reactivating.
