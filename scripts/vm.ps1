@@ -29,8 +29,8 @@
            Default GC preserves disabled VM entries; pass --gc-disabled
            to clear them too.
   pack:    Strip trivially regenerable artifacts (generated start/stop
-           scripts, src/<type>/overlay backing.qcow2 copies, src/<type>/Packer/ +
-           stale dot-dirs) so the tree can be copied as-is to another host.
+           scripts, src/<type>/Packer/ + stale dot-dirs) so the tree can be
+           copied as-is to another host.
            Dry-run by default; pass --force to perform. Refuses while any
            VM is running.
   unpack:  Regenerate per-platform VM artifacts (start/stop scripts +
@@ -582,14 +582,7 @@ function Invoke-VMPack {
   }
 
   if (Test-Path -LiteralPath $srcDir -PathType Container) {
-    # src/<type>/overlay backing.qcow2 — trivial cp from the kept prebuilt golden.
     Get-ChildItem -LiteralPath $srcDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-      $backing = Join-Path $_.FullName 'overlay backing.qcow2'
-      if (Test-Path -LiteralPath $backing -PathType Leaf) {
-        Write-NucleusInfo "pack — removing regenerable overlay backing: $backing"
-        if ($perform) { Remove-Item -LiteralPath $backing -Force }
-      }
-
       $packerDir = Join-Path $_.FullName 'Packer'
       if (Test-Path -LiteralPath $packerDir -PathType Container) {
         Write-NucleusInfo "pack — removing transient Packer directory: $packerDir"

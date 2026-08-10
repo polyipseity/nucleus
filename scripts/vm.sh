@@ -162,14 +162,13 @@ usage() {
                           shrink instead.
   gc                       Remove stale VM artifacts (non-provisioned VMs, disks, markers,
                           descriptors). Default GC preserves disabled VM entries and every
-                          manifest-referenced image (goldens, bases, Android system/GSI/
+                          manifest-referenced image (type system images, Android system/GSI/
                           userdata); pass --gc-disabled to clear disabled entries too.
-                          Pass --gc-data to also GC data/ runtime overlays.
+                          Pass --gc-data to also GC data/ writable disks.
   pack                     Strip trivially regenerable artifacts (UTM bundles, generated
-                          start/stop scripts, src/<type>/overlay backing.qcow2 copies, and
-                          src/<type>/Packer/ + stale dot-dirs) so the tree can be copied
-                          as-is to another host. Dry-run by default; pass --force to
-                          perform. Refuses while any VM is running.
+                          start/stop scripts, and src/<type>/Packer/ + stale dot-dirs) so
+                          the tree can be copied as-is to another host. Dry-run by default;
+                          pass --force to perform. Refuses while any VM is running.
   unpack                   Regenerate per-platform VM artifacts (start/stop scripts +
                           pack/unpack wrappers, UTM bundles, libvirt domains) from the
                           <id>.vm.json descriptors in the VM directory. Complements
@@ -190,10 +189,10 @@ usage() {
   --gc|--no-gc                  Run GC after setup (default: --no-gc).
   --gc-disabled|--no-gc-disabled  Also clear disabled VM entries during GC
                                 (default: --no-gc-disabled).
-  --gc-data|--no-gc-data        Also GC data/ runtime overlays during GC
+  --gc-data|--no-gc-data        Also GC data/ writable disks during GC
                                 (default: --no-gc-data).
-  --force                       Recreate invalid runtime overlays during setup, and
-                                perform pack removals (default: off; invalid overlays
+  --force                       Recreate invalid data disks during setup, and
+                                perform pack removals (default: off; invalid disks
                                 are skipped with a pointer to 'nucleus-vm reset <vm>').
   --allow-shrink                Allow shrinking during resize (default: off).
   --vm-dir-override PATH        Override the default ~/virtual machines path.
@@ -1017,8 +1016,8 @@ do_gc() {
 
 # do_pack
 #   Strips trivially regenerable artifacts (UTM bundles, generated
-#   start/stop scripts, src/<type>/overlay backing.qcow2 copies, src/<type>/Packer/ +
-#   stale dot-dirs) so the VM tree can be copied as-is to another host.
+#   start/stop scripts, src/<type>/Packer/ + stale dot-dirs) so the VM tree
+#   can be copied as-is to another host.
 #   WHY: pack complements setup — setup regenerates the wrappers, pack
 #   strips them into a compact payload for transfer.  Default is dry-run;
 #   --force performs.  Refuses while any VM is running.

@@ -31,7 +31,7 @@ usage() {
   --sccache-gc|--no-sccache-gc        Control sccache cache clearing (default: --sccache-gc).
   --wallpaper-gc|--no-wallpaper-gc    Control stale wallpaper gc (default: --wallpaper-gc).
   --vm-gc|--no-vm-gc                  Control stale VM artifact removal (default: --vm-gc).
-  --vm-data-gc|--no-vm-data-gc        Also GC data/ runtime overlays during VM gc (default: --no-vm-data-gc).
+  --vm-data-gc|--no-vm-data-gc        Also GC data/ writable disks during VM gc (default: --no-vm-data-gc).
   --log-gc|--no-log-gc                Control log rotation (default: --log-gc).
   --journald-gc|--no-journald-gc        Control journald log vacuum (default: --journald-gc).
   --log-max-size <bytes>              Log rotation max file size before rotation (default: 10000000).

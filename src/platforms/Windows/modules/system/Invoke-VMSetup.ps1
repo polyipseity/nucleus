@@ -4,15 +4,16 @@
 
 .DESCRIPTION
   Combines the former Invoke-VMBuild and Invoke-VMSetup into one module.
-  Phase 1 (build): builds pre-built QCOW2 images using Packer for each VM
+  Phase 1 (build): builds type system QCOW2 images using Packer for each type
   declared in src\modules\VMs.json, if absent at
-  %USERPROFILE%\virtual machines\src\<type>\prebuilt image.qcow2.  For NixOS guests on
+  %USERPROFILE%\virtual machines\src\<type>\system image.qcow2.  For NixOS guests on
   Windows, Packer downloads the NixOS ISO automatically (src\vms\NixOS\packer.pkr.hcl).
   For Windows 11 guests, a local ISO is required (-WindowsIso).
 
-  Phase 2 (provision): creates QEMU start scripts and places disk images for
-  each VM.  Disk images are copied from the built images, eliminating the manual
-  OS installation step previously required with empty disks.
+  Phase 2 (provision): creates QEMU start scripts and provisions the per-VM
+  data disk (a qcow2 overlay over the type system image) for each VM,
+  eliminating the manual OS installation step previously required with empty
+  disks.
 
   Called by scripts\vm.ps1 (alias: nucleus-vm setup).
   Not invoked automatically during nucleus apply — run manually when setting
@@ -109,11 +110,10 @@ function Get-VMRunningProcessNameList {
     return $running.ToArray()
 }
 
-$VM_PREBUILT_IMAGE = 'prebuilt image.qcow2'
-$VM_OVERLAY_BACKING = 'overlay backing.qcow2'
+$VM_SYSTEM_IMAGE = 'system image.qcow2'
 $VM_PACKER_BUILD_DIR = 'Packer'
 $VM_WINDOWS_INSTALLER_ISO = 'installer.iso'
-$VM_PREBUILT_MARKER_BASE = 'prebuilt image'
+$VM_TYPE_MARKER_BASE = 'system image'
 
 function Get-VMTypeSrcDir {
     param(
@@ -142,13 +142,13 @@ function Get-VMSrcPath {
     return Join-Path (Get-VMTypeSrcDir -SrcDir $SrcDir -Type $Type) $Leaf
 }
 
-function Get-VMOverlayBackingRelPath {
+function Get-VMSystemImageRelPath {
     param(
         [Parameter(Mandatory)]
         [string]$Type
     )
 
-    return "../src/$Type/$VM_OVERLAY_BACKING"
+    return "../src/$Type/$VM_SYSTEM_IMAGE"
 }
 
 function Invoke-VMSetup {
@@ -157,8 +157,8 @@ function Invoke-VMSetup {
     Build VM disk images and provision VMs on Windows.
 
   .DESCRIPTION
-    Orchestrates VM lifecycle: builds pre-built QCOW2 images using Packer
-    (Phase 1) and creates QEMU start scripts with disk images (Phase 2).
+    Orchestrates VM lifecycle: builds type system QCOW2 images using Packer
+    (Phase 1) and creates QEMU start scripts with per-VM data disks (Phase 2).
     Supports NixOS, Windows 11, and macOS guest types.
 
   .PARAMETER RepoRoot
@@ -283,7 +283,7 @@ function Invoke-VMSetup {
             [string[]]$ExpectedNames
         )
 
-        $keep = @($VM_PREBUILT_IMAGE, $VM_OVERLAY_BACKING)
+        $keep = @($VM_SYSTEM_IMAGE)
         foreach ($vm in $vmDef.VMs) {
             if ($vm.type -ne $Type) { continue }
             if ($vm.id -notin $ExpectedNames) { continue }
@@ -371,8 +371,8 @@ function Invoke-VMSetup {
                     continue
                 }
                 foreach ($markerName in @(
-                    "$VM_PREBUILT_MARKER_BASE.vm-guest-credentials-sha256"
-                    "$VM_PREBUILT_MARKER_BASE.vm-guest-config-sha256"
+                    "$VM_TYPE_MARKER_BASE.vm-guest-credentials-sha256"
+                    "$VM_TYPE_MARKER_BASE.vm-guest-config-sha256"
                 )) {
                     $markerPath = Join-Path $typeDir.FullName $markerName
                     if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
@@ -643,8 +643,8 @@ function Invoke-VMSetup {
             $disks += @{ role = 'userdata'; path = "data/$($Vm.id).qcow2" }
         } else {
             $disks = @(
-                @{ role = 'base'; path = "src/$($Vm.type)/$VM_OVERLAY_BACKING" },
-                @{ role = 'runtime'; path = "data/$($Vm.id).qcow2" }
+                @{ role = 'system'; path = "src/$($Vm.type)/$VM_SYSTEM_IMAGE" },
+                @{ role = 'data'; path = "data/$($Vm.id).qcow2" }
             )
         }
 
@@ -1121,15 +1121,18 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         if ($WindowsOnly -and $vm.type -ne 'Windows') { continue }
 
         # Pass A — disk provisioning (enabled-only, mirroring
-        # vm_ensure_base_and_overlay): the writable runtime disk is a qcow2
-        # overlay over src/<type>/overlay backing.qcow2 (base = cp of the prebuilt
-        # golden) created with a tree-root-relative backing path.  Android's
-        # userdata disk is a standalone qcow2 (no base).
+        # vm_ensure_data_disk): the writable data disk is a qcow2 overlay over
+        # src/<type>/system image.qcow2 created with a tree-root-relative
+        # backing path.  Android's userdata disk is a standalone qcow2 (no
+        # base).  Data-preservation invariants: an existing valid data disk is
+        # never recreated/truncated during setup; markers missing on an
+        # existing disk are adopted; credential drift warns for in-place
+        # injection only (never auto-wipes).
         Write-Information "vm-setup: configuring VM '$($vm.name)'..."
 
         $minSizeBytes = ConvertFrom-SizeString $vm.minImageSize
-        $prebuilt = Get-VMSrcPath -SrcDir $srcDir -Type $vm.type -Leaf $VM_PREBUILT_IMAGE
-        $prebuiltValid = (Test-Path $prebuilt) -and (Test-Qcow2Image -ImagePath $prebuilt -ImageLabel "pre-built image '$($vm.type)'" -MinBytes $minSizeBytes)
+        $systemImage = Get-VMSrcPath -SrcDir $srcDir -Type $vm.type -Leaf $VM_SYSTEM_IMAGE
+        $systemImageValid = (Test-Path $systemImage) -and (Test-Qcow2Image -ImagePath $systemImage -ImageLabel "system image '$($vm.type)'" -MinBytes $minSizeBytes)
 
         if ($vm.type -eq 'Android') {
             # Android userdata: standalone writable qcow2 created at the
@@ -1158,80 +1161,65 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         }
 
         $diskPath = Join-Path -Path $dataDir -ChildPath "$($vm.id).qcow2"
-        $basePath = Get-VMSrcPath -SrcDir $srcDir -Type $vm.type -Leaf $VM_OVERLAY_BACKING
-        $backingRel = Get-VMOverlayBackingRelPath -Type $vm.type
+        $backingRel = Get-VMSystemImageRelPath -Type $vm.type
         $diskCredentialMarker = Get-VMGuestSecretMarkerPath -BasePath $diskPath
 
-        # Base/overlay provisioning (mirrors vm_ensure_base_and_overlay):
-        # - overlay valid: refresh backing base on credential drift (overlay
-        #   preserved; skipped while the VM runs)
-        # - overlay invalid: refresh base from the prebuilt (overlay preserved)
-        # - overlay absent: create base (cp of prebuilt) + overlay
+        # Data disk provisioning (mirrors vm_ensure_data_disk):
+        # - data disk valid: keep it; adopt markers when absent; on credential
+        #   drift warn for in-place injection (never recreate)
+        # - data disk invalid: keep it and warn (reset is the destructive path)
+        # - data disk absent: create as an overlay on the system image
         if (Test-Path $diskPath) {
-            if (Test-Qcow2Image -ImagePath $diskPath -ImageLabel "runtime disk '$($vm.id)'" -MinBytes $minSizeBytes) {
+            if (Test-Qcow2Image -ImagePath $diskPath -ImageLabel "data disk '$($vm.id)'" -MinBytes $minSizeBytes) {
+                Write-Information "vm-setup: data disk already exists: $diskPath"
                 if (-not (Test-VMGuestSecretMarker -ExpectedHash $guestSecretHash -MarkerPath $diskCredentialMarker)) {
-                    if ($prebuiltValid) {
-                        Write-Warning "vm-setup: $($vm.type) runtime disk guest credential drift detected for '$($vm.id)'; refreshing base image from pre-built image (overlay preserved)"
-                        if (-not $DryRun) {
-                            if (-not (Test-VMProcessRunning -VmId $vm.id -VmDisplay $vm.name)) {
-                                Copy-Item $prebuilt $basePath -Force
-                                Set-Content -Path $diskCredentialMarker -Value $guestSecretHash -Encoding UTF8
-                            } else {
-                                Write-Warning "vm-setup: VM '$($vm.id)' is running; skipping base refresh until it is stopped"
-                            }
+                    if (Test-Path $diskCredentialMarker) {
+                        if (Test-VMProcessRunning -VmId $vm.id -VmDisplay $vm.name) {
+                            Write-Warning "vm-setup: VM '$($vm.id)' is running; skipping in-place injection (applies on next setup)"
                         } else {
-                            Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$basePath' -Force"
-                            Write-Information "vm-setup: [dry-run] Set-Content '$diskCredentialMarker' '$guestSecretHash'"
+                            Write-Warning "vm-setup: $($vm.type) data disk guest credential drift detected for '$($vm.id)'; run 'nucleus-vm inject $($vm.id)' to re-inject in place (data disk preserved)"
                         }
                     } else {
-                        Write-Warning "vm-setup: $($vm.type) runtime disk credential drift detected but no valid pre-built image exists for '$($vm.id)'; skipping"
+                        Write-Information "vm-setup: adopting missing provision marker for existing data disk '$($vm.id)'"
+                        if (-not $DryRun) {
+                            Set-Content -Path $diskCredentialMarker -Value $guestSecretHash -Encoding UTF8
+                        } else {
+                            Write-Information "vm-setup: [dry-run] Set-Content '$diskCredentialMarker' '$guestSecretHash'"
+                        }
                     }
-                } else {
-                    Write-Information "vm-setup: disk already exists: $diskPath"
-                }
-            } elseif ($prebuiltValid) {
-                Write-Warning "vm-setup: existing runtime disk is invalid; refreshing base image and preserving overlay: $basePath"
-                if (-not $DryRun) {
-                    Copy-Item $prebuilt $basePath -Force
-                    Set-Content -Path $diskCredentialMarker -Value $guestSecretHash -Encoding UTF8
-                } else {
-                    Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$basePath' -Force"
-                    Write-Information "vm-setup: [dry-run] Set-Content '$diskCredentialMarker' '$guestSecretHash'"
                 }
             } else {
-                Write-Warning "vm-setup: runtime disk is invalid and no valid pre-built image exists for '$($vm.id)'; skipping"
+                Write-Warning "vm-setup: data disk is invalid for '$($vm.id)': $diskPath; run 'nucleus-vm reset $($vm.id)' to recreate it (data preserved)"
             }
-        } elseif ($prebuiltValid) {
-            Write-Information "vm-setup: using pre-built image: $prebuilt"
+        } elseif ($systemImageValid) {
+            Write-Information "vm-setup: using system image: $systemImage"
             if (-not $DryRun) {
-                Copy-Item $prebuilt $basePath
                 if ($null -eq $qemuImg) {
-                    Write-Warning "vm-setup: qemu-img not found; cannot create overlay for '$($vm.id)'"
+                    Write-Warning "vm-setup: qemu-img not found; cannot create data disk for '$($vm.id)'"
                 } else {
                     & $qemuImg create -f qcow2 -b $backingRel -F qcow2 $diskPath
                     if ($LASTEXITCODE -ne 0) {
-                        Write-Warning "vm-setup: qemu-img create failed for overlay: $diskPath"
+                        Write-Warning "vm-setup: qemu-img create failed for data disk: $diskPath"
                     }
                 }
                 Set-Content -Path $diskCredentialMarker -Value $guestSecretHash -Encoding UTF8
             } else {
-                Write-Information "vm-setup: [dry-run] Copy-Item '$prebuilt' '$basePath'"
                 Write-Information "vm-setup: [dry-run] qemu-img create -f qcow2 -b '$backingRel' -F qcow2 '$diskPath'"
                 Write-Information "vm-setup: [dry-run] Set-Content '$diskCredentialMarker' '$guestSecretHash'"
             }
         } else {
-            Write-Warning "vm-setup: image not found or invalid for '$($vm.id)': $prebuilt; skipping"
+            Write-Warning "vm-setup: system image not found or invalid for '$($vm.id)': $systemImage; skipping"
         }
 
-        # Grow-only auto-grow: bring the overlay's virtual size up to the
-        # manifest disk size (never shrink).  Mirrors vm_ensure_base_and_overlay.
+        # Grow-only auto-grow: bring the data disk's virtual size up to the
+        # manifest disk size (never shrink).  Mirrors vm_ensure_data_disk.
         $diskBytes = ConvertFrom-SizeString $vm.diskSize
-        $overlaySize = Get-VMQcow2VirtualSize -ImagePath $diskPath
-        if ($overlaySize -gt 0 -and $diskBytes -gt $overlaySize) {
-            Write-Information "vm-setup: growing overlay '$($vm.id)' from $overlaySize to $diskBytes bytes (grow-only)"
+        $dataDiskSize = Get-VMQcow2VirtualSize -ImagePath $diskPath
+        if ($dataDiskSize -gt 0 -and $diskBytes -gt $dataDiskSize) {
+            Write-Information "vm-setup: growing data disk '$($vm.id)' from $dataDiskSize to $diskBytes bytes (grow-only)"
             if (-not $DryRun) {
                 if ($null -eq $qemuImg) {
-                    Write-Warning "vm-setup: qemu-img not found; cannot grow overlay for '$($vm.id)'"
+                    Write-Warning "vm-setup: qemu-img not found; cannot grow data disk for '$($vm.id)'"
                 } else {
                     & $qemuImg resize $diskPath $diskBytes
                     if ($LASTEXITCODE -ne 0) {
@@ -1373,7 +1361,7 @@ function Invoke-BuildNixosImage {
     )
 
     $vmType = 'NixOS'
-    $outPath = Get-VMSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PREBUILT_IMAGE
+    $outPath = Get-VMSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_SYSTEM_IMAGE
     $credentialMarkerPath = Get-VMGuestSecretMarkerPath -BasePath $outPath
     if (Test-Path $outPath) {
         if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing NixOS image' -MinBytes $MinSize) {
@@ -1582,7 +1570,7 @@ function Invoke-BuildWindowsImage {
 
     $vmType = 'Windows'
     $windowsTypeSrcDir = Get-VMTypeSrcDir -SrcDir $SrcDir -Type $vmType
-    $outPath = Get-VMSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PREBUILT_IMAGE
+    $outPath = Get-VMSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_SYSTEM_IMAGE
     $credentialMarkerPath = Get-VMGuestSecretMarkerPath -BasePath $outPath
     if (Test-Path $outPath) {
         if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing Windows image' -MinBytes $MinSize) {

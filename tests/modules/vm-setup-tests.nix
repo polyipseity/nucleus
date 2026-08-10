@@ -235,7 +235,7 @@ let
         (lib.hasInfix "_prebuilt_min_size=\"\$(parse_size \"\$(jq -r \".VMs[\$vm_index].minImageSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
         && (lib.hasInfix "validate_qcow2_image \"\$_bai_system_img\" \"Android system image for \$_bai_vm_id\"" vm_setup_sh_text)
         && (lib.hasInfix "validate_qcow2_image \"\$_bai_userdata_img\" \"Android userdata disk for \$_bai_vm_id\"" vm_setup_sh_text)
-        && (lib.hasInfix "Test-Qcow2Image -ImagePath \$prebuilt -ImageLabel \"pre-built image '\$(\$vm.type)'\" -MinBytes \$minSizeBytes" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Test-Qcow2Image -ImagePath \$systemImage -ImageLabel \"system image '\$(\$vm.type)'\" -MinBytes \$minSizeBytes" windows_vm_setup_ps1_text)
       )
       "Image validation floors must be parsed from manifest minImageSize instead of hardcoded byte constants";
 
@@ -1006,11 +1006,11 @@ let
       )
       "Windows vm-setup GC must preserve disabled VM entries by default and clear them only with --gc-disabled/-GcDisabled";
 
-  # GC keep-sets must preserve every manifest-referenced disk image: prebuilt
-  # goldens, overlay backing copies, Android system/GSI images under src/<type>/,
-  # and runtime overlays under data/ when --gc-data is enabled. Matching by full
-  # filename (with extension) keeps canonical artifacts (prebuilt image.qcow2,
-  # overlay backing.qcow2, system image.qcow2) from being orphaned by a
+  # GC keep-sets must preserve every manifest-referenced disk image: type
+  # system images, Android system/GSI images under src/<type>/, and data disks
+  # under data/ when --gc-data is enabled. Matching by full
+  # filename (with extension) keeps canonical artifacts (system image.qcow2,
+  # Android system/GSI/userdata images) from being orphaned by a
   # basename-stripped guest-id comparison.
   test_vm_gc_keep_set_preserves_manifest_images = assert' (
     (lib.hasInfix "vm_gc_disk_keep_set" vm_setup_sh_text)
@@ -1029,7 +1029,7 @@ let
     && (lib.hasInfix "vm_gc_orphan_descriptors \"\$_gcv_expected\"" vm_setup_sh_text)
   ) "vm-setup GC must remove orphaned VM descriptors for guests absent from the expected set";
 
-  # src/<type>/ prebuilt markers gate prebuilt goldens AND tart registrations,
+  # src/<type>/ type markers gate the type system image AND tart registrations,
   # so they are removed only when the guest leaves the expected set; data/
   # sidecar markers are removed when their disk image is gone (only with --gc-data).
   test_vm_gc_marker_expected_set_semantics =
@@ -1037,10 +1037,10 @@ let
       (
         (lib.hasInfix "vm_gc_orphan_markers" vm_setup_sh_text)
         && (lib.hasInfix "for _gcom_type_dir in \"\$SRC_DIR\"/*/" vm_setup_sh_text)
-        && (lib.hasInfix "VM_PREBUILT_MARKER_BASE}.vm-guest-credentials-sha256" vm_setup_sh_text)
+        && (lib.hasInfix "VM_TYPE_MARKER_BASE}.vm-guest-credentials-sha256" vm_setup_sh_text)
         && (lib.hasInfix "if [ \"\$gc_data_mode\" = true ]" vm_setup_sh_text)
       )
-      "vm-setup marker GC must key src/<type>/ prebuilt markers to the expected set and sweep data/ markers only with --gc-data";
+      "vm-setup marker GC must key src/<type>/ type markers to the expected set and sweep data/ markers only with --gc-data";
 
   # Windows vm-setup must mirror POSIX keep-set semantics: match full disk
   # filenames against per-directory keep-sets and sweep config markers too.
@@ -1326,8 +1326,8 @@ let
       "scripts/vm.sh must wire the pack subcommand (usage, dispatch, do_pack with dry-run-by-default, vm_pack_vms)";
 
   # pack's keep-set must exactly match the trivially-regenerable rule: only
-  # UTM bundles, generated start/stop scripts, src/<type>/overlay backing.qcow2
-  # copies, and src/<type>/Packer/ + stale dot-dirs are removed; everything else stays.
+  # UTM bundles, generated start/stop scripts, and src/<type>/Packer/ + stale
+  # dot-dirs are removed; everything else (src/, data/, descriptors) stays.
   test_vm_pack_removal_set =
     assert'
       (
@@ -1336,13 +1336,11 @@ let
         && (lib.hasInfix "removing regenerable start/stop script" vm_setup_sh_text)
         && (lib.hasInfix "scripts/start-*.sh" vm_setup_sh_text)
         && (lib.hasInfix "scripts/stop-*.ps1" vm_setup_sh_text)
-        && (lib.hasInfix "removing regenerable overlay backing" vm_setup_sh_text)
-        && (lib.hasInfix "$VM_OVERLAY_BACKING" vm_setup_sh_text)
         && (lib.hasInfix "removing transient Packer directory" vm_setup_sh_text)
         && (lib.hasInfix "$VM_PACKER_BUILD_DIR" vm_setup_sh_text)
         && (lib.hasInfix "cannot pack while a VM is running" vm_setup_sh_text)
       )
-      "vm_pack_vms must remove only trivially regenerable artifacts (UTM bundles, start/stop scripts, overlay backing copies, Packer/ + dot-dirs) and refuse while a VM is running";
+      "vm_pack_vms must remove only trivially regenerable artifacts (UTM bundles, start/stop scripts, Packer/ + dot-dirs) and refuse while a VM is running";
 
   # pack must refuse while any VM is running and print next steps.
   test_vm_pack_next_steps = assert' (
@@ -1623,34 +1621,32 @@ let
       )
       "src/vms/NixOS/guest.nix must force standalone-eval overrides (gcr-ssh-agent, 32-bit graphics, Steam, stateVersion, unfree/insecure policy)";
 
-  # core.nix must append camillagui-backend via ++ (lib.optionals ...) so the
-  # overlay-only package is skipped by vanilla nixpkgs evaluations (e.g. the
-  # nixos-generators guest build); placing lib.optionals inside the list literal
-  # would nest a list element and fail the systemPackages package-type check.
-  # core.nix must filter overlap packages by meta.available on Linux so
-  # arch-specific nixpkgs attrs (e.g. discord-canary, x86_64-linux only) are
-  # dropped from aarch64-linux evals like the nixos-generators guest build.
+  # vm.sh must provision UTM data disks from the type system image: the data
+  # disk is a qcow2 overlay over src/<type>/system image.qcow2 hard-linked into
+  # the UTM bundle (data preservation: an existing data disk is never recreated
+  # during setup; the old overlay-backing base link is gone).
   test_utm_base_overlay_provisioning =
     assert'
       (
-        (lib.hasInfix "vm_ensure_base_and_overlay \"\$vm_id\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
-        && (lib.hasInfix "linked runtime overlay into UTM bundle: \$disk_file" vm_setup_sh_text)
-        && (lib.hasInfix "_base_link=\"\$data_dir/\$(basename \"\$(vm_src_path \"\$vm_type\" \"\$VM_OVERLAY_BACKING\")\")\"" vm_setup_sh_text)
-        && (lib.hasInfix "linked base image into UTM bundle: \$_base_link" vm_setup_sh_text)
+        (lib.hasInfix "vm_ensure_data_disk \"\$vm_id\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
+        && (lib.hasInfix "linked data disk into UTM bundle: \$disk_file" vm_setup_sh_text)
+        && !(lib.hasInfix "_base_link=\"\$data_dir/\$(basename \"\$(vm_src_path \"\$vm_type\" \"\$VM_OVERLAY_BACKING\")\")\"" vm_setup_sh_text)
+        && !(lib.hasInfix "linked base image into UTM bundle: \$_base_link" vm_setup_sh_text)
       )
-      "scripts/vm.sh must provision UTM runtime disks as base/overlay pairs (src/<type>/overlay backing.qcow2 base + data/<id>.qcow2 overlay hard-linked into the bundle)";
+      "scripts/vm.sh must provision UTM data disks as qcow2 overlays over src/<type>/system image.qcow2 hard-linked into the bundle";
 
-  # Windows vm-setup must mirror POSIX base/overlay provisioning: the runtime
-  # disk is a qcow2 overlay data/<id>.qcow2 backed by src/<type>/overlay backing.qcow2
-  # (backing path tree-root-relative), the base is a cp of the kept prebuilt
-  # golden refreshed only while the VM is stopped, growth is grow-only via
-  # qemu-img resize, and Android userdata is a standalone data/ qcow2.
+  # Windows vm-setup must mirror POSIX data-disk provisioning: the data disk
+  # is a qcow2 overlay data/<id>.qcow2 backed by src/<type>/system image.qcow2
+  # (backing path tree-root-relative), existing data disks are preserved
+  # (markers adopted, credential drift warns for in-place injection only while
+  # the VM is stopped), growth is grow-only via qemu-img resize, and Android
+  # userdata is a standalone data/ qcow2.
   test_windows_base_overlay_parity =
     assert'
       (
-        (lib.hasInfix "Get-VMOverlayBackingRelPath -Type $vm.type" windows_vm_setup_ps1_text)
+        (lib.hasInfix "Get-VMSystemImageRelPath -Type $vm.type" windows_vm_setup_ps1_text)
         && (lib.hasInfix "& \$qemuImg create -f qcow2 -b \$backingRel -F qcow2 \$diskPath" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "Copy-Item \$prebuilt \$basePath" windows_vm_setup_ps1_text)
+        && !(lib.hasInfix "Copy-Item \$prebuilt \$basePath" windows_vm_setup_ps1_text)
         && (lib.hasInfix "Test-VMProcessRunning -VmId \$vm.id -VmDisplay \$vm.name" windows_vm_setup_ps1_text)
         && (lib.hasInfix "function Get-VMRunningProcessNameList" windows_vm_setup_ps1_text)
         && (lib.hasInfix "Get-VMRunningProcessNameList" vm_ps1_text)
@@ -1658,17 +1654,17 @@ let
         && (lib.hasInfix "\$qemuImg resize \$diskPath \$diskBytes" windows_vm_setup_ps1_text)
         && (lib.hasInfix "vm.id).qcow2" windows_vm_setup_ps1_text)
       )
-      "Windows vm-setup must provision data/<id>.qcow2 overlays over src/<type>/overlay backing.qcow2 (tree-root-relative backing, running-VM-guarded base refresh, grow-only resize, Android standalone userdata)";
+      "Windows vm-setup must provision data/<id>.qcow2 overlays over src/<type>/system image.qcow2 (tree-root-relative backing, data preservation, grow-only resize, Android standalone userdata)";
 
-  # The POSIX Windows/QEMU vm-setup callback must provision base/overlay
-  # disks for Windows guests (parity with the PowerShell Pass A): the
-  # vm_ensure_base_and_overlay call is what actually creates the writable
-  # runtime overlay data/<id>.qcow2 on the Windows host.
+  # The POSIX Windows/QEMU vm-setup callback must provision data disks for
+  # Windows guests (parity with the PowerShell Pass A): the vm_ensure_data_disk
+  # call is what actually creates the writable data disk data/<id>.qcow2 on the
+  # Windows host.
   test_windows_qemu_ensure_base_and_overlay = assert' (
     (lib.hasInfix "vm_setup_windows_qemu()" vm_setup_sh_text)
-    && (lib.hasInfix "vm_ensure_base_and_overlay \"\$vm_id\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
-    && (lib.hasInfix "runtime overlay ready: \$disk_path" vm_setup_sh_text)
-  ) "vm_setup_windows_qemu must call vm_ensure_base_and_overlay for Windows guests";
+    && (lib.hasInfix "vm_ensure_data_disk \"\$vm_id\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
+    && (lib.hasInfix "data disk ready: \$disk_path" vm_setup_sh_text)
+  ) "vm_setup_windows_qemu must call vm_ensure_data_disk for Windows guests";
 
   # UTM provisioning for Android must derive the system/userdata/GSI image
   # filenames from the manifest Android group (never hardcoded android-*
@@ -1756,10 +1752,10 @@ let
         && (lib.hasInfix "failed to mark libvirt default network for autostart" vm_setup_sh_text)
         && (lib.hasInfix "validate_qcow2_image \"$_prebuilt\" \"pre-built image for \${vm_id}\" \"$_prebuilt_min_size\"" vm_setup_sh_text)
         && (lib.hasInfix "disk_path=\"\$VM_DIR/data/\${vm_id}.qcow2\"" vm_setup_sh_text)
-        && (lib.hasInfix "vm_ensure_base_and_overlay \"\$vm_id\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
-        && (lib.hasInfix "runtime overlay ready: \$disk_path" vm_setup_sh_text)
+        && (lib.hasInfix "vm_ensure_data_disk \"\$vm_id\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
+        && (lib.hasInfix "data disk ready: \$disk_path" vm_setup_sh_text)
       )
-      "scripts/vm.sh must validate libvirt prebuilt disks against the manifest minImageSize, provision the data/<id>.qcow2 overlay, and surface default-network recovery failures";
+      "scripts/vm.sh must validate libvirt system images against the manifest minImageSize, provision the data/<id>.qcow2 overlay, and surface default-network recovery failures";
 
   # The shared Android start script must expose manifest-driven tokens for CPU
   # count, RAM, image filenames, and port forwards instead of hardcoded values.

@@ -108,11 +108,10 @@
         "properties": {
           "role": {
             "enum": [
-              "base",
-              "runtime",
               "system",
               "gsi",
-              "userdata"
+              "userdata",
+              "data"
             ],
             "type": "string"
           },

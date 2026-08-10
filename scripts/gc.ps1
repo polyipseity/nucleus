@@ -460,7 +460,7 @@ if (-not $NoVMGc) {
     }
 
     # WHY: keep-set has one source of truth in src/scripts/lib/vm.sh — the old
-    # enabled-only name sweep deleted non-regenerable goldens/bases of
+    # enabled-only name sweep deleted non-regenerable type system images of
     # disabled/other-host guests (e.g. Android-system.qcow2, Windows.qcow2);
     # vm.sh gc preserves every manifest guest by default (--gc-disabled narrows).
     # Start/stop scripts are regenerated for every manifest guest and stripped

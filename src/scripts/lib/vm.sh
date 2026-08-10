@@ -56,8 +56,7 @@ vm_init() {
   gc_data_mode="${25}"
 }
 
-VM_PREBUILT_IMAGE='prebuilt image.qcow2'
-VM_OVERLAY_BACKING='overlay backing.qcow2'
+VM_SYSTEM_IMAGE='system image.qcow2'
 VM_PACKER_BUILD_DIR='Packer'
 VM_ANDROID_RECOVERY_IMG='recovery userdebug.img'
 VM_ANDROID_RECOVERY_TAG='recovery userdebug.tag.json'
@@ -72,7 +71,7 @@ VM_ANDROID_LINEAGE_EXTRACT='Lineage extract'
 VM_ANDROID_GSI_DOWNLOAD_ZIP='GSI download.zip'
 VM_WINDOWS_INSTALLER_ISO='installer.iso'
 export VM_WINDOWS_VIRTIO_ISO='virtio guest tools.iso'
-VM_PREBUILT_MARKER_BASE='prebuilt image'
+VM_TYPE_MARKER_BASE='system image'
 
 vm_type_src_dir() {
   printf '%s/%s\n' "$SRC_DIR" "$1"
@@ -82,8 +81,8 @@ vm_src_path() {
   printf '%s/%s\n' "$(vm_type_src_dir "$1")" "$2"
 }
 
-vm_overlay_backing_rel_path() {
-  printf '../src/%s/%s\n' "$1" "$VM_OVERLAY_BACKING"
+vm_system_image_rel_path() {
+  printf '../src/%s/%s\n' "$1" "$VM_SYSTEM_IMAGE"
 }
 
 vm_ensure_type_src_dirs() {
@@ -272,7 +271,7 @@ vm_guest_credentials_marker_path() {
     printf '%s.vm-guest-credentials-sha256\n' "$_vgcm_disk_path"
   else
     _vgcm_type="$(jq -r --arg n "$_vgcm_name" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
-    vm_src_path "$_vgcm_type" "${VM_PREBUILT_MARKER_BASE}.vm-guest-credentials-sha256"
+    vm_src_path "$_vgcm_type" "${VM_TYPE_MARKER_BASE}.vm-guest-credentials-sha256"
   fi
 }
 
@@ -323,7 +322,7 @@ vm_guest_config_marker_path() {
     printf '%s.vm-guest-config-sha256\n' "$_vgcmp_disk_path"
   else
     _vgcmp_type="$(jq -r --arg n "$_vgcmp_name" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
-    vm_src_path "$_vgcmp_type" "${VM_PREBUILT_MARKER_BASE}.vm-guest-config-sha256"
+    vm_src_path "$_vgcmp_type" "${VM_TYPE_MARKER_BASE}.vm-guest-config-sha256"
   fi
 }
 
@@ -1093,8 +1092,8 @@ vm_write_descriptor() {
           ]
         else
           [
-            {role: "base", path: ("src/" + $vm.type + "/overlay backing.qcow2")},
-            {role: "runtime", path: ("data/" + $vm.id + ".qcow2")}
+            {role: "system", path: ("src/" + $vm.type + "/system image.qcow2")},
+            {role: "data", path: ("data/" + $vm.id + ".qcow2")}
           ]
         end
       ),
@@ -1250,104 +1249,115 @@ vm_resize_vm() {
   say "resized '$_rvm_id' disk: $_rvm_old_size -> $_rvm_size_bytes bytes"
 }
 
-# base/overlay provisioning helper
+# data disk provisioning helper
 
-# vm_ensure_base_and_overlay NAME PREBUILT MIN_SIZE DISK_BYTES CRED_MARKER CONFIG_MARKER CONFIG_FP
-#   Ensures the base/overlay disk pair for NAME under the managed layout:
-#     src/<type>/overlay backing.qcow2 — pristine base copied from PREBUILT
-#     data/<name>.qcow2                 — writable overlay backing ../src/<type>/overlay backing.qcow2
-#   PREBUILT is the build-phase golden image (src/<type>/prebuilt image.qcow2); MIN_SIZE and
-#   DISK_BYTES are parsed manifest bytes (minImageSize, diskSize).  CRED_MARKER
-#   and CONFIG_MARKER are sidecar marker paths; CONFIG_FP is the guest-config
-#   fingerprint (empty for non-NixOS guests).  Cases:
-#   1. Base missing or invalid → recreate from PREBUILT.
-#   2. Overlay missing → create with a RELATIVE backing path and write markers.
-#   3. Overlay invalid → warn and skip unless --force (default tells the user
-#      to run 'nucleus-vm reset <name>'); --force recreates a fresh overlay.
-#   4. Credential/config drift → replace the BASE from PREBUILT (overlay state
-#      preserved), refresh markers; skipped when the VM is running.
-#   5. Overlay virtual size < DISK_BYTES → auto-grow (never shrink).
-vm_ensure_base_and_overlay() {
-  local _ebao_name="$1" _ebao_prebuilt="$2" _ebao_min_size="$3" _ebao_disk_bytes="$4"
-  local _ebao_cred_marker="$5" _ebao_config_marker="$6" _ebao_config_fp="$7"
-  local _ebao_type _ebao_base _ebao_overlay _ebao_base_valid _ebao_running _ebao_virtual_size
+# vm_ensure_data_disk NAME SYSTEM_IMAGE MIN_SIZE DISK_BYTES CRED_MARKER CONFIG_MARKER CONFIG_FP
+#   Ensures the writable data disk for NAME under the managed layout:
+#     src/<type>/system image.qcow2 — pristine type system image (read-only base)
+#     data/<name>.qcow2             — writable data disk backing ../src/<type>/system image.qcow2
+#   SYSTEM_IMAGE is the build-phase type system image (src/<type>/system image.qcow2);
+#   MIN_SIZE and DISK_BYTES are parsed manifest bytes (minImageSize, diskSize).
+#   CRED_MARKER and CONFIG_MARKER are sidecar marker paths; CONFIG_FP is the
+#   guest-config fingerprint (empty for non-NixOS guests).  Cases:
+#   1. Data disk missing → create as an overlay on SYSTEM_IMAGE and write markers.
+#   2. Data disk exists and validates → KEEP it — never recreate, truncate, or
+#      re-base an existing data disk.
+#   3. Markers missing on an existing disk → ADOPT: write markers from current
+#      inputs; do not modify disk contents.
+#   4. Credential/config drift → in-place injection only; warn here (destructive
+#      recreation requires 'nucleus-vm reset' or --force).
+#   5. Data disk invalid → warn and skip unless --force (default tells the
+#      operator to run 'nucleus-vm reset <name>'; --force recreates with a
+#      printed destructive warning).
+#   6. Virtual size < DISK_BYTES → auto-grow (never shrink).
+vm_ensure_data_disk() {
+  local _edd_name="$1" _edd_system_image="$2" _edd_min_size="$3" _edd_disk_bytes="$4"
+  local _edd_cred_marker="$5" _edd_config_marker="$6" _edd_config_fp="$7"
+  local _edd_type _edd_disk _edd_disk_valid _edd_backing_rel _edd_running _edd_virtual_size
 
   mkdir -p "$VM_DIR/data"
 
-  _ebao_type="$(jq -r --arg n "$_ebao_name" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
-  if [ -z "$_ebao_type" ]; then
-    error "VM '$_ebao_name' not found in manifest; cannot provision base/overlay"
+  _edd_type="$(jq -r --arg n "$_edd_name" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
+  if [ -z "$_edd_type" ]; then
+    error "VM '$_edd_name' not found in manifest; cannot provision data disk"
     return 1
   fi
-  _ebao_base="$(vm_src_path "$_ebao_type" "$VM_OVERLAY_BACKING")"
-  _ebao_overlay="$VM_DIR/data/${_ebao_name}.qcow2"
-  _ebao_backing_rel="$(vm_overlay_backing_rel_path "$_ebao_type")"
+  _edd_disk="$VM_DIR/data/${_edd_name}.qcow2"
+  _edd_backing_rel="$(vm_system_image_rel_path "$_edd_type")"
 
-  _ebao_base_valid=false
-  if [ -f "$_ebao_base" ] && validate_qcow2_image "$_ebao_base" "base image for ${_ebao_name}" "$_ebao_min_size"; then
-    _ebao_base_valid=true
-  fi
-  if [ "$_ebao_base_valid" != true ]; then
-    if [ ! -f "$_ebao_prebuilt" ]; then
-      warn "pre-built image not found: $_ebao_prebuilt; cannot create base for '$_ebao_name'"
-      return 1
-    fi
-    if ! validate_qcow2_image "$_ebao_prebuilt" "pre-built image for ${_ebao_name}" "$_ebao_min_size"; then
-      warn "pre-built image is invalid for '$_ebao_name': $_ebao_prebuilt"
-      return 1
-    fi
-    if [ -f "$_ebao_base" ]; then
-      warn "base image is invalid for '$_ebao_name'; recreating from pre-built image"
-      rm -f "$_ebao_base"
-    fi
-    copy_with_reflink "$_ebao_prebuilt" "$_ebao_base"
-    say "created base image: $_ebao_base"
+  _edd_disk_valid=false
+  if [ -f "$_edd_disk" ] && validate_qcow2_image "$_edd_disk" "data disk for ${_edd_name}" "$_edd_min_size"; then
+    _edd_disk_valid=true
   fi
 
-  if [ ! -f "$_ebao_overlay" ] || ! validate_qcow2_image "$_ebao_overlay" "runtime overlay for ${_ebao_name}" "$_ebao_min_size"; then
-    if [ -f "$_ebao_overlay" ]; then
-      warn "runtime overlay is invalid for '$_ebao_name': $_ebao_overlay"
-      if [ "$force" != true ]; then
-        warn "run 'nucleus-vm reset $_ebao_name' to recreate it (or pass --force)"
-        return 1
-      fi
-      say "recreating runtime overlay for '$_ebao_name' (--force)"
-      rm -f "$_ebao_overlay"
-    fi
-    if ! qemu-img create -f qcow2 -b "$_ebao_backing_rel" -F qcow2 "$_ebao_overlay" >/dev/null; then
-      error "failed to create runtime overlay: $_ebao_overlay"
-      return 1
-    fi
-    printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_ebao_cred_marker"
-    if [ -n "$_ebao_config_fp" ]; then
-      printf '%s\n' "$_ebao_config_fp" >"$_ebao_config_marker"
-    fi
-    say "created runtime overlay: $_ebao_overlay (backing $_ebao_backing_rel)"
-  fi
-
-  if [ -f "$_ebao_overlay" ]; then
-    if ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_ebao_cred_marker" ||
-      { [ -n "$_ebao_config_fp" ] && ! vm_guest_config_marker_matches "$_ebao_config_fp" "$_ebao_config_marker"; }; then
-      _ebao_running="$(vm_get_running_ids)"
-      if printf '%s\n' "$_ebao_running" | grep -qxF "$_ebao_name"; then
-        say "VM '$_ebao_name' is running; skipping base refresh from pre-built image (applies on next setup)"
+  if [ "$_edd_disk_valid" = true ]; then
+    # Data preservation: an existing valid data disk is never recreated,
+    # truncated, or re-based during setup/sync.
+    say "data disk already exists: $_edd_disk"
+    if ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_edd_cred_marker" ||
+      { [ -n "$_edd_config_fp" ] && ! vm_guest_config_marker_matches "$_edd_config_fp" "$_edd_config_marker"; }; then
+      if [ -f "$_edd_cred_marker" ] || { [ -n "$_edd_config_fp" ] && [ -f "$_edd_config_marker" ]; }; then
+        _edd_running="$(vm_get_running_ids)"
+        if printf '%s\n' "$_edd_running" | grep -qxF "$_edd_name"; then
+          say "VM '$_edd_name' is running; skipping in-place injection (applies on next setup)"
+        else
+          say "guest credential/config drift detected for '$_edd_name'; run 'nucleus-vm inject $_edd_name' to re-inject in place (data disk preserved)"
+        fi
       else
-        say "guest credential/config drift detected for '$_ebao_name'; refreshing base from pre-built image (overlay preserved)"
-        copy_with_reflink "$_ebao_prebuilt" "$_ebao_base"
-        printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_ebao_cred_marker"
-        if [ -n "$_ebao_config_fp" ]; then
-          printf '%s\n' "$_ebao_config_fp" >"$_ebao_config_marker"
+        # Marker adoption: markers absent on an existing disk mean it predates
+        # this fingerprint scheme; adopt from current inputs, never rebuild.
+        say "adopting missing provision markers for existing data disk '$_edd_name'"
+        printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_edd_cred_marker"
+        if [ -n "$_edd_config_fp" ]; then
+          printf '%s\n' "$_edd_config_fp" >"$_edd_config_marker"
         fi
       fi
     fi
+  elif [ -f "$_edd_disk" ]; then
+    warn "data disk is invalid for '$_edd_name': $_edd_disk"
+    if [ "$force" != true ]; then
+      warn "run 'nucleus-vm reset $_edd_name' to recreate it (or pass --force)"
+      return 1
+    fi
+    warn "recreating data disk for '$_edd_name' (--force; this DESTROYS existing data)"
+    if [ "$dry_run" = false ]; then
+      rm -f "$_edd_disk" "$_edd_cred_marker" "$_edd_config_marker"
+    else
+      dry_run "rm -f $_edd_disk $_edd_cred_marker $_edd_config_marker"
+      return 0
+    fi
   fi
 
-  if [ -n "$_ebao_disk_bytes" ] && [ -f "$_ebao_overlay" ]; then
-    _ebao_virtual_size="$(qemu-img info --output=json "$_ebao_overlay" | jq -r '."virtual-size" // 0')"
-    if [ -n "$_ebao_virtual_size" ] && [ "$_ebao_virtual_size" -lt "$_ebao_disk_bytes" ]; then
-      say "growing runtime overlay for '$_ebao_name' from $_ebao_virtual_size to $_ebao_disk_bytes bytes"
-      if ! qemu-img resize "$_ebao_overlay" "$_ebao_disk_bytes" >/dev/null; then
-        error "failed to grow runtime overlay: $_ebao_overlay"
+  if [ ! -f "$_edd_disk" ]; then
+    if [ ! -f "$_edd_system_image" ]; then
+      warn "system image not found: $_edd_system_image; cannot create data disk for '$_edd_name' (run 'nucleus-vm setup' first)"
+      return 1
+    fi
+    if ! validate_qcow2_image "$_edd_system_image" "system image for ${_edd_name}" "$_edd_min_size"; then
+      warn "system image is invalid for '$_edd_name': $_edd_system_image"
+      return 1
+    fi
+    if [ "$dry_run" = false ]; then
+      if ! qemu-img create -f qcow2 -b "$_edd_backing_rel" -F qcow2 "$_edd_disk" >/dev/null; then
+        error "failed to create data disk: $_edd_disk"
+        return 1
+      fi
+      printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_edd_cred_marker"
+      if [ -n "$_edd_config_fp" ]; then
+        printf '%s\n' "$_edd_config_fp" >"$_edd_config_marker"
+      fi
+      say "created data disk: $_edd_disk (backing $_edd_backing_rel)"
+    else
+      dry_run "qemu-img create -f qcow2 -b $_edd_backing_rel -F qcow2 $_edd_disk"
+    fi
+  fi
+
+  if [ -n "$_edd_disk_bytes" ] && [ -f "$_edd_disk" ]; then
+    _edd_virtual_size="$(qemu-img info --output=json "$_edd_disk" | jq -r '."virtual-size" // 0')"
+    if [ -n "$_edd_virtual_size" ] && [ "$_edd_virtual_size" -lt "$_edd_disk_bytes" ]; then
+      say "growing data disk for '$_edd_name' from $_edd_virtual_size to $_edd_disk_bytes bytes"
+      if ! qemu-img resize "$_edd_disk" "$_edd_disk_bytes" >/dev/null; then
+        error "failed to grow data disk: $_edd_disk"
         return 1
       fi
     fi
@@ -2380,7 +2390,7 @@ vm_setup_utm() {
   local vm_display bundle data_dir disk_file
   local disk_credential_marker disk_config_marker config_plist bundle_exists template_drift_config
   local template_drift_config _prebuilt _prebuilt_valid _prebuilt_min_size _prebuilt_disk_bytes
-  local _android_system _android_userdata _android_gsi _userdata_file _gsi_file _base_link
+  local _android_system _android_userdata _android_gsi _userdata_file _gsi_file
   local _guest_config_fingerprint
 
   vm_display=$(jq -r ".VMs[$vm_index].name" "$MANIFEST")
@@ -2427,7 +2437,7 @@ vm_setup_utm() {
   if [ "$vm_type" = "Android" ]; then
     _prebuilt="$_android_system"
   else
-    _prebuilt="$(vm_src_path "$vm_type" "$VM_PREBUILT_IMAGE")"
+    _prebuilt="$(vm_src_path "$vm_type" "$VM_SYSTEM_IMAGE")"
   fi
   _prebuilt_valid=false
   if [ ! -f "$disk_file" ] && [ ! -f "$_prebuilt" ]; then
@@ -2494,15 +2504,12 @@ vm_setup_utm() {
         rm -f "$_gsi_file"
       fi
     else
-      if ! vm_ensure_base_and_overlay "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
+      if ! vm_ensure_data_disk "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
         "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
         return
       fi
       ln -f "$VM_DIR/data/${vm_id}.qcow2" "$disk_file"
-      say "linked runtime overlay into UTM bundle: $disk_file"
-      _base_link="$data_dir/$(basename "$(vm_src_path "$vm_type" "$VM_OVERLAY_BACKING")")"
-      ln -f "$(vm_src_path "$vm_type" "$VM_OVERLAY_BACKING")" "$_base_link"
-      say "linked base image into UTM bundle: $_base_link"
+      say "linked data disk into UTM bundle: $disk_file"
     fi
     if [ "$bundle_exists" != true ]; then
       say "UTM bundle created: $bundle"
@@ -2551,7 +2558,7 @@ vm_setup_libvirt() {
       return
     fi
   else
-    _prebuilt="$(vm_src_path "$vm_type" "$VM_PREBUILT_IMAGE")"
+    _prebuilt="$(vm_src_path "$vm_type" "$VM_SYSTEM_IMAGE")"
     _prebuilt_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
     _prebuilt_disk_bytes="$(parse_size "$(jq -r ".VMs[$vm_index].diskSize" "$MANIFEST")")"
     if [ ! -f "$_prebuilt" ]; then
@@ -2569,17 +2576,17 @@ vm_setup_libvirt() {
     if [ "$vm_type" = "Android" ]; then
       say "Android images referenced directly by domain XML: $_android_system, $_android_userdata"
     else
-      if ! vm_ensure_base_and_overlay "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
+      if ! vm_ensure_data_disk "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
         "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
         return
       fi
-      say "runtime overlay ready: $disk_path"
+      say "data disk ready: $disk_path"
     fi
   else
     if [ "$vm_type" = "Android" ]; then
       dry_run "use Android images in domain XML: $_android_system, $_android_userdata"
     else
-      dry_run "ensure base/overlay: $(vm_src_path "$vm_type" "$VM_OVERLAY_BACKING") + $disk_path"
+      dry_run "ensure data disk: $disk_path (overlay on $(vm_src_path "$vm_type" "$VM_SYSTEM_IMAGE"))"
     fi
   fi
 
@@ -2612,7 +2619,7 @@ vm_build_nixos() {
   esac
   _vm_type="$(jq -r --arg n "$_vm_id" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
   vm_ensure_type_src_dirs
-  _out="$(vm_src_path "$_vm_type" "$VM_PREBUILT_IMAGE")"
+  _out="$(vm_src_path "$_vm_type" "$VM_SYSTEM_IMAGE")"
   _marker="$(vm_guest_credentials_marker_path "$_vm_id")"
   _config_marker="$(vm_guest_config_marker_path "$_vm_id")"
   _min_size="$(parse_size "$(jq -r ".VMs[] | select(.id == \"$_vm_id\") | .minImageSize" "$MANIFEST")")"
@@ -2937,7 +2944,7 @@ vm_build_windows() {
   _edition="$3"
   _vm_type="$(jq -r --arg n "$_vm_id" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
   vm_ensure_type_src_dirs
-  _out="$(vm_src_path "$_vm_type" "$VM_PREBUILT_IMAGE")"
+  _out="$(vm_src_path "$_vm_type" "$VM_SYSTEM_IMAGE")"
   _marker="$(vm_guest_credentials_marker_path "$_vm_id")"
   _min_size="$(parse_size "$(jq -r ".VMs[] | select(.id == \"$_vm_id\") | .minImageSize" "$MANIFEST")")"
   _hostfwd="$(jq -r --arg n "$_vm_id" '[.VMs[] | select(.id == $n) | .portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")' "$MANIFEST")"
@@ -3503,7 +3510,7 @@ vm_setup_windows_qemu() {
     return
   fi
 
-  _prebuilt="$(vm_src_path "$vm_type" "$VM_PREBUILT_IMAGE")"
+  _prebuilt="$(vm_src_path "$vm_type" "$VM_SYSTEM_IMAGE")"
   _prebuilt_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
   _prebuilt_disk_bytes="$(parse_size "$(jq -r ".VMs[$vm_index].diskSize" "$MANIFEST")")"
   if [ ! -f "$_prebuilt" ]; then
@@ -3517,13 +3524,13 @@ vm_setup_windows_qemu() {
 
   if [ "$dry_run" = false ]; then
     mkdir -p "$VM_DIR"
-    if ! vm_ensure_base_and_overlay "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
+    if ! vm_ensure_data_disk "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
       "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
       return
     fi
-    say "runtime overlay ready: $disk_path"
+    say "data disk ready: $disk_path"
   else
-    dry_run "ensure base/overlay: $(vm_src_path "$vm_type" "$VM_OVERLAY_BACKING") + $disk_path"
+    dry_run "ensure data disk: $disk_path (overlay on $(vm_src_path "$vm_type" "$VM_SYSTEM_IMAGE"))"
   fi
 }
 
@@ -3633,15 +3640,13 @@ vm_gc_src_keep_set_for_type() {
   jq -r \
     --arg type "$_gcsksft_type" \
     --arg expected "$_gcsksft_expected" \
-    --arg prebuilt "$VM_PREBUILT_IMAGE" \
-    --arg backing "$VM_OVERLAY_BACKING" \
+    --arg systemImage "$VM_SYSTEM_IMAGE" \
     '
     .VMs[] |
     select(.type == $type) |
     select(.id as $id | ($expected | split("\n") | contains([$id]))) |
     [
-      $prebuilt,
-      $backing,
+      $systemImage,
       (if .Android then
         (.Android.systemImage,
          (if .Android.gsiUrl != null then .Android.gsiImage else empty end))
@@ -3652,7 +3657,7 @@ vm_gc_src_keep_set_for_type() {
 
 # vm_gc_disk_keep_set DIR EXPECTED_NAMES — Print the full filenames (with
 #   extension) of every disk image under DIR that must be preserved for the
-#   expected VMs.  data/ keeps runtime overlays (<id>.qcow2) when gc_data_mode
+#   expected VMs.  data/ keeps writable disks (<id>.qcow2) when gc_data_mode
 #   is enabled.
 vm_gc_disk_keep_set() {
   _gcdks_dir="$1"
@@ -3710,7 +3715,7 @@ vm_gc_orphan_disks() {
 
 # vm_gc_orphan_markers EXPECTED_NAMES — Remove guest marker files (credential
 #   and config fingerprints) that are no longer meaningful.  src/<type>/
-#   markers gate the prebuilt golden; data/ sidecar markers are removed when
+#   markers gate the type system image; data/ sidecar markers are removed when
 #   their disk image is gone (only when gc_data_mode is enabled).
 vm_gc_orphan_markers() {
   _gcom_expected="$1"
@@ -3727,8 +3732,8 @@ vm_gc_orphan_markers() {
       _gcom_type_expected=true
     fi
     for _gcom_marker in \
-      "$_gcom_type_dir/${VM_PREBUILT_MARKER_BASE}.vm-guest-credentials-sha256" \
-      "$_gcom_type_dir/${VM_PREBUILT_MARKER_BASE}.vm-guest-config-sha256"; do
+      "$_gcom_type_dir/${VM_TYPE_MARKER_BASE}.vm-guest-credentials-sha256" \
+      "$_gcom_type_dir/${VM_TYPE_MARKER_BASE}.vm-guest-config-sha256"; do
       [ -f "$_gcom_marker" ] || continue
       if [ "$_gcom_type_expected" != true ]; then
         say "GC — removing orphaned guest marker: $_gcom_marker"
@@ -3785,9 +3790,9 @@ vm_gc_orphan_descriptors() {
 #   are a pure function of kept inputs plus a trivial command (no downloads,
 #   no build time) plus transient junk: UTM bundles (rebuilt by setup from
 #   the plist template + ln -f + open), generated start/stop scripts
-#   (sed-rendered), src/<type>/overlay backing.qcow2 (cp from the kept prebuilt),
-#   and src/<type>/Packer/ + stale dot-dirs (Packer junk).  Everything else —
-#   data overlays, Android userdata, prebuilt goldens + markers, installer
+#   (sed-rendered), and src/<type>/Packer/ + stale dot-dirs (Packer junk).
+#   Everything else — data disks, Android userdata, type system images +
+#   markers, installer
 #   ISOs, descriptors, runtime markers, tart store, README, and the
 #   pack/unpack wrappers — is payload or data and stays.
 vm_pack_vms() {
@@ -3822,13 +3827,6 @@ vm_pack_vms() {
 
   for _pv_type_dir in "$SRC_DIR"/*/; do
     [ -d "$_pv_type_dir" ] || continue
-    _pv_backing="$_pv_type_dir$VM_OVERLAY_BACKING"
-    if [ -f "$_pv_backing" ]; then
-      say "pack — removing regenerable overlay backing: $_pv_backing"
-      if [ "$dry_run" = false ]; then
-        rm -f "$_pv_backing"
-      fi
-    fi
     _pv_packer="$_pv_type_dir$VM_PACKER_BUILD_DIR"
     if [ -d "$_pv_packer" ]; then
       say "pack — removing transient Packer directory: $_pv_packer"
@@ -3852,40 +3850,35 @@ vm_pack_vms() {
   fi
 }
 
-# vm_unpack_ensure_base_overlay NAME TYPE
-#   Restores the base/overlay disk pair after pack.  The overlay backing copy
-#   (src/<type>/overlay backing.qcow2) is a trivial cp from the kept prebuilt golden
-#   (src/<type>/prebuilt image.qcow2) — pack removes the copy, never the golden; the
-#   overlay (data/<name>.qcow2) is recreated only when absent — never rebuilt
-#   (its content is user data by design).  Returns 1 when the golden is
-#   missing (packed trees always carry it, so this signals a broken tree).
-vm_unpack_ensure_base_overlay() {
-  _uebo_name="$1"
-  _uebo_type="$2"
-  _uebo_prebuilt="$(vm_src_path "$_uebo_type" "$VM_PREBUILT_IMAGE")"
-  _uebo_base="$(vm_src_path "$_uebo_type" "$VM_OVERLAY_BACKING")"
-  _uebo_overlay="$VM_DIR/data/${_uebo_name}.qcow2"
-  _uebo_backing_rel="$(vm_overlay_backing_rel_path "$_uebo_type")"
+# vm_unpack_ensure_data_disk NAME TYPE
+#   Restores the data disk after pack.  The data disk (data/<name>.qcow2) is
+#   recreated only when absent — never rebuilt (its content is user data by
+#   design); when present it is kept as-is (pack never removes it).  Backs
+#   ../src/<type>/system image.qcow2 directly.  Returns 1 when the type
+#   system image is missing (packed trees always carry it, so this signals a
+#   broken tree).
+vm_unpack_ensure_data_disk() {
+  _uedd_name="$1"
+  _uedd_type="$2"
+  _uedd_system_image="$(vm_src_path "$_uedd_type" "$VM_SYSTEM_IMAGE")"
+  _uedd_disk="$VM_DIR/data/${_uedd_name}.qcow2"
+  _uedd_backing_rel="$(vm_system_image_rel_path "$_uedd_type")"
 
-  if [ ! -f "$_uebo_prebuilt" ]; then
-    warn "unpack — prebuilt golden missing: $_uebo_prebuilt (re-provision or copy it back)"
+  if [ ! -f "$_uedd_system_image" ]; then
+    warn "unpack — system image missing: $_uedd_system_image (re-provision or copy it back)"
     return 1
   fi
 
   if [ "$dry_run" = false ]; then
     mkdir -p "$VM_DIR/data"
-    if [ ! -f "$_uebo_base" ]; then
-      say "unpack — restoring base image from prebuilt: $_uebo_base"
-      copy_with_reflink "$_uebo_prebuilt" "$_uebo_base"
-    fi
-    if [ ! -f "$_uebo_overlay" ]; then
-      say "unpack — recreating absent overlay disk: $_uebo_overlay"
-      qemu-img create -f qcow2 -b "$_uebo_backing_rel" -F qcow2 "$_uebo_overlay" >/dev/null
+    if [ ! -f "$_uedd_disk" ]; then
+      say "unpack — recreating absent data disk: $_uedd_disk"
+      qemu-img create -f qcow2 -b "$_uedd_backing_rel" -F qcow2 "$_uedd_disk" >/dev/null
     else
-      say "unpack — keeping existing overlay disk: $_uebo_overlay"
+      say "unpack — keeping existing data disk: $_uedd_disk"
     fi
   else
-    dry_run "ensure base/overlay for $_uebo_name (base cp from $_uebo_prebuilt; overlay recreated only if absent)"
+    dry_run "ensure data disk for $_uedd_name (recreated only if absent; backing $_uedd_system_image)"
   fi
 }
 
@@ -3899,7 +3892,7 @@ vm_unpack_ensure_base_overlay() {
 #   descriptors (mirrors setup): UTM (Darwin) re-creates the bundle dir +
 #   cp the Nix-rendered plist template + chmod +w + link disks into Data/ +
 #   open + wait for registration; libvirt (Linux) virsh define + ensure
-#   base/overlay; Windows re-renders start scripts (PowerShell).  Dependency:
+#   data disks; Windows re-renders start scripts (PowerShell).  Dependency:
 #   the target's nucleus config must be applied (provides the plist/domain
 #   templates); copied data files are consumed as-is — never modified.
 vm_unpack_vms() {
@@ -3969,10 +3962,9 @@ vm_unpack_vms() {
             cp "$_uv_android_gsi" "$_uv_bundle/Data/$(basename "$_uv_android_gsi")"
           fi
         else
-          if ! vm_unpack_ensure_base_overlay "$_uv_name" "$_uv_type"; then
+          if ! vm_unpack_ensure_data_disk "$_uv_name" "$_uv_type"; then
             continue
           fi
-          ln -f "$(vm_src_path "$_uv_type" "$VM_OVERLAY_BACKING")" "$_uv_bundle/Data/$(basename "$(vm_src_path "$_uv_type" "$VM_OVERLAY_BACKING")")"
           ln -f "$VM_DIR/data/${_uv_name}.qcow2" "$_uv_bundle/Data/disk-main.qcow2"
         fi
         cp "$_uv_plist_template" "$_uv_bundle/config.plist"
@@ -4016,7 +4008,7 @@ vm_unpack_vms() {
             say "unpack — Android GSI present: $_uv_android_gsi"
           fi
         else
-          if ! vm_unpack_ensure_base_overlay "$_uv_name" "$_uv_type"; then
+          if ! vm_unpack_ensure_data_disk "$_uv_name" "$_uv_type"; then
             continue
           fi
         fi

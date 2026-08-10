@@ -1,25 +1,27 @@
 <#
 .SYNOPSIS
     Verifies Windows-side VM disk-model parity (P8): Invoke-VMSetup.ps1 and
-    scripts/vm.ps1 must provision writable runtime disks as data/<id>.qcow2
-    qcow2 overlays over src/<type>/overlay backing.qcow2 (base = cp of the prebuilt
-    golden, backing path tree-root-relative), mirroring vm_ensure_base_and_overlay
-    in src/scripts/lib/vm.sh. GC keep-sets, grow-only resize, running-VM guards,
-    and Android standalone userdata must match the POSIX disk model.
+    scripts/vm.ps1 must provision writable data disks as data/<id>.qcow2 qcow2
+    overlays over src/<type>/system image.qcow2 (backing path tree-root-relative),
+    mirroring vm_ensure_data_disk in src/scripts/lib/vm.sh. GC keep-sets,
+    grow-only resize, running-VM guards, data preservation, and Android
+    standalone userdata must match the POSIX disk model.
 .DESCRIPTION
     Static analysis tests (parse files, do not execute).  Enforces the
     disk-model parity invariant established across P7/P8:
 
-    - The writable runtime disk is data/<id>.qcow2, rendered RELATIVE in
+    - The writable data disk is data/<id>.qcow2, rendered RELATIVE in
       generated start scripts (templates re-anchor to the tree root first).
-    - The base image is src/<type>/overlay backing.qcow2, a cp of the kept prebuilt
-      golden, refreshed on guest-credential drift while the VM is stopped.
-    - Overlay growth is grow-only (never shrinks below the manifest size).
+    - The type system image is src/<type>/system image.qcow2; the data disk
+      backs it directly and is never recreated/refreshed during setup (data
+      preservation), with in-place injection on credential drift while the VM
+      is stopped.
+    - Data disk growth is grow-only (never shrinks below the manifest size).
     - Android userdata is a standalone qcow2 under data/ (no base).
     - GC orphan sweeps never touch the data/ payload.
 
 .NOTES
-    Run with: pwsh -NoProfile -Command "Invoke-Pester tests/hosts/Windows/system/vm-disk-model-parity.Tests.ps1 -Passthru"
+    Run with: pwsh -NoProfile -Command "Invoke-Pester tests/platforms/Windows/modules/system/vm-disk-model-parity.Tests.ps1 -Passthru"
     Exit codes: 0 on success; 1 on failure
 #>
 
@@ -62,16 +64,18 @@ Describe "Windows VM disk-model parity (P8)" {
     (Get-VmPs1Content) | Should -Match ([regex]::Escape('$diskPath = Join-Path ''data'' "$vmId.qcow2"'))
   }
 
-  It "overlay backing path is tree-root-relative (..\src\<type>\overlay backing.qcow2)" {
-    (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('Get-VMOverlayBackingRelPath -Type $vm.type'))
+  It "system image path is tree-root-relative (..\src\<type>\system image.qcow2)" {
+    (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('Get-VMSystemImageRelPath -Type $vm.type'))
     (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('& $qemuImg create -f qcow2 -b $backingRel -F qcow2 $diskPath'))
   }
 
-  It "base refresh copies the prebuilt golden and guards against running VMs" {
+  It "data disk creation guards against running VMs and preserves existing disks" {
     $content = Get-VmSetupPs1Content
-    $content | Should -Match ([regex]::Escape('Copy-Item $prebuilt $basePath'))
     $content | Should -Match ([regex]::Escape('Test-VMProcessRunning -VmId $vm.id -VmDisplay $vm.name'))
     $content | Should -Match ([regex]::Escape('function Get-VMRunningProcessNameList'))
+    $content | Should -Match ([regex]::Escape('data disk already exists: $diskPath'))
+    $content | Should -Match ([regex]::Escape('adopting missing provision marker for existing data disk'))
+    $content | Should -Not -Match ([regex]::Escape('Copy-Item $prebuilt $basePath'))
   }
 
   It "list/status share the same QEMU running-process probe as sync" {
@@ -80,7 +84,7 @@ Describe "Windows VM disk-model parity (P8)" {
     $vmPs1 | Should -Not -Match ([regex]::Escape("Name = 'qemu-system-x86_64w.exe'"))
   }
 
-  It "overlay growth is grow-only via qemu-img resize" {
+  It "data disk growth is grow-only via qemu-img resize" {
     $content = Get-VmSetupPs1Content
     $content | Should -Match ([regex]::Escape('Get-VMQcow2VirtualSize -ImagePath $diskPath'))
     $content | Should -Match ([regex]::Escape('$qemuImg resize $diskPath $diskBytes'))
@@ -96,10 +100,10 @@ Describe "Windows VM disk-model parity (P8)" {
     $content | Should -Match ([regex]::Escape('payload retained (src, data, descriptors, README)'))
   }
 
-  It "POSIX lib mirrors the relative data/ path and base/overlay provisioning" {
+  It "POSIX lib mirrors the relative data/ path and data-disk provisioning" {
     $content = Get-VmShLibContent
     $content | Should -Match ([regex]::Escape('_wss_disk_path="data/${_wss_id}.qcow2"'))
-    $content | Should -Match ([regex]::Escape('vm_ensure_base_and_overlay'))
+    $content | Should -Match ([regex]::Escape('vm_ensure_data_disk'))
   }
 
   It "pack.ps1 wrappers propagate exit codes in both renderers" {
