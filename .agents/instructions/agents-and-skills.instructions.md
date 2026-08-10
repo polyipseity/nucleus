@@ -43,6 +43,8 @@ Cursor reads different path names than Copilot/OpenCode. Shared content stays in
 
 Edit shared rules/agents/prompts/skills under `src/users/default/agents/` (or per-user overrides under `src/users/<username>/agents/`), not under `~/.cursor/`. Edit Cursor-native JSON under `src/users/default/cursor/`.
 
+Cursor's GUI model/API settings (`cursor.aiprovider.openai.baseUrl` / `apiKey` / `model`) live in the app-level user settings (`~/Library/Application Support/Cursor/User/settings.json` on macOS, `%APPDATA%\Cursor\User\settings.json` on Windows) — NOT in the `~/.cursor/` CLI overlay (`cli-config.json`, `mcp.json`, `hooks.json`). Do not place them under the bridge.
+
 The per-subdir layout replaces an older whole-dir symlink scheme. The old scheme forced every clawhub download into the tracked repo tree; the real-dir layout lets the `skills/` subtree be writable without any writes entering Git.
 
 The phrase "global agent instructions" (or "user agent instructions", "provisioned global agent instructions") refers to `src/users/default/agents/` — the actual source files for agent customizations. Files in `~/.agents/` are per-entry symlinks into the resolved overlay directory, not the source of truth. Always edit files under `src/users/default/agents/` (or per-user overrides) rather than editing `~/.agents/` directly; changes there would be overwritten on the next apply.
