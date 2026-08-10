@@ -89,6 +89,12 @@ Step 01 (code-formatting) behavior:
   No format-vs-validate dual mode exists anymore.
   Step 01 is skipped only if treefmt itself isn't available.
 
+  Write-mode consequence: check.sh/test.sh silently reformat the working tree
+  and still exit 0, so a committed file can be nonconformant while pipelines
+  stay green. Run `git status --short` after a pipeline run and commit any
+  treefmt-rewritten files as `style(...)` fixes; run `treefmt` (write mode) on
+  changed files before committing so committed state is conformant.
+
   Cross-platform:
     - POSIX: runs treefmt binary directly, plus Darwin workflow supplements and check-packer --validate-only
     - PS1: runs native formatter/linter CLIs in treefmt-equivalent order (shfmt, yamllint, taplo, packer fmt, actionlint, pinact, zizmor, check-packer --validate-only)
