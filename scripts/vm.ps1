@@ -3,10 +3,11 @@
   Unified VM management for Windows.
 
 .DESCRIPTION
-  Subcommands: setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, resize, gc, pack, unpack.
+  Subcommands: setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, inject, resize, gc, pack, unpack.
 
   sync:    Refresh VM config (descriptors, start/stop scripts). Non-destructive.
   build-system: Build/rebuild a single type's system image (src/<type>/system image.qcow2).
+  inject:   Re-run in-place disk injection for one VM (--force recreates the data disk; destructive).
   setup:   Full provision: config sync + image build + disk setup.
            Delegates to Invoke-VMSetup.ps1 (phase 1: Packer build,
            phase 2: QEMU start scripts + disk images).
@@ -42,7 +43,7 @@
            as-is. Pass --dry-run to preview.
 
 .PARAMETER Action
-  The operation to perform: setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, resize, gc, pack, unpack.
+  The operation to perform: setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, inject, resize, gc, pack, unpack.
 
 .PARAMETER SubcommandArgs
   Additional arguments passed after the subcommand (flags, VM names, etc.).
@@ -70,7 +71,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('setup', 'sync', 'build-system', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'android-config', 'resize', 'gc', 'pack', 'unpack')]
+  [ValidateSet('setup', 'sync', 'build-system', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'android-config', 'inject', 'resize', 'gc', 'pack', 'unpack')]
   [string]$Action,
 
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
@@ -90,7 +91,7 @@ $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-N
 Import-Module $modulePath -Force -DisableNameChecking
 
 if ($Help -or -not $Action) {
-  if (-not $Action) { Write-NucleusError "missing action (setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, resize, gc, pack, unpack)" }
+  if (-not $Action) { Write-NucleusError "missing action (setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, inject, resize, gc, pack, unpack)" }
   Get-Help $PSCommandPath -Detailed
   exit 0
 }
@@ -205,6 +206,43 @@ function Invoke-VMBuildSystem {
     . $ModulePath
     Invoke-VMSystemBuild @InvokeArgs
   } -ModulePath $module -InvokeArgs $invokeArgs
+}
+
+function Invoke-VMInject {
+  if ($SubcommandArgs.Length -eq 0) {
+    Write-NucleusError 'inject requires a VM id (e.g. "nucleus-vm inject NixOS")'
+    exit 1
+  }
+  $vmName = $SubcommandArgs[0]
+  $force = $false
+  for ($i = 1; $i -lt $SubcommandArgs.Length; $i++) {
+    switch ($SubcommandArgs[$i]) {
+      '--force' { $force = $true }
+      default { Write-NucleusWarning "ignoring unknown flag for inject: $($SubcommandArgs[$i])" }
+    }
+  }
+
+  $manifest = Get-VMManifest
+  $vm = $manifest.VMs | Where-Object { $_.id -eq $vmName }
+  if (-not $vm) {
+    Write-NucleusError "VM '$vmName' not found in manifest"
+    exit 1
+  }
+
+  if ($vmName -in (Get-VMRunningIdList)) {
+    Write-NucleusError "VM '$vmName' is running; stop it before injecting"
+    exit 1
+  }
+
+  $vmSh = Join-Path $RepoRoot 'scripts\vm.sh'
+  if (-not (Test-Path -LiteralPath $vmSh -PathType Leaf)) {
+    Write-NucleusError "vm.sh not found at $vmSh"
+    exit 1
+  }
+  $injectArgs = @('inject', $vmName)
+  if ($force) { $injectArgs += '--force' }
+  & bash $vmSh @injectArgs
+  if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 function Invoke-VMSetup {
@@ -840,6 +878,7 @@ switch ($Action) {
   'upgrade' { Invoke-VMUpgrade }
   'reset'   { Invoke-VMReset }
   'android-config' { Invoke-VMAndroidConfig }
+  'inject'  { Invoke-VMInject }
   'resize'  { Invoke-VMResize }
   'gc'      { Invoke-VMGc }
   'pack'    { Invoke-VMPack }

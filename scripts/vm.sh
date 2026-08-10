@@ -144,12 +144,13 @@ vm_guest_credentials_hash() {
 # ---------------------------------------------------------------------------
 
 usage() {
-  usage_std "$(basename "$0")" "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options]"
+  usage_std "$(basename "$0")" "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|inject|gc|resize|pack|unpack [vm...] [options]"
   cat <<'EOF'
   sync [vm...]             Refresh VM config (scripts, UTM plists, virsh define).
                           Non-destructive; runs automatically after nucleus-apply.
   build-system <type>      Build/rebuild the type-scoped system image (src/<type>/system image.qcow2).
   setup [vm...]            Full provision: config sync + image build + disk/bundle setup.
+  inject <vm>              Re-run in-place disk injection for one VM; --force recreates the data disk (destructive).
   list                     List all VMs from manifest with runtime status.
   status [vm...]           Show runtime status of specified VMs (all if omitted).
   start <vm>               Start a VM.
@@ -339,7 +340,7 @@ while [ "$#" -gt 0 ]; do
     repo_root_override="$2"
     shift 2
     ;;
-  setup | sync | build-system | list | status | start | stop | upgrade | reset | android-config | gc | resize | pack | unpack)
+  setup | sync | build-system | list | status | start | stop | upgrade | reset | android-config | inject | gc | resize | pack | unpack)
     action="$1"
     shift
     vm_args=("$@")
@@ -393,7 +394,7 @@ for arg in "${vm_args[@]}"; do
 done
 
 [ -z "$action" ] && {
-  error "missing action (setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, gc, resize, pack, unpack)"
+  error "missing action (setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, inject, gc, resize, pack, unpack)"
   usage >&2
   exit 1
 }
@@ -591,6 +592,41 @@ do_build_system() {
 
   vm_prepare_vm_command
   vm_build_system "$vm_type"
+  nuc_done
+}
+
+# do_inject
+#   Re-runs in-place disk injection for one VM: applies the per-VM guest
+#   identity (hostname, username, password, SSH key) into the existing data
+#   disk without recreating it, then refreshes the provision markers.
+#   --force recreates the data disk first (destructive; prints a warning).
+#   WHY: injection is the offline remediation for per-VM credential/config
+#   drift — it runs on a stopped VM and never touches other VMs' disks.
+do_inject() {
+  REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
+  resolve_manifest
+  require_command jq
+
+  if [ "${#filtered_vm_args[@]}" -eq 0 ]; then
+    error "inject requires a VM id (e.g. 'nucleus-vm inject NixOS')"
+    usage >&2
+    exit 1
+  fi
+
+  local vm_id="${filtered_vm_args[0]}"
+
+  # WHY: injection is per-VM and must accept any manifest id (enabled or
+  # not) so a stale data disk can be re-injected offline; the running-VM
+  # guard lives inside vm_inject_guest.
+  if ! jq -e --arg id "$vm_id" '[.VMs[] | select(.id == $id)] | length > 0' \
+    "$MANIFEST" >/dev/null; then
+    error "VM '$vm_id' not found in manifest"
+    usage >&2
+    exit 1
+  fi
+
+  vm_prepare_vm_command
+  vm_inject_guest "$vm_id"
   nuc_done
 }
 
@@ -1120,6 +1156,6 @@ do_unpack() {
 # ---------------------------------------------------------------------------
 
 case "$action" in
-setup | sync | build-system | list | status | start | stop | upgrade | reset | gc | resize | pack | unpack) "do_$action" ;;
+setup | sync | build-system | list | status | start | stop | upgrade | reset | inject | gc | resize | pack | unpack) "do_$action" ;;
 android-config) do_android_config ;;
 esac

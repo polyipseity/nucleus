@@ -1296,13 +1296,13 @@ let
   test_vm_resize_cli_subcommand =
     assert'
       (
-        (lib.hasInfix "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
+        (lib.hasInfix "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|inject|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
         && (lib.hasInfix "resize <vm> <size>" vm_setup_sh_text)
         && (lib.hasInfix "--allow-shrink) allow_shrink=true" vm_setup_sh_text)
         && (lib.hasInfix "do_resize() {" vm_setup_sh_text)
         && (lib.hasInfix "disk_bytes=\"\$(parse_size \"$size_arg\")\" || exit 1" vm_setup_sh_text)
         && (lib.hasInfix "vm_resize_vm \"$vm_id\" \"$disk_bytes\" \"$allow_shrink\"" vm_setup_sh_text)
-        && (containsRegex "setup *\\| *sync *\\| *build-system *\\| *list *\\| *status *\\| *start *\\| *stop *\\| *upgrade *\\| *reset *\\| *gc *\\| *resize *\\| *pack *\\| *unpack[)] \"do_\\$action\" ;;" vm_setup_sh_text)
+        && (containsRegex "setup *\\| *sync *\\| *build-system *\\| *list *\\| *status *\\| *start *\\| *stop *\\| *upgrade *\\| *reset *\\| *inject *\\| *gc *\\| *resize *\\| *pack *\\| *unpack[)] \"do_\\$action\" ;;" vm_setup_sh_text)
       )
       "scripts/vm.sh must wire the resize subcommand (usage, dispatch, parse_size, --allow-shrink) to vm_resize_vm";
 
@@ -1311,7 +1311,7 @@ let
   test_vm_resize_windows_twin =
     assert'
       (
-        (lib.hasInfix "reset', 'android-config', 'resize', 'gc', 'pack', 'unpack'" vm_ps1_text)
+        (lib.hasInfix "reset', 'android-config', 'inject', 'resize', 'gc', 'pack', 'unpack'" vm_ps1_text)
         && (lib.hasInfix "'resize'  { Invoke-VMResize }" vm_ps1_text)
         && (lib.hasInfix "function Invoke-VMResize {" vm_ps1_text)
         && (lib.hasInfix "'--allow-shrink' { $allowShrink = $true }" vm_ps1_text)
@@ -1325,9 +1325,9 @@ let
   test_vm_pack_cli_subcommand =
     assert'
       (
-        (lib.hasInfix "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
+        (lib.hasInfix "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|inject|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
         && (lib.hasInfix "pack                     Strip trivially regenerable artifacts" vm_setup_sh_text)
-        && (containsRegex "setup *\\| *sync *\\| *build-system *\\| *list *\\| *status *\\| *start *\\| *stop *\\| *upgrade *\\| *reset *\\| *gc *\\| *resize *\\| *pack *\\| *unpack[)] \"do_\\$action\" ;;" vm_setup_sh_text)
+        && (containsRegex "setup *\\| *sync *\\| *build-system *\\| *list *\\| *status *\\| *start *\\| *stop *\\| *upgrade *\\| *reset *\\| *inject *\\| *gc *\\| *resize *\\| *pack *\\| *unpack[)] \"do_\\$action\" ;;" vm_setup_sh_text)
         && (lib.hasInfix "do_pack() {" vm_setup_sh_text)
         && (lib.hasInfix "if [ \"$force\" != true ]; then" vm_setup_sh_text)
         && (lib.hasInfix "vm_pack_vms" vm_setup_sh_text)
@@ -1377,7 +1377,7 @@ let
     assert'
       (
         (lib.hasInfix "unpack                   Regenerate per-platform VM artifacts" vm_setup_sh_text)
-        && (containsRegex "setup *\\| *sync *\\| *build-system *\\| *list *\\| *status *\\| *start *\\| *stop *\\| *upgrade *\\| *reset *\\| *gc *\\| *resize *\\| *pack *\\| *unpack[)] \"do_\\$action\" ;;" vm_setup_sh_text)
+        && (containsRegex "setup *\\| *sync *\\| *build-system *\\| *list *\\| *status *\\| *start *\\| *stop *\\| *upgrade *\\| *reset *\\| *inject *\\| *gc *\\| *resize *\\| *pack *\\| *unpack[)] \"do_\\$action\" ;;" vm_setup_sh_text)
         && (lib.hasInfix "do_unpack() {" vm_setup_sh_text)
         && (lib.hasInfix "vm_unpack_vms() {" vm_setup_sh_text)
         && (lib.hasInfix "\"$VM_DIR\"/*.vm.json" vm_setup_sh_text)
@@ -1425,7 +1425,7 @@ let
   test_vm_build_system_cli_subcommand =
     assert'
       (
-        (lib.hasInfix "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
+        (lib.hasInfix "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|inject|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
         && (lib.hasInfix "build-system <type>      Build/rebuild the type-scoped system image (src/<type>/system image.qcow2)." vm_setup_sh_text)
         && (containsRegex "setup *\\| *sync *\\| *build-system *\\| *list" vm_setup_sh_text)
         && (lib.hasInfix "do_build_system() {" vm_setup_sh_text)
@@ -1445,6 +1445,52 @@ let
         && (lib.hasInfix "Invoke-VMSystemBuild" vm_ps1_text)
       )
       "scripts/vm.ps1 must mirror the build-system subcommand (ValidateSet, dispatch, Invoke-VMBuildSystem wrapper, Invoke-VMSystemBuild delegate)";
+
+  # The inject subcommand must be wired into the CLI: usage synopsis + body,
+  # dispatch, do_inject validating the VM id against the manifest, and
+  # vm_inject_guest doing the per-VM in-place disk injection.
+  test_vm_inject_cli_subcommand =
+    assert'
+      (
+        (lib.hasInfix "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|inject|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
+        && (lib.hasInfix "inject <vm>" vm_setup_sh_text)
+        && (lib.hasInfix "do_inject() {" vm_setup_sh_text)
+        && (lib.hasInfix "inject requires a VM id" vm_setup_sh_text)
+        && (lib.hasInfix "vm_inject_guest \"$vm_id\"" vm_setup_sh_text)
+      )
+      "scripts/vm.sh must wire the inject subcommand (usage, dispatch, do_inject with manifest validation, vm_inject_guest)";
+
+  # The Windows twin must mirror the inject subcommand: ValidateSet, dispatch,
+  # Invoke-VMInject with the running-VM guard and --force flag.
+  test_vm_inject_windows_twin =
+    assert'
+      (
+        (lib.hasInfix "reset', 'android-config', 'inject', 'resize', 'gc', 'pack', 'unpack'" vm_ps1_text)
+        && (lib.hasInfix "'inject'  { Invoke-VMInject }" vm_ps1_text)
+        && (lib.hasInfix "function Invoke-VMInject {" vm_ps1_text)
+        && (lib.hasInfix "inject requires a VM id" vm_ps1_text)
+        && (lib.hasInfix "VM '$vmName' is running; stop it before injecting" vm_ps1_text)
+      )
+      "scripts/vm.ps1 must mirror the inject subcommand (ValidateSet, dispatch, Invoke-VMInject, running-VM guard)";
+
+  # Injection must dispatch by type: NixOS via qemu-nbd + nixos-enter
+  # applying the guest config, Windows via libguestfs (virt-customize
+  # --in-place), macOS via tart clone of the type base.  Android skips
+  # injection entirely (userdata create + marker adoption only), and a
+  # running VM is never injected underneath.
+  test_vm_inject_dispatches_by_type = assert' (
+    (lib.hasInfix "vm_inject_guest() {" vm_setup_sh_text)
+    && (lib.hasInfix "vm_inject_nixos \"$_vig_name\"" vm_setup_sh_text)
+    && (lib.hasInfix "vm_inject_windows \"$_vig_name\"" vm_setup_sh_text)
+    && (lib.hasInfix "vm_inject_macos \"$_vig_name\"" vm_setup_sh_text)
+    && (lib.hasInfix "no disk injection for Android VM" vm_setup_sh_text)
+    && (lib.hasInfix "vm_inject_nixos() {" vm_setup_sh_text)
+    && (lib.hasInfix "vm_inject_windows() {" vm_setup_sh_text)
+    && (lib.hasInfix "vm_inject_macos() {" vm_setup_sh_text)
+    && (lib.hasInfix "nixos-enter --root" vm_setup_sh_text)
+    && (lib.hasInfix "virt-customize --in-place" vm_setup_sh_text)
+    && (lib.hasInfix "tart clone" vm_setup_sh_text)
+  ) "vm.sh must dispatch injection by type (vm_inject_guest, per-type implementations, Android skip)";
 
   # The Packer failure branch for the macOS build must print a human-readable
   # error and return the captured exit code.
@@ -2438,6 +2484,9 @@ let
     test_vm_unpack_windows_twin
     test_vm_build_system_cli_subcommand
     test_vm_build_system_windows_twin
+    test_vm_inject_cli_subcommand
+    test_vm_inject_windows_twin
+    test_vm_inject_dispatches_by_type
     test_vm_gc_keep_set_preserves_manifest_images
     test_vm_gc_orphan_descriptors_removed
     test_vm_gc_marker_expected_set_semantics
@@ -2617,6 +2666,9 @@ in
     test_vm_unpack_windows_twin
     test_vm_build_system_cli_subcommand
     test_vm_build_system_windows_twin
+    test_vm_inject_cli_subcommand
+    test_vm_inject_windows_twin
+    test_vm_inject_dispatches_by_type
     test_vm_gc_keep_set_preserves_manifest_images
     test_vm_gc_orphan_descriptors_removed
     test_vm_gc_marker_expected_set_semantics

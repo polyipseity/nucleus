@@ -1408,6 +1408,320 @@ vm_link_android_userdata_to_utm_bundle() {
   return 0
 }
 
+# vm_inject_guest NAME
+#   Re-run in-place disk injection for one VM: applies the per-VM guest
+#   identity (hostname, username, password, SSH key) into the existing data
+#   disk without recreating it, then refreshes the provision markers so the
+#   disk matches current inputs.  Dispatches by type:
+#     NixOS   — qemu-nbd attach + nixos-enter applying src/vms/guests/<id>/guest.nix
+#     Windows — libguestfs offline customization (virt-customize --in-place)
+#     macOS   — tart clone of the type base VM (the clone is the per-VM layer)
+#     Android — no injection; the userdata disk is created empty and needs no
+#               identity (marker adoption only)
+#   Refuses to run while the VM is running, and recreates the data disk first
+#   when --force is set (destructive — prints a warning).  WHY: per-VM
+#   identity is injected offline at setup time, never over the network, so a
+#   fresh data disk gets its identity before first boot.
+vm_inject_guest() {
+  local _vig_name="$1"
+  local _vig_type _vig_running _vig_disk _vig_cred_marker _vig_config_marker
+  local _vig_config_fp _vig_system _vig_min_size _vig_disk_bytes
+
+  _vig_type="$(jq -r --arg n "$_vig_name" '.VMs[] | select(.id == $n) | .type // empty' "$MANIFEST")"
+  if [ -z "$_vig_type" ]; then
+    error "VM '$_vig_name' not found in manifest; cannot inject"
+    return 1
+  fi
+
+  if [ "$_vig_type" = "Android" ]; then
+    say "no disk injection for Android VM '$_vig_name' (userdata disk is created empty; marker adoption only)"
+    return 0
+  fi
+
+  # Running guard: never inject underneath a live guest.
+  _vig_running="$(vm_get_running_ids)"
+  if printf '%s\n' "$_vig_running" | grep -qxF "$_vig_name"; then
+    say "VM '$_vig_name' is running; skipping in-place injection (stop it first, then re-run 'nucleus-vm inject $_vig_name')"
+    return 0
+  fi
+
+  # WHY: per-VM identity uses the manifest hostname (the type build uses a
+  # lowercase type-derived hostname instead); credentials and the SSH key are
+  # already exported as NUCLEUS_VM_GUEST_* by vm_prepare_vm_command.
+  export NUCLEUS_VM_GUEST_HOSTNAME
+  NUCLEUS_VM_GUEST_HOSTNAME="$(jq -r --arg n "$_vig_name" '.VMs[] | select(.id == $n) | .hostname // empty' "$MANIFEST")"
+
+  # NixOS/Windows inject into a qcow2 data disk; ensure one exists (recreate
+  # first with --force, which is destructive and prints a warning).
+  if [ "$_vig_type" = "NixOS" ] || [ "$_vig_type" = "Windows" ]; then
+    _vig_disk="$VM_DIR/data/${_vig_name}.qcow2"
+    _vig_cred_marker="$(vm_guest_credentials_marker_path "$_vig_name" "$_vig_disk")"
+    _vig_config_marker="$(vm_guest_config_marker_path "$_vig_name" "$_vig_disk")"
+    _vig_config_fp=''
+    if [ "$_vig_type" = "NixOS" ]; then
+      _vig_config_fp="$(vm_guest_config_fingerprint)"
+    fi
+
+    if [ "$force" = true ] && [ -f "$_vig_disk" ]; then
+      warn "recreating data disk for '$_vig_name' (--force; this DESTROYS existing data)"
+      if [ "$dry_run" = true ]; then
+        dry_run "rm -f $_vig_disk $_vig_cred_marker $_vig_config_marker"
+      else
+        rm -f "$_vig_disk" "$_vig_cred_marker" "$_vig_config_marker"
+      fi
+    fi
+
+    if [ ! -f "$_vig_disk" ]; then
+      if [ "$force" != true ]; then
+        error "data disk not found for '$_vig_name': $_vig_disk (run 'nucleus-vm setup $_vig_name' first, or pass --force to recreate it)"
+        return 1
+      fi
+      _vig_system="$(vm_src_path "$_vig_type" "$VM_SYSTEM_IMAGE")"
+      _vig_min_size="$(parse_size "$(jq -r --arg n "$_vig_name" '.VMs[] | select(.id == $n) | .minImageSize' "$MANIFEST")")"
+      _vig_disk_bytes="$(parse_size "$(jq -r --arg n "$_vig_name" '.VMs[] | select(.id == $n) | .diskSize' "$MANIFEST")")"
+      if ! vm_ensure_data_disk "$_vig_name" "$_vig_system" "$_vig_min_size" "$_vig_disk_bytes" \
+        "$_vig_cred_marker" "$_vig_config_marker" "$_vig_config_fp"; then
+        return 1
+      fi
+    fi
+  fi
+
+  case "$_vig_type" in
+  NixOS) vm_inject_nixos "$_vig_name" || return 1 ;;
+  Windows) vm_inject_windows "$_vig_name" || return 1 ;;
+  macOS) vm_inject_macos "$_vig_name" || return 1 ;;
+  *)
+    error "unsupported VM type for injection: $_vig_type"
+    return 1
+    ;;
+  esac
+
+  # WHY: after a successful in-place injection the disk now matches current
+  # inputs, so refresh the provision markers to clear the drift that prompted
+  # the re-inject.
+  if [ "$_vig_type" = "NixOS" ] || [ "$_vig_type" = "Windows" ]; then
+    if [ "$dry_run" = true ]; then
+      dry_run "refresh provision markers for $_vig_name"
+    else
+      printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_vig_cred_marker"
+      if [ -n "$_vig_config_fp" ]; then
+        printf '%s\n' "$_vig_config_fp" >"$_vig_config_marker"
+      fi
+      say "refreshed provision markers for '$_vig_name'"
+    fi
+  fi
+  return 0
+}
+
+# vm_inject_nixos NAME
+#   Offline NixOS guest identity injection: attach data/<name>.qcow2 via
+#   qemu-nbd, mount the btrfs root subvolume, stage the repo's src/ tree
+#   inside the guest (preserving the relative imports of the guest config),
+#   then apply src/vms/guests/<id>/guest.nix with nixos-enter.  The guest
+#   config reads the NUCLEUS_VM_GUEST_* variables from the environment, which
+#   nixos-enter passes through to the chroot.  Runs tools directly — qemu-nbd
+#   and mount typically need root and fail visibly when unprivileged.
+vm_inject_nixos() {
+  local _vix_name="$1"
+  local _vix_disk _vix_guest_nix _vix_mnt _vix_nbd _vix_part _vix_i
+
+  if [ -z "${NUCLEUS_VM_GUEST_USERNAME:-}" ] || [ -z "${NUCLEUS_VM_GUEST_PASSWORD:-}" ]; then
+    error "guest credentials not resolved; cannot inject NixOS identity for '$_vix_name'"
+    return 1
+  fi
+
+  _vix_disk="$VM_DIR/data/${_vix_name}.qcow2"
+  _vix_guest_nix="$VMS_DIR/guests/${_vix_name}/guest.nix"
+  if [ ! -f "$_vix_guest_nix" ]; then
+    error "guest config not found for NixOS VM '$_vix_name': $_vix_guest_nix"
+    return 1
+  fi
+  if [ ! -f "$_vix_disk" ]; then
+    error "data disk not found for '$_vix_name': $_vix_disk (run 'nucleus-vm setup $_vix_name' first, or pass --force to recreate it)"
+    return 1
+  fi
+
+  require_command qemu-nbd
+  require_command nixos-enter
+
+  say "injecting NixOS guest identity into '$_vix_name' (qemu-nbd + nixos-enter)"
+  if [ "$dry_run" = true ]; then
+    dry_run "qemu-nbd attach $_vix_disk; nixos-enter apply $_vix_guest_nix"
+    return 0
+  fi
+
+  # Pick the first free NBD device (no attached pid in sysfs).
+  _vix_nbd=''
+  for _vix_i in {0..15}; do
+    if [ ! -e "/sys/class/block/nbd${_vix_i}/pid" ]; then
+      _vix_nbd="/dev/nbd$_vix_i"
+      break
+    fi
+  done
+  if [ -z "$_vix_nbd" ]; then
+    error "no free NBD device; cannot attach data disk for '$_vix_name'"
+    return 1
+  fi
+
+  _vix_mnt="$(mktemp -d)"
+
+  # WHY: NBD partition nodes appear asynchronously; both qcow-btrfs and
+  # qcow-efi-btrfs layouts put the btrfs root on partition 2.
+  _vix_part="${_vix_nbd}p2"
+
+  _vix_cleanup() {
+    umount "$_vix_mnt" >/dev/null 2>&1 || true # check-suppress:suppression_doc: best-effort unmount during cleanup; the disk may not be mounted on early failures
+    qemu-nbd --disconnect "$_vix_nbd" >/dev/null 2>&1 || true # check-suppress:suppression_doc: best-effort disconnect during cleanup; the device may already be detached
+    rm -rf "$_vix_mnt"
+  }
+
+  if ! qemu-nbd --format=qcow2 --connect="$_vix_nbd" "$_vix_disk"; then
+    _vix_cleanup
+    error "qemu-nbd attach failed for '$_vix_name': $_vix_disk"
+    return 1
+  fi
+
+  for _vix_i in 1 2 3 4 5 6 7 8 9 10; do
+    [ -e "$_vix_part" ] && break
+    sleep 1
+  done
+  if [ ! -e "$_vix_part" ]; then
+    _vix_cleanup
+    error "NBD partition node did not appear: $_vix_part"
+    return 1
+  fi
+
+  if ! mount -o subvol=@ "$_vix_part" "$_vix_mnt"; then
+    _vix_cleanup
+    error "failed to mount $_vix_part (btrfs subvol=@) for '$_vix_name'"
+    return 1
+  fi
+
+  # Stage the repo's src/ tree so the guest config's relative imports
+  # (../../../src/...) resolve from inside the chroot, then apply the guest
+  # config as /etc/nixos/configuration.nix with nixos-rebuild switch.
+  if ! mkdir -p "$_vix_mnt/etc/nucleus-src" "$_vix_mnt/etc/nixos" ||
+    ! cp -a "$REPO_ROOT/src" "$_vix_mnt/etc/nucleus-src/src"; then
+    _vix_cleanup
+    error "failed to stage repo tree inside guest '$_vix_name'"
+    return 1
+  fi
+  cat >"$_vix_mnt/etc/nixos/configuration.nix" <<EOF
+{ imports = [ /etc/nucleus-src/src/vms/guests/${_vix_name}/guest.nix ]; }
+EOF
+
+  say "applying guest config for '$_vix_name' via nixos-enter (this can take a while)"
+  if ! nixos-enter --root "$_vix_mnt" --command "nixos-rebuild switch"; then
+    _vix_cleanup
+    error "nixos-enter apply failed for '$_vix_name'; see the error above"
+    return 1
+  fi
+
+  _vix_cleanup
+  say "injected NixOS guest identity into '$_vix_name'"
+  return 0
+}
+
+# vm_inject_windows NAME
+#   Offline Windows guest identity injection via libguestfs: virt-customize
+#   --in-place edits data/<name>.qcow2 directly — sets the computer name,
+#   creates the guest user with the SOPS password, and injects the SSH
+#   public key.  WHY: Windows cannot be configured by writing files into the
+#   disk blind; libguestfs handles the NTFS + registry work offline.
+vm_inject_windows() {
+  local _viw_name="$1"
+  local _viw_disk _viw_username _viw_password _viw_hostname _viw_key_file _viw_args
+
+  if [ -z "${NUCLEUS_VM_GUEST_USERNAME:-}" ] || [ -z "${NUCLEUS_VM_GUEST_PASSWORD:-}" ]; then
+    error "guest credentials not resolved; cannot inject Windows identity for '$_viw_name'"
+    return 1
+  fi
+
+  _viw_disk="$VM_DIR/data/${_viw_name}.qcow2"
+  if [ ! -f "$_viw_disk" ]; then
+    error "data disk not found for '$_viw_name': $_viw_disk (run 'nucleus-vm setup $_viw_name' first, or pass --force to recreate it)"
+    return 1
+  fi
+
+  require_command virt-customize
+
+  _viw_username="$NUCLEUS_VM_GUEST_USERNAME"
+  _viw_password="$NUCLEUS_VM_GUEST_PASSWORD"
+  _viw_hostname="${NUCLEUS_VM_GUEST_HOSTNAME:-$_viw_name}"
+
+  _viw_key_file=''
+  if [ -n "${NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY:-}" ]; then
+    _viw_key_file="$(mktemp)"
+    printf '%s\n' "$NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY" >"$_viw_key_file"
+  fi
+
+  say "injecting Windows guest identity into '$_viw_name' (libguestfs offline)"
+  if [ "$dry_run" = true ]; then
+    dry_run "virt-customize --in-place -a $_viw_disk --hostname $_viw_hostname (guest user, password, ssh key)"
+    return 0
+  fi
+
+  _viw_args=(virt-customize --in-place -a "$_viw_disk" \
+    --hostname "$_viw_hostname" \
+    --password "user:$_viw_username:password:$_viw_password")
+  if [ -n "$_viw_key_file" ]; then
+    _viw_args+=(--ssh-inject "user:$_viw_username:file:$_viw_key_file")
+  fi
+
+  if ! "${_viw_args[@]}"; then
+    rm -f "$_viw_key_file"
+    error "virt-customize failed for '$_viw_name'; see the error above"
+    return 1
+  fi
+  rm -f "$_viw_key_file"
+  say "injected Windows guest identity into '$_viw_name'"
+  return 0
+}
+
+# vm_inject_macos NAME
+#   Per-VM macOS identity layer via tart clone: the clone of the type base
+#   VM IS the per-VM writable layer (APFS copy-on-write), so no disk surgery
+#   is needed — cloning from the identity-free type base is the injection.
+vm_inject_macos() {
+  local _vim_name="$1"
+  local _vim_type
+
+  require_command tart
+
+  _vim_type="$(jq -r --arg n "$_vim_name" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
+
+  if vm_get_tart_registered_names | grep -qxF "$_vim_name"; then
+    if [ "$force" != true ]; then
+      say "macOS VM '$_vim_name' already cloned from type base '$_vim_type'; pass --force to re-clone (destructive)"
+      return 0
+    fi
+    say "re-cloning macOS VM '$_vim_name' from type base '$_vim_type' (--force; this DESTROYS existing state)"
+    if [ "$dry_run" = true ]; then
+      dry_run "tart delete $_vim_name"
+    elif ! tart delete "$_vim_name"; then
+      error "tart delete failed for '$_vim_name'"
+      return 1
+    fi
+  fi
+
+  if ! vm_get_tart_registered_names | grep -qxF "$_vim_type"; then
+    error "type base VM '$_vim_type' not found in Tart; run 'nucleus-vm build-system $_vim_type' first"
+    return 1
+  fi
+
+  if [ "$dry_run" = true ]; then
+    dry_run "tart clone $_vim_type $_vim_name"
+    return 0
+  fi
+
+  if ! tart clone "$_vim_type" "$_vim_name"; then
+    error "tart clone failed for '$_vim_name' from '$_vim_type'"
+    return 1
+  fi
+  say "cloned macOS VM '$_vim_name' from type base '$_vim_type'"
+  return 0
+}
+
 # --- Android guest configuration (adb / fastboot) ---
 
 vm_android_adb_host_port() {
