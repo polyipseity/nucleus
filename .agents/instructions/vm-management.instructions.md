@@ -240,6 +240,8 @@ Pre-built golden images land in `~/virtual machines/src/<type>/prebuilt image.qc
 
 QCOW2 enables copy-based migration between hosts without conversion.
 
+`src/vms/templates/README.md` is token-replaced at render time; preserve its `__VM_DIR_DISPLAY__` token (and any other `__TOKEN__` placeholders) when editing. README text changes require reconciling `test_vm_readme_template_content` in `tests/modules/vm-setup-tests.nix`.
+
 ## macOS — Tart (macOS guests)
 
 - VM backend: Tart CLI (Apple Virtualization.framework); macOS host only.
@@ -258,6 +260,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - After provisioning, UTM opens each bundle automatically.
 - VirtioFS shared directory: configured via `Sharing.DirectoryShare` in the Nix-generated config.plist.
 - Network: **Emulated** (QEMU user/slirp) — required for `PortForward` to work; vmnet-shared silently drops forwards.
+- Template drift: `vm.sh setup` copies the activation-generated `config.plist` template into the bundle only when they differ (`cmp -s`). The check compares template vs bundle — NOT template vs Nix source — so a stale template (activation predating a `src/hosts/MacBook/vms.nix` / `VMs.json` change) propagates silently. Run `nucleus-apply` to regenerate the template before `nucleus-vm setup` after manifest/template changes.
 
 - `utmctl` CLI path: `/Applications/UTM.app/Contents/MacOS/utmctl`.
 - **Running vs registered:** `utmctl list` (via `vm_get_utm_registered_names`) returns every registered VM regardless of `Status`. Running state filters `Status != stopped` (`starting`, `started`, `pausing`, `paused`, `resuming`, `stopping`) via `vm_get_running_ids`.
@@ -370,6 +373,7 @@ Guest configuration is not automatic after first boot. `nucleus-vm setup` builds
 - Packer installed as `pkgs.packer` (POSIX) / `HashiCorp.Packer` WinGet (Windows).
 - QEMU available (existing `pkgs.qemu` on POSIX / Scoop on Windows).
 - Windows builds only: `winrm_timeout = "3h"` — builds can take 30–90 minutes.
+- Template authoring gotchas: `<<-EOT` heredocs inside `inline = [...]` arrays need a trailing comma after the `EOT` marker when more elements follow; a quoted delimiter (`<< 'EOT'`) disables shell expansion, leaving `${...}` literals in the generated file. `check-packer` `validate_dir` must supply a dummy `-var` for EVERY required packer variable or `packer validate` fails.
 
 ## Removing a VM
 
