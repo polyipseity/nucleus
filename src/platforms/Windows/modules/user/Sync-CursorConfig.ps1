@@ -9,6 +9,7 @@
     - per-file symlinks agents\*.md -> agents\*.agent.md
     - per-file symlinks commands\*.md -> prompts\*.prompt.md
     - per-entry symlinks from src\users\<user>\cursor\ (hooks.json, mcp.json, …)
+    - symlink settings.json -> %APPDATA%\Cursor\User\settings.json
 
   Requires Sync-AgentsConfig and Sync-AgentsSkillManifest to have run first.
 
@@ -27,6 +28,18 @@
 .NOTES
   Exit codes: 0 on success; non-zero on failure
 #>
+
+function Test-DeveloperModeOrAdmin {
+  $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+  $devModeKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock'
+  # check-suppress:suppression_doc: probe whether Developer Mode is already enabled; Get-ItemProperty throws when value is absent.
+  $devModeProp = Get-ItemProperty -Path $devModeKey -Name 'AllowDevelopmentWithoutDevLicense' -ErrorAction SilentlyContinue
+  $devModeEnabled = $null -ne $devModeProp -and $devModeProp.AllowDevelopmentWithoutDevLicense -eq 1
+  return $isAdmin -or $devModeEnabled
+}
+
+. (Join-Path -Path $PSScriptRoot -ChildPath '..\Set-ManagedSymlinkDeleteProtection.ps1')
+
 function Sync-CursorConfig {
   [CmdletBinding()]
   param(
@@ -42,18 +55,10 @@ function Sync-CursorConfig {
   $agentsDir = Join-Path -Path $HOME -ChildPath '.agents'
   $cursorDir = Join-Path -Path $HOME -ChildPath '.cursor'
   $managedBridgeDirs = @('rules', 'agents', 'commands', 'skills')
+  # settings.json/settings.schema.json target the IDE User dir (Class C),
+  # not ~/.cursor/, so they are excluded from the overlay convergence below.
+  $ideSettingsSkipNames = @('settings.json', 'settings.schema.json')
   $cursorEntryNames = Get-UserConfigFirstLevelEntryList -User $Username -ConfigName 'cursor' -RepoRoot $RepoRoot
-
-  . (Join-Path -Path $PSScriptRoot -ChildPath '..\Set-ManagedSymlinkDeleteProtection.ps1')
-
-  function Test-DeveloperModeOrAdmin {
-    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-    $devModeKey = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock'
-    # check-suppress:suppression_doc: probe whether Developer Mode is already enabled; Get-ItemProperty throws when value is absent.
-    $devModeProp = Get-ItemProperty -Path $devModeKey -Name 'AllowDevelopmentWithoutDevLicense' -ErrorAction SilentlyContinue
-    $devModeEnabled = $null -ne $devModeProp -and $devModeProp.AllowDevelopmentWithoutDevLicense -eq 1
-    return $isAdmin -or $devModeEnabled
-  }
 
   function Initialize-RealDirectory {
     param([string]$Path)
@@ -166,7 +171,7 @@ function Sync-CursorConfig {
         $target = $child.Target
         $isManagedBridge = $managedBridgeDirs -contains $child.Name
         $isManagedNative = $false
-        if (-not $isManagedBridge) {
+        if (-not $isManagedBridge -and -not ($ideSettingsSkipNames -contains $child.Name)) {
           $expectedNative = $null
           # check-suppress:suppression_doc: overlay entry may have been removed; stale cleanup is best-effort.
           try {
@@ -195,6 +200,29 @@ function Sync-CursorConfig {
               Write-Output "$label`: removed managed cursor file symlink: $($bridgeChild.FullName)"
             }
           }
+        }
+      }
+    }
+    # Class C: remove the IDE settings symlink when it points at our overlay.
+    $appDataRoaming = Join-Path -Path $HOME -ChildPath 'AppData\Roaming'
+    $cursorUserDir = Join-Path -Path $appDataRoaming -ChildPath 'Cursor\User'
+    $ideSettingsLink = Join-Path -Path $cursorUserDir -ChildPath 'settings.json'
+    if (Test-Path -LiteralPath $ideSettingsLink) {
+      $item = Get-Item -LiteralPath $ideSettingsLink -Force
+      $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
+        -and $item.LinkType -eq 'SymbolicLink'
+      if ($isSymlink) {
+        $expectedSource = $null
+        # check-suppress:suppression_doc: overlay entry may have been removed; stale cleanup is best-effort.
+        try {
+          $expectedSource = Resolve-UserConfigFirstLevelEntry -User $Username -ConfigName 'cursor' -EntryName 'settings.json' -RepoRoot $RepoRoot
+        } catch {
+          $expectedSource = $null
+        }
+        if ($null -ne $expectedSource -and [string]::Equals($item.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
+          Remove-ManagedSymlinkDeleteProtection -Context $label -Path $ideSettingsLink
+          Remove-Item -LiteralPath $ideSettingsLink -Force
+          Write-Output "$label`: removed Cursor IDE settings symlink: $ideSettingsLink"
         }
       }
     }
@@ -238,6 +266,7 @@ function Sync-CursorConfig {
     $existingChildren = Get-ChildItem -LiteralPath $cursorDir -Force
     foreach ($child in $existingChildren) {
       if ($managedBridgeDirs -contains $child.Name) { continue }
+      if ($ideSettingsSkipNames -contains $child.Name) { continue }
       $isSymlink = ($child.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
         -and $child.LinkType -eq 'SymbolicLink'
       if ($isSymlink) {
@@ -261,6 +290,7 @@ function Sync-CursorConfig {
 
   foreach ($entryName in $cursorEntryNames) {
     if ($managedBridgeDirs -contains $entryName) { continue }
+    if ($ideSettingsSkipNames -contains $entryName) { continue }
     $entryPath = Resolve-UserConfigFirstLevelEntry -User $Username -ConfigName 'cursor' -EntryName $entryName -RepoRoot $RepoRoot
     $linkPath = Join-Path -Path $cursorDir -ChildPath $entryName
     if (Test-Path -LiteralPath $linkPath) {
@@ -282,4 +312,34 @@ function Sync-CursorConfig {
     Set-ManagedSymlinkDeleteProtection -Context $label -Path $linkPath
     Write-Output "$label`: linked $linkPath -> $entryPath"
   }
+
+  # Class C: Cursor IDE settings — symlink settings.json into the IDE User dir
+  # (separate from ~/.cursor/, which holds CLI-side config).
+  $ideSettingsSource = Resolve-UserConfigFirstLevelEntry -User $Username -ConfigName 'cursor' -EntryName 'settings.json' -RepoRoot $RepoRoot
+  $appDataRoaming = Join-Path -Path $HOME -ChildPath 'AppData\Roaming'
+  $cursorUserDir = Join-Path -Path $appDataRoaming -ChildPath 'Cursor\User'
+  $ideSettingsLink = Join-Path -Path $cursorUserDir -ChildPath 'settings.json'
+  if (Test-Path -LiteralPath $ideSettingsLink) {
+    $item = Get-Item -LiteralPath $ideSettingsLink -Force
+    $isSymlink = ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
+      -and $item.LinkType -eq 'SymbolicLink'
+    if ($isSymlink) {
+      if ([string]::Equals($item.Target, $ideSettingsSource, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return
+      }
+      Remove-ManagedSymlinkDeleteProtection -Context $label -Path $ideSettingsLink
+      Remove-Item -LiteralPath $ideSettingsLink -Force
+    } else {
+      Write-Error "$label`: $ideSettingsLink is not a managed symlink — merge any wanted content into $ideSettingsSource and remove it, then re-run apply."
+      return
+    }
+  }
+  # check-suppress:config-method: method 1 (writable symlink) -- Cursor reads settings on startup.
+  $ideSettingsParent = Split-Path -Path $ideSettingsLink -Parent
+  if (-not (Test-Path -LiteralPath $ideSettingsParent)) {
+    New-Item -ItemType Directory -Path $ideSettingsParent -Force > $null
+  }
+  New-Item -ItemType SymbolicLink -Path $ideSettingsLink -Target $ideSettingsSource > $null
+  Set-ManagedSymlinkDeleteProtection -Context $label -Path $ideSettingsLink
+  Write-Output "$label`: linked $ideSettingsLink -> $ideSettingsSource"
 }
