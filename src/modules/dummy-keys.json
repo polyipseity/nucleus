@@ -1,0 +1,12 @@
+{
+  "$schema": "./dummy-keys.schema.json",
+  "dummyKeys": {
+    "litellmMcp": {
+      "consumers": [
+        "src/users/default/cursor/mcp.json"
+      ],
+      "note": "LiteLLM MCP gateway header placeholder (proxy unauthenticated; any value works until master_key is set)",
+      "value": "sk-nucleus-dummy-litellm"
+    }
+  }
+}

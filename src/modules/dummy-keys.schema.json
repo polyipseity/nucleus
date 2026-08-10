@@ -1,0 +1,46 @@
+{
+  "$id": "https://nucleus.local/dummy-keys.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "Canonical registry of dummy/placeholder API key values used in configs that cannot reference SOPS secrets or environment variables. All hardcoded sk- style literals in the tracked tree must resolve to a registered value (enforced by check step 13 run_13_dummy_key_uniformity).",
+  "properties": {
+    "$schema": {
+      "description": "Reference to the JSON Schema file that validates this data file.",
+      "type": "string"
+    },
+    "dummyKeys": {
+      "additionalProperties": {
+        "additionalProperties": false,
+        "properties": {
+          "consumers": {
+            "description": "Repo-relative paths of configs that use this value.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "note": {
+            "description": "Why this dummy key exists and what it gates.",
+            "type": "string"
+          },
+          "value": {
+            "description": "The canonical dummy key literal (e.g. sk-nucleus-*).",
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "type": "object"
+      },
+      "description": "Named dummy keys. Keys are stable identifiers; values are the literals consumers must use.",
+      "type": "object"
+    }
+  },
+  "required": [
+    "$schema",
+    "dummyKeys"
+  ],
+  "type": "object"
+}
