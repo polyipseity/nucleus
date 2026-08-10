@@ -2,7 +2,7 @@
 
 let
   lib = import <nixpkgs/lib>;
-  inherit (import ../lib.nix) assert';
+  inherit (import ../lib.nix) assert' containsRegex;
 
   manifest = builtins.fromJSON (builtins.readFile ../../src/modules/VMs.json);
 
@@ -207,7 +207,7 @@ let
   # Status listing must parse the suffixed ram string and display decimal GB.
   test_vm_status_display_parses_suffixed_ram = assert' (
     (lib.hasInfix "ram_bytes=\"\$(parse_size \"\$ram\")\"" vm_setup_sh_text)
-    && (lib.hasInfix "ram_gib=\"\$(( (ram_bytes + 500000000) / 1000000000 ))\"" vm_setup_sh_text)
+    && (lib.hasInfix "ram_gib=\"\$(((ram_bytes + 500000000) / 1000000000))\"" vm_setup_sh_text)
     && (lib.hasInfix ".ram, .id] | @tsv" vm_setup_sh_text)
     && (lib.hasInfix "ConvertFrom-SizeString \$vm.ram" vm_ps1_text)
   ) "scripts/vm.sh and vm.ps1 status must parse the suffixed ram value and display decimal GB";
@@ -220,8 +220,8 @@ let
     assert'
       (
         (lib.hasInfix "vm_build_macos VM_ID DISK_BYTES RAM_BYTES" vm_setup_sh_text)
-        && (lib.hasInfix "_disk_gib=\"\$(( (_disk_bytes + 999999999) / 1000000000 ))\"" vm_setup_sh_text)
-        && (lib.hasInfix "_mem_gib=\"\$(( (_ram_bytes + 1073741823) / 1073741824 ))\"" vm_setup_sh_text)
+        && (lib.hasInfix "_disk_gib=\"\$(((_disk_bytes + 999999999) / 1000000000))\"" vm_setup_sh_text)
+        && (lib.hasInfix "_mem_gib=\"\$(((_ram_bytes + 1073741823) / 1073741824))\"" vm_setup_sh_text)
         && (lib.hasInfix "-var \"disk_size_gib=\$_disk_gib\"" vm_setup_sh_text)
         && (lib.hasInfix "-var \"memory_gib=\$_mem_gib\"" vm_setup_sh_text)
       )
@@ -965,8 +965,8 @@ let
   # The --gc-disabled/--no-gc-disabled option pair must be accepted in both
   # parse loops (global and post-subcommand) and documented in usage.
   test_vm_gc_disabled_option_pair = assert' (
-    (lib.hasInfix "--gc-disabled) gc_disabled_mode=true; shift ;;" vm_setup_sh_text)
-    && (lib.hasInfix "--no-gc-disabled) gc_disabled_mode=false; shift ;;" vm_setup_sh_text)
+    (containsRegex "--gc-disabled[)].*gc_disabled_mode=true.*shift" vm_setup_sh_text)
+    && (containsRegex "--no-gc-disabled[)].*gc_disabled_mode=false.*shift" vm_setup_sh_text)
     && (lib.hasInfix "--gc-disabled) gc_disabled_mode=true ;;" vm_setup_sh_text)
     && (lib.hasInfix "--no-gc-disabled) gc_disabled_mode=false ;;" vm_setup_sh_text)
     && (lib.hasInfix "--gc-disabled|--no-gc-disabled" vm_setup_sh_text)
@@ -981,8 +981,8 @@ let
   ) "vm-setup GC must preserve data/ runtime overlays by default and sweep them only with --gc-data";
 
   test_vm_gc_data_option_pair = assert' (
-    (lib.hasInfix "--gc-data) gc_data_mode=true; shift ;;" vm_setup_sh_text)
-    && (lib.hasInfix "--no-gc-data) gc_data_mode=false; shift ;;" vm_setup_sh_text)
+    (containsRegex "--gc-data[)].*gc_data_mode=true.*shift" vm_setup_sh_text)
+    && (containsRegex "--no-gc-data[)].*gc_data_mode=false.*shift" vm_setup_sh_text)
     && (lib.hasInfix "--gc-data) gc_data_mode=true ;;" vm_setup_sh_text)
     && (lib.hasInfix "--no-gc-data) gc_data_mode=false ;;" vm_setup_sh_text)
     && (lib.hasInfix "--gc-data|--no-gc-data" vm_setup_sh_text)
@@ -1293,7 +1293,7 @@ let
         && (lib.hasInfix "do_resize() {" vm_setup_sh_text)
         && (lib.hasInfix "disk_bytes=\"\$(parse_size \"$size_arg\")\" || exit 1" vm_setup_sh_text)
         && (lib.hasInfix "vm_resize_vm \"$vm_id\" \"$disk_bytes\" \"$allow_shrink\"" vm_setup_sh_text)
-        && (lib.hasInfix "setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) \"do_$action\" ;;") vm_setup_sh_text
+        && (containsRegex "setup *\\| *sync *\\| *list *\\| *status *\\| *start *\\| *stop *\\| *upgrade *\\| *reset *\\| *gc *\\| *resize *\\| *pack *\\| *unpack[)] \"do_\\$action\" ;;" vm_setup_sh_text)
       )
       "scripts/vm.sh must wire the resize subcommand (usage, dispatch, parse_size, --allow-shrink) to vm_resize_vm";
 
@@ -1318,7 +1318,7 @@ let
       (
         (lib.hasInfix "setup|sync|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
         && (lib.hasInfix "pack                     Strip trivially regenerable artifacts" vm_setup_sh_text)
-        && (lib.hasInfix "setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) \"do_$action\" ;;" vm_setup_sh_text)
+        && (containsRegex "setup *\\| *sync *\\| *list *\\| *status *\\| *start *\\| *stop *\\| *upgrade *\\| *reset *\\| *gc *\\| *resize *\\| *pack *\\| *unpack[)] \"do_\\$action\" ;;" vm_setup_sh_text)
         && (lib.hasInfix "do_pack() {" vm_setup_sh_text)
         && (lib.hasInfix "if [ \"$force\" != true ]; then" vm_setup_sh_text)
         && (lib.hasInfix "vm_pack_vms" vm_setup_sh_text)
@@ -1370,7 +1370,7 @@ let
     assert'
       (
         (lib.hasInfix "unpack                   Regenerate per-platform VM artifacts" vm_setup_sh_text)
-        && (lib.hasInfix "setup|sync|list|status|start|stop|upgrade|reset|gc|resize|pack|unpack) \"do_$action\" ;;" vm_setup_sh_text)
+        && (containsRegex "setup *\\| *sync *\\| *list *\\| *status *\\| *start *\\| *stop *\\| *upgrade *\\| *reset *\\| *gc *\\| *resize *\\| *pack *\\| *unpack[)] \"do_\\$action\" ;;" vm_setup_sh_text)
         && (lib.hasInfix "do_unpack() {" vm_setup_sh_text)
         && (lib.hasInfix "vm_unpack_vms() {" vm_setup_sh_text)
         && (lib.hasInfix "\"$VM_DIR\"/*.vm.json" vm_setup_sh_text)
@@ -1712,7 +1712,7 @@ let
   test_android_build_strips_wc_padding =
     assert'
       (
-        (lib.hasInfix "wc -c < \"\$_f\" | tr -d '[:space:]'" vm_setup_sh_text)
+        (lib.hasInfix "wc -c <\"\$_f\" | tr -d '[:space:]'" vm_setup_sh_text)
         && (lib.hasInfix "sort -rn | head -1 | cut -d' ' -f2-" vm_setup_sh_text)
       )
       "scripts/vm.sh must strip wc -c whitespace padding when selecting the largest qcow2 from the extracted LineageOS bundle";
@@ -2119,7 +2119,7 @@ let
         (lib.hasInfix "write_vm_directory_readme" vm_setup_sh_text)
         && (lib.hasInfix "wrote VM directory guide" vm_setup_sh_text)
         && (lib.hasInfix "TEMPLATES_DIR/README.md" vm_setup_sh_text)
-        && (lib.hasInfix "__SRC_DIR_DISPLAY__" vm_setup_sh_text)
+        && (lib.hasInfix "s|__VM_DIR_DISPLAY__|" vm_setup_sh_text)
         && (lib.hasInfix "__VM_DIR_DISPLAY__" readmeTemplateText)
         && (lib.hasInfix "## Start commands" readmeTemplateText)
         && (lib.hasInfix "## Troubleshooting" readmeTemplateText)
