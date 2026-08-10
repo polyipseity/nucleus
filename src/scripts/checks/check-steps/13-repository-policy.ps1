@@ -330,6 +330,63 @@ Register-Step -Id "repository-policy" -Number 13 -Name "Repository policy" -Acti
     Write-Output 'check: no real-user test coupling policy passed.'
   }
 
+  Write-Message "--- dummy key uniformity ---"
+
+  $dummyRegistry = Join-Path $r 'src\modules\dummy-keys.json'
+  $dummyErrors = 0
+  if (-not (Test-Path -LiteralPath $dummyRegistry)) {
+    Write-ErrorMessage "dummy-key registry not found at $dummyRegistry"
+    $failed = $true
+  } else {
+    $dummyRegistryData = Get-Content -LiteralPath $dummyRegistry -Raw | ConvertFrom-Json -AsHashtable
+    if ($dummyRegistryData.ContainsKey('dummyKeys')) {
+      $registeredDummyValues = @($dummyRegistryData['dummyKeys'].Values | ForEach-Object { $_.value })
+
+      # Rule: every hardcoded sk- style API key literal (sk-[A-Za-z0-9]{4,}) in tracked files must be a registered dummyKeys value.
+      # Exclude this check's own files: their source contains the literal pattern text.
+      # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
+      $dummySelfLeaf = Split-Path -Leaf $PSCommandPath
+      $dummySelfShLeaf = Split-Path -Leaf ([System.IO.Path]::ChangeExtension($PSCommandPath, '.sh'))
+
+      # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
+      $dummyFiles = @(if ($HasArgs) {
+        @($PositionalArgs | Where-Object {
+            $_ -notmatch '(^|[\\/])(src[\\/]secrets[\\/]|vendor[\\/]|tests[\\/]fixtures[\\/])' -and
+            $_ -notmatch '\.schema\.json$' -and
+            (Split-Path -Leaf $_) -notin @($dummySelfLeaf, $dummySelfShLeaf)
+          })
+      } else {
+        @(git ls-files | Select-GitIgnored | Where-Object {
+            $_ -notmatch '(^|[\\/])(src[\\/]secrets[\\/]|vendor[\\/]|tests[\\/]fixtures[\\/])' -and
+            $_ -notmatch '\.schema\.json$' -and
+            (Split-Path -Leaf $_) -notin @($dummySelfLeaf, $dummySelfShLeaf)
+          })  # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; gitignore filter applied on top
+      })
+
+      if ($dummyFiles.Count -gt 0) {
+        $dummyMatches = Select-String -Path $dummyFiles -Pattern '\bsk-[A-Za-z0-9-]{4,}' -AllMatches -CaseSensitive
+        foreach ($m in $dummyMatches) {
+          foreach ($lit in @($m.Matches | ForEach-Object { $_.Value } | Select-Object -Unique)) {
+            if ($registeredDummyValues -cnotcontains $lit) {
+              Write-ErrorMessage "unregistered dummy API key literal '$lit' at $($m.Path):$($m.LineNumber) (register it in src/modules/dummy-keys.json or use a registered value)"
+              $dummyErrors++
+            }
+          }
+        }
+      }
+
+      if ($dummyErrors -gt 0) {
+        Write-Output 'check:   Register new dummy keys in src/modules/dummy-keys.json and use registered values in consumers.'
+        $failed = $true
+      } else {
+        Write-Message "dummy key uniformity policy passed."
+      }
+    } else {
+      Write-ErrorMessage "dummy-key registry $dummyRegistry is missing the dummyKeys object"
+      $failed = $true
+    }
+  }
+
   if ($failed) {
     Write-ErrorMessage "repository policy check failed"
     return $false

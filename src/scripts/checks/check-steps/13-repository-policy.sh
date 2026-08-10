@@ -34,6 +34,9 @@ run_13_repository_policy() {
   say "--- no real-user test coupling ---"
   run_13_no_real_user_test_coupling "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
+  say "--- dummy key uniformity ---"
+  run_13_dummy_key_uniformity "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+
   if [ "$_failed" -ne 0 ]; then
     error "repository policy check failed"
     return 1
@@ -362,5 +365,91 @@ run_13_no_real_user_test_coupling() {
     return 1
   fi
   say "no real-user test coupling policy passed."
+  return 0
+}
+
+run_13_dummy_key_uniformity() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
+  local _files=("$@")
+  cd "$_repo_root" || return 1
+  local _dummy_registry="src/modules/dummy-keys.json"
+  local _dummy_errors=0
+  local _dummy_registered _dummy_hits _dummy_files=()
+  local _file _rest _line _lit _f
+
+  # Rule: every hardcoded sk- style API key literal (sk-[A-Za-z0-9]{4,}) in tracked files must be a registered dummyKeys value.
+  _dummy_registered=$(mktemp) || {
+    error "failed to create temp file"
+    return 1
+  }
+  _dummy_hits=$(mktemp) || {
+    error "failed to create temp file"
+    rm -f "$_dummy_registered"
+    return 1
+  }
+  if [ ! -f "$_dummy_registry" ]; then
+    error "dummy-key registry not found at $_dummy_registry"
+    rm -f "$_dummy_registered" "$_dummy_hits"
+    return 1
+  fi
+  jq -r '.dummyKeys[].value' "$_dummy_registry" >"$_dummy_registered" 2>/dev/null || {
+    error "failed to read dummy-key registry $_dummy_registry"
+    rm -f "$_dummy_registered" "$_dummy_hits"
+    return 1
+  }
+
+  # Exclude this check's own files: their source contains the literal pattern text.
+  # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
+  local _dummy_self_sh="$_REPOSITORY_POLICY_STEP_SH" _dummy_self_ps1="$_REPOSITORY_POLICY_STEP_PS1"
+
+  if $_has_args; then
+    for _f in "${_files[@]}"; do
+      # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; secrets/vendor/fixtures are separate concerns and schema prose documents the value format
+      case "$_f" in
+      src/secrets/* | vendor/* | tests/fixtures/* | *.schema.json) continue ;;
+      esac
+      case "$(basename "$_f")" in
+      "$_dummy_self_sh" | "$_dummy_self_ps1") continue ;;
+      esac
+      _dummy_files+=("$_f")
+    done
+  else
+    # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; secrets/vendor/fixtures are separate concerns
+    mapfile -t _dummy_files < <(
+      git ls-files |
+        filter_gitignored |
+        grep -v -E '^(src/secrets/|vendor/|tests/fixtures/)' |
+        grep -v '\.schema\.json$' |
+        grep -v -E "(^|/)$_dummy_self_sh$|(^|/)$_dummy_self_ps1$"
+    )
+  fi
+
+  if [ "${#_dummy_files[@]}" -gt 0 ]; then
+    printf '%s\0' "${_dummy_files[@]}" |
+      xargs -0 -P "$PARALLEL_JOBS" grep -HnoE '\bsk-[A-Za-z0-9-]{4,}' 2>/dev/null >"$_dummy_hits" ||
+      true # check-suppress:suppression_doc: grep exits 1 when no sk- API key literals are found; zero hits is the expected state
+
+    while IFS= read -r _hit; do
+      [ -z "$_hit" ] && continue
+      _file="${_hit%%:*}"
+      _rest="${_hit#*:}"
+      _line="${_rest%%:*}"
+      _lit="${_rest#*:}"
+      if grep -Fxq "$_lit" "$_dummy_registered"; then
+        continue
+      fi
+      _dummy_errors=$((_dummy_errors + 1))
+      error "unregistered dummy API key literal '$_lit' at $_file:$_line (register it in src/modules/dummy-keys.json or use a registered value)"
+    done <"$_dummy_hits"
+  fi
+
+  rm -f "$_dummy_registered" "$_dummy_hits"
+
+  if [ "$_dummy_errors" -gt 0 ]; then
+    error "dummy key uniformity check failed with $_dummy_errors error(s)"
+    return 1
+  fi
+  say "dummy key uniformity policy passed."
   return 0
 }
