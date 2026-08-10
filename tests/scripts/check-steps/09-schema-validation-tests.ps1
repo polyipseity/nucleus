@@ -44,4 +44,10 @@ if ($content -match 'users/\*/agents/hooks') {
   Assert-Fail -Name 'step09_ps1_hooks_exemption' -Reason 'step 7 PS1 should exempt agents/hooks JSON from $schema check'
 }
 
+if ($content -match 'users/\*/cursor') {
+  Assert-Pass -Name 'step09_ps1_cursor_exemption' -Reason 'step 7 PS1 exempts cursor JSON from $schema check'
+} else {
+  Assert-Fail -Name 'step09_ps1_cursor_exemption' -Reason 'step 7 PS1 should exempt cursor JSON from $schema check'
+}
+
 if ($script:failed) { exit 1 } else { exit 0 }

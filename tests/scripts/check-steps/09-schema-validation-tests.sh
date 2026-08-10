@@ -53,6 +53,15 @@ test_step09_exempts_app_configs_without_schema() {
   return 1
 }
 
+test_step09_exempts_cursor_app_configs() {
+  # Matches: */users/*/cursor/*.json in exception list (Cursor-native formats)
+  if grep -q 'users/\*/cursor' "$TEST_FILE"; then
+    return 0
+  fi
+  echo "FAIL: step 7 should exempt Cursor app config formats without published schemas"
+  return 1
+}
+
 test_step09_missing_schema_errors_counted() {
   # Matches: _jsonschema_errors=$((_jsonschema_errors + _missing_schema))
   if grep -q '_jsonschema_errors.*_missing_schema' "$TEST_FILE"; then
@@ -63,7 +72,7 @@ test_step09_missing_schema_errors_counted() {
 }
 
 failures=0
-for test in test_step09_has_missing_schema_check test_step09_has_format_check test_step09_has_exception_list test_step09_github_exceptions_handle_dot_prefix test_step09_exempts_app_configs_without_schema test_step09_missing_schema_errors_counted; do
+for test in test_step09_has_missing_schema_check test_step09_has_format_check test_step09_has_exception_list test_step09_github_exceptions_handle_dot_prefix test_step09_exempts_app_configs_without_schema test_step09_exempts_cursor_app_configs test_step09_missing_schema_errors_counted; do
   if ! $test; then
     failures=$((failures + 1))
   fi

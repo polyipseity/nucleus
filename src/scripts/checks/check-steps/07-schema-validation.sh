@@ -43,7 +43,7 @@ run_07_schema_validation() {
     *.schema.json | */vendor/* | */secrets/* | .github/workflows/* | */.github/workflows/* | */.github/dependabot.yml | .github/dependabot.yml)
       continue
       ;;
-    */users/*/vscode/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */ai/litellm-config.yml | */.sops.yaml)
+    */users/*/vscode/*.json | */users/*/cursor/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */ai/litellm-config.yml | */.sops.yaml)
       continue
       ;;
     esac

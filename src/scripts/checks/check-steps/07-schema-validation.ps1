@@ -94,6 +94,7 @@ Register-Step -Id "schema-validation" -Number 7 -Name "Schema validation (JSON/Y
         $f -like '*.github\workflows\*' -or $f -like '*.github/workflows/*' -or `
         $f -like '*.github\dependabot.yml' -or $f -like '*.github/dependabot.yml' -or `
         $f -like '*users\*\vscode\*.json' -or $f -like '*users/*/vscode/*.json' -or `
+        $f -like '*users\*\cursor\*.json' -or $f -like '*users/*/cursor/*.json' -or `
         $f -like '*users\*\iterm2\DynamicProfiles\*.json' -or $f -like '*users/*/iterm2/DynamicProfiles/*.json' -or `
         $f -like '*users\*\obsidian\*.json' -or $f -like '*users/*/obsidian/*.json' -or `
         $f -like '*users\*\qtpass\*.json' -or $f -like '*users/*/qtpass/*.json' -or `

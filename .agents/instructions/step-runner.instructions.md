@@ -209,14 +209,17 @@ Step 7 validation rules:
     - .gitignore, .gitkeep, package.json (infrastructure / well-known standard files)
     - opencode.jsonc (already has embedded $schema, checked by built-in schema)
     - App-owned config formats with no published JSON schema:
-      - src/modules/configs/vscode/*.json (vscode:// schema URIs are not fetchable by check-jsonschema)
-      - src/modules/configs/iterm2/DynamicProfiles/*.json
-      - src/modules/configs/obsidian/*.json
-      - src/modules/configs/qtpass/*.json
-      - src/modules/configs/camilladsp/**, src/modules/configs/camillagui-backend/**
-      - src/users/default/agents/skills/*/_meta.json (ClawHub skill metadata, generated/managed)
-      - src/modules/ai/litellm-config.yml
-      - .sops.yaml
+      - */users/*/vscode/*.json (vscode:// schema URIs are not fetchable by check-jsonschema)
+      - */users/*/cursor/*.json (Cursor-native formats with no published JSON schema)
+      - */users/*/iterm2/DynamicProfiles/*.json
+      - */users/*/obsidian/*.json
+      - */users/*/qtpass/*.json
+      - */configs/camilladsp/*, */configs/camillagui-backend/*
+      - */users/*/discord-music-rpc/*
+      - */users/*/agents/hooks/*.json
+      - */users/*/agents/skills/*/_meta.json (ClawHub skill metadata, generated/managed)
+      - */ai/litellm-config.yml
+      - */.sops.yaml
     (Registered in .agents/instructions/allow-and-deny-lists.instructions.md)
 
   Error aggregation:
