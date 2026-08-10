@@ -45,6 +45,9 @@ nix-instantiate --eval tests/modules/core-tests.nix
 # Evaluate module import tests
 nix-instantiate --eval tests/modules/module-imports-tests.nix
 
+# VM setup logic tests (attr `summary`; `-A all_tests` fails — not exported)
+nix-instantiate --eval --strict -A summary tests/modules/vm-setup-tests.nix
+
 # Full flake check (all configs parse)
 cd src && nix flake check
 ```
@@ -147,6 +150,8 @@ Test step 1 (`nix-test-eval` guard in `src/scripts/lib/nix-test-eval.sh` / `src/
 - Adding `src/users/test-user/` or any test-only user under production `src/users/` (auto-discovered as a real user)
 
 **Fixture conventions:** `test-user` lives only under `tests/fixtures/user-registry/src/users/`. Shared constants: `tests/fixtures/fixtures.nix` (`fixtureUsername`) and `tests/scripts/user-registry-fixture.sh` (`FIXTURE_USERNAME`).
+
+`tests/fixtures/user-registry/src/users/default` is a symlink to the live `src/users/default` tree — fixture `default`-user files share inode/mtime with production sources, so edits under it are production edits. Use `test-user` for isolated fixture changes.
 
 ### Layer 3: Module Import Validation
 
