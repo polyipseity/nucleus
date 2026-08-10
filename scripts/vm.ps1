@@ -3,9 +3,10 @@
   Unified VM management for Windows.
 
 .DESCRIPTION
-  Subcommands: setup, sync, list, status, start, stop, upgrade, reset, android-config, resize, gc, pack, unpack.
+  Subcommands: setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, resize, gc, pack, unpack.
 
   sync:    Refresh VM config (descriptors, start/stop scripts). Non-destructive.
+  build-system: Build/rebuild a single type's system image (src/<type>/system image.qcow2).
   setup:   Full provision: config sync + image build + disk setup.
            Delegates to Invoke-VMSetup.ps1 (phase 1: Packer build,
            phase 2: QEMU start scripts + disk images).
@@ -41,7 +42,7 @@
            as-is. Pass --dry-run to preview.
 
 .PARAMETER Action
-  The operation to perform: setup, list, status, start, stop, upgrade, reset, android-config, resize, gc, pack, unpack.
+  The operation to perform: setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, resize, gc, pack, unpack.
 
 .PARAMETER SubcommandArgs
   Additional arguments passed after the subcommand (flags, VM names, etc.).
@@ -69,7 +70,7 @@
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('setup', 'sync', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'android-config', 'resize', 'gc', 'pack', 'unpack')]
+  [ValidateSet('setup', 'sync', 'build-system', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'android-config', 'resize', 'gc', 'pack', 'unpack')]
   [string]$Action,
 
   [Parameter(Position = 1, ValueFromRemainingArguments = $true)]
@@ -89,7 +90,7 @@ $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-N
 Import-Module $modulePath -Force -DisableNameChecking
 
 if ($Help -or -not $Action) {
-  if (-not $Action) { Write-NucleusError "missing action (setup, sync, list, status, start, stop, upgrade, reset, android-config, resize, gc, pack, unpack)" }
+  if (-not $Action) { Write-NucleusError "missing action (setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, resize, gc, pack, unpack)" }
   Get-Help $PSCommandPath -Detailed
   exit 0
 }
@@ -154,6 +155,55 @@ function Invoke-VMSync {
     )
     . $ModulePath
     Invoke-VMSync @InvokeArgs
+  } -ModulePath $module -InvokeArgs $invokeArgs
+}
+
+function Invoke-VMBuildSystem {
+  if ($SubcommandArgs.Length -eq 0) {
+    Write-NucleusError 'build-system requires a VM type (e.g. "nucleus-vm build-system NixOS")'
+    exit 1
+  }
+  $vmType = $SubcommandArgs[0]
+
+  $module = Join-Path $RepoRoot 'src\platforms\Windows\modules\system\Invoke-VMSetup.ps1'
+  if (-not (Test-Path $module)) {
+    Write-NucleusWarning "Invoke-VMSetup module not found at $module"
+    exit 1
+  }
+
+  $invokeArgs = @{ RepoRoot = $RepoRoot; Type = $vmType }
+
+  # Parse build-system flags (type is the first positional arg, flags follow).
+  $i = 1
+  while ($i -lt $SubcommandArgs.Length) {
+    switch ($SubcommandArgs[$i]) {
+      '--vm-dir-override' {
+        $i++
+        if ($i -ge $SubcommandArgs.Length) {
+          Write-NucleusError '--vm-dir-override requires a path argument'
+          exit 1
+        }
+        $env:VM_DIR_OVERRIDE = $SubcommandArgs[$i]
+      }
+      '--dry-run' { $invokeArgs['DryRun'] = $true }
+      '--help' {
+        Get-Help $PSCommandPath -Detailed
+        exit 0
+      }
+      default {
+        Write-NucleusWarning "ignoring unknown flag for build-system: $($SubcommandArgs[$i])"
+      }
+    }
+    $i++
+  }
+
+  & {
+    param(
+      [string]$ModulePath,
+      [hashtable]$InvokeArgs
+    )
+    . $ModulePath
+    Invoke-VMSystemBuild @InvokeArgs
   } -ModulePath $module -InvokeArgs $invokeArgs
 }
 
@@ -782,6 +832,7 @@ function Write-VmUnpackFile {
 switch ($Action) {
   'setup'   { Invoke-VMSetup }
   'sync'    { Invoke-VMSync }
+  'build-system' { Invoke-VMBuildSystem }
   'list'    { Invoke-VMList }
   'status'  { Invoke-VMStatus }
   'start'   { Invoke-VMStart }

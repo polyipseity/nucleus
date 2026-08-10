@@ -268,7 +268,14 @@ function Invoke-VMSetup {
 
         # Config-only refresh: descriptors and start/stop scripts.  Skips image
         # build and disk provisioning.  Used by nucleus-vm sync and apply.
-        [switch]$SyncOnly
+        [switch]$SyncOnly,
+
+        # Build-only refresh: build/rebuild only TYPE's system image and return
+        # without config sync or Phase 2 disk provisioning.  Used by
+        # nucleus-vm build-system.  WHY: the type image is identity-free and
+        # shared by every VM of the type; per-VM identity is injected onto the
+        # data disk at provision time, so a rebuild never needs per-VM state.
+        [string]$BuildSystemType = ''
     )
 
     $ErrorActionPreference = 'Stop'
@@ -960,9 +967,11 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     # -------------------------------------------------------------------------
     # Config sync — descriptors and start/stop scripts (all manifest guests).
     # Runs before image build; shared with nucleus-vm sync (-SyncOnly).
+    # WHY: build-only mode must not touch descriptors/scripts or Phase 2 disks.
     # -------------------------------------------------------------------------
 
-    $scoopQemuDir = Join-Path $env:USERPROFILE 'scoop\apps\qemu\current'
+    if (-not $BuildSystemType) {
+        $scoopQemuDir = Join-Path $env:USERPROFILE 'scoop\apps\qemu\current'
     $qemuImg = Join-Path $scoopQemuDir 'qemu-img.exe'
     if (-not (Test-Path $qemuImg)) {
         # check-suppress:suppression_doc: probe whether qemu-img is on PATH; Get-Command throws when absent.
@@ -1014,9 +1023,10 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         Write-Information 'vm-sync: Windows VM config refresh complete'
         return
     }
+    }
 
     # -------------------------------------------------------------------------
-    # Phase 1 — Build images (if absent)
+    # Phase 1 — Build type-scoped system images (once per type, not per VM)
     # -------------------------------------------------------------------------
 
     # Prune orphaned dot-prefixed Packer build temp dirs under src/<type>/.
@@ -1032,29 +1042,34 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         }
     }
 
-    foreach ($vm in $vmDef.VMs) {
-        if (-not (Test-VMEnabled -Vm $vm)) {
-            Write-Information "vm-setup: VM '$($vm.id)' is disabled in manifest; skipping"
-            continue
+    # Distinct enabled+host-matched types to build, honoring -NixOSOnly /
+    # -WindowsOnly / -BuildSystemType filters.  WHY: the type system image is
+    # identity-free and shared by every VM of the type; per-VM identity is
+    # injected onto the data disk in Phase 2.
+    $buildTypes = @(
+        foreach ($vm in $vmDef.VMs) {
+            if (-not (Test-VMEnabled -Vm $vm)) { continue }
+            if (-not (Test-VMHostMatch -Vm $vm)) { continue }
+            if ($NixOSOnly -and $vm.type -ne 'NixOS') { continue }
+            if ($WindowsOnly -and $vm.type -ne 'Windows') { continue }
+            if ($BuildSystemType -and $vm.type -ne $BuildSystemType) { continue }
+            $vm.type
         }
+    ) | Sort-Object -Unique
 
-        # Apply host-scoping filter.  VMs that list a hosts array that does
-        # not include the current NUCLEUS_HOST are skipped.
-        if (-not (Test-VMHostMatch -Vm $vm)) {
-            Write-Information "vm-setup: VM '$($vm.id)' is not available on host '$env:NUCLEUS_HOST'; skipping"
-            continue
-        }
+    foreach ($buildType in $buildTypes) {
+        # Representative (first enabled+host-matched) VM of the type supplies
+        # build parameters; build once per type, not once per VM.
+        $repVm = $vmDef.VMs | Where-Object {
+            $_.type -eq $buildType -and (Test-VMEnabled -Vm $_) -and (Test-VMHostMatch -Vm $_)
+        } | Select-Object -First 1
 
-        # Apply -NixOSOnly / -WindowsOnly filter.
-        if ($NixOSOnly   -and $vm.type -ne 'NixOS')   { continue }
-        if ($WindowsOnly -and $vm.type -ne 'Windows') { continue }
-
-        switch ($vm.type) {
+        switch ($buildType) {
             'NixOS' {
-                $diskBytes = ConvertFrom-SizeString $vm.diskSize
-                $minSizeBytes = ConvertFrom-SizeString $vm.minImageSize
-                $env:NUCLEUS_VM_GUEST_HOSTNAME = $vm.hostname
-                Invoke-BuildNixosImage -VmName $vm.id -Accelerator $Accelerator `
+                $diskBytes = ConvertFrom-SizeString $repVm.diskSize
+                $minSizeBytes = ConvertFrom-SizeString $repVm.minImageSize
+                $env:NUCLEUS_VM_GUEST_HOSTNAME = $buildType.ToLowerInvariant()
+                Invoke-BuildNixosImage -VmName $buildType -Accelerator $Accelerator `
                     -DiskBytes $diskBytes -MinSize $minSizeBytes `
                     -VmsDir $vmsDir -SrcDir $srcDir `
                     -GuestAccountName $guestUsername -GuestSecret $guestPassword `
@@ -1062,20 +1077,20 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                     -DryRun:$DryRun
             }
             'Windows' {
-                $diskBytes = ConvertFrom-SizeString $vm.diskSize
-                $minSizeBytes = ConvertFrom-SizeString $vm.minImageSize
-                $hostFwds = ($vm.portForwards | ForEach-Object { "hostfwd=tcp::$($_.hostPort)-:$($_.guestPort)" }) -join ','
-                $isoUrl = if ($null -ne $vm.Windows.isoUrl) { [string]$vm.Windows.isoUrl } else { '' }
-                Invoke-BuildWindowsImage -VmName $vm.id -DiskBytes $diskBytes `
+                $diskBytes = ConvertFrom-SizeString $repVm.diskSize
+                $minSizeBytes = ConvertFrom-SizeString $repVm.minImageSize
+                $hostFwds = ($repVm.portForwards | ForEach-Object { "hostfwd=tcp::$($_.hostPort)-:$($_.guestPort)" }) -join ','
+                $isoUrl = if ($null -ne $repVm.Windows.isoUrl) { [string]$repVm.Windows.isoUrl } else { '' }
+                Invoke-BuildWindowsImage -VmName $buildType -DiskBytes $diskBytes `
                     -WindowsIso $WindowsIso -WindowsIsoUrl $isoUrl `
                     -WindowsIsoSource $WindowsIsoSource `
                     -WindowsIsoRetries $WindowsIsoRetries `
                     -RepoRoot $RepoRoot `
-                    -WindowsEdition $vm.Windows.edition `
+                    -WindowsEdition $repVm.Windows.edition `
                     -Accelerator $Accelerator `
-                        -GuestAccountName $guestUsername -GuestSecret $guestPassword `
-                        -GuestSecretHash $guestSecretHash `
-                    -MinSize $minSizeBytes -GuestHostname $vm.hostname -HostFwds $hostFwds `
+                    -GuestAccountName $guestUsername -GuestSecret $guestPassword `
+                    -GuestSecretHash $guestSecretHash `
+                    -MinSize $minSizeBytes -GuestHostname $buildType.ToLowerInvariant() -HostFwds $hostFwds `
                     -Headful:$Headful `
                     -VmsDir $vmsDir -SrcDir $srcDir -DryRun:$DryRun
             }
@@ -1090,9 +1105,15 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 Write-Information "vm-setup: macOS image must be obtained manually (licensing restricts automation)"
             }
             default {
-                Write-Information "vm-setup: skipping build for '$($vm.id)' (unsupported type: $($vm.type))"
+                Write-Information "vm-setup: skipping build for type '$buildType' (unsupported type)"
             }
         }
+    }
+
+    if ($BuildSystemType) {
+        # Build-only mode: the type image build above is the entire request.
+        Write-Information "vm-setup: system image build complete for type '$BuildSystemType'"
+        return
     }
 
     # -------------------------------------------------------------------------
@@ -1260,6 +1281,48 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     Write-Information "vm-setup: Disk images at: $vmDir"
     Write-Information "vm-setup: VM directory guide at: $vmReadmePath"
     Write-Information "vm-setup: Run the generated scripts/start-<name>.ps1 (or scripts/start-<name>.sh) scripts to launch VMs"
+}
+
+function Invoke-VMSystemBuild {
+    <#
+    .SYNOPSIS
+      Build/rebuild a single VM type's system image (src/<type>/system image.qcow2).
+
+    .DESCRIPTION
+      Type-scoped system image build without config sync or per-VM data disk
+      provisioning.  WHY: the type system image is identity-free and shared by
+      every VM of the type; per-VM identity is injected onto the data disk at
+      provision time (Phase 2 of Invoke-VMSetup), so a rebuild never needs
+      per-VM state.
+
+    .PARAMETER RepoRoot
+      Absolute path to the repository root.
+
+    .PARAMETER Type
+      VM type whose system image to build (e.g. NixOS, Windows).
+
+    .PARAMETER DryRun
+      Print planned actions without modifying any state.
+
+    .EXAMPLE
+      Invoke-VMSystemBuild -RepoRoot 'C:\Users\admin\nucleus' -Type NixOS
+
+    .NOTES
+      Environment variables: NUCLEUS_HOST, NUCLEUS_VM_SECRET_OWNER, USERNAME,
+      VM_DIR_OVERRIDE.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [string]$RepoRoot,
+
+        [Parameter(Mandatory)]
+        [string]$Type,
+
+        [switch]$DryRun
+    )
+
+    Invoke-VMSetup -RepoRoot $RepoRoot -BuildSystemType $Type -DryRun:$DryRun
 }
 
 function Invoke-VMSync {

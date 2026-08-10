@@ -144,10 +144,11 @@ vm_guest_credentials_hash() {
 # ---------------------------------------------------------------------------
 
 usage() {
-  usage_std "$(basename "$0")" "setup|sync|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options]"
+  usage_std "$(basename "$0")" "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options]"
   cat <<'EOF'
   sync [vm...]             Refresh VM config (scripts, UTM plists, virsh define).
                           Non-destructive; runs automatically after nucleus-apply.
+  build-system <type>      Build/rebuild the type-scoped system image (src/<type>/system image.qcow2).
   setup [vm...]            Full provision: config sync + image build + disk/bundle setup.
   list                     List all VMs from manifest with runtime status.
   status [vm...]           Show runtime status of specified VMs (all if omitted).
@@ -338,7 +339,7 @@ while [ "$#" -gt 0 ]; do
     repo_root_override="$2"
     shift 2
     ;;
-  setup | sync | list | status | start | stop | upgrade | reset | android-config | gc | resize | pack | unpack)
+  setup | sync | build-system | list | status | start | stop | upgrade | reset | android-config | gc | resize | pack | unpack)
     action="$1"
     shift
     vm_args=("$@")
@@ -392,7 +393,7 @@ for arg in "${vm_args[@]}"; do
 done
 
 [ -z "$action" ] && {
-  error "missing action (setup, sync, list, status, start, stop, upgrade, reset, android-config, gc, resize, pack, unpack)"
+  error "missing action (setup, sync, build-system, list, status, start, stop, upgrade, reset, android-config, gc, resize, pack, unpack)"
   usage >&2
   exit 1
 }
@@ -555,6 +556,41 @@ do_setup() {
     vm_gc_vms
   fi
 
+  nuc_done
+}
+
+# do_build_system
+#   Builds/rebuilds a single type's system image (src/<type>/system
+#   image.qcow2) without touching per-VM data disks or config sync.
+#   WHY: the type image is identity-free and shared by every VM of the type;
+#   per-VM identity is injected onto the data disk at provision time, so a
+#   rebuild never needs per-VM state.
+do_build_system() {
+  REPO_ROOT="${repo_root_override:-$(derive_repo_root)}"
+  resolve_manifest
+  NUCLEUS_HOST="$(resolve_nucleus_host)"
+  require_command jq
+
+  if [ "${#filtered_vm_args[@]}" -eq 0 ]; then
+    error "build-system requires a VM type (e.g. 'nucleus-vm build-system NixOS')"
+    usage >&2
+    exit 1
+  fi
+
+  local vm_type="${filtered_vm_args[0]}"
+
+  # WHY: fail fast on a type that is not enabled+host-matched on this host
+  # instead of letting the build resolve an empty representative VM.
+  if ! jq -e --arg type "$vm_type" --arg host "$NUCLEUS_HOST" \
+    '[.VMs[] | select(.type == $type) | select(.enabled == true) | select(.hosts | contains([$host]))] | length > 0' \
+    "$MANIFEST" >/dev/null; then
+    error "no enabled VM of type '$vm_type' configured for host '$NUCLEUS_HOST'"
+    usage >&2
+    exit 1
+  fi
+
+  vm_prepare_vm_command
+  vm_build_system "$vm_type"
   nuc_done
 }
 
@@ -1084,6 +1120,6 @@ do_unpack() {
 # ---------------------------------------------------------------------------
 
 case "$action" in
-setup | sync | list | status | start | stop | upgrade | reset | gc | resize | pack | unpack) "do_$action" ;;
+setup | sync | build-system | list | status | start | stop | upgrade | reset | gc | resize | pack | unpack) "do_$action" ;;
 android-config) do_android_config ;;
 esac

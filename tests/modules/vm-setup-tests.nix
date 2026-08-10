@@ -219,7 +219,7 @@ let
   test_macos_packer_ceil_units =
     assert'
       (
-        (lib.hasInfix "vm_build_macos VM_ID DISK_BYTES RAM_BYTES" vm_setup_sh_text)
+        (lib.hasInfix "vm_build_macos TYPE DISK_BYTES RAM_BYTES" vm_setup_sh_text)
         && (lib.hasInfix "_disk_gib=\"\$(((_disk_bytes + 999999999) / 1000000000))\"" vm_setup_sh_text)
         && (lib.hasInfix "_mem_gib=\"\$(((_ram_bytes + 1073741823) / 1073741824))\"" vm_setup_sh_text)
         && (lib.hasInfix "-var \"disk_size_gib=\$_disk_gib\"" vm_setup_sh_text)
@@ -1266,7 +1266,7 @@ let
   # vm-setup must resize NixOS images to manifest disk size so provisioning
   # logic does not reject the pre-built image for being too small.
   test_nixos_image_resize_to_manifest_disk = assert' (
-    (lib.hasInfix "vm_build_nixos VM_ID DISK_BYTES" vm_setup_sh_text)
+    (lib.hasInfix "vm_build_nixos TYPE DISK_BYTES" vm_setup_sh_text)
     && (lib.hasInfix "if ! resize_and_mark_image \"$_out\" \"$_marker\" \"$_disk_bytes\"; then" vm_setup_sh_text)
   ) "scripts/vm.sh must resize generated NixOS qcow2 images to the exact manifest disk byte count";
 
@@ -1296,13 +1296,13 @@ let
   test_vm_resize_cli_subcommand =
     assert'
       (
-        (lib.hasInfix "setup|sync|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
+        (lib.hasInfix "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
         && (lib.hasInfix "resize <vm> <size>" vm_setup_sh_text)
         && (lib.hasInfix "--allow-shrink) allow_shrink=true" vm_setup_sh_text)
         && (lib.hasInfix "do_resize() {" vm_setup_sh_text)
         && (lib.hasInfix "disk_bytes=\"\$(parse_size \"$size_arg\")\" || exit 1" vm_setup_sh_text)
         && (lib.hasInfix "vm_resize_vm \"$vm_id\" \"$disk_bytes\" \"$allow_shrink\"" vm_setup_sh_text)
-        && (containsRegex "setup *\\| *sync *\\| *list *\\| *status *\\| *start *\\| *stop *\\| *upgrade *\\| *reset *\\| *gc *\\| *resize *\\| *pack *\\| *unpack[)] \"do_\\$action\" ;;" vm_setup_sh_text)
+        && (containsRegex "setup *\\| *sync *\\| *build-system *\\| *list *\\| *status *\\| *start *\\| *stop *\\| *upgrade *\\| *reset *\\| *gc *\\| *resize *\\| *pack *\\| *unpack[)] \"do_\\$action\" ;;" vm_setup_sh_text)
       )
       "scripts/vm.sh must wire the resize subcommand (usage, dispatch, parse_size, --allow-shrink) to vm_resize_vm";
 
@@ -1325,9 +1325,9 @@ let
   test_vm_pack_cli_subcommand =
     assert'
       (
-        (lib.hasInfix "setup|sync|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
+        (lib.hasInfix "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
         && (lib.hasInfix "pack                     Strip trivially regenerable artifacts" vm_setup_sh_text)
-        && (containsRegex "setup *\\| *sync *\\| *list *\\| *status *\\| *start *\\| *stop *\\| *upgrade *\\| *reset *\\| *gc *\\| *resize *\\| *pack *\\| *unpack[)] \"do_\\$action\" ;;" vm_setup_sh_text)
+        && (containsRegex "setup *\\| *sync *\\| *build-system *\\| *list *\\| *status *\\| *start *\\| *stop *\\| *upgrade *\\| *reset *\\| *gc *\\| *resize *\\| *pack *\\| *unpack[)] \"do_\\$action\" ;;" vm_setup_sh_text)
         && (lib.hasInfix "do_pack() {" vm_setup_sh_text)
         && (lib.hasInfix "if [ \"$force\" != true ]; then" vm_setup_sh_text)
         && (lib.hasInfix "vm_pack_vms" vm_setup_sh_text)
@@ -1377,7 +1377,7 @@ let
     assert'
       (
         (lib.hasInfix "unpack                   Regenerate per-platform VM artifacts" vm_setup_sh_text)
-        && (containsRegex "setup *\\| *sync *\\| *list *\\| *status *\\| *start *\\| *stop *\\| *upgrade *\\| *reset *\\| *gc *\\| *resize *\\| *pack *\\| *unpack[)] \"do_\\$action\" ;;" vm_setup_sh_text)
+        && (containsRegex "setup *\\| *sync *\\| *build-system *\\| *list *\\| *status *\\| *start *\\| *stop *\\| *upgrade *\\| *reset *\\| *gc *\\| *resize *\\| *pack *\\| *unpack[)] \"do_\\$action\" ;;" vm_setup_sh_text)
         && (lib.hasInfix "do_unpack() {" vm_setup_sh_text)
         && (lib.hasInfix "vm_unpack_vms() {" vm_setup_sh_text)
         && (lib.hasInfix "\"$VM_DIR\"/*.vm.json" vm_setup_sh_text)
@@ -1418,6 +1418,33 @@ let
         && (lib.hasInfix "'--dry-run' { $perform = $false }" vm_ps1_text)
       )
       "scripts/vm.ps1 must mirror the unpack subcommand (ValidateSet, dispatch, Invoke-VMUnpack with --dry-run)";
+
+  # The build-system subcommand must be wired into the CLI: usage synopsis +
+  # body, dispatch, do_build_system validating the type against the manifest,
+  # and vm_build_system doing the type-scoped system image build.
+  test_vm_build_system_cli_subcommand =
+    assert'
+      (
+        (lib.hasInfix "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|gc|resize|pack|unpack [vm...] [options]" vm_setup_sh_text)
+        && (lib.hasInfix "build-system <type>      Build/rebuild the type-scoped system image (src/<type>/system image.qcow2)." vm_setup_sh_text)
+        && (containsRegex "setup *\\| *sync *\\| *build-system *\\| *list" vm_setup_sh_text)
+        && (lib.hasInfix "do_build_system() {" vm_setup_sh_text)
+        && (lib.hasInfix "build-system requires a VM type" vm_setup_sh_text)
+        && (lib.hasInfix "vm_build_system \"$vm_type\"" vm_setup_sh_text)
+      )
+      "scripts/vm.sh must wire the build-system subcommand (usage, dispatch, do_build_system with manifest validation, vm_build_system)";
+
+  # The Windows twin must mirror the build-system subcommand: ValidateSet,
+  # dispatch, Invoke-VMBuildSystem wrapper, and Invoke-VMSystemBuild delegate.
+  test_vm_build_system_windows_twin =
+    assert'
+      (
+        (lib.hasInfix "'sync', 'build-system', 'list'" vm_ps1_text)
+        && (lib.hasInfix "'build-system' { Invoke-VMBuildSystem }" vm_ps1_text)
+        && (lib.hasInfix "function Invoke-VMBuildSystem {" vm_ps1_text)
+        && (lib.hasInfix "Invoke-VMSystemBuild" vm_ps1_text)
+      )
+      "scripts/vm.ps1 must mirror the build-system subcommand (ValidateSet, dispatch, Invoke-VMBuildSystem wrapper, Invoke-VMSystemBuild delegate)";
 
   # The Packer failure branch for the macOS build must print a human-readable
   # error and return the captured exit code.
@@ -2409,6 +2436,8 @@ let
     test_vm_unpack_enabled_gate
     test_vm_unpack_descriptor_first
     test_vm_unpack_windows_twin
+    test_vm_build_system_cli_subcommand
+    test_vm_build_system_windows_twin
     test_vm_gc_keep_set_preserves_manifest_images
     test_vm_gc_orphan_descriptors_removed
     test_vm_gc_marker_expected_set_semantics
@@ -2586,6 +2615,8 @@ in
     test_vm_unpack_enabled_gate
     test_vm_unpack_descriptor_first
     test_vm_unpack_windows_twin
+    test_vm_build_system_cli_subcommand
+    test_vm_build_system_windows_twin
     test_vm_gc_keep_set_preserves_manifest_images
     test_vm_gc_orphan_descriptors_removed
     test_vm_gc_marker_expected_set_semantics

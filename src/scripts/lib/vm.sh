@@ -261,16 +261,17 @@ vm_resolve_guest_ssh_public_key() {
   return 1
 }
 
-# vm_guest_credentials_marker_path NAME [DISK_PATH]
+# vm_guest_credentials_marker_path TYPE [DISK_PATH]
 #   Returns the sidecar marker path storing the guest-credential fingerprint
-#   used when building/provisioning the VM image or runtime disk.
+#   used when building/provisioning the VM type image or runtime disk.
+#   WHY: the type system image is identity-free and shared by every VM of the
+#   type; the marker lives next to it (src/<type>/), not under a per-VM name.
 vm_guest_credentials_marker_path() {
-  _vgcm_name="$1"
+  _vgcm_type="$1"
   _vgcm_disk_path="${2:-}"
   if [ -n "$_vgcm_disk_path" ]; then
     printf '%s.vm-guest-credentials-sha256\n' "$_vgcm_disk_path"
   else
-    _vgcm_type="$(jq -r --arg n "$_vgcm_name" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
     vm_src_path "$_vgcm_type" "${VM_TYPE_MARKER_BASE}.vm-guest-credentials-sha256"
   fi
 }
@@ -312,16 +313,17 @@ vm_sha256_input() {
   return 1
 }
 
-# vm_guest_config_marker_path NAME [DISK_PATH]
+# vm_guest_config_marker_path TYPE [DISK_PATH]
 #   Returns the sidecar marker path storing the guest-config fingerprint
 #   (NixOS base-guest.nix + imports + flake.lock) for drift detection.
+#   WHY: the type system image is identity-free and shared by every VM of the
+#   type; the marker lives next to it (src/<type>/), not under a per-VM name.
 vm_guest_config_marker_path() {
-  _vgcmp_name="$1"
+  _vgcmp_type="$1"
   _vgcmp_disk_path="${2:-}"
   if [ -n "$_vgcmp_disk_path" ]; then
     printf '%s.vm-guest-config-sha256\n' "$_vgcmp_disk_path"
   else
-    _vgcmp_type="$(jq -r --arg n "$_vgcmp_name" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
     vm_src_path "$_vgcmp_type" "${VM_TYPE_MARKER_BASE}.vm-guest-config-sha256"
   fi
 }
@@ -2084,47 +2086,19 @@ vm_build_android() {
   say "Android image build complete for '$_bai_vm_id'"
 }
 
-# Image build callback for vm_for_each
+# Image build callback for vm_for_each (Android only).  WHY: Android is the
+# only type whose system/GSI images are downloaded per-VM (gsiUrl) instead of
+# being built once per type; all other types are handled by vm_build_system.
+vm_build_android_image() {
+  local _vai_id="$1" _vai_type="$2" _vai_hosts="$3" _vai_index="$4"
+  if [ "$_vai_type" != "Android" ]; then
+    return 0
+  fi
 
-vm_build_one_image() {
-  local _vm_id="$1" _vm_type="$2" _vm_hosts="$3" _vm_index="$4"
-  local _vm_disk_bytes _vm_ram_bytes
-  _vm_disk_bytes="$(parse_size "$(jq -r ".VMs[$_vm_index].diskSize" "$MANIFEST")")"
-
-  local _vm_guest_hostname
-  _vm_guest_hostname="$(jq -r --arg n "$_vm_id" '.VMs[] | select(.id == $n) | .hostname // empty' "$MANIFEST")"
-  export NUCLEUS_VM_GUEST_HOSTNAME="$_vm_guest_hostname"
-
-  case "$_vm_type" in
-  NixOS)
-    # check-suppress:suppression_doc: best-effort -- a prerequisite-missing or build failure for one
-    vm_build_nixos "$_vm_id" "$_vm_disk_bytes" ||
-      say "NixOS image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
-    ;;
-  Windows)
-    _vm_edition="$(jq -r ".VMs[$_vm_index].Windows.edition" "$MANIFEST")"
-    # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
-    vm_build_windows "$_vm_id" "$_vm_disk_bytes" "$_vm_edition" ||
-      say "Windows image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
-    ;;
-  macOS)
-    _vm_macos_ver="$(jq -r ".VMs[$_vm_index].macOS.version" "$MANIFEST")"
-    _vm_ram_bytes="$(parse_size "$(jq -r ".VMs[$_vm_index].ram" "$MANIFEST")")"
-    _vm_cpus="$(jq -r ".VMs[$_vm_index].cpus" "$MANIFEST")"
-    # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
-    vm_build_macos "$_vm_id" "$_vm_disk_bytes" "$_vm_ram_bytes" "$_vm_cpus" "$_vm_macos_ver" ||
-      say "macOS image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
-    ;;
-  Android)
-    # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
-    vm_build_android "$_vm_id" "$_vm_index" \
-      "$accept_gsi_license" "$upgrade_android" "$reset_userdata" ||
-      say "Android image build skipped for '$_vm_id' (prerequisite missing or build failed; see above)"
-    ;;
-  *)
-    say "skipping build for '$_vm_id' (unsupported type: $_vm_type)"
-    ;;
-  esac
+  # check-suppress:suppression_doc: best-effort -- a prerequisite-missing or build failure for one
+  vm_build_android "$_vai_id" "$_vai_index" \
+    "$accept_gsi_license" "$upgrade_android" "$reset_userdata" ||
+    say "Android image build skipped for '$_vai_id' (prerequisite missing or build failed; see above)"
 }
 
 # vm_prune_and_write_all_guest_scripts
@@ -2595,16 +2569,18 @@ vm_setup_libvirt() {
 
 # Phase 1 — Build images (if absent)
 
-# vm_build_nixos VM_ID DISK_BYTES
-#   Builds the NixOS guest image via nixos-generators (pinned as a flake
-#   input in src/flake.nix).  On macOS this requires an aarch64-linux builder;
+# vm_build_nixos TYPE DISK_BYTES
+#   Builds the NixOS guest type system image via nixos-generators (pinned as a
+#   flake input in src/flake.nix).  The image is identity-free and shared by
+#   every VM of the type; per-VM identity is injected onto the data disk at
+#   provision time.  On macOS this requires an aarch64-linux builder;
 #   enable nix.linux-builder.enable in the macOS host config so the Nix daemon
 #   delegates Linux derivations to the Virtualization.framework-backed builder
 #   VM created by nix-darwin.  Most derivations are fetched from the binary
 #   cache; hostname-specific ones (e.g. etc-hostname) are configuration-specific
 #   and cannot be cached.
 vm_build_nixos() {
-  _vm_id="$1"
+  _vm_type="$1"
   _disk_bytes="$2"
 
   case "$(uname -m)" in
@@ -2617,12 +2593,11 @@ vm_build_nixos() {
     _nixos_format_path="$VMS_DIR/NixOS/formats/qcow-btrfs.nix"
     ;;
   esac
-  _vm_type="$(jq -r --arg n "$_vm_id" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
   vm_ensure_type_src_dirs
   _out="$(vm_src_path "$_vm_type" "$VM_SYSTEM_IMAGE")"
-  _marker="$(vm_guest_credentials_marker_path "$_vm_id")"
-  _config_marker="$(vm_guest_config_marker_path "$_vm_id")"
-  _min_size="$(parse_size "$(jq -r ".VMs[] | select(.id == \"$_vm_id\") | .minImageSize" "$MANIFEST")")"
+  _marker="$(vm_guest_credentials_marker_path "$_vm_type")"
+  _config_marker="$(vm_guest_config_marker_path "$_vm_type")"
+  _min_size="$(parse_size "$(jq -r --arg t "$_vm_type" '[.VMs[] | select(.type == $t) | .minImageSize][0] // empty' "$MANIFEST")")"
 
   # WHY: rebuild when the guest config (base-guest.nix + imports + flake.lock)
   _config_fingerprint="$(vm_guest_config_fingerprint)" || return 1
@@ -2935,20 +2910,21 @@ download_windows_iso_fido_url_nonwindows() {
   return 0
 }
 
-# vm_build_windows VM_ID DISK_BYTES
-#   Builds the Windows 11 guest image using Packer and the Autounattend.xml
-#   answer file at src/vms/Windows/Autounattend.xml.
+# vm_build_windows TYPE DISK_BYTES EDITION
+#   Builds the Windows 11 guest type system image using Packer and the
+#   Autounattend.xml answer file at src/vms/Windows/Autounattend.xml.
+#   The image is identity-free and shared by every VM of the type; per-VM
+#   identity is injected onto the data disk at provision time.
 vm_build_windows() {
-  _vm_id="$1"
+  _vm_type="$1"
   _disk_bytes="$2"
   _edition="$3"
-  _vm_type="$(jq -r --arg n "$_vm_id" '.VMs[] | select(.id == $n) | .type' "$MANIFEST")"
   vm_ensure_type_src_dirs
   _out="$(vm_src_path "$_vm_type" "$VM_SYSTEM_IMAGE")"
-  _marker="$(vm_guest_credentials_marker_path "$_vm_id")"
-  _min_size="$(parse_size "$(jq -r ".VMs[] | select(.id == \"$_vm_id\") | .minImageSize" "$MANIFEST")")"
-  _hostfwd="$(jq -r --arg n "$_vm_id" '[.VMs[] | select(.id == $n) | .portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")' "$MANIFEST")"
-  _guest_hostname="$(jq -r --arg n "$_vm_id" '.VMs[] | select(.id == $n) | .hostname // empty' "$MANIFEST")"
+  _marker="$(vm_guest_credentials_marker_path "$_vm_type")"
+  _min_size="$(parse_size "$(jq -r --arg t "$_vm_type" '[.VMs[] | select(.type == $t) | .minImageSize][0] // empty' "$MANIFEST")")"
+  _hostfwd="$(jq -r --arg t "$_vm_type" '[.VMs[] | select(.type == $t)][0].portForwards | map("hostfwd=tcp::\(.hostPort)-:\(.guestPort)") | join(",")' "$MANIFEST")"
+  _guest_hostname="$(printf '%s' "$_vm_type" | tr '[:upper:]' '[:lower:]')"
 
   if [ -f "$_out" ]; then
     if validate_qcow2_image "$_out" "existing Windows image" "$_min_size"; then
@@ -2976,7 +2952,7 @@ vm_build_windows() {
   fi
 
   if [ -z "$_iso" ] && [ "$windows_iso_source" != "mido" ]; then
-    _iso_url="$(jq -r ".VMs[] | select(.id == \"$_vm_id\") | .Windows.isoUrl // empty" "$MANIFEST")"
+    _iso_url="$(jq -r --arg t "$_vm_type" '[.VMs[] | select(.type == $t)][0] | .Windows.isoUrl // empty' "$MANIFEST")"
     if [ -n "$_iso_url" ]; then
       _cached_iso="$(vm_src_path "$_vm_type" "$VM_WINDOWS_INSTALLER_ISO")"
       say "downloading Windows installer from Windows.isoUrl..."
@@ -3181,7 +3157,7 @@ EOF
     packer init .
   ) || _packer_init_status=$?
   if [ "$_packer_init_status" -ne 0 ]; then
-    error "Packer init for Windows VM '$_vm_id' failed (exit $_packer_init_status)"
+    error "Packer init for Windows VM '$_vm_type' failed (exit $_packer_init_status)"
     return "$_packer_init_status"
   fi
 
@@ -3193,7 +3169,7 @@ EOF
     say "Windows Packer attempt using firmware_mode=$_firmware_mode boot_strategy=$_boot_strategy (ssh_timeout=$_attempt_timeout)..."
 
     # WHY: Packer qemu builder requires a non-existent output_directory.
-    _attempt_tmpdir="$(mktemp -d "$(vm_src_path "$_vm_type" ".${_vm_id}.${_firmware_mode}.${_boot_strategy}.XXXXXX")")"
+    _attempt_tmpdir="$(mktemp -d "$(vm_src_path "$_vm_type" ".${_vm_type}.${_firmware_mode}.${_boot_strategy}.XXXXXX")")"
     _tmp_out="$_attempt_tmpdir/output"
     _packer_log="$_attempt_tmpdir/packer.log"
     _autounattend_rendered="$_attempt_tmpdir/Autounattend.xml"
@@ -3271,7 +3247,7 @@ $_build_attempts
 EOF
 
   if [ "$_packer_status" -ne 0 ]; then
-    error "Packer build for Windows VM '$_vm_id' failed (exit $_packer_status)"
+    error "Packer build for Windows VM '$_vm_type' failed (exit $_packer_status)"
     return "$_packer_status"
   fi
   _built="$_built_tmpdir/output/windows.qcow2"
@@ -3294,7 +3270,7 @@ EOF
   say "Windows 11 image ready: $_out"
 }
 
-# vm_build_macos VM_ID DISK_BYTES RAM_BYTES CPUS MACOS_VERSION
+# vm_build_macos TYPE DISK_BYTES RAM_BYTES CPUS MACOS_VERSION
 #   Builds the macOS guest VM using the Packer Tart plugin.  Requires tart
 #   and packer to be installed; only runs on Darwin hosts (Tart uses Apple
 #   Virtualization.framework which is not available on other platforms).
@@ -3302,12 +3278,12 @@ EOF
 #   the ~/.tart symlink created by ensure_tart_vm_dir).
 #   Source: https://github.com/cirruslabs/packer-plugin-tart
 vm_build_macos() {
-  _vm_id="$1"
+  _vm_type="$1"
   _disk_bytes="$2"
   _ram_bytes="$3"
   _cpus="$4"
   _macos_version="$5"
-  _marker="$(vm_guest_credentials_marker_path "$_vm_id")"
+  _marker="$(vm_guest_credentials_marker_path "$_vm_type")"
 
   if [ "$(uname -s)" != "Darwin" ]; then
     say "macOS guest build requires a macOS host (Tart uses Virtualization.framework); skipping"
@@ -3324,15 +3300,15 @@ vm_build_macos() {
     return 1
   fi
 
-  if vm_get_tart_registered_names | grep -qxF "$_vm_id"; then
+  if vm_get_tart_registered_names | grep -qxF "$_vm_type"; then
     if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker"; then
-      say "tart VM '$_vm_id' already exists for the current guest credentials (owner=$vm_secret_owner, username=$vm_guest_username)"
+      say "tart VM '$_vm_type' already exists for the current guest credentials (owner=$vm_secret_owner, username=$vm_guest_username)"
       return 0
     fi
 
-    say "macOS guest credential drift detected; rebuilding tart VM '$_vm_id'"
-    if ! tart delete "$_vm_id"; then
-      error "failed to delete stale tart VM '$_vm_id' before rebuild"
+    say "macOS guest credential drift detected; rebuilding tart VM '$_vm_type'"
+    if ! tart delete "$_vm_type"; then
+      error "failed to delete stale tart VM '$_vm_type' before rebuild"
       return 1
     fi
     rm -f "$_marker"
@@ -3345,7 +3321,7 @@ vm_build_macos() {
   say "building macOS $_macos_version VM via Packer Tart (disk=$_disk_gib GiB, mem=$_mem_gib GiB, cpus=$_cpus)..."
 
   if [ "$dry_run" = true ]; then
-    dry_run "cd $_packer_dir && packer build -var vm_name=$_vm_id -var macos_version=$_macos_version -var guest_username=$vm_guest_username -var guest_password=<redacted> -var vm_hostname=$NUCLEUS_VM_GUEST_HOSTNAME -var disk_size_gib=$_disk_gib -var memory_gib=$_mem_gib -var cpus=$_cpus ."
+    dry_run "cd $_packer_dir && packer build -var vm_name=$_vm_type -var macos_version=$_macos_version -var guest_username=$vm_guest_username -var guest_password=<redacted> -var vm_hostname=$NUCLEUS_VM_GUEST_HOSTNAME -var disk_size_gib=$_disk_gib -var memory_gib=$_mem_gib -var cpus=$_cpus ."
     return 0
   fi
 
@@ -3354,7 +3330,7 @@ vm_build_macos() {
     cd "$_packer_dir"
     packer init .
     packer build \
-      -var "vm_name=$_vm_id" \
+      -var "vm_name=$_vm_type" \
       -var "macos_version=$_macos_version" \
       -var "guest_username=$vm_guest_username" \
       -var "guest_password=$vm_guest_password" \
@@ -3366,11 +3342,11 @@ vm_build_macos() {
   ) || _packer_status=$?
 
   if [ "$_packer_status" -ne 0 ]; then
-    error "Packer build for macOS VM '$_vm_id' failed (exit $_packer_status)"
+    error "Packer build for macOS VM '$_vm_type' failed (exit $_packer_status)"
     return "$_packer_status"
   fi
   resize_and_mark_image '' "$_marker"
-  say "macOS VM '$_vm_id' built and registered in tart"
+  say "macOS VM '$_vm_type' built and registered in tart"
 }
 
 # prune_stale_build_dirs
@@ -3391,10 +3367,82 @@ prune_stale_build_dirs() {
   done
 }
 
+# vm_build_system TYPE
+#   Builds/rebuilds the type-scoped system image (src/<type>/system
+#   image.qcow2) once for TYPE, using the first enabled, host-matched manifest
+#   entry of TYPE for build parameters (disk size, edition, macOS version).
+#   WHY: the type image is identity-free and shared by every VM of the type;
+#   per-VM identity is injected onto the data disk at provision time, never
+#   baked into the image.
+vm_build_system() {
+  _bs_type="$1"
+
+  _bs_id="$(jq -r --arg type "$_bs_type" --arg host "$NUCLEUS_HOST" \
+    '[.VMs[] | select(.type == $type) | select(.enabled == true) | select(.hosts | contains([$host]))] | .[0].id // empty' \
+    "$MANIFEST")"
+  if [ -z "$_bs_id" ]; then
+    error "no enabled VM of type '$_bs_type' configured for host '$NUCLEUS_HOST'"
+    return 1
+  fi
+
+  _bs_disk_bytes="$(parse_size "$(jq -r --arg n "$_bs_id" '.VMs[] | select(.id == $n) | .diskSize' "$MANIFEST")")"
+  # WHY: the type image is identity-free; the type name is the guest hostname
+  # (macOS Tart -var vm_hostname, Windows Autounattend guest hostname token).
+  _bs_guest_hostname="$(printf '%s' "$_bs_type" | tr '[:upper:]' '[:lower:]')"
+  export NUCLEUS_VM_GUEST_HOSTNAME="$_bs_guest_hostname"
+
+  case "$_bs_type" in
+  NixOS)
+    # check-suppress:suppression_doc: best-effort -- a prerequisite-missing or build failure for one
+    vm_build_nixos "$_bs_type" "$_bs_disk_bytes" ||
+      say "NixOS image build skipped for type '$_bs_type' (prerequisite missing or build failed; see above)"
+    ;;
+  Windows)
+    _bs_edition="$(jq -r --arg n "$_bs_id" '.VMs[] | select(.id == $n) | .Windows.edition' "$MANIFEST")"
+    # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
+    vm_build_windows "$_bs_type" "$_bs_disk_bytes" "$_bs_edition" ||
+      say "Windows image build skipped for type '$_bs_type' (prerequisite missing or build failed; see above)"
+    ;;
+  macOS)
+    _bs_ram_bytes="$(parse_size "$(jq -r --arg n "$_bs_id" '.VMs[] | select(.id == $n) | .ram' "$MANIFEST")")"
+    _bs_cpus="$(jq -r --arg n "$_bs_id" '.VMs[] | select(.id == $n) | .cpus' "$MANIFEST")"
+    _bs_macos_ver="$(jq -r --arg n "$_bs_id" '.VMs[] | select(.id == $n) | .macOS.version' "$MANIFEST")"
+    # check-suppress:suppression_doc: best-effort -- see NixOS branch above.
+    vm_build_macos "$_bs_type" "$_bs_disk_bytes" "$_bs_ram_bytes" "$_bs_cpus" "$_bs_macos_ver" ||
+      say "macOS image build skipped for type '$_bs_type' (prerequisite missing or build failed; see above)"
+    ;;
+  Android)
+    # Android system/GSI images are downloaded per-VM (gsiUrl) by
+    # vm_build_android_image; there is no type-scoped Android image.
+    return 0
+    ;;
+  *)
+    error "unsupported VM type for system build: $_bs_type"
+    return 1
+    ;;
+  esac
+}
+
 vm_build_images() {
   vm_ensure_type_src_dirs
   prune_stale_build_dirs
-  vm_for_each vm_build_one_image
+
+  # Build each distinct enabled, host-matched type's system image once.
+  # WHY: the type image is identity-free and shared by every VM of the type;
+  # per-VM identity is injected onto the data disk at provision time.
+  while IFS= read -r _bi_type; do
+    [ -n "$_bi_type" ] || continue
+    if [ "$_bi_type" = "Android" ]; then
+      continue
+    fi
+    vm_build_system "$_bi_type"
+  done < <(jq -r --arg host "$NUCLEUS_HOST" \
+    '[.VMs[] | select(.enabled == true) | select(.hosts | contains([$host])) | .type] | unique[]' \
+    "$MANIFEST")
+
+  # Android keeps the per-VM build path: its system/GSI images are downloaded
+  # per id (gsiUrl) and the userdata disk is created per id.
+  vm_for_each vm_build_android_image
 }
 
 # macOS / Tart (macOS guests)
