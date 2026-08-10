@@ -249,7 +249,7 @@ The repository uses a consolidated lockfile at `src/lockfiles/lockfile.json` to 
 | `scoop`          | `string → string`                 | Scoop package name → version             |
 | `cargo-binstall` | `string → string`                 | Cargo crate name → version               |
 | `bun`            | `string → string`                 | Bun package name → version               |
-| `uv`             | `string → string`                 | Uv package name → version                |
+| `uv`             | `string → string`; VCS pins as `{source, rev}` object | Uv package name → version                |
 | `rustup`         | `string → string`                 | Rust toolchain → date                    |
 | `winget`         | `string → string`                 | WinGet package ID → version              |
 | `vscode`         | `string → string`                 | VS Code extension ID → version           |
@@ -266,6 +266,8 @@ Homebrew's `brew bundle` has no native lockfile. Formula, cask, and MAS version 
 
 Use `scripts/bump-lockfile.sh` / `scripts/bump-lockfile.ps1` to update the lockfile. For Nix-managed packages, regenerate `src/flake.lock` with `nix flake lock` from `src/`.
 
+The `uv` updater writes plain version strings and would clobber VCS object pins (e.g. `ext.discord-music-rpc` `{source, rev}`); both `bump-lockfile.sh` and `bump-lockfile.ps1` skip `.uv[<pkg>]` entries whose value is an object. Keep VCS-pinned uv packages as objects and preserve that guard.
+
 ## Validation
 
 - Nix files can be syntax-checked locally with `nix-instantiate --parse <file>` or `nix flake check` (requires Nix to be installed).
@@ -278,6 +280,7 @@ Use `scripts/bump-lockfile.sh` / `scripts/bump-lockfile.ps1` to update the lockf
 - Do not commit `result` symlinks or `*.drv` paths.
 - Do not guess or fabricate third-party tool behavior. When a bug or unexpected behavior involves an upstream tool (CamillaDSP, Jellyfin, nixpkgs, etc.), consult its source code or official documentation before reasoning about the root cause. Fabricated upstream semantics are not acceptable.
 - Do not use `builtins.fetchTarball` for inputs that should be pinned through the flake lock.
+- `substituteInPlace --replace` is deprecated — nixpkgs maps it to `--replace-warn`, which prints a warning and succeeds when the pattern does not match (a silent no-op trap). Use `--replace-fail` when the match is mandatory.
 
 ## Build artifact cleanup
 
