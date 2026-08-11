@@ -72,7 +72,7 @@ VM guest OSes must use the same hostname as the corresponding host OS. The canon
 
 The manifest `hostname` is the single source of truth. Guest files consume it through env/var/token plumbing and must not hard-code a hostname:
 
-- `src/vms/NixOS/guest.nix` — `networking.hostName = builtins.getEnv "NUCLEUS_VM_GUEST_HOSTNAME"` (and the flake attr `hostName`)
+- `src/vms/guests/<id>/guest.nix` — `networking.hostName = builtins.getEnv "NUCLEUS_VM_GUEST_HOSTNAME"` (and the flake attr `hostName`)
 - `src/vms/NixOS/packer.pkr.hcl` — `guest_hostname` var rendered into `networking.hostName`
 - `src/vms/macOS/packer.pkr.hcl` — `vm_hostname` var applied via `scutil` (HostName/ComputerName/LocalHostName)
 - `src/vms/Windows/Autounattend.xml` — `<ComputerName>__GUEST_HOSTNAME__</ComputerName>`
@@ -85,10 +85,10 @@ VM guest credentials must come from per-user SOPS secrets (`src/secrets/users-<u
 
 - Keys: `vm_guest_username`, `vm_guest_password` — referenced via `vmGuest` object (`usernameSecretKey`, `passwordSecretKey`) in `src/users/<username>/vm-guest.json`, assembled by `load-user-registry.sh` / `users-registry.nix`.
 - Each setup script (`vm.sh` / `Invoke-VMSetup.ps1`) resolves the current user, reads the `vmGuest` reference, decrypts the secret, and passes credentials into guest builders/templates.
-- All guest paths (NixOS: `guest.nix` + `packer.pkr.hcl`; Windows: `Autounattend.xml` + `packer.pkr.hcl`; macOS: `packer.pkr.hcl`) must consume injected credentials.
+- All guest paths (NixOS: `guests/<id>/guest.nix` + `packer.pkr.hcl`; Windows: `Autounattend.xml` + `packer.pkr.hcl`; macOS: `packer.pkr.hcl`) must consume injected credentials.
 - Credential drift must invalidate stale VM artifacts so changing secret-backed values rebuilds rather than reusing stale disks.
 
-Guest SSH public keys for NixOS `authorized_keys` are resolved from `src/modules/vm-guest-ssh-public-key-paths.json` (static `id_*.pub` paths first, then `ssh_personal_{username}.pub` templates aligned with `secrets.nix` and `50-nucleus.conf`). POSIX `vm_resolve_guest_ssh_public_key` in `src/scripts/lib/vm.sh` and Windows `Get-VMGuestSshPublicKey` read that manifest and export `NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY` for `guest.nix`.
+Guest SSH public keys for NixOS `authorized_keys` are resolved from `src/modules/vm-guest-ssh-public-key-paths.json` (static `id_*.pub` paths first, then `ssh_personal_{username}.pub` templates aligned with `secrets.nix` and `50-nucleus.conf`). POSIX `vm_resolve_guest_ssh_public_key` in `src/scripts/lib/vm.sh` and Windows `Get-VMGuestSshPublicKey` read that manifest and export `NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY` for `guests/<id>/guest.nix`.
 
 When changing credential policy, update `tests/modules/vm-setup-tests.nix` in the same commit.
 
@@ -230,13 +230,13 @@ The guest-side adb wedge persists with the workaround and is not caused by it.
 
 ## Disk format
 
-QCOW2 throughout all three platforms. Runtime disks live under `data/`; per-type source payloads and pre-built goldens live under `src/<type>/`:
+QCOW2 throughout all three platforms. Runtime disks live under `data/`; per-type source payloads and type system images live under `src/<type>/`:
 
 - macOS runtime: `~/virtual machines/data/<id>.qcow2` (UTM bundle exposes `~/virtual machines/<id>.utm/Data/disk-main.qcow2` as a hard link)
 - NixOS runtime: `~/virtual machines/data/<id>.qcow2`
 - Windows runtime: `%USERPROFILE%\virtual machines\data\<id>.qcow2`
 
-Pre-built golden images land in `~/virtual machines/src/<type>/prebuilt image.qcow2` (Windows: `%USERPROFILE%\virtual machines\src\<type>\prebuilt image.qcow2`). `nucleus-vm setup` builds these in phase 1 (if absent) and copies them to `src/<type>/overlay backing.qcow2` before creating the `data/<id>.qcow2` overlay in phase 2.
+Type system images land in `~/virtual machines/src/<type>/system image.qcow2` (Windows: `%USERPROFILE%\virtual machines\src\<type>\system image.qcow2`). `nucleus-vm setup` builds each once per type in phase 1 (if absent or drifted); phase 2 creates `data/<id>.qcow2` as a QCOW2 overlay backing directly to the system image.
 
 QCOW2 enables copy-based migration between hosts without conversion.
 
@@ -256,7 +256,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - VM backend: UTM 4.x QEMU backend.
 - Bundle location: `~/virtual machines/<id>.utm/`
 - Config template: `config.plist` pre-generated at `~/.local/share/nucleus/vms/<id>-config.plist` by `src/hosts/MacBook/vms.nix` at Home Manager activation time; `vm.sh setup` copies it into the bundle.
-- Disk pre-created in `Images/disk-main.qcow2` by copying or linking from `src/<type>/` (system image for Android; overlay chain for non-Android).
+- Disk pre-created in `Images/disk-main.qcow2` by copying or linking from `src/<type>/` (system image for Android; hard link to `data/<id>.qcow2` for non-Android).
 - After provisioning, UTM opens each bundle automatically.
 - VirtioFS shared directory: configured via `Sharing.DirectoryShare` in the Nix-generated config.plist.
 - Network: **Emulated** (QEMU user/slirp) — required for `PortForward` to work; vmnet-shared silently drops forwards.
@@ -311,7 +311,7 @@ Both hooks are best-effort: a VM sync/setup failure does not abort a completed s
 | `sync` | Manifest or Nix VM template changed; VMs already provisioned. Runs automatically after apply. |
 | `setup` | First VM, missing images/bundles, credential/config drift, new guest. Full provision (sync + build + disks). |
 | `android-config` | Android only: sideload MindTheGapps in recovery (`--gapps`), install ADB keys in recovery or booted system (`--adb-keys`), install Magisk (`--magisk`, booted only), enable rooted debugging (`--root`, booted only; requires Magisk su), configure fake Wi‑Fi (`--fake-wifi`, booted only; requires Magisk su). Run without flags to print the manual. Recovery flow: **Enter fastboot** → `--gapps` → **Enable ADB** → sideload → reboot → boot system → **Allow USB debugging** → `--magisk` → `--root` → `--fake-wifi`. |
-| `gc` | Remove stale VM artifacts not listed in `VMs.json`. Default preserves `data/` runtime disks; pass `--gc-data` to also GC orphaned overlays. Pass `--gc-disabled` to narrow the keep-set to enabled guests on the current host. |
+| `gc` | Remove stale VM artifacts not listed in `VMs.json`. Default preserves `data/` runtime disks; pass `--gc-data` to also GC orphaned data disks. Pass `--gc-disabled` to narrow the keep-set to enabled guests on the current host. |
 | `pack` / `unpack` | Copy VM tree to another host (`unpack` may recreate UTM bundles). |
 | `start` / `stop` | Runtime control. Restart after sync when port forwards changed. |
 
@@ -332,7 +332,8 @@ Both hooks are best-effort: a VM sync/setup failure does not abort a completed s
 
 | File                                                  | Purpose                                                        |
 | ----------------------------------------------------- | -------------------------------------------------------------- |
-| `src/vms/NixOS/guest.nix`                             | NixOS guest configuration for `nixos-generators` (macOS/NixOS) |
+| `src/vms/NixOS/base-guest.nix`                         | Identity-free NixOS guest base configuration for `nixos-generators` (macOS/NixOS) |
+| `src/vms/guests/<id>/guest.nix`                        | Per-VM NixOS delta (hostname, credentials) applied at injection |
 | `src/vms/NixOS/packer.pkr.hcl`                        | Packer template for NixOS guest on Windows hosts               |
 | `src/vms/Windows/packer.pkr.hcl`                      | Packer template for Windows 11 guest on all hosts              |
 | `src/vms/Windows/Autounattend.xml`                    | Windows 11 answer file (unattended install, TPM bypass, WinRM) |
@@ -344,7 +345,7 @@ Both hooks are best-effort: a VM sync/setup failure does not abort a completed s
 
 **NixOS guest on macOS/NixOS**:
 
-- Uses `nix run github:nix-community/nixos-generators` to build from `src/vms/NixOS/guest.nix`.
+- Uses `nix run github:nix-community/nixos-generators` to build from `src/vms/NixOS/base-guest.nix`.
 - Architecture-aware Btrfs formats: `qcow-efi-btrfs` (UEFI) on aarch64 hosts (UTM on Apple Silicon), `qcow-btrfs` (BIOS/hybrid) on x86_64. Format modules live in `src/vms/NixOS/formats/`. Both use `@`/`@nix` subvolumes and `compress-force=zstd` (shared with host via `src/hosts/NixOS/btrfs-options.nix`). Packer installs on Windows use the same layout.
 - No Packer required; just `nix` command which is always present.
 

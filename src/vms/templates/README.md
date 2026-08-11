@@ -22,22 +22,19 @@ __VM_DIR_DISPLAY__/
 │   │   ├── Lineage download.zip        — cached LineageOS zip
 │   │   └── Lineage extract/            — extracted Lineage artifacts
 │   ├── NixOS/
-│   │   ├── prebuilt image.qcow2        — golden pre-built guest image
-│   │   ├── overlay backing.qcow2       — pristine base (copied from prebuilt at setup)
-│   │   ├── prebuilt image.vm-guest-credentials-sha256 — credential fingerprint for prebuilt
-│   │   ├── prebuilt image.vm-guest-config-sha256      — guest-config fingerprint for prebuilt
+│   │   ├── system image.qcow2          — type system image (built once per type)
+│   │   ├── system image.vm-type-config-sha256 — type-config fingerprint
 │   │   └── Packer/                     — temporary Packer build output (safe to delete)
 │   ├── Windows/
-│   │   ├── prebuilt image.qcow2        — golden pre-built guest image
-│   │   ├── overlay backing.qcow2       — pristine base (copied from prebuilt at setup)
+│   │   ├── system image.qcow2          — type system image (built once per type)
+│   │   ├── system image.vm-type-config-sha256 — type-config fingerprint
 │   │   ├── installer.iso               — cached Windows installer ISO
 │   │   ├── virtio guest tools.iso      — shared Windows guest tools ISO (large download)
-│   │   ├── prebuilt image.vm-guest-credentials-sha256 — credential fingerprint for prebuilt
 │   │   └── Packer/                     — temporary Packer build output (safe to delete)
 │   └── macOS/                          — macOS guest payloads (Tart-managed)
 ├── data/                               — writable per-guest runtime disks
-│   ├── <id>.qcow2                      — runtime overlay (non-Android: backs ../src/<type>/overlay backing.qcow2; Android: userdata)
-│   └── <id>.qcow2.vm-guest-credentials-sha256 — credential fingerprint for runtime disk
+│   ├── <id>.qcow2                      — writable overlay (non-Android: backs ../src/<type>/system image.qcow2; Android: userdata)
+│   └── <id>.qcow2.vm-provision-sha256  — provision fingerprint for runtime disk
 ├── <id>.vm.json                        — self-describing VM descriptor (all manifest guests)
 ├── scripts/                            — generated helper scripts
 │   ├── start-<id>.sh / .ps1            — start helper variants (all manifest guests, enabled or not)
@@ -47,7 +44,6 @@ __VM_DIR_DISPLAY__/
 │   ├── config.plist                    — UTM VM configuration
 │   └── Data/                           — bundle-local disk files exposed to UTM
 │       ├── disk-main.qcow2             — non-Android: hard link to data/<id>.qcow2; Android: copy of src/Android/system image.qcow2
-│       ├── overlay backing.qcow2       — non-Android only: hard link to src/<type>/overlay backing.qcow2
 │       ├── <userdataImage>             — Android only: hard link to data/<id>.qcow2 (G1a write-through)
 │       └── <gsiImage>                  — Android only: copy of src/Android/GSI.img (when GSI present)
 └── README.md                           — this file
