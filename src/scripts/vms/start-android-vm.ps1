@@ -11,12 +11,12 @@
   (windows-qemu start script generation) and Start-AndroidVM.ps1 (thin
   wrapper). Keep single-source — do not embed a copy elsewhere.
 
-  Expects disk images with filenames from the manifest Android group
-  (rendered by vm.sh via __ANDROID_SYSTEM_IMAGE__ / __ANDROID_USERDATA_IMAGE__ /
-  __ANDROID_GSI_IMAGE__ tokens):
-    - <systemImage>   (system partition, vda)   under ~\virtual machines\src\Android\
-    - <userdataImage> (userdata partition, vdb) under ~\virtual machines\data\
-    - <gsiImage>      (optional GSI system image, vdc) under ~\virtual machines\src\Android\
+  Expects disk images with filenames rendered by vm.sh via
+  __ANDROID_SYSTEM_IMAGE__ / __ANDROID_USERDATA_IMAGE__ / __ANDROID_GSI_IMAGE__
+  tokens:
+    - <id>-system.qcow2 (system overlay, vda)  under ~\virtual machines\data\
+    - <userdataImage>   (userdata partition, vdb) under ~\virtual machines\data\
+    - <gsiImage>        (optional GSI system image, vdc, read-only) under ~\virtual machines\src\Android\
 
   Firmware path defaults to the edk2-aarch64 UEFI image bundled with QEMU's
   standard installation layout (Scoop/manual).
@@ -34,9 +34,8 @@ $ErrorActionPreference = 'Stop'
 $qemu = Get-Command 'qemu-system-aarch64.exe' -ErrorAction Stop
 
 # --- Paths ---
-# System/GSI images live under src/Android/ (read-only payload); the writable
-# userdata disk lives under data/ (canonical disk-model layout: every VM's
-# writable disk is data/<id>.qcow2).
+# The writable system overlay and userdata disk live under data/ (canonical
+# disk-model layout); the GSI payload stays under src/Android/ (read-only).
 $androidSrcDir = Join-Path $env:USERPROFILE 'virtual machines\src\Android'
 $dataDir       = Join-Path $env:USERPROFILE 'virtual machines\data'
 $firmwareDir = if (Get-Command 'qemu-img.exe' -ErrorAction SilentlyContinue) { # check-suppress:suppression_doc: qemu-img.exe is optional -- fallback to qemu dir
@@ -45,7 +44,7 @@ $firmwareDir = if (Get-Command 'qemu-img.exe' -ErrorAction SilentlyContinue) { #
                  Split-Path $qemu.Source -Parent
                }
 
-$diskSystem   = Join-Path $androidSrcDir '__ANDROID_SYSTEM_IMAGE__'
+$diskSystem   = Join-Path $dataDir '__ANDROID_SYSTEM_IMAGE__'
 $diskUserdata = Join-Path $dataDir '__ANDROID_USERDATA_IMAGE__'
 $diskGsi      = Join-Path $androidSrcDir '__ANDROID_GSI_IMAGE__'
 $uefiCode     = Join-Path $firmwareDir 'edk2-aarch64-code.fd'
@@ -91,7 +90,7 @@ $qemuArgs.AddRange(@(
 
 if (Test-Path -LiteralPath $diskGsi -PathType Leaf) {
   $qemuArgs.AddRange(@(
-    '-drive', "file=$diskGsi,format=raw,if=none,id=drive-gsi",
+    '-drive', "file=$diskGsi,format=raw,readonly=on,if=none,id=drive-gsi",
     '-device', 'virtio-blk-pci,drive=drive-gsi'
   ))
 }

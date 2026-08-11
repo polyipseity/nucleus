@@ -95,6 +95,12 @@ Describe "Windows VM disk-model parity (P8)" {
     (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('Join-Path -Path $dataDir -ChildPath "$($vm.id).qcow2"'))
   }
 
+  It "Android system overlay is a data/ qcow2 over src/Android/system image.qcow2" {
+    $content = Get-VmSetupPs1Content
+    $content | Should -Match ([regex]::Escape('Join-Path -Path $dataDir -ChildPath "$($vm.id)-system.qcow2"'))
+    $content | Should -Match ([regex]::Escape('& $qemuImg create -f qcow2 -b $systemImage -F qcow2 $systemOverlayPath'))
+  }
+
   It "pack refuses while a VM runs and retains the data/ payload" {
     $content = Get-VmPs1Content
     $content | Should -Match ([regex]::Escape('Get-VMRunningIdList'))

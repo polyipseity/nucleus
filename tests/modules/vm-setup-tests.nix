@@ -1773,8 +1773,10 @@ let
         && (lib.hasInfix "Get-VMQcow2VirtualSize -ImagePath \$diskPath" windows_vm_setup_ps1_text)
         && (lib.hasInfix "\$qemuImg resize \$diskPath \$diskBytes" windows_vm_setup_ps1_text)
         && (lib.hasInfix "vm.id).qcow2" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Join-Path -Path \$dataDir -ChildPath \"\$(\$vm.id)-system.qcow2\"" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "& \$qemuImg create -f qcow2 -b \$systemImage -F qcow2 \$systemOverlayPath" windows_vm_setup_ps1_text)
       )
-      "Windows vm-setup must provision data/<id>.qcow2 overlays over src/<type>/system image.qcow2 (absolute backing, data preservation, grow-only resize, Android standalone userdata)";
+      "Windows vm-setup must provision data/<id>.qcow2 overlays over src/<type>/system image.qcow2 (absolute backing, data preservation, grow-only resize, Android standalone userdata and data/<id>-system.qcow2 system overlay)";
 
   # The POSIX Windows/QEMU vm-setup callback must provision data disks for
   # Windows guests (parity with the PowerShell Pass A): the vm_provision_one
@@ -1818,10 +1820,39 @@ let
       )
       "Android userdata must hard-link from canonical data/<id>.qcow2 without deleting standalone bundle copies";
 
-  test_libvirt_android_userdata_canonical_path = assert' (
-    (lib.hasInfix "vm_setup_libvirt()" vm_setup_sh_text)
-    && (lib.hasInfix "_android_userdata=\"\$VM_DIR/data/\${vm_id}.qcow2\"" vm_setup_sh_text)
-  ) "vm_setup_libvirt must validate Android userdata at data/<id>.qcow2";
+  test_libvirt_android_userdata_canonical_path =
+    assert'
+      (
+        (lib.hasInfix "vm_setup_libvirt()" vm_setup_sh_text)
+        && (lib.hasInfix "_android_userdata=\"\$VM_DIR/data/\${vm_id}.qcow2\"" vm_setup_sh_text)
+        && (lib.hasInfix "vm_ensure_android_system_overlay \"\$vm_id\"" vm_setup_sh_text)
+      )
+      "vm_setup_libvirt must validate Android userdata at data/<id>.qcow2 and ensure the data/<id>-system.qcow2 system overlay";
+
+  # vm_ensure_android_system_overlay must create data/<name>-system.qcow2 as
+  # an absolute-backed qcow2 overlay over src/Android/system image.qcow2
+  # (create-once/preserve, provision marker, Android semantics) and be wired
+  # into libvirt and windows-qemu Android setup.
+  test_vm_ensure_android_system_overlay =
+    assert'
+      (
+        (lib.hasInfix "vm_ensure_android_system_overlay() {" vm_setup_sh_text)
+        && (lib.hasInfix "_easo_disk=\"\$VM_DIR/data/\${_easo_name}-system.qcow2\"" vm_setup_sh_text)
+        && (lib.hasInfix "qemu-img create -f qcow2 -b \"\$_easo_backing\" -F qcow2 \"\$_easo_disk\"" vm_setup_sh_text)
+        && (lib.hasInfix "vm_system_image_path Android" vm_setup_sh_text)
+        && (lib.hasInfix "Android system overlay already exists" vm_setup_sh_text)
+        && (lib.hasInfix "Android system overlay is invalid for" vm_setup_sh_text)
+        && !(lib.hasInfix "qemu-img create -f qcow2 -b \"\$_easo_disk\"" vm_setup_sh_text)
+      )
+      "vm_ensure_android_system_overlay must create data/<name>-system.qcow2 as an absolute-backed qcow2 overlay over src/Android/system image.qcow2 (create-once/preserve, never self-rebase)";
+
+  # vm_setup_windows_qemu must also ensure the Android system overlay for
+  # windows-qemu guests (parity with vm_setup_libvirt and the PowerShell
+  # Pass A Android branch).
+  test_windows_qemu_android_system_overlay = assert' (
+    (lib.hasInfix "vm_setup_windows_qemu()" vm_setup_sh_text)
+    && (lib.hasInfix "vm_ensure_android_system_overlay \"\$vm_id\"" vm_setup_sh_text)
+  ) "vm_setup_windows_qemu must ensure the data/<id>-system.qcow2 Android system overlay";
 
   # The Android build must strip the whitespace wc -c pads its output with
   # (macOS pads, Linux does not); otherwise the size leaks into the selected
@@ -1965,6 +1996,21 @@ let
       )
       "start-android-vm.ps1 must expose __ANDROID_CPU_COUNT__/__ANDROID_RAM_BYTES__/__ANDROID_SYSTEM_IMAGE__/__ANDROID_USERDATA_IMAGE__/__ANDROID_GSI_IMAGE__/__HOSTFWDS__ tokens for manifest-driven rendering";
 
+  # start-android-vm.ps1 must attach the system drive as the writable
+  # data/<id>-system.qcow2 overlay (rendered leaf), keep userdata under data/,
+  # and keep the GSI payload under src/Android/ read-only (readonly=on).
+  test_start_android_system_overlay_data_dir =
+    assert'
+      (
+        (lib.hasInfix "Join-Path \$dataDir '__ANDROID_SYSTEM_IMAGE__'" start_android_ps1_text)
+        && (lib.hasInfix "Join-Path \$dataDir '__ANDROID_USERDATA_IMAGE__'" start_android_ps1_text)
+        && (lib.hasInfix "Join-Path \$androidSrcDir '__ANDROID_GSI_IMAGE__'" start_android_ps1_text)
+        && (lib.hasInfix "readonly=on,if=none,id=drive-gsi" start_android_ps1_text)
+        && !(lib.hasInfix "Join-Path \$androidSrcDir '__ANDROID_SYSTEM_IMAGE__'" start_android_ps1_text)
+        && !(lib.hasInfix "file=\$diskSystem,format=qcow2,readonly=on" start_android_ps1_text)
+      )
+      "start-android-vm.ps1 must resolve the system overlay and userdata under data/ and keep the GSI payload under src/Android/ read-only (readonly=on, system overlay never readonly)";
+
   # vm_write_start_script must render the Android tokens via a sed chain after
   # copying the shared file, preserving the android-vm-single-source invariant.
   test_vm_write_start_script_android_sed_chain =
@@ -1978,6 +2024,20 @@ let
         && (lib.hasInfix "s|__HOSTFWDS__|" vm_setup_sh_text)
       )
       "vm.sh must render Android start-script tokens (CPU/RAM/images/portForwards) via a sed chain after copying the shared file";
+
+  # Both PowerShell renderers must emit the data/<id>-system.qcow2 overlay
+  # leaf for __ANDROID_SYSTEM_IMAGE__ (never the pristine src/Android/
+  # payload name), keeping the cross-host disk model in lockstep.
+  test_android_system_overlay_render_leaves =
+    assert'
+      (
+        (lib.hasInfix "Replace('__ANDROID_SYSTEM_IMAGE__', \"\$vmId-system.qcow2\")" vm_ps1_text)
+        && (lib.hasInfix "Replace('__ANDROID_SYSTEM_IMAGE__', \"\$(\$Vm.id)-system.qcow2\")" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "_wss_system_image=\"\${_wss_id}-system.qcow2\"" vm_setup_sh_text)
+        && !(lib.hasInfix "Replace('__ANDROID_SYSTEM_IMAGE__', [string]\$vmDoc.Android.systemImage)" vm_ps1_text)
+        && !(lib.hasInfix "Replace('__ANDROID_SYSTEM_IMAGE__', [string]\$Vm.Android.systemImage)" windows_vm_setup_ps1_text)
+      )
+      "All three renderers must emit the data/<id>-system.qcow2 overlay leaf for __ANDROID_SYSTEM_IMAGE__, never the pristine src/Android/ payload name";
 
   # Local Mido compatibility adjustments must be applied at runtime from a
   # repository-owned patch file, not by editing the vendored submodule files.
@@ -2387,19 +2447,20 @@ let
     && (lib.hasInfix "src/Android/\${vm.Android.gsiImage}" nixos_vms_nix_text)
   ) "src/hosts/NixOS/vms.nix must render the GSI disk only when vm.Android.gsiUrl is non-null";
 
-  # NixOS Android system/GSI disks must live under src/Android/ inside the VM
-  # directory, named from the manifest Android group; the userdata disk is the
-  # canonical data/<id>.qcow2 overlay.  Bare ${vmDir}/android-* paths would
-  # break the cross-host src/data layout.
+  # NixOS Android system disk must be the writable data/<id>-system.qcow2
+  # overlay over src/Android/system image.qcow2 (src/ stays pristine); the
+  # userdata disk is the canonical data/<id>.qcow2; the GSI payload stays
+  # under src/Android/ read-only.  Bare ${vmDir}/android-* paths would break
+  # the cross-host src/data layout.
   test_nixos_android_disk_paths =
     assert'
       (
-        (lib.hasInfix "src/Android/\${vm.Android.systemImage}" nixos_vms_nix_text)
+        (lib.hasInfix "\${vmDir}/data/\${vm.id}-system.qcow2" nixos_vms_nix_text)
         && (lib.hasInfix "\${vmDir}/data/\${vm.id}.qcow2" nixos_vms_nix_text)
         && !(lib.hasInfix "\${vmDir}/android-system.qcow2" nixos_vms_nix_text)
         && !(lib.hasInfix "\${vmDir}/android-userdata.qcow2" nixos_vms_nix_text)
       )
-      "src/hosts/NixOS/vms.nix must place Android system/GSI under \${vmDir}/src/Android/ from the manifest Android group and userdata under \${vmDir}/data/<id>.qcow2, never at the bare VM directory root";
+      "src/hosts/NixOS/vms.nix must attach the Android system disk as the writable data/<id>-system.qcow2 overlay and userdata as data/<id>.qcow2, never at the bare VM directory root";
 
   test_macbook_tart_storage_link =
     assert'
@@ -2613,6 +2674,10 @@ let
     test_vm_provision_android_marker_adoption_only
     test_windows_vm_data_disk_preservation
     test_vm_android_build_skip_if_exists
+    test_vm_ensure_android_system_overlay
+    test_windows_qemu_android_system_overlay
+    test_start_android_system_overlay_data_dir
+    test_android_system_overlay_render_leaves
   ];
 
 in
@@ -2802,6 +2867,10 @@ in
     test_vm_provision_android_marker_adoption_only
     test_windows_vm_data_disk_preservation
     test_vm_android_build_skip_if_exists
+    test_vm_ensure_android_system_overlay
+    test_windows_qemu_android_system_overlay
+    test_start_android_system_overlay_data_dir
+    test_android_system_overlay_render_leaves
     ;
 
   summary = builtins.deepSeq all_tests "vm-setup-tests: all tests passed";

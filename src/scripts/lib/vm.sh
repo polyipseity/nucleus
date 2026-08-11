@@ -703,7 +703,10 @@ vm_write_start_script() {
       fi
       _wss_cpus="$(printf '%s' "$_wss_doc" | jq -r '.cpus')"
       _wss_ram_bytes="$(parse_size "$(printf '%s' "$_wss_doc" | jq -r '.ram')")"
-      _wss_system_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.systemImage')"
+      # WHY: the Android start script resolves the system drive under data/;
+      # the rendered leaf is the canonical system overlay
+      # data/<id>-system.qcow2, not the pristine src/Android/ payload.
+      _wss_system_image="${_wss_id}-system.qcow2"
       _wss_userdata_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.userdataImage')"
       _wss_gsi_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.gsiImage')"
       _wss_hostfwds="$(printf '%s' "$_wss_doc" | jq -r '[.portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")')"
@@ -1410,6 +1413,81 @@ vm_ensure_data_disk() {
         error "failed to grow data disk: $_edd_disk"
         return 1
       fi
+    fi
+  fi
+
+  return 0
+}
+
+# vm_ensure_android_system_overlay NAME
+#   Ensures the Android system overlay for NAME under the managed layout:
+#     src/Android/system image.qcow2 — pristine Android system image (read-only base)
+#     data/<name>-system.qcow2       — persistent writable overlay backing the
+#                                      Android system image at its absolute path
+#   The overlay carries the guest /system partition so recovery sideload
+#   (GApps) keeps working while src/ stays pristine.  Cases:
+#   1. Overlay missing → create as an overlay on the Android system image and
+#      write provision markers.
+#   2. Overlay exists and validates → KEEP it — never recreate, truncate, or
+#      re-base; adopt a stale provision marker (Android semantics: derived
+#      from the base, never injected).
+#   3. Overlay invalid → warn and skip (manual deletion + re-setup is the
+#      destructive path).
+#   No grow logic: the overlay inherits the base virtual size.
+vm_ensure_android_system_overlay() {
+  local _easo_name="$1"
+  local _easo_disk _easo_backing _easo_system_image _easo_min_size
+  local _easo_disk_valid _easo_provision_marker _easo_provision_fp
+
+  mkdir -p "$VM_DIR/data"
+
+  _easo_disk="$VM_DIR/data/${_easo_name}-system.qcow2"
+  _easo_backing="$(vm_system_image_path Android)"
+  _easo_system_image="$(vm_src_path Android "$VM_SYSTEM_IMAGE")"
+  _easo_min_size="$(parse_size "$(jq -r --arg n "$_easo_name" '.VMs[] | select(.id == $n) | .minImageSize' "$MANIFEST")")"
+  _easo_provision_marker="$(vm_provision_marker_path "$_easo_disk")"
+  # WHY: the provision fingerprint covers per-VM guest identity and the
+  # provision-relevant manifest fields; it is the drift key for marker
+  # adoption (same fingerprint as the VM's userdata disk).
+  _easo_provision_fp="$(vm_provision_fingerprint "$_easo_name")" || return 1
+
+  _easo_disk_valid=false
+  if [ -f "$_easo_disk" ] && validate_qcow2_image "$_easo_disk" "Android system overlay for ${_easo_name}" "$_easo_min_size"; then
+    _easo_disk_valid=true
+  fi
+
+  if [ "$_easo_disk_valid" = true ]; then
+    say "Android system overlay already exists: $_easo_disk"
+    # WHY: the overlay is derived from the base and never injected; a missing
+    # or stale marker only means the provision inputs changed, so adopt it
+    # (marker adoption only — never recreation, never injection).
+    if ! vm_provision_marker_matches "$_easo_provision_fp" "$_easo_provision_marker"; then
+      printf '%s\n' "$_easo_provision_fp" >"$_easo_provision_marker"
+    fi
+  elif [ -f "$_easo_disk" ]; then
+    warn "Android system overlay is invalid for '$_easo_name': $_easo_disk"
+    # WHY: 'nucleus-vm reset' only wipes userdata (Android factory-reset
+    # semantics: /data reset, /system preserved, so GApps/Magisk survive); the
+    # overlay is never auto-recreated, so the operator deletes it manually and
+    # setup recreates it (this DESTROYS the guest /system state).
+    warn "delete it and re-run 'nucleus-vm setup' to recreate it (this DESTROYS the guest /system state)"
+    return 1
+  fi
+
+  if [ ! -f "$_easo_disk" ]; then
+    if [ ! -f "$_easo_system_image" ]; then
+      warn "Android system image not found: $_easo_system_image; cannot create system overlay for '$_easo_name'"
+      return 1
+    fi
+    if [ "$dry_run" = false ]; then
+      if ! qemu-img create -f qcow2 -b "$_easo_backing" -F qcow2 "$_easo_disk" >/dev/null; then
+        error "failed to create Android system overlay: $_easo_disk"
+        return 1
+      fi
+      printf '%s\n' "$_easo_provision_fp" >"$_easo_provision_marker"
+      say "created Android system overlay: $_easo_disk (backing $_easo_backing)"
+    else
+      dry_run "qemu-img create -f qcow2 -b $_easo_backing -F qcow2 $_easo_disk"
     fi
   fi
 
@@ -2907,6 +2985,12 @@ vm_setup_libvirt() {
       warn "Android images are invalid for '$vm_id'"
       return
     fi
+    # WHY: the libvirt domain XML attaches the guest-visible system disk as
+    # the data/<id>-system.qcow2 overlay (src/Android/ stays pristine); the
+    # overlay must exist before the domain references it.
+    if ! vm_ensure_android_system_overlay "$vm_id"; then
+      return
+    fi
   else
     _prebuilt="$(vm_src_path "$vm_type" "$VM_SYSTEM_IMAGE")"
     _prebuilt_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
@@ -2923,7 +3007,7 @@ vm_setup_libvirt() {
   if [ "$dry_run" = false ]; then
     mkdir -p "$VM_DIR"
     if [ "$vm_type" = "Android" ]; then
-      say "Android images referenced directly by domain XML: $_android_system, $_android_userdata"
+      say "Android disks ready for domain XML: $VM_DIR/data/${vm_id}-system.qcow2 (system overlay), $_android_userdata"
     else
       if ! vm_provision_one "$vm_id"; then
         return
@@ -2932,7 +3016,7 @@ vm_setup_libvirt() {
     fi
   else
     if [ "$vm_type" = "Android" ]; then
-      dry_run "use Android images in domain XML: $_android_system, $_android_userdata"
+      dry_run "ensure Android system overlay: $VM_DIR/data/${vm_id}-system.qcow2"
     else
       dry_run "ensure data disk: $disk_path (overlay on $(vm_src_path "$vm_type" "$VM_SYSTEM_IMAGE"))"
     fi
@@ -3880,7 +3964,8 @@ vm_setup_libvirt_vms() {
 #   writable runtime disk per VM: Windows guests get a data/<id>.qcow2 overlay
 #   over images/<type>.base.qcow2 (mirroring vm_setup_libvirt and the
 #   PowerShell vm-setup Pass A); Android guests get a standalone
-#   data/<id>.qcow2 userdata disk (system/GSI images are referenced directly).
+#   data/<id>.qcow2 userdata disk plus the data/<id>-system.qcow2 system
+#   overlay (system/GSI src/ payloads stay pristine).
 vm_setup_windows_qemu() {
   local vm_id="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display disk_path _prebuilt
@@ -3924,6 +4009,9 @@ vm_setup_windows_qemu() {
       fi
     else
       dry_run "ensure Android userdata disk: $_android_userdata (${_android_disk_bytes} bytes)"
+    fi
+    if ! vm_ensure_android_system_overlay "$vm_id"; then
+      return
     fi
     return
   fi

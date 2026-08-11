@@ -739,7 +739,7 @@ function Invoke-VMUnpack {
         $content = (Get-Content -LiteralPath $androidTemplate -Raw)
         $content = $content.Replace('__ANDROID_CPU_COUNT__', [string]$vmDoc.cpus)
         $content = $content.Replace('__ANDROID_RAM_BYTES__', "$ramBytes" + 'B')
-        $content = $content.Replace('__ANDROID_SYSTEM_IMAGE__', [string]$vmDoc.Android.systemImage)
+        $content = $content.Replace('__ANDROID_SYSTEM_IMAGE__', "$vmId-system.qcow2")
         $content = $content.Replace('__ANDROID_USERDATA_IMAGE__', [string]$vmDoc.Android.userdataImage)
         $content = $content.Replace('__ANDROID_GSI_IMAGE__', [string]$vmDoc.Android.gsiImage)
         $content = $content.Replace('__HOSTFWDS__', $hostFwds)

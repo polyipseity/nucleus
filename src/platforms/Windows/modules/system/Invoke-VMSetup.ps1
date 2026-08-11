@@ -842,7 +842,7 @@ function Invoke-VMSetup {
             $template = Get-Content -Path $androidStartPath -Raw
             $content = $template.Replace('__ANDROID_CPU_COUNT__', [string]$Vm.cpus)
             $content = $content.Replace('__ANDROID_RAM_BYTES__', "${ramBytes}B")
-            $content = $content.Replace('__ANDROID_SYSTEM_IMAGE__', [string]$Vm.Android.systemImage)
+            $content = $content.Replace('__ANDROID_SYSTEM_IMAGE__', "$($Vm.id)-system.qcow2")
             $content = $content.Replace('__ANDROID_USERDATA_IMAGE__', [string]$Vm.Android.userdataImage)
             $content = $content.Replace('__ANDROID_GSI_IMAGE__', [string]$Vm.Android.gsiImage)
             $content = $content.Replace('__HOSTFWDS__', $hostFwds)
@@ -1325,6 +1325,50 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                         Set-Content -Path $userdataProvisionMarker -Value $userdataProvisionHash -Encoding UTF8
                     } else {
                         Write-Information "vm-setup: [dry-run] Set-Content '$userdataProvisionMarker' '$userdataProvisionHash'"
+                    }
+                }
+            }
+
+            # Android system overlay: persistent writable qcow2 overlay over
+            # src/Android/system image.qcow2 (absolute backing path) carrying
+            # the guest /system partition so recovery sideload (GApps) keeps
+            # working while src/ stays pristine.  Create-once/preserve;
+            # marker adoption on drift (Android semantics: derived from the
+            # base, never injected).
+            $systemOverlayPath = Join-Path -Path $dataDir -ChildPath "$($vm.id)-system.qcow2"
+            $systemOverlayProvisionMarker = Get-VMProvisionMarkerPath -BasePath $systemOverlayPath
+            if (-not (Test-Path -LiteralPath $systemOverlayPath -PathType Leaf)) {
+                if ($systemImageValid) {
+                    Write-Information "vm-setup: Android system overlay missing; creating $systemOverlayPath"
+                    if (-not $DryRun) {
+                        if ($null -eq $qemuImg) {
+                            Write-Warning "vm-setup: qemu-img not found; cannot create Android system overlay for '$($vm.id)'"
+                        } else {
+                            & $qemuImg create -f qcow2 -b $systemImage -F qcow2 $systemOverlayPath
+                            if ($LASTEXITCODE -ne 0) {
+                                Write-Warning "vm-setup: qemu-img create failed for Android system overlay: $systemOverlayPath"
+                            }
+                            Set-Content -Path $systemOverlayProvisionMarker -Value $userdataProvisionHash -Encoding UTF8
+                        }
+                    } else {
+                        Write-Information "vm-setup: [dry-run] qemu-img create -f qcow2 -b '$systemImage' -F qcow2 '$systemOverlayPath'"
+                        Write-Information "vm-setup: [dry-run] Set-Content '$systemOverlayProvisionMarker' '$userdataProvisionHash'"
+                    }
+                } else {
+                    Write-Warning "vm-setup: Android system image not found or invalid for '$($vm.id)': $systemImage; skipping system overlay"
+                }
+            } else {
+                Write-Information "vm-setup: Android system overlay already exists: $systemOverlayPath"
+                if (-not (Test-VMMarker -ExpectedHash $userdataProvisionHash -MarkerPath $systemOverlayProvisionMarker)) {
+                    # WHY: Android system overlay is derived from the base and
+                    # never injected; a missing or stale marker only means the
+                    # inputs changed, so adopt it (marker adoption only, no
+                    # injection, no drift report).
+                    Write-Information "vm-setup: refreshing provision marker for Android system overlay '$($vm.id)'"
+                    if (-not $DryRun) {
+                        Set-Content -Path $systemOverlayProvisionMarker -Value $userdataProvisionHash -Encoding UTF8
+                    } else {
+                        Write-Information "vm-setup: [dry-run] Set-Content '$systemOverlayProvisionMarker' '$userdataProvisionHash'"
                     }
                 }
             }
