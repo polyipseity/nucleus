@@ -1482,10 +1482,6 @@ vm_link_android_userdata_to_utm_bundle() {
   _lautb_bundle="$_lautb_bundle_data_dir/$_lautb_userdata_image"
 
   if [ ! -f "$_lautb_canonical" ]; then
-    if [ -f "$_lautb_bundle" ]; then
-      error "Android userdata for '$_lautb_name' exists only in the UTM bundle ($_lautb_bundle); move it manually to $_lautb_canonical and re-run"
-      return 1
-    fi
     return 0
   fi
 
@@ -2412,15 +2408,11 @@ vm_build_android() {
     say "system image already exists: $_bai_system_img"
   fi
 
-  _bai_bundle_userdata="$VM_DIR/${_bai_vm_id}.utm/Data/$(jq -r ".VMs[$_bai_vm_index].Android.userdataImage" "$MANIFEST")"
   mkdir -p "$VM_DIR/data"
   if [ ! -f "$_bai_userdata_img" ] || [ "$_bai_reset_userdata" = "true" ]; then
     if [ "$_bai_reset_userdata" = "true" ] && [ -f "$_bai_userdata_img" ]; then
       say "resetting Android userdata disk..."
       rm -f "$_bai_userdata_img"
-    elif [ ! -f "$_bai_userdata_img" ] && [ -f "$_bai_bundle_userdata" ]; then
-      error "Android userdata for '$_bai_vm_id' exists only in the UTM bundle ($_bai_bundle_userdata); move it manually to $_bai_userdata_img and re-run"
-      return 1
     fi
     if [ ! -f "$_bai_userdata_img" ]; then
       say "creating userdata disk (${_bai_disk_bytes} bytes)..."

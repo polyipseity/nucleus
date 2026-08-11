@@ -1805,12 +1805,13 @@ let
       "scripts/vm.sh must provision Android UTM bundles from the manifest Android group image names, hard-linking the canonical data/<id>.qcow2 userdata into the bundle";
 
   # Android userdata must never delete standalone bundle copies; canonical
-  # data/<id>.qcow2 is the source of truth and sync must re-link it.
-  test_android_userdata_preserve_or_fail_fast =
+  # data/<id>.qcow2 is the source of truth and sync must re-link it (no
+  # legacy bundle-only migration paths).
+  test_android_userdata_hard_link_no_legacy_paths =
     assert'
       (
         (lib.hasInfix "vm_link_android_userdata_to_utm_bundle" vm_setup_sh_text)
-        && (lib.hasInfix "exists only in the UTM bundle" vm_setup_sh_text)
+        && !(lib.hasInfix "exists only in the UTM bundle" vm_setup_sh_text)
         && (lib.hasInfix "vm_link_android_userdata_to_utm_bundle \"\$vm_id\" \"\$vm_index\" \"\$bundle/Data\"" vm_setup_sh_text)
         && !(lib.hasInfix "removing legacy bundle userdata" vm_setup_sh_text)
         && !(lib.hasInfix "pre-migration" vm_setup_sh_text)
@@ -2518,7 +2519,7 @@ let
     test_guest_credentials_policy_in_macos_packer
     test_utm_base_overlay_provisioning
     test_utm_android_uses_shared_images
-    test_android_userdata_preserve_or_fail_fast
+    test_android_userdata_hard_link_no_legacy_paths
     test_libvirt_android_userdata_canonical_path
     test_android_build_strips_wc_padding
     test_android_build_honors_manifest_disk_size
@@ -2707,7 +2708,7 @@ in
     test_guest_credentials_policy_in_macos_packer
     test_utm_base_overlay_provisioning
     test_utm_android_uses_shared_images
-    test_android_userdata_preserve_or_fail_fast
+    test_android_userdata_hard_link_no_legacy_paths
     test_libvirt_android_userdata_canonical_path
     test_android_build_strips_wc_padding
     test_android_build_honors_manifest_disk_size

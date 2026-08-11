@@ -1154,7 +1154,6 @@ function Invoke-AndroidReset {
   $diskBytes = [long](ConvertFrom-SizeString $vm.diskSize)
 
   $systemImageName = [string]$vm.Android.systemImage
-  $userdataImageName = [string]$vm.Android.userdataImage
   $gsiImageName = [string]$vm.Android.gsiImage
   $gsiUrl = [string]$vm.Android.gsiUrl
 
@@ -1209,14 +1208,9 @@ function Invoke-AndroidReset {
   }
 
   # Step 2: reset userdata disk
-  $bundleUserdata = Join-Path $VmDir "$VmId.utm\Data\$userdataImageName"
   if (Test-Path -LiteralPath $userdataImg -PathType Leaf) {
     Write-NucleusInfo 'resetting Android userdata disk...'
     Remove-Item -LiteralPath $userdataImg -Force
-  }
-  elseif (Test-Path -LiteralPath $bundleUserdata -PathType Leaf) {
-    Write-NucleusError "Android userdata for '$VmId' exists only in the UTM bundle ($bundleUserdata); move it manually to $userdataImg and re-run"
-    exit 1
   }
 
   if (-not (Test-Path -LiteralPath $userdataImg -PathType Leaf)) {
