@@ -1324,12 +1324,10 @@ vm_resize_vm() {
 #      write provision markers.
 #   2. Data disk exists and validates → KEEP it — never recreate, truncate, or
 #      re-base an existing data disk.
-#   3. Markers missing on an existing disk → ADOPT: write markers from current
-#      inputs; do not modify disk contents.
-#   4. Data disk invalid → warn and skip unless --force (default tells the
+#   3. Data disk invalid → warn and skip unless --force (default tells the
 #      operator to run 'nucleus-vm reset <name>'; --force recreates with a
 #      printed destructive warning).
-#   5. Virtual size < manifest diskSize → auto-grow (never shrink).
+#   4. Virtual size < manifest diskSize → auto-grow (never shrink).
 #   Provision drift on a valid disk is reported by vm_provision_one (the
 #   provision orchestrator), which owns the drift-to-inject hint.
 vm_ensure_data_disk() {
@@ -1363,18 +1361,10 @@ vm_ensure_data_disk() {
 
   if [ "$_edd_disk_valid" = true ]; then
     # Data preservation: an existing valid data disk is never recreated,
-    # truncated, or re-based during setup/sync.
+    # truncated, or re-based during setup/sync.  Provision drift (a missing
+    # or stale marker) is reported by vm_provision_one, the provision
+    # orchestrator — never resolved here.
     say "data disk already exists: $_edd_disk"
-    if ! vm_provision_marker_matches "$_edd_provision_fp" "$_edd_provision_marker"; then
-      if [ ! -f "$_edd_provision_marker" ]; then
-        # Marker adoption: a marker absent on an existing disk means it
-        # predates this fingerprint scheme; adopt from current inputs, never
-        # rebuild.  (A marker present but stale is provision drift — reported
-        # by vm_provision_one, the provision orchestrator.)
-        say "adopting missing provision marker for existing data disk '$_edd_name'"
-        printf '%s\n' "$_edd_provision_fp" >"$_edd_provision_marker"
-      fi
-    fi
   elif [ -f "$_edd_disk" ]; then
     warn "data disk is invalid for '$_edd_name': $_edd_disk"
     if [ "$force" != true ]; then
@@ -1428,9 +1418,9 @@ vm_ensure_data_disk() {
 # vm_provision_one NAME
 #   Phase-2 per-VM provision orchestrator (shared by every runtime's setup
 #   callback): ensures the writable data disk for NAME exists — create
-#   overlay, keep existing, adopt missing markers via vm_ensure_data_disk —
-#   then reports provision drift (per-VM identity, wiring, or credentials)
-#   for in-place re-injection while the VM is stopped.  Host-specific wiring
+#   overlay, keep existing — then reports provision drift (per-VM identity,
+#   wiring, or credentials) for in-place re-injection while the VM is
+#   stopped.  Host-specific wiring
 #   (UTM bundle link, libvirt sync, start scripts) stays in the setup
 #   callbacks; this function owns the shared disk+markers decision.  Drift
 #   never triggers automatic recreation or injection at setup — the operator
@@ -1453,10 +1443,10 @@ vm_provision_one() {
     return 1
   fi
 
-  # Drift: the provision marker exists but is stale (a missing one was
-  # adopted by vm_ensure_data_disk, so any remaining mismatch is real drift).
-  # Never auto-inject or recreate here — report so the operator can re-inject
-  # in place with the explicit command while the VM is stopped.
+  # Drift: the provision marker is missing or stale (a mismatch against
+  # current inputs).  Never auto-inject or recreate here — report so the
+  # operator can re-inject in place with the explicit command while the VM is
+  # stopped.
   if ! vm_provision_marker_matches "$_vpo_provision_fp" "$_vpo_provision_marker"; then
     if [ "$_vpo_type" = "Android" ]; then
       # WHY: Android userdata is created empty and never injected; a stale

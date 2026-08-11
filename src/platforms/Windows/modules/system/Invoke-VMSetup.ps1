@@ -1277,9 +1277,8 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         # src/<type>/system image.qcow2 created with a tree-root-relative
         # backing path.  Android's userdata disk is a standalone qcow2 (no
         # base).  Data-preservation invariants: an existing valid data disk is
-        # never recreated/truncated during setup; markers missing on an
-        # existing disk are adopted; credential drift warns for in-place
-        # injection only (never auto-wipes).
+        # never recreated/truncated during setup; provision drift (missing or
+        # stale marker) warns for in-place injection only (never auto-wipes).
         Write-Information "vm-setup: configuring VM '$($vm.name)'..."
 
         $minSizeBytes = ConvertFrom-SizeString $vm.minImageSize
@@ -1314,13 +1313,15 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             } else {
                 Write-Information "vm-setup: Android userdata disk already exists: $userdataPath"
                 if (-not (Test-VMMarker -ExpectedHash $userdataProvisionHash -MarkerPath $userdataProvisionMarker)) {
-                    if (-not (Test-Path $userdataProvisionMarker)) {
-                        Write-Information "vm-setup: adopting missing provision marker for existing data disk '$($vm.id)'"
-                        if (-not $DryRun) {
-                            Set-Content -Path $userdataProvisionMarker -Value $userdataProvisionHash -Encoding UTF8
-                        } else {
-                            Write-Information "vm-setup: [dry-run] Set-Content '$userdataProvisionMarker' '$userdataProvisionHash'"
-                        }
+                    # WHY: Android userdata is created empty and never
+                    # injected; a missing or stale marker only means the
+                    # inputs changed, so adopt it (marker adoption only, no
+                    # injection, no drift report).
+                    Write-Information "vm-setup: refreshing provision marker for Android userdata '$($vm.id)'"
+                    if (-not $DryRun) {
+                        Set-Content -Path $userdataProvisionMarker -Value $userdataProvisionHash -Encoding UTF8
+                    } else {
+                        Write-Information "vm-setup: [dry-run] Set-Content '$userdataProvisionMarker' '$userdataProvisionHash'"
                     }
                 }
             }
@@ -1333,27 +1334,18 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         $provisionHash = Get-VMProvisionHash -Vm $vm -GuestSecretHash $guestSecretHash -RepoRoot $RepoRoot
 
         # Data disk provisioning (mirrors vm_ensure_data_disk):
-        # - data disk valid: keep it; adopt the marker when absent; on
-        #   provision drift warn for in-place injection (never recreate)
+        # - data disk valid: keep it; on provision drift (missing or stale
+        #   marker) warn for in-place injection (never recreate)
         # - data disk invalid: keep it and warn (reset is the destructive path)
         # - data disk absent: create as an overlay on the system image
         if (Test-Path $diskPath) {
             if (Test-Qcow2Image -ImagePath $diskPath -ImageLabel "data disk '$($vm.id)'" -MinBytes $minSizeBytes) {
                 Write-Information "vm-setup: data disk already exists: $diskPath"
                 if (-not (Test-VMMarker -ExpectedHash $provisionHash -MarkerPath $diskProvisionMarker)) {
-                    if (Test-Path $diskProvisionMarker) {
-                        if (Test-VMProcessRunning -VmId $vm.id -VmDisplay $vm.name) {
-                            Write-Warning "vm-setup: VM '$($vm.id)' is running; skipping in-place injection (applies on next setup)"
-                        } else {
-                            Write-Warning "vm-setup: provision drift detected for '$($vm.id)'; run 'nucleus-vm inject $($vm.id)' to re-inject in place (data disk preserved)"
-                        }
+                    if (Test-VMProcessRunning -VmId $vm.id -VmDisplay $vm.name) {
+                        Write-Warning "vm-setup: VM '$($vm.id)' is running; skipping in-place injection (applies on next setup)"
                     } else {
-                        Write-Information "vm-setup: adopting missing provision marker for existing data disk '$($vm.id)'"
-                        if (-not $DryRun) {
-                            Set-Content -Path $diskProvisionMarker -Value $provisionHash -Encoding UTF8
-                        } else {
-                            Write-Information "vm-setup: [dry-run] Set-Content '$diskProvisionMarker' '$provisionHash'"
-                        }
+                        Write-Warning "vm-setup: provision drift detected for '$($vm.id)'; run 'nucleus-vm inject $($vm.id)' to re-inject in place (data disk preserved)"
                     }
                 }
             } else {

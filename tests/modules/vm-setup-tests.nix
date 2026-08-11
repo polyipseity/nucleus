@@ -1758,9 +1758,9 @@ let
   # Windows vm-setup must mirror POSIX data-disk provisioning: the data disk
   # is a qcow2 overlay data/<id>.qcow2 backed by src/<type>/system image.qcow2
   # (backing path tree-root-relative), existing data disks are preserved
-  # (markers adopted, credential drift warns for in-place injection only while
-  # the VM is stopped), growth is grow-only via qemu-img resize, and Android
-  # userdata is a standalone data/ qcow2.
+  # (provision drift warns for in-place injection only while the VM is
+  # stopped), growth is grow-only via qemu-img resize, and Android userdata is
+  # a standalone data/ qcow2.
   test_windows_base_overlay_parity =
     assert'
       (
@@ -1879,9 +1879,9 @@ let
 
   # vm_provision_one is the phase-2 per-VM provision orchestrator: it derives
   # the type, disk path, and sidecar markers from NAME alone, delegates
-  # create/keep/adopt to the NAME-only vm_ensure_data_disk, and owns the
-  # provision drift message (setup never auto-injects or auto-recreates
-  # on drift — the operator runs 'nucleus-vm inject NAME' while stopped).
+  # create/keep to the NAME-only vm_ensure_data_disk, and owns the provision
+  # drift message (setup never auto-injects or auto-recreates on drift — the
+  # operator runs 'nucleus-vm inject NAME' while stopped).
   test_vm_provision_one_orchestrator =
     assert'
       (
@@ -1895,22 +1895,21 @@ let
       "vm_provision_one must orchestrate per-VM provision over the NAME-only vm_ensure_data_disk with the drift message in the orchestrator";
 
   # vm_ensure_data_disk is the data-preservation core: an existing valid data
-  # disk is never recreated/truncated/re-based, a missing provision marker on
-  # an existing disk is adopted from current inputs (never rebuilt), an
-  # invalid disk warns and defers to 'nucleus-vm reset' unless --force, and
-  # growth is strictly grow-only toward the manifest diskSize.
+  # disk is never recreated/truncated/re-based, an invalid disk warns and
+  # defers to 'nucleus-vm reset' unless --force, and growth is strictly
+  # grow-only toward the manifest diskSize.
   test_vm_ensure_data_disk_preservation =
     assert'
       (
         (lib.hasInfix "say \"data disk already exists: \$_edd_disk\"" vm_setup_sh_text)
-        && (lib.hasInfix "say \"adopting missing provision marker for existing data disk '\$_edd_name'\"" vm_setup_sh_text)
+        && !(lib.hasInfix "adopting missing provision marker" vm_setup_sh_text)
         && (lib.hasInfix "warn \"data disk is invalid for '\$_edd_name': \$_edd_disk\"" vm_setup_sh_text)
         && (lib.hasInfix "warn \"run 'nucleus-vm reset \$_edd_name' to recreate it (or pass --force)\"" vm_setup_sh_text)
         && (lib.hasInfix "warn \"recreating data disk for '\$_edd_name' (--force; this DESTROYS existing data)\"" vm_setup_sh_text)
         && (lib.hasInfix "say \"growing data disk for '\$_edd_name' from \$_edd_virtual_size to \$_edd_disk_bytes bytes\"" vm_setup_sh_text)
         && (lib.hasInfix "qemu-img create -f qcow2 -b \"\$_edd_backing_rel\" -F qcow2 \"\$_edd_disk\"" vm_setup_sh_text)
       )
-      "vm_ensure_data_disk must preserve existing data disks (skip-if-exists, marker adoption, invalid-disk reset guard, grow-only resize)";
+      "vm_ensure_data_disk must preserve existing data disks (skip-if-exists, invalid-disk reset guard, grow-only resize)";
 
   # Android provision drift is marker-adoption-only: Android userdata is
   # created empty and never injected, so a stale marker just means inputs
@@ -1926,19 +1925,19 @@ let
       "vm_provision_one must treat Android provision drift as marker-adoption-only (no injection, no drift report)";
 
   # Windows vm-setup must mirror the same data-preservation invariants:
-  # existing disks kept (skip-if-exists), missing markers adopted, invalid
-  # disks warned for 'nucleus-vm reset', grow-only resize, and Android
-  # userdata skip-if-exists with marker adoption.
+  # existing disks kept (skip-if-exists), invalid disks warned for
+  # 'nucleus-vm reset', grow-only resize, and Android userdata
+  # skip-if-exists with marker adoption.
   test_windows_vm_data_disk_preservation =
     assert'
       (
         (lib.hasInfix "vm-setup: data disk already exists: \$diskPath" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "vm-setup: adopting missing provision marker for existing data disk '\$(\$vm.id)'" windows_vm_setup_ps1_text)
+        && !(lib.hasInfix "adopting missing provision marker" windows_vm_setup_ps1_text)
         && (lib.hasInfix "vm-setup: data disk is invalid for '\$(\$vm.id)': \$diskPath; run 'nucleus-vm reset \$(\$vm.id)' to recreate it (data preserved)" windows_vm_setup_ps1_text)
         && (lib.hasInfix "vm-setup: growing data disk '\$(\$vm.id)' from \$dataDiskSize to \$diskBytes bytes (grow-only)" windows_vm_setup_ps1_text)
         && (lib.hasInfix "vm-setup: Android userdata disk already exists: \$userdataPath" windows_vm_setup_ps1_text)
       )
-      "Windows vm-setup must preserve existing data disks (skip-if-exists, marker adoption, invalid-disk reset guard, grow-only resize, Android userdata parity)";
+      "Windows vm-setup must preserve existing data disks (skip-if-exists, invalid-disk reset guard, grow-only resize, Android userdata parity)";
 
   # vm_build_android must skip existing canonical disks: the system image and
   # userdata are preserved unless --upgrade/--reset opt in (skip-if-exists),

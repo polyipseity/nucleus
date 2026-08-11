@@ -74,7 +74,8 @@ Describe "Windows VM disk-model parity (P8)" {
     $content | Should -Match ([regex]::Escape('Test-VMProcessRunning -VmId $vm.id -VmDisplay $vm.name'))
     $content | Should -Match ([regex]::Escape('function Get-VMRunningProcessNameList'))
     $content | Should -Match ([regex]::Escape('data disk already exists: $diskPath'))
-    $content | Should -Match ([regex]::Escape('adopting missing provision marker for existing data disk'))
+    $content | Should -Match ([regex]::Escape('provision drift detected for'))
+    $content | Should -Not -Match ([regex]::Escape('adopting missing provision marker for existing data disk'))
     $content | Should -Not -Match ([regex]::Escape('Copy-Item $prebuilt $basePath'))
   }
 
