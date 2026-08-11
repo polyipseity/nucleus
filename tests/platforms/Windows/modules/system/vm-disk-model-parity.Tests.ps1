@@ -2,7 +2,7 @@
 .SYNOPSIS
     Verifies Windows-side VM disk-model parity (P8): Invoke-VMSetup.ps1 and
     scripts/vm.ps1 must provision writable data disks as data/<id>.qcow2 qcow2
-    overlays over src/<type>/system image.qcow2 (backing path tree-root-relative),
+    overlays over src/<type>/system image.qcow2 (absolute backing path),
     mirroring vm_ensure_data_disk in src/scripts/lib/vm.sh. GC keep-sets,
     grow-only resize, running-VM guards, data preservation, and Android
     standalone userdata must match the POSIX disk model.
@@ -64,9 +64,9 @@ Describe "Windows VM disk-model parity (P8)" {
     (Get-VmPs1Content) | Should -Match ([regex]::Escape('$diskPath = Join-Path ''data'' "$vmId.qcow2"'))
   }
 
-  It "system image path is tree-root-relative (..\src\<type>\system image.qcow2)" {
-    (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('Get-VMSystemImageRelPath -Type $vm.type'))
-    (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('& $qemuImg create -f qcow2 -b $backingRel -F qcow2 $diskPath'))
+  It "system image backing path is absolute (Get-VMSystemImagePath)" {
+    (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('Get-VMSystemImagePath -SrcDir $srcDir -Type $vm.type'))
+    (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('& $qemuImg create -f qcow2 -b $backing -F qcow2 $diskPath'))
   }
 
   It "data disk creation guards against running VMs and preserves existing disks" {

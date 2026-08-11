@@ -81,8 +81,8 @@ vm_src_path() {
   printf '%s/%s\n' "$(vm_type_src_dir "$1")" "$2"
 }
 
-vm_system_image_rel_path() {
-  printf '../src/%s/%s\n' "$1" "$VM_SYSTEM_IMAGE"
+vm_system_image_path() {
+  vm_src_path "$1" "$VM_SYSTEM_IMAGE"
 }
 
 vm_ensure_type_src_dirs() {
@@ -1317,7 +1317,8 @@ vm_resize_vm() {
 # vm_ensure_data_disk NAME
 #   Ensures the writable data disk for NAME under the managed layout:
 #     src/<type>/system image.qcow2 — pristine type system image (read-only base)
-#     data/<name>.qcow2             — writable data disk backing ../src/<type>/system image.qcow2
+#     data/<name>.qcow2             — writable data disk backing the type system
+#                                     image at its absolute path
 #   Everything (type, system image, manifest sizes, sidecar marker paths, and
 #   the per-VM provision fingerprint) is derived from NAME alone.  Cases:
 #   1. Data disk missing → create as an overlay on the type system image and
@@ -1332,7 +1333,7 @@ vm_resize_vm() {
 #   provision orchestrator), which owns the drift-to-inject hint.
 vm_ensure_data_disk() {
   local _edd_name="$1"
-  local _edd_type _edd_disk _edd_disk_valid _edd_backing_rel _edd_virtual_size
+  local _edd_type _edd_disk _edd_disk_valid _edd_backing _edd_virtual_size
   local _edd_system_image _edd_min_size _edd_disk_bytes
   local _edd_provision_marker _edd_provision_fp
 
@@ -1344,7 +1345,7 @@ vm_ensure_data_disk() {
     return 1
   fi
   _edd_disk="$VM_DIR/data/${_edd_name}.qcow2"
-  _edd_backing_rel="$(vm_system_image_rel_path "$_edd_type")"
+  _edd_backing="$(vm_system_image_path "$_edd_type")"
   _edd_system_image="$(vm_src_path "$_edd_type" "$VM_SYSTEM_IMAGE")"
   _edd_min_size="$(parse_size "$(jq -r --arg n "$_edd_name" '.VMs[] | select(.id == $n) | .minImageSize' "$MANIFEST")")"
   _edd_disk_bytes="$(parse_size "$(jq -r --arg n "$_edd_name" '.VMs[] | select(.id == $n) | .diskSize' "$MANIFEST")")"
@@ -1390,14 +1391,14 @@ vm_ensure_data_disk() {
       return 1
     fi
     if [ "$dry_run" = false ]; then
-      if ! qemu-img create -f qcow2 -b "$_edd_backing_rel" -F qcow2 "$_edd_disk" >/dev/null; then
+      if ! qemu-img create -f qcow2 -b "$_edd_backing" -F qcow2 "$_edd_disk" >/dev/null; then
         error "failed to create data disk: $_edd_disk"
         return 1
       fi
       printf '%s\n' "$_edd_provision_fp" >"$_edd_provision_marker"
-      say "created data disk: $_edd_disk (backing $_edd_backing_rel)"
+      say "created data disk: $_edd_disk (backing $_edd_backing)"
     else
-      dry_run "qemu-img create -f qcow2 -b $_edd_backing_rel -F qcow2 $_edd_disk"
+      dry_run "qemu-img create -f qcow2 -b $_edd_backing -F qcow2 $_edd_disk"
     fi
   fi
 
@@ -4264,15 +4265,15 @@ vm_pack_vms() {
 #   Restores the data disk after pack.  The data disk (data/<name>.qcow2) is
 #   recreated only when absent — never rebuilt (its content is user data by
 #   design); when present it is kept as-is (pack never removes it).  Backs
-#   ../src/<type>/system image.qcow2 directly.  Returns 1 when the type
-#   system image is missing (packed trees always carry it, so this signals a
-#   broken tree).
+#   <VM_DIR>/src/<type>/system image.qcow2 directly (absolute path).  Returns
+#   1 when the type system image is missing (packed trees always carry it, so
+#   this signals a broken tree).
 vm_unpack_ensure_data_disk() {
   _uedd_name="$1"
   _uedd_type="$2"
   _uedd_system_image="$(vm_src_path "$_uedd_type" "$VM_SYSTEM_IMAGE")"
   _uedd_disk="$VM_DIR/data/${_uedd_name}.qcow2"
-  _uedd_backing_rel="$(vm_system_image_rel_path "$_uedd_type")"
+  _uedd_backing="$(vm_system_image_path "$_uedd_type")"
 
   if [ ! -f "$_uedd_system_image" ]; then
     warn "unpack — system image missing: $_uedd_system_image (re-provision or copy it back)"
@@ -4283,7 +4284,7 @@ vm_unpack_ensure_data_disk() {
     mkdir -p "$VM_DIR/data"
     if [ ! -f "$_uedd_disk" ]; then
       say "unpack — recreating absent data disk: $_uedd_disk"
-      qemu-img create -f qcow2 -b "$_uedd_backing_rel" -F qcow2 "$_uedd_disk" >/dev/null
+      qemu-img create -f qcow2 -b "$_uedd_backing" -F qcow2 "$_uedd_disk" >/dev/null
     else
       say "unpack — keeping existing data disk: $_uedd_disk"
     fi

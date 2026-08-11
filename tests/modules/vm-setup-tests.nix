@@ -1757,15 +1757,15 @@ let
 
   # Windows vm-setup must mirror POSIX data-disk provisioning: the data disk
   # is a qcow2 overlay data/<id>.qcow2 backed by src/<type>/system image.qcow2
-  # (backing path tree-root-relative), existing data disks are preserved
-  # (provision drift warns for in-place injection only while the VM is
-  # stopped), growth is grow-only via qemu-img resize, and Android userdata is
-  # a standalone data/ qcow2.
+  # (absolute backing path), existing data disks are preserved (provision
+  # drift warns for in-place injection only while the VM is stopped), growth
+  # is grow-only via qemu-img resize, and Android userdata is a standalone
+  # data/ qcow2.
   test_windows_base_overlay_parity =
     assert'
       (
-        (lib.hasInfix "Get-VMSystemImageRelPath -Type $vm.type" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "& \$qemuImg create -f qcow2 -b \$backingRel -F qcow2 \$diskPath" windows_vm_setup_ps1_text)
+        (lib.hasInfix "Get-VMSystemImagePath -SrcDir $srcDir -Type $vm.type" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "& \$qemuImg create -f qcow2 -b \$backing -F qcow2 \$diskPath" windows_vm_setup_ps1_text)
         && !(lib.hasInfix "Copy-Item \$prebuilt \$basePath" windows_vm_setup_ps1_text)
         && (lib.hasInfix "Test-VMProcessRunning -VmId \$vm.id -VmDisplay \$vm.name" windows_vm_setup_ps1_text)
         && (lib.hasInfix "function Get-VMRunningProcessNameList" windows_vm_setup_ps1_text)
@@ -1774,7 +1774,7 @@ let
         && (lib.hasInfix "\$qemuImg resize \$diskPath \$diskBytes" windows_vm_setup_ps1_text)
         && (lib.hasInfix "vm.id).qcow2" windows_vm_setup_ps1_text)
       )
-      "Windows vm-setup must provision data/<id>.qcow2 overlays over src/<type>/system image.qcow2 (tree-root-relative backing, data preservation, grow-only resize, Android standalone userdata)";
+      "Windows vm-setup must provision data/<id>.qcow2 overlays over src/<type>/system image.qcow2 (absolute backing, data preservation, grow-only resize, Android standalone userdata)";
 
   # The POSIX Windows/QEMU vm-setup callback must provision data disks for
   # Windows guests (parity with the PowerShell Pass A): the vm_provision_one
@@ -1908,7 +1908,7 @@ let
         && (lib.hasInfix "warn \"run 'nucleus-vm reset \$_edd_name' to recreate it (or pass --force)\"" vm_setup_sh_text)
         && (lib.hasInfix "warn \"recreating data disk for '\$_edd_name' (--force; this DESTROYS existing data)\"" vm_setup_sh_text)
         && (lib.hasInfix "say \"growing data disk for '\$_edd_name' from \$_edd_virtual_size to \$_edd_disk_bytes bytes\"" vm_setup_sh_text)
-        && (lib.hasInfix "qemu-img create -f qcow2 -b \"\$_edd_backing_rel\" -F qcow2 \"\$_edd_disk\"" vm_setup_sh_text)
+        && (lib.hasInfix "qemu-img create -f qcow2 -b \"\$_edd_backing\" -F qcow2 \"\$_edd_disk\"" vm_setup_sh_text)
       )
       "vm_ensure_data_disk must preserve existing data disks (skip-if-exists, invalid-disk reset guard, grow-only resize)";
 

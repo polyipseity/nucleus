@@ -142,13 +142,16 @@ function Get-VMSrcPath {
     return Join-Path (Get-VMTypeSrcDir -SrcDir $SrcDir -Type $Type) $Leaf
 }
 
-function Get-VMSystemImageRelPath {
+function Get-VMSystemImagePath {
     param(
+        [Parameter(Mandatory)]
+        [string]$SrcDir,
+
         [Parameter(Mandatory)]
         [string]$Type
     )
 
-    return "../src/$Type/$VM_SYSTEM_IMAGE"
+    return Get-VMSrcPath -SrcDir $SrcDir -Type $Type -Leaf $VM_SYSTEM_IMAGE
 }
 
 function Invoke-VMSetup {
@@ -1274,11 +1277,11 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
 
         # Pass A — disk provisioning (enabled-only, mirroring
         # vm_ensure_data_disk): the writable data disk is a qcow2 overlay over
-        # src/<type>/system image.qcow2 created with a tree-root-relative
-        # backing path.  Android's userdata disk is a standalone qcow2 (no
-        # base).  Data-preservation invariants: an existing valid data disk is
-        # never recreated/truncated during setup; provision drift (missing or
-        # stale marker) warns for in-place injection only (never auto-wipes).
+        # src/<type>/system image.qcow2 created with an absolute backing path.
+        # Android's userdata disk is a standalone qcow2 (no base).
+        # Data-preservation invariants: an existing valid data disk is never
+        # recreated/truncated during setup; provision drift (missing or stale
+        # marker) warns for in-place injection only (never auto-wipes).
         Write-Information "vm-setup: configuring VM '$($vm.name)'..."
 
         $minSizeBytes = ConvertFrom-SizeString $vm.minImageSize
@@ -1329,7 +1332,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         }
 
         $diskPath = Join-Path -Path $dataDir -ChildPath "$($vm.id).qcow2"
-        $backingRel = Get-VMSystemImageRelPath -Type $vm.type
+        $backing = Get-VMSystemImagePath -SrcDir $srcDir -Type $vm.type
         $diskProvisionMarker = Get-VMProvisionMarkerPath -BasePath $diskPath
         $provisionHash = Get-VMProvisionHash -Vm $vm -GuestSecretHash $guestSecretHash -RepoRoot $RepoRoot
 
@@ -1357,14 +1360,14 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 if ($null -eq $qemuImg) {
                     Write-Warning "vm-setup: qemu-img not found; cannot create data disk for '$($vm.id)'"
                 } else {
-                    & $qemuImg create -f qcow2 -b $backingRel -F qcow2 $diskPath
+                    & $qemuImg create -f qcow2 -b $backing -F qcow2 $diskPath
                     if ($LASTEXITCODE -ne 0) {
                         Write-Warning "vm-setup: qemu-img create failed for data disk: $diskPath"
                     }
                 }
                 Set-Content -Path $diskProvisionMarker -Value $provisionHash -Encoding UTF8
             } else {
-                Write-Information "vm-setup: [dry-run] qemu-img create -f qcow2 -b '$backingRel' -F qcow2 '$diskPath'"
+                Write-Information "vm-setup: [dry-run] qemu-img create -f qcow2 -b '$backing' -F qcow2 '$diskPath'"
                 Write-Information "vm-setup: [dry-run] Set-Content '$diskProvisionMarker' '$provisionHash'"
             }
         } else {
