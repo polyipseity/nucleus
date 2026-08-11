@@ -378,8 +378,7 @@ function Invoke-VMSetup {
                     continue
                 }
                 foreach ($markerName in @(
-                    "$VM_TYPE_MARKER_BASE.vm-guest-credentials-sha256"
-                    "$VM_TYPE_MARKER_BASE.vm-guest-config-sha256"
+                    "$VM_TYPE_MARKER_BASE.vm-type-config-sha256"
                 )) {
                     $markerPath = Join-Path $typeDir.FullName $markerName
                     if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
@@ -394,14 +393,13 @@ function Invoke-VMSetup {
         }
 
         if ($gcDataEnabled -and (Test-Path -LiteralPath $dataDir -PathType Container)) {
-            # check-suppress:suppression_doc: probe -- no credential markers may exist; foreach handles empty result.
+            # check-suppress:suppression_doc: probe -- no provision markers may exist; foreach handles empty result.
             foreach ($marker in @(
-                Get-ChildItem -LiteralPath $dataDir -Filter '*.vm-guest-credentials-sha256' -ErrorAction SilentlyContinue
-                Get-ChildItem -LiteralPath $dataDir -Filter '*.vm-guest-config-sha256' -ErrorAction SilentlyContinue
+                Get-ChildItem -LiteralPath $dataDir -Filter '*.vm-provision-sha256' -ErrorAction SilentlyContinue
             )) {
-                $basePath = $marker.FullName -replace '\.vm-guest-(credentials|config)-sha256$'
+                $basePath = $marker.FullName -replace '\.vm-provision-sha256$'
                 if (-not (Test-Path -LiteralPath $basePath -PathType Leaf)) {
-                    Write-Information "vm-setup: GC — removing orphaned credential marker: $($marker.FullName)"
+                    Write-Information "vm-setup: GC — removing orphaned provision marker: $($marker.FullName)"
                     if (-not $DryRun) {
                         Remove-Item -LiteralPath $marker.FullName -Force -ErrorAction Continue
                     }
@@ -425,16 +423,148 @@ function Invoke-VMSetup {
         return ([System.Convert]::ToHexString($hashBytes)).ToLowerInvariant()
     }
 
-    function Get-VMGuestSecretMarkerPath {
+    function Get-VMFileHash {
+        param(
+            [Parameter(Mandatory)]
+            [string[]]$Files
+        )
+
+        $text = [System.Text.StringBuilder]::new()
+        foreach ($file in $Files) {
+            if (Test-Path -LiteralPath $file -PathType Leaf) {
+                [void]$text.AppendLine((Get-Content -Path $file -Raw))
+            }
+        }
+        $hashBytes = [System.Security.Cryptography.SHA256]::HashData(
+            [System.Text.Encoding]::UTF8.GetBytes($text.ToString())
+        )
+        return ([System.Convert]::ToHexString($hashBytes)).ToLowerInvariant()
+    }
+
+    function Get-VMTypeConfigHash {
+        param(
+            [Parameter(Mandatory)]
+            [ValidateSet('NixOS', 'Windows', 'macOS')]
+            [string]$Type,
+
+            [Parameter(Mandatory)]
+            [string]$VmsDir,
+
+            [Parameter(Mandatory)]
+            [string]$RepoRoot
+        )
+
+        $typeDir = Join-Path $VmsDir $Type
+        $files = [System.Collections.Generic.List[string]]::new()
+        switch ($Type) {
+            'NixOS' {
+                $baseGuest = Join-Path $typeDir 'base-guest.nix'
+                if (Test-Path -LiteralPath $baseGuest -PathType Leaf) {
+                    [void]$files.Add($baseGuest)
+                    $content = Get-Content -Path $baseGuest -Raw
+                    foreach ($match in [regex]::Matches($content, '(\.\./)+src/[A-Za-z0-9_./-]+\.nix')) {
+                        $importPath = Join-Path $typeDir $match.Value
+                        if (-not (Test-Path -LiteralPath $importPath -PathType Leaf)) {
+                            throw "type-config fingerprint: missing import for NixOS base: $importPath"
+                        }
+                        [void]$files.Add($importPath)
+                    }
+                }
+                foreach ($subdir in @('formats', 'disk-image')) {
+                    $subdirPath = Join-Path $typeDir $subdir
+                    if (Test-Path -LiteralPath $subdirPath -PathType Container) {
+                        foreach ($file in (Get-ChildItem -LiteralPath $subdirPath -File -Recurse)) {
+                            [void]$files.Add($file.FullName)
+                        }
+                    }
+                }
+                [void]$files.Add((Join-Path $typeDir 'packer.pkr.hcl'))
+            }
+            'Windows' {
+                [void]$files.Add((Join-Path $typeDir 'Autounattend.xml'))
+                $patchesDir = Join-Path $typeDir 'patches'
+                if (Test-Path -LiteralPath $patchesDir -PathType Container) {
+                    foreach ($file in (Get-ChildItem -LiteralPath $patchesDir -File -Recurse)) {
+                        [void]$files.Add($file.FullName)
+                    }
+                }
+                [void]$files.Add((Join-Path $typeDir 'packer.pkr.hcl'))
+            }
+            'macOS' {
+                [void]$files.Add((Join-Path $typeDir 'packer.pkr.hcl'))
+            }
+        }
+        [void]$files.Add((Join-Path $RepoRoot 'src\flake.lock'))
+        return Get-VMFileHash -Files $files.ToArray()
+    }
+
+    function Get-VMTypeImageHash {
+        param(
+            [Parameter(Mandatory)]
+            [string]$TypeConfigHash,
+
+            [Parameter(Mandatory)]
+            [string]$GuestSecretHash
+        )
+
+        # WHY: Windows-host type builds bake guest identity (Autounattend.xml
+        # tokens, packer vars) into the base image, so the type marker must
+        # track config and credentials.  (The POSIX NixOS build is
+        # identity-free and gated on config alone.)
+        $hashBytes = [System.Security.Cryptography.SHA256]::HashData(
+            [System.Text.Encoding]::UTF8.GetBytes("$TypeConfigHash`n$GuestSecretHash")
+        )
+        return ([System.Convert]::ToHexString($hashBytes)).ToLowerInvariant()
+    }
+
+    function Get-VMProvisionHash {
+        param(
+            [Parameter(Mandatory)]
+            [object]$Vm,
+
+            [Parameter(Mandatory)]
+            [string]$GuestSecretHash,
+
+            [Parameter(Mandatory)]
+            [string]$RepoRoot
+        )
+
+        $files = [System.Collections.Generic.List[string]]::new()
+        $guestDir = Join-Path $RepoRoot "src\vms\guests\$($Vm.id)"
+        if (Test-Path -LiteralPath $guestDir -PathType Container) {
+            foreach ($file in (Get-ChildItem -LiteralPath $guestDir -File -Recurse)) {
+                [void]$files.Add($file.FullName)
+            }
+        }
+        $provisionJson = [ordered]@{
+            hostname    = $Vm.hostname
+            shareDevDir = $Vm.shareDevDir
+            portForwards = $Vm.portForwards
+        } | ConvertTo-Json -Compress
+        $text = (Get-VMFileHash -Files $files.ToArray()) + "`n" + $provisionJson + "`n" + $GuestSecretHash
+        $hashBytes = [System.Security.Cryptography.SHA256]::HashData([System.Text.Encoding]::UTF8.GetBytes($text))
+        return ([System.Convert]::ToHexString($hashBytes)).ToLowerInvariant()
+    }
+
+    function Get-VMTypeConfigMarkerPath {
         param(
             [Parameter(Mandatory)]
             [string]$BasePath
         )
 
-        return "${BasePath}.vm-guest-credentials-sha256"
+        return "${BasePath}.vm-type-config-sha256"
     }
 
-    function Test-VMGuestSecretMarker {
+    function Get-VMProvisionMarkerPath {
+        param(
+            [Parameter(Mandatory)]
+            [string]$BasePath
+        )
+
+        return "${BasePath}.vm-provision-sha256"
+    }
+
+    function Test-VMMarker {
         param(
             [Parameter(Mandatory)]
             [string]$ExpectedHash,
@@ -1072,6 +1202,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 Invoke-BuildNixosImage -VmName $buildType -Accelerator $Accelerator `
                     -DiskBytes $diskBytes -MinSize $minSizeBytes `
                     -VmsDir $vmsDir -SrcDir $srcDir `
+                    -RepoRoot $RepoRoot `
                     -GuestAccountName $guestUsername -GuestSecret $guestPassword `
                     -GuestSecretHash $guestSecretHash `
                     -DryRun:$DryRun
@@ -1158,8 +1289,11 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         if ($vm.type -eq 'Android') {
             # Android userdata: standalone writable qcow2 created at the
             # manifest disk size (system/GSI images are read-only payload
-            # under src/<type>/).  Mirrors the POSIX Android provisioning branch.
+            # under src/<type>/).  Mirrors the POSIX Android provisioning
+            # branch, including the provision-marker write/adoption.
             $userdataPath = Join-Path -Path $dataDir -ChildPath "$($vm.id).qcow2"
+            $userdataProvisionMarker = Get-VMProvisionMarkerPath -BasePath $userdataPath
+            $userdataProvisionHash = Get-VMProvisionHash -Vm $vm -GuestSecretHash $guestSecretHash -RepoRoot $RepoRoot
             if (-not (Test-Path -LiteralPath $userdataPath -PathType Leaf)) {
                 $diskBytes = ConvertFrom-SizeString $vm.diskSize
                 Write-Information "vm-setup: Android userdata disk missing; creating $userdataPath"
@@ -1171,41 +1305,54 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                         if ($LASTEXITCODE -ne 0) {
                             Write-Warning "vm-setup: qemu-img create failed for Android userdata disk: $userdataPath"
                         }
+                        Set-Content -Path $userdataProvisionMarker -Value $userdataProvisionHash -Encoding UTF8
                     }
                 } else {
                     Write-Information "vm-setup: [dry-run] qemu-img create -f qcow2 '$userdataPath' '$diskBytes'"
+                    Write-Information "vm-setup: [dry-run] Set-Content '$userdataProvisionMarker' '$userdataProvisionHash'"
                 }
             } else {
                 Write-Information "vm-setup: Android userdata disk already exists: $userdataPath"
+                if (-not (Test-VMMarker -ExpectedHash $userdataProvisionHash -MarkerPath $userdataProvisionMarker)) {
+                    if (-not (Test-Path $userdataProvisionMarker)) {
+                        Write-Information "vm-setup: adopting missing provision marker for existing data disk '$($vm.id)'"
+                        if (-not $DryRun) {
+                            Set-Content -Path $userdataProvisionMarker -Value $userdataProvisionHash -Encoding UTF8
+                        } else {
+                            Write-Information "vm-setup: [dry-run] Set-Content '$userdataProvisionMarker' '$userdataProvisionHash'"
+                        }
+                    }
+                }
             }
             continue
         }
 
         $diskPath = Join-Path -Path $dataDir -ChildPath "$($vm.id).qcow2"
         $backingRel = Get-VMSystemImageRelPath -Type $vm.type
-        $diskCredentialMarker = Get-VMGuestSecretMarkerPath -BasePath $diskPath
+        $diskProvisionMarker = Get-VMProvisionMarkerPath -BasePath $diskPath
+        $provisionHash = Get-VMProvisionHash -Vm $vm -GuestSecretHash $guestSecretHash -RepoRoot $RepoRoot
 
         # Data disk provisioning (mirrors vm_ensure_data_disk):
-        # - data disk valid: keep it; adopt markers when absent; on credential
-        #   drift warn for in-place injection (never recreate)
+        # - data disk valid: keep it; adopt the marker when absent; on
+        #   provision drift warn for in-place injection (never recreate)
         # - data disk invalid: keep it and warn (reset is the destructive path)
         # - data disk absent: create as an overlay on the system image
         if (Test-Path $diskPath) {
             if (Test-Qcow2Image -ImagePath $diskPath -ImageLabel "data disk '$($vm.id)'" -MinBytes $minSizeBytes) {
                 Write-Information "vm-setup: data disk already exists: $diskPath"
-                if (-not (Test-VMGuestSecretMarker -ExpectedHash $guestSecretHash -MarkerPath $diskCredentialMarker)) {
-                    if (Test-Path $diskCredentialMarker) {
+                if (-not (Test-VMMarker -ExpectedHash $provisionHash -MarkerPath $diskProvisionMarker)) {
+                    if (Test-Path $diskProvisionMarker) {
                         if (Test-VMProcessRunning -VmId $vm.id -VmDisplay $vm.name) {
                             Write-Warning "vm-setup: VM '$($vm.id)' is running; skipping in-place injection (applies on next setup)"
                         } else {
-                            Write-Warning "vm-setup: $($vm.type) data disk guest credential drift detected for '$($vm.id)'; run 'nucleus-vm inject $($vm.id)' to re-inject in place (data disk preserved)"
+                            Write-Warning "vm-setup: provision drift detected for '$($vm.id)'; run 'nucleus-vm inject $($vm.id)' to re-inject in place (data disk preserved)"
                         }
                     } else {
                         Write-Information "vm-setup: adopting missing provision marker for existing data disk '$($vm.id)'"
                         if (-not $DryRun) {
-                            Set-Content -Path $diskCredentialMarker -Value $guestSecretHash -Encoding UTF8
+                            Set-Content -Path $diskProvisionMarker -Value $provisionHash -Encoding UTF8
                         } else {
-                            Write-Information "vm-setup: [dry-run] Set-Content '$diskCredentialMarker' '$guestSecretHash'"
+                            Write-Information "vm-setup: [dry-run] Set-Content '$diskProvisionMarker' '$provisionHash'"
                         }
                     }
                 }
@@ -1223,10 +1370,10 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                         Write-Warning "vm-setup: qemu-img create failed for data disk: $diskPath"
                     }
                 }
-                Set-Content -Path $diskCredentialMarker -Value $guestSecretHash -Encoding UTF8
+                Set-Content -Path $diskProvisionMarker -Value $provisionHash -Encoding UTF8
             } else {
                 Write-Information "vm-setup: [dry-run] qemu-img create -f qcow2 -b '$backingRel' -F qcow2 '$diskPath'"
-                Write-Information "vm-setup: [dry-run] Set-Content '$diskCredentialMarker' '$guestSecretHash'"
+                Write-Information "vm-setup: [dry-run] Set-Content '$diskProvisionMarker' '$provisionHash'"
             }
         } else {
             Write-Warning "vm-setup: system image not found or invalid for '$($vm.id)': $systemImage; skipping"
@@ -1417,6 +1564,7 @@ function Invoke-BuildNixosImage {
         [string]$MinSize,
         [string]$VmsDir,
         [string]$SrcDir,
+        [string]$RepoRoot = (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))))),
         [string]$GuestAccountName,
         [string]$GuestSecret,
         [string]$GuestSecretHash,
@@ -1425,17 +1573,20 @@ function Invoke-BuildNixosImage {
 
     $vmType = 'NixOS'
     $outPath = Get-VMSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_SYSTEM_IMAGE
-    $credentialMarkerPath = Get-VMGuestSecretMarkerPath -BasePath $outPath
+    $typeConfigMarkerPath = Get-VMTypeConfigMarkerPath -BasePath $outPath
+    # WHY: the Windows-host NixOS build bakes guest identity (packer vars),
+    # so the type marker tracks config and credentials.
+    $typeImageHash = Get-VMTypeImageHash -TypeConfigHash (Get-VMTypeConfigHash -Type $vmType -VmsDir $VmsDir -RepoRoot $RepoRoot) -GuestSecretHash $GuestSecretHash
     if (Test-Path $outPath) {
         if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing NixOS image' -MinBytes $MinSize) {
-            if (Test-VMGuestSecretMarker -ExpectedHash $GuestSecretHash -MarkerPath $credentialMarkerPath) {
-                Write-Information "vm-setup: NixOS image already built for '$VmName' with the current guest credentials (username=$GuestAccountName): $outPath"
+            if (Test-VMMarker -ExpectedHash $typeImageHash -MarkerPath $typeConfigMarkerPath) {
+                Write-Information "vm-setup: NixOS image already built for '$VmName' with the current guest config and credentials (username=$GuestAccountName): $outPath"
                 return
             }
-            Write-Warning "vm-setup: NixOS image guest credential drift detected; rebuilding image: $outPath"
+            Write-Warning "vm-setup: NixOS image guest config/credential drift detected; rebuilding image: $outPath"
             Remove-Item $outPath -Force
-            if (Test-Path $credentialMarkerPath) {
-                Remove-Item $credentialMarkerPath -Force
+            if (Test-Path $typeConfigMarkerPath) {
+                Remove-Item $typeConfigMarkerPath -Force
             }
         } else {
             Write-Warning "vm-setup: existing NixOS image is invalid; rebuilding from scratch: $outPath"
@@ -1496,7 +1647,7 @@ function Invoke-BuildNixosImage {
 
     Move-Item $builtImage $outPath
     Remove-Item $tmpOutput -Recurse -Force
-    Set-Content -Path $credentialMarkerPath -Value $GuestSecretHash -Encoding UTF8
+    Set-Content -Path $typeConfigMarkerPath -Value $typeImageHash -Encoding UTF8
 
     if (-not (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'newly built NixOS image' -MinBytes $MinSize)) {
         Write-Warning "vm-setup: NixOS image validation failed after build; removing $outPath"
@@ -1634,19 +1785,22 @@ function Invoke-BuildWindowsImage {
     $vmType = 'Windows'
     $windowsTypeSrcDir = Get-VMTypeSrcDir -SrcDir $SrcDir -Type $vmType
     $outPath = Get-VMSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_SYSTEM_IMAGE
-    $credentialMarkerPath = Get-VMGuestSecretMarkerPath -BasePath $outPath
+    $typeConfigMarkerPath = Get-VMTypeConfigMarkerPath -BasePath $outPath
+    # WHY: the Windows type build bakes guest identity (Autounattend.xml
+    # tokens, packer vars), so the type marker tracks config and credentials.
+    $typeImageHash = Get-VMTypeImageHash -TypeConfigHash (Get-VMTypeConfigHash -Type $vmType -VmsDir $VmsDir -RepoRoot $RepoRoot) -GuestSecretHash $GuestSecretHash
     if (Test-Path $outPath) {
         if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing Windows image' -MinBytes $MinSize) {
-            if (Test-VMGuestSecretMarker -ExpectedHash $GuestSecretHash -MarkerPath $credentialMarkerPath) {
-                Write-Information "vm-setup: Windows image already built for the current guest credentials (username=$GuestAccountName): $outPath"
+            if (Test-VMMarker -ExpectedHash $typeImageHash -MarkerPath $typeConfigMarkerPath) {
+                Write-Information "vm-setup: Windows image already built for the current guest config and credentials (username=$GuestAccountName): $outPath"
                 return
             }
-            Write-Warning "vm-setup: Windows image guest credential drift detected; rebuilding image: $outPath"
+            Write-Warning "vm-setup: Windows image guest config/credential drift detected; rebuilding image: $outPath"
         }
         Write-Warning "vm-setup: existing Windows image is invalid; rebuilding from scratch: $outPath"
         Remove-Item $outPath -Force
-        if (Test-Path $credentialMarkerPath) {
-            Remove-Item $credentialMarkerPath -Force
+        if (Test-Path $typeConfigMarkerPath) {
+            Remove-Item $typeConfigMarkerPath -Force
         }
     }
 
@@ -1991,7 +2145,7 @@ function Invoke-BuildWindowsImage {
 
         Move-Item $builtImage $outPath
         Remove-Item $builtTempDir -Recurse -Force
-        Set-Content -Path $credentialMarkerPath -Value $GuestSecretHash -Encoding UTF8
+        Set-Content -Path $typeConfigMarkerPath -Value $typeImageHash -Encoding UTF8
 
     if (-not (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'newly built Windows image' -MinBytes $MinSize)) {
         Write-Warning "vm-setup: Windows image validation failed after build; removing $outPath"

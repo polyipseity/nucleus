@@ -1041,19 +1041,57 @@ let
       (
         (lib.hasInfix "vm_gc_orphan_markers" vm_setup_sh_text)
         && (lib.hasInfix "for _gcom_type_dir in \"\$SRC_DIR\"/*/" vm_setup_sh_text)
-        && (lib.hasInfix "VM_TYPE_MARKER_BASE}.vm-guest-credentials-sha256" vm_setup_sh_text)
+        && (lib.hasInfix "VM_TYPE_MARKER_BASE}.vm-type-config-sha256" vm_setup_sh_text)
         && (lib.hasInfix "if [ \"\$gc_data_mode\" = true ]" vm_setup_sh_text)
       )
       "vm-setup marker GC must key src/<type>/ type markers to the expected set and sweep data/ markers only with --gc-data";
 
   # Windows vm-setup must mirror POSIX keep-set semantics: match full disk
   # filenames against per-directory keep-sets and sweep config markers too.
-  test_windows_vm_gc_keep_set = assert' (
-    (lib.hasInfix "Get-VMGcSrcKeepSetForType" windows_vm_setup_ps1_text)
-    && (lib.hasInfix "Get-VMGcDataDiskKeepSet" windows_vm_setup_ps1_text)
-    && (lib.hasInfix "\$disk.Name -notin \$keep" windows_vm_setup_ps1_text)
-    && (lib.hasInfix "vm-guest-config-sha256" windows_vm_setup_ps1_text)
-  ) "Windows vm-setup GC must match full filenames against keep-sets and sweep config markers";
+  test_windows_vm_gc_keep_set =
+    assert'
+      (
+        (lib.hasInfix "Get-VMGcSrcKeepSetForType" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Get-VMGcDataDiskKeepSet" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "\$disk.Name -notin \$keep" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "vm-type-config-sha256" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "vm-provision-sha256" windows_vm_setup_ps1_text)
+      )
+      "Windows vm-setup GC must match full filenames against keep-sets and sweep type-config and provision markers";
+
+  # Commit 5: the fingerprint marker split.  POSIX vm-setup must track the
+  # type system image with a type-config marker and each data disk with a
+  # per-VM provision marker (identity + wiring + credentials).
+  test_vm_fingerprint_marker_split =
+    assert'
+      (
+        (lib.hasInfix "vm_type_config_marker_path() {" vm_setup_sh_text)
+        && (lib.hasInfix "vm_type_config_fingerprint() {" vm_setup_sh_text)
+        && (lib.hasInfix "vm_type_image_fingerprint() {" vm_setup_sh_text)
+        && (lib.hasInfix "vm_provision_marker_path() {" vm_setup_sh_text)
+        && (lib.hasInfix "vm_provision_fingerprint() {" vm_setup_sh_text)
+        && (lib.hasInfix "VM_TYPE_MARKER_BASE}.vm-type-config-sha256" vm_setup_sh_text)
+        && (lib.hasInfix "vm-provision-sha256" vm_setup_sh_text)
+        && (lib.hasInfix "_rmi_fingerprint=\"\$3\"" vm_setup_sh_text)
+        && (lib.hasInfix "resize_and_mark_image IMAGE_PATH MARKER_PATH FINGERPRINT [DISK_BYTES]" vm_setup_sh_text)
+      )
+      "vm-setup must split markers into a type-config marker for the type image and a per-VM provision marker for each data disk";
+
+  # Windows vm-setup must mirror the fingerprint marker split with matching
+  # helper names and marker suffixes.
+  test_windows_vm_fingerprint_marker_split =
+    assert'
+      (
+        (lib.hasInfix "function Get-VMTypeConfigHash" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "function Get-VMTypeImageHash" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "function Get-VMProvisionHash" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "function Get-VMTypeConfigMarkerPath" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "function Get-VMProvisionMarkerPath" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "function Test-VMMarker" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "vm-type-config-sha256" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "vm-provision-sha256" windows_vm_setup_ps1_text)
+      )
+      "Windows vm-setup must split markers into type-config and per-VM provision markers with matching helper names";
 
   # base-guest.nix and guests/<id>/guest.nix must be non-empty (parseable as
   # Nix expressions).
@@ -1267,7 +1305,7 @@ let
   # logic does not reject the pre-built image for being too small.
   test_nixos_image_resize_to_manifest_disk = assert' (
     (lib.hasInfix "vm_build_nixos TYPE DISK_BYTES" vm_setup_sh_text)
-    && (lib.hasInfix "if ! resize_and_mark_image \"$_out\" \"$_marker\" \"$_disk_bytes\"; then" vm_setup_sh_text)
+    && (lib.hasInfix "if ! resize_and_mark_image \"$_out\" \"$_marker\" \"$_type_fp\" \"$_disk_bytes\"; then" vm_setup_sh_text)
   ) "scripts/vm.sh must resize generated NixOS qcow2 images to the exact manifest disk byte count";
 
   # The runtime resize path must be grow-only: resize_and_mark_image only
@@ -1842,14 +1880,14 @@ let
   # vm_provision_one is the phase-2 per-VM provision orchestrator: it derives
   # the type, disk path, and sidecar markers from NAME alone, delegates
   # create/keep/adopt to the NAME-only vm_ensure_data_disk, and owns the
-  # credential/config drift message (setup never auto-injects or auto-recreates
+  # provision drift message (setup never auto-injects or auto-recreates
   # on drift — the operator runs 'nucleus-vm inject NAME' while stopped).
   test_vm_provision_one_orchestrator =
     assert'
       (
         (lib.hasInfix "vm_provision_one() {" vm_setup_sh_text)
         && (lib.hasInfix "if ! vm_ensure_data_disk \"\$_vpo_name\"; then" vm_setup_sh_text)
-        && (lib.hasInfix "guest credential/config drift detected for '\$_vpo_name'" vm_setup_sh_text)
+        && (lib.hasInfix "guest provision drift detected for '\$_vpo_name'" vm_setup_sh_text)
         && (lib.hasInfix "vm_ensure_data_disk() {" vm_setup_sh_text)
         && (lib.hasInfix "local _edd_name=\"\$1\"" vm_setup_sh_text)
         && (lib.hasInfix "vm_provision_one \"\$vm_id\"" vm_setup_sh_text)
@@ -2508,6 +2546,8 @@ let
     test_vm_gc_orphan_descriptors_removed
     test_vm_gc_marker_expected_set_semantics
     test_windows_vm_gc_keep_set
+    test_vm_fingerprint_marker_split
+    test_windows_vm_fingerprint_marker_split
     test_android_build_relink_refresh
     test_windows_base_overlay_parity
     test_windows_qemu_ensure_base_and_overlay
@@ -2691,6 +2731,8 @@ in
     test_vm_gc_orphan_descriptors_removed
     test_vm_gc_marker_expected_set_semantics
     test_windows_vm_gc_keep_set
+    test_vm_fingerprint_marker_split
+    test_windows_vm_fingerprint_marker_split
     test_android_build_relink_refresh
     test_windows_base_overlay_parity
     test_windows_qemu_ensure_base_and_overlay

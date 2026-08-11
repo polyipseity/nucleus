@@ -261,31 +261,44 @@ vm_resolve_guest_ssh_public_key() {
   return 1
 }
 
-# vm_guest_credentials_marker_path TYPE [DISK_PATH]
-#   Returns the sidecar marker path storing the guest-credential fingerprint
-#   used when building/provisioning the VM type image or runtime disk.
+# vm_type_config_marker_path TYPE
+#   Returns the sidecar marker path storing the type-config fingerprint for
+#   the type system image (src/<type>/system image.vm-type-config-sha256).
 #   WHY: the type system image is identity-free and shared by every VM of the
 #   type; the marker lives next to it (src/<type>/), not under a per-VM name.
-vm_guest_credentials_marker_path() {
-  _vgcm_type="$1"
-  _vgcm_disk_path="${2:-}"
-  if [ -n "$_vgcm_disk_path" ]; then
-    printf '%s.vm-guest-credentials-sha256\n' "$_vgcm_disk_path"
-  else
-    vm_src_path "$_vgcm_type" "${VM_TYPE_MARKER_BASE}.vm-guest-credentials-sha256"
-  fi
+vm_type_config_marker_path() {
+  local _vtcmp_type="$1"
+  vm_src_path "$_vtcmp_type" "${VM_TYPE_MARKER_BASE}.vm-type-config-sha256"
 }
 
-# vm_guest_credentials_marker_matches EXPECTED_FINGERPRINT MARKER_PATH
+# vm_type_config_marker_matches EXPECTED_FINGERPRINT MARKER_PATH
 #   Returns 0 when MARKER_PATH exists and equals EXPECTED.
-vm_guest_credentials_marker_matches() {
-  _vgcm_expected="$1"
-  _vgcm_marker="$2"
-  if [ ! -f "$_vgcm_marker" ]; then
+vm_type_config_marker_matches() {
+  local _vtcmm_expected="$1" _vtcmm_marker="$2" _vtcmm_actual
+  if [ ! -f "$_vtcmm_marker" ]; then
     return 1
   fi
-  _vgcm_actual="$(tr -d '\r\n' <"$_vgcm_marker")"
-  [ "$_vgcm_actual" = "$_vgcm_expected" ]
+  _vtcmm_actual="$(tr -d '\r\n' <"$_vtcmm_marker")"
+  [ "$_vtcmm_actual" = "$_vtcmm_expected" ]
+}
+
+# vm_provision_marker_path DISK_PATH
+#   Returns the sidecar marker path storing the per-VM provision fingerprint
+#   for the writable data disk DISK_PATH (data/<id>.qcow2.vm-provision-sha256).
+vm_provision_marker_path() {
+  local _vpmp_disk="$1"
+  printf '%s.vm-provision-sha256\n' "$_vpmp_disk"
+}
+
+# vm_provision_marker_matches EXPECTED_FINGERPRINT MARKER_PATH
+#   Returns 0 when MARKER_PATH exists and equals EXPECTED.
+vm_provision_marker_matches() {
+  local _vpmm_expected="$1" _vpmm_marker="$2" _vpmm_actual
+  if [ ! -f "$_vpmm_marker" ]; then
+    return 1
+  fi
+  _vpmm_actual="$(tr -d '\r\n' <"$_vpmm_marker")"
+  [ "$_vpmm_actual" = "$_vpmm_expected" ]
 }
 
 # vm_sha256_input
@@ -313,52 +326,101 @@ vm_sha256_input() {
   return 1
 }
 
-# vm_guest_config_marker_path TYPE [DISK_PATH]
-#   Returns the sidecar marker path storing the guest-config fingerprint
-#   (NixOS base-guest.nix + imports + flake.lock) for drift detection.
-#   WHY: the type system image is identity-free and shared by every VM of the
-#   type; the marker lives next to it (src/<type>/), not under a per-VM name.
-vm_guest_config_marker_path() {
-  _vgcmp_type="$1"
-  _vgcmp_disk_path="${2:-}"
-  if [ -n "$_vgcmp_disk_path" ]; then
-    printf '%s.vm-guest-config-sha256\n' "$_vgcmp_disk_path"
-  else
-    vm_src_path "$_vgcmp_type" "${VM_TYPE_MARKER_BASE}.vm-guest-config-sha256"
-  fi
-}
-
-# vm_guest_config_marker_matches EXPECTED_FINGERPRINT MARKER_PATH
-#   Returns 0 when MARKER_PATH exists and equals EXPECTED.
-vm_guest_config_marker_matches() {
-  _vgcmm_expected="$1"
-  _vgcmm_marker="$2"
-  if [ ! -f "$_vgcmm_marker" ]; then
+# vm_type_config_fingerprint TYPE
+#   Prints a SHA-256 fingerprint of the type's build config inputs: the
+#   type-scoped config files under src/vms/<type>/ (contents, not just paths)
+#   plus src/flake.lock.  NixOS hashes base-guest.nix and every resolved src/
+#   import, the formats/ and disk-image/ trees; Windows hashes Autounattend.xml,
+#   patches/ and packer.pkr.hcl; macOS hashes packer.pkr.hcl.  WHY: flake.lock
+#   pins the nixos-generators/Packer revisions.  Returns 1 when no SHA-256
+#   tool is available or a resolved import is missing.
+vm_type_config_fingerprint() {
+  local _vtcf_type="$1" _vtcf_import _vtcf_imports _vtcf_missing
+  case "$_vtcf_type" in
+  NixOS | Windows | macOS) ;;
+  *)
+    error "no type-config fingerprint definition for VM type: $_vtcf_type"
     return 1
+    ;;
+  esac
+  if [ "$_vtcf_type" = "NixOS" ]; then
+    _vtcf_imports="$(grep -oE '(\.\./)+src/[A-Za-z0-9_./-]+\.nix' "$VMS_DIR/NixOS/base-guest.nix" | sort -u)"
+    _vtcf_missing=0
+    for _vtcf_import in $_vtcf_imports; do
+      if [ ! -f "$VMS_DIR/NixOS/$_vtcf_import" ]; then
+        error "type-config fingerprint: missing import for NixOS base: $VMS_DIR/NixOS/$_vtcf_import"
+        _vtcf_missing=1
+      fi
+    done
+    if [ "$_vtcf_missing" -ne 0 ]; then
+      return 1
+    fi
   fi
-  _vgcmm_actual="$(tr -d '\r\n' <"$_vgcmm_marker")"
-  [ "$_vgcmm_actual" = "$_vgcmm_expected" ]
-}
-
-# vm_guest_config_fingerprint
-#   Prints a SHA-256 fingerprint of the NixOS guest configuration: the resolved
-#   paths of every src/ import in base-guest.nix plus src/flake.lock.  WHY: the
-#   imported files are leaf modules (no transitive imports), so resolving the
-#   import list captures all configuration source; flake.lock pins the
-#   nixos-generators revision.  Returns 1 when no SHA-256 tool is available.
-vm_guest_config_fingerprint() {
-  _gcf_imports="$(grep -oE '(\.\./)+src/[A-Za-z0-9_./-]+\.nix' "$VMS_DIR/NixOS/base-guest.nix" | sort -u)"
   {
-    printf '%s\n' "$_gcf_imports"
-    if [ -d "$VMS_DIR/NixOS/formats" ]; then
-      find "$VMS_DIR/NixOS/formats" -type f | sort
-    fi
-    if [ -d "$VMS_DIR/NixOS/disk-image" ]; then
-      find "$VMS_DIR/NixOS/disk-image" -type f | sort
-    fi
+    case "$_vtcf_type" in
+    NixOS)
+      cat "$VMS_DIR/NixOS/base-guest.nix"
+      for _vtcf_import in $_vtcf_imports; do
+        cat "$VMS_DIR/NixOS/$_vtcf_import"
+      done
+      if [ -d "$VMS_DIR/NixOS/formats" ]; then
+        find "$VMS_DIR/NixOS/formats" -type f -exec cat {} +
+      fi
+      if [ -d "$VMS_DIR/NixOS/disk-image" ]; then
+        find "$VMS_DIR/NixOS/disk-image" -type f -exec cat {} +
+      fi
+      ;;
+    Windows)
+      cat "$VMS_DIR/Windows/Autounattend.xml"
+      if [ -d "$VMS_DIR/Windows/patches" ]; then
+        find "$VMS_DIR/Windows/patches" -type f -exec cat {} +
+      fi
+      cat "$VMS_DIR/Windows/packer.pkr.hcl"
+      ;;
+    macOS)
+      cat "$VMS_DIR/macOS/packer.pkr.hcl"
+      ;;
+    esac
     if [ -f "$REPO_ROOT/src/flake.lock" ]; then
       cat "$REPO_ROOT/src/flake.lock"
     fi
+  } | vm_sha256_input
+}
+
+# vm_type_image_fingerprint TYPE
+#   Prints the fingerprint gating the type system image rebuild: the
+#   type-config fingerprint, plus the guest credential fingerprint for
+#   Windows and macOS.  WHY: POSIX NixOS builds (nixos-generators) are
+#   identity-free, so config alone gates the type image; Windows/macOS builds
+#   bake guest identity (Autounattend.xml tokens, Tart packer vars) into the
+#   base image, and macOS has no per-VM injection path at all, so the type
+#   marker must track credentials for those types (documented exception to the
+#   identity-free type image invariant).
+vm_type_image_fingerprint() {
+  local _vtif_type="$1" _vtif_config
+  _vtif_config="$(vm_type_config_fingerprint "$_vtif_type")" || return 1
+  if [ "$_vtif_type" = "NixOS" ]; then
+    printf '%s\n' "$_vtif_config"
+  else
+    printf '%s\n%s\n' "$_vtif_config" "$vm_guest_credentials_fingerprint" | vm_sha256_input
+  fi
+}
+
+# vm_provision_fingerprint NAME
+#   Prints the per-VM provision fingerprint for the data disk of manifest VM
+#   NAME: the contents of every file under src/vms/guests/<name>/ (the per-VM
+#   guest identity), the provision-relevant manifest fields (hostname,
+#   shareDevDir, portForwards), and the guest credential fingerprint.  WHY:
+#   this is the drift key for in-place re-injection — any change to per-VM
+#   identity, wiring, or credentials invalidates it.
+vm_provision_fingerprint() {
+  local _vpf_name="$1" _vpf_guest_dir="$VMS_DIR/guests/$1"
+  {
+    if [ -d "$_vpf_guest_dir" ]; then
+      find "$_vpf_guest_dir" -type f -exec cat {} +
+    fi
+    jq -c --arg n "$_vpf_name" '.VMs[] | select(.id == $n) | {hostname, shareDevDir, portForwards}' "$MANIFEST"
+    printf '%s\n' "$vm_guest_credentials_fingerprint"
   } | vm_sha256_input
 }
 
@@ -1174,16 +1236,15 @@ re_register_utm_bundle() {
 
 # Credential marker helper
 
-# resize_and_mark_image IMAGE_PATH MARKER_PATH [DISK_BYTES]
-#   Writes the current guest credential fingerprint to MARKER_PATH for drift
-#   detection.  When DISK_BYTES is specified, also resizes IMAGE_PATH via
-#   qemu-img before marking (qemu-img accepts bare byte counts).
-#   Grow-only: the image is only resized when its current virtual size is
-#   below DISK_BYTES; it is never shrunk here.  WHY: a shrink can destroy
-#   data beyond the new end, so shrinking is opt-in via
-#   'nucleus-vm resize --allow-shrink' only.
+# resize_and_mark_image IMAGE_PATH MARKER_PATH FINGERPRINT [DISK_BYTES]
+#   Writes FINGERPRINT to MARKER_PATH for drift detection.  When DISK_BYTES
+#   is specified, also resizes IMAGE_PATH via qemu-img before marking
+#   (qemu-img accepts bare byte counts).  Grow-only: the image is only
+#   resized when its current virtual size is below DISK_BYTES; it is never
+#   shrunk here.  WHY: a shrink can destroy data beyond the new end, so
+#   shrinking is opt-in via 'nucleus-vm resize --allow-shrink' only.
 resize_and_mark_image() {
-  local _rmi_file="$1" _rmi_marker="$2" _rmi_disk_bytes="${3:-}"
+  local _rmi_file="$1" _rmi_marker="$2" _rmi_fingerprint="$3" _rmi_disk_bytes="${4:-}"
   local _rmi_current_size
 
   if [ -n "$_rmi_disk_bytes" ]; then
@@ -1200,7 +1261,7 @@ resize_and_mark_image() {
       return 1
     fi
   fi
-  printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_rmi_marker"
+  printf '%s\n' "$_rmi_fingerprint" >"$_rmi_marker"
 }
 
 # vm_resize_vm NAME SIZE_BYTES ALLOW_SHRINK
@@ -1258,7 +1319,7 @@ vm_resize_vm() {
 #     src/<type>/system image.qcow2 — pristine type system image (read-only base)
 #     data/<name>.qcow2             — writable data disk backing ../src/<type>/system image.qcow2
 #   Everything (type, system image, manifest sizes, sidecar marker paths, and
-#   the NixOS-only guest-config fingerprint) is derived from NAME alone.  Cases:
+#   the per-VM provision fingerprint) is derived from NAME alone.  Cases:
 #   1. Data disk missing → create as an overlay on the type system image and
 #      write provision markers.
 #   2. Data disk exists and validates → KEEP it — never recreate, truncate, or
@@ -1269,13 +1330,13 @@ vm_resize_vm() {
 #      operator to run 'nucleus-vm reset <name>'; --force recreates with a
 #      printed destructive warning).
 #   5. Virtual size < manifest diskSize → auto-grow (never shrink).
-#   Credential/config drift on a valid disk is reported by vm_provision_one
-#   (the provision orchestrator), which owns the drift-to-inject hint.
+#   Provision drift on a valid disk is reported by vm_provision_one (the
+#   provision orchestrator), which owns the drift-to-inject hint.
 vm_ensure_data_disk() {
   local _edd_name="$1"
   local _edd_type _edd_disk _edd_disk_valid _edd_backing_rel _edd_virtual_size
   local _edd_system_image _edd_min_size _edd_disk_bytes
-  local _edd_cred_marker _edd_config_marker _edd_config_fp
+  local _edd_provision_marker _edd_provision_fp
 
   mkdir -p "$VM_DIR/data"
 
@@ -1289,13 +1350,11 @@ vm_ensure_data_disk() {
   _edd_system_image="$(vm_src_path "$_edd_type" "$VM_SYSTEM_IMAGE")"
   _edd_min_size="$(parse_size "$(jq -r --arg n "$_edd_name" '.VMs[] | select(.id == $n) | .minImageSize' "$MANIFEST")")"
   _edd_disk_bytes="$(parse_size "$(jq -r --arg n "$_edd_name" '.VMs[] | select(.id == $n) | .diskSize' "$MANIFEST")")"
-  _edd_cred_marker="$(vm_guest_credentials_marker_path "$_edd_name" "$_edd_disk")"
-  _edd_config_marker="$(vm_guest_config_marker_path "$_edd_name" "$_edd_disk")"
-  # WHY: only NixOS guests have a Nix-managed guest config to fingerprint.
-  _edd_config_fp=''
-  if [ "$_edd_type" = "NixOS" ]; then
-    _edd_config_fp="$(vm_guest_config_fingerprint)"
-  fi
+  _edd_provision_marker="$(vm_provision_marker_path "$_edd_disk")"
+  # WHY: the provision fingerprint covers the per-VM guest identity
+  # (src/vms/guests/<name>/), the provision-relevant manifest fields, and the
+  # guest credential fingerprint; it is the drift key for in-place injection.
+  _edd_provision_fp="$(vm_provision_fingerprint "$_edd_name")" || return 1
 
   _edd_disk_valid=false
   if [ -f "$_edd_disk" ] && validate_qcow2_image "$_edd_disk" "data disk for ${_edd_name}" "$_edd_min_size"; then
@@ -1306,18 +1365,14 @@ vm_ensure_data_disk() {
     # Data preservation: an existing valid data disk is never recreated,
     # truncated, or re-based during setup/sync.
     say "data disk already exists: $_edd_disk"
-    if ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_edd_cred_marker" ||
-      { [ -n "$_edd_config_fp" ] && ! vm_guest_config_marker_matches "$_edd_config_fp" "$_edd_config_marker"; }; then
-      if [ ! -f "$_edd_cred_marker" ] && { [ -z "$_edd_config_fp" ] || [ ! -f "$_edd_config_marker" ]; }; then
-        # Marker adoption: markers absent on an existing disk mean it predates
-        # this fingerprint scheme; adopt from current inputs, never rebuild.
-        # (Markers present but stale are credential/config drift — reported by
-        # vm_provision_one, the provision orchestrator.)
-        say "adopting missing provision markers for existing data disk '$_edd_name'"
-        printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_edd_cred_marker"
-        if [ -n "$_edd_config_fp" ]; then
-          printf '%s\n' "$_edd_config_fp" >"$_edd_config_marker"
-        fi
+    if ! vm_provision_marker_matches "$_edd_provision_fp" "$_edd_provision_marker"; then
+      if [ ! -f "$_edd_provision_marker" ]; then
+        # Marker adoption: a marker absent on an existing disk means it
+        # predates this fingerprint scheme; adopt from current inputs, never
+        # rebuild.  (A marker present but stale is provision drift — reported
+        # by vm_provision_one, the provision orchestrator.)
+        say "adopting missing provision marker for existing data disk '$_edd_name'"
+        printf '%s\n' "$_edd_provision_fp" >"$_edd_provision_marker"
       fi
     fi
   elif [ -f "$_edd_disk" ]; then
@@ -1328,9 +1383,9 @@ vm_ensure_data_disk() {
     fi
     warn "recreating data disk for '$_edd_name' (--force; this DESTROYS existing data)"
     if [ "$dry_run" = false ]; then
-      rm -f "$_edd_disk" "$_edd_cred_marker" "$_edd_config_marker"
+      rm -f "$_edd_disk" "$_edd_provision_marker"
     else
-      dry_run "rm -f $_edd_disk $_edd_cred_marker $_edd_config_marker"
+      dry_run "rm -f $_edd_disk $_edd_provision_marker"
       return 0
     fi
   fi
@@ -1349,10 +1404,7 @@ vm_ensure_data_disk() {
         error "failed to create data disk: $_edd_disk"
         return 1
       fi
-      printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_edd_cred_marker"
-      if [ -n "$_edd_config_fp" ]; then
-        printf '%s\n' "$_edd_config_fp" >"$_edd_config_marker"
-      fi
+      printf '%s\n' "$_edd_provision_fp" >"$_edd_provision_marker"
       say "created data disk: $_edd_disk (backing $_edd_backing_rel)"
     else
       dry_run "qemu-img create -f qcow2 -b $_edd_backing_rel -F qcow2 $_edd_disk"
@@ -1377,13 +1429,14 @@ vm_ensure_data_disk() {
 #   Phase-2 per-VM provision orchestrator (shared by every runtime's setup
 #   callback): ensures the writable data disk for NAME exists — create
 #   overlay, keep existing, adopt missing markers via vm_ensure_data_disk —
-#   then reports credential/config drift for in-place re-injection while the
-#   VM is stopped.  Host-specific wiring (UTM bundle link, libvirt sync,
-#   start scripts) stays in the setup callbacks; this function owns the
-#   shared disk+markers decision.  Drift never triggers automatic recreation
-#   or injection at setup — the operator runs 'nucleus-vm inject NAME'.
+#   then reports provision drift (per-VM identity, wiring, or credentials)
+#   for in-place re-injection while the VM is stopped.  Host-specific wiring
+#   (UTM bundle link, libvirt sync, start scripts) stays in the setup
+#   callbacks; this function owns the shared disk+markers decision.  Drift
+#   never triggers automatic recreation or injection at setup — the operator
+#   runs 'nucleus-vm inject NAME'.
 vm_provision_one() {
-  local _vpo_name="$1" _vpo_type _vpo_disk _vpo_cred_marker _vpo_config_marker _vpo_config_fp _vpo_running
+  local _vpo_name="$1" _vpo_type _vpo_disk _vpo_provision_marker _vpo_provision_fp _vpo_running
 
   _vpo_type="$(jq -r --arg n "$_vpo_name" '.VMs[] | select(.id == $n) | .type // empty' "$MANIFEST")"
   if [ -z "$_vpo_type" ]; then
@@ -1391,29 +1444,32 @@ vm_provision_one() {
     return 1
   fi
   _vpo_disk="$VM_DIR/data/${_vpo_name}.qcow2"
-  _vpo_cred_marker="$(vm_guest_credentials_marker_path "$_vpo_name" "$_vpo_disk")"
-  _vpo_config_marker="$(vm_guest_config_marker_path "$_vpo_name" "$_vpo_disk")"
-  # WHY: only NixOS guests have a Nix-managed guest config to fingerprint.
-  _vpo_config_fp=''
-  if [ "$_vpo_type" = "NixOS" ]; then
-    _vpo_config_fp="$(vm_guest_config_fingerprint)"
-  fi
+  _vpo_provision_marker="$(vm_provision_marker_path "$_vpo_disk")"
+  # WHY: the provision fingerprint covers per-VM identity, wiring, and
+  # credentials; it is the drift key reported below.
+  _vpo_provision_fp="$(vm_provision_fingerprint "$_vpo_name")" || return 1
 
   if ! vm_ensure_data_disk "$_vpo_name"; then
     return 1
   fi
 
-  # Drift: markers exist but are stale (missing ones were adopted by
-  # vm_ensure_data_disk, so any remaining mismatch is real drift).  Never
-  # auto-inject or recreate here — report so the operator can re-inject in
-  # place with the explicit command while the VM is stopped.
-  if ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_vpo_cred_marker" ||
-    { [ -n "$_vpo_config_fp" ] && ! vm_guest_config_marker_matches "$_vpo_config_fp" "$_vpo_config_marker"; }; then
-    _vpo_running="$(vm_get_running_ids)"
-    if printf '%s\n' "$_vpo_running" | grep -qxF "$_vpo_name"; then
-      say "VM '$_vpo_name' is running; skipping in-place injection (applies on next setup)"
+  # Drift: the provision marker exists but is stale (a missing one was
+  # adopted by vm_ensure_data_disk, so any remaining mismatch is real drift).
+  # Never auto-inject or recreate here — report so the operator can re-inject
+  # in place with the explicit command while the VM is stopped.
+  if ! vm_provision_marker_matches "$_vpo_provision_fp" "$_vpo_provision_marker"; then
+    if [ "$_vpo_type" = "Android" ]; then
+      # WHY: Android userdata is created empty and never injected; a stale
+      # marker only means the inputs changed, so adopt it (marker adoption
+      # only, no injection, no drift report).
+      printf '%s\n' "$_vpo_provision_fp" >"$_vpo_provision_marker"
     else
-      say "guest credential/config drift detected for '$_vpo_name'; run 'nucleus-vm inject $_vpo_name' to re-inject in place (data disk preserved)"
+      _vpo_running="$(vm_get_running_ids)"
+      if printf '%s\n' "$_vpo_running" | grep -qxF "$_vpo_name"; then
+        say "VM '$_vpo_name' is running; skipping in-place injection (applies on next setup)"
+      else
+        say "guest provision drift detected for '$_vpo_name'; run 'nucleus-vm inject $_vpo_name' to re-inject in place (data disk preserved)"
+      fi
     fi
   fi
   return 0
@@ -1462,7 +1518,7 @@ vm_link_android_userdata_to_utm_bundle() {
 # vm_inject_guest NAME
 #   Re-run in-place disk injection for one VM: applies the per-VM guest
 #   identity (hostname, username, password, SSH key) into the existing data
-#   disk without recreating it, then refreshes the provision markers so the
+#   disk without recreating it, then refreshes the provision marker so the
 #   disk matches current inputs.  Dispatches by type:
 #     NixOS   — qemu-nbd attach + nixos-enter applying src/vms/guests/<id>/guest.nix
 #     Windows — libguestfs offline customization (virt-customize --in-place)
@@ -1475,8 +1531,7 @@ vm_link_android_userdata_to_utm_bundle() {
 #   fresh data disk gets its identity before first boot.
 vm_inject_guest() {
   local _vig_name="$1"
-  local _vig_type _vig_running _vig_disk _vig_cred_marker _vig_config_marker
-  local _vig_config_fp
+  local _vig_type _vig_running _vig_disk _vig_provision_marker _vig_provision_fp
 
   _vig_type="$(jq -r --arg n "$_vig_name" '.VMs[] | select(.id == $n) | .type // empty' "$MANIFEST")"
   if [ -z "$_vig_type" ]; then
@@ -1506,19 +1561,17 @@ vm_inject_guest() {
   # first with --force, which is destructive and prints a warning).
   if [ "$_vig_type" = "NixOS" ] || [ "$_vig_type" = "Windows" ]; then
     _vig_disk="$VM_DIR/data/${_vig_name}.qcow2"
-    _vig_cred_marker="$(vm_guest_credentials_marker_path "$_vig_name" "$_vig_disk")"
-    _vig_config_marker="$(vm_guest_config_marker_path "$_vig_name" "$_vig_disk")"
-    _vig_config_fp=''
-    if [ "$_vig_type" = "NixOS" ]; then
-      _vig_config_fp="$(vm_guest_config_fingerprint)"
-    fi
+    _vig_provision_marker="$(vm_provision_marker_path "$_vig_disk")"
+    # WHY: the provision fingerprint is the drift key refreshed after a
+    # successful in-place injection.
+    _vig_provision_fp="$(vm_provision_fingerprint "$_vig_name")" || return 1
 
     if [ "$force" = true ] && [ -f "$_vig_disk" ]; then
       warn "recreating data disk for '$_vig_name' (--force; this DESTROYS existing data)"
       if [ "$dry_run" = true ]; then
-        dry_run "rm -f $_vig_disk $_vig_cred_marker $_vig_config_marker"
+        dry_run "rm -f $_vig_disk $_vig_provision_marker"
       else
-        rm -f "$_vig_disk" "$_vig_cred_marker" "$_vig_config_marker"
+        rm -f "$_vig_disk" "$_vig_provision_marker"
       fi
     fi
 
@@ -1548,13 +1601,10 @@ vm_inject_guest() {
   # the re-inject.
   if [ "$_vig_type" = "NixOS" ] || [ "$_vig_type" = "Windows" ]; then
     if [ "$dry_run" = true ]; then
-      dry_run "refresh provision markers for $_vig_name"
+      dry_run "refresh provision marker for $_vig_name"
     else
-      printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_vig_cred_marker"
-      if [ -n "$_vig_config_fp" ]; then
-        printf '%s\n' "$_vig_config_fp" >"$_vig_config_marker"
-      fi
-      say "refreshed provision markers for '$_vig_name'"
+      printf '%s\n' "$_vig_provision_fp" >"$_vig_provision_marker"
+      say "refreshed provision marker for '$_vig_name'"
     fi
   fi
   return 0
@@ -2936,32 +2986,28 @@ vm_build_nixos() {
   esac
   vm_ensure_type_src_dirs
   _out="$(vm_src_path "$_vm_type" "$VM_SYSTEM_IMAGE")"
-  _marker="$(vm_guest_credentials_marker_path "$_vm_type")"
-  _config_marker="$(vm_guest_config_marker_path "$_vm_type")"
+  _marker="$(vm_type_config_marker_path "$_vm_type")"
   _min_size="$(parse_size "$(jq -r --arg t "$_vm_type" '[.VMs[] | select(.type == $t) | .minImageSize][0] // empty' "$MANIFEST")")"
 
-  # WHY: rebuild when the guest config (base-guest.nix + imports + flake.lock)
-  _config_fingerprint="$(vm_guest_config_fingerprint)" || return 1
+  # WHY: the type system image is identity-free (nixos-generators), so the
+  # type marker tracks config inputs only; per-VM identity (credentials)
+  # drift surfaces via each data disk's provision marker instead.
+  _type_fp="$(vm_type_config_fingerprint "$_vm_type")" || return 1
 
   if [ -f "$_out" ]; then
     if validate_qcow2_image "$_out" "existing NixOS image" "$_min_size"; then
-      if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker" &&
-        vm_guest_config_marker_matches "$_config_fingerprint" "$_config_marker"; then
-        say "NixOS image already built for the current guest credentials and config (owner=$vm_secret_owner, username=$vm_guest_username): $_out"
+      if vm_type_config_marker_matches "$_type_fp" "$_marker"; then
+        say "NixOS image already built for the current guest config (owner=$vm_secret_owner, username=$vm_guest_username): $_out"
         return 0
       fi
-      if vm_guest_config_marker_matches "$_config_fingerprint" "$_config_marker"; then
-        say "NixOS image guest credential drift detected; rebuilding image: $_out"
-      else
-        say "NixOS image guest config drift detected; rebuilding image: $_out"
-      fi
+      say "NixOS image guest config drift detected; rebuilding image: $_out"
     else
       warn "existing NixOS image is invalid; rebuilding from scratch: $_out"
     fi
     if [ "$dry_run" = false ]; then
-      rm -f "$_out" "$_marker" "$_config_marker"
+      rm -f "$_out" "$_marker"
     else
-      dry_run "rm -f $_out $_marker $_config_marker"
+      dry_run "rm -f $_out $_marker"
       return 0
     fi
   fi
@@ -3001,11 +3047,10 @@ vm_build_nixos() {
   chmod u+w "$_out"
 
   # WHY: nixos-generators defaults to a small virtual disk (~4 GiB) for qcow
-  if ! resize_and_mark_image "$_out" "$_marker" "$_disk_bytes"; then
+  if ! resize_and_mark_image "$_out" "$_marker" "$_type_fp" "$_disk_bytes"; then
     rm -rf "$_tmpdir"
     return 1
   fi
-  printf '%s\n' "$_config_fingerprint" >"$_config_marker"
 
   rm -rf "$_tmpdir"
   say "NixOS image ready: $_out"
@@ -3262,18 +3307,21 @@ vm_build_windows() {
   _edition="$3"
   vm_ensure_type_src_dirs
   _out="$(vm_src_path "$_vm_type" "$VM_SYSTEM_IMAGE")"
-  _marker="$(vm_guest_credentials_marker_path "$_vm_type")"
+  _marker="$(vm_type_config_marker_path "$_vm_type")"
+  # WHY: the Windows type build bakes guest identity (Autounattend.xml
+  # tokens, packer vars), so the type marker tracks config and credentials.
+  _type_fp="$(vm_type_image_fingerprint "$_vm_type")" || return 1
   _min_size="$(parse_size "$(jq -r --arg t "$_vm_type" '[.VMs[] | select(.type == $t) | .minImageSize][0] // empty' "$MANIFEST")")"
   _hostfwd="$(jq -r --arg t "$_vm_type" '[.VMs[] | select(.type == $t)][0].portForwards | map("hostfwd=tcp::\(.hostPort)-:\(.guestPort)") | join(",")' "$MANIFEST")"
   _guest_hostname="$(printf '%s' "$_vm_type" | tr '[:upper:]' '[:lower:]')"
 
   if [ -f "$_out" ]; then
     if validate_qcow2_image "$_out" "existing Windows image" "$_min_size"; then
-      if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker"; then
-        say "Windows image already built for the current guest credentials (owner=$vm_secret_owner, username=$vm_guest_username): $_out"
+      if vm_type_config_marker_matches "$_type_fp" "$_marker"; then
+        say "Windows image already built for the current guest config and credentials (owner=$vm_secret_owner, username=$vm_guest_username): $_out"
         return 0
       fi
-      say "Windows image guest credential drift detected; rebuilding image: $_out"
+      say "Windows image guest config/credential drift detected; rebuilding image: $_out"
     fi
     warn "existing Windows image is invalid; rebuilding from scratch: $_out"
     rm -f "$_out" "$_marker"
@@ -3607,7 +3655,7 @@ EOF
     return 1
   fi
 
-  resize_and_mark_image '' "$_marker"
+  resize_and_mark_image '' "$_marker" "$_type_fp"
   say "Windows 11 image ready: $_out"
 }
 
@@ -3624,7 +3672,10 @@ vm_build_macos() {
   _ram_bytes="$3"
   _cpus="$4"
   _macos_version="$5"
-  _marker="$(vm_guest_credentials_marker_path "$_vm_type")"
+  _marker="$(vm_type_config_marker_path "$_vm_type")"
+  # WHY: the macOS type build bakes guest identity (Tart packer vars) and has
+  # no per-VM injection path, so the type marker tracks config and credentials.
+  _type_fp="$(vm_type_image_fingerprint "$_vm_type")" || return 1
 
   if [ "$(uname -s)" != "Darwin" ]; then
     say "macOS guest build requires a macOS host (Tart uses Virtualization.framework); skipping"
@@ -3642,12 +3693,12 @@ vm_build_macos() {
   fi
 
   if vm_get_tart_registered_names | grep -qxF "$_vm_type"; then
-    if vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_marker"; then
-      say "tart VM '$_vm_type' already exists for the current guest credentials (owner=$vm_secret_owner, username=$vm_guest_username)"
+    if vm_type_config_marker_matches "$_type_fp" "$_marker"; then
+      say "tart VM '$_vm_type' already exists for the current guest config and credentials (owner=$vm_secret_owner, username=$vm_guest_username)"
       return 0
     fi
 
-    say "macOS guest credential drift detected; rebuilding tart VM '$_vm_type'"
+    say "macOS guest config/credential drift detected; rebuilding tart VM '$_vm_type'"
     if ! tart delete "$_vm_type"; then
       error "failed to delete stale tart VM '$_vm_type' before rebuild"
       return 1
@@ -3686,7 +3737,7 @@ vm_build_macos() {
     error "Packer build for macOS VM '$_vm_type' failed (exit $_packer_status)"
     return "$_packer_status"
   fi
-  resize_and_mark_image '' "$_marker"
+  resize_and_mark_image '' "$_marker" "$_type_fp"
   say "macOS VM '$_vm_type' built and registered in tart"
 }
 
@@ -4095,8 +4146,8 @@ vm_gc_orphan_disks() {
   fi
 }
 
-# vm_gc_orphan_markers EXPECTED_NAMES — Remove guest marker files (credential
-#   and config fingerprints) that are no longer meaningful.  src/<type>/
+# vm_gc_orphan_markers EXPECTED_NAMES — Remove guest marker files (type-config
+#   and provision fingerprints) that are no longer meaningful.  src/<type>/
 #   markers gate the type system image; data/ sidecar markers are removed when
 #   their disk image is gone (only when gc_data_mode is enabled).
 vm_gc_orphan_markers() {
@@ -4113,28 +4164,23 @@ vm_gc_orphan_markers() {
     ' "$MANIFEST" >/dev/null 2>&1; then
       _gcom_type_expected=true
     fi
-    for _gcom_marker in \
-      "$_gcom_type_dir/${VM_TYPE_MARKER_BASE}.vm-guest-credentials-sha256" \
-      "$_gcom_type_dir/${VM_TYPE_MARKER_BASE}.vm-guest-config-sha256"; do
-      [ -f "$_gcom_marker" ] || continue
+    _gcom_marker="$_gcom_type_dir/${VM_TYPE_MARKER_BASE}.vm-type-config-sha256"
+    if [ -f "$_gcom_marker" ]; then
       if [ "$_gcom_type_expected" != true ]; then
         say "GC — removing orphaned guest marker: $_gcom_marker"
         if [ "$dry_run" = false ]; then
           rm -f "$_gcom_marker"
         fi
       fi
-    done
+    fi
   done
 
   if [ "$gc_data_mode" = true ]; then
     _gcom_data_dir="$VM_DIR/data"
     [ -d "$_gcom_data_dir" ] || return 0
-    for _gcom_marker in "$_gcom_data_dir"/*.vm-guest-credentials-sha256 "$_gcom_data_dir"/*.vm-guest-config-sha256; do
+    for _gcom_marker in "$_gcom_data_dir"/*.vm-provision-sha256; do
       [ -f "$_gcom_marker" ] || continue
-      case "$_gcom_marker" in
-      *.vm-guest-credentials-sha256) _gcom_base="${_gcom_marker%.vm-guest-credentials-sha256}" ;;
-      *) _gcom_base="${_gcom_marker%.vm-guest-config-sha256}" ;;
-      esac
+      _gcom_base="${_gcom_marker%.vm-provision-sha256}"
       if [ ! -f "$_gcom_base" ]; then
         say "GC — removing orphaned guest marker: $_gcom_marker"
         if [ "$dry_run" = false ]; then
