@@ -232,7 +232,7 @@ The guest-side adb wedge persists with the workaround and is not caused by it.
 
 QCOW2 throughout all three platforms. Runtime disks live under `data/`; per-type source payloads and type system images live under `src/<type>/`:
 
-- macOS runtime: `~/virtual machines/data/<id>.qcow2` (UTM bundle exposes `~/virtual machines/<id>.utm/Data/disk-main.qcow2` as a hard link)
+- macOS runtime: `~/virtual machines/data/<id>.qcow2` (UTM bundle exposes `~/virtual machines/<id>.utm/Data/system disk.qcow2` as a hard link)
 - NixOS runtime: `~/virtual machines/data/<id>.qcow2`
 - Windows runtime: `%USERPROFILE%\virtual machines\data\<id>.qcow2`
 
@@ -256,7 +256,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - VM backend: UTM 4.x QEMU backend.
 - Bundle location: `~/virtual machines/<id>.utm/`
 - Config template: `config.plist` pre-generated at `~/.local/share/nucleus/vms/<id>-config.plist` by `src/hosts/MacBook/vms.nix` at Home Manager activation time; `vm.sh setup` copies it into the bundle.
-- Disk pre-created in `Images/disk-main.qcow2` by copying or linking from `src/<type>/` (system image for Android; hard link to `data/<id>.qcow2` for non-Android).
+- Bundle disks are hard links only, never copies: `Data/system disk.qcow2` links `data/<id>.qcow2` (non-Android overlay) or `data/<id>-system.qcow2` (Android system overlay); Android additionally links `Data/user data.qcow2` → `data/<id>.qcow2` and `Data/GSI disk.qcow2` → `src/Android/GSI.img` (read-only).
 - After provisioning, UTM opens each bundle automatically.
 - VirtioFS shared directory: configured via `Sharing.DirectoryShare` in the Nix-generated config.plist.
 - Network: **Emulated** (QEMU user/slirp) — required for `PortForward` to work; vmnet-shared silently drops forwards.

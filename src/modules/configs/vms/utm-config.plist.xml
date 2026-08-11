@@ -12,7 +12,7 @@
             <key>Identifier</key>
             <string>__VM_ID__-disk-main</string>
             <key>ImageName</key>
-            <string>disk-main.qcow2</string>
+            <string>__VM_MAIN_DRIVE_IMAGE__</string>
             <key>ImageType</key>
             <string>Disk</string>
             <key>Interface</key>
@@ -20,7 +20,7 @@
             <key>InterfaceVersion</key>
             <integer>1</integer>
             <key>ReadOnly</key>
-            <false/>
+            __VM_MAIN_DRIVE_READONLY__
         </dict>
         __VM_ANDROID_DRIVES__
     </array>

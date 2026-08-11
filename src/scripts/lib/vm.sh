@@ -1545,7 +1545,7 @@ vm_provision_one() {
 }
 
 # vm_link_android_userdata_to_utm_bundle NAME INDEX [BUNDLE_DATA_DIR]
-#   Ensure Android.utm/Data/<userdataImage> is a hard link to data/<id>.qcow2
+#   Ensure Android.utm/Data/user data.qcow2 is a hard link to data/<id>.qcow2
 #   (G1a write-through).  Canonical data/ is the source of truth when present.
 #   Never deletes userdata disks — only ln -f when canonical exists.
 vm_link_android_userdata_to_utm_bundle() {
@@ -1554,11 +1554,12 @@ vm_link_android_userdata_to_utm_bundle() {
   _lautb_bundle_data_dir="${3:-}"
 
   _lautb_canonical="$VM_DIR/data/${_lautb_name}.qcow2"
-  _lautb_userdata_image="$(jq -r ".VMs[$_lautb_index].Android.userdataImage" "$MANIFEST")"
   if [ -z "$_lautb_bundle_data_dir" ]; then
     _lautb_bundle_data_dir="$VM_DIR/${_lautb_name}.utm/Data"
   fi
-  _lautb_bundle="$_lautb_bundle_data_dir/$_lautb_userdata_image"
+  # WHY: guest-agnostic natural-language bundle disk name (user requirement);
+  # the canonical disk stays data/<id>.qcow2 regardless of the bundle name.
+  _lautb_bundle="$_lautb_bundle_data_dir/user data.qcow2"
 
   if [ ! -f "$_lautb_canonical" ]; then
     return 0
@@ -2537,6 +2538,18 @@ vm_build_android() {
 
   # bundle; skipped in dry-run (no real mutations).  WHY: do_upgrade and
   if [ "$dry_run" = false ]; then
+    # WHY: a re-downloaded system image is a new base; the old overlay's
+    # guest /system writes belong to the previous base, so recreate the
+    # overlay on the new base (destructive to guest /system state — the
+    # --upgrade contract) before re-linking the bundle entry to it.
+    if [ "$_bai_system_replaced" = true ]; then
+      _bai_system_overlay="$VM_DIR/data/${_bai_vm_id}-system.qcow2"
+      rm -f "$_bai_system_overlay" "$(vm_provision_marker_path "$_bai_system_overlay")"
+      if ! vm_ensure_android_system_overlay "$_bai_vm_id"; then
+        return 1
+      fi
+      say "refreshed Android system overlay on new base: $_bai_system_overlay"
+    fi
     if [ "$_bai_system_replaced" = true ] || [ "$_bai_userdata_replaced" = true ]; then
       _bai_bundle_dir="$VM_DIR/${_bai_vm_id}.utm/Data"
       if [ -d "$_bai_bundle_dir" ]; then
@@ -2545,11 +2558,9 @@ vm_build_android() {
             return 1
         fi
         if [ "$_bai_system_replaced" = true ]; then
-          _bai_bundle_system="$_bai_bundle_dir/disk-main.qcow2"
-          if [ -f "$_bai_bundle_system" ]; then
-            cp "$_bai_system_img" "$_bai_bundle_system"
-            say "refreshed Android system disk in UTM bundle: $_bai_bundle_system"
-          fi
+          _bai_bundle_system="$_bai_bundle_dir/system disk.qcow2"
+          ln -f "$_bai_system_overlay" "$_bai_bundle_system"
+          say "refreshed Android system disk in UTM bundle: $_bai_bundle_system"
         fi
       fi
     fi
@@ -2835,7 +2846,7 @@ vm_setup_utm() {
   local vm_id="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display bundle data_dir disk_file
   local config_plist bundle_exists template_drift_config
-  local template_drift_config _prebuilt _prebuilt_valid _prebuilt_min_size
+  local template_drift_config _prebuilt _prebuilt_min_size
   local _android_system _android_userdata _android_gsi _userdata_file _gsi_file
 
   vm_display=$(jq -r ".VMs[$vm_index].name" "$MANIFEST")
@@ -2847,7 +2858,10 @@ vm_setup_utm() {
 
   bundle="$VM_DIR/${vm_id}.utm"
   data_dir="$bundle/Data"
-  disk_file="$data_dir/disk-main.qcow2"
+  # WHY: guest-agnostic natural-language bundle disk name (user requirement);
+  # the canonical disk stays data/<id>.qcow2 (non-Android) or
+  # data/<id>-system.qcow2 (Android system overlay) and is hard-linked here.
+  disk_file="$data_dir/system disk.qcow2"
   config_plist="$bundle/config.plist"
   bundle_exists=false
   template_drift_config=false
@@ -2877,7 +2891,6 @@ vm_setup_utm() {
   else
     _prebuilt="$(vm_src_path "$vm_type" "$VM_SYSTEM_IMAGE")"
   fi
-  _prebuilt_valid=false
   if [ ! -f "$disk_file" ] && [ ! -f "$_prebuilt" ]; then
     _build_tmp="$(vm_src_path "$vm_type" "$VM_PACKER_BUILD_DIR")"
     if [ -d "$_build_tmp" ]; then
@@ -2889,13 +2902,9 @@ vm_setup_utm() {
   fi
 
   _prebuilt_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
-  if [ -f "$_prebuilt" ]; then
-    if validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_id}" "$_prebuilt_min_size"; then
-      _prebuilt_valid=true
-    else
-      warn "pre-built image is invalid for '$vm_id': $_prebuilt"
-      return
-    fi
+  if [ -f "$_prebuilt" ] && ! validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_id}" "$_prebuilt_min_size"; then
+    warn "pre-built image is invalid for '$vm_id': $_prebuilt"
+    return
   fi
 
   if [ "$dry_run" = false ]; then
@@ -2905,33 +2914,30 @@ vm_setup_utm() {
         warn "Android userdata image not found: $_android_userdata; run vm-build first"
         return
       fi
-      _replace_runtime=false
-      if [ -f "$disk_file" ] && ! validate_qcow2_image "$disk_file" "existing UTM runtime disk for ${vm_id}" "$_prebuilt_min_size"; then
-        warn "existing Android runtime disk is invalid for '$vm_id'; replacing from pre-built image"
-        rm -f "$disk_file"
-        _replace_runtime=true
+      # WHY: the guest-visible system disk is the persistent writable
+      # data/<id>-system.qcow2 overlay (src/Android/ stays pristine); the
+      # bundle entry is a hard link to it, so UTM boots the overlay directly
+      # and the link tracks overlay replacement without ever copying.
+      if ! vm_ensure_android_system_overlay "$vm_id"; then
+        return
       fi
-      if [ ! -f "$disk_file" ]; then
-        if [ "$_prebuilt_valid" != true ]; then
-          warn "cannot create the $vm_id Android runtime disk because no valid system image is available: $_android_system"
-          return
-        fi
-        cp "$_android_system" "$disk_file"
-        say "copied Android system image: $disk_file"
-      elif [ "$_replace_runtime" = true ]; then
-        warn "replacement was requested for '$vm_id' but the Android runtime disk still exists; leaving it untouched"
+      if [ -f "$disk_file" ] && [ "$disk_file" -ef "$VM_DIR/data/${vm_id}-system.qcow2" ]; then
+        say "preserving existing Android system disk link: $disk_file"
       else
-        say "preserving existing Android system disk: $disk_file"
+        ln -f "$VM_DIR/data/${vm_id}-system.qcow2" "$disk_file"
+        say "linked Android system overlay into UTM bundle: $disk_file"
       fi
       if ! vm_link_android_userdata_to_utm_bundle "$vm_id" "$vm_index" "$data_dir"; then
         return 1
       fi
       _gsi_url="$(jq -r ".VMs[$vm_index].Android.gsiUrl" "$MANIFEST")"
-      _gsi_file="$data_dir/$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")"
+      _gsi_file="$data_dir/GSI disk.qcow2"
       if [ -n "$_gsi_url" ] && [ "$_gsi_url" != "null" ]; then
         if [ -f "$_android_gsi" ]; then
-          cp "$_android_gsi" "$_gsi_file"
-          say "copied Android GSI image: $_gsi_file"
+          # WHY: the GSI payload is read-only (raw, attached readonly in all
+          # runtimes), so the bundle entry is a hard link to src/Android/.
+          ln -f "$_android_gsi" "$_gsi_file"
+          say "linked Android GSI image into UTM bundle: $_gsi_file"
         elif [ -f "$_gsi_file" ]; then
           warn "Android GSI image removed from images dir; removing stale bundle copy: $_gsi_file"
           rm -f "$_gsi_file"
@@ -4455,16 +4461,21 @@ vm_unpack_vms() {
             warn "unpack — Android userdata missing: $_uv_android_userdata; skipping bundle for '$_uv_name'"
             continue
           fi
-          cp "$_uv_android_system" "$_uv_bundle/Data/disk-main.qcow2"
-          ln -f "$_uv_android_userdata" "$_uv_bundle/Data/$(basename "$_uv_android_userdata")"
+          # WHY: bundle entries are hard links to canonical disks (never
+          # copies); the system overlay must exist before linking it.
+          if ! vm_ensure_android_system_overlay "$_uv_name"; then
+            continue
+          fi
+          ln -f "$VM_DIR/data/${_uv_name}-system.qcow2" "$_uv_bundle/Data/system disk.qcow2"
+          ln -f "$_uv_android_userdata" "$_uv_bundle/Data/user data.qcow2"
           if [ -n "$_uv_gsi_url" ] && [ "$_uv_gsi_url" != "null" ] && [ -f "$_uv_android_gsi" ]; then
-            cp "$_uv_android_gsi" "$_uv_bundle/Data/$(basename "$_uv_android_gsi")"
+            ln -f "$_uv_android_gsi" "$_uv_bundle/Data/GSI disk.qcow2"
           fi
         else
           if ! vm_unpack_ensure_data_disk "$_uv_name" "$_uv_type"; then
             continue
           fi
-          ln -f "$VM_DIR/data/${_uv_name}.qcow2" "$_uv_bundle/Data/disk-main.qcow2"
+          ln -f "$VM_DIR/data/${_uv_name}.qcow2" "$_uv_bundle/Data/system disk.qcow2"
         fi
         cp "$_uv_plist_template" "$_uv_bundle/config.plist"
         chmod +w "$_uv_bundle/config.plist"

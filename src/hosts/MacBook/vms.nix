@@ -61,8 +61,10 @@ let
   # - NixOS images are qcow-efi on aarch64 and qcow (BIOS) on x86_64.
   qemuUefiBoot = vm: vm.type != "Windows" && vmArch vm == "aarch64";
 
-  # Image filenames come from the manifest Android group (userdataImage /
-  # gsiImage) so VMs.json is the single source of truth.
+  # Bundle ImageNames are guest-agnostic natural-language disk names; the
+  # canonical payloads they hard-link to are resolved by vm.sh at
+  # provisioning time (userdata overlay under data/, read-only GSI under
+  # src/Android/) from the manifest Android group.
   androidDrives =
     vm:
     if vm.type != "Android" then
@@ -73,7 +75,7 @@ let
             <key>Identifier</key>
             <string>${vm.id}-disk-userdata</string>
             <key>ImageName</key>
-            <string>${vm.Android.userdataImage}</string>
+            <string>user data.qcow2</string>
             <key>ImageType</key>
             <string>Disk</string>
             <key>Interface</key>
@@ -89,7 +91,7 @@ let
             <key>Identifier</key>
             <string>${vm.id}-disk-gsi</string>
             <key>ImageName</key>
-            <string>${vm.Android.gsiImage}</string>
+            <string>GSI disk.qcow2</string>
             <key>ImageType</key>
             <string>Disk</string>
             <key>Interface</key>
@@ -152,6 +154,8 @@ let
         "__VM_ANDROID_DRIVES__"
         "__VM_PORT_FORWARDS__"
         "__VM_SOUND__"
+        "__VM_MAIN_DRIVE_IMAGE__"
+        "__VM_MAIN_DRIVE_READONLY__"
       ]
       [
         vm.id
@@ -169,6 +173,11 @@ let
         (androidDrives vm)
         (portForwardEntries vm)
         (vmSound vm)
+        # WHY: the guest-visible main disk is always the writable
+        # data/<id>.qcow2 overlay (data/<id>-system.qcow2 for Android), so
+        # the bundle's main drive entry is never read-only.
+        "system disk.qcow2"
+        "<false/>"
       ]
       # check-suppress:config-method: method 4 (runtime direct read) -- builtins.readFile embeds at eval time
       (builtins.readFile ../../modules/configs/vms/utm-config.plist.xml);

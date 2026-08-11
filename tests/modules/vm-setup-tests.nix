@@ -1790,8 +1790,8 @@ let
 
   # UTM provisioning for Android must derive the system/userdata/GSI image
   # filenames from the manifest Android group (never hardcoded android-*
-  # literals), validate the prebuilt with the relaxed 4 GiB floor, and copy
-  # system/userdata/optional-GSI into the bundle.
+  # literals), validate the prebuilt with the relaxed 4 GiB floor, and
+  # hard-link system/userdata/optional-GSI into the bundle (never copy).
   test_utm_android_uses_shared_images =
     assert'
       (
@@ -1800,11 +1800,32 @@ let
         && (lib.hasInfix ''_android_gsi="$(vm_src_path Android "$(jq -r ".VMs[$vm_index].Android.gsiImage" "$MANIFEST")")"'' vm_setup_sh_text)
         && (lib.hasInfix ''_prebuilt="$_android_system"'' vm_setup_sh_text)
         && (lib.hasInfix "_prebuilt_min_size=\"\$(parse_size \"\$(jq -r \".VMs[\$vm_index].minImageSize\" \"\$MANIFEST\")\")\"" vm_setup_sh_text)
-        && (lib.hasInfix "copied Android system image" vm_setup_sh_text)
+        && (lib.hasInfix "linked Android system overlay into UTM bundle" vm_setup_sh_text)
         && (lib.hasInfix "linked Android userdata disk" vm_setup_sh_text)
         && (lib.hasInfix "Android userdata image not found" vm_setup_sh_text)
+        && !(lib.hasInfix "cp \"\$_android_system\" \"\$disk_file\"" vm_setup_sh_text)
       )
-      "scripts/vm.sh must provision Android UTM bundles from the manifest Android group image names, hard-linking the canonical data/<id>.qcow2 userdata into the bundle";
+      "scripts/vm.sh must provision Android UTM bundles from the manifest Android group image names, hard-linking canonical data/ overlays and src/Android/ payloads into the bundle (never copying)";
+
+  # UTM bundles must expose canonical disks as hard links only — never copies
+  # (no cp into bundle Data/), across all Darwin bundle writers (setup, build
+  # refresh, unpack) — so bundles track canonical data/ and src/ inodes and
+  # stay cheap to re-create; no legacy disk-main.qcow2 anywhere.
+  test_utm_bundle_hard_link_only =
+    assert'
+      (
+        (lib.hasInfix "ln -f \"\$VM_DIR/data/\${vm_id}-system.qcow2\" \"\$disk_file\"" vm_setup_sh_text)
+        && (lib.hasInfix "_bai_system_overlay=\"\$VM_DIR/data/\${_bai_vm_id}-system.qcow2\"" vm_setup_sh_text)
+        && (lib.hasInfix "ln -f \"\$_uv_android_userdata\" \"\$_uv_bundle/Data/user data.qcow2\"" vm_setup_sh_text)
+        && (lib.hasInfix "ln -f \"\$VM_DIR/data/\${_uv_name}.qcow2\" \"\$_uv_bundle/Data/system disk.qcow2\"" vm_setup_sh_text)
+        && !(lib.hasInfix "cp \"\$_bai_system_img\" \"\$_bai_bundle_system\"" vm_setup_sh_text)
+        && !(lib.hasInfix "cp \"\$_uv_android_system\" \"\$_uv_bundle/Data/disk-main.qcow2\"" vm_setup_sh_text)
+        && !(lib.hasInfix "cp \"\$_android_system\" \"\$disk_file\"" vm_setup_sh_text)
+        && !(lib.hasInfix "disk-main.qcow2" vm_setup_sh_text)
+        && !(lib.hasInfix "disk-main.qcow2" readmeTemplateText)
+        && !(lib.hasInfix "disk-main.qcow2" utmConfigPlistText)
+      )
+      "UTM bundle disks must be hard links to canonical data//src/ files (never copies) with guest-agnostic names and no legacy disk-main.qcow2 anywhere";
 
   # Android userdata must never delete standalone bundle copies; canonical
   # data/<id>.qcow2 is the source of truth and sync must re-link it (no
@@ -1815,6 +1836,7 @@ let
         (lib.hasInfix "vm_link_android_userdata_to_utm_bundle" vm_setup_sh_text)
         && !(lib.hasInfix "exists only in the UTM bundle" vm_setup_sh_text)
         && (lib.hasInfix "vm_link_android_userdata_to_utm_bundle \"\$vm_id\" \"\$vm_index\" \"\$bundle/Data\"" vm_setup_sh_text)
+        && (lib.hasInfix "_lautb_bundle=\"\$_lautb_bundle_data_dir/user data.qcow2\"" vm_setup_sh_text)
         && !(lib.hasInfix "removing legacy bundle userdata" vm_setup_sh_text)
         && !(lib.hasInfix "pre-migration" vm_setup_sh_text)
       )
@@ -1891,9 +1913,13 @@ let
         && (lib.hasInfix "_bai_system_replaced=true" vm_setup_sh_text)
         && (lib.hasInfix "_bai_userdata_replaced=true" vm_setup_sh_text)
         && (lib.hasInfix "vm_link_android_userdata_to_utm_bundle \"\$_bai_vm_id\" \"\$_bai_vm_index\" \"\$_bai_bundle_dir\"" vm_setup_sh_text)
+        && (lib.hasInfix "_bai_system_overlay=\"\$VM_DIR/data/\${_bai_vm_id}-system.qcow2\"" vm_setup_sh_text)
+        && (lib.hasInfix "_bai_bundle_system=\"\$_bai_bundle_dir/system disk.qcow2\"" vm_setup_sh_text)
+        && (lib.hasInfix "ln -f \"\$_bai_system_overlay\" \"\$_bai_bundle_system\"" vm_setup_sh_text)
         && (lib.hasInfix "refreshed Android system disk in UTM bundle" vm_setup_sh_text)
         && (lib.hasInfix "if [ \"\$dry_run\" = false ]; then" vm_setup_sh_text)
         && (lib.hasInfix "_bai_bundle_dir=\"\$VM_DIR/\${_bai_vm_id}.utm/Data\"" vm_setup_sh_text)
+        && !(lib.hasInfix "cp \"\$_bai_system_img\" \"\$_bai_bundle_system\"" vm_setup_sh_text)
       )
       "vm_build_android must re-link the UTM bundle's Android userdata/system disks after replacing a canonical disk (system re-download or userdata reset) so do_upgrade/do_reset do not leave stale bundle inodes";
 
@@ -2071,8 +2097,11 @@ let
         && (lib.hasInfix "<key>ImageName</key>" utmConfigPlistText)
         && (lib.hasInfix "<key>QEMU</key>" utmConfigPlistText)
         && (lib.hasInfix "<key>Input</key>" utmConfigPlistText)
+        && (lib.hasInfix "__VM_MAIN_DRIVE_IMAGE__" utmConfigPlistText)
+        && (lib.hasInfix "__VM_MAIN_DRIVE_READONLY__" utmConfigPlistText)
+        && !(lib.hasInfix "disk-main.qcow2" utmConfigPlistText)
       )
-      "src/modules/configs/vms/utm-config.plist.xml must include core UTM schema keys (Drive/ImageName/QEMU/Input) for reliable imports";
+      "src/modules/configs/vms/utm-config.plist.xml must include core UTM schema keys (Drive/ImageName/QEMU/Input) with guest-agnostic main-drive tokens (never a legacy disk-main.qcow2 literal)";
   # The Backend value must be exactly "QEMU" (uppercase) — UTM's Swift enum
   # performs a case-sensitive match and throws invalidBackend on any other value.
   # Keep generated templates schema-complete so UTM can decode/import bundles
@@ -2164,9 +2193,9 @@ let
     assert'
       (
         (lib.hasInfix "data_dir=\"$bundle/Data\"" vm_setup_sh_text)
-        && (lib.hasInfix "disk_file=\"$data_dir/disk-main.qcow2\"" vm_setup_sh_text)
+        && (lib.hasInfix "disk_file=\"$data_dir/system disk.qcow2\"" vm_setup_sh_text)
       )
-      "scripts/vm.sh must place UTM disk-main.qcow2 under bundle Data/ to match ImageName-based UTM drive resolution";
+      "scripts/vm.sh must place UTM system disk.qcow2 under bundle Data/ to match the guest-agnostic ImageName-based UTM drive resolution";
   test_macbook_utm_uses_direct_bundle_open =
     assert'
       (
@@ -2207,6 +2236,12 @@ let
         && (lib.hasInfix "vm-management.instructions.md" readmeTemplateText)
         && (lib.hasInfix "## Troubleshooting" readmeTemplateText)
         && (lib.hasInfix "__VM_DIR_DISPLAY__" readmeTemplateText)
+        && (lib.hasInfix "system disk.qcow2" readmeTemplateText)
+        && (lib.hasInfix "user data.qcow2" readmeTemplateText)
+        && (lib.hasInfix "GSI disk.qcow2" readmeTemplateText)
+        && !(lib.hasInfix "disk-main.qcow2" readmeTemplateText)
+        && !(lib.hasInfix "<userdataImage>" readmeTemplateText)
+        && !(lib.hasInfix "<gsiImage>" readmeTemplateText)
         && (!lib.hasInfix "{{" readmeTemplateText)
       )
       "src/vms/templates/README.md must contain expected template sections and __TOKEN__ placeholders, with no {{TOKEN}} style";
@@ -2402,16 +2437,19 @@ let
 
   # The Android GSI drive must be rendered only when the Android group's
   # gsiUrl is set; a revert to unconditional GSI emission must fail. The
-  # userdata drive stays attached unconditionally.  Image names come from the
-  # manifest Android group, never hardcoded android-* literals.
+  # userdata drive stays attached unconditionally.  Bundle ImageNames are
+  # guest-agnostic natural-language disk names (user data.qcow2 / GSI
+  # disk.qcow2), never manifest leaf names or hardcoded android-* literals.
   test_macbook_android_gsi_conditional =
     assert'
       (
         (lib.hasInfix "vm.Android.gsiUrl != null" macbook_vms_nix_text)
-        && (lib.hasInfix "\${vm.Android.gsiImage}" macbook_vms_nix_text)
-        && (lib.hasInfix "\${vm.Android.userdataImage}" macbook_vms_nix_text)
+        && (lib.hasInfix "<string>GSI disk.qcow2</string>" macbook_vms_nix_text)
+        && (lib.hasInfix "<string>user data.qcow2</string>" macbook_vms_nix_text)
+        && !(lib.hasInfix "\${vm.Android.gsiImage}" macbook_vms_nix_text)
+        && !(lib.hasInfix "\${vm.Android.userdataImage}" macbook_vms_nix_text)
       )
-      "src/hosts/MacBook/vms.nix must render the GSI drive only when vm.Android.gsiUrl is non-null while keeping the userdata drive (vm.Android.userdataImage) attached unconditionally";
+      "src/hosts/MacBook/vms.nix must render the GSI drive only when vm.Android.gsiUrl is non-null while keeping the userdata drive (user data.qcow2) attached unconditionally";
 
   # The Android drive token must be emitted inside the Drive array (before
   # </array>); an emission outside the array produces orphan <dict> entries at
@@ -2678,6 +2716,7 @@ let
     test_windows_qemu_android_system_overlay
     test_start_android_system_overlay_data_dir
     test_android_system_overlay_render_leaves
+    test_utm_bundle_hard_link_only
   ];
 
 in
@@ -2871,6 +2910,7 @@ in
     test_windows_qemu_android_system_overlay
     test_start_android_system_overlay_data_dir
     test_android_system_overlay_render_leaves
+    test_utm_bundle_hard_link_only
     ;
 
   summary = builtins.deepSeq all_tests "vm-setup-tests: all tests passed";

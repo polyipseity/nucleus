@@ -33,7 +33,8 @@ __VM_DIR_DISPLAY__/
 │   │   └── Packer/                     — temporary Packer build output (safe to delete)
 │   └── macOS/                          — macOS guest payloads (Tart-managed)
 ├── data/                               — writable per-guest runtime disks
-│   ├── <id>.qcow2                      — writable overlay (non-Android: backs ../src/<type>/system image.qcow2; Android: userdata)
+│   ├── <id>.qcow2                      — writable overlay (non-Android: backs __VM_DIR_DISPLAY__/src/<type>/system image.qcow2; Android: userdata)
+│   ├── <id>-system.qcow2               — Android: writable overlay backing __VM_DIR_DISPLAY__/src/Android/system image.qcow2 (guest /system)
 │   └── <id>.qcow2.vm-provision-sha256  — provision fingerprint for runtime disk
 ├── <id>.vm.json                        — self-describing VM descriptor (all manifest guests)
 ├── scripts/                            — generated helper scripts
@@ -42,10 +43,10 @@ __VM_DIR_DISPLAY__/
 │   └── pack.sh / unpack.sh (+ .ps1)    — pack/unpack delegation wrappers
 ├── <name>.utm/                         — UTM bundle directory (macOS only)
 │   ├── config.plist                    — UTM VM configuration
-│   └── Data/                           — bundle-local disk files exposed to UTM
-│       ├── disk-main.qcow2             — non-Android: hard link to data/<id>.qcow2; Android: copy of src/Android/system image.qcow2
-│       ├── <userdataImage>             — Android only: hard link to data/<id>.qcow2 (G1a write-through)
-│       └── <gsiImage>                  — Android only: copy of src/Android/GSI.img (when GSI present)
+│   └── Data/                           — bundle-local disk files exposed to UTM (hard links only, never copies)
+│       ├── system disk.qcow2           — hard link: non-Android → data/<id>.qcow2 overlay; Android → data/<id>-system.qcow2 overlay
+│       ├── user data.qcow2             — Android only: hard link to data/<id>.qcow2 (G1a write-through)
+│       └── GSI disk.qcow2              — Android only: hard link to src/Android/GSI.img (read-only, when GSI present)
 └── README.md                           — this file
 ```
 
