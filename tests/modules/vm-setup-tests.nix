@@ -1710,7 +1710,7 @@ let
   test_utm_base_overlay_provisioning =
     assert'
       (
-        (lib.hasInfix "vm_ensure_data_disk \"\$vm_id\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
+        (lib.hasInfix "vm_provision_one \"\$vm_id\"" vm_setup_sh_text)
         && (lib.hasInfix "linked data disk into UTM bundle: \$disk_file" vm_setup_sh_text)
         && !(lib.hasInfix "_base_link=\"\$data_dir/\$(basename \"\$(vm_src_path \"\$vm_type\" \"\$VM_OVERLAY_BACKING\")\")\"" vm_setup_sh_text)
         && !(lib.hasInfix "linked base image into UTM bundle: \$_base_link" vm_setup_sh_text)
@@ -1739,14 +1739,14 @@ let
       "Windows vm-setup must provision data/<id>.qcow2 overlays over src/<type>/system image.qcow2 (tree-root-relative backing, data preservation, grow-only resize, Android standalone userdata)";
 
   # The POSIX Windows/QEMU vm-setup callback must provision data disks for
-  # Windows guests (parity with the PowerShell Pass A): the vm_ensure_data_disk
+  # Windows guests (parity with the PowerShell Pass A): the vm_provision_one
   # call is what actually creates the writable data disk data/<id>.qcow2 on the
   # Windows host.
   test_windows_qemu_ensure_base_and_overlay = assert' (
     (lib.hasInfix "vm_setup_windows_qemu()" vm_setup_sh_text)
-    && (lib.hasInfix "vm_ensure_data_disk \"\$vm_id\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
+    && (lib.hasInfix "vm_provision_one \"\$vm_id\"" vm_setup_sh_text)
     && (lib.hasInfix "data disk ready: \$disk_path" vm_setup_sh_text)
-  ) "vm_setup_windows_qemu must call vm_ensure_data_disk for Windows guests";
+  ) "vm_setup_windows_qemu must call vm_provision_one for Windows guests";
 
   # UTM provisioning for Android must derive the system/userdata/GSI image
   # filenames from the manifest Android group (never hardcoded android-*
@@ -1834,10 +1834,27 @@ let
         && (lib.hasInfix "failed to mark libvirt default network for autostart" vm_setup_sh_text)
         && (lib.hasInfix "validate_qcow2_image \"$_prebuilt\" \"pre-built image for \${vm_id}\" \"$_prebuilt_min_size\"" vm_setup_sh_text)
         && (lib.hasInfix "disk_path=\"\$VM_DIR/data/\${vm_id}.qcow2\"" vm_setup_sh_text)
-        && (lib.hasInfix "vm_ensure_data_disk \"\$vm_id\" \"\$_prebuilt\" \"\$_prebuilt_min_size\"" vm_setup_sh_text)
+        && (lib.hasInfix "vm_provision_one \"\$vm_id\"" vm_setup_sh_text)
         && (lib.hasInfix "data disk ready: \$disk_path" vm_setup_sh_text)
       )
       "scripts/vm.sh must validate libvirt system images against the manifest minImageSize, provision the data/<id>.qcow2 overlay, and surface default-network recovery failures";
+
+  # vm_provision_one is the phase-2 per-VM provision orchestrator: it derives
+  # the type, disk path, and sidecar markers from NAME alone, delegates
+  # create/keep/adopt to the NAME-only vm_ensure_data_disk, and owns the
+  # credential/config drift message (setup never auto-injects or auto-recreates
+  # on drift — the operator runs 'nucleus-vm inject NAME' while stopped).
+  test_vm_provision_one_orchestrator =
+    assert'
+      (
+        (lib.hasInfix "vm_provision_one() {" vm_setup_sh_text)
+        && (lib.hasInfix "if ! vm_ensure_data_disk \"\$_vpo_name\"; then" vm_setup_sh_text)
+        && (lib.hasInfix "guest credential/config drift detected for '\$_vpo_name'" vm_setup_sh_text)
+        && (lib.hasInfix "vm_ensure_data_disk() {" vm_setup_sh_text)
+        && (lib.hasInfix "local _edd_name=\"\$1\"" vm_setup_sh_text)
+        && (lib.hasInfix "vm_provision_one \"\$vm_id\"" vm_setup_sh_text)
+      )
+      "vm_provision_one must orchestrate per-VM provision over the NAME-only vm_ensure_data_disk with the drift message in the orchestrator";
 
   # The shared Android start script must expose manifest-driven tokens for CPU
   # count, RAM, image filenames, and port forwards instead of hardcoded values.
@@ -2494,6 +2511,7 @@ let
     test_android_build_relink_refresh
     test_windows_base_overlay_parity
     test_windows_qemu_ensure_base_and_overlay
+    test_vm_provision_one_orchestrator
   ];
 
 in
@@ -2676,6 +2694,7 @@ in
     test_android_build_relink_refresh
     test_windows_base_overlay_parity
     test_windows_qemu_ensure_base_and_overlay
+    test_vm_provision_one_orchestrator
     ;
 
   summary = builtins.deepSeq all_tests "vm-setup-tests: all tests passed";

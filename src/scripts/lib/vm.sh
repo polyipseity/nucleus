@@ -1253,29 +1253,29 @@ vm_resize_vm() {
 
 # data disk provisioning helper
 
-# vm_ensure_data_disk NAME SYSTEM_IMAGE MIN_SIZE DISK_BYTES CRED_MARKER CONFIG_MARKER CONFIG_FP
+# vm_ensure_data_disk NAME
 #   Ensures the writable data disk for NAME under the managed layout:
 #     src/<type>/system image.qcow2 — pristine type system image (read-only base)
 #     data/<name>.qcow2             — writable data disk backing ../src/<type>/system image.qcow2
-#   SYSTEM_IMAGE is the build-phase type system image (src/<type>/system image.qcow2);
-#   MIN_SIZE and DISK_BYTES are parsed manifest bytes (minImageSize, diskSize).
-#   CRED_MARKER and CONFIG_MARKER are sidecar marker paths; CONFIG_FP is the
-#   guest-config fingerprint (empty for non-NixOS guests).  Cases:
-#   1. Data disk missing → create as an overlay on SYSTEM_IMAGE and write markers.
+#   Everything (type, system image, manifest sizes, sidecar marker paths, and
+#   the NixOS-only guest-config fingerprint) is derived from NAME alone.  Cases:
+#   1. Data disk missing → create as an overlay on the type system image and
+#      write provision markers.
 #   2. Data disk exists and validates → KEEP it — never recreate, truncate, or
 #      re-base an existing data disk.
 #   3. Markers missing on an existing disk → ADOPT: write markers from current
 #      inputs; do not modify disk contents.
-#   4. Credential/config drift → in-place injection only; warn here (destructive
-#      recreation requires 'nucleus-vm reset' or --force).
-#   5. Data disk invalid → warn and skip unless --force (default tells the
+#   4. Data disk invalid → warn and skip unless --force (default tells the
 #      operator to run 'nucleus-vm reset <name>'; --force recreates with a
 #      printed destructive warning).
-#   6. Virtual size < DISK_BYTES → auto-grow (never shrink).
+#   5. Virtual size < manifest diskSize → auto-grow (never shrink).
+#   Credential/config drift on a valid disk is reported by vm_provision_one
+#   (the provision orchestrator), which owns the drift-to-inject hint.
 vm_ensure_data_disk() {
-  local _edd_name="$1" _edd_system_image="$2" _edd_min_size="$3" _edd_disk_bytes="$4"
-  local _edd_cred_marker="$5" _edd_config_marker="$6" _edd_config_fp="$7"
-  local _edd_type _edd_disk _edd_disk_valid _edd_backing_rel _edd_running _edd_virtual_size
+  local _edd_name="$1"
+  local _edd_type _edd_disk _edd_disk_valid _edd_backing_rel _edd_virtual_size
+  local _edd_system_image _edd_min_size _edd_disk_bytes
+  local _edd_cred_marker _edd_config_marker _edd_config_fp
 
   mkdir -p "$VM_DIR/data"
 
@@ -1286,6 +1286,16 @@ vm_ensure_data_disk() {
   fi
   _edd_disk="$VM_DIR/data/${_edd_name}.qcow2"
   _edd_backing_rel="$(vm_system_image_rel_path "$_edd_type")"
+  _edd_system_image="$(vm_src_path "$_edd_type" "$VM_SYSTEM_IMAGE")"
+  _edd_min_size="$(parse_size "$(jq -r --arg n "$_edd_name" '.VMs[] | select(.id == $n) | .minImageSize' "$MANIFEST")")"
+  _edd_disk_bytes="$(parse_size "$(jq -r --arg n "$_edd_name" '.VMs[] | select(.id == $n) | .diskSize' "$MANIFEST")")"
+  _edd_cred_marker="$(vm_guest_credentials_marker_path "$_edd_name" "$_edd_disk")"
+  _edd_config_marker="$(vm_guest_config_marker_path "$_edd_name" "$_edd_disk")"
+  # WHY: only NixOS guests have a Nix-managed guest config to fingerprint.
+  _edd_config_fp=''
+  if [ "$_edd_type" = "NixOS" ]; then
+    _edd_config_fp="$(vm_guest_config_fingerprint)"
+  fi
 
   _edd_disk_valid=false
   if [ -f "$_edd_disk" ] && validate_qcow2_image "$_edd_disk" "data disk for ${_edd_name}" "$_edd_min_size"; then
@@ -1298,16 +1308,11 @@ vm_ensure_data_disk() {
     say "data disk already exists: $_edd_disk"
     if ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_edd_cred_marker" ||
       { [ -n "$_edd_config_fp" ] && ! vm_guest_config_marker_matches "$_edd_config_fp" "$_edd_config_marker"; }; then
-      if [ -f "$_edd_cred_marker" ] || { [ -n "$_edd_config_fp" ] && [ -f "$_edd_config_marker" ]; }; then
-        _edd_running="$(vm_get_running_ids)"
-        if printf '%s\n' "$_edd_running" | grep -qxF "$_edd_name"; then
-          say "VM '$_edd_name' is running; skipping in-place injection (applies on next setup)"
-        else
-          say "guest credential/config drift detected for '$_edd_name'; run 'nucleus-vm inject $_edd_name' to re-inject in place (data disk preserved)"
-        fi
-      else
+      if [ ! -f "$_edd_cred_marker" ] && { [ -z "$_edd_config_fp" ] || [ ! -f "$_edd_config_marker" ]; }; then
         # Marker adoption: markers absent on an existing disk mean it predates
         # this fingerprint scheme; adopt from current inputs, never rebuild.
+        # (Markers present but stale are credential/config drift — reported by
+        # vm_provision_one, the provision orchestrator.)
         say "adopting missing provision markers for existing data disk '$_edd_name'"
         printf '%s\n' "$vm_guest_credentials_fingerprint" >"$_edd_cred_marker"
         if [ -n "$_edd_config_fp" ]; then
@@ -1368,6 +1373,52 @@ vm_ensure_data_disk() {
   return 0
 }
 
+# vm_provision_one NAME
+#   Phase-2 per-VM provision orchestrator (shared by every runtime's setup
+#   callback): ensures the writable data disk for NAME exists — create
+#   overlay, keep existing, adopt missing markers via vm_ensure_data_disk —
+#   then reports credential/config drift for in-place re-injection while the
+#   VM is stopped.  Host-specific wiring (UTM bundle link, libvirt sync,
+#   start scripts) stays in the setup callbacks; this function owns the
+#   shared disk+markers decision.  Drift never triggers automatic recreation
+#   or injection at setup — the operator runs 'nucleus-vm inject NAME'.
+vm_provision_one() {
+  local _vpo_name="$1" _vpo_type _vpo_disk _vpo_cred_marker _vpo_config_marker _vpo_config_fp _vpo_running
+
+  _vpo_type="$(jq -r --arg n "$_vpo_name" '.VMs[] | select(.id == $n) | .type // empty' "$MANIFEST")"
+  if [ -z "$_vpo_type" ]; then
+    error "VM '$_vpo_name' not found in manifest; cannot provision data disk"
+    return 1
+  fi
+  _vpo_disk="$VM_DIR/data/${_vpo_name}.qcow2"
+  _vpo_cred_marker="$(vm_guest_credentials_marker_path "$_vpo_name" "$_vpo_disk")"
+  _vpo_config_marker="$(vm_guest_config_marker_path "$_vpo_name" "$_vpo_disk")"
+  # WHY: only NixOS guests have a Nix-managed guest config to fingerprint.
+  _vpo_config_fp=''
+  if [ "$_vpo_type" = "NixOS" ]; then
+    _vpo_config_fp="$(vm_guest_config_fingerprint)"
+  fi
+
+  if ! vm_ensure_data_disk "$_vpo_name"; then
+    return 1
+  fi
+
+  # Drift: markers exist but are stale (missing ones were adopted by
+  # vm_ensure_data_disk, so any remaining mismatch is real drift).  Never
+  # auto-inject or recreate here — report so the operator can re-inject in
+  # place with the explicit command while the VM is stopped.
+  if ! vm_guest_credentials_marker_matches "$vm_guest_credentials_fingerprint" "$_vpo_cred_marker" ||
+    { [ -n "$_vpo_config_fp" ] && ! vm_guest_config_marker_matches "$_vpo_config_fp" "$_vpo_config_marker"; }; then
+    _vpo_running="$(vm_get_running_ids)"
+    if printf '%s\n' "$_vpo_running" | grep -qxF "$_vpo_name"; then
+      say "VM '$_vpo_name' is running; skipping in-place injection (applies on next setup)"
+    else
+      say "guest credential/config drift detected for '$_vpo_name'; run 'nucleus-vm inject $_vpo_name' to re-inject in place (data disk preserved)"
+    fi
+  fi
+  return 0
+}
+
 # vm_link_android_userdata_to_utm_bundle NAME INDEX [BUNDLE_DATA_DIR]
 #   Ensure Android.utm/Data/<userdataImage> is a hard link to data/<id>.qcow2
 #   (G1a write-through).  Canonical data/ is the source of truth when present.
@@ -1425,7 +1476,7 @@ vm_link_android_userdata_to_utm_bundle() {
 vm_inject_guest() {
   local _vig_name="$1"
   local _vig_type _vig_running _vig_disk _vig_cred_marker _vig_config_marker
-  local _vig_config_fp _vig_system _vig_min_size _vig_disk_bytes
+  local _vig_config_fp
 
   _vig_type="$(jq -r --arg n "$_vig_name" '.VMs[] | select(.id == $n) | .type // empty' "$MANIFEST")"
   if [ -z "$_vig_type" ]; then
@@ -1476,11 +1527,7 @@ vm_inject_guest() {
         error "data disk not found for '$_vig_name': $_vig_disk (run 'nucleus-vm setup $_vig_name' first, or pass --force to recreate it)"
         return 1
       fi
-      _vig_system="$(vm_src_path "$_vig_type" "$VM_SYSTEM_IMAGE")"
-      _vig_min_size="$(parse_size "$(jq -r --arg n "$_vig_name" '.VMs[] | select(.id == $n) | .minImageSize' "$MANIFEST")")"
-      _vig_disk_bytes="$(parse_size "$(jq -r --arg n "$_vig_name" '.VMs[] | select(.id == $n) | .diskSize' "$MANIFEST")")"
-      if ! vm_ensure_data_disk "$_vig_name" "$_vig_system" "$_vig_min_size" "$_vig_disk_bytes" \
-        "$_vig_cred_marker" "$_vig_config_marker" "$_vig_config_fp"; then
+      if ! vm_ensure_data_disk "$_vig_name"; then
         return 1
       fi
     fi
@@ -2676,10 +2723,9 @@ vm_setup_tart() {
 vm_setup_utm() {
   local vm_id="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local vm_display bundle data_dir disk_file
-  local disk_credential_marker disk_config_marker config_plist bundle_exists template_drift_config
-  local template_drift_config _prebuilt _prebuilt_valid _prebuilt_min_size _prebuilt_disk_bytes
+  local config_plist bundle_exists template_drift_config
+  local template_drift_config _prebuilt _prebuilt_valid _prebuilt_min_size
   local _android_system _android_userdata _android_gsi _userdata_file _gsi_file
-  local _guest_config_fingerprint
 
   vm_display=$(jq -r ".VMs[$vm_index].name" "$MANIFEST")
 
@@ -2691,13 +2737,6 @@ vm_setup_utm() {
   bundle="$VM_DIR/${vm_id}.utm"
   data_dir="$bundle/Data"
   disk_file="$data_dir/disk-main.qcow2"
-  disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_id" "$disk_file")"
-  disk_config_marker="$(vm_guest_config_marker_path "$vm_id" "$disk_file")"
-  # WHY: only NixOS guests have a Nix-managed guest config to fingerprint;
-  _guest_config_fingerprint=''
-  if [ "$vm_type" = "NixOS" ]; then
-    _guest_config_fingerprint="$(vm_guest_config_fingerprint)"
-  fi
   config_plist="$bundle/config.plist"
   bundle_exists=false
   template_drift_config=false
@@ -2739,7 +2778,6 @@ vm_setup_utm() {
   fi
 
   _prebuilt_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
-  _prebuilt_disk_bytes="$(parse_size "$(jq -r ".VMs[$vm_index].diskSize" "$MANIFEST")")"
   if [ -f "$_prebuilt" ]; then
     if validate_qcow2_image "$_prebuilt" "pre-built image for ${vm_id}" "$_prebuilt_min_size"; then
       _prebuilt_valid=true
@@ -2792,8 +2830,7 @@ vm_setup_utm() {
         rm -f "$_gsi_file"
       fi
     else
-      if ! vm_ensure_data_disk "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
-        "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
+      if ! vm_provision_one "$vm_id"; then
         return
       fi
       ln -f "$VM_DIR/data/${vm_id}.qcow2" "$disk_file"
@@ -2813,21 +2850,13 @@ vm_setup_utm() {
 
 vm_setup_libvirt() {
   local vm_id="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
-  local vm_display disk_path disk_credential_marker disk_config_marker _prebuilt
-  local _prebuilt_min_size _prebuilt_disk_bytes
+  local vm_display disk_path _prebuilt
+  local _prebuilt_min_size
   local _android_system _android_userdata _android_gsi
-  local _guest_config_fingerprint
 
   vm_display=$(jq -r ".VMs[$vm_index].name" "$MANIFEST")
 
   disk_path="$VM_DIR/data/${vm_id}.qcow2"
-  disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_id" "$disk_path")"
-  disk_config_marker="$(vm_guest_config_marker_path "$vm_id" "$disk_path")"
-  # WHY: only NixOS guests have a Nix-managed guest config to fingerprint.
-  _guest_config_fingerprint=''
-  if [ "$vm_type" = "NixOS" ]; then
-    _guest_config_fingerprint="$(vm_guest_config_fingerprint)"
-  fi
 
   say "configuring libvirt VM '$vm_display' (hosts: $vm_hosts)..."
 
@@ -2848,7 +2877,6 @@ vm_setup_libvirt() {
   else
     _prebuilt="$(vm_src_path "$vm_type" "$VM_SYSTEM_IMAGE")"
     _prebuilt_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
-    _prebuilt_disk_bytes="$(parse_size "$(jq -r ".VMs[$vm_index].diskSize" "$MANIFEST")")"
     if [ ! -f "$_prebuilt" ]; then
       warn "image not found: $_prebuilt; skipping '$vm_id'"
       return
@@ -2864,8 +2892,7 @@ vm_setup_libvirt() {
     if [ "$vm_type" = "Android" ]; then
       say "Android images referenced directly by domain XML: $_android_system, $_android_userdata"
     else
-      if ! vm_ensure_data_disk "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
-        "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
+      if ! vm_provision_one "$vm_id"; then
         return
       fi
       say "data disk ready: $disk_path"
@@ -3822,18 +3849,13 @@ vm_setup_libvirt_vms() {
 #   data/<id>.qcow2 userdata disk (system/GSI images are referenced directly).
 vm_setup_windows_qemu() {
   local vm_id="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
-  local vm_display disk_path disk_credential_marker disk_config_marker _prebuilt
-  local _prebuilt_min_size _prebuilt_disk_bytes
+  local vm_display disk_path _prebuilt
+  local _prebuilt_min_size
   local _android_userdata _android_disk_bytes _android_virtual_size
-  local _guest_config_fingerprint
 
   vm_display=$(jq -r ".VMs[$vm_index].name" "$MANIFEST")
 
   disk_path="$VM_DIR/data/${vm_id}.qcow2"
-  disk_credential_marker="$(vm_guest_credentials_marker_path "$vm_id" "$disk_path")"
-  disk_config_marker="$(vm_guest_config_marker_path "$vm_id" "$disk_path")"
-  # WHY: only NixOS guests have a Nix-managed guest config to fingerprint.
-  _guest_config_fingerprint=''
 
   say "configuring Windows QEMU VM '$vm_display' (hosts: $vm_hosts)..."
 
@@ -3874,7 +3896,6 @@ vm_setup_windows_qemu() {
 
   _prebuilt="$(vm_src_path "$vm_type" "$VM_SYSTEM_IMAGE")"
   _prebuilt_min_size="$(parse_size "$(jq -r ".VMs[$vm_index].minImageSize" "$MANIFEST")")"
-  _prebuilt_disk_bytes="$(parse_size "$(jq -r ".VMs[$vm_index].diskSize" "$MANIFEST")")"
   if [ ! -f "$_prebuilt" ]; then
     warn "image not found: $_prebuilt; skipping '$vm_id'"
     return
@@ -3886,8 +3907,7 @@ vm_setup_windows_qemu() {
 
   if [ "$dry_run" = false ]; then
     mkdir -p "$VM_DIR"
-    if ! vm_ensure_data_disk "$vm_id" "$_prebuilt" "$_prebuilt_min_size" \
-      "$_prebuilt_disk_bytes" "$disk_credential_marker" "$disk_config_marker" "$_guest_config_fingerprint"; then
+    if ! vm_provision_one "$vm_id"; then
       return
     fi
     say "data disk ready: $disk_path"
