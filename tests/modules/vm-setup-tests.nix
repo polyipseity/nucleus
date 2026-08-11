@@ -1818,6 +1818,8 @@ let
         && (lib.hasInfix "_bai_system_overlay=\"\$VM_DIR/data/\${_bai_vm_id}-system.qcow2\"" vm_setup_sh_text)
         && (lib.hasInfix "ln -f \"\$_uv_android_userdata\" \"\$_uv_bundle/Data/user data.qcow2\"" vm_setup_sh_text)
         && (lib.hasInfix "ln -f \"\$VM_DIR/data/\${_uv_name}.qcow2\" \"\$_uv_bundle/Data/system disk.qcow2\"" vm_setup_sh_text)
+        && (lib.hasInfix "vm_link_system_base_to_utm_bundle" vm_setup_sh_text)
+        && (lib.hasInfix "system base.qcow2" vm_setup_sh_text)
         && !(lib.hasInfix "cp \"\$_bai_system_img\" \"\$_bai_bundle_system\"" vm_setup_sh_text)
         && !(lib.hasInfix "cp \"\$_uv_android_system\" \"\$_uv_bundle/Data/disk-main.qcow2\"" vm_setup_sh_text)
         && !(lib.hasInfix "cp \"\$_android_system\" \"\$disk_file\"" vm_setup_sh_text)
@@ -1825,7 +1827,7 @@ let
         && !(lib.hasInfix "disk-main.qcow2" readmeTemplateText)
         && !(lib.hasInfix "disk-main.qcow2" utmConfigPlistText)
       )
-      "UTM bundle disks must be hard links to canonical data//src/ files (never copies) with guest-agnostic names and no legacy disk-main.qcow2 anywhere";
+      "UTM bundle disks must be hard links to canonical data//src/ files (never copies) with guest-agnostic names, a bundle-local system base backing link (UTM sandbox), and no legacy disk-main.qcow2 anywhere";
 
   # Android userdata must never delete standalone bundle copies; canonical
   # data/<id>.qcow2 is the source of truth and sync must re-link it (no
@@ -1852,21 +1854,23 @@ let
       "vm_setup_libvirt must validate Android userdata at data/<id>.qcow2 and ensure the data/<id>-system.qcow2 system overlay";
 
   # vm_ensure_android_system_overlay must create data/<name>-system.qcow2 as
-  # an absolute-backed qcow2 overlay over src/Android/system image.qcow2
-  # (create-once/preserve, provision marker, Android semantics) and be wired
-  # into libvirt and windows-qemu Android setup.
+  # a qcow2 overlay backed onto the Android system image (bundle-local system
+  # base on macOS; src/ elsewhere) (create-once/preserve, provision marker,
+  # Android semantics) and be wired into libvirt and windows-qemu Android
+  # setup.
   test_vm_ensure_android_system_overlay =
     assert'
       (
         (lib.hasInfix "vm_ensure_android_system_overlay() {" vm_setup_sh_text)
         && (lib.hasInfix "_easo_disk=\"\$VM_DIR/data/\${_easo_name}-system.qcow2\"" vm_setup_sh_text)
         && (lib.hasInfix "qemu-img create -f qcow2 -b \"\$_easo_backing\" -F qcow2 \"\$_easo_disk\"" vm_setup_sh_text)
-        && (lib.hasInfix "vm_system_image_path Android" vm_setup_sh_text)
+        && (lib.hasInfix "vm_system_overlay_backing \"\$_easo_name\" Android" vm_setup_sh_text)
+        && (lib.hasInfix "vm_link_system_base_to_utm_bundle \"\$_easo_name\" Android" vm_setup_sh_text)
         && (lib.hasInfix "Android system overlay already exists" vm_setup_sh_text)
         && (lib.hasInfix "Android system overlay is invalid for" vm_setup_sh_text)
         && !(lib.hasInfix "qemu-img create -f qcow2 -b \"\$_easo_disk\"" vm_setup_sh_text)
       )
-      "vm_ensure_android_system_overlay must create data/<name>-system.qcow2 as an absolute-backed qcow2 overlay over src/Android/system image.qcow2 (create-once/preserve, never self-rebase)";
+      "vm_ensure_android_system_overlay must create data/<name>-system.qcow2 as a qcow2 overlay backed onto the Android system image (bundle-local system base on macOS; create-once/preserve, never self-rebase)";
 
   # vm_setup_windows_qemu must also ensure the Android system overlay for
   # windows-qemu guests (parity with vm_setup_libvirt and the PowerShell

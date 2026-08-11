@@ -256,7 +256,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - VM backend: UTM 4.x QEMU backend.
 - Bundle location: `~/virtual machines/<id>.utm/`
 - Config template: `config.plist` pre-generated at `~/.local/share/nucleus/vms/<id>-config.plist` by `src/hosts/MacBook/vms.nix` at Home Manager activation time; `vm.sh setup` copies it into the bundle.
-- Bundle disks are hard links only, never copies: `Data/system disk.qcow2` links `data/<id>.qcow2` (non-Android overlay) or `data/<id>-system.qcow2` (Android system overlay); Android additionally links `Data/user data.qcow2` → `data/<id>.qcow2` and `Data/GSI disk.qcow2` → `src/Android/GSI.img` (read-only).
+- Bundle disks are hard links only, never copies: `Data/system disk.qcow2` links `data/<id>.qcow2` (non-Android overlay) or `data/<id>-system.qcow2` (Android system overlay); Android additionally links `Data/user data.qcow2` → `data/<id>.qcow2` and `Data/GSI disk.qcow2` → `src/Android/GSI.img` (read-only). Because UTM is sandboxed (QEMUHelper may only open files inside the bundle), every writable overlay also backs onto `Data/system base.qcow2` — a hard link to `src/<type>/system image.qcow2` — so the backing chain stays inside the bundle; non-macOS runtimes back directly onto `src/`.
 - After provisioning, UTM opens each bundle automatically.
 - VirtioFS shared directory: configured via `Sharing.DirectoryShare` in the Nix-generated config.plist.
 - Network: **Emulated** (QEMU user/slirp) — required for `PortForward` to work; vmnet-shared silently drops forwards.

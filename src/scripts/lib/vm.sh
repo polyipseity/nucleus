@@ -1321,7 +1321,10 @@ vm_resize_vm() {
 #   Ensures the writable data disk for NAME under the managed layout:
 #     src/<type>/system image.qcow2 — pristine type system image (read-only base)
 #     data/<name>.qcow2             — writable data disk backing the type system
-#                                     image at its absolute path
+#                                     image at its absolute path (on macOS the
+#                                     backing is the bundle-local system base
+#                                     link — UTM's sandbox only exposes the
+#                                     bundle to QEMUHelper)
 #   Everything (type, system image, manifest sizes, sidecar marker paths, and
 #   the per-VM provision fingerprint) is derived from NAME alone.  Cases:
 #   1. Data disk missing → create as an overlay on the type system image and
@@ -1348,7 +1351,7 @@ vm_ensure_data_disk() {
     return 1
   fi
   _edd_disk="$VM_DIR/data/${_edd_name}.qcow2"
-  _edd_backing="$(vm_system_image_path "$_edd_type")"
+  _edd_backing="$(vm_system_overlay_backing "$_edd_name" "$_edd_type")"
   _edd_system_image="$(vm_src_path "$_edd_type" "$VM_SYSTEM_IMAGE")"
   _edd_min_size="$(parse_size "$(jq -r --arg n "$_edd_name" '.VMs[] | select(.id == $n) | .minImageSize' "$MANIFEST")")"
   _edd_disk_bytes="$(parse_size "$(jq -r --arg n "$_edd_name" '.VMs[] | select(.id == $n) | .diskSize' "$MANIFEST")")"
@@ -1369,6 +1372,16 @@ vm_ensure_data_disk() {
     # or stale marker) is reported by vm_provision_one, the provision
     # orchestrator — never resolved here.
     say "data disk already exists: $_edd_disk"
+    # WHY (macOS): the overlay must back onto the bundle-local system base
+    # link (UTM sandbox exposes only the bundle to QEMUHelper); a stale
+    # backing (e.g. a direct src/ path) would fail at boot, so warn
+    # and let the operator recreate the disk.
+    if [ "$(uname -s)" = "Darwin" ]; then
+      _edd_actual_backing="$(qemu-img info --output=json "$_edd_disk" 2>/dev/null | jq -r '."backing-filename" // empty')"
+      if [ -n "$_edd_actual_backing" ] && [ "$_edd_actual_backing" != "$_edd_backing" ]; then
+        warn "data disk backs onto '$_edd_actual_backing' but macOS UTM requires '$_edd_backing'; delete it and re-run 'nucleus-vm setup' to recreate it"
+      fi
+    fi
   elif [ -f "$_edd_disk" ]; then
     warn "data disk is invalid for '$_edd_name': $_edd_disk"
     if [ "$force" != true ]; then
@@ -1391,6 +1404,12 @@ vm_ensure_data_disk() {
     fi
     if ! validate_qcow2_image "$_edd_system_image" "system image for ${_edd_name}" "$_edd_min_size"; then
       warn "system image is invalid for '$_edd_name': $_edd_system_image"
+      return 1
+    fi
+    # WHY: on macOS the UTM sandbox only exposes the bundle to QEMUHelper,
+    # so the overlay backing must be a bundle-local hard link of the pristine
+    # base (see vm_link_system_base_to_utm_bundle).
+    if [ "$(uname -s)" = "Darwin" ] && ! vm_link_system_base_to_utm_bundle "$_edd_name" "$_edd_type"; then
       return 1
     fi
     if [ "$dry_run" = false ]; then
@@ -1423,7 +1442,11 @@ vm_ensure_data_disk() {
 #   Ensures the Android system overlay for NAME under the managed layout:
 #     src/Android/system image.qcow2 — pristine Android system image (read-only base)
 #     data/<name>-system.qcow2       — persistent writable overlay backing the
-#                                      Android system image at its absolute path
+#                                      Android system image at its absolute
+#                                      path (on macOS the backing is the
+#                                      bundle-local system base link — UTM's
+#                                      sandbox only exposes the bundle to
+#                                      QEMUHelper)
 #   The overlay carries the guest /system partition so recovery sideload
 #   (GApps) keeps working while src/ stays pristine.  Cases:
 #   1. Overlay missing → create as an overlay on the Android system image and
@@ -1442,7 +1465,7 @@ vm_ensure_android_system_overlay() {
   mkdir -p "$VM_DIR/data"
 
   _easo_disk="$VM_DIR/data/${_easo_name}-system.qcow2"
-  _easo_backing="$(vm_system_image_path Android)"
+  _easo_backing="$(vm_system_overlay_backing "$_easo_name" Android)"
   _easo_system_image="$(vm_src_path Android "$VM_SYSTEM_IMAGE")"
   _easo_min_size="$(parse_size "$(jq -r --arg n "$_easo_name" '.VMs[] | select(.id == $n) | .minImageSize' "$MANIFEST")")"
   _easo_provision_marker="$(vm_provision_marker_path "$_easo_disk")"
@@ -1458,6 +1481,16 @@ vm_ensure_android_system_overlay() {
 
   if [ "$_easo_disk_valid" = true ]; then
     say "Android system overlay already exists: $_easo_disk"
+    # WHY (macOS): the overlay must back onto the bundle-local system base
+    # link (UTM sandbox exposes only the bundle to QEMUHelper); a stale
+    # backing (e.g. a direct src/ path) would fail at boot, so warn
+    # and let the operator recreate the overlay.
+    if [ "$(uname -s)" = "Darwin" ]; then
+      _easo_actual_backing="$(qemu-img info --output=json "$_easo_disk" 2>/dev/null | jq -r '."backing-filename" // empty')"
+      if [ -n "$_easo_actual_backing" ] && [ "$_easo_actual_backing" != "$_easo_backing" ]; then
+        warn "Android system overlay backs onto '$_easo_actual_backing' but macOS UTM requires '$_easo_backing'; delete the overlay and re-run 'nucleus-vm setup' to recreate it"
+      fi
+    fi
     # WHY: the overlay is derived from the base and never injected; a missing
     # or stale marker only means the provision inputs changed, so adopt it
     # (marker adoption only — never recreation, never injection).
@@ -1477,6 +1510,12 @@ vm_ensure_android_system_overlay() {
   if [ ! -f "$_easo_disk" ]; then
     if [ ! -f "$_easo_system_image" ]; then
       warn "Android system image not found: $_easo_system_image; cannot create system overlay for '$_easo_name'"
+      return 1
+    fi
+    # WHY: on macOS the UTM sandbox only exposes the bundle to QEMUHelper,
+    # so the overlay backing must be a bundle-local hard link of the pristine
+    # base (see vm_link_system_base_to_utm_bundle).
+    if [ "$(uname -s)" = "Darwin" ] && ! vm_link_system_base_to_utm_bundle "$_easo_name" Android; then
       return 1
     fi
     if [ "$dry_run" = false ]; then
@@ -1578,6 +1617,57 @@ vm_link_android_userdata_to_utm_bundle() {
 
   ln -f "$_lautb_canonical" "$_lautb_bundle"
   say "linked Android userdata disk into UTM bundle: $_lautb_bundle"
+  return 0
+}
+
+# vm_system_overlay_backing NAME TYPE
+#   Prints the absolute backing path for a writable overlay on TYPE's system
+#   image.  On macOS (UTM runtime) the backing must live inside the UTM bundle
+#   (<name>.utm/Data/system base.qcow2) so the sandboxed QEMUHelper — whose
+#   file access is scoped to the bundle — can open it; elsewhere it is the
+#   pristine src/<type>/system image.qcow2 base.
+vm_system_overlay_backing() {
+  local _sob_name="$1" _sob_type="$2"
+  case "$(uname -s)" in
+    Darwin) printf '%s/%s.utm/Data/system base.qcow2\n' "$VM_DIR" "$_sob_name" ;;
+    *) vm_system_image_path "$_sob_type" ;;
+  esac
+}
+
+# vm_link_system_base_to_utm_bundle NAME TYPE [BUNDLE_DATA_DIR]
+#   Ensure <name>.utm/Data/system base.qcow2 is a hard link to the TYPE system
+#   image (read-only canonical → bundle).  WHY: on macOS, UTM's sandboxed
+#   QEMUHelper can only open files inside the bundle, so the writable overlay
+#   in data/ must back onto this bundle-local hard link of the pristine base.
+#   Never deletes base images — only ln -f when the canonical exists.
+vm_link_system_base_to_utm_bundle() {
+  _lsbtb_name="$1"
+  _lsbtb_type="$2"
+  _lsbtb_bundle_data_dir="${3:-}"
+
+  _lsbtb_canonical="$(vm_system_image_path "$_lsbtb_type")"
+  if [ -z "$_lsbtb_bundle_data_dir" ]; then
+    _lsbtb_bundle_data_dir="$VM_DIR/${_lsbtb_name}.utm/Data"
+  fi
+  _lsbtb_bundle="$_lsbtb_bundle_data_dir/system base.qcow2"
+
+  if [ ! -f "$_lsbtb_canonical" ]; then
+    return 0
+  fi
+
+  if [ "$dry_run" = true ]; then
+    dry_run "link system base into UTM bundle: $_lsbtb_bundle -> $_lsbtb_canonical"
+    return 0
+  fi
+
+  mkdir -p "$_lsbtb_bundle_data_dir"
+  if [ -f "$_lsbtb_bundle" ] && [ "$_lsbtb_bundle" -ef "$_lsbtb_canonical" ]; then
+    say "system base already linked: $_lsbtb_bundle"
+    return 0
+  fi
+
+  ln -f "$_lsbtb_canonical" "$_lsbtb_bundle"
+  say "linked system base into UTM bundle: $_lsbtb_bundle"
   return 0
 }
 
@@ -2558,6 +2648,8 @@ vm_build_android() {
             return 1
         fi
         if [ "$_bai_system_replaced" = true ]; then
+          vm_link_system_base_to_utm_bundle "$_bai_vm_id" Android "$_bai_bundle_dir" ||
+            return 1
           _bai_bundle_system="$_bai_bundle_dir/system disk.qcow2"
           ln -f "$_bai_system_overlay" "$_bai_bundle_system"
           say "refreshed Android system disk in UTM bundle: $_bai_bundle_system"
@@ -2718,6 +2810,9 @@ vm_sync_utm() {
   if [ "$vm_type" = "Android" ]; then
     vm_link_android_userdata_to_utm_bundle "$vm_id" "$vm_index" "$bundle/Data" ||
       return 1
+  fi
+  if ! vm_link_system_base_to_utm_bundle "$vm_id" "$vm_type" "$bundle/Data"; then
+    return 1
   fi
 
   vm_apply_utm_plist_and_register "$vm_id" "$bundle" "$template_drift_config"
@@ -2914,6 +3009,12 @@ vm_setup_utm() {
         warn "Android userdata image not found: $_android_userdata; run vm-build first"
         return
       fi
+      # WHY: the writable overlay in data/ backs onto this bundle-local hard
+      # link of the pristine base — the UTM sandbox only exposes the bundle
+      # to QEMUHelper, so a src/ backing path would fail at boot.
+      if ! vm_link_system_base_to_utm_bundle "$vm_id" Android "$data_dir"; then
+        return 1
+      fi
       # WHY: the guest-visible system disk is the persistent writable
       # data/<id>-system.qcow2 overlay (src/Android/ stays pristine); the
       # bundle entry is a hard link to it, so UTM boots the overlay directly
@@ -2947,6 +3048,11 @@ vm_setup_utm() {
         rm -f "$_gsi_file"
       fi
     else
+      # WHY: same bundle-local backing requirement as Android — the overlay
+      # ensured by vm_provision_one backs onto the system base link below.
+      if ! vm_link_system_base_to_utm_bundle "$vm_id" "$vm_type" "$data_dir"; then
+        return 1
+      fi
       if ! vm_provision_one "$vm_id"; then
         return
       fi
@@ -4359,7 +4465,8 @@ vm_pack_vms() {
 #   Restores the data disk after pack.  The data disk (data/<name>.qcow2) is
 #   recreated only when absent — never rebuilt (its content is user data by
 #   design); when present it is kept as-is (pack never removes it).  Backs
-#   <VM_DIR>/src/<type>/system image.qcow2 directly (absolute path).  Returns
+#   <VM_DIR>/src/<type>/system image.qcow2 directly (absolute path; on macOS
+#   the bundle-local system base — see vm_system_overlay_backing).  Returns
 #   1 when the type system image is missing (packed trees always carry it, so
 #   this signals a broken tree).
 vm_unpack_ensure_data_disk() {
@@ -4367,7 +4474,7 @@ vm_unpack_ensure_data_disk() {
   _uedd_type="$2"
   _uedd_system_image="$(vm_src_path "$_uedd_type" "$VM_SYSTEM_IMAGE")"
   _uedd_disk="$VM_DIR/data/${_uedd_name}.qcow2"
-  _uedd_backing="$(vm_system_image_path "$_uedd_type")"
+  _uedd_backing="$(vm_system_overlay_backing "$_uedd_name" "$_uedd_type")"
 
   if [ ! -f "$_uedd_system_image" ]; then
     warn "unpack — system image missing: $_uedd_system_image (re-provision or copy it back)"
@@ -4377,6 +4484,12 @@ vm_unpack_ensure_data_disk() {
   if [ "$dry_run" = false ]; then
     mkdir -p "$VM_DIR/data"
     if [ ! -f "$_uedd_disk" ]; then
+      # WHY: on macOS the UTM sandbox only exposes the bundle to QEMUHelper,
+      # so the overlay backing must be a bundle-local hard link of the
+      # pristine base (see vm_link_system_base_to_utm_bundle).
+      if [ "$(uname -s)" = "Darwin" ] && ! vm_link_system_base_to_utm_bundle "$_uedd_name" "$_uedd_type"; then
+        return 1
+      fi
       say "unpack — recreating absent data disk: $_uedd_disk"
       qemu-img create -f qcow2 -b "$_uedd_backing" -F qcow2 "$_uedd_disk" >/dev/null
     else
