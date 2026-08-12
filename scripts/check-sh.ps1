@@ -54,7 +54,9 @@ try {
 
   $exitCode = 0
   foreach ($path in $Paths) {
-    & $shellcheck.Source -x -S style $path
+    # --source-path=<script dir> mirrors treefmt.nix's source-path = "SCRIPTDIR":
+    # lets shellcheck resolve `# shellcheck source=` directives relative to each script's own directory.
+    & $shellcheck.Source -x --source-path="$(Split-Path -Parent $path)" -S style $path
     if ($LASTEXITCODE -ne 0) {
       $exitCode = $LASTEXITCODE
     }
