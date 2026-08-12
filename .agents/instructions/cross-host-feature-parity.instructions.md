@@ -310,3 +310,31 @@ The `__nucleus_symlink_farm` env var is generated in `src/hosts/MacBook/activati
 ### Audit
 
 Host vs platform vs implementation naming is enforced by service-registry validation (check step 8) and documented in this section.
+
+## Cross-surface identifier mapping
+
+The same activation or apply step is named across five identifier surfaces. Each surface keeps its platform-native format; this table is the canonical cross-boundary reference.
+
+| Surface | Convention | Example |
+| ------- | ---------- | ------- |
+| Nix/POSIX activation entries (`home.activation.*`, `system.activationScripts.*`, `nucleus.terminalActivations.*`) | kebab-case, verb-first (see `activation-scripts.instructions.md`) | `write-terminal-activations` |
+| DSC file IDs | `<scope>/<kebab-name>.dsc.yml` | `user/shell.dsc.yml` |
+| PowerShell functions/modules | PascalCase with approved verbs (`Sync-*`, `Deploy-*`, `Invoke-*`, `Get-*`, `Set-*`), enforced by `scripts/pwsh-naming-manifest.json` | `Sync-TerminalActivation` |
+| POSIX apply step functions (`src/scripts/apply.sh`) | snake_case `run_*` | `run_terminal_activations` |
+| Stage labels (`src/scripts/apply.sh`, `src/hosts/Windows/apply.ps1`) | `<label>:` kebab-case | `terminal-activations:` |
+
+### Worked cross-boundary pair
+
+`write-terminal-activations` (activation entry) ↔ `Sync-TerminalActivation` (PowerShell) ↔ `terminal-activations:` (stage label) ↔ `run_terminal_activations` (apply function) name the same step across all surfaces. The singular/plural asymmetry is deliberate: the PowerShell verb is singular `Sync-TerminalActivation` (renamed from `Sync-TerminalActivations` in commit "fix(pwsh): rename Sync-TerminalActivations to Sync-TerminalActivation"), while the activation entry and stage label use plural. Do NOT "fix" this — the mapping documents the asymmetry as-is.
+
+### Kept-as-is decisions
+
+- `Disable-SteamAutoStartup` keeps the approved `Disable` verb.
+- `config-utils.nix` generated names (`unprotectSymlink_${name}` etc.) are exempt from the kebab-case rule; the Windows side mirrors this exemption with `ConfigHelpers.ps1` `Deploy-*` generated names.
+
+### Known stage-label gaps
+
+Documented but NOT fixed — intentional parity gaps for future work:
+
+- POSIX `apply.sh` lacks the `svc:`, `vm-setup:`, `vm-sync:` labels that Windows `apply.ps1` emits.
+- Windows `apply.ps1` lacks the `health-check:` and `caddy-local-ca-trust:` labels that POSIX emits.
