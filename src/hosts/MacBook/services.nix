@@ -44,8 +44,8 @@ in
   # Shared cache flush that runs after both Automator workflows and App bundles
   # have been deployed. Each sub-module handles its own deploy and prune
   # lifecycle; this entry ensures final cache coherency.
-  home.activation.flush-services-cache =
-    lib.hm.dag.entryAfter [ "deploy-automator-workflows" "macos-deploy-app-bundles" ]
+  home.activation.macos-flush-services-cache =
+    lib.hm.dag.entryAfter [ "macos-deploy-automator-workflows" "macos-deploy-app-bundles" ]
       ''
         "${activationBundle}/src/scripts/services/refresh-services-menu.sh"
       '';

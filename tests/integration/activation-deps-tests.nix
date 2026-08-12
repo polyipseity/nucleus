@@ -330,16 +330,16 @@ let
   test_services_app_bundles_dag_after_link_generation = assert' (lib.hasInfix "macos-deploy-app-bundles = lib.hm.dag.entryAfter [ \"linkGeneration\" ]" macbookAppBundlesText) "app-bundles.nix macos-deploy-app-bundles activation must run after linkGeneration";
 
   # === TEST: macOS automator-workflows DAG orders after linkGeneration ===
-  test_services_workflows_dag_after_link_generation = assert' (lib.hasInfix "deploy-automator-workflows = lib.hm.dag.entryAfter [ \"linkGeneration\" ]" macbookAutomatorWorkflowsText) "automator-workflows.nix deploy-automator-workflows must run after linkGeneration";
+  test_services_workflows_dag_after_link_generation = assert' (lib.hasInfix "macos-deploy-automator-workflows = lib.hm.dag.entryAfter [ \"linkGeneration\" ]" macbookAutomatorWorkflowsText) "automator-workflows.nix macos-deploy-automator-workflows must run after linkGeneration";
 
   # === TEST: macOS services flush DAG orders after both deploy steps ===
   test_services_flush_dag_after_both =
     assert'
       (
-        lib.hasInfix "flush-services-cache =" macbookServicesText
-        && lib.hasInfix "entryAfter [ \"deploy-automator-workflows\" \"macos-deploy-app-bundles\" ]" macbookServicesText
+        lib.hasInfix "macos-flush-services-cache =" macbookServicesText
+        && lib.hasInfix "entryAfter [ \"macos-deploy-automator-workflows\" \"macos-deploy-app-bundles\" ]" macbookServicesText
       )
-      "services.nix flush-services-cache must run after both deploy-automator-workflows and macos-deploy-app-bundles";
+      "services.nix macos-flush-services-cache must run after both macos-deploy-automator-workflows and macos-deploy-app-bundles";
 
   # === TEST: macOS services.nix imports both sub-modules ===
   test_services_imports_both_submodules = assert' (
