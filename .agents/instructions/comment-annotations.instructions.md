@@ -39,8 +39,8 @@ Hard rules:
 | --- | --- | --- | --- | --- |
 | `# Inline by embedded-content policy exception N (name).` | 10 + 1 detector | `embedded-content` | `# check-suppress:embedded-content: exception N (name) -- <reason>` | step 13 `repository-policy` `.ps1` (regex `'check-suppress:embedded-content'`) |
 | `# Method N (name) -- <why>` (legacy form) | 68 → 71 sites | `config-method` | `# check-suppress:config-method: method N (name) -- <reason>` (lowercase `method N`) | step 13 `repository-policy` `.ps1` (regex `'# check-suppress:config-method'`); `.sh` twin has no `# Method` regex (checks `configs\.` method usage only) |
-| `# check-suppress:SuppressMessageAttribute: <rule> -- <just>` / bare rule lists | 18 | `SuppressMessageAttribute` | `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | step 11 `Get-UndocSuppViolation -CheckId 'SuppressMessageAttribute'` |
-| `# check-suppress:suppression_doc: <just>` | 542 | `suppression_doc` | unchanged (plain form) | step 11 regex `# check-suppress:$CheckId[\s:]` |
+| `# check-suppress:SuppressMessageAttribute: <rule> -- <just>` / bare rule lists | 33 | `SuppressMessageAttribute` | `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | step 11 `Get-UndocSuppViolation -CheckId 'SuppressMessageAttribute'` |
+| `# check-suppress:suppression_doc: <just>` | 623 | `suppression_doc` | unchanged (plain form) | step 11 regex `# check-suppress:$CheckId[\s:]` |
 | `# check-suppress:packer_validate: ...` | 1 | `packer_validate` | unchanged form (implemented) | `scripts/check-packer.ps1` + `scripts/check-packer.sh` (read the comment; suppress the checksum warning when present; fail when `iso_checksum = "none"` lacks the annotation) |
 | `|| true` (shell) / `$null =` / `[void]` (ps1) | 11 sh sites + 92 ps1 discard sites | `suppression_doc` | annotate with `# check-suppress:suppression_doc: <reason>` (implemented) | step 11 `.sh` + `.ps1` twins flag bare `|| true` in production scripts (`tests/` exempt); `.ps1` also flags `$null =` / `[void]` |
 
