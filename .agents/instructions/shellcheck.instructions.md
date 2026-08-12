@@ -1,7 +1,7 @@
 ---
 description: "Use when working with shell scripts in the repository. Covers shellcheck suppression rules: mandatory inline reason comments, SC1091 prohibition, and invocation conventions."
 name: "ShellCheck Policy"
-applyTo: "scripts/**/*.sh, src/scripts/**/*.sh, tests/**/*.sh"
+applyTo: "scripts/**/*.sh, src/scripts/**/*.sh, src/vms/**/*.sh, tests/**/*.sh"
 ---
 
 # ShellCheck policy
@@ -14,7 +14,7 @@ applyTo: "scripts/**/*.sh, src/scripts/**/*.sh, tests/**/*.sh"
 
   Example: `# shellcheck disable=SC2086 # reason: word splitting intentional for rclone flag passthrough`
 
-- **Neither SC1090 nor SC1091 may be suppressed.** Both must always be resolved with `# shellcheck source=` directives pointing from the repo root so shellcheck can follow the sourced file during static analysis. The Nix build mirrors the repo structure exactly, so directives that work in the source tree also work in the build — there is never a structural mismatch.
+- **Neither SC1090 nor SC1091 may be suppressed.** Both must always be resolved with `# shellcheck source=` directives so shellcheck can follow the sourced file during static analysis. Directives resolve relative to each script's own directory because treefmt-nix runs shellcheck with `source-path = "SCRIPTDIR"` (`src/treefmt.nix`) — a directive that works in the source tree also works wherever treefmt runs, since it is always anchored to the script's directory, never to the repo root.
 
   Example: a script at `src/scripts/services/foo.sh` sourcing `src/scripts/lib/lib.sh` adds `# shellcheck source=../lib/lib.sh` before `. "$SCRIPT_DIR/../lib/lib.sh"`.
 
@@ -65,19 +65,26 @@ full convention.
 
 ## Shellcheck invocation
 
-Shell scripts are checked in three places:
+Shell scripts are linted via treefmt (ShellCheck runs inside treefmt-nix):
 
-1. **`scripts/check.sh`** (pre-commit, via `prek-hooks.py`): delegates to `check-sh.sh` in
-   both scoped and full modes. Single source of truth for shellcheck invocation in CI.
-2. **`scripts/check-sh.sh`** (standalone): the canonical shellcheck runner, invoked directly:
+1. **`scripts/check.sh`** (pre-commit, via `prek-hooks.py`): step 01-code-formatting runs `treefmt`, which invokes ShellCheck with the settings in `src/treefmt.nix`.
+2. **`scripts/check-sh.sh`** (standalone): the canonical shell lint runner, invoked directly. It runs `treefmt --fail-on-change` over `git ls-files '*.sh' ':(exclude)vendor/'`. ShellCheck settings live in `src/treefmt.nix`:
 
-   ```shell
-   shellcheck --source-path=SCRIPTDIR -x <files>
+   ```nix
+   shellcheck = {
+     enable = true;
+     # resolves `# shellcheck source=` directives relative to each script's directory
+     source-path = "SCRIPTDIR";
+     # follow external sourced files (required for source-path to work)
+     external-sources = true;
+     # lowest severity so ALL findings fail the build
+     severity = "style";
+   };
    ```
 
-3. **Nix build** (`src/flake.nix`): runs on wrapper+real script in the nix store at build
-   time using `--source-path=$out` against the bundled mirror tree. Catches wrapper-level
-   issues that source-level checks cannot reach.
+3. **Windows** (`scripts/check-sh.ps1`): runs `shellcheck.exe -x -S style` directly (treefmt is Nix-only on POSIX hosts); it passes `--source-path` per file for parity with treefmt's `SCRIPTDIR`.
+
+ShellCheck does NOT run at Nix derivation build time (`src/modules/lib/script-tree.nix` documents this); it runs in `nucleus-check-sh` / CI only.
 
 The `--source-path` values differ between source and Nix build but both resolve the same
 `# shellcheck source=` directives because the SCRIPT_DIR-relative path structure is
