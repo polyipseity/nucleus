@@ -371,8 +371,8 @@ cache_file_lists() {
       sort
   ) # ref: allow-and-deny-lists.instructions.md#A7,#B7 -- schema files are meta; vendor is structural invariant; gitignore filter applied on top
   # shellcheck disable=SC2034 # reason: consumed by step files (11) via transitive sourcing
-  readarray -t CACHED_SH_FILES < <(
-    find src/scripts -type f -name '*.sh' -print |
+  readarray -t CACHED_SHELL_FILES < <(
+    find . -path ./vendor -prune -false -o -name '*.sh' -print |
       filter_gitignored |
       sort
   )

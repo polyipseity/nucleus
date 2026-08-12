@@ -31,7 +31,7 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
     if ($HasArgs) {
       $PositionalArgs | Where-Object { $_ -like '*.sh' -or $_ -like '*.envrc' }
     } else {
-      $cached = if ($script:CachedShFiles) { $script:CachedShFiles } else { @() }
+      $cached = if ($script:CachedShellFiles) { $script:CachedShellFiles } else { @() }
       $fromCache = @($cached | ForEach-Object { $_.FullName })
       # check-suppress:suppression_doc: probe -- no .envrc files may exist; empty result handled.
       $envrc = Get-ChildItem -Recurse -Path $r -Filter '.envrc' -Force -ErrorAction SilentlyContinue |

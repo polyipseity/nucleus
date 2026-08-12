@@ -25,7 +25,7 @@ run_suppression_audit() {
     [ ${#SH_FILES[@]} -gt 0 ] && _files+=("${SH_FILES[@]}")
     [ ${#NIX_FILES[@]} -gt 0 ] && _files+=("${NIX_FILES[@]}")
   else
-    _files=("${CACHED_NIX_FILES[@]}" "${CACHED_SH_FILES[@]}")
+    _files=("${CACHED_NIX_FILES[@]}" "${CACHED_SHELL_FILES[@]}")
   fi
 
   # Drop this step's own file: its scan definitions contain the literal suppression patterns.

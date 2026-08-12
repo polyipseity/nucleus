@@ -49,7 +49,7 @@ filter, provided by a shared library:
    `filter_gitignored`/`Select-GitIgnored` by default.** The `cache_file_lists()`
    function in `step-runner.sh`/`step-runner.ps1` applies this to all cached file
    lists (`CACHED_NIX_FILES`, `CACHED_YAML_FILES`, `CACHED_JSON_FILES`,
-   `CACHED_SH_FILES`).
+   `CACHED_SHELL_FILES`).
 2. **Hard-coded exclusions in check scripts must only exist for reasons that are
    NOT about gitignore semantics** — e.g., excluding `check.sh` from a grep
    because it contains the pattern being searched for. If the exclusion duplicates
