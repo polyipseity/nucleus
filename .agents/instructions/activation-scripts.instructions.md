@@ -17,7 +17,19 @@ All activation entry names — `home.activation.*`, `system.activationScripts.*`
 - **No prefix when cross-platform.** If the activation applies to multiple operating systems, no host prefix:
   - `cloud-drives-setup`, `provision-dev-repos`, `wait-for-sops-secrets`
 - **No `nucleus-` prefix.** The project name is redundant — all activations in this repo are nucleus-specific.
-- **Keep `protect`/`unprotect` for symlink hardening.** The shared protect/unprotect pattern in `home.nix` uses `protect-out-of-store-symlinks` / `unprotect-out-of-store-symlinks`. Generated entries from `config-utils.nix` use the underscored `unprotectSymlink_${name}` / `protectSymlink_${name}` / `mergeConfig_${name}` pattern — these are exempt.
+- **Keep `protect`/`unprotect` for symlink hardening.** The shared protect/unprotect pattern in `home.nix` uses `protect-out-of-store-symlinks` / `unprotect-out-of-store-symlinks`. Hand-written entries like `home.activation.macos-protect-icloud-downloads-symlink` follow the normal naming rules — protect/unprotect entries are NOT exempt from the `macos-`/`nixos-` prefix. Only the generated `config-utils.nix` names (`unprotectSymlink_${name}` / `protectSymlink_${name}` / `mergeConfig_${name}`) are exempt.
+
+### Per-namespace naming rules
+
+Names in every namespace are kebab-case and verb-first, with a `macos-`/`nixos-` prefix when OS-specific, no prefix when cross-platform, and never a `nucleus-` prefix:
+
+| Namespace | Rule |
+| --------- | ---- |
+| `home.activation.<name>` (Home Manager) | kebab-case, verb-first; `macos-`/`nixos-` prefix when OS-specific; no prefix when cross-platform; no `nucleus-` prefix |
+| `system.activationScripts.<name>` (nix-darwin / NixOS) | kebab-case, verb-first; `macos-`/`nixos-` prefix when OS-specific; no prefix when cross-platform; no `nucleus-` prefix |
+| `nucleus.terminalActivations.<name>` (nucleus terminal activations) | kebab-case, verb-first; `macos-`/`nixos-` prefix when OS-specific; no prefix when cross-platform; no `nucleus-` prefix |
+
+The exempt classes below apply to all three namespaces. The cross-boundary mapping table (Nix ↔ PowerShell ↔ DSC ↔ apply functions ↔ stage labels) lives in `.agents/instructions/cross-host-feature-parity.instructions.md`.
 
 ### Exempt classes
 
@@ -37,6 +49,21 @@ Shared DAG dependency names are defined in `src/modules/lib/activation-dag.nix`.
 ### References in documentation and comments
 
 All references to activation entry names in documentation, code comments, echo messages, script header comments, and any other human-readable text must use the same kebab-case verb-first naming convention. Stale camelCase references to renamed activations must be updated alongside the rename.
+
+---
+
+## nix-darwin fragment convention
+
+nix-darwin only honors the hardcoded `preActivation` / `extraActivation` / `postActivation` fragment names — any other `system.activationScripts` name is silently ignored. Never invent custom darwin fragment names.
+
+Every fragment MUST carry a header comment naming its owning module so its origin is traceable, e.g.:
+
+```nix
+# Fragment from src/modules/posix-sops.nix
+system.activationScripts.postActivation.text = lib.mkAfter ''
+  ...fragment body...
+'';
+```
 
 ---
 
@@ -87,7 +114,7 @@ home.activation.some-step = lib.hm.dag.entryAfter [ "dependency" ] ''
 '';
 
 # Thin wrapper: managed-symlink (protect/unprotect a single path)
-home.activation.protectFoo = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+home.activation.protect-foo = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
   "${activationBundle}/src/scripts/configs/managed-symlink.sh" "protect" "moduleName" "$HOME/.config/foo"
 '';
 
