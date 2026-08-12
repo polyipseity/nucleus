@@ -61,7 +61,7 @@ let
       + "\n    </filesystem>";
 
   # Android-specific disk attachments for GSI-based Android VM images.
-  # The system disk is the writable data/<id>-system.qcow2 overlay over
+  # The system disk is the writable data/<id> (system).qcow2 overlay over
   # src/Android/system image.qcow2 (src/ stays pristine); userdata is a
   # writable qcow2; the GSI image is attached read-only only when the
   # Android group's gsiUrl is set.  Image filenames come from the manifest
@@ -73,7 +73,7 @@ let
     else
       "<disk type='file' device='disk'>\n"
       + "      <driver name='qemu' type='qcow2'/>\n"
-      + "      <source file='${vmDir}/data/${vm.id}-system.qcow2'/>\n"
+      + "      <source file='${vmDir}/data/${vm.id} (system).qcow2'/>\n"
       + "      <target dev='vda' bus='virtio'/>\n"
       + "    </disk>\n"
       + "    <disk type='file' device='disk'>\n"

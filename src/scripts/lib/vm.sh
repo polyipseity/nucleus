@@ -705,8 +705,8 @@ vm_write_start_script() {
       _wss_ram_bytes="$(parse_size "$(printf '%s' "$_wss_doc" | jq -r '.ram')")"
       # WHY: the Android start script resolves the system drive under data/;
       # the rendered leaf is the canonical system overlay
-      # data/<id>-system.qcow2, not the pristine src/Android/ payload.
-      _wss_system_image="${_wss_id}-system.qcow2"
+      # data/<id> (system).qcow2, not the pristine src/Android/ payload.
+      _wss_system_image="${_wss_id} (system).qcow2"
       _wss_userdata_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.userdataImage')"
       _wss_gsi_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.gsiImage')"
       _wss_hostfwds="$(printf '%s' "$_wss_doc" | jq -r '[.portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")')"
@@ -1441,7 +1441,7 @@ vm_ensure_data_disk() {
 # vm_ensure_android_system_overlay NAME
 #   Ensures the Android system overlay for NAME under the managed layout:
 #     src/Android/system image.qcow2 — pristine Android system image (read-only base)
-#     data/<name>-system.qcow2       — persistent writable overlay backing the
+#     data/<name> (system).qcow2     — persistent writable overlay backing the
 #                                      Android system image at its absolute
 #                                      path (on macOS the backing is the
 #                                      bundle-local system base link — UTM's
@@ -1464,7 +1464,7 @@ vm_ensure_android_system_overlay() {
 
   mkdir -p "$VM_DIR/data"
 
-  _easo_disk="$VM_DIR/data/${_easo_name}-system.qcow2"
+  _easo_disk="$VM_DIR/data/${_easo_name} (system).qcow2"
   _easo_backing="$(vm_system_overlay_backing "$_easo_name" Android)"
   _easo_system_image="$(vm_src_path Android "$VM_SYSTEM_IMAGE")"
   _easo_min_size="$(parse_size "$(jq -r --arg n "$_easo_name" '.VMs[] | select(.id == $n) | .minImageSize' "$MANIFEST")")"
@@ -2633,7 +2633,7 @@ vm_build_android() {
     # overlay on the new base (destructive to guest /system state — the
     # --upgrade contract) before re-linking the bundle entry to it.
     if [ "$_bai_system_replaced" = true ]; then
-      _bai_system_overlay="$VM_DIR/data/${_bai_vm_id}-system.qcow2"
+      _bai_system_overlay="$VM_DIR/data/${_bai_vm_id} (system).qcow2"
       rm -f "$_bai_system_overlay" "$(vm_provision_marker_path "$_bai_system_overlay")"
       if ! vm_ensure_android_system_overlay "$_bai_vm_id"; then
         return 1
@@ -2955,7 +2955,7 @@ vm_setup_utm() {
   data_dir="$bundle/Data"
   # WHY: guest-agnostic natural-language bundle disk name (user requirement);
   # the canonical disk stays data/<id>.qcow2 (non-Android) or
-  # data/<id>-system.qcow2 (Android system overlay) and is hard-linked here.
+  # data/<id> (system).qcow2 (Android system overlay) and is hard-linked here.
   disk_file="$data_dir/system disk.qcow2"
   config_plist="$bundle/config.plist"
   bundle_exists=false
@@ -3016,16 +3016,16 @@ vm_setup_utm() {
         return 1
       fi
       # WHY: the guest-visible system disk is the persistent writable
-      # data/<id>-system.qcow2 overlay (src/Android/ stays pristine); the
+      # data/<id> (system).qcow2 overlay (src/Android/ stays pristine); the
       # bundle entry is a hard link to it, so UTM boots the overlay directly
       # and the link tracks overlay replacement without ever copying.
       if ! vm_ensure_android_system_overlay "$vm_id"; then
         return
       fi
-      if [ -f "$disk_file" ] && [ "$disk_file" -ef "$VM_DIR/data/${vm_id}-system.qcow2" ]; then
+      if [ -f "$disk_file" ] && [ "$disk_file" -ef "$VM_DIR/data/${vm_id} (system).qcow2" ]; then
         say "preserving existing Android system disk link: $disk_file"
       else
-        ln -f "$VM_DIR/data/${vm_id}-system.qcow2" "$disk_file"
+        ln -f "$VM_DIR/data/${vm_id} (system).qcow2" "$disk_file"
         say "linked Android system overlay into UTM bundle: $disk_file"
       fi
       if ! vm_link_android_userdata_to_utm_bundle "$vm_id" "$vm_index" "$data_dir"; then
@@ -3098,7 +3098,7 @@ vm_setup_libvirt() {
       return
     fi
     # WHY: the libvirt domain XML attaches the guest-visible system disk as
-    # the data/<id>-system.qcow2 overlay (src/Android/ stays pristine); the
+    # the data/<id> (system).qcow2 overlay (src/Android/ stays pristine); the
     # overlay must exist before the domain references it.
     if ! vm_ensure_android_system_overlay "$vm_id"; then
       return
@@ -3119,7 +3119,7 @@ vm_setup_libvirt() {
   if [ "$dry_run" = false ]; then
     mkdir -p "$VM_DIR"
     if [ "$vm_type" = "Android" ]; then
-      say "Android disks ready for domain XML: $VM_DIR/data/${vm_id}-system.qcow2 (system overlay), $_android_userdata"
+      say "Android disks ready for domain XML: $VM_DIR/data/${vm_id} (system).qcow2 (system overlay), $_android_userdata"
     else
       if ! vm_provision_one "$vm_id"; then
         return
@@ -3128,7 +3128,7 @@ vm_setup_libvirt() {
     fi
   else
     if [ "$vm_type" = "Android" ]; then
-      dry_run "ensure Android system overlay: $VM_DIR/data/${vm_id}-system.qcow2"
+      dry_run "ensure Android system overlay: $VM_DIR/data/${vm_id} (system).qcow2"
     else
       dry_run "ensure data disk: $disk_path (overlay on $(vm_src_path "$vm_type" "$VM_SYSTEM_IMAGE"))"
     fi
@@ -4076,7 +4076,7 @@ vm_setup_libvirt_vms() {
 #   writable runtime disk per VM: Windows guests get a data/<id>.qcow2 overlay
 #   over images/<type>.base.qcow2 (mirroring vm_setup_libvirt and the
 #   PowerShell vm-setup Pass A); Android guests get a standalone
-#   data/<id>.qcow2 userdata disk plus the data/<id>-system.qcow2 system
+#   data/<id>.qcow2 userdata disk plus the data/<id> (system).qcow2 system
 #   overlay (system/GSI src/ payloads stay pristine).
 vm_setup_windows_qemu() {
   local vm_id="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
@@ -4579,7 +4579,7 @@ vm_unpack_vms() {
           if ! vm_ensure_android_system_overlay "$_uv_name"; then
             continue
           fi
-          ln -f "$VM_DIR/data/${_uv_name}-system.qcow2" "$_uv_bundle/Data/system disk.qcow2"
+          ln -f "$VM_DIR/data/${_uv_name} (system).qcow2" "$_uv_bundle/Data/system disk.qcow2"
           ln -f "$_uv_android_userdata" "$_uv_bundle/Data/user data.qcow2"
           if [ -n "$_uv_gsi_url" ] && [ "$_uv_gsi_url" != "null" ] && [ -f "$_uv_android_gsi" ]; then
             ln -f "$_uv_android_gsi" "$_uv_bundle/Data/GSI disk.qcow2"

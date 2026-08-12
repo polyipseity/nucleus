@@ -14,7 +14,7 @@
   Expects disk images with filenames rendered by vm.sh via
   __ANDROID_SYSTEM_IMAGE__ / __ANDROID_USERDATA_IMAGE__ / __ANDROID_GSI_IMAGE__
   tokens:
-    - <id>-system.qcow2 (system overlay, vda)  under ~\virtual machines\data\
+    - <id> (system).qcow2 (system overlay, vda)  under ~\virtual machines\data\
     - <userdataImage>   (userdata partition, vdb) under ~\virtual machines\data\
     - <gsiImage>        (optional GSI system image, vdc, read-only) under ~\virtual machines\src\Android\
 

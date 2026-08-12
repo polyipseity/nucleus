@@ -842,7 +842,7 @@ function Invoke-VMSetup {
             $template = Get-Content -Path $androidStartPath -Raw
             $content = $template.Replace('__ANDROID_CPU_COUNT__', [string]$Vm.cpus)
             $content = $content.Replace('__ANDROID_RAM_BYTES__', "${ramBytes}B")
-            $content = $content.Replace('__ANDROID_SYSTEM_IMAGE__', "$($Vm.id)-system.qcow2")
+            $content = $content.Replace('__ANDROID_SYSTEM_IMAGE__', "$($Vm.id) (system).qcow2")
             $content = $content.Replace('__ANDROID_USERDATA_IMAGE__', [string]$Vm.Android.userdataImage)
             $content = $content.Replace('__ANDROID_GSI_IMAGE__', [string]$Vm.Android.gsiImage)
             $content = $content.Replace('__HOSTFWDS__', $hostFwds)
@@ -1335,7 +1335,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             # working while src/ stays pristine.  Create-once/preserve;
             # marker adoption on drift (Android semantics: derived from the
             # base, never injected).
-            $systemOverlayPath = Join-Path -Path $dataDir -ChildPath "$($vm.id)-system.qcow2"
+            $systemOverlayPath = Join-Path -Path $dataDir -ChildPath "$($vm.id) (system).qcow2"
             $systemOverlayProvisionMarker = Get-VMProvisionMarkerPath -BasePath $systemOverlayPath
             if (-not (Test-Path -LiteralPath $systemOverlayPath -PathType Leaf)) {
                 if ($systemImageValid) {

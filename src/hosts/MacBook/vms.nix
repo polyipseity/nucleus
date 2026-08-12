@@ -174,7 +174,7 @@ let
         (portForwardEntries vm)
         (vmSound vm)
         # WHY: the guest-visible main disk is always the writable
-        # data/<id>.qcow2 overlay (data/<id>-system.qcow2 for Android), so
+        # data/<id>.qcow2 overlay (data/<id> (system).qcow2 for Android), so
         # the bundle's main drive entry is never read-only.
         "system disk.qcow2"
         "<false/>"
