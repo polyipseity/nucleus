@@ -41,7 +41,7 @@ function Select-GitIgnored {
 
       # Capture git check-ignore output and exit code.
       # Using cmd /c to avoid PowerShell's own error handling interfering.
-      $ignored = Get-Content $tmp | & git check-ignore --stdin 2>$null
+      $ignored = Get-Content $tmp | & git check-ignore --stdin 2>$null  # check-suppress:suppression_doc: check-ignore exits 1 and may write stderr when nothing is ignored; $LASTEXITCODE checked on next line
       $gitExit = $LASTEXITCODE
 
       if ($gitExit -le 1) {
@@ -59,6 +59,7 @@ function Select-GitIgnored {
         $allPaths
       }
     } finally {
+      # check-suppress:suppression_doc: temp file cleanup in finally; file may already be removed (best-effort)
       Remove-Item -Path $tmp -Force -ErrorAction SilentlyContinue
     }
   }

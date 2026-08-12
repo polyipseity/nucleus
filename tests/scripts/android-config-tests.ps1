@@ -26,8 +26,8 @@ function Assert-Fail {
 
 function Test-GetAndroidVmArch {
   function Write-NucleusError { param([string]$Message) throw $Message }
-  function Write-NucleusInfo { param([string]$Message) $null = $Message }
-  function Write-NucleusWarning { param([string]$Message) $null = $Message }
+  function Write-NucleusInfo { param([string]$Message) $null = $Message }  # check-suppress:suppression_doc: test stub consumes unused param to mirror production signature
+  function Write-NucleusWarning { param([string]$Message) $null = $Message }  # check-suppress:suppression_doc: test stub consumes unused param to mirror production signature
   . $vmAndroidModule
 
   $androidArch = Get-AndroidVmArch -VmType 'Android'
@@ -47,8 +47,8 @@ function Test-GetAndroidVmArch {
 
 function Test-GetAndroidAdbHostPort {
   function Write-NucleusError { param([string]$Message) throw $Message }
-  function Write-NucleusInfo { param([string]$Message) $null = $Message }
-  function Write-NucleusWarning { param([string]$Message) $null = $Message }
+  function Write-NucleusInfo { param([string]$Message) $null = $Message }  # check-suppress:suppression_doc: test stub consumes unused param to mirror production signature
+  function Write-NucleusWarning { param([string]$Message) $null = $Message }  # check-suppress:suppression_doc: test stub consumes unused param to mirror production signature
   . $vmAndroidModule
 
   $vm = [pscustomobject]@{
@@ -77,7 +77,7 @@ function Test-GetAndroidAdbHostPort {
 
 function Test-ResolveAndroidVmIndex {
   function Write-NucleusError { param([string]$Message) throw $Message }
-  function Write-NucleusInfo { param([string]$Message) $null = $Message }
+  function Write-NucleusInfo { param([string]$Message) $null = $Message }  # check-suppress:suppression_doc: test stub consumes unused param to mirror production signature
   function Format-NucleusOutput { param([string]$Message) $Message }
   . $configModule
 
@@ -105,7 +105,7 @@ function Test-ResolveAndroidVmIndex {
 
 function Test-NoFlagsShowsManual {
   function Write-NucleusError { param([string]$Message) throw $Message }
-  function Write-NucleusInfo { param([string]$Message) $null = $Message }
+  function Write-NucleusInfo { param([string]$Message) $null = $Message }  # check-suppress:suppression_doc: test stub consumes unused param to mirror production signature
   function Format-NucleusOutput { param([string]$Message) $Message }
   . $configModule
   function Show-AndroidConfigManual { $script:manualShown = $true }
@@ -125,7 +125,7 @@ function Test-NoFlagsShowsManual {
 
 function Test-UnknownFlagRejected {
   function Write-NucleusError { param([string]$Message) $script:errored = $true; throw $Message }
-  function Write-NucleusInfo { param([string]$Message) $null = $Message }
+  function Write-NucleusInfo { param([string]$Message) $null = $Message }  # check-suppress:suppression_doc: test stub consumes unused param to mirror production signature
   function Format-NucleusOutput { param([string]$Message) $Message }
   . $configModule
 
@@ -137,6 +137,7 @@ function Test-UnknownFlagRejected {
   try {
     Invoke-AndroidConfig -RepoRoot $repoRoot -VmId 'Android' -Manifest $manifest -VmDir 'C:\tmp' -ConfigFlags @('--adb-debug')
   } catch {
+    # check-suppress:suppression_doc: capture the expected throw; errored flag below asserts it fired
     $null = $_
   }
 

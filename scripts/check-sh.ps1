@@ -30,6 +30,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+# check-suppress:suppression_doc: probe whether shellcheck is installed; $null check below throws if absent.
 $shellcheck = Get-Command -Name 'shellcheck' -ErrorAction SilentlyContinue
 if (-not $shellcheck) {
   throw 'shellcheck is required but was not found in PATH (install ShellCheck.ShellCheck via WinGet)'

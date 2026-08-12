@@ -415,7 +415,7 @@ function Get-UserConfigFirstLevelEntryList {
   foreach ($root in @($perUser, $default)) {
     if (-not (Test-Path -LiteralPath $root -PathType Container)) { continue }
     foreach ($child in Get-ChildItem -LiteralPath $root -Force) {
-      [void]$names.Add($child.Name)
+      [void]$names.Add($child.Name)  # check-suppress:suppression_doc: HashSet.Add returns bool; set membership is the side effect
     }
   }
   return [string[]]@($names)

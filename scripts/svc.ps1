@@ -350,6 +350,7 @@ function Get-ServiceLogFile {
   $files = @()
   foreach ($dir in (Get-ServiceLogDirList -ServiceKey $ServiceKey)) {
     if (Test-Path -LiteralPath $dir -PathType Container) {
+      # check-suppress:suppression_doc: probe -- log dir may be empty; empty result handled.
       $files += Get-ChildItem -LiteralPath $dir -Recurse -Filter '*.log' -File -ErrorAction SilentlyContinue |
         Select-Object -ExpandProperty FullName
     }

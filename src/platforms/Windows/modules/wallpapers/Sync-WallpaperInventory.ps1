@@ -126,6 +126,7 @@ function Sync-WallpaperInventory {
     foreach ($fileName in $unencryptedFiles) {
       $outputPath = Join-Path -Path $outputDir -ChildPath $fileName
       Write-Output "$($PSStyle.Foreground.Cyan)Linking unencrypted wallpaper for $user`: $fileName$($PSStyle.Reset)"
+      # check-suppress:suppression_doc: Deploy-UserWritableSymlink returns created symlink FileInfo; discarded
       $null = Deploy-UserWritableSymlink `
         -Name "wallpaper-$fileName" `
         -User $user `

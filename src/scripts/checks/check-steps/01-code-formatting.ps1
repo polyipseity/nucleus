@@ -33,6 +33,7 @@ Register-Step -Id "code-formatting" -Number 1 -Name "Code formatting and linting
     } else {
       $cached = if ($script:CachedShFiles) { $script:CachedShFiles } else { @() }
       $fromCache = @($cached | ForEach-Object { $_.FullName })
+      # check-suppress:suppression_doc: probe -- no .envrc files may exist; empty result handled.
       $envrc = Get-ChildItem -Recurse -Path $r -Filter '.envrc' -Force -ErrorAction SilentlyContinue |
         Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } |
         ForEach-Object { $_.FullName }

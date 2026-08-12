@@ -67,7 +67,7 @@ _wave_cleanup_stale() {
   local _d _pid
   for _d in "${TMPDIR:-/tmp}/nucleus-step-runner-"*; do
     [ -d "$_d" ] || continue # check-suppress:suppression_doc: glob may expand to literal pattern when no matches; [ -d ] check filters it
-    _pid=$(cat "$_d/pid" 2>/dev/null || true)
+    _pid=$(cat "$_d/pid" 2>/dev/null || true) # check-suppress:suppression_doc: pid file may not exist yet; empty pid handled below
     if [ -z "$_pid" ] || ! kill -0 "$_pid" 2>/dev/null; then
       rm -rf "$_d"
     fi

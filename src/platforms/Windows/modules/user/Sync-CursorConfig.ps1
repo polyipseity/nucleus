@@ -90,7 +90,7 @@ function Sync-CursorConfig {
     if (-not (Initialize-RealDirectory -Path $TargetDir)) { return $false }
 
     if (Test-Path -LiteralPath $SourceDir -PathType Container) {
-      $sources = Get-ChildItem -LiteralPath $SourceDir -Filter "*$SourceSuffix" -File -ErrorAction SilentlyContinue
+      $sources = Get-ChildItem -LiteralPath $SourceDir -Filter "*$SourceSuffix" -File -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: source dir may hold no matching files; foreach over empty list is a no-op
       foreach ($source in $sources) {
         $base = $source.Name.Substring(0, $source.Name.Length - $SourceSuffix.Length)
         $linkPath = Join-Path -Path $TargetDir -ChildPath "$base$TargetSuffix"

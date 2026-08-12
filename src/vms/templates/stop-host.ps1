@@ -39,6 +39,7 @@ switch ('__HOST_KIND__') {
     }
 
     # Fallback: kill the QEMU process.
+    # check-suppress:suppression_doc: probe -- no qemu process may be running; $null check below handles absence.
     $proc = Get-Process -Name 'qemu-system-*' -ErrorAction SilentlyContinue | Where-Object {
       $_.CommandLine -match "$vmName"
     }

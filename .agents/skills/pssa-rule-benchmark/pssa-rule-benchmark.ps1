@@ -100,7 +100,7 @@ if ($SkipExisting -and (Test-Path $ResultsFile)) {
     $existingData = Get-Content $ResultsFile -Raw | ConvertFrom-Json
     foreach ($entry in $existingData) {
       if ($entry.Runs -ge $Runs) {
-        $null = $skipRules.Add($entry.RuleName)
+        $null = $skipRules.Add($entry.RuleName)  # check-suppress:suppression_doc: HashSet.Add returns bool; set membership is the side effect
         Write-Output "Skipping $($entry.RuleName) (already has $Runs runs)"
       }
     }

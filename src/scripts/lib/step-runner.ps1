@@ -73,6 +73,7 @@ function Remove-WaveTempDir {
   param()
 
   if ($script:WaveTmpDir -and (Test-Path $script:WaveTmpDir)) {
+    # check-suppress:suppression_doc: best-effort temp-dir cleanup at exit; dir may already be gone.
     Remove-Item -Path $script:WaveTmpDir -Recurse -Force -ErrorAction SilentlyContinue
   }
 }
@@ -267,7 +268,7 @@ function Invoke-StepPipeline {
     if ($skip) {
       Invoke-SkippedStep -Number $n -Name $name -Id $id
     } else {
-      $null = $pendingIndices.Add($i)
+      $null = $pendingIndices.Add($i)  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
     }
   }
 
@@ -284,7 +285,7 @@ function Invoke-StepPipeline {
       $action = $script:StepActions[$i]
 
       $ps = [System.Management.Automation.PowerShell]::Create()
-      $null = $ps.AddScript({
+      $null = $ps.AddScript({  # check-suppress:suppression_doc: AddScript returns the pipeline for chaining; discarded
         param($Number, $Name, $Action, $HasArgs, $RepoRoot, $WaveTmpDir, $FAIL_FAST)
 
         $stepStart = [System.Diagnostics.Stopwatch]::StartNew()
@@ -326,16 +327,16 @@ function Invoke-StepPipeline {
         FAIL_FAST  = $script:FAIL_FAST
       })
       $handle = $ps.BeginInvoke()
-      $null = $runspaces.Add(@{ PowerShell = $ps; AsyncResult = $handle; Number = $n })
+      $null = $runspaces.Add(@{ PowerShell = $ps; AsyncResult = $handle; Number = $n })  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
       $startedSteps++
-      $null = $spawnedNumbers.Add($n)
+      $null = $spawnedNumbers.Add($n)  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
       Write-Output ("[{0}/{1}] step {2} {3} started" -f $startedSteps, $totalSteps, $n, $name)
     }
 
     $batchFailed = $false
     foreach ($rs in $runspaces) {
       try {
-        $null = $rs.PowerShell.EndInvoke($rs.AsyncResult)
+        $null = $rs.PowerShell.EndInvoke($rs.AsyncResult)  # check-suppress:suppression_doc: EndInvoke returns runspace output; already redirected to step out-file
       } catch {
         $batchFailed = $true
       } finally {

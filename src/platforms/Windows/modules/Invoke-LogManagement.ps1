@@ -190,6 +190,7 @@ function Invoke-LogExpiry {
   # both that naming and the legacy .log.N / dated log_* naming.
   $pattern = '(\.log\.\d+(\.gz)?$|\.\d+\.log(\.gz)?$|^log_.*\.log$|\.log\.gz$)'
 
+  # check-suppress:suppression_doc: probe -- no expired log files may exist; pipeline handles empty result.
   Get-ChildItem -LiteralPath $Path -Recurse -File -ErrorAction SilentlyContinue | Where-Object {
     $_.Name -match $pattern -and $_.LastWriteTime -lt $cutoff
   } | ForEach-Object {
@@ -226,6 +227,7 @@ function Invoke-LogRotation {
 
   if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return }
 
+  # check-suppress:suppression_doc: probe -- no log files may exist; empty result handled.
   $logFiles = Get-ChildItem -LiteralPath $Path -Recurse -Filter '*.log' -File -ErrorAction SilentlyContinue
   foreach ($file in $logFiles) {
     if ($file.Length -le $MaxSize) { continue }

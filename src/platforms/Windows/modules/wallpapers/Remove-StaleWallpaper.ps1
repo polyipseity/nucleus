@@ -39,10 +39,10 @@ function Remove-StaleWallpaper {
 
   $managedWallpaperSet = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
   foreach ($blobName in @(Get-WallpaperEncryptedBlobList -User $User -RepoRoot $RepoRoot)) {
-    [void]$managedWallpaperSet.Add([System.IO.Path]::GetFileNameWithoutExtension($blobName))
+    [void]$managedWallpaperSet.Add([System.IO.Path]::GetFileNameWithoutExtension($blobName))  # check-suppress:suppression_doc: HashSet.Add returns bool; set membership is the side effect
   }
   foreach ($fileName in @(Get-WallpaperUnencryptedFileList -User $User -RepoRoot $RepoRoot)) {
-    [void]$managedWallpaperSet.Add($fileName)
+    [void]$managedWallpaperSet.Add($fileName)  # check-suppress:suppression_doc: HashSet.Add returns bool; set membership is the side effect
   }
 
   if ($managedWallpaperSet.Count -eq 0) {

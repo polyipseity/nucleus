@@ -87,9 +87,9 @@ if (-not $NoSops) {
       }
     }
   }
-
-  $wallpaperList = @(Get-ChildItem -Path (Join-Path -Path $repoRoot -ChildPath 'src\users') -Recurse -Filter '*.sops' -File -ErrorAction SilentlyContinue |
-    Where-Object { $_.FullName -match '[\\/]wallpapers[\\/]encrypted[\\/]' })
+    # check-suppress:suppression_doc: probe -- no encrypted wallpaper blobs may exist; empty result handled.
+    $wallpaperList = @(Get-ChildItem -Path (Join-Path -Path $repoRoot -ChildPath 'src\users') -Recurse -Filter '*.sops' -File -ErrorAction SilentlyContinue |
+      Where-Object { $_.FullName -match '[\\/]wallpapers[\\/]encrypted[\\/]' })
   foreach ($encryptedWallpaper in $wallpaperList) {
     & sops --config $sopsConfig updatekeys --yes $encryptedWallpaper.FullName
     if ($LASTEXITCODE -ne 0) {

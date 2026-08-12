@@ -133,7 +133,7 @@ function Invoke-SecretVerification {
   }
   $usersRoot = Join-Path -Path $RepoRoot -ChildPath 'src\users'
   if (Test-Path -Path $usersRoot) {
-    $wallpaperSopsFiles = @(Get-ChildItem -Path $usersRoot -Recurse -Filter '*.sops' -File -ErrorAction SilentlyContinue |
+    $wallpaperSopsFiles = @(Get-ChildItem -Path $usersRoot -Recurse -Filter '*.sops' -File -ErrorAction SilentlyContinue |  # check-suppress:suppression_doc: probe -- users dir may hold no .sops files; Count guard below handles absence
       Where-Object { $_.FullName -match '[\\/]wallpapers[\\/]encrypted[\\/]' })
     if ($wallpaperSopsFiles.Count -gt 0) {
       $sopsTestFiles += @($wallpaperSopsFiles | Select-Object -ExpandProperty FullName)

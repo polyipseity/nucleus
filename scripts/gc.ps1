@@ -450,8 +450,9 @@ if (-not $NoVMGc) {
     }
 
     # Remove leftover Packer temporary build directories (dot-prefixed, from interrupted runs).
-    # check-suppress:suppression_doc: probe -- stale temporary directories may not exist; Where-Object handles empty result.
+    # check-suppress:suppression_doc: probe -- type directories may not exist; ForEach-Object handles empty result.
     Get-ChildItem -LiteralPath $srcDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+      # check-suppress:suppression_doc: probe -- stale temporary directories may not exist; Where-Object handles empty result.
       Get-ChildItem -LiteralPath $_.FullName -Directory -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -match '^\..+' } |
         ForEach-Object {

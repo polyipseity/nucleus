@@ -344,6 +344,7 @@ function Invoke-VMSetup {
     function Invoke-GcOrphanDisk {
         param([string[]] $ExpectedNames)
         if (Test-Path -LiteralPath $srcDir -PathType Container) {
+            # check-suppress:suppression_doc: probe -- no type directories may exist; foreach handles empty result.
             foreach ($typeDir in Get-ChildItem -LiteralPath $srcDir -Directory -ErrorAction SilentlyContinue) {
                 $keep = @(Get-VMGcSrcKeepSetForType -Type $typeDir.Name -ExpectedNames $ExpectedNames)
                 # check-suppress:suppression_doc: probe -- no disk images may exist; foreach handles empty result.
@@ -376,6 +377,7 @@ function Invoke-VMSetup {
         param([string[]] $ExpectedNames)
 
         if (Test-Path -LiteralPath $srcDir -PathType Container) {
+            # check-suppress:suppression_doc: probe -- no type directories may exist; foreach handles empty result.
             foreach ($typeDir in Get-ChildItem -LiteralPath $srcDir -Directory -ErrorAction SilentlyContinue) {
                 if (Test-VMTypeExpected -Type $typeDir.Name -ExpectedNames $ExpectedNames) {
                     continue
@@ -396,8 +398,8 @@ function Invoke-VMSetup {
         }
 
         if ($gcDataEnabled -and (Test-Path -LiteralPath $dataDir -PathType Container)) {
-            # check-suppress:suppression_doc: probe -- no provision markers may exist; foreach handles empty result.
             foreach ($marker in @(
+                # check-suppress:suppression_doc: probe -- no provision markers may exist; foreach handles empty result.
                 Get-ChildItem -LiteralPath $dataDir -Filter '*.vm-provision-sha256' -ErrorAction SilentlyContinue
             )) {
                 $basePath = $marker.FullName -replace '\.vm-provision-sha256$'
@@ -435,7 +437,7 @@ function Invoke-VMSetup {
         $text = [System.Text.StringBuilder]::new()
         foreach ($file in $Files) {
             if (Test-Path -LiteralPath $file -PathType Leaf) {
-                [void]$text.AppendLine((Get-Content -Path $file -Raw))
+                [void]$text.AppendLine((Get-Content -Path $file -Raw))  # check-suppress:suppression_doc: StringBuilder.AppendLine returns the builder for chaining; discarded
             }
         }
         $hashBytes = [System.Security.Cryptography.SHA256]::HashData(
@@ -463,41 +465,41 @@ function Invoke-VMSetup {
             'NixOS' {
                 $baseGuest = Join-Path $typeDir 'base-guest.nix'
                 if (Test-Path -LiteralPath $baseGuest -PathType Leaf) {
-                    [void]$files.Add($baseGuest)
+                    [void]$files.Add($baseGuest)  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
                     $content = Get-Content -Path $baseGuest -Raw
                     foreach ($match in [regex]::Matches($content, '(\.\./)+src/[A-Za-z0-9_./-]+\.nix')) {
                         $importPath = Join-Path $typeDir $match.Value
                         if (-not (Test-Path -LiteralPath $importPath -PathType Leaf)) {
                             throw "type-config fingerprint: missing import for NixOS base: $importPath"
                         }
-                        [void]$files.Add($importPath)
+                        [void]$files.Add($importPath)  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
                     }
                 }
                 foreach ($subdir in @('formats', 'disk-image')) {
                     $subdirPath = Join-Path $typeDir $subdir
                     if (Test-Path -LiteralPath $subdirPath -PathType Container) {
                         foreach ($file in (Get-ChildItem -LiteralPath $subdirPath -File -Recurse)) {
-                            [void]$files.Add($file.FullName)
+                            [void]$files.Add($file.FullName)  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
                         }
                     }
                 }
-                [void]$files.Add((Join-Path $typeDir 'packer.pkr.hcl'))
+                [void]$files.Add((Join-Path $typeDir 'packer.pkr.hcl'))  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
             }
             'Windows' {
-                [void]$files.Add((Join-Path $typeDir 'Autounattend.xml'))
+                [void]$files.Add((Join-Path $typeDir 'Autounattend.xml'))  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
                 $patchesDir = Join-Path $typeDir 'patches'
                 if (Test-Path -LiteralPath $patchesDir -PathType Container) {
                     foreach ($file in (Get-ChildItem -LiteralPath $patchesDir -File -Recurse)) {
-                        [void]$files.Add($file.FullName)
+                        [void]$files.Add($file.FullName)  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
                     }
                 }
-                [void]$files.Add((Join-Path $typeDir 'packer.pkr.hcl'))
+                [void]$files.Add((Join-Path $typeDir 'packer.pkr.hcl'))  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
             }
             'macOS' {
-                [void]$files.Add((Join-Path $typeDir 'packer.pkr.hcl'))
+                [void]$files.Add((Join-Path $typeDir 'packer.pkr.hcl'))  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
             }
         }
-        [void]$files.Add((Join-Path $RepoRoot 'src\flake.lock'))
+        [void]$files.Add((Join-Path $RepoRoot 'src\flake.lock'))  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
         return Get-VMFileHash -Files $files.ToArray()
     }
 
@@ -536,7 +538,7 @@ function Invoke-VMSetup {
         $guestDir = Join-Path $RepoRoot "src\vms\guests\$($Vm.id)"
         if (Test-Path -LiteralPath $guestDir -PathType Container) {
             foreach ($file in (Get-ChildItem -LiteralPath $guestDir -File -Recurse)) {
-                [void]$files.Add($file.FullName)
+                [void]$files.Add($file.FullName)  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
             }
         }
         $provisionJson = [ordered]@{
@@ -1120,6 +1122,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     $scriptsDir = Join-Path $vmDir 'scripts'
     if (Test-Path $scriptsDir) {
         $staleScripts = @(
+            # check-suppress:suppression_doc: probe -- no stale start/stop scripts may exist; empty result handled.
             Get-ChildItem -LiteralPath $scriptsDir -File -ErrorAction SilentlyContinue |
                 Where-Object { $_.Name -match '^(start|stop)-.+\.(sh|ps1)$' }
         )
@@ -1165,6 +1168,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
 
     # Prune orphaned dot-prefixed Packer build temp dirs under src/<type>/.
     if (Test-Path -LiteralPath $srcDir -PathType Container) {
+        # check-suppress:suppression_doc: probe -- no type directories may exist; foreach handles empty result.
         foreach ($typeDir in Get-ChildItem -LiteralPath $srcDir -Directory -ErrorAction SilentlyContinue) {
             # check-suppress:suppression_doc: probe -- no stale temp directories may exist; Where-Object handles empty result.
             Get-ChildItem -LiteralPath $typeDir.FullName -Directory -ErrorAction SilentlyContinue |

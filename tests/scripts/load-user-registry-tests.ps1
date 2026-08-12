@@ -6,7 +6,7 @@ param()
 
 $ErrorActionPreference = 'Stop'
 
-$bash = Get-Command -Name bash -ErrorAction SilentlyContinue
+$bash = Get-Command -Name bash -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: bash may be absent on non-POSIX hosts; explicit throw below
 if (-not $bash) {
   throw 'bash is required to run load-user-registry-tests.ps1'
 }

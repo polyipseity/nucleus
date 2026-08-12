@@ -158,6 +158,7 @@ function Register-HostAgeKey {
   # Dynamically include overlay wallpaper blobs so new wallpapers are automatically rewrapped.
   $usersRoot = Join-Path -Path $RepoRoot -ChildPath 'src\users'
   if (Test-Path -Path $usersRoot) {
+    # check-suppress:suppression_doc: probe -- no encrypted wallpaper blobs may exist; empty result handled.
     $wallpaperBlobs = @(Get-ChildItem -Path $usersRoot -Recurse -Filter '*.sops' -File -ErrorAction SilentlyContinue |
       Where-Object { $_.FullName -match '[\\/]wallpapers[\\/]encrypted[\\/]' })
     if ($wallpaperBlobs.Count -gt 0) {

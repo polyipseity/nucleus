@@ -23,7 +23,7 @@ Register-Step -Id "yaml-structural" -Number 9 -Name "YAML structural validation"
   foreach ($yf in $yamlFiles) {
     try {
       $content = Get-Content $yf -Raw -ErrorAction Stop
-      $null = $content | ConvertFrom-Yaml -ErrorAction Stop
+      $null = $content | ConvertFrom-Yaml -ErrorAction Stop  # check-suppress:suppression_doc: parsed object discarded; -ErrorAction Stop surfaces invalid YAML via throw
     } catch {
       Write-ErrorMessage "$yf : invalid YAML"
       $yamlErrors++
