@@ -101,15 +101,15 @@ function Write-Message { Write-Output "$args" }
 **Command-name wrappers** (`python`, `bun`, `cargo`, etc.): Functions that intentionally shadow native commands must keep their exact lowercase name to function as replacements. Non-hyphenated lowercase names (`python`, `bun`, `node`, etc.) do NOT trigger `PSUseApprovedVerbs` (it only fires on Verb-Noun hyphenated names), but `node` DOES trigger `PSAvoidOverwritingBuiltInCmdlets` (it shadows a built-in cmdlet). Add the attribute INSIDE the function body immediately before `param()`:
 
 ```powershell
-# check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets -- intentional: shadows native node; warns to use bun equivalents
 function node {
+  # check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets -- intentional: shadows native node; warns to use bun equivalents
   [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '')]
   param()
   ...
 }
 ```
 
-This is not an exemption — use inline suppression with a documented reason as per standard suppression rules. The comment syntax `# SuppressMessageAttribute('RuleId', '')` does NOT work — PSSA's `GetSuppressions` only reads `AttributeAst` from param blocks; comment-based suppressions are silently ignored (dead weight). The attribute MUST be placed inside the function body before `param()` (placing it on the `function` keyword line causes `UnexpectedAttribute` ParseErrors).
+This is not an exemption — use inline suppression with a documented reason as per standard suppression rules. The comment syntax `# SuppressMessageAttribute('RuleId', '')` does NOT work — PSSA's `GetSuppressions` only reads `AttributeAst` from param blocks; comment-based suppressions are silently ignored (dead weight). The attribute MUST be placed inside the function body before `param()` (placing it on the `function` keyword line causes `UnexpectedAttribute` ParseErrors), and the `# check-suppress:` annotation must sit on the same line as, or immediately above, the attribute (step-11 adjacency requirement).
 
 **`Add-ShellAlias` helper**: Functions that create aliases via `New-Item -Path Function:` use the PSFunction provider path and produce no `FunctionDefinitionAst`. The helper itself (`Add-ShellAlias`) uses the approved verb `Add-`. This is the canonical way to create function aliases without triggering the rule.
 
