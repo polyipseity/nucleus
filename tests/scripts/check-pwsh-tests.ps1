@@ -29,7 +29,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $pwshScript = Join-Path $repoRoot 'scripts\check-pwsh.ps1'
 
 # 1. Syntax validation passes on a known-good file.
-& $pwshScript -SkipStep PSSA -Paths $pwshScript | Out-Null
+& $pwshScript -SkipStep PSSA -Paths $pwshScript > $null
 if ($LASTEXITCODE -ne 0) {
   Assert-Fail 'check-pwsh: syntax validation on known-good file' "exit code $LASTEXITCODE"
 } else {
@@ -38,7 +38,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # 2. Syntax validation handles nonexistent files gracefully (skips them).
 $missingPath = Join-Path $repoRoot 'nonexistent\missing-file.ps1'
-& $pwshScript -SkipStep PSSA -Paths $missingPath | Out-Null
+& $pwshScript -SkipStep PSSA -Paths $missingPath > $null
 if ($LASTEXITCODE -ne 0) {
   Assert-Fail 'check-pwsh: nonexistent file' "exit code $LASTEXITCODE"
 } else {
@@ -48,7 +48,7 @@ if ($LASTEXITCODE -ne 0) {
 # 3. Unknown -SkipStep names produce an error.
 $unknownSkipRejected = $false
 try {
-  & $pwshScript -SkipStep UnknownName -Paths $pwshScript | Out-Null
+  & $pwshScript -SkipStep UnknownName -Paths $pwshScript > $null
   if ($LASTEXITCODE -ne 0) { $unknownSkipRejected = $true }
 } catch {
   $unknownSkipRejected = $true

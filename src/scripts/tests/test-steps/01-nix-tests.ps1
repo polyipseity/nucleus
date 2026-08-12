@@ -4,7 +4,7 @@ Register-Step -Id "nix-tests" -Number 1 -Name "Nix test suite" -Action {
   $lib = Join-Path -Path $RepoRoot -ChildPath 'src/scripts/lib/nix-test-eval.ps1'
   . $lib
   try {
-    Invoke-NixTestEval -HasArgs $false -RepoRoot $RepoRoot | Out-Null
+    Invoke-NixTestEval -HasArgs $false -RepoRoot $RepoRoot > $null
   } catch {
     return 1
   }

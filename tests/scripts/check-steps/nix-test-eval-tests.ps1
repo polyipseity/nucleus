@@ -16,7 +16,7 @@ if ($content -notmatch 'function Invoke-NixTestEval') {
 }
 
 $tmpDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ("nucleus-nix-test-eval-" + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Path (Join-Path $tmpDir 'tests') -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $tmpDir 'tests') -Force > $null
 
 try {
   @'
@@ -28,7 +28,7 @@ builtins.seq (builtins.deepSeq allTests) {
 
   $rejected = $false
   try {
-    Invoke-NixTestEval -HasArgs $true -RepoRoot $tmpDir -PositionalArgs @('tests/bad-deepseq.nix') | Out-Null
+    Invoke-NixTestEval -HasArgs $true -RepoRoot $tmpDir -PositionalArgs @('tests/bad-deepseq.nix') > $null
   } catch {
     $rejected = $true
   }
@@ -43,7 +43,8 @@ builtins.seq (builtins.deepSeq allTests null) {
 }
 '@ | Set-Content -Path (Join-Path $tmpDir 'tests/good-deepseq.nix') -NoNewline
 
-  Invoke-NixTestEval -HasArgs $true -RepoRoot $tmpDir -PositionalArgs @('tests/good-deepseq.nix') | Out-Null
+  Invoke-NixTestEval -HasArgs $true -RepoRoot $tmpDir -PositionalArgs @('tests/good-deepseq.nix') > $null
 } finally {
+  # check-suppress:suppression_doc: tmp dir cleanup in test teardown; missing path is acceptable.
   Remove-Item -LiteralPath $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
 }

@@ -663,6 +663,7 @@ function Invoke-VMPack {
   # Generated start/stop helper scripts (keep pack/unpack wrappers).
   $scriptsDir = Join-Path $vmDir 'scripts'
   if (Test-Path -LiteralPath $scriptsDir -PathType Container) {
+    # check-suppress:suppression_doc: scripts dir may be empty or unreadable; empty enumeration is the expected path.
     Get-ChildItem -LiteralPath $scriptsDir -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^(start|stop)-.+\.(sh|ps1)$' } | ForEach-Object {
       Write-NucleusInfo "pack — removing regenerable start/stop script: $($_.FullName)"
       if ($perform) { Remove-Item -LiteralPath $_.FullName -Force }
@@ -670,13 +671,14 @@ function Invoke-VMPack {
   }
 
   if (Test-Path -LiteralPath $srcDir -PathType Container) {
+    # check-suppress:suppression_doc: src dir may hold no VM payloads; empty enumeration is the expected path.
     Get-ChildItem -LiteralPath $srcDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
       $packerDir = Join-Path $_.FullName 'Packer'
       if (Test-Path -LiteralPath $packerDir -PathType Container) {
         Write-NucleusInfo "pack — removing transient Packer directory: $packerDir"
         if ($perform) { Remove-Item -LiteralPath $packerDir -Recurse -Force }
       }
-
+      # check-suppress:suppression_doc: transient subdirs may be absent; empty enumeration is the expected path.
       Get-ChildItem -LiteralPath $_.FullName -Directory -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -like '*-build' -or $_.Name -match '^\..+' } |
         ForEach-Object {
@@ -710,6 +712,7 @@ function Invoke-VMUnpack {
     Write-NucleusInfo 'unpack (dry-run): pass --force to regenerate artifacts'
   }
 
+  # check-suppress:suppression_doc: vm dir may hold no descriptors; empty list is handled below.
   $descriptors = @(Get-ChildItem -LiteralPath $vmDir -Filter '*.vm.json' -File -ErrorAction SilentlyContinue)
   if ($descriptors.Count -eq 0) {
     Write-NucleusInfo "unpack — no descriptors found in $vmDir; run 'nucleus-vm setup' to write them"
@@ -817,7 +820,7 @@ function Invoke-VMUnpack {
 
   # Refresh the pack/unpack wrappers (BOTH variants) for the whole tree.
   if ($perform) {
-    if (-not (Test-Path -LiteralPath $scriptsDir)) { New-Item -ItemType Directory -Path $scriptsDir -Force | Out-Null }
+    if (-not (Test-Path -LiteralPath $scriptsDir)) { New-Item -ItemType Directory -Path $scriptsDir -Force > $null }
   }
   Write-VmUnpackFile -Path (Join-Path $scriptsDir 'pack.sh') -Content @'
 #!/usr/bin/env bash
@@ -856,7 +859,7 @@ function Write-VmUnpackFile {
   )
   if ($Perform) {
     $parent = Split-Path -Parent $Path
-    if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+    if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force > $null }
     Set-Content -LiteralPath $Path -Value $Content -Encoding UTF8
     Write-NucleusInfo "unpack — wrote $Path"
   } else {

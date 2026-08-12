@@ -17,7 +17,7 @@ Register-Step -Id "script-and-framework-tests" -Number 5 -Name "Script and frame
     $match = $allTests | Where-Object { $_.BaseName -eq $priority } | Select-Object -First 1
     if ($match) {
       $ordered.Add($match.FullName)
-      $null = $seen.Add($match.FullName)
+      $null = $seen.Add($match.FullName)  # check-suppress:suppression_doc: HashSet.Add returns bool; seen-membership is the only effect needed.
     }
   }
 
@@ -30,7 +30,7 @@ Register-Step -Id "script-and-framework-tests" -Number 5 -Name "Script and frame
   $prioritySet = [System.Collections.Generic.HashSet[string]]::new(
     [System.StringComparer]::OrdinalIgnoreCase)
   foreach ($priority in $priorityNames) {
-    $null = $prioritySet.Add($priority)
+    $null = $prioritySet.Add($priority)  # check-suppress:suppression_doc: HashSet.Add returns bool; dedupe is the only effect needed.
   }
 
   $priorityScripts = [System.Collections.Generic.List[string]]::new()
@@ -55,7 +55,7 @@ Register-Step -Id "script-and-framework-tests" -Number 5 -Name "Script and frame
 
   if ($parallelScripts.Count -gt 0) {
     $captureDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath ([System.Guid]::NewGuid().ToString())
-    New-Item -ItemType Directory -Path $captureDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $captureDir -Force > $null
     $throttle = if ($env:PARALLEL_JOBS) { [int]$env:PARALLEL_JOBS } else { [System.Environment]::ProcessorCount }
 
     foreach ($testScript in $parallelScripts) {
@@ -69,7 +69,7 @@ Register-Step -Id "script-and-framework-tests" -Number 5 -Name "Script and frame
       $captureFile = Join-Path -Path $captureDir -ChildPath "$base.out"
       & $script *> $captureFile
       if ($LASTEXITCODE -ne 0) {
-        New-Item -ItemType File -Path (Join-Path -Path $captureDir -ChildPath "$base.failed") -Force | Out-Null
+        New-Item -ItemType File -Path (Join-Path -Path $captureDir -ChildPath "$base.failed") -Force > $null
       }
     } -ThrottleLimit $throttle
 
@@ -81,6 +81,7 @@ Register-Step -Id "script-and-framework-tests" -Number 5 -Name "Script and frame
       }
     }
 
+    # check-suppress:suppression_doc: capture dir may hold no .failed markers; empty result is the expected pass.
     $failed = @(Get-ChildItem -Path $captureDir -Filter '*.failed' -File -ErrorAction SilentlyContinue)
     if ($failed.Count -gt 0) {
       Write-ErrorMessage 'FAILED script tests:'

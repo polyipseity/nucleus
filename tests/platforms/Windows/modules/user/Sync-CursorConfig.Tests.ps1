@@ -50,7 +50,7 @@ Describe 'Sync-CursorConfig IDE settings symlink (Class C)' {
         $ideSettingsLink = Join-Path $script:homeRoot 'AppData\Roaming\Cursor\User\settings.json'
         Test-Path -LiteralPath $ideSettingsLink | Should -Be $false
 
-        Sync-CursorConfig -RepoRoot $script:repoRoot -Enabled:$true -Username 'testuser' | Out-Null
+        Sync-CursorConfig -RepoRoot $script:repoRoot -Enabled:$true -Username 'testuser' > $null
 
         $item = Get-Item -LiteralPath $ideSettingsLink -Force
         $item.LinkType | Should -Be 'SymbolicLink'
@@ -69,7 +69,7 @@ Describe 'Sync-CursorConfig IDE settings symlink (Class C)' {
         $ideSettingsLink = Join-Path $script:homeRoot 'AppData\Roaming\Cursor\User\settings.json'
         Test-Path -LiteralPath $ideSettingsLink | Should -Be $true
 
-        { Sync-CursorConfig -RepoRoot $script:repoRoot -Enabled:$true -Username 'testuser' | Out-Null } | Should -Not -Throw
+        { Sync-CursorConfig -RepoRoot $script:repoRoot -Enabled:$true -Username 'testuser' > $null } | Should -Not -Throw
 
         $item = Get-Item -LiteralPath $ideSettingsLink -Force
         $item.LinkType | Should -Be 'SymbolicLink'
@@ -84,7 +84,7 @@ Describe 'Sync-CursorConfig IDE settings symlink (Class C)' {
         $null = Remove-Item -LiteralPath $ideSettingsLink -Force  # check-suppress:suppression_doc: Remove-Item returns nothing useful, discarded in test setup
         $null = New-Item -ItemType SymbolicLink -Path $ideSettingsLink -Target $wrongTarget -Force  # check-suppress:suppression_doc: New-Item returns FileInfo, discarded in test setup
 
-        Sync-CursorConfig -RepoRoot $script:repoRoot -Enabled:$true -Username 'testuser' | Out-Null
+        Sync-CursorConfig -RepoRoot $script:repoRoot -Enabled:$true -Username 'testuser' > $null
 
         $item = Get-Item -LiteralPath $ideSettingsLink -Force
         $item.LinkType | Should -Be 'SymbolicLink'
@@ -96,7 +96,7 @@ Describe 'Sync-CursorConfig IDE settings symlink (Class C)' {
         $ideSettingsLink = Join-Path $script:homeRoot 'AppData\Roaming\Cursor\User\settings.json'
         Test-Path -LiteralPath $ideSettingsLink | Should -Be $true
 
-        Sync-CursorConfig -RepoRoot $script:repoRoot -Enabled:$false -Username 'testuser' | Out-Null
+        Sync-CursorConfig -RepoRoot $script:repoRoot -Enabled:$false -Username 'testuser' > $null
 
         Test-Path -LiteralPath $ideSettingsLink | Should -Be $false
     }

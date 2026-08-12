@@ -22,6 +22,7 @@ function Assert-AndroidTool {
     [string]$Name
   )
 
+  # check-suppress:suppression_doc: probe whether the host tool is on PATH; absence takes the error branch below.
   if (-not (Get-Command -Name $Name -ErrorAction SilentlyContinue)) {
     Write-NucleusError "$Name is required but was not found in PATH"
     exit 1
@@ -52,17 +53,19 @@ function Invoke-AndroidExternalWithTimeout {
     $timer = [System.Diagnostics.Stopwatch]::StartNew()
     while (-not $process.HasExited) {
       if ($timer.Elapsed.TotalSeconds -ge $TimeoutSeconds) {
-        # check-suppress:suppression_doc: timed-out process may already be dead; kill failure must not abort exit 124 path.
-        $process.Kill($true) | Out-Null
+        $process.Kill($true)
         return 124
       }
       Start-Sleep -Milliseconds 200
     }
+    # check-suppress:suppression_doc: read captured output best-effort; empty file means the process produced no output.
     if ($null -ne $StdOut) { $StdOut.Value = (Get-Content -LiteralPath $stdoutFile -Raw -ErrorAction SilentlyContinue) }
+    # check-suppress:suppression_doc: read captured output best-effort; empty file means the process produced no output.
     if ($null -ne $StdErr) { $StdErr.Value = (Get-Content -LiteralPath $stderrFile -Raw -ErrorAction SilentlyContinue) }
     return $process.ExitCode
   }
   finally {
+    # check-suppress:suppression_doc: temp files may already be gone after process exit; removal is best-effort cleanup.
     Remove-Item -LiteralPath $stdoutFile, $stderrFile -Force -ErrorAction SilentlyContinue
   }
 }
@@ -263,7 +266,7 @@ function Get-AndroidAdbListState {
   )
 
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  $devicesOutput = & adb devices 2>$null
+  $devicesOutput = & adb devices 2>$null  # check-suppress:suppression_doc: adb devices may fail when the daemon cannot start; empty list handled below.
   foreach ($line in @($devicesOutput)) {
     $trimmed = ($line | Out-String).Trim()
     if ($trimmed -match "^$([regex]::Escape($serial))\s+(\S+)") {
@@ -465,7 +468,7 @@ function Get-AndroidShellGetprop {
   )
 
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  $value = & adb -s $serial shell getprop $Name 2>$null
+  $value = & adb -s $serial shell getprop $Name 2>$null  # check-suppress:suppression_doc: getprop may fail while guest is booting; empty value handled below.
   if (-not $value) { return '' }
   return (($value | Out-String) -replace "`r`n", '').Trim()
 }
@@ -477,7 +480,7 @@ function Test-AndroidGuestShellIsRoot {
   )
 
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  $uid = & adb -s $serial shell 'id -u' 2>$null
+  $uid = & adb -s $serial shell 'id -u' 2>$null  # check-suppress:suppression_doc: id -u may fail while guest is booting; empty output handled below.
   return ((($uid | Out-String) -replace "`r", '').Trim() -eq '0')
 }
 
@@ -732,7 +735,7 @@ function Get-AndroidQemuImgPath {
   if (Test-Path -LiteralPath $qemuImg -PathType Leaf) {
     return $qemuImg
   }
-  $inPath = Get-Command qemu-img -ErrorAction SilentlyContinue
+  $inPath = Get-Command qemu-img -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe whether qemu-img is on PATH; absent tool handled below.
   if ($inPath) { return $inPath.Source }
   return $null
 }
@@ -764,7 +767,7 @@ function Test-AndroidQcow2Image {
     return $true
   }
 
-  $infoJson = & $qemuImg info --output=json $ImagePath 2>$null
+  $infoJson = & $qemuImg info --output=json $ImagePath 2>$null  # check-suppress:suppression_doc: qemu-img prints warnings to stderr; exit code checked immediately after.
   if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($infoJson | Out-String))) {
     Write-NucleusError "qemu-img could not read $Label`: $ImagePath"
     return $false

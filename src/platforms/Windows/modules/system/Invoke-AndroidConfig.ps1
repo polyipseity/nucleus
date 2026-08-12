@@ -114,7 +114,7 @@ function Test-AndroidGuestHasMagiskSu {
 
   if ((Get-AndroidAdbPollState -Vm $Vm) -ne 'device') { return $false }
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  $uid = & adb -s $serial shell 'su -c id -u' 2>$null
+  $uid = & adb -s $serial shell 'su -c id -u' 2>$null  # check-suppress:suppression_doc: guest may lack su; empty output handled below.
   return ((($uid | Out-String) -replace "`r", '').Trim() -eq '0')
 }
 
@@ -125,7 +125,7 @@ function Get-AndroidSuGetprop {
   )
 
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  $value = & adb -s $serial shell "su -c getprop $Name" 2>$null
+  $value = & adb -s $serial shell "su -c getprop $Name" 2>$null  # check-suppress:suppression_doc: getprop may fail while guest is booting; empty value handled below.
   if (-not $value) { return '' }
   return (($value | Out-String) -replace "`r`n", '').Trim()
 }
@@ -175,9 +175,9 @@ function Test-AndroidDevOptionsSmoke {
   param([Parameter(Mandatory)][object]$Vm)
 
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  & adb -s $serial shell 'am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS' 2>$null | Out-Null
+  & adb -s $serial shell 'am start -a android.settings.APPLICATION_DEVELOPMENT_SETTINGS' *> $null
   Start-Sleep -Seconds 2
-  $log = & adb -s $serial logcat -d -t 30 2>$null
+  $log = & adb -s $serial logcat -d -t 30 2>$null  # check-suppress:suppression_doc: logcat may fail while guest is booting; empty log handled below.
   if ((($log | Out-String) -match 'failed to set system property')) {
     Write-NucleusError 'Developer options smoke test failed (Settings property write error); ro.debuggable must stay 0'
     return $false
@@ -351,7 +351,7 @@ function Expand-AndroidMagiskPatchKit {
   if (Test-Path -LiteralPath $OutDir) {
     Remove-Item -LiteralPath $OutDir -Recurse -Force
   }
-  New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
+  New-Item -ItemType Directory -Path $OutDir -Force > $null
 
   $zip = [System.IO.Compression.ZipFile]::OpenRead($MagiskApk)
   try {
@@ -363,7 +363,7 @@ function Expand-AndroidMagiskPatchKit {
       }
       $dest = Join-Path $OutDir ($entryName -replace '/', [IO.Path]::DirectorySeparatorChar)
       $parent = Split-Path -Parent $dest
-      if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force | Out-Null }
+      if (-not (Test-Path -LiteralPath $parent)) { New-Item -ItemType Directory -Path $parent -Force > $null }
       [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $dest, $true)
     }
   }
@@ -489,8 +489,7 @@ function Invoke-AndroidMagiskInstallApk {
     if ($attempt -lt 11) {
       Write-NucleusInfo 'Magisk APK install not ready yet (guest may still be booting); retrying...'
       Start-Sleep -Seconds 10
-      # check-suppress:suppression_doc: guest may still be booting between Magisk APK install retries.
-      Wait-AndroidAdbBootCompleted -Vm $Vm -TimeoutSeconds 120 | Out-Null
+      Wait-AndroidAdbBootCompleted -Vm $Vm -TimeoutSeconds 120 > $null
     }
   }
 
@@ -600,12 +599,9 @@ function Invoke-AndroidConfigMagisk {
 function Invoke-AndroidFakeWifiAdbReconnect {
   param([Parameter(Mandatory)][string]$Serial)
 
-  # check-suppress:suppression_doc: disconnect drops stale sessions; reconnect kicks the host-side transport.
-  Invoke-AndroidExternalWithTimeout -TimeoutSeconds 5 -FilePath 'adb' -ArgumentList @('disconnect', $Serial) | Out-Null
-  # check-suppress:suppression_doc: idempotent ADB reconnect while guest link transitions.
-  Invoke-AndroidExternalWithTimeout -TimeoutSeconds 5 -FilePath 'adb' -ArgumentList @('reconnect') | Out-Null
-  # check-suppress:suppression_doc: idempotent ADB connect while guest link transitions.
-  Invoke-AndroidExternalWithTimeout -TimeoutSeconds 10 -FilePath 'adb' -ArgumentList @('connect', $Serial) | Out-Null
+  Invoke-AndroidExternalWithTimeout -TimeoutSeconds 5 -FilePath 'adb' -ArgumentList @('disconnect', $Serial) > $null
+  Invoke-AndroidExternalWithTimeout -TimeoutSeconds 5 -FilePath 'adb' -ArgumentList @('reconnect') > $null
+  Invoke-AndroidExternalWithTimeout -TimeoutSeconds 10 -FilePath 'adb' -ArgumentList @('connect', $Serial) > $null
 }
 
 function Test-AndroidFakeWifiAdbProbe {
@@ -814,13 +810,11 @@ function Invoke-AndroidFakeWifiRevert {
   $hadWlan0 = Test-AndroidFakeWifiWlan0Up -Serial $Serial
   $revertScript = Get-AndroidGuestScriptContent -RepoRoot $RepoRoot -Kind 'revert'
 
-  # check-suppress:suppression_doc: revert is best-effort; missing service file is acceptable.
   Invoke-AndroidFakeWifiRunAsRoot -Serial $Serial -Command "rm -f $($script:AndroidNucleusFakeWifiService)" `
-    -TimeoutSeconds $script:AndroidNucleusFakeWifiAsyncKickoffS | Out-Null
+    -TimeoutSeconds $script:AndroidNucleusFakeWifiAsyncKickoffS > $null
 
   if ($hadWlan0) {
-    # check-suppress:suppression_doc: guest link teardown runs async; ADB drops briefly on eth0 rename.
-    Invoke-AndroidFakeWifiRunGuestScript -Serial $Serial -ScriptContent $revertScript -Async | Out-Null
+    Invoke-AndroidFakeWifiRunGuestScript -Serial $Serial -ScriptContent $revertScript -Async > $null
     if (-not (Wait-AndroidFakeWifiAdbAfterAsync -Serial $Serial -TimeoutSeconds 30)) {
       Write-NucleusWarning "ADB did not recover within 30s after revert; if commands hang, run: adb disconnect $Serial && adb connect $Serial"
     }
@@ -1162,7 +1156,7 @@ function Invoke-AndroidReset {
   $gsiImg = Join-Path $androidSrcDir $gsiImageName
 
   if (-not (Test-Path -LiteralPath $dataDir)) {
-    New-Item -ItemType Directory -Path $dataDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $dataDir -Force > $null
   }
 
   # Step 1: ensure system image exists (download if missing; reset does not force upgrade)
@@ -1185,7 +1179,7 @@ function Invoke-AndroidReset {
 
     $extractDir = Join-Path $androidSrcDir $script:AndroidLineageExtract
     if (Test-Path -LiteralPath $extractDir) { Remove-Item -LiteralPath $extractDir -Recurse -Force }
-    New-Item -ItemType Directory -Path $extractDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $extractDir -Force > $null
     Expand-Archive -LiteralPath $zipPath -DestinationPath $extractDir -Force
 
     $largestQcow2 = Get-ChildItem -LiteralPath $extractDir -Filter '*.qcow2' -File -Recurse |
@@ -1197,6 +1191,7 @@ function Invoke-AndroidReset {
     }
 
     Copy-Item -LiteralPath $largestQcow2.FullName -Destination $systemImg -Force
+    # check-suppress:suppression_doc: zip and extract dir may already be gone; removal is best-effort cleanup.
     Remove-Item -LiteralPath $extractDir, $zipPath -Recurse -Force -ErrorAction SilentlyContinue
     if (-not (Test-AndroidQcow2Image -ImagePath $systemImg -Label "Android system image for $VmId" -MinVirtualSize $minSizeBytes)) {
       exit 1
@@ -1262,6 +1257,7 @@ function Invoke-AndroidReset {
       finally {
         $zip.Dispose()
       }
+      # check-suppress:suppression_doc: GSI zip may already be gone; removal is best-effort cleanup.
       Remove-Item -LiteralPath $gsiZip -Force -ErrorAction SilentlyContinue
       if (-not (Test-Path -LiteralPath $gsiImg -PathType Leaf)) {
         Write-NucleusError 'GSI system.img not found after extraction'

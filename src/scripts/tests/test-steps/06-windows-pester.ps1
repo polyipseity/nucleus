@@ -6,9 +6,10 @@ Register-Step -Id "windows-pester" -Number 6 -Name "Windows Pester tests" -Actio
   $manifestDir = Join-Path $RepoRoot 'result'
   $manifestFile = Join-Path $manifestDir 'env-parity-manifest.json'
   if (-not (Test-Path $manifestDir)) {
-    New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $manifestDir -Force > $null
   }
 
+  # check-suppress:suppression_doc: probe for the nix toolchain; absence takes the throw branch below.
   if (-not (Get-Command -Name nix -ErrorAction SilentlyContinue)) {
     throw 'nix is required to materialize result/env-parity-manifest.json for Windows Pester tests'
   }

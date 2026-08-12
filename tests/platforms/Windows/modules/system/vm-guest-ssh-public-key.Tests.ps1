@@ -18,7 +18,7 @@ BeforeAll {
 
     $FixtureRoot = Join-Path ([System.IO.Path]::GetTempPath()) "nucleus-vm-guest-ssh-$([Guid]::NewGuid().ToString())"
     $FixtureSshDir = Join-Path $FixtureRoot '.ssh'
-    New-Item -ItemType Directory -Path $FixtureSshDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $FixtureSshDir -Force > $null
 
     $script:OriginalUserProfile = $env:USERPROFILE
     $env:USERPROFILE = $FixtureRoot
@@ -32,6 +32,7 @@ BeforeAll {
 
 AfterAll {
     $env:USERPROFILE = $script:OriginalUserProfile
+    # check-suppress:suppression_doc: fixture cleanup in test teardown; missing path is acceptable.
     Remove-Item -LiteralPath $FixtureRoot -Recurse -Force -ErrorAction SilentlyContinue
 }
 

@@ -260,7 +260,7 @@ Register-Step -Id "repository-policy" -Number 13 -Name "Repository policy" -Acti
         if ($frontmatterCount -eq 2) { $inFrontmatter = $false; continue }
       }
       if (-not $inFrontmatter -and $frontmatterCount -ge 2) {
-        $body.Add($line) | Out-Null
+        $body.Add($line)
       }
     }
     return ($body -join "`n")
@@ -320,6 +320,7 @@ Register-Step -Id "repository-policy" -Number 13 -Name "Repository policy" -Acti
   foreach ($userDir in Get-ChildItem -Path $usersRoot -Directory) {
     if ($userDir.Name -eq 'default') { continue }
     $userName = $userDir.Name
+    # check-suppress:suppression_doc: tests tree may be missing or lack matching files; empty result is the expected pass.
     $hits = Select-String -Path (Join-Path $r 'tests') -Pattern "\b$([regex]::Escape($userName))\b" -Recurse -ErrorAction SilentlyContinue
     foreach ($hit in $hits) {
       Write-ErrorMessage "tests must not reference production user '$userName': $($hit.Path):$($hit.LineNumber):$($hit.Line.Trim()) (see testing.instructions.md: No real-user test coupling)"
