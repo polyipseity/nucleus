@@ -24,6 +24,9 @@ run_repository_policy() {
   say "--- activation token placeholder ---"
   run_activation_token_placeholder "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
+  say "--- activation naming policy ---"
+  run_activation_naming_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+
   say "--- preflight install command policy ---"
   run_preflight_install_command_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
@@ -148,6 +151,121 @@ run_activation_token_placeholder() {
   fi
 
   rm -f "$_act_temp"
+  return 0
+}
+
+# Exempt classes: framework-generated and hardcoded names (see
+# activation-scripts.instructions.md: Exempt classes).
+_activation_name_exempt() {
+  case "$1" in
+  linkGeneration | writeBoundary | checkLinkTargets | setupLaunchAgents | installPackages | preActivation | extraActivation | postActivation) return 0 ;;
+  unprotectSymlink_* | protectSymlink_* | mergeConfig_*) return 0 ;;
+  *sops*) return 0 ;;
+  esac
+  return 1
+}
+
+# ref: activation-scripts.instructions.md (Naming conventions) -- policy enforced here
+run_activation_naming_policy() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
+  local _files=("$@")
+  cd "$_repo_root" || return 1
+  local _errors=0
+  local _names_file _shared_file _f
+  _names_file=$(mktemp) || {
+    error "failed to create temp file"
+    return 1
+  }
+  _shared_file=$(mktemp) || {
+    error "failed to create temp file"
+    rm -f "$_names_file"
+    return 1
+  }
+
+  # Collect activation entry definitions as "file:line:name" lines across the three
+  # namespaces (home.activation, system.activationScripts, nucleus.terminalActivations).
+  local _ns_re='(home\.activation|system\.activationScripts|nucleus\.terminalActivations)'
+  # Attrset entry lines: name[.sub] = <lib.* value> or name[.sub] = (value on next line).
+  # Nested-content lines (config = {, Unit = {, bundle_id = "...") never match.
+  # The trailing $ is an EOL anchor inside the pattern value (double-quoted, so no expansion).
+  local _entry_re="^[[:space:]]*[a-zA-Z0-9_-]+(\\.[a-zA-Z0-9_-]+)?[[:space:]]*=[[:space:]]*(lib\\.(mkIf|mkAfter|mkBefore|mkForce|mkOverride|mkOrder|hm\\.dag\\.entry(A|Before|Order|After))|[[:space:]]*$)"
+
+  local _nix_files=()
+  if $_has_args; then
+    for _f in "${_files[@]}"; do
+      case "$_f" in
+      src/*.nix) _nix_files+=("$_f") ;;
+      esac
+    done
+  else
+    while IFS= read -r -d '' _f; do
+      _nix_files+=("$_f")
+    done < <(find src -name '*.nix' -not -path '*/vendor/*' -print0)
+    # Apply gitignore filter as a second pass (find -print0 uses null separators,
+    # which filter_gitignored doesn't support directly)
+    mapfile -t _nix_files < <(printf '%s\n' "${_nix_files[@]}" | filter_gitignored)
+  fi
+
+  if [ "${#_nix_files[@]}" -gt 0 ]; then
+    # Dotted definitions: home.activation.<name> = ...
+    printf '%s\0' "${_nix_files[@]}" |
+      xargs -0 grep -HnoE "([^a-zA-Z0-9_.]|^)${_ns_re}\\.[a-zA-Z0-9_-]+" 2>/dev/null |
+      sed -E 's/^([^:]+:[0-9]+:).*\.([a-zA-Z0-9_-]+)$/\1\2/' >>"$_names_file" ||
+      true # check-suppress:suppression_doc: grep exits 1 when no dotted definitions are found; an empty result file is the clean state
+
+    # Attrset definitions: <ns> = { <name> = ...; }; regions (entry-value filter
+    # avoids capturing nested-attrset content lines; `=` emits the line number,
+    # `paste` pairs it with the extracted name)
+    for _f in "${_nix_files[@]}"; do
+      sed -nE "/${_ns_re}[[:space:]]*=[^;]*\\{/,/^[[:space:]]*\\};/ {
+        /${_entry_re}/ {
+          s/^[[:space:]]*([a-zA-Z0-9_-]+).*/\\1/
+          =
+          p
+        }
+      }" "$_f" | paste -d: - - | sed "s|^|$_f:|" >>"$_names_file"
+    done
+  fi
+
+  sort -u -o "$_names_file" "$_names_file"
+
+  # Names defined outside macOS-scoped paths are cross-platform and need no macos- prefix.
+  grep -v -E '^(src/platforms/macOS|src/hosts/MacBook)/' "$_names_file" |
+    cut -d: -f3 |
+    sort -u >"$_shared_file"
+
+  local _name _ln
+  while IFS=: read -r _f _ln _name; do
+    _activation_name_exempt "$_name" && continue
+    if [[ ! "$_name" =~ ^[a-z][a-z0-9]*(-[a-z0-9]+)*$ ]]; then
+      _errors=$((_errors + 1))
+      error "activation name '$_name' at $_f:$_ln is not kebab-case (see .agents/instructions/activation-scripts.instructions.md)"
+    fi
+    case "$_name" in
+    nucleus-*)
+      _errors=$((_errors + 1))
+      error "activation name '$_name' at $_f:$_ln uses the forbidden nucleus- prefix (see .agents/instructions/activation-scripts.instructions.md)"
+      ;;
+    esac
+  done <"$_names_file"
+
+  # macOS-scoped entries must carry the macos- prefix unless cross-platform.
+  while IFS=: read -r _f _ln _name; do
+    _activation_name_exempt "$_name" && continue
+    if ! grep -Fxq "$_name" "$_shared_file"; then
+      _errors=$((_errors + 1))
+      error "macOS-only activation name '$_name' at $_f:$_ln lacks the macos- prefix (see .agents/instructions/activation-scripts.instructions.md)"
+    fi
+  done < <(grep -E '^(src/platforms/macOS|src/hosts/MacBook)/' "$_names_file" | grep -v ':macos-')
+
+  rm -f "$_names_file" "$_shared_file"
+
+  if [ "$_errors" -gt 0 ]; then
+    error "activation naming policy check failed with $_errors error(s)"
+    return 1
+  fi
+  say "activation naming policy passed."
   return 0
 }
 

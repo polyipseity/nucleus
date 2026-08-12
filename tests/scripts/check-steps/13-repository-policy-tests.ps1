@@ -46,4 +46,40 @@ if ($registryContent -match 'sk-nucleus-dummy-litellm') {
   Assert-Fail -Name 'step13_ps1_dummy_key_registered_value' -Reason 'dummy-key registry should register the sk-nucleus-dummy-litellm value'
 }
 
+if ($content -match 'activation naming policy') {
+  Assert-Pass -Name 'step13_ps1_naming_policy_present' -Reason 'step 13 PS1 enforces the activation naming policy'
+} else {
+  Assert-Fail -Name 'step13_ps1_naming_policy_present' -Reason 'step 13 PS1 should enforce the activation naming policy'
+}
+
+if ($content -match '\^\[a-z\]\[a-z0-9\]\*\(-\[a-z0-9\]\+\)\*\$') {
+  Assert-Pass -Name 'step13_ps1_naming_kebab_regex' -Reason 'step 13 PS1 validates activation names against the kebab-case regex'
+} else {
+  Assert-Fail -Name 'step13_ps1_naming_kebab_regex' -Reason 'step 13 PS1 should validate activation names against the kebab-case regex'
+}
+
+if ($content -match 'linkGeneration|writeBoundary|checkLinkTargets|setupLaunchAgents|installPackages|preActivation|extraActivation|postActivation') {
+  Assert-Pass -Name 'step13_ps1_naming_exemption_names' -Reason 'step 13 PS1 exempts Home Manager built-in and nix-darwin hardcoded activation names'
+} else {
+  Assert-Fail -Name 'step13_ps1_naming_exemption_names' -Reason 'step 13 PS1 should exempt Home Manager built-in and nix-darwin hardcoded activation names'
+}
+
+if ($content -match 'unprotectSymlink|protectSymlink|mergeConfig') {
+  Assert-Pass -Name 'step13_ps1_naming_generated_exemption' -Reason 'step 13 PS1 exempts config-utils.nix generated activation names'
+} else {
+  Assert-Fail -Name 'step13_ps1_naming_generated_exemption' -Reason 'step 13 PS1 should exempt config-utils.nix generated activation names'
+}
+
+if ($content -match 'lacks the macos- prefix') {
+  Assert-Pass -Name 'step13_ps1_naming_macos_prefix_error' -Reason 'step 13 PS1 requires the macos- prefix on macOS-only activation names'
+} else {
+  Assert-Fail -Name 'step13_ps1_naming_macos_prefix_error' -Reason 'step 13 PS1 should require the macos- prefix on macOS-only activation names'
+}
+
+if ($content -match 'cnotmatch') {
+  Assert-Pass -Name 'step13_ps1_naming_case_sensitive' -Reason 'step 13 PS1 keeps the kebab regex case-sensitive (-cnotmatch)'
+} else {
+  Assert-Fail -Name 'step13_ps1_naming_case_sensitive' -Reason 'step 13 PS1 should keep the kebab regex case-sensitive (-cnotmatch)'
+}
+
 if ($script:failed) { exit 1 } else { exit 0 }

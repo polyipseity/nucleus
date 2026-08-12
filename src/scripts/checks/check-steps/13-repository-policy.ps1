@@ -119,6 +119,100 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
     Write-Message "no token placeholder strings in script comments."
   }
 
+  Write-Message "--- activation naming policy ---"
+
+  # Collect activation entry definitions as "file:line:name" lines across the three
+  # namespaces (home.activation, system.activationScripts, nucleus.terminalActivations).
+  $nsRegex = '(home\.activation|system\.activationScripts|nucleus\.terminalActivations)'
+  # Attrset entry lines: name[.sub] = <lib.* value> or name[.sub] = (value on next line).
+  # Nested-content lines (config = {, Unit = {, bundle_id = "...") never match.
+  # WHY: group 1 captures the entry name (mirrors the .sh sed s/^[[:space:]]*([a-zA-Z0-9_-]+).*/\1/); group 2 is the optional .sub suffix and must not be used for the name
+  $entryRegex = '^\s*([a-zA-Z0-9_-]+)(\.[a-zA-Z0-9_-]+)?\s*=\s*(lib\.(mkIf|mkAfter|mkBefore|mkForce|mkOverride|mkOrder|hm\.dag\.entry(A|Before|Order|After))|\s*$)'
+  $dottedRegex = '([^a-zA-Z0-9_.]|^)(home\.activation|system\.activationScripts|nucleus\.terminalActivations)\.[a-zA-Z0-9_-]+'
+  # -cmatch: the kebab regex is anchored on [a-z] and must stay case-sensitive.
+  $kebabRegex = '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'
+  $macosDirRegex = '^(src[\\/]platforms[\\/]macOS[\\/]|src[\\/]hosts[\\/]MacBook[\\/])'
+  $namingErrors = 0
+  $definitions = @()
+
+  # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
+  # WHY: paths are made repo-relative (mirroring the .sh twin's `find src` output) so the ^src/... anchor in $macosDirRegex matches; full paths would never match and silently disable the macos- prefix rule
+  $nixFiles = @(if ($HasArgs) {
+    if ($script:NIX_FILES) { $script:NIX_FILES } else { @($PositionalArgs | Where-Object { $_ -like 'src/*.nix' }) }
+  } else {
+    @(Get-ChildItem -Recurse -Path (Join-Path $r 'src') -Include '*.nix' |
+        Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' } |
+        ForEach-Object { [IO.Path]::GetRelativePath($r, $_.FullName) } |
+        Select-GitIgnored)  # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; gitignore filter applied on top
+  })
+
+  if ($nixFiles.Count -gt 0) {
+    foreach ($file in $nixFiles) {
+      $lines = @(Get-Content -Path $file)
+      $inBlock = $false
+      $depth = 0
+      for ($i = 0; $i -lt $lines.Count; $i++) {
+        $line = $lines[$i]
+        if ($line -match '^\s*#') { continue }
+
+        # Dotted definitions: home.activation.<name> = ...
+        if ($line -match $dottedRegex) {
+          $definitions += "$file`:$($i + 1):$(($Matches[0] -split '\.')[-1])"
+        }
+
+        # Attrset definitions: <ns> = { <name> = ...; }; regions
+        if (-not $inBlock -and $line -match ($nsRegex + '\s*=[^;]*\{')) {
+          $inBlock = $true
+          $depth = 0
+        }
+        if ($inBlock -and $line -match $entryRegex) {
+          $definitions += "$file`:$($i + 1):$($Matches[1])"
+        }
+        if ($inBlock) {
+          $depth += ([regex]::Matches($line, '\{')).Count - ([regex]::Matches($line, '\}')).Count
+          if ($depth -le 0) { $inBlock = $false; $depth = 0 }
+        }
+      }
+    }
+  }
+  $definitions = @($definitions | Sort-Object -Unique)
+
+  # Names defined outside macOS-scoped paths are cross-platform and need no macos- prefix.
+  $sharedNames = @($definitions | Where-Object { $_ -notmatch $macosDirRegex } | ForEach-Object { ($_ -split ':')[-1] } | Sort-Object -Unique)
+
+  foreach ($def in $definitions) {
+    $parts = $def -split ':'
+    $file = $parts[0]
+    $lineNum = $parts[1]
+    $name = $parts[2]
+
+    # Exempt classes: framework-generated and hardcoded names (see
+    # activation-scripts.instructions.md: Exempt classes).
+    if ($name -in @('linkGeneration', 'writeBoundary', 'checkLinkTargets', 'setupLaunchAgents', 'installPackages', 'preActivation', 'extraActivation', 'postActivation')) { continue }
+    if ($name -like 'unprotectSymlink_*' -or $name -like 'protectSymlink_*' -or $name -like 'mergeConfig_*') { continue }
+    if ($name -like '*sops*') { continue }
+
+    if ($name -cnotmatch $kebabRegex) {
+      Write-ErrorMessage "activation name '$name' at $file`:$lineNum is not kebab-case (see .agents/instructions/activation-scripts.instructions.md)"
+      $namingErrors++
+    }
+    if ($name -like 'nucleus-*') {
+      Write-ErrorMessage "activation name '$name' at $file`:$lineNum uses the forbidden nucleus- prefix (see .agents/instructions/activation-scripts.instructions.md)"
+      $namingErrors++
+    }
+    if ($file -match $macosDirRegex -and $name -notlike 'macos-*' -and $sharedNames -notcontains $name) {
+      Write-ErrorMessage "macOS-only activation name '$name' at $file`:$lineNum lacks the macos- prefix (see .agents/instructions/activation-scripts.instructions.md)"
+      $namingErrors++
+    }
+  }
+
+  if ($namingErrors -gt 0) {
+    Write-ErrorMessage "activation naming policy check failed with $namingErrors error(s)"
+    $failed = $true
+  } else {
+    Write-Message "activation naming policy passed."
+  }
+
   Write-Message "--- preflight install command policy ---"
 
   $preflightViolations = @()
