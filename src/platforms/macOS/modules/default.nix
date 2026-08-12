@@ -290,13 +290,17 @@ lib.mkIf pkgs.stdenv.isDarwin {
     "Downloads/iCloud".source = config.lib.file.mkOutOfStoreSymlink liveICloudDownloads;
   };
 
-  home.activation.unprotect-icloud-downloads-symlink = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-    "${activationBundle}/src/scripts/configs/managed-symlink.sh" "unprotect" "macos.nix" "$HOME/Downloads/iCloud"
-  '';
+  home.activation.macos-unprotect-icloud-downloads-symlink =
+    lib.hm.dag.entryBefore [ "linkGeneration" ]
+      ''
+        "${activationBundle}/src/scripts/configs/managed-symlink.sh" "unprotect" "macos.nix" "$HOME/Downloads/iCloud"
+      '';
 
-  home.activation.protect-icloud-downloads-symlink = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-    "${activationBundle}/src/scripts/configs/managed-symlink.sh" "protect" "macos.nix" "$HOME/Downloads/iCloud"
-  '';
+  home.activation.macos-protect-icloud-downloads-symlink =
+    lib.hm.dag.entryAfter [ "linkGeneration" ]
+      ''
+        "${activationBundle}/src/scripts/configs/managed-symlink.sh" "protect" "macos.nix" "$HOME/Downloads/iCloud"
+      '';
 
   home.activation = {
     # -------------------------------------------------------------------------
