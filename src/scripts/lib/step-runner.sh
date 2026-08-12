@@ -219,7 +219,8 @@ _run_step() {
   local _func_pid=$!
 
   tee -a "$_wave_tmpdir/step-$_n.out" <"$_fifo" | while IFS= read -r _line || [ -n "$_line" ]; do
-    printf '[step %2d] %s\n' "$_n" "$_line" >&2
+    # _n is the zero-padded NN- prefix string; 10# forces decimal so %d doesn't parse it as octal.
+    printf '[step %2d] %s\n' "$((10#${_n}))" "$_line" >&2
   done
 
   _exit_code=0
@@ -473,13 +474,14 @@ aggregate_results() {
     _total_elapsed=$((_total_elapsed + _elapsed))
     _duration_s=$(_format_duration_s "$_elapsed")
 
+    # _n is the zero-padded NN- prefix string; 10# forces decimal so %d doesn't parse it as octal.
     if [ "$_exit_code" -eq 0 ]; then
-      printf '  step %2d  ✓  %8s  %s\n' "$_n" "$_duration_s" "$_name"
+      printf '  step %2d  ✓  %8s  %s\n' "$((10#${_n}))" "$_duration_s" "$_name"
     elif [ "$_exit_code" -eq 2 ]; then
-      printf '  step %2d  SKIP %8s  %s\n' "$_n" "$_duration_s" "$_name"
+      printf '  step %2d  SKIP %8s  %s\n' "$((10#${_n}))" "$_duration_s" "$_name"
     else
-      printf '  step %2d  ✗  %8s  %s\n' "$_n" "$_duration_s" "$_name"
-      _failed_steps="$_failed_steps$_n "
+      printf '  step %2d  ✗  %8s  %s\n' "$((10#${_n}))" "$_duration_s" "$_name"
+      _failed_steps="$_failed_steps$((10#${_n})) "
     fi
 
     if [ -f "$_wave_tmpdir/step-$_n.out" ]; then

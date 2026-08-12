@@ -1,4 +1,4 @@
-Register-Step -Id "windows-pester" -Number 6 -Name "Windows Pester tests" -Action {
+Register-Step -Id "windows-pester" -Name "Windows Pester tests" -Action {
   param($RepoRoot)
 
   # Provisioning: materialize env-parity manifest from the Nix catalog before

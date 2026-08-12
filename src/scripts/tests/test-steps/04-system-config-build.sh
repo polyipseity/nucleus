@@ -2,9 +2,9 @@
 # shellcheck source=../test-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../test-lib.sh"
 
-register_step "system-config-build" 4 "System config build" run_04_system_config_build
+register_step "system-config-build" "System config build" run_system_config_build
 
-run_04_system_config_build() {
+run_system_config_build() {
   local _has_args="$1" _repo_root="$2"
   shift 2
   local _exit_code=0
@@ -24,7 +24,7 @@ run_04_system_config_build() {
     fi
     ;;
   *)
-    say "system config build: unsupported host ($_host), skipping."
+    say "==== $(step_number): System config build ==== SKIPPED (unsupported host $_host)"
     return 2
     ;;
   esac

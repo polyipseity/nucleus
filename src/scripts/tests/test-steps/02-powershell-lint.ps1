@@ -1,4 +1,4 @@
-Register-Step -Id "powershell-lint-test" -Number 2 -Name "PowerShell lint (PSSA)" -Action {
+Register-Step -Id "powershell-lint-test" -Name "PowerShell lint (PSSA)" -Action {
   param($RepoRoot)
 
   $pwshScript = Join-Path -Path $RepoRoot -ChildPath 'scripts\check-pwsh.ps1'

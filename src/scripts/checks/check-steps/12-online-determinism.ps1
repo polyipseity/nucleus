@@ -1,4 +1,4 @@
-Register-Step -Id "online-determinism" -Number 12 -Name "Online determinism checks (--online)" -Action {
+Register-Step -Id "online-determinism" -Name "Online determinism checks (--online)" -Action {
   param($RepoRoot)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }

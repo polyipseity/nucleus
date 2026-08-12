@@ -2,7 +2,7 @@
   "$id": "https://nucleus.local/dummy-keys.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "additionalProperties": false,
-  "description": "Canonical registry of dummy/placeholder API key values used in configs that cannot reference SOPS secrets or environment variables. All hardcoded sk- style literals in the tracked tree must resolve to a registered value (enforced by check step 13 run_13_dummy_key_uniformity).",
+  "description": "Canonical registry of dummy/placeholder API key values used in configs that cannot reference SOPS secrets or environment variables. All hardcoded sk- style literals in the tracked tree must resolve to a registered value (enforced by check step 13 run_dummy_key_uniformity).",
   "properties": {
     "$schema": {
       "description": "Reference to the JSON Schema file that validates this data file.",

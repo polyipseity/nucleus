@@ -3,9 +3,9 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "locked-dsc-validation" 6 "Locked DSC validation" run_06_locked_dsc_validation
+register_step "locked-dsc-validation" "Locked DSC validation" run_locked_dsc_validation
 
-run_06_locked_dsc_validation() {
+run_locked_dsc_validation() {
   local _has_args="$1" _repo_root="$2"
   shift 2
   local _files=("$@")

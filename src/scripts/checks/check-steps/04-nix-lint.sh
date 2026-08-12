@@ -3,9 +3,9 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "nix-lint" 4 "Nix lint (nixf-tidy)" run_04_nix_lint
+register_step "nix-lint" "Nix lint (nixf-tidy)" run_nix_lint
 
-run_04_nix_lint() {
+run_nix_lint() {
   local _has_args="$1" _repo_root="$2"
   shift 2
   local _files=("$@")
@@ -60,7 +60,7 @@ run_04_nix_lint() {
     done
     [ -n "$_nixf_tmpdir" ] && rm -rf -- "$_nixf_tmpdir"
   else
-    say "==== 5: Nix lint (nixf-tidy) ==== SKIPPED (no Nix files to check)"
+    say "==== $(step_number): Nix lint (nixf-tidy) ==== SKIPPED (no Nix files to check)"
     return 2
   fi
 

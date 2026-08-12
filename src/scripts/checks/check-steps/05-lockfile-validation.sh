@@ -3,9 +3,9 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "lockfile-validation" 5 "Lockfile validation" run_05_lockfile_validation
+register_step "lockfile-validation" "Lockfile validation" run_lockfile_validation
 
-run_05_lockfile_validation() {
+run_lockfile_validation() {
   local _has_args="$1" _repo_root="$2"
   shift 2
   local _files=("$@")
@@ -27,7 +27,7 @@ run_05_lockfile_validation() {
       esac
     done
     if [ "$_has_lf_files" -eq 0 ]; then
-      say "==== 6: Lockfile validation ==== SKIPPED (no lockfile files to check)"
+      say "==== $(step_number): Lockfile validation ==== SKIPPED (no lockfile files to check)"
       return 2
     fi
   fi

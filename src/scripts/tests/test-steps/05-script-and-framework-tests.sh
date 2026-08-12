@@ -2,7 +2,7 @@
 # shellcheck source=../test-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../test-lib.sh"
 
-register_step "script-and-framework-tests" 5 "Script and framework tests" run_05_script_and_framework_tests
+register_step "script-and-framework-tests" "Script and framework tests" run_script_and_framework_tests
 
 # Discover tests/scripts/**/*-tests.sh in stable order: priority framework suites first,
 # then everything else lexicographically. Excludes suites wired to other test steps.
@@ -148,7 +148,7 @@ _run_parallel_script_tests() {
   return "$_exit_code"
 }
 
-run_05_script_and_framework_tests() {
+run_script_and_framework_tests() {
   local _has_args="$1" _repo_root="$2"
   shift 2
   local _exit_code=0

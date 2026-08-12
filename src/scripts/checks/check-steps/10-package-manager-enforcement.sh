@@ -3,9 +3,9 @@
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
-register_step "package-manager-enforcement" 10 "Package manager usage enforcement" run_10_package_manager_enforcement
+register_step "package-manager-enforcement" "Package manager usage enforcement" run_package_manager_enforcement
 
-run_10_package_manager_enforcement() {
+run_package_manager_enforcement() {
   local _has_args="$1" _repo_root="$2"
   shift 2
   local _files=("$@")
@@ -23,7 +23,7 @@ run_10_package_manager_enforcement() {
       esac
     done
     if [ "$_has_shell_files" -eq 0 ]; then
-      say "==== 11: Package manager usage enforcement ==== SKIPPED (no shell files to check)"
+      say "==== $(step_number): Package manager usage enforcement ==== SKIPPED (no shell files to check)"
       return 2
     fi
   fi

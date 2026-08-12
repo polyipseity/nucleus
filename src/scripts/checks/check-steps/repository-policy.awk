@@ -1,4 +1,4 @@
-# 13-repository-policy.awk — heredoc size detector for check step 13.
+# repository-policy.awk — heredoc size detector for check step 13.
 # Flags heredocs with more than 30 content lines (embedded-content policy).
 FNR == 1 { in_heredoc = 0 }
 !in_heredoc && match($0, /<<-?[ \t]*["\047\\]?[A-Za-z_][A-Za-z0-9_]*/) {

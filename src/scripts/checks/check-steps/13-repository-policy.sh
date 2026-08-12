@@ -6,36 +6,38 @@
 _REPOSITORY_POLICY_STEP_DIR="$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 _REPOSITORY_POLICY_STEP_SH="$(basename "${BASH_SOURCE[0]}")"
 _REPOSITORY_POLICY_STEP_PS1="${_REPOSITORY_POLICY_STEP_SH%.sh}.ps1"
-readonly _REPOSITORY_POLICY_STEP_DIR _REPOSITORY_POLICY_STEP_SH _REPOSITORY_POLICY_STEP_PS1
+_REPOSITORY_POLICY_STEP_ID="${_REPOSITORY_POLICY_STEP_SH#[0-9][0-9]-}"
+_REPOSITORY_POLICY_STEP_ID="${_REPOSITORY_POLICY_STEP_ID%.sh}"
+readonly _REPOSITORY_POLICY_STEP_DIR _REPOSITORY_POLICY_STEP_SH _REPOSITORY_POLICY_STEP_PS1 _REPOSITORY_POLICY_STEP_ID
 
-register_step "repository-policy" 13 "Repository policy" run_13_repository_policy
+register_step "repository-policy" "Repository policy" run_repository_policy
 
-run_13_repository_policy() {
+run_repository_policy() {
   local _has_args="$1" _repo_root="$2"
   shift 2
   local _files=("$@")
   local _failed=0
 
   say "--- config method compliance ---"
-  run_13_config_method_compliance "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+  run_config_method_compliance "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
   say "--- activation token placeholder ---"
-  run_13_activation_token_placeholder "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+  run_activation_token_placeholder "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
   say "--- preflight install command policy ---"
-  run_13_preflight_install_command_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+  run_preflight_install_command_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
   say "--- embedded content enforcement ---"
-  run_13_embedded_content_enforcement "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+  run_embedded_content_enforcement "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
   say "--- agents policy ---"
-  run_13_agents_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+  run_agents_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
   say "--- no real-user test coupling ---"
-  run_13_no_real_user_test_coupling "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+  run_no_real_user_test_coupling "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
   say "--- dummy key uniformity ---"
-  run_13_dummy_key_uniformity "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+  run_dummy_key_uniformity "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
   if [ "$_failed" -ne 0 ]; then
     error "repository policy check failed"
@@ -45,7 +47,7 @@ run_13_repository_policy() {
   return 0
 }
 
-run_13_config_method_compliance() {
+run_config_method_compliance() {
   local _has_args="$1" _repo_root="$2"
   shift 2
   local _files=("$@")
@@ -114,7 +116,7 @@ run_13_config_method_compliance() {
   return 0
 }
 
-run_13_activation_token_placeholder() {
+run_activation_token_placeholder() {
   local _has_args="$1" _repo_root="$2"
   shift 2
   local _files=("$@")
@@ -149,16 +151,16 @@ run_13_activation_token_placeholder() {
   return 0
 }
 
-run_13_preflight_install_command_policy() {
+run_preflight_install_command_policy() {
   local _has_args="$1" _repo_root="$2"
   shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
 
-  local _s21_errors=0
+  local _errors=0
   # Exclude this check's own sibling file: its source contains the literal pattern text.
   # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; self-refs are dynamic
-  local _s21_self_ps1="$_REPOSITORY_POLICY_STEP_PS1"
+  local _self_ps1="$_REPOSITORY_POLICY_STEP_PS1"
 
   # Collect PowerShell files
   local _ps1_files=()
@@ -166,24 +168,24 @@ run_13_preflight_install_command_policy() {
     if [ ${#PS1_FILES[@]} -gt 0 ]; then
       # Drop this check's own sibling file from the scoped set
       for _f in "${PS1_FILES[@]}"; do
-        [ "$(basename "$_f")" = "$_s21_self_ps1" ] || _ps1_files+=("$_f")
+        [ "$(basename "$_f")" = "$_self_ps1" ] || _ps1_files+=("$_f")
       done
     fi
   else
     # Find all .ps1 files outside vendor/ and this check's own sibling
     while IFS= read -r -d '' _f; do
       _ps1_files+=("$_f")
-    done < <(find . -name '*.ps1' -not -name "$_s21_self_ps1" -not -path './vendor/*' -not -path './.git/*' -print0)
+    done < <(find . -name '*.ps1' -not -name "$_self_ps1" -not -path './vendor/*' -not -path './.git/*' -print0)
     # Apply gitignore filter as a second pass (find -print0 uses null separators,
     # which filter_gitignored doesn't support directly)
     mapfile -t _ps1_files < <(printf '%s\n' "${_ps1_files[@]}" | filter_gitignored)
   fi
 
   if [ "${#_ps1_files[@]}" -gt 0 ]; then
-    local _s21_tmpdir
-    _s21_tmpdir=$(mktemp -d) || {
+    local _tmpdir
+    _tmpdir=$(mktemp -d) || {
       error "failed to create temp dir"
-      _s21_errors=$((_s21_errors + 1))
+      _errors=$((_errors + 1))
     }
 
     # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c
@@ -192,20 +194,20 @@ run_13_preflight_install_command_policy() {
         _f="$2"
         _out="$1/$(echo "$_f" | tr "/" "_").out"
         grep -Hn "Assert-ToolAvailable.*-InstallCommand" "$_f" >> "$_out" 2>/dev/null || true  # check-suppress:suppression_doc: grep exits 1 when a file has no InstallCommand matches; an empty .out file is the clean state
-      ' _ "$_s21_tmpdir"
+      ' _ "$_tmpdir"
 
     local _f _err
-    for _f in "$_s21_tmpdir"/*.out; do
+    for _f in "$_tmpdir"/*.out; do
       [ -f "$_f" ] || continue
       while IFS= read -r _err; do
-        _s21_errors=$((_s21_errors + 1))
+        _errors=$((_errors + 1))
         error "$_err"
       done <"$_f"
     done
 
-    rm -rf -- "$_s21_tmpdir"
+    rm -rf -- "$_tmpdir"
 
-    if [ "$_s21_errors" -gt 0 ]; then
+    if [ "$_errors" -gt 0 ]; then
       say "  Remove -InstallCommand parameters from Assert-ToolAvailable calls — preflight checks must hard-fail, not suggest install."
       return 1
     fi
@@ -215,44 +217,44 @@ run_13_preflight_install_command_policy() {
   return 0
 }
 
-run_13_embedded_content_enforcement() {
+run_embedded_content_enforcement() {
   local _has_args="$1" _repo_root="$2"
   shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
 
-  local _s18_errors=0
+  local _errors=0
   # Exclude this check's own file: its source contains the literal heredoc-detection patterns.
   # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
-  local _s18_self_sh="$_REPOSITORY_POLICY_STEP_SH"
+  local _self_sh="$_REPOSITORY_POLICY_STEP_SH"
 
   # Embedded-content policy scope for POSIX: src/scripts/** (see .agents/instructions/embedded-content.instructions.md).
   local _sh_files=()
   if $_has_args; then
     for _f in "${_files[@]}"; do
       case "$_f" in
-      src/scripts/*.sh) [ "$(basename "$_f")" = "$_s18_self_sh" ] || _sh_files+=("$_f") ;;
+      src/scripts/*.sh) [ "$(basename "$_f")" = "$_self_sh" ] || _sh_files+=("$_f") ;;
       esac
     done
   else
     while IFS= read -r -d '' _f; do
       _sh_files+=("$_f")
-    done < <(find src/scripts -type f -name '*.sh' -not -name "$_s18_self_sh" -print0)
+    done < <(find src/scripts -type f -name '*.sh' -not -name "$_self_sh" -print0)
     mapfile -t _sh_files < <(printf '%s\n' "${_sh_files[@]}" | filter_gitignored)
   fi
 
   if [ "${#_sh_files[@]}" -gt 0 ]; then
     # Heredoc detector lives in a sibling .awk file (shellcheck policy: extract awk programs >10 lines).
-    local _s18_awk_path="$_REPOSITORY_POLICY_STEP_DIR/13-repository-policy.awk"
+    local _awk_path="$_REPOSITORY_POLICY_STEP_DIR/$_REPOSITORY_POLICY_STEP_ID.awk"
 
-    local _s18_violation
-    while IFS= read -r _s18_violation; do
-      _s18_errors=$((_s18_errors + 1))
-      error "$_s18_violation"
-    done < <(awk -f "$_s18_awk_path" "${_sh_files[@]}")
+    local _violation
+    while IFS= read -r _violation; do
+      _errors=$((_errors + 1))
+      error "$_violation"
+    done < <(awk -f "$_awk_path" "${_sh_files[@]}")
   fi
 
-  if [ "$_s18_errors" -gt 0 ]; then
+  if [ "$_errors" -gt 0 ]; then
     say "  Extract heredocs above 30 content lines to shared files — see .agents/instructions/embedded-content.instructions.md."
     return 1
   fi
@@ -265,7 +267,7 @@ _strip_prompt_frontmatter() {
   awk 'BEGIN{fm=0} /^---$/ {fm++; if (fm == 1) next; if (fm == 2) {fm = 3; next}} fm == 1 || fm == 2 {next} {print}' "$1"
 }
 
-run_13_agents_policy() {
+run_agents_policy() {
   local _repo_root="$2"
   cd "$_repo_root" || return 1
   local _agents_errors=0
@@ -341,7 +343,7 @@ run_13_agents_policy() {
 }
 
 # ref: testing.instructions.md (No real-user test coupling)
-run_13_no_real_user_test_coupling() {
+run_no_real_user_test_coupling() {
   local _has_args="$1" _repo_root="$2"
   shift 2
   cd "$_repo_root" || return 1
@@ -368,7 +370,7 @@ run_13_no_real_user_test_coupling() {
   return 0
 }
 
-run_13_dummy_key_uniformity() {
+run_dummy_key_uniformity() {
   local _has_args="$1" _repo_root="$2"
   shift 2
   local _files=("$@")

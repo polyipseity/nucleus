@@ -1,4 +1,4 @@
-Register-Step -Id "suppression-audit" -Number 11 -Name "Suppression audit" -Action {
+Register-Step -Id "suppression-audit" -Name "Suppression audit" -Action {
   param($HasArgs, $RepoRoot, $PositionalArgs)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
@@ -107,7 +107,7 @@ Register-Step -Id "suppression-audit" -Number 11 -Name "Suppression audit" -Acti
   }
 
   if (-not $hasFiles) {
-    Write-Message "==== 11: Suppression audit ==== SKIPPED (no script files to check)"
+    Write-Message "==== $(Get-StepNumber): Suppression audit ==== SKIPPED (no script files to check)"
     return 2
   }
 

@@ -1,4 +1,4 @@
-Register-Step -Id "script-and-framework-tests" -Number 5 -Name "Script and framework tests" -Action {
+Register-Step -Id "script-and-framework-tests" -Name "Script and framework tests" -Action {
   param($RepoRoot)
 
   $exitCode = 0

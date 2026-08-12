@@ -1,4 +1,4 @@
-Register-Step -Id "powershell-lint" -Number 2 -Name "PowerShell syntax" -Action {
+Register-Step -Id "powershell-lint" -Name "PowerShell syntax" -Action {
   param($HasArgs, $RepoRoot)
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }

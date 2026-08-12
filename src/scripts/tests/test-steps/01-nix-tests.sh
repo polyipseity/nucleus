@@ -2,9 +2,9 @@
 # shellcheck source=../test-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../test-lib.sh"
 
-register_step "nix-tests" 1 "Nix test suite" run_01_nix_tests
+register_step "nix-tests" "Nix test suite" run_nix_tests
 
-run_01_nix_tests() {
+run_nix_tests() {
   local _has_args="$1" _repo_root="$2"
   shift 2
   local _exit_code=0
@@ -35,7 +35,7 @@ run_01_nix_tests() {
   # hold the nix lock for the whole eval phase so cross-step nix invocations
   # serialize. Evals run serially (xargs -P 1) because parallel imports of
   # <nixpkgs> race on flake-registry updates.
-  nucleus_nix_locked _run_01_eval_phase "$_tmp_failed"
+  nucleus_nix_locked _run_eval_phase "$_tmp_failed"
 
   if [ -s "$_tmp_failed" ]; then
     error "FAILED Nix tests:"
@@ -53,7 +53,7 @@ run_01_nix_tests() {
 # Runs the serial nix-instantiate phase under the nix lock (see
 # nucleus_nix_locked in step-runner.sh). Failures are recorded in the temp
 # file passed as $1; the lock wrapper's exit status is not a test verdict.
-_run_01_eval_phase() {
+_run_eval_phase() {
   local _tmp_failed="$1"
 
   if [ "$quiet_mode" = true ]; then

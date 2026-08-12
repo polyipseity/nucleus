@@ -1,4 +1,4 @@
-Register-Step -Id "nix-tests" -Number 1 -Name "Nix test suite" -Action {
+Register-Step -Id "nix-tests" -Name "Nix test suite" -Action {
   param($RepoRoot)
 
   $lib = Join-Path -Path $RepoRoot -ChildPath 'src/scripts/lib/nix-test-eval.ps1'
