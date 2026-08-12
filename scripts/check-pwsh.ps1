@@ -7,8 +7,8 @@
   (`System.Management.Automation.Language.Parser`) to validate `.ps1` syntax
   without executing scripts.
 
-  PSScriptAnalyzer lint: runs `Invoke-ScriptAnalyzer` at Error and Warning
-  severity on all enabled rules.
+  PSScriptAnalyzer lint: runs `Invoke-ScriptAnalyzer` at Error, Warning, and
+  Information severity on all enabled rules.
 
 .PARAMETER Settings
   Path to a PSScriptAnalyzerSettings .psd1 file. Controls which rules and
@@ -66,7 +66,7 @@ if (-not $Paths -or $Paths.Count -eq 0) {
     Write-Output 'No PowerShell files to check (scoped mode).'
     exit 0
   }
-  $Paths = @(git ls-files '*.ps1')
+  $Paths = @(git ls-files '*.ps1' ':(exclude)vendor/')
 }
 
 if (-not $Paths -or $Paths.Count -eq 0) {
