@@ -377,19 +377,21 @@ function Format-StepSummary {
     $n = $script:StepNumbers[$i]
     $name = $script:StepNames[$i]
 
+    # check-suppress:suppression_doc: probe -- exit file may not exist if step never ran; $null defaulted to '1' below
     $exitCode = Get-Content -Path (Join-Path $script:WaveTmpDir "step-$n.exit") -ErrorAction SilentlyContinue
     if (-not $exitCode) { $exitCode = "1" }
+    # check-suppress:suppression_doc: probe -- time file may not exist if step never ran; $null defaulted to '0' below
     $elapsed = Get-Content -Path (Join-Path $script:WaveTmpDir "step-$n.time") -ErrorAction SilentlyContinue
     if (-not $elapsed) { $elapsed = "0" }
     $totalElapsed += [int]$elapsed
 
     if ($exitCode -eq "0") {
-      "  step {0,2}  {1}  {2,8}  {3}" -f $n, "✓", (Format-StepDuration -Milliseconds [int]$elapsed), $name | Write-Output
+      "  step {0,2}  {1}  {2,8}  {3}" -f $n, "✓", (Format-StepDuration -Milliseconds ([int]$elapsed)), $name | Write-Output
     } elseif ($exitCode -eq "2") {
       # Exit code 2 = skipped step; rendered as SKIP, never a failure.
-      "  step {0,2}  {1}  {2,8}  {3}" -f $n, "SKIP", (Format-StepDuration -Milliseconds [int]$elapsed), $name | Write-Output
+      "  step {0,2}  {1}  {2,8}  {3}" -f $n, "SKIP", (Format-StepDuration -Milliseconds ([int]$elapsed)), $name | Write-Output
     } else {
-      "  step {0,2}  {1}  {2,8}  {3}" -f $n, "✗", (Format-StepDuration -Milliseconds [int]$elapsed), $name | Write-Output
+      "  step {0,2}  {1}  {2,8}  {3}" -f $n, "✗", (Format-StepDuration -Milliseconds ([int]$elapsed)), $name | Write-Output
       $failedSteps = "$failedSteps$n "
     }
 
