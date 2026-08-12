@@ -10,6 +10,9 @@ run_11_suppression_audit() {
   shift 2
   local _files=("$@")
   cd "$_repo_root" || return 1
+  # Step's own basename, for self-exclusion from the audit below.
+  # shellcheck disable=SC2155 # reason: basename's exit status is irrelevant; the step's own basename for self-exclusion
+  local _self_sh="$(basename "${BASH_SOURCE[0]}")"
   local _s17_errors=0
   local _step17_tmpdir
   _step17_tmpdir=$(mktemp -d) || {
@@ -25,6 +28,13 @@ run_11_suppression_audit() {
   else
     _step17_files=("${CACHED_NIX_FILES[@]}" "${CACHED_SH_FILES[@]}")
   fi
+
+  # Drop this step's own file: its scan definitions contain the literal suppression patterns.
+  local _step17_filtered=() _f17
+  for _f17 in "${_step17_files[@]}"; do
+    [ "$(basename "$_f17")" = "$_self_sh" ] || _step17_filtered+=("$_f17")
+  done
+  _step17_files=("${_step17_filtered[@]}")
 
   if [ "${#_step17_files[@]}" -gt 0 ]; then
     # shellcheck disable=SC2016 # reason: child-shell parameter expansion in bash -c

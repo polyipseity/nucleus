@@ -29,9 +29,10 @@ run_10_package_manager_enforcement() {
   fi
 
   # Ban bare `pip install` and `npm install`.
-  # ref: allow-and-deny-lists.instructions.md#A1 -- orchestrator/config files contain pip/npm patterns in comments; self-refs are dynamic
-  local _self_sh="10-package-manager-enforcement.sh"
-  local _self_ps1="10-package-manager-enforcement.ps1"
+  # ref: allow-and-deny-lists.instructions.md#A1 -- orchestrator/config files contain pip/npm patterns in comments; self basenames are derived from ${BASH_SOURCE[0]}
+  # shellcheck disable=SC2155 # reason: basename's exit status is irrelevant; the step's own basename for self-exclusion
+  local _self_sh="$(basename "${BASH_SOURCE[0]}")"
+  local _self_ps1="${_self_sh%.sh}.ps1"
   local _grep_files=()
   if $_has_args; then
     [ ${#SH_FILES[@]} -gt 0 ] && _grep_files+=("${SH_FILES[@]}")

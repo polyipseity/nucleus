@@ -62,7 +62,7 @@ Register-Step -Id "suppression-audit" -Number 11 -Name "Suppression audit" -Acti
     $shFiles = @(if ($script:SH_FILES) { $script:SH_FILES } else { $PositionalArgs | Where-Object { $_ -like '*.sh' } })
     $nixFiles = @(if ($script:NIX_FILES) { $script:NIX_FILES } else { $PositionalArgs | Where-Object { $_ -like '*.nix' } })
     $ps1Files = @(if ($script:PS1_FILES) { $script:PS1_FILES } else { $PositionalArgs | Where-Object { $_ -like '*.ps1' } })
-    $ps1Files = @($ps1Files | Where-Object { $_ -notmatch '11-suppression-audit\.ps1$' })  # ref: allow-and-deny-lists.instructions.md#A9 -- self-reference: scan definitions contain the literal suppression patterns being detected
+    $ps1Files = @($ps1Files | Where-Object { (Split-Path -Leaf $_) -ne (Split-Path -Leaf $PSCommandPath) })  # ref: allow-and-deny-lists.instructions.md#A9 -- self-reference: scan definitions contain the literal suppression patterns being detected
     $hasFiles = ($shFiles.Count -gt 0) -or ($nixFiles.Count -gt 0) -or ($ps1Files.Count -gt 0)
 
     $undocSuppViolations += Get-UndocSuppViolation -Pattern '|| true' -Label '|| true' -Files @(($shFiles + $nixFiles) | Where-Object { $_ -notmatch '(^|[\\/])tests[\\/]' })
@@ -82,7 +82,7 @@ Register-Step -Id "suppression-audit" -Number 11 -Name "Suppression audit" -Acti
     $allPs1 = @(
       Get-ChildItem -Recurse -Path $r -Include '*.ps1' |
         Where-Object { $_.FullName -notmatch '[\/]vendor[\/]' } |  # ref: allow-and-deny-lists.instructions.md#B5 -- structural invariant
-        Where-Object { $_.Name -notmatch '^11-suppression-audit\.ps1$' } |  # ref: allow-and-deny-lists.instructions.md#A9 -- self-reference: scan definitions contain the literal suppression patterns being detected
+        Where-Object { $_.Name -ne (Split-Path -Leaf $PSCommandPath) } |  # ref: allow-and-deny-lists.instructions.md#A9 -- self-reference: scan definitions contain the literal suppression patterns being detected
         ForEach-Object { $_.FullName }
     )
     $hasFiles = ($allShNix.Count -gt 0) -or ($allPs1.Count -gt 0)
