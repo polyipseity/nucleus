@@ -86,9 +86,7 @@ Shell scripts are linted via treefmt (ShellCheck runs inside treefmt-nix):
 
 ShellCheck does NOT run at Nix derivation build time (`src/modules/lib/script-tree.nix` documents this); it runs in `nucleus-check-sh` / CI only.
 
-The `--source-path` values differ between source and Nix build but both resolve the same
-`# shellcheck source=` directives because the SCRIPT_DIR-relative path structure is
-identical in both contexts.
+The `source-path` is always anchored to each script's own directory: treefmt runs (`check.sh` step 01, `scripts/check-sh.sh`) use `source-path = "SCRIPTDIR"` from `src/treefmt.nix`, and Windows (`scripts/check-sh.ps1`) passes `--source-path=<script dir>` per file. Both anchor to the same SCRIPT_DIR-relative structure, so a `# shellcheck source=` directive that works in the source tree resolves identically everywhere shellcheck runs.
 
 When adding new shell scripts, ensure they pass shellcheck with these flags. Do not add
 new scripts with pre-existing suppression warnings unless documented per the rules above.
