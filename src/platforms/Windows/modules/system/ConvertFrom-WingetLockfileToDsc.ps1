@@ -21,10 +21,10 @@
   Path to write the locked DSC.
 
 .EXAMPLE
-  ConvertFrom-WingetLockfileToDsc -ConfigPath .\system\settings.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system\settings.locked.dsc.yml
+  ConvertFrom-WingetLockfileToDsc -ConfigPath .\system\scheduler.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system\scheduler.locked.dsc.yml
 
 .EXAMPLE
-  ConvertFrom-WingetLockfileToDsc -ConfigPath .\system\registry.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system\registry.locked.dsc.yml
+  ConvertFrom-WingetLockfileToDsc -ConfigPath .\system\firewall.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system\firewall.locked.dsc.yml
 
 .EXAMPLE
   ConvertFrom-WingetLockfileToDsc -ConfigPath .\system\packages.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system\packages.locked.dsc.yml

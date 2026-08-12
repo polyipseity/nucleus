@@ -1,7 +1,7 @@
 ---
 description: "Use when adding or editing agents configuration, skill management, or ClawHub provisioning. Covers ~/.agents directory layout, bundled vs. fetched skill licensing rules, permission patterns, and the install-bun-packages/sync-clawhub-skills activation DAG."
 name: "Agents and Skills"
-applyTo: "src/modules/agents.nix, src/modules/cursor.nix, src/platforms/Windows/modules/user/Sync-AgentsSkill.ps1, src/platforms/Windows/modules/user/Sync-AgentsClawHubSkill.ps1, src/platforms/Windows/modules/user/Sync-CursorConfig.ps1, src/platforms/Windows/modules/setup/Invoke-BunSetup.ps1, src/users/*/agents/**, src/users/*/cursor/**, src/scripts/agents/**/*.sh, src/scripts/configs/symlink-cursor-config.sh"
+applyTo: "src/modules/agents.nix, src/modules/cursor.nix, src/platforms/Windows/modules/user/Sync-AgentsSkillManifest.ps1, src/platforms/Windows/modules/user/Sync-AgentsClawHubSkillManifest.ps1, src/platforms/Windows/modules/user/Sync-CursorConfig.ps1, src/platforms/Windows/modules/setup/Invoke-BunSetup.ps1, src/users/*/agents/**, src/users/*/cursor/**, src/scripts/agents/**/*.sh, src/scripts/configs/symlink-cursor-config.sh"
 ---
 
 # Agents and Skills
@@ -27,7 +27,7 @@ The `~/.agents/` directory is the runtime home for all agent configuration, prom
 | `~/.agents/hooks/`                    | `symlink-agent-config` activation                  | VS Code Copilot hook configs (e.g. `PreToolUse`/`PostToolUse`), loaded via `chat.hookFilesLocations` (`~/.agents/hooks`) |
 | `~/.agents/skills/`                   | `install-agent-skills` activation                  | Real directory; per-skill symlinks for bundled skills + real dirs for fetched skills               |
 | `~/.agents/skills/<name>/` (symlink)  | `install-agent-skills`                             | Bundled skill committed to `src/users/default/agents/skills/<name>/`                             |
-| `~/.agents/skills/<name>/` (real dir) | `sync-clawhub-skills` / `Sync-AgentsClawHubSkills` | Fetched skill downloaded by ClawHub; contains a `.clawhub/origin.json` marker                      |
+| `~/.agents/skills/<name>/` (real dir) | `sync-clawhub-skills` / `Sync-AgentsClawHubSkillManifest` | Fetched skill downloaded by ClawHub; contains a `.clawhub/origin.json` marker                      |
 
 ## Cursor bridge (`~/.cursor/`)
 
@@ -86,11 +86,11 @@ ClawHub is installed and managed declaratively by the `install-bun-packages` Hom
 
 ### Windows
 
-ClawHub is managed by `Invoke-BunSetup` in `src/platforms/Windows/modules/Invoke-BunSetup.ps1`, which is called by `apply.ps1` before `Sync-AgentsClawHubSkills`. `Invoke-BunSetup` manages a `$desiredPackages` list (currently `@mariozechner/pi-coding-agent` and `clawhub`) and writes a manifest to `%USERPROFILE%\.config\nucleus\bun-packages.json`. Applied in this order: WinGet DSC → `Invoke-BunSetup` (bun global packages) → `Sync-AgentsSkills` (bundled skill symlinks) → `Sync-AgentsClawHubSkills` (fetched skill downloads).
+ClawHub is managed by `Invoke-BunSetup` in `src/platforms/Windows/modules/setup/Invoke-BunSetup.ps1`, which is called by `apply.ps1` before `Sync-AgentsClawHubSkillManifest`. `Invoke-BunSetup` manages a `$desiredPackages` list (currently `@mariozechner/pi-coding-agent` and `clawhub`) and writes a manifest to `%USERPROFILE%\.config\nucleus\bun-packages.json`. Applied in this order: WinGet DSC → `Invoke-BunSetup` (bun global packages) → `Sync-AgentsSkillManifest` (bundled skill symlinks) → `Sync-AgentsClawHubSkillManifest` (fetched skill downloads).
 
 ## Authoring rules
 
-- **No fallback installs in sync functions**: POSIX `sync-clawhub-skills` and Windows `Sync-AgentsClawHubSkills` must not install ClawHub themselves. Provisioning belongs to `install-bun-packages` / `Invoke-BunSetup`.
+- **No fallback installs in sync functions**: POSIX `sync-clawhub-skills` and Windows `Sync-AgentsClawHubSkillManifest` must not install ClawHub themselves. Provisioning belongs to `install-bun-packages` / `Invoke-BunSetup`.
 - **Stale cleanup scoped to fetched downloads**: only remove directories with a `.clawhub/origin.json` marker; never touch bundled symlinks or unknown directories.
 - **Skill sync is best-effort**: log a warning on failure and continue.
 - **Desired-package lists sorted alphabetically**: keep `$desiredPackages` and the equivalent list in `install-bun-packages` sorted.

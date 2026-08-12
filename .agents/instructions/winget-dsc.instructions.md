@@ -150,7 +150,7 @@ When adding a new tool or capability, choose the package manager in this order:
 1. **WinGet (`system/packages.dsc.yml`)** — preferred for any package with a WinGet ID. Declarative, `--what-if`-capable, and centrally tracked.
 2. **Scoop (`src/platforms/Windows/modules/Invoke-ScoopSetup.ps1`)** — for portable CLI utilities that have no WinGet ID but exist in a Scoop bucket. Scoop is the user-space fallback: it requires no admin rights and installs to `%USERPROFILE%\scoop\`.
 3. **cargo binstall (`src/platforms/Windows/modules/Invoke-CargoBinstallSetup.ps1`)** — for Rust CLI tools not available in WinGet or Scoop. cargo-binstall downloads prebuilt binaries without requiring a local Rust toolchain.
-4. **bun (`src/platforms/Windows/modules/Invoke-BunSetup.ps1`)** — last resort for JS/npm-only tools absent from WinGet, Scoop, and cargo-binstall. `bun install -g` places binaries in `%USERPROFILE%\.bun\bin`. Bun itself is installed via WinGet (`Oven-sh.Bun` in `system/packages.dsc.yml`).
+4. **bun (`src/platforms/Windows/modules/setup/Invoke-BunSetup.ps1`)** — last resort for JS/npm-only tools absent from WinGet, Scoop, and cargo-binstall. `bun install -g` places binaries in `%USERPROFILE%\.bun\bin`. Bun itself is installed via WinGet (`Oven-sh.Bun` in `system/packages.dsc.yml`).
 
 The equivalent hierarchy on POSIX hosts is: `nixpkgs > cargo binstall > bun`.
 
