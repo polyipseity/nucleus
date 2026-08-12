@@ -148,7 +148,7 @@ in
   #   configureMonitorColorProfile     — clear ColorSync device cache
   #   clearFinderCache                 — purge stale Finder state for desktop visibility
   #   configureNvimLauncher            — macOS-specific neovim launcher
-  #   configureUtmRendererPrefs        — UTM Apple Core OpenGL (CGL) renderer for Android guest
+  #   configureUtmPrefs                — UTM global preferences (renderer, server, capture, screenshot policy)
   #   disableSpotlight                 — disable all Spotlight hotkeys + service
   #   removeCommandLineTools           — delete Apple CLT install tree (not receipts)
   #   configureXcodeSelect             — xcode-select --switch to apple-sdk-enhanced
@@ -206,18 +206,12 @@ in
     "${activationBundle}/src/hosts/MacBook/scripts/macos-register-mounty-login-item.sh"
     # ---- configure-linearmouse-preferences --------------------------------------
     "${activationBundle}/src/hosts/MacBook/scripts/macos-set-linearmouse-prefs.sh"
-    # ---- configure-utm-renderer-prefs -------------------------------------------
-    # Pin UTM's global renderer backend to Apple Core OpenGL (CGL) in the
-    # sandboxed app container so the Android (LineageOS) guest UI appears
-    # after boot (ANGLE (Metal) hides it; CGL is the UTM 5.x maintained GL
-    # backend, QEMURendererBackend = 3).  This does not prevent the recurring
-    # "display freezes randomly" bug -- that is a renderer-orthogonal
-    # client-side SPICE stall (UTM #2221, CocoaSpice#5); UTM 5.0.4 SPICE
-    # renderer fixes and keeping the VM window visible are the mitigations.
-    # See .agents/instructions/vm-management.instructions.md.
-    # Runs unconditionally: the pref is a global UTM setting, harmless when no
-    # Android VM is enabled, and idempotent when already set.
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-set-utm-renderer.sh"
+    # ---- configure-utm-prefs ----------------------------------------------------
+    # Provision UTM's global preferences in the sandboxed app container
+    # (renderer Default, server hardening, capture keys, NoSaveScreenshot) so
+    # they stay pinned across app updates.
+    # Runs unconditionally: idempotent, and harmless when UTM is absent.
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-set-utm-prefs.sh"
     # ---- configure-gimp-scroll-sensitivity ---------------------------------------
     "${activationBundle}/src/scripts/configs/configure-gimp-scroll-sensitivity.sh"
 

@@ -186,7 +186,7 @@ Guest port forwards are declared in the `portForwards` array of each VM entry: n
 
 **Change checklist:** update `VMs.json` + `VMs.schema.json`, `vm.sh`, `vm.ps1`, Windows modules, `tests/scripts/android-config-tests.sh`, `tests/scripts/android-config-tests.ps1`, `tests/integration/android-config-parity-tests.nix`, `tests/modules/vm-setup-tests.nix`, and all three `MANUAL.md` files in the same change.
 
-**Platform exceptions (WHY):** MacBook UTM renderer prefs and Android freeze workarounds (see [Android UTM freeze](#android-utm-freeze) below); NixOS uses libvirt/KVM; Windows uses QEMU (`start-android-vm.ps1`). Recovery/booted workflow steps are shared; host-specific setup notes differ only in `MANUAL.md`.
+**Platform exceptions (WHY):** MacBook UTM preferences and Android freeze workarounds (see [Android UTM freeze](#android-utm-freeze) below); NixOS uses libvirt/KVM; Windows uses QEMU (`start-android-vm.ps1`). Recovery/booted workflow steps are shared; host-specific setup notes differ only in `MANUAL.md`.
 
 ## Android UTM freeze
 
@@ -226,7 +226,6 @@ The guest-side adb wedge persists with the workaround and is not caused by it.
 ### Safety invariants
 
 - Killing UTM.app is state-lossy (QEMUHelper.xpc cascade) but required for audio deadlock recovery.
-- Renderer pref (`QEMURendererBackend = 3`, CGL) is provisioned but does NOT fix the freeze.
 
 ## Disk format
 
