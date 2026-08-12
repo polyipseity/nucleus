@@ -25,8 +25,7 @@ function Register-Step {
   param(
     [Parameter(Mandatory)]
     [string]$Id,
-    [Parameter(Mandatory)]
-    [int]$Number,
+    [int]$Number = 0,
     [Parameter(Mandatory)]
     [string]$Name,
     [Parameter(Mandatory)]
@@ -48,6 +47,21 @@ function Register-Step {
     throw "Duplicate step ID '$Id'"
   }
 
+  # Number 0 is a sentinel: derive it from the registering file's NN- prefix.
+  # $MyInvocation.PSCommandPath (not $PSCommandPath) is the caller's step file.
+  if ($Number -eq 0) {
+    $registeringFile = $MyInvocation.PSCommandPath
+    if ((Split-Path -Leaf $registeringFile) -notmatch '^(\d{2})-') {
+      throw "Register-Step: cannot derive step number from '$registeringFile' (expected NN- prefix); pass -Number explicitly"
+    }
+    $Number = [int]$Matches[1]
+  }
+
+  # Validate explicit number is a positive integer (0 is the derive sentinel).
+  if ($Number -lt 1) {
+    throw "Step number must be a positive integer, got $Number"
+  }
+
   # Validate unique number (Spec A).
   if ($script:StepNumbers -contains $Number) {
     throw "Duplicate step number $Number"
@@ -57,6 +71,16 @@ function Register-Step {
   $script:StepNumbers.Add($Number)
   $script:StepNames.Add($Name)
   $script:StepActions.Add($Action)
+}
+
+# --- Step-number derivation helper ---
+# Returns the NN- prefix of the file that defined the calling scriptblock
+# (used inside step actions for skip messages). Uses $MyInvocation.PSCommandPath,
+# NOT $PSCommandPath: inside this function $PSCommandPath always resolves to
+# step-runner.ps1 (the defining file), while $MyInvocation.PSCommandPath
+# resolves to the step file that defined the calling scriptblock.
+function Get-StepNumber {
+  [int]((Split-Path -Leaf $MyInvocation.PSCommandPath) -replace '^(\d{2})-.*', '$1')
 }
 
 # --- Wave parallelism infrastructure ---

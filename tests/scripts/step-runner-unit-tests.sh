@@ -96,6 +96,51 @@ test_register_step_duplicate_number_errors() {
   fi
 }
 
+# ---- Step number derivation (3-arg form) ----
+
+test_register_step_derives_number_from_filename() {
+  local _result _num _out
+  _step_runner_fake_tmp="$(mktemp -d)"
+  trap 'rm -rf "$_step_runner_fake_tmp"' EXIT
+  cat >"$_step_runner_fake_tmp/05-fake.sh" <<EOF
+. "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+register_step "fake" "Fake" fake_run
+fake_run() { step_number; }
+printf "%s %s\n" "\${_STEP_NUMBERS[0]}" "\$(fake_run)"
+EOF
+  _result="$(bash "$_step_runner_fake_tmp/05-fake.sh" 2>/dev/null)"
+  _num="${_result% *}"
+  _out="${_result#* }"
+  if [ "$_num" -eq 5 ] && [ "$_out" -eq 5 ]; then
+    assert_pass "register_step derives step number from NN- filename prefix"
+  else
+    assert_fail "register_step 3-arg derive" "Expected number 5 and output 5, got: number=$_num output=$_out"
+  fi
+  rm -rf "$_step_runner_fake_tmp"
+  trap - EXIT
+}
+
+test_register_step_no_prefix_errors() {
+  local _exit_code=0 _result
+  _step_runner_plain_tmp="$(mktemp -d)"
+  trap 'rm -rf "$_step_runner_plain_tmp"' EXIT
+  cat >"$_step_runner_plain_tmp/plain.sh" <<EOF
+. "$REPO_ROOT/src/scripts/lib/step-runner.sh"
+register_step "fake" "Fake" fake_run 2>/dev/null
+_status=\$?
+printf "count=%s\n" "\${#_STEP_FUNCS[@]}"
+exit "\$_status"
+EOF
+  _result="$(bash "$_step_runner_plain_tmp/plain.sh" 2>/dev/null)" || _exit_code=$?
+  if [ "$_exit_code" -ne 0 ] && echo "$_result" | grep -q 'count=0'; then
+    assert_pass "register_step without NN- prefix errors and does not register"
+  else
+    assert_fail "register_step no-prefix" "Expected non-zero exit and count=0, got: exit=$_exit_code result=$_result"
+  fi
+  rm -rf "$_step_runner_plain_tmp"
+  trap - EXIT
+}
+
 # ---- Spec B: --skip-steps flag ----
 
 test_skip_steps_equals_form() {
@@ -397,6 +442,11 @@ test_register_step_id_with_digits_errors
 test_register_step_empty_id_errors
 test_register_step_duplicate_id_errors
 test_register_step_duplicate_number_errors
+
+echo "--- Step number derivation (3-arg form) ---"
+test_register_step_derives_number_from_filename
+test_register_step_no_prefix_errors
+
 test_skip_steps_equals_form
 test_skip_steps_empty_value
 test_skip_steps_unknown_id_no_error

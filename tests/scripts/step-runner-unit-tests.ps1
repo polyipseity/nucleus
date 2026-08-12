@@ -131,6 +131,72 @@ function Test-RegisterStep-DuplicateNumberError {
     }
 }
 
+# ---- Spec A: Step number derivation from NN- filename prefix ----
+
+function Test-RegisterStep-DeriveNumberFromFilename {
+    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
+    $script:StepNames = [System.Collections.Generic.List[string]]::new()
+    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
+    $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ("step-runner-test-" + [System.IO.Path]::GetRandomFileName())
+    try {
+        $null = New-Item -ItemType Directory -Path $tmpDir  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+        $fakeStep = Join-Path $tmpDir '05-fake.ps1'
+        Set-Content -Path $fakeStep -Encoding utf8 -Value @(
+            ". '$stepRunner'"
+            "Register-Step -Id 'fake' -Name 'Fake' -Action { Write-Output (Get-StepNumber) }"
+        )
+        . $fakeStep
+
+        if ($script:StepNumbers.Count -eq 1 -and $script:StepNumbers[0] -eq 5) {
+            Assert-Pass "Register-Step derives step number from NN- filename prefix"
+        } else {
+            $num = if ($script:StepNumbers.Count -eq 1) { $script:StepNumbers[0] } else { "none" }
+            Assert-Fail "Register-Step derive number" "Expected number 5, got $num"
+        }
+
+        $output = & $script:StepActions[0]
+        if ($output -eq 5) {
+            Assert-Pass "Get-StepNumber returns the step number inside a step action"
+        } else {
+            Assert-Fail "Get-StepNumber" "Expected output 5, got '$output'"
+        }
+    } finally {
+        if ($tmpDir -and (Test-Path $tmpDir)) {
+            # check-suppress:suppression_doc: best-effort temp-dir cleanup; dir may already be gone.
+            Remove-Item -Path $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+function Test-RegisterStep-DeriveNumberThrowsWithoutPrefix {
+    $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
+    $script:StepNames = [System.Collections.Generic.List[string]]::new()
+    $script:StepActions = [System.Collections.Generic.List[scriptblock]]::new()
+    $tmpDir = Join-Path ([System.IO.Path]::GetTempPath()) ("step-runner-test-" + [System.IO.Path]::GetRandomFileName())
+    $exitCode = 0
+    try {
+        $null = New-Item -ItemType Directory -Path $tmpDir  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
+        $plainStep = Join-Path $tmpDir 'plain.ps1'
+        Set-Content -Path $plainStep -Encoding utf8 -Value @(
+            ". '$stepRunner'"
+            "Register-Step -Id 'fake' -Name 'Fake' -Action { Write-Output (Get-StepNumber) }"
+        )
+        . $plainStep
+    } catch {
+        $exitCode = 1
+    } finally {
+        if ($tmpDir -and (Test-Path $tmpDir)) {
+            # check-suppress:suppression_doc: best-effort temp-dir cleanup; dir may already be gone.
+            Remove-Item -Path $tmpDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+    if ($exitCode -eq 1 -and $script:StepNumbers.Count -eq 0) {
+        Assert-Pass "Register-Step without NN- prefix errors and registers no step"
+    } else {
+        Assert-Fail "Register-Step derive error" "Expected error and 0 steps registered, got $($script:StepNumbers.Count) steps"
+    }
+}
+
 # ---- Spec B: --skip-steps flag (via Read-Argument) ----
 
 function Test-SkipSteps-EqualsForm {
@@ -228,6 +294,8 @@ Test-RegisterStep-IdWithDigitError
 Test-RegisterStep-EmptyIdError
 Test-RegisterStep-DuplicateIdError
 Test-RegisterStep-DuplicateNumberError
+Test-RegisterStep-DeriveNumberFromFilename
+Test-RegisterStep-DeriveNumberThrowsWithoutPrefix
 Test-SkipSteps-EqualsForm
 Test-SkipSteps-EmptyValue
 Test-SkipSteps-UnknownIdNoError

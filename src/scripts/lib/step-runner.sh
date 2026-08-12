@@ -23,7 +23,35 @@ declare -a _STEP_NAMES=()
 declare -a _STEP_FUNCS=()
 
 register_step() {
-  local _id="$1" _n="$2" _name="$3" _func="$4"
+  local _id _n _name _func _base
+
+  case "$#" in
+  3)
+    # Derive the step number from the caller file's NN- filename prefix.
+    _id="$1" _name="$2" _func="$3"
+    if [ -z "${BASH_SOURCE[1]:-}" ]; then
+      printf '%s\n' "register_step: cannot derive step number from '' (expected NN- prefix); pass the number explicitly" >&2
+      return 1
+    fi
+    _base=$(basename -- "${BASH_SOURCE[1]}")
+    case "$_base" in
+    [0-9][0-9]-*)
+      _n="${_base%%-*}"
+      ;;
+    *)
+      printf '%s\n' "register_step: cannot derive step number from '${BASH_SOURCE[1]}' (expected NN- prefix); pass the number explicitly" >&2
+      return 1
+      ;;
+    esac
+    ;;
+  4)
+    _id="$1" _n="$2" _name="$3" _func="$4"
+    ;;
+  *)
+    printf '%s\n' "register_step: expected 3 or 4 arguments (id [number] name func), got $#: $*" >&2
+    return 1
+    ;;
+  esac
 
   if [ -z "$_id" ]; then
     error "Step ID must not be empty"
@@ -43,6 +71,11 @@ register_step() {
     fi
   done
 
+  if ! [[ "$_n" =~ ^[0-9]+$ ]] || [ "$_n" -eq 0 ] 2>/dev/null; then
+    error "Step number '$_n' must be a positive integer"
+    exit 1
+  fi
+
   local _existing_n
   for _existing_n in ${_STEP_NUMBERS[@]+"${_STEP_NUMBERS[@]}"}; do
     if [ "$_existing_n" -eq "$_n" ] 2>/dev/null; then
@@ -55,6 +88,22 @@ register_step() {
   _STEP_NUMBERS+=("$_n")
   _STEP_NAMES+=("$_name")
   _STEP_FUNCS+=("$_func")
+}
+
+# step_number — print the number of the enclosing registered step (for skip messages).
+# Works at any call depth: walks FUNCNAME and returns the first frame registered in
+# _STEP_FUNCS. Outputs nothing and returns 1 when called outside a step function.
+step_number() {
+  local _i _j
+  for ((_i = 1; _i < ${#FUNCNAME[@]}; _i++)); do
+    for _j in "${!_STEP_FUNCS[@]}"; do
+      if [ "${FUNCNAME[$_i]}" = "${_STEP_FUNCS[$_j]}" ]; then
+        printf '%s\n' "${_STEP_NUMBERS[$_j]}"
+        return 0
+      fi
+    done
+  done
+  return 1
 }
 
 # --- Wave parallelism infrastructure ---
