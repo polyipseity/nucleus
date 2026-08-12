@@ -1,5 +1,5 @@
 ---
-name: maintain
+name: maintainer
 description: Focused subagent for maintainability cleanup with behavior-preserving simplification and atomic, reversible change slices.
 model: inherit
 readonly: false

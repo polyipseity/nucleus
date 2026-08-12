@@ -25,7 +25,7 @@ Execution checklist:
 
 Broad cleanup rule:
 
-- For multi-file cleanup, run `maintain` subagents in parallel on independent lanes (max 2 concurrent).
+- For multi-file cleanup, run `maintainer` subagents in parallel on independent lanes (max 2 concurrent).
 - Merge results, then run another parallel pass for remaining hotspots.
 - Stop when only minor/cosmetic improvements remain.
 
