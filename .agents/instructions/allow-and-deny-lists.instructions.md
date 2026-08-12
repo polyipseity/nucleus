@@ -40,13 +40,13 @@ filter, provided by a shared library:
 
 - **`src/scripts/lib/deny-list.sh`** (POSIX) — `filter_gitignored` (stdin filter),
   `find_git_tracked` (find wrapper)
-- **`src/scripts/lib/deny-list.ps1`** (PowerShell) — `Filter-GitIgnored` (pipeline
+- **`src/scripts/lib/deny-list.ps1`** (PowerShell) — `Select-GitIgnored` (pipeline
   filter), `Get-GitTrackedFile`
 
 ### Policy
 
 1. **All check/test scripts that generate file lists must pipe through
-   `filter_gitignored`/`Filter-GitIgnored` by default.** The `cache_file_lists()`
+   `filter_gitignored`/`Select-GitIgnored` by default.** The `cache_file_lists()`
    function in `step-runner.sh`/`step-runner.ps1` applies this to all cached file
    lists (`CACHED_NIX_FILES`, `CACHED_YAML_FILES`, `CACHED_JSON_FILES`,
    `CACHED_SH_FILES`).
@@ -73,7 +73,7 @@ find_git_tracked [find_args...]
 
 ```powershell
 # PowerShell — pipeline filter, same semantics
-Get-ChildItem ... | Filter-GitIgnored
+Get-ChildItem ... | Select-GitIgnored
 ```
 
 ### Integration points
@@ -81,8 +81,8 @@ Get-ChildItem ... | Filter-GitIgnored
 | Layer                    | Integration                                                                                              |
 | ------------------------ | -------------------------------------------------------------------------------------------------------- |
 | `step-runner.sh`/`.ps1`  | Sources deny-list library; `require_command git` in preflight; `cache_file_lists()` pipes through filter |
-| Check steps (POSIX)      | Steps 9, 11, 12, 15, 17 use `filter_gitignored`                                                         |
-| Check steps (PowerShell) | Steps 9, 11, 15, 17 use `Filter-GitIgnored`                                                             |
+| Check steps (POSIX)      | Steps 10, 13 use `filter_gitignored`                                                                    |
+| Check steps (PowerShell) | Steps 7, 9, 13 use `Select-GitIgnored`                                                                  |
 | `test-lib.sh`            | Sources deny-list library; test file discovery pipes through filter                                      |
 
 ## Instance registry
@@ -91,9 +91,9 @@ Get-ChildItem ... | Filter-GitIgnored
 
 | ID  | Files                                       | Excluded                                              | Tier | Reason                                                                                                                                                       | Verification                                                       |
 | --- | ------------------------------------------- | ----------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| A1  | `12-package-manager-enforcement.sh`, `.ps1` | `check.sh`, `check.ps1`, `shell.nix` (+ self-refs)    | T2   | Orchestrator/parent config files legitimately contain `pip`/`npm` in comments and error messages; self-refs are dynamic                                      | grep after each run: excluded files still contain pip/npm patterns |
+| A1  | `10-package-manager-enforcement.sh`, `.ps1` | `check.sh`, `check.ps1`, `shell.nix` (+ self-refs)    | T2   | Orchestrator/parent config files legitimately contain `pip`/`npm` in comments and error messages; self-refs are dynamic                                      | grep after each run: excluded files still contain pip/npm patterns |
 | A2  | `13-repository-policy.sh`, `.ps1`    | `.gitkeep`, `.gitignore`, `*.schema.json`, `agents/*` | T3   | Infrastructure files are not configs; `agents/*` consumed as directory. Note: `qtpass.nix` removed 2026-07-29 by self-pruning check — file no longer existed | Manual quarterly review                                            |
-| A3  | `08-locked-dsc-validation.ps1`              | `packages.dsc.yml`                                    | T2   | Packages DSC is generated from lockfile, not manually authored                                                                                               | Verify file still exists                                           |
+| A3  | `06-locked-dsc-validation.ps1`              | `packages.dsc.yml`                                    | T2   | Packages DSC is generated from lockfile, not manually authored                                                                                               | Verify file still exists                                           |
 | A5  | `gc.sh`, `gc.ps1`                           | `index.lock`                                          | T3   | Git invariant — `index.lock` must never be cleaned                                                                                                           | Manual quarterly review                                            |
 | A6  | `test-lib.sh`                               | `lib.nix` in test discovery                           | T2   | Test helper library excluded from namespace of test files                                                                                                    | Verify file still exists                                           |
 | A7  | `step-runner.sh`, `step-runner.ps1`         | `*.schema.json`                                       | T3   | Glob pattern for schema files is narrow and stable                                                                                                           | Manual quarterly review                                            |
@@ -106,11 +106,11 @@ Get-ChildItem ... | Filter-GitIgnored
 | --- | ----------------------------------------- | --------------------- | ---- | ---------------------------------------------------------------------------------------------------------- | ----------------------- |
 | B1  | `13-repository-policy.sh`, `.ps1`  | `vendor/`, `configs/` | T3   | Structural invariants — vendored code and config methods are different concerns                            | Manual quarterly review |
 | B2  | `01-code-formatting.ps1`                  | `vendor/`             | T3   | Structural invariant (vendor/ speed); secrets/ covered by gitignore (treefmt natively respects .gitignore) | Manual quarterly review |
-| B3  | `09-schema-validation.ps1`                | `vendor/`             | T3   | Structural invariant (vendor/ speed); secrets/ dropped — covered by gitignore + Filter-GitIgnored          | Manual quarterly review |
-| B4  | `11-yaml-structural.ps1`                  | `vendor/`             | T3   | Structural invariant (vendor/ speed); secrets/ dropped — covered by gitignore + Filter-GitIgnored          | Manual quarterly review |
-| B5  | `11-suppression-audit.ps1`                | `vendor/`             | T3   | Structural invariant; supplemented by Filter-GitIgnored                                                    | Manual quarterly review |
-| B6  | `13-repository-policy.ps1` | `vendor/`             | T3   | Structural invariant; supplemented by Filter-GitIgnored                                                    | Manual quarterly review |
-| B7  | `step-runner.sh`, `step-runner.ps1`       | `vendor/`             | T3   | Structural invariant; supplemented by filter_gitignored/Filter-GitIgnored                                  | Manual quarterly review |
+| B3  | `07-schema-validation.ps1`                | `vendor/`             | T3   | Structural invariant (vendor/ speed); secrets/ dropped — covered by gitignore + Select-GitIgnored          | Manual quarterly review |
+| B4  | `09-yaml-structural.ps1`                  | `vendor/`             | T3   | Structural invariant (vendor/ speed); secrets/ dropped — covered by gitignore + Select-GitIgnored          | Manual quarterly review |
+| B5  | `11-suppression-audit.ps1`                | `vendor/`             | T3   | Structural invariant; supplemented by Select-GitIgnored                                                    | Manual quarterly review |
+| B6  | `13-repository-policy.ps1` | `vendor/`             | T3   | Structural invariant; supplemented by Select-GitIgnored                                                    | Manual quarterly review |
+| B7  | `step-runner.sh`, `step-runner.ps1`       | `vendor/`             | T3   | Structural invariant; supplemented by filter_gitignored/Select-GitIgnored                                  | Manual quarterly review |
 | B8  | `cleanup-nix-build-artifacts.sh`          | `vendor/`             | T3   | Structural invariant                                                                                       | Manual quarterly review |
 
 ### Category C — Content-pattern exclude lists (grep -v, notmatch)
@@ -127,14 +127,14 @@ Get-ChildItem ... | Filter-GitIgnored
 
 | ID  | Files                                    | Allowed entry                         | Tier | Reason                                                                | Verification                    |
 | --- | ---------------------------------------- | ------------------------------------- | ---- | --------------------------------------------------------------------- | ------------------------------- |
-| D1  | `07-lockfile-validation.ps1`             | `lfOverlapExceptions`: `astral-sh.ty` | T2   | Legitimate cross-section overlap in lockfile                          | Error if stale                  |
+| D1  | `05-lockfile-validation.ps1`             | `lfOverlapExceptions`: `astral-sh.ty` | T2   | Legitimate cross-section overlap in lockfile                          | Error if stale                  |
 | D2  | `lifecycle-allowlist.json`               | All entries                           | T2   | Supply-chain hardening: lifecycle hooks permitted for listed packages | Error if stale (via `check.sh`) |
 | D3  | `supply-chain-hardening.instructions.md` | Allowlist mechanism (cross-reference) | —    | External allowlist maintained in supply-chain-hardening docs          | See that file                   |
 
 ## Review cadence
 
-- **Quarterly**: full audit of all T3 entries. Check each excluded file still exists, each excluded pattern is still justified, and no new hard-coded exclude lists have been introduced. Verify that gitignore-based filtering (via `filter_gitignored`/`Filter-GitIgnored`) is applied to any new file-generation script.
-- **Quarterly — shared-content audit**: for each content category in the embedded-content policy (profile body, VM start scripts, service wrappers, Caddyfile, cloud-drive wrappers), confirm there is exactly ONE canonical file on disk and no same-language duplicate has re-appeared (e.g. a second inline copy of the Android VM QEMU start script). Step 18 (embedded-content enforcement) flags new large embedded literals; any duplicate found here is fixed in the same review. Registry of shared files lives in `embedded-content.instructions.md` § Shared cross-platform content.
+- **Quarterly**: full audit of all T3 entries. Check each excluded file still exists, each excluded pattern is still justified, and no new hard-coded exclude lists have been introduced. Verify that gitignore-based filtering (via `filter_gitignored`/`Select-GitIgnored`) is applied to any new file-generation script.
+- **Quarterly — shared-content audit**: for each content category in the embedded-content policy (profile body, VM start scripts, service wrappers, Caddyfile, cloud-drive wrappers), confirm there is exactly ONE canonical file on disk and no same-language duplicate has re-appeared (e.g. a second inline copy of the Android VM QEMU start script). Step 13's embedded-content enforcement sub-check (repository-policy) flags new large embedded literals; any duplicate found here is fixed in the same review. Registry of shared files lives in `embedded-content.instructions.md` § Shared cross-platform content.
 - **Trigger**: review is due when a check step is added, removed, or renumbered.
-- **Last reviewed**: 2026-08-08 (check steps renumbered 27 → 18; removed legacy-token, vm-manifest-regression, host-platform-audit, and nix-test-eval check steps)
+- **Last reviewed**: 2026-08-12 (13 check steps; numbers derived from NN- filename prefixes)
 - **Verification**: run `scripts/check.sh` (which includes step 13 `repository-policy` for preflight InstallCommand policy) to catch regressions.

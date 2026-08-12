@@ -1,5 +1,5 @@
 ---
-description: "Use when implementing or modifying the step-runner framework used by the check and test pipelines. Covers step registration, --skip-steps semantics, removed flags, skip message format, PS1 parallelism, and step 8 $schema enforcement."
+description: "Use when implementing or modifying the step-runner framework used by the check and test pipelines. Covers step registration, --skip-steps semantics, removed flags, skip message format, PS1 parallelism, and step 7 $schema enforcement."
 name: "Step-Runner Framework"
 applyTo: "src/scripts/lib/step-runner.sh, src/scripts/lib/step-runner.ps1, scripts/check.sh, scripts/check.ps1, scripts/test.sh, scripts/test.ps1, tests/scripts/**"
 ---
@@ -11,19 +11,25 @@ This document is the canonical contract for the step-runner framework used by th
 ## Spec A: Step ID registration
 
 ```
-register_step(id: str, number: int, name: str, func: Function)
+register_step(id: str, name: str, func: Function)                # 3-arg form: number derived from NN- prefix
+register_step(id: str, number: int, name: str, func: Function)   # 4-arg form: explicit number (unit tests only)
   id:      Non-empty string, no ASCII digits (0-9). Must be unique among all registered steps.
            Recommended: kebab-case, all lowercase, hyphens for word separators.
-  number:  Positive integer. Must be unique. Must match the 2-digit prefix of the source file.
+  number:  Positive integer. Must be unique. Derived from the 2-digit prefix of the registering file's name; explicit override allowed in unit tests only.
   name:    Human-readable display name. Used in output headers.
   func:    Function to call when step executes. Called with args: (has_args, repo_root, ...files).
+
+  Number derivation: the 3-arg form derives the number from the registering file's NN- filename
+  prefix (2-digit prefix required; registration fails with "cannot derive step number" if missing
+  or non-derivable). The 4-arg form overrides the number explicitly and is allowed ONLY in unit
+  tests (tests/scripts/step-runner-unit-tests.sh). PS1 equivalent: Register-Step -Number defaults
+  to 0 (derive); explicit -Number allowed only in unit tests (tests/scripts/step-runner-unit-tests.ps1).
 
   Validation errors (hard failure, stops script):
     - id contains a digit char  → "Step ID '<id>' contains forbidden digit"
     - id is empty               → "Step ID must not be empty"
     - id duplicates existing    → "Duplicate step ID '<id>'"
     - number duplicates         → "Duplicate step number <number>"
-    - func is not callable      → "Step <number> function is not callable"
 
   Effect: Appends (id, number, name, func) to the step arrays _STEP_IDS, _STEP_NUMBERS,
           _STEP_NAMES, _STEP_FUNCS (POSIX); $script:StepIds, $script:StepNumbers, etc. (PS1).
@@ -106,8 +112,8 @@ Step 01 (code-formatting) behavior:
 ```
 Test step 04 (system-config-build):
   - POSIX: always runs on supported platforms (macOS, Linux); skips only with platform message
-    "==== 4: System config build ==== SKIPPED (not a supported OS for system config build)"
-  - PS1: always skips with "==== 4: System config build ==== SKIPPED (system config build is POSIX-only)"
+    "==== 4: System config build ==== SKIPPED (unsupported host <host>)" (number derived from the 04- prefix)
+  - PS1: always skips with "==== 4: System config build ==== SKIPPED (POSIX-only test suite)"
   - A skipped step exits with code 2 (not a failure).
   - No flag controls whether step runs.
   - The --skip-system-build flag no longer exists.
@@ -244,4 +250,4 @@ Step 7 validation rules:
 
 - `testing.instructions.md` — Test structure, CI integration, and validation patterns for the test pipeline.
 - `tooling-and-validation.instructions.md` — Repository tooling, build commands, and validation hooks.
-- `allow-and-deny-lists.instructions.md` — Step 8 EXCEPTION_LIST registry and exclude-list policy.
+- `allow-and-deny-lists.instructions.md` — Step 7 EXCEPTION_LIST registry and exclude-list policy.
