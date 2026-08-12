@@ -12,9 +12,10 @@
   wrapper). Keep single-source — do not embed a copy elsewhere.
 
   Expects disk images with filenames rendered by vm.sh via
-  __ANDROID_SYSTEM_IMAGE__ / __ANDROID_USERDATA_IMAGE__ / __ANDROID_GSI_IMAGE__
-  tokens:
+  __ANDROID_SYSTEM_IMAGE__ / __ANDROID_USERDATA_IMAGE__ / __ANDROID_GSI_IMAGE__ /
+  __ANDROID_NVRAM_IMAGE__ tokens:
     - <id> (system).qcow2 (system overlay, vda)  under ~\virtual machines\data\
+    - <id> (nvram).fd     (UEFI vars, pflash, writable) under ~\virtual machines\data\
     - <userdataImage>   (userdata partition, vdb) under ~\virtual machines\data\
     - <gsiImage>        (optional GSI system image, vdc, read-only) under ~\virtual machines\src\Android\
 
@@ -48,10 +49,13 @@ $diskSystem   = Join-Path $dataDir '__ANDROID_SYSTEM_IMAGE__'
 $diskUserdata = Join-Path $dataDir '__ANDROID_USERDATA_IMAGE__'
 $diskGsi      = Join-Path $androidSrcDir '__ANDROID_GSI_IMAGE__'
 $uefiCode     = Join-Path $firmwareDir 'edk2-aarch64-code.fd'
-$uefiVars     = Join-Path $firmwareDir 'edk2-arm-vars.fd'
+# WHY: UEFI vars are per-VM writable state, so they live under data/ (like
+# every writable disk), never in the shared firmware dir (concurrent
+# corruption across VMs); the vars image is seeded once by vm-setup.
+$uefiVars     = Join-Path $dataDir '__ANDROID_NVRAM_IMAGE__'
 
 # Validate required disks.
-foreach ($d in @($diskSystem, $diskUserdata)) {
+foreach ($d in @($diskSystem, $diskUserdata, $uefiVars)) {
   if (-not (Test-Path -LiteralPath $d -PathType Leaf)) {
     Write-Error "Required disk image not found: $d"
     exit 1

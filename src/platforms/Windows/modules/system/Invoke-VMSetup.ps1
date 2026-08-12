@@ -845,6 +845,7 @@ function Invoke-VMSetup {
             $content = $content.Replace('__ANDROID_SYSTEM_IMAGE__', "$($Vm.id) (system).qcow2")
             $content = $content.Replace('__ANDROID_USERDATA_IMAGE__', [string]$Vm.Android.userdataImage)
             $content = $content.Replace('__ANDROID_GSI_IMAGE__', [string]$Vm.Android.gsiImage)
+            $content = $content.Replace('__ANDROID_NVRAM_IMAGE__', "$($Vm.id) (nvram).fd")
             $content = $content.Replace('__HOSTFWDS__', $hostFwds)
             $startPs1 = Join-Path $ScriptsDir "start-$($Vm.id).ps1"
             if ($DryRun) {
@@ -1371,6 +1372,29 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                         Write-Information "vm-setup: [dry-run] Set-Content '$systemOverlayProvisionMarker' '$userdataProvisionHash'"
                     }
                 }
+            }
+
+            # Per-VM UEFI NVRAM: writable vars state lives under data/ (like
+            # every writable disk); seed once from the shared firmware vars
+            # template that qemu-img ships alongside (the start script
+            # references data/<id> (nvram).fd).
+            $nvramImagePath = Join-Path -Path $dataDir -ChildPath "$($vm.id) (nvram).fd"
+            if (-not (Test-Path -LiteralPath $nvramImagePath -PathType Leaf)) {
+                if ($null -eq $qemuImg) {
+                    Write-Warning "vm-setup: qemu-img not found; cannot seed per-VM UEFI NVRAM vars for '$($vm.id)'"
+                } else {
+                    $firmwareVarsPath = Join-Path -Path (Split-Path -Parent $qemuImg) -ChildPath 'edk2-arm-vars.fd'
+                    if (-not (Test-Path -LiteralPath $firmwareVarsPath -PathType Leaf)) {
+                        Write-Warning "vm-setup: UEFI NVRAM vars template not found: $firmwareVarsPath; cannot seed '$nvramImagePath'"
+                    } elseif (-not $DryRun) {
+                        Copy-Item -LiteralPath $firmwareVarsPath -Destination $nvramImagePath
+                        Write-Information "vm-setup: seeded per-VM UEFI NVRAM vars: $nvramImagePath"
+                    } else {
+                        Write-Information "vm-setup: [dry-run] Copy-Item '$firmwareVarsPath' '$nvramImagePath'"
+                    }
+                }
+            } else {
+                Write-Information "vm-setup: per-VM UEFI NVRAM vars already exist: $nvramImagePath"
             }
             continue
         }

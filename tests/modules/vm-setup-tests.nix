@@ -2022,9 +2022,10 @@ let
         && (lib.hasInfix "__ANDROID_SYSTEM_IMAGE__" start_android_ps1_text)
         && (lib.hasInfix "__ANDROID_USERDATA_IMAGE__" start_android_ps1_text)
         && (lib.hasInfix "__ANDROID_GSI_IMAGE__" start_android_ps1_text)
+        && (lib.hasInfix "__ANDROID_NVRAM_IMAGE__" start_android_ps1_text)
         && (lib.hasInfix "__HOSTFWDS__" start_android_ps1_text)
       )
-      "start-android-vm.ps1 must expose __ANDROID_CPU_COUNT__/__ANDROID_RAM_BYTES__/__ANDROID_SYSTEM_IMAGE__/__ANDROID_USERDATA_IMAGE__/__ANDROID_GSI_IMAGE__/__HOSTFWDS__ tokens for manifest-driven rendering";
+      "start-android-vm.ps1 must expose __ANDROID_CPU_COUNT__/__ANDROID_RAM_BYTES__/__ANDROID_SYSTEM_IMAGE__/__ANDROID_USERDATA_IMAGE__/__ANDROID_GSI_IMAGE__/__ANDROID_NVRAM_IMAGE__/__HOSTFWDS__ tokens for manifest-driven rendering";
 
   # start-android-vm.ps1 must attach the system drive as the writable
   # data/<id> (system).qcow2 overlay (rendered leaf), keep userdata under data/,
@@ -2034,6 +2035,7 @@ let
       (
         (lib.hasInfix "Join-Path \$dataDir '__ANDROID_SYSTEM_IMAGE__'" start_android_ps1_text)
         && (lib.hasInfix "Join-Path \$dataDir '__ANDROID_USERDATA_IMAGE__'" start_android_ps1_text)
+        && (lib.hasInfix "Join-Path \$dataDir '__ANDROID_NVRAM_IMAGE__'" start_android_ps1_text)
         && (lib.hasInfix "Join-Path \$androidSrcDir '__ANDROID_GSI_IMAGE__'" start_android_ps1_text)
         && (lib.hasInfix "readonly=on,if=none,id=drive-gsi" start_android_ps1_text)
         && !(lib.hasInfix "Join-Path \$androidSrcDir '__ANDROID_SYSTEM_IMAGE__'" start_android_ps1_text)
@@ -2051,9 +2053,10 @@ let
         && (lib.hasInfix "s|__ANDROID_SYSTEM_IMAGE__|" vm_setup_sh_text)
         && (lib.hasInfix "s|__ANDROID_USERDATA_IMAGE__|" vm_setup_sh_text)
         && (lib.hasInfix "s|__ANDROID_GSI_IMAGE__|" vm_setup_sh_text)
+        && (lib.hasInfix "s|__ANDROID_NVRAM_IMAGE__|" vm_setup_sh_text)
         && (lib.hasInfix "s|__HOSTFWDS__|" vm_setup_sh_text)
       )
-      "vm.sh must render Android start-script tokens (CPU/RAM/images/portForwards) via a sed chain after copying the shared file";
+      "vm.sh must render Android start-script tokens (CPU/RAM/images/NVRAM/portForwards) via a sed chain after copying the shared file";
 
   # Both PowerShell renderers must emit the data/<id> (system).qcow2 overlay
   # leaf for __ANDROID_SYSTEM_IMAGE__ (never the pristine src/Android/
@@ -2068,6 +2071,37 @@ let
         && !(lib.hasInfix "Replace('__ANDROID_SYSTEM_IMAGE__', [string]\$Vm.Android.systemImage)" windows_vm_setup_ps1_text)
       )
       "All three renderers must emit the data/<id> (system).qcow2 overlay leaf for __ANDROID_SYSTEM_IMAGE__, never the pristine src/Android/ payload name";
+
+  # All three renderers must emit the per-VM UEFI NVRAM leaf
+  # data/<id> (nvram).fd for __ANDROID_NVRAM_IMAGE__ (writable vars state,
+  # seeded once by vm-setup; never the shared firmware vars template).
+  test_android_nvram_render_leaves =
+    assert'
+      (
+        (lib.hasInfix "Replace('__ANDROID_NVRAM_IMAGE__', \"\$vmId (nvram).fd\")" vm_ps1_text)
+        && (lib.hasInfix "Replace('__ANDROID_NVRAM_IMAGE__', \"\$(\$Vm.id) (nvram).fd\")" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "_wss_nvram_image=\"\${_wss_id} (nvram).fd\"" vm_setup_sh_text)
+        && (lib.hasInfix "s|__ANDROID_NVRAM_IMAGE__|" vm_setup_sh_text)
+        && !(lib.hasInfix "Join-Path \$firmwareDir 'edk2-arm-vars.fd'" start_android_ps1_text)
+      )
+      "All three renderers must emit the data/<id> (nvram).fd leaf for __ANDROID_NVRAM_IMAGE__, never the shared firmware vars template";
+
+  # macOS UTM adopts the UTM-generated Data/efi_vars.fd into the canonical
+  # data/<id> (nvram).fd (writable per-VM vars state) and hard-links it back;
+  # Windows Pass A seeds the same leaf once from the firmware vars template.
+  test_android_nvram_macos_adoption_and_windows_seed =
+    assert'
+      (
+        (lib.hasInfix "vm_link_nvram_to_utm_bundle()" vm_setup_sh_text)
+        && (lib.hasInfix "\$VM_DIR/data/\${_lntb_name} (nvram).fd" vm_setup_sh_text)
+        && (lib.hasInfix "ln -f \"\$_lntb_canonical\" \"\$_lntb_bundle\"" vm_setup_sh_text)
+        && (lib.hasInfix "vm_link_nvram_to_utm_bundle \"\$vm_id\" \"\$data_dir\"" vm_setup_sh_text)
+        && (lib.hasInfix "vm_link_nvram_to_utm_bundle \"\$_uv_name\" \"\$_uv_bundle/Data\"" vm_setup_sh_text)
+        && (lib.hasInfix "Join-Path -Path \$dataDir -ChildPath \"\$(\$vm.id) (nvram).fd\"" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "edk2-arm-vars.fd" windows_vm_setup_ps1_text)
+        && !(lib.hasInfix "pre-migration" vm_setup_sh_text)
+      )
+      "macOS must adopt UTM's Data/efi_vars.fd into data/<id> (nvram).fd (hard-linked back) and Windows must seed the same per-VM leaf from the firmware vars template";
 
   # Local Mido compatibility adjustments must be applied at runtime from a
   # repository-owned patch file, not by editing the vendored submodule files.
@@ -2243,6 +2277,8 @@ let
         && (lib.hasInfix "system disk.qcow2" readmeTemplateText)
         && (lib.hasInfix "user data.qcow2" readmeTemplateText)
         && (lib.hasInfix "GSI disk.qcow2" readmeTemplateText)
+        && (lib.hasInfix "efi_vars.fd" readmeTemplateText)
+        && (lib.hasInfix "(nvram).fd" readmeTemplateText)
         && !(lib.hasInfix "disk-main.qcow2" readmeTemplateText)
         && !(lib.hasInfix "<userdataImage>" readmeTemplateText)
         && !(lib.hasInfix "<gsiImage>" readmeTemplateText)
@@ -2720,6 +2756,8 @@ let
     test_windows_qemu_android_system_overlay
     test_start_android_system_overlay_data_dir
     test_android_system_overlay_render_leaves
+    test_android_nvram_render_leaves
+    test_android_nvram_macos_adoption_and_windows_seed
     test_utm_bundle_hard_link_only
   ];
 

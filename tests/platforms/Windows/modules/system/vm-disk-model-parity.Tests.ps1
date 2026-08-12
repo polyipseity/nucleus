@@ -101,6 +101,30 @@ Describe "Windows VM disk-model parity (P8)" {
     $content | Should -Match ([regex]::Escape('& $qemuImg create -f qcow2 -b $systemImage -F qcow2 $systemOverlayPath'))
   }
 
+  It "per-VM UEFI NVRAM is a data/ (nvram).fd seeded once from the firmware vars template" {
+    $content = Get-VmSetupPs1Content
+    $content | Should -Match ([regex]::Escape('Join-Path -Path $dataDir -ChildPath "$($vm.id) (nvram).fd"'))
+    $content | Should -Match ([regex]::Escape('edk2-arm-vars.fd'))
+    $content | Should -Match ([regex]::Escape('Copy-Item -LiteralPath $firmwareVarsPath -Destination $nvramImagePath'))
+  }
+
+  It "both Android start-script renderers emit the (nvram).fd leaf" {
+    (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('Replace(''__ANDROID_NVRAM_IMAGE__'', "$($Vm.id) (nvram).fd")'))
+    (Get-VmPs1Content) | Should -Match ([regex]::Escape('Replace(''__ANDROID_NVRAM_IMAGE__'', "$vmId (nvram).fd")'))
+  }
+
+  It "per-VM UEFI NVRAM is a data/ (nvram).fd seeded once from the firmware vars template" {
+    $content = Get-VmSetupPs1Content
+    $content | Should -Match ([regex]::Escape('Join-Path -Path $dataDir -ChildPath "$($vm.id) (nvram).fd"'))
+    $content | Should -Match ([regex]::Escape('edk2-arm-vars.fd'))
+    $content | Should -Match ([regex]::Escape('Copy-Item -LiteralPath $firmwareVarsPath -Destination $nvramImagePath'))
+  }
+
+  It "both Android start-script renderers emit the (nvram).fd leaf" {
+    (Get-VmSetupPs1Content) | Should -Match ([regex]::Escape('Replace(''__ANDROID_NVRAM_IMAGE__'', "$($Vm.id) (nvram).fd")'))
+    (Get-VmPs1Content) | Should -Match ([regex]::Escape('Replace(''__ANDROID_NVRAM_IMAGE__'', "$vmId (nvram).fd")'))
+  }
+
   It "pack refuses while a VM runs and retains the data/ payload" {
     $content = Get-VmPs1Content
     $content | Should -Match ([regex]::Escape('Get-VMRunningIdList'))

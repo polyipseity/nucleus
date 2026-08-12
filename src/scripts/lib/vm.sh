@@ -709,12 +709,17 @@ vm_write_start_script() {
       _wss_system_image="${_wss_id} (system).qcow2"
       _wss_userdata_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.userdataImage')"
       _wss_gsi_image="$(printf '%s' "$_wss_doc" | jq -r '.Android.gsiImage')"
+      # WHY: UEFI vars are per-VM writable state, so the rendered leaf is
+      # data/<id> (nvram).fd (like every writable disk), never the shared
+      # firmware dir (concurrent corruption across VMs).
+      _wss_nvram_image="${_wss_id} (nvram).fd"
       _wss_hostfwds="$(printf '%s' "$_wss_doc" | jq -r '[.portForwards[] | "hostfwd=tcp::\(.hostPort)-:\(.guestPort)"] | join(",")')"
       sed -e "s|__ANDROID_CPU_COUNT__|$_wss_cpus|g" \
         -e "s|__ANDROID_RAM_BYTES__|${_wss_ram_bytes}B|g" \
         -e "s|__ANDROID_SYSTEM_IMAGE__|$_wss_system_image|g" \
         -e "s|__ANDROID_USERDATA_IMAGE__|$_wss_userdata_image|g" \
         -e "s|__ANDROID_GSI_IMAGE__|$_wss_gsi_image|g" \
+        -e "s|__ANDROID_NVRAM_IMAGE__|$_wss_nvram_image|g" \
         -e "s|__HOSTFWDS__|$_wss_hostfwds|g" \
         "$_wss_android_start" >"$_wss_path_ps1"
     else
@@ -1668,6 +1673,43 @@ vm_link_system_base_to_utm_bundle() {
 
   ln -f "$_lsbtb_canonical" "$_lsbtb_bundle"
   say "linked system base into UTM bundle: $_lsbtb_bundle"
+  return 0
+}
+
+# vm_link_nvram_to_utm_bundle NAME [BUNDLE_DATA_DIR]
+#   Adopt UTM's generated <name>.utm/Data/efi_vars.fd into the canonical
+#   data/<name> (nvram).fd and re-link it back into the bundle.  WHY: UEFI
+#   variables are per-VM writable state, so they belong in data/ alongside
+#   every other writable disk; UTM generates efi_vars.fd on first import, so
+#   adoption copies bundle → canonical when missing/different, then ln -f
+#   re-links so later UTM writes land in the canonical file.
+vm_link_nvram_to_utm_bundle() {
+  _lntb_name="$1"
+  _lntb_bundle_data_dir="${2:-}"
+
+  if [ -z "$_lntb_bundle_data_dir" ]; then
+    _lntb_bundle_data_dir="$VM_DIR/${_lntb_name}.utm/Data"
+  fi
+  _lntb_bundle="$_lntb_bundle_data_dir/efi_vars.fd"
+  _lntb_canonical="$VM_DIR/data/${_lntb_name} (nvram).fd"
+
+  if [ ! -f "$_lntb_bundle" ]; then
+    return 0
+  fi
+
+  if [ "$dry_run" = true ]; then
+    dry_run "adopt UTM NVRAM vars: $_lntb_bundle -> $_lntb_canonical"
+    return 0
+  fi
+
+  if [ ! -f "$_lntb_canonical" ] || ! cmp -s "$_lntb_bundle" "$_lntb_canonical"; then
+    cp "$_lntb_bundle" "$_lntb_canonical"
+    say "adopted UTM NVRAM vars into data/: $_lntb_canonical"
+  else
+    say "NVRAM vars already canonical: $_lntb_canonical"
+  fi
+  ln -f "$_lntb_canonical" "$_lntb_bundle"
+  say "linked NVRAM vars into UTM bundle: $_lntb_bundle"
   return 0
 }
 
@@ -2816,6 +2858,7 @@ vm_sync_utm() {
   fi
 
   vm_apply_utm_plist_and_register "$vm_id" "$bundle" "$template_drift_config"
+  vm_link_nvram_to_utm_bundle "$vm_id" "$bundle/Data"
 }
 
 vm_sync_utm_vms() {
@@ -3063,9 +3106,11 @@ vm_setup_utm() {
       say "UTM bundle created: $bundle"
     fi
     vm_apply_utm_plist_and_register "$vm_id" "$bundle" "$template_drift_config"
+    vm_link_nvram_to_utm_bundle "$vm_id" "$data_dir"
   else
     dry_run "provision UTM bundle disks for $bundle"
     vm_apply_utm_plist_and_register "$vm_id" "$bundle" "$template_drift_config"
+    vm_link_nvram_to_utm_bundle "$vm_id" "$data_dir"
   fi
 }
 
@@ -4606,8 +4651,9 @@ vm_unpack_vms() {
         else
           say "UTM VM already registered: $_uv_name"
         fi
+        vm_link_nvram_to_utm_bundle "$_uv_name" "$_uv_bundle/Data"
       else
-        dry_run "recreate UTM bundle $_uv_bundle (cp plist template + link disks into Data/ + open)"
+        dry_run "recreate UTM bundle $_uv_bundle (cp plist template + link disks into Data/ + adopt NVRAM + open)"
       fi
       ;;
     Linux)

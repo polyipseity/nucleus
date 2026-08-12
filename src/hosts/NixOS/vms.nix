@@ -100,6 +100,10 @@ let
       "<os firmware='efi'>\n"
       + "    <type arch='aarch64' machine='virt'>hvm</type>\n"
       + "    <loader type='pflash' readonly='yes' secure='no'>/usr/share/AAVMF/AAVMF_CODE.secboot.fd</loader>\n"
+      # WHY: <nvram> is a template path — libvirt creates a per-domain
+      # writable NVRAM copy and preserves it across defines/reboots, so UEFI
+      # vars stay per-VM without our own data/ copy (don't fight libvirt's
+      # lifecycle).
       + "    <nvram>/usr/share/AAVMF/AAVMF_VARS.fd</nvram>\n"
       + "    <boot dev='hd'/>\n"
       + "  </os>"

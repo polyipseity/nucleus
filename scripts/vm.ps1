@@ -742,6 +742,7 @@ function Invoke-VMUnpack {
         $content = $content.Replace('__ANDROID_SYSTEM_IMAGE__', "$vmId (system).qcow2")
         $content = $content.Replace('__ANDROID_USERDATA_IMAGE__', [string]$vmDoc.Android.userdataImage)
         $content = $content.Replace('__ANDROID_GSI_IMAGE__', [string]$vmDoc.Android.gsiImage)
+        $content = $content.Replace('__ANDROID_NVRAM_IMAGE__', "$vmId (nvram).fd")
         $content = $content.Replace('__HOSTFWDS__', $hostFwds)
         Write-VmUnpackFile -Path $startPs1Path -Content $content -Perform $perform
       } else {
