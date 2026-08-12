@@ -2712,7 +2712,7 @@ vm_build_android_image() {
     return 0
   fi
 
-  # check-suppress:suppression_doc: best-effort -- a prerequisite-missing or build failure for one
+  # check-suppress:suppression_doc: best-effort -- a prerequisite-missing or build failure for one image must not abort the rest of the batch; the skip is reported via say.
   vm_build_android "$_vai_id" "$_vai_index" \
     "$accept_gsi_license" "$upgrade_android" "$reset_userdata" ||
     say "Android image build skipped for '$_vai_id' (prerequisite missing or build failed; see above)"
@@ -4009,7 +4009,7 @@ vm_build_system() {
 
   case "$_bs_type" in
   NixOS)
-    # check-suppress:suppression_doc: best-effort -- a prerequisite-missing or build failure for one
+    # check-suppress:suppression_doc: best-effort -- a prerequisite-missing or build failure for one image must not abort the rest of the batch; the skip is reported via say.
     vm_build_nixos "$_bs_type" "$_bs_disk_bytes" ||
       say "NixOS image build skipped for type '$_bs_type' (prerequisite missing or build failed; see above)"
     ;;

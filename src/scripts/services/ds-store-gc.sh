@@ -2,9 +2,6 @@
 # Daily .DS_Store cleanup for ~/dev.
 set -eu
 
-# shellcheck disable=SC2034 # reason: reserved for future lib sourcing
-SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
-
 DEV_ROOT="$HOME/dev"
 removed_count=0
 

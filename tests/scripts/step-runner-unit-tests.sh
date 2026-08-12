@@ -281,7 +281,6 @@ test_run_all_steps_parallel_jobs_cap() {
   (
     # shellcheck disable=SC2030 # reason: PARALLEL_JOBS must be set in the subshell that sources step-runner
     export PARALLEL_JOBS=1
-    # shellcheck disable=SC1091 # reason: test harness sources step-runner from repo root
     . "$REPO_ROOT/src/scripts/lib/step-runner.sh"
     # shellcheck disable=SC2329 # reason: invoked indirectly via register_step function name
     step_one() {

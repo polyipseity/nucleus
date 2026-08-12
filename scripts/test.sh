@@ -30,15 +30,12 @@ if [ -h "$_self" ]; then
 fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 
-# shellcheck source=../src/scripts/tests/test-lib.sh
 _ORCH_SCRIPT_DIR="$SCRIPT_DIR"
 _NUCLEUS_TESTS_DIR="$(CDPATH='' cd -- "$_ORCH_SCRIPT_DIR/../src/scripts/tests" && pwd)"
-cd "$_NUCLEUS_TESTS_DIR" || exit
-# shellcheck disable=SC1091 # reason: literal ./ source path — variable paths break BASH_SOURCE in sourced files
-. ./test-lib.sh
-cd "$_NUCLEUS_TESTS_DIR" || exit
-# shellcheck disable=SC1091 # reason: literal ./ source path — variable paths break BASH_SOURCE in sourced files
-. ./test-steps.sh
+# shellcheck source=../src/scripts/tests/test-lib.sh
+. "$_NUCLEUS_TESTS_DIR/test-lib.sh"
+# shellcheck source=../src/scripts/tests/test-steps.sh
+. "$_NUCLEUS_TESTS_DIR/test-steps.sh"
 
 cd "$REPO_ROOT" || exit
 

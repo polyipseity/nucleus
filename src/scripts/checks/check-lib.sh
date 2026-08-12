@@ -12,13 +12,11 @@ _NUCLEUS_CHECK_LIB_SOURCED=1
 _self="${BASH_SOURCE[0]:-$0}"
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 
-# shellcheck source=../lib/lib.sh
 _NUCLEUS_LIB_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/../lib" && pwd)"
-cd "$_NUCLEUS_LIB_DIR" || exit
-# shellcheck disable=SC1091 # reason: literal ./ source path — variable paths break BASH_SOURCE in sourced files
-. ./lib.sh
-# shellcheck disable=SC1091 # reason: literal ./ source path — variable paths break BASH_SOURCE in sourced files
-. ./step-runner.sh
+# shellcheck source=../lib/lib.sh
+. "$_NUCLEUS_LIB_DIR/lib.sh"
+# shellcheck source=../lib/step-runner.sh
+. "$_NUCLEUS_LIB_DIR/step-runner.sh"
 
 # Check-specific defaults
 export FAIL_FAST=false
