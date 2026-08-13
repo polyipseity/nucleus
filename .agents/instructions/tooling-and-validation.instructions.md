@@ -65,11 +65,7 @@ Enforcement scope: `scripts/`, `tests/`, `src/scripts/`, `src/platforms/Windows/
 
 ### Check script structure
 
-- Both `scripts/check.sh` (POSIX) and `scripts/check.ps1` (Windows) organize check steps into groups. Step numbers follow the `src/scripts/checks/check-steps/<nn>-*.sh|.ps1` file names — that file list is the source of truth (13 steps):
-  - **Toolchain checks** (1-2): Code formatting and linting (treefmt on POSIX; native CLIs on Windows), PowerShell syntax.
-  - **Nix checks** (3-4): Flake evaluation, nix lint (nixf-tidy).
-  - **Data integrity** (5-9): Lockfile validation, locked DSC validation, schema validation, service registry, YAML structural.
-  - **Policy/verification** (10-13): Package manager enforcement, error suppression, online determinism, repository policy (config method, activation token, preflight install-command, embedded content, agents policy).
+- Both `scripts/check.sh` (POSIX) and `scripts/check.ps1` (Windows) organize check steps into groups. Step numbers follow the `src/scripts/checks/check-steps/<nn>-*.sh|.ps1` file names — that file list is the source of truth. The canonical group layout is the "Check step groups" table in `step-runner.instructions.md`; do not duplicate it here (a duplicated listing drifts stale).
 - On Windows (check.ps1), steps 3-4 are stubs (POSIX/Nix-only tools).
 - Pre-flight tool validation runs at the start of both scripts (before `$_step=0`). On POSIX this uses `require_command` from `src/scripts/lib.sh`; on Windows it uses `Ensure-Tool` from `src/platforms/Windows/modules/Ensure-Tool.psm1`.
 - **Provisioning and preflight are separate:** provisioning (`nucleus-bootstrap`, `nucleus-apply`, `lockfile.json` pwsh modules, `core.nix`, WinGet DSC) installs tools; preflight only verifies presence and hard-fails if missing. Never install tools inside check/test preflight blocks.
