@@ -33,7 +33,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # usage
 #   Prints the CLI synopsis and available check flags to stdout.
 usage() {
-  usage_std "health-check.sh" "[options]" "Checks pre-flight readiness before bootstrap/apply/update operations."
+  usage_std "health-check.sh" "[--min-free-bytes=<bytes>] [--secret-health|--no-secret-health] [--log-health] [--store-audit|--no-store-audit]" "Checks pre-flight readiness before bootstrap/apply/update operations."
 }
 
 REPO_ROOT="$(derive_repo_root)"

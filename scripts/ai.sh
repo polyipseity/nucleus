@@ -53,6 +53,7 @@ usage() {
   sync options:
     --dry-run                       Print planned actions without executing them.
     --gc-only                       Skip pulls, only remove orphans.
+    --no-gc-only                    Re-enable pulls (default; cancels --gc-only).
     --ollama-profile <name>         Override profile selection (MacBook|NixOS|Windows).
 
   list options:
