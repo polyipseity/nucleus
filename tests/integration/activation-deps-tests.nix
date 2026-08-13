@@ -19,6 +19,7 @@ let
   activationDagModuleText = builtins.readFile ../../src/modules/lib/activation-dag.nix;
   macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
   middleClickScriptText = builtins.readFile ../../src/hosts/MacBook/scripts/macos-enable-middle-click.sh;
+  mountyScriptText = builtins.readFile ../../src/hosts/MacBook/scripts/macos-register-mounty-login-item.sh;
   spotlightScriptText = builtins.readFile ../../src/hosts/MacBook/scripts/macos-disable-spotlight.sh;
   gimpScrollSensitivityScriptText = builtins.readFile ../../src/scripts/configs/configure-gimp-scroll-sensitivity.sh;
   windowsGitSshModuleText = builtins.readFile ../../src/platforms/Windows/modules/user/Sync-GitAndSshConfig.ps1;
@@ -277,6 +278,21 @@ let
     && !(lib.hasInfix "launchd.agents.\"art.ginzburg.MiddleClick\"" macbookDefaultText)
   ) "MiddleClick startup on macOS must use native Login Items (no custom LaunchAgent)";
 
+  # === TEST: macOS Mounty startup uses Mounty's native helper login item, not System Events ===
+  # NOTE: login-item registration lives in macos-register-mounty-login-item.sh, not in
+  # activation.nix (which only invokes the script); target the script text. Mounty's own
+  # "Start at Login" checkbox calls SMLoginItemSetEnabled on the LSBackgroundOnly helper
+  # bundle com.cu4uc.MountyHelper, which launches the main app at login.
+  test_mounty_native_login_item =
+    assert'
+      (
+        (lib.hasInfix "SMLoginItemSetEnabled" mountyScriptText)
+        && (lib.hasInfix "com.cu4uc.MountyHelper" mountyScriptText)
+        && !(lib.hasInfix "System Events" mountyScriptText)
+        && !(lib.hasInfix "make login item" mountyScriptText)
+      )
+      "Mounty startup on macOS must use Mounty's native helper login item via SMLoginItemSetEnabled (no System Events registration)";
+
   # === TEST: Spotlight disables all known launcher hotkey slots ===
   # NOTE: hotkey loop lives in macos-disable-spotlight.sh, not in activation.nix
   # (which only invokes the script); target the script text.
@@ -375,6 +391,7 @@ let
     test_windows_git_identity_targets_user_gitconfig
     test_posix_git_signing_defaults_enabled
     test_middleclick_native_login_item
+    test_mounty_native_login_item
     test_spotlight_disables_all_hotkey_slots
     test_install_cargo_binstall_dependency_name_alignment
     test_macos_dev_maintenance_is_scheduled
