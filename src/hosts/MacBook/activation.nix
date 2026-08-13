@@ -194,6 +194,9 @@ in
     # ---- macos-configure-lulu-icon -------------------------------------------------
     "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-lulu-icon.sh"
 
+    # ---- macos-configure-menu-bar -------------------------------------------------
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-menu-bar.sh"
+
     # ---- configure-ssh-access -----------------------------------------------------
     # Allow all users to connect via SSH by removing the macOS access-control
     # group. When com.apple.access_ssh does not exist, sshd allows any user
