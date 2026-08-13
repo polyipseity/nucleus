@@ -36,7 +36,9 @@ assert lib.hasInfix "/Library/Objective-See/LuLu/preferences.plist" luluIconScri
 
 # src/hosts/MacBook/scripts/macos-configure-menu-bar.sh
 assert lib.hasInfix "-currentHost" menuBarScriptSh;
+assert lib.hasInfix "MenuItemHidden -bool true" menuBarScriptSh;
 assert lib.hasInfix "Battery -int 12" menuBarScriptSh;
+assert lib.hasInfix "\"NSStatusItem Visible Battery\" -bool false" menuBarScriptSh;
 assert lib.hasInfix "NSStatusItemSpacing" menuBarScriptSh;
 assert lib.hasInfix "killall ControlCenter" menuBarScriptSh;
 assert lib.hasInfix "launchctl asuser" menuBarScriptSh;
