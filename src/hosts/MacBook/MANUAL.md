@@ -2,22 +2,25 @@
 
 - If `/nix` is missing before the first Nix install: run `nucleus-bootstrap`, reboot when prompted, then re-run bootstrap. `nucleus-apply` never modifies `/etc/synthetic.conf`.
 - Configure Raycast database-only settings (see [raycast-manual-config.md](raycast-manual-config.md)): main hotkey (⌘Space), Clipboard History hotkey (⌥⌘C), search sensitivity, vim keybindings.
-- Hide MiddleClick from the menu bar: hold ⌘, drag icon away until ✖️ appears. Re-open to show the icon again.
+- Hide MiddleClick from the menu bar: hold ⌘, drag the icon away until ✖️ appears. The icon returns whenever the app is relaunched — hide it again with ⌘-drag.
 - Grant Accessibility to BetterDisplay, Chrome Remote Desktop Host, and MiddleClick.
 - Grant Screen Recording to BetterDisplay and Chrome Remote Desktop Host.
 - Grant Automation to the terminal running `nucleus-vm setup` for UTM imports.
 - **Allow full disk access for remote users**: Open System Settings → General → Sharing → Remote Login → click the **(i)** icon → toggle **Allow full disk access for remote users** to **On**.
 - Open `fuse-t.app` once, then enable the extension in System Settings > General > Login Items & Extensions > Extensions.
-- NTFS read-write: launch Mounty, agree to the dialog, plug in an NTFS drive, then re-mount it via the Mounty menu-bar icon. If the drive mounts read-only (e.g. after Windows Fast Startup): unmount the drive, run `sudo ntfsfix /dev/diskXsY`, then reconnect the drive. Fallback: unmount and `sudo ntfs-3g /dev/diskXsY /path/to/mountpoint`. The ntfs-3g binary is built automatically during `nucleus-apply`. If the build fails, see `/Users/Shared/nucleus/logs/ntfs-3g-build.log` for the full output.
-- Open `battery.app` once to install `/usr/local/bin/battery`.
+- NTFS read-write: launch Mounty, agree to the dialog, plug in an NTFS drive, then re-mount it via the Mounty menu-bar icon. If the drive mounts read-only (e.g. after Windows Fast Startup): unmount the drive, run `sudo ntfsfix /dev/diskXsY`, then reconnect the drive. Fallback: unmount and `sudo ntfs-3g /dev/diskXsY /path/to/mountpoint`. The ntfs-3g binary is built automatically during `nucleus-apply`. If the build fails, see `/Users/Shared/nucleus/logs/ntfs-3g-build.log` for the full output. Mounty's menu-bar icon cannot be hidden — it has no ⌘-drag support and no hide preference, and it is the app's only control surface (remount trigger + state color) — so it stays visible. The `sudo ntfs-3g` fallback above is the only no-icon path.
+- Open `battery.app` once to install `/usr/local/bin/battery`. The tray icon appears only when the app is opened manually — it is not a login item, so nothing shows at boot. The charge limit keeps working headlessly: `battery maintain 80` installs the `com.battery.app` LaunchAgent.
 - Sign in to the App Store so `mas` can provision Amphetamine.
 - Apple Command Line Tools (CLT) are not required before, during, or after `nucleus-apply`. The install tree under `/Library/Developer/CommandLineTools` is removed on each apply when present (~1 GB). SIP-protected pkgutil receipts are not removed — Software Update may still offer CLT installs. The Nix LLVM toolchain provides `clang`/`clang++`/`ld.lld` via absolute store paths in `CC`/`CXX`/`LD` — no PATH-based resolution occurs, so `/usr/bin/clang` (the xcrun shim) is never reached. If you see the xcrun dialog, check that `nucleus-apply` completed successfully and restart your shell session to pick up the updated environment.
 - Install Amphetamine Power Protect: copy script to `~/Library/Application Scripts/com.if.Amphetamine/` and sudoers to `/private/etc/sudoers.d/` (see upstream README). Re-run `nucleus-apply`.
 - Generate `rclone_config_pass` in `src/secrets/users-<username>.yml` via `openssl rand -hex 64`, commit, re-run `nucleus-apply`. If remotes exist without encryption, delete `~/.config/rclone/rclone.conf` first.
 - Run `nucleus-cloud-setup` and complete `rclone config` for GoogleDrive, iCloud, and OneDrive.
 - Open MusicBrainz Picard, sign in, and add AcoustID API key under Options.
-- Open Equaliser once, then approve its audio driver in System Settings > Privacy & Security > Extensions > Audio Extensions.
+- Open Equaliser once, then approve its audio driver in System Settings > Privacy & Security > Extensions > Audio Extensions. Equaliser's menu-bar icon is its only UI (menu-bar-only app, no hide option, no launch-at-login mechanism) — the app is not auto-launched, so the icon stays absent by default; never add a LaunchAgent for it.
 - Run `camilladsp --version`, then approve BlackHole in System Settings > Privacy & Security and grant Microphone permission.
+- LuLu's menu bar icon is hidden declaratively (`noIconMode`); alerts and firewall rules are unaffected. To manage LuLu (enable/disable, rules, profiles, quit), reopen the app to show its preferences window.
+- Hide OrbStack's menu bar applet (macOS-level, no app preference exists): System Settings → Menu Bar → find OrbStack → turn off **Allow in the Menu Bar**. Re-enable it there to restore the applet.
+- Parsec has no menu bar icon hide option. If its icon ever appears, hide it per-session with ⌘-drag.
 - Restart macOS to see managed Finder sidebar favorites.
 - Caddy local-CA trust runs automatically. If missing: `sudo caddy trust --address 127.0.0.1:2019`.
 - Nix commands may wait on a `nixpkgs-weekly/0.1` fetch from flakehub (multiple "waiting for another Nix process" or "unpacking" lines). This is machine-level config — the global registry maps `nixpkgs` to flakehub and `/etc/nix/nix.conf` sets `extra-nix-path` — not part of `src/flake.lock`. It is a one-time cold-cache cost; later runs are instant.
