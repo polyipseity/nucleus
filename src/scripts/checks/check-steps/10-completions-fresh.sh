@@ -4,7 +4,7 @@
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
 # The canonical nucleus-* command set (alphabetical) — the coverage contract
-# shared with scripts/gen-completions.sh and tests/scripts/gen-completions-tests.sh.
+# shared with src/scripts/completions/gen-completions.sh and tests/scripts/gen-completions-tests.sh.
 _NUCLEUS_COMMANDS=(ai apply audit-store bootstrap bump-lockfile check check-packer check-pwsh check-sh cleanup-nix cloud-setup config gc gs-pdf-opt health-check replica-reset replica-sync service-watchdog svc test update vm)
 
 # Map a command to its .sh help source (for the --list-* introspection check).
@@ -26,8 +26,8 @@ run_completions_fresh() {
   cd "$_repo_root" || return 1
 
   # 1. Generated files must match the generator output (drift = hard failure).
-  if ! bash "$_repo_root/scripts/gen-completions.sh" --check; then
-    error "generated completions are stale — run scripts/gen-completions.sh to regenerate"
+  if ! bash "$_repo_root/src/scripts/completions/gen-completions.sh" --check; then
+    error "generated completions are stale — run src/scripts/completions/gen-completions.sh to regenerate"
     return 1
   fi
 

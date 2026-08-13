@@ -9,6 +9,7 @@ applyTo: "scripts/**, src/scripts/**, src/scripts/lib/**, src/**/*.ps1, src/plat
 ## Scope
 
 - Keep repo-level helper scripts in `scripts/`. Contents include paired `.sh`/`.ps1` entry points for bootstrap, check, cloud-setup, gc, health-check, replica-sync, replica-reset, update, vm-setup, ai-sync, and other automation tasks.
+- `scripts/` is the home of user-facing CLIs (the `nucleus-*` command set). Internal dev/CI tooling that is NOT a `nucleus-*` app belongs under `src/scripts/` (e.g. the completion generators live at `src/scripts/completions/`).
 - Do not scatter contributor-facing or CI-facing automation across random folders when `scripts/` is the intended home.
 
 ## Cross-platform coordination
@@ -38,6 +39,7 @@ Non-host subdirectories follow a two-track convention:
 | ----------------------- | -------------------------------: | ---------------- |
 | `root/` (in `scripts/`) |             `<verb>-<target>.sh` | What action?     |
 | `agents/`               |             `<verb>-<target>.sh` | What action?     |
+| `completions/`          |             `<verb>-<target>.sh` | What action?     |
 | `configs/`              |             `<verb>-<target>.sh` | What action?     |
 | `editors/`              |             `<verb>-<target>.sh` | What action?     |
 | `integrations/`         |             `<verb>-<target>.sh` | What action?     |

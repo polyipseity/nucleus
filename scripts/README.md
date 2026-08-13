@@ -9,7 +9,7 @@ This directory holds contributor and operator commands. They are paired `.sh` / 
 | Who runs it | You, CI, post-apply hooks | Nix activation, systemd/launchd, internal callers |
 | Layout | Flat at repo root | Subdirs by domain (`services/`, `lib/`, `checks/`, …) |
 
-If a script becomes part of activation or a long-running service, it usually moves under `src/scripts/`.
+If a script becomes part of activation or a long-running service, it usually moves under `src/scripts/`. Internal dev tooling that is not a user-facing `nucleus-*` command also lives under `src/scripts/` (e.g. the completion generators in `src/scripts/completions/`).
 
 ## `nucleus-*` commands
 

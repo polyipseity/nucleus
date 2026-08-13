@@ -282,7 +282,7 @@ parse_args() {
       shift
       ;;
     --online)
-      # shellcheck disable=SC2034 # reason: consumed by check step 12 (online-determinism) via transitive sourcing
+      # shellcheck disable=SC2034 # reason: consumed by check step 13 (online-determinism) via transitive sourcing
       ONLINE=true
       shift
       ;;

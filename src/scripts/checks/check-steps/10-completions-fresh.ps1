@@ -1,7 +1,7 @@
-# Step 14: autocompletion freshness (PowerShell).
+# Step 10: autocompletion freshness (PowerShell).
 #
 # Verifies that the generated completer flag inventory in profile.ps1 matches
-# scripts/gen-completions.ps1 (drift), that every nucleus-* command has both a
+# src/scripts/completions/gen-completions.ps1 (drift), that every nucleus-* command has both a
 # zsh _nucleus-<cmd> file and a pwsh completer entry referencing its generated
 # flag array (coverage), and that the -Sections value completion in the
 # bump-lockfile completer still has its --list-sections contract (introspection).
@@ -11,11 +11,11 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Action {
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
-  # 1. Drift: the generated inventory must match scripts/gen-completions.ps1.
+  # 1. Drift: the generated inventory must match src/scripts/completions/gen-completions.ps1.
   Write-Message "--- generated completer inventory matches generator ---"
-  & (Join-Path $r 'scripts\gen-completions.ps1') -Check
+  & (Join-Path $r 'src\scripts\completions\gen-completions.ps1') -Check
   if ($LASTEXITCODE -ne 0) {
-    Write-ErrorMessage "src/scripts/shell/profile.ps1 is stale -- run scripts/gen-completions.ps1"
+    Write-ErrorMessage "src/scripts/shell/profile.ps1 is stale -- run src/scripts/completions/gen-completions.ps1"
     return $false
   }
 

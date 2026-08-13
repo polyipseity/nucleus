@@ -81,8 +81,8 @@ Get-ChildItem ... | Select-GitIgnored
 | Layer                    | Integration                                                                                              |
 | ------------------------ | -------------------------------------------------------------------------------------------------------- |
 | `step-runner.sh`/`.ps1`  | Sources deny-list library; `require_command git` in preflight; `cache_file_lists()` pipes through filter |
-| Check steps (POSIX)      | Steps 10, 13 use `filter_gitignored`                                                                    |
-| Check steps (PowerShell) | Steps 7, 9, 13 use `Select-GitIgnored`                                                                  |
+| Check steps (POSIX)      | Steps 11, 14 use `filter_gitignored`                                                                    |
+| Check steps (PowerShell) | Steps 7, 9, 14 use `Select-GitIgnored`                                                                  |
 | `test-lib.sh`            | Sources deny-list library; test file discovery pipes through filter                                      |
 
 ## Instance registry
@@ -91,25 +91,25 @@ Get-ChildItem ... | Select-GitIgnored
 
 | ID  | Files                                       | Excluded                                              | Tier | Reason                                                                                                                                                       | Verification                                                       |
 | --- | ------------------------------------------- | ----------------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------ |
-| A1  | `10-package-manager-enforcement.sh`, `.ps1` | `check.sh`, `check.ps1`, `shell.nix` (+ self-refs)    | T2   | Orchestrator/parent config files legitimately contain `pip`/`npm` in comments and error messages; self-refs are dynamic                                      | grep after each run: excluded files still contain pip/npm patterns |
-| A2  | `13-repository-policy.sh`, `.ps1`    | `.gitkeep`, `.gitignore`, `*.schema.json`, `agents/*` | T3   | Infrastructure files are not configs; `agents/*` consumed as directory. Note: `qtpass.nix` removed 2026-07-29 by self-pruning check — file no longer existed | Manual quarterly review                                            |
+| A1  | `11-package-manager-enforcement.sh`, `.ps1` | `check.sh`, `check.ps1`, `shell.nix` (+ self-refs)    | T2   | Orchestrator/parent config files legitimately contain `pip`/`npm` in comments and error messages; self-refs are dynamic                                      | grep after each run: excluded files still contain pip/npm patterns |
+| A2  | `14-repository-policy.sh`, `.ps1`    | `.gitkeep`, `.gitignore`, `*.schema.json`, `agents/*` | T3   | Infrastructure files are not configs; `agents/*` consumed as directory. Note: `qtpass.nix` removed 2026-07-29 by self-pruning check — file no longer existed | Manual quarterly review                                            |
 | A3  | `06-locked-dsc-validation.ps1`              | `packages.dsc.yml`                                    | T2   | Packages DSC is generated from lockfile, not manually authored                                                                                               | Verify file still exists                                           |
 | A5  | `gc.sh`, `gc.ps1`                           | `index.lock`                                          | T3   | Git invariant — `index.lock` must never be cleaned                                                                                                           | Manual quarterly review                                            |
 | A6  | `test-lib.sh`                               | `lib.nix` in test discovery                           | T2   | Test helper library excluded from namespace of test files                                                                                                    | Verify file still exists                                           |
 | A7  | `step-runner.sh`, `step-runner.ps1`         | `*.schema.json`                                       | T3   | Glob pattern for schema files is narrow and stable                                                                                                           | Manual quarterly review                                            |
 | A8  | `07-schema-validation.sh`, `.ps1`          | App-owned config formats in $schema EXCEPTION_LIST: `*/users/*/vscode/*.json`, `*/users/*/cursor/*.json`, `*/users/*/iterm2/DynamicProfiles/*.json`, `*/users/*/obsidian/*.json`, `*/users/*/qtpass/*.json`, `*/configs/camilladsp/*`, `*/configs/camillagui-backend/*`, `*/users/*/discord-music-rpc/*`, `*/users/*/agents/hooks/*.json`, `*/users/*/agents/skills/*/_meta.json`, `*/ai/litellm-config.yml`, `*/.sops.yaml` | T3   | No published JSON schema exists; vscode:// URIs not fetchable by check-jsonschema (Spec G)                                                                     | Manual quarterly review                                            |
-| A9  | `11-suppression-audit.ps1`                 | self-file (basename)                          | T3   | Self-reference — scan definitions contain the literal suppression patterns being detected; `| Out-Null` self-flags cannot be annotation-suppressed (NoSuppressionCheck) | Manual quarterly review                                            |
+| A9  | `12-suppression-audit.ps1`                 | self-file (basename)                          | T3   | Self-reference — scan definitions contain the literal suppression patterns being detected; `| Out-Null` self-flags cannot be annotation-suppressed (NoSuppressionCheck) | Manual quarterly review                                            |
 
 ### Category B — Directory-based exclude lists
 
 | ID  | Files                                     | Excluded dirs         | Tier | Reason                                                                                                     | Verification            |
 | --- | ----------------------------------------- | --------------------- | ---- | ---------------------------------------------------------------------------------------------------------- | ----------------------- |
-| B1  | `13-repository-policy.sh`, `.ps1`  | `vendor/`, `configs/` | T3   | Structural invariants — vendored code and config methods are different concerns                            | Manual quarterly review |
+| B1  | `14-repository-policy.sh`, `.ps1`  | `vendor/`, `configs/` | T3   | Structural invariants — vendored code and config methods are different concerns                            | Manual quarterly review |
 | B2  | `01-code-formatting.ps1`                  | `vendor/`             | T3   | Structural invariant (vendor/ speed); secrets/ covered by gitignore (treefmt natively respects .gitignore) | Manual quarterly review |
 | B3  | `07-schema-validation.ps1`                | `vendor/`             | T3   | Structural invariant (vendor/ speed); secrets/ dropped — covered by gitignore + Select-GitIgnored          | Manual quarterly review |
 | B4  | `09-yaml-structural.ps1`                  | `vendor/`             | T3   | Structural invariant (vendor/ speed); secrets/ dropped — covered by gitignore + Select-GitIgnored          | Manual quarterly review |
-| B5  | `11-suppression-audit.ps1`                | `vendor/`             | T3   | Structural invariant; supplemented by Select-GitIgnored                                                    | Manual quarterly review |
-| B6  | `13-repository-policy.ps1` | `vendor/`             | T3   | Structural invariant; supplemented by Select-GitIgnored                                                    | Manual quarterly review |
+| B5  | `12-suppression-audit.ps1`                | `vendor/`             | T3   | Structural invariant; supplemented by Select-GitIgnored                                                    | Manual quarterly review |
+| B6  | `14-repository-policy.ps1` | `vendor/`             | T3   | Structural invariant; supplemented by Select-GitIgnored                                                    | Manual quarterly review |
 | B7  | `step-runner.sh`, `step-runner.ps1`       | `vendor/`             | T3   | Structural invariant; supplemented by filter_gitignored/Select-GitIgnored                                  | Manual quarterly review |
 | B8  | `cleanup-nix-build-artifacts.sh`          | `vendor/`             | T3   | Structural invariant                                                                                       | Manual quarterly review |
 
@@ -121,7 +121,7 @@ Get-ChildItem ... | Select-GitIgnored
 | C2  | `script-validation-tests.sh` | `^svc: warning:` in service test         | T3   | Runtime warning noise from svc script                 | Manual quarterly review |
 | C3  | `apple-sdk-override.sh`      | env vars in nix output filter            | T3   | Nix-env debug output suppression                      | Manual quarterly review |
 | C4  | `scripts/check-packer.sh`    | `Warning: A checksum of 'none' was specified … (source code not available)` block | T3   | Microsoft publishes no stable Windows 11 ISO checksums; `iso_checksum = "none"` intentional in `src/vms/Windows/packer.pkr.hcl` (lines 39, 228); exit code still enforced | Manual quarterly review |
-| C5  | `13-repository-policy.sh`, `.ps1` | self-file (`basename "${BASH_SOURCE[0]}"` / `Split-Path -Leaf $PSCommandPath`) | T3   | Self-refs are dynamic — the source contains the literal heredoc/here-string patterns being detected | Manual quarterly review |
+| C5  | `14-repository-policy.sh`, `.ps1` | self-file (`basename "${BASH_SOURCE[0]}"` / `Split-Path -Leaf $PSCommandPath`) | T3   | Self-refs are dynamic — the source contains the literal heredoc/here-string patterns being detected | Manual quarterly review |
 
 ### Category D — Allowlists
 
@@ -134,7 +134,7 @@ Get-ChildItem ... | Select-GitIgnored
 ## Review cadence
 
 - **Quarterly**: full audit of all T3 entries. Check each excluded file still exists, each excluded pattern is still justified, and no new hard-coded exclude lists have been introduced. Verify that gitignore-based filtering (via `filter_gitignored`/`Select-GitIgnored`) is applied to any new file-generation script.
-- **Quarterly — shared-content audit**: for each content category in the embedded-content policy (profile body, VM start scripts, service wrappers, Caddyfile, cloud-drive wrappers), confirm there is exactly ONE canonical file on disk and no same-language duplicate has re-appeared (e.g. a second inline copy of the Android VM QEMU start script). Step 13's embedded-content enforcement sub-check (repository-policy) flags new large embedded literals; any duplicate found here is fixed in the same review. Registry of shared files lives in `embedded-content.instructions.md` § Shared cross-platform content.
+- **Quarterly — shared-content audit**: for each content category in the embedded-content policy (profile body, VM start scripts, service wrappers, Caddyfile, cloud-drive wrappers), confirm there is exactly ONE canonical file on disk and no same-language duplicate has re-appeared (e.g. a second inline copy of the Android VM QEMU start script). Step 14's embedded-content enforcement sub-check (repository-policy) flags new large embedded literals; any duplicate found here is fixed in the same review. Registry of shared files lives in `embedded-content.instructions.md` § Shared cross-platform content.
 - **Trigger**: review is due when a check step is added, removed, or renumbered.
-- **Last reviewed**: 2026-08-12 (13 check steps; numbers derived from NN- filename prefixes)
-- **Verification**: run `scripts/check.sh` (which includes step 13 `repository-policy` for preflight InstallCommand policy) to catch regressions.
+- **Last reviewed**: 2026-08-13 (14 check steps; numbers derived from NN- filename prefixes)
+- **Verification**: run `scripts/check.sh` (which includes step 14 `repository-policy` for preflight InstallCommand policy) to catch regressions.

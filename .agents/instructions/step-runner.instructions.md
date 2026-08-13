@@ -187,8 +187,8 @@ Cross-platform equivalence:
 | ----- | ----- | --- |
 | Format and lint | 01–02 | `code-formatting` (treefmt on POSIX; native CLIs on Windows), `powershell-lint` (syntax only; `-SkipStep PSSA`) |
 | Nix | 03–04 | `nix-flake-eval`, `nix-lint` |
-| Data and schema | 05–09 | `lockfile-validation`, `locked-dsc-validation`, `schema-validation`, `service-registry`, `yaml-structural` |
-| Repository policy | 10–13 | `package-manager-enforcement`, `suppression-audit`, `online-determinism`, `repository-policy` |
+| Data and schema | 05–10 | `lockfile-validation`, `locked-dsc-validation`, `schema-validation`, `service-registry`, `yaml-structural`, `completions-fresh` |
+| Repository policy | 11–14 | `package-manager-enforcement`, `suppression-audit`, `online-determinism`, `repository-policy` |
 
 Shell entry-script validation (`script-validation-tests.sh`) runs in test step 5 (`script-and-framework-tests`), not in the check pipeline. Step 5 runs priority framework suites serially, then parallelizes the remaining `tests/scripts/**/*-tests.*` suites with ordered output replay; `nucleus-apps-smoke-tests.sh` is discovered there and runs under `nucleus_nix_locked` on POSIX.
 
