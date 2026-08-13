@@ -1,6 +1,21 @@
 #compdef nucleus-bump-lockfile
 
+_nucleus_bump_lockfile_sections=(
+  'bun' 'camilladsp' 'camillagui-backend' 'cargo' 'cargo-binstall'
+  'homebrew' 'homebrew.brews' 'homebrew.casks' 'homebrew.masApps'
+  'ollama' 'pwsh' 'rustup' 'sccache' 'scoop' 'source-builds'
+  'starship' 'uv' 'version' 'vm-setup' 'vm-setup.nixos-iso'
+  'vm-setup.tart-images' 'vm-setup.windows' 'vscode' 'winget'
+)
+
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
-  '--sections:Comma-separated section names to update' \
+  '--list-sections[Print valid section names, one per line]' \
+  '--sections:Comma-separated section names to update:->sections' \
   '--verify[Verify lockfile integrity without modifying]'
+
+case $state in
+sections)
+  _describe 'sections' _nucleus_bump_lockfile_sections
+  ;;
+esac

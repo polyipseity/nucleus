@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
-# Behavioral tests for scripts/bump-lockfile.sh: --verify stability and
-# no-change write skipping (.updated is stamped only when a section changed).
+# Behavioral tests for scripts/bump-lockfile.sh: --verify stability, no-change
+# write skipping (.updated is stamped only when a section changed),
+# --list-sections / --sections validation, GitHub scalar updaters, no-updater
+# sections, and vm-setup sub-section selection.
 #
 # Run with: bash tests/scripts/bump-lockfile-tests.sh
 
@@ -17,7 +19,8 @@ BUMP_LOCKFILE_SCRIPT="$REPO_ROOT/scripts/bump-lockfile.sh"
 # Create a fake repo ($tmp/src/lockfiles/lockfile.json) plus an empty $tmp/bin
 # for stub tools; print the repo root. The fixture is a trimmed lockfile
 # (2-space jq indent, trailing newline) mirroring the shape of
-# src/lockfiles/lockfile.json for the sections phase 1 exercises.
+# src/lockfiles/lockfile.json for the sections the tests exercise (scalar pins
+# and vm-setup included).
 setup_fake_repo() {
   local dir
   dir="$(mktemp -d)"
@@ -28,10 +31,25 @@ setup_fake_repo() {
   "bun": {
     "fixture-pkg": "1.0.0"
   },
+  "camilladsp": "1.0.0",
   "cargo-binstall": {
     "fixture-tool": "0.1.0"
   },
-  "updated": "2026-08-02T07:16:01Z"
+  "updated": "2026-08-02T07:16:01Z",
+  "vm-setup": {
+    "nixos-iso": {
+      "aarch64-linux": {
+        "url": "https://channels.nixos.org/nixos-unstable/latest-nixos-minimal-aarch64-linux.iso",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      }
+    },
+    "tart-images": {
+      "sequoia": {
+        "image": "ghcr.io/cirruslabs/macos-sequoia-base",
+        "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+      }
+    }
+  }
 }
 EOF
   printf '%s\n' "$dir"
@@ -44,6 +62,188 @@ run_bump_lockfile() {
   shift
   NUCLEUS_REPO_ROOT="$repo_root" PATH="$repo_root/bin:$PATH" \
     "$BUMP_LOCKFILE_SCRIPT" "$@"
+}
+
+test_list_sections_prints_all() {
+  local tmp
+  tmp="$(setup_fake_repo)"
+  if run_bump_lockfile "$tmp" --list-sections >"$tmp/out.txt" 2>&1; then
+    assert_pass "bump-lockfile --list-sections exits 0"
+  else
+    assert_fail "bump-lockfile --list-sections exits 0" "exit code $?"
+  fi
+  cat >"$tmp/expected.txt" <<'EOF'
+bun
+camilladsp
+camillagui-backend
+cargo
+cargo-binstall
+homebrew
+homebrew.brews
+homebrew.casks
+homebrew.masApps
+ollama
+pwsh
+rustup
+sccache
+scoop
+source-builds
+starship
+uv
+version
+vm-setup
+vm-setup.nixos-iso
+vm-setup.tart-images
+vm-setup.windows
+vscode
+winget
+EOF
+  if diff -u "$tmp/expected.txt" "$tmp/out.txt" >"$tmp/diff.txt" 2>&1; then
+    assert_pass "bump-lockfile --list-sections prints the 24 canonical names"
+  else
+    assert_fail "bump-lockfile --list-sections prints the 24 canonical names" "diff: $(head -1 "$tmp/diff.txt")"
+  fi
+  rm -rf "$tmp"
+}
+
+test_sections_rejects_unknown() {
+  local tmp
+  tmp="$(setup_fake_repo)"
+  if run_bump_lockfile "$tmp" --sections bogus >"$tmp/out.txt" 2>&1; then
+    assert_fail "bump-lockfile --sections bogus exits 1" "expected non-zero exit"
+  else
+    assert_pass "bump-lockfile --sections bogus exits 1"
+  fi
+  if grep -q "unknown section 'bogus' (valid: bun,camilladsp," "$tmp/out.txt"; then
+    assert_pass "bump-lockfile --sections bogus reports the unknown section"
+  else
+    assert_fail "bump-lockfile --sections bogus reports the unknown section" "output: $(head -1 "$tmp/out.txt")"
+  fi
+  rm -rf "$tmp"
+}
+
+test_scalar_section_updates_from_github() {
+  local tmp
+  tmp="$(setup_fake_repo)"
+  cat >"$tmp/bin/curl-response.json" <<'EOF'
+{"tag_name": "v4.1.3"}
+EOF
+  cat >"$tmp/bin/curl" <<'EOF'
+#!/usr/bin/env bash
+cat "$(dirname "$0")/curl-response.json"
+EOF
+  chmod +x "$tmp/bin/curl"
+
+  if run_bump_lockfile "$tmp" --sections camilladsp >"$tmp/out.txt" 2>&1; then
+    assert_pass "bump-lockfile camilladsp GitHub release path exits 0"
+  else
+    assert_fail "bump-lockfile camilladsp GitHub release path exits 0" "exit code $?"
+  fi
+  if [ "$(jq -r '.camilladsp' "$tmp/src/lockfiles/lockfile.json")" = "4.1.3" ]; then
+    assert_pass "bump-lockfile camilladsp updates the pinned scalar"
+  else
+    assert_fail "bump-lockfile camilladsp updates the pinned scalar" "got $(jq -r '.camilladsp' "$tmp/src/lockfiles/lockfile.json")"
+  fi
+  if grep -q 'updating camilladsp.camilladsp from 1.0.0 to 4.1.3' "$tmp/out.txt"; then
+    assert_pass "bump-lockfile camilladsp reports the update"
+  else
+    assert_fail "bump-lockfile camilladsp reports the update" "output: $(head -1 "$tmp/out.txt")"
+  fi
+  rm -rf "$tmp"
+}
+
+test_no_updater_section_is_skipped() {
+  local tmp before after
+  tmp="$(setup_fake_repo)"
+  before="$(cat "$tmp/src/lockfiles/lockfile.json")"
+
+  if run_bump_lockfile "$tmp" --sections version >"$tmp/out.txt" 2>&1; then
+    assert_pass "bump-lockfile --sections version (no updater) exits 0"
+  else
+    assert_fail "bump-lockfile --sections version (no updater) exits 0" "exit code $?"
+  fi
+  after="$(cat "$tmp/src/lockfiles/lockfile.json")"
+  if [ "$before" = "$after" ]; then
+    assert_pass "bump-lockfile --sections version leaves the lockfile unchanged"
+  else
+    assert_fail "bump-lockfile --sections version leaves the lockfile unchanged" "file content changed"
+  fi
+  if grep -q 'has no updater' "$tmp/out.txt"; then
+    assert_pass "bump-lockfile --sections version warns about the manual section"
+  else
+    assert_fail "bump-lockfile --sections version warns about the manual section" "output: $(head -1 "$tmp/out.txt")"
+  fi
+  rm -rf "$tmp"
+}
+
+test_vm_setup_subsection_runs_alone() {
+  local tmp
+  tmp="$(setup_fake_repo)"
+  # Stub curl with a redirect location header plus a checksum body so the
+  # nixos-iso block resolves a URL and digest locally (no real network).
+  cat >"$tmp/bin/curl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' \
+  'location: https://channels.nixos.org/nixos-unstable/latest-nixos-minimal-aarch64-linux.iso' \
+  'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+EOF
+  chmod +x "$tmp/bin/curl"
+
+  if run_bump_lockfile "$tmp" --sections vm-setup.nixos-iso >"$tmp/out.txt" 2>&1; then
+    assert_pass "bump-lockfile --sections vm-setup.nixos-iso exits 0"
+  else
+    assert_fail "bump-lockfile --sections vm-setup.nixos-iso exits 0" "exit code $?"
+  fi
+  if grep -q 'updating vm-setup.nixos-iso.aarch64-linux' "$tmp/out.txt"; then
+    assert_pass "bump-lockfile --sections vm-setup.nixos-iso updates the ISO pin"
+  else
+    assert_fail "bump-lockfile --sections vm-setup.nixos-iso updates the ISO pin" "output: $(head -1 "$tmp/out.txt")"
+  fi
+  if [ "$(jq -r '.["vm-setup"]["nixos-iso"]["aarch64-linux"].digest' "$tmp/src/lockfiles/lockfile.json")" = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" ]; then
+    assert_pass "bump-lockfile --sections vm-setup.nixos-iso writes the new digest"
+  else
+    assert_fail "bump-lockfile --sections vm-setup.nixos-iso writes the new digest" "got $(jq -r '.["vm-setup"]["nixos-iso"]["aarch64-linux"].digest' "$tmp/src/lockfiles/lockfile.json")"
+  fi
+  if grep -q 'GHCR' "$tmp/out.txt"; then
+    assert_fail "bump-lockfile --sections vm-setup.nixos-iso does not run tart-images" "GHCR message present"
+  else
+    assert_pass "bump-lockfile --sections vm-setup.nixos-iso does not run tart-images"
+  fi
+  rm -rf "$tmp"
+}
+
+test_vm_setup_parent_selects_children() {
+  local tmp
+  tmp="$(setup_fake_repo)"
+  cat >"$tmp/bin/curl" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' \
+  'location: https://channels.nixos.org/nixos-unstable/latest-nixos-minimal-aarch64-linux.iso' \
+  'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+EOF
+  chmod +x "$tmp/bin/curl"
+
+  if run_bump_lockfile "$tmp" --sections vm-setup >"$tmp/out.txt" 2>&1; then
+    assert_pass "bump-lockfile --sections vm-setup (parent) exits 0"
+  else
+    assert_fail "bump-lockfile --sections vm-setup (parent) exits 0" "exit code $?"
+  fi
+  if grep -q 'updating vm-setup.nixos-iso.aarch64-linux' "$tmp/out.txt"; then
+    assert_pass "bump-lockfile --sections vm-setup runs the nixos-iso child"
+  else
+    assert_fail "bump-lockfile --sections vm-setup runs the nixos-iso child" "output: $(head -1 "$tmp/out.txt")"
+  fi
+  if grep -q 'could not get GHCR token' "$tmp/out.txt"; then
+    assert_pass "bump-lockfile --sections vm-setup runs the tart-images child"
+  else
+    assert_fail "bump-lockfile --sections vm-setup runs the tart-images child" "GHCR token message missing"
+  fi
+  if grep -q 'updating bun' "$tmp/out.txt"; then
+    assert_fail "bump-lockfile --sections vm-setup does not run unrelated sections" "bun updated"
+  else
+    assert_pass "bump-lockfile --sections vm-setup does not run unrelated sections"
+  fi
+  rm -rf "$tmp"
 }
 
 test_verify_passes_on_unchanged_fixture() {
@@ -291,6 +491,12 @@ test_cargo_binstall_updates_from_crates_io_api
 test_cargo_binstall_cargo_alias_selects_section
 test_cargo_binstall_falls_back_to_cargo_search
 test_cargo_binstall_warns_when_no_version_source
+test_list_sections_prints_all
+test_sections_rejects_unknown
+test_scalar_section_updates_from_github
+test_no_updater_section_is_skipped
+test_vm_setup_subsection_runs_alone
+test_vm_setup_parent_selects_children
 
 echo ""
 echo "============================================================"

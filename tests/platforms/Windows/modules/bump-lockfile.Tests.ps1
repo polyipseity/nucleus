@@ -8,7 +8,9 @@
   that 'updated' is stamped only when a real change is written.
 
   Also covers the cargo-binstall section: the crates.io API with the cargo
-  search fallback, and the 'cargo' section alias.
+  search fallback, and the 'cargo' section alias. Plus the CLI surface:
+  -ListSections output, unknown-section validation, the homebrew section via
+  a fake brew, and the no-updater skip message.
 
   Run with: pwsh -NoProfile -Command "Invoke-Pester tests/platforms/Windows/modules/bump-lockfile.Tests.ps1 -Passthru"
 #>
@@ -26,6 +28,11 @@ BeforeAll {
   },
   "cargo-binstall": {
     "nucleus-bump-lockfile-fixture-crate-does-not-exist": "0.1.0"
+  },
+  "homebrew": {
+    "brews": {
+      "fixture-brew-pkg": "0.9.0"
+    }
   },
   "updated": "2026-01-01T00:00:00Z",
   "version": 2
@@ -68,6 +75,17 @@ BeforeAll {
       # POSIX requires the executable bit; Windows CI uses cargo.cmd instead.
       & chmod +x (Join-Path $binDir 'cargo')
     }
+
+    # Fake brew: echoes the canned line stored in brew-output for any
+    # invocation. Dual shim so tests run on Windows CI (brew.cmd) and POSIX
+    # pwsh (brew).
+    Set-Content -Path (Join-Path $binDir 'brew-output') -Value 'fixture-brew-pkg 0.9.0' -NoNewline
+    Set-Content -Path (Join-Path $binDir 'brew.cmd') -Value "@echo off`r`nset /p OUT=<%~dp0brew-output`r`necho %OUT%" -Encoding ASCII
+    Set-Content -Path (Join-Path $binDir 'brew') -Value "#!/bin/sh`ncat `"`$(dirname `"`$0`")/brew-output`"" -Encoding ASCII
+    if (-not $IsWindows) {
+      # POSIX requires the executable bit; Windows CI uses brew.cmd instead.
+      & chmod +x (Join-Path $binDir 'brew')
+    }
   }
 
   function Set-FakeNpmVersion {
@@ -82,6 +100,13 @@ BeforeAll {
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     param([string]$Output)
     Set-Content -Path (Join-Path $Script:FixtureRoot 'bin/cargo-output') -Value $Output -NoNewline
+  }
+
+  function Set-FakeBrewOutput {
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test fixture writes an output file; no ShouldProcess in tests
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    param([string]$Output)
+    Set-Content -Path (Join-Path $Script:FixtureRoot 'bin/brew-output') -Value $Output -NoNewline
   }
 
   function Invoke-BumpLockfile {
@@ -185,5 +210,84 @@ Describe 'bump-lockfile.ps1 cargo-binstall (crates.io + cargo search fallback)' 
     $result.ExitCode | Should -Be 0
     $result.Output | Should -Match 'no version source'
     Get-FixtureContent | Should -Match '"nucleus-bump-lockfile-fixture-crate-does-not-exist": "0\.1\.0"'
+  }
+}
+
+Describe 'bump-lockfile.ps1 -ListSections' {
+  BeforeEach {
+    New-FixtureRepo
+  }
+
+  It 'prints exactly the 24 canonical section names in alphabetical order' {
+    $expected = @(
+      'bun',
+      'camilladsp',
+      'camillagui-backend',
+      'cargo',
+      'cargo-binstall',
+      'homebrew',
+      'homebrew.brews',
+      'homebrew.casks',
+      'homebrew.masApps',
+      'ollama',
+      'pwsh',
+      'rustup',
+      'sccache',
+      'scoop',
+      'source-builds',
+      'starship',
+      'uv',
+      'version',
+      'vm-setup',
+      'vm-setup.nixos-iso',
+      'vm-setup.tart-images',
+      'vm-setup.windows',
+      'vscode',
+      'winget'
+    )
+    $result = Invoke-BumpLockfile -Arguments @('-ListSections')
+    $result.ExitCode | Should -Be 0
+    $result.Output -split "`n" | Should -Be $expected
+  }
+}
+
+Describe 'bump-lockfile.ps1 -Sections validation' {
+  BeforeEach {
+    New-FixtureRepo
+  }
+
+  It 'rejects an unknown section with the valid list on stderr and exit 1' {
+    $result = Invoke-BumpLockfile -Arguments @('-Sections', 'bogus')
+    $result.ExitCode | Should -Be 1
+    $result.Output | Should -Match "unknown section 'bogus'"
+    $result.Output | Should -Match 'valid:'
+  }
+}
+
+Describe 'bump-lockfile.ps1 homebrew section' {
+  BeforeEach {
+    New-FixtureRepo
+  }
+
+  It 'updates a brew pin from the fake brew list --versions output' {
+    Set-FakeBrewOutput -Output 'fixture-brew-pkg 9.9.9'
+    $result = Invoke-BumpLockfile -Arguments @('-Sections', 'homebrew.brews')
+    $result.ExitCode | Should -Be 0
+    $result.Output | Should -Match 'updating homebrew\.brews\.fixture-brew-pkg'
+    Get-FixtureContent | Should -Match '"fixture-brew-pkg": "9\.9\.9"'
+  }
+}
+
+Describe 'bump-lockfile.ps1 no-updater sections' {
+  BeforeEach {
+    New-FixtureRepo
+  }
+
+  It 'skips an explicitly selected no-updater section without failing' {
+    $before = Get-FixtureContent
+    $result = Invoke-BumpLockfile -Arguments @('-Sections', 'version')
+    $result.ExitCode | Should -Be 0
+    $result.Output | Should -Match 'no updater'
+    Get-FixtureContent | Should -Be $before
   }
 }

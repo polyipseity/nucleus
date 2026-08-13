@@ -22,7 +22,7 @@
 - `nucleus-ai` — manage AI models (sync, list, status, endpoint, config)
 - `nucleus-apply` — apply configuration
 - `nucleus-bootstrap` — bootstrap system
-- `nucleus-bump-lockfile` — update version pins in `src/lockfiles/lockfile.json`; pass `-Sections winget,scoop,...` for specific sections
+- `nucleus-bump-lockfile` — update version pins in `src/lockfiles/lockfile.json`; `-Sections <csv>` selects sections (`cargo` aliases `cargo-binstall`; sub-section names like `vm-setup.nixos-iso`); `-Verify` checks without writing; `-ListSections` lists valid section names
 - `nucleus-check-pwsh` — check PowerShell syntax
 - `nucleus-check-sh` — check POSIX shell syntax
 - `nucleus-cloud-setup` — configure cloud remotes and re-apply

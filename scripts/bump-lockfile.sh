@@ -4,18 +4,31 @@
 # updated lockfile atomically.
 #
 # Sections (pass comma-separated via --sections to update selectively):
-#   winget        winget show --id <id>
-#   scoop         scoop info <pkg>
-#   cargo-binstall crates.io API (alias: cargo)
-#   bun           npm view <pkg> version
-#   uv            uv tool list
-#   rustup        rustc +<ch> --version
-#   pwsh          Find-Module via pwsh      (skip if pwsh unavailable)
-#   vscode        code/code-insiders --list-extensions --show-versions
-#                 (skip if neither available)
-#   ollama        ollama show <name>:<tag> --format json
-#                 (skip if ollama unavailable)
-#   vm-setup      VM image artifact pins (nixos-iso, tart-images, windows). Use --sections nixos-iso etc. for sub-sections.
+#   winget            winget show --id <id>
+#   scoop             scoop info <pkg>
+#   cargo-binstall    crates.io API (alias: cargo)
+#   bun               npm view <pkg> version
+#   uv                uv tool list
+#   rustup            rustc +<ch> --version
+#   pwsh              Find-Module via pwsh        (skip if pwsh unavailable)
+#   homebrew          parent - selects brews, casks, masApps
+#   homebrew.brews    brew list --versions
+#   homebrew.casks    brew list --cask --versions
+#   homebrew.masApps  no updater (manual)
+#   vscode            code/code-insiders --list-extensions --show-versions
+#                     (skip if neither available)
+#   ollama            ollama show <name>:<tag> --format json
+#                     (skip if ollama unavailable)
+#   camilladsp        GitHub releases (HEnquist/camilladsp)
+#   camillagui-backend GitHub releases (HEnquist/camillagui-backend)
+#   sccache           GitHub releases (mozilla/sccache)
+#   starship          GitHub releases (starship/starship)
+#   source-builds     no updater (manual)
+#   version           no updater (manual)
+#   vm-setup          parent - selects nixos-iso, tart-images, windows
+#   vm-setup.nixos-iso  NixOS channel latest ISO URL + SHA-256
+#   vm-setup.tart-images  GHCR OCI registry digest
+#   vm-setup.windows  no updater (manual)
 
 set -euo pipefail
 
@@ -32,23 +45,45 @@ SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 usage() {
-  usage_std "$(basename "$0")" "[--sections <comma-separated>] [--verify]" \
+  usage_std "$(basename "$0")" "[--sections <comma-separated>] [--verify] [--list-sections]" \
     "Query each available tool for the current version of each pinned item and write an updated lockfile atomically."
   cat <<'EOF'
 
-Sections (pass comma-separated via --sections to update selectively):
-  winget        winget show --id <id>
-  scoop         scoop info <pkg>
-  cargo-binstall crates.io API (alias: cargo)
-  bun           npm view <pkg> version
-  uv            uv tool list
-  rustup        rustc +<ch> --version
-  pwsh          Find-Module via pwsh      (skip if pwsh unavailable)
-  vscode        code/code-insiders --list-extensions --show-versions
-                (skip if neither available)
-  ollama        ollama show <name>:<tag> --format json
-                (skip if ollama unavailable)
-  vm-setup      VM image artifact pins (nixos-iso, tart-images, windows). Use --sections nixos-iso etc. for sub-sections.
+Options:
+  --sections <list>  Comma-separated section names to update (default: all)
+  --verify           Check for updates without writing (exit 1 if changes would be made)
+  --list-sections    Print valid section names, one per line
+  --help             Show this usage
+
+Sections (status — mechanism):
+  winget                updates   winget show --id <id>
+  scoop                 updates   scoop info <pkg>
+  cargo-binstall        updates   crates.io API
+  cargo                 alias     selects cargo-binstall
+  bun                   updates   npm view <pkg> version
+  uv                    updates   uv tool list
+  rustup                updates   rustc +<ch> --version
+  pwsh                  updates   Find-Module via pwsh (skip if pwsh unavailable)
+  homebrew              parent    selects brews, casks, masApps
+  homebrew.brews        updates   brew list --versions
+  homebrew.casks        updates   brew list --cask --versions
+  homebrew.masApps      no updater (manual)
+  vscode                updates   code/code-insiders --list-extensions --show-versions
+                                  (skip if neither available)
+  ollama                updates   ollama show <name>:<tag> --format json
+                                  (skip if ollama unavailable)
+  camilladsp            updates   GitHub releases (HEnquist/camilladsp)
+  camillagui-backend    updates   GitHub releases (HEnquist/camillagui-backend)
+  sccache               updates   GitHub releases (mozilla/sccache)
+  starship              updates   GitHub releases (starship/starship)
+  source-builds         no updater (manual)
+  version               no updater (manual)
+  vm-setup              parent    selects nixos-iso, tart-images, windows
+  vm-setup.nixos-iso    updates   NixOS channel latest ISO URL + SHA-256
+  vm-setup.tart-images  updates   GHCR OCI registry digest
+  vm-setup.windows      no updater (manual)
+
+PowerShell equivalents: -Sections, -Verify, -ListSections, -Help.
 EOF
 }
 
@@ -64,22 +99,31 @@ if [ ! -f "$LOCKFILE_ABS" ]; then
   exit 1
 fi
 
+# Canonical section names (alphabetical). cargo aliases cargo-binstall; the
+# legacy bare tokens nixos-iso / tart-images normalize to vm-setup children.
+_VALID_SECTIONS_CSV="bun,camilladsp,camillagui-backend,cargo,cargo-binstall,homebrew,homebrew.brews,homebrew.casks,homebrew.masApps,ollama,pwsh,rustup,sccache,scoop,source-builds,starship,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vm-setup.windows,vscode,winget"
+
 # Parse --sections flag (comma-separated, defaults to all)
 SECTIONS=""
 VERIFY=false
 
 while [ $# -gt 0 ]; do
   case "$1" in
+  --help)
+    usage
+    exit 0
+    ;;
+  --list-sections)
+    IFS=',' read -ra _sections <<<"$_VALID_SECTIONS_CSV"
+    printf '%s\n' "${_sections[@]}"
+    exit 0
+    ;;
   --sections)
     shift
     SECTIONS="$1"
     ;;
   --verify)
     VERIFY=true
-    ;;
-  --help)
-    usage
-    exit 0
     ;;
   *)
     error "unknown flag: $1"
@@ -89,18 +133,62 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+# Validate and normalize --sections tokens: trim whitespace, map legacy bare
+# sub-section names (nixos-iso, tart-images) and the cargo alias to canonical
+# dotted form, and reject anything unknown.
+_is_valid_section() {
+  local token="$1"
+  case ",$_VALID_SECTIONS_CSV," in
+  *",$token,"*) return 0 ;;
+  esac
+  return 1
+}
+
+if [ -n "$SECTIONS" ]; then
+  _normalized=()
+  IFS=',' read -ra _tokens <<<"$SECTIONS"
+  for _tok in "${_tokens[@]}"; do
+    _tok="$(printf '%s\n' "$_tok" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
+    [ -z "$_tok" ] && continue
+    case "$_tok" in
+    nixos-iso) _tok="vm-setup.nixos-iso" ;;
+    tart-images) _tok="vm-setup.tart-images" ;;
+    cargo) _tok="cargo-binstall" ;;
+    esac
+    if ! _is_valid_section "$_tok"; then
+      error "unknown section '$_tok' (valid: $_VALID_SECTIONS_CSV)"
+      exit 1
+    fi
+    _normalized+=("$_tok")
+  done
+  SECTIONS="$(printf '%s,' "${_normalized[@]}")"
+  SECTIONS="${SECTIONS%,}"
+fi
+
+# Explicitly-selected sections without an updater are kept manual; warn so the
+# run does not silently skip them. Parent tokens (homebrew, vm-setup) do not
+# warn for their no-updater children.
+if [ -n "$SECTIONS" ]; then
+  IFS=',' read -ra _tokens <<<"$SECTIONS"
+  for _tok in "${_tokens[@]}"; do
+    if [[ ",source-builds,homebrew.masApps,vm-setup.windows,version," == *",$_tok,"* ]]; then
+      warn "section '$_tok' has no updater — kept manual"
+    fi
+  done
+fi
+
 section_enabled() {
   local name="$1"
   [ -z "$SECTIONS" ] && return 0 # no filter = all enabled
-  case ",$SECTIONS," in
-  *",$name,"*) return 0 ;;
-  esac
-  # cargo is an alias for the cargo-binstall section
-  if [ "$name" = cargo-binstall ]; then
-    case ",$SECTIONS," in
-    *",cargo,"*) return 0 ;;
-    esac
-  fi
+  local token
+  IFS=',' read -ra _tokens <<<"$SECTIONS"
+  for token in "${_tokens[@]}"; do
+    # Exact match, dotted parent token (homebrew selects homebrew.brews), or
+    # dotted child token (vm-setup.nixos-iso selects its dotted section).
+    if [ "$token" = "$name" ] || [[ "$name" == "$token".* ]] || [[ "$token" == "$name".* ]]; then
+      return 0
+    fi
+  done
   return 1
 }
 
@@ -254,8 +342,8 @@ if section_enabled pwsh; then
   done < <(printf '%s\n' "$data" | jq -r '(.pwsh // {}) | keys[]')
 fi
 
-# homebrew — brew list --versions, brew list --cask --versions
-if section_enabled homebrew; then
+# homebrew — brew list --versions (brews), brew list --cask --versions (casks)
+if section_enabled homebrew.brews; then
   # brews
   while IFS= read -r key; do
     [ -z "$key" ] && continue
@@ -267,7 +355,9 @@ if section_enabled homebrew; then
       data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.homebrew.brews[$k] = $v')
     fi
   done < <(printf '%s\n' "$data" | jq -r '(.homebrew.brews // {}) | keys[]')
+fi
 
+if section_enabled homebrew.casks; then
   # casks
   while IFS= read -r key; do
     [ -z "$key" ] && continue
@@ -375,12 +465,39 @@ if section_enabled ollama; then
   done < <(printf '%s\n' "$data" | jq -r '(.ollama // {}) | keys[]')
 fi
 
+# camilladsp, camillagui-backend, sccache, starship — latest GitHub release
+# tag for top-level scalar pins. Unauthenticated GitHub API rate limit
+# (60 requests/hour per IP) is acceptable for a manual command.
+update_github_scalar() {
+  local key="$1" repo="$2"
+  section_enabled "$key" || return 0
+  local old new
+  old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '.[$k] // empty')
+  [ -z "$old" ] && return 0
+  # check-suppress:suppression_doc: GitHub API may be unreachable or return a non-JSON error page; the warn path reports the failure.
+  new=$(curl -fsSL -H 'User-Agent: nucleus-bump-lockfile' "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null) || new=""
+  if [ -z "$new" ]; then
+    warn "$key: could not fetch latest release from GitHub ($repo)"
+    return 0
+  fi
+  new="${new#v}"
+  if [ "$new" != "$old" ]; then
+    log_update "$key" "$key" "$old" "$new"
+    data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.[$k] = $v')
+  fi
+}
+
+update_github_scalar camilladsp HEnquist/camilladsp
+update_github_scalar camillagui-backend HEnquist/camillagui-backend
+update_github_scalar sccache mozilla/sccache
+update_github_scalar starship starship/starship
+
 # nixos-iso — Query NixOS channel for latest ISO URL and its SHA-256
-if section_enabled vm-setup || section_enabled nixos-iso; then
+if section_enabled vm-setup.nixos-iso; then
   while IFS= read -r arch; do
     [ -z "$arch" ] && continue
-    old_url=$(printf '%s\n' "$data" | jq -r --arg a "$arch" '(.vm-setup.nixos-iso // {})[$a].url // empty')
-    old_digest=$(printf '%s\n' "$data" | jq -r --arg a "$arch" '(.vm-setup.nixos-iso // {})[$a].digest // empty')
+    old_url=$(printf '%s\n' "$data" | jq -r --arg a "$arch" '(.["vm-setup"]["nixos-iso"] // {})[$a].url // empty')
+    old_digest=$(printf '%s\n' "$data" | jq -r --arg a "$arch" '(.["vm-setup"]["nixos-iso"] // {})[$a].digest // empty')
     [ -z "$old_url" ] && continue
 
     # Resolve the latest- redirect to a specific release URL
@@ -404,17 +521,17 @@ if section_enabled vm-setup || section_enabled nixos-iso; then
     if [ "$old_url" != "$resolved_url" ] || [ "$old_digest" != "$new_digest" ]; then
       log_update "vm-setup.nixos-iso" "$arch" "${old_digest##*:}" "${new_sha256:0:12}..."
       data=$(printf '%s\n' "$data" | jq --arg a "$arch" --arg u "$resolved_url" --arg d "$new_digest" '
-        .vm-setup.nixos-iso[$a] = {url: $u, digest: $d}
+        .["vm-setup"]["nixos-iso"][$a] = {url: $u, digest: $d}
       ')
     fi
-  done < <(printf '%s\n' "$data" | jq -r '(.vm-setup.nixos-iso // {}) | keys[]')
+  done < <(printf '%s\n' "$data" | jq -r '(.["vm-setup"]["nixos-iso"] // {}) | keys[]')
 fi
 
 # tart-images — Query GHCR OCI registry for Cirrus CI macOS base image digests
-if section_enabled vm-setup || section_enabled tart-images; then
+if section_enabled vm-setup.tart-images; then
   while IFS= read -r os_version; do
     [ -z "$os_version" ] && continue
-    entry=$(printf '%s\n' "$data" | jq -c --arg v "$os_version" '(.vm-setup.tart-images // {})[$v] // empty')
+    entry=$(printf '%s\n' "$data" | jq -c --arg v "$os_version" '(.["vm-setup"]["tart-images"] // {})[$v] // empty')
     [ -z "$entry" ] && continue
 
     old_image=$(printf '%s\n' "$entry" | jq -r '.image // empty')
@@ -451,10 +568,10 @@ if section_enabled vm-setup || section_enabled tart-images; then
     if [ "$old_digest" != "$new_digest" ]; then
       log_update "vm-setup.tart-images" "$os_version" "${old_digest:0:20}..." "${new_digest:0:20}..."
       data=$(printf '%s\n' "$data" | jq --arg v "$os_version" --arg d "$new_digest" '
-        .vm-setup.tart-images[$v].digest = $d
+        .["vm-setup"]["tart-images"][$v].digest = $d
       ')
     fi
-  done < <(printf '%s\n' "$data" | jq -r '(.vm-setup.tart-images // {}) | keys[]')
+  done < <(printf '%s\n' "$data" | jq -r '(.["vm-setup"]["tart-images"] // {}) | keys[]')
 fi
 
 # Compute the diff for --verify mode
