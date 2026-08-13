@@ -138,7 +138,7 @@ _prek_hook_install_if_needed() {
   fi
 
   __nucleus_prek_install_in_progress=1
-  if (cd "$repo_root" && prek install -q); then
+  if (cd "$repo_root" && prek install --quiet); then
     __nucleus_prek_checked_repos[$repo_root]=1
   else
     install_status=$?

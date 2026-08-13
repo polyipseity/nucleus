@@ -38,7 +38,7 @@ if ! command -v prek >/dev/null 2>&1; then
   exit 0
 fi
 
-if ! (cd "$_ephi_repo_root" && prek install -q); then
+if ! (cd "$_ephi_repo_root" && prek install --quiet); then
   printf '%s\n' "prek: failed to install hooks in $_ephi_repo_root" >&2
   exit 1
 fi

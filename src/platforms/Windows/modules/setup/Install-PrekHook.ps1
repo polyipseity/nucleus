@@ -5,7 +5,7 @@ function Install-PrekHook {
 
   .DESCRIPTION
     Checks whether the target repository contains a prek.toml file and, when it
-    does, runs `prek install -q` from that repository root. This keeps the live
+    does, runs `prek install --quiet` from that repository root. This keeps the live
     nucleus checkout protected during the same provision run that installs or
     updates the prek binary.
 
@@ -69,7 +69,7 @@ function Install-PrekHook {
 
   Push-Location -Path $resolvedRepositoryRoot
   try {
-    & $resolvedPrekPath install -q
+    & $resolvedPrekPath install --quiet
     if ($LASTEXITCODE -ne 0) {
       throw "prek install failed with exit code $LASTEXITCODE"
     }

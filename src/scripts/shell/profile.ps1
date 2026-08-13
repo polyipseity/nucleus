@@ -121,7 +121,7 @@ if ([Environment]::UserInteractive -and -not (Test-NucleusAgentSession) -and (Ge
 
 # prek: install repository-local Git hooks automatically the first time a
 # shell session enters a repo that opted into prek via prek.toml.
-# `prek install -q` is idempotent and self-healing (it always rewrites the
+# `prek install --quiet` is idempotent and self-healing (it always rewrites the
 # managed shims), so we run it at most once per session per repo and cache
 # both success and failure to avoid per-prompt retries.
 $script:__nucleusPrekCheckedRepos = @{}
@@ -164,7 +164,7 @@ function Invoke-PrekHookInstallIfNeeded {
   $script:__nucleusPrekInstallInProgress = $true
   Push-Location $repoRoot
   try {
-    & prek install -q
+    & prek install --quiet
     if ($LASTEXITCODE -ne 0) {
       throw "prek install failed with exit code $LASTEXITCODE"
     }

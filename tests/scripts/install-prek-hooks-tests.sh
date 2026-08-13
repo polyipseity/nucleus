@@ -62,8 +62,8 @@ test_installs_with_cwd_repo_root() {
     reason="installer exited non-zero with prek.toml"
   fi
   first_line="$(head -n 1 "$PREK_LOG")"
-  if [ "$first_line" != "$repo install -q" ]; then
-    reason="$reason; expected '$repo install -q', got '$first_line'"
+  if [ "$first_line" != "$repo install --quiet" ]; then
+    reason="$reason; expected '$repo install --quiet', got '$first_line'"
   fi
   if [ -n "$reason" ]; then
     assert_fail "installs_with_cwd_repo_root" "$reason"
@@ -101,8 +101,8 @@ test_submodule_git_file() {
     reason="installer exited non-zero with .git as a file"
   fi
   last_line="$(tail -n 1 "$PREK_LOG")"
-  if [ "$last_line" != "$repo install -q" ]; then
-    reason="$reason; expected '$repo install -q', got '$last_line'"
+  if [ "$last_line" != "$repo install --quiet" ]; then
+    reason="$reason; expected '$repo install --quiet', got '$last_line'"
   fi
   if [ -n "$reason" ]; then
     assert_fail "submodule_git_file" "$reason"
@@ -123,7 +123,7 @@ test_already_installed_silent() {
   if [ -s "$STDOUT_LOG" ] || [ -s "$STDERR_LOG" ]; then
     reason="$reason; installer emitted output (stdout: $(cat "$STDOUT_LOG"), stderr: $(cat "$STDERR_LOG"))"
   fi
-  if [ "$(tail -n 1 "$PREK_LOG")" != "$repo install -q" ]; then
+  if [ "$(tail -n 1 "$PREK_LOG")" != "$repo install --quiet" ]; then
     reason="$reason; prek not invoked"
   fi
   if [ -n "$reason" ]; then
@@ -136,10 +136,10 @@ test_already_installed_silent() {
 test_passes_quiet_flag() {
   local last_line
   last_line="$(tail -n 1 "$PREK_LOG")"
-  if [[ "$last_line" == *"install -q" ]]; then
+  if [[ "$last_line" == *"install --quiet" ]]; then
     assert_pass "passes_quiet_flag"
   else
-    assert_fail "passes_quiet_flag" "invocation lacks -q: '$last_line'"
+    assert_fail "passes_quiet_flag" "invocation lacks --quiet: '$last_line'"
   fi
 }
 
@@ -153,8 +153,8 @@ test_fresh_repo_no_git() {
     reason="installer exited non-zero on fresh repo without .git"
   fi
   last_line="$(tail -n 1 "$PREK_LOG")"
-  if [ "$last_line" != "$repo install -q" ]; then
-    reason="$reason; expected '$repo install -q', got '$last_line'"
+  if [ "$last_line" != "$repo install --quiet" ]; then
+    reason="$reason; expected '$repo install --quiet', got '$last_line'"
   fi
   if [ -n "$reason" ]; then
     assert_fail "fresh_repo_no_git" "$reason"
