@@ -41,11 +41,8 @@ let
     "com.apple.desktopservices"
     "com.apple.dock"
     "com.apple.finder"
-    "com.if.Amphetamine"
     "com.apple.iokit.AmbientLightSensor"
-    "com.knollsoft.Rectangle"
     "com.apple.loginwindow"
-    "com.lwouis.alt-tab-macos"
     "com.apple.menuextra.clock"
     "com.apple.screencapture"
     "com.apple.screensaver"
@@ -56,10 +53,13 @@ let
     "com.apple.terminal"
     "com.apple.universalaccess"
     "com.apple.universalcontrol"
-    "pro.betterdisplay.BetterDisplay"
     "com.googlecode.iterm2"
+    "com.if.Amphetamine"
+    "com.knollsoft.Rectangle"
+    "com.lwouis.alt-tab-macos"
     "com.raycast.macos"
     "org.linearmouse.LinearMouse"
+    "pro.betterdisplay.BetterDisplay"
   ];
 in
 {
