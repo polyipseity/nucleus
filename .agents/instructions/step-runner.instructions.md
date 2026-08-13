@@ -1,7 +1,7 @@
 ---
 description: "Use when implementing or modifying the step-runner framework used by the check and test pipelines. Covers step registration, --skip-steps semantics, removed flags, skip message format, PS1 parallelism, and step 7 $schema enforcement."
 name: "Step-Runner Framework"
-applyTo: "src/scripts/lib/step-runner.sh, src/scripts/lib/step-runner.ps1, scripts/check.sh, scripts/check.ps1, scripts/test.sh, scripts/test.ps1, tests/scripts/**"
+applyTo: "src/scripts/lib/step-runner.sh, src/scripts/lib/step-runner.ps1, scripts/check.sh, scripts/check.ps1, scripts/test.sh, scripts/test.ps1, tests/scripts/**, src/scripts/checks/check-steps/**, src/scripts/tests/test-steps/**"
 ---
 
 # Step-runner framework interface specification
@@ -189,6 +189,15 @@ Cross-platform equivalence:
 | Nix | 03–04 | `nix-flake-eval`, `nix-lint` |
 | Data and schema | 05–10 | `lockfile-validation`, `locked-dsc-validation`, `schema-validation`, `service-registry`, `yaml-structural`, `completions-fresh` |
 | Repository policy | 11–14 | `package-manager-enforcement`, `suppression-audit`, `online-determinism`, `repository-policy` |
+
+## Adding or renumbering check steps
+
+Step numbers derive from the `NN-` filename prefix of `src/scripts/checks/check-steps/<nn>-*.{sh,ps1}` (and `src/scripts/tests/test-steps/` for the test pipeline) at registration; step IDs are explicit digit-free kebab-case strings decoupled from numbers. Renumbering is a filename change plus a reference sweep — moved step files need no internal edits. The `tests/scripts/check-steps/<nn>-*-tests.{sh,ps1}` pairs hard-code their target step's filename (`TEST_FILE` / `$testFile` and `# shellcheck source=` comments), and prose "step N" references appear across `.agents/instructions/` and step-adjacent comments (`repository-policy.awk`, generator/installer headers), so every reference must move with the file in the same change.
+
+- **No blind appending.** Never create a new step as the next unused number (`NN+1`) merely because it is next; a step number must reflect the step's function and group, not its creation order.
+- **Group first, number second.** Before creating a new step, classify it into one of the groups above. If it fits an existing group, its number must land inside that group's range. A new group requires explicit justification and renumbering of the affected groups.
+- **Rename first, then create.** When the target slot is occupied: (a) `git mv` the affected check-step pairs (`src/scripts/checks/check-steps/<nn>-*.{sh,ps1}`) and their test pairs (`tests/scripts/check-steps/<nn>-*-tests.{sh,ps1}`) to make room; (b) update every hard-coded reference in the same change — `TEST_FILE` / `$testFile` paths and `# shellcheck source=` comments in moved tests, prose "step N" mentions across `.agents/instructions/`, `repository-policy.awk`, generator/installer comments, and the groups table above; (c) only then create the new step pair and its test pair; (d) land all renames and the new step in ONE atomic commit — never a broken intermediate state.
+- **Test-pipeline steps** (`src/scripts/tests/test-steps/`): the same principles apply — place new test steps near their functional kin (Nix tests, PowerShell lint, system config build, framework suites, Windows Pester), renumber first when inserting, never blind-append.
 
 Shell entry-script validation (`script-validation-tests.sh`) runs in test step 5 (`script-and-framework-tests`), not in the check pipeline. Step 5 runs priority framework suites serially, then parallelizes the remaining `tests/scripts/**/*-tests.*` suites with ordered output replay; `nucleus-apps-smoke-tests.sh` is discovered there and runs under `nucleus_nix_locked` on POSIX.
 
