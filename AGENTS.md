@@ -74,6 +74,7 @@ Check/test preflight, tool-availability policy, scoped-mode conventions, and dyn
   → ebook → screen). No automatic re-sorting; see inline comments in each
   source file for details.
 - Use sentence case for all user-facing UI labels (right-click menus, dock/folder/script labels, visible text); see `.agents/instructions/documentation.instructions.md` (UI Label Naming Convention section).
+- MacBook menu bar icons default to hidden; only Amphetamine and Stats may show. Policy, per-app hide mechanisms, and system-item keys: `.agents/instructions/menu-bar-policy.instructions.md`.
 - Use `.yml` for YAML files (except required `.sops.yaml`).
 - Do not hide meaningful errors (`2>/dev/null`, unconditional `|| true`, `-ErrorAction SilentlyContinue`) unless failure is expected, explicitly justified, and still checked.
 - Comment annotations (suppressions, references, rationale, sentinels) follow the unified grammar and four-category taxonomy in `.agents/instructions/comment-annotations.instructions.md`; Category 1+2 annotations must be machine-parsed, Category 3+4 must not.
