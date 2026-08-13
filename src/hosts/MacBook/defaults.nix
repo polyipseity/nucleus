@@ -235,8 +235,15 @@ in
       # Keyboard: Fn key acts as standard function keys (F1–F12) by default.
       "com.apple.TextInput.Kybd".FnKeyUsage = 1;
 
-      # Show the Input Menu (language switcher) in the menu bar.
-      "com.apple.TextInputMenu".visible = true;
+      # Hide the Input Menu (language switcher) from the menu bar: keyboard
+      # switching happens via a hotkey, so the menu icon is redundant chrome.
+      "com.apple.TextInputMenu".visible = false;
+
+      # Hide the macOS 14+ (Sequoia) input-source status item in the new Control
+      # Centre menu bar model (value 0 hides it).
+      "com.apple.TextInputMenuAgent" = {
+        "NSStatusItem VisibleCC Item-0" = 0;
+      };
 
       # Voice Memos: always record at uncompressed (lossless) quality.
       # RCVoiceMemosAudioQualityKey controls recording format:
@@ -273,22 +280,17 @@ in
         ShowTipOfTheDay = false; # disable daily tip notification entirely
       };
 
-      # Raycast: hide menu bar icon to reduce persistent chrome.
-      # This complements the Spotlight menu bar hide for a cleaner status bar.
-      # Note: Raycast must be hidden via Raycast Settings → General → Menu Bar Icon
-      # as well, but this plist setting provides additional enforcement.
-      # ˜This key may not exist in all Raycast versions; inclusion is defensive.~
-
       # App Store: enable automatic app updates.
       "com.apple.commerce" = {
         AutoUpdate = true;
       };
 
-      # Control Centre: show battery percentage; tighten status-item spacing.
+      # Control Centre: hide the battery percentage (the allow-listed Stats app
+      # shows it); tighten status-item spacing to the minimum (0 is the floor;
+      # 4 is the manual fallback if icons overlap).
       "com.apple.controlcenter" = {
-        BatteryShowPercentage = true;
-        NSStatusItemSelectionPadding = 6; # pixels of padding around selected item
-        NSStatusItemSpacing = 6; # pixels between status items
+        NSStatusItemSelectionPadding = 0; # pixels of padding around selected item
+        NSStatusItemSpacing = 0; # pixels between status items
       };
 
       # Prevent macOS from writing .DS_Store files on network and removable

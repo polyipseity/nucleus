@@ -41,8 +41,11 @@ let
     "com.apple.desktopservices"
     "com.apple.dock"
     "com.apple.finder"
+    "com.if.Amphetamine"
     "com.apple.iokit.AmbientLightSensor"
+    "com.knollsoft.Rectangle"
     "com.apple.loginwindow"
+    "com.lwouis.alt-tab-macos"
     "com.apple.menuextra.clock"
     "com.apple.screencapture"
     "com.apple.screensaver"
@@ -56,6 +59,7 @@ let
     "pro.betterdisplay.BetterDisplay"
     "com.googlecode.iterm2"
     "com.raycast.macos"
+    "org.linearmouse.LinearMouse"
   ];
 in
 {
