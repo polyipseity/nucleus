@@ -7,6 +7,9 @@
   not raw file text), that a no-change run does not rewrite the lockfile, and
   that 'updated' is stamped only when a real change is written.
 
+  Also covers the cargo-binstall section: the crates.io API with the cargo
+  search fallback, and the 'cargo' section alias.
+
   Run with: pwsh -NoProfile -Command "Invoke-Pester tests/platforms/Windows/modules/bump-lockfile.Tests.ps1 -Passthru"
 #>
 
@@ -22,7 +25,7 @@ BeforeAll {
     "fixture-pkg": "1.0.0"
   },
   "cargo-binstall": {
-    "fixture-crate": "0.1.0"
+    "nucleus-bump-lockfile-fixture-crate-does-not-exist": "0.1.0"
   },
   "updated": "2026-01-01T00:00:00Z",
   "version": 2
@@ -55,6 +58,16 @@ BeforeAll {
       # POSIX requires the executable bit; Windows CI uses npm.cmd instead.
       & chmod +x (Join-Path $binDir 'npm')
     }
+
+    # Fake cargo: echoes the crates.io-fallback output stored in cargo-output.
+    # Dual shim so tests run on Windows CI (cargo.cmd) and POSIX pwsh (cargo).
+    Set-Content -Path (Join-Path $binDir 'cargo-output') -Value '' -NoNewline
+    Set-Content -Path (Join-Path $binDir 'cargo.cmd') -Value "@echo off`r`nset /p OUT=<%~dp0cargo-output`r`necho %OUT%" -Encoding ASCII
+    Set-Content -Path (Join-Path $binDir 'cargo') -Value "#!/bin/sh`ncat `"`$(dirname `"`$0`")/cargo-output`"" -Encoding ASCII
+    if (-not $IsWindows) {
+      # POSIX requires the executable bit; Windows CI uses cargo.cmd instead.
+      & chmod +x (Join-Path $binDir 'cargo')
+    }
   }
 
   function Set-FakeNpmVersion {
@@ -62,6 +75,13 @@ BeforeAll {
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     param([string]$Version)
     Set-Content -Path (Join-Path $Script:FixtureRoot 'bin/npm-version') -Value $Version -NoNewline
+  }
+
+  function Set-FakeCargoOutput {
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test fixture writes an output file; no ShouldProcess in tests
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    param([string]$Output)
+    Set-Content -Path (Join-Path $Script:FixtureRoot 'bin/cargo-output') -Value $Output -NoNewline
   }
 
   function Invoke-BumpLockfile {
@@ -137,5 +157,33 @@ Describe 'bump-lockfile.ps1 write path' {
     $content | Should -Match '"fixture-pkg": "2\.0\.0"'
     $content | Should -Not -Match '"updated": "2026-01-01T00:00:00Z"'
     $content | Should -Match '"updated": "2026-'
+  }
+}
+
+Describe 'bump-lockfile.ps1 cargo-binstall (crates.io + cargo search fallback)' {
+  BeforeEach {
+    New-FixtureRepo
+  }
+
+  It 'resolves the cargo alias to the cargo-binstall section and falls back to cargo search' {
+    Set-FakeCargoOutput -Output 'nucleus-bump-lockfile-fixture-crate-does-not-exist = "2.0.0"'
+    $result = Invoke-BumpLockfile -Arguments @('-Sections', 'cargo')
+    $result.ExitCode | Should -Be 0
+    Get-FixtureContent | Should -Match '"nucleus-bump-lockfile-fixture-crate-does-not-exist": "2\.0\.0"'
+  }
+
+  It 'falls back to cargo search when the crates.io API 404s' {
+    Set-FakeCargoOutput -Output 'nucleus-bump-lockfile-fixture-crate-does-not-exist = "2.0.0"'
+    $result = Invoke-BumpLockfile -Arguments @('-Sections', 'cargo-binstall')
+    $result.ExitCode | Should -Be 0
+    Get-FixtureContent | Should -Match '"nucleus-bump-lockfile-fixture-crate-does-not-exist": "2\.0\.0"'
+  }
+
+  It 'warns and leaves the entry unchanged when both version sources fail' {
+    Set-FakeCargoOutput -Output ''
+    $result = Invoke-BumpLockfile -Arguments @('-Sections', 'cargo-binstall')
+    $result.ExitCode | Should -Be 0
+    $result.Output | Should -Match 'no version source'
+    Get-FixtureContent | Should -Match '"nucleus-bump-lockfile-fixture-crate-does-not-exist": "0\.1\.0"'
   }
 }

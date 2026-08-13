@@ -10,7 +10,7 @@
   Sections:
     winget        winget show --id <id>
     scoop         scoop info <pkg>
-    cargo-binstall Keep current version (no reliable CLI query)
+    cargo-binstall crates.io API (cargo alias selects this section)
     bun           npm view <pkg> version
     uv            uv tool list
     rustup        rustup toolchain list + rustc +<ch> --version
@@ -21,6 +21,7 @@
 
 .PARAMETER Sections
   Comma-separated list of sections to update. If omitted, all sections are updated.
+  'cargo' is an alias for 'cargo-binstall'.
 
 .PARAMETER Help
   Show this help message.
@@ -90,7 +91,11 @@ function Write-Update {
 function Test-SectionEnabled {
   param([string]$Name)
   if ([string]::IsNullOrEmpty($Sections)) { return $true }
-  return $Sections.Split(',') -contains $Name
+  # Normalize the 'cargo' alias to the canonical cargo-binstall section name.
+  $effective = @($Sections.Split(',') | ForEach-Object {
+    if ($_ -eq 'cargo') { 'cargo-binstall' } else { $_ }
+  })
+  return $effective -contains $Name
 }
 
 function Set-LockfileValue {
@@ -201,9 +206,51 @@ if (Test-SectionEnabled 'scoop') {
 }
 
 # ---------------------------------------------------------------------------
-# cargo-binstall — keep current version (no reliable CLI query)
+# cargo-binstall — crates.io API; -Sections cargo selects this section too
 # ---------------------------------------------------------------------------
-# Pinned versions are kept as-is; no CLI query available.
+if (Test-SectionEnabled 'cargo-binstall') {
+  if ($ht.ContainsKey('cargo-binstall') -and $ht['cargo-binstall'] -is [hashtable]) {
+    foreach ($key in @($ht['cargo-binstall'].Keys)) {
+      if ($ht['cargo-binstall'][$key] -is [hashtable]) {
+        continue  # object entry — no version query applies
+      }
+      $old = $ht['cargo-binstall'][$key]
+      $new = $null
+      try {
+        # check-suppress:suppression_doc: probe -- crate may not exist or network unavailable; cargo search is the fallback below
+        $resp = Invoke-RestMethod -Uri "https://crates.io/api/v1/crates/$key" -Headers @{ 'User-Agent' = 'nucleus-bump-lockfile' }
+        if ($resp.crate.max_stable_version) {
+          $new = $resp.crate.max_stable_version
+        } elseif ($resp.versions -and $resp.versions.Count -gt 0) {
+          $new = $resp.versions[0].num
+        }
+      } catch {
+        $new = $null  # check-suppress:suppression_doc: API failure — cargo search below is the only other version source
+      }
+      if ([string]::IsNullOrEmpty($new)) {
+        # check-suppress:suppression_doc: probe -- crate may not exist; stderr suppressed for clean output.
+        $searchOutput = & cargo search --limit 1 $key 2>$null
+        if ($searchOutput) {
+          foreach ($line in $searchOutput) {
+            $match = [regex]::Match($line.Trim(), '^[^\s=]+\s*=\s*"([^"]+)"')
+            if ($match.Success) {
+              $new = $match.Groups[1].Value.Trim()
+              break
+            }
+          }
+        }
+      }
+      if ([string]::IsNullOrEmpty($new)) {
+        Write-NucleusWarning "cargo-binstall.${key}: no version source (crates.io API and cargo search both failed)"
+        continue
+      }
+      if ($new -ne $old) {
+        Write-Update -Section 'cargo-binstall' -Key $key -OldValue $old -NewValue $new
+        $ht['cargo-binstall'][$key] = $new
+      }
+    }
+  }
+}
 
 # ---------------------------------------------------------------------------
 # bun — npm view <pkg> version

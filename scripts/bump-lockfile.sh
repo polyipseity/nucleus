@@ -6,7 +6,7 @@
 # Sections (pass comma-separated via --sections to update selectively):
 #   winget        winget show --id <id>
 #   scoop         scoop info <pkg>
-#   cargo-binstall Keep current version     (no reliable CLI query)
+#   cargo-binstall crates.io API (alias: cargo)
 #   bun           npm view <pkg> version
 #   uv            uv tool list
 #   rustup        rustc +<ch> --version
@@ -39,7 +39,7 @@ usage() {
 Sections (pass comma-separated via --sections to update selectively):
   winget        winget show --id <id>
   scoop         scoop info <pkg>
-  cargo-binstall Keep current version     (no reliable CLI query)
+  cargo-binstall crates.io API (alias: cargo)
   bun           npm view <pkg> version
   uv            uv tool list
   rustup        rustc +<ch> --version
@@ -94,8 +94,14 @@ section_enabled() {
   [ -z "$SECTIONS" ] && return 0 # no filter = all enabled
   case ",$SECTIONS," in
   *",$name,"*) return 0 ;;
-  *) return 1 ;;
   esac
+  # cargo is an alias for the cargo-binstall section
+  if [ "$name" = cargo-binstall ]; then
+    case ",$SECTIONS," in
+    *",cargo,"*) return 0 ;;
+    esac
+  fi
+  return 1
 }
 
 # Helpers
@@ -136,8 +142,34 @@ if section_enabled scoop; then
   done < <(printf '%s\n' "$data" | jq -r '(.scoop // {}) | keys[]')
 fi
 
-# cargo-binstall — keep current version (no reliable CLI query)
-#   No CLI query available; pinned versions are kept as-is.
+# cargo-binstall — crates.io API (alias: cargo)
+if section_enabled cargo-binstall; then
+  while IFS= read -r key; do
+    [ -z "$key" ] && continue
+    if printf '%s\n' "$data" | jq -e --arg k "$key" '(.["cargo-binstall"][$k] | type) == "object"' >/dev/null; then
+      continue # VCS hash-pin entry — no crates.io query can update the rev
+    fi
+    old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.["cargo-binstall"] // {})[$k] // empty')
+    [ -z "$old" ] && continue
+
+    # Query crates.io for the latest stable version (User-Agent required;
+    # crates.io returns 403 without it), falling back to cargo search.
+    # check-suppress:suppression_doc: crates.io API may be unreachable or return a non-JSON error page; the cargo search fallback handles failure.
+    new=$(curl -fsSL -A "nucleus-bump-lockfile" "https://crates.io/api/v1/crates/$key" 2>/dev/null | jq -r '.crate.max_stable_version // .versions[0].num // empty' 2>/dev/null) || new=""
+    if [ -z "$new" ]; then
+      # check-suppress:suppression_doc: cargo may be unavailable or the crate unpublished; the warn path reports the failure.
+      new=$(cargo search --limit 1 "$key" 2>/dev/null | awk -v k="$key" -F' = ' '$1 == k {gsub(/"/, "", $2); sub(/[[:space:]].*/, "", $2); print $2; exit}') || new=""
+    fi
+    if [ -z "$new" ]; then
+      warn "cargo-binstall.$key: no version source (crates.io API and cargo search both failed)"
+      continue
+    fi
+    if [ "$new" != "$old" ]; then
+      log_update "cargo-binstall" "$key" "$old" "$new"
+      data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.["cargo-binstall"][$k] = $v')
+    fi
+  done < <(printf '%s\n' "$data" | jq -r '(.["cargo-binstall"] // {}) | keys[]')
+fi
 
 # bun — npm view <pkg> version
 if section_enabled bun; then
