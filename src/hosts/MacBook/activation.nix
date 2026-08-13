@@ -185,7 +185,14 @@ in
     "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-battery-policy.sh"
 
     # ---- configure-charge-limit --------------------------------------------------
+    # WHY: the battery menu bar tray icon is not declaratively hideable — its tray
+    #   is created unconditionally.  `battery maintain 80` installs a headless
+    #   LaunchAgent (com.battery.app) so the charge limit persists without the tray
+    #   being open.
     "${activationBundle}/src/hosts/MacBook/scripts/macos-charge-limit.sh"
+
+    # ---- macos-configure-lulu-icon -------------------------------------------------
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-lulu-icon.sh"
 
     # ---- configure-ssh-access -----------------------------------------------------
     # Allow all users to connect via SSH by removing the macOS access-control

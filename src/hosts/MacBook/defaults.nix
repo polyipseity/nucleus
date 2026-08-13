@@ -527,8 +527,8 @@ in
       # LinearMouse: configure menu bar visibility, battery indicator,
       # dock visibility, and launch-at-login behavior.
       "org.linearmouse.LinearMouse" = {
-        showInMenuBar = false;
-        showBattery = "always";
+        menuBarVisibilityMode = "never";
+        menuBarBatteryDisplayMode = "off";
         showInDock = true;
         launchAtLogin = true;
         SUEnableAutomaticChecks = false;
@@ -575,8 +575,15 @@ in
       # this key activates that feature path once those files exist.
       # Parity note: this feature is macOS-only; there is no equivalent
       # Power Protect surface on NixOS/Windows in this repository.
+      # Menu-bar allow-list: Amphetamine is menu-bar-only by design (LSUIElement);
+      # it must never get a hide key.
       "com.if.Amphetamine" = {
         "Enable Power Protect Install" = true;
+      };
+
+      # Rectangle: hide its menu bar icon; window management is keyboard-driven, so the icon is pure chrome.
+      "com.knollsoft.Rectangle" = {
+        hideMenubarIcon = true;
       };
 
       # VS Code (stable and Insiders): disable ApplePressAndHold so held
@@ -587,6 +594,10 @@ in
       "com.microsoft.VSCodeInsiders" = {
         ApplePressAndHoldEnabled = false;
       };
+
+      # Menu-bar allow-list: Stats replaces the macOS battery item, so its icon
+      # must stay visible; it must never get a hide key.
+      "eu.exelban.Stats" = { };
     };
 
     # -------------------------------------------------------------------------
