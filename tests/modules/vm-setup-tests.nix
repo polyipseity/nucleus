@@ -933,6 +933,11 @@ let
     && (lib.hasInfix "wait_for_utm_registration" vm_setup_sh_text)
   ) "vm sync must refresh UTM plists and repair registration on drift";
 
+  test_vm_setup_removes_utm_screenshot = assert' (
+    (lib.hasInfix "vm_remove_utm_screenshot" vm_setup_sh_text)
+    && (lib.hasInfix "screenshot.png" vm_setup_sh_text)
+  ) "vm setup/sync must purge stale UTM screenshots from bundles";
+
   test_apply_vm_sync_default_on = assert' (
     (lib.hasInfix "vm_sync=true" apply_sh_text)
     && (lib.hasInfix "run_vm_post_apply" apply_sh_text)
@@ -2616,6 +2621,7 @@ let
     test_android_tools_provisioned_all_hosts
     test_vm_setup_calls_sync_phase
     test_vm_sync_utm_includes_registration
+    test_vm_setup_removes_utm_screenshot
     test_apply_vm_sync_default_on
     test_guest_nix_nonempty
     test_nixos_guest_qemu_guest_enabled
@@ -2812,6 +2818,7 @@ in
     test_android_tools_provisioned_all_hosts
     test_vm_setup_calls_sync_phase
     test_vm_sync_utm_includes_registration
+    test_vm_setup_removes_utm_screenshot
     test_apply_vm_sync_default_on
     test_guest_nix_nonempty
     test_nixos_guest_qemu_guest_enabled

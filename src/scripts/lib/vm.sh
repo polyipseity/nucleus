@@ -1713,6 +1713,28 @@ vm_link_nvram_to_utm_bundle() {
   return 0
 }
 
+# vm_remove_utm_screenshot BUNDLE
+#   Delete a stale UTM screenshot at the bundle root
+#   (<bundle>/screenshot.png).  WHY: UTM saves screenshots to the bundle
+#   root (kUTMBundleScreenshotFilename), and with NoSaveScreenshot = true the
+#   screenshot is only deleted on the next VM start — provisioning purges it
+#   immediately so bundles never carry stale screenshots.
+vm_remove_utm_screenshot() {
+  local bundle="$1"
+
+  if [ ! -f "$bundle/screenshot.png" ]; then
+    return 0
+  fi
+
+  if [ "$dry_run" = true ]; then
+    dry_run "remove UTM screenshot: $bundle/screenshot.png"
+    return 0
+  fi
+
+  rm -f "$bundle/screenshot.png"
+  say "removed stale UTM screenshot: $bundle/screenshot.png"
+}
+
 # vm_inject_guest NAME
 #   Re-run in-place disk injection for one VM: applies the per-VM guest
 #   identity (hostname, username, password, SSH key) into the existing data
@@ -2840,6 +2862,7 @@ vm_sync_utm() {
     return
   fi
 
+  vm_remove_utm_screenshot "$bundle"
   say "syncing UTM VM '$vm_display'..."
   if [ -f "$config_plist" ] && vm_validate_utm_plist_template "$vm_id" &&
     ! cmp -s "$_vupt_template" "$config_plist"; then
@@ -3010,6 +3033,8 @@ vm_setup_utm() {
     bundle_exists=true
     say "UTM bundle already exists: $bundle; refreshing config.plist"
   fi
+
+  vm_remove_utm_screenshot "$bundle"
 
   if ! vm_validate_utm_plist_template "$vm_id"; then
     return
