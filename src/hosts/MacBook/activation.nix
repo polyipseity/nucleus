@@ -143,7 +143,7 @@ in
   #   configureGimpScrollSensitivity   — GIMP drag-zoom-speed (25% of default)
   #   configureLinearMousePreferences  — LinearMouse update-check suppression
   #   configureMiddleClick             — 4-finger gesture + native login item
-  #   configureMountyLoginItem         — native login item registration
+  #   configureMountyLoginItem         — native Mounty helper login item (SMLoginItemSetEnabled)
   #   configureMissionControlSpansDisplays — spans-displays per-user pref
   #   configureMonitorColorProfile     — clear ColorSync device cache
   #   clearFinderCache                 — purge stale Finder state for desktop visibility
