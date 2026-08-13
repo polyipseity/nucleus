@@ -79,6 +79,11 @@ if (-not (Test-Path -Path $lockfileAbs)) {
 # ---------------------------------------------------------------------------
 function Write-Update {
   param([string]$Section, [string]$Key, [string]$OldValue, [string]$NewValue)
+  # Change tracker: every mutation flows through this function, so the flag
+  # decides whether the write path stamps 'updated' and rewrites the file.
+  # $script: scope is required — functions run in a child scope and a plain
+  # assignment would only update the function-local copy.
+  $script:changed = $true
   Write-NucleusInfo "updating ${Section}.${Key} from ${OldValue} to ${NewValue}"
 }
 
@@ -147,15 +152,20 @@ function ConvertTo-Hashtable {
 
 $ht = ConvertTo-Hashtable $lockfile
 
-# Update timestamp
-$ht['updated'] = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ' -AsUTC)
+# Change tracking: the timestamp is stamped and the file written only when at
+# least one section produced a change (set by Write-Update). Stamping before
+# the queries would make --verify always fail and rewrite the file on every
+# run (timestamp churn).
+$changed = $false
 
 # ---------------------------------------------------------------------------
 # winget — winget show --id <id>
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'winget') {
   if ($ht.ContainsKey('winget') -and $ht['winget'] -is [hashtable]) {
-    foreach ($key in $ht['winget'].Keys) {
+    # Snapshot the keys: assigning a value below invalidates the live
+    # KeyCollection enumerator on .NET Core ('Collection was modified').
+    foreach ($key in @($ht['winget'].Keys)) {
       $old = $ht['winget'][$key]
       # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
       $result = & winget show --id $key 2>$null | Select-String -Pattern '^Version '
@@ -175,7 +185,7 @@ if (Test-SectionEnabled 'winget') {
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'scoop') {
   if ($ht.ContainsKey('scoop') -and $ht['scoop'] -is [hashtable]) {
-    foreach ($key in $ht['scoop'].Keys) {
+    foreach ($key in @($ht['scoop'].Keys)) {
       $old = $ht['scoop'][$key]
       # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
       $result = & scoop info $key 2>$null | Select-String -Pattern '^Version '
@@ -200,7 +210,7 @@ if (Test-SectionEnabled 'scoop') {
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'bun') {
   if ($ht.ContainsKey('bun') -and $ht['bun'] -is [hashtable]) {
-    foreach ($key in $ht['bun'].Keys) {
+    foreach ($key in @($ht['bun'].Keys)) {
       $old = $ht['bun'][$key]
       # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
       $result = & npm view $key version 2>$null
@@ -247,7 +257,7 @@ if (Test-SectionEnabled 'uv') {
     }
 
     if ($ht.ContainsKey('uv') -and $ht['uv'] -is [hashtable]) {
-      foreach ($key in $ht['uv'].Keys) {
+      foreach ($key in @($ht['uv'].Keys)) {
         if ($ht['uv'][$key] -is [hashtable]) {
           continue  # VCS hash-pin entry — no CLI query can update the rev
         }
@@ -284,7 +294,7 @@ if (Test-SectionEnabled 'rustup') {
   }
 
   if ($ht.ContainsKey('rustup') -and $ht['rustup'] -is [hashtable]) {
-    foreach ($key in $ht['rustup'].Keys) {
+    foreach ($key in @($ht['rustup'].Keys)) {
       $old = $ht['rustup'][$key]
       if ($toolchainSet.ContainsKey($key)) {
         # check-suppress:suppression_doc: probe -- toolchain may not be installed; stderr suppressed for clean output.
@@ -309,7 +319,7 @@ if (Test-SectionEnabled 'rustup') {
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'pwsh') {
   if ($ht.ContainsKey('pwsh') -and $ht['pwsh'] -is [hashtable]) {
-    foreach ($key in $ht['pwsh'].Keys) {
+    foreach ($key in @($ht['pwsh'].Keys)) {
       $old = $ht['pwsh'][$key]
       # check-suppress:suppression_doc: probe -- module may not exist in PSGallery; stderr suppressed for clean output.
       $result = & pwsh -NoProfile -Command "Find-Module -Name '$key' | Select-Object -ExpandProperty Version" 2>$null
@@ -356,7 +366,7 @@ if (Test-SectionEnabled 'vscode') {
     }
 
     if ($ht.ContainsKey('vscode') -and $ht['vscode'] -is [hashtable]) {
-      foreach ($key in $ht['vscode'].Keys) {
+      foreach ($key in @($ht['vscode'].Keys)) {
         $old = $ht['vscode'][$key]
         if ($vscodeExts.ContainsKey($key)) {
           $new = $vscodeExts[$key]
@@ -418,7 +428,7 @@ if (Test-SectionEnabled 'ollama') {  # Point at the Ollama daemon directly, bypa
 # ---------------------------------------------------------------------------
 if ((Test-SectionEnabled 'vm-setup') -or (Test-SectionEnabled 'nixos-iso')) {
   if ($ht.ContainsKey('vm-setup') -and $ht['vm-setup'].ContainsKey('nixos-iso') -and $ht['vm-setup']['nixos-iso'] -is [hashtable]) {
-    foreach ($arch in $ht['vm-setup']['nixos-iso'].Keys) {
+    foreach ($arch in @($ht['vm-setup']['nixos-iso'].Keys)) {
       $entry = $ht['vm-setup']['nixos-iso'][$arch]
       $oldUrl = $entry['url']
       $oldDigest = $entry['digest']
@@ -513,27 +523,40 @@ if ((Test-SectionEnabled 'vm-setup') -or (Test-SectionEnabled 'tart-images')) {
 # ---------------------------------------------------------------------------
 if ($Verify) {
   $outputJson = $ht | ConvertTo-Json -Depth 10
-  $currentJson = Get-Content $lockfileAbs -Raw
+  # Canonical comparison: parse the committed file and re-serialize it with the
+  # identical ConvertTo-Json call used for the write. Comparing against the raw
+  # file text would always mismatch because key order and formatting differ
+  # between the file and PowerShell's serializer.
+  $currentJson = ConvertTo-Hashtable (Get-Content -Path $lockfileAbs -Raw -Encoding UTF8 | ConvertFrom-Json -Depth 32) | ConvertTo-Json -Depth 10
   if ($outputJson -ne $currentJson) {
     Write-NucleusInfo "--verify: lockfile out of date — changes would be made:"
     $diffLines = Compare-Object ([string[]]($currentJson -split "`n")) ([string[]]($outputJson -split "`n"))
-    $diffLines | ForEach-Object { Write-Output $_.ToString() }
+    $diffLines | ForEach-Object { Write-Output ("{0} {1}" -f $_.SideIndicator, $_.InputObject) }
     exit 1
   }
   Write-NucleusInfo "--verify: lockfile is up to date."
-  return
+  exit 0
 }
 
 # ---------------------------------------------------------------------------
 # Atomic write
 # ---------------------------------------------------------------------------
+if (-not $changed) {
+  Write-NucleusInfo 'no changes — lockfile up to date'
+  exit 0
+}
+
+# Stamp the timestamp only when an actual change is written; a no-change run
+# must not rewrite the file (avoids timestamp churn and spurious git diffs).
+$ht['updated'] = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ' -AsUTC)
+
 # Convert hashtable back to sorted JSON. Use a depth of 10 for nested objects.
 $outputJson = $ht | ConvertTo-Json -Depth 10
 
 $tmpFile = [System.IO.Path]::GetTempFileName()
 try {
   # Use UTF8 without BOM
-  [System.IO.File]::WriteAllText($tmpFile, $outputJson, [System.Text.UTF8Encoding]::$false)
+  [System.IO.File]::WriteAllText($tmpFile, $outputJson, [System.Text.UTF8Encoding]::new($false))
   Move-Item -Path $tmpFile -Destination $lockfileAbs -Force
   Write-NucleusInfo "wrote ${lockfileRel}"
 } catch {

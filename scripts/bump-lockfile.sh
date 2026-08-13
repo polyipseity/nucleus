@@ -99,15 +99,14 @@ section_enabled() {
 }
 
 # Helpers
+changed=false
 log_update() {
   say "updating $1.$2 from $3 to $4"
+  changed=true
 }
 
 # Read lockfile
 data=$(cat "$LOCKFILE_ABS")
-
-# Update timestamp to current UTC ISO 8601
-data=$(printf '%s\n' "$data" | jq --arg d "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.updated = $d')
 
 # winget — winget show --id <id>
 if section_enabled winget; then
@@ -438,6 +437,16 @@ if $VERIFY; then
   say "lockfile is up to date."
   exit 0
 fi
+
+# Skip the write when no section produced a change. .updated is stamped only
+# on an actual write so --verify diffs against the original value.
+if [ "$changed" != true ]; then
+  say "no changes — lockfile up to date"
+  exit 0
+fi
+
+# Stamp the timestamp right before the atomic write.
+data=$(printf '%s\n' "$data" | jq --arg d "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.updated = $d')
 
 # Atomic write
 tmpfile=$(mktemp "$LOCKFILE_ABS.tmp.XXXXXX")
