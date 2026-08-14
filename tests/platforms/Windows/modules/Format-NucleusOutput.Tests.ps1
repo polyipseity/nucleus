@@ -11,6 +11,11 @@
 #>
 
 BeforeAll {
+  # check-suppress:suppression_doc: deterministic color state -- color init runs
+  # at import; NO_COLOR pins NucleusColorOn=false for the whole suite (captured
+  # pure strings retain ANSI regardless of OutputRendering, so capture-time
+  # stripping cannot be relied on).
+  $env:NO_COLOR = '1'
   $modulePath = Join-Path $PSScriptRoot '../../../../src/platforms/Windows/modules/Format-NucleusOutput.psm1'
   # check-suppress:suppression_doc: cleanup -- module may not be loaded; WHY: Remove-Module gracefully handles absence.
   Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
@@ -49,6 +54,31 @@ Describe 'Write-NucleusInfo' {
     $result = Write-NucleusInfo 'test' 6>&1
     # Should start with a word (the command name) followed by ": "
     $result | Should -Match '^[a-zA-Z][a-zA-Z0-9-]*: test$'
+  }
+
+  It 'honors -CommandName label override (F1)' {
+    $result = Write-NucleusInfo 'hi' -CommandName cursor 6>&1
+    $result | Should -BeExactly 'cursor: hi'
+  }
+
+  It 'emits no ESC bytes under NO_COLOR' {
+    $result = Write-NucleusInfo 'plain' 6>&1
+    $result | Should -Not -Match "`e"
+  }
+
+  It 'forces ESC bytes when FORCE_COLOR=1 even when captured' {
+    # NO_COLOR wins over FORCE_COLOR, so it must be removed first
+    Remove-Item Env:NO_COLOR -ErrorAction SilentlyContinue
+    $env:FORCE_COLOR = '1'
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Import-Module $modulePath -Force -DisableNameChecking
+    $result = Write-NucleusInfo 'colored' 6>&1
+    $result | Should -Match "`e"
+    # restore deterministic state for the rest of the suite
+    Remove-Item Env:FORCE_COLOR -ErrorAction SilentlyContinue
+    $env:NO_COLOR = '1'
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Import-Module $modulePath -Force -DisableNameChecking
   }
 }
 

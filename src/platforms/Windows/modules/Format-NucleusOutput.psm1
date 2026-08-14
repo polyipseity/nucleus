@@ -7,20 +7,75 @@
     consistently across all nucleus-* commands.
 
     These functions auto-derive the command name from the script path, so
-    callers don't need to pass a prefix.
+    callers don't need to pass a prefix; pass -CommandName to override the
+    label (F1 grammar). Info/DryRun/Done are colored with $PSStyle when the
+    console supports it; Error/Warning are left to host rendering.
 
     Usage:
         Import-Module Format-NucleusOutput
         Write-NucleusInfo "processing 3 files"
+        Write-NucleusInfo "syncing" -CommandName replica-sync
         Write-NucleusError "file not found"
         Write-NucleusWarning "deprecated flag"
         Write-NucleusDryRun "would delete $path"
         Write-NucleusDone
 #>
 
+# One-time color detection at import (console-only invariant, F spec).
+# NO_COLOR wins; FORCE_COLOR (not "0") / CLICOLOR_FORCE force on; otherwise
+# virtual-terminal support AND output not redirected. $PSStyle.OutputRendering
+# is NOT touched — the engine owns NO_COLOR/TERM handling.
+$script:NucleusColorOn = $false
+if ($env:NO_COLOR) {
+    $script:NucleusColorOn = $false
+} elseif (($env:FORCE_COLOR -and $env:FORCE_COLOR -ne '0') -or $env:CLICOLOR_FORCE) {
+    $script:NucleusColorOn = $true
+} elseif ($Host.UI.SupportsVirtualTerminal -and -not [Console]::IsOutputRedirected) {
+    $script:NucleusColorOn = $true
+}
+
+# Internal F1 formatter for the stdout helpers (Info/DryRun/Done).
+# Embeds color around the label and level word only when $script:NucleusColorOn
+# is set; plain-string variant otherwise. No timestamp support yet (F1 allows
+# optional [<ts> ]); both POSIX and PS1 sides currently omit it.
+function Format-NucleusMessage {
+    param(
+        [string]$CommandName,
+        [string]$Level = '',
+        [string]$Message = ''
+    )
+    if (-not $script:NucleusColorOn) {
+        switch ($Level) {
+            'dry-run' { return "$CommandName`: [dry-run] $Message" }
+            'done' { return "$CommandName`: done" }
+            default { return "$CommandName`: $Message" }
+        }
+    }
+    $label = "$($PSStyle.Bold)$CommandName$($PSStyle.Reset)"
+    switch ($Level) {
+        'dry-run' {
+            $token = "$($PSStyle.Bold)$($PSStyle.Foreground.Magenta)[dry-run]$($PSStyle.Reset)"
+            return "$label`: $token $Message"
+        }
+        'done' {
+            $token = "$($PSStyle.Bold)$($PSStyle.Foreground.Green)done$($PSStyle.Reset)"
+            return "$label`: $token"
+        }
+        default {
+            return "$label`: $Message"
+        }
+    }
+}
+
 # Auto-derive the short command name from the script path.
 # e.g., "scripts/gc.ps1" → "gc", "nucleus-gc" → "gc"
 function Get-NucleusCommandName {
+    <#
+    .SYNOPSIS
+        Derive the short command name for the F1 output prefix.
+    .PARAMETER Path
+        Script path to derive from (defaults to the current command's file).
+    #>
     param(
         [string]$Path = $PSCommandPath
     )
@@ -37,10 +92,15 @@ function Write-NucleusInfo {
         Print an info message to stdout.
     .PARAMETER Message
         The message text (without prefix).
+    .PARAMETER CommandName
+        Optional label override (defaults to the derived command name).
     #>
-    param([string]$Message)
-    $cmd = Get-NucleusCommandName
-    Write-Output "$cmd`: $Message"
+    param(
+        [string]$Message,
+        [string]$CommandName = ''
+    )
+    if (-not $CommandName) { $CommandName = Get-NucleusCommandName }
+    Write-Output (Format-NucleusMessage -CommandName $CommandName -Message $Message)
 }
 
 function Write-NucleusError {
@@ -49,10 +109,15 @@ function Write-NucleusError {
         Print an error message to stderr.
     .PARAMETER Message
         The message text (without prefix).
+    .PARAMETER CommandName
+        Optional label override (defaults to the derived command name).
     #>
-    param([string]$Message)
-    $cmd = Get-NucleusCommandName
-    Write-Error "$cmd`: error: $Message"
+    param(
+        [string]$Message,
+        [string]$CommandName = ''
+    )
+    if (-not $CommandName) { $CommandName = Get-NucleusCommandName }
+    Write-Error "$CommandName`: error: $Message"
 }
 
 function Write-NucleusWarning {
@@ -61,10 +126,15 @@ function Write-NucleusWarning {
         Print a warning message to stderr.
     .PARAMETER Message
         The message text (without prefix).
+    .PARAMETER CommandName
+        Optional label override (defaults to the derived command name).
     #>
-    param([string]$Message)
-    $cmd = Get-NucleusCommandName
-    Write-Warning "$cmd`: warning: $Message"
+    param(
+        [string]$Message,
+        [string]$CommandName = ''
+    )
+    if (-not $CommandName) { $CommandName = Get-NucleusCommandName }
+    Write-Warning "$CommandName`: warning: $Message"
 }
 
 function Write-NucleusDryRun {
@@ -73,19 +143,29 @@ function Write-NucleusDryRun {
         Print a dry-run message to stdout.
     .PARAMETER Message
         The action description (without prefix).
+    .PARAMETER CommandName
+        Optional label override (defaults to the derived command name).
     #>
-    param([string]$Message)
-    $cmd = Get-NucleusCommandName
-    Write-Output "$cmd`: [dry-run] $Message"
+    param(
+        [string]$Message,
+        [string]$CommandName = ''
+    )
+    if (-not $CommandName) { $CommandName = Get-NucleusCommandName }
+    Write-Output (Format-NucleusMessage -CommandName $CommandName -Level 'dry-run' -Message $Message)
 }
 
 function Write-NucleusDone {
     <#
     .SYNOPSIS
         Print a completion message to stdout.
+    .PARAMETER CommandName
+        Optional label override (defaults to the derived command name).
     #>
-    $cmd = Get-NucleusCommandName
-    Write-Output "$cmd`: done"
+    param(
+        [string]$CommandName = ''
+    )
+    if (-not $CommandName) { $CommandName = Get-NucleusCommandName }
+    Write-Output (Format-NucleusMessage -CommandName $CommandName -Level 'done')
 }
 
 Export-ModuleMember -Function Get-NucleusCommandName, Write-NucleusInfo, Write-NucleusError, Write-NucleusWarning, Write-NucleusDryRun, Write-NucleusDone
