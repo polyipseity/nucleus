@@ -200,7 +200,7 @@ function Sync-VSCodeConfig {
 
     $json = $existing | ConvertTo-Json -Depth 10
     Set-Content -LiteralPath $DestFile -Value $json -Encoding UTF8 -NoNewline
-    Write-Output "vscode-config: merged chatLanguageModels from $RepoFile to $DestFile"
+    Write-NucleusInfo -CommandName 'vscode-config' "merged chatLanguageModels from $RepoFile to $DestFile"
   }
 
   foreach ($channelDir in $channelDirs) {
@@ -221,7 +221,7 @@ function Sync-VSCodeConfig {
           if ($isSymlink -and [string]::Equals($item.Target, $repoTarget, [System.StringComparison]::OrdinalIgnoreCase)) {
             Remove-ManagedSymlinkDeleteProtection -Context "vscode-config" -Path $linkPath
             Remove-Item -LiteralPath $linkPath -Force
-            Write-Output "vscode-config: removed VS Code config symlink: $linkPath"
+            Write-NucleusInfo -CommandName 'vscode-config' "removed VS Code config symlink: $linkPath"
           }
         }
         continue
@@ -252,7 +252,7 @@ function Sync-VSCodeConfig {
       }
       New-Item -ItemType SymbolicLink -Path $linkPath -Target $repoTarget > $null
       Set-ManagedSymlinkDeleteProtection -Context "vscode-config" -Path $linkPath
-      Write-Output "vscode-config: linked VS Code config file: $linkPath -> $repoTarget"
+      Write-NucleusInfo -CommandName 'vscode-config' "linked VS Code config file: $linkPath -> $repoTarget"
     }
 
     # --- Managed directories ---
@@ -267,7 +267,7 @@ function Sync-VSCodeConfig {
           if ($isSymlink -and [string]::Equals($item.Target, $repoTarget, [System.StringComparison]::OrdinalIgnoreCase)) {
             Remove-ManagedSymlinkDeleteProtection -Context "vscode-config" -Path $linkPath
             Remove-Item -LiteralPath $linkPath -Force
-            Write-Output "vscode-config: removed VS Code config dir symlink: $linkPath"
+            Write-NucleusInfo -CommandName 'vscode-config' "removed VS Code config dir symlink: $linkPath"
           }
         }
         continue
@@ -296,7 +296,7 @@ function Sync-VSCodeConfig {
       }
       New-Item -ItemType SymbolicLink -Path $linkPath -Target $repoTarget > $null
       Set-ManagedSymlinkDeleteProtection -Context "vscode-config" -Path $linkPath
-      Write-Output "vscode-config: linked VS Code config dir: $linkPath -> $repoTarget"
+      Write-NucleusInfo -CommandName 'vscode-config' "linked VS Code config dir: $linkPath -> $repoTarget"
     }
 
     # --- chatLanguageModels (regular file, managed by merge) ---

@@ -137,7 +137,7 @@ function Sync-VSCodeExtensionManifest {
     # check-suppress:suppression_doc: probe whether the VS Code CLI is installed; Get-Command throws when absent.
     $cliPath = Get-Command -Name $channel.Command -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source  # check-suppress:suppression_doc: probe -- CLI may not be in PATH; null check below handles absence
     if ([string]::IsNullOrWhiteSpace($cliPath)) {
-      Write-Output "Skipping VS Code $($channel.Name) extension sync: '$($channel.Command)' not found in PATH."
+      Write-NucleusInfo -CommandName 'vscode-extensions' "Skipping VS Code $($channel.Name) extension sync: '$($channel.Command)' not found in PATH."
       continue
     }
 
@@ -175,14 +175,14 @@ function Sync-VSCodeExtensionManifest {
         $matchedId = $managedExtensions | Where-Object { $folderName -like "$_-*" -or $folderName -eq $_ } | Select-Object -First 1
         if (-not $matchedId) {
           Remove-Item -Path $_.FullName -Recurse -Force
-          Write-Output "vscode-extensions: pruned non-managed folder: $folderName ($($channel.Name))"
+          Write-NucleusInfo -CommandName 'vscode-extensions' "pruned non-managed folder: $folderName ($($channel.Name))"
         } elseif ($vscodeVersions.$matchedId -and $folderName -ne $matchedId) {
           $lastDash = $folderName.LastIndexOf('-')
           if ($lastDash -gt 0) {
             $versionFromFolder = $folderName.Substring($lastDash + 1)
             if ($versionFromFolder -ne ($vscodeVersions.$matchedId -as [string])) {
               Remove-Item -Path $_.FullName -Recurse -Force
-              Write-Output "vscode-extensions: pruned stale version folder: $folderName ($($channel.Name))"
+              Write-NucleusInfo -CommandName 'vscode-extensions' "pruned stale version folder: $folderName ($($channel.Name))"
             }
           }
         }

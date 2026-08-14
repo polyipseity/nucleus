@@ -76,7 +76,7 @@ function Sync-WallpaperInventory {
     $unencryptedFiles = @(Get-WallpaperUnencryptedFileList -User $user -RepoRoot $RepoRoot)
 
     if ($wallpaperFiles.Count -eq 0 -and $unencryptedFiles.Count -eq 0) {
-      Write-Output "$($PSStyle.Foreground.Yellow)No overlay wallpaper sources found for user $user; skipping.$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'wallpaper-inventory' "No overlay wallpaper sources found for user $user; skipping."
       continue
     }
 
@@ -99,7 +99,7 @@ function Sync-WallpaperInventory {
         }
       }
 
-      Write-Output "$($PSStyle.Foreground.Cyan)Materializing wallpaper for $user`: $outputName$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'wallpaper-inventory' "Materializing wallpaper for $user`: $outputName"
       $getDecryptedBlobParams = @{
         FilePath    = $wallpaperFilePath
         GpgExe      = $GpgExe
@@ -125,7 +125,7 @@ function Sync-WallpaperInventory {
 
     foreach ($fileName in $unencryptedFiles) {
       $outputPath = Join-Path -Path $outputDir -ChildPath $fileName
-      Write-Output "$($PSStyle.Foreground.Cyan)Linking unencrypted wallpaper for $user`: $fileName$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'wallpaper-inventory' "Linking unencrypted wallpaper for $user`: $fileName"
       # check-suppress:suppression_doc: Deploy-UserWritableSymlink returns created symlink FileInfo; discarded
       $null = Deploy-UserWritableSymlink `
         -Name "wallpaper-$fileName" `
@@ -144,10 +144,10 @@ function Sync-WallpaperInventory {
   }
 
   if (-not $activeWallpaperPath) {
-    Write-Output "$($PSStyle.Foreground.Yellow)No overlay wallpaper sources found for specified users; skipping wallpaper sync.$($PSStyle.Reset)"
+    Write-NucleusInfo -CommandName 'wallpaper-inventory' "No overlay wallpaper sources found for specified users; skipping wallpaper sync."
     return $null
   }
 
-  Write-Output "$($PSStyle.Foreground.Green)Wallpaper sync complete.$($PSStyle.Reset)"
+  Write-NucleusInfo -CommandName 'wallpaper-inventory' "Wallpaper sync complete."
   return $activeWallpaperPath
 }
