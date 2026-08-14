@@ -50,4 +50,4 @@ REPO_ROOT="$(derive_repo_root)"
 export REPO_ROOT
 # shellcheck source=../src/scripts/cleanup-nix-build-artifacts.sh
 . "$SCRIPT_DIR/../src/scripts/cleanup-nix-build-artifacts.sh"
-nuc_done
+nuc_done "$@"

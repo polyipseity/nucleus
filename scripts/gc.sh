@@ -719,4 +719,4 @@ if [ "$journald_gc" = true ]; then
   fi
 fi
 
-nuc_done
+nuc_done "$@"

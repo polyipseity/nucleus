@@ -167,4 +167,4 @@ if [ "$sops" = true ]; then
   rewrap_sops_files
 fi
 
-nuc_done
+nuc_done "$@"

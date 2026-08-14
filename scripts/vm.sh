@@ -521,7 +521,7 @@ vm_prepare_vm_command() {
 do_sync() {
   vm_prepare_vm_command
   vm_sync_config_phase
-  nuc_done
+  nuc_done "$@"
 }
 
 # do_setup
@@ -557,7 +557,7 @@ do_setup() {
     vm_gc_vms
   fi
 
-  nuc_done
+  nuc_done "$@"
 }
 
 # do_build_system
@@ -592,7 +592,7 @@ do_build_system() {
 
   vm_prepare_vm_command
   vm_build_system "$vm_type"
-  nuc_done
+  nuc_done "$@"
 }
 
 # do_inject
@@ -627,7 +627,7 @@ do_inject() {
 
   vm_prepare_vm_command
   vm_inject_guest "$vm_id"
-  nuc_done
+  nuc_done "$@"
 }
 
 # Annotate a VM name with its running state.
@@ -1057,7 +1057,7 @@ do_resize() {
   VM_DIR="${vm_dir_override:-$HOME/virtual machines}"
 
   vm_resize_vm "$vm_id" "$disk_bytes" "$allow_shrink"
-  nuc_done
+  nuc_done "$@"
 }
 
 # do_gc
@@ -1083,7 +1083,7 @@ do_gc() {
     "$gc_data_mode"
 
   vm_gc_vms
-  nuc_done
+  nuc_done "$@"
 }
 
 # do_pack
@@ -1117,7 +1117,7 @@ do_pack() {
     "$gc_data_mode"
 
   vm_pack_vms
-  nuc_done
+  nuc_done "$@"
 }
 
 # do_unpack
@@ -1148,7 +1148,7 @@ do_unpack() {
     "$gc_data_mode"
 
   vm_unpack_vms
-  nuc_done
+  nuc_done "$@"
 }
 
 # ---------------------------------------------------------------------------

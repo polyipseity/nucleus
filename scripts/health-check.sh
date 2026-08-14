@@ -250,4 +250,4 @@ if [ "$store_audit" = true ] && command -v nix >/dev/null 2>&1; then
   audit_store_report
 fi
 
-nuc_done
+nuc_done "$@"

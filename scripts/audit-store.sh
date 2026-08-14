@@ -38,4 +38,4 @@ export REPO_ROOT
 # shellcheck source=../src/scripts/lib/audit-store.sh
 . "$SCRIPT_DIR/../src/scripts/lib/audit-store.sh"
 audit_store_report
-nuc_done
+nuc_done "$@"

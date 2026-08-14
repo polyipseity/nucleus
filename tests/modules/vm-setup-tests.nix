@@ -1998,11 +1998,11 @@ let
   test_windows_vm_data_disk_preservation =
     assert'
       (
-        (lib.hasInfix "vm-setup: data disk already exists: \$diskPath" windows_vm_setup_ps1_text)
+        (lib.hasInfix "Write-NucleusInfo -CommandName vm-setup \"data disk already exists: \$diskPath\"" windows_vm_setup_ps1_text)
         && !(lib.hasInfix "adopting missing provision marker" windows_vm_setup_ps1_text)
         && (lib.hasInfix "vm-setup: data disk is invalid for '\$(\$vm.id)': \$diskPath; run 'nucleus-vm reset \$(\$vm.id)' to recreate it (data preserved)" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "vm-setup: growing data disk '\$(\$vm.id)' from \$dataDiskSize to \$diskBytes bytes (grow-only)" windows_vm_setup_ps1_text)
-        && (lib.hasInfix "vm-setup: Android userdata disk already exists: \$userdataPath" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Write-NucleusInfo -CommandName vm-setup \"growing data disk '\$(\$vm.id)' from \$dataDiskSize to \$diskBytes bytes (grow-only)\"" windows_vm_setup_ps1_text)
+        && (lib.hasInfix "Write-NucleusInfo -CommandName vm-setup \"Android userdata disk already exists: \$userdataPath\"" windows_vm_setup_ps1_text)
       )
       "Windows vm-setup must preserve existing data disks (skip-if-exists, invalid-disk reset guard, grow-only resize, Android userdata parity)";
 
