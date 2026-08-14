@@ -23,7 +23,7 @@ run_package_manager_enforcement() {
       esac
     done
     if [ "$_has_shell_files" -eq 0 ]; then
-      say "==== $(step_number): Package manager usage enforcement ==== SKIPPED (no shell files to check)"
+      skip_step "$(step_number)" "Package manager usage enforcement" "no shell files to check"
       return 2
     fi
   fi

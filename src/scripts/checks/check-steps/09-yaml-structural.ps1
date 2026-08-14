@@ -36,7 +36,7 @@ Register-Step -Id "yaml-structural" -Name "YAML structural validation" -Action {
   }
 
   if ($yamlFiles.Count -eq 0) {
-    Write-Message "==== $(Get-StepNumber): YAML structural validation ==== SKIPPED (no YAML files to check)"
+    Skip-Step -Number (Get-StepNumber) -Name "YAML structural validation" -Reason "no YAML files to check"
     return 2
   }
 

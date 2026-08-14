@@ -15,6 +15,9 @@ _NUCLEUS_STEP_RUNNER_SOURCED=1
 _NUCLEUS_STEP_RUNNER_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 . "$_NUCLEUS_STEP_RUNNER_DIR/deny-list.sh"
 
+# shellcheck source=./lib.sh
+. "$_NUCLEUS_STEP_RUNNER_DIR/lib.sh"
+
 # --- Step registration ---
 # Indexed arrays: step numbers, step names, step function names.
 declare -a _STEP_IDS=()
@@ -220,7 +223,7 @@ _run_step() {
 
   tee -a "$_wave_tmpdir/step-$_n.out" <"$_fifo" | while IFS= read -r _line || [ -n "$_line" ]; do
     # _n is the zero-padded NN- prefix string; 10# forces decimal so %d doesn't parse it as octal.
-    printf '[step %2d] %s\n' "$((10#${_n}))" "$_line" >&2
+    printf '%s[step %2d]%s %s\n' "${_nuc_c2_dim}" "$((10#${_n}))" "${_nuc_c2_reset}" "$_line" >&2
   done
 
   _exit_code=0
@@ -248,6 +251,13 @@ _run_skipped_step() {
   printf '%s' "2" >"$_wave_tmpdir/step-$_n.exit"
   _elapsed_ms=$(($(_step_now_ms) - _step_start_ms))
   printf '%s' "$_elapsed_ms" >"$_wave_tmpdir/step-$_n.time"
+}
+
+# skip_step — Print a skip header to stdout (F3 with SKIPPED suffix). Used by step
+# scripts for runtime self-skips (scoped mode with no matching files). Display-only;
+# the runner's own skip path writes the step files and exit-code marker.
+skip_step() {
+  printf '\n%s=== [%s] %s === SKIPPED (%s)%s\n' "${_nuc_c1_bold}${_nuc_c1_cyan}" "$1" "$2" "$3" "${_nuc_c1_reset}"
 }
 
 # --- Argument parsing ---
@@ -430,7 +440,7 @@ run_all_steps() {
       _run_step "$_n" "$_name" "${_STEP_FUNCS[$_i]}" "${POSITIONAL_ARGS[@]+${POSITIONAL_ARGS[@]}}" &
       _batch_pids+=($!)
       _spawned_steps+=("$_n")
-      printf '[%d/%d] step %s %s started\n' "$_started" "$_total" "$_n" "$_name"
+      printf '%s[%d/%d] step %s %s started%s\n' "${_nuc_c1_dim}" "$_started" "$_total" "$_n" "$_name" "${_nuc_c1_reset}"
     done
     _fail_fast_exit=""
     for _batch_pid in "${_batch_pids[@]}"; do
@@ -451,7 +461,7 @@ run_all_steps() {
   for _n in "${_spawned_steps[@]}"; do
     _elapsed_ms=$(cat "$_wave_tmpdir/step-$_n.time" 2>/dev/null || echo 0)
     _duration_s=$(_format_duration_s "$_elapsed_ms")
-    printf 'step %s finished (%s)\n' "$_n" "$_duration_s"
+    printf '%sstep %s finished (%s)%s\n' "${_nuc_c1_dim}" "$_n" "$_duration_s" "${_nuc_c1_reset}"
   done
 }
 
@@ -476,22 +486,26 @@ aggregate_results() {
 
     # _n is the zero-padded NN- prefix string; 10# forces decimal so %d doesn't parse it as octal.
     if [ "$_exit_code" -eq 0 ]; then
-      printf '  step %2d  ✓  %8s  %s\n' "$((10#${_n}))" "$_duration_s" "$_name"
+      printf '  %sstep %2d%s  %s✓%s  %s%8s%s  %s\n' "${_nuc_c1_dim}" "$((10#${_n}))" "${_nuc_c1_reset}" "${_nuc_c1_green}" "${_nuc_c1_reset}" "${_nuc_c1_dim}" "$_duration_s" "${_nuc_c1_reset}" "$_name"
     elif [ "$_exit_code" -eq 2 ]; then
-      printf '  step %2d  SKIP %8s  %s\n' "$((10#${_n}))" "$_duration_s" "$_name"
+      printf '  %sstep %2d%s  %sSKIP%s  %s%8s%s  %s\n' "${_nuc_c1_dim}" "$((10#${_n}))" "${_nuc_c1_reset}" "${_nuc_c1_yellow}" "${_nuc_c1_reset}" "${_nuc_c1_dim}" "$_duration_s" "${_nuc_c1_reset}" "$_name"
     else
-      printf '  step %2d  ✗  %8s  %s\n' "$((10#${_n}))" "$_duration_s" "$_name"
+      printf '  %sstep %2d%s  %s✗%s  %s%8s%s  %s\n' "${_nuc_c1_dim}" "$((10#${_n}))" "${_nuc_c1_reset}" "${_nuc_c1_red}" "${_nuc_c1_reset}" "${_nuc_c1_dim}" "$_duration_s" "${_nuc_c1_reset}" "$_name"
       _failed_steps="$_failed_steps$((10#${_n})) "
     fi
 
     if [ -f "$_wave_tmpdir/step-$_n.out" ]; then
-      cat "$_wave_tmpdir/step-$_n.out"
+      if [ -n "$_nuc_c1_cyan" ]; then
+        sed "s/^=== .*$/${_nuc_c1_bold}${_nuc_c1_cyan}&${_nuc_c1_reset}/" "$_wave_tmpdir/step-$_n.out"
+      else
+        cat "$_wave_tmpdir/step-$_n.out"
+      fi
     fi
   done
 
   printf '\n'
-  printf '  sum of steps: %8s\n' "$(_format_duration_s "$_total_elapsed")"
-  printf '  wall clock:   %8s\n' "$(_format_duration_s "$_wall_ms")"
+  printf '%s  sum of steps:%s %8s\n' "${_nuc_c1_dim}" "${_nuc_c1_reset}" "$(_format_duration_s "$_total_elapsed")"
+  printf '%s  wall clock:  %s %8s\n' "${_nuc_c1_dim}" "${_nuc_c1_reset}" "$(_format_duration_s "$_wall_ms")"
   printf '\n'
 
   if [ -n "$_failed_steps" ]; then
@@ -499,7 +513,7 @@ aggregate_results() {
     printf '  Failed steps: %s\n' "$_failed_steps"
     exit 1
   else
-    say "all checks passed."
+    say "${_nuc_c1_green}all checks passed.${_nuc_c1_reset}"
     exit 0
   fi
 }

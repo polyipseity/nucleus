@@ -27,7 +27,7 @@ run_lockfile_validation() {
       esac
     done
     if [ "$_has_lf_files" -eq 0 ]; then
-      say "==== $(step_number): Lockfile validation ==== SKIPPED (no lockfile files to check)"
+      skip_step "$(step_number)" "Lockfile validation" "no lockfile files to check"
       return 2
     fi
   fi

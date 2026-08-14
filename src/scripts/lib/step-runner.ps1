@@ -7,6 +7,35 @@ Set-StrictMode -Version Latest
 
 . (Join-Path $PSScriptRoot "deny-list.ps1")
 
+# --- Color support (F2/F3/F4) ---
+# WHY: unified color detection — FORCE_COLOR/CLICOLOR_FORCE force on, NO_COLOR forces off,
+# otherwise VT support + not redirected. Never mutates $PSStyle.OutputRendering.
+$script:NucColorOn = $false
+if ($env:NO_COLOR -and $env:NO_COLOR.Length -gt 0) {
+  $script:NucColorOn = $false
+} elseif (($env:FORCE_COLOR -and $env:FORCE_COLOR -ne '0') -or ($env:CLICOLOR_FORCE -and $env:CLICOLOR_FORCE.Length -gt 0)) {
+  $script:NucColorOn = $true
+} elseif ($Host.UI.SupportsVirtualTerminal -and -not [Console]::IsOutputRedirected) {
+  $script:NucColorOn = $true
+}
+if ($script:NucColorOn) {
+  $script:NucStyleBold = $PSStyle.Bold
+  $script:NucStyleDim = $PSStyle.Dim
+  $script:NucStyleCyan = $PSStyle.Foreground.Cyan
+  $script:NucStyleGreen = $PSStyle.Foreground.Green
+  $script:NucStyleRed = $PSStyle.Foreground.Red
+  $script:NucStyleYellow = $PSStyle.Foreground.Yellow
+  $script:NucStyleReset = $PSStyle.Reset
+} else {
+  $script:NucStyleBold = ''
+  $script:NucStyleDim = ''
+  $script:NucStyleCyan = ''
+  $script:NucStyleGreen = ''
+  $script:NucStyleRed = ''
+  $script:NucStyleYellow = ''
+  $script:NucStyleReset = ''
+}
+
 # --- Step registration ---
 $script:StepIds = [System.Collections.Generic.List[string]]::new()
 $script:StepNumbers = [System.Collections.Generic.List[int]]::new()
@@ -116,6 +145,21 @@ function Invoke-SkippedStep {
   "2" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.exit") -Encoding utf8 -NoNewline
   $stepStart.Stop()
   "$($stepStart.ElapsedMilliseconds)" | Out-File -FilePath (Join-Path $script:WaveTmpDir "step-$Number.time") -Encoding utf8 -NoNewline
+}
+
+# --- Skip-Step display helper ---
+# WHY: runtime self-skips (scoped mode with no matching files) print the F3 skip header to
+# stdout; display-only — the runner's own skip path writes the step files and exit-code marker.
+function Skip-Step {
+  param(
+    [Parameter(Mandatory)]
+    [int]$Number,
+    [Parameter(Mandatory)]
+    [string]$Name,
+    [Parameter(Mandatory)]
+    [string]$Reason
+  )
+  "`n$($script:NucStyleBold)$($script:NucStyleCyan)=== [$Number] $Name === SKIPPED ($Reason)$($script:NucStyleReset)" | Write-Output
 }
 
 # --- Invoke-Step wrapper ---
@@ -310,7 +354,7 @@ function Invoke-StepPipeline {
 
       $ps = [System.Management.Automation.PowerShell]::Create()
       $null = $ps.AddScript({  # check-suppress:suppression_doc: AddScript returns the pipeline for chaining; discarded
-        param($Number, $Name, $Action, $HasArgs, $RepoRoot, $WaveTmpDir, $FAIL_FAST)
+        param($Number, $Name, $Action, $HasArgs, $RepoRoot, $WaveTmpDir, $FAIL_FAST, $Dim, $Reset)
 
         $stepStart = [System.Diagnostics.Stopwatch]::StartNew()
         $outFile = Join-Path $WaveTmpDir "step-$Number.out"
@@ -324,7 +368,7 @@ function Invoke-StepPipeline {
           foreach ($line in $stepOutput) {
             $text = if ($line -is [System.Management.Automation.ErrorRecord]) { $line.ToString() } else { "$line" }
             Add-Content -Path $outFile -Value $text
-            Write-Error ("[step {0,2}] {1}" -f $Number, $text)
+            Write-Error ("{0}[step {1,2}]{2} {3}" -f $Dim, $Number, $Reset, $text)
           }
           $status = @($stepOutput)[-1]
           if ($status -is [int] -and $status -eq 2) { $exitCode = 2 }
@@ -349,12 +393,14 @@ function Invoke-StepPipeline {
         RepoRoot   = $RepoRoot
         WaveTmpDir = $script:WaveTmpDir
         FAIL_FAST  = $script:FAIL_FAST
+        Dim        = $script:NucStyleDim
+        Reset      = $script:NucStyleReset
       })
       $handle = $ps.BeginInvoke()
       $null = $runspaces.Add(@{ PowerShell = $ps; AsyncResult = $handle; Number = $n })  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
       $startedSteps++
       $null = $spawnedNumbers.Add($n)  # check-suppress:suppression_doc: List.Add return discarded; mutation is the side effect
-      Write-Output ("[{0}/{1}] step {2} {3} started" -f $startedSteps, $totalSteps, $n, $name)
+      Write-Output ("$($script:NucStyleDim)[{0}/{1}] step {2} {3} started$($script:NucStyleReset)" -f $startedSteps, $totalSteps, $n, $name)
     }
 
     $batchFailed = $false
@@ -387,7 +433,7 @@ function Invoke-StepPipeline {
     $timeFile = Join-Path $script:WaveTmpDir "step-$n.time"
     $elapsedMs = 0
     if (Test-Path -LiteralPath $timeFile) { $elapsedMs = [int](Get-Content -LiteralPath $timeFile -Raw) }
-    Write-Output ("step {0} finished ({1})" -f $n, (Format-StepDuration -Milliseconds $elapsedMs))
+    Write-Output ("$($script:NucStyleDim)step {0} finished ({1})$($script:NucStyleReset)" -f $n, (Format-StepDuration -Milliseconds $elapsedMs))
   }
 }
 
@@ -411,19 +457,22 @@ function Format-StepSummary {
     $totalElapsed += [int]$elapsed
 
     if ($exitCode -eq "0") {
-      "  step {0,2}  {1}  {2,8}  {3}" -f $n, "✓", (Format-StepDuration -Milliseconds ([int]$elapsed)), $name | Write-Output
+      "$($script:NucStyleDim)  step {0,2}  $($script:NucStyleGreen){1}$($script:NucStyleReset)$($script:NucStyleDim)  {2,8}  $($script:NucStyleReset){3}" -f $n, "✓", (Format-StepDuration -Milliseconds ([int]$elapsed)), $name | Write-Output
     } elseif ($exitCode -eq "2") {
       # Exit code 2 = skipped step; rendered as SKIP, never a failure.
-      "  step {0,2}  {1}  {2,8}  {3}" -f $n, "SKIP", (Format-StepDuration -Milliseconds ([int]$elapsed)), $name | Write-Output
+      "$($script:NucStyleDim)  step {0,2}  $($script:NucStyleYellow){1}$($script:NucStyleReset)$($script:NucStyleDim)  {2,8}  $($script:NucStyleReset){3}" -f $n, "SKIP", (Format-StepDuration -Milliseconds ([int]$elapsed)), $name | Write-Output
     } else {
-      "  step {0,2}  {1}  {2,8}  {3}" -f $n, "✗", (Format-StepDuration -Milliseconds ([int]$elapsed)), $name | Write-Output
+      "$($script:NucStyleDim)  step {0,2}  $($script:NucStyleRed){1}$($script:NucStyleReset)$($script:NucStyleDim)  {2,8}  $($script:NucStyleReset){3}" -f $n, "✗", (Format-StepDuration -Milliseconds ([int]$elapsed)), $name | Write-Output
       $failedSteps = "$failedSteps$n "
     }
 
     # Replay step output
     $outFile = Join-Path $script:WaveTmpDir "step-$n.out"
     if (Test-Path $outFile) {
-      Get-Content -Path $outFile | Write-Output
+      Get-Content -Path $outFile | ForEach-Object {
+        if ($_ -match '^=== .* ===') { "$($script:NucStyleBold)$($script:NucStyleCyan)$_$($script:NucStyleReset)" }
+        else { $_ }
+      } | Write-Output
     }
   }
 
@@ -433,16 +482,16 @@ function Format-StepSummary {
     $wallMs = [int](Get-Content -LiteralPath $wallFile -Raw)
   }
 
-  "`n  sum of steps: {0,8}" -f (Format-StepDuration -Milliseconds $totalElapsed) | Write-Output
-  "  wall clock:   {0,8}" -f (Format-StepDuration -Milliseconds $wallMs) | Write-Output
+  "$($script:NucStyleDim)`n  sum of steps:$($script:NucStyleReset) {0,8}" -f (Format-StepDuration -Milliseconds $totalElapsed) | Write-Output
+  "$($script:NucStyleDim)  wall clock:  $($script:NucStyleReset){0,8}" -f (Format-StepDuration -Milliseconds $wallMs) | Write-Output
   "`n" | Write-Output
 
   if ($failedSteps) {
-    Write-ErrorMessage "some checks failed: steps $failedSteps"
+    Write-ErrorMessage "$($script:NucStyleRed)some checks failed: steps $failedSteps$($script:NucStyleReset)"
     "  Failed steps: $failedSteps" | Write-Output
     exit 1
   } else {
-    Write-Message "all checks passed."
+    Write-Message "$($script:NucStyleGreen)all checks passed.$($script:NucStyleReset)"
     exit 0
   }
 }

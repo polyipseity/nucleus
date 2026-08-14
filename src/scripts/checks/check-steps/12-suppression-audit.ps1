@@ -107,7 +107,7 @@ Register-Step -Id "suppression-audit" -Name "Suppression audit" -Action {
   }
 
   if (-not $hasFiles) {
-    Write-Message "==== $(Get-StepNumber): Suppression audit ==== SKIPPED (no script files to check)"
+    Skip-Step -Number (Get-StepNumber) -Name "Suppression audit" -Reason "no script files to check"
     return 2
   }
 

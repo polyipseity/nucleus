@@ -85,7 +85,7 @@ run_suppression_audit() {
       say "no undocumented error suppressions found."
     fi
   else
-    say "==== $(step_number): Suppression audit ==== SKIPPED (no script files to check)"
+    skip_step "$(step_number)" "Suppression audit" "no script files to check"
     rm -rf -- "$_tmpdir"
     return 2
   fi

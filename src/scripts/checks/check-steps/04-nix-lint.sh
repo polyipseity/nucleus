@@ -60,7 +60,7 @@ run_nix_lint() {
     done
     [ -n "$_nixf_tmpdir" ] && rm -rf -- "$_nixf_tmpdir"
   else
-    say "==== $(step_number): Nix lint (nixf-tidy) ==== SKIPPED (no Nix files to check)"
+    skip_step "$(step_number)" "Nix lint (nixf-tidy)" "no Nix files to check"
     return 2
   fi
 

@@ -58,7 +58,7 @@ run_yaml_structural() {
       done <"$_yaml_par_tmpdir/yaml_results.txt"
     fi
   else
-    say "==== $(step_number): YAML structural validation ==== SKIPPED (no YAML files to check)"
+    skip_step "$(step_number)" "YAML structural validation" "no YAML files to check"
     rm -rf -- "$_yaml_par_tmpdir"
     return 2
   fi

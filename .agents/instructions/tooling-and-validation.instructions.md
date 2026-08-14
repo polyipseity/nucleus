@@ -85,8 +85,8 @@ Checks in both `scripts/check.sh` and `scripts/check.ps1` are classified into th
 
 Check steps receive scoped file sets when prek passes staged files as args:
 
-- **POSIX**: step functions receive `$1=_has_args`, `$2=_repo_root`, remaining args = scoped files. Scoped skip pattern (steps 7, 12): loop the scoped files for a type match; if none, print `==== N: Name ==== SKIPPED (no X files to check)` and `return 0`.
-- **PowerShell**: steps are splatted with named params `param($HasArgs, $RepoRoot, $PositionalArgs)` (step-runner.ps1). Skip check: count matching `$PositionalArgs`; if none, emit `... SKIPPED ...` and `return $true`.
+- **POSIX**: step functions receive `$1=_has_args`, `$2=_repo_root`, remaining args = scoped files. Scoped skip pattern (steps 7, 12): loop the scoped files for a type match; if none, call the shared `skip_step` helper with the step number, name, and a `no X files to check` reason (emits the F3 `=== [N] Name === SKIPPED (reason)` header), then `return 2` (rendered as SKIP, never a failure).
+- **PowerShell**: steps are splatted with named params `param($HasArgs, $RepoRoot, $PositionalArgs)` (step-runner.ps1). Skip check: count matching `$PositionalArgs`; if none, call the shared `Skip-Step` helper with the step number, name, and reason (F3 form), then `return 2`.
 - **Scoped-mode `$null` trap**: building a scoped file list as an if-EXPRESSION pipeline-enumerates branch output — an empty scoped list enumerates away to `$null`, so `.Count` throws under StrictMode (step 14 repository-policy sub-checks hit this). Wrap the whole outer if-expression in `@(...)` (e.g. `$ps1Files = @(if ($HasArgs) {...} else {...})`) with a `# WHY:` comment.
 - End-to-end scoped check: `scripts/check.sh README.md` → steps 5+11 SKIP, exit 0; `scripts/check.sh src/modules/core.nix` → step 11 runs its scan, exit 0.
 

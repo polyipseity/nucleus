@@ -24,7 +24,7 @@ run_system_config_build() {
     fi
     ;;
   *)
-    say "==== $(step_number): System config build ==== SKIPPED (unsupported host $_host)"
+    skip_step "$(step_number)" "System config build" "unsupported host $_host"
     return 2
     ;;
   esac
