@@ -51,6 +51,9 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force
+
 # Determine repository root — prefer env var, fall back to parent of script dir.
 $repoRoot = if ($env:NUCLEUS_REPO_ROOT) {
   $env:NUCLEUS_REPO_ROOT
@@ -142,7 +145,7 @@ function Test-PackerValidateAnnotation {
 $suppressChecksumWarning = Test-PackerValidateAnnotation -TemplatePath $packerWindowsTemplate
 
 if ($AnnotationCheckOnly) {
-  Write-Output 'packer_validate annotation check passed.'
+  Write-NucleusInfo -CommandName check-packer 'packer_validate annotation check passed.'
   exit 0
 }
 
@@ -151,13 +154,13 @@ if ($AnnotationCheckOnly) {
 # ---------------------------------------------------------------------------
 if (-not $ValidateOnly) {
   if ($Paths.Count -gt 0) {
-    Write-Output 'Checking Packer formatting for specified paths...'
+    Write-NucleusInfo -CommandName check-packer 'Checking Packer formatting for specified paths...'
     & packer fmt -check $Paths
     if ($LASTEXITCODE -ne 0) {
       throw 'Packer formatting check failed for specified paths.'
     }
   } else {
-    Write-Output 'Checking Packer formatting for all templates...'
+    Write-NucleusInfo -CommandName check-packer 'Checking Packer formatting for all templates...'
     & packer fmt -check -recursive src/vms/
     if ($LASTEXITCODE -ne 0) {
       throw 'Packer formatting check failed.'
@@ -186,7 +189,7 @@ $nixosDigest = if ($lockfileData['vm-setup']['nixos-iso'].$nixArch) {
 
 function Test-PackerDir {
   param([string]$Dir)
-  Write-Output "Validating $Dir..."
+  Write-NucleusInfo -CommandName check-packer "Validating $Dir..."
   Push-Location -Path $Dir
   try {
     & packer init .
@@ -240,7 +243,7 @@ if (-not $isMacOSHost) {
 if ($isMacOSHost) {
   Test-PackerDir -Dir 'src/vms/macOS'
 } else {
-  Write-Output 'Skipping macOS Packer template validation (requires Tart plugin on macOS)'
+  Write-NucleusInfo -CommandName check-packer 'Skipping macOS Packer template validation (requires Tart plugin on macOS)'
 }
 
-Write-Output 'All Packer checks passed.'
+Write-NucleusInfo -CommandName check-packer 'All Packer checks passed.'

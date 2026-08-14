@@ -264,7 +264,7 @@ function Format-StatusTable {
   )
 
   if ($Json) {
-    $jsonObj = @{ version = '1'; services = @{} }
+    $jsonObj = @{ version = 1; services = @{} }
     foreach ($key in $Results.Keys) {
       if ($key -like 'ERROR:*') { continue }
       $jsonObj.services[$key] = $Results[$key]
@@ -444,9 +444,7 @@ function Show-LogConfig {
   $eventLogEntry = if ($hostLog -and $hostLog.ContainsKey('eventLog')) { $hostLog.eventLog } elseif ($topLog -and $topLog.ContainsKey('eventLog')) { $topLog.eventLog } else { $null }
   if ($eventLogEntry) { $config.eventLog = $eventLogEntry }
   if ($JsonOut) {
-    $obj = @{}
-    $obj[$ServiceKey] = $config
-    Write-Output ($obj | ConvertTo-Json -Depth 3 -Compress)
+    Write-Output (@{ version = 1; $ServiceKey = $config } | ConvertTo-Json -Depth 3 -Compress)
   } else {
     Write-Output "${ServiceKey}:"
     foreach ($key in ($config.Keys | Sort-Object)) {
@@ -519,7 +517,7 @@ switch ($Action) {
           Write-NucleusError "$key — action '$Action' failed"
           $overallExit = 1
         } elseif ($Json) {
-          Write-Output "{`"$key`":{`"success`":true}}"
+          Write-Output (@{ version = 1; $key = @{ success = $true } } | ConvertTo-Json -Compress -Depth 3)
         }
       } catch {
         Write-NucleusError "$key — $($_.Exception.Message)"

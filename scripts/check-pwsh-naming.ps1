@@ -27,12 +27,15 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force
+
 if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
   $ManifestPath = Join-Path $PSScriptRoot 'pwsh-naming-manifest.json'
 }
 
 if (-not (Test-Path -LiteralPath $ManifestPath -PathType Leaf)) {
-  Write-Error "check-pwsh-naming: manifest not found at $ManifestPath"
+  Write-NucleusError -CommandName check-pwsh-naming "manifest not found at $ManifestPath"
   exit 1
 }
 
@@ -45,7 +48,7 @@ foreach ($property in $manifest.requiredNames.PSObject.Properties) {
   $filePath = Join-Path $RepoRoot $relativePath
 
   if (-not (Test-Path -LiteralPath $filePath -PathType Leaf)) {
-    Write-Error "check-pwsh-naming: required file missing for $functionName : $relativePath"
+    Write-NucleusError -CommandName check-pwsh-naming "required file missing for $functionName : $relativePath"
     $failed = $true
     continue
   }
@@ -53,7 +56,7 @@ foreach ($property in $manifest.requiredNames.PSObject.Properties) {
   $content = Get-Content -LiteralPath $filePath -Raw
   $pattern = "function\s+$([regex]::Escape($functionName))\s*\{"
   if ($content -notmatch $pattern) {
-    Write-Error "check-pwsh-naming: $relativePath must define function $functionName"
+    Write-NucleusError -CommandName check-pwsh-naming "$relativePath must define function $functionName"
     $failed = $true
   }
 }
@@ -82,17 +85,17 @@ foreach ($forbiddenName in @($manifest.forbiddenNames)) {
       }
 
     foreach ($matchPath in @($matchedPaths)) {
-      Write-Error "check-pwsh-naming: forbidden function $forbiddenName still defined in $matchPath"
+      Write-NucleusError -CommandName check-pwsh-naming "forbidden function $forbiddenName still defined in $matchPath"
       $failed = $true
     }
   }
 }
 
 if ($failed) {
-  Write-Error 'check-pwsh-naming: naming manifest validation failed.'
+  Write-NucleusError -CommandName check-pwsh-naming 'naming manifest validation failed.'
   exit 1
 }
 
 $requiredCount = @($manifest.requiredNames.PSObject.Properties).Length
 $forbiddenCount = @($manifest.forbiddenNames).Length
-Write-Output "check-pwsh-naming: manifest validation passed ($requiredCount required names, $forbiddenCount forbidden names)."
+Write-NucleusInfo -CommandName check-pwsh-naming "manifest validation passed ($requiredCount required names, $forbiddenCount forbidden names)."

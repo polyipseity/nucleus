@@ -61,16 +61,19 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force
+
 if (-not $Paths -or $Paths.Count -eq 0) {
   if ($Scoped) {
-    Write-Output 'No PowerShell files to check (scoped mode).'
+    Write-NucleusInfo -CommandName check-pwsh 'No PowerShell files to check (scoped mode).'
     exit 0
   }
   $Paths = @(git ls-files '*.ps1' ':(exclude)vendor/')
 }
 
 if (-not $Paths -or $Paths.Count -eq 0) {
-  Write-Output 'No PowerShell files to check.'
+  Write-NucleusInfo -CommandName check-pwsh 'No PowerShell files to check.'
   exit 0
 }
 
@@ -112,16 +115,21 @@ if (-not $skipSyntax) {
   } -ThrottleLimit ([System.Environment]::ProcessorCount) | Where-Object { $_ -ne $null })
 
   if ($parseErrors.Count -gt 0) {
+    # WHY: Write-NucleusError → Write-Error is terminating under the script-wide
+    # $ErrorActionPreference = 'Stop'; scope Continue so every diagnostic renders
+    # before the exit-1 summary (the problems matcher consumes all of them).
+    $ErrorActionPreference = 'Continue'
     foreach ($parseError in $parseErrors) {
-      Write-Output ('{0}:{1}:{2}: {3}' -f $parseError.Extent.File, $parseError.Extent.StartLineNumber, $parseError.Extent.StartColumnNumber, $parseError.Message)
+      Write-NucleusError -CommandName check-pwsh ('{0}:{1}:{2}: {3}' -f $parseError.Extent.File, $parseError.Extent.StartLineNumber, $parseError.Extent.StartColumnNumber, $parseError.Message)
     }
-
-    throw 'PowerShell syntax check failed.'
+    $ErrorActionPreference = 'Stop'
+    Write-NucleusError -CommandName check-pwsh 'PowerShell syntax check failed.'
+    exit 1
   }
 
-  Write-Output ("PowerShell syntax check passed for {0} files." -f $Paths.Count)
+  Write-NucleusInfo -CommandName check-pwsh ("PowerShell syntax check passed for {0} files." -f $Paths.Count)
 } else {
-  Write-Output 'PowerShell syntax check skipped (-SkipStep Syntax).'
+  Write-NucleusInfo -CommandName check-pwsh 'PowerShell syntax check skipped (-SkipStep Syntax).'
 }
 
 # ---------------------------------------------------------------------------
@@ -162,17 +170,23 @@ if (-not $skipPSSA) {
       Rules = @{}
     }
     if ($diags) {
+      # WHY: Write-NucleusError → Write-Error is terminating under the script-wide
+      # $ErrorActionPreference = 'Stop'; scope Continue so every diagnostic renders
+      # before the exit-1 summary (the problems matcher consumes all of them).
+      $ErrorActionPreference = 'Continue'
       $diags | ForEach-Object {
-        Write-Output ('{0}:{1}:{2}: [{3}] {4}' -f $_.ScriptPath, $_.Line, $_.Column, $_.Severity, $_.Message)
+        Write-NucleusError -CommandName check-pwsh ('{0}:{1}:{2}: [{3}] {4}' -f $_.ScriptPath, $_.Line, $_.Column, $_.Severity, $_.Message)
       }
-      throw 'PowerShell lint check failed.'
+      $ErrorActionPreference = 'Stop'
+      Write-NucleusError -CommandName check-pwsh 'PowerShell lint check failed.'
+      exit 1
     }
 
-    Write-Output ("PowerShell lint check passed for {0} files." -f $Paths.Count)
+    Write-NucleusInfo -CommandName check-pwsh ("PowerShell lint check passed for {0} files." -f $Paths.Count)
   }
   finally {
     $env:PSModulePath = $originalPSModulePath
   }
 } else {
-  Write-Output 'PowerShell lint skipped (-SkipStep PSSA).'
+  Write-NucleusInfo -CommandName check-pwsh 'PowerShell lint skipped (-SkipStep PSSA).'
 }

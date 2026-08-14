@@ -25,6 +25,9 @@
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force
+
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { Split-Path -Parent $PSScriptRoot }
 
 $WhatIf = $false
@@ -36,7 +39,7 @@ for ($_i = 0; $_i -lt $args.Count; $_i++) {
     '-h' { Write-Output "Usage: cleanup-nix.ps1 [-WhatIf] [-Verbose]"; exit 0 }
     '--help' { Write-Output "Usage: cleanup-nix.ps1 [-WhatIf] [-Verbose]"; exit 0 }
     default {
-      [Console]::Error.WriteLine("ERROR: unsupported argument '$($args[$_i])'")
+      Write-NucleusError -CommandName cleanup-nix "unsupported argument '$($args[$_i])'"
       exit 1
     }
   }
@@ -60,14 +63,14 @@ while ($_dirIndex -lt $_directories.Count) {
       if ($_.LinkType -eq 'SymbolicLink') {
         $_target = $_.Target
         if ($WhatIf) {
-          Write-Output "cleanup-nix: [dry-run] would remove stale Nix build symlink: $($_.FullName) -> $_target"
+          Write-NucleusDryRun -CommandName cleanup-nix "would remove stale Nix build symlink: $($_.FullName) -> $_target"
         } else {
           Remove-Item -LiteralPath $_.FullName -Force
-          Write-Output "cleanup-nix: removed stale Nix build symlink: $($_.FullName) -> $_target"
+          Write-NucleusInfo -CommandName cleanup-nix "removed stale Nix build symlink: $($_.FullName) -> $_target"
         }
       } elseif ($_.PSIsContainer -or (-not $_.LinkType)) {
         if ($Verbose) {
-          Write-Output "cleanup-nix: found non-symlink at $($_.FullName) — skipping (not a Nix build artifact)"
+          Write-NucleusInfo -CommandName cleanup-nix "found non-symlink at $($_.FullName) — skipping (not a Nix build artifact)"
         }
       }
     }
@@ -82,5 +85,5 @@ while ($_dirIndex -lt $_directories.Count) {
 }
 
 if (-not $_found) {
-  Write-Output "cleanup-nix: no stale Nix build artifacts found."
+  Write-NucleusInfo -CommandName cleanup-nix "no stale Nix build artifacts found."
 }

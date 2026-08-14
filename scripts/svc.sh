@@ -583,8 +583,7 @@ do_list() {
 
   local has_error=false
   if [ "$json_output" = true ]; then
-    printf '{"version":"1","services":{'
-    local first=true
+    local entries_json=""
     while IFS=$'\t' read -r key display svc_json json_key; do
       if echo "$key" | grep -q '^ERROR:'; then
         has_error=true
@@ -595,13 +594,17 @@ do_list() {
       if [ "$domain_filter" = "user" ] && [ "$_d_entry_domain" != "user" ]; then continue; fi
       if [ "$domain_filter" = "system" ] && [ "$_d_entry_domain" != "system" ]; then continue; fi
       if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && ! $HAS_SUDO; then continue; fi
-      local status_json
+      local status_json pair_json
       status_json=$(svc_status "$key" "$svc_json")
-      "$first" || printf ','
-      first=false
-      printf '"%s":%s' "$json_key" "$status_json"
+      pair_json=$(jq -cn --arg k "$json_key" --argjson v "$status_json" '{key:$k, value:$v}')
+      if [ -n "$entries_json" ]; then
+        entries_json="$entries_json
+$pair_json"
+      else
+        entries_json="$pair_json"
+      fi
     done <<<"$entries"
-    printf '}}\n'
+    printf '%s\n' "$entries_json" | jq -c -s 'reduce .[] as $i ({}; .[$i.key] = $i.value) | {version: 1, services: .}'
   else
     printf '%-20s %-24s %-10s %-8s %s\n' "ID" "Name" "Status" "Running" "PID"
     printf '%.0s-' {1..80}
@@ -980,14 +983,7 @@ do_logs() {
 
   if [ "${#service_names[@]}" -eq 0 ]; then
     if $json_output; then
-      printf '['
-      local first=true
-      while IFS= read -r svc; do
-        "$first" || printf ',',
-        first=false
-        printf '  "%s"' "$svc"
-      done <<<"$(get_host_services)"
-      printf '\n]\n'
+      printf '%s\n' "$(get_host_services)" | jq -n -R -c '[inputs | select(length > 0)]'
     else
       printf 'Available services:\n\n'
       while IFS= read -r svc; do
@@ -1091,7 +1087,7 @@ do_log_config() {
       }
     ' "$SERVICES_JSON")
     if $json_output; then
-      printf '{"%s":%s}\n' "$svc" "$entry"
+      printf '%s\n' "$entry" | jq -c --argjson version 1 --arg svc "$svc" '{version: $version, ($svc): .}'
     else
       printf '%s:\n' "$svc"
       echo "$entry" | jq -r '

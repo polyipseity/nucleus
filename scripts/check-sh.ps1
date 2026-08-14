@@ -30,6 +30,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force
+
 # check-suppress:suppression_doc: probe whether shellcheck is installed; $null check below throws if absent.
 $shellcheck = Get-Command -Name 'shellcheck' -ErrorAction SilentlyContinue
 if (-not $shellcheck) {
@@ -41,14 +44,14 @@ Push-Location $repoRoot
 try {
   if ($Paths.Count -eq 0) {
     if ($Scoped) {
-      Write-Output 'no shell scripts to check (scoped mode).'
+      Write-NucleusInfo -CommandName check-sh 'no shell scripts to check (scoped mode).'
       exit 0
     }
     $Paths = @(git ls-files '*.sh' ':(exclude)vendor/')
   }
 
   if ($Paths.Count -eq 0) {
-    Write-Output 'no shell scripts to check.'
+    Write-NucleusInfo -CommandName check-sh 'no shell scripts to check.'
     exit 0
   }
 
@@ -66,7 +69,7 @@ try {
     exit $exitCode
   }
 
-  Write-Output "shell script check passed for $($Paths.Count) files."
+  Write-NucleusInfo -CommandName check-sh "shell script check passed for $($Paths.Count) files."
 }
 finally {
   Pop-Location
