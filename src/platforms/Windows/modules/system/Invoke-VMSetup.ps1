@@ -916,7 +916,7 @@ function Invoke-VMSetup {
             $startContentPs1 = $startContentPs1.Replace('__DISPLAY_BACKEND__', $display)
             $startContentPs1 = $startContentPs1.Replace('__VIRTIOFS_ARGS__', $virtiofsArgs)
         } else {
-            Write-Warning "vm-setup: start-windows.ps1 template not found at $ps1TemplatePath; writing minimal script"
+            Write-NucleusWarning -CommandName vm-setup "start-windows.ps1 template not found at $ps1TemplatePath; writing minimal script"
             $startContentPs1 = "Write-Host 'start-$($Vm.id).ps1 — Start VM $($Vm.name)'"
         }
         if (Test-Path -LiteralPath $shTemplatePath -PathType Leaf) {
@@ -933,7 +933,7 @@ function Invoke-VMSetup {
             $startContentSh = $startContentSh.Replace('__VGA__', $vga)
             $startContentSh = $startContentSh.Replace('__DISPLAY_BACKEND__', $display)
         } else {
-            Write-Warning "vm-setup: start-windows-host.sh template not found at $shTemplatePath; writing minimal script"
+            Write-NucleusWarning -CommandName vm-setup "start-windows-host.sh template not found at $shTemplatePath; writing minimal script"
             $startContentSh = "#!/bin/sh`n# start-$($Vm.id).sh — Start VM $($Vm.name)"
         }
 
@@ -961,7 +961,7 @@ function Invoke-VMSetup {
         $stopPs1 = Join-Path $ScriptsDir "stop-$($Vm.id).ps1"
         $stopTemplatePath = Join-Path $TemplatesDir 'stop-host.ps1'
         if (-not (Test-Path -LiteralPath $stopTemplatePath -PathType Leaf)) {
-            Write-Warning "vm-setup: stop-host.ps1 template not found at $stopTemplatePath; skipping stop script"
+            Write-NucleusWarning -CommandName vm-setup "stop-host.ps1 template not found at $stopTemplatePath; skipping stop script"
             return
         }
         if ($DryRun) {
@@ -1016,7 +1016,7 @@ function Invoke-VMSetup {
     catch {
         if ($SyncOnly) {
             Write-Warning $_.Exception.Message
-            Write-Warning 'vm-sync: proceeding without guest credentials'
+            Write-NucleusWarning -CommandName vm-sync 'proceeding without guest credentials'
             $guestCredential = $null
         } else {
             Write-Warning $_.Exception.Message
@@ -1035,7 +1035,7 @@ function Invoke-VMSetup {
             $env:NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY = $sshPublicKey
             Write-NucleusInfo -CommandName vm-setup "SSH public key exported for NixOS guest provisioning"
         } else {
-            Write-Warning "vm-setup: no SSH public key found; NixOS guest will use password auth only"
+            Write-NucleusWarning -CommandName vm-setup "no SSH public key found; NixOS guest will use password auth only"
         }
 
         Write-NucleusInfo -CommandName vm-setup "guest credential policy active (owner=$($guestCredential.Owner), username=$guestUsername, source=SOPS)"
@@ -1070,7 +1070,7 @@ function Invoke-VMSetup {
             | Set-Content -Path $vmReadmePath -Encoding UTF8
         Write-NucleusInfo -CommandName vm-setup "VM directory guide written: $vmReadmePath (template)"
     } else {
-        Write-Warning "vm-setup: README template not found at $vmReadmeTemplate; writing minimal guide"
+        Write-NucleusWarning -CommandName vm-setup "README template not found at $vmReadmeTemplate; writing minimal guide"
         # check-suppress:embedded-content: exception 2 (trivial static content) -- README fallback under 10 lines
         @"
 # virtual machines
@@ -1090,7 +1090,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 $Accelerator = 'whpx'
                 Write-NucleusInfo -CommandName vm-setup 'WHPX detected; using whpx accelerator for faster VM builds'
             } else {
-                Write-Warning 'vm-setup: WHPX is not enabled; using slow tcg accelerator. Enable for faster builds:'
+                Write-NucleusWarning -CommandName vm-setup 'WHPX is not enabled; using slow tcg accelerator. Enable for faster builds:'
                 Write-NucleusInfo -CommandName vm-setup '  Enable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -NoRestart'
             }
         } catch {
@@ -1152,7 +1152,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         if (-not (Test-VMEnabled -Vm $vm)) { continue }
         if (-not (Test-VMHostMatch -Vm $vm)) { continue }
         if (Test-VMProcessRunning -VmId $vm.id -VmDisplay $vm.name) {
-            Write-Warning "vm-sync: VM '$($vm.id)' is running; stop and restart it for config changes (e.g. port forwards) to take effect"
+            Write-NucleusWarning -CommandName vm-sync "VM '$($vm.id)' is running; stop and restart it for config changes (e.g. port forwards) to take effect"
         }
     }
 
@@ -1306,11 +1306,11 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 Write-NucleusInfo -CommandName vm-setup "Android userdata disk missing; creating $userdataPath"
                 if (-not $DryRun) {
                     if ($null -eq $qemuImg) {
-                        Write-Warning "vm-setup: qemu-img not found; cannot create Android userdata disk for '$($vm.id)'"
+                        Write-NucleusWarning -CommandName vm-setup "qemu-img not found; cannot create Android userdata disk for '$($vm.id)'"
                     } else {
                         & $qemuImg create -f qcow2 $userdataPath $diskBytes
                         if ($LASTEXITCODE -ne 0) {
-                            Write-Warning "vm-setup: qemu-img create failed for Android userdata disk: $userdataPath"
+                            Write-NucleusWarning -CommandName vm-setup "qemu-img create failed for Android userdata disk: $userdataPath"
                         }
                         Set-Content -Path $userdataProvisionMarker -Value $userdataProvisionHash -Encoding UTF8
                     }
@@ -1347,11 +1347,11 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                     Write-NucleusInfo -CommandName vm-setup "Android system overlay missing; creating $systemOverlayPath"
                     if (-not $DryRun) {
                         if ($null -eq $qemuImg) {
-                            Write-Warning "vm-setup: qemu-img not found; cannot create Android system overlay for '$($vm.id)'"
+                            Write-NucleusWarning -CommandName vm-setup "qemu-img not found; cannot create Android system overlay for '$($vm.id)'"
                         } else {
                             & $qemuImg create -f qcow2 -b $systemImage -F qcow2 $systemOverlayPath
                             if ($LASTEXITCODE -ne 0) {
-                                Write-Warning "vm-setup: qemu-img create failed for Android system overlay: $systemOverlayPath"
+                                Write-NucleusWarning -CommandName vm-setup "qemu-img create failed for Android system overlay: $systemOverlayPath"
                             }
                             Set-Content -Path $systemOverlayProvisionMarker -Value $userdataProvisionHash -Encoding UTF8
                         }
@@ -1360,7 +1360,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                         Write-NucleusDryRun -CommandName vm-setup "Set-Content '$systemOverlayProvisionMarker' '$userdataProvisionHash'"
                     }
                 } else {
-                    Write-Warning "vm-setup: Android system image not found or invalid for '$($vm.id)': $systemImage; skipping system overlay"
+                    Write-NucleusWarning -CommandName vm-setup "Android system image not found or invalid for '$($vm.id)': $systemImage; skipping system overlay"
                 }
             } else {
                 Write-NucleusInfo -CommandName vm-setup "Android system overlay already exists: $systemOverlayPath"
@@ -1385,11 +1385,11 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             $nvramImagePath = Join-Path -Path $dataDir -ChildPath "$($vm.id) (nvram).fd"
             if (-not (Test-Path -LiteralPath $nvramImagePath -PathType Leaf)) {
                 if ($null -eq $qemuImg) {
-                    Write-Warning "vm-setup: qemu-img not found; cannot seed per-VM UEFI NVRAM vars for '$($vm.id)'"
+                    Write-NucleusWarning -CommandName vm-setup "qemu-img not found; cannot seed per-VM UEFI NVRAM vars for '$($vm.id)'"
                 } else {
                     $firmwareVarsPath = Join-Path -Path (Split-Path -Parent $qemuImg) -ChildPath 'edk2-arm-vars.fd'
                     if (-not (Test-Path -LiteralPath $firmwareVarsPath -PathType Leaf)) {
-                        Write-Warning "vm-setup: UEFI NVRAM vars template not found: $firmwareVarsPath; cannot seed '$nvramImagePath'"
+                        Write-NucleusWarning -CommandName vm-setup "UEFI NVRAM vars template not found: $firmwareVarsPath; cannot seed '$nvramImagePath'"
                     } elseif (-not $DryRun) {
                         Copy-Item -LiteralPath $firmwareVarsPath -Destination $nvramImagePath
                         Write-NucleusInfo -CommandName vm-setup "seeded per-VM UEFI NVRAM vars: $nvramImagePath"
@@ -1418,23 +1418,23 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 Write-NucleusInfo -CommandName vm-setup "data disk already exists: $diskPath"
                 if (-not (Test-VMMarker -ExpectedHash $provisionHash -MarkerPath $diskProvisionMarker)) {
                     if (Test-VMProcessRunning -VmId $vm.id -VmDisplay $vm.name) {
-                        Write-Warning "vm-setup: VM '$($vm.id)' is running; skipping in-place injection (applies on next setup)"
+                        Write-NucleusWarning -CommandName vm-setup "VM '$($vm.id)' is running; skipping in-place injection (applies on next setup)"
                     } else {
-                        Write-Warning "vm-setup: provision drift detected for '$($vm.id)'; run 'nucleus-vm inject $($vm.id)' to re-inject in place (data disk preserved)"
+                        Write-NucleusWarning -CommandName vm-setup "provision drift detected for '$($vm.id)'; run 'nucleus-vm inject $($vm.id)' to re-inject in place (data disk preserved)"
                     }
                 }
             } else {
-                Write-Warning "vm-setup: data disk is invalid for '$($vm.id)': $diskPath; run 'nucleus-vm reset $($vm.id)' to recreate it (data preserved)"
+                Write-NucleusWarning -CommandName vm-setup "data disk is invalid for '$($vm.id)': $diskPath; run 'nucleus-vm reset $($vm.id)' to recreate it (data preserved)"
             }
         } elseif ($systemImageValid) {
             Write-NucleusInfo -CommandName vm-setup "using system image: $systemImage"
             if (-not $DryRun) {
                 if ($null -eq $qemuImg) {
-                    Write-Warning "vm-setup: qemu-img not found; cannot create data disk for '$($vm.id)'"
+                    Write-NucleusWarning -CommandName vm-setup "qemu-img not found; cannot create data disk for '$($vm.id)'"
                 } else {
                     & $qemuImg create -f qcow2 -b $backing -F qcow2 $diskPath
                     if ($LASTEXITCODE -ne 0) {
-                        Write-Warning "vm-setup: qemu-img create failed for data disk: $diskPath"
+                        Write-NucleusWarning -CommandName vm-setup "qemu-img create failed for data disk: $diskPath"
                     }
                 }
                 Set-Content -Path $diskProvisionMarker -Value $provisionHash -Encoding UTF8
@@ -1443,7 +1443,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 Write-NucleusDryRun -CommandName vm-setup "Set-Content '$diskProvisionMarker' '$provisionHash'"
             }
         } else {
-            Write-Warning "vm-setup: system image not found or invalid for '$($vm.id)': $systemImage; skipping"
+            Write-NucleusWarning -CommandName vm-setup "system image not found or invalid for '$($vm.id)': $systemImage; skipping"
         }
 
         # Grow-only auto-grow: bring the data disk's virtual size up to the
@@ -1454,11 +1454,11 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             Write-NucleusInfo -CommandName vm-setup "growing data disk '$($vm.id)' from $dataDiskSize to $diskBytes bytes (grow-only)"
             if (-not $DryRun) {
                 if ($null -eq $qemuImg) {
-                    Write-Warning "vm-setup: qemu-img not found; cannot grow data disk for '$($vm.id)'"
+                    Write-NucleusWarning -CommandName vm-setup "qemu-img not found; cannot grow data disk for '$($vm.id)'"
                 } else {
                     & $qemuImg resize $diskPath $diskBytes
                     if ($LASTEXITCODE -ne 0) {
-                        Write-Warning "vm-setup: qemu-img resize failed for '$($vm.id)': $diskPath"
+                        Write-NucleusWarning -CommandName vm-setup "qemu-img resize failed for '$($vm.id)': $diskPath"
                     }
                 }
             } else {
@@ -1573,14 +1573,14 @@ function Test-Qcow2Image {
     )
 
     if (-not (Test-Path $ImagePath)) {
-        Write-Warning "vm-setup: $ImageLabel not found: $ImagePath"
+        Write-NucleusWarning -CommandName vm-setup "$ImageLabel not found: $ImagePath"
         return $false
     }
 
     # check-suppress:suppression_doc: probe -- image file may be unreadable; $null check handles absence.
     $item = Get-Item $ImagePath -ErrorAction SilentlyContinue
     if (-not $item -or $item.Length -le 0) {
-        Write-Warning "vm-setup: $ImageLabel is empty or unreadable: $ImagePath"
+        Write-NucleusWarning -CommandName vm-setup "$ImageLabel is empty or unreadable: $ImagePath"
         return $false
     }
 
@@ -1592,24 +1592,24 @@ function Test-Qcow2Image {
 
     $infoJson = & $qemuImg.Source info --output=json $ImagePath 2>$null  # check-suppress:suppression_doc: probe -- image file may not exist or be corrupt; $LASTEXITCODE checked below
     if ($LASTEXITCODE -ne 0 -or -not $infoJson) {
-        Write-Warning "vm-setup: qemu-img could not read ${ImageLabel}: $ImagePath"
+        Write-NucleusWarning -CommandName vm-setup "qemu-img could not read ${ImageLabel}: $ImagePath"
         return $false
     }
 
     try {
         $info = $infoJson | ConvertFrom-Json
     } catch {
-        Write-Warning "vm-setup: qemu-img returned invalid JSON for ${ImageLabel}: $ImagePath"
+        Write-NucleusWarning -CommandName vm-setup "qemu-img returned invalid JSON for ${ImageLabel}: $ImagePath"
         return $false
     }
 
     if ($info.format -ne 'qcow2') {
-        Write-Warning "vm-setup: $ImageLabel has unexpected format '$($info.format)' (expected qcow2): $ImagePath"
+        Write-NucleusWarning -CommandName vm-setup "$ImageLabel has unexpected format '$($info.format)' (expected qcow2): $ImagePath"
         return $false
     }
 
     if ([long]$info.'virtual-size' -lt $MinBytes) {
-        Write-Warning "vm-setup: $ImageLabel virtual size is too small ($($info.'virtual-size') bytes): $ImagePath"
+        Write-NucleusWarning -CommandName vm-setup "$ImageLabel virtual size is too small ($($info.'virtual-size') bytes): $ImagePath"
         return $false
     }
 
@@ -1650,20 +1650,20 @@ function Invoke-BuildNixosImage {
                 Write-NucleusInfo -CommandName vm-setup "NixOS image already built for '$VmName' with the current guest config and credentials (username=$GuestAccountName): $outPath"
                 return
             }
-            Write-Warning "vm-setup: NixOS image guest config/credential drift detected; rebuilding image: $outPath"
+            Write-NucleusWarning -CommandName vm-setup "NixOS image guest config/credential drift detected; rebuilding image: $outPath"
             Remove-Item $outPath -Force
             if (Test-Path $typeConfigMarkerPath) {
                 Remove-Item $typeConfigMarkerPath -Force
             }
         } else {
-            Write-Warning "vm-setup: existing NixOS image is invalid; rebuilding from scratch: $outPath"
+            Write-NucleusWarning -CommandName vm-setup "existing NixOS image is invalid; rebuilding from scratch: $outPath"
             Remove-Item $outPath -Force
         }
     }
 
     # check-suppress:suppression_doc: probe whether packer is installed; Get-Command throws when absent.
     if (-not (Get-Command packer -ErrorAction SilentlyContinue)) {
-        Write-Warning 'vm-setup: packer not found; install via WinGet (HashiCorp.Packer)'
+        Write-NucleusWarning -CommandName vm-setup 'packer not found; install via WinGet (HashiCorp.Packer)'
         return
     }
 
@@ -1687,7 +1687,7 @@ function Invoke-BuildNixosImage {
     try {
         & packer init .
         if ($LASTEXITCODE -ne 0) {
-            Write-Warning 'vm-setup: packer init failed for NixOS'
+            Write-NucleusWarning -CommandName vm-setup 'packer init failed for NixOS'
             return
         }
         & packer build `
@@ -1698,7 +1698,7 @@ function Invoke-BuildNixosImage {
             -var "output_directory=$tmpOutput" `
             .
         if ($LASTEXITCODE -ne 0) {
-            Write-Warning 'vm-setup: packer build failed for NixOS'
+            Write-NucleusWarning -CommandName vm-setup 'packer build failed for NixOS'
             return
         }
     }
@@ -1708,7 +1708,7 @@ function Invoke-BuildNixosImage {
 
     $builtImage = Join-Path $tmpOutput 'nixos.qcow2'
     if (-not (Test-Path $builtImage)) {
-        Write-Warning "vm-setup: Packer did not produce $builtImage"
+        Write-NucleusWarning -CommandName vm-setup "Packer did not produce $builtImage"
         return
     }
 
@@ -1717,7 +1717,7 @@ function Invoke-BuildNixosImage {
     Set-Content -Path $typeConfigMarkerPath -Value $typeImageHash -Encoding UTF8
 
     if (-not (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'newly built NixOS image' -MinBytes $MinSize)) {
-        Write-Warning "vm-setup: NixOS image validation failed after build; removing $outPath"
+        Write-NucleusWarning -CommandName vm-setup "NixOS image validation failed after build; removing $outPath"
         Remove-Item $outPath -Force
         return
     }
@@ -1747,7 +1747,7 @@ function Invoke-FidoWindowsIso {
 
     $fidoScript = Join-Path $RepoRoot 'vendor\Fido\Fido.ps1'
     if (-not (Test-Path $fidoScript)) {
-        Write-Warning "vm-setup: Fido.ps1 not found at $fidoScript; run: git submodule update --init vendor/Fido"
+        Write-NucleusWarning -CommandName vm-setup "Fido.ps1 not found at $fidoScript; run: git submodule update --init vendor/Fido"
         return ''
     }
 
@@ -1759,7 +1759,7 @@ function Invoke-FidoWindowsIso {
     }
 
     if ($Retries -lt 0) {
-        Write-Warning "vm-setup: invalid retry count ($Retries); expected a non-negative integer"
+        Write-NucleusWarning -CommandName vm-setup "invalid retry count ($Retries); expected a non-negative integer"
         return ''
     }
 
@@ -1782,16 +1782,16 @@ function Invoke-FidoWindowsIso {
                 }
 
                 if (($fidoOutput -join "`n") -match '715-123130') {
-                    Write-Warning 'vm-setup: Microsoft blocked automated ISO download (code 715-123130); retry later or provide -WindowsIso path'
+                    Write-NucleusWarning -CommandName vm-setup 'Microsoft blocked automated ISO download (code 715-123130); retry later or provide -WindowsIso path'
                 }
 
                 if ($attempt -ge $maxAttempts) {
-                    Write-Warning "vm-setup: Fido exited with code $LASTEXITCODE"
+                    Write-NucleusWarning -CommandName vm-setup "Fido exited with code $LASTEXITCODE"
                     return ''
                 }
 
                 $sleepSeconds = [Math]::Min([Math]::Pow(2, $attempt - 1), 30)
-                Write-Warning "vm-setup: Fido download attempt $attempt/$maxAttempts failed; retrying in $sleepSeconds seconds"
+                Write-NucleusWarning -CommandName vm-setup "Fido download attempt $attempt/$maxAttempts failed; retrying in $sleepSeconds seconds"
                 Start-Sleep -Seconds $sleepSeconds
                 $attempt++
             } finally {
@@ -1803,7 +1803,7 @@ function Invoke-FidoWindowsIso {
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1
         if (-not $downloadedIso) {
-            Write-Warning 'vm-setup: Fido: no ISO found in temp dir after download'
+            Write-NucleusWarning -CommandName vm-setup 'Fido: no ISO found in temp dir after download'
             return ''
         }
 
@@ -1862,9 +1862,9 @@ function Invoke-BuildWindowsImage {
                 Write-NucleusInfo -CommandName vm-setup "Windows image already built for the current guest config and credentials (username=$GuestAccountName): $outPath"
                 return
             }
-            Write-Warning "vm-setup: Windows image guest config/credential drift detected; rebuilding image: $outPath"
+            Write-NucleusWarning -CommandName vm-setup "Windows image guest config/credential drift detected; rebuilding image: $outPath"
         }
-        Write-Warning "vm-setup: existing Windows image is invalid; rebuilding from scratch: $outPath"
+        Write-NucleusWarning -CommandName vm-setup "existing Windows image is invalid; rebuilding from scratch: $outPath"
         Remove-Item $outPath -Force
         if (Test-Path $typeConfigMarkerPath) {
             Remove-Item $typeConfigMarkerPath -Force
@@ -1872,7 +1872,7 @@ function Invoke-BuildWindowsImage {
     }
 
     if ($WindowsIsoRetries -lt 0) {
-        Write-Warning "vm-setup: invalid WindowsIsoRetries value ($WindowsIsoRetries); expected a non-negative integer"
+        Write-NucleusWarning -CommandName vm-setup "invalid WindowsIsoRetries value ($WindowsIsoRetries); expected a non-negative integer"
         return
     }
 
@@ -1894,7 +1894,7 @@ function Invoke-BuildWindowsImage {
             # Source: https://curl.se/docs/manpage.html
             # check-suppress:suppression_doc: probe whether curl.exe is available; Get-Command throws when absent.
             if (-not (Get-Command curl.exe -ErrorAction SilentlyContinue)) {
-                Write-Warning 'vm-setup: curl.exe not found; Windows 10 1803+ includes it in system32'
+                Write-NucleusWarning -CommandName vm-setup 'curl.exe not found; Windows 10 1803+ includes it in system32'
                 return
             }
 
@@ -1913,13 +1913,13 @@ function Invoke-BuildWindowsImage {
                 }
 
                 $sleepSeconds = [Math]::Min([Math]::Pow(2, $attempt - 1), 30)
-                Write-Warning "vm-setup: Windows.isoUrl download attempt $attempt/$maxAttempts failed; retrying in $sleepSeconds seconds"
+                Write-NucleusWarning -CommandName vm-setup "Windows.isoUrl download attempt $attempt/$maxAttempts failed; retrying in $sleepSeconds seconds"
                 Start-Sleep -Seconds $sleepSeconds
                 $attempt++
             }
 
             if (-not $downloadOk) {
-                Write-Warning "vm-setup: Windows.isoUrl download failed; removing partial file $cachedIso"
+                Write-NucleusWarning -CommandName vm-setup "Windows.isoUrl download failed; removing partial file $cachedIso"
                 if (Test-Path $cachedIso) {
                     Remove-Item $cachedIso -Force
                 }
@@ -1953,13 +1953,13 @@ function Invoke-BuildWindowsImage {
     }
 
     if (-not (Test-Path $WindowsIso)) {
-        Write-Warning "vm-setup: Windows ISO not found: $WindowsIso"
+        Write-NucleusWarning -CommandName vm-setup "Windows ISO not found: $WindowsIso"
         return
     }
 
     # check-suppress:suppression_doc: probe whether packer is installed; Get-Command throws when absent.
     if (-not (Get-Command packer -ErrorAction SilentlyContinue)) {
-        Write-Warning 'vm-setup: packer not found; install via WinGet (HashiCorp.Packer)'
+        Write-NucleusWarning -CommandName vm-setup 'packer not found; install via WinGet (HashiCorp.Packer)'
         return
     }
 
@@ -2017,7 +2017,7 @@ function Invoke-BuildWindowsImage {
         try {
             $qemuCommand = Get-Command qemu-system-x86_64 -ErrorAction Stop
         } catch {
-            Write-Warning 'vm-setup: qemu-system-x86_64 not found; cannot run headful debug mode'
+            Write-NucleusWarning -CommandName vm-setup 'qemu-system-x86_64 not found; cannot run headful debug mode'
             return
         }
 
@@ -2029,7 +2029,7 @@ function Invoke-BuildWindowsImage {
             }
         }
         if (-not $packerDisplayBackend) {
-            Write-Warning "vm-setup: no supported headful QEMU display backend detected. Available backends:`n$($displayHelp -join "`n")"
+            Write-NucleusWarning -CommandName vm-setup "no supported headful QEMU display backend detected. Available backends:`n$($displayHelp -join "`n")"
             return
         }
     }
@@ -2067,7 +2067,7 @@ function Invoke-BuildWindowsImage {
     try {
         & packer init .
         if ($LASTEXITCODE -ne 0) {
-            Write-Warning 'vm-setup: packer init failed for Windows'
+            Write-NucleusWarning -CommandName vm-setup 'packer init failed for Windows'
             return
         }
         $buildSucceeded = $false
@@ -2181,22 +2181,22 @@ function Invoke-BuildWindowsImage {
             }
 
             if ($LASTEXITCODE -in 130, 143) {
-                Write-Warning "vm-setup: Windows Packer attempt cancelled (exit $LASTEXITCODE); aborting retry matrix"
+                Write-NucleusWarning -CommandName vm-setup "Windows Packer attempt cancelled (exit $LASTEXITCODE); aborting retry matrix"
                 # check-suppress:suppression_doc: cleanup-after-failure; temp dir may not exist if cancelled early.
                 Remove-Item $attemptTempDir -Recurse -Force -ErrorAction Ignore
                 return
             }
 
-            Write-Warning "vm-setup: packer build attempt failed for firmware_mode=$($attempt.Firmware) boot_strategy=$($attempt.Boot) (exit $LASTEXITCODE); trying next strategy"
+            Write-NucleusWarning -CommandName vm-setup "packer build attempt failed for firmware_mode=$($attempt.Firmware) boot_strategy=$($attempt.Boot) (exit $LASTEXITCODE); trying next strategy"
             if (Test-Path $packerLog) {
-                Write-Warning "vm-setup: last 60 lines from failed Packer log ($packerLog):"
+                Write-NucleusWarning -CommandName vm-setup "last 60 lines from failed Packer log ($packerLog):"
                 Get-Content -Path $packerLog -Tail 60 | ForEach-Object { Write-Warning $_ }
             }
             Remove-Item $attemptTempDir -Recurse -Force
         }
 
         if (-not $buildSucceeded) {
-            Write-Warning 'vm-setup: packer build failed for Windows after all boot strategies'
+            Write-NucleusWarning -CommandName vm-setup 'packer build failed for Windows after all boot strategies'
             return
         }
     }
@@ -2206,7 +2206,7 @@ function Invoke-BuildWindowsImage {
 
         $builtImage = Join-Path (Join-Path $builtTempDir 'output') 'windows.qcow2'
     if (-not (Test-Path $builtImage)) {
-        Write-Warning "vm-setup: Packer did not produce $builtImage"
+        Write-NucleusWarning -CommandName vm-setup "Packer did not produce $builtImage"
         return
     }
 
@@ -2215,7 +2215,7 @@ function Invoke-BuildWindowsImage {
         Set-Content -Path $typeConfigMarkerPath -Value $typeImageHash -Encoding UTF8
 
     if (-not (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'newly built Windows image' -MinBytes $MinSize)) {
-        Write-Warning "vm-setup: Windows image validation failed after build; removing $outPath"
+        Write-NucleusWarning -CommandName vm-setup "Windows image validation failed after build; removing $outPath"
         Remove-Item $outPath -Force
         return
     }
