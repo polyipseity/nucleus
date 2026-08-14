@@ -2,11 +2,18 @@
 # Resolves a POSIX account homedir for a username.
 set -euo pipefail
 
+# Source lib.sh from this library's own directory (callers set SCRIPT_DIR to
+# their own location, so resolve relative to this file).
+_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$_LIB_DIR/lib.sh"
+unset _LIB_DIR
+
 resolve_user_homedir() {
   local username="$1"
 
   if [ -z "$username" ]; then
-    echo "resolve-user-homedir: username must be non-empty" >&2
+    warn -l resolve-user-homedir "username must be non-empty"
     return 1
   fi
 
@@ -31,7 +38,7 @@ resolve_user_homedir() {
     return 0
   fi
 
-  echo "resolve-user-homedir: could not resolve homedir for user '$username'" >&2
+  warn -l resolve-user-homedir "could not resolve homedir for user '$username'"
   return 1
 }
 

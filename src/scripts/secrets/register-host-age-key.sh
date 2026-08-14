@@ -48,29 +48,24 @@ _rak_host_pub="/etc/ssh/ssh_host_ed25519_key.pub"
 _rak_sops_yaml="$_rak_repo_root/.sops.yaml"
 
 if [ ! -f "$_rak_host_pub" ]; then
-  printf 'sops: %s not found; skipping machine age key auto-registration.\n' \
-    "$_rak_host_pub" >&2
+  warn -l sops "$_rak_host_pub not found; skipping machine age key auto-registration."
   exit 0
 fi
 
 _rak_age_pub=""
 if ! _rak_age_pub="$(ssh-to-age -i "$_rak_host_pub")"; then
-  printf 'sops: ERROR — ssh-to-age failed to derive age public key from %s.\n' \
-    "$_rak_host_pub" >&2
-  exit 1
+  die -l sops "ssh-to-age failed to derive age public key from $_rak_host_pub."
 fi
 if [ -z "$_rak_age_pub" ]; then
-  printf 'sops: ERROR — ssh-to-age returned an empty age public key for %s.\n' \
-    "$_rak_host_pub" >&2
-  exit 1
+  die -l sops "ssh-to-age returned an empty age public key for $_rak_host_pub."
 fi
 
 if grep -qF "$_rak_age_pub" "$_rak_sops_yaml"; then
-  printf 'sops: machine age key already registered in .sops.yaml; skipping auto-registration.\n'
+  say -l sops "machine age key already registered in .sops.yaml; skipping auto-registration."
   exit 0
 fi
 
-printf 'sops: registering machine age key in .sops.yaml and rewrapping SOPS files...\n'
+say -l sops "registering machine age key in .sops.yaml and rewrapping SOPS files..."
 
 _rak_tmp="$(mktemp)"
 awk -v age_pub="$_rak_age_pub" '
@@ -81,8 +76,7 @@ chmod 644 "$_rak_tmp"
 mv "$_rak_tmp" "$_rak_sops_yaml"
 
 if ! grep -qF "$_rak_age_pub" "$_rak_sops_yaml"; then
-  printf 'sops: ERROR — failed to insert machine age key into .sops.yaml; is the marker comment present?\n' >&2
-  exit 1
+  die -l sops "failed to insert machine age key into .sops.yaml; is the marker comment present?"
 fi
 
 for _rak_secret in \
@@ -91,10 +85,9 @@ for _rak_secret in \
     continue
   fi
   if ! sops updatekeys --yes "$_rak_secret"; then
-    printf 'sops: ERROR — sops updatekeys failed for %s.\n' "$_rak_secret" >&2
-    printf 'sops: Ensure the primary GPG key is imported first:\n' >&2
-    printf 'sops:   gpg --import <backup-key-file>\n' >&2
-    exit 1
+    die -l sops "sops updatekeys failed for $_rak_secret.
+sops: Ensure the primary GPG key is imported first:
+sops:   gpg --import <backup-key-file>"
   fi
 done
 
@@ -112,16 +105,15 @@ if [ -d "$_rak_repo_root/src/users" ]; then
       # the script immediately; the OS reclaims /tmp files on reboot.
       # Removing it inside the read-loop body would trigger SC2094 (the
       # same variable appears in both `rm` and `done < file`).
-      printf 'sops: ERROR — sops updatekeys failed for %s.\n' "$_rak_wallpaper" >&2
-      printf 'sops: Ensure the primary GPG key is imported first:\n' >&2
-      printf 'sops:   gpg --import <backup-key-file>\n' >&2
-      exit 1
+      die -l sops "sops updatekeys failed for $_rak_wallpaper.
+sops: Ensure the primary GPG key is imported first:
+sops:   gpg --import <backup-key-file>"
     fi
   done <"$_rak_wallpaper_list"
   rm -f "$_rak_wallpaper_list"
 fi
 
-printf 'sops: machine age key registered and SOPS files rewrapped.\n'
-printf 'sops: Commit the changes before deploying to other machines:\n'
-printf 'sops:   git add .sops.yaml src/secrets src/users\n'
-printf 'sops:   git commit -m "chore: register <hostname> machine age key"\n'
+say -l sops "machine age key registered and SOPS files rewrapped."
+say -l sops "Commit the changes before deploying to other machines:"
+say -l sops "  git add .sops.yaml src/secrets src/users"
+say -l sops "  git commit -m \"chore: register <hostname> machine age key\""

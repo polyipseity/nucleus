@@ -4,6 +4,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
 
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
 # shellcheck source=../lib/resolve-user-homedir.sh
 . "$SCRIPT_DIR/../lib/resolve-user-homedir.sh"
 
@@ -70,9 +72,10 @@ while [ "$#" -gt 0 ]; do
     exit 0
     ;;
   *)
-    echo "decrypt-sops: unknown argument '$1'" >&2
-    usage
-    exit 2
+    error "unknown argument '$1'" || {
+      usage
+      exit 2
+    }
     ;;
   esac
 done
@@ -85,8 +88,7 @@ if [ -z "$_ds_repo_root" ] || [ -z "$_ds_sops_file" ]; then
 fi
 
 if [ ! -f "$_ds_sops_file" ]; then
-  echo "decrypt-sops: file not found: $_ds_sops_file" >&2
-  exit 1
+  die "file not found: $_ds_sops_file"
 fi
 
 _ds_decrypt_with_env() {
@@ -156,5 +158,4 @@ if GNUPGHOME="$_ds_gnupg_home" "$_ds_gpg_bin" --with-colons --no-autostart --lis
 fi
 
 _ds_clear_age_env
-echo "decrypt-sops: unable to decrypt '$_ds_sops_file' with machine key, user SSH keys, or GPG keyring" >&2
-exit 1
+die "unable to decrypt '$_ds_sops_file' with machine key, user SSH keys, or GPG keyring"

@@ -25,7 +25,7 @@ while [[ $# -gt 0 ]]; do
     exit 0
     ;;
   *)
-    printf '%s: unknown argument: %s\n' "$(basename "$0")" "$1" >&2
+    error "unknown argument: $1"
     exit 1
     ;;
   esac
@@ -37,17 +37,14 @@ if [ -f "$_gsk_host_key" ]; then
   exit 0
 fi
 
-printf 'SSH: %s not found; generating SSH host keys...\n' "$_gsk_host_key"
+say -l SSH "$_gsk_host_key not found; generating SSH host keys..."
 # Pass PATH explicitly so sudo finds the Nix openssh ssh-keygen.
 if ! sudo env "PATH=$PATH" ssh-keygen -A; then
-  printf 'SSH: ERROR — ssh-keygen -A failed; cannot generate SSH host keys.\n' >&2
-  exit 1
+  die -l SSH "ssh-keygen -A failed; cannot generate SSH host keys."
 fi
 
 if [ ! -f "$_gsk_host_key" ]; then
-  printf 'SSH: ERROR — ssh-keygen -A completed but %s is still absent.\n' \
-    "$_gsk_host_key" >&2
-  exit 1
+  die -l SSH "ssh-keygen -A completed but $_gsk_host_key is still absent."
 fi
 
-printf 'SSH: SSH host keys generated successfully.\n'
+say -l SSH "SSH host keys generated successfully."

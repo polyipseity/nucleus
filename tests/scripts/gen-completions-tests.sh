@@ -10,7 +10,6 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 # shellcheck source=./test-lib.sh
 . "$SCRIPT_DIR/test-lib.sh"
 
-YELLOW='\033[1;33m'
 TESTS_SKIPPED=0
 
 assert_skip() {

@@ -10,6 +10,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
 . "$SCRIPT_DIR/../lib/require-command.sh"
 
 # --- Argument parsing ---
@@ -27,7 +29,7 @@ while [ $# -gt 0 ]; do
     config_file="${1:-$config_file}"
     ;;
   *)
-    printf 'error: unknown argument: %s\n' "$1" >&2
+    error "unknown argument: $1"
     exit 1
     ;;
   esac

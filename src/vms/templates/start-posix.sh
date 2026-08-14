@@ -3,6 +3,10 @@
 # (Tart, UTM, or libvirt/virt-viewer) based on $HOST_KIND
 # (substituted at VM creation time).
 # Other placeholders (VM_NAME, VM_DIR) are similarly substituted.
+#
+# NOTE: lib.sh output helpers are not available here — vm.sh renders this
+# template via sed token substitution into a standalone guest script — so
+# output uses the literal "vm-setup:" prefix.
 
 set -euo pipefail
 

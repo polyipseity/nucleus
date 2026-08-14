@@ -4,6 +4,10 @@
 # CLI args: bat_bin bun_bin fd_bin gh_bin opencode_bin ruff_bin rustup_bin typst_bin uv_bin zsh_completions_src
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
+
 _izc_bat_bin="$1"
 _izc_bun_bin="$2"
 _izc_fd_bin="$3"
@@ -29,10 +33,10 @@ _generate_if_stale() {
     return 0 # already current, skip
   fi
 
-  echo "zsh-completions: generating ${_comp_file##*/}"
+  say -l zsh-completions "generating ${_comp_file##*/}"
   mkdir -p "$(dirname "$_comp_file")"
   eval "$_gen_cmd" >"$_comp_file" 2>/dev/null || {
-    echo "  (failed, skipping)" >&2
+    warn -l zsh-completions "  (failed, skipping)"
     rm -f "$_comp_file"
   }
 }
@@ -126,6 +130,6 @@ for _zsh_nuc_f in "$_izc_zsh_completions_src"/_nucleus-* "$_izc_zsh_completions_
   cp -f "$_zsh_nuc_f" "$_zsh_comp_dir/"
 done
 
-echo "zsh-completions: done"
+nuc_done -l zsh-completions
 
-echo "zsh-completions: done"
+nuc_done -l zsh-completions

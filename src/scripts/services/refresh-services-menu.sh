@@ -7,6 +7,8 @@
 # Sourced functions: refresh_services_menu (macos-launch-services.sh)
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
 # shellcheck source=../lib/macos-launch-services.sh
 . "$SCRIPT_DIR/../lib/macos-launch-services.sh"
 

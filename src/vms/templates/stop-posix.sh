@@ -3,6 +3,10 @@
 # hypervisor selected by <HOST_KIND> (Tart, UTM, or libvirt), substituted at
 # VM creation time. Other placeholders (VM_NAME, VM_DISPLAY) are similarly
 # substituted.
+#
+# NOTE: lib.sh output helpers are not available here — vm.sh renders this
+# template via sed token substitution into a standalone guest script — so
+# output uses the literal "vm-setup:" prefix.
 
 set -euo pipefail
 
@@ -15,19 +19,19 @@ darwin-utm)
   if command -v utmctl >/dev/null 2>&1; then
     exec utmctl stop "__VM_DISPLAY__"
   fi
-  echo "utmctl not found; VM may still be running" >&2
+  echo "vm-setup: utmctl not found; VM may still be running" >&2
   exit 1
   ;;
 nixos-libvirt)
   if virsh shutdown "__VM_ID__" 2>/dev/null; then
-    echo "ACPI shutdown signal sent to __VM_ID__"
+    echo "vm-setup: ACPI shutdown signal sent to __VM_ID__"
   else
-    echo "virsh shutdown failed; trying virsh destroy..." >&2
+    echo "vm-setup: virsh shutdown failed; trying virsh destroy..." >&2
     exec virsh destroy "__VM_ID__"
   fi
   ;;
 *)
-  echo "nucleus-vm: unknown host kind: __HOST_KIND__" >&2
+  echo "vm-setup: unknown host kind: __HOST_KIND__" >&2
   exit 1
   ;;
 esac

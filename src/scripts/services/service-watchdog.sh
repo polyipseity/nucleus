@@ -69,7 +69,7 @@ while [ "$#" -gt 0 ]; do
     ;;
   --domain)
     if [ -z "${2:-}" ]; then
-      printf 'error: --domain requires an argument\n' >&2
+      error "--domain requires an argument"
       exit 1
     fi
     watchdog_domain="$2"
@@ -79,7 +79,7 @@ while [ "$#" -gt 0 ]; do
     watchdog_oneshot=true
     ;;
   *)
-    printf 'error: unknown option: %s\n' "$1" >&2
+    error "unknown option: $1"
     exit 1
     ;;
   esac

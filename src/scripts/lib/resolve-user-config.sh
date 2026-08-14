@@ -2,6 +2,13 @@
 # Resolves per-user homedir overlay paths. Mirrors users-overlay.nix.
 set -euo pipefail
 
+# Source lib.sh from this library's own directory (callers set SCRIPT_DIR to
+# their own location, so resolve relative to this file).
+_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$_LIB_DIR/lib.sh"
+unset _LIB_DIR
+
 _resolve_user_config_repo_root() {
   if [ -n "${NUCLEUS_REPO_ROOT:-}" ]; then
     printf '%s' "$NUCLEUS_REPO_ROOT"
@@ -17,7 +24,7 @@ _resolve_user_config_repo_root() {
     return 0
   fi
 
-  echo "resolve-user-config: NUCLEUS_REPO_ROOT is not set and repo root could not be derived" >&2
+  warn -l resolve-user-config "NUCLEUS_REPO_ROOT is not set and repo root could not be derived"
   return 1
 }
 
@@ -40,7 +47,7 @@ _resolve_user_config_first_level_entry() {
     return 0
   fi
 
-  echo "resolve_user_config_first_level_entry: no source for user '$username' config '$config_name' entry '$entry_name'" >&2
+  warn -l resolve_user_config_first_level_entry "no source for user '$username' config '$config_name' entry '$entry_name'"
   return 1
 }
 
@@ -102,7 +109,7 @@ resolve_user_config_file() {
     return 0
   fi
 
-  echo "resolve_user_config_file: no source for user '$username' config '$config_name' path '$relative_path' (resolved '$resolved')" >&2
+  warn -l resolve_user_config_file "no source for user '$username' config '$config_name' path '$relative_path' (resolved '$resolved')"
   return 1
 }
 

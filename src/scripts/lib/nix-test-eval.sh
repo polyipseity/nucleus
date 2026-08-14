@@ -4,6 +4,13 @@
 # shellcheck source=deny-list.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/deny-list.sh"
 
+# Source lib.sh from this library's own directory (callers set SCRIPT_DIR to
+# their own location, so resolve relative to this file).
+_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$_LIB_DIR/lib.sh"
+unset _LIB_DIR
+
 run_nix_test_eval() {
   local _has_args="$1" _repo_root="$2"
   shift 2
@@ -39,7 +46,7 @@ run_nix_test_eval() {
     local _nte_hit
     while IFS= read -r _nte_hit; do
       _nte_errors=$((_nte_errors + 1))
-      echo "test: error: $_nte_hit" >&2
+      warn -l test "$_nte_hit"
     done < <(grep -nH -E '^\s*builtins\.seq\s*\(\s*builtins\.deepSeq\s+[A-Za-z_][A-Za-z0-9_]*\s*\)' "${_scan_files[@]}")
   fi
 
@@ -49,12 +56,12 @@ run_nix_test_eval() {
       grep -q 'success = true' "$_nte_file" &&
       ! grep -qE 'builtins\.(seq|deepSeq|all|filter)|^[[:space:]]*assert[[:space:]]' "$_nte_file"; then
       _nte_errors=$((_nte_errors + 1))
-      echo "test: error: $_nte_file: Nix tests are only counted via builtins.length but never forced — assertions are silently skipped (see .agents/instructions/testing.instructions.md)" >&2
+      warn -l test "$_nte_file: Nix tests are only counted via builtins.length but never forced — assertions are silently skipped (see .agents/instructions/testing.instructions.md)"
     fi
   done
 
   if [ "$_nte_errors" -gt 0 ]; then
-    echo "test:   Force evaluation of every test file — see .agents/instructions/testing.instructions.md." >&2
+    warn -l test "  Force evaluation of every test file — see .agents/instructions/testing.instructions.md."
     return 1
   fi
 

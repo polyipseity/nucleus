@@ -18,7 +18,6 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
 cd "$REPO_ROOT"
 
-YELLOW='\033[1;33m'
 TESTS_SKIPPED=0
 
 assert_skip() {

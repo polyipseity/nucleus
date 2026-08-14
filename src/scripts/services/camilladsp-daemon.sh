@@ -38,7 +38,7 @@ while [ $# -gt 0 ]; do
     log_file="${1:-}"
     ;;
   *)
-    printf 'error: unknown argument: %s\n' "$1" >&2
+    error "unknown argument: $1"
     exit 1
     ;;
   esac
