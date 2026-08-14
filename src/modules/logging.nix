@@ -32,36 +32,44 @@ in
       description = "System-level log directory for nucleus services.";
     };
 
-    # Rotation parameters are now defined in services.json $defaults.logging
-    # and consumed at runtime by scripts/gc.sh and scripts/gc.ps1.
-    # The Nix build-time options are retired in favor of the JSON source of
-    # truth, which is readable by both POSIX and Windows tooling.
+    # Rotation defaults live in services.schema.json definitions.loggingEntry
+    # .properties (maxSize 10000000 / maxFiles 4 / compress true / sanitize
+    # true) and are consumed at runtime by scripts/gc.sh, scripts/gc.ps1, and
+    # scripts/health-check.sh (per-service overrides from services.json). The
+    # Nix options below mirror those defaults for build-time references only;
+    # runtime tooling reads the JSON schema, not these options.
     rotation = {
       maxSize = mkOption {
         type = types.int;
         default = 10000000; # bytes
-        description = "Maximum log file size in bytes before rotation (runtime source: services.json).";
+        description = "Maximum log file size in bytes before rotation (runtime source: services.schema.json definitions.loggingEntry.properties).";
       };
 
       maxFiles = mkOption {
         type = types.int;
         default = 4;
-        description = "Number of rotated archives to keep (runtime source: services.json).";
+        description = "Number of rotated archives to keep (runtime source: services.schema.json definitions.loggingEntry.properties).";
       };
 
       compress = mkOption {
         type = types.bool;
         default = true;
-        description = "Whether to compress rotated archives with gzip (runtime source: services.json).";
+        description = "Whether to compress rotated archives with gzip (runtime source: services.schema.json definitions.loggingEntry.properties).";
       };
     };
 
     sanitize = mkOption {
       type = types.bool;
       default = true;
-      description = "Whether to strip control characters (ANSI escapes, \\r) from log output.";
+      description = "Whether to strip control characters (ANSI escapes, \\r) from log output (runtime source: services.schema.json definitions.loggingEntry.properties).";
     };
 
+    # logging.capture is consumed by runtime tooling only: scripts/svc.sh
+    # (log display), scripts/gc.sh/ps1 and scripts/health-check.sh (whether a
+    # service's logs are rotated and size-checked). It is NOT wired to
+    # launchd/systemd unit output paths — those are hardcoded per module via
+    # StandardOutPath/StandardErrorPath (macOS) or journald (NixOS), and
+    # wiring capture to unit paths is explicitly out of scope.
     captureDefault = mkOption {
       type = types.enum [
         "all"
@@ -70,7 +78,7 @@ in
         "none"
       ];
       default = "all";
-      description = "Default log capture mode for services without an explicit logging.capture setting.";
+      description = "Default log capture mode for services without an explicit logging.capture setting (runtime source: services.schema.json definitions.loggingEntry.properties).";
     };
   };
 }
