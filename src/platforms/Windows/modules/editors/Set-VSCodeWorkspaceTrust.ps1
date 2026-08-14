@@ -53,7 +53,7 @@ function Set-VSCodeWorkspaceTrust {
     )
 
     if (-not $Enabled) {
-        Write-Output "vscode-workspace-trust: Set-VSCodeWorkspaceTrust: disabled; skipping"
+        Write-NucleusInfo -CommandName 'vscode-workspace-trust' "Set-VSCodeWorkspaceTrust: disabled; skipping"
         return
     }
 
@@ -92,7 +92,7 @@ function Set-VSCodeWorkspaceTrust {
 
         $bunCmd = Get-Command -Name "bun" -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- bun may not be installed; $null check below handles absence
         if ($null -eq $bunCmd) {
-            Write-Warning "vscode-workspace-trust: Set-VSCodeWorkspaceTrust: bun not found in PATH; skipping workspace trust write"
+            Write-NucleusWarning -CommandName 'vscode-workspace-trust' "Set-VSCodeWorkspaceTrust: bun not found in PATH; skipping workspace trust write"
             return
         }
 
@@ -101,7 +101,7 @@ function Set-VSCodeWorkspaceTrust {
         if ($PSCmdlet.ShouldProcess("VS Code workspace trust database", "Set")) {
             & $bunCmd.Source $tempScript $uriPath @dbPaths
             if ($LASTEXITCODE -ne 0) {
-                Write-Warning "vscode-workspace-trust: Set-VSCodeWorkspaceTrust: bun script exited with code $LASTEXITCODE"
+                Write-NucleusWarning -CommandName 'vscode-workspace-trust' "Set-VSCodeWorkspaceTrust: bun script exited with code $LASTEXITCODE"
             }
         }
     }

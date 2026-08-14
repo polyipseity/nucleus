@@ -54,10 +54,10 @@ function ConvertFrom-WingetLockfileToDsc {
         $wingetVersions = $lockfile['winget']
       }
     } catch {
-      Write-Warning "ConvertFrom-WingetLockfileToDsc: lockfile parse failed, copying config as-is"
+      Write-NucleusWarning -CommandName 'ConvertFrom-WingetLockfileToDsc' "lockfile parse failed, copying config as-is"
     }
   } else {
-    Write-Warning "ConvertFrom-WingetLockfileToDsc: lockfile not found at $LockfilePath, copying config as-is"
+    Write-NucleusWarning -CommandName 'ConvertFrom-WingetLockfileToDsc' "lockfile not found at $LockfilePath, copying config as-is"
   }
 
   if (-not (Test-Path -Path $ConfigPath)) {
@@ -94,5 +94,5 @@ function ConvertFrom-WingetLockfileToDsc {
   }
 
   $outputLines -join "`n" | Out-File -FilePath $OutputPath -Encoding utf8 -NoNewline
-  Write-Output "ConvertFrom-WingetLockfileToDsc: wrote $OutputPath"
+  Write-NucleusInfo -CommandName 'ConvertFrom-WingetLockfileToDsc' "wrote $OutputPath"
 }

@@ -567,14 +567,14 @@ foreach ($configuredUser in $userRegistry.users) {
 }
 
 if (-not $userRegistry.primaryUser) {
-  Write-Error "No primary user marked (isPrimary=true) in user registry" -ErrorAction Stop
+  Write-NucleusError -CommandName 'apply' "No primary user marked (isPrimary=true) in user registry"
   exit 1
 }
 
 $primaryUser = $userRegistry.primaryUser.name
 $sessionUser = [Environment]::UserName
 if ($Users -notcontains $sessionUser) {
-  Write-Error "apply: current user '$sessionUser' must be included in -Users ($($Users -join ', '))" -ErrorAction Stop
+  Write-NucleusError -CommandName 'apply' "current user '$sessionUser' must be included in -Users ($($Users -join ', '))"
   exit 1
 }
 $primarySshKeyPath = Join-Path -Path $userRegistry.primaryUser.homeDirectory -ChildPath ".ssh\ssh_personal_$primaryUser"
@@ -600,7 +600,7 @@ $env:NUCLEUS_HOST = "Windows"
 $existingRoot = [Environment]::GetEnvironmentVariable("NUCLEUS_REPO_ROOT", "Machine")
 if ($existingRoot -ne $repoRoot) {
   [Environment]::SetEnvironmentVariable("NUCLEUS_REPO_ROOT", $repoRoot, "Machine")
-  Write-Output "apply: set NUCLEUS_REPO_ROOT=$repoRoot (Machine scope)"
+  Write-NucleusInfo -CommandName 'apply' "set NUCLEUS_REPO_ROOT=$repoRoot (Machine scope)"
   if ($null -ne [Environment]::GetEnvironmentVariable("NUCLEUS_REPO_ROOT", "User")) {
     [Environment]::SetEnvironmentVariable("NUCLEUS_REPO_ROOT", $null, "User")
   }

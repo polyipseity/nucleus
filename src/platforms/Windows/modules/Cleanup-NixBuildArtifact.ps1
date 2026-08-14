@@ -56,13 +56,13 @@ function Clear-NixBuildArtifact {
         if ($PSCmdlet.ShouldProcess("$_item.FullName -> $_target", 'Remove stale Nix build symlink')) {
           Remove-Item -LiteralPath $_item.FullName -Force
           if (-not $PassThru) {
-            Write-Output "cleanup-nix: removed stale Nix build symlink: $($_item.FullName) -> $_target"
+            Write-NucleusInfo -CommandName 'cleanup-nix' "removed stale Nix build symlink: $($_item.FullName) -> $_target"
           }
           $_count++
         }
       } elseif (-not $PassThru) {
         if ($_item.PSIsContainer -or (-not $_item.LinkType)) {
-          Write-Output "cleanup-nix: found non-symlink at $($_item.FullName) — skipping (not a Nix build artifact)"
+          Write-NucleusInfo -CommandName 'cleanup-nix' "found non-symlink at $($_item.FullName) — skipping (not a Nix build artifact)"
         }
       }
     }
@@ -73,6 +73,6 @@ function Clear-NixBuildArtifact {
   }
 
   if ($_count -eq 0) {
-    Write-Output 'cleanup-nix: no stale Nix build artifacts found.'
+    Write-NucleusInfo -CommandName 'cleanup-nix' 'no stale Nix build artifacts found.'
   }
 }

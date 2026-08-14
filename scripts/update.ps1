@@ -100,4 +100,4 @@ if (-not $NoSops) {
   # Close if (-not $WithoutSops).
 }
 
-Write-NucleusInfo "$($PSStyle.Foreground.Green)update workflow completed$($PSStyle.Reset)"
+Write-NucleusInfo "update workflow completed"

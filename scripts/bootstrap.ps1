@@ -240,11 +240,11 @@ function Invoke-WingetPackageInstall {
     }
 
     if ($LASTEXITCODE -eq $NoApplicableUpgradeExitCode) {
-      Write-NucleusInfo "$($PSStyle.Foreground.Green)Package '$Id' is already installed at the requested version (or newer available version is not applicable).$($PSStyle.Reset)"
+      Write-NucleusInfo "Package '$Id' is already installed at the requested version (or newer available version is not applicable)."
       return
     }
 
-    Write-NucleusInfo "$($PSStyle.Foreground.Yellow)Requested version '$Version' for '$Id' not available. Falling back to latest.$($PSStyle.Reset)"
+    Write-NucleusInfo "Requested version '$Version' for '$Id' not available. Falling back to latest."
   }
 
   & winget @installArgs
@@ -254,7 +254,7 @@ function Invoke-WingetPackageInstall {
   }
 
   if ($LASTEXITCODE -eq $NoApplicableUpgradeExitCode) {
-    Write-NucleusInfo "$($PSStyle.Foreground.Green)Package '$Id' is already installed and up to date.$($PSStyle.Reset)"
+    Write-NucleusInfo "Package '$Id' is already installed and up to date."
     return
   }
 
@@ -360,7 +360,7 @@ if ($Apply) {
     }
   }
 
-  Write-NucleusInfo "$($PSStyle.Foreground.Cyan)Running apply flow via $applyScriptPath$($PSStyle.Reset)"
+  Write-NucleusInfo "Running apply flow via $applyScriptPath"
   & $applyScriptPath @effectiveApplyArgs
 
   if ($LASTEXITCODE -ne 0) {
@@ -370,4 +370,4 @@ if ($Apply) {
   return
 }
 
-Write-NucleusInfo "$($PSStyle.Foreground.Green)Bootstrap complete. Run '.\src\hosts\Windows\apply.ps1' to configure this host, or use -Apply.$($PSStyle.Reset)"
+Write-NucleusInfo "Bootstrap complete. Run '.\src\hosts\Windows\apply.ps1' to configure this host, or use -Apply."

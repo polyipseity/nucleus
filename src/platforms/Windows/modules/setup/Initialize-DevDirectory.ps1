@@ -32,15 +32,15 @@ function Initialize-DevDirectory {
     )
 
     if (-not $Enabled) {
-        Write-Output "provision-devdirectory: Initialize-DevDirectory: disabled; skipping"
+        Write-NucleusInfo -CommandName 'provision-devdirectory' "Initialize-DevDirectory: disabled; skipping"
         return
     }
 
     $devPath = Join-Path -Path $HOME -ChildPath "dev"
     if (-not (Test-Path -LiteralPath $devPath -PathType Container)) {
         New-Item -ItemType Directory -Path $devPath -Force > $null
-        Write-Output "provision-devdirectory: created $devPath"
+        Write-NucleusInfo -CommandName 'provision-devdirectory' "created $devPath"
     } else {
-        Write-Output "provision-devdirectory: $devPath already exists; skipping"
+        Write-NucleusInfo -CommandName 'provision-devdirectory' "$devPath already exists; skipping"
     }
 }

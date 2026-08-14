@@ -61,11 +61,11 @@ function Remove-StaleWallpaper {
       try {
         if ($PSCmdlet.ShouldProcess($deployedWallpaper.FullName, 'Remove')) {
           Remove-Item -Path $deployedWallpaper.FullName -Force -ErrorAction Stop
-          Write-Output "Removed stale wallpaper: $($deployedWallpaper.Name)"
+          Write-NucleusInfo -CommandName 'wallpapers' "Removed stale wallpaper: $($deployedWallpaper.Name)"
         }
       }
       catch {
-        Write-Warning "wallpapers: failed to remove stale wallpaper '$($deployedWallpaper.Name)': $_"
+        Write-NucleusWarning -CommandName 'wallpapers' "failed to remove stale wallpaper '$($deployedWallpaper.Name)': $_"
       }
     }
   }

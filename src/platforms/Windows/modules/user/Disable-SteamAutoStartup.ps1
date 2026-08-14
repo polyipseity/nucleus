@@ -33,7 +33,7 @@ function Disable-SteamAutoStartup {
     if ($null -ne $autoLoginUser) {
       # check-suppress:suppression_doc: best-effort removal (value was confirmed above but may have been removed concurrently).
       Remove-ItemProperty -Path $steamRegPath -Name "AutoLoginUser" -ErrorAction SilentlyContinue
-      Write-Output "steam: removed AutoLoginUser registry value"
+      Write-NucleusInfo -CommandName 'steam' "removed AutoLoginUser registry value"
     }
   }
 
@@ -42,6 +42,6 @@ function Disable-SteamAutoStartup {
   $steamShortcut = Join-Path -Path $startupPath -ChildPath "Steam.lnk"
   if (Test-Path -Path $steamShortcut) {
     Remove-Item -Path $steamShortcut -Force
-    Write-Output "steam: removed Steam.lnk from Startup folder"
+    Write-NucleusInfo -CommandName 'steam' "removed Steam.lnk from Startup folder"
   }
 }

@@ -345,4 +345,4 @@ if ($Apply) {
   }
 }
 
-Write-NucleusInfo "$($PSStyle.Foreground.Green)setup complete$($PSStyle.Reset)"
+Write-NucleusInfo "setup complete"

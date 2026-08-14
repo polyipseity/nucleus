@@ -539,7 +539,7 @@ switch ($Action) {
       $status = Get-ServiceStatus -HostEntry $resolved[$key].hostEntry
       if ($status.running) {
         $pidStr = if ($status.pid) { " (pid $($status.pid))" } else { '' }
-        Write-Output "svc: verify $key — active$pidStr"
+        Write-NucleusInfo -CommandName 'svc' "verify $key — active$pidStr"
       } else {
         $diag = if ($status.status) { " ($($status.status))" } else { '' }
         Write-NucleusWarning "$key — inactive$diag"
@@ -547,7 +547,7 @@ switch ($Action) {
       }
     }
     if (-not $hasInactive) {
-      Write-Output "svc: all services active"
+      Write-NucleusInfo -CommandName 'svc' "all services active"
     }
     if ($hasInactive) { exit 1 }
   }

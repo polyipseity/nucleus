@@ -33,11 +33,11 @@ function Clear-SccacheCache {
   # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
   $sccacheCmd = Get-Command -Name 'sccache' -ErrorAction SilentlyContinue
   if ($null -eq $sccacheCmd) {
-    Write-Warning 'sccache not installed; skipping sccache cache gc'
+    Write-NucleusWarning -CommandName 'sccache' 'sccache not installed; skipping sccache cache gc'
     return
   }
 
-  Write-Output 'sccache: clearing cache'
+  Write-NucleusInfo -CommandName 'sccache' 'clearing cache'
   & $sccacheCmd.Source --stop-server 2>$null  # check-suppress:suppression_doc: server may not be running; stop is best-effort before cache removal.
 
   $cacheDir = Get-SccacheCacheDir

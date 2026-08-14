@@ -241,7 +241,7 @@ function Sync-VSCodeConfig {
           Remove-ManagedSymlinkDeleteProtection -Context "vscode-config" -Path $linkPath
           Remove-Item -LiteralPath $linkPath -Force
         } else {
-          Write-Error "vscode-config: Sync-VSCodeConfig: $linkPath is not a managed symlink — merge any wanted content into $repoTarget and remove it, then re-run apply."
+          Write-NucleusError -CommandName 'vscode-config' "Sync-VSCodeConfig: $linkPath is not a managed symlink — merge any wanted content into $repoTarget and remove it, then re-run apply."
           return
         }
       }
@@ -285,7 +285,7 @@ function Sync-VSCodeConfig {
           Remove-ManagedSymlinkDeleteProtection -Context "vscode-config" -Path $linkPath
           Remove-Item -LiteralPath $linkPath -Force
         } else {
-          Write-Error "vscode-config: Sync-VSCodeConfig: $linkPath is not a managed symlink — merge any wanted content into $repoTarget and remove it, then re-run apply."
+          Write-NucleusError -CommandName 'vscode-config' "Sync-VSCodeConfig: $linkPath is not a managed symlink — merge any wanted content into $repoTarget and remove it, then re-run apply."
           return
         }
       }
@@ -303,7 +303,7 @@ function Sync-VSCodeConfig {
     $chatLmPath = Join-Path -Path $channelDir -ChildPath "chatLanguageModels.json"
     if (-not $Enabled) {
       if (Test-Path -LiteralPath $chatLmPath) {
-        Write-Warning "vscode-config: chatLanguageModels.json at ${chatLmPath} was previously managed. Delete manually if no longer needed."
+        Write-NucleusWarning -CommandName 'vscode-config' "chatLanguageModels.json at ${chatLmPath} was previously managed. Delete manually if no longer needed."
       }
     } else {
       # Remove any old symlink before merge so Set-Content writes a regular file.

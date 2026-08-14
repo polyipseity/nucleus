@@ -222,4 +222,4 @@ if ($LogHealth) {
   Test-LogHealth
 }
 
-Write-Output "$($PSStyle.Foreground.Green)nucleus: Windows health checks passed$($PSStyle.Reset)"
+Write-NucleusInfo -CommandName 'nucleus' "Windows health checks passed"
