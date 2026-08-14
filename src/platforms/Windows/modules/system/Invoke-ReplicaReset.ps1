@@ -61,7 +61,7 @@ function Invoke-ReplicaReset {
 
   $userRecord = @($usersRegistry.users | Where-Object { $_.name -eq $username }) | Select-Object -First 1
   if ($null -eq $userRecord) {
-    Write-Output "replica-reset: no user entry for '$username' in user registry; skipping"
+    Write-NucleusInfo -CommandName 'replica-reset' "no user entry for '$username' in user registry; skipping"
     return
   }
 
@@ -70,14 +70,14 @@ function Invoke-ReplicaReset {
     })
 
   if ($replicas.Count -eq 0) {
-    Write-Output "replica-reset: no enabled replicas for user '$username'"
+    Write-NucleusInfo -CommandName 'replica-reset' "no enabled replicas for user '$username'"
     return
   }
 
   if (-not [string]::IsNullOrWhiteSpace($ReplicaId)) {
     $replicas = @($replicas | Where-Object { $_.id -eq $ReplicaId })
     if ($replicas.Count -eq 0) {
-      Write-Output "replica-reset: replica id '$ReplicaId' not enabled for user '$username'"
+      Write-NucleusInfo -CommandName 'replica-reset' "replica id '$ReplicaId' not enabled for user '$username'"
       return
     }
   }
@@ -102,14 +102,14 @@ function Invoke-ReplicaReset {
         $isSymlink = $null -ne $localItem -and ($localItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint)
         if ($isSymlink) {
           if ($DryRun) {
-            Write-Output "replica-reset: [dry-run] Remove-Item -Path '$localRoot' -Force"
+            Write-NucleusDryRun -CommandName 'replica-reset' "Remove-Item -Path '$localRoot' -Force"
           }
           else {
             Remove-Item -Path $localRoot -Force
           }
         }
         else {
-          Write-Warning "replica-reset: [$id] expected iCloud drive symlink at '$localRoot'; leaving non-symlink path untouched"
+          Write-NucleusWarning -CommandName 'replica-reset' "[$id] expected iCloud drive symlink at '$localRoot'; leaving non-symlink path untouched"
         }
       }
 
@@ -120,8 +120,8 @@ function Invoke-ReplicaReset {
     # Note: If tree is locked read-only (from previous sync), grant write permissions first.
     if (Test-Path -Path $localRoot) {
       if ($DryRun) {
-        Write-Output "replica-reset: [dry-run] Grant write permissions to '$localRoot'"
-        Write-Output "replica-reset: [dry-run] Remove-Item -Path '$localRoot' -Recurse -Force"
+        Write-NucleusDryRun -CommandName 'replica-reset' "Grant write permissions to '$localRoot'"
+        Write-NucleusDryRun -CommandName 'replica-reset' "Remove-Item -Path '$localRoot' -Recurse -Force"
       }
       else {
         try {
@@ -186,12 +186,12 @@ function Invoke-ReplicaReset {
       continue
     }
     if ($DryRun) {
-      Write-Output "replica-reset: [dry-run] Remove-Item -Path '$cacheDir' -Recurse -Force"
+      Write-NucleusDryRun -CommandName 'replica-reset' "Remove-Item -Path '$cacheDir' -Recurse -Force"
     }
     else {
       Remove-Item -Path $cacheDir -Recurse -Force
     }
   }
 
-  Write-Output "replica-reset: completed successfully"
+  Write-NucleusInfo -CommandName 'replica-reset' "completed successfully"
 }

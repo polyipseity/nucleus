@@ -280,17 +280,17 @@ function Sync-PicardConfig {
       }
 
       _write_ini_file -Path $configPath -Lines $updatedLines
-      Write-Output "$($PSStyle.Foreground.Green)Picard settings synced for $username.$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'Sync-PicardConfig' "Picard settings synced for $username."
       continue
     }
 
     if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
-      Write-Output "$($PSStyle.Foreground.Yellow)Picard settings cleanup complete for $username.$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'Sync-PicardConfig' "Picard settings cleanup complete for $username."
       continue
     }
 
     $cleanedLines = _remove_managed_ini_keys -Lines $existingLines -Section 'setting' -Keys $managedSettingNames
     _write_ini_file -Path $configPath -Lines $cleanedLines
-    Write-Output "$($PSStyle.Foreground.Yellow)Picard settings cleanup complete for $username.$($PSStyle.Reset)"
+    Write-NucleusInfo -CommandName 'Sync-PicardConfig' "Picard settings cleanup complete for $username."
   }
 }

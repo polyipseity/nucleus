@@ -187,7 +187,7 @@ function Sync-JellyfinLibraryCatalog {
 
     $secretFile = Join-Path $RepoRoot "src\secrets\users\$($userRecord.name).yml"
     if (-not (Test-Path -LiteralPath $secretFile -PathType Leaf)) {
-      Write-Warning "jellyfin/library: users/$($userRecord.name).yml not found; skipping library declarations for this user."
+      Write-NucleusWarning -CommandName 'jellyfin/library' "users/$($userRecord.name).yml not found; skipping library declarations for this user."
       continue
     }
 
@@ -205,7 +205,7 @@ function Sync-JellyfinLibraryCatalog {
       $secrets = Get-Secret @getSecretParams
     }
     catch {
-      Write-Warning "jellyfin/library: failed to decrypt $secretFile; skipping library declarations for $($userRecord.name): $($_.Exception.Message)"
+      Write-NucleusWarning -CommandName 'jellyfin/library' "failed to decrypt $secretFile; skipping library declarations for $($userRecord.name): $($_.Exception.Message)"
       continue
     }
 
@@ -262,7 +262,7 @@ function Sync-JellyfinLibraryCatalog {
   foreach ($spec in $librarySpecs) {
     $lowerName = $spec.name.ToLowerInvariant()
     if ($mergedSpecs.ContainsKey($lowerName)) {
-      Write-Warning "jellyfin/library: duplicate library name '$($spec.name)' from user '$($spec.ownerUser)'; keeping first declaration from '$($mergedSpecs[$lowerName].ownerUser)'."
+      Write-NucleusWarning -CommandName 'jellyfin/library' "duplicate library name '$($spec.name)' from user '$($spec.ownerUser)'; keeping first declaration from '$($mergedSpecs[$lowerName].ownerUser)'."
       continue
     }
     $mergedSpecs[$lowerName] = $spec
@@ -340,7 +340,7 @@ function Sync-JellyfinLibraryCatalog {
   }
 
   if (-not $serverReady) {
-    Write-Warning "jellyfin/library: API at $BaseUrl is not reachable; skipping library convergence."
+    Write-NucleusWarning -CommandName 'jellyfin/library' "API at $BaseUrl is not reachable; skipping library convergence."
     return
   }
 
@@ -393,14 +393,14 @@ function Sync-JellyfinLibraryCatalog {
   }
 
   if (-not $adminToken) {
-    Write-Warning 'jellyfin/library: no elevated account credentials available; skipping library convergence.'
+    Write-NucleusWarning -CommandName 'jellyfin/library' 'no elevated account credentials available; skipping library convergence.'
     return
   }
 
   # 6. GET /Library/VirtualFolders — list existing.
   $existingFolders = Invoke-JellyfinApi -Method GET -Path '/Library/VirtualFolders' -Token $adminToken
   if ($existingFolders.StatusCode -ne 200) {
-    Write-Warning 'jellyfin/library: failed to list virtual folders; skipping library convergence.'
+    Write-NucleusWarning -CommandName 'jellyfin/library' 'failed to list virtual folders; skipping library convergence.'
     return
   }
 
@@ -476,11 +476,11 @@ function Sync-JellyfinLibraryCatalog {
         RefreshLibrary = $true
       }
       if ($createResponse.StatusCode -eq 204) {
-        Write-Output "jellyfin/library: created library '$($spec.name)' ($($spec.collectionType))."
+        Write-NucleusInfo -CommandName 'jellyfin/library' "created library '$($spec.name)' ($($spec.collectionType))."
         $null = Invoke-JellyfinApi -Method POST -Path '/Library/Refresh' -Token $adminToken  # check-suppress:suppression_doc: refresh API call is fire-and-forget, response discarded
       }
       else {
-        Write-Warning "jellyfin/library: failed to create library '$($spec.name)' (HTTP $($createResponse.StatusCode))."
+        Write-NucleusWarning -CommandName 'jellyfin/library' "failed to create library '$($spec.name)' (HTTP $($createResponse.StatusCode))."
       }
     }
     else {
@@ -497,11 +497,11 @@ function Sync-JellyfinLibraryCatalog {
         LibraryOptions = $libraryOptions
       }
       if ($updateResponse.StatusCode -eq 204) {
-        Write-Output "jellyfin/library: updated library options for '$($spec.name)'."
+        Write-NucleusInfo -CommandName 'jellyfin/library' "updated library options for '$($spec.name)'."
         $null = Invoke-JellyfinApi -Method POST -Path '/Library/Refresh' -Token $adminToken  # check-suppress:suppression_doc: refresh API call is fire-and-forget, response discarded
       }
       else {
-        Write-Warning "jellyfin/library: failed to update library options for '$($spec.name)' (HTTP $($updateResponse.StatusCode))."
+        Write-NucleusWarning -CommandName 'jellyfin/library' "failed to update library options for '$($spec.name)' (HTTP $($updateResponse.StatusCode))."
       }
     }
   }

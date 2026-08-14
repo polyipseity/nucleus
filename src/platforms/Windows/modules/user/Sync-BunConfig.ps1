@@ -20,11 +20,11 @@ function Sync-BunConfig {
   if (-not $Enabled) {
     if (Test-Path -Path $destPath -PathType Leaf) {
       Remove-Item -Path $destPath -Force
-      Write-Output "$($PSStyle.Foreground.Cyan)Sync-BunConfig: removed $destPath$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'Sync-BunConfig' "removed $destPath"
     }
     return
   }
 
   $result = Deploy-UserWritableSymlink -Name 'bun' -User $User -ConfigName 'bun' -RelativePath 'bunfig.toml' -RepoRoot $RepoRoot -TargetPath $destPath
-  Write-Output "$($PSStyle.Foreground.Cyan)$($result.Message)$($PSStyle.Reset)"
+  Write-NucleusInfo -CommandName 'bun' ($result.Message -replace '^bun: ', '')
 }

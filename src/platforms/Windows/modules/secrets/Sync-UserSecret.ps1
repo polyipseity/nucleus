@@ -57,5 +57,5 @@ function Sync-UserSecret {
 
   Sync-SecretFile @syncParams
 
-  Write-Output "$($PSStyle.Foreground.Green)user-secrets: per-user secret materialization complete for '$Username'.$($PSStyle.Reset)"
+  Write-NucleusInfo -CommandName 'user-secrets' "per-user secret materialization complete for '$Username'."
 }

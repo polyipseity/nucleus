@@ -2,6 +2,7 @@
 # Pester regression tests for the Sync-TerminalActivation module.
 
 BeforeAll {
+    Import-Module (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\src\platforms\Windows\modules\Format-NucleusOutput.psm1') -Force
     # Dot-source the module to make its function available.
     $modulePath = Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\src\platforms\Windows\modules\system\Sync-TerminalActivation.ps1'
     . $modulePath

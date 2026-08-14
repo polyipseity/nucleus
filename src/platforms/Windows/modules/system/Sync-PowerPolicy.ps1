@@ -83,7 +83,7 @@ function Sync-PowerPolicy {
       # check-suppress:suppression_doc: probe -- adapter may not support power management.
       $pm = $adapter | Get-NetAdapterPowerManagement -ErrorAction SilentlyContinue
       if ($null -eq $pm) {
-        Write-Warning "power: could not read power management for adapter '$($adapter.Name)'; skipping WoL."
+        Write-NucleusWarning -CommandName 'power' "could not read power management for adapter '$($adapter.Name)'; skipping WoL."
         continue
       }
       if ($pm.WakeOnMagicPacket -ne 'Enabled') {
@@ -93,7 +93,7 @@ function Sync-PowerPolicy {
           Write-Verbose "power: enabled Wake-on-LAN for adapter '$($adapter.Name)'."
         }
         else {
-          Write-Warning "power: failed to enable Wake-on-LAN for adapter '$($adapter.Name)'; adapter may not support WoL."
+          Write-NucleusWarning -CommandName 'power' "failed to enable Wake-on-LAN for adapter '$($adapter.Name)'; adapter may not support WoL."
         }
       }
     }

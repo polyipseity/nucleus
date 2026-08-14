@@ -62,7 +62,7 @@ function Sync-LiteLLMService {
     $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
     if ($null -ne $existingService) {
       Remove-NucleusService -Name $serviceName
-      Write-Output "litellm: removed SCM service '$serviceName' (disabled)"
+      Write-NucleusInfo -CommandName 'litellm' "removed SCM service '$serviceName' (disabled)"
     }
     return
   }
@@ -74,7 +74,7 @@ function Sync-LiteLLMService {
     # check-suppress:suppression_doc: probe whether the binary is on PATH; Get-Command throws when absent.
     $litellmCmd = Get-Command -Name "litellm" -ErrorAction SilentlyContinue
     if ($null -eq $litellmCmd) {
-      Write-Output "litellm: binary not found; ensure Invoke-UvSetup has installed 'litellm[proxy]'"
+      Write-NucleusInfo -CommandName 'litellm' "binary not found; ensure Invoke-UvSetup has installed 'litellm[proxy]'"
       return
     }
     $litellmBin = $litellmCmd.Source
@@ -131,12 +131,12 @@ function Sync-LiteLLMService {
   $existingService = Get-Service -Name $serviceName -ErrorAction SilentlyContinue
   if ($null -eq $existingService) {
     Set-NucleusService -Name $serviceName -BinaryPath "pwsh.exe -NoLogo -ExecutionPolicy Bypass -File `"$wrapperScript`"" -DisplayName "nucleus LiteLLM AI gateway proxy" -Description "Managed LiteLLM proxy for unified AI model access (http://$($litellmEndpoint.host):$($litellmEndpoint.port))"
-    Write-Output "litellm: created SCM service '$serviceName'"
+    Write-NucleusInfo -CommandName 'litellm' "created SCM service '$serviceName'"
   }
   else {
     Set-NucleusService -Name $serviceName -BinaryPath "pwsh.exe -NoLogo -ExecutionPolicy Bypass -File `"$wrapperScript`"" -DisplayName "nucleus LiteLLM AI gateway proxy" -Description "Managed LiteLLM proxy for unified AI model access (http://$($litellmEndpoint.host):$($litellmEndpoint.port))"
-    Write-Output "litellm: updated SCM service '$serviceName'"
+    Write-NucleusInfo -CommandName 'litellm' "updated SCM service '$serviceName'"
   }
 
-  Write-Output "litellm: ensured SCM service on http://127.0.0.1:4000"
+  Write-NucleusInfo -CommandName 'litellm' 'ensured SCM service on http://127.0.0.1:4000'
 }

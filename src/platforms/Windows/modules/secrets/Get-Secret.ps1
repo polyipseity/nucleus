@@ -98,7 +98,7 @@ function Invoke-SopsDecrypt {
   }
 
   if (Test-Path -Path $HostKeyPath) {
-    Write-Output "$($PSStyle.Foreground.Green)Found machine SSH key. Trying machine-key decryption first...$($PSStyle.Reset)"
+    Write-NucleusInfo -CommandName 'Get-Secret' "Found machine SSH key. Trying machine-key decryption first..."
     $env:SOPS_AGE_SSH_PRIVATE_KEY_FILE = $HostKeyPath
     try {
       $output = & $SopsExe @SopsArgs
@@ -106,7 +106,7 @@ function Invoke-SopsDecrypt {
         return $output
       }
 
-      Write-Output "$($PSStyle.Foreground.Yellow)Machine-key decryption failed. Trying machine age key file...$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'Get-Secret' "Machine-key decryption failed. Trying machine age key file..."
     }
     finally {
       & $clearAgeEnv
@@ -114,7 +114,7 @@ function Invoke-SopsDecrypt {
   }
 
   if (Test-Path -LiteralPath $MachineAgeKeyPath -PathType Leaf) {
-    Write-Output "$($PSStyle.Foreground.Green)Found machine age key file. Trying machine-age decryption...$($PSStyle.Reset)"
+    Write-NucleusInfo -CommandName 'Get-Secret' "Found machine age key file. Trying machine-age decryption..."
     $env:SOPS_AGE_KEY_FILE = $MachineAgeKeyPath
     try {
       $output = & $SopsExe @SopsArgs
@@ -122,7 +122,7 @@ function Invoke-SopsDecrypt {
         return $output
       }
 
-      Write-Output "$($PSStyle.Foreground.Yellow)Machine-age decryption failed. Trying user SSH keys...$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'Get-Secret' "Machine-age decryption failed. Trying user SSH keys..."
     }
     finally {
       & $clearAgeEnv
@@ -134,7 +134,7 @@ function Invoke-SopsDecrypt {
       continue
     }
 
-    Write-Output "$($PSStyle.Foreground.Green)Trying user SSH key: $userSshKeyPath$($PSStyle.Reset)"
+    Write-NucleusInfo -CommandName 'Get-Secret' "Trying user SSH key: $userSshKeyPath"
     $env:SOPS_AGE_SSH_PRIVATE_KEY_FILE = $userSshKeyPath
     try {
       $output = & $SopsExe @SopsArgs
@@ -148,7 +148,7 @@ function Invoke-SopsDecrypt {
   }
 
   if (-not [string]::IsNullOrWhiteSpace($PrimarySshKeyPath) -and (Test-Path -Path $PrimarySshKeyPath)) {
-    Write-Output "$($PSStyle.Foreground.Green)Found primary SSH key. Trying primary-ssh decryption...$($PSStyle.Reset)"
+    Write-NucleusInfo -CommandName 'Get-Secret' "Found primary SSH key. Trying primary-ssh decryption..."
     $env:SOPS_AGE_SSH_PRIVATE_KEY_FILE = $PrimarySshKeyPath
     try {
       $output = & $SopsExe @SopsArgs
@@ -156,7 +156,7 @@ function Invoke-SopsDecrypt {
         return $output
       }
 
-      Write-Output "$($PSStyle.Foreground.Yellow)Primary-ssh decryption failed. Falling back to GPG keyring...$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'Get-Secret' "Primary-ssh decryption failed. Falling back to GPG keyring..."
     }
     finally {
       & $clearAgeEnv
@@ -166,14 +166,14 @@ function Invoke-SopsDecrypt {
   $secretKeyInfo = & $GpgExe --list-secret-keys --with-colons
   $hasGpgSecretKeys = ($secretKeyInfo -and ($secretKeyInfo -match "^(sec|ssb):"))
   if ($hasGpgSecretKeys) {
-    Write-Output "$($PSStyle.Foreground.Cyan)Decrypting with GPG keyring...$($PSStyle.Reset)"
+    Write-NucleusInfo -CommandName 'Get-Secret' "Decrypting with GPG keyring..."
     $output = & $SopsExe @SopsArgs
     if ($LASTEXITCODE -eq 0) {
       return $output
     }
   }
   else {
-    Write-Output "$($PSStyle.Foreground.Yellow)No GPG secret keys detected.$($PSStyle.Reset)"
+    Write-NucleusInfo -CommandName 'Get-Secret' "No GPG secret keys detected."
   }
 
   return $null

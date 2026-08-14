@@ -54,7 +54,7 @@ function Sync-CamillaDSPHeartbeatService {
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- task may not be registered yet; $null check below handles absence
     if ($null -ne $existingTask) {
       Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-      Write-Output "camilladsp-heartbeat: removed scheduled task '$taskName' (disabled)"
+      Write-NucleusInfo -CommandName 'camilladsp-heartbeat' "removed scheduled task '$taskName' (disabled)"
     }
     return
   }
@@ -91,5 +91,5 @@ function Sync-CamillaDSPHeartbeatService {
   }
 
   Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force
-  Write-Output "camilladsp-heartbeat: registered scheduled task '$taskName'"
+  Write-NucleusInfo -CommandName 'camilladsp-heartbeat' "registered scheduled task '$taskName'"
 }

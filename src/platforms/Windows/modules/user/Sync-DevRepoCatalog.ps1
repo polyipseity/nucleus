@@ -74,7 +74,7 @@ function Sync-DevRepoCatalog {
       Write-Verbose "Sync-DevRepoCatalog: created dev directory at $devDir"
     }
     catch {
-      Write-Warning "Sync-DevRepoCatalog: failed to create dev directory $devDir : $_"
+      Write-NucleusWarning -CommandName 'Sync-DevRepoCatalog' "failed to create dev directory $devDir : $_"
       return
     }
   }
@@ -104,7 +104,7 @@ function Sync-DevRepoCatalog {
         }
       }
       catch {
-        Write-Warning "Sync-DevRepoCatalog: failed to create symlink for $RepoName : $_"
+        Write-NucleusWarning -CommandName 'Sync-DevRepoCatalog' "failed to create symlink for $RepoName : $_"
       }
     }
   }
@@ -154,12 +154,12 @@ function Sync-DevRepoCatalog {
             Write-Verbose "Sync-DevRepoCatalog: updated remote for $RepoName to $RepoUrl"
           }
           else {
-            Write-Warning "Sync-DevRepoCatalog: failed to update remote for $RepoName (soft fail, exit $($remoteUpdate.ExitCode)): $($remoteUpdate.Output)"
+            Write-NucleusWarning -CommandName 'Sync-DevRepoCatalog' "failed to update remote for $RepoName (soft fail, exit $($remoteUpdate.ExitCode)): $($remoteUpdate.Output)"
           }
         }
       }
       catch {
-        Write-Warning "Sync-DevRepoCatalog: error checking remote for $RepoName : $_"
+        Write-NucleusWarning -CommandName 'Sync-DevRepoCatalog' "error checking remote for $RepoName : $_"
       }
 
       # Ensure direct submodules are initialized.
@@ -185,14 +185,14 @@ function Sync-DevRepoCatalog {
                 Write-Verbose "Sync-DevRepoCatalog: initialized direct submodule $submodulePath in $RepoName"
               }
               else {
-                Write-Warning "Sync-DevRepoCatalog: failed to initialize direct submodule $submodulePath in $RepoName (soft fail, exit $($submoduleInit.ExitCode)): $($submoduleInit.Output)"
+                Write-NucleusWarning -CommandName 'Sync-DevRepoCatalog' "failed to initialize direct submodule $submodulePath in $RepoName (soft fail, exit $($submoduleInit.ExitCode)): $($submoduleInit.Output)"
               }
             }
           }
         }
       }
       catch {
-        Write-Warning "Sync-DevRepoCatalog: error initializing submodules for $RepoName : $_"
+        Write-NucleusWarning -CommandName 'Sync-DevRepoCatalog' "error initializing submodules for $RepoName : $_"
       }
 
       return
@@ -205,12 +205,12 @@ function Sync-DevRepoCatalog {
         $targetHasContents = (Get-ChildItem -Path $RepoTarget -ErrorAction Stop | Measure-Object).Count -gt 0
       }
       catch {
-        Write-Warning "Sync-DevRepoCatalog: unable to inspect $RepoTarget before clone (soft fail): $_"
+        Write-NucleusWarning -CommandName 'Sync-DevRepoCatalog' "unable to inspect $RepoTarget before clone (soft fail): $_"
         return
       }
     }
     if ((Test-Path -Path $RepoTarget) -and $targetHasContents) {
-      Write-Warning "Sync-DevRepoCatalog: $RepoTarget exists but is not a git repo (soft fail)"
+      Write-NucleusWarning -CommandName 'Sync-DevRepoCatalog' "$RepoTarget exists but is not a git repo (soft fail)"
       return
     }
 
@@ -241,28 +241,28 @@ function Sync-DevRepoCatalog {
                 Write-Verbose "Sync-DevRepoCatalog: initialized direct submodule $submodulePath in $RepoName"
               }
               else {
-                Write-Warning "Sync-DevRepoCatalog: failed to initialize direct submodule $submodulePath in $RepoName (soft fail, exit $($submoduleInit.ExitCode)): $($submoduleInit.Output)"
+                Write-NucleusWarning -CommandName 'Sync-DevRepoCatalog' "failed to initialize direct submodule $submodulePath in $RepoName (soft fail, exit $($submoduleInit.ExitCode)): $($submoduleInit.Output)"
               }
             }
           }
         }
         catch {
-          Write-Warning "Sync-DevRepoCatalog: error initializing submodules after clone for $RepoName : $_"
+          Write-NucleusWarning -CommandName 'Sync-DevRepoCatalog' "error initializing submodules after clone for $RepoName : $_"
         }
       }
       else {
-        Write-Warning "Sync-DevRepoCatalog: failed to clone $RepoName from $RepoUrl (soft fail, exit $($cloneResult.ExitCode)): $($cloneResult.Output)"
+        Write-NucleusWarning -CommandName 'Sync-DevRepoCatalog' "failed to clone $RepoName from $RepoUrl (soft fail, exit $($cloneResult.ExitCode)): $($cloneResult.Output)"
       }
     }
     catch {
-      Write-Warning "Sync-DevRepoCatalog: error during clone of $RepoName : $_"
+      Write-NucleusWarning -CommandName 'Sync-DevRepoCatalog' "error during clone of $RepoName : $_"
     }
   }
 
   # Provision repositories from the passed list.
   foreach ($repo in $Repositories) {
     if ($null -eq $repo -or $null -eq $repo.name -or $null -eq $repo.target) {
-      Write-Warning "Sync-DevRepoCatalog: repository entry missing required 'name' or 'target' field (skipping)"
+      Write-NucleusWarning -CommandName 'Sync-DevRepoCatalog' "repository entry missing required 'name' or 'target' field (skipping)"
       continue
     }
 
@@ -277,7 +277,7 @@ function Sync-DevRepoCatalog {
       Initialize-RepositoryWithSubmodule -RepoUrl $repo.url -RepoTarget $repoTarget -RepoName $repoName
     }
     else {
-      Write-Warning "Sync-DevRepoCatalog: repository '$repoName' has neither 'symlink' nor 'url' configured (skipping)"
+      Write-NucleusWarning -CommandName 'Sync-DevRepoCatalog' "repository '$repoName' has neither 'symlink' nor 'url' configured (skipping)"
     }
   }
 

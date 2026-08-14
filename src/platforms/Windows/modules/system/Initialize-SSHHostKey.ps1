@@ -84,7 +84,7 @@ function Initialize-SSHHostKey {
     # will skip gracefully when the service is missing, and the trailing
     # Register-HostAgeKey call completes registration on a future apply once
     # sshd is available.
-    Write-Warning ("SSH: sshd service not installed; SSH host key cannot be " +
+    Write-NucleusWarning -CommandName 'SSH' ("sshd service not installed; SSH host key cannot be " +
                    "generated yet.  Keys will be generated when sshd is available " +
                    "(enable the OpenSSH Server Windows optional feature).")
     return
@@ -96,7 +96,7 @@ function Initialize-SSHHostKey {
   # Sync-NucleusOpenSshServer, called later in the apply run.
   $wasRunning = $sshdService.Status -eq 'Running'
   if (-not $wasRunning) {
-    Write-Output "$($PSStyle.Foreground.Cyan)SSH: starting sshd temporarily to generate SSH host keys...$($PSStyle.Reset)"
+    Write-NucleusInfo -CommandName 'SSH' "starting sshd temporarily to generate SSH host keys..."
     Start-Service -Name 'sshd'
   }
 
@@ -119,10 +119,10 @@ function Initialize-SSHHostKey {
     # Advisory warning: a second apply run will succeed once the keys are fully
     # written to disk (for example if sshd initialisation takes longer than
     # StartupTimeoutSeconds on this hardware).
-    Write-Warning ("SSH: sshd started but $MachineSshHostKeyPath still absent after " +
+    Write-NucleusWarning -CommandName 'SSH' ("sshd started but $MachineSshHostKeyPath still absent after " +
                    "${StartupTimeoutSeconds}s.  Run apply again after sshd fully initializes.")
   }
   else {
-    Write-Output "$($PSStyle.Foreground.Green)SSH: SSH host keys generated.$($PSStyle.Reset)"
+    Write-NucleusInfo -CommandName 'SSH' "SSH host keys generated."
   }
 }

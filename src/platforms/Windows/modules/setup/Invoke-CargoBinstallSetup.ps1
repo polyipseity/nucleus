@@ -85,7 +85,7 @@ function Invoke-CargoBinstallSetup {
   # Guard: cargo-binstall must be accessible after Invoke-ScoopSetup has run.
   # check-suppress:suppression_doc: probe -- cargo-binstall may not be installed; if-guard checks absence below.
   if (-not (Get-Command cargo-binstall -ErrorAction SilentlyContinue)) {
-    Write-Error "Invoke-CargoBinstallSetup: cargo-binstall not found on PATH; ensure Invoke-ScoopSetup has run and installed cargo-binstall from the Scoop main bucket"
+    Write-NucleusError -CommandName 'Invoke-CargoBinstallSetup' "cargo-binstall not found on PATH; ensure Invoke-ScoopSetup has run and installed cargo-binstall from the Scoop main bucket"
     return
   }
 
@@ -128,13 +128,13 @@ function Invoke-CargoBinstallSetup {
   })
 
   foreach ($pkg in $toRemove) {
-    Write-Output "cargo-binstall-setup: uninstalling $pkg"
+    Write-NucleusInfo -CommandName 'cargo-binstall-setup' "uninstalling $pkg"
     cargo uninstall $pkg
     if ($LASTEXITCODE -ne 0) {
-      Write-Error "cargo-binstall-setup: 'cargo uninstall $pkg' failed (exit $LASTEXITCODE)"
+      Write-NucleusError -CommandName 'cargo-binstall-setup' "'cargo uninstall $pkg' failed (exit $LASTEXITCODE)"
       return
     }
-    Write-Output "cargo-binstall-setup: $pkg uninstalled"
+    Write-NucleusInfo -CommandName 'cargo-binstall-setup' "$pkg uninstalled"
   }
 
   # Install additions (fresh installs and version-mismatch reinstalls).
@@ -145,31 +145,31 @@ function Invoke-CargoBinstallSetup {
       # Version-pinned entry: install via cargo-binstall.
       $version = $entry
       $installSpec = if ($version) { "$crateName@$version" } else { $crateName }
-      Write-Output "cargo-binstall-setup: installing $installSpec"
+      Write-NucleusInfo -CommandName 'cargo-binstall-setup' "installing $installSpec"
       cargo-binstall --no-confirm $installSpec
       if ($LASTEXITCODE -ne 0) {
-        Write-Error "cargo-binstall-setup: 'cargo-binstall $installSpec' failed (exit $LASTEXITCODE)"
+        Write-NucleusError -CommandName 'cargo-binstall-setup' "'cargo-binstall $installSpec' failed (exit $LASTEXITCODE)"
         return
       }
     } else {
       # Hash-pinned entry: install directly from VCS via cargo install.
       $source = $entry.source
       $rev = $entry.rev
-      Write-Output "cargo-binstall-setup: installing $crateName from $source @ $rev"
+      Write-NucleusInfo -CommandName 'cargo-binstall-setup' "installing $crateName from $source @ $rev"
       cargo install --git $source --rev $rev $crateName
       if ($LASTEXITCODE -ne 0) {
-        Write-Error "cargo-binstall-setup: 'cargo install --git $source --rev $rev $crateName' failed (exit $LASTEXITCODE)"
+        Write-NucleusError -CommandName 'cargo-binstall-setup' "'cargo install --git $source --rev $rev $crateName' failed (exit $LASTEXITCODE)"
         return
       }
     }
     if (-not (Test-Path (Join-Path $cargoBinDir "$($pkg.BinaryName).exe"))) {
-      Write-Error "cargo-binstall-setup: $crateName installed but $($pkg.BinaryName).exe not found at '$cargoBinDir\$($pkg.BinaryName).exe'"
+      Write-NucleusError -CommandName 'cargo-binstall-setup' "$crateName installed but $($pkg.BinaryName).exe not found at '$cargoBinDir\$($pkg.BinaryName).exe'"
       return
     }
-    Write-Output "cargo-binstall-setup: $crateName installed successfully"
+    Write-NucleusInfo -CommandName 'cargo-binstall-setup' "$crateName installed successfully"
   }
 
   if ($toRemove.Count -eq 0 -and $toInstall.Count -eq 0) {
-    Write-Output "cargo-binstall-setup: all managed packages already converged — skipping"
+    Write-NucleusInfo -CommandName 'cargo-binstall-setup' "all managed packages already converged — skipping"
   }
 }

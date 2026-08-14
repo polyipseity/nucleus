@@ -126,7 +126,7 @@ function Invoke-AISync {
   # check-suppress:suppression_doc: probe -- ollama may not be installed; $null check handles absence.
   $ollamaCmd = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaCmd) {
-    Write-Output "ai: ollama not found; skipping sync"
+    Write-NucleusInfo -CommandName 'ai' "ollama not found; skipping sync"
     return
   }
 
@@ -151,7 +151,7 @@ function Invoke-AISync {
   $listOutput = @($probeResult.Output)
 
   if ($listExitCode -ne 0 -and $ServerReadyTimeoutSeconds -gt 0) {
-    Write-Output "ai: waiting up to ${ServerReadyTimeoutSeconds}s for ollama server readiness..."
+    Write-NucleusInfo -CommandName 'ai' "waiting up to ${ServerReadyTimeoutSeconds}s for ollama server readiness..."
     $deadline = (Get-Date).AddSeconds($ServerReadyTimeoutSeconds)
     do {
       Start-Sleep -Seconds 2
@@ -165,7 +165,7 @@ function Invoke-AISync {
   }
 
   if ($listExitCode -ne 0) {
-    Write-Output "ai: ollama server unavailable after waiting ${ServerReadyTimeoutSeconds}s; skipping sync"
+    Write-NucleusInfo -CommandName 'ai' "ollama server unavailable after waiting ${ServerReadyTimeoutSeconds}s; skipping sync"
     return
   }
 
@@ -190,17 +190,17 @@ function Invoke-AISync {
         continue
       }
       if ($DryRun) {
-        Write-Output "ai: would pull $model"
+        Write-NucleusInfo -CommandName 'ai' "would pull $model"
       } else {
-        Write-Output "ai: pulling $model"
+        Write-NucleusInfo -CommandName 'ai' "pulling $model"
         & $ollamaCmd.Source pull $model
         if ($LASTEXITCODE -ne 0) {
-          Write-Error "ai: ollama pull $model failed with exit code $LASTEXITCODE"
+          Write-NucleusError -CommandName 'ai' "ollama pull $model failed with exit code $LASTEXITCODE"
         } else {
           # Verify pull succeeded via ollama list
           $pullCheck = @(& $ollamaCmd.Source list 2>&1 | Select-Object -Skip 1 | ForEach-Object { ($_ -split '\s+')[0] } | Where-Object { $_ -ne '' })
           if ($pullCheck -notcontains $model) {
-            Write-Error "ai: $model was pulled but is not in 'ollama list'"
+            Write-NucleusError -CommandName 'ai' "$model was pulled but is not in 'ollama list'"
           } else {
             # Lockfile digest verification (optional)
             if (Test-Path $lockfilePath) {
@@ -214,9 +214,9 @@ function Invoke-AISync {
                 $_showJson = & $ollamaCmd.Source show --format json $model 2>&1 | Out-String
                 $_actualDigest = ($_showJson | ConvertFrom-Json).digest
                 if ($_actualDigest -and $_actualDigest -ne $_expectedDigest) {
-                  Write-Warning "ai: digest mismatch for $model (expected $_expectedDigest, got $_actualDigest)"
+                  Write-NucleusWarning -CommandName 'ai' "digest mismatch for $model (expected $_expectedDigest, got $_actualDigest)"
                 } elseif ($_actualDigest) {
-                  Write-Output "ai: digest verified for $model"
+                  Write-NucleusInfo -CommandName 'ai' "digest verified for $model"
                 }
               }
             }
@@ -234,12 +234,12 @@ function Invoke-AISync {
       continue
     }
     if ($DryRun) {
-        Write-Output "ai: would remove $model"
+        Write-NucleusInfo -CommandName 'ai' "would remove $model"
     } else {
-        Write-Output "ai: removing $model"
+        Write-NucleusInfo -CommandName 'ai' "removing $model"
       & $ollamaCmd.Source rm $model
       if ($LASTEXITCODE -ne 0) {
-        Write-Error "ai: ollama rm $model failed with exit code $LASTEXITCODE"
+        Write-NucleusError -CommandName 'ai' "ollama rm $model failed with exit code $LASTEXITCODE"
       }
     }
   }
@@ -248,5 +248,5 @@ function Invoke-AISync {
   if ($DryRun)    { $flags += "dry-run" }
   if ($GcOnly) { $flags += "gc-only" }
   $flagStr = if ($flags.Count -gt 0) { " ($($flags -join ', '))" } else { "" }
-  Write-Output "ai: sync completed (profile=$profileName$flagStr)"
+  Write-NucleusInfo -CommandName 'ai' "sync completed (profile=$profileName$flagStr)"
 }

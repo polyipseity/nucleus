@@ -80,7 +80,7 @@ function Sync-CaddyService {
   }
 
   if ($null -eq $caddyCommand) {
-    Write-Warning 'caddy-service: caddy binary not found in PATH; skipping Caddy service convergence.'
+    Write-NucleusWarning -CommandName 'caddy-service' 'caddy binary not found in PATH; skipping Caddy service convergence.'
     return
   }
 
@@ -100,7 +100,7 @@ function Sync-CaddyService {
     # check-suppress:suppression_doc: probe -- services.json may not exist yet; $null check handles absence.
     $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
     if ($null -eq $svc) {
-      Write-Warning 'caddy-service: failed to read services.json; skipping Caddy service convergence.'
+      Write-NucleusWarning -CommandName 'caddy-service' 'failed to read services.json; skipping Caddy service convergence.'
       return
     }
 
@@ -134,7 +134,7 @@ function Sync-CaddyService {
       }
 
       if ($null -eq $httpEndpoint) {
-        Write-Warning "caddy-service: service '$($entry.Name)' has HTTPS endpoint but no non-HTTPS endpoint; skipping."
+        Write-NucleusWarning -CommandName 'caddy-service' "service '$($entry.Name)' has HTTPS endpoint but no non-HTTPS endpoint; skipping."
         continue
       }
 
@@ -149,7 +149,7 @@ https://$($httpsEndpoint.host):$($httpsEndpoint.port) {
     }
 
     if ($virtualHostBlocks.Count -eq 0) {
-      Write-Warning 'caddy-service: no HTTPS virtual hosts discovered; Caddy service would have no sites.'
+      Write-NucleusWarning -CommandName 'caddy-service' 'no HTTPS virtual hosts discovered; Caddy service would have no sites.'
     }
 
     $caddyfile = @"
@@ -165,7 +165,7 @@ $($virtualHostBlocks -join "`n")
     $serviceCommand = "`"$($caddyCommand.Source)`" run --config `"$caddyfilePath`" --adapter caddyfile"
 
     Set-NucleusService -Name $serviceName -BinaryPath $serviceCommand -DisplayName "nucleus Caddy HTTPS proxy" -Description "Managed local Caddy TLS ingress for all configured service HTTPS endpoints"
-    Write-Output "caddy-service: ensured HTTPS proxy service ($serviceName)."
+    Write-NucleusInfo -CommandName 'caddy-service' "ensured HTTPS proxy service ($serviceName)."
     return
   }
 

@@ -65,17 +65,17 @@ function Sync-CursorConfig {
     if (Test-Path -LiteralPath $Path -PathType Container) {
       $item = Get-Item -LiteralPath $Path -Force
       if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 -and $item.LinkType -eq 'SymbolicLink') {
-        Write-Error "$label`: $Path is a symlink — expected a real directory for managed file symlinks."
+        Write-NucleusError -CommandName $label "$Path is a symlink — expected a real directory for managed file symlinks."
         return $false
       }
       return $true
     }
     if (Test-Path -LiteralPath $Path) {
-      Write-Error "$label`: $Path exists but is not a directory."
+      Write-NucleusError -CommandName $label "$Path exists but is not a directory."
       return $false
     }
     New-Item -ItemType Directory -Path $Path > $null
-    Write-Output "$label`: created $Path"
+    Write-NucleusInfo -CommandName $label "created $Path"
     return $true
   }
 
@@ -105,13 +105,13 @@ function Sync-CursorConfig {
             Remove-ManagedSymlinkDeleteProtection -Context $label -Path $linkPath
             Remove-Item -LiteralPath $linkPath -Force
           } else {
-            Write-Error "$label`: $linkPath is not a managed symlink — remove it and re-run apply."
+            Write-NucleusError -CommandName $label "$linkPath is not a managed symlink — remove it and re-run apply."
             return $false
           }
         }
         New-Item -ItemType SymbolicLink -Path $linkPath -Target $source.FullName > $null
         Set-ManagedSymlinkDeleteProtection -Context $label -Path $linkPath
-        Write-Output "$label`: linked $linkPath -> $($source.FullName)"
+        Write-NucleusInfo -CommandName $label "linked $linkPath -> $($source.FullName)"
       }
     }
 
@@ -126,7 +126,7 @@ function Sync-CursorConfig {
           if (-not (Test-Path -LiteralPath $target -PathType Leaf)) {
             Remove-ManagedSymlinkDeleteProtection -Context $label -Path $child.FullName
             Remove-Item -LiteralPath $child.FullName -Force
-            Write-Output "$label`: removed stale symlink $($child.Name) (source removed)"
+            Write-NucleusInfo -CommandName $label "removed stale symlink $($child.Name) (source removed)"
           }
         }
       }
@@ -151,13 +151,13 @@ function Sync-CursorConfig {
         Remove-ManagedSymlinkDeleteProtection -Context $label -Path $LinkPath
         Remove-Item -LiteralPath $LinkPath -Force
       } else {
-        Write-Error "$label`: $LinkPath is not a managed symlink — remove it and re-run apply."
+        Write-NucleusError -CommandName $label "$LinkPath is not a managed symlink — remove it and re-run apply."
         return $false
       }
     }
     New-Item -ItemType SymbolicLink -Path $LinkPath -Target $TargetPath > $null
     Set-ManagedSymlinkDeleteProtection -Context $label -Path $LinkPath
-    Write-Output "$label`: linked $LinkPath -> $TargetPath"
+    Write-NucleusInfo -CommandName $label "linked $LinkPath -> $TargetPath"
     return $true
   }
 
@@ -184,7 +184,7 @@ function Sync-CursorConfig {
         if ($isManagedBridge -or $isManagedNative) {
           Remove-ManagedSymlinkDeleteProtection -Context $label -Path $child.FullName
           Remove-Item -LiteralPath $child.FullName -Force
-          Write-Output "$label`: removed managed cursor entry: $($child.FullName)"
+          Write-NucleusInfo -CommandName $label "removed managed cursor entry: $($child.FullName)"
         }
       }
       foreach ($bridgeDir in @('rules', 'agents', 'commands')) {
@@ -197,7 +197,7 @@ function Sync-CursorConfig {
             if ($isSymlink) {
               Remove-ManagedSymlinkDeleteProtection -Context $label -Path $bridgeChild.FullName
               Remove-Item -LiteralPath $bridgeChild.FullName -Force
-              Write-Output "$label`: removed managed cursor file symlink: $($bridgeChild.FullName)"
+              Write-NucleusInfo -CommandName $label "removed managed cursor file symlink: $($bridgeChild.FullName)"
             }
           }
         }
@@ -222,7 +222,7 @@ function Sync-CursorConfig {
         if ($null -ne $expectedSource -and [string]::Equals($item.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
           Remove-ManagedSymlinkDeleteProtection -Context $label -Path $ideSettingsLink
           Remove-Item -LiteralPath $ideSettingsLink -Force
-          Write-Output "$label`: removed Cursor IDE settings symlink: $ideSettingsLink"
+          Write-NucleusInfo -CommandName $label "removed Cursor IDE settings symlink: $ideSettingsLink"
         }
       }
     }
@@ -230,17 +230,17 @@ function Sync-CursorConfig {
   }
 
   if (-not (Test-DeveloperModeOrAdmin)) {
-    Write-Error "$label`: requires Developer Mode or an elevated session to create symlinks."
+    Write-NucleusError -CommandName $label "requires Developer Mode or an elevated session to create symlinks."
     return
   }
 
   if (-not (Test-Path -LiteralPath $agentsDir -PathType Container)) {
-    Write-Error "$label`: $agentsDir not found — run Sync-AgentsConfig first."
+    Write-NucleusError -CommandName $label "$agentsDir not found — run Sync-AgentsConfig first."
     return
   }
 
   if ($cursorEntryNames.Count -eq 0) {
-    Write-Error "$label`: no cursor overlay entries found for user '$Username'"
+    Write-NucleusError -CommandName $label "no cursor overlay entries found for user '$Username'"
     return
   }
 
@@ -281,7 +281,7 @@ function Sync-CursorConfig {
           if (-not (Test-Path -LiteralPath $expectedSource)) {
             Remove-ManagedSymlinkDeleteProtection -Context $label -Path $child.FullName
             Remove-Item -LiteralPath $child.FullName -Force
-            Write-Output "$label`: removed stale link for $($child.Name) (source removed)"
+            Write-NucleusInfo -CommandName $label "removed stale link for $($child.Name) (source removed)"
           }
         }
       }
@@ -304,13 +304,13 @@ function Sync-CursorConfig {
         Remove-ManagedSymlinkDeleteProtection -Context $label -Path $linkPath
         Remove-Item -LiteralPath $linkPath -Force
       } else {
-        Write-Error "$label`: $linkPath is not a managed symlink — merge wanted content into $entryPath and remove it, then re-run apply."
+        Write-NucleusError -CommandName $label "$linkPath is not a managed symlink — merge wanted content into $entryPath and remove it, then re-run apply."
         return
       }
     }
     New-Item -ItemType SymbolicLink -Path $linkPath -Target $entryPath > $null
     Set-ManagedSymlinkDeleteProtection -Context $label -Path $linkPath
-    Write-Output "$label`: linked $linkPath -> $entryPath"
+    Write-NucleusInfo -CommandName $label "linked $linkPath -> $entryPath"
   }
 
   # Class C: Cursor IDE settings — symlink settings.json into the IDE User dir
@@ -330,7 +330,7 @@ function Sync-CursorConfig {
       Remove-ManagedSymlinkDeleteProtection -Context $label -Path $ideSettingsLink
       Remove-Item -LiteralPath $ideSettingsLink -Force
     } else {
-      Write-Error "$label`: $ideSettingsLink is not a managed symlink — merge any wanted content into $ideSettingsSource and remove it, then re-run apply."
+      Write-NucleusError -CommandName $label "$ideSettingsLink is not a managed symlink — merge any wanted content into $ideSettingsSource and remove it, then re-run apply."
       return
     }
   }
@@ -341,5 +341,5 @@ function Sync-CursorConfig {
   }
   New-Item -ItemType SymbolicLink -Path $ideSettingsLink -Target $ideSettingsSource > $null
   Set-ManagedSymlinkDeleteProtection -Context $label -Path $ideSettingsLink
-  Write-Output "$label`: linked $ideSettingsLink -> $ideSettingsSource"
+  Write-NucleusInfo -CommandName $label "linked $ideSettingsLink -> $ideSettingsSource"
 }

@@ -45,7 +45,7 @@ function Sync-AgentsSkillManifest {
     $devModeProp = Get-ItemProperty -Path $devModeKey -Name "AllowDevelopmentWithoutDevLicense" -ErrorAction SilentlyContinue
     $devModeEnabled = $null -ne $devModeProp -and $devModeProp.AllowDevelopmentWithoutDevLicense -eq 1
     if (-not $isAdmin -and -not $devModeEnabled) {
-      Write-Error "Sync-AgentsSkillManifest requires Developer Mode or an elevated session to create directory symlinks.  Enable Developer Mode in Settings -> System -> For Developers."
+      Write-NucleusError -CommandName 'skills' "Sync-AgentsSkillManifest requires Developer Mode or an elevated session to create directory symlinks.  Enable Developer Mode in Settings -> System -> For Developers."
       return
     }
   }
@@ -63,7 +63,7 @@ function Sync-AgentsSkillManifest {
           if ([string]::Equals($child.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
             Remove-ManagedSymlinkDeleteProtection -Context "skills" -Path $child.FullName
             Remove-Item -LiteralPath $child.FullName -Force
-            Write-Output "skills: removed managed skill symlink: $($child.FullName)"
+            Write-NucleusInfo -CommandName 'skills' "removed managed skill symlink: $($child.FullName)"
           }
         }
       }
@@ -72,7 +72,7 @@ function Sync-AgentsSkillManifest {
   }
 
   if (-not (Test-Path -LiteralPath $skillsSource -PathType Container)) {
-    Write-Error "skills: Sync-AgentsSkillManifest: skills source dir not found: $skillsSource"
+    Write-NucleusError -CommandName 'skills' "Sync-AgentsSkillManifest: skills source dir not found: $skillsSource"
     return
   }
 
@@ -81,7 +81,7 @@ function Sync-AgentsSkillManifest {
     $isWholeDirSymlink = ($skillsDirItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
                            -and $skillsDirItem.LinkType -eq 'SymbolicLink'
     if ($isWholeDirSymlink) {
-      Write-Error "skills: Sync-AgentsSkillManifest: $skillsDir is a whole-dir symlink — remove it manually and re-run apply."
+      Write-NucleusError -CommandName 'skills' "Sync-AgentsSkillManifest: $skillsDir is a whole-dir symlink — remove it manually and re-run apply."
       return
     }
   }
@@ -90,7 +90,7 @@ function Sync-AgentsSkillManifest {
   # clawhub downloads can land here without entering the tracked repo tree.
   if (-not (Test-Path -LiteralPath $skillsDir -PathType Container)) {
     New-Item -ItemType Directory -Path $skillsDir -Force > $null
-    Write-Output "skills: Sync-AgentsSkillManifest: created $skillsDir"
+    Write-NucleusInfo -CommandName 'skills' "Sync-AgentsSkillManifest: created $skillsDir"
   }
 
   # Remove stale per-skill symlinks: committed skills that have since been
@@ -106,7 +106,7 @@ function Sync-AgentsSkillManifest {
         if (-not (Test-Path -LiteralPath $expectedSource)) {
           Remove-ManagedSymlinkDeleteProtection -Context "skills" -Path $child.FullName
           Remove-Item -LiteralPath $child.FullName -Force
-          Write-Output "skills: Sync-AgentsSkillManifest: removed stale skill link for $($child.Name) (source removed)"
+          Write-NucleusInfo -CommandName 'skills' "Sync-AgentsSkillManifest: removed stale skill link for $($child.Name) (source removed)"
         }
       }
     }
@@ -133,12 +133,12 @@ function Sync-AgentsSkillManifest {
         # Real directory in place of a committed skill — could be a fetched
         # (clawhub) download with the same name, or user data.  Fail fast to
         # prevent silent overwrites; the operator must resolve the conflict.
-        Write-Error "skills: Sync-AgentsSkillManifest: $linkPath is a real directory — if it is a fetched clawhub download for a skill that has been re-committed, remove it and re-run apply."
+        Write-NucleusError -CommandName 'skills' "Sync-AgentsSkillManifest: $linkPath is a real directory — if it is a fetched clawhub download for a skill that has been re-committed, remove it and re-run apply."
         return
       }
     }
     New-Item -ItemType SymbolicLink -Path $linkPath -Target $skillEntry.FullName > $null
     Set-ManagedSymlinkDeleteProtection -Context "skills" -Path $linkPath
-    Write-Output "skills: Sync-AgentsSkillManifest: linked $linkPath -> $($skillEntry.FullName)"
+    Write-NucleusInfo -CommandName 'skills' "Sync-AgentsSkillManifest: linked $linkPath -> $($skillEntry.FullName)"
   }
 }

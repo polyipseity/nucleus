@@ -40,5 +40,5 @@ SET NUCLEUS_AGENT_SESSION=1
 SET VSCODE_AGENT=1
 powershell.exe
 "@ | Set-Content -Path $wrapperPath -NoNewline
-  Write-Output "agent-host-shell: wrote $wrapperPath"
+  Write-NucleusInfo -CommandName 'agent-host-shell' "wrote $wrapperPath"
 }

@@ -20,7 +20,7 @@ function Sync-NextestConfig {
   if (-not $Enabled) {
     if (Test-Path -Path $destPath -PathType Leaf) {
       Remove-Item -Path $destPath -Force
-      Write-Output "$($PSStyle.Foreground.Cyan)Sync-NextestConfig: removed $destPath$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'Sync-NextestConfig' "removed $destPath"
     }
     return
   }
@@ -31,5 +31,5 @@ function Sync-NextestConfig {
   }
 
   $result = Deploy-UserWritableSymlink -Name 'nextest' -User $User -ConfigName 'nextest' -RelativePath 'config.toml' -RepoRoot $RepoRoot -TargetPath $destPath
-  Write-Output "$($PSStyle.Foreground.Cyan)$($result.Message)$($PSStyle.Reset)"
+  Write-NucleusInfo -CommandName 'nextest' ($result.Message -replace '^nextest: ', '')
 }

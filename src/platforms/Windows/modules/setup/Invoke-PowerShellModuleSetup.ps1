@@ -35,7 +35,7 @@ function Invoke-PowerShellModuleSetup {
   $lockfilePath = Join-Path $repoRoot "src\lockfiles\lockfile.json"
 
   if (-not (Test-Path $lockfilePath)) {
-    Write-Warning "Invoke-PowerShellModuleSetup: lockfile.json not found at $lockfilePath"
+    Write-NucleusWarning -CommandName 'Invoke-PowerShellModuleSetup' "lockfile.json not found at $lockfilePath"
     return
   }
 
@@ -51,7 +51,7 @@ function Invoke-PowerShellModuleSetup {
     $requiredVersion = $entry.Value
 
     if ([string]::IsNullOrWhiteSpace($requiredVersion)) {
-      Write-Warning "Invoke-PowerShellModuleSetup: $moduleName has no pinned version — skipping"
+      Write-NucleusWarning -CommandName 'Invoke-PowerShellModuleSetup' "$moduleName has no pinned version — skipping"
       continue
     }
 
@@ -64,11 +64,11 @@ function Invoke-PowerShellModuleSetup {
     # Remove any existing version to avoid conflicts.
     $existing = Get-Module -ListAvailable -Name $moduleName | Select-Object -First 1
     if ($existing) {
-      Write-Output "$($PSStyle.Foreground.Yellow)Invoke-PowerShellModuleSetup: removing $moduleName version $($existing.Version)...$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'Invoke-PowerShellModuleSetup' "removing $moduleName version $($existing.Version)..."
       Uninstall-Module -Name $moduleName -AllVersions -Force -ErrorAction Stop
     }
 
-    Write-Output "$($PSStyle.Foreground.Cyan)Invoke-PowerShellModuleSetup: installing $moduleName version $requiredVersion...$($PSStyle.Reset)"
+    Write-NucleusInfo -CommandName 'Invoke-PowerShellModuleSetup' "installing $moduleName version $requiredVersion..."
     Install-Module -Name $moduleName -RequiredVersion $requiredVersion -Force -Scope CurrentUser -AllowClobber -ErrorAction Stop
   }
 }

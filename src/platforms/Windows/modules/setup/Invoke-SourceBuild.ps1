@@ -45,7 +45,7 @@ function Invoke-SourceBuild {
 
   # Guard: registry must exist.
   if (-not (Test-Path $registryPath)) {
-    Write-Error "Invoke-SourceBuild: registry not found at '$registryPath'"
+    Write-NucleusError -CommandName 'Invoke-SourceBuild' "registry not found at '$registryPath'"
     return
   }
 
@@ -67,7 +67,7 @@ function Invoke-SourceBuild {
       if ($dirName -eq '.cache') { continue } # skip cache directory itself
       if (-not $registryIds.ContainsKey($dirName)) {
         $target = Join-Path $installRoot $dirName
-        Write-Output "Invoke-SourceBuild: pruning absent package '$dirName' at '$target'"
+        Write-NucleusInfo -CommandName 'Invoke-SourceBuild' "pruning absent package '$dirName' at '$target'"
         Remove-Item -Recurse -Force $target -ErrorAction Stop
       }
     }
@@ -79,7 +79,7 @@ function Invoke-SourceBuild {
     $pin = $sourceBuildPins.$pkgId
 
     if (-not $pin) {
-      Write-Warning "Invoke-SourceBuild: no lockfile pin for '$pkgId'; skipping build (add to lockfile.json source-builds)"
+      Write-NucleusWarning -CommandName 'Invoke-SourceBuild' "no lockfile pin for '$pkgId'; skipping build (add to lockfile.json source-builds)"
       continue
     }
 
@@ -100,7 +100,7 @@ function Invoke-SourceBuild {
     foreach ($dep in $deps) {
       # check-suppress:suppression_doc: probe -- build dependency may not be installed; if-guard checks absence below.
       if (-not (Get-Command $dep -ErrorAction SilentlyContinue)) {
-        Write-Warning "Invoke-SourceBuild: missing build dependency '$dep' for '$pkgId'; skipping. Ensure $dep is installed via Scoop before calling Invoke-SourceBuild."
+        Write-NucleusWarning -CommandName 'Invoke-SourceBuild' "missing build dependency '$dep' for '$pkgId'; skipping. Ensure $dep is installed via Scoop before calling Invoke-SourceBuild."
         $missingDep = $true
         break
       }
@@ -129,18 +129,18 @@ function Invoke-SourceBuild {
     }
 
     if ($alreadyInstalled) {
-      Write-Output "Invoke-SourceBuild: '$pkgId' v$version already installed at '$installDir'"
+      Write-NucleusInfo -CommandName 'Invoke-SourceBuild' "'$pkgId' v$version already installed at '$installDir'"
       continue
     }
 
     # --- Clone / fetch the repository ---
     $repoCacheDir = Join-Path $cacheRoot $pkgId
     if (-not (Test-Path $repoCacheDir)) {
-      Write-Output "Invoke-SourceBuild: cloning $pkgId from $sourceUrl"
+      Write-NucleusInfo -CommandName 'Invoke-SourceBuild' "cloning $pkgId from $sourceUrl"
       $null = New-Item -ItemType Directory -Path $repoCacheDir -Force -ErrorAction Stop  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
       & git clone $sourceUrl $repoCacheDir 2>&1 > $null
       if ($LASTEXITCODE -ne 0) {
-        Write-Error "Invoke-SourceBuild: git clone failed for '$pkgId'"
+        Write-NucleusError -CommandName 'Invoke-SourceBuild' "git clone failed for '$pkgId'"
         continue
       }
     }
@@ -152,7 +152,7 @@ function Invoke-SourceBuild {
       & git fetch origin '+refs/*:refs/*' 2>&1 > $null
       & git checkout $rev 2>&1 > $null
       if ($LASTEXITCODE -ne 0) {
-        Write-Error "Invoke-SourceBuild: git checkout $rev failed for '$pkgId'"
+        Write-NucleusError -CommandName 'Invoke-SourceBuild' "git checkout $rev failed for '$pkgId'"
         continue
       }
     } finally {
@@ -160,19 +160,19 @@ function Invoke-SourceBuild {
     }
 
     # --- Build ---
-    Write-Output "Invoke-SourceBuild: building $pkgId v$version with $buildSystem"
+    Write-NucleusInfo -CommandName 'Invoke-SourceBuild' "building $pkgId v$version with $buildSystem"
     Push-Location $repoCacheDir
     try {
       switch ($buildSystem) {
         'zig' {
           & zig build 2>&1 | Out-String -Width 4096 | ForEach-Object { Write-Verbose $_ }
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "Invoke-SourceBuild: zig build failed for '$pkgId'"
+            Write-NucleusError -CommandName 'Invoke-SourceBuild' "zig build failed for '$pkgId'"
             continue
           }
         }
         default {
-          Write-Error "Invoke-SourceBuild: unsupported build system '$buildSystem' for '$pkgId'"
+          Write-NucleusError -CommandName 'Invoke-SourceBuild' "unsupported build system '$buildSystem' for '$pkgId'"
           continue
         }
       }
@@ -183,14 +183,14 @@ function Invoke-SourceBuild {
     # --- Install binary ---
     $builtBinary = Join-Path -Path $repoCacheDir -ChildPath $binarySubDir -AdditionalChildPath $binaryName
     if (-not (Test-Path $builtBinary)) {
-      Write-Error "Invoke-SourceBuild: built binary not found at '$builtBinary' for '$pkgId'"
+      Write-NucleusError -CommandName 'Invoke-SourceBuild' "built binary not found at '$builtBinary' for '$pkgId'"
       continue
     }
 
     $null = New-Item -ItemType Directory -Path $installDir -Force -ErrorAction Stop  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
     Copy-Item $builtBinary $installDir -Force -ErrorAction Stop
     Set-Content -Path $markerPath -Value $rev -Force -ErrorAction Stop
-    Write-Output "Invoke-SourceBuild: installed $pkgId v$version to '$installDir'"
+    Write-NucleusInfo -CommandName 'Invoke-SourceBuild' "installed $pkgId v$version to '$installDir'"
   }
 
   # --- Update PATH for this session ---

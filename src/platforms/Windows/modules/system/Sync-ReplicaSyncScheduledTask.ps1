@@ -45,7 +45,7 @@ function Sync-ReplicaSyncScheduledTask {
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($null -ne $existingTask) {
       Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-      Write-Output "replica-sync: removed scheduled task '$taskName' (disabled)"
+      Write-NucleusInfo -CommandName 'replica-sync' "removed scheduled task '$taskName' (disabled)"
     }
     return
   }
@@ -90,5 +90,5 @@ function Sync-ReplicaSyncScheduledTask {
     -Settings $settings `
     -Force > $null
 
-  Write-Output "replica-sync: ensured scheduled task '$taskName' (daily 12:00)"
+  Write-NucleusInfo -CommandName 'replica-sync' "ensured scheduled task '$taskName' (daily 12:00)"
 }

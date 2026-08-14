@@ -77,7 +77,7 @@ function Invoke-ScoopSetup {
   Add-NucleusPathEntry -Path (Get-NucleusScoopShimsDir)
 
   if (-not (Test-Path (Join-Path (Get-NucleusScoopShimsDir) "scoop.cmd"))) {
-    Write-Error "Invoke-ScoopSetup: scoop not found at '$(Get-NucleusScoopShimsDir)\scoop.cmd'; ensure Scoop.Scoop was installed by WinGet DSC before calling this function"
+    Write-NucleusError -CommandName 'Invoke-ScoopSetup' "scoop not found at '$(Get-NucleusScoopShimsDir)\scoop.cmd'; ensure Scoop.Scoop was installed by WinGet DSC before calling this function"
     return
   }
 
@@ -90,10 +90,10 @@ function Invoke-ScoopSetup {
     # The result string is checked immediately by the -notmatch guard.
     $existing = scoop bucket list 2>&1
     if ($existing -notmatch "(?m)^$bucket\b") {
-      Write-Output "scoop: adding bucket '$bucket'"
+      Write-NucleusInfo -CommandName 'scoop' "adding bucket '$bucket'"
       scoop bucket add $bucket
       if ($LASTEXITCODE -ne 0) {
-        Write-Error "scoop: failed to add bucket '$bucket' (exit $LASTEXITCODE)"
+        Write-NucleusError -CommandName 'scoop' "failed to add bucket '$bucket' (exit $LASTEXITCODE)"
         return
       }
     }
@@ -140,31 +140,31 @@ function Invoke-ScoopSetup {
 
   # Prune packages removed from the desired list.
   foreach ($pkg in $toRemove) {
-    Write-Output "scoop: uninstalling removed package '$pkg'"
+    Write-NucleusInfo -CommandName 'scoop' "uninstalling removed package '$pkg'"
     scoop uninstall $pkg
     if ($LASTEXITCODE -ne 0) {
-      Write-Error "scoop: 'scoop uninstall $pkg' failed (exit $LASTEXITCODE)"
+      Write-NucleusError -CommandName 'scoop' "'scoop uninstall $pkg' failed (exit $LASTEXITCODE)"
       return
     }
-    Write-Output "scoop: '$pkg' uninstalled"
+    Write-NucleusInfo -CommandName 'scoop' "'$pkg' uninstalled"
   }
 
   # Install additions with version pinning from lockfile.
   foreach ($pkg in $toInstall) {
     $version = $scoopVersions.$pkg
     $installSpec = if ($version) { "$pkg@$version" } else { $pkg }
-    Write-Output "scoop: installing '$installSpec'"
+    Write-NucleusInfo -CommandName 'scoop' "installing '$installSpec'"
     scoop install $installSpec
     if ($LASTEXITCODE -ne 0) {
-      Write-Error "scoop: 'scoop install $installSpec' failed (exit $LASTEXITCODE)"
+      Write-NucleusError -CommandName 'scoop' "'scoop install $installSpec' failed (exit $LASTEXITCODE)"
       return
     }
     if (-not (Test-Path (Join-Path (Get-NucleusScoopShimsDir) "$pkg.cmd")) -and
         -not (Test-Path (Join-Path (Get-NucleusScoopShimsDir) "$pkg.exe"))) {
-      Write-Error "scoop: '$pkg' installed but no shim found under '$(Get-NucleusScoopShimsDir)'"
+      Write-NucleusError -CommandName 'scoop' "'$pkg' installed but no shim found under '$(Get-NucleusScoopShimsDir)'"
       return
     }
-    Write-Output "scoop: '$pkg' installed successfully"
+    Write-NucleusInfo -CommandName 'scoop' "'$pkg' installed successfully"
   }
 
   # Hold all managed packages at their locked versions (prevents accidental upgrades).
@@ -173,7 +173,7 @@ function Invoke-ScoopSetup {
   }
 
   if ($toInstall.Count -eq 0 -and $toRemove.Count -eq 0) {
-    Write-Output "scoop: all managed packages already converged — skipping"
+    Write-NucleusInfo -CommandName 'scoop' "all managed packages already converged — skipping"
   }
 
 }

@@ -61,7 +61,7 @@ function Invoke-RustupSetup {
   # Guard: rustup must be accessible after WinGet DSC has installed Rustlang.Rustup.
   # check-suppress:suppression_doc: probe -- rustup may not be installed; if-guard checks absence below.
   if (-not (Get-Command rustup -ErrorAction SilentlyContinue)) {
-    Write-Error "Invoke-RustupSetup: rustup not found on PATH; ensure Rustlang.Rustup was installed by WinGet DSC before calling this function"
+    Write-NucleusError -CommandName 'Invoke-RustupSetup' "rustup not found on PATH; ensure Rustlang.Rustup was installed by WinGet DSC before calling this function"
     return
   }
 
@@ -106,30 +106,30 @@ function Invoke-RustupSetup {
 
   # Remove toolchains whose channel is not in the desired list.
   foreach ($toolchain in $toRemove) {
-    Write-Output "rustup: removing toolchain '$toolchain'"
+    Write-NucleusInfo -CommandName 'rustup' "removing toolchain '$toolchain'"
     rustup toolchain remove $toolchain
     if ($LASTEXITCODE -ne 0) {
-      Write-Error "rustup: 'rustup toolchain remove $toolchain' failed (exit $LASTEXITCODE)"
+      Write-NucleusError -CommandName 'rustup' "'rustup toolchain remove $toolchain' failed (exit $LASTEXITCODE)"
       return
     }
-    Write-Output "rustup: '$toolchain' removed"
+    Write-NucleusInfo -CommandName 'rustup' "'$toolchain' removed"
   }
 
   # Install desired channels not currently present with version pinning from lockfile.
   foreach ($channel in $toInstall) {
     $rustupDate = $rustupVersions.$channel
     $channelSpec = if ($rustupDate) { "${channel}-${rustupDate}" } else { $channel }
-    Write-Output "rustup: installing toolchain '$channelSpec'"
+    Write-NucleusInfo -CommandName 'rustup' "installing toolchain '$channelSpec'"
     rustup toolchain install $channelSpec
     if ($LASTEXITCODE -ne 0) {
-      Write-Error "rustup: 'rustup toolchain install $channelSpec' failed (exit $LASTEXITCODE)"
+      Write-NucleusError -CommandName 'rustup' "'rustup toolchain install $channelSpec' failed (exit $LASTEXITCODE)"
       return
     }
-    Write-Output "rustup: '$channelSpec' installed"
+    Write-NucleusInfo -CommandName 'rustup' "'$channelSpec' installed"
   }
 
   if ($toInstall.Count -eq 0 -and $toRemove.Count -eq 0) {
-    Write-Output "rustup: all managed toolchains already converged — skipping"
+    Write-NucleusInfo -CommandName 'rustup' "all managed toolchains already converged — skipping"
   }
 
   # Set the global default toolchain to none so every project must declare its
@@ -137,13 +137,13 @@ function Invoke-RustupSetup {
   # check-suppress:suppression_doc: a global default channel silently masks missing per-project toolchain
   # files and makes the effective compiler version opaque.
   # `rustup default none` is idempotent.
-  Write-Output "rustup: setting global default toolchain to none"
+  Write-NucleusInfo -CommandName 'rustup' "setting global default toolchain to none"
   rustup default none
   if ($LASTEXITCODE -ne 0) {
-    Write-Error "rustup: 'rustup default none' failed (exit $LASTEXITCODE)"
+    Write-NucleusError -CommandName 'rustup' "'rustup default none' failed (exit $LASTEXITCODE)"
     return
   }
-  Write-Output "rustup: global default toolchain set to none"
+  Write-NucleusInfo -CommandName 'rustup' "global default toolchain set to none"
 
   # check-suppress:config-method: method 1 (writable symlink) -- cargo config symlinked to repo file.
   # Mirrors the POSIX shell.nix deployment of cargo/config.toml.
@@ -153,5 +153,5 @@ function Invoke-RustupSetup {
     $null = New-Item -ItemType Directory -Path $cargoConfigDir -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
   }
   $result = Deploy-UserWritableSymlink -Name 'cargo' -User $User -ConfigName 'cargo' -RelativePath 'config.toml' -RepoRoot $RepoRoot -TargetPath $cargoConfigPath
-  Write-Output $result.Message
+  Write-NucleusInfo -CommandName 'cargo' ($result.Message -replace '^cargo: ', '')
 }

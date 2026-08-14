@@ -54,7 +54,7 @@ function Invoke-CamillaDSPSetup {
   }
 
   if ($alreadyConverged) {
-    Write-Output "camilladsp-setup: v$desiredVersion already installed — skipping"
+    Write-NucleusInfo -CommandName 'camilladsp-setup' "v$desiredVersion already installed — skipping"
     return
   }
 
@@ -70,15 +70,15 @@ function Invoke-CamillaDSPSetup {
     }
     New-Item -ItemType Directory -Force -Path $tempDir > $null
 
-    Write-Output "camilladsp-setup: downloading v${desiredVersion} from GitHub releases"
+    Write-NucleusInfo -CommandName 'camilladsp-setup' "downloading v${desiredVersion} from GitHub releases"
     # check-suppress:suppression_doc: probe -- download may fail; Test-Path check handles failure downstream.
     Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -ErrorAction SilentlyContinue
     if (-not (Test-Path $zipPath)) {
-      Write-Error "camilladsp-setup: download failed from $zipUrl"
+      Write-NucleusError -CommandName 'camilladsp-setup' "download failed from $zipUrl"
       return
     }
 
-    Write-Output "camilladsp-setup: extracting camilladsp.exe"
+    Write-NucleusInfo -CommandName 'camilladsp-setup' "extracting camilladsp.exe"
     # Ensure install directory exists.
     New-Item -ItemType Directory -Force -Path $installDir > $null
 
@@ -88,7 +88,7 @@ function Invoke-CamillaDSPSetup {
     try {
       $entry = $zip.Entries | Where-Object { $_.Name -eq "camilladsp.exe" }
       if (-not $entry) {
-        Write-Error "camilladsp-setup: camilladsp.exe not found in downloaded zip"
+        Write-NucleusError -CommandName 'camilladsp-setup' "camilladsp.exe not found in downloaded zip"
         return
       }
       [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $binaryPath, $true)
@@ -98,11 +98,11 @@ function Invoke-CamillaDSPSetup {
 
     # Verify extraction.
     if (-not (Test-Path $binaryPath)) {
-      Write-Error "camilladsp-setup: extraction failed — $binaryPath not found"
+      Write-NucleusError -CommandName 'camilladsp-setup' "extraction failed — $binaryPath not found"
       return
     }
 
-    Write-Output "camilladsp-setup: v$desiredVersion installed to $binaryPath"
+    Write-NucleusInfo -CommandName 'camilladsp-setup' "v$desiredVersion installed to $binaryPath"
 
     # check-suppress:config-method: method 1 (writable symlink) -- deploy user-level config to $HOME\.config
     # (cross-platform parity with POSIX ~/.config/camilladsp/configs/config.yml).
@@ -115,7 +115,7 @@ function Invoke-CamillaDSPSetup {
     }
     if (Test-Path $configPath) { Remove-Item -Path $configPath -Force }
     New-Item -Path $configPath -ItemType SymbolicLink -Target $configSource -Force > $null
-    Write-Output "camilladsp-setup: symlinked config to $configPath"
+    Write-NucleusInfo -CommandName 'camilladsp-setup' "symlinked config to $configPath"
   } finally {
     # Clean up temp directory.
     if (Test-Path $tempDir) {

@@ -67,7 +67,7 @@ function Sync-GitAndSshConfig {
     # we need deterministic per-user paths to converge each managed profile.
     $userHome = Join-Path -Path $env:SystemDrive -ChildPath "Users\$User"
     if (-not (Test-Path -Path $userHome)) {
-      Write-Warning "User profile path for '$User' does not exist: '$userHome'. Skipping."
+      Write-NucleusWarning -CommandName 'Sync-GitAndSshConfig' "User profile path for '$User' does not exist: '$userHome'. Skipping."
       continue
     }
 
@@ -99,11 +99,11 @@ function Sync-GitAndSshConfig {
         ($identityKv.ContainsKey('signingKey') -and -not [string]::IsNullOrWhiteSpace($identityKv['signingKey']))
 
       if (-not $hasCompleteIdentity) {
-        Write-Warning "Git identity payload for user '$User' is incomplete at '$identityPath'; applying managed Git baseline only."
+        Write-NucleusWarning -CommandName 'Sync-GitAndSshConfig' "Git identity payload for user '$User' is incomplete at '$identityPath'; applying managed Git baseline only."
       }
     }
     else {
-      Write-Warning "Missing SOPS-managed Git identity payload for user '$User': '$identityPath'. Applying managed Git baseline only."
+      Write-NucleusWarning -CommandName 'Sync-GitAndSshConfig' "Missing SOPS-managed Git identity payload for user '$User': '$identityPath'. Applying managed Git baseline only."
     }
 
     $sshDir = Join-Path -Path $userHome -ChildPath '.ssh'
@@ -187,7 +187,7 @@ function Sync-GitAndSshConfig {
       $deployedText = $outputSshLines -join "`n"
       foreach ($directive in $requiredDirectives) {
         if ($deployedText -notmatch "(?m)^\s+$directive\s+") {
-          Write-Warning "Sync-GitAndSshConfig: managed Host github.com block missing required directive '$directive'"
+          Write-NucleusWarning -CommandName 'Sync-GitAndSshConfig' "managed Host github.com block missing required directive '$directive'"
         }
       }
     }
@@ -269,7 +269,7 @@ function Sync-GitAndSshConfig {
         }
       }
       else {
-        Write-Warning "Applied managed Git baseline for user '$User' without user identity keys."
+        Write-NucleusWarning -CommandName 'Sync-GitAndSshConfig' "Applied managed Git baseline for user '$User' without user identity keys."
       }
     }
     else {

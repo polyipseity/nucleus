@@ -72,7 +72,7 @@ function Sync-CaddyLocalCA {
   }
 
   if ($null -eq $caddyCommand) {
-    Write-Warning 'caddy-trust: caddy binary not found in PATH; skipping local CA trust convergence.'
+    Write-NucleusWarning -CommandName 'caddy-trust' 'caddy binary not found in PATH; skipping local CA trust convergence.'
     return
   }
 
@@ -83,12 +83,12 @@ function Sync-CaddyLocalCA {
   for ($attempt = 1; $attempt -le 20; $attempt++) {
     try {
       & $caddyCommand.Source trust --address $adminAddr > $null
-      Write-Output 'caddy-trust: local CA trusted successfully.'
+      Write-NucleusInfo -CommandName 'caddy-trust' 'local CA trusted successfully.'
       return
     }
     catch {
       if ($attempt -eq 20) {
-        Write-Warning "caddy-trust: failed to trust local CA from $adminAddr after $attempt attempts: $($_.Exception.Message)"
+        Write-NucleusWarning -CommandName 'caddy-trust' "failed to trust local CA from $adminAddr after $attempt attempts: $($_.Exception.Message)"
         return
       }
       Start-Sleep -Seconds 1

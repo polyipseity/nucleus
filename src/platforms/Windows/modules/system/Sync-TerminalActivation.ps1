@@ -33,16 +33,16 @@ function Sync-TerminalActivation {
     return
   }
 
-  Write-Output "terminal-activations: running $($lines.Count) terminal-context activation(s)..."
+  Write-NucleusInfo -CommandName 'terminal-activations' "running $($lines.Count) terminal-context activation(s)..."
   foreach ($line in $lines) {
     $line = $line.Trim()
     if (-not $line) { continue }
-    Write-Output "terminal-activations: $line"
+    Write-NucleusInfo -CommandName 'terminal-activations' $line
     try {
       # check-suppress:suppression_doc: child process errors are non-fatal for apply.
       & ([ScriptBlock]::Create($line))
     } catch {
-      Write-Warning "terminal-activations: command exited with error (continuing): $_"
+      Write-NucleusWarning -CommandName 'terminal-activations' "command exited with error (continuing): $_"
     }
   }
   # check-suppress:suppression_doc: best-effort cleanup -- file may already be deleted by earlier steps or locked.

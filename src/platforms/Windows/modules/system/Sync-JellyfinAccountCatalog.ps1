@@ -114,7 +114,7 @@ function Sync-JellyfinAccountCatalog {
 
     $secretFile = Join-Path $RepoRoot "src\secrets\users\$($userRecord.name).yml"
     if (-not (Test-Path -LiteralPath $secretFile -PathType Leaf)) {
-      Write-Warning "jellyfin: users/$($userRecord.name).yml not found; skipping account declarations for this user."
+      Write-NucleusWarning -CommandName 'jellyfin' "users/$($userRecord.name).yml not found; skipping account declarations for this user."
       continue
     }
 
@@ -132,7 +132,7 @@ function Sync-JellyfinAccountCatalog {
       $secrets = Get-Secret @getSecretParams
     }
     catch {
-      Write-Warning "jellyfin: failed to decrypt $secretFile; skipping account declarations for $($userRecord.name): $($_.Exception.Message)"
+      Write-NucleusWarning -CommandName 'jellyfin' "failed to decrypt $secretFile; skipping account declarations for $($userRecord.name): $($_.Exception.Message)"
       continue
     }
 
@@ -140,14 +140,14 @@ function Sync-JellyfinAccountCatalog {
       $usernameKey = [string]$account.usernameSecretKey
       $passwordKey = [string]$account.passwordSecretKey
       if ([string]::IsNullOrWhiteSpace($usernameKey) -or [string]::IsNullOrWhiteSpace($passwordKey)) {
-        Write-Warning "jellyfin: account '$($account.id)' for user '$($userRecord.name)' is missing usernameSecretKey/passwordSecretKey; skipping."
+        Write-NucleusWarning -CommandName 'jellyfin' "account '$($account.id)' for user '$($userRecord.name)' is missing usernameSecretKey/passwordSecretKey; skipping."
         continue
       }
 
       $resolvedUsername = [string]$secrets.$usernameKey
       $resolvedPassword = [string]$secrets.$passwordKey
       if ([string]::IsNullOrWhiteSpace($resolvedUsername) -or [string]::IsNullOrWhiteSpace($resolvedPassword)) {
-        Write-Warning "jellyfin: account '$($account.id)' for user '$($userRecord.name)' has missing secret values; skipping."
+        Write-NucleusWarning -CommandName 'jellyfin' "account '$($account.id)' for user '$($userRecord.name)' has missing secret values; skipping."
         continue
       }
 
@@ -239,7 +239,7 @@ function Sync-JellyfinAccountCatalog {
   }
 
   if (-not $serverReady) {
-    Write-Warning "jellyfin: API at $BaseUrl is not reachable; skipping account convergence."
+    Write-NucleusWarning -CommandName 'jellyfin' "API at $BaseUrl is not reachable; skipping account convergence."
     return
   }
 
@@ -294,14 +294,14 @@ function Sync-JellyfinAccountCatalog {
   }
 
   if (-not $adminToken) {
-    Write-Warning 'jellyfin: no elevated account credentials available; skipping user convergence.'
+    Write-NucleusWarning -CommandName 'jellyfin' 'no elevated account credentials available; skipping user convergence.'
     return
   }
 
   foreach ($spec in $accountSpecs) {
     $usersResponse = Invoke-JellyfinApi -Method GET -Path '/Users' -Token $adminToken
     if ($usersResponse.StatusCode -ne 200) {
-      Write-Warning 'jellyfin: failed to list users; stopping Jellyfin account convergence.'
+      Write-NucleusWarning -CommandName 'jellyfin' 'failed to list users; stopping Jellyfin account convergence.'
       return
     }
 
@@ -312,28 +312,28 @@ function Sync-JellyfinAccountCatalog {
         Password = $spec.password
       }
       if ($createResponse.StatusCode -eq 200) {
-        Write-Output "jellyfin: created account '$($spec.username)'."
+        Write-NucleusInfo -CommandName 'jellyfin' "created account '$($spec.username)'."
         $matchingUser = $createResponse.Body
         if (-not $matchingUser -or [string]::IsNullOrWhiteSpace([string]$matchingUser.Id)) {
-          Write-Warning "jellyfin: created account '$($spec.username)' but failed to resolve user id for policy convergence."
+          Write-NucleusWarning -CommandName 'jellyfin' "created account '$($spec.username)' but failed to resolve user id for policy convergence."
           continue
         }
       }
       else {
-        Write-Warning "jellyfin: failed to create account '$($spec.username)' (HTTP $($createResponse.StatusCode))."
+        Write-NucleusWarning -CommandName 'jellyfin' "failed to create account '$($spec.username)' (HTTP $($createResponse.StatusCode))."
         continue
       }
     }
 
     $userDetail = Invoke-JellyfinApi -Method GET -Path "/Users/$($matchingUser.Id)" -Token $adminToken
     if ($userDetail.StatusCode -ne 200 -or -not $userDetail.Body) {
-      Write-Warning "jellyfin: failed to query account details for '$($spec.username)' (HTTP $($userDetail.StatusCode))."
+      Write-NucleusWarning -CommandName 'jellyfin' "failed to query account details for '$($spec.username)' (HTTP $($userDetail.StatusCode))."
       continue
     }
 
     $currentPolicy = $userDetail.Body.Policy
     if ($null -eq $currentPolicy) {
-      Write-Warning "jellyfin: missing policy payload for '$($spec.username)'; skipping admin policy convergence."
+      Write-NucleusWarning -CommandName 'jellyfin' "missing policy payload for '$($spec.username)'; skipping admin policy convergence."
       continue
     }
 
@@ -343,10 +343,10 @@ function Sync-JellyfinAccountCatalog {
       $policyBody.IsAdministrator = [bool]$spec.isAdmin
       $policyUpdate = Invoke-JellyfinApi -Method POST -Path "/Users/$($matchingUser.Id)/Policy" -Token $adminToken -Body $policyBody
       if ($policyUpdate.StatusCode -eq 204) {
-        Write-Output "jellyfin: updated admin policy for account '$($spec.username)' to $([bool]$spec.isAdmin)."
+        Write-NucleusInfo -CommandName 'jellyfin' "updated admin policy for account '$($spec.username)' to $([bool]$spec.isAdmin)."
       }
       else {
-        Write-Warning "jellyfin: failed to update admin policy for '$($spec.username)' (HTTP $($policyUpdate.StatusCode))."
+        Write-NucleusWarning -CommandName 'jellyfin' "failed to update admin policy for '$($spec.username)' (HTTP $($policyUpdate.StatusCode))."
       }
     }
 
@@ -366,10 +366,10 @@ function Sync-JellyfinAccountCatalog {
     }
 
     if ($passwordUpdate.StatusCode -eq 204) {
-      Write-Output "jellyfin: updated password for account '$($spec.username)'."
+      Write-NucleusInfo -CommandName 'jellyfin' "updated password for account '$($spec.username)'."
     }
     else {
-      Write-Warning "jellyfin: failed to update password for '$($spec.username)' (HTTP $($passwordUpdate.StatusCode))."
+      Write-NucleusWarning -CommandName 'jellyfin' "failed to update password for '$($spec.username)' (HTTP $($passwordUpdate.StatusCode))."
     }
   }
 }

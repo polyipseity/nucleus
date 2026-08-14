@@ -45,7 +45,7 @@ function Invoke-CamillaGUISetup {
   }
 
   if ($alreadyConverged) {
-    Write-Output "camillagui-backend-setup: v$desiredVersion already installed — skipping"
+    Write-NucleusInfo -CommandName 'camillagui-backend-setup' "v$desiredVersion already installed — skipping"
     return
   }
 
@@ -61,15 +61,15 @@ function Invoke-CamillaGUISetup {
     }
     New-Item -ItemType Directory -Force -Path $tempDir > $null
 
-    Write-Output "camillagui-backend-setup: downloading v${desiredVersion} from GitHub releases"
+    Write-NucleusInfo -CommandName 'camillagui-backend-setup' "downloading v${desiredVersion} from GitHub releases"
     # check-suppress:suppression_doc: probe -- download may fail; Test-Path check handles failure downstream.
     Invoke-WebRequest -Uri $zipUrl -OutFile $zipPath -ErrorAction SilentlyContinue
     if (-not (Test-Path $zipPath)) {
-      Write-Error "camillagui-backend-setup: download failed from $zipUrl"
+      Write-NucleusError -CommandName 'camillagui-backend-setup' "download failed from $zipUrl"
       return
     }
 
-    Write-Output "camillagui-backend-setup: extracting to $installDir"
+    Write-NucleusInfo -CommandName 'camillagui-backend-setup' "extracting to $installDir"
     # Ensure parent directory exists.
     $parentDir = Split-Path $installDir -Parent
     New-Item -ItemType Directory -Force -Path $parentDir > $null
@@ -99,11 +99,11 @@ function Invoke-CamillaGUISetup {
 
     # Verify extraction.
     if (-not (Test-Path $binaryPath)) {
-      Write-Error "camillagui-backend-setup: extraction failed — $binaryPath not found"
+      Write-NucleusError -CommandName 'camillagui-backend-setup' "extraction failed — $binaryPath not found"
       return
     }
 
-    Write-Output "camillagui-backend-setup: v$desiredVersion installed to $installDir"
+    Write-NucleusInfo -CommandName 'camillagui-backend-setup' "v$desiredVersion installed to $installDir"
 
     # check-suppress:config-method: method 1 (writable symlink) -- deploy user-level config to $HOME\.config
     # (cross-platform parity with POSIX ~/.config/camillagui-backend/config.yml).
@@ -115,7 +115,7 @@ function Invoke-CamillaGUISetup {
     }
     if (Test-Path $configPath) { Remove-Item -Path $configPath -Force }
     New-Item -Path $configPath -ItemType SymbolicLink -Target $configSource -Force > $null
-    Write-Output "camillagui-backend-setup: symlinked config to $configPath"
+    Write-NucleusInfo -CommandName 'camillagui-backend-setup' "symlinked config to $configPath"
   } finally {
     # Clean up temp directory.
     if (Test-Path $tempDir) {

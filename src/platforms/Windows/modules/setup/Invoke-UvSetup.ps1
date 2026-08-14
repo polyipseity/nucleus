@@ -73,7 +73,7 @@ function Invoke-UvSetup {
   # Guard: uv must be accessible after WinGet DSC has installed astral-sh.uv.
   # check-suppress:suppression_doc: probe -- uv may not be installed; if-guard checks absence below.
   if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-    Write-Error "Invoke-UvSetup: uv not found on PATH; ensure astral-sh.uv was installed by WinGet DSC before calling this function"
+    Write-NucleusError -CommandName 'Invoke-UvSetup' "uv not found on PATH; ensure astral-sh.uv was installed by WinGet DSC before calling this function"
     return
   }
 
@@ -127,16 +127,16 @@ function Invoke-UvSetup {
   # Prune packages removed from the desired list.
   foreach ($pkg in $toRemove) {
     if ($pkg -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]*$') {
-      Write-Output "uv: skipping invalid uninstall token '$pkg'"
+      Write-NucleusInfo -CommandName 'uv' "skipping invalid uninstall token '$pkg'"
       continue
     }
-    Write-Output "uv: uninstalling removed tool '$pkg'"
+    Write-NucleusInfo -CommandName 'uv' "uninstalling removed tool '$pkg'"
     uv tool uninstall $pkg
     if ($LASTEXITCODE -ne 0) {
-      Write-Error "uv: 'uv tool uninstall $pkg' failed (exit $LASTEXITCODE)"
+      Write-NucleusError -CommandName 'uv' "'uv tool uninstall $pkg' failed (exit $LASTEXITCODE)"
       return
     }
-    Write-Output "uv: '$pkg' uninstalled"
+    Write-NucleusInfo -CommandName 'uv' "'$pkg' uninstalled"
   }
 
   # Install additions (fresh installs and version-mismatch reinstalls).
@@ -151,16 +151,16 @@ function Invoke-UvSetup {
       $pythonArg = if ($pythonVersion) { @('--python', $pythonVersion) } else { @() }
       $reinstallArg = if ($installedTools -contains $pkg) { @('--reinstall') } else { @() }
       if ($pythonVersion) {
-        Write-Output "uv: installing tool '$installSpec' with Python $pythonVersion"
+        Write-NucleusInfo -CommandName 'uv' "installing tool '$installSpec' with Python $pythonVersion"
       } else {
-        Write-Output "uv: installing tool '$installSpec'"
+        Write-NucleusInfo -CommandName 'uv' "installing tool '$installSpec'"
       }
       uv tool install @pythonArg $reinstallArg $installSpec
       if ($LASTEXITCODE -ne 0) {
-        Write-Error "uv: 'uv tool install $installSpec' failed (exit $LASTEXITCODE)"
+        Write-NucleusError -CommandName 'uv' "'uv tool install $installSpec' failed (exit $LASTEXITCODE)"
         return
       }
-      Write-Output "uv: '$installSpec' installed successfully"
+      Write-NucleusInfo -CommandName 'uv' "'$installSpec' installed successfully"
     } else {
       # Hash-pinned entry: install from VCS.
       $source = $entry.source
@@ -170,21 +170,21 @@ function Invoke-UvSetup {
       $pythonArg = if ($pythonVersion) { @('--python', $pythonVersion) } else { @() }
       $reinstallArg = if ($installedTools -contains $pkg) { @('--reinstall') } else { @() }
       if ($pythonVersion) {
-        Write-Output "uv: installing tool '$installSpec' with Python $pythonVersion"
+        Write-NucleusInfo -CommandName 'uv' "installing tool '$installSpec' with Python $pythonVersion"
       } else {
-        Write-Output "uv: installing tool '$installSpec'"
+        Write-NucleusInfo -CommandName 'uv' "installing tool '$installSpec'"
       }
       uv tool install @pythonArg $reinstallArg $installSpec
       if ($LASTEXITCODE -ne 0) {
-        Write-Error "uv: 'uv tool install $installSpec' failed (exit $LASTEXITCODE)"
+        Write-NucleusError -CommandName 'uv' "'uv tool install $installSpec' failed (exit $LASTEXITCODE)"
         return
       }
-      Write-Output "uv: '$installSpec' installed successfully"
+      Write-NucleusInfo -CommandName 'uv' "'$installSpec' installed successfully"
     }
   }
 
   if ($toInstall.Count -eq 0 -and $toRemove.Count -eq 0) {
-    Write-Output "uv: all managed tools already converged — skipping"
+    Write-NucleusInfo -CommandName 'uv' "all managed tools already converged — skipping"
   }
 
 }

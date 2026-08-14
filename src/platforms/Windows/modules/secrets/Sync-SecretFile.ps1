@@ -136,7 +136,7 @@ function Sync-SecretFile {
     $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
     & icacls.exe $Path /inheritance:r /grant:r "${currentUser}:(F)" > $null
     if ($LASTEXITCODE -ne 0) {
-      Write-Warning "secrets: could not restrict ACL on $Path (icacls exit $LASTEXITCODE)"
+      Write-NucleusWarning -CommandName 'secrets' "could not restrict ACL on $Path (icacls exit $LASTEXITCODE)"
     }
   }
 
@@ -152,7 +152,7 @@ function Sync-SecretFile {
     Set-Acl -Path $Path -AclObject $acl
   }
 
-  Write-Output "$($PSStyle.Foreground.Cyan)Processing secrets from: $($secretFileInfo.Name)$($PSStyle.Reset)"
+  Write-NucleusInfo -CommandName 'secrets' "Processing secrets from: $($secretFileInfo.Name)"
   $getSecretParams = @{
     FilePath           = $secretFileInfo.FullName
     GpgExe             = $GpgExe
@@ -200,10 +200,10 @@ function Sync-SecretFile {
 
       "${firstFingerprint}:6:" | & $GpgExe --import-ownertrust > $null
       if ($LASTEXITCODE -ne 0) {
-        Write-Warning "secrets: ownertrust enforcement for '$firstFingerprint' exited $LASTEXITCODE — key imported and manifest updated, ownertrust may need a retry"
+        Write-NucleusWarning -CommandName 'secrets' "ownertrust enforcement for '$firstFingerprint' exited $LASTEXITCODE — key imported and manifest updated, ownertrust may need a retry"
       }
 
-      Write-Output "$($PSStyle.Foreground.Cyan)  Imported GPG material: $secretKey$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'secrets' "  Imported GPG material: $secretKey"
       continue
     }
 
@@ -224,7 +224,7 @@ function Sync-SecretFile {
 
       if ($existingValue -ne $secretValue) {
         $secretValue | Out-File -FilePath $sshKeyPath -Encoding ascii -NoNewline
-        Write-Output "$($PSStyle.Foreground.Cyan)  Updated SSH key: $relativeSshPath$($PSStyle.Reset)"
+        Write-NucleusInfo -CommandName 'secrets' "  Updated SSH key: $relativeSshPath"
       }
 
       & $restrictAcl -Path $sshKeyPath
@@ -252,7 +252,7 @@ function Sync-SecretFile {
               $sshAddCommand = Get-Command 'ssh-add' -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- ssh-add may not be installed; $null check below handles absence
               if ($null -ne $sshAddCommand) {
                 & $sshAddCommand.Source -D *> $null
-                Write-Output "$($PSStyle.Foreground.Cyan)  Flushed SSH agent due to key rotation ($oldSshFingerprint -> $newSshFingerprint)$($PSStyle.Reset)"
+                Write-NucleusInfo -CommandName 'secrets' "  Flushed SSH agent due to key rotation ($oldSshFingerprint -> $newSshFingerprint)"
               }
             }
 
@@ -261,7 +261,7 @@ function Sync-SecretFile {
           }
         }
         catch {
-          Write-Warning "secrets: could not update SSH fingerprint manifest: $_"
+          Write-NucleusWarning -CommandName 'secrets' "could not update SSH fingerprint manifest: $_"
         }
       }
 
@@ -278,7 +278,7 @@ function Sync-SecretFile {
 
       if ($existingIdentityValue -ne $secretValue) {
         $secretValue | Out-File -FilePath $gitIdentityPath -Encoding ascii -NoNewline
-        Write-Output "$($PSStyle.Foreground.Cyan)  Updated Git identity payload: $secretKey$($PSStyle.Reset)"
+        Write-NucleusInfo -CommandName 'secrets' "  Updated Git identity payload: $secretKey"
       }
 
       & $restrictAcl -Path $gitIdentityPath
@@ -300,7 +300,7 @@ function Sync-SecretFile {
       if ($existingRclonePass -ne $secretValue) {
         [System.IO.File]::WriteAllText($rclonePassPath, $secretValue, [System.Text.UTF8Encoding]::new($false))
         & $restrictAclReadOnly -Path $rclonePassPath
-        Write-Output "$($PSStyle.Foreground.Cyan)  Updated rclone config passphrase$($PSStyle.Reset)"
+        Write-NucleusInfo -CommandName 'secrets' "  Updated rclone config passphrase"
       }
     }
   }

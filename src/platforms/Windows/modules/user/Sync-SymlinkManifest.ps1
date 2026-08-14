@@ -99,7 +99,7 @@ function Sync-SymlinkManifest {
       return @($loaded | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
     }
     catch {
-      Write-Warning "Sync-SymlinkManifest: manifest at $ManifestPath was unreadable and will be rebuilt."
+      Write-NucleusWarning -CommandName 'Sync-SymlinkManifest' "manifest at $ManifestPath was unreadable and will be rebuilt."
       return @()
     }
   }
@@ -108,7 +108,7 @@ function Sync-SymlinkManifest {
     $username = [string]$userRecord.name
     $homeDirectory = [string]$userRecord.homeDirectory
     if ([string]::IsNullOrWhiteSpace($homeDirectory)) {
-      Write-Warning "Sync-SymlinkManifest: skipping user '$username' because homeDirectory is missing."
+      Write-NucleusWarning -CommandName 'Sync-SymlinkManifest' "skipping user '$username' because homeDirectory is missing."
       continue
     }
 
@@ -175,7 +175,7 @@ function Sync-SymlinkManifest {
         $isReparsePoint = ($existingItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0
 
         if (-not $isReparsePoint) {
-          Write-Warning "Sync-SymlinkManifest: keeping unmanaged path $($entry.LinkPath) for user '$username' because it is not a symlink."
+          Write-NucleusWarning -CommandName 'Sync-SymlinkManifest' "keeping unmanaged path $($entry.LinkPath) for user '$username' because it is not a symlink."
           continue
         }
 
@@ -200,7 +200,7 @@ function Sync-SymlinkManifest {
         Set-ManagedSymlinkDeleteProtection -Context "Sync-SymlinkManifest" -Path $entry.LinkPath
       }
       catch {
-        Write-Warning "Sync-SymlinkManifest: failed to create symlink $($entry.LinkPath) -> $($entry.TargetPath) for user '$username' : $_"
+        Write-NucleusWarning -CommandName 'Sync-SymlinkManifest' "failed to create symlink $($entry.LinkPath) -> $($entry.TargetPath) for user '$username' : $_"
       }
     }
 

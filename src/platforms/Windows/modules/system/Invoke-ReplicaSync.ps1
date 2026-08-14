@@ -48,7 +48,7 @@ function Invoke-ReplicaSync {
   $ErrorActionPreference = "Stop"
 
   if ($DryRun) {
-    Write-Output "replica-sync: running in dry-run mode (no changes will be made)"
+    Write-NucleusInfo -CommandName 'replica-sync' "running in dry-run mode (no changes will be made)"
   }
 
   $resolvedRepoRoot = (Resolve-Path -Path $RepoRoot).Path
@@ -64,7 +64,7 @@ function Invoke-ReplicaSync {
   # check-suppress:suppression_doc: probe -- rclone may not be installed; $null check handles absence.
   $rcloneCmd = Get-Command -Name "rclone" -ErrorAction SilentlyContinue
   if ($null -eq $rcloneCmd) {
-    Write-Output "replica-sync: rclone not found; skipping replica sync"
+    Write-NucleusInfo -CommandName 'replica-sync' "rclone not found; skipping replica sync"
     return
   }
 
@@ -100,7 +100,7 @@ function Invoke-ReplicaSync {
   $username = [System.Environment]::UserName
   $userRecord = @($usersRegistry.users | Where-Object { $_.name -eq $username }) | Select-Object -First 1
   if ($null -eq $userRecord) {
-    Write-Output "replica-sync: no user entry for '$username' in user registry; skipping"
+    Write-NucleusInfo -CommandName 'replica-sync' "no user entry for '$username' in user registry; skipping"
     return
   }
 
@@ -109,14 +109,14 @@ function Invoke-ReplicaSync {
     })
 
   if ($replicas.Count -eq 0) {
-    Write-Output "replica-sync: no enabled replicas for user '$username'"
+    Write-NucleusInfo -CommandName 'replica-sync' "no enabled replicas for user '$username'"
     return
   }
 
   if (-not [string]::IsNullOrWhiteSpace($ReplicaId)) {
     $replicas = @($replicas | Where-Object { $_.id -eq $ReplicaId })
     if ($replicas.Count -eq 0) {
-      Write-Output "replica-sync: replica id '$ReplicaId' not enabled for user '$username'"
+      Write-NucleusInfo -CommandName 'replica-sync' "replica id '$ReplicaId' not enabled for user '$username'"
       return
     }
   }
@@ -175,7 +175,7 @@ function Invoke-ReplicaSync {
     )
 
     if ($IsDryRun) {
-      Write-Output ("replica-sync: [dry-run] rclone " + ($Arguments -join ' '))
+      Write-NucleusDryRun -CommandName 'replica-sync' ("rclone " + ($Arguments -join ' '))
       return $true
     }
 
@@ -291,13 +291,13 @@ function Invoke-ReplicaSync {
           continue
         }
         if (Test-IsOneDriveInaccessibleRootEntry -EntryName $trimmedDir -BlockedRoots $BlockedRoots) {
-          Write-Warning "replica-sync: [$ReplicaId] skipping inaccessible OneDrive root entry '$trimmedDir'"
+          Write-NucleusWarning -CommandName 'replica-sync' "[$ReplicaId] skipping inaccessible OneDrive root entry '$trimmedDir'"
           continue
         }
         if (Test-RemoteTopLevelPathAccessible -RemoteRef $RemoteRef -EntryName $trimmedDir -IsDryRun:$IsDryRun) {
           Add-UniqueReplicaEntry -Set $dirEntries -Value $trimmedDir
         } else {
-          Write-Warning "replica-sync: [$ReplicaId] skipping inaccessible OneDrive root entry '$trimmedDir'"
+          Write-NucleusWarning -CommandName 'replica-sync' "[$ReplicaId] skipping inaccessible OneDrive root entry '$trimmedDir'"
         }
       }
     }
@@ -318,7 +318,7 @@ function Invoke-ReplicaSync {
     if ($LASTEXITCODE -eq 0 -and $null -ne $remoteFiles) {
       foreach ($remoteFile in @($remoteFiles)) {
         if (Test-IsOneDriveInaccessibleRootEntry -EntryName ([string]$remoteFile) -BlockedRoots $BlockedRoots) {
-          Write-Warning "replica-sync: [$ReplicaId] skipping inaccessible OneDrive root entry '$remoteFile'"
+          Write-NucleusWarning -CommandName 'replica-sync' "[$ReplicaId] skipping inaccessible OneDrive root entry '$remoteFile'"
           continue
         }
         Add-UniqueReplicaEntry -Set $fileEntries -Value ([string]$remoteFile)
@@ -329,7 +329,7 @@ function Invoke-ReplicaSync {
       # check-suppress:suppression_doc: probe -- directory may be empty; foreach handles empty result.
       foreach ($localEntry in Get-ChildItem -Path $LocalDir -Force -ErrorAction SilentlyContinue) {
         if (Test-IsOneDriveInaccessibleRootEntry -EntryName $localEntry.Name -BlockedRoots $BlockedRoots) {
-          Write-Warning "replica-sync: [$ReplicaId] skipping inaccessible OneDrive root entry '$($localEntry.Name)'"
+          Write-NucleusWarning -CommandName 'replica-sync' "[$ReplicaId] skipping inaccessible OneDrive root entry '$($localEntry.Name)'"
           continue
         }
         if ($localEntry.PSIsContainer) {
@@ -366,7 +366,7 @@ function Invoke-ReplicaSync {
     }
 
     if ($IsDryRun) {
-      Write-Output "replica-sync: [dry-run] local metadata gc in '$TargetDir'"
+      Write-NucleusDryRun -CommandName 'replica-sync' "local metadata gc in '$TargetDir'"
       return
     }
 
@@ -397,15 +397,15 @@ function Invoke-ReplicaSync {
 
     if ($null -eq $icaclsCmd) {
       if ($isWindowsHost) {
-        Write-Warning "replica-sync: icacls unavailable; cannot unlock '$TargetDir' for sync"
+        Write-NucleusWarning -CommandName 'replica-sync' "icacls unavailable; cannot unlock '$TargetDir' for sync"
         return $false
       }
-      Write-Output "replica-sync: non-Windows host without icacls; skipping unlock for '$TargetDir'"
+      Write-NucleusInfo -CommandName 'replica-sync' "non-Windows host without icacls; skipping unlock for '$TargetDir'"
       return $true
     }
 
     if ($IsDryRun) {
-      Write-Output "replica-sync: [dry-run] unlock replica tree '$TargetDir' (remove deny + clear read-only attributes)"
+      Write-NucleusDryRun -CommandName 'replica-sync' "unlock replica tree '$TargetDir' (remove deny + clear read-only attributes)"
       return $true
     }
 
@@ -434,15 +434,15 @@ function Invoke-ReplicaSync {
 
     if ($null -eq $icaclsCmd) {
       if ($isWindowsHost) {
-        Write-Warning "replica-sync: icacls unavailable; cannot lock '$TargetDir' as read-only"
+        Write-NucleusWarning -CommandName 'replica-sync' "icacls unavailable; cannot lock '$TargetDir' as read-only"
         return $false
       }
-      Write-Output "replica-sync: non-Windows host without icacls; skipping read-only lock for '$TargetDir'"
+      Write-NucleusInfo -CommandName 'replica-sync' "non-Windows host without icacls; skipping read-only lock for '$TargetDir'"
       return $true
     }
 
     if ($IsDryRun) {
-      Write-Output "replica-sync: [dry-run] lock replica tree '$TargetDir' (deny write/create/delete)"
+      Write-NucleusDryRun -CommandName 'replica-sync' "lock replica tree '$TargetDir' (deny write/create/delete)"
       return $true
     }
 
@@ -551,7 +551,7 @@ function Invoke-ReplicaSync {
       }
     }
 
-    Write-Output "replica-sync: [$displayName] pull $remoteRef -> $localDir"
+    Write-NucleusInfo -CommandName 'replica-sync' "[$displayName] pull $remoteRef -> $localDir"
     $ok = Invoke-ReplicaRcloneCommand -Arguments (@('sync', $remoteRef, $localDir) + $commonArgs) -IsDryRun:$DryRun
     if (-not $ok) {
       $failureCount += 1
@@ -574,5 +574,5 @@ function Invoke-ReplicaSync {
     throw "replica-sync: completed with $failureCount failure(s)"
   }
 
-  Write-Output "replica-sync: completed successfully"
+  Write-NucleusInfo -CommandName 'replica-sync' "completed successfully"
 }

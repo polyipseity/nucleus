@@ -185,11 +185,11 @@ function Sync-QtPassConfig {
           throw "QtPass setting '$settingName' for '$username' has unsupported type '$($settingValue.GetType().FullName)'."
         }
 
-        Write-Output "$($PSStyle.Foreground.Green)QtPass settings synced for $username.$($PSStyle.Reset)"
+        Write-NucleusInfo -CommandName 'Sync-QtPassConfig' "QtPass settings synced for $username."
       }
       else {
         Invoke-QtPassManagedCleanup -QtPassRegistryPath $qtPassRegistryPath -SettingNames $managedSettingNames
-        Write-Output "$($PSStyle.Foreground.Yellow)QtPass settings cleanup complete for $username.$($PSStyle.Reset)"
+        Write-NucleusInfo -CommandName 'Sync-QtPassConfig' "QtPass settings cleanup complete for $username."
       }
     }
     finally {

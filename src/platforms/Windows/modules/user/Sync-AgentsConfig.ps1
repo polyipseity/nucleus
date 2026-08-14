@@ -75,7 +75,7 @@ function Sync-AgentsConfig {
     $devModeProp = Get-ItemProperty -Path $devModeKey -Name "AllowDevelopmentWithoutDevLicense" -ErrorAction SilentlyContinue
     $devModeEnabled = $null -ne $devModeProp -and $devModeProp.AllowDevelopmentWithoutDevLicense -eq 1
     if (-not $isAdmin -and -not $devModeEnabled) {
-      Write-Error "Sync-AgentsConfig requires Developer Mode or an elevated session to create directory symlinks.  Enable Developer Mode in Settings -> System -> For Developers."
+      Write-NucleusError -CommandName 'agents-config' "Sync-AgentsConfig requires Developer Mode or an elevated session to create directory symlinks.  Enable Developer Mode in Settings -> System -> For Developers."
       return
     }
   }
@@ -100,7 +100,7 @@ function Sync-AgentsConfig {
           if ($null -ne $expectedSource -and [string]::Equals($child.Target, $expectedSource, [System.StringComparison]::OrdinalIgnoreCase)) {
             Remove-ManagedSymlinkDeleteProtection -Context "agents-config" -Path $child.FullName
             Remove-Item -LiteralPath $child.FullName -Force
-            Write-Output "agents-config: removed managed agents subdir symlink: $($child.FullName)"
+            Write-NucleusInfo -CommandName 'agents-config' "removed managed agents subdir symlink: $($child.FullName)"
           }
         }
       }
@@ -110,7 +110,7 @@ function Sync-AgentsConfig {
 
   $entryNames = Get-UserConfigFirstLevelEntryList -User $User -ConfigName 'agents' -RepoRoot $RepoRoot
   if ($entryNames.Count -eq 0) {
-    Write-Error "agents-config: Sync-AgentsConfig: no agents overlay entries found for user '$User'"
+    Write-NucleusError -CommandName 'agents-config' "Sync-AgentsConfig: no agents overlay entries found for user '$User'"
     return
   }
 
@@ -119,7 +119,7 @@ function Sync-AgentsConfig {
     $isWholeDirSymlink = ($agentsDirItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0 `
                            -and $agentsDirItem.LinkType -eq 'SymbolicLink'
     if ($isWholeDirSymlink) {
-      Write-Error "agents-config: Sync-AgentsConfig: $agentsDir is a whole-dir symlink — remove it manually and re-run apply so per-subdir symlinks can be created."
+      Write-NucleusError -CommandName 'agents-config' "Sync-AgentsConfig: $agentsDir is a whole-dir symlink — remove it manually and re-run apply so per-subdir symlinks can be created."
       return
     }
   }
@@ -127,7 +127,7 @@ function Sync-AgentsConfig {
   # Ensure ~/.agents\ exists as a real (writable) directory.
   if (-not (Test-Path -LiteralPath $agentsDir -PathType Container)) {
     New-Item -ItemType Directory -Path $agentsDir > $null
-    Write-Output "agents-config: Sync-AgentsConfig: created $agentsDir"
+    Write-NucleusInfo -CommandName 'agents-config' "Sync-AgentsConfig: created $agentsDir"
   }
 
   # Remove stale per-subdir symlinks whose resolved overlay entry no longer exists.
@@ -148,7 +148,7 @@ function Sync-AgentsConfig {
         if (-not (Test-Path -LiteralPath $expectedSource)) {
           Remove-ManagedSymlinkDeleteProtection -Context "agents-config" -Path $child.FullName
           Remove-Item -LiteralPath $child.FullName -Force
-          Write-Output "agents-config: Sync-AgentsConfig: removed stale link for $($child.Name) (source removed)"
+          Write-NucleusInfo -CommandName 'agents-config' "Sync-AgentsConfig: removed stale link for $($child.Name) (source removed)"
         }
       }
     }
@@ -173,12 +173,12 @@ function Sync-AgentsConfig {
         Remove-Item -LiteralPath $linkPath -Force
       } else {
         # Real file or directory: fail fast to prevent silent data loss.
-        Write-Error "agents-config: Sync-AgentsConfig: $linkPath is not a managed symlink — merge any wanted content into $entryPath and remove it, then re-run apply."
+        Write-NucleusError -CommandName 'agents-config' "Sync-AgentsConfig: $linkPath is not a managed symlink — merge any wanted content into $entryPath and remove it, then re-run apply."
         return
       }
     }
     New-Item -ItemType SymbolicLink -Path $linkPath -Target $entryPath > $null
     Set-ManagedSymlinkDeleteProtection -Context "agents-config" -Path $linkPath
-    Write-Output "agents-config: Sync-AgentsConfig: linked $linkPath -> $entryPath"
+    Write-NucleusInfo -CommandName 'agents-config' "Sync-AgentsConfig: linked $linkPath -> $entryPath"
   }
 }

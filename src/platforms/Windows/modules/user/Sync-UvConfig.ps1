@@ -21,7 +21,7 @@ function Sync-UvConfig {
   if (-not $Enabled) {
     if (Test-Path -Path $destPath -PathType Leaf) {
       Remove-Item -Path $destPath -Force
-      Write-Output "$($PSStyle.Foreground.Cyan)Sync-UvConfig: removed $destPath$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'Sync-UvConfig' "removed $destPath"
     }
     return
   }
@@ -31,5 +31,5 @@ function Sync-UvConfig {
   }
 
   $result = Deploy-UserWritableSymlink -Name 'uv' -User $User -ConfigName 'uv' -RelativePath 'uv.toml' -RepoRoot $RepoRoot -TargetPath $destPath
-  Write-Output "$($PSStyle.Foreground.Cyan)$($result.Message)$($PSStyle.Reset)"
+  Write-NucleusInfo -CommandName 'uv' ($result.Message -replace '^uv: ', '')
 }

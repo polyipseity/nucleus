@@ -90,7 +90,7 @@ function Invoke-WingetConfiguration {
       $resolvedConfigPath = $tempConfigPath
     }
 
-    Write-Output "Applying WinGet DSC: $resolvedConfigPath"
+    Write-NucleusInfo -CommandName 'winget' "Applying WinGet DSC: $resolvedConfigPath"
     winget configure --accept-configuration-agreements --disable-interactivity "$resolvedConfigPath"
 
     if ($LASTEXITCODE -ne 0) {

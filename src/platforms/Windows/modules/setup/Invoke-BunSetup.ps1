@@ -73,7 +73,7 @@ function Invoke-BunSetup {
   # Guard: bun must be accessible after WinGet DSC has installed Oven-sh.Bun.
   # check-suppress:suppression_doc: probe -- bun may not be installed; if-guard checks absence below.
   if (-not (Get-Command bun -ErrorAction SilentlyContinue)) {
-    Write-Error "Invoke-BunSetup: bun not found on PATH; ensure Oven-sh.Bun was installed by WinGet DSC before calling this function"
+    Write-NucleusError -CommandName 'Invoke-BunSetup' "bun not found on PATH; ensure Oven-sh.Bun was installed by WinGet DSC before calling this function"
     return
   }
 
@@ -102,7 +102,7 @@ function Invoke-BunSetup {
     catch {
       # || SilentlyContinue equivalent: parse failure treats installed set as
       # empty — safe because any desired packages will simply be re-installed.
-      Write-Warning "Invoke-BunSetup: could not parse '$bunGlobalJson'; treating as empty installed set"
+      Write-NucleusWarning -CommandName 'Invoke-BunSetup' "could not parse '$bunGlobalJson'; treating as empty installed set"
     }
   }
 
@@ -138,13 +138,13 @@ function Invoke-BunSetup {
   })
 
   foreach ($pkg in $toRemove) {
-    Write-Output "bun-setup: removing $pkg"
+    Write-NucleusInfo -CommandName 'bun-setup' "removing $pkg"
     bun remove -g $pkg
     if ($LASTEXITCODE -ne 0) {
-      Write-Error "bun-setup: 'bun remove -g $pkg' failed (exit $LASTEXITCODE)"
+      Write-NucleusError -CommandName 'bun-setup' "'bun remove -g $pkg' failed (exit $LASTEXITCODE)"
       return
     }
-    Write-Output "bun-setup: $pkg removed"
+    Write-NucleusInfo -CommandName 'bun-setup' "$pkg removed"
   }
 
   # Install additions (fresh installs and version-mismatch reinstalls).
@@ -154,10 +154,10 @@ function Invoke-BunSetup {
       # Version-pinned entry: install from npm registry.
       $version = $entry
       $installSpec = if ($version) { "${pkg}@${version}" } else { $pkg }
-      Write-Output "bun-setup: installing $installSpec"
+      Write-NucleusInfo -CommandName 'bun-setup' "installing $installSpec"
       bun install -g $installSpec
       if ($LASTEXITCODE -ne 0) {
-        Write-Error "bun-setup: 'bun install -g $installSpec' failed (exit $LASTEXITCODE)"
+        Write-NucleusError -CommandName 'bun-setup' "'bun install -g $installSpec' failed (exit $LASTEXITCODE)"
         return
       }
     } else {
@@ -165,10 +165,10 @@ function Invoke-BunSetup {
       $source = $entry.source
       $rev = $entry.rev
       $installSpec = "git+$source#$rev"
-      Write-Output "bun-setup: installing $pkg from $installSpec"
+      Write-NucleusInfo -CommandName 'bun-setup' "installing $pkg from $installSpec"
       bun install -g $installSpec
       if ($LASTEXITCODE -ne 0) {
-        Write-Error "bun-setup: 'bun install -g $installSpec' failed (exit $LASTEXITCODE)"
+        Write-NucleusError -CommandName 'bun-setup' "'bun install -g $installSpec' failed (exit $LASTEXITCODE)"
         return
       }
     }
@@ -178,10 +178,10 @@ function Invoke-BunSetup {
       (Test-Path (Join-Path $bunBinDir "$binName.exe")) -or
       (Test-Path (Join-Path $bunBinDir "$binName.cmd"))
     )) {
-      Write-Error "bun-setup: $pkg installed but binary '$binName' not found in '$bunBinDir'"
+      Write-NucleusError -CommandName 'bun-setup' "$pkg installed but binary '$binName' not found in '$bunBinDir'"
       return
     }
-    Write-Output "bun-setup: $pkg installed successfully"
+    Write-NucleusInfo -CommandName 'bun-setup' "$pkg installed successfully"
   }
 
 }

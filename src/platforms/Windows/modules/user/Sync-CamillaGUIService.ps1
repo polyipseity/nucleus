@@ -44,7 +44,7 @@ function Sync-CamillaGUIService {
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     if ($null -ne $existingTask) {
       Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-      Write-Output "camillagui-backend: removed scheduled task '$taskName' (disabled)"
+      Write-NucleusInfo -CommandName 'camillagui-backend' "removed scheduled task '$taskName' (disabled)"
     }
     return
   }
@@ -52,7 +52,7 @@ function Sync-CamillaGUIService {
   # Compute deterministic install path (must match Invoke-CamillaGUISetup).
   $camillaguiBin = Join-Path $HOME ".local\bin\camillagui_backend\camillagui_backend.exe"
   if (-not (Test-Path $camillaguiBin)) {
-    Write-Output "camillagui-backend: binary not found at $camillaguiBin; run Invoke-CamillaGUISetup first"
+    Write-NucleusInfo -CommandName 'camillagui-backend' "binary not found at $camillaguiBin; run Invoke-CamillaGUISetup first"
     return
   }
 
@@ -75,5 +75,5 @@ function Sync-CamillaGUIService {
   }
 
   Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force
-  Write-Output "camillagui-backend: registered scheduled task '$taskName'"
+  Write-NucleusInfo -CommandName 'camillagui-backend' "registered scheduled task '$taskName'"
 }

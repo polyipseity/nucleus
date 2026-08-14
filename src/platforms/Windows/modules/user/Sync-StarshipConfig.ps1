@@ -20,7 +20,7 @@ function Sync-StarshipConfig {
   if (-not $Enabled) {
     if (Test-Path -Path $destPath -PathType Leaf) {
       Remove-Item -Path $destPath -Force
-      Write-Output "$($PSStyle.Foreground.Cyan)Sync-StarshipConfig: removed $destPath$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'Sync-StarshipConfig' "removed $destPath"
     }
     return
   }
@@ -31,5 +31,5 @@ function Sync-StarshipConfig {
   }
 
   $result = Deploy-UserWritableSymlink -Name 'starship' -User $User -ConfigName 'starship' -RelativePath 'starship.toml' -RepoRoot $RepoRoot -TargetPath $destPath
-  Write-Output "$($PSStyle.Foreground.Cyan)$($result.Message)$($PSStyle.Reset)"
+  Write-NucleusInfo -CommandName 'starship' ($result.Message -replace '^starship: ', '')
 }

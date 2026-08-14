@@ -21,11 +21,11 @@ function Sync-DirenvConfig {
   if (-not $Enabled) {
     if (Test-Path -Path $destPath -PathType Leaf) {
       Remove-Item -Path $destPath -Force
-      Write-Output "$($PSStyle.Foreground.Cyan)Sync-DirenvConfig: removed $destPath$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'Sync-DirenvConfig' "removed $destPath"
     }
     return
   }
 
   $result = Deploy-UserWritableSymlink -Name 'direnv' -User $User -ConfigName 'direnv' -RelativePath 'direnvrc' -RepoRoot $RepoRoot -TargetPath $destPath
-  Write-Output "$($PSStyle.Foreground.Cyan)$($result.Message)$($PSStyle.Reset)"
+  Write-NucleusInfo -CommandName 'direnv' ($result.Message -replace '^direnv: ', '')
 }

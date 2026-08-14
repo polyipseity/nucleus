@@ -98,7 +98,7 @@ function Register-HostAgeKey {
     # Advisory: host key may not yet exist on a freshly installed system that
     # has not yet enabled the OpenSSH server feature.  Registration cannot
     # proceed without it; warn and skip rather than hard-failing apply.
-    Write-Warning "sops: $MachineSshHostKeyPubPath not found; skipping machine age key auto-registration."
+    Write-NucleusWarning -CommandName 'sops' "$MachineSshHostKeyPubPath not found; skipping machine age key auto-registration."
     return
   }
 
@@ -112,11 +112,11 @@ function Register-HostAgeKey {
   # Idempotency: skip insertion and rewrap when this machine is already registered.
   $rawContent = [System.IO.File]::ReadAllText($SopsYamlPath)
   if ($rawContent -like "*$agePub*") {
-    Write-Output "sops: machine age key already registered in .sops.yaml; skipping auto-registration."
+    Write-NucleusInfo -CommandName 'sops' "machine age key already registered in .sops.yaml; skipping auto-registration."
     return
   }
 
-  Write-Output "$($PSStyle.Foreground.FromName('Cyan'))sops: registering machine age key in .sops.yaml and rewrapping SOPS files...$($PSStyle.Reset)"
+  Write-NucleusInfo -CommandName 'sops' "registering machine age key in .sops.yaml and rewrapping SOPS files..."
 
   # Detect the existing line-ending style so the file is written back with the
   # same convention.  .sops.yaml is committed from POSIX systems and uses LF;
@@ -167,19 +167,19 @@ function Register-HostAgeKey {
   }
 
   foreach ($sopsFile in $sopsFiles) {
-    Write-Output "sops: sops updatekeys $sopsFile"
+    Write-NucleusInfo -CommandName 'sops' "sops updatekeys $sopsFile"
     # --yes skips the interactive "update recipients?" confirmation (sops v3.8+).
     $sopsResult = & $SopsExe updatekeys --yes $sopsFile 2>&1
     if ($LASTEXITCODE -ne 0) {
       # Surface sops stderr so the operator can diagnose GPG key import failures.
-      Write-Error ($sopsResult | Out-String)
+      Write-NucleusError -CommandName 'sops' ($sopsResult | Out-String)
       throw ("sops: ERROR — sops updatekeys failed for $sopsFile.  " +
              "Ensure the primary GPG key is imported first: gpg --import <backup-key-file>")
     }
   }
 
-  Write-Output "$($PSStyle.Foreground.FromName('Green'))sops: machine age key registered and SOPS files rewrapped.$($PSStyle.Reset)"
-  Write-Output "$($PSStyle.Formatting.Warning)sops: Commit the changes before deploying to other machines:$($PSStyle.Reset)"
-  Write-Output "$($PSStyle.Formatting.Warning)sops:   git add .sops.yaml src/secrets src/users$($PSStyle.Reset)"
-  Write-Output "$($PSStyle.Formatting.Warning)sops:   git commit -m `"chore: register $(hostname) machine age key`"$($PSStyle.Reset)"
+  Write-NucleusInfo -CommandName 'sops' "machine age key registered and SOPS files rewrapped."
+  Write-NucleusInfo -CommandName 'sops' "Commit the changes before deploying to other machines:"
+  Write-NucleusInfo -CommandName 'sops' "  git add .sops.yaml src/secrets src/users"
+  Write-NucleusInfo -CommandName 'sops' "  git commit -m `"chore: register $(hostname) machine age key`""
 }

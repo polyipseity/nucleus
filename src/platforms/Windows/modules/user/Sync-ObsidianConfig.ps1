@@ -165,12 +165,12 @@ function Sync-ObsidianConfig {
         $existingConfig[$settingName] = $managedSettings[$settingName]
       }
       Write-Utf8Json -Path $configPath -Value $existingConfig
-      Write-Output "$($PSStyle.Foreground.Green)Obsidian settings synced for $username.$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'Sync-ObsidianConfig' "Obsidian settings synced for $username."
       continue
     }
 
     if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
-      Write-Output "$($PSStyle.Foreground.Yellow)Obsidian settings cleanup complete for $username.$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'Sync-ObsidianConfig' "Obsidian settings cleanup complete for $username."
       continue
     }
 
@@ -185,6 +185,6 @@ function Sync-ObsidianConfig {
       Write-Utf8Json -Path $configPath -Value $existingConfig
     }
 
-    Write-Output "$($PSStyle.Foreground.Yellow)Obsidian settings cleanup complete for $username.$($PSStyle.Reset)"
+    Write-NucleusInfo -CommandName 'Sync-ObsidianConfig' "Obsidian settings cleanup complete for $username."
   }
 }

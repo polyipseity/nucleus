@@ -43,7 +43,7 @@ function Sync-CamillaDSPService {
     $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- task may not be registered yet; $null check below handles absence
     if ($null -ne $existingTask) {
       Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
-      Write-Output "camilladsp: removed scheduled task '$taskName' (disabled)"
+      Write-NucleusInfo -CommandName 'camilladsp' "removed scheduled task '$taskName' (disabled)"
     }
     return
   }
@@ -51,7 +51,7 @@ function Sync-CamillaDSPService {
   # Compute deterministic install path (must match Invoke-CamillaDSPSetup).
   $camilladspBin = Join-Path $HOME ".local\bin\camilladsp.exe"
   if (-not (Test-Path $camilladspBin)) {
-    Write-Output "camilladsp: binary not found at $camilladspBin; run Invoke-CamillaDSPSetup first"
+    Write-NucleusInfo -CommandName 'camilladsp' "binary not found at $camilladspBin; run Invoke-CamillaDSPSetup first"
     return
   }
 
@@ -89,5 +89,5 @@ function Sync-CamillaDSPService {
   }
 
   Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force
-  Write-Output "camilladsp: registered scheduled task '$taskName'"
+  Write-NucleusInfo -CommandName 'camilladsp' "registered scheduled task '$taskName'"
 }

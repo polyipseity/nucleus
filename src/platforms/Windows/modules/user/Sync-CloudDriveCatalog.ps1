@@ -76,7 +76,7 @@ function Sync-CloudDriveCatalog {
         # Verify rclone remote is configured before attempting to mount.
         $remoteName = $mount.remoteName
         if (-not $remoteName) {
-            Write-Warning "cloud-drives: mount '$($mount.id)' has no remoteName configured; skipping."
+            Write-NucleusWarning -CommandName 'cloud-drives' "mount '$($mount.id)' has no remoteName configured; skipping."
             continue
         }
 
@@ -85,7 +85,7 @@ function Sync-CloudDriveCatalog {
         # check-suppress:suppression_doc: probe -- rclone may not be installed; $null check handles absence.
         $rcloneExe = (Get-Command rclone -ErrorAction SilentlyContinue)?.Source
         if (-not $rcloneExe) {
-            Write-Warning "cloud-drives: rclone not found on PATH; install via 'winget install Rclone.Rclone'."
+            Write-NucleusWarning -CommandName 'cloud-drives' "rclone not found on PATH; install via 'winget install Rclone.Rclone'."
             continue
         }
 
@@ -95,13 +95,13 @@ function Sync-CloudDriveCatalog {
         $remoteList = & $rcloneExe listremotes 2>$null  # check-suppress:suppression_doc: probe -- remote may not be configured; $LASTEXITCODE checked below
         $remoteListExitCode = $LASTEXITCODE
         if ($remoteListExitCode -ne 0) {
-            Write-Warning "cloud-drives: failed to list rclone remotes for mount '$($mount.id)' (exit $remoteListExitCode); skipping."
+            Write-NucleusWarning -CommandName 'cloud-drives' "failed to list rclone remotes for mount '$($mount.id)' (exit $remoteListExitCode); skipping."
             continue
         }
 
         $remoteConfigured = $remoteList | Select-String -SimpleMatch "${remoteName}:"
         if (-not $remoteConfigured) {
-            Write-Warning "cloud-drives: rclone remote '$remoteName' not configured; run 'rclone config' then re-apply."
+            Write-NucleusWarning -CommandName 'cloud-drives' "rclone remote '$remoteName' not configured; run 'rclone config' then re-apply."
             continue
         }
 
@@ -227,5 +227,5 @@ function Sync-CloudDriveCatalog {
         Write-Verbose "cloud-drives: replica '$($replica.id)' ($($replica.provider)) provisioned at $localPath"
     }
 
-    Write-Output "$($PSStyle.Foreground.Green)cloud-drives: provisioning complete.$($PSStyle.Reset)"
+    Write-NucleusInfo -CommandName 'cloud-drives' "provisioning complete."
 }

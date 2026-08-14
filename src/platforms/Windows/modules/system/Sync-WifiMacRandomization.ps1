@@ -29,14 +29,14 @@ function Sync-WifiMacRandomization {
 
   $wlanSvcPath = 'HKLM:\SOFTWARE\Microsoft\WlanSvc\Interfaces'
   if (-not (Test-Path -Path $wlanSvcPath)) {
-    Write-Output "$($PSStyle.Formatting.Warning)WlanSvc registry path not found; skipping Wi-Fi MAC randomization.$($PSStyle.Reset)"
+    Write-NucleusWarning -CommandName 'Wi-Fi MAC' "WlanSvc registry path not found; skipping Wi-Fi MAC randomization."
     return
   }
 
   # check-suppress:suppression_doc: probe -- WlanSvc path may have no child items; empty result handled downstream.
   $interfaceGuids = Get-ChildItem -Path $wlanSvcPath -ErrorAction SilentlyContinue | Select-Object -ExpandProperty PSChildName
   if ($null -eq $interfaceGuids -or $interfaceGuids.Count -eq 0) {
-    Write-Output "$($PSStyle.Formatting.Warning)No WlanSvc interfaces found; skipping Wi-Fi MAC randomization.$($PSStyle.Reset)"
+    Write-NucleusWarning -CommandName 'Wi-Fi MAC' "No WlanSvc interfaces found; skipping Wi-Fi MAC randomization."
     return
   }
 
@@ -65,7 +65,7 @@ function Sync-WifiMacRandomization {
     if (-not (Test-Path -Path $paramsPath)) {
       $null = New-Item -Path $paramsPath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort -- Parameters subkey may already exist
       if (-not (Test-Path -Path $paramsPath)) {
-        Write-Warning "Wi-Fi MAC: could not create Parameters subkey for interface $guid ($ifaceName); skipping."
+        Write-NucleusWarning -CommandName 'Wi-Fi MAC' "could not create Parameters subkey for interface $guid ($ifaceName); skipping."
         continue
       }
     }
@@ -79,20 +79,20 @@ function Sync-WifiMacRandomization {
     }
 
     if ($currentValue -eq $targetValue) {
-      Write-Output "Wi-Fi MAC randomization on '$ifaceName' ($guid) already $($actionLabel)d."
+      Write-NucleusInfo -CommandName 'Wi-Fi MAC' "randomization on '$ifaceName' ($guid) already $($actionLabel)d."
       continue
     }
 
     try {
       Set-ItemProperty -Path $paramsPath -Name 'RandomizationEnabled' -Value $targetValue -Type DWord -ErrorAction Stop
-      Write-Output "Wi-Fi MAC randomization on '$ifaceName' ($guid): $($actionLabel)d."
+      Write-NucleusInfo -CommandName 'Wi-Fi MAC' "randomization on '$ifaceName' ($guid): $($actionLabel)d."
     }
     catch {
-      Write-Warning "Wi-Fi MAC: failed to set RandomizationEnabled on interface $guid ($ifaceName): $_"
+      Write-NucleusWarning -CommandName 'Wi-Fi MAC' "failed to set RandomizationEnabled on interface $guid ($ifaceName): $_"
     }
   }
 
   if (-not $foundWiFiAdapter) {
-    Write-Output "$($PSStyle.Formatting.Warning)No Wi-Fi adapters found in WlanSvc registry; skipping Wi-Fi MAC randomization.$($PSStyle.Reset)"
+    Write-NucleusWarning -CommandName 'Wi-Fi MAC' "No Wi-Fi adapters found in WlanSvc registry; skipping Wi-Fi MAC randomization."
   }
 }

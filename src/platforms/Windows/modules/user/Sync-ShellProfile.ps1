@@ -180,11 +180,11 @@ function Sync-ShellProfile {
         throw 'Sync-ShellProfile: NUCLEUS_REPO_ROOT is not set. Run via apply.ps1 which exports this variable.'
       }
       $result = Deploy-UserWritableSymlink -Name 'pwsh-pssa' -User $User -ConfigName 'pwsh' -RelativePath 'PSScriptAnalyzerSettings.psd1' -RepoRoot $RepoRoot -TargetPath $settingsPath
-      Write-Output "$($PSStyle.Foreground.Cyan)$($result.Message)$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'pwsh-pssa' ($result.Message -replace '^pwsh-pssa: ', '')
     }
     elseif (Test-Path -Path $settingsPath -PathType Leaf) {
       Remove-Item -Path $settingsPath -Force
-      Write-Output "$($PSStyle.Foreground.Cyan)Sync-ShellProfile: removed $settingsPath$($PSStyle.Reset)"
+      Write-NucleusInfo -CommandName 'Sync-ShellProfile' "removed $settingsPath"
     }
   }
 }

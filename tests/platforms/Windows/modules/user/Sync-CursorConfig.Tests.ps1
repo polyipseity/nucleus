@@ -15,6 +15,7 @@
 
 Describe 'Sync-CursorConfig IDE settings symlink (Class C)' {
     BeforeAll {
+        Import-Module (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\src\platforms\Windows\modules\Format-NucleusOutput.psm1') -Force
         . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\src\platforms\Windows\modules\ConfigHelpers.ps1')
         . (Join-Path -Path $PSScriptRoot -ChildPath '..\..\..\..\..\src\platforms\Windows\modules\user\Sync-CursorConfig.ps1')
         $script:repoRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("nucleus-cursorcfg-" + [guid]::NewGuid().ToString('N'))
