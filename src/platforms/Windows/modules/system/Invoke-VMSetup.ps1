@@ -350,7 +350,7 @@ function Invoke-VMSetup {
                 # check-suppress:suppression_doc: probe -- no disk images may exist; foreach handles empty result.
                 foreach ($disk in Get-ChildItem -LiteralPath $typeDir.FullName -Filter '*.qcow2' -ErrorAction SilentlyContinue) {
                     if ($disk.Name -notin $keep) {
-                        Write-Information "vm-setup: GC — removing non-provisioned disk image: $($disk.FullName)"
+                        Write-NucleusInfo -CommandName vm-setup "GC — removing non-provisioned disk image: $($disk.FullName)"
                         if (-not $DryRun) {
                             Remove-Item -LiteralPath $disk.FullName -Force -ErrorAction Continue
                         }
@@ -364,7 +364,7 @@ function Invoke-VMSetup {
             # check-suppress:suppression_doc: probe -- no disk images may exist; foreach handles empty result.
             foreach ($disk in Get-ChildItem -LiteralPath $dataDir -Filter '*.qcow2' -ErrorAction SilentlyContinue) {
                 if ($disk.Name -notin $keep) {
-                    Write-Information "vm-setup: GC — removing non-provisioned disk image: $($disk.FullName)"
+                    Write-NucleusInfo -CommandName vm-setup "GC — removing non-provisioned disk image: $($disk.FullName)"
                     if (-not $DryRun) {
                         Remove-Item -LiteralPath $disk.FullName -Force -ErrorAction Continue
                     }
@@ -389,7 +389,7 @@ function Invoke-VMSetup {
                     if (-not (Test-Path -LiteralPath $markerPath -PathType Leaf)) {
                         continue
                     }
-                    Write-Information "vm-setup: GC — removing orphaned guest marker: $markerPath"
+                    Write-NucleusInfo -CommandName vm-setup "GC — removing orphaned guest marker: $markerPath"
                     if (-not $DryRun) {
                         Remove-Item -LiteralPath $markerPath -Force -ErrorAction Continue
                     }
@@ -404,7 +404,7 @@ function Invoke-VMSetup {
             )) {
                 $basePath = $marker.FullName -replace '\.vm-provision-sha256$'
                 if (-not (Test-Path -LiteralPath $basePath -PathType Leaf)) {
-                    Write-Information "vm-setup: GC — removing orphaned provision marker: $($marker.FullName)"
+                    Write-NucleusInfo -CommandName vm-setup "GC — removing orphaned provision marker: $($marker.FullName)"
                     if (-not $DryRun) {
                         Remove-Item -LiteralPath $marker.FullName -Force -ErrorAction Continue
                     }
@@ -694,7 +694,7 @@ function Invoke-VMSetup {
         $orphanDescriptors = Get-ChildItem -LiteralPath $vmDir -File -Filter '*.vm.json' -ErrorAction SilentlyContinue |
             Where-Object { $_.BaseName -notin $ExpectedNames }
         foreach ($descriptor in $orphanDescriptors) {
-            Write-Information "vm-setup: GC — removing orphaned VM descriptor: $($descriptor.FullName)"
+            Write-NucleusInfo -CommandName vm-setup "GC — removing orphaned VM descriptor: $($descriptor.FullName)"
             if (-not $DryRun) {
                 Remove-Item -LiteralPath $descriptor.FullName -Force
             }
@@ -747,7 +747,7 @@ function Invoke-VMSetup {
 
         $descriptorPath = Join-Path $vmDir "$($Vm.id).vm.json"
         if ($DryRun) {
-            Write-Information "vm-setup: [dry-run] Write VM descriptor: $descriptorPath"
+            Write-NucleusDryRun -CommandName vm-setup "Write VM descriptor: $descriptorPath"
             return
         }
 
@@ -813,7 +813,7 @@ function Invoke-VMSetup {
         if ($null -ne $Vm.Windows) { $descriptor['Windows'] = $Vm.Windows }
 
         $descriptor | ConvertTo-Json -Depth 8 | Set-Content -Path $descriptorPath -Encoding UTF8
-        Write-Information "vm-setup: VM descriptor written: $descriptorPath"
+        Write-NucleusInfo -CommandName vm-setup "VM descriptor written: $descriptorPath"
     }
 
     function Invoke-VMWriteStartHelper {
@@ -851,10 +851,10 @@ function Invoke-VMSetup {
             $content = $content.Replace('__HOSTFWDS__', $hostFwds)
             $startPs1 = Join-Path $ScriptsDir "start-$($Vm.id).ps1"
             if ($DryRun) {
-                Write-Information "vm-setup: [dry-run] Write start script: $startPs1"
+                Write-NucleusDryRun -CommandName vm-setup "Write start script: $startPs1"
             } else {
                 Set-Content -Path $startPs1 -Value $content -Encoding UTF8
-                Write-Information "vm-setup: start script written: $startPs1"
+                Write-NucleusInfo -CommandName vm-setup "start script written: $startPs1"
             }
             return
         }
@@ -938,11 +938,11 @@ function Invoke-VMSetup {
         }
 
         if ($DryRun) {
-            Write-Information "vm-setup: [dry-run] Write start scripts: $startPs1Path, $startShPath"
+            Write-NucleusDryRun -CommandName vm-setup "Write start scripts: $startPs1Path, $startShPath"
         } else {
             Set-Content -Path $startPs1Path -Value $startContentPs1 -Encoding UTF8
             Set-Content -Path $startShPath -Value $startContentSh -Encoding UTF8
-            Write-Information "vm-setup: start scripts written: $startPs1Path, $startShPath"
+            Write-NucleusInfo -CommandName vm-setup "start scripts written: $startPs1Path, $startShPath"
         }
     }
 
@@ -965,13 +965,13 @@ function Invoke-VMSetup {
             return
         }
         if ($DryRun) {
-            Write-Information "vm-setup: [dry-run] Write stop script: $stopPs1"
+            Write-NucleusDryRun -CommandName vm-setup "Write stop script: $stopPs1"
             return
         }
         $template = Get-Content -Path $stopTemplatePath -Raw
         $content = $template.Replace('__HOST_KIND__', 'windows-qemu').Replace('__VM_ID__', $Vm.id)
         Set-Content -Path $stopPs1 -Value $content -Encoding UTF8
-        Write-Information "vm-setup: stop script written: $stopPs1"
+        Write-NucleusInfo -CommandName vm-setup "stop script written: $stopPs1"
     }
 
     function Invoke-VMWritePackUnpackHelper {
@@ -981,7 +981,7 @@ function Invoke-VMSetup {
         )
 
         if ($DryRun) {
-            Write-Information "vm-setup: [dry-run] Write pack/unpack helper scripts under $ScriptsDir"
+            Write-NucleusDryRun -CommandName vm-setup "Write pack/unpack helper scripts under $ScriptsDir"
             return
         }
         New-Item -ItemType Directory -Path $ScriptsDir -Force > $null
@@ -993,14 +993,14 @@ function Invoke-VMSetup {
         Set-Content -Path (Join-Path $ScriptsDir 'unpack.sh') -Value $unpackSh -Encoding UTF8
         Set-Content -Path (Join-Path $ScriptsDir 'pack.ps1') -Value $packPs1 -Encoding UTF8
         Set-Content -Path (Join-Path $ScriptsDir 'unpack.ps1') -Value $unpackPs1 -Encoding UTF8
-        Write-Information "vm-setup: pack/unpack helper scripts written: $ScriptsDir"
+        Write-NucleusInfo -CommandName vm-setup "pack/unpack helper scripts written: $ScriptsDir"
     }
 
     . (Join-Path -Path $RepoRoot -ChildPath 'src\platforms\Windows\modules\SizeStrings.ps1')
 
     $manifest = Join-Path $RepoRoot 'src\modules\VMs.json'
     if (-not (Test-Path $manifest)) {
-        Write-Information "vm-setup: manifest not found at $manifest; skipping"
+        Write-NucleusInfo -CommandName vm-setup "manifest not found at $manifest; skipping"
         return
     }
 
@@ -1033,12 +1033,12 @@ function Invoke-VMSetup {
         $sshPublicKey = Get-VMGuestSshPublicKey -RepoRoot $RepoRoot -Username $guestCredential.AccountName
         if ($null -ne $sshPublicKey) {
             $env:NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY = $sshPublicKey
-            Write-Information "vm-setup: SSH public key exported for NixOS guest provisioning"
+            Write-NucleusInfo -CommandName vm-setup "SSH public key exported for NixOS guest provisioning"
         } else {
             Write-Warning "vm-setup: no SSH public key found; NixOS guest will use password auth only"
         }
 
-        Write-Information "vm-setup: guest credential policy active (owner=$($guestCredential.Owner), username=$guestUsername, source=SOPS)"
+        Write-NucleusInfo -CommandName vm-setup "guest credential policy active (owner=$($guestCredential.Owner), username=$guestUsername, source=SOPS)"
     }
 
     if (-not $DryRun) {
@@ -1050,25 +1050,25 @@ function Invoke-VMSetup {
         }
         New-Item -ItemType Directory -Path (Join-Path $vmDir 'scripts') -Force > $null
     } else {
-        Write-Information "vm-setup: [dry-run] New-Item Directory $vmDir"
-        Write-Information "vm-setup: [dry-run] New-Item Directory $srcDir"
-        Write-Information "vm-setup: [dry-run] New-Item Directory $dataDir"
+        Write-NucleusDryRun -CommandName vm-setup "New-Item Directory $vmDir"
+        Write-NucleusDryRun -CommandName vm-setup "New-Item Directory $srcDir"
+        Write-NucleusDryRun -CommandName vm-setup "New-Item Directory $dataDir"
         foreach ($vmType in @($vmDef.VMs | ForEach-Object { $_.type } | Sort-Object -Unique)) {
-            Write-Information "vm-setup: [dry-run] New-Item Directory $(Get-VMTypeSrcDir -SrcDir $srcDir -Type $vmType)"
+            Write-NucleusDryRun -CommandName vm-setup "New-Item Directory $(Get-VMTypeSrcDir -SrcDir $srcDir -Type $vmType)"
         }
-        Write-Information "vm-setup: [dry-run] New-Item Directory $(Join-Path $vmDir 'scripts')"
+        Write-NucleusDryRun -CommandName vm-setup "New-Item Directory $(Join-Path $vmDir 'scripts')"
     }
 
     $vmReadmePath = Join-Path $vmDir 'README.md'
     $vmReadmeTemplate = Join-Path $templatesDir 'README.md'
     if ($DryRun) {
-        Write-Information "vm-setup: [dry-run] Write VM directory guide: $vmReadmePath"
+        Write-NucleusDryRun -CommandName vm-setup "Write VM directory guide: $vmReadmePath"
     } elseif (Test-Path -LiteralPath $vmReadmeTemplate -PathType Leaf) {
         $vmDirShort = $vmDir -replace [regex]::Escape($env:USERPROFILE), '%USERPROFILE%'
         (Get-Content -Path $vmReadmeTemplate -Raw) `
             -replace '__VM_DIR_DISPLAY__', $vmDirShort `
             | Set-Content -Path $vmReadmePath -Encoding UTF8
-        Write-Information "vm-setup: VM directory guide written: $vmReadmePath (template)"
+        Write-NucleusInfo -CommandName vm-setup "VM directory guide written: $vmReadmePath (template)"
     } else {
         Write-Warning "vm-setup: README template not found at $vmReadmeTemplate; writing minimal guide"
         # check-suppress:embedded-content: exception 2 (trivial static content) -- README fallback under 10 lines
@@ -1088,15 +1088,15 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             $whpxFeature = Get-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -ErrorAction Stop
             if ($whpxFeature.State -eq 'Enabled') {
                 $Accelerator = 'whpx'
-                Write-Information 'vm-setup: WHPX detected; using whpx accelerator for faster VM builds'
+                Write-NucleusInfo -CommandName vm-setup 'WHPX detected; using whpx accelerator for faster VM builds'
             } else {
                 Write-Warning 'vm-setup: WHPX is not enabled; using slow tcg accelerator. Enable for faster builds:'
-                Write-Information 'vm-setup:   Enable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -NoRestart'
+                Write-NucleusInfo -CommandName vm-setup '  Enable-WindowsOptionalFeature -Online -FeatureName HypervisorPlatform -NoRestart'
             }
         } catch {
             # Get-WindowsOptionalFeature requires elevation; skip detection and keep tcg.
             # Source: https://learn.microsoft.com/en-us/powershell/module/dism/get-windowsoptionalfeature
-            Write-Information 'vm-setup: cannot detect WHPX (requires elevation); defaulting to tcg'
+            Write-NucleusInfo -CommandName vm-setup 'cannot detect WHPX (requires elevation); defaulting to tcg'
         }
     }
 
@@ -1128,7 +1128,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         )
         foreach ($stale in $staleScripts) {
             if ($DryRun) {
-                Write-Information "vm-sync: [dry-run] Remove-Item '$($stale.FullName)' -Force"
+                Write-NucleusDryRun -CommandName vm-sync "Remove-Item '$($stale.FullName)' -Force"
             } else {
                 Remove-Item -LiteralPath $stale.FullName -Force
             }
@@ -1143,7 +1143,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         Invoke-VMWriteDescriptor -Vm $vm -RepoRoot $RepoRoot
         Invoke-VMWriteStartHelper -Vm $vm -QemuDir $scoopQemuDir -ScriptsDir $scriptsDir -TemplatesDir $templatesDir
         Invoke-VMWriteStopHelper -Vm $vm -ScriptsDir $scriptsDir -TemplatesDir $templatesDir
-        Write-Information "vm-sync: VM '$($vm.name)' scripts ready"
+        Write-NucleusInfo -CommandName vm-sync "VM '$($vm.name)' scripts ready"
     }
 
     Invoke-VMWritePackUnpackHelper -ScriptsDir $scriptsDir
@@ -1157,7 +1157,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
     }
 
     if ($SyncOnly) {
-        Write-Information 'vm-sync: Windows VM config refresh complete'
+        Write-NucleusInfo -CommandName vm-sync 'Windows VM config refresh complete'
         return
     }
     }
@@ -1175,7 +1175,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 Where-Object { $_.Name -like '.*' } |
                 ForEach-Object {
                     Remove-Item $_.FullName -Recurse -Force
-                    Write-Information "vm-setup: removing stale temporary build directory: $($typeDir.Name)/$($_.Name)"
+                    Write-NucleusInfo -CommandName vm-setup "removing stale temporary build directory: $($typeDir.Name)/$($_.Name)"
                 }
         }
     }
@@ -1238,20 +1238,20 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 # Android group (gsiUrl) and cannot be automated here; the
                 # writable data/<id>.qcow2 userdata disk is provisioned in
                 # Phase 2.
-                Write-Information "vm-setup: Android image must be obtained from the manifest Android group (gsiUrl); place system/GSI images under $(Get-VMTypeSrcDir -SrcDir $srcDir -Type 'Android')"
+                Write-NucleusInfo -CommandName vm-setup "Android image must be obtained from the manifest Android group (gsiUrl); place system/GSI images under $(Get-VMTypeSrcDir -SrcDir $srcDir -Type 'Android')"
             }
             'macOS' {
-                Write-Information "vm-setup: macOS image must be obtained manually (licensing restricts automation)"
+                Write-NucleusInfo -CommandName vm-setup "macOS image must be obtained manually (licensing restricts automation)"
             }
             default {
-                Write-Information "vm-setup: skipping build for type '$buildType' (unsupported type)"
+                Write-NucleusInfo -CommandName vm-setup "skipping build for type '$buildType' (unsupported type)"
             }
         }
     }
 
     if ($BuildSystemType) {
         # Build-only mode: the type image build above is the entire request.
-        Write-Information "vm-setup: system image build complete for type '$BuildSystemType'"
+        Write-NucleusInfo -CommandName vm-setup "system image build complete for type '$BuildSystemType'"
         return
     }
 
@@ -1265,14 +1265,14 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
 
     foreach ($vm in $vmDef.VMs) {
         if (-not (Test-VMEnabled -Vm $vm)) {
-            Write-Information "vm-setup: VM '$($vm.id)' is disabled in manifest; skipping"
+            Write-NucleusInfo -CommandName vm-setup "VM '$($vm.id)' is disabled in manifest; skipping"
             continue
         }
 
         # Apply host-scoping filter.  VMs that list a hosts array that does
         # not include the current NUCLEUS_HOST are skipped.
         if (-not (Test-VMHostMatch -Vm $vm)) {
-            Write-Information "vm-setup: VM '$($vm.id)' is not available on host '$env:NUCLEUS_HOST'; skipping"
+            Write-NucleusInfo -CommandName vm-setup "VM '$($vm.id)' is not available on host '$env:NUCLEUS_HOST'; skipping"
             continue
         }
 
@@ -1287,7 +1287,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         # Data-preservation invariants: an existing valid data disk is never
         # recreated/truncated during setup; provision drift (missing or stale
         # marker) warns for in-place injection only (never auto-wipes).
-        Write-Information "vm-setup: configuring VM '$($vm.name)'..."
+        Write-NucleusInfo -CommandName vm-setup "configuring VM '$($vm.name)'..."
 
         $minSizeBytes = ConvertFrom-SizeString $vm.minImageSize
         $systemImage = Get-VMSrcPath -SrcDir $srcDir -Type $vm.type -Leaf $VM_SYSTEM_IMAGE
@@ -1303,7 +1303,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             $userdataProvisionHash = Get-VMProvisionHash -Vm $vm -GuestSecretHash $guestSecretHash -RepoRoot $RepoRoot
             if (-not (Test-Path -LiteralPath $userdataPath -PathType Leaf)) {
                 $diskBytes = ConvertFrom-SizeString $vm.diskSize
-                Write-Information "vm-setup: Android userdata disk missing; creating $userdataPath"
+                Write-NucleusInfo -CommandName vm-setup "Android userdata disk missing; creating $userdataPath"
                 if (-not $DryRun) {
                     if ($null -eq $qemuImg) {
                         Write-Warning "vm-setup: qemu-img not found; cannot create Android userdata disk for '$($vm.id)'"
@@ -1315,21 +1315,21 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                         Set-Content -Path $userdataProvisionMarker -Value $userdataProvisionHash -Encoding UTF8
                     }
                 } else {
-                    Write-Information "vm-setup: [dry-run] qemu-img create -f qcow2 '$userdataPath' '$diskBytes'"
-                    Write-Information "vm-setup: [dry-run] Set-Content '$userdataProvisionMarker' '$userdataProvisionHash'"
+                    Write-NucleusDryRun -CommandName vm-setup "qemu-img create -f qcow2 '$userdataPath' '$diskBytes'"
+                    Write-NucleusDryRun -CommandName vm-setup "Set-Content '$userdataProvisionMarker' '$userdataProvisionHash'"
                 }
             } else {
-                Write-Information "vm-setup: Android userdata disk already exists: $userdataPath"
+                Write-NucleusInfo -CommandName vm-setup "Android userdata disk already exists: $userdataPath"
                 if (-not (Test-VMMarker -ExpectedHash $userdataProvisionHash -MarkerPath $userdataProvisionMarker)) {
                     # WHY: Android userdata is created empty and never
                     # injected; a missing or stale marker only means the
                     # inputs changed, so adopt it (marker adoption only, no
                     # injection, no drift report).
-                    Write-Information "vm-setup: refreshing provision marker for Android userdata '$($vm.id)'"
+                    Write-NucleusInfo -CommandName vm-setup "refreshing provision marker for Android userdata '$($vm.id)'"
                     if (-not $DryRun) {
                         Set-Content -Path $userdataProvisionMarker -Value $userdataProvisionHash -Encoding UTF8
                     } else {
-                        Write-Information "vm-setup: [dry-run] Set-Content '$userdataProvisionMarker' '$userdataProvisionHash'"
+                        Write-NucleusDryRun -CommandName vm-setup "Set-Content '$userdataProvisionMarker' '$userdataProvisionHash'"
                     }
                 }
             }
@@ -1344,7 +1344,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
             $systemOverlayProvisionMarker = Get-VMProvisionMarkerPath -BasePath $systemOverlayPath
             if (-not (Test-Path -LiteralPath $systemOverlayPath -PathType Leaf)) {
                 if ($systemImageValid) {
-                    Write-Information "vm-setup: Android system overlay missing; creating $systemOverlayPath"
+                    Write-NucleusInfo -CommandName vm-setup "Android system overlay missing; creating $systemOverlayPath"
                     if (-not $DryRun) {
                         if ($null -eq $qemuImg) {
                             Write-Warning "vm-setup: qemu-img not found; cannot create Android system overlay for '$($vm.id)'"
@@ -1356,24 +1356,24 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                             Set-Content -Path $systemOverlayProvisionMarker -Value $userdataProvisionHash -Encoding UTF8
                         }
                     } else {
-                        Write-Information "vm-setup: [dry-run] qemu-img create -f qcow2 -b '$systemImage' -F qcow2 '$systemOverlayPath'"
-                        Write-Information "vm-setup: [dry-run] Set-Content '$systemOverlayProvisionMarker' '$userdataProvisionHash'"
+                        Write-NucleusDryRun -CommandName vm-setup "qemu-img create -f qcow2 -b '$systemImage' -F qcow2 '$systemOverlayPath'"
+                        Write-NucleusDryRun -CommandName vm-setup "Set-Content '$systemOverlayProvisionMarker' '$userdataProvisionHash'"
                     }
                 } else {
                     Write-Warning "vm-setup: Android system image not found or invalid for '$($vm.id)': $systemImage; skipping system overlay"
                 }
             } else {
-                Write-Information "vm-setup: Android system overlay already exists: $systemOverlayPath"
+                Write-NucleusInfo -CommandName vm-setup "Android system overlay already exists: $systemOverlayPath"
                 if (-not (Test-VMMarker -ExpectedHash $userdataProvisionHash -MarkerPath $systemOverlayProvisionMarker)) {
                     # WHY: Android system overlay is derived from the base and
                     # never injected; a missing or stale marker only means the
                     # inputs changed, so adopt it (marker adoption only, no
                     # injection, no drift report).
-                    Write-Information "vm-setup: refreshing provision marker for Android system overlay '$($vm.id)'"
+                    Write-NucleusInfo -CommandName vm-setup "refreshing provision marker for Android system overlay '$($vm.id)'"
                     if (-not $DryRun) {
                         Set-Content -Path $systemOverlayProvisionMarker -Value $userdataProvisionHash -Encoding UTF8
                     } else {
-                        Write-Information "vm-setup: [dry-run] Set-Content '$systemOverlayProvisionMarker' '$userdataProvisionHash'"
+                        Write-NucleusDryRun -CommandName vm-setup "Set-Content '$systemOverlayProvisionMarker' '$userdataProvisionHash'"
                     }
                 }
             }
@@ -1392,13 +1392,13 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                         Write-Warning "vm-setup: UEFI NVRAM vars template not found: $firmwareVarsPath; cannot seed '$nvramImagePath'"
                     } elseif (-not $DryRun) {
                         Copy-Item -LiteralPath $firmwareVarsPath -Destination $nvramImagePath
-                        Write-Information "vm-setup: seeded per-VM UEFI NVRAM vars: $nvramImagePath"
+                        Write-NucleusInfo -CommandName vm-setup "seeded per-VM UEFI NVRAM vars: $nvramImagePath"
                     } else {
-                        Write-Information "vm-setup: [dry-run] Copy-Item '$firmwareVarsPath' '$nvramImagePath'"
+                        Write-NucleusDryRun -CommandName vm-setup "Copy-Item '$firmwareVarsPath' '$nvramImagePath'"
                     }
                 }
             } else {
-                Write-Information "vm-setup: per-VM UEFI NVRAM vars already exist: $nvramImagePath"
+                Write-NucleusInfo -CommandName vm-setup "per-VM UEFI NVRAM vars already exist: $nvramImagePath"
             }
             continue
         }
@@ -1415,7 +1415,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         # - data disk absent: create as an overlay on the system image
         if (Test-Path $diskPath) {
             if (Test-Qcow2Image -ImagePath $diskPath -ImageLabel "data disk '$($vm.id)'" -MinBytes $minSizeBytes) {
-                Write-Information "vm-setup: data disk already exists: $diskPath"
+                Write-NucleusInfo -CommandName vm-setup "data disk already exists: $diskPath"
                 if (-not (Test-VMMarker -ExpectedHash $provisionHash -MarkerPath $diskProvisionMarker)) {
                     if (Test-VMProcessRunning -VmId $vm.id -VmDisplay $vm.name) {
                         Write-Warning "vm-setup: VM '$($vm.id)' is running; skipping in-place injection (applies on next setup)"
@@ -1427,7 +1427,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 Write-Warning "vm-setup: data disk is invalid for '$($vm.id)': $diskPath; run 'nucleus-vm reset $($vm.id)' to recreate it (data preserved)"
             }
         } elseif ($systemImageValid) {
-            Write-Information "vm-setup: using system image: $systemImage"
+            Write-NucleusInfo -CommandName vm-setup "using system image: $systemImage"
             if (-not $DryRun) {
                 if ($null -eq $qemuImg) {
                     Write-Warning "vm-setup: qemu-img not found; cannot create data disk for '$($vm.id)'"
@@ -1439,8 +1439,8 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                 }
                 Set-Content -Path $diskProvisionMarker -Value $provisionHash -Encoding UTF8
             } else {
-                Write-Information "vm-setup: [dry-run] qemu-img create -f qcow2 -b '$backing' -F qcow2 '$diskPath'"
-                Write-Information "vm-setup: [dry-run] Set-Content '$diskProvisionMarker' '$provisionHash'"
+                Write-NucleusDryRun -CommandName vm-setup "qemu-img create -f qcow2 -b '$backing' -F qcow2 '$diskPath'"
+                Write-NucleusDryRun -CommandName vm-setup "Set-Content '$diskProvisionMarker' '$provisionHash'"
             }
         } else {
             Write-Warning "vm-setup: system image not found or invalid for '$($vm.id)': $systemImage; skipping"
@@ -1451,7 +1451,7 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         $diskBytes = ConvertFrom-SizeString $vm.diskSize
         $dataDiskSize = Get-VMQcow2VirtualSize -ImagePath $diskPath
         if ($dataDiskSize -gt 0 -and $diskBytes -gt $dataDiskSize) {
-            Write-Information "vm-setup: growing data disk '$($vm.id)' from $dataDiskSize to $diskBytes bytes (grow-only)"
+            Write-NucleusInfo -CommandName vm-setup "growing data disk '$($vm.id)' from $dataDiskSize to $diskBytes bytes (grow-only)"
             if (-not $DryRun) {
                 if ($null -eq $qemuImg) {
                     Write-Warning "vm-setup: qemu-img not found; cannot grow data disk for '$($vm.id)'"
@@ -1462,13 +1462,13 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
                     }
                 }
             } else {
-                Write-Information "vm-setup: [dry-run] qemu-img resize '$diskPath' '$diskBytes'"
+                Write-NucleusDryRun -CommandName vm-setup "qemu-img resize '$diskPath' '$diskBytes'"
             }
         }
     }
 
     if ($Gc) {
-        Write-Information 'vm-setup: GC — scanning for non-provisioned VM artifacts...'
+        Write-NucleusInfo -CommandName vm-setup 'GC — scanning for non-provisioned VM artifacts...'
         if ($GcDisabled) {
             # WHY: -GcDisabled opts into clearing disabled entries, so only
             # enabled-and-host-matched names are expected.
@@ -1488,13 +1488,13 @@ This directory stores VM artifacts managed by `nucleus-vm setup`.
         Invoke-GcOrphanDisk -ExpectedNames $expectedNames
         Invoke-GcOrphanMarker -ExpectedNames $expectedNames
         Invoke-GcOrphanDescriptor -ExpectedNames $expectedNames
-        Write-Information 'vm-setup: GC — done'
+        Write-NucleusInfo -CommandName vm-setup 'GC — done'
     }
 
-    Write-Information 'vm-setup: Windows VM setup complete'
-    Write-Information "vm-setup: Disk images at: $vmDir"
-    Write-Information "vm-setup: VM directory guide at: $vmReadmePath"
-    Write-Information "vm-setup: Run the generated scripts/start-<name>.ps1 (or scripts/start-<name>.sh) scripts to launch VMs"
+    Write-NucleusInfo -CommandName vm-setup 'Windows VM setup complete'
+    Write-NucleusInfo -CommandName vm-setup "Disk images at: $vmDir"
+    Write-NucleusInfo -CommandName vm-setup "VM directory guide at: $vmReadmePath"
+    Write-NucleusInfo -CommandName vm-setup "Run the generated scripts/start-<name>.ps1 (or scripts/start-<name>.sh) scripts to launch VMs"
 }
 
 function Invoke-VMSystemBuild {
@@ -1647,7 +1647,7 @@ function Invoke-BuildNixosImage {
     if (Test-Path $outPath) {
         if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing NixOS image' -MinBytes $MinSize) {
             if (Test-VMMarker -ExpectedHash $typeImageHash -MarkerPath $typeConfigMarkerPath) {
-                Write-Information "vm-setup: NixOS image already built for '$VmName' with the current guest config and credentials (username=$GuestAccountName): $outPath"
+                Write-NucleusInfo -CommandName vm-setup "NixOS image already built for '$VmName' with the current guest config and credentials (username=$GuestAccountName): $outPath"
                 return
             }
             Write-Warning "vm-setup: NixOS image guest config/credential drift detected; rebuilding image: $outPath"
@@ -1670,11 +1670,11 @@ function Invoke-BuildNixosImage {
     $packerDir = Join-Path $VmsDir 'NixOS'
     $tmpOutput = Get-VMSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_PACKER_BUILD_DIR
 
-    Write-Information "vm-setup: building NixOS image for '$VmName' (accelerator=$Accelerator)..."
+    Write-NucleusInfo -CommandName vm-setup "building NixOS image for '$VmName' (accelerator=$Accelerator)..."
 
     if ($DryRun) {
-        Write-Information "vm-setup: [dry-run] Remove stale temporary output directory if present: $tmpOutput"
-        Write-Information "vm-setup: [dry-run] cd $packerDir; packer init .; packer build -var accelerator=$Accelerator -var disk_size=${DiskBytes} -var guest_username=$GuestAccountName -var guest_password=<redacted> -var output_directory=$tmpOutput ."
+        Write-NucleusDryRun -CommandName vm-setup "Remove stale temporary output directory if present: $tmpOutput"
+        Write-NucleusDryRun -CommandName vm-setup "cd $packerDir; packer init .; packer build -var accelerator=$Accelerator -var disk_size=${DiskBytes} -var guest_username=$GuestAccountName -var guest_password=<redacted> -var output_directory=$tmpOutput ."
         return
     }
 
@@ -1722,7 +1722,7 @@ function Invoke-BuildNixosImage {
         return
     }
 
-    Write-Information "vm-setup: NixOS image ready: $outPath"
+    Write-NucleusInfo -CommandName vm-setup "NixOS image ready: $outPath"
 }
 
 # Invoke-FidoWindowsIso — Download a Windows 11 ISO using vendor/Fido/Fido.ps1
@@ -1754,7 +1754,7 @@ function Invoke-FidoWindowsIso {
     $cachedIso = Join-Path $TypeSrcDir $VM_WINDOWS_INSTALLER_ISO
 
     if ($DryRun) {
-        Write-Information "vm-setup: [dry-run] & '$fidoScript' -Win 11 -Ed $Edition -Lang English -Arch x64 -Download -NoPrompt"
+        Write-NucleusDryRun -CommandName vm-setup "& '$fidoScript' -Win 11 -Ed $Edition -Lang English -Arch x64 -Download -NoPrompt"
         return $cachedIso
     }
 
@@ -1763,7 +1763,7 @@ function Invoke-FidoWindowsIso {
         return ''
     }
 
-    Write-Information "vm-setup: downloading Windows 11 ISO via Fido (edition=$Edition)..."
+    Write-NucleusInfo -CommandName vm-setup "downloading Windows 11 ISO via Fido (edition=$Edition)..."
     # Run Fido in a temp dir; it downloads the ISO to the working directory.
     # Source: https://github.com/pbatard/Fido#usage
     $tmpDir = New-TemporaryFile | ForEach-Object { Remove-Item $_; New-Item -ItemType Directory -Path $_ }
@@ -1775,7 +1775,7 @@ function Invoke-FidoWindowsIso {
             try {
                 $fidoOutput = & $fidoScript -Win 11 -Ed $Edition -Lang English -Arch x64 -Download -NoPrompt 2>&1
                 if ($fidoOutput) {
-                    $fidoOutput | ForEach-Object { Write-Information "$_" }
+                    $fidoOutput | ForEach-Object { Write-Output "$_" }
                 }
                 if ($LASTEXITCODE -eq 0) {
                     break
@@ -1808,7 +1808,7 @@ function Invoke-FidoWindowsIso {
         }
 
         Move-Item $downloadedIso.FullName $cachedIso
-        Write-Information "vm-setup: Windows ISO downloaded: $cachedIso"
+        Write-NucleusInfo -CommandName vm-setup "Windows ISO downloaded: $cachedIso"
         return $cachedIso
     } finally {
         # check-suppress:suppression_doc: cleanup-after-failure in finally block; temp-dir removal is best-effort.
@@ -1859,7 +1859,7 @@ function Invoke-BuildWindowsImage {
     if (Test-Path $outPath) {
         if (Test-Qcow2Image -ImagePath $outPath -ImageLabel 'existing Windows image' -MinBytes $MinSize) {
             if (Test-VMMarker -ExpectedHash $typeImageHash -MarkerPath $typeConfigMarkerPath) {
-                Write-Information "vm-setup: Windows image already built for the current guest config and credentials (username=$GuestAccountName): $outPath"
+                Write-NucleusInfo -CommandName vm-setup "Windows image already built for the current guest config and credentials (username=$GuestAccountName): $outPath"
                 return
             }
             Write-Warning "vm-setup: Windows image guest config/credential drift detected; rebuilding image: $outPath"
@@ -1876,18 +1876,18 @@ function Invoke-BuildWindowsImage {
         return
     }
 
-    Write-Information "vm-setup: Windows ISO fallback order: cached installer -> Windows.isoUrl -> downloader ($WindowsIsoSource mode)"
+    Write-NucleusInfo -CommandName vm-setup "Windows ISO fallback order: cached installer -> Windows.isoUrl -> downloader ($WindowsIsoSource mode)"
 
     $cachedIso = Get-VMSrcPath -SrcDir $SrcDir -Type $vmType -Leaf $VM_WINDOWS_INSTALLER_ISO
     if (-not $WindowsIso -and (Test-Path $cachedIso)) {
-        Write-Information "vm-setup: using cached Windows installer: $cachedIso"
+        Write-NucleusInfo -CommandName vm-setup "using cached Windows installer: $cachedIso"
         $WindowsIso = $cachedIso
     }
 
     # Resolve the installer ISO: use -WindowsIso if provided, otherwise try the
     # VMs.json Windows.isoUrl field as a download source.
     if (-not $WindowsIso -and $WindowsIsoSource -ne 'Fido' -and $WindowsIsoUrl) {
-        Write-Information "vm-setup: downloading Windows installer from Windows.isoUrl..."
+        Write-NucleusInfo -CommandName vm-setup "downloading Windows installer from Windows.isoUrl..."
         if (-not $DryRun) {
             # Use curl.exe (available on Windows 10 1803+) for large ISO downloads;
             # Invoke-WebRequest buffers the full file in memory before writing to disk.
@@ -1927,9 +1927,9 @@ function Invoke-BuildWindowsImage {
             }
 
             $WindowsIso = $cachedIso
-            Write-Information "vm-setup: Windows installer downloaded: $cachedIso"
+            Write-NucleusInfo -CommandName vm-setup "Windows installer downloaded: $cachedIso"
         } else {
-            Write-Information "vm-setup: [dry-run] curl.exe -fL -o $cachedIso $WindowsIsoUrl"
+            Write-NucleusDryRun -CommandName vm-setup "curl.exe -fL -o $cachedIso $WindowsIsoUrl"
         }
     }
 
@@ -1945,10 +1945,10 @@ function Invoke-BuildWindowsImage {
     # If ISO is still empty after all resolution attempts, fail with instructions.
     if (-not $WindowsIso) {
         if ($WindowsIsoSource -eq 'Url') {
-            Write-Information 'vm-setup: windowsIsoSource=Url selected and no cached URL-based installer was resolved'
+            Write-NucleusInfo -CommandName vm-setup 'windowsIsoSource=Url selected and no cached URL-based installer was resolved'
         }
-        Write-Information 'vm-setup: alternatively set "Windows": { "isoUrl": "<url>" } on the VMs.json Windows entry'
-        Write-Information 'vm-setup: download from: https://www.microsoft.com/software-download/windows11'
+        Write-NucleusInfo -CommandName vm-setup 'alternatively set "Windows": { "isoUrl": "<url>" } on the VMs.json Windows entry'
+        Write-NucleusInfo -CommandName vm-setup 'download from: https://www.microsoft.com/software-download/windows11'
         return
     }
 
@@ -2002,9 +2002,9 @@ function Invoke-BuildWindowsImage {
     }
 
     if ($efiCode -and $efiVars) {
-        Write-Information "vm-setup: EFI firmware detected ($efiCode, $efiVars) but BIOS-only build policy is active"
+        Write-NucleusInfo -CommandName vm-setup "EFI firmware detected ($efiCode, $efiVars) but BIOS-only build policy is active"
     } else {
-        Write-Information 'vm-setup: EFI firmware not detected; using BIOS-only build attempts'
+        Write-NucleusInfo -CommandName vm-setup 'EFI firmware not detected; using BIOS-only build attempts'
     }
 
     # check-suppress:suppression_doc: Packer HCL bool vars are easiest to pass as explicit true/false
@@ -2034,27 +2034,27 @@ function Invoke-BuildWindowsImage {
         }
     }
 
-    Write-Information "vm-setup: building Windows 11 image (disk=${DiskBytes} bytes, accelerator=$Accelerator)..."
-    Write-Information 'vm-setup: this takes ~30-90 minutes; VirtIO drivers are downloaded from the internet'
+    Write-NucleusInfo -CommandName vm-setup "building Windows 11 image (disk=${DiskBytes} bytes, accelerator=$Accelerator)..."
+    Write-NucleusInfo -CommandName vm-setup 'this takes ~30-90 minutes; VirtIO drivers are downloaded from the internet'
     if ($Headful) {
-        Write-Information 'vm-setup: debug mode enabled; running Windows Packer build headful (headless=false)'
-        Write-Information "vm-setup: using QEMU display backend for debug run: $packerDisplayBackend"
+        Write-NucleusInfo -CommandName vm-setup 'debug mode enabled; running Windows Packer build headful (headless=false)'
+        Write-NucleusInfo -CommandName vm-setup "using QEMU display backend for debug run: $packerDisplayBackend"
     }
 
     if ($DryRun) {
-        Write-Information "vm-setup: [dry-run] Remove stale temporary output directory if present: $tmpOutput"
+        Write-NucleusDryRun -CommandName vm-setup "Remove stale temporary output directory if present: $tmpOutput"
         foreach ($attempt in $buildAttempts) {
             if ($attempt.Firmware -eq 'efi') {
                 if ($Headful) {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'Windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
+                    Write-NucleusDryRun -CommandName vm-setup "cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'Windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
                 } else {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'Windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
+                    Write-NucleusDryRun -CommandName vm-setup "cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'Windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var efi_firmware_code=$efiCode -var efi_firmware_vars=$efiVars -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
                 }
             } else {
                 if ($Headful) {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'Windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
+                    Write-NucleusDryRun -CommandName vm-setup "cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'Windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var display_backend=$packerDisplayBackend -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
                 } else {
-                    Write-Information "vm-setup: [dry-run] cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'Windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
+                    Write-NucleusDryRun -CommandName vm-setup "cd $packerDir; packer build -var windows_iso=$WindowsIso -var guest_username=$GuestAccountName -var guest_password=<redacted> -var hostfwd=$HostFwds -var guest_hostname=$GuestHostname -var autounattend_path=$(Join-Path $VmsDir 'Windows\\Autounattend.xml') -var accelerator=$Accelerator -var firmware_mode=$($attempt.Firmware) -var boot_strategy=$($attempt.Boot) -var ssh_timeout=$($attempt.Timeout) -var headless=$packerHeadless -var disk_size=${DiskBytes} -var output_directory=$tmpOutput ."
                 }
             }
         }
@@ -2073,7 +2073,7 @@ function Invoke-BuildWindowsImage {
         $buildSucceeded = $false
         $builtTempDir = $null
         foreach ($attempt in $buildAttempts) {
-            Write-Information "vm-setup: Windows Packer attempt using firmware_mode=$($attempt.Firmware) boot_strategy=$($attempt.Boot) (ssh_timeout=$($attempt.Timeout))..."
+            Write-NucleusInfo -CommandName vm-setup "Windows Packer attempt using firmware_mode=$($attempt.Firmware) boot_strategy=$($attempt.Boot) (ssh_timeout=$($attempt.Timeout))..."
 
             # check-suppress:suppression_doc: Packer qemu builder requires output_directory to not already exist.
             # Use a fresh temp tree per attempt so a failed try cannot poison the
@@ -2089,7 +2089,7 @@ function Invoke-BuildWindowsImage {
             $autounattendContent = $autounattendContent.Replace('__NUCLEUS_GUEST_PASSWORD__', $GuestSecret)
             $autounattendContent = $autounattendContent.Replace('__GUEST_HOSTNAME__', $GuestHostname)
             Set-Content -Path $autounattendRendered -Value $autounattendContent -Encoding UTF8
-            Write-Information "vm-setup: writing Packer debug log for this attempt: $packerLog"
+            Write-NucleusInfo -CommandName vm-setup "writing Packer debug log for this attempt: $packerLog"
 
             $packerArgs = @(
                 '-var', "windows_iso=$WindowsIso",
@@ -2220,5 +2220,5 @@ function Invoke-BuildWindowsImage {
         return
     }
 
-    Write-Information "vm-setup: Windows 11 image ready: $outPath"
+    Write-NucleusInfo -CommandName vm-setup "Windows 11 image ready: $outPath"
 }

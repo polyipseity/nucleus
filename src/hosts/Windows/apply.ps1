@@ -366,6 +366,10 @@ if (-not $Elevated) {
   exit $exitCode
 }
 
+# Format-NucleusOutput: shared F1 output formatting.  Must load before any
+# Sync-* / Invoke-* module that emits Write-Nucleus* messages.
+Import-Module (Join-Path -Path $resolvedModuleDir -ChildPath "Format-NucleusOutput.psm1")
+
 # Managed PATH data: canonical list of user-scope bin directories.
 # Must be loaded before any Sync-* or Invoke-* module that references
 # $nucleusPathComponents, $nucleusPrependRegistry, or Get-NucleusManagedBinDir.
@@ -894,7 +898,7 @@ if (Test-Path -LiteralPath $svcScript) {
   try {
     & $svcScript verify
   } catch {
-    Write-NucleusWarning "svc: some services are inactive (non-fatal; check Event Viewer for details)"
+    Write-NucleusWarning -CommandName svc "some services are inactive (non-fatal; check Event Viewer for details)"
   }
 }
 
@@ -907,14 +911,14 @@ Test-ArchivingStack > $null
 # missing or unreachable ollama binary is informational, not a hard failure,
 # because the system configuration has already been applied successfully.
 if ($NoAISync) {
-  Write-Output "ai: -NoAISync set; skipping post-apply model sync"
+  Write-NucleusInfo -CommandName ai "-NoAISync set; skipping post-apply model sync"
 } else {
   # check-suppress:suppression_doc: probe whether ollama is installed (may not be on first-provision hosts).
   $ollamaOnPath = Get-Command -Name "ollama" -ErrorAction SilentlyContinue
   if ($null -eq $ollamaOnPath) {
-    Write-Output "ai: ollama not found in PATH; skipping post-apply model sync"
+    Write-NucleusInfo -CommandName ai "ollama not found in PATH; skipping post-apply model sync"
   } else {
-    Write-Output "ai: running post-apply AI model sync..."
+    Write-NucleusInfo -CommandName ai "running post-apply AI model sync..."
     Invoke-AISync -RepoRoot $repoRoot -ServerReadyTimeoutSeconds 60
   }
 }
@@ -924,38 +928,38 @@ if ($NoAISync) {
 # retroactively fail a completed configuration convergence.
 
 if (-not $ReplicaSync) {
-  Write-Output "replica-sync: skipping post-apply replica sync (default; pass -ReplicaSync to run now)"
+  Write-NucleusInfo -CommandName replica-sync "skipping post-apply replica sync (default; pass -ReplicaSync to run now)"
 } else {
   # check-suppress:suppression_doc: probe -- rclone may be absent on first-provision hosts.
   $rcloneOnPath = Get-Command -Name "rclone" -ErrorAction SilentlyContinue
   if ($null -eq $rcloneOnPath) {
-    Write-Output "replica-sync: rclone not found in PATH; skipping post-apply replica sync"
+    Write-NucleusInfo -CommandName replica-sync "rclone not found in PATH; skipping post-apply replica sync"
   } else {
-    Write-Output "replica-sync: running post-apply replica sync..."
+    Write-NucleusInfo -CommandName replica-sync "running post-apply replica sync..."
     try {
       Invoke-ReplicaSync -RepoRoot $repoRoot
     } catch {
-      Write-Warning "replica-sync: replica sync incomplete (system apply succeeded): $($_.Exception.Message)"
+      Write-NucleusWarning -CommandName replica-sync "replica sync incomplete (system apply succeeded): $($_.Exception.Message)"
     }
   }
 }
 
 # Post-apply VM step: full setup (-VMSetup) or lightweight config sync (default).
 if ($VMSetup) {
-  Write-Output "vm-setup: running post-apply VM provisioning (setup)..."
+  Write-NucleusInfo -CommandName vm-setup "running post-apply VM provisioning (setup)..."
   try {
     Invoke-VMSetup -RepoRoot $repoRoot
   } catch {
-    Write-Warning "vm-setup: VM setup incomplete (system apply succeeded): $($_.Exception.Message)"
+    Write-NucleusWarning -CommandName vm-setup "VM setup incomplete (system apply succeeded): $($_.Exception.Message)"
   }
 } elseif ($NoVMSync) {
-  Write-Output "vm-sync: -NoVMSync set; skipping post-apply VM config refresh"
+  Write-NucleusInfo -CommandName vm-sync "-NoVMSync set; skipping post-apply VM config refresh"
 } else {
-  Write-Output "vm-sync: running post-apply VM config refresh..."
+  Write-NucleusInfo -CommandName vm-sync "running post-apply VM config refresh..."
   try {
     Invoke-VMSync -RepoRoot $repoRoot
   } catch {
-    Write-Warning "vm-sync: VM sync incomplete (system apply succeeded): $($_.Exception.Message)"
+    Write-NucleusWarning -CommandName vm-sync "VM sync incomplete (system apply succeeded): $($_.Exception.Message)"
   }
 }
 
@@ -964,13 +968,13 @@ if ($VMSetup) {
 # After all provisioning, GC can reclaim build artifacts, caches, and stale files.
 $gcScript = Join-Path -Path $repoRoot -ChildPath "scripts\gc.ps1"
 if (-not (Test-Path -LiteralPath $gcScript)) {
-  Write-Output "gc: scripts/gc.ps1 not found; skipping garbage collection"
+  Write-NucleusInfo -CommandName gc "scripts/gc.ps1 not found; skipping garbage collection"
 } else {
-  Write-Output "gc: running post-apply garbage collection..."
+  Write-NucleusInfo -CommandName gc "running post-apply garbage collection..."
   try {
     & $gcScript -ModuleDir $systemModuleDir -RepoRoot $repoRoot
   } catch {
-    Write-Warning "gc: GC incomplete (system apply succeeded): $($_.Exception.Message)"
+    Write-NucleusWarning -CommandName gc "GC incomplete (system apply succeeded): $($_.Exception.Message)"
   }
 }
 

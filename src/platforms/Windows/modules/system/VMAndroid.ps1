@@ -24,7 +24,7 @@ function Assert-AndroidTool {
 
   # check-suppress:suppression_doc: probe whether the host tool is on PATH; absence takes the error branch below.
   if (-not (Get-Command -Name $Name -ErrorAction SilentlyContinue)) {
-    Write-NucleusError "$Name is required but was not found in PATH"
+    Write-NucleusError -CommandName android-config "$Name is required but was not found in PATH"
     exit 1
   }
 }
@@ -92,7 +92,7 @@ function Invoke-AndroidWithBackoff {
       return $false
     }
     $sleepSeconds = [Math]::Min(30, [Math]::Pow(2, $attempt - 1))
-    Write-NucleusWarning "$Label failed (attempt $attempt/$MaxAttempts); retrying in ${sleepSeconds}s"
+    Write-NucleusWarning -CommandName android-config "$Label failed (attempt $attempt/$MaxAttempts); retrying in ${sleepSeconds}s"
     Start-Sleep -Seconds $sleepSeconds
     $attempt++
   }
@@ -133,7 +133,7 @@ function Get-AndroidAdbHostPort {
 
   $forward = @($Vm.portForwards | Where-Object { $_.guestPort -eq 5555 }) | Select-Object -First 1
   if ($null -eq $forward) {
-    Write-NucleusError 'no ADB port forward (guestPort 5555) in manifest'
+    Write-NucleusError -CommandName android-config 'no ADB port forward (guestPort 5555) in manifest'
     exit 1
   }
   return [string]$forward.hostPort
@@ -147,7 +147,7 @@ function Get-AndroidFastbootHostPort {
 
   $forward = @($Vm.portForwards | Where-Object { $_.guestPort -eq 5554 }) | Select-Object -First 1
   if ($null -eq $forward) {
-    Write-NucleusError 'no fastboot port forward (guestPort 5554) in manifest'
+    Write-NucleusError -CommandName android-config 'no fastboot port forward (guestPort 5554) in manifest'
     exit 1
   }
   return [string]$forward.hostPort
@@ -210,11 +210,11 @@ function Wait-AndroidFastboot {
 
   $serial = Get-AndroidFastbootSerial -Vm $Vm
   if ((Get-AndroidFastbootListState -Vm $Vm) -eq 'fastboot') {
-    Write-NucleusInfo "guest already in fastboot on $serial"
+    Write-NucleusInfo -CommandName android-config "guest already in fastboot on $serial"
     return $true
   }
 
-  Write-NucleusInfo "waiting for fastboot on $serial (timeout ${TimeoutSeconds}s)..."
+  Write-NucleusInfo -CommandName android-config "waiting for fastboot on $serial (timeout ${TimeoutSeconds}s)..."
   $elapsed = 0
   $lastHint = -30
   while ($elapsed -lt $TimeoutSeconds) {
@@ -222,14 +222,14 @@ function Wait-AndroidFastboot {
       return $true
     }
     if ($elapsed -ge ($lastHint + 30)) {
-      Write-NucleusInfo 'manual step: in LineageOS Recovery, open Advanced → Enter fastboot'
+      Write-NucleusInfo -CommandName android-config 'manual step: in LineageOS Recovery, open Advanced → Enter fastboot'
       $lastHint = $elapsed
     }
     Start-Sleep -Seconds 5
     $elapsed += 5
   }
 
-  Write-NucleusError "timed out waiting for fastboot on $serial; enter fastboot from recovery and retry"
+  Write-NucleusError -CommandName android-config "timed out waiting for fastboot on $serial; enter fastboot from recovery and retry"
   return $false
 }
 
@@ -299,7 +299,7 @@ function Wait-AndroidAdbAuthorized {
   )
 
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  Write-NucleusInfo "waiting for authorized ADB on $serial (timeout ${TimeoutSeconds}s)..."
+  Write-NucleusInfo -CommandName android-config "waiting for authorized ADB on $serial (timeout ${TimeoutSeconds}s)..."
   $elapsed = 0
   $lastUnauthMsg = -30
 
@@ -309,13 +309,13 @@ function Wait-AndroidAdbAuthorized {
       'device' { return $true }
       'unauthorized' {
         if ($elapsed -ge ($lastUnauthMsg + 30)) {
-          Write-NucleusInfo 'ADB unauthorized — boot LineageOS, enable USB debugging, and tap Allow on the device'
+          Write-NucleusInfo -CommandName android-config 'ADB unauthorized — boot LineageOS, enable USB debugging, and tap Allow on the device'
           $lastUnauthMsg = $elapsed
         }
       }
       { $_ -in @('recovery', 'sideload') } {
         if ($elapsed -ge ($lastUnauthMsg + 30)) {
-          Write-NucleusInfo "guest is in $state; boot LineageOS system for this step (Reboot system now from recovery)"
+          Write-NucleusInfo -CommandName android-config "guest is in $state; boot LineageOS system for this step (Reboot system now from recovery)"
           $lastUnauthMsg = $elapsed
         }
       }
@@ -326,10 +326,10 @@ function Wait-AndroidAdbAuthorized {
 
   $final = Get-AndroidAdbPollState -Vm $Vm
   if ($final -eq 'unauthorized') {
-    Write-NucleusError "timed out waiting for ADB authorization on $serial; boot LineageOS and tap Allow USB debugging"
+    Write-NucleusError -CommandName android-config "timed out waiting for ADB authorization on $serial; boot LineageOS and tap Allow USB debugging"
   }
   else {
-    Write-NucleusError "timed out waiting for authorized ADB on $serial"
+    Write-NucleusError -CommandName android-config "timed out waiting for authorized ADB on $serial"
   }
   return $false
 }
@@ -354,7 +354,7 @@ function Wait-AndroidAdbBootCompleted {
   )
 
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  Write-NucleusInfo "waiting for booted guest on $serial (timeout ${TimeoutSeconds}s)..."
+  Write-NucleusInfo -CommandName android-config "waiting for booted guest on $serial (timeout ${TimeoutSeconds}s)..."
   $elapsed = 0
   $lastHint = -30
 
@@ -366,19 +366,19 @@ function Wait-AndroidAdbBootCompleted {
           return $true
         }
         if ($elapsed -ge ($lastHint + 30)) {
-          Write-NucleusInfo 'guest ADB is up but still booting (waiting for sys.boot_completed=1)...'
+          Write-NucleusInfo -CommandName android-config 'guest ADB is up but still booting (waiting for sys.boot_completed=1)...'
           $lastHint = $elapsed
         }
       }
       'unauthorized' {
         if ($elapsed -ge ($lastHint + 30)) {
-          Write-NucleusInfo 'ADB unauthorized — boot LineageOS, enable USB debugging, and tap Allow on the device'
+          Write-NucleusInfo -CommandName android-config 'ADB unauthorized — boot LineageOS, enable USB debugging, and tap Allow on the device'
           $lastHint = $elapsed
         }
       }
       { $_ -in @('recovery', 'sideload') } {
         if ($elapsed -ge ($lastHint + 30)) {
-          Write-NucleusInfo "guest is in $state; boot LineageOS system for this step (Reboot system now from recovery)"
+          Write-NucleusInfo -CommandName android-config "guest is in $state; boot LineageOS system for this step (Reboot system now from recovery)"
           $lastHint = $elapsed
         }
       }
@@ -389,13 +389,13 @@ function Wait-AndroidAdbBootCompleted {
 
   $final = Get-AndroidAdbPollState -Vm $Vm
   if ($final -eq 'unauthorized') {
-    Write-NucleusError "timed out waiting for booted guest on $serial; tap Allow USB debugging"
+    Write-NucleusError -CommandName android-config "timed out waiting for booted guest on $serial; tap Allow USB debugging"
   }
   elseif ($final -eq 'device') {
-    Write-NucleusError "timed out waiting for boot completion on $serial (sys.boot_completed never became 1)"
+    Write-NucleusError -CommandName android-config "timed out waiting for boot completion on $serial (sys.boot_completed never became 1)"
   }
   else {
-    Write-NucleusError "timed out waiting for booted guest on $serial (state: $final)"
+    Write-NucleusError -CommandName android-config "timed out waiting for booted guest on $serial (state: $final)"
   }
   return $false
 }
@@ -408,7 +408,7 @@ function Wait-AndroidAdbSideload {
   )
 
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  Write-NucleusInfo "waiting for sideload ADB on $serial (timeout ${TimeoutSeconds}s)..."
+  Write-NucleusInfo -CommandName android-config "waiting for sideload ADB on $serial (timeout ${TimeoutSeconds}s)..."
   $elapsed = 0
   $lastHint = -15
 
@@ -418,13 +418,13 @@ function Wait-AndroidAdbSideload {
       'sideload' { return $true }
       'recovery' {
         if ($elapsed -ge ($lastHint + 15)) {
-          Write-NucleusInfo 'manual step: in recovery, select Apply update from ADB to enter sideload mode'
+          Write-NucleusInfo -CommandName android-config 'manual step: in recovery, select Apply update from ADB to enter sideload mode'
           $lastHint = $elapsed
         }
       }
       'unauthorized' {
         if ($elapsed -ge ($lastHint + 15)) {
-          Write-NucleusInfo 'ADB unauthorized — enable ADB in recovery (Advanced → Enable ADB)'
+          Write-NucleusInfo -CommandName android-config 'ADB unauthorized — enable ADB in recovery (Advanced → Enable ADB)'
           $lastHint = $elapsed
         }
       }
@@ -434,7 +434,7 @@ function Wait-AndroidAdbSideload {
   }
 
   $final = Get-AndroidAdbPollState -Vm $Vm
-  Write-NucleusError "timed out waiting for sideload ADB on $serial (state: $final)"
+  Write-NucleusError -CommandName android-config "timed out waiting for sideload ADB on $serial (state: $final)"
   return $false
 }
 
@@ -446,7 +446,7 @@ function Connect-AndroidAdb {
   )
 
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  Write-NucleusInfo "waiting for ADB on $serial (timeout ${TimeoutSeconds}s)..."
+  Write-NucleusInfo -CommandName android-config "waiting for ADB on $serial (timeout ${TimeoutSeconds}s)..."
   $elapsed = 0
   while ($elapsed -lt $TimeoutSeconds) {
     $state = Get-AndroidAdbPollState -Vm $Vm
@@ -502,7 +502,7 @@ function Get-AndroidJqssunReleaseTagForAsset {
   )
 
   if ([string]::IsNullOrWhiteSpace($AssetName)) {
-    Write-NucleusError 'jqssun asset name is required'
+    Write-NucleusError -CommandName android-config 'jqssun asset name is required'
     return $null
   }
 
@@ -518,7 +518,7 @@ function Get-AndroidJqssunReleaseTagForAsset {
       $location = $response.Headers['Location']
     }
     if ([string]::IsNullOrWhiteSpace($location)) {
-      Write-NucleusError "failed to resolve jqssun release redirect for $AssetName"
+      Write-NucleusError -CommandName android-config "failed to resolve jqssun release redirect for $AssetName"
       return $null
     }
   }
@@ -527,7 +527,7 @@ function Get-AndroidJqssunReleaseTagForAsset {
     $location = $response.Headers['Location']
   }
   if ([string]::IsNullOrWhiteSpace($location)) {
-    Write-NucleusError "failed to resolve jqssun release redirect for $AssetName (no Location header)"
+    Write-NucleusError -CommandName android-config "failed to resolve jqssun release redirect for $AssetName (no Location header)"
     return $null
   }
 
@@ -535,7 +535,7 @@ function Get-AndroidJqssunReleaseTagForAsset {
     return $Matches[1]
   }
 
-  Write-NucleusError "failed to parse jqssun release tag from redirect for $AssetName"
+  Write-NucleusError -CommandName android-config "failed to parse jqssun release tag from redirect for $AssetName"
   return $null
 }
 
@@ -548,7 +548,7 @@ function Get-AndroidJqssunAssetUrl {
   )
 
   if ([string]::IsNullOrWhiteSpace($Tag) -or [string]::IsNullOrWhiteSpace($AssetSubstring)) {
-    Write-NucleusError 'jqssun release tag and asset substring are required'
+    Write-NucleusError -CommandName android-config 'jqssun release tag and asset substring are required'
     return $null
   }
 
@@ -557,7 +557,7 @@ function Get-AndroidJqssunAssetUrl {
     $page = (Invoke-WebRequest -Uri $pageUrl -UseBasicParsing).Content
   }
   catch {
-    Write-NucleusError "failed to fetch jqssun release asset list for $Tag"
+    Write-NucleusError -CommandName android-config "failed to fetch jqssun release asset list for $Tag"
     return $null
   }
 
@@ -567,7 +567,7 @@ function Get-AndroidJqssunAssetUrl {
     return "https://github.com$path"
   }
 
-  Write-NucleusError "no jqssun asset matching '$AssetSubstring' in release $Tag"
+  Write-NucleusError -CommandName android-config "no jqssun asset matching '$AssetSubstring' in release $Tag"
   return $null
 }
 
@@ -595,30 +595,30 @@ function Invoke-AndroidDownloadUserdebugRecovery {
       if ($null -ne $tagDoc.tag_name) { $cachedTag = [string]$tagDoc.tag_name }
     }
     if ($cachedTag -eq $tag) {
-      Write-NucleusInfo "using cached userdebug recovery: $img"
+      Write-NucleusInfo -CommandName android-config "using cached userdebug recovery: $img"
       return $true
     }
-    Write-NucleusInfo "jqssun release changed ($cachedTag → $tag); re-downloading userdebug recovery..."
+    Write-NucleusInfo -CommandName android-config "jqssun release changed ($cachedTag → $tag); re-downloading userdebug recovery..."
     Remove-Item -LiteralPath $img -Force
   }
   else {
-    Write-NucleusInfo "downloading userdebug recovery ($assetName)..."
+    Write-NucleusInfo -CommandName android-config "downloading userdebug recovery ($assetName)..."
   }
 
   try {
     Invoke-WebRequest -Uri $downloadUrl -OutFile $img -UseBasicParsing
   }
   catch {
-    Write-NucleusError "failed to download userdebug recovery from $downloadUrl"
+    Write-NucleusError -CommandName android-config "failed to download userdebug recovery from $downloadUrl"
     return $false
   }
   if (-not (Test-Path -LiteralPath $img -PathType Leaf)) {
-    Write-NucleusError "failed to download userdebug recovery from $downloadUrl"
+    Write-NucleusError -CommandName android-config "failed to download userdebug recovery from $downloadUrl"
     return $false
   }
 
   (@{ tag_name = $tag } | ConvertTo-Json -Compress) | Set-Content -LiteralPath $tagFile -Encoding UTF8
-  Write-NucleusInfo "userdebug recovery ready: $img"
+  Write-NucleusInfo -CommandName android-config "userdebug recovery ready: $img"
   return $true
 }
 
@@ -651,22 +651,22 @@ function Invoke-AndroidEnsureUserdebugRecovery {
   $fbSerial = Get-AndroidFastbootSerial -Vm $Vm
 
   if (-not (Test-Path -LiteralPath $img -PathType Leaf)) {
-    Write-NucleusError "userdebug recovery image missing: $img"
+    Write-NucleusError -CommandName android-config "userdebug recovery image missing: $img"
     return $false
   }
 
   if ((Get-AndroidFastbootListState -Vm $Vm) -eq 'fastboot') {
-    Write-NucleusInfo "guest already in fastboot on $fbSerial"
+    Write-NucleusInfo -CommandName android-config "guest already in fastboot on $fbSerial"
   }
   elseif (Test-AndroidGuestHasUserdebugRecovery -Vm $Vm) {
     $buildType = Get-AndroidShellGetprop -Vm $Vm -Name 'ro.build.type'
     $debuggable = Get-AndroidShellGetprop -Vm $Vm -Name 'ro.debuggable'
-    Write-NucleusInfo "userdebug recovery is active on the guest (ro.build.type=$buildType, ro.debuggable=$debuggable)"
+    Write-NucleusInfo -CommandName android-config "userdebug recovery is active on the guest (ro.build.type=$buildType, ro.debuggable=$debuggable)"
     return $true
   }
   else {
-    Write-NucleusInfo 'flashing userdebug recovery for MindTheGapps sideload...'
-    Write-NucleusInfo 'manual step: in LineageOS Recovery, open Advanced → Enter fastboot (stock recovery cannot flash over ADB)'
+    Write-NucleusInfo -CommandName android-config 'flashing userdebug recovery for MindTheGapps sideload...'
+    Write-NucleusInfo -CommandName android-config 'manual step: in LineageOS Recovery, open Advanced → Enter fastboot (stock recovery cannot flash over ADB)'
     if (-not (Wait-AndroidFastboot -Vm $Vm -TimeoutSeconds 180)) {
       return $false
     }
@@ -674,14 +674,14 @@ function Invoke-AndroidEnsureUserdebugRecovery {
 
   & fastboot -s $fbSerial flash recovery $img
   if ($LASTEXITCODE -ne 0) {
-    Write-NucleusError "fastboot flash recovery failed on $fbSerial; confirm Advanced → Enter fastboot is active on the VM"
+    Write-NucleusError -CommandName android-config "fastboot flash recovery failed on $fbSerial; confirm Advanced → Enter fastboot is active on the VM"
     return $false
   }
 
   # check-suppress:suppression_doc: fastboot reboot after flash is best-effort; guest may already be rebooting to recovery.
   & fastboot -s $fbSerial reboot 2>$null
-  Write-NucleusInfo 'userdebug recovery flashed; guest should reboot to recovery'
-  Write-NucleusInfo 'manual step: in recovery, enable ADB (Advanced → Enable ADB) before sideload can continue'
+  Write-NucleusInfo -CommandName android-config 'userdebug recovery flashed; guest should reboot to recovery'
+  Write-NucleusInfo -CommandName android-config 'manual step: in recovery, enable ADB (Advanced → Enable ADB) before sideload can continue'
   Start-Sleep -Seconds 10
   return $true
 }
@@ -694,7 +694,7 @@ function Wait-AndroidAdbRecovery {
   )
 
   $serial = Get-AndroidAdbSerial -Vm $Vm
-  Write-NucleusInfo "waiting for recovery ADB on $serial (timeout ${TimeoutSeconds}s)..."
+  Write-NucleusInfo -CommandName android-config "waiting for recovery ADB on $serial (timeout ${TimeoutSeconds}s)..."
   $elapsed = 0
   $lastHint = -30
 
@@ -704,13 +704,13 @@ function Wait-AndroidAdbRecovery {
       { $_ -in @('recovery', 'sideload') } { return $true }
       'unauthorized' {
         if ($elapsed -ge ($lastHint + 30)) {
-          Write-NucleusInfo 'ADB unauthorized — in userdebug recovery, enable ADB (Advanced → Enable ADB)'
+          Write-NucleusInfo -CommandName android-config 'ADB unauthorized — in userdebug recovery, enable ADB (Advanced → Enable ADB)'
           $lastHint = $elapsed
         }
       }
       'device' {
         if ($elapsed -ge ($lastHint + 30)) {
-          Write-NucleusInfo 'guest is booted to system; boot LineageOS Recovery instead (power off → Reboot to recovery)'
+          Write-NucleusInfo -CommandName android-config 'guest is booted to system; boot LineageOS Recovery instead (power off → Reboot to recovery)'
           $lastHint = $elapsed
         }
       }
@@ -721,10 +721,10 @@ function Wait-AndroidAdbRecovery {
 
   $final = Get-AndroidAdbPollState -Vm $Vm
   if ($final -eq 'unauthorized') {
-    Write-NucleusError "timed out waiting for recovery ADB on $serial; enable ADB in recovery (Advanced → Enable ADB)"
+    Write-NucleusError -CommandName android-config "timed out waiting for recovery ADB on $serial; enable ADB in recovery (Advanced → Enable ADB)"
   }
   else {
-    Write-NucleusError "timed out waiting for recovery ADB on $serial (state: $final); boot LineageOS Recovery"
+    Write-NucleusError -CommandName android-config "timed out waiting for recovery ADB on $serial (state: $final); boot LineageOS Recovery"
   }
   return $false
 }
@@ -751,37 +751,37 @@ function Test-AndroidQcow2Image {
   )
 
   if (-not (Test-Path -LiteralPath $ImagePath -PathType Leaf)) {
-    Write-NucleusError "$Label not found: $ImagePath"
+    Write-NucleusError -CommandName android-config "$Label not found: $ImagePath"
     return $false
   }
 
   $fileInfo = Get-Item -LiteralPath $ImagePath
   if ($fileInfo.Length -le 0) {
-    Write-NucleusError "$Label is empty or unreadable: $ImagePath"
+    Write-NucleusError -CommandName android-config "$Label is empty or unreadable: $ImagePath"
     return $false
   }
 
   $qemuImg = Get-AndroidQemuImgPath
   if (-not $qemuImg) {
-    Write-NucleusWarning "qemu-img not found; skipping qcow2 validation for $Label"
+    Write-NucleusWarning -CommandName android-config "qemu-img not found; skipping qcow2 validation for $Label"
     return $true
   }
 
   $infoJson = & $qemuImg info --output=json $ImagePath 2>$null  # check-suppress:suppression_doc: qemu-img prints warnings to stderr; exit code checked immediately after.
   if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace(($infoJson | Out-String))) {
-    Write-NucleusError "qemu-img could not read $Label`: $ImagePath"
+    Write-NucleusError -CommandName android-config "qemu-img could not read $Label`: $ImagePath"
     return $false
   }
 
   $info = ($infoJson | Out-String) | ConvertFrom-Json
   if ([string]$info.format -ne 'qcow2') {
-    Write-NucleusError "$Label has unexpected format '$($info.format)' (expected qcow2): $ImagePath"
+    Write-NucleusError -CommandName android-config "$Label has unexpected format '$($info.format)' (expected qcow2): $ImagePath"
     return $false
   }
 
   $virtualSize = [long]$info.'virtual-size'
   if ($virtualSize -lt $MinVirtualSize) {
-    Write-NucleusError "${Label} virtual size $virtualSize is below minimum $MinVirtualSize`: $ImagePath"
+    Write-NucleusError -CommandName android-config "${Label} virtual size $virtualSize is below minimum $MinVirtualSize`: $ImagePath"
     return $false
   }
 
