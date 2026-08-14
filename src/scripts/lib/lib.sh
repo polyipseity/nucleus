@@ -40,29 +40,143 @@ case "$_nuc_prefix" in
 nucleus-*) _nuc_prefix="${_nuc_prefix#nucleus-}" ;;
 esac
 
+# Console color detection (console-only invariant). Computes per-stream flags
+# _nuc_color_1 (stdout) / _nuc_color_2 (stderr) plus the escape variables
+# _nuc_c1_* / _nuc_c2_* (empty strings when disabled). Idempotent.
+# Rules (see .agents/instructions/logging.instructions.md):
+#   NO_COLOR set non-empty        -> off for both streams
+#   FORCE_COLOR set and != "0"    -> on for both streams (chalk convention)
+#   CLICOLOR_FORCE set non-empty  -> on for both streams
+#   else                          -> per-stream [ -t N ] AND TERM != dumb
+_nuc_color_init() {
+  [ -n "${_nuc_color_initialized-}" ] && return 0
+  _nuc_color_initialized=1
+
+  if [ -n "${NO_COLOR-}" ]; then
+    _nuc_color_1=0
+    _nuc_color_2=0
+  elif [ -n "${CLICOLOR_FORCE-}" ] || { [ -n "${FORCE_COLOR-}" ] && [ "$FORCE_COLOR" != "0" ]; }; then
+    _nuc_color_1=1
+    _nuc_color_2=1
+  else
+    _nuc_color_1=0
+    _nuc_color_2=0
+    case "${TERM-}" in
+    dumb) ;;
+    *)
+      [ -t 1 ] && _nuc_color_1=1
+      [ -t 2 ] && _nuc_color_2=1
+      ;;
+    esac
+  fi
+
+  _nuc_esc="$(printf '\033')"
+  if [ "$_nuc_color_1" -eq 1 ]; then
+    _nuc_c1_bold="${_nuc_esc}[1m"
+    _nuc_c1_red="${_nuc_esc}[31m"
+    _nuc_c1_green="${_nuc_esc}[32m"
+    _nuc_c1_yellow="${_nuc_esc}[33m"
+    _nuc_c1_magenta="${_nuc_esc}[35m"
+    _nuc_c1_cyan="${_nuc_esc}[36m"
+    _nuc_c1_dim="${_nuc_esc}[2m"
+    _nuc_c1_reset="${_nuc_esc}[0m"
+  else
+    _nuc_c1_bold=""
+    _nuc_c1_red=""
+    _nuc_c1_green=""
+    _nuc_c1_yellow=""
+    _nuc_c1_magenta=""
+    _nuc_c1_cyan=""
+    _nuc_c1_dim=""
+    _nuc_c1_reset=""
+  fi
+  if [ "$_nuc_color_2" -eq 1 ]; then
+    _nuc_c2_bold="${_nuc_esc}[1m"
+    _nuc_c2_red="${_nuc_esc}[31m"
+    _nuc_c2_green="${_nuc_esc}[32m"
+    _nuc_c2_yellow="${_nuc_esc}[33m"
+    _nuc_c2_magenta="${_nuc_esc}[35m"
+    _nuc_c2_cyan="${_nuc_esc}[36m"
+    _nuc_c2_dim="${_nuc_esc}[2m"
+    _nuc_c2_reset="${_nuc_esc}[0m"
+  else
+    _nuc_c2_bold=""
+    _nuc_c2_red=""
+    _nuc_c2_green=""
+    _nuc_c2_yellow=""
+    _nuc_c2_magenta=""
+    _nuc_c2_cyan=""
+    _nuc_c2_dim=""
+    _nuc_c2_reset=""
+  fi
+}
+_nuc_color_init
+
 # Output helpers — use these instead of raw printf/echo.
-# All derive the <cmd>: prefix automatically from the script name.
+# All derive the <cmd>: prefix automatically from the script name; pass
+# -l <label> to override it (e.g. `say -l ai "msg"` -> `ai: msg`).
+# F1 grammar: [<ts> ]<cmd>: [<level>: ]<msg>; color is applied only when the
+# target stream supports it (see _nuc_color_init) and never in files.
 
 # say — Print an info message to stdout.
-say() { printf '%s\n' "$_nuc_prefix: $*"; }
+say() {
+  _say_label="$_nuc_prefix"
+  if [ "${1-}" = "-l" ]; then
+    _say_label="$2"
+    shift 2
+  fi
+  printf '%s\n' "${_nuc_c1_bold}${_say_label}${_nuc_c1_reset}: $*"
+}
 
 # error — Print an error message to stderr and return 1.
 error() {
-  printf '%s\n' "$_nuc_prefix: error: $*" >&2
+  _err_label="$_nuc_prefix"
+  if [ "${1-}" = "-l" ]; then
+    _err_label="$2"
+    shift 2
+  fi
+  printf '%s\n' "${_nuc_c2_bold}${_err_label}${_nuc_c2_reset}: ${_nuc_c2_bold}${_nuc_c2_red}error${_nuc_c2_reset}: $*" >&2
   return 1
 }
 
 # warn — Print a warning message to stderr.
-warn() { printf '%s\n' "$_nuc_prefix: warning: $*" >&2; }
+warn() {
+  _warn_label="$_nuc_prefix"
+  if [ "${1-}" = "-l" ]; then
+    _warn_label="$2"
+    shift 2
+  fi
+  printf '%s\n' "${_nuc_c2_bold}${_warn_label}${_nuc_c2_reset}: ${_nuc_c2_bold}${_nuc_c2_yellow}warning${_nuc_c2_reset}: $*" >&2
+}
 
 # dry_run — Print a dry-run message to stdout.
-dry_run() { printf '%s\n' "$_nuc_prefix: [dry-run] $*"; }
+dry_run() {
+  _dry_label="$_nuc_prefix"
+  if [ "${1-}" = "-l" ]; then
+    _dry_label="$2"
+    shift 2
+  fi
+  printf '%s\n' "${_nuc_c1_bold}${_dry_label}${_nuc_c1_reset}: ${_nuc_c1_bold}${_nuc_c1_magenta}[dry-run]${_nuc_c1_reset} $*"
+}
 
-# section — Print a section header to stdout.
-section() { printf '\n=== [%s] %s ===\n' "$1" "$2"; }
+# section — Print a section header to stdout (F3).
+section() { printf '\n%s=== [%s] %s ===%s\n' "${_nuc_c1_bold}${_nuc_c1_cyan}" "$1" "$2" "${_nuc_c1_reset}"; }
 
 # nuc_done — Print a completion message to stdout.
-nuc_done() { printf '%s\n' "$_nuc_prefix: done"; }
+nuc_done() {
+  _done_label="$_nuc_prefix"
+  if [ "${1-}" = "-l" ]; then
+    _done_label="$2"
+    shift 2
+  fi
+  printf '%s\n' "${_nuc_c1_bold}${_done_label}${_nuc_c1_reset}: ${_nuc_c1_bold}${_nuc_c1_green}done${_nuc_c1_reset}"
+}
+
+# die — Print an error message to stderr and exit 1.
+die() {
+  error "$@"
+  exit 1
+}
 
 # Resolution order: NUCLEUS_REPO_ROOT env var, /etc/nucleus/repo-root, SCRIPT_DIR+offset, then git rev-parse.
 derive_repo_root() {
@@ -149,8 +263,7 @@ merge_nix_config() {
 
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
-    printf '%s\n' "error: $1 is required but was not found in PATH" >&2
-    exit 1
+    die "$1 is required but was not found in PATH"
   fi
 }
 
@@ -160,7 +273,7 @@ require_command() {
 # Does NOT attempt nix profile install — see package-installation-scope.
 ensure_tool() {
   if ! command -v "$1" >/dev/null 2>&1; then
-    printf '%s\n' "error: $1 is required but was not found in PATH" >&2
+    error "$1 is required but was not found in PATH"
     printf '%s\n' "  Run nucleus-apply to install it, or use nix run .#check to run via flake." >&2
     exit 1
   fi
