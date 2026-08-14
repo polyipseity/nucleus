@@ -17,6 +17,10 @@ _icp_to_install=""
 _cleanup_icp() { rm -f "$_icp_desired" "$_icp_installed" "$_icp_to_remove" "$_icp_to_install"; }
 trap _cleanup_icp EXIT
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
+
 _icp_jq_bin="$1"
 _icp_gawk_bin="$2"
 _icp_desired_crates_json="$3"
@@ -59,25 +63,23 @@ done <"$_icp_desired"
 # Remove crates not in the desired list.
 while IFS= read -r _icp_crate; do
   [ -z "$_icp_crate" ] && continue
-  echo "cargo-binstall: removing $_icp_crate"
+  say -l cargo-binstall "removing $_icp_crate"
   if ! cargo uninstall "$_icp_crate"; then
-    echo "cargo-binstall: 'cargo uninstall $_icp_crate' failed" >&2
-    exit 1
+    die -l cargo-binstall "'cargo uninstall $_icp_crate' failed"
   fi
-  echo "cargo-binstall: '$_icp_crate' removed"
+  say -l cargo-binstall "'$_icp_crate' removed"
 done <"$_icp_to_remove"
 
 # Install desired crates not currently installed.
 while IFS= read -r _icp_crate; do
   [ -z "$_icp_crate" ] && continue
-  echo "cargo-binstall: installing $_icp_crate"
+  say -l cargo-binstall "installing $_icp_crate"
   if ! cargo-binstall --no-confirm "$_icp_crate"; then
-    echo "cargo-binstall: 'cargo-binstall $_icp_crate' failed" >&2
-    exit 1
+    die -l cargo-binstall "'cargo-binstall $_icp_crate' failed"
   fi
-  echo "cargo-binstall: '$_icp_crate' installed"
+  say -l cargo-binstall "'$_icp_crate' installed"
 done <"$_icp_to_install"
 
 if [ ! -s "$_icp_to_remove" ] && [ ! -s "$_icp_to_install" ]; then
-  echo "cargo-binstall: all managed packages already converged — skipping"
+  say -l cargo-binstall "all managed packages already converged — skipping"
 fi

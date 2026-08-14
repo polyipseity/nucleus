@@ -3,6 +3,10 @@
 # Consumes tool paths and desired tools JSON at activation time.
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
+
 _iut_uv_bin="$1"
 _iut_gawk_bin="$2"
 _iut_grep_bin="$3"
@@ -60,10 +64,10 @@ done <"$_iut_desired_names"
 while IFS= read -r _iut_tool; do
   [ -z "$_iut_tool" ] && continue
   if ! printf '%s' "$_iut_tool" | "$_iut_grep_bin" -Eq '^[A-Za-z0-9][A-Za-z0-9._-]*$'; then
-    echo "uv: skipping invalid uninstall token '$_iut_tool'"
+    say -l uv "skipping invalid uninstall token '$_iut_tool'"
     continue
   fi
-  echo "uv: uninstalling removed tool '$_iut_tool'"
+  say -l uv "uninstalling removed tool '$_iut_tool'"
   "$_iut_uv_bin" tool uninstall "$_iut_tool"
 done <"$_iut_to_remove"
 
@@ -71,7 +75,7 @@ done <"$_iut_to_remove"
 while IFS= read -r _iut_tool; do
   [ -z "$_iut_tool" ] && continue
   if ! printf '%s' "$_iut_tool" | "$_iut_grep_bin" -Eq '^[A-Za-z0-9][A-Za-z0-9._-]*$'; then
-    echo "uv: skipping invalid install token '$_iut_tool'"
+    say -l uv "skipping invalid install token '$_iut_tool'"
     continue
   fi
 
@@ -80,16 +84,16 @@ while IFS= read -r _iut_tool; do
   _iut_python="$("$_iut_gawk_bin" -v tool="$_iut_tool" '$1 == tool { print $2; exit }' "$_iut_desired")"
 
   if [ -n "$_iut_python" ]; then
-    echo "uv: installing tool '$_iut_tool' with Python $_iut_python"
+    say -l uv "installing tool '$_iut_tool' with Python $_iut_python"
     "$_iut_uv_bin" tool install --no-build --python "$_iut_python" "$_iut_tool"
   else
-    echo "uv: installing tool '$_iut_tool'"
+    say -l uv "installing tool '$_iut_tool'"
     "$_iut_uv_bin" tool install --no-build "$_iut_tool"
   fi
 done <"$_iut_to_install"
 
 if [ ! -s "$_iut_to_install" ] && [ ! -s "$_iut_to_remove" ]; then
-  echo "uv: all managed tools already converged — skipping"
+  say -l uv "all managed tools already converged — skipping"
 fi
 
 rm -f "$_iut_desired" "$_iut_desired_names" "$_iut_installed" "$_iut_to_remove" "$_iut_to_install"

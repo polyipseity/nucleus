@@ -3,6 +3,10 @@
 # CLI args: is_darwin pictures_dir desktoppr_bin coreutils_bin repo_root current_user sops_symlink_path wallpaper_items_json jq_bin
 set -eu
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
+
 copy_with_reflink() {
   _cwr_src="$1"
   _cwr_dst="$2"
@@ -30,12 +34,12 @@ lock_wallpaper_dir() {
   fi
 
   if ! chmod 555 "$_pictures_dir"; then
-    echo "provision-wallpaper: failed to set read-only mode on wallpaper directory $_pictures_dir." >&2
+    error "failed to set read-only mode on wallpaper directory $_pictures_dir."
     return 1
   fi
 
   if ! /usr/bin/chflags uchg "$_pictures_dir"; then
-    echo "provision-wallpaper: failed to set immutable flag on wallpaper directory $_pictures_dir." >&2
+    error "failed to set immutable flag on wallpaper directory $_pictures_dir."
     return 1
   fi
 
@@ -43,10 +47,14 @@ lock_wallpaper_dir() {
 }
 
 fail_wallpaper_provision() {
-  echo "$1" >&2
+  # Lock first so the managed directory is never left writable, then emit
+  # the primary error.  error returns 1, so in non-exempt callers errexit
+  # aborts with status 1 before the final exit 1; in exempt contexts the
+  # explicit exit 1 runs.  Either way: message printed, exit status 1.
   if ! lock_wallpaper_dir; then
-    echo "provision-wallpaper: failed to re-lock wallpaper directory after an earlier error." >&2
+    error "failed to re-lock wallpaper directory after an earlier error." || true # check-suppress:suppression_doc: error's failure status is deliberately consumed because the wrapper manages its own failure flow (re-lock then exit 1).
   fi
+  error "$1"
   exit 1
 }
 
@@ -54,22 +62,22 @@ wallpaper_pre_copy_setup() {
   # Refuse to operate on symlinks or non-directories to avoid writing or
   # deleting outside the intended managed wallpaper location.
   if [ -L "$_pictures_dir" ]; then
-    fail_wallpaper_provision "provision-wallpaper: wallpaper directory path $_pictures_dir is a symlink; refusing to manage wallpapers there."
+    fail_wallpaper_provision "wallpaper directory path $_pictures_dir is a symlink; refusing to manage wallpapers there."
   fi
 
   if [ -e "$_pictures_dir" ] && [ ! -d "$_pictures_dir" ]; then
-    fail_wallpaper_provision "provision-wallpaper: wallpaper path $_pictures_dir exists but is not a directory."
+    fail_wallpaper_provision "wallpaper path $_pictures_dir exists but is not a directory."
   fi
 
   # Keep the managed wallpaper directory mutable only during activation so
   # users/apps cannot accidentally delete or rename it between runs.
   if [ "$_is_darwin" -eq 1 ] && [ -d "$_pictures_dir" ]; then
     if ! /usr/bin/chflags nouchg "$_pictures_dir"; then
-      fail_wallpaper_provision "provision-wallpaper: failed to clear immutable flag on wallpaper directory $_pictures_dir."
+      fail_wallpaper_provision "failed to clear immutable flag on wallpaper directory $_pictures_dir."
     fi
 
     if ! chmod 755 "$_pictures_dir"; then
-      fail_wallpaper_provision "provision-wallpaper: failed to restore writable mode on wallpaper directory $_pictures_dir before managed updates."
+      fail_wallpaper_provision "failed to restore writable mode on wallpaper directory $_pictures_dir before managed updates."
     fi
   fi
 
@@ -77,7 +85,7 @@ wallpaper_pre_copy_setup() {
   chmod 755 "$_pictures_dir"
   if [ "$_is_darwin" -eq 1 ]; then
     if ! /usr/bin/chflags nouchg "$_pictures_dir"; then
-      fail_wallpaper_provision "provision-wallpaper: failed to clear immutable flag on wallpaper directory $_pictures_dir after create."
+      fail_wallpaper_provision "failed to clear immutable flag on wallpaper directory $_pictures_dir after create."
     fi
   fi
 }
@@ -98,7 +106,7 @@ wallpaper_provision_copy_items() {
     _targetFile="$_pictures_dir/$_wallpaperName"
 
     if [ ! -f "$_secretPath" ]; then
-      echo "provision-wallpaper: missing decrypted secret at $_secretPath; cannot apply wallpaper gallery." >&2
+      warn "missing decrypted secret at $_secretPath; cannot apply wallpaper gallery."
       _nucleus_wp_failed=1
       break
     fi
@@ -106,7 +114,7 @@ wallpaper_provision_copy_items() {
     case "$_targetFile" in
     "$_pictures_dir"/*) ;;
     *)
-      echo "provision-wallpaper: refusing to write wallpaper outside $_pictures_dir: $_targetFile" >&2
+      warn "refusing to write wallpaper outside $_pictures_dir: $_targetFile"
       _nucleus_wp_failed=1
       break
       ;;
@@ -145,7 +153,7 @@ wallpaper_provision_symlink_unencrypted() {
     case "$_targetFile" in
     "$_pictures_dir"/*) ;;
     *)
-      fail_wallpaper_provision "provision-wallpaper: refusing to write wallpaper outside $_pictures_dir: $_targetFile"
+      fail_wallpaper_provision "refusing to write wallpaper outside $_pictures_dir: $_targetFile"
       ;;
     esac
     ensure_file_symlink "$_sourcePath" "$_targetFile"
@@ -170,7 +178,7 @@ wallpaper_post_copy_teardown() {
       if ! resolve_wallpaper_unencrypted_file "$_current_user" "$baseName" >/dev/null 2>&1; then
         _nucleus_unprotect_symlink "provision-wallpaper" "$decryptedFile"
         rm -f "$decryptedFile"
-        echo "provision-wallpaper: removed stale wallpaper symlink $baseName (no matching overlay source)."
+        say "removed stale wallpaper symlink $baseName (no matching overlay source)."
       fi
       continue
     fi
@@ -179,7 +187,7 @@ wallpaper_post_copy_teardown() {
       continue
     fi
     rm -f "$decryptedFile"
-    echo "provision-wallpaper: removed stale wallpaper $baseName (no matching overlay source)."
+    say "removed stale wallpaper $baseName (no matching overlay source)."
   done
 
   # Apply gallery / slideshow mode.
@@ -200,7 +208,7 @@ wallpaper_post_copy_teardown() {
   done
 
   if [ "$hasWallpapers" -ne 1 ]; then
-    fail_wallpaper_provision "provision-wallpaper: no decrypted wallpapers found in $_pictures_dir; cannot apply wallpaper gallery."
+    fail_wallpaper_provision "no decrypted wallpapers found in $_pictures_dir; cannot apply wallpaper gallery."
   fi
 
   if [ "$_is_darwin" -eq 1 ]; then

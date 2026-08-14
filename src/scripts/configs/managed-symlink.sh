@@ -8,6 +8,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
+# shellcheck source=../lib/symlink-hardening.sh
 . "$SCRIPT_DIR/../lib/symlink-hardening.sh"
 
 _action="$1"
@@ -22,7 +25,6 @@ unprotect)
   _nucleus_unprotect_symlink "$_context" "$_path"
   ;;
 *)
-  echo "managed-symlink: unknown action '$_action' (use protect|unprotect)" >&2
-  exit 1
+  die "unknown action '$_action' (use protect|unprotect)"
   ;;
 esac

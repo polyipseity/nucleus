@@ -3,12 +3,15 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
+
 _git_secret_path="$1"
 _git_bin="$2"
 
 if [ ! -f "$_git_secret_path" ]; then
-  echo "git-identity: missing decrypted Git identity secret at $_git_secret_path." >&2
-  exit 1
+  die -l git-identity "missing decrypted Git identity secret at $_git_secret_path."
 fi
 
 identity_name="$(/usr/bin/grep -m1 '^name=' "$_git_secret_path" | /usr/bin/cut -d '=' -f 2-)"
@@ -16,8 +19,7 @@ identity_email="$(/usr/bin/grep -m1 '^email=' "$_git_secret_path" | /usr/bin/cut
 identity_signing_key="$(/usr/bin/grep -m1 '^signingKey=' "$_git_secret_path" | /usr/bin/cut -d '=' -f 2-)"
 
 if [ -z "$identity_name" ] || [ -z "$identity_email" ] || [ -z "$identity_signing_key" ]; then
-  echo "git-identity: git identity payload must include name/email/signingKey entries." >&2
-  exit 1
+  die -l git-identity "git identity payload must include name/email/signingKey entries."
 fi
 
 # Write to the dedicated identity include file, not to the HM-managed config.

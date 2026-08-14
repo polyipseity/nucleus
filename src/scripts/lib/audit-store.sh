@@ -10,7 +10,7 @@
 #   REPO_ROOT  Repository root (required).
 
 [ -n "${REPO_ROOT:-}" ] || {
-  printf '%s\n' "audit-store: REPO_ROOT is not set" >&2
+  error -l audit-store "REPO_ROOT is not set"
   return 1
 }
 

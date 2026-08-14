@@ -2,6 +2,10 @@
 # Daily .DS_Store cleanup for ~/dev.
 set -eu
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
+
 DEV_ROOT="$HOME/dev"
 removed_count=0
 
@@ -17,5 +21,5 @@ done < <(
 )
 
 if [ "$removed_count" -gt 0 ]; then
-  echo "ds-store-gc: removed $removed_count .DS_Store files from ~/dev." >&2
+  say "removed $removed_count .DS_Store files from ~/dev."
 fi

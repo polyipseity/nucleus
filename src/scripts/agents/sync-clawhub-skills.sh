@@ -5,6 +5,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
+# shellcheck source=../lib/symlink-hardening.sh
 . "$SCRIPT_DIR/../lib/symlink-hardening.sh"
 
 _scs_jq_bin="$1"
@@ -27,7 +30,7 @@ export PATH
 # present.
 _scs_manifest="$_scs_repo_root/$_scs_manifest_rel"
 if [ ! -f "$_scs_manifest" ]; then
-  echo "clawhub: manifest not found at $_scs_manifest; skipping fetched skill sync"
+  say -l clawhub "manifest not found at $_scs_manifest; skipping fetched skill sync"
   _scs_do_sync=false
 fi
 
@@ -36,7 +39,7 @@ if [ "$_scs_do_sync" = true ]; then
   "$_scs_jq_bin" -r '.skills[]?' "$_scs_manifest" >"$_scs_slugs_file"
 
   if [ ! -s "$_scs_slugs_file" ]; then
-    echo "clawhub: no fetched skills in manifest; skipping"
+    say -l clawhub "no fetched skills in manifest; skipping"
     _scs_do_sync=false
   fi
 fi
@@ -54,12 +57,12 @@ fi
 # install-bun-packages activation before this step is called; this step
 # never installs ClawHub itself.
 if [ "$_scs_do_sync" = true ] && ! command -v clawhub >/dev/null 2>&1; then
-  echo "clawhub: clawhub not found in PATH; install-bun-packages must complete before fetched skill sync; skipping" >&2
+  warn -l clawhub "clawhub not found in PATH; install-bun-packages must complete before fetched skill sync; skipping"
   _scs_do_sync=false
 fi
 
 if [ "$_scs_do_sync" = true ]; then
-  echo "clawhub: running fetched skill sync..."
+  say -l clawhub "running fetched skill sync..."
 
   # Install or update each skill from the manifest.
   #   --workdir "$HOME/.agents" installs to $HOME/.agents/skills/<slug>/
@@ -72,7 +75,7 @@ if [ "$_scs_do_sync" = true ]; then
       # A committed-skill (bundled) symlink exists with the same slug.
       # Skip to avoid overwriting the managed symlink; the slug must be
       # removed from clawhub-skills.json or the committed skill removed.
-      echo "clawhub: skipping '$_scs_slug' — a committed-skill symlink exists at $_scs_skill_path" >&2
+      warn -l clawhub "skipping '$_scs_slug' — a committed-skill symlink exists at $_scs_skill_path"
       continue
     fi
     # Unlock an existing fetched skill directory before updating so
@@ -80,7 +83,7 @@ if [ "$_scs_do_sync" = true ]; then
     if [ -d "$_scs_skill_path" ]; then
       chmod -R u+w "$_scs_skill_path"
     fi
-    echo "clawhub: installing/updating fetched skill '$_scs_slug'..."
+    say -l clawhub "installing/updating fetched skill '$_scs_slug'..."
     # Best-effort: non-zero exit from ClawHub is non-fatal because the
     # system apply already succeeded and skill sync is additive.
     if clawhub install --workdir "$HOME/.agents" --no-input "$_scs_slug"; then
@@ -91,7 +94,7 @@ if [ "$_scs_do_sync" = true ]; then
         chmod -R a-w "$_scs_skill_path"
       fi
     else
-      echo "clawhub: clawhub install failed for '$_scs_slug' (system apply succeeded)" >&2
+      warn -l clawhub "clawhub install failed for '$_scs_slug' (system apply succeeded)"
     fi
   done <"$_scs_slugs_file"
 
@@ -107,7 +110,7 @@ if [ "$_scs_do_sync" = true ]; then
     _scs_name="$(basename "$_scs_candidate")"
     [ ! -f "$_scs_candidate/.clawhub/origin.json" ] && continue
     if ! grep -qxF "$_scs_name" "$_scs_slugs_file"; then
-      echo "clawhub: removing stale fetched skill '$_scs_name' (removed from manifest)"
+      say -l clawhub "removing stale fetched skill '$_scs_name' (removed from manifest)"
       # Unlock before removal: fetched skill trees are locked a-w after
       # install, so rm -rf needs write access restored first.
       chmod -R u+w "$_scs_candidate"
@@ -115,7 +118,7 @@ if [ "$_scs_do_sync" = true ]; then
     fi
   done <"$_scs_stale_list"
   rm -f "$_scs_stale_list"
-  echo "clawhub: fetched skill sync complete"
+  say -l clawhub "fetched skill sync complete"
 fi
 
 rm -f "$_scs_slugs_file"

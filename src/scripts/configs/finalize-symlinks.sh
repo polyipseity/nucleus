@@ -5,6 +5,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
+# shellcheck source=../lib/symlink-hardening.sh
 . "$SCRIPT_DIR/../lib/symlink-hardening.sh"
 
 _nucleus_manifest_path="$1"
@@ -19,7 +22,7 @@ printf '%s\n' "$_nucleus_symlink_entries_json" | "$_nucleus_jq_bin" -r '.[]' | w
   if [ -L "$_nucleus_link_path" ]; then
     _nucleus_protect_symlink "symlinks" "$_nucleus_link_path"
   else
-    echo "symlinks: warning — expected managed symlink at $_nucleus_link_path." >&2
+    warn -l symlinks "warning — expected managed symlink at $_nucleus_link_path."
   fi
 done
 

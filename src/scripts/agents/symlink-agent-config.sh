@@ -3,6 +3,9 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
+# shellcheck source=../lib/symlink-hardening.sh
 . "$SCRIPT_DIR/../lib/symlink-hardening.sh"
 . "$SCRIPT_DIR/../lib/resolve-user-config.sh"
 . "$SCRIPT_DIR/../lib/symlink-convergence.sh"
@@ -18,11 +21,10 @@ _as_agents_dir="$HOME/.agents"
 # Ensure ~/.agents exists as a real (writable) directory.
 if [ ! -d "$_as_agents_dir" ]; then
   mkdir "$_as_agents_dir"
-  echo "agents-config: created $HOME/.agents"
+  say -l agents-config "created $HOME/.agents"
 elif [ -e "$_as_agents_dir" ] && [ ! -d "$_as_agents_dir" ]; then
   # Unexpected non-directory file: fail fast.
-  echo "agents-config: $HOME/.agents exists but is not a directory — remove it and re-run apply." >&2
-  exit 1
+  die -l agents-config "$HOME/.agents exists but is not a directory — remove it and re-run apply."
 fi
 
 _nucleus_remove_stale_merged_symlinks \
@@ -46,10 +48,9 @@ if [ -L "$_as_opencode_link" ]; then
     rm "$_as_opencode_link"
   fi
 elif [ -e "$_as_opencode_link" ]; then
-  echo "agents-config: $_as_opencode_link exists and is not a managed symlink — remove or back it up, then re-run apply." >&2
-  exit 1
+  die -l agents-config "$_as_opencode_link exists and is not a managed symlink — remove or back it up, then re-run apply."
 fi
 if [ ! -e "$_as_opencode_link" ]; then
   ln -s "$_as_opencode_source" "$_as_opencode_link"
-  echo "agents-config: linked $HOME/.config/opencode/opencode.jsonc"
+  say -l agents-config "linked $HOME/.config/opencode/opencode.jsonc"
 fi

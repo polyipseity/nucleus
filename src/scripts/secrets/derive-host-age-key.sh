@@ -11,6 +11,10 @@
 # manifest scan.
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
+
 _dha_ssh_to_age_bin="$1"
 _dha_owner_spec="$2"
 
@@ -19,9 +23,7 @@ age_key_file="$age_dir/machine.txt"
 host_ssh_key="/etc/ssh/ssh_host_ed25519_key"
 
 if [ ! -f "$host_ssh_key" ]; then
-  echo "sops: /etc/ssh/ssh_host_ed25519_key absent; skipping age key derivation." >&2
-  echo "sops:   This machine cannot decrypt SOPS secrets as a device age recipient" >&2
-  echo "sops:   until the host key is present and registered in .sops.yaml." >&2
+  warn -l sops "/etc/ssh/ssh_host_ed25519_key absent; skipping age key derivation." "This machine cannot decrypt SOPS secrets as a device age recipient" "until the host key is present and registered in .sops.yaml."
 else
   mkdir -p "$age_dir"
   # ssh-to-age -private-key -i reads an SSH private key FILE and outputs
@@ -32,7 +34,7 @@ else
   derived_age_key_exit=0
   derived_age_key="$("$_dha_ssh_to_age_bin" -private-key -i "$host_ssh_key")" || derived_age_key_exit=$?
   if [ "$derived_age_key_exit" -ne 0 ] || [ -z "$derived_age_key" ]; then
-    echo "sops: ssh-to-age failed (exit $derived_age_key_exit) reading $host_ssh_key; $age_key_file not written." >&2
+    warn -l sops "ssh-to-age failed (exit $derived_age_key_exit) reading $host_ssh_key; $age_key_file not written."
   else
     printf '%s\n' "$derived_age_key" >"$age_key_file"
     case "$_dha_owner_spec" in
@@ -45,7 +47,7 @@ else
       chmod 0600 "$age_key_file"
       ;;
     *)
-      echo "sops: invalid owner spec '$_dha_owner_spec'; expected user:<name> or group:<name>" >&2
+      error -l sops "invalid owner spec '$_dha_owner_spec'; expected user:<name> or group:<name>"
       exit 1
       ;;
     esac

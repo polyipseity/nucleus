@@ -46,9 +46,7 @@ while [[ $# -gt 0 ]]; do
     shift 2
     ;;
   *)
-    printf '%s: unknown argument: %s\n' "$(basename "$0")" "$1" >&2
-    usage >&2
-    exit 1
+    error "unknown argument: $1" || { usage >&2; exit 1; }
     ;;
   esac
 done
@@ -72,15 +70,15 @@ if [ -n "${_JFS_SOPS_PATH:-}" ]; then
 fi
 
 if ! command -v curl >/dev/null 2>&1; then
-  printf '%s\n' "jellyfin-sync: curl is not available; skipping sync"
+  say "curl is not available; skipping sync"
   exit 0
 fi
 if ! command -v jq >/dev/null 2>&1; then
-  printf '%s\n' "jellyfin-sync: jq is not available; skipping sync"
+  say "jq is not available; skipping sync"
   exit 0
 fi
 if ! command -v sops >/dev/null 2>&1; then
-  printf '%s\n' "jellyfin-sync: sops is not available; skipping sync"
+  say "sops is not available; skipping sync"
   exit 0
 fi
 
@@ -164,13 +162,13 @@ _jfs_sync_accounts() {
     _jfsa_pass_key="$(printf '%s' "$_jfsa_spec" | jq -r '.passwordSecretKey // empty')"
 
     if [ -z "$_jfsa_owner" ] || [ -z "$_jfsa_user_key" ] || [ -z "$_jfsa_pass_key" ]; then
-      printf '%s\n' "jellyfin: invalid account declaration for id '${_jfsa_id:-<unknown>}'; skipping" >&2
+      warn -l jellyfin "invalid account declaration for id '${_jfsa_id:-<unknown>}'; skipping"
       continue
     fi
 
     _jfsa_secret_file="$REPO_ROOT/src/secrets/users/${_jfsa_owner}.yml"
     if [ ! -f "$_jfsa_secret_file" ]; then
-      printf '%s\n' "jellyfin: missing users/${_jfsa_owner}.yml; skipping account declaration '${_jfsa_id}'" >&2
+      warn -l jellyfin "missing users/${_jfsa_owner}.yml; skipping account declaration '${_jfsa_id}'"
       continue
     fi
 
@@ -179,14 +177,14 @@ _jfs_sync_accounts() {
       --sops-file "$_jfsa_secret_file" \
       --sops-bin "${_JFS_SOPS_PATH:-$(command -v sops)}" \
       --gpg-bin "$(command -v gpg)")"; then
-      printf '%s\n' "jellyfin: failed to decrypt $_jfsa_secret_file; skipping account declaration '${_jfsa_id}'" >&2
+      warn -l jellyfin "failed to decrypt $_jfsa_secret_file; skipping account declaration '${_jfsa_id}'"
       continue
     fi
 
     _jfsa_username="$(printf '%s' "$_jfsa_secret_json" | jq -r --arg key "$_jfsa_user_key" '.[$key] // empty')"
     _jfsa_password="$(printf '%s' "$_jfsa_secret_json" | jq -r --arg key "$_jfsa_pass_key" '.[$key] // empty')"
     if [ -z "$_jfsa_username" ] || [ -z "$_jfsa_password" ]; then
-      printf '%s\n' "jellyfin: missing secret values for account declaration '${_jfsa_id}' in users/${_jfsa_owner}.yml" >&2
+      warn -l jellyfin "missing secret values for account declaration '${_jfsa_id}' in users/${_jfsa_owner}.yml"
       continue
     fi
 
@@ -216,7 +214,7 @@ _jfs_sync_accounts() {
   done
 
   if [ "$_jfsa_waited" -ge 60 ]; then
-    printf '%s\n' "jellyfin: API at $_jfs_base_url is not reachable; skipping account sync"
+    say -l jellyfin "API at $_jfs_base_url is not reachable; skipping account sync"
     rm -f "$_jfsa_resolved_file"
     return
   fi
@@ -264,7 +262,7 @@ _jfs_sync_accounts() {
       _jfsa_complete_response="$(_jfs_api_request POST '/Startup/Complete' '' '')"
       _jfsa_complete_status="$(_jfs_status_from_response "$_jfsa_complete_response")"
       if [ "$_jfsa_complete_status" != "204" ]; then
-        printf '%s\n' "jellyfin: startup completion returned HTTP $_jfsa_complete_status" >&2
+        warn -l jellyfin "startup completion returned HTTP $_jfsa_complete_status"
       fi
     fi
 
@@ -293,7 +291,7 @@ _jfs_sync_accounts() {
   fi
 
   if [ -z "$_jfsa_admin_token" ]; then
-    printf '%s\n' "jellyfin: no elevated account credentials available; skipping account sync"
+    say -l jellyfin "no elevated account credentials available; skipping account sync"
     rm -f "$_jfsa_resolved_file"
     return
   fi
@@ -305,7 +303,7 @@ _jfs_sync_accounts() {
     _jfsa_users_response="$(_jfs_api_request GET '/Users' "$_jfsa_admin_token" '')"
     _jfsa_users_status="$(_jfs_status_from_response "$_jfsa_users_response")"
     if [ "$_jfsa_users_status" != "200" ]; then
-      printf '%s\n' "jellyfin: failed to list users (HTTP $_jfsa_users_status); stopping account sync" >&2
+      warn -l jellyfin "failed to list users (HTTP $_jfsa_users_status); stopping account sync"
       break
     fi
     _jfsa_users_body="$(_jfs_body_from_response "$_jfsa_users_response")"
@@ -317,14 +315,14 @@ _jfs_sync_accounts() {
       _jfsa_create_response="$(_jfs_api_request POST '/Users/New' "$_jfsa_admin_token" "$_jfsa_create_payload")"
       _jfsa_create_status="$(_jfs_status_from_response "$_jfsa_create_response")"
       if [ "$_jfsa_create_status" = "200" ]; then
-        printf '%s\n' "jellyfin: created account '$_jfsa_username'"
+        say -l jellyfin "created account '$_jfsa_username'"
         _jfsa_user_id="$(printf '%s' "$(_jfs_body_from_response "$_jfsa_create_response")" | jq -r '.Id // empty')"
         if [ -z "$_jfsa_user_id" ]; then
-          printf '%s\n' "jellyfin: created account '$_jfsa_username' but could not resolve user id for policy sync" >&2
+          warn -l jellyfin "created account '$_jfsa_username' but could not resolve user id for policy sync"
           continue
         fi
       else
-        printf '%s\n' "jellyfin: failed to create account '$_jfsa_username' (HTTP $_jfsa_create_status)" >&2
+        warn -l jellyfin "failed to create account '$_jfsa_username' (HTTP $_jfsa_create_status)"
         continue
       fi
     fi
@@ -332,13 +330,13 @@ _jfs_sync_accounts() {
     _jfsa_user_detail_response="$(_jfs_api_request GET "/Users/${_jfsa_user_id}" "$_jfsa_admin_token" '')"
     _jfsa_user_detail_status="$(_jfs_status_from_response "$_jfsa_user_detail_response")"
     if [ "$_jfsa_user_detail_status" != "200" ]; then
-      printf '%s\n' "jellyfin: failed to query account details for '$_jfsa_username' (HTTP $_jfsa_user_detail_status)" >&2
+      warn -l jellyfin "failed to query account details for '$_jfsa_username' (HTTP $_jfsa_user_detail_status)"
       continue
     fi
 
     _jfsa_user_policy_json="$(printf '%s' "$(_jfs_body_from_response "$_jfsa_user_detail_response")" | jq -c '.Policy // empty')"
     if [ -z "$_jfsa_user_policy_json" ]; then
-      printf '%s\n' "jellyfin: missing policy payload for account '$_jfsa_username'; skipping admin policy sync" >&2
+      warn -l jellyfin "missing policy payload for account '$_jfsa_username'; skipping admin policy sync"
       continue
     fi
 
@@ -348,9 +346,9 @@ _jfs_sync_accounts() {
       _jfsa_policy_update_response="$(_jfs_api_request POST "/Users/${_jfsa_user_id}/Policy" "$_jfsa_admin_token" "$_jfsa_updated_policy")"
       _jfsa_policy_update_status="$(_jfs_status_from_response "$_jfsa_policy_update_response")"
       if [ "$_jfsa_policy_update_status" = "204" ]; then
-        printf '%s\n' "jellyfin: updated admin policy for account '$_jfsa_username' to $_jfsa_desired_admin"
+        say -l jellyfin "updated admin policy for account '$_jfsa_username' to $_jfsa_desired_admin"
       else
-        printf '%s\n' "jellyfin: failed to update admin policy for account '$_jfsa_username' (HTTP $_jfsa_policy_update_status)" >&2
+        warn -l jellyfin "failed to update admin policy for account '$_jfsa_username' (HTTP $_jfsa_policy_update_status)"
       fi
     fi
 
@@ -365,9 +363,9 @@ _jfs_sync_accounts() {
     _jfsa_password_response="$(_jfs_api_request POST "/Users/Password?userId=${_jfsa_user_id}" "$_jfsa_admin_token" "$_jfsa_password_payload")"
     _jfsa_password_status="$(_jfs_status_from_response "$_jfsa_password_response")"
     if [ "$_jfsa_password_status" = "204" ]; then
-      printf '%s\n' "jellyfin: updated password for account '$_jfsa_username'"
+      say -l jellyfin "updated password for account '$_jfsa_username'"
     else
-      printf '%s\n' "jellyfin: failed to update password for account '$_jfsa_username' (HTTP $_jfsa_password_status)" >&2
+      warn -l jellyfin "failed to update password for account '$_jfsa_username' (HTTP $_jfsa_password_status)"
     fi
   done <"$_jfsa_resolved_file"
 
@@ -416,15 +414,15 @@ _jfs_sync_libraries() {
   fi
 
   if ! command -v curl >/dev/null 2>&1; then
-    printf '%s\n' "jellyfin/library: curl is not available; skipping library sync"
+    say -l jellyfin/library "curl is not available; skipping library sync"
     return
   fi
   if ! command -v jq >/dev/null 2>&1; then
-    printf '%s\n' "jellyfin/library: jq is not available; skipping library sync"
+    say -l jellyfin/library "jq is not available; skipping library sync"
     return
   fi
   if ! command -v sops >/dev/null 2>&1; then
-    printf '%s\n' "jellyfin/library: sops is not available; skipping library sync"
+    say -l jellyfin/library "sops is not available; skipping library sync"
     return
   fi
 
@@ -536,7 +534,7 @@ _jfs_sync_libraries() {
   done
 
   if [ "$_jfsl_waited" -ge 60 ]; then
-    printf '%s\n' "jellyfin/library: API at $_jfs_base_url is not reachable; skipping library sync"
+    say -l jellyfin/library "API at $_jfs_base_url is not reachable; skipping library sync"
     rm -f "$_jfsl_merged_file" "$_jfsl_creds_file"
     return
   fi
@@ -605,7 +603,7 @@ _jfs_sync_libraries() {
   fi
 
   if [ -z "$_jfsl_admin_token" ]; then
-    printf '%s\n' "jellyfin/library: no elevated account credentials available; skipping library sync"
+    say -l jellyfin/library "no elevated account credentials available; skipping library sync"
     rm -f "$_jfsl_merged_file" "$_jfsl_creds_file"
     return
   fi
@@ -615,7 +613,7 @@ _jfs_sync_libraries() {
   _jfsl_folders_response="$(_jfs_api_request GET '/Library/VirtualFolders' "$_jfsl_admin_token" '')"
   _jfsl_folders_status="$(_jfs_status_from_response "$_jfsl_folders_response")"
   if [ "$_jfsl_folders_status" != "200" ]; then
-    printf '%s\n' "jellyfin/library: failed to list virtual folders (HTTP $_jfsl_folders_status); skipping"
+    say -l jellyfin/library "failed to list virtual folders (HTTP $_jfsl_folders_status); skipping"
     rm -f "$_jfsl_merged_file"
     return
   fi
@@ -699,10 +697,10 @@ _jfs_sync_libraries() {
       _jfsl_create_response="$(_jfs_api_request POST "/Library/VirtualFolders?${_jfsl_query_params}" "$_jfsl_admin_token" "$_jfsl_create_payload")"
       _jfsl_create_status="$(_jfs_status_from_response "$_jfsl_create_response")"
       if [ "$_jfsl_create_status" = "204" ]; then
-        printf '%s\n' "jellyfin/library: created library '$_jfsl_name' ($_jfsl_collection_type)"
+        say -l jellyfin/library "created library '$_jfsl_name' ($_jfsl_collection_type)"
         _jfs_api_request POST '/Library/Refresh' "$_jfsl_admin_token" '' >/dev/null
       else
-        printf '%s\n' "jellyfin/library: failed to create library '$_jfsl_name' (HTTP $_jfsl_create_status)" >&2
+        warn -l jellyfin/library "failed to create library '$_jfsl_name' (HTTP $_jfsl_create_status)"
       fi
     else
       _jfsl_current_options="$(printf '%s' "$_jfsl_folders_body" | jq -c --arg name "$_jfsl_name" '
@@ -718,10 +716,10 @@ _jfs_sync_libraries() {
       _jfsl_update_response="$(_jfs_api_request POST '/Library/VirtualFolders/LibraryOptions' "$_jfsl_admin_token" "$_jfsl_update_payload")"
       _jfsl_update_status="$(_jfs_status_from_response "$_jfsl_update_response")"
       if [ "$_jfsl_update_status" = "204" ]; then
-        printf '%s\n' "jellyfin/library: updated library options for '$_jfsl_name'"
+        say -l jellyfin/library "updated library options for '$_jfsl_name'"
         _jfs_api_request POST '/Library/Refresh' "$_jfsl_admin_token" '' >/dev/null
       else
-        printf '%s\n' "jellyfin/library: failed to update library options for '$_jfsl_name' (HTTP $_jfsl_update_status)" >&2
+        warn -l jellyfin/library "failed to update library options for '$_jfsl_name' (HTTP $_jfsl_update_status)"
       fi
     fi
   done

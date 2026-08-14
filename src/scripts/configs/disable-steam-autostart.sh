@@ -7,6 +7,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
 # shellcheck source=../lib/macos-console-user.sh
 . "$SCRIPT_DIR/../lib/macos-console-user.sh"
 
@@ -20,7 +22,7 @@ Darwin)
       -e 'delete login item "Steam"' \
       -e 'end if' \
       -e 'end tell' 2>/dev/null; then
-      echo "steam: failed to remove login item." >&2
+      warn -l steam "failed to remove login item."
     fi
   fi
   ;;

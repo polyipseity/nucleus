@@ -4,10 +4,13 @@
 # same paths — overlap is intentional and idempotent.
 set -eu
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
+
 NUCLEUS_REPO_ROOT="${NUCLEUS_REPO_ROOT:?NUCLEUS_REPO_ROOT not set — set in launchd/service environment}"
 if [ ! -f "$NUCLEUS_REPO_ROOT/scripts/gc.sh" ]; then
-  echo "gc: scripts/gc.sh not found at $NUCLEUS_REPO_ROOT; skipping weekly GC"
-  exit 1
+  die -l gc "scripts/gc.sh not found at $NUCLEUS_REPO_ROOT; skipping weekly GC"
 fi
 
 # Weekly GC is space-reclaim only; skip model pulls and skip any operations

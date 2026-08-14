@@ -137,13 +137,11 @@ ensure_tart_vm_dir() {
       say "tart storage already linked: $_etd_default -> $_etd_target"
       return 0
     fi
-    echo "tart: $_etd_default is a symlink to $_etd_current (expected $_etd_target); fix manually and retry" >&2
-    return 1
+    error -l tart "$_etd_default is a symlink to $_etd_current (expected $_etd_target); fix manually and retry" || return 1
   fi
 
   if [ -e "$_etd_default" ]; then
-    echo "tart: $_etd_default exists and is not a symlink to $_etd_target; fix manually and retry" >&2
-    return 1
+    error -l tart "$_etd_default exists and is not a symlink to $_etd_target; fix manually and retry" || return 1
   fi
 
   ln -s "$_etd_target" "$_etd_default"

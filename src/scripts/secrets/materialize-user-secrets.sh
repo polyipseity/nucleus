@@ -5,6 +5,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
 
 _mus_repo_root="$1"
 _mus_username="$2"
@@ -22,7 +24,7 @@ if [ ! -f "$_mus_user_secret_file" ]; then
 fi
 
 _mus_jq_bin="$(command -v jq)" || {
-  echo "materialize-user-secrets: jq is required but not found in PATH." >&2
+  error "jq is required but not found in PATH."
   exit 1
 }
 

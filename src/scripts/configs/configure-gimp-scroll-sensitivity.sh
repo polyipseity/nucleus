@@ -12,6 +12,8 @@
 # hardcoded version list, so new app upgrades keep working automatically.
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
 # shellcheck source=../lib/macos-console-user.sh
 . "$SCRIPT_DIR/../lib/macos-console-user.sh"
 
@@ -35,17 +37,17 @@ if _nucleus_resolve_console_user; then
   # e.g. 3.2.4 -> 3.2
   gimp_version_branch="$(printf '%s' "$gimp_version_raw" | /usr/bin/awk -F. 'NF >= 2 { print $1 "." $2 }')"
   if [ -z "$gimp_version_branch" ]; then
-    echo "gimp: unable to determine installed GIMP major.minor version from /Applications/GIMP.app; skipping sensitivity convergence." >&2
+    warn -l gimp "unable to determine installed GIMP major.minor version from /Applications/GIMP.app; skipping sensitivity convergence."
   else
     gimprc_dir="$console_home/Library/Application Support/GIMP/$gimp_version_branch"
     gimprc_file="$gimprc_dir/gimprc"
 
     if ! /bin/mkdir -p "$gimprc_dir"; then
-      echo "gimp: failed to create $gimprc_dir." >&2
+      warn -l gimp "failed to create $gimprc_dir."
     else
       if [ ! -f "$gimprc_file" ]; then
         if ! /usr/bin/touch "$gimprc_file"; then
-          echo "gimp: failed to create $gimprc_file." >&2
+          warn -l gimp "failed to create $gimprc_file."
         fi
       fi
 
@@ -54,22 +56,22 @@ if _nucleus_resolve_console_user; then
         # drag-zoom-speed token.
         if /usr/bin/grep -Eq '^\(drag-zoom-speed[[:space:]]+[^)]*\)$' "$gimprc_file"; then
           if ! /usr/bin/sed -E -i.bak 's#^\(drag-zoom-speed[[:space:]]+[^)]*\)$#(drag-zoom-speed 25.0)#' "$gimprc_file"; then
-            echo "gimp: failed to update drag-zoom-speed in $gimprc_file." >&2
+            warn -l gimp "failed to update drag-zoom-speed in $gimprc_file."
           fi
           /bin/rm -f "$gimprc_file.bak"
         else
           if ! printf '\n(drag-zoom-speed 25.0)\n' >>"$gimprc_file"; then
-            echo "gimp: failed to append drag-zoom-speed to $gimprc_file." >&2
+            warn -l gimp "failed to append drag-zoom-speed to $gimprc_file."
           fi
         fi
 
         if [ -n "$console_group" ]; then
           if ! /usr/sbin/chown "$_nucleus_console_user:$console_group" "$gimprc_file"; then
-            echo "gimp: failed to set ownership on $gimprc_file." >&2
+            warn -l gimp "failed to set ownership on $gimprc_file."
           fi
         else
           if ! /usr/sbin/chown "$_nucleus_console_user" "$gimprc_file"; then
-            echo "gimp: failed to set ownership on $gimprc_file." >&2
+            warn -l gimp "failed to set ownership on $gimprc_file."
           fi
         fi
       fi

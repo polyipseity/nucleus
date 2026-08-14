@@ -11,6 +11,10 @@ _ibp_to_install=""
 _cleanup_ibp() { rm -f "$_ibp_desired" "$_ibp_installed" "$_ibp_to_remove" "$_ibp_to_install"; }
 trap _cleanup_ibp EXIT
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
+
 _jq_bin="$1"
 _bun_bin="$2"
 
@@ -21,8 +25,7 @@ PATH="$_bun_bin_dir:$PATH"
 export PATH
 
 if [ ! -x "$_bun_bin" ]; then
-  echo "bun: $_bun_bin not found in nix store; cannot install bun global packages" >&2
-  exit 1
+  die -l bun "$_bun_bin not found in nix store; cannot install bun global packages"
 fi
 
 # Declarative desired-state list.  One package per line.
@@ -74,26 +77,23 @@ done <"$_ibp_desired"
 # Remove packages no longer in the desired list.
 while IFS= read -r _ibp_pkg; do
   [ -z "$_ibp_pkg" ] && continue
-  echo "bun: removing $_ibp_pkg"
+  say -l bun "removing $_ibp_pkg"
   if ! "$_bun_bin" remove -g "$_ibp_pkg"; then
-    echo "bun: '$_bun_bin remove -g $_ibp_pkg' failed" >&2
-    exit 1
+    die -l bun "'$_bun_bin remove -g $_ibp_pkg' failed"
   fi
 done <"$_ibp_to_remove"
 
 # Install packages whose binary is absent from ~/.bun/bin.
 while IFS= read -r _ibp_pkg; do
   [ -z "$_ibp_pkg" ] && continue
-  echo "bun: installing $_ibp_pkg"
+  say -l bun "installing $_ibp_pkg"
   if ! "$_bun_bin" install -g --ignore-scripts "$_ibp_pkg"; then
-    echo "bun: '$_bun_bin install -g $_ibp_pkg' failed" >&2
-    exit 1
+    die -l bun "'$_bun_bin install -g $_ibp_pkg' failed"
   fi
   _ibp_bin="${_ibp_pkg##*/}"
   if [ ! -f "$HOME/.bun/bin/$_ibp_bin" ] &&
     [ ! -f "$HOME/.bun/bin/$_ibp_bin.cmd" ]; then
-    echo "bun: $_ibp_pkg installed but binary '$_ibp_bin' not found in '$HOME/.bun/bin'" >&2
-    exit 1
+    die -l bun "$_ibp_pkg installed but binary '$_ibp_bin' not found in '$HOME/.bun/bin'"
   fi
-  echo "bun: $_ibp_pkg installed successfully"
+  say -l bun "$_ibp_pkg installed successfully"
 done <"$_ibp_to_install"

@@ -34,11 +34,10 @@ if [ ! -f "$_ephi_config_path" ]; then
 fi
 
 if ! command -v prek >/dev/null 2>&1; then
-  printf '%s\n' "prek: prek binary not found; skipping hook installation for $_ephi_repo_root" >&2
+  warn -l prek "prek binary not found; skipping hook installation for $_ephi_repo_root"
   exit 0
 fi
 
 if ! (cd "$_ephi_repo_root" && prek install --quiet); then
-  printf '%s\n' "prek: failed to install hooks in $_ephi_repo_root" >&2
-  exit 1
+  die -l prek "failed to install hooks in $_ephi_repo_root"
 fi

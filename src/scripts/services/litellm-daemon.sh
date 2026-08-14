@@ -9,6 +9,10 @@
 #   LITELLM_OPENGODE_ZEN_API_KEY_PATH / $5 = OpenCode Zen API key file path
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../lib/lib.sh
+. "$SCRIPT_DIR/../lib/lib.sh"
+
 config="${LITELLM_CONFIG:-${1:?usage: litellm-daemon.sh <config> <poll_timeout> <openrouter_key_path> <opencode_go_key_path> <opencode_zen_key_path>}}"
 poll_timeout="${LITELLM_EVAL_TIMEOUT:-${2:?}}"
 _poll_ticks="$poll_timeout"
@@ -23,7 +27,7 @@ _wait_for_keyfile() {
   _path="$1"
   _ticks="$2"
   while [ ! -f "$_path" ] && [ "$_ticks" -gt 0 ]; do
-    echo "litellm-daemon: waiting for $_path ..." >&2
+    warn "waiting for $_path ..."
     sleep 5
     _ticks=$((_ticks - 1))
   done
@@ -31,7 +35,7 @@ _wait_for_keyfile() {
     cat "$_path"
     return 0
   else
-    echo "litellm-daemon: WARNING $_path not found after $((_poll_ticks * 5))s, continuing without it" >&2
+    warn "WARNING $_path not found after $((_poll_ticks * 5))s, continuing without it"
     return 1
   fi
 }

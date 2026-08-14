@@ -15,7 +15,7 @@
 #   REPO_ROOT  Repository root (must be set before sourcing).
 
 [ -n "${REPO_ROOT:-}" ] || {
-  printf '%s\n' "cleanup-nix-build-artifacts: REPO_ROOT is not set" >&2
+  error -l cleanup-nix-build-artifacts "REPO_ROOT is not set"
   return 1
 }
 
@@ -25,7 +25,7 @@ for _cnba_opt in $_cnba_options; do
   case "$_cnba_opt" in
   --dry-run) _cnba_dry_run=true ;;
   *)
-    printf '%s\n' "cleanup-nix-build-artifacts: unknown option: $_cnba_opt" >&2
+    error -l cleanup-nix-build-artifacts "unknown option: $_cnba_opt"
     return 1
     ;;
   esac
