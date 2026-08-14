@@ -49,8 +49,8 @@ done
 echo ""
 echo "============================================================"
 echo "Test Summary:"
-echo -e "${GREEN}Passed: $TESTS_PASSED${NC}"
-echo -e "${RED}Failed: $TESTS_FAILED${NC}"
+printf '%sPassed: %s%s\n' "$GREEN" "$TESTS_PASSED" "$NC"
+printf '%sFailed: %s%s\n' "$RED" "$TESTS_FAILED" "$NC"
 echo "============================================================"
 
 if [[ $TESTS_FAILED -eq 0 ]]; then

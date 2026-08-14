@@ -1,4 +1,5 @@
 # Test: step 14 repository-policy PS1 must enforce dummy-key registry uniformity
+# and the logging format policy
 
 $ErrorActionPreference = 'Stop'
 $PSStyle.OutputRendering = 'PlainText'
@@ -80,6 +81,60 @@ if ($content -match 'cnotmatch') {
   Assert-Pass -Name 'step14_ps1_naming_case_sensitive' -Reason 'step 14 PS1 keeps the kebab regex case-sensitive (-cnotmatch)'
 } else {
   Assert-Fail -Name 'step14_ps1_naming_case_sensitive' -Reason 'step 14 PS1 should keep the kebab regex case-sensitive (-cnotmatch)'
+}
+
+if ($content -match 'logging format policy') {
+  Assert-Pass -Name 'step14_ps1_logging_policy_present' -Reason 'step 14 PS1 enforces the logging format policy'
+} else {
+  Assert-Fail -Name 'step14_ps1_logging_policy_present' -Reason 'step 14 PS1 should enforce the logging format policy'
+}
+
+if ($content -match 'raw ANSI escape literal') {
+  Assert-Pass -Name 'step14_ps1_logging_ansi_pattern' -Reason 'step 14 PS1 flags raw ANSI escape literals'
+} else {
+  Assert-Fail -Name 'step14_ps1_logging_ansi_pattern' -Reason 'step 14 PS1 should flag raw ANSI escape literals'
+}
+
+if ($content -match 'terminal capability query') {
+  Assert-Pass -Name 'step14_ps1_logging_termcap_pattern' -Reason 'step 14 PS1 flags terminal capability queries'
+} else {
+  Assert-Fail -Name 'step14_ps1_logging_termcap_pattern' -Reason 'step 14 PS1 should flag terminal capability queries'
+}
+
+if ($content -match 'echo dash-e flag') {
+  Assert-Pass -Name 'step14_ps1_logging_echo_e_pattern' -Reason 'step 14 PS1 flags the echo dash-e flag'
+} else {
+  Assert-Fail -Name 'step14_ps1_logging_echo_e_pattern' -Reason 'step 14 PS1 should flag the echo dash-e flag'
+}
+
+if ($content -match 'char-27 escape literal') {
+  Assert-Pass -Name 'step14_ps1_logging_char27_pattern' -Reason 'step 14 PS1 flags char-27 escape literals'
+} else {
+  Assert-Fail -Name 'step14_ps1_logging_char27_pattern' -Reason 'step 14 PS1 should flag char-27 escape literals'
+}
+
+if ($content -match 'backtick-e escape literal') {
+  Assert-Pass -Name 'step14_ps1_logging_backtick_e_pattern' -Reason 'step 14 PS1 flags backtick-e escape literals'
+} else {
+  Assert-Fail -Name 'step14_ps1_logging_backtick_e_pattern' -Reason 'step 14 PS1 should flag backtick-e escape literals'
+}
+
+if ($content -match 'legacy skip marker') {
+  Assert-Pass -Name 'step14_ps1_logging_skip_marker_pattern' -Reason 'step 14 PS1 flags legacy skip markers'
+} else {
+  Assert-Fail -Name 'step14_ps1_logging_skip_marker_pattern' -Reason 'step 14 PS1 should flag legacy skip markers'
+}
+
+if ($content -match 'Invoke-LogManagement\.ps1' -and $content -match 'log-management\.Tests\.ps1') {
+  Assert-Pass -Name 'step14_ps1_logging_allowlist' -Reason 'step 14 PS1 allowlists the log sanitizer and its tests'
+} else {
+  Assert-Fail -Name 'step14_ps1_logging_allowlist' -Reason 'step 14 PS1 should allowlist the log sanitizer and its tests'
+}
+
+if ($content -match 'NO_COLOR') {
+  Assert-Pass -Name 'step14_ps1_logging_self_check' -Reason 'step 14 PS1 self-checks NO_COLOR handling in shared helpers'
+} else {
+  Assert-Fail -Name 'step14_ps1_logging_self_check' -Reason 'step 14 PS1 should self-check NO_COLOR handling in shared helpers'
 }
 
 if ($script:failed) { exit 1 } else { exit 0 }

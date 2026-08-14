@@ -15,7 +15,7 @@ TESTS_SKIPPED=0
 assert_skip() {
   local test_name="$1"
   local reason="$2"
-  echo -e "${YELLOW}⊘${NC} $test_name: $reason"
+  printf '%s⊘%s %s: %s\n' "$YELLOW" "$NC" "$test_name" "$reason"
   ((++TESTS_SKIPPED))
 }
 

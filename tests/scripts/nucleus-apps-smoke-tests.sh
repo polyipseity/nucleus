@@ -23,7 +23,7 @@ TESTS_SKIPPED=0
 assert_skip() {
   local test_name="$1"
   local reason="$2"
-  echo -e "${YELLOW}⊘${NC} $test_name: $reason"
+  printf '%s⊘%s %s: %s\n' "$YELLOW" "$NC" "$test_name" "$reason"
   ((++TESTS_SKIPPED))
 }
 
@@ -294,11 +294,11 @@ unset _pwsh_comp_file
 echo ""
 if [ "$TESTS_FAILED" -eq 0 ]; then
   if [ "$TESTS_SKIPPED" -eq 0 ]; then
-    echo -e "${GREEN}All $TESTS_PASSED nucleus apps smoke tests passed.${NC}"
+    printf '%sAll %s nucleus apps smoke tests passed.%s\n' "$GREEN" "$TESTS_PASSED" "$NC"
   else
-    echo -e "${GREEN}$TESTS_PASSED passed, $TESTS_SKIPPED skipped.${NC}"
+    printf '%s%s passed, %s skipped.%s\n' "$GREEN" "$TESTS_PASSED" "$TESTS_SKIPPED" "$NC"
   fi
 else
-  echo -e "${RED}$TESTS_FAILED/$((TESTS_FAILED + TESTS_PASSED)) nucleus apps smoke tests FAILED.${NC}" >&2
+  printf '%s%s/%s nucleus apps smoke tests FAILED.%s\n' "$RED" "$TESTS_FAILED" "$((TESTS_FAILED + TESTS_PASSED))" "$NC" >&2
   exit 1
 fi

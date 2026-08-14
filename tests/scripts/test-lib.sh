@@ -6,7 +6,7 @@
 # non-empty -> plain; FORCE_COLOR set and != "0" or CLICOLOR_FORCE set
 # non-empty -> color; else color only when stdout is a tty ([ -t 1 ]) and
 # TERM != dumb. Colors become empty strings when off so assert_* can print
-# plain text without echo -e.
+# plain text with plain printf (no escape interpretation).
 if [ -n "${NO_COLOR-}" ]; then
   TEST_COLOR=0
 elif [ -n "${CLICOLOR_FORCE-}" ] || { [ -n "${FORCE_COLOR-}" ] && [ "$FORCE_COLOR" != "0" ]; }; then
@@ -39,7 +39,7 @@ TESTS_FAILED=0
 assert_pass() {
   local test_name="$1"
   if [ "$TEST_COLOR" -eq 1 ]; then
-    echo -e "${GREEN}✓${NC} $test_name"
+    printf '%s✓%s %s\n' "$GREEN" "$NC" "$test_name"
   else
     echo "✓ $test_name"
   fi
@@ -50,7 +50,7 @@ assert_fail() {
   local test_name="$1"
   local reason="$2"
   if [ "$TEST_COLOR" -eq 1 ]; then
-    echo -e "${RED}✗${NC} $test_name: $reason"
+    printf '%s✗%s %s: %s\n' "$RED" "$NC" "$test_name" "$reason"
   else
     echo "✗ $test_name: $reason"
   fi

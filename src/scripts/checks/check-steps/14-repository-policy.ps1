@@ -482,6 +482,105 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
     }
   }
 
+  Write-Message "--- logging format policy ---"
+
+  $lfErrors = 0
+  # Exclude this check's own files: their source contains the literal pattern text.
+  # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
+  $lfSelfLeaf = Split-Path -Leaf $PSCommandPath
+  $lfSelfShLeaf = Split-Path -Leaf ([System.IO.Path]::ChangeExtension($PSCommandPath, '.sh'))
+
+  # Logging-format policy scope: tracked script files outside vendored code,
+  # secrets, and test fixtures (fixtures deliberately hold violation samples).
+  # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; vendored and secret files are separate concerns
+  $lfFiles = @(if ($HasArgs) {
+    @($PositionalArgs | Where-Object {
+        $_ -notmatch '(^|[\\/])(vendor[\\/]|src[\\/]secrets[\\/]|tests[\\/]fixtures[\\/])' -and
+        $_ -match '\.(sh|zsh|ps1|psm1)$' -and
+        (Split-Path -Leaf $_) -notin @($lfSelfLeaf, $lfSelfShLeaf)
+      })
+  } else {
+    @(git ls-files | Select-GitIgnored | Where-Object {
+        $_ -notmatch '(^|[\\/])(vendor[\\/]|src[\\/]secrets[\\/]|tests[\\/]fixtures[\\/])' -and
+        $_ -match '\.(sh|zsh|ps1|psm1)$' -and
+        (Split-Path -Leaf $_) -notin @($lfSelfLeaf, $lfSelfShLeaf)
+      })  # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; gitignore filter applied on top
+  })
+
+  if ($lfFiles.Count -gt 0) {
+    # Allowlist: the shared color helpers, their tests, and the log sanitizer
+    # are the only sanctioned ANSI emitters. WHY: Invoke-LogManagement.ps1 is
+    # the log sanitizer (it must reference ESC patterns to strip them) and its
+    # tests feed ESC input, so both join the allowlist alongside the helper
+    # modules and their tests.
+    $lfAllowlisted = @('lib.sh', 'step-runner.sh', 'step-runner.ps1', 'test-lib.sh', 'test-lib.ps1',
+      'Format-NucleusOutput.psm1', 'Format-NucleusOutput.Tests.ps1', 'Invoke-LogManagement.ps1', 'log-management.Tests.ps1')
+    $lfScanned = @($lfFiles | Where-Object { (Split-Path -Leaf $_) -notin $lfAllowlisted })
+
+    $lfShFiles = @($lfScanned | Where-Object { $_ -match '\.(sh|zsh)$' })
+    $lfEchoFiles = @($lfScanned | Where-Object { $_ -match '\.sh$' })
+    $lfPsFiles = @($lfScanned | Where-Object { $_ -match '\.(ps1|psm1)$' })
+
+    if ($lfShFiles.Count -gt 0) {
+      foreach ($m in (Select-String -Path $lfShFiles -Pattern '\\033\[', '\\e\[', '\\x1b\[')) {
+        Write-ErrorMessage "$($m.Path):$($m.LineNumber): raw ANSI escape literal (use shared color helpers)"
+        $lfErrors++
+      }
+      foreach ($m in (Select-String -Path $lfShFiles -Pattern '\btput\b')) {
+        Write-ErrorMessage "$($m.Path):$($m.LineNumber): terminal capability query (use shared color helpers)"
+        $lfErrors++
+      }
+    }
+    if ($lfEchoFiles.Count -gt 0) {
+      foreach ($m in (Select-String -Path $lfEchoFiles -Pattern '(^|[^A-Za-z0-9_])echo\s+-e([^A-Za-z0-9_]|$)')) {
+        Write-ErrorMessage "$($m.Path):$($m.LineNumber): echo dash-e flag (use printf with %b)"
+        $lfErrors++
+      }
+    }
+    if ($lfPsFiles.Count -gt 0) {
+      foreach ($m in (Select-String -Path $lfPsFiles -Pattern '\\033\[', '\\e\[', '\\x1b\[')) {
+        Write-ErrorMessage "$($m.Path):$($m.LineNumber): raw ANSI escape literal (use shared color helpers)"
+        $lfErrors++
+      }
+      foreach ($m in (Select-String -Path $lfPsFiles -Pattern '\btput\b')) {
+        Write-ErrorMessage "$($m.Path):$($m.LineNumber): terminal capability query (use shared color helpers)"
+        $lfErrors++
+      }
+      foreach ($m in (Select-String -Path $lfPsFiles -Pattern '\[char\]27')) {
+        Write-ErrorMessage "$($m.Path):$($m.LineNumber): char-27 escape literal (use PSStyle helpers)"
+        $lfErrors++
+      }
+      foreach ($m in (Select-String -Path $lfPsFiles -Pattern '`e')) {
+        Write-ErrorMessage "$($m.Path):$($m.LineNumber): backtick-e escape literal (use PSStyle helpers)"
+        $lfErrors++
+      }
+    }
+    foreach ($m in (Select-String -Path $lfScanned -Pattern '==== [0-9]')) {
+      Write-ErrorMessage "$($m.Path):$($m.LineNumber): legacy skip marker (use the shared skip_step helper)"
+      $lfErrors++
+    }
+  }
+
+  # Self-check: the color spec requires NO_COLOR handling in both shared helpers.
+  # Guarded on existence so fixture trees in tests skip this content probe.
+  $libShPath = Join-Path $r 'src\scripts\lib\lib.sh'
+  if ((Test-Path -LiteralPath $libShPath) -and -not (Select-String -Path $libShPath -Pattern 'NO_COLOR' -Quiet)) {
+    Write-ErrorMessage "src/scripts/lib/lib.sh does not reference NO_COLOR (logging-format self-check)"
+    $lfErrors++
+  }
+  $psm1Path = Join-Path $r 'src\platforms\Windows\modules\Format-NucleusOutput.psm1'
+  if ((Test-Path -LiteralPath $psm1Path) -and -not (Select-String -Path $psm1Path -Pattern 'NO_COLOR' -Quiet)) {
+    Write-ErrorMessage "src/platforms/Windows/modules/Format-NucleusOutput.psm1 does not reference NO_COLOR (logging-format self-check)"
+    $lfErrors++
+  }
+
+  if ($lfErrors -gt 0) {
+    Write-ErrorMessage "logging format policy check failed with $lfErrors error(s)"
+    $failed = $true
+  } else {
+    Write-Message "logging format policy passed."
+  }
+
   if ($failed) {
     Write-ErrorMessage "repository policy check failed"
     return $false

@@ -42,6 +42,9 @@ run_repository_policy() {
   say "--- dummy key uniformity ---"
   run_dummy_key_uniformity "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
+  say "--- logging format policy ---"
+  run_logging_format_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+
   if [ "$_failed" -ne 0 ]; then
     error "repository policy check failed"
     return 1
@@ -571,5 +574,80 @@ run_dummy_key_uniformity() {
     return 1
   fi
   say "dummy key uniformity policy passed."
+  return 0
+}
+
+run_logging_format_policy() {
+  local _has_args="$1" _repo_root="$2"
+  shift 2
+  local _files=("$@")
+  cd "$_repo_root" || return 1
+
+  local _lf_errors=0
+  # Exclude this check's own files: their source contains the literal pattern text.
+  # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
+  local _lf_self_sh="$_REPOSITORY_POLICY_STEP_SH" _lf_self_ps1="$_REPOSITORY_POLICY_STEP_PS1"
+
+  # Logging-format policy scope: tracked script files outside vendored code,
+  # secrets, and test fixtures (fixtures deliberately hold violation samples).
+  # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariants; vendored and secret files are separate concerns
+  local _lf_files=()
+  if $_has_args; then
+    for _f in "${_files[@]}"; do
+      case "$_f" in
+      vendor/* | src/secrets/* | tests/fixtures/*) continue ;;
+      esac
+      case "$_f" in
+      *.sh | *.zsh | *.ps1 | *.psm1) ;;
+      *) continue ;;
+      esac
+      case "$(basename "$_f")" in
+      "$_lf_self_sh" | "$_lf_self_ps1") continue ;;
+      esac
+      _lf_files+=("$_f")
+    done
+  else
+    while IFS= read -r _f; do
+      case "$_f" in
+      vendor/* | src/secrets/* | tests/fixtures/*) continue ;;
+      esac
+      case "$_f" in
+      *.sh | *.zsh | *.ps1 | *.psm1) ;;
+      *) continue ;;
+      esac
+      case "$(basename "$_f")" in
+      "$_lf_self_sh" | "$_lf_self_ps1") continue ;;
+      esac
+      _lf_files+=("$_f")
+    done < <(git ls-files | filter_gitignored)
+  fi
+
+  if [ "${#_lf_files[@]}" -gt 0 ]; then
+    # Pattern scan lives in the sibling .awk file (shellcheck policy: extract awk programs >10 lines).
+    local _awk_path="$_REPOSITORY_POLICY_STEP_DIR/$_REPOSITORY_POLICY_STEP_ID.awk"
+
+    local _violation
+    while IFS= read -r _violation; do
+      _lf_errors=$((_lf_errors + 1))
+      error "$_violation"
+    done < <(awk -v mode=logging-format -f "$_awk_path" "${_lf_files[@]}")
+  fi
+
+  # Self-check: the color spec requires NO_COLOR handling in both shared helpers.
+  # Guarded on existence so fixture trees in tests skip this content probe.
+  if [ -f src/scripts/lib/lib.sh ] && ! grep -q 'NO_COLOR' src/scripts/lib/lib.sh; then
+    _lf_errors=$((_lf_errors + 1))
+    error "src/scripts/lib/lib.sh does not reference NO_COLOR (logging-format self-check)"
+  fi
+  if [ -f src/platforms/Windows/modules/Format-NucleusOutput.psm1 ] && ! grep -q 'NO_COLOR' src/platforms/Windows/modules/Format-NucleusOutput.psm1; then
+    _lf_errors=$((_lf_errors + 1))
+    error "src/platforms/Windows/modules/Format-NucleusOutput.psm1 does not reference NO_COLOR (logging-format self-check)"
+  fi
+
+  if [ "$_lf_errors" -gt 0 ]; then
+    error "logging format policy check failed with $_lf_errors error(s)"
+    return 1
+  fi
+  say "logging format policy passed."
   return 0
 }
