@@ -4,11 +4,13 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
 . "$SCRIPT_DIR/../../../scripts/lib/macos-fda-warning.sh"
 
 _pp_repo_root="$1"
 
-echo "macos: checking macOS privacy permissions before defaults writes..." >&2
+say "checking macOS privacy permissions before defaults writes..."
 
 fda_warning_emitted=0
 
@@ -21,6 +23,6 @@ if ! probe_err="$({
   if printf '%s' "$probe_err" | /usr/bin/grep -Eqi 'Operation not permitted|Permission denied'; then
     print_fda_warning "protected user preferences"
   else
-    echo "macos: privacy preflight probe failed unexpectedly ($probe_err); continuing with best-effort defaults writes." >&2
+    warn "privacy preflight probe failed unexpectedly ($probe_err); continuing with best-effort defaults writes."
   fi
 fi

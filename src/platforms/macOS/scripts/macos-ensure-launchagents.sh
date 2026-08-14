@@ -7,9 +7,14 @@
 # Uses $newGenPath (set by Home Manager activation).
 set -euo pipefail
 
-# Provide local fallbacks for HM functions when running as a bundle subprocess.
-verboseEcho() { echo "verbose: $*" >&2; }
-warnEcho() { echo "warning: $*" >&2; }
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
+
+# Provide local fallbacks for HM functions when running as a bundle subprocess
+# (F1 format: info via say on stdout, warnings via warn on stderr).
+verboseEcho() { say "$*"; }
+warnEcho() { warn "$*"; }
 
 _new_gen_path="$1"
 _gui_domain="gui/$(id -u)"

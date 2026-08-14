@@ -4,6 +4,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
+
 _mge_prepend="$1"
 _mge_append="$2"
 _mge_managed_set="$3"
@@ -61,13 +65,13 @@ _mge_desired_path="$_mge_launchctl_config_path"
 _mge_current_path="$(/usr/libexec/PlistBuddy -c 'Print PathEnvironmentVariable' /private/var/db/com.apple.xpc.launchd/config/user.plist 2>/dev/null || true)" # check-suppress:suppression_doc: user.plist may not exist before first launchctl config write; read fails gracefully
 
 if [ "$_mge_current_path" != "$_mge_desired_path" ]; then
-  echo "launchd: updating user PATH (current differs from desired)."
+  say -l launchd "updating user PATH (current differs from desired)."
   if /usr/bin/sudo /bin/launchctl config user path "$_mge_desired_path" 2>/dev/null; then
-    echo "launchd: user PATH updated via launchctl config user path."
-    echo "launchd: REBOOT REQUIRED for .app bundles to inherit the new PATH."
+    say -l launchd "user PATH updated via launchctl config user path."
+    say -l launchd "REBOOT REQUIRED for .app bundles to inherit the new PATH."
   else
-    echo "launchd: failed to update user PATH (non-fatal)." >&2
+    warn -l launchd "failed to update user PATH (non-fatal)."
   fi
 else
-  echo "launchd: user PATH already up-to-date."
+  say -l launchd "user PATH already up-to-date."
 fi

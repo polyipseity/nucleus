@@ -4,6 +4,13 @@
 # All functions take their required data as function parameters. The caller
 # (activation script) passes Nix-derived values.
 
+# Source lib.sh from this library's own directory (callers set SCRIPT_DIR to
+# their own location, so resolve relative to this file).
+_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$_LIB_DIR/lib.sh"
+unset _LIB_DIR
+
 # ---------------------------------------------------------------------------
 # Ensure directories referenced by managed Finder favorites exist.
 # System-owned directories (~/Desktop, ~/Downloads, etc.) are created
@@ -98,7 +105,7 @@ finder_add_managed_strict() {
     _name=$(_jq '.name')
     _url=$(_jq '.url')
     if ! "$mysides_bin" add "$_name" "$_url" >/dev/null 2>&1; then
-      echo "macos: failed to add Finder favorite '$_name' ($_url)." >&2
+      warn "failed to add Finder favorite '$_name' ($_url)."
       _add_failed=1
     fi
   done <"$_add_tmp"
@@ -184,7 +191,7 @@ finder_configure_sidebar() {
   local expected_order="$4"
   local managed_count="$5"
   if [ ! -x "$mysides_bin" ]; then
-    echo "macos: mysides is unavailable; Finder favorites were not updated automatically." >&2
+    warn "mysides is unavailable; Finder favorites were not updated automatically."
     exit 0
   fi
 
@@ -197,7 +204,7 @@ finder_configure_sidebar() {
   _finder_list_output=$("$mysides_bin" list 2>/dev/null || true)
   _finder_actual_order="$(echo "$_finder_list_output" | /usr/bin/awk -F' -> ' 'NF >= 1 && $1 != "" { print $1 }' | /usr/bin/head -n "$managed_count" | /usr/bin/paste -sd'|' -)"
   if [ "$_finder_actual_order" != "$expected_order" ]; then
-    echo "macos: warning — mysides reported sidebar order mismatch (expected: $expected_order, actual: $_finder_actual_order)." >&2
+    warn "warning — mysides reported sidebar order mismatch (expected: $expected_order, actual: $_finder_actual_order)."
     _finder_sidebar_failed=1
   fi
 
@@ -208,8 +215,8 @@ finder_configure_sidebar() {
   /usr/bin/killall -KILL cfprefsd 2>/dev/null || true
 
   if [ "$_finder_sidebar_failed" -eq 1 ]; then
-    echo "macos: Finder favorites were partially updated; if stale entries persist, log out and log back in once." >&2
+    warn "Finder favorites were partially updated; if stale entries persist, log out and log back in once."
   else
-    echo "macos: Finder favorites updated automatically." >&2
+    say "Finder favorites updated automatically."
   fi
 }

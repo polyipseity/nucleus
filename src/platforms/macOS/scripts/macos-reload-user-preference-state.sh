@@ -5,6 +5,10 @@
 # Usage: reload-user-preference-state
 set -eu
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
+
 if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
-  echo "reload-user-preference-state: activateSettings -u failed; some preference updates may require relogin." >&2
+  warn "activateSettings -u failed; some preference updates may require relogin."
 fi

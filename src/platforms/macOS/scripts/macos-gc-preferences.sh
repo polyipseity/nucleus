@@ -3,11 +3,15 @@
 # Expects env vars: NIX_STORE_BIN, MANAGED_PREF_DOMAINS
 set -eu
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
+
 # Verify Nix store integrity before running destructive preference cleanup.
 # If verification fails we skip purge so an unrelated store issue cannot be
 # compounded by deleting user preference state in the same maintenance run.
 if ! "$NIX_STORE_BIN" --verify --check-contents >/dev/null 2>&1; then
-  echo "macos: store integrity check failed; skipping managed preference purge for safety." >&2
+  warn "store integrity check failed; skipping managed preference purge for safety."
   exit 0
 fi
 

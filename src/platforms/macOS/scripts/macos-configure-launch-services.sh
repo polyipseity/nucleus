@@ -7,6 +7,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
 . "$SCRIPT_DIR/../../../scripts/lib/macos-launch-services.sh"
 
 _duti_bin="$1"
@@ -27,6 +29,6 @@ if command -v jq >/dev/null 2>&1; then
     _i=$((_i + 1))
   done
 else
-  echo "configure-launch-services: jq not found — skipping handler registration" >&2
+  warn "jq not found — skipping handler registration"
 fi
 rm -f "$_handlers_tmp"

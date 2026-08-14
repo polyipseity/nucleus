@@ -7,6 +7,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
 . "$SCRIPT_DIR/../../../scripts/lib/macos-fda-warning.sh"
 fda_warning_emitted=0
 
@@ -15,16 +17,13 @@ set_default() {
   key="$2"
   value="$3"
   value_type="$4"
-  yellow="$(printf '\033[33m')"
-  bold="$(printf '\033[1m')"
-  reset="$(printf '\033[0m')"
 
   if ! write_err="$({ /usr/bin/defaults write "$domain" "$key" "-$value_type" "$value"; } 2>&1)"; then
     if printf '%s' "$write_err" | /usr/bin/grep -Eqi 'Operation not permitted|Permission denied'; then
       print_fda_warning "Accessibility preferences"
-      printf '%s![Permission Denied]%s Failed to set %s%s %s%s. Ensure Full Disk Access and Accessibility permissions are granted.\n' "$yellow" "$reset" "$bold" "$domain" "$key" "$reset" >&2
+      printf '%s![Permission Denied]%s Failed to set %s%s %s%s. Ensure Full Disk Access and Accessibility permissions are granted.\n' "$_nuc_c2_yellow" "$_nuc_c2_reset" "$_nuc_c2_bold" "$domain" "$key" "$_nuc_c2_reset" >&2
     else
-      echo "macos: failed to set $domain $key ($write_err)." >&2
+      warn "failed to set $domain $key ($write_err)."
     fi
   fi
 }

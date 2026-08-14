@@ -6,6 +6,8 @@
 set -eu
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
 . "$SCRIPT_DIR/../../../scripts/lib/symlink-hardening.sh"
 
 _ray_alias_dir="$HOME/Applications/Nucleus App Aliases"
@@ -26,7 +28,7 @@ ensure_alias() {
     _nucleus_unprotect_symlink "raycast" "$_alias_path"
     rm "$_alias_path"
   elif [ -e "$_alias_path" ]; then
-    echo "raycast: keeping unmanaged app alias path $_alias_path (not a symlink)." >&2
+    warn "keeping unmanaged app alias path $_alias_path (not a symlink)."
     return 0
   fi
 

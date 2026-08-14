@@ -17,6 +17,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
 . "$SCRIPT_DIR/../../../scripts/lib/macos-console-user.sh"
 
 DP_BIN="/opt/homebrew/bin/displayplacer"
@@ -75,11 +77,11 @@ if [ -x "$DP_BIN" ]; then
   if [ -n "$MODE4_STR" ] && [ "$MODE4_CURRENT" != "yes" ]; then
     if _nucleus_resolve_console_user; then
       if ! /bin/launchctl asuser "$_nucleus_console_uid" "$DP_BIN" "id:$PRIMARY_ID $MODE4_STR"; then
-        echo "macos: failed to apply primary display mode with displayplacer." >&2
+        warn "failed to apply primary display mode with displayplacer."
       fi
     else
       if ! "$DP_BIN" "id:$PRIMARY_ID $MODE4_STR"; then
-        echo "macos: failed to apply primary display mode with displayplacer." >&2
+        warn "failed to apply primary display mode with displayplacer."
       fi
     fi
     /bin/sleep 1
@@ -125,11 +127,11 @@ if [ -x "$DP_BIN" ]; then
     if [ -n "$BEST_MODE" ]; then
       if _nucleus_resolve_console_user; then
         if ! /bin/launchctl asuser "$_nucleus_console_uid" "$DP_BIN" "id:$ID $BEST_MODE"; then
-          echo "macos: failed to apply mode '$BEST_MODE' to display id $ID." >&2
+          warn "failed to apply mode '$BEST_MODE' to display id $ID."
         fi
       else
         if ! "$DP_BIN" "id:$ID $BEST_MODE"; then
-          echo "macos: failed to apply mode '$BEST_MODE' to display id $ID." >&2
+          warn "failed to apply mode '$BEST_MODE' to display id $ID."
         fi
       fi
     fi

@@ -3,6 +3,10 @@
 # Directory names to exclude are passed as space-separated $1.
 set -eu
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
+
 DEV_ROOT="$HOME/dev"
 updated_count=0
 
@@ -33,5 +37,5 @@ done < <(
 )
 
 if [ "$updated_count" -gt 0 ]; then
-  echo "macos: added Spotlight exclusion markers to $updated_count dev directories." >&2
+  say "added Spotlight exclusion markers to $updated_count dev directories."
 fi

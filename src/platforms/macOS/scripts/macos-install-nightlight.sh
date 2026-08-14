@@ -7,13 +7,15 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
 . "$SCRIPT_DIR/../../../scripts/lib/macos-console-user.sh"
 
 if [ -x "/opt/homebrew/bin/nightlight" ]; then
   NL_BIN="/opt/homebrew/bin/nightlight"
 
   if ! "$NL_BIN" schedule start; then
-    echo "macos: failed to configure Nightlight schedule." >&2
+    warn "failed to configure Nightlight schedule."
   fi
 
   # Read current temperature; skip setting if already at target value.
@@ -23,11 +25,11 @@ if [ -x "/opt/homebrew/bin/nightlight" ]; then
   if [ "$current_temp" != "50" ]; then
     if _nucleus_resolve_console_user; then
       if ! /bin/launchctl asuser "$_nucleus_console_uid" "$NL_BIN" temp 50; then
-        echo "macos: failed to set Nightlight temperature." >&2
+        warn "failed to set Nightlight temperature."
       fi
     else
       if ! "$NL_BIN" temp 50; then
-        echo "macos: failed to set Nightlight temperature." >&2
+        warn "failed to set Nightlight temperature."
       fi
     fi
   fi
@@ -36,21 +38,21 @@ if [ -x "/opt/homebrew/bin/nightlight" ]; then
   if [ "$current_hour" -ge 18 ] || [ "$current_hour" -lt 6 ]; then
     if _nucleus_resolve_console_user; then
       if ! /bin/launchctl asuser "$_nucleus_console_uid" "$NL_BIN" on; then
-        echo "macos: failed to enable Nightlight." >&2
+        warn "failed to enable Nightlight."
       fi
     else
       if ! "$NL_BIN" on; then
-        echo "macos: failed to enable Nightlight." >&2
+        warn "failed to enable Nightlight."
       fi
     fi
   else
     if _nucleus_resolve_console_user; then
       if ! /bin/launchctl asuser "$_nucleus_console_uid" "$NL_BIN" off; then
-        echo "macos: failed to disable Nightlight." >&2
+        warn "failed to disable Nightlight."
       fi
     else
       if ! "$NL_BIN" off; then
-        echo "macos: failed to disable Nightlight." >&2
+        warn "failed to disable Nightlight."
       fi
     fi
   fi

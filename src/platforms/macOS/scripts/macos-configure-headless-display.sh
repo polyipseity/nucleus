@@ -17,6 +17,10 @@
 # No-op if BetterDisplay is not installed.
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
+
 BD_BIN="/Applications/BetterDisplay.app/Contents/MacOS/BetterDisplay"
 BD_APP="/Applications/BetterDisplay.app"
 DISPLAY_NAME="HeadlessDisplay"
@@ -47,7 +51,7 @@ discard_headless_displays() {
   # screens and avoid affecting physical monitors.
   for tag_id in $1; do
     if ! "$BD_BIN" discard -tagID="$tag_id"; then
-      echo "macos: failed to discard duplicate BetterDisplay virtual screen tagID=$tag_id." >&2
+      warn "failed to discard duplicate BetterDisplay virtual screen tagID=$tag_id."
     fi
   done
 }
@@ -68,7 +72,7 @@ if [ -f "$BD_BIN" ]; then
     fi
 
     if ! create_headless_display; then
-      echo "macos: failed to create BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
+      warn "failed to create BetterDisplay virtual screen '$DISPLAY_NAME'."
     fi
     /bin/sleep 3 # wait for the virtual display to be registered
     identifiers_json="$(_bd_cli get -identifiers -name="$DISPLAY_NAME")"
@@ -79,11 +83,11 @@ if [ -f "$BD_BIN" ]; then
 
     if [ "$connected_state" != "on" ]; then
       if ! "$BD_BIN" discard -tagID="$tag_id"; then
-        echo "macos: failed to discard disconnected BetterDisplay virtual screen '$DISPLAY_NAME' (tagID=$tag_id)." >&2
+        warn "failed to discard disconnected BetterDisplay virtual screen '$DISPLAY_NAME' (tagID=$tag_id)."
       fi
 
       if ! create_headless_display; then
-        echo "macos: failed to recreate BetterDisplay virtual screen '$DISPLAY_NAME'." >&2
+        warn "failed to recreate BetterDisplay virtual screen '$DISPLAY_NAME'."
       fi
       /bin/sleep 3 # wait for the virtual display to be registered
       identifiers_json="$(_bd_cli get -identifiers -name="$DISPLAY_NAME")"
@@ -93,6 +97,6 @@ if [ -f "$BD_BIN" ]; then
 
   connected_after="$(_bd_cli get -name="$DISPLAY_NAME" -connected)"
   if [ "$connected_after" != "on" ]; then
-    echo "macos: failed to set BetterDisplay virtual screen '$DISPLAY_NAME' connected=on." >&2
+    warn "failed to set BetterDisplay virtual screen '$DISPLAY_NAME' connected=on."
   fi
 fi

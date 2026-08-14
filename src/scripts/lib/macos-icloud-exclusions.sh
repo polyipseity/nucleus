@@ -5,6 +5,13 @@
 # apply_exclusions JQ_BIN FIND_BIN EXCLUDED_DIRS_JSON MANAGED_ROOTS_JSON
 # Returns 0 on success, 1 on error.
 
+# Source lib.sh from this library's own directory (callers set SCRIPT_DIR to
+# their own location, so resolve relative to this file).
+_LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=lib.sh
+. "$_LIB_DIR/lib.sh"
+unset _LIB_DIR
+
 apply_exclusions() {
   local jq_bin="$1"
   local find_bin="$2"
@@ -45,6 +52,6 @@ apply_exclusions() {
   elapsed=$((end_time - start_time))
 
   if [ "$count" -gt 0 ]; then
-    echo "macos: iCloud exclusion applied to $count directories in ${elapsed}s" >&2
+    say "iCloud exclusion applied to $count directories in ${elapsed}s"
   fi
 }
