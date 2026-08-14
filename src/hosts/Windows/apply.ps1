@@ -731,6 +731,7 @@ $effectiveConfigFiles = @($effectiveConfigFiles | ForEach-Object {
 })
 
 foreach ($configFile in $effectiveConfigFiles) {
+  Write-NucleusInfo "Applying WinGet DSC: $(Split-Path -Leaf $configFile)"
   Invoke-WingetConfiguration -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath $configFile) -WallpaperPath $activeWallpaperPath
 }
 
