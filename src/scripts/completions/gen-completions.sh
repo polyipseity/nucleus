@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Generate zsh completion files for every nucleus-* command from its --help
 # output (the CLI is the source of truth; the help contract is enforced by
-# nucleus-output-format.instructions.md). Idempotent: generating twice yields
+# logging.instructions.md). Idempotent: generating twice yields
 # byte-identical files. --check regenerates into a temp dir and fails listing
 # every differing checked-in file (enforced by check step 10-completions-fresh).
 # Generated files must not be edited by hand.
