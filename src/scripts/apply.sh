@@ -50,14 +50,14 @@ while [ "$#" -gt 0 ]; do
     target_user="$2"
     shift
     if [ -z "$target_user" ]; then
-      printf '%s\n' "apply: --target-user requires a non-empty value" >&2
+      error -l apply "--target-user requires a non-empty value"
       exit 1
     fi
     ;;
   --target-user=*)
     target_user="${1#--target-user=}"
     if [ -z "$target_user" ]; then
-      printf '%s\n' "apply: --target-user requires a non-empty value" >&2
+      error -l apply "--target-user requires a non-empty value"
       exit 1
     fi
     ;;
@@ -65,7 +65,7 @@ while [ "$#" -gt 0 ]; do
     NUCLEUS_USERNAME="$2"
     shift
     if [ -z "$NUCLEUS_USERNAME" ]; then
-      printf '%s\n' "apply: --username requires a non-empty value" >&2
+      error -l apply "--username requires a non-empty value"
       exit 1
     fi
     ;;
@@ -73,7 +73,7 @@ while [ "$#" -gt 0 ]; do
     usage
     ;;
   *)
-    printf '%s\n' "apply: unsupported argument '$1'" >&2
+    error -l apply "unsupported argument '$1'"
     exit 1
     ;;
   esac
@@ -165,48 +165,48 @@ run_ai_sync() {
   # Call nucleus-ai sync to converge locally installed Ollama models with
   # the declarative manifest after the system configuration has been applied.
   if [ "$ai_sync" = false ]; then
-    printf '%s\n' "ai: --no-ai-sync set; skipping post-apply model sync"
+    say -l ai "--no-ai-sync set; skipping post-apply model sync"
     return
   fi
 
   if ! command -v nucleus-ai >/dev/null 2>&1; then
-    printf '%s\n' "ai: nucleus-ai not found in PATH; skipping model sync"
+    say -l ai "nucleus-ai not found in PATH; skipping model sync"
     return
   fi
 
   if ! command -v ollama >/dev/null 2>&1; then
-    printf '%s\n' "ai: ollama not found in PATH; skipping post-apply model sync"
+    say -l ai "ollama not found in PATH; skipping post-apply model sync"
     return
   fi
 
-  printf '%s\n' "ai: running post-apply AI model sync..."
+  say -l ai "running post-apply AI model sync..."
   if ! nucleus-ai sync; then
-    printf '%s\n' "ai: nucleus-ai sync exited with an error; model sync incomplete (system apply succeeded)" >&2
+    warn -l ai "nucleus-ai sync exited with an error; model sync incomplete (system apply succeeded)"
   fi
 }
 
 run_vm_post_apply() {
   if ! command -v nucleus-vm >/dev/null 2>&1; then
-    printf '%s\n' "nucleus-vm: nucleus-vm not found in PATH; skipping post-apply VM step"
+    say -l nucleus-vm "nucleus-vm not found in PATH; skipping post-apply VM step"
     return
   fi
 
   if [ "$vm_setup" = true ]; then
-    printf '%s\n' "nucleus-vm: running post-apply VM provisioning (setup)..."
+    say -l nucleus-vm "running post-apply VM provisioning (setup)..."
     if ! nucleus-vm setup --accept-gsi-license; then
-      printf '%s\n' "nucleus-vm: nucleus-vm setup exited with an error; VM setup incomplete (system apply succeeded)" >&2
+      warn -l nucleus-vm "nucleus-vm setup exited with an error; VM setup incomplete (system apply succeeded)"
     fi
     return
   fi
 
   if [ "$vm_sync" = false ]; then
-    printf '%s\n' "nucleus-vm: --no-vm-sync set; skipping post-apply VM config refresh"
+    say -l nucleus-vm "--no-vm-sync set; skipping post-apply VM config refresh"
     return
   fi
 
-  printf '%s\n' "nucleus-vm: running post-apply VM config refresh (sync)..."
+  say -l nucleus-vm "running post-apply VM config refresh (sync)..."
   if ! nucleus-vm sync; then
-    printf '%s\n' "nucleus-vm: nucleus-vm sync exited with an error; VM sync incomplete (system apply succeeded)" >&2
+    warn -l nucleus-vm "nucleus-vm sync exited with an error; VM sync incomplete (system apply succeeded)"
   fi
 }
 
@@ -215,13 +215,13 @@ run_gc() {
   # configuration and model/VM setup have completed.
   _rgc_script="$REPO_ROOT/scripts/gc.sh"
   if [ ! -f "$_rgc_script" ]; then
-    printf '%s\n' "gc: scripts/gc.sh not found at $_rgc_script; skipping garbage collection"
+    say -l gc "scripts/gc.sh not found at $_rgc_script; skipping garbage collection"
     return
   fi
 
-  printf '%s\n' "gc: running post-apply garbage collection..."
+  say -l gc "running post-apply garbage collection..."
   if ! sh "$_rgc_script"; then
-    printf '%s\n' "gc: gc.sh exited with an error; GC incomplete (system apply succeeded)" >&2
+    warn -l gc "gc.sh exited with an error; GC incomplete (system apply succeeded)"
   fi
 }
 
@@ -230,12 +230,12 @@ run_caddy_local_ca_trust() {
   # (retry loop with caddy --address 127.0.0.1:2019).
   _rclct_script="$REPO_ROOT/src/scripts/services/caddy-trust.sh"
   if [ ! -f "$_rclct_script" ]; then
-    printf '%s\n' "caddy-trust: caddy-trust.sh not found at $_rclct_script; skipping local CA trust"
+    say -l caddy-trust "caddy-trust.sh not found at $_rclct_script; skipping local CA trust"
     return
   fi
 
   if ! sh "$_rclct_script" "$1"; then
-    printf '%s\n' 'caddy-trust: delegated trust script exited with an error (continuing without failing apply)' >&2
+    warn -l caddy-trust 'delegated trust script exited with an error (continuing without failing apply)'
   fi
 }
 
@@ -243,24 +243,24 @@ run_replica_sync() {
   # Call scripts/replica-sync.sh so enabled replicas in users.json are
   # synchronized after a successful apply.
   if [ "$replica_sync" = false ]; then
-    printf '%s\n' "replica-sync: skipping post-apply replica sync (default; pass --replica-sync to run now)"
+    say -l replica-sync "skipping post-apply replica sync (default; pass --replica-sync to run now)"
     return
   fi
 
   _rrb_script="$REPO_ROOT/scripts/replica-sync.sh"
   if [ ! -f "$_rrb_script" ]; then
-    printf '%s\n' "replica-sync: scripts/replica-sync.sh not found at $_rrb_script; skipping replica sync"
+    say -l replica-sync "scripts/replica-sync.sh not found at $_rrb_script; skipping replica sync"
     return
   fi
 
   if ! command -v rclone >/dev/null 2>&1; then
-    printf '%s\n' "replica-sync: rclone not found in PATH; skipping post-apply replica sync"
+    say -l replica-sync "rclone not found in PATH; skipping post-apply replica sync"
     return
   fi
 
-  printf '%s\n' "replica-sync: running post-apply replica sync..."
+  say -l replica-sync "running post-apply replica sync..."
   if ! sh "$_rrb_script"; then
-    printf '%s\n' "replica-sync: replica-sync.sh exited with an error; replica sync incomplete (system apply succeeded)" >&2
+    warn -l replica-sync "replica-sync.sh exited with an error; replica sync incomplete (system apply succeeded)"
   fi
 }
 
@@ -289,14 +289,14 @@ run_terminal_activations() {
   fi
 
   # check-suppress:suppression_doc: grep returns exit code 1 when no lines match; set -e would abort.
-  printf '%s\n' "terminal-activations: running $(grep -c '^[^#]' "$_rta_manifest" || true) terminal-context activation(s)..."
+  say -l terminal-activations "running $(grep -c '^[^#]' "$_rta_manifest" || true) terminal-context activation(s)..."
   while IFS= read -r _rta_line; do
     case "$_rta_line" in
     '' | '#'*) continue ;;
     esac
-    printf '%s\n' "terminal-activations: $_rta_line"
+    say -l terminal-activations "$_rta_line"
     if ! eval "$_rta_line"; then
-      printf '%s\n' "terminal-activations: command exited with error (continuing)" >&2
+      warn -l terminal-activations "command exited with error (continuing)"
     fi
   done <"$_rta_manifest"
   rm -f "$_rta_manifest"
@@ -319,7 +319,7 @@ Darwin)
   # nix-darwin manages both the system layer and the user Home Manager
   # profile.  darwin-rebuild invokes sudo internally for system activation.
   if [ -n "$target_user" ]; then
-    printf '%s\n' "apply: --target-user is ignored on Darwin system rebuilds (host-level configuration selects the Home Manager user)."
+    say -l apply "--target-user is ignored on Darwin system rebuilds (host-level configuration selects the Home Manager user)."
   fi
   start_sudo_keepalive
   "$_ash_script_dir/secrets/generate-ssh-host-key.sh"
@@ -342,7 +342,7 @@ Linux)
     # NixOS: use nixos-rebuild so the system layer and the embedded
     # home-manager module are applied in a single atomic activation.
     if [ -n "$target_user" ]; then
-      printf '%s\n' "apply: --target-user is ignored on NixOS system rebuilds (host-level configuration selects the Home Manager user)."
+      say -l apply "--target-user is ignored on NixOS system rebuilds (host-level configuration selects the Home Manager user)."
     fi
     start_sudo_keepalive
     "$_ash_script_dir/secrets/generate-ssh-host-key.sh"
@@ -379,7 +379,7 @@ Linux)
   fi
   ;;
 *)
-  printf '%s\n' "error: unsupported OS '$(uname -s)'" >&2
+  error "unsupported OS '$(uname -s)'"
   exit 1
   ;;
 esac
