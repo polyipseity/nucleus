@@ -3,13 +3,16 @@
     Shared output formatting for nucleus-* PowerShell scripts.
 .DESCRIPTION
     Provides Write-NucleusInfo, Write-NucleusError, Write-NucleusWarning,
-    Write-NucleusDryRun, and Write-NucleusDone functions that format output
-    consistently across all nucleus-* commands.
+    Write-NucleusDryRun, Write-NucleusDone, and Write-NucleusNotice functions
+    that format output consistently across all nucleus-* commands.
 
     These functions auto-derive the command name from the script path, so
     callers don't need to pass a prefix; pass -CommandName to override the
-    label (F1 grammar). Info/DryRun/Done are colored with $PSStyle when the
-    console supports it; Error/Warning are left to host rendering.
+    label (F1 grammar). Info/DryRun/Done/Notice are colored with $PSStyle when
+    the console supports it; Error/Warning are left to host rendering.
+    Semantic inline coloring (URLs -> underline cyan, single-quoted spans ->
+    blue) is applied to message text only when color is on; output is
+    byte-identical to plain text otherwise.
 
     Usage:
         Import-Module Format-NucleusOutput
@@ -18,6 +21,7 @@
         Write-NucleusError "file not found"
         Write-NucleusWarning "deprecated flag"
         Write-NucleusDryRun "would delete $path"
+        Write-NucleusNotice "reboot pending"
         Write-NucleusDone
 #>
 
@@ -34,7 +38,24 @@ if ($env:NO_COLOR) {
     $script:NucleusColorOn = $true
 }
 
-# Internal F1 formatter for the stdout helpers (Info/DryRun/Done).
+# Semantic inline tokenizer (F spec, "more console colors"): single-quoted
+# spans -> blue, URLs -> underline cyan, only when color is on; byte-identical
+# passthrough otherwise. Quote pass runs first so URLs inside quotes still read
+# as URLs. Mirrors _nuc_semantic_color in src/scripts/lib/lib.sh.
+function ConvertTo-NucleusSemanticColor {
+    param(
+        [string]$Text
+    )
+    if (-not $script:NucleusColorOn -or -not $Text) { return $Text }
+    $blue = $PSStyle.Foreground.Blue
+    $underlineCyan = "$($PSStyle.Underline)$($PSStyle.Foreground.Cyan)"
+    $reset = $PSStyle.Reset
+    $result = [regex]::Replace($Text, "'[^']*'", { param($m) "${blue}$($m.Value)${reset}" })
+    $result = [regex]::Replace($result, 'https?://[^\s''"]*', { param($m) "${underlineCyan}$($m.Value)${reset}" })
+    return $result
+}
+
+# Internal F1 formatter for the stdout helpers (Info/DryRun/Done/Notice).
 # Embeds color around the label and level word only when $script:NucleusColorOn
 # is set; plain-string variant otherwise. No timestamp support yet (F1 allows
 # optional [<ts> ]); both POSIX and PS1 sides currently omit it.
@@ -48,21 +69,27 @@ function Format-NucleusMessage {
         switch ($Level) {
             'dry-run' { return "$CommandName`: [dry-run] $Message" }
             'done' { return "$CommandName`: done" }
+            'notice' { return "$CommandName`: [notice] $Message" }
             default { return "$CommandName`: $Message" }
         }
     }
     $label = "$($PSStyle.Bold)$CommandName$($PSStyle.Reset)"
+    $message = ConvertTo-NucleusSemanticColor -Text $Message
     switch ($Level) {
         'dry-run' {
             $token = "$($PSStyle.Bold)$($PSStyle.Foreground.Magenta)[dry-run]$($PSStyle.Reset)"
-            return "$label`: $token $Message"
+            return "$label`: $token $message"
         }
         'done' {
             $token = "$($PSStyle.Bold)$($PSStyle.Foreground.Green)done$($PSStyle.Reset)"
             return "$label`: $token"
         }
+        'notice' {
+            $token = "$($PSStyle.Bold)$($PSStyle.Foreground.Blue)[notice]$($PSStyle.Reset)"
+            return "$label`: $token $message"
+        }
         default {
-            return "$label`: $Message"
+            return "$label`: $message"
         }
     }
 }
@@ -122,6 +149,7 @@ function Write-NucleusError {
         [string]$ErrorAction = ''
     )
     if (-not $CommandName) { $CommandName = Get-NucleusCommandName }
+    if ($script:NucleusColorOn) { $Message = ConvertTo-NucleusSemanticColor -Text $Message }
     if ($ErrorAction) {
         Write-Error "$CommandName`: error: $Message" -ErrorAction $ErrorAction
     }
@@ -144,6 +172,7 @@ function Write-NucleusWarning {
         [string]$CommandName = ''
     )
     if (-not $CommandName) { $CommandName = Get-NucleusCommandName }
+    if ($script:NucleusColorOn) { $Message = ConvertTo-NucleusSemanticColor -Text $Message }
     Write-Warning "$CommandName`: warning: $Message"
 }
 
@@ -178,4 +207,21 @@ function Write-NucleusDone {
     Write-Output (Format-NucleusMessage -CommandName $CommandName -Level 'done')
 }
 
-Export-ModuleMember -Function Get-NucleusCommandName, Write-NucleusInfo, Write-NucleusError, Write-NucleusWarning, Write-NucleusDryRun, Write-NucleusDone
+function Write-NucleusNotice {
+    <#
+    .SYNOPSIS
+        Print a notice message to stdout.
+    .PARAMETER Message
+        The message text (without prefix).
+    .PARAMETER CommandName
+        Optional label override (defaults to the derived command name).
+    #>
+    param(
+        [string]$Message,
+        [string]$CommandName = ''
+    )
+    if (-not $CommandName) { $CommandName = Get-NucleusCommandName }
+    Write-Output (Format-NucleusMessage -CommandName $CommandName -Level 'notice' -Message $Message)
+}
+
+Export-ModuleMember -Function Get-NucleusCommandName, Write-NucleusInfo, Write-NucleusError, Write-NucleusWarning, Write-NucleusDryRun, Write-NucleusDone, Write-NucleusNotice

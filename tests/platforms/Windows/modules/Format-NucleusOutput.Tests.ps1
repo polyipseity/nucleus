@@ -141,3 +141,100 @@ Describe 'Write-NucleusDone' {
     $result | Should -Match ': done$'
   }
 }
+
+Describe 'Write-NucleusNotice' {
+  It 'outputs notice message' {
+    $result = Write-NucleusNotice 'reboot pending' 6>&1
+    $result | Should -Match ': \[notice\] reboot pending$'
+  }
+
+  It 'honors -CommandName label override (F1)' {
+    $result = Write-NucleusNotice 'reboot' -CommandName apply 6>&1
+    $result | Should -BeExactly 'apply: [notice] reboot'
+  }
+
+  It 'emits no ESC bytes under NO_COLOR' {
+    $result = Write-NucleusNotice 'plain' 6>&1
+    $result | Should -Not -Match "`e"
+  }
+}
+
+Describe 'Semantic message coloring' {
+  # Color-on branch: FORCE_COLOR=1 overrides capture-time suppression, so the
+  # tokenizer output (ESC-wrapped spans) is observable in Pester.
+  BeforeAll {
+    Remove-Item Env:NO_COLOR -ErrorAction SilentlyContinue
+    $env:FORCE_COLOR = '1'
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Import-Module $modulePath -Force -DisableNameChecking
+  }
+  AfterAll {
+    Remove-Item Env:FORCE_COLOR -ErrorAction SilentlyContinue
+    $env:NO_COLOR = '1'
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Import-Module $modulePath -Force -DisableNameChecking
+  }
+
+  It 'wraps single-quoted spans in blue when color is on' {
+    $result = (Write-NucleusInfo "account 'jellyfin'" 6>&1) -join "`n"
+    $result.Contains("`e[34m'jellyfin'`e[0m") | Should -BeTrue
+  }
+
+  It 'wraps URLs in underline cyan when color is on' {
+    $result = (Write-NucleusInfo 'check https://example.com/x' 6>&1) -join "`n"
+    $result.Contains("`e[4m`e[36mhttps://example.com/x`e[0m") | Should -BeTrue
+  }
+
+  It 'colors URLs inside quoted spans (quote pass runs first)' {
+    $result = (Write-NucleusInfo "see 'https://example.com' now" 6>&1) -join "`n"
+    # URL wrap resets style within the span, so the closing quote renders plain
+    # (mirrors the POSIX _nuc_semantic_color pass ordering).
+    $result.Contains("`e[34m'`e[4m`e[36mhttps://example.com`e[0m'`e[0m") | Should -BeTrue
+  }
+
+  It 'colors notice messages too' {
+    $result = (Write-NucleusNotice 'install from https://example.com' 6>&1) -join "`n"
+    $result.Contains("`e[4m`e[36mhttps://example.com`e[0m") | Should -BeTrue
+  }
+
+  It 'is byte-identical to plain text under NO_COLOR' {
+    Remove-Item Env:FORCE_COLOR -ErrorAction SilentlyContinue
+    $env:NO_COLOR = '1'
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Import-Module $modulePath -Force -DisableNameChecking
+    $result = Write-NucleusInfo "account 'jellyfin' at https://example.com" 6>&1
+    $result | Should -Match "^[a-zA-Z][a-zA-Z0-9-]*: account 'jellyfin' at https://example.com$"
+    Remove-Item Env:NO_COLOR -ErrorAction SilentlyContinue
+    $env:FORCE_COLOR = '1'
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Import-Module $modulePath -Force -DisableNameChecking
+  }
+}
+
+Describe 'Color detection branches' {
+  It 'forces ESC bytes when CLICOLOR_FORCE is set' {
+    Remove-Item Env:NO_COLOR -ErrorAction SilentlyContinue
+    $env:CLICOLOR_FORCE = '1'
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Import-Module $modulePath -Force -DisableNameChecking
+    $result = Write-NucleusInfo 'colored' 6>&1
+    $result | Should -Match "`e"
+    Remove-Item Env:CLICOLOR_FORCE -ErrorAction SilentlyContinue
+    $env:NO_COLOR = '1'
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Import-Module $modulePath -Force -DisableNameChecking
+  }
+
+  It 'does not force color when FORCE_COLOR=0' {
+    Remove-Item Env:NO_COLOR -ErrorAction SilentlyContinue
+    $env:FORCE_COLOR = '0'
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Import-Module $modulePath -Force -DisableNameChecking
+    $result = Write-NucleusInfo 'plain' 6>&1
+    $result | Should -Not -Match "`e"
+    Remove-Item Env:FORCE_COLOR -ErrorAction SilentlyContinue
+    $env:NO_COLOR = '1'
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Import-Module $modulePath -Force -DisableNameChecking
+  }
+}
