@@ -111,13 +111,23 @@ function Write-NucleusError {
         The message text (without prefix).
     .PARAMETER CommandName
         Optional label override (defaults to the derived command name).
+    .PARAMETER ErrorAction
+        Optional -ErrorAction passthrough for Write-Error (e.g. 'Continue' to
+        keep the error non-terminating under $ErrorActionPreference='Stop').
+        Defaults to '' (flagless; ambient caller preference applies).
     #>
     param(
         [string]$Message,
-        [string]$CommandName = ''
+        [string]$CommandName = '',
+        [string]$ErrorAction = ''
     )
     if (-not $CommandName) { $CommandName = Get-NucleusCommandName }
-    Write-Error "$CommandName`: error: $Message"
+    if ($ErrorAction) {
+        Write-Error "$CommandName`: error: $Message" -ErrorAction $ErrorAction
+    }
+    else {
+        Write-Error "$CommandName`: error: $Message"
+    }
 }
 
 function Write-NucleusWarning {

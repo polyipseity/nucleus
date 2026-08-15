@@ -472,7 +472,7 @@ function Invoke-ReplicaSync {
       $direction = 'pull'
     }
     if ($direction -ne 'pull') {
-      Write-Error "replica-sync: [$id] unsupported direction '$direction'; replicas are pull-only by policy" -ErrorAction Continue
+      Write-NucleusError -CommandName replica-sync "[$id] unsupported direction '$direction'; replicas are pull-only by policy" -ErrorAction Continue
       $failureCount += 1
       continue
     }
@@ -501,7 +501,7 @@ function Invoke-ReplicaSync {
 
     $unlocked = Invoke-ReplicaTreeWritable -TargetDir $localDir -IsDryRun:$DryRun
     if (-not $unlocked) {
-      Write-Error "replica-sync: [$id] failed to unlock replica tree '$localDir'" -ErrorAction Continue
+      Write-NucleusError -CommandName replica-sync "[$id] failed to unlock replica tree '$localDir'" -ErrorAction Continue
       $failureCount += 1
       continue
     }
@@ -510,11 +510,11 @@ function Invoke-ReplicaSync {
     $resolvedFilterPath = Resolve-ReplicaFilterPath -Candidate ([string]$replica.filtersFile)
     $runtimeFilterPath = $null
     if ($null -ne $resolvedFilterPath -and -not (Test-Path -Path $resolvedFilterPath -PathType Leaf)) {
-      Write-Error "replica-sync: filters file '$resolvedFilterPath' not found for replica '$id'" -ErrorAction Continue
+      Write-NucleusError -CommandName replica-sync "filters file '$resolvedFilterPath' not found for replica '$id'" -ErrorAction Continue
       if (-not $readWrite) {
         $lockedAfterFilterFailure = Invoke-ReplicaTreeReadOnly -TargetDir $localDir -IsDryRun:$DryRun
         if (-not $lockedAfterFilterFailure) {
-          Write-Error "replica-sync: [$displayName] failed to re-lock replica tree '$localDir' after filter validation failure" -ErrorAction Continue
+          Write-NucleusError -CommandName replica-sync "[$displayName] failed to re-lock replica tree '$localDir' after filter validation failure" -ErrorAction Continue
           $failureCount += 1
         }
       }
@@ -564,7 +564,7 @@ function Invoke-ReplicaSync {
     if (-not $readWrite) {
       $locked = Invoke-ReplicaTreeReadOnly -TargetDir $localDir -IsDryRun:$DryRun
       if (-not $locked) {
-        Write-Error "replica-sync: [$displayName] failed to lock replica tree '$localDir'" -ErrorAction Continue
+        Write-NucleusError -CommandName replica-sync "[$displayName] failed to lock replica tree '$localDir'" -ErrorAction Continue
         $failureCount += 1
       }
     }

@@ -32,7 +32,7 @@ function Test-ArchivingStack {
   # Check: 7z CLI is available in PATH and responds to --help.
   $sevenZipExe = Get-Command -Name "7z.exe" -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- 7z may not be installed; $null check below handles absence
   if ($null -eq $sevenZipExe) {
-    Write-Error "archiving-stack: warning — 7z.exe not found in PATH; archive extraction may fail." -ErrorAction Continue
+    Write-NucleusError -CommandName archiving-stack "warning — 7z.exe not found in PATH; archive extraction may fail." -ErrorAction Continue
     $healthCheckPassed = $false
   }
   else {
@@ -40,7 +40,7 @@ function Test-ArchivingStack {
       & $sevenZipExe.Source --help > $null
     }
     catch {
-      Write-Error "archiving-stack: warning — 7z.exe exists but --help failed: $_" -ErrorAction Continue
+      Write-NucleusError -CommandName archiving-stack "warning — 7z.exe exists but --help failed: $_" -ErrorAction Continue
       $healthCheckPassed = $false
     }
   }
@@ -48,12 +48,12 @@ function Test-ArchivingStack {
   # Check: 7-Zip application is installed in Program Files.
   $sevenZipAppPath = Join-Path -Path $env:ProgramFiles -ChildPath "7-Zip"
   if (-not (Test-Path -Path $sevenZipAppPath)) {
-    Write-Error "archiving-stack: warning — 7-Zip not found in $env:ProgramFiles; GUI archive handler may be unavailable." -ErrorAction Continue
+    Write-NucleusError -CommandName archiving-stack "warning — 7-Zip not found in $env:ProgramFiles; GUI archive handler may be unavailable." -ErrorAction Continue
     $healthCheckPassed = $false
   }
 
   if (-not $healthCheckPassed) {
-    Write-Error "archiving-stack: archiving stack health check completed with warnings. See messages above." -ErrorAction Continue
+    Write-NucleusError -CommandName archiving-stack "archiving stack health check completed with warnings. See messages above." -ErrorAction Continue
   }
 
   return $healthCheckPassed

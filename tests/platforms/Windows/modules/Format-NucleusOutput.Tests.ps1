@@ -87,6 +87,38 @@ Describe 'Write-NucleusError' {
     $result = Write-NucleusError 'something failed' 2>&1
     $result | Should -Match ': error: something failed$'
   }
+
+  It 'is non-terminating with -ErrorAction Continue under Stop' {
+    $previous = $ErrorActionPreference
+    try {
+      $ErrorActionPreference = 'Stop'
+      $result = Write-NucleusError 'non-fatal' -ErrorAction Continue 2>&1
+      $result | Should -Match ': error: non-fatal$'
+    }
+    finally {
+      $ErrorActionPreference = $previous
+    }
+  }
+
+  It 'terminates under Stop by default (flagless)' {
+    # Pester's test session state isolates the It block's $ErrorActionPreference
+    # from Import-Module'd module functions (module scope sees Continue), so the
+    # ambient-termination contract is verified in a child pwsh at console scope,
+    # mirroring production wiring where apply.ps1 dot-sources the module under
+    # $ErrorActionPreference = 'Stop'.
+    $script = @"
+`$ErrorActionPreference = 'Stop'
+Import-Module '$modulePath' -Force -DisableNameChecking
+try {
+  Write-NucleusError 'fatal'
+  exit 1
+} catch {
+  exit 0
+}
+"@
+    pwsh -NoProfile -Command $script | Out-Null
+    $LASTEXITCODE | Should -Be 0
+  }
 }
 
 Describe 'Write-NucleusWarning' {
