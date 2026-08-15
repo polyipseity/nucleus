@@ -6,6 +6,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/lib.sh"
 . "$SCRIPT_DIR/../lib/symlink-hardening.sh"
 . "$SCRIPT_DIR/../lib/resolve-user-config.sh"
 
@@ -52,7 +53,7 @@ for _vsym_base_dir in "$_vsym_stable_base" "$_vsym_insiders_base"; do
     if ! "$_vsym_jq_bin" -s \
       '.[0] as $existing | reduce .[1][] as $item ($existing; (map(.name) | index($item.name)) as $idx | if $idx then .[$idx] = $item else . + [$item] end)' \
       "$_chat_lm_path" "$_vsym_chat_lm_repo" >"$_chat_lm_path.tmp" 2>"$_chat_lm_path.jqerr"; then
-      echo "VS Code: warning — jq merge failed for $_chat_lm_path, keeping existing." >&2
+      warn -l "VS Code" "jq merge failed for $_chat_lm_path, keeping existing."
       cat "$_chat_lm_path.jqerr" >&2
       rm -f "$_chat_lm_path.tmp" "$_chat_lm_path.jqerr"
     else

@@ -5,6 +5,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/lib.sh"
 . "$SCRIPT_DIR/../lib/symlink-hardening.sh"
 . "$SCRIPT_DIR/../lib/resolve-user-config.sh"
 . "$SCRIPT_DIR/../lib/symlink-convergence.sh"
@@ -20,28 +21,28 @@ _scc_agents_dir="$HOME/.agents"
 _scc_cursor_dir="$HOME/.cursor"
 
 if [ ! -d "$_scc_agents_dir" ]; then
-  echo "$_scc_label: $HOME/.agents not found — run symlink-agent-config first." >&2
+  error -l "$_scc_label" "$HOME/.agents not found — run symlink-agent-config first."
   exit 1
 fi
 
 # Ensure ~/.cursor exists as a real (writable) directory.
 if [ ! -d "$_scc_cursor_dir" ]; then
   mkdir "$_scc_cursor_dir"
-  echo "$_scc_label: created $HOME/.cursor"
+  say -l "$_scc_label" "created $HOME/.cursor"
 elif [ -e "$_scc_cursor_dir" ] && [ ! -d "$_scc_cursor_dir" ]; then
-  echo "$_scc_label: $HOME/.cursor exists but is not a directory — remove it and re-run apply." >&2
+  error -l "$_scc_label" "$HOME/.cursor exists but is not a directory — remove it and re-run apply."
   exit 1
 fi
 
 _scc_ensure_real_dir() {
   _erd_path="$1"
   if [ -L "$_erd_path" ]; then
-    echo "$_scc_label: $_erd_path is a symlink — expected a real directory for managed file symlinks." >&2
+    error -l "$_scc_label" "$_erd_path is a symlink — expected a real directory for managed file symlinks."
     exit 1
   fi
   if [ ! -d "$_erd_path" ]; then
     mkdir "$_erd_path"
-    echo "$_scc_label: created $_erd_path"
+    say -l "$_scc_label" "created $_erd_path"
   fi
 }
 
@@ -65,12 +66,12 @@ _scc_converge_mapped_file_symlinks() {
         _nucleus_unprotect_symlink "$_scc_label" "$_cms_link"
         rm "$_cms_link"
       elif [ -e "$_cms_link" ]; then
-        echo "$_scc_label: $_cms_link is not a managed symlink — remove it and re-run apply." >&2
+        error -l "$_scc_label" "$_cms_link is not a managed symlink — remove it and re-run apply."
         exit 1
       fi
       ln -s "$_cms_source" "$_cms_link"
       _nucleus_protect_symlink "$_scc_label" "$_cms_link"
-      echo "$_scc_label: linked $_cms_link -> $_cms_source"
+      say -l "$_scc_label" "linked $_cms_link -> $_cms_source"
     done
   fi
 
@@ -82,7 +83,7 @@ _scc_converge_mapped_file_symlinks() {
         if [ ! -f "$_cms_ctarget" ]; then
           _nucleus_unprotect_symlink "$_scc_label" "$_cms_candidate"
           rm "$_cms_candidate"
-          echo "$_scc_label: removed stale symlink $(basename "$_cms_candidate") (source removed)"
+          say -l "$_scc_label" "removed stale symlink $(basename "$_cms_candidate") (source removed)"
         fi
         ;;
       esac
@@ -101,12 +102,12 @@ _scc_converge_folder_symlink() {
     _nucleus_unprotect_symlink "$_scc_label" "$_cfs_link"
     rm "$_cfs_link"
   elif [ -e "$_cfs_link" ]; then
-    echo "$_scc_label: $_cfs_link is not a managed symlink — remove it and re-run apply." >&2
+    error -l "$_scc_label" "$_cfs_link is not a managed symlink — remove it and re-run apply."
     exit 1
   fi
   ln -s "$_cfs_target" "$_cfs_link"
   _nucleus_protect_symlink "$_scc_label" "$_cfs_link"
-  echo "$_scc_label: linked $_cfs_link -> $_cfs_target"
+  say -l "$_scc_label" "linked $_cfs_link -> $_cfs_target"
 }
 
 # Class A: shared agents assets under ~/.agents/.
@@ -147,7 +148,7 @@ Linux)
   _scc_ide_user_dir="$HOME/.config/Cursor/User"
   ;;
 *)
-  echo "$_scc_label: unsupported platform for Cursor IDE settings symlink: $(uname -s)" >&2
+  error -l "$_scc_label" "unsupported platform for Cursor IDE settings symlink: $(uname -s)"
   exit 1
   ;;
 esac

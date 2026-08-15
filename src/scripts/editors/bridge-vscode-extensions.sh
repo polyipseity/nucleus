@@ -6,6 +6,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/lib.sh"
 . "$SCRIPT_DIR/../lib/symlink-hardening.sh"
 
 _extension_store="$1"
@@ -34,7 +35,7 @@ setup_extension_dir() {
   _sed_dir="$1"
 
   if [ -L "$_sed_dir" ]; then
-    echo "VS Code extensions: $_sed_dir is a symlink; remove it, recreate a directory, and re-apply" >&2
+    error -l "VS Code extensions" "$_sed_dir is a symlink; remove it, recreate a directory, and re-apply"
     return 1
   fi
   mkdir -p "$_sed_dir"

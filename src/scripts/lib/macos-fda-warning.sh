@@ -19,12 +19,12 @@ print_fda_warning() {
     return
   fi
 
-  printf '%s%sERROR: Full Disk Access Required%s\n' "$_nuc_c2_red" "$_nuc_c2_bold" "$_nuc_c2_reset" >&2
-  printf '%sNucleus cannot write %s from this terminal session.%s\n' "$_nuc_c2_yellow" "$fda_target" "$_nuc_c2_reset" >&2
-  printf '%s\n' "To fix this:" >&2
-  printf '  1. Open %sSystem Settings > Privacy & Security > Full Disk Access%s\n' "$_nuc_c2_bold" "$_nuc_c2_reset" >&2
-  printf '  2. Toggle %sOn%s for your terminal emulator\n' "$_nuc_c2_bold" "$_nuc_c2_reset" >&2
-  printf '  3. If already enabled, remove and re-add it, then restart the terminal\n' >&2
+  # check-suppress:suppression_doc: the FDA banner is advisory output; callers run under `set -e` and must not abort on the non-fatal warning
+  error "Full Disk Access Required: Nucleus cannot write $fda_target from this terminal session." || true
+  say "To fix this:" >&2
+  say "  1. Open System Settings > Privacy & Security > Full Disk Access" >&2
+  say "  2. Toggle On for your terminal emulator" >&2
+  say "  3. If already enabled, remove and re-add it, then restart the terminal" >&2
 
   fda_warning_emitted=1
 }

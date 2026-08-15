@@ -4,6 +4,9 @@
 # Env var fallbacks: NIX_INDEX_NAME, NIX_INDEX_MAX_AGE_DAYS
 set -euo pipefail
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/lib.sh"
+
 _uni_nix_index_bin="${NIX_INDEX_NAME:-${1:?usage: update-nix-index.sh <nix_index_bin> [max_age_days]}}"
 _uni_max_age_days="${NIX_INDEX_MAX_AGE_DAYS:-${2:-}}"
 
@@ -22,7 +25,7 @@ fi
 # Background the build when called from activation (no max-age).
 if [ -z "$_uni_max_age_days" ]; then
   "$_uni_nix_index_bin" >/dev/null 2>&1 &
-  echo "nix-index database build started in background; this may take a few minutes." >&2
+  say -l nix-index "database build started in background; this may take a few minutes." >&2
 else
   exec "$_uni_nix_index_bin"
 fi
