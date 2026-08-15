@@ -15,7 +15,7 @@ function Set-ManagedSymlinkDeleteProtection {
   if ($PSCmdlet.ShouldProcess($Path, "Apply symlink delete-protection ACL")) {
     $grantResult = (& icacls $Path /L /deny "${principal}:(D)" 2>&1) | Out-String
     if ($LASTEXITCODE -ne 0) {
-      Write-Warning "${Context}: could not apply delete-protection ACL to ${Path} : $grantResult"
+      Write-NucleusWarning -CommandName $Context "could not apply delete-protection ACL to ${Path} : $grantResult"
     }
   }
 }
@@ -33,7 +33,7 @@ function Remove-ManagedSymlinkDeleteProtection {
   if ($PSCmdlet.ShouldProcess($Path, "Remove symlink delete-protection ACL")) {
     $removeResult = (& icacls $Path /L /remove:d $principal 2>&1) | Out-String
     if ($LASTEXITCODE -ne 0) {
-      Write-Warning "${Context}: could not clear delete-protection ACL from ${Path} before update : $removeResult"
+      Write-NucleusWarning -CommandName $Context "could not clear delete-protection ACL from ${Path} before update : $removeResult"
     }
   }
 }

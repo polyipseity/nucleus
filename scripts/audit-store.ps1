@@ -50,12 +50,12 @@ foreach ($arg in $args) {
       exit 0
     }
     default {
-      Write-Error "$cmd`: error: unsupported argument '$arg'"
+      Write-NucleusError -CommandName $cmd "unsupported argument '$arg'"
       Show-AuditStoreUsage
       exit 1
     }
   }
 }
 
-Write-Output "$cmd`: Nix store audit is POSIX-only (no Nix store on Windows); skipping."
-Write-Output "$cmd`: done"
+Write-NucleusInfo -CommandName $cmd "Nix store audit is POSIX-only (no Nix store on Windows); skipping."
+Write-NucleusDone -CommandName $cmd

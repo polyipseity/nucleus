@@ -172,7 +172,7 @@ function Invoke-PrekHookInstallIfNeeded {
     $script:__nucleusPrekCheckedRepos[$repoRoot] = $true
   }
   catch {
-    Write-Warning "prek: failed to install hooks in $repoRoot — $($_.Exception.Message)"
+    Write-Warning "prek: warning: failed to install hooks in $repoRoot — $($_.Exception.Message)"
     $script:__nucleusPrekCheckedRepos[$repoRoot] = $true
   }
   finally {
@@ -427,7 +427,7 @@ function python {
       return
     }
   }
-  Write-Warning "shell: system-wide Python is banned to prevent accidental modifications."
+  Write-Warning "shell: warning: system-wide Python is banned to prevent accidental modifications."
   Write-Warning "         Use one of these approaches instead:"
   Write-Warning "         - nix develop     (activate project devShell with scoped Python)"
   Write-Warning "         - uv run <cmd>    (run Python via uv package manager)"
@@ -449,7 +449,7 @@ function pip {
   if (Invoke-NucleusPythonScopedTool -ToolName "pip" @Args) {
     return
   }
-  Write-Warning "shell: system-wide pip is banned to prevent breaking system dependencies."
+  Write-Warning "shell: warning: system-wide pip is banned to prevent breaking system dependencies."
   Write-Warning "         Use one of these approaches instead:"
   Write-Warning "         - nix develop     (activate project devShell with scoped Python+pip)"
   Write-Warning "         - uv pip install  (use uv to manage project dependencies)"
@@ -470,7 +470,7 @@ function pip3 {
 # and package manager is bun.  Users who separately installed Node.js
 # should use bun equivalents instead.
 function npm {
-  Write-Warning "shell: system-wide npm is not used in this environment."
+  Write-Warning "shell: warning: system-wide npm is not used in this environment."
   Write-Warning "         Use bun equivalents instead:"
   Write-Warning "         - bun install     (install packages)"
   Write-Warning "         - bun add <pkg>   (add a dependency)"
@@ -480,7 +480,7 @@ function npm {
   return 1
 }
 function npx {
-  Write-Warning "shell: system-wide npx is not used in this environment."
+  Write-Warning "shell: warning: system-wide npx is not used in this environment."
   Write-Warning "         Use bun x <cmd> for one-shot package execution instead."
   return 1
 }
@@ -488,14 +488,14 @@ function node {
   # check-suppress:SuppressMessageAttribute: PSAvoidOverwritingBuiltInCmdlets -- intentional: shadows native node; warns to use bun equivalents
   [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSAvoidOverwritingBuiltInCmdlets', '')]
   param()
-  Write-Warning "shell: system-wide Node.js is not used in this environment."
+  Write-Warning "shell: warning: system-wide Node.js is not used in this environment."
   Write-Warning "         Use bun as the JavaScript runtime instead:"
   Write-Warning "         - bun <script>   (run a script)"
   Write-Warning "         - bun run        (run package.json scripts)"
   return 1
 }
 function corepack {
-  Write-Warning "shell: corepack is not used in this environment."
+  Write-Warning "shell: warning: corepack is not used in this environment."
   Write-Warning "         Use bun for package management instead."
   return 1
 }
@@ -568,7 +568,7 @@ function bun {
   if (Invoke-NucleusManagedDevTool -ToolName "bun" -FallbackBinDirectory $fallbackBinDirectory @Args) {
     return
   }
-  Write-Warning "shell: managed bun is unavailable right now."
+  Write-Warning "shell: warning: managed bun is unavailable right now."
   Write-Warning "         For development, use one of these managed entrypoints:"
   Write-Warning "         - Enter a project directory with .envrc (direnv auto-loads the devShell)"
   Write-Warning "         - Or use the user-scoped default toolchain installed by nucleus apply"
@@ -580,7 +580,7 @@ function cargo {
   if (Invoke-NucleusManagedDevTool -ToolName "cargo" -FallbackBinDirectory $fallbackBinDirectory @Args) {
     return
   }
-  Write-Warning "shell: managed cargo is unavailable right now."
+  Write-Warning "shell: warning: managed cargo is unavailable right now."
   Write-Warning "         For Rust development, use one of these managed entrypoints:"
   Write-Warning "         - Enter a project directory with .envrc (direnv auto-loads the devShell)"
   Write-Warning "         - Or add a rust-toolchain.toml file to this directory"
@@ -591,7 +591,7 @@ function rustc {
   if (Invoke-NucleusManagedDevTool -ToolName "rustc" -FallbackBinDirectory $fallbackBinDirectory @Args) {
     return
   }
-  Write-Warning "shell: managed rustc is unavailable right now."
+  Write-Warning "shell: warning: managed rustc is unavailable right now."
   Write-Warning "         For Rust development, use one of these managed entrypoints:"
   Write-Warning "         - Enter a project directory with .envrc (direnv auto-loads the devShell)"
   Write-Warning "         - Or add a rust-toolchain.toml file to this directory"
@@ -602,7 +602,7 @@ function uv {
   if (Invoke-NucleusManagedDevTool -ToolName "uv" -FallbackBinDirectory $fallbackBinDirectory @Args) {
     return
   }
-  Write-Warning "shell: managed uv is unavailable right now."
+  Write-Warning "shell: warning: managed uv is unavailable right now."
   Write-Warning "         For Python development, use one of these managed entrypoints:"
   Write-Warning "         - Enter a project directory with .envrc (direnv auto-loads the devShell)"
   Write-Warning "         - Or use the user-scoped default toolchain installed by nucleus apply"

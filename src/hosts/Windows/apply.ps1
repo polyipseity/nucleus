@@ -270,11 +270,16 @@ if ($ParamsJson -and (Test-Path $ParamsJson)) {
   $Elevated = $true
 }
 
+# Format-NucleusOutput: shared F1 output formatting.  Must load before any
+# Sync-* / Invoke-* module that emits Write-Nucleus* messages.
+$resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
+Import-Module (Join-Path -Path $resolvedModuleDir -ChildPath "Format-NucleusOutput.psm1")
+
 # Refuse to run as Administrator — privilege escalation is managed internally
 # when needed rather than relying on an already-elevated caller.
 $isAdmin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if ($isAdmin -and -not $Elevated) {
-  Write-Error "This script must not be run as Administrator. Run as a regular user (elevation is managed internally when needed)."
+  Write-NucleusError -CommandName apply "This script must not be run as Administrator. Run as a regular user (elevation is managed internally when needed)."
   exit 1
 }
 
@@ -318,7 +323,6 @@ $EnableVsCodeExtensionsParity = -not $noUserStateParity
 $EnableVsCodeSettingsParity = -not $noUserStateParity
 $EnableVsCodeWorkspaceTrustParity = -not $noUserStateParity
 
-$resolvedModuleDir = (Resolve-Path -Path $ModuleDir).Path
 $secretsModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "secrets"
 $systemModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "system"
 $setupModuleDir = Join-Path -Path $resolvedModuleDir -ChildPath "setup"
@@ -365,10 +369,6 @@ if (-not $Elevated) {
   Remove-Item $paramsJsonPath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: same -- temp file in %TEMP%; child may have already cleaned up
   exit $exitCode
 }
-
-# Format-NucleusOutput: shared F1 output formatting.  Must load before any
-# Sync-* / Invoke-* module that emits Write-Nucleus* messages.
-Import-Module (Join-Path -Path $resolvedModuleDir -ChildPath "Format-NucleusOutput.psm1")
 
 # Managed PATH data: canonical list of user-scope bin directories.
 # Must be loaded before any Sync-* or Invoke-* module that references
@@ -536,7 +536,7 @@ $selectedUserRecords = @($userRegistry.users | Where-Object { $Users -contains $
 # Validate that all explicitly provided users exist in the registry.
 foreach ($user in $Users) {
   if ($user -notin $registeredUserNames) {
-    Write-Error "User '$user' not found in registry. Registered users: $($registeredUserNames -join ', ')" -ErrorAction Stop
+    Write-NucleusError -CommandName apply "User '$user' not found in registry. Registered users: $($registeredUserNames -join ', ')" -ErrorAction Stop
     exit 1
   }
 }

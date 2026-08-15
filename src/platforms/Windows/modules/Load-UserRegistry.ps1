@@ -295,7 +295,7 @@ function Build-UserRecord {
 }
 
 if (-not (Test-Path -Path $UsersRoot -PathType Container)) {
-  Write-Error "User registry root not found: $UsersRoot" -ErrorAction Stop
+  Write-NucleusError -CommandName Load-UserRegistry "User registry root not found: $UsersRoot" -ErrorAction Stop
   exit 1
 }
 
@@ -308,14 +308,14 @@ foreach ($entry in Get-ChildItem -Path $UsersRoot -Directory) {
 
   $record = Build-UserRecord -Username $name
   if ([string]::IsNullOrWhiteSpace($record.homeDirectory)) {
-    Write-Error "User '$name' missing required 'homeDirectory'" -ErrorAction Stop
+    Write-NucleusError -CommandName Load-UserRegistry "User '$name' missing required 'homeDirectory'" -ErrorAction Stop
     exit 1
   }
   $userList += $record
 }
 
 if ($userList.Count -eq 0) {
-  Write-Error 'User registry contains no users' -ErrorAction Stop
+  Write-NucleusError -CommandName Load-UserRegistry 'User registry contains no users' -ErrorAction Stop
   exit 1
 }
 

@@ -1015,11 +1015,11 @@ function Invoke-VMSetup {
     }
     catch {
         if ($SyncOnly) {
-            Write-Warning $_.Exception.Message
+            Write-NucleusWarning -CommandName vm-setup $_.Exception.Message
             Write-NucleusWarning -CommandName vm-sync 'proceeding without guest credentials'
             $guestCredential = $null
         } else {
-            Write-Warning $_.Exception.Message
+            Write-NucleusWarning -CommandName vm-setup $_.Exception.Message
             return
         }
     }
