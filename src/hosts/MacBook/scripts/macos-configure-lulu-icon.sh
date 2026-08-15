@@ -27,16 +27,17 @@
 
 set -euo pipefail
 
-# shellcheck disable=SC2034 # reason: convention boilerplate shared with every sibling host script, kept for style parity; this script needs no sourced library
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
 
-echo "lulu: hiding menu bar status icon..."
+say -l lulu "hiding menu bar status icon..."
 
 # Write the preference into the daemon-side plist.  `defaults` on an absolute
 # .plist path merges just this key into the existing dictionary, leaving
 # every other preference (rules, profiles, disabled state, ...) intact.
 if ! /usr/bin/defaults write /Library/Objective-See/LuLu/preferences.plist noIconMode -bool YES; then
-  echo "lulu: failed to write noIconMode preference to /Library/Objective-See/LuLu/preferences.plist." >&2
+  error -l lulu "failed to write noIconMode preference to /Library/Objective-See/LuLu/preferences.plist."
   exit 1
 fi
 
@@ -45,12 +46,12 @@ fi
 # re-reads the plist.
 if /usr/bin/pgrep -x com.objective-see.lulu.extension >/dev/null; then
   if ! /bin/pkill -x com.objective-see.lulu.extension; then
-    echo "lulu: failed to terminate daemon (com.objective-see.lulu.extension)." >&2
+    error -l lulu "failed to terminate daemon (com.objective-see.lulu.extension)."
     exit 1
   fi
-  echo "lulu: daemon terminated; it re-reads preferences on next start."
+  say -l lulu "daemon terminated; it re-reads preferences on next start."
 else
-  echo "lulu: daemon not running; preference applies at next daemon start."
+  say -l lulu "daemon not running; preference applies at next daemon start."
 fi
 
-echo "lulu: done."
+say -l lulu "done."

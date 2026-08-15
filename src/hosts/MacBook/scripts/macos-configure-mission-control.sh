@@ -7,11 +7,13 @@
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../../scripts/lib/macos-console-user.sh
 . "$SCRIPT_DIR/../../../scripts/lib/macos-console-user.sh"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
 
 if _nucleus_resolve_console_user; then
   if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/defaults write com.apple.spaces spans-displays -bool true; then
-    echo "power: failed to enable Mission Control spans-displays for console uid $_nucleus_console_uid." >&2
+    warn -l power "failed to enable Mission Control spans-displays for console uid $_nucleus_console_uid."
   fi
 else
-  echo "power: no active non-root console user; skipping spans-displays write." >&2
+  say -l power "no active non-root console user; skipping spans-displays write." >&2
 fi

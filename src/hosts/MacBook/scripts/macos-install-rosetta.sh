@@ -18,8 +18,13 @@
 #
 # Declarative Nix daemon support for x86_64-darwin is configured separately
 # in base.nix via `nix.extraOptions` / `extra-platforms`.
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
+
 if ! /usr/sbin/pkgutil --pkg-info com.apple.pkg.RosettaUpdateAuto >/dev/null 2>&1; then
   if ! /usr/sbin/softwareupdate --install-rosetta --agree-to-license; then
-    echo "rosetta: installation failed." >&2
+    warn -l rosetta "installation failed."
   fi
 fi

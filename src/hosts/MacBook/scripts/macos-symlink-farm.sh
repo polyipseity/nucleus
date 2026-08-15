@@ -15,6 +15,10 @@
 #   - Marker file (.nucleus-symlink-farm) is skipped during farm GC sweeps.
 set -eu
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
+
 FARM_DIR="/usr/local/bin"
 FARM_MARKER=".nucleus-symlink-farm"
 
@@ -29,7 +33,7 @@ NUCLEUS_VERBOSE="${NUCLEUS_VERBOSE:-}"
 _log() {
   printf '[%s] symlink-farm: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >>"$LOG_FILE"
   if [ -n "$NUCLEUS_VERBOSE" ]; then
-    printf 'symlink-farm: %s\n' "$*"
+    say -l symlink-farm "$*"
   fi
 }
 
@@ -83,4 +87,4 @@ for link_path in "$FARM_DIR"/*; do
   fi
 done
 
-printf 'symlink-farm: %d active symlinks, %d GC'\''d (log: %s)\n' "$_created" "$_gc_count" "$LOG_FILE"
+say -l symlink-farm "$_created active symlinks, $_gc_count GC'd (log: $LOG_FILE)"

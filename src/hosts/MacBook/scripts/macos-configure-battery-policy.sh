@@ -31,9 +31,13 @@
 #
 # The helper emits a clear error when any write fails so a mis-typed key
 # does not silently leave a stale policy in place.
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
+
 apply_pmset() {
   if ! /usr/bin/pmset "$@"; then
-    echo "power: failed to apply pmset settings: $*" >&2
+    error -l power "failed to apply pmset settings: $*"
     return 1
   fi
 }

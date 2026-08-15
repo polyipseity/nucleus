@@ -12,34 +12,36 @@
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../../scripts/lib/macos-console-user.sh
 . "$SCRIPT_DIR/../../../scripts/lib/macos-console-user.sh"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
 
-echo "spotlight: disabling..."
+say -l spotlight "disabling..."
 
 if _nucleus_resolve_console_user; then
   for hotkey in 61 64 65; do
     if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
       /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add "$hotkey" \
       "<dict><key>enabled</key><false/></dict>"; then
-      echo "spotlight: failed to disable hotkey $hotkey." >&2
+      warn -l spotlight "failed to disable hotkey $hotkey."
     fi
   done
 
   if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
     /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
-    echo "spotlight: hotkey changes applied; log out/in once to fully activate." >&2
+    warn -l spotlight "hotkey changes applied; log out/in once to fully activate."
   fi
 else
-  echo "spotlight: skipped hotkey disable (no active non-root GUI session)." >&2
+  say -l spotlight "skipped hotkey disable (no active non-root GUI session)." >&2
 fi
 
 if ! /usr/bin/mdutil -i off /; then
-  echo "spotlight: failed to disable indexing." >&2
+  warn -l spotlight "failed to disable indexing."
 fi
 
 if [ -d "/.Spotlight-V100" ]; then
   if ! /bin/rm -rf "/.Spotlight-V100"; then
-    echo "spotlight: failed to remove /.Spotlight-V100 cache directory." >&2
+    warn -l spotlight "failed to remove /.Spotlight-V100 cache directory."
   fi
 fi
 
-echo "spotlight: done."
+say -l spotlight "done."

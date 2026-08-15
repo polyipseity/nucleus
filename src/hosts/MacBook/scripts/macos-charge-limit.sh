@@ -12,6 +12,8 @@
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../../scripts/lib/macos-console-user.sh
 . "$SCRIPT_DIR/../../../scripts/lib/macos-console-user.sh"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
 
 macos_major="$(/usr/bin/sw_vers -productVersion 2>/dev/null | /usr/bin/awk -F. '{print $1}')"
 
@@ -40,21 +42,21 @@ if [ -n "$battery_cli" ] && _nucleus_resolve_console_user; then
   # battery's own log file (~/.battery/battery.log) retains full
   # diagnostic output for post-failure inspection.
   if ! /usr/bin/sudo -H -u "$_nucleus_console_user" "$battery_cli" maintain 80 </dev/null >/dev/null 2>&1; then
-    echo "power: battery maintain 80 failed for user '$_nucleus_console_user'." >&2
+    warn -l power "battery maintain 80 failed for user '$_nucleus_console_user'."
   fi
 elif [ -x /opt/homebrew/bin/bclm ]; then
   if [ -n "$macos_major" ] && [ "$macos_major" -ge 15 ]; then
-    echo "power: bclm is unsupported on macOS >= 15; install and initialize the battery app to enforce 80% charge limit." >&2
+    warn -l power "bclm is unsupported on macOS >= 15; install and initialize the battery app to enforce 80% charge limit."
   else
     if ! /opt/homebrew/bin/bclm write 80; then
-      echo "power: bclm write 80 failed." >&2
+      warn -l power "bclm write 80 failed."
     fi
     if ! /opt/homebrew/bin/bclm persist; then
-      echo "power: bclm persist failed." >&2
+      warn -l power "bclm persist failed."
     fi
   fi
 elif [ -d "$battery_app" ]; then
-  echo "power: battery.app is installed but the battery CLI is unavailable; open battery.app once and complete setup to install the helper command." >&2
+  warn -l power "battery.app is installed but the battery CLI is unavailable; open battery.app once and complete setup to install the helper command."
 else
-  echo "power: no supported battery charge-limit tool found (expected /usr/local/bin/battery or /opt/homebrew/bin/bclm)." >&2
+  warn -l power "no supported battery charge-limit tool found (expected /usr/local/bin/battery or /opt/homebrew/bin/bclm)."
 fi

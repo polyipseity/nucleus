@@ -6,6 +6,10 @@
 
 set -eu
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
+
 _main() {
   LOCKFILE="${1:?repo root required}/src/lockfiles/lockfile.json"
 
@@ -75,7 +79,7 @@ KEYEOF
   fi
 
   if [ -n "$WARNINGS" ]; then
-    echo "homebrew: package version(s) differ from lockfile (nix-homebrew may be out of sync):" >&2
+    warn -l homebrew "package version(s) differ from lockfile (nix-homebrew may be out of sync):"
     printf '%s' "$WARNINGS" >&2
   fi
 }

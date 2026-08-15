@@ -10,6 +10,8 @@
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../../scripts/lib/macos-console-user.sh
 . "$SCRIPT_DIR/../../../scripts/lib/macos-console-user.sh"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
 
 # Write one preference into the sandboxed com.utmapp.UTM domain as the console
 # user.  Best-effort: failures are reported to stderr, never fatal.
@@ -21,16 +23,16 @@ utm_write_default() {
     # Container already registered (UTM launched before): write through
     # cfprefsd so the domain resolves to the container.
     if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" /usr/bin/defaults write com.utmapp.UTM "$key" "$flag" "$value"; then
-      echo "utm: failed to set preference '$key' for user '$_nucleus_console_user'." >&2
+      warn -l utm "failed to set preference '$key' for user '$_nucleus_console_user'."
     fi
   else
     # UTM never launched, so its sandbox container does not exist yet.
     # Create the prefs directory and write the container plist directly;
     # cfprefsd adopts it when UTM first launches.
     if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" /bin/mkdir -p "$(dirname "$utm_container_prefs")"; then
-      echo "utm: failed to create container prefs directory for user '$_nucleus_console_user'." >&2
+      warn -l utm "failed to create container prefs directory for user '$_nucleus_console_user'."
     elif ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" /usr/bin/defaults write "$utm_container_prefs" "$key" "$flag" "$value"; then
-      echo "utm: failed to set preference '$key' for user '$_nucleus_console_user'." >&2
+      warn -l utm "failed to set preference '$key' for user '$_nucleus_console_user'."
     fi
   fi
 }
@@ -81,5 +83,5 @@ ServerPassword -string ""
 EOF
   fi
 else
-  echo "utm: no active non-root console user; skipping UTM preferences provisioning." >&2
+  say -l utm "no active non-root console user; skipping UTM preferences provisioning." >&2
 fi

@@ -26,6 +26,10 @@
 #   that works without kext approval, so the polyipseity fork is the preferred
 #   build on modern macOS.
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
+
 CURRENT_FINGERPRINT="${1:?ntfs-3g build: missing fingerprint arg}"
 BUILD_TOOLS_PATH="${2:?ntfs-3g build: missing buildToolsPath arg}"
 ACLOCAL_PATH_VALUE="${3:?ntfs-3g build: missing aclocalPath arg}"
@@ -49,7 +53,7 @@ LOG_FILE="/Users/Shared/nucleus/logs/ntfs-3g-build.log"
 if ! [ -x /usr/local/bin/ntfs-3g ] ||
   ! [ -f "$FINGERPRINT_FILE" ] ||
   [ "$(cat "$FINGERPRINT_FILE")" != "$CURRENT_FINGERPRINT" ]; then
-  echo "ntfs-3g: building from source... (log: $LOG_FILE)"
+  say -l ntfs-3g "building from source... (log: $LOG_FILE)"
   export PATH="$PATH:$BUILD_TOOLS_PATH"
   export ACLOCAL_PATH="$ACLOCAL_PATH_VALUE"
   BUILD_DIR="$(mktemp -d)"
@@ -60,7 +64,7 @@ if ! [ -x /usr/local/bin/ntfs-3g ] ||
 
   /bin/mkdir -p "$(dirname "$LOG_FILE")"
   {
-    echo "=== ntfs-3g build started at $(date) ==="
+    section 1 "ntfs-3g build started at $(date)"
 
     # Patch configure.ac: remove crypto autodetect block (AM_PATH_LIBGCRYPT
     # and PKG_CHECK_MODULES(GNUTLS macros undefined without library deps),
@@ -93,13 +97,13 @@ if ! [ -x /usr/local/bin/ntfs-3g ] ||
   } >>"$LOG_FILE" 2>&1 || exit_code=$?
 
   if [ "${exit_code:-0}" -ne 0 ]; then
-    echo "ntfs-3g: BUILD FAILED (exit ${exit_code}) — see $(/bin/realpath "$LOG_FILE")" >&2
+    error -l ntfs-3g "BUILD FAILED (exit ${exit_code}) — see $(/bin/realpath "$LOG_FILE")"
     exit "$exit_code"
   fi
 
   echo "=== ntfs-3g build finished at $(date) ===" >>"$LOG_FILE" 2>&1
 
-  echo "ntfs-3g: build complete — log at $(/bin/realpath "$LOG_FILE")"
+  say -l ntfs-3g "build complete — log at $(/bin/realpath "$LOG_FILE")"
 
   /bin/mkdir -p "$(dirname "$FINGERPRINT_FILE")"
   echo "$CURRENT_FINGERPRINT" >"$FINGERPRINT_FILE"

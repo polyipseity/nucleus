@@ -12,6 +12,8 @@
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../../../scripts/lib/macos-console-user.sh
 . "$SCRIPT_DIR/../../../scripts/lib/macos-console-user.sh"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
 
 if _nucleus_resolve_console_user; then
   if [ -d "/Applications/Mounty.app" ]; then
@@ -19,7 +21,7 @@ if _nucleus_resolve_console_user; then
     if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
       /usr/bin/osascript -l JavaScript \
       -e 'ObjC.import("ServiceManagement"); if (!$.SMLoginItemSetEnabled($("com.cu4uc.MountyHelper"), true)) throw new Error("SMLoginItemSetEnabled failed");'; then
-      echo "mounty: failed to ensure native Login Item startup for user '$_nucleus_console_user'." >&2
+      warn -l mounty "failed to ensure native Login Item startup for user '$_nucleus_console_user'."
     fi
   fi
 fi

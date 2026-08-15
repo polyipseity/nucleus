@@ -14,6 +14,10 @@
 # pkgutil receipts, or other /Library/Developer paths.
 set -eu
 
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=../../../scripts/lib/lib.sh
+. "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
+
 CLT_DIR="/Library/Developer/CommandLineTools"
 
 LOG_FILE="${1:-/Users/Shared/nucleus/logs/command-line-tools.log}"
@@ -26,11 +30,11 @@ _log() {
 if [ -d "$CLT_DIR" ]; then
   if /bin/rm -rf "$CLT_DIR"; then
     _log "removed $CLT_DIR"
-    echo "command-line-tools: removed $CLT_DIR." >&2
+    say -l command-line-tools "removed $CLT_DIR." >&2
   else
-    echo "command-line-tools: failed to remove $CLT_DIR." >&2
+    warn -l command-line-tools "failed to remove $CLT_DIR."
   fi
 else
   _log "install tree already absent"
-  echo "command-line-tools: install tree already absent." >&2
+  say -l command-line-tools "install tree already absent." >&2
 fi
