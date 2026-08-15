@@ -207,6 +207,39 @@ test_force_color_overrides_term_dumb() {
   fi
 }
 
+# (i) nucleus_expand_log_path: ~ and ~/... templates expand to $HOME; plain
+# paths pass through unchanged. The ~/ prefix strip must escape the tilde so
+# bash does not tilde-expand the pattern itself.
+test_expand_log_path_tilde_slash() {
+  local out
+  out="$(_run_lib 'HOME=/tmp/nucleus-log-test' 'nucleus_expand_log_path "~/nucleus/logs"')"
+  if [ "$out" = "/tmp/nucleus-log-test/nucleus/logs" ]; then
+    assert_pass "nucleus_expand_log_path expands ~/ prefix"
+  else
+    assert_fail "expand-tilde-slash" "expected /tmp/nucleus-log-test/nucleus/logs, got: $out"
+  fi
+}
+
+test_expand_log_path_bare_tilde() {
+  local out
+  out="$(_run_lib 'HOME=/tmp/nucleus-log-test' 'nucleus_expand_log_path "~"')"
+  if [ "$out" = "/tmp/nucleus-log-test" ]; then
+    assert_pass "nucleus_expand_log_path expands bare ~"
+  else
+    assert_fail "expand-bare-tilde" "expected /tmp/nucleus-log-test, got: $out"
+  fi
+}
+
+test_expand_log_path_plain() {
+  local out
+  out="$(_run_lib 'HOME=/tmp/nucleus-log-test' 'nucleus_expand_log_path "/var/log/nucleus"')"
+  if [ "$out" = "/var/log/nucleus" ]; then
+    assert_pass "nucleus_expand_log_path leaves absolute paths unchanged"
+  else
+    assert_fail "expand-plain" "expected /var/log/nucleus, got: $out"
+  fi
+}
+
 # (e) log_sanitize still strips escapes.
 test_log_sanitize_strips() {
   local out
@@ -240,6 +273,9 @@ test_semantic_quote_color_on
 test_semantic_color_off_plain
 test_term_dumb_off
 test_force_color_overrides_term_dumb
+test_expand_log_path_tilde_slash
+test_expand_log_path_bare_tilde
+test_expand_log_path_plain
 test_log_sanitize_strips
 
 echo ""
