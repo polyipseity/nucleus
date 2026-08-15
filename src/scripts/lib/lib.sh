@@ -297,11 +297,20 @@ resolve_nucleus_host() {
 }
 
 merge_nix_config() {
+  # WHY: min-free = 0 disables Nix automatic GC for scripted pipelines.  On
+  # APFS the whole container (not just the /nix volume) sets free space, so a
+  # full Data volume makes every nix command trigger auto-GC, which deletes
+  # flake-input source trees while a multi-step pipeline still needs them
+  # (nucleus-apply failed with "path ...-source/lib/services/lib.nix does not
+  # exist" on MacBook).  Store cleanup is explicit instead: daily nixStoreGc,
+  # weekly gc-weekly, and apply.sh's post-apply run_gc.  NIX_CONFIG lines
+  # override the min-free/max-free in nix.custom.conf, so appending
+  # min-free = 0 here wins.
   _mnc_base="${1:-experimental-features = nix-command flakes}"
   if [ -n "${NIX_CONFIG:-}" ]; then
-    printf '%s\n%s' "$NIX_CONFIG" "$_mnc_base"
+    printf '%s\n%s\nmin-free = 0' "$NIX_CONFIG" "$_mnc_base"
   else
-    printf '%s' "$_mnc_base"
+    printf '%s\nmin-free = 0' "$_mnc_base"
   fi
 }
 
