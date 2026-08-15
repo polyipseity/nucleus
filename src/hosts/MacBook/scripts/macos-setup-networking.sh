@@ -47,6 +47,6 @@ if [ -n "$_WIFI_IFACE" ]; then
   _WIFI_MAC=$(/usr/sbin/networksetup -getmacaddress "$_WIFI_IFACE" 2>/dev/null |
     /usr/bin/awk '{print $3}')
   say -l "Wi-Fi ($_WIFI_IFACE)" "permanent HW MAC $_WIFI_MAC — Private Address active (Fixed per SSID by default)"
-  echo "  Per-network Rotating mode: System Settings > Wi-Fi > [SSID] > Private Wi-Fi Address > Rotating"
+  say -l "Wi-Fi ($_WIFI_IFACE)" "Per-network Rotating mode: System Settings > Wi-Fi > [SSID] > Private Wi-Fi Address > Rotating"
 fi
 unset _WIFI_IFACE _WIFI_MAC
