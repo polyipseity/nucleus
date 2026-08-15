@@ -126,8 +126,12 @@ Invoke-StepPipeline behavior:
   - Same wave-based parallelism as POSIX step-runner.sh.
   - Steps dispatch in waves capped at PARALLEL_JOBS concurrent steps (default: logical processor count).
   - PARALLEL_JOBS env var controls max concurrent jobs per wave.
-  - Parallel dispatch mechanism: RunspacePool (preferred — better performance, no temp files)
-    Fallback: Start-Job + file-based exit code (mirrors POSIX wave pattern).
+  - Parallel dispatch mechanism: one PowerShell instance per step via
+    [System.Management.Automation.PowerShell]::Create() + BeginInvoke() (one runspace
+    per step), dispatched in waves capped at PARALLEL_JOBS; each step's stdout, exit
+    code, and timing are captured to per-step files (step-N.out / step-N.exit /
+    step-N.time) under a wave temp dir, mirroring the POSIX wave pattern. No
+    RunspacePool, no Start-Job.
   - Live output: each step line is prefixed [step NN] on stderr during execution; ordered
     unprefixed replay still appears in aggregate_results / Format-StepSummary.
   - Output ordering: Steps' output is captured per-step and printed in step-number order,
@@ -155,6 +159,7 @@ Invoke-StepPipeline behavior:
 
 Live console chrome follows the F2/F4 palette via the shared color helpers — POSIX `_nuc_color_init` in `src/scripts/lib/lib.sh`, PS1 `$PSStyle` escapes embedded by `Format-NucleusOutput.psm1` — never raw ANSI, `tput`, or `echo -e` (check step 14).
 
+- F1 message lines: the `notice` level renders bold blue; message-body semantic coloring (URLs underline-cyan, single-quoted spans blue) applies inside step output.
 - Step chrome (F2): `[step NN]` marker is dim, content default.
 - Results table (F4): glyphs ✓ green / ✗ red / SKIP yellow / ⊘ yellow (test-lib), labels dim.
 - Captured step files and skip messages are plain: color is console-only and capture files hold no escape sequences.
