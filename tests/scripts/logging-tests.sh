@@ -131,6 +131,82 @@ test_die_exits_1() {
   fi
 }
 
+# (f) notice level grammar + label override.
+test_notice_grammar() {
+  local out
+  out="$(_run_lib 'NO_COLOR=1' 'notice hi')"
+  if [ "$out" = "logging-test: [notice] hi" ]; then
+    assert_pass "notice emits F1 <cmd>: [notice] <msg>"
+  else
+    assert_fail "f1-notice" "expected 'logging-test: [notice] hi', got: $out"
+  fi
+}
+
+test_notice_label_override() {
+  local out
+  out="$(_run_lib 'NO_COLOR=1' 'notice -l ai hi')"
+  if [ "$out" = "ai: [notice] hi" ]; then
+    assert_pass "notice -l overrides the command label"
+  else
+    assert_fail "notice-label" "expected 'ai: [notice] hi', got: $out"
+  fi
+}
+
+# (g) semantic inline coloring: URLs -> underline-cyan, quoted spans -> blue,
+# only when color is on; byte-identical otherwise.
+test_semantic_url_color_on() {
+  local esc=$'\033' out
+  local ulcyan="${esc}[4;36m" reset="${esc}[0m"
+  out="$(_run_lib 'FORCE_COLOR=1' 'say "check https://example.com"')"
+  if printf '%s' "$out" | grep -Fq "${ulcyan}https://example.com${reset}"; then
+    assert_pass "URL spans get underline-cyan when color is on"
+  else
+    assert_fail "semantic-url" "missing underline-cyan URL wrap: $(echo "$out" | od -c | head -1)"
+  fi
+}
+
+test_semantic_quote_color_on() {
+  local esc=$'\033' out
+  local blue="${esc}[34m" reset="${esc}[0m"
+  out="$(_run_lib 'FORCE_COLOR=1' "say \"account 'jellyfin'\"")"
+  if printf '%s' "$out" | grep -Fq "${blue}'jellyfin'${reset}"; then
+    assert_pass "single-quoted spans get blue when color is on"
+  else
+    assert_fail "semantic-quote" "missing blue quote wrap: $(echo "$out" | od -c | head -1)"
+  fi
+}
+
+test_semantic_color_off_plain() {
+  local out
+  out="$(_run_lib 'NO_COLOR=1' "say \"account 'jellyfin' at https://example.com\"")"
+  if [ "$out" = "logging-test: account 'jellyfin' at https://example.com" ]; then
+    assert_pass "semantic coloring is byte-identical when color is off"
+  else
+    assert_fail "semantic-plain" "expected byte-identical plain output, got: $out"
+  fi
+}
+
+# (h) TERM=dumb forces color off unless FORCE_COLOR is set.
+test_term_dumb_off() {
+  local out
+  out="$(_run_lib 'TERM=dumb' 'say hello')"
+  if ! echo "$out" | grep -q $'\033'; then
+    assert_pass "TERM=dumb disables color"
+  else
+    assert_fail "term-dumb" "ESC bytes present with TERM=dumb"
+  fi
+}
+
+test_force_color_overrides_term_dumb() {
+  local out
+  out="$(_run_lib 'TERM=dumb FORCE_COLOR=1' 'say hello')"
+  if echo "$out" | grep -q $'\033'; then
+    assert_pass "FORCE_COLOR=1 overrides TERM=dumb"
+  else
+    assert_fail "force-over-term-dumb" "no ESC bytes with FORCE_COLOR=1 TERM=dumb"
+  fi
+}
+
 # (e) log_sanitize still strips escapes.
 test_log_sanitize_strips() {
   local out
@@ -157,6 +233,13 @@ test_f1_grammar_plain
 test_label_override
 test_error_grammar
 test_die_exits_1
+test_notice_grammar
+test_notice_label_override
+test_semantic_url_color_on
+test_semantic_quote_color_on
+test_semantic_color_off_plain
+test_term_dumb_off
+test_force_color_overrides_term_dumb
 test_log_sanitize_strips
 
 echo ""

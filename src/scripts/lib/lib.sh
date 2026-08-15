@@ -78,6 +78,9 @@ _nuc_color_init() {
     _nuc_c1_yellow="${_nuc_esc}[33m"
     _nuc_c1_magenta="${_nuc_esc}[35m"
     _nuc_c1_cyan="${_nuc_esc}[36m"
+    _nuc_c1_blue="${_nuc_esc}[34m"
+    _nuc_c1_underline="${_nuc_esc}[4m"
+    _nuc_c1_ulcyan="${_nuc_esc}[4;36m"
     _nuc_c1_dim="${_nuc_esc}[2m"
     _nuc_c1_reset="${_nuc_esc}[0m"
   else
@@ -87,6 +90,9 @@ _nuc_color_init() {
     _nuc_c1_yellow=""
     _nuc_c1_magenta=""
     _nuc_c1_cyan=""
+    _nuc_c1_blue=""
+    _nuc_c1_underline=""
+    _nuc_c1_ulcyan=""
     _nuc_c1_dim=""
     _nuc_c1_reset=""
   fi
@@ -97,6 +103,9 @@ _nuc_color_init() {
     _nuc_c2_yellow="${_nuc_esc}[33m"
     _nuc_c2_magenta="${_nuc_esc}[35m"
     _nuc_c2_cyan="${_nuc_esc}[36m"
+    _nuc_c2_blue="${_nuc_esc}[34m"
+    _nuc_c2_underline="${_nuc_esc}[4m"
+    _nuc_c2_ulcyan="${_nuc_esc}[4;36m"
     _nuc_c2_dim="${_nuc_esc}[2m"
     _nuc_c2_reset="${_nuc_esc}[0m"
   else
@@ -106,6 +115,9 @@ _nuc_color_init() {
     _nuc_c2_yellow=""
     _nuc_c2_magenta=""
     _nuc_c2_cyan=""
+    _nuc_c2_blue=""
+    _nuc_c2_underline=""
+    _nuc_c2_ulcyan=""
     _nuc_c2_dim=""
     _nuc_c2_reset=""
   fi
@@ -118,6 +130,23 @@ _nuc_color_init
 # F1 grammar: [<ts> ]<cmd>: [<level>: ]<msg>; color is applied only when the
 # target stream supports it (see _nuc_color_init) and never in files.
 
+# _nuc_semantic_color <ulcyan> <blue> <reset> — Apply semantic inline coloring
+# to a message on stdin, writing to stdout. URL spans -> underline-cyan;
+# single-quoted spans -> blue. Emits markup ONLY through the color variables
+# (empty when the stream is color-disabled), so plain output stays
+# byte-identical. Never use markup delimiters (e.g. backticks) — they would
+# trigger shell command substitution inside double-quoted printf call sites.
+_nuc_semantic_color() {
+  _nsc_ulcyan="$1"
+  _nsc_blue="$2"
+  _nsc_reset="$3"
+  # Color-on only: empty args (disabled stream) -> byte-identical passthrough.
+  [ -n "$_nsc_ulcyan" ] || { cat; return 0; }
+  # Quoted spans first, then URLs, so a URL inside quotes still reads as a URL.
+  sed -e "s|'\([^']*\)'|${_nsc_blue}'\\1'${_nsc_reset}|g" \
+    -e "s|https\?://[^[:space:]'\"]*|${_nsc_ulcyan}&${_nsc_reset}|g"
+}
+
 # say — Print an info message to stdout.
 say() {
   _say_label="$_nuc_prefix"
@@ -125,7 +154,8 @@ say() {
     _say_label="$2"
     shift 2
   fi
-  printf '%s\n' "${_nuc_c1_bold}${_say_label}${_nuc_c1_reset}: $*"
+  _say_msg="$(printf '%s\n' "$*" | _nuc_semantic_color "$_nuc_c1_ulcyan" "$_nuc_c1_blue" "$_nuc_c1_reset")"
+  printf '%s\n' "${_nuc_c1_bold}${_say_label}${_nuc_c1_reset}: $_say_msg"
 }
 
 # error — Print an error message to stderr and return 1.
@@ -135,7 +165,8 @@ error() {
     _err_label="$2"
     shift 2
   fi
-  printf '%s\n' "${_nuc_c2_bold}${_err_label}${_nuc_c2_reset}: ${_nuc_c2_bold}${_nuc_c2_red}error${_nuc_c2_reset}: $*" >&2
+  _err_msg="$(printf '%s\n' "$*" | _nuc_semantic_color "$_nuc_c2_ulcyan" "$_nuc_c2_blue" "$_nuc_c2_reset")"
+  printf '%s\n' "${_nuc_c2_bold}${_err_label}${_nuc_c2_reset}: ${_nuc_c2_bold}${_nuc_c2_red}error${_nuc_c2_reset}: $_err_msg" >&2
   return 1
 }
 
@@ -146,7 +177,8 @@ warn() {
     _warn_label="$2"
     shift 2
   fi
-  printf '%s\n' "${_nuc_c2_bold}${_warn_label}${_nuc_c2_reset}: ${_nuc_c2_bold}${_nuc_c2_yellow}warning${_nuc_c2_reset}: $*" >&2
+  _warn_msg="$(printf '%s\n' "$*" | _nuc_semantic_color "$_nuc_c2_ulcyan" "$_nuc_c2_blue" "$_nuc_c2_reset")"
+  printf '%s\n' "${_nuc_c2_bold}${_warn_label}${_nuc_c2_reset}: ${_nuc_c2_bold}${_nuc_c2_yellow}warning${_nuc_c2_reset}: $_warn_msg" >&2
 }
 
 # dry_run — Print a dry-run message to stdout.
@@ -156,7 +188,19 @@ dry_run() {
     _dry_label="$2"
     shift 2
   fi
-  printf '%s\n' "${_nuc_c1_bold}${_dry_label}${_nuc_c1_reset}: ${_nuc_c1_bold}${_nuc_c1_magenta}[dry-run]${_nuc_c1_reset} $*"
+  _dry_msg="$(printf '%s\n' "$*" | _nuc_semantic_color "$_nuc_c1_ulcyan" "$_nuc_c1_blue" "$_nuc_c1_reset")"
+  printf '%s\n' "${_nuc_c1_bold}${_dry_label}${_nuc_c1_reset}: ${_nuc_c1_bold}${_nuc_c1_magenta}[dry-run]${_nuc_c1_reset} $_dry_msg"
+}
+
+# notice — Print a notice message to stdout (F1 [notice] level, bold blue).
+notice() {
+  _notice_label="$_nuc_prefix"
+  if [ "${1-}" = "-l" ]; then
+    _notice_label="$2"
+    shift 2
+  fi
+  _notice_msg="$(printf '%s\n' "$*" | _nuc_semantic_color "$_nuc_c1_ulcyan" "$_nuc_c1_blue" "$_nuc_c1_reset")"
+  printf '%s\n' "${_nuc_c1_bold}${_notice_label}${_nuc_c1_reset}: ${_nuc_c1_bold}${_nuc_c1_blue}[notice]${_nuc_c1_reset} $_notice_msg"
 }
 
 # section — Print a section header to stdout (F3).
