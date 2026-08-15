@@ -238,12 +238,12 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
 
   if ($preflightViolations.Count -gt 0) {
     foreach ($v in $preflightViolations) {
-      Write-Error "check: error: $v"
+      Write-ErrorMessage $v
     }
-    Write-Output "check:   Remove -InstallCommand parameters from Assert-ToolAvailable calls — preflight checks must hard-fail, not suggest install."
+    Write-Message "  Remove -InstallCommand parameters from Assert-ToolAvailable calls — preflight checks must hard-fail, not suggest install."
     $failed = $true
   } else {
-    Write-Output "check: no preflight InstallCommand violations found."
+    Write-Message "no preflight InstallCommand violations found."
   }
 
   Write-Message "--- embedded content enforcement ---"
@@ -329,12 +329,12 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
 
   if ($embeddedViolations.Count -gt 0) {
     foreach ($v in $embeddedViolations) {
-      Write-Error "check: error: $v"
+      Write-ErrorMessage $v
     }
-    Write-Output "check:   Extract here-strings above 10 content lines to shared files — see .agents/instructions/embedded-content.instructions.md."
+    Write-Message "  Extract here-strings above 10 content lines to shared files — see .agents/instructions/embedded-content.instructions.md."
     $failed = $true
   } else {
-    Write-Output "check: no embedded-content violations found."
+    Write-Message "no embedded-content violations found."
   }
 
   Write-Message "--- agents policy ---"
@@ -365,7 +365,7 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
     Write-ErrorMessage 'commit-staged.prompt.md body mismatch between repo and user overlay'
     $failed = $true
   } else {
-    Write-Output 'check: commit-staged prompt bodies match.'
+    Write-Message 'commit-staged prompt bodies match.'
   }
 
   $instructionFiles = Get-ChildItem -Path (Join-Path $r '.agents\instructions') -Filter '*.instructions.md' -File
@@ -405,7 +405,7 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
     }
     $failed = $true
   } else {
-    Write-Output 'check: AGENTS.md instruction links resolve.'
+    Write-Message 'AGENTS.md instruction links resolve.'
   }
 
   Write-Message '--- no real-user test coupling ---'
@@ -422,7 +422,7 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
     }
   }
   if (-not $failed) {
-    Write-Output 'check: no real-user test coupling policy passed.'
+    Write-Message 'no real-user test coupling policy passed.'
   }
 
   Write-Message "--- dummy key uniformity ---"
@@ -471,7 +471,7 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
       }
 
       if ($dummyErrors -gt 0) {
-        Write-Output 'check:   Register new dummy keys in src/modules/dummy-keys.json and use registered values in consumers.'
+        Write-Message '  Register new dummy keys in src/modules/dummy-keys.json and use registered values in consumers.'
         $failed = $true
       } else {
         Write-Message "dummy key uniformity policy passed."

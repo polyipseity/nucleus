@@ -72,7 +72,7 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
     param($Files)
     $ylExit = 0
     foreach ($yf in $Files) {
-      yamllint $yf 2>&1 | ForEach-Object { Write-Output "check: $_" }
+      yamllint $yf 2>&1 | ForEach-Object { Write-Message $_ }
       if ($LASTEXITCODE -ne 0) { $ylExit = $LASTEXITCODE }
     }
     if ($ylExit -ne 0) { throw 'yamllint found issues in YAML files.' }

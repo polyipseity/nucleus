@@ -52,7 +52,7 @@ Register-Step -Id "suppression-audit" -Name "Suppression audit" -Action {
         $result += "$($m.Path):$($m.LineNumber) ($Label)"
       }
     } catch {
-      Write-Warning "Error scanning for $Label`: $_"
+      Write-WarningMessage "Error scanning for $Label`: $_"
     }
     return $result
   }
