@@ -70,7 +70,7 @@ _nucleus_converge_symlinks() {
       _nucleus_protect_symlink "$_ncs_label" "$_ncs_link"
       echo "$_ncs_label: updated $_ncs_target/$_ncs_name -> $_ncs_entry"
     elif test "$_ncs_conflict_test" "$_ncs_link"; then
-      echo "$_ncs_label: $_ncs_link $_ncs_conflict_msg_suffix" >&2
+      echo "$_ncs_label: error: $_ncs_link $_ncs_conflict_msg_suffix" >&2
       exit 1
     else
       ln -s "$_ncs_entry" "$_ncs_link"
@@ -102,7 +102,7 @@ _nucleus_converge_overlay_entry() {
     _nucleus_protect_symlink "$_coe_label" "$_coe_link"
     echo "$_coe_label: updated $_coe_link -> $_coe_source"
   elif test "$_coe_conflict_test" "$_coe_link"; then
-    echo "$_coe_label: $_coe_link $_coe_conflict_msg_suffix" >&2
+    echo "$_coe_label: error: $_coe_link $_coe_conflict_msg_suffix" >&2
     exit 1
   else
     ln -s "$_coe_source" "$_coe_link"

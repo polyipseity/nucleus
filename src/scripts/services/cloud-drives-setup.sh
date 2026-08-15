@@ -10,11 +10,11 @@ _cd_ensure_real_directory() {
   _cd_name="$2"
 
   if [ -L "$_cd_path" ]; then
-    printf '%s\n' "cloud-drives (${_cd_name}): $_cd_path is a symlink; fix manually and re-apply" >&2
+    printf '%s\n' "cloud-drives (${_cd_name}): error: $_cd_path is a symlink; fix manually and re-apply" >&2
     exit 1
   fi
   if [ -e "$_cd_path" ] && [ ! -d "$_cd_path" ]; then
-    printf '%s\n' "cloud-drives (${_cd_name}): $_cd_path exists and is not a directory; fix manually and re-apply" >&2
+    printf '%s\n' "cloud-drives (${_cd_name}): error: $_cd_path exists and is not a directory; fix manually and re-apply" >&2
     exit 1
   fi
   mkdir -p "$_cd_path"
@@ -51,11 +51,11 @@ while IFS= read -r _vsd_entry; do
 
     if [ -L "$_vsd_icloud_replica_path" ]; then
       if [ "$(readlink "$_vsd_icloud_replica_path")" != "$_vsd_icloud_native_target" ]; then
-        printf '%s\n' "cloud-drives ($_vsd_display_name): $_vsd_icloud_replica_path must symlink to $_vsd_icloud_native_target; fix manually and re-apply" >&2
+        printf '%s\n' "cloud-drives ($_vsd_display_name): error: $_vsd_icloud_replica_path must symlink to $_vsd_icloud_native_target; fix manually and re-apply" >&2
         exit 1
       fi
     elif [ -e "$_vsd_icloud_replica_path" ]; then
-      printf '%s\n' "cloud-drives ($_vsd_display_name): $_vsd_icloud_replica_path exists and is not the native iCloud symlink; fix manually and re-apply" >&2
+      printf '%s\n' "cloud-drives ($_vsd_display_name): error: $_vsd_icloud_replica_path exists and is not the native iCloud symlink; fix manually and re-apply" >&2
       exit 1
     else
       ln -s "$_vsd_icloud_native_target" "$_vsd_icloud_replica_path"

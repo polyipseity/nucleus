@@ -15,13 +15,13 @@ _nucleus_protect_symlink() {
   case "$(uname -s)" in
   Darwin)
     if ! /usr/bin/chflags -h uchg "$_nps_path"; then
-      echo "$_nps_context: warning — could not protect symlink $_nps_path with uchg." >&2
+      echo "$_nps_context: warning: could not protect symlink $_nps_path with uchg." >&2
     fi
     ;;
   Linux)
     if command -v chattr >/dev/null; then
       if ! chattr -h +i "$_nps_path"; then
-        echo "$_nps_context: warning — could not protect symlink $_nps_path with chattr +i." >&2
+        echo "$_nps_context: warning: could not protect symlink $_nps_path with chattr +i." >&2
       fi
     fi
     ;;
@@ -34,13 +34,13 @@ _nucleus_unprotect_symlink() {
   case "$(uname -s)" in
   Darwin)
     if ! /usr/bin/chflags -h nouchg "$_nus_path"; then
-      echo "$_nus_context: warning — could not clear uchg from symlink $_nus_path before update." >&2
+      echo "$_nus_context: warning: could not clear uchg from symlink $_nus_path before update." >&2
     fi
     ;;
   Linux)
     if command -v chattr >/dev/null; then
       if ! chattr -h -i "$_nus_path"; then
-        echo "$_nus_context: warning — could not clear chattr +i from symlink $_nus_path before update." >&2
+        echo "$_nus_context: warning: could not clear chattr +i from symlink $_nus_path before update." >&2
       fi
     fi
     ;;
@@ -69,7 +69,7 @@ _nucleus_resolve_repo_root() {
     _nrr_resolved="$(CDPATH='' cd -- "$_nrr_fallback" && pwd -P 2>/dev/null)" || true
     printf '%s\n' "${_nrr_resolved:-$_nrr_fallback}"
   else
-    echo "$_nrr_context: repo root not set; run via apply.sh or export NUCLEUS_REPO_ROOT." >&2
+    echo "$_nrr_context: error: repo root not set; run via apply.sh or export NUCLEUS_REPO_ROOT." >&2
     return 1
   fi
 }
@@ -85,7 +85,7 @@ ensure_file_symlink() {
     _nucleus_unprotect_symlink "VS Code" "$_efs_link"
     rm "$_efs_link"
   elif [ -e "$_efs_link" ]; then
-    echo "ensure_file_symlink: $_efs_link exists and is not a symlink to $_efs_target; fix manually and re-apply" >&2
+    echo "ensure_file_symlink: error: $_efs_link exists and is not a symlink to $_efs_target; fix manually and re-apply" >&2
     return 1
   fi
 
@@ -105,7 +105,7 @@ ensure_dir_symlink() {
     _nucleus_unprotect_symlink "VS Code" "$_eds_link"
     rm "$_eds_link"
   elif [ -e "$_eds_link" ]; then
-    echo "ensure_dir_symlink: $_eds_link exists and is not a symlink to $_eds_target; fix manually and re-apply" >&2
+    echo "ensure_dir_symlink: error: $_eds_link exists and is not a symlink to $_eds_target; fix manually and re-apply" >&2
     return 1
   fi
 

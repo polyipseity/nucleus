@@ -63,7 +63,7 @@ __nucleus_check_icloud_exclusion() {
       if /usr/bin/xattr -w com.apple.fileprovider.ignore#P 1 "$normalized_path"; then
         echo "shell: iCloud exclusion marked $normalized_path" >&2
       else
-        echo "shell: failed to mark iCloud exclusion for $normalized_path" >&2
+        echo "shell: error: failed to mark iCloud exclusion for $normalized_path" >&2
       fi
       return 0
     fi

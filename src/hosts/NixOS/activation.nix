@@ -181,7 +181,7 @@ in
   system.activationScripts.nixos-verify-nucleus-services = lib.mkAfter ''
     if command -v nucleus-svc >/dev/null 2>&1; then
       if ! nucleus-svc verify; then
-        echo "svc: some services are inactive (non-fatal; check journalctl for details)" >&2
+        echo "svc: warning: some services are inactive (non-fatal; check journalctl for details)" >&2
       fi
     fi
   '';

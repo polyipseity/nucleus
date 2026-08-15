@@ -142,7 +142,7 @@ _prek_hook_install_if_needed() {
     __nucleus_prek_checked_repos[$repo_root]=1
   else
     install_status=$?
-    echo "prek: failed to install hooks in $repo_root (exit $install_status)" >&2
+    echo "prek: error: failed to install hooks in $repo_root (exit $install_status)" >&2
     __nucleus_prek_checked_repos[$repo_root]=1
   fi
   __nucleus_prek_install_in_progress=0
@@ -180,7 +180,7 @@ python() {
     return $?
   fi
   cat >&2 << 'EOF'
-shell: system-wide Python is banned to prevent accidental modifications.
+shell: error: system-wide Python is banned to prevent accidental modifications.
          Use one of these approaches instead:
          - nix develop     (activate project devShell with scoped Python)
          - uv run <cmd>    (run Python via uv package manager)
@@ -219,7 +219,7 @@ pip() {
     return $?
   fi
   cat >&2 << 'EOF'
-shell: system-wide pip is banned to prevent breaking system dependencies.
+shell: error: system-wide pip is banned to prevent breaking system dependencies.
          Use one of these approaches instead:
          - nix develop     (activate project devShell with scoped Python+pip)
          - uv pip install  (use uv to manage project dependencies)
@@ -258,7 +258,7 @@ bun() {
     return "$_status"
   fi
   cat >&2 << 'EOF'
-shell: managed bun is unavailable right now.
+shell: warning: managed bun is unavailable right now.
          For development, use one of these managed entrypoints:
          - Enter a project directory with .envrc (direnv auto-loads the devShell)
          - Or use the user-scoped default toolchain installed by nucleus apply
@@ -274,7 +274,7 @@ cargo() {
     return "$_status"
   fi
   cat >&2 << 'EOF'
-shell: managed cargo is unavailable right now.
+shell: warning: managed cargo is unavailable right now.
          For Rust development, use one of these managed entrypoints:
          - Enter a project directory with .envrc (direnv auto-loads the devShell)
          - Or add a rust-toolchain.toml file to this directory
@@ -289,7 +289,7 @@ rustc() {
     return "$_status"
   fi
   cat >&2 << 'EOF'
-shell: managed rustc is unavailable right now.
+shell: warning: managed rustc is unavailable right now.
          For Rust development, use one of these managed entrypoints:
          - Enter a project directory with .envrc (direnv auto-loads the devShell)
          - Or add a rust-toolchain.toml file to this directory
@@ -304,7 +304,7 @@ uv() {
     return "$_status"
   fi
   cat >&2 << 'EOF'
-shell: managed uv is unavailable right now.
+shell: warning: managed uv is unavailable right now.
          For Python development, use one of these managed entrypoints:
          - Enter a project directory with .envrc (direnv auto-loads the devShell)
          - Or use the user-scoped default toolchain installed by nucleus apply
@@ -319,7 +319,7 @@ EOF
 # No DIRENV_DIR pass-through: no devShell in this repo provides these tools.
 npm() {
   cat >&2 << 'EOF'
-shell: system-wide npm is not used in this environment.
+shell: error: system-wide npm is not used in this environment.
          Use bun equivalents instead:
          - bun install     (install packages)
          - bun add <pkg>   (add a dependency)
@@ -332,7 +332,7 @@ EOF
 
 npx() {
   cat >&2 << 'EOF'
-shell: system-wide npx is not used in this environment.
+shell: error: system-wide npx is not used in this environment.
          Use bun x <cmd> for one-shot package execution instead.
 EOF
   return 1
@@ -340,7 +340,7 @@ EOF
 
 node() {
   cat >&2 << 'EOF'
-shell: system-wide Node.js is not used in this environment.
+shell: error: system-wide Node.js is not used in this environment.
          Use bun as the JavaScript runtime instead:
          - bun <script>   (run a script)
          - bun run        (run package.json scripts)
@@ -350,7 +350,7 @@ EOF
 
 corepack() {
   cat >&2 << 'EOF'
-shell: corepack is not used in this environment.
+shell: error: corepack is not used in this environment.
          Use bun for package management instead.
 EOF
   return 1
