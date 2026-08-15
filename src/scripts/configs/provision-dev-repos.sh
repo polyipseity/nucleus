@@ -12,6 +12,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+. "$SCRIPT_DIR/../lib/lib.sh"
 . "$SCRIPT_DIR/../lib/symlink-hardening.sh"
 . "$SCRIPT_DIR/../lib/dev-repos-provision.sh"
 
@@ -24,15 +25,11 @@ _jqBin="$5"
 devReposJson="$6"
 
 if [ -z "$repoRoot" ] || [ ! -d "$repoRoot" ]; then
-  echo "provision-dev-repos: repo root is empty or invalid — check NUCLEUS_REPO_ROOT at build time" >&2
-  exit 1
+  die -l provision-dev-repos "repo root is empty or invalid — check NUCLEUS_REPO_ROOT at build time"
 fi
 
 devDir="$HOME/dev"
-mkdir -p "$devDir" || {
-  echo "provision-dev-repos: failed to create $devDir" >&2
-  exit 1
-}
+mkdir -p "$devDir" || die -l provision-dev-repos "failed to create $devDir"
 
 # Step 1: Provision configured repositories
 # Use temp file to avoid subshell isolation (while-read in pipelines
@@ -111,7 +108,7 @@ done <"$_submoduleListTmp"
 rm -f "$_submoduleListTmp"
 unset _submoduleListTmp _jq
 
-echo "provision-dev-repos: completed provisioning dev repositories and submodules"
+say -l provision-dev-repos "completed provisioning dev repositories and submodules"
 if [ "$devReposErrors" -gt 0 ]; then
-  echo "provision-dev-repos: completed with $devReposErrors non-fatal error(s); see messages above." >&2
+  warn -l provision-dev-repos "completed with $devReposErrors non-fatal error(s); see messages above."
 fi
