@@ -180,7 +180,8 @@ run_ai_sync() {
   fi
 
   say -l ai "running post-apply AI model sync..."
-  if ! nucleus-ai sync; then
+  apply_log_init
+  if ! nucleus-ai sync 2>&1 | tee -a "$_apply_log"; then
     warn -l ai "nucleus-ai sync exited with an error; model sync incomplete (system apply succeeded)"
   fi
 }
@@ -193,7 +194,8 @@ run_vm_post_apply() {
 
   if [ "$vm_setup" = true ]; then
     say -l nucleus-vm "running post-apply VM provisioning (setup)..."
-    if ! nucleus-vm setup --accept-gsi-license; then
+    apply_log_init
+    if ! nucleus-vm setup --accept-gsi-license 2>&1 | tee -a "$_apply_log"; then
       warn -l nucleus-vm "nucleus-vm setup exited with an error; VM setup incomplete (system apply succeeded)"
     fi
     return
@@ -205,8 +207,22 @@ run_vm_post_apply() {
   fi
 
   say -l nucleus-vm "running post-apply VM config refresh (sync)..."
-  if ! nucleus-vm sync; then
+  apply_log_init
+  if ! nucleus-vm sync 2>&1 | tee -a "$_apply_log"; then
     warn -l nucleus-vm "nucleus-vm sync exited with an error; VM sync incomplete (system apply succeeded)"
+  fi
+}
+
+# Per-run apply log: post-apply subcommand output (AI sync, replica sync, VM
+# post-apply, GC) is teed here for audit while staying live on the console.
+# Files land in the host user log dir (services.json $logging.logDir, honoring
+# NUCLEUS_LOG_DIR) and are rotated by log-gc-user.sh.
+_apply_log=""
+apply_log_init() {
+  if [ -z "$_apply_log" ]; then
+    _ali_dir="$(nucleus_log_dir)"
+    mkdir -p "$_ali_dir"
+    _apply_log="$_ali_dir/apply-$(date -u +%Y%m%dT%H%M%SZ).log"
   fi
 }
 
@@ -220,7 +236,8 @@ run_gc() {
   fi
 
   say -l gc "running post-apply garbage collection..."
-  if ! sh "$_rgc_script"; then
+  apply_log_init
+  if ! sh "$_rgc_script" 2>&1 | tee -a "$_apply_log"; then
     warn -l gc "gc.sh exited with an error; GC incomplete (system apply succeeded)"
   fi
 }
@@ -259,7 +276,8 @@ run_replica_sync() {
   fi
 
   say -l replica-sync "running post-apply replica sync..."
-  if ! sh "$_rrb_script"; then
+  apply_log_init
+  if ! sh "$_rrb_script" 2>&1 | tee -a "$_apply_log"; then
     warn -l replica-sync "replica-sync.sh exited with an error; replica sync incomplete (system apply succeeded)"
   fi
 }
@@ -357,7 +375,6 @@ Linux)
     run_ai_sync
     run_replica_sync
     run_vm_post_apply
-    run_gc
     run_gc
     run_manual_display NixOS
   else
