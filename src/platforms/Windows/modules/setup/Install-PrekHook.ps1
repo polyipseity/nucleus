@@ -63,7 +63,7 @@ function Install-PrekHook {
     $resolvedPrekPath = Get-Command -Name "prek" -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
   }
   if ([string]::IsNullOrWhiteSpace($resolvedPrekPath)) {
-    Write-Warning "prek: prek executable not found; skipping hook installation for $resolvedRepositoryRoot"
+    Write-NucleusWarning -CommandName prek "prek executable not found; skipping hook installation for $resolvedRepositoryRoot"
     return
   }
 

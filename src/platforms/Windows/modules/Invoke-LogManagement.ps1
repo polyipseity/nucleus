@@ -241,7 +241,7 @@ function Invoke-LogRotation {
       $isWritable = $false
     }
     if (-not $isWritable) {
-      Write-Warning "log-rotation: skipping unwritable '$($file.FullName)'"
+      Write-NucleusWarning -CommandName log-rotation "skipping unwritable '$($file.FullName)'"
       continue
     }
 
@@ -291,7 +291,7 @@ function Invoke-LogRotation {
     if ($Compress) {
       $null = & gzip @($archivePath) 2>$null  # check-suppress:suppression_doc: archive may fail to compress if already corrupted or missing; $? checked below
       if (-not $?) {
-        Write-Warning "log-rotation: gzip failed for $archivePath; keeping uncompressed."
+        Write-NucleusWarning -CommandName log-rotation "gzip failed for $archivePath; keeping uncompressed."
       }
     }
   }
