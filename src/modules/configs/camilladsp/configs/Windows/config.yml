@@ -33,7 +33,7 @@ filters:
   compressor pre-gain:
     description: null
     parameters:
-      gain: 20
+      gain: 30
       inverted: false
       mute: false
       scale: dB
