@@ -4,6 +4,8 @@ name: "Cross-Host Feature Parity"
 applyTo: "src/modules/**/*.json, src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/Windows/**/*.yml, scripts/**/*.{sh,ps1}, src/scripts/**/*.{sh,ps1}, scripts/gc.*"
 ---
 
+# Cross-host feature parity
+
 ## Goal
 
 Default to parity-first changes: apply new capabilities to as many hosts as practical in the same change. Avoid one-host features unless there is a concrete platform constraint. Keep host orchestration thin and push reusable behavior into shared modules (`src/modules/*.nix` and `src/platforms/Windows/modules/*.ps1`) or declarative state files (`src/hosts/Windows/*.dsc.yml`).

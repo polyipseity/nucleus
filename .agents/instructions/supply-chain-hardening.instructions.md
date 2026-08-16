@@ -4,6 +4,8 @@ name: "Supply Chain Hardening"
 applyTo: "src/modules/shell*.nix, src/modules/agents.nix, src/modules/pwsh.nix, src/hosts/Windows/user/env.dsc.yml, src/platforms/Windows/modules/**/*.ps1, scripts/check.sh, scripts/check.ps1, scripts/bump-lockfile.sh, scripts/bump-lockfile.ps1, src/lockfiles/lifecycle-allowlist.json"
 ---
 
+# Supply chain hardening
+
 All managed package managers in this repository MUST have a minimum release age delay configured to limit exposure to newly published (potentially compromised) package versions.
 
 ## Active delays and pinning defaults

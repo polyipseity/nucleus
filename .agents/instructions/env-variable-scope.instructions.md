@@ -4,6 +4,8 @@ name: "Environment Variable Scope"
 applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/**/*.ps1, src/hosts/Windows/**/*.yml"
 ---
 
+# Environment variable scope
+
 Every environment variable set by this repo must default to all-process availability on the host. Restricting scope (shell-only, service-only) is an exception requiring an inline `# WHY:` comment.
 
 ## Centralized registry

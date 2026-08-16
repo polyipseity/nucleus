@@ -4,6 +4,8 @@ name: "Package Installation Scope"
 applyTo: "src/**/*.nix, src/**/*.ps1, src/hosts/Windows/**/*.yml, scripts/**, src/scripts/**"
 ---
 
+# Package installation scope
+
 ## Core principle
 
 All tools and libraries must be installed at user-level only. System-wide installations are prohibited except where explicitly required for system infrastructure (e.g., nix-darwin system packages, WinGet DSC registry settings).

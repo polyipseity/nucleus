@@ -4,6 +4,8 @@ name: "Application Config Policy"
 applyTo: "src/modules/configs/**, src/modules/**/*.nix, src/hosts/**/*.nix, src/platforms/Windows/modules/**/*.ps1, src/flake.nix, src/users/**/*.json, tests/modules/*-tests.nix, tests/integration/*-tests.nix, tests/hosts/**/*-tests.nix"
 ---
 
+# Application config policy
+
 ## Config application policy
 
 All configs in `src/modules/configs/` must follow this method priority, chosen by the nature of the target application's config behavior:

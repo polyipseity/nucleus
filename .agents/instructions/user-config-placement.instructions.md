@@ -4,6 +4,8 @@ name: "User Config Placement"
 applyTo: "src/modules/configs/**, src/users/**, src/modules/**/*.nix, src/hosts/**/*.nix, src/platforms/Windows/modules/**/*.ps1, AGENTS.md"
 ---
 
+# User config placement
+
 ## Placement taxonomy
 
 ### Machine-wide singleton — `src/modules/configs/`

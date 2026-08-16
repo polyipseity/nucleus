@@ -4,6 +4,8 @@ name: "Git Scope Terminology"
 applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/Windows/**/*.ps1, src/users/**, src/modules/configs/git/**"
 ---
 
+# Git scope terminology
+
 This file is the single source of truth for git configuration and gitignore naming, file layout, and provisioning in this repo. Every git config or gitignore file, symlink target, activation script, and comment MUST use the terminology and rules below exactly as written.
 
 ## 1. Scope terminology (THE canonical convention — never use these words loosely)
