@@ -209,11 +209,11 @@ in
       echo "ssh: com.apple.access_ssh group does not exist (already allowing all users)." >&2
     fi
 
-    # ---- configure-middle-click -------------------------------------------------
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-enable-middle-click.sh"
-
-    # ---- configure-mounty-login-item ---------------------------------------------
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-register-mounty-login-item.sh"
+    # ---- configure-app-autostart ------------------------------------------------
+    # Registry-driven GUI app auto-start (replaces ad-hoc MiddleClick/Mounty login
+    # items and the inline steam-autostart disable).  Reads apps.json and converges
+    # every macOS app to its declared state via our uniform mechanism.
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-app-autostart.sh"
     # ---- configure-linearmouse-preferences --------------------------------------
     "${activationBundle}/src/hosts/MacBook/scripts/macos-set-linearmouse-prefs.sh"
     # ---- configure-utm-prefs ----------------------------------------------------
@@ -272,9 +272,6 @@ in
     # Warning-only check that installed Homebrew versions match lockfile.
     # Never fails activation.
     "${activationBundle}/src/hosts/MacBook/scripts/macos-verify-homebrew-pin.sh" "${repoRoot}"
-
-    # ---- disableSteamAutoStartup ------------------------------------------------
-    "${activationBundle}/src/scripts/configs/disable-steam-autostart.sh"
 
     # ---- verifyNucleusServices ---------------------------------------------------
     # Warn-only verification that all managed services are running.
