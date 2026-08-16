@@ -35,7 +35,10 @@ run_app_registry() {
       ] | @tsv' "$_app_json")
 
     # enabled / disableNative must be booleans; kind must be in the enum.
-    while IFS=$'\t' read -r _name _host _enabled _disable_native _kind; do
+    while IFS=$'\t' read -r _name _host _type _enabled _disable_native _kind; do
+      # Omitted hosts carry no runtime fields; the first loop already validated
+      # their justification. Skip boolean/kind checks for them.
+      [ "$_type" = "omitted" ] && continue
       case "$_enabled" in
       true | false) ;;
       *)
@@ -52,7 +55,7 @@ run_app_registry() {
       esac
       case "$_kind" in
       login-item | launchagent | xdg-desktop | run-key | startup-folder | system-extension) ;;
-      omitted | "missing") ;;
+      "missing") ;;
       *)
         error "apps.json: '$_name' host '$_host' has invalid kind '$_kind'"
         _app_errors=$((_app_errors + 1))
@@ -65,8 +68,9 @@ run_app_registry() {
       [
         $name,
         .key,
-        (.value.enabled // "missing" | tostring),
-        (.value.disableNative // "missing" | tostring),
+        (.value.type // "missing"),
+        (if (.value | has("enabled")) then (.value.enabled | tostring) else "missing" end),
+        (if (.value | has("disableNative")) then (.value.disableNative | tostring) else "missing" end),
         (.value.kind // "missing")
       ] | @tsv' "$_app_json")
   fi

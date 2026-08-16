@@ -1,3 +1,423 @@
 {
-  "$schema": "./apps.schema.json"
+  "$schema": "./apps.schema.json",
+  "Raycast": {
+    "displayName": "Raycast",
+    "description": "Spotlight replacement and launcher",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/Raycast.app",
+        "bundleId": "com.raycast.macos"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "macOS-only launcher; PowerToys provides the Windows equivalent, no Linux build."
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "macOS-only launcher; PowerToys provides the Windows equivalent."
+      }
+    }
+  },
+  "Amphetamine": {
+    "displayName": "Amphetamine",
+    "description": "Keep-awake menu-bar utility (Mac App Store)",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/Amphetamine.app",
+        "bundleId": "com.if.Amphetamine"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "macOS-only menu-bar app; no Linux build."
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "macOS-only menu-bar app; no Windows build."
+      }
+    }
+  },
+  "Stats": {
+    "displayName": "Stats",
+    "description": "System stats menu-bar utility",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/Stats.app",
+        "bundleId": "eu.exelban.Stats"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "macOS-only menu-bar app; no Linux build."
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "macOS-only menu-bar app; no Windows build."
+      }
+    }
+  },
+  "BetterDisplay": {
+    "displayName": "BetterDisplay",
+    "description": "Advanced display management and virtual screens",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/BetterDisplay.app",
+        "bundleId": "me.betterdisplay.BetterDisplay"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "macOS-only display utility; no Linux build."
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "macOS-only display utility; no Windows build."
+      }
+    }
+  },
+  "MiddleClick": {
+    "displayName": "MiddleClick",
+    "description": "Three/four-finger middle-click gesture helper",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/MiddleClick.app",
+        "bundleId": "com.rouge41.middleclick"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "macOS-only gesture helper; no Linux build."
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "macOS-only gesture helper; no Windows build."
+      }
+    }
+  },
+  "Mounty": {
+    "displayName": "Mounty",
+    "description": "NTFS auto-mounter for fuse-t drives",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/Mounty.app",
+        "bundleId": "com.mounty.app"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "macOS-only NTFS mounter; no Linux build."
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "macOS-only NTFS mounter; no Windows build."
+      }
+    }
+  },
+  "LinearMouse": {
+    "displayName": "LinearMouse",
+    "description": "Per-device mouse/trackpad scrolling behavior and sensitivity",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/LinearMouse.app",
+        "bundleId": "com.lujjjh.LinearMouse"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "macOS-only input utility; no Linux build."
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "macOS-only input utility; no Windows build."
+      }
+    }
+  },
+  "LuLu": {
+    "displayName": "LuLu",
+    "description": "Outbound network firewall",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": false,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/LuLu.app",
+        "bundleId": "com.objective-see.LuLu"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "macOS-only firewall; no Linux build."
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "macOS-only firewall; no Windows build."
+      }
+    }
+  },
+  "OrbStack": {
+    "displayName": "OrbStack",
+    "description": "Docker/Linux VM runtime",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/OrbStack.app",
+        "bundleId": "com.orbstack.orbstack"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "macOS-only VM runtime; NixOS is the host itself."
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "macOS-only VM runtime; WSL/Docker Desktop cover Windows."
+      }
+    }
+  },
+  "Parsec": {
+    "displayName": "Parsec",
+    "description": "Low-latency remote desktop streaming",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/Parsec.app",
+        "bundleId": "tv.parsec.www"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "xdg-desktop",
+        "path": "/run/current-system/sw/bin/parsec"
+      },
+      "Windows": {
+        "platform": "Windows",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "run-key",
+        "path": "C:\\Program Files\\Parsec\\parsec.exe"
+      }
+    }
+  },
+  "Telegram": {
+    "displayName": "Telegram",
+    "description": "Messaging client (beta channel)",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/Telegram.app",
+        "bundleId": "ru.keepcoder.Telegram"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "xdg-desktop",
+        "path": "/run/current-system/sw/bin/telegram-desktop"
+      },
+      "Windows": {
+        "platform": "Windows",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "run-key",
+        "path": "%LOCALAPPDATA%\\Telegram Desktop\\Telegram.exe"
+      }
+    }
+  },
+  "WhatsApp": {
+    "displayName": "WhatsApp",
+    "description": "Messaging client (beta channel)",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/WhatsApp.app",
+        "bundleId": "net.whatsapp.WhatsApp"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "No stable Linux client; beta channel is macOS/Windows only."
+      },
+      "Windows": {
+        "platform": "Windows",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "run-key",
+        "path": "%LOCALAPPDATA%\\WhatsApp\\WhatsApp.exe"
+      }
+    }
+  },
+  "Steam": {
+    "displayName": "Steam",
+    "description": "Game distribution and launcher platform",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": false,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/Steam.app",
+        "bundleId": "com.valvesoftware.steam"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "enabled": false,
+        "disableNative": true,
+        "kind": "xdg-desktop",
+        "path": "/run/current-system/sw/bin/steam"
+      },
+      "Windows": {
+        "platform": "Windows",
+        "enabled": false,
+        "disableNative": true,
+        "kind": "run-key",
+        "path": "C:\\Program Files (x86)\\Steam\\steam.exe"
+      }
+    }
+  },
+  "AltTab": {
+    "displayName": "AltTab",
+    "description": "Windows-style alt-tab switcher",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/AltTab.app",
+        "bundleId": "com.lwouis.alt-tab-macos"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "macOS-only window switcher; no Linux build."
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "Native alt-tab exists on Windows; no separate app."
+      }
+    }
+  },
+  "battery": {
+    "displayName": "battery",
+    "description": "Apple Silicon charge-limit manager (menu-bar GUI)",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": true,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/battery.app",
+        "bundleId": "com.fiplab.battery"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "macOS-only charge-limit utility; no Linux build."
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "macOS-only charge-limit utility; no Windows build."
+      }
+    }
+  },
+  "fuse-t": {
+    "displayName": "fuse-t",
+    "description": "FSKit-capable FUSE userspace driver for rclone mounts",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": true,
+        "disableNative": false,
+        "kind": "system-extension",
+        "justification": "System extension; manual approval once in System Settings → Privacy & Security."
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "macOS-only system extension; Linux uses native FUSE."
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "macOS-only system extension; Windows uses WinFsp."
+      }
+    }
+  },
+  "Chrome Remote Desktop Host": {
+    "displayName": "Chrome Remote Desktop Host",
+    "description": "Headless remote-desktop receiver",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": true,
+        "disableNative": false,
+        "kind": "system-extension",
+        "justification": "System extension; manual approval once in System Settings → Privacy & Security."
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "macOS-only system extension; Linux uses the Chrome Remote Desktop service."
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "macOS-only system extension; Windows uses the native service."
+      }
+    }
+  }
 }
