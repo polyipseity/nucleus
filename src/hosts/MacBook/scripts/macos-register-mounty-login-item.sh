@@ -18,10 +18,10 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 if _nucleus_resolve_console_user; then
   if [ -d "/Applications/Mounty.app" ]; then
     # shellcheck disable=SC2016 # reason: JXA expression passed to osascript; $ is JavaScript, not shell expansion
-    if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
+    if ! tool_err="$(/bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
       /usr/bin/osascript -l JavaScript \
-      -e 'ObjC.import("ServiceManagement"); if (!$.SMLoginItemSetEnabled($("com.cu4uc.MountyHelper"), true)) throw new Error("SMLoginItemSetEnabled failed");'; then
-      warn -l mounty "failed to ensure native Login Item startup for user '$_nucleus_console_user'."
+      -e 'ObjC.import("ServiceManagement"); if (!$.SMLoginItemSetEnabled($("com.cu4uc.MountyHelper"), true)) throw new Error("SMLoginItemSetEnabled failed");' 2>&1)"; then
+      warn -l mounty "failed to ensure native Login Item startup for user '$_nucleus_console_user'${tool_err:+: $tool_err}"
     fi
   fi
 fi
