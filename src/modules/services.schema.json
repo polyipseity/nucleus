@@ -1,10 +1,8 @@
 {
-  "$id": "https://nucleus.local/services.schema.json",
   "$schema": "http://json-schema.org/draft-07/schema#",
   "properties": {
     "$schema": {
-      "description": "Reference to the JSON Schema file that validates this data file.",
-      "type": "string"
+      "$ref": "registry-common.schema.json#/definitions/schemaProperty"
     },
     "$logging": {
       "$ref": "#/definitions/hostLoggingRoots",
@@ -30,20 +28,25 @@
         "type": "object"
       },
       "hosts": {
-        "additionalProperties": false,
-        "minProperties": 1,
-        "properties": {
-          "MacBook": {
-            "$ref": "#/definitions/hostEntry"
+        "allOf": [
+          {
+            "$ref": "registry-common.schema.json#/definitions/hostsParity"
           },
-          "NixOS": {
-            "$ref": "#/definitions/hostEntry"
-          },
-          "Windows": {
-            "$ref": "#/definitions/hostEntry"
+          {
+            "additionalProperties": false,
+            "properties": {
+              "MacBook": {
+                "$ref": "#/definitions/hostEntry"
+              },
+              "NixOS": {
+                "$ref": "#/definitions/hostEntry"
+              },
+              "Windows": {
+                "$ref": "#/definitions/hostEntry"
+              }
+            }
           }
-        },
-        "type": "object"
+        ]
       }
     },
     "required": [
@@ -250,22 +253,6 @@
       ],
       "type": "object"
     },
-    "omittedEntry": {
-      "properties": {
-        "justification": {
-          "description": "Why this service is not managed on this platform.",
-          "type": "string"
-        },
-        "type": {
-          "const": "omitted"
-        }
-      },
-      "required": [
-        "type",
-        "justification"
-      ],
-      "type": "object"
-    },
     "serviceRuntimeEntry": {
       "description": "Service runtime configuration for one host",
       "oneOf": [
@@ -282,38 +269,20 @@
           "$ref": "#/definitions/schtaskEntry"
         },
         {
-          "$ref": "#/definitions/omittedEntry"
+          "$ref": "registry-common.schema.json#/definitions/omittedEntry"
         }
       ]
     },
     "hostEntry": {
       "allOf": [
         {
-          "properties": {
-            "platform": {
-              "$ref": "#/definitions/platformKey"
-            }
-          },
-          "required": [ "platform" ],
-          "type": "object"
+          "$ref": "registry-common.schema.json#/definitions/hostEntryBase"
         },
         {
           "$ref": "#/definitions/serviceRuntimeEntry"
-        },
-        {
-          "propertyNames": {
-            "not": {
-              "enum": [ "darwin", "flags", "linux", "posix", "win32" ]
-            }
-          }
         }
       ],
       "description": "Host-specific service configuration with platform reference"
-    },
-    "platformKey": {
-      "description": "OS-family platform key referenced by host entries",
-      "enum": [ "macOS", "NixOS", "Windows" ],
-      "type": "string"
     },
     "schtaskEntry": {
       "properties": {

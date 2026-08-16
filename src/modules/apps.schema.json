@@ -1,0 +1,114 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "properties": {
+    "$schema": {
+      "$ref": "registry-common.schema.json#/definitions/schemaProperty"
+    }
+  },
+  "additionalProperties": {
+    "properties": {
+      "description": {
+        "type": "string"
+      },
+      "displayName": {
+        "type": "string"
+      },
+      "hosts": {
+        "allOf": [
+          {
+            "$ref": "registry-common.schema.json#/definitions/hostsParity"
+          },
+          {
+            "additionalProperties": false,
+            "properties": {
+              "MacBook": {
+                "$ref": "#/definitions/hostAutostartEntry"
+              },
+              "NixOS": {
+                "$ref": "#/definitions/hostAutostartEntry"
+              },
+              "Windows": {
+                "$ref": "#/definitions/hostAutostartEntry"
+              }
+            }
+          }
+        ]
+      }
+    },
+    "required": [
+      "displayName",
+      "hosts"
+    ],
+    "type": "object"
+  },
+  "definitions": {
+    "autostartKind": {
+      "description": "Our uniform auto-start mechanism per platform. Never the app's native enable path.",
+      "enum": [
+        "login-item",
+        "launchagent",
+        "xdg-desktop",
+        "run-key",
+        "startup-folder",
+        "system-extension"
+      ],
+      "type": "string"
+    },
+    "hostAutostartEntry": {
+      "allOf": [
+        {
+          "$ref": "registry-common.schema.json#/definitions/hostEntryBase"
+        },
+        {
+          "oneOf": [
+            {
+              "$ref": "#/definitions/autostartRuntimeEntry"
+            },
+            {
+              "$ref": "registry-common.schema.json#/definitions/omittedEntry"
+            }
+          ]
+        }
+      ],
+      "description": "Host-specific auto-start configuration with platform reference"
+    },
+    "autostartRuntimeEntry": {
+      "description": "Auto-start runtime configuration for one host",
+      "properties": {
+        "bundleId": {
+          "description": "macOS bundle identifier (e.g. com.if.Amphetamine). Used to locate the app for login-item manipulation.",
+          "type": "string"
+        },
+        "disableNative": {
+          "description": "Does the app ship a native auto-start setting we must turn off (true for almost everything; false only for system-extension apps with no app setting).",
+          "type": "boolean"
+        },
+        "enabled": {
+          "description": "Do we launch this app via our uniform mechanism.",
+          "type": "boolean"
+        },
+        "hidden": {
+          "description": "Launch the app hidden (macOS login item / launchagent Hide flag).",
+          "type": "boolean"
+        },
+        "justification": {
+          "description": "Explanation of platform-specific configuration choices.",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/autostartKind"
+        },
+        "path": {
+          "description": "Absolute path to the app or executable (e.g. /Applications/Amphetamine.app).",
+          "type": "string"
+        }
+      },
+      "required": [
+        "enabled",
+        "disableNative",
+        "kind"
+      ],
+      "type": "object"
+    }
+  }
+}
