@@ -107,9 +107,7 @@ test_filter_no_ignore_under_errexit() {
   fi
 }
 
-echo ""
-echo "Deny-list library tests"
-echo "======================="
+section 1 "Deny-list library tests"
 echo ""
 test_filter_ignored_path
 test_filter_tracked_path

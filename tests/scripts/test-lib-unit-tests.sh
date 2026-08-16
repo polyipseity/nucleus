@@ -56,8 +56,7 @@ test_test_lib_usage_no_skip_system_build() {
 }
 
 # ---- Run tests ----
-echo ""
-echo "=== Phase 2: test-lib unit tests ==="
+section 1 "Phase 2: test-lib unit tests"
 echo ""
 
 test_parse_args_skip_system_build_removed

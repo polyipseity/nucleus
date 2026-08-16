@@ -46,12 +46,9 @@ for script in "${ENTRY_SCRIPTS[@]}"; do
   test_is_executable "$script"
 done
 
-echo ""
-echo "============================================================"
-echo "Test Summary:"
+section 1 "Test Summary"
 printf '%sPassed: %s%s\n' "$GREEN" "$TESTS_PASSED" "$NC"
 printf '%sFailed: %s%s\n' "$RED" "$TESTS_FAILED" "$NC"
-echo "============================================================"
 
 if [[ $TESTS_FAILED -eq 0 ]]; then
   exit 0

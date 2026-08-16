@@ -431,8 +431,7 @@ test_nix_lock_serializes() {
 }
 
 # ---- Run tests ----
-echo ""
-echo "=== Phase 1: Framework core unit tests (POSIX) ==="
+section 1 "Phase 1: Framework core unit tests (POSIX)"
 echo "Tests for Spec A (step IDs) and Spec B (--skip-steps)."
 echo ""
 

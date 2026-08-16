@@ -22,12 +22,14 @@ fi
 if [ "$TEST_COLOR" -eq 1 ]; then
   RED='\033[0;31m'
   GREEN='\033[0;32m'
+  CYAN='\033[1;36m'
   # shellcheck disable=SC2034 # reason: consumed by sibling test files (gen-completions-tests.sh, nucleus-apps-smoke-tests.sh) via sourcing
   YELLOW='\033[0;33m'
   NC='\033[0m'
 else
   RED=''
   GREEN=''
+  CYAN=''
   # shellcheck disable=SC2034 # reason: consumed by sibling test files (gen-completions-tests.sh, nucleus-apps-smoke-tests.sh) via sourcing
   YELLOW=''
   NC=''
@@ -56,3 +58,6 @@ assert_fail() {
   fi
   ((++TESTS_FAILED))
 }
+
+# section — Print a section header to stdout (F3, mirrors lib.sh section()).
+section() { printf '\n%s=== [%s] %s ===%s\n' "$CYAN" "$1" "$2" "$NC"; }

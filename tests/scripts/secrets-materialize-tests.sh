@@ -111,12 +111,9 @@ test_decrypt_sops_skips_unreadable_host_key
 test_materialize_replaces_stale_ssh_symlinks
 test_derive_host_age_key_skips_without_host_key
 
-echo ""
-echo "============================================================"
-echo "Test Summary:"
+section 1 "Test Summary"
 printf '%sPassed: %s%s\n' "$GREEN" "$TESTS_PASSED" "$NC"
 printf '%sFailed: %s%s\n' "$RED" "$TESTS_FAILED" "$NC"
-echo "============================================================"
 
 if [[ $TESTS_FAILED -eq 0 ]]; then
   exit 0

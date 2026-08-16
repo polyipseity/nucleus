@@ -123,8 +123,7 @@ APP_COMMANDS=(
   gc health-check replica-reset replica-sync update svc vm
 )
 
-echo ""
-echo "=== Tier 1: --help smoke tests ==="
+section 1 "Tier 1: --help smoke tests"
 for cmd in "${APP_COMMANDS[@]}"; do
   test_app_help "$cmd"
 done
@@ -150,8 +149,7 @@ fi
 # Commands that support --dry-run: run in dry mode to verify the control flow
 # works (config parsing, argument dispatch) without side effects.
 
-echo ""
-echo "=== Tier 2: dry-run tests ==="
+section 2 "Tier 2: dry-run tests"
 
 declare -A DRY_RUN_APPS=(
   [ai]=nucleus-ai
@@ -192,8 +190,7 @@ test_app_dry_run vm
 # --- Tier 3: safe no-op read-only commands --------------------------------
 # Commands that perform read-only operations against local files.
 
-echo ""
-echo "=== Tier 3: no-op read-only commands ==="
+section 3 "Tier 3: no-op read-only commands"
 
 test_app_noop() {
   local app_name="$1"
@@ -222,8 +219,7 @@ SVC_DOMAIN_FILTER=user test_app_noop svc list --json
 
 # --- Tier 4: completion syntax validation -----------------------------------
 
-echo ""
-echo "=== Tier 4: completion file syntax validation ==="
+section 4 "Tier 4: completion file syntax validation"
 
 # Zsh completion files: check syntax with zsh -n.
 _zsh_comp_dir="$REPO_ROOT/src/modules/completions/zsh"

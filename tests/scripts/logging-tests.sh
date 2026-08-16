@@ -252,8 +252,7 @@ test_log_sanitize_strips() {
 }
 
 # ---- Run tests ----
-echo ""
-echo "=== logging tests ==="
+section 1 "logging tests"
 echo ""
 
 test_no_color_disables
