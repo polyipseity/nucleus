@@ -30,7 +30,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 /bin/launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true # check-suppress:suppression_doc: Screen Sharing daemon may already be loaded; launchctl load -w exits 1 for already-loaded services.
 if ! /bin/launchctl list com.apple.screensharing >/dev/null 2>&1; then
-  warn -l RDP "Screen Sharing daemon not listed after load; remote desktop may not be active."
+  warn -l rdp "Screen Sharing daemon not listed after load; remote desktop may not be active."
 fi
 
 # ---- wifiPrivateAddress ----------------------------------------------------
@@ -46,7 +46,7 @@ _WIFI_IFACE=$(/usr/sbin/networksetup -listallhardwareports 2>/dev/null |
 if [ -n "$_WIFI_IFACE" ]; then
   _WIFI_MAC=$(/usr/sbin/networksetup -getmacaddress "$_WIFI_IFACE" 2>/dev/null |
     /usr/bin/awk '{print $3}')
-  say -l "Wi-Fi ($_WIFI_IFACE)" "permanent HW MAC $_WIFI_MAC — Private Address active (Fixed per SSID by default)"
-  say -l "Wi-Fi ($_WIFI_IFACE)" "Per-network Rotating mode: System Settings > Wi-Fi > [SSID] > Private Wi-Fi Address > Rotating"
+  say -l "wi-fi" "$_WIFI_IFACE: permanent HW MAC $_WIFI_MAC — Private Address active (Fixed per SSID by default)"
+  say -l "wi-fi" "$_WIFI_IFACE: Per-network Rotating mode: System Settings > Wi-Fi > [SSID] > Private Wi-Fi Address > Rotating"
 fi
 unset _WIFI_IFACE _WIFI_MAC
