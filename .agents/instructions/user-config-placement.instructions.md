@@ -44,7 +44,7 @@ Directory-wide iteration uses `listFirstLevelEntries` / `list_user_config_first_
 Every app tree under `src/users/` MUST be consumed only through overlay selectors — never via a hardcoded `src/users/default/...` path in deployment code.
 
 | Mechanism | POSIX | Windows | Shell scripts |
-|-----------|-------|---------|---------------|
+| ----------- | ------- | --------- | --------------- |
 | Host-specific file | `mkUserOverlay` → `selectSource` | `Resolve-UserConfigSource` | N/A |
 | File path (any depth) | `mkUserOverlay` → `selectFile` | `Resolve-UserConfigFile` / `Deploy-UserWritableSymlink` | `resolve_user_config_file` |
 | First-level entry | `mkUserOverlay` → `selectFirstLevelEntry` | `Resolve-UserConfigFirstLevelEntry` | `resolve_user_config_first_level_entry` |
@@ -64,7 +64,7 @@ Split explicitly when an app supports both machine-wide and per-user scopes. Git
 Per-user homedir assets under `src/users/default/wallpapers/` + `src/users/<username>/wallpapers/`. The config folder has exactly two first-level entries:
 
 | Subdirectory | Contents | Deploy method |
-|--------------|----------|---------------|
+| -------------- | ---------- | --------------- |
 | `encrypted/` | SOPS blobs (`*.sops`) | Method 2: decrypt → `~/Pictures/wallpapers/` |
 | `wallpapers/` | Unencrypted images | Method 1: writable symlink → `~/Pictures/wallpapers/` |
 

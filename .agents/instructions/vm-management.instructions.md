@@ -8,11 +8,11 @@ applyTo: "scripts/vm.*, scripts/vm-setup.*, src/scripts/lib/vm.sh, src/scripts/v
 
 ## Host × Guest Matrix
 
-| Host \ Guest | macOS         | NixOS           | Windows         |
+| Host \ Guest | macOS | NixOS | Windows |
 | ------------ | ------------- | --------------- | --------------- |
-| macOS        | Tart (Packer) | UTM 4.x (QEMU)  | UTM 4.x (QEMU)  |
-| NixOS        | not supported | libvirt/KVM     | libvirt/KVM     |
-| Windows      | not supported | QEMU standalone | QEMU standalone |
+| macOS | Tart (Packer) | UTM 4.x (QEMU) | UTM 4.x (QEMU) |
+| NixOS | not supported | libvirt/KVM | libvirt/KVM |
+| Windows | not supported | QEMU standalone | QEMU standalone |
 
 macOS guest uses Tart (Apple Virtualization.framework) exclusively; automated Tart→UTM runtime handoff is not supported (format mismatch, no tooling).
 
@@ -65,10 +65,10 @@ VM guest OSes must use the same hostname as the corresponding host OS. The canon
 
 | Guest OS | `hostname` in VMs.json |
 | -------- | ---------------------- |
-| Android  | `Android`              |
-| macOS    | `MacBook`              |
-| NixOS    | `NixOS`                |
-| Windows  | `Windows`              |
+| Android | `Android` |
+| macOS | `MacBook` |
+| NixOS | `NixOS` |
+| Windows | `Windows` |
 
 The manifest `hostname` is the single source of truth. Guest files consume it through env/var/token plumbing and must not hard-code a hostname:
 
@@ -98,30 +98,30 @@ All virtual machines are declared in `src/modules/VMs.json`. This is the single 
 
 Required fields for each VM entry:
 
-| Field              | Type    | Description                                                       |
+| Field | Type | Description |
 | ------------------ | ------- | ----------------------------------------------------------------- |
-| `id`               | string  | Machine-readable key used for files, domains, UUID/MAC derivation, and CLI selection |
-| `name`             | string  | Human-readable label shown in UTM/virt-manager and CLI tables     |
-| `type`             | string  | Guest OS family: `"Android"`, `"NixOS"`, `"Windows"`, `"macOS"` |
-| `enabled`          | bool    | Whether the VM is provisioned                                     |
-| `hosts`            | array   | Hosts that provision this VM (`"MacBook"`, `"NixOS"`, `"Windows"`); non-empty |
-| `cpus`             | int     | Number of virtual CPUs                                            |
-| `ram`             | string  | RAM as a suffixed size string per the size grammar (e.g. `"8GB"`) |
-| `diskSize`        | string  | Boot disk size as a suffixed size string per the size grammar (e.g. `"128GB"`) |
-| `shareDevDir`      | bool    | Mount `~/dev` inside the guest via VirtioFS                       |
-| `sound`            | string  | Audio device: `"intel-hda"` or `"none"`                        |
-| `portForwards`     | array   | Non-empty `{guestPort, hostPort}` port-forward pairs (see Port forwarding) |
-| `hostname`         | string  | Guest OS hostname; must equal the `name` value (see Hostname convention) |
-| `minImageSize`     | string  | Minimum prebuilt image size floor per the size grammar (e.g. `"4GB"`) |
-| `macAddressPrefix` | string  | MAC address prefix used for the guest NIC                         |
+| `id` | string | Machine-readable key used for files, domains, UUID/MAC derivation, and CLI selection |
+| `name` | string | Human-readable label shown in UTM/virt-manager and CLI tables |
+| `type` | string | Guest OS family: `"Android"`, `"NixOS"`, `"Windows"`, `"macOS"` |
+| `enabled` | bool | Whether the VM is provisioned |
+| `hosts` | array | Hosts that provision this VM (`"MacBook"`, `"NixOS"`, `"Windows"`); non-empty |
+| `cpus` | int | Number of virtual CPUs |
+| `ram` | string | RAM as a suffixed size string per the size grammar (e.g. `"8GB"`) |
+| `diskSize` | string | Boot disk size as a suffixed size string per the size grammar (e.g. `"128GB"`) |
+| `shareDevDir` | bool | Mount `~/dev` inside the guest via VirtioFS |
+| `sound` | string | Audio device: `"intel-hda"` or `"none"` |
+| `portForwards` | array | Non-empty `{guestPort, hostPort}` port-forward pairs (see Port forwarding) |
+| `hostname` | string | Guest OS hostname; must equal the `name` value (see Hostname convention) |
+| `minImageSize` | string | Minimum prebuilt image size floor per the size grammar (e.g. `"4GB"`) |
+| `macAddressPrefix` | string | MAC address prefix used for the guest NIC |
 
 Type-specific fields (nested objects keyed by `type`; all fields required when `type` matches, forbidden otherwise):
 
-| `type`      | Group      | Fields                                                                                                                                                                                                                    |
+| `type` | Group | Fields |
 | ----------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `"Android"` | `Android`  | `systemImage`, `userdataImage`, `gsiImage`, `gsiUrl`, `gappsUrl` (all required; `gsiUrl` may be `null` for Lineage-only — no GSI disk; `gappsUrl` is the MindTheGapps zip URL for recovery sideload)                                                                                             |
-| `"macOS"`  | `macOS`    | `version` (release name, e.g. `"tahoe"`)                                                                                                                                                                                 |
-| `"Windows"` | `Windows`  | `edition` (e.g. `"pro"`), `isoUrl` (`null` = Mido/Fido auto-resolve; a URL auto-downloads the installer ISO when `--windows-iso` is omitted, cached at `~/virtual machines/src/Windows/installer.iso`)                  |
+| `"Android"` | `Android` | `systemImage`, `userdataImage`, `gsiImage`, `gsiUrl`, `gappsUrl` (all required; `gsiUrl` may be `null` for Lineage-only — no GSI disk; `gappsUrl` is the MindTheGapps zip URL for recovery sideload) |
+| `"macOS"` | `macOS` | `version` (release name, e.g. `"tahoe"`) |
+| `"Windows"` | `Windows` | `edition` (e.g. `"pro"`), `isoUrl` (`null` = Mido/Fido auto-resolve; a URL auto-downloads the installer ISO when `--windows-iso` is omitted, cached at `~/virtual machines/src/Windows/installer.iso`) |
 
 All common fields and every field in the matching type group are **required** — there are no optional manifest properties. Deliberate nullable values: `Windows.isoUrl` and `Android.gsiUrl` (`null` is valid; a URL is valid for both).
 
@@ -148,7 +148,7 @@ Guest port forwards are declared in the `portForwards` array of each VM entry: n
 **Reserved host port block:** `22000–22099` (nucleus VM forward range). Every `hostPort` must be unique across all VMs so concurrent guests do not collide.
 
 | VM | Host port(s) | Guest port | Service |
-|----|-------------|------------|---------|
+| ---- | ------------- | ------------ | --------- |
 | MacBook | `22010` | `22` | SSH |
 | NixOS | `22020` | `22` | SSH |
 | Windows | `22030` | `22` | SSH |
@@ -161,7 +161,7 @@ Guest port forwards are declared in the `portForwards` array of each VM entry: n
 - Guest-readiness probes resolve the manifest host port by `guestPort` (`22` for SSH, `5555` for ADB) — never by literal host port number.
 
 | Backend | Forward mechanism | Host-local access |
-|---------|-------------------|-------------------|
+| --------- | ------------------- | ------------------- |
 | UTM (Emulated) | `PortForward` plist dicts from manifest | `localhost:<hostPort>` |
 | Windows QEMU | `hostfwd` in start scripts | `localhost:<hostPort>` |
 | libvirt/KVM | passt `<portForward><range start='hostPort' to='guestPort'/></portForward>` | `localhost:<hostPort>` |
@@ -175,7 +175,7 @@ Guest port forwards are declared in the `portForwards` array of each VM entry: n
 `android-config` is a paired native implementation — not bash delegation on Windows. See `cross-host-feature-parity.instructions.md` (What parity means).
 
 | Layer | POSIX | Windows |
-|-------|-------|---------|
+| ------- | ------- | --------- |
 | CLI entry | `scripts/vm.sh` → `do_android_config` | `scripts/vm.ps1` → `Invoke-AndroidConfig` |
 | Implementation | `src/scripts/vms/android-config.sh` (+ magisk, fake-wifi) | `src/platforms/Windows/modules/system/Invoke-AndroidConfig.ps1` (+ `VMAndroid.ps1`) |
 | Reset prerequisite | `scripts/vm.sh` `do_reset` | `Invoke-AndroidReset` in `Invoke-AndroidConfig.ps1` |
@@ -296,7 +296,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 Post-apply VM behavior:
 
 | Step | Default | Flag |
-|------|---------|------|
+| ------ | --------- | ------ |
 | Config sync | **on** | `--no-vm-sync` / `-NoVMSync` to skip |
 | Full provision | off | `--vm-setup` / `-VMSetup` (includes sync; do not run both) |
 
@@ -308,7 +308,7 @@ Both hooks are best-effort: a VM sync/setup failure does not abort a completed s
 ## Command taxonomy
 
 | Command | When to use |
-|---------|-------------|
+| --------- | ------------- |
 | `sync` | Manifest or Nix VM template changed; VMs already provisioned. Runs automatically after apply. |
 | `setup` | First VM, missing images/bundles, credential/config drift, new guest. Full provision (sync + build + disks). |
 | `android-config` | Android only: sideload MindTheGapps in recovery (`--gapps`), install ADB keys in recovery or booted system (`--adb-keys`), install Magisk (`--magisk`, booted only), enable rooted debugging (`--root`, booted only; requires Magisk su), configure fake Wi‑Fi (`--fake-wifi`, booted only; requires Magisk su). Run without flags to print the manual. Recovery flow: **Enter fastboot** → `--gapps` → **Enable ADB** → sideload → reboot → boot system → **Allow USB debugging** → `--magisk` → `--root` → `--fake-wifi`. |
@@ -331,16 +331,16 @@ Both hooks are best-effort: a VM sync/setup failure does not abort a completed s
 
 ### Files
 
-| File                                                  | Purpose                                                        |
+| File | Purpose |
 | ----------------------------------------------------- | -------------------------------------------------------------- |
-| `src/vms/NixOS/base-guest.nix`                         | Identity-free NixOS guest base configuration for `nixos-generators` (macOS/NixOS) |
-| `src/vms/guests/<id>/guest.nix`                        | Per-VM NixOS delta (hostname, credentials) applied at injection |
-| `src/vms/NixOS/packer.pkr.hcl`                        | Packer template for NixOS guest on Windows hosts               |
-| `src/vms/Windows/packer.pkr.hcl`                      | Packer template for Windows 11 guest on all hosts              |
-| `src/vms/Windows/Autounattend.xml`                    | Windows 11 answer file (unattended install, TPM bypass, WinRM) |
-| `scripts/vm.sh`                                       | Unified build+provision script for macOS and NixOS hosts       |
-| `scripts/vm.ps1`                                      | Windows wrapper calling `Invoke-VMSetup.ps1`                   |
-| `src/platforms/Windows/modules/system/Invoke-VMSetup.ps1` | Build + provision logic for Windows hosts                      |
+| `src/vms/NixOS/base-guest.nix` | Identity-free NixOS guest base configuration for `nixos-generators` (macOS/NixOS) |
+| `src/vms/guests/<id>/guest.nix` | Per-VM NixOS delta (hostname, credentials) applied at injection |
+| `src/vms/NixOS/packer.pkr.hcl` | Packer template for NixOS guest on Windows hosts |
+| `src/vms/Windows/packer.pkr.hcl` | Packer template for Windows 11 guest on all hosts |
+| `src/vms/Windows/Autounattend.xml` | Windows 11 answer file (unattended install, TPM bypass, WinRM) |
+| `scripts/vm.sh` | Unified build+provision script for macOS and NixOS hosts |
+| `scripts/vm.ps1` | Windows wrapper calling `Invoke-VMSetup.ps1` |
+| `src/platforms/Windows/modules/system/Invoke-VMSetup.ps1` | Build + provision logic for Windows hosts |
 
 ### Build strategies
 

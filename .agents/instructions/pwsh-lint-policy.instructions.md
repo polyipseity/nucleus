@@ -159,13 +159,13 @@ PSSA flags plural nouns; the tempting fix is to drop the trailing `s`. That is *
 
 **Allowed collection-indicating singular nouns:**
 
-| Category             | Words                                                                                                       |
+| Category | Words |
 | -------------------- | ----------------------------------------------------------------------------------------------------------- |
-| General collections  | List, Set, Collection, Array, Group, Batch, Bundle, Cluster                                                 |
-| Key-value structures | Map, Dictionary, Hash, Hashtable, Index, Registry, Catalog, Table                                           |
-| Data structures      | Queue, Stack, Vector, Matrix, Range, Buffer, Pool, Cache, Heap, Ring, Tree, Graph, Stream, Sequence, Series |
-| Record-keeping       | Enum, Inventory, Manifest, Record, Store, Archive, Suite, Toolkit, Library, Report                          |
-| Organizational       | Aggregate, Compilation, Overview, Summary                                                                   |
+| General collections | List, Set, Collection, Array, Group, Batch, Bundle, Cluster |
+| Key-value structures | Map, Dictionary, Hash, Hashtable, Index, Registry, Catalog, Table |
+| Data structures | Queue, Stack, Vector, Matrix, Range, Buffer, Pool, Cache, Heap, Ring, Tree, Graph, Stream, Sequence, Series |
+| Record-keeping | Enum, Inventory, Manifest, Record, Store, Archive, Suite, Toolkit, Library, Report |
+| Organizational | Aggregate, Compilation, Overview, Summary |
 
 **Suppression:** Never. Do not suppress `PSUseSingularNouns`. Rename the function.
 
@@ -173,14 +173,14 @@ PSSA flags plural nouns; the tempting fix is to drop the trailing `s`. That is *
 
 ## Reference table
 
-| Rule ID                                                    | Trigger                             | Fix strategy                                                                                                |
+| Rule ID | Trigger | Fix strategy |
 | ---------------------------------------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `PSUseUsingScopeModifierInNewRunspaces`                    | `$using:VAR.Count` member access    | Assign `$using:` var to local, use `.Count` on local                                                        |
-| `PSUseApprovedVerbs`                                       | Function name uses unapproved verb  | Rename to approved verb; lowercase helpers get Verb-Noun name; command-name wrappers add inline suppression |
-| `PSUseSingularNouns`                                       | Function name uses plural noun      | Rename to singular noun: bare singular for single-return, collection-indicating singular for multi-return   |
-| `PSUseDeclaredVarsMoreThanAssignments`                     | `$null = <cmd>` or `[void]<expr>`   | `> $null` redirect preferred, else annotate with `# check-suppress:suppression_doc:`               |
-| `PSPossibleIncorrectComparisonWithNull`                    | `$null = <cmd>`                     | `> $null` redirect preferred, else annotate with `# check-suppress:suppression_doc:`               |
-| `PSReviewUnusedParameter` / `PSAvoidUsingUnusedParameters` | Parameter not used in function body | Reassess parameter necessity; annotate `$null =` with `# check-suppress:suppression_doc:`          |
+| `PSUseUsingScopeModifierInNewRunspaces` | `$using:VAR.Count` member access | Assign `$using:` var to local, use `.Count` on local |
+| `PSUseApprovedVerbs` | Function name uses unapproved verb | Rename to approved verb; lowercase helpers get Verb-Noun name; command-name wrappers add inline suppression |
+| `PSUseSingularNouns` | Function name uses plural noun | Rename to singular noun: bare singular for single-return, collection-indicating singular for multi-return |
+| `PSUseDeclaredVarsMoreThanAssignments` | `$null = <cmd>` or `[void]<expr>` | `> $null` redirect preferred, else annotate with `# check-suppress:suppression_doc:` |
+| `PSPossibleIncorrectComparisonWithNull` | `$null = <cmd>` | `> $null` redirect preferred, else annotate with `# check-suppress:suppression_doc:` |
+| `PSReviewUnusedParameter` / `PSAvoidUsingUnusedParameters` | Parameter not used in function body | Reassess parameter necessity; annotate `$null =` with `# check-suppress:suppression_doc:` |
 
 ## Adding a new rule policy
 
@@ -199,10 +199,10 @@ To document a new PSScriptAnalyzer rule policy:
 
 Two coexisting annotation formats, both under the `# check-suppress:` prefix:
 
-| Format                                                           | Class | Used for                                                                                                    |
+| Format | Class | Used for |
 | ---------------------------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------- |
-| `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | A/C   | `[SuppressMessageAttribute]` attribute, and any comment-only suppression of PSSA rules                     |
-| `# check-suppress:suppression_doc: <reason>`                     | B     | `$null =`, `[void]`, `2>$null`, `-ErrorAction SilentlyContinue`, empty `catch {}`, <code>\|\| true</code> |
+| `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | A/C | `[SuppressMessageAttribute]` attribute, and any comment-only suppression of PSSA rules |
+| `# check-suppress:suppression_doc: <reason>` | B | `$null =`, `[void]`, `2>$null`, `-ErrorAction SilentlyContinue`, empty `catch {}`, <code>\|\| true</code> |
 
 Both are grep-able: `grep 'check-suppress:' **/*.ps1`
 

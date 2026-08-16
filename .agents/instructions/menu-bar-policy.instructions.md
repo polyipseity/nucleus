@@ -20,7 +20,7 @@ Never set a hide key for allow-listed apps.
 ## Hide mechanisms
 
 | Class | Mechanism | Examples |
-|---|---|---|
+| --- | --- | --- |
 | a | Declarative preference key, set in `defaults.nix` or an activation script | Raycast `ShowMenuBarIcon`, BetterDisplay `hideMenuIcon`, AltTab `menubarIconShown`, Rectangle `hideMenubarIcon`, LinearMouse `menuBarVisibilityMode`, LuLu `noIconMode` |
 | b | ⌘-drag only (per-session; icon returns on relaunch) | MiddleClick (`statusItem.behavior = .removalAllowed`) |
 | c | Icon is the app's primary UI — not hideable | Mounty (NTFS remount surface), Equaliser (menu-bar-only SwiftUI app) |

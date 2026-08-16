@@ -38,14 +38,14 @@ When evaluating whether to suppress or rewrite, use this priority to assess risk
 
 ### Reference table
 
-| SC code | Trigger                              | Canonical fix strategy                                                                                                |
+| SC code | Trigger | Canonical fix strategy |
 | ------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
-| SC2016  | Literal `$` in single quotes         | Extract awk scripts to `.awk` files; line-scoped suppression for small tool-specific strings with `# reason:` comment |
-| SC2034  | Variable assigned but never used     | Pass variable as function argument or `export` for consumed-by-sourced-file pattern                                   |
-| SC2064  | Double-quoted trap                   | Convert to single-quoted trap preserving same variable references                                                     |
-| SC2086  | Word splitting                       | Quote the variable; suppress only for intentional word-split flag passthrough                                         |
-| SC2154  | Variable referenced but not assigned | Add runtime source with `# shellcheck source=` directive; suppress only for unreachable framework-injected vars       |
-| SC2194  | Constant as `case` subject           | Replace `{{PLACEHOLDER}}` with `__PLACEHOLDER__` + intermediate variable                                              |
+| SC2016 | Literal `$` in single quotes | Extract awk scripts to `.awk` files; line-scoped suppression for small tool-specific strings with `# reason:` comment |
+| SC2034 | Variable assigned but never used | Pass variable as function argument or `export` for consumed-by-sourced-file pattern |
+| SC2064 | Double-quoted trap | Convert to single-quoted trap preserving same variable references |
+| SC2086 | Word splitting | Quote the variable; suppress only for intentional word-split flag passthrough |
+| SC2154 | Variable referenced but not assigned | Add runtime source with `# shellcheck source=` directive; suppress only for unreachable framework-injected vars |
+| SC2194 | Constant as `case` subject | Replace `{{PLACEHOLDER}}` with `__PLACEHOLDER__` + intermediate variable |
 
 ## Script file conventions
 

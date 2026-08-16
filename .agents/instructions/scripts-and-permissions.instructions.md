@@ -35,21 +35,21 @@ Non-host subdirectories follow a two-track convention:
 - **Entity-first** (`services/` only): `<entity>-<role>.<ext>` — the first word tells which component is managed.
 - **Library scripts** (`lib/`): `<domain>.sh` — descriptive, no action verb. `lib.sh` is the universal library; other `.sh` files are domain-specific libraries.
 
-| Subdirectory            |                          Pattern | First-word role  |
+| Subdirectory | Pattern | First-word role |
 | ----------------------- | -------------------------------: | ---------------- |
-| `root/` (in `scripts/`) |             `<verb>-<target>.sh` | What action?     |
-| `agents/`               |             `<verb>-<target>.sh` | What action?     |
-| `completions/`          |             `<verb>-<target>.sh` | What action?     |
-| `configs/`              |             `<verb>-<target>.sh` | What action?     |
-| `editors/`              |             `<verb>-<target>.sh` | What action?     |
-| `integrations/`         |             `<verb>-<target>.sh` | What action?     |
-| `lib/`                  |                    `<domain>.sh` | What domain?     |
-| `packages/`             |             `<verb>-<target>.sh` | What action?     |
-| `secrets/`              |             `<verb>-<target>.sh` | What action?     |
-| `services/`             |             `<entity>-<role>.sh` | Which component? |
-| `shell/`                | `init.*` or `<verb>-<target>.sh` | Varies           |
-| `src/hosts/<Host>/scripts/` | `<prefix>-<verb>-<target>.<ext>` | What action?     |
-| `src/platforms/<Platform>/scripts/` | `<prefix>-<verb>-<target>.<ext>` | What action?     |
+| `root/` (in `scripts/`) | `<verb>-<target>.sh` | What action? |
+| `agents/` | `<verb>-<target>.sh` | What action? |
+| `completions/` | `<verb>-<target>.sh` | What action? |
+| `configs/` | `<verb>-<target>.sh` | What action? |
+| `editors/` | `<verb>-<target>.sh` | What action? |
+| `integrations/` | `<verb>-<target>.sh` | What action? |
+| `lib/` | `<domain>.sh` | What domain? |
+| `packages/` | `<verb>-<target>.sh` | What action? |
+| `secrets/` | `<verb>-<target>.sh` | What action? |
+| `services/` | `<entity>-<role>.sh` | Which component? |
+| `shell/` | `init.*` or `<verb>-<target>.sh` | Varies |
+| `src/hosts/<Host>/scripts/` | `<prefix>-<verb>-<target>.<ext>` | What action? |
+| `src/platforms/<Platform>/scripts/` | `<prefix>-<verb>-<target>.<ext>` | What action? |
 
 `<prefix>` is `macos-` for MacBook, `nixos-` for NixOS, etc.
 
@@ -107,13 +107,13 @@ When extracting inline PowerShell here-strings from `src/platforms/Windows/modul
 
 Use `--XXX`/`--no-XXX` flag pairs for CLI options and positive variable names for scripts and config knobs. Every feature must support both `--XXX` and `--no-XXX` regardless of its default state.
 
-| Aspect            | Convention                                                |
+| Aspect | Convention |
 | ----------------- | --------------------------------------------------------- |
-| Shell variable    | `ai_sync=true` (positive, no prefix)                      |
+| Shell variable | `ai_sync=true` (positive, no prefix) |
 | Conditional check | `if [ "$ai_sync" = false ]` or `if [ "$ai_sync" = true ]` |
-| POSIX CLI flag    | `--ai-sync` (enables) / `--no-ai-sync` (disables)         |
-| PowerShell param  | `[switch]$AISync` + `[switch]$NoAISync`                   |
-| PowerShell call   | `-AISync` (enables) / `-NoAISync` (disables)              |
+| POSIX CLI flag | `--ai-sync` (enables) / `--no-ai-sync` (disables) |
+| PowerShell param | `[switch]$AISync` + `[switch]$NoAISync` |
+| PowerShell call | `-AISync` (enables) / `-NoAISync` (disables) |
 
 Rules:
 

@@ -10,11 +10,11 @@ applyTo: "src/modules/ai/**, src/users/*/vscode/chatLanguageModels.*.json, src/h
 
 `src/modules/ai/models.json` groups model lists by **host name**, not by platform nickname. Use the exact OS hostname as keys (PascalCase, matching `networking.hostName` / `ComputerName` on each host):
 
-| Key       | Host          | Resolved by                            |
+| Key | Host | Resolved by |
 | --------- | ------------- | -------------------------------------- |
-| `MacBook` | macOS         | `ai-sync.sh` Darwin branch             |
-| `NixOS`   | NixOS (Linux) | `ai-sync.sh` wildcard branch           |
-| `Windows` | Windows       | `Invoke-AISync.ps1` (always `Windows`) |
+| `MacBook` | macOS | `ai-sync.sh` Darwin branch |
+| `NixOS` | NixOS (Linux) | `ai-sync.sh` wildcard branch |
+| `Windows` | Windows | `Invoke-AISync.ps1` (always `Windows`) |
 
 Do **not** use lowercase names like `"macbook"`, `"nixos"`, or `"windows"` — the keys must match the exact OS hostname (see `AGENTS.md` **Host name equals display name** policy). Do **not** use generic names like `"mac"` or `"pc"`. When adding a new host, add a new key matching its exact OS hostname and update the profile detection logic in both `ai-sync.sh` and `Invoke-AISync.ps1`.
 
@@ -22,11 +22,11 @@ Do **not** use lowercase names like `"macbook"`, `"nixos"`, or `"windows"` — t
 
 These are the authoritative assumptions for model size budgeting. Update this table whenever hardware changes.
 
-| Host      | Memory budget                                     | Notes                                                                                                                   |
+| Host | Memory budget | Notes |
 | --------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `MacBook` | ≤ 16 GB GPU (slight excess ~17–18 GB is OK)       | 24 GB unified RAM; Apple Silicon Metal; flash attention + q4_0 KV cache enabled                                         |
-| `NixOS`   | ≤ 6 GB discrete VRAM (model file ≤ ~5 GB target)  | GPU acceleration enabled via `services.ollama.acceleration = "cuda"`; `MemoryMax = "16G"` systemd cap remains in effect |
-| `Windows` | ≤ 6 GB discrete VRAM (same assumption as `NixOS`) | Same hardware class as NixOS PC; update if specs differ                                                                 |
+| `MacBook` | ≤ 16 GB GPU (slight excess ~17–18 GB is OK) | 24 GB unified RAM; Apple Silicon Metal; flash attention + q4_0 KV cache enabled |
+| `NixOS` | ≤ 6 GB discrete VRAM (model file ≤ ~5 GB target) | GPU acceleration enabled via `services.ollama.acceleration = "cuda"`; `MemoryMax = "16G"` systemd cap remains in effect |
+| `Windows` | ≤ 6 GB discrete VRAM (same assumption as `NixOS`) | Same hardware class as NixOS PC; update if specs differ |
 
 ## Required cross-file sync
 
@@ -44,15 +44,15 @@ Rule: each host's `chatLanguageModels.<host>.json` IDs must be a subset of that 
 
 Ollama model tags follow `<base>-<quant>` naming. Key quantizations:
 
-| Tag suffix      | Typical size vs Q4_K_M       | Quality vs Q4_K_M | When to use                                                                          |
+| Tag suffix | Typical size vs Q4_K_M | Quality vs Q4_K_M | When to use |
 | --------------- | ---------------------------- | ----------------- | ------------------------------------------------------------------------------------ |
-| `q4_K_M`        | baseline (default)           | baseline          | Default; best quality/size tradeoff for most models                                  |
-| `q8_0`          | ~1.7× larger                 | noticeably better | MacBook only when headroom allows; never for NixOS/Windows                           |
-| `fp16` / `bf16` | ~2× larger                   | near-lossless     | MacBook only for small models (e.g. e4b) where size allows                           |
-| `it-qat`        | same as Q4_K_M               | approaches BF16   | Preferred over plain Q4_K_M for Gemma models that ship QAT variants (gemma3, gemma4) |
-| `nvfp4`         | slightly smaller than Q4_K_M | similar           | NVIDIA GPU only (NixOS/Windows with NVIDIA); not for MacBook Metal                   |
-| `mxfp8`         | ~1.5× Q4_K_M                 | good              | NVIDIA GPU or Apple MLX only                                                         |
-| `mlx-bf16`      | ~2× Q4_K_M                   | near-lossless     | Apple MLX only; MacBook with sufficient headroom                                     |
+| `q4_K_M` | baseline (default) | baseline | Default; best quality/size tradeoff for most models |
+| `q8_0` | ~1.7× larger | noticeably better | MacBook only when headroom allows; never for NixOS/Windows |
+| `fp16` / `bf16` | ~2× larger | near-lossless | MacBook only for small models (e.g. e4b) where size allows |
+| `it-qat` | same as Q4_K_M | approaches BF16 | Preferred over plain Q4_K_M for Gemma models that ship QAT variants (gemma3, gemma4) |
+| `nvfp4` | slightly smaller than Q4_K_M | similar | NVIDIA GPU only (NixOS/Windows with NVIDIA); not for MacBook Metal |
+| `mxfp8` | ~1.5× Q4_K_M | good | NVIDIA GPU or Apple MLX only |
+| `mlx-bf16` | ~2× Q4_K_M | near-lossless | Apple MLX only; MacBook with sufficient headroom |
 
 ## Model selection preference
 

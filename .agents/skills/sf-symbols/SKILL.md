@@ -12,7 +12,7 @@ Every SF Symbol name must be verified against the macOS SFSymbols private framew
 ## Authoritative sources
 
 | Source | Location | Best for |
-|--------|----------|----------|
+| -------- | ---------- | ---------- |
 | **SF Symbols app** | Free download from Apple Developer | Visual browsing, search, copy name |
 | **macOS private framework** | `/System/Library/PrivateFrameworks/SFSymbols.framework/` | Authoritative; source for the local list |
 | **Local extracted list** | `symbols.txt` (extracted from macOS framework, in this skill directory) | Quick `grep`-based lookup |

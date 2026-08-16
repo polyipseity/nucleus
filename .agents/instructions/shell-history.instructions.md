@@ -11,7 +11,7 @@ applyTo: "src/modules/shell.nix, src/modules/pwsh.nix, src/scripts/shell/init.zs
 All managed shells now exclude two types of history entries:
 
 | Feature | zsh | PowerShell (POSIX) | PowerShell (Windows) | cmd.exe |
-|---------|-----|---------------------|-----------------------|---------|
+| --------- | ----- | --------------------- | ----------------------- | --------- |
 | Ignore space-prefixed commands | `setopt HIST_IGNORE_SPACE` | `-AddToHistoryHandler { ... }` | Same | ❌ No equivalent |
 | Ignore consecutive duplicates | `setopt HIST_IGNORE_DUPS` | `-HistoryNoDuplicates` | Same | ❌ No equivalent |
 

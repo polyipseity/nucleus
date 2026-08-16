@@ -10,10 +10,10 @@ All managed package managers in this repository MUST have a minimum release age 
 
 ## Active delays and pinning defaults
 
-| Package manager | Mechanism        | Setting                                                                    | File(s)                                                                         |
+| Package manager | Mechanism | Setting | File(s) |
 | --------------- | ---------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| **bun**         | `~/.bunfig.toml` | `[install] minimumReleaseAge = 432000` (5 days in seconds), `exact = true` | `src/modules/shell.nix`, `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` |
-| **uv**          | `uv.toml`        | `exclude-newer = "P5D"` (ISO 8601 duration) + `add-bounds = "exact"`       | `src/modules/shell.nix`, `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` |
+| **bun** | `~/.bunfig.toml` | `[install] minimumReleaseAge = 432000` (5 days in seconds), `exact = true` | `src/modules/shell.nix`, `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` |
+| **uv** | `uv.toml` | `exclude-newer = "P5D"` (ISO 8601 duration) + `add-bounds = "exact"` | `src/modules/shell.nix`, `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` |
 
 ## Package managers without delay features
 

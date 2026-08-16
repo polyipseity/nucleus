@@ -14,13 +14,13 @@ All Nix-side env vars are declared in `src/modules/lib/env-catalog.nix`. The cat
 
 ### Registry locations
 
-| OS      | Location                                                        | Format        |
+| OS | Location | Format |
 | ------- | --------------------------------------------------------------- | ------------- |
-| macOS   | `src/modules/lib/env-catalog.nix` (catalog)                     | Nix attrs     |
-| NixOS   | `src/modules/lib/env-catalog.nix` (catalog)                     | Nix attrs     |
-| Windows | `src/hosts/Windows/user/env.dsc.yml` (user-specific vars)       | WinGet DSC v3 |
+| macOS | `src/modules/lib/env-catalog.nix` (catalog) | Nix attrs |
+| NixOS | `src/modules/lib/env-catalog.nix` (catalog) | Nix attrs |
+| Windows | `src/hosts/Windows/user/env.dsc.yml` (user-specific vars) | WinGet DSC v3 |
 | Windows | `src/hosts/Windows/system/env.dsc.yml` (non-user-specific vars) | WinGet DSC v3 |
-| Windows | `src/platforms/Windows/modules/user/Sync-UserPath.ps1` (PATH)       | PowerShell    |
+| Windows | `src/platforms/Windows/modules/user/Sync-UserPath.ps1` (PATH) | PowerShell |
 
 **Nix-side registry** (`src/modules/lib/env-catalog.nix`):
 
@@ -62,12 +62,12 @@ All Nix-side env vars are declared in `src/modules/lib/env-catalog.nix`. The cat
 
 Some environment variables need different treatment per OS — this table documents the exceptions and why they exist.
 
-| Var                 | macOS         | NixOS      | Windows | Rationale                                                                                                                           |
+| Var | macOS | NixOS | Windows | Rationale |
 | ------------------- | ------------- | ---------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `NUCLEUS_REPO_ROOT` | `/etc/nucleus/repo-root` + session/GUI env | `/etc/nucleus/repo-root` + `environment.variables` | Machine registry via `apply.ps1` | All-process repo root for out-of-store symlinks and cwd-independent `nucleus-*` commands (including under `sudo`). POSIX `/etc` file is parity with Windows Machine scope. |
-| `NIX_SSL_CERT_FILE` | daemon env    | —          | —       | macOS has no system CA bundle in a standard location; NixOS ships `/etc/ssl/certs/ca-certificates.crt` in the system profile.       |
-| `NUCLEUS_HOST`      | daemon env    | daemon env | —       | Identifies which host the daemon runs on; not meaningful on Windows since daemons are managed differently.                          |
-| `OLLAMA_HOST`       | gui-env agent | —          | —       | macOS Ollama daemon binds to default port; CLI clients route through LiteLLM proxy via gui-env. NixOS uses the systemd service env. |
+| `NIX_SSL_CERT_FILE` | daemon env | — | — | macOS has no system CA bundle in a standard location; NixOS ships `/etc/ssl/certs/ca-certificates.crt` in the system profile. |
+| `NUCLEUS_HOST` | daemon env | daemon env | — | Identifies which host the daemon runs on; not meaningful on Windows since daemons are managed differently. |
+| `OLLAMA_HOST` | gui-env agent | — | — | macOS Ollama daemon binds to default port; CLI clients route through LiteLLM proxy via gui-env. NixOS uses the systemd service env. |
 
 The principle: **same value, same scope** is the default. When a var must have different treatment (excluded from a host, different scope, etc.), document it here with an explicit why.
 
