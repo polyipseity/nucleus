@@ -19,7 +19,7 @@ _audit_store_tmpfile() {
 }
 
 _audit_store_section() {
-  say "=== $1 ==="
+  say "$1"
 }
 
 _audit_store_privileges_required() {

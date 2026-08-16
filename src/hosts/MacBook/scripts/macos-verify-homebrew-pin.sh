@@ -39,7 +39,7 @@ _main() {
       # check-suppress:suppression_doc: package may not be installed; brew list exits 1 for absent items.
       installed="$(brew list --versions "$key" 2>/dev/null | awk '{print $NF}' || true)"
       if [ -n "$installed" ] && [ "$installed" != "$expected" ]; then
-        WARNINGS="${WARNINGS}  homebrew.brews.$key: expected $expected, installed $installed${NL}"
+        WARNINGS="${WARNINGS}homebrew.brews.$key: expected $expected, installed $installed${NL}"
       fi
     done <<KEYEOF
 $BREW_KEYS
@@ -54,7 +54,7 @@ KEYEOF
       # check-suppress:suppression_doc: cask may not be installed; brew list exits 1 for absent items.
       installed="$(brew list --cask --versions "$key" 2>/dev/null | awk '{print $NF}' || true)"
       if [ -n "$installed" ] && [ "$installed" != "$expected" ]; then
-        WARNINGS="${WARNINGS}  homebrew.casks.$key: expected $expected, installed $installed${NL}"
+        WARNINGS="${WARNINGS}homebrew.casks.$key: expected $expected, installed $installed${NL}"
       fi
     done <<KEYEOF
 $CASK_KEYS
@@ -71,7 +71,7 @@ KEYEOF
       # mas list format: "id appname (version)" or "id appname (???)"
       installed="$(printf '%s' "$mas_list" | awk -v name="$key" -F'[()]' '$0 ~ name {print $2}' | head -1 | tr -d '[:space:]')"
       if [ -n "$installed" ] && [ "$installed" != "$expected" ]; then
-        WARNINGS="${WARNINGS}  homebrew.masApps.$key: expected $expected, installed $installed${NL}"
+        WARNINGS="${WARNINGS}homebrew.masApps.$key: expected $expected, installed $installed${NL}"
       fi
     done <<KEYEOF
 $MAS_KEYS
@@ -80,7 +80,13 @@ KEYEOF
 
   if [ -n "$WARNINGS" ]; then
     warn -l homebrew "package version(s) differ from lockfile (nix-homebrew may be out of sync):"
-    printf '%s' "$WARNINGS" >&2
+    while IFS= read -r line; do
+      if [ -n "$line" ]; then
+        warn -l homebrew "$line"
+      fi
+    done <<WARNEOF
+$WARNINGS
+WARNEOF
   fi
 }
 
