@@ -54,4 +54,4 @@ else
   say -l lulu "daemon not running; preference applies at next daemon start."
 fi
 
-say -l lulu "done."
+nuc_done -l lulu

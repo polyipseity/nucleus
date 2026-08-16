@@ -60,4 +60,4 @@ else
   say -l menu-bar "skipped (no GUI session)."
 fi
 
-say -l menu-bar "done."
+nuc_done -l menu-bar

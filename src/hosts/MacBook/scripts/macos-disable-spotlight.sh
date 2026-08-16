@@ -44,4 +44,4 @@ if [ -d "/.Spotlight-V100" ]; then
   fi
 fi
 
-say -l spotlight "done."
+nuc_done -l spotlight
