@@ -85,6 +85,7 @@ These output classes intentionally bypass the standard; new passthrough requires
 - VM guest templates (POSIX + PS1): `vm-setup:` / `nucleus-vm:` labels — rendered templates; lib.sh / module unavailable in the guest.
 - Android guest script: `virt_wifi:` — same rendered/guest context.
 - Nix-inlined activation scripts: `lib/symlink-hardening.sh`, `lib/symlink-convergence.sh`, `services/cloud-drives-setup.sh` — literal context labels; lib.sh unreachable via `builtins.readFile` / activationScripts.
+- Darwin activation scripts (MacBook host): plain by design — nix-darwin's generated `activate` runs under `#!/usr/bin/env -i`, wiping color env vars before any activation script runs; no policy-compliant propagation path (would require patching nix-darwin output generation).
 - Shell-init contexts: `src/scripts/shell/init.zsh`, `src/scripts/shell/profile.ps1`, `src/platforms/macOS/scripts/macos-install-icloud-hooks.zsh` — F1 literal grammar; no helpers (lib.sh / module import unavailable in shell-init).
 - Framework-local PS1: `src/scripts/lib/nix-test-eval.ps1` — `test: error:` literals already F1 grammar; no module import in the test-framework context.
 - Daemon log-file writers: `service-watchdog.sh` / `service-watchdog.ps1` — `[<ts>] watchdog: ...` F1-shaped lines written to log files (trap context + file writers, not console).
