@@ -126,9 +126,20 @@ run_nix() {
 
 run_nix_as_root() {
   # Forward NUCLEUS_REPO_ROOT so builtins.getEnv in Nix config can construct
-  # writable out-of-store symlinks during evaluation.
+  # writable out-of-store symlinks during evaluation.  Color env vars are
+  # forwarded so activation scripts render colored output under sudo; empty
+  # values are treated as unset by _nuc_color_init, keeping non-color runs
+  # byte-identical.  TERM also keeps nix build-progress rendering intact.
   NIX_CONFIG_VALUE="$(merge_nix_config)"
-  sudo -H env "NIX_CONFIG=$NIX_CONFIG_VALUE" "NIX_PATH=nixpkgs=flake:nixpkgs" "NUCLEUS_REPO_ROOT=${NUCLEUS_REPO_ROOT}" nix --option warn-dirty false "$@"
+  sudo -H env \
+    "NIX_CONFIG=$NIX_CONFIG_VALUE" \
+    "NIX_PATH=nixpkgs=flake:nixpkgs" \
+    "NUCLEUS_REPO_ROOT=${NUCLEUS_REPO_ROOT}" \
+    "FORCE_COLOR=${FORCE_COLOR:-}" \
+    "NO_COLOR=${NO_COLOR:-}" \
+    "CLICOLOR_FORCE=${CLICOLOR_FORCE:-}" \
+    "TERM=${TERM:-}" \
+    nix --option warn-dirty false "$@"
 }
 
 start_sudo_keepalive() {
