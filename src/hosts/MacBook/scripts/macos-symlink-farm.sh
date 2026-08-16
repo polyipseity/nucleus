@@ -31,7 +31,7 @@ LOG_FILE="${2:-$NUCLEUS_SYSTEM_LOG_DIR/symlink-farm.log}"
 NUCLEUS_VERBOSE="${NUCLEUS_VERBOSE:-}"
 
 _log() {
-  printf '[%s] symlink-farm: %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >>"$LOG_FILE"
+  printf '[%s] symlink-farm: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >>"$LOG_FILE"
   if [ -n "$NUCLEUS_VERBOSE" ]; then
     say -l symlink-farm "$*"
   fi
