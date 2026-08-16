@@ -123,18 +123,32 @@ if ($ListSections) {
 }
 
 # ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+$repoRoot = if ($env:NUCLEUS_REPO_ROOT) {
+  $env:NUCLEUS_REPO_ROOT
+} else {
+  (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
+}
+
+$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
+Import-Module $modulePath -Force -DisableNameChecking
+
+# ---------------------------------------------------------------------------
 # Section selection — validate and normalize explicit -Sections tokens
 # ---------------------------------------------------------------------------
 # Unknown tokens error out before any updater or network query runs. Written
-# via [Console]::Error.WriteLine so the message survives $ErrorActionPreference
-# 'Stop' (Write-Error would throw a terminating error before reaching exit 1).
+# via Write-NucleusError with -ErrorAction Continue so the message survives
+# $ErrorActionPreference 'Stop' while still exiting 1.
 $sectionTokens = if ([string]::IsNullOrEmpty($Sections)) {
   @()
 } else {
   foreach ($token in $Sections.Split(',')) {
     $t = $token.Trim()
     if ($validTokens -notcontains $t) {
-      [Console]::Error.WriteLine("bump-lockfile: error: unknown section '$t' (valid: $($validSections -join ','))")
+      # -CommandName is explicit: the module's Get-NucleusCommandName default
+      # ($PSCommandPath) resolves to the module file, not this script.
+      Write-NucleusError -CommandName bump-lockfile -Message "unknown section '$t' (valid: $($validSections -join ','))" -ErrorAction Continue
       exit 1
     }
   }
@@ -148,18 +162,6 @@ $sectionTokens = if ([string]::IsNullOrEmpty($Sections)) {
     else { $t }
   })
 }
-
-# ---------------------------------------------------------------------------
-# Paths
-# ---------------------------------------------------------------------------
-$repoRoot = if ($env:NUCLEUS_REPO_ROOT) {
-  $env:NUCLEUS_REPO_ROOT
-} else {
-  (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path
-}
-
-$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
-Import-Module $modulePath -Force -DisableNameChecking
 
 $lockfileRel = 'src/lockfiles/lockfile.json'
 $lockfileAbs = Join-Path -Path $repoRoot -ChildPath $lockfileRel
