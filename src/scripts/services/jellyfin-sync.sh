@@ -404,7 +404,7 @@ _jfs_library_options_match() {
       };
     def asObject: if type == "object" then . else {} end;
     ($current | asObject | normalize) == ($desired | asObject | normalize)
-  '
+  ' >/dev/null
 }
 
 # Converge Jellyfin library folders declared in src/users/.
