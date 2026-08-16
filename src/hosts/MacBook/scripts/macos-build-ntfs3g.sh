@@ -64,35 +64,35 @@ if ! [ -x /usr/local/bin/ntfs-3g ] ||
 
   /bin/mkdir -p "$(dirname "$LOG_FILE")"
   {
-    section 1 "ntfs-3g build started at $(date)"
+    printf '[%s] ntfs-3g: build started\n' "$(date '+%Y-%m-%d %H:%M:%S')"
 
     # Patch configure.ac: remove crypto autodetect block (AM_PATH_LIBGCRYPT
     # and PKG_CHECK_MODULES(GNUTLS macros undefined without library deps),
     # fix rootbindir/rootlibdir defaults from /bin:/lib to /usr/local/*
     # (SIP), and fix install-exec-hook to handle missing .so/.dylib files
     # on Darwin.
-    echo "ntfs-3g: patching..."
+    printf '[%s] ntfs-3g: patching...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
     patch -p1 <"$CRYPTO_PATCH_PATH"
     patch -p1 <"$ROOTBINDIR_PATCH_PATH"
     patch -p1 <"$INSTALL_HOOK_PATCH_PATH"
 
-    echo "ntfs-3g: running autotools..."
+    printf '[%s] ntfs-3g: running autotools...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
     libtoolize --copy --force
     aclocal --force -I m4
     autoheader --force
     automake --add-missing --copy --force-missing
     autoconf --force
 
-    echo "ntfs-3g: configuring..."
+    printf '[%s] ntfs-3g: configuring...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
     # WHY: keep fuse-t out of LDFLAGS during configure — autoconf link probes
     # fail when every test binary must link fuse-t under nix clang wrappers.
     LDFLAGS=
     ./configure "$CONFIGURE_FLAGS"
 
-    echo "ntfs-3g: building..."
+    printf '[%s] ntfs-3g: building...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
     export LDFLAGS="$LINK_FLAGS"
     make -j"$(sysctl -n hw.ncpu)"
-    echo "ntfs-3g: installing..."
+    printf '[%s] ntfs-3g: installing...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
     make install
   } >>"$LOG_FILE" 2>&1 || exit_code=$?
 
@@ -101,7 +101,7 @@ if ! [ -x /usr/local/bin/ntfs-3g ] ||
     exit "$exit_code"
   fi
 
-  echo "=== ntfs-3g build finished at $(date) ===" >>"$LOG_FILE" 2>&1
+  printf '[%s] ntfs-3g: build finished\n' "$(date '+%Y-%m-%d %H:%M:%S')" >>"$LOG_FILE" 2>&1
 
   say -l ntfs-3g "build complete — log at $(/bin/realpath "$LOG_FILE")"
 
