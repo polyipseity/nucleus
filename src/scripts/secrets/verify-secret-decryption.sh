@@ -29,14 +29,14 @@ for _vsd_path in \
   "$_vsd_ssh_key_paths_manifest" \
   "$_vsd_ssh_adopt_manifest"; do
   if [ ! -s "$_vsd_path" ]; then
-    die -l secrets "ERROR — managed secret artefact missing or empty at '$_vsd_path'."
+    die -l secrets "managed secret artefact missing or empty at '$_vsd_path'."
   fi
 done
 
 while IFS= read -r _vsd_private_key_path; do
   [ -n "$_vsd_private_key_path" ] || continue
   if [ ! -s "$_vsd_private_key_path" ]; then
-    die -l secrets "ERROR — managed SSH private key missing or empty at '$_vsd_private_key_path'."
+    die -l secrets "managed SSH private key missing or empty at '$_vsd_private_key_path'."
   fi
 done <"$_vsd_ssh_key_paths_manifest"
 
@@ -48,7 +48,7 @@ _vsd_gpg_all_secret_fprs="$(GNUPGHOME="$_vsd_gpg_home" \
 while IFS= read -r _vsd_managed_fpr; do
   [ -n "$_vsd_managed_fpr" ] || continue
   if ! printf '%s\n' "$_vsd_gpg_all_secret_fprs" | /usr/bin/grep -qF "$_vsd_managed_fpr"; then
-    die -l secrets "ERROR — managed GPG key $_vsd_managed_fpr not in keyring after materialize-user-secrets."
+    die -l secrets "managed GPG key $_vsd_managed_fpr not in keyring after materialize-user-secrets."
   fi
 done <"$_vsd_gpg_manifest"
 
@@ -66,7 +66,7 @@ while IFS= read -r _vsd_entry; do
   fi
 done < <(printf '%s\n' "$_vsd_all_sops_files_json" | "$_vsd_jq_bin" -r -c '.[]')
 if [ -n "$_vsd_gpg_failures" ]; then
-  die -l secrets "ERROR — GPG SOPS decryption check failed for:$_vsd_gpg_failures; managed GPG key may not be registered in .sops.yaml."
+  die -l secrets "GPG SOPS decryption check failed for:$_vsd_gpg_failures; managed GPG key may not be registered in .sops.yaml."
 fi
 
 # --- 4. Personal SSH age recipient check for all SOPS files ---
@@ -75,7 +75,7 @@ _vsd_ssh_failures=""
 # check-suppress:suppression_doc: ssh-to-age may fail if the SSH public key hasn't been materialized yet (first bootstrap); empty result is handled below.
 _vsd_ssh_age_pub="$("$_vsd_ssh_to_age_bin" -i "$_vsd_ssh_public_key_path")" || true
 if [ -z "$_vsd_ssh_age_pub" ]; then
-  die -l secrets "ERROR — personal SSH key age-backend SOPS decryption check failed for: <ssh-to-age pubkey derivation failed>; ensure $_vsd_ssh_public_key_path is a valid Ed25519 public key."
+  die -l secrets "personal SSH key age-backend SOPS decryption check failed for: <ssh-to-age pubkey derivation failed>; ensure $_vsd_ssh_public_key_path is a valid Ed25519 public key."
 fi
 while IFS= read -r _vsd_entry; do
   [ -z "$_vsd_entry" ] && continue
@@ -86,10 +86,10 @@ while IFS= read -r _vsd_entry; do
   fi
 done < <(printf '%s\n' "$_vsd_all_sops_files_json" | "$_vsd_jq_bin" -r -c '.[]')
 if [ -n "$_vsd_ssh_failures" ]; then
-  die -l secrets "ERROR — personal SSH key age-backend SOPS decryption check failed for:$_vsd_ssh_failures; SSH key may not be registered in .sops.yaml as an age recipient."
+  die -l secrets "personal SSH key age-backend SOPS decryption check failed for:$_vsd_ssh_failures; SSH key may not be registered in .sops.yaml as an age recipient."
 fi
 
 # --- 5. Machine age key existence check (warning-only) ---
 if [ ! -f "/etc/sops/age/machine.txt" ]; then
-  warn -l secrets "warning — /etc/sops/age/machine.txt missing; this machine cannot be a SOPS age device recipient until the host key is registered in .sops.yaml and deriveHostAgeKey has run successfully."
+  warn -l secrets "/etc/sops/age/machine.txt missing; this machine cannot be a SOPS age device recipient until the host key is registered in .sops.yaml and deriveHostAgeKey has run successfully."
 fi

@@ -13,12 +13,12 @@ _p7zip_bin="$1"
 # Do not rely on PATH lookup since Home Manager activation runs in a minimal
 # shell that may not have nix-darwin system package paths available yet.
 if [ ! -x "$_p7zip_bin" ]; then
-  warn -l macos "warning — 7z binary not found at $_p7zip_bin; archive extraction may fail."
+  warn -l macos "7z binary not found at $_p7zip_bin; archive extraction may fail."
 elif ! "$_p7zip_bin" --help >/dev/null 2>&1; then
-  warn -l macos "warning — 7z exists but --help failed; archive handling may be broken."
+  warn -l macos "7z exists but --help failed; archive handling may be broken."
 fi
 
 # Verify Keka application is installed and registered.
 if [ ! -d "/Applications/Keka.app" ]; then
-  warn -l macos "warning — Keka.app not found in /Applications; GUI archiving unavailable."
+  warn -l macos "Keka.app not found in /Applications; GUI archiving unavailable."
 fi

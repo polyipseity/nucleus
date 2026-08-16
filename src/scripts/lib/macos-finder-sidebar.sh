@@ -204,7 +204,7 @@ finder_configure_sidebar() {
   _finder_list_output=$("$mysides_bin" list 2>/dev/null || true)
   _finder_actual_order="$(echo "$_finder_list_output" | /usr/bin/awk -F' -> ' 'NF >= 1 && $1 != "" { print $1 }' | /usr/bin/head -n "$managed_count" | /usr/bin/paste -sd'|' -)"
   if [ "$_finder_actual_order" != "$expected_order" ]; then
-    warn "warning — mysides reported sidebar order mismatch (expected: $expected_order, actual: $_finder_actual_order)."
+    warn "mysides reported sidebar order mismatch (expected: $expected_order, actual: $_finder_actual_order)."
     _finder_sidebar_failed=1
   fi
 

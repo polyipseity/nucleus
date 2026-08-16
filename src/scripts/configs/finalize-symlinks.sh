@@ -22,7 +22,7 @@ printf '%s\n' "$_nucleus_symlink_entries_json" | "$_nucleus_jq_bin" -r '.[]' | w
   if [ -L "$_nucleus_link_path" ]; then
     _nucleus_protect_symlink "symlinks" "$_nucleus_link_path"
   else
-    warn -l symlinks "warning — expected managed symlink at $_nucleus_link_path."
+    warn -l symlinks "expected managed symlink at $_nucleus_link_path."
   fi
 done
 
