@@ -15,5 +15,5 @@ if _nucleus_resolve_console_user; then
     warn -l power "failed to enable Mission Control spans-displays for console uid $_nucleus_console_uid."
   fi
 else
-  say -l power "no active non-root console user; skipping spans-displays write." >&2
+  say -l power "no active non-root console user; skipping spans-displays write."
 fi

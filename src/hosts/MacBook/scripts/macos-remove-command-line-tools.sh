@@ -30,11 +30,11 @@ _log() {
 if [ -d "$CLT_DIR" ]; then
   if /bin/rm -rf "$CLT_DIR"; then
     _log "removed $CLT_DIR"
-    say -l command-line-tools "removed $CLT_DIR." >&2
+    say -l command-line-tools "removed $CLT_DIR."
   else
     warn -l command-line-tools "failed to remove $CLT_DIR."
   fi
 else
   _log "install tree already absent"
-  say -l command-line-tools "install tree already absent." >&2
+  say -l command-line-tools "install tree already absent."
 fi

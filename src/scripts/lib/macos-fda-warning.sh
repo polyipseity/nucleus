@@ -21,10 +21,10 @@ print_fda_warning() {
 
   # check-suppress:suppression_doc: the FDA banner is advisory output; callers run under `set -e` and must not abort on the non-fatal warning
   error "Full Disk Access Required: Nucleus cannot write $fda_target from this terminal session." || true
-  say "To fix this:" >&2
-  say "  1. Open System Settings > Privacy & Security > Full Disk Access" >&2
-  say "  2. Toggle On for your terminal emulator" >&2
-  say "  3. If already enabled, remove and re-add it, then restart the terminal" >&2
+  say "To fix this:"
+  say "  1. Open System Settings > Privacy & Security > Full Disk Access"
+  say "  2. Toggle On for your terminal emulator"
+  say "  3. If already enabled, remove and re-add it, then restart the terminal"
 
   fda_warning_emitted=1
 }

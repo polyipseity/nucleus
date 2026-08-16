@@ -31,7 +31,7 @@ if _nucleus_resolve_console_user; then
     warn -l spotlight "hotkey changes applied; log out/in once to fully activate."
   fi
 else
-  say -l spotlight "skipped hotkey disable (no active non-root GUI session)." >&2
+  say -l spotlight "skipped hotkey disable (no active non-root GUI session)."
 fi
 
 if ! /usr/bin/mdutil -i off /; then

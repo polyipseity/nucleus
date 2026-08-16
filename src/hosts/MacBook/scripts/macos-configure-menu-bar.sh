@@ -57,7 +57,7 @@ if _nucleus_resolve_console_user; then
   /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
     /usr/bin/killall ControlCenter 2>/dev/null || true # check-suppress:suppression_doc: Control Centre may not be running; killall exits 1, defaults persist and apply at next launch
 else
-  say -l menu-bar "skipped (no GUI session)." >&2
+  say -l menu-bar "skipped (no GUI session)."
 fi
 
 say -l menu-bar "done."

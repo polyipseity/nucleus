@@ -83,5 +83,5 @@ ServerPassword -string ""
 EOF
   fi
 else
-  say -l utm "no active non-root console user; skipping UTM preferences provisioning." >&2
+  say -l utm "no active non-root console user; skipping UTM preferences provisioning."
 fi

@@ -25,7 +25,7 @@ fi
 # Background the build when called from activation (no max-age).
 if [ -z "$_uni_max_age_days" ]; then
   "$_uni_nix_index_bin" >/dev/null 2>&1 &
-  say -l nix-index "database build started in background; this may take a few minutes." >&2
+  say -l nix-index "database build started in background; this may take a few minutes."
 else
   exec "$_uni_nix_index_bin"
 fi
