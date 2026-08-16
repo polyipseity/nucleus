@@ -78,7 +78,7 @@ These output classes intentionally bypass the standard; new passthrough requires
 
 - Third-party passthrough: nix/darwin-rebuild/home-manager build output, brew/cargo/bun/uv/rustup/ollama, git hook prek/commitlint/treefmt, winget configure, adb/qemu VM output.
 - Probe suppression: vm.sh virsh/socat/ssh/adb/tart readiness, ai.sh ollama readiness, silent-daemon `/dev/null`.
-- pwsh host rendering: `WARNING: ` prefix and `Write-Error` rendering are host-injected.
+- pwsh host rendering: `WARNING:` prefix and `Write-Error` rendering are host-injected.
 - Vendored `vendor/` scripts untouched.
 - Static doc content: MANUAL.md activation tail, `--- MANUAL SETUP (one-time, required) ---` banner in apply.ps1, `# ---- name ----` activation separators in macOS activation.nix.
 - Pre-lib bootstrap lines: apply.sh root check (line 9).

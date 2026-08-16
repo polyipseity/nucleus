@@ -10,7 +10,7 @@ This document is the canonical contract for the step-runner framework used by th
 
 ## Spec A: Step ID registration
 
-```
+```text
 register_step(id: str, name: str, func: Function)                # 3-arg form: number derived from NN- prefix
 register_step(id: str, number: int, name: str, func: Function)   # 4-arg form: explicit number (unit tests only)
   id:      Non-empty string, no ASCII digits (0-9). Must be unique among all registered steps.
@@ -42,7 +42,7 @@ register_step(id: str, number: int, name: str, func: Function)   # 4-arg form: e
 
 ## Spec B: `--skip-steps` flag
 
-```
+```text
 parse_args flag: --skip-steps=<comma-separated-ids>
 
   Single form only: --skip-steps=id1,id2,id3
@@ -88,7 +88,7 @@ parse_args flag: --skip-steps=<comma-separated-ids>
 
 ## Spec C: `--format` removal (post-removal behavior)
 
-```
+```text
 Step 01 (code-formatting) behavior:
   Always runs `treefmt` to format all source files in-place.
   treefmt is invoked without --fail-on-change.
@@ -109,7 +109,7 @@ Step 01 (code-formatting) behavior:
 
 ## Spec D: `--skip-system-build` removal (post-removal behavior)
 
-```
+```text
 Test step 04 (system-config-build):
   - POSIX: always runs on supported platforms (macOS, Linux); skips only with platform message
     "=== [4] System config build === SKIPPED (unsupported host <host>)" (number derived from the 04- prefix)
@@ -121,7 +121,7 @@ Test step 04 (system-config-build):
 
 ## Spec E: PS1 parallelism
 
-```
+```text
 Invoke-StepPipeline behavior:
   - Same wave-based parallelism as POSIX step-runner.sh.
   - Steps dispatch in waves capped at PARALLEL_JOBS concurrent steps (default: logical processor count).
@@ -167,7 +167,7 @@ Live console chrome follows the F2/F4 palette via the shared color helpers — P
 
 ## Spec F: Silent skip elimination
 
-```
+```text
 Every step that chooses NOT to run (for any reason — empty file list, platform mismatch,
 missing tool) MUST output an explicit skip message with the pattern:
 
@@ -217,7 +217,7 @@ Shell entry-script validation (`script-validation-tests.sh`) runs in test step 5
 
 ## Spec G: Step 7 `$schema` enforcement
 
-```
+```text
 Step 7 validation rules:
   For every JSON and YAML file in scope (except exceptions):
 

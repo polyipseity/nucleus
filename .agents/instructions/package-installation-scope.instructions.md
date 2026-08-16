@@ -60,8 +60,8 @@ On POSIX, `pkgs.rust-bin.fromRustupToolchainFile` (rust-overlay) assembles a Nix
 
 1. Add the blocking shell function to `src/modules/shell.nix` (`initContent`), following the existing `bun`/`cargo`/`rustc`/`uv` pattern.
 2. Add the equivalent PowerShell function to `src/scripts/shell/profile.ps1` — the single shared shell-parity profile consumed by both `src/modules/pwsh.nix` (POSIX, embedded at eval time) and `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` (Windows, managed block).
-4. Update this instruction file.
-5. If the tool is also a devShell tool, add it to `devShells.default` in `src/flake.nix` (alphabetically sorted in the `packages` list).
+3. Update this instruction file.
+4. If the tool is also a devShell tool, add it to `devShells.default` in `src/flake.nix` (alphabetically sorted in the `packages` list).
 
 ## Invariants
 

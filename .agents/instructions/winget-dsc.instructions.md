@@ -211,8 +211,6 @@ if (-not (Test-Path $cbBin)) {
 
 After Scoop installs cargo-binstall, `src/platforms/Windows/modules/Invoke-CargoBinstallSetup.ps1` manages Rust CLI tools that have no WinGet or Scoop equivalent (e.g. `cargo-cache`, `pay-respects`). It maintains a desired-state list and a manifest at `~\.config\nucleus\cargo-binstall-packages.json`; on each apply it installs additions via `cargo binstall --no-confirm` and removes deletions via `cargo uninstall`.
 
-
-
 ## Imperative fallback safety (Windows modules)
 
 See [Imperative fallback safety (Windows)](cross-host-feature-parity.instructions.md#imperative-fallback-safety-windows) for the full policy.
@@ -220,6 +218,7 @@ See [Imperative fallback safety (Windows)](cross-host-feature-parity.instruction
 ## Validation
 
 - Test the manifest dry-run on the target machine with:
+
   ```powershell
   winget configure --what-if .\src\hosts\windows\system.dsc.yml
   winget configure --what-if .\src\hosts\windows\system-packages.dsc.yml
@@ -227,6 +226,7 @@ See [Imperative fallback safety (Windows)](cross-host-feature-parity.instruction
   winget configure --what-if .\src\hosts\windows\user-env.dsc.yml
   winget configure --what-if .\src\hosts\windows\user-context.dsc.yml
   ```
+
 - Full application requires an elevated PowerShell session and `--accept-configuration-agreements`.
 - The `scripts/bootstrap.ps1` wrapper passes both flags automatically.
 

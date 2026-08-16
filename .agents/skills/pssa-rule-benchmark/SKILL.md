@@ -75,7 +75,7 @@ The three slow rules (`PSAvoidUsingCmdletAliases`, `PSUseCmdletCorrectly`, `PSSh
 
 ## File layout
 
-```
+```text
 .agents/skills/pssa-rule-benchmark/
 ├── SKILL.md                               # This file
 ├── PSScriptAnalyzerSettings.psd1          # Rule severity/exclusion config

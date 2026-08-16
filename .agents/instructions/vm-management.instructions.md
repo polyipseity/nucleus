@@ -129,7 +129,7 @@ All common fields and every field in the matching type group are **required** â€
 
 All size fields (`ram`, `diskSize`, `minImageSize`) are suffixed size strings matching the grammar below. The grammar is case-sensitive and identical across all three platform parsers (`src/modules/lib/size.nix`, `src/scripts/lib/size.sh`, `src/platforms/Windows/modules/SizeStrings.ps1`); a malformed string aborts provisioning with an error rather than coercing.
 
-```
+```text
 ^[0-9]+ ?(kB|MB|GB|TB|kiB|MiB|GiB|TiB)$
 ```
 

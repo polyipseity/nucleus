@@ -125,6 +125,7 @@ When citing APIs or settings:
    - Cite the deprecation notice
    - Cite the modern replacement API in the same block
    - Example:
+
      ```nix
      # Old approach (deprecated): use Carbon Text Services Manager
      # Modern approach: use InputMethodKit

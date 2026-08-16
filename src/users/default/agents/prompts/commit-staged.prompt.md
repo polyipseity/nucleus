@@ -35,6 +35,7 @@ Proceed automatically with best-effort defaults and available context.
      - **Bash/zsh:** `echo "<full message>" | bun x commitlint 2>&1`
      - **PowerShell:** `"<full message>" | bun x commitlint 2>&1`
      - **If `bun x commitlint` fails to resolve the config's `extends` deps** (e.g. `Cannot find package 'conventional-changelog-conventionalcommits'` from the config's `noop.js`), install into a temp dir and run commitlint from there — never install into the project repo:
+
        ```bash
        tmpdir=$(mktemp -d)
        trap 'rm -rf "$tmpdir"' EXIT
@@ -43,6 +44,7 @@ Proceed automatically with best-effort defaults and available context.
        (cd "$tmpdir" && bun install --frozen-lockfile --no-summary)
        echo "<full message>" | (cd "$tmpdir" && bun run commitlint)
        ```
+
        Copy whichever lockfile exists (`bun.lock`, `package-lock.json`, `yarn.lock`). If the repo has no manifest, replace the `cp` line with a minimal `package.json` in the temp dir (devDependencies `@commitlint/cli` + `@commitlint/config-conventional`) — `--frozen-lockfile` is safe because bun generates a lockfile when none is copied. The commitlint config must live inside the temp dir (`extends` resolves relative to the config file's location, not the cwd). Use `bun run commitlint` — no `node` binary assumed. The `trap` guarantees cleanup; never create or modify `package.json`, `bun.lock`, or `node_modules` in the project repo.
      - Structural conventional-commit check (type-prefix, format) is the LAST resort: only if `bun` is unavailable or the temp-dir install cannot complete.
    - **On failure.** If validation fails AND no conflicting convention is documented, fix the message and re-run validation. Do not proceed to `git commit` until validation passes. If commitlint is present but fails with a tool error (not a lint error), report the failure — do not proceed. If the failure is `Cannot find package 'conventional-changelog-conventionalcommits'` (config `extends` unresolvable by `bun x`), use the temp-dir install fallback above — `bun x commitlint --default-config` is not a workaround.
@@ -62,12 +64,14 @@ Proceed automatically with best-effort defaults and available context.
      Use single-quoted here-strings (`@'...'@`) to avoid expansion.
 
    - **Bash/zsh (Linux/macOS):**
+
      ```bash
      (git commit --file - <<'MSG'
      <full commit message>
      MSG
      ) && git rev-parse HEAD
      ```
+
      Use `<<'MSG'` to prevent shell expansion. If `MSG` appears in the message, choose another delimiter.
 
    If heredoc quoting fails, retry up to 3 times with a different delimiter. For other failures, report the error and do not modify the index.

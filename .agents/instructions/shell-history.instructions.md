@@ -25,6 +25,7 @@ All managed shells now exclude two types of history entries:
 ## Adding a new shell
 
 When adding a new shell (bash, fish, nushell, etc.), enable the equivalent:
+
 - **bash**: `HISTCONTROL=ignorespace:ignoredups`
 - **fish**: use `fish_history` or custom function
 - **nushell**: `$env.config.shell_integration.history.exclude_patterns`
