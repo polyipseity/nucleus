@@ -35,6 +35,10 @@ setup_fake_repo() {
   "cargo-binstall": {
     "fixture-tool": "0.1.0"
   },
+  "uv": {
+    "fixture-uv-pkg": "1.0.0",
+    "other-pkg": "4.0.0"
+  },
   "updated": "2026-08-02T07:16:01Z",
   "vm-setup": {
     "nixos-iso": {
@@ -483,6 +487,90 @@ EOF
   rm -rf "$tmp"
 }
 
+test_missing_winget_skips_with_warning() {
+  local tmp
+  tmp="$(setup_fake_repo)"
+  # No winget stub in PATH => command -v winget fails => section skipped.
+  if run_bump_lockfile "$tmp" --sections winget >"$tmp/out.txt" 2>&1; then
+    assert_pass "bump-lockfile --sections winget (absent tool) exits 0"
+  else
+    assert_fail "bump-lockfile --sections winget (absent tool) exits 0" "exit code $?"
+  fi
+  if grep -q 'winget: command not found — skipping section' "$tmp/out.txt"; then
+    assert_pass "bump-lockfile --sections winget warns when the tool is absent"
+  else
+    assert_fail "bump-lockfile --sections winget warns when the tool is absent" "output: $(head -1 "$tmp/out.txt")"
+  fi
+  rm -rf "$tmp"
+}
+
+test_missing_scoop_skips_with_warning() {
+  local tmp
+  tmp="$(setup_fake_repo)"
+  if run_bump_lockfile "$tmp" --sections scoop >"$tmp/out.txt" 2>&1; then
+    assert_pass "bump-lockfile --sections scoop (absent tool) exits 0"
+  else
+    assert_fail "bump-lockfile --sections scoop (absent tool) exits 0" "exit code $?"
+  fi
+  if grep -q 'scoop: command not found — skipping section' "$tmp/out.txt"; then
+    assert_pass "bump-lockfile --sections scoop warns when the tool is absent"
+  else
+    assert_fail "bump-lockfile --sections scoop warns when the tool is absent" "output: $(head -1 "$tmp/out.txt")"
+  fi
+  rm -rf "$tmp"
+}
+
+test_missing_npm_skips_bun_with_warning() {
+  local tmp
+  tmp="$(setup_fake_repo)"
+  if run_bump_lockfile "$tmp" --sections bun >"$tmp/out.txt" 2>&1; then
+    assert_pass "bump-lockfile --sections bun (absent npm) exits 0"
+  else
+    assert_fail "bump-lockfile --sections bun (absent npm) exits 0" "exit code $?"
+  fi
+  if grep -q 'npm: command not found — skipping bun section' "$tmp/out.txt"; then
+    assert_pass "bump-lockfile --sections bun warns when npm is absent"
+  else
+    assert_fail "bump-lockfile --sections bun warns when npm is absent" "output: $(head -1 "$tmp/out.txt")"
+  fi
+  rm -rf "$tmp"
+}
+
+test_uv_parser_skips_dependency_lines() {
+  local tmp
+  tmp="$(setup_fake_repo)"
+  cat >"$tmp/bin/uv" <<'EOF'
+#!/usr/bin/env bash
+printf '%s\n' \
+  'fixture-uv-pkg v1.2.3' \
+  '- fixture-uv-dep' \
+  'other-pkg v4.5.6'
+EOF
+  chmod +x "$tmp/bin/uv"
+
+  if run_bump_lockfile "$tmp" --sections uv >"$tmp/out.txt" 2>&1; then
+    assert_pass "bump-lockfile --sections uv exits 0"
+  else
+    assert_fail "bump-lockfile --sections uv exits 0" "exit code $?"
+  fi
+  if [ "$(jq -r '.uv["fixture-uv-pkg"]' "$tmp/src/lockfiles/lockfile.json")" = "1.2.3" ]; then
+    assert_pass "bump-lockfile --sections uv updates the real package version"
+  else
+    assert_fail "bump-lockfile --sections uv updates the real package version" "got $(jq -r '.uv["fixture-uv-pkg"]' "$tmp/src/lockfiles/lockfile.json")"
+  fi
+  if [ "$(jq -r '.uv["other-pkg"]' "$tmp/src/lockfiles/lockfile.json")" = "4.5.6" ]; then
+    assert_pass "bump-lockfile --sections uv parses the second package line"
+  else
+    assert_fail "bump-lockfile --sections uv parses the second package line" "got $(jq -r '.uv["other-pkg"]' "$tmp/src/lockfiles/lockfile.json")"
+  fi
+  if grep -q 'updating uv.fixture-uv-dep' "$tmp/out.txt"; then
+    assert_fail "bump-lockfile --sections uv does not treat dependency lines as packages" "dep line updated"
+  else
+    assert_pass "bump-lockfile --sections uv does not treat dependency lines as packages"
+  fi
+  rm -rf "$tmp"
+}
+
 test_verify_passes_on_unchanged_fixture
 test_verify_fails_on_section_diff
 test_no_change_run_writes_nothing
@@ -497,6 +585,10 @@ test_scalar_section_updates_from_github
 test_no_updater_section_is_skipped
 test_vm_setup_subsection_runs_alone
 test_vm_setup_parent_selects_children
+test_missing_winget_skips_with_warning
+test_missing_scoop_skips_with_warning
+test_missing_npm_skips_bun_with_warning
+test_uv_parser_skips_dependency_lines
 
 section 1 "Test Summary"
 printf '%sPassed: %s%s\n' "$GREEN" "$TESTS_PASSED" "$NC"
