@@ -410,13 +410,17 @@
       },
       "NixOS": {
         "platform": "NixOS",
-        "type": "omitted",
-        "justification": "macOS-only system extension; Linux uses the Chrome Remote Desktop service."
+        "enabled": true,
+        "disableNative": false,
+        "kind": "system-extension",
+        "justification": "System extension; manual approval once (see MANUAL.md)."
       },
       "Windows": {
         "platform": "Windows",
-        "type": "omitted",
-        "justification": "macOS-only system extension; Windows uses the native service."
+        "enabled": true,
+        "disableNative": false,
+        "kind": "system-extension",
+        "justification": "System extension; manual approval once (see MANUAL.md)."
       }
     }
   }
