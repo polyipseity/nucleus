@@ -15,12 +15,12 @@
       "NixOS": {
         "platform": "NixOS",
         "type": "omitted",
-        "justification": "macOS-only launcher; PowerToys provides the Windows equivalent, no Linux build."
+        "justification": "macOS-only launcher; no Linux build exists."
       },
       "Windows": {
         "platform": "Windows",
         "type": "omitted",
-        "justification": "macOS-only launcher; PowerToys provides the Windows equivalent."
+        "justification": "macOS-only launcher; no Windows build exists."
       }
     }
   },
@@ -207,12 +207,12 @@
       "NixOS": {
         "platform": "NixOS",
         "type": "omitted",
-        "justification": "macOS-only VM runtime; NixOS is the host itself."
+        "justification": "macOS-only VM runtime; no Linux build exists."
       },
       "Windows": {
         "platform": "Windows",
         "type": "omitted",
-        "justification": "macOS-only VM runtime; WSL/Docker Desktop cover Windows."
+        "justification": "macOS-only VM runtime; no Windows build exists."
       }
     }
   },
@@ -346,7 +346,7 @@
       "Windows": {
         "platform": "Windows",
         "type": "omitted",
-        "justification": "Native alt-tab exists on Windows; no separate app."
+        "justification": "macOS-only window switcher; no Windows build exists."
       }
     }
   },
@@ -388,12 +388,12 @@
       "NixOS": {
         "platform": "NixOS",
         "type": "omitted",
-        "justification": "macOS-only system extension; Linux uses native FUSE."
+        "justification": "macOS-only system extension; no Linux build exists."
       },
       "Windows": {
         "platform": "Windows",
         "type": "omitted",
-        "justification": "macOS-only system extension; Windows uses WinFsp."
+        "justification": "macOS-only system extension; no Windows build exists."
       }
     }
   },
