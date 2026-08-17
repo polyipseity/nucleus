@@ -8,11 +8,11 @@
   "camillagui-backend": "4.1.0",
   "cargo-binstall": {
     "cargo-cache": "0.8.3",
-    "nickel-lang-lsp": "1.16.0",
+    "nickel-lang-lsp": "1.17.0",
     "pay-respects": "0.8.8",
-    "cargo-nextest": "0.9.88"
+    "cargo-nextest": "0.9.143"
   },
-  "sccache": "0.9.1",
+  "sccache": "0.17.0",
   "homebrew": {
     "brews": {
       "cirruslabs/cli/tart": "2.32.1",
@@ -102,12 +102,12 @@
     ]
   },
   "pwsh": {
-    "Pester": "5.6.1",
+    "Pester": "6.1.0",
     "PSScriptAnalyzer": "1.25.0",
     "powershell-yaml": "0.4.12"
   },
   "rustup": {
-    "stable": "2024-12-01"
+    "stable": "2026-04-14"
   },
   "scoop": {
     "cargo-binstall": "1.10.0",
@@ -123,8 +123,8 @@
       "version": "2.9.2"
     }
   },
-  "starship": "1.22.1",
-  "updated": "2026-08-02T07:16:01Z",
+  "starship": "1.26.0",
+  "updated": "2026-08-17T07:43:00Z",
   "uv": {
     "discord-music-rpc": {
       "source": "https://github.com/polyipseity/ext.discord-music-rpc",
@@ -138,21 +138,21 @@
   "vm-setup": {
     "nixos-iso": {
       "aarch64-linux": {
-        "digest": "sha256:724965ef8cca51bd56729021b548a598171daea59d3dc2a66e86a46bf7228c18",
-        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1011622.a799d3e3886d/nixos-minimal-26.11pre1011622.a799d3e3886d-aarch64-linux.iso"
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1055335.e5bdc4a41d4c/nixos-minimal-26.11pre1055335.e5bdc4a41d4c-aarch64-linux.iso",
+        "digest": "sha256:07371bd78abd699c3f9c04a8b2f69aacbf57ce283b25fc94b2c464ff5a5d1846"
       },
       "x86_64-linux": {
-        "digest": "sha256:b23b81eab44362619f7135a84b352494a95a6701958f1b112a94e5467c6f0268",
-        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1011622.a799d3e3886d/nixos-minimal-26.11pre1011622.a799d3e3886d-x86_64-linux.iso"
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1055335.e5bdc4a41d4c/nixos-minimal-26.11pre1055335.e5bdc4a41d4c-x86_64-linux.iso",
+        "digest": "sha256:907839a9c04c40578ae1f0b66da6b95ca084797b83acc6a86e91061c33e8d094"
       }
     },
     "tart-images": {
       "sequoia": {
-        "digest": "sha256:fdd8b72a6ee46fc8ad35dc1b9f3b1f162b6607b82a584947d20bb28d3dcb99ed",
+        "digest": "sha256:785c3acb40fa5af6dd5aab96cd60408372c26125e173c14ea417498d086f829c",
         "image": "ghcr.io/cirruslabs/macos-sequoia-base"
       },
       "tahoe": {
-        "digest": "sha256:a8e1c8305758643f513fdccdd829c2243687c60791083dea42f73f0b7aeb435c",
+        "digest": "sha256:e3c3f00c2247e302e83db7a79274997e54f4b39e887bd4da79e529048b6d40d9",
         "image": "ghcr.io/cirruslabs/macos-tahoe-base"
       }
     },
@@ -160,70 +160,70 @@
   },
   "vscode": {
     "asvetliakov.vscode-neovim": "1.19.0",
-    "arrterian.nix-env-selector": "1.3.1",
+    "arrterian.nix-env-selector": "1.3.2",
     "astral-sh.ty": "2025.71.13500942",
-    "charliermarsh.ruff": "2026.46.0",
+    "charliermarsh.ruff": "2026.68.0",
     "christian-kohler.npm-intellisense": "1.4.5",
     "christian-kohler.path-intellisense": "2.10.0",
     "cl.eide": "3.26.14",
     "cschlosser.doxdocgen": "1.4.0",
-    "davidanson.vscode-markdownlint": "0.61.2",
-    "dbaeumer.vscode-eslint": "3.0.24",
+    "davidanson.vscode-markdownlint": "0.62.0",
+    "dbaeumer.vscode-eslint": "3.0.34",
     "docker.docker": "0.18.0",
     "editorconfig.editorconfig": "0.18.2",
     "esbenp.prettier-vscode": "12.4.0",
-    "github.codespaces": "1.18.13",
-    "github.remotehub": "0.65.2026060101",
+    "github.codespaces": "1.18.15",
+    "github.remotehub": "0.65.2026072301",
     "github.vscode-github-actions": "0.31.5",
     "heaths.vscode-guid": "1.9.0",
     "ibm.output-colorizer": "0.1.2",
     "icrawl.discord-vscode": "5.9.2",
     "james-yu.latex-workshop": "10.16.1",
-    "jnoortheen.nix-ide": "0.5.9",
+    "jnoortheen.nix-ide": "0.5.13",
     "keroc.hex-fmt": "1.0.0",
     "mark-hansen.hledger-vscode": "0.0.12",
     "mkhl.direnv": "0.17.0",
-    "ms-azuretools.vscode-containers": "2.4.2",
-    "ms-ceintl.vscode-language-pack-zh-hant": "1.110.2026041514",
-    "ms-python.debugpy": "2025.18.0",
+    "ms-azuretools.vscode-containers": "2.4.5",
+    "ms-ceintl.vscode-language-pack-zh-hant": "1.129.2026071717",
+    "ms-python.debugpy": "2026.6.0",
     "ms-python.python": "2026.4.0",
-    "ms-python.vscode-python-envs": "1.33.2026060801",
-    "ms-toolsai.datawrangler": "1.24.0",
+    "ms-python.vscode-python-envs": "1.37.2026073101",
+    "ms-toolsai.datawrangler": "1.24.2",
     "ms-toolsai.jupyter": "2025.9.1",
     "ms-toolsai.jupyter-keymap": "1.1.2",
     "ms-toolsai.jupyter-renderers": "1.3.0",
     "ms-toolsai.vscode-jupyter-cell-tags": "0.1.9",
     "ms-toolsai.vscode-jupyter-slideshow": "0.1.6",
-    "ms-vscode-remote.remote-containers": "0.447.0",
-    "ms-vscode-remote.remote-ssh": "0.123.0",
+    "ms-vscode-remote.remote-containers": "0.466.0",
+    "ms-vscode-remote.remote-ssh": "0.124.0",
     "ms-vscode-remote.remote-ssh-edit": "0.87.0",
     "ms-vscode-remote.remote-wsl": "0.104.3",
     "ms-vscode.cmake-tools": "1.23.52",
-    "ms-vscode.cpp-devtools": "0.6.4",
-    "ms-vscode.cpptools": "1.31.5",
+    "ms-vscode.cpp-devtools": "0.6.13",
+    "ms-vscode.cpptools": "1.32.2",
     "ms-vscode.cpptools-extension-pack": "1.5.1",
     "ms-vscode.cpptools-themes": "2.0.0",
     "ms-vscode.hexeditor": "1.11.1",
     "ms-vscode.makefile-tools": "0.12.17",
     "ms-vscode.powershell": "2025.4.0",
     "ms-vscode.remote-explorer": "0.5.0",
-    "ms-vscode.remote-repositories": "0.43.2026060101",
-    "ms-vscode.remote-server": "1.6.2026052809",
-    "ms-vscode.vscode-chat-customizations-evaluations": "1.1.2026060511",
+    "ms-vscode.remote-repositories": "0.43.2026072301",
+    "ms-vscode.remote-server": "1.6.2026072909",
+    "ms-vscode.vscode-chat-customizations-evaluations": "1.1.2026072818",
     "ms-vscode.vscode-serial-monitor": "0.13.251128001",
     "ms-vsliveshare.vsliveshare": "1.1.122",
-    "myriad-dreamin.tinymist": "0.14.21",
-    "redhat.vscode-yaml": "1.23.0",
+    "myriad-dreamin.tinymist": "0.15.2",
+    "redhat.vscode-yaml": "1.24.0",
     "rust-lang.rust-analyzer": "0.3.2803",
     "s-nlf-fh.glassit": "0.2.6",
     "sjhuangx.vscode-scheme": "0.4.0",
     "sst-dev.opencode-v2": "0.1.1",
     "streetsidesoftware.code-spell-checker": "4.5.6",
-    "svelte.svelte-vscode": "110.1.0",
+    "svelte.svelte-vscode": "110.3.0",
     "takumii.markdowntable": "0.10.3",
     "tamasfe.even-better-toml": "0.21.2",
     "tweag.vscode-nickel": "0.5.0",
-    "vadimcn.vscode-lldb": "1.12.1"
+    "vadimcn.vscode-lldb": "1.12.2"
   },
   "winget": {
     "7zip.7zip": "26.01",
