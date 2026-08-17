@@ -6,7 +6,8 @@ _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
   '--list-sections[list sections]' \
   '--sections:section name:->sections' \
-  '--verify[verify]'
+  '--verify[verify]' \
+  '--verify-installed[verify installed]'
 case $state in
 sections)
   _call_program 'sections' nucleus-bump-lockfile --list-sections

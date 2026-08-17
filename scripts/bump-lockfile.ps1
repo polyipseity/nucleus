@@ -45,6 +45,11 @@
   Check whether the lockfile is up to date without writing. Exits 0 when
   unchanged, 1 with the pending diff otherwise. POSIX equivalent: --verify.
 
+.PARAMETER VerifyInstalled
+  Verify installed tool versions against the pinned lockfile sections and exit
+  (never writes). Exits 1 with a drift summary when any pinned section has
+  version drift. POSIX equivalent: --verify-installed.
+
 .PARAMETER ListSections
   Print the valid section names, one per line, and exit. POSIX equivalent:
   --list-sections.
@@ -72,7 +77,9 @@ param(
   [Alias("l")]
   [switch]$ListSections,
   [Alias("v")]
-  [switch]$Verify
+  [switch]$Verify,
+  [Alias("vi")]
+  [switch]$VerifyInstalled
 )
 
 $ErrorActionPreference = 'Stop'
@@ -264,6 +271,23 @@ function ConvertTo-Hashtable {
 }
 
 $ht = ConvertTo-Hashtable $lockfile
+
+# -VerifyInstalled: verify installed tool versions against the pinned lockfile
+# sections and exit (never writes). Delegates to the shared probe library used
+# by the check step so behavior stays identical.
+if ($VerifyInstalled) {
+  . (Join-Path $PSScriptRoot '..\src\scripts\checks\lockfile-enforcement-lib.ps1')
+  $errors = Invoke-LockfileEnforcement -Lockfile $ht `
+    -InfoFn { param($m) Write-NucleusInfo $m } `
+    -WarnFn { param($m) Write-NucleusWarning $m } `
+    -ErrorFn { param($m) Write-NucleusError -CommandName bump-lockfile -Message $m -ErrorAction Continue }
+  if ($errors -gt 0) {
+    Write-NucleusError -CommandName bump-lockfile -Message "lockfile verification found $errors pinned section(s) with version drift" -ErrorAction Continue
+    exit 1
+  }
+  Write-NucleusInfo 'lockfile verification: all applicable pinned sections match'
+  exit 0
+}
 
 # Change tracking: the timestamp is stamped and the file written only when at
 # least one section produced a change (set by Write-Update). Stamping before

@@ -41,15 +41,19 @@ if [ -h "$_self" ]; then
 fi
 SCRIPT_DIR=$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
+# shellcheck source=../src/scripts/checks/lockfile-enforcement-lib.sh
+. "$SCRIPT_DIR/../src/scripts/checks/lockfile-enforcement-lib.sh"
 
 usage() {
-  usage_std "$(basename "$0")" "[--sections <comma-separated>] [--verify] [--list-sections]" \
+  usage_std "$(basename "$0")" "[--sections <comma-separated>] [--verify] [--verify-installed] [--list-sections]" \
     "Query each available tool for the current version of each pinned item and write an updated lockfile atomically."
   cat <<'EOF'
 
 Options:
   --sections <list>  Comma-separated section names to update (default: all)
   --verify           Check for updates without writing (exit 1 if changes would be made)
+  --verify-installed  Verify installed tool versions against the pinned lockfile
+                      sections (exit 1 on drift; never writes)
   --list-sections    Print valid section names, one per line
   --help             Show this usage
 
@@ -105,6 +109,7 @@ _VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,uv
 # Parse --sections flag (comma-separated, defaults to all)
 SECTIONS=""
 VERIFY=false
+VERIFY_INSTALLED=false
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -123,6 +128,9 @@ while [ $# -gt 0 ]; do
     ;;
   --verify)
     VERIFY=true
+    ;;
+  --verify-installed)
+    VERIFY_INSTALLED=true
     ;;
   *)
     error "unknown flag: $1"
@@ -219,6 +227,14 @@ log_update() {
 
 # Read lockfile
 data=$(cat "$LOCKFILE_ABS")
+
+# --verify-installed: verify installed tool versions against the pinned
+# lockfile sections and exit (never writes).  Delegates to the shared probe
+# library used by the check step so behavior stays identical.
+if $VERIFY_INSTALLED; then
+  verify_installed_versions "$REPO_ROOT"
+  exit $?
+fi
 
 # winget — winget show --id <id>
 if section_enabled winget; then

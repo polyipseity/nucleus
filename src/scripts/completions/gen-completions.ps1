@@ -100,7 +100,7 @@ function Get-NucleusFlagMap {
     'apply' = @('--ai-sync', '--help', '--no-ai-sync', '--no-replica-sync', '--no-store-audit', '--no-vm-setup', '--no-vm-sync', '--replica-sync', '--store-audit', '--target-user', '--username', '--vm-setup', '--vm-sync')
     'audit-store' = @('-h', '--help')
     'bootstrap' = @('--ai-sync', '--apply', '--help', '--no-ai-sync', '--no-apply', '--no-replica-sync', '--replica-sync', '--target-user')
-    'bump-lockfile' = @('--help', '--list-sections', '--sections', '--verify')
+    'bump-lockfile' = @('--help', '--list-sections', '--sections', '--verify', '--verify-installed')
     'check' = @('--fail-fast', '--full', '--help', '--no-fail-fast', '--online', '--scoped', '--skip-steps')
     'check-packer' = @('--help', '--validate-only')
     'check-pwsh' = @('--help', '--scoped', '--settings', '--skip-step')
