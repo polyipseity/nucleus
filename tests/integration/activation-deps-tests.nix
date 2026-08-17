@@ -17,9 +17,9 @@ let
   shellModuleText = builtins.readFile ../../src/modules/shell.nix;
   macosModuleText = builtins.readFile ../../src/platforms/macOS/modules/default.nix;
   activationDagModuleText = builtins.readFile ../../src/modules/lib/activation-dag.nix;
-  macbookDefaultText = builtins.readFile ../../src/hosts/MacBook/default.nix;
-  middleClickScriptText = builtins.readFile ../../src/hosts/MacBook/scripts/macos-enable-middle-click.sh;
-  mountyScriptText = builtins.readFile ../../src/hosts/MacBook/scripts/macos-register-mounty-login-item.sh;
+  macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
+  macosAppAutostartScriptText = builtins.readFile ../../src/hosts/MacBook/scripts/macos-configure-app-autostart.sh;
+  appsRegistryText = builtins.readFile ../../src/modules/apps.json;
   spotlightScriptText = builtins.readFile ../../src/hosts/MacBook/scripts/macos-disable-spotlight.sh;
   gimpScrollSensitivityScriptText = builtins.readFile ../../src/scripts/configs/configure-gimp-scroll-sensitivity.sh;
   windowsGitSshModuleText = builtins.readFile ../../src/platforms/Windows/modules/user/Sync-GitAndSshConfig.ps1;
@@ -269,29 +269,28 @@ let
       )
       "POSIX Git defaults must keep commit.gpgsign and tag.gpgsign enabled for cross-host signing parity";
 
-  # === TEST: macOS MiddleClick startup uses native Login Items, not LaunchAgent ===
-  # NOTE: login-item registration lives in macos-enable-middle-click.sh, not in
-  # activation.nix (which only invokes the script); target the script text.
+  # === TEST: macOS MiddleClick startup is registry-driven via our login item ===
+  # NOTE: login-item registration now lives in macos-configure-app-autostart.sh
+  # (which invokes scripts/autostart.sh apply), driven by apps.json. We assert
+  # the registry declares MiddleClick as an enabled macOS login-item and that no
+  # custom LaunchAgent is used.
   test_middleclick_native_login_item = assert' (
-    (lib.hasInfix "make login item at end with properties {name:\"MiddleClick\"" middleClickScriptText)
-    && (lib.hasInfix "tell application \"System Events\"" middleClickScriptText)
-    && !(lib.hasInfix "launchd.agents.\"art.ginzburg.MiddleClick\"" macbookDefaultText)
-  ) "MiddleClick startup on macOS must use native Login Items (no custom LaunchAgent)";
+    (lib.hasInfix "\"MiddleClick\":" appsRegistryText)
+    && (lib.hasInfix "\"kind\": \"login-item\"" appsRegistryText)
+    && (lib.hasInfix "macos-configure-app-autostart.sh" macbookActivationText)
+    && !(lib.hasInfix "launchd.agents.\"art.ginzburg.MiddleClick\"" macbookActivationText)
+  ) "MiddleClick startup on macOS must be registry-driven via our login item (no custom LaunchAgent)";
 
-  # === TEST: macOS Mounty startup uses Mounty's native helper login item, not System Events ===
-  # NOTE: login-item registration lives in macos-register-mounty-login-item.sh, not in
-  # activation.nix (which only invokes the script); target the script text. Mounty's own
-  # "Start at Login" checkbox calls SMLoginItemSetEnabled on the LSBackgroundOnly helper
-  # bundle com.cu4uc.MountyHelper, which launches the main app at login.
-  test_mounty_native_login_item =
-    assert'
-      (
-        (lib.hasInfix "SMLoginItemSetEnabled" mountyScriptText)
-        && (lib.hasInfix "com.cu4uc.MountyHelper" mountyScriptText)
-        && !(lib.hasInfix "System Events" mountyScriptText)
-        && !(lib.hasInfix "make login item" mountyScriptText)
-      )
-      "Mounty startup on macOS must use Mounty's native helper login item via SMLoginItemSetEnabled (no System Events registration)";
+  # === TEST: macOS Mounty startup is registry-driven via our login item ===
+  # NOTE: Mounty previously used SMLoginItemSetEnabled on its helper bundle; the
+  # new policy owns exactly one uniform mechanism (our osascript login item), so
+  # the app-native helper path must no longer be referenced.
+  test_mounty_native_login_item = assert' (
+    (lib.hasInfix "\"Mounty\":" appsRegistryText)
+    && (lib.hasInfix "\"kind\": \"login-item\"" appsRegistryText)
+    && !(lib.hasInfix "SMLoginItemSetEnabled" macosAppAutostartScriptText)
+    && !(lib.hasInfix "com.cu4uc.MountyHelper" macosAppAutostartScriptText)
+  ) "Mounty startup on macOS must be registry-driven via our login item (no app-native helper)";
 
   # === TEST: Spotlight disables all known launcher hotkey slots ===
   # NOTE: hotkey loop lives in macos-disable-spotlight.sh, not in activation.nix
