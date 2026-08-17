@@ -27,14 +27,14 @@ _main() {
 '
 
   # Pre-extract keys to avoid POSIX-unfriendly process substitution
-  BREW_KEYS="$(printf '%s' "$LOCKFILE_DATA" | jq -r '(.homebrew.brews // {}) | keys[]')"
-  CASK_KEYS="$(printf '%s' "$LOCKFILE_DATA" | jq -r '(.homebrew.casks // {}) | keys[]')"
-  MAS_KEYS="$(printf '%s' "$LOCKFILE_DATA" | jq -r '(.homebrew.masApps // {}) | keys[]')"
+  BREW_KEYS="$(printf '%s' "$LOCKFILE_DATA" | jq -r '(.suggestions.homebrew.brews // {}) | keys[]')"
+  CASK_KEYS="$(printf '%s' "$LOCKFILE_DATA" | jq -r '(.suggestions.homebrew.casks // {}) | keys[]')"
+  MAS_KEYS="$(printf '%s' "$LOCKFILE_DATA" | jq -r '(.suggestions.homebrew.masApps // {}) | keys[]')"
 
   if [ "$HAS_BREW" -eq 1 ]; then
     while IFS= read -r key; do
       [ -z "$key" ] && continue
-      expected="$(printf '%s' "$LOCKFILE_DATA" | jq -r --arg k "$key" '(.homebrew.brews // {})[$k] // empty')"
+      expected="$(printf '%s' "$LOCKFILE_DATA" | jq -r --arg k "$key" '(.suggestions.homebrew.brews // {})[$k] // empty')"
       [ -z "$expected" ] && continue
       # check-suppress:suppression_doc: package may not be installed; brew list exits 1 for absent items.
       installed="$(brew list --versions "$key" 2>/dev/null | awk '{print $NF}' || true)"
@@ -49,7 +49,7 @@ KEYEOF
   if [ "$HAS_BREW" -eq 1 ]; then
     while IFS= read -r key; do
       [ -z "$key" ] && continue
-      expected="$(printf '%s' "$LOCKFILE_DATA" | jq -r --arg k "$key" '(.homebrew.casks // {})[$k] // empty')"
+      expected="$(printf '%s' "$LOCKFILE_DATA" | jq -r --arg k "$key" '(.suggestions.homebrew.casks // {})[$k] // empty')"
       [ -z "$expected" ] && continue
       # check-suppress:suppression_doc: cask may not be installed; brew list exits 1 for absent items.
       installed="$(brew list --cask --versions "$key" 2>/dev/null | awk '{print $NF}' || true)"
@@ -66,7 +66,7 @@ KEYEOF
     mas_list="$(mas list 2>/dev/null || true)"
     while IFS= read -r key; do
       [ -z "$key" ] && continue
-      expected="$(printf '%s' "$LOCKFILE_DATA" | jq -r --arg k "$key" '(.homebrew.masApps // {})[$k] // empty')"
+      expected="$(printf '%s' "$LOCKFILE_DATA" | jq -r --arg k "$key" '(.suggestions.homebrew.masApps // {})[$k] // empty')"
       [ -z "$expected" ] && continue
       # mas list format: "id appname (version)" or "id appname (???)"
       installed="$(printf '%s' "$mas_list" | awk -v name="$key" -F'[()]' '$0 ~ name {print $2}' | head -1 | tr -d '[:space:]')"

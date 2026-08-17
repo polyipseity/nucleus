@@ -27,6 +27,7 @@
 - `nucleus-apply` — apply configuration
 - `nucleus-bootstrap` — bootstrap system
 - `nucleus-bump-lockfile` — update version pins in `src/lockfiles/lockfile.json`; pass `--sections winget,scoop,...` for specific sections
+- `suggestions.*` sections (homebrew, nixpkgs, ollama, vscode, vm-setup.windows) are warn-only — never enforced. `nucleus-bump-lockfile --verify-installed` always warns for them.
 - `nucleus-check-pwsh` — check PowerShell syntax
 - `nucleus-check-sh` — check POSIX shell syntax
 - `nucleus-cloud-setup` — configure cloud remotes and re-apply
