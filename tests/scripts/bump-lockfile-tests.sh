@@ -35,22 +35,22 @@ setup_fake_repo() {
   "cargo-binstall": {
     "fixture-tool": "0.1.0"
   },
+  "updated": "2026-08-02T07:16:01Z",
   "uv": {
     "fixture-uv-pkg": "1.0.0",
     "other-pkg": "4.0.0"
   },
-  "updated": "2026-08-02T07:16:01Z",
   "vm-setup": {
     "nixos-iso": {
       "aarch64-linux": {
-        "url": "https://channels.nixos.org/nixos-unstable/latest-nixos-minimal-aarch64-linux.iso",
-        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "url": "https://channels.nixos.org/nixos-unstable/latest-nixos-minimal-aarch64-linux.iso"
       }
     },
     "tart-images": {
       "sequoia": {
-        "image": "ghcr.io/cirruslabs/macos-sequoia-base",
-        "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        "digest": "sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "image": "ghcr.io/cirruslabs/macos-sequoia-base"
       }
     }
   }

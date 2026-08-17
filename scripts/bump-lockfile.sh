@@ -559,8 +559,10 @@ fi
 
 # Compute the diff for --verify mode
 if $VERIFY; then
+  # Sort keys recursively to match the canonical on-disk ordering before diffing.
+  _data_sorted=$(printf '%s\n' "$data" | jq -S .)
   # check-suppress:suppression_doc: diff exits 1 when files differ; output is needed for the [ -n "$_diff" ] check.
-  _diff=$(diff <(printf '%s\n' "$data") "$LOCKFILE_ABS" 2>/dev/null || true)
+  _diff=$(diff <(printf '%s\n' "$_data_sorted") "$LOCKFILE_ABS" 2>/dev/null || true)
   if [ -n "$_diff" ]; then
     say "lockfile out of date — changes would be made:"
     printf '%s\n' "$_diff"
@@ -577,13 +579,16 @@ if [ "$changed" != true ]; then
   exit 0
 fi
 
-# Stamp the timestamp right before the atomic write.
-data=$(printf '%s\n' "$data" | jq --arg d "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.updated = $d')
+# Stamp the timestamp right before the atomic write. Sort keys recursively
+# (jq -S) so the on-disk file is deterministic and matches the PowerShell
+# writer's ConvertTo-Json ordering.
+data=$(printf '%s\n' "$data" | jq -S --arg d "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.updated = $d')
 
 # Atomic write
 tmpfile=$(mktemp "$LOCKFILE_ABS.tmp.XXXXXX")
 trap 'rm -f "$tmpfile"' EXIT
 
+# printf '%s\n' guarantees exactly one trailing newline.
 printf '%s\n' "$data" >"$tmpfile"
 mv -- "$tmpfile" "$LOCKFILE_ABS"
 

@@ -766,7 +766,9 @@ if (-not $changed) {
 $ht['updated'] = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ' -AsUTC)
 
 # Convert hashtable back to sorted JSON. Use a depth of 10 for nested objects.
-$outputJson = $ht | ConvertTo-Json -Depth 10
+# ConvertTo-Json sorts keys recursively; append exactly one trailing newline to
+# match the bash writer's `printf '%s\n'` contract.
+$outputJson = ($ht | ConvertTo-Json -Depth 10) + [Environment]::NewLine
 
 $tmpFile = [System.IO.Path]::GetTempFileName()
 try {
