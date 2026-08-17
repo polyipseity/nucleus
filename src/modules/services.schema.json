@@ -68,17 +68,30 @@
           "type": "string"
         }
       },
-      "required": [ "logDir", "systemLogDir" ],
+      "required": [
+        "logDir",
+        "systemLogDir"
+      ],
       "type": "object"
     },
     "hostLoggingRoots": {
       "description": "Log roots keyed by canonical hostname (MacBook, NixOS, Windows).",
       "properties": {
-        "MacBook": { "$ref": "#/definitions/hostLogRoots" },
-        "NixOS": { "$ref": "#/definitions/hostLogRoots" },
-        "Windows": { "$ref": "#/definitions/hostLogRoots" }
+        "MacBook": {
+          "$ref": "#/definitions/hostLogRoots"
+        },
+        "NixOS": {
+          "$ref": "#/definitions/hostLogRoots"
+        },
+        "Windows": {
+          "$ref": "#/definitions/hostLogRoots"
+        }
       },
-      "required": [ "MacBook", "NixOS", "Windows" ],
+      "required": [
+        "MacBook",
+        "NixOS",
+        "Windows"
+      ],
       "type": "object"
     },
     "loggingEntry": {
@@ -87,7 +100,12 @@
         "capture": {
           "description": "Which streams to capture: all, stdout, stderr, or none.",
           "type": "string",
-          "enum": [ "all", "stdout", "stderr", "none" ],
+          "enum": [
+            "all",
+            "stdout",
+            "stderr",
+            "none"
+          ],
           "default": "all"
         },
         "compress": {
@@ -100,12 +118,16 @@
           "properties": {
             "system": {
               "description": "Subdirs needed under the system-wide log root.",
-              "items": { "type": "string" },
+              "items": {
+                "type": "string"
+              },
               "type": "array"
             },
             "user": {
               "description": "Subdirs needed under the per-user log root.",
-              "items": { "type": "string" },
+              "items": {
+                "type": "string"
+              },
               "type": "array"
             }
           },
@@ -124,7 +146,9 @@
               "type": "string"
             }
           },
-          "required": [ "provider" ],
+          "required": [
+            "provider"
+          ],
           "type": "object"
         },
         "level": {

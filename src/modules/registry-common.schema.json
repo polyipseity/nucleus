@@ -3,7 +3,11 @@
   "definitions": {
     "platformKey": {
       "description": "OS-family platform key referenced by host entries",
-      "enum": ["macOS", "NixOS", "Windows"],
+      "enum": [
+        "macOS",
+        "NixOS",
+        "Windows"
+      ],
       "type": "string"
     },
     "omittedEntry": {
@@ -16,7 +20,10 @@
           "const": "omitted"
         }
       },
-      "required": ["type", "justification"],
+      "required": [
+        "type",
+        "justification"
+      ],
       "type": "object"
     },
     "hostEntryBase": {
@@ -27,13 +34,21 @@
               "$ref": "#/definitions/platformKey"
             }
           },
-          "required": ["platform"],
+          "required": [
+            "platform"
+          ],
           "type": "object"
         },
         {
           "propertyNames": {
             "not": {
-              "enum": ["darwin", "flags", "linux", "posix", "win32"]
+              "enum": [
+                "darwin",
+                "flags",
+                "linux",
+                "posix",
+                "win32"
+              ]
             }
           }
         }
@@ -42,7 +57,11 @@
     },
     "hostsParity": {
       "minProperties": 1,
-      "required": ["MacBook", "NixOS", "Windows"],
+      "required": [
+        "MacBook",
+        "NixOS",
+        "Windows"
+      ],
       "type": "object",
       "description": "Host-key parity wrapper: requires the canonical host keys (MacBook/NixOS/Windows). Each host value type is supplied by the consuming schema via allOf (e.g. hostEntry / hostAutostartEntry). Enforces the parity-first rule at validation time."
     },
