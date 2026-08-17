@@ -104,6 +104,7 @@ function Sync-LiteLLMService {
   $openrouterKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_openrouter_api_key"
   $opencodeGoKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_opencode_go_api_key"
   $opencodeZenKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_opencode_zen_api_key"
+  $commandCodeKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_command_code_api_key"
 
   $litellmEndpoint = & {
     # check-suppress:suppression_doc: probe -- services.json may not exist yet; $null check handles absence.
@@ -124,7 +125,8 @@ function Sync-LiteLLMService {
     -replace '__PORT__', $($litellmEndpoint.port) `
     -replace '__OPENROUTER_KEY_FILE__', $openrouterKeyFile `
     -replace '__OPENCODE_GO_KEY_FILE__', $opencodeGoKeyFile `
-    -replace '__OPENCODE_ZEN_KEY_FILE__', $opencodeZenKeyFile
+    -replace '__OPENCODE_ZEN_KEY_FILE__', $opencodeZenKeyFile `
+    -replace '__COMMAND_CODE_KEY_FILE__', $commandCodeKeyFile
   [System.IO.File]::WriteAllText($wrapperScript, $wrapperContent, [System.Text.UTF8Encoding]::new($false))
 
   # check-suppress:suppression_doc: probe whether service already exists; Get-Service throws when absent.

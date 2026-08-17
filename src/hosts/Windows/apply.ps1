@@ -668,7 +668,7 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
     $getSystemSecretParams['PrimarySshKeyPath'] = $primarySshKeyPath
   }
   $systemSecrets = Get-Secret @getSystemSecretParams
-  foreach ($key in @('ai_openrouter_api_key', 'ai_opencode_go_api_key', 'ai_opencode_zen_api_key')) {
+  foreach ($key in @('ai_openrouter_api_key', 'ai_opencode_go_api_key', 'ai_opencode_zen_api_key', 'ai_command_code_api_key')) {
     $value = $systemSecrets.$key
     if (-not [string]::IsNullOrWhiteSpace($value)) {
       $keyFile = Join-Path -Path $systemSecretsDir -ChildPath $key

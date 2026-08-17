@@ -7,18 +7,20 @@
 #   LITELLM_OPENROUTER_API_KEY_PATH / $3 = OpenRouter API key file path
 #   LITELLM_OPENGODE_GO_API_KEY_PATH / $4 = OpenCode Go API key file path
 #   LITELLM_OPENGODE_ZEN_API_KEY_PATH / $5 = OpenCode Zen API key file path
+#   LITELLM_COMMAND_CODE_API_KEY_PATH / $6 = Command Code API key file path
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
 
-config="${LITELLM_CONFIG:-${1:?usage: litellm-daemon.sh <config> <poll_timeout> <openrouter_key_path> <opencode_go_key_path> <opencode_zen_key_path>}}"
+config="${LITELLM_CONFIG:-${1:?usage: litellm-daemon.sh <config> <poll_timeout> <openrouter_key_path> <opencode_go_key_path> <opencode_zen_key_path> <command_code_key_path>}}"
 poll_timeout="${LITELLM_EVAL_TIMEOUT:-${2:?}}"
 _poll_ticks="$poll_timeout"
 _openrouter_key_path="${LITELLM_OPENROUTER_API_KEY_PATH:-${3:?}}"
 _opencode_go_key_path="${LITELLM_OPENGODE_GO_API_KEY_PATH:-${4:?}}"
 _opencode_zen_key_path="${LITELLM_OPENGODE_ZEN_API_KEY_PATH:-${5:?}}"
+_command_code_key_path="${LITELLM_COMMAND_CODE_API_KEY_PATH:-${6:?}}"
 
 # Poll for each key file when configured (macOS launchd needs to handle
 # the boot-time race with sops-install-secrets; systemd on NixOS restarts
@@ -52,7 +54,8 @@ _read_keyfile() {
 for _spec in \
   "$_openrouter_key_path:OPENROUTER_API_KEY" \
   "$_opencode_go_key_path:OPENCODE_GO_API_KEY" \
-  "$_opencode_zen_key_path:OPENCODE_ZEN_API_KEY"; do
+  "$_opencode_zen_key_path:OPENCODE_ZEN_API_KEY" \
+  "$_command_code_key_path:COMMAND_CODE_API_KEY"; do
   _keyfile="${_spec%%:*}"
   _varname="${_spec#*:}"
   if [ "$_poll_ticks" -gt 0 ]; then

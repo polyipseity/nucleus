@@ -73,7 +73,7 @@ in
           config.sops.secrets."ai_openrouter_api_key".path
         }' '${config.sops.secrets."ai_opencode_go_api_key".path}' '${
           config.sops.secrets."ai_opencode_zen_api_key".path
-        }'"
+        }' '${config.sops.secrets."ai_command_code_api_key".path}'"
       ];
       KeepAlive = true;
       RunAtLoad = true;

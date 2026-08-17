@@ -26,4 +26,10 @@
     owner = "litellm";
     mode = "0400";
   };
+
+  sops.secrets."ai_command_code_api_key" = {
+    sopsFile = ../../secrets/system.yml;
+    owner = "litellm";
+    mode = "0400";
+  };
 }
