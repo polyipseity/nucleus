@@ -114,13 +114,6 @@
           ],
           "type": "object"
         },
-        "nixpkgs": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Versions derived from nixpkgs/flake.lock (camilladsp, camillagui-backend, sccache, starship). Tracked by flake.lock, not lockfile.json; cannot be pinned here.",
-          "type": "object"
-        },
         "ollama": {
           "additionalProperties": {
             "items": {

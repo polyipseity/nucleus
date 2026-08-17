@@ -24,8 +24,6 @@
 #   suggestions.vscode  code/code-insiders --list-extensions --show-versions
 #                        (skip if neither available; warn-only)
 #   suggestions.ollama  ollama show <name>:<tag> --format json (warn-only)
-#   suggestions.nixpkgs  camilladsp, camillagui-backend, sccache, starship
-#                        GitHub releases (warn-only; tracked by flake.lock)
 #   suggestions.vm-setup.windows  no updater (manual; warn-only)
 
 set -euo pipefail
@@ -80,8 +78,6 @@ Sections (status — mechanism):
                                   (skip if neither available; warn-only)
   suggestions.ollama    updates   ollama show <name>:<tag> --format json
                                   (skip if ollama unavailable; warn-only)
-  suggestions.nixpkgs   updates   GitHub releases (camilladsp, camillagui-backend,
-                                  sccache, starship) — tracked by flake.lock (warn-only)
   suggestions.vm-setup.windows  no updater (manual; warn-only)
 
 PowerShell equivalents: -Sections, -Verify, -ListSections, -Help.
@@ -104,7 +100,7 @@ fi
 # legacy bare tokens nixos-iso / tart-images normalize to vm-setup children.
 # Sections under suggestions.* are warn-only (unpinnable) — bump-lockfile may
 # report/update them as audit data but never treats them as authoritative pins.
-_VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,winget,suggestions.homebrew,suggestions.homebrew.brews,suggestions.homebrew.casks,suggestions.homebrew.masApps,suggestions.ollama,suggestions.vscode,suggestions.nixpkgs,suggestions.vm-setup.windows"
+_VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,winget,suggestions.homebrew,suggestions.homebrew.brews,suggestions.homebrew.casks,suggestions.homebrew.masApps,suggestions.ollama,suggestions.vscode,suggestions.vm-setup.windows"
 
 # Parse --sections flag (comma-separated, defaults to all)
 SECTIONS=""
@@ -512,33 +508,6 @@ if suggestions_enabled suggestions.ollama; then
     done
   done < <(printf '%s\n' "$data" | jq -r '(.suggestions.ollama // {}) | keys[]')
 fi
-
-# camilladsp, camillagui-backend, sccache, starship — latest GitHub release
-# tag for nixpkgs-derived scalars. These are tracked by flake.lock, not
-# lockfile.json, so they live under suggestions.nixpkgs (warn-only audit data).
-update_github_scalar_suggestion() {
-  local key="$1" repo="$2"
-  suggestions_enabled suggestions.nixpkgs || return 0
-  local old new
-  old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.suggestions.nixpkgs // {})[$k] // empty')
-  [ -z "$old" ] && return 0
-  # check-suppress:suppression_doc: GitHub API may be unreachable or return a non-JSON error page; the warn path reports the failure.
-  new=$(curl -fsSL -H 'User-Agent: nucleus-bump-lockfile' "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null) || new=""
-  if [ -z "$new" ]; then
-    warn "suggestions.nixpkgs.$key: could not fetch latest release from GitHub ($repo)"
-    return 0
-  fi
-  new="${new#v}"
-  if [ "$new" != "$old" ]; then
-    log_update "suggestions.nixpkgs.$key" "$key" "$old" "$new"
-    data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.suggestions.nixpkgs[$k] = $v')
-  fi
-}
-
-update_github_scalar_suggestion camilladsp HEnquist/camilladsp
-update_github_scalar_suggestion camillagui-backend HEnquist/camillagui-backend
-update_github_scalar_suggestion sccache mozilla/sccache
-update_github_scalar_suggestion starship starship/starship
 
 # nixos-iso — Query NixOS channel for latest ISO URL and its SHA-256
 if section_enabled vm-setup.nixos-iso; then

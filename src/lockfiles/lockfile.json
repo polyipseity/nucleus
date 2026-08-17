@@ -281,12 +281,6 @@
       "ms-python.vscode-python-envs": "1.37.2026073101",
       "davidanson.vscode-markdownlint": "0.62.0"
     },
-    "nixpkgs": {
-      "camilladsp": "4.1.3",
-      "camillagui-backend": "4.1.0",
-      "sccache": "0.17.0",
-      "starship": "1.26.0"
-    },
     "vm-setup": {
       "windows": {}
     }

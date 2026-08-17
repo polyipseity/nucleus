@@ -28,8 +28,6 @@
     suggestions.homebrew.masApps no updater (manual) — App Store IDs (warn-only)
     suggestions.vscode   updates — code / code-insiders --list-extensions --show-versions (warn-only)
     suggestions.ollama   updates — ollama show <name>:<tag> --format json (warn-only)
-    suggestions.nixpkgs  updates — GitHub releases API for camilladsp, camillagui-backend,
-                          sccache, starship — tracked by flake.lock (warn-only)
     suggestions.vm-setup.windows no updater (manual) — digest recording not implemented (warn-only)
   Run -ListSections for the machine-readable name list.
 
@@ -109,7 +107,6 @@ $validSections = @(
   'suggestions.homebrew.masApps',
   'suggestions.ollama',
   'suggestions.vscode',
-  'suggestions.nixpkgs',
   'suggestions.vm-setup.windows'
 )
 $validTokens = @($validSections) + @('nixos-iso', 'tart-images')
@@ -690,41 +687,6 @@ if (Test-SuggestionsEnabled 'suggestions.ollama') {  # Point at the Ollama daemo
   } else {
     Write-NucleusWarning 'ollama not found — skipping ollama section'
   }
-}
-
-# ---------------------------------------------------------------------------
-# suggestions.nixpkgs — GitHub release scalars for camilladsp, camillagui-backend,
-# sccache, starship. These are tracked by flake.lock, not lockfile.json, so they
-# live under suggestions.nixpkgs (warn-only audit data).
-# ---------------------------------------------------------------------------
-function Update-GitHubReleaseScalarSuggestion {
-  [CmdletBinding(SupportsShouldProcess)]
-  param([string]$Key, [string]$Repo)
-  if (-not (Test-SuggestionsEnabled 'suggestions.nixpkgs')) { return }
-  if (-not ($ht.ContainsKey('suggestions') -and $ht['suggestions'] -is [hashtable] -and $ht['suggestions'].ContainsKey('nixpkgs') -and $ht['suggestions']['nixpkgs'] -is [hashtable])) { return }
-  if (-not $ht['suggestions']['nixpkgs'].ContainsKey($Key) -or $ht['suggestions']['nixpkgs'][$Key] -is [hashtable]) { return }
-  $old = $ht['suggestions']['nixpkgs'][$Key]
-  try {
-    # WHY: unauthenticated GitHub API requests are rate-limited to 60/hr, acceptable for a manual command.
-    $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{ 'User-Agent' = 'nucleus-bump-lockfile' }
-    $new = [string]$release.tag_name
-    if ($new -like 'v*') { $new = $new.Substring(1) }
-    if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
-      if ($PSCmdlet.ShouldProcess($Key, 'Set value')) {
-        Write-Update -Section "suggestions.nixpkgs.$Key" -Key $Key -OldValue $old -NewValue $new
-        $ht['suggestions']['nixpkgs'][$Key] = $new
-      }
-    }
-  } catch {
-    Write-NucleusWarning "suggestions.nixpkgs.$Key : GitHub releases query failed — keeping current version ($($_.Exception.Message))"
-  }
-}
-
-if (Test-SuggestionsEnabled 'suggestions.nixpkgs') {
-  Update-GitHubReleaseScalarSuggestion -Key 'camilladsp' -Repo 'HEnquist/camilladsp'
-  Update-GitHubReleaseScalarSuggestion -Key 'camillagui-backend' -Repo 'HEnquist/camillagui-backend'
-  Update-GitHubReleaseScalarSuggestion -Key 'sccache' -Repo 'mozilla/sccache'
-  Update-GitHubReleaseScalarSuggestion -Key 'starship' -Repo 'starship/starship'
 }
 
 # ---------------------------------------------------------------------------

@@ -46,7 +46,6 @@ run_lockfile_validation() {
         (.suggestions.homebrew.brews // {} | keys[] | {s: "suggestions.homebrew.brews", p: .}),
         (.suggestions.homebrew.casks // {} | keys[] | {s: "suggestions.homebrew.casks", p: .}),
         (.suggestions.homebrew.masApps // {} | keys[] | {s: "suggestions.homebrew.masApps", p: .}),
-        (.suggestions.nixpkgs // {} | keys[] | {s: "suggestions.nixpkgs", p: .}),
         (.suggestions.vscode // {} | keys[] | {s: "suggestions.vscode", p: .})
       ]
       | group_by(.p)
