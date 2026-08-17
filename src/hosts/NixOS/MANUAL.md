@@ -8,6 +8,11 @@
 - Verify CamillaDSP loopback: `arecord -l | grep Loopback`. If missing, reboot after `nucleus-apply`.
 - Caddy local-CA trust runs automatically. If missing: `sudo caddy trust --address 127.0.0.1:2019`.
 
+## recurring operations
+
+- **Chrome Remote Desktop Host**: not packaged in nixpkgs. To enable inbound CRD access, install the host component manually (Google-provided package) and approve the system extension once in System Settings → Privacy & Security. The `apps.json` entry tracks it as a `system-extension` (manual approval); it is not force-launched by activation.
+- **WhatsApp**: no Linux client exists. Use WhatsApp Web in the browser; the NixOS `apps.json` entry is intentionally `omitted`.
+
 ## command shortcuts
 
 - `-g`, `-ga`, `-gb`, `-gc`, `-gca`, `-gcl`, `-gco`, `-gd`, `-gf`, `-gff`, `-gl`, `-gp`, `-gpl`, `-gplf`, `-gs`, `-gst`, `-gsw` — git commands
