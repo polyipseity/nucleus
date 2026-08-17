@@ -16,22 +16,21 @@
     uv                   updates — uv tool list
     rustup               updates — rustup toolchain list + rustc +<ch> --version
     pwsh                 updates — Find-Module via pwsh
-    homebrew             updates — parent section; selects brews, casks, masApps
-    homebrew.brews       updates — brew list --versions
-    homebrew.casks       updates — brew list --cask --versions
-    homebrew.masApps     no updater (manual) — App Store IDs, not versions
-    vscode               updates — code / code-insiders --list-extensions --show-versions
-    ollama               updates — ollama show <name>:<tag> --format json
+    source-builds        no updater (manual) — VCS rev + version
+    version              no updater (manual) — schema version
     vm-setup             updates — parent section; selects nixos-iso, tart-images, windows
     vm-setup.nixos-iso   updates — NixOS channel latest ISO URL and SHA-256
     vm-setup.tart-images updates — GHCR OCI registry digest
     vm-setup.windows     no updater (manual) — digest recording not implemented
-    camilladsp           updates — GitHub releases API
-    camillagui-backend   updates — GitHub releases API
-    sccache              updates — GitHub releases API
-    starship             updates — GitHub releases API
-    source-builds        no updater (manual) — VCS rev + version
-    version              no updater (manual) — schema version
+    suggestions.homebrew parent — selects brews, casks, masApps (warn-only)
+    suggestions.homebrew.brews  updates — brew list --versions (warn-only)
+    suggestions.homebrew.casks  updates — brew list --cask --versions (warn-only)
+    suggestions.homebrew.masApps no updater (manual) — App Store IDs (warn-only)
+    suggestions.vscode   updates — code / code-insiders --list-extensions --show-versions (warn-only)
+    suggestions.ollama   updates — ollama show <name>:<tag> --format json (warn-only)
+    suggestions.nixpkgs  updates — GitHub releases API for camilladsp, camillagui-backend,
+                          sccache, starship — tracked by flake.lock (warn-only)
+    suggestions.vm-setup.windows no updater (manual) — digest recording not implemented (warn-only)
   Run -ListSections for the machine-readable name list.
 
 .PARAMETER Sections
@@ -84,29 +83,27 @@ $ErrorActionPreference = 'Stop'
 # tart-images are accepted as input tokens only (not listed).
 $validSections = @(
   'bun',
-  'camilladsp',
-  'camillagui-backend',
   'cargo',
   'cargo-binstall',
-  'homebrew',
-  'homebrew.brews',
-  'homebrew.casks',
-  'homebrew.masApps',
-  'ollama',
   'pwsh',
   'rustup',
-  'sccache',
   'scoop',
   'source-builds',
-  'starship',
   'uv',
   'version',
   'vm-setup',
   'vm-setup.nixos-iso',
   'vm-setup.tart-images',
   'vm-setup.windows',
-  'vscode',
-  'winget'
+  'winget',
+  'suggestions.homebrew',
+  'suggestions.homebrew.brews',
+  'suggestions.homebrew.casks',
+  'suggestions.homebrew.masApps',
+  'suggestions.ollama',
+  'suggestions.vscode',
+  'suggestions.nixpkgs',
+  'suggestions.vm-setup.windows'
 )
 $validTokens = @($validSections) + @('nixos-iso', 'tart-images')
 
@@ -192,6 +189,19 @@ function Test-SectionEnabled {
   # selects all of its dotted children.
   foreach ($token in $sectionTokens) {
     if ($Name -eq $token -or $Name.StartsWith("$token.")) { return $true }
+  }
+  return $false
+}
+
+function Test-SuggestionsEnabled {
+  param([string]$Name)
+  # Suggestions sections are warn-only audit data, never authoritative pins.
+  # They are selected only by an explicit suggestions.* token (or the default
+  # all-sections run). A parent token (suggestions, suggestions.homebrew) also
+  # selects all of its dotted children.
+  if ([string]::IsNullOrEmpty($Sections)) { return $true }
+  foreach ($token in $sectionTokens) {
+    if ($token.StartsWith('suggestions') -and ($Name -eq $token -or $Name.StartsWith("$token."))) { return $true }
   }
   return $false
 }
@@ -504,13 +514,14 @@ if (Test-SectionEnabled 'pwsh') {
 }
 
 # ---------------------------------------------------------------------------
-# homebrew — brew list --versions, brew list --cask --versions
+# suggestions.homebrew — brew list --versions, brew list --cask --versions
+# Warn-only audit data; never authoritative pins.
 # ---------------------------------------------------------------------------
-if ((Test-SectionEnabled 'homebrew.brews') -or (Test-SectionEnabled 'homebrew.casks')) {
+if ((Test-SuggestionsEnabled 'suggestions.homebrew.brews') -or (Test-SuggestionsEnabled 'suggestions.homebrew.casks')) {
   # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
   if (Get-Command -Name 'brew' -ErrorAction SilentlyContinue) {
-    if (Test-SectionEnabled 'homebrew.brews') {
-      if ($ht.ContainsKey('homebrew') -and $ht['homebrew'] -is [hashtable] -and $ht['homebrew'].ContainsKey('brews') -and $ht['homebrew']['brews'] -is [hashtable]) {
+    if (Test-SuggestionsEnabled 'suggestions.homebrew.brews') {
+      if ($ht.ContainsKey('suggestions') -and $ht['suggestions'] -is [hashtable] -and $ht['suggestions'].ContainsKey('homebrew') -and $ht['suggestions']['homebrew'] -is [hashtable] -and $ht['suggestions']['homebrew'].ContainsKey('brews') -and $ht['suggestions']['homebrew']['brews'] -is [hashtable]) {
         # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
         $brewList = & brew list --versions 2>$null
         $brewVersions = @{}
@@ -520,20 +531,20 @@ if ((Test-SectionEnabled 'homebrew.brews') -or (Test-SectionEnabled 'homebrew.ca
             $brewVersions[$parts[0]] = $parts[1]
           }
         }
-        foreach ($key in @($ht['homebrew']['brews'].Keys)) {
-          $old = $ht['homebrew']['brews'][$key]
+        foreach ($key in @($ht['suggestions']['homebrew']['brews'].Keys)) {
+          $old = $ht['suggestions']['homebrew']['brews'][$key]
           if ($brewVersions.ContainsKey($key)) {
             $new = $brewVersions[$key]
             if ($new -ne $old) {
-              Write-Update -Section 'homebrew.brews' -Key $key -OldValue $old -NewValue $new
-              $ht['homebrew']['brews'][$key] = $new
+              Write-Update -Section 'suggestions.homebrew.brews' -Key $key -OldValue $old -NewValue $new
+              $ht['suggestions']['homebrew']['brews'][$key] = $new
             }
           }
         }
       }
     }
-    if (Test-SectionEnabled 'homebrew.casks') {
-      if ($ht.ContainsKey('homebrew') -and $ht['homebrew'] -is [hashtable] -and $ht['homebrew'].ContainsKey('casks') -and $ht['homebrew']['casks'] -is [hashtable]) {
+    if (Test-SuggestionsEnabled 'suggestions.homebrew.casks') {
+      if ($ht.ContainsKey('suggestions') -and $ht['suggestions'] -is [hashtable] -and $ht['suggestions'].ContainsKey('homebrew') -and $ht['suggestions']['homebrew'] -is [hashtable] -and $ht['suggestions']['homebrew'].ContainsKey('casks') -and $ht['suggestions']['homebrew']['casks'] -is [hashtable]) {
         # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
         $caskList = & brew list --cask --versions 2>$null
         $caskVersions = @{}
@@ -543,27 +554,28 @@ if ((Test-SectionEnabled 'homebrew.brews') -or (Test-SectionEnabled 'homebrew.ca
             $caskVersions[$parts[0]] = $parts[1]
           }
         }
-        foreach ($key in @($ht['homebrew']['casks'].Keys)) {
-          $old = $ht['homebrew']['casks'][$key]
+        foreach ($key in @($ht['suggestions']['homebrew']['casks'].Keys)) {
+          $old = $ht['suggestions']['homebrew']['casks'][$key]
           if ($caskVersions.ContainsKey($key)) {
             $new = $caskVersions[$key]
             if ($new -ne $old) {
-              Write-Update -Section 'homebrew.casks' -Key $key -OldValue $old -NewValue $new
-              $ht['homebrew']['casks'][$key] = $new
+              Write-Update -Section 'suggestions.homebrew.casks' -Key $key -OldValue $old -NewValue $new
+              $ht['suggestions']['homebrew']['casks'][$key] = $new
             }
           }
         }
       }
     }
   } else {
-    Write-NucleusWarning 'brew unavailable — skipping homebrew section'
+    Write-NucleusWarning 'brew unavailable — skipping suggestions.homebrew section'
   }
 }
 
 # ---------------------------------------------------------------------------
-# vscode — code / code-insiders --list-extensions --show-versions
+# suggestions.vscode — code / code-insiders --list-extensions --show-versions
+# Warn-only audit data (Windows installs --pre-release --force; POSIX uses flake.lock).
 # ---------------------------------------------------------------------------
-if (Test-SectionEnabled 'vscode') {
+if (Test-SuggestionsEnabled 'suggestions.vscode') {
   $vscodeOutput = $null
   # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
   if (Get-Command -Name 'code' -ErrorAction SilentlyContinue) {
@@ -574,7 +586,7 @@ if (Test-SectionEnabled 'vscode') {
     # check-suppress:suppression_doc: probe -- tool may not be installed; stderr suppressed for clean output.
     $vscodeOutput = & code-insiders --list-extensions --show-versions 2>$null
   } else {
-    Write-NucleusWarning 'code/code-insiders not found — skipping vscode section'
+    Write-NucleusWarning 'code/code-insiders not found — skipping suggestions.vscode section'
   }
 
   if ($vscodeOutput) {
@@ -593,14 +605,14 @@ if (Test-SectionEnabled 'vscode') {
       }
     }
 
-    if ($ht.ContainsKey('vscode') -and $ht['vscode'] -is [hashtable]) {
-      foreach ($key in @($ht['vscode'].Keys)) {
-        $old = $ht['vscode'][$key]
+    if ($ht.ContainsKey('suggestions') -and $ht['suggestions'] -is [hashtable] -and $ht['suggestions'].ContainsKey('vscode') -and $ht['suggestions']['vscode'] -is [hashtable]) {
+      foreach ($key in @($ht['suggestions']['vscode'].Keys)) {
+        $old = $ht['suggestions']['vscode'][$key]
         if ($vscodeExts.ContainsKey($key)) {
           $new = $vscodeExts[$key]
           if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
-            Write-Update -Section 'vscode' -Key $key -OldValue $old -NewValue $new
-            $ht['vscode'][$key] = $new
+            Write-Update -Section 'suggestions.vscode' -Key $key -OldValue $old -NewValue $new
+            $ht['suggestions']['vscode'][$key] = $new
           }
         }
       }
@@ -609,14 +621,15 @@ if (Test-SectionEnabled 'vscode') {
 }
 
 # ---------------------------------------------------------------------------
-# ollama — ollama show <name>:<tag> --format json
+# suggestions.ollama — ollama show <name>:<tag> --format json
+# Warn-only audit data.
 # ---------------------------------------------------------------------------
-if (Test-SectionEnabled 'ollama') {  # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
+if (Test-SuggestionsEnabled 'suggestions.ollama') {  # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
   # home.sessionVariables.OLLAMA_HOST (127.0.0.1:4000) normally routes to.
   if (Get-Command -Name 'ollama' -ErrorAction SilentlyContinue) {
-    if ($ht.ContainsKey('ollama') -and $ht['ollama'] -is [hashtable]) {
-    foreach ($hostName in $ht['ollama'].Keys) {
-      $models = $ht['ollama'][$hostName]
+    if ($ht.ContainsKey('suggestions') -and $ht['suggestions'] -is [hashtable] -and $ht['suggestions'].ContainsKey('ollama') -and $ht['suggestions']['ollama'] -is [hashtable]) {
+    foreach ($hostName in $ht['suggestions']['ollama'].Keys) {
+      $models = $ht['suggestions']['ollama'][$hostName]
       if ($models -isnot [System.Collections.IList]) { continue }
 
       for ($idx = 0; $idx -lt $models.Count; $idx++) {
@@ -656,13 +669,17 @@ if (Test-SectionEnabled 'ollama') {  # Point at the Ollama daemon directly, bypa
 }
 
 # ---------------------------------------------------------------------------
-# GitHub release scalars — camilladsp, camillagui-backend, sccache, starship
+# suggestions.nixpkgs — GitHub release scalars for camilladsp, camillagui-backend,
+# sccache, starship. These are tracked by flake.lock, not lockfile.json, so they
+# live under suggestions.nixpkgs (warn-only audit data).
 # ---------------------------------------------------------------------------
-function Update-GitHubReleaseScalar {
+function Update-GitHubReleaseScalarSuggestion {
   [CmdletBinding(SupportsShouldProcess)]
   param([string]$Key, [string]$Repo)
-  if (-not $ht.ContainsKey($Key) -or $ht[$Key] -is [hashtable]) { return }
-  $old = $ht[$Key]
+  if (-not (Test-SuggestionsEnabled 'suggestions.nixpkgs')) { return }
+  if (-not ($ht.ContainsKey('suggestions') -and $ht['suggestions'] -is [hashtable] -and $ht['suggestions'].ContainsKey('nixpkgs') -and $ht['suggestions']['nixpkgs'] -is [hashtable])) { return }
+  if (-not $ht['suggestions']['nixpkgs'].ContainsKey($Key) -or $ht['suggestions']['nixpkgs'][$Key] -is [hashtable]) { return }
+  $old = $ht['suggestions']['nixpkgs'][$Key]
   try {
     # WHY: unauthenticated GitHub API requests are rate-limited to 60/hr, acceptable for a manual command.
     $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{ 'User-Agent' = 'nucleus-bump-lockfile' }
@@ -670,19 +687,21 @@ function Update-GitHubReleaseScalar {
     if ($new -like 'v*') { $new = $new.Substring(1) }
     if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
       if ($PSCmdlet.ShouldProcess($Key, 'Set value')) {
-        Write-Update -Section $Key -Key $Key -OldValue $old -NewValue $new
-        $ht[$Key] = $new
+        Write-Update -Section "suggestions.nixpkgs.$Key" -Key $Key -OldValue $old -NewValue $new
+        $ht['suggestions']['nixpkgs'][$Key] = $new
       }
     }
   } catch {
-    Write-NucleusWarning "${Key}: GitHub releases query failed — keeping current version ($($_.Exception.Message))"
+    Write-NucleusWarning "suggestions.nixpkgs.$Key : GitHub releases query failed — keeping current version ($($_.Exception.Message))"
   }
 }
 
-if (Test-SectionEnabled 'camilladsp') { Update-GitHubReleaseScalar -Key 'camilladsp' -Repo 'HEnquist/camilladsp' }
-if (Test-SectionEnabled 'camillagui-backend') { Update-GitHubReleaseScalar -Key 'camillagui-backend' -Repo 'HEnquist/camillagui-backend' }
-if (Test-SectionEnabled 'sccache') { Update-GitHubReleaseScalar -Key 'sccache' -Repo 'mozilla/sccache' }
-if (Test-SectionEnabled 'starship') { Update-GitHubReleaseScalar -Key 'starship' -Repo 'starship/starship' }
+if (Test-SuggestionsEnabled 'suggestions.nixpkgs') {
+  Update-GitHubReleaseScalarSuggestion -Key 'camilladsp' -Repo 'HEnquist/camilladsp'
+  Update-GitHubReleaseScalarSuggestion -Key 'camillagui-backend' -Repo 'HEnquist/camillagui-backend'
+  Update-GitHubReleaseScalarSuggestion -Key 'sccache' -Repo 'mozilla/sccache'
+  Update-GitHubReleaseScalarSuggestion -Key 'starship' -Repo 'starship/starship'
+}
 
 # ---------------------------------------------------------------------------
 # nixos-iso — Query NixOS channel for latest ISO URL and SHA-256
@@ -785,7 +804,7 @@ if (Test-SectionEnabled 'vm-setup.tart-images') {
 # Only the default all-sections run must stay silent: these names have no
 # updater and selecting them explicitly should say so instead of doing nothing.
 foreach ($token in $sectionTokens) {
-  if ($token -in @('source-builds', 'homebrew.masApps', 'vm-setup.windows', 'version')) {
+  if ($token -in @('source-builds', 'suggestions.homebrew.masApps', 'suggestions.vm-setup.windows', 'version')) {
     Write-NucleusWarning "section '$token' has no updater — kept manual"
   }
 }

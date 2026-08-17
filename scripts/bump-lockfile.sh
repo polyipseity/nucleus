@@ -11,24 +11,22 @@
 #   uv                uv tool list
 #   rustup            rustc +<ch> --version
 #   pwsh              Find-Module via pwsh        (skip if pwsh unavailable)
-#   homebrew          parent - selects brews, casks, masApps
-#   homebrew.brews    brew list --versions
-#   homebrew.casks    brew list --cask --versions
-#   homebrew.masApps  no updater (manual)
-#   vscode            code/code-insiders --list-extensions --show-versions
-#                     (skip if neither available)
-#   ollama            ollama show <name>:<tag> --format json
-#                     (skip if ollama unavailable)
-#   camilladsp        GitHub releases (HEnquist/camilladsp)
-#   camillagui-backend GitHub releases (HEnquist/camillagui-backend)
-#   sccache           GitHub releases (mozilla/sccache)
-#   starship          GitHub releases (starship/starship)
 #   source-builds     no updater (manual)
 #   version           no updater (manual)
 #   vm-setup          parent - selects nixos-iso, tart-images, windows
 #   vm-setup.nixos-iso  NixOS channel latest ISO URL + SHA-256
 #   vm-setup.tart-images  GHCR OCI registry digest
 #   vm-setup.windows  no updater (manual)
+#   suggestions.homebrew  parent - selects brews, casks, masApps (warn-only)
+#   suggestions.homebrew.brews    brew list --versions
+#   suggestions.homebrew.casks    brew list --cask --versions
+#   suggestions.homebrew.masApps  no updater (manual)
+#   suggestions.vscode  code/code-insiders --list-extensions --show-versions
+#                        (skip if neither available; warn-only)
+#   suggestions.ollama  ollama show <name>:<tag> --format json (warn-only)
+#   suggestions.nixpkgs  camilladsp, camillagui-backend, sccache, starship
+#                        GitHub releases (warn-only; tracked by flake.lock)
+#   suggestions.vm-setup.windows  no updater (manual; warn-only)
 
 set -euo pipefail
 
@@ -64,24 +62,23 @@ Sections (status — mechanism):
   uv                    updates   uv tool list
   rustup                updates   rustc +<ch> --version
   pwsh                  updates   Find-Module via pwsh (skip if pwsh unavailable)
-  homebrew              parent    selects brews, casks, masApps
-  homebrew.brews        updates   brew list --versions
-  homebrew.casks        updates   brew list --cask --versions
-  homebrew.masApps      no updater (manual)
-  vscode                updates   code/code-insiders --list-extensions --show-versions
-                                  (skip if neither available)
-  ollama                updates   ollama show <name>:<tag> --format json
-                                  (skip if ollama unavailable)
-  camilladsp            updates   GitHub releases (HEnquist/camilladsp)
-  camillagui-backend    updates   GitHub releases (HEnquist/camillagui-backend)
-  sccache               updates   GitHub releases (mozilla/sccache)
-  starship              updates   GitHub releases (starship/starship)
   source-builds         no updater (manual)
   version               no updater (manual)
   vm-setup              parent    selects nixos-iso, tart-images, windows
   vm-setup.nixos-iso    updates   NixOS channel latest ISO URL + SHA-256
   vm-setup.tart-images  updates   GHCR OCI registry digest
   vm-setup.windows      no updater (manual)
+  suggestions.homebrew  parent    selects brews, casks, masApps (warn-only)
+  suggestions.homebrew.brews  updates  brew list --versions
+  suggestions.homebrew.casks  updates  brew list --cask --versions
+  suggestions.homebrew.masApps  no updater (manual)
+  suggestions.vscode    updates   code/code-insiders --list-extensions --show-versions
+                                  (skip if neither available; warn-only)
+  suggestions.ollama    updates   ollama show <name>:<tag> --format json
+                                  (skip if ollama unavailable; warn-only)
+  suggestions.nixpkgs   updates   GitHub releases (camilladsp, camillagui-backend,
+                                  sccache, starship) — tracked by flake.lock (warn-only)
+  suggestions.vm-setup.windows  no updater (manual; warn-only)
 
 PowerShell equivalents: -Sections, -Verify, -ListSections, -Help.
 EOF
@@ -101,7 +98,9 @@ fi
 
 # Canonical section names (alphabetical). cargo aliases cargo-binstall; the
 # legacy bare tokens nixos-iso / tart-images normalize to vm-setup children.
-_VALID_SECTIONS_CSV="bun,camilladsp,camillagui-backend,cargo,cargo-binstall,homebrew,homebrew.brews,homebrew.casks,homebrew.masApps,ollama,pwsh,rustup,sccache,scoop,source-builds,starship,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vm-setup.windows,vscode,winget"
+# Sections under suggestions.* are warn-only (unpinnable) — bump-lockfile may
+# report/update them as audit data but never treats them as authoritative pins.
+_VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,winget,suggestions.homebrew,suggestions.homebrew.brews,suggestions.homebrew.casks,suggestions.homebrew.masApps,suggestions.ollama,suggestions.vscode,suggestions.nixpkgs,suggestions.vm-setup.windows"
 
 # Parse --sections flag (comma-separated, defaults to all)
 SECTIONS=""
@@ -171,7 +170,7 @@ fi
 if [ -n "$SECTIONS" ]; then
   IFS=',' read -ra _tokens <<<"$SECTIONS"
   for _tok in "${_tokens[@]}"; do
-    if [[ ",source-builds,homebrew.masApps,vm-setup.windows,version," == *",$_tok,"* ]]; then
+    if [[ ",source-builds,suggestions.homebrew.masApps,suggestions.vm-setup.windows,version," == *",$_tok,"* ]]; then
       warn "section '$_tok' has no updater — kept manual"
     fi
   done
@@ -187,6 +186,25 @@ section_enabled() {
     # dotted child token (vm-setup.nixos-iso selects its dotted section).
     if [ "$token" = "$name" ] || [[ "$name" == "$token".* ]] || [[ "$token" == "$name".* ]]; then
       return 0
+    fi
+  done
+  return 1
+}
+
+# suggestions_enabled mirrors section_enabled but for the suggestions.* subtree.
+# A bare "suggestions" token selects all suggestions children; a dotted token
+# (suggestions.homebrew) selects its subtree; a child token (suggestions.homebrew.brews)
+# selects its dotted section.
+suggestions_enabled() {
+  local name="$1"
+  [ -z "$SECTIONS" ] && return 0 # no filter = all enabled
+  local token
+  IFS=',' read -ra _tokens <<<"$SECTIONS"
+  for token in "${_tokens[@]}"; do
+    if [[ "$token" == suggestions* ]]; then
+      if [ "$token" = "suggestions" ] || [[ "$name" == "$token".* ]] || [[ "$token" == "$name".* ]]; then
+        return 0
+      fi
     fi
   done
   return 1
@@ -355,36 +373,38 @@ if section_enabled pwsh; then
 fi
 
 # homebrew — brew list --versions (brews), brew list --cask --versions (casks)
-if section_enabled homebrew.brews; then
+# Under suggestions: warn-only audit data, never authoritative pins.
+if suggestions_enabled suggestions.homebrew.brews; then
   # brews
   while IFS= read -r key; do
     [ -z "$key" ] && continue
-    old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.homebrew.brews // {})[$k] // empty')
+    old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.suggestions.homebrew.brews // {})[$k] // empty')
     [ -z "$old" ] && continue
     new=$(brew list --versions 2>/dev/null | awk -v k="$key" '$1 == k {print $2}' | head -1 | tr -d '[:space:]')
     if [ -n "$new" ] && [ "$new" != "$old" ]; then
-      log_update "homebrew.brews" "$key" "$old" "$new"
-      data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.homebrew.brews[$k] = $v')
+      log_update "suggestions.homebrew.brews" "$key" "$old" "$new"
+      data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.suggestions.homebrew.brews[$k] = $v')
     fi
-  done < <(printf '%s\n' "$data" | jq -r '(.homebrew.brews // {}) | keys[]')
+  done < <(printf '%s\n' "$data" | jq -r '(.suggestions.homebrew.brews // {}) | keys[]')
 fi
 
-if section_enabled homebrew.casks; then
+if suggestions_enabled suggestions.homebrew.casks; then
   # casks
   while IFS= read -r key; do
     [ -z "$key" ] && continue
-    old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.homebrew.casks // {})[$k] // empty')
+    old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.suggestions.homebrew.casks // {})[$k] // empty')
     [ -z "$old" ] && continue
     new=$(brew list --cask --versions 2>/dev/null | awk -v k="$key" '$1 == k {print $2}' | head -1 | tr -d '[:space:]')
     if [ -n "$new" ] && [ "$new" != "$old" ]; then
-      log_update "homebrew.casks" "$key" "$old" "$new"
-      data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.homebrew.casks[$k] = $v')
+      log_update "suggestions.homebrew.casks" "$key" "$old" "$new"
+      data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.suggestions.homebrew.casks[$k] = $v')
     fi
-  done < <(printf '%s\n' "$data" | jq -r '(.homebrew.casks // {}) | keys[]')
+  done < <(printf '%s\n' "$data" | jq -r '(.suggestions.homebrew.casks // {}) | keys[]')
 fi
 
 # vscode — code/code-insiders --list-extensions --show-versions
-if section_enabled vscode; then
+# Under suggestions: warn-only audit data (Windows installs --pre-release --force; POSIX uses flake.lock).
+if suggestions_enabled suggestions.vscode; then
   vscode_output=""
   if command -v code >/dev/null 2>&1; then
     # check-suppress:suppression_doc: VS Code CLI may not be installed; empty extension list is expected.
@@ -410,29 +430,29 @@ if section_enabled vscode; then
 
     while IFS= read -r key; do
       [ -z "$key" ] && continue
-      old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.vscode // {})[$k] // empty')
+      old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.suggestions.vscode // {})[$k] // empty')
       [ -z "$old" ] && continue
       new="${vscode_exts[$key]:-}"
       if [ -n "$new" ] && [ "$new" != "$old" ]; then
-        log_update "vscode" "$key" "$old" "$new"
-        data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.vscode[$k] = $v')
+        log_update "suggestions.vscode" "$key" "$old" "$new"
+        data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.suggestions.vscode[$k] = $v')
       fi
-    done < <(printf '%s\n' "$data" | jq -r '(.vscode // {}) | keys[]')
+    done < <(printf '%s\n' "$data" | jq -r '(.suggestions.vscode // {}) | keys[]')
   fi
 fi
 
 : "${NUCLEUS_OLLAMA_HOST:=$(jq -r '.ollama.network.default | "\(.host):\(.port)"' "$REPO_ROOT/src/modules/services.json" 2>/dev/null || echo "127.0.0.1:11434")}"
-if section_enabled ollama; then
+if suggestions_enabled suggestions.ollama; then
   # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
   # home.sessionVariables.OLLAMA_HOST (127.0.0.1:4000) normally routes to.
   while IFS= read -r host; do
     [ -z "$host" ] && continue
     # Get the array index to iterate over models for this host
-    model_count=$(printf '%s\n' "$data" | jq -r --arg h "$host" '(.ollama[$h] // []) | length')
+    model_count=$(printf '%s\n' "$data" | jq -r --arg h "$host" '(.suggestions.ollama[$h] // []) | length')
     [ "$model_count" -eq 0 ] && continue
 
     for idx in $(seq 0 $((model_count - 1))); do
-      entry=$(printf '%s\n' "$data" | jq -c --arg h "$host" --argjson i "$idx" '(.ollama[$h] // [])[$i]')
+      entry=$(printf '%s\n' "$data" | jq -c --arg h "$host" --argjson i "$idx" '(.suggestions.ollama[$h] // [])[$i]')
       [ -z "$entry" ] && continue
 
       name=$(printf '%s\n' "$entry" | jq -r '.name // empty')
@@ -447,11 +467,11 @@ if section_enabled ollama; then
       if [ -n "$ollama_info" ]; then
         new_digest=$(printf '%s\n' "$ollama_info" | jq -r '.digest // empty' 2>/dev/null || true) # check-suppress:suppression_doc: jq may error on empty/malformed input from failed ollama probe; null check downstream handles the empty case.
         if [ -n "$new_digest" ] && [ "$new_digest" != "$old_digest" ]; then
-          log_update "ollama ($host)" "$name:$tag" "${old_digest:-none}" "$new_digest"
+          log_update "suggestions.ollama ($host)" "$name:$tag" "${old_digest:-none}" "$new_digest"
           if [ -n "$old_digest" ]; then
             # Update digest for entry that already has it
             data=$(printf '%s\n' "$data" | jq --arg h "$host" --arg n "$name" --arg t "$tag" --arg d "$new_digest" '
-              .ollama[$h] |= map(
+              .suggestions.ollama[$h] |= map(
                 if .name == $n and .tag == $t then
                   .digest = $d
                 else
@@ -462,7 +482,7 @@ if section_enabled ollama; then
           else
             # Add digest field for entries that don't have one yet
             data=$(printf '%s\n' "$data" | jq --arg h "$host" --arg n "$name" --arg t "$tag" --arg d "$new_digest" '
-              .ollama[$h] |= map(
+              .suggestions.ollama[$h] |= map(
                 if .name == $n and .tag == $t then
                   .digest = $d
                 else
@@ -474,35 +494,35 @@ if section_enabled ollama; then
         fi
       fi
     done
-  done < <(printf '%s\n' "$data" | jq -r '(.ollama // {}) | keys[]')
+  done < <(printf '%s\n' "$data" | jq -r '(.suggestions.ollama // {}) | keys[]')
 fi
 
 # camilladsp, camillagui-backend, sccache, starship — latest GitHub release
-# tag for top-level scalar pins. Unauthenticated GitHub API rate limit
-# (60 requests/hour per IP) is acceptable for a manual command.
-update_github_scalar() {
+# tag for nixpkgs-derived scalars. These are tracked by flake.lock, not
+# lockfile.json, so they live under suggestions.nixpkgs (warn-only audit data).
+update_github_scalar_suggestion() {
   local key="$1" repo="$2"
-  section_enabled "$key" || return 0
+  suggestions_enabled suggestions.nixpkgs || return 0
   local old new
-  old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '.[$k] // empty')
+  old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.suggestions.nixpkgs // {})[$k] // empty')
   [ -z "$old" ] && return 0
   # check-suppress:suppression_doc: GitHub API may be unreachable or return a non-JSON error page; the warn path reports the failure.
   new=$(curl -fsSL -H 'User-Agent: nucleus-bump-lockfile' "https://api.github.com/repos/$repo/releases/latest" 2>/dev/null | jq -r '.tag_name // empty' 2>/dev/null) || new=""
   if [ -z "$new" ]; then
-    warn "$key: could not fetch latest release from GitHub ($repo)"
+    warn "suggestions.nixpkgs.$key: could not fetch latest release from GitHub ($repo)"
     return 0
   fi
   new="${new#v}"
   if [ "$new" != "$old" ]; then
-    log_update "$key" "$key" "$old" "$new"
-    data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.[$k] = $v')
+    log_update "suggestions.nixpkgs.$key" "$key" "$old" "$new"
+    data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.suggestions.nixpkgs[$k] = $v')
   fi
 }
 
-update_github_scalar camilladsp HEnquist/camilladsp
-update_github_scalar camillagui-backend HEnquist/camillagui-backend
-update_github_scalar sccache mozilla/sccache
-update_github_scalar starship starship/starship
+update_github_scalar_suggestion camilladsp HEnquist/camilladsp
+update_github_scalar_suggestion camillagui-backend HEnquist/camillagui-backend
+update_github_scalar_suggestion sccache mozilla/sccache
+update_github_scalar_suggestion starship starship/starship
 
 # nixos-iso — Query NixOS channel for latest ISO URL and its SHA-256
 if section_enabled vm-setup.nixos-iso; then
