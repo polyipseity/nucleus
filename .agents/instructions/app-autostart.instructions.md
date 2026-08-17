@@ -18,6 +18,13 @@ We **never let an app manage its own startup**. For every GUI/user app on every 
 
 No app-native "enable" path is ever used as the control mechanism.
 
+## Omission rule (hard constraint)
+
+An app may be `omitted` on a host **only** when the software has no build or port for that platform — i.e. it does not apply to that host at all. Citing an *equivalent* app or a *native service* as the reason for omission is **not** valid: every platform must run the same app, and where the app cannot run, the omission must state platform inapplicability (e.g. "no Linux build exists"), not point at a substitute.
+
+- **Valid omission**: WhatsApp on NixOS — "No Linux client exists; WhatsApp is macOS/Windows only." (no Linux binary of any kind).
+- **Invalid omission**: "PowerToys provides the Windows equivalent" or "Linux uses the native service" — these cite a substitute and must be replaced with a platform-inapplicability statement.
+
 ## Registry location and shape
 
 - `src/modules/apps.json` is the SSOT for GUI/user app auto-start. Every entry declares per host: `enabled` (bool — do we launch it), `disableNative` (bool — does the app ship a native setting we must turn off), and the uniform `kind` (`login-item` | `launchagent` | `xdg-desktop` | `run-key` | `startup-folder` | `system-extension`).
