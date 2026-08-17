@@ -1,5 +1,5 @@
 ---
-description: "Use when editing src/lockfiles/lockfile.json, the lockfile enforcement check step, or bump-lockfile. Covers the two-tier (pinned vs suggestions) model, the warn-only→suggestions invariant, the no-cross-lockfile-duplication policy, and canonical section classification."
+description: "Use when editing src/lockfiles/lockfile.json, the lockfile enforcement lib (used by bump-lockfile verify), or bump-lockfile. Covers the two-tier (pinned vs suggestions) model, the warn-only→suggestions invariant, the no-cross-lockfile-duplication policy, and canonical section classification."
 name: "Lockfile Enforcement"
 applyTo: "src/lockfiles/lockfile.json, src/lockfiles/lockfile.schema.json, src/scripts/checks/check-steps/05-lockfile-validation.*, src/scripts/checks/lockfile-enforcement-lib.*, scripts/bump-lockfile.*"
 ---
@@ -10,7 +10,7 @@ applyTo: "src/lockfiles/lockfile.json, src/lockfiles/lockfile.schema.json, src/s
 
 ## Two-tier model
 
-- **Pinned root sections** — authoritative. The check step (`05-lockfile-validation.*` + `lockfile-enforcement-lib.*`) fails the run on any version drift. `bump-lockfile --verify` / `--verify-installed` reports drift. Currently pinned: `bun`, `cargo-binstall`, `pwsh`, `rustup`, `scoop`, `source-builds`, `uv`, `version`, `vm-setup`, `winget`.
+- **Pinned root sections** — authoritative. The enforcement lib (`lockfile-enforcement-lib.*`, used by `bump-lockfile --verify-installed` / `-VerifyInstalled`) reports version drift against the provisioned machine. `bump-lockfile --verify` / `--verify-installed` reports drift. Currently pinned: `bun`, `cargo-binstall`, `pwsh`, `rustup`, `scoop`, `source-builds`, `uv`, `version`, `vm-setup`, `winget`.
 - **`suggestions` block** — warn-only, never enforced. Always emits a warning that each sub-section is non-authoritative. Never causes a check failure. Sub-sections: `homebrew` (masApps only), `ollama`, `vscode`, `vm-setup.windows`.
 
 ## Invariant
@@ -42,12 +42,12 @@ All other `flake.lock` duplicates (nixpkgs, homebrew brews/casks) are removed.
 
 ## Shared probe library
 
-The enforcement probe logic lives in a shared lib used by `bump-lockfile --verify-installed` (and the Windows equivalent). The check step `05-lockfile-validation.*` performs structural validation (placeholder/overlap checks) separately and does NOT source the enforcement lib.
+The enforcement probe logic lives in a shared lib used by `bump-lockfile --verify-installed` (and the Windows equivalent). It is NOT wired into any repo check/test step — enforcement validates the provisioned machine only. The check step `05-lockfile-validation.*` performs structural validation (placeholder/overlap checks) separately and does NOT source the enforcement lib.
 
 - POSIX: `src/scripts/checks/lockfile-enforcement-lib.sh` (`_lfe_check_*`, `_lfe_check_vscode`, `_lfe_warn_suggestions`, `_lfe_run_core`, `verify_installed_versions`). `bump-lockfile --verify-installed` calls `verify_installed_versions` directly.
 - Windows: `src/scripts/checks/lockfile-enforcement-lib.ps1` (`Invoke-LockfileEnforcement` with message-function delegates). `bump-lockfile -VerifyInstalled` calls it.
 
-When changing probe logic, edit the shared lib and re-run `tests/scripts/lockfile-enforcement-tests.sh` plus PSScriptAnalyzer on the ps1 files.
+When changing probe logic, edit the shared lib and re-run PSScriptAnalyzer on the ps1 files. Enforcement is NOT a repo check/test step — it runs only via `bump-lockfile --verify-installed` / `-VerifyInstalled` against the provisioned machine.
 
 ## bump-lockfile behavior
 
