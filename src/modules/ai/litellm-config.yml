@@ -3,9 +3,8 @@
 #
 # AI gateway on 127.0.0.1:4000 routing to:
 #   - Local Ollama daemon (127.0.0.1:11434) for offline models
-#   - DeepSeek V4 Flash via OpenCode Zen (primary) → Go → OpenRouter
-#     fallback chain.  DeepSeek V4 Pro via Go (primary) → OpenRouter.
-#     API keys from SOPS secrets.
+#   - A single generic `default` model backed by remote providers, selected
+#     by `order` tier (primary → paid → fallback).  API keys from SOPS secrets.
 
 litellm_settings:
   # Drop unsupported client params (e.g. max_tokens) per-endpoint.
@@ -56,222 +55,46 @@ model_list:
         max_input_tokens: 32768
         max_output_tokens: 8192
 
-  # ---- DeepSeek V4 models with fallback chain ----
-  # Primary: OpenCode Zen (order: 1), Fallback: OpenCode Go (order: 2),
-  # Tertiary: OpenRouter (order: 3).
-  # Both V4 Flash and V4 Pro support reasoning.effort = high | xhigh
-  # (xhigh maps to max reasoning).  Each effort level gets a separate model
-  # entry so clients can select the desired effort level by model name.
-  #
-  # Base variant (no reasoning param — lets the client decide).
-  - model_name: deepseek/deepseek-v4-flash
+  # ---- Default model (generic, remote-backed) ----
+  # Single public `default` model.  `order` tiers primary → paid → fallback.
+  # Highest thinking via reasoning_effort: high (drop_params drops it on any
+  # upstream that rejects it).  Public name never exposes the upstream model.
+  - model_name: default
     litellm_params:
-      model: openai/deepseek-v4-flash-free
+      model: openai/hy3-free
       api_base: https://opencode.ai/zen/v1
       api_key: os.environ/OPENCODE_ZEN_API_KEY
       order: 1
+      reasoning_effort: high
       model_info:
-        max_input_tokens: 128000
+        max_input_tokens: 256000
         max_output_tokens: 8192
-  - model_name: deepseek/deepseek-v4-flash
+  - model_name: default
     litellm_params:
-      model: openai/deepseek-v4-flash
+      model: openai/hy3
       api_base: https://opencode.ai/zen/go/v1
       api_key: os.environ/OPENCODE_GO_API_KEY
       order: 2
+      reasoning_effort: high
       model_info:
-        max_input_tokens: 128000
+        max_input_tokens: 256000
         max_output_tokens: 8192
-  - model_name: deepseek/deepseek-v4-flash
+  - model_name: default
     litellm_params:
-      model: openrouter/deepseek/deepseek-v4-flash
+      model: openai/tencent/hy3-paid
+      api_base: https://api.commandcode.ai/provider/v1
+      api_key: os.environ/COMMAND_CODE_API_KEY
+      order: 2
+      reasoning_effort: high
+      model_info:
+        max_input_tokens: 256000
+        max_output_tokens: 8192
+  - model_name: default
+    litellm_params:
+      model: openrouter/tencent/hy3
       api_key: os.environ/OPENROUTER_API_KEY
       order: 3
+      reasoning_effort: high
       model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-
-  - model_name: deepseek/deepseek-v4-flash/reasoning_high
-    litellm_params:
-      model: openai/deepseek-v4-flash-free
-      api_base: https://opencode.ai/zen/v1
-      api_key: os.environ/OPENCODE_ZEN_API_KEY
-      order: 1
-      reasoning:
-        effort: high
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-  - model_name: deepseek/deepseek-v4-flash/reasoning_high
-    litellm_params:
-      model: openai/deepseek-v4-flash
-      api_base: https://opencode.ai/zen/go/v1
-      api_key: os.environ/OPENCODE_GO_API_KEY
-      order: 2
-      reasoning:
-        effort: high
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-  - model_name: deepseek/deepseek-v4-flash/reasoning_high
-    litellm_params:
-      model: openrouter/deepseek/deepseek-v4-flash
-      api_key: os.environ/OPENROUTER_API_KEY
-      order: 3
-      reasoning:
-        effort: high
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-
-  - model_name: deepseek/deepseek-v4-flash/reasoning_xhigh
-    litellm_params:
-      model: openai/deepseek-v4-flash-free
-      api_base: https://opencode.ai/zen/v1
-      api_key: os.environ/OPENCODE_ZEN_API_KEY
-      order: 1
-      reasoning:
-        effort: xhigh
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-  - model_name: deepseek/deepseek-v4-flash/reasoning_xhigh
-    litellm_params:
-      model: openai/deepseek-v4-flash
-      api_base: https://opencode.ai/zen/go/v1
-      api_key: os.environ/OPENCODE_GO_API_KEY
-      order: 2
-      reasoning:
-        effort: xhigh
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-  - model_name: deepseek/deepseek-v4-flash/reasoning_xhigh
-    litellm_params:
-      model: openrouter/deepseek/deepseek-v4-flash
-      api_key: os.environ/OPENROUTER_API_KEY
-      order: 3
-      reasoning:
-        effort: xhigh
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-
-  - model_name: deepseek/deepseek-v4-pro
-    litellm_params:
-      model: openai/deepseek-v4-pro
-      api_base: https://opencode.ai/zen/go/v1
-      api_key: os.environ/OPENCODE_GO_API_KEY
-      order: 1
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-  - model_name: deepseek/deepseek-v4-pro
-    litellm_params:
-      model: openrouter/deepseek/deepseek-v4-pro
-      api_key: os.environ/OPENROUTER_API_KEY
-      order: 2
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-
-  - model_name: deepseek/deepseek-v4-pro/reasoning_high
-    litellm_params:
-      model: openai/deepseek-v4-pro
-      api_base: https://opencode.ai/zen/go/v1
-      api_key: os.environ/OPENCODE_GO_API_KEY
-      order: 1
-      reasoning:
-        effort: high
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-  - model_name: deepseek/deepseek-v4-pro/reasoning_high
-    litellm_params:
-      model: openrouter/deepseek/deepseek-v4-pro
-      api_key: os.environ/OPENROUTER_API_KEY
-      order: 2
-      reasoning:
-        effort: high
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-
-  - model_name: deepseek/deepseek-v4-pro/reasoning_xhigh
-    litellm_params:
-      model: openai/deepseek-v4-pro
-      api_base: https://opencode.ai/zen/go/v1
-      api_key: os.environ/OPENCODE_GO_API_KEY
-      order: 1
-      reasoning:
-        effort: xhigh
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-  - model_name: deepseek/deepseek-v4-pro/reasoning_xhigh
-    litellm_params:
-      model: openrouter/deepseek/deepseek-v4-pro
-      api_key: os.environ/OPENROUTER_API_KEY
-      order: 2
-      reasoning:
-        effort: xhigh
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-
-  # ---- OpenCode Zen free models ----
-  # Free-tier models available through the OpenCode Zen endpoint.
-  - model_name: stealth/big-pickle
-    litellm_params:
-      model: openai/big-pickle
-      api_base: https://opencode.ai/zen/v1
-      api_key: os.environ/OPENCODE_ZEN_API_KEY
-      order: 1
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-  - model_name: xiaomi/mimo-v2.5
-    litellm_params:
-      model: openai/mimo-v2.5-free
-      api_base: https://opencode.ai/zen/v1
-      api_key: os.environ/OPENCODE_ZEN_API_KEY
-      order: 1
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-  - model_name: alibaba/qwen3.6-plus
-    litellm_params:
-      model: openai/qwen3.6-plus-free
-      api_base: https://opencode.ai/zen/v1
-      api_key: os.environ/OPENCODE_ZEN_API_KEY
-      order: 1
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-  - model_name: minimax/minimax-m3
-    litellm_params:
-      model: openai/minimax-m3-free
-      api_base: https://opencode.ai/zen/v1
-      api_key: os.environ/OPENCODE_ZEN_API_KEY
-      order: 1
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-  - model_name: nvidia/nemotron-3-ultra
-    litellm_params:
-      model: openai/nemotron-3-ultra-free
-      api_base: https://opencode.ai/zen/v1
-      api_key: os.environ/OPENCODE_ZEN_API_KEY
-      order: 1
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 8192
-  - model_name: stealth/north-mini-code
-    litellm_params:
-      model: openai/north-mini-code-free
-      api_base: https://opencode.ai/zen/v1
-      api_key: os.environ/OPENCODE_ZEN_API_KEY
-      order: 1
-      model_info:
-        max_input_tokens: 128000
+        max_input_tokens: 256000
         max_output_tokens: 8192
