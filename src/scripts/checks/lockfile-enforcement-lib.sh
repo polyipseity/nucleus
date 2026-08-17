@@ -190,6 +190,42 @@ $_subs
 EOF
 }
 
+# Warn-only probe for `suggestions.vscode` (editor extensions).  Runs
+# `code --list-extensions --show-versions` (fallback `code-insiders`) and
+# compares each managed extension's installed version to the lockfile map.
+# Never errors: vscode is a suggestions section (warn-only per the invariant)
+# and is not actually locked on all platforms (POSIX locks via flake.lock).
+# Skips gracefully when no `code` CLI is installed.  Returns 0 always.
+_lfe_check_vscode() {
+  local _lf="$1" _jq="$2"
+  local _code
+  _code="$(command -v code || command -v code-insiders || true)"
+  [ -z "$_code" ] && { say -l vscode "no code CLI; skipping suggestions.vscode verify"; return 0; }
+  local _installed
+  # check-suppress:suppression_doc: code CLI failure yields empty installed set -- safe, drift is still reported below.
+  _installed="$( "$_code" --list-extensions --show-versions 2>/dev/null)" || true
+  local _pkgs _pkg _pin _inst
+  # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the section -- safe.
+  _pkgs="$(printf '%s' "$_lf" | "$_jq" -r '(.suggestions.vscode // {}) | keys[]' 2>/dev/null)" || return 0
+  while IFS= read -r _pkg; do
+    [ -z "$_pkg" ] && continue
+    # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
+    # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
+    _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg p "$_pkg" '(.suggestions.vscode // {})[$p] // empty' 2>/dev/null)" || true
+    [ -z "$_pin" ] && continue
+    # shellcheck disable=SC2016 # reason: extension id is a literal prefix match
+    _inst="$(printf '%s\n' "$_installed" | awk -F'@' -v id="$_pkg" '$1==id {print $2; exit}')"
+    if [ -z "$_inst" ]; then
+      warn -l vscode "$_pkg: expected $_pin, not installed (warn-only)"
+    elif [ "$_inst" != "$_pin" ]; then
+      warn -l vscode "$_pkg: expected $_pin, installed $_inst (warn-only)"
+    fi
+  done <<EOF
+$_pkgs
+EOF
+  return 0
+}
+
 # Shared core: given the lockfile data and a jq path, run the pinned probes
 # and always warn for suggestions.  Returns 1 if any pinned section has
 # version drift.  Does NOT depend on check-lib.sh (no skip_step / step_number),
@@ -204,6 +240,7 @@ _lfe_run_core() {
   _lfe_check_rustup "$_lf_data" "$_jq" || _failures=$((_failures + 1))
   _lfe_check_pwsh "$_lf_data" "$_jq" || _failures=$((_failures + 1))
 
+  _lfe_check_vscode "$_lf_data" "$_jq"
   _lfe_warn_suggestions "$_lf_data" "$_jq"
 
   return "$_failures"

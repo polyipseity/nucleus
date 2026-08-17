@@ -136,19 +136,19 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
     Write-Message "warning: winget: empty section (not yet populated)"
   }
 
-  # vscode: warn if empty
-  if (-not $lf.ContainsKey('vscode')) {
-    Write-ErrorMessage "vscode: missing section"
+  # vscode: warn if empty (suggestions — non-authoritative, warn-only)
+  if (-not $lf.ContainsKey('suggestions') -or -not $lf.suggestions.ContainsKey('vscode')) {
+    Write-ErrorMessage "suggestions.vscode: missing section"
     $lfErrors++
-  } elseif ($lf.vscode.Count -gt 0) {
-    foreach ($entry in $lf.vscode.GetEnumerator()) {
+  } elseif ($lf.suggestions.vscode.Count -gt 0) {
+    foreach ($entry in $lf.suggestions.vscode.GetEnumerator()) {
       if ([string]::IsNullOrEmpty($entry.Value) -or @('CHANGEME', '1.0.0') -contains $entry.Value) {
-        Write-ErrorMessage "vscode.$($entry.Key): placeholder version ($($entry.Value))"
+        Write-ErrorMessage "suggestions.vscode.$($entry.Key): placeholder version ($($entry.Value))"
         $lfErrors++
       }
     }
   } else {
-    Write-Message "warning: vscode: empty section (not yet populated)"
+    Write-Message "warning: suggestions.vscode: empty section (not yet populated)"
   }
 
   # homebrew: must be non-empty

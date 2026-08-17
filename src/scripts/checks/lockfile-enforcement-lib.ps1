@@ -127,6 +127,28 @@ function Invoke-LockfileEnforcement {
     & $InfoFn "source-builds: VCS/rev-pinned — not version-verifiable, skipping enforcement"
   }
 
+  # --- suggestions.vscode (warn-only verify probe) ---
+  # vscode is a suggestions section (warn-only per the invariant) and is not
+  # actually locked on all platforms (POSIX locks via flake.lock).  Compare
+  # installed extension versions to the lockfile map; never error.  Skip
+  # gracefully when no code CLI is installed.
+  $codeExe = $null
+  if (Get-Command code -ErrorAction SilentlyContinue) { $codeExe = 'code' }
+  elseif (Get-Command code-insiders -ErrorAction SilentlyContinue) { $codeExe = 'code-insiders' }
+  if ($null -ne $codeExe) {
+    $installedList = & $codeExe --list-extensions --show-versions 2>$null
+    $vscodeSec = if ($Lockfile.ContainsKey('suggestions') -and $Lockfile.suggestions.ContainsKey('vscode')) { $Lockfile.suggestions.vscode } else { @{} }
+    foreach ($entry in $vscodeSec.GetEnumerator()) {
+      $ext = $entry.Key; $pin = $entry.Value
+      $inst = $null
+      foreach ($line in $installedList) {
+        if ($line -match "^$([regex]::Escape($ext))@(.+)") { $inst = $Matches[1]; break }
+      }
+      if ($null -eq $inst) { & $WarnFn "suggestions.vscode.$ext`: expected $pin, not installed (warn-only)" }
+      elseif ($inst -ne $pin) { & $WarnFn "suggestions.vscode.$ext`: expected $pin, installed $inst (warn-only)" }
+    }
+  } else { & $InfoFn "vscode: no code CLI; skipping suggestions.vscode verify" }
+
   # --- suggestions: always warn (non-authoritative) ---
   if ($Lockfile.ContainsKey('suggestions')) {
     foreach ($sub in $Lockfile.suggestions.Keys) {

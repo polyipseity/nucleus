@@ -58,7 +58,7 @@ function Sync-VSCodeExtensionManifest {
   if (Test-Path $lockfilePath) {
     $lockfile = Get-Content $lockfilePath -Raw | ConvertFrom-Json
   }
-  $vscodeVersions = if ($lockfile -and $lockfile.vscode) { $lockfile.vscode } else { @{} }
+  $vscodeVersions = if ($lockfile -and $lockfile.suggestions -and $lockfile.suggestions.vscode) { $lockfile.suggestions.vscode } else { @{} }
 
   $managedExtensions = @(
     'asvetliakov.vscode-neovim',
