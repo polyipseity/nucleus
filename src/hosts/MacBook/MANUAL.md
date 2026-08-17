@@ -3,7 +3,7 @@
 - If `/nix` is missing before the first Nix install: run `nucleus-bootstrap`, reboot when prompted, then re-run bootstrap. `nucleus-apply` never modifies `/etc/synthetic.conf`.
 - Configure Raycast database-only settings (see [raycast-manual-config.md](raycast-manual-config.md)): main hotkey (⌘Space), Clipboard History hotkey (⌥⌘C), search sensitivity, vim keybindings.
 - Hide MiddleClick from the menu bar: hold ⌘, drag the icon away until ✖️ appears. The icon returns whenever the app is relaunched — hide it again with ⌘-drag.
-- Grant Accessibility to BetterDisplay, Chrome Remote Desktop Host, and MiddleClick.
+- Grant Accessibility to BetterDisplay, Chrome Remote Desktop Host, and MiddleClick. The `osascript System Events` login-item convergence (`macos-configure-app-autostart.sh`) also needs Accessibility on first run (UI scripting) to add/remove login items; if login items are not applied, grant the terminal/runner Accessibility and re-run `nucleus-apply`.
 - Grant Screen Recording to BetterDisplay and Chrome Remote Desktop Host.
 - Grant Automation to the terminal running `nucleus-vm setup` for UTM imports.
 - **Allow full disk access for remote users**: Open System Settings → General → Sharing → Remote Login → click the **(i)** icon → toggle **Allow full disk access for remote users** to **On**.
