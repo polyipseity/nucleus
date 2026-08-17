@@ -132,6 +132,113 @@ macos_system_extension_present() {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
+# NixOS XDG autostart helpers (run as the target user)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# app_desktop_filename — Derive OUR autostart .desktop filename for an app.
+# Prefixed with "nucleus-" and space-sanitized so it never collides with an
+# app-shipped file (e.g. steam.desktop), keeping our mechanism distinct and
+# removable in isolation.
+app_desktop_filename() {
+  local key="$1"
+  printf 'nucleus-%s.desktop' "$(printf '%s' "$key" | tr ' ' '-')"
+}
+
+# xdg_autostart_dir — stdout the current user's XDG autostart directory.
+xdg_autostart_dir() {
+  printf '%s/autostart' "${XDG_CONFIG_HOME:-$HOME/.config}"
+}
+
+# xdg_desktop_exists NAME — stdout "true"/"false".
+xdg_desktop_exists() {
+  local name="$1"
+  if [ -f "$(xdg_autostart_dir)/$name" ]; then printf 'true'; else printf 'false'; fi
+}
+
+# xdg_desktop_write NAME EXEC_PATH HIDDEN — create OUR autostart .desktop.
+xdg_desktop_write() {
+  local name="$1" exec_path="$2" hidden="$3"
+  local dir
+  dir=$(xdg_autostart_dir)
+  mkdir -p "$dir"
+  local no_display="false"
+  [ "$hidden" = "true" ] && no_display="true"
+  cat > "$dir/$name" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=$name
+Exec=$exec_path
+X-GNOME-Autostart-enabled=true
+X-GNOME-Autostart-Delay=0
+NoDisplay=$no_display
+Hidden=$no_display
+DESKTOP
+}
+
+# xdg_desktop_remove NAME — delete OUR autostart .desktop if present.
+xdg_desktop_remove() {
+  local name="$1"
+  rm -f "$(xdg_autostart_dir)/$name"
+}
+
+# xdg_native_autostart_remove EXEC_PATH — delete any app-shipped .desktop whose
+# Exec references the app binary, neutralizing the app's native auto-start
+# (e.g. the steam.desktop Steam writes when "Start on login" is toggled).
+xdg_native_autostart_remove() {
+  local exec_path="$1"
+  local dir
+  dir=$(xdg_autostart_dir)
+  [ -d "$dir" ] || return 0
+  local base
+  base=$(basename "$exec_path")
+  [ -z "$base" ] && return 0
+  local f
+  for f in "$dir"/*.desktop; do
+    [ -f "$f" ] || continue
+    if grep -q "^Exec=.*$base" "$f" 2>/dev/null; then
+      rm -f "$f"
+    fi
+  done
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# NixOS per-user dispatch (root activation converges every real user)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# nixos_real_user_homes — stdout one home dir per real user (under /home).
+nixos_real_user_homes() {
+  find /home -maxdepth 1 -mindepth 1 -type d 2>/dev/null
+}
+
+# nixos_dispatch_per_user ACTION — Re-exec autostart.sh ACTION once per real
+# user so each user's ~/.config/autostart is converged.  Each child runs with
+# HOME and NUCLEUS_USERNAME set to that user; NUCLEUS_AUTOSTART_AS_USER guards
+# against re-dispatching inside the child.
+nixos_dispatch_per_user() {
+  local action="$1"
+  local overall=0
+  local home user
+  while IFS= read -r home; do
+    [ -d "$home" ] || continue
+    user=$(basename "$home")
+    if [ "${#app_names[@]}" -gt 0 ]; then
+      if ! sudo -u "$user" -H env HOME="$home" NUCLEUS_USERNAME="$user" \
+        NUCLEUS_AUTOSTART_AS_USER=1 \
+        "$0" "$action" "${app_names[@]}"; then
+        overall=1
+      fi
+    else
+      if ! sudo -u "$user" -H env HOME="$home" NUCLEUS_USERNAME="$user" \
+        NUCLEUS_AUTOSTART_AS_USER=1 \
+        "$0" "$action"; then
+        overall=1
+      fi
+    fi
+  done < <(nixos_real_user_homes)
+  return "$overall"
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Per-app state resolution
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -164,6 +271,15 @@ app_actual_state() {
     local bundle_id
     bundle_id=$(echo "$entry_json" | jq -r '.hostEntry.bundleId // empty')
     if [ -n "$bundle_id" ] && [ "$(macos_system_extension_present "$bundle_id")" = "true" ]; then
+      printf 'enabled'
+    else
+      printf 'disabled'
+    fi
+    ;;
+  xdg-desktop)
+    local name
+    name=$(app_desktop_filename "$key")
+    if [ "$(xdg_desktop_exists "$name")" = "true" ]; then
       printf 'enabled'
     else
       printf 'disabled'
@@ -213,6 +329,19 @@ app_converge() {
       else
         warn -l "$key" "system extension not yet approved — enable it in System Settings → Privacy & Security, then approve the extension."
       fi
+    fi
+    ;;
+  xdg-desktop)
+    if [ "$disable_native" = "true" ]; then
+      # Neutralize any app-shipped autostart .desktop (e.g. steam.desktop)
+      # so only our uniform mechanism remains.
+      xdg_native_autostart_remove "$path"
+    fi
+    name=$(app_desktop_filename "$key")
+    if [ "$enabled" = "true" ]; then
+      xdg_desktop_write "$name" "$path" "$hidden" || warn -l "$key" "failed to write autostart .desktop"
+    else
+      xdg_desktop_remove "$name" || true # check-suppress:suppression_doc: our autostart .desktop may already be absent; removal is best-effort.
     fi
     ;;
   *)
@@ -275,8 +404,8 @@ do_status() {
   done <<<"$entries"
 }
 
-do_enable() { do_set enabled true; }
-do_disable() { do_set enabled false; }
+do_enable() { do_set true; }
+do_disable() { do_set false; }
 
 # do_set — Enable or disable a named app's auto-start via our mechanism.
 do_set() {
@@ -397,6 +526,19 @@ done
   usage >&2
   exit 1
 }
+
+# On NixOS, root activation must converge every real user's autostart dir.
+# Dispatch once per user (guarded so children don't re-dispatch), then exit.
+if [ "$HOST" = "NixOS" ] && [ "$(id -u)" -eq 0 ] && [ "${NUCLEUS_AUTOSTART_AS_USER:-}" != "1" ]; then
+  case "$action" in
+  apply | verify | enable | disable)
+    if ! nixos_dispatch_per_user "$action"; then
+      exit 1
+    fi
+    exit 0
+    ;;
+  esac
+fi
 
 case "$action" in
 list) do_list ;;

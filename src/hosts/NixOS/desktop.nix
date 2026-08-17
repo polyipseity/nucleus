@@ -9,7 +9,14 @@
 # Power management is declared here alongside the desktop services because
 # all three concerns (desktop environment, remote access, power posture) share
 # the same NixOS services layer.
-{ lib, pkgs, ... }: {
+{ lib, pkgs, ... }:
+
+let
+  # Bundle scripts into the nix store so activation can read them without
+  # needing NUCLEUS_REPO_ROOT.  Same approach as activation.nix.
+  activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
+in
+{
   # Load the virtual KMS (vkms) kernel module to provide a software-only
   # display device when no physical monitor is connected.  This mirrors the
   # BetterDisplay HeadlessDisplay virtual screen on macOS: remote-desktop
@@ -171,19 +178,12 @@
   hardware.graphics.enable32Bit = true;
   programs.steam.enable = true;
 
-  # Suppress Steam autostart: Steam creates ~/.config/autostart/steam.desktop
-  # when the user toggles "Start Steam on login" inside the application.
-  # This activation script removes the file on every rebuild so the declarative
-  # config overrides that runtime preference.
-  # Inlined (not the shared disable-steam-autostart.sh) because the shared
-  # script sources macos-console-user.sh for macOS login-item removal,
-  # which is unused on Linux and would fail from SCRIPT_DIR resolution.
-  # Cross-platform parity:
-  #   macOS   — login item removal in MacBook/activation.nix (osascript)
-  #   NixOS   — this activation script
-  #   Windows — Disable-SteamAutoStartup module + apply.ps1
-  system.activationScripts.nixos-disable-steam-autostart = lib.mkAfter ''
-    find /home -maxdepth 3 -path '*/autostart/steam.desktop' -delete 2>/dev/null || true  # check-suppress:suppression_doc: steam autostart entry may not exist; find exits 1 when no match, harmless
+  # Registry-driven GUI app auto-start (replaces the inline steam-autostart
+  # disable).  Reads apps.json and converges every NixOS app to its declared
+  # state via our uniform XDG-autostart mechanism, neutralizing any app-shipped
+  # .desktop (e.g. steam.desktop) so only our mechanism remains.
+  system.activationScripts.nixos-configure-app-autostart.text = lib.mkAfter ''
+    "${activationBundle}/src/hosts/NixOS/scripts/nixos-configure-app-autostart.sh"
   '';
 
   # EasyEffects: graphical PipeWire audio processing GUI with plugin-based
