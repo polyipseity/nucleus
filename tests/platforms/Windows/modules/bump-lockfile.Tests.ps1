@@ -9,8 +9,8 @@
 
   Also covers the cargo-binstall section: the crates.io API with the cargo
   search fallback, and the 'cargo' section alias. Plus the CLI surface:
-  -ListSections output, unknown-section validation, the homebrew section via
-  a fake brew, and the no-updater skip message.
+  -ListSections output, unknown-section validation, and the no-updater skip
+  message.
 
   Run with: pwsh -NoProfile -Command "Invoke-Pester tests/platforms/Windows/modules/bump-lockfile.Tests.ps1 -Passthru"
 #>
@@ -28,11 +28,6 @@ BeforeAll {
   },
   "cargo-binstall": {
     "nucleus-bump-lockfile-fixture-crate-does-not-exist": "0.1.0"
-  },
-  "homebrew": {
-    "brews": {
-      "fixture-brew-pkg": "0.9.0"
-    }
   },
   "updated": "2026-01-01T00:00:00Z",
   "version": 2
@@ -218,32 +213,27 @@ Describe 'bump-lockfile.ps1 -ListSections' {
     New-FixtureRepo
   }
 
-  It 'prints exactly the 24 canonical section names in alphabetical order' {
+  It 'prints exactly the 19 canonical section names in alphabetical order' {
     $expected = @(
       'bun',
-      'camilladsp',
-      'camillagui-backend',
       'cargo',
       'cargo-binstall',
-      'homebrew',
-      'homebrew.brews',
-      'homebrew.casks',
-      'homebrew.masApps',
-      'ollama',
       'pwsh',
       'rustup',
-      'sccache',
       'scoop',
       'source-builds',
-      'starship',
       'uv',
       'version',
       'vm-setup',
       'vm-setup.nixos-iso',
       'vm-setup.tart-images',
       'vm-setup.windows',
-      'vscode',
-      'winget'
+      'winget',
+      'suggestions.homebrew',
+      'suggestions.homebrew.masApps',
+      'suggestions.ollama',
+      'suggestions.vscode',
+      'suggestions.vm-setup.windows'
     )
     $result = Invoke-BumpLockfile -Arguments @('-ListSections')
     $result.ExitCode | Should -Be 0
@@ -261,20 +251,6 @@ Describe 'bump-lockfile.ps1 -Sections validation' {
     $result.ExitCode | Should -Be 1
     $result.Output | Should -Match "unknown section 'bogus'"
     $result.Output | Should -Match 'valid:'
-  }
-}
-
-Describe 'bump-lockfile.ps1 homebrew section' {
-  BeforeEach {
-    New-FixtureRepo
-  }
-
-  It 'updates a brew pin from the fake brew list --versions output' {
-    Set-FakeBrewOutput -Output 'fixture-brew-pkg 9.9.9'
-    $result = Invoke-BumpLockfile -Arguments @('-Sections', 'homebrew.brews')
-    $result.ExitCode | Should -Be 0
-    $result.Output | Should -Match 'updating homebrew\.brews\.fixture-brew-pkg'
-    Get-FixtureContent | Should -Match '"fixture-brew-pkg": "9\.9\.9"'
   }
 }
 
@@ -330,13 +306,13 @@ Describe 'bump-lockfile.ps1 missing-tool guards' {
     }
   }
 
-  It 'does not abort on uv/rustup/pwsh/ollama when those tools are present' {
+  It 'does not abort on uv/rustup/pwsh/suggestions.ollama when those tools are present' {
     # The fixture has no keys for these sections, so a present tool is a
     # no-op; the regression being guarded is the old abort-on-missing-command
     # behavior. Absent tools warn and skip (covered above); present tools must
     # run without throwing.
     $before = Get-FixtureContent
-    $result = Invoke-BumpLockfile -Arguments @('-Sections', 'uv,rustup,pwsh,ollama')
+    $result = Invoke-BumpLockfile -Arguments @('-Sections', 'uv,rustup,pwsh,suggestions.ollama')
     $result.ExitCode | Should -Be 0
     Get-FixtureContent | Should -Be $before
   }

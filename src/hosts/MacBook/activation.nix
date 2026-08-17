@@ -268,11 +268,6 @@ in
       /bin/mkdir -p "$_camilladsp_user/nucleus/logs/camilladsp"
     fi
 
-    # ---- homebrew-pin-verify ----------------------------------------------
-    # Warning-only check that installed Homebrew versions match lockfile.
-    # Never fails activation.
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-verify-homebrew-pin.sh" "${repoRoot}"
-
     # ---- verifyNucleusServices ---------------------------------------------------
     # Warn-only verification that all managed services are running.
     # Failing to start a service should not block activation, but the warning

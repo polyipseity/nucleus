@@ -83,22 +83,8 @@
       "properties": {
         "homebrew": {
           "additionalProperties": false,
-          "description": "Homebrew formula, cask, and Mac App Store pins for macOS. POSIX installs via nix-homebrew (tap commits in flake.lock); this is audit-trail only and cannot be enforced.",
+          "description": "Mac App Store pins for macOS. Formula/cask names are managed in nix-homebrew (tap commits in flake.lock); only masApps (App Store IDs, not in any lockfile) remain here as warn-only audit data.",
           "properties": {
-            "brews": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "description": "Homebrew formula versions. Formula name → version string.",
-              "type": "object"
-            },
-            "casks": {
-              "additionalProperties": {
-                "type": "string"
-              },
-              "description": "Homebrew cask versions. Cask name → version string.",
-              "type": "object"
-            },
             "masApps": {
               "additionalProperties": {
                 "type": "string"
@@ -108,8 +94,6 @@
             }
           },
           "required": [
-            "brews",
-            "casks",
             "masApps"
           ],
           "type": "object"

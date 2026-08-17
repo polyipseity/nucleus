@@ -17,9 +17,7 @@
 #   vm-setup.nixos-iso  NixOS channel latest ISO URL + SHA-256
 #   vm-setup.tart-images  GHCR OCI registry digest
 #   vm-setup.windows  no updater (manual)
-#   suggestions.homebrew  parent - selects brews, casks, masApps (warn-only)
-#   suggestions.homebrew.brews    brew list --versions
-#   suggestions.homebrew.casks    brew list --cask --versions
+#   suggestions.homebrew  parent - selects masApps (warn-only)
 #   suggestions.homebrew.masApps  no updater (manual)
 #   suggestions.vscode  code/code-insiders --list-extensions --show-versions
 #                        (skip if neither available; warn-only)
@@ -70,9 +68,7 @@ Sections (status — mechanism):
   vm-setup.nixos-iso    updates   NixOS channel latest ISO URL + SHA-256
   vm-setup.tart-images  updates   GHCR OCI registry digest
   vm-setup.windows      no updater (manual)
-  suggestions.homebrew  parent    selects brews, casks, masApps (warn-only)
-  suggestions.homebrew.brews  updates  brew list --versions
-  suggestions.homebrew.casks  updates  brew list --cask --versions
+  suggestions.homebrew  parent    selects masApps (warn-only)
   suggestions.homebrew.masApps  no updater (manual)
   suggestions.vscode    updates   code/code-insiders --list-extensions --show-versions
                                   (skip if neither available; warn-only)
@@ -100,7 +96,7 @@ fi
 # legacy bare tokens nixos-iso / tart-images normalize to vm-setup children.
 # Sections under suggestions.* are warn-only (unpinnable) — bump-lockfile may
 # report/update them as audit data but never treats them as authoritative pins.
-_VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,winget,suggestions.homebrew,suggestions.homebrew.brews,suggestions.homebrew.casks,suggestions.homebrew.masApps,suggestions.ollama,suggestions.vscode,suggestions.vm-setup.windows"
+_VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,winget,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.vscode,suggestions.vm-setup.windows"
 
 # Parse --sections flag (comma-separated, defaults to all)
 SECTIONS=""
@@ -197,7 +193,7 @@ section_enabled() {
 
 # suggestions_enabled mirrors section_enabled but for the suggestions.* subtree.
 # A bare "suggestions" token selects all suggestions children; a dotted token
-# (suggestions.homebrew) selects its subtree; a child token (suggestions.homebrew.brews)
+# (suggestions.homebrew) selects its subtree; a child token (suggestions.homebrew.masApps)
 # selects its dotted section.
 suggestions_enabled() {
   local name="$1"
@@ -382,36 +378,6 @@ if section_enabled pwsh; then
       data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.pwsh[$k] = $v')
     fi
   done < <(printf '%s\n' "$data" | jq -r '(.pwsh // {}) | keys[]')
-fi
-
-# homebrew — brew list --versions (brews), brew list --cask --versions (casks)
-# Under suggestions: warn-only audit data, never authoritative pins.
-if suggestions_enabled suggestions.homebrew.brews; then
-  # brews
-  while IFS= read -r key; do
-    [ -z "$key" ] && continue
-    old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.suggestions.homebrew.brews // {})[$k] // empty')
-    [ -z "$old" ] && continue
-    new=$(brew list --versions 2>/dev/null | awk -v k="$key" '$1 == k {print $2}' | head -1 | tr -d '[:space:]')
-    if [ -n "$new" ] && [ "$new" != "$old" ]; then
-      log_update "suggestions.homebrew.brews" "$key" "$old" "$new"
-      data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.suggestions.homebrew.brews[$k] = $v')
-    fi
-  done < <(printf '%s\n' "$data" | jq -r '(.suggestions.homebrew.brews // {}) | keys[]')
-fi
-
-if suggestions_enabled suggestions.homebrew.casks; then
-  # casks
-  while IFS= read -r key; do
-    [ -z "$key" ] && continue
-    old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.suggestions.homebrew.casks // {})[$k] // empty')
-    [ -z "$old" ] && continue
-    new=$(brew list --cask --versions 2>/dev/null | awk -v k="$key" '$1 == k {print $2}' | head -1 | tr -d '[:space:]')
-    if [ -n "$new" ] && [ "$new" != "$old" ]; then
-      log_update "suggestions.homebrew.casks" "$key" "$old" "$new"
-      data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.suggestions.homebrew.casks[$k] = $v')
-    fi
-  done < <(printf '%s\n' "$data" | jq -r '(.suggestions.homebrew.casks // {}) | keys[]')
 fi
 
 # vscode — code/code-insiders --list-extensions --show-versions

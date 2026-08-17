@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Behavioral tests for scripts/bump-lockfile.sh: --verify stability, no-change
 # write skipping (.updated is stamped only when a section changed),
-# --list-sections / --sections validation, GitHub scalar updaters, no-updater
+# --list-sections / --sections validation, no-updater
 # sections, and vm-setup sub-section selection.
 #
 # Run with: bash tests/scripts/bump-lockfile-tests.sh
@@ -78,34 +78,28 @@ test_list_sections_prints_all() {
   fi
   cat >"$tmp/expected.txt" <<'EOF'
 bun
-camilladsp
-camillagui-backend
 cargo
 cargo-binstall
-homebrew
-homebrew.brews
-homebrew.casks
-homebrew.masApps
-ollama
 pwsh
 rustup
-sccache
 scoop
 source-builds
-starship
 uv
 version
 vm-setup
 vm-setup.nixos-iso
 vm-setup.tart-images
-vm-setup.windows
-vscode
 winget
+suggestions.homebrew
+suggestions.homebrew.masApps
+suggestions.ollama
+suggestions.vscode
+suggestions.vm-setup.windows
 EOF
   if diff -u "$tmp/expected.txt" "$tmp/out.txt" >"$tmp/diff.txt" 2>&1; then
-    assert_pass "bump-lockfile --list-sections prints the 24 canonical names"
+    assert_pass "bump-lockfile --list-sections prints the 19 canonical names"
   else
-    assert_fail "bump-lockfile --list-sections prints the 24 canonical names" "diff: $(head -1 "$tmp/diff.txt")"
+    assert_fail "bump-lockfile --list-sections prints the 19 canonical names" "diff: $(head -1 "$tmp/diff.txt")"
   fi
   rm -rf "$tmp"
 }
@@ -118,40 +112,10 @@ test_sections_rejects_unknown() {
   else
     assert_pass "bump-lockfile --sections bogus exits 1"
   fi
-  if grep -q "unknown section 'bogus' (valid: bun,camilladsp," "$tmp/out.txt"; then
+  if grep -q "unknown section 'bogus' (valid: bun,cargo," "$tmp/out.txt"; then
     assert_pass "bump-lockfile --sections bogus reports the unknown section"
   else
     assert_fail "bump-lockfile --sections bogus reports the unknown section" "output: $(head -1 "$tmp/out.txt")"
-  fi
-  rm -rf "$tmp"
-}
-
-test_scalar_section_updates_from_github() {
-  local tmp
-  tmp="$(setup_fake_repo)"
-  cat >"$tmp/bin/curl-response.json" <<'EOF'
-{"tag_name": "v4.1.3"}
-EOF
-  cat >"$tmp/bin/curl" <<'EOF'
-#!/usr/bin/env bash
-cat "$(dirname "$0")/curl-response.json"
-EOF
-  chmod +x "$tmp/bin/curl"
-
-  if run_bump_lockfile "$tmp" --sections camilladsp >"$tmp/out.txt" 2>&1; then
-    assert_pass "bump-lockfile camilladsp GitHub release path exits 0"
-  else
-    assert_fail "bump-lockfile camilladsp GitHub release path exits 0" "exit code $?"
-  fi
-  if [ "$(jq -r '.camilladsp' "$tmp/src/lockfiles/lockfile.json")" = "4.1.3" ]; then
-    assert_pass "bump-lockfile camilladsp updates the pinned scalar"
-  else
-    assert_fail "bump-lockfile camilladsp updates the pinned scalar" "got $(jq -r '.camilladsp' "$tmp/src/lockfiles/lockfile.json")"
-  fi
-  if grep -q 'updating camilladsp.camilladsp from 1.0.0 to 4.1.3' "$tmp/out.txt"; then
-    assert_pass "bump-lockfile camilladsp reports the update"
-  else
-    assert_fail "bump-lockfile camilladsp reports the update" "output: $(head -1 "$tmp/out.txt")"
   fi
   rm -rf "$tmp"
 }
@@ -581,7 +545,6 @@ test_cargo_binstall_falls_back_to_cargo_search
 test_cargo_binstall_warns_when_no_version_source
 test_list_sections_prints_all
 test_sections_rejects_unknown
-test_scalar_section_updates_from_github
 test_no_updater_section_is_skipped
 test_vm_setup_subsection_runs_alone
 test_vm_setup_parent_selects_children

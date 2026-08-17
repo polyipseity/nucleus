@@ -43,8 +43,6 @@ run_lockfile_validation() {
     _lf_overlaps=$(jq -r --argjson exceptions "$_lf_overlap_exceptions" '
       [
         (to_entries[] | select(.key != "suggestions" and .key != "ollama" and (.value | type == "object")) | .key as $s | (.value | keys)[] | {s: $s, p: .}),
-        (.suggestions.homebrew.brews // {} | keys[] | {s: "suggestions.homebrew.brews", p: .}),
-        (.suggestions.homebrew.casks // {} | keys[] | {s: "suggestions.homebrew.casks", p: .}),
         (.suggestions.homebrew.masApps // {} | keys[] | {s: "suggestions.homebrew.masApps", p: .}),
         (.suggestions.vscode // {} | keys[] | {s: "suggestions.vscode", p: .})
       ]

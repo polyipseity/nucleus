@@ -47,7 +47,7 @@
 - `nucleus-apply` — apply configuration
 - `nucleus-bootstrap` — bootstrap system
 - `nucleus-bump-lockfile` — update version pins in `src/lockfiles/lockfile.json`; pass `--sections winget,scoop,...` for specific sections
-- Homebrew pins (`suggestions.homebrew.*`) are warn-only — never enforced. `macos-verify-homebrew-pin.sh` warns on drift but never aborts activation. `nucleus-bump-lockfile --verify-installed` always warns for `suggestions`.
+- Homebrew `masApps` (`suggestions.homebrew.masApps`) are warn-only — never enforced. Formula/cask versions are pinned by nix-homebrew tap commits in `flake.lock`, not `lockfile.json`. `nucleus-bump-lockfile --verify-installed` always warns for `suggestions`.
 - `nucleus-check-pwsh` — check PowerShell syntax
 - `nucleus-check-sh` — check POSIX shell syntax
 - `nucleus-cloud-setup` — configure cloud remotes and re-apply

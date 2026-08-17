@@ -22,9 +22,7 @@
     vm-setup.nixos-iso   updates — NixOS channel latest ISO URL and SHA-256
     vm-setup.tart-images updates — GHCR OCI registry digest
     vm-setup.windows     no updater (manual) — digest recording not implemented
-    suggestions.homebrew parent — selects brews, casks, masApps (warn-only)
-    suggestions.homebrew.brews  updates — brew list --versions (warn-only)
-    suggestions.homebrew.casks  updates — brew list --cask --versions (warn-only)
+    suggestions.homebrew parent — selects masApps (warn-only)
     suggestions.homebrew.masApps no updater (manual) — App Store IDs (warn-only)
     suggestions.vscode   updates — code / code-insiders --list-extensions --show-versions (warn-only)
     suggestions.ollama   updates — ollama show <name>:<tag> --format json (warn-only)
@@ -102,8 +100,6 @@ $validSections = @(
   'vm-setup.windows',
   'winget',
   'suggestions.homebrew',
-  'suggestions.homebrew.brews',
-  'suggestions.homebrew.casks',
   'suggestions.homebrew.masApps',
   'suggestions.ollama',
   'suggestions.vscode',
@@ -531,64 +527,6 @@ if (Test-SectionEnabled 'pwsh') {
     }
   } else {
     Write-NucleusWarning 'pwsh not found — skipping pwsh section'
-  }
-}
-
-# ---------------------------------------------------------------------------
-# suggestions.homebrew — brew list --versions, brew list --cask --versions
-# Warn-only audit data; never authoritative pins.
-# ---------------------------------------------------------------------------
-if ((Test-SuggestionsEnabled 'suggestions.homebrew.brews') -or (Test-SuggestionsEnabled 'suggestions.homebrew.casks')) {
-  # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
-  if (Get-Command -Name 'brew' -ErrorAction SilentlyContinue) {
-    if (Test-SuggestionsEnabled 'suggestions.homebrew.brews') {
-      if ($ht.ContainsKey('suggestions') -and $ht['suggestions'] -is [hashtable] -and $ht['suggestions'].ContainsKey('homebrew') -and $ht['suggestions']['homebrew'] -is [hashtable] -and $ht['suggestions']['homebrew'].ContainsKey('brews') -and $ht['suggestions']['homebrew']['brews'] -is [hashtable]) {
-        # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
-        $brewList = & brew list --versions 2>$null
-        $brewVersions = @{}
-        foreach ($line in $brewList) {
-          $parts = $line.Trim() -split '\s+'
-          if ($parts.Count -ge 2) {
-            $brewVersions[$parts[0]] = $parts[1]
-          }
-        }
-        foreach ($key in @($ht['suggestions']['homebrew']['brews'].Keys)) {
-          $old = $ht['suggestions']['homebrew']['brews'][$key]
-          if ($brewVersions.ContainsKey($key)) {
-            $new = $brewVersions[$key]
-            if ($new -ne $old) {
-              Write-Update -Section 'suggestions.homebrew.brews' -Key $key -OldValue $old -NewValue $new
-              $ht['suggestions']['homebrew']['brews'][$key] = $new
-            }
-          }
-        }
-      }
-    }
-    if (Test-SuggestionsEnabled 'suggestions.homebrew.casks') {
-      if ($ht.ContainsKey('suggestions') -and $ht['suggestions'] -is [hashtable] -and $ht['suggestions'].ContainsKey('homebrew') -and $ht['suggestions']['homebrew'] -is [hashtable] -and $ht['suggestions']['homebrew'].ContainsKey('casks') -and $ht['suggestions']['homebrew']['casks'] -is [hashtable]) {
-        # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
-        $caskList = & brew list --cask --versions 2>$null
-        $caskVersions = @{}
-        foreach ($line in $caskList) {
-          $parts = $line.Trim() -split '\s+'
-          if ($parts.Count -ge 2) {
-            $caskVersions[$parts[0]] = $parts[1]
-          }
-        }
-        foreach ($key in @($ht['suggestions']['homebrew']['casks'].Keys)) {
-          $old = $ht['suggestions']['homebrew']['casks'][$key]
-          if ($caskVersions.ContainsKey($key)) {
-            $new = $caskVersions[$key]
-            if ($new -ne $old) {
-              Write-Update -Section 'suggestions.homebrew.casks' -Key $key -OldValue $old -NewValue $new
-              $ht['suggestions']['homebrew']['casks'][$key] = $new
-            }
-          }
-        }
-      }
-    }
-  } else {
-    Write-NucleusWarning 'brew unavailable — skipping suggestions.homebrew section'
   }
 }
 

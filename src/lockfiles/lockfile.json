@@ -127,53 +127,8 @@
   },
   "suggestions": {
     "homebrew": {
-      "casks": {
-        "coolterm": "2.4.0.3.0.1425",
-        "orbstack": "2.0.5,19905",
-        "discord@canary": "0.0.1076",
-        "zoom": "7.0.0.77593",
-        "keka": "1.6.3",
-        "battery": "1.4.0",
-        "parsec": "150-103a",
-        "fuse-t": "1.2.7",
-        "google-chrome": "147.0.7727.56",
-        "visual-studio-code@insiders": "1.124.0-insider,1780665628493,0035c783eccf8a2efbdb972dfe62becb51f11fc6",
-        "lulu": "4.3.2",
-        "chrome-remote-desktop-host": "147.0.7727.3",
-        "betterdisplay": "4.2.3",
-        "musicbrainz-picard": "2.13.3",
-        "whatsapp@beta": "2.26.15.16",
-        "alt-tab": "10.12.0",
-        "libreoffice": "26.2.4",
-        "blender": "5.1.2",
-        "cursor": "3.14.7,a758f2241ca99fecf380180b6cbdbbce0f1f42cf",
-        "steam": "6.0",
-        "keyboardcleantool": "7",
-        "krita": "5.3.2.1",
-        "blackhole-2ch": "0.6.1",
-        "gimp": "3.2.4",
-        "middleclick": "3.2.0",
-        "raycast": "1.104.12",
-        "visual-studio-code": "1.123.0",
-        "appcleaner": "3.6.8",
-        "obsidian": "1.12.7",
-        "utm@beta": "5.0.4",
-        "linearmouse": "0.11.2",
-        "stats": "2.12.9",
-        "telegram-desktop@beta": "6.7.5",
-        "rectangle": "0.95",
-        "vlc": "3.0.23",
-        "iterm2": "3.6.9",
-        "google-chrome@canary": "149.0.7792.0"
-      },
       "masApps": {
         "Amphetamine": "937984704"
-      },
-      "brews": {
-        "zackelia/formulae/bclm": "0.1.0",
-        "displayplacer": "1.4.0",
-        "cirruslabs/cli/tart": "2.32.1",
-        "smudge/smudge/nightlight": "1.0.0"
       }
     },
     "ollama": {
