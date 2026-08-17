@@ -1,6 +1,8 @@
 [
 	{
 		"apiType": "chat-completions",
+		"name": "LiteLLM",
+		"vendor": "customendpoint",
 		"models": [
 			{
 				"id": "ollama_chat/devstral-small-2:24b",
@@ -21,115 +23,14 @@
 				"vision": false
 			},
 			{
-				"id": "deepseek/deepseek-v4-flash",
-			"maxInputTokens": 128000,
+				"id": "default",
+				"maxInputTokens": 256000,
 				"maxOutputTokens": 8192,
-				"name": "DeepSeek V4 Flash",
+				"name": "LiteLLM Default",
 				"toolCalling": true,
 				"url": "http://127.0.0.1:4000/v1",
-				"vision": false
-			},
-			{
-				"id": "deepseek/deepseek-v4-flash/reasoning_high",
-			"maxInputTokens": 128000,
-				"maxOutputTokens": 8192,
-				"name": "DeepSeek V4 Flash (High)",
-				"toolCalling": true,
-				"url": "http://127.0.0.1:4000/v1",
-				"vision": false
-			},
-			{
-				"id": "deepseek/deepseek-v4-flash/reasoning_xhigh",
-			"maxInputTokens": 128000,
-				"maxOutputTokens": 8192,
-				"name": "DeepSeek V4 Flash (X-High)",
-				"toolCalling": true,
-				"url": "http://127.0.0.1:4000/v1",
-				"vision": false
-			},
-			{
-				"id": "deepseek/deepseek-v4-pro",
-			"maxInputTokens": 128000,
-				"maxOutputTokens": 8192,
-				"name": "DeepSeek V4 Pro",
-				"toolCalling": true,
-				"url": "http://127.0.0.1:4000/v1",
-				"vision": false
-			},
-			{
-				"id": "deepseek/deepseek-v4-pro/reasoning_high",
-			"maxInputTokens": 128000,
-				"maxOutputTokens": 8192,
-				"name": "DeepSeek V4 Pro (High)",
-				"toolCalling": true,
-				"url": "http://127.0.0.1:4000/v1",
-				"vision": false
-			},
-			{
-				"id": "deepseek/deepseek-v4-pro/reasoning_xhigh",
-			"maxInputTokens": 128000,
-				"maxOutputTokens": 8192,
-				"name": "DeepSeek V4 Pro (X-High)",
-				"toolCalling": true,
-				"url": "http://127.0.0.1:4000/v1",
-				"vision": false
-			},
-			{
-				"id": "stealth/big-pickle",
-			"maxInputTokens": 128000,
-				"maxOutputTokens": 8192,
-				"name": "Big Pickle",
-				"toolCalling": false,
-				"url": "http://127.0.0.1:4000/v1",
-				"vision": false
-			},
-			{
-				"id": "xiaomi/mimo-v2.5",
-			"maxInputTokens": 128000,
-				"maxOutputTokens": 8192,
-				"name": "MiMo V2.5",
-				"toolCalling": true,
-				"url": "http://127.0.0.1:4000/v1",
-				"vision": false
-			},
-			{
-				"id": "alibaba/qwen3.6-plus",
-			"maxInputTokens": 128000,
-				"maxOutputTokens": 8192,
-				"name": "Qwen3.6 Plus",
-				"toolCalling": true,
-				"url": "http://127.0.0.1:4000/v1",
-				"vision": false
-			},
-			{
-				"id": "minimax/minimax-m3",
-			"maxInputTokens": 128000,
-				"maxOutputTokens": 8192,
-				"name": "MiniMax M3",
-				"toolCalling": true,
-				"url": "http://127.0.0.1:4000/v1",
-				"vision": false
-			},
-			{
-				"id": "nvidia/nemotron-3-ultra",
-			"maxInputTokens": 128000,
-				"maxOutputTokens": 8192,
-				"name": "Nemotron 3 Ultra",
-				"toolCalling": true,
-				"url": "http://127.0.0.1:4000/v1",
-				"vision": false
-			},
-			{
-				"id": "stealth/north-mini-code",
-			"maxInputTokens": 128000,
-				"maxOutputTokens": 8192,
-				"name": "North Mini Code",
-				"toolCalling": false,
-				"url": "http://127.0.0.1:4000/v1",
-				"vision": false
+				"vision": true
 			}
-		],
-		"name": "LiteLLM",
-		"vendor": "customendpoint"
+		]
 	}
 ]
