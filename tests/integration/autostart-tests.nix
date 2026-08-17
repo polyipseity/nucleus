@@ -4,8 +4,8 @@ let
   inherit (import ../lib.nix) containsRegex;
 
   appsJsonText = builtins.readFile ../../src/modules/apps.json;
-  autostartShText = builtins.readFile ../../scripts/autostart.sh;
-  autostartPs1Text = builtins.readFile ../../scripts/autostart.ps1;
+  autostartShText = builtins.readFile ../../src/scripts/autostart.sh;
+  autostartPs1Text = builtins.readFile ../../src/scripts/autostart.ps1;
   macosAppAutostartScriptText = builtins.readFile ../../src/hosts/MacBook/scripts/macos-configure-app-autostart.sh;
   nixosAppAutostartScriptText = builtins.readFile ../../src/hosts/NixOS/scripts/nixos-configure-app-autostart.sh;
   syncAppAutostartPs1Text = builtins.readFile ../../src/platforms/Windows/modules/user/Sync-AppAutostart.ps1;

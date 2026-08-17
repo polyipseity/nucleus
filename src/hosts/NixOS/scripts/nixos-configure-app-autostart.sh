@@ -17,7 +17,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 REPO_ROOT="${NUCLEUS_REPO_ROOT:-$(derive_repo_root)}"
 export NUCLEUS_REPO_ROOT="$REPO_ROOT"
 
-AUTOSTART_CLI="$REPO_ROOT/scripts/autostart.sh"
+AUTOSTART_CLI="$REPO_ROOT/src/scripts/autostart.sh"
 
 if [ ! -f "$AUTOSTART_CLI" ]; then
   warn -l autostart "registry CLI not found at $AUTOSTART_CLI; skipping app auto-start convergence."

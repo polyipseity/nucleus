@@ -32,8 +32,8 @@ if [ -h "$_self" ]; then
   esac
 fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
-. "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
-. "$SCRIPT_DIR/../src/scripts/lib/macos-console-user.sh"
+. "$SCRIPT_DIR/lib/lib.sh"
+. "$SCRIPT_DIR/lib/macos-console-user.sh"
 
 usage() {
   usage_std "$(basename "$0")" "list|status|enable|disable|apply|verify [app...] [options]"

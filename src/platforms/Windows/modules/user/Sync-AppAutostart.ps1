@@ -18,7 +18,7 @@
   When true, converge app auto-start to the registry. When false, skip.
 
 .PARAMETER RepoRoot
-  Path to the nucleus repository root (used to locate scripts/autostart.ps1).
+  Path to the nucleus repository root (used to locate src/scripts/autostart.ps1).
 
 .EXAMPLE
   Sync-AppAutostart -Enabled:$true -RepoRoot $repoRoot
@@ -36,7 +36,7 @@ function Sync-AppAutostart {
     $RepoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\..\..\")).Path
   }
 
-  $autostartScript = Join-Path -Path $RepoRoot -ChildPath "scripts\autostart.ps1"
+  $autostartScript = Join-Path -Path $RepoRoot -ChildPath "src\scripts\autostart.ps1"
   if (-not (Test-Path -LiteralPath $autostartScript)) {
     Write-NucleusError -CommandName 'autostart' "script not found at $autostartScript"
     return

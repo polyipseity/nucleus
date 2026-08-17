@@ -9,7 +9,8 @@ applyTo: "scripts/**, src/scripts/**, src/scripts/lib/**, src/**/*.ps1, src/plat
 ## Scope
 
 - Keep repo-level helper scripts in `scripts/`. Contents include paired `.sh`/`.ps1` entry points for bootstrap, check, cloud-setup, gc, health-check, replica-sync, replica-reset, update, vm-setup, ai-sync, and other automation tasks.
-- `scripts/` is the home of user-facing CLIs (the `nucleus-*` command set). Internal dev/CI tooling that is NOT a `nucleus-*` app belongs under `src/scripts/` (e.g. the completion generators live at `src/scripts/completions/`).
+- `scripts/` is the home of user-facing CLIs (the `nucleus-*` command set) ONLY. Every script in `scripts/` MUST be a registered `nucleusApp` (wired in `src/flake.nix` via `writeNucleusShellApplication`/`writeNucleusPowerShellApplication`). Convergence/activation tooling that is invoked only by activation scripts and is NOT a `nucleus-*` app does NOT belong in `scripts/` — it belongs under `src/scripts/` (e.g. `src/scripts/autostart.sh` + `src/scripts/autostart.ps1`, which are driven by `apps.json` and called from `macos-configure-app-autostart.sh` / `nixos-configure-app-autostart.sh` / `Sync-AppAutostart.ps1`).
+- `src/scripts/` is the home of internal dev/CI tooling that is NOT a `nucleus-*` app (e.g. the completion generators live at `src/scripts/completions/`).
 - Do not scatter contributor-facing or CI-facing automation across random folders when `scripts/` is the intended home.
 
 ## Cross-platform coordination

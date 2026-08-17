@@ -12,7 +12,7 @@
 
 BeforeAll {
   # Read autostart.ps1 and extract function definitions using the PowerShell AST parser.
-  $autostartPs1Path = Join-Path $PSScriptRoot '../../../../scripts/autostart.ps1'
+  $autostartPs1Path = Join-Path $PSScriptRoot '../../../../src/scripts/autostart.ps1'
   $autostartPs1Content = Get-Content -Path $autostartPs1Path -Raw
   $tokens = $null
   $errors = $null

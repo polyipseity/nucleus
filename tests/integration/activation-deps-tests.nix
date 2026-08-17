@@ -271,7 +271,7 @@ let
 
   # === TEST: macOS MiddleClick startup is registry-driven via our login item ===
   # NOTE: login-item registration now lives in macos-configure-app-autostart.sh
-  # (which invokes scripts/autostart.sh apply), driven by apps.json. We assert
+  # (which invokes src/scripts/autostart.sh apply), driven by apps.json. We assert
   # the registry declares MiddleClick as an enabled macOS login-item and that no
   # custom LaunchAgent is used.
   test_middleclick_native_login_item = assert' (

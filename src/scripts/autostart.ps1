@@ -57,7 +57,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
+$modulePath = Join-Path $PSScriptRoot '..\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force -DisableNameChecking
 
 if ($Help -or -not $Action) {
@@ -70,7 +70,7 @@ if ($Help -or -not $Action) {
 # Initialization
 # ---------------------------------------------------------------------------
 
-$RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Get-Item $PSScriptRoot).Parent.FullName }
+$RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Get-Item $PSScriptRoot).Parent.Parent.FullName }
 $AppsJson = Join-Path $RepoRoot "src\modules\apps.json"
 $NucleusHost = 'Windows'
 
