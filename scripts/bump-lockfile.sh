@@ -204,30 +204,38 @@ data=$(cat "$LOCKFILE_ABS")
 
 # winget — winget show --id <id>
 if section_enabled winget; then
-  while IFS= read -r key; do
-    [ -z "$key" ] && continue
-    old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.winget // {})[$k] // empty')
-    [ -z "$old" ] && continue
-    new=$(winget show --id "$key" 2>/dev/null | awk -F': ' '/^Version / {print $2}' | head -1 | tr -d '[:space:]')
-    if [ -n "$new" ] && [ "$new" != "$old" ]; then
-      log_update "winget" "$key" "$old" "$new"
-      data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.winget[$k] = $v')
-    fi
-  done < <(printf '%s\n' "$data" | jq -r '(.winget // {}) | keys[]')
+  if command -v winget >/dev/null 2>&1; then
+    while IFS= read -r key; do
+      [ -z "$key" ] && continue
+      old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.winget // {})[$k] // empty')
+      [ -z "$old" ] && continue
+      new=$(winget show --id "$key" 2>/dev/null | awk -F': ' '/^Version / {print $2}' | head -1 | tr -d '[:space:]')
+      if [ -n "$new" ] && [ "$new" != "$old" ]; then
+        log_update "winget" "$key" "$old" "$new"
+        data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.winget[$k] = $v')
+      fi
+    done < <(printf '%s\n' "$data" | jq -r '(.winget // {}) | keys[]')
+  else
+    warn "winget: command not found — skipping section"
+  fi
 fi
 
 # scoop — scoop info <pkg>
 if section_enabled scoop; then
-  while IFS= read -r key; do
-    [ -z "$key" ] && continue
-    old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.scoop // {})[$k] // empty')
-    [ -z "$old" ] && continue
-    new=$(scoop info "$key" 2>/dev/null | awk -F': ' '/^Version / {print $2}' | head -1 | tr -d '[:space:]')
-    if [ -n "$new" ] && [ "$new" != "$old" ]; then
-      log_update "scoop" "$key" "$old" "$new"
-      data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.scoop[$k] = $v')
-    fi
-  done < <(printf '%s\n' "$data" | jq -r '(.scoop // {}) | keys[]')
+  if command -v scoop >/dev/null 2>&1; then
+    while IFS= read -r key; do
+      [ -z "$key" ] && continue
+      old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.scoop // {})[$k] // empty')
+      [ -z "$old" ] && continue
+      new=$(scoop info "$key" 2>/dev/null | awk -F': ' '/^Version / {print $2}' | head -1 | tr -d '[:space:]')
+      if [ -n "$new" ] && [ "$new" != "$old" ]; then
+        log_update "scoop" "$key" "$old" "$new"
+        data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.scoop[$k] = $v')
+      fi
+    done < <(printf '%s\n' "$data" | jq -r '(.scoop // {}) | keys[]')
+  else
+    warn "scoop: command not found — skipping section"
+  fi
 fi
 
 # cargo-binstall — crates.io API (alias: cargo)
@@ -261,16 +269,20 @@ fi
 
 # bun — npm view <pkg> version
 if section_enabled bun; then
-  while IFS= read -r key; do
-    [ -z "$key" ] && continue
-    old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.bun // {})[$k] // empty')
-    [ -z "$old" ] && continue
-    new=$(npm view "$key" version 2>/dev/null | tr -d '[:space:]')
-    if [ -n "$new" ] && [ "$new" != "$old" ]; then
-      log_update "bun" "$key" "$old" "$new"
-      data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.bun[$k] = $v')
-    fi
-  done < <(printf '%s\n' "$data" | jq -r '(.bun // {}) | keys[]')
+  if command -v npm >/dev/null 2>&1; then
+    while IFS= read -r key; do
+      [ -z "$key" ] && continue
+      old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.bun // {})[$k] // empty')
+      [ -z "$old" ] && continue
+      new=$(npm view "$key" version 2>/dev/null | tr -d '[:space:]')
+      if [ -n "$new" ] && [ "$new" != "$old" ]; then
+        log_update "bun" "$key" "$old" "$new"
+        data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.bun[$k] = $v')
+      fi
+    done < <(printf '%s\n' "$data" | jq -r '(.bun // {}) | keys[]')
+  else
+    warn "npm: command not found — skipping bun section"
+  fi
 fi
 
 # uv — uv tool list
