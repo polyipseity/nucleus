@@ -151,6 +151,113 @@
       "description": "Starship cross-shell prompt version.",
       "type": "string"
     },
+    "suggestions": {
+      "additionalProperties": false,
+      "description": "Sections that cannot be hard-pinned/enforced. Consumers must warn when present and never treat as authoritative. A section enforceable at most warn-only MUST live here, never as a pinned root child.",
+      "properties": {
+        "homebrew": {
+          "additionalProperties": false,
+          "description": "Homebrew formula, cask, and Mac App Store pins for macOS. POSIX installs via nix-homebrew (tap commits in flake.lock); this is audit-trail only and cannot be enforced.",
+          "properties": {
+            "brews": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Homebrew formula versions. Formula name → version string.",
+              "type": "object"
+            },
+            "casks": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Homebrew cask versions. Cask name → version string.",
+              "type": "object"
+            },
+            "masApps": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Mac App Store app identifiers. App name → App Store ID string.",
+              "type": "object"
+            }
+          },
+          "required": [
+            "brews",
+            "casks",
+            "masApps"
+          ],
+          "type": "object"
+        },
+        "nixpkgs": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Versions derived from nixpkgs/flake.lock (camilladsp, camillagui-backend, sccache, starship). Tracked by flake.lock, not lockfile.json; cannot be pinned here.",
+          "type": "object"
+        },
+        "ollama": {
+          "additionalProperties": {
+            "items": {
+              "properties": {
+                "digest": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "tag": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "tag"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "description": "Ollama model pins per host. Digest is warn-only (model pull by tag).",
+          "type": "object"
+        },
+        "vscode": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "VS Code extension versions. Windows installs --pre-release --force (latest); POSIX uses flake.lock. Warn-only.",
+          "type": "object"
+        },
+        "vm-setup": {
+          "additionalProperties": false,
+          "description": "VM image artifact pins that cannot be enforced.",
+          "properties": {
+            "windows": {
+              "additionalProperties": {
+                "additionalProperties": false,
+                "properties": {
+                  "digest": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "format": "uri",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "url",
+                  "digest"
+                ],
+                "type": "object"
+              },
+              "description": "Windows ISO pins. Empty placeholder — digest recording unimplemented.",
+              "type": "object"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
     "updated": {
       "description": "Last update timestamp in ISO-8601 format.",
       "format": "date-time",
