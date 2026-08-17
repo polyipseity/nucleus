@@ -292,18 +292,18 @@ if section_enabled uv; then
   declare -A uv_installed=()
   while IFS= read -r line; do
     [ -z "$line" ] && continue
-    # Strip leading "- " or bullet, then split on '@' or whitespace+version prefix.
-    line="${line#- }"
-    line="${line#* }"
-    if echo "$line" | grep -q '@'; then
-      pkg="${line%%@*}"
-      ver="${line#*@}"
+    # Dependency continuation lines ("- depname") carry no version and must be skipped.
+    case "$line" in
+      -*) continue ;;
+    esac
+    # "pkgname@version" or "pkgname v1.0.0" — package name is the first token.
+    pkg="${line%% *}"
+    rest="${line#* }"
+    if echo "$rest" | grep -q '@'; then
+      ver="${rest#*@}"
     else
-      # "pkgname v1.0.0" — version after space, stripped of leading 'v'
-      pkg="${line%% *}"
-      ver="${line#* }"
+      ver="${rest#v}"
     fi
-    ver="${ver#v}"
     [ -n "$pkg" ] && [ -n "$ver" ] && uv_installed["$pkg"]="$ver"
     # check-suppress:suppression_doc: uv may not be installed yet; empty tool list is expected.
   done < <(uv tool list 2>/dev/null || true)
