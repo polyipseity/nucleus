@@ -291,3 +291,53 @@ Describe 'bump-lockfile.ps1 no-updater sections' {
     Get-FixtureContent | Should -Be $before
   }
 }
+
+Describe 'bump-lockfile.ps1 missing-tool guards' {
+  BeforeEach {
+    New-FixtureRepo
+  }
+
+  It 'warns and skips winget when the tool is absent, and never aborts' {
+    $before = Get-FixtureContent
+    $result = Invoke-BumpLockfile -Arguments @('-Sections', 'winget')
+    $result.ExitCode | Should -Be 0
+    Get-FixtureContent | Should -Be $before
+    if (-not (Get-Command -Name 'winget' -ErrorAction SilentlyContinue)) {
+      $result.Output | Should -Match 'winget not found — skipping winget section'
+    }
+  }
+
+  It 'warns and skips scoop when the tool is absent, and never aborts' {
+    $before = Get-FixtureContent
+    $result = Invoke-BumpLockfile -Arguments @('-Sections', 'scoop')
+    $result.ExitCode | Should -Be 0
+    Get-FixtureContent | Should -Be $before
+    if (-not (Get-Command -Name 'scoop' -ErrorAction SilentlyContinue)) {
+      $result.Output | Should -Match 'scoop not found — skipping scoop section'
+    }
+  }
+
+  It 'warns and skips the bun section when npm is absent, and never aborts' {
+    $before = Get-FixtureContent
+    # The fixture ships a fake npm; remove it so the guard path is exercised.
+    Remove-Item -LiteralPath (Join-Path $Script:FixtureRoot 'bin/npm') -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Join-Path $Script:FixtureRoot 'bin/npm.cmd') -Force -ErrorAction SilentlyContinue
+    $result = Invoke-BumpLockfile -Arguments @('-Sections', 'bun')
+    $result.ExitCode | Should -Be 0
+    Get-FixtureContent | Should -Be $before
+    if (-not (Get-Command -Name 'npm' -ErrorAction SilentlyContinue)) {
+      $result.Output | Should -Match 'npm not found — skipping bun section'
+    }
+  }
+
+  It 'does not abort on uv/rustup/pwsh/ollama when those tools are present' {
+    # The fixture has no keys for these sections, so a present tool is a
+    # no-op; the regression being guarded is the old abort-on-missing-command
+    # behavior. Absent tools warn and skip (covered above); present tools must
+    # run without throwing.
+    $before = Get-FixtureContent
+    $result = Invoke-BumpLockfile -Arguments @('-Sections', 'uv,rustup,pwsh,ollama')
+    $result.ExitCode | Should -Be 0
+    Get-FixtureContent | Should -Be $before
+  }
+}
