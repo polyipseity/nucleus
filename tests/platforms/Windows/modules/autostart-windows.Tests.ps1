@@ -42,7 +42,7 @@ BeforeAll {
   # mocked command absent from non-Windows CI hosts needs a stub definition
   # first. Each Mock below overrides its stub.
   function Test-RunKeyEntry { throw 'stub: Test-RunKeyEntry' }
-  function Write-NucleusInfo { param([string]$Message, [string]$CommandName) Write-Host "$CommandName : $Message" }
+  function Write-NucleusInfo { param([string]$Message, [string]$CommandName) Write-Output "$CommandName : $Message" }
   function Write-NucleusError { param([string]$Message, [string]$CommandName) Write-Error "$CommandName : $Message" }
 
   # Write-Nucleus* helpers come from Format-NucleusOutput.psm1 (not dot-sourced
@@ -130,8 +130,8 @@ Describe 'Enable-RunKeyEntry' {
   It 'writes the Run-key value via Set-ItemProperty' {
     $Script:written = $null
     Mock Test-Path { return $true }
-    Mock Set-ItemProperty { param($Path, $Name, $Value) $Script:written = @{ Name = $Name; Value = $Value } }
-    Mock New-Item { param($Path, $ItemType, $Force) return $null }
+    Mock Set-ItemProperty { param($Name, $Value) $Script:written = @{ Name = $Name; Value = $Value } }
+    Mock New-Item { return $null }
     Enable-RunKeyEntry -Key 'Parsec' -Path 'C:\Program Files\Parsec\parsec.exe'
     $Script:written.Name | Should -Be 'nucleus-Parsec'
     $Script:written.Value | Should -Be 'C:\Program Files\Parsec\parsec.exe'
@@ -142,7 +142,7 @@ Describe 'Disable-RunKeyEntry' {
   It 'removes the Run-key value when present' {
     $Script:removed = $null
     Mock Test-RunKeyEntry { return $true }
-    Mock Remove-ItemProperty { param($Path, $Name) $Script:removed = $Name }
+    Mock Remove-ItemProperty { param($Name) $Script:removed = $Name }
     Disable-RunKeyEntry -Key 'Parsec'
     $Script:removed | Should -Be 'nucleus-Parsec'
   }
@@ -150,7 +150,7 @@ Describe 'Disable-RunKeyEntry' {
   It 'does nothing when Run-key value absent' {
     $Script:removed = $null
     Mock Test-RunKeyEntry { return $false }
-    Mock Remove-ItemProperty { param($Path, $Name) $Script:removed = $Name }
+    Mock Remove-ItemProperty { param($Name) $Script:removed = $Name }
     Disable-RunKeyEntry -Key 'Parsec'
     $Script:removed | Should -BeNullOrEmpty
   }

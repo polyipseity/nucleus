@@ -8,6 +8,7 @@
 # Write-ErrorMessage) and bump-lockfile.ps1 (Write-NucleusInfo / etc.).
 function Invoke-LockfileEnforcement {
   [CmdletBinding()]
+  [OutputType([int])]
   param(
     [Parameter(Mandatory = $true)]
     [hashtable]$Lockfile,
