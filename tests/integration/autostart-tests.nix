@@ -134,4 +134,60 @@ assert containsRegex ''apps\.schema\.json'' appsJsonText;
 assert containsRegex "to_entries.*map" autostartShText;
 assert containsRegex "select.*type == .object." autostartShText;
 
+# --- Omission rationale (negative): no equivalent-citing phrases ---
+# An omitted host entry must justify omission by platform inapplicability,
+# never by citing an equivalent app or native service.
+assert all (
+  name:
+  let
+    entry = parsedApps.${name};
+    hosts = builtins.attrNames entry.hosts;
+    forbidden = [
+      "equivalent"
+      "provides the"
+      "covers"
+      "uses the native"
+      "native service"
+      "WSL"
+      "Docker Desktop"
+      "PowerToys"
+      "WinFsp"
+    ];
+    justificationForbidden =
+      just: all (phrase: !(builtins.match ".*${phrase}.*" just != null)) forbidden;
+  in
+  all (
+    h:
+    let
+      hostEntry = entry.hosts.${h};
+    in
+    if hostEntry ? type && hostEntry.type == "omitted" then
+      justificationForbidden hostEntry.justification
+    else
+      true
+  ) hosts
+) appNames;
+
+# --- Native-disable invariant: non-system-extension runtime entries must disable native ---
+assert all (
+  name:
+  let
+    entry = parsedApps.${name};
+    hosts = builtins.attrNames entry.hosts;
+  in
+  all (
+    h:
+    let
+      hostEntry = entry.hosts.${h};
+    in
+    if
+      (hostEntry ? type && hostEntry.type == "omitted")
+      || hostEntry ? kind && hostEntry.kind == "system-extension"
+    then
+      true
+    else
+      hostEntry.disableNative == true
+  ) hosts
+) appNames;
+
 true
