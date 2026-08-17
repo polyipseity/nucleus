@@ -25,6 +25,11 @@ let
 
   managedPaths = import ./lib/managed-paths.nix { inherit pkgs; };
 
+  # Read the consolidated lockfile so activation scripts can converge to
+  # exact pins (closes the drift root cause).  Mirrors pwsh.nix.
+  lockfile = builtins.fromJSON (builtins.readFile ../lockfiles/lockfile.json);
+  cargoBinstallDesired = builtins.attrNames (lockfile."cargo-binstall" or { });
+
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 {
@@ -148,7 +153,8 @@ in
     # -------------------------------------------------------------------------
     init-rustup = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/packages/init-rustup.sh" \
-        "${pkgs.rustup}/bin/rustup"
+        "${pkgs.rustup}/bin/rustup" \
+        "${pkgs.jq}/bin/jq"
     '';
 
     # -------------------------------------------------------------------------
@@ -176,7 +182,7 @@ in
       "${activationBundle}/src/scripts/packages/install-cargo-binstall-packages.sh" \
         "${pkgs.jq}/bin/jq" \
         "${pkgs.gawk}/bin/awk" \
-        '${builtins.toJSON [ ]}' \
+        '${builtins.toJSON cargoBinstallDesired}' \
         "${pkgs.cargo}/bin/cargo"
     '';
 
