@@ -265,21 +265,25 @@ $changed = $false
 # winget — winget show --id <id>
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'winget') {
-  if ($ht.ContainsKey('winget') -and $ht['winget'] -is [hashtable]) {
-    # Snapshot the keys: assigning a value below invalidates the live
-    # KeyCollection enumerator on .NET Core ('Collection was modified').
-    foreach ($key in @($ht['winget'].Keys)) {
+  if (Get-Command -Name 'winget' -ErrorAction SilentlyContinue) {
+    if ($ht.ContainsKey('winget') -and $ht['winget'] -is [hashtable]) {
+      # Snapshot the keys: assigning a value below invalidates the live
+      # KeyCollection enumerator on .NET Core ('Collection was modified').
+      foreach ($key in @($ht['winget'].Keys)) {
       $old = $ht['winget'][$key]
       # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
       $result = & winget show --id $key 2>$null | Select-String -Pattern '^Version '
-      if ($result) {
-        $new = ($result -split ':\s*', 2)[-1].Trim()
-        if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
-          Write-Update -Section 'winget' -Key $key -OldValue $old -NewValue $new
-          $ht['winget'][$key] = $new
+        if ($result) {
+          $new = ($result -split ':\s*', 2)[-1].Trim()
+          if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
+            Write-Update -Section 'winget' -Key $key -OldValue $old -NewValue $new
+            $ht['winget'][$key] = $new
+          }
         }
       }
     }
+  } else {
+    Write-NucleusWarning 'winget not found — skipping winget section'
   }
 }
 
@@ -287,19 +291,23 @@ if (Test-SectionEnabled 'winget') {
 # scoop — scoop info <pkg>
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'scoop') {
-  if ($ht.ContainsKey('scoop') -and $ht['scoop'] -is [hashtable]) {
-    foreach ($key in @($ht['scoop'].Keys)) {
+  if (Get-Command -Name 'scoop' -ErrorAction SilentlyContinue) {
+    if ($ht.ContainsKey('scoop') -and $ht['scoop'] -is [hashtable]) {
+      foreach ($key in @($ht['scoop'].Keys)) {
       $old = $ht['scoop'][$key]
       # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
       $result = & scoop info $key 2>$null | Select-String -Pattern '^Version '
-      if ($result) {
-        $new = ($result -split ':\s*', 2)[-1].Trim()
-        if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
-          Write-Update -Section 'scoop' -Key $key -OldValue $old -NewValue $new
-          $ht['scoop'][$key] = $new
+        if ($result) {
+          $new = ($result -split ':\s*', 2)[-1].Trim()
+          if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
+            Write-Update -Section 'scoop' -Key $key -OldValue $old -NewValue $new
+            $ht['scoop'][$key] = $new
+          }
         }
       }
     }
+  } else {
+    Write-NucleusWarning 'scoop not found — skipping scoop section'
   }
 }
 
@@ -354,19 +362,23 @@ if (Test-SectionEnabled 'cargo-binstall') {
 # bun — npm view <pkg> version
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'bun') {
-  if ($ht.ContainsKey('bun') -and $ht['bun'] -is [hashtable]) {
-    foreach ($key in @($ht['bun'].Keys)) {
-      $old = $ht['bun'][$key]
-      # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
-      $result = & npm view $key version 2>$null
-      if ($result) {
-        $new = $result.Trim()
-        if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
-          Write-Update -Section 'bun' -Key $key -OldValue $old -NewValue $new
-          $ht['bun'][$key] = $new
+  if (Get-Command -Name 'npm' -ErrorAction SilentlyContinue) {
+    if ($ht.ContainsKey('bun') -and $ht['bun'] -is [hashtable]) {
+      foreach ($key in @($ht['bun'].Keys)) {
+        $old = $ht['bun'][$key]
+        # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
+        $result = & npm view $key version 2>$null
+        if ($result) {
+          $new = $result.Trim()
+          if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
+            Write-Update -Section 'bun' -Key $key -OldValue $old -NewValue $new
+            $ht['bun'][$key] = $new
+          }
         }
       }
     }
+  } else {
+    Write-NucleusWarning 'npm not found — skipping bun section'
   }
 }
 
@@ -374,8 +386,9 @@ if (Test-SectionEnabled 'bun') {
 # uv — uv tool list
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'uv') {
-  # check-suppress:suppression_doc: probe -- uv may not be installed; stderr suppressed for clean output.
-  $uvOutput = & uv tool list 2>$null
+  if (Get-Command -Name 'uv' -ErrorAction SilentlyContinue) {
+    # check-suppress:suppression_doc: probe -- uv may not be installed; stderr suppressed for clean output.
+    $uvOutput = & uv tool list 2>$null
   if ($uvOutput) {
     # Build hashtable from uv tool list output.
     # Format: "package@version" or "package v1.0.0" or "- package@version"
@@ -417,15 +430,19 @@ if (Test-SectionEnabled 'uv') {
       }
     }
   }
+  } else {
+    Write-NucleusWarning 'uv not found — skipping uv section'
+  }
 }
 
 # ---------------------------------------------------------------------------
 # rustup — rustc +<channel> --version
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'rustup') {
-  # Get installed toolchains
-  # check-suppress:suppression_doc: probe -- rustup may not be installed; stderr suppressed for clean output.
-  $toolchains = & rustup toolchain list 2>$null
+  if (Get-Command -Name 'rustup' -ErrorAction SilentlyContinue) {
+    # Get installed toolchains
+    # check-suppress:suppression_doc: probe -- rustup may not be installed; stderr suppressed for clean output.
+    $toolchains = & rustup toolchain list 2>$null
   $toolchainSet = @{}
   if ($toolchains) {
     foreach ($tc in $toolchains) {
@@ -457,25 +474,32 @@ if (Test-SectionEnabled 'rustup') {
       }
     }
   }
+  } else {
+    Write-NucleusWarning 'rustup not found — skipping rustup section'
+  }
 }
 
 # ---------------------------------------------------------------------------
 # pwsh — Find-Module via pwsh -NoProfile
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'pwsh') {
-  if ($ht.ContainsKey('pwsh') -and $ht['pwsh'] -is [hashtable]) {
-    foreach ($key in @($ht['pwsh'].Keys)) {
-      $old = $ht['pwsh'][$key]
-      # check-suppress:suppression_doc: probe -- module may not exist in PSGallery; stderr suppressed for clean output.
-      $result = & pwsh -NoProfile -Command "Find-Module -Name '$key' | Select-Object -ExpandProperty Version" 2>$null
-      if ($result) {
-        $new = $result.Trim()
-        if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
-          Write-Update -Section 'pwsh' -Key $key -OldValue $old -NewValue $new
-          $ht['pwsh'][$key] = $new
+  if (Get-Command -Name 'pwsh' -ErrorAction SilentlyContinue) {
+    if ($ht.ContainsKey('pwsh') -and $ht['pwsh'] -is [hashtable]) {
+      foreach ($key in @($ht['pwsh'].Keys)) {
+        $old = $ht['pwsh'][$key]
+        # check-suppress:suppression_doc: probe -- module may not exist in PSGallery; stderr suppressed for clean output.
+        $result = & pwsh -NoProfile -Command "Find-Module -Name '$key' | Select-Object -ExpandProperty Version" 2>$null
+        if ($result) {
+          $new = $result.Trim()
+          if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
+            Write-Update -Section 'pwsh' -Key $key -OldValue $old -NewValue $new
+            $ht['pwsh'][$key] = $new
+          }
         }
       }
     }
+  } else {
+    Write-NucleusWarning 'pwsh not found — skipping pwsh section'
   }
 }
 
@@ -549,6 +573,8 @@ if (Test-SectionEnabled 'vscode') {
   } elseif (Get-Command -Name 'code-insiders' -ErrorAction SilentlyContinue) {
     # check-suppress:suppression_doc: probe -- tool may not be installed; stderr suppressed for clean output.
     $vscodeOutput = & code-insiders --list-extensions --show-versions 2>$null
+  } else {
+    Write-NucleusWarning 'code/code-insiders not found — skipping vscode section'
   }
 
   if ($vscodeOutput) {
@@ -587,7 +613,8 @@ if (Test-SectionEnabled 'vscode') {
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'ollama') {  # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
   # home.sessionVariables.OLLAMA_HOST (127.0.0.1:4000) normally routes to.
-  if ($ht.ContainsKey('ollama') -and $ht['ollama'] -is [hashtable]) {
+  if (Get-Command -Name 'ollama' -ErrorAction SilentlyContinue) {
+    if ($ht.ContainsKey('ollama') -and $ht['ollama'] -is [hashtable]) {
     foreach ($hostName in $ht['ollama'].Keys) {
       $models = $ht['ollama'][$hostName]
       if ($models -isnot [System.Collections.IList]) { continue }
@@ -622,6 +649,9 @@ if (Test-SectionEnabled 'ollama') {  # Point at the Ollama daemon directly, bypa
         }
       }
     }
+  }
+  } else {
+    Write-NucleusWarning 'ollama not found — skipping ollama section'
   }
 }
 
