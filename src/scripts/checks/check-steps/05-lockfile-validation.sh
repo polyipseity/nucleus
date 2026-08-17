@@ -41,7 +41,14 @@ run_lockfile_validation() {
     local _lf_overlap_exceptions='["astral-sh.ty"]'
     local _lf_overlaps
     _lf_overlaps=$(jq -r --argjson exceptions "$_lf_overlap_exceptions" '
-      [to_entries[] | select(.key != "ollama" and (.value | type == "object")) | .key as $s | (.value | keys)[] | {s: $s, p: .}]
+      [
+        (to_entries[] | select(.key != "suggestions" and .key != "ollama" and (.value | type == "object")) | .key as $s | (.value | keys)[] | {s: $s, p: .}),
+        (.suggestions.homebrew.brews // {} | keys[] | {s: "suggestions.homebrew.brews", p: .}),
+        (.suggestions.homebrew.casks // {} | keys[] | {s: "suggestions.homebrew.casks", p: .}),
+        (.suggestions.homebrew.masApps // {} | keys[] | {s: "suggestions.homebrew.masApps", p: .}),
+        (.suggestions.nixpkgs // {} | keys[] | {s: "suggestions.nixpkgs", p: .}),
+        (.suggestions.vscode // {} | keys[] | {s: "suggestions.vscode", p: .})
+      ]
       | group_by(.p)
       | map(select(length > 1))
       | .[][]
@@ -129,40 +136,40 @@ run_lockfile_validation() {
       fi
     fi
 
-    # homebrew: must be non-empty
-    if ! jq -e '.homebrew | type == "object" and length > 0' "$_lfpath" >/dev/null 2>&1; then
-      error "homebrew: empty or missing section"
+    # homebrew: must be non-empty (under suggestions)
+    if ! jq -e '.suggestions.homebrew | type == "object" and length > 0' "$_lfpath" >/dev/null 2>&1; then
+      error "suggestions.homebrew: empty or missing section"
       _lf_section_errors=$((_lf_section_errors + 1))
     fi
 
-    # vscode: must be non-null; warn if empty, validate non-placeholder if non-empty
-    if ! jq -e '.vscode | type == "object"' "$_lfpath" >/dev/null 2>&1; then
-      error "vscode: missing or invalid section"
+    # vscode: must be non-null; warn if empty, validate non-placeholder if non-empty (under suggestions)
+    if ! jq -e '.suggestions.vscode | type == "object"' "$_lfpath" >/dev/null 2>&1; then
+      error "suggestions.vscode: missing or invalid section"
       _lf_section_errors=$((_lf_section_errors + 1))
-    elif jq '.vscode | length == 0' "$_lfpath" >/dev/null 2>&1; then
-      say "vscode: empty section (not yet populated)"
+    elif jq '.suggestions.vscode | length == 0' "$_lfpath" >/dev/null 2>&1; then
+      say "suggestions.vscode: empty section (not yet populated)"
     else
       local _placeholders
-      _placeholders=$(jq -r '.vscode | to_entries[] | select(.value == "" or .value == "CHANGEME" or .value == "1.0.0") | .key' "$_lfpath" 2>/dev/null)
+      _placeholders=$(jq -r '.suggestions.vscode | to_entries[] | select(.value == "" or .value == "CHANGEME" or .value == "1.0.0") | .key' "$_lfpath" 2>/dev/null)
       if [ -n "$_placeholders" ]; then
-        error "vscode has placeholder versions for:"
+        error "suggestions.vscode has placeholder versions for:"
         error "  ${_placeholders//$'\n'/$'\n'  }"
         _lf_section_errors=$((_lf_section_errors + 1))
       fi
     fi
 
-    # ollama: must have at least one profile with models
-    if ! jq -e '.ollama | type == "object" and length > 0' "$_lfpath" >/dev/null 2>&1; then
-      error "ollama: empty or missing section"
+    # ollama: must have at least one profile with models (under suggestions)
+    if ! jq -e '.suggestions.ollama | type == "object" and length > 0' "$_lfpath" >/dev/null 2>&1; then
+      error "suggestions.ollama: empty or missing section"
       _lf_section_errors=$((_lf_section_errors + 1))
     else
       while IFS=$'\t' read -r _profile _idx _name _tag; do
         if [ -z "$_name" ] || [ -z "$_tag" ]; then
-          error "ollama.${_profile}[${_idx}]: missing name or tag"
+          error "suggestions.ollama.${_profile}[${_idx}]: missing name or tag"
           _lf_section_errors=$((_lf_section_errors + 1))
         fi
       done < <(jq -r '
-        .ollama | to_entries[] | .key as $profile |
+        .suggestions.ollama | to_entries[] | .key as $profile |
         (.value // []) | to_entries[] |
         [$profile, (.key | tostring), (.value.name // ""), (.value.tag // "")] |
         @tsv' "$_lfpath")

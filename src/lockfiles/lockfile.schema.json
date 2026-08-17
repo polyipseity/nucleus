@@ -42,77 +42,11 @@
       "description": "Bun-installed global package versions. Package name → version string or VCS hash pin.",
       "type": "object"
     },
-    "camilladsp": {
-      "description": "CamillaDSP audio DSP engine version.",
-      "type": "string"
-    },
-    "camillagui-backend": {
-      "description": "CamillaGUI backend version.",
-      "type": "string"
-    },
     "cargo-binstall": {
       "additionalProperties": {
         "$ref": "#/definitions/versionOrHash"
       },
       "description": "cargo-binstall crate versions. Crate name → version string or VCS hash pin.",
-      "type": "object"
-    },
-    "homebrew": {
-      "additionalProperties": false,
-      "description": "Homebrew formula, cask, and Mac App Store version pins for macOS.",
-      "properties": {
-        "brews": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Homebrew formula versions. Formula name → version string.",
-          "type": "object"
-        },
-        "casks": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Homebrew cask versions. Cask name → version string.",
-          "type": "object"
-        },
-        "masApps": {
-          "additionalProperties": {
-            "type": "string"
-          },
-          "description": "Mac App Store app identifiers. App name → App Store ID string.",
-          "type": "object"
-        }
-      },
-      "required": [
-        "brews",
-        "casks",
-        "masApps"
-      ],
-      "type": "object"
-    },
-    "ollama": {
-      "additionalProperties": {
-        "items": {
-          "properties": {
-            "digest": {
-              "type": "string"
-            },
-            "name": {
-              "type": "string"
-            },
-            "tag": {
-              "type": "string"
-            }
-          },
-          "required": [
-            "name",
-            "tag"
-          ],
-          "type": "object"
-        },
-        "type": "array"
-      },
-      "description": "Ollama model pins per host. Host name → array of model specs.",
       "type": "object"
     },
     "pwsh": {
@@ -129,10 +63,6 @@
       "description": "Rustup toolchain versions. Channel name → date string.",
       "type": "object"
     },
-    "sccache": {
-      "description": "Sccache compiler cache version.",
-      "type": "string"
-    },
     "scoop": {
       "additionalProperties": {
         "type": "string"
@@ -146,10 +76,6 @@
       },
       "description": "Windows source-built package VCS pins. Package name → VCS hash pin with source URL and version.",
       "type": "object"
-    },
-    "starship": {
-      "description": "Starship cross-shell prompt version.",
-      "type": "string"
     },
     "suggestions": {
       "additionalProperties": false,
@@ -360,13 +286,6 @@
       },
       "type": "object"
     },
-    "vscode": {
-      "additionalProperties": {
-        "type": "string"
-      },
-      "description": "VS Code extension versions. Extension ID → version string.",
-      "type": "object"
-    },
     "winget": {
       "additionalProperties": {
         "type": "string"
@@ -378,18 +297,14 @@
   "required": [
     "bun",
     "cargo-binstall",
-    "homebrew",
-    "ollama",
     "pwsh",
     "rustup",
     "scoop",
     "source-builds",
-    "starship",
     "updated",
     "uv",
     "version",
     "vm-setup",
-    "vscode",
     "winget"
   ],
   "title": "nucleus lockfile",
