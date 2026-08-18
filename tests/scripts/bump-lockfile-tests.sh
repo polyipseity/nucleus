@@ -535,6 +535,44 @@ EOF
   rm -rf "$tmp"
 }
 
+test_rustup_pins_version_for_stable_not_date() {
+  local tmp
+  tmp="$(setup_fake_repo)"
+  # Add a rustup section with a stable key to the fixture lockfile.
+  jq '.rustup = {"stable": "1.90.0"}' "$tmp/src/lockfiles/lockfile.json" >"$tmp/lockfile.tmp" \
+    && mv "$tmp/lockfile.tmp" "$tmp/src/lockfiles/lockfile.json"
+  # Stub rustup (toolchain list emits the channel) and rustc (version line).
+  cat >"$tmp/bin/rustup" <<'EOF'
+#!/usr/bin/env bash
+if [ "$1" = "toolchain" ] && [ "$2" = "list" ]; then
+  printf 'stable-aarch64-apple-darwin (active)\n'
+fi
+EOF
+  chmod +x "$tmp/bin/rustup"
+  cat >"$tmp/bin/rustc" <<'EOF'
+#!/usr/bin/env bash
+printf 'rustc 1.95.0 (59807616e 2026-04-14)\n'
+EOF
+  chmod +x "$tmp/bin/rustc"
+
+  if run_bump_lockfile "$tmp" --sections rustup >"$tmp/out.txt" 2>&1; then
+    assert_pass "bump-lockfile --sections rustup exits 0"
+  else
+    assert_fail "bump-lockfile --sections rustup exits 0" "exit code $?"
+  fi
+  if [ "$(jq -r '.rustup.stable' "$tmp/src/lockfiles/lockfile.json")" = "1.95.0" ]; then
+    assert_pass "bump-lockfile --sections rustup records the version for stable"
+  else
+    assert_fail "bump-lockfile --sections rustup records the version for stable" "got $(jq -r '.rustup.stable' "$tmp/src/lockfiles/lockfile.json")"
+  fi
+  if grep -q '2026-04-14' "$tmp/out.txt"; then
+    assert_fail "bump-lockfile --sections rustup does not record a date for stable" "date present"
+  else
+    assert_pass "bump-lockfile --sections rustup does not record a date for stable"
+  fi
+  rm -rf "$tmp"
+}
+
 test_verify_passes_on_unchanged_fixture
 test_verify_fails_on_section_diff
 test_no_change_run_writes_nothing
@@ -552,6 +590,7 @@ test_missing_winget_skips_with_warning
 test_missing_scoop_skips_with_warning
 test_missing_npm_skips_bun_with_warning
 test_uv_parser_skips_dependency_lines
+test_rustup_pins_version_for_stable_not_date
 
 section 1 "Test Summary"
 printf '%sPassed: %s%s\n' "$GREEN" "$TESTS_PASSED" "$NC"

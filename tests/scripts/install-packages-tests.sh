@@ -44,7 +44,7 @@ setup_fake_repo() {
     }
   },
   "rustup": {
-    "stable": "2026-04-14"
+    "stable": "1.95.0"
   },
   "cargo-binstall": {
     "nickel-lang-lsp": "1.17.0",
@@ -126,10 +126,10 @@ test_rustup_install_passes_channel_date() {
   else
     assert_fail "init-rustup runs to completion" "exit code $?"
   fi
-  if grep -qxF 'toolchain install stable-2026-04-14 --no-self-update' "$tmp/calls-rustup.txt"; then
-    assert_pass "init-rustup pins stable-2026-04-14 from lockfile"
+  if grep -qxF 'toolchain install stable --no-self-update' "$tmp/calls-rustup.txt"; then
+    assert_pass "init-rustup pins stable channel (no date suffix) from lockfile"
   else
-    assert_fail "init-rustup pins stable-2026-04-14 from lockfile" "calls: $(cat "$tmp/calls-rustup.txt" 2>/dev/null)"
+    assert_fail "init-rustup pins stable channel (no date suffix) from lockfile" "calls: $(cat "$tmp/calls-rustup.txt" 2>/dev/null)"
   fi
   rm -f "$tmp/calls-rustup.txt"
   rm -rf "$tmp"

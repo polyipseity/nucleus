@@ -81,6 +81,26 @@ BeforeAll {
       # POSIX requires the executable bit; Windows CI uses brew.cmd instead.
       & chmod +x (Join-Path $binDir 'brew')
     }
+
+    # Fake rustup: echoes the toolchain-list line stored in rustup-output.
+    # Dual shim so tests run on Windows CI (rustup.cmd) and POSIX pwsh (rustup).
+    Set-Content -Path (Join-Path $binDir 'rustup-output') -Value 'stable-aarch64-pc-windows-msvc (default)' -NoNewline
+    Set-Content -Path (Join-Path $binDir 'rustup.cmd') -Value "@echo off`r`nset /p OUT=<%~dp0rustup-output`r`necho %OUT%" -Encoding ASCII
+    Set-Content -Path (Join-Path $binDir 'rustup') -Value "#!/bin/sh`ncat `"`$(dirname `"`$0`")/rustup-output`"" -Encoding ASCII
+    if (-not $IsWindows) {
+      # POSIX requires the executable bit; Windows CI uses rustup.cmd instead.
+      & chmod +x (Join-Path $binDir 'rustup')
+    }
+
+    # Fake rustc: echoes the version line stored in rustc-output.
+    # Dual shim so tests run on Windows CI (rustc.cmd) and POSIX pwsh (rustc).
+    Set-Content -Path (Join-Path $binDir 'rustc-output') -Value 'rustc 1.95.0 (59807616e 2026-04-14)' -NoNewline
+    Set-Content -Path (Join-Path $binDir 'rustc.cmd') -Value "@echo off`r`nset /p OUT=<%~dp0rustc-output`r`necho %OUT%" -Encoding ASCII
+    Set-Content -Path (Join-Path $binDir 'rustc') -Value "#!/bin/sh`ncat `"`$(dirname `"`$0`")/rustc-output`"" -Encoding ASCII
+    if (-not $IsWindows) {
+      # POSIX requires the executable bit; Windows CI uses rustc.cmd instead.
+      & chmod +x (Join-Path $binDir 'rustc')
+    }
   }
 
   function Set-FakeNpmVersion {
@@ -102,6 +122,20 @@ BeforeAll {
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     param([string]$Output)
     Set-Content -Path (Join-Path $Script:FixtureRoot 'bin/brew-output') -Value $Output -NoNewline
+  }
+
+  function Set-FakeRustupOutput {
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test fixture writes an output file; no ShouldProcess in tests
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    param([string]$Output)
+    Set-Content -Path (Join-Path $Script:FixtureRoot 'bin/rustup-output') -Value $Output -NoNewline
+  }
+
+  function Set-FakeRustcOutput {
+    # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test fixture writes an output file; no ShouldProcess in tests
+    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
+    param([string]$Output)
+    Set-Content -Path (Join-Path $Script:FixtureRoot 'bin/rustc-output') -Value $Output -NoNewline
   }
 
   function Invoke-BumpLockfile {
@@ -205,6 +239,24 @@ Describe 'bump-lockfile.ps1 cargo-binstall (crates.io + cargo search fallback)' 
     $result.ExitCode | Should -Be 0
     $result.Output | Should -Match 'no version source'
     Get-FixtureContent | Should -Match '"nucleus-bump-lockfile-fixture-crate-does-not-exist": "0\.1\.0"'
+  }
+}
+
+Describe 'bump-lockfile.ps1 rustup (version pin for stable, not date)' {
+  BeforeEach {
+    New-FixtureRepo
+    # Add a rustup section with a stable key to the fixture lockfile.
+    $lockfilePath = Join-Path $Script:FixtureRoot 'src/lockfiles/lockfile.json'
+    $ht = Get-Content -Raw $lockfilePath | ConvertFrom-Json -AsHashtable
+    $ht['rustup'] = @{ stable = '1.90.0' }
+    $ht | ConvertTo-Json -Depth 10 | Set-Content -Path $lockfilePath -Encoding UTF8
+  }
+
+  It 'records the version (not a date) for stable' {
+    $result = Invoke-BumpLockfile -Arguments @('-Sections', 'rustup')
+    $result.ExitCode | Should -Be 0
+    Get-FixtureContent | Should -Match '"stable": "1\.95\.0"'
+    Get-FixtureContent | Should -Not -Match '2026-04-14'
   }
 }
 
