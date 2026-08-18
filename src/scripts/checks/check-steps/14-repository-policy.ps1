@@ -51,6 +51,7 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
       $refs = @($using:cfgSelectOutput | Where-Object { $_.Line -match [regex]::Escape($basename) })
     }
     if ($refs.Count -eq 0) {
+      # check-suppress:config-method: self-reference -- this is the step's own explanatory comment, not a config deployment
       # WHY: ${hostName}.gitconfig references every host's config (MacBook/NixOS/Windows.gitconfig);
       # match template lines by the basename's extension suffix.
       $dotIndex = $basename.IndexOf('.')
@@ -143,7 +144,7 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
   # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
   # WHY: paths are made repo-relative (mirroring the .sh twin's `find src` output) so the ^src/... anchor in $macosDirRegex matches; full paths would never match and silently disable the macos- prefix rule
   $nixFiles = @(if ($HasArgs) {
-    if ($script:NIX_FILES) { $script:NIX_FILES } else { @($PositionalArgs | Where-Object { $_ -like 'src/*.nix' }) }
+    if ($Context.NixFiles) { $Context.NixFiles } else { @($PositionalArgs | Where-Object { $_ -like 'src/*.nix' }) }
   } else {
     @(Get-ChildItem -Recurse -Path (Join-Path $r 'src') -Include '*.nix' |
         Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' } |
@@ -225,7 +226,7 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
   # Find all .ps1 files
   # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
   $ps1Files = @(if ($HasArgs) {
-    if ($script:PS1_FILES) { $script:PS1_FILES } else { @($PositionalArgs | Where-Object { $_ -like '*.ps1' }) }
+    if ($Context.Ps1Files) { $Context.Ps1Files } else { @($PositionalArgs | Where-Object { $_ -like '*.ps1' }) }
   } else {
     @(Get-ChildItem -Recurse -Path $r -Include '*.ps1' | Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' } | ForEach-Object { $_.FullName } | Select-GitIgnored)  # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; gitignore filter applied on top
   })
@@ -233,7 +234,6 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
   if ($ps1Files.Count -gt 0) {
     # Exclude this check's own file: its source contains the literal pattern text.
     # ref: allow-and-deny-lists.instructions.md#B6 -- structural invariant; self-refs are dynamic
-    $selfLeaf = Split-Path -Leaf $PSCommandPath
     $selMatches = Select-String -Path $ps1Files -Pattern 'Assert-ToolAvailable.*-InstallCommand' -AllMatches |
       Where-Object { (Split-Path -Leaf $_.Path) -ne $selfLeaf }
     foreach ($m in $selMatches) {
@@ -254,11 +254,11 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
   Write-Message "--- embedded content enforcement ---"
 
   $embeddedViolations = @()
-  $embeddedSelfLeaf = Split-Path -Leaf $PSCommandPath
+  $embeddedSelfLeaf = $selfLeaf
 
   # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count checks below under StrictMode; the @() wrapper forces an array
   $embeddedPs1Files = @(if ($HasArgs) {
-    if ($script:PS1_FILES) { $script:PS1_FILES } else { @($PositionalArgs | Where-Object { $_ -like '*.ps1' }) }
+    if ($Context.Ps1Files) { $Context.Ps1Files } else { @($PositionalArgs | Where-Object { $_ -like '*.ps1' }) }
   } else {
     @(Get-ChildItem -Recurse -Path $r -Include '*.ps1' | Where-Object { $_.FullName -notmatch '[\\/]vendor[\\/]' } | ForEach-Object { $_.FullName } | Select-GitIgnored)  # ref: allow-and-deny-lists.instructions.md#C5 -- structural invariant; gitignore filter applied on top
   })
@@ -420,7 +420,8 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
     if ($userDir.Name -eq 'default') { continue }
     $userName = $userDir.Name
     # check-suppress:suppression_doc: tests tree may be missing or lack matching files; empty result is the expected pass.
-    $hits = Select-String -Path (Join-Path $r 'tests') -Pattern "\b$([regex]::Escape($userName))\b" -Recurse -ErrorAction SilentlyContinue
+    $testFiles = Get-ChildItem -Path (Join-Path $r 'tests') -Recurse -File -ErrorAction SilentlyContinue
+    $hits = Select-String -Path $testFiles -Pattern "\b$([regex]::Escape($userName))\b" -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: $testFiles may be empty or include unreadable/binary files; no matches is the expected pass
     foreach ($hit in $hits) {
       Write-ErrorMessage "tests must not reference production user '$userName': $($hit.Path):$($hit.LineNumber):$($hit.Line.Trim()) (see testing.instructions.md: No real-user test coupling)"
       $failed = $true
@@ -445,8 +446,8 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
       # Rule: every hardcoded sk- style API key literal (sk-[A-Za-z0-9]{4,}) in tracked files must be a registered dummyKeys value.
       # Exclude this check's own files: their source contains the literal pattern text.
       # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
-      $dummySelfLeaf = Split-Path -Leaf $PSCommandPath
-      $dummySelfShLeaf = Split-Path -Leaf ([System.IO.Path]::ChangeExtension($PSCommandPath, '.sh'))
+      $dummySelfLeaf = $selfLeaf
+      $dummySelfShLeaf = $selfShLeaf
 
       # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
       $dummyFiles = @(if ($HasArgs) {
@@ -492,8 +493,8 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
   $lfErrors = 0
   # Exclude this check's own files: their source contains the literal pattern text.
   # ref: allow-and-deny-lists.instructions.md#C5 -- self-refs are dynamic
-  $lfSelfLeaf = Split-Path -Leaf $PSCommandPath
-  $lfSelfShLeaf = Split-Path -Leaf ([System.IO.Path]::ChangeExtension($PSCommandPath, '.sh'))
+  $lfSelfLeaf = $selfLeaf
+  $lfSelfShLeaf = $selfShLeaf
 
   # Logging-format policy scope: tracked script files outside vendored code,
   # secrets, and test fixtures (fixtures deliberately hold violation samples).
