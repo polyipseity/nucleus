@@ -1632,8 +1632,8 @@ vm_link_android_userdata_to_utm_bundle() {
 vm_system_overlay_backing() {
   local _sob_name="$1" _sob_type="$2"
   case "$(uname -s)" in
-    Darwin) printf '%s/%s.utm/Data/system base.qcow2\n' "$VM_DIR" "$_sob_name" ;;
-    *) vm_system_image_path "$_sob_type" ;;
+  Darwin) printf '%s/%s.utm/Data/system base.qcow2\n' "$VM_DIR" "$_sob_name" ;;
+  *) vm_system_image_path "$_sob_type" ;;
   esac
 }
 
@@ -1885,7 +1885,7 @@ vm_inject_nixos() {
   _vix_part="${_vix_nbd}p2"
 
   _vix_cleanup() {
-    umount "$_vix_mnt" >/dev/null 2>&1 || true # check-suppress:suppression_doc: best-effort unmount during cleanup; the disk may not be mounted on early failures
+    umount "$_vix_mnt" >/dev/null 2>&1 || true                # check-suppress:suppression_doc: best-effort unmount during cleanup; the disk may not be mounted on early failures
     qemu-nbd --disconnect "$_vix_nbd" >/dev/null 2>&1 || true # check-suppress:suppression_doc: best-effort disconnect during cleanup; the device may already be detached
     rm -rf "$_vix_mnt"
   }
@@ -1976,8 +1976,8 @@ vm_inject_windows() {
     return 0
   fi
 
-  _viw_args=(virt-customize --in-place -a "$_viw_disk" \
-    --hostname "$_viw_hostname" \
+  _viw_args=(virt-customize --in-place -a "$_viw_disk"
+    --hostname "$_viw_hostname"
     --password "user:$_viw_username:password:$_viw_password")
   if [ -n "$_viw_key_file" ]; then
     _viw_args+=(--ssh-inject "user:$_viw_username:file:$_viw_key_file")
