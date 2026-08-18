@@ -3,6 +3,9 @@
 # Consumes crate-description tokens at activation time.
 #
 # Cargo resolution: uses nixpkgs cargo directly (store-path arg).
+# cargo-binstall is also supplied as a store-path arg (arg 5), not probed
+# from PATH — ShellCheck cannot verify PATH-resolved commands at activation
+# time, so external tools must be passed by absolute store path.
 # Runtime path probing (~/.cargo/bin) is prohibited.
 #
 # Install priority: nixpkgs > cargo binstall > cargo > bun > uv.
@@ -25,6 +28,10 @@ _icp_jq_bin="$1"
 _icp_gawk_bin="$2"
 _icp_desired_crates_json="$3"
 _icp_cargo_bin="$4"
+_icp_cargo_binstall_bin="$5"
+if [ -z "$_icp_cargo_binstall_bin" ]; then
+  die -l cargo-binstall "cargo-binstall store-path bin argument (arg 5) is required"
+fi
 
 # Read version pins from the consolidated lockfile so installs are
 # reproducible (closes the drift root cause).  Falls back to unpinned
