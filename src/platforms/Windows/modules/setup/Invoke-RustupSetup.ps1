@@ -89,13 +89,20 @@ function Invoke-RustupSetup {
   $installedChannels = @($installedToolchains | ForEach-Object { ($_ -split '-')[0] })
 
   # Toolchains to remove: installed ones whose channel is not in the desired
-  # list, OR whose installed version does not match the lockfile pin.
+  # list, OR whose installed nightly archive date does not match the lockfile
+  # pin. stable/beta are rolling channels pinned by version (tracked only, not
+  # in the spec), so they are removed solely by channel-name membership.
   $toRemove = @($installedToolchains | Where-Object {
     $channel = ($_ -split '-')[0]
     if ($desiredChannels -notcontains $channel) { return $true }
-    $expectedDate = $rustupVersions.$channel
-    if (-not $expectedDate) { return $false }
-    -not ($_ -match "$channel-$expectedDate-")
+    $pin = $rustupVersions.$channel
+    # Only nightly pins carry a -YYYY-MM-DD archive suffix that can be matched
+    # against an installed toolchain name; version pins for stable/beta are
+    # tracked only and never used to remove by version.
+    if ($pin -and $pin -match '^nightly-\d{4}-\d{2}-\d{2}$') {
+      return -not ($_ -match [regex]::Escape($pin))
+    }
+    return $false
   })
 
   # Channels to install: desired ones not currently present in any installed toolchain.
@@ -117,8 +124,11 @@ function Invoke-RustupSetup {
 
   # Install desired channels not currently present with version pinning from lockfile.
   foreach ($channel in $toInstall) {
-    $rustupDate = $rustupVersions.$channel
-    $channelSpec = if ($rustupDate) { "${channel}-${rustupDate}" } else { $channel }
+    # nightly pins carry a valid -YYYY-MM-DD archive suffix and are used
+    # verbatim; stable/beta are rolling channels installed by name alone (their
+    # version pin is tracked, not appended to the spec).
+    $pin = $rustupVersions.$channel
+    $channelSpec = if ($pin -and $pin -match '^nightly(-\d{4}-\d{2}-\d{2})?$') { $pin } else { $channel }
     Write-NucleusInfo -CommandName 'rustup' "installing toolchain '$channelSpec'"
     rustup toolchain install $channelSpec
     if ($LASTEXITCODE -ne 0) {
