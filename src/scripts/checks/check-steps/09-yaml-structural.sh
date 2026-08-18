@@ -6,8 +6,9 @@
 register_step "yaml-structural" "YAML structural validation" run_yaml_structural
 
 run_yaml_structural() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
+  local -n ctx="$1"
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  shift
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _yaml_errors=0
@@ -19,6 +20,7 @@ run_yaml_structural() {
 
   # Collect YAML files for validation
   local _yaml_files=()
+  local -n _cached_yaml_files="${ctx[CACHED_YAML_FILES]}"
   if $_has_args; then
     for _yf in "${_files[@]}"; do
       case "$_yf" in
@@ -26,7 +28,7 @@ run_yaml_structural() {
       esac
     done
   else
-    for _yf in "${CACHED_YAML_FILES[@]}"; do
+    for _yf in "${_cached_yaml_files[@]}"; do
       _yaml_files+=("$_yf")
     done
   fi

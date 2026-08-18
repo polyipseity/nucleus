@@ -7,7 +7,9 @@
 # bump-lockfile completer still has its --list-sections contract (introspection).
 
 Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Action {
-  param($RepoRoot)
+  param([Parameter(Mandatory)][PSObject]$Context)
+
+  $RepoRoot = $Context.RepoRoot
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 

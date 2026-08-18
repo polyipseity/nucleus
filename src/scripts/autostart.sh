@@ -87,7 +87,10 @@ read_registry() {
 # macos_login_item_exists NAME — stdout "true"/"false".
 macos_login_item_exists() {
   local name="$1"
-  _nucleus_resolve_console_user || { printf 'false'; return 0; }
+  _nucleus_resolve_console_user || {
+    printf 'false'
+    return 0
+  }
   /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
     /usr/bin/osascript \
     -e 'tell application "System Events"' \
@@ -163,7 +166,7 @@ xdg_desktop_write() {
   mkdir -p "$dir"
   local no_display="false"
   [ "$hidden" = "true" ] && no_display="true"
-  cat > "$dir/$name" <<DESKTOP
+  cat >"$dir/$name" <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=$name
@@ -458,8 +461,8 @@ do_verify() {
     local declared actual
     declared=$(echo "$entry_json" | jq -r '.hostEntry.enabled')
     actual=$(app_actual_state "$key" "$entry_json")
-    if { [ "$declared" = "true" ] && [ "$actual" != "enabled" ]; } || \
-       { [ "$declared" = "false" ] && [ "$actual" != "disabled" ]; }; then
+    if { [ "$declared" = "true" ] && [ "$actual" != "enabled" ]; } ||
+      { [ "$declared" = "false" ] && [ "$actual" != "disabled" ]; }; then
       drift=true
       warn "$key — drift: declared enabled=$declared, actual=$actual"
     fi

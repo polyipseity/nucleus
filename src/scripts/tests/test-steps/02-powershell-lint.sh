@@ -5,8 +5,9 @@
 register_step "powershell-lint-test" "PowerShell lint (PSSA)" run_powershell_lint
 
 run_powershell_lint() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
+  local -n ctx="$1"
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  shift
   local _exit_code=0
 
   say "--- PSScriptAnalyzer lint (syntax runs in check step 2) ---"

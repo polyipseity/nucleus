@@ -6,17 +6,20 @@
 register_step "nix-lint" "Nix lint (nixf-tidy)" run_nix_lint
 
 run_nix_lint() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
+  local -n ctx="$1"
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  shift
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _nixf_files=()
   local _nixf_exit=0
 
-  if [ "${#NIX_FILES[@]}" -gt 0 ]; then
-    _nixf_files=("${NIX_FILES[@]}")
+  local -n _nix_files="${ctx[NIX_FILES]}"
+  local -n _cached_nix_files="${ctx[CACHED_NIX_FILES]}"
+  if [ "${#_nix_files[@]}" -gt 0 ]; then
+    _nixf_files=("${_nix_files[@]}")
   elif ! $_has_args; then
-    _nixf_files=("${CACHED_NIX_FILES[@]}")
+    _nixf_files=("${_cached_nix_files[@]}")
   else
     _nixf_files=()
   fi

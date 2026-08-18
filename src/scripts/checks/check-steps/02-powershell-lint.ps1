@@ -1,9 +1,12 @@
 Register-Step -Id "powershell-lint" -Name "PowerShell syntax" -Action {
-  param($HasArgs, $RepoRoot)
+  param([Parameter(Mandatory)][PSObject]$Context)
+
+  $HasArgs = $Context.HasArgs
+  $RepoRoot = $Context.RepoRoot
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
-  $ps1Files = $script:PS1_FILES
+  $ps1Files = $Context.Ps1Files
   if (-not $ps1Files) { $ps1Files = @() }
   if ($ps1Files.Count -gt 0) {
     & "$r\scripts\check-pwsh.ps1" -SkipStep PSSA -Scoped -Paths $ps1Files

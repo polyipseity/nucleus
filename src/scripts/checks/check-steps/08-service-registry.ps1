@@ -1,5 +1,7 @@
 Register-Step -Id "service-registry" -Name "Service registry validation" -Action {
-  param($RepoRoot)
+  param([Parameter(Mandatory)][PSObject]$Context)
+
+  $RepoRoot = $Context.RepoRoot
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 

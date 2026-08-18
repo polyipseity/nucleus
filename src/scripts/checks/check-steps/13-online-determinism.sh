@@ -6,12 +6,13 @@
 register_step "online-determinism" "Online determinism checks (--online)" run_online_determinism
 
 run_online_determinism() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
+  local -n ctx="$1"
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  shift
   local _files=("$@")
   cd "$_repo_root" || return 1
 
-  if $ONLINE; then
+  if [ "${ctx[ONLINE]}" = "true" ]; then
     if bash "$_repo_root/scripts/bump-lockfile.sh" --verify; then
       say "online determinism checks passed."
       return 0

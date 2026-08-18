@@ -6,8 +6,9 @@
 register_step "code-formatting" "Code formatting and linting" run_code_formatting
 
 run_code_formatting() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
+  local -n ctx="$1"
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  shift
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _exit=0

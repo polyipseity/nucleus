@@ -6,6 +6,10 @@ Set-StrictMode -Version Latest
 
 . (Join-Path $FrameworkDir "step-runner.ps1")
 
+# WHY: tell the runspace which lib to dot-source so step actions can call the
+# Write-* helpers defined below.
+Set-StepLibPath -Path $MyInvocation.MyCommand.Path
+
 $script:FAIL_FAST = $true
 $script:usageAction = {
   Write-Output "Usage: test.ps1 [--fail-fast|--no-fail-fast] [--quiet] [--skip-steps=<ids>]"
@@ -33,6 +37,7 @@ function Read-Argument {
   $script:positionalArgs = @()
   $script:SCOPED = $false
   $script:FULL = $false
+  $script:ONLINE = $false
   $script:SkipSteps = @()
 
   $i = 0
@@ -83,6 +88,24 @@ function Read-Argument {
       }
     }
     $i++
+  }
+
+  $script:HAS_ARGS = $script:positionalArgs.Count -gt 0
+  if ($script:SCOPED) { $script:HAS_ARGS = $true }
+  if ($script:FULL) { $script:HAS_ARGS = $false }
+
+  # Group positional args by extension (matching POSIX Read-Argument behavior).
+  $script:SH_FILES = @()
+  $script:PS1_FILES = @()
+  $script:PKR_FILES = @()
+  $script:NIX_FILES = @()
+  if ($script:HAS_ARGS) {
+    foreach ($_f in $script:positionalArgs) {
+      if ($_f -like '*.sh') { $script:SH_FILES += $_f }
+      elseif ($_f -like '*.ps1') { $script:PS1_FILES += $_f }
+      elseif ($_f -like '*.pkr.hcl') { $script:PKR_FILES += $_f }
+      elseif ($_f -like '*.nix') { $script:NIX_FILES += $_f }
+    }
   }
 }
 

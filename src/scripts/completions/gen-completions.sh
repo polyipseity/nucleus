@@ -397,4 +397,4 @@ fi
 
 trap 'rm -f "$COMPLETIONS_DIR"/.tmp-_nucleus*' EXIT
 generate_all "$COMPLETIONS_DIR"
-say "generated $(( ${#COMMANDS[@]} + 1 )) completion files in src/modules/completions/zsh"
+say "generated $((${#COMMANDS[@]} + 1)) completion files in src/modules/completions/zsh"

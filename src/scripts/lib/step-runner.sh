@@ -118,7 +118,7 @@ _wave_tmpdir_created=false
 _wave_cleanup_stale() {
   local _d _pid
   for _d in "${TMPDIR:-/tmp}/nucleus-step-runner-"*; do
-    [ -d "$_d" ] || continue # check-suppress:suppression_doc: glob may expand to literal pattern when no matches; [ -d ] check filters it
+    [ -d "$_d" ] || continue                  # check-suppress:suppression_doc: glob may expand to literal pattern when no matches; [ -d ] check filters it
     _pid=$(cat "$_d/pid" 2>/dev/null || true) # check-suppress:suppression_doc: pid file may not exist yet; empty pid handled below
     if [ -z "$_pid" ] || ! kill -0 "$_pid" 2>/dev/null; then
       rm -rf "$_d"
@@ -177,8 +177,12 @@ nucleus_nix_locked() {
   return "$_lock_ret"
 }
 
-# Default value if parse_args hasn't been called
+# Defaults for when parse_args hasn't been called (e.g. unit tests that source
+# this library directly). run_all_steps reads all three eagerly while building
+# the step context, so they must always be bound under `set -u`.
 HAS_ARGS=${HAS_ARGS:-false}
+FAIL_FAST=${FAIL_FAST:-false}
+ONLINE=${ONLINE:-false}
 
 _step_now_ms() {
   if [ -n "${EPOCHREALTIME-}" ]; then
@@ -213,7 +217,7 @@ _run_step() {
   _fifo=$(mktemp -u "${TMPDIR:-/tmp}/nucleus-step-${_n}-XXXXXX")
   mkfifo "$_fifo"
   (
-    if "$_func" "$HAS_ARGS" "$REPO_ROOT" "$@"; then
+    if "$_func" "STEP_CTX" "$@"; then
       exit 0
     else
       exit $?
@@ -394,7 +398,29 @@ run_all_steps() {
   _wave_init
   cache_file_lists
 
-  rm -f result result-*
+  # Build the shared context object once; every step receives it explicitly as
+  # its first argument (the name of this assoc array) so no step reads enclosing
+  # globals. Subshells copy the parent's variables, but explicit context keeps
+  # the contract identical to the PowerShell runner and removes ambient reads.
+  local -A STEP_CTX=()
+  STEP_CTX[HAS_ARGS]="$HAS_ARGS"
+  STEP_CTX[REPO_ROOT]="$REPO_ROOT"
+  STEP_CTX[_wave_tmpdir]="$_wave_tmpdir"
+  STEP_CTX[FAIL_FAST]="$FAIL_FAST"
+  STEP_CTX[SKIP_STEPS]="SKIP_STEPS"
+  STEP_CTX[ONLINE]="$ONLINE"
+  STEP_CTX[SH_FILES]="SH_FILES"
+  STEP_CTX[PS1_FILES]="PS1_FILES"
+  STEP_CTX[PKR_FILES]="PKR_FILES"
+  STEP_CTX[NIX_FILES]="NIX_FILES"
+  STEP_CTX[CACHED_NIX_FILES]="CACHED_NIX_FILES"
+  STEP_CTX[CACHED_YAML_FILES]="CACHED_YAML_FILES"
+  STEP_CTX[CACHED_JSON_FILES]="CACHED_JSON_FILES"
+  STEP_CTX[CACHED_SHELL_FILES]="CACHED_SHELL_FILES"
+  # shellcheck disable=SC2034  # reason: STEP_CTX is consumed inside the step subshells via nameref; shellcheck cannot trace cross-subshell use.
+  STEP_CTX[POSITIONAL_ARGS]="POSITIONAL_ARGS"
+
+  rm -rf result result-* # check-suppress:suppression_doc: nix build may leave a 'result' symlink/dir; -rf clears either form
 
   local _max_jobs _pipeline_start_ms
   _max_jobs="${PARALLEL_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 2)}"

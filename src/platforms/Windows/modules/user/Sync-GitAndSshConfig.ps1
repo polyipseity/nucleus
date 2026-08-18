@@ -300,12 +300,12 @@ function Sync-GitAndSshConfig {
     $installRoot = Split-Path -Path (Split-Path -Path $gitExecutable -Parent) -Parent
     $systemConfigPath = Join-Path -Path $installRoot -ChildPath 'etc\gitconfig'
     $systemConfigBackup = "$systemConfigPath.bak"
+    # check-suppress:config-method: method 1 (writable symlink) -- per-host <Host>.gitconfig symlinked into Git's system scope; installer-owned original backed up to etc\gitconfig.bak
     $managedSource = (Join-Path $env:NUCLEUS_REPO_ROOT "src\modules\configs\git\$hostName.gitconfig").Replace('\', '/')
     # check-suppress:suppression_doc: repo checkout may lack the file; fail loudly instead of silently skipping.
     if (-not (Test-Path -Path $managedSource -PathType Leaf)) {
       throw "Sync-GitAndSshConfig: $hostName.gitconfig source not found at $managedSource"
     }
-    # check-suppress:config-method: method 1 (writable symlink) -- per-host <Host>.gitconfig symlinked into Git's system scope; installer-owned original backed up to etc\gitconfig.bak
     if ($Enabled) {
       Save-RegularFileBackup -Path $systemConfigPath -BackupPath $systemConfigBackup
       New-Item -ItemType SymbolicLink -Path $systemConfigPath -Target $managedSource -Force > $null

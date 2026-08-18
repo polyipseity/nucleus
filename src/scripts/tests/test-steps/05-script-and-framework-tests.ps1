@@ -1,5 +1,7 @@
 Register-Step -Id "script-and-framework-tests" -Name "Script and framework tests" -Action {
-  param($RepoRoot)
+  param([Parameter(Mandatory)][PSObject]$Context)
+
+  $RepoRoot = $Context.RepoRoot
 
   $exitCode = 0
   $testDir = Join-Path -Path $RepoRoot -ChildPath 'tests' -AdditionalChildPath 'scripts'

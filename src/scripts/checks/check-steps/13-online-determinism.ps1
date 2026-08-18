@@ -1,9 +1,11 @@
 Register-Step -Id "online-determinism" -Name "Online determinism checks (--online)" -Action {
-  param($RepoRoot)
+  param([Parameter(Mandatory)][PSObject]$Context)
+
+  $RepoRoot = $Context.RepoRoot
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
-  if ($script:ONLINE) {
+  if ($Context.Online) {
     & "$r\scripts\bump-lockfile.ps1" -Verify
     if ($LASTEXITCODE -ne 0) {
       Write-ErrorMessage "online determinism checks failed."

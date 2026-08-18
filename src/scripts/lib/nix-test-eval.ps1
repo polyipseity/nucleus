@@ -20,6 +20,11 @@ function Invoke-NixTestEval {
       ($_ -like 'tests/*.nix') -and
       ((Split-Path -Leaf $_) -ne 'lib.nix') -and
       ((Split-Path -Leaf $_) -ne $selfLeaf)
+    } | ForEach-Object {
+      # WHY: positional args are relative to $RepoRoot (e.g. a temp dir that
+      # mimics a repo layout). Resolve them against $RepoRoot so Get-Content
+      # does not resolve against the current working directory.
+      if ([System.IO.Path]::IsPathRooted($_)) { $_ } else { Join-Path $RepoRoot $_ }
     })
   } else {
     @(Get-ChildItem -Path (Join-Path $r 'tests') -Recurse -File -Filter '*.nix' |

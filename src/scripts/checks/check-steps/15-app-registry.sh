@@ -6,8 +6,9 @@
 register_step "app-registry" "App auto-start registry validation" run_app_registry
 
 run_app_registry() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
+  local -n ctx="$1"
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  shift
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _app_errors=0

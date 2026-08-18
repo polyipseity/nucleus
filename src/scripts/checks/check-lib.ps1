@@ -6,6 +6,10 @@ Set-StrictMode -Version Latest
 
 . (Join-Path $FrameworkDir "step-runner.ps1")
 
+# WHY: tell the runspace which lib to dot-source so step actions can call the
+# Write-* helpers defined below.
+Set-StepLibPath -Path $MyInvocation.MyCommand.Path
+
 $script:FAIL_FAST = $false
 $script:usageAction = {
   Write-Output "Usage: check.ps1 [--fail-fast|--no-fail-fast] [--scoped|--full] [--online] [--skip-steps=<ids>] [path ...]"

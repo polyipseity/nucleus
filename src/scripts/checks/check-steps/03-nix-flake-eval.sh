@@ -6,16 +6,18 @@
 register_step "nix-flake-eval" "Nix flake evaluation" run_nix_flake_eval
 
 run_nix_flake_eval() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
+  local -n ctx="$1"
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  shift
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _ne_exit=0
   local _ne_eval=false
 
+  local -n _nix_files="${ctx[NIX_FILES]}"
   if $_has_args; then
     # Scoped mode: evaluate only when the scoped files include .nix changes.
-    if [ "${#NIX_FILES[@]}" -gt 0 ]; then
+    if [ "${#_nix_files[@]}" -gt 0 ]; then
       _ne_eval=true
     fi
   else

@@ -6,8 +6,9 @@
 register_step "suppression-audit" "Suppression audit" run_suppression_audit
 
 run_suppression_audit() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
+  local -n ctx="$1"
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  shift
   cd "$_repo_root" || return 1
   # Step's own basename, for self-exclusion from the audit below.
   # shellcheck disable=SC2155 # reason: basename's exit status is irrelevant; the step's own basename for self-exclusion
@@ -21,11 +22,15 @@ run_suppression_audit() {
 
   # Collect script files
   local _files=()
+  local -n _sh_files="${ctx[SH_FILES]}"
+  local -n _nix_files="${ctx[NIX_FILES]}"
+  local -n _cached_nix_files="${ctx[CACHED_NIX_FILES]}"
+  local -n _cached_shell_files="${ctx[CACHED_SHELL_FILES]}"
   if $_has_args; then
-    [ ${#SH_FILES[@]} -gt 0 ] && _files+=("${SH_FILES[@]}")
-    [ ${#NIX_FILES[@]} -gt 0 ] && _files+=("${NIX_FILES[@]}")
+    [ ${#_sh_files[@]} -gt 0 ] && _files+=("${_sh_files[@]}")
+    [ ${#_nix_files[@]} -gt 0 ] && _files+=("${_nix_files[@]}")
   else
-    _files=("${CACHED_NIX_FILES[@]}" "${CACHED_SHELL_FILES[@]}")
+    _files=("${_cached_nix_files[@]}" "${_cached_shell_files[@]}")
   fi
 
   # Drop this step's own file: its scan definitions contain the literal suppression patterns.

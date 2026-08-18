@@ -1,8 +1,13 @@
 Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
-  param($HasArgs, $RepoRoot, $PositionalArgs)
+  param([Parameter(Mandatory)][PSObject]$Context)
 
-  $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
-  $failed = $false
+  $HasArgs = $Context.HasArgs
+  $RepoRoot = $Context.RepoRoot
+  $PositionalArgs = $Context.PositionalArgs
+
+  $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }  # WHY: $PSCommandPath is empty inside runspaces (the step body is a [scriptblock]::Create'd text, not a file), so Split-Path -Leaf '' throws "Path empty". Fall back to the known file name.
+  $selfLeaf = if ($PSCommandPath) { Split-Path -Leaf $PSCommandPath } else { '14-repository-policy.ps1' }
+  $selfShLeaf = if ($PSCommandPath) { [System.IO.Path]::ChangeExtension((Split-Path -Leaf $PSCommandPath), '.sh') } else { '14-repository-policy.sh' }  $failed = $false
 
   Write-Message "--- config method compliance ---"
 

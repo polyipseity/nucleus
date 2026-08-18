@@ -5,8 +5,9 @@
 register_step "nix-tests" "Nix test suite" run_nix_tests
 
 run_nix_tests() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
+  local -n ctx="$1"
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  shift
   local _exit_code=0
   local _tmp_failed
 

@@ -141,7 +141,10 @@ _nuc_semantic_color() {
   _nsc_blue="$2"
   _nsc_reset="$3"
   # Color-on only: empty args (disabled stream) -> byte-identical passthrough.
-  [ -n "$_nsc_ulcyan" ] || { cat; return 0; }
+  [ -n "$_nsc_ulcyan" ] || {
+    cat
+    return 0
+  }
   # Quoted spans first, then URLs, so a URL inside quotes still reads as a URL.
   sed -e "s|'\([^']*\)'|${_nsc_blue}'\\1'${_nsc_reset}|g" \
     -e "s|https\?://[^[:space:]'\"]*|${_nsc_ulcyan}&${_nsc_reset}|g"

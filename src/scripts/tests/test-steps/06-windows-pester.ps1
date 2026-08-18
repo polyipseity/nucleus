@@ -1,5 +1,16 @@
 Register-Step -Id "windows-pester" -Name "Windows Pester tests" -Action {
-  param($RepoRoot)
+  param([Parameter(Mandatory)][PSObject]$Context)
+
+  # These Pester suites exercise Windows-only behavior (DSC env-var parity,
+  # Windows service dispatch, etc.). They also rely on $PSScriptRoot-relative
+  # module loading that breaks when Pester is invoked inside a step-runner
+  # runspace on non-Windows hosts. Skip the step off-Windows.
+  if (-not $IsWindows) {
+    Skip-Step -Number (Get-StepNumber -Context $Context) -Name 'Windows Pester tests' -Reason 'non-Windows host'
+    return 2
+  }
+
+  $RepoRoot = $Context.RepoRoot
 
   # Provisioning: materialize env-parity manifest from the Nix catalog before
   # EnvVarParity.Tests.ps1 runs. Preflight only reads the generated JSON file.

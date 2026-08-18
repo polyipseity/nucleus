@@ -1,5 +1,9 @@
 Register-Step -Id "yaml-structural" -Name "YAML structural validation" -Action {
-  param($HasArgs, $RepoRoot, $PositionalArgs)
+  param([Parameter(Mandatory)][PSObject]$Context)
+
+  $HasArgs = $Context.HasArgs
+  $RepoRoot = $Context.RepoRoot
+  $PositionalArgs = $Context.PositionalArgs
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
@@ -9,8 +13,8 @@ Register-Step -Id "yaml-structural" -Name "YAML structural validation" -Action {
   if ($HasArgs) {
     $yamlFiles = $PositionalArgs | Where-Object { $_ -like '*.yml' -or $_ -like '*.yaml' }
   } else {
-    $yamlFiles = if ($script:CachedYamlFiles) {
-      $script:CachedYamlFiles |
+    $yamlFiles = if ($Context.CachedYamlFiles) {
+      $Context.CachedYamlFiles |
         Where-Object { $_ } |
         ForEach-Object { $_ }
     } else {

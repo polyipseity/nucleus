@@ -1,5 +1,7 @@
 Register-Step -Id "locked-dsc-validation" -Name "Locked DSC validation" -Action {
-  param($RepoRoot)
+  param([Parameter(Mandatory)][PSObject]$Context)
+
+  $RepoRoot = $Context.RepoRoot
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
@@ -89,6 +91,7 @@ Register-Step -Id "locked-dsc-validation" -Name "Locked DSC validation" -Action 
 
   # Inject version pins from lockfile into WinGet resources.
   foreach ($resource in $dsc.properties.resources) {
+    if (-not $resource.ContainsKey('settings')) { continue }
     if ($resource.resource -eq 'Microsoft.WinGet.Client/Package' -and $resource.settings.source -eq 'winget') {
       $id = $resource.settings.id
       if ($lockfileData.winget.ContainsKey($id) -and $lockfileData.winget[$id]) {
@@ -99,6 +102,7 @@ Register-Step -Id "locked-dsc-validation" -Name "Locked DSC validation" -Action 
 
   # Validate generated pins match lockfile entries.
   foreach ($resource in $dsc.properties.resources) {
+    if (-not $resource.ContainsKey('settings')) { continue }
     $hasVer = $resource.settings.PSObject.Properties.Name -contains 'version'
     if ($resource.resource -eq 'Microsoft.WinGet.Client/Package' `
         -and $resource.settings.source -eq 'winget' `
@@ -123,6 +127,7 @@ Register-Step -Id "locked-dsc-validation" -Name "Locked DSC validation" -Action 
     $lfVer = $entry.Value
     $foundPin = $false
     foreach ($resource in $dsc.properties.resources) {
+      if (-not $resource.ContainsKey('settings')) { continue }
       $hasVer = $resource.settings.PSObject.Properties.Name -contains 'version'
       if ($resource.resource -eq 'Microsoft.WinGet.Client/Package' `
           -and $resource.settings.source -eq 'winget' `

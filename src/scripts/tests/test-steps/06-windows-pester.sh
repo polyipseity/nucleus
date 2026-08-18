@@ -5,8 +5,9 @@
 register_step "windows-pester" "Windows Pester tests" run_windows_pester
 
 run_windows_pester() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
+  local -n ctx="$1"
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  shift
   say "skipping (Windows Pester tests are pwsh-only)."
   return 2
 }

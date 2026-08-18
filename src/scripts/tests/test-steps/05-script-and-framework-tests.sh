@@ -149,8 +149,9 @@ _run_parallel_script_tests() {
 }
 
 run_script_and_framework_tests() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
+  local -n ctx="$1"
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  shift
   local _exit_code=0
   local _test_dir="$_repo_root/tests/scripts"
   local -a _all_scripts=() _priority_scripts=() _parallel_scripts=()

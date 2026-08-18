@@ -26,6 +26,13 @@ cd "$REPO_ROOT" || exit
 
 # Override parse_args to add test-specific flags
 parse_args() {
+  # Mirror step-runner.sh parse_args defaults so run_all_steps' context object
+  # has every key bound (test mode never runs online and takes no positional args).
+  ONLINE=false
+  SCOPED=false
+  FULL=false
+  HAS_ARGS=false
+  POSITIONAL_ARGS=()
   quiet_mode=false
 
   while [ "$#" -gt 0 ]; do

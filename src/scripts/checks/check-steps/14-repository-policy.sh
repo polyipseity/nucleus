@@ -13,8 +13,10 @@ readonly _REPOSITORY_POLICY_STEP_DIR _REPOSITORY_POLICY_STEP_SH _REPOSITORY_POLI
 register_step "repository-policy" "Repository policy" run_repository_policy
 
 run_repository_policy() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
+  local -n ctx="$1"
+  local _ctx_name="$1"
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  shift
   local _files=("$@")
   local _failed=0
 
@@ -28,7 +30,7 @@ run_repository_policy() {
   run_activation_naming_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
 
   say "--- preflight install command policy ---"
-  run_preflight_install_command_policy "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
+  run_preflight_install_command_policy "$_ctx_name" "${_files[@]}" || _failed=1
 
   say "--- embedded content enforcement ---"
   run_embedded_content_enforcement "$_has_args" "$_repo_root" "${_files[@]}" || _failed=1
@@ -273,9 +275,10 @@ run_activation_naming_policy() {
 }
 
 run_preflight_install_command_policy() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
+  local -n ctx="$1"
+  shift
   local _files=("$@")
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
   cd "$_repo_root" || return 1
 
   local _errors=0
@@ -284,11 +287,12 @@ run_preflight_install_command_policy() {
   local _self_ps1="$_REPOSITORY_POLICY_STEP_PS1"
 
   # Collect PowerShell files
+  local -n _ps1_files_ctx="${ctx[PS1_FILES]}"
   local _ps1_files=()
   if $_has_args; then
-    if [ ${#PS1_FILES[@]} -gt 0 ]; then
+    if [ ${#_ps1_files_ctx[@]} -gt 0 ]; then
       # Drop this check's own sibling file from the scoped set
-      for _f in "${PS1_FILES[@]}"; do
+      for _f in "${_ps1_files_ctx[@]}"; do
         [ "$(basename "$_f")" = "$_self_ps1" ] || _ps1_files+=("$_f")
       done
     fi

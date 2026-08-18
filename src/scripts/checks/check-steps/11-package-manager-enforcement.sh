@@ -6,8 +6,9 @@
 register_step "package-manager-enforcement" "Package manager usage enforcement" run_package_manager_enforcement
 
 run_package_manager_enforcement() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
+  local -n ctx="$1"
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  shift
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _violations=0
@@ -34,10 +35,13 @@ run_package_manager_enforcement() {
   local _self_sh="$(basename "${BASH_SOURCE[0]}")"
   local _self_ps1="${_self_sh%.sh}.ps1"
   local _grep_files=()
+  local -n _sh_files="${ctx[SH_FILES]}"
+  local -n _ps1_files="${ctx[PS1_FILES]}"
+  local -n _nix_files="${ctx[NIX_FILES]}"
   if $_has_args; then
-    [ ${#SH_FILES[@]} -gt 0 ] && _grep_files+=("${SH_FILES[@]}")
-    [ ${#PS1_FILES[@]} -gt 0 ] && _grep_files+=("${PS1_FILES[@]}")
-    [ ${#NIX_FILES[@]} -gt 0 ] && _grep_files+=("${NIX_FILES[@]}")
+    [ ${#_sh_files[@]} -gt 0 ] && _grep_files+=("${_sh_files[@]}")
+    [ ${#_ps1_files[@]} -gt 0 ] && _grep_files+=("${_ps1_files[@]}")
+    [ ${#_nix_files[@]} -gt 0 ] && _grep_files+=("${_nix_files[@]}")
     local _filtered=()
     local _f
     for _f in "${_grep_files[@]}"; do

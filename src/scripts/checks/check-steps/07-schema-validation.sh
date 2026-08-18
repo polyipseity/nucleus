@@ -6,8 +6,9 @@
 register_step "schema-validation" "Schema validation (JSON/YAML)" run_schema_validation
 
 run_schema_validation() {
-  local _has_args="$1" _repo_root="$2"
-  shift 2
+  local -n ctx="$1"
+  local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  shift
   local _files=("$@")
   cd "$_repo_root" || return 1
   local _jsonschema_errors=0
@@ -21,13 +22,15 @@ run_schema_validation() {
   local _js_manifest="$_js_tmpdir/manifest"
   local _js_schema_files=()
 
+  local -n _cached_json_files="${ctx[CACHED_JSON_FILES]}"
+  local -n _cached_yaml_files="${ctx[CACHED_YAML_FILES]}"
   if $_has_args; then
     for _sf in "${_files[@]}"; do
       case "$_sf" in *.json | *.yml | *.yaml) _js_schema_files+=("$_sf") ;; esac
     done
   else
-    _js_schema_files=("${CACHED_JSON_FILES[@]}")
-    for _yf in "${CACHED_YAML_FILES[@]}"; do
+    _js_schema_files=("${_cached_json_files[@]}")
+    for _yf in "${_cached_yaml_files[@]}"; do
       _js_schema_files+=("$_yf")
     done
   fi

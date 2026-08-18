@@ -1,5 +1,9 @@
 Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action {
-  param($HasArgs, $RepoRoot, $PositionalArgs)
+  param([Parameter(Mandatory)][PSObject]$Context)
+
+  $HasArgs = $Context.HasArgs
+  $RepoRoot = $Context.RepoRoot
+  $PositionalArgs = $Context.PositionalArgs
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
   $exitCode = 0
@@ -10,29 +14,32 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
     param(
       [string]$SkipMessage,
       [scriptblock]$Run,
-      [object[]]$ScopedFiles
+      [object[]]$ScopedFiles,
+      [ref]$ToolCount,
+      [ref]$SkippedTools,
+      [ref]$ExitCode
     )
-    $script:toolCount++
+    $ToolCount.Value++
     if ($ScopedFiles.Count -gt 0) {
       & $Run $ScopedFiles
-      if ($LASTEXITCODE -ne 0) { $script:exitCode = $LASTEXITCODE }
+      if ($LASTEXITCODE -ne 0) { $ExitCode.Value = $LASTEXITCODE }
       return
     }
     if ($HasArgs) {
       Write-Message $SkipMessage
-      $script:skippedTools++
+      $SkippedTools.Value++
       return
     }
     & $Run
-    if ($LASTEXITCODE -ne 0) { $script:exitCode = $LASTEXITCODE }
+    if ($LASTEXITCODE -ne 0) { $ExitCode.Value = $LASTEXITCODE }
   }
 
   $shFiles = @(
     if ($HasArgs) {
       $PositionalArgs | Where-Object { $_ -like '*.sh' -or $_ -like '*.envrc' }
     } else {
-      $cached = if ($script:CachedShellFiles) { $script:CachedShellFiles } else { @() }
-      $fromCache = @($cached | ForEach-Object { $_.FullName })
+      $cached = if ($Context.CachedShellFiles) { $Context.CachedShellFiles } else { @() }
+      $fromCache = @($cached)
       # check-suppress:suppression_doc: probe -- no .envrc files may exist; empty result handled.
       $envrc = Get-ChildItem -Recurse -Path $r -Filter '.envrc' -Force -ErrorAction SilentlyContinue |
         Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } |
@@ -40,7 +47,7 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
       @($fromCache + $envrc) | Sort-Object -Unique
     }
   )
-  Invoke-ScopedTool -SkipMessage 'skipping shfmt (no shell files to check).' -ScopedFiles $shFiles -Run {
+  Invoke-ScopedTool -SkipMessage 'skipping shfmt (no shell files to check).' -ScopedFiles $shFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
     param($Files)
     if ($Files) {
       shfmt -w @Files
@@ -57,10 +64,9 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
     if ($HasArgs) {
       $PositionalArgs | Where-Object { $_ -like '*.yml' -or $_ -like '*.yaml' }
     } else {
-      if ($script:CachedYamlFiles) {
-        $script:CachedYamlFiles |
-          Where-Object { $_.FullName -notmatch '[/\\]secrets[/\\]' } |
-          ForEach-Object { $_.FullName }
+      if ($Context.CachedYamlFiles) {
+        $Context.CachedYamlFiles |
+          Where-Object { $_ -notmatch '[/\\]secrets[/\\]' }
       } else {
         Get-ChildItem -Recurse -Path $r -Include '*.yml', '*.yaml' |
           Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' -and $_.FullName -notmatch '[/\\]secrets[/\\]' } |  # ref: allow-and-deny-lists.instructions.md#B2 -- structural invariant
@@ -68,7 +74,7 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
       }
     }
   )
-  Invoke-ScopedTool -SkipMessage 'skipping yamllint (no YAML files to check).' -ScopedFiles $yamlFiles -Run {
+  Invoke-ScopedTool -SkipMessage 'skipping yamllint (no YAML files to check).' -ScopedFiles $yamlFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
     param($Files)
     $ylExit = 0
     foreach ($yf in $Files) {
@@ -88,7 +94,7 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
         Sort-Object FullName | ForEach-Object { $_.FullName }
     }
   )
-  Invoke-ScopedTool -SkipMessage 'skipping taplo (no TOML files to check).' -ScopedFiles $tomlFiles -Run {
+  Invoke-ScopedTool -SkipMessage 'skipping taplo (no TOML files to check).' -ScopedFiles $tomlFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
     param($Files)
     taplo fmt @Files
     if ($LASTEXITCODE -ne 0) { throw 'taplo fmt failed.' }
@@ -97,14 +103,14 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
 
   $pkrFiles = @(
     if ($HasArgs) {
-      if ($script:PKR_FILES) { $script:PKR_FILES } else { @() }
+      if ($Context.PKR_FILES) { $Context.PKR_FILES } else { @() }
     } else {
       Get-ChildItem -Recurse -Path $r -Filter '*.pkr.hcl' |
         Where-Object { $_.FullName -notmatch '[/\\]vendor[/\\]' } |
         Sort-Object FullName | ForEach-Object { $_.FullName }
     }
   )
-  Invoke-ScopedTool -SkipMessage 'skipping packer fmt (no Packer templates to check).' -ScopedFiles $pkrFiles -Run {
+  Invoke-ScopedTool -SkipMessage 'skipping packer fmt (no Packer templates to check).' -ScopedFiles $pkrFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
     param($Files)
     packer fmt @Files
     if ($LASTEXITCODE -ne 0) { throw 'packer fmt failed.' }
@@ -115,34 +121,36 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
     if ($HasArgs) {
       $PositionalArgs | Where-Object { $_ -like '*/.github/workflows/*' }
     } else {
-      $workflowDir = Join-Path $r '.github\workflows'
+      $workflowDir = Join-Path -Path $r -ChildPath '.github' -AdditionalChildPath 'workflows'
       if (Test-Path -LiteralPath $workflowDir) {
-        Get-ChildItem -Path $workflowDir -Include '*.yml', '*.yaml' -Recurse |
-          Sort-Object FullName | ForEach-Object { $_.FullName }
+        @(
+          Get-ChildItem -Path $workflowDir -Filter '*.yml' -File -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- one extension variant may have no matches; empty result handled by the Invoke-ScopedTool skip path
+          Get-ChildItem -Path $workflowDir -Filter '*.yaml' -File -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- one extension variant may have no matches; empty result handled by the Invoke-ScopedTool skip path
+        ) | Sort-Object FullName | ForEach-Object { $_.FullName }
       } else {
         @()
       }
     }
   )
-  Invoke-ScopedTool -SkipMessage 'skipping actionlint (no workflow files to check).' -ScopedFiles $workflowFiles -Run {
+  Invoke-ScopedTool -SkipMessage 'skipping actionlint (no workflow files to check).' -ScopedFiles $workflowFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
     param($Files)
     actionlint @Files
     if ($LASTEXITCODE -ne 0) { throw 'actionlint failed.' }
     Write-Message 'actionlint passed.'
   }
 
-  Invoke-ScopedTool -SkipMessage 'skipping pinact (no workflow files to check).' -ScopedFiles $workflowFiles -Run {
+  Invoke-ScopedTool -SkipMessage 'skipping pinact (no workflow files to check).' -ScopedFiles $workflowFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
     param($Files)
     if ($Files) {
       pinact run --fix=false --no-api @Files
     } else {
-      pinact run --fix=false --no-api (Join-Path $r '.github\workflows')
+      pinact run --fix=false --no-api (Join-Path -Path $r -ChildPath '.github' -AdditionalChildPath 'workflows')
     }
     if ($LASTEXITCODE -ne 0) { throw 'pinact failed.' }
     Write-Message 'pinact passed.'
   }
 
-  Invoke-ScopedTool -SkipMessage 'skipping zizmor (no workflow files to check).' -ScopedFiles $workflowFiles -Run {
+  Invoke-ScopedTool -SkipMessage 'skipping zizmor (no workflow files to check).' -ScopedFiles $workflowFiles -ToolCount ([ref]$toolCount) -SkippedTools ([ref]$skippedTools) -ExitCode ([ref]$exitCode) -Run {
     param($Files)
     zizmor @Files
     if ($LASTEXITCODE -ne 0) { throw 'zizmor failed.' }
@@ -151,7 +159,7 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
 
   $validatePkrFiles = @(
     if ($HasArgs) {
-      if ($script:PKR_FILES) { $script:PKR_FILES } else { @() }
+      if ($Context.PKR_FILES) { $Context.PKR_FILES } else { @() }
     } else {
       @()
     }

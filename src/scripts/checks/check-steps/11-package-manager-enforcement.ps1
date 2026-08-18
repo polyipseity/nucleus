@@ -1,5 +1,9 @@
 Register-Step -Id "package-manager-enforcement" -Name "Package manager usage enforcement" -Action {
-  param($HasArgs, $RepoRoot, $PositionalArgs)
+  param([Parameter(Mandatory)][PSObject]$Context)
+
+  $HasArgs = $Context.HasArgs
+  $RepoRoot = $Context.RepoRoot
+  $PositionalArgs = $Context.PositionalArgs
 
   $r = if ($RepoRoot) { $RepoRoot } else { Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 
@@ -17,21 +21,22 @@ Register-Step -Id "package-manager-enforcement" -Name "Package manager usage enf
   # Ban bare pip install and npm install -- these bypass the lockfile.
   # uv pip install is allowed. Exclude self-references.
   # ref: allow-and-deny-lists.instructions.md#A1 -- orchestrator/config files contain pip/npm patterns in comments; self-refs are dynamic
-  $selfPs1 = $MyInvocation.MyCommand.Name
-  $selfSh = [System.IO.Path]::ChangeExtension($selfPs1, '.sh')
+  # WHY: in a runspace the step body is [scriptblock]::Create'd text, so $MyInvocation.MyCommand.Name is empty; fall back to the literal filename so the self-file is still excluded
+  $selfPs1 = if ($MyInvocation.MyCommand.Name) { $MyInvocation.MyCommand.Name } else { '11-package-manager-enforcement.ps1' }
+  $selfSh = if ($MyInvocation.MyCommand.Name) { [System.IO.Path]::ChangeExtension($MyInvocation.MyCommand.Name, '.sh') } else { '11-package-manager-enforcement.sh' }
   $excludeNames = @('check.sh', 'check.ps1', 'shell.nix', $selfPs1, $selfSh)
 
   if ($HasArgs) {
     # WHY: if-statement output is pipeline-enumerated — an empty else branch yields $null, crashing the .Count checks below under StrictMode; the @() wrapper forces an array
-    $shFiles = @(if ($script:SH_FILES) { $script:SH_FILES } else { $PositionalArgs | Where-Object { $_ -like '*.sh' } })
-    $ps1Files = @(if ($script:PS1_FILES) { $script:PS1_FILES } else { $PositionalArgs | Where-Object { $_ -like '*.ps1' } })
-    $nixFiles = @(if ($script:NIX_FILES) { $script:NIX_FILES } else { $PositionalArgs | Where-Object { $_ -like '*.nix' } })
+    $shFiles = @(if ($Context.ShFiles) { $Context.ShFiles } else { $PositionalArgs | Where-Object { $_ -like '*.sh' } })
+    $ps1Files = @(if ($Context.Ps1Files) { $Context.Ps1Files } else { $PositionalArgs | Where-Object { $_ -like '*.ps1' } })
+    $nixFiles = @(if ($Context.NixFiles) { $Context.NixFiles } else { $PositionalArgs | Where-Object { $_ -like '*.nix' } })
     $grepFiles = @($shFiles + $ps1Files + $nixFiles | Where-Object {
         $excludeNames -notcontains [System.IO.Path]::GetFileName($_)
       })
   } else {
     $grepFiles = @(
-      Get-ChildItem -Recurse -Path "$r\scripts", "$r\src", "$r\tests" `
+      Get-ChildItem -Recurse -Path (Join-Path $r 'scripts'), (Join-Path $r 'src'), (Join-Path $r 'tests') `
         -Include *.sh, *.ps1, *.nix `
         -Exclude check.sh, check.ps1, shell.nix, $selfPs1, $selfSh `
         | ForEach-Object { $_.FullName }
