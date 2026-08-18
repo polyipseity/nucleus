@@ -184,7 +184,8 @@ in
         "${pkgs.jq}/bin/jq" \
         "${pkgs.gawk}/bin/awk" \
         '${builtins.toJSON cargoBinstallDesired}' \
-        "${pkgs.cargo}/bin/cargo"
+        "${pkgs.cargo}/bin/cargo" \
+        "${pkgs.cargo-binstall}/bin/cargo-binstall"
     '';
 
     # -------------------------------------------------------------------------
