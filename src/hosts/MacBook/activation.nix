@@ -78,8 +78,6 @@ let
 
   macBookUserLogDirSuffix = lib.removePrefix "~/" servicesJSON."$logging".MacBook.logDir;
 
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
-
   # Enhanced apple-sdk with real tool symlinks in usr/bin/ so xcrun shims
   # resolve to nixpkgs tools.  Used by configureXcodeSelect below.
   appleSdkEnhanced = import ../../modules/lib/apple-sdk-enhanced.nix { inherit pkgs lib; };
