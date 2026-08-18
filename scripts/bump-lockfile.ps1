@@ -292,7 +292,7 @@ $changed = $false
 # winget — winget show --id <id>
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'winget') {
-  if (Get-Command -Name 'winget' -ErrorAction SilentlyContinue) {
+  if (Get-Command -Name 'winget' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
     if ($ht.ContainsKey('winget') -and $ht['winget'] -is [hashtable]) {
       # Snapshot the keys: assigning a value below invalidates the live
       # KeyCollection enumerator on .NET Core ('Collection was modified').
@@ -318,7 +318,7 @@ if (Test-SectionEnabled 'winget') {
 # scoop — scoop info <pkg>
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'scoop') {
-  if (Get-Command -Name 'scoop' -ErrorAction SilentlyContinue) {
+  if (Get-Command -Name 'scoop' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
     if ($ht.ContainsKey('scoop') -and $ht['scoop'] -is [hashtable]) {
       foreach ($key in @($ht['scoop'].Keys)) {
       $old = $ht['scoop'][$key]
@@ -389,7 +389,7 @@ if (Test-SectionEnabled 'cargo-binstall') {
 # bun — npm view <pkg> version
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'bun') {
-  if (Get-Command -Name 'npm' -ErrorAction SilentlyContinue) {
+  if (Get-Command -Name 'npm' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
     if ($ht.ContainsKey('bun') -and $ht['bun'] -is [hashtable]) {
       foreach ($key in @($ht['bun'].Keys)) {
         $old = $ht['bun'][$key]
@@ -413,7 +413,7 @@ if (Test-SectionEnabled 'bun') {
 # uv — uv tool list
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'uv') {
-  if (Get-Command -Name 'uv' -ErrorAction SilentlyContinue) {
+  if (Get-Command -Name 'uv' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
     # check-suppress:suppression_doc: probe -- uv may not be installed; stderr suppressed for clean output.
     $uvOutput = & uv tool list 2>$null
   if ($uvOutput) {
@@ -466,7 +466,7 @@ if (Test-SectionEnabled 'uv') {
 # rustup — rustc +<channel> --version
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'rustup') {
-  if (Get-Command -Name 'rustup' -ErrorAction SilentlyContinue) {
+  if (Get-Command -Name 'rustup' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
     # Get installed toolchains
     # check-suppress:suppression_doc: probe -- rustup may not be installed; stderr suppressed for clean output.
     $toolchains = & rustup toolchain list 2>$null
@@ -510,7 +510,7 @@ if (Test-SectionEnabled 'rustup') {
 # pwsh — Find-Module via pwsh -NoProfile
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'pwsh') {
-  if (Get-Command -Name 'pwsh' -ErrorAction SilentlyContinue) {
+  if (Get-Command -Name 'pwsh' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
     if ($ht.ContainsKey('pwsh') -and $ht['pwsh'] -is [hashtable]) {
       foreach ($key in @($ht['pwsh'].Keys)) {
         $old = $ht['pwsh'][$key]
@@ -585,7 +585,7 @@ if (Test-SuggestionsEnabled 'suggestions.vscode') {
 # ---------------------------------------------------------------------------
 if (Test-SuggestionsEnabled 'suggestions.ollama') {  # Point at the Ollama daemon directly, bypassing the LiteLLM proxy that
   # home.sessionVariables.OLLAMA_HOST (127.0.0.1:4000) normally routes to.
-  if (Get-Command -Name 'ollama' -ErrorAction SilentlyContinue) {
+  if (Get-Command -Name 'ollama' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
     if ($ht.ContainsKey('suggestions') -and $ht['suggestions'] -is [hashtable] -and $ht['suggestions'].ContainsKey('ollama') -and $ht['suggestions']['ollama'] -is [hashtable]) {
     foreach ($hostName in $ht['suggestions']['ollama'].Keys) {
       $models = $ht['suggestions']['ollama'][$hostName]

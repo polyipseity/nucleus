@@ -20,7 +20,7 @@ function Invoke-LockfileEnforcement {
   $errors = 0
 
   # --- bun (global packages) ---
-  if (Get-Command bun -ErrorAction SilentlyContinue) {
+  if (Get-Command bun -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
     $globalJson = Join-Path $env:USERPROFILE '.\bun\install\global\package.json'
     if (Test-Path $globalJson) {
       $installed = $null
@@ -37,8 +37,8 @@ function Invoke-LockfileEnforcement {
   } else { & $InfoFn "bun: not installed; skipping enforcement" }
 
   # --- uv (tools) ---
-  if (Get-Command uv -ErrorAction SilentlyContinue) {
-    $uvList = & uv tool list 2>$null
+  if (Get-Command uv -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
+    $uvList = & uv tool list 2>$null  # check-suppress:suppression_doc: list command may emit noise/errors when the tool store is uninitialised; empty output is treated as no-installs and drift is still reported below
     $uvSec = if ($Lockfile.ContainsKey('uv')) { $Lockfile.uv } else { @{} }
     foreach ($entry in $uvSec.GetEnumerator()) {
       $tool = $entry.Key; $pin = $entry.Value
@@ -53,8 +53,8 @@ function Invoke-LockfileEnforcement {
   } else { & $InfoFn "uv: not installed; skipping enforcement" }
 
   # --- cargo-binstall (crates) ---
-  if (Get-Command cargo -ErrorAction SilentlyContinue) {
-    $cargoList = & cargo install --list 2>$null
+  if (Get-Command cargo -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
+    $cargoList = & cargo install --list 2>$null  # check-suppress:suppression_doc: list command may emit noise/errors when the tool store is uninitialised; empty output is treated as no-installs and drift is still reported below
     $cbSec = if ($Lockfile.ContainsKey('cargo-binstall')) { $Lockfile.'cargo-binstall' } else { @{} }
     foreach ($entry in $cbSec.GetEnumerator()) {
       $crate = $entry.Key; $pin = $entry.Value
@@ -69,11 +69,11 @@ function Invoke-LockfileEnforcement {
   } else { & $InfoFn "cargo: not installed; skipping enforcement" }
 
   # --- rustup (stable toolchain) ---
-  if (Get-Command rustup -ErrorAction SilentlyContinue) {
+  if (Get-Command rustup -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
     $date = if ($Lockfile.ContainsKey('rustup') -and $Lockfile.rustup.ContainsKey('stable')) { $Lockfile.rustup.stable } else { $null }
     if ($null -ne $date) {
       $spec = "stable-$date"
-      $toolchains = & rustup toolchain list 2>$null
+      $toolchains = & rustup toolchain list 2>$null  # check-suppress:suppression_doc: list command may emit noise/errors when the tool store is uninitialised; empty output is treated as no-installs and drift is still reported below
       $found = $false
       foreach ($line in $toolchains) { if ($line -match "^$([regex]::Escape($spec))") { $found = $true; break } }
       if (-not $found) { & $ErrorFn "rustup.stable: expected toolchain $spec not installed"; $errors++ }
@@ -81,19 +81,19 @@ function Invoke-LockfileEnforcement {
   } else { & $InfoFn "rustup: not installed; skipping enforcement" }
 
   # --- pwsh (modules) ---
-  if (Get-Command pwsh -ErrorAction SilentlyContinue) {
+  if (Get-Command pwsh -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
     $pwshSec = if ($Lockfile.ContainsKey('pwsh')) { $Lockfile.pwsh } else { @{} }
     foreach ($entry in $pwshSec.GetEnumerator()) {
       $mod = $entry.Key; $pin = $entry.Value
-      $inst = & pwsh -NoProfile -NonInteractive -Command "(Get-Module -ListAvailable -Name '$mod' | Select-Object -First 1).Version.ToString()" 2>$null
+      $inst = & pwsh -NoProfile -NonInteractive -Command "(Get-Module -ListAvailable -Name '$mod' | Select-Object -First 1).Version.ToString()" 2>$null  # check-suppress:suppression_doc: list command may emit noise/errors when the tool store is uninitialised; empty output is treated as no-installs and drift is still reported below
       if ([string]::IsNullOrWhiteSpace($inst)) { & $ErrorFn "pwsh.$mod`: expected $pin, not installed"; $errors++ }
       elseif ($inst.Trim() -ne $pin) { & $ErrorFn "pwsh.$mod`: expected $pin, installed $($inst.Trim())"; $errors++ }
     }
   } else { & $InfoFn "pwsh: not installed; skipping enforcement" }
 
   # --- scoop ---
-  if (Get-Command scoop -ErrorAction SilentlyContinue) {
-    $scoopList = & scoop list 2>$null
+  if (Get-Command scoop -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
+    $scoopList = & scoop list 2>$null  # check-suppress:suppression_doc: list command may emit noise/errors when the tool store is uninitialised; empty output is treated as no-installs and drift is still reported below
     $scoopSec = if ($Lockfile.ContainsKey('scoop')) { $Lockfile.scoop } else { @{} }
     foreach ($entry in $scoopSec.GetEnumerator()) {
       $app = $entry.Key; $pin = $entry.Value
@@ -108,8 +108,8 @@ function Invoke-LockfileEnforcement {
   } else { & $InfoFn "scoop: not installed; skipping enforcement" }
 
   # --- winget ---
-  if (Get-Command winget -ErrorAction SilentlyContinue) {
-    $wingetList = & winget list 2>$null
+  if (Get-Command winget -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
+    $wingetList = & winget list 2>$null  # check-suppress:suppression_doc: list command may emit noise/errors when the tool store is uninitialised; empty output is treated as no-installs and drift is still reported below
     $wingetSec = if ($Lockfile.ContainsKey('winget')) { $Lockfile.winget } else { @{} }
     foreach ($entry in $wingetSec.GetEnumerator()) {
       $app = $entry.Key; $pin = $entry.Value
@@ -134,10 +134,10 @@ function Invoke-LockfileEnforcement {
   # installed extension versions to the lockfile map; never error.  Skip
   # gracefully when no code CLI is installed.
   $codeExe = $null
-  if (Get-Command code -ErrorAction SilentlyContinue) { $codeExe = 'code' }
-  elseif (Get-Command code-insiders -ErrorAction SilentlyContinue) { $codeExe = 'code-insiders' }
+  if (Get-Command code -ErrorAction SilentlyContinue) { $codeExe = 'code' }  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
+  elseif (Get-Command code-insiders -ErrorAction SilentlyContinue) { $codeExe = 'code-insiders' }  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
   if ($null -ne $codeExe) {
-    $installedList = & $codeExe --list-extensions --show-versions 2>$null
+    $installedList = & $codeExe --list-extensions --show-versions 2>$null  # check-suppress:suppression_doc: list command may emit noise/errors when the tool store is uninitialised; empty output is treated as no-installs and drift is still reported below
     $vscodeSec = if ($Lockfile.ContainsKey('suggestions') -and $Lockfile.suggestions.ContainsKey('vscode')) { $Lockfile.suggestions.vscode } else { @{} }
     foreach ($entry in $vscodeSec.GetEnumerator()) {
       $ext = $entry.Key; $pin = $entry.Value

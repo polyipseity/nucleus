@@ -21,10 +21,16 @@
 _lfe_check_bun() {
   local _lf="$1" _jq="$2"
   local _bun
-  _bun="$(command -v bun || true)"
-  [ -z "$_bun" ] && { say -l bun "not installed; skipping enforcement"; return 0; }
+  _bun="$(command -v bun || true)" # check-suppress:suppression_doc: command -v exits non-zero when the tool is absent; || true avoids set -e abort and the empty-string check below handles it
+  [ -z "$_bun" ] && {
+    say -l bun "not installed; skipping enforcement"
+    return 0
+  }
   local _global_json="$HOME/.bun/install/global/package.json"
-  [ -f "$_global_json" ] || { say -l bun "no global package.json; skipping"; return 0; }
+  [ -f "$_global_json" ] || {
+    say -l bun "no global package.json; skipping"
+    return 0
+  }
   local _installed
   # check-suppress:suppression_doc: malformed global package.json treats installed set as empty -- safe, drift is still reported below.
   _installed="$(cat "$_global_json" 2>/dev/null)" || true
@@ -35,7 +41,7 @@ _lfe_check_bun() {
     [ -z "$_pkg" ] && continue
     # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
-    _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg p "$_pkg" '(.bun // {})[$p] // empty' 2>/dev/null)" || true
+    _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg p "$_pkg" '(.bun // {})[$p] // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
     [ -z "$_pin" ] && continue
     # Object (VCS/rev) pins are not version-verifiable from the installed record.
     if [ "${_pin%"${_pin#?}"}" = '{' ]; then
@@ -44,7 +50,7 @@ _lfe_check_bun() {
     fi
     # check-suppress:suppression_doc: jq parse failure on a malformed installed record skips the comparison -- safe.
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
-    _inst="$(printf '%s' "$_installed" | "$_jq" -r --arg p "$_pkg" '(.dependencies // {})[$p] // empty' 2>/dev/null)" || true
+    _inst="$(printf '%s' "$_installed" | "$_jq" -r --arg p "$_pkg" '(.dependencies // {})[$p] // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed installed record skips the comparison -- safe.
     if [ -z "$_inst" ]; then
       error "bun.$_pkg: expected $_pin, not installed" || _rc=1
     elif [ "$_inst" != "$_pin" ]; then
@@ -60,12 +66,18 @@ EOF
 _lfe_check_uv() {
   local _lf="$1" _jq="$2"
   local _uv
-  _uv="$(command -v uv || true)"
-  [ -z "$_uv" ] && { say -l uv "not installed; skipping enforcement"; return 0; }
+  _uv="$(command -v uv || true)" # check-suppress:suppression_doc: command -v exits non-zero when the tool is absent; || true avoids set -e abort and the empty-string check below handles it
+  [ -z "$_uv" ] && {
+    say -l uv "not installed; skipping enforcement"
+    return 0
+  }
   local _installed
   # check-suppress:suppression_doc: uv tool list may fail if no tool env initialised -- safe, drift reported below if parseable.
   _installed="$("$_uv" tool list 2>/dev/null)" || true
-  [ -z "$_installed" ] && { say -l uv "no tools installed; skipping"; return 0; }
+  [ -z "$_installed" ] && {
+    say -l uv "no tools installed; skipping"
+    return 0
+  }
   local _pkgs _tool _pin _inst _rc=0
   # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the section -- safe.
   _pkgs="$(printf '%s' "$_lf" | "$_jq" -r '(.uv // {}) | keys[]' 2>/dev/null)" || return 0
@@ -73,7 +85,7 @@ _lfe_check_uv() {
     [ -z "$_tool" ] && continue
     # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
-    _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg p "$_tool" '(.uv // {})[$p] // empty' 2>/dev/null)" || true
+    _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg p "$_tool" '(.uv // {})[$p] // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
     [ -z "$_pin" ] && continue
     if [ "${_pin%"${_pin#?}"}" = '{' ]; then
       say -l uv "$_tool: VCS-pinned (rev) — not version-verifiable, skipping"
@@ -95,12 +107,18 @@ EOF
 _lfe_check_cargo_binstall() {
   local _lf="$1" _jq="$2"
   local _cargo
-  _cargo="$(command -v cargo || true)"
-  [ -z "$_cargo" ] && { say -l cargo-binstall "cargo not installed; skipping enforcement"; return 0; }
+  _cargo="$(command -v cargo || true)" # check-suppress:suppression_doc: command -v exits non-zero when the tool is absent; || true avoids set -e abort and the empty-string check below handles it
+  [ -z "$_cargo" ] && {
+    say -l cargo-binstall "cargo not installed; skipping enforcement"
+    return 0
+  }
   local _installed
   # check-suppress:suppression_doc: cargo install --list may fail if ~/.cargo uninitialised -- safe.
   _installed="$("$_cargo" install --list 2>/dev/null)" || true
-  [ -z "$_installed" ] && { say -l cargo-binstall "no crates installed; skipping"; return 0; }
+  [ -z "$_installed" ] && {
+    say -l cargo-binstall "no crates installed; skipping"
+    return 0
+  }
   local _pkgs _crate _pin _inst _rc=0
   # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the section -- safe.
   _pkgs="$(printf '%s' "$_lf" | "$_jq" -r '(.["cargo-binstall"] // {}) | keys[]' 2>/dev/null)" || return 0
@@ -108,7 +126,7 @@ _lfe_check_cargo_binstall() {
     [ -z "$_crate" ] && continue
     # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
-    _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg p "$_crate" '(.["cargo-binstall"] // {})[$p] // empty' 2>/dev/null)" || true
+    _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg p "$_crate" '(.["cargo-binstall"] // {})[$p] // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
     [ -z "$_pin" ] && continue
     if [ "${_pin%"${_pin#?}"}" = '{' ]; then
       say -l cargo-binstall "$_crate: VCS-pinned (rev) — not version-verifiable, skipping"
@@ -130,12 +148,18 @@ EOF
 _lfe_check_rustup() {
   local _lf="$1" _jq="$2"
   local _rustup
-  _rustup="$(command -v rustup || true)"
-  [ -z "$_rustup" ] && { say -l rustup "not installed; skipping enforcement"; return 0; }
+  _rustup="$(command -v rustup || true)" # check-suppress:suppression_doc: command -v exits non-zero when the tool is absent; || true avoids set -e abort and the empty-string check below handles it
+  [ -z "$_rustup" ] && {
+    say -l rustup "not installed; skipping enforcement"
+    return 0
+  }
   # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
   local _date
-  _date="$(printf '%s' "$_lf" | "$_jq" -r '(.rustup // {}).stable // empty' 2>/dev/null)" || true
-  [ -z "$_date" ] && { say -l rustup "no stable pin in lockfile; skipping"; return 0; }
+  _date="$(printf '%s' "$_lf" | "$_jq" -r '(.rustup // {}).stable // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
+  [ -z "$_date" ] && {
+    say -l rustup "no stable pin in lockfile; skipping"
+    return 0
+  }
   local _spec="stable-${_date}"
   # check-suppress:suppression_doc: rustup toolchain list may fail if rustup uninitialised -- safe.
   if "$_rustup" toolchain list 2>/dev/null | grep -q "^${_spec}"; then
@@ -150,8 +174,11 @@ _lfe_check_rustup() {
 _lfe_check_pwsh() {
   local _lf="$1" _jq="$2"
   local _pwsh
-  _pwsh="$(command -v pwsh || true)"
-  [ -z "$_pwsh" ] && { say -l pwsh "not installed; skipping enforcement"; return 0; }
+  _pwsh="$(command -v pwsh || true)" # check-suppress:suppression_doc: command -v exits non-zero when the tool is absent; || true avoids set -e abort and the empty-string check below handles it
+  [ -z "$_pwsh" ] && {
+    say -l pwsh "not installed; skipping enforcement"
+    return 0
+  }
   local _pkgs _mod _pin _inst _rc=0
   # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the section -- safe.
   _pkgs="$(printf '%s' "$_lf" | "$_jq" -r '(.pwsh // {}) | keys[]' 2>/dev/null)" || return 0
@@ -159,7 +186,7 @@ _lfe_check_pwsh() {
     [ -z "$_mod" ] && continue
     # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
-    _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg m "$_mod" '(.pwsh // {})[$m] // empty' 2>/dev/null)" || true
+    _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg m "$_mod" '(.pwsh // {})[$m] // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
     [ -z "$_pin" ] && continue
     # check-suppress:suppression_doc: module query may fail if pwsh profile errors -- safe.
     _inst="$("$_pwsh" -NoProfile -NonInteractive -Command "Get-Module -ListAvailable -Name '$_mod' | Select-Object -First 1 | ForEach-Object { \$_.Version.ToString() }" 2>/dev/null)" || true
@@ -199,11 +226,14 @@ EOF
 _lfe_check_vscode() {
   local _lf="$1" _jq="$2"
   local _code
-  _code="$(command -v code || command -v code-insiders || true)"
-  [ -z "$_code" ] && { say -l vscode "no code CLI; skipping suggestions.vscode verify"; return 0; }
+  _code="$(command -v code || command -v code-insiders || true)" # check-suppress:suppression_doc: command -v exits non-zero when the tool is absent; || true avoids set -e abort and the empty-string check below handles it
+  [ -z "$_code" ] && {
+    say -l vscode "no code CLI; skipping suggestions.vscode verify"
+    return 0
+  }
   local _installed
   # check-suppress:suppression_doc: code CLI failure yields empty installed set -- safe, drift is still reported below.
-  _installed="$( "$_code" --list-extensions --show-versions 2>/dev/null)" || true
+  _installed="$("$_code" --list-extensions --show-versions 2>/dev/null)" || true
   local _pkgs _pkg _pin _inst
   # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the section -- safe.
   _pkgs="$(printf '%s' "$_lf" | "$_jq" -r '(.suggestions.vscode // {}) | keys[]' 2>/dev/null)" || return 0
@@ -211,7 +241,7 @@ _lfe_check_vscode() {
     [ -z "$_pkg" ] && continue
     # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
     # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
-    _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg p "$_pkg" '(.suggestions.vscode // {})[$p] // empty' 2>/dev/null)" || true
+    _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg p "$_pkg" '(.suggestions.vscode // {})[$p] // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
     [ -z "$_pin" ] && continue
     # shellcheck disable=SC2016 # reason: extension id is a literal prefix match
     _inst="$(printf '%s\n' "$_installed" | awk -F'@' -v id="$_pkg" '$1==id {print $2; exit}')"
@@ -261,7 +291,7 @@ verify_installed_versions() {
   fi
 
   local _jq
-  _jq="$(command -v jq || true)"
+  _jq="$(command -v jq || true)" # check-suppress:suppression_doc: command -v exits non-zero when the tool is absent; || true avoids set -e abort and the empty-string check below handles it
   if [ -z "$_jq" ]; then
     error "jq not found; cannot verify lockfile versions"
     return 1
