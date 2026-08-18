@@ -22,7 +22,7 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
           $manifest.Add(@{SchemaFile = $schemafile; InstanceFile = $sf })
         }
       } elseif ($sf -like '*.yml' -or $sf -like '*.yaml') {
-        $schema = try { ($sf | Get-Content -Raw | ConvertFrom-Yaml)['$schema'] } catch { $null }
+        $schema = try { (ConvertFrom-Yaml -Yaml (Get-Content $sf -Raw))['$schema'] } catch { $null }
         if ($schema) {
           if ($schema -match '^\.') {
             $schemafile = [System.IO.Path]::GetFullPath((Join-Path (Split-Path $sf) $schema))
@@ -51,15 +51,15 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
     # YAML files
     Get-ChildItem -Recurse -Path $r -Include '*.yml', '*.yaml' | Where-Object {
       $_.FullName -notmatch '[/\\]vendor[/\\]'  # ref: allow-and-deny-lists.instructions.md#B3 -- structural invariant; gitignore filter applied on top
-    } | Select-GitIgnored | ForEach-Object {
-      $schema = try { ($_ | Get-Content -Raw | ConvertFrom-Yaml)['$schema'] } catch { $null }
+    } | ForEach-Object { $_.FullName } | Select-GitIgnored | ForEach-Object {
+      $schema = try { (ConvertFrom-Yaml -Yaml (Get-Content $_ -Raw))['$schema'] } catch { $null }
       if ($schema) {
         if ($schema -match '^\.') {
-          $schemafile = [System.IO.Path]::GetFullPath((Join-Path $_.DirectoryName $schema))
+          $schemafile = [System.IO.Path]::GetFullPath((Join-Path (Split-Path $_ -Parent) $schema))
         } else {
           $schemafile = $schema
         }
-        $manifest.Add(@{SchemaFile = $schemafile; InstanceFile = $_.FullName })
+        $manifest.Add(@{SchemaFile = $schemafile; InstanceFile = $_ })
       }
     }
   }
@@ -83,7 +83,7 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
     } | ForEach-Object { $allFiles.Add($_.FullName) }
     Get-ChildItem -Recurse -Path $r -Include '*.yml', '*.yaml' | Where-Object {
       $_.FullName -notmatch '[/\\]vendor[/\\]'  # ref: allow-and-deny-lists.instructions.md#B3 -- structural invariant; gitignore filter applied on top
-    } | Select-GitIgnored | ForEach-Object { $allFiles.Add($_.FullName) }
+    } | ForEach-Object { $_.FullName } | Select-GitIgnored | ForEach-Object { $allFiles.Add($_) }
   }
 
   foreach ($f in $allFiles) {
@@ -158,9 +158,12 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
   }
 
   # GitHub schema validation -- always-run
-  $ghWorkflows = Join-Path $r '.github\workflows\*.yml'
-  check-jsonschema --builtin-schema vendor.github-workflows $ghWorkflows
-  if ($LASTEXITCODE -ne 0) { $jsonschemaErrors++ }
+  $ghWorkflowDir = Join-Path -Path $r -ChildPath '.github' -AdditionalChildPath 'workflows'
+  $ghWorkflows = @(Get-ChildItem -Path $ghWorkflowDir -Filter '*.yml' -File -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })  # check-suppress:suppression_doc: probe -- .github/workflows may be absent; empty result is handled by the .Count -gt 0 guard below
+  if ($ghWorkflows.Count -gt 0) {
+    check-jsonschema --builtin-schema vendor.github-workflows $ghWorkflows
+    if ($LASTEXITCODE -ne 0) { $jsonschemaErrors++ }
+  }
 
   $dependabot = Join-Path $r '.github\dependabot.yml'
   if (Test-Path $dependabot) {
