@@ -37,6 +37,14 @@ _NUCLEUS_TESTS_DIR="$(CDPATH='' cd -- "$_ORCH_SCRIPT_DIR/../src/scripts/tests" &
 # shellcheck source=../src/scripts/tests/test-steps.sh
 . "$_NUCLEUS_TESTS_DIR/test-steps.sh"
 
+# Disable Nix auto-GC for the whole scripted pipeline. The Data volume is
+# frequently >90% full; Nix's default min-free (40GiB) then triggers auto-GC
+# that deletes flake-input source trees another parallel step still needs
+# mid-eval (see src/scripts/lib/lib.sh merge_nix_config). min-free = 0 keeps
+# inputs stable across parallel steps.
+NIX_CONFIG="$(merge_nix_config)"
+export NIX_CONFIG
+
 cd "$REPO_ROOT" || exit
 
 parse_args "$@"
