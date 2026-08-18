@@ -661,7 +661,8 @@ $nucleusBumpLockfileFlags = @(
   '--help',
   '--list-sections',
   '--sections',
-  '--verify'
+  '--verify',
+  '--verify-installed'
 )
 
 $nucleusCheckFlags = @(
