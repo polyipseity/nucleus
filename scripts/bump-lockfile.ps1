@@ -489,7 +489,15 @@ if (Test-SectionEnabled 'rustup') {
         # check-suppress:suppression_doc: probe -- toolchain may not be installed; stderr suppressed for clean output.
         $versionOutput = & rustc "+$key" --version 2>$null
         if ($versionOutput) {
-          $match = [regex]::Match($versionOutput, '\d{4}-\d{2}-\d{2}')
+          # nightly pins carry a valid -YYYY-MM-DD archive suffix; record the
+          # full nightly-YYYY-MM-DD spec. stable/beta are rolling channels
+          # pinned by version (X.Y.Z) — a date suffix is invalid for them, so
+          # record the bare version instead of the release date.
+          if ($key -eq 'nightly' -or $key -match '^nightly-\d{4}-\d{2}-\d{2}$') {
+            $match = [regex]::Match($versionOutput, 'nightly-\d{4}-\d{2}-\d{2}')
+          } else {
+            $match = [regex]::Match($versionOutput, '\d+\.\d+\.\d+')
+          }
           if ($match.Success) {
             $new = $match.Value
             if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
