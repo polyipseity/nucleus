@@ -8,6 +8,7 @@ register_step "code-formatting" "Code formatting and linting" run_code_formattin
 run_code_formatting() {
   local -n ctx="$1"
   local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
+  local -n _pkr_files="${ctx[PKR_FILES]}"
   shift
   local _files=("$@")
   cd "$_repo_root" || return 1
@@ -80,8 +81,8 @@ run_code_formatting() {
   fi
 
   local _pkr_exit=0
-  if [ "${#PKR_FILES[@]}" -gt 0 ]; then
-    bash scripts/check-packer.sh --validate-only "${PKR_FILES[@]}" || _pkr_exit=$?
+  if [ "${#_pkr_files[@]}" -gt 0 ]; then
+    bash scripts/check-packer.sh --validate-only "${_pkr_files[@]}" || _pkr_exit=$?
   elif ! $_has_args; then
     bash scripts/check-packer.sh --validate-only || _pkr_exit=$?
   else
