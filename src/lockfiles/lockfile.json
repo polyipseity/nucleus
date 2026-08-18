@@ -16,7 +16,7 @@
     "powershell-yaml": "0.4.12"
   },
   "rustup": {
-    "stable": "2026-04-14"
+    "stable": "1.95.0"
   },
   "scoop": {
     "cargo-binstall": "1.10.0",

@@ -60,7 +60,7 @@
       "additionalProperties": {
         "type": "string"
       },
-      "description": "Rustup toolchain versions. Channel name → date string.",
+      "description": "Rustup toolchain pins. Channel name → version (stable/beta) or nightly-YYYY-MM-DD (nightly).",
       "type": "object"
     },
     "scoop": {
