@@ -143,7 +143,8 @@ test_cargo_binstall_passes_version_pins() {
   if run_pkg_script install-cargo-binstall-packages.sh "$tmp" \
     "$(command -v jq)" "$(command -v awk)" \
     '["nickel-lang-lsp","pay-respects"]' \
-    "$tmp/bin/cargo" >"$tmp/out.txt" 2>&1; then
+    "$tmp/bin/cargo" \
+    "$tmp/bin/cargo-binstall" >"$tmp/out.txt" 2>&1; then
     assert_pass "install-cargo-binstall-packages runs to completion"
   else
     assert_fail "install-cargo-binstall-packages runs to completion" "exit code $?"
