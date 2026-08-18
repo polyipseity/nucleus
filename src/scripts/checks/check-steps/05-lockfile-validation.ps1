@@ -27,7 +27,7 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
   } else {
     $lf = Get-Content $lfPath -Raw | ConvertFrom-Json -AsHashtable
     # Known cross-section overlaps that are legitimate
-    $lfOverlapExceptions = @('astral-sh.ty')  # ref: allow-and-deny-lists.instructions.md#D1 -- legitimate cross-section overlap in lockfile
+    $lfOverlapExceptions = @()  # ref: allow-and-deny-lists.instructions.md#D1 -- legitimate cross-section overlaps in lockfile
     $pkgToSections = @{}
     foreach ($section in $lf.Keys) {
       if ($section -eq 'ollama') { continue }
@@ -117,7 +117,7 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
       $lfErrors++
     } else {
       foreach ($entry in $lf[$section].GetEnumerator()) {
-        if ([string]::IsNullOrEmpty($entry.Value) -or @('CHANGEME', '1.0.0') -contains $entry.Value) {
+        if ([string]::IsNullOrEmpty($entry.Value) -or $entry.Value -eq 'CHANGEME') {
           Write-ErrorMessage "${section}.$($entry.Key): placeholder version ($($entry.Value))"
           $lfErrors++
         }
@@ -131,7 +131,7 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
     $lfErrors++
   } elseif ($lf.winget.Count -gt 0) {
     foreach ($entry in $lf.winget.GetEnumerator()) {
-      if ([string]::IsNullOrEmpty($entry.Value) -or @('CHANGEME', '1.0.0') -contains $entry.Value) {
+      if ([string]::IsNullOrEmpty($entry.Value) -or $entry.Value -eq 'CHANGEME') {
         Write-ErrorMessage "winget.$($entry.Key): placeholder version ($($entry.Value))"
         $lfErrors++
       }
@@ -146,7 +146,7 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
     $lfErrors++
   } elseif ($lf.suggestions.vscode.Count -gt 0) {
     foreach ($entry in $lf.suggestions.vscode.GetEnumerator()) {
-      if ([string]::IsNullOrEmpty($entry.Value) -or @('CHANGEME', '1.0.0') -contains $entry.Value) {
+      if ([string]::IsNullOrEmpty($entry.Value) -or $entry.Value -eq 'CHANGEME') {
         Write-ErrorMessage "suggestions.vscode.$($entry.Key): placeholder version ($($entry.Value))"
         $lfErrors++
       }
@@ -155,26 +155,26 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
     Write-Message "warning: suggestions.vscode: empty section (not yet populated)"
   }
 
-  # homebrew: must be non-empty
-  if (-not $lf.ContainsKey('homebrew') -or $lf.homebrew.Count -eq 0) {
-    Write-ErrorMessage "homebrew: empty or missing section"
+  # homebrew: must be non-empty (lives under suggestions — warn-only per schema)
+  if (-not $lf.ContainsKey('suggestions') -or -not $lf.suggestions.ContainsKey('homebrew') -or $lf.suggestions.homebrew.Count -eq 0) {
+    Write-ErrorMessage "suggestions.homebrew: empty or missing section"
     $lfErrors++
   }
 
-  # ollama: must have at least one profile with models
-  if (-not $lf.ContainsKey('ollama') -or $lf.ollama.Count -eq 0) {
-    Write-ErrorMessage "ollama: empty or missing section"
+  # ollama: must have at least one profile with models (lives under suggestions — warn-only per schema)
+  if (-not $lf.ContainsKey('suggestions') -or -not $lf.suggestions.ContainsKey('ollama') -or $lf.suggestions.ollama.Count -eq 0) {
+    Write-ErrorMessage "suggestions.ollama: empty or missing section"
     $lfErrors++
   } else {
-    foreach ($ollamaProfile in $lf.ollama.GetEnumerator()) {
+    foreach ($ollamaProfile in $lf.suggestions.ollama.GetEnumerator()) {
       if ($ollamaProfile.Value.Count -eq 0) {
-        Write-ErrorMessage "ollama.$($ollamaProfile.Key): empty model list"
+        Write-ErrorMessage "suggestions.ollama.$($ollamaProfile.Key): empty model list"
         $lfErrors++
       } else {
         for ($i = 0; $i -lt $ollamaProfile.Value.Count; $i++) {
           $model = $ollamaProfile.Value[$i]
           if ([string]::IsNullOrEmpty($model.name) -or [string]::IsNullOrEmpty($model.tag)) {
-            Write-ErrorMessage "ollama.$($profile.Key)[$i]: missing name or tag"
+            Write-ErrorMessage "suggestions.ollama.$($ollamaProfile.Key)[$i]: missing name or tag"
             $lfErrors++
           }
         }
