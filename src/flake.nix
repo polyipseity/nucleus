@@ -488,6 +488,7 @@
             scriptName = "src/scripts/apply";
             runtimeInputs = [
               pkgs.curl
+              pkgs.gawk
               pkgs.git
               pkgs.jq
               pkgs.openssh
@@ -740,6 +741,7 @@
             scriptName = "src/scripts/apply";
             runtimeInputs = [
               pkgs.curl
+              pkgs.gawk
               pkgs.git
               pkgs.jq
               pkgs.openssh
