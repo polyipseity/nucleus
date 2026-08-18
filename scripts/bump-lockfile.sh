@@ -357,7 +357,15 @@ if section_enabled rustup; then
     [ -z "$old" ] && continue
     # Check if the toolchain is installed before querying
     if rustup toolchain list 2>/dev/null | grep -q "^$key"; then
-      new=$(rustc "+$key" --version 2>/dev/null | grep -oE '[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1)
+      # nightly pins carry a valid -YYYY-MM-DD archive suffix; record the full
+      # nightly-YYYY-MM-DD spec. stable/beta are rolling channels pinned by
+      # version (X.Y.Z) — a date suffix is invalid for them, so record the
+      # bare version instead of the release date.
+      if [ "$key" = "nightly" ] || printf '%s\n' "$key" | grep -qE '^nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}$'; then
+        new=$(rustc "+$key" --version 2>/dev/null | grep -oE 'nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}' | head -1)
+      else
+        new=$(rustc "+$key" --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+      fi
       if [ -n "$new" ] && [ "$new" != "$old" ]; then
         log_update "rustup" "$key" "$old" "$new"
         data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.rustup[$k] = $v')
