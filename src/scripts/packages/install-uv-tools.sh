@@ -81,7 +81,8 @@ while IFS= read -r _iut_tool; do
         else "" end
     ' "$_iut_lockfile" 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile treats the pin as absent -- safe because the tool is then installed unpinned.
   fi
-  _iut_installed_version="$(awk -F'\t' -v p="$_iut_tool" '$1 == p { print $2; exit }' "$_iut_installed_versions")"
+  # shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
+  _iut_installed_version="$("$_iut_gawk_bin" -F'\t' -v p="$_iut_tool" '$1 == p { print $2; exit }' "$_iut_installed_versions")"
   _iut_needs_install=0
   if ! grep -qxF "$_iut_tool" "$_iut_installed"; then
     _iut_needs_install=1

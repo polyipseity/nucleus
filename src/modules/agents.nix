@@ -108,7 +108,8 @@ in
     install-bun-packages = lib.hm.dag.entryAfter [ "install-agent-skills" ] ''
       "${activationBundle}/src/scripts/packages/install-bun-packages.sh" \
         "${pkgs.jq}/bin/jq" \
-        "${pkgs.bun}/bin/bun"
+        "${pkgs.bun}/bin/bun" \
+        "${pkgs.gawk}/bin/awk"
     '';
 
     # -------------------------------------------------------------------------

@@ -17,6 +17,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 _jq_bin="$1"
 _bun_bin="$2"
+_gawk_bin="$3"
 
 # Add bun's directory to PATH so bun is callable and child processes
 # can find it.
@@ -95,7 +96,8 @@ while IFS= read -r _ibp_pkg; do
         else "" end
     ' "$_ibp_lockfile" 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile treats the pin as absent -- safe because the package is then installed unpinned.
   fi
-  _ibp_installed_version="$(awk -F'\t' -v p="$_ibp_pkg" '$1 == p { print $2; exit }' "$_ibp_installed_versions")"
+  # shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
+  _ibp_installed_version="$("$_gawk_bin" -F'\t' -v p="$_ibp_pkg" '$1 == p { print $2; exit }' "$_ibp_installed_versions")"
   _ibp_needs_install=0
   if ! grep -qxF "$_ibp_pkg" "$_ibp_installed"; then
     _ibp_needs_install=1

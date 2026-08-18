@@ -81,7 +81,8 @@ while IFS= read -r _icp_crate; do
         else "" end
     ' "$_icp_lockfile" 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile treats the pin as absent -- safe because the crate is then installed unpinned.
   fi
-  _icp_installed_version="$(awk -F'\t' -v p="$_icp_crate" '$1 == p { print $2; exit }' "$_icp_installed_versions")"
+  # shellcheck disable=SC2016 # reason: awk script body must not be expanded by shell
+  _icp_installed_version="$("$_icp_gawk_bin" -F'\t' -v p="$_icp_crate" '$1 == p { print $2; exit }' "$_icp_installed_versions")"
   _icp_needs_install=0
   if ! grep -qxF "$_icp_crate" "$_icp_installed"; then
     _icp_needs_install=1
