@@ -127,7 +127,7 @@ while IFS= read -r _icp_crate; do
   fi
   say -l cargo-binstall "installing $_icp_spec"
   # shellcheck disable=SC2086 # reason: _icp_spec is a single crate@version token or a --git/--rev/crate triple, intentionally unquoted
-  if ! cargo-binstall --no-confirm $_icp_spec; then
+  if ! "$_icp_cargo_binstall_bin" --no-confirm $_icp_spec; then
     die -l cargo-binstall "'cargo-binstall $_icp_spec' failed"
   fi
   say -l cargo-binstall "'$_icp_crate' installed"
