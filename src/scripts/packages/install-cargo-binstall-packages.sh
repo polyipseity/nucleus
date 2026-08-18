@@ -7,6 +7,9 @@
 # from PATH — ShellCheck cannot verify PATH-resolved commands at activation
 # time, so external tools must be passed by absolute store path.
 # Runtime path probing (~/.cargo/bin) is prohibited.
+# External tools MUST be passed as absolute store-path arguments; bare
+# PATH-resolved commands are forbidden and enforced by the
+# `activation-tool-resolution` check (step 17).
 #
 # Install priority: nixpkgs > cargo binstall > cargo > bun > uv.
 set -euo pipefail
