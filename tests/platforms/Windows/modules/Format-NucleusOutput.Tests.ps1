@@ -68,16 +68,16 @@ Describe 'Write-NucleusInfo' {
 
   It 'forces ESC bytes when FORCE_COLOR=1 even when captured' {
     # NO_COLOR wins over FORCE_COLOR, so it must be removed first
-    Remove-Item Env:NO_COLOR -ErrorAction SilentlyContinue
+    Remove-Item Env:NO_COLOR -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- env var may be unset; absence is the expected pass
     $env:FORCE_COLOR = '1'
-    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- module may not be loaded; reload is the expected path
     Import-Module $modulePath -Force -DisableNameChecking
     $result = Write-NucleusInfo 'colored' 6>&1
     $result | Should -Match "`e"
     # restore deterministic state for the rest of the suite
-    Remove-Item Env:FORCE_COLOR -ErrorAction SilentlyContinue
+    Remove-Item Env:FORCE_COLOR -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- env var may be unset; absence is the expected pass
     $env:NO_COLOR = '1'
-    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- module may not be loaded; reload is the expected path
     Import-Module $modulePath -Force -DisableNameChecking
   }
 }
@@ -116,7 +116,7 @@ try {
   exit 0
 }
 "@
-    pwsh -NoProfile -Command $script | Out-Null
+    pwsh -NoProfile -Command $script > $null
     $LASTEXITCODE | Should -Be 0
   }
 }
@@ -163,15 +163,15 @@ Describe 'Semantic message coloring' {
   # Color-on branch: FORCE_COLOR=1 overrides capture-time suppression, so the
   # tokenizer output (ESC-wrapped spans) is observable in Pester.
   BeforeAll {
-    Remove-Item Env:NO_COLOR -ErrorAction SilentlyContinue
+    Remove-Item Env:NO_COLOR -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- env var may be unset; absence is the expected pass
     $env:FORCE_COLOR = '1'
-    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- module may not be loaded; reload is the expected path
     Import-Module $modulePath -Force -DisableNameChecking
   }
   AfterAll {
-    Remove-Item Env:FORCE_COLOR -ErrorAction SilentlyContinue
+    Remove-Item Env:FORCE_COLOR -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- env var may be unset; absence is the expected pass
     $env:NO_COLOR = '1'
-    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- module may not be loaded; reload is the expected path
     Import-Module $modulePath -Force -DisableNameChecking
   }
 
@@ -198,43 +198,43 @@ Describe 'Semantic message coloring' {
   }
 
   It 'is byte-identical to plain text under NO_COLOR' {
-    Remove-Item Env:FORCE_COLOR -ErrorAction SilentlyContinue
+    Remove-Item Env:FORCE_COLOR -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- env var may be unset; absence is the expected pass
     $env:NO_COLOR = '1'
-    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- module may not be loaded; reload is the expected path
     Import-Module $modulePath -Force -DisableNameChecking
     $result = Write-NucleusInfo "account 'jellyfin' at https://example.com" 6>&1
     $result | Should -Match "^[a-zA-Z][a-zA-Z0-9-]*: account 'jellyfin' at https://example.com$"
-    Remove-Item Env:NO_COLOR -ErrorAction SilentlyContinue
+    Remove-Item Env:NO_COLOR -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- env var may be unset; absence is the expected pass
     $env:FORCE_COLOR = '1'
-    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- module may not be loaded; reload is the expected path
     Import-Module $modulePath -Force -DisableNameChecking
   }
 }
 
 Describe 'Color detection branches' {
   It 'forces ESC bytes when CLICOLOR_FORCE is set' {
-    Remove-Item Env:NO_COLOR -ErrorAction SilentlyContinue
+    Remove-Item Env:NO_COLOR -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- env var may be unset; absence is the expected pass
     $env:CLICOLOR_FORCE = '1'
-    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- module may not be loaded; reload is the expected path
     Import-Module $modulePath -Force -DisableNameChecking
     $result = Write-NucleusInfo 'colored' 6>&1
     $result | Should -Match "`e"
-    Remove-Item Env:CLICOLOR_FORCE -ErrorAction SilentlyContinue
+    Remove-Item Env:CLICOLOR_FORCE -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- env var may be unset; absence is the expected pass
     $env:NO_COLOR = '1'
-    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- module may not be loaded; reload is the expected path
     Import-Module $modulePath -Force -DisableNameChecking
   }
 
   It 'does not force color when FORCE_COLOR=0' {
-    Remove-Item Env:NO_COLOR -ErrorAction SilentlyContinue
+    Remove-Item Env:NO_COLOR -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- env var may be unset; absence is the expected pass
     $env:FORCE_COLOR = '0'
-    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- module may not be loaded; reload is the expected path
     Import-Module $modulePath -Force -DisableNameChecking
     $result = Write-NucleusInfo 'plain' 6>&1
     $result | Should -Not -Match "`e"
-    Remove-Item Env:FORCE_COLOR -ErrorAction SilentlyContinue
+    Remove-Item Env:FORCE_COLOR -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- env var may be unset; absence is the expected pass
     $env:NO_COLOR = '1'
-    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue
+    Remove-Module Format-NucleusOutput -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- module may not be loaded; reload is the expected path
     Import-Module $modulePath -Force -DisableNameChecking
   }
 }

@@ -201,7 +201,7 @@ Describe 'Format-StatusTable' {
     }
     $output = Format-StatusTable -Results $results
     $output | Should -Not -BeNullOrEmpty
-    $output | Should -Match '"version":"1"'
+    $output | Should -Match '"version":1'
     $output | Should -Match '"services"'
     $output | Should -Match '"ollama"'
   }
@@ -600,7 +600,7 @@ Describe 'Dispatch' {
 
       $output = Invoke-Dispatch -Action list
 
-      $output | Should -Match '"version":"1"'
+      $output | Should -Match '"version":1'
     }
 
     It 'log-config with Json passes -JsonOut to Show-LogConfig' {

@@ -169,7 +169,7 @@ Describe "Autounattend.xml template token integrity" {
 Describe "start-android-vm.ps1 template token integrity" {
   It "declares exactly the 7 expected __TOKEN__ placeholders" {
     $templateTokens = Get-UpperSnakeTokenList (Join-Path $RepoRoot "src\scripts\vms\start-android-vm.ps1")
-    ($templateTokens -join ",") | Should -Be "ANDROID_CPU_COUNT,ANDROID_GSI_IMAGE,ANDROID_RAM_BYTES,ANDROID_SYSTEM_IMAGE,ANDROID_USERDATA_IMAGE,HOSTFWDS"
+    ($templateTokens -join ",") | Should -Be "ANDROID_CPU_COUNT,ANDROID_GSI_IMAGE,ANDROID_NVRAM_IMAGE,ANDROID_RAM_BYTES,ANDROID_SYSTEM_IMAGE,ANDROID_USERDATA_IMAGE,HOSTFWDS"
   }
 
   It "every placeholder has a replacement in the vm.sh sed render chain" {

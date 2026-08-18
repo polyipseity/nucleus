@@ -42,7 +42,7 @@ BeforeAll {
       Remove-Item -LiteralPath $Script:FixtureRoot -Recurse -Force
     }
     $lockfileDir = Join-Path $Script:FixtureRoot 'src/lockfiles'
-    New-Item -Path $lockfileDir -ItemType Directory -Force | Out-Null
+    New-Item -Path $lockfileDir -ItemType Directory -Force > $null
     [System.IO.File]::WriteAllText(
       (Join-Path $lockfileDir 'lockfile.json'),
       $fixtureJson,
@@ -52,7 +52,7 @@ BeforeAll {
     # Fake npm: prints the version stored in npm-version. Dual shim so tests
     # run on Windows CI (npm.cmd) and POSIX pwsh (npm).
     $binDir = Join-Path $Script:FixtureRoot 'bin'
-    New-Item -Path $binDir -ItemType Directory -Force | Out-Null
+    New-Item -Path $binDir -ItemType Directory -Force > $null
     Set-Content -Path (Join-Path $binDir 'npm-version') -Value '1.0.0' -NoNewline
     Set-Content -Path (Join-Path $binDir 'npm.cmd') -Value "@echo off`r`nset /p VER=<%~dp0npm-version`r`necho %VER%" -Encoding ASCII
     Set-Content -Path (Join-Path $binDir 'npm') -Value "#!/bin/sh`ncat `"`$(dirname `"`$0`")/npm-version`"" -Encoding ASCII
@@ -278,7 +278,7 @@ Describe 'bump-lockfile.ps1 missing-tool guards' {
     $result = Invoke-BumpLockfile -Arguments @('-Sections', 'winget')
     $result.ExitCode | Should -Be 0
     Get-FixtureContent | Should -Be $before
-    if (-not (Get-Command -Name 'winget' -ErrorAction SilentlyContinue)) {
+    if (-not (Get-Command -Name 'winget' -ErrorAction SilentlyContinue)) {  # check-suppress:suppression_doc: probe -- tool may be absent; the guard only asserts the skip message when present
       $result.Output | Should -Match 'winget not found — skipping winget section'
     }
   }
@@ -288,7 +288,7 @@ Describe 'bump-lockfile.ps1 missing-tool guards' {
     $result = Invoke-BumpLockfile -Arguments @('-Sections', 'scoop')
     $result.ExitCode | Should -Be 0
     Get-FixtureContent | Should -Be $before
-    if (-not (Get-Command -Name 'scoop' -ErrorAction SilentlyContinue)) {
+    if (-not (Get-Command -Name 'scoop' -ErrorAction SilentlyContinue)) {  # check-suppress:suppression_doc: probe -- tool may be absent; the guard only asserts the skip message when present
       $result.Output | Should -Match 'scoop not found — skipping scoop section'
     }
   }
@@ -296,12 +296,12 @@ Describe 'bump-lockfile.ps1 missing-tool guards' {
   It 'warns and skips the bun section when npm is absent, and never aborts' {
     $before = Get-FixtureContent
     # The fixture ships a fake npm; remove it so the guard path is exercised.
-    Remove-Item -LiteralPath (Join-Path $Script:FixtureRoot 'bin/npm') -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath (Join-Path $Script:FixtureRoot 'bin/npm.cmd') -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath (Join-Path $Script:FixtureRoot 'bin/npm') -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- file may not exist on this platform; absence is the expected pass
+    Remove-Item -LiteralPath (Join-Path $Script:FixtureRoot 'bin/npm.cmd') -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- file may not exist on this platform; absence is the expected pass
     $result = Invoke-BumpLockfile -Arguments @('-Sections', 'bun')
     $result.ExitCode | Should -Be 0
     Get-FixtureContent | Should -Be $before
-    if (-not (Get-Command -Name 'npm' -ErrorAction SilentlyContinue)) {
+    if (-not (Get-Command -Name 'npm' -ErrorAction SilentlyContinue)) {  # check-suppress:suppression_doc: probe -- tool may be absent; the guard only asserts the skip message when present
       $result.Output | Should -Match 'npm not found — skipping bun section'
     }
   }

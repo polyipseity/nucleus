@@ -124,7 +124,7 @@ Describe 'gen-completions.ps1 generated inventory' {
   }
 
   It 'emits a $nucleus<Cmd>Flags array for every nucleus-* command' {
-    $null = Invoke-GenCompletion
+    $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $commands = @(
       'ai', 'apply', 'audit-store', 'bootstrap', 'bump-lockfile', 'check',
       'check-packer', 'check-pwsh', 'check-sh', 'cleanup-nix', 'cloud-setup',
@@ -139,14 +139,14 @@ Describe 'gen-completions.ps1 generated inventory' {
   }
 
   It 'keeps the hand-coded glue: cleanup-nix completer and $nucleusSvcCommands' {
-    $null = Invoke-GenCompletion
+    $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $profileText = Get-FixtureProfile
     $profileText | Should -Match 'Register-ArgumentCompleter -CommandName nucleus-cleanup-nix '
     $profileText | Should -Match "'verify'"
   }
 
   It 'gc flags include the full generated set' {
-    $null = Invoke-GenCompletion
+    $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $profileText = Get-FixtureProfile
     foreach ($flag in '--tool-cache-gc', '--system-gc', '--nix-artifacts-gc', '--vm-data-gc', '--journald-gc') {
       $profileText | Should -Match ([regex]::Escape($flag))
@@ -154,7 +154,7 @@ Describe 'gen-completions.ps1 generated inventory' {
   }
 
   It 'single-flag commands get a full --help entry (no corrupt scalar)' {
-    $null = Invoke-GenCompletion
+    $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $profileText = Get-FixtureProfile
     # Regression: if-expression unrolling once wrote "-" instead of "--help".
     $profileText | Should -Match ([regex]::Escape("`$nucleusConfigFlags = @(") + "`r?`n  '--help'`r?`n\)")
@@ -162,7 +162,7 @@ Describe 'gen-completions.ps1 generated inventory' {
   }
 
   It 'vm setup flags derive from the generated inventory (no stale --no-windows-iso)' {
-    $null = Invoke-GenCompletion
+    $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $profileText = Get-FixtureProfile
     # The setup-specific subset must be derived from the generated inventory so
     # it can never drift; android-config-only flags are the exclusion list.
@@ -174,7 +174,7 @@ Describe 'gen-completions.ps1 generated inventory' {
   }
 
   It 'Windows nucleus-ai completer mirrors ai.ps1 params (no POSIX-only spellings)' {
-    $null = Invoke-GenCompletion
+    $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $profileText = Get-FixtureProfile
     $aiBlock = [regex]::Match(
       $profileText,
@@ -194,7 +194,7 @@ Describe 'gen-completions.ps1 generated inventory' {
   }
 
   It 'keeps the generated region markers' {
-    $null = Invoke-GenCompletion
+    $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $profileText = Get-FixtureProfile
     $profileText | Should -Match '# --- BEGIN GENERATED completer flag inventory ---'
     $profileText | Should -Match '# --- END GENERATED ---'
@@ -202,7 +202,7 @@ Describe 'gen-completions.ps1 generated inventory' {
   }
 
   It 'fixed flag sets match the authoritative table' {
-    $null = Invoke-GenCompletion
+    $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $profileText = Get-FixtureProfile
 
     # Commands whose generated (sorted) order equals the authoritative table.
