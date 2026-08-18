@@ -29,6 +29,7 @@ Options:
   --host-key-path <path>       Machine SSH host private key
   --machine-age-key-path <path> Derived machine age key file
   --gnupg-home <path>          GnuPG homedir for GPG fallback
+  --gawk-bin <path>            gawk executable (default: awk)
   --output-type <fmt>          sops output type (default: json)
 EOF
 }
@@ -63,6 +64,10 @@ while [ "$#" -gt 0 ]; do
     _ds_gnupg_home="$2"
     shift 2
     ;;
+  --gawk-bin)
+    _ds_gawk_bin="$2"
+    shift 2
+    ;;
   --output-type)
     _ds_output_format="$2"
     shift 2
@@ -81,6 +86,8 @@ while [ "$#" -gt 0 ]; do
 done
 
 _ds_output_format="${_ds_output_format:-json}"
+_ds_gawk_bin="${_ds_gawk_bin:-awk}"
+export _ds_gawk_bin
 
 if [ -z "$_ds_repo_root" ] || [ -z "$_ds_sops_file" ]; then
   usage

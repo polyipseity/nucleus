@@ -17,6 +17,7 @@ _mus_ssh_add_bin="$6"
 _mus_sops_bin="$7"
 _mus_host_key_path="$8"
 _mus_machine_age_key_path="$9"
+_mus_gawk_bin="${10}"
 
 _mus_user_secret_file="$_mus_repo_root/src/secrets/users/${_mus_username}.yml"
 if [ ! -f "$_mus_user_secret_file" ]; then
@@ -36,6 +37,7 @@ _mus_decrypt_json="$(
     --gpg-bin "$_mus_gpg_bin" \
     --host-key-path "$_mus_host_key_path" \
     --machine-age-key-path "$_mus_machine_age_key_path" \
+    --gawk-bin "$_mus_gawk_bin" \
     --gnupg-home "${GNUPGHOME:-$HOME/.gnupg}"
 )"
 

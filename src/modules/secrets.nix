@@ -75,7 +75,8 @@ in
         "${pkgs.openssh}/bin/ssh-add" \
         "${pkgs.sops}/bin/sops" \
         "/etc/ssh/ssh_host_ed25519_key" \
-        "/etc/sops/age/machine.txt"
+        "/etc/sops/age/machine.txt" \
+        "${pkgs.gawk}/bin/awk"
     ''
   );
 

@@ -18,9 +18,10 @@ resolve_user_homedir() {
   fi
 
   local homedir=""
+  # shellcheck disable=SC2016 # reason: awk script bodies must not be expanded by shell
   if command -v getent >/dev/null 2>&1; then
-    homedir="$(getent passwd "$username" | awk -F: '{print $6}')"
-  elif homedir="$(dscl . -read "/Users/$username" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"; then
+    homedir="$(getent passwd "$username" | "${_ds_gawk_bin:-awk}" -F: '{print $6}')"
+  elif homedir="$(dscl . -read "/Users/$username" NFSHomeDirectory 2>/dev/null | "${_ds_gawk_bin:-awk}" '{print $2}')"; then
     :
   elif [ -d "/Users/$username" ]; then
     homedir="/Users/$username"
