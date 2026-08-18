@@ -120,18 +120,18 @@ run_store_path_arg_usage() {
     for _search_file in "${_all_sh_files[@]}"; do
       local _refs
       # check-suppress:suppression_doc: grep returns exit 1 on no match; || true allows empty result
-      _refs=$(grep -n "\"\\\${${_var}\|\"\\\$${_var}" "$_search_file" 2>/dev/null \
-        || true) # check-suppress:suppression_doc: grep returns exit 1 on no match; || true allows empty result
+      _refs=$(grep -n "\"\\\${${_var}\|\"\\\$${_var}" "$_search_file" 2>/dev/null ||
+        true) # check-suppress:suppression_doc: grep returns exit 1 on no match; || true allows empty result
       [ -z "$_refs" ] && continue
 
       _all_refs=$((_all_refs + $(echo "$_refs" | wc -l)))
 
       # Exclude: declarations (var="$N"), condition checks ([ -z/-n "$var" ]).
       local _filtered
-      _filtered=$(echo "$_refs" | \
-        grep -v -E "^[0-9]+:[[:space:]]*_?[a-z_]*=\"\\\$[0-9]+\"" | \
-        grep -v -E "^[0-9]+:[[:space:]]*\[\[?\s+-[zn]\s" \
-        || true) # check-suppress:suppression_doc: grep returns exit 1 when all lines are filtered; || true allows empty result
+      _filtered=$(echo "$_refs" |
+        grep -v -E "^[0-9]+:[[:space:]]*_?[a-z_]*=\"\\\$[0-9]+\"" |
+        grep -v -E "^[0-9]+:[[:space:]]*\[\[?\s+-[zn]\s" ||
+        true) # check-suppress:suppression_doc: grep returns exit 1 when all lines are filtered; || true allows empty result
       # check-suppress:suppression_doc: grep -c returns exit 1 on zero matches; || true counts as 0
       _non_condition_refs=$((_non_condition_refs + $(echo "$_filtered" | grep -c . || true)))
     done
