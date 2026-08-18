@@ -59,6 +59,7 @@ Non-host subdirectories follow a two-track convention:
 - **All extracted inline scripts must accept inputs via positional arguments, not environment variables.** This keeps reasoning local, avoids hidden coupling between source and consumer, and makes each script independently testable.
 - `src/scripts/services/caddy-trust.sh` historically uses `NUCLEUS_REPO_ROOT` (an environment variable) for backward compatibility. New scripts must use positional arguments instead.
 - **Helper scripts in `src/scripts/` (e.g. `register-host-age-key.sh`, `install-prek-hooks.sh`) use `--repo-root <path>` flags, not bare positional args.** Call sites in `src/scripts/apply.sh` must use the flag form. This prevents recurring bugs where a bare path is passed to a script that expects `--repo-root`.
+- **Store-path args for external commands.** Activation scripts that invoke external tools (e.g. `jq`, `sops`, `age`) receive them as Nix store-path arguments (e.g. `_jq_bin="$1"`) and MUST invoke them via the variable (e.g. `"$_jq_bin"`), never as bare command names. This prevents "command not found" failures in minimal PATH environments. Check step 16 enforces that every `_X_bin` positional-arg declaration has at least one command-like usage.
 
 ## Relative pathing convention
 
