@@ -1,17 +1,22 @@
 #!/usr/bin/env bash
-# Updates flake inputs, optionally updates macOS packages via Homebrew, and
-# rewraps all SOPS-managed files for current recipients.
+# Updates flake inputs and rewraps all SOPS-managed files for current
+# recipients.
 #
-# Commands: [--flake|--no-flake] [--brew|--no-brew] [--sops|--no-sops].
+# WHY no Homebrew stage: nix-homebrew manages taps immutably via flake.lock
+# (mutableTaps = false), so brew update / brew upgrade are both impossible
+# (read-only Nix store paths) and unnecessary (tap versions are bumped by
+# the flake stage; installed packages are reconciled by nix-darwin activation).
+#
+# Commands: [--flake|--no-flake] [--sops|--no-sops].
 # Each stage is independently skippable, so partial updates are possible
 # (e.g. rewrap secrets without touching flake.lock).
 #
 # Environment variables read: NIX_CONFIG (merged into the update invocation),
 # NUCLEUS_REPO_ROOT (via derive_repo_root).
 #
-# Prerequisites: nix with flakes; brew (macOS) and sops only when their
-# stage is enabled. Exits 1 when a selected stage fails — flake errors are
-# reported explicitly, and brew/sops failures abort via set -e.
+# Prerequisites: nix with flakes; sops only when its stage is enabled.
+# Exits 1 when a selected stage fails — flake errors are reported explicitly,
+# and sops failures abort via set -e.
 
 set -euo pipefail
 
@@ -28,12 +33,11 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
 # usage
-#   Prints the CLI synopsis and the three stage toggles to stdout.
+#   Prints the CLI synopsis and the two stage toggles to stdout.
 usage() {
   usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
   --flake|--no-flake    Control nix flake update (default: --flake).
-  --brew|--no-brew      Control Homebrew update/upgrade (macOS only) (default: --brew).
   --sops|--no-sops      Control sops updatekeys (default: --sops).
 EOF
 }
@@ -41,7 +45,6 @@ EOF
 REPO_ROOT="$(derive_repo_root)"
 
 flake=true
-brew=true
 sops=true
 
 while [ "$#" -gt 0 ]; do
@@ -55,12 +58,6 @@ while [ "$#" -gt 0 ]; do
     ;;
   --no-flake)
     flake=false
-    ;;
-  --brew)
-    brew=true
-    ;;
-  --no-brew)
-    brew=false
     ;;
 
   --sops)
@@ -113,19 +110,6 @@ update_flake_inputs() {
   error "flake update failed"
 }
 
-# update_homebrew_if_available
-#   Runs brew update, then upgrades formulae and casks. WHY: metadata is
-#   refreshed first so upgrade decisions use current formula versions;
-#   casks upgrade separately because their versioning differs from formulae.
-update_homebrew_if_available() {
-
-  # Refresh formula/cask metadata first to avoid stale-upgrade decisions.
-  brew update
-  # Upgrade all installed formulae and casks; mirrors winget --all behavior.
-  brew upgrade
-  brew upgrade --cask
-}
-
 # rewrap_sops_files
 #   Re-encrypts every SOPS-managed repository asset with the recipient set
 #   declared in .sops.yaml. WHY: after machine age/GPG keys are added or
@@ -157,10 +141,6 @@ rewrap_sops_files() {
 
 if [ "$flake" = true ]; then
   update_flake_inputs
-fi
-
-if [ "$brew" = true ]; then
-  update_homebrew_if_available
 fi
 
 if [ "$sops" = true ]; then

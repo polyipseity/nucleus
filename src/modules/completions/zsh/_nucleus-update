@@ -4,9 +4,7 @@
 
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
-  '--brew[brew]' \
   '--flake[flake]' \
-  '--no-brew[no brew]' \
   '--no-flake[no flake]' \
   '--no-sops[no sops]' \
   '--sops[sops]'
