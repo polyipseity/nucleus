@@ -116,7 +116,7 @@ function Get-NucleusFlagMap {
     'service-watchdog' = @('--domain', '--help', '--oneshot')
     'svc' = @('--help', '--json', '--system', '--user', '--verbose')
     'test' = @('-q', '--fail-fast', '--help', '--no-fail-fast', '--quiet', '--skip-steps')
-    'update' = @('--brew', '--flake', '--help', '--no-brew', '--no-flake', '--no-sops', '--sops')
+    'update' = @('--flake', '--help', '--no-flake', '--no-sops', '--sops')
     'vm' = @('--accept-gsi-license', '--accelerator', '--adb-keys', '--allow-shrink', '--dry-run', '--fake-wifi', '--fake-wifi-revert', '--force', '--gc', '--gc-data', '--gc-disabled', '--gapps', '--headful', '--help', '--json', '--magisk', '--mido-patch-file', '--mido-script', '--no-accept-gsi-license', '--no-gc', '--no-gc-data', '--no-gc-disabled', '--no-headful', '--repo-root', '--root', '--vm-dir-override', '--windows-iso', '--windows-iso-retries', '--windows-iso-source')
   }
 }

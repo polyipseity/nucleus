@@ -804,10 +804,8 @@ $nucleusTestFlags = @(
 )
 
 $nucleusUpdateFlags = @(
-  '--brew',
   '--flake',
   '--help',
-  '--no-brew',
   '--no-flake',
   '--no-sops',
   '--sops'
