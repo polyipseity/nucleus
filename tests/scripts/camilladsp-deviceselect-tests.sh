@@ -1,0 +1,235 @@
+#!/usr/bin/env bash
+# Tests for src/scripts/services/camilladsp-deviceselect.sh —
+# smart playback device detection for CamillaDSP.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
+# shellcheck source=./test-lib.sh
+. "$SCRIPT_DIR/test-lib.sh"
+
+DEVICESELECT_SH="$SCRIPT_DIR/../../src/scripts/services/camilladsp-deviceselect.sh"
+
+# Guard: python3 + yaml module required for all tests.
+if ! command -v python3 >/dev/null 2>&1; then
+  echo "python3 not found — skipping camilladsp-deviceselect tests"
+  exit 0
+fi
+if ! python3 -c "import yaml" 2>/dev/null; then
+  echo "python3 yaml module not found — skipping camilladsp-deviceselect tests"
+  exit 0
+fi
+
+# --- Helpers ---
+
+# Create a minimal CamillaDSP config YAML with given playback and capture devices.
+# Writes to a temp file and prints the path.
+_make_config() {
+  local playback_device="${1:-}"
+  local capture_device="${2:-Loopback Audio}"
+  local cfg
+  cfg=$(mktemp) || return 1
+  cat >"$cfg" <<YAML
+---
+devices:
+  playback:
+    channels: 2
+    device: "$playback_device"
+    type: CoreAudio
+  capture:
+    channels: 2
+    device: "$capture_device"
+    type: CoreAudio
+YAML
+  printf '%s' "$cfg"
+}
+
+# Source the deviceselect library in a subshell context so mock overrides
+# don't leak into the test runner. All test functions use _run_resolve which
+# forks a bash subshell that sources the library, applies mocks, then calls
+# camilladsp_resolve_playback_device.
+#
+# Mock globals set by each test before calling _run_resolve:
+#   _MOCK_DEFAULT_OUTPUT  — value for camilladsp_detect_default_output
+#   _MOCK_FIRST_AVAILABLE — value for camilladsp_detect_first_available
+#   _MOCK_DEFAULT_RC      — return code for camilladsp_detect_default_output (default 0)
+#   _MOCK_FIRST_RC        — return code for camilladsp_detect_first_available (default 0)
+
+_MOCK_DEFAULT_OUTPUT=""
+_MOCK_FIRST_AVAILABLE=""
+_MOCK_DEFAULT_RC=0
+_MOCK_FIRST_RC=0
+
+# Run resolve in a subshell with mocked detection functions.
+# $1 = config file path. Prints resolved config to stdout.
+_run_resolve() {
+  local config_file="$1"
+  bash -c '
+    _lib_script="$1"
+    _mock_default="$2"
+    _mock_default_rc="$3"
+    _mock_first="$4"
+    _mock_first_rc="$5"
+    _config_file="$6"
+    . "$_lib_script"
+    # Override detection functions with mocks (use variables, not positional params).
+    camilladsp_detect_default_output() {
+      printf "%s" "$_mock_default"
+      return "$_mock_default_rc"
+    }
+    camilladsp_detect_first_available() {
+      printf "%s" "$_mock_first"
+      return "$_mock_first_rc"
+    }
+    camilladsp_resolve_playback_device "$_config_file"
+  ' _ "$DEVICESELECT_SH" \
+    "$_MOCK_DEFAULT_OUTPUT" "$_MOCK_DEFAULT_RC" \
+    "$_MOCK_FIRST_AVAILABLE" "$_MOCK_FIRST_RC" \
+    "$config_file"
+}
+
+# Extract playback.device from a YAML string on stdin.
+_extract_playback_device() {
+  python3 -c "
+import yaml, sys
+cfg = yaml.safe_load(sys.stdin.read())
+print(cfg.get('devices', {}).get('playback', {}).get('device', ''))
+"
+}
+
+# Extract playback.type from a YAML string on stdin (verify non-playback fields survive).
+_extract_playback_type() {
+  python3 -c "
+import yaml, sys
+cfg = yaml.safe_load(sys.stdin.read())
+print(cfg.get('devices', {}).get('playback', {}).get('type', ''))
+"
+}
+
+# --- Tests ---
+
+# Test 1: Non-empty playback device → pass through unchanged.
+test_passthrough_nonempty_device() {
+  local cfg
+  cfg="$(_make_config 'MacBook Pro Speakers' 'Loopback Audio')"
+  local resolved
+  resolved=$(_run_resolve "$cfg")
+  local device
+  device=$(_extract_playback_device <<< "$resolved")
+  rm -f "$cfg"
+  if [ "$device" = "MacBook Pro Speakers" ]; then
+    assert_pass "non-empty playback device passes through unchanged"
+  else
+    assert_fail "non-empty playback device passthrough" "expected 'MacBook Pro Speakers', got '$device'"
+  fi
+}
+
+# Test 2: Empty playback device + default output available → patch with detected device.
+test_patches_with_default_output() {
+  local cfg
+  cfg="$(_make_config "" "Loopback Audio")"
+  _MOCK_DEFAULT_OUTPUT="External USB DAC"
+  _MOCK_FIRST_AVAILABLE=""
+  local resolved
+  resolved=$(_run_resolve "$cfg")
+  local device
+  device=$(_extract_playback_device <<< "$resolved")
+  rm -f "$cfg"
+  if [ "$device" = "External USB DAC" ]; then
+    assert_pass "empty device patched with detected default output"
+  else
+    assert_fail "empty device patching" "expected 'External USB DAC', got '$device'"
+  fi
+}
+
+# Test 3: Default output = capture device → rejects capture, uses fallback.
+test_rejects_capture_device() {
+  local cfg
+  cfg="$(_make_config "" "Loopback Audio")"
+  _MOCK_DEFAULT_OUTPUT="Loopback Audio"
+  _MOCK_FIRST_AVAILABLE="MacBook Pro Speakers"
+  local resolved
+  resolved=$(_run_resolve "$cfg")
+  local device
+  device=$(_extract_playback_device <<< "$resolved")
+  rm -f "$cfg"
+  if [ "$device" = "MacBook Pro Speakers" ]; then
+    assert_pass "capture device rejected, fallback used"
+  else
+    assert_fail "capture device rejection" "expected 'MacBook Pro Speakers', got '$device'"
+  fi
+}
+
+# Test 4: No default output, no fallback devices → pass through with empty device.
+test_empty_when_no_devices() {
+  local cfg
+  cfg="$(_make_config "" "Loopback Audio")"
+  _MOCK_DEFAULT_OUTPUT=""
+  _MOCK_DEFAULT_RC=1
+  _MOCK_FIRST_AVAILABLE=""
+  _MOCK_FIRST_RC=1
+  local resolved
+  resolved=$(_run_resolve "$cfg")
+  local device
+  device=$(_extract_playback_device <<< "$resolved")
+  rm -f "$cfg"
+  if [ -z "$device" ]; then
+    assert_pass "empty device preserved when no devices available"
+  else
+    assert_fail "no-devices passthrough" "expected empty, got '$device'"
+  fi
+}
+
+# Test 5: Non-playback fields survive YAML round-trip.
+test_preserves_other_fields() {
+  local cfg
+  cfg="$(_make_config "" "Loopback Audio")"
+  _MOCK_DEFAULT_OUTPUT="USB Speaker"
+  _MOCK_FIRST_AVAILABLE=""
+  local resolved
+  resolved=$(_run_resolve "$cfg")
+  local ptype
+  ptype=$(_extract_playback_type <<< "$resolved")
+  rm -f "$cfg"
+  if [ "$ptype" = "CoreAudio" ]; then
+    assert_pass "non-playback fields preserved after patching"
+  else
+    assert_fail "field preservation" "expected 'CoreAudio', got '$ptype'"
+  fi
+}
+
+# Test 6: Default output = capture AND fallback returns empty (all devices are capture).
+# camilladsp_detect_first_available's contract is to exclude the capture device;
+# when every device is the capture device, it returns empty.
+test_all_devices_are_capture() {
+  local cfg
+  cfg="$(_make_config "" "Loopback Audio")"
+  _MOCK_DEFAULT_OUTPUT="Loopback Audio"
+  _MOCK_FIRST_AVAILABLE=""
+  _MOCK_FIRST_RC=1
+  local resolved
+  resolved=$(_run_resolve "$cfg")
+  local device
+  device=$(_extract_playback_device <<< "$resolved")
+  rm -f "$cfg"
+  if [ -z "$device" ]; then
+    assert_pass "empty device when all available devices match capture"
+  else
+    assert_fail "all-capture fallback" "expected empty, got '$device'"
+  fi
+}
+
+# --- Run all tests ---
+
+test_passthrough_nonempty_device
+test_patches_with_default_output
+test_rejects_capture_device
+test_empty_when_no_devices
+test_preserves_other_fields
+test_all_devices_are_capture
+
+echo ""
+echo "--- camilladsp-deviceselect tests: $TESTS_PASSED passed, $TESTS_FAILED failed ---"
+echo ""
+
+exit "$TESTS_FAILED"
