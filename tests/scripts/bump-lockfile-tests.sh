@@ -487,6 +487,17 @@ test_missing_scoop_skips_with_warning() {
 test_missing_curl_skips_bun_with_warning() {
   local tmp
   tmp="$(setup_fake_repo)"
+  # Override 'command' to make 'command -v curl' fail while preserving other
+  # lookups. The script sources lib.sh which uses 'command' for other tools.
+  # shellcheck disable=SC2329 # reason: invoked indirectly via export -f in subprocess
+  command() {
+    if [ "$1" = "-v" ] && [ "$2" = "curl" ]; then
+      return 1
+    fi
+    builtin command "$@"
+  }
+  export -f command
+
   if run_bump_lockfile "$tmp" --sections bun >"$tmp/out.txt" 2>&1; then
     assert_pass "bump-lockfile --sections bun (absent curl) exits 0"
   else
@@ -497,6 +508,7 @@ test_missing_curl_skips_bun_with_warning() {
   else
     assert_fail "bump-lockfile --sections bun warns when curl is absent" "output: $(head -1 "$tmp/out.txt")"
   fi
+  unset -f command
   rm -rf "$tmp"
 }
 
