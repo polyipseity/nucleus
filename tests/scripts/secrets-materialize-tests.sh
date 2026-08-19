@@ -39,7 +39,8 @@ test_materialize_exits_clean_without_user_secret_file() {
   if "$MATERIALIZE_SCRIPT" \
     "$tmp" "missing-user" "$(command -v gpg)" "$(command -v git)" \
     "$(command -v ssh-keygen)" "$(command -v ssh-add)" "$(command -v sops)" \
-    "/tmp/nonexistent-host-key" "/tmp/nonexistent-age-key" >/dev/null 2>&1; then
+    "/tmp/nonexistent-host-key" "/tmp/nonexistent-age-key" \
+    "$(command -v awk)" >/dev/null 2>&1; then
     assert_pass "materialize-user-secrets exits 0 when user secret file is absent"
   else
     assert_fail "materialize-user-secrets exits 0 when user secret file is absent" "exit code $?"
