@@ -60,8 +60,8 @@ in
   # === Key count matches static registry ===
 
   test_key_count_matches_registry = assert' (
-    !manifestExists || builtins.length availableKeys == 4
-  ) "manifest must contain exactly 4 keys (one per provider)";
+    !manifestExists || builtins.length availableKeys == 6
+  ) "manifest must contain exactly 6 keys";
 
   test_expected_providers_present = assert' (
     !manifestExists
@@ -69,7 +69,9 @@ in
       "ai_command_code_api_key"
       "ai_openrouter_api_key"
       "ai_opencode_go_api_key"
+      "ai_opencode_go_api_key_1"
       "ai_opencode_zen_api_key"
+      "ai_opencode_zen_api_key_1"
     ]
-  ) "all 4 expected provider keys must be present in manifest";
+  ) "all 6 expected provider keys must be present in manifest";
 }
