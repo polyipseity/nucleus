@@ -201,6 +201,7 @@ let
       nixpkgsAttr = "utm";
     };
     cursor = {
+      enable = false;
       category = "gui";
       homebrew = {
         kind = "cask";
@@ -246,6 +247,9 @@ let
 
   packageSelection = config.nucleus.macos.packageSelection;
   overlapPackageNames = builtins.attrNames overlappingPackages;
+  enabledOverlapPackageNames = builtins.filter (
+    name: (overlappingPackages.${name}.enable or true)
+  ) overlapPackageNames;
 
   # CLI → nixpkgs, GUI → homebrew. If a package ships any GUI component, classify as "gui".
   defaultBackendFor = category: if category == "cli" then "nixpkgs" else "homebrew";
@@ -264,7 +268,7 @@ let
     map (packageName: {
       name = packageName;
       value = resolveBackend packageName;
-    }) overlapPackageNames
+    }) enabledOverlapPackageNames
   );
 
   # Platform compatibility check: a package's `platforms` field restricts which
@@ -292,7 +296,7 @@ let
     platformCompatible packageName
     && (if pkgs.stdenv.isDarwin then selectedOverlapBackends.${packageName} == "nixpkgs" else true)
     && !(builtins.hasAttr overlappingPackages.${packageName}.nixpkgsAttr pkgs)
-  ) overlapPackageNames;
+  ) enabledOverlapPackageNames;
 
   # Cross-platform nixpkgs packages from the overlap set.
   # On macOS: respects backend selection (only if routed to nixpkgs).
@@ -308,9 +312,11 @@ let
         if pkgs.stdenv.isDarwin then
           builtins.filter (
             name: selectedOverlapBackends.${name} == "nixpkgs" && platformCompatible name
-          ) overlapPackageNames
+          ) enabledOverlapPackageNames
         else
-          builtins.filter (name: platformCompatible name && overlapNixAttrAvailable name) overlapPackageNames
+          builtins.filter (
+            name: platformCompatible name && overlapNixAttrAvailable name
+          ) enabledOverlapPackageNames
       );
 
   # Whether the overlap package's nixpkgs attribute is actually available on
@@ -334,7 +340,7 @@ let
           meta.homebrew.name
         else
           null
-      ) overlapPackageNames
+      ) enabledOverlapPackageNames
     )
   );
 
@@ -349,7 +355,7 @@ let
           meta.homebrew.name
         else
           null
-      ) overlapPackageNames
+      ) enabledOverlapPackageNames
     )
   );
 
