@@ -243,11 +243,11 @@ EOF
 test_verify_fails_on_section_diff() {
   local tmp
   tmp="$(setup_fake_repo)"
-  cat >"$tmp/bin/npm" <<'EOF'
+  cat >"$tmp/bin/curl" <<'EOF'
 #!/usr/bin/env bash
-printf '2.0.0\n'
+printf '{"version":"2.0.0"}\n'
 EOF
-  chmod +x "$tmp/bin/npm"
+  chmod +x "$tmp/bin/curl"
 
   if run_bump_lockfile "$tmp" --sections bun --verify >"$tmp/out.txt" 2>&1; then
     assert_fail "bump-lockfile --verify exits 1 on section diff" "expected non-zero exit"
@@ -270,11 +270,11 @@ EOF
 test_no_change_run_writes_nothing() {
   local tmp before after
   tmp="$(setup_fake_repo)"
-  cat >"$tmp/bin/npm" <<'EOF'
+  cat >"$tmp/bin/curl" <<'EOF'
 #!/usr/bin/env bash
-printf '1.0.0\n'
+printf '{"version":"1.0.0"}\n'
 EOF
-  chmod +x "$tmp/bin/npm"
+  chmod +x "$tmp/bin/curl"
   before="$(cat "$tmp/src/lockfiles/lockfile.json")"
 
   if run_bump_lockfile "$tmp" --sections bun >"$tmp/out.txt" 2>&1; then
@@ -299,11 +299,11 @@ EOF
 test_change_run_writes_and_stamps_updated() {
   local tmp new_updated old_updated
   tmp="$(setup_fake_repo)"
-  cat >"$tmp/bin/npm" <<'EOF'
+  cat >"$tmp/bin/curl" <<'EOF'
 #!/usr/bin/env bash
-printf '2.0.0\n'
+printf '{"version":"2.0.0"}\n'
 EOF
-  chmod +x "$tmp/bin/npm"
+  chmod +x "$tmp/bin/curl"
   old_updated="$(jq -r '.updated' "$tmp/src/lockfiles/lockfile.json")"
 
   if run_bump_lockfile "$tmp" --sections bun >"$tmp/out.txt" 2>&1; then
@@ -484,18 +484,18 @@ test_missing_scoop_skips_with_warning() {
   rm -rf "$tmp"
 }
 
-test_missing_npm_skips_bun_with_warning() {
+test_missing_curl_skips_bun_with_warning() {
   local tmp
   tmp="$(setup_fake_repo)"
   if run_bump_lockfile "$tmp" --sections bun >"$tmp/out.txt" 2>&1; then
-    assert_pass "bump-lockfile --sections bun (absent npm) exits 0"
+    assert_pass "bump-lockfile --sections bun (absent curl) exits 0"
   else
-    assert_fail "bump-lockfile --sections bun (absent npm) exits 0" "exit code $?"
+    assert_fail "bump-lockfile --sections bun (absent curl) exits 0" "exit code $?"
   fi
-  if grep -q 'npm: command not found — skipping bun section' "$tmp/out.txt"; then
-    assert_pass "bump-lockfile --sections bun warns when npm is absent"
+  if grep -q 'curl: command not found — skipping bun section' "$tmp/out.txt"; then
+    assert_pass "bump-lockfile --sections bun warns when curl is absent"
   else
-    assert_fail "bump-lockfile --sections bun warns when npm is absent" "output: $(head -1 "$tmp/out.txt")"
+    assert_fail "bump-lockfile --sections bun warns when curl is absent" "output: $(head -1 "$tmp/out.txt")"
   fi
   rm -rf "$tmp"
 }
@@ -588,7 +588,7 @@ test_vm_setup_subsection_runs_alone
 test_vm_setup_parent_selects_children
 test_missing_winget_skips_with_warning
 test_missing_scoop_skips_with_warning
-test_missing_npm_skips_bun_with_warning
+test_missing_curl_skips_bun_with_warning
 test_uv_parser_skips_dependency_lines
 test_rustup_pins_version_for_stable_not_date
 
