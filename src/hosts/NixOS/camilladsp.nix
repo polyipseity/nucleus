@@ -16,6 +16,7 @@ let
       pkgs.camilladsp
       pkgs.websocat
       pkgs.jq
+      pkgs.python3
     ];
   };
 
@@ -25,6 +26,7 @@ let
     runtimeInputs = [
       pkgs.websocat
       pkgs.jq
+      pkgs.python3
     ];
   };
 in
