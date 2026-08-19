@@ -13,9 +13,6 @@
 .PARAMETER NoFlake
   Do not run nix flake update (default: $false).
 
-.PARAMETER NoBrew
-  Do not run Homebrew update/upgrade (macOS only; ignored on Windows) (default: $false).
-
 .PARAMETER NoSops
   Do not run sops updatekeys (default: $false).
 
@@ -29,13 +26,12 @@
   .\update.ps1 -NoFlake -NoSops
 
 .NOTES
-  Environment variables: NUCLEUS_NO_FLAKE, NUCLEUS_NO_BREW, NUCLEUS_NO_SOPS, NUCLEUS_REPO_ROOT.
+  Environment variables: NUCLEUS_NO_FLAKE, NUCLEUS_NO_SOPS, NUCLEUS_REPO_ROOT.
   Exit codes: 0 on success; non-zero on failure.
 #>
 [CmdletBinding()]
 param(
   [switch]$NoFlake = $(if ($env:NUCLEUS_NO_FLAKE -eq 'true') { $true } else { $false }),
-  [switch]$NoBrew = $(if ($env:NUCLEUS_NO_BREW -eq 'true') { $true } else { $false }),
   [switch]$NoSops = $(if ($env:NUCLEUS_NO_SOPS -eq 'true') { $true } else { $false }),
   [Alias("h")]
   [switch]$Help
@@ -50,9 +46,6 @@ if ($Help) {
   Get-Help $PSCommandPath -Detailed
   return
 }
-
-# macOS-only parameter; accepted for interface compatibility.
-$NoBrew > $null
 
 $repoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath '..')).Path }
 
