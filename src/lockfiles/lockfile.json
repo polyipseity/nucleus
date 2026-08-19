@@ -147,7 +147,7 @@
       "vadimcn.vscode-lldb": "1.12.2"
     }
   },
-  "updated": "2026-08-17T08:22:09Z",
+  "updated": "2026-08-19T04:11:41Z",
   "uv": {
     "discord-music-rpc": {
       "rev": "bba71027a684db53f3fcde5adbd3d42627241a83",
@@ -161,12 +161,12 @@
   "vm-setup": {
     "nixos-iso": {
       "aarch64-linux": {
-        "digest": "sha256:07371bd78abd699c3f9c04a8b2f69aacbf57ce283b25fc94b2c464ff5a5d1846",
-        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1055335.e5bdc4a41d4c/nixos-minimal-26.11pre1055335.e5bdc4a41d4c-aarch64-linux.iso"
+        "digest": "sha256:29e34f6204ddf49b25d957db4cc43ac1132235c3285f5865f4d1c07c68d3e7b1",
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1057639.0ae2bc1419c3/nixos-minimal-26.11pre1057639.0ae2bc1419c3-aarch64-linux.iso"
       },
       "x86_64-linux": {
-        "digest": "sha256:907839a9c04c40578ae1f0b66da6b95ca084797b83acc6a86e91061c33e8d094",
-        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1055335.e5bdc4a41d4c/nixos-minimal-26.11pre1055335.e5bdc4a41d4c-x86_64-linux.iso"
+        "digest": "sha256:78b131d842f64972e9f50d3b1affb6892c7f8dbc8cd6fc92289dbef7f4cf253b",
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1057639.0ae2bc1419c3/nixos-minimal-26.11pre1057639.0ae2bc1419c3-x86_64-linux.iso"
       }
     },
     "tart-images": {
