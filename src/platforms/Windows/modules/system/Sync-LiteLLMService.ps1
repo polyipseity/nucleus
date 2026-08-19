@@ -101,10 +101,33 @@ function Sync-LiteLLMService {
   Set-ManagedSymlinkDeleteProtection -Context "Sync-LiteLLMService" -Path $configLink
 
   $logFile = Join-Path -Path $serviceLogDir -ChildPath "combined.log"
-  $openrouterKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_openrouter_api_key"
-  $opencodeGoKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_opencode_go_api_key"
-  $opencodeZenKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_opencode_zen_api_key"
-  $commandCodeKeyFile = Join-Path -Path $secretsDir -ChildPath "ai_command_code_api_key"
+
+  # Data-driven: read the keys manifest to discover which API keys are
+  # available, then build KEYFILE:ENVVAR pairs from the key registry.
+  $manifestPath = Join-Path -Path $RepoRoot -ChildPath 'src\modules\ai\keys-manifest.json'
+  $manifest = if (Test-Path -LiteralPath $manifestPath) {
+    Get-Content -Raw -LiteralPath $manifestPath | ConvertFrom-Json
+  } else { [PSCustomObject]@{ availableKeys = @() } }
+
+  # Import the key registry (SOPS key name → env var name mapping).
+  $registryNix = Join-Path -Path $RepoRoot -ChildPath 'src\modules\ai\key-registry.nix'
+  $registry = @{}
+  foreach ($line in (Get-Content -LiteralPath $registryNix)) {
+    if ($line -match '^\s+(ai_\w+)\s*=\s*"(\w+)";') {
+      $registry[$Matches[1]] = $Matches[2]
+    }
+  }
+
+  # Build JSON key-spec array for the wrapper script: [{file, env}, ...]
+  $keySpecs = @()
+  foreach ($keyName in $manifest.availableKeys) {
+    if ($keyName -match '^ai_(.+)_api_key(_(\d+))?$') {
+      $baseKey = if ($Matches[3]) { "ai_$($Matches[1])_api_key" } else { $keyName }
+      $indexSuffix = if ($Matches[3]) { "_$($Matches[3])" } else { '' }
+      $envVar = "$($registry[$baseKey])$indexSuffix"
+      $keySpecs += [PSCustomObject]@{ file = $keyName; env = $envVar }
+    }
+  }
 
   $litellmEndpoint = & {
     # check-suppress:suppression_doc: probe -- services.json may not exist yet; $null check handles absence.
@@ -117,16 +140,14 @@ function Sync-LiteLLMService {
   # that would arise from embedding this logic inline in sc.exe binPath.
   $wrapperScript = Join-Path -Path $programDataDir -ChildPath "run-litellm.ps1"
   $wrapperContent = Get-Content -Raw (Join-Path -Path $PSScriptRoot -ChildPath "..\scripts\LiteLLM-run.ps1")
+  $keySpecsJson = $keySpecs | ConvertTo-Json -Compress
   $wrapperContent = $wrapperContent `
     -replace '__LITELLM_BIN__', $litellmBin `
     -replace '__CONFIG_LINK__', $configLink `
     -replace '__LOGFILE__', $logFile `
     -replace '__HOST__', $($litellmEndpoint.host) `
     -replace '__PORT__', $($litellmEndpoint.port) `
-    -replace '__OPENROUTER_KEY_FILE__', $openrouterKeyFile `
-    -replace '__OPENCODE_GO_KEY_FILE__', $opencodeGoKeyFile `
-    -replace '__OPENCODE_ZEN_KEY_FILE__', $opencodeZenKeyFile `
-    -replace '__COMMAND_CODE_KEY_FILE__', $commandCodeKeyFile
+    -replace "'__KEY_SPECS__'", $keySpecsJson
   [System.IO.File]::WriteAllText($wrapperScript, $wrapperContent, [System.Text.UTF8Encoding]::new($false))
 
   # check-suppress:suppression_doc: probe whether service already exists; Get-Service throws when absent.
