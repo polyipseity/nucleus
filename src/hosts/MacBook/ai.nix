@@ -19,23 +19,9 @@
 let
   userHome = "/Users/${username}";
   litellmConfig = "${userHome}/.config/nucleus/litellm-config.yml";
-  # Data-driven key args: read manifest + registry to build KEYFILE:ENVVAR pairs.
-  keyRegistry = import ../../modules/ai/key-registry.nix;
-  manifest = builtins.fromJSON (builtins.readFile ../../modules/ai/keys-manifest.json);
-  availableKeys = manifest.availableKeys or [ ];
-  keyArgs = map (
-    keyName:
-    let
-      isIndexed = builtins.match "^ai_.+_api_key_([0-9]+)$" keyName != null;
-      baseName =
-        if isIndexed then builtins.head (builtins.match "^(ai_.+_api_key)_[0-9]+$" keyName) else keyName;
-      indexSuffix =
-        if isIndexed then "_" + (builtins.head (builtins.match "^ai_.+_api_key_([0-9]+)$" keyName)) else "";
-      envVar = keyRegistry.${baseName} + indexSuffix;
-      secretPath = config.sops.secrets.${keyName}.path;
-    in
-    "${secretPath}:${envVar}"
-  ) availableKeys;
+  # Data-driven key args: read key catalog to build KEYFILE:ENVVAR pairs.
+  catalog = builtins.fromJSON (builtins.readFile ../../modules/ai/key-catalog.json);
+  keyArgs = map (entry: "${config.sops.secrets.${entry.name}.path}:${entry.envVar}") catalog.keys;
 
   envVars = import ../../modules/lib/env-catalog.nix {
     inherit

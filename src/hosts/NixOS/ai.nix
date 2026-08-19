@@ -22,23 +22,9 @@ let
     runtimeInputs = [ pkgs.litellm ];
     scriptName = "src/scripts/services/litellm-daemon";
   };
-  # Data-driven key args: read manifest + registry to build KEYFILE:ENVVAR pairs.
-  keyRegistry = import ../../modules/ai/key-registry.nix;
-  manifest = builtins.fromJSON (builtins.readFile ../../modules/ai/keys-manifest.json);
-  availableKeys = manifest.availableKeys or [ ];
-  keyArgs = map (
-    keyName:
-    let
-      isIndexed = builtins.match "^ai_.+_api_key_([0-9]+)$" keyName != null;
-      baseName =
-        if isIndexed then builtins.head (builtins.match "^(ai_.+_api_key)_[0-9]+$" keyName) else keyName;
-      indexSuffix =
-        if isIndexed then "_" + (builtins.head (builtins.match "^ai_.+_api_key_([0-9]+)$" keyName)) else "";
-      envVar = keyRegistry.${baseName} + indexSuffix;
-      secretPath = config.sops.secrets.${keyName}.path;
-    in
-    "${secretPath}:${envVar}"
-  ) availableKeys;
+  # Data-driven key args: read key catalog to build KEYFILE:ENVVAR pairs.
+  catalog = builtins.fromJSON (builtins.readFile ../../modules/ai/key-catalog.json);
+  keyArgs = map (entry: "${config.sops.secrets.${entry.name}.path}:${entry.envVar}") catalog.keys;
 in
 {
   # LiteLLM AI gateway — systemd service on 127.0.0.1:4000.
