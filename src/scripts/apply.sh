@@ -117,25 +117,27 @@ _ash_script_dir="$(cd "$(dirname -- "$0")" && pwd -P)"
 # Generate key-catalog.json from decrypted system.yml so Nix modules
 # (sops.nix, ai.nix) can discover available AI API keys and their env var
 # mappings at evaluation time.  Must run before any nix build/eval.
+# Output goes to ~/.config/nucleus/ (not the repo tree) so generated content
+# stays out of git.  NUCLEUS_CATALOG_PATH is exported for Nix consumers.
 generate_key_catalog() {
   _gkm_yml="$REPO_ROOT/src/secrets/system.yml"
-  _gkm_out="$REPO_ROOT/src/modules/ai/key-catalog.json"
+  _gkm_out="$HOME/.config/nucleus/key-catalog.json"
   if [ ! -f "$_gkm_yml" ]; then
     say -l apply "system.yml not found; generating empty key catalog"
-    # shellcheck disable=SC2016 # reason: literal JSON $schema key in single-quoted string, not shell expansion
-    printf '%s' '{"$schema":"./key-catalog.schema.json","keys":[]}' > "$_gkm_out"
+    # shellcheck disable=SC2016 # reason: $schema is a JSON key in the output, not a shell variable
+    printf '%s' '{"$schema":"'"$REPO_ROOT/src/modules/ai/key-catalog.schema.json"'","keys":[]}' > "$_gkm_out"
     return
   fi
   _gkm_decrypted="$(sops -d --output-type json "$_gkm_yml" 2>/dev/null)" || {
     warn -l apply "sops decryption failed; generating empty key catalog"
-    # shellcheck disable=SC2016 # reason: literal JSON $schema key in single-quoted string, not shell expansion
-    printf '%s' '{"$schema":"./key-catalog.schema.json","keys":[]}' > "$_gkm_out"
+    # shellcheck disable=SC2016 # reason: $schema is a JSON key in the output, not a shell variable
+    printf '%s' '{"$schema":"'"$REPO_ROOT/src/modules/ai/key-catalog.schema.json"'","keys":[]}' > "$_gkm_out"
     return
   }
   # Build catalog: extract ai_*_api_key entries with non-null values, derive
   # envVar from key name via convention: ai_<X>_api_key → <X>_API_KEY.
   # shellcheck disable=SC2016 # reason: jq filter uses $schema as a literal JSON key, not shell expansion
-  printf '%s' "$_gkm_decrypted" | jq '
+  printf '%s' "$_gkm_decrypted" | jq --arg repoRoot "$REPO_ROOT" '
     [to_entries[]
       | select(.key | test("^ai_.+_api_key"))
       | select(.value != null)
@@ -146,16 +148,18 @@ generate_key_catalog() {
         else { name: $k, envVar: ($base + "_API_KEY") }
         end
     ]
-    | {"$schema": "./key-catalog.schema.json", "keys": .}
+    | {"$schema": ($repoRoot + "/src/modules/ai/key-catalog.schema.json"), "keys": .}
   ' > "$_gkm_out"
-  say -l apply "wrote key-catalog.json with $(yq '.keys | length' "$_gkm_out") keys"
+  say -l apply "wrote key-catalog.json with $(jq '.keys | length' "$_gkm_out") keys"
 }
+mkdir -p "$HOME/.config/nucleus"
 generate_key_catalog
+NUCLEUS_CATALOG_PATH="$_gkm_out"
+export NUCLEUS_CATALOG_PATH
 
 # Symlink the LiteLLM config so edits take effect on service restart without
 # re-running apply.  All host services (macOS launchd, NixOS systemd, Windows
 # scheduled task) reference this well-known path.
-mkdir -p "$HOME/.config/nucleus"
 ln -sf "$REPO_ROOT/src/modules/ai/litellm-config.yml" "$HOME/.config/nucleus/litellm-config.yml"
 
 run_nix() {
@@ -176,6 +180,7 @@ run_nix_as_root() {
     "NIX_CONFIG=$NIX_CONFIG_VALUE" \
     "NIX_PATH=nixpkgs=flake:nixpkgs" \
     "NUCLEUS_REPO_ROOT=${NUCLEUS_REPO_ROOT}" \
+    "NUCLEUS_CATALOG_PATH=${NUCLEUS_CATALOG_PATH:-}" \
     "FORCE_COLOR=${FORCE_COLOR:-}" \
     "NO_COLOR=${NO_COLOR:-}" \
     "CLICOLOR_FORCE=${CLICOLOR_FORCE:-}" \
