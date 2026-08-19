@@ -33,4 +33,4 @@ filters: {}
 mixers: null
 pipeline: null
 processors: null
-title: null
+title: default
