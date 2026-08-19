@@ -14,7 +14,7 @@ devices:
   multithreaded: null
   playback:
     channels: 2
-    device: "" # Intentionally empty — smart detection selects the default playback device
+    device: null
     exclusive: null
     format: null
     type: Wasapi
