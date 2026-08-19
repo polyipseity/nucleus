@@ -134,7 +134,7 @@ generate_keys_manifest() {
   }
   # Build manifest: extract ai_*_api_key entries with non-null values, wrap in schema+availableKeys.
   # shellcheck disable=SC2016 # reason: yq filter uses $schema as a literal JSON key, not shell expansion
-  printf '%s' "$$_gkm_decrypted" | yq -o=json -r '
+  printf '%s' "$_gkm_decrypted" | yq -o=json -r '
     [to_entries[] | select(.key | test("^ai_.+_api_key")) | select(.value != null) | .key]
     | {"availableKeys": .}
     | . + {"$schema": "./keys-manifest.schema.json"}
