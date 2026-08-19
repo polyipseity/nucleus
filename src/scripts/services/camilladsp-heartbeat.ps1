@@ -22,6 +22,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# ── Smart device detection ────────────────────────────────────────────────
+. "$PSScriptRoot/camilladsp-deviceselect.ps1"
+
 # ── Exponential backoff ────────────────────────────────────────────────────
 $baseSleep = 5
 $maxSleep = 300
@@ -67,7 +70,8 @@ while ($true) {
     # ── Push config ──────────────────────────────────────────────────────
     if (Test-Path $ConfigFile) {
       try {
-        $yaml = Get-Content -Raw $ConfigFile -ErrorAction Stop
+        # Resolve playback device: patches empty device in config with system default.
+        $yaml = Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigFile
         $msg = "{`"SetConfig`": $($yaml | ConvertTo-Json -Compress)}"
         $ws = [System.Net.WebSockets.ClientWebSocket]::new()
         $ws.ConnectAsync([System.Uri]"ws://127.0.0.1:$Port", $ct).Wait()

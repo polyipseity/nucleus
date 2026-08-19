@@ -14,6 +14,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# ── Smart device detection ────────────────────────────────────────────────
+. (Join-Path $PSScriptRoot "deviceselect.ps1")
+
 $stateFile = Join-Path -Path $HOME -ChildPath ".local\state\camilladsp\statefile.yml"
 $null = New-Item -Path (Split-Path $stateFile -Parent) -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
 
@@ -62,7 +65,8 @@ for ($i = 0; $i -lt 30; $i++) {
   Start-Sleep -Milliseconds 500
   if (-not (Test-Path $ConfigFile)) { continue }
   try {
-    $configYaml = Get-Content -Raw $ConfigFile
+    # Resolve playback device: patches empty device in config with system default.
+    $configYaml = Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigFile
     $configEscaped = $configYaml | ConvertTo-Json -Compress
     $message = "{`"SetConfig`": $configEscaped}"
     $ws = [System.Net.WebSockets.ClientWebSocket]::new()
@@ -112,7 +116,8 @@ $heartbeatTimer = [System.Threading.Timer]::new({
   }
   # Push config.
   try {
-    $yaml = Get-Content -Raw $cf -ErrorAction Stop
+    # Resolve playback device: patches empty device in config with system default.
+    $yaml = Resolve-CamillaDSPPlaybackDevice -ConfigPath $cf
     $msg = "{`"SetConfig`": $($yaml | ConvertTo-Json -Compress)}"
     $ws = [System.Net.WebSockets.ClientWebSocket]::new()
     $ws.ConnectAsync([System.Uri]"ws://127.0.0.1:$p", $ct).Wait()

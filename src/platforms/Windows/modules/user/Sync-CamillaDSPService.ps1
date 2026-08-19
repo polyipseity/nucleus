@@ -78,6 +78,12 @@ function Sync-CamillaDSPService {
   $wrapperContent = Get-Content -Raw $wrapperScriptPathSource
   Set-Content -Path $wrapperScriptPath -Value $wrapperContent -NoNewline
 
+  # Copy the shared device-detection library alongside the wrapper script.
+  $deviceSelectSource = Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\..\..\src\scripts\services\camilladsp-deviceselect.ps1"
+  $deviceSelectDest = Join-Path -Path $wrapperDir -ChildPath "deviceselect.ps1"
+  $deviceSelectContent = Get-Content -Raw $deviceSelectSource
+  Set-Content -Path $deviceSelectDest -Value $deviceSelectContent -NoNewline
+
   $action = New-ScheduledTaskAction -Execute "pwsh.exe" -Argument "-WindowStyle Hidden -NoLogo -ExecutionPolicy Bypass -NoProfile -File `"$wrapperScriptPath`" -CamillaDSPBin `"$camilladspBin`" -Port $wsPort -ConfigFile `"$configPath`" -LogFile `"$logFile`""
   $trigger = New-ScheduledTaskTrigger -AtLogOn -User $userId
   $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
