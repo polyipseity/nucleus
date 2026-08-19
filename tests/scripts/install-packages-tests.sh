@@ -80,7 +80,12 @@ test_bun_install_passes_version_pins() {
   tmp="$(setup_fake_repo)"
   stub_tool bun "$tmp"
   # No global package.json -> both desired packages are fresh installs.
-  if run_pkg_script install-bun-packages.sh "$tmp" "$(command -v jq)" "$tmp/bin/bun" >"$tmp/out.txt" 2>&1; then
+  # WHY: HOME must point at a clean temp dir so the host's real
+  # ~/.bun/install/global/package.json is not found by the script.
+  # The stub bun exits 0 but doesn't create the binary, so we pre-create the
+  # target binary to satisfy the post-install existence check.
+  mkdir -p "$tmp/.bun/bin" && touch "$tmp/.bun/bin/clawhub"
+  if HOME="$tmp" run_pkg_script install-bun-packages.sh "$tmp" "$(command -v jq)" "$tmp/bin/bun" "$(command -v awk)" >"$tmp/out.txt" 2>&1; then
     assert_pass "install-bun-packages runs to completion"
   else
     assert_fail "install-bun-packages runs to completion" "exit code $?"
