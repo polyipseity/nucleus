@@ -680,6 +680,8 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
     }
   }
   # Write key-catalog.json for Nix module consumption.
+  # Output goes to ~/.config/nucleus/ (not the repo tree) so generated content
+  # stays out of git.
   $keyEntries = @()
   foreach ($keyName in $availableKeys) {
     if ($keyName -match '^ai_(.+)_api_key(_(\d+))?$') {
@@ -690,10 +692,11 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
     }
   }
   $catalog = @{
-    '$schema' = './key-catalog.schema.json'
+    '$schema' = "$repoRoot\src\modules\ai\key-catalog.schema.json"
     keys = $keyEntries
   } | ConvertTo-Json -Compress
-  $catalogPath = Join-Path -Path $repoRoot -ChildPath 'src\modules\ai\key-catalog.json'
+  $catalogPath = Join-Path -Path $env:USERPROFILE -ChildPath '.config\nucleus\key-catalog.json'
+  New-Item -Path (Split-Path $catalogPath) -ItemType Directory -Force > $null
   [System.IO.File]::WriteAllText($catalogPath, $catalog, [System.Text.UTF8Encoding]::new($false))
   Write-NucleusInfo -CommandName 'apply' "wrote key-catalog.json with $($availableKeys.Count) keys"
 }
