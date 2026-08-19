@@ -14,7 +14,7 @@ devices:
   multithreaded: null
   playback:
     channels: 2
-    device: "\u5916\u7F6E\u8033\u7B52"
+    device: "" # Intentionally empty — smart detection selects the default playback device
     exclusive: null
     format: null
     type: CoreAudio

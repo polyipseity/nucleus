@@ -14,7 +14,7 @@ devices:
   multithreaded: null
   playback:
     channels: 2
-    device: hw:CARD=DAC,DEV=0
+    device: "" # Intentionally empty — smart detection selects the default playback device
     exclusive: null
     format: null
     type: Alsa
