@@ -1,26 +1,23 @@
 #!/usr/bin/env bash
 # LiteLLM AI gateway daemon.
 # Reads SOPS-decrypted API key files and starts litellm.
-# All configuration values can be passed via env vars or CLI args:
-#   LITELLM_CONFIG / $1 = config path
-#   LITELLM_EVAL_TIMEOUT / $2 = polling timeout in 5-second ticks (0 = no polling)
-#   LITELLM_OPENROUTER_API_KEY_PATH / $3 = OpenRouter API key file path
-#   LITELLM_OPENGODE_GO_API_KEY_PATH / $4 = OpenCode Go API key file path
-#   LITELLM_OPENGODE_ZEN_API_KEY_PATH / $5 = OpenCode Zen API key file path
-#   LITELLM_COMMAND_CODE_API_KEY_PATH / $6 = Command Code API key file path
+#
+# Usage: litellm-daemon.sh <config> <poll_timeout> [KEYFILE:ENVVAR ...]
+#
+#   config          Path to litellm-config.yml
+#   poll_timeout    Polling timeout in 5-second ticks (0 = no polling)
+#   KEYFILE:ENVVAR  Pairs of key file path and env var name to export.
+#                   Zero or more pairs — zero means no remote keys.
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
 
-config="${LITELLM_CONFIG:-${1:?usage: litellm-daemon.sh <config> <poll_timeout> <openrouter_key_path> <opencode_go_key_path> <opencode_zen_key_path> <command_code_key_path>}}"
+config="${LITELLM_CONFIG:-${1:?usage: litellm-daemon.sh <config> <poll_timeout> [KEYFILE:ENVVAR ...]}}"
 poll_timeout="${LITELLM_EVAL_TIMEOUT:-${2:?}}"
 _poll_ticks="$poll_timeout"
-_openrouter_key_path="${LITELLM_OPENROUTER_API_KEY_PATH:-${3:?}}"
-_opencode_go_key_path="${LITELLM_OPENGODE_GO_API_KEY_PATH:-${4:?}}"
-_opencode_zen_key_path="${LITELLM_OPENGODE_ZEN_API_KEY_PATH:-${5:?}}"
-_command_code_key_path="${LITELLM_COMMAND_CODE_API_KEY_PATH:-${6:?}}"
+shift 2 || true # check-suppress:suppression_doc: shift fails when config and poll_timeout are supplied via env vars (no positional args)
 
 # Poll for each key file when configured (macOS launchd needs to handle
 # the boot-time race with sops-install-secrets; systemd on NixOS restarts
@@ -51,11 +48,7 @@ _read_keyfile() {
   return 1
 }
 
-for _spec in \
-  "$_openrouter_key_path:OPENROUTER_API_KEY" \
-  "$_opencode_go_key_path:OPENCODE_GO_API_KEY" \
-  "$_opencode_zen_key_path:OPENCODE_ZEN_API_KEY" \
-  "$_command_code_key_path:COMMAND_CODE_API_KEY"; do
+for _spec in "$@"; do
   _keyfile="${_spec%%:*}"
   _varname="${_spec#*:}"
   if [ "$_poll_ticks" -gt 0 ]; then

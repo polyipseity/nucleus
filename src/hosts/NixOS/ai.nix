@@ -22,6 +22,23 @@ let
     runtimeInputs = [ pkgs.litellm ];
     scriptName = "src/scripts/services/litellm-daemon";
   };
+  # Data-driven key args: read manifest + registry to build KEYFILE:ENVVAR pairs.
+  keyRegistry = import ../../modules/ai/key-registry.nix;
+  manifest = builtins.fromJSON (builtins.readFile ../../modules/ai/keys-manifest.json);
+  availableKeys = manifest.availableKeys or [ ];
+  keyArgs = map (
+    keyName:
+    let
+      isIndexed = builtins.match "^ai_.+_api_key_([0-9]+)$" keyName != null;
+      baseName =
+        if isIndexed then builtins.head (builtins.match "^(ai_.+_api_key)_[0-9]+$" keyName) else keyName;
+      indexSuffix =
+        if isIndexed then "_" + (builtins.head (builtins.match "^ai_.+_api_key_([0-9]+)$" keyName)) else "";
+      envVar = keyRegistry.${baseName} + indexSuffix;
+      secretPath = config.sops.secrets.${keyName}.path;
+    in
+    "${secretPath}:${envVar}"
+  ) availableKeys;
 in
 {
   # LiteLLM AI gateway — systemd service on 127.0.0.1:4000.
@@ -39,11 +56,9 @@ in
     path = [ pkgs.litellm ];
     serviceConfig = {
       Type = "simple";
-      ExecStart = "${litellmDaemon}/bin/nucleus-litellm-daemon '${litellmConfig}' '0' '${
-        config.sops.secrets."ai_openrouter_api_key".path
-      }' '${config.sops.secrets."ai_opencode_go_api_key".path}' '${
-        config.sops.secrets."ai_opencode_zen_api_key".path
-      }' '${config.sops.secrets."ai_command_code_api_key".path}'";
+      ExecStart = "${litellmDaemon}/bin/nucleus-litellm-daemon '${litellmConfig}' '0' ${
+        lib.concatStringsSep " " (map (arg: "'${arg}'") keyArgs)
+      }";
       Restart = "always";
       User = "litellm";
       # Protect against resource exhaustion and information leaks.

@@ -19,6 +19,24 @@
 let
   userHome = "/Users/${username}";
   litellmConfig = "${userHome}/.config/nucleus/litellm-config.yml";
+  # Data-driven key args: read manifest + registry to build KEYFILE:ENVVAR pairs.
+  keyRegistry = import ../../modules/ai/key-registry.nix;
+  manifest = builtins.fromJSON (builtins.readFile ../../modules/ai/keys-manifest.json);
+  availableKeys = manifest.availableKeys or [ ];
+  keyArgs = map (
+    keyName:
+    let
+      isIndexed = builtins.match "^ai_.+_api_key_([0-9]+)$" keyName != null;
+      baseName =
+        if isIndexed then builtins.head (builtins.match "^(ai_.+_api_key)_[0-9]+$" keyName) else keyName;
+      indexSuffix =
+        if isIndexed then "_" + (builtins.head (builtins.match "^ai_.+_api_key_([0-9]+)$" keyName)) else "";
+      envVar = keyRegistry.${baseName} + indexSuffix;
+      secretPath = config.sops.secrets.${keyName}.path;
+    in
+    "${secretPath}:${envVar}"
+  ) availableKeys;
+
   envVars = import ../../modules/lib/env-catalog.nix {
     inherit
       config
@@ -69,11 +87,9 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${litellmDaemon}/bin/nucleus-litellm-daemon '${litellmConfig}' '60' '${
-          config.sops.secrets."ai_openrouter_api_key".path
-        }' '${config.sops.secrets."ai_opencode_go_api_key".path}' '${
-          config.sops.secrets."ai_opencode_zen_api_key".path
-        }' '${config.sops.secrets."ai_command_code_api_key".path}'"
+        "exec ${litellmDaemon}/bin/nucleus-litellm-daemon '${litellmConfig}' '60' ${
+          lib.concatStringsSep " " (map (arg: "'${arg}'") keyArgs)
+        }"
       ];
       KeepAlive = true;
       RunAtLoad = true;
