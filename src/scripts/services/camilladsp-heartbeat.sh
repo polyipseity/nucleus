@@ -13,6 +13,8 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
 . "$SCRIPT_DIR/../lib/require-command.sh"
+# shellcheck source=camilladsp-deviceselect.sh
+. "$SCRIPT_DIR/camilladsp-deviceselect.sh"
 
 # --- Argument parsing ---
 ws_port="${WS_PORT:-1234}"
@@ -71,7 +73,9 @@ while true; do
 
   if [ "$_success" = false ]; then
     # --- Push config ---
-    if [ -f "$config_file" ] && _push_resp=$(jq -cRs '{SetConfig: .}' "$config_file" | websocat -1 "ws://127.0.0.1:$ws_port" 2>/dev/null); then
+    # Resolve playback device: patches empty device in config with system default.
+    _resolved_config=$(camilladsp_resolve_playback_device "$config_file")
+    if _push_resp=$(printf '%s\n' "$_resolved_config" | jq -cRs '{SetConfig: .}' | websocat -1 "ws://127.0.0.1:$ws_port" 2>/dev/null); then
       if printf '%s' "$_push_resp" | jq -e '.SetConfig.result == "Ok"' >/dev/null 2>&1; then
         _success=true
       fi
