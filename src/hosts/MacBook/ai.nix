@@ -20,7 +20,7 @@ let
   userHome = "/Users/${username}";
   litellmConfig = "${userHome}/.config/nucleus/litellm-config.yml";
   # Data-driven key args: read key catalog to build KEYFILE:ENVVAR pairs.
-  catalog = builtins.fromJSON (builtins.readFile ../../modules/ai/key-catalog.json);
+  catalog = builtins.fromJSON (builtins.readFile (builtins.getEnv "NUCLEUS_CATALOG_PATH"));
   keyArgs = map (entry: "${config.sops.secrets.${entry.name}.path}:${entry.envVar}") catalog.keys;
 
   envVars = import ../../modules/lib/env-catalog.nix {
