@@ -49,16 +49,16 @@ BeforeAll {
       [System.Text.UTF8Encoding]::new($false)
     )
 
-    # Fake npm: prints the version stored in npm-version. Dual shim so tests
-    # run on Windows CI (npm.cmd) and POSIX pwsh (npm).
+    # Fake curl: prints the version stored in curl-bun-version. Dual shim so
+    # tests run on Windows CI (curl.cmd) and POSIX pwsh (curl).
     $binDir = Join-Path $Script:FixtureRoot 'bin'
     New-Item -Path $binDir -ItemType Directory -Force > $null
-    Set-Content -Path (Join-Path $binDir 'npm-version') -Value '1.0.0' -NoNewline
-    Set-Content -Path (Join-Path $binDir 'npm.cmd') -Value "@echo off`r`nset /p VER=<%~dp0npm-version`r`necho %VER%" -Encoding ASCII
-    Set-Content -Path (Join-Path $binDir 'npm') -Value "#!/bin/sh`ncat `"`$(dirname `"`$0`")/npm-version`"" -Encoding ASCII
+    Set-Content -Path (Join-Path $binDir 'curl-bun-version') -Value '1.0.0' -NoNewline
+    Set-Content -Path (Join-Path $binDir 'curl.cmd') -Value "@echo off`r`nset /p VER=<%~dp0curl-bun-version`r`necho {`"version`":`"%VER%`"}" -Encoding ASCII
+    Set-Content -Path (Join-Path $binDir 'curl') -Value "#!/bin/sh`nprintf '{""version"":""%s""}\n' ""`$(cat ""`$(dirname ""`$0"")/curl-bun-version"")""" -Encoding ASCII
     if (-not $IsWindows) {
-      # POSIX requires the executable bit; Windows CI uses npm.cmd instead.
-      & chmod +x (Join-Path $binDir 'npm')
+      # POSIX requires the executable bit; Windows CI uses curl.cmd instead.
+      & chmod +x (Join-Path $binDir 'curl')
     }
 
     # Fake cargo: echoes the crates.io-fallback output stored in cargo-output.
@@ -103,11 +103,11 @@ BeforeAll {
     }
   }
 
-  function Set-FakeNpmVersion {
+  function Set-FakeBunVersion {
     # check-suppress:SuppressMessageAttribute: PSUseShouldProcessForStateChangingFunctions -- test fixture writes a version file; no ShouldProcess in tests
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseShouldProcessForStateChangingFunctions', '')]
     param([string]$Version)
-    Set-Content -Path (Join-Path $Script:FixtureRoot 'bin/npm-version') -Value $Version -NoNewline
+    Set-Content -Path (Join-Path $Script:FixtureRoot 'bin/curl-bun-version') -Value $Version -NoNewline
   }
 
   function Set-FakeCargoOutput {
@@ -143,7 +143,7 @@ BeforeAll {
       [string[]]$Arguments,
       [string]$FixtureVersion = '1.0.0'
     )
-    Set-FakeNpmVersion -Version $FixtureVersion
+    Set-FakeBunVersion -Version $FixtureVersion
     $oldRepoRoot = $env:NUCLEUS_REPO_ROOT
     $oldPath = $env:PATH
     try {
@@ -345,16 +345,16 @@ Describe 'bump-lockfile.ps1 missing-tool guards' {
     }
   }
 
-  It 'warns and skips the bun section when npm is absent, and never aborts' {
+  It 'warns and skips the bun section when curl is absent, and never aborts' {
     $before = Get-FixtureContent
-    # The fixture ships a fake npm; remove it so the guard path is exercised.
-    Remove-Item -LiteralPath (Join-Path $Script:FixtureRoot 'bin/npm') -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- file may not exist on this platform; absence is the expected pass
-    Remove-Item -LiteralPath (Join-Path $Script:FixtureRoot 'bin/npm.cmd') -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- file may not exist on this platform; absence is the expected pass
+    # The fixture ships a fake curl; remove it so the guard path is exercised.
+    Remove-Item -LiteralPath (Join-Path $Script:FixtureRoot 'bin/curl') -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- file may not exist on this platform; absence is the expected pass
+    Remove-Item -LiteralPath (Join-Path $Script:FixtureRoot 'bin/curl.cmd') -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- file may not exist on this platform; absence is the expected pass
     $result = Invoke-BumpLockfile -Arguments @('-Sections', 'bun')
     $result.ExitCode | Should -Be 0
     Get-FixtureContent | Should -Be $before
-    if (-not (Get-Command -Name 'npm' -ErrorAction SilentlyContinue)) {  # check-suppress:suppression_doc: probe -- tool may be absent; the guard only asserts the skip message when present
-      $result.Output | Should -Match 'npm not found — skipping bun section'
+    if (-not (Get-Command -Name 'curl' -ErrorAction SilentlyContinue)) {  # check-suppress:suppression_doc: probe -- tool may be absent; the guard only asserts the skip message when present
+      $result.Output | Should -Match 'curl: command not found — skipping bun section'
     }
   }
 
