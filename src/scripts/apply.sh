@@ -126,7 +126,7 @@ generate_key_catalog() {
     printf '%s' '{"$schema":"./key-catalog.schema.json","keys":[]}' > "$_gkm_out"
     return
   fi
-  _gkm_decrypted="$(sops -d "$_gkm_yml" 2>/dev/null)" || {
+  _gkm_decrypted="$(sops -d --output-type json "$_gkm_yml" 2>/dev/null)" || {
     warn -l apply "sops decryption failed; generating empty key catalog"
     # shellcheck disable=SC2016 # reason: literal JSON $schema key in single-quoted string, not shell expansion
     printf '%s' '{"$schema":"./key-catalog.schema.json","keys":[]}' > "$_gkm_out"
@@ -134,8 +134,8 @@ generate_key_catalog() {
   }
   # Build catalog: extract ai_*_api_key entries with non-null values, derive
   # envVar from key name via convention: ai_<X>_api_key → <X>_API_KEY.
-  # shellcheck disable=SC2016 # reason: yq filter uses $schema as a literal JSON key, not shell expansion
-  printf '%s' "$_gkm_decrypted" | yq -o=json -r '
+  # shellcheck disable=SC2016 # reason: jq filter uses $schema as a literal JSON key, not shell expansion
+  printf '%s' "$_gkm_decrypted" | jq '
     [to_entries[]
       | select(.key | test("^ai_.+_api_key"))
       | select(.value != null)
