@@ -12,7 +12,7 @@
     scoop                updates — scoop info <pkg>
     cargo-binstall       updates — crates.io API
     cargo                alias — selects the cargo-binstall section
-    bun                  updates — npm view <pkg> version
+    bun                  updates — npm registry API (curl)
     uv                   updates — uv tool list
     rustup               updates — rustup toolchain list + rustc +<ch> --version
     pwsh                 updates — Find-Module via pwsh
@@ -386,17 +386,17 @@ if (Test-SectionEnabled 'cargo-binstall') {
 }
 
 # ---------------------------------------------------------------------------
-# bun — npm view <pkg> version
+# bun — npm registry API (curl)
 # ---------------------------------------------------------------------------
 if (Test-SectionEnabled 'bun') {
-  if (Get-Command -Name 'npm' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
+  if (Get-Command -Name 'curl' -ErrorAction SilentlyContinue) {  # check-suppress:suppression_doc: probe -- tool may not be installed on this platform; the else branch warns and skips the section
     if ($ht.ContainsKey('bun') -and $ht['bun'] -is [hashtable]) {
       foreach ($key in @($ht['bun'].Keys)) {
         $old = $ht['bun'][$key]
         # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
-        $result = & npm view $key version 2>$null
-        if ($result) {
-          $new = $result.Trim()
+        $response = Invoke-RestMethod -Uri "https://registry.npmjs.org/$key/latest" -ErrorAction SilentlyContinue
+        if ($response.version) {
+          $new = $response.version.Trim()
           if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
             Write-Update -Section 'bun' -Key $key -OldValue $old -NewValue $new
             $ht['bun'][$key] = $new
@@ -405,7 +405,7 @@ if (Test-SectionEnabled 'bun') {
       }
     }
   } else {
-    Write-NucleusWarning 'npm not found — skipping bun section'
+    Write-NucleusWarning 'curl: command not found — skipping bun section'
   }
 }
 
