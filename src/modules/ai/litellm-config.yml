@@ -25,9 +25,9 @@
 #     convention (strip ai_ prefix, strip _api_key suffix + index,
 #     uppercase), and exports each one.
 #
-# To add a new provider: add an entry to key-registry.nix, add the
-# corresponding SOPS key to system.yml, add a model_list entry here,
-# and run apply to regenerate keys-manifest.json.
+# To add a new provider: add the SOPS key to system.yml (ai_<name>_api_key),
+# add a model_list entry here, and run apply to regenerate key-catalog.json.
+# The env var name is derived automatically from the SOPS key name convention.
 
 litellm_settings:
   # Drop unsupported client params (e.g. max_tokens) per-endpoint.
