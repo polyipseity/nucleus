@@ -4,8 +4,8 @@
 #
 # Provides:
 #   camilladsp_resolve_playback_device <config_file>
-#     If devices.playback.device is non-empty, passes config through unchanged.
-#     If empty, detects the system default output device, patches the YAML
+#     If devices.playback.device is non-null, passes config through unchanged.
+#     If null, detects the system default output device, patches the YAML
 #     in-memory, and writes the patched config to stdout.
 #     The capture device (devices.capture.device) is always excluded from
 #     detection — if the system default matches capture, it is skipped.
@@ -207,9 +207,10 @@ camilladsp_resolve_playback_device() {
 import yaml, sys
 with open(sys.argv[1]) as f:
     cfg = yaml.safe_load(f)
-playback = cfg.get('devices', {}).get('playback', {}).get('device', '') or ''
+playback = cfg.get('devices', {}).get('playback', {}).get('device', None)
 capture = cfg.get('devices', {}).get('capture', {}).get('device', '') or ''
-print(playback)
+# null (None) = auto-detect signal; print empty string for shell -z check.
+print(playback if playback is not None else '')
 print(capture)
 PYEOF
   _devices=$(python3 "$_tmpfile" "$config_file") || {
@@ -224,7 +225,7 @@ PYEOF
   playback_device=$(printf '%s' "$_devices" | head -1)
   capture_device=$(printf '%s' "$_devices" | tail -1)
 
-  # Non-empty playback device → pass through unchanged.
+  # Non-null playback device → pass through unchanged.
   if [ -n "$playback_device" ]; then
     cat "$config_file"
     return 0
@@ -254,7 +255,7 @@ PYEOF
     return 0
   fi
 
-  # Patch YAML in-memory: replace empty playback device with detected device.
+  # Patch YAML in-memory: replace null playback device with detected device.
   local _patchfile
   _patchfile=$(mktemp) || {
     cat "$config_file"
