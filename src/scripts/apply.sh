@@ -114,6 +114,35 @@ unset _nix_profile_bin
 # Resolve src/scripts/ for apply-internal script delegation.
 _ash_script_dir="$(cd "$(dirname -- "$0")" && pwd -P)"
 
+# Generate keys-manifest.json from decrypted system.yml so Nix modules
+# (sops.nix, litellm-config.nix) can discover available AI API keys at
+# evaluation time.  Must run before any nix build/eval.
+generate_keys_manifest() {
+  _gkm_yml="$REPO_ROOT/src/secrets/system.yml"
+  _gkm_out="$REPO_ROOT/src/modules/ai/keys-manifest.json"
+  if [ ! -f "$_gkm_yml" ]; then
+    say -l apply "system.yml not found; generating empty keys manifest"
+    # shellcheck disable=SC2016 # reason: literal JSON $schema key in single-quoted string, not shell expansion
+    printf '%s' '{"$schema":"./keys-manifest.schema.json","availableKeys":[]}' > "$_gkm_out"
+    return
+  fi
+  _gkm_decrypted="$(sops -d "$_gkm_yml" 2>/dev/null)" || {
+    warn -l apply "sops decryption failed; generating empty keys manifest"
+    # shellcheck disable=SC2016 # reason: literal JSON $schema key in single-quoted string, not shell expansion
+    printf '%s' '{"$schema":"./keys-manifest.schema.json","availableKeys":[]}' > "$_gkm_out"
+    return
+  }
+  # Build manifest: extract ai_*_api_key entries with non-null values, wrap in schema+availableKeys.
+  # shellcheck disable=SC2016 # reason: yq filter uses $schema as a literal JSON key, not shell expansion
+  printf '%s' "$_gkm_decrypted" | yq -r '
+    [to_entries[] | select(.key | test("^ai_.+_api_key")) | select(.value != null) | .key]
+    | {"availableKeys": .}
+    | . + {"$schema": "./keys-manifest.schema.json"}
+  ' > "$_gkm_out"
+  say -l apply "wrote keys-manifest.json with $(yq '.availableKeys | length' "$_gkm_out") keys"
+}
+generate_keys_manifest
+
 # Symlink the LiteLLM config so edits take effect on service restart without
 # re-running apply.  All host services (macOS launchd, NixOS systemd, Windows
 # scheduled task) reference this well-known path.

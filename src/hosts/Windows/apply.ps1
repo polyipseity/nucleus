@@ -668,16 +668,25 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
     $getSystemSecretParams['PrimarySshKeyPath'] = $primarySshKeyPath
   }
   $systemSecrets = Get-Secret @getSystemSecretParams
-  foreach ($key in @('ai_openrouter_api_key', 'ai_opencode_go_api_key', 'ai_opencode_zen_api_key', 'ai_command_code_api_key')) {
-    $value = $systemSecrets.$key
-    if (-not [string]::IsNullOrWhiteSpace($value)) {
-      $keyFile = Join-Path -Path $systemSecretsDir -ChildPath $key
+  $availableKeys = @()
+  foreach ($prop in $systemSecrets.PSObject.Properties) {
+    if ($prop.Name -match '^ai_.+_api_key' -and -not [string]::IsNullOrWhiteSpace($prop.Value)) {
+      $availableKeys += $prop.Name
+      $keyFile = Join-Path -Path $systemSecretsDir -ChildPath $prop.Name
       $existing = if (Test-Path -Path $keyFile -PathType Leaf) { Get-Content -Path $keyFile -Raw -Encoding UTF8 }
-      if ($existing -ne $value) {
-        [System.IO.File]::WriteAllText($keyFile, $value, [System.Text.UTF8Encoding]::new($false))
+      if ($existing -ne $prop.Value) {
+        [System.IO.File]::WriteAllText($keyFile, $prop.Value, [System.Text.UTF8Encoding]::new($false))
       }
     }
   }
+  # Write keys-manifest.json for Nix module consumption.
+  $manifest = @{
+    '$schema' = './keys-manifest.schema.json'
+    availableKeys = $availableKeys
+  } | ConvertTo-Json -Compress
+  $manifestPath = Join-Path -Path $repoRoot -ChildPath 'src\modules\ai\keys-manifest.json'
+  [System.IO.File]::WriteAllText($manifestPath, $manifest, [System.Text.UTF8Encoding]::new($false))
+  Write-NucleusInfo -CommandName 'apply' "wrote keys-manifest.json with $($availableKeys.Count) keys"
 }
 
 # Materialize decrypted wallpapers ahead of DSC so user/wallpaper.dsc.yml can resolve an
