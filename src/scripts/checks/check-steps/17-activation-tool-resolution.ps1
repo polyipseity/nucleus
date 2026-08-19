@@ -61,7 +61,7 @@ Register-Step -Id "activation-tool-resolution" -Name "Activation script tool res
     # Skip if file doesn't exist (may have been deleted since find).
     if (-not (Test-Path $file)) { continue }
 
-    $lines = Get-Content -LiteralPath $file -ErrorAction SilentlyContinue
+    $lines = Get-Content -LiteralPath $file -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: file may have been deleted since find; treat empty/unreadable as no content
     if (-not $lines) { continue }
 
     for ($i = 0; $i -lt $lines.Count; $i++) {
