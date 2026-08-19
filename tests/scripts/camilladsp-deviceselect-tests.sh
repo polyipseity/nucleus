@@ -29,7 +29,8 @@ _make_config() {
   local capture_device="${2:-Loopback Audio}"
   local cfg
   cfg=$(mktemp) || return 1
-  cat >"$cfg" <<YAML
+  if [ -n "$playback_device" ]; then
+    cat >"$cfg" <<YAML
 ---
 devices:
   playback:
@@ -41,6 +42,33 @@ devices:
     device: "$capture_device"
     type: CoreAudio
 YAML
+  else
+    cat >"$cfg" <<'YAML'
+---
+devices:
+  playback:
+    channels: 2
+    device: null
+    type: CoreAudio
+  capture:
+    channels: 2
+    device: Loopback Audio
+    type: CoreAudio
+YAML
+    # Override capture_device when using null template (heredoc cannot interpolate).
+    if [ "$capture_device" != "Loopback Audio" ]; then
+      local patched
+      patched=$(mktemp) || return 1
+      python3 -c "
+import yaml, sys
+with open('$cfg') as f:
+    cfg = yaml.safe_load(f)
+cfg['devices']['capture']['device'] = '$capture_device'
+yaml.dump(cfg, open('$patched', 'w'), default_flow_style=False, sort_keys=False)
+" 2>/dev/null || { rm -f "$patched"; rm -f "$cfg"; return 1; }
+      mv "$patched" "$cfg"
+    fi
+  fi
   printf '%s' "$cfg"
 }
 
@@ -124,7 +152,7 @@ test_passthrough_nonempty_device() {
   fi
 }
 
-# Test 2: Empty playback device + default output available → patch with detected device.
+# Test 2: Null playback device + default output available → patch with detected device.
 test_patches_with_default_output() {
   local cfg
   cfg="$(_make_config "" "Loopback Audio")"
@@ -136,9 +164,9 @@ test_patches_with_default_output() {
   device=$(_extract_playback_device <<< "$resolved")
   rm -f "$cfg"
   if [ "$device" = "External USB DAC" ]; then
-    assert_pass "empty device patched with detected default output"
+    assert_pass "null device patched with detected default output"
   else
-    assert_fail "empty device patching" "expected 'External USB DAC', got '$device'"
+    assert_fail "null device patching" "expected 'External USB DAC', got '$device'"
   fi
 }
 
@@ -160,8 +188,8 @@ test_rejects_capture_device() {
   fi
 }
 
-# Test 4: No default output, no fallback devices → pass through with empty device.
-test_empty_when_no_devices() {
+# Test 4: No default output, no fallback devices → pass through with null device.
+test_null_when_no_devices() {
   local cfg
   cfg="$(_make_config "" "Loopback Audio")"
   _MOCK_DEFAULT_OUTPUT=""
@@ -174,7 +202,7 @@ test_empty_when_no_devices() {
   device=$(_extract_playback_device <<< "$resolved")
   rm -f "$cfg"
   if [ -z "$device" ]; then
-    assert_pass "empty device preserved when no devices available"
+    assert_pass "null device preserved when no devices available"
   else
     assert_fail "no-devices passthrough" "expected empty, got '$device'"
   fi
@@ -213,7 +241,7 @@ test_all_devices_are_capture() {
   device=$(_extract_playback_device <<< "$resolved")
   rm -f "$cfg"
   if [ -z "$device" ]; then
-    assert_pass "empty device when all available devices match capture"
+    assert_pass "null device when all available devices match capture"
   else
     assert_fail "all-capture fallback" "expected empty, got '$device'"
   fi
@@ -224,7 +252,7 @@ test_all_devices_are_capture() {
 test_passthrough_nonempty_device
 test_patches_with_default_output
 test_rejects_capture_device
-test_empty_when_no_devices
+test_null_when_no_devices
 test_preserves_other_fields
 test_all_devices_are_capture
 
