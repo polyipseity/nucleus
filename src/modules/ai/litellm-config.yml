@@ -5,6 +5,29 @@
 #   - Local Ollama daemon (127.0.0.1:11434) for offline models
 #   - A single generic `default` model backed by remote providers, selected
 #     by `order` tier (primary → paid → fallback).  API keys from SOPS secrets.
+#
+# Env var lifecycle
+# ────────────────
+# Each api_key entry below references an environment variable (e.g.
+# os.environ/OPENCODE_ZEN_API_KEY).  These env vars are populated at runtime
+# by the platform-specific daemon scripts before litellm starts:
+#
+#   POSIX (NixOS/macOS):
+#     litellm-daemon.sh receives KEYFILE:ENVVAR positional args from
+#     the systemd/launchd service (ai.nix).  For each pair, if KEYFILE
+#     exists, the script reads its contents and exports the env var.
+#     Key files come from sops-nix, which decrypts src/secrets/system.yml
+#     to /run/secrets/ai_* at boot.
+#
+#   Windows:
+#     LiteLLM-run.ps1 reads all ai_*_api_key* files from the SOPS
+#     secrets directory, derives the env var name using the naming
+#     convention (strip ai_ prefix, strip _api_key suffix + index,
+#     uppercase), and exports each one.
+#
+# To add a new provider: add an entry to key-registry.nix, add the
+# corresponding SOPS key to system.yml, add a model_list entry here,
+# and run apply to regenerate keys-manifest.json.
 
 litellm_settings:
   # Drop unsupported client params (e.g. max_tokens) per-endpoint.
