@@ -394,9 +394,10 @@ if (Test-SectionEnabled 'bun') {
       foreach ($key in @($ht['bun'].Keys)) {
         $old = $ht['bun'][$key]
         # check-suppress:suppression_doc: probe -- package may not exist; stderr suppressed for clean output.
-        $response = Invoke-RestMethod -Uri "https://registry.npmjs.org/$key/latest" -ErrorAction SilentlyContinue
-        if ($response.version) {
-          $new = $response.version.Trim()
+        $result = & curl -fsSL "https://registry.npmjs.org/$key/latest" 2>$null
+        if ($result) {
+          $parsed = $result | ConvertFrom-Json
+          $new = $parsed.version.Trim()
           if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
             Write-Update -Section 'bun' -Key $key -OldValue $old -NewValue $new
             $ht['bun'][$key] = $new
