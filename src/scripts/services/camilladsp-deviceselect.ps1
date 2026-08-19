@@ -3,7 +3,7 @@
 #
 # Provides Resolve-CamillaDSPPlaybackDevice which reads a config YAML file,
 # detects the system default playback device when devices.playback.device is
-# empty, and returns the patched YAML.  When playback.device is already set,
+# null, and returns the patched YAML.  When playback.device is already set,
 # the config is returned unchanged.
 #
 # The capture device is always excluded from autodetection to prevent audio
@@ -29,8 +29,8 @@ function Resolve-CamillaDSPPlaybackDevice {
   $playbackDevice = $cfg.devices.playback.device
   $captureDevice = $cfg.devices.capture.device
 
-  # Non-empty playback device → pass through unchanged.
-  if ($playbackDevice) {
+  # Non-null playback device → pass through unchanged.
+  if ($null -ne $playbackDevice) {
     return $yaml
   }
 
