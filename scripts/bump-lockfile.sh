@@ -7,7 +7,7 @@
 #   winget            winget show --id <id>
 #   scoop             scoop info <pkg>
 #   cargo-binstall    crates.io API (alias: cargo)
-#   bun               npm view <pkg> version
+#   bun               npm registry API (curl)
 #   uv                uv tool list
 #   rustup            rustc +<ch> --version
 #   pwsh              Find-Module via pwsh        (skip if pwsh unavailable)
@@ -58,7 +58,7 @@ Sections (status — mechanism):
   scoop                 updates   scoop info <pkg>
   cargo-binstall        updates   crates.io API
   cargo                 alias     selects cargo-binstall
-  bun                   updates   npm view <pkg> version
+  bun                   updates   npm registry API (curl)
   uv                    updates   uv tool list
   rustup                updates   rustc +<ch> --version
   pwsh                  updates   Find-Module via pwsh (skip if pwsh unavailable)
@@ -293,21 +293,21 @@ if section_enabled cargo-binstall; then
   done < <(printf '%s\n' "$data" | jq -r '(.["cargo-binstall"] // {}) | keys[]')
 fi
 
-# bun — npm view <pkg> version
+# bun — npm registry API (curl)
 if section_enabled bun; then
-  if command -v npm >/dev/null 2>&1; then
+  if command -v curl >/dev/null 2>&1; then
     while IFS= read -r key; do
       [ -z "$key" ] && continue
       old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.bun // {})[$k] // empty')
       [ -z "$old" ] && continue
-      new=$(npm view "$key" version 2>/dev/null | tr -d '[:space:]')
+      new=$(curl -fsSL "https://registry.npmjs.org/$key/latest" 2>/dev/null | jq -r '.version // empty' 2>/dev/null)
       if [ -n "$new" ] && [ "$new" != "$old" ]; then
         log_update "bun" "$key" "$old" "$new"
         data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.bun[$k] = $v')
       fi
     done < <(printf '%s\n' "$data" | jq -r '(.bun // {}) | keys[]')
   else
-    warn "npm: command not found — skipping bun section"
+    warn "curl: command not found — skipping bun section"
   fi
 fi
 
