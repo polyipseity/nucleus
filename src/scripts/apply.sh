@@ -114,34 +114,43 @@ unset _nix_profile_bin
 # Resolve src/scripts/ for apply-internal script delegation.
 _ash_script_dir="$(cd "$(dirname -- "$0")" && pwd -P)"
 
-# Generate keys-manifest.json from decrypted system.yml so Nix modules
-# (sops.nix, litellm-config.nix) can discover available AI API keys at
-# evaluation time.  Must run before any nix build/eval.
-generate_keys_manifest() {
+# Generate key-catalog.json from decrypted system.yml so Nix modules
+# (sops.nix, ai.nix) can discover available AI API keys and their env var
+# mappings at evaluation time.  Must run before any nix build/eval.
+generate_key_catalog() {
   _gkm_yml="$REPO_ROOT/src/secrets/system.yml"
-  _gkm_out="$REPO_ROOT/src/modules/ai/keys-manifest.json"
+  _gkm_out="$REPO_ROOT/src/modules/ai/key-catalog.json"
   if [ ! -f "$_gkm_yml" ]; then
-    say -l apply "system.yml not found; generating empty keys manifest"
+    say -l apply "system.yml not found; generating empty key catalog"
     # shellcheck disable=SC2016 # reason: literal JSON $schema key in single-quoted string, not shell expansion
-    printf '%s' '{"$schema":"./keys-manifest.schema.json","availableKeys":[]}' > "$_gkm_out"
+    printf '%s' '{"$schema":"./key-catalog.schema.json","keys":[]}' > "$_gkm_out"
     return
   fi
   _gkm_decrypted="$(sops -d "$_gkm_yml" 2>/dev/null)" || {
-    warn -l apply "sops decryption failed; generating empty keys manifest"
+    warn -l apply "sops decryption failed; generating empty key catalog"
     # shellcheck disable=SC2016 # reason: literal JSON $schema key in single-quoted string, not shell expansion
-    printf '%s' '{"$schema":"./keys-manifest.schema.json","availableKeys":[]}' > "$_gkm_out"
+    printf '%s' '{"$schema":"./key-catalog.schema.json","keys":[]}' > "$_gkm_out"
     return
   }
-  # Build manifest: extract ai_*_api_key entries with non-null values, wrap in schema+availableKeys.
+  # Build catalog: extract ai_*_api_key entries with non-null values, derive
+  # envVar from key name via convention: ai_<X>_api_key → <X>_API_KEY.
   # shellcheck disable=SC2016 # reason: yq filter uses $schema as a literal JSON key, not shell expansion
   printf '%s' "$_gkm_decrypted" | yq -o=json -r '
-    [to_entries[] | select(.key | test("^ai_.+_api_key")) | select(.value != null) | .key]
-    | {"availableKeys": .}
-    | . + {"$schema": "./keys-manifest.schema.json"}
+    [to_entries[]
+      | select(.key | test("^ai_.+_api_key"))
+      | select(.value != null)
+      | .key as $k
+      | ($k | sub("^ai_"; "") | sub("_api_key(_[0-9]+)?$"; "") | ascii_upcase) as $base
+      | if ($k | test("_api_key_[0-9]+$"))
+        then { name: $k, envVar: ($base + "_API_KEY_" + ($k | capture("_api_key_(?<i>[0-9]+)$").i)) }
+        else { name: $k, envVar: ($base + "_API_KEY") }
+        end
+    ]
+    | {"$schema": "./key-catalog.schema.json", "keys": .}
   ' > "$_gkm_out"
-  say -l apply "wrote keys-manifest.json with $(yq '.availableKeys | length' "$_gkm_out") keys"
+  say -l apply "wrote key-catalog.json with $(yq '.keys | length' "$_gkm_out") keys"
 }
-generate_keys_manifest
+generate_key_catalog
 
 # Symlink the LiteLLM config so edits take effect on service restart without
 # re-running apply.  All host services (macOS launchd, NixOS systemd, Windows

@@ -679,14 +679,23 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
       }
     }
   }
-  # Write keys-manifest.json for Nix module consumption.
-  $manifest = @{
-    '$schema' = './keys-manifest.schema.json'
-    availableKeys = $availableKeys
+  # Write key-catalog.json for Nix module consumption.
+  $keyEntries = @()
+  foreach ($keyName in $availableKeys) {
+    if ($keyName -match '^ai_(.+)_api_key(_(\d+))?$') {
+      $base = $Matches[1].ToUpper()
+      $indexSuffix = if ($Matches[3]) { "_$($Matches[3])" } else { '' }
+      $envVar = "${base}_API_KEY${indexSuffix}"
+      $keyEntries += @{ name = $keyName; envVar = $envVar }
+    }
+  }
+  $catalog = @{
+    '$schema' = './key-catalog.schema.json'
+    keys = $keyEntries
   } | ConvertTo-Json -Compress
-  $manifestPath = Join-Path -Path $repoRoot -ChildPath 'src\modules\ai\keys-manifest.json'
-  [System.IO.File]::WriteAllText($manifestPath, $manifest, [System.Text.UTF8Encoding]::new($false))
-  Write-NucleusInfo -CommandName 'apply' "wrote keys-manifest.json with $($availableKeys.Count) keys"
+  $catalogPath = Join-Path -Path $repoRoot -ChildPath 'src\modules\ai\key-catalog.json'
+  [System.IO.File]::WriteAllText($catalogPath, $catalog, [System.Text.UTF8Encoding]::new($false))
+  Write-NucleusInfo -CommandName 'apply' "wrote key-catalog.json with $($availableKeys.Count) keys"
 }
 
 # Materialize decrypted wallpapers ahead of DSC so user/wallpaper.dsc.yml can resolve an
