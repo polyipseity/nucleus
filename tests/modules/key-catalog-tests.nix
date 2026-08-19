@@ -10,7 +10,7 @@
 # catalog edits.
 
 let
-  catalogPath = ../../src/modules/ai/key-catalog.json;
+  catalogPath = ../fixtures/key-catalog.json;
   catalog = builtins.fromJSON (builtins.readFile catalogPath);
   inherit (import ../lib.nix) assert';
 
