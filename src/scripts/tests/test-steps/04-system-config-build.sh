@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck source=../test-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../test-lib.sh"
+# shellcheck source=../../lib/key-catalog.sh
+# (provides ensure_key_catalog so Nix modules reading NUCLEUS_CATALOG_PATH don't
+# fail on an empty env var)
+. "$NUCLEUS_LIB_DIR/key-catalog.sh"
 
 register_step "system-config-build" "System config build" run_system_config_build
 
@@ -83,6 +87,10 @@ run_system_config_build() {
     skip_step "$(step_number)" "System config build" "sops secret material unavailable for host $_host"
     return 2
   fi
+
+  # Generate the key catalog so Nix modules reading NUCLEUS_CATALOG_PATH
+  # evaluate against a valid (possibly empty) catalog, not an empty env var.
+  ensure_key_catalog
 
   case "$_host" in
   MacBook) _attr="darwinConfigurations.MacBook.system" ;;
