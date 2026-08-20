@@ -686,8 +686,16 @@ gc_logs() {
   expire_logs_in_directory "$_gl_log_dir" "$_gl_expiry"
 
   if [ -n "$_gl_system_log_dir" ] && [ "$_gl_system_log_dir" != "$_gl_log_dir" ]; then
-    rotate_logs_in_directory "$_gl_system_log_dir" "$_gl_maxsize" "$_gl_maxfiles" "$_gl_compress"
-    expire_logs_in_directory "$_gl_system_log_dir" "$_gl_expiry"
+    if [ -w "$_gl_system_log_dir" ]; then
+      rotate_logs_in_directory "$_gl_system_log_dir" "$_gl_maxsize" "$_gl_maxfiles" "$_gl_compress"
+      expire_logs_in_directory "$_gl_system_log_dir" "$_gl_expiry"
+    elif command -v sudo >/dev/null 2>&1 && [ "$(id -u)" -ne 0 ]; then
+      say "system log dir '$_gl_system_log_dir' not writable by current user; escalating to root"
+      sudo env NUCLEUS_REPO_ROOT="$REPO_ROOT" NUCLEUS_GC_EXPIRY="$_gl_expiry" \
+        "$REPO_ROOT/src/scripts/services/log-gc-system.sh"
+    else
+      warn "system log dir '$_gl_system_log_dir' not writable and cannot escalate; skipping"
+    fi
   fi
 }
 
