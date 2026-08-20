@@ -294,9 +294,9 @@ _jfs_sync_accounts() {
   fi
 
   if [ -z "$_jfsa_admin_token" ]; then
-    say -l jellyfin "no elevated account credentials available; skipping account sync"
     rm -f "$_jfsa_resolved_file"
-    return
+    error -l jellyfin "no admin Jellyfin account configured; configure your own admin account before account items can be synced"
+    return 1
   fi
 
   while IFS= read -r _jfsa_account; do
@@ -606,9 +606,9 @@ _jfs_sync_libraries() {
   fi
 
   if [ -z "$_jfsl_admin_token" ]; then
-    say -l jellyfin/library "no elevated account credentials available; skipping library sync"
     rm -f "$_jfsl_merged_file" "$_jfsl_creds_file"
-    return
+    error -l jellyfin/library "no admin Jellyfin account configured; configure your own admin account before library items can be synced"
+    return 1
   fi
 
   rm -f "$_jfsl_creds_file"

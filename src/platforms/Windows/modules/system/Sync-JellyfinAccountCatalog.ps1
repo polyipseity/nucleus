@@ -294,8 +294,7 @@ function Sync-JellyfinAccountCatalog {
   }
 
   if (-not $adminToken) {
-    Write-NucleusWarning -CommandName 'jellyfin' 'no elevated account credentials available; skipping user convergence.'
-    return
+    throw "jellyfin: no admin Jellyfin account configured; configure your own admin account before account items can be synced."
   }
 
   foreach ($spec in $accountSpecs) {

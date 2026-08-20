@@ -393,8 +393,7 @@ function Sync-JellyfinLibraryCatalog {
   }
 
   if (-not $adminToken) {
-    Write-NucleusWarning -CommandName 'jellyfin/library' 'no elevated account credentials available; skipping library convergence.'
-    return
+    throw "jellyfin/library: no admin Jellyfin account configured; configure your own admin account before library items can be synced."
   }
 
   # 6. GET /Library/VirtualFolders — list existing.
