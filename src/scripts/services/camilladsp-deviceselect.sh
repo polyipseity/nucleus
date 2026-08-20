@@ -49,7 +49,7 @@ for i, line in enumerate(lines):
                     sys.exit(0)
         break
 PYEOF
-  python3 "$_tmpfile" <<< "$output" 2>/dev/null
+  python3 "$_tmpfile" <<<"$output" 2>/dev/null
   local _rc=$?
   rm -f "$_tmpfile"
   return $_rc
@@ -60,11 +60,11 @@ _camilladsp_detect_linux() {
   # WirePlumber
   if _has_command wpctl; then
     local default_sink
-    default_sink=$(wpctl status 2>/dev/null \
-      | grep -A1 'Sinks:' \
-      | grep '\*' \
-      | sed 's/.*\*\s*//' \
-      | sed 's/\s\+[0-9]\+.*//')
+    default_sink=$(wpctl status 2>/dev/null |
+      grep -A1 'Sinks:' |
+      grep '\*' |
+      sed 's/.*\*\s*//' |
+      sed 's/\s\+[0-9]\+.*//')
     if [ -n "$default_sink" ]; then
       printf '%s\n' "$default_sink"
       return 0
@@ -74,9 +74,9 @@ _camilladsp_detect_linux() {
   # PulseAudio
   if _has_command pactl; then
     local default_sink
-    default_sink=$(pactl info 2>/dev/null \
-      | grep 'Default Sink:' \
-      | sed 's/Default Sink: //')
+    default_sink=$(pactl info 2>/dev/null |
+      grep 'Default Sink:' |
+      sed 's/Default Sink: //')
     if [ -n "$default_sink" ]; then
       printf '%s\n' "$default_sink"
       return 0
@@ -86,10 +86,10 @@ _camilladsp_detect_linux() {
   # ALSA fallback: first card
   if _has_command aplay; then
     local first_card
-    first_card=$(aplay -l 2>/dev/null \
-      | grep '^card [0-9]' \
-      | head -1 \
-      | sed 's/card \([0-9]*\): .*/\1/')
+    first_card=$(aplay -l 2>/dev/null |
+      grep '^card [0-9]' |
+      head -1 |
+      sed 's/card \([0-9]*\): .*/\1/')
     if [ -n "$first_card" ]; then
       printf '%s\n' "hw:CARD=${first_card},DEV=0"
       return 0
@@ -101,9 +101,9 @@ _camilladsp_detect_linux() {
 
 camilladsp_detect_default_output() {
   case "$(uname -s)" in
-    Darwin) _camilladsp_detect_macos ;;
-    Linux)  _camilladsp_detect_linux ;;
-    *)      return 1 ;;
+  Darwin) _camilladsp_detect_macos ;;
+  Linux) _camilladsp_detect_linux ;;
+  *) return 1 ;;
   esac
 }
 
@@ -129,7 +129,7 @@ for i, line in enumerate(lines):
             print(name)
             sys.exit(0)
 PYEOF
-  python3 "$_tmpfile" "$capture_device" <<< "$output" 2>/dev/null
+  python3 "$_tmpfile" "$capture_device" <<<"$output" 2>/dev/null
   local _rc=$?
   rm -f "$_tmpfile"
   return $_rc
@@ -142,12 +142,12 @@ _camilladsp_detect_first_available_linux() {
   # WirePlumber
   if _has_command wpctl; then
     local first_sink
-    first_sink=$(wpctl status 2>/dev/null \
-      | grep -A20 'Sinks:' \
-      | grep -E '^\s+[0-9]+\.' \
-      | head -1 \
-      | sed 's/^\s*[0-9]*\.\s*//' \
-      | sed 's/\s\+[0-9]\+.*//')
+    first_sink=$(wpctl status 2>/dev/null |
+      grep -A20 'Sinks:' |
+      grep -E '^\s+[0-9]+\.' |
+      head -1 |
+      sed 's/^\s*[0-9]*\.\s*//' |
+      sed 's/\s\+[0-9]\+.*//')
     if [ -n "$first_sink" ] && [ "$first_sink" != "$capture_device" ]; then
       printf '%s\n' "$first_sink"
       return 0
@@ -157,9 +157,9 @@ _camilladsp_detect_first_available_linux() {
   # PulseAudio
   if _has_command pactl; then
     local first_sink
-    first_sink=$(pactl list sinks short 2>/dev/null \
-      | head -1 \
-      | awk '{print $2}')
+    first_sink=$(pactl list sinks short 2>/dev/null |
+      head -1 |
+      awk '{print $2}')
     if [ -n "$first_sink" ] && [ "$first_sink" != "$capture_device" ]; then
       printf '%s\n' "$first_sink"
       return 0
@@ -169,10 +169,10 @@ _camilladsp_detect_first_available_linux() {
   # ALSA fallback
   if _has_command aplay; then
     local first_card
-    first_card=$(aplay -l 2>/dev/null \
-      | grep '^card [0-9]' \
-      | head -1 \
-      | sed 's/card \([0-9]*\): .*/\1/')
+    first_card=$(aplay -l 2>/dev/null |
+      grep '^card [0-9]' |
+      head -1 |
+      sed 's/card \([0-9]*\): .*/\1/')
     if [ -n "$first_card" ]; then
       printf '%s\n' "hw:CARD=${first_card},DEV=0"
       return 0
@@ -185,9 +185,9 @@ _camilladsp_detect_first_available_linux() {
 camilladsp_detect_first_available() {
   local capture_device="$1"
   case "$(uname -s)" in
-    Darwin) _camilladsp_detect_first_available_macos "$capture_device" ;;
-    Linux)  _camilladsp_detect_first_available_linux "$capture_device" ;;
-    *)      return 1 ;;
+  Darwin) _camilladsp_detect_first_available_macos "$capture_device" ;;
+  Linux) _camilladsp_detect_first_available_linux "$capture_device" ;;
+  *) return 1 ;;
   esac
 }
 

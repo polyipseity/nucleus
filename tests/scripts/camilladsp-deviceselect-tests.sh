@@ -65,7 +65,11 @@ with open('$cfg') as f:
     cfg = yaml.safe_load(f)
 cfg['devices']['capture']['device'] = '$capture_device'
 yaml.dump(cfg, open('$patched', 'w'), default_flow_style=False, sort_keys=False)
-" 2>/dev/null || { rm -f "$patched"; rm -f "$cfg"; return 1; }
+" 2>/dev/null || {
+        rm -f "$patched"
+        rm -f "$cfg"
+        return 1
+      }
       mv "$patched" "$cfg"
     fi
   fi
@@ -143,7 +147,7 @@ test_passthrough_nonempty_device() {
   local resolved
   resolved=$(_run_resolve "$cfg")
   local device
-  device=$(_extract_playback_device <<< "$resolved")
+  device=$(_extract_playback_device <<<"$resolved")
   rm -f "$cfg"
   if [ "$device" = "MacBook Pro Speakers" ]; then
     assert_pass "non-empty playback device passes through unchanged"
@@ -161,7 +165,7 @@ test_patches_with_default_output() {
   local resolved
   resolved=$(_run_resolve "$cfg")
   local device
-  device=$(_extract_playback_device <<< "$resolved")
+  device=$(_extract_playback_device <<<"$resolved")
   rm -f "$cfg"
   if [ "$device" = "External USB DAC" ]; then
     assert_pass "null device patched with detected default output"
@@ -179,7 +183,7 @@ test_rejects_capture_device() {
   local resolved
   resolved=$(_run_resolve "$cfg")
   local device
-  device=$(_extract_playback_device <<< "$resolved")
+  device=$(_extract_playback_device <<<"$resolved")
   rm -f "$cfg"
   if [ "$device" = "MacBook Pro Speakers" ]; then
     assert_pass "capture device rejected, fallback used"
@@ -199,7 +203,7 @@ test_null_when_no_devices() {
   local resolved
   resolved=$(_run_resolve "$cfg")
   local device
-  device=$(_extract_playback_device <<< "$resolved")
+  device=$(_extract_playback_device <<<"$resolved")
   rm -f "$cfg"
   if [ -z "$device" ]; then
     assert_pass "null device preserved when no devices available"
@@ -217,7 +221,7 @@ test_preserves_other_fields() {
   local resolved
   resolved=$(_run_resolve "$cfg")
   local ptype
-  ptype=$(_extract_playback_type <<< "$resolved")
+  ptype=$(_extract_playback_type <<<"$resolved")
   rm -f "$cfg"
   if [ "$ptype" = "CoreAudio" ]; then
     assert_pass "non-playback fields preserved after patching"
@@ -238,7 +242,7 @@ test_all_devices_are_capture() {
   local resolved
   resolved=$(_run_resolve "$cfg")
   local device
-  device=$(_extract_playback_device <<< "$resolved")
+  device=$(_extract_playback_device <<<"$resolved")
   rm -f "$cfg"
   if [ -z "$device" ]; then
     assert_pass "null device when all available devices match capture"
