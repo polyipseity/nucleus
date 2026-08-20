@@ -84,7 +84,7 @@ model_list:
   # upstream that rejects it).  Public name never exposes the upstream model.
   - model_name: default
     litellm_params:
-      model: openai/mimo-v2.5-free
+      model: openai/hy3-free
       api_base: https://opencode.ai/zen/v1
       api_key: os.environ/OPENCODE_ZEN_API_KEY
       order: 1
@@ -94,7 +94,7 @@ model_list:
         max_output_tokens: 8192
   - model_name: default
     litellm_params:
-      model: openai/mimo-v2.5
+      model: openai/hy3
       api_base: https://opencode.ai/zen/go/v1
       api_key: os.environ/OPENCODE_GO_API_KEY
       order: 2
@@ -104,7 +104,7 @@ model_list:
         max_output_tokens: 8192
   - model_name: default
     litellm_params:
-      model: openai/mimo-v2.5
+      model: openai/hy3
       api_base: https://opencode.ai/zen/go/v1
       api_key: os.environ/OPENCODE_GO_API_KEY_1
       order: 2
