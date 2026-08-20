@@ -112,6 +112,46 @@ function Get-NucleusSystemLogDir {
   return $path
 }
 
+function Test-NucleusLogDirWritable {
+  <#
+  .SYNOPSIS
+    Returns $true when the current user can write to the given log directory.
+  .DESCRIPTION
+    Probes writability without mutating files: tries to open the directory for
+    write access. Used to decide whether log rotation/expiry can run inline or
+    must escalate to the system-level scheduled task.
+  .PARAMETER Path
+    Directory path to probe.
+  .EXAMPLE
+    Test-NucleusLogDirWritable -Path (Get-NucleusSystemLogDir)
+  #>
+  [CmdletBinding()]
+  [OutputType([bool])]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Path
+  )
+
+  if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return $false }
+
+  try {
+    $dirInfo = [System.IO.DirectoryInfo]::new($Path)
+    $acl = $dirInfo.GetAccessControl()
+    $rules = $acl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])
+    $identity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+    foreach ($rule in $rules) {
+      if ($identity.User -eq $rule.IdentityReference -or $identity.Groups -contains $rule.IdentityReference) {
+        if ($rule.FileSystemRights -band [System.Security.AccessControl.FileSystemRights]::Write -and $rule.AccessControlType -eq [System.Security.AccessControl.AccessControlType]::Allow) {
+          return $true
+        }
+      }
+    }
+    return $false
+  } catch {
+    return $false
+  }
+}
+
 function ConvertTo-SanitizedText {
   <#
   .SYNOPSIS

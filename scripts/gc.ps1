@@ -505,8 +505,17 @@ if (-not $NoLogGc) {
     Invoke-LogExpiry -Path $logDir -Expiry $logExpiry
 
     if ($systemLogDir -and ($systemLogDir -ne $logDir)) {
-      Invoke-LogRotation -Path $systemLogDir -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
-      Invoke-LogExpiry -Path $systemLogDir -Expiry $logExpiry
+      if (Test-NucleusLogDirWritable -Path $systemLogDir) {
+        Invoke-LogRotation -Path $systemLogDir -MaxSize $logMaxSize -MaxFiles $logMaxFiles -Compress $logCompress
+        Invoke-LogExpiry -Path $systemLogDir -Expiry $logExpiry
+      } else {
+        try {
+          Start-ScheduledTask -TaskName 'log-gc-system' -TaskPath '\nucleus\' -ErrorAction Stop
+          Write-NucleusNotice -CommandName log-gc "escalated system log rotation to 'log-gc-system' scheduled task"
+        } catch {
+          Write-NucleusWarning -CommandName log-gc "system log dir '$systemLogDir' not writable and cannot escalate; skipping"
+        }
+      }
     }
   }
 }
