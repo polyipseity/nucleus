@@ -105,6 +105,7 @@ Check/test preflight, tool-availability policy, scoped-mode conventions, and dyn
 - Keep Windows long-path support enabled in DSC (`LongPathsEnabled = 1`).
 - Wallpaper state must come from managed decrypted assets, not ad-hoc local files.
 - Keep SOPS recipients real and shared across encrypted files; rewrap encrypted files with `sops updatekeys` after recipient changes.
+- Privilege-gating policy (hard-error default for `src/`; escalate for user-facing `scripts/`; inverse-family exception): see `.agents/instructions/scripts-and-permissions.instructions.md` ("Privilege-gating policy"). Jellyfin admin-token absence is a separate hard-error concern, not a warn-and-skip exception.
 
 See `.agents/instructions/package-installation-scope.instructions.md` for package installation policies.
 

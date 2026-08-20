@@ -143,6 +143,60 @@ Rules:
 - Do not assume Bash-only features in `.sh` unless you intentionally require Bash and document that requirement.
 - For PowerShell, prefer clear cmdlet names over aliases in committed scripts.
 
+## Privilege-gating policy
+
+Any code that checks whether it holds a privilege (sudo/root on POSIX;
+Administrator/elevated on Windows) follows this rule. A privilege is "required"
+only when the operation at hand cannot succeed without it; a script that never
+needs the privilege is unaffected by this policy.
+
+1. **Default (all `src/` code, and any non-user-facing path):** if the privilege
+   is required but unavailable, **hard-error** (exit non-zero with a clear
+   message). No warn-and-continue on a privilege gap. Continuing the operation
+   *without* the privilege is also forbidden — attempting to proceed (e.g.
+   falling back to a degraded non-privileged path) is not allowed. Such
+   continue-without-privilege branches add parallel code paths that must be
+   maintained for no benefit, since the operation cannot succeed correctly
+   without the privilege. Hard-error is the only sanctioned outcome.
+2. **User-facing exception (`scripts/` only — the `nucleus-*` CLI set, NOT
+   `src/scripts/`, `src/platforms/*/scripts/`, `src/hosts/*/`):** when an
+   operation *requires* a privilege that the current process lacks, the script
+   **escalates** to obtain it (POSIX: `sudo` re-exec / prefix; Windows: `RunAs`
+   self-elevation). Only **warn-and-skip if escalation is genuinely impossible**
+   (no `sudo` binary, UAC cancelled). If already privileged, proceed directly.
+   This rule is scoped to *privilege-requiring operations only* — a user-facing
+   script that never needs the privilege is unaffected and must not be forced to
+   escalate. The rule replaces the prior warn-and-skip behavior for cases where
+   the script already gates on a missing item (e.g. `svc` system-domain).
+3. **Inverse family (the only other sanctioned exception):** scripts that
+   *refuse to run already-elevated* because they manage escalation internally
+   (`scripts/bootstrap.sh`, `scripts/bootstrap.ps1`, `src/scripts/apply.sh`,
+   `src/hosts/Windows/apply.ps1`). Documented as the sole exceptions to rule 2.
+4. **Non-escalatable privileges (documented exceptions, keep warn-and-skip):**
+   - macOS Full Disk Access (TCC privacy grant — cannot be obtained via sudo).
+   - `health-check` diagnostic reporting (its purpose is to surface gaps, not act).
+   - `Invoke-VMSetup.ps1` WHPX detection (informational capability probe, not a gate).
+5. **Applies to all platforms** (macOS, NixOS, Windows).
+
+Canonical escalation mechanisms to standardize on (already exist):
+
+- POSIX sudo keepalive + re-exec: `src/scripts/apply.sh` `start_sudo_keepalive`
+  (lines ~186-211) and `run_nix_as_root`; `scripts/gc.sh` `sudo env … log-gc-system.sh`
+  (lines ~688-697).
+- Windows self-elevation: `src/hosts/Windows/apply.ps1` `RunAs` + `-Elevated`/`-ParamsJson`
+  (lines ~337-369).
+- Windows scheduled-task escalation: `scripts/gc.ps1` `Start-ScheduledTask 'log-gc-system'`
+  (lines ~508-516); task registered in `src/hosts/Windows/system/scheduler.dsc.yml`,
+  `src/modules/posix-base.nix`, `src/hosts/NixOS/activation.nix`.
+
+**Separate concern — Jellyfin admin token:** the Jellyfin app-level admin token
+(`.Policy.IsAdministrator`) is NOT covered by this policy and is NOT a
+warn-and-skip exception. A missing admin token normally means the user has not
+yet configured an admin Jellyfin account for themselves; if they lack admin they
+must not configure library items at all. Such code must **hard-error** (exit
+non-zero / `throw`), not warn-and-skip. This is a configuration-prerequisite
+check, not an escalation case.
+
 ## Explicit Parameter Passing (PowerShell)
 
 **All PowerShell functions must enforce caller awareness through explicit parameters.**
