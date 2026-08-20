@@ -34,6 +34,13 @@ assert lib.hasInfix "SDK_DEV_DIR=" buildScript;
 # Appending it (PATH="$PATH:$BUILD_TOOLS_PATH") made BSD make win, aborting the
 # build with "Something went wrong bootstrapping makefile fragments".
 assert lib.hasInfix "export PATH=\"$BUILD_TOOLS_PATH:$PATH\"" buildScript;
+# LDFLAGS must be passed on the make command line, not only via export.
+# ./configure writes "LDFLAGS =" (empty) into every Makefile, and a Makefile-
+# defined LDFLAGS overrides the environment variable of the same name. Without
+# the command-line form the link step loses -L/usr/local/lib and fails with
+# "library not found for -lfuse-t".
+assert lib.hasInfix "make -j\"$(sysctl -n hw.ncpu)\" LDFLAGS=\"$LINK_FLAGS\"" buildScript;
+assert lib.hasInfix "make install LDFLAGS=\"$LINK_FLAGS\"" buildScript;
 
 # ntfs-3g.nix must define and thread the new params.
 assert lib.hasInfix "sdkDevDir = appleSdkEnhanced" ntfs3gNix;
