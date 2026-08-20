@@ -74,7 +74,7 @@ function Invoke-Resolve {
     }
     return (& $scriptBlock $deviceSelect $cfgFile.FullName $Default $First)
   } finally {
-    Remove-Item -Path $cfgFile.FullName -Force -ErrorAction SilentlyContinue
+    Remove-Item -Path $cfgFile.FullName -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort cleanup -- temp config may already be gone
   }
 }
 
