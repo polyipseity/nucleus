@@ -69,9 +69,11 @@ let
   # default /tmp is auto-cleaned by macOS after 3 days of inactivity, silently
   # breaking the builder after a long sleep.  Use a dedicated /run path that
   # we own and clean ourselves instead.
+  # No runtimeInputs — create-builder is resolved from /nix/store at runtime
+  # to avoid circular dependency: daemon → create-builder → nixos-vm →
+  # nixos-system → linux-builder → daemon.
   linuxBuilderDaemon = pkgs.writeNucleusShellApplication {
     name = "linux-builder-daemon";
-    runtimeInputs = [ pkg ];
     scriptName = "src/hosts/MacBook/scripts/macos-daemonize-linux-builder";
   };
 in
