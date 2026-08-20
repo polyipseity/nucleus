@@ -347,24 +347,15 @@
           scriptName ? "scripts/${name}",
           runtimeInputs ? [ ],
           extraEnv ? { },
-          bundleDefault ? false,
           text ? null,
           meta ? { },
         }:
         let
           inherit (pkgs) lib;
-          repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
           thisScriptTree = pkgs.callPackage ./modules/lib/script-tree.nix { };
           thisScriptsBundle = pkgs.callPackage ./modules/lib/scripts-bundle.nix {
             scriptTree = thisScriptTree;
           };
-          singleScriptSource =
-            if lib.hasPrefix "scripts/" scriptName then
-              "${thisScriptsBundle}/${scriptName}.sh"
-            else
-              "${thisScriptTree}/${scriptName}.sh";
-          repoRootFile =
-            if repoRoot != "" then pkgs.writeText "nucleus-repo-root" (repoRoot + "\n") else null;
         in
         pkgs.runCommand "${name}-nucleus-app"
           {
@@ -373,21 +364,11 @@
           ''
             mkdir -p "$out/bin"
 
-            ${lib.optionalString bundleDefault ''
-              # Symlink shared bundles (deduplicated store paths).
-              ln -s ${thisScriptsBundle}/scripts "$out/scripts"
-              ln -s ${thisScriptTree}/src "$out/src"
-            ''}
-
-            ${lib.optionalString (!bundleDefault && text == null) ''
-              mkdir -p "$(dirname "$out/${scriptName}.sh")"
-              ln -s ${singleScriptSource} "$out/${scriptName}.sh"
-              ln -s ${thisScriptTree}/src "$out/src"
-            ''}
-
-            ${lib.optionalString (repoRootFile != null) ''
-              cp ${repoRootFile} "$out/.nucleus-repo-root"
-            ''}
+            # Uniform layout: mirror repo hierarchy as-is (deduplicated store paths).
+            # Every call site gets the same $out/scripts + $out/src so SCRIPT_DIR-relative
+            # resolution works identically from the store path. No per-call-site divergence.
+            ln -s ${thisScriptsBundle}/scripts "$out/scripts"
+            ln -s ${thisScriptTree}/src "$out/src"
 
             ${
               if text != null then
@@ -408,8 +389,8 @@
                 ''
               else
                 ''
-                  # Create thin wrapper with repo-root-relative script path.
-                  # Resolve symlinks so it works through home-manager profile symlinks.
+                  # Create thin wrapper. Resolve symlinks so it works through
+                  # home-manager profile symlinks, then exec the store-bundled script.
                   cat > "$out/bin/nucleus-${name}" << 'WRAPPER'
                   #!${pkgs.runtimeShell}
                   set -euo pipefail
@@ -427,42 +408,10 @@
                       *) _self="$(CDPATH="" cd -- "$(dirname -- "$_self")" && pwd -P)/$_target" ;;
                     esac
                   done
-                  # Use logical pwd (not -P) so $0 stays under $out/scripts and
-                  # SCRIPT_DIR/../src resolves to the sibling script-tree symlink.
+                  # $out/scripts + $out/src are always mirrored, so the store script is
+                  # the single source of truth — no repo-root detection, no fallback.
                   _store_root="$(CDPATH="" cd -- "$(dirname -- "$_self")/.." && pwd)"
-                  _store_script="$_store_root/${scriptName}.sh"
-                  _script="$_store_script"
-                  # Launchd daemons cannot read iCloud Drive paths (TCC blocks root).
-                  # Skip repo-root detection — use the store-bundled script.
-                  if [ -n "''${XPC_SERVICE_NAME:-}" ]; then
-                    exec "$_store_script" "$@"
-                  fi
-                  _repo_root=""
-                  if [ -n "''${NUCLEUS_REPO_ROOT:-}" ] && [ -f "''${NUCLEUS_REPO_ROOT}/src/flake.nix" ]; then
-                    _repo_root="$NUCLEUS_REPO_ROOT"
-                  elif [ -f /etc/nucleus/repo-root ]; then
-                    IFS= read -r _repo_root < /etc/nucleus/repo-root || _repo_root=""
-                    case "$_repo_root" in
-                      /*) ;;
-                      *) _repo_root="" ;;
-                    esac
-                    if [ -n "$_repo_root" ] && [ ! -f "$_repo_root/src/flake.nix" ]; then
-                      _repo_root=""
-                    fi
-                  elif [ -f "$_store_root/.nucleus-repo-root" ]; then
-                    IFS= read -r _repo_root < "$_store_root/.nucleus-repo-root" || _repo_root=""
-                    case "$_repo_root" in
-                      /*) ;;
-                      *) _repo_root="" ;;
-                    esac
-                    if [ -n "$_repo_root" ] && [ ! -f "$_repo_root/src/flake.nix" ]; then
-                      _repo_root=""
-                    fi
-                  fi
-                  if [ -n "$_repo_root" ] && [ -f "$_repo_root/${scriptName}.sh" ]; then
-                    _script="$_repo_root/${scriptName}.sh"
-                  fi
-                  exec "$_script" "$@"
+                  exec "$_store_root/${scriptName}.sh" "$@"
                   WRAPPER
                   chmod +x "$out/bin/nucleus-${name}"
                 ''
@@ -514,7 +463,6 @@
             pkgs.git
             pkgs.powershell
           ];
-          bundleDefault = true;
           text = ''
             _self="$0"
             while [ -h "$_self" ]; do
