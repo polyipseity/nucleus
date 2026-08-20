@@ -66,9 +66,13 @@ MacBook | NixOS) ;;
 *) error "unsupported host '$HOST'" ;;
 esac
 
-HAS_SUDO=false
-if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-  HAS_SUDO=true
+# SUDO_BIN_AVAILABLE — whether the sudo binary exists at all (regardless of
+# passwordless config). Used to decide escalation vs. hard-error: if the binary
+# exists we escalate (sudo may prompt); if it is entirely absent, system-domain
+# operations cannot run and we error out.
+SUDO_BIN_AVAILABLE=false
+if command -v sudo >/dev/null 2>&1; then
+  SUDO_BIN_AVAILABLE=true
 fi
 
 REAL_USER_UID="$(id -u)"
@@ -593,7 +597,10 @@ do_list() {
       _d_entry_domain=$(echo "$svc_json" | jq -r '.domain // .scope // "system"')
       if [ "$domain_filter" = "user" ] && [ "$_d_entry_domain" != "user" ]; then continue; fi
       if [ "$domain_filter" = "system" ] && [ "$_d_entry_domain" != "system" ]; then continue; fi
-      if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && ! $HAS_SUDO; then continue; fi
+      if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
+        error "system-domain operations require sudo; run as root or with sudo"
+        exit 1
+      fi
       local status_json pair_json
       status_json=$(svc_status "$key" "$svc_json")
       pair_json=$(jq -cn --arg k "$json_key" --argjson v "$status_json" '{key:$k, value:$v}')
@@ -620,7 +627,10 @@ $pair_json"
       _d_entry_domain=$(echo "$svc_json" | jq -r '.domain // .scope // "system"')
       if [ "$domain_filter" = "user" ] && [ "$_d_entry_domain" != "user" ]; then continue; fi
       if [ "$domain_filter" = "system" ] && [ "$_d_entry_domain" != "system" ]; then continue; fi
-      if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && ! $HAS_SUDO; then continue; fi
+      if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
+        error "system-domain operations require sudo; run as root or with sudo"
+        exit 1
+      fi
       local status_json
       status_json=$(svc_status "$key" "$svc_json")
       local status running pid exit_code
@@ -669,7 +679,10 @@ do_status() {
     _d_entry_domain=$(echo "$svc_json" | jq -r '.domain // .scope // "system"')
     if [ "$domain_filter" = "user" ] && [ "$_d_entry_domain" != "user" ]; then continue; fi
     if [ "$domain_filter" = "system" ] && [ "$_d_entry_domain" != "system" ]; then continue; fi
-    if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && ! $HAS_SUDO; then continue; fi
+    if [ "$domain_filter" = "all" ] && [ "$_d_entry_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
+      error "system-domain operations require sudo; run as root or with sudo"
+      exit 1
+    fi
     local status_json
     status_json=$(svc_status "$key" "$svc_json")
     local status running pid exit_code
@@ -715,6 +728,14 @@ do_action() {
       continue
     fi
 
+    local _d_domain
+    _d_domain=$(echo "$entry" | jq -r '.hostEntry.domain // "system"')
+    if [ "$_d_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
+      error "$svc_name — system-domain operations require sudo; run as root or with sudo"
+      overall_exit=1
+      continue
+    fi
+
     if ! svc_action "$action" "$svc_name" "$(echo "$entry" | jq '.hostEntry')"; then
       warn "$svc_name — action $action failed"
       overall_exit=1
@@ -747,6 +768,13 @@ do_verify() {
 
   while IFS=$'\t' read -r key display svc_json json_key; do
     if echo "$key" | grep -q '^ERROR:'; then continue; fi
+    local _d_domain
+    _d_domain=$(echo "$svc_json" | jq -r '.domain // .scope // "system"')
+    if [ "$_d_domain" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
+      error "$json_key — system-domain operations require sudo; run as root or with sudo"
+      any_inactive=true
+      continue
+    fi
     local status_json
     status_json=$(svc_status "$key" "$svc_json")
     local running
@@ -1175,8 +1203,8 @@ user | system | all) ;;
 esac
 domain_filter="${domain_filter:-$SVC_DOMAIN_FILTER}"
 
-if [ "$domain_filter" = "system" ] && ! $HAS_SUDO; then
-  error "--system requires passwordless sudo"
+if [ "$domain_filter" = "system" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
+  error "--system requires sudo; run as root or with sudo"
   exit 1
 fi
 
@@ -1185,8 +1213,8 @@ if [ "$domain_filter" = "user" ]; then
   domain_filter_warning="listing user-domain services only"
 elif [ "$domain_filter" = "system" ]; then
   domain_filter_warning="listing system-domain services only"
-elif [ "$domain_filter" = "all" ] && ! $HAS_SUDO; then
-  domain_filter_warning="sudo not available — skipping system-domain services (use --user or --system)"
+elif [ "$domain_filter" = "all" ] && [ "$EUID" -ne 0 ] && ! $SUDO_BIN_AVAILABLE; then
+  error "system-domain operations require sudo; run as root or with sudo"
 fi
 
 [ -z "$action" ] && {

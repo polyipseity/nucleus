@@ -55,7 +55,11 @@ param(
   [switch]$Json,
 
   [Alias("h")]
-  [switch]$Help
+  [switch]$Help,
+
+  # Internal: set by the self-elevation re-exec so the elevated child does not
+  # re-trigger elevation.
+  [switch]$Elevated
 )
 
 $ErrorActionPreference = 'Stop'
@@ -76,6 +80,51 @@ if ($Help -or -not $Action) {
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Get-Item $PSScriptRoot).Parent.FullName }
 $ServicesJson = Join-Path $RepoRoot "src\modules\services.json"
 $NucleusHost = 'Windows'
+
+# ── Self-elevation ──────────────────────────────────────────────────────────────
+# Set when elevation was requested but could not be obtained (UAC cancelled /
+# no admin). In that case system-domain entries are skipped with a warning
+# rather than failing the whole run (rule-2 "cannot escalate" branch).
+$SkipSystemDomain = $false
+
+# System-domain operations (native services, scheduled tasks) require admin.
+# When the caller is not elevated, re-exec via RunAs so the operation can
+# actually run. If elevation is impossible (UAC cancelled / no admin), warn and
+# skip only the system-domain entries rather than failing the whole run.
+$isAdmin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+if (-not $Elevated -and -not $isAdmin) {
+  $params = @{
+    Action      = $Action
+    ServiceName = $ServiceName
+    Json        = $Json.IsPresent
+    Elevated    = $true
+  }
+  $paramsJsonPath = [System.IO.Path]::GetTempFileName() + ".json"
+  $params | ConvertTo-Json -Compress | Set-Content $paramsJsonPath -Encoding utf8 -NoNewline
+
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = (Get-Process -Id $PID).Path
+  $psi.Arguments = "-NoProfile -File `"$PSCommandPath`" -ParamsJson `"$paramsJsonPath`""
+  $psi.Verb = "RunAs"
+  $psi.UseShellExecute = $true
+  try {
+    $proc = [System.Diagnostics.Process]::Start($psi)
+  } catch {
+    $proc = $null
+  }
+  if ($null -eq $proc) {
+    Remove-Item $paramsJsonPath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: temp file cleanup; failure harmless (%TEMP% recycled)
+    Write-NucleusWarning "svc: elevation unavailable (UAC cancelled or no admin) — system-domain operations will be skipped"
+    # Continue un-elevated: user-domain operations still work; system-domain
+    # entries are skipped below via $SkipSystemDomain.
+    $SkipSystemDomain = $true
+  } else {
+    $proc.WaitForExit()
+    $exitCode = $proc.ExitCode
+    Remove-Item $paramsJsonPath -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: temp file cleanup; child may have cleaned up
+    exit $exitCode
+  }
+}
 
 # Read and parse registry
 if (-not (Test-Path $ServicesJson)) {
@@ -157,6 +206,17 @@ function Resolve-ServiceName {
     }
   }
   return $results
+}
+
+# Returns $true when the resolved registry entry is a system-domain service
+# (requires admin). Used to skip such entries when elevation is unavailable.
+function Test-ServiceIsSystemDomain {
+  param(
+    [hashtable]$ResolvedEntry
+  )
+  $plat = $ResolvedEntry.hostEntry
+  if ($null -eq $plat -or -not $plat.ContainsKey('domain')) { return $false }
+  return $plat.domain -eq 'system'
 }
 
 # ---------------------------------------------------------------------------
@@ -464,6 +524,10 @@ switch ($Action) {
         $hasError = $true
         continue
       }
+      if ($SkipSystemDomain -and (Test-ServiceIsSystemDomain -ResolvedEntry $resolved[$key])) {
+        Write-NucleusWarning "$key — system-domain operation skipped (elevation unavailable)"
+        continue
+      }
       $status = Get-ServiceStatus -HostEntry $resolved[$key].hostEntry
       $status.displayName = $resolved[$key].displayName
       $results[$key] = $status
@@ -480,6 +544,10 @@ switch ($Action) {
       if ($key -like 'ERROR:*') {
         Write-NucleusWarning "$($resolved[$key].displayName) — $($resolved[$key].hostEntry.error)"
         $hasError = $true
+        continue
+      }
+      if ($SkipSystemDomain -and (Test-ServiceIsSystemDomain -ResolvedEntry $resolved[$key])) {
+        Write-NucleusWarning "$key — system-domain operation skipped (elevation unavailable)"
         continue
       }
       $status = Get-ServiceStatus -HostEntry $resolved[$key].hostEntry
@@ -501,6 +569,11 @@ switch ($Action) {
       if ($key -like 'ERROR:*') {
         Write-NucleusError "$($resolved[$key].displayName) — service not found in registry"
         $overallExit = 1
+        continue
+      }
+
+      if ($SkipSystemDomain -and (Test-ServiceIsSystemDomain -ResolvedEntry $resolved[$key])) {
+        Write-NucleusWarning "$key — system-domain operation skipped (elevation unavailable)"
         continue
       }
 
@@ -534,6 +607,10 @@ switch ($Action) {
       if ($key -like 'ERROR:*') {
         Write-NucleusWarning "$($resolved[$key].displayName) — $($resolved[$key].hostEntry.error)"
         $hasInactive = $true
+        continue
+      }
+      if ($SkipSystemDomain -and (Test-ServiceIsSystemDomain -ResolvedEntry $resolved[$key])) {
+        Write-NucleusWarning "$key — system-domain operation skipped (elevation unavailable)"
         continue
       }
       $status = Get-ServiceStatus -HostEntry $resolved[$key].hostEntry
