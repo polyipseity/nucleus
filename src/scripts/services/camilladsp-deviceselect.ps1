@@ -9,12 +9,68 @@
 # The capture device is always excluded from autodetection to prevent audio
 # loops (output → capture → processed → output again).
 #
+# Detection helpers (Get-CamillaDSPDefaultPlaybackDevice,
+# Get-CamillaDSPFirstAvailablePlaybackDevice) are mockable for unit tests.
+#
 # Dependencies: PowerShell 7+, powershell-yaml module
 #
 # Usage (dot-source):
 #   . "$PSScriptRoot/camilladsp-deviceselect.ps1"
 #   $resolved = Resolve-CamillaDSPPlaybackDevice -ConfigPath $configPath
 #
+
+function Get-CamillaDSPDefaultPlaybackDevice {
+  [CmdletBinding()]
+  param()
+
+  # Detect system default playback device via WASAPI COM.
+  try {
+    # 0 = eRender (playback), 0 = DMT_DEFAULT (user default)
+    $enumerator = New-Object -ComObject MMDeviceEnumerator
+    $endpoint = $enumerator.GetDefaultAudioEndpoint(0, 0)
+    return $endpoint.FriendlyName
+  } catch {
+    # Audio service not running or no devices.
+    $null = $_  # check-suppress:suppression_doc: $_ discarded; detection failure is non-fatal
+    return $null
+  }
+}
+
+function Get-CamillaDSPFirstAvailablePlaybackDevice {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $false)]
+    [string]$CaptureDevice = $null
+  )
+
+  # Enumerate active render endpoints and collect names, excluding capture.
+  try {
+    $enumerator = New-Object -ComObject MMDeviceEnumerator
+    # 0 = eRender, 0x1 = DEVICE_STATE_ACTIVE
+    $devices = $enumerator.EnumAudioEndpoints(0, 0x1)
+    $names = @()
+    for ($i = 0; $i -lt $devices.Count; $i++) {
+      $name = $devices.Item($i).FriendlyName
+      if ($name -ne $CaptureDevice) {
+        $names += $name
+      }
+    }
+  } catch {
+    # Enumeration failed.
+    $null = $_  # check-suppress:suppression_doc: $_ discarded; enumeration failure is non-fatal
+    return $null
+  }
+
+  # Sort by name (invariant culture, ascending) so selection is stable across
+  # reboots and Windows updates, instead of relying on undocumented
+  # EnumAudioEndpoints enumeration order.
+  $names = $names | Sort-Object { $_.ToLowerInvariant() }
+
+  if ($names.Count -eq 0) {
+    return $null
+  }
+  return $names[0]
+}
 
 function Resolve-CamillaDSPPlaybackDevice {
   [CmdletBinding()]
@@ -35,16 +91,7 @@ function Resolve-CamillaDSPPlaybackDevice {
   }
 
   # Detect system default playback device via WASAPI COM.
-  $detected = $null
-  try {
-    # 0 = eRender (playback), 0 = DMT_DEFAULT (user default)
-    $enumerator = New-Object -ComObject MMDeviceEnumerator
-    $endpoint = $enumerator.GetDefaultAudioEndpoint(0, 0)
-    $detected = $endpoint.FriendlyName
-  } catch {
-    # Audio service not running or no devices.
-    $null = $_  # check-suppress:suppression_doc: $_ discarded; detection failure is non-fatal
-  }
+  $detected = Get-CamillaDSPDefaultPlaybackDevice
 
   # Hard invariant: if detected device matches capture device, reject it.
   # The capture device must never be used as playback — it would create
@@ -53,23 +100,9 @@ function Resolve-CamillaDSPPlaybackDevice {
     $detected = $null
   }
 
-  # Fallback: first available playback device (not capture).
+  # Fallback: first available playback device by deterministic sorted name.
   if (-not $detected) {
-    try {
-      $enumerator = New-Object -ComObject MMDeviceEnumerator
-      # 0 = eRender, 0x1 = DEVICE_STATE_ACTIVE
-      $devices = $enumerator.EnumAudioEndpoints(0, 0x1)
-      for ($i = 0; $i -lt $devices.Count; $i++) {
-        $name = $devices.Item($i).FriendlyName
-        if ($name -ne $captureDevice) {
-          $detected = $name
-          break
-        }
-      }
-    } catch {
-      # Enumeration failed.
-      $null = $_  # check-suppress:suppression_doc: $_ discarded; enumeration failure is non-fatal
-    }
+    $detected = Get-CamillaDSPFirstAvailablePlaybackDevice -CaptureDevice $captureDevice
   }
 
   # Nothing available → pass through with empty device.
