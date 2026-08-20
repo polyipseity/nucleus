@@ -33,7 +33,7 @@ _expire_profile_generations_run_nix_env() {
   _epg_profile="$1"
   shift
   if [ "${NUCLEUS_GC_PROFILE_SUDO:-false}" = true ]; then
-    sudo nix-env -p "$_epg_profile" "$@"
+    sudo -H nix-env -p "$_epg_profile" "$@"
   else
     nix-env -p "$_epg_profile" "$@"
   fi
