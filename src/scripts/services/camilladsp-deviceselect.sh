@@ -9,6 +9,9 @@
 #     in-memory, and writes the patched config to stdout.
 #     The capture device (devices.capture.device) is always excluded from
 #     detection — if the system default matches capture, it is skipped.
+#     Fallback device selection is deterministic: the first non-capture device
+#     is chosen by a case-insensitive ascending name ordering, matching the
+#     Windows resolver.
 #
 # Dependencies: python3 (yaml module), system_profiler (macOS), wpctl/pactl/aplay (Linux)
 #
@@ -109,7 +112,8 @@ camilladsp_detect_default_output() {
 
 # --- Fallback: first available device (not matching capture_device) ---
 
-# macOS: enumerate all audio output devices, return the first non-capture one.
+# macOS: enumerate all audio output devices, return the first non-capture one
+# by deterministic case-insensitive ascending name ordering.
 _camilladsp_detect_first_available_macos() {
   local capture_device="$1"
   local output
@@ -127,59 +131,54 @@ for i, line in enumerate(lines):
         name = stripped.rstrip(':').strip()
         if name and name != capture:
             print(name)
-            sys.exit(0)
 PYEOF
-  python3 "$_tmpfile" "$capture_device" <<<"$output" 2>/dev/null
+  local -a names
+  mapfile -t names < <(python3 "$_tmpfile" "$capture_device" <<<"$output" 2>/dev/null)
   local _rc=$?
   rm -f "$_tmpfile"
-  return $_rc
+  [ "${#names[@]}" -eq 0 ] && return $_rc
+  printf '%s\n' "${names[@]}" | sort -f | head -1
 }
 
-# Linux: enumerate sinks via wpctl/aplay, return the first non-capture one.
+# Linux: enumerate sinks via wpctl/pactl/aplay, return the first non-capture
+# one by deterministic case-insensitive ascending name ordering.
 _camilladsp_detect_first_available_linux() {
   local capture_device="$1"
+  local -a candidates=()
 
   # WirePlumber
   if _has_command wpctl; then
-    local first_sink
-    first_sink=$(wpctl status 2>/dev/null |
+    local sink
+    while IFS= read -r sink; do
+      [ -n "$sink" ] && [ "$sink" != "$capture_device" ] && candidates+=("$sink")
+    done < <(wpctl status 2>/dev/null |
       grep -A20 'Sinks:' |
       grep -E '^\s+[0-9]+\.' |
-      head -1 |
       sed 's/^\s*[0-9]*\.\s*//' |
       sed 's/\s\+[0-9]\+.*//')
-    if [ -n "$first_sink" ] && [ "$first_sink" != "$capture_device" ]; then
-      printf '%s\n' "$first_sink"
-      return 0
-    fi
   fi
 
   # PulseAudio
   if _has_command pactl; then
-    local first_sink
-    first_sink=$(pactl list sinks short 2>/dev/null |
-      head -1 |
+    local sink
+    while IFS= read -r sink; do
+      [ -n "$sink" ] && [ "$sink" != "$capture_device" ] && candidates+=("$sink")
+    done < <(pactl list sinks short 2>/dev/null |
       awk '{print $2}')
-    if [ -n "$first_sink" ] && [ "$first_sink" != "$capture_device" ]; then
-      printf '%s\n' "$first_sink"
-      return 0
-    fi
   fi
 
   # ALSA fallback
   if _has_command aplay; then
-    local first_card
-    first_card=$(aplay -l 2>/dev/null |
+    local card
+    while IFS= read -r card; do
+      [ -n "$card" ] && candidates+=("hw:CARD=${card},DEV=0")
+    done < <(aplay -l 2>/dev/null |
       grep '^card [0-9]' |
-      head -1 |
       sed 's/card \([0-9]*\): .*/\1/')
-    if [ -n "$first_card" ]; then
-      printf '%s\n' "hw:CARD=${first_card},DEV=0"
-      return 0
-    fi
   fi
 
-  return 1
+  [ "${#candidates[@]}" -eq 0 ] && return 1
+  printf '%s\n' "${candidates[@]}" | sort -f | head -1
 }
 
 camilladsp_detect_first_available() {
