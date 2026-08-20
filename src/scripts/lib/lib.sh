@@ -545,8 +545,8 @@ rotate_log_file() {
 
   _rlf_logdir=$(dirname -- "$_rlf_logfile")
   if [ ! -w "$_rlf_logfile" ] || [ ! -w "$_rlf_logdir" ]; then
-    warn "skipping log rotation for unwritable '$_rlf_logfile'"
-    return 0
+    error "log rotation requires write access to '$_rlf_logfile' and '$_rlf_logdir'; run as root or with sudo"
+    return 1
   fi
 
   if [ "$_rlf_maxfiles" -gt 0 ]; then

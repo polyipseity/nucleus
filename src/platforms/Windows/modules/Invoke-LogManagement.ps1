@@ -281,8 +281,7 @@ function Invoke-LogRotation {
       $isWritable = $false
     }
     if (-not $isWritable) {
-      Write-NucleusWarning -CommandName log-rotation "skipping unwritable '$($file.FullName)'"
-      continue
+      throw "log rotation requires write access to '$($file.FullName)'; run as administrator"
     }
 
     $baseName = $file.BaseName
