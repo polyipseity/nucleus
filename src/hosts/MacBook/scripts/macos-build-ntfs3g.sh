@@ -3,10 +3,10 @@
 # Build polyipseity/ext.ntfs-3g from source.
 # Arguments: fingerprint buildToolsPath aclocalPath ntfs3gSrc cc cxx cppFlags
 #            linkFlags configureFlags cryptoPatchPath rootbindirPatchPath
-#            installHookPatchPath sdkRoot
+#            installHookPatchPath sdkRoot cFlags cxxFlags sdkDevDir
 #
-# CC/CXX/CPPFLAGS/LDFLAGS are exported here so ./configure and make resolve
-# them from the environment.
+# CC/CXX/CPPFLAGS/CFLAGS/CXXFLAGS/LDFLAGS are exported here so ./configure and
+# make resolve them from the environment.
 #
 # WHY: build from source, not nixpkgs:
 #   The polyipseity fork of ntfs-3g (commit f0e5cb0) links against fuse-t, a
@@ -43,9 +43,22 @@ CRYPTO_PATCH_PATH="${10:?ntfs-3g build: missing cryptoPatchPath arg}"
 ROOTBINDIR_PATCH_PATH="${11:?ntfs-3g build: missing rootbindirPatchPath arg}"
 INSTALL_HOOK_PATCH_PATH="${12:?ntfs-3g build: missing installHookPatchPath arg}"
 SDK_ROOT="${13:?ntfs-3g build: missing sdkRoot arg}"
+C_FLAGS="${14:?ntfs-3g build: missing cFlags arg}"
+CXX_FLAGS="${15:?ntfs-3g build: missing cxxFlags arg}"
+SDK_DEV_DIR="${16:?ntfs-3g build: missing sdkDevDir arg}"
 
-export CC CXX CPPFLAGS
+export CC CXX CPPFLAGS CFLAGS="$C_FLAGS" CXXFLAGS="$CXX_FLAGS"
 export SDKROOT="$SDK_ROOT"
+# WHY: the nix clang-wrapper's darwin-sdk-setup.bash overrides SDKROOT from
+#   DEVELOPER_DIR_arm64_apple_darwin (already set in the activation env via
+#   xcode-select --switch) or a hardcoded apple-sdk-14.4 fallback, ignoring the
+#   SDKROOT we export.  Pointing DEVELOPER_DIR_arm64_apple_darwin at the
+#   enhanced SDK root makes the wrapper resolve the correct SDK instead of
+#   erroring with "unable to find sdk: 'macosx'".  Unset DEVELOPER_DIR so the
+#   wrapper does not emit "Multiple conflicting values" and fall back to a
+#   wrong SDK.
+export DEVELOPER_DIR_arm64_apple_darwin="$SDK_DEV_DIR"
+unset DEVELOPER_DIR
 
 FINGERPRINT_FILE="/usr/local/share/ntfs-3g/.build-fingerprint"
 LOG_FILE="/Users/Shared/nucleus/logs/ntfs-3g-build.log"

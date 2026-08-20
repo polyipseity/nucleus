@@ -22,6 +22,13 @@ let
   activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
   appleSdkEnhanced = import ../../modules/lib/apple-sdk-enhanced.nix { inherit pkgs lib; };
   sdkRoot = "${appleSdkEnhanced}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk";
+  # WHY: the nix clang-wrapper's darwin-sdk-setup.bash overrides SDKROOT from
+  #   DEVELOPER_DIR_arm64_apple_darwin (already set in the activation env via
+  #   xcode-select --switch) or a hardcoded apple-sdk-14.4 fallback, ignoring
+  #   the SDKROOT we export.  Pointing DEVELOPER_DIR_arm64_apple_darwin at the
+  #   enhanced SDK root makes the wrapper resolve the correct SDK instead of
+  #   erroring with "unable to find sdk: 'macosx'".
+  sdkDevDir = appleSdkEnhanced;
   # Pinned source for the polyipseity/ext.ntfs-3g fork (edge branch).
   ntfs3gSrc = pkgs.fetchFromGitHub {
     owner = "polyipseity";
@@ -61,6 +68,13 @@ let
   configureFlags = "--with-fuse=external --prefix=/usr/local --disable-crypto --disable-plugins";
   clangBin = "${pkgs.llvmPackages.clang}/bin/clang";
   clangxxBin = "${pkgs.llvmPackages.clang}/bin/clang++";
+  # WHY: pin the C standard to gnu17, not the autoconf-detected gnu23.
+  #   clang 21 defaults to -std=gnu23, under which calling an undeclared
+  #   function is a hard error.  autoconf's AC_CHECK_FUNC probes rely on
+  #   implicit declarations (no headers), so every probe fails and configure
+  #   aborts with "Unable to find libdl".  gnu17 downgrades that to a warning.
+  cFlags = "-std=gnu17";
+  cxxFlags = "-std=gnu17";
   buildFingerprint = builtins.hashString "sha256" (
     builtins.concatStringsSep "\n" [
       ntfs3gSrc.outPath
@@ -72,6 +86,9 @@ let
       linkFlags
       configureFlags
       sdkRoot
+      cFlags
+      cxxFlags
+      sdkDevDir
       cryptoPatchPath
       rootbindirPatchPath
       installHookPatchPath
@@ -93,6 +110,9 @@ in
       "${cryptoPatchPath}" \
       "${rootbindirPatchPath}" \
       "${installHookPatchPath}" \
-      "${sdkRoot}"
+      "${sdkRoot}" \
+      "${cFlags}" \
+      "${cxxFlags}" \
+      "${sdkDevDir}"
   '';
 }
