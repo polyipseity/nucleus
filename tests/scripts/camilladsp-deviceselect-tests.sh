@@ -251,7 +251,31 @@ test_all_devices_are_capture() {
   fi
 }
 
+# Test 7: No default output (rc 1) but first-available returns a device →
+# deterministic fallback selection picks that device. This is the scenario where
+# no audio device is the system default but autodetection must still pick one.
+test_no_default_fallback_first_available() {
+  local cfg
+  cfg="$(_make_config "" "Loopback Audio")"
+  _MOCK_DEFAULT_OUTPUT=""
+  _MOCK_DEFAULT_RC=1
+  _MOCK_FIRST_AVAILABLE="USB Speaker"
+  _MOCK_FIRST_RC=0
+  local resolved
+  resolved=$(_run_resolve "$cfg")
+  local device
+  device=$(_extract_playback_device <<<"$resolved")
+  rm -f "$cfg"
+  if [ "$device" = "USB Speaker" ]; then
+    assert_pass "no default → first non-capture fallback selected deterministically"
+  else
+    assert_fail "no-default fallback" "expected 'USB Speaker', got '$device'"
+  fi
+}
+
 # --- Run all tests ---
+
+test_no_default_fallback_first_available
 
 test_passthrough_nonempty_device
 test_patches_with_default_output
