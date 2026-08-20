@@ -30,6 +30,10 @@ assert lib.hasInfix "C_FLAGS=" buildScript;
 assert lib.hasInfix "CXX_FLAGS=" buildScript;
 # Script must accept the new positional args (16 total).
 assert lib.hasInfix "SDK_DEV_DIR=" buildScript;
+# Build tools path must be PREPENDED so nix gnumake shadows BSD /usr/bin/make.
+# Appending it (PATH="$PATH:$BUILD_TOOLS_PATH") made BSD make win, aborting the
+# build with "Something went wrong bootstrapping makefile fragments".
+assert lib.hasInfix "export PATH=\"$BUILD_TOOLS_PATH:$PATH\"" buildScript;
 
 # ntfs-3g.nix must define and thread the new params.
 assert lib.hasInfix "sdkDevDir = appleSdkEnhanced" ntfs3gNix;
