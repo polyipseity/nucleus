@@ -67,7 +67,10 @@ if ! [ -x /usr/local/bin/ntfs-3g ] ||
   ! [ -f "$FINGERPRINT_FILE" ] ||
   [ "$(cat "$FINGERPRINT_FILE")" != "$CURRENT_FINGERPRINT" ]; then
   say -l ntfs-3g "building from source... (log: $LOG_FILE)"
-  export PATH="$PATH:$BUILD_TOOLS_PATH"
+  # WHY: prepend (not append) so nix gnumake shadows BSD /usr/bin/make.  BSD
+  #   make cannot parse the GNU Makefiles ./configure generates, aborting the
+  #   build with "Something went wrong bootstrapping makefile fragments".
+  export PATH="$BUILD_TOOLS_PATH:$PATH"
   export ACLOCAL_PATH="$ACLOCAL_PATH_VALUE"
   BUILD_DIR="$(mktemp -d)"
   trap 'rm -rf "$BUILD_DIR"' EXIT
