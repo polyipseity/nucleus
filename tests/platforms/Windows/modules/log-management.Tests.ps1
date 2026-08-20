@@ -161,6 +161,19 @@ Describe 'Invoke-LogRotation' {
     (Test-Path -LiteralPath $nonLog -PathType Leaf) | Should -Be $true
     (Test-Path -LiteralPath "$Script:LogDir\data.1.txt" -PathType Leaf) | Should -Be $false
   }
+
+  It 'throws on an unwritable log target instead of skipping' {
+    $logFile = Join-Path $Script:LogDir 'test.log'
+    Set-Content -Path $logFile -Value ('a' * 100)
+    # Drop write permission so the OpenWrite probe fails (cross-platform: macOS
+    # does not enforce NT-style ACL denies, so chmod is the reliable signal).
+    chmod 0444 $logFile
+    try {
+      { Invoke-LogRotation -Path $Script:LogDir -MaxSize 10 -MaxFiles 2 -Compress:$false } | Should -Throw
+    } finally {
+      chmod 0644 $logFile
+    }
+  }
 }
 
 Describe 'Invoke-LogExpiry' {

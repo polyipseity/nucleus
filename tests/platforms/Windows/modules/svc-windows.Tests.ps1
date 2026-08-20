@@ -799,3 +799,20 @@ Describe 'Show-LogConfig' {
     $output | Should -Match '"ollama"'
   }
 }
+
+Describe 'Test-ServiceIsSystemDomain' {
+  It 'returns true for a system-domain entry' {
+    $entry = @{ hostEntry = @{ domain = 'system' } }
+    Test-ServiceIsSystemDomain -ResolvedEntry $entry | Should -Be $true
+  }
+
+  It 'returns false for a user-domain entry' {
+    $entry = @{ hostEntry = @{ domain = 'user' } }
+    Test-ServiceIsSystemDomain -ResolvedEntry $entry | Should -Be $false
+  }
+
+  It 'returns false when domain is absent' {
+    $entry = @{ hostEntry = @{} }
+    Test-ServiceIsSystemDomain -ResolvedEntry $entry | Should -Be $false
+  }
+}

@@ -101,4 +101,10 @@ Describe 'Sync-CursorConfig IDE settings symlink (Class C)' {
 
         Test-Path -LiteralPath $ideSettingsLink | Should -Be $false
     }
+
+    It 'throws when Developer Mode or admin is unavailable' {
+        Mock Test-DeveloperModeOrAdmin { return $false }
+
+        { Sync-CursorConfig -RepoRoot $script:repoRoot -Enabled:$true -Username 'testuser' > $null } | Should -Throw
+    }
 }

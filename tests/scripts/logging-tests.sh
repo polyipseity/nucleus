@@ -240,6 +240,27 @@ test_expand_log_path_plain() {
   fi
 }
 
+# rotate_log_file must hard-error (non-zero) on an unwritable target instead of
+# silently skipping. Uses a read-only file in a read-only dir so both the file
+# and dir writability probes fail.
+test_rotate_log_file_hard_errors_on_unwritable() {
+  local tmpdir
+  tmpdir="$(mktemp -d)"
+  local logfile="$tmpdir/nucleus.log"
+  printf 'x%.0s' $(seq 1 100) >"$logfile"
+  chmod 000 "$logfile"
+  chmod 500 "$tmpdir"
+  local rc=0
+  _run_lib "" "rotate_log_file '$logfile' 10 4 true" >/dev/null 2>&1 || rc=$?
+  chmod 700 "$tmpdir" "$logfile"
+  rm -rf "$tmpdir"
+  if [ "$rc" -ne 0 ]; then
+    assert_pass "rotate_log_file hard-errors on unwritable target"
+  else
+    assert_fail "rotate-unwritable" "rotate_log_file returned 0 on unwritable target (expected non-zero)"
+  fi
+}
+
 # (e) log_sanitize still strips escapes.
 test_log_sanitize_strips() {
   local out
@@ -275,6 +296,7 @@ test_force_color_overrides_term_dumb
 test_expand_log_path_tilde_slash
 test_expand_log_path_bare_tilde
 test_expand_log_path_plain
+test_rotate_log_file_hard_errors_on_unwritable
 test_log_sanitize_strips
 
 echo ""
