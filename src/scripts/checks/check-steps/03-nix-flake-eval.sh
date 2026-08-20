@@ -2,6 +2,10 @@
 # shellcheck source=../check-lib.sh
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
+# shellcheck source=../../lib/key-catalog.sh
+# (provides ensure_key_catalog so Nix modules reading NUCLEUS_CATALOG_PATH don't
+# fail on an empty env var)
+. "$_NUCLEUS_LIB_DIR/key-catalog.sh"
 
 register_step "nix-flake-eval" "Nix flake evaluation" run_nix_flake_eval
 
@@ -11,6 +15,9 @@ run_nix_flake_eval() {
   shift
   local _files=("$@")
   cd "$_repo_root" || return 1
+  # Generate the key catalog so Nix modules reading NUCLEUS_CATALOG_PATH
+  # evaluate against a valid (possibly empty) catalog, not an empty env var.
+  ensure_key_catalog
   local _ne_exit=0
   local _ne_eval=false
 
