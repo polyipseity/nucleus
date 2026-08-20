@@ -107,9 +107,14 @@ if ! [ -x /usr/local/bin/ntfs-3g ] ||
 
     printf '[%s] ntfs-3g: building...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
     export LDFLAGS="$LINK_FLAGS"
-    make -j"$(sysctl -n hw.ncpu)"
+    # WHY: pass LDFLAGS on the make command line, not only via export.
+    #   ./configure writes "LDFLAGS =" (empty) into every Makefile, and a
+    #   Makefile-defined LDFLAGS overrides the environment variable of the same
+    #   name.  Without the command-line form the link step loses -L/usr/local/lib
+    #   and fails with "library not found for -lfuse-t".
+    make -j"$(sysctl -n hw.ncpu)" LDFLAGS="$LINK_FLAGS"
     printf '[%s] ntfs-3g: installing...\n' "$(date '+%Y-%m-%d %H:%M:%S')"
-    make install
+    make install LDFLAGS="$LINK_FLAGS"
   } >>"$LOG_FILE" 2>&1 || exit_code=$?
 
   if [ "${exit_code:-0}" -ne 0 ]; then
