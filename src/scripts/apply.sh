@@ -125,13 +125,13 @@ generate_key_catalog() {
   if [ ! -f "$_gkm_yml" ]; then
     say -l apply "system.yml not found; generating empty key catalog"
     # shellcheck disable=SC2016 # reason: $schema is a JSON key in the output, not a shell variable
-    printf '%s' '{"$schema":"'"$REPO_ROOT/src/modules/ai/key-catalog.schema.json"'","keys":[]}' > "$_gkm_out"
+    printf '%s' '{"$schema":"'"$REPO_ROOT/src/modules/ai/key-catalog.schema.json"'","keys":[]}' >"$_gkm_out"
     return
   fi
   _gkm_decrypted="$(sops -d --output-type json "$_gkm_yml" 2>/dev/null)" || {
     warn -l apply "sops decryption failed; generating empty key catalog"
     # shellcheck disable=SC2016 # reason: $schema is a JSON key in the output, not a shell variable
-    printf '%s' '{"$schema":"'"$REPO_ROOT/src/modules/ai/key-catalog.schema.json"'","keys":[]}' > "$_gkm_out"
+    printf '%s' '{"$schema":"'"$REPO_ROOT/src/modules/ai/key-catalog.schema.json"'","keys":[]}' >"$_gkm_out"
     return
   }
   # Build catalog: extract ai_*_api_key entries with non-null values, derive
@@ -149,7 +149,7 @@ generate_key_catalog() {
         end
     ]
     | {"$schema": ($repoRoot + "/src/modules/ai/key-catalog.schema.json"), "keys": .}
-  ' > "$_gkm_out"
+  ' >"$_gkm_out"
   say -l apply "wrote key-catalog.json with $(jq '.keys | length' "$_gkm_out") keys"
 }
 mkdir -p "$HOME/.config/nucleus"
