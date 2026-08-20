@@ -119,43 +119,9 @@ _ash_script_dir="$(cd "$(dirname -- "$0")" && pwd -P)"
 # mappings at evaluation time.  Must run before any nix build/eval.
 # Output goes to ~/.config/nucleus/ (not the repo tree) so generated content
 # stays out of git.  NUCLEUS_CATALOG_PATH is exported for Nix consumers.
-generate_key_catalog() {
-  _gkm_yml="$REPO_ROOT/src/secrets/system.yml"
-  _gkm_out="$HOME/.config/nucleus/key-catalog.json"
-  if [ ! -f "$_gkm_yml" ]; then
-    say -l apply "system.yml not found; generating empty key catalog"
-    # shellcheck disable=SC2016 # reason: $schema is a JSON key in the output, not a shell variable
-    printf '%s' '{"$schema":"'"$REPO_ROOT/src/modules/ai/key-catalog.schema.json"'","keys":[]}' >"$_gkm_out"
-    return
-  fi
-  _gkm_decrypted="$(sops -d --output-type json "$_gkm_yml" 2>/dev/null)" || {
-    warn -l apply "sops decryption failed; generating empty key catalog"
-    # shellcheck disable=SC2016 # reason: $schema is a JSON key in the output, not a shell variable
-    printf '%s' '{"$schema":"'"$REPO_ROOT/src/modules/ai/key-catalog.schema.json"'","keys":[]}' >"$_gkm_out"
-    return
-  }
-  # Build catalog: extract ai_*_api_key entries with non-null values, derive
-  # envVar from key name via convention: ai_<X>_api_key → <X>_API_KEY.
-  # shellcheck disable=SC2016 # reason: jq filter uses $schema as a literal JSON key, not shell expansion
-  printf '%s' "$_gkm_decrypted" | jq --arg repoRoot "$REPO_ROOT" '
-    [to_entries[]
-      | select(.key | test("^ai_.+_api_key"))
-      | select(.value != null)
-      | .key as $k
-      | ($k | sub("^ai_"; "") | sub("_api_key(_[0-9]+)?$"; "") | ascii_upcase) as $base
-      | if ($k | test("_api_key_[0-9]+$"))
-        then { name: $k, envVar: ($base + "_API_KEY_" + ($k | capture("_api_key_(?<i>[0-9]+)$").i)) }
-        else { name: $k, envVar: ($base + "_API_KEY") }
-        end
-    ]
-    | {"$schema": ($repoRoot + "/src/modules/ai/key-catalog.schema.json"), "keys": .}
-  ' >"$_gkm_out"
-  say -l apply "wrote key-catalog.json with $(jq '.keys | length' "$_gkm_out") keys"
-}
-mkdir -p "$HOME/.config/nucleus"
-generate_key_catalog
-NUCLEUS_CATALOG_PATH="$_gkm_out"
-export NUCLEUS_CATALOG_PATH
+# shellcheck source=lib/key-catalog.sh
+. "$SCRIPT_DIR/lib/key-catalog.sh"
+ensure_key_catalog
 
 # Symlink the LiteLLM config so edits take effect on service restart without
 # re-running apply.  All host services (macOS launchd, NixOS systemd, Windows
