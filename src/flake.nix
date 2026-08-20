@@ -432,6 +432,11 @@
                   _store_root="$(CDPATH="" cd -- "$(dirname -- "$_self")/.." && pwd)"
                   _store_script="$_store_root/${scriptName}.sh"
                   _script="$_store_script"
+                  # Launchd daemons cannot read iCloud Drive paths (TCC blocks root).
+                  # Skip repo-root detection — use the store-bundled script.
+                  if [ -n "''${XPC_SERVICE_NAME:-}" ]; then
+                    exec "$_store_script" "$@"
+                  fi
                   _repo_root=""
                   if [ -n "''${NUCLEUS_REPO_ROOT:-}" ] && [ -f "''${NUCLEUS_REPO_ROOT}/src/flake.nix" ]; then
                     _repo_root="$NUCLEUS_REPO_ROOT"
