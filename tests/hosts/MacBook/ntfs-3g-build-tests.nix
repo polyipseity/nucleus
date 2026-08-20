@@ -44,6 +44,11 @@ assert lib.hasInfix "make install LDFLAGS=\"$LINK_FLAGS\"" buildScript;
 
 # ntfs-3g.nix must define and thread the new params.
 assert lib.hasInfix "sdkDevDir = appleSdkEnhanced" ntfs3gNix;
+# ENABLE_NFCONV is enabled by default on darwin, so libntfs-3g/unistr.c calls
+# CoreFoundation APIs but upstream's Makefile.am never links the framework.
+# linkFlags must carry -framework CoreFoundation so the libntfs-3g.la link
+# resolves (the link step otherwise fails with undefined _CF* symbols).
+assert lib.hasInfix "-framework CoreFoundation" ntfs3gNix;
 assert lib.hasInfix "cFlags = \"-std=gnu17\"" ntfs3gNix;
 assert lib.hasInfix "cxxFlags = \"-std=gnu17\"" ntfs3gNix;
 assert lib.hasInfix "sdkDevDir" ntfs3gNix;
