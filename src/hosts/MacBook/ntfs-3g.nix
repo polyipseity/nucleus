@@ -64,7 +64,13 @@ let
   cppFlags = "-I/usr/local/include/fuse/fuse";
   # fuse-t is linked only during make/install — not during ./configure, where
   # -lfuse-t in LDFLAGS breaks autoconf link probes under nix clang wrappers.
-  linkFlags = "-L/usr/local/lib -lfuse-t -Wl,-rpath,/usr/local/lib";
+  # WHY: ENABLE_NFCONV is enabled by default on darwin (configure.ac), so
+  #   libntfs-3g/unistr.c calls CoreFoundation APIs
+  #   (_CFStringNormalize, _CFRelease, ...) but upstream's Makefile.am never
+  #   links the framework.  Add it here so the libntfs-3g.la link resolves.
+  #   linkFlags flows only into make LDFLAGS (configure uses empty LDFLAGS=),
+  #   so this does not affect autoconf probes.
+  linkFlags = "-L/usr/local/lib -lfuse-t -Wl,-rpath,/usr/local/lib -framework CoreFoundation";
   configureFlags = "--with-fuse=external --prefix=/usr/local --disable-crypto --disable-plugins";
   clangBin = "${pkgs.llvmPackages.clang}/bin/clang";
   clangxxBin = "${pkgs.llvmPackages.clang}/bin/clang++";
