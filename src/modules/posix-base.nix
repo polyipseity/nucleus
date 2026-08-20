@@ -33,9 +33,12 @@ let
     keep-outputs = true;
     lazy-trees = true;
     eval-cores = 0;
-    # GC pressure thresholds (512 GB–first sizing; shared across hosts).
-    min-free = 40 * 1024 * 1024 * 1024;
-    max-free = 96 * 1024 * 1024 * 1024;
+    # GC pressure thresholds (shared across hosts). min-free matches the
+    # health-check free-space limit (scripts/health-check.{sh,ps1}
+    # min_free_bytes) so the daemon starts reclaiming at the same point
+    # pre-flight would block; max-free is 2x headroom in the same unit.
+    min-free = 10000000000;
+    max-free = 20000000000;
   };
 
   gitconfigActivation = ''
