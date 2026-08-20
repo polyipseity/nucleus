@@ -551,8 +551,8 @@ test_rustup_pins_version_for_stable_not_date() {
   local tmp
   tmp="$(setup_fake_repo)"
   # Add a rustup section with a stable key to the fixture lockfile.
-  jq '.rustup = {"stable": "1.90.0"}' "$tmp/src/lockfiles/lockfile.json" >"$tmp/lockfile.tmp" \
-    && mv "$tmp/lockfile.tmp" "$tmp/src/lockfiles/lockfile.json"
+  jq '.rustup = {"stable": "1.90.0"}' "$tmp/src/lockfiles/lockfile.json" >"$tmp/lockfile.tmp" &&
+    mv "$tmp/lockfile.tmp" "$tmp/src/lockfiles/lockfile.json"
   # Stub rustup (toolchain list emits the channel) and rustc (version line).
   cat >"$tmp/bin/rustup" <<'EOF'
 #!/usr/bin/env bash

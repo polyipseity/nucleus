@@ -320,7 +320,7 @@ if section_enabled uv; then
     [ -z "$line" ] && continue
     # Dependency continuation lines ("- depname") carry no version and must be skipped.
     case "$line" in
-      -*) continue ;;
+    -*) continue ;;
     esac
     # "pkgname@version" or "pkgname v1.0.0" — package name is the first token.
     pkg="${line%% *}"
