@@ -36,16 +36,9 @@ NixOS `/nix` lives on a dedicated Btrfs subvolume `@nix` ([`disks.nix`](../../sr
 - Mount options: `compress-force=zstd` on both `@` and `@nix` (forces compression on substituted binary-cache paths; plain `compress=zstd` often skips them — see [nix#3550](https://github.com/NixOS/nix/issues/3550)).
 - **`df` / `du` under-report btrfs usage** when compression is active; use `compsize /nix/store` or `btdu` for accurate space accounting.
 
-## `bundleDefault` policy
+## Uniform `$out` layout
 
-`writeNucleusShellApplication` in [`flake.nix`](../../src/flake.nix) defaults to **`bundleDefault = false`**. Pass **`bundleDefault = true`** only at call sites that require the full `scripts-bundle` + `script-tree` layout.
-
-| `bundleDefault` | Behavior |
-| --------------- | -------- |
-| `false` (default) | Thin wrapper with a single-script symlink plus `script-tree/src` at `$out/src` for `lib.sh` resolution |
-| `true` (explicit opt-in) | Symlink full shared `scripts-bundle` + `script-tree` — required when runtime needs sibling scripts under `scripts/` (e.g. `mkCheckPwshPackage`) |
-
-The `nucleusApp` helper does **not** override this default — each call site opts in explicitly when needed.
+`writeNucleusShellApplication` in [`flake.nix`](../../src/flake.nix) always mirrors the repo hierarchy into `$out`: `$out/scripts` (shared `nucleus-scripts-bundle`) and `$out/src` (shared `nucleus-script-tree`), with the entry script at `$out/<scriptName>.sh`. There is no `bundleDefault` toggle — every call site gets the same layout, so `SCRIPT_DIR`-relative resolution works identically from the store path.
 
 See [`nix-authoring.instructions.md`](nix-authoring.instructions.md) for call-site guidance.
 
@@ -53,7 +46,7 @@ Shellcheck runs in CI (`nucleus-check-sh` / `script-tree.nix`), not per-app deri
 
 ## Dominant duplication (mitigated)
 
-Each `writeNucleusShellApplication` with `bundleDefault = true` previously `cp -r` the full `scripts/` and `src/scripts/` trees. Shared derivations (`nucleus-script-tree`, `nucleus-scripts-bundle`) are symlinked into app `$out` to deduplicate store bytes.
+Each `writeNucleusShellApplication` previously `cp -r` the full `scripts/` and `src/scripts/` trees. Shared derivations (`nucleus-script-tree`, `nucleus-scripts-bundle`) are symlinked into app `$out` to deduplicate store bytes — each app `$out` only adds two symlinks, so there is no per-app tree duplication.
 
 ## Runtime copies (reflink)
 
