@@ -230,8 +230,7 @@ function Sync-CursorConfig {
   }
 
   if (-not (Test-DeveloperModeOrAdmin)) {
-    Write-NucleusError -CommandName $label "requires Developer Mode or an elevated session to create symlinks."
-    return
+    throw "$label requires Developer Mode or an elevated session to create symlinks."
   }
 
   if (-not (Test-Path -LiteralPath $agentsDir -PathType Container)) {

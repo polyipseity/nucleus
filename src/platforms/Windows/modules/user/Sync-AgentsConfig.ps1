@@ -75,8 +75,7 @@ function Sync-AgentsConfig {
     $devModeProp = Get-ItemProperty -Path $devModeKey -Name "AllowDevelopmentWithoutDevLicense" -ErrorAction SilentlyContinue
     $devModeEnabled = $null -ne $devModeProp -and $devModeProp.AllowDevelopmentWithoutDevLicense -eq 1
     if (-not $isAdmin -and -not $devModeEnabled) {
-      Write-NucleusError -CommandName 'agents-config' "Sync-AgentsConfig requires Developer Mode or an elevated session to create directory symlinks.  Enable Developer Mode in Settings -> System -> For Developers."
-      return
+      throw "Sync-AgentsConfig requires Developer Mode or an elevated session to create directory symlinks.  Enable Developer Mode in Settings -> System -> For Developers."
     }
   }
 

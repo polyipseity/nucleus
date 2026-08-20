@@ -104,7 +104,7 @@ function Sync-DevRepoCatalog {
         }
       }
       catch {
-        Write-NucleusWarning -CommandName 'Sync-DevRepoCatalog' "failed to create symlink for $RepoName : $_"
+        throw "Sync-DevRepoCatalog failed to create symlink for $RepoName : $_"
       }
     }
   }
