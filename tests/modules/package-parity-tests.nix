@@ -654,6 +654,27 @@ let
     in
     assert' (builtins.all notBuildableOnLinux darwinOnlyPackages) "Darwin-only packages must not be buildable on Linux";
 
+  # Dotted nixpkgs attribute paths must resolve via path traversal
+  # (lib.hasAttrByPath), not as a literal dotted top-level name. Regression guard
+  # for the core.nix resolution fix: builtins.hasAttr/getAttr treat the whole
+  # dotted string as one literal attr name and never split on ".".
+  dottedNixpkgsPaths = [
+    "dotnetCorePackages.runtime_6_0"
+    "nerd-fonts.jetbrains-mono"
+    "llvmPackages_latest.llvm"
+    "llvmPackages.clang"
+    "llvmPackages.lld"
+    "llvmPackages.lldb"
+  ];
+
+  test_dotted_nixpkgs_paths_resolve =
+    let
+      pkgs' = import <nixpkgs> { };
+      pathOf = s: lib.strings.splitString "." s;
+      resolves = s: lib.hasAttrByPath (pathOf s) pkgs';
+    in
+    assert' (builtins.all resolves dottedNixpkgsPaths) "Dotted nixpkgs attribute paths must resolve via lib.hasAttrByPath";
+
   # Guard: every managedPackages entry in core.nix must be covered by either
   # crossPlatformOverlapAttrs (cross-platform) or darwinOnlyPackages (darwin-only).
   test_all_overlapping_packages_covered =
@@ -693,6 +714,7 @@ let
     test_overlapping_packages_have_nixpkgs
     test_darwin_only_packages_platform_marked
     test_darwin_only_absent_on_linux
+    test_dotted_nixpkgs_paths_resolve
     test_all_overlapping_packages_covered
   ];
 in
