@@ -26,9 +26,7 @@ let
         name = "p7zip";
       };
       nixpkgs = "p7zip";
-      winget = {
-        id = "7zip.7zip";
-      };
+      winget = "7zip.7zip";
     };
     actionlint = {
       category = "cli";
@@ -37,9 +35,7 @@ let
         name = "actionlint";
       };
       nixpkgs = "actionlint";
-      winget = {
-        id = "rhysd.actionlint";
-      };
+      winget = "rhysd.actionlint";
     };
     "android-tools" = {
       category = "cli";
@@ -48,9 +44,7 @@ let
         name = "android-platform-tools";
       };
       nixpkgs = "android-tools";
-      winget = {
-        id = "Google.PlatformTools";
-      };
+      winget = "Google.PlatformTools";
     };
     asciinema = {
       category = "cli";
@@ -63,9 +57,7 @@ let
         name = "bat";
       };
       nixpkgs = "bat";
-      winget = {
-        id = "sharkdp.bat";
-      };
+      winget = "sharkdp.bat";
     };
     blender = {
       category = "gui";
@@ -74,9 +66,7 @@ let
         name = "blender";
       };
       nixpkgs = "blender";
-      winget = {
-        id = "BlenderFoundation.Blender";
-      };
+      winget = "BlenderFoundation.Blender";
     };
     bottom = {
       category = "cli";
@@ -85,9 +75,7 @@ let
         name = "bottom";
       };
       nixpkgs = "bottom";
-      winget = {
-        id = "Clement.bottom";
-      };
+      winget = "Clement.bottom";
     };
     bun = {
       category = "cli";
@@ -96,9 +84,7 @@ let
         name = "bun";
       };
       nixpkgs = "bun";
-      winget = {
-        id = "Oven-sh.Bun";
-      };
+      winget = "Oven-sh.Bun";
     };
     caddy = {
       category = "cli";
@@ -107,9 +93,7 @@ let
         name = "caddy";
       };
       nixpkgs = "caddy";
-      winget = {
-        id = "CaddyServer.Caddy";
-      };
+      winget = "CaddyServer.Caddy";
     };
     camilladsp = {
       category = "cli";
@@ -140,9 +124,7 @@ let
         name = "chrome-remote-desktop-host";
       };
       nixpkgs = "chrome-remote-desktop";
-      winget = {
-        id = "Google.ChromeRemoteDesktopHost";
-      };
+      winget = "Google.ChromeRemoteDesktopHost";
     };
     czkawka = {
       category = "gui";
@@ -151,9 +133,7 @@ let
         name = "czkawka";
       };
       nixpkgs = "czkawka";
-      winget = {
-        id = "qarmin.czkawka.cli";
-      };
+      winget = "qarmin.czkawka.cli";
     };
     cursor = {
       # Single source of truth for Cursor enable/disable across all hosts.
@@ -169,9 +149,7 @@ let
       };
       # WHY: code-cursor is Linux-only (AppImage repack); macOS uses the Homebrew cask.
       nixpkgs = "code-cursor";
-      winget = {
-        id = "Anysphere.Cursor";
-      };
+      winget = "Anysphere.Cursor";
     };
     deadnix = {
       category = "cli";
@@ -189,9 +167,7 @@ let
         name = "discord@canary";
       };
       nixpkgs = "discord-canary";
-      winget = {
-        id = "Discord.Discord.Canary";
-      };
+      winget = "Discord.Discord.Canary";
     };
     direnv = {
       category = "cli";
@@ -200,9 +176,7 @@ let
         name = "direnv";
       };
       nixpkgs = "direnv";
-      winget = {
-        id = "direnv.direnv";
-      };
+      winget = "direnv.direnv";
     };
     "dotnet-runtime-6" = {
       category = "cli";
@@ -211,9 +185,7 @@ let
         name = "dotnet";
       };
       nixpkgs = "dotnetCorePackages.runtime_6_0";
-      winget = {
-        id = "Microsoft.DotNet.Runtime.6";
-      };
+      winget = "Microsoft.DotNet.Runtime.6";
     };
     duti = {
       category = "cli";
@@ -227,9 +199,7 @@ let
         name = "eza";
       };
       nixpkgs = "eza";
-      winget = {
-        id = "eza-community.eza";
-      };
+      winget = "eza-community.eza";
     };
     "equaliser" = {
       category = "cli";
@@ -244,9 +214,7 @@ let
         name = "equalizer-apo";
       };
       nixpkgs = "equalizer-apo";
-      winget = {
-        id = "EqualizerAPO.EqualizerAPO";
-      };
+      winget = "EqualizerAPO.EqualizerAPO";
     };
     ffmpeg = {
       category = "cli";
@@ -255,9 +223,7 @@ let
         name = "ffmpeg";
       };
       nixpkgs = "ffmpeg-full";
-      winget = {
-        id = "Gyan.FFmpeg";
-      };
+      winget = "Gyan.FFmpeg";
     };
     fd = {
       category = "cli";
@@ -266,9 +232,7 @@ let
         name = "fd";
       };
       nixpkgs = "fd";
-      winget = {
-        id = "sharkdp.fd";
-      };
+      winget = "sharkdp.fd";
     };
     fzf = {
       category = "cli";
@@ -277,9 +241,7 @@ let
         name = "fzf";
       };
       nixpkgs = "fzf";
-      winget = {
-        id = "junegunn.fzf";
-      };
+      winget = "junegunn.fzf";
     };
     gh = {
       category = "cli";
@@ -288,9 +250,7 @@ let
         name = "gh";
       };
       nixpkgs = "gh";
-      winget = {
-        id = "GitHub.cli";
-      };
+      winget = "GitHub.cli";
     };
     gimp = {
       category = "gui";
@@ -299,9 +259,7 @@ let
         name = "gimp";
       };
       nixpkgs = "gimp";
-      winget = {
-        id = "GIMP.GIMP";
-      };
+      winget = "GIMP.GIMP";
     };
     git = {
       category = "cli";
@@ -310,9 +268,7 @@ let
         name = "git";
       };
       nixpkgs = "gitFull";
-      winget = {
-        id = "Git.Git";
-      };
+      winget = "Git.Git";
     };
     gnupg = {
       category = "cli";
@@ -321,9 +277,7 @@ let
         name = "gnupg";
       };
       nixpkgs = "gnupg";
-      winget = {
-        id = "GnuPG.Gpg4win";
-      };
+      winget = "GnuPG.Gpg4win";
     };
     "google-chrome" = {
       category = "gui";
@@ -332,9 +286,7 @@ let
         name = "google-chrome";
       };
       nixpkgs = "google-chrome";
-      winget = {
-        id = "Google.Chrome";
-      };
+      winget = "Google.Chrome";
     };
     "google-chrome@canary" = {
       # No nixpkgs attr (canary is a Homebrew cask / WinGet-only channel); the
@@ -345,9 +297,7 @@ let
         name = "google-chrome@canary";
       };
       nixpkgs = "google-chrome";
-      winget = {
-        id = "Google.Chrome.Canary";
-      };
+      winget = "Google.Chrome.Canary";
     };
     ghostscript = {
       category = "cli";
@@ -356,9 +306,7 @@ let
         name = "ghostscript";
       };
       nixpkgs = "ghostscript";
-      winget = {
-        id = "ArtifexSoftware.GhostScript";
-      };
+      winget = "ArtifexSoftware.GhostScript";
     };
     imagemagick = {
       category = "cli";
@@ -367,9 +315,7 @@ let
         name = "imagemagick";
       };
       nixpkgs = "imagemagick";
-      winget = {
-        id = "ImageMagick.ImageMagick";
-      };
+      winget = "ImageMagick.ImageMagick";
     };
     inter = {
       category = "cli";
@@ -378,9 +324,7 @@ let
         name = "font-inter";
       };
       nixpkgs = "inter";
-      winget = {
-        id = "Inter.Inter";
-      };
+      winget = "Inter.Inter";
     };
     iterm2 = {
       category = "gui";
@@ -398,9 +342,7 @@ let
         name = "openjdk@25";
       };
       nixpkgs = "jdk";
-      winget = {
-        id = "EclipseAdoptium.Temurin.25.JDK";
-      };
+      winget = "EclipseAdoptium.Temurin.25.JDK";
     };
     jellyfin = {
       category = "cli";
@@ -409,9 +351,7 @@ let
         name = "jellyfin";
       };
       nixpkgs = "jellyfin";
-      winget = {
-        id = "Jellyfin.Server";
-      };
+      winget = "Jellyfin.Server";
     };
     "jetbrains-mono-nerd-font" = {
       category = "cli";
@@ -420,9 +360,7 @@ let
         name = "font-jetbrains-mono-nerd-font";
       };
       nixpkgs = "nerd-fonts.jetbrains-mono";
-      winget = {
-        id = "DEVCOM.JetBrainsMonoNerdFont";
-      };
+      winget = "DEVCOM.JetBrainsMonoNerdFont";
     };
     jq = {
       category = "cli";
@@ -431,9 +369,7 @@ let
         name = "jq";
       };
       nixpkgs = "jq";
-      winget = {
-        id = "jqlang.jq";
-      };
+      winget = "jqlang.jq";
     };
     krita = {
       category = "gui";
@@ -442,9 +378,7 @@ let
         name = "krita";
       };
       nixpkgs = "krita";
-      winget = {
-        id = "KDE.Krita";
-      };
+      winget = "KDE.Krita";
     };
     krokiet = {
       # WinGet-only (no nixpkgs attr); Windows installs via WinGet.
@@ -454,9 +388,7 @@ let
         name = "krokiet";
       };
       nixpkgs = "krokiet";
-      winget = {
-        id = "qarmin.krokiet";
-      };
+      winget = "qarmin.krokiet";
     };
     libreoffice = {
       category = "gui";
@@ -465,9 +397,7 @@ let
         name = "libreoffice";
       };
       nixpkgs = "libreoffice";
-      winget = {
-        id = "TheDocumentFoundation.LibreOffice";
-      };
+      winget = "TheDocumentFoundation.LibreOffice";
     };
     litellm = {
       category = "cli";
@@ -482,9 +412,7 @@ let
         name = "llvm";
       };
       nixpkgs = "llvmPackages_latest.llvm";
-      winget = {
-        id = "LLVM.LLVM";
-      };
+      winget = "LLVM.LLVM";
     };
     "llvm-clang" = {
       category = "cli";
@@ -509,9 +437,7 @@ let
         name = "musicbrainz-picard";
       };
       nixpkgs = "picard";
-      winget = {
-        id = "MusicBrainz.Picard";
-      };
+      winget = "MusicBrainz.Picard";
     };
     ncdu = {
       category = "cli";
@@ -524,9 +450,7 @@ let
         name = "neovim";
       };
       nixpkgs = "neovim";
-      winget = {
-        id = "Neovim.Neovim";
-      };
+      winget = "Neovim.Neovim";
     };
     nickel = {
       category = "cli";
@@ -559,9 +483,7 @@ let
         name = "font-noto-sans-cjk-sc";
       };
       nixpkgs = "noto-fonts-cjk-sans";
-      winget = {
-        id = "Google.NotoSans.CJK.SC";
-      };
+      winget = "Google.NotoSans.CJK.SC";
     };
     "noto-sans-cjk-tc" = {
       category = "cli";
@@ -570,9 +492,7 @@ let
         name = "font-noto-sans-cjk-tc";
       };
       nixpkgs = "noto-fonts-cjk-sans";
-      winget = {
-        id = "Google.NotoSans.CJK.TC";
-      };
+      winget = "Google.NotoSans.CJK.TC";
     };
     "noto-serif-cjk-sc" = {
       category = "cli";
@@ -581,9 +501,7 @@ let
         name = "font-noto-serif-cjk-sc";
       };
       nixpkgs = "noto-fonts-cjk-serif";
-      winget = {
-        id = "Google.NotoSerif.CJK.SC";
-      };
+      winget = "Google.NotoSerif.CJK.SC";
     };
     "noto-serif-cjk-tc" = {
       category = "cli";
@@ -592,9 +510,7 @@ let
         name = "font-noto-serif-cjk-tc";
       };
       nixpkgs = "noto-fonts-cjk-serif";
-      winget = {
-        id = "Google.NotoSerif.CJK.TC";
-      };
+      winget = "Google.NotoSerif.CJK.TC";
     };
     "obs-studio" = {
       # Stable OBS Studio. Enabled on every platform (no beta channel exists in
@@ -606,9 +522,7 @@ let
         name = "obs";
       };
       nixpkgs = "obs-studio";
-      winget = {
-        id = "OBSProject.OBSStudio";
-      };
+      winget = "OBSProject.OBSStudio";
     };
     obsidian = {
       category = "gui";
@@ -617,9 +531,7 @@ let
         name = "obsidian";
       };
       nixpkgs = "obsidian";
-      winget = {
-        id = "Obsidian.Obsidian";
-      };
+      winget = "Obsidian.Obsidian";
     };
     ollama = {
       category = "cli";
@@ -628,9 +540,7 @@ let
         name = "ollama";
       };
       nixpkgs = "ollama";
-      winget = {
-        id = "Ollama.Ollama";
-      };
+      winget = "Ollama.Ollama";
     };
     opencode = {
       category = "cli";
@@ -639,9 +549,7 @@ let
         name = "opencode";
       };
       nixpkgs = "opencode";
-      winget = {
-        id = "SST.opencode";
-      };
+      winget = "SST.opencode";
     };
     packer = {
       category = "cli";
@@ -650,9 +558,7 @@ let
         name = "packer";
       };
       nixpkgs = "packer";
-      winget = {
-        id = "HashiCorp.Packer";
-      };
+      winget = "HashiCorp.Packer";
     };
     parsec = {
       # macOS cask is in MacBook/homebrew.nix; no nixpkgs attr, so it is not on nixpkgs.
@@ -662,9 +568,7 @@ let
         name = "parsec";
       };
       nixpkgs = "parsec";
-      winget = {
-        id = "Parsec.Parsec";
-      };
+      winget = "Parsec.Parsec";
     };
     "pay-respects" = {
       category = "cli";
@@ -678,9 +582,7 @@ let
         name = "peace-equalizer-apo";
       };
       nixpkgs = "peace-equalizer-apo";
-      winget = {
-        id = "PeterVerbeek.PeaceEqualizerAPO";
-      };
+      winget = "PeterVerbeek.PeaceEqualizerAPO";
     };
     "pi-coding-agent" = {
       category = "cli";
@@ -693,9 +595,7 @@ let
         name = "pinact";
       };
       nixpkgs = "pinact";
-      winget = {
-        id = "suzuki-shunsuke.pinact";
-      };
+      winget = "suzuki-shunsuke.pinact";
     };
     "pinentry_mac" = {
       category = "cli";
@@ -709,9 +609,7 @@ let
         name = "powershell";
       };
       nixpkgs = "powershell";
-      winget = {
-        id = "Microsoft.PowerShell";
-      };
+      winget = "Microsoft.PowerShell";
     };
     powertoys = {
       category = "gui";
@@ -721,9 +619,7 @@ let
         name = "powertoys";
       };
       nixpkgs = "powertoys";
-      winget = {
-        id = "Microsoft.PowerToys";
-      };
+      winget = "Microsoft.PowerToys";
     };
     powersession = {
       # WinGet-only (no nixpkgs attr); Windows installs via WinGet.
@@ -733,9 +629,7 @@ let
         name = "powersession";
       };
       nixpkgs = "powersession";
-      winget = {
-        id = "Watfaq.PowerSession";
-      };
+      winget = "Watfaq.PowerSession";
     };
     prek = {
       category = "cli";
@@ -744,9 +638,7 @@ let
         name = "prek";
       };
       nixpkgs = "prek";
-      winget = {
-        id = "j178.Prek";
-      };
+      winget = "j178.Prek";
     };
     python = {
       category = "cli";
@@ -755,9 +647,7 @@ let
         name = "python";
       };
       nixpkgs = "python3";
-      winget = {
-        id = "Python.Python.3.13";
-      };
+      winget = "Python.Python.3.13";
     };
     qtpass = {
       # Installed via MacBook/homebrew.nix managedSystemPackages (Homebrew cask
@@ -768,9 +658,7 @@ let
         name = "qtpass";
       };
       nixpkgs = "qtpass";
-      winget = {
-        id = "IJHack.QtPass";
-      };
+      winget = "IJHack.QtPass";
     };
     qemu = {
       category = "cli";
@@ -796,9 +684,7 @@ let
         name = "rclone";
       };
       nixpkgs = "rclone";
-      winget = {
-        id = "Rclone.Rclone";
-      };
+      winget = "Rclone.Rclone";
     };
     ripgrep = {
       category = "cli";
@@ -807,9 +693,7 @@ let
         name = "ripgrep";
       };
       nixpkgs = "ripgrep";
-      winget = {
-        id = "BurntSushi.ripgrep";
-      };
+      winget = "BurntSushi.ripgrep";
     };
     ruff = {
       category = "cli";
@@ -818,9 +702,7 @@ let
         name = "ruff";
       };
       nixpkgs = "ruff";
-      winget = {
-        id = "astral-sh.ruff";
-      };
+      winget = "astral-sh.ruff";
     };
     rustup = {
       category = "cli";
@@ -829,9 +711,7 @@ let
         name = "rustup";
       };
       nixpkgs = "rustup";
-      winget = {
-        id = "Rustlang.Rustup";
-      };
+      winget = "Rustlang.Rustup";
     };
     sccache = {
       category = "cli";
@@ -840,9 +720,7 @@ let
         name = "sccache";
       };
       nixpkgs = "sccache";
-      winget = {
-        id = "Mozilla.sccache";
-      };
+      winget = "Mozilla.sccache";
     };
     shellcheck = {
       category = "cli";
@@ -851,9 +729,7 @@ let
         name = "shellcheck";
       };
       nixpkgs = "shellcheck";
-      winget = {
-        id = "ShellCheck.ShellCheck";
-      };
+      winget = "ShellCheck.ShellCheck";
     };
     shfmt = {
       category = "cli";
@@ -863,9 +739,7 @@ let
       };
       nixpkgs = "shfmt";
       # WHY: shfmt is a single static binary; no separate macOS cask exists.
-      winget = {
-        id = "mvdan.shfmt";
-      };
+      winget = "mvdan.shfmt";
     };
     sops = {
       category = "cli";
@@ -874,9 +748,7 @@ let
         name = "sops";
       };
       nixpkgs = "sops";
-      winget = {
-        id = "SecretsOPerationS.SOPS";
-      };
+      winget = "SecretsOPerationS.SOPS";
     };
     "source-serif" = {
       category = "cli";
@@ -885,9 +757,7 @@ let
         name = "font-source-serif";
       };
       nixpkgs = "source-serif";
-      winget = {
-        id = "Adobe.SourceSerif4";
-      };
+      winget = "Adobe.SourceSerif4";
     };
     "ssh-to-age" = {
       category = "cli";
@@ -900,9 +770,7 @@ let
         name = "starship";
       };
       nixpkgs = "starship";
-      winget = {
-        id = "Starship.Starship";
-      };
+      winget = "Starship.Starship";
     };
     stats = {
       category = "gui";
@@ -920,9 +788,7 @@ let
         name = "steam";
       };
       nixpkgs = "steam";
-      winget = {
-        id = "Valve.Steam";
-      };
+      winget = "Valve.Steam";
     };
     scoop = {
       category = "cli";
@@ -932,9 +798,7 @@ let
         name = "scoop";
       };
       nixpkgs = "scoop";
-      winget = {
-        id = "Scoop.Scoop";
-      };
+      winget = "Scoop.Scoop";
     };
     taplo = {
       category = "cli";
@@ -943,9 +807,7 @@ let
         name = "taplo";
       };
       nixpkgs = "taplo";
-      winget = {
-        id = "tamasfe.taplo";
-      };
+      winget = "tamasfe.taplo";
     };
     "telegram@beta" = {
       category = "gui";
@@ -954,9 +816,7 @@ let
         name = "telegram-desktop@beta";
       };
       nixpkgs = "telegram-desktop";
-      winget = {
-        id = "Telegram.TelegramDesktop.Beta";
-      };
+      winget = "Telegram.TelegramDesktop.Beta";
     };
     ty = {
       category = "cli";
@@ -965,9 +825,7 @@ let
         name = "ty";
       };
       nixpkgs = "ty";
-      winget = {
-        id = "astral-sh.ty";
-      };
+      winget = "astral-sh.ty";
     };
     typst = {
       category = "cli";
@@ -976,9 +834,7 @@ let
         name = "typst";
       };
       nixpkgs = "typst";
-      winget = {
-        id = "Typst.Typst";
-      };
+      winget = "Typst.Typst";
     };
     "utm@beta" = {
       category = "gui";
@@ -996,9 +852,7 @@ let
         name = "uv";
       };
       nixpkgs = "uv";
-      winget = {
-        id = "astral-sh.uv";
-      };
+      winget = "astral-sh.uv";
     };
     vlc = {
       category = "gui";
@@ -1007,9 +861,7 @@ let
         name = "vlc";
       };
       nixpkgs = "vlc";
-      winget = {
-        id = "VideoLAN.VLC";
-      };
+      winget = "VideoLAN.VLC";
     };
     "visual-studio-code" = {
       category = "gui";
@@ -1018,9 +870,7 @@ let
         name = "visual-studio-code";
       };
       nixpkgs = "vscode";
-      winget = {
-        id = "Microsoft.VisualStudioCode";
-      };
+      winget = "Microsoft.VisualStudioCode";
     };
     "visual-studio-code@insiders" = {
       # Was darwin-only for nix; now also provisioned on Windows via WinGet.
@@ -1032,13 +882,11 @@ let
         name = "visual-studio-code@insiders";
       };
       nixpkgs = "vscode-insiders";
-      winget = {
-        id = "Microsoft.VisualStudioCode.Insiders";
-      };
+      winget = "Microsoft.VisualStudioCode.Insiders";
     };
     "whatsapp-beta" = {
       # Allow-list is source-agnostic: the converter matches `settings.id`
-      # regardless of `source: msstore`, so the Store id is a valid winget.id.
+      # regardless of `source: msstore`, so the Store id is a valid winget id.
       # macOS beta cask is in MacBook/homebrew.nix; no nixpkgs attr, so it is
       # not on nixpkgs.
       category = "gui";
@@ -1047,9 +895,7 @@ let
         name = "whatsapp@beta";
       };
       nixpkgs = "whatsapp";
-      winget = {
-        id = "9NBDXK71NK08";
-      };
+      winget = "9NBDXK71NK08";
     };
     winfsp = {
       category = "cli";
@@ -1059,9 +905,7 @@ let
         name = "winfsp";
       };
       nixpkgs = "winfsp";
-      winget = {
-        id = "WinFsp.WinFsp";
-      };
+      winget = "WinFsp.WinFsp";
     };
     "windows-terminal-preview" = {
       category = "gui";
@@ -1071,9 +915,7 @@ let
         name = "windows-terminal-preview";
       };
       nixpkgs = "windows-terminal-preview";
-      winget = {
-        id = "Microsoft.WindowsTerminal.Preview";
-      };
+      winget = "Microsoft.WindowsTerminal.Preview";
     };
     yamllint = {
       category = "cli";
@@ -1090,9 +932,7 @@ let
         name = "zizmor";
       };
       nixpkgs = "zizmor";
-      winget = {
-        id = "zizmor.zizmor";
-      };
+      winget = "zizmor.zizmor";
     };
     zoom = {
       category = "gui";
@@ -1101,9 +941,7 @@ let
         name = "zoom";
       };
       nixpkgs = "zoom-us";
-      winget = {
-        id = "Zoom.Zoom";
-      };
+      winget = "Zoom.Zoom";
     };
     zoxide = {
       category = "cli";
@@ -1112,9 +950,7 @@ let
         name = "zoxide";
       };
       nixpkgs = "zoxide";
-      winget = {
-        id = "ajeetdsouza.zoxide";
-      };
+      winget = "ajeetdsouza.zoxide";
     };
   };
 
@@ -1321,7 +1157,7 @@ in
           type = lib.types.listOf lib.types.str;
           default = [ ];
           internal = true;
-          description = "WinGet package IDs enabled for the Windows host, derived from managedPackages entries carrying a `winget.id` and resolving enabled for Windows.";
+          description = "WinGet package IDs enabled for the Windows host, derived from managedPackages entries carrying a `winget` id and resolving enabled for Windows.";
         };
       };
     };
@@ -1363,9 +1199,9 @@ in
       # Windows-resolved WinGet ID set (host-agnostic; identical wherever Nix runs).
       # Windows installs via WinGet, an axis orthogonal to the nix `platforms`
       # field (which governs darwin/linux nix provisioning only). Any entry with
-      # a `winget.id` enabled for Windows enters the set regardless of `platforms`.
+      # a `winget` id enabled for Windows enters the set regardless of `platforms`.
       nucleus.windows.wingetPackages.packages = builtins.sort (a: b: a < b) (
-        builtins.map (n: managedPackages.${n}.winget.id) (
+        builtins.map (n: managedPackages.${n}.winget) (
           builtins.filter (
             n: (managedPackages.${n}.winget or null) != null && managedPackageEnabledForHost "Windows" n
           ) managedPackageNames
