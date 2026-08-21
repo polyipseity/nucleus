@@ -73,12 +73,11 @@ let
   # Nix-managed packages that must be in the system environment (not just the
   # user profile) because they need to be reachable from non-login shells or
   # other accounts. CLI tools default to nixpkgs per AGENTS.md policy.
-  managedSystemPackages = [
-    (pkgs.pass.withExtensions (extensions: [ extensions.pass-otp ]))
-  ];
+  # pass.withExtensions wraps pkgs.pass (pass-otp is an output of pass, not a
+  # top-level attr), so it is contributed via core.nix's extraSystemPackages
+  # rather than a managedPackages entry.
 in
 {
-  environment.systemPackages = managedSystemPackages;
 
   # nix-homebrew pins Homebrew binary and all tap definitions via flake.lock,
   # making Homebrew fully declarative and supply-chain hardened.

@@ -1142,7 +1142,8 @@ let
     # evaluations like the nixos-generators guest build use plain nixpkgs, so
     # append it only when the evaluating package set actually provides it.
     ++ (lib.optionals (pkgs ? camillagui-backend) [ pkgs.camillagui-backend ])
-    ++ lib.optional (treefmtPackage != null) treefmtPackage;
+    ++ lib.optional (treefmtPackage != null) treefmtPackage
+    ++ config.nucleus.packages.selection.extraSystemPackages;
 in
 {
   options.nucleus.packages.selection = {
@@ -1178,8 +1179,20 @@ in
         "google-chrome" = "nixpkgs";
       };
       description = ''
-        Per-package override map for entries in core.nix managedPackages.
+        Per-package override map for entries in core.nix version of this module.
         Keys are Homebrew package names (for example "visual-studio-code").
+      '';
+    };
+
+    # Packages contributed directly to the system/user path without a
+    # managedPackages entry (for example a derivation wrapper that cannot be
+    # expressed as a bare nixpkgs attr). Consumed by sharedPackages so they
+    # reach both environment.systemPackages and home.packages.
+    extraSystemPackages = lib.mkOption {
+      type = lib.types.listOf lib.types.package;
+      default = [ ];
+      description = ''
+        Extra packages added to the shared package set outside managedPackages.
       '';
     };
   };
