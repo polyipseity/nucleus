@@ -222,12 +222,8 @@ let
       nixpkgs = "equaliser";
     };
     "equalizer-apo" = {
-      # WinGet-only (no nixpkgs attr); Windows installs via WinGet.
+      # WinGet-only: no Homebrew cask exists and no nixpkgs attr; Windows installs via WinGet.
       category = "gui";
-      homebrew = {
-        kind = "cask";
-        name = "equalizer-apo";
-      };
       nixpkgs = "equalizer-apo";
       winget = "EqualizerAPO.EqualizerAPO";
     };
@@ -396,12 +392,8 @@ let
       winget = "KDE.Krita";
     };
     krokiet = {
-      # WinGet-only (no nixpkgs attr); Windows installs via WinGet.
+      # WinGet-only: no Homebrew cask exists and no nixpkgs attr; Windows installs via WinGet.
       category = "gui";
-      homebrew = {
-        kind = "cask";
-        name = "krokiet";
-      };
       nixpkgs = "krokiet";
       winget = "qarmin.krokiet";
     };
@@ -589,12 +581,8 @@ let
       nixpkgs = "pay-respects";
     };
     "peace-equalizer-apo" = {
-      # WinGet-only (no nixpkgs attr); Windows installs via WinGet.
+      # WinGet-only: no Homebrew cask exists and no nixpkgs attr; Windows installs via WinGet.
       category = "gui";
-      homebrew = {
-        kind = "cask";
-        name = "peace-equalizer-apo";
-      };
       nixpkgs = "peace-equalizer-apo";
       winget = "PeterVerbeek.PeaceEqualizerAPO";
     };
