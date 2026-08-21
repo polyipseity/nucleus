@@ -1,6 +1,7 @@
 # Local AI inference baseline (Ollama, oterm, LiteLLM proxy).
-# Primary-user-only: unconditionally installs AI tooling; gated at the
-# host level by which user's Home Manager config imports this module.
+# Ollama is installed globally via the managedPackages registry in core.nix;
+# this module provides the per-user oterm client. Gated at the host level by
+# which user's Home Manager config imports this module.
 { nixpkgs, pkgs, ... }:
 let
   appleSiliconDarwin = pkgs.stdenv.isDarwin && pkgs.stdenv.hostPlatform.system == "aarch64-darwin";
@@ -20,7 +21,6 @@ let
 in
 {
   home.packages = [
-    pkgs.ollama
     otermPkg
   ];
 

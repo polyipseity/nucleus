@@ -319,15 +319,8 @@ in
       rcloneMounts = builtins.filter (
         m: m.enable && m.remoteName != null
       ) config.nucleus.cloudDrives.mounts;
-
-      hasRcloneProvider = rcloneMounts != [ ] || enabledReplicas != [ ];
     in
     lib.mkMerge [
-      # -----------------------------------------------------------------------
-      # Shared: rclone package installation
-      # -----------------------------------------------------------------------
-      (lib.mkIf hasRcloneProvider { home.packages = [ pkgs.rclone ]; })
-
       # -----------------------------------------------------------------------
       # Shared: directory structure
       # cloud-drives-setup: creates ~/clouds/ and per-entry subdirectories.

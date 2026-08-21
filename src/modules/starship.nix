@@ -1,7 +1,6 @@
 # Starship cross-shell prompt — shared config for all hosts.
 {
   config,
-  pkgs,
   managedUsername ? null,
   username ? null,
   ...
@@ -24,8 +23,6 @@ let
   starshipConfigFile = overlay.selectFile "starship" "starship.toml";
 in
 {
-  home.packages = [ pkgs.starship ];
-
   home.file.".config/starship.toml".source =
     config.lib.file.mkOutOfStoreSymlink
       # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without reactivation since starship reads ~/.config/starship.toml at shell start. Windows: deployed via Deploy-WritableSymlink in ConfigHelpers.ps1 (same method).
