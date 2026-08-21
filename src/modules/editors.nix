@@ -2,6 +2,7 @@
 # Extension backend: nixpkgs on Linux vs Homebrew/nixpkgs on macOS;
 # extensions managed by symlink-vscode-extensions on all backends.
 {
+  config,
   lib,
   hostName,
   managedUser ? null,
