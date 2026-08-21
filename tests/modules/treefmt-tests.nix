@@ -37,13 +37,13 @@ let
   ) "treefmt.nix must configure pinact for offline --fix=false --no-api checks";
 
   test_core_provisions_formatter_packages = assert' (
-    lib.hasInfix "pkgs.shfmt" coreModuleText
-    && lib.hasInfix "pkgs.taplo" coreModuleText
-    && lib.hasInfix "pkgs.actionlint" coreModuleText
-    && lib.hasInfix "pkgs.pinact" coreModuleText
-    && lib.hasInfix "pkgs.zizmor" coreModuleText
-    && !lib.hasInfix "pkgs.typos" coreModuleText
-  ) "core.nix sharedPackages must provision formatter CLIs without typos";
+    lib.hasInfix "nixpkgsAttr = \"shfmt\";" coreModuleText
+    && lib.hasInfix "nixpkgsAttr = \"taplo\";" coreModuleText
+    && lib.hasInfix "nixpkgsAttr = \"actionlint\";" coreModuleText
+    && lib.hasInfix "nixpkgsAttr = \"pinact\";" coreModuleText
+    && lib.hasInfix "nixpkgsAttr = \"zizmor\";" coreModuleText
+    && !lib.hasInfix "nixpkgsAttr = \"typos\";" coreModuleText
+  ) "core.nix managedPackages must provision formatter CLIs without typos";
 
   allTests = [
     test_treefmt_enables_repo_formatters

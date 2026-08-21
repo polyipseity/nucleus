@@ -143,8 +143,8 @@ let
     builtins.length guiTools >= 2
   ) "GUI tools should be declared for applicable platforms";
 
-  # === OVERLAPPING PACKAGES PARITY ===
-  # Verify all cross-platform entries in modules/core.nix overlappingPackages
+  # === MANAGED PACKAGES PARITY ===
+  # Verify all cross-platform entries in modules/core.nix managedPackages
   # have valid nixpkgs attribute names.
   coreModuleText = builtins.readFile ../../src/modules/core.nix;
 
@@ -479,9 +479,114 @@ let
       name = "jdk";
       nixpkgsAttr = "jdk";
     }
+    # --- Former baseSharedPackages CLI tools (folded into managedPackages) ---
+    {
+      name = "android-tools";
+      nixpkgsAttr = "android-tools";
+    }
+    {
+      name = "asciinema";
+      nixpkgsAttr = "asciinema";
+    }
+    {
+      name = "camilladsp";
+      nixpkgsAttr = "camilladsp";
+    }
+    {
+      name = "cargo-binstall";
+      nixpkgsAttr = "cargo-binstall";
+    }
+    {
+      name = "cargo-cache";
+      nixpkgsAttr = "cargo-cache";
+    }
+    {
+      name = "cargo-nextest";
+      nixpkgsAttr = "cargo-nextest";
+    }
+    {
+      name = "check-jsonschema";
+      nixpkgsAttr = "check-jsonschema";
+    }
+    {
+      name = "deadnix";
+      nixpkgsAttr = "deadnix";
+    }
+    {
+      name = "gnupg";
+      nixpkgsAttr = "gnupg";
+    }
+    {
+      name = "litellm";
+      nixpkgsAttr = "litellm";
+    }
+    {
+      name = "llvm-clang";
+      nixpkgsAttr = "llvmPackages.clang";
+    }
+    {
+      name = "llvm-lld";
+      nixpkgsAttr = "llvmPackages.lld";
+    }
+    {
+      name = "llvm-lldb";
+      nixpkgsAttr = "llvmPackages.lldb";
+    }
+    {
+      name = "mold";
+      nixpkgsAttr = "mold";
+    }
+    {
+      name = "ncdu";
+      nixpkgsAttr = "ncdu";
+    }
+    {
+      name = "nickel";
+      nixpkgsAttr = "nickel";
+    }
+    {
+      name = "nixd";
+      nixpkgsAttr = "nixd";
+    }
+    {
+      name = "nixf";
+      nixpkgsAttr = "nixf";
+    }
+    {
+      name = "nixfmt";
+      nixpkgsAttr = "nixfmt";
+    }
+    {
+      name = "nix-index";
+      nixpkgsAttr = "nix-index";
+    }
+    {
+      name = "nls";
+      nixpkgsAttr = "nls";
+    }
+    {
+      name = "pay-respects";
+      nixpkgsAttr = "pay-respects";
+    }
+    {
+      name = "pi-coding-agent";
+      nixpkgsAttr = "pi-coding-agent";
+    }
+    {
+      name = "ssh-to-age";
+      nixpkgsAttr = "ssh-to-age";
+    }
+    {
+      name = "yamllint";
+      nixpkgsAttr = "yamllint";
+    }
+    {
+      name = "yq-go";
+      nixpkgsAttr = "yq-go";
+    }
   ];
 
-  # Darwin-only overlappingPackages entries (attrs exist on Linux nixpkgs but
+  # Darwin-only managedPackages entries (attrs exist on Linux nixpkgs but
   # are only buildable on darwin via meta.platforms).
   darwinOnlyPackages = [
     {
@@ -503,6 +608,22 @@ let
     {
       name = "visual-studio-code@insiders";
       nixpkgsAttr = "vscode-insiders";
+    }
+    {
+      name = "duti";
+      nixpkgsAttr = "duti";
+    }
+    {
+      name = "desktoppr";
+      nixpkgsAttr = "desktoppr";
+    }
+    {
+      name = "pinentry_mac";
+      nixpkgsAttr = "pinentry_mac";
+    }
+    {
+      name = "equaliser";
+      nixpkgsAttr = "equaliser";
     }
   ];
 
@@ -533,15 +654,15 @@ let
     in
     assert' (builtins.all notBuildableOnLinux darwinOnlyPackages) "Darwin-only packages must not be buildable on Linux";
 
-  # Guard: every overlappingPackages entry in core.nix must be covered by either
+  # Guard: every managedPackages entry in core.nix must be covered by either
   # crossPlatformOverlapAttrs (cross-platform) or darwinOnlyPackages (darwin-only).
   test_all_overlapping_packages_covered =
     let
-      # Scope extraction to the overlappingPackages = { ... }; block so option
+      # Scope extraction to the managedPackages = { ... }; block so option
       # declarations like `    default = { }` elsewhere in core.nix are not
       # mistaken for package entries. Find the block by its unique opening marker
       # and the first top-level `  };` that closes it.
-      marker = "overlappingPackages = {";
+      marker = "managedPackages = {";
       afterStart = lib.lists.drop 1 (lib.strings.splitString marker coreModuleText);
       rest = builtins.head afterStart;
       endMarker = "\n  };";
@@ -559,7 +680,7 @@ let
     in
     assert' (
       uncovered == [ ]
-    ) "All overlappingPackages entries must be covered by tests: ${builtins.toString uncovered}";
+    ) "All managedPackages entries must be covered by tests: ${builtins.toString uncovered}";
 
   allTests = [
     test_nixpkgs_coverage

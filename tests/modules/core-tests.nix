@@ -14,7 +14,10 @@ let
     && lib.hasInfix "++ lib.optional (treefmtPackage != null) treefmtPackage" coreModuleText
   ) "core.nix must accept treefmtPackage and append it to sharedPackages when set";
 
-  test_core_provisions_android_tools = assert' (lib.hasInfix "pkgs.android-tools" coreModuleText) "core.nix must install android-tools (adb, fastboot) on POSIX hosts via sharedPackages";
+  test_core_provisions_android_tools = assert' (
+    lib.hasInfix ''"android-tools" = {'' coreModuleText
+    && lib.hasInfix "nixpkgsAttr = \"android-tools\";" coreModuleText
+  ) "core.nix must declare android-tools (adb, fastboot) in managedPackages for POSIX hosts";
 
   test_linux_nix_index_is_daily = assert' (
     containsRegex ''Description = "Daily nix-index database refresh";'' linuxText
@@ -34,21 +37,18 @@ let
       overrides = {
         "google-chrome" = "nixpkgs";
       };
-      overlapBackend = "homebrew";
+      backend = "homebrew";
       resolveBackend =
         packageName:
-        if builtins.hasAttr packageName overrides then
-          builtins.getAttr packageName overrides
-        else
-          overlapBackend;
+        if builtins.hasAttr packageName overrides then builtins.getAttr packageName overrides else backend;
     in
     assert' (resolveBackend "google-chrome" == "nixpkgs")
       "Override should take precedence: google-chrome should resolve to nixpkgs despite homebrew global";
 
-  # Policy-based categorization when overlapBackend == "policy".
+  # Policy-based categorization when backend == "policy".
   test_policy_based_categorization =
     let
-      overlappingPackages = {
+      managedPackages = {
         "git" = {
           category = "cli";
         };
@@ -57,7 +57,7 @@ let
         };
       };
       packageSelection = {
-        overlapBackend = "policy";
+        backend = "policy";
         overrides = { };
       };
 
@@ -67,26 +67,23 @@ let
         packageName:
         if builtins.hasAttr packageName packageSelection.overrides then
           builtins.getAttr packageName packageSelection.overrides
-        else if packageSelection.overlapBackend == "policy" then
-          defaultBackendFor overlappingPackages.${packageName}.category
+        else if packageSelection.backend == "policy" then
+          defaultBackendFor managedPackages.${packageName}.category
         else
-          packageSelection.overlapBackend;
+          packageSelection.backend;
     in
     assert' (
       (resolveBackend "git" == "nixpkgs") && (resolveBackend "visual-studio-code" == "homebrew")
     ) "Policy mode should route CLI to nixpkgs and GUI to homebrew";
 
-  # Global backend setting when overlapBackend != "policy".
+  # Global backend setting when backend != "policy".
   test_global_backend_fallback =
     let
-      overlapBackend = "homebrew";
+      backend = "homebrew";
       overrides = { };
       resolveBackend =
         packageName:
-        if builtins.hasAttr packageName overrides then
-          builtins.getAttr packageName overrides
-        else
-          overlapBackend;
+        if builtins.hasAttr packageName overrides then builtins.getAttr packageName overrides else backend;
     in
     assert' (
       (resolveBackend "python" == "homebrew") && (resolveBackend "nodejs" == "homebrew")
@@ -95,7 +92,7 @@ let
   # Empty overrides with policy mode cascades to category defaults.
   test_policy_with_no_overrides =
     let
-      overlappingPackages = {
+      managedPackages = {
         "bat" = {
           category = "cli";
         };
@@ -104,7 +101,7 @@ let
         };
       };
       packageSelection = {
-        overlapBackend = "policy";
+        backend = "policy";
         overrides = { };
       };
 
@@ -114,10 +111,10 @@ let
         packageName:
         if builtins.hasAttr packageName packageSelection.overrides then
           builtins.getAttr packageName packageSelection.overrides
-        else if packageSelection.overlapBackend == "policy" then
-          defaultBackendFor overlappingPackages.${packageName}.category
+        else if packageSelection.backend == "policy" then
+          defaultBackendFor managedPackages.${packageName}.category
         else
-          packageSelection.overlapBackend;
+          packageSelection.backend;
     in
     assert' (
       (resolveBackend "bat" == "nixpkgs") && (resolveBackend "blender" == "homebrew")
@@ -126,7 +123,7 @@ let
   # Override can selectively flip specific packages in policy mode.
   test_selective_override_in_policy_mode =
     let
-      overlappingPackages = {
+      managedPackages = {
         "ripgrep" = {
           category = "cli";
         }; # Default: nixpkgs
@@ -135,7 +132,7 @@ let
         }; # Default: nixpkgs
       };
       packageSelection = {
-        overlapBackend = "policy";
+        backend = "policy";
         overrides = {
           "ripgrep" = "homebrew";
         }; # Override ripgrep only
@@ -147,10 +144,10 @@ let
         packageName:
         if builtins.hasAttr packageName packageSelection.overrides then
           builtins.getAttr packageName packageSelection.overrides
-        else if packageSelection.overlapBackend == "policy" then
-          defaultBackendFor overlappingPackages.${packageName}.category
+        else if packageSelection.backend == "policy" then
+          defaultBackendFor managedPackages.${packageName}.category
         else
-          packageSelection.overlapBackend;
+          packageSelection.backend;
     in
     assert' (
       (resolveBackend "ripgrep" == "homebrew") && (resolveBackend "fzf" == "nixpkgs")
@@ -159,7 +156,7 @@ let
   # Multiple overrides in policy mode.
   test_multiple_overrides =
     let
-      overlappingPackages = {
+      managedPackages = {
         "discord" = {
           category = "gui";
         };
@@ -171,7 +168,7 @@ let
         };
       };
       packageSelection = {
-        overlapBackend = "policy";
+        backend = "policy";
         overrides = {
           "discord" = "nixpkgs";
           "vscode" = "nixpkgs";
@@ -184,10 +181,10 @@ let
         packageName:
         if builtins.hasAttr packageName packageSelection.overrides then
           builtins.getAttr packageName packageSelection.overrides
-        else if packageSelection.overlapBackend == "policy" then
-          defaultBackendFor overlappingPackages.${packageName}.category
+        else if packageSelection.backend == "policy" then
+          defaultBackendFor managedPackages.${packageName}.category
         else
-          packageSelection.overlapBackend;
+          packageSelection.backend;
     in
     assert' (
       (resolveBackend "discord" == "nixpkgs")
@@ -221,7 +218,7 @@ let
       platformCompatible =
         isDarwin: isLinux: packageName:
         let
-          entry = overlappingPackages.${packageName};
+          entry = managedPackages.${packageName};
           platforms =
             entry.platforms or [
               "darwin"
@@ -235,7 +232,7 @@ let
         else
           true;
 
-      overlappingPackages = {
+      managedPackages = {
         blender = {
           category = "gui";
         };
@@ -251,7 +248,7 @@ let
       platformCompatible =
         isDarwin: isLinux: packageName:
         let
-          entry = overlappingPackages.${packageName};
+          entry = managedPackages.${packageName};
           platforms =
             entry.platforms or [
               "darwin"
@@ -265,7 +262,7 @@ let
         else
           true;
 
-      overlappingPackages = {
+      managedPackages = {
         iterm2 = {
           category = "gui";
           platforms = [ "darwin" ];
@@ -282,7 +279,7 @@ let
       platformCompatible =
         isDarwin: isLinux: packageName:
         let
-          entry = overlappingPackages.${packageName};
+          entry = managedPackages.${packageName};
           platforms =
             entry.platforms or [
               "darwin"
@@ -296,7 +293,7 @@ let
         else
           true;
 
-      overlappingPackages = {
+      managedPackages = {
         linux-only-pkg = {
           category = "cli";
           platforms = [ "linux" ];

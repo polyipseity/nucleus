@@ -2,10 +2,10 @@
 #
 # The committed src/hosts/Windows/system/winget-packages.json is the artifact
 # apply.ps1 consumes to filter packages.dsc.yml (Windows does not run Nix). It
-# MUST equal the Nix-resolved Windows enable set from overlappingPackages in
+# MUST equal the Nix-resolved Windows enable set from managedPackages in
 # core.nix. Any divergence (hand-edited DSC, stale committed JSON) fails here —
 # the dummy-proof guarantee that the Windows package set cannot contradict the
-# shared overlap registry.
+# shared package registry.
 
 let
   lib = import <nixpkgs/lib>;
@@ -19,7 +19,7 @@ let
     modules = [
       ../../src/modules/core.nix
       {
-        nucleus.macos.packageSelection.overlapBackend = "policy";
+        nucleus.packages.selection.backend = "policy";
       }
       {
         options.assertions = lib.mkOption {
@@ -41,7 +41,7 @@ let
     };
   };
 
-  resolvedWindowsPackages = evaluated.config.nucleus.windows.generatedWinget.packages;
+  resolvedWindowsPackages = evaluated.config.nucleus.windows.wingetPackages.packages;
 
   # The committed artifact apply.ps1 reads.
   committedDoc = builtins.fromJSON (
@@ -57,7 +57,7 @@ let
   # per-host override enables it).
   test_cursor_disabled_on_windows = assert' (
     !builtins.elem "Anysphere.Cursor" resolvedWindowsPackages
-  ) "Cursor must be disabled on Windows (overlappingPackages.cursor.enable=false)";
+  ) "Cursor must be disabled on Windows (managedPackages.cursor.enable=false)";
 
   # OBS Studio (stable) and JDK 25 must be enabled on Windows.
   test_obs_enabled_on_windows = assert' (builtins.elem "OBSProject.OBSStudio" resolvedWindowsPackages) "OBS Studio (stable) must be enabled on Windows";

@@ -41,7 +41,7 @@ let
 
   # Test 6: Verify security options are boolean or specific enums
   test_security_options_types = assert' (
-    containsRegex "overlapBackend = lib\.mkOption" coreModuleText
+    containsRegex "backend = lib\.mkOption" coreModuleText
     && containsRegex "type = lib\.types\.enum" coreModuleText
   ) "Enum options should declare explicit allowed values";
 
@@ -65,7 +65,7 @@ let
 
   # Test 10: Verify no conflicting option definitions across modules
   test_no_conflicting_options = assert' (
-    containsRegex "options\.nucleus\.macos\.packageSelection" coreModuleText
+    containsRegex "options\.nucleus\.packages\.selection" coreModuleText
     && containsRegex ''options\.nucleus\.rclone = \{'' homeModuleText
   ) "No conflicting option definitions should exist across modules";
 
