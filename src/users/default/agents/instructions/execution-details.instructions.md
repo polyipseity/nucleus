@@ -1,5 +1,5 @@
 ---
-description: "Use when debugging tool retries, structuring investigation of failures, or applying multi-edit fallback strategies."
+description: "Use when debugging tool retries, structuring investigation of failures, or applying multi-edit recovery strategies."
 name: "Execution Details and Tool Recovery"
 applyTo: "**"
 alwaysApply: true
@@ -7,9 +7,9 @@ alwaysApply: true
 
 # Execution details and tool recovery
 
-## Multi-edit fallback
+## Multi-edit recovery
 
-When a batch edit tool call fails (e.g., `multi_replace_string_in_file`), fall back to sequential single-edit calls. Do not retry the same multi-edit call without adjusting the approach (smaller batch size, simpler diffs, or sequential replacements).
+When a batch edit tool call fails (e.g., `multi_replace_string_in_file`), recover with sequential single-edit calls. Do not retry the same multi-edit call without adjusting the approach (smaller batch size, simpler diffs, or sequential replacements).
 
 ## Tool-retry discipline
 

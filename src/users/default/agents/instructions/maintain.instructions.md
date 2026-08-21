@@ -64,4 +64,4 @@ Final check:
 
 - `core-behavior.instructions.md` — Subagent delegation patterns, git boundary rules, and immutable-by-default enforcement.
 - `commit-safety.instructions.md` — Commit verification protocol, amend prohibition, and failure recovery.
-- `execution-details.instructions.md` — Tool recovery and multi-edit fallback strategies.
+- `execution-details.instructions.md` — Tool recovery and multi-edit recovery strategies.

@@ -17,7 +17,7 @@ echo "<message>" | bun x commitlint
 
 from the project root. If a commitlint config exists (`.commitlintrc.*`, `commitlint.config.*`), it is used automatically. If no config is found and no conflicting convention is documented, commitlint validates with its conventional-commit defaults.
 
-### Temp-dir install fallback (never in the repo)
+### Temp-dir install method (never in the repo)
 
 `bun x commitlint` needs no install — it fetches the requested package into a per-run temp dir (`/tmp/bunx-*`) plus a global cache (`~/.bun/install/cache`) and never writes to the repository. If `bun x commitlint` fails to resolve the config's `extends` dependencies (see below), run commitlint from a temp dir with `bun install`:
 
@@ -48,7 +48,7 @@ If commitlint validation fails AND no conflicting convention is documented, fix 
 
 ### Config-extension resolution failure
 
-If `bun x commitlint` fails with `Cannot find package 'conventional-changelog-conventionalcommits'` (resolved from the config's transpiled `noop.js`), the repository's commitlint config `extends` a package that `bun x`'s cache-based resolution cannot reach. Use the temp-dir install fallback above. `--default-config` is NOT a workaround: bun's global cache cannot resolve `conventional-changelog-conventionalcommits` from the transpiled `noop.js` either (verified in nucleus). The repository's real commit-msg hook enforces the actual config with its own dependency setup.
+If `bun x commitlint` fails with `Cannot find package 'conventional-changelog-conventionalcommits'` (resolved from the config's transpiled `noop.js`), the repository's commitlint config `extends` a package that `bun x`'s cache-based resolution cannot reach. Use the temp-dir install method above. `--default-config` is NOT a workaround: bun's global cache cannot resolve `conventional-changelog-conventionalcommits` from the transpiled `noop.js` either (verified in nucleus). The repository's real commit-msg hook enforces the actual config with its own dependency setup.
 
 If commitlint is present and configured but fails unexpectedly (tool error, not lint error), report the failure — do not proceed with the commit. This follows the no-fallbacks principle.
 
