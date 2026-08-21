@@ -20,6 +20,13 @@
 .PARAMETER OutputPath
   Path to write the locked DSC.
 
+.PARAMETER EnabledPackages
+  Optional hashset of WinGet package IDs that are enabled. When provided, any
+  Microsoft.WinGet.Client/Package resource whose settings.id is NOT in this set
+  is dropped from the output. This enforces the single-source overlap enable
+  flag (overlappingPackages in core.nix) on Windows, which does not run Nix.
+  When omitted, all resources are emitted (no filtering).
+
 .EXAMPLE
   ConvertFrom-WingetLockfileToDsc -ConfigPath .\system\scheduler.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system\scheduler.locked.dsc.yml
 
@@ -28,6 +35,9 @@
 
 .EXAMPLE
   ConvertFrom-WingetLockfileToDsc -ConfigPath .\system\packages.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system\packages.locked.dsc.yml
+
+.EXAMPLE
+  ConvertFrom-WingetLockfileToDsc -ConfigPath .\system\packages.dsc.yml -LockfilePath ..\..\lockfiles\lockfile.json -OutputPath .\system\packages.locked.dsc.yml -EnabledPackages @{ 'Anysphere.Cursor' = $true; 'OBSProject.OBSStudio.Pre-release' = $true }
 
 .NOTES
   Environment variables:
@@ -42,7 +52,10 @@ function ConvertFrom-WingetLockfileToDsc {
     [string]$LockfilePath,
 
     [Parameter(Mandatory = $true)]
-    [string]$OutputPath
+    [string]$OutputPath,
+
+    [Parameter(Mandatory = $false)]
+    [hashtable]$EnabledPackages
   )
 
   # Graceful degradation: missing or unparseable lockfile → passthrough.
@@ -64,31 +77,59 @@ function ConvertFrom-WingetLockfileToDsc {
     throw "ConvertFrom-WingetLockfileToDsc: source DSC not found at $ConfigPath"
   }
 
+  $filterEnabled = $PSBoundParameters.ContainsKey('EnabledPackages') -and $EnabledPackages
   $lines = Get-Content -Path $ConfigPath
   $outputLines = [System.Collections.ArrayList]::new()
+  # Buffer the current resource block so it can be dropped wholesale when disabled.
+  $resourceBuffer = [System.Collections.ArrayList]::new()
+  $inResource = $false
   $currentWingetId = $null
 
   foreach ($line in $lines) {
-    # Reset tracking at resource boundary (4-space indent).
+    # Resource boundary (4-space indent) starts a new block.
     if ($line -match '^    - resource:') {
-      $currentWingetId = $null
-    }
-
-    # Capture settings-level id (8-space indent).
-    if ($line -match '^        id:\s+(.+)$') {
-      $currentWingetId = $Matches[1]
-    }
-
-    # Emit the current line.
-    [void]$outputLines.Add($line)  # check-suppress:suppression_doc: Add returns collection count, discarded
-
-    # After source: winget at 8-space indent, inject version if lockfile has one.
-    if ($line -match '^        source:\s+winget$' -and $currentWingetId) {
-      if ($wingetVersions.ContainsKey($currentWingetId)) {
-        $version = $wingetVersions[$currentWingetId]
-        if ($version) {
-          [void]$outputLines.Add("        version: $version")  # check-suppress:suppression_doc: Add returns collection count, discarded
+      # Flush the previous buffered resource (if any) before starting a new one.
+      if ($inResource) {
+        if (-not $filterEnabled -or ($currentWingetId -and $EnabledPackages.ContainsKey($currentWingetId))) {
+          foreach ($buffered in $resourceBuffer) {
+            [void]$outputLines.Add($buffered)  # check-suppress:suppression_doc: Add returns collection count, discarded
+          }
         }
+      }
+      $resourceBuffer = [System.Collections.ArrayList]::new()
+      $inResource = $true
+      $currentWingetId = $null
+      [void]$resourceBuffer.Add($line)  # check-suppress:suppression_doc: Add returns collection count, discarded
+      continue
+    }
+
+    if ($inResource) {
+      [void]$resourceBuffer.Add($line)  # check-suppress:suppression_doc: Add returns collection count, discarded
+      # Capture settings-level id (8-space indent).
+      if ($line -match '^        id:\s+(.+)$') {
+        $currentWingetId = $Matches[1]
+      }
+      # After source: winget at 8-space indent, inject version if lockfile has one.
+      if ($line -match '^        source:\s+winget$' -and $currentWingetId) {
+        if ($wingetVersions.ContainsKey($currentWingetId)) {
+          $version = $wingetVersions[$currentWingetId]
+          if ($version) {
+            [void]$resourceBuffer.Add("        version: $version")  # check-suppress:suppression_doc: Add returns collection count, discarded
+          }
+        }
+      }
+      continue
+    }
+
+    # Lines outside any resource are emitted verbatim.
+    [void]$outputLines.Add($line)  # check-suppress:suppression_doc: Add returns collection count, discarded
+  }
+
+  # Flush the final buffered resource.
+  if ($inResource) {
+    if (-not $filterEnabled -or ($currentWingetId -and $EnabledPackages.ContainsKey($currentWingetId))) {
+      foreach ($buffered in $resourceBuffer) {
+        [void]$outputLines.Add($buffered)  # check-suppress:suppression_doc: Add returns collection count, discarded
       }
     }
   }

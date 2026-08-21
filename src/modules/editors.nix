@@ -308,12 +308,15 @@ in
     package = pkgs.vscode;
   };
 
-  programs.cursor = lib.mkIf (!isDarwin && pkgs ? code-cursor) {
-    # Mirror programs.vscode: install via Homebrew on Darwin, nixpkgs on Linux.
-    # Agent config is bridged separately via cursor.nix (symlink-cursor-config).
-    enable = true;
-    package = pkgs.code-cursor;
-  };
+  programs.cursor =
+    lib.mkIf (!isDarwin && (config.nucleus.overlapEnabled.cursor or false) && pkgs ? code-cursor)
+      {
+        # Single source of truth: gated by the resolved overlap enable state
+        # (overlappingPackages.cursor, honoring hosts.NixOS or falling back to enable).
+        # Agent config is bridged separately via cursor.nix (symlink-cursor-config).
+        enable = true;
+        package = pkgs.code-cursor;
+      };
 
   home.activation = {
     # -------------------------------------------------------------------------

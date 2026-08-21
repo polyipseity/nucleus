@@ -1041,6 +1041,54 @@
       };
 
       # -----------------------------------------------------------------------
+      # winget-packages — Nix-generated list of WinGet package IDs that are
+      # enabled for the Windows host, derived from the shared overlap registry
+      # (overlappingPackages in core.nix). Committed as
+      # src/hosts/Windows/system/winget-packages.json and consumed by apply.ps1
+      # to filter packages.dsc.yml (Windows does not run Nix).
+      # -----------------------------------------------------------------------
+      winget-packages = pkgsMac.writeText "winget-packages.json" (
+        let
+          evaluated = nixpkgs.lib.evalModules {
+            prefix = [ ];
+            modules = [
+              ./modules/core.nix
+              {
+                # core.nix reads this for macOS backend selection; harmless here.
+                nucleus.macos.packageSelection.overlapBackend = "policy";
+              }
+              # core.nix sets `assertions`; that option is normally provided by
+              # NixOS/nix-darwin, so declare a stub for this standalone eval.
+              {
+                options.assertions = nixpkgs.lib.mkOption {
+                  type = nixpkgs.lib.types.listOf nixpkgs.lib.types.attrs;
+                  default = [ ];
+                  internal = true;
+                };
+                # Windows does not set networking.hostName via Nix; declare a stub
+                # so the host-agnostic resolver computes the Windows-resolved set.
+                options.networking.hostName = nixpkgs.lib.mkOption {
+                  type = nixpkgs.lib.types.str;
+                  default = "Windows";
+                  internal = true;
+                };
+              }
+            ];
+            specialArgs = {
+              lib = nixpkgs.lib;
+              pkgs = pkgsMac;
+              options = { };
+            };
+          };
+        in
+        builtins.toJSON {
+          "$schema" = "./winget-packages.schema.json";
+          packages = evaluated.config.nucleus.windows.generatedWinget.packages;
+        }
+        + "\n"
+      );
+
+      # -----------------------------------------------------------------------
       # devShells — entered via `nix develop .#<name>` or auto-loaded by
       # nix-direnv when an .envrc with `use flake` is present.
       #

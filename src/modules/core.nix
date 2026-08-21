@@ -201,6 +201,11 @@ let
       nixpkgsAttr = "utm";
     };
     cursor = {
+      # Single source of truth for Cursor enable/disable across all hosts.
+      # `enable` is the default for every host; `hosts` is the opt-in per-host
+      # override (precedence over `enable`). A host omitted from `hosts` falls
+      # back to `enable`, so new hosts can never silently diverge. Cursor stays
+      # disabled everywhere (no per-host override enables it).
       enable = false;
       category = "gui";
       homebrew = {
@@ -209,6 +214,36 @@ let
       };
       # WHY: code-cursor is Linux-only (AppImage repack); macOS uses the Homebrew cask.
       nixpkgsAttr = "code-cursor";
+      winget = {
+        id = "Anysphere.Cursor";
+      };
+    };
+    "obs-studio" = {
+      # Stable OBS Studio. Enabled on every platform (no beta channel exists in
+      # nixpkgs, so stable is the uniform choice across macOS/NixOS/Windows).
+      enable = true;
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "obs";
+      };
+      nixpkgsAttr = "obs-studio";
+      winget = {
+        id = "OBSProject.OBSStudio";
+      };
+    };
+    jdk = {
+      # Latest JDK LTS (25 as of 2026-08). Floating LTS alias tracks future LTS.
+      enable = true;
+      category = "cli";
+      homebrew = {
+        kind = "cask";
+        name = "openjdk@25";
+      };
+      nixpkgsAttr = "jdk";
+      winget = {
+        id = "EclipseAdoptium.Temurin.25.JDK";
+      };
     };
     visual-studio-code = {
       category = "gui";
@@ -247,9 +282,23 @@ let
 
   packageSelection = config.nucleus.macos.packageSelection;
   overlapPackageNames = builtins.attrNames overlappingPackages;
-  enabledOverlapPackageNames = builtins.filter (
-    name: (overlappingPackages.${name}.enable or true)
-  ) overlapPackageNames;
+
+  # Resolve whether an overlap package is enabled for a given host.
+  # Precedence: explicit per-host override (hosts.<host>) > global `enable` (default).
+  # Host-agnostic: takes hostName explicitly so the Windows-resolved set can be
+  # computed anywhere Nix runs (Windows itself does not run Nix).
+  overlapEnabledForHost =
+    hostName: packageName:
+    let
+      entry = overlappingPackages.${packageName};
+      global = entry.enable or true;
+      hostOverride = entry.hosts or { };
+    in
+    if builtins.hasAttr hostName hostOverride then builtins.getAttr hostName hostOverride else global;
+
+  # Current host (MacBook/NixOS set networking.hostName).
+  currentHost = config.networking.hostName or "";
+  enabledOverlapPackageNames = builtins.filter (overlapEnabledForHost currentHost) overlapPackageNames;
 
   # CLI → nixpkgs, GUI → homebrew. If a package ships any GUI component, classify as "gui".
   defaultBackendFor = category: if category == "cli" then "nixpkgs" else "homebrew";
@@ -422,6 +471,29 @@ in
     };
   };
 
+  options.nucleus.overlapEnabled = lib.mkOption {
+    type = lib.types.attrsOf lib.types.bool;
+    default = { };
+    internal = true;
+    description = "Resolved per-host enable state for each overlappingPackages entry (current host).";
+  };
+
+  options.nucleus.windows = lib.mkOption {
+    type = lib.types.submodule {
+      options.generatedWinget = {
+        packages = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ ];
+          internal = true;
+          description = "WinGet package IDs enabled for the Windows host, derived from overlappingPackages entries carrying a `winget.id` and resolving enabled for Windows.";
+        };
+      };
+    };
+    default = { };
+    internal = true;
+    description = "Windows-specific generated state derived from the shared overlap registry.";
+  };
+
   config = lib.mkMerge [
     (lib.optionalAttrs (options ? environment && options.environment ? systemPackages) {
       environment.systemPackages = sharedPackages;
@@ -442,5 +514,22 @@ in
       nucleus.macos.generatedHomebrew.brews = overlapHomebrewBrews;
       nucleus.macos.generatedHomebrew.casks = overlapHomebrewCasks;
     })
+
+    {
+      # Resolved enable state for the current host (consumed by editors.nix etc.).
+      nucleus.overlapEnabled = lib.listToAttrs (
+        map (n: {
+          name = n;
+          value = overlapEnabledForHost currentHost n;
+        }) overlapPackageNames
+      );
+
+      # Windows-resolved WinGet ID set (host-agnostic; identical wherever Nix runs).
+      nucleus.windows.generatedWinget.packages = builtins.map (n: overlappingPackages.${n}.winget.id) (
+        builtins.filter (
+          n: (overlappingPackages.${n}.winget or null) != null && overlapEnabledForHost "Windows" n
+        ) overlapPackageNames
+      );
+    }
   ];
 }
