@@ -10,8 +10,16 @@
 let
   # Cross-platform shared package registry. Each package is declared exactly
   # once with full cross-platform metadata (nixpkgs attr, Homebrew, WinGet).
+  # field: nixpkgs — nixpkgs attribute name (the package's derivation path).
+  # field: homebrew — optional { kind = "formula"|"cask"; name = "..." }.
+  # field: winget — optional WinGet package id string (e.g. "Anysphere.Cursor").
   # field: platforms — restrict to specific platforms (["darwin"] or ["linux"]).
-  #   Default (absent): both darwin and linux.
+  #   Buildability axis only; governs darwin/linux nix provisioning. Default
+  #   (absent): both darwin and linux. Kept separate from `hosts` (parity map).
+  # field: hosts — optional per-host parity map { MacBook = bool; NixOS = bool;
+  #   Windows = bool }. Absent hosts default to enabled, so new hosts can never
+  #   silently diverge. This is the single source of truth for enable/disable
+  #   across all hosts (replaces the old `enable` + `hosts` override split).
   # Category rules: cli → nixpkgs; gui → Homebrew (cask preferred) on macOS.
   #   On NixOS: all packages go to nixpkgs unconditionally.
   # If a package ships any GUI component (binary, UI, daemon), classify as "gui".

@@ -198,7 +198,7 @@ let
       name = "vlc";
       nixpkgs = "vlc";
     }
-    # --- Completed overlap entries (cross-platform, carry a winget.id) ---
+    # --- Completed overlap entries (cross-platform, carry a winget id) ---
     {
       name = "google-chrome@canary";
       nixpkgs = "google-chrome";
