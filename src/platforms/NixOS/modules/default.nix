@@ -25,7 +25,7 @@ let
 
   activationBundle = pkgs.callPackage ../../../modules/lib/script-tree.nix { };
 in
-lib.mkIf pkgs.stdenv.isLinux {
+lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
   # Home Manager exposes GNOME settings via `dconf.*` (not `programs.dconf`).
   # Enabling this keeps `dconf.settings` declarative and idempotent.
   dconf.enable = true;

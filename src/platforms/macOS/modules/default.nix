@@ -278,7 +278,7 @@ let
 
   activationBundle = pkgs.callPackage ../../../modules/lib/script-tree.nix { };
 in
-lib.mkIf pkgs.stdenv.isDarwin {
+lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   home.packages = [
     preferenceGc.managedPreferencesGcScript
     pkgs.mysides

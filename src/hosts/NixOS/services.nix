@@ -60,7 +60,7 @@ let
     }) gsPdfOptPresets
   );
 in
-lib.mkIf pkgs.stdenv.isLinux {
+lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
   home.file = {
     # Shared script that Nautilus and Dolphin both invoke
     # check-suppress:config-method: method 1 (writable symlink) -- repo edits take effect without rebuild.
