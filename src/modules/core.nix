@@ -1031,12 +1031,19 @@ let
     else
       true;
 
+  # Split a managed package's dotted `nixpkgs` attribute into a path list so it
+  # can be resolved against the nested pkgs attrset. `builtins.hasAttr`/
+  # `getAttr` treat a dotted string as a single literal top-level name and do
+  # NOT traverse the path, so nested attrs (e.g. "llvmPackages_latest.llvm")
+  # must be split first.
+  nixPkgsAttrPath = packageName: lib.strings.splitString "." managedPackages.${packageName}.nixpkgs;
+
   # Managed packages routed to nixpkgs but absent from pkgs (platform-specific).
   missingNixPackageAttrs = builtins.filter (
     packageName:
     managedPackagePlatformCompatible packageName
     && (if pkgs.stdenv.isDarwin then managedPackageBackends.${packageName} == "nixpkgs" else true)
-    && !(builtins.hasAttr managedPackages.${packageName}.nixpkgs pkgs)
+    && !(lib.hasAttrByPath (nixPkgsAttrPath packageName) pkgs)
   ) enabledManagedPackageNames;
 
   # Cross-platform nixpkgs packages from the managed set.
@@ -1047,18 +1054,16 @@ let
   # is x86_64-linux only; the nixos-generators guest builds aarch64-linux).
   # meta.available reads lazily and does NOT trigger check-meta's refusal
   # assertion, so filtering by it safely drops arch-incompatible packages.
-  managedNixPackages =
-    map (packageName: builtins.getAttr managedPackages.${packageName}.nixpkgs pkgs)
-      (
-        if pkgs.stdenv.isDarwin then
-          builtins.filter (
-            name: managedPackageBackends.${name} == "nixpkgs" && managedPackagePlatformCompatible name
-          ) enabledManagedPackageNames
-        else
-          builtins.filter (
-            name: managedPackagePlatformCompatible name && nixPackageAttrAvailable name
-          ) enabledManagedPackageNames
-      );
+  managedNixPackages = map (packageName: lib.attrByPath (nixPkgsAttrPath packageName) null pkgs) (
+    if pkgs.stdenv.isDarwin then
+      builtins.filter (
+        name: managedPackageBackends.${name} == "nixpkgs" && managedPackagePlatformCompatible name
+      ) enabledManagedPackageNames
+    else
+      builtins.filter (
+        name: managedPackagePlatformCompatible name && nixPackageAttrAvailable name
+      ) enabledManagedPackageNames
+  );
 
   # Whether the managed package's nixpkgs attribute is actually available on
   # the current platform (checks meta.available, defaulting to true when the
@@ -1068,7 +1073,7 @@ let
     let
       attr = managedPackages.${packageName}.nixpkgs;
     in
-    (pkgs.${attr}.meta.available or true);
+    ((lib.attrByPath (lib.strings.splitString "." attr) null pkgs).meta.available or true);
 
   managedHomebrewBrews = lib.optionals pkgs.stdenv.isDarwin (
     builtins.filter (name: name != null) (
