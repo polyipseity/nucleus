@@ -10,7 +10,8 @@ let
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
   managedUserNames = builtins.attrNames users;
   sopsGroup = "nucleus-sops";
-  machineAgeOwnerSpec = if pkgs.stdenv.isDarwin then "user:${username}" else "group:${sopsGroup}";
+  machineAgeOwnerSpec =
+    if pkgs.stdenv.hostPlatform.isDarwin then "user:${username}" else "group:${sopsGroup}";
 in
 {
   # ---------------------------------------------------------------------------
@@ -38,16 +39,16 @@ in
   #   produce identical output.  We always overwrite to keep the file current
   #   if the host key is ever rotated.
   # ---------------------------------------------------------------------------
-  users.groups.${sopsGroup} = lib.mkIf (!pkgs.stdenv.isDarwin) { };
+  users.groups.${sopsGroup} = lib.mkIf (!pkgs.stdenv.hostPlatform.isDarwin) { };
 
-  users.users = lib.mkIf (!pkgs.stdenv.isDarwin) (
+  users.users = lib.mkIf (!pkgs.stdenv.hostPlatform.isDarwin) (
     lib.genAttrs managedUserNames (_name: {
       extraGroups = lib.mkAfter [ sopsGroup ];
     })
   );
 
   system.activationScripts =
-    if pkgs.stdenv.isDarwin then
+    if pkgs.stdenv.hostPlatform.isDarwin then
       {
         postActivation.text = lib.mkBefore ''
           "${activationBundle}/src/scripts/secrets/derive-host-age-key.sh" "${pkgs.ssh-to-age}/bin/ssh-to-age" "${machineAgeOwnerSpec}"
@@ -78,7 +79,11 @@ in
     # on NixOS where services.openssh is enabled.  macOS avoids the conflict
     # because nix-darwin's OpenSSH setup often lacks RSA host-key definitions.
     gnupg = {
-      home = if pkgs.stdenv.isDarwin then "/Users/${username}/.gnupg" else "/home/${username}/.gnupg";
+      home =
+        if pkgs.stdenv.hostPlatform.isDarwin then
+          "/Users/${username}/.gnupg"
+        else
+          "/home/${username}/.gnupg";
       sshKeyPaths = [ ];
     };
   };

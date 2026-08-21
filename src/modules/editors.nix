@@ -20,7 +20,7 @@ let
 
   # Platform switch used to keep one declarative config while selecting the
   # backend that integrates best on each OS.
-  isDarwin = pkgs.stdenv.isDarwin;
+  isDarwin = pkgs.stdenv.hostPlatform.isDarwin;
 
   # Safe accessor for VS Code Marketplace extensions provided by
   # nix-vscode-extensions.  Returns a single-element list when the extension is

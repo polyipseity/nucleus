@@ -141,7 +141,7 @@ in
           ))
           agentEnv.devinPosixPath
           "${managedPaths.defaultDevTools}"
-          (lib.optionalString pkgs.stdenv.isDarwin (
+          (lib.optionalString pkgs.stdenv.hostPlatform.isDarwin (
             builtins.replaceStrings
               [ "__ICLOUD_EXCLUDED_NAMES__" "__ICLOUD_MANAGED_ROOTS__" ]
               [

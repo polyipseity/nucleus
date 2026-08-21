@@ -10,7 +10,9 @@
     # Home Manager's OS integration derives `home.homeDirectory` from
     # `users.users.<name>.home`. On nix-darwin that value is not always set,
     # so we provide platform-correct defaults to keep HM evaluation stable.
-    home = lib.mkDefault (if pkgs.stdenv.isDarwin then "/Users/${username}" else "/home/${username}");
+    home = lib.mkDefault (
+      if pkgs.stdenv.hostPlatform.isDarwin then "/Users/${username}" else "/home/${username}"
+    );
 
     # Keep zsh as the managed login shell across POSIX hosts.
     shell = pkgs.zsh;

@@ -20,7 +20,7 @@ let
   # activation. QtPass settings are merged into platform-native stores
   # (macOS: defaults, Linux: INI, Windows: registry), so Method 1 (symlink)
   # does not apply.
-  qtPassPlatformSettings = lib.optionalAttrs pkgs.stdenv.isDarwin {
+  qtPassPlatformSettings = lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
     # macOS keeps Hide on close disabled, per the requested platform-specific
     # exception to the shared QtPass baseline.
     hideOnClose = false;

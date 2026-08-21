@@ -83,7 +83,8 @@ let
 
   # desktoppr is darwin-only; keep this reference lazy so Linux evaluation
   # does not attempt to instantiate an unsupported package.
-  desktopprBinPath = if pkgs.stdenv.isDarwin then "${pkgs.desktoppr}/bin/desktoppr" else "";
+  desktopprBinPath =
+    if pkgs.stdenv.hostPlatform.isDarwin then "${pkgs.desktoppr}/bin/desktoppr" else "";
 
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
@@ -99,7 +100,7 @@ in
 
   home.activation.provision-wallpapers = lib.hm.dag.entryAfter [ "sops-nix" ] ''
     "${activationBundle}/src/scripts/configs/provision-wallpaper.sh" \
-      "${if pkgs.stdenv.isDarwin then "1" else "0"}" \
+      "${if pkgs.stdenv.hostPlatform.isDarwin then "1" else "0"}" \
       "${currentUserHome}/Pictures/wallpapers" \
       "${desktopprBinPath}" \
       "${pkgs.coreutils}" \

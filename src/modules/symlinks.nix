@@ -12,9 +12,9 @@ let
   userConfig = users.${currentUsername}.symlinks or [ ];
 
   hostKey =
-    if pkgs.stdenv.isDarwin then
+    if pkgs.stdenv.hostPlatform.isDarwin then
       "MacBook"
-    else if pkgs.stdenv.isLinux then
+    else if pkgs.stdenv.hostPlatform.isLinux then
       "NixOS"
     else
       null;

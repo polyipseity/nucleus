@@ -103,7 +103,7 @@ in
     }
 
     # macOS: launchd agent keeps the tray app running persistently after login.
-    (lib.mkIf (pkgs.stdenv.isDarwin && userEnable) {
+    (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && userEnable) {
       launchd.agents."discord-music-rpc" = {
         enable = true;
         config = {
@@ -118,7 +118,7 @@ in
     })
 
     # NixOS: systemd user service for headless operation.
-    (lib.mkIf (pkgs.stdenv.isLinux && userEnable) {
+    (lib.mkIf (pkgs.stdenv.hostPlatform.isLinux && userEnable) {
       systemd.user.services."discord-music-rpc" = {
         Unit = {
           Description = "discord-music-rpc music presence for Discord";

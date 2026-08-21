@@ -44,7 +44,7 @@ let
 
   iterm2DynamicProfilesDir = overlay.selectFirstLevelEntry "iterm2" "DynamicProfiles";
 in
-lib.mkIf pkgs.stdenv.isDarwin {
+lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   home.file = {
     # Place the pinned iTerm2 zsh shell integration script at the well-known
     # path that the sourcing guard in programs.zsh.initContent expects.

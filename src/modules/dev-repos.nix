@@ -13,7 +13,7 @@ let
   # macOS ssh_config commonly uses Apple-only directives such as UseKeychain.
   # Git-over-SSH must therefore use /usr/bin/ssh on Darwin; the Nix OpenSSH
   # client rejects those directives and breaks clones during activation.
-  sshClient = if pkgs.stdenv.isDarwin then "/usr/bin/ssh" else "${pkgs.openssh}/bin/ssh";
+  sshClient = if pkgs.stdenv.hostPlatform.isDarwin then "/usr/bin/ssh" else "${pkgs.openssh}/bin/ssh";
 
   # Read user-specific dev repos config from the centralized user registry.
   # Falls back to disabled if not defined for this user.

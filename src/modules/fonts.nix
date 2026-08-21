@@ -23,7 +23,7 @@ in
 {
   config = lib.mkMerge [
     {
-      home.file = lib.optionalAttrs pkgs.stdenv.isDarwin {
+      home.file = lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
         "Library/Fonts/open-source-fonts".source = "${darwinFontStore}/share/fonts";
       };
     }

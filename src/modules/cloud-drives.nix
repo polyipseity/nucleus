@@ -179,12 +179,12 @@ let
         "--iclouddrive-service"
         mount.iCloudService
       ];
-      fsKitBackendArgs = lib.optionals pkgs.stdenv.isDarwin [
+      fsKitBackendArgs = lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
         "--option"
         "backend=fskit"
       ];
       mountVolumeLabel = if mount.name != null then mount.name else mount.id;
-      volumeNameArgs = lib.optionals pkgs.stdenv.isDarwin [
+      volumeNameArgs = lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
         "--volname"
         mountVolumeLabel
       ];
@@ -336,7 +336,7 @@ in
                   localPath = r.localPath;
                   name = if r.name != null then r.name else r.id;
                   isSpecialICloud =
-                    pkgs.stdenv.isDarwin
+                    pkgs.stdenv.hostPlatform.isDarwin
                     && r.provider == "iCloud"
                     && r.id == "iCloud"
                     && r.localPath == "clouds/iCloudReplica";
@@ -349,7 +349,7 @@ in
       # -----------------------------------------------------------------------
       # macOS: LaunchAgents for rclone-backed mounts
       # -----------------------------------------------------------------------
-      (lib.mkIf (pkgs.stdenv.isDarwin && declaredMountAgents != [ ]) {
+      (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && declaredMountAgents != [ ]) {
         launchd.agents = builtins.listToAttrs (
           map (mount: {
             name = "cloud-mount-${mount.id}";
@@ -381,7 +381,7 @@ in
       # -----------------------------------------------------------------------
       # NixOS: systemd user services for rclone-backed mounts
       # -----------------------------------------------------------------------
-      (lib.mkIf (pkgs.stdenv.isLinux && rcloneMounts != [ ]) {
+      (lib.mkIf (pkgs.stdenv.hostPlatform.isLinux && rcloneMounts != [ ]) {
         systemd.user.services = builtins.listToAttrs (
           map (mount: {
             name = "cloud-mount-${mount.id}";
@@ -446,7 +446,7 @@ in
       # -----------------------------------------------------------------------
       # macOS: LaunchAgents for per-replica scheduled replica-sync timers
       # -----------------------------------------------------------------------
-      (lib.mkIf (pkgs.stdenv.isDarwin && declaredScheduledSyncReplicas != [ ]) {
+      (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && declaredScheduledSyncReplicas != [ ]) {
         launchd.agents = builtins.listToAttrs (
           map (replica: {
             name = "cloud-replica-scheduled-sync-${replica.id}";
@@ -476,7 +476,7 @@ in
       # -----------------------------------------------------------------------
       # NixOS: systemd services/timers for per-replica scheduled replica-sync
       # -----------------------------------------------------------------------
-      (lib.mkIf (pkgs.stdenv.isLinux && scheduledSyncReplicas != [ ]) {
+      (lib.mkIf (pkgs.stdenv.hostPlatform.isLinux && scheduledSyncReplicas != [ ]) {
         systemd.user.services = builtins.listToAttrs (
           map (replica: {
             name = "cloud-replica-scheduled-sync-${replica.id}";

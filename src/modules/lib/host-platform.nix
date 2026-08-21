@@ -59,9 +59,9 @@ let
   hostFromStdenv =
     if pkgs == null then
       builtins.throw "host-platform.nix: hostFromStdenv requires pkgs"
-    else if pkgs.stdenv.isDarwin then
+    else if pkgs.stdenv.hostPlatform.isDarwin then
       "MacBook"
-    else if pkgs.stdenv.isLinux then
+    else if pkgs.stdenv.hostPlatform.isLinux then
       "NixOS"
     else
       builtins.throw "host-platform.nix: unsupported stdenv for hostFromStdenv";

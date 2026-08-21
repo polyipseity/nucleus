@@ -48,7 +48,7 @@ in
           AddKeysToAgent = "yes";
           IgnoreUnknown = "UseKeychain";
         }
-        // lib.optionalAttrs pkgs.stdenv.isDarwin { UseKeychain = "yes"; };
+        // lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin { UseKeychain = "yes"; };
       in
       {
         "*" = baseSshSettings;

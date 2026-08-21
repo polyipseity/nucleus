@@ -266,7 +266,7 @@ in
             config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/camillagui-backend/config-${configName}.yml";
         }
       )
-      (lib.optionalAttrs pkgs.stdenv.isDarwin {
+      (lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
         # Keep iCloud Drive reachable from a short, stable path for all managed
         # macOS users so scripts and shell workflows avoid long spaced paths.
         "iCloud".source =

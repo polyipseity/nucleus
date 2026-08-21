@@ -7,7 +7,7 @@
 }:
 lib.mkIf
   (
-    pkgs.stdenv.isDarwin
+    pkgs.stdenv.hostPlatform.isDarwin
     && options ? programs
     && options.programs ? gnupg
     && options.programs.gnupg ? agent

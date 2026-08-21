@@ -4,7 +4,8 @@
 # which user's Home Manager config imports this module.
 { nixpkgs, pkgs, ... }:
 let
-  appleSiliconDarwin = pkgs.stdenv.isDarwin && pkgs.stdenv.hostPlatform.system == "aarch64-darwin";
+  appleSiliconDarwin =
+    pkgs.stdenv.hostPlatform.isDarwin && pkgs.stdenv.hostPlatform.system == "aarch64-darwin";
 
   otermPkg =
     if appleSiliconDarwin then
