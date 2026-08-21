@@ -75,7 +75,7 @@ while true; do
     # --- Push config ---
     # Resolve playback device: patches empty device in config with system default.
     _resolved_config=$(camilladsp_resolve_playback_device "$config_file")
-    if _push_resp=$(printf '%s\n' "$_resolved_config" | jq -cRs '{SetConfig: .}' | websocat -1 "ws://127.0.0.1:$ws_port" 2>/dev/null); then
+    if _push_resp=$(jq -cRs '{SetConfig: .}' <<<"$_resolved_config" | websocat -1 "ws://127.0.0.1:$ws_port" 2>/dev/null); then
       if printf '%s' "$_push_resp" | jq -e '.SetConfig.result == "Ok"' >/dev/null 2>&1; then
         _success=true
       fi

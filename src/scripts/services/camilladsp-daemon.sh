@@ -68,8 +68,7 @@ if [ -f "$config_file" ]; then
   # Resolve playback device: patches empty device in config with system default.
   _resolved_config=$(camilladsp_resolve_playback_device "$config_file")
   for _i in $(seq 1 60); do
-    if printf '%s\n' "$_resolved_config" |
-      jq -cRs '{SetConfig: .}' |
+    if jq -cRs '{SetConfig: .}' <<<"$_resolved_config" |
       websocat -1 "ws://127.0.0.1:$ws_port" >/dev/null 2>&1; then
       break
     fi
