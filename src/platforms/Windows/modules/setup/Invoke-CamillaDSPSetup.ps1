@@ -107,6 +107,7 @@ function Invoke-CamillaDSPSetup {
     # check-suppress:config-method: method 1 (writable symlink) -- deploy user-level config to $HOME\.config
     # (cross-platform parity with POSIX ~/.config/camilladsp/configs/config.yml).
     # check-suppress:config-method: method 1 (writable symlink) -- camilladsp/configs/Windows/default.yml deployed alongside config.yml
+    # check-suppress:config-method: method 1 (writable symlink) -- camilladsp/configs/Windows/2-band automatic gain control (-14 LUFS).yml deployed alongside config.yml
     $configDir = Join-Path -Path $HOME -ChildPath ".config\camilladsp\configs"
     $configPath = Join-Path -Path $configDir -ChildPath "config.yml"
     $configSource = Join-Path -Path $repoRoot -ChildPath "src\modules\configs\camilladsp\configs\Windows\config.yml"
