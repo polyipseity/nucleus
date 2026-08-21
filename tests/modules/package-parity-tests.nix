@@ -202,6 +202,14 @@ let
       name = "zoom";
       nixpkgsAttr = "zoom-us";
     }
+    {
+      name = "obs-studio";
+      nixpkgsAttr = "obs-studio";
+    }
+    {
+      name = "jdk";
+      nixpkgsAttr = "jdk";
+    }
   ];
 
   # Darwin-only overlappingPackages entries (attrs exist on Linux nixpkgs but
@@ -260,9 +268,18 @@ let
   # crossPlatformOverlapAttrs (cross-platform) or darwinOnlyPackages (darwin-only).
   test_all_overlapping_packages_covered =
     let
-      # Extract all entry names from core.nix overlappingPackages block.
+      # Scope extraction to the overlappingPackages = { ... }; block so option
+      # declarations like `    default = { }` elsewhere in core.nix are not
+      # mistaken for package entries. Find the block by its unique opening marker
+      # and the first top-level `  };` that closes it.
+      marker = "overlappingPackages = {";
+      afterStart = lib.lists.drop 1 (lib.strings.splitString marker coreModuleText);
+      rest = builtins.head afterStart;
+      endMarker = "\n  };";
+      blockText = lib.lists.head (lib.strings.splitString endMarker rest);
+      # Extract all entry names from the scoped block.
       # Entries have the form: `    name = {` or `    "quoted name" = {`
-      parts = builtins.split "\n    \"?([a-zA-Z0-9@._-]+)\"? = \\{" coreModuleText;
+      parts = builtins.split "\n    \"?([a-zA-Z0-9@._-]+)\"? = \\{" blockText;
       isListElement = x: builtins.isList x;
       listElements = builtins.filter isListElement parts;
       extractedNames = map builtins.head listElements;

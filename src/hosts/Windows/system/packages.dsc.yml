@@ -641,3 +641,24 @@ properties:
       settings:
         id: Mozilla.sccache
         source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          OBS Studio (stable) — cross-platform parity with macOS (Homebrew cask obs)
+          and NixOS (nixpkgs obs-studio). Gated by the single-source overlap enable
+          flag; excluded at apply time unless overlappingPackages."obs-studio".enable
+          is true for Windows.
+      settings:
+        id: OBSProject.OBSStudio
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
+        description: >-
+          Eclipse Temurin JDK 25 (latest LTS) — cross-platform parity with macOS
+          (Homebrew cask openjdk@25) and NixOS (nixpkgs jdk floating LTS alias).
+          Enabled by default via the single-source overlap enable flag.
+      settings:
+        id: EclipseAdoptium.Temurin.25.JDK
+        source: winget
