@@ -53,11 +53,11 @@ let
     assert' (resolvedWindowsPackages == committedPackages)
       "winget-packages.json must equal the Nix-resolved Windows enable set: resolved=${builtins.toString resolvedWindowsPackages} committed=${builtins.toString committedPackages}";
 
-  # Cursor must be disabled on Windows (single source of truth: enable=false, no
-  # per-host override enables it).
+  # Cursor must be disabled on Windows (single source of truth: hosts map
+  # disables it on every host, no host enables it).
   test_cursor_disabled_on_windows = assert' (
     !builtins.elem "Anysphere.Cursor" resolvedWindowsPackages
-  ) "Cursor must be disabled on Windows (managedPackages.cursor.enable=false)";
+  ) "Cursor must be disabled on Windows (managedPackages.cursor.hosts disables it everywhere)";
 
   # OBS Studio (stable) and JDK 25 must be enabled on Windows.
   test_obs_enabled_on_windows = assert' (builtins.elem "OBSProject.OBSStudio" resolvedWindowsPackages) "OBS Studio (stable) must be enabled on Windows";

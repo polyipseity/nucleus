@@ -137,11 +137,15 @@ let
     };
     cursor = {
       # Single source of truth for Cursor enable/disable across all hosts.
-      # `enable` is the default for every host; `hosts` is the opt-in per-host
-      # override (precedence over `enable`). A host omitted from `hosts` falls
-      # back to `enable`, so new hosts can never silently diverge. Cursor stays
-      # disabled everywhere (no per-host override enables it).
-      enable = false;
+      # `hosts` is the per-host parity map; every host is explicitly disabled,
+      # so Cursor stays off everywhere (no host enables it). A host omitted from
+      # `hosts` would default to enabled, so all three are listed to prevent
+      # silent divergence on new hosts.
+      hosts = {
+        MacBook = false;
+        NixOS = false;
+        Windows = false;
+      };
       category = "gui";
       homebrew = {
         kind = "cask";
@@ -515,7 +519,6 @@ let
     "obs-studio" = {
       # Stable OBS Studio. Enabled on every platform (no beta channel exists in
       # nixpkgs, so stable is the uniform choice across macOS/NixOS/Windows).
-      enable = true;
       category = "gui";
       homebrew = {
         kind = "cask";
@@ -958,17 +961,22 @@ let
   managedPackageNames = builtins.attrNames managedPackages;
 
   # Resolve whether a managed package is enabled for a given host.
-  # Precedence: explicit per-host override (hosts.<host>) > global `enable` (default).
-  # Host-agnostic: takes hostName explicitly so the Windows-resolved set can be
-  # computed anywhere Nix runs (Windows itself does not run Nix).
+  # `hosts` is a per-host parity map; absent entries default to enabled, so new
+  # hosts can never silently diverge. Host-agnostic: takes hostName explicitly
+  # so the Windows-resolved set can be computed anywhere Nix runs (Windows itself
+  # does not run Nix).
   managedPackageEnabledForHost =
     hostName: packageName:
     let
       entry = managedPackages.${packageName};
-      global = entry.enable or true;
-      hostOverride = entry.hosts or { };
+      hostMap =
+        entry.hosts or {
+          MacBook = true;
+          NixOS = true;
+          Windows = true;
+        };
     in
-    if builtins.hasAttr hostName hostOverride then builtins.getAttr hostName hostOverride else global;
+    hostMap.${hostName} or true;
 
   # Current host (MacBook/NixOS set networking.hostName).
   currentHost = config.networking.hostName or "";
