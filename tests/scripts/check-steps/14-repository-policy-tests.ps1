@@ -137,4 +137,14 @@ if ($content -match 'NO_COLOR') {
   Assert-Fail -Name 'step14_ps1_logging_self_check' -Reason 'step 14 PS1 should self-check NO_COLOR handling in shared helpers'
 }
 
+# Args mode passes positional args (which may be non-file tokens like a step id)
+# straight to Select-String -Path; under Stop that throws on a missing path. The
+# dummy-key scan must filter to existing files first to match the .sh twin's grep
+# behavior (grep silently skips missing files).
+if ($content -match 'Test-Path -LiteralPath') {
+  Assert-Pass -Name 'step14_ps1_args_mode_skips_missing_paths' -Reason 'step 14 PS1 filters args-mode file lists to existing paths before Select-String'
+} else {
+  Assert-Fail -Name 'step14_ps1_args_mode_skips_missing_paths' -Reason 'step 14 PS1 should filter args-mode file lists to existing paths before Select-String'
+}
+
 if ($script:failed) { exit 1 } else { exit 0 }

@@ -108,7 +108,8 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
   $actViolations = @()
 
   if ($HasArgs) {
-    $actFiles = $PositionalArgs | Where-Object { $_ -like '*.sh' -or $_ -like '*.zsh' }
+    # WHY: if-expression output is pipeline-enumerated — an empty branch yields $null, crashing the .Count check below under StrictMode; the @() wrapper forces an array
+    $actFiles = @($PositionalArgs | Where-Object { $_ -like '*.sh' -or $_ -like '*.zsh' })
     if ($actFiles.Count -gt 0) {
       $actViolations += Select-String -Path $actFiles -Pattern $actPattern | ForEach-Object { "$($_.Path):$($_.LineNumber)" }
     }
@@ -465,12 +466,16 @@ Register-Step -Id "repository-policy" -Name "Repository policy" -Action {
       })
 
       if ($dummyFiles.Count -gt 0) {
-        $dummyMatches = Select-String -Path $dummyFiles -Pattern '\bsk-[A-Za-z0-9-]{4,}' -AllMatches -CaseSensitive
-        foreach ($m in $dummyMatches) {
-          foreach ($lit in @($m.Matches | ForEach-Object { $_.Value } | Select-Object -Unique)) {
-            if ($registeredDummyValues -cnotcontains $lit) {
-              Write-ErrorMessage "unregistered dummy API key literal '$lit' at $($m.Path):$($m.LineNumber) (register it in src/modules/dummy-keys.json or use a registered value)"
-              $dummyErrors++
+        # WHY: in args mode $PositionalArgs may carry non-file tokens (e.g. a step id like "repository-policy"); Select-String -Path throws on a missing path under Stop, whereas the .sh twin's grep silently skips them. Filter to existing files to match twin behavior.
+        $dummyExisting = @($dummyFiles | Where-Object { Test-Path -LiteralPath $_ })
+        if ($dummyExisting.Count -gt 0) {
+          $dummyMatches = Select-String -Path $dummyExisting -Pattern '\bsk-[A-Za-z0-9-]{4,}' -AllMatches -CaseSensitive
+          foreach ($m in $dummyMatches) {
+            foreach ($lit in @($m.Matches | ForEach-Object { $_.Value } | Select-Object -Unique)) {
+              if ($registeredDummyValues -cnotcontains $lit) {
+                Write-ErrorMessage "unregistered dummy API key literal '$lit' at $($m.Path):$($m.LineNumber) (register it in src/modules/dummy-keys.json or use a registered value)"
+                $dummyErrors++
+              }
             }
           }
         }
