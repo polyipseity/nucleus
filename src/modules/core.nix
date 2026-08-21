@@ -635,7 +635,13 @@ let
       winget = "Microsoft.PowerToys";
     };
     powersession = {
-      # WinGet-only (no nixpkgs attr); Windows installs via WinGet.
+      # WinGet-only: absent from nixpkgs (darwin+linux) and Homebrew. Windows
+      # installs via WinGet; disable nix/homebrew routing on the other hosts.
+      enable = {
+        MacBook = false;
+        NixOS = false;
+        Windows = true;
+      };
       category = "cli";
       homebrew = {
         kind = "formula";
