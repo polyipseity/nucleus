@@ -78,6 +78,7 @@ Default typing policy for all code.
   - **Kotlin**: `Any` → `is` smart cast (level 1/2); `as` with reason (level 3/4).
 
 - **No type-error suppression.** Do not use `# type: ignore`, `@ts-ignore`, `@ts-expect-error`, `@SuppressWarnings`, `// NOLINT`, or similar suppression mechanisms. When intentionally bypassing the type system (e.g., testing with deliberately wrong types), use an explicit checked cast or conversion that produces a correctly-typed value.
+- **No silent defaulting of missing values.** Do not substitute a default for a missing, failed, or errored value (`or ""`, `?? ""`, `|| ""`, `dict.get(k, "")`, `unwrap_or("")`, `except: pass`, swallowing `try/except`, `-ErrorAction SilentlyContinue` without a stated reason, `2>$null` without an annotation). Surface the failure or return the error so the caller decides. This is a value-masking fallback and is banned by the no-fallbacks rule in `core-behavior.instructions.md`.
 - **No non-null assertions.** Do not use operators that assert non-null without runtime checking. These bypass strict null checks at the type level, making null-pointer errors possible at runtime. Instead, use proper type narrowing, early returns, or optional chaining to handle nullable values explicitly. Affected operators per language:
   - TypeScript: postfix `!`
   - Kotlin: `!!`

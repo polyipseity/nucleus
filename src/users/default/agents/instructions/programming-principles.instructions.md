@@ -22,7 +22,7 @@ Highest priority. Directly counters over-engineering, prevents hallucinated scop
 Enforces clean error propagation, eliminates resource leaks, and keeps codebase edits self-correcting and incrementally clean.
 
 - **Boy Scout Rule:** Leave code cleaner than you found it. When modifying a file, fix minor readability issues (cryptic variable names, missing types, dead comments) without exceeding the task scope.
-- **Fail fast and defensive boundaries:** Detect invalid arguments, broken preconditions, or null states immediately at routine entry points. Abort execution or return an error — do not propagate garbage data hoping a downstream handler catches it.
+- **Fail fast and defensive boundaries:** Detect invalid arguments, broken preconditions, or null states immediately at routine entry points. Abort execution or return an error — do not propagate garbage data hoping a downstream handler catches it. Never substitute a default value for a missing or failed result; surface the error instead.
 - **RAII and explicit ownership:** Bind resource lifecycles (file handles, sockets, locks, allocated memory) strictly to object lifetimes with deterministic cleanup on scope exit. Prefer borrowing or references for read-only access over copying. Let the standard library manage low-level resource ownership.
 - **Railway-oriented programming:** Model operations with sequential failable steps using monadic error pipelines (Result/Either) instead of scattered try/catch blocks or defensive if/else checks deep in business logic. This makes error paths explicit and composable.
 - **Shotgun parsing avoidance:** Complete all validation and decoding at the entry point. Internal domain functions must accept pre-validated, strongly-typed inputs — no piecemeal parsing scattered across the call chain.
@@ -51,6 +51,6 @@ Crucial when writing network services, concurrent code, or running automated tes
 
 - `authoring.instructions.md` — Markdown authoring conventions, document structure, and formatting rules.
 - `core-behavior.instructions.md` — Agent operational model (communication, subagent delegation, terminal hygiene, git rules, premise integrity).
-- `execution-details.instructions.md` — Tool recovery, multi-edit fallback, and investigation protocol.
+- `execution-details.instructions.md` — Tool recovery, multi-edit recovery, and investigation protocol.
 - `maintain.instructions.md` — Codebase maintainability workflow (atomic commits, safety rules, broad cleanup patterns).
 - `typing-conventions.instructions.md` — Language-specific type-level conventions (immutability per language, abstract over concrete, no catch-all types, structural typing).
