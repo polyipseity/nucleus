@@ -1204,7 +1204,7 @@ in
 
     {
       assertions = map (packageName: {
-        assertion = false;
+        assertion = missingNixPackageAttrs == [ ];
         message = "core.nix: package '${packageName}' routes to nixpkgs but pkgs.${
           managedPackages.${packageName}.nixpkgs
         } is unavailable on this platform.";
