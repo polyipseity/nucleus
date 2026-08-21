@@ -342,6 +342,7 @@ __marimo__/
 # self {
 !/src/modules/env/
 !/src/modules/lib/
+!/src/platforms/Windows/modules/lib/
 !/src/scripts/lib/
 !/src/users/*/direnv/lib/
 
