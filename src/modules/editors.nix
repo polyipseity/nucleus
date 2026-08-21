@@ -309,10 +309,10 @@ in
   };
 
   programs.cursor =
-    lib.mkIf (!isDarwin && (config.nucleus.overlapEnabled.cursor or false) && pkgs ? code-cursor)
+    lib.mkIf (!isDarwin && (config.nucleus.packages.enabled.cursor or false) && pkgs ? code-cursor)
       {
-        # Single source of truth: gated by the resolved overlap enable state
-        # (overlappingPackages.cursor, honoring hosts.NixOS or falling back to enable).
+        # Single source of truth: gated by the resolved enable state
+        # (managedPackages.cursor, honoring hosts.NixOS or falling back to enable).
         # Agent config is bridged separately via cursor.nix (symlink-cursor-config).
         enable = true;
         package = pkgs.code-cursor;

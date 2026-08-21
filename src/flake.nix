@@ -1042,8 +1042,8 @@
 
       # -----------------------------------------------------------------------
       # winget-packages — Nix-generated list of WinGet package IDs that are
-      # enabled for the Windows host, derived from the shared overlap registry
-      # (overlappingPackages in core.nix). Committed as
+      # enabled for the Windows host, derived from the shared package registry
+      # (managedPackages in core.nix). Committed as
       # src/hosts/Windows/system/winget-packages.json and consumed by apply.ps1
       # to filter packages.dsc.yml (Windows does not run Nix).
       # -----------------------------------------------------------------------
@@ -1055,7 +1055,7 @@
               ./modules/core.nix
               {
                 # core.nix reads this for macOS backend selection; harmless here.
-                nucleus.macos.packageSelection.overlapBackend = "policy";
+                nucleus.packages.selection.backend = "policy";
               }
               # core.nix sets `assertions`; that option is normally provided by
               # NixOS/nix-darwin, so declare a stub for this standalone eval.
@@ -1083,7 +1083,7 @@
         in
         (import ./modules/lib/json.nix { lib = nixpkgs.lib; }).toSortedJSON {
           "$schema" = "./winget-packages.schema.json";
-          packages = evaluated.config.nucleus.windows.generatedWinget.packages;
+          packages = evaluated.config.nucleus.windows.wingetPackages.packages;
         }
       );
 

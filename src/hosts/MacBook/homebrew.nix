@@ -18,8 +18,8 @@
 }:
 let
   # Package overlap decisions are centralized in modules/core.nix.
-  coreManagedBrews = config.nucleus.macos.generatedHomebrew.brews;
-  coreManagedCasks = config.nucleus.macos.generatedHomebrew.casks;
+  coreManagedBrews = config.nucleus.macos.homebrew.brews;
+  coreManagedCasks = config.nucleus.macos.homebrew.casks;
 
   # CLI formulae managed via Homebrew.
   # These are tools unavailable in nixpkgs or where the Homebrew build is
