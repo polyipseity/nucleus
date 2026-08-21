@@ -134,7 +134,6 @@ let
         kind = "cask";
         name = "chrome-remote-desktop-host";
       };
-      nixpkgs = "chrome-remote-desktop";
       winget = "Google.ChromeRemoteDesktopHost";
     };
     czkawka = {
@@ -219,12 +218,10 @@ let
     "equaliser" = {
       category = "cli";
       platforms = [ "darwin" ];
-      nixpkgs = "equaliser";
     };
     "equalizer-apo" = {
       # WinGet-only: no Homebrew cask exists and no nixpkgs attr; Windows installs via WinGet.
       category = "gui";
-      nixpkgs = "equalizer-apo";
       winget = "EqualizerAPO.EqualizerAPO";
     };
     ffmpeg = {
@@ -396,7 +393,6 @@ let
     krokiet = {
       # WinGet-only: no Homebrew cask exists and no nixpkgs attr; Windows installs via WinGet.
       category = "gui";
-      nixpkgs = "krokiet";
       winget = "qarmin.krokiet";
     };
     libreoffice = {
@@ -575,7 +571,6 @@ let
         kind = "cask";
         name = "parsec";
       };
-      nixpkgs = "parsec";
       winget = "Parsec.Parsec";
     };
     "pay-respects" = {
@@ -585,7 +580,6 @@ let
     "peace-equalizer-apo" = {
       # WinGet-only: no Homebrew cask exists and no nixpkgs attr; Windows installs via WinGet.
       category = "gui";
-      nixpkgs = "peace-equalizer-apo";
       winget = "PeterVerbeek.PeaceEqualizerAPO";
     };
     "pi-coding-agent" = {
@@ -622,7 +616,6 @@ let
         kind = "cask";
         name = "powertoys";
       };
-      nixpkgs = "powertoys";
       winget = "Microsoft.PowerToys";
     };
     powersession = {
@@ -638,7 +631,6 @@ let
         kind = "formula";
         name = "powersession";
       };
-      nixpkgs = "powersession";
       winget = "Watfaq.PowerSession";
     };
     prek = {
@@ -804,7 +796,6 @@ let
         kind = "formula";
         name = "scoop";
       };
-      nixpkgs = "scoop";
       winget = "Scoop.Scoop";
     };
     taplo = {
@@ -888,7 +879,6 @@ let
         kind = "cask";
         name = "visual-studio-code@insiders";
       };
-      nixpkgs = "vscode-insiders";
       winget = "Microsoft.VisualStudioCode.Insiders";
     };
     "whatsapp-beta" = {
@@ -901,7 +891,6 @@ let
         kind = "cask";
         name = "whatsapp@beta";
       };
-      nixpkgs = "whatsapp";
       winget = "9NBDXK71NK08";
     };
     winfsp = {
@@ -911,7 +900,6 @@ let
         kind = "formula";
         name = "winfsp";
       };
-      nixpkgs = "winfsp";
       winget = "WinFsp.WinFsp";
     };
     "windows-terminal-preview" = {
@@ -921,7 +909,6 @@ let
         kind = "cask";
         name = "windows-terminal-preview";
       };
-      nixpkgs = "windows-terminal-preview";
       winget = "Microsoft.WindowsTerminal.Preview";
     };
     yamllint = {
