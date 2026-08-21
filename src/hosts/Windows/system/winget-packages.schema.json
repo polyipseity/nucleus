@@ -17,5 +17,7 @@
       "uniqueItems": true
     }
   },
-  "required": ["packages"]
+  "required": [
+    "packages"
+  ]
 }
