@@ -32,7 +32,7 @@ Comment-based help (`<# … #>`) is the formal documentation mechanism for Power
 - **Script-level help**: every `.ps1` script that is invoked as an entry point must open with a `<# .SYNOPSIS … .DESCRIPTION … .PARAMETER … .EXAMPLE … #>` block placed directly before the `[CmdletBinding()]` or `param(…)` declaration.
 - **Function-level help**: every `function Verb-Noun { … }` must have its own `<# .SYNOPSIS … .DESCRIPTION … .PARAMETER … .OUTPUTS … .EXAMPLE … #>` block. Required sections: `.SYNOPSIS`, `.DESCRIPTION`, `.PARAMETER` (one per parameter), `.EXAMPLE`. Add `.OUTPUTS` whenever the function returns a value.
 - **Inline logic comments**: non-trivial logic blocks, exit-code checks, and PowerShell idioms that are not immediately obvious must have an inline `#` comment explaining what the block does and, where relevant, why this approach was chosen over alternatives.
-- **Document the WHY**: record the rationale behind security-sensitive patterns (e.g. "env var cleared in `finally` so it is never left in the environment on failure") and any non-obvious fallback behaviour or error handling choices.
+- **Document the WHY**: record the rationale behind security-sensitive patterns (e.g. "env var cleared in `finally` so it is never left in the environment on failure") and any non-obvious error-handling or recovery behaviour.
 
 ## WinGet DSC YAML (`src/hosts/Windows/**/*.yml`)
 

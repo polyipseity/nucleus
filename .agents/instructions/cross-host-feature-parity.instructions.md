@@ -52,7 +52,7 @@ When a config file's application has a native extension-point mechanism that aut
 - **Windows reusable imperative logic**: keep in `src/platforms/Windows/modules/*.ps1`; keep `src/hosts/Windows/apply.ps1` orchestration-only.
 - If a Windows parity feature cannot be represented declaratively, implement it in a reusable module with an explicit cleanup/deconfiguration path so the feature can be safely disabled later.
 
-## Imperative fallback safety (Windows)
+## Imperative recovery safety (Windows)
 
 If a parity feature requires imperative Windows code, enforce all of the following in both configuration and deconfiguration paths:
 

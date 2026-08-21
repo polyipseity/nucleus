@@ -211,9 +211,9 @@ if (-not (Test-Path $cbBin)) {
 
 After Scoop installs cargo-binstall, `src/platforms/Windows/modules/Invoke-CargoBinstallSetup.ps1` manages Rust CLI tools that have no WinGet or Scoop equivalent (e.g. `cargo-cache`, `pay-respects`). It maintains a desired-state list and a manifest at `~\.config\nucleus\cargo-binstall-packages.json`; on each apply it installs additions via `cargo binstall --no-confirm` and removes deletions via `cargo uninstall`.
 
-## Imperative fallback safety (Windows modules)
+## Imperative recovery safety (Windows modules)
 
-See [Imperative fallback safety (Windows)](cross-host-feature-parity.instructions.md#imperative-fallback-safety-windows) for the full policy.
+See [Imperative recovery safety (Windows)](cross-host-feature-parity.instructions.md#imperative-recovery-safety-windows) for the full policy.
 
 ## Validation
 
