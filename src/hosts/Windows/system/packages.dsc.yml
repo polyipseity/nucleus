@@ -647,7 +647,7 @@ properties:
         description: >-
           OBS Studio (stable) — cross-platform parity with macOS (Homebrew cask obs)
           and NixOS (nixpkgs obs-studio). Gated by the single-source overlap enable
-          flag; excluded at apply time unless overlappingPackages."obs-studio".enable
+          flag; excluded at apply time unless managedPackages."obs-studio".enable
           is true for Windows.
       settings:
         id: OBSProject.OBSStudio

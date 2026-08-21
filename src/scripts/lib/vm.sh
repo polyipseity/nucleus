@@ -3670,7 +3670,7 @@ vm_build_windows() {
   fi
 
   if ! command -v packer >/dev/null 2>&1; then
-    error "packer not found; install via nixpkgs (pkgs.packer is in baseSharedPackages)"
+    error "packer not found; install via nixpkgs (pkgs.packer is in managedPackages)"
     return 1
   fi
 

@@ -59,7 +59,7 @@ function Invoke-CargoBinstallSetup {
     # by the tweag.vscode-nickel VS Code extension for Nickel file editing.
     # nls is not available in WinGet or Scoop; cargo-binstall downloads nls.exe
     # from the nickel-lang GitHub release assets.
-    # Cross-platform parity: pkgs.nls in baseSharedPackages on POSIX.
+    # Cross-platform parity: pkgs.nls in managedPackages on POSIX.
     [pscustomobject]@{ CrateName = 'nickel-lang-lsp'; BinaryName = 'nls' }
     # nix-index is managed on POSIX hosts (pkgs.nix-index in core.nix plus
     # a LaunchAgent/systemd timer for periodic DB builds) but has no Windows

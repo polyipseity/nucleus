@@ -77,9 +77,9 @@ On POSIX, `pkgs.rust-bin.fromRustupToolchainFile` (rust-overlay) assembles a Nix
 - **Rust tools**: Prefer devShell for development, `cargo-binstall` for prebuilt binaries, `cargo install` as fallback. Installs to `~/.cargo/bin`.
 - **JavaScript tools**: Only `bun install -g` for globally callable JS CLI tools (not dev dependencies). Managed via `src/modules/agents.nix` (POSIX) or `src/platforms/Windows/modules/setup/Invoke-BunSetup.ps1` (Windows). Never `npm install -g`.
 
-## Overlapping package classification
+## Managed package classification
 
-Packages available in both nixpkgs and Homebrew use a `category` field in `src/modules/core.nix`'s `overlappingPackages` to decide the install backend. This mechanism works cross-platform:
+Every cross-platform package is declared exactly once in `src/modules/core.nix`'s `managedPackages` registry with full cross-platform metadata (nixpkgs attr, Homebrew, WinGet). A `category` field decides the install backend. This mechanism works cross-platform:
 
 - **macOS**: routes to either nixpkgs or Homebrew based on `category` and backend policy.
 - **NixOS**: all platform-compatible packages go through nixpkgs unconditionally.
@@ -93,7 +93,7 @@ If a package ships any GUI component (graphical binary, UI frontend, background 
 
 ### Platform restrictions
 
-Packages that only exist on a specific platform must declare a `platforms` field in their `overlappingPackages` entry:
+Packages that only exist on a specific platform must declare a `platforms` field in their `managedPackages` entry:
 
 ```nix
 iterm2 = {
@@ -108,9 +108,9 @@ Known darwin-only packages: `iterm2`, `rectangle`, `stats`, `utm`.
 
 For packages that exist in Homebrew but not in nixpkgs, use `missingNixAttrs` in `core.nix` to keep them declared in the same central location.
 
-### Adding a new overlapping package
+### Adding a new managed package
 
-1. Add an entry to `overlappingPackages` in `src/modules/core.nix`, alphabetically sorted.
+1. Add an entry to `managedPackages` in `src/modules/core.nix`, alphabetically sorted.
 2. If the package only exists on macOS, add `platforms = ["darwin"]`.
 3. Choose the appropriate `category`.
 4. Remove any duplicate declaration from `src/hosts/NixOS/desktop.nix` if needed.

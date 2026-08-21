@@ -13,7 +13,7 @@
 #
 # Prerequisites:
 #   - tart CLI installed (brew install cirruslabs/cli/tart)
-#   - packer installed (pkgs.packer in baseSharedPackages)
+#   - packer installed (pkgs.packer in managedPackages)
 #   - Apple Silicon Mac (Tart requires Virtualization.framework)
 #
 # The resulting VM is stored in ~/virtual machines/tart/vms/<vm_id>/

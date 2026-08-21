@@ -81,7 +81,7 @@ in
       # pass: Unix password manager (compatible with gopass on Windows).
       # qtpass: Qt GUI frontend for pass/gopass.
       # Blender, Krita, LibreOffice, Picard, and Zoom are provided via
-      # sharedPackages from modules/core.nix (overlappingPackages) — listed
+      # sharedPackages from modules/core.nix (managedPackages) — listed
       # here for context only; they come from core.nix environment.systemPackages.
       easyeffects # graphical PipeWire audio processing GUI
       gimp

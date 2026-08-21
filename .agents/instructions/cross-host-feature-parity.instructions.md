@@ -204,7 +204,7 @@ All hosts use the OS-native SSH agent and server, with no custom service definit
 
 - When adding a cross-host CLI tool to `src/modules/core.nix`, check whether a Windows equivalent should be added to `src/hosts/Windows/system-packages.dsc.yml`.
 - When adding a Windows CLI package to `system-packages.dsc.yml`, check whether POSIX hosts should also receive it through `core.nix`.
-- When adding a package that exists in both nixpkgs and Homebrew, add it to `overlappingPackages` in `src/modules/core.nix` (not spread across host files). See `package-installation-scope.instructions.md` (Overlapping package classification) for category, platform, and add-workflow rules.
+- When adding a package that exists in both nixpkgs and Homebrew, add it to `managedPackages` in `src/modules/core.nix` (not spread across host files). See `package-installation-scope.instructions.md` (Managed package classification) for category, platform, and add-workflow rules.
 - Remove duplicate declarations from `src/hosts/NixOS/desktop.nix` when a package is already delivered via `core.nix`'s `sharedPackages`.
 - Windows source builds use git hash pinning. When a tool must be compiled from source on Windows, pin by git commit hash, not a tag or branch. Document the build steps in a reusable `Build-<Tool>.ps1` module under `src/platforms/Windows/modules/` and wire it into the activation DAG in `apply.ps1`.
 

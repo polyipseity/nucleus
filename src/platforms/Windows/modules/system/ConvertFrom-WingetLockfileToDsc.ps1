@@ -24,7 +24,7 @@
   Optional hashset of WinGet package IDs that are enabled. When provided, any
   Microsoft.WinGet.Client/Package resource whose settings.id is NOT in this set
   is dropped from the output. This enforces the single-source overlap enable
-  flag (overlappingPackages in core.nix) on Windows, which does not run Nix.
+  flag (managedPackages in core.nix) on Windows, which does not run Nix.
   When omitted, all resources are emitted (no filtering).
 
 .EXAMPLE

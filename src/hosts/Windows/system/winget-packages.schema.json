@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft-07/schema#",
-  "description": "Nix-generated list of WinGet package IDs enabled for the Windows host, derived from the shared overlap registry (overlappingPackages in core.nix). Consumed by apply.ps1 to filter packages.dsc.yml (Windows does not run Nix).",
+  "description": "Nix-generated list of WinGet package IDs enabled for the Windows host, derived from the shared overlap registry (managedPackages in core.nix). Consumed by apply.ps1 to filter packages.dsc.yml (Windows does not run Nix).",
   "type": "object",
   "additionalProperties": false,
   "properties": {
