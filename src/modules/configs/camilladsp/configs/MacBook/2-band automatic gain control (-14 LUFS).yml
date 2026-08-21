@@ -200,7 +200,7 @@ processors:
     description: null
     parameters:
       attack: 0.05
-      attenuation: 20
+      attenuation: 10
       channels: 4
       monitor_channels:
         - 0
@@ -208,8 +208,8 @@ processors:
       process_channels:
         - 0
         - 1
-      release: 1.5
-      threshold: -50
+      release: 2.5
+      threshold: -54
     type: NoiseGate
   master limiter:
     description: null
@@ -251,7 +251,7 @@ processors:
     description: null
     parameters:
       attack: 0.02
-      attenuation: 24
+      attenuation: 15
       channels: 4
       monitor_channels:
         - 2
@@ -259,7 +259,7 @@ processors:
       process_channels:
         - 2
         - 3
-      release: 1.5
-      threshold: -52
+      release: 2.5
+      threshold: -56
     type: NoiseGate
 title: 2-band automatic gain control (-14 LUFS)
