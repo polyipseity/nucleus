@@ -25,7 +25,7 @@ let
         kind = "formula";
         name = "p7zip";
       };
-      nixpkgsAttr = "p7zip";
+      nixpkgs = "p7zip";
       winget = {
         id = "7zip.7zip";
       };
@@ -36,7 +36,7 @@ let
         kind = "formula";
         name = "actionlint";
       };
-      nixpkgsAttr = "actionlint";
+      nixpkgs = "actionlint";
       winget = {
         id = "rhysd.actionlint";
       };
@@ -47,14 +47,14 @@ let
         kind = "formula";
         name = "android-platform-tools";
       };
-      nixpkgsAttr = "android-tools";
+      nixpkgs = "android-tools";
       winget = {
         id = "Google.PlatformTools";
       };
     };
     asciinema = {
       category = "cli";
-      nixpkgsAttr = "asciinema";
+      nixpkgs = "asciinema";
     };
     bat = {
       category = "cli";
@@ -62,7 +62,7 @@ let
         kind = "formula";
         name = "bat";
       };
-      nixpkgsAttr = "bat";
+      nixpkgs = "bat";
       winget = {
         id = "sharkdp.bat";
       };
@@ -73,7 +73,7 @@ let
         kind = "cask";
         name = "blender";
       };
-      nixpkgsAttr = "blender";
+      nixpkgs = "blender";
       winget = {
         id = "BlenderFoundation.Blender";
       };
@@ -84,7 +84,7 @@ let
         kind = "formula";
         name = "bottom";
       };
-      nixpkgsAttr = "bottom";
+      nixpkgs = "bottom";
       winget = {
         id = "Clement.bottom";
       };
@@ -95,7 +95,7 @@ let
         kind = "formula";
         name = "bun";
       };
-      nixpkgsAttr = "bun";
+      nixpkgs = "bun";
       winget = {
         id = "Oven-sh.Bun";
       };
@@ -106,30 +106,30 @@ let
         kind = "formula";
         name = "caddy";
       };
-      nixpkgsAttr = "caddy";
+      nixpkgs = "caddy";
       winget = {
         id = "CaddyServer.Caddy";
       };
     };
     camilladsp = {
       category = "cli";
-      nixpkgsAttr = "camilladsp";
+      nixpkgs = "camilladsp";
     };
     "cargo-binstall" = {
       category = "cli";
-      nixpkgsAttr = "cargo-binstall";
+      nixpkgs = "cargo-binstall";
     };
     "cargo-cache" = {
       category = "cli";
-      nixpkgsAttr = "cargo-cache";
+      nixpkgs = "cargo-cache";
     };
     "cargo-nextest" = {
       category = "cli";
-      nixpkgsAttr = "cargo-nextest";
+      nixpkgs = "cargo-nextest";
     };
     "check-jsonschema" = {
       category = "cli";
-      nixpkgsAttr = "check-jsonschema";
+      nixpkgs = "check-jsonschema";
     };
     "chrome-remote-desktop" = {
       # macOS cask chrome-remote-desktop-host is in MacBook/homebrew.nix; the
@@ -139,7 +139,7 @@ let
         kind = "cask";
         name = "chrome-remote-desktop-host";
       };
-      nixpkgsAttr = "chrome-remote-desktop";
+      nixpkgs = "chrome-remote-desktop";
       winget = {
         id = "Google.ChromeRemoteDesktopHost";
       };
@@ -150,7 +150,7 @@ let
         kind = "brew";
         name = "czkawka";
       };
-      nixpkgsAttr = "czkawka";
+      nixpkgs = "czkawka";
       winget = {
         id = "qarmin.czkawka.cli";
       };
@@ -168,19 +168,19 @@ let
         name = "cursor";
       };
       # WHY: code-cursor is Linux-only (AppImage repack); macOS uses the Homebrew cask.
-      nixpkgsAttr = "code-cursor";
+      nixpkgs = "code-cursor";
       winget = {
         id = "Anysphere.Cursor";
       };
     };
     deadnix = {
       category = "cli";
-      nixpkgsAttr = "deadnix";
+      nixpkgs = "deadnix";
     };
     desktoppr = {
       category = "cli";
       platforms = [ "darwin" ];
-      nixpkgsAttr = "desktoppr";
+      nixpkgs = "desktoppr";
     };
     "discord@canary" = {
       category = "gui";
@@ -188,7 +188,7 @@ let
         kind = "cask";
         name = "discord@canary";
       };
-      nixpkgsAttr = "discord-canary";
+      nixpkgs = "discord-canary";
       winget = {
         id = "Discord.Discord.Canary";
       };
@@ -199,7 +199,7 @@ let
         kind = "formula";
         name = "direnv";
       };
-      nixpkgsAttr = "direnv";
+      nixpkgs = "direnv";
       winget = {
         id = "direnv.direnv";
       };
@@ -210,7 +210,7 @@ let
         kind = "formula";
         name = "dotnet";
       };
-      nixpkgsAttr = "dotnetCorePackages.runtime_6_0";
+      nixpkgs = "dotnetCorePackages.runtime_6_0";
       winget = {
         id = "Microsoft.DotNet.Runtime.6";
       };
@@ -218,7 +218,7 @@ let
     duti = {
       category = "cli";
       platforms = [ "darwin" ];
-      nixpkgsAttr = "duti";
+      nixpkgs = "duti";
     };
     eza = {
       category = "cli";
@@ -226,7 +226,7 @@ let
         kind = "formula";
         name = "eza";
       };
-      nixpkgsAttr = "eza";
+      nixpkgs = "eza";
       winget = {
         id = "eza-community.eza";
       };
@@ -234,7 +234,7 @@ let
     "equaliser" = {
       category = "cli";
       platforms = [ "darwin" ];
-      nixpkgsAttr = "equaliser";
+      nixpkgs = "equaliser";
     };
     "equalizer-apo" = {
       # WinGet-only (no nixpkgs attr); Windows installs via WinGet.
@@ -243,7 +243,7 @@ let
         kind = "cask";
         name = "equalizer-apo";
       };
-      nixpkgsAttr = "equalizer-apo";
+      nixpkgs = "equalizer-apo";
       winget = {
         id = "EqualizerAPO.EqualizerAPO";
       };
@@ -254,7 +254,7 @@ let
         kind = "formula";
         name = "ffmpeg";
       };
-      nixpkgsAttr = "ffmpeg-full";
+      nixpkgs = "ffmpeg-full";
       winget = {
         id = "Gyan.FFmpeg";
       };
@@ -265,7 +265,7 @@ let
         kind = "formula";
         name = "fd";
       };
-      nixpkgsAttr = "fd";
+      nixpkgs = "fd";
       winget = {
         id = "sharkdp.fd";
       };
@@ -276,7 +276,7 @@ let
         kind = "formula";
         name = "fzf";
       };
-      nixpkgsAttr = "fzf";
+      nixpkgs = "fzf";
       winget = {
         id = "junegunn.fzf";
       };
@@ -287,7 +287,7 @@ let
         kind = "formula";
         name = "gh";
       };
-      nixpkgsAttr = "gh";
+      nixpkgs = "gh";
       winget = {
         id = "GitHub.cli";
       };
@@ -298,7 +298,7 @@ let
         kind = "cask";
         name = "gimp";
       };
-      nixpkgsAttr = "gimp";
+      nixpkgs = "gimp";
       winget = {
         id = "GIMP.GIMP";
       };
@@ -309,7 +309,7 @@ let
         kind = "formula";
         name = "git";
       };
-      nixpkgsAttr = "gitFull";
+      nixpkgs = "gitFull";
       winget = {
         id = "Git.Git";
       };
@@ -320,7 +320,7 @@ let
         kind = "formula";
         name = "gnupg";
       };
-      nixpkgsAttr = "gnupg";
+      nixpkgs = "gnupg";
       winget = {
         id = "GnuPG.Gpg4win";
       };
@@ -331,7 +331,7 @@ let
         kind = "cask";
         name = "google-chrome";
       };
-      nixpkgsAttr = "google-chrome";
+      nixpkgs = "google-chrome";
       winget = {
         id = "Google.Chrome";
       };
@@ -344,7 +344,7 @@ let
         kind = "cask";
         name = "google-chrome@canary";
       };
-      nixpkgsAttr = "google-chrome";
+      nixpkgs = "google-chrome";
       winget = {
         id = "Google.Chrome.Canary";
       };
@@ -355,7 +355,7 @@ let
         kind = "formula";
         name = "ghostscript";
       };
-      nixpkgsAttr = "ghostscript";
+      nixpkgs = "ghostscript";
       winget = {
         id = "ArtifexSoftware.GhostScript";
       };
@@ -366,7 +366,7 @@ let
         kind = "formula";
         name = "imagemagick";
       };
-      nixpkgsAttr = "imagemagick";
+      nixpkgs = "imagemagick";
       winget = {
         id = "ImageMagick.ImageMagick";
       };
@@ -377,7 +377,7 @@ let
         kind = "cask";
         name = "font-inter";
       };
-      nixpkgsAttr = "inter";
+      nixpkgs = "inter";
       winget = {
         id = "Inter.Inter";
       };
@@ -389,7 +389,7 @@ let
         kind = "cask";
         name = "iterm2";
       };
-      nixpkgsAttr = "iterm2";
+      nixpkgs = "iterm2";
     };
     jdk = {
       category = "cli";
@@ -397,7 +397,7 @@ let
         kind = "formula";
         name = "openjdk@25";
       };
-      nixpkgsAttr = "jdk";
+      nixpkgs = "jdk";
       winget = {
         id = "EclipseAdoptium.Temurin.25.JDK";
       };
@@ -408,7 +408,7 @@ let
         kind = "formula";
         name = "jellyfin";
       };
-      nixpkgsAttr = "jellyfin";
+      nixpkgs = "jellyfin";
       winget = {
         id = "Jellyfin.Server";
       };
@@ -419,7 +419,7 @@ let
         kind = "cask";
         name = "font-jetbrains-mono-nerd-font";
       };
-      nixpkgsAttr = "nerd-fonts.jetbrains-mono";
+      nixpkgs = "nerd-fonts.jetbrains-mono";
       winget = {
         id = "DEVCOM.JetBrainsMonoNerdFont";
       };
@@ -430,7 +430,7 @@ let
         kind = "formula";
         name = "jq";
       };
-      nixpkgsAttr = "jq";
+      nixpkgs = "jq";
       winget = {
         id = "jqlang.jq";
       };
@@ -441,7 +441,7 @@ let
         kind = "cask";
         name = "krita";
       };
-      nixpkgsAttr = "krita";
+      nixpkgs = "krita";
       winget = {
         id = "KDE.Krita";
       };
@@ -453,7 +453,7 @@ let
         kind = "cask";
         name = "krokiet";
       };
-      nixpkgsAttr = "krokiet";
+      nixpkgs = "krokiet";
       winget = {
         id = "qarmin.krokiet";
       };
@@ -464,14 +464,14 @@ let
         kind = "cask";
         name = "libreoffice";
       };
-      nixpkgsAttr = "libreoffice";
+      nixpkgs = "libreoffice";
       winget = {
         id = "TheDocumentFoundation.LibreOffice";
       };
     };
     litellm = {
       category = "cli";
-      nixpkgsAttr = "litellm";
+      nixpkgs = "litellm";
     };
     llvm = {
       # Distinct from the llvmPackages.* clang/lldb/lld entries (separate base
@@ -481,26 +481,26 @@ let
         kind = "formula";
         name = "llvm";
       };
-      nixpkgsAttr = "llvmPackages_latest.llvm";
+      nixpkgs = "llvmPackages_latest.llvm";
       winget = {
         id = "LLVM.LLVM";
       };
     };
     "llvm-clang" = {
       category = "cli";
-      nixpkgsAttr = "llvmPackages.clang";
+      nixpkgs = "llvmPackages.clang";
     };
     "llvm-lld" = {
       category = "cli";
-      nixpkgsAttr = "llvmPackages.lld";
+      nixpkgs = "llvmPackages.lld";
     };
     "llvm-lldb" = {
       category = "cli";
-      nixpkgsAttr = "llvmPackages.lldb";
+      nixpkgs = "llvmPackages.lldb";
     };
     mold = {
       category = "cli";
-      nixpkgsAttr = "mold";
+      nixpkgs = "mold";
     };
     "musicbrainz-picard" = {
       category = "gui";
@@ -508,14 +508,14 @@ let
         kind = "cask";
         name = "musicbrainz-picard";
       };
-      nixpkgsAttr = "picard";
+      nixpkgs = "picard";
       winget = {
         id = "MusicBrainz.Picard";
       };
     };
     ncdu = {
       category = "cli";
-      nixpkgsAttr = "ncdu";
+      nixpkgs = "ncdu";
     };
     neovim = {
       category = "cli";
@@ -523,34 +523,34 @@ let
         kind = "formula";
         name = "neovim";
       };
-      nixpkgsAttr = "neovim";
+      nixpkgs = "neovim";
       winget = {
         id = "Neovim.Neovim";
       };
     };
     nickel = {
       category = "cli";
-      nixpkgsAttr = "nickel";
+      nixpkgs = "nickel";
     };
     nixd = {
       category = "cli";
-      nixpkgsAttr = "nixd";
+      nixpkgs = "nixd";
     };
     nixf = {
       category = "cli";
-      nixpkgsAttr = "nixf";
+      nixpkgs = "nixf";
     };
     nixfmt = {
       category = "cli";
-      nixpkgsAttr = "nixfmt";
+      nixpkgs = "nixfmt";
     };
     "nix-index" = {
       category = "cli";
-      nixpkgsAttr = "nix-index";
+      nixpkgs = "nix-index";
     };
     nls = {
       category = "cli";
-      nixpkgsAttr = "nls";
+      nixpkgs = "nls";
     };
     "noto-sans-cjk-sc" = {
       category = "cli";
@@ -558,7 +558,7 @@ let
         kind = "cask";
         name = "font-noto-sans-cjk-sc";
       };
-      nixpkgsAttr = "noto-fonts-cjk-sans";
+      nixpkgs = "noto-fonts-cjk-sans";
       winget = {
         id = "Google.NotoSans.CJK.SC";
       };
@@ -569,7 +569,7 @@ let
         kind = "cask";
         name = "font-noto-sans-cjk-tc";
       };
-      nixpkgsAttr = "noto-fonts-cjk-sans";
+      nixpkgs = "noto-fonts-cjk-sans";
       winget = {
         id = "Google.NotoSans.CJK.TC";
       };
@@ -580,7 +580,7 @@ let
         kind = "cask";
         name = "font-noto-serif-cjk-sc";
       };
-      nixpkgsAttr = "noto-fonts-cjk-serif";
+      nixpkgs = "noto-fonts-cjk-serif";
       winget = {
         id = "Google.NotoSerif.CJK.SC";
       };
@@ -591,7 +591,7 @@ let
         kind = "cask";
         name = "font-noto-serif-cjk-tc";
       };
-      nixpkgsAttr = "noto-fonts-cjk-serif";
+      nixpkgs = "noto-fonts-cjk-serif";
       winget = {
         id = "Google.NotoSerif.CJK.TC";
       };
@@ -605,7 +605,7 @@ let
         kind = "cask";
         name = "obs";
       };
-      nixpkgsAttr = "obs-studio";
+      nixpkgs = "obs-studio";
       winget = {
         id = "OBSProject.OBSStudio";
       };
@@ -616,7 +616,7 @@ let
         kind = "cask";
         name = "obsidian";
       };
-      nixpkgsAttr = "obsidian";
+      nixpkgs = "obsidian";
       winget = {
         id = "Obsidian.Obsidian";
       };
@@ -627,7 +627,7 @@ let
         kind = "formula";
         name = "ollama";
       };
-      nixpkgsAttr = "ollama";
+      nixpkgs = "ollama";
       winget = {
         id = "Ollama.Ollama";
       };
@@ -638,7 +638,7 @@ let
         kind = "formula";
         name = "opencode";
       };
-      nixpkgsAttr = "opencode";
+      nixpkgs = "opencode";
       winget = {
         id = "SST.opencode";
       };
@@ -649,7 +649,7 @@ let
         kind = "formula";
         name = "packer";
       };
-      nixpkgsAttr = "packer";
+      nixpkgs = "packer";
       winget = {
         id = "HashiCorp.Packer";
       };
@@ -661,14 +661,14 @@ let
         kind = "cask";
         name = "parsec";
       };
-      nixpkgsAttr = "parsec";
+      nixpkgs = "parsec";
       winget = {
         id = "Parsec.Parsec";
       };
     };
     "pay-respects" = {
       category = "cli";
-      nixpkgsAttr = "pay-respects";
+      nixpkgs = "pay-respects";
     };
     "peace-equalizer-apo" = {
       # WinGet-only (no nixpkgs attr); Windows installs via WinGet.
@@ -677,14 +677,14 @@ let
         kind = "cask";
         name = "peace-equalizer-apo";
       };
-      nixpkgsAttr = "peace-equalizer-apo";
+      nixpkgs = "peace-equalizer-apo";
       winget = {
         id = "PeterVerbeek.PeaceEqualizerAPO";
       };
     };
     "pi-coding-agent" = {
       category = "cli";
-      nixpkgsAttr = "pi-coding-agent";
+      nixpkgs = "pi-coding-agent";
     };
     pinact = {
       category = "cli";
@@ -692,7 +692,7 @@ let
         kind = "formula";
         name = "pinact";
       };
-      nixpkgsAttr = "pinact";
+      nixpkgs = "pinact";
       winget = {
         id = "suzuki-shunsuke.pinact";
       };
@@ -700,7 +700,7 @@ let
     "pinentry_mac" = {
       category = "cli";
       platforms = [ "darwin" ];
-      nixpkgsAttr = "pinentry_mac";
+      nixpkgs = "pinentry_mac";
     };
     powershell = {
       category = "cli";
@@ -708,7 +708,7 @@ let
         kind = "formula";
         name = "powershell";
       };
-      nixpkgsAttr = "powershell";
+      nixpkgs = "powershell";
       winget = {
         id = "Microsoft.PowerShell";
       };
@@ -720,7 +720,7 @@ let
         kind = "cask";
         name = "powertoys";
       };
-      nixpkgsAttr = "powertoys";
+      nixpkgs = "powertoys";
       winget = {
         id = "Microsoft.PowerToys";
       };
@@ -732,7 +732,7 @@ let
         kind = "formula";
         name = "powersession";
       };
-      nixpkgsAttr = "powersession";
+      nixpkgs = "powersession";
       winget = {
         id = "Watfaq.PowerSession";
       };
@@ -743,7 +743,7 @@ let
         kind = "formula";
         name = "prek";
       };
-      nixpkgsAttr = "prek";
+      nixpkgs = "prek";
       winget = {
         id = "j178.Prek";
       };
@@ -754,7 +754,7 @@ let
         kind = "formula";
         name = "python";
       };
-      nixpkgsAttr = "python3";
+      nixpkgs = "python3";
       winget = {
         id = "Python.Python.3.13";
       };
@@ -767,7 +767,7 @@ let
         kind = "cask";
         name = "qtpass";
       };
-      nixpkgsAttr = "qtpass";
+      nixpkgs = "qtpass";
       winget = {
         id = "IJHack.QtPass";
       };
@@ -778,7 +778,7 @@ let
         kind = "formula";
         name = "qemu";
       };
-      nixpkgsAttr = "qemu";
+      nixpkgs = "qemu";
     };
     rectangle = {
       category = "gui";
@@ -787,7 +787,7 @@ let
         kind = "cask";
         name = "rectangle";
       };
-      nixpkgsAttr = "rectangle";
+      nixpkgs = "rectangle";
     };
     rclone = {
       category = "cli";
@@ -795,7 +795,7 @@ let
         kind = "formula";
         name = "rclone";
       };
-      nixpkgsAttr = "rclone";
+      nixpkgs = "rclone";
       winget = {
         id = "Rclone.Rclone";
       };
@@ -806,7 +806,7 @@ let
         kind = "formula";
         name = "ripgrep";
       };
-      nixpkgsAttr = "ripgrep";
+      nixpkgs = "ripgrep";
       winget = {
         id = "BurntSushi.ripgrep";
       };
@@ -817,7 +817,7 @@ let
         kind = "formula";
         name = "ruff";
       };
-      nixpkgsAttr = "ruff";
+      nixpkgs = "ruff";
       winget = {
         id = "astral-sh.ruff";
       };
@@ -828,7 +828,7 @@ let
         kind = "formula";
         name = "rustup";
       };
-      nixpkgsAttr = "rustup";
+      nixpkgs = "rustup";
       winget = {
         id = "Rustlang.Rustup";
       };
@@ -839,7 +839,7 @@ let
         kind = "formula";
         name = "sccache";
       };
-      nixpkgsAttr = "sccache";
+      nixpkgs = "sccache";
       winget = {
         id = "Mozilla.sccache";
       };
@@ -850,7 +850,7 @@ let
         kind = "formula";
         name = "shellcheck";
       };
-      nixpkgsAttr = "shellcheck";
+      nixpkgs = "shellcheck";
       winget = {
         id = "ShellCheck.ShellCheck";
       };
@@ -861,7 +861,7 @@ let
         kind = "formula";
         name = "shfmt";
       };
-      nixpkgsAttr = "shfmt";
+      nixpkgs = "shfmt";
       # WHY: shfmt is a single static binary; no separate macOS cask exists.
       winget = {
         id = "mvdan.shfmt";
@@ -873,7 +873,7 @@ let
         kind = "formula";
         name = "sops";
       };
-      nixpkgsAttr = "sops";
+      nixpkgs = "sops";
       winget = {
         id = "SecretsOPerationS.SOPS";
       };
@@ -884,14 +884,14 @@ let
         kind = "cask";
         name = "font-source-serif";
       };
-      nixpkgsAttr = "source-serif";
+      nixpkgs = "source-serif";
       winget = {
         id = "Adobe.SourceSerif4";
       };
     };
     "ssh-to-age" = {
       category = "cli";
-      nixpkgsAttr = "ssh-to-age";
+      nixpkgs = "ssh-to-age";
     };
     starship = {
       category = "cli";
@@ -899,7 +899,7 @@ let
         kind = "formula";
         name = "starship";
       };
-      nixpkgsAttr = "starship";
+      nixpkgs = "starship";
       winget = {
         id = "Starship.Starship";
       };
@@ -911,7 +911,7 @@ let
         kind = "cask";
         name = "stats";
       };
-      nixpkgsAttr = "stats";
+      nixpkgs = "stats";
     };
     steam = {
       category = "gui";
@@ -919,7 +919,7 @@ let
         kind = "cask";
         name = "steam";
       };
-      nixpkgsAttr = "steam";
+      nixpkgs = "steam";
       winget = {
         id = "Valve.Steam";
       };
@@ -931,7 +931,7 @@ let
         kind = "formula";
         name = "scoop";
       };
-      nixpkgsAttr = "scoop";
+      nixpkgs = "scoop";
       winget = {
         id = "Scoop.Scoop";
       };
@@ -942,7 +942,7 @@ let
         kind = "formula";
         name = "taplo";
       };
-      nixpkgsAttr = "taplo";
+      nixpkgs = "taplo";
       winget = {
         id = "tamasfe.taplo";
       };
@@ -953,7 +953,7 @@ let
         kind = "cask";
         name = "telegram-desktop@beta";
       };
-      nixpkgsAttr = "telegram-desktop";
+      nixpkgs = "telegram-desktop";
       winget = {
         id = "Telegram.TelegramDesktop.Beta";
       };
@@ -964,7 +964,7 @@ let
         kind = "formula";
         name = "ty";
       };
-      nixpkgsAttr = "ty";
+      nixpkgs = "ty";
       winget = {
         id = "astral-sh.ty";
       };
@@ -975,7 +975,7 @@ let
         kind = "formula";
         name = "typst";
       };
-      nixpkgsAttr = "typst";
+      nixpkgs = "typst";
       winget = {
         id = "Typst.Typst";
       };
@@ -987,7 +987,7 @@ let
         kind = "cask";
         name = "utm@beta";
       };
-      nixpkgsAttr = "utm";
+      nixpkgs = "utm";
     };
     uv = {
       category = "cli";
@@ -995,7 +995,7 @@ let
         kind = "formula";
         name = "uv";
       };
-      nixpkgsAttr = "uv";
+      nixpkgs = "uv";
       winget = {
         id = "astral-sh.uv";
       };
@@ -1006,7 +1006,7 @@ let
         kind = "cask";
         name = "vlc";
       };
-      nixpkgsAttr = "vlc";
+      nixpkgs = "vlc";
       winget = {
         id = "VideoLAN.VLC";
       };
@@ -1017,7 +1017,7 @@ let
         kind = "cask";
         name = "visual-studio-code";
       };
-      nixpkgsAttr = "vscode";
+      nixpkgs = "vscode";
       winget = {
         id = "Microsoft.VisualStudioCode";
       };
@@ -1031,7 +1031,7 @@ let
         kind = "cask";
         name = "visual-studio-code@insiders";
       };
-      nixpkgsAttr = "vscode-insiders";
+      nixpkgs = "vscode-insiders";
       winget = {
         id = "Microsoft.VisualStudioCode.Insiders";
       };
@@ -1046,7 +1046,7 @@ let
         kind = "cask";
         name = "whatsapp@beta";
       };
-      nixpkgsAttr = "whatsapp";
+      nixpkgs = "whatsapp";
       winget = {
         id = "9NBDXK71NK08";
       };
@@ -1058,7 +1058,7 @@ let
         kind = "formula";
         name = "winfsp";
       };
-      nixpkgsAttr = "winfsp";
+      nixpkgs = "winfsp";
       winget = {
         id = "WinFsp.WinFsp";
       };
@@ -1070,18 +1070,18 @@ let
         kind = "cask";
         name = "windows-terminal-preview";
       };
-      nixpkgsAttr = "windows-terminal-preview";
+      nixpkgs = "windows-terminal-preview";
       winget = {
         id = "Microsoft.WindowsTerminal.Preview";
       };
     };
     yamllint = {
       category = "cli";
-      nixpkgsAttr = "yamllint";
+      nixpkgs = "yamllint";
     };
     "yq-go" = {
       category = "cli";
-      nixpkgsAttr = "yq-go";
+      nixpkgs = "yq-go";
     };
     zizmor = {
       category = "cli";
@@ -1089,7 +1089,7 @@ let
         kind = "formula";
         name = "zizmor";
       };
-      nixpkgsAttr = "zizmor";
+      nixpkgs = "zizmor";
       winget = {
         id = "zizmor.zizmor";
       };
@@ -1100,7 +1100,7 @@ let
         kind = "cask";
         name = "zoom";
       };
-      nixpkgsAttr = "zoom-us";
+      nixpkgs = "zoom-us";
       winget = {
         id = "Zoom.Zoom";
       };
@@ -1111,7 +1111,7 @@ let
         kind = "formula";
         name = "zoxide";
       };
-      nixpkgsAttr = "zoxide";
+      nixpkgs = "zoxide";
       winget = {
         id = "ajeetdsouza.zoxide";
       };
@@ -1182,7 +1182,7 @@ let
     packageName:
     managedPackagePlatformCompatible packageName
     && (if pkgs.stdenv.isDarwin then managedPackageBackends.${packageName} == "nixpkgs" else true)
-    && !(builtins.hasAttr managedPackages.${packageName}.nixpkgsAttr pkgs)
+    && !(builtins.hasAttr managedPackages.${packageName}.nixpkgs pkgs)
   ) enabledManagedPackageNames;
 
   # Cross-platform nixpkgs packages from the managed set.
@@ -1194,7 +1194,7 @@ let
   # meta.available reads lazily and does NOT trigger check-meta's refusal
   # assertion, so filtering by it safely drops arch-incompatible packages.
   managedNixPackages =
-    map (packageName: builtins.getAttr managedPackages.${packageName}.nixpkgsAttr pkgs)
+    map (packageName: builtins.getAttr managedPackages.${packageName}.nixpkgs pkgs)
       (
         if pkgs.stdenv.isDarwin then
           builtins.filter (
@@ -1212,7 +1212,7 @@ let
   nixPackageAttrAvailable =
     packageName:
     let
-      attr = managedPackages.${packageName}.nixpkgsAttr;
+      attr = managedPackages.${packageName}.nixpkgs;
     in
     (pkgs.${attr}.meta.available or true);
 
@@ -1341,7 +1341,7 @@ in
       assertions = map (packageName: {
         assertion = false;
         message = "core.nix: package '${packageName}' routes to nixpkgs but pkgs.${
-          managedPackages.${packageName}.nixpkgsAttr
+          managedPackages.${packageName}.nixpkgs
         } is unavailable on this platform.";
       }) missingNixPackageAttrs;
     }

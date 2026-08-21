@@ -100,7 +100,7 @@ iterm2 = {
   category = "gui";
   platforms = ["darwin"];  # only available on macOS
   homebrew = { kind = "cask"; name = "iterm2"; };
-  nixpkgsAttr = "iterm2";
+  nixpkgs = "iterm2";
 };
 ```
 

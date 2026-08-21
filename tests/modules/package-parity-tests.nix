@@ -152,437 +152,437 @@ let
   crossPlatformOverlapAttrs = [
     {
       name = "blender";
-      nixpkgsAttr = "blender";
+      nixpkgs = "blender";
     }
     {
       name = "czkawka";
-      nixpkgsAttr = "czkawka";
+      nixpkgs = "czkawka";
     }
     {
       name = "google-chrome";
-      nixpkgsAttr = "google-chrome";
+      nixpkgs = "google-chrome";
     }
     {
       name = "krita";
-      nixpkgsAttr = "krita";
+      nixpkgs = "krita";
     }
     {
       name = "libreoffice";
-      nixpkgsAttr = "libreoffice";
+      nixpkgs = "libreoffice";
     }
     {
       name = "obsidian";
-      nixpkgsAttr = "obsidian";
+      nixpkgs = "obsidian";
     }
     {
       name = "musicbrainz-picard";
-      nixpkgsAttr = "picard";
+      nixpkgs = "picard";
     }
     {
       name = "qemu";
-      nixpkgsAttr = "qemu";
+      nixpkgs = "qemu";
     }
     {
       name = "discord@canary";
-      nixpkgsAttr = "discord-canary";
+      nixpkgs = "discord-canary";
     }
     {
       name = "cursor";
-      nixpkgsAttr = "code-cursor";
+      nixpkgs = "code-cursor";
     }
     {
       name = "visual-studio-code";
-      nixpkgsAttr = "vscode";
+      nixpkgs = "vscode";
     }
     {
       name = "vlc";
-      nixpkgsAttr = "vlc";
+      nixpkgs = "vlc";
     }
     # --- Completed overlap entries (cross-platform, carry a winget.id) ---
     {
       name = "google-chrome@canary";
-      nixpkgsAttr = "google-chrome";
+      nixpkgs = "google-chrome";
     }
     {
       name = "chrome-remote-desktop";
-      nixpkgsAttr = "chrome-remote-desktop";
+      nixpkgs = "chrome-remote-desktop";
     }
     {
       name = "gimp";
-      nixpkgsAttr = "gimp";
+      nixpkgs = "gimp";
     }
     {
       name = "qtpass";
-      nixpkgsAttr = "qtpass";
+      nixpkgs = "qtpass";
     }
     {
       name = "neovim";
-      nixpkgsAttr = "neovim";
+      nixpkgs = "neovim";
     }
     {
       name = "krokiet";
-      nixpkgsAttr = "krokiet";
+      nixpkgs = "krokiet";
     }
     {
       name = "parsec";
-      nixpkgsAttr = "parsec";
+      nixpkgs = "parsec";
     }
     {
       name = "peace-equalizer-apo";
-      nixpkgsAttr = "peace-equalizer-apo";
+      nixpkgs = "peace-equalizer-apo";
     }
     {
       name = "equalizer-apo";
-      nixpkgsAttr = "equalizer-apo";
+      nixpkgs = "equalizer-apo";
     }
     {
       name = "steam";
-      nixpkgsAttr = "steam";
+      nixpkgs = "steam";
     }
     {
       name = "telegram@beta";
-      nixpkgsAttr = "telegram-desktop";
+      nixpkgs = "telegram-desktop";
     }
     {
       name = "powersession";
-      nixpkgsAttr = "powersession";
+      nixpkgs = "powersession";
     }
     {
       name = "whatsapp-beta";
-      nixpkgsAttr = "whatsapp";
+      nixpkgs = "whatsapp";
     }
     {
       name = "powertoys";
-      nixpkgsAttr = "powertoys";
+      nixpkgs = "powertoys";
     }
     {
       name = "windows-terminal-preview";
-      nixpkgsAttr = "windows-terminal-preview";
+      nixpkgs = "windows-terminal-preview";
     }
     {
       name = "scoop";
-      nixpkgsAttr = "scoop";
+      nixpkgs = "scoop";
     }
     {
       name = "winfsp";
-      nixpkgsAttr = "winfsp";
+      nixpkgs = "winfsp";
     }
     {
       name = "7zip";
-      nixpkgsAttr = "p7zip";
+      nixpkgs = "p7zip";
     }
     {
       name = "gpg4win";
-      nixpkgsAttr = "gnupg";
+      nixpkgs = "gnupg";
     }
     {
       name = "zoxide";
-      nixpkgsAttr = "zoxide";
+      nixpkgs = "zoxide";
     }
     {
       name = "ghostscript";
-      nixpkgsAttr = "ghostscript";
+      nixpkgs = "ghostscript";
     }
     {
       name = "packer";
-      nixpkgsAttr = "packer";
+      nixpkgs = "packer";
     }
     {
       name = "uv";
-      nixpkgsAttr = "uv";
+      nixpkgs = "uv";
     }
     {
       name = "ruff";
-      nixpkgsAttr = "ruff";
+      nixpkgs = "ruff";
     }
     {
       name = "ty";
-      nixpkgsAttr = "ty";
+      nixpkgs = "ty";
     }
     {
       name = "ripgrep";
-      nixpkgsAttr = "ripgrep";
+      nixpkgs = "ripgrep";
     }
     {
       name = "caddy";
-      nixpkgsAttr = "caddy";
+      nixpkgs = "caddy";
     }
     {
       name = "bottom";
-      nixpkgsAttr = "bottom";
+      nixpkgs = "bottom";
     }
     {
       name = "direnv";
-      nixpkgsAttr = "direnv";
+      nixpkgs = "direnv";
     }
     {
       name = "starship";
-      nixpkgsAttr = "starship";
+      nixpkgs = "starship";
     }
     {
       name = "eza";
-      nixpkgsAttr = "eza";
+      nixpkgs = "eza";
     }
     {
       name = "git";
-      nixpkgsAttr = "gitFull";
+      nixpkgs = "gitFull";
     }
     {
       name = "gh";
-      nixpkgsAttr = "gh";
+      nixpkgs = "gh";
     }
     {
       name = "ffmpeg";
-      nixpkgsAttr = "ffmpeg-full";
+      nixpkgs = "ffmpeg-full";
     }
     {
       name = "imagemagick";
-      nixpkgsAttr = "imagemagick";
+      nixpkgs = "imagemagick";
     }
     {
       name = "prek";
-      nixpkgsAttr = "prek";
+      nixpkgs = "prek";
     }
     {
       name = "jq";
-      nixpkgsAttr = "jq";
+      nixpkgs = "jq";
     }
     {
       name = "jellyfin";
-      nixpkgsAttr = "jellyfin";
+      nixpkgs = "jellyfin";
     }
     {
       name = "fzf";
-      nixpkgsAttr = "fzf";
+      nixpkgs = "fzf";
     }
     {
       name = "dotnet-runtime-6";
-      nixpkgsAttr = "dotnetCorePackages.runtime_6_0";
+      nixpkgs = "dotnetCorePackages.runtime_6_0";
     }
     {
       name = "powershell";
-      nixpkgsAttr = "powershell";
+      nixpkgs = "powershell";
     }
     {
       name = "ollama";
-      nixpkgsAttr = "ollama";
+      nixpkgs = "ollama";
     }
     {
       name = "bun";
-      nixpkgsAttr = "bun";
+      nixpkgs = "bun";
     }
     {
       name = "rclone";
-      nixpkgsAttr = "rclone";
+      nixpkgs = "rclone";
     }
     {
       name = "actionlint";
-      nixpkgsAttr = "actionlint";
+      nixpkgs = "actionlint";
     }
     {
       name = "rustup";
-      nixpkgsAttr = "rustup";
+      nixpkgs = "rustup";
     }
     {
       name = "sops";
-      nixpkgsAttr = "sops";
+      nixpkgs = "sops";
     }
     {
       name = "bat";
-      nixpkgsAttr = "bat";
+      nixpkgs = "bat";
     }
     {
       name = "fd";
-      nixpkgsAttr = "fd";
+      nixpkgs = "fd";
     }
     {
       name = "shellcheck";
-      nixpkgsAttr = "shellcheck";
+      nixpkgs = "shellcheck";
     }
     {
       name = "opencode";
-      nixpkgsAttr = "opencode";
+      nixpkgs = "opencode";
     }
     {
       name = "pinact";
-      nixpkgsAttr = "pinact";
+      nixpkgs = "pinact";
     }
     {
       name = "python";
-      nixpkgsAttr = "python3";
+      nixpkgs = "python3";
     }
     {
       name = "typst";
-      nixpkgsAttr = "typst";
+      nixpkgs = "typst";
     }
     {
       name = "taplo";
-      nixpkgsAttr = "taplo";
+      nixpkgs = "taplo";
     }
     {
       name = "zizmor";
-      nixpkgsAttr = "zizmor";
+      nixpkgs = "zizmor";
     }
     {
       name = "sccache";
-      nixpkgsAttr = "sccache";
+      nixpkgs = "sccache";
     }
     {
       name = "shfmt";
-      nixpkgsAttr = "shfmt";
+      nixpkgs = "shfmt";
     }
     {
       name = "llvm";
-      nixpkgsAttr = "llvmPackages_latest.llvm";
+      nixpkgs = "llvmPackages_latest.llvm";
     }
     {
       name = "platform-tools";
-      nixpkgsAttr = "android-tools";
+      nixpkgs = "android-tools";
     }
     {
       name = "source-serif";
-      nixpkgsAttr = "source-serif";
+      nixpkgs = "source-serif";
     }
     {
       name = "jetbrains-mono-nerd-font";
-      nixpkgsAttr = "nerd-fonts.jetbrains-mono";
+      nixpkgs = "nerd-fonts.jetbrains-mono";
     }
     {
       name = "noto-sans-cjk-sc";
-      nixpkgsAttr = "noto-fonts-cjk-sans";
+      nixpkgs = "noto-fonts-cjk-sans";
     }
     {
       name = "noto-sans-cjk-tc";
-      nixpkgsAttr = "noto-fonts-cjk-sans";
+      nixpkgs = "noto-fonts-cjk-sans";
     }
     {
       name = "noto-serif-cjk-sc";
-      nixpkgsAttr = "noto-fonts-cjk-serif";
+      nixpkgs = "noto-fonts-cjk-serif";
     }
     {
       name = "noto-serif-cjk-tc";
-      nixpkgsAttr = "noto-fonts-cjk-serif";
+      nixpkgs = "noto-fonts-cjk-serif";
     }
     {
       name = "inter";
-      nixpkgsAttr = "inter";
+      nixpkgs = "inter";
     }
     {
       name = "zoom";
-      nixpkgsAttr = "zoom-us";
+      nixpkgs = "zoom-us";
     }
     {
       name = "obs-studio";
-      nixpkgsAttr = "obs-studio";
+      nixpkgs = "obs-studio";
     }
     {
       name = "jdk";
-      nixpkgsAttr = "jdk";
+      nixpkgs = "jdk";
     }
     # --- Former baseSharedPackages CLI tools (folded into managedPackages) ---
     {
       name = "android-tools";
-      nixpkgsAttr = "android-tools";
+      nixpkgs = "android-tools";
     }
     {
       name = "asciinema";
-      nixpkgsAttr = "asciinema";
+      nixpkgs = "asciinema";
     }
     {
       name = "camilladsp";
-      nixpkgsAttr = "camilladsp";
+      nixpkgs = "camilladsp";
     }
     {
       name = "cargo-binstall";
-      nixpkgsAttr = "cargo-binstall";
+      nixpkgs = "cargo-binstall";
     }
     {
       name = "cargo-cache";
-      nixpkgsAttr = "cargo-cache";
+      nixpkgs = "cargo-cache";
     }
     {
       name = "cargo-nextest";
-      nixpkgsAttr = "cargo-nextest";
+      nixpkgs = "cargo-nextest";
     }
     {
       name = "check-jsonschema";
-      nixpkgsAttr = "check-jsonschema";
+      nixpkgs = "check-jsonschema";
     }
     {
       name = "deadnix";
-      nixpkgsAttr = "deadnix";
+      nixpkgs = "deadnix";
     }
     {
       name = "gnupg";
-      nixpkgsAttr = "gnupg";
+      nixpkgs = "gnupg";
     }
     {
       name = "litellm";
-      nixpkgsAttr = "litellm";
+      nixpkgs = "litellm";
     }
     {
       name = "llvm-clang";
-      nixpkgsAttr = "llvmPackages.clang";
+      nixpkgs = "llvmPackages.clang";
     }
     {
       name = "llvm-lld";
-      nixpkgsAttr = "llvmPackages.lld";
+      nixpkgs = "llvmPackages.lld";
     }
     {
       name = "llvm-lldb";
-      nixpkgsAttr = "llvmPackages.lldb";
+      nixpkgs = "llvmPackages.lldb";
     }
     {
       name = "mold";
-      nixpkgsAttr = "mold";
+      nixpkgs = "mold";
     }
     {
       name = "ncdu";
-      nixpkgsAttr = "ncdu";
+      nixpkgs = "ncdu";
     }
     {
       name = "nickel";
-      nixpkgsAttr = "nickel";
+      nixpkgs = "nickel";
     }
     {
       name = "nixd";
-      nixpkgsAttr = "nixd";
+      nixpkgs = "nixd";
     }
     {
       name = "nixf";
-      nixpkgsAttr = "nixf";
+      nixpkgs = "nixf";
     }
     {
       name = "nixfmt";
-      nixpkgsAttr = "nixfmt";
+      nixpkgs = "nixfmt";
     }
     {
       name = "nix-index";
-      nixpkgsAttr = "nix-index";
+      nixpkgs = "nix-index";
     }
     {
       name = "nls";
-      nixpkgsAttr = "nls";
+      nixpkgs = "nls";
     }
     {
       name = "pay-respects";
-      nixpkgsAttr = "pay-respects";
+      nixpkgs = "pay-respects";
     }
     {
       name = "pi-coding-agent";
-      nixpkgsAttr = "pi-coding-agent";
+      nixpkgs = "pi-coding-agent";
     }
     {
       name = "ssh-to-age";
-      nixpkgsAttr = "ssh-to-age";
+      nixpkgs = "ssh-to-age";
     }
     {
       name = "yamllint";
-      nixpkgsAttr = "yamllint";
+      nixpkgs = "yamllint";
     }
     {
       name = "yq-go";
-      nixpkgsAttr = "yq-go";
+      nixpkgs = "yq-go";
     }
   ];
 
@@ -591,44 +591,44 @@ let
   darwinOnlyPackages = [
     {
       name = "iterm2";
-      nixpkgsAttr = "iterm2";
+      nixpkgs = "iterm2";
     }
     {
       name = "rectangle";
-      nixpkgsAttr = "rectangle";
+      nixpkgs = "rectangle";
     }
     {
       name = "stats";
-      nixpkgsAttr = "stats";
+      nixpkgs = "stats";
     }
     {
       name = "utm@beta";
-      nixpkgsAttr = "utm";
+      nixpkgs = "utm";
     }
     {
       name = "visual-studio-code@insiders";
-      nixpkgsAttr = "vscode-insiders";
+      nixpkgs = "vscode-insiders";
     }
     {
       name = "duti";
-      nixpkgsAttr = "duti";
+      nixpkgs = "duti";
     }
     {
       name = "desktoppr";
-      nixpkgsAttr = "desktoppr";
+      nixpkgs = "desktoppr";
     }
     {
       name = "pinentry_mac";
-      nixpkgsAttr = "pinentry_mac";
+      nixpkgs = "pinentry_mac";
     }
     {
       name = "equaliser";
-      nixpkgsAttr = "equaliser";
+      nixpkgs = "equaliser";
     }
   ];
 
   test_overlapping_packages_have_nixpkgs = assert' (builtins.all
-    (p: builtins.match (".*" + p.nixpkgsAttr + ".*") coreModuleText != null)
+    (p: builtins.match (".*" + p.nixpkgs + ".*") coreModuleText != null)
     crossPlatformOverlapAttrs
   ) "All cross-platform overlappingPackages entries should be defined in core.nix";
 
@@ -649,8 +649,8 @@ let
       linuxPkgs = import <nixpkgs> { system = "x86_64-linux"; };
       notBuildableOnLinux =
         p:
-        !builtins.hasAttr p.nixpkgsAttr linuxPkgs
-        || !(builtins.elem "x86_64-linux" (linuxPkgs.${p.nixpkgsAttr}.meta.platforms or [ ]));
+        !builtins.hasAttr p.nixpkgs linuxPkgs
+        || !(builtins.elem "x86_64-linux" (linuxPkgs.${p.nixpkgs}.meta.platforms or [ ]));
     in
     assert' (builtins.all notBuildableOnLinux darwinOnlyPackages) "Darwin-only packages must not be buildable on Linux";
 

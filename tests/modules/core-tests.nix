@@ -16,7 +16,7 @@ let
 
   test_core_provisions_android_tools = assert' (
     lib.hasInfix ''"android-tools" = {'' coreModuleText
-    && lib.hasInfix "nixpkgsAttr = \"android-tools\";" coreModuleText
+    && lib.hasInfix "nixpkgs = \"android-tools\";" coreModuleText
   ) "core.nix must declare android-tools (adb, fastboot) in managedPackages for POSIX hosts";
 
   test_linux_nix_index_is_daily = assert' (
