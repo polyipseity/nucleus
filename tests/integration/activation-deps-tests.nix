@@ -19,6 +19,7 @@ let
   activationDagModuleText = builtins.readFile ../../src/modules/lib/activation-dag.nix;
   macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
   macosAppAutostartScriptText = builtins.readFile ../../src/hosts/MacBook/scripts/macos-configure-app-autostart.sh;
+  autostartShText = builtins.readFile ../../src/scripts/autostart.sh;
   appsRegistryText = builtins.readFile ../../src/modules/apps.json;
   spotlightScriptText = builtins.readFile ../../src/hosts/MacBook/scripts/macos-disable-spotlight.sh;
   gimpScrollSensitivityScriptText = builtins.readFile ../../src/scripts/configs/configure-gimp-scroll-sensitivity.sh;
@@ -285,12 +286,17 @@ let
   # NOTE: Mounty previously used SMLoginItemSetEnabled on its helper bundle; the
   # new policy owns exactly one uniform mechanism (our osascript login item), so
   # the app-native helper path must no longer be referenced.
-  test_mounty_native_login_item = assert' (
-    (lib.hasInfix "\"Mounty\":" appsRegistryText)
-    && (lib.hasInfix "\"kind\": \"login-item\"" appsRegistryText)
-    && !(lib.hasInfix "SMLoginItemSetEnabled" macosAppAutostartScriptText)
-    && !(lib.hasInfix "com.cu4uc.MountyHelper" macosAppAutostartScriptText)
-  ) "Mounty startup on macOS must be registry-driven via our login item (no app-native helper)";
+  test_mounty_native_login_item =
+    assert'
+      (
+        (lib.hasInfix "\"Mounty\":" appsRegistryText)
+        && (lib.hasInfix "\"kind\": \"login-item\"" appsRegistryText)
+        && !(lib.hasInfix "SMLoginItemSetEnabled" macosAppAutostartScriptText)
+        && !(lib.hasInfix "com.cu4uc.MountyHelper" macosAppAutostartScriptText)
+        && (lib.hasInfix "macos_native_login_items_remove" autostartShText)
+        && (lib.hasInfix "Contents/Library/LoginItems" autostartShText)
+      )
+      "Mounty startup on macOS must be registry-driven via our login item (no app-native helper; embedded helper neutralized by path)";
 
   # === TEST: Spotlight disables all known launcher hotkey slots ===
   # NOTE: hotkey loop lives in macos-disable-spotlight.sh, not in activation.nix

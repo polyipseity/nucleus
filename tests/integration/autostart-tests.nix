@@ -58,6 +58,8 @@ assert containsRegex "do_apply" autostartShText;
 assert containsRegex "do_verify" autostartShText;
 assert containsRegex ''apps\.json'' autostartShText;
 assert containsRegex "osascript" autostartShText;
+assert containsRegex "macos_native_login_items_remove" autostartShText;
+assert containsRegex "Contents/Library/LoginItems" autostartShText;
 assert containsRegex "System Events" autostartShText;
 assert containsRegex "xdg_autostart_dir" autostartShText;
 assert containsRegex "xdg_desktop_write" autostartShText;
