@@ -4,6 +4,7 @@
   lib,
   pkgs,
   options,
+  hostName,
   treefmtPackage ? null,
   ...
 }:
@@ -994,8 +995,12 @@ let
     in
     enableMap.${hostName} or true;
 
-  # Current host (MacBook/NixOS set networking.hostName).
-  currentHost = config.networking.hostName or "";
+  # Current host. Resolved from the `hostName` module arg, which the flake
+  # passes in every eval context (darwin/nixos specialArgs, home-manager
+  # extraSpecialArgs). `config.networking.hostName` is unset inside the
+  # embedded Home Manager eval, so reading it there silently yields "" and
+  # defeats the per-host `enable` map — hence no fallback.
+  currentHost = hostName;
   enabledManagedPackageNames = builtins.filter (managedPackageEnabledForHost currentHost) managedPackageNames;
 
   # CLI → nixpkgs, GUI → homebrew. If a package ships any GUI component, classify as "gui".

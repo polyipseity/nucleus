@@ -12,8 +12,8 @@ let
   inherit (import ../lib.nix) assert';
 
   # Replicate the flake `winget-packages` eval: evaluate core.nix standalone with
-  # networking.hostName pinned to "Windows" and the NixOS/nix-darwin-only options
-  # stubbed (assertions, networking.hostName).
+  # the `hostName` module arg set to "Windows" and the NixOS/nix-darwin-only
+  # options stubbed (assertions).
   evaluated = lib.evalModules {
     prefix = [ ];
     modules = [
@@ -27,17 +27,13 @@ let
           default = [ ];
           internal = true;
         };
-        options.networking.hostName = lib.mkOption {
-          type = lib.types.str;
-          default = "Windows";
-          internal = true;
-        };
       }
     ];
     specialArgs = {
       lib = lib;
       pkgs = import <nixpkgs> { system = "x86_64-linux"; };
       options = { };
+      hostName = "Windows";
     };
   };
 

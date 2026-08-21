@@ -1065,19 +1065,14 @@
                   default = [ ];
                   internal = true;
                 };
-                # Windows does not set networking.hostName via Nix; declare a stub
-                # so the host-agnostic resolver computes the Windows-resolved set.
-                options.networking.hostName = nixpkgs.lib.mkOption {
-                  type = nixpkgs.lib.types.str;
-                  default = "Windows";
-                  internal = true;
-                };
               }
             ];
             specialArgs = {
               lib = nixpkgs.lib;
               pkgs = pkgsMac;
               options = { };
+              # core.nix resolves the current host from the `hostName` module arg.
+              hostName = "Windows";
             };
           };
         in
