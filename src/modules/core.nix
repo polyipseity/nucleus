@@ -1065,14 +1065,30 @@ let
   # is x86_64-linux only; the nixos-generators guest builds aarch64-linux).
   # meta.available reads lazily and does NOT trigger check-meta's refusal
   # assertion, so filtering by it safely drops arch-incompatible packages.
+
+  # Packages already contributed to the Home Manager / system path by a
+  # dedicated programs.* module (e.g. programs.neovim) on POSIX hosts.
+  # Listing them here too would add a second, conflicting derivation to
+  # buildEnv's paths. Windows still provisions them via WinGet, and the
+  # managedPackages entry is retained for settings lookup + parity tests.
+  posixProgramsProvidedPackages = [
+    "neovim"
+  ];
+
   managedNixPackages = map (packageName: lib.attrByPath (nixPkgsAttrPath packageName) null pkgs) (
     if pkgs.stdenv.isDarwin then
       builtins.filter (
-        name: managedPackageBackends.${name} == "nixpkgs" && managedPackagePlatformCompatible name
+        name:
+        managedPackageBackends.${name} == "nixpkgs"
+        && managedPackagePlatformCompatible name
+        && !(builtins.elem name posixProgramsProvidedPackages)
       ) enabledManagedPackageNames
     else
       builtins.filter (
-        name: managedPackagePlatformCompatible name && nixPackageAttrAvailable name
+        name:
+        managedPackagePlatformCompatible name
+        && nixPackageAttrAvailable name
+        && !(builtins.elem name posixProgramsProvidedPackages)
       ) enabledManagedPackageNames
   );
 
