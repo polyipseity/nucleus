@@ -45,7 +45,7 @@ while IFS= read -r _vsd_entry; do
     # macOS-only exception: iCloudReplica must point to native CloudDocs
     # storage so we do not duplicate Apple's iCloud integration with a
     # second managed tree.  Only reachable on Darwin (the isSpecialICloud
-    # flag is set at Nix eval time based on pkgs.stdenv.isDarwin).
+    # flag is set at Nix eval time based on pkgs.stdenv.hostPlatform.isDarwin).
     _vsd_icloud_native_target="$HOME/Library/Mobile Documents"
     _vsd_icloud_replica_path="$HOME/$_vsd_local_path"
 
