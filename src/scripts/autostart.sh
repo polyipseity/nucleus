@@ -124,6 +124,34 @@ macos_login_item_remove() {
     -e 'end tell' 2>/dev/null
 }
 
+# macos_native_login_items_remove APP_PATH — delete any login item whose path
+# lives under the app's embedded helper location (Contents/Library/LoginItems).
+# Apps like Mounty register an SMLoginItemSetEnabled helper there; when the app
+# launches it re-enables that helper, creating a second startup path alongside
+# our own login item. Removing it enforces the single-owned-mechanism policy.
+# Best-effort: a missing console user or absent helper is not an error.
+macos_native_login_items_remove() {
+  local app_path="$1"
+  [ -n "$app_path" ] || return 0
+  _nucleus_resolve_console_user || return 0
+  local prefix="$app_path/Contents/Library/LoginItems"
+  /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
+    /usr/bin/osascript \
+    -e 'tell application "System Events"' \
+    -e "set liPrefix to \"$prefix\"" \
+    -e 'repeat with li in login items' \
+    -e 'try' \
+    -e 'set liPath to path of li' \
+    -e 'on error' \
+    -e 'set liPath to ""' \
+    -e 'end try' \
+    -e 'if liPath starts with liPrefix then' \
+    -e 'delete li' \
+    -e 'end if' \
+    -e 'end repeat' \
+    -e 'end tell' 2>/dev/null
+}
+
 # macos_system_extension_present ID — stdout "true"/"false" via systemextensionsctl.
 macos_system_extension_present() {
   local bundle_id="$1"
@@ -313,6 +341,10 @@ app_converge() {
       # Neutralize any app-owned login item (our mechanism and the app's
       # native checkbox both manifest as a login item with this name).
       macos_login_item_remove "$name" || true # check-suppress:suppression_doc: login item may already be absent; removal is best-effort before re-adding our own.
+      # Neutralize the app's embedded SMLoginItemSetEnabled helper (e.g.
+      # Mounty's com.cu4uc.MountyHelper), which the app re-enables on launch
+      # and would otherwise start a second copy alongside our login item.
+      macos_native_login_items_remove "$path" || true # check-suppress:suppression_doc: embedded helper login item may be absent; removal is best-effort.
     fi
     if [ "$enabled" = "true" ]; then
       macos_login_item_ensure "$name" "$path" "$hidden" || warn -l "$key" "failed to ensure login item"
