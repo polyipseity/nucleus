@@ -134,37 +134,37 @@
             (_final: prev: {
               # Nix sandbox; ffmpeg-full's tests cover them.
               davs2 = prev.davs2.overrideAttrs (_: {
-                doCheck = !prev.stdenv.isDarwin;
+                doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
               kvazaar = prev.kvazaar.overrideAttrs (_: {
-                doCheck = !prev.stdenv.isDarwin;
+                doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
               lcevcdec = prev.lcevcdec.overrideAttrs (_: {
-                doCheck = !prev.stdenv.isDarwin;
+                doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
               openapv = prev.openapv.overrideAttrs (_: {
-                doCheck = !prev.stdenv.isDarwin;
+                doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
               openh264 = prev.openh264.overrideAttrs (_: {
-                doCheck = !prev.stdenv.isDarwin;
+                doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
               svt-av1 = prev.svt-av1.overrideAttrs (_: {
-                doCheck = !prev.stdenv.isDarwin;
+                doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
               uavs3d = prev.uavs3d.overrideAttrs (_: {
-                doCheck = !prev.stdenv.isDarwin;
+                doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
               vvenc = prev.vvenc.overrideAttrs (_: {
-                doCheck = !prev.stdenv.isDarwin;
+                doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
               xavs2 = prev.xavs2.overrideAttrs (_: {
-                doCheck = !prev.stdenv.isDarwin;
+                doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
               xeve = prev.xeve.overrideAttrs (_: {
-                doCheck = !prev.stdenv.isDarwin;
+                doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
               xevd = prev.xevd.overrideAttrs (_: {
-                doCheck = !prev.stdenv.isDarwin;
+                doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
               # WHY: nixpkgs frei0r 3.2.1 unconditionally depends on gavl → libdrm,
               # which breaks ffmpeg-full eval on Darwin. Gate gavl to Linux and disable
@@ -221,8 +221,8 @@
                 version = "4.1.0";
 
                 src =
-                  if prev.stdenv.isDarwin then
-                    if prev.stdenv.isAarch64 then
+                  if prev.stdenv.hostPlatform.isDarwin then
+                    if prev.stdenv.hostPlatform.isAarch64 then
                       prev.fetchurl {
                         url = "https://github.com/HEnquist/camillagui-backend/releases/download/v${version}/bundle_macos_aarch64.tar.gz";
                         hash = "sha256-CdoLZUrvqhyYPwIIUk2av3aOihOuRnDWm8ZcF/1LT2M=";
@@ -232,7 +232,7 @@
                         url = "https://github.com/HEnquist/camillagui-backend/releases/download/v${version}/bundle_macos_intel.tar.gz";
                         hash = "sha256-RUDHi8Bbhpdydr6lGI+TCNTMqtlUyoJgtH0rG2x01kE=";
                       }
-                  else if prev.stdenv.isAarch64 then
+                  else if prev.stdenv.hostPlatform.isAarch64 then
                     prev.fetchurl {
                       url = "https://github.com/HEnquist/camillagui-backend/releases/download/v${version}/bundle_linux_aarch64.tar.gz";
                       hash = "sha256-mlQVtE3aWEePGN6f1XLt8JL2Wf1eRcvoCG/1ZI3Aidc=";
