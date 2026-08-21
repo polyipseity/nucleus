@@ -1114,7 +1114,17 @@ let
         let
           meta = managedPackages.${packageName};
         in
-        if managedPackageBackends.${packageName} == "homebrew" && meta.homebrew.kind == "brew" then
+        # WHY: only emit when the package is darwin-compatible (per-entry
+        # `platforms`) and actually carries a Homebrew block. WinGet-only
+        # entries drop their `homebrew` block but still resolve to the homebrew
+        # backend, so the `meta.homebrew or null` guard skips them instead of
+        # crashing on the absent `meta.homebrew.kind` attribute.
+        if
+          managedPackageBackends.${packageName} == "homebrew"
+          && managedPackagePlatformCompatible packageName
+          && (meta.homebrew or null) != null
+          && meta.homebrew.kind == "brew"
+        then
           meta.homebrew.name
         else
           null
@@ -1129,7 +1139,12 @@ let
         let
           meta = managedPackages.${packageName};
         in
-        if managedPackageBackends.${packageName} == "homebrew" && meta.homebrew.kind == "cask" then
+        if
+          managedPackageBackends.${packageName} == "homebrew"
+          && managedPackagePlatformCompatible packageName
+          && (meta.homebrew or null) != null
+          && meta.homebrew.kind == "cask"
+        then
           meta.homebrew.name
         else
           null
