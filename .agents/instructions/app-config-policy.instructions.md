@@ -20,7 +20,7 @@ A symlink from the app's config path back into the repo tree. Edits through the 
 
 Some apps auto-write managed state into their config at startup or on activation (e.g. `redhat.vscode-yaml` writes `yaml.disableSchemaDetection` into VS Code user `settings.json`). With a writable symlink, every auto-write re-dirties the repo working tree. Resolve by committing the auto-written key intentionally, disabling the auto-write, or switching to Method 2/3.
 
-### Method 2 — Read-only deployment (fallback)
+### Method 2 — Read-only deployment (alternative)
 
 A read-only copy (Nix store path or copied file with ReadOnly attribute) at the app's config path. Changes require editing the repo file and reactivating.
 
@@ -35,9 +35,9 @@ A read-only copy (Nix store path or copied file with ReadOnly attribute) at the 
 
 - The config path is system-level (`/etc/`, `/etc/ssh/`, etc.) — system paths do not inherently require read-only deployment. Use an activation script to create a writable symlink instead.
 - "No user writes it" or "read-only by convention" — if the app tolerates a symlink without overwriting it, Method 1 is the correct choice.
-- Preference for immutability — Method 2 is a technical fallback, not a stylistic choice.
+- Preference for immutability — Method 2 is a technical alternative, not a stylistic choice.
 
-### Method 3 — Selective merge (fallback)
+### Method 3 — Selective merge (alternative)
 
 The managed subset is stored in the repo and merged into the live app config at activation time. Merge is key-wise (JSON) or section-wise (INI); app-owned data outside managed keys is preserved.
 
@@ -78,7 +78,7 @@ Example: `src/users/default/direnv/lib/apple-sdk-override.sh` — a macOS-specif
 
 ### User-scoped configs
 
-Per-user homedir configs live in `src/users/<username>/<config>/` with `src/users/default/<config>/` as defaults-fallback. Placement rules and overlay coverage requirements are in `user-config-placement.instructions.md`. File selection goes through `mkUserOverlay` in `src/modules/lib/users-overlay.nix` (POSIX), `Resolve-UserConfig*` / `Deploy-UserWritableSymlink` in `ConfigHelpers.ps1` (Windows), and `resolve-user-config.sh` (POSIX activation scripts). Registry JSON domains use `users-registry.nix` instead. These paths are OUTSIDE the step-19 config-method-compliance scan (`src/modules/configs/**` only) — no `# check-suppress:config-method` annotations are required for `src/users/**` reference sites, but the same method-1 writable-symlink rule still applies.
+Per-user homedir configs live in `src/users/<username>/<config>/` with `src/users/default/<config>/` as the default template. Placement rules and overlay coverage requirements are in `user-config-placement.instructions.md`. File selection goes through `mkUserOverlay` in `src/modules/lib/users-overlay.nix` (POSIX), `Resolve-UserConfig*` / `Deploy-UserWritableSymlink` in `ConfigHelpers.ps1` (Windows), and `resolve-user-config.sh` (POSIX activation scripts). Registry JSON domains use `users-registry.nix` instead. These paths are OUTSIDE the step-19 config-method-compliance scan (`src/modules/configs/**` only) — no `# check-suppress:config-method` annotations are required for `src/users/**` reference sites, but the same method-1 writable-symlink rule still applies.
 
 ## Management workflow
 
@@ -98,7 +98,7 @@ Store settings in the format the app actually reads (e.g., Nix attrset rendered 
 
 All app settings must support per-user overrides. The merge order is: `defaults // platform_overrides // user_overrides`.
 
-1. Define override fields in the user registry (`src/users/<username>/<domain>.json`, with `src/users/default/` fallback). Nix modules consume the assembled registry via `src/modules/lib/users-registry.nix`; Windows scripts use `Load-UserRegistry.ps1`.
+1. Define override fields in the user registry (`src/users/<username>/<domain>.json`, with `src/users/default/` as the default template). Nix modules consume the assembled registry via `src/modules/lib/users-registry.nix`; Windows scripts use `Load-UserRegistry.ps1`.
 2. Implement merge logic in the target platform's activation code.
 3. Add tests asserting override fields exist and are wired correctly.
 

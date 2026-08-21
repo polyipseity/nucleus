@@ -14,7 +14,7 @@ One configuration location for the entire host. Adding a second managed nucleus 
 
 ### Per-user homedir — `src/users/default/` + `src/users/<username>/`
 
-One config instance per OS user via homedir deployment (usually writable symlink). `default/` is the fallback template; per-user entries override at the first level only (see overlay merge rule).
+One config instance per OS user via homedir deployment (usually writable symlink). `default/` is the default template; per-user entries override at the first level only (see overlay merge rule).
 
 Examples: `agents/`, `cursor/`, `direnv/`, `plasma/desktop/`, `autocorrect/wordlist.txt`, `wallpapers/encrypted/*.sops`, `wallpapers/wallpapers/*.png`.
 
