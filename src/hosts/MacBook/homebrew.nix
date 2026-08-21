@@ -64,19 +64,16 @@ let
     "whatsapp@beta" # WhatsApp pre-release client
   ];
 
-  # QtPass (GUI frontend for pass/gopass) is intentionally absent from macOS
-  # Homebrew. The Homebrew cask fails Gatekeeper checks (app not notarized) and
-  # is scheduled for removal in September 2026. Use pass from the CLI or the
-  # nixpkgs-based qtpass (added to managedSystemPackages below). Windows uses
-  # WinGet IJHack.QtPass.
+  # QtPass (GUI frontend for pass/gopass) is routed to nixpkgs on macOS via
+  # nucleus.packages.selection.backendOverrides in core.nix (the Homebrew cask
+  # is broken/notarized), so it is contributed by core.nix's managedNixPackages
+  # rather than listed here. Windows uses WinGet IJHack.QtPass.
   managedCasks = builtins.sort (a: b: a < b) (lib.unique (staticManagedCasks ++ coreManagedCasks));
 
   # Nix-managed packages that must be in the system environment (not just the
   # user profile) because they need to be reachable from non-login shells or
-  # other accounts. CLI tools default to nixpkgs per AGENTS.md policy; qtpass
-  # is included here as a fallback since the Homebrew cask is broken.
+  # other accounts. CLI tools default to nixpkgs per AGENTS.md policy.
   managedSystemPackages = [
-    pkgs.qtpass
     (pkgs.pass.withExtensions (extensions: [ extensions.pass-otp ]))
   ];
 in

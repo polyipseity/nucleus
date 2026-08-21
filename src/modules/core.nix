@@ -658,13 +658,10 @@ let
       winget = "Python.Python.3.13";
     };
     qtpass = {
-      # Installed via MacBook/homebrew.nix managedSystemPackages (Homebrew cask
-      # is broken/notarized); not on nixpkgs to avoid a second install path.
+      # macOS installs via nixpkgs (pkgs.qtpass); the Homebrew cask is
+      # broken/notarized. Routed to nixpkgs on macOS via
+      # nucleus.packages.selection.backendOverrides.
       category = "gui";
-      homebrew = {
-        kind = "cask";
-        name = "qtpass";
-      };
       nixpkgs = "qtpass";
       winget = "IJHack.QtPass";
     };
@@ -1174,7 +1171,12 @@ in
           "nixpkgs"
         ]
       );
-      default = { };
+      # WHY: qtpass's Homebrew cask is broken/notarized on macOS; route it to
+      # nixpkgs (pkgs.qtpass) there instead. Windows still uses WinGet; NixOS is
+      # nixpkgs anyway, so this only changes macOS.
+      default = {
+        qtpass = "nixpkgs";
+      };
       example = {
         "google-chrome" = "nixpkgs";
       };
