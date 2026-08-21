@@ -1032,12 +1032,18 @@ let
   # `getAttr` treat a dotted string as a single literal top-level name and do
   # NOT traverse the path, so nested attrs (e.g. "llvmPackages_latest.llvm")
   # must be split first.
-  nixPkgsAttrPath = packageName: lib.strings.splitString "." managedPackages.${packageName}.nixpkgs;
+  nixPkgsAttrPath =
+    packageName:
+    let
+      attr = managedPackages.${packageName}.nixpkgs or null;
+    in
+    if attr == null then [ ] else lib.strings.splitString "." attr;
 
   # Managed packages routed to nixpkgs but absent from pkgs (platform-specific).
   missingNixPackageAttrs = builtins.filter (
     packageName:
-    managedPackagePlatformCompatible packageName
+    (managedPackages.${packageName}.nixpkgs or null) != null
+    && managedPackagePlatformCompatible packageName
     && (
       if pkgs.stdenv.hostPlatform.isDarwin then
         managedPackageBackends.${packageName} == "nixpkgs"
@@ -1069,14 +1075,16 @@ let
     if pkgs.stdenv.hostPlatform.isDarwin then
       builtins.filter (
         name:
-        managedPackageBackends.${name} == "nixpkgs"
+        (managedPackages.${name}.nixpkgs or null) != null
+        && managedPackageBackends.${name} == "nixpkgs"
         && managedPackagePlatformCompatible name
         && !(builtins.elem name posixProgramsProvidedPackages)
       ) enabledManagedPackageNames
     else
       builtins.filter (
         name:
-        managedPackagePlatformCompatible name
+        (managedPackages.${name}.nixpkgs or null) != null
+        && managedPackagePlatformCompatible name
         && nixPackageAttrAvailable name
         && !(builtins.elem name posixProgramsProvidedPackages)
       ) enabledManagedPackageNames
