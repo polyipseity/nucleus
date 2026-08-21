@@ -18,7 +18,7 @@ See `AGENTS.md` Repository Shape for the canonical repo layout. **Subagent path 
 ## Host conventions
 
 - Every host module must import `../../modules/core.nix` so the shared package set is consistently applied.
-- Both POSIX hosts must import `posix-base.nix`, `posix-security.nix`, `posix-sops.nix`, `posix-user-shell.nix`, and `gnupg.nix` — these replace duplicated system-layer options that previously lived in each host directly.
+- Both POSIX hosts must import `posix-base.nix`, `posix-security.nix`, `posix-sops.nix`, `posix-user-shell.nix`, and `gnupg.nix` — these provide the shared system-layer options.
 - System-specific options (drivers, hardware modules, kernel args) belong in the host file, not in shared modules.
 - Shared modules must not hardcode paths under `src/hosts/` (for example `../hosts/<host>/MANUAL.md`). If a shared module needs host-scoped data, declare a shared option in `src/modules/home.nix` (or another shared module) and set it from each host entrypoint.
 - Set each host's `system.stateVersion` to its bootstrap-era value and never bump it automatically.

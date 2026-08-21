@@ -116,7 +116,6 @@ Test step 04 (system-config-build):
   - PS1: always skips with "=== [4] System config build === SKIPPED (POSIX-only test suite)"
   - A skipped step exits with code 2 (not a failure).
   - No flag controls whether step runs.
-  - The --skip-system-build flag no longer exists.
 ```
 
 ## Spec E: PS1 parallelism

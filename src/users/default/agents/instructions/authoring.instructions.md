@@ -21,6 +21,7 @@ Default rule: write for readability in raw form, not for rendered aesthetics.
 - **Place by topic, not by end-of-file.** Find the most specific existing section that matches each fact. If a fact belongs inside an existing paragraph or bullet list, integrate it there — do not add a section elsewhere.
 - **Split facts across sections.** When a concept touches multiple topics, place each fragment in the section where it belongs rather than dumping everything in one place.
 - **Plan all edits first.** Before applying any changes, decide all edits across all target sections and files. Order edits bottom-up within each file and apply with a single `multi_replace_string_in_file` call per file.
+- **No historical asides.** Never annotate what changed, what a value used to be, or what a construct replaced (e.g. "(changed from a to b)", "previously lived in ...", "no longer exists", "replaces historical ..."). State the rule as it is now; if prior state matters for a decision, consult `programming-principles.instructions.md` (Chesterton's Fence) and read git history instead of embedding it in the doc.
 
 ## Document conventions
 
@@ -32,5 +33,6 @@ Default rule: write for readability in raw form, not for rendered aesthetics.
 ## Related instruction files
 
 - `programming-principles.instructions.md` — General coding conventions for document structure, naming, and formatting.
-- `workspace-guidance.instructions.md` — `.instructions.md` frontmatter structure and project-level source of truth conventions.
+- `workspace-guidance.instructions.md` — `.instructions.md` frontmatter structure and project-level source of
+- `maintain.instructions.md` — Maintainability policy: remove stale guidance aggressively, prefer deletion over abstraction. truth conventions.
 - `core-behavior.instructions.md` — Communication conventions, terminal hygiene, and output formatting rules.

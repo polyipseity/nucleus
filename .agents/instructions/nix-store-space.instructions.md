@@ -46,7 +46,7 @@ Shellcheck runs in CI (`nucleus-check-sh` / `script-tree.nix`), not per-app deri
 
 ## Dominant duplication (mitigated)
 
-Each `writeNucleusShellApplication` previously `cp -r` the full `scripts/` and `src/scripts/` trees. Shared derivations (`nucleus-script-tree`, `nucleus-scripts-bundle`) are symlinked into app `$out` to deduplicate store bytes — each app `$out` only adds two symlinks, so there is no per-app tree duplication.
+Each `writeNucleusShellApplication` symlinks shared derivations (`nucleus-script-tree`, `nucleus-scripts-bundle`) into app `$out` to deduplicate store bytes — each app `$out` only adds two symlinks, so there is no per-app tree duplication.
 
 ## Runtime copies (reflink)
 

@@ -211,8 +211,8 @@ check, not an escalation case.
 
 **Use canonical usernames in all code examples and documentation:**
 
-- **`admin`**: represents the primary/elevated user in examples. Use this for any context where the primary user is required or most common (e.g. `-PrimaryUsername 'admin'`, `-Users @('admin')`). Replaces historical context-specific usernames like `polyipseity`, `root`, etc.
-- **`guest`**: represents any secondary or unprivileged user. Use when examples need to show multi-user scenarios (e.g. `-Users @('admin', 'guest')`). Replaces historical placeholders like `john`, `otheruser`, `someone`, etc.
+- **`admin`**: represents the primary/elevated user in examples. Use this for any context where the primary user is required or most common (e.g. `-PrimaryUsername 'admin'`, `-Users @('admin')`).
+- **`guest`**: represents any secondary or unprivileged user. Use when examples need to show multi-user scenarios (e.g. `-Users @('admin', 'guest')`).
 
 This standardization makes examples portable and immediately clear about user context without needing explanation or configuration.
 
