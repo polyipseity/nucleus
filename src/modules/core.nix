@@ -1035,9 +1035,9 @@ let
           "linux"
         ];
     in
-    if pkgs.stdenv.isDarwin then
+    if pkgs.stdenv.hostPlatform.isDarwin then
       lib.elem "darwin" platforms
-    else if pkgs.stdenv.isLinux then
+    else if pkgs.stdenv.hostPlatform.isLinux then
       lib.elem "linux" platforms
     else
       true;
@@ -1053,7 +1053,12 @@ let
   missingNixPackageAttrs = builtins.filter (
     packageName:
     managedPackagePlatformCompatible packageName
-    && (if pkgs.stdenv.isDarwin then managedPackageBackends.${packageName} == "nixpkgs" else true)
+    && (
+      if pkgs.stdenv.hostPlatform.isDarwin then
+        managedPackageBackends.${packageName} == "nixpkgs"
+      else
+        true
+    )
     && !(lib.hasAttrByPath (nixPkgsAttrPath packageName) pkgs)
   ) enabledManagedPackageNames;
 
@@ -1076,7 +1081,7 @@ let
   ];
 
   managedNixPackages = map (packageName: lib.attrByPath (nixPkgsAttrPath packageName) null pkgs) (
-    if pkgs.stdenv.isDarwin then
+    if pkgs.stdenv.hostPlatform.isDarwin then
       builtins.filter (
         name:
         managedPackageBackends.${name} == "nixpkgs"
@@ -1102,7 +1107,7 @@ let
     in
     ((lib.attrByPath (lib.strings.splitString "." attr) null pkgs).meta.available or true);
 
-  managedHomebrewBrews = lib.optionals pkgs.stdenv.isDarwin (
+  managedHomebrewBrews = lib.optionals pkgs.stdenv.hostPlatform.isDarwin (
     builtins.filter (name: name != null) (
       map (
         packageName:
@@ -1117,7 +1122,7 @@ let
     )
   );
 
-  managedHomebrewCasks = lib.optionals pkgs.stdenv.isDarwin (
+  managedHomebrewCasks = lib.optionals pkgs.stdenv.hostPlatform.isDarwin (
     builtins.filter (name: name != null) (
       map (
         packageName:
@@ -1232,7 +1237,7 @@ in
       }) missingNixPackageAttrs;
     }
 
-    (lib.mkIf pkgs.stdenv.isDarwin {
+    (lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
       nucleus.macos.homebrew.brews = managedHomebrewBrews;
       nucleus.macos.homebrew.casks = managedHomebrewCasks;
     })

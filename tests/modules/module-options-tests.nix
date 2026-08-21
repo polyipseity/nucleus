@@ -77,7 +77,7 @@ let
 
   # Test 12: Verify condition-gated options use mkIf (not mkDefault on conditional content)
   test_conditional_options_structure = assert' (
-    containsRegex "lib\.mkIf pkgs\.stdenv\.isDarwin" coreModuleText
+    containsRegex "lib\.mkIf pkgs\.stdenv\.hostPlatform\.isDarwin" coreModuleText
     && containsRegex ''lib\.optionalAttrs \(options \? environment'' coreModuleText
     && containsRegex "mkHomeManagerUsers" flakeText
   ) "Conditional options should use mkIf, not implicit conditionals";
