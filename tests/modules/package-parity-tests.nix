@@ -198,6 +198,275 @@ let
       name = "vlc";
       nixpkgsAttr = "vlc";
     }
+    # --- Completed overlap entries (cross-platform, carry a winget.id) ---
+    {
+      name = "google-chrome@canary";
+      nixpkgsAttr = "google-chrome";
+    }
+    {
+      name = "chrome-remote-desktop";
+      nixpkgsAttr = "chrome-remote-desktop";
+    }
+    {
+      name = "gimp";
+      nixpkgsAttr = "gimp";
+    }
+    {
+      name = "qtpass";
+      nixpkgsAttr = "qtpass";
+    }
+    {
+      name = "neovim";
+      nixpkgsAttr = "neovim";
+    }
+    {
+      name = "krokiet";
+      nixpkgsAttr = "krokiet";
+    }
+    {
+      name = "parsec";
+      nixpkgsAttr = "parsec";
+    }
+    {
+      name = "peace-equalizer-apo";
+      nixpkgsAttr = "peace-equalizer-apo";
+    }
+    {
+      name = "equalizer-apo";
+      nixpkgsAttr = "equalizer-apo";
+    }
+    {
+      name = "steam";
+      nixpkgsAttr = "steam";
+    }
+    {
+      name = "telegram@beta";
+      nixpkgsAttr = "telegram-desktop";
+    }
+    {
+      name = "powersession";
+      nixpkgsAttr = "powersession";
+    }
+    {
+      name = "whatsapp-beta";
+      nixpkgsAttr = "whatsapp";
+    }
+    {
+      name = "powertoys";
+      nixpkgsAttr = "powertoys";
+    }
+    {
+      name = "windows-terminal-preview";
+      nixpkgsAttr = "windows-terminal-preview";
+    }
+    {
+      name = "scoop";
+      nixpkgsAttr = "scoop";
+    }
+    {
+      name = "winfsp";
+      nixpkgsAttr = "winfsp";
+    }
+    {
+      name = "7zip";
+      nixpkgsAttr = "p7zip";
+    }
+    {
+      name = "gpg4win";
+      nixpkgsAttr = "gnupg";
+    }
+    {
+      name = "zoxide";
+      nixpkgsAttr = "zoxide";
+    }
+    {
+      name = "ghostscript";
+      nixpkgsAttr = "ghostscript";
+    }
+    {
+      name = "packer";
+      nixpkgsAttr = "packer";
+    }
+    {
+      name = "uv";
+      nixpkgsAttr = "uv";
+    }
+    {
+      name = "ruff";
+      nixpkgsAttr = "ruff";
+    }
+    {
+      name = "ty";
+      nixpkgsAttr = "ty";
+    }
+    {
+      name = "ripgrep";
+      nixpkgsAttr = "ripgrep";
+    }
+    {
+      name = "caddy";
+      nixpkgsAttr = "caddy";
+    }
+    {
+      name = "bottom";
+      nixpkgsAttr = "bottom";
+    }
+    {
+      name = "direnv";
+      nixpkgsAttr = "direnv";
+    }
+    {
+      name = "starship";
+      nixpkgsAttr = "starship";
+    }
+    {
+      name = "eza";
+      nixpkgsAttr = "eza";
+    }
+    {
+      name = "git";
+      nixpkgsAttr = "gitFull";
+    }
+    {
+      name = "gh";
+      nixpkgsAttr = "gh";
+    }
+    {
+      name = "ffmpeg";
+      nixpkgsAttr = "ffmpeg-full";
+    }
+    {
+      name = "imagemagick";
+      nixpkgsAttr = "imagemagick";
+    }
+    {
+      name = "prek";
+      nixpkgsAttr = "prek";
+    }
+    {
+      name = "jq";
+      nixpkgsAttr = "jq";
+    }
+    {
+      name = "jellyfin";
+      nixpkgsAttr = "jellyfin";
+    }
+    {
+      name = "fzf";
+      nixpkgsAttr = "fzf";
+    }
+    {
+      name = "dotnet-runtime-6";
+      nixpkgsAttr = "dotnetCorePackages.runtime_6_0";
+    }
+    {
+      name = "powershell";
+      nixpkgsAttr = "powershell";
+    }
+    {
+      name = "ollama";
+      nixpkgsAttr = "ollama";
+    }
+    {
+      name = "bun";
+      nixpkgsAttr = "bun";
+    }
+    {
+      name = "rclone";
+      nixpkgsAttr = "rclone";
+    }
+    {
+      name = "actionlint";
+      nixpkgsAttr = "actionlint";
+    }
+    {
+      name = "rustup";
+      nixpkgsAttr = "rustup";
+    }
+    {
+      name = "sops";
+      nixpkgsAttr = "sops";
+    }
+    {
+      name = "bat";
+      nixpkgsAttr = "bat";
+    }
+    {
+      name = "fd";
+      nixpkgsAttr = "fd";
+    }
+    {
+      name = "shellcheck";
+      nixpkgsAttr = "shellcheck";
+    }
+    {
+      name = "opencode";
+      nixpkgsAttr = "opencode";
+    }
+    {
+      name = "pinact";
+      nixpkgsAttr = "pinact";
+    }
+    {
+      name = "python";
+      nixpkgsAttr = "python3";
+    }
+    {
+      name = "typst";
+      nixpkgsAttr = "typst";
+    }
+    {
+      name = "taplo";
+      nixpkgsAttr = "taplo";
+    }
+    {
+      name = "zizmor";
+      nixpkgsAttr = "zizmor";
+    }
+    {
+      name = "sccache";
+      nixpkgsAttr = "sccache";
+    }
+    {
+      name = "shfmt";
+      nixpkgsAttr = "shfmt";
+    }
+    {
+      name = "llvm";
+      nixpkgsAttr = "llvmPackages_latest.llvm";
+    }
+    {
+      name = "platform-tools";
+      nixpkgsAttr = "android-tools";
+    }
+    {
+      name = "source-serif";
+      nixpkgsAttr = "source-serif";
+    }
+    {
+      name = "jetbrains-mono-nerd-font";
+      nixpkgsAttr = "nerd-fonts.jetbrains-mono";
+    }
+    {
+      name = "noto-sans-cjk-sc";
+      nixpkgsAttr = "noto-fonts-cjk-sans";
+    }
+    {
+      name = "noto-sans-cjk-tc";
+      nixpkgsAttr = "noto-fonts-cjk-sans";
+    }
+    {
+      name = "noto-serif-cjk-sc";
+      nixpkgsAttr = "noto-fonts-cjk-serif";
+    }
+    {
+      name = "noto-serif-cjk-tc";
+      nixpkgsAttr = "noto-fonts-cjk-serif";
+    }
+    {
+      name = "inter";
+      nixpkgsAttr = "inter";
+    }
     {
       name = "zoom";
       nixpkgsAttr = "zoom-us";

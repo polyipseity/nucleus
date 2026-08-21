@@ -64,11 +64,44 @@ let
 
   test_jdk_enabled_on_windows = assert' (builtins.elem "EclipseAdoptium.Temurin.25.JDK" resolvedWindowsPackages) "Temurin JDK 25 must be enabled on Windows";
 
+  # Every WinGet id declared in packages.dsc.yml MUST be covered by the
+  # generated allow-list, otherwise apply.ps1 would silently drop that DSC
+  # resource at provisioning time. Cursor is the single intentional exception
+  # (overlappingPackages.cursor.enable=false disables it everywhere).
+  dscPath = ../../src/hosts/Windows/system/packages.dsc.yml;
+  dscText = builtins.readFile dscPath;
+  # Nix has no native YAML parser; extract `settings.id:` lines (8-space indent)
+  # via regex. This matches the DSC package resource id field precisely.
+  dscLines = lib.splitString "\n" dscText;
+  dscIdsRaw = builtins.filter (l: builtins.match "^        id: .*" l != null) dscLines;
+  dscIds = builtins.map (l: builtins.substring 12 (builtins.stringLength l - 12) l) dscIdsRaw;
+  test_dsc_ids_covered_by_allowlist =
+    assert'
+      (builtins.all (id: builtins.elem id resolvedWindowsPackages || id == "Anysphere.Cursor") dscIds)
+      "Every DSC WinGet id must be in the generated allow-list (cursor is the only allowed exception): dscIds=${builtins.toString dscIds}";
+
+  # The committed artifact must be byte-deterministic: object keys sorted
+  # case-sensitively, the packages array sorted case-sensitively, and exactly
+  # one trailing newline. This guards against hand-edits that break diffs.
+  committedRaw = builtins.readFile ../../src/hosts/Windows/system/winget-packages.json;
+  # Strip the single trailing newline for key/array shape checks (Nix regex has
+  # no "\n" escape, and builtins.match anchors to the whole string).
+  committedBody = lib.removeSuffix "\n" committedRaw;
+  # Trailing newline: the raw text ends with exactly one "\n" (not two).
+  committedEndsWithSingleNewline =
+    builtins.match ".*\n" committedRaw != null && builtins.match ".*\n\n" committedRaw == null;
+  committedSortedKeys = builtins.match ''^\{.*"\$schema".*"packages".*\}$'' committedBody != null; # array present
+  test_committed_json_sorted_and_terminated = assert' (
+    committedEndsWithSingleNewline && committedSortedKeys
+  ) "winget-packages.json must have sorted keys and exactly one trailing newline";
+
   allTests = [
     test_resolved_matches_committed
     test_cursor_disabled_on_windows
     test_obs_enabled_on_windows
     test_jdk_enabled_on_windows
+    test_dsc_ids_covered_by_allowlist
+    test_committed_json_sorted_and_terminated
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {
