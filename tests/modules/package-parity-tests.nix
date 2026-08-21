@@ -204,10 +204,6 @@ let
       nixpkgs = "google-chrome";
     }
     {
-      name = "chrome-remote-desktop";
-      nixpkgs = "chrome-remote-desktop";
-    }
-    {
       name = "gimp";
       nixpkgs = "gimp";
     }
@@ -220,52 +216,12 @@ let
       nixpkgs = "neovim";
     }
     {
-      name = "krokiet";
-      nixpkgs = "krokiet";
-    }
-    {
-      name = "parsec";
-      nixpkgs = "parsec";
-    }
-    {
-      name = "peace-equalizer-apo";
-      nixpkgs = "peace-equalizer-apo";
-    }
-    {
-      name = "equalizer-apo";
-      nixpkgs = "equalizer-apo";
-    }
-    {
       name = "steam";
       nixpkgs = "steam";
     }
     {
       name = "telegram@beta";
       nixpkgs = "telegram-desktop";
-    }
-    {
-      name = "powersession";
-      nixpkgs = "powersession";
-    }
-    {
-      name = "whatsapp-beta";
-      nixpkgs = "whatsapp";
-    }
-    {
-      name = "powertoys";
-      nixpkgs = "powertoys";
-    }
-    {
-      name = "windows-terminal-preview";
-      nixpkgs = "windows-terminal-preview";
-    }
-    {
-      name = "scoop";
-      nixpkgs = "scoop";
-    }
-    {
-      name = "winfsp";
-      nixpkgs = "winfsp";
     }
     {
       name = "7zip";
@@ -627,6 +583,25 @@ let
     }
   ];
 
+  # managedPackages entries that intentionally have NO nixpkgs attr (the
+  # attribute does not exist in nixpkgs; they are WinGet-only or macOS-cask
+  # only). Listed here so the coverage guard still accounts for them.
+  noNixpkgsAttrPackages = [
+    "chrome-remote-desktop"
+    "equaliser"
+    "equalizer-apo"
+    "krokiet"
+    "parsec"
+    "peace-equalizer-apo"
+    "powertoys"
+    "powersession"
+    "scoop"
+    "vscode-insiders"
+    "whatsapp-beta"
+    "winfsp"
+    "windows-terminal-preview"
+  ];
+
   test_overlapping_packages_have_nixpkgs = assert' (builtins.all
     (p: builtins.match (".*" + p.nixpkgs + ".*") coreModuleText != null)
     crossPlatformOverlapAttrs
@@ -696,12 +671,28 @@ let
       extractedNames = map builtins.head listElements;
       crossPlatformNames = map (p: p.name) crossPlatformOverlapAttrs;
       darwinOnlyNames = map (p: p.name) darwinOnlyPackages;
-      knownNames = crossPlatformNames ++ darwinOnlyNames;
+      knownNames = crossPlatformNames ++ darwinOnlyNames ++ noNixpkgsAttrPackages;
       uncovered = builtins.filter (n: !(builtins.elem n knownNames)) extractedNames;
     in
     assert' (
       uncovered == [ ]
     ) "All managedPackages entries must be covered by tests: ${builtins.toString uncovered}";
+
+  # Regression guard: every nixpkgs attr declared in managedPackages must
+  # resolve to an existing nixpkgs attribute. Catches future bogus fields like
+  # the 13 removed in the cleanup (attrs absent from nixpkgs).
+  test_managed_nixpkgs_attrs_resolve =
+    let
+      pkgs' = import <nixpkgs> { };
+      pathOf = s: lib.strings.splitString "." s;
+      resolves = s: lib.hasAttrByPath (pathOf s) pkgs';
+      # Extract every `nixpkgs = "...";` string from core.nix.
+      matches = builtins.split "nixpkgs = \"([^\"]+)\";" coreModuleText;
+      isStr = x: builtins.isString x;
+      strings = builtins.filter isStr matches;
+      attrs = builtins.filter (s: builtins.match "[a-zA-Z0-9_.-]+" s != null) strings;
+    in
+    assert' (builtins.all resolves attrs) "All managedPackages nixpkgs attrs must resolve in nixpkgs";
 
   allTests = [
     test_nixpkgs_coverage
@@ -716,6 +707,7 @@ let
     test_darwin_only_absent_on_linux
     test_dotted_nixpkgs_paths_resolve
     test_all_overlapping_packages_covered
+    test_managed_nixpkgs_attrs_resolve
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {
