@@ -1081,11 +1081,10 @@
             };
           };
         in
-        builtins.toJSON {
+        (import ./modules/lib/json.nix { lib = nixpkgs.lib; }).toSortedJSON {
           "$schema" = "./winget-packages.schema.json";
           packages = evaluated.config.nucleus.windows.generatedWinget.packages;
         }
-        + "\n"
       );
 
       # -----------------------------------------------------------------------

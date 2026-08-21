@@ -118,7 +118,10 @@ function Set-ConfigValue {
     $current[$keys[-1]] = $rawValue
   }
 
-  $cfg | ConvertTo-Json -Depth 10 | Set-Content -Path $configFile -NoNewline
+  # ConvertTo-Json does not sort keys; the committed config is not a parity
+  # artifact, but we still emit a single trailing newline (Set-Content
+  # -NoNewline strips it). See json-generation.instructions.md.
+  $cfg | ConvertTo-Json -Depth 10 | ForEach-Object { $_ + [Environment]::NewLine } | Set-Content -Path $configFile -NoNewline
 }
 
 function Out-ConfigValueList {

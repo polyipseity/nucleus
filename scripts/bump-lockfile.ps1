@@ -774,9 +774,10 @@ if (-not $changed) {
 # must not rewrite the file (avoids timestamp churn and spurious git diffs).
 $ht['updated'] = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ssZ' -AsUTC)
 
-# Convert hashtable back to sorted JSON. Use a depth of 10 for nested objects.
-# ConvertTo-Json sorts keys recursively; append exactly one trailing newline to
-# match the bash writer's `printf '%s\n'` contract.
+# Convert hashtable back to JSON. Use a depth of 10 for nested objects.
+# NOTE: ConvertTo-Json does NOT sort keys (it preserves insertion order), so the
+# hashtable must already be keyed in the desired order. Append exactly one
+# trailing newline to match the bash writer's `printf '%s\n'` contract.
 $outputJson = ($ht | ConvertTo-Json -Depth 10) + [Environment]::NewLine
 
 $tmpFile = [System.IO.Path]::GetTempFileName()
