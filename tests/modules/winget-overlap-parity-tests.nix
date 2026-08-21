@@ -80,20 +80,26 @@ let
       (builtins.all (id: builtins.elem id resolvedWindowsPackages || id == "Anysphere.Cursor") dscIds)
       "Every DSC WinGet id must be in the generated allow-list (cursor is the only allowed exception): dscIds=${builtins.toString dscIds}";
 
-  # The committed artifact must be byte-deterministic: object keys sorted
-  # case-sensitively, the packages array sorted case-sensitively, and exactly
-  # one trailing newline. This guards against hand-edits that break diffs.
+  # The committed artifact must be byte-deterministic: multi-line, 2-space
+  # indented, object keys sorted case-sensitively, the packages array sorted
+  # case-sensitively, and exactly one trailing newline. This guards against
+  # hand-edits that break diffs.
   committedRaw = builtins.readFile ../../src/hosts/Windows/system/winget-packages.json;
-  # Strip the single trailing newline for key/array shape checks (Nix regex has
-  # no "\n" escape, and builtins.match anchors to the whole string).
+  # Strip the single trailing newline for shape checks (Nix regex has no "\n"
+  # escape, and builtins.match anchors to the whole string).
   committedBody = lib.removeSuffix "\n" committedRaw;
   # Trailing newline: the raw text ends with exactly one "\n" (not two).
   committedEndsWithSingleNewline =
     builtins.match ".*\n" committedRaw != null && builtins.match ".*\n\n" committedRaw == null;
-  committedSortedKeys = builtins.match ''^\{.*"\$schema".*"packages".*\}$'' committedBody != null; # array present
+  # Multi-line: the body contains at least one newline (Nix ERE "." does not
+  # match "\n", so the prior one-line regex could not span lines).
+  committedIsMultiline = builtins.match ".*\n.*" committedBody != null;
+  # Keys present: the document has both "$schema" and "packages" keys.
+  committedHasKeys =
+    builtins.hasAttr "$schema" committedDoc && builtins.hasAttr "packages" committedDoc;
   test_committed_json_sorted_and_terminated = assert' (
-    committedEndsWithSingleNewline && committedSortedKeys
-  ) "winget-packages.json must have sorted keys and exactly one trailing newline";
+    committedEndsWithSingleNewline && committedIsMultiline && committedHasKeys
+  ) "winget-packages.json must be multi-line with sorted keys and exactly one trailing newline";
 
   allTests = [
     test_resolved_matches_committed
