@@ -99,6 +99,9 @@ let
         name = "blender";
       };
       nixpkgsAttr = "blender";
+      winget = {
+        id = "BlenderFoundation.Blender";
+      };
     };
     czkawka = {
       category = "gui";
@@ -107,6 +110,9 @@ let
         name = "czkawka";
       };
       nixpkgsAttr = "czkawka";
+      winget = {
+        id = "qarmin.czkawka.cli";
+      };
     };
     "discord@canary" = {
       category = "gui";
@@ -115,6 +121,9 @@ let
         name = "discord@canary";
       };
       nixpkgsAttr = "discord-canary";
+      winget = {
+        id = "Discord.Discord.Canary";
+      };
     };
     google-chrome = {
       category = "gui";
@@ -123,6 +132,9 @@ let
         name = "google-chrome";
       };
       nixpkgsAttr = "google-chrome";
+      winget = {
+        id = "Google.Chrome";
+      };
     };
     iterm2 = {
       category = "gui";
@@ -140,6 +152,9 @@ let
         name = "krita";
       };
       nixpkgsAttr = "krita";
+      winget = {
+        id = "KDE.Krita";
+      };
     };
     libreoffice = {
       category = "gui";
@@ -148,6 +163,9 @@ let
         name = "libreoffice";
       };
       nixpkgsAttr = "libreoffice";
+      winget = {
+        id = "TheDocumentFoundation.LibreOffice";
+      };
     };
     obsidian = {
       category = "gui";
@@ -156,6 +174,9 @@ let
         name = "obsidian";
       };
       nixpkgsAttr = "obsidian";
+      winget = {
+        id = "Obsidian.Obsidian";
+      };
     };
     "musicbrainz-picard" = {
       category = "gui";
@@ -164,6 +185,9 @@ let
         name = "musicbrainz-picard";
       };
       nixpkgsAttr = "picard";
+      winget = {
+        id = "MusicBrainz.Picard";
+      };
     };
     qemu = {
       category = "cli";
@@ -252,15 +276,24 @@ let
         name = "visual-studio-code";
       };
       nixpkgsAttr = "vscode";
+      winget = {
+        id = "Microsoft.VisualStudioCode";
+      };
     };
     "visual-studio-code@insiders" = {
-      category = "gui";
+      # Was darwin-only for nix; now also provisioned on Windows via WinGet.
+      # No nixpkgs attr for the insiders build, so skip the nix side.
       platforms = [ "darwin" ];
+      skipNix = true;
+      category = "gui";
       homebrew = {
         kind = "cask";
         name = "visual-studio-code@insiders";
       };
       nixpkgsAttr = "vscode-insiders";
+      winget = {
+        id = "Microsoft.VisualStudioCode.Insiders";
+      };
     };
     vlc = {
       category = "gui";
@@ -269,6 +302,9 @@ let
         name = "vlc";
       };
       nixpkgsAttr = "vlc";
+      winget = {
+        id = "VideoLAN.VLC";
+      };
     };
     zoom = {
       category = "gui";
@@ -277,6 +313,857 @@ let
         name = "zoom";
       };
       nixpkgsAttr = "zoom-us";
+      winget = {
+        id = "Zoom.Zoom";
+      };
+    };
+
+    # -----------------------------------------------------------------------
+    # Completed cross-platform overlap entries. Each carries a `winget.id` so
+    # the Windows allow-list (winget-packages.json) covers it. Entries whose
+    # nixpkgsAttr is already installed by baseSharedPackages / a dedicated
+    # module / fonts.nix set `skipNix = true` to avoid double-installing on
+    # macOS/NixOS while still reaching the Windows allow-list.
+    # -----------------------------------------------------------------------
+
+    # --- NEW: cross-platform packages not yet in the registry ---
+    "google-chrome@canary" = {
+      # No nixpkgs attr (canary is a Homebrew cask / WinGet-only channel); the
+      # macOS cask is declared in MacBook/homebrew.nix, so skip the nix side.
+      skipNix = true;
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "google-chrome@canary";
+      };
+      nixpkgsAttr = "google-chrome";
+      winget = {
+        id = "Google.Chrome.Canary";
+      };
+    };
+    "chrome-remote-desktop" = {
+      # macOS cask chrome-remote-desktop-host is in MacBook/homebrew.nix; the
+      # nixpkgs attr is linux-only, so skip the nix side to avoid a darwin eval
+      # failure (overlapNixAttrAvailable guards linux anyway).
+      skipNix = true;
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "chrome-remote-desktop-host";
+      };
+      nixpkgsAttr = "chrome-remote-desktop";
+      winget = {
+        id = "Google.ChromeRemoteDesktopHost";
+      };
+    };
+    gimp = {
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "gimp";
+      };
+      nixpkgsAttr = "gimp";
+      winget = {
+        id = "GIMP.GIMP";
+      };
+    };
+    qtpass = {
+      # Installed via MacBook/homebrew.nix managedSystemPackages (Homebrew cask
+      # is broken/notarized); skip the nix side to avoid a second install path.
+      skipNix = true;
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "qtpass";
+      };
+      nixpkgsAttr = "qtpass";
+      winget = {
+        id = "IJHack.QtPass";
+      };
+    };
+    neovim = {
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "neovim";
+      };
+      nixpkgsAttr = "neovim";
+      winget = {
+        id = "Neovim.Neovim";
+      };
+    };
+    krokiet = {
+      # WinGet-only (no nixpkgs attr); Windows installs via WinGet.
+      skipNix = true;
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "krokiet";
+      };
+      nixpkgsAttr = "krokiet";
+      winget = {
+        id = "qarmin.krokiet";
+      };
+    };
+    parsec = {
+      # macOS cask is in MacBook/homebrew.nix; no nixpkgs attr, so skip nix.
+      skipNix = true;
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "parsec";
+      };
+      nixpkgsAttr = "parsec";
+      winget = {
+        id = "Parsec.Parsec";
+      };
+    };
+    "peace-equalizer-apo" = {
+      # WinGet-only (no nixpkgs attr); Windows installs via WinGet.
+      skipNix = true;
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "peace-equalizer-apo";
+      };
+      nixpkgsAttr = "peace-equalizer-apo";
+      winget = {
+        id = "PeterVerbeek.PeaceEqualizerAPO";
+      };
+    };
+    "equalizer-apo" = {
+      # WinGet-only (no nixpkgs attr); Windows installs via WinGet.
+      skipNix = true;
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "equalizer-apo";
+      };
+      nixpkgsAttr = "equalizer-apo";
+      winget = {
+        id = "EqualizerAPO.EqualizerAPO";
+      };
+    };
+    steam = {
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "steam";
+      };
+      nixpkgsAttr = "steam";
+      winget = {
+        id = "Valve.Steam";
+      };
+    };
+    "telegram@beta" = {
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "telegram-desktop@beta";
+      };
+      nixpkgsAttr = "telegram-desktop";
+      winget = {
+        id = "Telegram.TelegramDesktop.Beta";
+      };
+    };
+    powersession = {
+      # WinGet-only (no nixpkgs attr); Windows installs via WinGet.
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "powersession";
+      };
+      nixpkgsAttr = "powersession";
+      winget = {
+        id = "Watfaq.PowerSession";
+      };
+    };
+
+    # --- MSSTORE: WhatsApp Beta uses its Store id as the allow-list key ---
+    "whatsapp-beta" = {
+      # Allow-list is source-agnostic: the converter matches `settings.id`
+      # regardless of `source: msstore`, so the Store id is a valid winget.id.
+      # macOS beta cask is in MacBook/homebrew.nix; no nixpkgs attr, skip nix.
+      skipNix = true;
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "whatsapp@beta";
+      };
+      nixpkgsAttr = "whatsapp";
+      winget = {
+        id = "9NBDXK71NK08";
+      };
+    };
+
+    # --- WIN-ONLY: Windows infrastructure, never provisioned on macOS/NixOS ---
+    powertoys = {
+      skipNix = true;
+      platforms = [ "linux" ];
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "powertoys";
+      };
+      nixpkgsAttr = "powertoys";
+      winget = {
+        id = "Microsoft.PowerToys";
+      };
+    };
+    "windows-terminal-preview" = {
+      skipNix = true;
+      platforms = [ "linux" ];
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "windows-terminal-preview";
+      };
+      nixpkgsAttr = "windows-terminal-preview";
+      winget = {
+        id = "Microsoft.WindowsTerminal.Preview";
+      };
+    };
+    scoop = {
+      skipNix = true;
+      platforms = [ "linux" ];
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "scoop";
+      };
+      nixpkgsAttr = "scoop";
+      winget = {
+        id = "Scoop.Scoop";
+      };
+    };
+    winfsp = {
+      skipNix = true;
+      platforms = [ "linux" ];
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "winfsp";
+      };
+      nixpkgsAttr = "winfsp";
+      winget = {
+        id = "WinFsp.WinFsp";
+      };
+    };
+
+    # --- DUP: already in baseSharedPackages / fonts.nix / dedicated modules ---
+    # These carry a `winget.id` so the Windows allow-list covers them, but
+    # `skipNix = true` prevents a second nix install (the real install path is
+    # baseSharedPackages, fonts.nix, or a dedicated module).
+    "7zip" = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "p7zip";
+      };
+      nixpkgsAttr = "p7zip";
+      winget = {
+        id = "7zip.7zip";
+      };
+    };
+    gpg4win = {
+      # Installed via baseSharedPackages (pkgs.gnupg); skip the nix side here.
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "gnupg";
+      };
+      nixpkgsAttr = "gnupg";
+      winget = {
+        id = "GnuPG.Gpg4win";
+      };
+    };
+    zoxide = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "zoxide";
+      };
+      nixpkgsAttr = "zoxide";
+      winget = {
+        id = "ajeetdsouza.zoxide";
+      };
+    };
+    ghostscript = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "ghostscript";
+      };
+      nixpkgsAttr = "ghostscript";
+      winget = {
+        id = "ArtifexSoftware.GhostScript";
+      };
+    };
+    packer = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "packer";
+      };
+      nixpkgsAttr = "packer";
+      winget = {
+        id = "HashiCorp.Packer";
+      };
+    };
+    uv = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "uv";
+      };
+      nixpkgsAttr = "uv";
+      winget = {
+        id = "astral-sh.uv";
+      };
+    };
+    ruff = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "ruff";
+      };
+      nixpkgsAttr = "ruff";
+      winget = {
+        id = "astral-sh.ruff";
+      };
+    };
+    ty = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "ty";
+      };
+      nixpkgsAttr = "ty";
+      winget = {
+        id = "astral-sh.ty";
+      };
+    };
+    ripgrep = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "ripgrep";
+      };
+      nixpkgsAttr = "ripgrep";
+      winget = {
+        id = "BurntSushi.ripgrep";
+      };
+    };
+    caddy = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "caddy";
+      };
+      nixpkgsAttr = "caddy";
+      winget = {
+        id = "CaddyServer.Caddy";
+      };
+    };
+    bottom = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "bottom";
+      };
+      nixpkgsAttr = "bottom";
+      winget = {
+        id = "Clement.bottom";
+      };
+    };
+    direnv = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "direnv";
+      };
+      nixpkgsAttr = "direnv";
+      winget = {
+        id = "direnv.direnv";
+      };
+    };
+    starship = {
+      # Installed by starship.nix (home.packages); skip the nix side here.
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "starship";
+      };
+      nixpkgsAttr = "starship";
+      winget = {
+        id = "Starship.Starship";
+      };
+    };
+    eza = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "eza";
+      };
+      nixpkgsAttr = "eza";
+      winget = {
+        id = "eza-community.eza";
+      };
+    };
+    git = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "git";
+      };
+      nixpkgsAttr = "gitFull";
+      winget = {
+        id = "Git.Git";
+      };
+    };
+    gh = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "gh";
+      };
+      nixpkgsAttr = "gh";
+      winget = {
+        id = "GitHub.cli";
+      };
+    };
+    ffmpeg = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "ffmpeg";
+      };
+      nixpkgsAttr = "ffmpeg-full";
+      winget = {
+        id = "Gyan.FFmpeg";
+      };
+    };
+    imagemagick = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "imagemagick";
+      };
+      nixpkgsAttr = "imagemagick";
+      winget = {
+        id = "ImageMagick.ImageMagick";
+      };
+    };
+    prek = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "prek";
+      };
+      nixpkgsAttr = "prek";
+      winget = {
+        id = "j178.Prek";
+      };
+    };
+    jq = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "jq";
+      };
+      nixpkgsAttr = "jq";
+      winget = {
+        id = "jqlang.jq";
+      };
+    };
+    jellyfin = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "jellyfin";
+      };
+      nixpkgsAttr = "jellyfin";
+      winget = {
+        id = "Jellyfin.Server";
+      };
+    };
+    fzf = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "fzf";
+      };
+      nixpkgsAttr = "fzf";
+      winget = {
+        id = "junegunn.fzf";
+      };
+    };
+    "dotnet-runtime-6" = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "dotnet";
+      };
+      nixpkgsAttr = "dotnetCorePackages.runtime_6_0";
+      winget = {
+        id = "Microsoft.DotNet.Runtime.6";
+      };
+    };
+    powershell = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "powershell";
+      };
+      nixpkgsAttr = "powershell";
+      winget = {
+        id = "Microsoft.PowerShell";
+      };
+    };
+    ollama = {
+      # Installed by ai/default.nix (home.packages); skip the nix side here.
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "ollama";
+      };
+      nixpkgsAttr = "ollama";
+      winget = {
+        id = "Ollama.Ollama";
+      };
+    };
+    bun = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "bun";
+      };
+      nixpkgsAttr = "bun";
+      winget = {
+        id = "Oven-sh.Bun";
+      };
+    };
+    rclone = {
+      # Installed by cloud-drives.nix (home.packages); skip the nix side here.
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "rclone";
+      };
+      nixpkgsAttr = "rclone";
+      winget = {
+        id = "Rclone.Rclone";
+      };
+    };
+    actionlint = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "actionlint";
+      };
+      nixpkgsAttr = "actionlint";
+      winget = {
+        id = "rhysd.actionlint";
+      };
+    };
+    rustup = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "rustup";
+      };
+      nixpkgsAttr = "rustup";
+      winget = {
+        id = "Rustlang.Rustup";
+      };
+    };
+    sops = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "sops";
+      };
+      nixpkgsAttr = "sops";
+      winget = {
+        id = "SecretsOPerationS.SOPS";
+      };
+    };
+    bat = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "bat";
+      };
+      nixpkgsAttr = "bat";
+      winget = {
+        id = "sharkdp.bat";
+      };
+    };
+    fd = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "fd";
+      };
+      nixpkgsAttr = "fd";
+      winget = {
+        id = "sharkdp.fd";
+      };
+    };
+    shellcheck = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "shellcheck";
+      };
+      nixpkgsAttr = "shellcheck";
+      winget = {
+        id = "ShellCheck.ShellCheck";
+      };
+    };
+    opencode = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "opencode";
+      };
+      nixpkgsAttr = "opencode";
+      winget = {
+        id = "SST.opencode";
+      };
+    };
+    pinact = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "pinact";
+      };
+      nixpkgsAttr = "pinact";
+      winget = {
+        id = "suzuki-shunsuke.pinact";
+      };
+    };
+    python = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "python";
+      };
+      nixpkgsAttr = "python3";
+      winget = {
+        id = "Python.Python.3.13";
+      };
+    };
+    typst = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "typst";
+      };
+      nixpkgsAttr = "typst";
+      winget = {
+        id = "Typst.Typst";
+      };
+    };
+    taplo = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "taplo";
+      };
+      nixpkgsAttr = "taplo";
+      winget = {
+        id = "tamasfe.taplo";
+      };
+    };
+    zizmor = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "zizmor";
+      };
+      nixpkgsAttr = "zizmor";
+      winget = {
+        id = "zizmor.zizmor";
+      };
+    };
+    sccache = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "sccache";
+      };
+      nixpkgsAttr = "sccache";
+      winget = {
+        id = "Mozilla.sccache";
+      };
+    };
+    shfmt = {
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "shfmt";
+      };
+      nixpkgsAttr = "shfmt";
+      # WHY: shfmt is a single static binary; no separate macOS cask exists.
+      winget = {
+        id = "mvdan.shfmt";
+      };
+    };
+    llvm = {
+      # Multiple nixpkgs attrs (clang/lldb/lld); no single top-level attr. The
+      # real install is baseSharedPackages (llvmPackages.*). Skip the nix side.
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "llvm";
+      };
+      nixpkgsAttr = "llvmPackages_latest.llvm";
+      winget = {
+        id = "LLVM.LLVM";
+      };
+    };
+    "platform-tools" = {
+      # Installed via baseSharedPackages (pkgs.android-tools); skip the nix side.
+      skipNix = true;
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "android-platform-tools";
+      };
+      nixpkgsAttr = "android-tools";
+      winget = {
+        id = "Google.PlatformTools";
+      };
+    };
+
+    # --- DUP: fonts already installed via fonts.nix (home.packages) ---
+    "source-serif" = {
+      skipNix = true;
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "font-source-serif";
+      };
+      nixpkgsAttr = "source-serif";
+      winget = {
+        id = "Adobe.SourceSerif4";
+      };
+    };
+    "jetbrains-mono-nerd-font" = {
+      skipNix = true;
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "font-jetbrains-mono-nerd-font";
+      };
+      nixpkgsAttr = "nerd-fonts.jetbrains-mono";
+      winget = {
+        id = "DEVCOM.JetBrainsMonoNerdFont";
+      };
+    };
+    "noto-sans-cjk-sc" = {
+      skipNix = true;
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "font-noto-sans-cjk-sc";
+      };
+      nixpkgsAttr = "noto-fonts-cjk-sans";
+      winget = {
+        id = "Google.NotoSans.CJK.SC";
+      };
+    };
+    "noto-sans-cjk-tc" = {
+      skipNix = true;
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "font-noto-sans-cjk-tc";
+      };
+      nixpkgsAttr = "noto-fonts-cjk-sans";
+      winget = {
+        id = "Google.NotoSans.CJK.TC";
+      };
+    };
+    "noto-serif-cjk-sc" = {
+      skipNix = true;
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "font-noto-serif-cjk-sc";
+      };
+      nixpkgsAttr = "noto-fonts-cjk-serif";
+      winget = {
+        id = "Google.NotoSerif.CJK.SC";
+      };
+    };
+    "noto-serif-cjk-tc" = {
+      skipNix = true;
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "font-noto-serif-cjk-tc";
+      };
+      nixpkgsAttr = "noto-fonts-cjk-serif";
+      winget = {
+        id = "Google.NotoSerif.CJK.TC";
+      };
+    };
+    inter = {
+      skipNix = true;
+      category = "gui";
+      homebrew = {
+        kind = "cask";
+        name = "font-inter";
+      };
+      nixpkgsAttr = "inter";
+      winget = {
+        id = "Inter.Inter";
+      };
     };
   };
 
@@ -355,16 +1242,23 @@ let
   # is x86_64-linux only; the nixos-generators guest builds aarch64-linux).
   # meta.available reads lazily and does NOT trigger check-meta's refusal
   # assertion, so filtering by it safely drops arch-incompatible packages.
+  # Whether the overlap entry is installed by another path (baseSharedPackages,
+  # a dedicated module, or fonts.nix) and must NOT be re-added here. Such entries
+  # still carry a `winget.id` so the Windows allow-list covers them, but they
+  # are skipped on the nixpkgs side to avoid double-installing.
+  overlapNixSkipped = name: overlappingPackages.${name}.skipNix or false;
+
   overlapNixPackages =
     map (packageName: builtins.getAttr overlappingPackages.${packageName}.nixpkgsAttr pkgs)
       (
         if pkgs.stdenv.isDarwin then
           builtins.filter (
-            name: selectedOverlapBackends.${name} == "nixpkgs" && platformCompatible name
+            name:
+            !overlapNixSkipped name && selectedOverlapBackends.${name} == "nixpkgs" && platformCompatible name
           ) enabledOverlapPackageNames
         else
           builtins.filter (
-            name: platformCompatible name && overlapNixAttrAvailable name
+            name: !overlapNixSkipped name && platformCompatible name && overlapNixAttrAvailable name
           ) enabledOverlapPackageNames
       );
 
@@ -385,7 +1279,11 @@ let
         let
           meta = overlappingPackages.${packageName};
         in
-        if selectedOverlapBackends.${packageName} == "homebrew" && meta.homebrew.kind == "brew" then
+        if
+          !overlapNixSkipped packageName
+          && selectedOverlapBackends.${packageName} == "homebrew"
+          && meta.homebrew.kind == "brew"
+        then
           meta.homebrew.name
         else
           null
@@ -400,7 +1298,11 @@ let
         let
           meta = overlappingPackages.${packageName};
         in
-        if selectedOverlapBackends.${packageName} == "homebrew" && meta.homebrew.kind == "cask" then
+        if
+          !overlapNixSkipped packageName
+          && selectedOverlapBackends.${packageName} == "homebrew"
+          && meta.homebrew.kind == "cask"
+        then
           meta.homebrew.name
         else
           null
@@ -525,10 +1427,15 @@ in
       );
 
       # Windows-resolved WinGet ID set (host-agnostic; identical wherever Nix runs).
-      nucleus.windows.generatedWinget.packages = builtins.map (n: overlappingPackages.${n}.winget.id) (
-        builtins.filter (
-          n: (overlappingPackages.${n}.winget or null) != null && overlapEnabledForHost "Windows" n
-        ) overlapPackageNames
+      # Windows installs via WinGet, an axis orthogonal to the nix `platforms`
+      # field (which governs darwin/linux nix provisioning only). Any entry with
+      # a `winget.id` enabled for Windows enters the set regardless of `platforms`.
+      nucleus.windows.generatedWinget.packages = builtins.sort (a: b: a < b) (
+        builtins.map (n: overlappingPackages.${n}.winget.id) (
+          builtins.filter (
+            n: (overlappingPackages.${n}.winget or null) != null && overlapEnabledForHost "Windows" n
+          ) overlapPackageNames
+        )
       );
     }
   ];
