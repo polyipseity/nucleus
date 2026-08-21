@@ -255,6 +255,8 @@ in
           # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
           # camilladsp/configs/MacBook/default.yml — Method 1 (writable symlink) consumed via directory symlink above
           # check-suppress:config-method: method 1 (writable symlink) -- camilladsp/configs/NixOS/default.yml consumed via directory symlink above
+          # check-suppress:config-method: method 1 (writable symlink) -- camilladsp/configs/MacBook/2-band automatic gain control (-14 LUFS).yml consumed via directory symlink above
+          # check-suppress:config-method: method 1 (writable symlink) -- camilladsp/configs/NixOS/2-band automatic gain control (-14 LUFS).yml consumed via directory symlink above
           ".config/camilladsp/configs".source =
             config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/camilladsp/configs/${configName}";
           # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
