@@ -15,11 +15,13 @@ let
   # field: winget — optional WinGet package id string (e.g. "Anysphere.Cursor").
   # field: platforms — restrict to specific platforms (["darwin"] or ["linux"]).
   #   Buildability axis only; governs darwin/linux nix provisioning. Default
-  #   (absent): both darwin and linux. Kept separate from `hosts` (parity map).
-  # field: hosts — optional per-host parity map { MacBook = bool; NixOS = bool;
+  #   (absent): both darwin and linux. Kept separate from `enable` (provisioning map).
+  # field: enable — optional per-host provisioning map { MacBook = bool; NixOS = bool;
   #   Windows = bool }. Absent hosts default to enabled, so new hosts can never
   #   silently diverge. This is the single source of truth for enable/disable
-  #   across all hosts (replaces the old `enable` + `hosts` override split).
+  #   across all hosts. Distinct from `platforms`: `platforms` is the build-capability
+  #   axis (which OS families can build/install the package); `enable` is the
+  #   provisioning axis (whether the package is actually installed on a given host).
   # Category rules: cli → nixpkgs; gui → Homebrew (cask preferred) on macOS.
   #   On NixOS: all packages go to nixpkgs unconditionally.
   # If a package ships any GUI component (binary, UI, daemon), classify as "gui".
@@ -145,11 +147,11 @@ let
     };
     cursor = {
       # Single source of truth for Cursor enable/disable across all hosts.
-      # `hosts` is the per-host parity map; every host is explicitly disabled,
+      # `enable` is the per-host provisioning map; every host is explicitly disabled,
       # so Cursor stays off everywhere (no host enables it). A host omitted from
-      # `hosts` would default to enabled, so all three are listed to prevent
+      # `enable` would default to enabled, so all three are listed to prevent
       # silent divergence on new hosts.
-      hosts = {
+      enable = {
         MacBook = false;
         NixOS = false;
         Windows = false;
@@ -969,7 +971,7 @@ let
   managedPackageNames = builtins.attrNames managedPackages;
 
   # Resolve whether a managed package is enabled for a given host.
-  # `hosts` is a per-host parity map; absent entries default to enabled, so new
+  # `enable` is a per-host provisioning map; absent entries default to enabled, so new
   # hosts can never silently diverge. Host-agnostic: takes hostName explicitly
   # so the Windows-resolved set can be computed anywhere Nix runs (Windows itself
   # does not run Nix).
@@ -977,14 +979,14 @@ let
     hostName: packageName:
     let
       entry = managedPackages.${packageName};
-      hostMap =
-        entry.hosts or {
+      enableMap =
+        entry.enable or {
           MacBook = true;
           NixOS = true;
           Windows = true;
         };
     in
-    hostMap.${hostName} or true;
+    enableMap.${hostName} or true;
 
   # Current host (MacBook/NixOS set networking.hostName).
   currentHost = config.networking.hostName or "";
