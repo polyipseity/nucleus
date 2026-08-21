@@ -300,8 +300,10 @@ let
       winget = "Google.Chrome";
     };
     "google-chrome@canary" = {
-      # No nixpkgs attr (canary is a Homebrew cask / WinGet-only channel); the
-      # macOS cask is declared in MacBook/homebrew.nix, so it is not on nixpkgs.
+      # nixpkgs provides the stable `google-chrome` attr, but the canary channel
+      # is macOS-only via the Homebrew cask (MacBook/homebrew.nix) and Windows
+      # via WinGet canary; the stable nixpkgs attr is intentionally not the
+      # install path for the canary channel.
       category = "gui";
       homebrew = {
         kind = "cask";
