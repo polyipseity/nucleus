@@ -28,7 +28,7 @@ The following tools are installed globally (via nixpkgs / WinGet) for system pac
 | ----------------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
 | `bun` | nixpkgs / `Oven-sh.Bun` | `bun add -g` for global JS system packages |
 | `cargo` | all platforms: via `rustup` stable toolchain | `cargo-binstall` / `cargo install` for system Rust binary installs |
-| `rustup` | all platforms: `pkgs.rustup` (POSIX) / `Rustlang.Rustup` (Windows) | manages Rust toolchains; default = `none`; stable installed for cargo-binstall fallback |
+| `rustup` | all platforms: `pkgs.rustup` (POSIX) / `Rustlang.Rustup` (Windows) | manages Rust toolchains; default = `none`; stable installed for cargo-binstall alternative |
 | `uv` | nixpkgs / WinGet | `uv tool install` for system-level Python tooling |
 | `prek` | nixpkgs | system-wide Git hook manager binary (invoked by managed shell/apply hooks) |
 | `python` / `pip` | **banned** | no permitted system use; all Python via devShell or uv venv |
@@ -40,8 +40,8 @@ Direct developer invocation of any of the above in an interactive shell session 
 
 Each blocked tool is overridden as a shell function that intercepts the command and prints a helpful error pointing to the devShell.
 
-- **POSIX (zsh)** — `src/scripts/shell/init.zsh`: functions for `bun`, `cargo`, `rustc`, `uv`, `python`, `python3`, `pip`, `pip3`, `npm`, `npx`, `node`, `corepack` in `programs.zsh.initContent`. Flow: check `$DIRENV_DIR` → invoke devShell-scoped binary → check fallback tool bundle path → error. Pure educational blocks (`npm`/`npx`/`node`/`corepack`, `pip`/`pip3`, `python`/`python3`) skip the pass-through flow and print a ban message directly.
-- **PowerShell (POSIX and Windows)** — `src/scripts/shell/profile.ps1`: the single shared shell-parity profile. POSIX gets it embedded by `src/modules/pwsh.nix` at Nix eval time; Windows gets it written into the managed profile block by `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` at runtime. Same flow via `$env:DIRENV_DIR` then the fallback tool bundle path.
+- **POSIX (zsh)** — `src/scripts/shell/init.zsh`: functions for `bun`, `cargo`, `rustc`, `uv`, `python`, `python3`, `pip`, `pip3`, `npm`, `npx`, `node`, `corepack` in `programs.zsh.initContent`. Flow: check `$DIRENV_DIR` → invoke devShell-scoped binary → check alternative tool bundle path → error. Pure educational blocks (`npm`/`npx`/`node`/`corepack`, `pip`/`pip3`, `python`/`python3`) skip the pass-through flow and print a ban message directly.
+- **PowerShell (POSIX and Windows)** — `src/scripts/shell/profile.ps1`: the single shared shell-parity profile. POSIX gets it embedded by `src/modules/pwsh.nix` at Nix eval time; Windows gets it written into the managed profile block by `src/platforms/Windows/modules/user/Sync-ShellProfile.ps1` at runtime. Same flow via `$env:DIRENV_DIR` then the alternative tool bundle path.
 
 User-scope bin dir PATH wiring is declared via `home.sessionPath` (→ `~/.zshenv`), not `initContent` PATH guards. This ensures directories survive direnv deactivation.
 
@@ -51,8 +51,8 @@ For project-specific development, enter the project devShell. For repositories w
 
 - **POSIX — automatic (preferred):** direnv auto-loads the devShell when a directory has an `.envrc` with `use flake`.
 - **POSIX — manual:** `nix develop` from the repo root.
-- **POSIX — default fallback:** outside any active `.envrc`, the managed shell profile exposes the same inventory from the fallback tool bundle.
-- **Windows:** `nix develop` from WSL when available, or the managed PowerShell profile fallback.
+- **POSIX — default alternative:** outside any active `.envrc`, the managed shell profile exposes the same inventory from the alternative tool bundle.
+- **Windows:** `nix develop` from WSL when available, or the managed PowerShell profile alternative.
 
 On POSIX, `pkgs.rust-bin.fromRustupToolchainFile` (rust-overlay) assembles a Nix-patched toolchain from the project's `rust-toolchain.toml` (or falls back to `pkgs.rust-bin.stable.latest.default`) — distinct from the system `pkgs.rustup` install so devShell toolchains are reproducible and version-pinned. On Windows, rustup (`Rustlang.Rustup`) intercepts cargo invocations and reads `rust-toolchain.toml` natively.
 
@@ -66,7 +66,7 @@ On POSIX, `pkgs.rust-bin.fromRustupToolchainFile` (rust-overlay) assembles a Nix
 ## Invariants
 
 - The `DIRENV_DIR` pass-through must be present in every blocking function. Omitting it would prevent the tool from working inside nix devShells.
-- The managed fallback environment must expose the same baseline inventory as `devShells.default`: `bun`, `cargo`, `prek`, `rustc`, and `uv`.
+- The alternative managed environment must expose the same baseline inventory as `devShells.default`: `bun`, `cargo`, `prek`, `rustc`, and `uv`.
 - `cargo-binstall` and `cargo-cache` are not blocked — they are the permitted system-package-management invocations of the Rust toolchain.
 - `rustup` is not blocked — it is the toolchain manager and must remain accessible for toolchain lifecycle management.
 - `ruff` and `ty` are not blocked — they are linting/formatting tools that must be globally accessible for editor integrations (e.g., VS Code extensions).
@@ -74,7 +74,7 @@ On POSIX, `pkgs.rust-bin.fromRustupToolchainFile` (rust-overlay) assembles a Nix
 ## Tool installation patterns
 
 - **Python tools**: Always use `uv tool install` for isolated, per-tool virtual environments. Never `pip install --system`.
-- **Rust tools**: Prefer devShell for development, `cargo-binstall` for prebuilt binaries, `cargo install` as fallback. Installs to `~/.cargo/bin`.
+- **Rust tools**: Prefer devShell for development, `cargo-binstall` for prebuilt binaries, `cargo install` as alternative. Installs to `~/.cargo/bin`.
 - **JavaScript tools**: Only `bun install -g` for globally callable JS CLI tools (not dev dependencies). Managed via `src/modules/agents.nix` (POSIX) or `src/platforms/Windows/modules/setup/Invoke-BunSetup.ps1` (Windows). Never `npm install -g`.
 
 ## Managed package classification
@@ -87,7 +87,7 @@ Every cross-platform package is declared exactly once in `src/modules/core.nix`'
 Category rules:
 
 - `"cli"` → nixpkgs
-- `"gui"` → Homebrew (cask preferred, formula fallback) on macOS; nixpkgs on NixOS
+- `"gui"` → Homebrew (cask preferred, formula alternative) on macOS; nixpkgs on NixOS
 
 If a package ships any GUI component (graphical binary, UI frontend, background daemon with a UI), classify it as `"gui"` even if it also provides CLI-only tools.
 
