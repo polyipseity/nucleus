@@ -61,10 +61,10 @@ function Get-CamillaDSPFirstAvailablePlaybackDevice {
     return $null
   }
 
-  # Sort by name (invariant culture, ascending) so selection is stable across
-  # reboots and Windows updates, instead of relying on undocumented
-  # EnumAudioEndpoints enumeration order.
-  $names = $names | Sort-Object { $_.ToLowerInvariant() }
+  # Sort by name (case-sensitive, ascending) so selection is stable across
+  # reboots and Windows updates and matches the macOS/Linux case-sensitive
+  # ordering, instead of relying on undocumented EnumAudioEndpoints enumeration order.
+  $names = $names | Sort-Object
 
   if ($names.Count -eq 0) {
     return $null

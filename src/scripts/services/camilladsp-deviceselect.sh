@@ -10,7 +10,7 @@
 #     The capture device (devices.capture.device) is always excluded from
 #     detection — if the system default matches capture, it is skipped.
 #     Fallback device selection is deterministic: the first non-capture device
-#     is chosen by a case-insensitive ascending name ordering, matching the
+#     is chosen by a case-sensitive ascending name ordering, matching the
 #     Windows resolver.
 #
 # Dependencies: python3 (yaml module), system_profiler (macOS), wpctl/pactl/aplay (Linux)
@@ -31,26 +31,23 @@ _has_command() { command -v "$1" >/dev/null 2>&1; }
 
 # --- Platform-specific default output detection ---
 
-# macOS: parse system_profiler SPAudioDataType for the default output device.
+# macOS: parse system_profiler SPAudioDataType -json for the default output device.
+# The default output device is the one whose _properties has
+# coreaudio_default_audio_system_device == 'spaudio_yes'.
 _camilladsp_detect_macos() {
   local output
-  output=$(system_profiler SPAudioDataType 2>/dev/null) || return 1
+  output=$(system_profiler SPAudioDataType -json 2>/dev/null) || return 1
 
   local _tmpfile
   _tmpfile=$(mktemp) || return 1
   cat <<PYEOF >"$_tmpfile"
-import sys
-lines = sys.stdin.read().split('\n')
-for i, line in enumerate(lines):
-    if 'Default Output Device: Yes' in line:
-        for j in range(i - 1, -1, -1):
-            stripped = lines[j].rstrip()
-            if stripped and not stripped.startswith(' ' * 6):
-                name = stripped.strip().rstrip(':')
-                if name:
-                    print(name)
-                    sys.exit(0)
-        break
+import json, sys
+for dev in json.loads(sys.stdin.read()).get('SPAudioDataType', []):
+    for item in dev.get('_items', []):
+        props = item.get('_properties', {})
+        if props.get('coreaudio_default_audio_system_device') == 'spaudio_yes':
+            print(item.get('_name', ''))
+            sys.exit(0)
 PYEOF
   python3 "$_tmpfile" <<<"$output" 2>/dev/null
   local _rc=$?
@@ -112,23 +109,24 @@ camilladsp_detect_default_output() {
 
 # --- Fallback: first available device (not matching capture_device) ---
 
-# macOS: enumerate all audio output devices, return the first non-capture one
-# by deterministic case-insensitive ascending name ordering.
+# macOS: enumerate output-capable devices (presence of coreaudio_device_output),
+# return the first non-capture one by deterministic case-sensitive ascending name ordering.
 _camilladsp_detect_first_available_macos() {
   local capture_device="$1"
   local output
-  output=$(system_profiler SPAudioDataType 2>/dev/null) || return 1
+  output=$(system_profiler SPAudioDataType -json 2>/dev/null) || return 1
 
   local _tmpfile
   _tmpfile=$(mktemp) || return 1
   cat <<PYEOF >"$_tmpfile"
-import sys
+import json, sys
 capture = sys.argv[1]
-lines = sys.stdin.read().split('\n')
-for i, line in enumerate(lines):
-    stripped = line.rstrip()
-    if stripped and not stripped.startswith('  ') and stripped.endswith(':'):
-        name = stripped.rstrip(':').strip()
+for dev in json.loads(sys.stdin.read()).get('SPAudioDataType', []):
+    for item in dev.get('_items', []):
+        props = item.get('_properties', {})
+        if 'coreaudio_device_output' not in props:
+            continue  # input-only device (e.g. built-in mic)
+        name = item.get('_name', '')
         if name and name != capture:
             print(name)
 PYEOF
@@ -137,7 +135,7 @@ PYEOF
   local _rc=$?
   rm -f "$_tmpfile"
   [ "${#names[@]}" -eq 0 ] && return $_rc
-  printf '%s\n' "${names[@]}" | sort -f | head -1
+  printf '%s\n' "${names[@]}" | sort | head -1
 }
 
 # Linux: enumerate sinks via wpctl/pactl/aplay, return the first non-capture
@@ -178,7 +176,7 @@ _camilladsp_detect_first_available_linux() {
   fi
 
   [ "${#candidates[@]}" -eq 0 ] && return 1
-  printf '%s\n' "${candidates[@]}" | sort -f | head -1
+  printf '%s\n' "${candidates[@]}" | sort | head -1
 }
 
 camilladsp_detect_first_available() {

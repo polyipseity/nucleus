@@ -273,7 +273,85 @@ test_no_default_fallback_first_available() {
   fi
 }
 
+# Test 8: real macOS JSON parsing — default output detection via system_profiler -json.
+test_macos_json_default_output() {
+  local json
+  json=$(
+    cat <<'JSON'
+{
+  "SPAudioDataType": [
+    {
+      "_items": [
+        { "_name": "BlackHole 2ch", "_properties": { "coreaudio_default_audio_system_device": "spaudio_yes", "coreaudio_device_output": 2 } },
+        { "_name": "MacBook Air喇叭", "_properties": { "coreaudio_device_output": 2 } },
+        { "_name": "MacBook Air咪高風", "_properties": { "coreaudio_device_input": 1 } }
+      ],
+      "_name": "coreaudio_device"
+    }
+  ]
+}
+JSON
+  )
+  local result
+  result=$(bash -c '
+    _lib_script="$1"
+    _json="$2"
+    . "$_lib_script"
+    system_profiler() { printf "%s" "$_json"; }
+    _camilladsp_detect_macos
+  ' _ "$DEVICESELECT_SH" "$json")
+  if [ "$result" = "BlackHole 2ch" ]; then
+    assert_pass "macOS JSON default output detection"
+  else
+    assert_fail "macOS JSON default output" "expected 'BlackHole 2ch', got '$result'"
+  fi
+}
+
+# Test 9: real macOS JSON fallback — output-only filtering + case-sensitive ordering.
+# Includes an input-only mic (excluded), the capture device (excluded), and two
+# output devices whose case-sensitive vs case-insensitive ordering differs
+# ("Banana" < "apple" case-sensitively, the reverse case-insensitively).
+test_macos_json_first_available() {
+  local json
+  json=$(
+    cat <<'JSON'
+{
+  "SPAudioDataType": [
+    {
+      "_items": [
+        { "_name": "BlackHole 2ch", "_properties": { "coreaudio_device_output": 2 } },
+        { "_name": "apple", "_properties": { "coreaudio_device_output": 2 } },
+        { "_name": "Banana", "_properties": { "coreaudio_device_output": 2 } },
+        { "_name": "MacBook Air咪高風", "_properties": { "coreaudio_device_input": 1 } }
+      ],
+      "_name": "coreaudio_device"
+    }
+  ]
+}
+JSON
+  )
+  local result
+  result=$(bash -c '
+    _lib_script="$1"
+    _json="$2"
+    _capture="$3"
+    . "$_lib_script"
+    system_profiler() { printf "%s" "$_json"; }
+    _camilladsp_detect_first_available_macos "$_capture"
+  ' _ "$DEVICESELECT_SH" "$json" "BlackHole 2ch")
+  # Case-sensitive ascending: "Banana" (B=66) precedes "apple" (a=97); mic and
+  # capture are excluded. Expecting "Banana" proves case-sensitive ordering.
+  if [ "$result" = "Banana" ]; then
+    assert_pass "macOS JSON fallback excludes input-only and capture, case-sensitive"
+  else
+    assert_fail "macOS JSON fallback" "expected 'Banana', got '$result'"
+  fi
+}
+
 # --- Run all tests ---
+
+test_macos_json_default_output
+test_macos_json_first_available
 
 test_no_default_fallback_first_available
 
