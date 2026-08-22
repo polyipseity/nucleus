@@ -6,7 +6,6 @@
 {
   config,
   lib,
-  pkgs,
   username,
   homebrew-core,
   homebrew-cask,
