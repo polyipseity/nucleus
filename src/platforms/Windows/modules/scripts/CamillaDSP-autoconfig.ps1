@@ -96,8 +96,9 @@ $heartbeatTimer = [System.Threading.Timer]::new({
     if ($null -ne $nc.camilladsp.heartbeat -and -not $nc.camilladsp.heartbeat) { return }
   }
   try {
-    # Check current state — skip if already Running to avoid filling
-    # CamillaDSP's bounded command channel (capacity 10).
+    # Check current state.  Skip only when Running AND the live playback
+    # device is already set — a null live device must always be corrected
+    # (idiot-proof skip: never leave a running instance with no device).
     $stateWs = [System.Net.WebSockets.ClientWebSocket]::new()
     $ct = [System.Threading.CancellationToken]::Empty
     $stateWs.ConnectAsync([System.Uri]"ws://127.0.0.1:$p", $ct).Wait()
@@ -109,7 +110,20 @@ $heartbeatTimer = [System.Threading.Timer]::new({
     $stateResp = [Text.Encoding]::UTF8.GetString($recvBuf, 0, $result.Count)
     $stateWs.CloseAsync([CloseStatus]::NormalClosure, "done", $ct).Wait()
     $state = ($stateResp | ConvertFrom-Json).GetState.value
-    if ($state -eq "Running") { return }
+    if ($state -eq "Running") {
+      # Query the live config to see if the playback device is already set.
+      $cfgWs = [System.Net.WebSockets.ClientWebSocket]::new()
+      $cfgWs.ConnectAsync([System.Uri]"ws://127.0.0.1:$p", $ct).Wait()
+      $getCfg = '{ "GetConfig": null }'
+      $cfgBytes = [Text.Encoding]::UTF8.GetBytes($getCfg)
+      $cfgWs.SendAsync([ArraySegment[byte]]::new($cfgBytes), [WebSocketMessageType]::Text, $true, $ct).Wait()
+      $cfgBuf = New-Object byte[] 4096
+      $cfgResult = $cfgWs.ReceiveAsync([ArraySegment[byte]]::new($cfgBuf), $ct).Result
+      $cfgResp = [Text.Encoding]::UTF8.GetString($cfgBuf, 0, $cfgResult.Count)
+      $cfgWs.CloseAsync([CloseStatus]::NormalClosure, "done", $ct).Wait()
+      $liveDevice = ($cfgResp | ConvertFrom-Json).GetConfig.value.devices.playback.device
+      if (-not [string]::IsNullOrEmpty($liveDevice)) { return }
+    }
   } catch {
     # Can't connect — will retry on next heartbeat.
     return
