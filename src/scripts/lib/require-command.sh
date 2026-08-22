@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # require_command for CamillaDSP service scripts. Sourced by
-# camilladsp-supervisor.sh and camilladsp-heartbeat.sh; the heartbeat does not
+# camilladsp-run.sh and camilladsp-heartbeat.sh; the heartbeat does not
 # source lib.sh itself, so lib.sh is resolved from this file's directory.
 
 # Source lib.sh from this library's own directory (callers set SCRIPT_DIR to
