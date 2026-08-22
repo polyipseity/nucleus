@@ -187,4 +187,46 @@ assert all (
   ) hosts
 ) appNames;
 
+# --- macOS system-extension entries must declare bundleId + approvalInstructions ---
+# Catches the dead-code detection bug (empty bundleId) and the wrong
+# Privacy & Security hint (missing per-app approvalInstructions). Scoped to
+# macOS: the detection/instructions bug only manifests there. NixOS/Windows
+# system-extension entries are a separate deferred cleanup (CRD Host is a
+# macOS-only PrivilegedHelperTool mis-declared on those platforms).
+assert all (
+  name:
+  let
+    entry = parsedApps.${name};
+    hosts = builtins.attrNames entry.hosts;
+  in
+  all (
+    h:
+    let
+      hostEntry = entry.hosts.${h};
+    in
+    if hostEntry ? kind && hostEntry.kind == "system-extension" && hostEntry.platform == "macOS" then
+      hostEntry ? bundleId
+      && hostEntry.bundleId != ""
+      && hostEntry ? approvalInstructions
+      && hostEntry.approvalInstructions != ""
+    else
+      true
+  ) hosts
+) appNames;
+
+# --- Per-app approval instructions must point to the correct path ---
+# fuse-t is an FSKit file-system extension (Login Items & Extensions → File
+# System Extensions), not Privacy & Security. Chrome Remote Desktop Host is a
+# helper tool needing Accessibility + Screen Recording, not a system extension.
+assert (
+  builtins.match ".*File System Extensions.*" (
+    parsedApps."fuse-t".hosts.MacBook.approvalInstructions or ""
+  ) != null
+);
+assert (
+  builtins.match ".*Accessibility.*" (
+    parsedApps."Chrome Remote Desktop Host".hosts.MacBook.approvalInstructions or ""
+  ) != null
+);
+
 true
