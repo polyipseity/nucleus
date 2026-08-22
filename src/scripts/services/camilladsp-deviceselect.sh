@@ -217,12 +217,7 @@ capture = cfg.get('devices', {}).get('capture', {}).get('device', '') or ''
 print(playback if playback is not None else '')
 print(capture)
 PYEOF
-  _devices=$(python3 "$_tmpfile" "$config_file") || {
-    rm -f "$_tmpfile"
-    # Python/yaml unavailable — pass config through unchanged.
-    cat "$config_file"
-    return 0
-  }
+  _devices=$(python3 "$_tmpfile" "$config_file")
   rm -f "$_tmpfile"
 
   local playback_device capture_device
@@ -272,13 +267,7 @@ with open(sys.argv[1]) as f:
 cfg['devices']['playback']['device'] = sys.argv[2]
 yaml.dump(cfg, sys.stdout, default_flow_style=False, allow_unicode=True, sort_keys=False)
 PYEOF
-  python3 "$_patchfile" "$config_file" "$detected_device" 2>/dev/null || {
-    rm -f "$_patchfile"
-    # YAML patch failed — pass original config through.
-    cat "$config_file"
-    rm -f "$_patchfile"
-    return 0
-  }
+  python3 "$_patchfile" "$config_file" "$detected_device"
   rm -f "$_patchfile"
 }
 
