@@ -49,9 +49,16 @@ for _vsym_base_dir in "$_vsym_stable_base" "$_vsym_insiders_base"; do
     rm "$_chat_lm_path"
   fi
   if [ -s "$_chat_lm_path" ] 2>/dev/null; then
+    # A corrupt (unparseable) existing file cannot be merged; replace it from
+    # the repo source (authoritative for managed entries) rather than keeping
+    # the corrupt content. VS Code-added entries in a corrupt file are
+    # unrecoverable anyway.
     # shellcheck disable=SC2016 # reason: jq filter body must not be expanded by shell
-    if ! "$_vsym_jq_bin" -s \
-      '.[0] as $existing | reduce .[1][] as $item ($existing; (map(.name) | index($item.name)) as $idx | if $idx then .[$idx] = $item else . + [$item] end)' \
+    if ! "$_vsym_jq_bin" -e . "$_chat_lm_path" >/dev/null 2>&1; then
+      warn -l "VS Code" "existing $_chat_lm_path is not valid JSON; replacing from repo source."
+      cp "$_vsym_chat_lm_repo" "$_chat_lm_path"
+    elif ! "$_vsym_jq_bin" -s \
+      '.[0] as $existing | reduce .[1][] as $item ($existing; (map(.name) | index($item.name)) as $idx | if $idx != null then .[$idx] = $item else . + [$item] end)' \
       "$_chat_lm_path" "$_vsym_chat_lm_repo" >"$_chat_lm_path.tmp" 2>"$_chat_lm_path.jqerr"; then
       warn -l "VS Code" "jq merge failed for $_chat_lm_path, keeping existing."
       cat "$_chat_lm_path.jqerr" >&2
