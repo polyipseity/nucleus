@@ -32,8 +32,10 @@ _has_command() { command -v "$1" >/dev/null 2>&1; }
 # --- Platform-specific default output detection ---
 
 # macOS: parse system_profiler SPAudioDataType -json for the default output device.
-# The default output device is the one whose _properties has
-# coreaudio_default_audio_system_device == 'spaudio_yes'.
+# The default output device is the one whose coreaudio_default_audio_system_device
+# == 'spaudio_yes'. Real system_profiler emits device flags as flat top-level
+# keys and _properties as a string naming the default property; a dict _properties
+# (older/edge shapes) is tolerated by merging it over the item.
 _camilladsp_detect_macos() {
   local output
   output=$(system_profiler SPAudioDataType -json 2>/dev/null) || return 1
@@ -44,8 +46,9 @@ _camilladsp_detect_macos() {
 import json, sys
 for dev in json.loads(sys.stdin.read()).get('SPAudioDataType', []):
     for item in dev.get('_items', []):
-        props = item.get('_properties', {})
-        if props.get('coreaudio_default_audio_system_device') == 'spaudio_yes':
+        props = item.get('_properties')
+        flat = item if not isinstance(props, dict) else {**item, **props}
+        if flat.get('coreaudio_default_audio_system_device') == 'spaudio_yes':
             print(item.get('_name', ''))
             sys.exit(0)
 PYEOF
@@ -111,6 +114,8 @@ camilladsp_detect_default_output() {
 
 # macOS: enumerate output-capable devices (presence of coreaudio_device_output),
 # return the first non-capture one by deterministic case-sensitive ascending name ordering.
+# Device flags are flat top-level keys on real system_profiler output; a dict
+# _properties is merged over the item when present.
 _camilladsp_detect_first_available_macos() {
   local capture_device="$1"
   local output
@@ -123,8 +128,9 @@ import json, sys
 capture = sys.argv[1]
 for dev in json.loads(sys.stdin.read()).get('SPAudioDataType', []):
     for item in dev.get('_items', []):
-        props = item.get('_properties', {})
-        if 'coreaudio_device_output' not in props:
+        props = item.get('_properties')
+        flat = item if not isinstance(props, dict) else {**item, **props}
+        if 'coreaudio_device_output' not in flat:
             continue  # input-only device (e.g. built-in mic)
         name = item.get('_name', '')
         if name and name != capture:
