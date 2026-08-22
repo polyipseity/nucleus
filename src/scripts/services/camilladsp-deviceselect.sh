@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Device detection and config-push library for CamillaDSP playback device selection.
-# Sourced by camilladsp-supervisor.sh and camilladsp-heartbeat.sh.
+# Sourced by camilladsp-run.sh and camilladsp-heartbeat.sh.
 #
 # Provides:
 #   camilladsp_resolve_playback_device <config_file>
