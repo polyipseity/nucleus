@@ -249,6 +249,14 @@ in
     source = config.lib.file.mkOutOfStoreSymlink (overlay.selectFile "uv" "uv.toml");
   };
 
+  # User-scoped `node` → `bun` shim so `node` resolves to bun on the managed
+  # append PATH (bun run child shells, GUI apps).  Repo bans system Node.js.
+  # ~/.local/bin is already in home.sessionPath (pathComponents.append), so no
+  # PATH change is needed.  Interactive `node()` in init.zsh still blocks.
+  home.file.".local/bin/node" = {
+    source = "${managedPaths.nodeShim}/bin/node";
+  };
+
   # ---------------------------------------------------------------------------
   # install-zsh-completions
   # Idempotently generates zsh completion files for CLI tools whose Nix packages
