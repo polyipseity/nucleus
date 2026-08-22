@@ -250,7 +250,7 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": true,
+        "enabled": false,
         "disableNative": true,
         "kind": "login-item",
         "path": "/Applications/Telegram.app",
