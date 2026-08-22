@@ -153,10 +153,19 @@ menu_bar_native_set() {
     fi
     ;;
   activation-script)
-    local script
+    local script app_key
     script=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.script')
+    app_key=$(echo "$entry_json" | jq -r '.key // empty')
     if [ -n "$script" ]; then
-      "$script" "$visible" || warn -l "$(echo "$entry_json" | jq -r '.displayName // "app"')" "activation-script failed"
+      case "$script" in
+      /*) ;;
+      *) script="$REPO_ROOT/$script" ;;
+      esac
+      if [ ! -f "$script" ]; then
+        warn -l "$(echo "$entry_json" | jq -r '.displayName // "app"')" "activation-script not found: $script"
+        return 1
+      fi
+      "$script" "$visible" "${app_key:-}" || warn -l "$(echo "$entry_json" | jq -r '.displayName // "app"')" "activation-script failed"
     fi
     ;;
   *)
