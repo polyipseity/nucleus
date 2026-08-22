@@ -153,6 +153,10 @@ macos_native_login_items_remove() {
 }
 
 # macos_system_extension_present ID — stdout "true"/"false" via systemextensionsctl.
+# Only network/cmio/endpoint-security extensions appear here. FSKit file-system
+# extensions and TCC-granted helper tools (e.g. fuse-t, Chrome Remote Desktop
+# Host) are NOT visible to systemextensionsctl, so they are reported as absent
+# and handled as manual-approval-only via the entry's approvalInstructions.
 macos_system_extension_present() {
   local bundle_id="$1"
   if command -v systemextensionsctl >/dev/null 2>&1; then
@@ -354,15 +358,20 @@ app_converge() {
     ;;
   system-extension)
     # System extensions cannot be enabled/disabled from the shell; approval is
-    # manual in System Settings → Privacy & Security.  Surface a reminder and
-    # report actual presence; never pretend we forced the state.
-    local bundle_id
+    # manual. Surface a per-app reminder (approvalInstructions) and report
+    # actual presence; never pretend we forced the state.
+    local bundle_id approval_instructions
     bundle_id=$(echo "$entry_json" | jq -r '.hostEntry.bundleId // empty')
+    approval_instructions=$(echo "$entry_json" | jq -r '.hostEntry.approvalInstructions // empty')
     if [ "$enabled" = "true" ]; then
       if [ -n "$bundle_id" ] && [ "$(macos_system_extension_present "$bundle_id")" = "true" ]; then
-        say -l "$key" "system extension present (approved in System Settings)."
+        say -l "$key" "system extension present (approved)."
       else
-        warn -l "$key" "system extension not yet approved — enable it in System Settings → Privacy & Security, then approve the extension."
+        if [ -n "$approval_instructions" ]; then
+          warn -l "$key" "$approval_instructions"
+        else
+          warn -l "$key" "system extension not yet approved — enable it in System Settings → Privacy & Security, then approve the extension."
+        fi
       fi
     fi
     ;;
