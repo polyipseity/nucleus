@@ -10,8 +10,8 @@ let
   wsPort = toString servicesJSON.camilladsp.network.websocket.port;
 
   camilladspDaemon = pkgs.writeNucleusShellApplication {
-    name = "camilladsp-daemon";
-    scriptName = "src/scripts/services/camilladsp-daemon";
+    name = "camilladsp-supervisor";
+    scriptName = "src/scripts/services/camilladsp-supervisor";
     runtimeInputs = [
       pkgs.camilladsp
       pkgs.websocat
@@ -49,7 +49,7 @@ in
     serviceConfig = {
       Type = "simple";
       User = username;
-      ExecStart = "${camilladspDaemon}/bin/nucleus-camilladsp-daemon --port ${toString wsPort}";
+      ExecStart = "${camilladspDaemon}/bin/nucleus-camilladsp-supervisor --port ${toString wsPort}";
       Restart = "always";
       WorkingDirectory = "%h";
     };

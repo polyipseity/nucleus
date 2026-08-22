@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# Shared daemon wrapper for CamillaDSP.
-# Starts camilladsp with --no_config, pushes the initial config via websocket,
-# then blocks until camilladsp exits.  The heartbeat is a separate service.
+# Process supervisor for CamillaDSP.
+# Starts camilladsp with --no_config, pushes the initial config once via the
+# shared deviceselect lib, then blocks until camilladsp exits.  The heartbeat
+# (camilladsp-heartbeat.sh) is a separate service that keeps the config
+# converged.  This script does NOT loop — it supervises a single process.
 #
-# Dependencies: camilladsp, websocat, jq (PATH managed via writeShellApplication runtimeInputs)
+# Dependencies: camilladsp, websocat, jq, python3 (yaml) — PATH managed via writeShellApplication runtimeInputs
 #
-# Usage: camilladsp-daemon.sh [--port PORT] [--statefile PATH] [--config FILE] [--logfile FILE]
+# Usage: camilladsp-supervisor.sh [--port PORT] [--statefile PATH] [--config FILE] [--logfile FILE]
 set -euo pipefail
 
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
@@ -63,17 +65,10 @@ mkdir -p "$(dirname "$state_file")" "$(dirname "$log_file")"
 camilladsp -p "$ws_port" --statefile "$state_file" -w --no_config -o "$log_file" &
 pid=$!
 
-# Push initial config (retry up to ~30 s)
+# Push initial config once (retry up to ~30 s).  The shared lib resolves the
+# playback device and pushes via websocket.
 if [ -f "$config_file" ]; then
-  # Resolve playback device: patches empty device in config with system default.
-  _resolved_config=$(camilladsp_resolve_playback_device "$config_file")
-  for _i in $(seq 1 60); do
-    if jq -cRs '{SetConfig: .}' <<<"$_resolved_config" |
-      websocat -1 "ws://127.0.0.1:$ws_port" >/dev/null 2>&1; then
-      break
-    fi
-    sleep 0.5
-  done
+  camilladsp_push_config --port "$ws_port" --config "$config_file" --retries 60 --retry-delay 0.5
 fi
 
 # Wait for camilladsp to exit
