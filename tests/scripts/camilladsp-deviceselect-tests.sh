@@ -274,6 +274,10 @@ test_no_default_fallback_first_available() {
 }
 
 # Test 8: real macOS JSON parsing — default output detection via system_profiler -json.
+# Fixture mirrors the REAL system_profiler SPAudioDataType -json shape: _properties
+# is a STRING (naming the default property) and device flags are FLAT top-level
+# keys on each item. The buggy code assumed _properties was a dict and read flags
+# from it, which raised on the real shape.
 test_macos_json_default_output() {
   local json
   json=$(
@@ -282,9 +286,9 @@ test_macos_json_default_output() {
   "SPAudioDataType": [
     {
       "_items": [
-        { "_name": "BlackHole 2ch", "_properties": { "coreaudio_default_audio_system_device": "spaudio_yes", "coreaudio_device_output": 2 } },
-        { "_name": "MacBook Air喇叭", "_properties": { "coreaudio_device_output": 2 } },
-        { "_name": "MacBook Air咪高風", "_properties": { "coreaudio_device_input": 1 } }
+        { "_name": "BlackHole 2ch", "_properties": "coreaudio_default_audio_system_device", "coreaudio_default_audio_system_device": "spaudio_yes", "coreaudio_device_output": 2 },
+        { "_name": "MacBook Air喇叭", "_properties": "coreaudio_device_output", "coreaudio_device_output": 2 },
+        { "_name": "MacBook Air咪高風", "_properties": "coreaudio_device_input", "coreaudio_device_input": 1 }
       ],
       "_name": "coreaudio_device"
     }
@@ -311,6 +315,7 @@ JSON
 # Includes an input-only mic (excluded), the capture device (excluded), and two
 # output devices whose case-sensitive vs case-insensitive ordering differs
 # ("Banana" < "apple" case-sensitively, the reverse case-insensitively).
+# Fixture uses the REAL shape: string _properties + flat top-level keys.
 test_macos_json_first_available() {
   local json
   json=$(
@@ -319,10 +324,10 @@ test_macos_json_first_available() {
   "SPAudioDataType": [
     {
       "_items": [
-        { "_name": "BlackHole 2ch", "_properties": { "coreaudio_device_output": 2 } },
-        { "_name": "apple", "_properties": { "coreaudio_device_output": 2 } },
-        { "_name": "Banana", "_properties": { "coreaudio_device_output": 2 } },
-        { "_name": "MacBook Air咪高風", "_properties": { "coreaudio_device_input": 1 } }
+        { "_name": "BlackHole 2ch", "_properties": "coreaudio_device_output", "coreaudio_device_output": 2 },
+        { "_name": "apple", "_properties": "coreaudio_device_output", "coreaudio_device_output": 2 },
+        { "_name": "Banana", "_properties": "coreaudio_device_output", "coreaudio_device_output": 2 },
+        { "_name": "MacBook Air咪高風", "_properties": "coreaudio_device_input", "coreaudio_device_input": 1 }
       ],
       "_name": "coreaudio_device"
     }
@@ -348,10 +353,49 @@ JSON
   fi
 }
 
+# Test 10: real-shape regression — default output detection against a fixture
+# byte-identical in shape to actual `system_profiler SPAudioDataType -json` on a
+# MacBook: string _properties, flat keys, a default output device, a built-in
+# output device, and an input-only mic with no coreaudio_device_output. Guards
+# against the dict-_properties assumption that broke real detection.
+test_macos_real_shape_default_output() {
+  local json
+  json=$(
+    cat <<'JSON'
+{
+  "SPAudioDataType": [
+    {
+      "_items": [
+        { "_name": "BlackHole 2ch", "_properties": "coreaudio_default_audio_system_device", "coreaudio_default_audio_output_device": "spaudio_yes", "coreaudio_default_audio_system_device": "spaudio_yes", "coreaudio_device_input": 2, "coreaudio_device_output": 2, "coreaudio_device_srate": 96000, "coreaudio_device_transport": "coreaudio_device_type_virtual" },
+        { "_name": "MacBook Air咪高風", "_properties": "coreaudio_default_audio_input_device", "coreaudio_default_audio_input_device": "spaudio_yes", "coreaudio_device_input": 1, "coreaudio_device_srate": 48000, "coreaudio_device_transport": "coreaudio_device_type_builtin" },
+        { "_name": "MacBook Air喇叭", "_properties": "coreaudio_device_output", "coreaudio_device_output": 2, "coreaudio_device_srate": 96000, "coreaudio_device_transport": "coreaudio_device_type_builtin" }
+      ],
+      "_name": "coreaudio_device"
+    }
+  ]
+}
+JSON
+  )
+  local result
+  result=$(bash -c '
+    _lib_script="$1"
+    _json="$2"
+    . "$_lib_script"
+    system_profiler() { printf "%s" "$_json"; }
+    _camilladsp_detect_macos
+  ' _ "$DEVICESELECT_SH" "$json")
+  if [ "$result" = "BlackHole 2ch" ]; then
+    assert_pass "macOS real-shape default output detection"
+  else
+    assert_fail "macOS real-shape default output" "expected 'BlackHole 2ch', got '$result'"
+  fi
+}
+
 # --- Run all tests ---
 
 test_macos_json_default_output
 test_macos_json_first_available
+test_macos_real_shape_default_output
 
 test_no_default_fallback_first_available
 
