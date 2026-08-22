@@ -10,10 +10,12 @@ By default, hide all menu bar icons on the MacBook host. Configure both the app 
 
 ## Allow-list
 
-Only these apps may keep a menu bar icon:
+These apps keep a menu bar icon (enabled via the Control Center gate, class f):
 
 - Amphetamine — menu-bar-only by design (LSUIElement); provisioned as the focus/energy tool.
 - Stats — the user-visible monitoring surface; replaces the macOS battery percentage item.
+- Mounty — NTFS remount surface; menu-bar-only by design.
+- OrbStack — menu-bar-first VM/container manager.
 
 Never set a hide key for allow-listed apps.
 
@@ -23,9 +25,10 @@ Never set a hide key for allow-listed apps.
 | --- | --- | --- |
 | a | Declarative preference key, converged from the `apps.json` `menuBarIcon` registry via `src/scripts/menu-bar.sh` | Raycast `ShowMenuBarIcon`, BetterDisplay `hideMenuIcon`, AltTab `menubarIconShown`, Rectangle `hideMenubarIcon`, LinearMouse `menuBarVisibilityMode`, LuLu `noIconMode` |
 | b | ⌘-drag only (per-session; icon returns on relaunch) | MiddleClick (`statusItem.behavior = .removalAllowed`) |
-| c | Icon is the app's primary UI — not hideable | Mounty (NTFS remount surface), Equaliser (menu-bar-only SwiftUI app) |
-| d | No supported option | Parsec, battery tray app |
-| e | macOS "Allow in the Menu Bar" user-level list only | OrbStack |
+| c | Icon is the app's primary UI — not hideable | Equaliser (menu-bar-only SwiftUI app) |
+| d | No supported option | Parsec, Telegram, WhatsApp, Steam |
+| e | macOS "Allow in the Menu Bar" user-level list only | (none — see class f) |
+| f | macOS 26 Control Center `NSStatusItem` gate, converged declaratively from the `apps.json` `menuBarIcon` registry | Amphetamine, Stats, Mounty, OrbStack |
 
 ## System items
 
@@ -34,6 +37,7 @@ Hide Siri (`com.apple.Siri` `StatusMenuVisible`), Spotlight (`com.apple.Spotligh
 ## Rules
 
 - Set `NSStatusItemSpacing`/`NSStatusItemSelectionPadding` as low as possible: 0, falling back to 4 when icons overlap. Values below 4 are untested and may overlap.
-- Never manage the macOS 26 "Allow in the Menu Bar" list declaratively: it is per-user GUI state keyed by bundle ID in `group.com.apple.controlcenter`, and a stale `menuItemLocations` entry can hide icons even when allowed. Document user-level steps in `MANUAL.md` instead.
+- The macOS 26 Control Center `NSStatusItem` gate is managed declaratively. Write `defaults write com.apple.controlcenter "NSStatusItem Visible <BundleID>" -bool <true|false>` (true = allowed/shown, false = hidden; NOT inverted) from the `apps.json` `menuBarIcon` registry via `src/scripts/menu-bar.sh`. Pre-Tahoe this key is a harmless no-op (apps show by default). Do not write `menuItemLocations`; only the `NSStatusItem Visible <BundleID>` boolean is managed.
+- Apps with no programmatic hide mechanism are still declared in `apps.json` with `kind: "manual"` and `provisioned: false` so the desired state is explicit and surfaced via `menu-bar.sh list/verify`. The engine never auto-provisions manual entries.
 - ByHost plists (`defaults -currentHost`) cannot be written by `system.defaults.CustomUserPreferences`; use an activation script with the `macos-console-user.sh` pattern.
 - Precedent: `homebrew.nix` declines provisioning apps whose menu bar chrome cannot be managed declaratively.
