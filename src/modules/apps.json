@@ -10,7 +10,16 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Raycast.app",
-        "bundleId": "com.raycast.macos"
+        "bundleId": "com.raycast.macos",
+        "menuBarIcon": {
+          "kind": "defaults-key",
+          "domain": "com.raycast.macos",
+          "key": "ShowMenuBarIcon",
+          "valueType": "bool",
+          "iconVisible": false,
+          "iconVisibleValue": true,
+          "iconHiddenValue": false
+        }
       },
       "NixOS": {
         "platform": "NixOS",
@@ -82,7 +91,16 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/BetterDisplay.app",
-        "bundleId": "me.betterdisplay.BetterDisplay"
+        "bundleId": "me.betterdisplay.BetterDisplay",
+        "menuBarIcon": {
+          "kind": "defaults-key",
+          "domain": "me.betterdisplay.BetterDisplay",
+          "key": "hideMenuIcon",
+          "valueType": "bool",
+          "iconVisible": false,
+          "iconVisibleValue": false,
+          "iconHiddenValue": true
+        }
       },
       "NixOS": {
         "platform": "NixOS",
@@ -154,7 +172,16 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/LinearMouse.app",
-        "bundleId": "com.lujjjh.LinearMouse"
+        "bundleId": "com.lujjjh.LinearMouse",
+        "menuBarIcon": {
+          "kind": "defaults-key",
+          "domain": "com.lujjjh.LinearMouse",
+          "key": "menuBarVisibilityMode",
+          "valueType": "string",
+          "iconVisible": false,
+          "iconVisibleValue": "always",
+          "iconHiddenValue": "never"
+        }
       },
       "NixOS": {
         "platform": "NixOS",
@@ -178,7 +205,16 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/LuLu.app",
-        "bundleId": "com.objective-see.LuLu"
+        "bundleId": "com.objective-see.LuLu",
+        "menuBarIcon": {
+          "kind": "plist",
+          "plistPath": "/Library/Objective-See/LuLu/preferences.plist",
+          "key": "noIconMode",
+          "valueType": "bool",
+          "iconVisible": false,
+          "iconVisibleValue": false,
+          "iconHiddenValue": true
+        }
       },
       "NixOS": {
         "platform": "NixOS",
@@ -336,7 +372,16 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/AltTab.app",
-        "bundleId": "com.lwouis.alt-tab-macos"
+        "bundleId": "com.lwouis.alt-tab-macos",
+        "menuBarIcon": {
+          "kind": "defaults-key",
+          "domain": "com.lwouis.alt-tab-macos",
+          "key": "menubarIconShown",
+          "valueType": "string",
+          "iconVisible": false,
+          "iconVisibleValue": "true",
+          "iconHiddenValue": "false"
+        }
       },
       "NixOS": {
         "platform": "NixOS",
@@ -360,7 +405,16 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/battery.app",
-        "bundleId": "com.fiplab.battery"
+        "bundleId": "com.fiplab.battery",
+        "menuBarIcon": {
+          "kind": "defaults-key",
+          "domain": "com.fiplab.battery",
+          "key": "menuBarBatteryDisplayMode",
+          "valueType": "string",
+          "iconVisible": false,
+          "iconVisibleValue": "on",
+          "iconHiddenValue": "off"
+        }
       },
       "NixOS": {
         "platform": "NixOS",
