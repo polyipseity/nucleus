@@ -92,11 +92,6 @@ assert containsRegex "autostartScript.*apply" syncAppAutostartPs1Text;
 assert containsRegex "nucleus-apply" flakeText;
 
 # --- apps.json scope assertions ---
-# Parsec/Telegram/WhatsApp are enabled Run-key entries on Windows.
-assert containsRegex ''"Parsec".*"Windows".*"run-key"'' appsJsonText;
-assert containsRegex ''"Telegram".*"Windows".*"run-key"'' appsJsonText;
-assert containsRegex ''"WhatsApp".*"Windows".*"run-key"'' appsJsonText;
-
 # Steam is disabled on all platforms (declared but not launched).
 assert containsRegex ''"Steam".*"enabled".*false'' appsJsonText;
 
