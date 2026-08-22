@@ -98,6 +98,9 @@
         "kind": {
           "$ref": "#/definitions/autostartKind"
         },
+        "menuBarIcon": {
+          "$ref": "#/definitions/menuBarIconEntry"
+        },
         "path": {
           "description": "Absolute path to the app or executable (e.g. /Applications/Amphetamine.app).",
           "type": "string"
@@ -106,6 +109,89 @@
       "required": [
         "autostartEnabled",
         "autostartDisableNative",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "menuBarKind": {
+      "description": "How the menu-bar / tray icon visibility is controlled for one host.",
+      "enum": [
+        "defaults-key",
+        "plist",
+        "activation-script"
+      ],
+      "type": "string"
+    },
+    "menuBarIconEntry": {
+      "description": "Menu-bar / tray icon visibility control for one host. Icon visibility is AND semantics: the icon shows only if the app-native show setting equals the desired state AND the OS allows it. We SET the native preference to the desired state; we never disable the native setting (unlike auto-start). Inverted keys (e.g. BetterDisplay hideMenuIcon) are expressed via iconVisibleValue/iconHiddenValue.",
+      "properties": {
+        "domain": {
+          "description": "defaults domain for kind 'defaults-key' (e.g. com.raycast.macos).",
+          "type": "string"
+        },
+        "iconHiddenValue": {
+          "description": "Native value written when iconVisible is false. Typed per valueType.",
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "iconVisible": {
+          "description": "Desired menu-bar / tray icon visibility (true = shown).",
+          "type": "boolean"
+        },
+        "iconVisibleValue": {
+          "description": "Native value written when iconVisible is true. Typed per valueType.",
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            }
+          ]
+        },
+        "justification": {
+          "description": "Explanation of platform-specific configuration choices.",
+          "type": "string"
+        },
+        "key": {
+          "description": "defaults key for kind 'defaults-key' (e.g. ShowMenuBarIcon).",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/definitions/menuBarKind"
+        },
+        "plistPath": {
+          "description": "Absolute plist path for kind 'plist' (e.g. /Library/Objective-See/LuLu/preferences.plist).",
+          "type": "string"
+        },
+        "script": {
+          "description": "Host script for kind 'activation-script' (non-keyed convergence).",
+          "type": "string"
+        },
+        "valueType": {
+          "description": "Native value type for iconVisibleValue/iconHiddenValue.",
+          "enum": [
+            "bool",
+            "string",
+            "int"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "iconVisible",
         "kind"
       ],
       "type": "object"
