@@ -566,7 +566,9 @@
         "autostartEnabled": true,
         "autostartDisableNative": false,
         "kind": "system-extension",
-        "justification": "System extension; manual approval once in System Settings → Privacy & Security."
+        "bundleId": "org.fuset.fskit-srv.module",
+        "approvalInstructions": "System Settings → General → Login Items & Extensions → by category → File System Extensions → enable fuse-t (FSKit module).",
+        "justification": "FSKit file-system extension; approve in Login Items & Extensions → File System Extensions (not Privacy & Security)."
       },
       "NixOS": {
         "platform": "NixOS",
@@ -589,7 +591,9 @@
         "autostartEnabled": true,
         "autostartDisableNative": false,
         "kind": "system-extension",
-        "justification": "System extension; manual approval once in System Settings → Privacy & Security."
+        "bundleId": "com.google.chromeremotedesktop.me2me-host",
+        "approvalInstructions": "Not a system extension. Grant Accessibility and Screen Recording in System Settings → Privacy & Security (see MANUAL.md).",
+        "justification": "PrivilegedHelperTool; grant Accessibility + Screen Recording (not a system extension)."
       },
       "NixOS": {
         "platform": "NixOS",

@@ -87,6 +87,10 @@
           "description": "Do we launch this app via our uniform auto-start mechanism.",
           "type": "boolean"
         },
+        "approvalInstructions": {
+          "description": "Manual approval steps shown when a system-extension is not yet approved. Overrides the generic Privacy & Security hint because extension types differ (FSKit file-system extension vs TCC grants). Required for kind 'system-extension'.",
+          "type": "string"
+        },
         "hidden": {
           "description": "Launch the app hidden (macOS login item / launchagent Hide flag).",
           "type": "boolean"
