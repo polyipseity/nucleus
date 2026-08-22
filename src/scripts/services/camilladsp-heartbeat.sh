@@ -73,8 +73,17 @@ while true; do
   if _state_resp=$(printf '{"GetState":null}' | websocat -1 "ws://127.0.0.1:$ws_port" 2>/dev/null); then
     _state=$(printf '%s' "$_state_resp" | jq -r '.GetState.value // empty')
   fi
+  # GetConfig.value is a YAML string, not JSON — extract the live playback
+  # device via python yaml so the skip decision sees the real device.
   if _config_resp=$(printf '{"GetConfig":null}' | websocat -1 "ws://127.0.0.1:$ws_port" 2>/dev/null); then
-    _live=$(printf '%s' "$_config_resp" | jq -r '.GetConfig.value.devices.playback.device // empty')
+    _live=$(printf '%s' "$_config_resp" | python3 -c "
+import sys, json, yaml
+try:
+    v = json.load(sys.stdin)['GetConfig']['value']
+    print(yaml.safe_load(v).get('devices', {}).get('playback', {}).get('device', '') or '')
+except Exception:
+    pass
+")
   fi
 
   if camilladsp_needs_push "$_state" "$_live"; then

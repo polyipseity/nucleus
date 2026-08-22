@@ -413,7 +413,51 @@ JSON
   fi
 }
 
+# Test 11: skip-decision invariant — a null live device on a running instance
+# must NEVER be skipped (it must be pushed). This is the regression guard for
+# the broken "skip when Running" logic that let a null device stick forever.
+test_needs_push_decision() {
+  local cases=(
+    "Running|MacBook Air喇叭|skip" # Running + device set → skip
+    "Running||push"              # Running + null device → MUST push
+    "Stopped|MacBook Air喇叭|push" # not Running → push
+    "|MacBook Air喇叭|push"        # empty state → push
+  )
+  local all_ok=1
+  for c in "${cases[@]}"; do
+    local state live expected
+    state="${c%%|*}"
+    c="${c#*|}"
+    live="${c%%|*}"
+    expected="${c#*|}"
+    # camilladsp_needs_push returns 1 (skip) or 0 (push). Capture the rc
+    # inside a subshell so the non-zero skip return doesn't trip set -e.
+    local rc
+    rc=$(
+      bash -c '
+      _lib_script="$1"
+      _state="$2"
+      _live="$3"
+      . "$_lib_script"
+      camilladsp_needs_push "$_state" "$_live"
+    ' _ "$DEVICESELECT_SH" "$state" "$live"
+      echo $?
+    )
+    local got
+    got=$([ "$rc" -eq 1 ] && printf 'skip' || printf 'push')
+    if [ "$got" != "$expected" ]; then
+      all_ok=0
+      assert_fail "needs_push($state,$live)" "expected '$expected', got '$got'"
+    fi
+  done
+  if [ "$all_ok" -eq 1 ]; then
+    assert_pass "skip-decision pushes on null live device while running"
+  fi
+}
+
 # --- Run all tests ---
+
+test_needs_push_decision
 
 test_macos_json_default_output
 test_macos_json_first_available
