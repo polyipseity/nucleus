@@ -340,6 +340,10 @@ switch ($Action) {
       if ($key -like 'ERROR:*') { continue }
       $declared = [bool]$Registry[$key].hostEntry.menuBarIcon.iconVisible
       $actual = Get-MenuBarActualVisible -Key $key -Entry $Registry[$key]
+      if ($actual -eq 'manual') {
+        # Manual entries are declared but not auto-provisioned; no drift check.
+        continue
+      }
       if ($declared -ne $actual) {
         $drift = $true
         Write-NucleusWarning "$key — drift: declared iconVisible=$declared, actual=$actual"

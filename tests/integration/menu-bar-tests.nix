@@ -69,6 +69,8 @@ assert containsRegex "nixos_dispatch_per_user" menuBarShText;
 assert containsRegex "Get-MenuBarNativeValue" menuBarPs1Text;
 assert containsRegex "Set-MenuBarNative" menuBarPs1Text;
 assert containsRegex "Get-MenuBarActualVisible" menuBarPs1Text;
+# Windows verify must skip manual entries (no drift flag), mirroring POSIX do_verify.
+assert containsRegex "no drift check" menuBarPs1Text;
 assert containsRegex "Invoke-MenuBarConverge" menuBarPs1Text;
 assert containsRegex "Resolve-AppNameList" menuBarPs1Text;
 assert containsRegex "Format-ListTable" menuBarPs1Text;
