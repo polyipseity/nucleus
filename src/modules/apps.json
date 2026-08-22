@@ -43,7 +43,16 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Amphetamine.app",
-        "bundleId": "com.if.Amphetamine"
+        "bundleId": "com.if.Amphetamine",
+        "menuBarIcon": {
+          "kind": "defaults-key",
+          "domain": "com.apple.controlcenter",
+          "key": "NSStatusItem Visible com.if.Amphetamine",
+          "valueType": "bool",
+          "iconVisible": true,
+          "iconVisibleValue": true,
+          "iconHiddenValue": false
+        }
       },
       "NixOS": {
         "platform": "NixOS",
@@ -67,7 +76,16 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Stats.app",
-        "bundleId": "eu.exelban.Stats"
+        "bundleId": "eu.exelban.Stats",
+        "menuBarIcon": {
+          "kind": "defaults-key",
+          "domain": "com.apple.controlcenter",
+          "key": "NSStatusItem Visible eu.exelban.Stats",
+          "valueType": "bool",
+          "iconVisible": true,
+          "iconVisibleValue": true,
+          "iconHiddenValue": false
+        }
       },
       "NixOS": {
         "platform": "NixOS",
@@ -124,7 +142,12 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/MiddleClick.app",
-        "bundleId": "com.rouge41.middleclick"
+        "bundleId": "com.rouge41.middleclick",
+        "menuBarIcon": {
+          "kind": "manual",
+          "provisioned": false,
+          "iconVisible": false
+        }
       },
       "NixOS": {
         "platform": "NixOS",
@@ -148,7 +171,16 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Mounty.app",
-        "bundleId": "com.mounty.app"
+        "bundleId": "com.mounty.app",
+        "menuBarIcon": {
+          "kind": "defaults-key",
+          "domain": "com.apple.controlcenter",
+          "key": "NSStatusItem Visible com.mounty.app",
+          "valueType": "bool",
+          "iconVisible": true,
+          "iconVisibleValue": true,
+          "iconHiddenValue": false
+        }
       },
       "NixOS": {
         "platform": "NixOS",
@@ -238,7 +270,16 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/OrbStack.app",
-        "bundleId": "com.orbstack.orbstack"
+        "bundleId": "com.orbstack.orbstack",
+        "menuBarIcon": {
+          "kind": "defaults-key",
+          "domain": "com.apple.controlcenter",
+          "key": "NSStatusItem Visible com.orbstack.orbstack",
+          "valueType": "bool",
+          "iconVisible": true,
+          "iconVisibleValue": true,
+          "iconHiddenValue": false
+        }
       },
       "NixOS": {
         "platform": "NixOS",
@@ -262,21 +303,36 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Parsec.app",
-        "bundleId": "tv.parsec.www"
+        "bundleId": "tv.parsec.www",
+        "menuBarIcon": {
+          "kind": "manual",
+          "provisioned": false,
+          "iconVisible": false
+        }
       },
       "NixOS": {
         "platform": "NixOS",
         "autostartEnabled": true,
         "autostartDisableNative": true,
         "kind": "xdg-desktop",
-        "path": "/run/current-system/sw/bin/parsec"
+        "path": "/run/current-system/sw/bin/parsec",
+        "menuBarIcon": {
+          "kind": "manual",
+          "provisioned": false,
+          "iconVisible": false
+        }
       },
       "Windows": {
         "platform": "Windows",
         "autostartEnabled": true,
         "autostartDisableNative": true,
         "kind": "run-key",
-        "path": "C:\\Program Files\\Parsec\\parsec.exe"
+        "path": "C:\\Program Files\\Parsec\\parsec.exe",
+        "menuBarIcon": {
+          "kind": "manual",
+          "provisioned": false,
+          "iconVisible": false
+        }
       }
     }
   },
@@ -290,21 +346,36 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Telegram.app",
-        "bundleId": "ru.keepcoder.Telegram"
+        "bundleId": "ru.keepcoder.Telegram",
+        "menuBarIcon": {
+          "kind": "manual",
+          "provisioned": false,
+          "iconVisible": false
+        }
       },
       "NixOS": {
         "platform": "NixOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
         "kind": "xdg-desktop",
-        "path": "/run/current-system/sw/bin/telegram-desktop"
+        "path": "/run/current-system/sw/bin/telegram-desktop",
+        "menuBarIcon": {
+          "kind": "manual",
+          "provisioned": false,
+          "iconVisible": false
+        }
       },
       "Windows": {
         "platform": "Windows",
         "autostartEnabled": false,
         "autostartDisableNative": true,
         "kind": "run-key",
-        "path": "%LOCALAPPDATA%\\Telegram Desktop\\Telegram.exe"
+        "path": "%LOCALAPPDATA%\\Telegram Desktop\\Telegram.exe",
+        "menuBarIcon": {
+          "kind": "manual",
+          "provisioned": false,
+          "iconVisible": false
+        }
       }
     }
   },
@@ -318,7 +389,12 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/WhatsApp.app",
-        "bundleId": "net.whatsapp.WhatsApp"
+        "bundleId": "net.whatsapp.WhatsApp",
+        "menuBarIcon": {
+          "kind": "manual",
+          "provisioned": false,
+          "iconVisible": false
+        }
       },
       "NixOS": {
         "platform": "NixOS",
@@ -330,7 +406,12 @@
         "autostartEnabled": false,
         "autostartDisableNative": true,
         "kind": "run-key",
-        "path": "%LOCALAPPDATA%\\WhatsApp\\WhatsApp.exe"
+        "path": "%LOCALAPPDATA%\\WhatsApp\\WhatsApp.exe",
+        "menuBarIcon": {
+          "kind": "manual",
+          "provisioned": false,
+          "iconVisible": false
+        }
       }
     }
   },
@@ -344,21 +425,36 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Steam.app",
-        "bundleId": "com.valvesoftware.steam"
+        "bundleId": "com.valvesoftware.steam",
+        "menuBarIcon": {
+          "kind": "manual",
+          "provisioned": false,
+          "iconVisible": false
+        }
       },
       "NixOS": {
         "platform": "NixOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
         "kind": "xdg-desktop",
-        "path": "/run/current-system/sw/bin/steam"
+        "path": "/run/current-system/sw/bin/steam",
+        "menuBarIcon": {
+          "kind": "manual",
+          "provisioned": false,
+          "iconVisible": false
+        }
       },
       "Windows": {
         "platform": "Windows",
         "autostartEnabled": false,
         "autostartDisableNative": true,
         "kind": "run-key",
-        "path": "C:\\Program Files (x86)\\Steam\\steam.exe"
+        "path": "C:\\Program Files (x86)\\Steam\\steam.exe",
+        "menuBarIcon": {
+          "kind": "manual",
+          "provisioned": false,
+          "iconVisible": false
+        }
       }
     }
   },
@@ -521,7 +617,12 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Discord.app",
-        "bundleId": "com.hnc.Discord"
+        "bundleId": "com.hnc.Discord",
+        "menuBarIcon": {
+          "kind": "activation-script",
+          "script": "src/scripts/lib/discord-tray.sh",
+          "iconVisible": false
+        }
       },
       "NixOS": {
         "platform": "NixOS",
@@ -529,6 +630,11 @@
         "autostartDisableNative": true,
         "kind": "xdg-desktop",
         "path": "/run/current-system/sw/bin/discord",
+        "menuBarIcon": {
+          "kind": "activation-script",
+          "script": "src/scripts/lib/discord-tray.sh",
+          "iconVisible": false
+        },
         "justification": "Stable Discord not provisioned in core.nix (only discord-canary); binary absent until user installs. Entry neutralizes native startup when present."
       },
       "Windows": {
@@ -536,7 +642,12 @@
         "autostartEnabled": false,
         "autostartDisableNative": true,
         "kind": "run-key",
-        "path": "%LOCALAPPDATA%\\Discord\\Discord.exe"
+        "path": "%LOCALAPPDATA%\\Discord\\Discord.exe",
+        "menuBarIcon": {
+          "kind": "activation-script",
+          "script": "src/scripts/lib/discord-tray.ps1",
+          "iconVisible": false
+        }
       }
     }
   },
@@ -550,21 +661,36 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Discord Canary.app",
-        "bundleId": "com.hnc.DiscordCanary"
+        "bundleId": "com.hnc.DiscordCanary",
+        "menuBarIcon": {
+          "kind": "activation-script",
+          "script": "src/scripts/lib/discord-tray.sh",
+          "iconVisible": false
+        }
       },
       "NixOS": {
         "platform": "NixOS",
         "autostartEnabled": false,
         "autostartDisableNative": true,
         "kind": "xdg-desktop",
-        "path": "/run/current-system/sw/bin/discord-canary"
+        "path": "/run/current-system/sw/bin/discord-canary",
+        "menuBarIcon": {
+          "kind": "activation-script",
+          "script": "src/scripts/lib/discord-tray.sh",
+          "iconVisible": false
+        }
       },
       "Windows": {
         "platform": "Windows",
         "autostartEnabled": false,
         "autostartDisableNative": true,
         "kind": "run-key",
-        "path": "%LOCALAPPDATA%\\DiscordCanary\\DiscordCanary.exe"
+        "path": "%LOCALAPPDATA%\\DiscordCanary\\DiscordCanary.exe",
+        "menuBarIcon": {
+          "kind": "activation-script",
+          "script": "src/scripts/lib/discord-tray.ps1",
+          "iconVisible": false
+        }
       }
     }
   }
