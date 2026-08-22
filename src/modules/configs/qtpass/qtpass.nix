@@ -26,7 +26,12 @@ let
     hideOnClose = false;
   };
 
+  # Pin the gpg executable to the managed gnupg package so QtPass never resolves a
+  # garbage-collectable nix store hash (or a system gpg) that may read a different
+  # keyring. The Windows path resolves gpg at runtime in Sync-QtPassConfig.ps1
+  # because the shared qtpass.json is written verbatim to the registry there.
   qtPassManagedSettings = (qtPassDefaultSettings // qtPassPlatformSettings) // {
+    gpgExecutable = lib.getExe pkgs.gnupg;
     passStore = "${lib.removeSuffix "/" passwordStoreDir}/";
   };
 

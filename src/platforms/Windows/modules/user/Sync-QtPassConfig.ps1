@@ -88,7 +88,18 @@ function Sync-QtPassConfig {
     )
 
     $settingsPath = Resolve-UserConfigFile -User $Username -ConfigName 'qtpass' -RelativePath 'qtpass.json' -RepoRoot $RepoRoot
-    return ConvertTo-Hashtable -InputObject (Get-Content -Path $settingsPath -Raw | ConvertFrom-Json)
+    $settings = ConvertTo-Hashtable -InputObject (Get-Content -Path $settingsPath -Raw | ConvertFrom-Json)
+
+    # Pin the gpg executable to the managed GnuPG install so QtPass never resolves
+    # a stale or system gpg that may read a different keyring. The shared
+    # qtpass.json cannot carry a nix store path (POSIX-only), so resolve it here.
+    $gpgExe = Get-Command -Name 'gpg.exe' -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
+    if ([string]::IsNullOrWhiteSpace($gpgExe)) {
+      $gpgExe = 'C:\Program Files\GnuPG\bin\gpg.exe'
+    }
+    $settings['gpgExecutable'] = $gpgExe
+
+    return $settings
   }
 
   function Get-QtPassRegistryHive {
