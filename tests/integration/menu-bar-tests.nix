@@ -43,6 +43,9 @@ assert containsRegex "iconVisibleValue" appsJsonText;
 assert containsRegex "iconHiddenValue" appsJsonText;
 assert containsRegex "defaults-key" appsJsonText;
 assert containsRegex "plist" appsJsonText;
+assert containsRegex "activation-script" appsJsonText;
+assert containsRegex "manual" appsJsonText;
+assert containsRegex "provisioned" appsJsonText;
 
 # --- menu-bar.sh structural assertions ---
 assert containsRegex "read_registry" menuBarShText;
@@ -131,5 +134,38 @@ assert containsRegex ''apps\.schema\.json'' appsJsonText;
 assert containsRegex ''"BetterDisplay".*"menuBarIcon"'' appsJsonText;
 assert containsRegex ''"Rectangle".*"menuBarIcon"'' appsJsonText;
 assert containsRegex ''"LuLu".*"menuBarIcon"'' appsJsonText;
+
+# --- Scope: every app with a controllable tray icon declares menuBarIcon on
+# every non-omitted host it runs on (enable via Control Center gate, disable
+# via manual/activation-script, or keep the existing defaults-key/plist block).
+assert containsRegex ''"Amphetamine".*"menuBarIcon"'' appsJsonText;
+assert containsRegex ''"Stats".*"menuBarIcon"'' appsJsonText;
+assert containsRegex ''"Mounty".*"menuBarIcon"'' appsJsonText;
+assert containsRegex ''"OrbStack".*"menuBarIcon"'' appsJsonText;
+assert containsRegex ''"MiddleClick".*"menuBarIcon"'' appsJsonText;
+assert containsRegex ''"Parsec".*"menuBarIcon"'' appsJsonText;
+assert containsRegex ''"Telegram".*"menuBarIcon"'' appsJsonText;
+assert containsRegex ''"WhatsApp".*"menuBarIcon"'' appsJsonText;
+assert containsRegex ''"Steam".*"menuBarIcon"'' appsJsonText;
+assert containsRegex ''"Discord".*"menuBarIcon"'' appsJsonText;
+assert containsRegex ''"Discord Canary".*"menuBarIcon"'' appsJsonText;
+
+# --- Control Center NSStatusItem gate: enabled apps converge via the
+# com.apple.controlcenter "NSStatusItem Visible <BundleID>" boolean (true =
+# allowed/shown, false = hidden; NOT inverted).
+assert containsRegex ''"com.apple.controlcenter"'' appsJsonText;
+assert containsRegex ''"NSStatusItem Visible com.if.Amphetamine"'' appsJsonText;
+assert containsRegex ''"NSStatusItem Visible eu.exelban.Stats"'' appsJsonText;
+assert containsRegex ''"NSStatusItem Visible com.mounty.app"'' appsJsonText;
+assert containsRegex ''"NSStatusItem Visible com.orbstack.orbstack"'' appsJsonText;
+
+# --- Manual entries: declared but not auto-provisioned (no programmatic
+# mechanism).  Engine must skip SET and surface via list/verify.
+assert containsRegex ''"MiddleClick".*"kind": "manual".*"provisioned": false'' appsJsonText;
+assert containsRegex ''"Parsec".*"kind": "manual".*"provisioned": false'' appsJsonText;
+
+# --- Discord tray: converged via activation-script (cross-platform).
+assert containsRegex ''"Discord".*"activation-script".*discord-tray'' appsJsonText;
+assert containsRegex ''"Discord Canary".*"activation-script".*discord-tray'' appsJsonText;
 
 true

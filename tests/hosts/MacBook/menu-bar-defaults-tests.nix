@@ -27,6 +27,15 @@ let
   linearMouse = appsJson.LinearMouse.hosts.MacBook.menuBarIcon;
   battery = appsJson.battery.hosts.MacBook.menuBarIcon;
   lulu = appsJson.LuLu.hosts.MacBook.menuBarIcon;
+  # Enabled via the macOS 26 Control Center NSStatusItem gate (class f).
+  amphetamine = appsJson.Amphetamine.hosts.MacBook.menuBarIcon;
+  stats = appsJson.Stats.hosts.MacBook.menuBarIcon;
+  mounty = appsJson.Mounty.hosts.MacBook.menuBarIcon;
+  orbstack = appsJson.OrbStack.hosts.MacBook.menuBarIcon;
+  # Manual (no programmatic mechanism) — declared but not auto-provisioned.
+  middleClick = appsJson.MiddleClick.hosts.MacBook.menuBarIcon;
+  # Discord tray — converged via activation-script.
+  discord = appsJson.Discord.hosts.MacBook.menuBarIcon;
 in
 
 # src/hosts/MacBook/defaults.nix — per-app icon keys removed (now in apps.json)
@@ -95,6 +104,49 @@ assert
   && lulu.iconVisible == false
   && lulu.iconVisibleValue == false
   && lulu.iconHiddenValue == true;
+
+# Enabled apps converge via the macOS 26 Control Center NSStatusItem gate.
+# The key is NOT inverted: true = allowed/shown, false = hidden.
+assert
+  amphetamine.kind == "defaults-key"
+  && amphetamine.domain == "com.apple.controlcenter"
+  && amphetamine.key == "NSStatusItem Visible com.if.Amphetamine"
+  && amphetamine.iconVisible == true
+  && amphetamine.iconVisibleValue == true
+  && amphetamine.iconHiddenValue == false;
+assert
+  stats.kind == "defaults-key"
+  && stats.domain == "com.apple.controlcenter"
+  && stats.key == "NSStatusItem Visible eu.exelban.Stats"
+  && stats.iconVisible == true
+  && stats.iconVisibleValue == true
+  && stats.iconHiddenValue == false;
+assert
+  mounty.kind == "defaults-key"
+  && mounty.domain == "com.apple.controlcenter"
+  && mounty.key == "NSStatusItem Visible com.mounty.app"
+  && mounty.iconVisible == true
+  && mounty.iconVisibleValue == true
+  && mounty.iconHiddenValue == false;
+assert
+  orbstack.kind == "defaults-key"
+  && orbstack.domain == "com.apple.controlcenter"
+  && orbstack.key == "NSStatusItem Visible com.orbstack.orbstack"
+  && orbstack.iconVisible == true
+  && orbstack.iconVisibleValue == true
+  && orbstack.iconHiddenValue == false;
+
+# Manual entries: declared but not auto-provisioned (no programmatic mechanism).
+assert
+  middleClick.kind == "manual"
+  && middleClick.provisioned == false
+  && middleClick.iconVisible == false;
+
+# Discord tray: converged via activation-script (cross-platform).
+assert
+  discord.kind == "activation-script"
+  && lib.hasInfix "discord-tray" discord.script
+  && discord.iconVisible == false;
 
 # src/hosts/MacBook/scripts/macos-configure-menu-bar-icons.sh — invokes menu-bar.sh apply
 assert lib.hasInfix "menu-bar.sh" menuBarIconsScriptSh;
