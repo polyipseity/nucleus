@@ -165,6 +165,7 @@ _arg2="$2"
 Rules:
 
 - **Always start with `set -euo pipefail`** (except scripts that intentionally allow failures).
+- **Hard-error on required-op failure.** A required convergence or configuration operation that fails must abort the activation (POSIX `die`/`error` + `exit 1`; PowerShell `Write-NucleusError` + `throw`). `warn`/`Write-NucleusWarning` + continue is banned for required operations in activation scripts — see `.agents/instructions/error-handling.instructions.md` (activation scripts hard-error, error vs warning vs info decision model).
 - **Always define `SCRIPT_DIR`** — never reference `$REPO_ROOT` at runtime.
 - **Source libs via SCRIPT_DIR-relative path.** Never use `${repoRoot}` or hardcoded paths.
 - **Use descriptive variable names** with a script-specific prefix (e.g., `_mqi_` for merge-qtpass-ini).
