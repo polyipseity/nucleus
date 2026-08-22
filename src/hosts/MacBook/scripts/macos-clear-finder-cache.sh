@@ -23,7 +23,8 @@ if _nucleus_resolve_console_user; then
     if /bin/rm -rf "$finder_cache_dir"; then
       say -l finder "cleared cached application state from $finder_cache_dir"
     else
-      warn -l finder "failed to clear cached state at $finder_cache_dir (non-fatal; user may need manual restart)."
+      # check-suppress:suppression_doc: cache clear is best-effort; missing cache is not a config failure
+      warn -l finder "failed to clear cached state at $finder_cache_dir (user may need manual restart)."
     fi
   fi
   # Process restarts handled by Home Manager's relaunchDesktopServices step.

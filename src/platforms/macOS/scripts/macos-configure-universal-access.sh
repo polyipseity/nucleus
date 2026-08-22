@@ -21,9 +21,9 @@ set_default() {
   if ! write_err="$({ /usr/bin/defaults write "$domain" "$key" "-$value_type" "$value"; } 2>&1)"; then
     if printf '%s' "$write_err" | /usr/bin/grep -Eqi 'Operation not permitted|Permission denied'; then
       print_fda_warning "Accessibility preferences"
-      warn "Failed to set '$domain' '$key'. Ensure Full Disk Access and Accessibility permissions are granted."
+      die "Failed to set '$domain' '$key'. Ensure Full Disk Access and Accessibility permissions are granted."
     else
-      warn "failed to set $domain $key ($write_err)."
+      die "failed to set $domain $key ($write_err)."
     fi
   fi
 }

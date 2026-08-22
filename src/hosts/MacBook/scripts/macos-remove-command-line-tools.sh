@@ -32,7 +32,7 @@ if [ -d "$CLT_DIR" ]; then
     _log "removed $CLT_DIR"
     say -l command-line-tools "removed $CLT_DIR."
   else
-    warn -l command-line-tools "failed to remove $CLT_DIR."
+    die -l command-line-tools "failed to remove $CLT_DIR."
   fi
 else
   _log "install tree already absent"

@@ -25,5 +25,5 @@ if [ ! -f "$MENU_BAR_CLI" ]; then
 fi
 
 if ! "$MENU_BAR_CLI" apply; then
-  warn -l menu-bar "one or more app icons failed to converge (non-fatal)."
+  die -l menu-bar "one or more app icons failed to converge."
 fi

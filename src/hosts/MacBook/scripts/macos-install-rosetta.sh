@@ -25,6 +25,6 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 if ! /usr/sbin/pkgutil --pkg-info com.apple.pkg.RosettaUpdateAuto >/dev/null 2>&1; then
   if ! /usr/sbin/softwareupdate --install-rosetta --agree-to-license; then
-    warn -l rosetta "installation failed."
+    die -l rosetta "installation failed."
   fi
 fi

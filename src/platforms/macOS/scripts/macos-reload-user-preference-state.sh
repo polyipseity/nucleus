@@ -10,5 +10,5 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 . "$SCRIPT_DIR/../../../scripts/lib/lib.sh"
 
 if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
-  warn "activateSettings -u failed; some preference updates may require relogin."
+  die "activateSettings -u failed; some preference updates may require relogin."
 fi

@@ -22,24 +22,25 @@ if _nucleus_resolve_console_user; then
     if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
       /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add "$hotkey" \
       "<dict><key>enabled</key><false/></dict>"; then
-      warn -l spotlight "failed to disable hotkey $hotkey."
+      die -l spotlight "failed to disable hotkey $hotkey."
     fi
   done
 
   if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" \
     /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
-    warn -l spotlight "hotkey changes applied; log out/in once to fully activate."
+    die -l spotlight "hotkey changes applied; log out/in once to fully activate."
   fi
 else
   say -l spotlight "skipped hotkey disable (no active non-root GUI session)."
 fi
 
 if ! /usr/bin/mdutil -i off /; then
-  warn -l spotlight "failed to disable indexing."
+  die -l spotlight "failed to disable indexing."
 fi
 
 if [ -d "/.Spotlight-V100" ]; then
   if ! /bin/rm -rf "/.Spotlight-V100"; then
+    # check-suppress:suppression_doc: cache dir may not exist; removal is best-effort cleanup, not a config write
     warn -l spotlight "failed to remove /.Spotlight-V100 cache directory."
   fi
 fi

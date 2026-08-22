@@ -42,17 +42,17 @@ if [ -n "$battery_cli" ] && _nucleus_resolve_console_user; then
   # battery's own log file (~/.battery/battery.log) retains full
   # diagnostic output for post-failure inspection.
   if ! /usr/bin/sudo -H -u "$_nucleus_console_user" "$battery_cli" maintain 80 </dev/null >/dev/null 2>&1; then
-    warn -l power "battery maintain 80 failed for user '$_nucleus_console_user'."
+    die -l power "battery maintain 80 failed for user '$_nucleus_console_user'."
   fi
 elif [ -x /opt/homebrew/bin/bclm ]; then
   if [ -n "$macos_major" ] && [ "$macos_major" -ge 15 ]; then
     warn -l power "bclm is unsupported on macOS >= 15; install and initialize the battery app to enforce 80% charge limit."
   else
     if ! /opt/homebrew/bin/bclm write 80; then
-      warn -l power "bclm write 80 failed."
+      die -l power "bclm write 80 failed."
     fi
     if ! /opt/homebrew/bin/bclm persist; then
-      warn -l power "bclm persist failed."
+      die -l power "bclm persist failed."
     fi
   fi
 elif [ -d "$battery_app" ]; then

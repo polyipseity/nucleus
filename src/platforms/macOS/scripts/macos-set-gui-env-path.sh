@@ -70,7 +70,7 @@ if [ "$_mge_current_path" != "$_mge_desired_path" ]; then
     say -l launchd "user PATH updated via launchctl config user path."
     say -l launchd "REBOOT REQUIRED for .app bundles to inherit the new PATH."
   else
-    warn -l launchd "failed to update user PATH (non-fatal)."
+    die -l launchd "failed to update user PATH."
   fi
 else
   say -l launchd "user PATH already up-to-date."

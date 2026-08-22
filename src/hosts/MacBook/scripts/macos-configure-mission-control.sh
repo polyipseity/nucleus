@@ -12,7 +12,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 if _nucleus_resolve_console_user; then
   if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/defaults write com.apple.spaces spans-displays -bool true; then
-    warn -l power "failed to enable Mission Control spans-displays for console uid $_nucleus_console_uid."
+    die -l power "failed to enable Mission Control spans-displays for console uid $_nucleus_console_uid."
   fi
 else
   say -l power "no active non-root console user; skipping spans-displays write."

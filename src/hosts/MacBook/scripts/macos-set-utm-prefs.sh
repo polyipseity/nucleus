@@ -23,16 +23,16 @@ utm_write_default() {
     # Container already registered (UTM launched before): write through
     # cfprefsd so the domain resolves to the container.
     if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" /usr/bin/defaults write com.utmapp.UTM "$key" "$flag" "$value"; then
-      warn -l utm "failed to set preference '$key' for user '$_nucleus_console_user'."
+      die -l utm "failed to set preference '$key' for user '$_nucleus_console_user'."
     fi
   else
     # UTM never launched, so its sandbox container does not exist yet.
     # Create the prefs directory and write the container plist directly;
     # cfprefsd adopts it when UTM first launches.
     if ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" /bin/mkdir -p "$(dirname "$utm_container_prefs")"; then
-      warn -l utm "failed to create container prefs directory for user '$_nucleus_console_user'."
+      die -l utm "failed to create container prefs directory for user '$_nucleus_console_user'."
     elif ! /bin/launchctl asuser "$_nucleus_console_uid" /usr/bin/sudo -H -u "$_nucleus_console_user" /usr/bin/defaults write "$utm_container_prefs" "$key" "$flag" "$value"; then
-      warn -l utm "failed to set preference '$key' for user '$_nucleus_console_user'."
+      die -l utm "failed to set preference '$key' for user '$_nucleus_console_user'."
     fi
   fi
 }

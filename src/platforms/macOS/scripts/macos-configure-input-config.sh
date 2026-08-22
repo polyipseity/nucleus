@@ -13,11 +13,11 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # Source: symbolic hotkey values are persisted in
 # com.apple.symbolichotkeys/AppleSymbolicHotKeys via defaults(1).
 if ! /usr/bin/defaults write com.apple.symbolichotkeys AppleSymbolicHotKeys -dict-add 176 "<dict><key>enabled</key><false/></dict>"; then
-  warn "failed to update symbolic hotkey 176."
+  die "failed to update symbolic hotkey 176."
 fi
 
 if ! /System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings -u; then
-  warn "activateSettings -u failed; input settings may apply on next login."
+  die "activateSettings -u failed; input settings may apply on next login."
 fi
 
 refresh_tiswitcher

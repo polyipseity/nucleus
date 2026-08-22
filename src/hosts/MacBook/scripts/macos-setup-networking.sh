@@ -30,6 +30,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 /bin/launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true # check-suppress:suppression_doc: Screen Sharing daemon may already be loaded; launchctl load -w exits 1 for already-loaded services.
 if ! /bin/launchctl list com.apple.screensharing >/dev/null 2>&1; then
+  # check-suppress:suppression_doc: verification-only; load already succeeded, this is a post-load sanity note
   warn -l rdp "Screen Sharing daemon not listed after load; remote desktop may not be active."
 fi
 

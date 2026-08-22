@@ -25,5 +25,5 @@ if [ ! -f "$AUTOSTART_CLI" ]; then
 fi
 
 if ! "$AUTOSTART_CLI" apply; then
-  warn -l autostart "one or more apps failed to converge (non-fatal)."
+  die -l autostart "one or more apps failed to converge."
 fi
