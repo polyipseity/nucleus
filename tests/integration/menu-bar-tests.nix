@@ -64,6 +64,11 @@ assert containsRegex "defaults write" menuBarShText;
 assert containsRegex "pgrep" menuBarShText;
 assert containsRegex "pkill" menuBarShText;
 assert containsRegex "nixos_dispatch_per_user" menuBarShText;
+# activation-script entries must resolve the repo-relative script against
+# REPO_ROOT and pass the app key, so Discord Canary edits the canary config
+# rather than the stable one (regression guard for the discord-tray warning).
+assert containsRegex ''\$REPO_ROOT/\$script'' menuBarShText;
+assert containsRegex ''"\$script" "\$visible" "\$\{app_key'' menuBarShText;
 
 # --- menu-bar.ps1 structural assertions ---
 assert containsRegex "Get-MenuBarNativeValue" menuBarPs1Text;
@@ -75,6 +80,9 @@ assert containsRegex "Invoke-MenuBarConverge" menuBarPs1Text;
 assert containsRegex "Resolve-AppNameList" menuBarPs1Text;
 assert containsRegex "Format-ListTable" menuBarPs1Text;
 assert containsRegex ''apps\.json'' menuBarPs1Text;
+# Windows activation-script entries must resolve against $RepoRoot and pass $Key.
+assert containsRegex ''Join-Path \$RepoRoot \$script'' menuBarPs1Text;
+assert containsRegex ''\$resolvedScript \$Visible \$Key'' menuBarPs1Text;
 
 # --- macOS activation wiring assertions ---
 assert containsRegex "MENU_BAR_CLI.*apply" macosMenuBarScriptText;
