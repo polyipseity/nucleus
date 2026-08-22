@@ -157,7 +157,16 @@ function Set-MenuBarNative {
     'activation-script' {
       $script = $icon.script
       if (-not [string]::IsNullOrEmpty($script)) {
-        & $script $Visible
+        $resolvedScript = if ([System.IO.Path]::IsPathRooted($script)) {
+          $script
+        } else {
+          Join-Path $RepoRoot $script
+        }
+        if (-not (Test-Path -LiteralPath $resolvedScript)) {
+          Write-NucleusWarning "$Key — activation-script not found: $resolvedScript"
+          return 1
+        }
+        & $resolvedScript $Visible $Key
         Write-NucleusInfo -CommandName 'menu-bar' "set $Key icon via activation-script"
       }
     }
