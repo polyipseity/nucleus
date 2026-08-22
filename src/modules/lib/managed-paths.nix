@@ -24,6 +24,19 @@ let
     ];
   };
 
+  # ── User-scoped `node` → `bun` shim ────────────────────────────────
+  # The repository bans system-wide Node.js; bun is the sole JS runtime.  bun's
+  # node-compat mode runs Node.js scripts, so a `node` symlink to `bun` lets
+  # `node <script>` invocations (e.g. inside `bun run` child shells, GUI apps)
+  # resolve to bun without installing a separate Node.js.  Installed into
+  # ~/.local/bin (already on the managed append PATH) so it is reachable by
+  # subprocess PATHs.  Interactive `node()` in init.zsh still blocks — this is
+  # infrastructure on PATH, not a license to use node interactively.
+  nodeShim = pkgs.runCommand "node-shim" { } ''
+    mkdir -p "$out/bin"
+    ln -s "${pkgs.bun}/bin/bun" "$out/bin/node"
+  '';
+
   # ── PATH components ─────────────────────────────────────────────────
   # Managed PATH directories split into prepend (before system default) and
   # append (after system default) groups.  Each consumer renders these as
@@ -156,6 +169,7 @@ in
   inherit
     cargoBinDir
     defaultDevTools
+    nodeShim
     pathComponents
     toAbsoluteAppendPath
     toAbsolutePrependPath
