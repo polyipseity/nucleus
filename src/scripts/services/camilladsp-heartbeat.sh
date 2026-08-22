@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Persistent-loop heartbeat for CamillaDSP: pushes the current config if
-# camilladsp is not in "Running" state.  Runs indefinitely with exponential
-# backoff.  Designed as a persistent daemon (KeepAlive / Restart=always /
-# scheduled task AtLogOn) — not a timer-driven oneshot.
+# Persistent-loop heartbeat for CamillaDSP: pushes the current config unless
+# camilladsp is Running AND the live playback device is already set (idiot-proof
+# skip: a null live device is always corrected).  Runs indefinitely with
+# exponential backoff.  Designed as a persistent daemon (KeepAlive /
+# Restart=always / scheduled task AtLogOn) — not a timer-driven oneshot.
 #
-# Dependencies: websocat, jq (PATH managed via writeShellApplication runtimeInputs)
+# Dependencies: websocat, jq, python3 (yaml) — PATH managed via writeShellApplication runtimeInputs
 #
 # Usage: camilladsp-heartbeat.sh [--port PORT] [--config FILE]
 set -euo pipefail
@@ -62,24 +63,29 @@ while true; do
 
   _success=false
 
-  # --- Skip push if already running ---
-  # Avoid filling CamillaDSP's bounded command channel (capacity 10).
+  # --- Decide whether a push is needed ---
+  # Query live state and the live playback device. If the websocket is
+  # unreachable, leave both empty (treated as "push"). The skip decision is
+  # idiot-proof: skip ONLY when Running AND the live device is already set. A
+  # null live device can never be skipped, so a null device is always corrected.
+  _state=""
+  _live=""
   if _state_resp=$(printf '{"GetState":null}' | websocat -1 "ws://127.0.0.1:$ws_port" 2>/dev/null); then
     _state=$(printf '%s' "$_state_resp" | jq -r '.GetState.value // empty')
-    if [ "$_state" = "Running" ]; then
-      _success=true
-    fi
+  fi
+  if _config_resp=$(printf '{"GetConfig":null}' | websocat -1 "ws://127.0.0.1:$ws_port" 2>/dev/null); then
+    _live=$(printf '%s' "$_config_resp" | jq -r '.GetConfig.value.devices.playback.device // empty')
   fi
 
-  if [ "$_success" = false ]; then
+  if camilladsp_needs_push "$_state" "$_live"; then
     # --- Push config ---
     # Resolve playback device: patches empty device in config with system default.
-    _resolved_config=$(camilladsp_resolve_playback_device "$config_file")
-    if _push_resp=$(jq -cRs '{SetConfig: .}' <<<"$_resolved_config" | websocat -1 "ws://127.0.0.1:$ws_port" 2>/dev/null); then
-      if printf '%s' "$_push_resp" | jq -e '.SetConfig.result == "Ok"' >/dev/null 2>&1; then
-        _success=true
-      fi
+    if camilladsp_push_config --port "$ws_port" --config "$config_file"; then
+      _success=true
     fi
+  else
+    # Already converged (Running with a live device set) — nothing to do.
+    _success=true
   fi
 
   if [ "$_success" = true ]; then
