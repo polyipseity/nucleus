@@ -102,8 +102,8 @@
     "displayName": "CamillaDSP Heartbeat",
     "hosts": {
       "MacBook": {
-        "domain": "system",
-        "justification": "Launchd daemon with internal 5s loop; runs as console user for audio device access.",
+        "domain": "user",
+        "justification": "User agent (launchd.agents) so TCC permits reading $HOME/.config/camilladsp/configs/config.yml; a system daemon is blocked from user-home file reads (EPERM).",
         "runAsUser": true,
         "service": "local.camilladsp-heartbeat",
         "type": "launchctl",

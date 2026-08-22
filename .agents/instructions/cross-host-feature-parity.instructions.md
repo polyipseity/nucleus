@@ -94,7 +94,7 @@ All nucleus-managed services use persistent-daemon semantics by default: auto-st
 | ------------------------- | ------------------------------------------- | ------------------------- | ---------------------- |
 | `caddy` | launchd `daemon`, system | SCM | SCM |
 | `camilladsp` | launchd `daemon`, system | systemd `service`, system | scheduled task, user |
-| `camilladsp-heartbeat` | launchd `daemon`, system | systemd `service`, system | scheduled task, user |
+| `camilladsp-heartbeat` | launchd `agent`, user | systemd `service`, system | scheduled task, user |
 | `camillagui-backend` | launchd `daemon`, system | systemd `service`, system | scheduled task, user |
 | `cloud-drive` | launchd `agent`, user | systemd `service`, user | scheduled task, user |
 | `discord-music-rpc` | launchd `agent`, user | systemd `service`, user | scheduled task, user |

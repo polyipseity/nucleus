@@ -22,6 +22,11 @@ let
   jellyfinRunAsUser = services.jellyfin.hosts.MacBook.runAsUser;
   litellmRunAsUser = services.litellm.hosts.MacBook.runAsUser;
 
+  # Verify launchd domain: heartbeat must be a user agent (TCC can read
+  # user-home config); run service stays a system daemon.
+  camillaHeartbeatDomain = services."camilladsp-heartbeat".hosts.MacBook.domain;
+  camillaRunDomain = services.camilladsp.hosts.MacBook.domain;
+
   # --- Tests ---
   test_camilladsp_dirs = assert' (
     camillaDirs.system == [ "camilladsp" ] && camillaDirs.user == [ "camilladsp" ]
@@ -61,6 +66,13 @@ let
   test_jellyfin_runAsUser = assert' jellyfinRunAsUser "jellyfin: runAsUser=true";
   test_litellm_runAsUser = assert' litellmRunAsUser "litellm: runAsUser=true";
 
+  test_camilladsp_heartbeat_domain = assert' (
+    camillaHeartbeatDomain == "user"
+  ) "camilladsp-heartbeat: MacBook domain=user (TCC-readable user agent)";
+  test_camilladsp_run_domain = assert' (
+    camillaRunDomain == "system"
+  ) "camilladsp: MacBook domain=system (no user-home config read)";
+
 in
 {
   tests = builtins.filter (x: x != null) [
@@ -77,6 +89,8 @@ in
     test_caddy_runAsUser
     test_jellyfin_runAsUser
     test_litellm_runAsUser
+    test_camilladsp_heartbeat_domain
+    test_camilladsp_run_domain
   ];
   success = true;
   allPass = true;

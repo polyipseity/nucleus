@@ -1,11 +1,18 @@
 # hosts/MacBook/camilladsp.nix — CamillaDSP launchd services.
 #
-# Runs as the primary user via UserName so the daemon can access user-level
-# config at $HOME/.config/camilladsp/. Config is deployed by Home Manager
-# in modules/home.nix.
+# The run service is a system daemon (launchd.daemons) that starts camilladsp
+# with --no_config and never reads user-home config, so TCC is not triggered.
+# Config is deployed by Home Manager in modules/home.nix.
 #
-# Heartbeat is a separate timer-driven agent (StartInterval 5s) that
-# re-pushes the config when camilladsp is not in "Running" state, so
+# The heartbeat is a user agent (launchd.agents) running inside the primary
+# user's GUI/login session. It reads $HOME/.config/camilladsp/configs/config.yml
+# to resolve the playback device; a system daemon is blocked by macOS TCC from
+# reading user-home file contents (EPERM on `cat`), which previously left the
+# device null after every rebuild. A user agent inherits the session's TCC
+# grants, so the read succeeds. Trade-off: the agent only runs while the user
+# is logged into a GUI session (not at the login window); acceptable for audio.
+#
+# Heartbeat re-pushes the config when camilladsp is not in "Running" state, so
 # config re-applies when a disconnected audio device reappears.
 {
   config,
@@ -77,11 +84,13 @@ in
     };
   };
 
-  launchd.daemons."camilladsp-heartbeat" = {
+  launchd.agents."camilladsp-heartbeat" = {
     serviceConfig = {
       Label = "local.camilladsp-heartbeat";
-      # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
-      # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
+      # User agent: runs inside the primary user's GUI/login session so TCC
+      # permits reading $HOME/.config/camilladsp/configs/config.yml. A system
+      # daemon is blocked by TCC from reading user-home file contents (EPERM),
+      # which left the playback device null after every rebuild.
       # ref: macos-service-hardening.instructions.md -- SIP /bin/sh wrapper
       # Upstream <https://github.com/nix-darwin/nix-darwin/issues/1219> tracks
       # making launchd services show descriptive names; do not revisit until
@@ -91,7 +100,6 @@ in
         "-c"
         "exec ${camilladspHeartbeat}/bin/nucleus-camilladsp-heartbeat --port ${toString wsPort}"
       ];
-      UserName = username;
       EnvironmentVariables = daemonEnv;
       KeepAlive = true;
       RunAtLoad = true;
