@@ -258,14 +258,14 @@
       },
       "NixOS": {
         "platform": "NixOS",
-        "enabled": true,
+        "enabled": false,
         "disableNative": true,
         "kind": "xdg-desktop",
         "path": "/run/current-system/sw/bin/telegram-desktop"
       },
       "Windows": {
         "platform": "Windows",
-        "enabled": true,
+        "enabled": false,
         "disableNative": true,
         "kind": "run-key",
         "path": "%LOCALAPPDATA%\\Telegram Desktop\\Telegram.exe"
@@ -278,7 +278,7 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": true,
+        "enabled": false,
         "disableNative": true,
         "kind": "login-item",
         "path": "/Applications/WhatsApp.app",
