@@ -155,15 +155,7 @@ pipeline:
     type: Filter
   - bypassed: null
     description: null
-    name: low gate
-    type: Processor
-  - bypassed: null
-    description: null
     name: low compressor
-    type: Processor
-  - bypassed: null
-    description: null
-    name: mid-high gate
     type: Processor
   - bypassed: null
     description: null
@@ -196,21 +188,6 @@ processors:
       soft_clip: null
       threshold: -32
     type: Compressor
-  low gate:
-    description: null
-    parameters:
-      attack: 0.05
-      attenuation: 10
-      channels: 4
-      monitor_channels:
-        - 0
-        - 1
-      process_channels:
-        - 0
-        - 1
-      release: 2.5
-      threshold: -54
-    type: NoiseGate
   master limiter:
     description: null
     parameters:
@@ -247,19 +224,4 @@ processors:
       soft_clip: null
       threshold: -36
     type: Compressor
-  mid-high gate:
-    description: null
-    parameters:
-      attack: 0.02
-      attenuation: 15
-      channels: 4
-      monitor_channels:
-        - 2
-        - 3
-      process_channels:
-        - 2
-        - 3
-      release: 2.5
-      threshold: -56
-    type: NoiseGate
 title: 2-band automatic gain control (-14 LUFS)
