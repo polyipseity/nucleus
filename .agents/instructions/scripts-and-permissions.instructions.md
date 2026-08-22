@@ -168,10 +168,12 @@ needs the privilege is unaffected by this policy.
    script that never needs the privilege is unaffected and must not be forced to
    escalate. The rule replaces the prior warn-and-skip behavior for cases where
    the script already gates on a missing item (e.g. `svc` system-domain).
-3. **Inverse family (the only other sanctioned exception):** scripts that
-   *refuse to run already-elevated* because they manage escalation internally
-   (`scripts/bootstrap.sh`, `scripts/bootstrap.ps1`, `src/scripts/apply.sh`,
-   `src/hosts/Windows/apply.ps1`). Documented as the sole exceptions to rule 2.
+3. **Inverse family — hard-refuse when already elevated (NOT warn-and-skip):**
+   scripts that *refuse to run already-elevated* because they manage escalation
+   internally (`scripts/bootstrap.sh`, `scripts/bootstrap.ps1`, `src/scripts/apply.sh`,
+   `src/hosts/Windows/apply.ps1`). This is the sole exception to rule 2's
+   escalate-then-warn path, but its outcome is a **hard refusal** (abort with a
+   non-zero exit), not a warning. Refusing to run is an error, not a warn-and-continue.
 4. **Non-escalatable privileges (documented exceptions, keep warn-and-skip):**
    - macOS Full Disk Access (TCC privacy grant — cannot be obtained via sudo).
    - `health-check` diagnostic reporting (its purpose is to surface gaps, not act).
