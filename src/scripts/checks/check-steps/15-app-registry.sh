@@ -35,7 +35,7 @@ run_app_registry() {
         (if .value.type == "omitted" then (.value.justification | type == "string" and length > 0) else true end | tostring)
       ] | @tsv' "$_app_json")
 
-    # enabled / disableNative must be booleans; kind must be in the enum.
+    # autostartEnabled / autostartDisableNative must be booleans; kind must be in the enum.
     while IFS=$'\t' read -r _name _host _type _enabled _disable_native _kind; do
       # Omitted hosts carry no runtime fields; the first loop already validated
       # their justification. Skip boolean/kind checks for them.
@@ -43,14 +43,14 @@ run_app_registry() {
       case "$_enabled" in
       true | false) ;;
       *)
-        error "apps.json: '$_name' host '$_host' enabled must be boolean (got '$_enabled')"
+        error "apps.json: '$_name' host '$_host' autostartEnabled must be boolean (got '$_enabled')"
         _app_errors=$((_app_errors + 1))
         ;;
       esac
       case "$_disable_native" in
       true | false) ;;
       *)
-        error "apps.json: '$_name' host '$_host' disableNative must be boolean (got '$_disable_native')"
+        error "apps.json: '$_name' host '$_host' autostartDisableNative must be boolean (got '$_disable_native')"
         _app_errors=$((_app_errors + 1))
         ;;
       esac
@@ -70,8 +70,8 @@ run_app_registry() {
         $name,
         .key,
         (.value.type // "missing"),
-        (if (.value | has("enabled")) then (.value.enabled | tostring) else "missing" end),
-        (if (.value | has("disableNative")) then (.value.disableNative | tostring) else "missing" end),
+        (if (.value | has("autostartEnabled")) then (.value.autostartEnabled | tostring) else "missing" end),
+        (if (.value | has("autostartDisableNative")) then (.value.autostartDisableNative | tostring) else "missing" end),
         (.value.kind // "missing")
       ] | @tsv' "$_app_json")
   fi

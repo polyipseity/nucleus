@@ -79,12 +79,12 @@
           "description": "macOS bundle identifier (e.g. com.if.Amphetamine). Used to locate the app for login-item manipulation.",
           "type": "string"
         },
-        "disableNative": {
+        "autostartDisableNative": {
           "description": "Does the app ship a native auto-start setting we must turn off (true for almost everything; false only for system-extension apps with no app setting).",
           "type": "boolean"
         },
-        "enabled": {
-          "description": "Do we launch this app via our uniform mechanism.",
+        "autostartEnabled": {
+          "description": "Do we launch this app via our uniform auto-start mechanism.",
           "type": "boolean"
         },
         "hidden": {
@@ -104,8 +104,8 @@
         }
       },
       "required": [
-        "enabled",
-        "disableNative",
+        "autostartEnabled",
+        "autostartDisableNative",
         "kind"
       ],
       "type": "object"

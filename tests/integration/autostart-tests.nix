@@ -43,7 +43,7 @@ assert containsRegex ''"WhatsApp"'' appsJsonText;
 assert containsRegex ''"MiddleClick"'' appsJsonText;
 assert containsRegex ''"Mounty"'' appsJsonText;
 assert containsRegex "displayName" appsJsonText;
-assert containsRegex "disableNative" appsJsonText;
+assert containsRegex "autostartDisableNative" appsJsonText;
 assert containsRegex "kind" appsJsonText;
 
 # --- autostart.sh structural assertions ---
@@ -93,7 +93,7 @@ assert containsRegex "nucleus-apply" flakeText;
 
 # --- apps.json scope assertions ---
 # Steam is disabled on all platforms (declared but not launched).
-assert containsRegex ''"Steam".*"enabled".*false'' appsJsonText;
+assert containsRegex ''"Steam".*"autostartEnabled".*false'' appsJsonText;
 
 # User-scoped entries must have justification.
 assert containsRegex ''"MiddleClick".*justification'' appsJsonText;
@@ -183,7 +183,7 @@ assert all (
     then
       true
     else
-      hostEntry.disableNative == true
+      hostEntry.autostartDisableNative == true
   ) hosts
 ) appNames;
 

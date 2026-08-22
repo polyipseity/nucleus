@@ -207,8 +207,8 @@ function Get-AppActualState {
 function Invoke-AppConverge {
   param([string]$Key, [hashtable]$Entry)
   $kind = $Entry.hostEntry.kind
-  $enabled = $Entry.hostEntry.enabled
-  $disableNative = $Entry.hostEntry.disableNative
+  $enabled = $Entry.hostEntry.autostartEnabled
+  $disableNative = $Entry.hostEntry.autostartDisableNative
   $path = if ($Entry.hostEntry.ContainsKey('path')) { $Entry.hostEntry.path } else { '' }
 
   switch ($kind) {
@@ -283,7 +283,7 @@ function Format-ListTable {
       $jsonObj.apps[$key] = @{
         displayName = $Results[$key].displayName
         state       = (Get-AppActualState -Key $key -Entry $Results[$key])
-        declared    = $Results[$key].hostEntry.enabled
+        declared    = $Results[$key].hostEntry.autostartEnabled
       }
     }
     return ($jsonObj | ConvertTo-Json -Depth 3 -Compress)
@@ -296,7 +296,7 @@ function Format-ListTable {
       $lines += "{0,-22} {1,-10} {2,-8} {3}" -f $key, 'n/a', '-', $Results[$key].displayName
     } else {
       $state = Get-AppActualState -Key $key -Entry $Results[$key]
-      $declared = $Results[$key].hostEntry.enabled
+      $declared = $Results[$key].hostEntry.autostartEnabled
       $lines += "{0,-22} {1,-10} {2,-8} {3}" -f $key, $state, $declared, $Results[$key].displayName
     }
   }
@@ -338,7 +338,7 @@ switch ($Action) {
       }
       $entry = $Registry[$key]
       # Override the declared enabled flag with the requested action for this run.
-      $entry.hostEntry.enabled = ($Action -eq 'enable')
+      $entry.hostEntry.autostartEnabled = ($Action -eq 'enable')
       try {
         if ((Invoke-AppConverge -Key $key -Entry $entry) -ne 0) {
           Write-NucleusError "$key — $Action failed"
@@ -372,7 +372,7 @@ switch ($Action) {
     $drift = $false
     foreach ($key in $resolved.Keys) {
       if ($key -like 'ERROR:*') { continue }
-      $declared = $Registry[$key].hostEntry.enabled
+      $declared = $Registry[$key].hostEntry.autostartEnabled
       $actual = Get-AppActualState -Key $key -Entry $Registry[$key]
       $declaredOn = ($declared -eq $true)
       $actualOn = ($actual -eq 'enabled')

@@ -8,7 +8,7 @@
 #   Actions: list, status, enable, disable, apply, verify.
 #
 # Policy (driving constraint): we never let an app manage its own startup.
-# If an app exposes a native auto-start setting, we disable it (disableNative),
+# If an app exposes a native auto-start setting, we disable it (autostartDisableNative),
 # then control enable/disable through exactly one uniform mechanism we own:
 #   macOS   — login items we add/remove via osascript System Events
 #             (system extensions use systemextensionsctl best-effort + manual)
@@ -323,14 +323,14 @@ app_actual_state() {
 }
 
 # app_converge KEY ENTRY_JSON — Apply declared state for one app.
-# disableNative first neutralizes the app's own native auto-start (so only our
-# mechanism remains), then we add/remove our login item per `enabled`.
+# autostartDisableNative first neutralizes the app's own native auto-start (so only our
+# mechanism remains), then we add/remove our login item per `autostartEnabled`.
 app_converge() {
   local key="$1" entry_json="$2"
   local kind enabled disable_native name path hidden
   kind=$(echo "$entry_json" | jq -r '.hostEntry.kind')
-  enabled=$(echo "$entry_json" | jq -r '.hostEntry.enabled')
-  disable_native=$(echo "$entry_json" | jq -r '.hostEntry.disableNative')
+  enabled=$(echo "$entry_json" | jq -r '.hostEntry.autostartEnabled')
+  disable_native=$(echo "$entry_json" | jq -r '.hostEntry.autostartDisableNative')
   name=$(app_login_item_name "$key" "$entry_json")
   path=$(echo "$entry_json" | jq -r '.hostEntry.path // empty')
   hidden=$(echo "$entry_json" | jq -r '.hostEntry.hidden // false')
@@ -399,7 +399,7 @@ do_list() {
       local state
       state=$(app_actual_state "$key" "$entry_json")
       local declared
-      declared=$(echo "$entry_json" | jq -r '.hostEntry.enabled')
+      declared=$(echo "$entry_json" | jq -r '.hostEntry.autostartEutostartEutostartEutostartEnabled')
       local pair
       pair=$(jq -cn --arg k "$key" --argjson v "$(jq -cn --arg s "$state" --argjson d "$declared" '{state:$s, declaredEnabled:$d}')" '{key:$k, value:$v}')
       out="${out:+$out
@@ -413,7 +413,7 @@ do_list() {
     while IFS=$'\t' read -r key display entry_json; do
       local state declared
       state=$(app_actual_state "$key" "$entry_json")
-      declared=$(echo "$entry_json" | jq -r '.hostEntry.enabled')
+      declared=$(echo "$entry_json" | jq -r '.hostEntry.autostartEnabled')
       printf '%-22s %-10s %-8s %s\n' "$key" "$state" "$declared" "$display"
     done < <(echo "$registry" | jq -r 'to_entries[] | [.key, .value.displayName, (.value | tojson)] | @tsv')
   fi
@@ -459,9 +459,9 @@ do_set() {
       overall=1
       continue
     fi
-    # Override the declared `enabled` with the requested action for this run.
+    # Override the declared `autostartEnabled` with the requested action for this run.
     local overridden
-    overridden=$(echo "$entry" | jq --argjson v "$value" '.hostEntry.enabled = $v')
+    overridden=$(echo "$entry" | jq --argjson v "$value" '.hostEntry.autostartEnabled = $v')
     if ! app_converge "$app" "$overridden"; then
       warn "$app — $action failed"
       overall=1
@@ -491,7 +491,7 @@ do_verify() {
   while IFS=$'\t' read -r key display entry_json; do
     if echo "$key" | grep -q '^ERROR:'; then continue; fi
     local declared actual
-    declared=$(echo "$entry_json" | jq -r '.hostEntry.enabled')
+    declared=$(echo "$entry_json" | jq -r '.hostEntry.autostartEnabled')
     actual=$(app_actual_state "$key" "$entry_json")
     if { [ "$declared" = "true" ] && [ "$actual" != "enabled" ]; } ||
       { [ "$declared" = "false" ] && [ "$actual" != "disabled" ]; }; then

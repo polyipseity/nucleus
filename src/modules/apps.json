@@ -6,8 +6,8 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": true,
-        "disableNative": true,
+        "autostartEnabled": true,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Raycast.app",
         "bundleId": "com.raycast.macos"
@@ -30,8 +30,8 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": true,
-        "disableNative": true,
+        "autostartEnabled": true,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Amphetamine.app",
         "bundleId": "com.if.Amphetamine"
@@ -54,8 +54,8 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": true,
-        "disableNative": true,
+        "autostartEnabled": true,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Stats.app",
         "bundleId": "eu.exelban.Stats"
@@ -78,8 +78,8 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": true,
-        "disableNative": true,
+        "autostartEnabled": true,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/BetterDisplay.app",
         "bundleId": "me.betterdisplay.BetterDisplay"
@@ -102,8 +102,8 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": true,
-        "disableNative": true,
+        "autostartEnabled": true,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/MiddleClick.app",
         "bundleId": "com.rouge41.middleclick"
@@ -126,8 +126,8 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": true,
-        "disableNative": true,
+        "autostartEnabled": true,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Mounty.app",
         "bundleId": "com.mounty.app"
@@ -150,8 +150,8 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": true,
-        "disableNative": true,
+        "autostartEnabled": true,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/LinearMouse.app",
         "bundleId": "com.lujjjh.LinearMouse"
@@ -174,8 +174,8 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": false,
-        "disableNative": true,
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/LuLu.app",
         "bundleId": "com.objective-see.LuLu"
@@ -198,8 +198,8 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": false,
-        "disableNative": true,
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/OrbStack.app",
         "bundleId": "com.orbstack.orbstack"
@@ -222,23 +222,23 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": true,
-        "disableNative": true,
+        "autostartEnabled": true,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Parsec.app",
         "bundleId": "tv.parsec.www"
       },
       "NixOS": {
         "platform": "NixOS",
-        "enabled": true,
-        "disableNative": true,
+        "autostartEnabled": true,
+        "autostartDisableNative": true,
         "kind": "xdg-desktop",
         "path": "/run/current-system/sw/bin/parsec"
       },
       "Windows": {
         "platform": "Windows",
-        "enabled": true,
-        "disableNative": true,
+        "autostartEnabled": true,
+        "autostartDisableNative": true,
         "kind": "run-key",
         "path": "C:\\Program Files\\Parsec\\parsec.exe"
       }
@@ -250,23 +250,23 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": false,
-        "disableNative": true,
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Telegram.app",
         "bundleId": "ru.keepcoder.Telegram"
       },
       "NixOS": {
         "platform": "NixOS",
-        "enabled": false,
-        "disableNative": true,
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
         "kind": "xdg-desktop",
         "path": "/run/current-system/sw/bin/telegram-desktop"
       },
       "Windows": {
         "platform": "Windows",
-        "enabled": false,
-        "disableNative": true,
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
         "kind": "run-key",
         "path": "%LOCALAPPDATA%\\Telegram Desktop\\Telegram.exe"
       }
@@ -278,8 +278,8 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": false,
-        "disableNative": true,
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/WhatsApp.app",
         "bundleId": "net.whatsapp.WhatsApp"
@@ -291,8 +291,8 @@
       },
       "Windows": {
         "platform": "Windows",
-        "enabled": false,
-        "disableNative": true,
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
         "kind": "run-key",
         "path": "%LOCALAPPDATA%\\WhatsApp\\WhatsApp.exe"
       }
@@ -304,23 +304,23 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": false,
-        "disableNative": true,
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Steam.app",
         "bundleId": "com.valvesoftware.steam"
       },
       "NixOS": {
         "platform": "NixOS",
-        "enabled": false,
-        "disableNative": true,
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
         "kind": "xdg-desktop",
         "path": "/run/current-system/sw/bin/steam"
       },
       "Windows": {
         "platform": "Windows",
-        "enabled": false,
-        "disableNative": true,
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
         "kind": "run-key",
         "path": "C:\\Program Files (x86)\\Steam\\steam.exe"
       }
@@ -332,8 +332,8 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": true,
-        "disableNative": true,
+        "autostartEnabled": true,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/AltTab.app",
         "bundleId": "com.lwouis.alt-tab-macos"
@@ -356,8 +356,8 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": true,
-        "disableNative": true,
+        "autostartEnabled": true,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/battery.app",
         "bundleId": "com.fiplab.battery"
@@ -380,8 +380,8 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": true,
-        "disableNative": false,
+        "autostartEnabled": true,
+        "autostartDisableNative": false,
         "kind": "system-extension",
         "justification": "System extension; manual approval once in System Settings → Privacy & Security."
       },
@@ -403,22 +403,22 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": true,
-        "disableNative": false,
+        "autostartEnabled": true,
+        "autostartDisableNative": false,
         "kind": "system-extension",
         "justification": "System extension; manual approval once in System Settings → Privacy & Security."
       },
       "NixOS": {
         "platform": "NixOS",
-        "enabled": true,
-        "disableNative": false,
+        "autostartEnabled": true,
+        "autostartDisableNative": false,
         "kind": "system-extension",
         "justification": "System extension; manual approval once (see MANUAL.md)."
       },
       "Windows": {
         "platform": "Windows",
-        "enabled": true,
-        "disableNative": false,
+        "autostartEnabled": true,
+        "autostartDisableNative": false,
         "kind": "system-extension",
         "justification": "System extension; manual approval once (see MANUAL.md)."
       }
@@ -430,24 +430,24 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": false,
-        "disableNative": true,
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Discord.app",
         "bundleId": "com.hnc.Discord"
       },
       "NixOS": {
         "platform": "NixOS",
-        "enabled": false,
-        "disableNative": true,
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
         "kind": "xdg-desktop",
         "path": "/run/current-system/sw/bin/discord",
         "justification": "Stable Discord not provisioned in core.nix (only discord-canary); binary absent until user installs. Entry neutralizes native startup when present."
       },
       "Windows": {
         "platform": "Windows",
-        "enabled": false,
-        "disableNative": true,
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
         "kind": "run-key",
         "path": "%LOCALAPPDATA%\\Discord\\Discord.exe"
       }
@@ -459,23 +459,23 @@
     "hosts": {
       "MacBook": {
         "platform": "macOS",
-        "enabled": false,
-        "disableNative": true,
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/Discord Canary.app",
         "bundleId": "com.hnc.DiscordCanary"
       },
       "NixOS": {
         "platform": "NixOS",
-        "enabled": false,
-        "disableNative": true,
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
         "kind": "xdg-desktop",
         "path": "/run/current-system/sw/bin/discord-canary"
       },
       "Windows": {
         "platform": "Windows",
-        "enabled": false,
-        "disableNative": true,
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
         "kind": "run-key",
         "path": "%LOCALAPPDATA%\\DiscordCanary\\DiscordCanary.exe"
       }

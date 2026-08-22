@@ -1,5 +1,5 @@
 ---
-description: "Use when adding, editing, or reviewing GUI/user app auto-start entries in apps.json or the autostart tooling (src/scripts/autostart.sh, src/scripts/autostart.ps1, Sync-AppAutostart.ps1). Enforces the never-app-owned-startup policy, disableNative-first discipline, and single uniform mechanism per platform."
+description: "Use when adding, editing, or reviewing GUI/user app auto-start entries in apps.json or the autostart tooling (src/scripts/autostart.sh, src/scripts/autostart.ps1, Sync-AppAutostart.ps1). Enforces the never-app-owned-startup policy, autostartDisableNative-first discipline, and single uniform mechanism per platform."
 name: "App Auto-Start Registry"
 applyTo: "src/modules/apps.json, src/modules/apps.schema.json, src/scripts/autostart.sh, src/scripts/autostart.ps1, src/platforms/Windows/modules/user/Sync-AppAutostart.ps1, src/hosts/MacBook/scripts/macos-configure-app-autostart.sh, src/hosts/NixOS/scripts/nixos-configure-app-autostart.sh"
 ---
@@ -27,8 +27,8 @@ An app may be `omitted` on a host **only** when the software has no build or por
 
 ## Registry location and shape
 
-- `src/modules/apps.json` is the SSOT for GUI/user app auto-start. Every entry declares per host: `enabled` (bool — do we launch it), `disableNative` (bool — does the app ship a native setting we must turn off), and the uniform `kind` (`login-item` | `launchagent` | `xdg-desktop` | `run-key` | `startup-folder` | `system-extension`).
-- `disableNative` is **first-class**: the app's own setting is always disabled (imperatively if a declarative toggle is impossible). This guarantees a single source of truth for enable/disable.
+- `src/modules/apps.json` is the SSOT for GUI/user app auto-start. Every entry declares per host: `autostartEnabled` (bool — do we launch it), `autostartDisableNative` (bool — does the app ship a native setting we must turn off), and the uniform `kind` (`login-item` | `launchagent` | `xdg-desktop` | `run-key` | `startup-folder` | `system-extension`).
+- `autostartDisableNative` is **first-class**: the app's own setting is always disabled (imperatively if a declarative toggle is impossible). This guarantees a single source of truth for enable/disable.
 - Schema: `src/modules/apps.schema.json` reuses shared parity definitions from `src/modules/registry-common.schema.json` (same machinery as `services.schema.json`). Every app requires `MacBook`/`NixOS`/`Windows` keys, or an explicit `omitted` + `justification` entry, enforcing parity-first at validation time.
 - Tooling: `src/scripts/autostart.sh` (POSIX) and `src/scripts/autostart.ps1` (Windows) mirror the `svc` CLI surface (`list`/`status`/`enable`/`disable`/`apply`/`verify`) but manage login bootstrap, not daemon lifecycle. They live under `src/scripts/` (convergence tooling invoked by activation scripts), NOT `scripts/` (which is reserved for `nucleus-*` apps). Windows convergence is invoked from `Sync-AppAutostart.ps1` during `apply.ps1`.
 
@@ -42,7 +42,7 @@ An app may be `omitted` on a host **only** when the software has no build or por
 ## Adding a new app
 
 1. Add the app block to `apps.json` with `MacBook`/`NixOS`/`Windows` entries (or `omitted` + `justification`).
-2. Set `disableNative: true` on every host where the app ships a native auto-start setting.
+2. Set `autostartDisableNative: true` on every host where the app ships a native auto-start setting.
 3. Pick the uniform `kind` per host from the allowed enum.
 4. Run `src/scripts/autostart.sh apply` (or `autostart.ps1 apply` on Windows) to converge; `verify` must pass.
 5. No backwards-compat shims: remove any ad-hoc per-app script in the same change that adds the registry entry.
