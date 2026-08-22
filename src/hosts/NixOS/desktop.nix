@@ -186,6 +186,14 @@ in
     "${activationBundle}/src/hosts/NixOS/scripts/nixos-configure-app-autostart.sh"
   '';
 
+  # Registry-driven per-app menu-bar / tray icon convergence (mirrors the macOS
+  # icon mechanism).  Reads apps.json and SETs each app's native icon preference
+  # to its declared state.  Most entries are omitted on NixOS, so this is a
+  # no-op unless a Linux-native tray setting is declared.
+  system.activationScripts.nixos-configure-menu-bar.text = lib.mkAfter ''
+    "${activationBundle}/src/hosts/NixOS/scripts/nixos-configure-menu-bar.sh"
+  '';
+
   # EasyEffects: graphical PipeWire audio processing GUI with plugin-based
   # limiter, compressor, equalizer, and other DSP effects.
   # Usage: open the EasyEffects GUI, navigate to Effects > Output > Add Effect,
