@@ -101,11 +101,19 @@ menu_bar_value_for() {
 }
 
 # menu_bar_native_set ENTRY_JSON VISIBLE — Write the native preference to the
-# desired state.  Never disables the native setting; SETs it.
+# desired state.  Never disables the native setting; SETs it.  Manual entries
+# (provisioned=false) are declared in config but not auto-provisioned; the gap
+# is surfaced via list/verify, so we skip the SET and return 0.
 menu_bar_native_set() {
   local entry_json="$1" visible="$2"
   local kind domain key plist_path value
   kind=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.kind')
+  local provisioned
+  provisioned=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.provisioned // true')
+  if [ "$kind" = "manual" ] || [ "$provisioned" = "false" ]; then
+    warn -l "$(echo "$entry_json" | jq -r '.displayName // "app"')" "manual icon entry; not auto-provisioned (set in the app's UI)"
+    return 0
+  fi
   value=$(menu_bar_value_for "$visible" "$entry_json")
   case "$kind" in
   defaults-key)
@@ -164,6 +172,12 @@ menu_bar_actual_visible() {
   local key="$1" entry_json="$2"
   local kind domain key_name plist_path value_type current desired_visible
   kind=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.kind')
+  local provisioned
+  provisioned=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.provisioned // true')
+  if [ "$kind" = "manual" ] || [ "$provisioned" = "false" ]; then
+    printf 'manual'
+    return 0
+  fi
   value_type=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.valueType // "bool"')
   desired_visible=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.iconVisible')
   case "$kind" in
@@ -356,6 +370,10 @@ do_verify() {
     local declared actual
     declared=$(echo "$entry_json" | jq -r '.hostEntry.menuBarIcon.iconVisible')
     actual=$(menu_bar_actual_visible "$key" "$entry_json")
+    if [ "$actual" = "manual" ]; then
+      # Manual entries are declared but not auto-provisioned; no drift check.
+      continue
+    fi
     if [ "$declared" != "$actual" ]; then
       drift=true
       warn "$key — drift: declared iconVisible=$declared, actual=$actual"
