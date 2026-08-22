@@ -1,7 +1,7 @@
 ---
-description: "Use when adding, editing, or reviewing GUI/user app auto-start entries in apps.json or the autostart tooling (src/scripts/autostart.sh, src/scripts/autostart.ps1, Sync-AppAutostart.ps1). Enforces the never-app-owned-startup policy, autostartDisableNative-first discipline, and single uniform mechanism per platform."
-name: "App Auto-Start Registry"
-applyTo: "src/modules/apps.json, src/modules/apps.schema.json, src/scripts/autostart.sh, src/scripts/autostart.ps1, src/platforms/Windows/modules/user/Sync-AppAutostart.ps1, src/hosts/MacBook/scripts/macos-configure-app-autostart.sh, src/hosts/NixOS/scripts/nixos-configure-app-autostart.sh"
+description: "Use when adding, editing, or reviewing GUI/user app auto-start or menu-bar/tray-icon entries in apps.json or the convergence tooling (src/scripts/autostart.sh, src/scripts/autostart.ps1, Sync-AppAutostart.ps1, src/scripts/menu-bar.sh, src/scripts/menu-bar.ps1, Sync-MenuBar.ps1). Enforces the never-app-owned-startup policy, autostartDisableNative-first discipline, single uniform mechanism per platform, and the menu-bar icon registry."
+name: "App Auto-Start & Menu-Bar Registry"
+applyTo: "src/modules/apps.json, src/modules/apps.schema.json, src/scripts/autostart.sh, src/scripts/autostart.ps1, src/platforms/Windows/modules/user/Sync-AppAutostart.ps1, src/hosts/MacBook/scripts/macos-configure-app-autostart.sh, src/hosts/NixOS/scripts/nixos-configure-app-autostart.sh, src/scripts/menu-bar.sh, src/scripts/menu-bar.ps1, src/platforms/Windows/modules/user/Sync-MenuBar.ps1, src/hosts/MacBook/scripts/macos-configure-menu-bar-icons.sh, src/hosts/NixOS/scripts/nixos-configure-menu-bar.sh"
 ---
 
 # App auto-start registry
@@ -31,6 +31,23 @@ An app may be `omitted` on a host **only** when the software has no build or por
 - `autostartDisableNative` is **first-class**: the app's own setting is always disabled (imperatively if a declarative toggle is impossible). This guarantees a single source of truth for enable/disable.
 - Schema: `src/modules/apps.schema.json` reuses shared parity definitions from `src/modules/registry-common.schema.json` (same machinery as `services.schema.json`). Every app requires `MacBook`/`NixOS`/`Windows` keys, or an explicit `omitted` + `justification` entry, enforcing parity-first at validation time.
 - Tooling: `src/scripts/autostart.sh` (POSIX) and `src/scripts/autostart.ps1` (Windows) mirror the `svc` CLI surface (`list`/`status`/`enable`/`disable`/`apply`/`verify`) but manage login bootstrap, not daemon lifecycle. They live under `src/scripts/` (convergence tooling invoked by activation scripts), NOT `scripts/` (which is reserved for `nucleus-*` apps). Windows convergence is invoked from `Sync-AppAutostart.ps1` during `apply.ps1`.
+
+## Menu-bar / tray-icon registry (same SSOT)
+
+Menu-bar / tray-icon visibility is converged from the **same** `apps.json` SSOT via a `menuBarIcon` block on each host entry. It is a distinct concern from auto-start and uses a different semantic:
+
+- **Auto-start is OR** (app-native OR our login item ⇒ launches), so auto-start *disables* the native setting.
+- **Icon visibility is AND** (icon shows only if the app-native show setting AND the OS both allow it). There is **no separate "our mechanism"** — the app's native preference *is* the control. The convergence tool **SETs** the native preference to the desired state; it never disables it.
+
+`menuBarIcon` block fields (see `apps.schema.json` `menuBarIconEntry`):
+
+- `iconVisible` (bool, required) — the desired end state (true = show, false = hide).
+- `kind` (required) — `defaults-key` (macOS `defaults`/`plist` domain+key), `plist` (arbitrary plist path, e.g. LuLu's `/Library/Objective-See/LuLu/preferences.plist`), or `activation-script` (delegates to a host activation script).
+- `domain` + `key` + `valueType` (`defaults-key`), or `plistPath` + `key` + `valueType` (`plist`).
+- `iconVisibleValue` / `iconHiddenValue` (typed per `valueType`: bool/string/int) — the native value that means "visible" / "hidden". Inverted keys (e.g. BetterDisplay `hideMenuIcon`, Rectangle `hideMenubarIcon`, LuLu `noIconMode`) express the inversion here rather than via a disable flag: `iconVisible: false`, `iconVisibleValue: false`, `iconHiddenValue: true`.
+- `justification` — required when the app is allow-listed (Amphetamine/Stats) or otherwise intentionally omits a `menuBarIcon` block.
+
+Tooling mirrors the autostart CLI surface (`list`/`status`/`show`/`hide`/`apply`/`verify`): `src/scripts/menu-bar.sh` (POSIX) and `src/scripts/menu-bar.ps1` (Windows), invoked from `macos-configure-menu-bar-icons.sh` / `nixos-configure-menu-bar.sh` / `Sync-MenuBar.ps1`. `plist` kind on macOS restarts the owning daemon (via `pgrep`/`pkill` bundleId) so the new value takes effect.
 
 ## Boundary with `services.json`
 

@@ -1,7 +1,7 @@
 ---
-description: "Use when provisioning or configuring macOS apps on the MacBook host. Mandates the default-hide menu bar icon policy, the amphetamine+stats allow-list, minimal NSStatusItem spacing, and per-app hide mechanisms."
+description: "Use when provisioning or configuring macOS apps on the MacBook host. Mandates the default-hide menu bar icon policy, the amphetamine+stats allow-list, minimal NSStatusItem spacing, and per-app hide mechanisms. Menu-bar icon state is converged from the apps.json menuBarIcon registry (src/scripts/menu-bar.sh), not inline defaults.nix."
 name: "macOS Menu Bar Icon Policy"
-applyTo: "src/hosts/MacBook/**"
+applyTo: "src/hosts/MacBook/**, src/modules/apps.json, src/modules/apps.schema.json"
 ---
 
 # Menu bar icon policy
@@ -21,7 +21,7 @@ Never set a hide key for allow-listed apps.
 
 | Class | Mechanism | Examples |
 | --- | --- | --- |
-| a | Declarative preference key, set in `defaults.nix` or an activation script | Raycast `ShowMenuBarIcon`, BetterDisplay `hideMenuIcon`, AltTab `menubarIconShown`, Rectangle `hideMenubarIcon`, LinearMouse `menuBarVisibilityMode`, LuLu `noIconMode` |
+| a | Declarative preference key, converged from the `apps.json` `menuBarIcon` registry via `src/scripts/menu-bar.sh` | Raycast `ShowMenuBarIcon`, BetterDisplay `hideMenuIcon`, AltTab `menubarIconShown`, Rectangle `hideMenubarIcon`, LinearMouse `menuBarVisibilityMode`, LuLu `noIconMode` |
 | b | ⌘-drag only (per-session; icon returns on relaunch) | MiddleClick (`statusItem.behavior = .removalAllowed`) |
 | c | Icon is the app's primary UI — not hideable | Mounty (NTFS remount surface), Equaliser (menu-bar-only SwiftUI app) |
 | d | No supported option | Parsec, battery tray app |
