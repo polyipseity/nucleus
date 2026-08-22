@@ -19,15 +19,11 @@ let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   wsPort = toString servicesJSON.camilladsp.network.websocket.port;
 
-  camilladspDaemon = pkgs.writeNucleusShellApplication {
-    name = "camilladsp-supervisor";
-    scriptName = "src/scripts/services/camilladsp-supervisor";
+  camilladspRun = pkgs.writeNucleusShellApplication {
+    name = "camilladsp-run";
+    scriptName = "src/scripts/services/camilladsp-run";
     runtimeInputs = [
       pkgs.camilladsp
-      pkgs.websocat
-      pkgs.jq
-      pkgs.python3
-      pkgs.python3Packages.pyyaml
     ];
   };
 
@@ -37,8 +33,8 @@ let
     runtimeInputs = [
       pkgs.websocat
       pkgs.jq
-      pkgs.python3
-      pkgs.python3Packages.pyyaml
+      pkgs.python3.withPackages
+      (p: [ p.pyyaml ])
     ];
   };
 
@@ -70,7 +66,7 @@ in
       ProgramArguments = [
         "/bin/sh"
         "-c"
-        "exec ${camilladspDaemon}/bin/nucleus-camilladsp-supervisor --port ${toString wsPort}"
+        "exec ${camilladspRun}/bin/nucleus-camilladsp-run --port ${toString wsPort}"
       ];
       UserName = username;
       EnvironmentVariables = daemonEnv;
