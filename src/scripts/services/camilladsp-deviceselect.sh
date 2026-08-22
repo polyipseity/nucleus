@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Device detection library for CamillaDSP playback device selection.
-# Sourced by camilladsp-daemon.sh and camilladsp-heartbeat.sh.
+# Device detection and config-push library for CamillaDSP playback device selection.
+# Sourced by camilladsp-supervisor.sh and camilladsp-heartbeat.sh.
 #
 # Provides:
 #   camilladsp_resolve_playback_device <config_file>
@@ -12,11 +12,18 @@
 #     Fallback device selection is deterministic: the first non-capture device
 #     is chosen by a case-sensitive ascending name ordering, matching the
 #     Windows resolver.
+#   camilladsp_needs_push <state> <live_device>
+#     Pure decision: returns 0 (push) unless camilladsp is Running AND the live
+#     playback device is already set. A null live device can never be skipped —
+#     this is the invariant that prevents a null device from sticking forever.
+#   camilladsp_push_config [--port PORT] [--config FILE] [--retries N] [--retry-delay S]
+#     Resolves the config and pushes it via SetConfig over the websocket API.
 #
-# Dependencies: python3 (yaml module), system_profiler (macOS), wpctl/pactl/aplay (Linux)
+# Dependencies: python3 (yaml module), websocat, jq, system_profiler (macOS),
+#               wpctl/pactl/aplay (Linux)
 #
 # State: entirely in-memory — no persistent cache file.
-# Called once per config push (heartbeat tick or daemon initial push).
+# Called once per config push (heartbeat tick or supervisor initial push).
 set -euo pipefail
 
 _LIB_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -273,4 +280,74 @@ PYEOF
     return 0
   }
   rm -f "$_patchfile"
+}
+
+# --- Push decision and config push ---
+
+# Pure skip decision. Returns 0 (push) unless camilladsp is Running AND the
+# live playback device is already set. A null/empty live device can NEVER be
+# skipped — that is the invariant that prevents a null device from sticking
+# forever on a running instance (the old "skip when Running" logic was broken).
+# Arguments: <state> <live_device>
+camilladsp_needs_push() {
+  local state="$1"
+  local live_device="$2"
+  if [ "$state" = "Running" ] && [ -n "$live_device" ]; then
+    return 1
+  fi
+  return 0
+}
+
+# Resolve the config and push it via SetConfig over the websocket API.
+# Retries with a fixed delay until success or retries exhausted.
+# Arguments: [--port PORT] [--config FILE] [--retries N] [--retry-delay S]
+# Returns 0 on successful SetConfig, 1 otherwise.
+camilladsp_push_config() {
+  local ws_port="${WS_PORT:-1234}"
+  local config_file="$HOME/.config/camilladsp/configs/config.yml"
+  local retries=1
+  local retry_delay=0.5
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+    --port)
+      shift
+      ws_port="${1:-$ws_port}"
+      ;;
+    --config)
+      shift
+      config_file="${1:-$config_file}"
+      ;;
+    --retries)
+      shift
+      retries="${1:-$retries}"
+      ;;
+    --retry-delay)
+      shift
+      retry_delay="${1:-$retry_delay}"
+      ;;
+    *)
+      error "unknown argument: $1"
+      return 1
+      ;;
+    esac
+    shift
+  done
+
+  [ -f "$config_file" ] || return 1
+
+  local _resolved_config
+  _resolved_config=$(camilladsp_resolve_playback_device "$config_file") || return 1
+
+  local _i
+  for _i in $(seq 1 "$retries"); do
+    if _push_resp=$(jq -cRs '{SetConfig: .}' <<<"$_resolved_config" |
+      websocat -1 "ws://127.0.0.1:$ws_port" 2>/dev/null); then
+      if printf '%s' "$_push_resp" | jq -e '.SetConfig.result == "Ok"' >/dev/null 2>&1; then
+        return 0
+      fi
+    fi
+    [ "$_i" -lt "$retries" ] && sleep "$retry_delay"
+  done
+  return 1
 }
