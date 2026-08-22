@@ -189,10 +189,16 @@ in
     #   being open.
     "${activationBundle}/src/hosts/MacBook/scripts/macos-charge-limit.sh"
 
-    # ---- macos-configure-lulu-icon -------------------------------------------------
-    "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-lulu-icon.sh"
+    # ---- macos-configure-menu-bar-icons --------------------------------------------
+    # Registry-driven per-app menu-bar / tray icon convergence (replaces the ad-hoc
+    # defaults keys in defaults.nix and the standalone LuLu plist script).  Reads
+    # apps.json and SETs each app's native icon preference to its declared state.
+    "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-menu-bar-icons.sh"
 
     # ---- macos-configure-menu-bar -------------------------------------------------
+    # System menu-bar items (Spotlight, Siri, Input Menu, Control-Centre battery,
+    # NSStatusItem spacing) — these are not apps and have no apps.json entry, so
+    # they stay here.
     "${activationBundle}/src/hosts/MacBook/scripts/macos-configure-menu-bar.sh"
 
     # ---- configure-ssh-access -----------------------------------------------------

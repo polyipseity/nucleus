@@ -384,7 +384,6 @@ in
         LaunchAtLogin = true; # Launch Raycast at login
         Appearance = "system"; # Auto Dark/Light based on time of day
         WindowMode = "default"; # Use default window (not compact)
-        ShowMenuBarIcon = false; # Hide Raycast icon from menu bar
         ShowFavoritesInCompactMode = true; # Show favorites in compact mode
 
         # --- Appearance & Text ---
@@ -443,11 +442,9 @@ in
       # Note: preferences domain is pro.betterdisplay.BetterDisplay (not com.betterdisplay).
       "pro.betterdisplay.BetterDisplay" = {
         LaunchAtLogin = true;
-        hideMenuIcon = true;
         ShowResolutionsAsList = true;
         UseMaximumResolution = true;
         sendCrashReports = true;
-        showInMenuBar = false;
         enableProfessionalFeatures = false;
         setDelay = 0.2;
         wakeDelay = 1.5;
@@ -519,7 +516,6 @@ in
 
         # --- Requested general settings ---
         startAtLogin = "true";
-        menubarIconShown = "false";
         captureWindowsInBackground = "true";
         language = "0"; # system default
         updatePolicy = "0"; # do not check periodically
@@ -529,8 +525,6 @@ in
       # LinearMouse: configure menu bar visibility, battery indicator,
       # dock visibility, and launch-at-login behavior.
       "org.linearmouse.LinearMouse" = {
-        menuBarVisibilityMode = "never";
-        menuBarBatteryDisplayMode = "off";
         showInDock = true;
         launchAtLogin = true;
         SUEnableAutomaticChecks = false;
@@ -581,11 +575,6 @@ in
       # it must never get a hide key.
       "com.if.Amphetamine" = {
         "Enable Power Protect Install" = true;
-      };
-
-      # Rectangle: hide its menu bar icon; window management is keyboard-driven, so the icon is pure chrome.
-      "com.knollsoft.Rectangle" = {
-        hideMenubarIcon = true;
       };
 
       # VS Code (stable and Insiders): disable ApplePressAndHold so held

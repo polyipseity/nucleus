@@ -91,10 +91,10 @@
         "autostartDisableNative": true,
         "kind": "login-item",
         "path": "/Applications/BetterDisplay.app",
-        "bundleId": "me.betterdisplay.BetterDisplay",
+        "bundleId": "pro.betterdisplay.BetterDisplay",
         "menuBarIcon": {
           "kind": "defaults-key",
-          "domain": "me.betterdisplay.BetterDisplay",
+          "domain": "pro.betterdisplay.BetterDisplay",
           "key": "hideMenuIcon",
           "valueType": "bool",
           "iconVisible": false,
@@ -425,6 +425,39 @@
         "platform": "Windows",
         "type": "omitted",
         "justification": "macOS-only charge-limit utility; no Windows build."
+      }
+    }
+  },
+  "Rectangle": {
+    "displayName": "Rectangle",
+    "description": "Keyboard-driven window tiling",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "autostartEnabled": true,
+        "autostartDisableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/Rectangle.app",
+        "bundleId": "com.knollsoft.Rectangle",
+        "menuBarIcon": {
+          "kind": "defaults-key",
+          "domain": "com.knollsoft.Rectangle",
+          "key": "hideMenubarIcon",
+          "valueType": "bool",
+          "iconVisible": false,
+          "iconVisibleValue": false,
+          "iconHiddenValue": true
+        }
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "type": "omitted",
+        "justification": "macOS-only window tiler; no Linux build."
+      },
+      "Windows": {
+        "platform": "Windows",
+        "type": "omitted",
+        "justification": "macOS-only window tiler; no Windows build exists."
       }
     }
   },
