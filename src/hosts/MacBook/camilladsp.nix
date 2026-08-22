@@ -33,8 +33,7 @@ let
     runtimeInputs = [
       pkgs.websocat
       pkgs.jq
-      pkgs.python3.withPackages
-      (p: [ p.pyyaml ])
+      (pkgs.python3.withPackages (p: [ p.pyyaml ]))
     ];
   };
 
