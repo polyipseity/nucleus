@@ -17,6 +17,7 @@ let
       pkgs.websocat
       pkgs.jq
       pkgs.python3
+      pkgs.python3Packages.pyyaml
     ];
   };
 
@@ -27,6 +28,7 @@ let
       pkgs.websocat
       pkgs.jq
       pkgs.python3
+      pkgs.python3Packages.pyyaml
     ];
   };
 in
