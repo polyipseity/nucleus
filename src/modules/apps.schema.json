@@ -114,11 +114,12 @@
       "type": "object"
     },
     "menuBarKind": {
-      "description": "How the menu-bar / tray icon visibility is controlled for one host.",
+      "description": "How the menu-bar / tray icon visibility is controlled for one host. 'manual' declares the desired state in config but the engine does not auto-provision it (no programmatic mechanism exists); the gap is surfaced via list/verify.",
       "enum": [
         "defaults-key",
         "plist",
-        "activation-script"
+        "activation-script",
+        "manual"
       ],
       "type": "string"
     },
@@ -171,6 +172,10 @@
         },
         "kind": {
           "$ref": "#/definitions/menuBarKind"
+        },
+        "provisioned": {
+          "description": "Whether the engine can automatically converge this icon state. false = declared in config but must be set manually by the user (no programmatic mechanism). Defaults to true. Only meaningful with kind 'manual'.",
+          "type": "boolean"
         },
         "plistPath": {
           "description": "Absolute plist path for kind 'plist' (e.g. /Library/Objective-See/LuLu/preferences.plist).",
