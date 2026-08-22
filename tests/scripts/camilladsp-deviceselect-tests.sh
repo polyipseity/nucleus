@@ -174,6 +174,28 @@ test_patches_with_default_output() {
   fi
 }
 
+# Test 2b: real yaml import + patch path. Detection is mocked, but the
+# resolve function's internal `import yaml` and in-memory YAML patch run for
+# real. If yaml were missing (the deployed-bare-python3 gap), resolve would
+# pass the null config through unchanged and this test would FAIL loudly
+# (not skip) — catching the runtime regression the suite previously missed.
+test_resolve_patches_via_real_yaml() {
+  local cfg
+  cfg="$(_make_config "" "Loopback Audio")"
+  _MOCK_DEFAULT_OUTPUT="Real YAML Patched Speaker"
+  _MOCK_FIRST_AVAILABLE=""
+  local resolved
+  resolved=$(_run_resolve "$cfg")
+  local device
+  device=$(_extract_playback_device <<<"$resolved")
+  rm -f "$cfg"
+  if [ "$device" = "Real YAML Patched Speaker" ]; then
+    assert_pass "null device patched through real import yaml + patch path"
+  else
+    assert_fail "real yaml patch path" "expected 'Real YAML Patched Speaker', got '$device'"
+  fi
+}
+
 # Test 3: Default output = capture device → rejects capture, uses fallback.
 test_rejects_capture_device() {
   local cfg
@@ -401,6 +423,7 @@ test_no_default_fallback_first_available
 
 test_passthrough_nonempty_device
 test_patches_with_default_output
+test_resolve_patches_via_real_yaml
 test_rejects_capture_device
 test_null_when_no_devices
 test_preserves_other_fields
