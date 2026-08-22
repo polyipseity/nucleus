@@ -291,7 +291,7 @@
       },
       "Windows": {
         "platform": "Windows",
-        "enabled": true,
+        "enabled": false,
         "disableNative": true,
         "kind": "run-key",
         "path": "%LOCALAPPDATA%\\WhatsApp\\WhatsApp.exe"
@@ -421,6 +421,63 @@
         "disableNative": false,
         "kind": "system-extension",
         "justification": "System extension; manual approval once (see MANUAL.md)."
+      }
+    }
+  },
+  "Discord": {
+    "displayName": "Discord",
+    "description": "Voice/text chat client (stable)",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": false,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/Discord.app",
+        "bundleId": "com.hnc.Discord"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "enabled": false,
+        "disableNative": true,
+        "kind": "xdg-desktop",
+        "path": "/run/current-system/sw/bin/discord",
+        "justification": "Stable Discord not provisioned in core.nix (only discord-canary); binary absent until user installs. Entry neutralizes native startup when present."
+      },
+      "Windows": {
+        "platform": "Windows",
+        "enabled": false,
+        "disableNative": true,
+        "kind": "run-key",
+        "path": "%LOCALAPPDATA%\\Discord\\Discord.exe"
+      }
+    }
+  },
+  "Discord Canary": {
+    "displayName": "Discord Canary",
+    "description": "Voice/text chat client (canary channel)",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "enabled": false,
+        "disableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/Discord Canary.app",
+        "bundleId": "com.hnc.DiscordCanary"
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "enabled": false,
+        "disableNative": true,
+        "kind": "xdg-desktop",
+        "path": "/run/current-system/sw/bin/discord-canary"
+      },
+      "Windows": {
+        "platform": "Windows",
+        "enabled": false,
+        "disableNative": true,
+        "kind": "run-key",
+        "path": "%LOCALAPPDATA%\\DiscordCanary\\DiscordCanary.exe"
       }
     }
   }
