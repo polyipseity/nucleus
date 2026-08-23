@@ -124,7 +124,7 @@ fi
 #    gc cleanup-nix/preferences, apply health-check/audit-store, cloud
 #    setup/reset/sync, update lockfile).
 _sub_ok=1
-for _s in packer sh pwsh pwsh-naming; do
+for _s in packer sh pwsh; do
   grep -qw -- "$_s" "$_COMPLETIONS_DIR/_nucleus-check" || {
     assert_fail "gen-completions: subcommand" "check missing $_s"
     _sub_ok=0

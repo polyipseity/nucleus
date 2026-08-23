@@ -335,7 +335,7 @@ case "$action" in
   usage
   exit 0
   ;;
-packer | pwsh | pwsh-naming | sh)
+packer | pwsh | sh)
   shift
   ;;
 *)
@@ -348,7 +348,6 @@ if [ -n "$action" ]; then
   packer) do_packer "$@" ;;
   sh) do_sh "$@" ;;
   pwsh) do_pwsh "$@" ;;
-  pwsh-naming) pwsh -NoProfile -File "$SCRIPT_DIR/check-pwsh-naming.ps1" "$@" ;;
   esac
   exit $?
 fi
