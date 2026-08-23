@@ -10,5 +10,4 @@ _arguments \
   '--no-fail-fast[no fail fast]' \
   '--online[online]' \
   '--scoped[scoped]' \
-  '--skip-steps[skip steps]' \
-  '-naming[naming]'
+  '--skip-steps[skip steps]'
