@@ -29,7 +29,6 @@ let
 
   # Sub-module imports extracted from this file for focused maintainability.
   finderSidebar = import ./finder-sidebar.nix { inherit config lib pkgs; };
-  preferenceGc = import ./preference-gc.nix { inherit config lib pkgs; };
 
   # Cached imports for all env-var-related callsites below.
   # managed-paths.nix for PATH components; env-catalog.nix for catalog/resolution.
@@ -280,7 +279,6 @@ let
 in
 lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   home.packages = [
-    preferenceGc.managedPreferencesGcScript
     pkgs.mysides
   ];
 
