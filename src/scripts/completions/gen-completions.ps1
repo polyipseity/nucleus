@@ -39,7 +39,8 @@
 param(
   [Alias("h")]
   [switch]$Help,
-  [switch]$Check
+  [switch]$Check,
+  [switch]$ListCommands
 )
 
 $ErrorActionPreference = 'Stop'
@@ -187,6 +188,11 @@ function Get-GeneratedRegion {
 # ---------------------------------------------------------------------------
 # Region regeneration
 # ---------------------------------------------------------------------------
+
+if ($ListCommands) {
+  Get-NucleusCommandList | ForEach-Object { $_ }
+  return
+}
 
 $text = [System.IO.File]::ReadAllText($profilePath)
 $eol = if ($text.Contains("`r`n")) { "`r`n" } else { "`n" }

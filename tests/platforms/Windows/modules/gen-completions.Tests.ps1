@@ -125,10 +125,8 @@ Describe 'gen-completions.ps1 generated inventory' {
 
   It 'emits a $nucleus<Cmd>Flags array for every nucleus-* command' {
     $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
-    $commands = @(
-      'ai', 'apply', 'bootstrap', 'check', 'cloud', 'config', 'gc',
-      'gs-pdf-opt', 'service-watchdog', 'svc', 'test', 'update', 'vm'
-    )
+    $listResult = Invoke-GenCompletion -Arguments @('-ListCommands')
+    $commands = $listResult.Output -split "`n" | Where-Object { $_.Trim() }
     $profileText = Get-FixtureProfile
     foreach ($command in $commands) {
       $pascal = (($command.Split('-') | ForEach-Object { $_.Substring(0, 1).ToUpperInvariant() + $_.Substring(1) }) -join '')
