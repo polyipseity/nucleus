@@ -351,7 +351,7 @@ app_converge() {
       macos_native_login_items_remove "$path" || true # check-suppress:suppression_doc: embedded helper login item may be absent; removal is best-effort.
     fi
     if [ "$enabled" = "true" ]; then
-      macos_login_item_ensure "$name" "$path" "$hidden" || warn -l "$key" "failed to ensure login item"
+      macos_login_item_ensure "$name" "$path" "$hidden" || die -l "$key" "failed to ensure login item"
     else
       macos_login_item_remove "$name" || true # check-suppress:suppression_doc: login item may already be absent; removal is best-effort.
     fi
@@ -383,7 +383,7 @@ app_converge() {
     fi
     name=$(app_desktop_filename "$key")
     if [ "$enabled" = "true" ]; then
-      xdg_desktop_write "$name" "$path" "$hidden" || warn -l "$key" "failed to write autostart .desktop"
+      xdg_desktop_write "$name" "$path" "$hidden" || die -l "$key" "failed to write autostart .desktop"
     else
       xdg_desktop_remove "$name" || true # check-suppress:suppression_doc: our autostart .desktop may already be absent; removal is best-effort.
     fi

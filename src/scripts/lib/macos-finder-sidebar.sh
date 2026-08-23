@@ -215,7 +215,7 @@ finder_configure_sidebar() {
   /usr/bin/killall -KILL cfprefsd 2>/dev/null || true
 
   if [ "$_finder_sidebar_failed" -eq 1 ]; then
-    warn "Finder favorites were partially updated; if stale entries persist, log out and log back in once."
+    die "Finder favorites were partially updated; if stale entries persist, log out and log back in once."
   else
     say "Finder favorites updated automatically."
   fi

@@ -28,7 +28,7 @@ register_handler() {
   shift 2
   for uti in "$@"; do
     if ! "$duti_bin" -s "$handler" "$uti" all; then
-      warn "failed to register LaunchServices handler $handler for UTI $uti."
+      die "failed to register LaunchServices handler $handler for UTI $uti."
     fi
   done
 }

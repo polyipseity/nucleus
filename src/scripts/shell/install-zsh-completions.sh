@@ -36,6 +36,7 @@ _generate_if_stale() {
   say -l zsh-completions "generating ${_comp_file##*/}"
   mkdir -p "$(dirname "$_comp_file")"
   eval "$_gen_cmd" >"$_comp_file" 2>/dev/null || {
+    # check-suppress:suppression_doc: completion generation is best-effort; shell functions without it.
     warn -l zsh-completions "(failed, skipping)"
     rm -f "$_comp_file"
   }

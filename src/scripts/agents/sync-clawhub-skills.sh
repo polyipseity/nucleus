@@ -15,6 +15,7 @@ _scs_path_prepend="$2"
 _scs_path_append="$3"
 _scs_repo_root="$4"
 _scs_manifest_rel="$5"
+_scs_clawhub_bin="$6"
 
 _scs_do_sync=true
 
@@ -86,7 +87,7 @@ if [ "$_scs_do_sync" = true ]; then
     say -l clawhub "installing/updating fetched skill '$_scs_slug'..."
     # Best-effort: non-zero exit from ClawHub is non-fatal because the
     # system apply already succeeded and skill sync is additive.
-    if clawhub install --workdir "$HOME/.agents" --no-input "$_scs_slug"; then
+    if "$_scs_clawhub_bin" install --workdir "$HOME/.agents" --no-input "$_scs_slug"; then
       # Lock installed content so files cannot be modified outside a
       # managed apply run.  The unlock above re-opens write access before
       # the next update.
@@ -94,7 +95,7 @@ if [ "$_scs_do_sync" = true ]; then
         chmod -R a-w "$_scs_skill_path"
       fi
     else
-      warn -l clawhub "clawhub install failed for '$_scs_slug' (system apply succeeded)"
+      die -l clawhub "clawhub install failed for '$_scs_slug' (system apply succeeded)"
     fi
   done <"$_scs_slugs_file"
 

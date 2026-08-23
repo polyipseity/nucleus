@@ -34,7 +34,7 @@ else
   derived_age_key_exit=0
   derived_age_key="$("$_dha_ssh_to_age_bin" -private-key -i "$host_ssh_key")" || derived_age_key_exit=$?
   if [ "$derived_age_key_exit" -ne 0 ] || [ -z "$derived_age_key" ]; then
-    warn -l sops "ssh-to-age failed (exit $derived_age_key_exit) reading $host_ssh_key; $age_key_file not written."
+    die -l sops "ssh-to-age failed (exit $derived_age_key_exit) reading $host_ssh_key; $age_key_file not written."
   else
     printf '%s\n' "$derived_age_key" >"$age_key_file"
     case "$_dha_owner_spec" in

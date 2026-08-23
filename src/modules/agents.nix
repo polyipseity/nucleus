@@ -208,7 +208,8 @@ in
         "${managedPaths.toShellPrependGuard}" \
         "${managedPaths.toShellAppendGuard}" \
         "${repoRoot}" \
-        "${clawhubManifestRelativePath}"
+        "${clawhubManifestRelativePath}" \
+        "$HOME/${builtins.elemAt managedPaths.pathComponents.append 0}/clawhub"
     '';
   };
 }

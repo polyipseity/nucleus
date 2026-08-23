@@ -165,7 +165,7 @@ menu_bar_native_set() {
         warn -l "$(echo "$entry_json" | jq -r '.displayName // "app"')" "activation-script not found: $script"
         return 1
       fi
-      "$script" "$visible" "${app_key:-}" || warn -l "$(echo "$entry_json" | jq -r '.displayName // "app"')" "activation-script failed"
+      "$script" "$visible" "${app_key:-}" || die -l "$(echo "$entry_json" | jq -r '.displayName // "app"')" "activation-script failed"
     fi
     ;;
   *)

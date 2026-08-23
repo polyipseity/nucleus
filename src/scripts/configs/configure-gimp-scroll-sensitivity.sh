@@ -43,11 +43,11 @@ if _nucleus_resolve_console_user; then
     gimprc_file="$gimprc_dir/gimprc"
 
     if ! /bin/mkdir -p "$gimprc_dir"; then
-      warn -l gimp "failed to create $gimprc_dir."
+      die -l gimp "failed to create $gimprc_dir."
     else
       if [ ! -f "$gimprc_file" ]; then
         if ! /usr/bin/touch "$gimprc_file"; then
-          warn -l gimp "failed to create $gimprc_file."
+          die -l gimp "failed to create $gimprc_file."
         fi
       fi
 
@@ -56,22 +56,22 @@ if _nucleus_resolve_console_user; then
         # drag-zoom-speed token.
         if /usr/bin/grep -Eq '^\(drag-zoom-speed[[:space:]]+[^)]*\)$' "$gimprc_file"; then
           if ! /usr/bin/sed -E -i.bak 's#^\(drag-zoom-speed[[:space:]]+[^)]*\)$#(drag-zoom-speed 25.0)#' "$gimprc_file"; then
-            warn -l gimp "failed to update drag-zoom-speed in $gimprc_file."
+            die -l gimp "failed to update drag-zoom-speed in $gimprc_file."
           fi
           /bin/rm -f "$gimprc_file.bak"
         else
           if ! printf '\n(drag-zoom-speed 25.0)\n' >>"$gimprc_file"; then
-            warn -l gimp "failed to append drag-zoom-speed to $gimprc_file."
+            die -l gimp "failed to append drag-zoom-speed to $gimprc_file."
           fi
         fi
 
         if [ -n "$console_group" ]; then
           if ! /usr/sbin/chown "$_nucleus_console_user:$console_group" "$gimprc_file"; then
-            warn -l gimp "failed to set ownership on $gimprc_file."
+            die -l gimp "failed to set ownership on $gimprc_file."
           fi
         else
           if ! /usr/sbin/chown "$_nucleus_console_user" "$gimprc_file"; then
-            warn -l gimp "failed to set ownership on $gimprc_file."
+            die -l gimp "failed to set ownership on $gimprc_file."
           fi
         fi
       fi
