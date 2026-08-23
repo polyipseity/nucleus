@@ -4,13 +4,15 @@
 # with --no_config and never reads user-home config, so TCC is not triggered.
 # Config is deployed by Home Manager in modules/home.nix.
 #
-# The heartbeat is a user agent (launchd.agents) running inside the primary
-# user's GUI/login session. It reads $HOME/.config/camilladsp/configs/config.yml
+# The heartbeat is a user launch agent (environment.userLaunchAgents) scoped to
+# the primary user's GUI/login session, so each user can configure it
+# individually. It reads $HOME/.config/camilladsp/configs/config.yml
 # to resolve the playback device; a system daemon is blocked by macOS TCC from
 # reading user-home file contents (EPERM on `cat`), which previously left the
-# device null after every rebuild. A user agent inherits the session's TCC
-# grants, so the read succeeds. Trade-off: the agent only runs while the user
-# is logged into a GUI session (not at the login window); acceptable for audio.
+# device null after every rebuild. A user launch agent inherits the session's
+# TCC grants, so the read succeeds. Trade-off: the agent only runs while the
+# user is logged into a GUI session (not at the login window); acceptable for
+# audio.
 #
 # Heartbeat re-pushes the config when camilladsp is not in "Running" state, so
 # config re-applies when a disconnected audio device reappears.
@@ -84,11 +86,11 @@ in
     };
   };
 
-  launchd.agents."camilladsp-heartbeat" = {
-    serviceConfig = {
+  environment.userLaunchAgents."camilladsp-heartbeat" = {
+    text = lib.generators.toPlist { escape = true; } {
       Label = "local.camilladsp-heartbeat";
-      # User agent: runs inside the primary user's GUI/login session so TCC
-      # permits reading $HOME/.config/camilladsp/configs/config.yml. A system
+      # User launch agent: runs inside the primary user's GUI/login session so
+      # TCC permits reading $HOME/.config/camilladsp/configs/config.yml. A system
       # daemon is blocked by TCC from reading user-home file contents (EPERM),
       # which left the playback device null after every rebuild.
       # ref: macos-service-hardening.instructions.md -- SIP /bin/sh wrapper

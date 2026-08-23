@@ -104,9 +104,8 @@ in
 
     # macOS: launchd agent keeps the tray app running persistently after login.
     (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && userEnable) {
-      launchd.agents."discord-music-rpc" = {
-        enable = true;
-        config = {
+      environment.userLaunchAgents."discord-music-rpc" = {
+        text = lib.generators.toPlist { escape = true; } {
           Label = "local.discord-music-rpc";
           ProgramArguments = [ "${discord-music-rpc}/bin/discord-music-rpc" ];
           KeepAlive = true;

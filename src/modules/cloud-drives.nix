@@ -350,12 +350,11 @@ in
       # macOS: LaunchAgents for rclone-backed mounts
       # -----------------------------------------------------------------------
       (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && declaredMountAgents != [ ]) {
-        launchd.agents = builtins.listToAttrs (
+        environment.userLaunchAgents = builtins.listToAttrs (
           map (mount: {
             name = "cloud-mount-${mount.id}";
             value = {
-              enable = mount.enable;
-              config = {
+              text = lib.generators.toPlist { escape = true; } {
                 Label = "local.cloud-mount.${mount.id}";
                 ProgramArguments = [ "${mkRcloneMountScript mount}/bin/nucleus-cloud-mount-${mount.id}" ];
                 RunAtLoad = true;
@@ -447,12 +446,11 @@ in
       # macOS: LaunchAgents for per-replica scheduled replica-sync timers
       # -----------------------------------------------------------------------
       (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && declaredScheduledSyncReplicas != [ ]) {
-        launchd.agents = builtins.listToAttrs (
+        environment.userLaunchAgents = builtins.listToAttrs (
           map (replica: {
             name = "cloud-replica-scheduled-sync-${replica.id}";
             value = {
-              enable = replica.enable;
-              config = {
+              text = lib.generators.toPlist { escape = true; } {
                 Label = "local.cloud-replica-scheduled-sync.${replica.id}";
                 ProgramArguments = [
                   "${mkReplicaScheduledSyncScript replica}/bin/nucleus-cloud-replica-scheduled-sync-${replica.id}"
