@@ -46,6 +46,12 @@ function Sync-MenuBar {
 
   try {
     & $menuBarScript apply
+    if ($LASTEXITCODE -ne 0) {
+      # The child script signals failure via exit code, not a thrown
+      # exception; surface it as a hard error so convergence failure is never
+      # silently swallowed (activation scripts must hard-error on failure).
+      throw "menu-bar.ps1 exited with code $LASTEXITCODE"
+    }
   } catch {
     Write-NucleusError -CommandName 'menu-bar' "menu-bar icon convergence failed: $($_.Exception.Message)"
     throw

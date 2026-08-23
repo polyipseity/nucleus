@@ -44,6 +44,12 @@ function Sync-AppAutostart {
 
   try {
     & $autostartScript apply
+    if ($LASTEXITCODE -ne 0) {
+      # The child script signals failure via exit code, not a thrown
+      # exception; surface it as a hard error so convergence failure is never
+      # silently swallowed (activation scripts must hard-error on failure).
+      throw "autostart.ps1 exited with code $LASTEXITCODE"
+    }
   } catch {
     Write-NucleusError -CommandName 'autostart' "app auto-start convergence failed: $($_.Exception.Message)"
     throw
