@@ -91,7 +91,9 @@ let
 
 in
 {
-  home.packages = builtins.attrValues nucleusApps;
+  home.packages = builtins.attrValues (
+    builtins.removeAttrs nucleusApps [ "nucleus-service-watchdog" ]
+  );
 
   # direnv: automatically loads/unloads per-directory environments.
   # nix-direnv: caches nix-shell/flake devShells so re-entering a directory

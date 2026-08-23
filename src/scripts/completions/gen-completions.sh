@@ -25,14 +25,13 @@ COMPLETIONS_DIR="$REPO_ROOT/src/modules/completions/zsh"
 
 # The canonical nucleus-* command set (alphabetical) — the coverage contract
 # shared with check step 10-completions-fresh and the generator tests.
-COMMANDS=(ai apply audit-store bootstrap bump-lockfile check check-packer check-pwsh check-sh cleanup-nix cloud-setup config gc gs-pdf-opt health-check replica-reset replica-sync service-watchdog svc test update vm)
+COMMANDS=(ai apply bootstrap check cloud config gc gs-pdf-opt service-watchdog svc test update vm)
 
 # Map a command to its .sh help source (the executable contract).
-# check-pwsh has no .sh twin (PowerShell-only); service-watchdog lives under src/scripts.
+# service-watchdog lives under src/scripts; every other command has a scripts/<cmd>.sh twin.
 sh_for_command() {
   case "$1" in
   service-watchdog) printf '%s\n' "src/scripts/services/service-watchdog.sh" ;;
-  check-pwsh) printf '%s\n' "" ;;
   *) printf '%s\n' "scripts/$1.sh" ;;
   esac
 }
@@ -46,6 +45,11 @@ known_subcommands() {
   vm) printf '%s\n' "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|inject|gc|resize|pack|unpack" ;;
   ai) printf '%s\n' "sync|list|status|endpoint|config" ;;
   config) printf '%s\n' "get|set|list" ;;
+  check) printf '%s\n' "packer|sh|pwsh" ;;
+  gc) printf '%s\n' "cleanup-nix|preferences" ;;
+  apply) printf '%s\n' "health-check|audit-store" ;;
+  cloud) printf '%s\n' "setup|reset|sync" ;;
+  update) printf '%s\n' "lockfile" ;;
   esac
 }
 
@@ -145,7 +149,7 @@ capture_help() {
   local _cmd="$1" _out="$2" _sh_rel
   _sh_rel="$(sh_for_command "$_cmd")"
   : >"$_out"
-  [ -n "$_sh_rel" ] || return 0 # check-pwsh: no .sh source — the fixed --help group only.
+  [ -n "$_sh_rel" ] || return 0 # no .sh source — the fixed --help group only.
   # check-suppress:suppression_doc: help output is stdout-only per the output-format contract; stderr is suppressed.
   if ! bash "$REPO_ROOT/$_sh_rel" --help >"$_out" 2>/dev/null; then
     error "nucleus-$_cmd: --help failed (every .sh command supports --help; a failure is a real bug)"

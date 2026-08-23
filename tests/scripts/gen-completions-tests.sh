@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests for src/scripts/completions/gen-completions.sh: --help contract, --check determinism,
-# idempotent regeneration, 22-command coverage, generated headers + zsh syntax,
-# bump-lockfile --list-* dynamic wiring, and flag-extraction correctness pins.
+# idempotent regeneration, 13-command coverage, generated headers + zsh syntax,
+# update lockfile --list-* dynamic wiring, and flag-extraction correctness pins.
 
 set -euo pipefail
 
@@ -25,7 +25,10 @@ _gen_script="src/scripts/completions/gen-completions.sh"
 _COMPLETIONS_DIR="src/modules/completions/zsh"
 
 # The canonical nucleus-* command set (alphabetical) — must match the generator.
-_NUCLEUS_COMMANDS=(ai apply audit-store bootstrap bump-lockfile check check-packer check-pwsh check-sh cleanup-nix cloud-setup config gc gs-pdf-opt health-check replica-reset replica-sync service-watchdog svc test update vm)
+# Subcommands are covered by their parent completion files, not as standalone
+# commands: check packer/sh/pwsh, gc cleanup-nix/preferences, apply
+# health-check/audit-store, cloud setup/reset/sync, update lockfile.
+_NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc gs-pdf-opt service-watchdog svc test update vm)
 
 # 1. --help exits 0 and prints a usage: line.
 if _help_out="$(bash "$_gen_script" --help 2>&1)" && printf '%s\n' "$_help_out" | grep -q '^usage: '; then
@@ -86,26 +89,27 @@ else
   assert_skip "gen-completions: zsh syntax check" "zsh not available"
 fi
 
-# 6. bump-lockfile dynamic value completion via --list-sections.
-if grep -q "_call_program 'sections' nucleus-bump-lockfile --list-sections" "$_COMPLETIONS_DIR/_nucleus-bump-lockfile" &&
-  grep -q -- '--sections:section name:->sections' "$_COMPLETIONS_DIR/_nucleus-bump-lockfile"; then
-  assert_pass "gen-completions: bump-lockfile --sections dynamic wiring"
+# 6. update lockfile dynamic value completion via --list-sections.
+if grep -q "_call_program 'sections' nucleus-update --list-sections" "$_COMPLETIONS_DIR/_nucleus-update" &&
+  grep -q -- '--sections:section name:->sections' "$_COMPLETIONS_DIR/_nucleus-update"; then
+  assert_pass "gen-completions: update lockfile --sections dynamic wiring"
 else
-  assert_fail "gen-completions: bump-lockfile --sections wiring" "missing _call_program/->sections"
+  assert_fail "gen-completions: update lockfile --sections wiring" "missing _call_program/->sections"
 fi
 
 # 8. Flag extraction correctness: usage-line + body flags land in the spec,
-#    corrected sets are pinned (apply's 12, test's -q group, health-check's 6,
-#    gs-pdf-opt --rm-bak), and no jq/rclone/curl tool flags leak into any file.
+#    corrected sets are pinned (apply's 12 flags + health-check/audit-store
+#    subcommands, test's -q group, gs-pdf-opt --rm-bak), and no jq/rclone/curl
+#    tool flags leak into any file.
 if [ "$(grep -cE "^  '--" "$_COMPLETIONS_DIR/_nucleus-apply")" -eq 12 ] &&
   grep -q -- "'--ai-sync\[ai sync\]'" "$_COMPLETIONS_DIR/_nucleus-apply" &&
+  grep -q -- 'health-check' "$_COMPLETIONS_DIR/_nucleus-apply" &&
+  grep -q -- 'audit-store' "$_COMPLETIONS_DIR/_nucleus-apply" &&
   grep -q -- "'-q\[q\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
   grep -q -- "'--quiet\[quiet\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
   grep -q -- "'--fail-fast\[fail fast\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
   grep -q -- "'--no-fail-fast\[no fail fast\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
   grep -q -- "'--skip-steps\[skip steps\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
-  [ "$(grep -cE "^  '--" "$_COMPLETIONS_DIR/_nucleus-health-check")" -eq 6 ] &&
-  grep -q -- "'--min-free-bytes\[min free bytes\]'" "$_COMPLETIONS_DIR/_nucleus-health-check" &&
   grep -q -- "'--rm-bak\[rm bak\]'" "$_COMPLETIONS_DIR/_nucleus-gs-pdf-opt" &&
   ! grep -q -- "'--remove-backup" "$_COMPLETIONS_DIR/_nucleus-gs-pdf-opt" &&
   ! grep -qE -- '--(arg|argjson)' "$_COMPLETIONS_DIR/_nucleus-config" &&
@@ -115,13 +119,54 @@ else
   assert_fail "gen-completions: flag extraction" "flag set deviates from the authoritative table"
 fi
 
+# 9. Merged subcommand coverage: parent completion files enumerate their
+#    subcommands after the command-surface merge (check packer/sh/pwsh,
+#    gc cleanup-nix/preferences, apply health-check/audit-store, cloud
+#    setup/reset/sync, update lockfile).
+_sub_ok=1
+for _s in packer sh pwsh pwsh-naming; do
+  grep -qw -- "$_s" "$_COMPLETIONS_DIR/_nucleus-check" || {
+    assert_fail "gen-completions: subcommand" "check missing $_s"
+    _sub_ok=0
+  }
+done
+for _s in cleanup-nix preferences; do
+  grep -qw -- "$_s" "$_COMPLETIONS_DIR/_nucleus-gc" || {
+    assert_fail "gen-completions: subcommand" "gc missing $_s"
+    _sub_ok=0
+  }
+done
+for _s in health-check audit-store; do
+  grep -qw -- "$_s" "$_COMPLETIONS_DIR/_nucleus-apply" || {
+    assert_fail "gen-completions: subcommand" "apply missing $_s"
+    _sub_ok=0
+  }
+done
+for _s in setup reset sync; do
+  grep -qw -- "$_s" "$_COMPLETIONS_DIR/_nucleus-cloud" || {
+    assert_fail "gen-completions: subcommand" "cloud missing $_s"
+    _sub_ok=0
+  }
+done
+for _s in update lockfile; do
+  grep -qw -- "$_s" "$_COMPLETIONS_DIR/_nucleus-update" || {
+    assert_fail "gen-completions: subcommand" "update missing $_s"
+    _sub_ok=0
+  }
+done
+if [ "$_sub_ok" -eq 1 ]; then
+  assert_pass "gen-completions: merged subcommands covered by parent completions"
+fi
+
 # 7. _nucleus dispatcher completes `nucleus-<TAB>` with every command name.
 _disp_file="$_COMPLETIONS_DIR/_nucleus"
 if grep -q '^#compdef nucleus-$' "$_disp_file" &&
-  grep -qw 'audit-store' "$_disp_file" &&
-  grep -qw 'cleanup-nix' "$_disp_file" &&
+  grep -qw 'apply' "$_disp_file" &&
+  grep -qw 'check' "$_disp_file" &&
+  grep -qw 'cloud' "$_disp_file" &&
+  grep -qw 'gc' "$_disp_file" &&
   grep -qw 'service-watchdog' "$_disp_file" &&
-  grep -qw 'bump-lockfile' "$_disp_file" &&
+  grep -qw 'update' "$_disp_file" &&
   grep -qw 'vm' "$_disp_file"; then
   assert_pass "gen-completions: _nucleus dispatcher lists commands"
 else

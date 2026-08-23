@@ -421,264 +421,23 @@
           inherit meta;
         };
 
-      # Helper for `nix run .#<name>` apps. Delegates to writeNucleusShellApplication.
-      mkApp =
-        pkgs: args:
-        let
-          pkg = writeNucleusShellApplication pkgs args;
-        in
-        {
-          type = "app";
-          program = "${pkg}/bin/nucleus-${args.name}";
-        };
-
-      # App wrapper for `nix run .#apply`. apply.sh resolves sibling src/scripts/*
-      # via $_ash_script_dir; thin wrappers symlink script-tree/src for lib access.
-      mkApplyApp = pkgs: {
-        type = "app";
-        program = "${
-          writeNucleusShellApplication pkgs {
-            name = "apply";
-            scriptName = "src/scripts/apply";
-            runtimeInputs = [
-              pkgs.curl
-              pkgs.gawk
-              pkgs.git
-              pkgs.jq
-              pkgs.openssh
-              pkgs.prek
-              pkgs.sops
-              pkgs.ssh-to-age
-            ];
+      # Derive flake `apps` entries from the single nucleusApps registration so
+      # PATH, `nix run`, and `packages` stay in lockstep. Keyed by the short name
+      # (strip the `nucleus-` prefix); program points at the app's bin wrapper.
+      mkNucleusAppsAsFlakeApps =
+        apps:
+        nixpkgs.lib.mapAttrs' (
+          name: pkg:
+          let
+            short = nixpkgs.lib.removePrefix "nucleus-" name;
+          in
+          nixpkgs.lib.nameValuePair short {
+            type = "app";
+            program = "${pkg}/bin/${name}";
           }
-        }/bin/nucleus-apply";
-      };
-
-      # PowerShell syntax validation (bundled deps so CI doesn't need system packages).
-      mkCheckPwshPackage =
-        pkgs:
-        writeNucleusShellApplication pkgs {
-          name = "check-pwsh";
-          runtimeInputs = [
-            pkgs.git
-            pkgs.powershell
-          ];
-          text = ''
-            _self="$0"
-            while [ -h "$_self" ]; do
-              _target="$(readlink "$_self")"
-              case "$_target" in
-                /*) _self="$_target" ;;
-                *) _self="$(CDPATH="" cd -- "$(dirname -- "$_self")" && pwd -P)/$_target" ;;
-              esac
-            done
-            _script_dir="$(CDPATH="" cd -- "$(dirname -- "$_self")/../scripts" && pwd)"
-            # Use -File (not -Command): -File binds positional parameters directly,
-            # which works with check-pwsh.ps1's [Parameter(Position=0)] $Paths.
-            # -Command would require array-literal construction and shell quoting.
-            exec pwsh -NoLogo -NoProfile -NonInteractive -File "$_script_dir/check-pwsh.ps1" "$@"
-          '';
-        };
-
-      mkCheckPwshApp = pkgs: {
-        type = "app";
-        program = "${mkCheckPwshPackage pkgs}/bin/nucleus-check-pwsh";
-      };
-
-      # treefmt-based shell script linting (ShellCheck via treefmt-nix).
-      mkCheckShApp =
-        pkgs: treefmtWrapper:
-        mkApp pkgs {
-          name = "check-sh";
-          runtimeInputs = [
-            pkgs.bash
-            pkgs.git
-            treefmtWrapper
-          ];
-        };
-
-      # Packer template validation.
-      mkCheckPackerApp =
-        pkgs:
-        mkApp pkgs {
-          name = "check-packer";
-          runtimeInputs = [
-            pkgs.bash
-            pkgs.packer
-          ];
-        };
+        ) apps;
 
       mkTreefmtWrapper = _system: pkgs: treefmt-nix.lib.mkWrapper pkgs ./treefmt.nix;
-
-      # Build the consolidated repository check app for a given package set.
-      # Does NOT inject nixpkgs `pkgs.nix` into PATH — scripts/check.sh uses
-      # nix eval which should use the host nix binary so host-specific nix.conf
-      # settings (eval-cores, lazy-trees) are interpreted without warnings.
-      mkCheckApp =
-        pkgs: treefmtWrapper:
-        mkApp pkgs {
-          name = "check";
-          runtimeInputs = [
-            pkgs.bash
-            pkgs.check-jsonschema
-            pkgs.git
-            pkgs.jq
-            pkgs.nixf
-            pkgs.packer
-            pkgs.powershell
-            treefmtWrapper
-            pkgs.yq-go
-          ];
-        };
-
-      # Does NOT inject nixpkgs `pkgs.nix` into PATH — scripts/test.sh uses
-      # nix-instantiate --eval which should use the host nix binary so
-      # host-specific nix.conf settings (eval-cores, lazy-trees) are
-      # interpreted without warnings.
-      mkTestApp =
-        pkgs: treefmtWrapper:
-        mkApp pkgs {
-          name = "test";
-          runtimeInputs = [
-            pkgs.bash
-            pkgs.findutils
-            pkgs.git
-            pkgs.powershell
-            treefmtWrapper
-          ];
-        };
-
-      # Build pre-flight health checks as a runnable app that fails fast before
-      # apply/bootstrap flows attempt large downloads or secret-dependent work.
-      mkHealthCheckApp =
-        pkgs:
-        mkApp pkgs {
-          name = "health-check";
-          runtimeInputs = [
-            pkgs.curl
-            pkgs.git
-            pkgs.gnupg
-            pkgs.jq
-            pkgs.sops
-          ];
-        };
-
-      # Build a cross-host update orchestration app.
-      # Intentionally does not inject nixpkgs `pkgs.nix` into PATH — update.sh
-      # should use the host nix binary so host-specific nix.conf settings
-      # (eval-cores, lazy-trees) are interpreted without warnings.
-      mkUpdateApp =
-        pkgs:
-        mkApp pkgs {
-          name = "update";
-          runtimeInputs = [
-            pkgs.gnupg
-            pkgs.sops
-          ];
-        };
-
-      # Build garbage-collection app for POSIX hosts.
-      mkGcApp =
-        pkgs:
-        mkApp pkgs {
-          name = "gc";
-          runtimeInputs = [
-            pkgs.jq
-            pkgs.gnugrep
-            pkgs.home-manager
-          ];
-        };
-
-      mkAuditStoreApp =
-        pkgs:
-        mkApp pkgs {
-          name = "audit-store";
-          runtimeInputs = [ pkgs.jq ];
-        };
-
-      # Build cloud setup helper app for POSIX hosts.
-      # Does NOT inject nixpkgs `pkgs.nix` into PATH — scripts/cloud-setup.sh
-      # uses nix --option which should use the host nix binary so host-specific
-      # nix.conf settings (eval-cores, lazy-trees) are interpreted without warnings.
-      mkCloudSetupApp =
-        pkgs:
-        mkApp pkgs {
-          name = "cloud-setup";
-          runtimeInputs = [
-            pkgs.git
-            pkgs.jq
-            pkgs.rclone
-          ];
-        };
-
-      # Build cloud replica sync helper app for POSIX hosts.
-      mkReplicaSyncApp =
-        pkgs:
-        mkApp pkgs {
-          name = "replica-sync";
-          runtimeInputs = [
-            pkgs.git
-            pkgs.jq
-            pkgs.rclone
-          ];
-        };
-
-      # Build cloud replica state reset helper app for POSIX hosts.
-      mkReplicaResetApp =
-        pkgs:
-        mkApp pkgs {
-          name = "replica-reset";
-          runtimeInputs = [
-            pkgs.git
-            pkgs.jq
-          ];
-        };
-
-      # Build unified AI management app for POSIX hosts.
-      mkAiApp =
-        pkgs:
-        mkApp pkgs {
-          name = "ai";
-          runtimeInputs = [ pkgs.jq ];
-        };
-
-      # Build unified VM management app for POSIX hosts.
-      mkVmApp =
-        pkgs:
-        mkApp pkgs {
-          name = "vm";
-          runtimeInputs = [ pkgs.jq ];
-        };
-
-      mkBootstrapApp =
-        pkgs:
-        mkApp pkgs {
-          name = "bootstrap";
-          runtimeInputs = [ ];
-        };
-
-      mkBumpLockfileApp =
-        pkgs:
-        mkApp pkgs {
-          name = "bump-lockfile";
-          runtimeInputs = [ pkgs.jq ];
-        };
-
-      # Build unified service management app for POSIX hosts.
-      mkSvcApp =
-        pkgs:
-        mkApp pkgs {
-          name = "svc";
-          runtimeInputs = [ pkgs.jq ];
-        };
-
-      # Manage runtime configuration for nucleus services.
-      mkNucleusConfigApp =
-        pkgs:
-        mkApp pkgs {
-          name = "config";
-          runtimeInputs = [ pkgs.jq ];
-        };
 
       # Build the full set of nucleus app packages for a given package set.
       # Used by home-manager (home.packages) and flake packages output.
@@ -707,17 +466,9 @@
             name = "ai";
             runtimeInputs = [ pkgs.jq ];
           };
-          nucleus-audit-store = nucleusApp {
-            name = "audit-store";
-            runtimeInputs = [ pkgs.jq ];
-          };
           nucleus-bootstrap = nucleusApp {
             name = "bootstrap";
             runtimeInputs = [ ];
-          };
-          nucleus-bump-lockfile = nucleusApp {
-            name = "bump-lockfile";
-            runtimeInputs = [ pkgs.jq ];
           };
           nucleus-check = nucleusApp {
             name = "check";
@@ -733,28 +484,8 @@
               pkgs.yq-go
             ];
           };
-          nucleus-check-packer = nucleusApp {
-            name = "check-packer";
-            runtimeInputs = [
-              pkgs.bash
-              pkgs.packer
-            ];
-          };
-          nucleus-check-pwsh = mkCheckPwshPackage pkgs;
-          nucleus-check-sh = nucleusApp {
-            name = "check-sh";
-            runtimeInputs = [
-              pkgs.bash
-              pkgs.git
-              treefmtWrapper
-            ];
-          };
-          nucleus-cleanup-nix = nucleusApp {
-            name = "cleanup-nix";
-            runtimeInputs = [ pkgs.bash ];
-          };
-          nucleus-cloud-setup = nucleusApp {
-            name = "cloud-setup";
+          nucleus-cloud = nucleusApp {
+            name = "cloud";
             runtimeInputs = [
               pkgs.git
               pkgs.jq
@@ -775,31 +506,6 @@
               pkgs.jq
               pkgs.gnugrep
               pkgs.home-manager
-            ];
-          };
-          nucleus-health-check = nucleusApp {
-            name = "health-check";
-            runtimeInputs = [
-              pkgs.curl
-              pkgs.git
-              pkgs.gnupg
-              pkgs.jq
-              pkgs.sops
-            ];
-          };
-          nucleus-replica-reset = nucleusApp {
-            name = "replica-reset";
-            runtimeInputs = [
-              pkgs.git
-              pkgs.jq
-            ];
-          };
-          nucleus-replica-sync = nucleusApp {
-            name = "replica-sync";
-            runtimeInputs = [
-              pkgs.git
-              pkgs.jq
-              pkgs.rclone
             ];
           };
           nucleus-svc = nucleusApp {
@@ -851,46 +557,14 @@
       #     apply script does not have to locate them from the system PATH.
       # -----------------------------------------------------------------------
       apps = {
-        "${systems.mac}" = {
-          ai = mkAiApp pkgsMac;
-          apply = mkApplyApp pkgsMac;
-          bootstrap = mkBootstrapApp pkgsMac;
-          bump-lockfile = mkBumpLockfileApp pkgsMac;
-          check = mkCheckApp pkgsMac (mkTreefmtWrapper systems.mac pkgsMac);
-          test = mkTestApp pkgsMac (mkTreefmtWrapper systems.mac pkgsMac);
-          check-packer = mkCheckPackerApp pkgsMac;
-          check-pwsh = mkCheckPwshApp pkgsMac;
-          check-sh = mkCheckShApp pkgsMac (mkTreefmtWrapper systems.mac pkgsMac);
-          cloud-setup = mkCloudSetupApp pkgsMac;
+        "${systems.mac}" = mkNucleusAppsAsFlakeApps nucleusAppsMac // {
           darwin-rebuild = {
             type = "app";
             program = "${darwin.packages.${systems.mac}.darwin-rebuild}/bin/darwin-rebuild";
           };
-          audit-store = mkAuditStoreApp pkgsMac;
-          gc = mkGcApp pkgsMac;
-          health-check = mkHealthCheckApp pkgsMac;
           nixos-generators = nixos-generators.apps.${systems.mac}.default;
-          config = mkNucleusConfigApp pkgsMac;
-          replica-reset = mkReplicaResetApp pkgsMac;
-          replica-sync = mkReplicaSyncApp pkgsMac;
-          update = mkUpdateApp pkgsMac;
-          svc = mkSvcApp pkgsMac;
-          vm = mkVmApp pkgsMac;
         };
-        "${systems.linux}" = {
-          ai = mkAiApp pkgsLinux;
-          apply = mkApplyApp pkgsLinux;
-          bootstrap = mkBootstrapApp pkgsLinux;
-          bump-lockfile = mkBumpLockfileApp pkgsLinux;
-          check = mkCheckApp pkgsLinux (mkTreefmtWrapper systems.linux pkgsLinux);
-          test = mkTestApp pkgsLinux (mkTreefmtWrapper systems.linux pkgsLinux);
-          check-packer = mkCheckPackerApp pkgsLinux;
-          check-pwsh = mkCheckPwshApp pkgsLinux;
-          check-sh = mkCheckShApp pkgsLinux (mkTreefmtWrapper systems.linux pkgsLinux);
-          cloud-setup = mkCloudSetupApp pkgsLinux;
-          audit-store = mkAuditStoreApp pkgsLinux;
-          gc = mkGcApp pkgsLinux;
-          health-check = mkHealthCheckApp pkgsLinux;
+        "${systems.linux}" = mkNucleusAppsAsFlakeApps nucleusAppsLinux // {
           home-manager = {
             type = "app";
             program = "${home-manager.packages.${systems.linux}.home-manager}/bin/home-manager";
@@ -900,12 +574,6 @@
             program = "${pkgsLinux.nixos-rebuild}/bin/nixos-rebuild";
           };
           nixos-generators = nixos-generators.apps.${systems.linux}.default;
-          config = mkNucleusConfigApp pkgsLinux;
-          replica-reset = mkReplicaResetApp pkgsLinux;
-          replica-sync = mkReplicaSyncApp pkgsLinux;
-          update = mkUpdateApp pkgsLinux;
-          svc = mkSvcApp pkgsLinux;
-          vm = mkVmApp pkgsLinux;
         };
       };
 

@@ -82,9 +82,9 @@ run_code_formatting() {
 
   local _pkr_exit=0
   if [ "${#_pkr_files[@]}" -gt 0 ]; then
-    bash scripts/check-packer.sh --validate-only "${_pkr_files[@]}" || _pkr_exit=$?
+    bash scripts/check.sh packer --validate-only "${_pkr_files[@]}" || _pkr_exit=$?
   elif ! $_has_args; then
-    bash scripts/check-packer.sh --validate-only || _pkr_exit=$?
+    bash scripts/check.sh packer --validate-only || _pkr_exit=$?
   else
     say "skipping check-packer (no Packer templates to check)."
   fi

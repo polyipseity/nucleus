@@ -14,7 +14,7 @@
 - Apple Command Line Tools (CLT) are not required before, during, or after `nucleus-apply`. The install tree under `/Library/Developer/CommandLineTools` is removed on each apply when present (~1 GB). SIP-protected pkgutil receipts are not removed — Software Update may still offer CLT installs. The Nix LLVM toolchain provides `clang`/`clang++`/`ld.lld` via absolute store paths in `CC`/`CXX`/`LD` — no PATH-based resolution occurs, so `/usr/bin/clang` (the xcrun shim) is never reached. If you see the xcrun dialog, check that `nucleus-apply` completed successfully and restart your shell session to pick up the updated environment.
 - Install Amphetamine Power Protect: copy script to `~/Library/Application Scripts/com.if.Amphetamine/` and sudoers to `/private/etc/sudoers.d/` (see upstream README). Re-run `nucleus-apply`.
 - Generate `rclone_config_pass` in `src/secrets/users-<username>.yml` via `openssl rand -hex 64`, commit, re-run `nucleus-apply`. If remotes exist without encryption, delete `~/.config/rclone/rclone.conf` first.
-- Run `nucleus-cloud-setup` and complete `rclone config` for GoogleDrive, iCloud, and OneDrive.
+- Run `nucleus-cloud setup` and complete `rclone config` for GoogleDrive, iCloud, and OneDrive.
 - Open MusicBrainz Picard, sign in, and add AcoustID API key under Options.
 - Open Equaliser once, then approve its audio driver in System Settings > Privacy & Security > Extensions > Audio Extensions. Equaliser's menu-bar icon is its only UI (menu-bar-only app, no hide option, no launch-at-login mechanism) — the app is not auto-launched, so the icon stays absent by default; never add a LaunchAgent for it.
 - Run `camilladsp --version`, then approve BlackHole in System Settings > Privacy & Security and grant Microphone permission.
@@ -46,17 +46,17 @@
 - `nucleus-ai` — manage AI models (sync, list, status, endpoint, config)
 - `nucleus-apply` — apply configuration
 - `nucleus-bootstrap` — bootstrap system
-- `nucleus-bump-lockfile` — update version pins in `src/lockfiles/lockfile.json`; pass `--sections winget,scoop,...` for specific sections
-- Homebrew `masApps` (`suggestions.homebrew.masApps`) are warn-only — never enforced. Formula/cask versions are pinned by nix-homebrew tap commits in `flake.lock`, not `lockfile.json`. `nucleus-bump-lockfile --verify-installed` always warns for `suggestions`.
-- `nucleus-check-pwsh` — check PowerShell syntax
-- `nucleus-check-sh` — check POSIX shell syntax
-- `nucleus-cloud-setup` — configure cloud remotes and re-apply
+- `nucleus-update lockfile` — update version pins in `src/lockfiles/lockfile.json`; pass `--sections winget,scoop,...` for specific sections
+- Homebrew `masApps` (`suggestions.homebrew.masApps`) are warn-only — never enforced. Formula/cask versions are pinned by nix-homebrew tap commits in `flake.lock`, not `lockfile.json`. `nucleus-update lockfile --verify-installed` always warns for `suggestions`.
+- `nucleus-check pwsh` — check PowerShell syntax
+- `nucleus-check sh` — check POSIX shell syntax
+- `nucleus-cloud setup` — configure cloud remotes and re-apply
 - `nucleus-gc` — run Nix garbage collection (VM GC policy: `vm-management.instructions.md`)
 - `nucleus-gs-pdf-opt` — optimize PDF files with Ghostscript (keeps .bak backup by default; use `--rm-bak` to remove)
-- `nucleus-audit-store` — print Nix store audit baseline metrics
-- `nucleus-health-check` — run health checks
-- `nucleus-replica-sync` — pull cloud replicas
-- `nucleus-replica-reset` — reset local replica state
+- `nucleus-apply audit-store` — print Nix store audit baseline metrics
+- `nucleus-apply health-check` — run health checks
+- `nucleus-cloud sync` — pull cloud replicas
+- `nucleus-cloud reset` — reset local replica state
 - `nucleus-update` — update repository
 - `nucleus-vm setup` — build and provision VMs from `src/modules/VMs.json`
   - **macOS guest** (tart): automatic on Apple Silicon. Requires `brew install cirruslabs/cli/tart`. Start with `tart run MacBook [--no-graphics]`.

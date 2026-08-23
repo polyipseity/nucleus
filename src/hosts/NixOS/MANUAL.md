@@ -2,7 +2,7 @@
 
 - After first install (Btrfs with `@` root and `@nix` for `/nix` per `src/hosts/NixOS/hardware/disks.nix`): partition the disk, `mkfs.btrfs` on the root partition, `btrfs subvolume create @` and `btrfs subvolume create @nix`, mount `@` at `/mnt` and `@nix` at `/mnt/nix`, then run `nixos-install`. Generate hardware config: `sudo nixos-generate-config --dir /tmp/nixos-generate-config`. Compare with `src/hosts/NixOS/hardware/{cpu,gpu,disks}.nix` and merge host-specific facts (filesystem UUIDs, EFI `/boot`, swap, kernel modules, device paths). Uncomment the `/boot` vfat entry in `disks.nix` when merging. Rebuild to confirm no missing references.
 - Generate `rclone_config_pass` in `src/secrets/users-<username>.yml` via `openssl rand -hex 64`, commit, re-run `nucleus-apply`. If remotes exist without encryption, delete `~/.config/rclone/rclone.conf` first.
-- Run `nucleus-cloud-setup` and complete `rclone config` for GoogleDrive, iCloud, and OneDrive.
+- Run `nucleus-cloud setup` and complete `rclone config` for GoogleDrive, iCloud, and OneDrive.
 - Open MusicBrainz Picard, sign in, and add AcoustID API key under Options.
 - Open EasyEffects, add Limiter or Compressor under Effects > Output to cap volume. For presets: clone <https://github.com/Digitalone1/EasyEffects-Presets> into `~/.local/share/easyeffects/output/`.
 - Verify CamillaDSP loopback: `arecord -l | grep Loopback`. If missing, reboot after `nucleus-apply`.
@@ -26,17 +26,17 @@
 - `nucleus-ai` — manage AI models (sync, list, status, endpoint, config)
 - `nucleus-apply` — apply configuration
 - `nucleus-bootstrap` — bootstrap system
-- `nucleus-bump-lockfile` — update version pins in `src/lockfiles/lockfile.json`; pass `--sections winget,scoop,...` for specific sections
-- `suggestions.*` sections (homebrew.masApps, ollama, vscode, vm-setup.windows) are warn-only — never enforced. `nucleus-bump-lockfile --verify-installed` always warns for them.
-- `nucleus-check-pwsh` — check PowerShell syntax
-- `nucleus-check-sh` — check POSIX shell syntax
-- `nucleus-cloud-setup` — configure cloud remotes and re-apply
+- `nucleus-update lockfile` — update version pins in `src/lockfiles/lockfile.json`; pass `--sections winget,scoop,...` for specific sections
+- `suggestions.*` sections (homebrew.masApps, ollama, vscode, vm-setup.windows) are warn-only — never enforced. `nucleus-update lockfile --verify-installed` always warns for them.
+- `nucleus-check pwsh` — check PowerShell syntax
+- `nucleus-check sh` — check POSIX shell syntax
+- `nucleus-cloud setup` — configure cloud remotes and re-apply
 - `nucleus-gc` — run Nix garbage collection (VM GC policy: `vm-management.instructions.md`)
 - `nucleus-gs-pdf-opt` — optimize PDF files with Ghostscript (keeps .bak backup by default; use `--rm-bak` to remove)
-- `nucleus-audit-store` — print Nix store audit baseline metrics
-- `nucleus-health-check` — run health checks
-- `nucleus-replica-sync` — pull cloud replicas
-- `nucleus-replica-reset` — reset local replica state
+- `nucleus-apply audit-store` — print Nix store audit baseline metrics
+- `nucleus-apply health-check` — run health checks
+- `nucleus-cloud sync` — pull cloud replicas
+- `nucleus-cloud reset` — reset local replica state
 - `nucleus-update` — update repository
 - `nucleus-vm setup` — build and provision VMs from `src/modules/VMs.json`. Requires `libvirtd` active (from `vms.nix`). Guest converge is automatic; run `nixos-rebuild switch` inside the guest for manual re-converge.
   - **macOS guest**: not automated (Apple EULA restricts redistribution).

@@ -1,7 +1,7 @@
 # Windows manual steps
 
 - Generate `rclone_config_pass` in `src/secrets/users-<username>.yml` via `openssl rand -hex 64`, commit, re-run `nucleus-apply`. If remotes exist without encryption, delete `%USERPROFILE%\.config\rclone\rclone.conf` first.
-- Run `nucleus-cloud-setup` in PowerShell and complete `rclone config` for GoogleDrive, iCloud, and OneDrive.
+- Run `nucleus-cloud setup` in PowerShell and complete `rclone config` for GoogleDrive, iCloud, and OneDrive.
 - Open MusicBrainz Picard, sign in, and add AcoustID API key under Options.
 - Run Equalizer APO configurator to select your playback device, then reboot.
 - Launch Peace Equalizer APO, use Effects > Limiter sliders or pre-amplification to cap output.
@@ -21,16 +21,16 @@
 - `nucleus-ai` — manage AI models (sync, list, status, endpoint, config)
 - `nucleus-apply` — apply configuration
 - `nucleus-bootstrap` — bootstrap system
-- `nucleus-bump-lockfile` — update version pins in `src/lockfiles/lockfile.json`; `-Sections <csv>` selects sections (`cargo` aliases `cargo-binstall`; sub-section names like `vm-setup.nixos-iso`); `-Verify` checks without writing; `-ListSections` lists valid section names; `-VerifyInstalled` compares installed versions against pins and exits 1 on drift
+- `nucleus-update lockfile` — update version pins in `src/lockfiles/lockfile.json`; `-Sections <csv>` selects sections (`cargo` aliases `cargo-binstall`; sub-section names like `vm-setup.nixos-iso`); `-Verify` checks without writing; `-ListSections` lists valid section names; `-VerifyInstalled` compares installed versions against pins and exits 1 on drift
 - `suggestions.*` sections (homebrew.masApps, ollama, vscode, vm-setup.windows) are warn-only — never enforced. `-VerifyInstalled` always warns for them.
-- `nucleus-check-pwsh` — check PowerShell syntax
-- `nucleus-check-sh` — check POSIX shell syntax
-- `nucleus-cloud-setup` — configure cloud remotes and re-apply
+- `nucleus-check pwsh` — check PowerShell syntax
+- `nucleus-check sh` — check POSIX shell syntax
+- `nucleus-cloud setup` — configure cloud remotes and re-apply
 - `nucleus-gc` — run Nix garbage collection (VM GC policy: `vm-management.instructions.md`)
 - `nucleus-gs-pdf-opt` — optimize PDF files with Ghostscript (keeps .bak backup by default; use `--rm-bak` to remove)
-- `nucleus-health-check` — run health checks
-- `nucleus-replica-sync` — pull cloud replicas
-- `nucleus-replica-reset` — reset local replica state
+- `nucleus-apply health-check` — run health checks
+- `nucleus-cloud sync` — pull cloud replicas
+- `nucleus-cloud reset` — reset local replica state
 - `nucleus-update` — update repository
 - `nucleus-vm setup` — build and provision VMs from `src/modules/VMs.json`. Requires QEMU (managed by Scoop). Guest converge is automatic; run `.\src\hosts\Windows\apply.ps1` inside the guest for manual re-converge.
   - **NixOS guest**: uses Packer (ISO auto-downloaded).

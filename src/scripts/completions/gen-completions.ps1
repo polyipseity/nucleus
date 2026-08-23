@@ -71,21 +71,12 @@ function Get-NucleusCommandList {
   return @(
     'ai',
     'apply',
-    'audit-store',
     'bootstrap',
-    'bump-lockfile',
     'check',
-    'check-packer',
-    'check-pwsh',
-    'check-sh',
-    'cleanup-nix',
-    'cloud-setup',
+    'cloud',
     'config',
     'gc',
     'gs-pdf-opt',
-    'health-check',
-    'replica-reset',
-    'replica-sync',
     'service-watchdog',
     'svc',
     'test',
@@ -98,25 +89,16 @@ function Get-NucleusFlagMap {
   return @{
     'ai' = @('--dry-run', '--gc-only', '--help', '--json', '--no-gc-only', '--ollama-profile', '--profile')
     'apply' = @('--ai-sync', '--help', '--no-ai-sync', '--no-replica-sync', '--no-store-audit', '--no-vm-setup', '--no-vm-sync', '--replica-sync', '--store-audit', '--target-user', '--username', '--vm-setup', '--vm-sync')
-    'audit-store' = @('-h', '--help')
     'bootstrap' = @('--ai-sync', '--apply', '--help', '--no-ai-sync', '--no-apply', '--no-replica-sync', '--replica-sync', '--target-user')
-    'bump-lockfile' = @('--help', '--list-sections', '--sections', '--verify', '--verify-installed')
     'check' = @('--fail-fast', '--full', '--help', '--no-fail-fast', '--online', '--scoped', '--skip-steps')
-    'check-packer' = @('--help', '--validate-only')
-    'check-pwsh' = @('--help', '--scoped', '--settings', '--skip-step')
-    'check-sh' = @('--help', '--scoped')
-    'cleanup-nix' = @('--dry-run', '--help')
-    'cloud-setup' = @('--apply', '--help', '--no-apply')
+    'cloud' = @('--apply', '--help', '--no-apply')
     'config' = @('--help')
     'gc' = @('--dry-run', '--duperemove-gc', '--expiry', '--generations-keep', '--git-cache-gc', '--help', '--hm-expiry', '--hm-gc', '--hm-generations-keep', '--journald-gc', '--log-compress', '--log-gc', '--log-max-files', '--log-max-size', '--nix-artifacts-gc', '--nix-expiry', '--nix-gc', '--no-dry-run', '--no-duperemove-gc', '--no-git-cache-gc', '--no-hm-gc', '--no-journald-gc', '--no-log-gc', '--no-nix-artifacts-gc', '--no-nix-gc', '--no-ollama-gc', '--no-sccache-gc', '--no-system-gc', '--no-tool-cache-gc', '--no-vm-data-gc', '--no-vm-gc', '--no-wallpaper-gc', '--ollama-gc', '--sccache-gc', '--system-gc', '--system-generations-keep', '--tool-cache-gc', '--vm-data-gc', '--vm-gc', '--wallpaper-gc')
     'gs-pdf-opt' = @('--help', '--preset', '--rm-bak')
-    'health-check' = @('--help', '--log-health', '--min-free-bytes', '--no-secret-health', '--no-store-audit', '--secret-health', '--store-audit')
-    'replica-reset' = @('--dry-run', '--help', '--replica-id', '--repo-root')
-    'replica-sync' = @('--dry-run', '--help', '--replica-id', '--repo-root')
     'service-watchdog' = @('--domain', '--help', '--oneshot')
     'svc' = @('--help', '--json', '--system', '--user', '--verbose')
     'test' = @('-q', '--fail-fast', '--help', '--no-fail-fast', '--quiet', '--skip-steps')
-    'update' = @('--flake', '--help', '--no-flake', '--no-sops', '--sops')
+    'update' = @('--flake', '--help', '--list-sections', '--no-flake', '--no-sops', '--sections', '--sops', '--verify', '--verify-installed')
     'vm' = @('--accept-gsi-license', '--accelerator', '--adb-keys', '--allow-shrink', '--dry-run', '--fake-wifi', '--fake-wifi-revert', '--force', '--gc', '--gc-data', '--gc-disabled', '--gapps', '--headful', '--help', '--json', '--magisk', '--mido-patch-file', '--mido-script', '--no-accept-gsi-license', '--no-gc', '--no-gc-data', '--no-gc-disabled', '--no-headful', '--repo-root', '--root', '--vm-dir-override', '--windows-iso', '--windows-iso-retries', '--windows-iso-source')
   }
 }

@@ -34,11 +34,10 @@ assert_skip() {
 # All nucleus-* packages that we test. Ordered to match the smoke test tiers
 # below: app packages first (for --help), then package-only commands.
 declare -a BATCH_PACKAGES=(
-  nucleus-apply nucleus-ai nucleus-bootstrap nucleus-bump-lockfile
-  nucleus-check nucleus-test nucleus-check-packer nucleus-check-pwsh
-  nucleus-check-sh nucleus-cloud-setup nucleus-config nucleus-gc
-  nucleus-gs-pdf-opt nucleus-health-check nucleus-audit-store nucleus-replica-reset
-  nucleus-replica-sync nucleus-svc nucleus-update nucleus-vm
+  nucleus-apply nucleus-ai nucleus-bootstrap
+  nucleus-check nucleus-test nucleus-config nucleus-gc
+  nucleus-gs-pdf-opt nucleus-svc nucleus-update nucleus-vm
+  nucleus-cloud
 )
 
 echo "Building ${#BATCH_PACKAGES[@]} nucleus packages..."
@@ -78,22 +77,15 @@ run_binary() {
 declare -A APP_TO_PKG=(
   [apply]=nucleus-apply
   [ai]=nucleus-ai
-  ["audit-store"]=nucleus-audit-store
   [bootstrap]=nucleus-bootstrap
-  ["bump-lockfile"]=nucleus-bump-lockfile
   [check]=nucleus-check
   [test]=nucleus-test
-  ["check-packer"]=nucleus-check-packer
-  ["check-sh"]=nucleus-check-sh
-  ["cloud-setup"]=nucleus-cloud-setup
   [config]=nucleus-config
   [gc]=nucleus-gc
-  ["health-check"]=nucleus-health-check
-  ["replica-reset"]=nucleus-replica-reset
-  ["replica-sync"]=nucleus-replica-sync
   [svc]=nucleus-svc
   [update]=nucleus-update
   [vm]=nucleus-vm
+  [cloud]=nucleus-cloud
 )
 
 test_app_help() {
@@ -118,9 +110,8 @@ test_app_help() {
 
 # App commands (names match `nix run ./src#<name>`)
 APP_COMMANDS=(
-  apply ai audit-store bootstrap bump-lockfile check test
-  check-packer check-sh cloud-setup config
-  gc health-check replica-reset replica-sync update svc vm
+  apply ai bootstrap check test
+  config gc update svc vm cloud
 )
 
 section 1 "Tier 1: --help smoke tests"
@@ -128,12 +119,11 @@ for cmd in "${APP_COMMANDS[@]}"; do
   test_app_help "$cmd"
 done
 
-# check-pwsh: wrapper script does `exec pwsh -File ...` which does not handle
-# --help.  Verify it builds (already done in batch) and just note the pass
-# for the package-only build assertion.
+# gs-pdf-opt: verify it builds (already done in batch) and note the pass for
+# the package-only build assertion.  (check-pwsh is now a subcommand of
+# nucleus-check, covered by the Tier 1 --help test above.)
 echo ""
 echo "--- Package-only commands ---"
-assert_pass "nucleus-check-pwsh build"
 assert_pass "nucleus-gs-pdf-opt build"
 
 # gs-pdf-opt does support --help; run it from the store path.
@@ -154,8 +144,6 @@ section 2 "Tier 2: dry-run tests"
 declare -A DRY_RUN_APPS=(
   [ai]=nucleus-ai
   [gc]=nucleus-gc
-  ["replica-sync"]=nucleus-replica-sync
-  ["replica-reset"]=nucleus-replica-reset
   [vm]=nucleus-vm
 )
 
@@ -183,8 +171,6 @@ test_app_dry_run() {
 # ai sync needs NUCLEUS_AI_SYNC_TIMEOUT=0 to avoid blocking on Ollama
 NUCLEUS_AI_SYNC_TIMEOUT=0 test_app_dry_run ai
 test_app_dry_run gc
-test_app_dry_run replica-sync
-test_app_dry_run replica-reset
 test_app_dry_run vm
 
 # --- Tier 3: safe no-op read-only commands --------------------------------

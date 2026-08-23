@@ -4,6 +4,7 @@
 
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
+  '1:subcommand:((health-check "" audit-store ""))' \
   '--ai-sync[ai sync]' \
   '--no-ai-sync[no ai sync]' \
   '--no-replica-sync[no replica sync]' \

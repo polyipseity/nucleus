@@ -2,7 +2,7 @@
 #
 # Provides the domain list and drift-reset script for purging stale user
 # preference state before declarative re-assertion.
-{ pkgs, ... }:
+{ ... }:
 let
   # Domains intentionally reset before each Home Manager write pass so stale
   # manual overrides do not survive forever in ~/Library/Preferences.
@@ -64,22 +64,4 @@ let
 in
 {
   inherit resetUserPreferenceDomains;
-
-  # Manual drift-reset helper for managed macOS preference domains.
-  # This is intentionally a user-invoked command instead of an automatic
-  # activation phase so destructive purge operations cannot race with
-  # writeBoundary defaults application.
-  managedPreferencesGcScript = pkgs.writeNucleusShellApplication {
-    name = "gc-managed-user-preferences";
-    runtimeInputs = [ pkgs.nix ];
-    # extraEnv because the underlying script body expects env vars: it is also
-    # sourced by gc-managed-preferences.sh (which sets the same vars with POSIX
-    # shell defaults).  Positional args would require the shared body to handle
-    # both $1 and env-var fallbacks, gaining nothing.
-    extraEnv = {
-      NIX_STORE_BIN = "${pkgs.nix}/bin/nix";
-      MANAGED_PREF_DOMAINS = builtins.concatStringsSep " " resetUserPreferenceDomains;
-    };
-    scriptName = "src/platforms/macOS/scripts/macos-gc-preferences";
-  };
 }

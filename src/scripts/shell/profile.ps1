@@ -641,11 +641,6 @@ $nucleusApplyFlags = @(
   '--vm-sync'
 )
 
-$nucleusAuditStoreFlags = @(
-  '--help',
-  '-h'
-)
-
 $nucleusBootstrapFlags = @(
   '--ai-sync',
   '--apply',
@@ -655,14 +650,6 @@ $nucleusBootstrapFlags = @(
   '--no-replica-sync',
   '--replica-sync',
   '--target-user'
-)
-
-$nucleusBumpLockfileFlags = @(
-  '--help',
-  '--list-sections',
-  '--sections',
-  '--verify',
-  '--verify-installed'
 )
 
 $nucleusCheckFlags = @(
@@ -675,29 +662,7 @@ $nucleusCheckFlags = @(
   '--skip-steps'
 )
 
-$nucleusCheckPackerFlags = @(
-  '--help',
-  '--validate-only'
-)
-
-$nucleusCheckPwshFlags = @(
-  '--help',
-  '--scoped',
-  '--settings',
-  '--skip-step'
-)
-
-$nucleusCheckShFlags = @(
-  '--help',
-  '--scoped'
-)
-
-$nucleusCleanupNixFlags = @(
-  '--dry-run',
-  '--help'
-)
-
-$nucleusCloudSetupFlags = @(
+$nucleusCloudFlags = @(
   '--apply',
   '--help',
   '--no-apply'
@@ -756,30 +721,6 @@ $nucleusGsPdfOptFlags = @(
   '--rm-bak'
 )
 
-$nucleusHealthCheckFlags = @(
-  '--help',
-  '--log-health',
-  '--min-free-bytes',
-  '--no-secret-health',
-  '--no-store-audit',
-  '--secret-health',
-  '--store-audit'
-)
-
-$nucleusReplicaResetFlags = @(
-  '--dry-run',
-  '--help',
-  '--replica-id',
-  '--repo-root'
-)
-
-$nucleusReplicaSyncFlags = @(
-  '--dry-run',
-  '--help',
-  '--replica-id',
-  '--repo-root'
-)
-
 $nucleusServiceWatchdogFlags = @(
   '--domain',
   '--help',
@@ -806,9 +747,13 @@ $nucleusTestFlags = @(
 $nucleusUpdateFlags = @(
   '--flake',
   '--help',
+  '--list-sections',
   '--no-flake',
   '--no-sops',
-  '--sops'
+  '--sections',
+  '--sops',
+  '--verify',
+  '--verify-installed'
 )
 
 $nucleusVmFlags = @(
@@ -878,29 +823,11 @@ if ($IsWindows) {
     }
     & $scriptPath @ScriptArguments
   }
-  function nucleus-check-pwsh {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
-    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
-    param()
-    Invoke-NucleusRepoScript 'scripts\check-pwsh.ps1' @Args
-  }
-  function nucleus-check-sh {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
-    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
-    param()
-    Invoke-NucleusRepoScript 'scripts\check-sh.ps1' @Args
-  }
   function nucleus-ai {
     # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\ai.ps1' @Args
-  }
-  function nucleus-audit-store {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
-    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
-    param()
-    Invoke-NucleusRepoScript 'scripts\audit-store.ps1' @Args
   }
   function nucleus-apply {
     # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
@@ -915,12 +842,6 @@ if ($IsWindows) {
     }
     & $scriptPath -ModuleDir $moduleDir -Users @($username) @Args
   }
-  function nucleus-cloud-setup {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
-    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
-    param()
-    Invoke-NucleusRepoScript 'scripts\cloud-setup.ps1' @Args
-  }
   function nucleus-config {
     # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
@@ -932,24 +853,6 @@ if ($IsWindows) {
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\gc.ps1' @Args
-  }
-  function nucleus-health-check {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
-    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
-    param()
-    Invoke-NucleusRepoScript 'scripts\health-check.ps1' @Args
-  }
-  function nucleus-replica-sync {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
-    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
-    param()
-    Invoke-NucleusRepoScript 'scripts\replica-sync.ps1' @Args
-  }
-  function nucleus-replica-reset {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
-    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
-    param()
-    Invoke-NucleusRepoScript 'scripts\replica-reset.ps1' @Args
   }
   function nucleus-update {
     # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
@@ -968,12 +871,6 @@ if ($IsWindows) {
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
     Invoke-NucleusRepoScript 'scripts\vm.ps1' @Args
-  }
-  function nucleus-bump-lockfile {
-    # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
-    [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
-    param()
-    Invoke-NucleusRepoScript 'scripts\bump-lockfile.ps1' @Args
   }
   function nucleus-svc {
     # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
@@ -1026,11 +923,10 @@ Register-ArgumentCompleter -CommandName nucleus-gc -ScriptBlock {
   $nucleusGcFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 
-Register-ArgumentCompleter -CommandName nucleus-health-check -ScriptBlock {
+Register-ArgumentCompleter -CommandName nucleus-cloud -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
   $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
-  $nucleusHealthCheckFlags |
-    Where-Object { $_ -like "$wordToComplete*" }
+  $nucleusCloudFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-update -ScriptBlock {
@@ -1063,37 +959,11 @@ Register-ArgumentCompleter -CommandName nucleus-ai -ScriptBlock {
   }
 }
 
-Register-ArgumentCompleter -CommandName nucleus-audit-store -ScriptBlock {
-  param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
-  $nucleusAuditStoreFlags | Where-Object { $_ -like "$wordToComplete*" }
-}
-
-Register-ArgumentCompleter -CommandName nucleus-replica-sync -ScriptBlock {
-  param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
-  $nucleusReplicaSyncFlags |
-    Where-Object { $_ -like "$wordToComplete*" }
-}
-
-Register-ArgumentCompleter -CommandName nucleus-replica-reset -ScriptBlock {
-  param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
-  $nucleusReplicaResetFlags |
-    Where-Object { $_ -like "$wordToComplete*" }
-}
-
 Register-ArgumentCompleter -CommandName nucleus-bootstrap -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
   $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   $nucleusBootstrapFlags |
     Where-Object { $_ -like "$wordToComplete*" }
-}
-
-Register-ArgumentCompleter -CommandName nucleus-cloud-setup -ScriptBlock {
-  param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
-  $nucleusCloudSetupFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 $nucleusVmCommands = @('setup', 'sync', 'build-system', 'list', 'status', 'start', 'stop', 'upgrade', 'reset', 'android-config', 'inject', 'resize', 'gc', 'pack', 'unpack')
@@ -1121,50 +991,6 @@ Register-ArgumentCompleter -CommandName nucleus-apply -ScriptBlock {
   $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
   $nucleusApplyFlags |
     Where-Object { $_ -like "$wordToComplete*" }
-}
-
-Register-ArgumentCompleter -CommandName nucleus-bump-lockfile -ScriptBlock {
-  param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
-  $nucleusBumpLockfileFlags | Where-Object { $_ -like "$wordToComplete*" }
-  if ($commandAst.CommandElements.Count -ge 2) {
-    $prev = $commandAst.CommandElements[1].Value
-    if ($prev -eq '--sections') {
-      # Complete section names via the canonical --list-sections contract
-      $repoRoot = Resolve-NucleusRepoRoot
-      if ($repoRoot) {
-        $bumpScript = Join-Path $repoRoot 'scripts\bump-lockfile.ps1'
-        if (Test-Path -Path $bumpScript -PathType Leaf) {
-          # check-suppress:suppression_doc: stderr from -ListSections is irrelevant to completion values
-          & $bumpScript -ListSections 2>$null | Where-Object { $_ -like "$wordToComplete*" }
-        }
-      }
-    }
-  }
-}
-
-Register-ArgumentCompleter -CommandName nucleus-check-packer -ScriptBlock {
-  param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
-  $nucleusCheckPackerFlags | Where-Object { $_ -like "$wordToComplete*" }
-}
-
-Register-ArgumentCompleter -CommandName nucleus-check-pwsh -ScriptBlock {
-  param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
-  $nucleusCheckPwshFlags | Where-Object { $_ -like "$wordToComplete*" }
-}
-
-Register-ArgumentCompleter -CommandName nucleus-check-sh -ScriptBlock {
-  param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
-  $nucleusCheckShFlags | Where-Object { $_ -like "$wordToComplete*" }
-}
-
-Register-ArgumentCompleter -CommandName nucleus-cleanup-nix -ScriptBlock {
-  param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
-  $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
-  $nucleusCleanupNixFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-service-watchdog -ScriptBlock {

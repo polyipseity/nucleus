@@ -4,6 +4,7 @@
 
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
+  '1:subcommand:((cleanup-nix "" preferences ""))' \
   '--dry-run[dry run]' \
   '--duperemove-gc[duperemove gc]' \
   '--expiry[expiry]' \

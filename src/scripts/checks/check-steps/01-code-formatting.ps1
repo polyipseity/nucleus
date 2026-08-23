@@ -166,11 +166,11 @@ Register-Step -Id "code-formatting" -Name "Code formatting and linting" -Action 
   )
   $toolCount++
   if ($validatePkrFiles.Count -gt 0) {
-    & "$r\scripts\check-packer.ps1" -ValidateOnly @validatePkrFiles
+    & "$r\scripts\check.ps1" packer -ValidateOnly @validatePkrFiles
     if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
     else { Write-Message 'Packer template validation passed.' }
   } elseif (-not $HasArgs) {
-    & "$r\scripts\check-packer.ps1" -ValidateOnly
+    & "$r\scripts\check.ps1" packer -ValidateOnly
     if ($LASTEXITCODE -ne 0) { $exitCode = $LASTEXITCODE }
     else { Write-Message 'Packer template validation passed.' }
   } else {

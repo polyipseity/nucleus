@@ -13,7 +13,7 @@ run_online_determinism() {
   cd "$_repo_root" || return 1
 
   if [ "${ctx[ONLINE]}" = "true" ]; then
-    if bash "$_repo_root/scripts/bump-lockfile.sh" --verify; then
+    if bash "$_repo_root/scripts/update.sh" lockfile --verify; then
       say "online determinism checks passed."
       return 0
     else

@@ -4,7 +4,17 @@
 
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
+  '1:subcommand:((lockfile "Query each available tool for the current version of each pinned"))' \
   '--flake[flake]' \
+  '--list-sections[list sections]' \
   '--no-flake[no flake]' \
   '--no-sops[no sops]' \
-  '--sops[sops]'
+  '--sections:section name:->sections' \
+  '--sops[sops]' \
+  '--verify[verify]' \
+  '--verify-installed[verify installed]'
+case $state in
+sections)
+  _call_program 'sections' nucleus-update --list-sections
+  ;;
+esac

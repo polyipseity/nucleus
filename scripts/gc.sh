@@ -17,6 +17,20 @@ fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
+# Subcommand dispatch. gc.sh normally runs the full default GC below; a leading
+# subcommand word runs a single targeted operation instead and exits.
+action="${1:-}"
+case "$action" in
+cleanup-nix | preferences)
+  shift
+  case "$action" in
+  cleanup-nix) do_cleanup_nix "$@" ;;
+  preferences) do_preferences "$@" ;;
+  esac
+  exit $?
+  ;;
+esac
+
 usage() {
   usage_std "$(basename "$0")" "[options]"
   cat <<'EOF'
@@ -589,6 +603,48 @@ gc_vm_artifacts_if_present() {
     _gc_vm_extra_args+=(--gc-data)
   fi
   "$REPO_ROOT/scripts/vm.sh" gc "${_gc_vm_extra_args[@]}"
+}
+
+# do_cleanup_nix — Remove stale Nix build result symlinks (result, result-*)
+# from the repo root. Delegates to the shared build-artifact cleanup body.
+do_cleanup_nix() {
+  _cnba_options=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --dry-run)
+      _cnba_options="$_cnba_options --dry-run"
+      shift
+      ;;
+    *)
+      error "unsupported argument '$1'"
+      usage >&2
+      exit 1
+      ;;
+    esac
+  done
+
+  REPO_ROOT="$(derive_repo_root)"
+  export REPO_ROOT
+  # shellcheck source=../src/scripts/cleanup-nix-build-artifacts.sh
+  . "$SCRIPT_DIR/../src/scripts/cleanup-nix-build-artifacts.sh"
+  nuc_done "$@"
+}
+
+# do_preferences — macOS-only: purge stale managed user preference domains.
+do_preferences() {
+  if [ "$(uname -s)" != "Darwin" ]; then
+    error "preferences subcommand is macOS-only"
+    exit 1
+  fi
+  MANAGED_PREF_DOMAINS="${MANAGED_PREF_DOMAINS:-$1}"
+  export MANAGED_PREF_DOMAINS
+  NIX_STORE_BIN="${NIX_STORE_BIN:-nix}"
+  export NIX_STORE_BIN
+  exec "$SCRIPT_DIR/../../src/platforms/macOS/scripts/macos-gc-preferences.sh"
 }
 
 if [ "$system_gc" = true ]; then

@@ -25,10 +25,8 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Action {
   #    Register-ArgumentCompleter entry, and a generated $nucleus<Cmd>Flags array.
   Write-Message "--- coverage: zsh + pwsh completions for every nucleus-* command ---"
   $commands = @(
-    'ai', 'apply', 'audit-store', 'bootstrap', 'bump-lockfile', 'check',
-    'check-packer', 'check-pwsh', 'check-sh', 'cleanup-nix', 'cloud-setup',
-    'config', 'gc', 'gs-pdf-opt', 'health-check', 'replica-reset',
-    'replica-sync', 'service-watchdog', 'svc', 'test', 'update', 'vm'
+    'ai', 'apply', 'bootstrap', 'check', 'cloud', 'config', 'gc',
+    'gs-pdf-opt', 'service-watchdog', 'svc', 'test', 'update', 'vm'
   )
   $profilePath = Join-Path $r 'src/scripts/shell/profile.ps1'
   $zshDir = Join-Path $r 'src/modules/completions/zsh'
@@ -48,13 +46,12 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Action {
     return $false
   }
 
-  # 3. Introspection contract: the bump-lockfile completer completes -Sections
-  #    values via scripts/bump-lockfile.ps1 -ListSections; that parameter must
-  #    exist.
+  # 3. Introspection contract: the update lockfile completer completes -Sections
+  #    values via scripts/update.sh -ListSections; that parameter must exist.
   Write-Message "--- --list-* introspection contract ---"
-  $bumpLockfilePath = Join-Path $r 'scripts\bump-lockfile.ps1'
-  if (-not (Select-String -Path $bumpLockfilePath -Pattern 'ListSections' -SimpleMatch -Quiet)) {
-    Write-ErrorMessage "scripts/bump-lockfile.ps1 lacks -ListSections, which the bump-lockfile completer depends on"
+  $updatePath = Join-Path $r 'scripts\update.sh'
+  if (-not (Select-String -Path $updatePath -Pattern 'list-sections' -SimpleMatch -Quiet)) {
+    Write-ErrorMessage "scripts/update.sh lacks --list-sections, which the update lockfile completer depends on"
     return $false
   }
 

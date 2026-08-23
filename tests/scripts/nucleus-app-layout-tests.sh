@@ -9,7 +9,7 @@
 #   - nucleus-gc            (scripts/-prefixed entry: scripts/gc)
 #   - nucleus-apply         (src/-prefixed entry: src/scripts/apply)
 #   - nucleus-service-watchdog (host-script-backed: src/scripts/services/service-watchdog)
-#   - nucleus-check-pwsh    (text= wrapper, no scriptName)
+#   - nucleus-check         (pwsh subcommand: text= wrapper, no scriptName)
 #
 # Dependencies: nix (with flakes enabled), jq.
 
@@ -24,21 +24,41 @@ cd "$REPO_ROOT"
 
 # Packages under test, with their expected entry script path under $out.
 declare -a LAYOUT_PACKAGES=(
-  nucleus-gc
   nucleus-apply
+  nucleus-ai
+  nucleus-bootstrap
+  nucleus-check
+  nucleus-config
+  nucleus-gs-pdf-opt
+  nucleus-gc
+  nucleus-svc
   nucleus-service-watchdog
-  nucleus-check-pwsh
+  nucleus-test
+  nucleus-update
+  nucleus-vm
+  nucleus-cloud
 )
 # Non-text packages: entry script reachable at $out/<scriptName>.sh.
 declare -A ENTRY_SCRIPT=(
-  ["nucleus-gc"]=scripts/gc.sh
   ["nucleus-apply"]=src/scripts/apply.sh
+  ["nucleus-ai"]=scripts/ai.sh
+  ["nucleus-bootstrap"]=scripts/bootstrap.sh
+  ["nucleus-check"]=scripts/check.sh
+  ["nucleus-config"]=scripts/config.sh
+  ["nucleus-gs-pdf-opt"]=scripts/gs-pdf-opt.sh
+  ["nucleus-gc"]=scripts/gc.sh
+  ["nucleus-svc"]=scripts/svc.sh
   ["nucleus-service-watchdog"]=src/scripts/services/service-watchdog.sh
+  ["nucleus-test"]=scripts/test.sh
+  ["nucleus-update"]=scripts/update.sh
+  ["nucleus-vm"]=scripts/vm.sh
+  ["nucleus-cloud"]=scripts/cloud.sh
 )
 # Text-mode packages: script is inlined into $out/bin/nucleus-<name> (no
 # $out/<scriptName>.sh). The uniform $out/scripts + $out/src still apply.
+# The merged command surface has no text-mode packages.
 declare -A TEXT_PKG=(
-  ["nucleus-check-pwsh"]=1
+
 )
 
 echo "Building ${#LAYOUT_PACKAGES[@]} nucleus packages..."

@@ -126,10 +126,8 @@ Describe 'gen-completions.ps1 generated inventory' {
   It 'emits a $nucleus<Cmd>Flags array for every nucleus-* command' {
     $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $commands = @(
-      'ai', 'apply', 'audit-store', 'bootstrap', 'bump-lockfile', 'check',
-      'check-packer', 'check-pwsh', 'check-sh', 'cleanup-nix', 'cloud-setup',
-      'config', 'gc', 'gs-pdf-opt', 'health-check', 'replica-reset',
-      'replica-sync', 'service-watchdog', 'svc', 'test', 'update', 'vm'
+      'ai', 'apply', 'bootstrap', 'check', 'cloud', 'config', 'gc',
+      'gs-pdf-opt', 'service-watchdog', 'svc', 'test', 'update', 'vm'
     )
     $profileText = Get-FixtureProfile
     foreach ($command in $commands) {
@@ -138,10 +136,10 @@ Describe 'gen-completions.ps1 generated inventory' {
     }
   }
 
-  It 'keeps the hand-coded glue: cleanup-nix completer and $nucleusSvcCommands' {
+  It 'keeps the hand-coded glue: gc completer and $nucleusSvcCommands' {
     $null = Invoke-GenCompletion  # check-suppress:suppression_doc: Invoke-GenCompletion returns the generated profile text; output discarded because the test reads the fixture file instead
     $profileText = Get-FixtureProfile
-    $profileText | Should -Match 'Register-ArgumentCompleter -CommandName nucleus-cleanup-nix '
+    $profileText | Should -Match 'Register-ArgumentCompleter -CommandName nucleus-gc '
     $profileText | Should -Match "'verify'"
   }
 

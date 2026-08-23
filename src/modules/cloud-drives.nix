@@ -233,7 +233,7 @@ let
     mountPoint: "/bin/sh -c 'fusermount3 -u ${lib.escapeShellArg mountPoint} || true'";
 
   # Build a scheduled replica-sync runner that invokes
-  # scripts/replica-sync.sh for one replica id. NUCLEUS_REPO_ROOT is set by
+  # scripts/cloud.sh sync for one replica id. NUCLEUS_REPO_ROOT is set by
   # the launchd/systemd service environment. replica_id and user_home are
   # passed as positional args.
   mkReplicaScheduledSyncScript =

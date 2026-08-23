@@ -97,6 +97,9 @@
 #>
 [CmdletBinding()]
 param(
+  [Parameter(Position = 0)]
+  [ValidateSet('all', 'cleanup-nix', 'preferences')]
+  [string]$Action = 'all',
   [string]$ModuleDir = $(if ($env:NUCLEUS_GC_MODULE_DIR) { $env:NUCLEUS_GC_MODULE_DIR } else { '' }),
   [switch]$NoNixGc = { $env:NUCLEUS_GC_NO_NIX -eq 'true' }.Invoke(),
   [switch]$NoHmGc = { $env:NUCLEUS_GC_NO_HM -eq 'true' }.Invoke(),
@@ -344,6 +347,72 @@ function Clear-GitCache {
   }
 }
 
+function Invoke-CleanupNix {
+  [CmdletBinding(SupportsShouldProcess = $true)]
+  param(
+    [Parameter(ValueFromRemainingArguments = $true)]
+    [string[]]$Arguments = @()
+  )
+
+  $Verbose = ($VerbosePreference -eq 'Continue')
+
+  foreach ($_arg in $Arguments) {
+    switch ($_arg) {
+      '-WhatIf'  { $WhatIfPreference = $true }  # routes ShouldProcess to DryRun branch
+      '-Verbose' { $Verbose = $true }
+      '-h'      { Write-Output "Usage: gc.ps1 cleanup-nix [-WhatIf] [-Verbose]"; return }
+      '--help'  { Write-Output "Usage: gc.ps1 cleanup-nix [-WhatIf] [-Verbose]"; return }
+      default   {
+        Write-NucleusError -CommandName cleanup-nix "unsupported argument '$_arg'"
+        exit 1
+      }
+    }
+  }
+
+  $_found = $false
+
+  # Recursively scan for result and result-* symlinks without following symlinks.
+  # Manual directory walk avoids Get-ChildItem -Recurse which follows reparse points.
+  # Use an index cursor to avoid range-operator edge cases with single-element arrays.
+  $_dirIndex = 0
+  $_directories = @($resolvedRepoRoot)
+
+  while ($_dirIndex -lt $_directories.Count) {
+    $_dir = $_directories[$_dirIndex]
+    $_dirIndex++
+
+    foreach ($_pattern in @('result', 'result-*')) {
+      # check-suppress:suppression_doc: probe -- result symlinks may not exist; ForEach-Object handles absent results gracefully.
+      Get-ChildItem -Path $_dir -Filter $_pattern -Force -ErrorAction SilentlyContinue | ForEach-Object {
+        if ($_.LinkType -eq 'SymbolicLink') {
+          $_target = $_.Target
+          if ($PSCmdlet.ShouldProcess($_.FullName, "Remove stale Nix build symlink")) {
+            Remove-Item -LiteralPath $_.FullName -Force
+            Write-NucleusInfo -CommandName cleanup-nix "removed stale Nix build symlink: $($_.FullName) -> $_target"
+          } else {
+            Write-NucleusDryRun -CommandName cleanup-nix "would remove stale Nix build symlink: $($_.FullName) -> $_target"
+          }
+        } elseif ($_.PSIsContainer -or (-not $_.LinkType)) {
+          if ($Verbose) {
+            Write-NucleusInfo -CommandName cleanup-nix "found non-symlink at $($_.FullName) — skipping (not a Nix build artifact)"
+          }
+        }
+      }
+    }
+
+    # Enqueue subdirectories, skipping reparse points (symlinks/junctions)
+    # to avoid following symlinks into Nix store or other large trees.
+    # check-suppress:suppression_doc: -ErrorAction SilentlyContinue on Get-ChildItem to skip permission-denied directories without aborting traversal.
+    Get-ChildItem -Path $_dir -Directory -Force -ErrorAction SilentlyContinue |
+      Where-Object { -not ($_.Attributes -band [System.IO.FileAttributes]::ReparsePoint) } |
+      ForEach-Object { $_directories += $_.FullName }
+  }
+
+  if (-not $_found) {
+    Write-NucleusInfo -CommandName cleanup-nix "no stale Nix build artifacts found."
+  }
+}
+
 # Load only the modules required by this script.
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ConfigHelpers.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "remove-stalewallpaper.ps1")
@@ -352,8 +421,17 @@ function Clear-GitCache {
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-SccacheManagement.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ManagedPaths.ps1")
 
-# ---- Step 1: stale wallpaper gc ----------------------------------------
-if (-not $NoWallpaperGc) {
+switch ($Action) {
+  'cleanup-nix' {
+    Invoke-CleanupNix
+  }
+  'preferences' {
+    Write-NucleusInfo "preferences gc is macOS-only; no Windows action performed"
+    Write-NucleusDone
+  }
+  'all' {
+    # ---- Step 1: stale wallpaper gc ----------------------------------------
+    if (-not $NoWallpaperGc) {
   $wallpaperOutputDir = Join-Path -Path $env:USERPROFILE -ChildPath "Pictures\wallpapers"
   Remove-StaleWallpaper -RepoRoot $resolvedRepoRoot -User $env:USERNAME -OutputDir $wallpaperOutputDir
 }
@@ -520,4 +598,6 @@ if (-not $NoLogGc) {
   }
 }
 
-Write-NucleusDone
+  Write-NucleusDone
+  }
+}

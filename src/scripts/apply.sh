@@ -22,6 +22,228 @@ usage() {
   exit 0
 }
 
+# ── Subcommand dispatch ───────────────────────────────────────────────────────
+# health-check / audit-store run standalone (inlining scripts/health-check.sh
+# and scripts/audit-store.sh); the default apply path falls through to the
+# existing flag parsing + OS-specific rebuild flow below, which stays unchanged.
+#
+# do_health_check — Inlines scripts/health-check.sh: disk/connectivity/secret
+# (and opt-in log/store-audit) pre-flight checks.
+do_health_check() {
+  REPO_ROOT="$(derive_repo_root)"
+
+  min_free_bytes=10000000000
+  secret_health=true
+  log_health=false
+  store_audit=false
+
+  if [ "${NUCLEUS_HEALTH_CHECK_STORE_AUDIT:-}" = "1" ]; then
+    store_audit=true
+  fi
+
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+    -h | --help)
+      usage
+      ;;
+    --min-free-bytes)
+      if [ "$#" -lt 2 ]; then
+        error "--min-free-bytes requires a value"
+        exit 1
+      fi
+      min_free_bytes="$2"
+      shift
+      ;;
+    --secret-health)
+      secret_health=true
+      ;;
+    --no-secret-health)
+      secret_health=false
+      ;;
+    --log-health)
+      log_health=true
+      require_command jq
+      ;;
+    --store-audit)
+      store_audit=true
+      ;;
+    --no-store-audit)
+      store_audit=false
+      ;;
+    *)
+      error "unsupported argument '$1'"
+      exit 1
+      ;;
+    esac
+    shift
+  done
+
+  # check_disk_space — Fails when the repo filesystem has less free space than
+  # the threshold.
+  check_disk_space() {
+    min_kb=$((min_free_bytes / 1024))
+    available_kb=$(df -Pk "$REPO_ROOT" | awk 'NR == 2 { print $4 }')
+
+    if [ -z "$available_kb" ] || [ "$available_kb" -lt "$min_kb" ]; then
+      error "insufficient disk space at repo filesystem (${available_kb:-0} KiB available, requires ${min_kb} KiB)."
+    fi
+
+    return 0
+  }
+
+  # check_connectivity — Verifies reachability of GitHub and cache.nixos.org.
+  check_connectivity() {
+    if ! curl -fsSI --max-time 10 https://github.com >/dev/null; then
+      error "connectivity check failed for https://github.com"
+    fi
+
+    if ! curl -fsSI --max-time 10 https://cache.nixos.org >/dev/null; then
+      error "connectivity check failed for https://cache.nixos.org"
+    fi
+
+    return 0
+  }
+
+  # check_secret_health — Decrypt-checks every SOPS-managed secret file.
+  check_secret_health() {
+    _sch_machine_key="/etc/sops/age/machine.txt"
+    if [ -f "$_sch_machine_key" ]; then
+      SOPS_AGE_KEY_FILE="$_sch_machine_key"
+      export SOPS_AGE_KEY_FILE
+    fi
+
+    for secret_file in "$REPO_ROOT"/src/secrets/users/*.yml; do
+      if [ -f "$secret_file" ] && ! sops -d "$secret_file" >/dev/null; then
+        error "unable to decrypt secret file with current identities: $secret_file"
+      fi
+    done
+
+    return 0
+  }
+
+  # check_log_health — Validates log dirs and per-service log files against the
+  # rotation and sanitize policy in services.json.
+  check_log_health() {
+    log_dir="$(nucleus_log_dir)"
+    system_log_dir="$(nucleus_system_log_dir)"
+    services_json="$REPO_ROOT/src/modules/services.json"
+    services_schema_json="$REPO_ROOT/src/modules/services.schema.json"
+    _max_size_default=$(jq -r '.definitions.loggingEntry.properties.maxSize.default // 10000000' "$services_schema_json")
+    failures=0
+
+    for dir in "$log_dir" "$system_log_dir"; do
+      if [ -d "$dir" ]; then
+        if [ ! -w "$dir" ]; then
+          warn "log dir '$dir' is not writable"
+          failures=$((failures + 1))
+        fi
+      else
+        warn "log dir '$dir' does not exist"
+        failures=$((failures + 1))
+      fi
+    done
+
+    while IFS= read -r svc; do
+      capture=$(jq -r --arg svc "$svc" '.[$svc].logging.capture // "all"' "$services_json")
+      max_size=$(jq -r --arg svc "$svc" --arg def "$_max_size_default" '(.[$svc].logging.maxSize // ($def | tonumber))' "$services_json") # bytes
+      sanitize=$(jq -r --arg svc "$svc" '.[$svc].logging.sanitize // true' "$services_json")
+
+      if [ "$capture" = "none" ]; then
+        continue
+      fi
+
+      while IFS= read -r subdir; do
+        [ -n "$subdir" ] || continue
+        for log_file in "$log_dir/$subdir"/*.log; do
+          [ -f "$log_file" ] || continue
+
+          size=$(wc -c <"$log_file")
+          threshold=$((max_size * 80 / 100))
+          if [ "$size" -gt "$threshold" ]; then
+            warn "'$log_file' ($size bytes) exceeds 80% of rotation max ($max_size bytes)"
+          fi
+
+          if [ "$sanitize" = "true" ] && head -n 5 "$log_file" | tr -d '[:print:][:space:]' | grep -q .; then
+            warn "'$log_file' contains control characters despite sanitize=true"
+            failures=$((failures + 1))
+          fi
+        done
+      done <<<"$(jq -r --arg svc "$svc" '.[$svc].logging.dirs.user[]? // empty' "$services_json")"
+
+      while IFS= read -r subdir; do
+        [ -n "$subdir" ] || continue
+        for log_file in "$system_log_dir/$subdir"/*.log; do
+          [ -f "$log_file" ] || continue
+
+          size=$(wc -c <"$log_file")
+          threshold=$((max_size * 80 / 100))
+          if [ "$size" -gt "$threshold" ]; then
+            warn "'$log_file' ($size bytes) exceeds 80% of rotation max ($max_size bytes)"
+          fi
+
+          if [ "$sanitize" = "true" ] && head -n 5 "$log_file" | tr -d '[:print:][:space:]' | grep -q .; then
+            warn "'$log_file' contains control characters despite sanitize=true"
+            failures=$((failures + 1))
+          fi
+        done
+      done <<<"$(jq -r --arg svc "$svc" '.[$svc].logging.dirs.system[]? // empty' "$services_json")"
+    done <<<"$(jq -r 'to_entries[] | select(.key | startswith("$") | not) | .key' "$services_json" | sort)"
+
+    if [ "$failures" -gt 0 ]; then
+      error "log health checks failed ($failures issue(s))"
+    fi
+    return 0
+  }
+
+  check_disk_space
+  check_connectivity
+  if [ "$secret_health" = true ]; then
+    check_secret_health
+  fi
+  if [ "$log_health" = true ]; then
+    check_log_health
+  fi
+  if [ "$store_audit" = true ] && command -v nix >/dev/null 2>&1; then
+    require_command jq
+    export REPO_ROOT
+    # shellcheck source=lib/audit-store.sh
+    . "$SCRIPT_DIR/lib/audit-store.sh"
+    audit_store_report
+  fi
+
+  nuc_done "$@"
+}
+
+# do_audit_store — Inlines scripts/audit-store.sh: Nix store baseline report.
+do_audit_store() {
+  REPO_ROOT="$(derive_repo_root)"
+  export REPO_ROOT
+  # shellcheck source=lib/audit-store.sh
+  . "$SCRIPT_DIR/lib/audit-store.sh"
+  audit_store_report
+  nuc_done "$@"
+}
+
+action="${1:-apply}"
+case "$action" in
+health-check)
+  shift
+  do_health_check "$@"
+  exit $?
+  ;;
+audit-store)
+  shift
+  do_audit_store "$@"
+  exit $?
+  ;;
+apply)
+  :
+  ;;
+*)
+  action="apply"
+  ;;
+esac
+
 # Flag parsing
 ai_sync=true
 replica_sync=false
@@ -181,7 +403,7 @@ run_health_check() {
   if [ "$store_audit" = true ]; then
     _rhc_args+=(--store-audit)
   fi
-  run_nix run "$REPO_ROOT/src#health-check" "${_rhc_args[@]}"
+  run_nix run "$REPO_ROOT/src#apply" health-check "${_rhc_args[@]}"
 }
 
 run_ai_sync() {
@@ -192,8 +414,9 @@ run_ai_sync() {
     return
   fi
 
-  if ! command -v nucleus-ai >/dev/null 2>&1; then
-    say -l ai "nucleus-ai not found in PATH; skipping model sync"
+  _ras_script="$REPO_ROOT/scripts/ai.sh"
+  if [ ! -f "$_ras_script" ]; then
+    say -l ai "scripts/ai.sh not found at $_ras_script; skipping model sync"
     return
   fi
 
@@ -204,22 +427,23 @@ run_ai_sync() {
 
   say -l ai "running post-apply AI model sync..."
   apply_log_init
-  if ! nucleus-ai sync 2>&1 | tee -a "$_apply_log"; then
-    warn -l ai "nucleus-ai sync exited with an error; model sync incomplete (system apply succeeded)"
+  if ! sh "$_ras_script" sync 2>&1 | tee -a "$_apply_log"; then
+    warn -l ai "ai.sh sync exited with an error; model sync incomplete (system apply succeeded)"
   fi
 }
 
 run_vm_post_apply() {
-  if ! command -v nucleus-vm >/dev/null 2>&1; then
-    say -l nucleus-vm "nucleus-vm not found in PATH; skipping post-apply VM step"
+  _rvp_script="$REPO_ROOT/scripts/vm.sh"
+  if [ ! -f "$_rvp_script" ]; then
+    say -l nucleus-vm "scripts/vm.sh not found at $_rvp_script; skipping post-apply VM step"
     return
   fi
 
   if [ "$vm_setup" = true ]; then
     say -l nucleus-vm "running post-apply VM provisioning (setup)..."
     apply_log_init
-    if ! nucleus-vm setup --accept-gsi-license 2>&1 | tee -a "$_apply_log"; then
-      warn -l nucleus-vm "nucleus-vm setup exited with an error; VM setup incomplete (system apply succeeded)"
+    if ! sh "$_rvp_script" setup --accept-gsi-license 2>&1 | tee -a "$_apply_log"; then
+      warn -l nucleus-vm "vm.sh setup exited with an error; VM setup incomplete (system apply succeeded)"
     fi
     return
   fi
@@ -231,8 +455,8 @@ run_vm_post_apply() {
 
   say -l nucleus-vm "running post-apply VM config refresh (sync)..."
   apply_log_init
-  if ! nucleus-vm sync 2>&1 | tee -a "$_apply_log"; then
-    warn -l nucleus-vm "nucleus-vm sync exited with an error; VM sync incomplete (system apply succeeded)"
+  if ! sh "$_rvp_script" sync 2>&1 | tee -a "$_apply_log"; then
+    warn -l nucleus-vm "vm.sh sync exited with an error; VM sync incomplete (system apply succeeded)"
   fi
 }
 
@@ -280,16 +504,16 @@ run_caddy_local_ca_trust() {
 }
 
 run_replica_sync() {
-  # Call scripts/replica-sync.sh so enabled replicas in users.json are
+  # Call scripts/cloud.sh sync so enabled replicas in users.json are
   # synchronized after a successful apply.
   if [ "$replica_sync" = false ]; then
     say -l replica-sync "skipping post-apply replica sync (default; pass --replica-sync to run now)"
     return
   fi
 
-  _rrb_script="$REPO_ROOT/scripts/replica-sync.sh"
+  _rrb_script="$REPO_ROOT/scripts/cloud.sh"
   if [ ! -f "$_rrb_script" ]; then
-    say -l replica-sync "scripts/replica-sync.sh not found at $_rrb_script; skipping replica sync"
+    say -l replica-sync "scripts/cloud.sh not found at $_rrb_script; skipping replica sync"
     return
   fi
 
@@ -300,8 +524,8 @@ run_replica_sync() {
 
   say -l replica-sync "running post-apply replica sync..."
   apply_log_init
-  if ! sh "$_rrb_script" 2>&1 | tee -a "$_apply_log"; then
-    warn -l replica-sync "replica-sync.sh exited with an error; replica sync incomplete (system apply succeeded)"
+  if ! sh "$_rrb_script" sync 2>&1 | tee -a "$_apply_log"; then
+    warn -l replica-sync "cloud.sh sync exited with an error; replica sync incomplete (system apply succeeded)"
   fi
 }
 

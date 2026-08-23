@@ -179,6 +179,13 @@
 .PARAMETER Help
   When present, prints this help text and exits without applying anything.
 
+.PARAMETER Action
+  Selects the command surface to run.  Defaults to "apply" (the existing
+  configuration lifecycle, unchanged).  "health-check" and "audit-store" are
+  standalone actions merged from the deleted scripts/health-check.ps1 and
+  scripts/audit-store.ps1.  No Windows helper scripts exist for these yet, so
+  each is a thin stub that reports not-implemented and exits 0.
+
 .EXAMPLE
   # Apply with explicit module directory and user list:
   .\apply.ps1 -ModuleDir "C:\Users\admin\nucleus\src\platforms\Windows\modules" -Users @('admin')
@@ -245,6 +252,7 @@ param(
   [switch]$NoVMSync,
   [switch]$VMSetup,
   [switch]$Elevated,
+  [string]$Action = "apply",
   [string]$ParamsJson = ""
 )
 
@@ -281,6 +289,36 @@ $isAdmin = [Security.Principal.WindowsPrincipal]::new([Security.Principal.Window
 if ($isAdmin -and -not $Elevated) {
   Write-NucleusError -CommandName apply "This script must not be run as Administrator. Run as a regular user (elevation is managed internally when needed)."
   exit 1
+}
+
+# ── Subcommand dispatch ─────────────────────────────────────────────────────────
+# The nucleus command surface was merged: health-check and audit-store are now
+# standalone actions of apply.ps1 instead of separate scripts.  The default
+# "apply" action falls through to the existing apply flow below, unchanged.
+# No helper scripts exist under src/scripts/ for these on Windows yet, so each
+# is a thin stub that reports not-implemented and exits 0.
+$actionRepoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..\..\..")).Path
+switch ($Action) {
+  "health-check" {
+    Write-NucleusInfo -CommandName health-check "health-check is not yet implemented for Windows; exiting 0"
+    exit 0
+  }
+  "audit-store" {
+    $auditStoreScript = Join-Path -Path $actionRepoRoot -ChildPath "src\scripts\lib\audit-store.ps1"
+    if (Test-Path -LiteralPath $auditStoreScript) {
+      & $auditStoreScript
+    } else {
+      Write-NucleusInfo -CommandName audit-store "audit-store is not yet implemented for Windows; exiting 0"
+    }
+    exit 0
+  }
+  "apply" {
+    # Default flow continues below.
+  }
+  default {
+    Write-NucleusError -CommandName apply "Unknown action '$Action'. Valid actions: apply, health-check, audit-store."
+    exit 1
+  }
 }
 
 if ($Help) { Get-Help $PSCommandPath -Detailed; return }
@@ -461,10 +499,6 @@ if (-not $Elevated) {
 # wallpapers/: wallpaper materialization and stale-file cleanup.
 . (Join-Path -Path $wallpapersModuleDir -ChildPath "Remove-StaleWallpaper.ps1")
 . (Join-Path -Path $wallpapersModuleDir -ChildPath "Sync-WallpaperInventory.ps1")
-$healthCheckScript = Join-Path -Path $PSScriptRoot -ChildPath "..\..\..\scripts\health-check.ps1"
-if (Test-Path -Path $healthCheckScript) {
-  & $healthCheckScript -MinFreeGB $MinFreeDiskGB -NoSecretHealth
-}
 
 # Load the user registry from src/users/ domain files. This declarative
 # configuration defines all users managed by this Windows host (primary and

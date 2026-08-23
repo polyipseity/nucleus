@@ -4,9 +4,11 @@
 
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
+  '1:subcommand:((packer "" sh "" pwsh ""))' \
   '--fail-fast[fail fast]' \
   '--full[full]' \
   '--no-fail-fast[no fail fast]' \
   '--online[online]' \
   '--scoped[scoped]' \
-  '--skip-steps[skip steps]'
+  '--skip-steps[skip steps]' \
+  '-naming[naming]'

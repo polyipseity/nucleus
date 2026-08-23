@@ -4,7 +4,7 @@
 #   - src/platforms/ (platform activation scripts)
 #   - src/hosts/<Host>/scripts/ (host-only activation scripts; selective, not full hosts tree)
 # The $out/ layout mirrors the repo root under $out/src/, making paths repo-root-relative.
-# Shellcheck runs in nucleus-check-sh / CI, not at derivation build time.
+# Shellcheck runs in nucleus-check sh / CI, not at derivation build time.
 { pkgs }:
 
 pkgs.runCommand "nucleus-script-tree"
