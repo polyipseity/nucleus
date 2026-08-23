@@ -74,8 +74,8 @@ function Sync-DevRepoCatalog {
       Write-Verbose "Sync-DevRepoCatalog: created dev directory at $devDir"
     }
     catch {
-      Write-NucleusWarning -CommandName 'Sync-DevRepoCatalog' "failed to create dev directory $devDir : $_"
-      return
+      Write-NucleusError -CommandName 'Sync-DevRepoCatalog' "failed to create dev directory $devDir : $_"
+      throw
     }
   }
 

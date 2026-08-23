@@ -149,11 +149,12 @@ function Sync-AgentsClawHubSkillManifest {
     }
 
     Write-NucleusInfo -CommandName 'clawhub-skills' "Sync-AgentsClawHubSkillManifest: installing/updating fetched skill '$slug'..."
-    # Non-zero exit from clawhub is non-fatal: the system apply succeeded; skill
-    # sync is additive.  A warning is printed and the loop continues.
+    # Non-zero exit from clawhub is a required convergence failure: abort the
+    # activation so the missing skill is not silently skipped.
     & $clawhubExe install --workdir "$HOME\.agents" --no-input $slug
     if ($LASTEXITCODE -ne 0) {
-      Write-NucleusWarning -CommandName 'clawhub-skills' "Sync-AgentsClawHubSkillManifest: clawhub install failed for '$slug' (system apply succeeded)"
+      Write-NucleusError -CommandName 'clawhub-skills' "Sync-AgentsClawHubSkillManifest: clawhub install failed for '$slug' (exit $LASTEXITCODE)"
+      throw
     } elseif (Test-Path -LiteralPath $skillPath -PathType Container) {
       # Lock installed skill files to prevent modification outside a managed apply
       # run.  Mirrors POSIX chmod -R a-w after install.  The unlock above

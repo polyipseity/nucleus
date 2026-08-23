@@ -45,6 +45,7 @@ function Sync-AppAutostart {
   try {
     & $autostartScript apply
   } catch {
-    Write-NucleusWarning "app auto-start convergence failed (non-fatal): $($_.Exception.Message)"
+    Write-NucleusError -CommandName 'autostart' "app auto-start convergence failed: $($_.Exception.Message)"
+    throw
   }
 }

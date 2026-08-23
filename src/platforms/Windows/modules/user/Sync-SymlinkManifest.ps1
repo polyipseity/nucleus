@@ -200,7 +200,8 @@ function Sync-SymlinkManifest {
         Set-ManagedSymlinkDeleteProtection -Context "Sync-SymlinkManifest" -Path $entry.LinkPath
       }
       catch {
-        Write-NucleusWarning -CommandName 'Sync-SymlinkManifest' "failed to create symlink $($entry.LinkPath) -> $($entry.TargetPath) for user '$username' : $_"
+        Write-NucleusError -CommandName 'Sync-SymlinkManifest' "failed to create symlink $($entry.LinkPath) -> $($entry.TargetPath) for user '$username' : $_"
+        throw
       }
     }
 

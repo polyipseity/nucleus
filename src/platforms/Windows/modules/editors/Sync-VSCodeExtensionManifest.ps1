@@ -154,12 +154,14 @@ function Sync-VSCodeExtensionManifest {
           $output = & $cliPath --install-extension $installSpec --pre-release --force 2>&1
         }
         if ($LASTEXITCODE -ne 0) {
-          Write-NucleusWarning -CommandName 'vscode-extensions' "VS Code extension install failed: $extensionId (exit $LASTEXITCODE) — $output"
+          Write-NucleusError -CommandName 'vscode-extensions' "VS Code extension install failed: $extensionId (exit $LASTEXITCODE) — $output"
+          throw
         }
       } else {
         $output = & $cliPath --uninstall-extension $extensionId 2>&1
         if ($LASTEXITCODE -ne 0) {
-          Write-NucleusWarning -CommandName 'vscode-extensions' "VS Code extension uninstall failed: $extensionId (exit $LASTEXITCODE) — $output"
+          Write-NucleusError -CommandName 'vscode-extensions' "VS Code extension uninstall failed: $extensionId (exit $LASTEXITCODE) — $output"
+          throw
         }
       }
     }

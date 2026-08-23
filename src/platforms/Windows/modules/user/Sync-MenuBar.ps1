@@ -47,6 +47,7 @@ function Sync-MenuBar {
   try {
     & $menuBarScript apply
   } catch {
-    Write-NucleusWarning "menu-bar icon convergence failed (non-fatal): $($_.Exception.Message)"
+    Write-NucleusError -CommandName 'menu-bar' "menu-bar icon convergence failed: $($_.Exception.Message)"
+    throw
   }
 }

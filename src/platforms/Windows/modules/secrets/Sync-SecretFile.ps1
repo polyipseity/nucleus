@@ -136,7 +136,8 @@ function Sync-SecretFile {
     $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
     & icacls.exe $Path /inheritance:r /grant:r "${currentUser}:(F)" > $null
     if ($LASTEXITCODE -ne 0) {
-      Write-NucleusWarning -CommandName 'secrets' "could not restrict ACL on $Path (icacls exit $LASTEXITCODE)"
+      Write-NucleusError -CommandName 'secrets' "could not restrict ACL on $Path (icacls exit $LASTEXITCODE)"
+      throw
     }
   }
 
@@ -200,7 +201,8 @@ function Sync-SecretFile {
 
       "${firstFingerprint}:6:" | & $GpgExe --import-ownertrust > $null
       if ($LASTEXITCODE -ne 0) {
-        Write-NucleusWarning -CommandName 'secrets' "ownertrust enforcement for '$firstFingerprint' exited $LASTEXITCODE — key imported and manifest updated, ownertrust may need a retry"
+        Write-NucleusError -CommandName 'secrets' "ownertrust enforcement for '$firstFingerprint' exited $LASTEXITCODE — key imported and manifest updated, ownertrust may need a retry"
+        throw
       }
 
       Write-NucleusInfo -CommandName 'secrets' "  Imported GPG material: $secretKey"
@@ -261,7 +263,8 @@ function Sync-SecretFile {
           }
         }
         catch {
-          Write-NucleusWarning -CommandName 'secrets' "could not update SSH fingerprint manifest: $_"
+          Write-NucleusError -CommandName 'secrets' "could not update SSH fingerprint manifest: $_"
+          throw
         }
       }
 
