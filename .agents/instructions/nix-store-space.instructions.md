@@ -1,7 +1,7 @@
 ---
 description: "Use when changing Nix store policy, GC thresholds, script bundling, or store-space audits in nucleus. Documents rejected approaches, host filesystem limits, bundleDefault policy, and GC semantics."
 name: "Nix Store Space"
-applyTo: "src/modules/posix-base.nix, src/modules/configs/nix/**, src/flake.nix, src/modules/lib/script-tree.nix, scripts/gc.sh, scripts/cleanup-nix.sh, src/scripts/cleanup-nix-build-artifacts.sh, src/scripts/services/duperemove-store.sh"
+applyTo: "src/modules/posix-base.nix, src/modules/configs/nix/**, src/flake.nix, src/modules/lib/script-tree.nix, scripts/gc.sh, src/scripts/cleanup-nix-build-artifacts.sh, src/scripts/services/duperemove-store.sh"
 ---
 
 # Nix store space policy
@@ -19,7 +19,7 @@ Managed in [`posix-base.nix`](../../src/modules/posix-base.nix) (NixOS `nix.sett
 | `min-free` | `40 GiB` | GC trigger when store volume free space drops below this during builds |
 | `max-free` | `96 GiB` | Target free space after automatic GC (512 GB–first sizing; fine on 1–2 TB) |
 
-**Not the same as** [`health-check.sh`](../../scripts/health-check.sh) `--min-free-bytes` (default 10 GB system-wide disk warning).
+**Not the same as** [`apply.sh`](../../scripts/apply.sh) `health-check` subcommand `--min-free-bytes` (default 10 GB system-wide disk warning).
 
 Age-based store GC is canonical: `nix-collect-garbage --delete-older-than` via [`posix-base.nix`](../../src/modules/posix-base.nix), [`nix-store-gc.sh`](../../src/scripts/services/nix-store-gc.sh), and [`gc.sh`](../../scripts/gc.sh). Never use `nix-collect-garbage -d`.
 
@@ -42,7 +42,7 @@ NixOS `/nix` lives on a dedicated Btrfs subvolume `@nix` ([`disks.nix`](../../sr
 
 See [`nix-authoring.instructions.md`](nix-authoring.instructions.md) for call-site guidance.
 
-Shellcheck runs in CI (`nucleus-check-sh` / `script-tree.nix`), not per-app derivation builds.
+Shellcheck runs in CI (`nucleus-check sh` / `script-tree.nix`), not per-app derivation builds.
 
 ## Dominant duplication (mitigated)
 
@@ -111,9 +111,9 @@ Each `writeNucleusShellApplication` symlinks shared derivations (`nucleus-script
 
 ## Store audit helpers
 
-`nucleus-health-check` and `nucleus-apply` run the store audit only when opted in: `--store-audit` or `NUCLEUS_HEALTH_CHECK_STORE_AUDIT=1`.
+`nucleus-apply health-check` and `nucleus-apply` run the store audit only when opted in: `--store-audit` or `NUCLEUS_HEALTH_CHECK_STORE_AUDIT=1`.
 
-Manual entry points: `nix run .#audit-store`, `nucleus-audit-store`, [`scripts/audit-store.sh`](../../scripts/audit-store.sh) (sources [`audit-store.sh`](../../src/scripts/lib/audit-store.sh)).
+Manual entry points: `nix run .#apply audit-store`, `nucleus-apply audit-store`, [`src/scripts/apply.sh`](../../src/scripts/apply.sh) (the audit-store subcommand).
 
 Report sections:
 

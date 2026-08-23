@@ -135,7 +135,7 @@ This avoids:
 
 Do NOT use `text` to wrap a shared-body script with inline env var assignments — that duplicates `extraEnv`. If the script body exists as a file under `src/scripts/`, reference it via `scriptName` (with `extraEnv` for values). Reserve `text` for truly inline scripts or host-specific wrappers without a shared body.
 
-Shellcheck for bundled scripts runs in `nucleus-check-sh` / CI (`script-tree.nix` and per-app derivations do not shellcheck at build time). See [`nix-store-space.instructions.md`](nix-store-space.instructions.md) for store-space policy.
+Shellcheck for bundled scripts runs in `nucleus-check sh` / CI (`script-tree.nix` and per-app derivations do not shellcheck at build time). See [`nix-store-space.instructions.md`](nix-store-space.instructions.md) for store-space policy.
 
 ### Env-var fallback pattern for scripts with callers that use positional args
 
@@ -263,7 +263,7 @@ Homebrew's `brew bundle` has no native lockfile. Formula, cask, and MAS version 
 
 ### Updating
 
-Use `scripts/bump-lockfile.sh` / `scripts/bump-lockfile.ps1` to update the lockfile. For Nix-managed packages, regenerate `src/flake.lock` with `nix flake lock` from `src/`.
+Use `scripts/update.sh` / `scripts/update.ps1` to update the lockfile. For Nix-managed packages, regenerate `src/flake.lock` with `nix flake lock` from `src/`.
 
 The `uv` updater writes plain version strings and would clobber VCS object pins (e.g. `ext.discord-music-rpc` `{source, rev}`); both `bump-lockfile.sh` and `bump-lockfile.ps1` skip `.uv[<pkg>]` entries whose value is an object. Keep VCS-pinned uv packages as objects and preserve that guard.
 
@@ -283,7 +283,7 @@ The `uv` updater writes plain version strings and would clobber VCS object pins 
 
 ## Build artifact cleanup
 
-After any `nix build`, `nix run ... -o`, or `nixos-generators`, run `scripts/cleanup-nix.sh` (POSIX) or `scripts/cleanup-nix.ps1` (Windows) to remove `result` / `result-*` symlinks from the repo root. Use `--dry-run` / `-WhatIf` for a preview.
+After any `nix build`, `nix run ... -o`, or `nixos-generators`, run `scripts/gc.sh` (POSIX) or `scripts/gc.ps1` (Windows) to remove `result` / `result-*` symlinks from the repo root. Use `--dry-run` / `-WhatIf` for a preview.
 
 Cleanup is integrated into `scripts/check.sh` and `scripts/check.ps1` in dry-run mode — stale artifacts cause the check to fail.
 

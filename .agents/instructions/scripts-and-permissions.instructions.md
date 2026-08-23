@@ -8,7 +8,7 @@ applyTo: "scripts/**, src/scripts/**, src/scripts/lib/**, src/**/*.ps1, src/plat
 
 ## Scope
 
-- Keep repo-level helper scripts in `scripts/`. Contents include paired `.sh`/`.ps1` entry points for bootstrap, check, cloud-setup, gc, health-check, replica-sync, replica-reset, update, vm-setup, ai-sync, and other automation tasks.
+- Keep repo-level helper scripts in `scripts/`. Contents include paired `.sh`/`.ps1` entry points for bootstrap, check, cloud setup, gc, apply health-check, cloud sync, cloud reset, update, vm-setup, ai-sync, and other automation tasks.
 - `scripts/` is the home of user-facing CLIs (the `nucleus-*` command set) ONLY. Every script in `scripts/` MUST be a registered `nucleusApp` (wired in `src/flake.nix` via `writeNucleusShellApplication`/`writeNucleusPowerShellApplication`). Convergence/activation tooling that is invoked only by activation scripts and is NOT a `nucleus-*` app does NOT belong in `scripts/` — it belongs under `src/scripts/` (e.g. `src/scripts/autostart.sh` + `src/scripts/autostart.ps1`, which are driven by `apps.json` and called from `macos-configure-app-autostart.sh` / `nixos-configure-app-autostart.sh` / `Sync-AppAutostart.ps1`).
 - `src/scripts/` is the home of internal dev/CI tooling that is NOT a `nucleus-*` app (e.g. the completion generators live at `src/scripts/completions/`).
 - Do not scatter contributor-facing or CI-facing automation across random folders when `scripts/` is the intended home.
@@ -176,7 +176,7 @@ needs the privilege is unaffected by this policy.
    non-zero exit), not a warning. Refusing to run is an error, not a warn-and-continue.
 4. **Non-escalatable privileges (documented exceptions, keep warn-and-skip):**
    - macOS Full Disk Access (TCC privacy grant — cannot be obtained via sudo).
-   - `health-check` diagnostic reporting (its purpose is to surface gaps, not act).
+   - `nucleus-apply health-check` diagnostic reporting (its purpose is to surface gaps, not act).
    - `Invoke-VMSetup.ps1` WHPX detection (informational capability probe, not a gate).
 5. **Applies to all platforms** (macOS, NixOS, Windows).
 
@@ -224,11 +224,11 @@ This standardization makes examples portable and immediately clear about user co
 - If a script wraps project tooling, keep the underlying canonical commands discoverable in docs and config instead of hiding the real workflow.
 - When script location or behavior changes, re-check `.github/workflows/ci.yml`, `.vscode/settings.json`, and any prompt or instruction files that reference it.
 
-## health-check.sh SOPS identity resolution
+## apply.sh health-check subcommand SOPS identity resolution
 
-`scripts/health-check.sh` must export `SOPS_AGE_KEY_FILE` pointing to `/etc/sops/age/machine.txt` (the machine age key written by `deriveHostAgeKey`) before its `sops -d` probe loop, since `sops` does not search that path by default. Without this, `sops` falls through to GPG, which may not have the secret key in the keyring at health-check time.
+`scripts/apply.sh` (the `health-check` subcommand) must export `SOPS_AGE_KEY_FILE` pointing to `/etc/sops/age/machine.txt` (the machine age key written by `deriveHostAgeKey`) before its `sops -d` probe loop, since `sops` does not search that path by default. Without this, `sops` falls through to GPG, which may not have the secret key in the keyring at health-check time.
 
-See the `check_secret_health()` function in `scripts/health-check.sh` for the implementation.
+See the `check_secret_health()` function in `scripts/apply.sh` (the `health-check` subcommand) for the implementation.
 
 ## CWD independence — all `nucleus-*` commands must work from any working directory
 
@@ -247,7 +247,7 @@ Scripts must not assume the current working directory is inside the repository. 
 | `check` (pre-commit) | 2 `powershell-lint` | `-SkipStep PSSA` | Parser syntax validation only; full-repo runs also call `check-pwsh-naming.ps1` |
 | `test` (pre-push) | 2 `powershell-lint-test` | `-SkipStep Syntax -Settings PSScriptAnalyzerSettings.test.psd1` | PSScriptAnalyzer only (full rule set) |
 
-Standalone `nucleus-check-pwsh` runs both phases (no `-SkipStep`). Settings files: `scripts/PSScriptAnalyzerSettings.check.psd1` (when PSSA runs outside the test pipeline) and `scripts/PSScriptAnalyzerSettings.test.psd1` (test step 2). Do not configure rule exclusions in the checker script itself.
+Standalone `nucleus-check pwsh` runs both phases (no `-SkipStep`). Settings files: `scripts/PSScriptAnalyzerSettings.check.psd1` (when PSSA runs outside the test pipeline) and `scripts/PSScriptAnalyzerSettings.test.psd1` (test step 2). Do not configure rule exclusions in the checker script itself.
 
 Always exclude `PSUseBOMForUnicodeEncodedFile` in settings files — UTF-8 without BOM is the repository standard (`.editorconfig`).
 

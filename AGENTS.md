@@ -47,6 +47,7 @@ Check/test preflight, tool-availability policy, scoped-mode conventions, and dyn
   limitations.
 
 - Discover commands from the repository itself; never assume a default stack. Validation commands and check-step taxonomy: `.agents/instructions/tooling-and-validation.instructions.md`.
+- The nucleus command surface (flake apps, subcommand folding, internal-invocation policy, Windows parity, completion generators) is canonical in `.agents/instructions/nucleus-apps.instructions.md`. Do not add new single-purpose `nucleus-*` PATH commands.
 - Hard rule: never filter or truncate `nucleus-apply` output (no `grep`, `head`, `tail`, or similar). Run it directly and capture the full combined stdout+stderr. When reviewing output, ignore the direnv environment variable dump (`direnv: export +AR +AR_FOR_BUILD ...`) that sometimes appears at the end — it is irrelevant noise from `.envrc` re-evaluation. If the output ends abruptly (no clear success/failure end marker, partial lines, or incomplete direnv dump) or the exit code is non-zero, do NOT re-run — instead, read the last visible activation step name and diagnose the failure there.
 - Known upstream caveat: `builtins.derivation`/`options.json` contextless-source warning is upstream, not a local regression unless concrete local breakage is shown.
 

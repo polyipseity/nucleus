@@ -113,7 +113,7 @@ This is not an exemption — use inline suppression with a documented reason as 
 
 **`Add-ShellAlias` helper**: Functions that create aliases via `New-Item -Path Function:` use the PSFunction provider path and produce no `FunctionDefinitionAst`. The helper itself (`Add-ShellAlias`) uses the approved verb `Add-`. This is the canonical way to create function aliases without triggering the rule.
 
-**`nucleus-*` CLI wrappers** (`nucleus-apply`, `nucleus-check-pwsh`, etc. in `src/scripts/shell/profile.ps1`): These intentionally use the fixed `nucleus-<command>` contract as the function name. They trigger `PSUseApprovedVerbs` because `nucleus` is not an approved verb. Add the attribute INSIDE the function body immediately before `param()` with a documented reason. Prefer `Add-ShellAlias` for new shell aliases that do not need the exact `nucleus-*` name.
+**`nucleus-*` CLI wrappers** (`nucleus-apply`, `nucleus-check`, `nucleus-cloud`, etc. in `src/scripts/shell/profile.ps1`): These intentionally use the fixed `nucleus-<command>` contract as the function name. They trigger `PSUseApprovedVerbs` because `nucleus` is not an approved verb. Add the attribute INSIDE the function body immediately before `param()` with a documented reason. Prefer `Add-ShellAlias` for new shell aliases that do not need the exact `nucleus-*` name.
 
 ### `PSUseSingularNouns` — always use singular nouns
 

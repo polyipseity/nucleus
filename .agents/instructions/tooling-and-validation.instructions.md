@@ -61,7 +61,7 @@ Scripts and tests assume all required tools are installed. Skip-guards that exit
 - **No `command -v <tool> || return 0` / `exit 0` patterns.** No `Test-CommandAvailable` / `Get-Command -ErrorAction SilentlyContinue` gating that exits successfully on absence. No `Get-Module -ListAvailable` skip-guards in PowerShell. No `Test-Path` skip-guards in tests.
 - **Allowed:** inline alternative selection between equivalent tools; pre-flight validation at script entry that `exit 1` on absence; configuration-driven optional features (not implicit tool-detection).
 
-Enforcement scope: `scripts/`, `tests/`, `src/scripts/`, `src/platforms/Windows/modules/`. The `nucleus-check-sh` and `nucleus-check-pwsh` validators reject skip-guard patterns.
+Enforcement scope: `scripts/`, `tests/`, `src/scripts/`, `src/platforms/Windows/modules/`. The `nucleus-check sh` and `nucleus-check pwsh` validators reject skip-guard patterns.
 
 ### Check script structure
 

@@ -1,7 +1,7 @@
 ---
 description: "Use when generating or editing JSON/YAML data files from code (Nix, PowerShell, shell). Covers deterministic key/array ordering and trailing-newline policy so committed artifacts are diff-friendly."
 name: "Deterministic JSON generation"
-applyTo: "src/**/*.json, src/**/*.jsonc, src/**/*.yaml, src/**/*.yml, src/modules/lib/json.nix, src/platforms/Windows/modules/lib/JsonSort.ps1, scripts/config.ps1, scripts/bump-lockfile.ps1, src/flake.nix"
+applyTo: "src/**/*.json, src/**/*.jsonc, src/**/*.yaml, src/**/*.yml, src/modules/lib/json.nix, src/platforms/Windows/modules/lib/JsonSort.ps1, scripts/config.ps1, scripts/update.ps1, src/flake.nix"
 alwaysApply: true
 ---
 

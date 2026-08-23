@@ -41,7 +41,7 @@ Hard rules:
 | `# Method N (name) -- <why>` (legacy form) | 68 → 71 sites | `config-method` | `# check-suppress:config-method: method N (name) -- <reason>` (lowercase `method N`) | step 14 `repository-policy` `.ps1` (regex `'# check-suppress:config-method'`); `.sh` twin has no `# Method` regex (checks `configs\.` method usage only) |
 | `# check-suppress:SuppressMessageAttribute: <rule> -- <just>` / bare rule lists | 33 | `SuppressMessageAttribute` | `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | step 12 `Get-UndocSuppViolation -CheckId 'SuppressMessageAttribute'` |
 | `# check-suppress:suppression_doc: <just>` | 623 | `suppression_doc` | unchanged (plain form) | step 12 regex `# check-suppress:$CheckId[\s:]` |
-| `# check-suppress:packer_validate: ...` | 1 | `packer_validate` | unchanged form (implemented) | `scripts/check-packer.ps1` + `scripts/check-packer.sh` (read the comment; suppress the checksum warning when present; fail when `iso_checksum = "none"` lacks the annotation) |
+| `# check-suppress:packer_validate: ...` | 1 | `packer_validate` | unchanged form (implemented) | `scripts/check.ps1` + `scripts/check.sh` (read the comment; suppress the checksum warning when present; fail when `iso_checksum = "none"` lacks the annotation) |
 | `\|\| true` (shell) / `$null =` / `[void]` (ps1) | 11 sh sites + 92 ps1 discard sites | `suppression_doc` | annotate with `# check-suppress:suppression_doc: <reason>` (implemented) | step 12 `.sh` + `.ps1` twins flag bare `\|\| true` in production scripts (`tests/` exempt); `.ps1` also flags `$null =` / `[void]` |
 
 **Suppression semantics:** `|| true`, `$null =`, and `[void]` are suppression patterns (they silence exit codes or discard values). They are NOT rationale markers — justify them with `# check-suppress:suppression_doc:` on the same line, never with `# WHY:`.
@@ -52,7 +52,7 @@ Hard rules:
 
 | Family | Machine consumer |
 | --- | --- |
-| `# shellcheck disable=SCxxxx` / `# shellcheck source=` (+ inner `# reason:`) | shellcheck itself (via `scripts/check-sh.sh`) |
+| `# shellcheck disable=SCxxxx` / `# shellcheck source=` (+ inner `# reason:`) | shellcheck itself (via `scripts/check.sh sh`) |
 | `[SuppressMessageAttribute('Rule','')]` attributes | PSScriptAnalyzer itself |
 | `# >>> begin nucleus-managed: <subject> >>>` / `# <<< end nucleus-managed: <subject> <<<` sentinels | the managing script (e.g. `Sync-ShellProfile.ps1` reads them as functional delimiters) |
 | `<!-- markdownlint-disable ... -->` HTML comments | markdownlint (config at `.markdownlint.jsonc` + `.agents/.markdownlint.jsonc`; no runner wired today — config-only) |
@@ -78,7 +78,7 @@ Dividers (`# --- section ---`), DSC structural headers (`# WinGet DSC v3 -`, `# 
 | --- | --- | --- |
 | `suppression_doc` | generic suppression documentation | step 12 `.ps1` + `.sh` twin |
 | `SuppressMessageAttribute` | PSSA rule-name suppression comments | step 12 `Get-UndocSuppViolation` |
-| `packer_validate` | packer checksum annotations | `scripts/check-packer.ps1` + `scripts/check-packer.sh` |
+| `packer_validate` | packer checksum annotations | `scripts/check.ps1` + `scripts/check.sh` |
 | `embedded-content` | embedded-content policy exceptions | step 14 `repository-policy` `.ps1` |
 | `config-method` | config deployment method annotations | step 14 `repository-policy` `.ps1` + `.sh` twin |
 

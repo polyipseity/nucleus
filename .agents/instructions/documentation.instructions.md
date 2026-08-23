@@ -61,7 +61,7 @@ MANUAL.md files are concise post-apply checklists. They must contain only steps 
 - Include a `command shortcuts` section (complete set, names starting with `-` like `-g`, `-ga`) and a separate `nucleus commands` section.
 - Group permission-grant steps by category (e.g. Accessibility, Screen Recording); each permission appears once with all apps that need it.
 - Do not duplicate behavior that `apply` already guarantees. Remove steps when they become automatable.
-- Point to setup commands (e.g. `nucleus-cloud-setup`) instead of expanding internal details.
+- Point to setup commands (e.g. `nucleus-cloud setup`) instead of expanding internal details.
 
 ## UI Label Naming Convention
 

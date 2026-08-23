@@ -57,7 +57,7 @@ Data-driven managed settings (git config, sshd_config keys, wallpaper registry v
 ## Lint integration
 
 - Extracted `.ps1` content files under `modules/scripts/` and `src/scripts/` are linted by `scripts/check-pwsh.ps1` (`git ls-files '*.ps1'`); they MUST pass PSScriptAnalyzer per `pwsh-lint-policy.instructions.md`.
-- Extracted `.sh` templates under `src/vms/templates/` are checked by `scripts/check-sh.sh`; `__TOKEN__` placeholders must not trigger shellcheck (quote-check them).
+- Extracted `.sh` templates under `src/vms/templates/` are checked by `scripts/check.sh sh`; `__TOKEN__` placeholders must not trigger shellcheck (quote-check them).
 - `# check-suppress:` inline comments carry over verbatim from embedded strings to extracted files.
 
 ## Related instruction files

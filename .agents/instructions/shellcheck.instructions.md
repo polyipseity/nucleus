@@ -68,7 +68,7 @@ full convention.
 Shell scripts are linted via treefmt (ShellCheck runs inside treefmt-nix):
 
 1. **`scripts/check.sh`** (pre-commit, via `prek-hooks.py`): step 01-code-formatting runs `treefmt`, which invokes ShellCheck with the settings in `src/treefmt.nix`.
-2. **`scripts/check-sh.sh`** (standalone): the canonical shell lint runner, invoked directly. It runs `treefmt --fail-on-change` over `git ls-files '*.sh' ':(exclude)vendor/'`. ShellCheck settings live in `src/treefmt.nix`:
+2. **`scripts/check.sh`** (standalone `sh` subcommand): the canonical shell lint runner, invoked directly as `scripts/check.sh sh`. It runs `treefmt --fail-on-change` over `git ls-files '*.sh' ':(exclude)vendor/'`. ShellCheck settings live in `src/treefmt.nix`:
 
    ```nix
    shellcheck = {
@@ -82,11 +82,11 @@ Shell scripts are linted via treefmt (ShellCheck runs inside treefmt-nix):
    };
    ```
 
-3. **Windows** (`scripts/check-sh.ps1`): runs `shellcheck.exe -x -S style` directly (treefmt is Nix-only on POSIX hosts); it passes `--source-path` per file for parity with treefmt's `SCRIPTDIR`.
+3. **Windows** (`scripts/check.ps1` sh): runs `shellcheck.exe -x -S style` directly (treefmt is Nix-only on POSIX hosts); it passes `--source-path` per file for parity with treefmt's `SCRIPTDIR`.
 
-ShellCheck does NOT run at Nix derivation build time (`src/modules/lib/script-tree.nix` documents this); it runs in `nucleus-check-sh` / CI only.
+ShellCheck does NOT run at Nix derivation build time (`src/modules/lib/script-tree.nix` documents this); it runs in `nucleus-check sh` / CI only.
 
-The `source-path` is always anchored to each script's own directory: treefmt runs (`check.sh` step 01, `scripts/check-sh.sh`) use `source-path = "SCRIPTDIR"` from `src/treefmt.nix`, and Windows (`scripts/check-sh.ps1`) passes `--source-path=<script dir>` per file. Both anchor to the same SCRIPT_DIR-relative structure, so a `# shellcheck source=` directive that works in the source tree resolves identically everywhere shellcheck runs.
+The `source-path` is always anchored to each script's own directory: treefmt runs (`check.sh` step 01, `check.sh sh`) use `source-path = "SCRIPTDIR"` from `src/treefmt.nix`, and Windows (`scripts/check.ps1` sh) passes `--source-path=<script dir>` per file. Both anchor to the same SCRIPT_DIR-relative structure, so a `# shellcheck source=` directive that works in the source tree resolves identically everywhere shellcheck runs.
 
 When adding new shell scripts, ensure they pass shellcheck with these flags. Do not add
 new scripts with pre-existing suppression warnings unless documented per the rules above.
