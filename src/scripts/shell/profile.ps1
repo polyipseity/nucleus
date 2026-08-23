@@ -888,6 +888,7 @@ if ($IsWindows) {
 
 $nucleusSvcCommands = @('list', 'status', 'start', 'stop', 'restart', 'enable', 'disable', 'verify', 'endpoint', 'logs', 'log-paths', 'log-config')
 $nucleusConfigCommands = @('get', 'set', 'list')
+$nucleusGcCommands = @('cleanup-nix', 'preferences')
 
 Register-ArgumentCompleter -CommandName nucleus-svc -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
@@ -920,6 +921,7 @@ Register-ArgumentCompleter -CommandName nucleus-config -ScriptBlock {
 Register-ArgumentCompleter -CommandName nucleus-gc -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
   $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: parameter metadata variables, declared for introspection
+  $nucleusGcCommands | Where-Object { $_ -like "$wordToComplete*" }
   $nucleusGcFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 
