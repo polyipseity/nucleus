@@ -446,6 +446,10 @@
         pkgs: treefmtWrapper:
         let
           nucleusApp = args: writeNucleusShellApplication pkgs args;
+          # Single source of truth for managed macOS preference domains (see
+          # preference-gc.nix). Exposed to nucleus-gc so `gc preferences` can
+          # purge stale state without duplicating the list.
+          managedPrefDomains = import ../platforms/macOS/modules/preference-gc.nix { };
         in
         {
           nucleus-apply = nucleusApp {
@@ -507,6 +511,9 @@
               pkgs.gnugrep
               pkgs.home-manager
             ];
+            extraEnv = {
+              MANAGED_PREF_DOMAINS = builtins.concatStringsSep " " managedPrefDomains.resetUserPreferenceDomains;
+            };
           };
           nucleus-svc = nucleusApp {
             name = "svc";
