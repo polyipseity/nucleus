@@ -33,6 +33,24 @@ Internal code must NOT call `nucleus-*` PATH commands. This includes daemons, ap
 
 PATH commands are a user convenience surface, not an internal API. Relying on them inside the system couples activation to a user-installed profile.
 
+## Single registration surface
+
+All nucleus commands are declared exactly once in `mkNucleusApps` (`src/flake.nix`). The user-facing surfaces derive from it automatically:
+
+- `home.packages` (`src/modules/shell.nix`) spreads `nucleusApps` onto PATH.
+- The flake `apps` output derives via `mkNucleusAppsAsFlakeApps` (strips the `nucleus-` prefix for `nix run .#<name>`).
+- The `packages` flake output spreads `nucleusApps`.
+
+Never hand-register a command in two places. Deleting an entry from `mkNucleusApps` removes it from PATH, `nix run`, and `packages` simultaneously. This is the structural guard against the duplicate-`apps` failure mode.
+
+## Bootstrap independence
+
+`nucleus-bootstrap` installs Nix and base dependencies only. It MUST NOT assume anything is already provisioned. It may *optionally* invoke apply via `--apply`/`-Apply` after dependencies exist, but apply must never be a bootstrap dependency — bootstrap must succeed on a bare machine with no prior nucleus state.
+
+## Windows provisioning runs elevated
+
+Windows provisioning (`apply.ps1`, agent-host-shell setup, scheduled-task registration) runs self-elevated via `RunAs`, exactly like POSIX `sudo`. Writing to `%ProgramData%\nucleus\bin` (or other system-wide locations) is admin-normal and requires NO non-admin fallback path. The agent must NOT assume a non-admin case for Windows provisioning and must NOT add degraded non-privileged branches. This is the inverse-family exception already documented for `apply.ps1`; restate it explicitly so it is not forgotten.
+
 ## Windows parity
 
 Every POSIX `scripts/<name>.sh` that exposes subcommands needs a `scripts/<name>.ps1` twin with matching `[ValidateSet(...)]` `$Action` dispatch. The two entry points must accept the same subcommand vocabulary so `nix run .#<name>` behaves identically on macOS/NixOS and Windows.

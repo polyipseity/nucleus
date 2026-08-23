@@ -174,6 +174,13 @@ needs the privilege is unaffected by this policy.
    `src/hosts/Windows/apply.ps1`). This is the sole exception to rule 2's
    escalate-then-warn path, but its outcome is a **hard refusal** (abort with a
    non-zero exit), not a warning. Refusing to run is an error, not a warn-and-continue.
+   - **Windows admin-normal provisioning (no non-admin fallback):** writing to
+     `%ProgramData%\nucleus\bin` (agent-host-shell setup, scheduled-task
+     registration) runs under `RunAs` self-elevation, exactly like POSIX `sudo`.
+     It is admin-normal and requires NO non-admin fallback path. The agent must
+     NOT assume a non-admin case for Windows provisioning and must NOT add
+     degraded non-privileged branches. This is the inverse-family exception
+     restated for the Windows side.
 4. **Non-escalatable privileges (documented exceptions, keep warn-and-skip):**
    - macOS Full Disk Access (TCC privacy grant — cannot be obtained via sudo).
    - `nucleus-apply health-check` diagnostic reporting (its purpose is to surface gaps, not act).
