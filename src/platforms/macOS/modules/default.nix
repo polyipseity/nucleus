@@ -555,8 +555,14 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   # Clears the sccache compilation cache every day at 12:00 to prevent
   # unbounded cache growth between weekly GC runs. Cross-host parity with
   # NixOS systemd timer and Windows scheduled task.
-  environment.userLaunchAgents."sccache-gc" = {
-    text = lib.generators.toPlist { escape = true; } {
+  #
+  # domain = "user" installs to ~/Library/LaunchAgents (the user's GUI/login
+  # session) instead of /Library/LaunchAgents, so each user can configure it
+  # individually and launchd loads it without the root-domain mismatch warning
+  # that global launchd.agents trigger under nix-darwin.
+  launchd.agents."sccache-gc" = {
+    domain = "user";
+    config = {
       Label = "local.sccache-gc";
       ProgramArguments = [ "${sccacheGc}/bin/nucleus-sccache-gc" ];
       RunAtLoad = false;
@@ -573,8 +579,9 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   # Daily user log rotation LaunchAgent
   # Rotates user-scope nucleus logs daily at noon. Cross-host parity with
   # NixOS systemd user timer and Windows scheduled task.
-  environment.userLaunchAgents."log-gc-user" = {
-    text = lib.generators.toPlist { escape = true; } {
+  launchd.agents."log-gc-user" = {
+    domain = "user";
+    config = {
       Label = "local.log-gc-user";
       ProgramArguments = [ "${logGcUser}/bin/nucleus-log-gc-user" ];
       EnvironmentVariables = {
@@ -607,8 +614,9 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   #
   # Output is silenced to prevent log spam from 30-second no-op loop iterations.
   # --------------------------------------------------------------------------
-  environment.userLaunchAgents."betterdisplay-heartbeat" = {
-    text = lib.generators.toPlist { escape = true; } {
+  launchd.agents."betterdisplay-heartbeat" = {
+    domain = "user";
+    config = {
       Label = "local.betterdisplay-heartbeat";
       ProgramArguments = [ "${betterdisplayHeartbeat}/bin/nucleus-betterdisplay-heartbeat" ];
       # Start at login and stay alive; internal loop handles the 30 s interval.
@@ -628,8 +636,9 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   # `nix run .#apply` and bootstrap apply stay synchronous only for
   # configuration work that must happen immediately.
   # --------------------------------------------------------------------------
-  environment.userLaunchAgents."ds-store-gc" = {
-    text = lib.generators.toPlist { escape = true; } {
+  launchd.agents."ds-store-gc" = {
+    domain = "user";
+    config = {
       Label = "local.ds-store-gc";
       ProgramArguments = [ "${devDsStoreGc}/bin/nucleus-ds-store-gc" ];
       # Do not run on every agent reload during apply/bootstrap apply; daily
@@ -644,8 +653,9 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
     };
   };
 
-  environment.userLaunchAgents."spotlight-exclusions" = {
-    text = lib.generators.toPlist { escape = true; } {
+  launchd.agents."spotlight-exclusions" = {
+    domain = "user";
+    config = {
       Label = "local.spotlight-exclusions";
       ProgramArguments = [
         "${devSpotlightExclusions}/bin/nucleus-spotlight-exclusions"
@@ -681,8 +691,9 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   # on the next daily run or load.  Check exit status with:
   #   launchctl list | grep nix-index-update
   # --------------------------------------------------------------------------
-  environment.userLaunchAgents."nix-index-update" = {
-    text = lib.generators.toPlist { escape = true; } {
+  launchd.agents."nix-index-update" = {
+    domain = "user";
+    config = {
       Label = "local.nix-index-update";
       ProgramArguments = [
         "${nixIndexUpdate}/bin/nucleus-nix-index-update"
@@ -716,8 +727,9 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   # this agent provides drift correction between activations.
   # RunAtLoad = false because the activation hook already runs on every apply.
   # --------------------------------------------------------------------------
-  environment.userLaunchAgents."icloud-exclusions" = {
-    text = lib.generators.toPlist { escape = true; } {
+  launchd.agents."icloud-exclusions" = {
+    domain = "user";
+    config = {
       Label = "local.icloud-exclusions";
       ProgramArguments = [
         "${icloudExclusionsScript}/bin/nucleus-icloud-exclusions"
@@ -743,8 +755,9 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   # services.  Kept in home-manager so root-launched activation does not trigger
   # macOS warnings about root managing user-scope agents.
   # --------------------------------------------------------------------------
-  environment.userLaunchAgents."service-watchdog-user" = {
-    text = lib.generators.toPlist { escape = true; } {
+  launchd.agents."service-watchdog-user" = {
+    domain = "user";
+    config = {
       Label = "local.service-watchdog-user";
       ProgramArguments = [
         "${nucleusApps.nucleus-service-watchdog}/bin/nucleus-service-watchdog"
@@ -830,8 +843,9 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   # the GUI domain until explicitly changed or reboot.  The gui-env-path
   # activation step re-applies all vars on every nucleus-apply.
   # --------------------------------------------------------------------------
-  environment.userLaunchAgents."gui-env" = {
-    text = lib.generators.toPlist { escape = true; } {
+  launchd.agents."gui-env" = {
+    domain = "user";
+    config = {
       Label = "local.gui-env";
       ProgramArguments = [
         "${guiEnvAgent}/bin/nucleus-gui-env"
