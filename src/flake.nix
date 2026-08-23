@@ -519,11 +519,6 @@
             name = "svc";
             runtimeInputs = [ pkgs.jq ];
           };
-          nucleus-service-watchdog = nucleusApp {
-            name = "service-watchdog";
-            scriptName = "src/scripts/services/service-watchdog";
-            runtimeInputs = [ pkgs.jq ];
-          };
           nucleus-test = nucleusApp {
             name = "test";
             runtimeInputs = [
@@ -552,6 +547,15 @@
 
       nucleusAppsMac = mkNucleusApps pkgsMac (mkTreefmtWrapper systems.mac pkgsMac);
       nucleusAppsLinux = mkNucleusApps pkgsLinux (mkTreefmtWrapper systems.linux pkgsLinux);
+
+      # Daemon-only package: NOT a nucleus app (not in mkNucleusApps), so it is
+      # never on PATH, via `nix run`, or in `packages`. Daemons resolve it by
+      # store path through the per-host nucleusApps merge below.
+      serviceWatchdogPkg = writeNucleusShellApplication pkgsLinux {
+        name = "service-watchdog";
+        scriptName = "src/scripts/services/service-watchdog";
+        runtimeInputs = [ pkgsLinux.jq ];
+      };
 
     in
     {
@@ -605,7 +609,9 @@
             smudge-smudge
             zackelia-formulae
             ;
-          nucleusApps = nucleusAppsMac;
+          nucleusApps = nucleusAppsMac // {
+            nucleus-service-watchdog = serviceWatchdogPkg;
+          };
           treefmtPackage = mkTreefmtWrapper systems.mac pkgsMac;
         };
         system = systems.mac;
@@ -627,7 +633,9 @@
               hostName = "MacBook";
               inherit nixpkgs username;
               users = usersMacBook;
-              nucleusApps = nucleusAppsMac;
+              nucleusApps = nucleusAppsMac // {
+                nucleus-service-watchdog = serviceWatchdogPkg;
+              };
               vsCodeMarketplace = vsCodeMarketplaceMac;
               treefmtPackage = mkTreefmtWrapper systems.mac pkgsMac;
             };
@@ -648,7 +656,9 @@
           hostName = "NixOS";
           inherit username;
           users = usersNixOS;
-          nucleusApps = nucleusAppsLinux;
+          nucleusApps = nucleusAppsLinux // {
+            nucleus-service-watchdog = serviceWatchdogPkg;
+          };
           treefmtPackage = mkTreefmtWrapper systems.linux pkgsLinux;
         };
         system = systems.linux;
@@ -667,7 +677,9 @@
               hostName = "NixOS";
               inherit nixpkgs username;
               users = usersNixOS;
-              nucleusApps = nucleusAppsLinux;
+              nucleusApps = nucleusAppsLinux // {
+                nucleus-service-watchdog = serviceWatchdogPkg;
+              };
               vsCodeMarketplace = vsCodeMarketplaceLinux;
               treefmtPackage = mkTreefmtWrapper systems.linux pkgsLinux;
             };
