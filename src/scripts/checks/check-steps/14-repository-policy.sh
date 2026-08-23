@@ -239,6 +239,15 @@ run_activation_naming_policy() {
   grep -v -E '^(src/platforms/macOS|src/hosts/MacBook)/' "$_names_file" |
     cut -d: -f3 |
     sort -u >"$_shared_file"
+  # Cross-host activation names registered in activation-dag.nix are shared across
+  # platforms and need no macos- prefix even when only the macOS file is scanned
+  # (scoped mode). Seed the shared set from the canonical registry so the carve-out
+  # holds regardless of which files the hook passes.
+  if [ -f src/modules/lib/activation-dag.nix ]; then
+    grep -oE '"[a-zA-Z0-9_-]+"' src/modules/lib/activation-dag.nix |
+      tr -d '"' >>"$_shared_file"
+  fi
+  sort -u -o "$_shared_file" "$_shared_file"
 
   local _name _ln
   while IFS=: read -r _f _ln _name; do
