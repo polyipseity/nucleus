@@ -10,16 +10,17 @@ applyTo: "src/flake.nix, scripts/**/*.sh, scripts/**/*.ps1, src/scripts/**/*.sh,
 
 The user-facing CLI is a fixed set of ~12 flake apps, each a `nucleus-<name>` package built by `mkNucleusApps` in `src/flake.nix`. The flake `apps` output strips the `nucleus-` prefix so they run as `nix run .#<name>`:
 
-- `apply`, `ai`, `bootstrap`, `check`, `config`, `gs-pdf-opt`, `gc`, `svc`, `service-watchdog`, `test`, `update`, `vm`, `cloud`
+- `apply`, `ai`, `bootstrap`, `check`, `config`, `gs-pdf-opt`, `gc`, `svc`, `test`, `update`, `vm`, `cloud`
 
-`service-watchdog` is a package but is excluded from `home.packages` (`src/modules/shell.nix` removes it via `builtins.removeAttrs nucleusApps [ "nucleus-service-watchdog" ]`). It runs only under systemd/launchd (`src/hosts/NixOS/activation.nix`, `src/hosts/MacBook/service-watchdog.nix`), never from a user PATH.
+`service-watchdog` is a daemon-only package, NOT a nucleus app — it is not registered in `mkNucleusApps`, so it never appears on PATH, via `nix run`, or in `packages`. It runs only under systemd/launchd (`src/hosts/NixOS/activation.nix`, `src/hosts/MacBook/service-watchdog.nix`) via its store path, never as a user command.
 
 ## No new single-purpose commands
 
-Do NOT add new single-purpose `nucleus-<x>` PATH commands. Fold new functionality into one of these:
+When adding new functionality, decide in this fixed order — stop at the first tier that fits:
 
-- A **subcommand** of an existing parent command (`check`, `gc`, `apply`, `cloud`, `update`).
-- A **new parent command** added to `mkNucleusApps` in `src/flake.nix` (with a matching `scripts/<name>.sh` / `scripts/<name>.ps1` entry and a `home.packages` registration unless it is daemon-only like `service-watchdog`).
+1. **Internal** — if the logic is not user-facing (a library, daemon helper, or activation step), keep it as a plain script invoked by other code. Do NOT register a `nucleus-*` PATH command for it. (How internal code must call other logic is governed separately by "Internal-invocation policy" below.)
+2. **Subcommand** — if it is a variant or aspect of an existing nucleus app, add it as a subcommand of that parent (`check`, `gc`, `apply`, `cloud`, `update`).
+3. **New nucleus app** — only if it is a genuinely independent top-level concern with no suitable parent. Register it via `nucleusApp` in `mkNucleusApps` in `src/flake.nix` (with a matching `scripts/<name>.sh` / `scripts/<name>.ps1` entry and a `home.packages` registration unless it is daemon-only like `service-watchdog`).
 
 The command set is the coverage contract shared with the completion generators and check step `10-completions-fresh`. Adding a command without updating both breaks freshness enforcement.
 
