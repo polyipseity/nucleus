@@ -78,7 +78,6 @@ function Get-NucleusCommandList {
     'config',
     'gc',
     'gs-pdf-opt',
-    'service-watchdog',
     'svc',
     'test',
     'update',
@@ -96,7 +95,6 @@ function Get-NucleusFlagMap {
     'config' = @('--help')
     'gc' = @('--dry-run', '--duperemove-gc', '--expiry', '--generations-keep', '--git-cache-gc', '--help', '--hm-expiry', '--hm-gc', '--hm-generations-keep', '--journald-gc', '--log-compress', '--log-gc', '--log-max-files', '--log-max-size', '--nix-artifacts-gc', '--nix-expiry', '--nix-gc', '--no-dry-run', '--no-duperemove-gc', '--no-git-cache-gc', '--no-hm-gc', '--no-journald-gc', '--no-log-gc', '--no-nix-artifacts-gc', '--no-nix-gc', '--no-ollama-gc', '--no-sccache-gc', '--no-system-gc', '--no-tool-cache-gc', '--no-vm-data-gc', '--no-vm-gc', '--no-wallpaper-gc', '--ollama-gc', '--sccache-gc', '--system-gc', '--system-generations-keep', '--tool-cache-gc', '--vm-data-gc', '--vm-gc', '--wallpaper-gc')
     'gs-pdf-opt' = @('--help', '--preset', '--rm-bak')
-    'service-watchdog' = @('--domain', '--help', '--oneshot')
     'svc' = @('--help', '--json', '--system', '--user', '--verbose')
     'test' = @('-q', '--fail-fast', '--help', '--no-fail-fast', '--quiet', '--skip-steps')
     'update' = @('--flake', '--help', '--list-sections', '--no-flake', '--no-sops', '--sections', '--sops', '--verify', '--verify-installed')

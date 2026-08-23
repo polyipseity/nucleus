@@ -721,12 +721,6 @@ $nucleusGsPdfOptFlags = @(
   '--rm-bak'
 )
 
-$nucleusServiceWatchdogFlags = @(
-  '--domain',
-  '--help',
-  '--oneshot'
-)
-
 $nucleusSvcFlags = @(
   '--help',
   '--json',

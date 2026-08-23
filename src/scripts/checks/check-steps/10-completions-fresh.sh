@@ -5,13 +5,12 @@
 
 # The canonical nucleus-* command set (alphabetical) — the coverage contract
 # shared with src/scripts/completions/gen-completions.sh and tests/scripts/gen-completions-tests.sh.
-_NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc gs-pdf-opt service-watchdog svc test update vm)
+_NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc gs-pdf-opt svc test update vm)
 
 # Map a command to its .sh help source (for the --list-* introspection check).
 # check-pwsh has no .sh twin (PowerShell-only) — nothing to introspect.
 sh_for_command() {
   case "$1" in
-  service-watchdog) printf '%s\n' "src/scripts/services/service-watchdog.sh" ;;
   *) printf '%s\n' "scripts/$1.sh" ;;
   esac
 }

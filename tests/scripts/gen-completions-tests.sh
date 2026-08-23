@@ -28,7 +28,7 @@ _COMPLETIONS_DIR="src/modules/completions/zsh"
 # Subcommands are covered by their parent completion files, not as standalone
 # commands: check packer/sh/pwsh, gc cleanup-nix/preferences, apply
 # health-check/audit-store, cloud setup/reset/sync, update lockfile.
-_NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc gs-pdf-opt service-watchdog svc test update vm)
+_NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc gs-pdf-opt svc test update vm)
 
 # 1. --help exits 0 and prints a usage: line.
 if _help_out="$(bash "$_gen_script" --help 2>&1)" && printf '%s\n' "$_help_out" | grep -q '^usage: '; then
@@ -165,7 +165,6 @@ if grep -q '^#compdef nucleus-$' "$_disp_file" &&
   grep -qw 'check' "$_disp_file" &&
   grep -qw 'cloud' "$_disp_file" &&
   grep -qw 'gc' "$_disp_file" &&
-  grep -qw 'service-watchdog' "$_disp_file" &&
   grep -qw 'update' "$_disp_file" &&
   grep -qw 'vm' "$_disp_file"; then
   assert_pass "gen-completions: _nucleus dispatcher lists commands"

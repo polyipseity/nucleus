@@ -25,13 +25,11 @@ COMPLETIONS_DIR="$REPO_ROOT/src/modules/completions/zsh"
 
 # The canonical nucleus-* command set (alphabetical) — the coverage contract
 # shared with check step 10-completions-fresh and the generator tests.
-COMMANDS=(ai apply bootstrap check cloud config gc gs-pdf-opt service-watchdog svc test update vm)
+COMMANDS=(ai apply bootstrap check cloud config gc gs-pdf-opt svc test update vm)
 
 # Map a command to its .sh help source (the executable contract).
-# service-watchdog lives under src/scripts; every other command has a scripts/<cmd>.sh twin.
 sh_for_command() {
   case "$1" in
-  service-watchdog) printf '%s\n' "src/scripts/services/service-watchdog.sh" ;;
   *) printf '%s\n' "scripts/$1.sh" ;;
   esac
 }
