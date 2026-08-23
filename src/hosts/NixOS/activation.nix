@@ -80,14 +80,8 @@ in
   # ---------------------------------------------------------------------------
   systemd.services."nucleus-service-watchdog" = {
     description = "Nucleus service watchdog — restart stuck services";
-    path = with nucleusApps; [
-      nucleus-service-watchdog
-      pkgs.jq
-    ];
     environment.NUCLEUS_SERVICES_JSON = "${servicesJson}";
-    script = ''
-      exec nucleus-service-watchdog
-    '';
+    script = "exec ${nucleusApps.nucleus-service-watchdog}/bin/nucleus-service-watchdog";
     serviceConfig = {
       Restart = "always";
       Type = "simple";
