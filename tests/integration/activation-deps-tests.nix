@@ -315,9 +315,16 @@ let
       "install-cargo-binstall-packages activation name must match between agents.nix and its dependent module's dependency list";
 
   # === TEST: macOS dev-tree maintenance is scheduled, not activation-bound ===
+  # NOTE: these jobs are user launch agents. In the Home Manager module
+  # (default.nix) the mechanism is HM-native `launchd.agents.<name>` with
+  # `domain = "user"` (installs to ~/Library/LaunchAgents), so each user can
+  # configure them individually and they load without the root-domain
+  # launchctl warning that global launchd.agents trigger. The assertion intent
+  # is unchanged: scheduled via launchd, not activation-bound.
   test_macos_dev_maintenance_is_scheduled = assert' (
     (lib.hasInfix "launchd.agents.\"ds-store-gc\"" macosModuleText)
     && (lib.hasInfix "launchd.agents.\"spotlight-exclusions\"" macosModuleText)
+    && (lib.hasInfix "domain = \"user\"" macosModuleText)
     && (lib.hasInfix "Label = \"local.ds-store-gc\";" macosModuleText)
     && (lib.hasInfix "Label = \"local.spotlight-exclusions\";" macosModuleText)
     && (lib.hasInfix "ProgramArguments = [ \"\${devDsStoreGc}/bin/nucleus-ds-store-gc\" ];" macosModuleText)
@@ -325,7 +332,7 @@ let
     && (lib.hasInfix "\"\${devSpotlightExclusions}/bin/nucleus-spotlight-exclusions\"" macosModuleText)
     && !(lib.hasInfix "cleanDevDsStore = lib.hm.dag.entryAfter" macosModuleText)
     && !(lib.hasInfix "configureDevSpotlightExclusions = lib.hm.dag.entryAfter" macosModuleText)
-  ) "macOS dev-tree maintenance must run from launchd agents instead of Home Manager activation";
+  ) "macOS dev-tree maintenance must run from user launch agents instead of Home Manager activation";
 
   # === TEST: discord-music-rpc out-of-store symlink properly wired ===
   # Verify that the config.yaml path appears in managedSymlinkPaths in home.nix
