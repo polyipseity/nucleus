@@ -318,8 +318,8 @@ do_sh() {
 
 do_pwsh() {
   local _exit=0
-  pwsh -NoProfile -File "$SCRIPT_DIR/check-pwsh.ps1" "$@" || _exit=$?
-  pwsh -NoProfile -File "$SCRIPT_DIR/check-pwsh-naming.ps1" "$@" || _exit=$?
+  pwsh -NoProfile -File "$_ORCH_SCRIPT_DIR/check-pwsh.ps1" "$@" || _exit=$?
+  pwsh -NoProfile -File "$_ORCH_SCRIPT_DIR/check-pwsh-naming.ps1" "$@" || _exit=$?
   return $_exit
 }
 
