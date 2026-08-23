@@ -413,13 +413,13 @@
   "telemetry.feedback.enabled": false,
   "telemetry.telemetryLevel": "off",
   "terminal.integrated.agentHostProfile.linux": {
-    "path": "${userHome}/.local/bin/nucleus-agent-host-wrapper.sh"
+    "path": "/etc/nucleus/bin/agent-host-shell"
   },
   "terminal.integrated.agentHostProfile.osx": {
-    "path": "${userHome}/.local/bin/nucleus-agent-host-wrapper.sh"
+    "path": "/etc/nucleus/bin/agent-host-shell"
   },
   "terminal.integrated.agentHostProfile.windows": {
-    "path": "${userHome}\\.local\\bin\\nucleus-agent-host-wrapper.cmd"
+    "path": "C:\\ProgramData\\nucleus\\bin\\agent-host-shell.ps1"
   },
   "terminal.integrated.enableMultiLinePasteWarning": "never",
   "terminal.integrated.fontSize": 14,
