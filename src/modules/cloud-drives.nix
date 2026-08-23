@@ -349,12 +349,18 @@ in
       # -----------------------------------------------------------------------
       # macOS: LaunchAgents for rclone-backed mounts
       # -----------------------------------------------------------------------
+      # This module is imported into the Home Manager config (home-manager.users
+      # via sharedModules), so use HM-native launchd.agents with domain = "user"
+      # (installs to ~/Library/LaunchAgents) rather than
+      # environment.userLaunchAgents, which is a nix-darwin top-level option and
+      # does not exist in the HM context.
       (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && declaredMountAgents != [ ]) {
-        environment.userLaunchAgents = builtins.listToAttrs (
+        launchd.agents = builtins.listToAttrs (
           map (mount: {
             name = "cloud-mount-${mount.id}";
             value = {
-              text = lib.generators.toPlist { escape = true; } {
+              domain = "user";
+              config = {
                 Label = "local.cloud-mount.${mount.id}";
                 ProgramArguments = [ "${mkRcloneMountScript mount}/bin/nucleus-cloud-mount-${mount.id}" ];
                 RunAtLoad = true;
@@ -445,12 +451,16 @@ in
       # -----------------------------------------------------------------------
       # macOS: LaunchAgents for per-replica scheduled replica-sync timers
       # -----------------------------------------------------------------------
+      # HM-native launchd.agents with domain = "user" (see mount block note):
+      # this module is imported into the Home Manager config, not the darwin
+      # config, so environment.userLaunchAgents is not available here.
       (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && declaredScheduledSyncReplicas != [ ]) {
-        environment.userLaunchAgents = builtins.listToAttrs (
+        launchd.agents = builtins.listToAttrs (
           map (replica: {
             name = "cloud-replica-scheduled-sync-${replica.id}";
             value = {
-              text = lib.generators.toPlist { escape = true; } {
+              domain = "user";
+              config = {
                 Label = "local.cloud-replica-scheduled-sync.${replica.id}";
                 ProgramArguments = [
                   "${mkReplicaScheduledSyncScript replica}/bin/nucleus-cloud-replica-scheduled-sync-${replica.id}"
