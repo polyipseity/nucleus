@@ -14,16 +14,7 @@ run_powershell_lint() {
   local _ps_exit=0
 
   local -n _ps1_files="${ctx[PS1_FILES]}"
-  if [ "${#_ps1_files[@]}" -gt 0 ]; then
-    local _ps_paths
-    _ps_paths=$(printf "'%s'," "${_ps1_files[@]}")
-    pwsh -NoLogo -NoProfile -NonInteractive -Command "& scripts/check-pwsh.ps1 -SkipStep PSSA -Scoped -Paths @(${_ps_paths%,})" || _ps_exit=$?
-  elif ! $_has_args; then
-    pwsh -NoLogo -NoProfile -NonInteractive -File scripts/check-pwsh.ps1 -SkipStep PSSA || _ps_exit=$?
-  else
-    say "skipping (no PowerShell scripts to check)."
-    return 2
-  fi
+  bash scripts/check.sh pwsh || _ps_exit=$?
 
   return $_ps_exit
 }
