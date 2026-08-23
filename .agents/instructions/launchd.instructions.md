@@ -100,6 +100,36 @@ unchanged except install location (`/Library` → `~/Library`) and load context
 (root → user). Standardize on `serviceConfig`-shaped attrsets (rename legacy
 `config = { ... }` to the attrset form) before conversion.
 
+## User agent in Home Manager modules
+
+`environment.userLaunchAgents` is a **nix-darwin top-level** option. It is
+**invalid inside a Home Manager module** (anything imported via `home.nix` or
+`home-manager.sharedModules`), where `environment` does not exist — the build
+fails with `home-manager.users.<user>.environment does not exist`.
+
+In HM module context, declare a user-scoped agent with HM's native
+`launchd.agents.<name>` and `domain = "user"`. This installs the plist into
+`~/Library/LaunchAgents` and registers it in the user domain (`gui/<uid>`),
+exactly like `environment.userLaunchAgents` — same install path, same no-warning
+load context — but it is valid in HM modules:
+
+```nix
+launchd.agents."<name>" = {
+  domain = "user";
+  config = {
+    Label = "local.<name>";
+    ProgramArguments = [ "..." ];
+    RunAtLoad = true;
+  };
+};
+```
+
+Use this form for every primaryUser-scoped agent defined in an HM module
+(`src/platforms/macOS/modules/default.nix`, `src/modules/ext-discord-music-rpc.nix`,
+`src/modules/cloud-drives.nix`). Reserve `environment.userLaunchAgents` for the
+darwin config context (`src/hosts/MacBook/camilladsp.nix`, imported via
+`MacBook/default.nix` `imports`), where it is the correct option.
+
 ## Related instruction files
 
 - `programming-principles.instructions.md` — General coding principles.
