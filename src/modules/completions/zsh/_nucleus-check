@@ -4,7 +4,7 @@
 
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
-  '1:subcommand:((packer "" sh "" pwsh ""))' \
+  '1:subcommand:((packer "" sh "" pwsh "" pwsh-naming ""))' \
   '--fail-fast[fail fast]' \
   '--full[full]' \
   '--no-fail-fast[no fail fast]' \

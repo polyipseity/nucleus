@@ -45,7 +45,7 @@ known_subcommands() {
   vm) printf '%s\n' "setup|sync|build-system|list|status|start|stop|upgrade|reset|android-config|inject|gc|resize|pack|unpack" ;;
   ai) printf '%s\n' "sync|list|status|endpoint|config" ;;
   config) printf '%s\n' "get|set|list" ;;
-  check) printf '%s\n' "packer|sh|pwsh" ;;
+  check) printf '%s\n' "packer|sh|pwsh|pwsh-naming" ;;
   gc) printf '%s\n' "cleanup-nix|preferences" ;;
   apply) printf '%s\n' "health-check|audit-store" ;;
   cloud) printf '%s\n' "setup|reset|sync" ;;
