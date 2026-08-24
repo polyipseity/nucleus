@@ -11,7 +11,7 @@ applyTo: "src/hosts/Windows/**/*.yml"
 DSC files in this repo split into two categories:
 
 - **System files** (`system/*.dsc.yml`): applied universally to every user on the machine. Currently: `scheduler`, `developer-mode`, `firewall`, `taskbar`, `computer-name`, `long-paths`, `storage-sense`, `font-substitutes`, `remote-desktop`, `packages`.
-- **User files** (`user/*.dsc.yml`): applied per-user based on each user's `dscConfigFiles` list in `src/users/<username>/windows.json`. Currently: `wallpaper`, `screen-saver`, `explorer`, `shell`, `env`, `context-manual`, `context-pdf-opt`.
+- **User files** (`user/*.dsc.yml`): applied per-user based on each user's `dscConfigFiles` list in `src/users/<username>/windows.json`. Currently: `wallpaper`, `screen-saver`, `explorer`, `shell`, `env`, `context-manual`, `context-optimize-pdf`.
 
 Mapping: system files are always applied; user files must be explicitly listed per user. See `src/users/polyipseity/windows.json` (and `src/users/default/windows.json` fallback) for the active user-to-file mapping.
 
@@ -35,7 +35,7 @@ Each DSC file covers exactly one Windows subsystem or functional concern. Do not
 - `src/hosts/Windows/user/shell.dsc.yml` — user-level shell autorun (cmd AutoRun).
 - `src/hosts/Windows/user/env.dsc.yml` — user environment variable declarations.
 - `src/hosts/Windows/user/context-manual.dsc.yml` — right-click "open nucleus manual" entries.
-- `src/hosts/Windows/user/context-pdf-opt.dsc.yml` — right-click "optimize PDF" presets.
+- `src/hosts/Windows/user/context-optimize-pdf.dsc.yml` — right-click "optimize PDF" presets.
 - They are applied in-order by `src/hosts/Windows/apply.ps1`.
 - Reusable Windows helper logic is loaded from `src/platforms/Windows/modules/*.ps1`; DSC files should remain state declarations rather than script logic.
 

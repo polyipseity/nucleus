@@ -12,7 +12,7 @@ The user-facing CLI is a fixed set of ~12 flake apps, each a `nucleus-<name>` pa
 
 - `apply`, `ai`, `bootstrap`, `check`, `config`, `utils`, `gc`, `svc`, `test`, `update`, `vm`, `cloud`
 
-`service-watchdog` is a daemon-only package, NOT a nucleus app — it is not registered in `mkNucleusApps`, so it never appears on PATH, via `nix run`, or in `packages`. It runs only under systemd/launchd (`src/hosts/NixOS/activation.nix`, `src/hosts/MacBook/service-watchdog.nix`) via its store path, never as a user command. `nucleus-utils` groups user utilities; `gs-pdf-opt` is its first subcommand.
+`service-watchdog` is a daemon-only package, NOT a nucleus app — it is not registered in `mkNucleusApps`, so it never appears on PATH, via `nix run`, or in `packages`. It runs only under systemd/launchd (`src/hosts/NixOS/activation.nix`, `src/hosts/MacBook/service-watchdog.nix`) via its store path, never as a user command. `nucleus-utils` groups user utilities; `optimize-pdf` is its first subcommand.
 
 ## No new single-purpose commands
 

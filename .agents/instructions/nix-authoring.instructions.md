@@ -145,7 +145,7 @@ Scripts that accept positional args should also support the corresponding env va
 VAR="${ENV_VAR_NAME:-${1:-default_value}}"
 ```
 
-This pattern is used by `open-host-manual.sh`, `macos-set-gui-env.sh`, and `configure-file-manager-pdf-opt.sh`.
+This pattern is used by `open-host-manual.sh`, `macos-set-gui-env.sh`, and `configure-file-manager-optimize-pdf.sh`.
 
 ### Sites that cannot use the CLI-arg pattern
 

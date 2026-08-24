@@ -28,7 +28,7 @@
 ## command shortcuts
 
 - `-g`, `-ga`, `-gb`, `-gc`, `-gca`, `-gcl`, `-gco`, `-gd`, `-gf`, `-gff`, `-gl`, `-gp`, `-gpl`, `-gplf`, `-gs`, `-gst`, `-gsw` — git commands
-- `-gs-pdf-opt-default`, `-gs-pdf-opt-ebook`, `-gs-pdf-opt-prepress`, `-gs-pdf-opt-printer`, `-gs-pdf-opt-screen` — Ghostscript PDF optimization profiles
+- `-optimize-pdf-default`, `-optimize-pdf-ebook`, `-optimize-pdf-prepress`, `-optimize-pdf-printer`, `-optimize-pdf-screen` — Ghostscript PDF optimization profiles
 - `-la`, `-ll` — `eza -la`
 - `-n`, `-na`, `-nb`, `-nc`, `-nci`, `-ncl`, `-nf`, `-nff`, `-ni`, `-nl`, `-no`, `-nr`, `-nrm`, `-nt`, `-nu`, `-nup`, `-nw`, `-nx` — bun commands
 - `-v` — `nvim`
@@ -52,7 +52,7 @@
 - `nucleus-check sh` — check POSIX shell syntax
 - `nucleus-cloud setup` — configure cloud remotes and re-apply
 - `nucleus-gc` — run Nix garbage collection (VM GC policy: `vm-management.instructions.md`)
-- `nucleus-utils gs-pdf-opt` — optimize PDF files with Ghostscript (keeps .bak backup by default; use `--rm-bak` to remove)
+- `nucleus-utils optimize-pdf` — optimize PDF files with Ghostscript (keeps .bak backup by default; use `--rm-bak` to remove)
 - `nucleus-apply audit-store` — print Nix store audit baseline metrics
 - `nucleus-apply health-check` — run health checks
 - `nucleus-cloud sync` — pull cloud replicas
