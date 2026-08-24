@@ -779,6 +779,13 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   # terminal context via the terminal-activations manifest so macOS TCC grants
   # are inherited.
   nucleus.terminalActivations = {
+    macos-configure-passwords-defaults = {
+      # WHY: terminal-activations (last resort): the PassKit daemon reverts
+      # writes made during darwin-rebuild switch, so the live user-terminal
+      # context is required for the .policy domain values to persist.
+      command = "${activationBundle}/src/platforms/macOS/scripts/macos-configure-passwords-defaults.sh";
+      order = 55;
+    };
     macos-configure-safari-defaults = {
       command = "${activationBundle}/src/platforms/macOS/scripts/macos-configure-safari-defaults.sh";
       order = 50;
