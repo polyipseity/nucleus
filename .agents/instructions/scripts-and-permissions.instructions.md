@@ -252,9 +252,9 @@ Scripts must not assume the current working directory is inside the repository. 
 | Pipeline | Step | Flags | What runs |
 | -------- | ---- | ----- | --------- |
 | `check` (pre-commit) | 2 `powershell-lint` | `-SkipStep PSSA` | Parser syntax validation only |
-| `test` (pre-push) | 2 `powershell-lint-test` | `-SkipStep Syntax -Settings PSScriptAnalyzerSettings.test.psd1` | PSScriptAnalyzer only (full rule set) |
+| `test` (pre-push) | 2 `powershell-lint-test` | `-SkipStep Syntax -Settings test-PSScriptAnalyzerSettings.psd1` | PSScriptAnalyzer only (full rule set) |
 
-Standalone `nucleus-check pwsh` runs both phases (no `-SkipStep`). Settings files: `scripts/PSScriptAnalyzerSettings.check.psd1` (when PSSA runs outside the test pipeline) and `scripts/PSScriptAnalyzerSettings.test.psd1` (test step 2). Do not configure rule exclusions in the checker script itself.
+Standalone `nucleus-check pwsh` runs both phases (no `-SkipStep`). Settings files: `scripts/check-PSScriptAnalyzerSettings.psd1` (when PSSA runs outside the test pipeline) and `scripts/test-PSScriptAnalyzerSettings.psd1` (test step 2). Do not configure rule exclusions in the checker script itself.
 
 Always exclude `PSUseBOMForUnicodeEncodedFile` in settings files — UTF-8 without BOM is the repository standard (`.editorconfig`).
 

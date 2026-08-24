@@ -12,12 +12,12 @@
 
 .PARAMETER Settings
   Path to a PSScriptAnalyzerSettings .psd1 file. Controls which rules and
-  severities are enabled. Defaults to PSScriptAnalyzerSettings.check.psd1
+  severities are enabled. Defaults to check-PSScriptAnalyzerSettings.psd1
   (excludes three slow rules — PSAvoidUsingCmdletAliases,
   PSUseCmdletCorrectly, PSShouldProcess — plus
   PSUseBOMForUnicodeEncodedFile, which is auto-fixable and low value).
   Pass test settings for full coverage:
-  -Settings scripts/PSScriptAnalyzerSettings.test.psd1
+  -Settings scripts/test-PSScriptAnalyzerSettings.psd1
 
 .PARAMETER SkipStep
   Step names to skip. Recognized values:
@@ -40,10 +40,10 @@
   nix run ./src#check-pwsh -- -SkipStep PSSA
 
 .EXAMPLE
-  nix run ./src#check-pwsh -- -SkipStep Syntax -Settings scripts/PSScriptAnalyzerSettings.test.psd1
+  nix run ./src#check-pwsh -- -SkipStep Syntax -Settings scripts/test-PSScriptAnalyzerSettings.psd1
 
 .EXAMPLE
-  nix run ./src#check-pwsh -- -Settings scripts/PSScriptAnalyzerSettings.check.psd1 src/hosts/Windows/apply.ps1
+  nix run ./src#check-pwsh -- -Settings scripts/check-PSScriptAnalyzerSettings.psd1 src/hosts/Windows/apply.ps1
 
 .NOTES
   Environment variables: NUCLEUS_CHECK_PATHS.
@@ -63,7 +63,7 @@ $ErrorActionPreference = 'Stop'
 
 $RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path }
 
-if (-not $Settings) { $Settings = Join-Path $RepoRoot 'scripts\PSScriptAnalyzerSettings.check.psd1' }
+if (-not $Settings) { $Settings = Join-Path $RepoRoot 'scripts\check-PSScriptAnalyzerSettings.psd1' }
 
 $modulePath = Join-Path $RepoRoot 'src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force

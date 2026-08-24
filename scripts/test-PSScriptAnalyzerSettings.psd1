@@ -26,7 +26,7 @@
   PSUseBOMForUnicodeEncodedFile is excluded (that rule is auto-fixable by pwsh
   and rarely relevant for lint-only runs).
 
-  Unlike scripts/PSScriptAnalyzerSettings.check.psd1, this file does NOT
+  Unlike scripts/check-PSScriptAnalyzerSettings.psd1, this file does NOT
   exclude the three slow rules (PSAvoidUsingCmdletAliases, PSUseCmdletCorrectly,
   PSShouldProcess). Test runs take ~56s on 128 *.ps1 files (all rules enabled).
 
@@ -40,7 +40,7 @@
     data: .agents/skills/pssa-rule-benchmark/pssa-rule-benchmark-results.json
 
   Related settings files (all intentionally separate — no deduplication):
-    scripts/PSScriptAnalyzerSettings.check.psd1                   — pre-commit/lint (excludes slow rules)
+    scripts/check-PSScriptAnalyzerSettings.psd1                   — pre-commit/lint (excludes slow rules)
     src/users/default/pwsh/PSScriptAnalyzerSettings.psd1       — interactive profile
     .agents/skills/pssa-rule-benchmark/PSScriptAnalyzerSettings.psd1 — benchmarking
 #>

@@ -8,12 +8,12 @@
   (see src/modules/pwsh.nix).
 
   It provides full rule coverage for interactive use, matching the
-  test/CI configuration (scripts/PSScriptAnalyzerSettings.test.psd1).
+  test/CI configuration (scripts/test-PSScriptAnalyzerSettings.psd1).
   Only PSUseBOMForUnicodeEncodedFile is excluded.
 
   CI-specific settings files:
-    scripts/PSScriptAnalyzerSettings.check.psd1  — pre-commit checks
-    scripts/PSScriptAnalyzerSettings.test.psd1   — full coverage tests
+    scripts/check-PSScriptAnalyzerSettings.psd1  — pre-commit checks
+    scripts/test-PSScriptAnalyzerSettings.psd1   — full coverage tests
     .agents/skills/pssa-rule-benchmark/PSScriptAnalyzerSettings.psd1 — benchmarking
 
   All settings files are intentionally separate — no deduplication. Each serves

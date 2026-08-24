@@ -64,7 +64,7 @@ let
         ""
       ]
       (builtins.readFile ../scripts/shell/init.ps1 + builtins.readFile ../scripts/shell/profile.ps1)
-  # PSScriptAnalyzerSettings.psd1 — Method 3 (consumed by src/scripts/checks/check-pwsh.ps1 at CI time via -Settings); refer to scripts/PSScriptAnalyzerSettings.check.psd1 and scripts/PSScriptAnalyzerSettings.test.psd1.
+  # PSScriptAnalyzerSettings.psd1 — Method 3 (consumed by src/scripts/checks/check-pwsh.ps1 at CI time via -Settings); refer to scripts/check-PSScriptAnalyzerSettings.psd1 and scripts/test-PSScriptAnalyzerSettings.psd1.
   ;
 
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
@@ -80,8 +80,8 @@ in
   # via -Settings. PSSA does not auto-discover this path — it only discovers
   # PSScriptAnalyzerSettings.psd1 in the sibling directory of the analyzed file.
   # The CI copies consumed by src/scripts/checks/check-pwsh.ps1 live at
-  # scripts/PSScriptAnalyzerSettings.check.psd1 and
-  # scripts/PSScriptAnalyzerSettings.test.psd1 (Method 3).
+  # scripts/check-PSScriptAnalyzerSettings.psd1 and
+  # scripts/test-PSScriptAnalyzerSettings.psd1 (Method 3).
   home.file.".config/powershell/PSScriptAnalyzerSettings.psd1" = {
     # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
     source = config.lib.file.mkOutOfStoreSymlink (

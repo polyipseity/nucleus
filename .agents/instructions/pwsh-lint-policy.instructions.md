@@ -1,7 +1,7 @@
 ---
 description: "Use when handling PSScriptAnalyzer lint results in PowerShell files. Covers suppression rules, per-rule fix strategies, and how to document new rule policies."
 name: "PowerShell Lint Policy"
-applyTo: "**/*.ps1, scripts/PSScriptAnalyzerSettings.*.psd1"
+applyTo: "**/*.ps1, scripts/*-PSScriptAnalyzerSettings.psd1"
 ---
 
 # PowerShell lint rule fixing policy
