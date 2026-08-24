@@ -425,15 +425,6 @@ in
         ArchiveVaultEnabled = 1;
       };
 
-      # Password and passkey autofill settings for Safari and login fields.
-      # These control the "Settings" app behavior for autofill across the system.
-      "com.apple.PassKit.policy" = {
-        AutoFillPasskeysAndPasswords = 1; # enable autofill for passwords/passkeys
-        AutoFillPasskeysAndPasswordsSource = "com.apple.Passwords"; # use macOS Passwords app
-        SetupVerificationCodesEnabled = 1; # enable verification code setup
-        DeleteVerificationCodesAfterUse = 0; # do NOT auto-delete codes after use
-      };
-
       # BetterDisplay: launch at login, show resolutions as a flat list, use
       # maximum native resolution by default, configure update settings, enable
       # crash reporting, disable professional features (licensing), and set delay
