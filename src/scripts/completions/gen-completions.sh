@@ -25,7 +25,7 @@ COMPLETIONS_DIR="$REPO_ROOT/src/modules/completions/zsh"
 
 # The canonical nucleus-* command set (alphabetical) — the coverage contract
 # shared with check step 10-completions-fresh and the generator tests.
-COMMANDS=(ai apply bootstrap check cloud config gc gs-pdf-opt svc test update vm)
+COMMANDS=(ai apply bootstrap check cloud config gc svc test update utils vm)
 
 # Map a command to its .sh help source (the executable contract).
 sh_for_command() {
@@ -48,6 +48,7 @@ known_subcommands() {
   apply) printf '%s\n' "health-check|audit-store" ;;
   cloud) printf '%s\n' "setup|reset|sync" ;;
   update) printf '%s\n' "lockfile" ;;
+  utils) printf '%s\n' "gs-pdf-opt" ;;
   esac
 }
 
