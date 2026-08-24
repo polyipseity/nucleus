@@ -32,7 +32,7 @@
 - `nucleus-check sh` — check POSIX shell syntax
 - `nucleus-cloud setup` — configure cloud remotes and re-apply
 - `nucleus-gc` — run Nix garbage collection (VM GC policy: `vm-management.instructions.md`)
-- `nucleus-gs-pdf-opt` — optimize PDF files with Ghostscript (keeps .bak backup by default; use `--rm-bak` to remove)
+- `nucleus-utils gs-pdf-opt` — optimize PDF files with Ghostscript (keeps .bak backup by default; use `--rm-bak` to remove)
 - `nucleus-apply audit-store` — print Nix store audit baseline metrics
 - `nucleus-apply health-check` — run health checks
 - `nucleus-cloud sync` — pull cloud replicas

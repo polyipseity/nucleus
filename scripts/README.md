@@ -8,7 +8,7 @@ Each nucleus app ships both a `.sh` and a `.ps1` twin. The `.sh` runs on POSIX h
 
 ## `nucleus-*` commands
 
-The flake wraps each paired `.sh` / `.ps1` pair as `nucleus-<name>` (for example `nucleus-gc` → `scripts/gc.sh` + `scripts/gc.ps1`). The one exception is `nucleus-apply`: its POSIX entry point lives at `src/scripts/apply.sh`, with its Windows twin at `scripts/apply.ps1`.
+The flake wraps each paired `.sh` / `.ps1` pair as `nucleus-<name>` (for example `nucleus-gc` → `scripts/gc.sh` + `scripts/gc.ps1`). The one exception is `nucleus-apply`: its POSIX entry point lives at `src/scripts/apply.sh`, with its Windows twin at `scripts/apply.ps1`. `nucleus-utils` groups user utilities; `gs-pdf-opt` is its first subcommand (run as `nucleus-utils gs-pdf-opt`).
 
 | App | POSIX | Windows |
 |-----|-------|---------|
@@ -19,7 +19,7 @@ The flake wraps each paired `.sh` / `.ps1` pair as `nucleus-<name>` (for example
 | `nucleus-cloud` | `scripts/cloud.sh` | `scripts/cloud.ps1` |
 | `nucleus-config` | `scripts/config.sh` | `scripts/config.ps1` |
 | `nucleus-gc` | `scripts/gc.sh` | `scripts/gc.ps1` |
-| `nucleus-gs-pdf-opt` | `scripts/gs-pdf-opt.sh` | `scripts/gs-pdf-opt.ps1` |
+| `nucleus-utils` | `scripts/utils.sh` | `scripts/utils.ps1` |
 | `nucleus-svc` | `scripts/svc.sh` | `scripts/svc.ps1` |
 | `nucleus-test` | `scripts/test.sh` | `scripts/test.ps1` |
 | `nucleus-update` | `scripts/update.sh` | `scripts/update.ps1` |
