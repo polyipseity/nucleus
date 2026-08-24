@@ -341,11 +341,11 @@ function Invoke-NucleusGhostscript {
 
 # CompatibilityLevel is pinned to 2.0 (latest as of 2026-05); bump when a
 # newer PDF compatibility target is released by Ghostscript.
-Add-ShellAlias '-gs-pdf-opt-default' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/default  -dNOPAUSE -dQUIET -dBATCH @Args }
-Add-ShellAlias '-gs-pdf-opt-prepress' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH @Args }
-Add-ShellAlias '-gs-pdf-opt-printer' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer  -dNOPAUSE -dQUIET -dBATCH @Args }
-Add-ShellAlias '-gs-pdf-opt-ebook' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook    -dNOPAUSE -dQUIET -dBATCH @Args }
-Add-ShellAlias '-gs-pdf-opt-screen' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen   -dNOPAUSE -dQUIET -dBATCH @Args }
+Add-ShellAlias '-optimize-pdf-default' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/default  -dNOPAUSE -dQUIET -dBATCH @Args }
+Add-ShellAlias '-optimize-pdf-prepress' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH @Args }
+Add-ShellAlias '-optimize-pdf-printer' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer  -dNOPAUSE -dQUIET -dBATCH @Args }
+Add-ShellAlias '-optimize-pdf-ebook' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook    -dNOPAUSE -dQUIET -dBATCH @Args }
+Add-ShellAlias '-optimize-pdf-screen' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen   -dNOPAUSE -dQUIET -dBATCH @Args }
 
 # la/ll: prefer eza for colour, icons, and extended metadata; fall back to
 # Get-ChildItem when eza is absent so the profile loads on unmanaged machines.
