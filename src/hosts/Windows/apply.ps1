@@ -295,20 +295,24 @@ if ($isAdmin -and -not $Elevated) {
 # The nucleus command surface was merged: health-check and audit-store are now
 # standalone actions of apply.ps1 instead of separate scripts.  The default
 # "apply" action falls through to the existing apply flow below, unchanged.
-# No helper scripts exist under src/scripts/ for these on Windows yet, so each
-# is a thin stub that reports not-implemented and exits 0.
+# The standalone actions delegate to the Windows twin scripts/apply.ps1 so the
+# twin is not dead code (mirrors how svc.ps1 / gc.ps1 are consumed below).
 $actionRepoRoot = (Resolve-Path -Path (Join-Path -Path $PSScriptRoot -ChildPath "..\..\..")).Path
+$applyScript = Join-Path -Path $actionRepoRoot -ChildPath "scripts\apply.ps1"
 switch ($Action) {
   "health-check" {
-    Write-NucleusInfo -CommandName health-check "health-check is not yet implemented for Windows; exiting 0"
+    if (Test-Path -LiteralPath $applyScript) {
+      & $applyScript health-check
+    } else {
+      Write-NucleusInfo -CommandName health-check "scripts/apply.ps1 not found; health-check is not yet implemented for Windows; exiting 0"
+    }
     exit 0
   }
   "audit-store" {
-    $auditStoreScript = Join-Path -Path $actionRepoRoot -ChildPath "src\scripts\lib\audit-store.ps1"
-    if (Test-Path -LiteralPath $auditStoreScript) {
-      & $auditStoreScript
+    if (Test-Path -LiteralPath $applyScript) {
+      & $applyScript audit-store
     } else {
-      Write-NucleusInfo -CommandName audit-store "audit-store is not yet implemented for Windows; exiting 0"
+      Write-NucleusInfo -CommandName audit-store "scripts/apply.ps1 not found; audit-store is not yet implemented for Windows; exiting 0"
     }
     exit 0
   }

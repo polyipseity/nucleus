@@ -454,6 +454,7 @@
         {
           nucleus-apply = nucleusApp {
             name = "apply";
+            # Windows twin: scripts/apply.ps1 (consumed by src/hosts/Windows/apply.ps1).
             scriptName = "src/scripts/apply";
             runtimeInputs = [
               pkgs.curl

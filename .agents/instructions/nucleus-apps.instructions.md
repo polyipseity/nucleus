@@ -56,6 +56,8 @@ Windows provisioning (`apply.ps1`, agent-host-shell setup, scheduled-task regist
 
 Every POSIX `scripts/<name>.sh` that exposes subcommands needs a `scripts/<name>.ps1` twin with matching `[ValidateSet(...)]` `$Action` dispatch. The two entry points must accept the same subcommand vocabulary so `nix run .#<name>` behaves identically on macOS/NixOS and Windows.
 
+`apply` has a `scripts/apply.ps1` twin (consumed by `src/hosts/Windows/apply.ps1` for the `health-check` / `audit-store` actions), consistent with `svc` / `gc` / `cloud` / `vm` / `test` / `check`.
+
 ## Completion generators
 
 `src/scripts/completions/gen-completions.sh` (zsh) and `gen-completions.ps1` (pwsh) are the source of truth for completions. They derive completions from each command's `--help` output. After any change to the command surface (new command, renamed subcommand, changed `[ValidateSet]`), regenerate and commit the output. Check step `10-completions-fresh` enforces freshness: it re-runs the generators in check mode and fails on any diff. Generated completion files must not be edited by hand.
