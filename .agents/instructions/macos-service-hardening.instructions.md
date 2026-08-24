@@ -93,7 +93,8 @@ The `service-watchdog` (every 5 min) does this automatically via `recover_launch
 - When adding a new managed macOS defaults domain in either `src/hosts/MacBook/defaults.nix` or `src/platforms/macOS/modules/default.nix`, update `resetUserPreferenceDomains` in `src/platforms/macOS/modules/preference-gc.nix` in the same change.
 - Keep `resetUserPreferenceDomains` alphabetically sorted.
 - If the managed domain is `NSGlobalDomain`, also account for the on-disk `.GlobalPreferences` alias.
-- `resetUserPreferenceDomains` drives `gc-managed-user-preferences` and must not be wired into automatic `home.activation.*` execution.
+- `resetUserPreferenceDomains` drives the manual drift-reset command `nucleus-gc preferences` (backed by `macos-purge-preferences.sh`) and must not be wired into automatic `home.activation.*` execution. The GC is domain-level destructive — it wipes the whole plist including unmanaged keys — and is gated on `nix --verify`, so it must stay manual and must not be wired into `home.activation.*` or the Darwin apply path.
+- `.policy`-suffixed / daemon-owned preference domains (e.g. `com.apple.PassKit.policy`) revert writes made during `darwin-rebuild switch` and must be provisioned from a user-terminal activation script (the Safari precedent) rather than `CustomUserPreferences`; see `macos-configure-passwords-defaults.sh`.
 
 ## nix-darwin activation scripts
 

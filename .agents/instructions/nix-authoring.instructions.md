@@ -88,7 +88,7 @@ Always use `pkgs.writeNucleusShellApplication` instead of `pkgs.writeShellApplic
 
 `writeNucleusShellApplication` provides:
 
-- `scriptName` — repo-root-relative path without `.sh` suffix. Paths under `scripts/` resolve via `scripts-bundle` (e.g. `"scripts/gc"` for user CLIs). All other paths resolve via `script-tree` (e.g. `"src/scripts/services/jellyfin-daemon"`, `"src/platforms/macOS/scripts/macos-gc-preferences"`, `"src/hosts/MacBook/scripts/macos-daemonize-linux-builder"`). The script receives `$@` from the wrapper; pass values as positional args at the call site. The entry script is always reachable at `$out/<scriptName>.sh` because every call site mirrors both trees into `$out`.
+- `scriptName` — repo-root-relative path without `.sh` suffix. Paths under `scripts/` resolve via `scripts-bundle` (e.g. `"scripts/gc"` for user CLIs). All other paths resolve via `script-tree` (e.g. `"src/scripts/services/jellyfin-daemon"`, `"src/platforms/macOS/scripts/macos-purge-preferences"`, `"src/hosts/MacBook/scripts/macos-daemonize-linux-builder"`). The script receives `$@` from the wrapper; pass values as positional args at the call site. The entry script is always reachable at `$out/<scriptName>.sh` because every call site mirrors both trees into `$out`.
 - `text` — inline the script body directly instead of referencing an external file. Does not bundle trees; sets up `PATH` from `runtimeInputs`, and appends the text content to the wrapper. Use when the script body is trivial or when a shared script cannot be reused due to host-specific values.
 - `extraEnv` — injects Nix-computed values as environment variables into the wrapper script. Values are automatically shell-escaped. **Prefer positional args for standalone scripts** (see "CLI-arg-first pattern" below). Use `extraEnv` when the script body is a **shared body sourced by multiple callers** (see "Shared script body pattern" below) — the env var contract stays uniform across callers, avoiding dual-parsing of `$1` and env-var fallbacks in the shared code. Environment variables are opaque to shellcheck, bypass PATH isolation, and cannot be forwarded through exec wrappers; these drawbacks are acceptable for shared bodies where args are not the natural interface.
 
@@ -124,7 +124,7 @@ extraEnv = {
   NIX_STORE_BIN = "${pkgs.nix}/bin/nix";
   MANAGED_PREF_DOMAINS = builtins.concatStringsSep " " resetUserPreferenceDomains;
 };
-scriptName = "src/platforms/macOS/scripts/macos-gc-preferences";
+scriptName = "src/platforms/macOS/scripts/macos-purge-preferences";
 ```
 
 This avoids:
