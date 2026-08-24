@@ -501,8 +501,8 @@
             name = "config";
             runtimeInputs = [ pkgs.jq ];
           };
-          nucleus-gs-pdf-opt = nucleusApp {
-            name = "gs-pdf-opt";
+          nucleus-utils = nucleusApp {
+            name = "utils";
             runtimeInputs = [ pkgs.ghostscript ];
           };
           nucleus-gc = nucleusApp {
