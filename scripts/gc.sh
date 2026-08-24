@@ -25,7 +25,7 @@ cleanup-nix | preferences)
   shift
   case "$action" in
   cleanup-nix) do_cleanup_nix "$@" ;;
-  preferences) do_preferences "$@" ;;
+  preferences) do_macos_preferences "$@" ;;
   esac
   exit $?
   ;;
@@ -634,8 +634,8 @@ do_cleanup_nix() {
   nuc_done "$@"
 }
 
-# do_preferences — macOS-only: purge stale managed user preference domains.
-do_preferences() {
+# do_macos_preferences — macOS-only: purge stale managed user preference domains.
+do_macos_preferences() {
   if [ "$(uname -s)" != "Darwin" ]; then
     error "preferences subcommand is macOS-only"
     exit 1
@@ -644,7 +644,7 @@ do_preferences() {
   export MANAGED_PREF_DOMAINS
   NIX_STORE_BIN="${NIX_STORE_BIN:-nix}"
   export NIX_STORE_BIN
-  exec "$SCRIPT_DIR/../../src/platforms/macOS/scripts/macos-gc-preferences.sh"
+  exec "$SCRIPT_DIR/../src/scripts/services/gc-macos-preferences.sh"
 }
 
 if [ "$system_gc" = true ]; then
