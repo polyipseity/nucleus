@@ -3,30 +3,30 @@
 .SYNOPSIS
   Grouped nucleus user utilities.
 .DESCRIPTION
-  Currently provides the gs-pdf-opt subcommand: optimize PDF files using
-  Ghostscript with backup/restore. The gs-pdf-opt subcommand's --preset and
+  Currently provides the optimize-pdf subcommand: optimize PDF files using
+  Ghostscript with backup/restore. The optimize-pdf subcommand's --preset and
   --rm-bak options map to the -Preset and -RemoveBackup PowerShell parameters
   below; input files map to -File.
 .PARAMETER Action
-  The subcommand to run: gs-pdf-opt.
+  The subcommand to run: optimize-pdf.
 .PARAMETER Preset
   Ghostscript PDF settings preset: default, ebook, prepress, printer, screen.
-  Default: default. Maps to the gs-pdf-opt --preset option.
+  Default: default. Maps to the optimize-pdf --preset option.
 .PARAMETER RemoveBackup
   Switch. Remove the .bak backup file on success (kept by default). Maps to
-  the gs-pdf-opt --rm-bak option.
+  the optimize-pdf --rm-bak option.
 .PARAMETER File
   One or more PDF file paths to optimize.
 .PARAMETER Help
   Show detailed help.
 .EXAMPLE
-  .\utils.ps1 gs-pdf-opt document.pdf
-  .\utils.ps1 gs-pdf-opt -Preset screen doc1.pdf doc2.pdf
+  .\utils.ps1 optimize-pdf document.pdf
+  .\utils.ps1 optimize-pdf -Preset screen doc1.pdf doc2.pdf
 #>
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('gs-pdf-opt')]
+  [ValidateSet('optimize-pdf')]
   [string]$Action,
 
   [Parameter()]
@@ -48,7 +48,7 @@ $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-N
 Import-Module $modulePath -Force -DisableNameChecking
 
 if ($Help -or -not $Action) {
-  if (-not $Action) { Write-NucleusError "missing subcommand (gs-pdf-opt)" }
+  if (-not $Action) { Write-NucleusError "missing subcommand (optimize-pdf)" }
   Get-Help $PSCommandPath -Detailed
   exit 0
 }
@@ -69,7 +69,7 @@ if (-not (Get-Command Invoke-NucleusGhostscript -ErrorAction SilentlyContinue)) 
 }
 
 switch ($Action) {
-  'gs-pdf-opt' {
+  'optimize-pdf' {
     $validPresets = @("default", "ebook", "prepress", "printer", "screen")
     if ($validPresets -notcontains $Preset) {
       Write-NucleusError "unknown preset '$Preset'. Valid: $($validPresets -join ', ')"
@@ -77,7 +77,7 @@ switch ($Action) {
     }
 
     if ($File.Count -eq 0) {
-      Write-NucleusInfo "usage: $(Split-Path -Leaf $PSCommandPath) gs-pdf-opt [[-Preset] <name>] [[-RemoveBackup]] [-File] <path>..."
+      Write-NucleusInfo "usage: $(Split-Path -Leaf $PSCommandPath) optimize-pdf [[-Preset] <name>] [[-RemoveBackup]] [-File] <path>..."
       Write-NucleusInfo "presets: $($validPresets -join ', ') (default: default)"
       Write-NucleusInfo "options: -RemoveBackup  Remove the .bak backup on success (kept by default)."
       exit 1

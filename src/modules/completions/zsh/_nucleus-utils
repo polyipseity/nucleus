@@ -4,6 +4,6 @@
 
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
-  '1:subcommand:((gs-pdf-opt ".."))' \
+  '1:subcommand:((optimize-pdf ".."))' \
   '--preset[preset]' \
   '--rm-bak[rm bak]'

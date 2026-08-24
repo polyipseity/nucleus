@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # nucleus-utils: Grouped nucleus user utilities.
 #
-# Currently provides the gs-pdf-opt subcommand: optimize PDF files with
+# Currently provides the optimize-pdf subcommand: optimize PDF files with
 # Ghostscript, keeping a .bak backup that is restored automatically if
 # optimization fails.
 #
 # Usage: nucleus-utils <subcommand> [args...]
-#   Subcommand: gs-pdf-opt [--preset <name>] [--rm-bak] <file>...
+#   Subcommand: optimize-pdf [--preset <name>] [--rm-bak] <file>...
 #   Presets: default, ebook, prepress, printer, screen (default: default).
 #
 # Env vars: TMPDIR — ghostscript scratch space; falls back to a per-user
@@ -33,15 +33,15 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # subcommand, flag, and preset the parsers accept, so it stays in sync with
 # the dispatch and case branches below.
 usage() {
-  usage_std "$(basename "$0")" "gs-pdf-opt [--preset <name>] [--rm-bak] <file>..." \
-    "Grouped nucleus user utilities. Currently: gs-pdf-opt (optimize PDFs with Ghostscript)."
+  usage_std "$(basename "$0")" "optimize-pdf [--preset <name>] [--rm-bak] <file>..." \
+    "Grouped nucleus user utilities. Currently: optimize-pdf (optimize PDFs with Ghostscript)."
   cat <<'EOF'
 
 Subcommands:
-  gs-pdf-opt [--preset <name>] [--rm-bak] <file>...
+  optimize-pdf [--preset <name>] [--rm-bak] <file>...
               Optimize PDF files using Ghostscript. Keeps a .bak backup by default.
 
-  gs-pdf-opt presets (default: default):
+  optimize-pdf presets (default: default):
     default   - high quality
     ebook     - medium quality (good for e-readers)
     prepress  - high quality (preserves color, suitable for printing)
@@ -56,13 +56,13 @@ Subcommands:
 EOF
 }
 
-# do_gs_pdf_opt — Optimize each input PDF in place via Ghostscript.
+# do_optimize_pdf — Optimize each input PDF in place via Ghostscript.
 # Args: $@ — option/flag pairs followed by input file paths.
 # Side effects: renames each input to <file>.bak and writes the optimized
 # file back to <file>; removes the .bak only with --rm-bak.
 # Preconditions: gs on PATH; TMPDIR set or creatable; no pre-existing .bak
 # for any input — the .bak is the only recovery copy if gs fails mid-run.
-do_gs_pdf_opt() {
+do_optimize_pdf() {
   local preset="default"
   local rm_bak=false
   local files=()
@@ -115,7 +115,7 @@ do_gs_pdf_opt() {
   # From macOS sandboxed contexts (do shell script via Services), TMPDIR may not
   # be set and /tmp may not be writable, so fall back to a per-user cache dir
   # that is guaranteed writable and scoped to this tool.
-  export TMPDIR="${TMPDIR:-$HOME/Library/Caches/nucleus-gs-pdf-opt}"
+  export TMPDIR="${TMPDIR:-$HOME/Library/Caches/nucleus-optimize-pdf}"
   mkdir -p "$TMPDIR"
 
   local gs_cmd
@@ -169,8 +169,8 @@ main() {
   shift
 
   case "$subcommand" in
-  gs-pdf-opt)
-    do_gs_pdf_opt "$@"
+  optimize-pdf)
+    do_optimize_pdf "$@"
     ;;
   *)
     error "unknown subcommand: $subcommand"

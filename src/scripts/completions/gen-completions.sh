@@ -48,7 +48,7 @@ known_subcommands() {
   apply) printf '%s\n' "health-check|audit-store" ;;
   cloud) printf '%s\n' "setup|reset|sync" ;;
   update) printf '%s\n' "lockfile" ;;
-  utils) printf '%s\n' "gs-pdf-opt" ;;
+  utils) printf '%s\n' "optimize-pdf" ;;
   esac
 }
 
