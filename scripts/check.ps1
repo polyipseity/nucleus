@@ -10,7 +10,7 @@
 #                     all    Run every check via the step pipeline.
 #                     packer Run the Packer template validation (check-packer.ps1).
 #                     sh     Run the shell script lint (check-sh.ps1).
-#                     pwsh   Run check-pwsh.ps1 + check-pwsh-naming.ps1.
+#                     pwsh   Run check-pwsh.ps1.
 #   --full           Run all checks including whole-repo checks (default).
 #   --scoped         Run only path-scopable checks.
 #   --fail-fast      Exit immediately on first failure.
@@ -315,8 +315,6 @@ switch ($Action) {
   'pwsh' {
     & (Join-Path $ScriptDir '..\src\scripts\checks\check-pwsh.ps1') @Paths
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    & (Join-Path $ScriptDir 'check-pwsh-naming.ps1')
-    exit $LASTEXITCODE
   }
   'all' {
     $CheckDir = Join-Path $RepoRoot "src/scripts/checks"

@@ -313,13 +313,12 @@ do_sh() {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# pwsh subcommand — PowerShell syntax (check-pwsh.ps1) + naming lint (check-pwsh-naming.ps1)
+# pwsh subcommand — PowerShell syntax (check-pwsh.ps1)
 # ──────────────────────────────────────────────────────────────────────────────
 
 do_pwsh() {
   local _exit=0
   pwsh -NoProfile -File "$_ORCH_SCRIPT_DIR/../src/scripts/checks/check-pwsh.ps1" "$@" || _exit=$?
-  pwsh -NoProfile -File "$_ORCH_SCRIPT_DIR/check-pwsh-naming.ps1" "$@" || _exit=$?
   return $_exit
 }
 

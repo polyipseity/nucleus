@@ -121,7 +121,7 @@ This is not an exemption — use inline suppression with a documented reason as 
 
 **Root cause:** PowerShell convention requires function names to use singular nouns. PSSA's `PSUseSingularNouns` rule flags any function whose noun part appears grammatically plural (typically ending in 's', 'es', 'ies', or irregular plurals).
 
-**Semantic audit required:** Passing `scripts/check-pwsh.ps1` (PSSA) is necessary but not sufficient. A function can pass PSSA while still misrepresenting its contract. After fixing PSSA findings, run `scripts/check-pwsh-naming.ps1` and apply the decision tree below. Never rename only to silence PSSA without checking whether the function operates on a collection.
+**Semantic audit required:** Passing `scripts/check-pwsh.ps1` (PSSA) is necessary but not sufficient. A function can pass PSSA while still misrepresenting its contract. After fixing PSSA findings, apply the decision tree below. Never rename only to silence PSSA without checking whether the function operates on a collection.
 
 ### Anti-pattern: naive de-pluralization
 
