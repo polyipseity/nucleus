@@ -61,7 +61,7 @@
 					<key>COMMAND_STRING</key>
 					<string>export PATH="/etc/profiles/per-user/$USER/bin:$PATH"
 for f in "$@"; do
-    nucleus-gs-pdf-opt --preset prepress "$f"
+    nucleus-utils gs-pdf-opt --preset prepress "$f"
 done
 </string>
 					<key>CheckedForUserDefaultShell</key>

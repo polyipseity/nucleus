@@ -23,7 +23,7 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - default\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-gs-pdf-opt --preset default '%1'"
+          "nucleus-utils gs-pdf-opt --preset default '%1'"
         valueType: String
 
     - resource: Microsoft.Windows.Registry/RegistryValue
@@ -42,7 +42,7 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - prepress\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-gs-pdf-opt --preset prepress '%1'"
+          "nucleus-utils gs-pdf-opt --preset prepress '%1'"
         valueType: String
 
     - resource: Microsoft.Windows.Registry/RegistryValue
@@ -61,7 +61,7 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - printer\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-gs-pdf-opt --preset printer '%1'"
+          "nucleus-utils gs-pdf-opt --preset printer '%1'"
         valueType: String
 
     - resource: Microsoft.Windows.Registry/RegistryValue
@@ -80,7 +80,7 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - ebook\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-gs-pdf-opt --preset ebook '%1'"
+          "nucleus-utils gs-pdf-opt --preset ebook '%1'"
         valueType: String
 
     - resource: Microsoft.Windows.Registry/RegistryValue
@@ -99,5 +99,5 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - screen\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-gs-pdf-opt --preset screen '%1'"
+          "nucleus-utils gs-pdf-opt --preset screen '%1'"
         valueType: String
