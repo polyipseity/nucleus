@@ -73,7 +73,7 @@ Check/test preflight, tool-availability policy, scoped-mode conventions, and dyn
 - All services use persistent-daemon semantics by default (auto-start + auto-restart). See `cross-host-feature-parity.instructions.md` (Service firing policy section) for the default policy and per-service classification.
 - Sort unordered lists/blocks alphabetically; preserve semantic/load order where required.
 - Service entry lists (currentNucleusAppBundles, currentNucleusWorkflows,
-  gsPdfOptPresets, context-pdf-opt.dsc.yml) are manually maintained in their
+  optimizePdfPresets, context-optimize-pdf.dsc.yml) are manually maintained in their
   declared order — alphabetical by entry name, with the 5 Optimize PDF presets
   grouped as a block sorted quality-descending (default → prepress → printer
   → ebook → screen). No automatic re-sorting; see inline comments in each

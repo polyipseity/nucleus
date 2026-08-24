@@ -1,4 +1,4 @@
-# tests/integration/gs-pdf-opt-presets-tests.nix — Verify cross-platform preset parity for all 5 Ghostscript PDF optimization presets.
+# tests/integration/optimize-pdf-presets-tests.nix — Verify cross-platform preset parity for all 5 Ghostscript PDF optimization presets.
 
 let
   lib = import <nixpkgs/lib>;
@@ -6,9 +6,9 @@ let
   macAutomatorWorkflowsText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows.nix;
   macAppBundlesText = builtins.readFile ../../src/hosts/MacBook/services/app-bundles.nix;
   nixosServicesText = builtins.readFile ../../src/hosts/NixOS/services.nix;
-  windowsDscText = builtins.readFile ../../src/hosts/Windows/user/context-pdf-opt.dsc.yml;
-  nautilusScriptText = builtins.readFile ../../src/scripts/integrations/configure-file-manager-pdf-opt.sh;
-  plasmaDesktopText = builtins.readFile ../../src/users/default/plasma/desktop/nucleus-gs-pdf-opt.desktop;
+  windowsDscText = builtins.readFile ../../src/hosts/Windows/user/context-optimize-pdf.dsc.yml;
+  nautilusScriptText = builtins.readFile ../../src/scripts/integrations/configure-file-manager-optimize-pdf.sh;
+  plasmaDesktopText = builtins.readFile ../../src/users/default/plasma/desktop/nucleus-optimize-pdf.desktop;
 
   inherit (import ../lib.nix) assert';
 
@@ -241,5 +241,5 @@ in
 builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
-  message = "gs-pdf-opt cross-platform preset parity tests passed";
+  message = "optimize-pdf cross-platform preset parity tests passed";
 }
