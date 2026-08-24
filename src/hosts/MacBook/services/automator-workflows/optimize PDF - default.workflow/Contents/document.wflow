@@ -61,7 +61,7 @@
 					<key>COMMAND_STRING</key>
 					<string>export PATH="/etc/profiles/per-user/$USER/bin:$PATH"
 for f in "$@"; do
-    nucleus-utils gs-pdf-opt --preset default "$f"
+    nucleus-utils optimize-pdf --preset default "$f"
 done
 </string>
 					<key>CheckedForUserDefaultShell</key>

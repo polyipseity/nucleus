@@ -8,7 +8,7 @@ properties:
   resources:
     # Right-click "optimize PDF" presets for .pdf files only
     - resource: Microsoft.Windows.Registry/RegistryValue
-      id: gsPdfOptVerbDefault
+      id: optimizePdfVerbDefault
       directives:
         description: Add "optimize PDF - default" to the right-click context menu for PDF files
       settings:
@@ -16,18 +16,18 @@ properties:
         valueData: "optimize PDF - default"
         valueType: String
     - resource: Microsoft.Windows.Registry/RegistryValue
-      id: gsPdfOptCmdDefault
+      id: optimizePdfCmdDefault
       directives:
         description: Command for the optimize PDF - default context menu entry
       settings:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - default\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils gs-pdf-opt --preset default '%1'"
+          "nucleus-utils optimize-pdf --preset default '%1'"
         valueType: String
 
     - resource: Microsoft.Windows.Registry/RegistryValue
-      id: gsPdfOptVerbPrepress
+      id: optimizePdfVerbPrepress
       directives:
         description: Add "optimize PDF - prepress" to the right-click context menu for PDF files
       settings:
@@ -35,18 +35,18 @@ properties:
         valueData: "optimize PDF - prepress"
         valueType: String
     - resource: Microsoft.Windows.Registry/RegistryValue
-      id: gsPdfOptCmdPrepress
+      id: optimizePdfCmdPrepress
       directives:
         description: Command for the optimize PDF - prepress context menu entry
       settings:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - prepress\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils gs-pdf-opt --preset prepress '%1'"
+          "nucleus-utils optimize-pdf --preset prepress '%1'"
         valueType: String
 
     - resource: Microsoft.Windows.Registry/RegistryValue
-      id: gsPdfOptVerbPrinter
+      id: optimizePdfVerbPrinter
       directives:
         description: Add "optimize PDF - printer" to the right-click context menu for PDF files
       settings:
@@ -54,18 +54,18 @@ properties:
         valueData: "optimize PDF - printer"
         valueType: String
     - resource: Microsoft.Windows.Registry/RegistryValue
-      id: gsPdfOptCmdPrinter
+      id: optimizePdfCmdPrinter
       directives:
         description: Command for the optimize PDF - printer context menu entry
       settings:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - printer\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils gs-pdf-opt --preset printer '%1'"
+          "nucleus-utils optimize-pdf --preset printer '%1'"
         valueType: String
 
     - resource: Microsoft.Windows.Registry/RegistryValue
-      id: gsPdfOptVerbEbook
+      id: optimizePdfVerbEbook
       directives:
         description: Add "optimize PDF - ebook" to the right-click context menu for PDF files
       settings:
@@ -73,18 +73,18 @@ properties:
         valueData: "optimize PDF - ebook"
         valueType: String
     - resource: Microsoft.Windows.Registry/RegistryValue
-      id: gsPdfOptCmdEbook
+      id: optimizePdfCmdEbook
       directives:
         description: Command for the optimize PDF - ebook context menu entry
       settings:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - ebook\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils gs-pdf-opt --preset ebook '%1'"
+          "nucleus-utils optimize-pdf --preset ebook '%1'"
         valueType: String
 
     - resource: Microsoft.Windows.Registry/RegistryValue
-      id: gsPdfOptVerbScreen
+      id: optimizePdfVerbScreen
       directives:
         description: Add "optimize PDF - screen" to the right-click context menu for PDF files
       settings:
@@ -92,12 +92,12 @@ properties:
         valueData: "optimize PDF - screen"
         valueType: String
     - resource: Microsoft.Windows.Registry/RegistryValue
-      id: gsPdfOptCmdScreen
+      id: optimizePdfCmdScreen
       directives:
         description: Command for the optimize PDF - screen context menu entry
       settings:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.pdf\shell\optimize PDF - screen\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils gs-pdf-opt --preset screen '%1'"
+          "nucleus-utils optimize-pdf --preset screen '%1'"
         valueType: String
