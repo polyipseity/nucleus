@@ -25,6 +25,7 @@ let
     "com.apple.HIToolbox"
     "com.apple.LaunchServices"
     "com.apple.Photos"
+    "com.apple.PassKit.policy"
     "com.apple.Safari"
     "com.apple.Siri"
     "com.apple.SoftwareUpdate"
