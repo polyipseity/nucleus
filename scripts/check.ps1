@@ -313,7 +313,7 @@ switch ($Action) {
     exit $LASTEXITCODE
   }
   'pwsh' {
-    & (Join-Path $ScriptDir 'check-pwsh.ps1') @Paths
+    & (Join-Path $ScriptDir '..\src\scripts\checks\check-pwsh.ps1') @Paths
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     & (Join-Path $ScriptDir 'check-pwsh-naming.ps1')
     exit $LASTEXITCODE

@@ -1,6 +1,6 @@
 ---
 name: pssa-rule-benchmark
-description: "Benchmark each PSScriptAnalyzer rule independently to identify slow rules and measure per-rule performance. Use when debugging slow lint runs, optimizing check-pwsh.ps1, or profiling PSSA rule timing."
+description: "Benchmark each PSScriptAnalyzer rule independently to identify slow rules and measure per-rule performance. Use when debugging slow lint runs, optimizing the `check pwsh` PSSA path (src/scripts/checks/check-pwsh.ps1), or profiling PSSA rule timing."
 argument-hint: "[ResultsFile]"
 ---
 
@@ -8,7 +8,7 @@ argument-hint: "[ResultsFile]"
 
 ## When to use
 
-- Debug why `check-pwsh.ps1` or `Invoke-ScriptAnalyzer` is slow
+- Debug why the `check pwsh` PSSA path (src/scripts/checks/check-pwsh.ps1) or `Invoke-ScriptAnalyzer` is slow
 - Profile individual rule timing across the repository's `.ps1` files
 - Compare performance between PSScriptAnalyzer versions
 - Identify rules that dominate total lint time

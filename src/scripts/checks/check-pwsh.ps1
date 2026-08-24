@@ -51,7 +51,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Settings = (Join-Path $PSScriptRoot 'PSScriptAnalyzerSettings.check.psd1'),
+  [string]$Settings = '',
   [string[]]$SkipStep = @(),
   [switch]$Scoped,
   [Parameter(Position = 0)]
@@ -61,7 +61,11 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-NucleusOutput.psm1'
+$RepoRoot = if ($env:NUCLEUS_REPO_ROOT) { $env:NUCLEUS_REPO_ROOT } else { (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path }
+
+if (-not $Settings) { $Settings = Join-Path $RepoRoot 'scripts\PSScriptAnalyzerSettings.check.psd1' }
+
+$modulePath = Join-Path $RepoRoot 'src\platforms\Windows\modules\Format-NucleusOutput.psm1'
 Import-Module $modulePath -Force
 
 if (-not $Paths -or $Paths.Count -eq 0) {

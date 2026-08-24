@@ -26,7 +26,7 @@ function Assert-Fail {
 }
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-$pwshScript = Join-Path $repoRoot 'scripts\check-pwsh.ps1'
+$pwshScript = Join-Path $repoRoot 'src\scripts\checks\check-pwsh.ps1'
 
 # 1. Syntax validation passes on a known-good file.
 & $pwshScript -SkipStep PSSA -Paths $pwshScript > $null

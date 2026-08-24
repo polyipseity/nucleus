@@ -21,7 +21,7 @@
   PSScriptAnalyzer settings for full-coverage repository test runs.
 
 .DESCRIPTION
-  This settings file is used by scripts/check-pwsh.ps1 during repository test
+# This settings file is used by src/scripts/checks/check-pwsh.ps1 during repository test
   runs (test.sh / test.ps1). It provides full rule coverage — only
   PSUseBOMForUnicodeEncodedFile is excluded (that rule is auto-fixable by pwsh
   and rarely relevant for lint-only runs).

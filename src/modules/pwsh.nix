@@ -64,7 +64,7 @@ let
         ""
       ]
       (builtins.readFile ../scripts/shell/init.ps1 + builtins.readFile ../scripts/shell/profile.ps1)
-  # PSScriptAnalyzerSettings.psd1 — Method 3 (consumed by scripts/check-pwsh.ps1 at CI time via -Settings); refer to scripts/PSScriptAnalyzerSettings.check.psd1 and scripts/PSScriptAnalyzerSettings.test.psd1.
+  # PSScriptAnalyzerSettings.psd1 — Method 3 (consumed by src/scripts/checks/check-pwsh.ps1 at CI time via -Settings); refer to scripts/PSScriptAnalyzerSettings.check.psd1 and scripts/PSScriptAnalyzerSettings.test.psd1.
   ;
 
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
@@ -79,7 +79,7 @@ in
   # This is a reference copy that can be passed to Invoke-ScriptAnalyzer
   # via -Settings. PSSA does not auto-discover this path — it only discovers
   # PSScriptAnalyzerSettings.psd1 in the sibling directory of the analyzed file.
-  # The CI copies consumed by scripts/check-pwsh.ps1 live at
+  # The CI copies consumed by src/scripts/checks/check-pwsh.ps1 live at
   # scripts/PSScriptAnalyzerSettings.check.psd1 and
   # scripts/PSScriptAnalyzerSettings.test.psd1 (Method 3).
   home.file.".config/powershell/PSScriptAnalyzerSettings.psd1" = {
@@ -99,7 +99,7 @@ in
   '';
 
   # Install PSScriptAnalyzer for PowerShell linting if pwsh is available.
-  # This enables the lint phase in scripts/check-pwsh.ps1.
+  # This enables the lint phase in src/scripts/checks/check-pwsh.ps1.
   home.activation.install-pwsh-script-analyzer = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     "${activationBundle}/src/scripts/packages/install-pwsh-module.sh" \
       "${pkgs.powershell}/bin/pwsh" \

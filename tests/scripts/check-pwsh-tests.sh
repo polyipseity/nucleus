@@ -12,7 +12,7 @@ REPO_ROOT="$(CDPATH='' cd -- "$SCRIPT_DIR/../.." && pwd -P)"
 
 cd "$REPO_ROOT"
 
-_ps_script="scripts/check-pwsh.ps1"
+_ps_script="src/scripts/checks/check-pwsh.ps1"
 
 # 1. Syntax validation passes on a known-good file.
 if pwsh -NoLogo -NoProfile -NonInteractive -File "$_ps_script" -SkipStep PSSA -Paths "$_ps_script" >/dev/null 2>&1; then
