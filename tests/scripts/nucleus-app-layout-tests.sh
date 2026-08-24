@@ -29,7 +29,7 @@ declare -a LAYOUT_PACKAGES=(
   nucleus-bootstrap
   nucleus-check
   nucleus-config
-  nucleus-gs-pdf-opt
+  nucleus-utils
   nucleus-gc
   nucleus-svc
   nucleus-service-watchdog
@@ -45,7 +45,7 @@ declare -A ENTRY_SCRIPT=(
   ["nucleus-bootstrap"]=scripts/bootstrap.sh
   ["nucleus-check"]=scripts/check.sh
   ["nucleus-config"]=scripts/config.sh
-  ["nucleus-gs-pdf-opt"]=scripts/gs-pdf-opt.sh
+  ["nucleus-utils"]=scripts/utils.sh
   ["nucleus-gc"]=scripts/gc.sh
   ["nucleus-svc"]=scripts/svc.sh
   ["nucleus-service-watchdog"]=src/scripts/services/service-watchdog.sh

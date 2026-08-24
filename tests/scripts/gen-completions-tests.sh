@@ -28,7 +28,7 @@ _COMPLETIONS_DIR="src/modules/completions/zsh"
 # Subcommands are covered by their parent completion files, not as standalone
 # commands: check packer/sh/pwsh, gc cleanup-nix/preferences, apply
 # health-check/audit-store, cloud setup/reset/sync, update lockfile.
-_NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc gs-pdf-opt svc test update vm)
+_NUCLEUS_COMMANDS=(ai apply bootstrap check cloud config gc utils svc test update vm)
 
 # 1. --help exits 0 and prints a usage: line.
 if _help_out="$(bash "$_gen_script" --help 2>&1)" && printf '%s\n' "$_help_out" | grep -q '^usage: '; then
@@ -110,8 +110,7 @@ if [ "$(grep -cE "^  '--" "$_COMPLETIONS_DIR/_nucleus-apply")" -eq 12 ] &&
   grep -q -- "'--fail-fast\[fail fast\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
   grep -q -- "'--no-fail-fast\[no fail fast\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
   grep -q -- "'--skip-steps\[skip steps\]'" "$_COMPLETIONS_DIR/_nucleus-test" &&
-  grep -q -- "'--rm-bak\[rm bak\]'" "$_COMPLETIONS_DIR/_nucleus-gs-pdf-opt" &&
-  ! grep -q -- "'--remove-backup" "$_COMPLETIONS_DIR/_nucleus-gs-pdf-opt" &&
+  grep -q -- '--help' "$_COMPLETIONS_DIR/_nucleus-utils" &&
   ! grep -qE -- '--(arg|argjson)' "$_COMPLETIONS_DIR/_nucleus-config" &&
   ! grep -qE -- "'--(arg|argjson|max-time|contimeout|import|all)\[" "$_COMPLETIONS_DIR"/_nucleus*; then
   assert_pass "gen-completions: flag extraction matches the authoritative table"

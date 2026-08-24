@@ -26,7 +26,7 @@ Register-Step -Id "completions-fresh" -Name "Autocompletion freshness" -Action {
   Write-Message "--- coverage: zsh + pwsh completions for every nucleus-* command ---"
   $commands = @(
     'ai', 'apply', 'bootstrap', 'check', 'cloud', 'config', 'gc',
-    'gs-pdf-opt', 'svc', 'test', 'update', 'vm'
+    'utils', 'svc', 'test', 'update', 'vm'
   )
   $profilePath = Join-Path $r 'src/scripts/shell/profile.ps1'
   $zshDir = Join-Path $r 'src/modules/completions/zsh'

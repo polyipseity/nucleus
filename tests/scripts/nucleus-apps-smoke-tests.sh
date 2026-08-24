@@ -36,7 +36,7 @@ assert_skip() {
 declare -a BATCH_PACKAGES=(
   nucleus-apply nucleus-ai nucleus-bootstrap
   nucleus-check nucleus-test nucleus-config nucleus-gc
-  nucleus-gs-pdf-opt nucleus-svc nucleus-update nucleus-vm
+  nucleus-utils nucleus-svc nucleus-update nucleus-vm
   nucleus-cloud
 )
 
@@ -124,15 +124,15 @@ done
 # nucleus-check, covered by the Tier 1 --help test above.)
 echo ""
 echo "--- Package-only commands ---"
-assert_pass "nucleus-gs-pdf-opt build"
+assert_pass "nucleus-utils build"
 
 # gs-pdf-opt does support --help; run it from the store path.
 gs_pdf_opt_exit=0
-gs_pdf_opt_output=$(run_binary nucleus-gs-pdf-opt --help 2>/dev/null) || gs_pdf_opt_exit=$?
+gs_pdf_opt_output=$(run_binary nucleus-utils gs-pdf-opt --help 2>/dev/null) || gs_pdf_opt_exit=$?
 if [ "$gs_pdf_opt_exit" -eq 0 ] && printf '%s' "$gs_pdf_opt_output" | grep -q 'usage:'; then
-  assert_pass "nucleus-gs-pdf-opt --help"
+  assert_pass "nucleus-utils --help"
 else
-  assert_fail "nucleus-gs-pdf-opt --help" "exit=$gs_pdf_opt_exit"
+  assert_fail "nucleus-utils --help" "exit=$gs_pdf_opt_exit"
 fi
 
 # --- Tier 2: dry-run tests -------------------------------------------------

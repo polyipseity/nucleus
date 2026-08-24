@@ -203,7 +203,7 @@ Describe 'gen-completions.ps1 generated inventory' {
 
     # Commands whose generated (sorted) order equals the authoritative table.
     @(Get-NucleusFlagsFromProfile -VariableName 'nucleusAiFlags' -ProfileText $profileText) | Should -Be @('--dry-run', '--gc-only', '--help', '--json', '--no-gc-only', '--ollama-profile', '--profile')
-    @(Get-NucleusFlagsFromProfile -VariableName 'nucleusGsPdfOptFlags' -ProfileText $profileText) | Should -Be @('--help', '--preset', '--rm-bak')
+    @(Get-NucleusFlagsFromProfile -VariableName 'nucleusUtilsFlags' -ProfileText $profileText) | Should -Be @('--help')
     @(Get-NucleusFlagsFromProfile -VariableName 'nucleusServiceWatchdogFlags' -ProfileText $profileText) | Should -Be @('--domain', '--help', '--oneshot')
     @(Get-NucleusFlagsFromProfile -VariableName 'nucleusSvcFlags' -ProfileText $profileText) | Should -Be @('--help', '--json', '--system', '--user', '--verbose')
 
