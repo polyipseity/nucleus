@@ -7,6 +7,8 @@ let
   defaultsNix = builtins.readFile ../../../src/hosts/MacBook/defaults.nix;
   safariDefaultsSh = builtins.readFile ../../../src/platforms/macOS/scripts/macos-configure-safari-defaults.sh;
   macosDefaultNix = builtins.readFile ../../../src/platforms/macOS/modules/default.nix;
+  gcSh = builtins.readFile ../../../scripts/gc.sh;
+  gcMacosPreferencesSh = builtins.readFile ../../../src/scripts/services/gc-macos-preferences.sh;
   # Path literals (not readFile) for files that may not exist yet — existence is
   # asserted via builtins.pathExists, and Nix `&&` short-circuits so the
   # readFile content check is only forced when the file is present.
@@ -35,9 +37,9 @@ assert
 # src/platforms/macOS/scripts — gc-preferences renamed to purge-preferences (Phase 4)
 # Old path gone (file absent + not referenced), new path present (file exists + referenced).
 assert !builtins.pathExists gcPreferencesShPath;
-assert !lib.hasInfix "macos-gc-preferences" macosDefaultNix;
+assert !lib.hasInfix "macos-gc-preferences" gcSh;
 assert builtins.pathExists purgePreferencesShPath;
-assert lib.hasInfix "macos-purge-preferences" macosDefaultNix;
+assert lib.hasInfix "macos-purge-preferences" gcMacosPreferencesSh;
 
 {
   success = true;
