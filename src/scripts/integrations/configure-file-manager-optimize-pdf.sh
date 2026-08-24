@@ -14,5 +14,5 @@ for f in "$@"; do
   esac
 done
 if [ ${#pdfs[@]} -gt 0 ]; then
-  exec nucleus-utils gs-pdf-opt --preset "$preset" "${pdfs[@]}"
+  exec nucleus-utils optimize-pdf --preset "$preset" "${pdfs[@]}"
 fi

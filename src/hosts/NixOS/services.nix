@@ -35,7 +35,7 @@ let
   # Ghostscript PDF optimization presets (quality descending).
   # Sorting policy: manually maintained in quality-descending order.
   # Must match macOS and Windows ordering (default → prepress → printer → ebook → screen).
-  gsPdfOptPresets = [
+  optimizePdfPresets = [
     "default"
     "prepress"
     "printer"
@@ -43,21 +43,21 @@ let
     "screen"
   ];
 
-  mkGSPdfOptNautilus =
+  mkOptimizePdfNautilus =
     preset:
     pkgs.writeNucleusShellApplication {
-      name = "gs-pdf-opt-nautilus-${preset}";
+      name = "optimize-pdf-nautilus-${preset}";
       runtimeInputs = [ pkgs.file ];
       text = ''
-        exec '${../../scripts/integrations/configure-file-manager-pdf-opt.sh}' '${preset}' "$@"
+        exec '${../../scripts/integrations/configure-file-manager-optimize-pdf.sh}' '${preset}' "$@"
       '';
     };
 
-  gsPdfOptNautilusScripts = builtins.listToAttrs (
+  optimizePdfNautilusScripts = builtins.listToAttrs (
     map (p: {
       name = p;
-      value = "${mkGSPdfOptNautilus p}/bin/nucleus-gs-pdf-opt-nautilus-${p}";
-    }) gsPdfOptPresets
+      value = "${mkOptimizePdfNautilus p}/bin/nucleus-optimize-pdf-nautilus-${p}";
+    }) optimizePdfPresets
   );
 in
 lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
@@ -78,23 +78,23 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     # Nautilus: right-click → Scripts → optimize PDF - <preset> (5 presets)
     # Nautilus scripts have no MIME filtering; each script guards with file --mime-type.
     ".local/share/nautilus/scripts/optimize PDF - default" = {
-      source = gsPdfOptNautilusScripts.default;
+      source = optimizePdfNautilusScripts.default;
       executable = true;
     };
     ".local/share/nautilus/scripts/optimize PDF - prepress" = {
-      source = gsPdfOptNautilusScripts.prepress;
+      source = optimizePdfNautilusScripts.prepress;
       executable = true;
     };
     ".local/share/nautilus/scripts/optimize PDF - printer" = {
-      source = gsPdfOptNautilusScripts.printer;
+      source = optimizePdfNautilusScripts.printer;
       executable = true;
     };
     ".local/share/nautilus/scripts/optimize PDF - ebook" = {
-      source = gsPdfOptNautilusScripts.ebook;
+      source = optimizePdfNautilusScripts.ebook;
       executable = true;
     };
     ".local/share/nautilus/scripts/optimize PDF - screen" = {
-      source = gsPdfOptNautilusScripts.screen;
+      source = optimizePdfNautilusScripts.screen;
       executable = true;
     };
 
@@ -107,10 +107,10 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     };
 
     # Dolphin: right-click → optimize PDF (5 presets as sub-actions)
-    ".local/share/kio/servicemenus/nucleus-gs-pdf-opt.desktop" = {
+    ".local/share/kio/servicemenus/nucleus-optimize-pdf.desktop" = {
       # check-suppress:config-method: method 1 (writable symlink) -- the GS PDF Opt preset file can be updated in-place; no rebuild needed after adding/changing presets.
       source = config.lib.file.mkOutOfStoreSymlink (
-        overlay.selectFile "plasma" "desktop/nucleus-gs-pdf-opt.desktop"
+        overlay.selectFile "plasma" "desktop/nucleus-optimize-pdf.desktop"
       );
     };
   };

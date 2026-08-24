@@ -3,7 +3,7 @@
   "description": "Primary user receiving secret materialization and full configuration",
   "dscConfigFiles": [
     "context-manual.dsc.yml",
-    "context-pdf-opt.dsc.yml",
+    "context-optimize-pdf.dsc.yml",
     "env.dsc.yml",
     "wallpaper.dsc.yml",
     "screen-saver.dsc.yml",

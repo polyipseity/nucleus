@@ -6,25 +6,25 @@ Actions=optimizePdfDefault;optimizePdfPrepress;optimizePdfPrinter;optimizePdfEbo
 
 [Desktop Action optimizePdfDefault]
 Name=optimize PDF - default
-Exec=nucleus-utils gs-pdf-opt --preset default %f
+Exec=nucleus-utils optimize-pdf --preset default %f
 Icon=application-pdf
 
 [Desktop Action optimizePdfPrepress]
 Name=optimize PDF - prepress
-Exec=nucleus-utils gs-pdf-opt --preset prepress %f
+Exec=nucleus-utils optimize-pdf --preset prepress %f
 Icon=application-pdf
 
 [Desktop Action optimizePdfPrinter]
 Name=optimize PDF - printer
-Exec=nucleus-utils gs-pdf-opt --preset printer %f
+Exec=nucleus-utils optimize-pdf --preset printer %f
 Icon=application-pdf
 
 [Desktop Action optimizePdfEbook]
 Name=optimize PDF - ebook
-Exec=nucleus-utils gs-pdf-opt --preset ebook %f
+Exec=nucleus-utils optimize-pdf --preset ebook %f
 Icon=application-pdf
 
 [Desktop Action optimizePdfScreen]
 Name=optimize PDF - screen
-Exec=nucleus-utils gs-pdf-opt --preset screen %f
+Exec=nucleus-utils optimize-pdf --preset screen %f
 Icon=application-pdf

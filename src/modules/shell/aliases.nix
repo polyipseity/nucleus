@@ -101,15 +101,15 @@
   # --- Ghostscript PDF optimization presets ---
   # CompatibilityLevel is pinned to 2.0 (latest as of 2026-05); bump when a
   # newer PDF compatibility target is released by Ghostscript.
-  "-gs-pdf-opt-default" =
+  "-optimize-pdf-default" =
     "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/default -dNOPAUSE -dQUIET -dBATCH";
-  "-gs-pdf-opt-prepress" =
+  "-optimize-pdf-prepress" =
     "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/prepress -dNOPAUSE -dQUIET -dBATCH";
-  "-gs-pdf-opt-printer" =
+  "-optimize-pdf-printer" =
     "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/printer -dNOPAUSE -dQUIET -dBATCH";
-  "-gs-pdf-opt-ebook" =
+  "-optimize-pdf-ebook" =
     "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH";
-  "-gs-pdf-opt-screen" =
+  "-optimize-pdf-screen" =
     "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH";
   # --- Non-git aliases ---
   "-la" = "eza --long --all";
