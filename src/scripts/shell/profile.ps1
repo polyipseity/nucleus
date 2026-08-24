@@ -715,12 +715,6 @@ $nucleusGcFlags = @(
   '--wallpaper-gc'
 )
 
-$nucleusGsPdfOptFlags = @(
-  '--help',
-  '--preset',
-  '--rm-bak'
-)
-
 $nucleusSvcFlags = @(
   '--help',
   '--json',
@@ -872,11 +866,11 @@ if ($IsWindows) {
     param()
     Invoke-NucleusRepoScript 'scripts\svc.ps1' @Args
   }
-  function nucleus-gs-pdf-opt {
+  function nucleus-utils {
     # check-suppress:SuppressMessageAttribute: PSUseApprovedVerbs -- intentional: wrapper function name is the fixed nucleus CLI contract
     [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute('PSUseApprovedVerbs', '')]
     param()
-    Invoke-NucleusRepoScript 'scripts\gs-pdf-opt.ps1' @Args
+    Invoke-NucleusRepoScript 'scripts\utils.ps1' @Args
   }
 }
 
@@ -995,10 +989,10 @@ Register-ArgumentCompleter -CommandName nucleus-service-watchdog -ScriptBlock {
   $nucleusServiceWatchdogFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 
-Register-ArgumentCompleter -CommandName nucleus-gs-pdf-opt -ScriptBlock {
+Register-ArgumentCompleter -CommandName nucleus-utils -ScriptBlock {
   param($commandName, $parameterName, $wordToComplete, $commandAst, $fakeBoundParameters)
   $null = $commandName, $parameterName, $commandAst, $fakeBoundParameters  # check-suppress:suppression_doc: completer callback params are signature-required but unused
-  $nucleusGsPdfOptFlags | Where-Object { $_ -like "$wordToComplete*" }
+  $nucleusUtilsFlags | Where-Object { $_ -like "$wordToComplete*" }
 }
 
 Register-ArgumentCompleter -CommandName nucleus-test -ScriptBlock {
