@@ -119,20 +119,20 @@ for cmd in "${APP_COMMANDS[@]}"; do
   test_app_help "$cmd"
 done
 
-# gs-pdf-opt: verify it builds (already done in batch) and note the pass for
+# optimize-pdf: verify it builds (already done in batch) and note the pass for
 # the package-only build assertion.  (check-pwsh is now a subcommand of
 # nucleus-check, covered by the Tier 1 --help test above.)
 echo ""
 echo "--- Package-only commands ---"
 assert_pass "nucleus-utils build"
 
-# gs-pdf-opt does support --help; run it from the store path.
-gs_pdf_opt_exit=0
-gs_pdf_opt_output=$(run_binary nucleus-utils gs-pdf-opt --help 2>/dev/null) || gs_pdf_opt_exit=$?
-if [ "$gs_pdf_opt_exit" -eq 0 ] && printf '%s' "$gs_pdf_opt_output" | grep -q 'usage:'; then
+# optimize-pdf does support --help; run it from the store path.
+optimize_pdf_exit=0
+optimize_pdf_output=$(run_binary nucleus-utils optimize-pdf --help 2>/dev/null) || optimize_pdf_exit=$?
+if [ "$optimize_pdf_exit" -eq 0 ] && printf '%s' "$optimize_pdf_output" | grep -q 'usage:'; then
   assert_pass "nucleus-utils --help"
 else
-  assert_fail "nucleus-utils --help" "exit=$gs_pdf_opt_exit"
+  assert_fail "nucleus-utils --help" "exit=$optimize_pdf_exit"
 fi
 
 # --- Tier 2: dry-run tests -------------------------------------------------

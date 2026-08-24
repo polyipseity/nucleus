@@ -99,7 +99,7 @@ fi
 
 # 8. Flag extraction correctness: usage-line + body flags land in the spec,
 #    corrected sets are pinned (apply's 12 flags + health-check/audit-store
-#    subcommands, test's -q group, gs-pdf-opt --rm-bak), and no jq/rclone/curl
+#    subcommands, test's -q group, optimize-pdf --rm-bak), and no jq/rclone/curl
 #    tool flags leak into any file.
 if [ "$(grep -cE "^  '--" "$_COMPLETIONS_DIR/_nucleus-apply")" -eq 12 ] &&
   grep -q -- "'--ai-sync\[ai sync\]'" "$_COMPLETIONS_DIR/_nucleus-apply" &&
