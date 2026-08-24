@@ -29,6 +29,6 @@ set_safari_default() {
 
 # Source: Safari preference behavior.
 # https://support.apple.com/en-us/guide/safari/change-settings-ibrwa005/mac
-set_safari_default "AutoFillPasswords" "false" "bool"
+set_safari_default "AutoFillPasswords" "true" "bool"
 set_safari_default "IncludeDevelopMenu" "true" "bool"
 set_safari_default "IncludeInternalDebugMenu" "true" "bool"
