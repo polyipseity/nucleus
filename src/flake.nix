@@ -549,10 +549,18 @@
       nucleusAppsMac = mkNucleusApps pkgsMac (mkTreefmtWrapper systems.mac pkgsMac);
       nucleusAppsLinux = mkNucleusApps pkgsLinux (mkTreefmtWrapper systems.linux pkgsLinux);
 
-      # Daemon-only package: NOT a nucleus app (not in mkNucleusApps), so it is
-      # never on PATH, via `nix run`, or in `packages`. Daemons resolve it by
-      # store path through the per-host nucleusApps merge below.
-      serviceWatchdogPkg = writeNucleusShellApplication pkgsLinux {
+      # Daemon-only packages: NOT nucleus apps (not in mkNucleusApps), so they
+      # are never on PATH, via `nix run`, or in `packages`. Daemons resolve them
+      # by store path through the per-host nucleusApps merge below. Built per-host
+      # so the shared script-tree/scripts-bundle derivations stay on the host's
+      # native system (aarch64-darwin / x86_64-linux) instead of forcing a
+      # cross-system build that no configured builder can satisfy.
+      serviceWatchdogPkgMac = writeNucleusShellApplication pkgsMac {
+        name = "service-watchdog";
+        scriptName = "src/scripts/services/service-watchdog";
+        runtimeInputs = [ pkgsMac.jq ];
+      };
+      serviceWatchdogPkgLinux = writeNucleusShellApplication pkgsLinux {
         name = "service-watchdog";
         scriptName = "src/scripts/services/service-watchdog";
         runtimeInputs = [ pkgsLinux.jq ];
@@ -611,7 +619,7 @@
             zackelia-formulae
             ;
           nucleusApps = nucleusAppsMac // {
-            nucleus-service-watchdog = serviceWatchdogPkg;
+            nucleus-service-watchdog = serviceWatchdogPkgMac;
           };
           treefmtPackage = mkTreefmtWrapper systems.mac pkgsMac;
         };
@@ -635,7 +643,7 @@
               inherit nixpkgs username;
               users = usersMacBook;
               nucleusApps = nucleusAppsMac // {
-                nucleus-service-watchdog = serviceWatchdogPkg;
+                nucleus-service-watchdog = serviceWatchdogPkgMac;
               };
               vsCodeMarketplace = vsCodeMarketplaceMac;
               treefmtPackage = mkTreefmtWrapper systems.mac pkgsMac;
@@ -658,7 +666,7 @@
           inherit username;
           users = usersNixOS;
           nucleusApps = nucleusAppsLinux // {
-            nucleus-service-watchdog = serviceWatchdogPkg;
+            nucleus-service-watchdog = serviceWatchdogPkgLinux;
           };
           treefmtPackage = mkTreefmtWrapper systems.linux pkgsLinux;
         };
@@ -679,7 +687,7 @@
               inherit nixpkgs username;
               users = usersNixOS;
               nucleusApps = nucleusAppsLinux // {
-                nucleus-service-watchdog = serviceWatchdogPkg;
+                nucleus-service-watchdog = serviceWatchdogPkgLinux;
               };
               vsCodeMarketplace = vsCodeMarketplaceLinux;
               treefmtPackage = mkTreefmtWrapper systems.linux pkgsLinux;
