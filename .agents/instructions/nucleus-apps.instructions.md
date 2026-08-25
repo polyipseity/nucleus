@@ -66,7 +66,7 @@ Every POSIX `scripts/<name>.sh` that exposes subcommands needs a `scripts/<name>
 
 The VS Code agent-host wrapper lives outside the user HOME:
 
-- POSIX: `/etc/nucleus/bin/agent-host-shell` (`src/modules/agent-host-shell.nix`).
+- POSIX: SYSTEM root bin — macOS `/Library/Application Support/nucleus/bin/agent-host-shell`, NixOS `/var/lib/nucleus/bin/agent-host-shell` (`src/modules/agent-host-shell.nix`).
 - Windows: `%ProgramData%\nucleus\bin\agent-host-shell.ps1` (`src/platforms/Windows/modules/system/Invoke-AgentHostShellSetup.ps1`).
 
 It is a system-level provisioning artifact, not a per-user dotfile. Do not relocate it into HOME or symlink it from `src/users/`.

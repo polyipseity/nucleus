@@ -239,7 +239,7 @@ See the `check_secret_health()` function in `scripts/apply.sh` (the `health-chec
 
 ## CWD independence — all `nucleus-*` commands must work from any working directory
 
-Repository root resolution goes through `derive_repo_root()` in `src/scripts/lib/lib.sh` (priority order: `NUCLEUS_REPO_ROOT` environment variable → `/etc/nucleus/repo-root` system file (POSIX all-process parity with Windows Machine scope) → `SCRIPT_DIR` offset walk checking `src/flake.nix`, then `.nucleus-repo-root` marker in the store tree → `git rev-parse` fallback).
+Repository root resolution goes through `derive_repo_root()` in `src/scripts/lib/lib.sh` (priority order: `NUCLEUS_REPO_ROOT` environment variable → `<SYSTEM root>/repo-root` system file (macOS `/Library/Application Support/nucleus/repo-root`, NixOS `/var/lib/nucleus/repo-root`; POSIX all-process parity with Windows Machine scope) → `SCRIPT_DIR` offset walk checking `src/flake.nix`, then `.nucleus-repo-root` marker in the store tree → `git rev-parse` fallback).
 
 `writeNucleusShellApplication` in `src/flake.nix` bakes `.nucleus-repo-root` into each nucleus app store tree at build time from eval-time `NUCLEUS_REPO_ROOT` (forwarded by `apply.sh` through `run_nix_as_root`). `src/modules/repo-root-file.nix` materializes `/etc/nucleus/repo-root` on macOS and NixOS during apply. `posix-security.nix` adds `Defaults env_keep += "NUCLEUS_REPO_ROOT"` so `sudo` preserves the variable when the invoking shell already has it.
 

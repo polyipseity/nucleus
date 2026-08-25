@@ -13,14 +13,18 @@ let
   realShellExe = lib.getExe pkgs.zsh;
 
   # Stable path referenced by agentHostProfile VS Code setting.
-  wrapperFileName = "/etc/nucleus/bin/agent-host-shell";
+  wrapperFileName =
+    if pkgs.stdenv.hostPlatform.isDarwin then
+      "/Library/Application Support/nucleus/bin/agent-host-shell"
+    else
+      "/var/lib/nucleus/bin/agent-host-shell";
 in
 {
   options.nucleus.agentHostShell = {
     enable = mkOption {
       type = types.bool;
       default = true;
-      description = "Whether to create the VS Code agent-host wrapper script at /etc/nucleus/bin/agent-host-shell.";
+      description = "Whether to create the VS Code agent-host wrapper script at the SYSTEM root bin (macOS /Library/Application Support/nucleus/bin, NixOS /var/lib/nucleus/bin).";
     };
   };
 

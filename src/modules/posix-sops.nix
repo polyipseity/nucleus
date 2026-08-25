@@ -17,7 +17,9 @@ in
   # ---------------------------------------------------------------------------
   # deriveHostAgeKey
   # Derives the age secret identity from the machine's SSH host key and writes
-  # it to /etc/sops/age/machine.txt so the Home Manager sops-nix instance can
+  # it to /Library/Application Support/nucleus/sops/age/machine.txt (macOS) /
+  # /var/lib/nucleus/sops/age/machine.txt (NixOS) so the Home Manager sops-nix
+  # instance can
   # decrypt SOPS secrets without requiring root privileges.
   #
   # Why a dedicated derived file rather than sshKeyPaths in Home Manager:
@@ -27,7 +29,7 @@ in
   #   identity and fails with "permission denied" in that context.  System
   #   activation runs as root and CAN read the host key, so we derive the age
   #   identity there and write it to a group-readable path:
-  #   /etc/sops/age/machine.txt is owned root:nucleus-sops (mode 0640) on NixOS
+  #   /var/lib/nucleus/sops/age/machine.txt is owned root:nucleus-sops (mode 0640) on NixOS
   #   or by the primary user (mode 0600) on nix-darwin, and is referenced via
   #   sops.age.keyFile in secrets.nix.
   #
@@ -66,7 +68,9 @@ in
       # System activation runs as root and can read /etc/ssh/ssh_host_ed25519_key
       # directly; keep sshKeyPaths for the system-level sops-nix instance.
       # The Home Manager sops-nix instance (secrets.nix) references
-      # /etc/sops/age/machine.txt (derived by deriveHostAgeKey above) via
+      # /Library/Application Support/nucleus/sops/age/machine.txt (macOS) /
+      # /var/lib/nucleus/sops/age/machine.txt (NixOS) (derived by deriveHostAgeKey
+      # above) via
       # sops.age.keyFile to avoid the user-permission issue at HM activation time.
       sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
     };

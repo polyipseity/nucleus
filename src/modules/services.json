@@ -2,16 +2,16 @@
   "$schema": "./services.schema.json",
   "$logging": {
     "MacBook": {
-      "logDir": "~/nucleus/logs",
-      "systemLogDir": "/Users/Shared/nucleus/logs"
+      "logDir": "~/Library/Application Support/nucleus/logs",
+      "systemLogDir": "/Library/Application Support/nucleus/logs"
     },
     "NixOS": {
-      "logDir": "~/.local/state/nucleus/log",
-      "systemLogDir": "/var/log/nucleus"
+      "logDir": "~/.local/share/nucleus/logs",
+      "systemLogDir": "/var/lib/nucleus/logs"
     },
     "Windows": {
-      "logDir": "%LOCALAPPDATA%\\nucleus\\logs",
-      "systemLogDir": "%ProgramData%\\nucleus\\logs"
+      "logDir": "%LOCALAPPDATA%\\nucleus\\log",
+      "systemLogDir": "%ProgramData%\\nucleus\\log"
     }
   },
   "caddy": {

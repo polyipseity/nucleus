@@ -413,10 +413,10 @@
   "telemetry.feedback.enabled": false,
   "telemetry.telemetryLevel": "off",
   "terminal.integrated.agentHostProfile.linux": {
-    "path": "/etc/nucleus/bin/agent-host-shell"
+    "path": "/var/lib/nucleus/bin/agent-host-shell"
   },
   "terminal.integrated.agentHostProfile.osx": {
-    "path": "/etc/nucleus/bin/agent-host-shell"
+    "path": "/Library/Application Support/nucleus/bin/agent-host-shell"
   },
   "terminal.integrated.agentHostProfile.windows": {
     "path": "C:\\ProgramData\\nucleus\\bin\\agent-host-shell.ps1"

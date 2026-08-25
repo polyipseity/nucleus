@@ -10,11 +10,16 @@ let
   sshIdentityFile = "~/.ssh/ssh_personal_${currentUsername}";
   sshPrivateKeyPath = "${config.home.homeDirectory}/.ssh/ssh_personal_${currentUsername}";
   sshPublicKeyPath = "${sshPrivateKeyPath}.pub";
-  rcloneConfigPassPath = "${config.home.homeDirectory}/.config/nucleus/secrets/rclone-config-pass";
+  nucleusUserRoot =
+    if pkgs.stdenv.hostPlatform.isDarwin then
+      "${config.home.homeDirectory}/Library/Application Support/nucleus"
+    else
+      "${config.home.homeDirectory}/.local/share/nucleus";
+  rcloneConfigPassPath = "${nucleusUserRoot}/secrets/rclone-config-pass";
   gitIdentityPath = "${config.home.homeDirectory}/.config/git/identity";
-  managedGpgKeysManifest = "${config.home.homeDirectory}/.config/nucleus/managed-gpg-keys";
-  managedSshKeyPathsManifest = "${config.home.homeDirectory}/.config/nucleus/managed-ssh-key-paths";
-  managedSshKeysManifest = "${config.home.homeDirectory}/.config/nucleus/managed-ssh-keys";
+  managedGpgKeysManifest = "${nucleusUserRoot}/managed-gpg-keys";
+  managedSshKeyPathsManifest = "${nucleusUserRoot}/managed-ssh-key-paths";
+  managedSshKeysManifest = "${nucleusUserRoot}/managed-ssh-keys";
   userSecretFilePath = ../secrets/users + "/${currentUsername}.yml";
   hasUserSecretFile = builtins.pathExists userSecretFilePath;
 
@@ -28,7 +33,11 @@ in
   # sshKeyPaths must be empty: the host private key is root-only; HM reads
   # the derived identity from keyFile instead (same contract as posix-sops.nix).
   sops.age = {
-    keyFile = "/etc/sops/age/machine.txt";
+    keyFile =
+      if pkgs.stdenv.hostPlatform.isDarwin then
+        "/Library/Application Support/nucleus/sops/age/machine.txt"
+      else
+        "/var/lib/nucleus/sops/age/machine.txt";
     sshKeyPaths = [ ];
   };
 
@@ -75,7 +84,12 @@ in
         "${pkgs.openssh}/bin/ssh-add" \
         "${pkgs.sops}/bin/sops" \
         "/etc/ssh/ssh_host_ed25519_key" \
-        "/etc/sops/age/machine.txt" \
+        "${
+          if pkgs.stdenv.hostPlatform.isDarwin then
+            "/Library/Application Support/nucleus/sops/age/machine.txt"
+          else
+            "/var/lib/nucleus/sops/age/machine.txt"
+        }" \
         "${pkgs.gawk}/bin/awk"
     ''
   );

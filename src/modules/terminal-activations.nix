@@ -27,10 +27,21 @@
 # from a text file) and bypass the declarative Nix model — each use erodes
 # reproducibility.
 # ─────────────────────────────────────────────────────────────────────────────
-{ config, lib, ... }:
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
 
 let
   cfg = config.nucleus.terminalActivations;
+
+  nucleusUserRoot =
+    if pkgs.stdenv.hostPlatform.isDarwin then
+      "$HOME/Library/Application Support/nucleus"
+    else
+      "$HOME/.local/share/nucleus";
 
   # Convert attrset to sorted list preserving names, ordered by `order`.
   sortedEntries = builtins.sort (a: b: a.order < b.order) (
@@ -58,14 +69,15 @@ in
     description = ''
       Activation commands that must run in the user's terminal context (outside
       the Nix rebuild), serialised to
-      ~/.config/nucleus/terminal-activations.list for consumption by
+      ~/Library/Application Support/nucleus/terminal-activations.list (macOS) /
+      ~/.local/share/nucleus/terminal-activations.list (NixOS) for consumption by
       apply.sh / apply.ps1.
     '';
   };
 
   config = lib.mkIf (cfg != { }) {
     home.activation.write-terminal-activations = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      manifest="$HOME/.config/nucleus/terminal-activations.list"
+      manifest="${nucleusUserRoot}/terminal-activations.list"
       mkdir -p "$(dirname "$manifest")"
       : > "$manifest"
       ${lib.concatStringsSep "\n" (

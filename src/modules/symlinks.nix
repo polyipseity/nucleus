@@ -19,6 +19,12 @@ let
     else
       null;
 
+  nucleusUserRoot =
+    if hostKey == "MacBook" then
+      "${currentUserHome}/Library/Application Support/nucleus"
+    else
+      "${currentUserHome}/.local/share/nucleus";
+
   resolveManagedTargetPath =
     path:
     if path == null then
@@ -59,7 +65,7 @@ let
         ) config.nucleus.symlinks
       );
 
-  managedSymlinkManifestPath = "${currentUserHome}/.config/nucleus/symlinks.json";
+  managedSymlinkManifestPath = "${nucleusUserRoot}/symlinks.json";
   managedSymlinkManifestJson = builtins.toJSON (
     map (entry: entry.linkAbsolutePath) selectedSymlinksResolved
   );

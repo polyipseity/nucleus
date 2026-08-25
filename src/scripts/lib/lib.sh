@@ -225,16 +225,20 @@ die() {
   exit 1
 }
 
-# Resolution order: NUCLEUS_REPO_ROOT env var, /etc/nucleus/repo-root, SCRIPT_DIR+offset, then git rev-parse.
+# Resolution order: NUCLEUS_REPO_ROOT env var, <SYSTEM root>/repo-root, SCRIPT_DIR+offset, then git rev-parse.
 derive_repo_root() {
   if [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ]; then
     NUCLEUS_REPO_ROOT="$(CDPATH='' cd -- "$NUCLEUS_REPO_ROOT" && pwd -P)"
     printf '%s\n' "$NUCLEUS_REPO_ROOT"
     return 0
   fi
-  _drr_system_file="${NUCLEUS_REPO_ROOT_SYSTEM_FILE:-/etc/nucleus/repo-root}"
+  case "$(uname -s)" in
+  Darwin) _drr_default_system_file="/Library/Application Support/nucleus/repo-root" ;;
+  *) _drr_default_system_file="/var/lib/nucleus/repo-root" ;;
+  esac
+  _drr_system_file="${NUCLEUS_REPO_ROOT_SYSTEM_FILE:-$_drr_default_system_file}"
   if [ -f "$_drr_system_file" ]; then
-    # WHY: sudo/su reset the environment; /etc/nucleus/repo-root (materialized at
+    # WHY: sudo/su reset the environment; <SYSTEM root>/repo-root (materialized at
     # apply time) gives all-process repo-root availability on POSIX hosts.
     IFS= read -r _drr_system_root <"$_drr_system_file" ||
       _drr_system_root="" # check-suppress:suppression_doc: unreadable system file treated as absent.
