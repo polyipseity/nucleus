@@ -60,7 +60,7 @@ model_list:
       api_base: http://127.0.0.1:11434
       model_info:
         max_input_tokens: 32768
-        max_output_tokens: 8192
+        max_output_tokens: 16384
 
   - model_name: ollama_chat/qwen2.5:1.5b
     litellm_params:
@@ -68,7 +68,7 @@ model_list:
       api_base: http://127.0.0.1:11434
       model_info:
         max_input_tokens: 32768
-        max_output_tokens: 8192
+        max_output_tokens: 16384
 
   - model_name: ollama_chat/qwen3:8b
     litellm_params:
@@ -76,7 +76,7 @@ model_list:
       api_base: http://127.0.0.1:11434
       model_info:
         max_input_tokens: 32768
-        max_output_tokens: 8192
+        max_output_tokens: 16384
 
   # ---- Default model (generic, remote-backed) ----
   # Single public `default` model.  `order` tiers primary → paid → fallback.
@@ -91,7 +91,7 @@ model_list:
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
-        max_output_tokens: 8192
+        max_output_tokens: 16384
   - model_name: default
     litellm_params:
       model: openai/hy3
@@ -101,7 +101,7 @@ model_list:
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
-        max_output_tokens: 8192
+        max_output_tokens: 16384
   - model_name: default
     litellm_params:
       model: openai/hy3
@@ -111,7 +111,7 @@ model_list:
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
-        max_output_tokens: 8192
+        max_output_tokens: 16384
   - model_name: default
     litellm_params:
       model: openai/tencent/hy3-paid
@@ -121,7 +121,7 @@ model_list:
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
-        max_output_tokens: 8192
+        max_output_tokens: 16384
   - model_name: default
     litellm_params:
       model: openrouter/xiaomi/mimo-v2.5
@@ -130,4 +130,4 @@ model_list:
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
-        max_output_tokens: 8192
+        max_output_tokens: 16384
