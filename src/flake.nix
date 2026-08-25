@@ -449,7 +449,7 @@
           # Single source of truth for managed macOS preference domains (see
           # preference-gc.nix). Exposed to nucleus-gc so `gc preferences` can
           # purge stale state without duplicating the list.
-          managedPrefDomains = import ../platforms/macOS/modules/preference-gc.nix { };
+          managedPrefDomains = import ./platforms/macOS/modules/preference-gc.nix { };
         in
         {
           nucleus-apply = nucleusApp {
