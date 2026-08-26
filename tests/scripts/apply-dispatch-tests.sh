@@ -54,7 +54,28 @@ test_nucleus_wrappers_prefer_live_checkout() {
   fi
 }
 
+test_apply_pins_flake_inputs() {
+  if grep -Fq 'run_pin_flake_inputs' "$APPLY_SH"; then
+    assert_pass "apply.sh defines run_pin_flake_inputs"
+  else
+    assert_fail "apply.sh defines run_pin_flake_inputs" "missing run_pin_flake_inputs function"
+  fi
+  if grep -Fq 'flakeInputs' "$APPLY_SH"; then
+    assert_pass "apply.sh references flakeInputs output"
+  else
+    assert_fail "apply.sh references flakeInputs output" "missing flakeInputs reference"
+  fi
+  # Must be wired in all three OS branches (Darwin, NixOS, Linux HM).
+  _branches=$(grep -c 'run_pin_flake_inputs' "$APPLY_SH")
+  if [ "$_branches" -ge 3 ]; then
+    assert_pass "apply.sh calls run_pin_flake_inputs in all OS branches"
+  else
+    assert_fail "apply.sh calls run_pin_flake_inputs in all OS branches" "found $_branches call sites, expected >=3"
+  fi
+}
+
 test_apply_uses_pascal_case_flake_hosts
 test_apply_prefers_live_checkout
 test_scripts_apply_delegates_to_src
 test_nucleus_wrappers_prefer_live_checkout
+test_apply_pins_flake_inputs
