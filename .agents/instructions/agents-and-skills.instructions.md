@@ -82,11 +82,11 @@ ClawHub is installed and managed declaratively by the `install-bun-packages` Hom
 3. Maintains a desired-state list (`clawhub` is the only current entry).
 4. Installs packages whose binary is absent from `~/.bun/bin`.
 5. Removes packages no longer desired (via `bun remove -g`).
-6. Persists the managed set to `~/.config/nucleus/bun-packages.json`.
+6. Persists the managed set to bun's global `package.json` (`~/.bun/install/global/package.json`).
 
 ### Windows
 
-ClawHub is managed by `Invoke-BunSetup` in `src/platforms/Windows/modules/setup/Invoke-BunSetup.ps1`, which is called by `apply.ps1` before `Sync-AgentsClawHubSkillManifest`. `Invoke-BunSetup` manages a `$desiredPackages` list (currently `@mariozechner/pi-coding-agent` and `clawhub`) and writes a manifest to `%USERPROFILE%\.config\nucleus\bun-packages.json`. Applied in this order: WinGet DSC → `Invoke-BunSetup` (bun global packages) → `Sync-AgentsSkillManifest` (bundled skill symlinks) → `Sync-AgentsClawHubSkillManifest` (fetched skill downloads).
+ClawHub is managed by `Invoke-BunSetup` in `src/platforms/Windows/modules/setup/Invoke-BunSetup.ps1`, which is called by `apply.ps1` before `Sync-AgentsClawHubSkillManifest`. `Invoke-BunSetup` manages a `$desiredPackages` list (currently `@mariozechner/pi-coding-agent` and `clawhub`) and writes a manifest to bun's global `package.json` (`%USERPROFILE%\.bun\install\global\package.json`). Applied in this order: WinGet DSC → `Invoke-BunSetup` (bun global packages) → `Sync-AgentsSkillManifest` (bundled skill symlinks) → `Sync-AgentsClawHubSkillManifest` (fetched skill downloads).
 
 ## Authoring rules
 
