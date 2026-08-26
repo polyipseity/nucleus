@@ -19,7 +19,7 @@ if ($IsWindows) {
   # Load rclone config passphrase from materialized secret for automatic config
   # file encryption in interactive and scripted rclone invocations.
   # WHY: conditional: secret file may be absent before apply has materialized it.
-  $_rclonePassFile = Join-Path $HOME ".config\nucleus\secrets\rclone-config-pass"
+  $_rclonePassFile = Join-Path $HOME "AppData\Local\nucleus\secrets\rclone-config-pass"
   if (Test-Path -Path $_rclonePassFile -PathType Leaf) {
     # check-suppress:suppression_doc: file may not exist yet (first provision); absence is expected and handled downstream.
     $env:RCLONE_CONFIG_PASS = (Get-Content -Path $_rclonePassFile -Raw -ErrorAction SilentlyContinue).Trim()

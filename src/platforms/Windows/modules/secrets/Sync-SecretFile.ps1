@@ -25,20 +25,20 @@ function Sync-SecretFile {
     gpg_*
       Imported into the current GPG keyring via stdin (`gpg --batch --import -`).
       The managed primary fingerprint is recorded in
-      $HOME\.config\nucleus\managed-gpg-keys.
+      %LOCALAPPDATA%\nucleus\managed-gpg-keys.
 
     ssh_*
       Prefix is stripped and the remainder is written under $HOME\.ssh\
       (for example ssh_ssh_personal_admin -> ssh_personal_admin). Private key
-      paths are recorded in $HOME\.config\nucleus\managed-ssh-key-paths.
-      Public keys update $HOME\.config\nucleus\managed-ssh-keys for rotation
+      paths are recorded in %LOCALAPPDATA%\nucleus\managed-ssh-key-paths.
+      Public keys update %LOCALAPPDATA%\nucleus\managed-ssh-keys for rotation
       detection and SSH agent flush.
 
     git_identity
-      Written to $HOME\.config\nucleus\git-identity.env.
+      Written to %LOCALAPPDATA%\nucleus\git-identity.env.
 
     rclone_config_pass
-      Written to $HOME\.config\nucleus\secrets\rclone-config-pass.
+      Written to %LOCALAPPDATA%\nucleus\secrets\rclone-config-pass.
 
   .PARAMETER FilePath
     Absolute path to the SOPS-encrypted YAML file.
@@ -99,7 +99,7 @@ function Sync-SecretFile {
   }
 
   $secretFileInfo = Get-Item -Path $FilePath
-  $configDir = Join-Path -Path $userHome -ChildPath '.config\nucleus'
+  $configDir = Join-Path -Path $userHome -ChildPath 'AppData\Local\nucleus'
   $gitIdentityPath = Join-Path -Path $configDir -ChildPath 'git-identity.env'
   $managedGpgKeysManifest = Join-Path -Path $configDir -ChildPath 'managed-gpg-keys'
   $managedSshKeysManifest = Join-Path -Path $configDir -ChildPath 'managed-ssh-keys'

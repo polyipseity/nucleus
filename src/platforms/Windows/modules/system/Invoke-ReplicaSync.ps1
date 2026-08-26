@@ -68,7 +68,7 @@ function Invoke-ReplicaSync {
     return
   }
 
-  $rclonePassPath = Join-Path -Path $HOME -ChildPath ".config\nucleus\secrets\rclone-config-pass"
+  $rclonePassPath = Join-Path -Path $HOME -ChildPath "AppData\Local\nucleus\secrets\rclone-config-pass"
   if (Test-Path -Path $rclonePassPath -PathType Leaf) {
     # check-suppress:suppression_doc: probe -- passphrase file may be unreadable; .Trim() handles empty result.
     $passphrase = (Get-Content -Path $rclonePassPath -Raw -ErrorAction SilentlyContinue).Trim()

@@ -153,7 +153,7 @@ function Sync-CloudDriveCatalog {
         $taskPath = '\NucleusCloudMount\'
         $logFile = Join-Path $mountLogDir "combined.log"
         $wrapperPath = Join-Path $cloudDriveDir "mount-$($mount.id).ps1"
-        $rclonePassFile = Join-Path $HomeDirectory '.config\nucleus\secrets\rclone-config-pass'
+        $rclonePassFile = Join-Path $HomeDirectory 'AppData\Local\nucleus\secrets\rclone-config-pass'
 
         # check-suppress:embedded-content: exception 1 (data-driven/generated content) -- per-mount rclone wrapper
         $wrapperLines = [System.Collections.ArrayList]@()

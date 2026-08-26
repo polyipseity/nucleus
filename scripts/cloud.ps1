@@ -311,7 +311,7 @@ function Invoke-CloudSetup {
     # inherits it and rclone encrypts the new config with the managed passphrase.
     # WHY: conditional: secret file may be absent before Windows apply has
     # materialized it; benign absence — rclone uses an unencrypted config.
-    $rclonePassFile = Join-Path $HOME '.config\nucleus\secrets\rclone-config-pass'
+    $rclonePassFile = Join-Path $HOME 'AppData\Local\nucleus\secrets\rclone-config-pass'
     if (Test-Path -Path $rclonePassFile -PathType Leaf) {
       $Env:RCLONE_CONFIG_PASS = (Get-Content -Path $rclonePassFile -Raw).Trim()
     }
@@ -361,7 +361,7 @@ function Invoke-CloudSetup {
   }
 
   if ($staleRemotes.Count -gt 0) {
-    $rclonePassFile = Join-Path $HOME '.config\nucleus\secrets\rclone-config-pass'
+    $rclonePassFile = Join-Path $HOME 'AppData\Local\nucleus\secrets\rclone-config-pass'
     if (Test-Path -Path $rclonePassFile -PathType Leaf) {
       $Env:RCLONE_CONFIG_PASS = (Get-Content -Path $rclonePassFile -Raw).Trim()
     }

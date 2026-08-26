@@ -254,7 +254,7 @@ function Invoke-LogRotation {
   .PARAMETER Compress
     Whether to compress rotated archives with gzip (default: $true).
   .EXAMPLE
-    Invoke-LogRotation -Path "$env:LOCALAPPDATA\nucleus\logs\discord-music-rpc"
+    Invoke-LogRotation -Path (Join-Path (Get-NucleusLogDir) 'discord-music-rpc')
   #>
   [CmdletBinding()]
   param(

@@ -52,7 +52,7 @@ function Get-SecretUserSshPrivateKeyPath {
       continue
     }
 
-    $manifest = Join-Path -Path $userHome -ChildPath '.config\nucleus\managed-ssh-key-paths'
+    $manifest = Join-Path -Path $userHome -ChildPath 'AppData\Local\nucleus\managed-ssh-key-paths'
     if (-not (Test-Path -LiteralPath $manifest -PathType Leaf)) {
       continue
     }

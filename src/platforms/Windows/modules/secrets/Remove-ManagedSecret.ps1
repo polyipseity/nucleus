@@ -48,14 +48,14 @@ function Remove-ManagedSecret {
     $sshDir = Join-Path -Path $userHome -ChildPath '.ssh'
     $sshSecretName = "ssh_personal_$Username"
     $sshRsaSecretName = "${sshSecretName}_rsa"
-    $configDir = Join-Path -Path $userHome -ChildPath '.config\nucleus'
+    $configDir = Join-Path -Path $userHome -ChildPath 'AppData\Local\nucleus'
 
     foreach ($managedPath in @(
         (Join-Path -Path $sshDir -ChildPath $sshSecretName),
         (Join-Path -Path $sshDir -ChildPath "${sshSecretName}.pub"),
         (Join-Path -Path $sshDir -ChildPath $sshRsaSecretName),
         (Join-Path -Path $sshDir -ChildPath "${sshRsaSecretName}.pub"),
-        (Join-Path -Path $userHome -ChildPath ".config\nucleus\git-identity.env"),
+        (Join-Path -Path $userHome -ChildPath "AppData\Local\nucleus\git-identity.env"),
         (Join-Path -Path $configDir -ChildPath 'managed-gpg-keys'),
         (Join-Path -Path $configDir -ChildPath 'managed-ssh-keys')
       )) {

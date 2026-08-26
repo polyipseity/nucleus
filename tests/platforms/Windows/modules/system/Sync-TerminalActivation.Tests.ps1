@@ -21,15 +21,15 @@ Describe 'Sync-TerminalActivation module loading' {
 
 Describe 'Sync-TerminalActivation behavior' {
     BeforeEach {
-        # Use a temp directory as USERPROFILE so manifest paths are isolated.
+        # Use a temp directory as LOCALAPPDATA so manifest paths are isolated.
         $script:testRoot = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "nucleus-test-$([System.IO.Path]::GetRandomFileName())"
         $null = New-Item -Path $script:testRoot -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
-        $script:originalUserProfile = $env:USERPROFILE
-        $env:USERPROFILE = $script:testRoot
+        $script:originalLocalAppData = $env:LOCALAPPDATA
+        $env:LOCALAPPDATA = $script:testRoot
     }
 
     AfterEach {
-        $env:USERPROFILE = $script:originalUserProfile
+        $env:LOCALAPPDATA = $script:originalLocalAppData
         if ($script:testRoot -and (Test-Path -LiteralPath $script:testRoot)) {
             # check-suppress:suppression_doc: cleanup in test teardown -- failure is acceptable
             Remove-Item -LiteralPath $script:testRoot -Recurse -Force -ErrorAction SilentlyContinue
@@ -41,7 +41,7 @@ Describe 'Sync-TerminalActivation behavior' {
     }
 
     It 'Should be a no-op and delete empty manifest' {
-        $manifestDir = Join-Path -Path $script:testRoot -ChildPath '.config\nucleus'
+        $manifestDir = Join-Path -Path $script:testRoot -ChildPath 'nucleus'
         $null = New-Item -Path $manifestDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $manifestPath = Join-Path -Path $manifestDir -ChildPath 'terminal-activations.list'
         $null = New-Item -Path $manifestPath -ItemType File -Force  # check-suppress:suppression_doc: New-Item returns FileInfo, discarded in test setup
@@ -52,7 +52,7 @@ Describe 'Sync-TerminalActivation behavior' {
     }
 
     It 'Should execute a single command from the manifest' {
-        $manifestDir = Join-Path -Path $script:testRoot -ChildPath '.config\nucleus'
+        $manifestDir = Join-Path -Path $script:testRoot -ChildPath 'nucleus'
         $null = New-Item -Path $manifestDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $manifestPath = Join-Path -Path $manifestDir -ChildPath 'terminal-activations.list'
         $markerPath = Join-Path -Path $script:testRoot -ChildPath 'marker-single'
@@ -65,7 +65,7 @@ Describe 'Sync-TerminalActivation behavior' {
     }
 
     It 'Should skip comment lines' {
-        $manifestDir = Join-Path -Path $script:testRoot -ChildPath '.config\nucleus'
+        $manifestDir = Join-Path -Path $script:testRoot -ChildPath 'nucleus'
         $null = New-Item -Path $manifestDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $manifestPath = Join-Path -Path $manifestDir -ChildPath 'terminal-activations.list'
         $markerPath = Join-Path -Path $script:testRoot -ChildPath 'marker-comment'
@@ -81,7 +81,7 @@ Describe 'Sync-TerminalActivation behavior' {
     }
 
     It 'Should continue on command failure' {
-        $manifestDir = Join-Path -Path $script:testRoot -ChildPath '.config\nucleus'
+        $manifestDir = Join-Path -Path $script:testRoot -ChildPath 'nucleus'
         $null = New-Item -Path $manifestDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded in test setup
         $manifestPath = Join-Path -Path $manifestDir -ChildPath 'terminal-activations.list'
         $markerPath = Join-Path -Path $script:testRoot -ChildPath 'marker-after-fail'

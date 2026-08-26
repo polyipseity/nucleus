@@ -5,18 +5,8 @@ properties:
   configurationVersion: 0.2.0
   resources:
     # ref: https://learn.microsoft.com/windows/win32/api/winuser/nf-winuser-systemparametersinfoa -- SystemParametersInfo API docs for wallpaper settings
-    - resource: Microsoft.Windows.Storage/Folder
-      id: wallpaperFolder
-      directives:
-        description: Ensure wallpaper output directory exists
-      settings:
-        Path: "%USERPROFILE%\\Pictures\\wallpapers"
-        Ensure: Present
-
     - resource: Microsoft.Windows.Registry/RegistryValue
       id: wallpaperPath
-      dependsOn:
-        - wallpaperFolder
       directives:
         description: Ensure desktop wallpaper points at declaratively materialized asset
       settings:

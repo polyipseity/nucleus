@@ -120,7 +120,7 @@ function Sync-VSCodeConfig {
   # Build the target user's AppData\Roaming root from the explicit Username
   # parameter so callers control which profile receives managed VS Code
   # symlinks.
-  $userProfile = Join-Path -Path "C:\Users" -ChildPath $Username
+  $userProfile = [Environment]::GetFolderPath('UserProfile')
   $appDataRoaming = Join-Path -Path $userProfile -ChildPath "AppData\Roaming"
 
   # Both stable and insiders channels share the same repo-backed config so

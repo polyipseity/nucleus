@@ -71,7 +71,7 @@ function Sync-GitAndSshConfig {
       continue
     }
 
-    $identityPath = Join-Path -Path $userHome -ChildPath ".config\nucleus\git-identity.env"
+    $identityPath = Join-Path -Path $userHome -ChildPath "AppData\Local\nucleus\git-identity.env"
     # check-suppress:config-method: method 1 (writable symlink) -- per-user .gitconfig symlinked to the repo's <Host>.gitconfig (derived from $env:NUCLEUS_HOST; mirrors POSIX git.nix user scope), so git reads managed keys directly from the repo tree.
     $userGitConfigPath = Join-Path -Path $userHome -ChildPath '.gitconfig'
     $userGitConfigDir = Join-Path -Path $userHome -ChildPath '.config\git'

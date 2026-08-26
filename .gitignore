@@ -364,4 +364,7 @@ src/users/*/vscode/profiles/*
 !src/users/*/vscode/profiles/*/snippets/
 !src/users/*/vscode/profiles/*/snippets/**
 !src/users/*/vscode/profiles/*/tasks.json
+
+# Generated Windows DSC lockfiles (produced by apply.ps1 from lockfile.json).
+src/hosts/Windows/.generated/
 # }

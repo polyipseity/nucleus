@@ -421,6 +421,7 @@ if (-not $Elevated) {
 # Root utilities: shared helpers with no single domain affinity.
 # Config deployment helpers (Deploy-WritableSymlink, Resolve-UserConfigSource):
 # must load before any Sync-* module that deploys managed configs.
+. (Join-Path -Path $resolvedModuleDir -ChildPath "New-NucleusHub.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "ConfigHelpers.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Load-UserRegistry.ps1")
 . (Join-Path -Path $resolvedModuleDir -ChildPath "Invoke-LogManagement.ps1")
@@ -666,6 +667,18 @@ if ($EnableHostAgeKeyRegistration) {
     -RepoRoot $repoRoot
 }
 
+# Create the per-user ~/.nucleus hub (user -> %LOCALAPPDATA%\nucleus,
+# system -> %ProgramData%\nucleus) for every managed user. Runs in the
+# elevated apply.ps1 context so junctions can be created under each profile.
+foreach ($user in $Users) {
+  $userRecord = @($userRegistry.users | Where-Object { $_.name -eq $user }) | Select-Object -First 1
+  if ($null -eq $userRecord -or [string]::IsNullOrWhiteSpace($userRecord.homeDirectory)) {
+    Write-NucleusWarning -CommandName 'apply' "skipping hub creation for '$user': homeDirectory not found in registry."
+    continue
+  }
+  New-NucleusHub -UserHome $userRecord.homeDirectory
+}
+
 if ($EnableSecretsParity) {
   foreach ($user in $Users) {
     $userRecord = @($userRegistry.users | Where-Object { $_.name -eq $user }) | Select-Object -First 1
@@ -735,7 +748,7 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
     '$schema' = "$repoRoot\src\modules\ai\key-catalog.schema.json"
     keys = $keyEntries
   } | ConvertTo-Json -Compress
-  $catalogPath = Join-Path -Path $env:USERPROFILE -ChildPath '.config\nucleus\key-catalog.json'
+  $catalogPath = Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus\key-catalog.json'
   New-Item -Path (Split-Path $catalogPath) -ItemType Directory -Force > $null
   [System.IO.File]::WriteAllText($catalogPath, $catalog, [System.Text.UTF8Encoding]::new($false))
   Write-NucleusInfo -CommandName 'apply' "wrote key-catalog.json with $($availableKeys.Count) keys"
@@ -763,17 +776,20 @@ foreach ($user in $Users) {
 $activeWallpaperPath = Sync-WallpaperInventory -RepoRoot $repoRoot -GpgExe $gpgExe -HostKeyPath $machineSshHostKeyPath -Users $Users -SopsExe $sopsExe
 Remove-StaleWallpaper -RepoRoot $repoRoot -User $sessionUser -OutputDir $sessionWallpaperOutputDir
 
-# Generate locked DSC from lockfile before applying.
+# Generate locked DSC from lockfile before applying. Output goes to
+# .generated/ (not the repo tree) so generated artifacts stay out of git.
 $lockfilePath = Join-Path -Path $PSScriptRoot -ChildPath "..\..\lockfiles\lockfile.json"
-ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/scheduler.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/scheduler.locked.dsc.yml")
-ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/developer-mode.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/developer-mode.locked.dsc.yml")
-ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/firewall.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/firewall.locked.dsc.yml")
-ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/taskbar.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/taskbar.locked.dsc.yml")
-ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/computer-name.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/computer-name.locked.dsc.yml")
-ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/long-paths.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/long-paths.locked.dsc.yml")
-ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/storage-sense.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/storage-sense.locked.dsc.yml")
-ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/font-substitutes.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/font-substitutes.locked.dsc.yml")
-ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/remote-desktop.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/remote-desktop.locked.dsc.yml")
+$generatedDir = Join-Path -Path $resolvedConfigDir -ChildPath ".generated"
+New-Item -Path $generatedDir -ItemType Directory -Force > $null
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/scheduler.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $generatedDir -ChildPath "system/scheduler.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/developer-mode.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $generatedDir -ChildPath "system/developer-mode.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/firewall.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $generatedDir -ChildPath "system/firewall.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/taskbar.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $generatedDir -ChildPath "system/taskbar.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/computer-name.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $generatedDir -ChildPath "system/computer-name.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/long-paths.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $generatedDir -ChildPath "system/long-paths.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/storage-sense.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $generatedDir -ChildPath "system/storage-sense.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/font-substitutes.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $generatedDir -ChildPath "system/font-substitutes.locked.dsc.yml")
+ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir -ChildPath "system/remote-desktop.dsc.yml") -LockfilePath $lockfilePath -OutputPath (Join-Path -Path $generatedDir -ChildPath "system/remote-desktop.locked.dsc.yml")
 
 # Single-source overlap enable state for Windows (generated by Nix from
 # managedPackages in core.nix; committed as winget-packages.json so Windows
@@ -798,16 +814,16 @@ ConvertFrom-WingetLockfileToDsc -ConfigPath (Join-Path -Path $resolvedConfigDir 
 
 # Replace system DSC files with locked variants in effective config list.
 $effectiveConfigFiles = @($effectiveConfigFiles | ForEach-Object {
-  if ($_ -eq "system/scheduler.dsc.yml") { "system/scheduler.locked.dsc.yml" }
-  elseif ($_ -eq "system/developer-mode.dsc.yml") { "system/developer-mode.locked.dsc.yml" }
-  elseif ($_ -eq "system/firewall.dsc.yml") { "system/firewall.locked.dsc.yml" }
-  elseif ($_ -eq "system/taskbar.dsc.yml") { "system/taskbar.locked.dsc.yml" }
-  elseif ($_ -eq "system/computer-name.dsc.yml") { "system/computer-name.locked.dsc.yml" }
-  elseif ($_ -eq "system/long-paths.dsc.yml") { "system/long-paths.locked.dsc.yml" }
-  elseif ($_ -eq "system/storage-sense.dsc.yml") { "system/storage-sense.locked.dsc.yml" }
-  elseif ($_ -eq "system/font-substitutes.dsc.yml") { "system/font-substitutes.locked.dsc.yml" }
-  elseif ($_ -eq "system/remote-desktop.dsc.yml") { "system/remote-desktop.locked.dsc.yml" }
-  elseif ($_ -eq "system/packages.dsc.yml") { "system/packages.locked.dsc.yml" }
+  if ($_ -eq "system/scheduler.dsc.yml") { ".generated/system/scheduler.locked.dsc.yml" }
+  elseif ($_ -eq "system/developer-mode.dsc.yml") { ".generated/system/developer-mode.locked.dsc.yml" }
+  elseif ($_ -eq "system/firewall.dsc.yml") { ".generated/system/firewall.locked.dsc.yml" }
+  elseif ($_ -eq "system/taskbar.dsc.yml") { ".generated/system/taskbar.locked.dsc.yml" }
+  elseif ($_ -eq "system/computer-name.dsc.yml") { ".generated/system/computer-name.locked.dsc.yml" }
+  elseif ($_ -eq "system/long-paths.dsc.yml") { ".generated/system/long-paths.locked.dsc.yml" }
+  elseif ($_ -eq "system/storage-sense.dsc.yml") { ".generated/system/storage-sense.locked.dsc.yml" }
+  elseif ($_ -eq "system/font-substitutes.dsc.yml") { ".generated/system/font-substitutes.locked.dsc.yml" }
+  elseif ($_ -eq "system/remote-desktop.dsc.yml") { ".generated/system/remote-desktop.locked.dsc.yml" }
+  elseif ($_ -eq "system/packages.dsc.yml") { ".generated/system/packages.locked.dsc.yml" }
   else { $_ }
 })
 

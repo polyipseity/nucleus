@@ -112,7 +112,7 @@ function Sync-SymlinkManifest {
       continue
     }
 
-    $manifestDir = Join-Path -Path $homeDirectory -ChildPath '.config\nucleus'
+    $manifestDir = Join-Path -Path $homeDirectory -ChildPath 'AppData\Local\nucleus'
     $manifestPath = Join-Path -Path $manifestDir -ChildPath 'symlinks.json'
     $previousManagedPaths = @(Get-ManifestPathList -ManifestPath $manifestPath)
 

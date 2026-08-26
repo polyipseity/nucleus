@@ -108,7 +108,7 @@ function Invoke-SecretVerification {
     throw "verification: ERROR — could not resolve home directory for user '$Username'."
   }
 
-  $configDir = Join-Path -Path $userHome -ChildPath '.config\nucleus'
+  $configDir = Join-Path -Path $userHome -ChildPath 'AppData\Local\nucleus'
   $managedGpgKeysManifest = Join-Path -Path $configDir -ChildPath 'managed-gpg-keys'
   $managedSshKeysManifest = Join-Path -Path $configDir -ChildPath 'managed-ssh-keys'
   $managedSshKeyPathsManifest = Join-Path -Path $configDir -ChildPath 'managed-ssh-key-paths'
