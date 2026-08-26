@@ -503,6 +503,17 @@ run_caddy_local_ca_trust() {
   fi
 }
 
+run_pin_flake_inputs() {
+  # Build the flakeInputs output into a persistent profile so the daily GC
+  # keeps flake-input *-source paths alive between applies (otherwise they are
+  # re-fetched from cache.nixos.org on every apply).
+  _rpfi_profile="/nix/var/nix/profiles/flake-inputs"
+  say -l flake-inputs "pinning flake inputs to $_rpfi_profile..."
+  if ! run_nix_as_root build --profile "$_rpfi_profile" "$REPO_ROOT/src#flakeInputs"; then
+    warn -l flake-inputs "flakeInputs build failed (inputs may re-fetch next apply)"
+  fi
+}
+
 run_replica_sync() {
   # Call scripts/cloud.sh sync so enabled replicas in users.json are
   # synchronized after a successful apply.
@@ -593,6 +604,7 @@ Darwin)
   # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
   # while running as root (which otherwise produces ownership warnings).
   run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --impure --flake "$REPO_ROOT/src#MacBook"
+  run_pin_flake_inputs
   run_terminal_activations
   "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
   run_caddy_local_ca_trust sudo
@@ -615,6 +627,7 @@ Linux)
     run_health_check
     # Keep root invocations on root-owned HOME for consistent Nix behavior.
     run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#NixOS"
+    run_pin_flake_inputs
     run_terminal_activations
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
     run_caddy_local_ca_trust sudo
@@ -631,6 +644,7 @@ Linux)
     target_username="${target_user:-${NUCLEUS_USERNAME:-$(id -un)}}"
     run_health_check
     run_nix run "$REPO_ROOT/src#home-manager" -- switch --flake "$REPO_ROOT/src#$target_username"
+    run_pin_flake_inputs
     run_terminal_activations
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
     run_caddy_local_ca_trust user
