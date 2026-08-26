@@ -84,7 +84,7 @@ in
     (lib.optionalAttrs hasLaunchdDaemonsOption (
       let
         # Shared GC application derivations (plan item 6).
-        gcApps = import ./gc-activations.nix { inherit lib pkgs; };
+        gcApps = import ./gc-activations.nix { inherit pkgs; };
         inherit (gcApps) logGcSystem nixStoreGc gcWeekly;
       in
       {

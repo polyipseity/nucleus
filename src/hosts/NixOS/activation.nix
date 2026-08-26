@@ -31,7 +31,7 @@ let
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
   # Shared GC application derivations (plan item 6).
-  gcApps = import ../../modules/gc-activations.nix { inherit lib pkgs; };
+  gcApps = import ../../modules/gc-activations.nix { inherit pkgs; };
   inherit (gcApps) logGcSystem nixStoreGc gcWeekly;
 in
 {
