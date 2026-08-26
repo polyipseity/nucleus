@@ -549,6 +549,44 @@
       nucleusAppsMac = mkNucleusApps pkgsMac (mkTreefmtWrapper systems.mac pkgsMac);
       nucleusAppsLinux = mkNucleusApps pkgsLinux (mkTreefmtWrapper systems.linux pkgsLinux);
 
+      # Retain every flake-input source tree across daily GC. Built into the
+      # /nix/var/nix/profiles/flake-inputs profile by apply.sh after a
+      # successful rebuild, so nix-collect-garbage cannot prune the *-source
+      # paths the next evaluation needs.
+      mkFlakeInputsPkg =
+        pkgs: inputs:
+        pkgs.runCommand "flake-inputs" { } (
+          ''
+            mkdir -p "$out"
+          ''
+          + pkgs.lib.concatStringsSep "\n" (
+            pkgs.lib.mapAttrsToList (n: v: ''
+              ln -s "${v}" "$out/${n}"
+            '') inputs
+          )
+        );
+
+      flakeInputsMac = {
+        darwin = darwin;
+        home-manager = home-manager;
+        nix-vscode-extensions = nix-vscode-extensions;
+        nixpkgs = nixpkgs;
+        rust-overlay = rust-overlay;
+        sops-nix = sops-nix;
+        treefmt-nix = treefmt-nix;
+        nix-homebrew = nix-homebrew;
+        homebrew-core = homebrew-core;
+        homebrew-cask = homebrew-cask;
+        cirruslabs-cli = cirruslabs-cli;
+        smudge-smudge = smudge-smudge;
+        macos-fuse-t-cask = macos-fuse-t-cask;
+        zackelia-formulae = zackelia-formulae;
+        nixos-generators = nixos-generators;
+        brew-src = nix-homebrew.inputs.brew-src;
+        nixlib = nixos-generators.inputs.nixlib;
+      };
+      flakeInputsLinux = flakeInputsMac;
+
       # Daemon-only packages: NOT nucleus apps (not in mkNucleusApps), so they
       # are never on PATH, via `nix run`, or in `packages`. Daemons resolve them
       # by store path through the per-host nucleusApps merge below. Built per-host
@@ -720,7 +758,10 @@
             ];
           };
         }
-        // nucleusAppsMac;
+        // nucleusAppsMac
+        // {
+          flakeInputs = mkFlakeInputsPkg pkgsMac flakeInputsMac;
+        };
         "${systems.linux}" = {
           treefmt = mkTreefmtWrapper systems.linux pkgsLinux;
           bootstrap-deps = pkgsLinux.symlinkJoin {
@@ -733,7 +774,10 @@
             ];
           };
         }
-        // nucleusAppsLinux;
+        // nucleusAppsLinux
+        // {
+          flakeInputs = mkFlakeInputsPkg pkgsLinux flakeInputsLinux;
+        };
       };
 
       # -----------------------------------------------------------------------
