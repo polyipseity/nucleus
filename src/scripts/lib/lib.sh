@@ -482,7 +482,7 @@ nucleus_system_log_dir() {
   nucleus_log_path_from_json systemLogDir
 }
 
-# Caddy state directory sibling to the system log root (/Users/Shared/nucleus/caddy).
+# Caddy state directory sibling to the system log root (/Library/Application Support/nucleus/caddy).
 nucleus_caddy_state_dir() {
   _ncsd_sys="$(nucleus_system_log_dir)" || return 1
   printf '%s\n' "$(dirname -- "$_ncsd_sys")/caddy"

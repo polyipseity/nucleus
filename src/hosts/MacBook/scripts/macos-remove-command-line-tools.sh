@@ -20,7 +20,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 CLT_DIR="/Library/Developer/CommandLineTools"
 
-LOG_FILE="${1:-/Users/Shared/nucleus/logs/command-line-tools.log}"
+LOG_FILE="${1:-/Library/Application Support/nucleus/logs/command-line-tools.log}"
 /bin/mkdir -p "$(dirname "$LOG_FILE")"
 
 _log() {

@@ -2754,7 +2754,7 @@ vm_prune_and_write_all_guest_scripts() {
 vm_validate_utm_plist_template() {
   local _vupt_name="$1"
 
-  _vupt_template="${HOME}/.local/share/nucleus/vms/${_vupt_name}-config.plist"
+  _vupt_template="${HOME}/Library/Application Support/nucleus/vms/${_vupt_name}-config.plist"
   if [ ! -f "$_vupt_template" ]; then
     warn "UTM config template not found at $_vupt_template; apply the macOS config first"
     return 1
@@ -2898,7 +2898,7 @@ vm_sync_libvirt() {
   local vm_id="$1" vm_type="$2" vm_hosts="$3" vm_index="$4"
   local _xml_file
 
-  _xml_file="/etc/nucleus/vms/${vm_id}-domain.xml"
+  _xml_file="/var/lib/nucleus/vms/${vm_id}-domain.xml"
   if [ ! -f "$_xml_file" ]; then
     warn "domain XML not found at $_xml_file; apply the NixOS config first"
     return
@@ -4621,7 +4621,7 @@ vm_unpack_vms() {
         continue
       fi
       _uv_bundle="$VM_DIR/${_uv_name}.utm"
-      _uv_plist_template="${HOME}/.local/share/nucleus/vms/${_uv_name}-config.plist"
+      _uv_plist_template="${HOME}/Library/Application Support/nucleus/vms/${_uv_name}-config.plist"
       if [ ! -f "$_uv_plist_template" ]; then
         warn "unpack — UTM config template not found: $_uv_plist_template (apply the macOS config on this host first)"
         continue
@@ -4680,7 +4680,7 @@ vm_unpack_vms() {
       fi
       ;;
     Linux)
-      _uv_xml_file="/etc/nucleus/vms/${_uv_name}-domain.xml"
+      _uv_xml_file="/var/lib/nucleus/vms/${_uv_name}-domain.xml"
       if [ ! -f "$_uv_xml_file" ]; then
         warn "unpack — libvirt domain XML not found: $_uv_xml_file (apply the NixOS config on this host first)"
         continue

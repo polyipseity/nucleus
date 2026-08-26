@@ -52,7 +52,7 @@ _current_sleep=$_base_sleep
 while true; do
   # --- Runtime toggle from config.json ---
   # Respects the camilladsp.heartbeat flag for dynamic disable.
-  config_json="$HOME/.local/state/nucleus/config.json"
+  config_json="$(case "$(uname -s)" in Darwin) echo "$HOME/Library/Application Support/nucleus/config.json" ;; *) echo "$HOME/.local/share/nucleus/config.json" ;; esac)"
   if [ -f "$config_json" ]; then
     _hb_enabled=$(jq -r '.camilladsp.heartbeat // true' "$config_json")
     if [ "$_hb_enabled" = "false" ]; then

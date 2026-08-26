@@ -12,7 +12,7 @@ export TMPDIR=/run/org.nixos.linux-builder USE_TMPDIR=1
 rm -rf "$TMPDIR"
 mkdir -p "$TMPDIR"
 
-work_dir="${LINUX_BUILDER_WORK_DIR:-${1:-/var/lib/linux-builder}}"
+work_dir="${LINUX_BUILDER_WORK_DIR:-${1:-/Library/Application Support/nucleus/linux-builder}}"
 mkdir -p "$work_dir"
 trap 'rm -rf '"$TMPDIR" EXIT
 

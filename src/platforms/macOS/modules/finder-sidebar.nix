@@ -22,10 +22,6 @@ let
       url = uriEncode "file://${config.home.homeDirectory}/Downloads";
     }
     {
-      name = "data";
-      url = uriEncode "file://${config.home.homeDirectory}/data";
-    }
-    {
       name = "dev";
       url = uriEncode "file://${config.home.homeDirectory}/dev";
     }

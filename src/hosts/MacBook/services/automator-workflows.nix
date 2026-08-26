@@ -26,7 +26,7 @@
 #
 # WHY: home.file for manual.md:
 #   The manual.md file is symlinked via home.file so the workflow's shell
-#   script can find it at $HOME/.local/share/nucleus/manual.md without needing
+#   script can find it at $HOME/Library/Application Support/nucleus/manual.md without needing
 #   NUCLEUS_REPO_ROOT at runtime.
 #
 # SF Symbol icon policy:
@@ -157,7 +157,7 @@ let
   };
 in
 {
-  home.file.".local/share/nucleus/manual.md".source = ../MANUAL.md;
+  home.file."Library/Application Support/nucleus/manual.md".source = ../MANUAL.md;
 
   # CLI entry: `nucleus-open-manual` in ~/.local/lib/nucleus/open-manual.
   # Uses the shared open-host-manual.sh with the manual path as positional arg.

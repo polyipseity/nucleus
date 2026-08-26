@@ -40,7 +40,7 @@ let
       )
     ];
   };
-  workDir = "/var/lib/linux-builder";
+  workDir = "/Library/Application Support/nucleus/linux-builder";
   # Nix 2.34.x ssh-ng master sessions fail against darwin linux-builder; the
   # ssh:// builder path works. Keep registration on ssh:// until upstream
   # ssh-ng/master startup is fixed. Rely on managed Host/HostKeyAlias/

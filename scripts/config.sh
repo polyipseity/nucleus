@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Manages runtime configuration for nucleus services.
-# Config is stored in ~/.local/state/nucleus/config.json.
+# Config is stored in the nucleus USER root (~/Library/Application Support/nucleus/config.json on macOS, ~/.local/share/nucleus/config.json on NixOS).
 # Subcommands: get, set, list.
 
 set -euo pipefail
@@ -17,7 +17,10 @@ fi
 SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 . "$SCRIPT_DIR/../src/scripts/lib/lib.sh"
 
-CONFIG_FILE="${HOME}/.local/state/nucleus/config.json"
+case "$(uname -s)" in
+Darwin) CONFIG_FILE="$HOME/Library/Application Support/nucleus/config.json" ;;
+*) CONFIG_FILE="$HOME/.local/share/nucleus/config.json" ;;
+esac
 
 usage() {
   usage_std "$(basename "$0")" "get [<section.key>]|set <section.key> <value>|list" "Manage runtime configuration for nucleus services."

@@ -20,7 +20,7 @@ in
 
     # macOS SIP log path restriction: on macOS 26+, SIP blocks non-root
     # launchd daemons from writing to /Library/Logs/ (EX_CONFIG 78).
-    # /Users/Shared/nucleus/logs is the approved alternative.
+    # /Library/Application Support/nucleus/logs is the approved native SYSTEM root.
     # /tmp/ works for testing; /Library/Logs/ is blocked.
     # The same SIP restriction also blocks unsigned binary execution at boot;
     # all MacBook daemons work around it via /bin/sh wrapper

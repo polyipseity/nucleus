@@ -59,7 +59,7 @@
 				<key>ActionParameters</key>
 				<dict>
 					<key>COMMAND_STRING</key>
-					<string>open "$HOME/.local/share/nucleus/manual.md"</string>
+					<string>open "$HOME/Library/Application Support/nucleus/manual.md"</string>
 					<key>CheckedForUserDefaultShell</key>
 					<true/>
 					<key>inputMethod</key>

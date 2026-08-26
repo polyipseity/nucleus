@@ -23,7 +23,7 @@ FARM_DIR="/usr/local/bin"
 FARM_MARKER=".nucleus-symlink-farm"
 
 # Log file location.
-NUCLEUS_SYSTEM_LOG_DIR="${NUCLEUS_SYSTEM_LOG_DIR:-/Users/Shared/nucleus/logs}"
+NUCLEUS_SYSTEM_LOG_DIR="${NUCLEUS_SYSTEM_LOG_DIR:-/Library/Application Support/nucleus/logs}"
 LOG_FILE="${2:-$NUCLEUS_SYSTEM_LOG_DIR/symlink-farm.log}"
 /bin/mkdir -p "$(dirname "$LOG_FILE")"
 

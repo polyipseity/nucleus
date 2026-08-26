@@ -12,7 +12,7 @@ if [ -n "$_sys_log_dir" ]; then
   done
 fi
 
-# macOS-specific: create user-level log dirs under ~/nucleus/logs and
+# macOS-specific: create user-level log dirs under ~/Library/Application Support/nucleus/logs and
 # chown system log subdirs to the console user so launchd can write.
 _user_log_root="${5:-}"
 _user_log_subdirs="$3"

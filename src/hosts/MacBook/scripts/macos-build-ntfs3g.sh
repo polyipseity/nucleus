@@ -61,7 +61,7 @@ export DEVELOPER_DIR_arm64_apple_darwin="$SDK_DEV_DIR"
 unset DEVELOPER_DIR
 
 FINGERPRINT_FILE="/usr/local/share/ntfs-3g/.build-fingerprint"
-LOG_FILE="/Users/Shared/nucleus/logs/ntfs-3g-build.log"
+LOG_FILE="/Library/Application Support/nucleus/logs/ntfs-3g-build.log"
 
 if ! [ -x /usr/local/bin/ntfs-3g ] ||
   ! [ -f "$FINGERPRINT_FILE" ] ||

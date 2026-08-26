@@ -8,7 +8,8 @@
 set -eu
 
 state_root="${JELLYFIN_STATE_ROOT:-${1:-/Users/Shared/Jellyfin}}"
-log_dir="${JELLYFIN_LOG_DIR:-${2:-${HOME}/.local/state/nucleus/log/jellyfin}}"
+_jfd_log_default="$(case "$(uname -s)" in Darwin) echo "$HOME/Library/Application Support/nucleus/logs/jellyfin" ;; *) echo "$HOME/.local/share/nucleus/logs/jellyfin" ;; esac)"
+log_dir="${JELLYFIN_LOG_DIR:-${2:-$_jfd_log_default}}"
 jellyfin_bin="${JELLYFIN_BIN:-${3:-jellyfin}}"
 shift 3 2>/dev/null || true # check-suppress:suppression_doc: expected failure when defaulting all positional args
 

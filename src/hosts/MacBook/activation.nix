@@ -88,6 +88,11 @@ let
   symlinkFarmEntries = lib.concatStringsSep " " (
     lib.mapAttrsToList (name: target: "${target}->${name}") appleSdkTools.symlinkFarmTools
   );
+
+  # Nucleus root + hub activation helpers (Phase 1).  Returns shell text that
+  # creates the USER/SYSTEM roots, their root->conventional symlinks, and the
+  # ~/.nucleus hub.  Console user is resolved at activation time.
+  nucleusRoots = import ../../modules/lib/nucleus-roots.nix { inherit lib pkgs; };
 in
 {
   # ---------------------------------------------------------------------------
@@ -114,6 +119,27 @@ in
     # directory doesn't exist, the cask install silently skips the link step,
     # leaving ntfs-3g build with no fuse headers.  Create it pre-emptively.
     /bin/mkdir -p /usr/local/include
+
+    # ---- ensure-nucleus-roots ------------------------------------------------------
+    # Create the USER/SYSTEM nucleus roots, their root->conventional symlinks, and
+    # the ~/.nucleus hub for the console user.  Resolved at activation time because
+    # the console user is not known at eval time.
+    # check-suppress:suppression_doc: /dev/console may not exist; guards handle empty/root.
+    _console_user="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
+    if [ -n "$_console_user" ] && [ "$_console_user" != "root" ]; then
+      # check-suppress:suppression_doc: dscl may fail if the user record is missing; treat as absent.
+      _console_home="$(/usr/bin/dscl . -read "/Users/${_console_user}" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}' || true)"
+      if [ -n "$_console_home" ]; then
+        ${nucleusRoots.mkNucleusRootSymlinks {
+          userHome = "$_console_home";
+          userName = "$_console_user";
+        }}
+        ${nucleusRoots.mkNucleusHub {
+          userHome = "$_console_home";
+          userName = "$_console_user";
+        }}
+      fi
+    fi
 
     # ---- ensure-log-dirs -----------------------------------------------------------
     # Create system log dirs (all hosts) and macOS-specific user log dirs (console
@@ -257,19 +283,11 @@ in
     # Pass empty arg to trigger runtime resolution from /dev/console (macOS).
     "${activationBundle}/src/scripts/editors/launch-nvim.sh" ""
 
-    # ---- ensureLogDirs (repeated from extraActivation) --------------------------
-    # Also ensure log directories exist during postActivation (belt-and-suspenders
-    # in case systemLogDir was reconfigured at activation time).
-    "${activationBundle}/src/scripts/services/log-dirs-init.sh" \
-      "${config.nucleus.logging.systemLogDir}" \
-      "${builtins.toString systemLogDirs}" \
-      "${builtins.toString userLogDirsWithReplicas}" \
-      "${builtins.toString chownLogDirs}" \
-      "${macBookUserLogDirSuffix}"
+    # ---- ensure-camilladsp-log-dir ----------------------------------------------
     # check-suppress:suppression_doc: /dev/console may not exist; guards below handle empty/root.
     _camilladsp_user="/Users/$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     if [ -n "$_camilladsp_user" ] && [ "$_camilladsp_user" != "/Users/root" ]; then
-      /bin/mkdir -p "$_camilladsp_user/nucleus/logs/camilladsp"
+      /bin/mkdir -p "$_camilladsp_user/Library/Application Support/nucleus/logs/camilladsp"
     fi
 
     # ---- verifyNucleusServices ---------------------------------------------------
