@@ -65,9 +65,12 @@ while true; do
 
   # --- Decide whether a push is needed ---
   # Query live state and the live playback device. If the websocket is
-  # unreachable, leave both empty (treated as "push"). The skip decision is
-  # idiot-proof: skip ONLY when Running AND the live device is already set. A
-  # null live device can never be skipped, so a null device is always corrected.
+  # unreachable, leave both empty (treated as "push"). The skip decision
+  # compares the live device against the target device that detection would
+  # currently select: skip ONLY when Running AND the live device is already set
+  # AND it equals the target. When the system default output device changes, the
+  # target differs from the live device, so the config is re-pushed. A null
+  # target is never pushed (it would set the device to null).
   _state=""
   _live=""
   if _state_resp=$(printf '{"GetState":null}' | websocat -1 "ws://127.0.0.1:$ws_port" 2>/dev/null); then
@@ -86,7 +89,14 @@ except Exception:
 ")
   fi
 
-  if camilladsp_needs_push "$_state" "$_live"; then
+  # Target device that detection would currently select (empty if none).
+  _target=""
+  if [ -f "$config_file" ]; then
+    # check-suppress:suppression_doc: detection failure is non-fatal — empty target is treated as "skip" by the push decision
+    _target=$(camilladsp_target_playback_device "$config_file" 2>/dev/null) || true
+  fi
+
+  if camilladsp_needs_push "$_state" "$_live" "$_target"; then
     # --- Push config ---
     # Resolve playback device: patches empty device in config with system default.
     if camilladsp_push_config --port "$ws_port" --config "$config_file"; then

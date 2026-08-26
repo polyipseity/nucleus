@@ -115,3 +115,25 @@ function Resolve-CamillaDSPPlaybackDevice {
   $patched = $cfg | ConvertTo-Yaml
   return $patched
 }
+
+function Get-CamillaDSPResolvedPlaybackDeviceName {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$ConfigPath
+  )
+
+  # Return the playback device name that detection would currently select for
+  # the given config (the device Resolve-CamillaDSPPlaybackDevice would set), or
+  # $null if detection yields nothing. Used by the heartbeat to detect when the
+  # live device has drifted from the desired device (e.g. the system default
+  # output device changed).
+  if (-not (Test-Path $ConfigPath)) {
+    return $null
+  }
+  $resolved = Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigPath
+  $cfg = $resolved | ConvertFrom-Yaml
+  $device = $cfg.devices.playback.device
+  if ($null -eq $device) { return $null }
+  return [string]$device
+}

@@ -45,7 +45,15 @@ while ($true) {
 
   $success = $false
 
-  # ── Check current state — skip if already Running ──────────────────────
+  # ── Check current state — skip only when Running AND live device matches target ──
+  # The target device is what detection would currently select. When the system
+  # default output device changes, the target differs from the live device, so
+  # the config must be re-pushed. A null target is never pushed (it would set
+  # the device to null).
+  $targetDevice = $null
+  if (Test-Path $ConfigFile) {
+    $targetDevice = Get-CamillaDSPResolvedPlaybackDeviceName -ConfigPath $ConfigFile
+  }
   try {
     $stateWs = [System.Net.WebSockets.ClientWebSocket]::new()
     $ct = [System.Threading.CancellationToken]::Empty
@@ -59,7 +67,24 @@ while ($true) {
     $stateWs.CloseAsync([System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure, "done", $ct).Wait()
     $state = ($stateResp | ConvertFrom-Json).GetState.value
     if ($state -eq "Running") {
-      $success = $true
+      # Query the live config to see if the playback device already matches target.
+      $cfgWs = [System.Net.WebSockets.ClientWebSocket]::new()
+      $cfgWs.ConnectAsync([System.Uri]"ws://127.0.0.1:$Port", $ct).Wait()
+      $getCfg = '{ "GetConfig": null }'
+      $cfgBytes = [Text.Encoding]::UTF8.GetBytes($getCfg)
+      $cfgWs.SendAsync([ArraySegment[byte]]::new($cfgBytes), [System.Net.WebSockets.WebSocketMessageType]::Text, $true, $ct).Wait()
+      $cfgBuf = New-Object byte[] 4096
+      $cfgResult = $cfgWs.ReceiveAsync([ArraySegment[byte]]::new($cfgBuf), $ct).Result
+      $cfgResp = [Text.Encoding]::UTF8.GetString($cfgBuf, 0, $cfgResult.Count)
+      $cfgWs.CloseAsync([System.Net.WebSockets.WebSocketCloseStatus]::NormalClosure, "done", $ct).Wait()
+      $liveDevice = ($cfgResp | ConvertFrom-Json).GetConfig.value.devices.playback.device
+      # Skip only when a non-null target is already live. A null target is never
+      # pushed; a live device that differs from a non-null target must be corrected.
+      if (-not [string]::IsNullOrEmpty($targetDevice) -and
+          -not [string]::IsNullOrEmpty($liveDevice) -and
+          $liveDevice -eq $targetDevice) {
+        $success = $true
+      }
     }
   } catch {
     # Can't connect — will retry with backoff.

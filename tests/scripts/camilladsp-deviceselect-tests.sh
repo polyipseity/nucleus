@@ -395,19 +395,27 @@ JSON
 # Test 11: skip-decision invariant — a null live device on a running instance
 # must NEVER be skipped (it must be pushed). This is the regression guard for
 # the broken "skip when Running" logic that let a null device stick forever.
+# The decision now also re-pushes when the live device differs from the target
+# (the device detection would currently select) — i.e. when the system default
+# output device changes. A null target is never pushed.
 test_needs_push_decision() {
+  # Format: state|live|target|expected  (expected = skip or push)
   local cases=(
-    "Running|MacBook Air喇叭|skip" # Running + device set → skip
-    "Running||push"              # Running + null device → MUST push
-    "Stopped|MacBook Air喇叭|push" # not Running → push
-    "|MacBook Air喇叭|push"        # empty state → push
+    "Running|MacBook Air喇叭|MacBook Air喇叭|skip" # Running + live==target → skip
+    "Running|MacBook Air喇叭||skip"              # Running + null target → skip (never push null)
+    "Running||MacBook Air喇叭|push"              # Running + null live + non-null target → push
+    "Running|Old Device|MacBook Air喇叭|push"    # Running + live != target → push (default changed)
+    "Stopped|MacBook Air喇叭|MacBook Air喇叭|push" # not Running → push
+    "|MacBook Air喇叭|MacBook Air喇叭|push"        # empty state → push
   )
   local all_ok=1
   for c in "${cases[@]}"; do
-    local state live expected
+    local state live target expected
     state="${c%%|*}"
     c="${c#*|}"
     live="${c%%|*}"
+    c="${c#*|}"
+    target="${c%%|*}"
     expected="${c#*|}"
     # camilladsp_needs_push returns 1 (skip) or 0 (push). Capture the rc
     # inside a subshell so the non-zero skip return doesn't trip set -e.
@@ -417,26 +425,96 @@ test_needs_push_decision() {
       _lib_script="$1"
       _state="$2"
       _live="$3"
+      _target="$4"
       . "$_lib_script"
-      camilladsp_needs_push "$_state" "$_live"
-    ' _ "$DEVICESELECT_SH" "$state" "$live"
+      camilladsp_needs_push "$_state" "$_live" "$_target"
+    ' _ "$DEVICESELECT_SH" "$state" "$live" "$target"
       echo $?
     )
     local got
     got=$([ "$rc" -eq 1 ] && printf 'skip' || printf 'push')
     if [ "$got" != "$expected" ]; then
       all_ok=0
-      assert_fail "needs_push($state,$live)" "expected '$expected', got '$got'"
+      assert_fail "needs_push($state,$live,$target)" "expected '$expected', got '$got'"
     fi
   done
   if [ "$all_ok" -eq 1 ]; then
-    assert_pass "skip-decision pushes on null live device while running"
+    assert_pass "skip-decision re-pushes when live device differs from target"
+  fi
+}
+
+# Test 12: target device helper — returns the device detection would currently
+# select (the device camilladsp_resolve_playback_device would set), or empty
+# when detection yields nothing. This is what the heartbeat compares against.
+test_target_playback_device() {
+  # Null playback device + default output available → target is the detected device.
+  local cfg
+  cfg="$(_make_config "" "Loopback Audio")"
+  _MOCK_DEFAULT_OUTPUT="External USB DAC"
+  _MOCK_FIRST_AVAILABLE=""
+  local target
+  target=$(bash -c '
+    _lib_script="$1"
+    _cfg="$2"
+    _mock_default="$3"
+    _mock_first="$4"
+    . "$_lib_script"
+    camilladsp_detect_default_output() { printf "%s" "$_mock_default"; return 0; }
+    camilladsp_detect_first_available() { printf "%s" "$_mock_first"; return 0; }
+    camilladsp_target_playback_device "$_cfg"
+  ' _ "$DEVICESELECT_SH" "$cfg" "$_MOCK_DEFAULT_OUTPUT" "$_MOCK_FIRST_AVAILABLE")
+  rm -f "$cfg"
+  if [ "$target" = "External USB DAC" ]; then
+    assert_pass "target helper returns detected default output"
+  else
+    assert_fail "target helper default output" "expected 'External USB DAC', got '$target'"
+  fi
+
+  # Non-null playback device → target is the explicit device (pass-through).
+  cfg="$(_make_config "MacBook Pro Speakers" "Loopback Audio")"
+  target=$(bash -c '
+    _lib_script="$1"
+    _cfg="$2"
+    . "$_lib_script"
+    camilladsp_target_playback_device "$_cfg"
+  ' _ "$DEVICESELECT_SH" "$cfg")
+  rm -f "$cfg"
+  if [ "$target" = "MacBook Pro Speakers" ]; then
+    assert_pass "target helper returns explicit playback device"
+  else
+    assert_fail "target helper explicit device" "expected 'MacBook Pro Speakers', got '$target'"
+  fi
+
+  # No devices available → target is empty (never push a null device).
+  cfg="$(_make_config "" "Loopback Audio")"
+  _MOCK_DEFAULT_OUTPUT=""
+  _MOCK_DEFAULT_RC=1
+  _MOCK_FIRST_AVAILABLE=""
+  _MOCK_FIRST_RC=1
+  target=$(bash -c '
+    _lib_script="$1"
+    _cfg="$2"
+    _mock_default="$3"
+    _mock_default_rc="$4"
+    _mock_first="$5"
+    _mock_first_rc="$6"
+    . "$_lib_script"
+    camilladsp_detect_default_output() { printf "%s" "$_mock_default"; return "$_mock_default_rc"; }
+    camilladsp_detect_first_available() { printf "%s" "$_mock_first"; return "$_mock_first_rc"; }
+    camilladsp_target_playback_device "$_cfg"
+  ' _ "$DEVICESELECT_SH" "$cfg" "$_MOCK_DEFAULT_OUTPUT" "$_MOCK_DEFAULT_RC" "$_MOCK_FIRST_AVAILABLE" "$_MOCK_FIRST_RC")
+  rm -f "$cfg"
+  if [ -z "$target" ]; then
+    assert_pass "target helper returns empty when no devices available"
+  else
+    assert_fail "target helper no devices" "expected empty, got '$target'"
   fi
 }
 
 # --- Run all tests ---
 
 test_needs_push_decision
+test_target_playback_device
 
 test_macos_json_default_output
 test_macos_json_first_available

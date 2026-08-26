@@ -12,10 +12,18 @@
 #     Fallback device selection is deterministic: the first non-capture device
 #     is chosen by a case-sensitive ascending name ordering, matching the
 #     Windows resolver.
-#   camilladsp_needs_push <state> <live_device>
-#     Pure decision: returns 0 (push) unless camilladsp is Running AND the live
-#     playback device is already set. A null live device can never be skipped —
-#     this is the invariant that prevents a null device from sticking forever.
+#   camilladsp_target_playback_device <config_file>
+#     Returns the playback device name that detection would currently select
+#     for the given config (the device camilladsp_resolve_playback_device would
+#     set), or empty string if detection yields nothing. Used by the heartbeat
+#     to detect when the live device has drifted from the desired device.
+#   camilladsp_needs_push <state> <live_device> <target_device>
+#     Pure decision: returns 1 (skip) only when camilladsp is Running AND the
+#     live playback device is already set AND the target device is non-empty AND
+#     the live device equals the target. This makes the heartbeat re-push when
+#     the system default output device changes (live != target) instead of
+#     skipping forever once any device is set. A null/empty target is NEVER
+#     pushed — pushing it would set the device to null.
 #   camilladsp_push_config [--port PORT] [--config FILE] [--retries N] [--retry-delay S]
 #     Resolves the config and pushes it via SetConfig over the websocket API.
 #
@@ -273,15 +281,43 @@ PYEOF
 
 # --- Push decision and config push ---
 
-# Pure skip decision. Returns 0 (push) unless camilladsp is Running AND the
-# live playback device is already set. A null/empty live device can NEVER be
-# skipped — that is the invariant that prevents a null device from sticking
-# forever on a running instance (the old "skip when Running" logic was broken).
-# Arguments: <state> <live_device>
+# Resolve the target playback device name that detection would currently select
+# for the given config (the device camilladsp_resolve_playback_device would set),
+# or empty string if detection yields nothing. Used by the heartbeat to decide
+# whether the live device has drifted from the desired device.
+# Arguments: <config_file>
+camilladsp_target_playback_device() {
+  local config_file="$1"
+  [ -f "$config_file" ] || return 1
+  local _resolved
+  _resolved=$(camilladsp_resolve_playback_device "$config_file") || return 1
+  printf '%s' "$_resolved" | python3 -c "
+import sys, yaml
+try:
+    cfg = yaml.safe_load(sys.stdin.read())
+    d = cfg.get('devices', {}).get('playback', {}).get('device', None)
+    print(d if d is not None else '')
+except Exception:
+    pass
+"
+}
+
+# Pure skip decision. Returns 1 (skip) only when camilladsp is Running AND the
+# live playback device is already set AND the target device is non-empty AND the
+# live device equals the target. This makes the heartbeat re-push when the
+# system default output device changes (live != target) instead of skipping
+# forever once any device is set. A null/empty target is NEVER pushed — pushing
+# it would set the device to null, so we skip in that case too.
+# Arguments: <state> <live_device> <target_device>
 camilladsp_needs_push() {
   local state="$1"
   local live_device="$2"
-  if [ "$state" = "Running" ] && [ -n "$live_device" ]; then
+  local target_device="$3"
+  # Never push a null target — that would set the device to null.
+  if [ -z "$target_device" ]; then
+    return 1
+  fi
+  if [ "$state" = "Running" ] && [ -n "$live_device" ] && [ "$live_device" = "$target_device" ]; then
     return 1
   fi
   return 0

@@ -133,6 +133,85 @@ if ($cfg.devices.playback.type -eq 'CoreAudio') {
   Assert-Fail 'field preservation' "expected 'CoreAudio', got '$($cfg.devices.playback.type)'"
 }
 
+# Test 7: target device helper — returns the device detection would currently
+# select (the device Resolve-CamillaDSPPlaybackDevice would set), or $null when
+# detection yields nothing. This is what the heartbeat compares against so it
+# re-pushes when the system default output device changes.
+function Get-TargetDevice {
+  param([string]$ConfigYaml, [string]$Default = $null, [string]$First = $null)
+  $cfgFile = New-TemporaryFile | Rename-Item -NewName { $_ -replace '\.tmp$', '.yml' } -PassThru
+  Set-Content -Path $cfgFile.FullName -Value $ConfigYaml -NoNewline
+  try {
+    $scriptBlock = {
+      param([string]$DeviceSelectPath, [string]$ConfigPath, [string]$MockDefault, [string]$MockFirst)
+      . $DeviceSelectPath
+      function Get-CamillaDSPDefaultPlaybackDevice { return $MockDefault }
+      function Get-CamillaDSPFirstAvailablePlaybackDevice { return $MockFirst }
+      Get-CamillaDSPResolvedPlaybackDeviceName -ConfigPath $ConfigPath
+    }
+    return (& $scriptBlock $deviceSelect $cfgFile.FullName $Default $First)
+  } finally {
+    Remove-Item -Path $cfgFile.FullName -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort cleanup -- temp config may already be gone
+  }
+}
+
+$target = Get-TargetDevice -ConfigYaml (New-Config -PlaybackDevice '') -Default 'External USB DAC'
+if ($target -eq 'External USB DAC') {
+  Assert-Pass 'target helper returns detected default output'
+} else {
+  Assert-Fail 'target helper default output' "expected 'External USB DAC', got '$target'"
+}
+
+$target = Get-TargetDevice -ConfigYaml (New-Config -PlaybackDevice 'MacBook Pro Speakers')
+if ($target -eq 'MacBook Pro Speakers') {
+  Assert-Pass 'target helper returns explicit playback device'
+} else {
+  Assert-Fail 'target helper explicit device' "expected 'MacBook Pro Speakers', got '$target'"
+}
+
+$target = Get-TargetDevice -ConfigYaml (New-Config -PlaybackDevice '') -Default '' -First ''
+if ([string]::IsNullOrEmpty($target)) {
+  Assert-Pass 'target helper returns empty when no devices available'
+} else {
+  Assert-Fail 'target helper no devices' "expected empty, got '$target'"
+}
+
+# Test 8: push-decision matrix — mirrors the POSIX camilladsp_needs_push logic.
+# Skip (return $true) only when Running AND live non-empty AND target non-empty
+# AND live == target. Re-push when the live device differs from the target
+# (system default changed). Never push a null target.
+function Test-ShouldSkip {
+  param([string]$State, [string]$Live, [string]$Target)
+  # Replicates the heartbeat skip predicate.
+  if ([string]::IsNullOrEmpty($Target)) { return $true }
+  if ($State -eq 'Running' -and
+      -not [string]::IsNullOrEmpty($Live) -and
+      $Live -eq $Target) {
+    return $true
+  }
+  return $false
+}
+
+$skipCases = @(
+  @{ State = 'Running'; Live = 'MacBook Air喇叭'; Target = 'MacBook Air喇叭'; Expect = $true },   # live==target → skip
+  @{ State = 'Running'; Live = 'MacBook Air喇叭'; Target = '';            Expect = $true },   # null target → skip (never push null)
+  @{ State = 'Running'; Live = '';            Target = 'MacBook Air喇叭'; Expect = $false },  # null live → push
+  @{ State = 'Running'; Live = 'Old Device';  Target = 'MacBook Air喇叭'; Expect = $false },  # live != target → push (default changed)
+  @{ State = 'Stopped'; Live = 'MacBook Air喇叭'; Target = 'MacBook Air喇叭'; Expect = $false }, # not Running → push
+  @{ State = '';       Live = 'MacBook Air喇叭'; Target = 'MacBook Air喇叭'; Expect = $false }  # empty state → push
+)
+$matrixOk = $true
+foreach ($c in $skipCases) {
+  $got = Test-ShouldSkip -State $c.State -Live $c.Live -Target $c.Target
+  if ($got -ne $c.Expect) {
+    $matrixOk = $false
+    Assert-Fail "should-skip($($c.State),$($c.Live),$($c.Target))" "expected $($c.Expect), got $got"
+  }
+}
+if ($matrixOk) {
+  Assert-Pass 'skip-decision re-pushes when live device differs from target'
+}
+
 Write-Output ''
 Write-Output "--- camilladsp-deviceselect tests: $script:passCount passed, $script:failCount failed ---"
 Write-Output ''

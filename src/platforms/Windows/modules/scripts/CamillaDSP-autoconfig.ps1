@@ -97,8 +97,12 @@ $heartbeatTimer = [System.Threading.Timer]::new({
   }
   try {
     # Check current state.  Skip only when Running AND the live playback
-    # device is already set — a null live device must always be corrected
-    # (idiot-proof skip: never leave a running instance with no device).
+    # device already matches the target device that detection would currently
+    # select — a null live device must always be corrected (idiot-proof skip:
+    # never leave a running instance with no device), and a live device that
+    # differs from a non-null target (e.g. the system default output device
+    # changed) must be re-pushed. A null target is never pushed.
+    $targetDevice = Get-CamillaDSPResolvedPlaybackDeviceName -ConfigPath $cf
     $stateWs = [System.Net.WebSockets.ClientWebSocket]::new()
     $ct = [System.Threading.CancellationToken]::Empty
     $stateWs.ConnectAsync([System.Uri]"ws://127.0.0.1:$p", $ct).Wait()
@@ -111,7 +115,7 @@ $heartbeatTimer = [System.Threading.Timer]::new({
     $stateWs.CloseAsync([CloseStatus]::NormalClosure, "done", $ct).Wait()
     $state = ($stateResp | ConvertFrom-Json).GetState.value
     if ($state -eq "Running") {
-      # Query the live config to see if the playback device is already set.
+      # Query the live config to see if the playback device already matches target.
       $cfgWs = [System.Net.WebSockets.ClientWebSocket]::new()
       $cfgWs.ConnectAsync([System.Uri]"ws://127.0.0.1:$p", $ct).Wait()
       $getCfg = '{ "GetConfig": null }'
@@ -122,7 +126,9 @@ $heartbeatTimer = [System.Threading.Timer]::new({
       $cfgResp = [Text.Encoding]::UTF8.GetString($cfgBuf, 0, $cfgResult.Count)
       $cfgWs.CloseAsync([CloseStatus]::NormalClosure, "done", $ct).Wait()
       $liveDevice = ($cfgResp | ConvertFrom-Json).GetConfig.value.devices.playback.device
-      if (-not [string]::IsNullOrEmpty($liveDevice)) { return }
+      if (-not [string]::IsNullOrEmpty($targetDevice) -and
+          -not [string]::IsNullOrEmpty($liveDevice) -and
+          $liveDevice -eq $targetDevice) { return }
     }
   } catch {
     # Can't connect — will retry on next heartbeat.
