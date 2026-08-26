@@ -114,7 +114,7 @@ model_list:
         max_output_tokens: 16384
   - model_name: default
     litellm_params:
-      model: openai/tencent/hy3-paid
+      model: openai/deepseek/deepseek-v4-flash
       api_base: https://api.commandcode.ai/provider/v1
       api_key: os.environ/COMMAND_CODE_API_KEY
       order: 2
