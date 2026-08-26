@@ -39,7 +39,7 @@ in
       "sound.target"
     ];
     preStart = ''
-      mkdir -p '%h/.local/state/nucleus/log/camilladsp' '%h/.local/state/camilladsp'
+      mkdir -p '%h/.local/share/nucleus/logs/camilladsp' '%h/.local/state/camilladsp'
     '';
     serviceConfig = {
       Type = "simple";

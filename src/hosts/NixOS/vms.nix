@@ -13,8 +13,8 @@
 # /home/<user>/dev inside the VM for seamless cross-host development.
 #
 # Domain XML is generated at Nix evaluation time and installed to
-# /etc/nucleus/vms/<name>-domain.xml so vm.sh can call virsh define
-# without needing to inline the XML at provisioning time.
+# /var/lib/nucleus/vms/<name>-domain.xml (the nucleus SYSTEM root) so vm.sh
+# can call virsh define without needing to inline the XML at provisioning time.
 {
   lib,
   pkgs,
@@ -178,6 +178,14 @@ let
       ]
       # check-suppress:config-method: method 4 (runtime direct read) -- builtins.readFile embeds at eval time
       (builtins.readFile ../../modules/configs/vms/nixos-domain.xml);
+
+  # Pre-generate libvirt domain XML for each declared VM into the nix store so
+  # the activation script can install it to the SYSTEM root.  Keyed by VM id.
+  vmXmlFiles = lib.listToAttrs (
+    builtins.map (
+      vm: lib.nameValuePair vm.id (pkgs.writeText "nucleus-${vm.id}-domain.xml" (mkDomainXml vm))
+    ) enabledVms
+  );
 in
 {
   # Enable KVM-accelerated QEMU virtualisation via the libvirt management API.
@@ -231,13 +239,26 @@ in
   ];
 
   # Pre-generate libvirt domain XML for each declared VM so vm.sh can
-  # call `virsh define /etc/nucleus/vms/<id>-domain.xml` without needing to
-  # inline or template the XML at provisioning time.  Files are mode 444
-  # (readable by all) so the regular user can pass them to virsh define.
-  # Source: https://mynixos.com/nixpkgs/option/environment.etc
-  environment.etc = lib.listToAttrs (
-    builtins.map (
-      vm: lib.nameValuePair "nucleus/vms/${vm.id}-domain.xml" { text = mkDomainXml vm; }
-    ) enabledVms
-  );
+  # call `virsh define /var/lib/nucleus/vms/<id>-domain.xml` without needing to
+  # inline or template the XML at provisioning time.  environment.etc always
+  # nests under /etc, so we write the files directly to the SYSTEM root via a
+  # system activation script (mode 0444, readable by all for virsh define).
+  # Source: https://mynixos.com/nixpkgs/option/system.activationScripts
+  system.activationScripts.nixos-vms-xml = lib.mkBefore ''
+    install -d -m 0755 /var/lib/nucleus/vms
+    ${lib.concatStringsSep "\n" (
+      builtins.map (
+        vm: "install -D -m 0444 '${vmXmlFiles.${vm.id}}' '/var/lib/nucleus/vms/${vm.id}-domain.xml'"
+      ) enabledVms
+    )}
+  '';
+
+  # Declare the VM disk-image base under the excluded `virtual machines` tree
+  # (item 3).  The data/ and src/ subdirs hold QCOW2 images provisioned by
+  # vm.sh; this is a user-intended directory, not a nucleus root, so it stays
+  # under ~/virtual machines and is excluded from cloud sync.
+  systemd.tmpfiles.rules = lib.mkAfter [
+    "d ${homeDir}/virtual machines/data 0755 ${username} users -"
+    "d ${homeDir}/virtual machines/src 0755 ${username} users -"
+  ];
 }

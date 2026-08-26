@@ -24,6 +24,10 @@ let
 
   activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
 
+  # Shared nucleus root constants + activation helpers (Phase 1).
+  nucleusRoots = import ../../modules/lib/nucleus-roots.nix { inherit lib pkgs; };
+  userHome = config.users.users.${username}.home;
+
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
   logGcSystem = pkgs.writeNucleusShellApplication {
@@ -59,9 +63,31 @@ in
   '';
 
   # ---------------------------------------------------------------------------
+  # nixos-nucleus-root-symlinks
+  # Create the physical conventional dirs + root→conventional symlinks BEFORE
+  # log-dirs-init so `mkdir -p <root>/logs` resolves through the symlink into
+  # the physical target (e.g. /var/log/nucleus).  Also creates the ~/.nucleus
+  # hub (user → USER root, system → SYSTEM root) for the managed user.
+  # Activation (and ONLY activation) creates these; services reference only
+  # root paths.  All nucleus config lives directly in the USER root
+  # (~/.local/share/nucleus) — there is no ~/.config/nucleus symlink.
+  # ---------------------------------------------------------------------------
+  system.activationScripts.nixos-nucleus-root-symlinks = lib.mkBefore ''
+    ${nucleusRoots.mkNucleusRootSymlinks {
+      inherit userHome;
+      userName = username;
+    }}
+    ${nucleusRoots.mkNucleusHub {
+      inherit userHome;
+      userName = username;
+    }}
+  '';
+
+  # ---------------------------------------------------------------------------
   # nixos-ensure-log-dirs
   # Create system log directories for all nucleus systemd services before they
-  # start, so journald/stderr redirect targets exist on disk.
+  # start, so journald/stderr redirect targets exist on disk.  Runs AFTER the
+  # root symlinks so <root>/logs resolves into the physical target.
   # ---------------------------------------------------------------------------
   system.activationScripts.nixos-ensure-log-dirs = lib.mkAfter ''
     "${activationBundle}/src/scripts/services/log-dirs-init.sh" \
