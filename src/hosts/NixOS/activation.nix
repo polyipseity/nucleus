@@ -30,23 +30,9 @@ let
 
   repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
-  logGcSystem = pkgs.writeNucleusShellApplication {
-    name = "log-gc-system";
-    runtimeInputs = [ pkgs.jq ];
-    scriptName = "src/scripts/services/log-gc-system";
-  };
-
-  nixStoreGc = pkgs.writeNucleusShellApplication {
-    name = "nix-store-gc";
-    runtimeInputs = [ pkgs.nix ];
-    scriptName = "src/scripts/services/nix-store-gc";
-  };
-
-  gcWeekly = pkgs.writeNucleusShellApplication {
-    name = "gc-weekly";
-    runtimeInputs = [ ];
-    scriptName = "src/scripts/services/gc-sweep";
-  };
+  # Shared GC application derivations (plan item 6).
+  gcApps = import ../../modules/gc-activations.nix { inherit lib pkgs; };
+  inherit (gcApps) logGcSystem nixStoreGc gcWeekly;
 in
 {
   # ---------------------------------------------------------------------------

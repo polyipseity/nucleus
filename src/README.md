@@ -37,3 +37,37 @@ User-facing commands (`nucleus-gc`, `nucleus-check`, …) live in the sibling [`
 Quick apply commands are in the [root README](../README.md). From this directory: `nix run .#apply` on macOS or NixOS, or `src/hosts/Windows/apply.ps1` on Windows.
 
 Policy and invariants: `AGENTS.md` and `.agents/instructions/`.
+
+## Directory roots
+
+Nucleus owns at most **two native roots per host** — one USER root and one SYSTEM root, both fully native per-OS — plus a `~/.nucleus` convenience hub (Windows: `%USERPROFILE%\.nucleus`) for every user. User-intended dirs (`clouds`, `dev`, `virtual machines`, `Pictures/wallpapers`, `Downloads`) are excluded and stay as-is.
+
+**Hard rule: nucleus code references only root paths** (`<root>/logs`, `<root>/state`, `<root>/config`, `<root>/run`, `<root>/caddy`). The physical conventional locations (`/var/log/nucleus`, `~/Library/Logs/nucleus`, `/run/nucleus`, `~/.local/state/nucleus`, …) are reached only via root→conventional symlinks created by activation (and by systemd `StateDirectory`/`LogsDirectory`/`RuntimeDirectory`). They must never appear in service runtime code. Symlink direction is fixed: `~/.nucleus` → roots, and roots → conventional targets. Never reversed. `~/.nucleus` is never a data root and is never written to by services.
+
+```
+macOS
+  ~/.nucleus/user    -> ~/Library/Application Support/nucleus
+  ~/.nucleus/system  -> /Library/Application Support/nucleus
+  ~/Library/Application Support/nucleus/   (USER root)
+    logs/   -> ~/Library/Logs/nucleus
+    state/  -> ~/Library/State/nucleus
+  /Library/Application Support/nucleus/    (SYSTEM root)
+    logs/   -> /var/log/nucleus
+
+NixOS
+  ~/.nucleus/user    -> ~/.local/share/nucleus
+  ~/.nucleus/system  -> /var/lib/nucleus
+  ~/.local/share/nucleus/   (USER root)
+    logs/   -> ~/.local/state/nucleus/log
+  /var/lib/nucleus/         (SYSTEM root)
+    logs/   -> /var/log/nucleus
+    run/    -> /run/nucleus
+
+Windows
+  %USERPROFILE%\.nucleus\user    -> %LOCALAPPDATA%\nucleus
+  %USERPROFILE%\.nucleus\system  -> %ProgramData%\nucleus
+  %LOCALAPPDATA%\nucleus\         (USER root — LocalAppData is already conventional)
+  %ProgramData%\nucleus\          (SYSTEM root — ProgramData is already conventional)
+```
+
+Accepted exceptions (not nucleus roots, left unchanged): `/usr/local/*` (impure Homebrew/fuse-t/battery), `/nix` (OS `synthetic.conf`), `%USERPROFILE%\.agents` (standard agent-tool location), `/run/secrets` (sops-nix default), `C:\ProgramData\ssh` (OS-owned), scheduled-task registry/HKLM/HKCU env vars, and `/etc/nucleus/bin` (nvim two-mechanism path).

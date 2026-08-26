@@ -88,6 +88,14 @@ Check/test preflight, tool-availability policy, scoped-mode conventions, and dyn
 - Keep canonical hostnames and display names aligned: `MacBook`, `NixOS`, `Windows`. Host vs platform naming rules live in `.agents/instructions/cross-host-feature-parity.instructions.md` (Host vs platform naming section).
 - Prefer preview/beta/canary channels when viable; if stable is required, add a short `# WHY:` comment.
 
+## Directory roots
+
+- Nucleus owns at most **two native roots per host**: one USER root and one SYSTEM root, both fully native per-OS. Every user also gets a `~/.nucleus` convenience hub (Windows: `%USERPROFILE%\.nucleus`) with two symlinks (`user` → USER root, `system` → SYSTEM root). User-intended dirs (`clouds`, `dev`, `virtual machines`, `Pictures/wallpapers`, `Downloads`) are excluded and stay as-is.
+- Native roots: macOS `~/Library/Application Support/nucleus` (USER) / `/Library/Application Support/nucleus` (SYSTEM); NixOS `~/.local/share/nucleus` (USER) / `/var/lib/nucleus` (SYSTEM); Windows `%LOCALAPPDATA%\nucleus` (USER) / `%ProgramData%\nucleus` (SYSTEM).
+- **Hard rule: nucleus code references only root paths.** Services/scripts write to and read from `<root>/logs`, `<root>/state`, `<root>/config`, `<root>/run`, `<root>/caddy`. The physical conventional locations (`/var/log/nucleus`, `~/Library/Logs/nucleus`, `/run/nucleus`, `~/.local/state/nucleus`, etc.) are reached only via root→conventional symlinks created by activation (and by systemd `StateDirectory`/`LogsDirectory`/`RuntimeDirectory`). They must never appear in service runtime code.
+- Symlink direction is fixed: `~/.nucleus` → roots, and roots → conventional targets. Never reversed. `~/.nucleus` is never a data root and is never written to by services.
+- Accepted exceptions (not nucleus roots, left unchanged): `/usr/local/*` (impure Homebrew/fuse-t/battery), `/nix` (OS `synthetic.conf`), `%USERPROFILE%\.agents` (standard agent-tool location), `/run/secrets` (sops-nix default), `C:\ProgramData\ssh` (OS-owned), scheduled-task registry/HKLM/HKCU env vars, and `/etc/nucleus/bin` (nvim two-mechanism path). See the plan's "Directory roots" section for the full target trees.
+
 ## Interaction Boundaries
 
 - When the user says "only plan", "only research", "do not start implement", or "do not edit files", the agent MUST NOT create or edit any files, run any implementation- related commands, or invoke `/implement-plan`. Only read/search operations and text output are permitted. This is a hard rule, not a suggestion.

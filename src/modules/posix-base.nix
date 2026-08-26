@@ -83,21 +83,9 @@ in
 
     (lib.optionalAttrs hasLaunchdDaemonsOption (
       let
-        logGcSystem = pkgs.writeNucleusShellApplication {
-          name = "log-gc-system";
-          runtimeInputs = [ pkgs.jq ];
-          scriptName = "src/scripts/services/log-gc-system";
-        };
-        nixStoreGc = pkgs.writeNucleusShellApplication {
-          name = "nix-store-gc";
-          runtimeInputs = [ pkgs.nix ];
-          scriptName = "src/scripts/services/nix-store-gc";
-        };
-        gcWeekly = pkgs.writeNucleusShellApplication {
-          name = "gc-weekly";
-          runtimeInputs = [ ];
-          scriptName = "src/scripts/services/gc-sweep";
-        };
+        # Shared GC application derivations (plan item 6).
+        gcApps = import ./gc-activations.nix { inherit lib pkgs; };
+        inherit (gcApps) logGcSystem nixStoreGc gcWeekly;
       in
       {
         # Determinate Nix keeps nix-darwin `nix.enable = false`, so use launchd
