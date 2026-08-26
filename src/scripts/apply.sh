@@ -339,7 +339,7 @@ _ash_script_dir="$(cd "$(dirname -- "$0")" && pwd -P)"
 # Generate key-catalog.json from decrypted system.yml so Nix modules
 # (sops.nix, ai.nix) can discover available AI API keys and their env var
 # mappings at evaluation time.  Must run before any nix build/eval.
-# Output goes to ~/.config/nucleus/ (not the repo tree) so generated content
+# Output goes to the nucleus USER root (not the repo tree) so generated content
 # stays out of git.  NUCLEUS_CATALOG_PATH is exported for Nix consumers.
 # shellcheck source=lib/key-catalog.sh
 . "$SCRIPT_DIR/lib/key-catalog.sh"
@@ -348,7 +348,7 @@ ensure_key_catalog
 # Symlink the LiteLLM config so edits take effect on service restart without
 # re-running apply.  All host services (macOS launchd, NixOS systemd, Windows
 # scheduled task) reference this well-known path.
-ln -sf "$REPO_ROOT/src/modules/ai/litellm-config.yml" "$HOME/.config/nucleus/litellm-config.yml"
+ln -sf "$REPO_ROOT/src/modules/ai/litellm-config.yml" "$NUCLEUS_USER_ROOT/litellm-config.yml"
 
 run_nix() {
   NIX_CONFIG="$(merge_nix_config)" NIX_PATH="nixpkgs=flake:nixpkgs" nix --option warn-dirty false "$@"
@@ -533,7 +533,7 @@ run_terminal_activations() {
   # Run activation commands that require the user's terminal TCC context
   # (macOS Full Disk Access / Accessibility), serialised by the
   # write-terminal-activations HM activation step to
-  # ~/.config/nucleus/terminal-activations.list.
+  # $NUCLEUS_USER_ROOT/terminal-activations.list.
   #
   # This runs after the rebuild so the manifest exists, but before any
   # post-apply steps that may depend on the terminal-context changes.
@@ -542,7 +542,7 @@ run_terminal_activations() {
   # This stage is a LAST RESORT for macOS TCC-sensitive commands only.
   # See src/modules/terminal-activations.nix for the full policy.
   # ─────────────────────────────────────────────────────────────────
-  _rta_manifest="$HOME/.config/nucleus/terminal-activations.list"
+  _rta_manifest="$NUCLEUS_USER_ROOT/terminal-activations.list"
   if [ ! -f "$_rta_manifest" ]; then
     return
   fi

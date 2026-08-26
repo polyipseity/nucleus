@@ -190,7 +190,7 @@ function Get-Secret {
       1. Machine SSH key (age recipient derived from this machine's SSH host key).
       2. Machine age key file when present.
       3. Each private SSH key listed in every user's
-         ~/.config/nucleus/managed-ssh-key-paths manifest (users sorted by
+         %LOCALAPPDATA%\nucleus\managed-ssh-key-paths manifest (users sorted by
          src/secrets/users/*.yml filename).
       4. Optional primary personal SSH key during transition.
       5. GPG keyring.

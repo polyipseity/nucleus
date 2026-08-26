@@ -53,7 +53,7 @@ _mus_should_skip_key() {
 }
 
 _mus_ssh_dir="$HOME/.ssh"
-_mus_nucleus_config_dir="$HOME/.config/nucleus"
+_mus_nucleus_config_dir="$NUCLEUS_USER_ROOT"
 _mus_nucleus_secrets_dir="$_mus_nucleus_config_dir/secrets"
 _mus_managed_ssh_key_paths="$_mus_nucleus_config_dir/managed-ssh-key-paths"
 _mus_primary_ssh_pub="$_mus_ssh_dir/ssh_personal_${_mus_username}.pub"

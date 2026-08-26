@@ -20,6 +20,12 @@ _NUCLEUS_LIB_SOURCED=1
 : "${PARALLEL_JOBS:=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 2)}"
 export PARALLEL_JOBS
 
+# Nucleus USER root (native per-OS). Mirrors nucleusUserRootFor in
+# src/modules/lib/nucleus-roots.nix. Exported so all sourced scripts reference
+# the canonical root, never ~/.config/nucleus (legacy migration source only).
+: "${NUCLEUS_USER_ROOT:=$(derive_nucleus_user_root)}"
+export NUCLEUS_USER_ROOT
+
 usage_std() {
   _us_name="$1"
   _us_opts="${2:-}"
@@ -288,6 +294,18 @@ derive_repo_root() {
   fi
   printf '%s\n' "derive_repo_root: cannot determine nucleus repository root — set NUCLEUS_REPO_ROOT or run from within the nucleus repo" >&2
   return 1
+}
+
+# Nucleus USER root (native per-OS). Mirrors nucleusUserRootFor in
+# src/modules/lib/nucleus-roots.nix. All nucleus user-scoped data lives here;
+# never under ~/.config/nucleus (legacy migration source only).
+#   macOS:  ~/Library/Application Support/nucleus
+#   NixOS:  ~/.local/share/nucleus
+derive_nucleus_user_root() {
+  case "$(uname -s)" in
+  Darwin) printf '%s\n' "$HOME/Library/Application Support/nucleus" ;;
+  *) printf '%s\n' "$HOME/.local/share/nucleus" ;;
+  esac
 }
 
 # Resolution order: NUCLEUS_HOST env var, then uname auto-detection.

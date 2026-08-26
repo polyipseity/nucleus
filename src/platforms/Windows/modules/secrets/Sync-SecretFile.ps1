@@ -5,7 +5,7 @@
 .DESCRIPTION
     Decrypts one SOPS file and converges prefix-driven payloads for the
     configured user.  Also maintains managed-key manifest files in
-    ~/.config/nucleus/ to enable rotation detection and agent flush on rotation,
+    %LOCALAPPDATA%\nucleus\ to enable rotation detection and agent flush on rotation,
     mirroring the POSIX gpg-import and ssh-key-adopt Home Manager activations.
 
 .NOTES

@@ -136,7 +136,7 @@ while IFS= read -r _ds_username; do
     continue
   fi
 
-  _ds_manifest="$_ds_user_home/.config/nucleus/managed-ssh-key-paths"
+  _ds_manifest="$_ds_user_home/$NUCLEUS_USER_ROOT/managed-ssh-key-paths"
   if [ ! -f "$_ds_manifest" ]; then
     continue
   fi

@@ -20,7 +20,7 @@ fi
 mkdir -p "$_gnupghome"
 chmod 700 "$_gnupghome"
 
-nucleus_config_dir="$HOME/.config/nucleus"
+nucleus_config_dir="$NUCLEUS_USER_ROOT"
 managed_keys_manifest="$nucleus_config_dir/managed-gpg-keys"
 
 _gpg_fingerprint_from_secret() {

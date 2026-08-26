@@ -34,8 +34,8 @@ ensure_key_catalog() {
 
   local _gkm_repo_root="${REPO_ROOT:-$(derive_repo_root)}"
   local _gkm_yml="$_gkm_repo_root/src/secrets/system.yml"
-  local _gkm_out="$HOME/.config/nucleus/key-catalog.json"
-  mkdir -p "$HOME/.config/nucleus"
+  local _gkm_out="$NUCLEUS_USER_ROOT/key-catalog.json"
+  mkdir -p "$NUCLEUS_USER_ROOT"
 
   if [ ! -f "$_gkm_yml" ]; then
     say -l key-catalog "system.yml not found; generating empty key catalog"

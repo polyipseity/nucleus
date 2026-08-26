@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tracks the fingerprint of the managed personal SSH public key in
-# ~/.config/nucleus/managed-ssh-keys and flushes the in-memory SSH agent
+# $NUCLEUS_USER_ROOT/managed-ssh-keys and flushes the in-memory SSH agent
 # when the fingerprint changes (i.e., the key was rotated in the SOPS secret).
 
 set -euo pipefail
@@ -13,7 +13,7 @@ _ssh_pub_path="$1"
 _ssh_keygen_bin="$2"
 _ssh_add_bin="$3"
 
-nucleus_config_dir="$HOME/.config/nucleus"
+nucleus_config_dir="$NUCLEUS_USER_ROOT"
 managed_ssh_manifest="$nucleus_config_dir/managed-ssh-keys"
 
 if [ ! -f "$_ssh_pub_path" ]; then

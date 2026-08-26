@@ -604,7 +604,7 @@ do_setup() {
     # Inject rclone config passphrase from materialized SOPS secret so the remote
     # creation flow inherits it and rclone encrypts the new config entry with the
     # managed passphrase automatically.
-    _rclone_pass_file="$HOME/.config/nucleus/secrets/rclone-config-pass"
+    _rclone_pass_file="$NUCLEUS_USER_ROOT/secrets/rclone-config-pass"
     if [ -s "$_rclone_pass_file" ]; then
       RCLONE_CONFIG_PASS="$(cat "$_rclone_pass_file")"
       export RCLONE_CONFIG_PASS
@@ -656,7 +656,7 @@ do_setup() {
   done
 
   if [ -n "$_stale_remotes" ]; then
-    _rclone_pass_file="$HOME/.config/nucleus/secrets/rclone-config-pass"
+    _rclone_pass_file="$NUCLEUS_USER_ROOT/secrets/rclone-config-pass"
     if [ -s "$_rclone_pass_file" ]; then
       RCLONE_CONFIG_PASS="$(cat "$_rclone_pass_file")"
       export RCLONE_CONFIG_PASS
@@ -1003,7 +1003,7 @@ do_sync() {
   # rclone configs may be pass-encrypted; RCLONE_CONFIG_PASS lets rclone
   # decrypt them at runtime. The pass file is only exported when present, so
   # the environment stays clean on machines without encrypted remotes.
-  rclone_pass_path="$HOME/.config/nucleus/secrets/rclone-config-pass"
+  rclone_pass_path="$NUCLEUS_USER_ROOT/secrets/rclone-config-pass"
   if [ -s "$rclone_pass_path" ]; then
     rclone_config_pass_value="$(cat "$rclone_pass_path")"
     export RCLONE_CONFIG_PASS="$rclone_config_pass_value"

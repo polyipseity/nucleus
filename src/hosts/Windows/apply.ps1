@@ -733,7 +733,7 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
     }
   }
   # Write key-catalog.json for Nix module consumption.
-  # Output goes to ~/.config/nucleus/ (not the repo tree) so generated content
+  # Output goes to %LOCALAPPDATA%\nucleus\ (not the repo tree) so generated content
   # stays out of git.
   $keyEntries = @()
   foreach ($keyName in $availableKeys) {

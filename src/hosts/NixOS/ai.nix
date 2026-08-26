@@ -16,7 +16,7 @@
   ...
 }:
 let
-  litellmConfig = "${config.users.users.${username}.home}/.config/nucleus/litellm-config.yml";
+  litellmConfig = "${config.users.users.${username}.home}/.local/share/nucleus/litellm-config.yml";
   litellmDaemon = pkgs.writeNucleusShellApplication {
     name = "litellm-daemon";
     runtimeInputs = [ pkgs.litellm ];

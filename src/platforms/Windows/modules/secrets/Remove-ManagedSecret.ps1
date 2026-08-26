@@ -20,9 +20,9 @@ function Remove-ManagedSecret {
     Cleanup companion for secret parity toggles. Iterates over each user in the
     `$Users` list and removes only repository-managed files in that user's home
     directory (`ssh_personal_<user>`, `ssh_personal_<user>_rsa`, corresponding
-    `.pub` files, `~/.config/nucleus/git-identity.env`, and the key-rotation
-    manifest files `~/.config/nucleus/managed-gpg-keys` and
-    `~/.config/nucleus/managed-ssh-keys`).
+    `.pub` files, `%LOCALAPPDATA%\nucleus\git-identity.env`, and the key-rotation
+    manifest files `%LOCALAPPDATA%\nucleus\managed-gpg-keys` and
+    `%LOCALAPPDATA%\nucleus\managed-ssh-keys`).
 
     GPG keyring cleanup is intentionally out of scope because selective private
     key deletion is not reliably reversible without a canonical key inventory.

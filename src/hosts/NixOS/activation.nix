@@ -56,7 +56,7 @@ in
   # hub (user → USER root, system → SYSTEM root) for the managed user.
   # Activation (and ONLY activation) creates these; services reference only
   # root paths.  All nucleus config lives directly in the USER root
-  # (~/.local/share/nucleus) — there is no ~/.config/nucleus symlink.
+  # (~/.local/share/nucleus) — there is no legacy config location.
   # ---------------------------------------------------------------------------
   system.activationScripts.nixos-nucleus-root-symlinks = lib.mkBefore ''
     ${nucleusRoots.mkNucleusRootSymlinks {
