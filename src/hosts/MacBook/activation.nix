@@ -128,7 +128,7 @@ in
     _console_user="$(/usr/bin/stat -f%Su /dev/console 2>/dev/null || true)"
     if [ -n "$_console_user" ] && [ "$_console_user" != "root" ]; then
       # check-suppress:suppression_doc: dscl may fail if the user record is missing; treat as absent.
-      _console_home="$(/usr/bin/dscl . -read "/Users/${_console_user}" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}' || true)"
+      _console_home="$(/usr/bin/dscl . -read "/Users/''${_console_user}" NFSHomeDirectory 2>/dev/null | /usr/bin/awk '{print $2}' || true)"
       if [ -n "$_console_home" ]; then
         ${nucleusRoots.mkNucleusRootSymlinks {
           userHome = "$_console_home";
