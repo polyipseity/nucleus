@@ -112,6 +112,10 @@ while IFS= read -r _mus_key; do
     ;;
   rclone_config_pass)
     _mus_rclone_pass_path="$_mus_nucleus_secrets_dir/rclone-config-pass"
+    # Replace the stale read-only file from a prior generation before writing:
+    # the 0400 mode would otherwise make the `>` redirect fail with
+    # Permission denied under set -e.  Mirrors the ssh_* branch above.
+    rm -f "$_mus_rclone_pass_path"
     printf '%s' "$_mus_value" >"$_mus_rclone_pass_path"
     chmod 0400 "$_mus_rclone_pass_path"
     ;;
