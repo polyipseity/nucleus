@@ -124,7 +124,6 @@ in
 
   imports = [
     ./lib/gc-options.nix
-    ./agent-host-shell.nix
     ./agents.nix
     ./ai
     ./cloud-drives.nix

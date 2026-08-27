@@ -12,6 +12,7 @@
     ../../modules/posix-sops.nix
     ../../modules/posix-user-shell.nix
     ../../modules/repo-root-file.nix
+    ../../modules/agent-host-shell.nix
     ./ai.nix
     ./base.nix
     ./camilladsp.nix
