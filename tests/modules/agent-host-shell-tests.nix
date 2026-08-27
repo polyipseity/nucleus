@@ -1,7 +1,7 @@
 # tests/modules/agent-host-shell-tests.nix — Validate agent-host-shell module.
 #
 # Verifies:
-#   • Module can be imported and defines expected options
+#   • Module imports cleanly as a system module and defines expected options
 #   • Wrapper content exports expected environment variables
 #
 # Run with: nix-instantiate --eval tests/modules/agent-host-shell-tests.nix
@@ -11,24 +11,18 @@ let
   pkgs = import <nixpkgs> { };
   inherit (lib) hasInfix hasSuffix;
 
-  # Module imports cleanly (will throw if it doesn't).
+  # Module imports cleanly as a system module (will throw if it doesn't).
   module = import ../../src/modules/agent-host-shell.nix {
     inherit lib pkgs;
     config = {
-      home = {
-        username = "testuser";
-        homeDirectory = "/home/testuser";
-        shell = pkgs.zsh;
-      };
       nucleus.agentHostShell.enable = true;
     };
-    hm = { };
   };
 
   # Option exists.
   optionExists = module.options ? nucleus.agentHostShell.enable;
 
-  # Verify wrapper text content by constructing it like the module does.
+  # Verify wrapper text content by constructing it like the bundle script does.
   realShellExe = lib.getExe pkgs.zsh;
   wrapperText = ''
     export NUCLEUS_AGENT_SESSION=1
