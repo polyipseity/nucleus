@@ -13,6 +13,7 @@
   config,
   lib,
   pkgs,
+  repoRoot,
   username,
   managedUsername ? null,
   nucleusApps,
@@ -22,7 +23,6 @@
 }:
 let
   effectiveUsername = if managedUsername != null then managedUsername else config.home.username;
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
   overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot hostName;
   };

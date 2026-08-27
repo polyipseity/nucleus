@@ -8,6 +8,7 @@
   managedUser ? null,
   managedUsername ? null,
   pkgs,
+  repoRoot,
   username ? null,
   users ? null,
   vsCodeMarketplace,
@@ -16,7 +17,6 @@
 let
   # Capture NUCLEUS_REPO_ROOT at eval time as fallback for home-manager activation,
   # which runs as the user and does not inherit the sudo-level env var.
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
   # Platform switch used to keep one declarative config while selecting the
   # backend that integrates best on each OS.

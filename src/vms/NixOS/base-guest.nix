@@ -72,6 +72,11 @@
   # guest injects its credentials and hostname via NUCLEUS_VM_GUEST_*
   # environment variables instead of SOPS decryption.
   _module.args = {
+    # WHY: posix-base.nix and other shared modules now take `repoRoot` as a
+    # module arg (threaded via specialArgs on the real hosts). nixos-generators
+    # passes no specialArgs, so inject the repo root here. The guest image is
+    # built from the repo tree, so the repo root is the parent of src/.
+    repoRoot = ../..;
     hostName = lib.mkDefault "nixos";
     username = lib.mkDefault "nixos";
   };

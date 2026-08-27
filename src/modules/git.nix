@@ -1,10 +1,11 @@
 # Shared Git behavior; identity is sourced from managed secrets.
 {
   config,
-  lib,
   hostName,
-  username,
+  lib,
   managedUsername ? null,
+  repoRoot,
+  username,
   ...
 }:
 let
@@ -12,7 +13,6 @@ let
   # overlay directory, falling back to the shared defaults below.
   effectiveUsername = if managedUsername != null then managedUsername else username;
 
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
   overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot hostName;
   };

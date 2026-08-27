@@ -2,6 +2,7 @@
 {
   config,
   managedUsername ? null,
+  repoRoot,
   username ? null,
   ...
 }:
@@ -13,8 +14,6 @@ let
       username
     else
       config.home.username;
-
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
   overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot;

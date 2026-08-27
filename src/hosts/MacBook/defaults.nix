@@ -3,12 +3,12 @@
 # All settings are applied by nix-darwin via the `defaults write` mechanism
 # during `darwin-rebuild switch`.  They are grouped below by subsystem.
 {
+  repoRoot,
   username,
   ...
 }:
 let
   effectiveUsername = username;
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
   overlay = (import ../../modules/lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot;
   };

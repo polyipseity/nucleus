@@ -646,7 +646,7 @@
         pkgs = pkgsMac;
         specialArgs = {
           hostName = "MacBook";
-          inherit username;
+          inherit username repoRoot;
           users = usersMacBook;
           inherit
             homebrew-core
@@ -660,6 +660,7 @@
             nucleus-service-watchdog = serviceWatchdogPkgMac;
           };
           treefmtPackage = mkTreefmtWrapper systems.mac pkgsMac;
+          keyCatalogPath = "/Users/${username}/Library/Application Support/nucleus/key-catalog.json";
         };
         system = systems.mac;
         modules = [
@@ -678,13 +679,14 @@
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
               hostName = "MacBook";
-              inherit nixpkgs username;
+              inherit nixpkgs username repoRoot;
               users = usersMacBook;
               nucleusApps = nucleusAppsMac // {
                 nucleus-service-watchdog = serviceWatchdogPkgMac;
               };
               vsCodeMarketplace = vsCodeMarketplaceMac;
               treefmtPackage = mkTreefmtWrapper systems.mac pkgsMac;
+              keyCatalogPath = "/Users/${username}/Library/Application Support/nucleus/key-catalog.json";
             };
             home-manager.users = mkHomeManagerUsers "MacBook" ./modules/home.nix usersMacBook;
           }
@@ -701,12 +703,13 @@
         pkgs = pkgsLinux;
         specialArgs = {
           hostName = "NixOS";
-          inherit username;
+          inherit username repoRoot;
           users = usersNixOS;
           nucleusApps = nucleusAppsLinux // {
             nucleus-service-watchdog = serviceWatchdogPkgLinux;
           };
           treefmtPackage = mkTreefmtWrapper systems.linux pkgsLinux;
+          keyCatalogPath = "/home/${username}/.local/share/nucleus/key-catalog.json";
         };
         system = systems.linux;
         modules = [
@@ -722,13 +725,14 @@
             home-manager.useUserPackages = true;
             home-manager.extraSpecialArgs = {
               hostName = "NixOS";
-              inherit nixpkgs username;
+              inherit nixpkgs username repoRoot;
               users = usersNixOS;
               nucleusApps = nucleusAppsLinux // {
                 nucleus-service-watchdog = serviceWatchdogPkgLinux;
               };
               vsCodeMarketplace = vsCodeMarketplaceLinux;
               treefmtPackage = mkTreefmtWrapper systems.linux pkgsLinux;
+              keyCatalogPath = "/home/${username}/.local/share/nucleus/key-catalog.json";
             };
             home-manager.users = mkHomeManagerUsers "NixOS" ./modules/home.nix usersNixOS;
           }
@@ -950,9 +954,10 @@
       homeConfigurations.${username} = home-manager.lib.homeManagerConfiguration {
         extraSpecialArgs = {
           hostName = "NixOS";
-          inherit nixpkgs username;
+          inherit nixpkgs username repoRoot;
           users = usersNixOS;
           vsCodeMarketplace = vsCodeMarketplaceLinux;
+          keyCatalogPath = "/home/${username}/.local/share/nucleus/key-catalog.json";
         };
         modules = [
           {

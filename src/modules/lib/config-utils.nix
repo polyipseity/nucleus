@@ -14,7 +14,6 @@ let
   # Resolve NUCLEUS_REPO_ROOT at eval time (set by apply.sh). Used for
   # mkOutOfStoreSymlink source paths (build-time) and for lib sourcing paths
   # (baked into activation scripts at build time, resolved at runtime).
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
   activationBundle = pkgs.callPackage ./script-tree.nix { };
 in

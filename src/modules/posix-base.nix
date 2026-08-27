@@ -5,12 +5,12 @@
   lib,
   options,
   pkgs,
+  repoRoot,
   username,
   ...
 }:
 let
   hasLaunchdDaemonsOption = options ? launchd && options.launchd ? daemons;
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
   nixStoreSettings = {
     # Opportunistically deduplicate equal store paths via hard-linking to

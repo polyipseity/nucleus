@@ -3,20 +3,13 @@
   config,
   lib,
   pkgs,
+  repoRoot,
   username,
   users ? null,
   hostName,
   ...
 }:
 let
-  # Activation scripts resolve the repo root from $NUCLEUS_REPO_ROOT (set by apply.sh
-  # and forwarded through sudo), so out-of-store symlinks survive repo relocations
-  # and rebuilds without stale store paths.  As a fallback, capture NUCLEUS_REPO_ROOT
-  # at eval time (where the env var IS available) so home-manager activation,
-  # which runs as the user and does not inherit the sudo-level env var, can still
-  # locate the repo root.
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
-
   overlay = (import ../../../modules/lib/users-overlay.nix).mkUserOverlay {
     effectiveUsername = config.home.username;
     inherit repoRoot;

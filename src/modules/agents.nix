@@ -14,7 +14,6 @@ let
   # at runtime without builtins.readFile.  The baked path is the same
   # one used for mkOutOfStoreSymlink — if NUCLEUS_REPO_ROOT is unset,
   # both symlink targets and lib sourcing will fail identically.
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
   effectiveUsername = config.home.username;
   overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot;

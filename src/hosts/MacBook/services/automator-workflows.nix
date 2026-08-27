@@ -60,7 +60,6 @@ let
   workflowsDir = ./automator-workflows;
 
   # Baked at eval time from NUCLEUS_REPO_ROOT (set by apply.sh).
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
   # Currently deployed Automator workflows. Add new workflows here.
   # Each entry has:

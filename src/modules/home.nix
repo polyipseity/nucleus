@@ -6,6 +6,7 @@
   config,
   lib,
   pkgs,
+  repoRoot,
   username,
   users ? null,
   managedUsername ? null,
@@ -43,8 +44,6 @@ let
       builtins.replaceStrings [ "~" ] [ resolvedHomeDirectory ] effectiveUser.passwordStore.path
     else
       "${resolvedHomeDirectory}/.password-store";
-
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
   loggingPaths = import ./lib/logging-paths.nix { inherit pkgs hostName; };
 
@@ -257,12 +256,12 @@ in
           # check-suppress:config-method: method 1 (writable symlink) -- camilladsp/configs/MacBook/2-band automatic gain control (-14 LUFS).yml consumed via directory symlink above
           # check-suppress:config-method: method 1 (writable symlink) -- camilladsp/configs/NixOS/2-band automatic gain control (-14 LUFS).yml consumed via directory symlink above
           ".config/camilladsp/configs".source =
-            config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/camilladsp/configs/${configName}";
+            config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/modules/configs/camilladsp/configs/${configName}";
           # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
           # camillagui-backend/config-MacBook.yml — Method 1 (writable symlink) consumed via dynamic configName above
           # check-suppress:config-method: method 1 (writable symlink) -- camillagui-backend/config-NixOS.yml consumed via dynamic configName above
           ".config/camillagui-backend/config.yml".source =
-            config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/modules/configs/camillagui-backend/config-${configName}.yml";
+            config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/modules/configs/camillagui-backend/config-${configName}.yml";
         }
       )
       (lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {

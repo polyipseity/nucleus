@@ -10,6 +10,7 @@
 # including this one.
 {
   config,
+  keyCatalogPath,
   lib,
   pkgs,
   username,
@@ -23,7 +24,11 @@ let
     scriptName = "src/scripts/services/litellm-daemon";
   };
   # Data-driven key args: read key catalog to build KEYFILE:ENVVAR pairs.
-  catalog = builtins.fromJSON (builtins.readFile (builtins.getEnv "NUCLEUS_CATALOG_PATH"));
+  catalog =
+    if builtins.pathExists keyCatalogPath then
+      builtins.fromJSON (builtins.readFile keyCatalogPath)
+    else
+      { keys = [ ]; };
   keyArgs = map (entry: "${config.sops.secrets.${entry.name}.path}:${entry.envVar}") catalog.keys;
 in
 {

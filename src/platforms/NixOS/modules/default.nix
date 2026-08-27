@@ -3,14 +3,10 @@
   config,
   lib,
   pkgs,
+  repoRoot,
   ...
 }:
 let
-  # Capture NUCLEUS_REPO_ROOT at eval time as fallback for activation contexts
-  # where the env var may not be inherited (home-manager activation,
-  # systemd services).
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
-
   sccacheGc = pkgs.writeNucleusShellApplication {
     name = "sccache-gc";
     runtimeInputs = [ pkgs.sccache ];

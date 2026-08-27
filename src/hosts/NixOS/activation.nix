@@ -5,6 +5,7 @@
   config,
   lib,
   pkgs,
+  repoRoot,
   username,
   nucleusApps,
   ...
@@ -27,8 +28,6 @@ let
   # Shared nucleus root constants + activation helpers (Phase 1).
   nucleusRoots = import ../../modules/lib/nucleus-roots.nix { inherit lib pkgs; };
   userHome = config.users.users.${username}.home;
-
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
   # Shared GC application derivations (plan item 6).
   gcApps = import ../../modules/gc-activations.nix { inherit pkgs; };

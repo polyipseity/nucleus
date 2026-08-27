@@ -5,10 +5,10 @@ args@{
   config,
   lib,
   pkgs,
+  repoRoot,
   ...
 }:
 let
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
   users = args.users or { };
   currentUsername = config.home.username;
   currentUserHome = config.home.homeDirectory;

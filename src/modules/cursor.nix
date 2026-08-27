@@ -5,6 +5,7 @@
   config,
   lib,
   pkgs,
+  repoRoot,
   managedUsername ? null,
   username ? null,
   ...
@@ -17,8 +18,6 @@ let
       username
     else
       config.home.username;
-
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in

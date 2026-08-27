@@ -3,6 +3,7 @@
   config,
   lib,
   pkgs,
+  repoRoot,
   ...
 }:
 let
@@ -76,7 +77,7 @@ in
   home.activation.materialize-user-secrets = lib.mkIf hasUserSecretFile (
     lib.hm.dag.entryAfter [ "sops-nix" ] ''
       "${activationBundle}/src/scripts/secrets/materialize-user-secrets.sh" \
-        "${builtins.getEnv "NUCLEUS_REPO_ROOT"}" \
+        "${repoRoot}" \
         "${currentUsername}" \
         "${pkgs.gnupg}/bin/gpg" \
         "${pkgs.git}/bin/git" \

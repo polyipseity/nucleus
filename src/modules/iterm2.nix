@@ -12,6 +12,7 @@
   config,
   lib,
   pkgs,
+  repoRoot,
   managedUsername ? null,
   username ? null,
   ...
@@ -36,7 +37,6 @@ let
     sha256 = "0yhfnaigim95sk1idrc3hpwii8hfhjl5m3lyc0ip3vi1a9npq0li";
   };
   # Root of the nucleus repository, set by apply.sh at activation time.
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
 
   overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot;

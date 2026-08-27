@@ -7,6 +7,7 @@
   config,
   lib,
   pkgs,
+  repoRoot,
   managedUsername ? null,
   username ? null,
   ...
@@ -19,7 +20,6 @@ let
       username
     else
       config.home.username;
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
   overlay = (import ../../modules/lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot;
   };
@@ -28,7 +28,7 @@ let
     name = "open-manual";
     runtimeInputs = [ pkgs.xdg-utils ];
     text = ''
-      exec '${../../scripts/integrations/open-host-manual.sh}' '${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/hosts/NixOS/MANUAL.md' "$@"
+      exec '${../../scripts/integrations/open-host-manual.sh}' '${repoRoot}/src/hosts/NixOS/MANUAL.md' "$@"
     '';
   };
 
@@ -65,7 +65,7 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     # Shared script that Nautilus and Dolphin both invoke
     # check-suppress:config-method: method 1 (writable symlink) -- repo edits take effect without rebuild.
     ".local/lib/nucleus/open-manual" = {
-      source = config.lib.file.mkOutOfStoreSymlink "${builtins.getEnv "NUCLEUS_REPO_ROOT"}/src/scripts/integrations/open-host-manual.sh";
+      source = config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/scripts/integrations/open-host-manual.sh";
       executable = true;
     };
 

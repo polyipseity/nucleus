@@ -19,6 +19,7 @@
 {
   pkgs,
   lib,
+  repoRoot,
   username,
   hostName,
   ...
@@ -276,9 +277,9 @@ let
     # ── macOS-specific: repo root ───────────────────────────────────
     NUCLEUS_REPO_ROOT = {
       values = {
-        MacBook = builtins.getEnv "NUCLEUS_REPO_ROOT";
+        MacBook = repoRoot;
       };
-      why = "Repo root for out-of-store symlinks. Baked into store script at build time from apply.sh; activation hook overrides for repo-move edge case.";
+      why = "Repo root for out-of-store symlinks. Flake-derived via specialArgs (repoRoot) at eval time; activation hook overrides for repo-move edge case.";
     };
 
     # ── macOS GUI environment PATH (append-only; user-specific) ──

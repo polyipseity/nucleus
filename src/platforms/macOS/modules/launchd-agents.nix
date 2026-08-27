@@ -8,6 +8,7 @@
   config,
   lib,
   pkgs,
+  repoRoot,
   username,
   nucleusApps,
   users ? null,
@@ -15,14 +16,6 @@
   ...
 }:
 let
-  # Activation scripts resolve the repo root from $NUCLEUS_REPO_ROOT (set by apply.sh
-  # and forwarded through sudo), so out-of-store symlinks survive repo relocations
-  # and rebuilds without stale store paths.  As a fallback, capture NUCLEUS_REPO_ROOT
-  # at eval time (where the env var IS available) so home-manager activation,
-  # which runs as the user and does not inherit the sudo-level env var, can still
-  # locate the repo root.
-  repoRoot = builtins.getEnv "NUCLEUS_REPO_ROOT";
-
   # Cached imports for all env-var-related callsites below.
   # managed-paths.nix for PATH components; env-catalog.nix for catalog/resolution.
   managedPaths = import ../../../modules/lib/managed-paths.nix { inherit pkgs; };
@@ -418,7 +411,7 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
       StandardErrorPath = "${config.nucleus.logging.logDir}/service-watchdog/stderr.log";
       EnvironmentVariables = {
         NUCLEUS_SERVICES_JSON = import ../../../modules/lib/services-json-path.nix { };
-        NUCLEUS_REPO_ROOT = builtins.getEnv "NUCLEUS_REPO_ROOT";
+        NUCLEUS_REPO_ROOT = repoRoot;
       };
     };
   };
