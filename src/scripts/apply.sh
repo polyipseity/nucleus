@@ -601,6 +601,11 @@ Darwin)
   "$_ash_script_dir/secrets/generate-ssh-host-key.sh"
   "$_ash_script_dir/secrets/register-host-age-key.sh" --repo-root "$REPO_ROOT"
   run_health_check
+  # Activation scripts run under `env -i` and cannot read NUCLEUS_REPO_ROOT;
+  # materialize it at the SYSTEM root so derive_repo_root resolves REPO_ROOT
+  # during activation (menu-bar/autostart convergence depend on it).
+  sudo -H install -d -m 0755 "/Library/Application Support/nucleus"
+  printf '%s\n' "$REPO_ROOT" | sudo -H tee "/Library/Application Support/nucleus/repo-root" >/dev/null
   # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
   # while running as root (which otherwise produces ownership warnings).
   run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --impure --flake "$REPO_ROOT/src#MacBook"
