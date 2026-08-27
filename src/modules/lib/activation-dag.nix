@@ -13,7 +13,6 @@
 #     "hostSpecificEntry"
 #   ];
 [
-  "agent-host-shell-config"
   "install-agent-skills"
   "symlink-agent-config"
   "symlink-cursor-config"
