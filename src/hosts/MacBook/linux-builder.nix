@@ -162,8 +162,10 @@ in
   };
 
   # Ensure the builder's working directory exists before the daemon starts.
+  # workDir contains a space ("Application Support"); quote it so the shell
+  # does not word-split and try to mkdir "Support" at the read-only root.
   system.activationScripts.preActivation.text = ''
-    mkdir -p ${workDir}
+    mkdir -p "${workDir}"
     mkdir -p /var/root/.ssh
     chmod 700 /var/root/.ssh
   '';
