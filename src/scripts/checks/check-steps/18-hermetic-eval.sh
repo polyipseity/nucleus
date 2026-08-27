@@ -1,6 +1,6 @@
 # shellcheck shell=bash
 # shellcheck source=../check-lib.sh
-# (provides say, error, warn, register_step, skip_step)
+# (provides say, error, warn, register_step)
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../check-lib.sh"
 
 register_step "hermetic-eval" "Hermetic Nix eval (no env vars, no --impure)" run_hermetic_eval
@@ -10,14 +10,13 @@ register_step "hermetic-eval" "Hermetic Nix eval (no env vars, no --impure)" run
 # specialArgs and dropped every builtins.getEnv read, so the flake must now evaluate
 # cleanly with NUCLEUS_REPO_ROOT / NUCLEUS_CATALOG_PATH unset.
 #
-# Darwin must build hermetically (exit 0). NixOS currently carries a PRE-EXISTING,
-# out-of-scope config conflict (programs.ssh.startAgent vs services.gnome.gcr-ssh-agent.enable
-# in src/hosts/NixOS/{security,desktop}.nix) that blocks any NixOS build regardless of
-# impurity. We therefore assert NixOS hermetic eval reaches the assertion stage — i.e. it
-# gets past all module-arg resolution (impurity gone) and fails only on that known conflict,
-# not on a getEnv / required-argument error. An impurity regression surfaces as a
-# "called without required argument 'repoRoot'/'keyCatalogPath'" failure, which this step
-# treats as a hard error.
+# Darwin and NixOS must BOTH build hermetically (exit 0). The NixOS ssh.startAgent vs
+# GNOME ssh-agent conflict (src/hosts/NixOS/{security,desktop}.nix) was resolved by forcing
+# the GNOME agent off in security.nix (mirrors the base-guest precedent), so NixOS no longer
+# carries any out-of-scope blocker. This step therefore asserts NixOS hermetic eval reaches
+# exit 0 — there is NO skip fallback. An impurity regression surfaces as a "called without
+# required argument 'repoRoot'/'keyCatalogPath'" failure, which this step treats as a hard
+# error.
 run_hermetic_eval() {
   local -n ctx="$1"
   local _has_args="${ctx[HAS_ARGS]}" _repo_root="${ctx[REPO_ROOT]}"
@@ -62,12 +61,6 @@ run_hermetic_eval() {
       error "nixos hermetic eval regressed to env-var dependency:"
       cat "$_nixos_out" >&2
       _exit=1
-    elif grep -q "gcr-ssh-agent" "$_nixos_out"; then
-      # Pre-existing, out-of-scope config conflict (ssh.startAgent vs gcr-ssh-agent).
-      # Reaching it proves module-arg resolution (impurity) is gone.
-      skip_step "$(step_number)" "Hermetic Nix eval" \
-        "nixos hermetic eval reached assertion stage; pre-existing ssh.startAgent vs gcr-ssh-agent conflict (out of scope)"
-      _exit=2
     else
       error "nixos hermetic eval failed for an unexpected reason:"
       cat "$_nixos_out" >&2
