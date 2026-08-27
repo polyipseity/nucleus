@@ -9,7 +9,7 @@ _shell_exe="$2"
 # Quoted so a path with spaces (e.g. /Library/Application Support/...) is not
 # word-split. install creates the parent dir; the wrapper is written via a
 # quoted heredoc delimiter so only $_shell_exe expands at write time.
-/bin/install -d -m 0755 "$(dirname "$_wrapper_path")"
+install -d -m 0755 "$(dirname "$_wrapper_path")"
 cat >"$_wrapper_path" <<WRAPPER
 export NUCLEUS_AGENT_SESSION=1
 export VSCODE_AGENT=1
