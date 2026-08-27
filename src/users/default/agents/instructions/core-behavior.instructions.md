@@ -37,6 +37,28 @@ Default operating mode for all agent interactions.
 - **Record animated CLIs/TUIs with asciinema.** For detailed usage, invoke the skill: `skill: "asciinema"`.
 - **Terminal output: NEVER pipe, always redirect to file.** This is a hard rule — see "Terminal output pipes" section below.
 
+## Never silently skip warnings or errors
+
+When a task is to fix warnings/errors, or any run emits them, EVERY warning and
+error MUST be accounted for. Silently omitting, waving away, or labelling
+something "benign" without proof is forbidden — it hides real problems and leaves
+the task incomplete.
+
+- **Enumerate everything.** List each warning/error with the exact output line and
+  its source (file/step). Do not summarize groups away.
+- **Disposition each one.** Every item gets exactly one of: `fix` (in nucleus
+  code), `upstream` (cannot fix here — name the project and the issue), `by-design`
+  (intentional, cite the flag/code), or `consequence` (caused by another item — fix
+  the root, not the symptom).
+- **Benign requires proof.** "Benign"/"expected" is only valid with evidence: the
+  service is confirmed running, the flag is intentional, the upstream bug is named,
+  or the condition is documented. A bare assertion is not enough.
+- **No silent exclusions.** If an item is excluded from the fix list, the plan must
+  still show it with its disposition and proof. An item absent from the plan is an
+  item not investigated.
+- Reinforces `error-handling.instructions.md` (no silent downgrade) and
+  `execution-details.instructions.md` (investigate with evidence before concluding).
+
 ## Subagent delegation
 
 **MUST use subagents for every delegatable subproblem** — planning, implementation, research, and Q&A with separable concerns. Each subagent gets a dedicated context window, preventing overflow and reducing risk of forgetting earlier details.

@@ -81,3 +81,13 @@ script baseline.
 - `step-runner.instructions.md` — skip ≠ failure (exit 2), fail-fast.
 - `activation-scripts.instructions.md` — `set -euo pipefail` baseline for activation scripts.
 - `testing.instructions.md` — fail-fast convention for check vs test.
+
+## Disposition of every warning/error
+
+When fixing or triaging warnings/errors, never leave one uninvestigated. For each
+emitted item: capture the exact line, classify it (`fix` / `upstream` / `by-design`
+/ `consequence`), and record the evidence behind the classification. "Benign"
+without proof — a confirmed-running service, an intentional flag, a named upstream
+bug, or a documented condition — is itself a violation of the no-silent-downgrade
+rule in `core-behavior.instructions.md`. See that file's "Never silently skip
+warnings or errors" section for the full protocol.
