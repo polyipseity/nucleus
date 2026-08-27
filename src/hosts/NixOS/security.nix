@@ -1,8 +1,13 @@
 # NixOS/security.nix — Privilege-escalation hardening for the NixOS host.
-{ ... }: {
+{ lib, ... }: {
   # Enable the user-level SSH agent via programs.ssh. macOS and Windows
   # already have ssh-agent managed through their native service mechanisms.
   programs.ssh.startAgent = true;
+  # WHY: desktop.nix enables GNOME, whose gcr-ssh-agent (default-on via
+  # gnome-keyring) asserts against the standalone programs.ssh agent above.
+  # Keep the standalone agent and drop gcr's duplicate to satisfy the assertion.
+  # Precedent: src/vms/NixOS/base-guest.nix forces the same override for guests.
+  services.gnome.gcr-ssh-agent.enable = lib.mkForce false;
   # Enable SSH for remote access while restricting authentication to public
   # keys only.  Both password mechanisms are disabled so the attack surface is
   # limited to key material, which cannot be brute-forced over the network.
