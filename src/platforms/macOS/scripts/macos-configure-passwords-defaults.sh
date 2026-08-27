@@ -29,7 +29,9 @@ set_passkit_policy_default() {
 }
 
 # Source: PassKit password/verification-code autofill policy.
-set_passkit_policy_default "AutoFillPasskeysAndPasswords" "1" "bool"
+# `defaults -bool` only accepts (true | false | yes | no); numeric 1/0 makes
+# `defaults` print its usage and exit 255, which aborts the activation.
+set_passkit_policy_default "AutoFillPasskeysAndPasswords" "true" "bool"
 set_passkit_policy_default "AutoFillPasskeysAndPasswordsSource" "com.apple.Passwords" "string"
-set_passkit_policy_default "SetupVerificationCodesEnabled" "1" "bool"
-set_passkit_policy_default "DeleteVerificationCodesAfterUse" "0" "bool"
+set_passkit_policy_default "SetupVerificationCodesEnabled" "true" "bool"
+set_passkit_policy_default "DeleteVerificationCodesAfterUse" "false" "bool"
