@@ -38,8 +38,8 @@ run_nix_flake_eval() {
     # WHY: both evals write the shared SQLite eval cache; serialize them with
     # the test steps' nix invocations (pre-push check and test may overlap).
     local sys
-    sys=$(nucleus_nix_locked nix eval --impure --expr 'builtins.currentSystem' --raw 2>/dev/null || echo 'aarch64-darwin')
-    if ! nucleus_nix_locked nix eval --impure "path:./src#packages.$sys" >/dev/null; then
+    sys=$(nucleus_nix_locked nix eval --expr 'builtins.currentSystem' --raw 2>/dev/null || echo 'aarch64-darwin')
+    if ! nucleus_nix_locked nix eval "path:./src#packages.$sys" >/dev/null; then
       _ne_exit=1
     else
       say "nix flake evaluation passed."

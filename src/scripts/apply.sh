@@ -355,20 +355,19 @@ run_nix() {
 }
 
 run_nix_as_root() {
-  # Forward NUCLEUS_REPO_ROOT so builtins.getEnv in Nix config can construct
-  # writable out-of-store symlinks during evaluation.  Color env vars and TERM
-  # keep nix build-progress rendering intact; empty values are treated as
-  # unset by _nuc_color_init, keeping non-color runs byte-identical.  Note:
-  # activation scripts never receive these vars — nix-darwin's generated
-  # activate script runs under `#!/usr/bin/env -i`, wiping the env before any
-  # activation script executes, so activation output is plain by design (see
-  # logging spec "External exceptions").
+  # Color env vars and TERM keep nix build-progress rendering intact; empty
+  # values are treated as unset by _nuc_color_init, keeping non-color runs
+  # byte-identical.  Note: activation scripts never receive these vars —
+  # nix-darwin's generated activate script runs under `#!/usr/bin/env -i`,
+  # wiping the env before any activation script executes, so activation output
+  # is plain by design (see logging spec "External exceptions").  The Nix eval
+  # is hermetic: repoRoot/keyCatalogPath are threaded via specialArgs, so no
+  # NUCLEUS_REPO_ROOT / NUCLEUS_CATALOG_PATH env forwarding is needed (and
+  # --impure is dropped from the darwin-rebuild invocation).
   NIX_CONFIG_VALUE="$(merge_nix_config)"
   sudo -H env \
     "NIX_CONFIG=$NIX_CONFIG_VALUE" \
     "NIX_PATH=nixpkgs=flake:nixpkgs" \
-    "NUCLEUS_REPO_ROOT=${NUCLEUS_REPO_ROOT}" \
-    "NUCLEUS_CATALOG_PATH=${NUCLEUS_CATALOG_PATH:-}" \
     "FORCE_COLOR=${FORCE_COLOR:-}" \
     "NO_COLOR=${NO_COLOR:-}" \
     "CLICOLOR_FORCE=${CLICOLOR_FORCE:-}" \
@@ -608,7 +607,7 @@ Darwin)
   printf '%s\n' "$REPO_ROOT" | sudo -H tee "/Library/Application Support/nucleus/repo-root" >/dev/null
   # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
   # while running as root (which otherwise produces ownership warnings).
-  run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --impure --flake "$REPO_ROOT/src#MacBook"
+  run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#MacBook"
   run_pin_flake_inputs
   run_terminal_activations
   "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"

@@ -115,9 +115,9 @@ run_system_config_build() {
   # flake-input source trees mid-eval (see merge_nix_config in lib.sh).
   _nix_cfg="$(merge_nix_config)"
   if [ "$quiet_mode" = true ]; then
-    NIX_CONFIG="$_nix_cfg" nucleus_nix_locked nix build --impure --no-link --keep-going --print-out-paths "./src#$_attr" >/dev/null || _exit_code=$?
+    NIX_CONFIG="$_nix_cfg" nucleus_nix_locked nix build --no-link --keep-going --print-out-paths "./src#$_attr" >/dev/null || _exit_code=$?
   else
-    NIX_CONFIG="$_nix_cfg" nucleus_nix_locked nix build --impure --no-link --keep-going --print-out-paths "./src#$_attr" || _exit_code=$?
+    NIX_CONFIG="$_nix_cfg" nucleus_nix_locked nix build --no-link --keep-going --print-out-paths "./src#$_attr" || _exit_code=$?
   fi
 
   return "$_exit_code"

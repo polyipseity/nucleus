@@ -227,7 +227,7 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
       ProgramArguments = [ "${logGcUser}/bin/nucleus-log-gc-user" ];
       EnvironmentVariables = {
         NUCLEUS_GC_EXPIRY = config.modules.gc.expiry;
-        NUCLEUS_REPO_ROOT = repoRoot;
+        NUCLEUS_REPO_ROOT = toString repoRoot;
       };
       RunAtLoad = false;
       StartCalendarInterval = [
@@ -411,7 +411,7 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
       StandardErrorPath = "${config.nucleus.logging.logDir}/service-watchdog/stderr.log";
       EnvironmentVariables = {
         NUCLEUS_SERVICES_JSON = import ../../../modules/lib/services-json-path.nix { };
-        NUCLEUS_REPO_ROOT = repoRoot;
+        NUCLEUS_REPO_ROOT = toString repoRoot;
       };
     };
   };

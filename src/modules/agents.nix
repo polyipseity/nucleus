@@ -6,14 +6,15 @@
   config,
   lib,
   pkgs,
+  repoRoot,
   ...
 }:
 let
-  # Activation scripts embed the repo root path at build time (from
-  # $NUCLEUS_REPO_ROOT, set by apply.sh) so lib files can be sourced
-  # at runtime without builtins.readFile.  The baked path is the same
-  # one used for mkOutOfStoreSymlink — if NUCLEUS_REPO_ROOT is unset,
-  # both symlink targets and lib sourcing will fail identically.
+  # Activation scripts embed the repo root path at build time (threaded via
+  # specialArgs, not getEnv) so lib files can be sourced at runtime without
+  # builtins.readFile.  The baked path is the same one used for
+  # mkOutOfStoreSymlink — if repoRoot is unset, both symlink targets and lib
+  # sourcing will fail identically.
   effectiveUsername = config.home.username;
   overlay = (import ./lib/users-overlay.nix).mkUserOverlay {
     inherit effectiveUsername repoRoot;

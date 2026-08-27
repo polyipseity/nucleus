@@ -51,6 +51,7 @@
   lib,
   pkgs,
   mkPresentationModes,
+  repoRoot,
   ...
 }:
 let

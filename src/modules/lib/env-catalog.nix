@@ -19,7 +19,13 @@
 {
   pkgs,
   lib,
-  repoRoot,
+  # WHY: default to the repo root relative to this file (src/modules/lib →
+  # ../../..).  env-catalog.nix is imported as a plain function (not a module),
+  # so it does not receive specialArgs.  Callers that have repoRoot available
+  # (modules threaded via specialArgs) pass it explicitly; the default keeps
+  # standalone/test callers hermetic without threading the arg everywhere.
+  # Matches the internal repoRoot = ../../..; used for users-registry.nix below.
+  repoRoot ? ../../..,
   username,
   hostName,
   ...
@@ -277,7 +283,10 @@ let
     # ── macOS-specific: repo root ───────────────────────────────────
     NUCLEUS_REPO_ROOT = {
       values = {
-        MacBook = repoRoot;
+        # WHY: toString so the value is a string for launchd EnvironmentVariables
+        # (which requires string-typed values).  repoRoot is a path; without the
+        # coercion, resolveValue returns a path and the launchd option errors.
+        MacBook = toString repoRoot;
       };
       why = "Repo root for out-of-store symlinks. Flake-derived via specialArgs (repoRoot) at eval time; activation hook overrides for repo-move edge case.";
     };

@@ -26,7 +26,7 @@ Register-Step -Id "windows-pester" -Name "Windows Pester tests" -Action {
   }
 
   $nixTestFile = Join-Path $RepoRoot 'tests\integration\env-parity-tests.nix'
-  $json = & nix eval --impure --file $nixTestFile manifest --json
+  $json = & nix eval --file $nixTestFile manifest --json
   if ($LASTEXITCODE -ne 0) {
     throw "nix eval failed for env-parity manifest (exit $LASTEXITCODE)"
   }
