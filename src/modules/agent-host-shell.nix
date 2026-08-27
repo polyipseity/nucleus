@@ -5,14 +5,17 @@
 # nix-darwin only honors the hardcoded activation fragment names, so macOS uses
 # postActivation; NixOS supports a custom kebab-case name.
 {
-  config,
   lib,
   pkgs,
   ...
 }:
 let
-  inherit (lib) types mkOption mkIf;
-  cfg = config.nucleus.agentHostShell;
+  inherit (lib)
+    types
+    mkOption
+    mkAfter
+    mkIf
+    ;
 
   # Resolve the shell binary that the wrapper will exec.
   realShellExe = lib.getExe pkgs.zsh;
@@ -35,24 +38,28 @@ in
     };
   };
 
-  config = mkIf cfg.enable (
-    if pkgs.stdenv.hostPlatform.isDarwin then
+  # The wrapper is always written by a system activation script (root context).
+  # Each platform branch is wrapped in `mkIf` (a deferred thunk) rather than a
+  # bare `if/then/else`: a bare conditional evaluates its `pkgs` reference while
+  # the `config` attribute is being constructed, which forces `pkgs` resolution
+  # through `_module.args` (needing `config`) and recurses. `mkIf` defers the
+  # reference until after `config` is available, matching repo-root-file.nix.
+  config = lib.mkMerge [
+    (mkIf pkgs.stdenv.hostPlatform.isDarwin {
       # Fragment from src/modules/agent-host-shell.nix
-      {
-        system.activationScripts.postActivation.text = lib.mkAfter ''
-          "${activationBundle}/src/scripts/agent-host-shell/write-wrapper.sh" \
-            "${wrapperPath}" \
-            "${realShellExe}"
-        '';
-      }
-    else
+      system.activationScripts.postActivation.text = mkAfter ''
+        "${activationBundle}/src/scripts/agent-host-shell/write-wrapper.sh" \
+          "${wrapperPath}" \
+          "${realShellExe}"
+      '';
+    })
+    (mkIf (!pkgs.stdenv.hostPlatform.isDarwin) {
       # Fragment from src/modules/agent-host-shell.nix
-      {
-        system.activationScripts.agent-host-shell.text = lib.mkAfter ''
-          "${activationBundle}/src/scripts/agent-host-shell/write-wrapper.sh" \
-            "${wrapperPath}" \
-            "${realShellExe}"
-        '';
-      }
-  );
+      system.activationScripts.agent-host-shell.text = mkAfter ''
+        "${activationBundle}/src/scripts/agent-host-shell/write-wrapper.sh" \
+          "${wrapperPath}" \
+          "${realShellExe}"
+      '';
+    })
+  ];
 }
