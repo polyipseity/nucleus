@@ -41,18 +41,19 @@ resolve_repo_path() {
   esac
 }
 
-# Repo-root-backed symlinks are only valid when apply.sh has recorded the
-# live checkout path. Failing fast here avoids quietly linking dev repos
-# to an empty string or a stale store path.
-# Takes the repo root as argument.
+# Repo-root-backed symlinks must point at the live checkout, never the
+# immutable Nix store -source snapshot produced at flake eval time. The live
+# root is resolved at runtime via derive_repo_root (env -> <SYSTEM root>/repo-root
+# -> SCRIPT_DIR offset -> git rev-parse) — the same resolver every other consumer
+# uses. Failing fast here avoids quietly linking dev repos to a stale store path.
 resolve_repo_root_target() {
-  repoRoot="$1"
-  if [ -z "$repoRoot" ]; then
-    report_error "repo root not set; run via apply.sh or export NUCLEUS_REPO_ROOT."
+  local liveRoot
+  if ! liveRoot="$(derive_repo_root 2>/dev/null)" || [ -z "$liveRoot" ] || [ ! -d "$liveRoot" ]; then
+    report_error "repo root not resolvable; run via apply.sh or export NUCLEUS_REPO_ROOT."
     return 1
   fi
 
-  printf '%s\n' "$repoRoot"
+  printf '%s\n' "$liveRoot"
 }
 
 # Expand glob pattern and return matching paths. If no matches, return empty.
