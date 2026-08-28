@@ -27,6 +27,13 @@ function Deploy-WritableSymlink {
     Path relative to repo root, e.g. "src\modules\configs\foo\bar".
   .PARAMETER TargetPath
     Absolute target path for the symlink.
+  .NOTES
+    Parity with the POSIX implementation: this function is the Windows counterpart
+    of src/scripts/configs/seed-writable-symlink.sh. Both MUST point at the LIVE
+    repo root (here $env:NUCLEUS_REPO_ROOT), never at a Nix store snapshot. The
+    writable-vs-immutable decision is owned solely by the managed-symlink registry
+    (managedSymlinkPaths on POSIX); this function must not take a writable flag or
+    harden/unharden the link itself.
   .EXAMPLE
     Deploy-WritableSymlink -Name "starship" -RepoRoot `$env:NUCLEUS_REPO_ROOT -RepoRelPath "src\modules\configs\starship\starship.toml" -TargetPath "`$env:USERPROFILE\.config\starship.toml"
   #>
