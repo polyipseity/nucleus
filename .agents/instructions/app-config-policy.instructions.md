@@ -14,7 +14,13 @@ All configs in `src/modules/configs/` must follow this method priority, chosen b
 
 A symlink from the app's config path back into the repo tree. Edits through the symlink (by user or app) are immediately reflected in the repo; repo changes are visible without reactivation. This is the default because it makes edits take effect immediately without a rebuild/reactivation cycle — the lightest-weight abstraction.
 
-**Implementation:** Nix `mkOutOfStoreSymlink` (POSIX); PowerShell `New-Item -ItemType SymbolicLink` (Windows).
+**Implementation (POSIX):** create the symlink at **activation time** against the **LIVE repo root**, resolved via `derive_repo_root` (`$NUCLEUS_REPO_ROOT`), using the shared helper `src/scripts/configs/seed-writable-symlink.sh` invoked from a `home.activation` entry (`entryAfter [ "linkGeneration" ]`). The repo-relative source path is computed at eval time (a literal string, or `overlay.toRepoRelPath (overlay.selectFile ...)` for per-user configs) and re-anchored to the live root by the helper at activation time.
+
+> **CRITICAL — never bake the eval-time store snapshot as the target.** `flake.nix` defines `repoRoot = ../.` as a Nix **path literal**, which Nix copies into a **read-only `/nix/store/*-source` snapshot** at eval time. `config.lib.file.mkOutOfStoreSymlink "${repoRoot}/..."` therefore points the symlink at that read-only store path, not the live working tree. Writes through the symlink fail with `EACCES` (e.g. camillagui-backend returns HTTP 500), and "repo changes take effect without rebuild" is false. **Do NOT use `mkOutOfStoreSymlink` with a `repoRoot`-derived path for method-1 links.** Use `seed-writable-symlink.sh` instead. The already-correct reference is `src/platforms/macOS/scripts/macos-configure-linearmouse.sh`.
+
+**Implementation (Windows):** PowerShell `New-Item -ItemType SymbolicLink` with `-Target` pointing at the live repo root (`$env:NUCLEUS_REPO_ROOT`, or `$repoRoot` derived from `$PSScriptRoot`). See `Deploy-WritableSymlink` in `ConfigHelpers.ps1` (the Windows counterpart of `seed-writable-symlink.sh`).
+
+**Writable-vs-immutable is owned solely by `managedSymlinkPaths`** (`src/modules/home.nix`): entries marked `writable = true` are left unhardened so the app can write through; all others are re-hardened immutable by the `protect-out-of-store-symlinks` activation entry after the link exists. The symlink-creation helper must **NOT** take a writable flag or call protect/unprotect itself — that duplicates `managedSymlinkPaths` and risks divergence.
 
 **Use when:** The app tolerates a symlink at its config path and does not overwrite it with auto-generated state on startup.
 
