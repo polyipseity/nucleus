@@ -53,5 +53,12 @@ require_command camilladsp
 camilladsp -p "$ws_port" --statefile "$state_file" -w --no_config -o "$log_file" &
 pid=$!
 
+# Push an initial config once camilladsp is up so the device is set even if the
+# heartbeat is briefly unavailable. Best-effort: the heartbeat owns steady-state
+# pushing, so a failure here must not kill the supervisor.
+# shellcheck source=./camilladsp-deviceselect.sh
+. "$SCRIPT_DIR/camilladsp-deviceselect.sh"
+camilladsp_push_config --port "$ws_port" --retries 5 --retry-delay 1 || true # check-suppress:suppression_doc: initial push is best-effort; the heartbeat owns steady-state config and will retry
+
 # Wait for camilladsp to exit
 wait "$pid"
