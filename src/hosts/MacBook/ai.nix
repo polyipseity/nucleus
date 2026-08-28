@@ -11,7 +11,6 @@
 # variable, and oterm client.
 {
   config,
-  keyCatalogPath,
   lib,
   pkgs,
   username,
@@ -21,11 +20,9 @@ let
   userHome = "/Users/${username}";
   litellmConfig = "${userHome}/Library/Application Support/nucleus/litellm-config.yml";
   # Data-driven key args: read key catalog to build KEYFILE:ENVVAR pairs.
-  catalog =
-    if builtins.pathExists keyCatalogPath then
-      builtins.fromJSON (builtins.readFile keyCatalogPath)
-    else
-      { keys = [ ]; };
+  # The catalog is emitted as a Nix expression by ensure_key_catalog so it is
+  # importable under pure evaluation (an absolute user-path JSON is not).
+  catalog = import ../../modules/ai/key-catalog.generated.nix;
   keyArgs = map (entry: "${config.sops.secrets.${entry.name}.path}:${entry.envVar}") catalog.keys;
 
   envVars = import ../../modules/lib/env-catalog.nix {
