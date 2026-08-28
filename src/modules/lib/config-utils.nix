@@ -6,7 +6,6 @@
 # priority ordering and "why not #1" comment rule.
 {
   lib,
-  config,
   pkgs,
   ...
 }:
@@ -20,24 +19,22 @@ in
 {
   # ---------------------------------------------------------------------------
   # deployWritableSymlink — Method 1 (default).
-  # Creates an out-of-store symlink from targetPath → repoRelPath, wrapped
-  # with protect/unprotect around linkGeneration so the symlink survives
-  # home-manager rebuilds.
+  # Creates an out-of-store symlink from $HOME/targetRelPath → the LIVE repo
+  # source (resolved at activation time via seed-writable-symlink.sh), so repo
+  # edits take effect without rebuild. The writable-vs-immutable decision is
+  # owned solely by managedSymlinkPaths (home.nix) and applied by the
+  # protect-out-of-store-symlinks activation entry — this helper does NOT call
+  # protect/unprotect itself (that would duplicate managedSymlinkPaths).
   #
-  # name: unique identifier for activation entry names
+  # name: unique identifier for the activation entry name
   # repoRelPath: path relative to repo root, e.g. "src/modules/configs/foo/bar"
   # targetRelPath: path relative to $HOME, e.g. ".config/foo/bar"
   # ---------------------------------------------------------------------------
   deployWritableSymlink = name: repoRelPath: targetRelPath: {
-    home.file."${targetRelPath}".source =
-      config.lib.file.mkOutOfStoreSymlink "${repoRoot}/${repoRelPath}";
-
-    home.activation."unprotectSymlink_${name}" = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
-      "${activationBundle}/src/scripts/configs/managed-symlink.sh" "unprotect" ${lib.escapeShellArg name} "$HOME/${targetRelPath}"
-    '';
-
-    home.activation."protectSymlink_${name}" = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
-      "${activationBundle}/src/scripts/configs/managed-symlink.sh" "protect" ${lib.escapeShellArg name} "$HOME/${targetRelPath}"
+    home.activation."seedSymlink_${name}" = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "$HOME/${targetRelPath}" \
+        "${repoRelPath}" \
     '';
   };
 
@@ -67,7 +64,8 @@ in
 
   # ---------------------------------------------------------------------------
   # deployUserWritableSymlink — Method 1 for per-user homedir configs.
-  # Resolves the source via mkUserOverlay, then delegates to deployWritableSymlink.
+  # Resolves the source via mkUserOverlay, then delegates to deployWritableSymlink
+  # (which seeds the LIVE repo symlink at activation time).
   # ---------------------------------------------------------------------------
   deployUserWritableSymlink =
     name:
