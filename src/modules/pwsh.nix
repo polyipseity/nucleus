@@ -82,12 +82,17 @@ in
   # The CI copies consumed by src/scripts/checks/check-pwsh.ps1 live at
   # scripts/check-PSScriptAnalyzerSettings.psd1 and
   # scripts/test-PSScriptAnalyzerSettings.psd1 (Method 3).
-  home.file.".config/powershell/PSScriptAnalyzerSettings.psd1" = {
-    # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-    source = config.lib.file.mkOutOfStoreSymlink (
-      overlay.selectFile "pwsh" "PSScriptAnalyzerSettings.psd1"
-    );
-  };
+  # ~/.config/powershell/PSScriptAnalyzerSettings.psd1 as a method-1 (writable) symlink to
+  # the selected repo file, created at activation time against the LIVE repo root so repo
+  # changes take effect without rebuild. The writable/immutable decision is owned by
+  # managedSymlinkPaths; this entry must run before protect-out-of-store-symlinks so the
+  # link is hardened if immutable.
+  # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
+  home.activation.seed-pwsh-psscriptanalyzer-settings = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+      "${config.home.homeDirectory}/.config/powershell/PSScriptAnalyzerSettings.psd1" \
+      "${overlay.toRepoRelPath (overlay.selectFile "pwsh" "PSScriptAnalyzerSettings.psd1")}" \
+  '';
 
   # Install Pester for Windows Pester test suites if pwsh is available.
   # This enables Invoke-Pester in src/scripts/tests/test-steps/06-windows-pester.ps1.
