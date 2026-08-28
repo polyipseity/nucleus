@@ -43,6 +43,10 @@ let
   };
 
   iterm2DynamicProfilesDir = overlay.selectFirstLevelEntry "iterm2" "DynamicProfiles";
+
+  # Activation helper bundle (seed-writable-symlink.sh) resolved at eval time;
+  # the helper itself resolves the LIVE repo root at activation time.
+  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
 lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   home.file = {
@@ -51,14 +55,19 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
     # home.file replaces the symlink atomically on each home-manager switch so
     # the script version tracks the pinned hash in iterm2ZshIntegration above.
     ".iterm2_shell_integration.zsh".source = iterm2ZshIntegration;
-
-    # Symlink the Dynamic Profiles directory so iTerm2 picks up profile
-    # definitions at runtime.  iTerm2 monitors this directory for changes.
-    # check-suppress:config-method: method 1 (writable symlink) -- via config.lib.file.mkOutOfStoreSymlink.
-    # See .agents/instructions/app-config-policy.instructions.md
-    "Library/Application Support/iTerm2/DynamicProfiles".source =
-      config.lib.file.mkOutOfStoreSymlink iterm2DynamicProfilesDir;
   };
+
+  # Method-1 (writable) symlink for the iTerm2 Dynamic Profiles directory. Created
+  # at activation time against the LIVE repo root so profile edits take effect
+  # without rebuild. The writable/immutable decision is owned by managedSymlinkPaths;
+  # this entry must run before protect-out-of-store-symlinks so the link is hardened
+  # if immutable.
+  # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
+  home.activation.seed-iterm2-dynamic-profiles = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+      "${config.home.homeDirectory}/Library/Application Support/iTerm2/DynamicProfiles" \
+      "${overlay.toRepoRelPath iterm2DynamicProfilesDir}" \
+  '';
 
   # Source iTerm2 shell integration when the script is present.  The test-e
   # guard makes this a no-op in non-iTerm2 terminals (VS Code terminal, SSH,

@@ -24,6 +24,10 @@ let
 
   discordMusicRpcConfigFile = overlay.selectFile "discord-music-rpc" "config.yaml";
 
+  # Activation helper bundle (seed-writable-symlink.sh) resolved at eval time;
+  # the helper itself resolves the LIVE repo root at activation time.
+  activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
+
   # Per-user service enable flag from src/users/ services.json (default: enabled).
   services = args.users.${config.home.username}.services or { };
   userEnable = services."discord-music-rpc".enable or true;
@@ -93,12 +97,18 @@ in
     {
       home.packages = [ discord-music-rpc ];
 
-      # The app only writes the config file when the schema needs migration
-      # (diff-driven, stat-cached) and tolerates read-only targets, so a
-      # writable symlink is safe: repo-managed settings are preserved.
+      # Method-1 (writable) symlink for the discord-music-rpc config file. Created
+      # at activation time against the LIVE repo root so the app can write config
+      # back through to the repo (repo changes take effect without rebuild). The
+      # writable/immutable decision is owned by managedSymlinkPaths; this entry
+      # must run before protect-out-of-store-symlinks so the link is hardened if
+      # immutable.
       # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-      home.file.".config/discord-music-rpc/config.yaml".source =
-        config.lib.file.mkOutOfStoreSymlink discordMusicRpcConfigFile;
+      home.activation.seed-discord-music-rpc-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+        "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+          "${config.home.homeDirectory}/.config/discord-music-rpc/config.yaml" \
+          "${overlay.toRepoRelPath discordMusicRpcConfigFile}" \
+      '';
     }
 
     # macOS: launchd agent keeps the tray app running persistently after login.
