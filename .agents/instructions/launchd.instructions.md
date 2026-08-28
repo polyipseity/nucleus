@@ -78,6 +78,28 @@ genuinely must run for *every* logged-in user with identical behavior (e.g. a
 system-wide accessibility helper that has no per-user configuration). When in
 doubt, user launch agent.
 
+### Activation-restart gap — use HM `launchd.agents` (domain = "user") for persistent daemons
+
+`environment.userLaunchAgents` (nix-darwin top-level) only `launchctl load`s an
+agent if it is NOT already loaded. It does **not** restart a loaded agent when
+its plist (store hash in `ProgramArguments`) changes. A `KeepAlive` agent
+therefore keeps running the stale binary across every `nucleus-apply` until the
+user logs out — the running process is never replaced. This is a real, observed
+failure (camilladsp-heartbeat ran a pre-fix binary for days after deploy).
+
+For any **persistent** user-scoped job (KeepAlive / Restart=always / long-lived
+loop), declare it as Home Manager `launchd.agents.<name>` with `domain = "user"`
+instead. HM's `setupLaunchAgents` does `cmp -s` and bootout+bootstrap on any
+plist change, so a rebuild takes effect on the next apply with no manual
+intervention. The install path (`~/Library/LaunchAgents`) and `gui/<uid>` domain
+are identical, so TCC scope and per-user configurability are unchanged.
+
+`environment.userLaunchAgents` remains valid only for the nix-darwin config
+context (`hosts/MacBook/*.nix` imported via `MacBook/default.nix` `imports`)
+where the job is genuinely short-lived or does not need restart-on-change. Do
+not introduce new persistent `environment.userLaunchAgents` entries; migrate
+existing ones to HM `launchd.agents` (domain = "user") when they are persistent.
+
 ## Plist generation for `environment.userLaunchAgents`
 
 `environment.userLaunchAgents.<name>` takes raw `text` (a plist string), not a

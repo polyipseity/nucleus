@@ -125,6 +125,7 @@ in
     ./lib/gc-options.nix
     ./agents.nix
     ./ai
+    ./camilladsp.nix
     ./cloud-drives.nix
     ./core.nix
     ./cursor.nix
