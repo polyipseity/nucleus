@@ -64,6 +64,20 @@ let
     usersNixOS.${fixtureUsername}.passwordStore.path == "~/fixture/passwords"
   ) "users-registry.nix must merge password-store.json for env-catalog consumers";
 
+  # Wholesale-array replacement: a user override of an array field must REPLACE
+  # the default list entirely (lib.recursiveUpdate semantics), not union with it.
+  test_user_array_override_replaces_wholesale = assert' (
+    let
+      exclusions = fixtureUser.iCloudExclusions.excludedDirNames;
+    in
+    builtins.elem "node_modules" exclusions
+    && builtins.elem "target" exclusions
+    # Default-only entries must be absent — proves no element-wise union occurred.
+    && !(builtins.elem ".venv" exclusions)
+    && !(builtins.elem "dist" exclusions)
+    && builtins.length exclusions == 2
+  ) "users-registry.nix must replace default array wholesale (not union) on user override";
+
   allTests = [
     test_discovers_fixture_user
     test_excludes_default_dir
@@ -74,6 +88,7 @@ let
     test_assembles_vm_guest_domain
     test_assembles_windows_dsc_config_files
     test_password_store_path_available
+    test_user_array_override_replaces_wholesale
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {

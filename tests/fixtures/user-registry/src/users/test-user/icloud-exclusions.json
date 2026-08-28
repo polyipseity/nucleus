@@ -1,0 +1,10 @@
+{
+  "$schema": "../default/icloud-exclusions.schema.json",
+  "excludedDirNames": [
+    "node_modules",
+    "target"
+  ],
+  "managedRoots": [
+    "Library/Mobile Documents/com~apple~CloudDocs"
+  ]
+}
