@@ -3,7 +3,6 @@ args@{
   config,
   lib,
   pkgs,
-  repoRoot,
   ...
 }:
 let
@@ -113,7 +112,6 @@ in
             "${currentUserHome}" \
             "${pkgs.git}/bin" \
             "${sshClient}" \
-            "${repoRoot}" \
             "${pkgs.jq}/bin/jq" \
             '${builtins.toJSON config.nucleus.devRepos}'
         '';

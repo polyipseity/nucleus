@@ -20,13 +20,8 @@ export HOME="$1"
 export PATH="$PATH:$2"
 export GIT_SSH_COMMAND="$3"
 
-repoRoot="$4"
-_jqBin="$5"
-devReposJson="$6"
-
-if [ -z "$repoRoot" ] || [ ! -d "$repoRoot" ]; then
-  die -l provision-dev-repos "repo root is empty or invalid — check NUCLEUS_REPO_ROOT at build time"
-fi
+_jqBin="$4"
+devReposJson="$5"
 
 devDir="$HOME/dev"
 mkdir -p "$devDir" || die -l provision-dev-repos "failed to create $devDir"
@@ -48,7 +43,7 @@ while IFS= read -r _item; do
   _resolvedTarget="$(resolve_repo_path "$_target")"
 
   if [ "$_symlinkFromRepoRoot" = "true" ]; then
-    if _repoSymlinkTarget="$(resolve_repo_root_target "$repoRoot")"; then
+    if _repoSymlinkTarget="$(resolve_repo_root_target)"; then
       ensure_symlink "$_repoSymlinkTarget" "$_resolvedTarget" "$_name"
     else
       report_error "repo-root symlink target unavailable for $_name"
