@@ -184,10 +184,16 @@ in
   # installs (bun install -g, bun add, etc.) and enable exact version pinning
   # in package.json (no caret ranges). Bun reads bunfig.toml from $HOME by default.
   # Source: https://bun.sh/docs/runtime/bunfig#install
-  home.file.".bunfig.toml" = {
-    # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-    source = config.lib.file.mkOutOfStoreSymlink (overlay.selectFile "bun" "bunfig.toml");
-  };
+  # ~/.bunfig.toml as a method-1 (writable) symlink to the selected repo file, created
+  # at activation time against the LIVE repo root so repo changes take effect without
+  # rebuild. The writable/immutable decision is owned by managedSymlinkPaths; this entry
+  # must run before protect-out-of-store-symlinks so the link is hardened if immutable.
+  # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
+  home.activation.seed-bunfig = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+      "${config.home.homeDirectory}/.bunfig.toml" \
+      "${overlay.toRepoRelPath (overlay.selectFile "bun" "bunfig.toml")}" \
+  '';
 
   # Global Cargo configuration: per-platform linker selection.
   # Cargo evaluates cfg(target_os = "...") against the host build target at
@@ -196,16 +202,24 @@ in
   #   Linux   → mold via clang -fuse-ld=mold (fastest ELF linker)
   #   macOS   → native Apple ld64 via cc     (system default, explicit for clarity)
   #   Windows → rust-lld bundled with Rust    (zero-install, lld-link)
-  home.file.".cargo/config.toml" = {
-    # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-    source = config.lib.file.mkOutOfStoreSymlink (overlay.selectFile "cargo" "config.toml");
-  };
+  # ~/.cargo/config.toml as a method-1 (writable) symlink to the selected repo file, created
+  # at activation time against the LIVE repo root so repo changes take effect without rebuild.
+  # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
+  home.activation.seed-cargo-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+      "${config.home.homeDirectory}/.cargo/config.toml" \
+      "${overlay.toRepoRelPath (overlay.selectFile "cargo" "config.toml")}" \
+  '';
 
   # Global nextest configuration: test runner UI settings.
-  home.file.".config/nextest/config.toml" = {
-    # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-    source = config.lib.file.mkOutOfStoreSymlink (overlay.selectFile "nextest" "config.toml");
-  };
+  # ~/.config/nextest/config.toml as a method-1 (writable) symlink to the selected repo file,
+  # created at activation time against the LIVE repo root so repo changes take effect without rebuild.
+  # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
+  home.activation.seed-nextest-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+      "${config.home.homeDirectory}/.config/nextest/config.toml" \
+      "${overlay.toRepoRelPath (overlay.selectFile "nextest" "config.toml")}" \
+  '';
 
   # ---------------------------------------------------------------------------
   # Direnv: cross-platform base config + host-specific lib overrides
@@ -229,27 +243,38 @@ in
   # our override in lib/ takes effect before the .envrc calls use_flake.
   # The _nix_direnv_nix variable is set by nix-direnv's _nix_direnv_preflight()
   # at the start of use_flake, so referencing it from the override is safe.
-  home.file.".config/direnv/direnvrc" = {
-    # check-suppress:config-method: method 1 (writable symlink) -- cross-platform base config.
-    source = config.lib.file.mkOutOfStoreSymlink (overlay.selectFile "direnv" "direnvrc");
-  };
+  # ~/.config/direnv/direnvrc as a method-1 (writable) symlink to the selected repo file, created
+  # at activation time against the LIVE repo root so repo changes take effect without rebuild.
+  # check-suppress:config-method: method 1 (writable symlink) -- cross-platform base config.
+  home.activation.seed-direnvrc = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+      "${config.home.homeDirectory}/.config/direnv/direnvrc" \
+      "${overlay.toRepoRelPath (overlay.selectFile "direnv" "direnvrc")}" \
+  '';
 
   # Host-specific apple-sdk _nix() override, auto-sourced by direnv before direnvrc.
-  home.file.".config/direnv/lib/apple-sdk-override.sh" = {
-    # check-suppress:config-method: method 1 (writable symlink) -- POSIX-only; Windows deploys only the base config.
-    source = config.lib.file.mkOutOfStoreSymlink (
-      overlay.selectFile "direnv" "lib/apple-sdk-override.sh"
-    );
-  };
+  # ~/.config/direnv/lib/apple-sdk-override.sh as a method-1 (writable) symlink to the selected
+  # repo file, created at activation time against the LIVE repo root so repo changes take effect
+  # without rebuild.
+  # check-suppress:config-method: method 1 (writable symlink) -- POSIX-only; Windows deploys only the base config.
+  home.activation.seed-direnv-apple-sdk-override = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+      "${config.home.homeDirectory}/.config/direnv/lib/apple-sdk-override.sh" \
+      "${overlay.toRepoRelPath (overlay.selectFile "direnv" "lib/apple-sdk-override.sh")}" \
+  '';
 
   # Global uv configuration: exact pinning and supply-chain hardening.
   # uv reads uv.toml from $XDG_CONFIG_HOME/uv/uv.toml (~/.config/uv/uv.toml).
   # Source: https://docs.astral.sh/uv/reference/settings/#add-bounds
   # Source: https://docs.astral.sh/uv/reference/settings/#exclude-newer
-  home.file."${config.xdg.configHome}/uv/uv.toml" = {
-    # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-    source = config.lib.file.mkOutOfStoreSymlink (overlay.selectFile "uv" "uv.toml");
-  };
+  # ~/.config/uv/uv.toml as a method-1 (writable) symlink to the selected repo file, created at
+  # activation time against the LIVE repo root so repo changes take effect without rebuild.
+  # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
+  home.activation.seed-uv-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+      "${config.home.homeDirectory}/.config/uv/uv.toml" \
+      "${overlay.toRepoRelPath (overlay.selectFile "uv" "uv.toml")}" \
+  '';
 
   # User-scoped `node` → `bun` shim so `node` resolves to bun on the managed
   # append PATH (bun run child shells, GUI apps).  Repo bans system Node.js.
