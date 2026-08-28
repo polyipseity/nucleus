@@ -24,7 +24,7 @@ Structured nucleus data (`profile.json`, `cloud-drives.json`, …) assembled by 
 
 `cloud-drives.json` includes `replicaGc` (per-provider GC rules for replica sync) alongside `mounts` and `replicas`.
 
-Registry domains deep-merge `default/` with `src/users/<username>/` (user wins on conflicts; arrays replace wholesale). Fields that differ by host use maps keyed by `MacBook`, `NixOS`, and `Windows`; loaders resolve them to scalars for the current host. Jellyfin sync unions merged accounts and libraries across all users on the host — see `src/users/README.md` (Jellyfin union at sync time).
+Registry domains deep-merge `default/` with `src/users/<username>/` via `lib.recursiveUpdate` (in `users-registry.nix`): the user file wins on conflicts, and array fields are replaced wholesale — this is intended, the override contract, not a defect. A user who sets an array field replaces the default list entirely; element-wise union is not performed and must not be added. Fields that differ by host use maps keyed by `MacBook`, `NixOS`, and `Windows`; loaders resolve them to scalars for the current host. Jellyfin sync unions merged accounts and libraries across all users on the host — see `src/users/README.md` (Jellyfin union at sync time). The canonical docstring for this merge lives in `users-registry.nix`.
 
 **Testing:** Tests exercise user overlays via fixture trees or temp dirs — never by coupling to a production `src/users/<username>/` identity. See `testing.instructions.md` (No real-user test coupling).
 
