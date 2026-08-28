@@ -190,7 +190,7 @@ let
     scriptName = "src/platforms/macOS/scripts/macos-set-gui-env";
   };
 in
-lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
+{
   # --------------------------------------------------------------------------
   # Daily sccache cache clearing LaunchAgent
   # Clears the sccache compilation cache every day at 12:00 to prevent

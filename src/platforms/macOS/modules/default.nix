@@ -7,6 +7,7 @@
   username,
   users ? null,
   hostName,
+  nucleusApps,
   ...
 }:
 let
@@ -21,6 +22,23 @@ let
 
   # Sub-module imports extracted from this file for focused maintainability.
   finderSidebar = import ./finder-sidebar.nix { inherit config lib pkgs; };
+
+  # macOS LaunchAgents (sccache-gc, log-gc-user, betterdisplay-heartbeat,
+  # ds-store-gc, spotlight-exclusions, nix-index-update, icloud-exclusions,
+  # service-watchdog-user, gui-env).  Imported as a fragment and merged into
+  # the isDarwin-guarded config below; only ever loaded on macOS.
+  launchdAgents = import ./launchd-agents.nix {
+    inherit
+      config
+      lib
+      pkgs
+      repoRoot
+      username
+      nucleusApps
+      users
+      hostName
+      ;
+  };
 
   # Cached imports for all env-var-related callsites below.
   # managed-paths.nix for PATH components; env-catalog.nix for catalog/resolution.
@@ -183,6 +201,9 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   home.packages = [
     pkgs.mysides
   ];
+
+  # Merge the macOS LaunchAgents defined in ./launchd-agents.nix.
+  launchd.agents = launchdAgents.launchd.agents;
 
   home.file = {
     # Keep iCloud Downloads reachable from a short stable path without
@@ -449,12 +470,6 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
       "${activationBundle}/src/platforms/macOS/scripts/macos-configure-headless-display.sh"
     '';
   };
-
-  # --------------------------------------------------------------------------
-  # macOS LaunchAgents (sccache-gc, log-gc-user, betterdisplay-heartbeat,
-  # ds-store-gc, spotlight-exclusions, nix-index-update, icloud-exclusions,
-  # service-watchdog-user, gui-env) are defined in ./launchd-agents.nix.
-  # --------------------------------------------------------------------------
 
   # WHY: terminal-activations (last resort): Safari and accessibility defaults
   # require Full Disk Access (FDA), which is lost when running inside a sudo
