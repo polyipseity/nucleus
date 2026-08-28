@@ -660,7 +660,6 @@
             nucleus-service-watchdog = serviceWatchdogPkgMac;
           };
           treefmtPackage = mkTreefmtWrapper systems.mac pkgsMac;
-          keyCatalogPath = "/Users/${username}/Library/Application Support/nucleus/key-catalog.json";
         };
         system = systems.mac;
         modules = [
@@ -686,7 +685,6 @@
               };
               vsCodeMarketplace = vsCodeMarketplaceMac;
               treefmtPackage = mkTreefmtWrapper systems.mac pkgsMac;
-              keyCatalogPath = "/Users/${username}/Library/Application Support/nucleus/key-catalog.json";
             };
             home-manager.users = mkHomeManagerUsers "MacBook" ./modules/home.nix usersMacBook;
           }
@@ -709,7 +707,6 @@
             nucleus-service-watchdog = serviceWatchdogPkgLinux;
           };
           treefmtPackage = mkTreefmtWrapper systems.linux pkgsLinux;
-          keyCatalogPath = "/home/${username}/.local/share/nucleus/key-catalog.json";
         };
         system = systems.linux;
         modules = [
@@ -732,7 +729,6 @@
               };
               vsCodeMarketplace = vsCodeMarketplaceLinux;
               treefmtPackage = mkTreefmtWrapper systems.linux pkgsLinux;
-              keyCatalogPath = "/home/${username}/.local/share/nucleus/key-catalog.json";
             };
             home-manager.users = mkHomeManagerUsers "NixOS" ./modules/home.nix usersNixOS;
           }
@@ -957,7 +953,6 @@
           inherit nixpkgs username repoRoot;
           users = usersNixOS;
           vsCodeMarketplace = vsCodeMarketplaceLinux;
-          keyCatalogPath = "/home/${username}/.local/share/nucleus/key-catalog.json";
         };
         modules = [
           {
