@@ -88,6 +88,24 @@ in
     };
   };
 
+  # Guard: if the key catalog declares AI keys but the resolved keyArgs is
+  # empty, the LiteLLM daemon would start with no API-key pairs and every
+  # `default` request fails with "Missing credentials". This happens when the
+  # catalog is out of sync with sops.secrets (e.g. key-catalog.generated.nix
+  # was not regenerated after editing system.yml). Fail fast with a clear
+  # message naming the missing secret.
+  assertions = [
+    {
+      assertion =
+        (builtins.length catalog.keys == 0) || (builtins.length keyArgs == builtins.length catalog.keys);
+      message =
+        "litellm: key catalog declares ${toString (builtins.length catalog.keys)} AI key(s) but only ${toString (builtins.length keyArgs)} KEYFILE:ENVVAR pair(s) resolved. Run nucleus-apply to regenerate src/modules/ai/key-catalog.generated.nix from the decrypted secrets. Missing: "
+        + lib.concatStringsSep ", " (
+          map (e: e.name) (builtins.filter (e: !(config.sops.secrets ? ${e.name})) catalog.keys)
+        );
+    }
+  ];
+
   launchd.daemons."ollama" = {
     serviceConfig = {
       # Explicit label to match services.json (which expects local.ollama).
