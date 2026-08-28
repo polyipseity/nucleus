@@ -21,7 +21,7 @@ devices:
   queuelimit: null
   rate_measure_interval: null
   resampler: null
-  samplerate: 96000
+  samplerate: 44100
   silence_threshold: null
   silence_timeout: null
   stop_on_rate_change: null
