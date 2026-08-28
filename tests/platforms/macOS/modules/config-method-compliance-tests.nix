@@ -60,6 +60,19 @@ assert containsRegex "mkUserOverlay" defaultsText;
 assert containsRegex "selectFile" defaultsText;
 assert containsRegex "camilladsp/configs" homeText;
 assert containsRegex "camillagui-backend/config" homeText;
+# Method 1 (writable symlink) deployments MUST be marked writable = true in
+# managedSymlinkPaths, otherwise the symlink is hardened immutable (uchg/chattr +i)
+# and the app cannot write the active config back through it.
+assert containsRegex "camilladsp/configs\";[[:space:]]*writable = true" homeText;
+assert containsRegex "discord-music-rpc/config.yaml\";[[:space:]]*writable = true" homeText;
+# Ban: a Method 1 (writable symlink) path must never appear as a non-writable
+# managedSymlinkPaths entry. A non-writable entry is hardened immutable
+# (uchg/chattr +i) and the app cannot write the active config back through it —
+# the camilladsp "can read but cannot write" regression. The two Method 1 paths
+# below must each be present as `writable = true`, and must NOT appear as a bare
+# `{ path = "..."; }` (immutable) entry.
+assert !(containsRegex "camilladsp/configs\";[[:space:]]*}" homeText);
+assert !(containsRegex "discord-music-rpc/config.yaml\";[[:space:]]*}" homeText);
 assert containsRegex "linearmouse\\.json" macosText;
 assert containsRegex "nix\\.custom\\.conf" macbookBaseText;
 assert containsRegex "sshd_config\\.d" macbookSecurityText;

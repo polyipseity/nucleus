@@ -345,8 +345,12 @@ let
       (
         (lib.hasInfix "discord-music-rpc/config.yaml" homeModuleText)
         && (lib.hasInfix "mkOutOfStoreSymlink" discordMusicRpcModuleText)
+        && (
+          lib.hasInfix "discord-music-rpc/config.yaml\";" homeModuleText
+          && lib.hasInfix "writable = true" homeModuleText
+        )
       )
-      "discord-music-rpc config.yaml must be in home.nix managedSymlinkPaths and use mkOutOfStoreSymlink";
+      "discord-music-rpc config.yaml must be in home.nix managedSymlinkPaths (writable = true) and use mkOutOfStoreSymlink";
 
   # === TEST: App bundles Phase 2 uses declared order (no re-sort) ===
   test_app_bundles_deployment_uses_declared_order = assert' (lib.hasInfix "}) currentNucleusAppBundles" macbookAppBundlesText) "app-bundles.nix Phase 2 must iterate currentNucleusAppBundles directly without re-sorting";
