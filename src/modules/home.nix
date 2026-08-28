@@ -238,6 +238,30 @@ in
       "${activationBundle}/src/scripts/configs/manage-out-of-store-symlinks.sh" "protect" "home.nix" '${managedSymlinkPathsJson}' "${pkgs.jq}/bin/jq"
     '';
 
+    # Method-1 (writable) symlink for the camilladsp config directory. Created at
+    # activation time against the LIVE repo root so the GUI can write config.yml
+    # back through to the repo (repo changes take effect without rebuild). The
+    # writable/immutable decision is owned by managedSymlinkPaths; this entry must
+    # run before protect-out-of-store-symlinks so the link is hardened if immutable.
+    # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
+    home.activation.seed-camilladsp-configs = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "${config.home.homeDirectory}/.config/camilladsp/configs" \
+        "src/modules/configs/camilladsp/configs/${hostName}" \
+        "${hostName}"
+    '';
+
+    # Method-1 (writable) symlink for the camillagui-backend config file. Created at
+    # activation time against the LIVE repo root so repo edits show without rebuild.
+    # The GUI does not write this file, but it must still point at the live repo.
+    # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
+    home.activation.seed-camillagui-config = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "${config.home.homeDirectory}/.config/camillagui-backend/config.yml" \
+        "src/modules/configs/camillagui-backend/config-${hostName}.yml" \
+        "${hostName}"
+    '';
+
     # Override the default logDir (which uses ~) with a proper absolute path.
     # The launchd StandardErrorPath/StandardOutPath option types require an
     # absolute path and do not expand ~.
@@ -258,25 +282,6 @@ in
       (lib.optionalAttrs (builtins.pathExists (dotfilesRoot + "/.gitconfig")) {
         ".gitconfig".source = dotfilesRoot + "/.gitconfig";
       })
-      (
-        let
-          configName = hostName;
-        in
-        {
-          # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-          # camilladsp/configs/MacBook/default.yml — Method 1 (writable symlink) consumed via directory symlink above
-          # check-suppress:config-method: method 1 (writable symlink) -- camilladsp/configs/NixOS/default.yml consumed via directory symlink above
-          # check-suppress:config-method: method 1 (writable symlink) -- camilladsp/configs/MacBook/2-band automatic gain control (-14 LUFS).yml consumed via directory symlink above
-          # check-suppress:config-method: method 1 (writable symlink) -- camilladsp/configs/NixOS/2-band automatic gain control (-14 LUFS).yml consumed via directory symlink above
-          ".config/camilladsp/configs".source =
-            config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/modules/configs/camilladsp/configs/${configName}";
-          # check-suppress:config-method: method 1 (writable symlink) -- repo changes take effect without rebuild.
-          # camillagui-backend/config-MacBook.yml — Method 1 (writable symlink) consumed via dynamic configName above
-          # check-suppress:config-method: method 1 (writable symlink) -- camillagui-backend/config-NixOS.yml consumed via dynamic configName above
-          ".config/camillagui-backend/config.yml".source =
-            config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/modules/configs/camillagui-backend/config-${configName}.yml";
-        }
-      )
       (lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
         # Keep iCloud Drive reachable from a short, stable path for all managed
         # macOS users so scripts and shell workflows avoid long spaced paths.
