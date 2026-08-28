@@ -87,13 +87,25 @@ let
   # Out-of-store symlink paths protected across activation cycles.
   # Expanded from $HOME to resolvedHomeDirectory at eval time so the JSON
   # token carries absolute paths and no shell expansion is needed at runtime.
+  # Each entry is { path, writable ? false }. `writable = false` (default) hardens
+  # the symlink immutable (uchg/chattr +i) so it cannot be deleted or written
+  # through; `writable = true` keeps it managed (still unprotect-before/re-protect-after)
+  # but never immutable, so apps can write the active config back through it.
+  # A `method 1 (writable symlink)` deployment MUST be `writable = true` — see
+  # the config-method compliance check (step 14) which bans immutable Method 1 links.
   managedSymlinkPaths = [
-    "${resolvedHomeDirectory}/iCloud"
-    "${resolvedHomeDirectory}/.config/camilladsp/configs"
-    "${resolvedHomeDirectory}/.config/camillagui-backend/config.yml"
-    "${resolvedHomeDirectory}/.config/discord-music-rpc/config.yaml"
-    "${resolvedHomeDirectory}/.config/starship.toml"
-    "${resolvedHomeDirectory}/Library/Application Support/iTerm2/DynamicProfiles"
+    { path = "${resolvedHomeDirectory}/iCloud"; }
+    {
+      path = "${resolvedHomeDirectory}/.config/camilladsp/configs";
+      writable = true;
+    }
+    { path = "${resolvedHomeDirectory}/.config/camillagui-backend/config.yml"; }
+    {
+      path = "${resolvedHomeDirectory}/.config/discord-music-rpc/config.yaml";
+      writable = true;
+    }
+    { path = "${resolvedHomeDirectory}/.config/starship.toml"; }
+    { path = "${resolvedHomeDirectory}/Library/Application Support/iTerm2/DynamicProfiles"; }
   ];
   managedSymlinkPathsJson = builtins.toJSON managedSymlinkPaths;
 

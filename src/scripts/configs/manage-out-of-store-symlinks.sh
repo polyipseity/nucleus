@@ -18,10 +18,21 @@ _do_managed_paths() {
   _context="$1"
   _paths_json="$2"
   _jq_bin="$3"
-  echo "$_paths_json" | "$_jq_bin" -r '.[]' | while IFS= read -r _p; do
+  # Each entry is { path, writable ? false }. Writable entries are managed (still
+  # unprotect-before update so a previously-immutable link is cleared once) but are
+  # never hardened immutable, so apps can write through them. Non-writable entries
+  # are hardened immutable (uchg/chattr +i) per the default managed-symlink contract.
+  echo "$_paths_json" | "$_jq_bin" -r '.[] | [.path, (.writable // false)] | @tsv' | while IFS=$'\t' read -r _p _writable; do
     [ -n "$_p" ] || continue
     case "$_action" in
-    protect) _nucleus_protect_symlink "$_context" "$_p" ;;
+    protect)
+      if [ "$_writable" = "true" ]; then
+        # Writable managed symlink: clear any stale immutable flag, then leave writable.
+        _nucleus_unprotect_symlink "$_context" "$_p"
+      else
+        _nucleus_protect_symlink "$_context" "$_p"
+      fi
+      ;;
     unprotect) _nucleus_unprotect_symlink "$_context" "$_p" ;;
     esac
   done
