@@ -336,11 +336,12 @@ unset _nix_profile_bin
 # Resolve src/scripts/ for apply-internal script delegation.
 _ash_script_dir="$(cd "$(dirname -- "$0")" && pwd -P)"
 
-# Generate key-catalog.json from decrypted system.yml so Nix modules
+# Generate key-catalog.generated.nix from decrypted system.yml so Nix modules
 # (sops.nix, ai.nix) can discover available AI API keys and their env var
-# mappings at evaluation time.  Must run before any nix build/eval.
-# Output goes to the nucleus USER root (not the repo tree) so generated content
-# stays out of git.  NUCLEUS_CATALOG_PATH is exported for Nix consumers.
+# mappings at evaluation time.  Must run before any nix build/eval.  The artifact
+# lives in the repo tree (tracked) so pure Nix eval can import it; it contains
+# only key names and env-var mappings, never secret values.  NUCLEUS_CATALOG_PATH
+# is exported for Nix consumers.
 # shellcheck source=lib/key-catalog.sh
 . "$SCRIPT_DIR/lib/key-catalog.sh"
 ensure_key_catalog
@@ -361,9 +362,10 @@ run_nix_as_root() {
   # nix-darwin's generated activate script runs under `#!/usr/bin/env -i`,
   # wiping the env before any activation script executes, so activation output
   # is plain by design (see logging spec "External exceptions").  The Nix eval
-  # is hermetic: repoRoot/keyCatalogPath are threaded via specialArgs, so no
-  # NUCLEUS_REPO_ROOT / NUCLEUS_CATALOG_PATH env forwarding is needed (and
-  # --impure is dropped from the darwin-rebuild invocation).
+  # The Nix eval is hermetic: the key catalog is imported from a tracked .nix
+  # artifact in the repo tree, so no NUCLEUS_REPO_ROOT / NUCLEUS_CATALOG_PATH env
+  # forwarding is needed (and --impure is dropped from the darwin-rebuild
+  # invocation).
   NIX_CONFIG_VALUE="$(merge_nix_config)"
   sudo -H env \
     "NIX_CONFIG=$NIX_CONFIG_VALUE" \

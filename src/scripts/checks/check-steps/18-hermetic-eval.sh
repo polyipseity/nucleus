@@ -6,9 +6,9 @@
 register_step "hermetic-eval" "Hermetic Nix eval (no env vars, no --impure)" run_hermetic_eval
 
 # run_hermetic_eval — Prove the Nix layer evaluates without any forwarded environment
-# variable and without --impure. Phase 3-6 threaded repoRoot/keyCatalogPath via
-# specialArgs and dropped every builtins.getEnv read, so the flake must now evaluate
-# cleanly with NUCLEUS_REPO_ROOT / NUCLEUS_CATALOG_PATH unset.
+# variable and without --impure. The key catalog is imported from a tracked .nix
+# artifact in the repo tree, so the flake must now evaluate cleanly with
+# NUCLEUS_REPO_ROOT / NUCLEUS_CATALOG_PATH unset.
 #
 # Darwin and NixOS must BOTH build hermetically (exit 0). The NixOS ssh.startAgent vs
 # GNOME ssh-agent conflict (src/hosts/NixOS/{security,desktop}.nix) was resolved by forcing
@@ -57,7 +57,7 @@ run_hermetic_eval() {
   else
     # Impurity regression: a missing specialArgs value surfaces as a required-argument
     # error at module-arg resolution, BEFORE assertions. That must hard-fail.
-    if grep -Eq "required argument 'repoRoot'|required argument 'keyCatalogPath'|getEnv" "$_nixos_out"; then
+    if grep -Eq "required argument 'repoRoot'|getEnv" "$_nixos_out"; then
       error "nixos hermetic eval regressed to env-var dependency:"
       cat "$_nixos_out" >&2
       _exit=1

@@ -3,12 +3,10 @@
 #
 # The AI key catalog is generated from the decrypted system.yml so Nix modules
 # can discover available AI API keys and their env var mappings at evaluation
-# time.  Two artifacts are emitted:
-#   • key-catalog.json — under the nucleus USER root; consumed by Windows
-#     PowerShell provisioning and used by the key-catalog test contract.
-#   • src/modules/ai/key-catalog.generated.nix — a Nix expression of the same
-#     catalog, imported by ai.nix/sops.nix under pure evaluation (an absolute
-#     user-path JSON is unreadable in pure eval).
+# time.  The catalog is emitted as a Nix expression at
+# src/modules/ai/key-catalog.generated.nix, which ai.nix/sops.nix import under
+# pure evaluation (an absolute user-path JSON is unreadable in pure eval).  The
+# artifact contains only key names and env-var mappings — never secret values.
 # Every nix invocation path (apply.sh, the check nix-flake-eval step, the test
 # system-config-build step) must run ensure_key_catalog first so the .nix
 # artifact exists.  This lib is the single source of truth for that.
@@ -29,30 +27,32 @@ if ! command -v derive_repo_root >/dev/null 2>&1; then
 fi
 
 # ensure_key_catalog
-# Generate key-catalog.json (if missing) and export NUCLEUS_CATALOG_PATH.
-# Also emit src/modules/ai/key-catalog.generated.nix so Nix modules can import
-# the catalog under pure evaluation (an absolute user-path JSON is unreadable in
-# pure eval). Idempotent: if the var is already set to an existing file, skip
-# regeneration.
+# Generate src/modules/ai/key-catalog.generated.nix (if missing) and export
+# NUCLEUS_CATALOG_PATH pointing at it.  The .nix artifact is imported by
+# ai.nix/sops.nix under pure evaluation (an absolute user-path JSON is
+# unreadable in pure eval).  Idempotent: if NUCLEUS_CATALOG_PATH is already set
+# to an existing file, skip regeneration.
 ensure_key_catalog() {
+  local _gkm_repo_root="${REPO_ROOT:-$(derive_repo_root)}"
+  local _gkm_yml="$_gkm_repo_root/src/secrets/system.yml"
+  local _gkm_nix="$_gkm_repo_root/src/modules/ai/key-catalog.generated.nix"
+  mkdir -p "$_gkm_repo_root/src/modules/ai"
+
+  # Idempotent: if the var already points at an existing artifact, skip.
   if [ -n "${NUCLEUS_CATALOG_PATH:-}" ] && [ -f "$NUCLEUS_CATALOG_PATH" ]; then
     return 0
   fi
 
-  local _gkm_repo_root="${REPO_ROOT:-$(derive_repo_root)}"
-  local _gkm_yml="$_gkm_repo_root/src/secrets/system.yml"
-  local _gkm_out="$NUCLEUS_USER_ROOT/key-catalog.json"
-  local _gkm_nix="$_gkm_repo_root/src/modules/ai/key-catalog.generated.nix"
-  mkdir -p "$NUCLEUS_USER_ROOT" "$_gkm_repo_root/src/modules/ai"
-
+  local _gkm_json _gkm_decrypted
+  _gkm_json="$(mktemp)"
   if [ ! -f "$_gkm_yml" ]; then
     say -l key-catalog "system.yml not found; generating empty key catalog"
     # shellcheck disable=SC2016 # reason: $schema is a JSON key in the output, not a shell variable
-    printf '%s' '{"$schema":"'"$_gkm_repo_root/src/modules/ai/key-catalog.schema.json"'","keys":[]}' >"$_gkm_out"
+    printf '%s' '{"$schema":"'"$_gkm_repo_root/src/modules/ai/key-catalog.schema.json"'","keys":[]}' >"$_gkm_json"
   elif ! _gkm_decrypted="$(sops -d --output-type json "$_gkm_yml" 2>/dev/null)"; then
     warn -l key-catalog "sops decryption failed; generating empty key catalog"
     # shellcheck disable=SC2016 # reason: $schema is a JSON key in the output, not a shell variable
-    printf '%s' '{"$schema":"'"$_gkm_repo_root/src/modules/ai/key-catalog.schema.json"'","keys":[]}' >"$_gkm_out"
+    printf '%s' '{"$schema":"'"$_gkm_repo_root/src/modules/ai/key-catalog.schema.json"'","keys":[]}' >"$_gkm_json"
   else
     # Build catalog: extract ai_*_api_key entries with non-null values, derive
     # envVar from key name via convention: ai_<X>_api_key → <X>_API_KEY.
@@ -69,15 +69,16 @@ ensure_key_catalog() {
           end
       ]
       | {"$schema": ($repoRoot + "/src/modules/ai/key-catalog.schema.json"), "keys": .}
-    ' >"$_gkm_out"
-    say -l key-catalog "wrote key-catalog.json with $(jq '.keys | length' "$_gkm_out") keys"
+    ' >"$_gkm_json"
+    say -l key-catalog "generated key catalog with $(jq '.keys | length' "$_gkm_json") keys"
   fi
 
   # Emit a Nix expression of the catalog inside the repo tree so pure Nix eval
   # can import it (absolute user-path JSON is unreadable under pure eval).
-  _emit_key_catalog_nix "$_gkm_out" "$_gkm_nix"
+  _emit_key_catalog_nix "$_gkm_json" "$_gkm_nix"
+  rm -f "$_gkm_json"
 
-  NUCLEUS_CATALOG_PATH="$_gkm_out"
+  NUCLEUS_CATALOG_PATH="$_gkm_nix"
   export NUCLEUS_CATALOG_PATH
 }
 
