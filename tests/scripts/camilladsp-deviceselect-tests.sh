@@ -407,6 +407,8 @@ test_needs_push_decision() {
     "Running|Old Device|MacBook Air喇叭|push"    # Running + live != target → push (default changed)
     "Stopped|MacBook Air喇叭|MacBook Air喇叭|push" # not Running → push
     "|MacBook Air喇叭|MacBook Air喇叭|push"        # empty state → push
+    "Inactive|||push"                          # not Running + empty target → push (initial config set even when detection yields nothing)
+    "Running|U18||skip"                        # Running + null target → skip (never push null onto a running instance)
   )
   local all_ok=1
   for c in "${cases[@]}"; do

@@ -177,13 +177,15 @@ if ([string]::IsNullOrEmpty($target)) {
 }
 
 # Test 8: push-decision matrix — mirrors the POSIX camilladsp_needs_push logic.
-# Skip (return $true) only when Running AND live non-empty AND target non-empty
-# AND live == target. Re-push when the live device differs from the target
-# (system default changed). Never push a null target.
+# Skip (return $true) only when Running AND (null target OR (live non-empty AND
+# live == target)). Re-push when the live device differs from the target (system
+# default changed). A null target is only skipped when Running (never push null
+# onto a running instance); when not Running, an empty target still pushes so the
+# initial config is set even when detection yields nothing.
 function Test-ShouldSkip {
   param([string]$State, [string]$Live, [string]$Target)
   # Replicates the heartbeat skip predicate.
-  if ([string]::IsNullOrEmpty($Target)) { return $true }
+  if ($State -eq 'Running' -and [string]::IsNullOrEmpty($Target)) { return $true }
   if ($State -eq 'Running' -and
       -not [string]::IsNullOrEmpty($Live) -and
       $Live -eq $Target) {
@@ -194,11 +196,13 @@ function Test-ShouldSkip {
 
 $skipCases = @(
   @{ State = 'Running'; Live = 'MacBook Air喇叭'; Target = 'MacBook Air喇叭'; Expect = $true },   # live==target → skip
-  @{ State = 'Running'; Live = 'MacBook Air喇叭'; Target = '';            Expect = $true },   # null target → skip (never push null)
+  @{ State = 'Running'; Live = 'MacBook Air喇叭'; Target = '';            Expect = $true },   # null target + Running → skip (never push null)
   @{ State = 'Running'; Live = '';            Target = 'MacBook Air喇叭'; Expect = $false },  # null live → push
   @{ State = 'Running'; Live = 'Old Device';  Target = 'MacBook Air喇叭'; Expect = $false },  # live != target → push (default changed)
   @{ State = 'Stopped'; Live = 'MacBook Air喇叭'; Target = 'MacBook Air喇叭'; Expect = $false }, # not Running → push
-  @{ State = '';       Live = 'MacBook Air喇叭'; Target = 'MacBook Air喇叭'; Expect = $false }  # empty state → push
+  @{ State = '';       Live = 'MacBook Air喇叭'; Target = 'MacBook Air喇叭'; Expect = $false }, # empty state → push
+  @{ State = 'Inactive'; Live = '';            Target = '';            Expect = $false },  # not Running + empty target → push (initial config)
+  @{ State = 'Running'; Live = 'U18';          Target = '';            Expect = $true }   # Running + null target → skip (never push null)
 )
 $matrixOk = $true
 foreach ($c in $skipCases) {
