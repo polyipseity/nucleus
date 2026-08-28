@@ -24,6 +24,10 @@ let
     inherit effectiveUsername repoRoot;
   };
 
+  # Activation helper bundle (seed-writable-symlink.sh) resolved at eval time;
+  # the helper itself resolves the LIVE repo root at activation time.
+  activationBundle = pkgs.callPackage ../../modules/lib/script-tree.nix { };
+
   openManualScript = pkgs.writeNucleusShellApplication {
     name = "open-manual";
     runtimeInputs = [ pkgs.xdg-utils ];
@@ -62,13 +66,6 @@ let
 in
 lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
   home.file = {
-    # Shared script that Nautilus and Dolphin both invoke
-    # check-suppress:config-method: method 1 (writable symlink) -- repo edits take effect without rebuild.
-    ".local/lib/nucleus/open-manual" = {
-      source = config.lib.file.mkOutOfStoreSymlink "${repoRoot}/src/scripts/integrations/open-host-manual.sh";
-      executable = true;
-    };
-
     # Nautilus: right-click → Scripts → open nucleus manual
     ".local/share/nautilus/scripts/open nucleus manual" = {
       source = "${openManualScript}/bin/nucleus-open-manual";
@@ -98,20 +95,30 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       executable = true;
     };
 
-    # Dolphin: right-click → open nucleus manual
-    ".local/share/kio/servicemenus/nucleus-manual.desktop" = {
-      # check-suppress:config-method: method 1 (writable symlink) -- repo edits take effect without rebuild.
-      source = config.lib.file.mkOutOfStoreSymlink (
-        overlay.selectFile "plasma" "desktop/nucleus-manual.desktop"
-      );
-    };
+  };
 
-    # Dolphin: right-click → optimize PDF (5 presets as sub-actions)
-    ".local/share/kio/servicemenus/nucleus-optimize-pdf.desktop" = {
-      # check-suppress:config-method: method 1 (writable symlink) -- the GS PDF Opt preset file can be updated in-place; no rebuild needed after adding/changing presets.
-      source = config.lib.file.mkOutOfStoreSymlink (
-        overlay.selectFile "plasma" "desktop/nucleus-optimize-pdf.desktop"
-      );
-    };
+  # Method-1 (writable) symlinks to the live repo, created at activation time against the
+  # LIVE repo root so repo edits take effect without rebuild. The writable/immutable
+  # decision is owned by managedSymlinkPaths; these entries run before
+  # protect-out-of-store-symlinks so the link is hardened if immutable.
+  home.activation = {
+    # Shared script that Nautilus and Dolphin both invoke.
+    seed-open-manual = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "${config.home.homeDirectory}/.local/lib/nucleus/open-manual" \
+        "src/scripts/integrations/open-host-manual.sh" \
+    '';
+
+    seed-nucleus-manual-desktop = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "${config.home.homeDirectory}/.local/share/kio/servicemenus/nucleus-manual.desktop" \
+        "${overlay.toRepoRelPath (overlay.selectFile "plasma" "desktop/nucleus-manual.desktop")}" \
+    '';
+
+    seed-nucleus-optimize-pdf-desktop = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "${config.home.homeDirectory}/.local/share/kio/servicemenus/nucleus-optimize-pdf.desktop" \
+        "${overlay.toRepoRelPath (overlay.selectFile "plasma" "desktop/nucleus-optimize-pdf.desktop")}" \
+    '';
   };
 }
