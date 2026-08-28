@@ -90,10 +90,22 @@ function Sync-CamillaDSPService {
   $principal = New-ScheduledTaskPrincipal -UserId $userId -RunLevel Limited
 
   $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: probe -- task may not be registered yet; $null check below handles absence
+  $wasRunning = $false
   if ($null -ne $existingTask) {
+    # Capture running state before unregister: Unregister-ScheduledTask kills the
+    # live instance, and the new registration won't auto-start until the next logon
+    # trigger. Restarting explicitly closes the gap for a live session so the updated
+    # wrapper script is loaded by the running process (mirrors macOS bootout+bootstrap+kickstart).
+    $wasRunning = $existingTask.State -eq 'Running'
     Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
   }
 
   Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings -Principal $principal -Force
   Write-NucleusInfo -CommandName 'camilladsp' "registered scheduled task '$taskName'"
+
+  if ($wasRunning) {
+    Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: task was just re-registered; stop is best-effort to ensure a clean restart with the updated script
+    Start-ScheduledTask -TaskName $taskName
+    Write-NucleusInfo -CommandName 'camilladsp' "restarted running scheduled task '$taskName' with updated script"
+  }
 }
