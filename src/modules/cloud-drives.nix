@@ -360,6 +360,7 @@ in
             name = "cloud-mount-${mount.id}";
             value = {
               domain = "user";
+              enable = true;
               config = {
                 Label = "local.cloud-mount.${mount.id}";
                 ProgramArguments = [ "${mkRcloneMountScript mount}/bin/nucleus-cloud-mount-${mount.id}" ];
@@ -460,6 +461,7 @@ in
             name = "cloud-replica-scheduled-sync-${replica.id}";
             value = {
               domain = "user";
+              enable = true;
               config = {
                 Label = "local.cloud-replica-scheduled-sync.${replica.id}";
                 ProgramArguments = [
