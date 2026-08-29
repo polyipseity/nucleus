@@ -62,6 +62,10 @@ in
 lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   launchd.agents."camilladsp-heartbeat" = {
     domain = "user";
+    # HM's launchd module filters agents by a per-agent `enable` flag (defaults
+    # false via mkEnableOption), so without this the agent is silently dropped
+    # and no plist is generated in ~/Library/LaunchAgents.
+    enable = true;
     config = {
       Label = "local.camilladsp-heartbeat";
       ProgramArguments = [
