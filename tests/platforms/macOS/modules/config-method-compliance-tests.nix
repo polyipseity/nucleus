@@ -8,10 +8,13 @@ let
   gitText = builtins.readFile ../../../../src/modules/git.nix;
   usersOverlayText = builtins.readFile ../../../../src/modules/lib/users-overlay.nix;
   homeText = builtins.readFile ../../../../src/modules/home.nix;
+  discordMusicRpcText = builtins.readFile ../../../../src/modules/ext-discord-music-rpc.nix;
+  iterm2Text = builtins.readFile ../../../../src/modules/iterm2.nix;
   macosText = builtins.readFile ../../../../src/platforms/macOS/modules/default.nix;
   posixBaseText = builtins.readFile ../../../../src/modules/posix-base.nix;
   pwshText = builtins.readFile ../../../../src/modules/pwsh.nix;
   shellText = builtins.readFile ../../../../src/modules/shell.nix;
+  starshipText = builtins.readFile ../../../../src/modules/starship.nix;
   # Host-specific files
   macbookBaseText = builtins.readFile ../../../../src/hosts/MacBook/base.nix;
   macbookLinuxBuilderText = builtins.readFile ../../../../src/hosts/MacBook/linux-builder.nix;
@@ -88,6 +91,39 @@ assert containsRegex "nextest/config\\.toml" shellText;
 assert containsRegex "mkUserOverlay" shellText;
 assert containsRegex "selectFile" shellText;
 assert containsRegex "agents/" agentsText;
+# Phase 3: method-1 (writable symlink) deployments MUST be created at activation
+# time against the LIVE repo root via seed-writable-symlink.sh — never via
+# mkOutOfStoreSymlink with a repoRoot-derived path (repoRoot is a read-only
+# /nix/store/*-source snapshot, so writes fail with EACCES -> HTTP 500 and repo
+# edits don't take effect without rebuild). Assert the seed-* activation entries
+# exist and that mkOutOfStoreSymlink is no longer used for these paths.
+assert containsRegex "seed-writable-symlink\\.sh" gitText;
+assert containsRegex "seed-git-gitconfig" gitText;
+assert containsRegex "seed-git-gitignore" gitText;
+assert containsRegex "seed-starship-config" starshipText;
+assert containsRegex "seed-camilladsp-configs" homeText;
+assert containsRegex "seed-camillagui-config" homeText;
+assert containsRegex "seed-discord-music-rpc-config" discordMusicRpcText;
+assert containsRegex "seed-iterm2-dynamic-profiles" iterm2Text;
+assert containsRegex "seed-bunfig" shellText;
+assert containsRegex "seed-cargo-config" shellText;
+assert containsRegex "seed-nextest-config" shellText;
+assert containsRegex "seed-direnvrc" shellText;
+assert containsRegex "seed-direnv-apple-sdk-override" shellText;
+assert containsRegex "seed-uv-config" shellText;
+assert containsRegex "seed-pwsh-psscriptanalyzer-settings" pwshText;
+assert containsRegex "seed-open-manual" nixosServicesText;
+assert containsRegex "seed-nucleus-manual-desktop" nixosServicesText;
+assert containsRegex "seed-nucleus-optimize-pdf-desktop" nixosServicesText;
+# Ban mkOutOfStoreSymlink for the method-1 repo-sourced paths (would bake the
+# read-only store snapshot as the symlink target). The helper seed-writable-symlink.sh
+# resolves the LIVE repo root at activation time instead.
+assert !(containsRegex "mkOutOfStoreSymlink" gitText);
+assert
+  !(containsRegex "config\\.lib\\.file\\.mkOutOfStoreSymlink.*(camilladsp|camillagui)" homeText);
+assert !(containsRegex "mkOutOfStoreSymlink" shellText);
+assert !(containsRegex "mkOutOfStoreSymlink" pwshText);
+assert !(containsRegex "mkOutOfStoreSymlink" nixosServicesText);
 {
   success = true;
   message = "Config method compliance tests passed";
