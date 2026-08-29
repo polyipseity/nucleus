@@ -120,17 +120,21 @@ rec {
       hostName ? null,
     }:
     let
-      prefix = repoRoot + "/";
-      hasRepoPrefix =
-        absolutePath: builtins.substring 0 (builtins.stringLength prefix) absolutePath == prefix;
+      # WHY: `repoRoot` is the eval-time path literal, but under Nix flake eval the
+      # repo is copied into the store (e.g. `/nix/store/<hash>-nucleus-physical`),
+      # so the literal `repoRoot` prefix no longer matches the actual path. A naive
+      # `repoRoot + "/"` strip therefore fails and `toRepoRelPath` returns an
+      # absolute store path, which `seed-writable-symlink.sh` then wrongly joins
+      # onto the live repo root (producing a dangling symlink and aborting apply).
+      # Every nucleus repo has `src/` at its root and every selector resolves under
+      # `src/`, so strip through the `/src/` boundary to obtain the repo-relative
+      # path (`src/...`) regardless of where the eval-time copy landed.
       toRepoRelPath =
         absolutePath:
-        if hasRepoPrefix absolutePath then
-          builtins.substring (builtins.stringLength prefix) (
-            builtins.stringLength absolutePath - builtins.stringLength prefix
-          ) absolutePath
-        else
-          absolutePath;
+        let
+          m = builtins.match ".*/src/(.*)" absolutePath;
+        in
+        if m == null then absolutePath else "src/" + builtins.head m;
       overlayArgs = {
         inherit effectiveUsername repoRoot;
       };
