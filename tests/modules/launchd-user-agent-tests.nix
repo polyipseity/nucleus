@@ -64,6 +64,11 @@ in
     (assert' (
       !containsRegex "environment.userLaunchAgents.\"camilladsp-heartbeat\"" camilladspModuleNix
     ) "camilladsp-heartbeat: not environment.userLaunchAgents")
+    # HM's launchd module filters agents by a per-agent `enable` flag (defaults
+    # false via mkEnableOption), so without `enable = true` the agent is silently
+    # dropped and no plist is generated. This assertion guards against a future
+    # regression that removes the flag.
+    (assert' (containsRegex "enable = true" camilladspModuleNix) "camilladsp-heartbeat: enable = true set")
     # --- Home Manager modules: HM-native launchd.agents with domain = "user" ---
     # ext-discord-music-rpc.nix and cloud-drives.nix are imported into the HM
     # config (home-manager.users / sharedModules), so they must use
