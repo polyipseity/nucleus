@@ -283,10 +283,10 @@ let
     # ── macOS-specific: repo root ───────────────────────────────────
     NUCLEUS_REPO_ROOT = {
       values = {
-        # WHY: toString so the value is a string for launchd EnvironmentVariables
-        # (which requires string-typed values).  repoRoot is a path; without the
-        # coercion, resolveValue returns a path and the launchd option errors.
-        MacBook = toString repoRoot;
+        # WHY: String interpolation ("${repoRoot}") preserves Nix derivation context
+        # while producing a string-typed value for launchd EnvironmentVariables.
+        # toString strips context, causing builtins.derivation contextless-source warnings.
+        MacBook = "${repoRoot}";
       };
       why = "Repo root for out-of-store symlinks. Flake-derived via specialArgs (repoRoot) at eval time; activation hook overrides for repo-move edge case.";
     };
