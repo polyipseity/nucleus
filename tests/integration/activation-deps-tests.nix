@@ -16,6 +16,7 @@ let
   agentsModuleText = builtins.readFile ../../src/modules/agents.nix;
   shellModuleText = builtins.readFile ../../src/modules/shell.nix;
   macosModuleText = builtins.readFile ../../src/platforms/macOS/modules/default.nix;
+  macosLaunchdText = builtins.readFile ../../src/platforms/macOS/modules/launchd-agents.nix;
   activationDagModuleText = builtins.readFile ../../src/modules/lib/activation-dag.nix;
   macbookActivationText = builtins.readFile ../../src/hosts/MacBook/activation.nix;
   macosAppAutostartScriptText = builtins.readFile ../../src/hosts/MacBook/scripts/macos-configure-app-autostart.sh;
@@ -322,14 +323,14 @@ let
   # launchctl warning that global launchd.agents trigger. The assertion intent
   # is unchanged: scheduled via launchd, not activation-bound.
   test_macos_dev_maintenance_is_scheduled = assert' (
-    (lib.hasInfix "launchd.agents.\"ds-store-gc\"" macosModuleText)
-    && (lib.hasInfix "launchd.agents.\"spotlight-exclusions\"" macosModuleText)
-    && (lib.hasInfix "domain = \"user\"" macosModuleText)
-    && (lib.hasInfix "Label = \"local.ds-store-gc\";" macosModuleText)
-    && (lib.hasInfix "Label = \"local.spotlight-exclusions\";" macosModuleText)
-    && (lib.hasInfix "ProgramArguments = [ \"\${devDsStoreGc}/bin/nucleus-ds-store-gc\" ];" macosModuleText)
-    && (lib.hasInfix "ProgramArguments = [" macosModuleText)
-    && (lib.hasInfix "\"\${devSpotlightExclusions}/bin/nucleus-spotlight-exclusions\"" macosModuleText)
+    (lib.hasInfix "launchd.agents.\"ds-store-gc\"" macosLaunchdText)
+    && (lib.hasInfix "launchd.agents.\"spotlight-exclusions\"" macosLaunchdText)
+    && (lib.hasInfix "domain = \"user\"" macosLaunchdText)
+    && (lib.hasInfix "Label = \"local.ds-store-gc\";" macosLaunchdText)
+    && (lib.hasInfix "Label = \"local.spotlight-exclusions\";" macosLaunchdText)
+    && (lib.hasInfix "ProgramArguments = [ \"\${devDsStoreGc}/bin/nucleus-ds-store-gc\" ];" macosLaunchdText)
+    && (lib.hasInfix "ProgramArguments = [" macosLaunchdText)
+    && (lib.hasInfix "\"\${devSpotlightExclusions}/bin/nucleus-spotlight-exclusions\"" macosLaunchdText)
     && !(lib.hasInfix "cleanDevDsStore = lib.hm.dag.entryAfter" macosModuleText)
     && !(lib.hasInfix "configureDevSpotlightExclusions = lib.hm.dag.entryAfter" macosModuleText)
   ) "macOS dev-tree maintenance must run from user launch agents instead of Home Manager activation";
