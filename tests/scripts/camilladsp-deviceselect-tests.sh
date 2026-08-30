@@ -86,11 +86,15 @@ yaml.dump(cfg, open('$patched', 'w'), default_flow_style=False, sort_keys=False)
 #   _MOCK_FIRST_AVAILABLE — value for camilladsp_detect_first_available
 #   _MOCK_DEFAULT_RC      — return code for camilladsp_detect_default_output (default 0)
 #   _MOCK_FIRST_RC        — return code for camilladsp_detect_first_available (default 0)
+#   _MOCK_LAST_DEVICE     — value for camilladsp_load_last_device
+#   _MOCK_LAST_RC         — return code for camilladsp_load_last_device (default 1)
 
 _MOCK_DEFAULT_OUTPUT=""
 _MOCK_FIRST_AVAILABLE=""
 _MOCK_DEFAULT_RC=0
 _MOCK_FIRST_RC=0
+_MOCK_LAST_DEVICE=""
+_MOCK_LAST_RC=1
 
 # Run resolve in a subshell with mocked detection functions.
 # $1 = config file path. Prints resolved config to stdout.
@@ -102,7 +106,9 @@ _run_resolve() {
     _mock_default_rc="$3"
     _mock_first="$4"
     _mock_first_rc="$5"
-    _config_file="$6"
+    _mock_last="$6"
+    _mock_last_rc="$7"
+    _config_file="$8"
     . "$_lib_script"
     # Override detection functions with mocks (use variables, not positional params).
     camilladsp_detect_default_output() {
@@ -113,10 +119,15 @@ _run_resolve() {
       printf "%s" "$_mock_first"
       return "$_mock_first_rc"
     }
+    camilladsp_load_last_device() {
+      printf "%s" "$_mock_last"
+      return "$_mock_last_rc"
+    }
     camilladsp_resolve_playback_device "$_config_file"
   ' _ "$DEVICESELECT_SH" \
     "$_MOCK_DEFAULT_OUTPUT" "$_MOCK_DEFAULT_RC" \
     "$_MOCK_FIRST_AVAILABLE" "$_MOCK_FIRST_RC" \
+    "$_MOCK_LAST_DEVICE" "$_MOCK_LAST_RC" \
     "$config_file"
 }
 
@@ -392,7 +403,122 @@ JSON
   fi
 }
 
-# Test 11: skip-decision invariant — a null live device on a running instance
+# Test 11: last saved default used when no system default available.
+# Null playback, no system default (RC 1), last saved = "Saved USB DAC".
+test_last_saved_used_when_no_default() {
+  local cfg
+  cfg="$(_make_config "" "Loopback Audio")"
+  _MOCK_DEFAULT_OUTPUT=""
+  _MOCK_DEFAULT_RC=1
+  _MOCK_FIRST_AVAILABLE=""
+  _MOCK_FIRST_RC=1
+  _MOCK_LAST_DEVICE="Saved USB DAC"
+  _MOCK_LAST_RC=0
+  local resolved
+  resolved=$(_run_resolve "$cfg")
+  local device
+  device=$(_extract_playback_device <<<"$resolved")
+  rm -f "$cfg"
+  if [ "$device" = "Saved USB DAC" ]; then
+    assert_pass "last saved default used when no system default available"
+  else
+    assert_fail "last saved fallback" "expected 'Saved USB DAC', got '$device'"
+  fi
+}
+
+# Test 12: system default wins over last saved default.
+# Null playback, system default available, last saved present but deprioritized.
+test_system_default_wins_over_last_saved() {
+  local cfg
+  cfg="$(_make_config "" "Loopback Audio")"
+  _MOCK_DEFAULT_OUTPUT="External USB DAC"
+  _MOCK_DEFAULT_RC=0
+  _MOCK_FIRST_AVAILABLE=""
+  _MOCK_FIRST_RC=1
+  _MOCK_LAST_DEVICE="Saved USB DAC"
+  _MOCK_LAST_RC=0
+  local resolved
+  resolved=$(_run_resolve "$cfg")
+  local device
+  device=$(_extract_playback_device <<<"$resolved")
+  rm -f "$cfg"
+  if [ "$device" = "External USB DAC" ]; then
+    assert_pass "system default wins over last saved default"
+  else
+    assert_fail "system default priority" "expected 'External USB DAC', got '$device'"
+  fi
+}
+
+# Test 13: last saved default rejected when it matches capture device.
+# Falls through to first available when last saved == capture.
+test_last_saved_rejected_when_matches_capture() {
+  local cfg
+  cfg="$(_make_config "" "Loopback Audio")"
+  _MOCK_DEFAULT_OUTPUT=""
+  _MOCK_DEFAULT_RC=1
+  _MOCK_FIRST_AVAILABLE="USB Speaker"
+  _MOCK_FIRST_RC=0
+  _MOCK_LAST_DEVICE="Loopback Audio"
+  _MOCK_LAST_RC=0
+  local resolved
+  resolved=$(_run_resolve "$cfg")
+  local device
+  device=$(_extract_playback_device <<<"$resolved")
+  rm -f "$cfg"
+  if [ "$device" = "USB Speaker" ]; then
+    assert_pass "last saved rejected when it matches capture, falls to first available"
+  else
+    assert_fail "last saved capture rejection" "expected 'USB Speaker', got '$device'"
+  fi
+}
+
+# Test 14: no system default, no last saved → first available (backward compat).
+# Verifies the existing no-default fallback still works with last-device mocks.
+test_no_default_no_last_saved_fallback() {
+  local cfg
+  cfg="$(_make_config "" "Loopback Audio")"
+  _MOCK_DEFAULT_OUTPUT=""
+  _MOCK_DEFAULT_RC=1
+  _MOCK_FIRST_AVAILABLE="USB Speaker"
+  _MOCK_FIRST_RC=0
+  _MOCK_LAST_DEVICE=""
+  _MOCK_LAST_RC=1
+  local resolved
+  resolved=$(_run_resolve "$cfg")
+  local device
+  device=$(_extract_playback_device <<<"$resolved")
+  rm -f "$cfg"
+  if [ "$device" = "USB Speaker" ]; then
+    assert_pass "no default + no last saved → first available (backward compat)"
+  else
+    assert_fail "no-default-no-last fallback" "expected 'USB Speaker', got '$device'"
+  fi
+}
+
+# Test 15: last saved matches capture AND no first available → null preserved.
+# Both fallbacks exhausted: last saved rejected (==capture), first available empty.
+test_last_saved_match_capture_no_first_available() {
+  local cfg
+  cfg="$(_make_config "" "Loopback Audio")"
+  _MOCK_DEFAULT_OUTPUT=""
+  _MOCK_DEFAULT_RC=1
+  _MOCK_FIRST_AVAILABLE=""
+  _MOCK_FIRST_RC=1
+  _MOCK_LAST_DEVICE="Loopback Audio"
+  _MOCK_LAST_RC=0
+  local resolved
+  resolved=$(_run_resolve "$cfg")
+  local device
+  device=$(_extract_playback_device <<<"$resolved")
+  rm -f "$cfg"
+  if [ -z "$device" ]; then
+    assert_pass "last saved match + no first available → null preserved"
+  else
+    assert_fail "last saved + no first available" "expected empty, got '$device'"
+  fi
+}
+
+# Test 16: skip-decision invariant — a null live device on a running instance
 # must NEVER be skipped (it must be pushed). This is the regression guard for
 # the broken "skip when Running" logic that let a null device stick forever.
 # The decision now also re-pushes when the live device differs from the target
@@ -445,7 +571,7 @@ test_needs_push_decision() {
   fi
 }
 
-# Test 12: target device helper — returns the device detection would currently
+# Test 17: target device helper — returns the device detection would currently
 # select (the device camilladsp_resolve_playback_device would set), or empty
 # when detection yields nothing. This is what the heartbeat compares against.
 test_target_playback_device() {
@@ -463,6 +589,7 @@ test_target_playback_device() {
     . "$_lib_script"
     camilladsp_detect_default_output() { printf "%s" "$_mock_default"; return 0; }
     camilladsp_detect_first_available() { printf "%s" "$_mock_first"; return 0; }
+    camilladsp_load_last_device() { return 1; }
     camilladsp_target_playback_device "$_cfg"
   ' _ "$DEVICESELECT_SH" "$cfg" "$_MOCK_DEFAULT_OUTPUT" "$_MOCK_FIRST_AVAILABLE")
   rm -f "$cfg"
@@ -503,6 +630,7 @@ test_target_playback_device() {
     . "$_lib_script"
     camilladsp_detect_default_output() { printf "%s" "$_mock_default"; return "$_mock_default_rc"; }
     camilladsp_detect_first_available() { printf "%s" "$_mock_first"; return "$_mock_first_rc"; }
+    camilladsp_load_last_device() { return 1; }
     camilladsp_target_playback_device "$_cfg"
   ' _ "$DEVICESELECT_SH" "$cfg" "$_MOCK_DEFAULT_OUTPUT" "$_MOCK_DEFAULT_RC" "$_MOCK_FIRST_AVAILABLE" "$_MOCK_FIRST_RC")
   rm -f "$cfg"
@@ -523,6 +651,12 @@ test_macos_json_first_available
 test_macos_real_shape_default_output
 
 test_no_default_fallback_first_available
+
+test_last_saved_used_when_no_default
+test_system_default_wins_over_last_saved
+test_last_saved_rejected_when_matches_capture
+test_no_default_no_last_saved_fallback
+test_last_saved_match_capture_no_first_available
 
 test_passthrough_nonempty_device
 test_patches_with_default_output
