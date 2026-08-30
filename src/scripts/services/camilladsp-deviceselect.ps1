@@ -2,15 +2,23 @@
 # Smart playback device detection for CamillaDSP (Windows).
 #
 # Provides Resolve-CamillaDSPPlaybackDevice which reads a config YAML file,
-# detects the system default playback device when devices.playback.device is
-# null, and returns the patched YAML.  When playback.device is already set,
-# the config is returned unchanged.
+# detects the playback device when devices.playback.device is null using this
+# priority chain:
+#   1. System default output (via WASAPI COM)
+#   2. Last saved default (from state file, maintained across pushes)
+#   3. First available device (deterministic sorted-name fallback)
+# When playback.device is already set, the config is returned unchanged.
 #
 # The capture device is always excluded from autodetection to prevent audio
 # loops (output → capture → processed → output again).
 #
 # Detection helpers (Get-CamillaDSPDefaultPlaybackDevice,
-# Get-CamillaDSPFirstAvailablePlaybackDevice) are mockable for unit tests.
+# Get-CamillaDSPFirstAvailablePlaybackDevice, Get-CamillaDSPLastDevice,
+# Save-CamillaDSPLastDevice) are mockable for unit tests.
+#
+# State file: %LOCALAPPDATA%\nucleus\camilladsp\last-device.txt persists the
+# last device pushed to CamillaDSP, used as fallback when no system default
+# is detected.
 #
 # Dependencies: PowerShell 7+, powershell-yaml module
 #
@@ -72,6 +80,38 @@ function Get-CamillaDSPFirstAvailablePlaybackDevice {
   return $names[0]
 }
 
+# --- Last saved default state file ---
+
+$script:CamillaDSPStateDir = Join-Path $env:LOCALAPPDATA 'nucleus\camilladsp'
+$script:CamillaDSPLastDeviceFile = Join-Path $script:CamillaDSPStateDir 'last-device.txt'
+
+function Save-CamillaDSPLastDevice {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)]
+    [string]$Device
+  )
+
+  if ([string]::IsNullOrEmpty($Device)) { return }
+  if (-not (Test-Path $script:CamillaDSPStateDir)) {
+    $null = New-Item -ItemType Directory -Path $script:CamillaDSPStateDir -Force
+  }
+  Set-Content -Path $script:CamillaDSPLastDeviceFile -Value $Device -NoNewline
+}
+
+function Get-CamillaDSPLastDevice {
+  [CmdletBinding()]
+  param()
+
+  if (Test-Path $script:CamillaDSPLastDeviceFile) {
+    $content = Get-Content -Raw $script:CamillaDSPLastDeviceFile
+    if (-not [string]::IsNullOrWhiteSpace($content)) {
+      return $content.Trim()
+    }
+  }
+  return $null
+}
+
 function Resolve-CamillaDSPPlaybackDevice {
   [CmdletBinding()]
   param(
@@ -100,7 +140,15 @@ function Resolve-CamillaDSPPlaybackDevice {
     $detected = $null
   }
 
-  # Fallback: first available playback device by deterministic sorted name.
+  # Fallback 1: last saved default (maintains previously used device).
+  if (-not $detected) {
+    $savedDevice = Get-CamillaDSPLastDevice
+    if ($savedDevice -and $savedDevice -ne $captureDevice) {
+      $detected = $savedDevice
+    }
+  }
+
+  # Fallback 2: first available playback device by deterministic sorted name.
   if (-not $detected) {
     $detected = Get-CamillaDSPFirstAvailablePlaybackDevice -CaptureDevice $captureDevice
   }
@@ -113,6 +161,10 @@ function Resolve-CamillaDSPPlaybackDevice {
   # Patch YAML: set the detected device and re-serialize.
   $cfg.devices.playback.device = $detected
   $patched = $cfg | ConvertTo-Yaml
+
+  # Save the resolved device to state file for future fallback.
+  Save-CamillaDSPLastDevice -Device $detected
+
   return $patched
 }
 
