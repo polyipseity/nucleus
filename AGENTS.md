@@ -51,7 +51,7 @@ Check/test preflight, tool-availability policy, scoped-mode conventions, and dyn
 - **Single registration surface:** every nucleus command is declared once in `mkNucleusApps` (`src/flake.nix`); PATH (`home.packages`), `nix run` (`apps`, derived via `mkNucleusAppsAsFlakeApps`), and `packages` all flow from it. Never hand-register a command in two places.
 - **Bootstrap independence:** `nucleus-bootstrap` installs Nix + base deps only and must never depend on apply; it may optionally invoke apply via `--apply`/`-Apply` after deps exist, but apply is never a bootstrap dependency.
 - Hard rule: never filter or truncate `nucleus-apply` output (no `grep`, `head`, `tail`, or similar). Run it directly and capture the full combined stdout+stderr. When reviewing output, ignore the direnv environment variable dump (`direnv: export +AR +AR_FOR_BUILD ...`) that sometimes appears at the end — it is irrelevant noise from `.envrc` re-evaluation. If the output ends abruptly (no clear success/failure end marker, partial lines, or incomplete direnv dump) or the exit code is non-zero, do NOT re-run — instead, read the last visible activation step name and diagnose the failure there.
-- Known upstream caveat: `builtins.derivation`/`options.json` contextless-source warning is upstream, not a local regression unless concrete local breakage is shown.
+- Known upstream caveat: `builtins.derivation`/`options.json` contextless-source warning is upstream for `options.json` and `activation-script` derivations; nucleus-fixed for all plist-based `NUCLEUS_REPO_ROOT` derivations via context-preserving string interpolation (not `toString`).
 
 ## Testing
 
