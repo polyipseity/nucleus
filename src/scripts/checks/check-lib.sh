@@ -21,6 +21,7 @@ _NUCLEUS_LIB_DIR="$(CDPATH='' cd -- "$SCRIPT_DIR/../lib" && pwd)"
 # Check-specific defaults
 export FAIL_FAST=false
 REPO_ROOT=$(derive_repo_root)
+export NUCLEUS_REPO_ROOT="$REPO_ROOT"
 cd "$REPO_ROOT" || exit
 
 usage() {
