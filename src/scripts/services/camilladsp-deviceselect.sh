@@ -5,13 +5,13 @@
 # Provides:
 #   camilladsp_resolve_playback_device <config_file>
 #     If devices.playback.device is non-null, passes config through unchanged.
-#     If null, detects the system default output device, patches the YAML
-#     in-memory, and writes the patched config to stdout.
+#     If null, resolves the playback device using this priority chain:
+#       1. System default output (via platform APIs)
+#       2. Last saved default (from state file, maintained across pushes)
+#       3. First available device (deterministic sorted-name fallback)
 #     The capture device (devices.capture.device) is always excluded from
-#     detection — if the system default matches capture, it is skipped.
-#     Fallback device selection is deterministic: the first non-capture device
-#     is chosen by a case-sensitive ascending name ordering, matching the
-#     Windows resolver.
+#     detection — if any candidate matches capture, it is skipped.
+#     Writes the patched config to stdout.
 #   camilladsp_target_playback_device <config_file>
 #     Returns the playback device name that detection would currently select
 #     for the given config (the device camilladsp_resolve_playback_device would
@@ -30,7 +30,8 @@
 # Dependencies: python3 (yaml module), websocat, jq, system_profiler (macOS),
 #               wpctl/pactl/aplay (Linux)
 #
-# State: entirely in-memory — no persistent cache file.
+# State file: ~/.local/state/camilladsp/last-device.txt persists the last device
+# pushed to CamillaDSP, used as fallback when no system default is detected.
 # Called once per config push (heartbeat tick or supervisor initial push).
 set -euo pipefail
 
@@ -203,6 +204,33 @@ camilladsp_detect_first_available() {
   esac
 }
 
+# --- Last saved default state file ---
+
+# State directory for CamillaDSP device persistence.
+CAMILLADSP_STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/camilladsp"
+CAMILLADSP_LAST_DEVICE_FILE="$CAMILLADSP_STATE_DIR/last-device.txt"
+
+# Save the resolved device name to the state file.
+# Argument: device name
+# Creates the state directory if it doesn't exist.
+camilladsp_save_last_device() {
+  local device="$1"
+  [ -n "$device" ] || return 0
+  mkdir -p "$CAMILLADSP_STATE_DIR"
+  printf '%s' "$device" >"$CAMILLADSP_LAST_DEVICE_FILE"
+}
+
+# Load the last saved device name from the state file.
+# Prints the device name if file exists and is non-empty.
+# Returns 1 if file doesn't exist or is empty.
+camilladsp_load_last_device() {
+  if [ -s "$CAMILLADSP_LAST_DEVICE_FILE" ]; then
+    cat "$CAMILLADSP_LAST_DEVICE_FILE"
+    return 0
+  fi
+  return 1
+}
+
 # --- Main resolve function ---
 
 camilladsp_resolve_playback_device() {
@@ -250,7 +278,17 @@ PYEOF
     detected_device=""
   fi
 
-  # Fallback: first available device (not matching capture).
+  # Fallback 1: last saved default (maintains previously used device).
+  if [ -z "$detected_device" ]; then
+    local saved_device
+    if saved_device=$(camilladsp_load_last_device 2>/dev/null); then
+      if [ -n "$saved_device" ] && [ "$saved_device" != "$capture_device" ]; then
+        detected_device="$saved_device"
+      fi
+    fi
+  fi
+
+  # Fallback 2: first available device (deterministic sorted-name fallback).
   if [ -z "$detected_device" ]; then
     # check-suppress:suppression_doc: detection failure is non-fatal — passes through with empty device
     detected_device=$(camilladsp_detect_first_available "$capture_device" 2>/dev/null) || true
@@ -375,6 +413,15 @@ camilladsp_push_config() {
     if _push_resp=$(jq -cRs '{SetConfig: .}' <<<"$_resolved_config" |
       websocat -1 "ws://127.0.0.1:$ws_port" 2>/dev/null); then
       if printf '%s' "$_push_resp" | jq -e '.SetConfig.result == "Ok"' >/dev/null 2>&1; then
+        # Save the resolved device to state file for future fallback.
+        local _saved_device
+        _saved_device=$(printf '%s' "$_resolved_config" | python3 -c "
+import sys, yaml
+cfg = yaml.safe_load(sys.stdin.read())
+d = cfg.get('devices', {}).get('playback', {}).get('device', None)
+print(d if d is not None else '')
+" 2>/dev/null) || true
+        [ -n "$_saved_device" ] && camilladsp_save_last_device "$_saved_device"
         return 0
       fi
     fi
