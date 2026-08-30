@@ -7,6 +7,7 @@ let
   # === NIX-INDEX SCHEDULE INVARIANTS ===
   linuxText = builtins.readFile ../../src/platforms/NixOS/modules/default.nix;
   macosText = builtins.readFile ../../src/platforms/macOS/modules/default.nix;
+  macosLaunchdText = builtins.readFile ../../src/platforms/macOS/modules/launchd-agents.nix;
   coreModuleText = builtins.readFile ../../src/modules/core.nix;
 
   test_core_accepts_treefmt_package = assert' (
@@ -26,8 +27,8 @@ let
   ) "linux nix-index timer must run daily at 12:00";
 
   test_macos_nix_index_is_daily = assert' (
-    containsRegex ''Label = "local.nix-index-update";'' macosText
-    && containsRegex "StartCalendarInterval = [[] .*[{] .*Hour = 12; .*Minute = 0; *[}] .*[]];" macosText
+    containsRegex ''Label = "local.nix-index-update";'' macosLaunchdText
+    && containsRegex "StartCalendarInterval = [[] .*[{] .*Hour = 12; .*Minute = 0; *[}] .*[]];" macosLaunchdText
   ) "macOS nix-index launch agent must run daily at 12:00";
 
   # === BACKEND SELECTION RESOLUTION LOGIC ===

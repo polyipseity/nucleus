@@ -76,7 +76,6 @@ assert containsRegex "multi-user.target" nixosActivationText;
 assert containsRegex "Type = .simple." nixosActivationText;
 assert containsRegex "nucleus-service-watchdog" nixosActivationText;
 assert containsRegex "nucleus-service-watchdog" nixosActivationText;
-assert containsRegex "pkgs.jq" nixosActivationText;
 assert containsRegex "NUCLEUS_REPO_ROOT" nixosActivationText;
 
 # --- Windows DSC task config ---

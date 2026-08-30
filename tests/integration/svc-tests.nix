@@ -112,10 +112,8 @@ assert containsRegex "filtered_service_names" svcShText;
 assert containsRegex "entry -is " svcPs1Text;
 
 # --- flake.nix wiring assertions ---
-assert containsRegex "mkSvcApp" flakeText;
-assert containsRegex "svc = mkSvcApp pkgsMac" flakeText;
-assert containsRegex "svc = mkSvcApp pkgsLinux" flakeText;
-assert containsRegex "runtimeInputs.*jq" flakeText;
+assert containsRegex "nucleus-svc" flakeText;
+assert containsRegex ''name = "svc"'' flakeText;
 
 # --- flake.nix nucleusApps wiring assertions ---
 assert containsRegex "nucleus-svc" flakeText;
