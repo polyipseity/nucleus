@@ -13,8 +13,8 @@
 # loops (output → capture → processed → output again).
 #
 # Detection helpers (Get-CamillaDSPDefaultPlaybackDevice,
-# Get-CamillaDSPFirstAvailablePlaybackDevice, Get-CamillaDSPLastDevice,
-# Save-CamillaDSPLastDevice) are mockable for unit tests.
+# Get-CamillaDSPAvailablePlaybackDevices, Get-CamillaDSPFirstAvailablePlaybackDevice,
+# Get-CamillaDSPLastDevice, Save-CamillaDSPLastDevice) are mockable for unit tests.
 #
 # State file: %LOCALAPPDATA%\nucleus\camilladsp\last-device.txt persists the
 # last device pushed to CamillaDSP, used as fallback when no system default
@@ -44,7 +44,7 @@ function Get-CamillaDSPDefaultPlaybackDevice {
   }
 }
 
-function Get-CamillaDSPFirstAvailablePlaybackDevice {
+function Get-CamillaDSPAvailablePlaybackDevices {
   [CmdletBinding()]
   param(
     [Parameter(Mandatory = $false)]
@@ -72,9 +72,18 @@ function Get-CamillaDSPFirstAvailablePlaybackDevice {
   # Sort by name (case-sensitive, ascending) so selection is stable across
   # reboots and Windows updates and matches the macOS/Linux case-sensitive
   # ordering, instead of relying on undocumented EnumAudioEndpoints enumeration order.
-  $names = $names | Sort-Object
+  return ($names | Sort-Object)
+}
 
-  if ($names.Count -eq 0) {
+function Get-CamillaDSPFirstAvailablePlaybackDevice {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory = $false)]
+    [string]$CaptureDevice = $null
+  )
+
+  $names = Get-CamillaDSPAvailablePlaybackDevices -CaptureDevice $CaptureDevice
+  if ($null -eq $names -or $names.Count -eq 0) {
     return $null
   }
   return $names[0]
@@ -141,10 +150,18 @@ function Resolve-CamillaDSPPlaybackDevice {
   }
 
   # Fallback 1: last saved default (maintains previously used device).
+  # Validate that the saved device still exists on the system — if a USB DAC
+  # was unplugged, fall through to first-available instead of pushing a
+  # nonexistent device name to CamillaDSP.
   if (-not $detected) {
     $savedDevice = Get-CamillaDSPLastDevice
     if ($savedDevice -and $savedDevice -ne $captureDevice) {
-      $detected = $savedDevice
+      $allDevices = Get-CamillaDSPAvailablePlaybackDevices -CaptureDevice $captureDevice
+      if ($null -ne $allDevices -and ($allDevices -contains $savedDevice)) {
+        $detected = $savedDevice
+      }
+      # If enumeration failed ($null) or device missing, $detected stays null
+      # and we fall through to fallback 2 (first available).
     }
   }
 
