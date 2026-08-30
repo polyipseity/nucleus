@@ -202,6 +202,10 @@ in
   # individually and launchd loads it without the root-domain mismatch warning
   # that global launchd.agents trigger under nix-darwin.
   launchd.agents."sccache-gc" = {
+    # HM's launchd module filters agents by a per-agent `enable` flag (defaults
+    # false via mkEnableOption), so without this the agent is silently dropped
+    # and no plist is generated in ~/Library/LaunchAgents.
+    enable = true;
     domain = "user";
     config = {
       Label = "local.sccache-gc";
@@ -221,6 +225,10 @@ in
   # Rotates user-scope nucleus logs daily at noon. Cross-host parity with
   # NixOS systemd user timer and Windows scheduled task.
   launchd.agents."log-gc-user" = {
+    # HM's launchd module filters agents by a per-agent `enable` flag (defaults
+    # false via mkEnableOption), so without this the agent is silently dropped
+    # and no plist is generated in ~/Library/LaunchAgents.
+    enable = true;
     domain = "user";
     config = {
       Label = "local.log-gc-user";
@@ -256,6 +264,10 @@ in
   # Output is silenced to prevent log spam from 30-second no-op loop iterations.
   # --------------------------------------------------------------------------
   launchd.agents."betterdisplay-heartbeat" = {
+    # HM's launchd module filters agents by a per-agent `enable` flag (defaults
+    # false via mkEnableOption), so without this the agent is silently dropped
+    # and no plist is generated in ~/Library/LaunchAgents.
+    enable = true;
     domain = "user";
     config = {
       Label = "local.betterdisplay-heartbeat";
@@ -278,6 +290,10 @@ in
   # configuration work that must happen immediately.
   # --------------------------------------------------------------------------
   launchd.agents."ds-store-gc" = {
+    # HM's launchd module filters agents by a per-agent `enable` flag (defaults
+    # false via mkEnableOption), so without this the agent is silently dropped
+    # and no plist is generated in ~/Library/LaunchAgents.
+    enable = true;
     domain = "user";
     config = {
       Label = "local.ds-store-gc";
@@ -295,6 +311,10 @@ in
   };
 
   launchd.agents."spotlight-exclusions" = {
+    # HM's launchd module filters agents by a per-agent `enable` flag (defaults
+    # false via mkEnableOption), so without this the agent is silently dropped
+    # and no plist is generated in ~/Library/LaunchAgents.
+    enable = true;
     domain = "user";
     config = {
       Label = "local.spotlight-exclusions";
@@ -333,6 +353,10 @@ in
   #   launchctl list | grep nix-index-update
   # --------------------------------------------------------------------------
   launchd.agents."nix-index-update" = {
+    # HM's launchd module filters agents by a per-agent `enable` flag (defaults
+    # false via mkEnableOption), so without this the agent is silently dropped
+    # and no plist is generated in ~/Library/LaunchAgents.
+    enable = true;
     domain = "user";
     config = {
       Label = "local.nix-index-update";
@@ -369,6 +393,10 @@ in
   # RunAtLoad = false because the activation hook already runs on every apply.
   # --------------------------------------------------------------------------
   launchd.agents."icloud-exclusions" = {
+    # HM's launchd module filters agents by a per-agent `enable` flag (defaults
+    # false via mkEnableOption), so without this the agent is silently dropped
+    # and no plist is generated in ~/Library/LaunchAgents.
+    enable = true;
     domain = "user";
     config = {
       Label = "local.icloud-exclusions";
@@ -397,6 +425,10 @@ in
   # macOS warnings about root managing user-scope agents.
   # --------------------------------------------------------------------------
   launchd.agents."service-watchdog-user" = {
+    # HM's launchd module filters agents by a per-agent `enable` flag (defaults
+    # false via mkEnableOption), so without this the agent is silently dropped
+    # and no plist is generated in ~/Library/LaunchAgents.
+    enable = true;
     domain = "user";
     config = {
       Label = "local.service-watchdog-user";
@@ -434,6 +466,10 @@ in
   # activation step re-applies all vars on every nucleus-apply.
   # --------------------------------------------------------------------------
   launchd.agents."gui-env" = {
+    # HM's launchd module filters agents by a per-agent `enable` flag (defaults
+    # false via mkEnableOption), so without this the agent is silently dropped
+    # and no plist is generated in ~/Library/LaunchAgents.
+    enable = true;
     domain = "user";
     config = {
       Label = "local.gui-env";

@@ -118,6 +118,10 @@ in
     # a nix-darwin top-level option and does not exist in the HM context.
     (lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && userEnable) {
       launchd.agents."discord-music-rpc" = {
+        # HM's launchd module filters agents by a per-agent `enable` flag (defaults
+        # false via mkEnableOption), so without this the agent is silently dropped
+        # and no plist is generated in ~/Library/LaunchAgents.
+        enable = true;
         domain = "user";
         config = {
           Label = "local.discord-music-rpc";

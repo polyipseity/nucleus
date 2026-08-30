@@ -15,37 +15,36 @@
 let
   inherit (import ../lib.nix) assert' containsRegex;
 
-  macosDefaultNix = builtins.readFile ../../src/platforms/macOS/modules/default.nix;
   camilladspNix = builtins.readFile ../../src/hosts/MacBook/camilladsp.nix;
   camilladspModuleNix = builtins.readFile ../../src/modules/camilladsp.nix;
   discordRpcNix = builtins.readFile ../../src/modules/ext-discord-music-rpc.nix;
   cloudDrivesNix = builtins.readFile ../../src/modules/cloud-drives.nix;
+  launchdAgentsNix = builtins.readFile ../../src/platforms/macOS/modules/launchd-agents.nix;
 in
 {
   tests = builtins.filter (x: x != null) [
-    # --- Home Manager module (default.nix): HM-native user agents ---
-    # Each primaryUser-scoped agent MUST be a launchd.agents entry with
-    # domain = "user" (NOT environment.userLaunchAgents, which is invalid in
-    # an HM module context).
-    (assert' (containsRegex "launchd.agents.\"sccache-gc\"" macosDefaultNix) "sccache-gc: uses launchd.agents")
+    # --- HM launchd agents (launchd-agents.nix): HM-native user agents ---
+    # Each agent MUST be a launchd.agents entry with domain = "user" (NOT
+    # environment.userLaunchAgents, which is invalid in an HM module context).
+    (assert' (containsRegex "launchd.agents.\"sccache-gc\"" launchdAgentsNix) "sccache-gc: uses launchd.agents")
     (assert' (
-      containsRegex "launchd.agents.\"sccache-gc\"" macosDefaultNix
-      && containsRegex "domain = \"user\"" macosDefaultNix
+      containsRegex "launchd.agents.\"sccache-gc\"" launchdAgentsNix
+      && containsRegex "domain = \"user\"" launchdAgentsNix
     ) "sccache-gc: domain = user")
-    (assert' (containsRegex "launchd.agents.\"log-gc-user\"" macosDefaultNix) "log-gc-user: uses launchd.agents")
-    (assert' (containsRegex "launchd.agents.\"betterdisplay-heartbeat\"" macosDefaultNix) "betterdisplay-heartbeat: uses launchd.agents")
-    (assert' (containsRegex "launchd.agents.\"ds-store-gc\"" macosDefaultNix) "ds-store-gc: uses launchd.agents")
-    (assert' (containsRegex "launchd.agents.\"spotlight-exclusions\"" macosDefaultNix) "spotlight-exclusions: uses launchd.agents")
-    (assert' (containsRegex "launchd.agents.\"nix-index-update\"" macosDefaultNix) "nix-index-update: uses launchd.agents")
-    (assert' (containsRegex "launchd.agents.\"icloud-exclusions\"" macosDefaultNix) "icloud-exclusions: uses launchd.agents")
-    (assert' (containsRegex "launchd.agents.\"service-watchdog-user\"" macosDefaultNix) "service-watchdog-user: uses launchd.agents")
-    (assert' (containsRegex "launchd.agents.\"gui-env\"" macosDefaultNix) "gui-env: uses launchd.agents")
+    (assert' (containsRegex "launchd.agents.\"log-gc-user\"" launchdAgentsNix) "log-gc-user: uses launchd.agents")
+    (assert' (containsRegex "launchd.agents.\"betterdisplay-heartbeat\"" launchdAgentsNix) "betterdisplay-heartbeat: uses launchd.agents")
+    (assert' (containsRegex "launchd.agents.\"ds-store-gc\"" launchdAgentsNix) "ds-store-gc: uses launchd.agents")
+    (assert' (containsRegex "launchd.agents.\"spotlight-exclusions\"" launchdAgentsNix) "spotlight-exclusions: uses launchd.agents")
+    (assert' (containsRegex "launchd.agents.\"nix-index-update\"" launchdAgentsNix) "nix-index-update: uses launchd.agents")
+    (assert' (containsRegex "launchd.agents.\"icloud-exclusions\"" launchdAgentsNix) "icloud-exclusions: uses launchd.agents")
+    (assert' (containsRegex "launchd.agents.\"service-watchdog-user\"" launchdAgentsNix) "service-watchdog-user: uses launchd.agents")
+    (assert' (containsRegex "launchd.agents.\"gui-env\"" launchdAgentsNix) "gui-env: uses launchd.agents")
     # None of these agents may use environment.userLaunchAgents in the HM module.
     (assert' (
-      !containsRegex "environment.userLaunchAgents.\"sccache-gc\"" macosDefaultNix
+      !containsRegex "environment.userLaunchAgents.\"sccache-gc\"" launchdAgentsNix
     ) "sccache-gc: not environment.userLaunchAgents")
     (assert' (
-      !containsRegex "environment.userLaunchAgents.\"gui-env\"" macosDefaultNix
+      !containsRegex "environment.userLaunchAgents.\"gui-env\"" launchdAgentsNix
     ) "gui-env: not environment.userLaunchAgents")
 
     # --- darwin config: camilladsp-heartbeat BANNED from environment.userLaunchAgents ---
@@ -75,6 +74,14 @@ in
     # launchd.agents.<name> with domain = "user", NOT environment.userLaunchAgents.
     (assert' (containsRegex "launchd.agents.\"discord-music-rpc\"" discordRpcNix) "discord-music-rpc: uses launchd.agents")
     (assert' (containsRegex "domain = \"user\"" discordRpcNix) "discord-music-rpc: domain = user")
+    # HM's launchd module filters agents by a per-agent `enable` flag (defaults
+    # false via mkEnableOption), so without `enable = true` the agent is silently
+    # dropped and no plist is generated. This assertion guards against a future
+    # regression that removes the flag.
+    (assert' (containsRegex "enable = true" discordRpcNix) "discord-music-rpc: enable = true set")
+    # All launchd agents in launchd-agents.nix must have enable = true so HM
+    # generates the plist in ~/Library/LaunchAgents.
+    (assert' (containsRegex "enable = true" launchdAgentsNix) "launchd-agents.nix: all agents have enable = true")
     (assert' (containsRegex "launchd.agents = builtins.listToAttrs" cloudDrivesNix) "cloud-drives: mounts use launchd.agents")
     (assert' (containsRegex "domain = \"user\"" cloudDrivesNix) "cloud-drives: domain = user")
     # None of these agents may use environment.userLaunchAgents in HM modules.
