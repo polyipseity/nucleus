@@ -424,8 +424,8 @@ test_last_saved_used_when_no_default() {
   _MOCK_FIRST_AVAILABLE=""
   _MOCK_FIRST_RC=1
   _MOCK_LAST_DEVICE="Saved USB DAC"
-  _MOCK_LAST_RC=0  _MOCK_LIST_DEVICES=$'USB Speaker\nSaved USB DAC'
-  _MOCK_LIST_RC=0  local resolved
+  _MOCK_LAST_RC=0 _MOCK_LIST_DEVICES=$'USB Speaker\nSaved USB DAC'
+  _MOCK_LIST_RC=0 local resolved
   resolved=$(_run_resolve "$cfg")
   local device
   device=$(_extract_playback_device <<<"$resolved")
