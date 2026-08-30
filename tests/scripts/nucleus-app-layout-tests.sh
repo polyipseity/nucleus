@@ -8,7 +8,7 @@
 # Representative packages:
 #   - nucleus-gc            (scripts/-prefixed entry: scripts/gc)
 #   - nucleus-apply         (src/-prefixed entry: src/scripts/apply)
-#   - nucleus-service-watchdog (host-script-backed: src/scripts/services/service-watchdog)
+#   nucleus-check         (pwsh subcommand: text= wrapper, no scriptName)
 #   - nucleus-check         (pwsh subcommand: text= wrapper, no scriptName)
 #
 # Dependencies: nix (with flakes enabled), jq.
@@ -32,7 +32,6 @@ declare -a LAYOUT_PACKAGES=(
   nucleus-utils
   nucleus-gc
   nucleus-svc
-  nucleus-service-watchdog
   nucleus-test
   nucleus-update
   nucleus-vm
@@ -48,7 +47,6 @@ declare -A ENTRY_SCRIPT=(
   ["nucleus-utils"]=scripts/utils.sh
   ["nucleus-gc"]=scripts/gc.sh
   ["nucleus-svc"]=scripts/svc.sh
-  ["nucleus-service-watchdog"]=src/scripts/services/service-watchdog.sh
   ["nucleus-test"]=scripts/test.sh
   ["nucleus-update"]=scripts/update.sh
   ["nucleus-vm"]=scripts/vm.sh
