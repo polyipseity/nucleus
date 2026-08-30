@@ -141,7 +141,7 @@ in
             ];
             EnvironmentVariables = {
               NUCLEUS_GC_EXPIRY = config.modules.gc.expiry;
-              NUCLEUS_REPO_ROOT = toString repoRoot;
+              NUCLEUS_REPO_ROOT = "${repoRoot}";
             };
             RunAtLoad = false;
             StartCalendarInterval = [
@@ -160,7 +160,7 @@ in
             EnvironmentVariables = {
               NUCLEUS_GC_EXPIRY = config.modules.gc.expiry;
               NUCLEUS_GC_GENERATIONS_KEEP = toString config.modules.gc.generationsKeep;
-              NUCLEUS_REPO_ROOT = toString repoRoot;
+              NUCLEUS_REPO_ROOT = "${repoRoot}";
               NUCLEUS_USERNAME = username;
             };
             RunAtLoad = false;
