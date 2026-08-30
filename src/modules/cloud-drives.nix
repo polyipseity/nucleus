@@ -468,7 +468,7 @@ in
                   "${mkReplicaScheduledSyncScript replica}/bin/nucleus-cloud-replica-scheduled-sync-${replica.id}"
                 ];
                 EnvironmentVariables = {
-                  NUCLEUS_REPO_ROOT = toString repoRoot;
+                  NUCLEUS_REPO_ROOT = "${repoRoot}";
                 };
                 StartCalendarInterval = mkScheduledSyncLaunchdCalendar replica.fallbackTimer.interval;
                 # Keep scheduled sync runs on schedule boundaries only.
