@@ -26,6 +26,16 @@ in
   # drivers — it adds a virtual display alongside any real hardware.
   boot.kernelModules = [ "vkms" ];
 
+  # OBS Studio virtual camera.  OBS itself is installed via the cross-host
+  # managedPackages registry (core.nix "obs-studio"); we only pull in the
+  # virtual-camera backend here.  package = null avoids a second (wrapped) OBS
+  # install — the module's enableVirtualCamera still wires v4l2loopback and
+  # polkit independently of the package attr.  v4l2loopback ships its own udev
+  # rules, so no extra services.udev.extraRules are needed.
+  programs.obs-studio.enable = true;
+  programs.obs-studio.package = null;
+  programs.obs-studio.enableVirtualCamera = true;
+
   # Enable X11 server and desktop managers.
   services.xserver = {
     enable = true;
