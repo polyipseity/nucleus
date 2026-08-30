@@ -30,6 +30,10 @@ let
   };
   resolveValue = name: envVars.resolveValue name "MacBook";
   daemonEnv = lib.filterAttrs (_name: value: value != null) {
+    # launchd does not set HOME for root daemons (no UserName). lib.sh
+    # needs HOME for derive_nucleus_user_root(). Provide it explicitly.
+    # Root's home on macOS is always /var/root.
+    HOME = "/var/root";
     NIX_SSL_CERT_FILE = resolveValue "NIX_SSL_CERT_FILE";
     NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";
   };
