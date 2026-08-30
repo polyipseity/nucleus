@@ -46,15 +46,13 @@ router_settings:
   # Selection algorithm for endpoints within the same order tier (random healthy pick).
   routing_strategy: simple-shuffle
   # Total request-level retry budget across all endpoints and priority tiers combined.
-  num_retries: 9
+  num_retries: 5
   # Delay (in seconds) to wait before executing the next retry attempt.
   retry_after: 2
   # Cumulative failure threshold per endpoint required to bench it into temporary cooldown.
   allowed_fails: 3
   # Duration (in seconds) a benched endpoint is excluded from routing before resetting.
   cooldown_time: 60
-  # Specific HTTP status codes that trigger retries rather than immediately raising errors.
-  retry_on_status_codes: [429, 500, 502, 503, 504, 408]
   # Per-request HTTP timeout (in seconds) before marking an attempt as failed.
   timeout: 30
 
@@ -100,26 +98,6 @@ model_list:
         max_output_tokens: 16384
   - model_name: default
     litellm_params:
-      model: openai/mimo-v2.5
-      api_base: https://opencode.ai/zen/go/v1
-      api_key: os.environ/OPENCODE_GO_API_KEY
-      order: 2
-      reasoning_effort: high
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 16384
-  - model_name: default
-    litellm_params:
-      model: openai/mimo-v2.5
-      api_base: https://opencode.ai/zen/go/v1
-      api_key: os.environ/OPENCODE_GO_API_KEY_1
-      order: 2
-      reasoning_effort: high
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 16384
-  - model_name: default
-    litellm_params:
       model: openai/deepseek/deepseek-v4-flash
       api_base: https://api.commandcode.ai/provider/v1
       api_key: os.environ/COMMAND_CODE_API_KEY
@@ -130,9 +108,29 @@ model_list:
         max_output_tokens: 16384
   - model_name: default
     litellm_params:
+      model: openai/mimo-v2.5
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: os.environ/OPENCODE_GO_API_KEY
+      order: 3
+      reasoning_effort: high
+      model_info:
+        max_input_tokens: 128000
+        max_output_tokens: 16384
+  - model_name: default
+    litellm_params:
+      model: openai/mimo-v2.5
+      api_base: https://opencode.ai/zen/go/v1
+      api_key: os.environ/OPENCODE_GO_API_KEY_1
+      order: 4
+      reasoning_effort: high
+      model_info:
+        max_input_tokens: 128000
+        max_output_tokens: 16384
+  - model_name: default
+    litellm_params:
       model: openrouter/xiaomi/mimo-v2.5
       api_key: os.environ/OPENROUTER_API_KEY
-      order: 3
+      order: 5
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
