@@ -40,18 +40,23 @@ general_settings:
   environment_variables:
     LITELLM_LOG: WARNING
 
-# enable_pre_call_checks=true is required for the `order` field
-# (primary/fallback tier selection) to be respected.  simple-shuffle
-# randomizes endpoint selection within a tier.  The cooldown combo
-# (allowed_fails/cooldown_time) benches a deployment after 3 failures
-# for 60 s, with 5 s between retries.
 router_settings:
+  # Enables pre-flight checks (cooldown status, context limits); mandatory for `order` prioritization.
   enable_pre_call_checks: true
-  num_retries: 3
-  retry_after: 5
-  allowed_fails: 3
-  cooldown_time: 60
+  # Selection algorithm for endpoints within the same order tier (random healthy pick).
   routing_strategy: simple-shuffle
+  # Total request-level retry budget across all endpoints and priority tiers combined.
+  num_retries: 9
+  # Delay (in seconds) to wait before executing the next retry attempt.
+  retry_after: 2
+  # Cumulative failure threshold per endpoint required to bench it into temporary cooldown.
+  allowed_fails: 3
+  # Duration (in seconds) a benched endpoint is excluded from routing before resetting.
+  cooldown_time: 60
+  # Specific HTTP status codes that trigger retries rather than immediately raising errors.
+  retry_on_status_codes: [429, 500, 502, 503, 504, 408]
+  # Per-request HTTP timeout (in seconds) before marking an attempt as failed.
+  timeout: 30
 
 model_list:
   # ---- Ollama models ----
