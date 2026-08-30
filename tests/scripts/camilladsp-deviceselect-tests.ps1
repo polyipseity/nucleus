@@ -61,21 +61,23 @@ function Invoke-Resolve {
     [string]$ConfigYaml,
     [string]$Default = $null,
     [string]$First = $null,
-    [string]$Last = $null
+    [string]$Last = $null,
+    [string[]]$Available = @()
   )
   $cfgFile = New-TemporaryFile | Rename-Item -NewName { $_ -replace '\.tmp$', '.yml' } -PassThru
   Set-Content -Path $cfgFile.FullName -Value $ConfigYaml -NoNewline
   try {
     $scriptBlock = {
-      param([string]$DeviceSelectPath, [string]$ConfigPath, [string]$MockDefault, [string]$MockFirst, [string]$MockLast)
+      param([string]$DeviceSelectPath, [string]$ConfigPath, [string]$MockDefault, [string]$MockFirst, [string]$MockLast, [string[]]$MockAvailable)
       . $DeviceSelectPath
       # Override COM-backed helpers with mocks so no audio stack is required.
       function Get-CamillaDSPDefaultPlaybackDevice { return $MockDefault }
+      function Get-CamillaDSPAvailablePlaybackDevices { return $MockAvailable }
       function Get-CamillaDSPFirstAvailablePlaybackDevice { return $MockFirst }
       function Get-CamillaDSPLastDevice { return $MockLast }
       Resolve-CamillaDSPPlaybackDevice -ConfigPath $ConfigPath
     }
-    return (& $scriptBlock $deviceSelect $cfgFile.FullName $Default $First $Last)
+    return (& $scriptBlock $deviceSelect $cfgFile.FullName $Default $First $Last $Available)
   } finally {
     Remove-Item -Path $cfgFile.FullName -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort cleanup -- temp config may already be gone
   }
@@ -141,19 +143,26 @@ if ($cfg.devices.playback.type -eq 'CoreAudio') {
 # detection yields nothing. This is what the heartbeat compares against so it
 # re-pushes when the system default output device changes.
 function Get-TargetDevice {
-  param([string]$ConfigYaml, [string]$Default = $null, [string]$First = $null, [string]$Last = $null)
+  param(
+    [string]$ConfigYaml,
+    [string]$Default = $null,
+    [string]$First = $null,
+    [string]$Last = $null,
+    [string[]]$Available = @()
+  )
   $cfgFile = New-TemporaryFile | Rename-Item -NewName { $_ -replace '\.tmp$', '.yml' } -PassThru
   Set-Content -Path $cfgFile.FullName -Value $ConfigYaml -NoNewline
   try {
     $scriptBlock = {
-      param([string]$DeviceSelectPath, [string]$ConfigPath, [string]$MockDefault, [string]$MockFirst, [string]$MockLast)
+      param([string]$DeviceSelectPath, [string]$ConfigPath, [string]$MockDefault, [string]$MockFirst, [string]$MockLast, [string[]]$MockAvailable)
       . $DeviceSelectPath
       function Get-CamillaDSPDefaultPlaybackDevice { return $MockDefault }
+      function Get-CamillaDSPAvailablePlaybackDevices { return $MockAvailable }
       function Get-CamillaDSPFirstAvailablePlaybackDevice { return $MockFirst }
       function Get-CamillaDSPLastDevice { return $MockLast }
       Get-CamillaDSPResolvedPlaybackDeviceName -ConfigPath $ConfigPath
     }
-    return (& $scriptBlock $deviceSelect $cfgFile.FullName $Default $First $Last)
+    return (& $scriptBlock $deviceSelect $cfgFile.FullName $Default $First $Last $Available)
   } finally {
     Remove-Item -Path $cfgFile.FullName -Force -ErrorAction SilentlyContinue  # check-suppress:suppression_doc: best-effort cleanup -- temp config may already be gone
   }
@@ -221,7 +230,8 @@ if ($matrixOk) {
 }
 
 # Test 9: last saved default used when no system default available.
-$resolved = Invoke-Resolve -ConfigYaml (New-Config -PlaybackDevice '') -Default '' -First '' -Last 'Saved USB DAC'
+# The saved device must appear in the available list for validation to pass.
+$resolved = Invoke-Resolve -ConfigYaml (New-Config -PlaybackDevice '') -Default '' -First '' -Last 'Saved USB DAC' -Available @('USB Speaker', 'Saved USB DAC')
 $device = Get-PlaybackDevice -Yaml $resolved
 if ($device -eq 'Saved USB DAC') {
   Assert-Pass 'last saved default used when no system default available'
@@ -257,12 +267,23 @@ if ($device -eq 'USB Speaker') {
 }
 
 # Test 13: last saved matches capture AND no first available → null.
-$resolved = Invoke-Resolve -ConfigYaml (New-Config -PlaybackDevice '' -CaptureDevice 'Loopback Audio') -Default '' -First '' -Last 'Loopback Audio'
+$resolved = Invoke-Resolve -ConfigYaml (New-Config -PlaybackDevice '' -CaptureDevice 'Loopback Audio') -Default '' -First '' -Last 'Loopback Audio' -Available @('USB Speaker')
 $device = Get-PlaybackDevice -Yaml $resolved
 if ($null -eq $device -or $device -eq '') {
   Assert-Pass 'last saved matches capture + no first available → null'
 } else {
   Assert-Fail 'last saved capture + no fallback' "expected empty, got '$device'"
+}
+
+# Test 14: last saved device missing from available list → falls through to first available.
+# When the saved device (e.g. unplugged USB DAC) no longer exists, the validation
+# rejects it and falls through to first-available instead of pushing a nonexistent name.
+$resolved = Invoke-Resolve -ConfigYaml (New-Config -PlaybackDevice '') -Default '' -First 'USB Speaker' -Last 'Old USB DAC' -Available @('USB Speaker')
+$device = Get-PlaybackDevice -Yaml $resolved
+if ($device -eq 'USB Speaker') {
+  Assert-Pass 'last saved missing → falls through to first available'
+} else {
+  Assert-Fail 'last saved missing fallback' "expected 'USB Speaker', got '$device'"
 }
 
 Write-Output ''
