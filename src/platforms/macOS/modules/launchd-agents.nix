@@ -235,7 +235,7 @@ in
       ProgramArguments = [ "${logGcUser}/bin/nucleus-log-gc-user" ];
       EnvironmentVariables = {
         NUCLEUS_GC_EXPIRY = config.modules.gc.expiry;
-        NUCLEUS_REPO_ROOT = toString repoRoot;
+        NUCLEUS_REPO_ROOT = "${repoRoot}";
       };
       RunAtLoad = false;
       StartCalendarInterval = [
@@ -443,7 +443,7 @@ in
       StandardErrorPath = "${config.nucleus.logging.logDir}/service-watchdog/stderr.log";
       EnvironmentVariables = {
         NUCLEUS_SERVICES_JSON = import ../../../modules/lib/services-json-path.nix { };
-        NUCLEUS_REPO_ROOT = toString repoRoot;
+        NUCLEUS_REPO_ROOT = "${repoRoot}";
       };
     };
   };
