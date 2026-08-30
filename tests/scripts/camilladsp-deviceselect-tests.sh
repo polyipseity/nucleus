@@ -95,6 +95,8 @@ _MOCK_DEFAULT_RC=0
 _MOCK_FIRST_RC=0
 _MOCK_LAST_DEVICE=""
 _MOCK_LAST_RC=1
+_MOCK_LIST_DEVICES=""
+_MOCK_LIST_RC=0
 
 # Run resolve in a subshell with mocked detection functions.
 # $1 = config file path. Prints resolved config to stdout.
@@ -108,7 +110,9 @@ _run_resolve() {
     _mock_first_rc="$5"
     _mock_last="$6"
     _mock_last_rc="$7"
-    _config_file="$8"
+    _mock_list="$8"
+    _mock_list_rc="$9"
+    _config_file="${10}"
     . "$_lib_script"
     # Override detection functions with mocks (use variables, not positional params).
     camilladsp_detect_default_output() {
@@ -123,11 +127,16 @@ _run_resolve() {
       printf "%s" "$_mock_last"
       return "$_mock_last_rc"
     }
+    camilladsp_list_available_devices() {
+      printf "%s" "$_mock_list"
+      return "$_mock_list_rc"
+    }
     camilladsp_resolve_playback_device "$_config_file"
   ' _ "$DEVICESELECT_SH" \
     "$_MOCK_DEFAULT_OUTPUT" "$_MOCK_DEFAULT_RC" \
     "$_MOCK_FIRST_AVAILABLE" "$_MOCK_FIRST_RC" \
     "$_MOCK_LAST_DEVICE" "$_MOCK_LAST_RC" \
+    "$_MOCK_LIST_DEVICES" "$_MOCK_LIST_RC" \
     "$config_file"
 }
 
@@ -354,14 +363,16 @@ JSON
     _capture="$3"
     . "$_lib_script"
     system_profiler() { printf "%s" "$_json"; }
-    _camilladsp_detect_first_available_macos "$_capture"
+    _camilladsp_list_available_macos "$_capture"
   ' _ "$DEVICESELECT_SH" "$json" "BlackHole 2ch")
   # Case-sensitive ascending: "Banana" (B=66) precedes "apple" (a=97); mic and
-  # capture are excluded. Expecting "Banana" proves case-sensitive ordering.
-  if [ "$result" = "Banana" ]; then
-    assert_pass "macOS JSON fallback excludes input-only and capture, case-sensitive"
+  # capture are excluded. First line is "Banana" — proves case-sensitive ordering.
+  local first_line
+  first_line=$(head -1 <<<"$result")
+  if [ "$first_line" = "Banana" ]; then
+    assert_pass "macOS JSON list-available excludes input-only and capture, case-sensitive"
   else
-    assert_fail "macOS JSON fallback" "expected 'Banana', got '$result'"
+    assert_fail "macOS JSON list-available" "expected 'Banana', got '$first_line'"
   fi
 }
 
@@ -413,8 +424,8 @@ test_last_saved_used_when_no_default() {
   _MOCK_FIRST_AVAILABLE=""
   _MOCK_FIRST_RC=1
   _MOCK_LAST_DEVICE="Saved USB DAC"
-  _MOCK_LAST_RC=0
-  local resolved
+  _MOCK_LAST_RC=0  _MOCK_LIST_DEVICES=$'USB Speaker\nSaved USB DAC'
+  _MOCK_LIST_RC=0  local resolved
   resolved=$(_run_resolve "$cfg")
   local device
   device=$(_extract_playback_device <<<"$resolved")
@@ -437,6 +448,8 @@ test_system_default_wins_over_last_saved() {
   _MOCK_FIRST_RC=1
   _MOCK_LAST_DEVICE="Saved USB DAC"
   _MOCK_LAST_RC=0
+  _MOCK_LIST_DEVICES=""
+  _MOCK_LIST_RC=0
   local resolved
   resolved=$(_run_resolve "$cfg")
   local device
@@ -460,6 +473,8 @@ test_last_saved_rejected_when_matches_capture() {
   _MOCK_FIRST_RC=0
   _MOCK_LAST_DEVICE="Loopback Audio"
   _MOCK_LAST_RC=0
+  _MOCK_LIST_DEVICES="USB Speaker"
+  _MOCK_LIST_RC=0
   local resolved
   resolved=$(_run_resolve "$cfg")
   local device
@@ -506,6 +521,8 @@ test_last_saved_match_capture_no_first_available() {
   _MOCK_FIRST_RC=1
   _MOCK_LAST_DEVICE="Loopback Audio"
   _MOCK_LAST_RC=0
+  _MOCK_LIST_DEVICES=""
+  _MOCK_LIST_RC=0
   local resolved
   resolved=$(_run_resolve "$cfg")
   local device
@@ -518,7 +535,33 @@ test_last_saved_match_capture_no_first_available() {
   fi
 }
 
-# Test 16: skip-decision invariant — a null live device on a running instance
+# Test 16: last saved device missing from available list → falls through to first available.
+# When the saved device (e.g. unplugged USB DAC) no longer exists, the validation
+# rejects it and falls through to first-available instead of pushing a nonexistent name.
+test_last_saved_missing_falls_through() {
+  local cfg
+  cfg="$(_make_config "" "Loopback Audio")"
+  _MOCK_DEFAULT_OUTPUT=""
+  _MOCK_DEFAULT_RC=1
+  _MOCK_FIRST_AVAILABLE="USB Speaker"
+  _MOCK_FIRST_RC=0
+  _MOCK_LAST_DEVICE="Old USB DAC"
+  _MOCK_LAST_RC=0
+  _MOCK_LIST_DEVICES="USB Speaker"
+  _MOCK_LIST_RC=0
+  local resolved
+  resolved=$(_run_resolve "$cfg")
+  local device
+  device=$(_extract_playback_device <<<"$resolved")
+  rm -f "$cfg"
+  if [ "$device" = "USB Speaker" ]; then
+    assert_pass "last saved missing → falls through to first available"
+  else
+    assert_fail "last saved missing fallback" "expected 'USB Speaker', got '$device'"
+  fi
+}
+
+# Test 17: skip-decision invariant — a null live device on a running instance
 # must NEVER be skipped (it must be pushed). This is the regression guard for
 # the broken "skip when Running" logic that let a null device stick forever.
 # The decision now also re-pushes when the live device differs from the target
@@ -657,6 +700,7 @@ test_system_default_wins_over_last_saved
 test_last_saved_rejected_when_matches_capture
 test_no_default_no_last_saved_fallback
 test_last_saved_match_capture_no_first_available
+test_last_saved_missing_falls_through
 
 test_passthrough_nonempty_device
 test_patches_with_default_output

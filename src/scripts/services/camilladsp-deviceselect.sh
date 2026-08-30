@@ -7,15 +7,15 @@
 #     If devices.playback.device is non-null, passes config through unchanged.
 #     If null, resolves the playback device using this priority chain:
 #       1. System default output (via platform APIs)
-      2. Last saved default (from state file, validated against available devices)
-      3. First available device (deterministic sorted-name fallback)
-    The capture device (devices.capture.device) is always excluded from
-    detection — if any candidate matches capture, it is skipped.
-    Writes the patched config to stdout.
-  camilladsp_list_available_devices <capture_device>
-    Enumerates all available playback output devices from platform APIs,
-    excluding the capture device. Returns sorted names, one per line.
-    Used by last-saved validation and first-available fallback.
+#      2. Last saved default (from state file, validated against available devices)
+#      3. First available device (deterministic sorted-name fallback)
+#    The capture device (devices.capture.device) is always excluded from
+#    detection — if any candidate matches capture, it is skipped.
+#    Writes the patched config to stdout.
+#  camilladsp_list_available_devices <capture_device>
+#    Enumerates all available playback output devices from platform APIs,
+#    excluding the capture device. Returns sorted names, one per line.
+#    Used by last-saved validation and first-available fallback.
 #   camilladsp_target_playback_device <config_file>
 #     Returns the playback device name that detection would currently select
 #     for the given config (the device camilladsp_resolve_playback_device would
