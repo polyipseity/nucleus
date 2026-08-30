@@ -7,11 +7,15 @@
 #     If devices.playback.device is non-null, passes config through unchanged.
 #     If null, resolves the playback device using this priority chain:
 #       1. System default output (via platform APIs)
-#       2. Last saved default (from state file, maintained across pushes)
-#       3. First available device (deterministic sorted-name fallback)
-#     The capture device (devices.capture.device) is always excluded from
-#     detection — if any candidate matches capture, it is skipped.
-#     Writes the patched config to stdout.
+      2. Last saved default (from state file, validated against available devices)
+      3. First available device (deterministic sorted-name fallback)
+    The capture device (devices.capture.device) is always excluded from
+    detection — if any candidate matches capture, it is skipped.
+    Writes the patched config to stdout.
+  camilladsp_list_available_devices <capture_device>
+    Enumerates all available playback output devices from platform APIs,
+    excluding the capture device. Returns sorted names, one per line.
+    Used by last-saved validation and first-available fallback.
 #   camilladsp_target_playback_device <config_file>
 #     Returns the playback device name that detection would currently select
 #     for the given config (the device camilladsp_resolve_playback_device would
@@ -126,9 +130,9 @@ camilladsp_detect_default_output() {
 # --- Fallback: first available device (not matching capture_device) ---
 
 # macOS: enumerate output-capable devices (presence of coreaudio_device_output),
-# return the first non-capture one by deterministic case-sensitive ascending name ordering.
+# excluding the capture device. Returns sorted names, one per line.
 # Device flags are flat top-level keys on real system_profiler output.
-_camilladsp_detect_first_available_macos() {
+_camilladsp_list_available_macos() {
   local capture_device="$1"
   local output
   output=$(system_profiler SPAudioDataType -json 2>/dev/null) || return 1
@@ -151,12 +155,12 @@ PYEOF
   local _rc=$?
   rm -f "$_tmpfile"
   [ "${#names[@]}" -eq 0 ] && return $_rc
-  printf '%s\n' "${names[@]}" | sort | head -1
+  printf '%s\n' "${names[@]}" | sort
 }
 
-# Linux: enumerate sinks via wpctl/pactl/aplay, return the first non-capture
-# one by deterministic case-insensitive ascending name ordering.
-_camilladsp_detect_first_available_linux() {
+# Linux: enumerate sinks via wpctl/pactl/aplay, excluding the capture device.
+# Returns sorted names, one per line.
+_camilladsp_list_available_linux() {
   local capture_device="$1"
   local -a candidates=()
 
@@ -192,16 +196,26 @@ _camilladsp_detect_first_available_linux() {
   fi
 
   [ "${#candidates[@]}" -eq 0 ] && return 1
-  printf '%s\n' "${candidates[@]}" | sort | head -1
+  printf '%s\n' "${candidates[@]}" | sort
 }
 
-camilladsp_detect_first_available() {
+# List all available playback output devices (excluding capture_device).
+# Returns sorted names, one per line. Used by last-saved validation and
+# first-available fallback.
+camilladsp_list_available_devices() {
   local capture_device="$1"
   case "$(uname -s)" in
-  Darwin) _camilladsp_detect_first_available_macos "$capture_device" ;;
-  Linux) _camilladsp_detect_first_available_linux "$capture_device" ;;
+  Darwin) _camilladsp_list_available_macos "$capture_device" ;;
+  Linux) _camilladsp_list_available_linux "$capture_device" ;;
   *) return 1 ;;
   esac
+}
+
+# Return the first available playback device (not matching capture_device).
+# Deterministic sorted-name fallback: delegates to camilladsp_list_available_devices.
+camilladsp_detect_first_available() {
+  local capture_device="$1"
+  camilladsp_list_available_devices "$capture_device" | head -1
 }
 
 # --- Last saved default state file ---
@@ -278,12 +292,21 @@ PYEOF
     detected_device=""
   fi
 
-  # Fallback 1: last saved default (maintains previously used device).
+  # Fallback 1: last saved default (validates device still exists).
   if [ -z "$detected_device" ]; then
     local saved_device
     if saved_device=$(camilladsp_load_last_device 2>/dev/null); then
       if [ -n "$saved_device" ] && [ "$saved_device" != "$capture_device" ]; then
-        detected_device="$saved_device"
+        # Verify the saved device still exists on the system.
+        local _all_devices
+        if _all_devices=$(camilladsp_list_available_devices "$capture_device" 2>/dev/null); then
+          if printf '%s\n' "$_all_devices" | grep -qxF "$saved_device"; then
+            detected_device="$saved_device"
+          fi
+        else
+          # Enumeration failed — accept saved device as best effort.
+          detected_device="$saved_device"
+        fi
       fi
     fi
   fi
