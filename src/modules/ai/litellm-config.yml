@@ -46,7 +46,7 @@ router_settings:
   # Selection algorithm for endpoints within the same order tier (random healthy pick).
   routing_strategy: simple-shuffle
   # Total request-level retry budget across all endpoints and priority tiers combined.
-  num_retries: 5
+  num_retries: 7
   # Delay (in seconds) to wait before executing the next retry attempt.
   retry_after: 2
   # Cumulative failure threshold per endpoint required to bench it into temporary cooldown.
