@@ -49,6 +49,13 @@
       "description": "cargo-binstall crate versions. Crate name → version string or VCS hash pin.",
       "type": "object"
     },
+    "opencode": {
+      "additionalProperties": {
+        "$ref": "#/definitions/versionOrHash"
+      },
+      "description": "OpenCode plugin versions. Plugin name → version string or VCS hash pin.",
+      "type": "object"
+    },
     "pwsh": {
       "additionalProperties": {
         "type": "string"
@@ -274,6 +281,7 @@
   "required": [
     "bun",
     "cargo-binstall",
+    "opencode",
     "pwsh",
     "rustup",
     "scoop",
