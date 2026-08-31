@@ -916,7 +916,7 @@ let
     assert'
       (
         (lib.hasInfix "pkgs.android-tools" flake_nix_text)
-        && (lib.hasInfix '"android-tools"' core_nix_text)
+        && (lib.hasInfix ''"android-tools"'' core_nix_text)
         && (lib.hasInfix "Google.PlatformTools" windows_system_packages_dsc_text)
       )
       "adb/fastboot must be provisioned on POSIX (core.nix + nucleus-vm flake) and Windows (Google.PlatformTools winget)";
