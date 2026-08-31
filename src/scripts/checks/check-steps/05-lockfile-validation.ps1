@@ -55,10 +55,16 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
         }
       }
     }
+    # Cursor and VS Code are both VS Code–based editors; identical extension IDs
+    # across these two sections are expected and excluded from overlap checks.
+    $vscodeBased = @('suggestions.cursor', 'suggestions.vscode')
     foreach ($entry in $pkgToSections.GetEnumerator()) {
       if ($entry.Value.Count -gt 1 -and $entry.Key -notin $lfOverlapExceptions) {
-        Write-ErrorMessage "package '$($entry.Key)' appears in both $($entry.Value -join ', ')"
-        $lfOverlapErrors++
+        $nonVscode = $entry.Value | Where-Object { $_ -notin $vscodeBased }
+        if ($nonVscode.Count -gt 0) {
+          Write-ErrorMessage "package '$($entry.Key)' appears in both $($entry.Value -join ', ')"
+          $lfOverlapErrors++
+        }
       }
     }
     # Self-pruning: check if lfOverlapExceptions are still needed (A4)
@@ -208,6 +214,24 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
     }
   } else {
     Write-Message "warning: suggestions.opencode: empty section (not yet populated)"
+  }
+
+  # superpowers: must be non-empty (pinned root section)
+  if (-not $lf.ContainsKey('superpowers') -or $lf.superpowers.Count -eq 0) {
+    Write-ErrorMessage "superpowers: empty or missing section"
+    $lfErrors++
+  } else {
+    foreach ($entry in $lf.superpowers.GetEnumerator()) {
+      if ($entry.Value -is [hashtable]) {
+        if (-not $entry.Value.ContainsKey('rev')) {
+          Write-ErrorMessage "superpowers.$($entry.Key): pinned entry missing rev"
+          $lfErrors++
+        }
+      } elseif ([string]::IsNullOrEmpty($entry.Value) -or $entry.Value -eq 'CHANGEME') {
+        Write-ErrorMessage "superpowers.$($entry.Key): placeholder version ($($entry.Value))"
+        $lfErrors++
+      }
+    }
   }
 
   # ollama: must have at least one profile with models (lives under suggestions — warn-only per schema)

@@ -41,6 +41,8 @@ run_lockfile_validation() {
   else
     local _lf_overlap_exceptions='["astral-sh.ty"]'
     local _lf_overlaps
+    # Note: cursor and vscode are both VS Code–based editors; identical
+    # extension IDs across these two sections are expected and excluded.
     _lf_overlaps=$(jq -r --argjson exceptions "$_lf_overlap_exceptions" '
       [
         (to_entries[] | select(.key != "suggestions" and .key != "ollama" and (.value | type == "object")) | .key as $s | (.value | keys)[] | {s: $s, p: .}),
@@ -50,6 +52,7 @@ run_lockfile_validation() {
       ]
       | group_by(.p)
       | map(select(length > 1))
+      | map(select(map(.s) | map(select(. != "suggestions.cursor" and . != "suggestions.vscode")) | length > 0))
       | .[][]
       | select(.p as $p | ($exceptions | index($p)) | not)
       | "ERROR: package \"\(.p)\" appears in both \(.s)"' "$_lfpath" 2>/dev/null)
@@ -184,6 +187,20 @@ run_lockfile_validation() {
       _placeholders=$(jq -r '.suggestions.opencode | to_entries[] | .value | if type == "object" then empty else select(. == "" or . == "CHANGEME" or . == "1.0.0") end | .+' "$_lfpath" 2>/dev/null)
       if [ -n "$_placeholders" ]; then
         error "suggestions.opencode has placeholder versions for:"
+        error "  ${_placeholders//$'\n'/$'\n'  }"
+        _lf_section_errors=$((_lf_section_errors + 1))
+      fi
+    fi
+
+    # superpowers: must be non-empty (pinned root section)
+    if ! jq -e '.superpowers | type == "object" and length > 0' "$_lfpath" >/dev/null 2>&1; then
+      error "superpowers: empty or missing section"
+      _lf_section_errors=$((_lf_section_errors + 1))
+    else
+      local _placeholders
+      _placeholders=$(jq -r '.superpowers | to_entries[] | .value | if type == "object" then .rev // empty else select(. == "" or . == "CHANGEME" or . == "1.0.0") end | .+' "$_lfpath" 2>/dev/null)
+      if [ -n "$_placeholders" ]; then
+        error "superpowers has placeholder versions for:"
         error "  ${_placeholders//$'\n'/$'\n'  }"
         _lf_section_errors=$((_lf_section_errors + 1))
       fi
