@@ -26,6 +26,13 @@
 - Caddy local-CA trust runs automatically. If missing: `sudo caddy trust --address 127.0.0.1:2019`.
 - Nix commands may wait on a `nixpkgs-weekly/0.1` fetch from flakehub ("waiting for another Nix process" / "unpacking" lines). Machine-level config (global registry maps `nixpkgs` to flakehub; `/etc/nix/nix.conf` sets `extra-nix-path`), not `src/flake.lock`. One-time cold-cache cost; later runs are instant.
 
+## Superpowers (Cursor)
+
+After apply, install superpowers for Cursor:
+
+1. Open Cursor Agent chat
+2. Run: `/add-plugin superpowers`
+
 ## command shortcuts
 
 - `-g`, `-ga`, `-gb`, `-gc`, `-gca`, `-gcl`, `-gco`, `-gd`, `-gf`, `-gff`, `-gl`, `-gp`, `-gpl`, `-gplf`, `-gs`, `-gst`, `-gsw` — git commands

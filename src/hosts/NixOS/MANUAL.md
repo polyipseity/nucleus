@@ -14,6 +14,13 @@
 - **LiteLLM recovery**: if `nucleus-svc litellm` is active but every `default` request fails with HTTP 429/500 (`Missing credentials` / `No deployments available`), the daemon was built with no API-key pairs — typically because `src/modules/ai/key-catalog.generated.nix` is out of sync with decrypted SOPS secrets. Confirm with `systemctl cat litellm.service | grep ExecStart` — if no `KEYFILE:ENVVAR` pairs, run `nucleus-apply` to regenerate the catalog, then `nucleus-svc restart litellm`. The build-time assertion in `ai.nix` fails eval fast if the catalog declares keys but none resolve.
 - **WhatsApp**: no Linux client exists. Use WhatsApp Web in the browser; the NixOS `apps.json` entry is intentionally `omitted`.
 
+## Superpowers (Cursor)
+
+After apply, install superpowers for Cursor:
+
+1. Open Cursor Agent chat
+2. Run: `/add-plugin superpowers`
+
 ## command shortcuts
 
 - `-g`, `-ga`, `-gb`, `-gc`, `-gca`, `-gcl`, `-gco`, `-gd`, `-gf`, `-gff`, `-gl`, `-gp`, `-gpl`, `-gplf`, `-gs`, `-gst`, `-gsw` — git commands
