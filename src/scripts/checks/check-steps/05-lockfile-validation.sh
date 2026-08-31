@@ -45,6 +45,7 @@ run_lockfile_validation() {
       [
         (to_entries[] | select(.key != "suggestions" and .key != "ollama" and (.value | type == "object")) | .key as $s | (.value | keys)[] | {s: $s, p: .}),
         (.suggestions.homebrew.masApps // {} | keys[] | {s: "suggestions.homebrew.masApps", p: .}),
+        (.suggestions.cursor // {} | keys[] | {s: "suggestions.cursor", p: .}),
         (.suggestions.vscode // {} | keys[] | {s: "suggestions.vscode", p: .})
       ]
       | group_by(.p)
@@ -138,6 +139,22 @@ run_lockfile_validation() {
     if ! jq -e '.suggestions.homebrew | type == "object" and length > 0' "$_lfpath" >/dev/null 2>&1; then
       error "suggestions.homebrew: empty or missing section"
       _lf_section_errors=$((_lf_section_errors + 1))
+    fi
+
+    # cursor: must be non-null; warn if empty, validate non-placeholder if non-empty (under suggestions)
+    if ! jq -e '.suggestions.cursor | type == "object"' "$_lfpath" >/dev/null 2>&1; then
+      error "suggestions.cursor: missing or invalid section"
+      _lf_section_errors=$((_lf_section_errors + 1))
+    elif jq '.suggestions.cursor | length == 0' "$_lfpath" >/dev/null 2>&1; then
+      say "suggestions.cursor: empty section (not yet populated)"
+    else
+      local _placeholders
+      _placeholders=$(jq -r '.suggestions.cursor | to_entries[] | select(.value == "" or .value == "CHANGEME" or .value == "1.0.0") | .key' "$_lfpath" 2>/dev/null)
+      if [ -n "$_placeholders" ]; then
+        error "suggestions.cursor has placeholder versions for:"
+        error "  ${_placeholders//$'\n'/$'\n'  }"
+        _lf_section_errors=$((_lf_section_errors + 1))
+      fi
     fi
 
     # vscode: must be non-null; warn if empty, validate non-placeholder if non-empty (under suggestions)

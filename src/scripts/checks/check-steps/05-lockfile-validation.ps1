@@ -155,6 +155,21 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
     Write-Message "warning: suggestions.vscode: empty section (not yet populated)"
   }
 
+  # cursor: warn if empty (suggestions — non-authoritative, warn-only)
+  if (-not $lf.ContainsKey('suggestions') -or -not $lf.suggestions.ContainsKey('cursor')) {
+    Write-ErrorMessage "suggestions.cursor: missing section"
+    $lfErrors++
+  } elseif ($lf.suggestions.cursor.Count -gt 0) {
+    foreach ($entry in $lf.suggestions.cursor.GetEnumerator()) {
+      if ([string]::IsNullOrEmpty($entry.Value) -or $entry.Value -eq 'CHANGEME') {
+        Write-ErrorMessage "suggestions.cursor.$($entry.Key): placeholder version ($($entry.Value))"
+        $lfErrors++
+      }
+    }
+  } else {
+    Write-Message "warning: suggestions.cursor: empty section (not yet populated)"
+  }
+
   # homebrew: must be non-empty (lives under suggestions — warn-only per schema)
   if (-not $lf.ContainsKey('suggestions') -or -not $lf.suggestions.ContainsKey('homebrew') -or $lf.suggestions.homebrew.Count -eq 0) {
     Write-ErrorMessage "suggestions.homebrew: empty or missing section"
