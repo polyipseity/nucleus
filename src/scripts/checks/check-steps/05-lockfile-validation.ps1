@@ -57,7 +57,8 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
     }
     # Cursor and VS Code are both VS Code–based editors; identical extension IDs
     # across these two sections are expected and excluded from overlap checks.
-    $vscodeBased = @('suggestions.cursor', 'suggestions.vscode')
+    # Root cursor/vscode sections (editor plugins) also overlap with suggestions pairs.
+    $vscodeBased = @('suggestions.cursor', 'suggestions.vscode', 'cursor', 'vscode')
     foreach ($entry in $pkgToSections.GetEnumerator()) {
       if ($entry.Value.Count -gt 1 -and $entry.Key -notin $lfOverlapExceptions) {
         $nonVscode = $entry.Value | Where-Object { $_ -notin $vscodeBased }
@@ -216,20 +217,20 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
     Write-Message "warning: suggestions.opencode: empty section (not yet populated)"
   }
 
-  # superpowers: must be non-empty (pinned root section)
-  if (-not $lf.ContainsKey('superpowers') -or $lf.superpowers.Count -eq 0) {
-    Write-ErrorMessage "superpowers: empty or missing section"
-    $lfErrors++
-  } else {
-    foreach ($entry in $lf.superpowers.GetEnumerator()) {
-      if ($entry.Value -is [hashtable]) {
-        if (-not $entry.Value.ContainsKey('rev')) {
-          Write-ErrorMessage "superpowers.$($entry.Key): pinned entry missing rev"
-          $lfErrors++
+  # cursor and vscode: editor plugin sections (pinned root sections)
+  foreach ($editorSection in @('cursor', 'vscode')) {
+    if (-not $lf.ContainsKey($editorSection) -or $lf[$editorSection].Count -eq 0) {
+      Write-NucleusWarning "${editorSection}: empty or missing section"
+    } else {
+      foreach ($entry in $lf[$editorSection].GetEnumerator()) {
+        if ($entry.Value -is [hashtable]) {
+          if (-not $entry.Value.ContainsKey('rev')) {
+            Write-ErrorMessage "${editorSection}.$($entry.Key): pinned entry missing rev"
+            $lfErrors++
+          }
+        } elseif ([string]::IsNullOrEmpty($entry.Value) -or $entry.Value -eq 'CHANGEME') {
+          Write-ErrorMessage "${editorSection}.$($entry.Key): placeholder version ($($entry.Value))"
         }
-      } elseif ([string]::IsNullOrEmpty($entry.Value) -or $entry.Value -eq 'CHANGEME') {
-        Write-ErrorMessage "superpowers.$($entry.Key): placeholder version ($($entry.Value))"
-        $lfErrors++
       }
     }
   }

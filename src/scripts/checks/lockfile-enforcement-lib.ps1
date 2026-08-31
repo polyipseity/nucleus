@@ -128,11 +128,16 @@ function Invoke-LockfileEnforcement {
     & $InfoFn "source-builds: VCS/rev-pinned — not version-verifiable, skipping enforcement"
   }
 
-  # --- superpowers (local plugin clone — filesystem-based enforcement) ---
-  if ($Lockfile.ContainsKey('superpowers') -and $Lockfile.superpowers.ContainsKey('superpowers')) {
-    $expectedRev = $Lockfile.superpowers.superpowers.rev
-    $pluginDir = Join-Path $env:USERPROFILE '.local\share
-ucleus\plugins\superpowers'
+  # --- cursor/vscode superpowers (local plugin clone — filesystem-based enforcement) ---
+  # Read from cursor or vscode root sections; both reference the same plugin directory.
+  $expectedRev = $null
+  if ($Lockfile.ContainsKey('cursor') -and $Lockfile.cursor.ContainsKey('superpowers')) {
+    $expectedRev = $Lockfile.cursor.superpowers.rev
+  } elseif ($Lockfile.ContainsKey('vscode') -and $Lockfile.vscode.ContainsKey('superpowers')) {
+    $expectedRev = $Lockfile.vscode.superpowers.rev
+  }
+  if ($expectedRev) {
+    $pluginDir = Join-Path $env:USERPROFILE '.local\share\nucleus\plugins\superpowers'
     if (Test-Path $pluginDir) {
       $actualRev = & git -C $pluginDir rev-parse HEAD 2>$null  # check-suppress:suppression_doc: git may fail if the directory is not a git repo; empty output triggers the error path
       if ([string]::IsNullOrWhiteSpace($actualRev)) {

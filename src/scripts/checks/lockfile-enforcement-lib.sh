@@ -217,14 +217,14 @@ $_subs
 EOF
 }
 
-# Compare the local superpowers plugin clone against the lockfile `superpowers` section.
-# The root section is enforced (hard-fail on drift).
+# Compare the local superpowers plugin clone against the lockfile editor plugin sections.
+# Root cursor/vscode sections are enforced (hard-fail on drift).
 _lfe_check_superpowers() {
   local _lf="$1" _jq="$2"
   local _plugin_dir="$HOME/.local/share/nucleus/plugins/superpowers"
   # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
   local _expected_rev
-  _expected_rev="$(printf '%s' "$_lf" | "$_jq" -r '(.superpowers // {}).superpowers.rev // empty' 2>/dev/null)" || true
+  _expected_rev="$(printf '%s' "$_lf" | "$_jq" -r '(.cursor // {}).superpowers.rev // (.vscode // {}).superpowers.rev // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
   [ -z "$_expected_rev" ] && {
     say -l superpowers "no superpowers rev in lockfile; skipping"
     return 0

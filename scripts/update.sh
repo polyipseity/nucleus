@@ -206,7 +206,7 @@ EOF
 
   # Canonical section names (alphabetical). cargo aliases cargo-binstall; the
   # legacy bare tokens nixos-iso / tart-images normalize to vm-setup children.
-  _VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,superpowers,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows"
+  _VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,cursor,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,vscode,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows"
 
   # Parse flags (comma-separated, defaults to all)
   SECTIONS=""
@@ -280,7 +280,7 @@ EOF
   if [ -n "$SECTIONS" ]; then
     IFS=',' read -ra _tokens <<<"$SECTIONS"
     for _tok in "${_tokens[@]}"; do
-      if [[ ",source-builds,superpowers,suggestions.homebrew.masApps,suggestions.opencode,suggestions.vm-setup.windows,version," == *",$_tok,"* ]]; then
+      if [[ ",source-builds,cursor,vscode,suggestions.homebrew.masApps,suggestions.opencode,suggestions.vm-setup.windows,version," == *",$_tok,"* ]]; then
         warn "section '$_tok' has no updater — kept manual"
       fi
     done

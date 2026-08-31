@@ -52,7 +52,7 @@ run_lockfile_validation() {
       ]
       | group_by(.p)
       | map(select(length > 1))
-      | map(select(map(.s) | map(select(. != "suggestions.cursor" and . != "suggestions.vscode")) | length > 0))
+      | map(select(map(.s) | map(select(. != "suggestions.cursor" and . != "suggestions.vscode" and . != "cursor" and . != "vscode")) | length > 0))
       | .[][]
       | select(.p as $p | ($exceptions | index($p)) | not)
       | "ERROR: package \"\(.p)\" appears in both \(.s)"' "$_lfpath" 2>/dev/null)
@@ -192,19 +192,20 @@ run_lockfile_validation() {
       fi
     fi
 
-    # superpowers: must be non-empty (pinned root section)
-    if ! jq -e '.superpowers | type == "object" and length > 0' "$_lfpath" >/dev/null 2>&1; then
-      error "superpowers: empty or missing section"
-      _lf_section_errors=$((_lf_section_errors + 1))
-    else
-      local _placeholders
-      _placeholders=$(jq -r '.superpowers | to_entries[] | .value | if type == "object" then .rev // empty else select(. == "" or . == "CHANGEME" or . == "1.0.0") end | .+' "$_lfpath" 2>/dev/null)
-      if [ -n "$_placeholders" ]; then
-        error "superpowers has placeholder versions for:"
-        error "  ${_placeholders//$'\n'/$'\n'  }"
-        _lf_section_errors=$((_lf_section_errors + 1))
+    # cursor and vscode: editor plugin sections (pinned root sections)
+    for _section in cursor vscode; do
+      if ! jq -e ".${_section} | type == \"object\" and length > 0" "$_lfpath" >/dev/null 2>&1; then
+        warn "${_section}: empty or missing section"
+      else
+        local _placeholders
+        _placeholders=$(jq -r ".${_section} | to_entries[] | .value | if type == \"object\" then .rev // empty else select(. == \"\" or . == \"CHANGEME\" or . == \"1.0.0\") end | .+" "$_lfpath" 2>/dev/null)
+        if [ -n "$_placeholders" ]; then
+          error "${_section} has placeholder versions for:"
+          error "  ${_placeholders//$'\n'/$'\n  '}"
+          _lf_section_errors=$((_lf_section_errors + 1))
+        fi
       fi
-    fi
+    done
 
     # ollama: must have at least one profile with models (under suggestions)
     if ! jq -e '.suggestions.ollama | type == "object" and length > 0' "$_lfpath" >/dev/null 2>&1; then

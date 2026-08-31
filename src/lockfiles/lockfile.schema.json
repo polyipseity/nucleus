@@ -77,11 +77,18 @@
       "description": "Windows source-built package VCS pins. Package name → VCS hash pin with source URL and version.",
       "type": "object"
     },
-    "superpowers": {
+    "cursor": {
       "additionalProperties": {
         "$ref": "#/definitions/versionOrHash"
       },
-      "description": "Pinned superpowers plugin versions for VS Code / Cursor (filesystem-enforced)",
+      "description": "Deterministic pinned versions for Cursor editor plugins. Plugin name → VCS hash pin.",
+      "type": "object"
+    },
+    "vscode": {
+      "additionalProperties": {
+        "$ref": "#/definitions/versionOrHash"
+      },
+      "description": "Deterministic pinned versions for VS Code editor plugins. Plugin name → VCS hash pin.",
       "type": "object"
     },
     "suggestions": {
@@ -295,15 +302,16 @@
   "required": [
     "bun",
     "cargo-binstall",
+    "cursor",
     "pwsh",
     "rustup",
     "scoop",
     "source-builds",
-    "superpowers",
     "updated",
     "uv",
     "version",
     "vm-setup",
+    "vscode",
     "winget"
   ],
   "title": "nucleus lockfile",
