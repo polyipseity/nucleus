@@ -49,13 +49,6 @@
       "description": "cargo-binstall crate versions. Crate name → version string or VCS hash pin.",
       "type": "object"
     },
-    "opencode": {
-      "additionalProperties": {
-        "$ref": "#/definitions/versionOrHash"
-      },
-      "description": "OpenCode plugin versions. Plugin name → version string or VCS hash pin.",
-      "type": "object"
-    },
     "pwsh": {
       "additionalProperties": {
         "type": "string"
@@ -128,6 +121,13 @@
             "type": "array"
           },
           "description": "Ollama model pins per host. Digest is warn-only (model pull by tag).",
+          "type": "object"
+        },
+        "opencode": {
+          "additionalProperties": {
+            "$ref": "#/definitions/versionOrHash"
+          },
+          "description": "OpenCode plugin versions (warn-only). Plugin name → version string or VCS hash pin.",
           "type": "object"
         },
         "vscode": {
@@ -281,7 +281,6 @@
   "required": [
     "bun",
     "cargo-binstall",
-    "opencode",
     "pwsh",
     "rustup",
     "scoop",
