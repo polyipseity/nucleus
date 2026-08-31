@@ -14,7 +14,7 @@
   Absolute path to the nucleus repository checkout root.
 
 .PARAMETER Enabled
-  True ensures symlinks exist; false removes managed symlinks (leaves
+  True creates symlinks; false removes managed symlinks (leaves
   fetched directories intact).
 
 .NOTES

@@ -6,8 +6,8 @@ function Invoke-CamillaDSPSetup {
   .DESCRIPTION
     Downloads the CamillaDSP prebuilt binary from GitHub releases if not
     installed or if the installed version differs from the lockfile pin.
-    Extracts camilladsp.exe to %USERPROFILE%\.local\bin\ and ensures the
-    directory is on PATH.
+    Extracts camilladsp.exe to %USERPROFILE%\.local\bin\ and adds the
+    directory to PATH.
 
     CamillaDSP is not available in WinGet, Scoop, or cargo-binstall, so a
     direct GitHub release download is used instead.

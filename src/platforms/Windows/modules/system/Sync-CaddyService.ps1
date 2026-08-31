@@ -29,7 +29,7 @@ function Sync-CaddyService {
     Converges the nucleus-caddy Windows service for local HTTPS ingress.
 
   .DESCRIPTION
-    Ensures the `nucleus-caddy` Windows service exists, runs at boot, and serves
+    Creates or updates the `nucleus-caddy` Windows service to run at boot and serve
     HTTPS virtual hosts for all services with HTTPS endpoints in services.json.
 
     The service uses loopback bindings only (127.0.0.1, ::1) and tls internal,

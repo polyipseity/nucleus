@@ -18,7 +18,7 @@ function Sync-OpenSSHServer {
     Converges OpenSSH Server startup, auth policy, and firewall access.
 
   .DESCRIPTION
-    Ensures OpenSSH Server is enabled for remote administration and aligns auth
+    Enables OpenSSH Server for remote administration and aligns auth
     posture with key-focused remote access:
       - Service startup type: Automatic
       - Service state: Running
@@ -34,7 +34,7 @@ function Sync-OpenSSHServer {
     pointed at the materialized path so the authorized key follows the secret
     management lifecycle without duplication.
 
-    Also ensures the built-in "OpenSSH-Server-In-TCP" firewall rule is enabled.
+    Also enables the built-in "OpenSSH-Server-In-TCP" firewall rule.
 
     When disabled, the function reverses managed state by:
       - Removing managed sshd_config keys

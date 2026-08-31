@@ -9,7 +9,7 @@ function Sync-ShellProfile {
       - CurrentUserAllHosts profile
 
     Managed content is read from the shared cross-platform profile
-    src/scripts/shell/profile.ps1 (single source of truth; also embedded by
+    src/scripts/shell/profile.ps1 (canonical source; also embedded by
     src/modules/pwsh.nix on POSIX hosts) and substituted into the managed
     block, intentionally mirroring key POSIX shell workflow behavior:
       - direnv integration (if direnv is present)

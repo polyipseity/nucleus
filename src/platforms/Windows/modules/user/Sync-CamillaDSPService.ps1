@@ -55,7 +55,7 @@ function Sync-CamillaDSPService {
     return
   }
 
-  # Read port from services.json (single source of truth).
+  # Read port from services.json (canonical source).
   $repoRoot = Resolve-Path "$PSScriptRoot\..\..\..\..\.."
   # check-suppress:suppression_doc: probe -- services.json may not exist yet on first provision; fallback to default port
   $svc = Get-Content -Raw (Join-Path $repoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json

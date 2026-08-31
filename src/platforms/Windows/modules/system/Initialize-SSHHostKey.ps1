@@ -4,7 +4,7 @@
 
 .DESCRIPTION
   Mirrors generate_ssh_host_key_if_needed in src/scripts/apply.sh.
-  Ensures the Windows SSH host Ed25519 key exists before
+  Verify the Windows SSH host Ed25519 key exists before
   register-hostagekey.ps1 tries to derive the machine age public key from
   the corresponding .pub file.  On a fresh machine the key is absent until the
   OpenSSH Server Windows service first starts; this module starts the service
@@ -21,7 +21,7 @@
 function Initialize-SSHHostKey {
   <#
   .SYNOPSIS
-    Ensures the Windows SSH host Ed25519 key exists, generating it if absent.
+    Verify the Windows SSH host Ed25519 key exists, generating it if absent.
 
   .DESCRIPTION
     Checks whether the SSH host Ed25519 private key exists and returns

@@ -4,7 +4,7 @@ function Invoke-RustupSetup {
     Idempotently converges the declarative rustup toolchain set (install + zap).
 
   .DESCRIPTION
-    Ensures only the declared set of Rust toolchain channels is installed.
+    Install only the declared set of Rust toolchain channels.
     On each apply it queries `rustup toolchain list` for the actually installed
     toolchains, removes any whose channel prefix is not in the desired list
     (zap-style), and installs any desired channel not currently present.

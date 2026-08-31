@@ -3,7 +3,7 @@
   Trust Caddy local CA for managed localhost HTTPS ingress.
 
 .DESCRIPTION
-  Ensures the local machine trusts certificates issued by Caddy's internal PKI
+  Make the local machine trust certificates issued by Caddy's internal PKI
   authority served by the admin endpoint (127.0.0.1:2019). This trust is shared
   across any managed localhost reverse proxies using `tls internal`, not just
   Jellyfin.

@@ -4,7 +4,7 @@ function Sync-DevRepoCatalog {
     Provision development repositories in ~/dev on Windows.
 
   .DESCRIPTION
-    Ensures that ~/dev contains repositories specified in the -Repositories
+    Populates ~/dev with repositories specified in the -Repositories
     parameter (which comes from the centralized user registry).
 
     Each repository object can specify either a symlink or a Git URL:

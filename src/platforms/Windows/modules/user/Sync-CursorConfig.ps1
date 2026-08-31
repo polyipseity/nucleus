@@ -3,7 +3,7 @@
   Bridge %USERPROFILE%\.cursor to shared agents assets and Cursor-native config.
 
 .DESCRIPTION
-  Ensures %USERPROFILE%\.cursor is a real directory, then:
+  Makes sure %USERPROFILE%\.cursor is a real directory, then:
     - folder symlink skills\ -> %USERPROFILE%\.agents\skills\
     - per-file symlinks rules\*.mdc -> instructions\*.instructions.md
     - per-file symlinks agents\*.md -> agents\*.agent.md

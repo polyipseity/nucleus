@@ -19,8 +19,8 @@ function Sync-WindowsRDP {
     Converges Windows Remote Desktop (RDP) service state and firewall access.
 
   .DESCRIPTION
-    Ensures the Windows built-in RDP server (TermService) is running and the
-    firewall rule permits inbound connections on TCP 3389, completing the
+    Starts the Windows built-in RDP server (TermService) and
+    the firewall rule permits inbound connections on TCP 3389, completing the
     three-protocol remote-desktop baseline alongside Chrome Remote Desktop and
     Parsec:
       - Service startup type: Automatic

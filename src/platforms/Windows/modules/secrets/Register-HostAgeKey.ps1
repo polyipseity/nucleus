@@ -10,7 +10,7 @@
 
     ConvertFrom-SshEd25519PublicKeyToAgePubKey is provided by
     convert-sshpublickeytoage.ps1, which apply.ps1 dot-sources before this file
-    (alphabetical order ensures 'c' < 'r').
+    (alphabetical order so 'c' < 'r').
 
 .NOTES
     Environment variables: (none)
@@ -125,7 +125,7 @@ function Register-HostAgeKey {
 
   # Insert the new age key line immediately before the marker comment that
   # separates machine recipients from the personal SSH backup key.  The marker
-  # ensures new machine keys are always grouped above the backup entry.
+  # so new machine keys are always grouped above the backup entry.
   $marker = "    # -- machine keys end; personal SSH backup key below --"
   $newKeyLine = "    - $agePub"
   if (-not ($rawContent -like "*$marker*")) {

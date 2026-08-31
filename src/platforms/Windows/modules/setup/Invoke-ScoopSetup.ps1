@@ -4,7 +4,7 @@ function Invoke-ScoopSetup {
     Idempotently converges the declarative Scoop app set (install + prune).
 
   .DESCRIPTION
-    Ensures the 'extras' and 'main' Scoop buckets are registered, then
+    Register the 'extras' and 'main' Scoop buckets, then
     reads the Scoop apps directory for the actually installed set and removes
     anything not in the desired list (zap-style), then installs any desired
     apps that are missing at versions pinned in the repository lockfile.

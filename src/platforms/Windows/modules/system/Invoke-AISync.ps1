@@ -11,7 +11,7 @@
     1. Pull any model in the manifest that is not already installed.
        (Skipped when -GcOnly is specified.)
     2. Remove any locally installed model absent from the manifest.
-       The manifest is the single source of truth; orphaned models are
+       The manifest is the canonical registry; orphaned models are
        removed to reclaim disk space.
 
   The function is a no-op when the ollama binary is absent or the Ollama
@@ -227,7 +227,7 @@ function Invoke-AISync {
   }
 
   # Remove locally installed models absent from the manifest.
-  # The manifest is the single source of truth; any model not listed here
+  # The manifest is the canonical registry; any model not listed here
   # is considered orphaned and is removed to reclaim disk space.
   foreach ($model in $installedModels) {
     if ($desiredModels -contains $model) {

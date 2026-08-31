@@ -4,8 +4,8 @@ function Invoke-PowerShellModuleSetup {
     Idempotently installs PowerShell modules pinned in the repository lockfile.
 
   .DESCRIPTION
-    Reads the `pwsh` section of lockfile.json and ensures each listed module is
-    installed at the pinned version. Modules already at the correct version are
+    Reads the `pwsh` section of lockfile.json and installs each listed module at
+    the pinned version. Modules already at the correct version are
     skipped. Missing or mismatched modules are installed or updated.
 
     This is additive-only: modules present but not in the lockfile are left

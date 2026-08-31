@@ -4,7 +4,7 @@ function Initialize-DevDirectory {
   Create %USERPROFILE%\dev if absent.
 
 .DESCRIPTION
-  Ensures the managed dev root directory exists under the current user's home.
+  Create the managed dev root directory under the current user's home.
   Mirrors the MacBook ensure-dev-directory (macos.nix) and NixOS
   ensure-dev-directory (linux.nix) activations, which both create ~/dev
   unconditionally during activation.

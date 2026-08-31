@@ -10,7 +10,7 @@
 
     ConvertFrom-SshEd25519PublicKeyToAgePubKey is provided by
     convert-sshpublickeytoage.ps1, which apply.ps1 dot-sources before this file
-    (alphabetical order ensures 'c' < 'i').
+    (alphabetical order so 'c' < 'i').
 
 .NOTES
     Environment variables: (none)

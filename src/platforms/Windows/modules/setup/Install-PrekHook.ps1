@@ -9,8 +9,8 @@ function Install-PrekHook {
     nucleus checkout protected during the same provision run that installs or
     updates the prek binary.
 
-    Ensures repositories that opt into prek via prek.toml have their Git hooks
-    installed during the Windows apply flow.
+    Install Git hooks for repositories that opt into prek via prek.toml
+    during the Windows apply flow.
 
     The operation is idempotent because `prek install` safely re-writes the
     managed hook shims when they already exist.
