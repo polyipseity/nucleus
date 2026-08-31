@@ -6,4 +6,9 @@
   "skills": {
     "paths": [".agents/skills"],
   },
+  "plugin": [
+    // Source: superpowers agent skills methodology.
+    // https://github.com/obra/superpowers
+    "superpowers@git+https://github.com/obra/superpowers.git"
+  ],
 }
