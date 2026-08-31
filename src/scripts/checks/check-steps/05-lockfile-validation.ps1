@@ -31,7 +31,21 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
     $pkgToSections = @{}
     foreach ($section in $lf.Keys) {
       if ($section -eq 'ollama') { continue }
-      if ($lf[$section] -is [hashtable]) {
+      if ($section -eq 'suggestions') {
+        # Scan nested suggestions sections (homebrew.masApps, cursor, vscode)
+        foreach ($sub in $lf['suggestions'].Keys) {
+          if ($lf['suggestions'][$sub] -is [hashtable]) {
+            foreach ($pkg in $lf['suggestions'][$sub].Keys) {
+              $subKey = "suggestions.$sub"
+              if ($pkgToSections.ContainsKey($pkg)) {
+                $pkgToSections[$pkg] += , $subKey
+              } else {
+                $pkgToSections[$pkg] = @($subKey)
+              }
+            }
+          }
+        }
+      } elseif ($lf[$section] -is [hashtable]) {
         foreach ($pkg in $lf[$section].Keys) {
           if ($pkgToSections.ContainsKey($pkg)) {
             $pkgToSections[$pkg] += , $section
