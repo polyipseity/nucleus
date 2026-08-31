@@ -29,8 +29,8 @@ applyTo: "src/modules/cloud-drives.nix, src/platforms/macOS/modules/default.nix,
 
 ## Finder favorites policy on modern macOS
 
-- Do **not** manage Finder favorites by writing `FavoriteItems.sfl*` archives directly via NSKeyedArchiver/JXA.
-- Do **not** rely on `sfltool` for favorites management.
+- Do not manage Finder favorites by writing `FavoriteItems.sfl*` archives directly via NSKeyedArchiver/JXA.
+- Do not rely on `sfltool` for favorites management.
 - Preferred strategy:
   1. Ensure canonical directories exist (`~/dev`, `~/clouds`, and standard user folders referenced by favorites).
   2. Use `mysides` in activation to enforce an exact ordered favorites list.
@@ -53,16 +53,16 @@ applyTo: "src/modules/cloud-drives.nix, src/platforms/macOS/modules/default.nix,
 
 ## Replica sync performance constraints
 
-rclone's remote listing/comparison phase is inherently slow — expect multi-minute runtimes even for incremental syncs (5–15 min for full-root). Accept this as the trade-off for safe pull-only idempotent replication.
+rclone's remote listing/comparison phase is slow — expect multi-minute runtimes even for incremental syncs (5–15 min for full-root). This is the trade-off for pull-only idempotent replication.
 
-- **Do not force throttle flags** (`--checkers 1`, `--transfers 1`, etc.) in runtime sync paths unless a temporary exception is required. Bounded root-access probes (e.g., OneDrive inaccessible-root filtering) may use defensive flags; the real sync path must use backend defaults.
-- **Schedule adequately**: inter-run spacing must accommodate multi-minute runtime.
+- Do not force throttle flags (`--checkers 1`, `--transfers 1`, etc.) in runtime sync paths unless a temporary exception is required. Bounded root-access probes (e.g., OneDrive inaccessible-root filtering) may use defensive flags; the real sync path must use backend defaults.
+- Inter-run spacing must accommodate multi-minute runtime.
 
 ## Tests and docs coupling
 
-When changing cloud-drive/Finder behavior, update all of the following in the same change:
+When changing cloud-drive/Finder behavior, update in the same change:
 
 - Inline WHY comments for every platform-specific exception.
 - Host `MANUAL.md` steps when behavior cannot be automated.
 
-Do not leave stale assertions that refer to removed flags or deprecated implementation paths.
+Do not leave stale assertions referring to removed flags or deprecated paths.

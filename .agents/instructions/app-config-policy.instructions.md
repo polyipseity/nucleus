@@ -12,19 +12,17 @@ All configs in `src/modules/configs/` must follow this method priority, chosen b
 
 ### Method 1 — Bidirectional writable symlink (default)
 
-A symlink from the app's config path back into the repo tree. Edits through the symlink (by user or app) are immediately reflected in the repo; repo changes are visible without reactivation. This is the default because it makes edits take effect immediately without a rebuild/reactivation cycle — the lightest-weight abstraction.
+A symlink from the app's config path back into the repo tree. Edits through the symlink (by user or app) are immediately reflected in the repo; repo changes are visible without reactivation.
 
-**Implementation (POSIX):** create the symlink at **activation time** against the **LIVE repo root**, resolved via `derive_repo_root` (`$NUCLEUS_REPO_ROOT`), using the shared helper `src/scripts/configs/seed-writable-symlink.sh` invoked from a `home.activation` entry (`entryAfter [ "linkGeneration" ]`). The repo-relative source path is computed at eval time (a literal string, or `overlay.toRepoRelPath (overlay.selectFile ...)` for per-user configs) and re-anchored to the live root by the helper at activation time.
+**Implementation (POSIX):** create the symlink at activation time against the live repo root, resolved via `derive_repo_root` (`$NUCLEUS_REPO_ROOT`), using the shared helper `src/scripts/configs/seed-writable-symlink.sh` invoked from a `home.activation` entry (`entryAfter [ "linkGeneration" ]`). The repo-relative source path is computed at eval time (a literal string, or `overlay.toRepoRelPath (overlay.selectFile ...)` for per-user configs) and re-anchored to the live root by the helper at activation time.
 
-> **CRITICAL — never bake the eval-time store snapshot as the target.** `flake.nix` defines `repoRoot = ../.` as a Nix **path literal**, which Nix copies into a **read-only `/nix/store/*-source` snapshot** at eval time. `config.lib.file.mkOutOfStoreSymlink "${repoRoot}/..."` therefore points the symlink at that read-only store path, not the live working tree. Writes through the symlink fail with `EACCES` (e.g. camillagui-backend returns HTTP 500), and "repo changes take effect without rebuild" is false. **Do NOT use `mkOutOfStoreSymlink` with a `repoRoot`-derived path for method-1 links.** Use `seed-writable-symlink.sh` instead. The already-correct reference is `src/platforms/macOS/scripts/macos-configure-linearmouse.sh`.
+> **Do NOT use `mkOutOfStoreSymlink` with a `repoRoot`-derived path for method-1 links.** `flake.nix` defines `repoRoot = ../.` as a Nix path literal, which Nix copies into a read-only `/nix/store/*-source` snapshot at eval time. `config.lib.file.mkOutOfStoreSymlink "${repoRoot}/..."` points the symlink at that read-only store path, not the live working tree. Writes through the symlink fail with `EACCES` (e.g. camillagui-backend returns HTTP 500). Use `seed-writable-symlink.sh` instead. Correct reference: `src/platforms/macOS/scripts/macos-configure-linearmouse.sh`.
 
-**Implementation (Windows):** PowerShell `New-Item -ItemType SymbolicLink` with `-Target` pointing at the live repo root (`$env:NUCLEUS_REPO_ROOT`, or `$repoRoot` derived from `$PSScriptRoot`). See `Deploy-WritableSymlink` in `ConfigHelpers.ps1` (the Windows counterpart of `seed-writable-symlink.sh`).
+**Implementation (Windows):** PowerShell `New-Item -ItemType SymbolicLink` with `-Target` pointing at the live repo root (`$env:NUCLEUS_REPO_ROOT`, or `$repoRoot` derived from `$PSScriptRoot`). See `Deploy-WritableSymlink` in `ConfigHelpers.ps1`.
 
-**Writable-vs-immutable is owned solely by `managedSymlinkPaths`** (`src/modules/home.nix`): entries marked `writable = true` are left unhardened so the app can write through; all others are re-hardened immutable by the `protect-out-of-store-symlinks` activation entry after the link exists. The symlink-creation helper must **NOT** take a writable flag or call protect/unprotect itself — that duplicates `managedSymlinkPaths` and risks divergence.
+**Writable-vs-immutable** is owned solely by `managedSymlinkPaths` (`src/modules/home.nix`): entries marked `writable = true` are left unhardened; all others are re-hardened immutable by the `protect-out-of-store-symlinks` activation entry after the link exists. The symlink-creation helper must NOT take a writable flag or call protect/unprotect itself — that duplicates `managedSymlinkPaths` and risks divergence.
 
-**Use when:** The app tolerates a symlink at its config path and does not overwrite it with auto-generated state on startup.
-
-Some apps auto-write managed state into their config at startup or on activation (e.g. `redhat.vscode-yaml` writes `yaml.disableSchemaDetection` into VS Code user `settings.json`). With a writable symlink, every auto-write re-dirties the repo working tree. Resolve by committing the auto-written key intentionally, disabling the auto-write, or switching to Method 2/3.
+**Use when:** the app tolerates a symlink and does not overwrite it with auto-generated state on startup. Some apps auto-write managed state into their config (e.g. `redhat.vscode-yaml` writes `yaml.disableSchemaDetection` into VS Code user `settings.json`). With a writable symlink, this re-dirties the repo working tree. Resolve by committing the auto-written key, disabling the auto-write, or switching to Method 2/3.
 
 ### Method 2 — Read-only deployment (alternative)
 
@@ -37,9 +35,9 @@ A read-only copy (Nix store path or copied file with ReadOnly attribute) at the 
 - The app overwrites the config file with auto-generated state on startup (e.g., serializing full internal state, discarding managed settings).
 - A platform limitation requires a read-only copy (e.g., macOS LaunchServices refuses symlinks for .app bundles).
 
-**NOT valid reasons for Method 2:**
+**Not valid reasons for Method 2:**
 
-- The config path is system-level (`/etc/`, `/etc/ssh/`, etc.) — system paths do not inherently require read-only deployment. Use an activation script to create a writable symlink instead.
+- The config path is system-level (`/etc/`, `/etc/ssh/`, etc.) — system paths do not require read-only deployment. Use an activation script to create a writable symlink instead.
 - "No user writes it" or "read-only by convention" — if the app tolerates a symlink without overwriting it, Method 1 is the correct choice.
 - Preference for immutability — Method 2 is a technical alternative, not a stylistic choice.
 
@@ -49,22 +47,21 @@ The managed subset is stored in the repo and merged into the live app config at 
 
 **Implementation:** activation-block shell script (awk/Python) reading repo file and merging into live path (POSIX); equivalent PowerShell merge (Windows).
 
-**Use when:** The app manages its own state in the same file (e.g., vault metadata in Obsidian `obsidian.json`, user preferences in Picard `Picard.ini`). A symlink would let the app write its full state back into the repo file.
+**Use when** the app manages its own state in the same file (e.g., vault metadata in Obsidian `obsidian.json`, user preferences in Picard `Picard.ini`). A symlink would let the app write its full state back into the repo file.
 
 ### Method 4 — Runtime direct read (nucleus infrastructure only)
 
 No deployment. The script reads the config directly from the repo tree at runtime via `$NUCLEUS_REPO_ROOT`.
 
-**Use when:** Config is consumed only by nucleus-owned scripts, never by third-party apps.
+**Use when** config is consumed only by nucleus-owned scripts.
 
 ### Priority rule
 
-1. Always use Method 1. Method 2 is only acceptable with a documented technical constraint that makes Method 1 impossible.
-2. If Method 1 is unsuitable, use Method 2.
-3. If Method 2 is unsuitable, use Method 3.
-4. Method 4 is for nucleus-owned infrastructure configs only.
-5. Any deviation from Method 1 must have a code comment citing the specific technical reason why Method 1 is unsuitable, using the canonical annotation format `# check-suppress:config-method: method N (name) -- <reason>` (e.g., "app overwrites this file on startup -- using merge instead of symlink to preserve managed settings"). See Method 2 for invalid reasons.
-6. Every config must have equivalent deployment on all applicable hosts (macOS, NixOS, Windows). If a host has no equivalent application, document as N/A.
+1. Method 1 by default. Method 2 only with a documented technical constraint that makes Method 1 impossible.
+2. If Method 1 is unsuitable, use Method 2. If Method 2 is unsuitable, use Method 3.
+3. Method 4 is for nucleus-owned infrastructure configs only.
+4. Any deviation from Method 1 requires a code comment citing the specific technical reason: `# check-suppress:config-method: method N (name) -- <reason>` (e.g., "app overwrites this file on startup -- using merge instead of symlink to preserve managed settings"). See Method 2 for invalid reasons.
+5. Every config must have equivalent deployment on all applicable hosts (macOS, NixOS, Windows). If a host has no equivalent application, document as N/A.
 
 ### Host-specific lib/ subdirectory convention
 

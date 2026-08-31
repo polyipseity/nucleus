@@ -8,13 +8,13 @@ applyTo: "src/modules/**/*.json, src/modules/**/*.nix, src/hosts/**/*.nix, src/h
 
 ## Goal
 
-Default to parity-first changes: apply new capabilities to as many hosts as practical in the same change. Avoid one-host features unless there is a concrete platform constraint. Keep host orchestration thin and push reusable behavior into shared modules (`src/modules/*.nix` and `src/platforms/Windows/modules/*.ps1`) or declarative state files (`src/hosts/Windows/*.dsc.yml`).
+Default to parity-first: apply new capabilities to as many hosts as possible in the same change. Avoid one-host features unless a platform constraint prevents it. Keep host orchestration thin and push reusable behavior into shared modules (`src/modules/*.nix` and `src/platforms/Windows/modules/*.ps1`) or declarative state files (`src/hosts/Windows/*.dsc.yml`).
 
 Avoid special-casing in module logic. When a feature requires per-host differences, refactor shared behavior into parameterized abstractions rather than adding `if-else` branches or duplicating files.
 
 ## What parity means
 
-Parity means the same capability is available on every host where it is practical, with the same CLI surface (subcommands, flags, exit codes, error messages where feasible), the same declarative data (`*.json` + schema) as SSOT when applicable, the same host tooling provisioned per platform, and the same docs (`MANUAL.md` on all hosts) and tests (paired unit tests + Nix wiring).
+Parity means the same capability on every host where possible, with the same CLI surface (subcommands, flags, exit codes, error messages where feasible), the same declarative data (`*.json` + schema) as SSOT when applicable, the same host tooling per platform, and the same docs (`MANUAL.md` on all hosts) and tests (paired unit tests + Nix wiring).
 
 Parity does **not** mean delegating Windows work to bash, `sh`, or `.sh` scripts; byte-identical implementation files across platforms; or identical platform primitives (launchd vs systemd vs SCM) — those differences are documented exceptions with WHY.
 
@@ -29,17 +29,17 @@ Parity does **not** mean delegating Windows work to bash, `sh`, or `.sh` scripts
 
 ## Feature scope triage
 
-For every new capability, evaluate all three hosts before coding:
+For every new capability, evaluate all three hosts before writing code:
 
 1. macOS (`src/hosts/MacBook/` + shared modules)
 2. NixOS (`src/hosts/NixOS/` + shared modules)
 3. Windows (`src/hosts/Windows/` + `src/platforms/Windows/modules/`)
 
-If a capability can exist on more than one host, implement those hosts in the same change whenever feasible.
+If a capability can exist on more than one host, implement those hosts in the same change.
 
-When reducing parity debt (especially Windows vs macOS/NixOS), evaluate existing capabilities one-by-one. For each feature discovered on any host, record one explicit decision: implement parity now, already in parity, or not practical yet (with a short WHY in code and change summary). At minimum review: packages/tools, shell/dev workflow, security posture, desktop/UI behavior, remote-access behavior, secrets, editor experience, git/signing behavior, power/network posture, and automation hooks.
+When reducing parity debt (especially Windows vs macOS/NixOS), evaluate existing capabilities one-by-one. For each feature on any host, record one decision: implement parity now, already in parity, or not practical yet (with a short WHY in code and change summary). At minimum review: packages/tools, shell/dev workflow, security posture, desktop/UI behavior, remote-access behavior, secrets, editor experience, git/signing behavior, power/network posture, and automation hooks.
 
-When reviewing desktop/UI behavior, apply a minimal-chrome parity lens: prefer reducing persistent chrome (menu extras, taskbar buttons, recents, always-visible docks/panels) when equivalent keyboard/command workflows remain available. At the same time, preserve high-signal visibility defaults (hidden files, file extensions, status/path bars, and explicit metadata) unless there is a concrete host constraint.
+When reviewing desktop/UI behavior, apply a minimal-chrome parity lens: prefer reducing persistent chrome (menu extras, taskbar buttons, recents, always-visible docks/panels) when equivalent keyboard/command workflows remain available. At the same time, preserve high-signal visibility defaults (hidden files, file extensions, status/path bars, and explicit metadata) unless a host constraint prevents it.
 
 ### Host-specific lib/ pattern for per-host config differences
 
@@ -78,7 +78,7 @@ Services that fail to start during activation emit a warning but do not abort th
 
 ### Default policy: persistent daemon
 
-All nucleus-managed services use persistent-daemon semantics by default: auto-start on boot/login and auto-restart on crash. This gives a consistent, predictable service lifecycle across all hosts with no manual recovery needed after transient failures.
+All nucleus-managed services use persistent-daemon semantics by default: auto-start on boot/login and auto-restart on crash. This gives a consistent service lifecycle across all hosts with no manual recovery needed after transient failures.
 
 #### Default templates per platform
 
@@ -124,11 +124,11 @@ All nucleus-managed services use persistent-daemon semantics by default: auto-st
 
 ### Explicit recovery settings removed
 
-Service configurations do not set explicit rate-limiting or restart-interval settings (`ThrottleInterval` on macOS, `RestartSec` on NixOS, `RestartCount`/`RestartInterval` on Windows). Platform defaults are sufficient because the internal loop pattern handles keepalive pacing — the service manager only needs crash recovery (launchd's default throttle is shorter than the explicit 30 s; systemd's default `RestartSec` is 100 ms; Windows scheduled tasks do not restart automatically — the internal loop handles keepalive).
+Service configurations do not set explicit rate-limiting or restart-interval settings (`ThrottleInterval` on macOS, `RestartSec` on NixOS, `RestartCount`/`RestartInterval` on Windows). Platform defaults suffice: the internal loop pattern handles keepalive pacing, so the service manager only needs crash recovery (launchd's default throttle is shorter than 30 s; systemd's default `RestartSec` is 100 ms; Windows scheduled tasks do not restart — the internal loop handles keepalive).
 
 ### Internal loop pattern (heartbeat and watchdog)
 
-Services that need periodic work but must stay registered as persistent daemons use an internal sleep loop instead of platform timer mechanisms:
+Services that need periodic work but must stay registered as persistent daemons use an internal sleep loop instead of platform timers:
 
 ```bash
 # POSIX (shell script)
@@ -163,11 +163,7 @@ This pattern applies to:
 - `service-watchdog-user` (300 s fixed loop, user scope)
 - `betterdisplay-heartbeat` (30 s fixed loop)
 
-Benefits:
-
-- Platform timer mechanisms (StartInterval, systemd timers, scheduled-task repetition) become crash recovery only — the daemon always looks "running" instead of repeatedly spawning short-lived processes.
-- Unified service lifecycle monitoring (process is always alive).
-- Fixes the Windows scheduled-task `Duration` cap (P1D on the watchdog was causing the task to stop repeating after 24 h).
+Why this pattern: platform timer mechanisms (StartInterval, systemd timers, scheduled-task repetition) become crash recovery only — the daemon stays "running" instead of repeatedly spawning short-lived processes. Also fixes the Windows scheduled-task `Duration` cap (P1D on the watchdog stopped repeating after 24 h).
 
 ### macOS-only services
 
@@ -202,17 +198,16 @@ All hosts use the OS-native SSH agent and server, with no custom service definit
 
 ## Package parity rules
 
-- When adding a cross-host CLI tool to `src/modules/core.nix`, check whether a Windows equivalent should be added to `src/hosts/Windows/system-packages.dsc.yml`.
-- When adding a Windows CLI package to `system-packages.dsc.yml`, check whether POSIX hosts should also receive it through `core.nix`.
-- When adding a package that exists in both nixpkgs and Homebrew, add it to `managedPackages` in `src/modules/core.nix` (not spread across host files). See `package-installation-scope.instructions.md` (Managed package classification) for category, platform, and add-workflow rules.
+- When adding a cross-host CLI tool to `src/modules/core.nix`, check whether a Windows equivalent should be added to `src/hosts/Windows/system-packages.dsc.yml`. Vice versa for Windows packages going to POSIX.
+- When adding a package in both nixpkgs and Homebrew, add it to `managedPackages` in `src/modules/core.nix` (not spread across host files). See `package-installation-scope.instructions.md` (Managed package classification) for category, platform, and add-workflow rules.
 - Remove duplicate declarations from `src/hosts/NixOS/desktop.nix` when a package is already delivered via `core.nix`'s `sharedPackages`.
-- Windows source builds use git hash pinning. When a tool must be compiled from source on Windows, pin by git commit hash, not a tag or branch. Document the build steps in a reusable `Build-<Tool>.ps1` module under `src/platforms/Windows/modules/` and wire it into the activation DAG in `apply.ps1`.
+- Windows source builds use git hash pinning. Pin by commit hash, not tag or branch. Document build steps in `Build-<Tool>.ps1` under `src/platforms/Windows/modules/` and wire into the activation DAG in `apply.ps1`.
 
 ## Secrets and wallpaper parity
 
 - POSIX secrets: `src/modules/secrets.nix` + `materialize-user-secrets.sh`; Windows: `Sync-UserSecret.ps1` / `Sync-SecretFile.ps1` wired by `apply.ps1`.
-- POSIX wallpapers: `src/modules/wallpapers.nix`; Windows: `src/platforms/Windows/modules/wallpapers/Sync-WallpaperInventory.ps1` + `user.dsc.yml`.
-- Stale cleanup rules must be preserved on every host implementation.
+- POSIX wallpapers: `src/modules/wallpapers.nix`; Windows: `Sync-WallpaperInventory.ps1` + `user.dsc.yml`.
+- Preserve stale cleanup rules on every host.
 
 ## Cloud-drive parity
 
@@ -222,11 +217,11 @@ See `cloud-drives-and-finder.instructions.md` for the full cloud-drive policy. K
 
 Scripts under `src/hosts/<Host>/scripts/` or `src/platforms/<Platform>/scripts/` must implement a feature that is semantically host- or platform-specific. If the feature could apply to any POSIX host, the script belongs in a non-host subdirectory (`services/`, `configs/`, `packages/`, `editors/`, `secrets/`, `shell/`, `agents/`, `lib/`, or root of `src/scripts/`).
 
-When the same feature exists on both macOS and NixOS with host-specific implementations, the scripts SHOULD be merged into a single POSIX-compatible script using `builtins.replaceStrings` token substitution (preferred) or `case "$(uname)"` dispatch in the script body. Merged scripts MUST NOT use the `macos-` or `nixos-` prefix; they use natural names per the naming rule. After merging, delete the original host-specific scripts — no backwards-compatibility shims.
+If the same feature exists on both macOS and NixOS with host-specific implementations, merge into a single POSIX-compatible script using `builtins.replaceStrings` token substitution (preferred) or `case "$(uname)"` dispatch. Merged scripts MUST NOT use the `macos-` or `nixos-` prefix; use natural names per the naming rule. After merging, delete the originals — no backwards-compatibility shims.
 
 ## Allowed platform-specific exceptions
 
-Single-host implementation is allowed only when the feature depends on platform-specific primitives (for example: macOS defaults domains, NixOS kernel modules, Windows registry/DSC resources). When that happens, add a short WHY comment in code explaining why parity is not possible or not desirable. If an exception masks information or controls (for example auto-hide, taskbar/menu toggles, or hidden-file toggles), the WHY comment must explain the tradeoff and name the alternate access path (shortcut, command, or menu route).
+Single-host implementation is allowed only when the feature depends on platform-specific primitives (macOS defaults domains, NixOS kernel modules, Windows registry/DSC resources). Add a short WHY comment in code explaining why parity is not possible or not desirable. If an exception masks information or controls (auto-hide, taskbar/menu toggles, hidden-file toggles), the WHY comment must explain the tradeoff and name the alternate access path (shortcut, command, or menu route).
 
 ## Pre-merge parity checklist
 

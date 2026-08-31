@@ -6,7 +6,7 @@ applyTo: "src/**/*.nix"
 
 # Nix Configuration Authoring
 
-See `AGENTS.md` Repository Shape for the canonical repo layout. **Subagent path reminder**: when asking a subagent to extract or reference a file from a Nix module, the path must be relative to the Nix file's directory, not the repo root. For `src/modules/*.nix`, that means `../scripts/...`; for `src/platforms/<Platform>/modules/*.nix`, `../../../scripts/...` (cross-platform scripts) or `../../scripts/...` (platform scripts); for `src/hosts/<Host>/*.nix`, `../../scripts/...`.
+See `AGENTS.md` Repository Shape for the canonical repo layout. Subagent path note: when a subagent extracts or references a file from a Nix module, the path must be relative to the Nix file's directory, not the repo root. For `src/modules/*.nix`: `../scripts/...`. For `src/platforms/<Platform>/modules/*.nix`: `../../../scripts/...` (cross-platform) or `../../scripts/...` (platform). For `src/hosts/<Host>/*.nix`: `../../scripts/...`.
 
 ## Flake conventions
 
@@ -26,7 +26,7 @@ See `AGENTS.md` Repository Shape for the canonical repo layout. **Subagent path 
 
 ## Runtime imperative scripts vs. inline activation shell
 
-Extract runtime imperative logic (SOPS decryption, API calls, service polling) into separate invocable scripts instead of inlining in Nix indented strings. Keeps activation files readable, allows independent testing, and prevents duplication across hosts.
+Extract runtime imperative logic (SOPS decryption, API calls, service polling) into separate invocable scripts instead of inlining in Nix indented strings. Keeps activation files readable, allows independent testing, and avoids duplication across hosts.
 
 See `src/scripts/services/jellyfin-sync.sh` for an example.
 
@@ -36,7 +36,6 @@ Libraries under `src/scripts/lib/` must never be sourced directly inside Nix act
 
 Instead, create a small import wrapper script under `src/scripts/lib/` that sources the library (using `SCRIPT_DIR`-based path resolution). Activation blocks use `builtins.readFile` of the import wrapper only.
 
-See `src/scripts/lib/import-symlink-hardening.sh` for the canonical pattern.
 
 The only exception is standalone scripts under `src/scripts/` that are not libraries (e.g. scripts executed for their side effects, like `src/platforms/macOS/scripts/macos-configure-preflight-privacy.sh`). These may be run directly via `builtins.readFile` without an import wrapper.
 
@@ -92,13 +91,13 @@ Always use `pkgs.writeNucleusShellApplication` instead of `pkgs.writeShellApplic
 - `text` — inline the script body directly instead of referencing an external file. Does not bundle trees; sets up `PATH` from `runtimeInputs`, and appends the text content to the wrapper. Use when the script body is trivial or when a shared script cannot be reused due to host-specific values.
 - `extraEnv` — injects Nix-computed values as environment variables into the wrapper script. Values are automatically shell-escaped. **Prefer positional args for standalone scripts** (see "CLI-arg-first pattern" below). Use `extraEnv` when the script body is a **shared body sourced by multiple callers** (see "Shared script body pattern" below) — the env var contract stays uniform across callers, preventing dual-parsing of `$1` and env-var fallbacks in the shared code. Environment variables are opaque to shellcheck, bypass PATH isolation, and cannot be forwarded through exec wrappers; these drawbacks are acceptable for shared bodies where args are not the natural interface.
 
-`writeShellApplication` (from nixpkgs) does not support `bundleDefault`, `extraEnv`, or `text`. Scripts built with it cannot source sibling libraries via `SCRIPT_DIR`-relative paths, leading to silent breakage when a script evolves to need library access.
+`writeShellApplication` (from nixpkgs) does not support `bundleDefault`, `extraEnv`, or `text`. Scripts built with it cannot source sibling libraries via `SCRIPT_DIR`-relative paths, breaking when a script evolves to need library access.
 
-The only exception is when technical constraints prevent using `writeNucleusShellApplication` (e.g., dynamic names in function context as in `cloud-drives.nix`). In that case, add a `# WHY:` comment explaining the constraint.
+The only exception is when technical constraints prevent using `writeNucleusShellApplication` (e.g., dynamic names in function context as in `cloud-drives.nix`). Add a `# WHY:` comment explaining the constraint.
 
 ### CLI-arg-first pattern (standalone scripts)
 
-Prefer passing Nix-computed values as positional CLI arguments over environment variables. This applies to:
+Prefer passing Nix-computed values as positional CLI arguments over environment variables. Applies to:
 
 - **Launchd agents**: add extra elements to `ProgramArguments` array instead of `extraEnv`. The script receives them as `$1`, `$2`, etc. This keeps the agent invocation self-documenting and makes the script independently testable.
 - **Activation hooks**: pass values as script arguments in the activation string (already standard practice; avoid `export` before script calls).
@@ -117,7 +116,7 @@ Prefer passing Nix-computed values as positional CLI arguments over environment 
 
 ### Shared script body pattern
 
-When a `.sh` file under `src/scripts/` is both invoked directly via `scriptName` and `source`d by another script (e.g., a service script that calls functions and does extra work after the shared body), use `extraEnv` with `scriptName` to pass Nix-computed values. The shared body reads env vars set by both callers — `extraEnv` for the `scriptName` caller, POSIX shell defaults for the `source`-based caller — without needing to parse positional arguments.
+When a `.sh` file under `src/scripts/` is both invoked directly via `scriptName` and `source`d by another script (e.g., a service script that calls functions and does extra work after the shared body), use `extraEnv` with `scriptName` to pass Nix-computed values. The shared body reads env vars set by both callers — `extraEnv` for the `scriptName` caller, POSIX shell defaults for the `source`-based caller — without parsing positional arguments.
 
 ```nix
 extraEnv = {
@@ -127,11 +126,7 @@ extraEnv = {
 scriptName = "src/platforms/macOS/scripts/macos-purge-preferences";
 ```
 
-This prevents:
-
-- Dual-parsing `$1` vs env-var fallbacks in the shared body (the env var is the natural interface).
-- A `text` wrapper that duplicates the `extraEnv` mechanism and bypasses `writeNucleusShellApplication`'s PATH setup.
-- Breaking the `source`-based caller if the wrapper were changed to pass args instead.
+This prevents dual-parsing `$1` vs env-var fallbacks in the shared body, avoids a `text` wrapper that duplicates the `extraEnv` mechanism and bypasses PATH setup, and prevents breaking the `source`-based caller.
 
 Do NOT use `text` to wrap a shared-body script with inline env var assignments — that duplicates `extraEnv`. If the script body exists as a file under `src/scripts/`, reference it via `scriptName` (with `extraEnv` for values). Reserve `text` for truly inline scripts or host-specific wrappers without a shared body.
 
@@ -154,7 +149,7 @@ Some scripts embed Nix-computed values via `builtins.readFile` into activation b
 - A library function definition (not a script body) that must be sourced by multiple callers.
 - A token-replaced template that uses `builtins.replaceStrings` (the established token-injection pattern).
 
-These sites are not candidates for the CLI-arg conversion. Examples: `macos-icloud-exclusions.sh` (sourced by both activation hook and launchd agent), `macos-fda-warning.sh` (library with no script entry point). Do not attempt to convert these unless an alternative dispatch mechanism is introduced.
+These sites are not candidates for CLI-arg conversion. Examples: `macos-icloud-exclusions.sh` (sourced by both activation hook and launchd agent), `macos-fda-warning.sh` (library with no script entry point). Do not convert unless an alternative dispatch mechanism is introduced.
 
 ## Module conventions
 
@@ -318,4 +313,4 @@ Examples with their extracted helpers:
 
 The cross-platform no-embedding invariant, shared-file rule, and `__TOKEN__` convention are canonical in `embedded-content.instructions.md`; the boundaries above are the Nix-side exceptions.
 
-See `scripts-and-permissions.instructions.md` ("When a script needs its own file") for the complementary policy on when extracted scripts should remain separate files vs. be inlined directly.
+See `scripts-and-permissions.instructions.md` ("When a script needs its own file") for the complementary policy on when extracted scripts stay separate vs. inline.

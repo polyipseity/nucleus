@@ -19,13 +19,13 @@ Repo `.agents/skills/` holds **project-tied** skills (`pssa-rule-benchmark`, `sf
 
 ## Directory layout
 
-The `~/.agents/` directory is the runtime home for all agent configuration, prompts, skills, and hooks. It is a real (writable) directory — not a whole-directory symlink into the repo tree.
+The `~/.agents/` directory is the runtime home for agent configuration, prompts, skills, and hooks — a real (writable) directory with per-subdirectory symlinks, not a whole-directory symlink.
 
 | Path | Owner | Purpose |
 | ------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `~/.agents/` | `symlink-agent-config` activation | Real directory; per-subdir symlinks for every resolved `src/users/<user>/agents/` entry except `skills/` |
-| `~/.agents/hooks/` | `symlink-agent-config` activation | VS Code Copilot hook configs (e.g. `PreToolUse`/`PostToolUse`), loaded via `chat.hookFilesLocations` (`~/.agents/hooks`) |
-| `~/.agents/skills/` | `install-agent-skills` activation | Real directory; per-skill symlinks for bundled skills + real dirs for fetched skills |
+| `~/.agents/` | `symlink-agent-config` activation | Per-subdir symlinks for every resolved `src/users/<user>/agents/` entry except `skills/` |
+| `~/.agents/hooks/` | `symlink-agent-config` activation | VS Code Copilot hook configs (`PreToolUse`/`PostToolUse`), loaded via `chat.hookFilesLocations` |
+| `~/.agents/skills/` | `install-agent-skills` activation | Per-skill symlinks for bundled skills + real dirs for fetched skills |
 | `~/.agents/skills/<name>/` (symlink) | `install-agent-skills` | Bundled skill committed to `src/users/default/agents/skills/<name>/` |
 | `~/.agents/skills/<name>/` (real dir) | `sync-clawhub-skills` / `Sync-AgentsClawHubSkillManifest` | Fetched skill downloaded by ClawHub; contains a `.clawhub/origin.json` marker |
 
@@ -43,31 +43,31 @@ Cursor reads different path names than Copilot/OpenCode. Shared content stays in
 
 Edit shared rules/agents/prompts/skills under `src/users/default/agents/` (or per-user overrides under `src/users/<username>/agents/`), not under `~/.cursor/`. Edit Cursor-native JSON under `src/users/default/cursor/`.
 
-Cursor's GUI model/API settings (`cursor.aiprovider.openai.baseUrl` / `apiKey` / `model`) live in the app-level user settings (`~/Library/Application Support/Cursor/User/settings.json` on macOS, `%APPDATA%\Cursor\User\settings.json` on Windows) — NOT in the `~/.cursor/` CLI overlay (`cli-config.json`, `mcp.json`, `hooks.json`). Do not place them under the bridge.
+Cursor's GUI model/API settings (`cursor.aiprovider.openai.baseUrl` / `apiKey` / `model`) live in the app-level user settings (`~/Library/Application Support/Cursor/User/settings.json` on macOS, `%APPDATA%\Cursor\User\settings.json` on Windows), NOT in the `~/.cursor/` CLI overlay (`cli-config.json`, `mcp.json`, `hooks.json`).
 
-The per-subdir layout replaces an older whole-dir symlink scheme. The old scheme forced every clawhub download into the tracked repo tree; the real-dir layout lets the `skills/` subtree be writable without any writes entering Git.
+The per-subdir layout lets `skills/` be writable without writes entering Git.
 
-The phrase "global agent instructions" (or "user agent instructions", "provisioned global agent instructions") refers to `src/users/default/agents/` — the actual source files for agent customizations. Files in `~/.agents/` are per-entry symlinks into the resolved overlay directory, not the source of truth. Always edit files under `src/users/default/agents/` (or per-user overrides) rather than editing `~/.agents/` directly; changes there would be overwritten on the next apply.
+Files in `~/.agents/` are per-entry symlinks into the resolved overlay directory — not the source of truth. Always edit under `src/users/default/agents/` (or per-user overrides); changes to `~/.agents/` are overwritten on the next apply.
 
 ## Bundled vs. fetched skills
 
-**Bundled**: AGPL-compatible license → commit all skill files to `src/users/default/agents/skills/<name>/`. The `install-agent-skills` activation creates a symlink at `~/.agents/skills/<name>` that points into the store.
+**Bundled**: AGPL-compatible license → commit all skill files to `src/users/default/agents/skills/<name>/`. The `install-agent-skills` activation symlinks `~/.agents/skills/<name>` into the store.
 
-**Fetched**: non-AGPL-compatible license → never commit; list the skill slug in `src/users/default/agents/clawhub-skills.json` under `"skills"`. The `sync-clawhub-skills` activation runs the fetched skill convergence logic inline, downloading skills at apply time via the ClawHub CLI.
+**Fetched**: non-AGPL-compatible license → never commit; list the skill slug in `src/users/default/agents/clawhub-skills.json` under `"skills"`. The `sync-clawhub-skills` activation downloads skills at apply time via the ClawHub CLI.
 
-The `.clawhub/origin.json` marker written by ClawHub during install is the **only** reliable indicator that a directory in `~/.agents/skills/` is a fetched download. Stale cleanup must check for this marker before removing any directory; directories without it (bundled symlinks, user content) are never removed.
+The `.clawhub/origin.json` marker is the only reliable indicator of a fetched download. Stale cleanup must check for it before removing any directory — bundled symlinks and user content are never removed.
 
-Conflict guard: if a slug in `clawhub-skills.json` matches a committed-skill symlink already in `~/.agents/skills/`, the activation prints a warning and skips that slug; the operator must resolve the naming conflict before ClawHub can write there.
+If a slug in `clawhub-skills.json` matches an existing committed-skill symlink in `~/.agents/skills/`, the activation warns and skips that slug. The operator must resolve the naming conflict before ClawHub can write there.
 
 ## Permission locking
 
-Installed skill files are locked read-only after each install or update to prevent accidental modification outside a managed apply run. The lock is cleared before an update so clawhub can overwrite existing files.
+Installed skill files are locked read-only after each install or update. The lock is cleared before an update so clawhub can overwrite existing files.
 
 **POSIX**: `chmod -R a-w` after install; `chmod -R u+w` before update/cleanup.
 
 **Windows**: `FileAttributes.ReadOnly` set via `Get-ChildItem -Recurse` after install; cleared via the same loop before update/cleanup.
 
-Secret and manifest files written by `Sync-NucleusSecretFile` on Windows use a stricter `$restrictAcl` block (`icacls /inheritance:r /grant:r`) on top of `ReadOnly` to ensure owner-only access.
+Secret and manifest files written by `Sync-NucleusSecretFile` on Windows use a stricter `$restrictAcl` block (`icacls /inheritance:r /grant:r`) on top of `ReadOnly` for owner-only access.
 
 ## ClawHub provisioning
 
@@ -90,7 +90,7 @@ ClawHub is managed by `Invoke-BunSetup` in `src/platforms/Windows/modules/setup/
 
 ## Authoring rules
 
-- **No fallback installs in sync functions**: POSIX `sync-clawhub-skills` and Windows `Sync-AgentsClawHubSkillManifest` must not install ClawHub themselves. Provisioning belongs to `install-bun-packages` / `Invoke-BunSetup`.
-- **Stale cleanup scoped to fetched downloads**: only remove directories with a `.clawhub/origin.json` marker; never touch bundled symlinks or unknown directories.
-- **Skill sync is best-effort**: log a warning on failure and continue.
-- **Desired-package lists sorted alphabetically**: keep `$desiredPackages` and the equivalent list in `install-bun-packages` sorted.
+- No fallback installs in sync functions: POSIX `sync-clawhub-skills` and Windows `Sync-AgentsClawHubSkillManifest` must not install ClawHub themselves. Provisioning belongs to `install-bun-packages` / `Invoke-BunSetup`.
+- Stale cleanup scoped to fetched downloads: only remove directories with a `.clawhub/origin.json` marker.
+- Skill sync is best-effort: log a warning on failure and continue.
+- Desired-package lists sorted alphabetically.

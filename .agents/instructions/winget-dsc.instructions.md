@@ -17,7 +17,7 @@ Mapping: system files are always applied; user files must be explicitly listed p
 
 ## File location and purpose
 
-Each DSC file covers exactly one Windows subsystem or functional concern. Do not mix resources from different subsystems in the same file. If a new setting belongs to an existing subsystem, add it to that subsystem's file; if it introduces a new concern, create a new file.
+Each DSC file covers exactly one Windows subsystem or functional concern. Do not mix resources from different subsystems in the same file. If a new setting belongs to an existing subsystem, add it there; if it introduces a new concern, create a new file.
 
 - `src/hosts/Windows/system/scheduler.dsc.yml` — scheduled task (weekly gc).
 - `src/hosts/Windows/system/developer-mode.dsc.yml` — Developer Mode toggle.
@@ -70,25 +70,25 @@ Within each group, sort entries alphabetically by the `settings.id` (for package
 ## Authoring rules
 
 - Always use `.yml` extension for WinGet DSC manifests; do not create long-extension YAML filenames in `src/hosts/Windows/`.
-- Always specify `source: winget` for `Microsoft.WinGet.Client/Package` entries; do not omit it even if it is technically the default.
+- Always specify `source: winget` for `Microsoft.WinGet.Client/Package` entries, even if it is technically the default.
 - Use the canonical WinGet package identifier (verified via `winget search`) rather than a display name or URL.
 - When a WinGet package has a Preview or Canary variant (for example `Microsoft.WindowsTerminal.Preview` vs `Microsoft.WindowsTerminal`), prefer the preview channel per the repository-wide Channel Preference Policy in `AGENTS.md`. Use the stable ID only when the preview channel is unavailable or severely broken; document the exception with a `directives.description:` note.
-- Prefer human-readable named package IDs over opaque Microsoft Store-generated IDs whenever a named ID exists.
-- When a Microsoft Store package only exposes a generated ID, keep using that ID and document the rationale in `directives.description:`.
+- Prefer human-readable named package IDs over opaque Microsoft Store-generated IDs when a named ID exists.
+- When a package only exposes a generated ID, use it and document the rationale in `directives.description:`.
 - For registry values, always include `valueType` (`DWord`, `String`, etc.) to prevent ambiguous interpretation.
-- Environment variable scope must be `User` or `Machine`; prefer `User` unless the setting must be machine-wide.
+- Scope environment variables as `User` or `Machine`; prefer `User` unless the setting must be machine-wide.
 - Use `%USERPROFILE%` rather than a hard-coded path for the user's home directory in `value` strings.
-- For UI/discoverability settings, apply a minimal-chrome rule: allow reduced persistent chrome (for example hidden optional taskbar controls or compact surfaces) when equivalent keyboard/command access remains available.
-- Preserve high-signal visibility defaults by default (for example hidden files, file extensions, status bars, and navigation-pane folder visibility) unless a concrete workflow reason justifies reducing visibility.
-- If a Windows UI choice reduces visibility or masks controls, explain the tradeoff in `directives.description:` with a short WHY and include the alternate access path (shortcut, command, or menu route).
+- For UI/discoverability settings, apply a minimal-chrome rule: allow reduced persistent chrome (hidden optional taskbar controls, compact surfaces) when equivalent keyboard/command access remains available.
+- Preserve high-signal visibility defaults (hidden files, file extensions, status bars, navigation-pane folder visibility) unless a concrete workflow reason justifies reducing visibility.
+- If a choice reduces visibility or masks controls, explain the tradeoff in `directives.description:` with a short WHY and the alternate access path (shortcut, command, or menu route).
 
 ## PowerShell DSC resource modules
 
-`winget configure` resolves each `resource: Module/Resource` identifier against the PowerShell Gallery and **auto-installs** the required module if it is not already present in `$env:PSModulePath`. No separate install step is needed — any `PSDscResources/Script` entry will cause WinGet to download and install the `PSDscResources` module automatically before invoking the resource.
+`winget configure` resolves each `resource: Module/Resource` identifier against the PowerShell Gallery and **auto-installs** the required module if not already present in `$env:PSModulePath`. No separate install step needed — any `PSDscResources/Script` entry causes WinGet to download and install the `PSDscResources` module automatically before invoking the resource.
 
-Use `PSDscResources/Script` only for imperative steps that cannot be expressed by any declarative resource type. Prefer moving complex logic to `src/platforms/Windows/modules/*.ps1` (dot-sourced by `apply.ps1`) so the DSC file stays a state declaration rather than a script host.
+Use `PSDscResources/Script` only for imperative steps that no declarative resource type covers. Prefer moving complex logic to `src/platforms/Windows/modules/*.ps1` (dot-sourced by `apply.ps1`) so the DSC file stays a state declaration.
 
-**When PATH is not guaranteed during DSC execution:** DSC resources run in a fresh PowerShell session where `$env:PATH` may not include user-level tool directories (for example `~\.cargo\bin` from a prior `rustup init` call). Any `PSDscResources/Script` block that invokes a user-installed binary must prepend the relevant path explicitly in `SetScript` and `TestScript`. If that cannot be done reliably, do not add the resource — document the gap and rely on a graceful probe in `apply.ps1` or a `scripts/gc.ps1`-style script instead.
+**When PATH is not guaranteed during DSC execution:** DSC resources run in a fresh PowerShell session where `$env:PATH` may not include user-level tool directories (e.g. `~\.cargo\bin` from a prior `rustup init`). Any `PSDscResources/Script` block invoking a user-installed binary must prepend the relevant path in `SetScript` and `TestScript`. If that cannot be done reliably, do not add the resource — document the gap and rely on a graceful probe in `apply.ps1` or a `scripts/gc.ps1`-style script.
 
 **cargo-cache is managed via cargo-binstall, not `system/packages.dsc.yml`:** `cargo-cache` has no WinGet package ID and is not in Scoop. It is installed declaratively by `Invoke-CargoBinstallSetup` (in `src/platforms/Windows/modules/Invoke-CargoBinstallSetup.ps1`) which runs after the DSC step in `apply.ps1`. `scripts/gc.ps1` probes for the binary gracefully and skips pruning when it is absent.
 
@@ -96,7 +96,7 @@ Use `PSDscResources/Script` only for imperative steps that cannot be expressed b
 
 ### Purpose and advantages
 
-Wrapping imperative logic in a `PSDscResources/Script` block makes the _management_ of that logic declarative, even though the code inside remains imperative. Four concrete benefits:
+Wrapping imperative logic in a `PSDscResources/Script` block makes the _management_ of that logic declarative, even though the code inside remains imperative. Four benefits:
 
 1. **Idempotency by design** — `TestScript` is the authoritative check; `SetScript` only runs when `TestScript` returns `$false`, so no manual `if`-guards needed.
 2. **Dependency orchestration** — `dependsOn` controls ordering relative to other resources (e.g., run after a package is installed).
@@ -124,14 +124,14 @@ Wrapping imperative logic in a `PSDscResources/Script` block makes the _manageme
 
 Use `PSDscResources/Script` only when:
 
-1. A meaningful `TestScript` can be written — a simple, reliable boolean check of the desired state.
+1. A reliable `TestScript` can be written — a simple boolean check of the desired state.
 2. No native DSC resource (`Microsoft.Windows.Registry`, `Microsoft.Windows.Environment`, etc.) already covers the same state.
 3. PATH is guaranteed or can be explicitly prepended in both `TestScript` and `SetScript`. DSC runs in a fresh PowerShell session where user-level tool directories (e.g., `~\.cargo\bin`, `~\scoop\shims`) may not be on PATH. Any block invoking a user-installed binary must prepend its directory explicitly.
 4. Moving to DSC provides a genuine benefit — idempotency, `dependsOn` ordering, or `--what-if` reporting — that the existing `apply.ps1` call does not already provide.
 
 ### Path resolution in DSC context
 
-When dot-sourcing repo modules from `SetScript`, use an explicit repo-relative path anchored to `$PSScriptRoot` or a known env var rather than assuming the working directory:
+When dot-sourcing repo modules from `SetScript`, use an explicit repo-relative path anchored to `$PSScriptRoot` or a known env var:
 
 ```powershell
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)

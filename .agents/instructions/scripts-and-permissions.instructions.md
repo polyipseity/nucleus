@@ -16,17 +16,17 @@ applyTo: "scripts/**, src/scripts/**, src/scripts/lib/**, src/**/*.ps1, src/plat
 ## Cross-platform coordination
 
 - Treat `scripts/bootstrap.sh` and `scripts/bootstrap.ps1` as paired entry points for the same bootstrap intent; keep capability parity as close as platform constraints allow.
-- When adding a bootstrap dependency or behavior on one platform, evaluate and update the other platform in the same change when practical.
+- When adding a bootstrap dependency or behavior on one platform, update the other platform in the same change.
 - Keep shared version pins in `scripts/bootstrap-versions.env` as the canonical location whenever both scripts depend on the same tool versions.
 
 ## Placement and naming
 
-- Name scripts for the task they perform (`bootstrap`, `check`, `release`, etc.) and keep each script narrowly focused.
-- Choose the extension that matches the intended shell or runtime instead of relying on ambiguous launcher behavior.
-- If a script becomes application code rather than repo automation, move it into the appropriate source tree instead of leaving it in `scripts/`.
-- Detect a script's runtime from its extension, shebang, adjacent config files, and the commands it invokes before adding stack-specific script guidance.
+- Name scripts for the task they perform (`bootstrap`, `check`, `release`, etc.) and keep each script focused.
+- Choose the extension that matches the intended shell or runtime.
+- If a script becomes application code rather than repo automation, move it into the appropriate source tree.
+- Detect a script's runtime from its extension, shebang, adjacent config files, and the commands it invokes.
 - `src/scripts/apply.sh` (the Nix apply dispatcher) lives under `src/` because it is embedded in the flake as `apps.apply`; it follows the same doc and line-ending rules as `scripts/` shell scripts.
-- **Host-specific placement rule**: scripts under `src/hosts/<Host>/scripts/` must implement a semantically host-specific feature; scripts under `src/platforms/<Platform>/scripts/` implement platform-shared behavior for that OS family. Cross-platform features belong in non-host subdirectories (`services/`, `configs/`, `packages/`, `editors/`, `secrets/`, `shell/`, `agents/`, `lib/`, `integrations/`). See [cross-host-feature-parity.instructions.md](cross-host-feature-parity.instructions.md) for the script deduplication policy.
+- **Host-specific placement rule**: scripts under `src/hosts/<Host>/scripts/` implement a host-specific feature; scripts under `src/platforms/<Platform>/scripts/` implement platform-shared behavior for that OS family. Cross-platform features belong in non-host subdirectories (`services/`, `configs/`, `packages/`, `editors/`, `secrets/`, `shell/`, `agents/`, `lib/`, `integrations/`). See [cross-host-feature-parity.instructions.md](cross-host-feature-parity.instructions.md) for the script deduplication policy.
 
 ## Per-directory naming patterns
 
@@ -65,7 +65,7 @@ Non-host subdirectories follow a two-track convention:
 ## Relative pathing convention
 
 All scripts that source other files (libraries, configs, etc.) MUST derive their
-own directory via SCRIPT_DIR and source via SCRIPT_DIR-relative paths. This
+directory via SCRIPT_DIR and source via SCRIPT_DIR-relative paths. This
 makes scripts work from any cwd, prevents `CDPATH` interference, and resolves
 symlinks to physical paths (matching nix store resolution).
 
@@ -86,17 +86,17 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 
 ## PowerShell file naming
 
-When adding or renaming standalone PowerShell entry points, use PascalCase and an approved `Verb-Noun` form for the filename, for example `Get-SystemInventory.ps1` or `Backup-Database.ps1`.
+When adding or renaming standalone PowerShell entry points, use PascalCase and an approved `Verb-Noun` form (e.g. `Get-SystemInventory.ps1`).
 
-The `scripts/` directory is the exception: helper scripts there keep the paired shell basename so the `.sh` and `.ps1` entry points stay aligned. That means `bootstrap.sh` pairs with `bootstrap.ps1`, `check-sh.sh` pairs with `check-sh.ps1`, and `check-pwsh.ps1` is a separate entry point for PowerShell linting (PSScriptAnalyzer) — not the Windows twin of `check-sh.sh`.
+The `scripts/` directory is the exception: helper scripts there keep the paired shell basename so `.sh` and `.ps1` stay aligned. That means `bootstrap.sh` pairs with `bootstrap.ps1`, `check-sh.sh` pairs with `check-sh.ps1`, and `check-pwsh.ps1` is a separate entry point for PowerShell linting (PSScriptAnalyzer) — not the Windows twin of `check-sh.sh`.
 
-For reusable Windows modules under `src/platforms/Windows/modules/`, keep the file name aligned with the exported function name and prefer a single exported `Verb-Noun` function per file. If a module is renamed, update the dot-sourcing paths in `src/hosts/Windows/apply.ps1` in the same change. Collection-operating functions must use collection-indicating singular nouns — see [pwsh-lint-policy.instructions.md](pwsh-lint-policy.instructions.md) (`PSUseSingularNouns`, anti–naive-de-pluralization).
+For reusable Windows modules under `src/platforms/Windows/modules/`, align the filename with the exported function name and prefer a single exported `Verb-Noun` function per file. If a module is renamed, update the dot-sourcing paths in `src/hosts/Windows/apply.ps1` in the same change. Collection-operating functions must use collection-indicating singular nouns — see [pwsh-lint-policy.instructions.md](pwsh-lint-policy.instructions.md) (`PSUseSingularNouns`, anti–naive-de-pluralization).
 
-If a PowerShell file exports multiple functions or none, keep it in `src/platforms/Windows/modules/` as a utility module and give the filename a scope that describes the shared purpose of the file.
+If a PowerShell file exports multiple functions or none, keep it in `src/platforms/Windows/modules/` as a utility module and name the file for its shared purpose.
 
 ### PowerShell here-string extraction
 
-The no-embedding invariant, shared cross-platform content rule, token convention, and exceptions are canonical in [embedded-content.instructions.md](embedded-content.instructions.md). This section keeps the mechanical details:
+The no-embedding invariant, shared cross-platform content rule, token convention, and exceptions are canonical in [embedded-content.instructions.md](embedded-content.instructions.md). The mechanical details:
 
 When extracting inline PowerShell here-strings from `src/platforms/Windows/modules/` into standalone scripts:
 
@@ -108,7 +108,7 @@ When extracting inline PowerShell here-strings from `src/platforms/Windows/modul
 
 ## CLI option and variable naming
 
-Use `--XXX`/`--no-XXX` flag pairs for CLI options and positive variable names for scripts and config knobs. Every feature must support both `--XXX` and `--no-XXX` regardless of its default state.
+Use `--XXX`/`--no-XXX` flag pairs for CLI options and positive variable names for scripts and config knobs. Every feature supports both `--XXX` and `--no-XXX` regardless of default state.
 
 | Aspect | Convention |
 | ----------------- | --------------------------------------------------------- |
@@ -127,8 +127,8 @@ Rules:
 
 ## Line endings and permissions
 
-- Respect `.editorconfig` and `.gitattributes` for line endings. New script extensions need explicit policy before widespread use.
-- Every `.sh`, `.ps1`, and `.bat` script file anywhere in the repository must have its executable bit tracked in Git, regardless of location (`scripts/`, `src/scripts/`, `src/hosts/Windows/`, `src/platforms/Windows/modules/`, or elsewhere). This applies to Windows scripts too — Git stores the executable bit independent of CRLF line endings, and many CI environments and tooling wrappers check the mode before invoking scripts. Set it with `git update-index --chmod=+x <path>` when adding or renaming any script. Verify the stored mode with `git ls-files --stage <path>` (mode `100755` is correct; `100644` is not). Non-script data files such as `bootstrap-versions.env`, `.yml`, `.json`, and `.nix` files must remain `100644`.
+- Respect `.editorconfig` and `.gitattributes` for line endings. New script extensions need explicit policy before widespread adoption.
+- Every `.sh`, `.ps1`, and `.bat` script file anywhere in the repository must have its executable bit tracked in Git, regardless of location. This applies to Windows scripts too — Git stores the executable bit independent of CRLF line endings, and many CI environments check the mode before invoking scripts. Set it with `git update-index --chmod=+x <path>` when adding or renaming any script. Verify the stored mode with `git ls-files --stage <path>` (mode `100755` is correct; `100644` is not). Non-script data files such as `bootstrap-versions.env`, `.yml`, `.json`, and `.nix` files must remain `100644`.
 - If you add a new script extension or change placement conventions, update the related config and any tests in the same change.
 
 ## Sorting
@@ -138,17 +138,17 @@ Rules:
 
 ## Portability and safety
 
-- Keep scripts non-interactive by default unless interactivity is the explicit purpose of the script.
-- Prefer explicit error handling, predictable exit codes, and idempotent operations where possible.
-- Do not assume Bash-only features in `.sh` unless you intentionally require Bash and document that requirement.
-- For PowerShell, prefer clear cmdlet names over aliases in committed scripts.
+- Keep scripts non-interactive by default unless that is their purpose.
+- Prefer explicit error handling, predictable exit codes, and idempotent operations.
+- Do not assume Bash-only features in `.sh` unless you require Bash and document that requirement.
+- Prefer full cmdlet names over aliases in committed PowerShell scripts.
 
 ## Privilege-gating policy
 
 Any code that checks whether it holds a privilege (sudo/root on POSIX;
 Administrator/elevated on Windows) follows this rule. A privilege is "required"
-only when the operation at hand cannot succeed without it; a script that never
-needs the privilege is unaffected by this policy.
+only when the operation cannot succeed without it; a script that never
+needs the privilege is unaffected.
 
 1. **Default (all `src/` code, and any non-user-facing path):** if the privilege
    is required but unavailable, **hard-error** (exit non-zero with a clear
@@ -157,7 +157,7 @@ needs the privilege is unaffected by this policy.
    falling back to a degraded non-privileged path) is not allowed. Such
    continue-without-privilege branches add parallel code paths that must be
    maintained for no benefit, since the operation cannot succeed correctly
-   without the privilege. Hard-error is the only sanctioned outcome.
+   without the privilege. Hard-error is the only acceptable outcome.
 2. **User-facing exception (`scripts/` only — the `nucleus-*` CLI set, NOT
    `src/scripts/`, `src/platforms/*/scripts/`, `src/hosts/*/`):** when an
    operation *requires* a privilege that the current process lacks, the script
@@ -166,21 +166,10 @@ needs the privilege is unaffected by this policy.
    (no `sudo` binary, UAC cancelled). If already privileged, proceed directly.
    This rule is scoped to *privilege-requiring operations only* — a user-facing
    script that never needs the privilege is unaffected and must not be forced to
-   escalate. The rule replaces the prior warn-and-skip behavior for cases where
-   the script already gates on a missing item (e.g. `svc` system-domain).
+   escalate. This rule replaces prior warn-and-skip behavior for cases where the script already gates on a missing item (e.g. `svc` system-domain).
 3. **Inverse family — hard-refuse when already elevated (NOT warn-and-skip):**
-   scripts that *refuse to run already-elevated* because they manage escalation
-   internally (`scripts/bootstrap.sh`, `scripts/bootstrap.ps1`, `src/scripts/apply.sh`,
-   `src/hosts/Windows/apply.ps1`). This is the sole exception to rule 2's
-   escalate-then-warn path, but its outcome is a **hard refusal** (abort with a
-   non-zero exit), not a warning. Refusing to run is an error, not a warn-and-continue.
-   - **Windows admin-normal provisioning (no non-admin fallback):** writing to
-     `%ProgramData%\nucleus\bin` (agent-host-shell setup, scheduled-task
-     registration) runs under `RunAs` self-elevation, exactly like POSIX `sudo`.
-     It is admin-normal and requires NO non-admin fallback path. The agent must
-     NOT assume a non-admin case for Windows provisioning and must NOT add
-     degraded non-privileged branches. This is the inverse-family exception
-     restated for the Windows side.
+   scripts that *refuse to run already-elevated* because they manage escalation internally (`scripts/bootstrap.sh`, `scripts/bootstrap.ps1`, `src/scripts/apply.sh`, `src/hosts/Windows/apply.ps1`). The outcome is a **hard refusal** (non-zero exit), not a warning.
+   - **Windows admin-normal provisioning (no non-admin fallback):** writing to `%ProgramData%\nucleus\bin` (agent-host-shell setup, scheduled-task registration) runs under `RunAs` self-elevation, like POSIX `sudo`. No non-admin fallback path. Do not assume a non-admin case for Windows provisioning.
 4. **Non-escalatable privileges (documented exceptions, keep warn-and-skip):**
    - macOS Full Disk Access (TCC privacy grant — cannot be obtained via sudo).
    - `nucleus-apply health-check` diagnostic reporting (its purpose is to surface gaps, not act).
@@ -266,7 +255,7 @@ Runtime toggles live at `~/.local/state/nucleus/config.json` (outside `~/.config
 
 Services read the config file directly (not via `nucleus-config`) for early-boot compatibility, following the same pattern on both POSIX and Windows.
 
-Adding a new toggle: add a default entry to the `DEFAULTS`/`$Defaults` map in both script implementations, then update consuming code to read the key (defaulting to `true`).
+When adding a toggle: add a default entry to the `DEFAULTS`/`$Defaults` map in both script implementations, then update consuming code to read the key (defaulting to `true`).
 
 ## Centralized daemon/service refresh
 
@@ -281,16 +270,16 @@ For macOS activation blocks that need daemon refresh, use wrapper scripts under 
 
 ## When a script needs its own file
 
-A script under `src/scripts/` earns its own file when it falls into one of these categories. Otherwise, inline its content directly in the Nix activation block that calls it.
+A script under `src/scripts/` earns its own file when it falls into one of these categories. Otherwise, inline directly in the Nix activation block.
 
-**Keep as a separate file when:**
+**Separate file when:**
 
 1. **Substantial logic** — loops, conditionals, data processing, error handling, or multi-step algorithms that would bloat the Nix activation string.
 2. **Exec dispatch** — script validates prerequisites then `exec`s another command (e.g., `gc-sweep.sh`). The validation+dispatch pattern keeps activation blocks focused.
 3. **Thin dispatcher** — script calls another tool/script with argument setup (e.g., `merge-obsidian-json.sh`). The argument preparation and error handling justify separation.
 4. **Persistent daemon/service** — long-running process with lifecycle management.
 
-**Inline directly in the Nix activation block when:**
+**Inline when:**
 
 1. **Thin library wrapper** — script only sources a library (from `src/scripts/lib/`) and calls functions from it, with no additional logic. No loops over data, no conditionals on runtime state, no data transformation. Embed the library via `${builtins.readFile <lib-path>}` in the activation block and call the functions directly. Wrappers that iterate over data entries (loops) still justify a separate file.
 2. **Trivial one-command** — script whose entire logic is a single command or a few simple commands with minimal/no control flow (no loops, no conditionals on runtime state, no data transformation).
@@ -312,14 +301,14 @@ Apply these patterns when maintaining scripts under `src/scripts/`:
 
 Library files (under `src/scripts/lib/`) are pure function/constant definitions. The same rules apply by analogy to Windows PowerShell helper modules under `src/platforms/Windows/modules/scripts/`.
 
-1. **No top-level side effects on import.** A lib file must define functions and variables only — never execute commands at import time. No `set -eu` at the top level (only inside function bodies). No auto-invocation at end of file.
+1. **No top-level side effects on import.** A lib file defines functions and variables only — never execute commands at import time. No `set -eu` at the top level (only inside function bodies). No auto-invocation at end of file.
 
-2. **No Nix placeholders.** Lib files must never contain `__TOKEN__`-style placeholders intended for Nix `builtins.replaceStrings`. All data must enter via function parameters.
+2. **No Nix placeholders.** Lib files must never contain `__TOKEN__`-style placeholders for Nix `builtins.replaceStrings`. All data enters via function parameters.
 
-3. **Nix must not `builtins.readFile` lib files.** Nix modules must source lib files at runtime (`. "$REPO_ROOT/src/scripts/lib/..."`) rather than inlining their content at build time.
+3. **Nix must not `builtins.readFile` lib files.** Nix modules source lib files at runtime (`. "$REPO_ROOT/src/scripts/lib/..."`) rather than inlining them at build time.
 
 4. **Data from Nix goes to the consumer script first, then to lib via function args.** The consumer (activation script, service script, or standalone Nix-derived script) receives data from Nix through its own parameters or token substitution, then passes it to lib functions as arguments.
 
 ### Exception
 
-A lib file may be embedded via `builtins.readFile` when it contains a clean function definition (no tokens, no env var dependencies) and is being wrapped into a standalone script (e.g., a launchd daemon script) that will execute independently. The embedded lib must remain pure — all external inputs must arrive as function arguments from the wrapping code.
+A lib file may be embedded via `builtins.readFile` when it contains a clean function definition (no tokens, no env var dependencies) and is wrapped into a standalone script (e.g., a launchd daemon script) that executes independently. The embedded lib must remain pure — all external inputs arrive as function arguments from the wrapping code.

@@ -6,24 +6,26 @@ applyTo: "src/scripts/lib/step-runner.sh, src/scripts/lib/step-runner.ps1, scrip
 
 # Step-runner framework interface specification
 
-This document is the canonical contract for the step-runner framework used by the check and test pipelines. Both POSIX (`step-runner.sh`) and Windows/PowerShell (`step-runner.ps1`) implementations MUST conform to this spec.
+Canonical contract for the step-runner framework. Both POSIX (`step-runner.sh`) and Windows/PowerShell (`step-runner.ps1`) implementations MUST conform.
 
 ## Spec A: Step ID registration
 
 ```text
-register_step(id: str, name: str, func: Function)                # 3-arg form: number derived from NN- prefix
-register_step(id: str, number: int, name: str, func: Function)   # 4-arg form: explicit number (unit tests only)
-  id:      Non-empty string, no ASCII digits (0-9). Must be unique among all registered steps.
+register_step(id: str, name: str, func: Function)                # 3-arg: number derived from NN- prefix
+register_step(id: str, number: int, name: str, func: Function)   # 4-arg: explicit number (unit tests only)
+  id:      Non-empty string, no ASCII digits (0-9). Unique among all registered steps.
            Recommended: kebab-case, all lowercase, hyphens for word separators.
-  number:  Positive integer. Must be unique. Derived from the 2-digit prefix of the registering file's name; explicit override allowed in unit tests only.
+  number:  Positive integer. Unique. Derived from the 2-digit prefix of the registering file's name;
+           explicit override allowed in unit tests only.
   name:    Human-readable display name. Used in output headers.
-  func:    Function to call when step executes. Called with args: (has_args, repo_root, ...files).
+  func:    Called with args: (has_args, repo_root, ...files).
 
   Number derivation: the 3-arg form derives the number from the registering file's NN- filename
-  prefix (2-digit prefix required; registration fails with "cannot derive step number" if missing
-  or non-derivable). The 4-arg form overrides the number explicitly and is allowed ONLY in unit
-  tests (tests/scripts/step-runner-unit-tests.sh). PS1 equivalent: Register-Step -Number defaults
-  to 0 (derive); explicit -Number allowed only in unit tests (tests/scripts/step-runner-unit-tests.ps1).
+  prefix (2-digit prefix required; registration fails with "cannot derive step number" if missing).
+  The 4-arg form overrides the number explicitly and is allowed ONLY in unit tests
+  (tests/scripts/step-runner-unit-tests.sh). PS1 equivalent: Register-Step -Number defaults to 0
+  (derive); explicit -Number allowed only in unit tests
+  (tests/scripts/step-runner-unit-tests.ps1).
 
   Validation errors (hard failure, stops script):
     - id contains a digit char  → "Step ID '<id>' contains forbidden digit"
@@ -34,10 +36,7 @@ register_step(id: str, number: int, name: str, func: Function)   # 4-arg form: e
   Effect: Appends (id, number, name, func) to the step arrays _STEP_IDS, _STEP_NUMBERS,
           _STEP_NAMES, _STEP_FUNCS (POSIX); $script:StepIds, $script:StepNumbers, etc. (PS1).
 
-  Cross-platform equivalence:
-    - Same validation rules
-    - Same error messages (same text — executed in different shells)
-    - Same side effects on internal state
+  Cross-platform: same validation rules, same error messages, same side effects on internal state.
 ```
 
 ## Spec B: `--skip-steps` flag
@@ -65,25 +64,20 @@ parse_args flag: --skip-steps=<comma-separated-ids>
         execute normally
 
   Error cases:
-    - Unknown ID in --skip-steps: NOT an error (allow future-proofing — IDs may be added later).
-      Unknown IDs are silently ignored. (Rationale: forward compatibility.)
-    - Duplicate ID in --skip-steps: silently deduplicate.
+    - Unknown ID: NOT an error (forward compatibility — IDs may be added later). Silently ignored.
+    - Duplicate ID: silently deduplicate.
     - --skip-steps given multiple times: last value wins (no accumulation).
 
   Interaction with --fail-fast:
-    - Skipped steps do not trigger fail-fast (they're not failures).
-    - Non-skipped steps that fail still trigger fail-fast as normal.
+    - Skipped steps do not trigger fail-fast (not failures).
+    - Non-skipped steps that fail still trigger fail-fast.
 
   Interaction with --scoped:
     - Steps that already skip due to --scoped (no relevant files) still skip — the --skip-steps
       skip message takes priority if both conditions apply.
 
-  Cross-platform equivalence:
-    - Same parsing rules (= sign mandatory)
-    - Same skip message format (identical text)
-    - Same deduplication behavior
-    - Same interaction with --fail-fast
-    - Same forward-compatible unknown-ID handling
+  Cross-platform: same parsing rules, skip message format, deduplication, --fail-fast interaction,
+  and forward-compatible unknown-ID handling.
 ```
 
 ## Spec C: `--format` removal (post-removal behavior)
@@ -134,7 +128,7 @@ Invoke-StepPipeline behavior:
   - Live output: each step line is prefixed [step NN] on stderr during execution; ordered
     unprefixed replay still appears in aggregate_results / Format-StepSummary.
   - Output ordering: Steps' output is captured per-step and printed in step-number order,
-    NOT in completion order. This matches POSIX behavior where aggregation prints in order.
+    not completion order. Matches POSIX behavior.
   - Timing summary reports sum of per-step duration and wall-clock duration as decimal
     seconds (`%.3f s`, e.g. `4.127 s`). Internal storage remains integer milliseconds
     (`step-N.time`, `pipeline.wall_ms`). POSIX measurement uses sub-second clocks on all
@@ -145,13 +139,10 @@ Invoke-StepPipeline behavior:
     - After all waves complete, overall exit code = max of all step exit codes (same as POSIX).
     - Fail-fast: if any step fails, stop after current wave, exit.
 
-  Compatible with --skip-steps: skipped steps are excluded from parallelism (not dispatched).
+  Compatible with --skip-steps: skipped steps are excluded from parallelism.
 
-  Cross-platform equivalence:
-    - Same wave structure
-    - Same output ordering (step-number, not completion)
-    - Same error aggregation (max exit code)
-    - Same fail-fast boundary (end of wave, not mid-wave)
+  Cross-platform: same wave structure, output ordering (step-number), error aggregation (max
+  exit code), and fail-fast boundary (end of wave, not mid-wave).
 ```
 
 ### Output color
@@ -161,14 +152,14 @@ Live console chrome follows the F2/F4 palette via the shared color helpers — P
 - F1 message lines: the `notice` level renders bold blue; message-body semantic coloring (URLs underline-cyan, single-quoted spans blue) applies inside step output.
 - Step chrome (F2): `[step NN]` marker is dim, content default.
 - Results table (F4): glyphs ✓ green / ✗ red / SKIP yellow / ⊘ yellow (test-lib), labels dim.
-- Captured step files and skip messages are plain: color is console-only and capture files hold no escape sequences.
+- Captured step files and skip messages are plain: color is console-only, capture files hold no escape sequences.
 - Colors are gated by NO_COLOR / FORCE_COLOR / tty detection per the console color spec in `logging.instructions.md`.
 
 ## Spec F: Silent skip elimination
 
 ```text
 Every step that chooses NOT to run (for any reason — empty file list, platform mismatch,
-missing tool) MUST output an explicit skip message with the pattern:
+missing tool) MUST output an explicit skip message:
 
   "=== [<number>] <name> === SKIPPED (<reason>)"
 
@@ -180,18 +171,16 @@ The <reason> must be a concise, human-readable explanation. Examples:
   - "nixf-tidy not available on Windows"
 
 Rules:
-  - Every runtime self-skip MUST go through the shared skip_step helper (F3 form) rather than printing a bare literal; the runner's own --skip-steps path already emits the same F3 form via _run_skipped_step.
+  - Every runtime self-skip MUST go through the shared skip_step helper (F3 form) rather than
+    printing a bare literal; the runner's own --skip-steps path already emits the same F3 form
+    via _run_skipped_step.
   - A skipped step is NOT a failure (exit code 2 — rendered as SKIP in the results table).
   - A skipped step MUST NOT say "passed" or "no issues found" — that implies it ran.
   - Every skip MUST go through the single canonical skip path (the skip check in the
-    step function body), not via silent early-return or conditional execution that
-    produces no output.
+    step function body), not via silent early-return or conditional execution.
 
-Cross-platform equivalence:
-  - Same format for skip messages
-  - Same reasons for skips (where applicable — some reasons are inherently platform-specific)
-  - A step that skips on POSIX for a platform reason must also skip on PS1 (opposite direction)
-  - No step on either platform says "passed" when it didn't run any checks
+Cross-platform: same skip message format, same reasons (where applicable — some are platform-
+specific), no step says "passed" when it didn't run any checks.
 ```
 
 ## Check step groups
@@ -207,12 +196,12 @@ Cross-platform equivalence:
 
 Step numbers derive from the `NN-` filename prefix of `src/scripts/checks/check-steps/<nn>-*.{sh,ps1}` (and `src/scripts/tests/test-steps/` for the test pipeline) at registration; step IDs are explicit digit-free kebab-case strings decoupled from numbers. Renumbering is a filename change plus a reference sweep — moved step files need no internal edits. The `tests/scripts/check-steps/<nn>-*-tests.{sh,ps1}` pairs hard-code their target step's filename (`TEST_FILE` / `$testFile` and `# shellcheck source=` comments), and prose "step N" references appear across `.agents/instructions/` and step-adjacent comments (`repository-policy.awk`, generator/installer headers), so every reference must move with the file in the same change.
 
-- **No blind appending.** Never create a new step as the next unused number (`NN+1`) merely because it is next; a step number must reflect the step's function and group, not its creation order.
-- **Group first, number second.** Before creating a new step, classify it into one of the groups above. If it fits an existing group, its number must land inside that group's range. A new group requires explicit justification and renumbering of the affected groups.
-- **Rename first, then create.** When the target slot is occupied: (a) `git mv` the affected check-step pairs (`src/scripts/checks/check-steps/<nn>-*.{sh,ps1}`) and their test pairs (`tests/scripts/check-steps/<nn>-*-tests.{sh,ps1}`) to make room; (b) update every hard-coded reference in the same change — `TEST_FILE` / `$testFile` paths and `# shellcheck source=` comments in moved tests, prose "step N" mentions across `.agents/instructions/`, `repository-policy.awk`, generator/installer comments, and the groups table above; (c) only then create the new step pair and its test pair; (d) land all renames and the new step in ONE atomic commit — never a broken intermediate state.
-- **Test-pipeline steps** (`src/scripts/tests/test-steps/`): the same principles apply — place new test steps near their functional kin (Nix tests, PowerShell lint, system config build, framework suites, Windows Pester), renumber first when inserting, never blind-append.
+- **No blind appending.** Never create a new step as the next unused number (`NN+1`) merely because it is next; a step number must reflect the step's function and group.
+- **Group first, number second.** Before creating a new step, classify it into one of the groups above. If it fits an existing group, its number must land inside that group's range. A new group requires explicit justification and renumbering.
+- **Rename first, then create.** When the target slot is occupied: (a) `git mv` the affected check-step pairs (`src/scripts/checks/check-steps/<nn>-*.{sh,ps1}`) and their test pairs (`tests/scripts/check-steps/<nn>-*-tests.{sh,ps1}`) to make room; (b) update every hard-coded reference in the same change — `TEST_FILE` / `$testFile` paths, `# shellcheck source=` comments, prose "step N" mentions across `.agents/instructions/`, `repository-policy.awk`, generator/installer comments, and the groups table; (c) create the new step pair and its test pair; (d) land all renames and the new step in ONE atomic commit.
+- **Test-pipeline steps** (`src/scripts/tests/test-steps/`): same principles — place new test steps near their functional kin, renumber first when inserting, never blind-append.
 
-Shell entry-script validation (`script-validation-tests.sh`) runs in test step 5 (`script-and-framework-tests`), not in the check pipeline. Step 5 runs priority framework suites serially, then parallelizes the remaining `tests/scripts/**/*-tests.*` suites with ordered output replay; `nucleus-apps-smoke-tests.sh` is discovered there and runs under `nucleus_nix_locked` on POSIX.
+Shell entry-script validation (`script-validation-tests.sh`) runs in test step 5 (`script-and-framework-tests`), not in the check pipeline. Step 5 runs priority framework suites serially, then parallelizes remaining `tests/scripts/**/*-tests.*` suites with ordered output replay; `nucleus-apps-smoke-tests.sh` runs under `nucleus_nix_locked` on POSIX.
 
 ## Spec G: Step 7 `$schema` enforcement
 
@@ -270,6 +259,6 @@ Step 7 validation rules:
 
 ## Related instruction files
 
-- `testing.instructions.md` — Test structure, CI integration, and validation patterns for the test pipeline.
+- `testing.instructions.md` — Test structure, CI integration, and validation patterns.
 - `tooling-and-validation.instructions.md` — Repository tooling, build commands, and validation hooks.
 - `allow-and-deny-lists.instructions.md` — Step 7 EXCEPTION_LIST registry and exclude-list policy.

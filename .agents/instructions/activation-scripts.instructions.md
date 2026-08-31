@@ -1,5 +1,5 @@
 ---
-description: "Use when adding, renaming, or reviewing activation entries, or adding or editing activation scripts in Nix modules. Covers naming conventions, the activation bundle architecture, inline activation rules, standalone script patterns (for launchd/systemd), prohibited patterns, and conventions."
+description: "Use when adding, renaming, or reviewing activation entries, or adding or editing activation scripts in Nix modules. Covers naming conventions, activation bundle architecture, inline activation rules, standalone script patterns, prohibited patterns, and conventions."
 name: "Activation Script Conventions"
 applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/**/services/*.nix, src/scripts/**/*.sh, src/modules/terminal-activations.nix, src/hosts/Windows/apply.ps1, src/platforms/Windows/modules/system/Sync-TerminalActivation.ps1"
 ---
@@ -8,47 +8,31 @@ applyTo: "src/modules/**/*.nix, src/hosts/**/*.nix, src/hosts/**/services/*.nix,
 
 ## Naming conventions
 
-All activation entry names — `home.activation.*`, `system.activationScripts.*`, and `nucleus.terminalActivations.*` — follow these rules:
+All activation entry names — `home.activation.*`, `system.activationScripts.*`, and `nucleus.terminalActivations.*` — use these rules:
 
-- **kebab-case only.** Use hyphens to separate words: `cloud-drives-setup`, not `cloudDrivesSetup` or `cloud_drives_setup`.
-- **verb-first.** Start every name with a verb or action word: `provision-dev-repos`, `install-pwsh-yaml`, `merge-obsidian-json`.
-- **Host-prefixed when OS-specific.** If the activation only applies to one OS, prefix with `macos-` or `nixos-`:
-  - `macos-configure-finder-sidebar`, `nixos-launch-nvim`
-- **No prefix when cross-platform.** If the activation applies to multiple operating systems, no host prefix:
-  - `cloud-drives-setup`, `provision-dev-repos`, `wait-for-sops-secrets`
-- **No `nucleus-` prefix.** The project name is redundant — all activations in this repo are nucleus-specific.
-- **Keep `protect`/`unprotect` for symlink hardening.** The shared protect/unprotect pattern in `home.nix` uses `protect-out-of-store-symlinks` / `unprotect-out-of-store-symlinks`. Hand-written entries like `home.activation.macos-protect-icloud-downloads-symlink` follow the normal naming rules — protect/unprotect entries are NOT exempt from the `macos-`/`nixos-` prefix. Only the generated `config-utils.nix` names (`unprotectSymlink_${name}` / `protectSymlink_${name}` / `mergeConfig_${name}`) are exempt.
+- **kebab-case only**: `cloud-drives-setup`, not `cloudDrivesSetup` or `cloud_drives_setup`.
+- **verb-first**: `provision-dev-repos`, `install-pwsh-yaml`, `merge-obsidian-json`.
+- **Host-prefixed when OS-specific**: `macos-configure-finder-sidebar`, `nixos-launch-nvim`.
+- **No prefix when cross-platform**: `cloud-drives-setup`, `provision-dev-repos`, `wait-for-sops-secrets`.
+- **No `nucleus-` prefix**: the project name is redundant.
+- **`protect`/`unprotect` for symlink hardening** follows the same rules — `home.activation.macos-protect-icloud-downloads-symlink` needs the `macos-` prefix. Only generated `config-utils.nix` names (`unprotectSymlink_*`, `protectSymlink_*`, `mergeConfig_*`) are exempt.
 
-### Per-namespace naming rules
-
-Names in every namespace are kebab-case and verb-first, with a `macos-`/`nixos-` prefix when OS-specific, no prefix when cross-platform, and never a `nucleus-` prefix:
-
-| Namespace | Rule |
-| --------- | ---- |
-| `home.activation.<name>` (Home Manager) | kebab-case, verb-first; `macos-`/`nixos-` prefix when OS-specific; no prefix when cross-platform; no `nucleus-` prefix |
-| `system.activationScripts.<name>` (nix-darwin / NixOS) | kebab-case, verb-first; `macos-`/`nixos-` prefix when OS-specific; no prefix when cross-platform; no `nucleus-` prefix |
-| `nucleus.terminalActivations.<name>` (nucleus terminal activations) | kebab-case, verb-first; `macos-`/`nixos-` prefix when OS-specific; no prefix when cross-platform; no `nucleus-` prefix |
-
-The exempt classes below apply to all three namespaces. The cross-boundary mapping table (Nix ↔ PowerShell ↔ DSC ↔ apply functions ↔ stage labels) lives in `.agents/instructions/cross-host-feature-parity.instructions.md`.
+These rules apply uniformly across `home.activation`, `system.activationScripts`, and `nucleus.terminalActivations`. The cross-boundary mapping table lives in `.agents/instructions/cross-host-feature-parity.instructions.md`.
 
 ### Exempt classes
 
-The following activation entry types are **not** subject to the naming policy:
-
-1. **Generated names** from `config-utils.nix`: `unprotectSymlink_*`, `protectSymlink_*`, `mergeConfig_*` — these are dynamically generated from data, not manually authored.
-2. **Built-in Home Manager phases**: `linkGeneration`, `writeBoundary`, `checkLinkTargets`, `setupLaunchAgents`, `installPackages` — these are framework-defined.
-3. **`sops-nix` entries**: framework-defined names.
+1. **Generated names** from `config-utils.nix`: `unprotectSymlink_*`, `protectSymlink_*`, `mergeConfig_*`.
+2. **Built-in Home Manager phases**: `linkGeneration`, `writeBoundary`, `checkLinkTargets`, `setupLaunchAgents`, `installPackages`.
+3. **`sops-nix` entries**: framework-defined.
 4. **nix-darwin system activationScripts**: only the hardcoded names (`extraActivation`, `postActivation`, `preActivation`) work; custom names are silently ignored.
 
 ### DAG ordering references
 
-When referencing another activation in `entryAfter [...]` or `entryBefore [...]`, use the exact kebab-case name of the target entry. For built-in phases, use the framework-provided name (e.g., `"linkGeneration"`, `"writeBoundary"`).
-
-Shared DAG dependency names are defined in `src/modules/lib/activation-dag.nix`.
+Use the exact kebab-case name in `entryAfter [...]` or `entryBefore [...]`. For built-in phases, use the framework-provided name (e.g., `"linkGeneration"`, `"writeBoundary"`). Shared DAG dependency names are in `src/modules/lib/activation-dag.nix`.
 
 ### References in documentation and comments
 
-All references to activation entry names in documentation, code comments, echo messages, script header comments, and any other human-readable text must use the same kebab-case verb-first naming convention. Stale camelCase references to renamed activations must be updated alongside the rename.
+All references to activation entry names in documentation, code comments, echo messages, and script headers use the same kebab-case verb-first convention. Stale camelCase references must be updated alongside the rename.
 
 ---
 
@@ -67,9 +51,7 @@ system.activationScripts.postActivation.text = lib.mkAfter ''
 
 ---
 
-All activation blocks in this repo must use the **activation bundle subprocess pattern**: scripts live in `src/scripts/`, are assembled into a single Nix derivation (`src/modules/lib/script-tree.nix`), and are invoked as subprocesses from activation blocks.
-
-This eliminates `builtins.readFile` embedding, `__TOKEN__` placeholders, and `+` concatenation from activation blocks entirely.
+All activation blocks use the **activation bundle subprocess pattern**: scripts live in `src/scripts/`, assembled into a single Nix derivation (`src/modules/lib/script-tree.nix`), and invoked as subprocesses. This eliminates `builtins.readFile` embedding, `__TOKEN__` placeholders, and `+` concatenation.
 
 ---
 
@@ -77,19 +59,9 @@ This eliminates `builtins.readFile` embedding, `__TOKEN__` placeholders, and `+`
 
 `src/modules/lib/script-tree.nix` builds a `nucleus-script-tree` derivation containing all scripts from `src/scripts/` bundled into `$out/src/scripts/` with the same subtree structure, making `$out/` the repo root.
 
-Every script in the bundle:
+Every bundle script: sets `SCRIPT_DIR` from `$0`, sources libs via `"$SCRIPT_DIR/../lib/<name>.sh"`, accepts per-user values as CLI positional args, executes as a standalone subprocess.
 
-1. Sets `SCRIPT_DIR` from `$0`
-2. Sources libs via `"$SCRIPT_DIR/../lib/<name>.sh"`
-3. Accepts per-user values as CLI positional args
-4. Executes as a standalone subprocess
-
-**Adding a new script to the bundle:**
-
-1. Create the script in `src/scripts/` (cross-platform), `src/platforms/<Platform>/scripts/` (platform-specific), or `src/hosts/<Host>/scripts/` (host-only).
-2. Follow the SCRIPT_DIR + lib sourcing pattern (see below).
-3. It is automatically included — no manual registration needed.
-4. Invoke from Nix as `"${activationBundle}/src/scripts/<path>.sh" <pos-arg1> <pos-arg2>`.
+**Adding a new script:** create it in `src/scripts/` (cross-platform), `src/platforms/<Platform>/scripts/` (platform-specific), or `src/hosts/<Host>/scripts/` (host-only). Follow the SCRIPT_DIR + lib sourcing pattern. It is automatically included. Invoke from Nix as `"${activationBundle}/src/scripts/<path>.sh" <pos-arg1> <pos-arg2>`.
 
 ---
 
@@ -126,13 +98,13 @@ home.activation.protect-out-of-store-symlinks = lib.hm.dag.entryAfter [ "linkGen
 
 Rules:
 
-- **Always use `activationBundle` from `pkgs.callPackage ./lib/script-tree.nix { }`** — never hardcode a store path.
-- **Use `"${activationBundle}/src/scripts/<path>.sh"`** — the leading `"` makes Nix expand the store path.
-- **Positional CLI args for all per-user values.** No `__TOKEN__` placeholders.
-- **Use `lib.escapeShellArg` for values going into shell single-quoted context** (prevents injection).
-- **Use `builtins.toJSON` for structured data** (lists, attrsets) and pass as a single quoted argument.
-- **Use double quotes for store paths** (`"${pkgs.jq}/bin/jq"`).
-- **`$HOME` is preserved** in Nix `''` strings (`$` passes literally unless followed by `{`).
+- Use `activationBundle` from `pkgs.callPackage ./lib/script-tree.nix { }` — never hardcode a store path.
+- Use `"${activationBundle}/src/scripts/<path>.sh"` — the leading `"` makes Nix expand the store path.
+- Positional CLI args for all per-user values. No `__TOKEN__` placeholders.
+- Use `lib.escapeShellArg` for values going into shell single-quoted context (prevents injection).
+- Use `builtins.toJSON` for structured data (lists, attrsets) and pass as a single quoted argument.
+- Use double quotes for store paths (`"${pkgs.jq}/bin/jq"`).
+- `$HOME` is preserved in Nix `''` strings (`$` passes literally unless followed by `{`).
 
 ### Pure inline exception
 
@@ -164,14 +136,14 @@ _arg2="$2"
 
 Rules:
 
-- **Always start with `set -euo pipefail`** (except scripts that intentionally allow failures).
-- **Hard-error on required-op failure.** A required convergence or configuration operation that fails must abort the activation (POSIX `die`/`error` + `exit 1`; PowerShell `Write-NucleusError` + `throw`). `warn`/`Write-NucleusWarning` + continue is banned for required operations in activation scripts — see `.agents/instructions/error-handling.instructions.md` (activation scripts hard-error, error vs warning vs info decision model).
-- **Always define `SCRIPT_DIR`** — never reference `$REPO_ROOT` at runtime.
-- **Source libs via SCRIPT_DIR-relative path.** Never use `${repoRoot}` or hardcoded paths.
-- **Use descriptive variable names** with a script-specific prefix (e.g., `_mqi_` for merge-qtpass-ini).
-- **Do not define functions as `main()`** — scripts are standalone executables, run top-to-bottom.
-- **No Nix `__TOKEN__` placeholders** — all per-user values come as CLI positional args.
-- **No shebang in activation bundle scripts** — the bundle derivation sets bash as the interpreter.
+- Start with `set -euo pipefail` (except scripts that intentionally allow failures).
+- **Hard-error on required-op failure.** A required convergence or configuration operation that fails must abort the activation (POSIX `die`/`error` + `exit 1`; PowerShell `Write-NucleusError` + `throw`). `warn`/`Write-NucleusWarning` + continue is banned for required operations — see `.agents/instructions/error-handling.instructions.md`.
+- Always define `SCRIPT_DIR` — never reference `$REPO_ROOT` at runtime.
+- Source libs via SCRIPT_DIR-relative path. Never use `${repoRoot}` or hardcoded paths.
+- Use descriptive variable names with a script-specific prefix (e.g., `_mqi_` for merge-qtpass-ini).
+- Do not define functions as `main()` — scripts run top-to-bottom.
+- No Nix `__TOKEN__` placeholders — all per-user values come as CLI positional args.
+- No shebang in activation bundle scripts — the bundle derivation sets bash as the interpreter.
 
 ---
 
@@ -238,16 +210,16 @@ Every exception to these rules must have an inline `# WHY:` comment in the Nix e
 
 ## Terminal activations (last resort)
 
-Terminal activations (`nucleus.terminalActivations`) are a **LAST RESORT**. Never add a new entry unless **all three** criteria are met:
+Terminal activations (`nucleus.terminalActivations`) are a **last resort**. Never add a new entry unless all three criteria are met:
 
-1. **TCC constraint**: the command MUST run in the user's terminal context (outside sudo/Nix activation) — typically because macOS TCC grants (Full Disk Access, Accessibility) are required and would be lost inside the sudo process tree during `darwin-rebuild switch`.
-2. **No alternative**: the command cannot be refactored into a Nix declarative option, a Home Manager activation entry, or a system activation script that runs inside the rebuild.
+1. **TCC constraint**: the command MUST run in the user's terminal context (outside sudo/Nix activation) — macOS TCC grants (Full Disk Access, Accessibility) would be lost inside the sudo process tree during `darwin-rebuild switch`.
+2. **No alternative**: the command cannot be refactored into a Nix declarative option, Home Manager activation entry, or system activation script.
 3. **Documented constraint**: the technical constraint is documented inline with a `# WHY: terminal-activations (last resort):` comment at the call site.
 
-If a command does not need TCC-sensitive context (FDA, Accessibility, Screen Recording, Automation), it **SHOULD** run as a normal Nix/Home Manager activation entry. Terminal activations are inherently imperative (eval'd from a manifest file) and bypass the declarative Nix model — each use erodes reproducibility.
+Commands that do not need TCC-sensitive context (FDA, Accessibility, Screen Recording, Automation) should run as a normal Nix/Home Manager activation entry. Terminal activations are inherently imperative (eval'd from a manifest file) and bypass the declarative Nix model.
 
-Every `nucleus.terminalActivations` entry in `.nix` files must have a `# WHY: terminal-activations (last resort):` comment immediately before it, explaining why the Nix activation path cannot work for that specific command.
+Every `nucleus.terminalActivations` entry must have a `# WHY: terminal-activations (last resort):` comment explaining why the Nix activation path cannot work.
 
-macOS `darwin-rebuild switch` runs as root (via sudo). Activation scripts executing inside that process tree lose macOS TCC grants. Terminal activations escape the sudo process tree, so TCC grants are inherited from the user's shell session. On Linux and Windows there is no TCC concept — if a terminal activation is added for a non-macOS host, it must have an equally compelling reason documented.
+macOS `darwin-rebuild switch` runs as root (via sudo). Activation scripts inside that process tree lose macOS TCC grants. Terminal activations escape the sudo process tree, so TCC grants are inherited from the user's shell session. On Linux and Windows there is no TCC concept — if a terminal activation is added for a non-mACOS host, it must have an equally compelling documented reason.
 
 See `src/modules/terminal-activations.nix` for the canonical module definition and policy text.

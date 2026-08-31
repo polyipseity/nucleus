@@ -90,13 +90,13 @@ VM guest credentials must come from per-user SOPS secrets (`src/secrets/users-<u
 
 Guest SSH public keys for NixOS `authorized_keys` are resolved from `src/modules/vm-guest-ssh-public-key-paths.json` (static `id_*.pub` paths first, then `ssh_personal_{username}.pub` templates aligned with `secrets.nix` and `50-nucleus.conf`). POSIX `vm_resolve_guest_ssh_public_key` in `src/scripts/lib/vm.sh` and Windows `Get-VMGuestSshPublicKey` read that manifest and export `NUCLEUS_VM_GUEST_SSH_PUBLIC_KEY` for `guests/<id>/guest.nix`.
 
-When changing credential policy, update `tests/modules/vm-setup-tests.nix` in the same commit.
+Update `tests/modules/vm-setup-tests.nix` in the same commit when changing credential policy.
 
 ## VM manifest
 
 All virtual machines are declared in `src/modules/VMs.json`. This is the canonical source for VM names, resources, and options consumed by all three platform setup scripts.
 
-Required fields for each VM entry:
+Required fields:
 
 | Field | Type | Description |
 | ------------------ | ------- | ----------------------------------------------------------------- |
@@ -123,7 +123,7 @@ Type-specific fields (nested objects keyed by `type`; all fields required when `
 | `"macOS"` | `macOS` | `version` (release name, e.g. `"tahoe"`) |
 | `"Windows"` | `Windows` | `edition` (e.g. `"pro"`), `isoUrl` (`null` = Mido/Fido auto-resolve; a URL auto-downloads the installer ISO when `--windows-iso` is omitted, cached at `~/virtual machines/src/Windows/installer.iso`) |
 
-All common fields and every field in the matching type group are **required** — there are no optional manifest properties. Deliberate nullable values: `Windows.isoUrl` and `Android.gsiUrl` (`null` is valid; a URL is valid for both).
+All common fields and every field in the matching type group are **required** — no optional manifest properties. Deliberate nullable values: `Windows.isoUrl` and `Android.gsiUrl` (`null` is valid; a URL is valid for both).
 
 ## Size suffix grammar
 
@@ -143,7 +143,7 @@ All size fields (`ram`, `diskSize`, `minImageSize`) are suffixed size strings ma
 
 ## Port forwarding
 
-Guest port forwards are declared in the `portForwards` array of each VM entry: non-empty `{guestPort, hostPort}` pairs mapping a guest port to a host port. All host-side forwards (UTM, QEMU `hostfwd`, Packer, Tart softnet-expose, libvirt passt) and guest-readiness probes are derived from this array — never hard-code host ports in production code.
+Guest port forwards are declared in the `portForwards` array of each VM entry: non-empty `{guestPort, hostPort}` pairs mapping a guest port to a host port. All host-side forwards (UTM, QEMU `hostfwd`, Packer, Tart softnet-expose, libvirt passt) and guest-readiness probes derive from this array — never hard-code host ports in production code.
 
 **Reserved host port block:** `22000–22099` (nucleus VM forward range). Every `hostPort` must be unique across all VMs so concurrent guests do not collide.
 
@@ -182,7 +182,7 @@ Guest port forwards are declared in the `portForwards` array of each VM entry: n
 
 **Flags (both hosts):** `--gapps`, `--adb-keys`, `--magisk`, `--root`, `--fake-wifi`, `--fake-wifi-revert`. Omit all flags to print the manual.
 
-**Privileged access policy:** Booted `android-config` uses Magisk `su` only (`adb shell su -c …`). Recovery `--adb-keys` uses the recovery shell when `id -u` is `0` (Advanced → Enable ADB). **`adb root` is never used.** `--root` sets `persist.sys.root_access=3` only; `ro.debuggable` must remain `0` on jqssun user builds. The Lineage **Rooted debugging** Developer-options toggle stays hidden on user builds — automation uses Magisk `su`, not host `adb root`.
+**Privileged access policy:** Booted `android-config` uses Magisk `su` only (`adb shell su -c …`). Recovery `--adb-keys` uses the recovery shell when `id -u` is `0` (Advanced → Enable ADB). **`adb root` is never used.** `--root` sets `persist.sys.root_access=3` only; `ro.debuggable` must remain `0` on user builds. The Lineage **Rooted debugging** Developer-options toggle stays hidden on user builds — automation uses Magisk `su`, not `adb root`.
 
 **Change checklist:** update `VMs.json` + `VMs.schema.json`, `vm.sh`, `vm.ps1`, Windows modules, `tests/scripts/android-config-tests.sh`, `tests/scripts/android-config-tests.ps1`, `tests/integration/android-config-parity-tests.nix`, `tests/modules/vm-setup-tests.nix`, and all three `MANUAL.md` files in the same change.
 
@@ -190,7 +190,7 @@ Guest port forwards are declared in the `portForwards` array of each VM entry: n
 
 ## Android UTM freeze
 
-The "display freezes randomly" bug is a **client-side deadlock in UTM's SPICE client** (CocoaSpice): the SPICE main loop's GStreamer audio-pipeline teardown deadlocks against the CoreAudio IO thread, stalling all SPICE channels (display scanout, input, audio, QMP-over-spiceport). It is renderer-orthogonal: not fixed by the renderer backend, not display sleep, not virgl, not guest-side.
+The "display freezes randomly" bug is a **client-side deadlock in UTM's SPICE client** (CocoaSpice): the SPICE main loop's GStreamer audio-pipeline teardown deadlocks against the CoreAudio IO thread, stalling all SPICE channels (display scanout, input, audio, QMP-over-spiceport). Renderer-orthogonal: not fixed by the renderer backend, not display sleep, not virgl, not guest-side.
 
 ### Root cause
 
@@ -261,7 +261,7 @@ QCOW2 enables copy-based migration between hosts without conversion.
 - After provisioning, UTM opens each bundle automatically.
 - VirtioFS shared directory: configured via `Sharing.DirectoryShare` in the Nix-generated config.plist.
 - Network: **Emulated** (QEMU user/slirp) — required for `PortForward` to work; vmnet-shared silently drops forwards.
-- Template drift: `vm.sh setup` copies the activation-generated `config.plist` template into the bundle only when they differ (`cmp -s`). The check compares template vs bundle — NOT template vs Nix source — so a stale template (activation predating a `src/hosts/MacBook/vms.nix` / `VMs.json` change) propagates silently. Run `nucleus-apply` to regenerate the template before `nucleus-vm setup` after manifest/template changes.
+- Template drift: `vm.sh setup` copies the activation-generated `config.plist` template into the bundle only when they differ (`cmp -s`). The check compares template vs bundle — NOT template vs Nix source — so a stale template (activation predating a `src/hosts/MacBook/vms.nix` / `VMs.json` change) propagates silently. Run `nucleus-apply` to regenerate the template before `nucleus-vm setup` after manifest changes.
 
 - `utmctl` CLI path: `/Applications/UTM.app/Contents/MacOS/utmctl`.
 - **Running vs registered:** `utmctl list` (via `vm_get_utm_registered_names`) returns every registered VM regardless of `Status`. Running state filters `Status != stopped` (`starting`, `started`, `pausing`, `paused`, `resuming`, `stopping`) via `vm_get_running_ids`.
@@ -303,7 +303,7 @@ Post-apply VM behavior:
 - POSIX: [`src/scripts/apply.sh`](src/scripts/apply.sh) runs `nucleus-vm sync` after rebuild unless `--no-vm-sync` is set.
 - Windows: [`src/hosts/Windows/apply.ps1`](src/hosts/Windows/apply.ps1) runs `Invoke-VMSync` unless `-NoVMSync` is set.
 
-Both hooks are best-effort: a VM sync/setup failure does not abort a completed system apply.
+Both hooks are best-effort: a VM sync/setup failure does not abort a completed apply.
 
 ## Command taxonomy
 
