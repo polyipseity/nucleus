@@ -610,6 +610,12 @@ Darwin)
   # `-H` sets HOME to root's home so Nix does not inherit a user-owned HOME
   # while running as root (which otherwise produces ownership warnings).
   run_nix_as_root run "$REPO_ROOT/src#darwin-rebuild" -- switch --flake "$REPO_ROOT/src#MacBook"
+  # Re-derive and rewrite the system repo-root file after activation overwrote
+  # it with the Nix store path (repo-root-file.nix writes ${repoRoot} which
+  # resolves to /nix/store/...). The live checkout path is needed by scripts
+  # that call derive_repo_root() to access src/modules/*.json data files.
+  _post_rebuild_repo_root="$(derive_repo_root)"
+  printf '%s\n' "$_post_rebuild_repo_root" | sudo -H tee "/Library/Application Support/nucleus/repo-root" >/dev/null
   run_pin_flake_inputs
   run_terminal_activations
   "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"
@@ -633,6 +639,12 @@ Linux)
     run_health_check
     # Keep root invocations on root-owned HOME for consistent Nix behavior.
     run_nix_as_root run "$REPO_ROOT/src#nixos-rebuild" -- switch --flake "$REPO_ROOT/src#NixOS"
+    # Re-derive and rewrite the system repo-root file after activation overwrote
+    # it with the Nix store path (repo-root-file.nix writes ${repoRoot} which
+    # resolves to /nix/store/...). The live checkout path is needed by scripts
+    # that call derive_repo_root() to access src/modules/*.json data files.
+    _post_rebuild_repo_root="$(derive_repo_root)"
+    printf '%s\n' "$_post_rebuild_repo_root" | sudo -H tee "/var/lib/nucleus/repo-root" >/dev/null
     run_pin_flake_inputs
     run_terminal_activations
     "$_ash_script_dir/install-prek-hooks.sh" --repo-root "$REPO_ROOT"

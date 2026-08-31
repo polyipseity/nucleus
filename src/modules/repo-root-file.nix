@@ -14,6 +14,14 @@ in
 {
   system.activationScripts.materialize-repo-root.text = ''
     install -d -m 0755 "$(dirname "${repoRootPath}")"
-    printf '%s\n' "${repoRoot}" > "${repoRootPath}"
+    if [ -f "${repoRootPath}" ]; then
+      _existing="$(cat "${repoRootPath}" 2>/dev/null || true)"  # check-suppress:suppression_doc: file may not exist on first activation; empty result falls through to Nix store path fallback
+      case "$_existing" in
+        /*) printf '%s\n' "$_existing" > "${repoRootPath}" ;;
+        *) printf '%s\n' "${repoRoot}" > "${repoRootPath}" ;;
+      esac
+    else
+      printf '%s\n' "${repoRoot}" > "${repoRootPath}"
+    fi
   '';
 }
