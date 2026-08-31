@@ -10,6 +10,7 @@ let
   macosModuleText = builtins.readFile ../../../../src/platforms/macOS/modules/default.nix;
   shellModuleText = builtins.readFile ../../../../src/modules/shell.nix;
   icloudHooksText = builtins.readFile ../../../../src/platforms/macOS/scripts/macos-install-icloud-hooks.zsh;
+  icloudExclusionsLibText = builtins.readFile ../../../../src/scripts/lib/macos-icloud-exclusions.sh;
   usersRegistry = loadFixtureRegistry "MacBook";
 
   inherit (import ../../../lib.nix) assert';
@@ -78,7 +79,7 @@ let
 
   test_macos_activation_recursive_pass = assert' (
     (lib.hasInfix "macos-configure-icloud-exclusions" macosModuleText)
-    && (lib.hasInfix "com.apple.fileprovider.ignore#P" macosModuleText)
+    && (lib.hasInfix "com.apple.fileprovider.ignore#P" icloudExclusionsLibText)
     && (lib.hasInfix "sanitizeICloudManagedRoots" macosModuleText)
   ) "macos.nix must retain activation-time recursive iCloud exclusion pass";
 
