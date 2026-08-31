@@ -111,7 +111,7 @@ in
 
   # GNOME may enable power-profiles-daemon by default, but that service
   # conflicts with auto-cpufreq (both attempt to control CPU governor policy).
-  # Keep auto-cpufreq as the single source of truth for power tuning.
+  # Keep auto-cpufreq as the sole power tuner.
   services.power-profiles-daemon.enable = false;
 
   # CPU governor profiles mirror macOS lowpowermode parity:

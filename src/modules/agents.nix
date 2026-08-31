@@ -195,7 +195,7 @@ in
     # declarative manifest in the resolved agents clawhub-skills.json overlay file.
     #
     # Why after install-bun-packages: requires the ClawHub CLI, which is
-    # installed by install-bun-packages.  Ordering ensures ClawHub is present
+    # installed by install-bun-packages.  Ordering makes sure ClawHub is present
     # before this step tries to invoke it.
     #
     # Why best-effort: the system configuration applied successfully.  Skill

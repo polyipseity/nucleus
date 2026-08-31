@@ -7,7 +7,7 @@
   ...
 }:
 let
-  # Centralized env var catalog — single source of truth for managed
+  # Centralized env var catalog — canonical registry for managed
   # environment variables across all hosts.
   managedPaths = import ../../modules/lib/managed-paths.nix { inherit pkgs; };
   envVars = import ../../modules/lib/env-catalog.nix {

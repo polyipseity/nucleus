@@ -409,7 +409,7 @@
                     esac
                   done
                   # $out/scripts + $out/src are always mirrored, so the store script is
-                  # the single source of truth — no repo-root detection, no fallback.
+                  # the canonical path — no repo-root detection, no fallback.
                   _store_root="$(CDPATH="" cd -- "$(dirname -- "$_self")/.." && pwd)"
                   exec "$_store_root/${scriptName}.sh" "$@"
                   WRAPPER
@@ -446,7 +446,7 @@
         pkgs: treefmtWrapper:
         let
           nucleusApp = args: writeNucleusShellApplication pkgs args;
-          # Single source of truth for managed macOS preference domains (see
+          # Canonical list of managed macOS preference domains (see
           # preference-gc.nix). Exposed to nucleus-gc so `gc preferences` can
           # purge stale state without duplicating the list.
           managedPrefDomains = import ./platforms/macOS/modules/preference-gc.nix { };

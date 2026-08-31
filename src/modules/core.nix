@@ -19,7 +19,7 @@ let
   #   (absent): both darwin and linux. Kept separate from `enable` (provisioning map).
   # field: enable — optional per-host provisioning map { MacBook = bool; NixOS = bool;
   #   Windows = bool }. Absent hosts default to enabled, so new hosts can never
-  #   silently diverge. This is the single source of truth for enable/disable
+  #   silently diverge. This is the canonical registry for enable/disable
   #   across all hosts. Distinct from `platforms`: `platforms` is the build-capability
   #   axis (which OS families can build/install the package); `enable` is the
   #   provisioning axis (whether the package is actually installed on a given host).

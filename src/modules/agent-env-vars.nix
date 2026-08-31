@@ -1,6 +1,6 @@
 # modules/agent-env-vars.nix — AI agent session detection environment variables.
 #
-# Single source of truth for the set of environment variable names that AI
+# Canonical list of environment variable names that AI
 # coding agents set to identify their sessions.  shell.nix, pwsh.nix, and
 # Sync-ShellProfile.ps1 (Windows) all use this list.  Keep additions and
 # removals here, then update the consumers.

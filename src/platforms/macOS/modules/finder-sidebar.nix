@@ -11,7 +11,7 @@ let
   # (: and /) back so file:// URIs remain valid.
   uriEncode = url: builtins.replaceStrings [ "%3A" "%2F" ] [ ":" "/" ] (lib.escapeURL url);
 
-  # Single source of truth for managed Finder favorites and ordering.
+  # Canonical list of managed Finder favorites and ordering.
   finderSidebarManagedFavorites = [
     {
       name = "Applications";

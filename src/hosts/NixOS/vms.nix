@@ -65,7 +65,7 @@ let
   # src/Android/system image.qcow2 (src/ stays pristine); userdata is a
   # writable qcow2; the GSI image is attached read-only only when the
   # Android group's gsiUrl is set.  Image filenames come from the manifest
-  # Android group so VMs.json is the single source of truth.
+  # Android group so VMs.json is the canonical source.
   androidDisks =
     vm:
     if vm.type != "Android" then

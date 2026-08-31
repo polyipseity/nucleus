@@ -25,7 +25,7 @@ in
   home.activation = {
     # -------------------------------------------------------------------------
     # symlink-cursor-config
-    # Ensures ~/.cursor/ is a real directory, then:
+    # Verify ~/.cursor/ is a real directory, then:
     #   - folder symlink skills/ -> ~/.agents/skills/
     #   - per-file extension-mapped symlinks for rules/, agents/, commands/
     #   - per-entry symlinks from src/users/<user>/cursor/ (hooks.json, mcp.json, …)

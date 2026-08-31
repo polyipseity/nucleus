@@ -41,7 +41,7 @@ let
       ;
   };
 
-  # Single source of truth for AI agent session detection.  Shared with
+  # Canonical AI agent session detection names.  Shared with
   # pwsh.nix and Sync-ShellProfile.ps1 (Windows).
   agentEnv = import ./agent-env-vars.nix;
 
