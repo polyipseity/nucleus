@@ -337,21 +337,21 @@ let
 
   # === TEST: discord-music-rpc out-of-store symlink properly wired ===
   # Verify that the config.yaml path appears in managedSymlinkPaths in home.nix
-  # and uses mkOutOfStoreSymlink in its own module.
+  # and uses seed-writable-symlink.sh in its own module.
   # discord-music-rpc config is managed via out-of-store symlink (Method 1).
   # Verify it appears in the managedSymlinkPaths list in home.nix and uses
-  # mkOutOfStoreSymlink in its own module.
+  # seed-writable-symlink.sh in its own module.
   test_discord_music_rpc_out_of_store_symlink =
     assert'
       (
         (lib.hasInfix "discord-music-rpc/config.yaml" homeModuleText)
-        && (lib.hasInfix "mkOutOfStoreSymlink" discordMusicRpcModuleText)
+        && (lib.hasInfix "seed-writable-symlink.sh" discordMusicRpcModuleText)
         && (
           lib.hasInfix "discord-music-rpc/config.yaml\";" homeModuleText
           && lib.hasInfix "writable = true" homeModuleText
         )
       )
-      "discord-music-rpc config.yaml must be in home.nix managedSymlinkPaths (writable = true) and use mkOutOfStoreSymlink";
+      "discord-music-rpc config.yaml must be in home.nix managedSymlinkPaths (writable = true) and use seed-writable-symlink.sh";
 
   # === TEST: App bundles Phase 2 uses declared order (no re-sort) ===
   test_app_bundles_deployment_uses_declared_order = assert' (lib.hasInfix "}) currentNucleusAppBundles" macbookAppBundlesText) "app-bundles.nix Phase 2 must iterate currentNucleusAppBundles directly without re-sorting";
