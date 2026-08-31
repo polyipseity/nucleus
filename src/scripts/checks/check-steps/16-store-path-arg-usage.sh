@@ -51,9 +51,15 @@ run_store_path_arg_usage() {
     done
     local _filtered=()
     for _f in "${_candidate_files[@]}"; do
-      case "$(basename "$_f")" in
+      local _base
+      _base="$(basename "$_f")"
+      # Apply same exclusions as non-args branch (basename check + regex).
+      case "$_base" in
       check.sh | "$_self_sh" | "$_self_ps1") continue ;;
       esac
+      if echo "$_base" | grep -qE "$_exclude_pattern"; then
+        continue
+      fi
       _filtered+=("$_f")
     done
     _candidate_files=("${_filtered[@]}")
@@ -70,13 +76,22 @@ run_store_path_arg_usage() {
     return 2
   fi
 
-  # Also collect ALL .sh files for cross-file usage search (variables may be
+  # Collect ALL .sh files for cross-file usage search (variables may be
   # exported and consumed in other scripts, e.g., _ds_gawk_bin).
+  # In $HasArgs mode, search only candidate files (same scope as declarations)
+  # so excluded files don't create false-positive "declared but never referenced"
+  # errors when the variable IS used in another candidate file.
   local _all_sh_files=()
-  mapfile -t _all_sh_files < <(
-    find scripts/ src/scripts/ -name '*.sh' -print |
-      filter_gitignored
-  )
+  if $_has_args; then
+    for _f in "${_candidate_files[@]}"; do
+      _all_sh_files+=("$_f")
+    done
+  else
+    mapfile -t _all_sh_files < <(
+      find scripts/ src/scripts/ -name '*.sh' -print |
+        filter_gitignored
+    )
+  fi
 
   # Phase 1: extract _X_bin="$N" declarations from candidate files.
   # Format: "file:line:varname" where N is a positional arg $1-$9 or ${10}+.
