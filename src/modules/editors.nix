@@ -376,6 +376,20 @@ in
     '';
 
     # -----------------------------------------------------------------------
+    # symlink-cursor-extensions
+    # Populates ~/.cursor/extensions with per-extension symlinks into the
+    # same Nix-managed extension store used by VS Code.  This bridge runs
+    # unconditionally on ALL platforms so Cursor extensions mirror the VS
+    # Code extension set regardless of installation backend.
+    #
+    # Directory policy: same as VS Code bridge — real writable directory
+    # with per-extension symlinks, not a whole-directory store symlink.
+    # -----------------------------------------------------------------------
+    symlink-cursor-extensions = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/src/scripts/editors/bridge-cursor-extensions.sh" "${extensionStore}"
+    '';
+
+    # -----------------------------------------------------------------------
     # trust-vscode-workspace
     # Inserts a workspace trust entry for ~/dev into VS Code's SQLite state
     # database (globalStorage/state.vscdb) for both stable and insiders
