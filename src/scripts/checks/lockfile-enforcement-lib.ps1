@@ -160,6 +160,26 @@ function Invoke-LockfileEnforcement {
     }
   } else { & $InfoFn "vscode: no code CLI; skipping suggestions.vscode verify" }
 
+  # --- suggestions.cursor (warn-only verify probe) ---
+  # cursor is a suggestions section (warn-only per the invariant).  Compare
+  # installed extension versions to the lockfile map; never error.  Skip
+  # gracefully when no cursor CLI is installed.
+  $cursorExe = $null
+  if (Get-Command cursor -ErrorAction SilentlyContinue) { $cursorExe = 'cursor' }  # check-suppress:suppression_doc: tool may not be installed on this host; the else branch reports the skip
+  if ($null -ne $cursorExe) {
+    $installedList = & $cursorExe --list-extensions --show-versions 2>$null  # check-suppress:suppression_doc: list command may emit noise/errors when the tool store is uninitialised; empty output is treated as no-installs and drift is still reported below
+    $cursorSec = if ($Lockfile.ContainsKey('suggestions') -and $Lockfile.suggestions.ContainsKey('cursor')) { $Lockfile.suggestions.cursor } else { @{} }
+    foreach ($entry in $cursorSec.GetEnumerator()) {
+      $ext = $entry.Key; $pin = $entry.Value
+      $inst = $null
+      foreach ($line in $installedList) {
+        if ($line -match "^$([regex]::Escape($ext))@(.+)") { $inst = $Matches[1]; break }
+      }
+      if ($null -eq $inst) { & $WarnFn "suggestions.cursor.$ext`: expected $pin, not installed (warn-only)" }
+      elseif ($inst -ne $pin) { & $WarnFn "suggestions.cursor.$ext`: expected $pin, installed $inst (warn-only)" }
+    }
+  } else { & $InfoFn "cursor: no cursor CLI; skipping suggestions.cursor verify" }
+
   # --- suggestions: always warn (non-authoritative) ---
   if ($Lockfile.ContainsKey('suggestions')) {
     foreach ($sub in $Lockfile.suggestions.Keys) {

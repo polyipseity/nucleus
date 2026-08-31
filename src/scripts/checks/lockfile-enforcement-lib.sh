@@ -281,6 +281,44 @@ EOF
   return 0
 }
 
+# Warn-only probe for `suggestions.cursor` (editor extensions).  Runs
+# `cursor --list-extensions --show-versions` and compares each managed
+# extension's installed version to the lockfile map.  Never errors: cursor
+# is a suggestions section (warn-only per the invariant).  Skips gracefully
+# when no `cursor` CLI is installed.  Returns 0 always.
+_lfe_check_cursor() {
+  local _lf="$1" _jq="$2"
+  local _cursor
+  _cursor="$(command -v cursor || true)" # check-suppress:suppression_doc: command -v exits non-zero when the tool is absent; || true avoids set -e abort and the empty-string check below handles it
+  [ -z "$_cursor" ] && {
+    say -l cursor "no cursor CLI; skipping suggestions.cursor verify"
+    return 0
+  }
+  local _installed
+  # check-suppress:suppression_doc: cursor CLI failure yields empty installed set -- safe, drift is still reported below.
+  _installed="$("$_cursor" --list-extensions --show-versions 2>/dev/null)" || true
+  local _pkgs _pkg _pin _inst
+  # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the section -- safe.
+  _pkgs="$(printf '%s' "$_lf" | "$_jq" -r '(.suggestions.cursor // {}) | keys[]' 2>/dev/null)" || return 0
+  while IFS= read -r _pkg; do
+    [ -z "$_pkg" ] && continue
+    # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
+    # shellcheck disable=SC2016 # reason: jq --arg variable, not shell expansion
+    _pin="$(printf '%s' "$_lf" | "$_jq" -r --arg p "$_pkg" '(.suggestions.cursor // {})[$p] // empty' 2>/dev/null)" || true # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
+    [ -z "$_pin" ] && continue
+    # shellcheck disable=SC2016 # reason: extension id is a literal prefix match
+    _inst="$(printf '%s\n' "$_installed" | awk -F'@' -v id="$_pkg" '$1==id {print $2; exit}')"
+    if [ -z "$_inst" ]; then
+      warn -l cursor "$_pkg: expected $_pin, not installed (warn-only)"
+    elif [ "$_inst" != "$_pin" ]; then
+      warn -l cursor "$_pkg: expected $_pin, installed $_inst (warn-only)"
+    fi
+  done <<EOF
+$_pkgs
+EOF
+  return 0
+}
+
 # Shared core: given the lockfile data and a jq path, run the pinned probes
 # and always warn for suggestions.  Returns 1 if any pinned section has
 # version drift.  Does NOT depend on check-lib.sh (no skip_step / step_number),
@@ -297,6 +335,7 @@ _lfe_run_core() {
 
   _lfe_check_opencode "$_lf_data" "$_jq"
   _lfe_check_vscode "$_lf_data" "$_jq"
+  _lfe_check_cursor "$_lf_data" "$_jq"
   _lfe_warn_suggestions "$_lf_data" "$_jq"
 
   return "$_failures"
