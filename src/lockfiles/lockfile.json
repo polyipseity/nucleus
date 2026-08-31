@@ -32,6 +32,13 @@
       "version": "2.9.2"
     }
   },
+  "superpowers": {
+    "superpowers": {
+      "rev": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
+      "source": "https://github.com/obra/superpowers.git",
+      "version": "6.3.0"
+    }
+  },
   "suggestions": {
     "opencode": {
       "superpowers": {

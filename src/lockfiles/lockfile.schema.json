@@ -77,6 +77,13 @@
       "description": "Windows source-built package VCS pins. Package name → VCS hash pin with source URL and version.",
       "type": "object"
     },
+    "superpowers": {
+      "additionalProperties": {
+        "$ref": "#/definitions/versionOrHash"
+      },
+      "description": "Pinned superpowers plugin versions for VS Code / Cursor (filesystem-enforced)",
+      "type": "object"
+    },
     "suggestions": {
       "additionalProperties": false,
       "description": "Sections that cannot be hard-pinned/enforced. Consumers must warn when present and never treat as authoritative. A section enforceable at most warn-only MUST live here, never as a pinned root child.",
@@ -292,6 +299,7 @@
     "rustup",
     "scoop",
     "source-builds",
+    "superpowers",
     "updated",
     "uv",
     "version",
