@@ -136,7 +136,7 @@ function Invoke-LockfileBump {
   # --list-sections: print the canonical section names and exit 0 (no lockfile
   # read required, matching the bash twin's early-exit behavior).
   if ($ListSections) {
-    $validSectionsCsv = 'bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,winget,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
+    $validSectionsCsv = 'bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
     foreach ($s in ($validSectionsCsv -split ',')) {
       Write-NucleusInfo $s
     }
@@ -155,7 +155,7 @@ function Invoke-LockfileBump {
   # the --sections token list exactly like the bash twin: trim whitespace per
   # token, map legacy bare sub-section names and the cargo alias to canonical
   # dotted form, and reject anything unknown.
-  $validSectionsCsv = 'bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,winget,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
+  $validSectionsCsv = 'bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
   $sectionTokens = @()
   if (-not [string]::IsNullOrEmpty($Sections)) {
     foreach ($tok in ($Sections -split ',')) {
@@ -503,6 +503,97 @@ function Invoke-LockfileBump {
       }
     } else {
       Write-NucleusWarning 'pwsh not found — skipping pwsh section'
+    }
+  }
+
+  # -------------------------------------------------------------------------
+  # suggestions.cursor — cursor --list-extensions --show-versions
+  # Warn-only audit data.
+  # -------------------------------------------------------------------------
+  if (Test-SuggestionsEnabled 'suggestions.cursor') {
+    $cursorOutput = $null
+    # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
+    if (Get-Command -Name 'cursor' -ErrorAction SilentlyContinue) {
+      # check-suppress:suppression_doc: probe -- tool may not be installed; stderr suppressed for clean output.
+      $cursorOutput = & cursor --list-extensions --show-versions 2>$null
+    } else {
+      Write-NucleusWarning 'cursor not found — skipping suggestions.cursor section'
+    }
+
+    if ($cursorOutput) {
+      # Build extension map from output lines "publisher.extension@version"
+      $cursorExts = @{
+      }
+      foreach ($line in $cursorOutput) {
+        $line = $line.Trim()
+        if ([string]::IsNullOrEmpty($line)) { continue }
+        $atIdx = $line.LastIndexOf('@')
+        if ($atIdx -ge 0) {
+          $pkg = $line.Substring(0, $atIdx)
+          $ver = $line.Substring($atIdx + 1)
+          if (-not [string]::IsNullOrEmpty($pkg) -and -not [string]::IsNullOrEmpty($ver)) {
+            $cursorExts[$pkg] = $ver
+          }
+        }
+      }
+
+      if ($ht.ContainsKey('suggestions') -and $ht['suggestions'] -is [hashtable] -and $ht['suggestions'].ContainsKey('cursor') -and $ht['suggestions']['cursor'] -is [hashtable]) {
+        foreach ($key in @($ht['suggestions']['cursor'].Keys)) {
+          $old = $ht['suggestions']['cursor'][$key]
+          if ($cursorExts.ContainsKey($key)) {
+            $new = $cursorExts[$key]
+            if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
+              Write-Update -Section 'suggestions.cursor' -Key $key -OldValue $old -NewValue $new
+              $ht['suggestions']['cursor'][$key] = $new
+            }
+          }
+        }
+      }
+    }
+  }
+
+  # -------------------------------------------------------------------------
+  # suggestions.cursor — cursor --list-extensions --show-versions
+  # Warn-only audit data.
+  # -------------------------------------------------------------------------
+  if (Test-SuggestionsEnabled 'suggestions.cursor') {
+    $cursorOutput = $null
+    # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
+    if (Get-Command -Name 'cursor' -ErrorAction SilentlyContinue) {
+      # check-suppress:suppression_doc: probe -- tool may not be installed; stderr suppressed for clean output.
+      $cursorOutput = & cursor --list-extensions --show-versions 2>$null
+    } else {
+      Write-NucleusWarning 'cursor not found — skipping suggestions.cursor section'
+    }
+
+    if ($cursorOutput) {
+      # Build extension map from output lines "publisher.extension@version"
+      $cursorExts = @{}
+      foreach ($line in $cursorOutput) {
+        $line = $line.Trim()
+        if ([string]::IsNullOrEmpty($line)) { continue }
+        $atIdx = $line.LastIndexOf('@')
+        if ($atIdx -ge 0) {
+          $pkg = $line.Substring(0, $atIdx)
+          $ver = $line.Substring($atIdx + 1)
+          if (-not [string]::IsNullOrEmpty($pkg) -and -not [string]::IsNullOrEmpty($ver)) {
+            $cursorExts[$pkg] = $ver
+          }
+        }
+      }
+
+      if ($ht.ContainsKey('suggestions') -and $ht['suggestions'] -is [hashtable] -and $ht['suggestions'].ContainsKey('cursor') -and $ht['suggestions']['cursor'] -is [hashtable]) {
+        foreach ($key in @($ht['suggestions']['cursor'].Keys)) {
+          $old = $ht['suggestions']['cursor'][$key]
+          if ($cursorExts.ContainsKey($key)) {
+            $new = $cursorExts[$key]
+            if (-not [string]::IsNullOrEmpty($new) -and $new -ne $old) {
+              Write-Update -Section 'suggestions.cursor' -Key $key -OldValue $old -NewValue $new
+              $ht['suggestions']['cursor'][$key] = $new
+            }
+          }
+        }
+      }
     }
   }
 

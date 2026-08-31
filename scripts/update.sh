@@ -206,7 +206,7 @@ EOF
 
   # Canonical section names (alphabetical). cargo aliases cargo-binstall; the
   # legacy bare tokens nixos-iso / tart-images normalize to vm-setup children.
-  _VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,winget,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows"
+  _VALID_SECTIONS_CSV="bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,winget,suggestions.cursor,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows"
 
   # Parse flags (comma-separated, defaults to all)
   SECTIONS=""
@@ -482,6 +482,40 @@ EOF
         data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.pwsh[$k] = $v')
       fi
     done < <(printf '%s\n' "$data" | jq -r '(.pwsh // {}) | keys[]')
+  fi
+
+  # cursor — cursor --list-extensions --show-versions
+  if suggestions_enabled suggestions.cursor; then
+    cursor_output=""
+    if command -v cursor >/dev/null 2>&1; then
+      # check-suppress:suppression_doc: Cursor CLI may not be installed; empty extension list is expected.
+      cursor_output=$(cursor --list-extensions --show-versions 2>/dev/null || true)
+    fi
+
+    if [ -n "$cursor_output" ]; then
+      declare -A cursor_exts=()
+      while IFS= read -r line; do
+        [ -z "$line" ] && continue
+        case "$line" in
+        *@*)
+          pkg="${line%%@*}"
+          ver="${line#*@}"
+          [ -n "$pkg" ] && [ -n "$ver" ] && cursor_exts["$pkg"]="$ver"
+          ;;
+        esac
+      done <<<"$cursor_output"
+
+      while IFS= read -r key; do
+        [ -z "$key" ] && continue
+        old=$(printf '%s\n' "$data" | jq -r --arg k "$key" '(.suggestions.cursor // {})[$k] // empty')
+        [ -z "$old" ] && continue
+        new="${cursor_exts[$key]:-}"
+        if [ -n "$new" ] && [ "$new" != "$old" ]; then
+          log_update "suggestions.cursor" "$key" "$old" "$new"
+          data=$(printf '%s\n' "$data" | jq --arg k "$key" --arg v "$new" '.suggestions.cursor[$k] = $v')
+        fi
+      done < <(printf '%s\n' "$data" | jq -r '(.suggestions.cursor // {}) | keys[]')
+    fi
   fi
 
   # vscode — code/code-insiders --list-extensions --show-versions
