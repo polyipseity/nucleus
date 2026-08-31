@@ -212,19 +212,5 @@ in
         "$HOME/${builtins.elemAt managedPaths.pathComponents.append 0}/clawhub"
     '';
 
-    # -------------------------------------------------------------------------
-    # install-copilot-superpowers
-    # Installs the superpowers plugin via the Copilot CLI.  Best-effort:
-    # skips silently when the copilot binary is not reachable.
-    #
-    # Why after install-bun-packages: managed PATH prepend must be in place
-    # so the copilot binary (if installed by a managed package) is reachable.
-    # -------------------------------------------------------------------------
-    install-copilot-superpowers = lib.hm.dag.entryAfter [ "install-bun-packages" ] ''
-      "${activationBundle}/src/scripts/agents/install-copilot-superpowers.sh" \
-        "${managedPaths.toShellPrependGuard}" \
-        "${managedPaths.toShellAppendGuard}" \
-        "$(command -v copilot 2>/dev/null || echo /nonexistent)"
-    '';
   };
 }
