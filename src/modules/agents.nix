@@ -212,5 +212,27 @@ in
         "$HOME/${builtins.elemAt managedPaths.pathComponents.append 0}/clawhub"
     '';
 
+    # -----------------------------------------------------------------------
+    # clone-superpowers-plugin
+    # Clones or updates the superpowers plugin repo into a fixed local path
+    # for VS Code / Cursor local plugin install.  The repo is fetched at
+    # apply time so VS Code and Cursor can load it from a local directory
+    # instead of fetching from a marketplace at runtime.
+    #
+    # Why after install-bun-packages: the managed PATH prepend/append guards
+    # must be available (installed by install-bun-packages).  Ordering ensures
+    # the PATH is correct for any runtime tool needs.
+    #
+    # Why best-effort: the system configuration applied successfully.  A
+    # missing plugin does not break any declared system state.
+    # -----------------------------------------------------------------------
+    clone-superpowers-plugin = lib.hm.dag.entryAfter [ "install-bun-packages" ] ''
+      "${activationBundle}/src/scripts/agents/clone-superpowers-plugin.sh" \
+        "${managedPaths.toShellPrependGuard}" \
+        "${managedPaths.toShellAppendGuard}" \
+        "$HOME/.local/share/nucleus/plugins/superpowers" \
+        "b36e0829c6d0140e93cfef2ca599b1b07d4a7797"
+    '';
+
   };
 }

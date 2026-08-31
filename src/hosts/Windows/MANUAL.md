@@ -9,13 +9,6 @@
 - Starship prompt is active in all shells. Requires a Nerd Font (configured automatically via `CaskaydiaCove Nerd Font`).
 - OBS virtual camera: `obs-virtualcam` ships inside the OBS Studio install (`OBSProject.OBSStudio`, gated by `managedPackages."obs-studio".enable`). Start the virtual camera from OBS and it appears as a DirectShow device in other apps.
 
-## Superpowers (Cursor)
-
-After apply, install superpowers for Cursor:
-
-1. Open Cursor Agent chat
-2. Run: `/add-plugin superpowers`
-
 ## command shortcuts
 
 - `-g`, `-ga`, `-gb`, `-gc`, `-gca`, `-gcl`, `-gco`, `-gd`, `-gf`, `-gff`, `-gl`, `-gp`, `-gpl`, `-gplf`, `-gs`, `-gst`, `-gsw` — git commands
