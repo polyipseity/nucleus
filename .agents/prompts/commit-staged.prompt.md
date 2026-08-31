@@ -4,9 +4,9 @@ description: Produce a commit message for the currently staged changes and commi
 argument-hint: Optional extras (e.g., ticket=ABC-123). To skip committing, pass `commitNow=no`.
 ---
 
-# Commit staged change
+# Commit staged changes
 
-Proceed automatically with best-effort defaults and available context.
+Proceed automatically with best-effort defaults and context.
 
 ## Workflow
 
@@ -17,7 +17,7 @@ Proceed automatically with best-effort defaults and available context.
    git diff --cached --name-status --no-color && git --no-pager diff --cached --staged --patch --no-color
    ```
 
-   If not executed, produce a best-effort commit message from available context and stop.
+   If not executed, produce a best-effort commit message from context and stop.
 
 2. **Compose commit message**
    Inspect Command 1 output and repository conventions (`CONTRIBUTING.md`, `.agents/`, `package.json`, `commitlint`, `prek.toml`, `CHANGELOG.md`, etc.). Build a commit message with:
@@ -29,7 +29,7 @@ Proceed automatically with best-effort defaults and available context.
 
 3. **Validate with commitlint**
    Before running `git commit`, validate the message with commitlint:
-   - **Detect project setup.** Check for a commitlint config file (`.commitlintrc.*`, `commitlint.config.*`) in the project root. If found, the config is used. If not found, check for a documented conflicting convention (CONTRIBUTING.md / README.md specifies a non-conventional-commit format such as `gitmoji` or a custom schema). If a conflicting convention exists AND no commitlint config is present, skip validation entirely — the project has explicitly opted out.
+   - **Detect project setup.** Check for a commitlint config file (`.commitlintrc.*`, `commitlint.config.*`) in the project root. If found, the config is used. If not found, check for a documented conflicting convention (CONTRIBUTING.md / README.md specifies a non-conventional-commit format such as `gitmoji` or a custom schema). If a conflicting convention exists AND no commitlint config is present, skip validation — the project opts out.
    - **Run validation.** From the project root:
      - **Bash/zsh:** `echo "<full message>" | bun x commitlint 2>&1`
      - **PowerShell:** `"<full message>" | bun x commitlint 2>&1`
@@ -44,10 +44,10 @@ Proceed automatically with best-effort defaults and available context.
        echo "<full message>" | (cd "$tmpdir" && bun run commitlint)
        ```
 
-       Copy whichever lockfile exists (`bun.lock`, `package-lock.json`, `yarn.lock`). If the repo has no manifest, replace the `cp` line with a minimal `package.json` in the temp dir (devDependencies `@commitlint/cli` + `@commitlint/config-conventional`) — `--frozen-lockfile` is safe because bun generates a lockfile when none is copied. The commitlint config must live inside the temp dir (`extends` resolves relative to the config file's location, not the cwd). Use `bun run commitlint` — no `node` binary assumed. The `trap` guarantees cleanup; never create or modify `package.json`, `bun.lock`, or `node_modules` in the project repo.
+       Copy whichever lockfile exists (`bun.lock`, `package-lock.json`, `yarn.lock`). If the repo has no manifest, replace the `cp` line with a minimal `package.json` in the temp dir (devDependencies `@commitlint/cli` + `@commitlint/config-conventional`) — `--frozen-lockfile` is safe because bun generates a lockfile when none is copied. The commitlint config must live inside the temp dir (`extends` resolves relative to the config file's location, not the cwd). Use `bun run commitlint` — no `node` binary assumed. The `trap` cleans up; never create or modify `package.json`, `bun.lock`, or `node_modules` in the project repo.
      - Structural conventional-commit check (type-prefix, format) is the LAST resort: only if `bun` is unavailable or the temp-dir install cannot complete.
    - **On failure.** If validation fails AND no conflicting convention is documented, fix the message and re-run validation. Do not proceed to `git commit` until validation passes. If commitlint is present but fails with a tool error (not a lint error), report the failure — do not proceed. If the failure is `Cannot find package 'conventional-changelog-conventionalcommits'` (config `extends` unresolvable by `bun x`), use the temp-dir install fallback above — `bun x commitlint --default-config` is not a workaround.
-   - **On success.** Proceed to step 4.
+   - **On success.** Go to step 4.
 
 4. **Create the commit**
    If `${input:commitNow}` is `no`, skip and only present the message.
@@ -75,10 +75,10 @@ Proceed automatically with best-effort defaults and available context.
 
    If heredoc quoting fails, retry up to 3 times with a different delimiter. For other failures, report the error and do not modify the index.
 
-5. **Verify commit** - Run `git rev-parse HEAD` and `git log -1 --format=%s`. Confirm the hash is new and the message is your intended message. If they show the previous commit's message, the commit was not created — retry with a fresh `git commit` (not `--amend`).
+5. **Verify commit** - Run `git rev-parse HEAD` and `git log -1 --format=%s`. Confirm the hash is new and the message matches. If they show the previous commit's message, the commit was not created — retry with a fresh `git commit` (not `--amend`).
 
 6. **Output**
-   Summary of staged files, detected convention, commit message, and result (SHA or skip reason).
+   Staged files, detected convention, commit message, and result (SHA or skip reason).
 
 ## Rules
 

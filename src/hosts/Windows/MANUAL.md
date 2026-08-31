@@ -7,7 +7,7 @@
 - Launch Peace Equalizer APO, use Effects > Limiter sliders or pre-amplification to cap output.
 - Caddy local-CA trust runs automatically. If missing: run `caddy trust --address 127.0.0.1:2019` in an elevated PowerShell.
 - Starship prompt is active in all shells. Requires a Nerd Font (configured automatically via `CaskaydiaCove Nerd Font`).
-- OBS virtual camera is automatic: `obs-virtualcam` ships inside the OBS Studio install (`OBSProject.OBSStudio`, gated by `managedPackages."obs-studio".enable`), so no manual step is needed — start the virtual camera from OBS and it appears as a DirectShow device in other apps.
+- OBS virtual camera: `obs-virtualcam` ships inside the OBS Studio install (`OBSProject.OBSStudio`, gated by `managedPackages."obs-studio".enable`). Start the virtual camera from OBS and it appears as a DirectShow device in other apps.
 
 ## command shortcuts
 

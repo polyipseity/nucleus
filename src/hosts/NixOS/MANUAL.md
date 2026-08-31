@@ -39,10 +39,10 @@
 - `nucleus-cloud sync` — pull cloud replicas
 - `nucleus-cloud reset` — reset local replica state
 - `nucleus-update` — update repository
-- `nucleus-vm setup` — build and provision VMs from `src/modules/VMs.json`. Requires `libvirtd` active (from `vms.nix`). Guest converge is automatic; run `nixos-rebuild switch` inside the guest for manual re-converge.
+- `nucleus-vm setup` — build and provision VMs from `src/modules/VMs.json`. Requires `libvirtd` active (from `vms.nix`). Guest config applies automatically; run `nixos-rebuild switch` inside the guest for manual re-apply.
   - **macOS guest**: not automated (Apple EULA restricts redistribution).
-  - **NixOS guest**: automatic; `nixos-generators` builds the image.
-  - **Windows 11 guest**: ISO auto-downloaded (Fido-style); fallback `--windows-iso /path/to/Win11.iso` (download from <https://www.microsoft.com/software-download/windows11>).
+  - **NixOS guest**: built by `nixos-generators`.
+  - **Windows 11 guest**: ISO downloaded by Fido; fallback `--windows-iso /path/to/Win11.iso` (download from <https://www.microsoft.com/software-download/windows11>).
   - **Android guest** (LineageOS): libvirt/KVM; ADB at `localhost:22040`. See `.agents/instructions/vm-management.instructions.md` (android-config). Run `nucleus-vm android-config Android` without flags for step-by-step instructions.
 - `nucleus-vm resize <id> <size>` — grow-only runtime disk; see `vm-management.instructions.md`
 - `nucleus-vm pack` / `nucleus-vm unpack` — cross-host migration; see `vm-management.instructions.md`
