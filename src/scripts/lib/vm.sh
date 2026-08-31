@@ -1321,7 +1321,7 @@ vm_resize_vm() {
 # data disk provisioning helper
 
 # vm_ensure_data_disk NAME
-#   Ensures the writable data disk for NAME under the managed layout:
+#   Verify the writable data disk for NAME under the managed layout:
 #     src/<type>/system image.qcow2 — pristine type system image (read-only base)
 #     data/<name>.qcow2             — writable data disk backing the type system
 #                                     image at its absolute path (on macOS the
@@ -1442,7 +1442,7 @@ vm_ensure_data_disk() {
 }
 
 # vm_ensure_android_system_overlay NAME
-#   Ensures the Android system overlay for NAME under the managed layout:
+#   Verify the Android system overlay for NAME under the managed layout:
 #     src/Android/system image.qcow2 — pristine Android system image (read-only base)
 #     data/<name> (system).qcow2     — persistent writable overlay backing the
 #                                      Android system image at its absolute
@@ -1538,7 +1538,7 @@ vm_ensure_android_system_overlay() {
 
 # vm_provision_one NAME
 #   Phase-2 per-VM provision orchestrator (shared by every runtime's setup
-#   callback): ensures the writable data disk for NAME exists — create
+#   callback): make sure the writable data disk for NAME exists — create
 #   overlay, keep existing — then reports provision drift (per-VM identity,
 #   wiring, or credentials) for in-place re-injection while the VM is
 #   stopped.  Host-specific wiring
@@ -2818,7 +2818,7 @@ vm_validate_utm_plist_template() {
 }
 
 # vm_apply_utm_plist_and_register NAME BUNDLE TEMPLATE_DRIFT_CONFIG
-#   Copies the managed plist into an existing UTM bundle and ensures UTM has
+#   Copies the managed plist into an existing UTM bundle and makes sure UTM has
 #   the VM registered (open on first import; re-register on config drift).
 vm_apply_utm_plist_and_register() {
   local _ap_name="$1" _ap_bundle="$2" _ap_template_drift="$3"

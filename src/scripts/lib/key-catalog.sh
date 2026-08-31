@@ -9,7 +9,7 @@
 # artifact contains only key names and env-var mappings — never secret values.
 # Every nix invocation path (apply.sh, the check nix-flake-eval step, the test
 # system-config-build step) must run ensure_key_catalog first so the .nix
-# artifact exists.  This lib is the single source of truth for that.
+# artifact exists.  This lib is the canonical owner for that.
 
 # Guard against re-sourcing.
 [ -n "${_NUCLEUS_KEY_CATALOG_SOURCED-}" ] && return

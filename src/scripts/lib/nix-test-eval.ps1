@@ -1,4 +1,4 @@
-# Nix test evaluation guard — ensures tests/ .nix files force assertions before eval.
+# Nix test evaluation guard — makes sure tests/ .nix files force assertions before eval.
 # Wired from test step 01 (01-nix-tests.ps1) before nix-instantiate --eval --strict.
 
 . "$PSScriptRoot/deny-list.ps1"

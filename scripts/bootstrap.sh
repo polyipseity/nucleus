@@ -208,7 +208,7 @@ allow_repo_direnv_if_available() {
 }
 
 ensure_macos_nix_mount() {
-  # Ensures the /nix synthetic mount point exists on macOS before any Nix
+  # Create the /nix synthetic mount point on macOS before any Nix
   # installation is attempted.
   #
   # macOS does not allow creating top-level directories on the root filesystem

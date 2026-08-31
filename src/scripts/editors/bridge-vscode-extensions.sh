@@ -15,7 +15,7 @@ stable_extensions="$HOME/.vscode/extensions"
 insiders_extensions="$HOME/.vscode-insiders/extensions"
 
 # setup_extension_dir CHANNEL_EXTENSIONS
-# Ensures CHANNEL_EXTENSIONS is a real writable directory containing
+# Verify CHANNEL_EXTENSIONS is a real writable directory containing
 # per-extension symlinks into the Nix-managed source tree.  VS Code must
 # write extensions.json inside this directory; a whole-directory symlink
 # to the immutable Nix store prevents that with EACCES.

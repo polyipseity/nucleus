@@ -467,7 +467,7 @@ gc_local_macos_artifacts() {
 }
 
 # ensure_macos_icloud_replica_symlink RELATIVE_PATH
-#   Ensures ~/RELATIVE_PATH is a symlink to ~/Library/Mobile Documents.
+#   Make ~/RELATIVE_PATH a symlink to ~/Library/Mobile Documents.
 ensure_macos_icloud_replica_symlink() {
   _relative_path="$1"
   _native_target="$HOME/Library/Mobile Documents"

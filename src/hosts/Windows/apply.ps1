@@ -57,7 +57,7 @@
   SSH keys, and home directory state, run apply.ps1 separately for each user:
     .\apply.ps1 -ModuleDir "C:\path\to\src\platforms\Windows\modules" -Users @('admin')
     .\apply.ps1 -ModuleDir "C:\path\to\src\platforms\Windows\modules" -Users @('guest')
-  This ensures each user gets properly isolated secret materialization.
+  This way each user gets properly isolated secret materialization.
 
 .PARAMETER EnableAgentsConfigParity
   Enable managed per-subdir symlinks in %USERPROFILE%\.agents\ pointing into

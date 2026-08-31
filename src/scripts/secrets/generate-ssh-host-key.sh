@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Ensures /etc/ssh/ssh_host_ed25519_key exists so that
+# Verify /etc/ssh/ssh_host_ed25519_key exists so that
 # register-host-age-key.sh can derive the machine age public key from it.
 # On freshly provisioned machines the OS may not have generated host keys
 # yet; ssh-keygen -A creates all standard host key types.
