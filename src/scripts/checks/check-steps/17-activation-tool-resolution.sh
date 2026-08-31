@@ -114,7 +114,7 @@ run_activation_tool_resolution() {
   # 4. Validate command names: only flag tokens matching [a-z_][a-z0-9_-]*
   #    to eliminate flags, globs, colons, uppercase, etc.
   # 5. Load lib function names from a temp file to avoid flagging sourced calls.
-  # 6. Fix the 'command' prefix handling bug (use rest offset, not line offset).
+  # 6. if/elif/while handler emits next to avoid coordinate mismatch in command-handler.
   local _awk_program
   read -r -d '' _awk_program <<'AWKEOF'
 BEGIN {
@@ -260,7 +260,7 @@ case_depth > 0 { next }
     match(rest, /^[^[:space:];|&()]+/)
     if (RSTART == 0 || RLENGTH == 0) next
     cmd = substr(rest, RSTART, RLENGTH)
-    _cmd_end = RSTART + RLENGTH
+    next  # command already resolved; avoid coordinate mismatch in command-handler
   }
 
   # Skip past command/enable + optional flags.
