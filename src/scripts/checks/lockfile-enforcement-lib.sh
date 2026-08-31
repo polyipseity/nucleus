@@ -217,6 +217,37 @@ $_subs
 EOF
 }
 
+# Compare the local superpowers plugin clone against the lockfile `superpowers` section.
+# The root section is enforced (hard-fail on drift).
+_lfe_check_superpowers() {
+  local _lf="$1" _jq="$2"
+  local _plugin_dir="$HOME/.local/share/nucleus/plugins/superpowers"
+  # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the pin -- safe.
+  local _expected_rev
+  _expected_rev="$(printf '%s' "$_lf" | "$_jq" -r '(.superpowers // {}).superpowers.rev // empty' 2>/dev/null)" || true
+  [ -z "$_expected_rev" ] && {
+    say -l superpowers "no superpowers rev in lockfile; skipping"
+    return 0
+  }
+  if [ ! -d "$_plugin_dir" ]; then
+    error "superpowers.$_expected_rev: plugin directory not found at $_plugin_dir"
+    return 1
+  fi
+  local _actual_rev
+  # check-suppress:suppression_doc: git rev-parse may fail if the directory is not a git repo -- error path handles it.
+  _actual_rev="$(git -C "$_plugin_dir" rev-parse HEAD 2>/dev/null)" || true
+  if [ -z "$_actual_rev" ]; then
+    error "superpowers.$_expected_rev: could not read HEAD from $_plugin_dir"
+    return 1
+  fi
+  if [ "$_actual_rev" != "$_expected_rev" ]; then
+    error "superpowers.$_expected_rev: expected rev $_expected_rev, got $_actual_rev"
+    return 1
+  fi
+  say -l superpowers "$_expected_rev present"
+  return 0
+}
+
 # Warn-only probe for `suggestions.opencode` (editor plugins).  Checks
 # that each managed plugin entry is present in the lockfile map and
 # reports info-level messages for VCS-pinned entries that cannot be
@@ -332,6 +363,7 @@ _lfe_run_core() {
   _lfe_check_cargo_binstall "$_lf_data" "$_jq" || _failures=$((_failures + 1))
   _lfe_check_rustup "$_lf_data" "$_jq" || _failures=$((_failures + 1))
   _lfe_check_pwsh "$_lf_data" "$_jq" || _failures=$((_failures + 1))
+  _lfe_check_superpowers "$_lf_data" "$_jq" || _failures=$((_failures + 1))
 
   _lfe_check_opencode "$_lf_data" "$_jq"
   _lfe_check_vscode "$_lf_data" "$_jq"

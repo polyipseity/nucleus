@@ -128,6 +128,25 @@ function Invoke-LockfileEnforcement {
     & $InfoFn "source-builds: VCS/rev-pinned — not version-verifiable, skipping enforcement"
   }
 
+  # --- superpowers (local plugin clone — filesystem-based enforcement) ---
+  if ($Lockfile.ContainsKey('superpowers') -and $Lockfile.superpowers.ContainsKey('superpowers')) {
+    $expectedRev = $Lockfile.superpowers.superpowers.rev
+    $pluginDir = Join-Path $env:USERPROFILE '.local\share
+ucleus\plugins\superpowers'
+    if (Test-Path $pluginDir) {
+      $actualRev = & git -C $pluginDir rev-parse HEAD 2>$null  # check-suppress:suppression_doc: git may fail if the directory is not a git repo; empty output triggers the error path
+      if ([string]::IsNullOrWhiteSpace($actualRev)) {
+        & $ErrorFn "superpowers.$expectedRev`: could not read HEAD from $pluginDir"; $errors++
+      } elseif ($actualRev.Trim() -ne $expectedRev) {
+        & $ErrorFn "superpowers.$expectedRev`: expected rev $expectedRev, got $($actualRev.Trim())"; $errors++
+      } else {
+        & $InfoFn "superpowers.$expectedRev`: present"
+      }
+    } else {
+      & $ErrorFn "superpowers.$expectedRev`: plugin directory not found at $pluginDir"; $errors++
+    }
+  }
+
   # --- suggestions.opencode (warn-only, not version-verifiable) ---
   # opencode is a suggestions section (warn-only per the invariant).  Plugins
   # use git+URL format with no installed-version query mechanism.  Report
