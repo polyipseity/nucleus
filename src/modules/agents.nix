@@ -29,6 +29,7 @@ let
   # exact pins (closes the drift root cause).  Mirrors pwsh.nix.
   lockfile = builtins.fromJSON (builtins.readFile ../lockfiles/lockfile.json);
   cargoBinstallDesired = builtins.attrNames (lockfile."cargo-binstall" or { });
+  superpowersRev = lockfile.cursor.superpowers.rev;
 
   activationBundle = pkgs.callPackage ./lib/script-tree.nix { };
 in
@@ -231,7 +232,7 @@ in
         "${managedPaths.toShellPrependGuard}" \
         "${managedPaths.toShellAppendGuard}" \
         "$HOME/.local/share/nucleus/plugins/superpowers" \
-        "b36e0829c6d0140e93cfef2ca599b1b07d4a7797"
+        "${superpowersRev}"
     '';
 
   };
