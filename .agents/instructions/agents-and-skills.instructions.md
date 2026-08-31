@@ -19,7 +19,7 @@ Repo `.agents/skills/` holds **project-tied** skills (`pssa-rule-benchmark`, `sf
 
 ## Directory layout
 
-The `~/.agents/` directory is the runtime home for all agent configuration, prompts, skills, and hooks. It is a real (writable) directory, **not** a whole-dir symlink into the repo tree.
+The `~/.agents/` directory is the runtime home for all agent configuration, prompts, skills, and hooks. It is a real (writable) directory — not a whole-directory symlink into the repo tree.
 
 | Path | Owner | Purpose |
 | ------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
@@ -55,7 +55,7 @@ The phrase "global agent instructions" (or "user agent instructions", "provision
 
 **Fetched**: non-AGPL-compatible license → never commit; list the skill slug in `src/users/default/agents/clawhub-skills.json` under `"skills"`. The `sync-clawhub-skills` activation runs the fetched skill convergence logic inline, downloading skills at apply time via the ClawHub CLI.
 
-The `.clawhub/origin.json` marker written by ClawHub during install is the **sole** reliable signal that a directory in `~/.agents/skills/` is a fetched download. Stale cleanup must check for this marker before removing any directory; directories without it (bundled symlinks, user content) are never removed.
+The `.clawhub/origin.json` marker written by ClawHub during install is the **only** reliable indicator that a directory in `~/.agents/skills/` is a fetched download. Stale cleanup must check for this marker before removing any directory; directories without it (bundled symlinks, user content) are never removed.
 
 Conflict guard: if a slug in `clawhub-skills.json` matches a committed-skill symlink already in `~/.agents/skills/`, the activation prints a warning and skips that slug; the operator must resolve the naming conflict before ClawHub can write there.
 

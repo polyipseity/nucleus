@@ -17,7 +17,7 @@ All managed package managers in this repository MUST have a minimum release age 
 
 ## Package managers without delay features
 
-These lack a built-in delay mechanism and are managed through explicit version pinning in `src/lockfiles/lockfile.json` instead:
+These lack a built-in delay mechanism and use explicit version pinning in `src/lockfiles/lockfile.json` instead:
 
 - WinGet — no delay feature; rely on lockfile pinning
 - Scoop — no delay feature; rely on lockfile pinning

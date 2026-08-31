@@ -28,7 +28,4 @@ Mark the exception with a `# WHY:` comment if non-obvious.
 
 ## Rationale
 
-Ambient passing silently breaks under isolation (runspaces, subshells, strict scoping) and hides data flow.
-This was the root cause behind the step-runner context contract: PowerShell runspaces cannot inherit the caller's `$script:` scope, so steps that read `$script:`-scoped shared state either fail outright or corrupt the main session via concurrent access.
-Bash subshells happen to copy globals, masking the same latent defect.
-See `step-runner.instructions.md` (framework contract), `programming-principles.instructions.md` (explicit boundaries), and `core-behavior.instructions.md` (immutable-by-default, no fallbacks).
+Ambient passing silently breaks under isolation (runspaces, subshells, strict scoping) and hides data flow. This was the root cause of the step-runner context contract: PowerShell runspaces cannot inherit the caller's `$script:` scope, so steps reading `$script:`-scoped state either fail outright or corrupt the main session via concurrent access. Bash subshells copy globals, masking the same latent defect. See `step-runner.instructions.md` (framework contract), `programming-principles.instructions.md` (explicit boundaries), and `core-behavior.instructions.md` (immutable-by-default, no fallbacks).

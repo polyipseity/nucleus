@@ -71,7 +71,7 @@ Ollama's available quantizations for models in the relevant size range are limit
 - **MacBook default**: `q4_K_M` (default tag); use `it-qat` when the model family ships one (e.g. `gemma3:27b-it-qat`). Use `e4b-it-bf16` (16 GB) for `gemma4:e4b` when maximum quality at a single small model is desired.
 - **NixOS / Windows default**: always `q4_K_M` (default tag) — VRAM is tight; do not use q8_0 or fp16 variants.
 
-## Model size SSOT
+## Model size canonical source
 
 Model tags, sizes, and capability metadata are authoritative in `src/modules/ai/models.json` and the manifest comment block in `src/modules/ai/default.nix`. Do not duplicate volatile size tables in this file — read those sources when evaluating fit.
 

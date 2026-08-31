@@ -1,5 +1,5 @@
 ---
-description: "Use when working with shell scripts in the repository. Covers shellcheck suppression rules: mandatory inline reason comments, SC1091 prohibition, and invocation conventions."
+description: "Use when working with shell scripts in the repository. Shellcheck suppression rules: mandatory inline reason comments, SC1091 prohibition, and invocation conventions."
 name: "ShellCheck Policy"
 applyTo: "scripts/**/*.sh, src/scripts/**/*.sh, src/vms/**/*.sh, tests/**/*.sh"
 ---
@@ -34,7 +34,7 @@ When evaluating whether to suppress or rewrite, use this priority to assess risk
 - **SC2064 (trap with variable expansion) — must restructure to single-quoted trap form.** The expansion at trap time is intentional, but single-quoted form preserves identical semantics when the variable is set before the trap and never reassigned. Convert `trap "...$VAR..."` to `trap '..."$VAR"...'`. Suppression only if the variable genuinely must be expanded at trap-definition time (rare).
 - \*\*SC2016 (literal `$` in single quotes) — restructure first: for awk scripts longer than ~10 lines, extract to a `.awk` file referenced via `-f`. This eliminates the suppression entirely. For small awk one-liners, jq filters, sed scripts, and other tool-specific strings where `$` is not shell expansion, use a line-scoped suppression with reason. Acceptable contexts include: awk script bodies, jq filter variables (`$var`), `sh -c` child-shell parameter expansion, tool expression strings (yq paths, PowerShell redirection patterns, regex metacharacters), and literal text matching with `grep -F`. Suppress with reason.
 - **SC2154/SC2034 (referenced but not assigned / unused) — must fix root cause (prefer runtime library import via `source` with `# shellcheck source=`) over suppression.** The root cause is typically build-time string concatenation (Nix prepend) that hides variable assignment from shellcheck. Fix by having scripts source libs at runtime via SCRIPT_DIR-relative paths and adding `# shellcheck source=` directives. Suppression only for genuinely untraceable framework-injected vars (e.g., nix-direnv `_nix_direnv_nix` set in user-specific paths).
-- **SC2194 (constant in loop) — template placeholder must use `__PLACEHOLDER__` convention with intermediate variable.** Replace `case "{{PLACEHOLDER}}"` with `HOST_KIND="__HOST_KIND__"; case "$HOST_KIND"`. Shellcheck sees a variable expansion and does not fire SC2194. The `__PLACEHOLDER__` format also avoids false matches with Mustache/Handlebars syntax. Suppression only for build-time-only templates that shellcheck never evaluates.\*\*
+- **SC2194 (constant in loop) — template placeholder must use `__PLACEHOLDER__` convention with intermediate variable.** Replace `case "{{PLACEHOLDER}}"` with `HOST_KIND="__HOST_KIND__"; case "$HOST_KIND"`. Shellcheck sees a variable expansion and does not fire SC2194. The `__PLACEHOLDER__` format also avoids false matches with Mustache/Handlebars syntax. Suppression only for build-time-only templates that shellcheck never evaluates.
 
 ### Reference table
 

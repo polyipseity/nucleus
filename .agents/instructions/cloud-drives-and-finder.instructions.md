@@ -65,4 +65,4 @@ When changing cloud-drive/Finder behavior, update all of the following in the sa
 - Inline WHY comments for every platform-specific exception.
 - Host `MANUAL.md` steps when behavior cannot be automated.
 
-Avoid stale assertions that refer to removed flags or deprecated implementation paths.
+Do not leave stale assertions that refer to removed flags or deprecated implementation paths.

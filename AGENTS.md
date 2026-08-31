@@ -2,7 +2,7 @@
 
 ## Repository Shape
 
-- Root `AGENTS.md` is the workspace-wide source of truth. Do not add `.github/copilot-instructions.md`.
+- Root `AGENTS.md` is the workspace-wide canonical reference. Do not add `.github/copilot-instructions.md`.
 - `src/` contains the Nix-based declarative configuration: `flake.nix`, `hosts/` (per-machine configs), `platforms/` (per-platform logic), and `modules/` (cross-host shared logic).
   - `src/flake.lock` is the Nix-mandated lockfile location — Nix requires `flake.lock` adjacent to `flake.nix`. The canonical lockfile storage is under `src/lockfiles/` but `flake.lock` cannot be moved there due to this Nix limitation. It is not duplicated; the `src/lockfiles/` directory holds all other lockfiles (`lockfile.json`, etc.) alongside a symlinked copy of `flake.lock` for organizational consistency.
 - `src/hosts/<Host>/` — host-specific deployment: flake system config (`MacBook/`, `NixOS/`), Windows `apply.ps1` + DSC YAML (`Windows/`), host-only activation scripts (`<Host>/scripts/`).

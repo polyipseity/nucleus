@@ -36,7 +36,7 @@ PATH commands are a user convenience surface, not an internal API. Relying on th
 
 ## Single registration surface
 
-All nucleus commands are declared exactly once in `mkNucleusApps` (`src/flake.nix`). The user-facing surfaces derive from it automatically:
+All nucleus commands are declared exactly once in `mkNucleusApps` (`src/flake.nix`). User-facing surfaces derive from it automatically:
 
 - `home.packages` (`src/modules/shell.nix`) spreads `nucleusApps` onto PATH.
 - The flake `apps` output derives via `mkNucleusAppsAsFlakeApps` (strips the `nucleus-` prefix for `nix run .#<name>`).
