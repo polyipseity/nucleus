@@ -128,6 +128,16 @@ function Invoke-LockfileEnforcement {
     & $InfoFn "source-builds: VCS/rev-pinned — not version-verifiable, skipping enforcement"
   }
 
+  # --- suggestions.opencode (warn-only, not version-verifiable) ---
+  # opencode is a suggestions section (warn-only per the invariant).  Plugins
+  # use git+URL format with no installed-version query mechanism.  Report
+  # info-level skip for each entry.  Never errors.
+  if ($Lockfile.ContainsKey('suggestions') -and $Lockfile.suggestions.ContainsKey('opencode')) {
+    foreach ($entry in $Lockfile.suggestions.opencode.Keys) {
+      & $InfoFn "suggestions.opencode.$entry`: VCS-pinned — not version-verifiable, skipping"
+    }
+  }
+
   # --- suggestions.vscode (warn-only verify probe) ---
   # vscode is a suggestions section (warn-only per the invariant) and is not
   # actually locked on all platforms (POSIX locks via flake.lock).  Compare

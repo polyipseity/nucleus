@@ -217,6 +217,31 @@ $_subs
 EOF
 }
 
+# Warn-only probe for `suggestions.opencode` (editor plugins).  Checks
+# that each managed plugin entry is present in the lockfile map and
+# reports info-level messages for VCS-pinned entries that cannot be
+# version-verified.  Never errors: opencode is a suggestions section
+# (warn-only per the invariant).  Returns 0 always.
+_lfe_check_opencode() {
+  local _lf="$1" _jq="$2"
+  local _oc
+  _oc="$(command -v opencode || true)" # check-suppress:suppression_doc: command -v exits non-zero when the tool is absent; || true avoids set -e abort and the empty-string check below handles it
+  [ -z "$_oc" ] && {
+    say -l opencode "no opencode CLI; skipping suggestions.opencode verify"
+    return 0
+  }
+  local _pkgs _pkg
+  # check-suppress:suppression_doc: jq parse failure on a malformed lockfile skips the section -- safe.
+  _pkgs="$(printf '%s' "$_lf" | "$_jq" -r '(.suggestions.opencode // {}) | keys[]' 2>/dev/null)" || return 0
+  while IFS= read -r _pkg; do
+    [ -z "$_pkg" ] && continue
+    say -l opencode "$_pkg: VCS-pinned — not version-verifiable, skipping"
+  done <<EOF
+$_pkgs
+EOF
+  return 0
+}
+
 # Warn-only probe for `suggestions.vscode` (editor extensions).  Runs
 # `code --list-extensions --show-versions` (fallback `code-insiders`) and
 # compares each managed extension's installed version to the lockfile map.
@@ -270,6 +295,7 @@ _lfe_run_core() {
   _lfe_check_rustup "$_lf_data" "$_jq" || _failures=$((_failures + 1))
   _lfe_check_pwsh "$_lf_data" "$_jq" || _failures=$((_failures + 1))
 
+  _lfe_check_opencode "$_lf_data" "$_jq"
   _lfe_check_vscode "$_lf_data" "$_jq"
   _lfe_warn_suggestions "$_lf_data" "$_jq"
 
