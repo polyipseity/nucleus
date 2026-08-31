@@ -51,9 +51,9 @@ Files in `~/.agents/` are per-entry symlinks into the resolved overlay directory
 
 ## Bundled vs. fetched skills
 
-**Bundled**: AGPL-compatible license → commit all skill files to `src/users/default/agents/skills/<name>/`. The `install-agent-skills` activation symlinks `~/.agents/skills/<name>` into the store.
+**Bundled**: license compatible with AGPL inclusion (MIT, BSD, Apache-2.0, AGPL) → commit all skill files to `src/users/default/agents/skills/<name>/`. The `install-agent-skills` activation symlinks `~/.agents/skills/<name>` into the store.
 
-**Fetched**: non-AGPL-compatible license → never commit; list the skill slug in `src/users/default/agents/clawhub-skills.json` under `"skills"`. The `sync-clawhub-skills` activation downloads skills at apply time via the ClawHub CLI.
+**Fetched**: licenses incompatible with AGPL inclusion (e.g., proprietary, CC-NC, GPL-only without linking exception) → never commit; list the skill slug in `src/users/default/agents/clawhub-skills.json` under `"skills"`. The `sync-clawhub-skills` activation downloads skills at apply time via the ClawHub CLI.
 
 The `.clawhub/origin.json` marker is the only reliable indicator of a fetched download. Stale cleanup must check for it before removing any directory — bundled symlinks and user content are never removed.
 
