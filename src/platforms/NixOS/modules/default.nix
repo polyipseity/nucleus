@@ -3,7 +3,6 @@
   config,
   lib,
   pkgs,
-  repoRoot,
   ...
 }:
 let
@@ -277,7 +276,6 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       ExecStart = "${logGcUser}/bin/nucleus-log-gc-user";
       Environment = [
         "NUCLEUS_GC_EXPIRY=${config.modules.gc.expiry}"
-        "NUCLEUS_REPO_ROOT=${repoRoot}"
       ];
     };
   };

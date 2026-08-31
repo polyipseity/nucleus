@@ -25,7 +25,6 @@
   # (modules threaded via specialArgs) pass it explicitly; the default keeps
   # standalone/test callers hermetic without threading the arg everywhere.
   # Matches the internal repoRoot = ../../..; used for users-registry.nix below.
-  repoRoot ? ../../..,
   username,
   hostName,
   ...
@@ -278,17 +277,6 @@ let
         Windows = "Windows";
       };
       why = "Canonical host name for VM host-scoping and host-aware consumers. Windows set in system/env.dsc.yml at Machine scope.";
-    };
-
-    # ── macOS-specific: repo root ───────────────────────────────────
-    NUCLEUS_REPO_ROOT = {
-      values = {
-        # WHY: String interpolation ("${repoRoot}") preserves Nix derivation context
-        # while producing a string-typed value for launchd EnvironmentVariables.
-        # toString strips context, causing builtins.derivation contextless-source warnings.
-        MacBook = "${repoRoot}";
-      };
-      why = "Repo root for out-of-store symlinks. Flake-derived via specialArgs (repoRoot) at eval time; activation hook overrides for repo-move edge case.";
     };
 
     # ── macOS GUI environment PATH (append-only; user-specific) ──

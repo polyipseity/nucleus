@@ -60,7 +60,6 @@ let
   daemonEnv = lib.filterAttrs (_name: value: value != null) {
     NIX_SSL_CERT_FILE = resolveValue "NIX_SSL_CERT_FILE";
     NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";
-    NUCLEUS_REPO_ROOT = resolveValue "NUCLEUS_REPO_ROOT";
     NUCLEUS_SYSTEM_LOG_DIR = systemLogDir;
   };
 in

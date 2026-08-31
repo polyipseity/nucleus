@@ -5,7 +5,6 @@
   config,
   lib,
   pkgs,
-  repoRoot,
   username,
   nucleusApps,
   ...
@@ -111,7 +110,6 @@ in
       ExecStart = "${logGcSystem}/bin/nucleus-log-gc-system";
       Environment = [
         "NUCLEUS_GC_EXPIRY=${config.modules.gc.expiry}"
-        "NUCLEUS_REPO_ROOT=${repoRoot}"
       ];
     };
   };
@@ -162,7 +160,6 @@ in
       Environment = [
         "NUCLEUS_GC_EXPIRY=${config.modules.gc.expiry}"
         "NUCLEUS_GC_GENERATIONS_KEEP=${toString config.modules.gc.generationsKeep}"
-        "NUCLEUS_REPO_ROOT=${repoRoot}"
         "NUCLEUS_USERNAME=${username}"
       ];
     };

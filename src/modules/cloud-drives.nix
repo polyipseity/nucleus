@@ -5,7 +5,6 @@ args@{
   config,
   lib,
   pkgs,
-  repoRoot,
   ...
 }:
 let
@@ -467,9 +466,7 @@ in
                 ProgramArguments = [
                   "${mkReplicaScheduledSyncScript replica}/bin/nucleus-cloud-replica-scheduled-sync-${replica.id}"
                 ];
-                EnvironmentVariables = {
-                  NUCLEUS_REPO_ROOT = "${repoRoot}";
-                };
+                EnvironmentVariables = { };
                 StartCalendarInterval = mkScheduledSyncLaunchdCalendar replica.fallbackTimer.interval;
                 # Keep scheduled sync runs on schedule boundaries only.
                 RunAtLoad = false;
@@ -499,7 +496,6 @@ in
               Service = {
                 Type = "oneshot";
                 ExecStart = "${mkReplicaScheduledSyncScript replica}/bin/nucleus-cloud-replica-scheduled-sync-${replica.id}";
-                Environment = "NUCLEUS_REPO_ROOT=${repoRoot}";
               };
               Install = {
                 WantedBy = [ "default.target" ];
