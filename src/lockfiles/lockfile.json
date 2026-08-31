@@ -28,30 +28,26 @@
   "source-builds": {
     "ncdu": {
       "rev": "1b3d0a670e730b338de6b716e2a60cf86351e44b",
-      "source": "https://code.blicky.net/yorhel/ncdu.git",
-      "version": "2.9.2"
+      "source": "https://code.blicky.net/yorhel/ncdu.git"
     }
   },
   "cursor": {
     "superpowers": {
       "rev": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
-      "source": "https://github.com/obra/superpowers.git",
-      "version": "6.3.0"
+      "source": "https://github.com/obra/superpowers.git"
     }
   },
   "vscode": {
     "superpowers": {
       "rev": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
-      "source": "https://github.com/obra/superpowers.git",
-      "version": "6.3.0"
+      "source": "https://github.com/obra/superpowers.git"
     }
   },
   "suggestions": {
     "opencode": {
       "superpowers": {
         "rev": "b36e0829c6d0140e93cfef2ca599b1b07d4a7797",
-        "source": "https://github.com/obra/superpowers.git",
-        "version": "6.3.0"
+        "source": "https://github.com/obra/superpowers.git"
       }
     },
     "homebrew": {
