@@ -1,4 +1,3 @@
-#!/usr/bin/env bash
 # shellcheck shell=bash
 # shellcheck source=../check-lib.sh
 # (provides say, error, warn, require_command, derive_repo_root, register_step)
