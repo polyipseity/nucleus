@@ -189,6 +189,9 @@
   },
   "chat.permissions.default": "autopilot",
   "chat.planAgent.defaultModel": "LiteLLM Default (customendpoint)",
+  "chat.plugins.marketplaces": [
+    "obra/superpowers-marketplace"
+  ],
   "chat.promptFilesLocations": {
     ".agents/prompts": true,
     "~/.agents/prompts": true
