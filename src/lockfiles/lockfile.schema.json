@@ -98,6 +98,13 @@
           ],
           "type": "object"
         },
+        "cursor": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Cursor extension versions. Same VS Code-compatible extensions as suggestions.vscode. Warn-only.",
+          "type": "object"
+        },
         "ollama": {
           "additionalProperties": {
             "items": {

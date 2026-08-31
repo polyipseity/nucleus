@@ -11,7 +11,7 @@ applyTo: "src/lockfiles/lockfile.json, src/lockfiles/lockfile.schema.json, src/s
 ## Two-tier model
 
 - **Pinned root sections** — authoritative. The enforcement lib (`lockfile-enforcement-lib.*`, used by `bump-lockfile --verify-installed` / `-VerifyInstalled`) compares installed versions against pins and reports drift. Currently pinned: `bun`, `cargo-binstall`, `pwsh`, `rustup`, `scoop`, `source-builds`, `uv`, `version`, `vm-setup`, `winget`.
-- **`suggestions` block** — warn-only, never enforced. Always warns that sub-sections are non-authoritative. Never causes a check failure. Sub-sections: `homebrew` (masApps only), `ollama`, `opencode`, `vscode`, `vm-setup.windows`.
+- **`suggestions` block** — warn-only, never enforced. Always warns that sub-sections are non-authoritative. Never causes a check failure. Sub-sections: `cursor`, `homebrew` (masApps only), `ollama`, `opencode`, `vscode`, `vm-setup.windows`.
 
 ## Invariant
 
@@ -38,7 +38,7 @@ All other `flake.lock` duplicates (nixpkgs, homebrew brews/casks) are removed.
 ## Canonical classification
 
 - **Root (pinned, enforced):** tools with a deterministic installed-version query on the target platform (`bun` global packages, `uv` tools, `cargo-binstall` crates, `rustup` stable toolchain, `pwsh` modules, `scoop`, `winget`, `vm-setup` ISO/digest sources, `source-builds`/`version` manual pins).
-- **`suggestions` (warn-only):** `homebrew.masApps` (App Store IDs, not in any lockfile), `ollama` (daemon-dependent), `opencode` (VCS-pinned plugins, no installed-version query), `vscode` (editor extensions — Windows lock bridge, see above), `vm-setup.windows` (manual digest).
+- **`suggestions` (warn-only):** `cursor` (editor extensions, same as `vscode`), `homebrew.masApps` (App Store IDs, not in any lockfile), `ollama` (daemon-dependent), `opencode` (VCS-pinned plugins, no installed-version query), `vscode` (editor extensions — Windows lock bridge, see above), `vm-setup.windows` (manual digest).
 
 ## Shared probe library
 
