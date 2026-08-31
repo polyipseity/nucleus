@@ -10,7 +10,7 @@ applyTo: "scripts/**/*.sh, src/scripts/**/*.sh, src/vms/**/*.sh, tests/**/*.sh"
 
 - **Prefer rewriting over suppressing.** Before adding a `# shellcheck disable=`, first attempt to restructure the code to satisfy shellcheck: quote the variable, use a static source path for `# shellcheck source=`, or break the line into separate statements. Suppression is the last resort, not the first reflex.
 
-- **Every `# shellcheck disable=` must have an inline `# reason:` comment** (with colon) on the same line, documenting why the suppression is necessary, what constraint prevents the code from being rewritten to avoid the warning, and (if applicable) why the trigger is a false positive. Format: `# shellcheck disable=SCXXXX # reason: <justification>`. The `reason:` prefix is mandatory — bare `# text` comments do not count.
+- **Every `# shellcheck disable=` must have an inline `# reason:` comment** (with colon) on the same line, documenting what constraint prevents rewriting the code and (if applicable) why the trigger is a false positive. Format: `# shellcheck disable=SCXXXX # reason: <justification>`. The `reason:` prefix is mandatory — bare `# text` comments do not count.
 
   Example: `# shellcheck disable=SC2086 # reason: word splitting intentional for rclone flag passthrough`
 
@@ -20,7 +20,7 @@ applyTo: "scripts/**/*.sh, src/scripts/**/*.sh, src/vms/**/*.sh, tests/**/*.sh"
 
   The sole exception is when the sourced file genuinely cannot exist at shellcheck analysis time (e.g., `$HOME/.nix-profile/etc/profile.d/nix.sh` sourced by bootstrap.sh — created at runtime by the Nix installer). In that case: (a) an inline `# reason` comment must justify the exception, and (b) the directive `# shellcheck source=` approach is impossible because the path is genuinely unreachable. No other exceptions are permitted.
 
-- **Review new suppressions twice.** Before adding a new `# shellcheck disable=`, ask: "Can I quote the variable? Can I use a static path? Can I restructure the expression?" If the answer to all is no, the suppression is justified. Any suppression that survives this self-review must have a `# reason:` comment that documents the attempted alternatives and why they failed.
+- **Review new suppressions.** Before adding a `# shellcheck disable=`, ask: "Can I quote the variable? Can I use a static path? Can I restructure the expression?" If the answer to all is no, the suppression is justified. Any surviving suppression must have a `# reason:` comment documenting the attempted alternatives and why they failed.
 
 - **Suppressions in vendored third-party code** (`vendor/`) are exempt from this policy. The repo's shellcheck invocations skip vendor directories via `git ls-files` pathspecs.
 

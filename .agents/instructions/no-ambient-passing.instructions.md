@@ -8,9 +8,9 @@ applyTo: "src/scripts/**, scripts/**, tests/**"
 
 ## Rule
 
-No function or step may read shared state from enclosing scope (`$script:` in PowerShell, globals in bash, module-level vars in Python/TS) that was not passed as a parameter.
+No function or step may read state from enclosing scope (`$script:` in PowerShell, globals in bash, module-level vars in Python/TS) that was not passed as a parameter.
 State must flow through the call signature.
-The step-runner context object is the **only** sanctioned carrier of runner-populated shared state.
+The step-runner context object is the only carrier of runner-populated state.
 
 ## Step context contract
 
@@ -18,14 +18,14 @@ Check/test steps receive a context object as their first parameter:
 - PowerShell: `$Context.<Field>` (a `[PSObject]` built by `step-runner.ps1`).
 - Bash: `${ctx[...]}` (an associative array referenced via `local -n ctx="$1"`, built by `step-runner.sh`).
 
-Steps read only from that context and from their own `local` variables — never from ambient scope.
-Step-private accumulators (counters, exit codes) must be `local` / `$local:`, never written to shared scope to be read back elsewhere.
+Steps read only from that context and their own `local` variables — never from ambient scope.
+Step-private accumulators (counters, exit codes) must be `local` / `$local:`. Never write them to shared scope for other steps to read.
 
 ## Intentional exceptions
 
-A documented required environment input (e.g. `REPO_ROOT`, `NUCLEUS_REPO_ROOT` in lib helpers) or an external env var (e.g. `PARALLEL_JOBS`) is not ambient passing of runner state.
+Documented required environment inputs (e.g. `REPO_ROOT`, `NUCLEUS_REPO_ROOT` in lib helpers) or external env vars (e.g. `PARALLEL_JOBS`) are not ambient passing of runner state.
 Mark the exception with a `# WHY:` comment if non-obvious.
 
 ## Rationale
 
-Ambient passing silently breaks under isolation (runspaces, subshells, strict scoping) and hides data flow. This was the root cause of the step-runner context contract: PowerShell runspaces cannot inherit the caller's `$script:` scope, so steps reading `$script:`-scoped state either fail outright or corrupt the main session via concurrent access. Bash subshells copy globals, masking the same latent defect. See `step-runner.instructions.md` (framework contract), `programming-principles.instructions.md` (explicit boundaries), and `core-behavior.instructions.md` (immutable-by-default, no fallbacks).
+Ambient passing breaks under isolation (runspaces, subshells, strict scoping). PowerShell runspaces cannot inherit the caller's `$script:` scope, so steps reading `$script:`-scoped state either fail or corrupt the main session via concurrent access. Bash subshells copy globals, hiding the same defect. See `step-runner.instructions.md`, `programming-principles.instructions.md`, and `core-behavior.instructions.md`.

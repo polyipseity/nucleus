@@ -7,7 +7,7 @@ alwaysApply: true
 
 # Deterministic JSON generation
 
-Generated JSON artifacts (e.g. `winget-packages.json`, `lockfile.json`) are committed to the repo and consumed by other tooling. They MUST be byte-stable across runs so diffs show only real changes.
+Generated JSON artifacts (e.g. `winget-packages.json`, `lockfile.json`) are committed and consumed by tooling. They must be byte-stable across runs so diffs show only real changes.
 
 ## Rules
 

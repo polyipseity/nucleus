@@ -6,7 +6,7 @@ applyTo: "src/modules/shell*.nix, src/modules/agents.nix, src/modules/pwsh.nix, 
 
 # Supply chain hardening
 
-All managed package managers in this repository MUST have a minimum release age delay configured to limit exposure to newly published (potentially compromised) package versions.
+All managed package managers must have a minimum release age delay configured to limit exposure to newly published compromised package versions.
 
 ## Active delays and pinning defaults
 
@@ -17,13 +17,7 @@ All managed package managers in this repository MUST have a minimum release age 
 
 ## Package managers without delay features
 
-These lack a built-in delay mechanism and use explicit version pinning in `src/lockfiles/lockfile.json` instead:
-
-- WinGet — no delay feature; rely on lockfile pinning
-- Scoop — no delay feature; rely on lockfile pinning
-- cargo-binstall — no delay feature; rely on lockfile pinning
-- rustup — no delay feature; rely on lockfile pinning
-- Homebrew — autoUpdate disabled globally; rely on lockfile pinning
+WinGet, Scoop, cargo-binstall, rustup, and Homebrew have no built-in delay mechanism. They rely on version pinning in `src/lockfiles/lockfile.json`. Homebrew also disables `autoUpdate` globally.
 
 ## Lifecycle script hardening
 
@@ -72,4 +66,4 @@ When adding a NEW package manager to this repository, you MUST:
 
 ## Cross-host parity
 
-Supply chain delay settings MUST be applied on every host (macOS, NixOS, Windows) that runs the package manager. POSIX hosts share config through Nix modules; Windows has separate DSC and PowerShell profile layers — all must be kept in sync.
+Delay settings must be applied on every host that runs the package manager. POSIX hosts share config through Nix modules; Windows has separate DSC and PowerShell profile layers. All must stay in sync.

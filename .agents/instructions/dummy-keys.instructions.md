@@ -6,11 +6,11 @@ applyTo: "src/modules/dummy-keys.json, src/modules/dummy-keys.schema.json, src/s
 
 # Dummy Key Management
 
-The canonical dummy-key registry lives at `src/modules/dummy-keys.json`, validated against `src/modules/dummy-keys.schema.json`.
+Dummy-key registry: `src/modules/dummy-keys.json`, validated against `src/modules/dummy-keys.schema.json`.
 
 ## Policy
 
-- Any dummy/placeholder API-key literal of the form `sk-` followed by 4+ alphanumerics that is hardcoded in a tracked config must resolve to a registered `dummyKeys.<name>.value`.
-- Add new dummy keys to the registry with three fields: `value` (the exact literal consumers must use), `consumers` (repo-relative paths of configs using it), and `note` (why the dummy key exists).
-- Consumers must use the registry `value` verbatim — no re-typing, no variant spellings, no inline substitutions.
-- Check step 14 (`run_dummy_key_uniformity` in `src/scripts/checks/check-steps/14-repository-policy.sh` / `.ps1`) enforces registration; keep the check in sync with any registry shape changes.
+- Any dummy/placeholder API-key literal of the form `sk-` followed by 4+ alphanumerics hardcoded in a tracked config must resolve to a registered `dummyKeys.<name>.value`.
+- New entries need three fields: `value` (the exact literal consumers use), `consumers` (repo-relative paths of configs using it), and `note` (why it exists).
+- Consumers must use the registry `value` verbatim.
+- Check step 14 (`run_dummy_key_uniformity` in `src/scripts/checks/check-steps/14-repository-policy.sh` / `.ps1`) enforces registration; keep the check in sync with registry shape changes.

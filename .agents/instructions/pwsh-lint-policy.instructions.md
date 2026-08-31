@@ -51,9 +51,9 @@ applyTo: "**/*.ps1, scripts/*-PSScriptAnalyzerSettings.psd1"
 
 ### `PSUseUsingScopeModifierInNewRunspaces` with `$using:VAR.Count`
 
-**Trigger:** Accessing a property/member on a `$using:` variable inside a `Start-Job` / `Start-ThreadJob` script block, e.g. `$using:PS1_FILES.Count`.
+**Trigger:** Member access on a `$using:` variable in a `Start-Job` / `Start-ThreadJob` script block (e.g. `$using:PS1_FILES.Count`).
 
-**Root cause:** The AST for `$using:PS1_FILES.Count` places the `VariableExpressionAst` (`$using:PS1_FILES`) under a `MemberExpressionAst`, **not** a `UsingExpressionAst`. The rule's `IsNonUsingNonSpecialVariableExpressionAst` predicate only checks the immediate parent, so it misses the `$using:` scope modifier in the ancestor chain and falsely flags it as undeclared.
+**Root cause:** The AST places `$using:PS1_FILES` under a `MemberExpressionAst`, not a `UsingExpressionAst`. The rule's predicate only checks the immediate parent, missing the `$using:` scope modifier in the ancestor chain.
 
 **Upstream status:**
 
@@ -72,13 +72,13 @@ $_ps1Files = $using:PS1_FILES
 if ($_ps1Files.Count -gt 0) { ... $_ps1Files ... }
 ```
 
-### `PSUseApprovedVerbs` — always use approved verbs
+### `PSUseApprovedVerbs`
 
-**Trigger:** Function or cmdlet name using an unapproved verb, e.g. `Ensure-Tool`.
+**Trigger:** Function or cmdlet name using an unapproved verb (e.g. `Ensure-Tool`).
 
-**Root cause:** PowerShell's `PSUseApprovedVerbs` rule checks every `FunctionDefinitionAst` node — functions defined with the `function` keyword — and verifies that the verb part (text before the first hyphen) is one of the [approved PowerShell verbs](https://learn.microsoft.com/en-us/powershell/scripting/developer/cmdlet/approved-verbs-for-windows-powershell-commands).
+**Root cause:** The rule checks every `FunctionDefinitionAst` node and verifies the verb part (text before the first hyphen) is one of the [approved PowerShell verbs](https://learn.microsoft.com/en-us/powershell/scripting/developer/cmdlet/approved-verbs-for-windows-powershell-commands).
 
-**Fix:** Rename the function to use an approved verb. Example:
+**Fix:** Rename to use an approved verb. Example:
 
 ```powershell
 # BAD — 'Ensure' is not an approved verb:
@@ -98,7 +98,7 @@ function say { Write-Output "$args" }
 function Write-Message { Write-Output "$args" }
 ```
 
-**Command-name wrappers** (`python`, `bun`, `cargo`, etc.): Functions that intentionally shadow native commands must keep their exact lowercase name to function as replacements. Non-hyphenated lowercase names (`python`, `bun`, `node`, etc.) do NOT trigger `PSUseApprovedVerbs` (it only fires on Verb-Noun hyphenated names), but `node` DOES trigger `PSAvoidOverwritingBuiltInCmdlets` (it shadows a built-in cmdlet). Add the attribute INSIDE the function body immediately before `param()`:
+**Command-name wrappers** (`python`, `bun`, `cargo`, etc.): Functions that shadow native commands keep their exact lowercase name. Non-hyphenated lowercase names don't trigger `PSUseApprovedVerbs` (it only fires on Verb-Noun hyphenated names), but `node` triggers `PSAvoidOverwritingBuiltInCmdlets`. Add the attribute INSIDE the function body immediately before `param()`:
 
 ```powershell
 function node {
@@ -109,19 +109,19 @@ function node {
 }
 ```
 
-This is not an exemption — use inline suppression with a documented reason as per standard suppression rules. The comment syntax `# SuppressMessageAttribute('RuleId', '')` does NOT work — PSSA's `GetSuppressions` only reads `AttributeAst` from param blocks; comment-based suppressions are silently ignored (dead weight). The attribute MUST be placed inside the function body before `param()` (placing it on the `function` keyword line causes `UnexpectedAttribute` ParseErrors), and the `# check-suppress:` annotation must sit on the same line as, or immediately above, the attribute (step-11 adjacency requirement).
+Use inline suppression with a documented reason as per standard suppression rules. The comment syntax `# SuppressMessageAttribute('RuleId', '')` does NOT work — PSSA's `GetSuppressions` only reads `AttributeAst` from param blocks; comment-based suppressions are silently ignored. The attribute MUST be placed inside the function body before `param()` (placing it on the `function` keyword line causes `UnexpectedAttribute` ParseErrors), and the `# check-suppress:` annotation must sit on the same line as, or immediately above, the attribute (step-11 adjacency requirement).
 
 **`Add-ShellAlias` helper**: Functions that create aliases via `New-Item -Path Function:` use the PSFunction provider path and produce no `FunctionDefinitionAst`. The helper itself (`Add-ShellAlias`) uses the approved verb `Add-`. This is the canonical way to create function aliases without triggering the rule.
 
-**`nucleus-*` CLI wrappers** (`nucleus-apply`, `nucleus-check`, `nucleus-cloud`, etc. in `src/scripts/shell/profile.ps1`): These intentionally use the fixed `nucleus-<command>` contract as the function name. They trigger `PSUseApprovedVerbs` because `nucleus` is not an approved verb. Add the attribute INSIDE the function body immediately before `param()` with a documented reason. Prefer `Add-ShellAlias` for new shell aliases that do not need the exact `nucleus-*` name.
+**`nucleus-*` CLI wrappers** (`nucleus-apply`, `nucleus-check`, `nucleus-cloud`, etc. in `src/scripts/shell/profile.ps1`): These use the fixed `nucleus-<command>` contract as the function name. They trigger `PSUseApprovedVerbs` because `nucleus` is not an approved verb. Add the attribute INSIDE the function body immediately before `param()` with a documented reason. Prefer `Add-ShellAlias` for new shell aliases that do not need the exact `nucleus-*` name.
 
-### `PSUseSingularNouns` — always use singular nouns
+### `PSUseSingularNouns`
 
-**Trigger:** Function or cmdlet name using a plural noun, e.g. `Get-VmRunningNames`.
+**Trigger:** Function or cmdlet name using a plural noun (e.g. `Get-VmRunningNames`).
 
-**Root cause:** PowerShell convention requires function names to use singular nouns. PSSA's `PSUseSingularNouns` rule flags any function whose noun part appears grammatically plural (typically ending in 's', 'es', 'ies', or irregular plurals).
+**Root cause:** PowerShell convention requires singular nouns. PSSA flags any function whose noun part appears grammatically plural.
 
-**Semantic audit required:** Passing `scripts/check-pwsh.ps1` (PSSA) is necessary but not sufficient. A function can pass PSSA while still misrepresenting its contract. After fixing PSSA findings, apply the decision tree below. Never rename only to silence PSSA without checking whether the function operates on a collection.
+**Semantic audit required:** Passing PSSA is necessary but not sufficient — a function can pass PSSA while misrepresenting its contract. After fixing PSSA findings, apply the decision tree below. Never rename only to silence PSSA without checking whether the function operates on a collection.
 
 ### Anti-pattern: naive de-pluralization
 
@@ -197,11 +197,11 @@ To document a new PSScriptAnalyzer rule policy:
 
 ## Annotation reference
 
-Two coexisting annotation formats, both under the `# check-suppress:` prefix:
+Two formats coexist under the `# check-suppress:` prefix:
 
 | Format | Class | Used for |
 | ---------------------------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------- |
-| `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | A/C | `[SuppressMessageAttribute]` attribute, and any comment-only suppression of PSSA rules |
+| `# check-suppress:SuppressMessageAttribute: <RuleName> -- <reason>` | A/C | `[SuppressMessageAttribute]` attribute, and comment-only suppression of PSSA rules |
 | `# check-suppress:suppression_doc: <reason>` | B | `$null =`, `[void]`, `2>$null`, `-ErrorAction SilentlyContinue`, empty `catch {}`, <code>\|\| true</code> |
 
 Both are grep-able: `grep 'check-suppress:' **/*.ps1`

@@ -14,41 +14,62 @@ The working solution comprises six interdependent stages, each handling a differ
 
 ### Stage 1: Disable all three hotkey IDs (61, 64, 65)
 
-Loop over symbolic-hotkey IDs 61, 64, 65 and write `enabled=false` to each via `defaults write`. All three IDs must be disabled because macOS uses different ID slots across versions (Mojave→Sequoia), profile migrations preserve old entries, and disabling only one ID still leaves Cmd+Space active.
+Loop over symbolic-hotkey IDs 61, 64, 65 and write `enabled=false` to each via `defaults
+write`. macOS uses different ID slots across versions (Mojave→Sequoia), and profile
+migrations preserve old entries — disabling only one ID still leaves Cmd+Space active.
 
 ### Stage 2: Invoke activateSettings -u immediately
 
-Call `activateSettings -u` as the console user immediately after the hotkey writes. Without this, the disable applies only to the next login session — Cmd+Space still works until logout. This forces loginwindow to re-read hotkey settings immediately, making the disable user-visible in the current session. Must run as the console user (not root) because it operates on the user's session context.
+Call `activateSettings -u` as the console user immediately after the hotkey writes.
+Without this, the disable applies only to the next login session — Cmd+Space still works
+until logout. Must run as the console user (not root) because it operates on the user's
+session context.
 
 ### Stage 3: launchctl disable — prevent re-launch on reboot
 
-Disable the `com.apple.Spotlight` launchd service. Even if hotkeys and indexing are disabled, the service can be re-enabled by system updates or manual intervention. `launchctl disable` removes it from the auto-start registry, preventing reboot-based restoration.
+Disable the `com.apple.Spotlight` launchd service. System updates can re-enable it;
+`launchctl disable` removes it from the auto-start registry, preventing reboot-based
+restoration.
 
 ### Stage 4: launchctl bootout — stop running instance immediately
 
-Boot out (immediately stop) the running `com.apple.Spotlight` service. `launchctl disable` prevents re-launch but does not stop an already-running process, so `bootout` terminates it now to prevent any in-flight re-enable or listener activity.
+Boot out the running `com.apple.Spotlight` service. `launchctl disable` prevents re-launch
+but does not stop an already-running process, so `bootout` terminates it now.
 
-`bootout` may fail with a non-zero exit code if the service is already absent (e.g., a previous activation already stopped it). This is expected and safe; log it as a warning, not an error.
+`bootout` may exit non-zero if the service is already absent (e.g., a previous activation
+already stopped it). This is expected; log it as a warning, not an error.
 
-SIP nuance (macOS 15+): `launchctl bootout gui/<uid>/com.apple.Spotlight` can return `Operation not permitted while System Integrity Protection is engaged` even when `launchctl disable` and `mdutil -i off /` have already converged the effective state. Treat this as an expected classified warning (not a hard error), and avoid printing raw unclassified `launchctl` output directly in activation logs.
+SIP nuance (macOS 15+): `launchctl bootout gui/<uid>/com.apple.Spotlight` can return
+`Operation not permitted while System Integrity Protection is engaged` even when
+`launchctl disable` and `mdutil -i off /` have already converged the effective state. Treat
+this as an expected classified warning (not a hard error), and avoid printing raw
+unclassified `launchctl` output directly in activation logs.
 
 ### Stage 5: mdutil -i off / — disable Spotlight indexing globally
 
-Disable Spotlight indexing at the filesystem level for the root volume. Even if the launchd service is disabled, the indexing subsystem can persist. `mdutil -i off /` is enforced at the kernel/storage layer, so indexing stays off even if an admin or macOS update re-enables the service. Requires root privileges — must run in `system.activationScripts`, not `home.activation`.
+Disable Spotlight indexing at the filesystem level for the root volume. `mdutil -i off /` is
+enforced at the kernel/storage layer, so indexing stays off even if an admin or macOS update
+re-enables the launchd service. Requires root privileges — must run in
+`system.activationScripts`, not `home.activation`.
 
 ### Stage 6: Remove cache directory `/.Spotlight-V100`
 
-Delete the existing Spotlight index cache at `/.Spotlight-V100`. Without a pre-built cache, Spotlight must rebuild from scratch if re-enabled, making re-enable less convenient. Combined with `mdutil -i off`, this ensures no indexed data is available even if Spotlight is re-enabled.
+Delete the existing Spotlight index cache at `/.Spotlight-V100`. Without a pre-built cache,
+Spotlight must rebuild from scratch if re-enabled. Combined with `mdutil -i off`, this
+ensures no indexed data is available.
 
-The entire strategy must run in `system.activationScripts.postActivation.text` (as root via `darwin-rebuild switch`), not `home.activation`. Three operations require root privilege unavailable with `sudo` in user context: (1) `mdutil -i off /`, (2) `launchctl bootout`, (3) `launchctl disable`.
+The entire strategy runs in `system.activationScripts.postActivation.text` (as root via
+`darwin-rebuild switch`), not `home.activation`. Three operations require root privilege
+unavailable with `sudo` in user context: (1) `mdutil -i off /`, (2) `launchctl bootout`,
+(3) `launchctl disable`.
 
 After applying, verify hotkey IDs 61/64/65 show disabled, `mdutil -s /` reports no indexing, `launchctl list | grep Spotlight` is empty, `/.Spotlight-V100` is absent, and cmd+space does not open Spotlight in the active GUI session.
 
 ## SIP / launchd daemon restriction
 
-macOS 26+ (Sequoia) SIP blocks **system launchd daemons** that have a non-root `UserName` from executing unsigned binaries at boot during `RunAtLoad`. The daemon exits immediately with exit code 78 (`EX_CONFIG`), which is a non-retryable error — launchd marks it with a `penalty box` and never retries. The service becomes permanently stuck until manually recovered.
+macOS 26+ (Sequoia) SIP blocks **system launchd daemons** that have a non-root `UserName` from executing unsigned binaries at boot during `RunAtLoad`. The daemon exits immediately with exit code 78 (`EX_CONFIG`), which is non-retryable — launchd marks it with a `penalty box` and never retries.
 
-This restriction only affects the **system domain** (`launchd.daemons`). User domain agents (`launchd.agents`) are not affected because they start after login when the user session is established.
+This restriction only affects the **system domain** (`launchd.daemons`). User domain agents (`launchd.agents`) are not affected.
 
 Common symptoms:
 
@@ -70,9 +91,9 @@ ProgramArguments = [
 ];
 ```
 
-Apply this to **every** `launchd.daemons` entry with a non-root `UserName`, regardless of whether the program is a compiled binary or a `writeShellScript`. The restriction applies to any unsigned file in the Nix store.
+Apply this to **every** `launchd.daemons` entry with a non-root `UserName`. The restriction applies to any unsigned file in the Nix store.
 
-`camillagui-backend.nix` was the reference — it used the `/bin/sh` wrapper and worked at boot while direct-binary daemons failed. Services with `RunAtLoad = false` + `StartInterval` also survived the boot window by delaying past the strict phase, but the `/bin/sh` wrapper is the correct permanent fix.
+`camillagui-backend.nix` was the reference — it used the `/bin/sh` wrapper and worked at boot while direct-binary daemons failed. The `/bin/sh` wrapper is the correct permanent fix.
 
 ### Recovery from penalty box
 
@@ -90,23 +111,23 @@ The `service-watchdog` (every 5 min) does this automatically via `recover_launch
 
 ## macOS defaults domain synchronization
 
-- When adding a new managed macOS defaults domain in either `src/hosts/MacBook/defaults.nix` or `src/platforms/macOS/modules/default.nix`, update `resetUserPreferenceDomains` in `src/platforms/macOS/modules/preference-gc.nix` in the same change.
+- When adding a new managed macOS defaults domain in either `src/hosts/MacBook/defaults.nix` or `src/platforms/macOS/modules/default.nix`, update `resetUserPreferenceDomains` in `src/platforms/macOS/modules/preference-gc.nix` simultaneously.
 - Keep `resetUserPreferenceDomains` alphabetically sorted.
 - If the managed domain is `NSGlobalDomain`, also account for the on-disk `.GlobalPreferences` alias.
-- `resetUserPreferenceDomains` drives the manual drift-reset command `nucleus-gc preferences` (backed by `macos-purge-preferences.sh`) and must not be wired into automatic `home.activation.*` execution. The GC is domain-level destructive — it wipes the whole plist including unmanaged keys — and is gated on `nix --verify`, so it must stay manual and must not be wired into `home.activation.*` or the Darwin apply path.
-- `.policy`-suffixed / daemon-owned preference domains (e.g. `com.apple.PassKit.policy`) revert writes made during `darwin-rebuild switch` and must be provisioned from a user-terminal activation script (the Safari precedent) rather than `CustomUserPreferences`; see `macos-configure-passwords-defaults.sh`.
+- `resetUserPreferenceDomains` drives the manual drift-reset command `nucleus-gc preferences` (backed by `macos-purge-preferences.sh`). The GC is domain-level destructive — it wipes the whole plist including unmanaged keys — and is gated on `nix --verify`, so it must stay manual and never be wired into `home.activation.*` or the Darwin apply path.
+- `.policy`-suffixed / daemon-owned preference domains (e.g. `com.apple.PassKit.policy`) revert writes made during `darwin-rebuild switch` and must be provisioned from a user-terminal activation script rather than `CustomUserPreferences`; see `macos-configure-passwords-defaults.sh`.
 
 ## nix-darwin activation scripts
 
-nix-darwin only executes activation hooks from a fixed internal list. On Darwin, custom `system.activationScripts.<custom-name>.text` entries are evaluated but not invoked unless `<custom-name>` is a built-in hook name.
+nix-darwin only executes activation hooks from a fixed internal list. Custom `system.activationScripts.<custom-name>.text` entries are evaluated but not invoked unless `<custom-name>` is a built-in hook name.
 
 Use these extension points only:
 
 - `extraActivation`: after `createRun`, before `openssh`.
-- `postActivation`: after `homebrew`; use this for most custom work.
+- `postActivation`: after `homebrew`.
 - Home Manager launchd: custom steps that verify agents must use `entryAfter [ "setupLaunchAgents" ]`.
 
-Contribution rules: use `lib.mkBefore` for fragments that must run before HM defaults; add `lib` to module arguments when using `lib.mkBefore`. On NixOS, custom `system.activationScripts.<name>.text` entries are supported.
+Use `lib.mkBefore` for fragments that must run before HM defaults; add `lib` to module arguments when using `lib.mkBefore`. On NixOS, custom `system.activationScripts.<name>.text` entries are supported.
 
 Background-process safety: activation commands that fork persistent daemons must fully detach stdio (`</dev/null >/dev/null 2>&1`), or apply can hang on inherited pipe FDs.
 

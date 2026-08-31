@@ -30,29 +30,27 @@ Select severity by whether the operation must succeed for the host to be correct
   - Allow/deny-list staleness (see `allow-and-deny-lists.instructions.md`, Tier 2).
   - Missing required tool in check/test preflight (see `tooling-and-validation.instructions.md`).
   - Cloud-drive mount/replica path conflict (see `cloud-drives-and-finder.instructions.md`).
-- **WARNING (continue allowed):** genuinely optional or best-effort operations where
-  skipping is safe — daemon restart when not yet running, cache clear, an expected
-  runtime condition (e.g. `bootout` on an absent service, see
-  `macos-service-hardening.instructions.md` M1/M2), or a by-design additive post-apply
-  step whose prerequisite is absent. A warning MUST still be checked — never `|| true`
-  without reason. Every warning requires an inline or preceding-line
-  `# check-suppress:suppression_doc: reason` comment (see `maintain.instructions.md` MA1
-  and `comment-annotations.instructions.md` CA1/CA2).
+- **WARNING (continue allowed):** optional or best-effort operations where skipping is
+  safe — daemon restart when not yet running, cache clear, an expected runtime condition
+  (e.g. `bootout` on an absent service, see `macos-service-hardening.instructions.md`
+  M1/M2), or a by-design post-apply step whose prerequisite is absent. A warning still
+  must be checked — never `|| true` without reason. Every warning requires an inline or
+  preceding-line `# check-suppress:suppression_doc: reason` comment (see
+  `maintain.instructions.md` MA1 and `comment-annotations.instructions.md` CA1/CA2).
 - **INFO / NOTICE:** normal progress, success, or dry-run. Never used to report a failure.
 
-Rule of thumb: if the operation *must* succeed for the host to be correct, it is an error.
-If it is *nice-to-have* and safe to skip, it is a warning *with justification*. There is
-no "warning instead of error because the failure is inconvenient" category.
+If the operation must succeed for the host to be correct, it is an error. If it is
+nice-to-have and safe to skip, it is a warning with justification. There is no
+"warning instead of error because the failure is inconvenient" category.
 
 ## Activation scripts hard-error
 
 Activation scripts run during system configuration apply (nix-darwin `darwin-rebuild`,
-Home Manager, `nixos-rebuild`, Windows DSC/`apply.ps1`). They MUST hard-error on any
-required convergence failure. `warn`/`Write-NucleusWarning` + continue is banned for
-required operations in activation scripts. A required op that fails must abort the
-activation via `die`/`throw`, not downgrade to a warning. See
-`activation-scripts.instructions.md` (`set -euo pipefail`, AC1) for the activation
-script baseline.
+Home Manager, `nixos-rebuild`, Windows DSC/`apply.ps1`). They must hard-error on any
+required convergence failure — `warn`/`Write-NucleusWarning` + continue is banned for
+required operations. A required op that fails must abort via `die`/`throw`, not downgrade
+to a warning. See `activation-scripts.instructions.md` (`set -euo pipefail`, AC1) for the
+activation script baseline.
 
 ## Do not
 
@@ -84,10 +82,9 @@ script baseline.
 
 ## Disposition of every warning/error
 
-When fixing or triaging warnings/errors, never leave one uninvestigated. For each
-emitted item: capture the exact line, classify it (`fix` / `upstream` / `by-design`
-/ `consequence`), and record the evidence behind the classification. "Benign"
-without proof — a confirmed-running service, an intentional flag, a named upstream
-bug, or a documented condition — is itself a violation of the no-silent-downgrade
-rule in `core-behavior.instructions.md`. See that file's "Never silently skip
-warnings or errors" section for the full protocol.
+Never leave a warning/error uninvestigated. For each emitted item: capture the exact line,
+classify it (`fix` / `upstream` / `by-design` / `consequence`), and record the evidence
+behind the classification. "Benign" without proof — a confirmed-running service, an
+intentional flag, a named upstream bug, or a documented condition — violates the
+no-silent-downgrade rule in `core-behavior.instructions.md`. See that file's "Never
+silently skip warnings or errors" section for the full protocol.

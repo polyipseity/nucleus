@@ -6,7 +6,7 @@ applyTo: "src/hosts/**, scripts/bootstrap.*, src/vms/NixOS/**"
 
 # Host filesystem scope
 
-Canonical reference for what nucleus manages at apply time versus what remains on OS defaults or install/bootstrap workflows.
+What nucleus manages at apply time, what stays on OS defaults, and what bootstrap-only steps exist.
 
 ## Managed at apply
 

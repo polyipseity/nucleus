@@ -6,7 +6,10 @@ applyTo: "scripts/**/*.sh, scripts/**/*.ps1, src/scripts/**/*.sh, src/scripts/**
 
 # Logging and output format standard
 
-This document is the canonical contract for all console output and log files produced by `nucleus-*` commands, internal scripts, and host modules. Five message formats (F1-F5) cover every output class; the console color spec governs when colors apply; check step 14 enforces the console-only invariant. POSIX helpers live in `src/scripts/lib/lib.sh` (messages, colors), `src/scripts/lib/step-runner.sh` and `src/scripts/tests/test-lib.sh` (pipeline chrome); PowerShell equivalents live in `src/platforms/Windows/modules/Format-NucleusOutput.psm1`, `src/scripts/lib/step-runner.ps1` and `src/scripts/tests/test-lib.ps1`.
+This document defines all console output and log files produced by `nucleus-*` commands,
+internal scripts, and host modules. Five message formats (F1-F5) cover all output classes;
+the console color spec governs when colors apply; check step 14 enforces the console-only
+invariant. POSIX helpers live in `src/scripts/lib/lib.sh` (messages, colors), `src/scripts/lib/step-runner.sh` and `src/scripts/tests/test-lib.sh` (pipeline chrome); PowerShell equivalents live in `src/platforms/Windows/modules/Format-NucleusOutput.psm1`, `src/scripts/lib/step-runner.ps1` and `src/scripts/tests/test-lib.ps1`.
 
 ## F1: Message line
 
@@ -74,7 +77,8 @@ Rotation: `log-gc-user.sh`/`log-gc-system.sh` copy-truncate + gzip; `NUCLEUS_GC_
 
 ## External exceptions
 
-These output classes intentionally bypass the standard; new passthrough requires a spec entry with a one-line rationale — never silently added or removed.
+These output classes bypass the standard; new passthrough requires a spec entry with a
+one-line rationale — never silently added or removed.
 
 - Third-party passthrough: nix/darwin-rebuild/home-manager build output, brew/cargo/bun/uv/rustup/ollama, git hook prek/commitlint/treefmt, winget configure, adb/qemu VM output.
 - Probe suppression: vm.sh virsh/socat/ssh/adb/tart readiness, ai.sh ollama readiness, silent-daemon `/dev/null`.

@@ -6,7 +6,7 @@ applyTo: "src/hosts/MacBook/**, src/modules/apps.json, src/modules/apps.schema.j
 
 # Menu bar icon policy
 
-By default, hide all menu bar icons on the MacBook host. Configure both the app and macOS to hide an icon wherever a mechanism exists. When asked to disable icons, disable as much as possible; when asked to enable, enable as much as possible. The default is disable.
+By default, hide all menu bar icons on the MacBook host. Configure both the app and macOS to hide the icon where possible. When asked to disable, disable as much as possible; when asked to enable, enable as much as possible. The default is disable.
 
 ## Allow-list
 

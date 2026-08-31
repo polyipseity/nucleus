@@ -4,16 +4,16 @@ name: "Shell History Exclusion"
 applyTo: "src/modules/shell.nix, src/modules/pwsh.nix, src/scripts/shell/init.zsh, src/scripts/shell/profile.ps1, src/platforms/Windows/modules/user/Sync-ShellProfile.ps1, src/hosts/Windows/user/shell.dsc.yml"
 ---
 
-# Shell History Exclusion Features
+# Shell History Exclusion
 
 ## Enabled features
 
-All managed shells now exclude two types of history entries:
+All managed shells exclude two history features:
 
 | Feature | zsh | PowerShell (POSIX) | PowerShell (Windows) | cmd.exe |
 | --------- | ----- | --------------------- | ----------------------- | --------- |
-| Ignore space-prefixed commands | `setopt HIST_IGNORE_SPACE` | `-AddToHistoryHandler { ... }` | Same | ❌ No equivalent |
-| Ignore consecutive duplicates | `setopt HIST_IGNORE_DUPS` | `-HistoryNoDuplicates` | Same | ❌ No equivalent |
+| Ignore space-prefixed commands | `setopt HIST_IGNORE_SPACE` | `-AddToHistoryHandler { ... }` | Same | No equivalent |
+| Ignore consecutive duplicates | `setopt HIST_IGNORE_DUPS` | `-HistoryNoDuplicates` | Same | No equivalent |
 
 ## File locations
 

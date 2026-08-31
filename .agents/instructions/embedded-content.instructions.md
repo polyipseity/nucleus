@@ -6,7 +6,7 @@ applyTo: "src/**/*.nix, src/**/*.ps1, src/**/*.sh, src/hosts/Windows/**/*.yml, s
 
 # Embedded content policy
 
-Canonical cross-platform policy for file content inside scripts. Supersedes the platform-specific extraction guidance in `scripts-and-permissions.instructions.md` (PowerShell here-string extraction) and `nix-authoring.instructions.md` (inline code extraction boundaries); those files keep their mechanical examples and point back here.
+Cross-platform policy for file content inside scripts. Supersedes platform-specific extraction guidance in `scripts-and-permissions.instructions.md` and `nix-authoring.instructions.md`; those files keep their mechanical examples and point back here.
 
 ## Invariant
 
@@ -32,8 +32,8 @@ Content with analogous semantics across platforms MUST be a single shared file, 
 
 - Shared files live in `src/scripts/` (or `src/vms/templates/` for VM templates).
 - Platform divergence inside a shared file uses runtime conditionals (`$IsWindows`, `$IsMacOS`, `$IsLinux` in PowerShell content) or `__TOKEN__` values supplied per consumer.
-- A per-platform file is allowed only when the language differs or the semantics genuinely differ; the difference must be cited in a comment at both the file and its consumer.
-- Registry of shared files (keep current as new shared files land): `src/scripts/shell/profile.ps1` (profile body), `src/scripts/vms/start-android-vm.ps1` (Android QEMU start), `src/scripts/vms/android-fake-wifi-guest-setup.sh` and `src/scripts/vms/android-fake-wifi-guest-revert.sh` (Android guest Magisk scripts), `src/vms/templates/*` (VM templates).
+- A per-platform file is allowed only when the language or semantics differ; the difference must be cited in a comment at both the file and its consumer.
+- Shared files registry (keep current as new files land): `src/scripts/shell/profile.ps1` (profile body), `src/scripts/vms/start-android-vm.ps1` (Android QEMU start), `src/scripts/vms/android-fake-wifi-guest-setup.sh` and `src/scripts/vms/android-fake-wifi-guest-revert.sh` (Android guest Magisk scripts), `src/vms/templates/*` (VM templates).
 
 ## Token convention
 
@@ -52,7 +52,7 @@ Each exception requires an inline `# check-suppress:embedded-content:` comment n
 4. **Split-pattern** — static body extracted to a file, dynamic Nix/PowerShell wrapper stays inline (see `nix-authoring.instructions.md`, "Inline code extraction boundaries").
 5. **DSC `Script` resources** — Get/Test/Set must stay inline (API requirement) but must remain trivial (1–3 lines); move logic to a `modules/scripts/` file invoked from the resource if it grows. **Quarterly check (D6)**: scan `src/hosts/Windows/**/*.dsc.yml` `Script` resources; any block exceeding ~10 lines or containing substantial logic is moved to a `modules/scripts/` file invoked from the resource in the same review.
 
-Data-driven managed settings (git config, sshd_config keys, wallpaper registry values, JSON/INI merge data) are NOT file content — they are structured data passed as parameters or hashtables (`ConfigHelpers.ps1`), and are exempt from this policy entirely.
+Data-driven managed settings (git config, sshd_config keys, wallpaper registry values, JSON/INI merge data) are NOT file content — they are structured data passed as parameters or hashtables (`ConfigHelpers.ps1`), exempt from this policy.
 
 ## Lint integration
 

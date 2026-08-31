@@ -10,12 +10,12 @@ applyTo: "src/lockfiles/lockfile.json, src/lockfiles/lockfile.schema.json, src/s
 
 ## Two-tier model
 
-- **Pinned root sections** — authoritative. The enforcement lib (`lockfile-enforcement-lib.*`, used by `bump-lockfile --verify-installed` / `-VerifyInstalled`) compares installed versions against pins and reports drift. `bump-lockfile --verify` / `--verify-installed` also reports drift. Currently pinned: `bun`, `cargo-binstall`, `pwsh`, `rustup`, `scoop`, `source-builds`, `uv`, `version`, `vm-setup`, `winget`.
-- **`suggestions` block** — warn-only, never enforced. Always emits a warning that each sub-section is non-authoritative. Never causes a check failure. Sub-sections: `homebrew` (masApps only), `ollama`, `vscode`, `vm-setup.windows`.
+- **Pinned root sections** — authoritative. The enforcement lib (`lockfile-enforcement-lib.*`, used by `bump-lockfile --verify-installed` / `-VerifyInstalled`) compares installed versions against pins and reports drift. Currently pinned: `bun`, `cargo-binstall`, `pwsh`, `rustup`, `scoop`, `source-builds`, `uv`, `version`, `vm-setup`, `winget`.
+- **`suggestions` block** — warn-only, never enforced. Always warns that sub-sections are non-authoritative. Never causes a check failure. Sub-sections: `homebrew` (masApps only), `ollama`, `vscode`, `vm-setup.windows`.
 
 ## Invariant
 
-Any section that is enforceable at most warn-only MUST live under `suggestions`, never as a pinned root child. If a section cannot be reliably version-verified (VCS/rev pins, cross-host tooling, or non-authoritative audit data), it belongs in `suggestions` — not as a root key. This keeps the root reserved for sections that hard-fail on drift.
+Any section that can at most warn must live under `suggestions`, not as a pinned root child. If a section cannot be reliably version-verified (VCS/rev pins, cross-host tooling, non-authoritative audit data), it belongs in `suggestions`. Root is reserved for sections that hard-fail on drift.
 
 ## No cross-lockfile duplication
 
