@@ -94,12 +94,14 @@ def run_check(files: list[str], repo_root: Path, scoped: bool = False) -> int:
 def run_test(files: list[str], repo_root: Path) -> int:
     """Run the test suite.
 
-    On POSIX, delegates to ``nix run ./src#test`` (forwarding files after ``--``
-    for consistency).  On Windows, runs ``scripts/test.ps1`` as a placeholder
-    (future Windows test support).
+    On POSIX, delegates to ``nix run ./src#test``.  On Windows, runs
+    ``scripts/test.ps1`` as a placeholder (future Windows test support).
+
+    The test suite runs the full suite and does not accept file arguments —
+    the ``files`` parameter is accepted for API consistency but ignored.
 
     Args:
-        files: List of file paths to forward to the test runner.
+        files: Ignored (test suite does not scope by file).
         repo_root: Absolute path to the repository root.
 
     Returns:
@@ -112,9 +114,6 @@ def run_test(files: list[str], repo_root: Path) -> int:
         # Intentionally NOT passing --no-fail-fast: test defaults to fail-fast.
         # CI explicitly passes --no-fail-fast to accumulate all failures.
         cmd = ["nix", "run", "./src#test"]
-        if files:
-            cmd.append("--")
-            cmd.extend(files)
         result = subprocess.run(cmd, env=env, cwd=repo_root, shell=False)
         if result.returncode != 0:
             print(
@@ -133,8 +132,6 @@ def run_test(files: list[str], repo_root: Path) -> int:
         "-File",
         str(repo_root / "scripts" / "test.ps1"),
     ]
-    if files:
-        cmd.extend(files)
     result = subprocess.run(cmd, shell=False)
     if result.returncode != 0:
         print(
