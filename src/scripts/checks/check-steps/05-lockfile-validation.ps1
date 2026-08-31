@@ -161,6 +161,26 @@ Register-Step -Id "lockfile-validation" -Name "Lockfile validation" -Action {
     $lfErrors++
   }
 
+  # opencode: warn if empty (suggestions — non-authoritative, warn-only)
+  if (-not $lf.ContainsKey('suggestions') -or -not $lf.suggestions.ContainsKey('opencode')) {
+    Write-ErrorMessage "suggestions.opencode: missing section"
+    $lfErrors++
+  } elseif ($lf.suggestions.opencode.Count -gt 0) {
+    foreach ($entry in $lf.suggestions.opencode.GetEnumerator()) {
+      if ($entry.Value -is [hashtable]) {
+        if (-not $entry.Value.ContainsKey('rev')) {
+          Write-ErrorMessage "suggestions.opencode.$($entry.Key): VCS-pinned entry missing rev"
+          $lfErrors++
+        }
+      } elseif ([string]::IsNullOrEmpty($entry.Value) -or $entry.Value -eq 'CHANGEME') {
+        Write-ErrorMessage "suggestions.opencode.$($entry.Key): placeholder version ($($entry.Value))"
+        $lfErrors++
+      }
+    }
+  } else {
+    Write-Message "warning: suggestions.opencode: empty section (not yet populated)"
+  }
+
   # ollama: must have at least one profile with models (lives under suggestions — warn-only per schema)
   if (-not $lf.ContainsKey('suggestions') -or -not $lf.suggestions.ContainsKey('ollama') -or $lf.suggestions.ollama.Count -eq 0) {
     Write-ErrorMessage "suggestions.ollama: empty or missing section"

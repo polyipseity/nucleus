@@ -156,6 +156,22 @@ run_lockfile_validation() {
       fi
     fi
 
+    # opencode: must be non-null; warn if empty (under suggestions)
+    if ! jq -e '.suggestions.opencode | type == "object"' "$_lfpath" >/dev/null 2>&1; then
+      error "suggestions.opencode: missing or invalid section"
+      _lf_section_errors=$((_lf_section_errors + 1))
+    elif jq '.suggestions.opencode | length == 0' "$_lfpath" >/dev/null 2>&1; then
+      say "suggestions.opencode: empty section (not yet populated)"
+    else
+      local _placeholders
+      _placeholders=$(jq -r '.suggestions.opencode | to_entries[] | .value | if type == "object" then empty else select(. == "" or . == "CHANGEME" or . == "1.0.0") end | .+' "$_lfpath" 2>/dev/null)
+      if [ -n "$_placeholders" ]; then
+        error "suggestions.opencode has placeholder versions for:"
+        error "  ${_placeholders//$'\n'/$'\n'  }"
+        _lf_section_errors=$((_lf_section_errors + 1))
+      fi
+    fi
+
     # ollama: must have at least one profile with models (under suggestions)
     if ! jq -e '.suggestions.ollama | type == "object" and length > 0' "$_lfpath" >/dev/null 2>&1; then
       error "suggestions.ollama: empty or missing section"
