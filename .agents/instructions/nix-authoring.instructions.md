@@ -26,7 +26,7 @@ See `AGENTS.md` Repository Shape for the canonical repo layout. **Subagent path 
 
 ## Runtime imperative scripts vs. inline activation shell
 
-Extract runtime imperative logic (SOPS decryption, API calls, service polling) into separate invocable scripts instead of inlining in Nix indented strings. Keeps activation files readable, allows independent testing, and avoids duplication across hosts.
+Extract runtime imperative logic (SOPS decryption, API calls, service polling) into separate invocable scripts instead of inlining in Nix indented strings. Keeps activation files readable, allows independent testing, and prevents duplication across hosts.
 
 See `src/scripts/services/jellyfin-sync.sh` for an example.
 
@@ -90,7 +90,7 @@ Always use `pkgs.writeNucleusShellApplication` instead of `pkgs.writeShellApplic
 
 - `scriptName` — repo-root-relative path without `.sh` suffix. Paths under `scripts/` resolve via `scripts-bundle` (e.g. `"scripts/gc"` for user CLIs). All other paths resolve via `script-tree` (e.g. `"src/scripts/services/jellyfin-daemon"`, `"src/platforms/macOS/scripts/macos-purge-preferences"`, `"src/hosts/MacBook/scripts/macos-daemonize-linux-builder"`). The script receives `$@` from the wrapper; pass values as positional args at the call site. The entry script is always reachable at `$out/<scriptName>.sh` because every call site mirrors both trees into `$out`.
 - `text` — inline the script body directly instead of referencing an external file. Does not bundle trees; sets up `PATH` from `runtimeInputs`, and appends the text content to the wrapper. Use when the script body is trivial or when a shared script cannot be reused due to host-specific values.
-- `extraEnv` — injects Nix-computed values as environment variables into the wrapper script. Values are automatically shell-escaped. **Prefer positional args for standalone scripts** (see "CLI-arg-first pattern" below). Use `extraEnv` when the script body is a **shared body sourced by multiple callers** (see "Shared script body pattern" below) — the env var contract stays uniform across callers, avoiding dual-parsing of `$1` and env-var fallbacks in the shared code. Environment variables are opaque to shellcheck, bypass PATH isolation, and cannot be forwarded through exec wrappers; these drawbacks are acceptable for shared bodies where args are not the natural interface.
+- `extraEnv` — injects Nix-computed values as environment variables into the wrapper script. Values are automatically shell-escaped. **Prefer positional args for standalone scripts** (see "CLI-arg-first pattern" below). Use `extraEnv` when the script body is a **shared body sourced by multiple callers** (see "Shared script body pattern" below) — the env var contract stays uniform across callers, preventing dual-parsing of `$1` and env-var fallbacks in the shared code. Environment variables are opaque to shellcheck, bypass PATH isolation, and cannot be forwarded through exec wrappers; these drawbacks are acceptable for shared bodies where args are not the natural interface.
 
 `writeShellApplication` (from nixpkgs) does not support `bundleDefault`, `extraEnv`, or `text`. Scripts built with it cannot source sibling libraries via `SCRIPT_DIR`-relative paths, leading to silent breakage when a script evolves to need library access.
 
@@ -127,7 +127,7 @@ extraEnv = {
 scriptName = "src/platforms/macOS/scripts/macos-purge-preferences";
 ```
 
-This avoids:
+This prevents:
 
 - Dual-parsing `$1` vs env-var fallbacks in the shared body (the env var is the natural interface).
 - A `text` wrapper that duplicates the `extraEnv` mechanism and bypasses `writeNucleusShellApplication`'s PATH setup.
@@ -169,7 +169,7 @@ These sites are not candidates for the CLI-arg conversion. Examples: `macos-iclo
 All Nix modules must enforce explicit configuration and avoid implicit assumptions:
 
 - **Explicit option defaults**: when defining `lib.mkOption`, provide meaningful default values only when the default is obvious (e.g. `false` for feature flags, `[ ]` for lists). For complex or context-dependent defaults, require the user to specify them; use `description` to explain the choice.
-- **Documentation examples must use canonical usernames**: any `.example` field in module options or inline code examples must use `admin` for primary/elevated users and `guest` for secondary/unprivileged users. Paths should reference `/home/admin` or `/Users/admin` rather than real usernames from the repo history. This ensures examples are portable and immediately understandable.
+- **Documentation examples must use canonical usernames**: any `.example` field in module options or inline code examples must use `admin` for primary/elevated users and `guest` for secondary/unprivileged users. Paths should reference `/home/admin` or `/Users/admin` rather than real usernames from the repo history. This makes examples portable and immediately understandable.
 
 ### Template placeholder convention
 

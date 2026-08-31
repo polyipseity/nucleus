@@ -73,7 +73,7 @@ Exception: system-internal identifiers like `CFBundleIdentifier`, filenames on d
 
 ## Citation quality
 
-When citing external sources (APIs, documentation, vendor settings, support articles), maintain URL and content correctness to prevent drift and ensure maintainability.
+When citing external sources (APIs, documentation, vendor settings, support articles), keep URLs and content correct to prevent drift.
 
 ### Source preference (priority order)
 

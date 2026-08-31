@@ -28,7 +28,7 @@ The repository's check and test scripts follow a deliberate fail-fast convention
 
 Both scripts accept `--fail-fast` and `--no-fail-fast` flags for explicit control over the default behavior.
 
-The prek hooks (`prek.toml`) use the defaults (`--no-fail-fast` is not passed for check, not passed for test). The CI workflow (`.github/workflows/ci.yml`) always passes `--no-fail-fast` explicitly to both check and test, ensuring CI reports all failures regardless of the default.
+The prek hooks (`prek.toml`) use the defaults (`--no-fail-fast` is not passed for check, not passed for test). The CI workflow (`.github/workflows/ci.yml`) always passes `--no-fail-fast` explicitly to both check and test, so CI reports all failures regardless of the default.
 
 ---
 

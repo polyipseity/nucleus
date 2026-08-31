@@ -18,7 +18,7 @@ macOS guest uses Tart (Apple Virtualization.framework) exclusively; automated Ta
 
 ## Guest identity
 
-SSOT: [`src/modules/VMs.json`](../../src/modules/VMs.json). This repo does not use `guestId`, `guestName`, or `osType`.
+Manifest: [`src/modules/VMs.json`](../../src/modules/VMs.json). This repo does not use `guestId`, `guestName`, or `osType`.
 
 ### Field contract
 
@@ -70,7 +70,7 @@ VM guest OSes must use the same hostname as the corresponding host OS. The canon
 | NixOS | `NixOS` |
 | Windows | `Windows` |
 
-The manifest `hostname` is the single source of truth. Guest files consume it through env/var/token plumbing and must not hard-code a hostname:
+The manifest `hostname` is the canonical source. Guest files consume it through env/var/token plumbing and must not hard-code a hostname:
 
 - `src/vms/guests/<id>/guest.nix` — `networking.hostName = builtins.getEnv "NUCLEUS_VM_GUEST_HOSTNAME"` (and the flake attr `hostName`)
 - `src/vms/NixOS/packer.pkr.hcl` — `guest_hostname` var rendered into `networking.hostName`
@@ -94,7 +94,7 @@ When changing credential policy, update `tests/modules/vm-setup-tests.nix` in th
 
 ## VM manifest
 
-All virtual machines are declared in `src/modules/VMs.json`. This is the single source of truth for VM names, resources, and options consumed by all three platform setup scripts.
+All virtual machines are declared in `src/modules/VMs.json`. This is the canonical source for VM names, resources, and options consumed by all three platform setup scripts.
 
 Required fields for each VM entry:
 
@@ -338,7 +338,7 @@ Both hooks are best-effort: a VM sync/setup failure does not abort a completed s
 | `src/vms/NixOS/packer.pkr.hcl` | Packer template for NixOS guest on Windows hosts |
 | `src/vms/Windows/packer.pkr.hcl` | Packer template for Windows 11 guest on all hosts |
 | `src/vms/Windows/Autounattend.xml` | Windows 11 answer file (unattended install, TPM bypass, WinRM) |
-| `scripts/vm.sh` | Unified build+provision script for macOS and NixOS hosts |
+| `scripts/vm.sh` | Combined build+provision script for macOS and NixOS hosts |
 | `scripts/vm.ps1` | Windows wrapper calling `Invoke-VMSetup.ps1` |
 | `src/platforms/Windows/modules/system/Invoke-VMSetup.ps1` | Build + provision logic for Windows hosts |
 

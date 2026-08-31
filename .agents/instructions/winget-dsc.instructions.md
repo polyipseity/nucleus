@@ -80,7 +80,7 @@ Within each group, sort entries alphabetically by the `settings.id` (for package
 - Use `%USERPROFILE%` rather than a hard-coded path for the user's home directory in `value` strings.
 - For UI/discoverability settings, apply a minimal-chrome rule: allow reduced persistent chrome (for example hidden optional taskbar controls or compact surfaces) when equivalent keyboard/command access remains available.
 - Preserve high-signal visibility defaults by default (for example hidden files, file extensions, status bars, and navigation-pane folder visibility) unless a concrete workflow reason justifies reducing visibility.
-- If a Windows UI choice reduces visibility or hides controls, explain the tradeoff in `directives.description:` with a short WHY and include the alternate access path (shortcut, command, or menu route).
+- If a Windows UI choice reduces visibility or masks controls, explain the tradeoff in `directives.description:` with a short WHY and include the alternate access path (shortcut, command, or menu route).
 
 ## PowerShell DSC resource modules
 
@@ -99,7 +99,7 @@ Use `PSDscResources/Script` only for imperative steps that cannot be expressed b
 Wrapping imperative logic in a `PSDscResources/Script` block makes the _management_ of that logic declarative, even though the code inside remains imperative. Four concrete benefits:
 
 1. **Idempotency by design** — `TestScript` is the authoritative check; `SetScript` only runs when `TestScript` returns `$false`, so no manual `if`-guards needed.
-2. **Dependency orchestration** — `dependsOn` ensures ordering relative to other resources (e.g., run after a package is installed).
+2. **Dependency orchestration** — `dependsOn` controls ordering relative to other resources (e.g., run after a package is installed).
 3. **`--what-if` support** — `winget configure --what-if` executes `TestScript` for all resources and reports what _would_ change without applying `SetScript`.
 4. **Drift detection** — re-running `TestScript` later reveals configuration drift without triggering re-installation.
 
@@ -164,7 +164,7 @@ Scoop is the user-space package manager for portable CLI utilities that have no 
 
 ### Declaring Scoop in system/packages.dsc.yml
 
-Install Scoop itself via WinGet (package ID `Scoop.Scoop`). Scoop requires `Git.Git` for bucket management; ensure it appears in the packages list. Use `dependsOn` to enforce ordering:
+Install Scoop itself via WinGet (package ID `Scoop.Scoop`). Scoop requires `Git.Git` for bucket management; confirm it appears in the packages list. Use `dependsOn` to enforce ordering:
 
 ```yaml
 - resource: Microsoft.WinGet.Client/Package

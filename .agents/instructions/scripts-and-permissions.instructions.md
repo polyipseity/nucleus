@@ -17,7 +17,7 @@ applyTo: "scripts/**, src/scripts/**, src/scripts/lib/**, src/**/*.ps1, src/plat
 
 - Treat `scripts/bootstrap.sh` and `scripts/bootstrap.ps1` as paired entry points for the same bootstrap intent; keep capability parity as close as platform constraints allow.
 - When adding a bootstrap dependency or behavior on one platform, evaluate and update the other platform in the same change when practical.
-- Keep shared version pins in `scripts/bootstrap-versions.env` as the source of truth whenever both scripts depend on the same tool versions.
+- Keep shared version pins in `scripts/bootstrap-versions.env` as the canonical location whenever both scripts depend on the same tool versions.
 
 ## Placement and naming
 
@@ -56,7 +56,7 @@ Non-host subdirectories follow a two-track convention:
 
 ## Argument convention for extracted scripts
 
-- **All extracted inline scripts must accept inputs via positional arguments, not environment variables.** This keeps reasoning local, avoids hidden coupling between source and consumer, and makes each script independently testable.
+- **All extracted inline scripts must accept inputs via positional arguments, not environment variables.** This keeps reasoning local and makes each script testable in isolation.
 - `src/scripts/services/caddy-trust.sh` historically uses `NUCLEUS_REPO_ROOT` (an environment variable) for backward compatibility. New scripts must use positional arguments instead.
 - **Helper scripts in `src/scripts/` (e.g. `register-host-age-key.sh`, `install-prek-hooks.sh`) use `--repo-root <path>` flags, not bare positional args.** Call sites in `src/scripts/apply.sh` must use the flag form. This prevents recurring bugs where a bare path is passed to a script that expects `--repo-root`.
 - **Store-path args for external commands.** Activation scripts that invoke external tools (e.g. `jq`, `sops`, `age`) receive them as Nix store-path arguments (e.g. `_jq_bin="$1"`) and MUST invoke them via the variable (e.g. `"$_jq_bin"`), never as bare command names. This prevents "command not found" failures in minimal PATH environments. Check step 16 enforces that every `_X_bin` positional-arg declaration has at least one command-like usage.
@@ -66,7 +66,7 @@ Non-host subdirectories follow a two-track convention:
 
 All scripts that source other files (libraries, configs, etc.) MUST derive their
 own directory via SCRIPT_DIR and source via SCRIPT_DIR-relative paths. This
-ensures scripts work from any cwd, prevents `CDPATH` interference, and resolves
+makes scripts work from any cwd, prevents `CDPATH` interference, and resolves
 symlinks to physical paths (matching nix store resolution).
 
 Standard form:
@@ -275,7 +275,7 @@ All program/daemon/service killing, refresh, and restart operations must go thro
 - **macOS**: `src/scripts/lib/macos-launch-services.sh` (`refresh_*` functions)
 - **Windows**: `src/platforms/Windows/modules/Set-NucleusService.ps1`
 
-Do not inline killall/Stop-Service commands in activation blocks or individual scripts. This ensures a single point of control per OS and prevents redundant kills in the same activation run.
+Do not inline killall/Stop-Service commands in activation blocks or individual scripts. This centralizes control per OS and prevents redundant kills in the same activation run.
 
 For macOS activation blocks that need daemon refresh, use wrapper scripts under `src/platforms/macOS/scripts/` (or `src/scripts/lib/macos-launch-services.sh` directly when inlined) that source the library and call the appropriate `refresh_*` function. Invoke via the activation bundle subprocess pattern.
 
@@ -306,7 +306,7 @@ Apply these patterns when maintaining scripts under `src/scripts/`:
 - **Console user boilerplate (MacBook scripts)**: When multiple scripts independently probe `/dev/console` for UID/username, extract into a shared function under `src/scripts/lib/macos-console-user.sh`.
 - **Service script helper duplication**: When two daemon scripts define identical small functions (e.g., `require_command`), extract to `src/scripts/lib/require-command.sh` and prepend at Nix build time.
 - **Shared symlink convergence logic**: When scripts share structural overlap (iterate find results → remove stale → create missing), extract into `src/scripts/lib/symlink-convergence.sh`.
-- **Nix prepend pattern**: For scripts built via `pkgs.writeShellScript` or activation strings, prepend lib content at build time: `(builtins.readFile ../scripts/lib/foo.sh) + (builtins.readFile ../scripts/main-script.sh)` — avoids runtime sourcing path dependency.
+- **Nix prepend pattern**: For scripts built via `pkgs.writeShellScript` or activation strings, prepend lib content at build time: `(builtins.readFile ../scripts/lib/foo.sh) + (builtins.readFile ../scripts/main-script.sh)` — removes the runtime sourcing path dependency.
 
 ## Library purity
 

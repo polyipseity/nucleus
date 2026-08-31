@@ -43,7 +43,7 @@ When reviewing desktop/UI behavior, apply a minimal-chrome parity lens: prefer r
 
 ### Host-specific lib/ pattern for per-host config differences
 
-When a config file's application has a native extension-point mechanism that auto-loads override scripts (e.g., direnv's `~/.config/direnv/lib/*.sh`), use the Host-specific lib/ subdirectory convention documented in `app-config-policy.instructions.md`. This avoids `if-else` branches in module logic and avoids deploying dead platform-specific code.
+When a config file's application has a native extension-point mechanism that auto-loads override scripts (e.g., direnv's `~/.config/direnv/lib/*.sh`), use the Host-specific lib/ subdirectory convention documented in `app-config-policy.instructions.md`. This prevents `if-else` branches in module logic and prevents deploying dead platform-specific code.
 
 ## Where to implement
 
@@ -78,7 +78,7 @@ Services that fail to start during activation emit a warning but do not abort th
 
 ### Default policy: persistent daemon
 
-All nucleus-managed services use persistent-daemon semantics by default: auto-start on boot/login and auto-restart on crash. This ensures uniform, predictable service lifecycle across all hosts with no manual recovery needed after transient failures.
+All nucleus-managed services use persistent-daemon semantics by default: auto-start on boot/login and auto-restart on crash. This gives a consistent, predictable service lifecycle across all hosts with no manual recovery needed after transient failures.
 
 #### Default templates per platform
 
@@ -226,7 +226,7 @@ When the same feature exists on both macOS and NixOS with host-specific implemen
 
 ## Allowed platform-specific exceptions
 
-Single-host implementation is allowed only when the feature depends on platform-specific primitives (for example: macOS defaults domains, NixOS kernel modules, Windows registry/DSC resources). When that happens, add a short WHY comment in code explaining why parity is not possible or not desirable. If an exception hides information or controls (for example auto-hide, taskbar/menu toggles, or hidden-file toggles), the WHY comment must explain the tradeoff and name the alternate access path (shortcut, command, or menu route).
+Single-host implementation is allowed only when the feature depends on platform-specific primitives (for example: macOS defaults domains, NixOS kernel modules, Windows registry/DSC resources). When that happens, add a short WHY comment in code explaining why parity is not possible or not desirable. If an exception masks information or controls (for example auto-hide, taskbar/menu toggles, or hidden-file toggles), the WHY comment must explain the tradeoff and name the alternate access path (shortcut, command, or menu route).
 
 ## Pre-merge parity checklist
 
