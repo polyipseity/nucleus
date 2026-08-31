@@ -499,6 +499,7 @@ if (-not $Elevated) {
 # editors/: VS Code configuration and workspace management.
 . (Join-Path -Path $editorsModuleDir -ChildPath "Set-VSCodeWorkspaceTrust.ps1")
 . (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeExtensionManifest.ps1")
+. (Join-Path -Path $editorsModuleDir -ChildPath "Sync-CursorExtensions.ps1")
 . (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeSettingManifest.ps1")
 . (Join-Path -Path $editorsModuleDir -ChildPath "Sync-VSCodeConfig.ps1")
 # wallpapers/: wallpaper materialization and stale-file cleanup.
@@ -911,6 +912,7 @@ Sync-AgentsClawHubSkillManifest -RepoRoot $repoRoot -Enabled:$EnableAgentsClawHu
 Sync-CursorConfig -RepoRoot $repoRoot -Enabled:$EnableAgentsConfigParity -Username $sessionUser
 Sync-VSCodeConfig -RepoRoot $repoRoot -Enabled:$EnableVsCodeSettingsParity -Username $sessionUser
 Sync-VSCodeExtensionManifest -Enabled:$EnableVsCodeExtensionsParity
+Sync-CursorExtensions -Enabled:$EnableVsCodeExtensionsParity
 Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
 Set-VSCodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
