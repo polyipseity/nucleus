@@ -57,7 +57,7 @@ run_activation_tool_resolution() {
         "$_dir"/*)
           # shellcheck disable=SC2155 # reason: basename's exit status is irrelevant; exclusion check
           case "$(basename "$_f")" in
-          "$_self_sh" | check.sh) continue 2 ;;
+          "$_self_sh" | check.sh | android-fake-wifi-guest-*.sh) continue 2 ;;
           esac
           _candidate_files+=("$_f")
           break
@@ -75,7 +75,7 @@ run_activation_tool_resolution() {
         # shellcheck disable=SC2046 # reason: echo expands the find array safely — no globbing risk
         find "${_find_dirs[@]}" -name '*.sh' -print |
           filter_gitignored |
-          grep -v -E '(check\.sh|'"$_self_sh"')$'
+          grep -v -E '(check\.sh|android-fake-wifi-guest-|'"$_self_sh"')$'
       )
     fi
   fi

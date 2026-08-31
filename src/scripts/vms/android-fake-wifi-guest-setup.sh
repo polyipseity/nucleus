@@ -1,4 +1,4 @@
-#!/system/bin/sh
+# shellcheck shell=sh
 set -eu
 
 # virt_wifi advertises an open BSS named VirtWifi; Android must associate or ADB stays offline.

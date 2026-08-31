@@ -1,4 +1,4 @@
-#!/system/bin/sh
+# shellcheck shell=sh
 set -eu
 
 _revert_links() {
