@@ -443,7 +443,7 @@ import sys, yaml
 cfg = yaml.safe_load(sys.stdin.read())
 d = cfg.get('devices', {}).get('playback', {}).get('device', None)
 print(d if d is not None else '')
-" 2>/dev/null) || true  # check-suppress:suppression_doc: YAML parsing is best-effort; missing device field is handled by downstream fallback
+" 2>/dev/null) || true # check-suppress:suppression_doc: YAML parsing is best-effort; missing device field is handled by downstream fallback
         [ -n "$_saved_device" ] && camilladsp_save_last_device "$_saved_device"
         return 0
       fi

@@ -6,7 +6,6 @@ let
 
   # === NIX-INDEX SCHEDULE INVARIANTS ===
   linuxText = builtins.readFile ../../src/platforms/NixOS/modules/default.nix;
-  macosText = builtins.readFile ../../src/platforms/macOS/modules/default.nix;
   macosLaunchdText = builtins.readFile ../../src/platforms/macOS/modules/launchd-agents.nix;
   coreModuleText = builtins.readFile ../../src/modules/core.nix;
 

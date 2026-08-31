@@ -10,17 +10,11 @@ let
 
   desktopText = builtins.readFile ../../src/hosts/NixOS/desktop.nix;
 
-  test_obs_virtual_camera_enabled = assert' (
-    lib.hasInfix "programs.obs-studio.enableVirtualCamera = true;" desktopText
-  ) "NixOS desktop.nix must enable programs.obs-studio.enableVirtualCamera";
+  test_obs_virtual_camera_enabled = assert' (lib.hasInfix "programs.obs-studio.enableVirtualCamera = true;" desktopText) "NixOS desktop.nix must enable programs.obs-studio.enableVirtualCamera";
 
-  test_obs_package_null_avoid_duplicate_install = assert' (
-    lib.hasInfix "programs.obs-studio.package = null;" desktopText
-  ) "NixOS desktop.nix must set programs.obs-studio.package = null to avoid a duplicate OBS install";
+  test_obs_package_null_avoid_duplicate_install = assert' (lib.hasInfix "programs.obs-studio.package = null;" desktopText) "NixOS desktop.nix must set programs.obs-studio.package = null to avoid a duplicate OBS install";
 
-  test_obs_enable_set = assert' (
-    lib.hasInfix "programs.obs-studio.enable = true;" desktopText
-  ) "NixOS desktop.nix must set programs.obs-studio.enable = true";
+  test_obs_enable_set = assert' (lib.hasInfix "programs.obs-studio.enable = true;" desktopText) "NixOS desktop.nix must set programs.obs-studio.enable = true";
 
   allTests = [
     test_obs_enable_set
