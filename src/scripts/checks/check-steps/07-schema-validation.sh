@@ -22,11 +22,38 @@ run_schema_validation() {
   local _js_manifest="$_js_tmpdir/manifest"
   local _js_schema_files=()
 
+  # Single source of truth for A8 exception list: files that don't need $schema.
+  # ref: allow-and-deny-lists.instructions.md#A8
+  skip_schema_file() {
+    local _f="$1"
+    case "$_f" in
+    *.schema.json | */vendor/* | */secrets/* | */.github/workflows/* | */.github/dependabot.yml)
+      return 0
+      ;;
+    */users/*/vscode/*.json | */users/*/cursor/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */ai/litellm-config.yml | */.sops.yaml | */.vscode/* | */.agents/skills/*)
+      return 0
+      ;;
+    esac
+    local _nobase="${_f##*/}"
+    case "$_nobase" in
+    package.json | opencode.jsonc) return 0 ;;
+    esac
+    return 1
+  }
+
   local -n _cached_json_files="${ctx[CACHED_JSON_FILES]}"
   local -n _cached_yaml_files="${ctx[CACHED_YAML_FILES]}"
   if $_has_args; then
     for _sf in "${_files[@]}"; do
-      case "$_sf" in *.json | *.yml | *.yaml) _js_schema_files+=("$_sf") ;; esac
+      case "$_sf" in
+      *.json | *.yml | *.yaml) ;;
+      *) continue ;;
+      esac
+      # Normalize relative paths to absolute so exception patterns match consistently.
+      local _abs
+      _abs="$(cd "$_repo_root" && realpath -- "$_sf" 2>/dev/null || echo "$_PWD/$_sf")"
+      skip_schema_file "$_abs" && continue
+      _js_schema_files+=("$_abs")
     done
   else
     _js_schema_files=("${_cached_json_files[@]}")
@@ -38,22 +65,7 @@ run_schema_validation() {
   # $schema presence and format check (Spec G)
   local _missing_schema=0
   for _f in "${_js_schema_files[@]}"; do
-    # Exception list (Spec G): *.schema.json, vendor/**, secrets/**,
-    # */.github/workflows/*.yml, */.github/dependabot.yml, package.json, opencode.jsonc
-    # + app-owned formats with no published JSON schema (vscode:// URIs are not
-    # fetchable by check-jsonschema; other formats have no published schema).
-    case "$_f" in
-    *.schema.json | */vendor/* | */secrets/* | .github/workflows/* | */.github/workflows/* | */.github/dependabot.yml | .github/dependabot.yml)
-      continue
-      ;;
-    */users/*/vscode/*.json | */users/*/cursor/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */ai/litellm-config.yml | */.sops.yaml)
-      continue
-      ;;
-    esac
-    local _sf_nobase="${_f##*/}"
-    case "$_sf_nobase" in
-    package.json | opencode.jsonc) continue ;;
-    esac
+    skip_schema_file "$_f" && continue
 
     case "$_f" in
     *.json)

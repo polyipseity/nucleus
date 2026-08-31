@@ -1,3 +1,31 @@
+# Single source of truth for A8 exception list: files that don't need $schema.
+# ref: allow-and-deny-lists.instructions.md#A8
+function Skip-SchemaFile([string]$FilePath) {
+  $f = $FilePath
+  return (
+    $f -like '*.schema.json' -or
+    $f -like '*\vendor\*' -or $f -like '*/vendor/*' -or
+    $f -like '*\secrets\*' -or $f -like '*/secrets/*' -or
+    $f -like '*.github\workflows\*' -or $f -like '*.github/workflows/*' -or
+    $f -like '*.github\dependabot.yml' -or $f -like '*.github/dependabot.yml' -or
+    $f -like '*users\*\vscode\*.json' -or $f -like '*users/*/vscode/*.json' -or
+    $f -like '*users\*\cursor\*.json' -or $f -like '*users/*/cursor/*.json' -or
+    $f -like '*users\*\iterm2\DynamicProfiles\*.json' -or $f -like '*users/*/iterm2/DynamicProfiles/*.json' -or
+    $f -like '*users\*\obsidian\*.json' -or $f -like '*users/*/obsidian/*.json' -or
+    $f -like '*users\*\qtpass\*.json' -or $f -like '*users/*/qtpass/*.json' -or
+    $f -like '*configs\camilladsp\*' -or $f -like '*configs/camilladsp/*' -or
+    $f -like '*configs\camillagui-backend\*' -or $f -like '*configs/camillagui-backend/*' -or
+    $f -like '*users\*\discord-music-rpc\*' -or $f -like '*users/*/discord-music-rpc/*' -or
+    $f -like '*users\*\agents\hooks\*.json' -or $f -like '*users/*/agents/hooks/*.json' -or
+    $f -like '*users\*\agents\skills\*\_meta.json' -or $f -like '*users/*/agents/skills/*/_meta.json' -or
+    $f -like '*ai\litellm-config.yml' -or $f -like '*ai/litellm-config.yml' -or
+    $f -like '*\.sops.yaml' -or $f -like '*/.sops.yaml' -or
+    $f -like '*.vscode\*' -or $f -like '*.vscode/*' -or
+    $f -like '*.agents\skills\*' -or $f -like '*.agents/skills/*' -or
+    (Split-Path $f -Leaf) -in @('package.json', 'opencode.jsonc')
+  )
+}
+
 Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Action {
   param([Parameter(Mandatory)][PSObject]$Context)
 
@@ -11,25 +39,20 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
 
   if ($HasArgs) {
     foreach ($sf in $PositionalArgs) {
-      if ($sf -like '*.json') {
-        $schema = try { (Get-Content $sf -Raw | ConvertFrom-Json -AsHashtable)['$schema'] } catch { $null }
+      # Normalize relative paths to absolute so exception patterns match consistently.
+      $absSf = if ([System.IO.Path]::IsPathRooted($sf)) { $sf } else { [System.IO.Path]::GetFullPath((Join-Path $r $sf)) }
+      if (Skip-SchemaFile $absSf) { continue }
+      if ($absSf -like '*.json') {
+        $schema = try { (Get-Content $absSf -Raw | ConvertFrom-Json -AsHashtable)['$schema'] } catch { $null }
         if ($schema) {
-          if ($schema -match '^\.') {
-            $schemafile = [System.IO.Path]::GetFullPath((Join-Path (Split-Path $sf -Parent) $schema))
-          } else {
-            $schemafile = $schema
-          }
-          $manifest.Add(@{SchemaFile = $schemafile; InstanceFile = $sf })
+          $schemafile = if ($schema -match '^\.') { [System.IO.Path]::GetFullPath((Join-Path (Split-Path $absSf -Parent) $schema)) } else { $schema }
+          $manifest.Add(@{SchemaFile = $schemafile; InstanceFile = $absSf })
         }
-      } elseif ($sf -like '*.yml' -or $sf -like '*.yaml') {
-        $schema = try { (ConvertFrom-Yaml -Yaml (Get-Content $sf -Raw))['$schema'] } catch { $null }
+      } elseif ($absSf -like '*.yml' -or $absSf -like '*.yaml') {
+        $schema = try { (ConvertFrom-Yaml -Yaml (Get-Content $absSf -Raw))['$schema'] } catch { $null }
         if ($schema) {
-          if ($schema -match '^\.') {
-            $schemafile = [System.IO.Path]::GetFullPath((Join-Path (Split-Path $sf) $schema))
-          } else {
-            $schemafile = $schema
-          }
-          $manifest.Add(@{SchemaFile = $schemafile; InstanceFile = $sf })
+          $schemafile = if ($schema -match '^\.') { [System.IO.Path]::GetFullPath((Join-Path (Split-Path $absSf -Parent) $schema)) } else { $schema }
+          $manifest.Add(@{SchemaFile = $schemafile; InstanceFile = $absSf })
         }
       }
     }
@@ -73,8 +96,10 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
   $allFiles = [System.Collections.Generic.List[string]]::new()
   if ($HasArgs) {
     foreach ($sf in $PositionalArgs) {
-      if ($sf -like '*.json' -or $sf -like '*.yml' -or $sf -like '*.yaml') {
-        $allFiles.Add($sf)
+      # Normalize relative paths to absolute so exception patterns match consistently.
+      $absSf = if ([System.IO.Path]::IsPathRooted($sf)) { $sf } else { [System.IO.Path]::GetFullPath((Join-Path $r $sf)) }
+      if ($absSf -like '*.json' -or $absSf -like '*.yml' -or $absSf -like '*.yaml') {
+        $allFiles.Add($absSf)
       }
     }
   } else {
@@ -87,32 +112,7 @@ Register-Step -Id "schema-validation" -Name "Schema validation (JSON/YAML)" -Act
   }
 
   foreach ($f in $allFiles) {
-    # Exception list: *.schema.json, vendor/**, secrets/**,
-    # */.github/workflows/*.yml, */.github/dependabot.yml, package.json, opencode.jsonc
-    # + app-owned formats with no published JSON schema (vscode:// URIs are not
-    # fetchable by check-jsonschema; other formats have no published schema).
-    $skipFile = $false
-    if ($f -like '*.schema.json' -or $f -like '*\vendor\*' -or $f -like '*/vendor/*' -or `
-        $f -like '*\secrets\*' -or $f -like '*/secrets/*' -or `
-        $f -like '*.github\workflows\*' -or $f -like '*.github/workflows/*' -or `
-        $f -like '*.github\dependabot.yml' -or $f -like '*.github/dependabot.yml' -or `
-        $f -like '*users\*\vscode\*.json' -or $f -like '*users/*/vscode/*.json' -or `
-        $f -like '*users\*\cursor\*.json' -or $f -like '*users/*/cursor/*.json' -or `
-        $f -like '*users\*\iterm2\DynamicProfiles\*.json' -or $f -like '*users/*/iterm2/DynamicProfiles/*.json' -or `
-        $f -like '*users\*\obsidian\*.json' -or $f -like '*users/*/obsidian/*.json' -or `
-        $f -like '*users\*\qtpass\*.json' -or $f -like '*users/*/qtpass/*.json' -or `
-        $f -like '*configs\camilladsp\*' -or $f -like '*configs/camilladsp/*' -or `
-        $f -like '*configs\camillagui-backend\*' -or $f -like '*configs/camillagui-backend/*' -or `
-        $f -like '*users\*\discord-music-rpc\*' -or $f -like '*users/*/discord-music-rpc/*' -or `
-        $f -like '*users\*\agents\hooks\*.json' -or $f -like '*users/*/agents/hooks/*.json' -or `
-        $f -like '*users\*\agents\skills\*\_meta.json' -or $f -like '*users/*/agents/skills/*/_meta.json' -or `
-        $f -like '*ai\litellm-config.yml' -or $f -like '*ai/litellm-config.yml' -or `
-        $f -like '*\.sops.yaml' -or $f -like '*/.sops.yaml') { $skipFile = $true }
-    if (-not $skipFile) {
-      $fileName = Split-Path $f -Leaf
-      if ($fileName -in @('package.json', 'opencode.jsonc')) { $skipFile = $true }
-    }
-    if ($skipFile) { continue }
+    if (Skip-SchemaFile $f) { continue }
 
     if ($f -like '*.json') {
       $content = try { Get-Content $f -Raw | ConvertFrom-Json -AsHashtable } catch { $null }
