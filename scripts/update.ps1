@@ -136,7 +136,7 @@ function Invoke-LockfileBump {
   # --list-sections: print the canonical section names and exit 0 (no lockfile
   # read required, matching the bash twin's early-exit behavior).
   if ($ListSections) {
-    $validSectionsCsv = 'bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,winget,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.vscode,suggestions.vm-setup.windows'
+    $validSectionsCsv = 'bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,winget,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
     foreach ($s in ($validSectionsCsv -split ',')) {
       Write-NucleusInfo $s
     }
@@ -155,7 +155,7 @@ function Invoke-LockfileBump {
   # the --sections token list exactly like the bash twin: trim whitespace per
   # token, map legacy bare sub-section names and the cargo alias to canonical
   # dotted form, and reject anything unknown.
-  $validSectionsCsv = 'bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,winget,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.vscode,suggestions.vm-setup.windows'
+  $validSectionsCsv = 'bun,cargo,cargo-binstall,pwsh,rustup,scoop,source-builds,uv,version,vm-setup,vm-setup.nixos-iso,vm-setup.tart-images,winget,suggestions.homebrew,suggestions.homebrew.masApps,suggestions.ollama,suggestions.opencode,suggestions.vscode,suggestions.vm-setup.windows'
   $sectionTokens = @()
   if (-not [string]::IsNullOrEmpty($Sections)) {
     foreach ($tok in ($Sections -split ',')) {
@@ -177,7 +177,7 @@ function Invoke-LockfileBump {
   # Explicitly-selected sections without an updater are kept manual; warn so the
   # run does not silently skip them (mirrors the bash twin's no-updater warning).
   foreach ($tok in $sectionTokens) {
-    if (",source-builds,suggestions.homebrew.masApps,suggestions.vm-setup.windows,version," -match ",$tok,") {
+    if (",source-builds,suggestions.homebrew.masApps,suggestions.opencode,suggestions.vm-setup.windows,version," -match ",$tok,") {
       Write-NucleusWarning "section '$tok' has no updater — kept manual"
     }
   }
