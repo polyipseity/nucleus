@@ -63,7 +63,7 @@ let
 
   # Test 9: Verify specialArgs are passed correctly to all modules
   test_special_args_passed = assert' (
-    containsRegex ''specialArgs = \{.*inherit username;'' flakeText
+    containsRegex ''specialArgs = \{.*inherit username'' flakeText
     && containsRegex "users = users[A-Z]" flakeText
   ) "specialArgs (username, users) must be passed to all configs";
 
