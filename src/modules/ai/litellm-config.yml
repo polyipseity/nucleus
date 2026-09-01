@@ -20,9 +20,9 @@
 #     to /run/secrets/key_* at boot.
 #
 #   Windows:
-#     LiteLLM-run.ps1 reads all key_* files from the SOPS secrets
-#     directory, uppercases each name (key_ai_foo → KEY_AI_FOO),
-#     and exports each one.
+#     LiteLLM-run.ps1 reads all env_key_* files from the SOPS secrets
+#     directory, strips the env_ prefix, and uppercases each name
+#     (env_key_ai_foo → KEY_AI_FOO).
 #
 # To add a new provider: add the SOPS key to system.yml (env_key_<name>),
 # add a model_list entry here, and run apply to regenerate

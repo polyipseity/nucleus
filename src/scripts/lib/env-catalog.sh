@@ -54,14 +54,14 @@ ensure_env_catalog() {
     # shellcheck disable=SC2016 # reason: $schema is a JSON key in the output, not a shell variable
     printf '%s' '{"$schema":"'"$_gkm_repo_root/src/modules/ai/env-catalog.schema.json"'","keys":[]}' >"$_gkm_json"
   else
-    # Build catalog: extract key_* entries with non-null values, derive
-    # envVar by uppercasing the full key name (key_ai_foo → KEY_AI_FOO).
+    # Build catalog: extract env_key_* entries with non-null values, derive
+    # envVar by stripping the env_ prefix and uppercasing (env_key_ai_foo → KEY_AI_FOO).
     # shellcheck disable=SC2016 # reason: jq filter uses $schema as a literal JSON key, not shell expansion
     printf '%s' "$_gkm_decrypted" | jq --arg repoRoot "$_gkm_repo_root" '
       [to_entries[]
-        | select(.key | startswith("key_"))
+        | select(.key | startswith("env_"))
         | select(.value != null)
-        | { name: .key, envVar: (.key | ascii_upcase) }
+        | { name: .key, envVar: (.key | ltrimstr("env_") | ascii_upcase) }
       ]
       | {"$schema": ($repoRoot + "/src/modules/ai/env-catalog.schema.json"), "keys": .}
     ' >"$_gkm_json"

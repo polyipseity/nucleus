@@ -16,8 +16,8 @@ let
 
   keys = catalog.keys or [ ];
 
-  # Pattern: name must match key_<provider> (key_ prefix + lowercase alphanumeric + underscores)
-  namePattern = builtins.match "^key_[a-z0-9_]+$";
+  # Pattern: name must match env_key_<provider> (env_key_ prefix + lowercase alphanumeric + underscores)
+  namePattern = builtins.match "^env_key_[a-z0-9_]+$";
 
   # Pattern: envVar must be valid env var name (uppercase + digits + underscores)
   envVarPattern = builtins.match "^[A-Z][A-Z0-9_]*$";
@@ -59,7 +59,7 @@ in
 
   test_all_names_match_pattern = assert' (builtins.all (
     e: namePattern e.name != null
-  ) keys) "all names must match key_<provider> pattern";
+  ) keys) "all names must match env_key_<provider> pattern";
 
   # === EnvVar pattern validation ===
 
@@ -81,31 +81,31 @@ in
     (expected: builtins.any (e: e.name == expected.name && e.envVar == expected.envVar) keys)
     [
       {
-        name = "key_ai_cline";
+        name = "env_key_ai_cline";
         envVar = "KEY_AI_CLINE";
       }
       {
-        name = "key_ai_command_code";
+        name = "env_key_ai_command_code";
         envVar = "KEY_AI_COMMAND_CODE";
       }
       {
-        name = "key_ai_opencode_go";
+        name = "env_key_ai_opencode_go";
         envVar = "KEY_AI_OPENCODE_GO";
       }
       {
-        name = "key_ai_opencode_go_1";
+        name = "env_key_ai_opencode_go_1";
         envVar = "KEY_AI_OPENCODE_GO_1";
       }
       {
-        name = "key_ai_opencode_zen";
+        name = "env_key_ai_opencode_zen";
         envVar = "KEY_AI_OPENCODE_ZEN";
       }
       {
-        name = "key_ai_opencode_zen_1";
+        name = "env_key_ai_opencode_zen_1";
         envVar = "KEY_AI_OPENCODE_ZEN_1";
       }
       {
-        name = "key_ai_openrouter";
+        name = "env_key_ai_openrouter";
         envVar = "KEY_AI_OPENROUTER";
       }
     ]

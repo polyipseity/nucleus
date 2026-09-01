@@ -14,12 +14,12 @@
         "additionalProperties": false,
         "properties": {
           "name": {
-            "description": "SOPS secret name with key_ prefix (e.g. key_ai_openrouter).",
-            "pattern": "^key_[a-z0-9_]+$",
+            "description": "SOPS secret name with env_key_ prefix (e.g. env_key_ai_openrouter).",
+            "pattern": "^env_key_[a-z0-9_]+$",
             "type": "string"
           },
           "envVar": {
-            "description": "Environment variable name: the SOPS key name uppercased (key_ai_foo → KEY_AI_FOO).",
+            "description": "Environment variable name: env_key_ prefix stripped and uppercased (env_key_ai_foo → KEY_AI_FOO).",
             "pattern": "^KEY_[A-Z][A-Z0-9_]*$",
             "type": "string"
           }

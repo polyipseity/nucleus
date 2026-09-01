@@ -724,7 +724,7 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
   $systemSecrets = Get-Secret @getSystemSecretParams
   $availableKeys = @()
   foreach ($prop in $systemSecrets.PSObject.Properties) {
-    if ($prop.Name -match '^key_' -and -not [string]::IsNullOrWhiteSpace($prop.Value)) {
+    if ($prop.Name -match '^env_' -and -not [string]::IsNullOrWhiteSpace($prop.Value)) {
       $availableKeys += $prop.Name
       $keyFile = Join-Path -Path $systemSecretsDir -ChildPath $prop.Name
       $existing = if (Test-Path -Path $keyFile -PathType Leaf) { Get-Content -Path $keyFile -Raw -Encoding UTF8 }
@@ -738,7 +738,8 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
   # stays out of git.
   $keyEntries = @()
   foreach ($keyName in $availableKeys) {
-    $keyEntries += @{ name = $keyName; envVar = $keyName.ToUpper() }
+    $envVar = $keyName.Substring(4).ToUpper()
+    $keyEntries += @{ name = $keyName; envVar = $envVar }
   }
   $catalog = @{
     '$schema' = "$repoRoot\src\modules\ai\env-catalog.schema.json"
