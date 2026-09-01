@@ -52,7 +52,7 @@ router_settings:
   # Cumulative failure threshold per endpoint required to bench it into temporary cooldown.
   allowed_fails: 3
   # Duration (in seconds) a benched endpoint is excluded from routing before resetting.
-  cooldown_time: 60
+  cooldown_time: 300
   # Per-request HTTP timeout (in seconds) before marking an attempt as failed.
   timeout: 30
 
