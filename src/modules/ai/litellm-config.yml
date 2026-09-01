@@ -90,7 +90,7 @@ model_list:
     litellm_params:
       model: openai/mimo-v2.5-free
       api_base: https://opencode.ai/zen/v1
-      api_key: os.environ/OPENCODE_ZEN_API_KEY
+      api_key: os.environ/OPENCODE_ZEN_API_KEY_1
       order: 1
       reasoning_effort: high
       model_info:
@@ -110,18 +110,8 @@ model_list:
     litellm_params:
       model: openai/mimo-v2.5
       api_base: https://opencode.ai/zen/go/v1
-      api_key: os.environ/OPENCODE_GO_API_KEY
-      order: 3
-      reasoning_effort: high
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 16384
-  - model_name: default
-    litellm_params:
-      model: openai/mimo-v2.5
-      api_base: https://opencode.ai/zen/go/v1
       api_key: os.environ/OPENCODE_GO_API_KEY_1
-      order: 4
+      order: 3
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
@@ -130,7 +120,7 @@ model_list:
     litellm_params:
       model: openrouter/xiaomi/mimo-v2.5
       api_key: os.environ/OPENROUTER_API_KEY
-      order: 5
+      order: 4
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
