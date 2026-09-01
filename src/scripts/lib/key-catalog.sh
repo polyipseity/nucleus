@@ -54,19 +54,14 @@ ensure_key_catalog() {
     # shellcheck disable=SC2016 # reason: $schema is a JSON key in the output, not a shell variable
     printf '%s' '{"$schema":"'"$_gkm_repo_root/src/modules/ai/key-catalog.schema.json"'","keys":[]}' >"$_gkm_json"
   else
-    # Build catalog: extract ai_*_api_key entries with non-null values, derive
-    # envVar from key name via convention: ai_<X>_api_key → <X>_API_KEY.
+    # Build catalog: extract key_* entries with non-null values, derive
+    # envVar by stripping the key_ prefix and uppercasing.
     # shellcheck disable=SC2016 # reason: jq filter uses $schema as a literal JSON key, not shell expansion
     printf '%s' "$_gkm_decrypted" | jq --arg repoRoot "$_gkm_repo_root" '
       [to_entries[]
-        | select(.key | test("^ai_.+_api_key"))
+        | select(.key | startswith("key_"))
         | select(.value != null)
-        | .key as $k
-        | ($k | sub("^ai_"; "") | sub("_api_key(_[0-9]+)?$"; "") | ascii_upcase) as $base
-        | if ($k | test("_api_key_[0-9]+$"))
-          then { name: $k, envVar: ($base + "_API_KEY_" + ($k | capture("_api_key_(?<i>[0-9]+)$").i)) }
-          else { name: $k, envVar: ($base + "_API_KEY") }
-          end
+        | { name: .key, envVar: (.key | ltrimstr("key_") | ascii_upcase) }
       ]
       | {"$schema": ($repoRoot + "/src/modules/ai/key-catalog.schema.json"), "keys": .}
     ' >"$_gkm_json"

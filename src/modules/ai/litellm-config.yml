@@ -9,26 +9,25 @@
 # Env var lifecycle
 # ────────────────
 # Each api_key entry below references an environment variable (e.g.
-# os.environ/OPENCODE_ZEN_API_KEY).  These env vars are populated at runtime
-# by the platform-specific daemon scripts before litellm starts:
+# os.environ/KEY_AI_OPENCODE_ZEN_1).  These env vars are populated at
+# runtime by the platform-specific daemon scripts before litellm starts:
 #
 #   POSIX (NixOS/macOS):
 #     litellm-daemon.sh receives KEYFILE:ENVVAR positional args from
 #     the systemd/launchd service (ai.nix).  For each pair, if KEYFILE
 #     exists, the script reads its contents and exports the env var.
 #     Key files come from sops-nix, which decrypts src/secrets/system.yml
-#     to /run/secrets/ai_* at boot.
+#     to /run/secrets/key_* at boot.
 #
 #   Windows:
-#     LiteLLM-run.ps1 reads all ai_*_api_key* files from the SOPS
-#     secrets directory, derives the env var name using the naming
-#     convention (strip ai_ prefix, strip _api_key suffix + index,
-#     uppercase), and exports each one.
+#     LiteLLM-run.ps1 reads all key_* files from the SOPS secrets
+#     directory, derives the env var name by stripping the key_ prefix
+#     and uppercasing, and exports each one.
 #
-# To add a new provider: add the SOPS key to system.yml (ai_<name>_api_key),
+# To add a new provider: add the SOPS key to system.yml (key_<name>),
 # add a model_list entry here, and run apply to regenerate
-# key-catalog.generated.nix. The env var name is derived automatically from the
-# SOPS key name convention.
+# key-catalog.generated.nix. The env var name is derived automatically by
+# stripping the key_ prefix and uppercasing.
 
 litellm_settings:
   # Drop unsupported client params (e.g. max_tokens) per-endpoint.
@@ -90,7 +89,7 @@ model_list:
     litellm_params:
       model: openai/mimo-v2.5-free
       api_base: https://opencode.ai/zen/v1
-      api_key: os.environ/OPENCODE_ZEN_API_KEY_1
+      api_key: os.environ/KEY_AI_OPENCODE_ZEN_1
       order: 1
       reasoning_effort: high
       model_info:
@@ -100,7 +99,7 @@ model_list:
     litellm_params:
       model: openai/deepseek/deepseek-v4-flash
       api_base: https://api.commandcode.ai/provider/v1
-      api_key: os.environ/COMMAND_CODE_API_KEY
+      api_key: os.environ/KEY_AI_COMMAND_CODE
       order: 2
       reasoning_effort: high
       model_info:
@@ -110,7 +109,7 @@ model_list:
     litellm_params:
       model: openai/mimo-v2.5
       api_base: https://opencode.ai/zen/go/v1
-      api_key: os.environ/OPENCODE_GO_API_KEY_1
+      api_key: os.environ/KEY_AI_OPENCODE_GO_1
       order: 3
       reasoning_effort: high
       model_info:
@@ -119,7 +118,7 @@ model_list:
   - model_name: default
     litellm_params:
       model: openrouter/xiaomi/mimo-v2.5
-      api_key: os.environ/OPENROUTER_API_KEY
+      api_key: os.environ/KEY_AI_OPENROUTER
       order: 4
       reasoning_effort: high
       model_info:

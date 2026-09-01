@@ -724,7 +724,7 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
   $systemSecrets = Get-Secret @getSystemSecretParams
   $availableKeys = @()
   foreach ($prop in $systemSecrets.PSObject.Properties) {
-    if ($prop.Name -match '^ai_.+_api_key' -and -not [string]::IsNullOrWhiteSpace($prop.Value)) {
+    if ($prop.Name -match '^key_' -and -not [string]::IsNullOrWhiteSpace($prop.Value)) {
       $availableKeys += $prop.Name
       $keyFile = Join-Path -Path $systemSecretsDir -ChildPath $prop.Name
       $existing = if (Test-Path -Path $keyFile -PathType Leaf) { Get-Content -Path $keyFile -Raw -Encoding UTF8 }
@@ -738,10 +738,8 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
   # stays out of git.
   $keyEntries = @()
   foreach ($keyName in $availableKeys) {
-    if ($keyName -match '^ai_(.+)_api_key(_(\d+))?$') {
-      $base = $Matches[1].ToUpper()
-      $indexSuffix = if ($Matches[3]) { "_$($Matches[3])" } else { '' }
-      $envVar = "${base}_API_KEY${indexSuffix}"
+    if ($keyName -match '^key_(.+)$') {
+      $envVar = $Matches[1].ToUpper()
       $keyEntries += @{ name = $keyName; envVar = $envVar }
     }
   }

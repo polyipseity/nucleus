@@ -14,8 +14,8 @@
         "additionalProperties": false,
         "properties": {
           "name": {
-            "description": "SOPS secret name matching ai_*_api_key or ai_*_api_key_N.",
-            "pattern": "^ai_.+_api_key(_[0-9]+)?$",
+            "description": "SOPS secret name with key_ prefix (e.g. key_ai_openrouter).",
+            "pattern": "^key_[a-z0-9_]+$",
             "type": "string"
           },
           "envVar": {

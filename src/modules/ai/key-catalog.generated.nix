@@ -2,28 +2,32 @@
 {
   keys = [
     {
-      name = "ai_command_code_api_key";
-      envVar = "COMMAND_CODE_API_KEY";
+      name = "key_ai_cline";
+      envVar = "AI_CLINE";
     }
     {
-      name = "ai_opencode_go_api_key";
-      envVar = "OPENCODE_GO_API_KEY";
+      name = "key_ai_command_code";
+      envVar = "AI_COMMAND_CODE";
     }
     {
-      name = "ai_opencode_go_api_key_1";
-      envVar = "OPENCODE_GO_API_KEY_1";
+      name = "key_ai_opencode_go";
+      envVar = "AI_OPENCODE_GO";
     }
     {
-      name = "ai_opencode_zen_api_key";
-      envVar = "OPENCODE_ZEN_API_KEY";
+      name = "key_ai_opencode_go_1";
+      envVar = "AI_OPENCODE_GO_1";
     }
     {
-      name = "ai_opencode_zen_api_key_1";
-      envVar = "OPENCODE_ZEN_API_KEY_1";
+      name = "key_ai_opencode_zen";
+      envVar = "AI_OPENCODE_ZEN";
     }
     {
-      name = "ai_openrouter_api_key";
-      envVar = "OPENROUTER_API_KEY";
+      name = "key_ai_opencode_zen_1";
+      envVar = "AI_OPENCODE_ZEN_1";
+    }
+    {
+      name = "key_ai_openrouter";
+      envVar = "AI_OPENROUTER";
     }
   ];
 }

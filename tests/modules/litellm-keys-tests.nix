@@ -31,7 +31,7 @@ let
   # A KEYFILE:ENVVAR pair must contain exactly one ':' separating a non-empty
   # path from a non-empty env var.
   pairPattern =
-    pair: builtins.match "^/run/secrets\\.d/15/ai_[a-z0-9_]+_api_key(_[0-9]+)?:[A-Z][A-Z0-9_]*$" pair;
+    pair: builtins.match "^/run/secrets\\.d/15/key_[a-z0-9_]+:[A-Z][A-Z0-9_]*$" pair;
 in
 {
   # === Catalog non-empty ===

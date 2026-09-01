@@ -16,8 +16,8 @@ let
 
   keys = catalog.keys or [ ];
 
-  # Pattern: name must match ai_<provider>_api_key or ai_<provider>_api_key_<N>
-  namePattern = builtins.match "^ai_[a-z0-9_]+_api_key(_[0-9]+)?$";
+  # Pattern: name must match key_<provider> (key_ prefix + lowercase alphanumeric + underscores)
+  namePattern = builtins.match "^key_[a-z0-9_]+$";
 
   # Pattern: envVar must be valid env var name (uppercase + digits + underscores)
   envVarPattern = builtins.match "^[A-Z][A-Z0-9_]*$";
@@ -59,7 +59,7 @@ in
 
   test_all_names_match_pattern = assert' (builtins.all (
     e: namePattern e.name != null
-  ) keys) "all names must match ai_<provider>_api_key[_<N>] pattern";
+  ) keys) "all names must match key_<provider> pattern";
 
   # === EnvVar pattern validation ===
 
@@ -75,37 +75,41 @@ in
 
   # === Expected key count and providers ===
 
-  test_key_count = assert' (builtins.length keys == 6) "catalog must contain exactly 6 keys";
+  test_key_count = assert' (builtins.length keys == 7) "catalog must contain exactly 7 keys";
 
   test_expected_providers_present = assert' (builtins.all
     (expected: builtins.any (e: e.name == expected.name && e.envVar == expected.envVar) keys)
     [
       {
-        name = "ai_command_code_api_key";
-        envVar = "COMMAND_CODE_API_KEY";
+        name = "key_ai_cline";
+        envVar = "KEY_AI_CLINE";
       }
       {
-        name = "ai_openrouter_api_key";
-        envVar = "OPENROUTER_API_KEY";
+        name = "key_ai_command_code";
+        envVar = "KEY_AI_COMMAND_CODE";
       }
       {
-        name = "ai_opencode_go_api_key";
-        envVar = "OPENCODE_GO_API_KEY";
+        name = "key_ai_opencode_go";
+        envVar = "KEY_AI_OPENCODE_GO";
       }
       {
-        name = "ai_opencode_go_api_key_1";
-        envVar = "OPENCODE_GO_API_KEY_1";
+        name = "key_ai_opencode_go_1";
+        envVar = "KEY_AI_OPENCODE_GO_1";
       }
       {
-        name = "ai_opencode_zen_api_key";
-        envVar = "OPENCODE_ZEN_API_KEY";
+        name = "key_ai_opencode_zen";
+        envVar = "KEY_AI_OPENCODE_ZEN";
       }
       {
-        name = "ai_opencode_zen_api_key_1";
-        envVar = "OPENCODE_ZEN_API_KEY_1";
+        name = "key_ai_opencode_zen_1";
+        envVar = "KEY_AI_OPENCODE_ZEN_1";
+      }
+      {
+        name = "key_ai_openrouter";
+        envVar = "KEY_AI_OPENROUTER";
       }
     ]
-  ) "all 6 expected provider keys with correct envVar mappings must be present";
+  ) "all 7 expected provider keys with correct envVar mappings must be present";
 
   # === Cross-check: litellm-config.yml env refs vs catalog ===
 
