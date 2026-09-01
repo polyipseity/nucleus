@@ -3,31 +3,31 @@
   keys = [
     {
       name = "key_ai_cline";
-      envVar = "AI_CLINE";
+      envVar = "KEY_AI_CLINE";
     }
     {
       name = "key_ai_command_code";
-      envVar = "AI_COMMAND_CODE";
+      envVar = "KEY_AI_COMMAND_CODE";
     }
     {
       name = "key_ai_opencode_go";
-      envVar = "AI_OPENCODE_GO";
+      envVar = "KEY_AI_OPENCODE_GO";
     }
     {
       name = "key_ai_opencode_go_1";
-      envVar = "AI_OPENCODE_GO_1";
+      envVar = "KEY_AI_OPENCODE_GO_1";
     }
     {
       name = "key_ai_opencode_zen";
-      envVar = "AI_OPENCODE_ZEN";
+      envVar = "KEY_AI_OPENCODE_ZEN";
     }
     {
       name = "key_ai_opencode_zen_1";
-      envVar = "AI_OPENCODE_ZEN_1";
+      envVar = "KEY_AI_OPENCODE_ZEN_1";
     }
     {
       name = "key_ai_openrouter";
-      envVar = "AI_OPENROUTER";
+      envVar = "KEY_AI_OPENROUTER";
     }
   ];
 }

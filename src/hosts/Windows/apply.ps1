@@ -738,10 +738,7 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
   # stays out of git.
   $keyEntries = @()
   foreach ($keyName in $availableKeys) {
-    if ($keyName -match '^key_(.+)$') {
-      $envVar = $Matches[1].ToUpper()
-      $keyEntries += @{ name = $keyName; envVar = $envVar }
-    }
+    $keyEntries += @{ name = $keyName; envVar = $keyName.ToUpper() }
   }
   $catalog = @{
     '$schema' = "$repoRoot\src\modules\ai\key-catalog.schema.json"

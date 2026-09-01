@@ -21,13 +21,13 @@
 #
 #   Windows:
 #     LiteLLM-run.ps1 reads all key_* files from the SOPS secrets
-#     directory, derives the env var name by stripping the key_ prefix
-#     and uppercasing, and exports each one.
+#     directory, uppercases each name (key_ai_foo → KEY_AI_FOO),
+#     and exports each one.
 #
 # To add a new provider: add the SOPS key to system.yml (key_<name>),
 # add a model_list entry here, and run apply to regenerate
-# key-catalog.generated.nix. The env var name is derived automatically by
-# stripping the key_ prefix and uppercasing.
+# key-catalog.generated.nix. The env var name is derived automatically
+# by uppercasing the full key name.
 
 litellm_settings:
   # Drop unsupported client params (e.g. max_tokens) per-endpoint.

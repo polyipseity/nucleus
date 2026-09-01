@@ -19,8 +19,8 @@
             "type": "string"
           },
           "envVar": {
-            "description": "Environment variable name derived from the SOPS key name.",
-            "pattern": "^[A-Z][A-Z0-9_]*$",
+            "description": "Environment variable name: the SOPS key name uppercased (key_ai_foo → KEY_AI_FOO).",
+            "pattern": "^KEY_[A-Z][A-Z0-9_]*$",
             "type": "string"
           }
         },
