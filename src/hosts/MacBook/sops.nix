@@ -2,10 +2,10 @@
 # Shared POSIX SOPS defaults live in ../../modules/posix-sops.nix.
 { username, ... }:
 let
-  # Data-driven: read the key catalog to determine which SOPS secrets to
-  # declare.  The catalog is emitted as a Nix expression by ensure_key_catalog
-  # so it is importable under pure evaluation.
-  catalog = import ../../modules/ai/key-catalog.generated.nix;
+    # Data-driven: read the env catalog to determine which SOPS secrets to
+    # declare.  The catalog is emitted as a Nix expression by ensure_env_catalog
+    # so it is importable under pure evaluation.
+    catalog = import ../../modules/ai/env-catalog.generated.nix;
 in
 {
   # System-level SOPS secrets used by the system-wide LiteLLM launchd daemon

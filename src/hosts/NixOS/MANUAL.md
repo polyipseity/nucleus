@@ -11,7 +11,7 @@
 ## recurring operations
 
 - **Chrome Remote Desktop Host**: not packaged in nixpkgs. To enable inbound CRD access, install the host component manually (Google-provided package) and approve the system extension once in System Settings → Privacy & Security. The `apps.json` entry tracks it as a `system-extension` (manual approval); it is not force-launched by activation.
-- **LiteLLM recovery**: if `nucleus-svc litellm` is active but every `default` request fails with HTTP 429/500 (`Missing credentials` / `No deployments available`), the daemon was built with no API-key pairs — typically because `src/modules/ai/key-catalog.generated.nix` is out of sync with decrypted SOPS secrets. Confirm with `systemctl cat litellm.service | grep ExecStart` — if no `KEYFILE:ENVVAR` pairs, run `nucleus-apply` to regenerate the catalog, then `nucleus-svc restart litellm`. The build-time assertion in `ai.nix` fails eval fast if the catalog declares keys but none resolve.
+- **LiteLLM recovery**: if `nucleus-svc litellm` is active but every `default` request fails with HTTP 429/500 (`Missing credentials` / `No deployments available`), the daemon was built with no API-key pairs — typically because `src/modules/ai/env-catalog.generated.nix` is out of sync with decrypted SOPS secrets. Confirm with `systemctl cat litellm.service | grep ExecStart` — if no `KEYFILE:ENVVAR` pairs, run `nucleus-apply` to regenerate the catalog, then `nucleus-svc restart litellm`. The build-time assertion in `ai.nix` fails eval fast if the catalog declares keys but none resolve.
 - **WhatsApp**: no Linux client exists. Use WhatsApp Web in the browser; the NixOS `apps.json` entry is intentionally `omitted`.
 
 ## command shortcuts

@@ -6,7 +6,7 @@
 register_step "hermetic-eval" "Hermetic Nix eval (no env vars, no --impure)" run_hermetic_eval
 
 # run_hermetic_eval — Prove the Nix layer evaluates without any forwarded environment
-# variable and without --impure. The key catalog is imported from a tracked .nix
+# variable and without --impure. The env catalog is imported from a tracked .nix
 # artifact in the repo tree, so the flake must now evaluate cleanly with
 # NUCLEUS_REPO_ROOT / NUCLEUS_CATALOG_PATH unset.
 #
@@ -15,7 +15,7 @@ register_step "hermetic-eval" "Hermetic Nix eval (no env vars, no --impure)" run
 # the GNOME agent off in security.nix (mirrors the base-guest precedent), so NixOS no longer
 # carries any out-of-scope blocker. This step therefore asserts NixOS hermetic eval reaches
 # exit 0 — there is NO skip fallback. An impurity regression surfaces as a "called without
-# required argument 'repoRoot'/'keyCatalogPath'" failure, which this step treats as a hard
+# required argument 'repoRoot'/'envCatalogPath'" failure, which this step treats as a hard
 # error.
 run_hermetic_eval() {
   local -n ctx="$1"

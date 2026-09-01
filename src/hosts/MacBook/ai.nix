@@ -19,10 +19,10 @@
 let
   userHome = "/Users/${username}";
   litellmConfig = "${userHome}/Library/Application Support/nucleus/litellm-config.yml";
-  # Data-driven key args: read key catalog to build KEYFILE:ENVVAR pairs.
-  # The catalog is emitted as a Nix expression by ensure_key_catalog so it is
-  # importable under pure evaluation (an absolute user-path JSON is not).
-  catalog = import ../../modules/ai/key-catalog.generated.nix;
+    # Data-driven key args: read env catalog to build KEYFILE:ENVVAR pairs.
+    # The catalog is emitted as a Nix expression by ensure_env_catalog so it is
+    # importable under pure evaluation (an absolute user-path JSON is not).
+    catalog = import ../../modules/ai/env-catalog.generated.nix;
   keyArgs = map (entry: "${config.sops.secrets.${entry.name}.path}:${entry.envVar}") catalog.keys;
 
   envVars = import ../../modules/lib/env-catalog.nix {
@@ -88,10 +88,10 @@ in
     };
   };
 
-  # Guard: if the key catalog declares AI keys but the resolved keyArgs is
+  # Guard: if the env catalog declares AI keys but the resolved keyArgs is
   # empty, the LiteLLM daemon would start with no API-key pairs and every
   # `default` request fails with "Missing credentials". This happens when the
-  # catalog is out of sync with sops.secrets (e.g. key-catalog.generated.nix
+  # catalog is out of sync with sops.secrets (e.g. env-catalog.generated.nix
   # was not regenerated after editing system.yml). Fail fast with a clear
   # message naming the missing secret.
   assertions = [
@@ -99,7 +99,7 @@ in
       assertion =
         (builtins.length catalog.keys == 0) || (builtins.length keyArgs == builtins.length catalog.keys);
       message =
-        "litellm: key catalog declares ${toString (builtins.length catalog.keys)} AI key(s) but only ${toString (builtins.length keyArgs)} KEYFILE:ENVVAR pair(s) resolved. Run nucleus-apply to regenerate src/modules/ai/key-catalog.generated.nix from the decrypted secrets. Missing: "
+        "litellm: env catalog declares ${toString (builtins.length catalog.keys)} AI key(s) but only ${toString (builtins.length keyArgs)} KEYFILE:ENVVAR pair(s) resolved. Run nucleus-apply to regenerate src/modules/ai/env-catalog.generated.nix from the decrypted secrets. Missing: "
         + lib.concatStringsSep ", " (
           map (e: e.name) (builtins.filter (e: !(config.sops.secrets ? ${e.name})) catalog.keys)
         );

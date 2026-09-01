@@ -1,7 +1,7 @@
 # tests/modules/litellm-keys-tests.nix — litellm keyArgs derivation invariants.
 #
 # The LiteLLM daemon wrapper receives KEYFILE:ENVVAR positional pairs
-# (keyArgs) derived from the key catalog.  If keyArgs is empty while the
+# (keyArgs) derived from the env catalog.  If keyArgs is empty while the
 # catalog declares keys, the daemon starts with no API-key pairs and every
 # `default` request fails with "Missing credentials".  This test mirrors the
 # derivation used in ai.nix (map each catalog entry to a "PATH:ENVVAR" pair)
@@ -9,7 +9,7 @@
 # caught without building the full host configuration.
 
 let
-  catalogPath = ../../src/modules/ai/key-catalog.generated.nix;
+  catalogPath = ../../src/modules/ai/env-catalog.generated.nix;
   catalog = import catalogPath;
   inherit (import ../lib.nix) assert';
 

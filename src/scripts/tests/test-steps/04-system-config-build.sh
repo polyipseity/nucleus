@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # shellcheck source=../test-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../test-lib.sh"
-# shellcheck source=../../lib/key-catalog.sh
-# (provides ensure_key_catalog so the key-catalog.generated.nix artifact exists
-# for pure Nix eval)
-. "$NUCLEUS_LIB_DIR/key-catalog.sh"
+# shellcheck source=../../lib/env-catalog.sh
+  # (provides ensure_env_catalog so the env-catalog.generated.nix artifact exists
+  # for pure Nix eval)
+  . "$NUCLEUS_LIB_DIR/env-catalog.sh"
 
 register_step "system-config-build" "System config build" run_system_config_build
 
@@ -88,9 +88,9 @@ run_system_config_build() {
     return 2
   fi
 
-  # Generate the key-catalog.generated.nix artifact so pure Nix eval can import
-  # the catalog.
-  ensure_key_catalog
+# Generate the env-catalog.generated.nix artifact so pure Nix eval can import
+    # the catalog.
+    ensure_env_catalog
 
   case "$_host" in
   MacBook) _attr="darwinConfigurations.MacBook.system" ;;

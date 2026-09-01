@@ -24,9 +24,9 @@
 #     directory, uppercases each name (key_ai_foo → KEY_AI_FOO),
 #     and exports each one.
 #
-# To add a new provider: add the SOPS key to system.yml (key_<name>),
+# To add a new provider: add the SOPS key to system.yml (env_key_<name>),
 # add a model_list entry here, and run apply to regenerate
-# key-catalog.generated.nix. The env var name is derived automatically
+# env-catalog.generated.nix. The env var name is derived automatically
 # by uppercasing the full key name.
 
 litellm_settings:

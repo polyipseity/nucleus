@@ -733,7 +733,7 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
       }
     }
   }
-  # Write key-catalog.json for Nix module consumption.
+  # Write env-catalog.json for Nix module consumption.
   # Output goes to %LOCALAPPDATA%\nucleus\ (not the repo tree) so generated content
   # stays out of git.
   $keyEntries = @()
@@ -741,13 +741,13 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
     $keyEntries += @{ name = $keyName; envVar = $keyName.ToUpper() }
   }
   $catalog = @{
-    '$schema' = "$repoRoot\src\modules\ai\key-catalog.schema.json"
+    '$schema' = "$repoRoot\src\modules\ai\env-catalog.schema.json"
     keys = $keyEntries
   } | ConvertTo-Json -Compress
-  $catalogPath = Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus\key-catalog.json'
+  $catalogPath = Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus\env-catalog.json'
   New-Item -Path (Split-Path $catalogPath) -ItemType Directory -Force > $null
   [System.IO.File]::WriteAllText($catalogPath, $catalog, [System.Text.UTF8Encoding]::new($false))
-  Write-NucleusInfo -CommandName 'apply' "wrote key-catalog.json with $($availableKeys.Count) keys"
+  Write-NucleusInfo -CommandName 'apply' "wrote env-catalog.json with $($availableKeys.Count) keys"
 }
 
 # Materialize decrypted wallpapers ahead of DSC so user/wallpaper.dsc.yml can resolve an
