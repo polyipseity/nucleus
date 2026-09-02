@@ -14,8 +14,20 @@ let
   linuxServices = lib.filterAttrs (
     _: svc: svc ? hosts.NixOS && svc.hosts.NixOS ? type && svc.hosts.NixOS.type != "omitted"
   ) servicesJSON;
+  # NOTE: `svc.logging` is accessed unguarded so a service that omits its
+  # `logging` block fails Nix eval loudly (instead of being silently skipped).
+  # `dirs` may be absent (services with no log files), so only that level is
+  # guarded with `or {}` / `or []`.
   linuxSystemLogDirs = lib.unique (
-    lib.flatten (lib.mapAttrsToList (_: svc: svc.logging.dirs.system or [ ]) linuxServices)
+    lib.flatten (
+      lib.mapAttrsToList (
+        _: svc:
+        let
+          log = svc.logging;
+        in
+        (log.dirs or { }).system or [ ]
+      ) linuxServices
+    )
   );
   # Bundle services.json into the nix store so the systemd watchdog can
   # read it without needing NUCLEUS_REPO_ROOT.  Same approach as the

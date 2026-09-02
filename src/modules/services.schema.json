@@ -51,7 +51,8 @@
     },
     "required": [
       "displayName",
-      "hosts"
+      "hosts",
+      "logging"
     ],
     "type": "object"
   },

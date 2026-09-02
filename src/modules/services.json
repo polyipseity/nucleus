@@ -100,6 +100,13 @@
   "camilladsp-heartbeat": {
     "description": "Periodic config re-push for CamillaDSP audio device recovery",
     "displayName": "CamillaDSP Heartbeat",
+    "logging": {
+      "capture": "all",
+      "dirs": {
+        "system": [ "camilladsp" ],
+        "user": []
+      }
+    },
     "hosts": {
       "MacBook": {
         "domain": "user",

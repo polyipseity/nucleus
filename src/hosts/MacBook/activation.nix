@@ -25,12 +25,33 @@ let
     _: svc: svc ? hosts.MacBook && svc.hosts.MacBook ? type && svc.hosts.MacBook.type != "omitted"
   ) servicesJSON;
 
+  # NOTE: `svc.logging` is accessed unguarded so a service that omits its
+  # `logging` block fails Nix eval loudly (instead of being silently skipped,
+  # which previously let launchd crash with EX_CONFIG 78 for a missing log
+  # dir). `dirs` may be absent (services with no log files), so only that level
+  # is guarded with `or {}` / `or []`.
   systemLogDirs = lib.unique (
-    lib.flatten (lib.mapAttrsToList (_: svc: svc.logging.dirs.system or [ ]) macosServices)
+    lib.flatten (
+      lib.mapAttrsToList (
+        _: svc:
+        let
+          log = svc.logging;
+        in
+        (log.dirs or { }).system or [ ]
+      ) macosServices
+    )
   );
 
   userLogDirs = lib.unique (
-    lib.flatten (lib.mapAttrsToList (_: svc: svc.logging.dirs.user or [ ]) macosServices)
+    lib.flatten (
+      lib.mapAttrsToList (
+        _: svc:
+        let
+          log = svc.logging;
+        in
+        (log.dirs or { }).user or [ ]
+      ) macosServices
+    )
   );
 
   usersDir = ../../users;
