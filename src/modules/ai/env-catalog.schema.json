@@ -22,11 +22,17 @@
             "description": "Environment variable name: env_ prefix stripped and uppercased (env_key_ai_foo → KEY_AI_FOO, env_redis_password → REDIS_PASSWORD).",
             "pattern": "^[A-Z][A-Z0-9_]*$",
             "type": "string"
+          },
+          "secret": {
+            "description": "When true, the env var contains a sensitive value (API key, token, password) and must not propagate to shell sessions or appear in logs.",
+            "type": "boolean",
+            "default": true
           }
         },
         "required": [
           "name",
-          "envVar"
+          "envVar",
+          "secret"
         ],
         "type": "object"
       },
