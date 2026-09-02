@@ -6,9 +6,8 @@
 register_step "hermetic-eval" "Hermetic Nix eval (no env vars, no --impure)" run_hermetic_eval
 
 # run_hermetic_eval — Prove the Nix layer evaluates without any forwarded environment
-# variable and without --impure. The env catalog is imported from a tracked .nix
-# artifact in the repo tree, so the flake must now evaluate cleanly with
-# NUCLEUS_REPO_ROOT / NUCLEUS_CATALOG_PATH unset.
+# variable and without --impure. The env catalog is a static Nix attrset in the
+# repo tree, so the flake must now evaluate cleanly with NUCLEUS_REPO_ROOT unset.
 #
 # Darwin and NixOS must BOTH build hermetically (exit 0). The NixOS ssh.startAgent vs
 # GNOME ssh-agent conflict (src/hosts/NixOS/{security,desktop}.nix) was resolved by forcing
@@ -37,7 +36,7 @@ run_hermetic_eval() {
   _nix_cfg="$(merge_nix_config)"
 
   # --- Darwin: must build hermetically (exit 0) ---
-  if ! nucleus_nix_locked env -u NUCLEUS_REPO_ROOT -u NUCLEUS_CATALOG_PATH \
+  if ! nucleus_nix_locked env -u NUCLEUS_REPO_ROOT \
     NIX_CONFIG="$_nix_cfg" \
     nix build "./src#darwinConfigurations.MacBook.config.system.build.toplevel" --dry-run >/dev/null; then
     error "darwin hermetic eval failed (expected exit 0 with no env vars and no --impure)"
@@ -49,7 +48,7 @@ run_hermetic_eval() {
   # --- NixOS: hermetic eval must reach the assertion stage, not fail on impurity ---
   local _nixos_out
   _nixos_out="$(mktemp)"
-  if nucleus_nix_locked env -u NUCLEUS_REPO_ROOT -u NUCLEUS_CATALOG_PATH \
+  if nucleus_nix_locked env -u NUCLEUS_REPO_ROOT \
     NIX_CONFIG="$_nix_cfg" \
     nix build "./src#nixosConfigurations.NixOS.config.system.build.toplevel" --dry-run \
     >"$_nixos_out" 2>&1; then

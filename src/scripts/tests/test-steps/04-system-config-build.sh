@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck source=../test-lib.sh
 . "$(CDPATH='' cd -- "$(dirname "${BASH_SOURCE[0]}")" && pwd)/../test-lib.sh"
-# shellcheck source=../../lib/env-catalog.sh
-  # (provides ensure_env_catalog so the env-catalog.generated.nix artifact exists
-  # for pure Nix eval)
-  . "$NUCLEUS_LIB_DIR/env-catalog.sh"
 
 register_step "system-config-build" "System config build" run_system_config_build
 
@@ -87,10 +83,6 @@ run_system_config_build() {
     skip_step "$(step_number)" "System config build" "sops secret material unavailable for host $_host"
     return 2
   fi
-
-# Generate the env-catalog.generated.nix artifact so pure Nix eval can import
-    # the catalog.
-    ensure_env_catalog
 
   case "$_host" in
   MacBook) _attr="darwinConfigurations.MacBook.system" ;;
