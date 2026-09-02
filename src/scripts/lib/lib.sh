@@ -246,9 +246,16 @@ die() {
 # Resolution order: NUCLEUS_REPO_ROOT env var, <SYSTEM root>/repo-root, SCRIPT_DIR+offset, then git rev-parse.
 derive_repo_root() {
   if [ -n "${NUCLEUS_REPO_ROOT:-}" ] && [ -d "$NUCLEUS_REPO_ROOT" ]; then
-    NUCLEUS_REPO_ROOT="$(CDPATH='' cd -- "$NUCLEUS_REPO_ROOT" && pwd -P)"
-    printf '%s\n' "$NUCLEUS_REPO_ROOT"
-    return 0
+    case "$NUCLEUS_REPO_ROOT" in
+    /nix/store/*)
+      warn "NUCLEUS_REPO_ROOT points to Nix store path ($NUCLEUS_REPO_ROOT); ignoring — use system repo-root file instead"
+      ;;
+    *)
+      NUCLEUS_REPO_ROOT="$(CDPATH='' cd -- "$NUCLEUS_REPO_ROOT" && pwd -P)"
+      printf '%s\n' "$NUCLEUS_REPO_ROOT"
+      return 0
+      ;;
+    esac
   fi
   case "$(uname -s)" in
   Darwin) _drr_default_system_file="/Library/Application Support/nucleus/repo-root" ;;
