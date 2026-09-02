@@ -453,6 +453,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-JellyfinLibraryCatalog.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-CaddyService.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-LiteLLMService.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Sync-RedisService.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-ReplicaSyncScheduledTask.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-OpenSSHServer.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Sync-PowerPolicy.ps1")
@@ -950,6 +951,7 @@ Sync-CamillaGUIService -Enabled:$EnableCamillaGUIServiceParity
 Sync-AppAutostart -Enabled:$EnableAppAutostartParity -RepoRoot $repoRoot
 Sync-MenuBar -Enabled:$EnableMenuBarParity -RepoRoot $repoRoot
 Sync-LiteLLMService -RepoRoot $repoRoot -Enabled:`$true
+Sync-RedisService -RepoRoot $repoRoot -Enabled:`$true
 Sync-ReplicaSyncScheduledTask -RepoRoot $repoRoot -Enabled:$EnableCloudDrivesParity
 Sync-OpenSSHServer -Enabled:$EnableRemoteAccessParity
 # Re-run host age key registration after Sync-OpenSSHServer has started
