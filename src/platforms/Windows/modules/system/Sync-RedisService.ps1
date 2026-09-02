@@ -4,10 +4,10 @@
 
 .DESCRIPTION
   Creates and maintains the `nucleus-redis` native Windows SCM service that
-  starts a local Redis server at boot as SYSTEM, bound to loopback for LiteLLM
-  coordination and response caching.
+  starts a local Redis server at boot as SYSTEM, bound to loopback for
+  cross-service coordination and caching.
 
-  Redis is installed via WinGet (tporadowski.redis) when not already present.
+  Redis is installed via WinGet (Redis.Redis) when not already present.
   The server is configured with requirepass from the SOPS-decrypted
   env_redis_password secret (materialised by apply.ps1 into
   %ProgramData%\nucleus\secrets\env_redis_password), matching the POSIX
