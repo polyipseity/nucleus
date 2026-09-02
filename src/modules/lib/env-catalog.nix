@@ -448,6 +448,14 @@ let
   );
 
   getAllNixVarNames = builtins.attrNames catalog;
+  # mkKeyArgs: build KEYFILE:ENVVAR pairs from the secret catalog and sops config.
+  # Usage: mkKeyArgs { inherit config catalog; }
+  #   where config is the NixOS/darwin module config and catalog is from
+  #   import ../../modules/env-catalog.nix.
+  mkKeyArgs =
+    { config, catalog }:
+    map (entry: "${config.sops.secrets.${entry.name}.path}:${entry.envVar}") catalog.keys;
+
 in
 {
   inherit
@@ -461,5 +469,6 @@ in
     resolveValue
     passwordStoreDir
     currentHost
+    mkKeyArgs
     ;
 }
