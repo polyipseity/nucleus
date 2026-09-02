@@ -25,14 +25,5 @@ in
         mode = "0400";
       };
     }) catalog.keys
-  )
-  // {
-    # Redis password for LiteLLM coordination + response cache.
-    # Not in the env_key_* catalog (naming convention differs).
-    env_redis_password = {
-      sopsFile = ../../secrets/system.yml;
-      owner = "litellm";
-      mode = "0400";
-    };
-  };
+  );
 }
