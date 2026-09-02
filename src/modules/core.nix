@@ -685,6 +685,10 @@ let
       nixpkgs = "rclone";
       winget = "Rclone.Rclone";
     };
+    redis = {
+      category = "cli";
+      nixpkgs = "redis";
+    };
     ripgrep = {
       category = "cli";
       homebrew = {
