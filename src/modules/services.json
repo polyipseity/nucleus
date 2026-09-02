@@ -437,6 +437,7 @@
     },
     "hosts": {
       "MacBook": {
+        "domain": "system",
         "service": "local.redis",
         "type": "launchctl",
         "platform": "macOS"
