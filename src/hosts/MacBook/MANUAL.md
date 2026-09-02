@@ -41,7 +41,7 @@
 - `nucleus-svc restart <service>` — restart a service (recovery strategy in `macos-service-hardening.instructions.md`)
 - Service watchdog runs every 5 minutes (`local.service-watchdog`). Check status with `launchctl list | grep service-watchdog`.
 - To see if a service is running: `nucleus-svc status <service>` or `sudo launchctl print system/<plist-id>` (e.g. `sudo launchctl print system/org.nixos.local.ollama`).
-- LiteLLM recovery: if `nucleus-svc litellm` is active but every `default` request fails with HTTP 429/500 (`Missing credentials` / `No deployments available`), the daemon was built with no API-key pairs — typically because `src/modules/ai/env-catalog.generated.nix` is out of sync with decrypted SOPS secrets. Confirm with `sudo launchctl print system/local.litellm | grep ProgramArguments` — if no `KEYFILE:ENVVAR` pairs, run `nucleus-apply` to regenerate the catalog, then `nucleus-svc restart litellm`. The build-time assertion in `ai.nix` fails eval fast if the catalog declares keys but none resolve.
+- LiteLLM recovery: if `nucleus-svc litellm` is active but every `default` request fails with HTTP 429/500 (`Missing credentials` / `No deployments available`), the daemon was built with no API-key pairs — typically because `src/modules/env-catalog.nix` is out of sync with decrypted SOPS secrets. Confirm with `sudo launchctl print system/local.litellm | grep ProgramArguments` — if no `KEYFILE:ENVVAR` pairs, run `nucleus-apply` to rebuild, then `nucleus-svc restart litellm`. The build-time assertion in `ai.nix` fails eval fast if the catalog declares keys but none resolve.
 
 ## nucleus commands
 

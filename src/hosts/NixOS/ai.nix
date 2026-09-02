@@ -142,9 +142,9 @@ in
   # Guard: if the env catalog declares AI keys but the resolved keyArgs is
   # empty, the LiteLLM service would start with no API-key pairs and every
   # `default` request fails with "Missing credentials". This happens when the
-  # catalog is out of sync with sops.secrets (e.g. env-catalog.generated.nix
-  # was not regenerated after editing system.yml). Fail fast with a clear
-  # message naming the missing secret.
+    # catalog (src/modules/env-catalog.nix) is out of sync with sops.secrets
+    # (e.g. a key was added to the catalog but not to system.yml). Fail fast
+    # with a clear message naming the missing secret.
   assertions = [
     {
       assertion =

@@ -37,9 +37,8 @@
 #     (env_key_ai_foo → KEY_AI_FOO).
 #
 # To add a new provider: add the SOPS key to system.yml (env_key_<name>),
-# add a model_list entry here, and run apply to regenerate
-# env-catalog.generated.nix. The env var name is derived automatically
-# by uppercasing the full key name.
+# add a model_list entry here, and add the mapping to src/modules/env-catalog.nix.
+# The env var name is derived automatically by uppercasing the full key name.
 
 litellm_settings:
   # Drop unsupported client params (e.g. max_tokens) per-endpoint.
