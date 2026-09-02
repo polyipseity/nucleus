@@ -733,22 +733,12 @@ if (Test-Path -Path $systemYmlPath -PathType Leaf) {
       }
     }
   }
-  # Write env-catalog.json for Nix module consumption.
-  # Output goes to %LOCALAPPDATA%\nucleus\ (not the repo tree) so generated content
-  # stays out of git.
-  $keyEntries = @()
-  foreach ($keyName in $availableKeys) {
-    $envVar = $keyName.Substring(4).ToUpper()
-    $keyEntries += @{ name = $keyName; envVar = $envVar }
-  }
-  $catalog = @{
-    '$schema' = "$repoRoot\src\modules\ai\env-catalog.schema.json"
-    keys = $keyEntries
-  } | ConvertTo-Json -Compress
+  # Copy static env-catalog.json to %LOCALAPPDATA%\nucleus\ for Sync-LiteLLMService consumption.
+  $catalogSource = Join-Path -Path $repoRoot -ChildPath 'src\hosts\Windows\env-catalog.json'
   $catalogPath = Join-Path -Path $env:LOCALAPPDATA -ChildPath 'nucleus\env-catalog.json'
   New-Item -Path (Split-Path $catalogPath) -ItemType Directory -Force > $null
-  [System.IO.File]::WriteAllText($catalogPath, $catalog, [System.Text.UTF8Encoding]::new($false))
-  Write-NucleusInfo -CommandName 'apply' "wrote env-catalog.json with $($availableKeys.Count) keys"
+  Copy-Item -Path $catalogSource -Destination $catalogPath -Force
+  Write-NucleusInfo -CommandName 'apply' "copied static env-catalog.json"
 }
 
 # Materialize decrypted wallpapers ahead of DSC so user/wallpaper.dsc.yml can resolve an

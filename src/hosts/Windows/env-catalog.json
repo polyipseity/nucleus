@@ -1,0 +1,13 @@
+{
+  "$schema": "../../modules/env-catalog.schema.json",
+  "keys": [
+    { "name": "env_key_ai_cline", "envVar": "KEY_AI_CLINE" },
+    { "name": "env_key_ai_claude", "envVar": "KEY_AI_CLAUDE" },
+    { "name": "env_key_ai_claudecode", "envVar": "KEY_AI_CLAUDECODE" },
+    { "name": "env_key_ai_codex", "envVar": "KEY_AI_CODEX" },
+    { "name": "env_key_ai_github_copilot", "envVar": "KEY_AI_GITHUB_COPILOT" },
+    { "name": "env_key_ai_openrouter", "envVar": "KEY_AI_OPENROUTER" },
+    { "name": "env_key_ai_zai", "envVar": "KEY_AI_ZAI" },
+    { "name": "env_redis_password", "envVar": "REDIS_PASSWORD" }
+  ]
+}

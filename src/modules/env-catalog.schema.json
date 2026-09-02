@@ -1,0 +1,42 @@
+{
+  "$id": "https://nucleus.local/env-catalog.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "description": "Static catalog of environment variable secrets with env var mappings. Source of truth for all hosts.",
+  "properties": {
+    "$schema": {
+      "description": "Reference to this schema file.",
+      "type": "string"
+    },
+    "keys": {
+      "description": "List of environment variable catalog entries. Each entry maps a SOPS secret name to the environment variable it should be exported as.",
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "description": "SOPS secret name with env_ prefix (e.g. env_key_ai_openrouter, env_redis_password).",
+            "pattern": "^env_[a-z0-9_]+$",
+            "type": "string"
+          },
+          "envVar": {
+            "description": "Environment variable name: env_ prefix stripped and uppercased (env_key_ai_foo → KEY_AI_FOO, env_redis_password → REDIS_PASSWORD).",
+            "pattern": "^[A-Z][A-Z0-9_]*$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "envVar"
+        ],
+        "type": "object"
+      },
+      "type": "array",
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "$schema",
+    "keys"
+  ],
+  "type": "object"
+}
