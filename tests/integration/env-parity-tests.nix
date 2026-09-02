@@ -35,6 +35,11 @@ let
       windowsValue = envVars.resolveValue name "Windows";
       userSpecific = entry ? userSpecific && entry.userSpecific;
       why = entry.why;
+      # dscRequired: true for every catalog var that MUST have a DSC entry.
+      # Derived from dscVarNames (the exclusion-filtered list).  Any new
+      # host-specific var with a Windows value auto-includes here unless
+      # explicitly excluded — wiring by default.
+      dscRequired = builtins.elem name dscVarNames;
     }
   ) envVars.getAllNixVarNames;
 

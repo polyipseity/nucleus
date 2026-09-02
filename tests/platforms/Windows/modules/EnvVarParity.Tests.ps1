@@ -89,26 +89,26 @@ Describe "Windows env var parity with Nix catalog" {
       $script:Manifest | Should -Not -BeNullOrEmpty
     }
 
-    It "every user-specific catalog var has a User-scope DSC entry" {
+    It "every user-specific DSC-required catalog var has a User-scope DSC entry" {
       $dscVars = Get-DscEnvVarNameList -DscPath $script:UserDscFile
-      $userSpecificVars = @($script:Manifest | Where-Object { $_.userSpecific -and $_.hasWindowsEntry } | ForEach-Object { $_.name })
+      $requiredVars = @($script:Manifest | Where-Object { $_.dscRequired -and $_.userSpecific } | ForEach-Object { $_.name })
 
-      $missing = $userSpecificVars | Where-Object { $_ -notin $dscVars }
+      $missing = $requiredVars | Where-Object { $_ -notin $dscVars }
       if ($missing.Count -gt 0) {
         Write-Warning "Missing User-scope DSC env vars: $($missing -join ', ')"
       }
-      $missing.Count | Should -Be 0 -Because "every user-specific catalog var expected on Windows should have a User-scope DSC Environment resource"
+      $missing.Count | Should -Be 0 -Because "every user-specific DSC-required catalog var should have a User-scope DSC Environment resource"
     }
 
-    It "every User-scope DSC Env resource has a Nix catalog counterpart" {
+    It "every User-scope DSC Env resource is DSC-required in catalog" {
       $dscVars = Get-DscEnvVarNameList -DscPath $script:UserDscFile
-      $catalogNames = $script:Manifest | ForEach-Object { $_.name }
+      $catalogDscRequired = @($script:Manifest | Where-Object { $_.dscRequired -and $_.userSpecific } | ForEach-Object { $_.name })
 
-      $extra = $dscVars | Where-Object { $_ -notin $catalogNames }
+      $extra = $dscVars | Where-Object { $_ -notin $catalogDscRequired }
       if ($extra.Count -gt 0) {
-        Write-Warning "User-scope DSC env vars without Nix catalog entry: $($extra -join ', ')"
+        Write-Warning "User-scope DSC env vars without DSC-required catalog entry: $($extra -join ', ')"
       }
-      $extra.Count | Should -Be 0 -Because "every DSC Environment resource should have a Nix catalog counterpart"
+      $extra.Count | Should -Be 0 -Because "every User-scope DSC Environment resource should be DSC-required in the Nix catalog"
     }
   }
 
@@ -117,26 +117,26 @@ Describe "Windows env var parity with Nix catalog" {
       $script:SystemDscFile | Should -Exist
     }
 
-    It "every non-user-specific catalog var has a Machine-scope DSC entry" {
+    It "every DSC-required catalog var has a Machine-scope DSC entry" {
       $dscVars = Get-DscEnvVarNameList -DscPath $script:SystemDscFile
-      $machineSpecificVars = @($script:Manifest | Where-Object { -not $_.userSpecific -and $_.hasWindowsEntry } | ForEach-Object { $_.name })
+      $requiredVars = @($script:Manifest | Where-Object { $_.dscRequired -and -not $_.userSpecific } | ForEach-Object { $_.name })
 
-      $missing = $machineSpecificVars | Where-Object { $_ -notin $dscVars }
+      $missing = $requiredVars | Where-Object { $_ -notin $dscVars }
       if ($missing.Count -gt 0) {
         Write-Warning "Missing Machine-scope DSC env vars: $($missing -join ', ')"
       }
-      $missing.Count | Should -Be 0 -Because "every non-user-specific catalog var expected on Windows should have a Machine-scope DSC Environment resource"
+      $missing.Count | Should -Be 0 -Because "every DSC-required catalog var should have a Machine-scope DSC Environment resource"
     }
 
-    It "every Machine-scope DSC Env resource has a Nix catalog counterpart" {
+    It "every Machine-scope DSC Env resource is DSC-required in catalog" {
       $dscVars = Get-DscEnvVarNameList -DscPath $script:SystemDscFile
-      $catalogNames = $script:Manifest | ForEach-Object { $_.name }
+      $catalogDscRequired = @($script:Manifest | Where-Object { $_.dscRequired -and -not $_.userSpecific } | ForEach-Object { $_.name })
 
-      $extra = $dscVars | Where-Object { $_ -notin $catalogNames }
+      $extra = $dscVars | Where-Object { $_ -notin $catalogDscRequired }
       if ($extra.Count -gt 0) {
-        Write-Warning "Machine-scope DSC env vars without Nix catalog entry: $($extra -join ', ')"
+        Write-Warning "Machine-scope DSC env vars without DSC-required catalog entry: $($extra -join ', ')"
       }
-      $extra.Count | Should -Be 0 -Because "every DSC Environment resource should have a Nix catalog counterpart"
+      $extra.Count | Should -Be 0 -Because "every Machine-scope DSC Environment resource should be DSC-required in the Nix catalog"
     }
   }
 
