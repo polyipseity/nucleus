@@ -40,6 +40,8 @@ let
   litellmEnv = lib.filterAttrs (_name: value: value != null) {
     NIX_SSL_CERT_FILE = resolveValue "NIX_SSL_CERT_FILE";
     NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";
+    REDIS_HOST = resolveValue "REDIS_HOST";
+    REDIS_PORT = resolveValue "REDIS_PORT";
   };
   # Ollama daemon env vars: OLLAMA_* runtime tunables excluding OLLAMA_HOST.
   # OLLAMA_HOST is excluded because the ollama server must bind to the default
