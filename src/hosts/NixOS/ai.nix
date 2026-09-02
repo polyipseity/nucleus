@@ -22,6 +22,10 @@ let
     runtimeInputs = [ pkgs.litellm ];
     scriptName = "src/scripts/services/litellm-daemon";
   };
+  # Centralized service registry — single source of truth for network config.
+  servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
+  ollamaCfg = servicesJSON.ollama.network.default;
+  redisCfg = servicesJSON.redis.network.default;
     # Data-driven key args: read env catalog to build KEYFILE:ENVVAR pairs.
     # The catalog is emitted as a Nix expression by ensure_env_catalog so it is
     # importable under pure evaluation (an absolute user-path JSON is not).
@@ -64,8 +68,8 @@ in
     # on some versions) would expose the API to all LAN peers without any
     # authentication requirement.
     #
-    host = "127.0.0.1";
-    port = 11434;
+    host = ollamaCfg.host;
+    port = ollamaCfg.port;
     # Enable GPU inference explicitly for this host class.  The repository's
     # planning assumption for nixos/windows is a 6 GB discrete GPU tier, and
     # Ollama should use a CUDA-capable package on compatible NVIDIA setups.
@@ -106,8 +110,8 @@ in
   # Runs on localhost only; password-protected via SOPS secret.
   services.redis.servers.nucleus = {
     enable = true;
-    bind = "127.0.0.1";
-    port = 6379;
+    bind = redisCfg.host;
+    port = redisCfg.port;
     # Password from SOPS — same pipeline as API keys.
     passwordFile = config.sops.secrets.env_redis_password.path;
     # Eviction: volatile-lru for safe multi-tenant operation.
