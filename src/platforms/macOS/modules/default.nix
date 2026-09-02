@@ -507,15 +507,18 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
   # Single activation-time mechanism for macOS GUI environment variables.
   #
   # This step handles ALL GUI env var propagation at activation time:
-  #   1. launchctl setenv NUCLEUS_REPO_ROOT — repo root for out-of-store symlinks
-  #   2. launchctl setenv PATH — managed PATH with dedup (launchd-direct/XPC)
-  #   3. launchctl setenv for all non-PATH vars from env-catalog (EDITOR,
+  #   1. launchctl setenv PATH — managed PATH with dedup (launchd-direct/XPC)
+  #   2. launchctl setenv for all non-PATH vars from env-catalog (EDITOR,
   #      OLLAMA_HOST, etc.)
-  #   4. sudo launchctl config user path — persistent per-user PATH for LaunchServices
+  #   3. sudo launchctl config user path — persistent per-user PATH for LaunchServices
   #      .app bundles (requires reboot on first set).
   #      KNOWN BROKEN: https://github.com/nix-darwin/nix-darwin/issues/1080 —
   #      `launchctl config` is unreliable or broken on many macOS versions;
   #      .app bundles launched via LaunchServices fall back to the default PATH.
+  #
+  # NUCLEUS_REPO_ROOT is resolved from the system repo-root file at runtime,
+  # not set via launchctl (the env var was removed from the catalog in commit
+  # 01ebf5e8 to prevent Nix store path poisoning).
   #
   # The gui-env LaunchAgent (below) provides login-time coverage before the
   # first activation runs.

@@ -14,10 +14,6 @@ _mge_managed_set="$3"
 _mge_all_vars_block="$4"
 _mge_launchctl_config_path="$5"
 
-if [ -n "${NUCLEUS_REPO_ROOT:-}" ]; then
-  /bin/launchctl setenv NUCLEUS_REPO_ROOT "$NUCLEUS_REPO_ROOT"
-fi
-
 # Strip stale managed entries from launchctl PATH, then prepend + append
 # managed dirs for the GUI launchd domain.
 
