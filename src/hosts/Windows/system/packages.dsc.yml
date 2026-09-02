@@ -120,7 +120,7 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
-        description: Ensure Redis is installed as the local in-memory data store for LiteLLM coordination and response cache, matching the NixOS nucleus-redis server
+        description: Ensure Redis is installed as the local loopback in-memory data store for cross-service coordination and caching, matching the NixOS nucleus-redis server
       settings:
         id: Redis.Redis
         source: winget
