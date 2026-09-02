@@ -51,9 +51,15 @@ in
     e: builtins.isAttrs e
   ) keys) "every entry must be an object";
 
-  test_all_entries_have_name_and_envvar = assert' (builtins.all (
-    e: e ? name && e ? envVar
-  ) keys) "every entry must have name and envVar fields";
+  test_all_entries_have_name_envvar_and_secret = assert' (builtins.all (
+    e: e ? name && e ? envVar && e ? secret
+  ) keys) "every entry must have name, envVar, and secret fields";
+
+  # === Secret field validation ===
+
+  test_all_entries_are_secret = assert' (builtins.all (
+    e: e.secret == true
+  ) keys) "all generated catalog entries must be secret (AI API keys)";
 
   # === Name pattern validation ===
 
