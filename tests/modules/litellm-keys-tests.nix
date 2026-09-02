@@ -9,7 +9,7 @@
 # caught without building the full host configuration.
 
 let
-  catalogPath = ../../src/modules/ai/env-catalog.generated.nix;
+  catalogPath = ../../src/modules/env-catalog.nix;
   catalog = import catalogPath;
   inherit (import ../lib.nix) assert';
 
@@ -31,7 +31,7 @@ let
   # A KEYFILE:ENVVAR pair must contain exactly one ':' separating a non-empty
   # path from a non-empty env var.
   pairPattern =
-    pair: builtins.match "^/run/secrets\.d/15/env_key_[a-z0-9_]+:[A-Z][A-Z0-9_]*$" pair;
+    pair: builtins.match "^/run/secrets\.d/15/env_[a-z0-9_]+:[A-Z][A-Z0-9_]*$" pair;
 in
 {
   # === Catalog non-empty ===

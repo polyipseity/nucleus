@@ -2,12 +2,12 @@
   "$schema": "../../modules/env-catalog.schema.json",
   "keys": [
     { "name": "env_key_ai_cline", "envVar": "KEY_AI_CLINE" },
-    { "name": "env_key_ai_claude", "envVar": "KEY_AI_CLAUDE" },
-    { "name": "env_key_ai_claudecode", "envVar": "KEY_AI_CLAUDECODE" },
-    { "name": "env_key_ai_codex", "envVar": "KEY_AI_CODEX" },
-    { "name": "env_key_ai_github_copilot", "envVar": "KEY_AI_GITHUB_COPILOT" },
+    { "name": "env_key_ai_command_code", "envVar": "KEY_AI_COMMAND_CODE" },
+    { "name": "env_key_ai_opencode_go", "envVar": "KEY_AI_OPENCODE_GO" },
+    { "name": "env_key_ai_opencode_go_1", "envVar": "KEY_AI_OPENCODE_GO_1" },
+    { "name": "env_key_ai_opencode_zen", "envVar": "KEY_AI_OPENCODE_ZEN" },
+    { "name": "env_key_ai_opencode_zen_1", "envVar": "KEY_AI_OPENCODE_ZEN_1" },
     { "name": "env_key_ai_openrouter", "envVar": "KEY_AI_OPENROUTER" },
-    { "name": "env_key_ai_zai", "envVar": "KEY_AI_ZAI" },
     { "name": "env_redis_password", "envVar": "REDIS_PASSWORD" }
   ]
 }
