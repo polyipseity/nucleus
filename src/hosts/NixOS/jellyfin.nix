@@ -9,7 +9,10 @@
 # - https://jellyfin.org/docs/general/post-install/networking/reverse-proxy/
 { ... }:
 let
-  jellyfinHttpPort = 8096;
+  # Centralized service registry — single source of truth for network config.
+  servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
+  jellyfinHttpPort = servicesJSON.jellyfin.network.http.port;
+  jellyfinHttpsPort = servicesJSON.jellyfin.network.https.port;
 in
 {
   services.jellyfin = {
@@ -19,7 +22,7 @@ in
   };
 
   nucleus.httpsProxy.virtualHosts.jellyfin = {
-    listenPort = 8920;
+    listenPort = jellyfinHttpsPort;
     upstreamPort = jellyfinHttpPort;
   };
 }
