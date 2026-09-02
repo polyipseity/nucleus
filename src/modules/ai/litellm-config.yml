@@ -136,6 +136,19 @@ model_list:
 
   - model_name: default
     litellm_params:
+      model: openai/xiaomi/mimo-v2.5
+      api_base: https://api.cline.bot/api/v1
+      api_key: os.environ/KEY_AI_CLINE
+      order: 2
+      tpm: 128000
+      rpm: 30
+      reasoning_effort: high
+      model_info:
+        max_input_tokens: 128000
+        max_output_tokens: 16384
+
+  - model_name: default
+    litellm_params:
       model: openai/deepseek/deepseek-v4-flash
       api_base: https://api.commandcode.ai/provider/v1
       api_key: os.environ/KEY_AI_COMMAND_CODE
