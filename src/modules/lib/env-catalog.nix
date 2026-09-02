@@ -216,6 +216,20 @@ let
       why = "Point CLI clients at LiteLLM proxy (127.0.0.1:4000) on all OSes instead of Ollama directly.";
     };
 
+    # ── Redis (LiteLLM coordination + response cache) ──────────────
+    REDIS_HOST = {
+      values = {
+        default = "127.0.0.1";
+      };
+      why = "LiteLLM Redis coordination + response cache endpoint. Shared across all hosts (localhost-only).";
+    };
+    REDIS_PORT = {
+      values = {
+        default = "6379";
+      };
+      why = "LiteLLM Redis coordination + response cache endpoint. Shared across all hosts.";
+    };
+
     # Ollama runtime tunables (all hosts).
     # Set on all OSes for consistent inference behaviour.
     OLLAMA_FLASH_ATTENTION = {
