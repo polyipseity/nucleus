@@ -14,6 +14,8 @@ let
   litellmDirs = services.litellm.logging.dirs;
   ollamaDirs = services.ollama.logging.dirs;
   watchdogDirs = services.service-watchdog.logging.dirs;
+  redisDirs = services.redis.logging.dirs;
+  camillaHeartbeatDirs = services."camilladsp-heartbeat".logging.dirs;
 
   # Verify runAsUser fields.
   camillaRunAsUser = services.camilladsp.hosts.MacBook.runAsUser;
@@ -60,6 +62,14 @@ let
     watchdogDirs.system == [ "service-watchdog" ]
   ) "service-watchdog: dirs.system=[service-watchdog]";
 
+  test_redis_dirs = assert' (
+    redisDirs.system == [ "redis" ] && redisDirs.user == [ ]
+  ) "redis: dirs.system=[redis] dirs.user=[]";
+
+  test_camilladsp_heartbeat_dirs = assert' (
+    camillaHeartbeatDirs.system == [ "camilladsp" ] && camillaHeartbeatDirs.user == [ ]
+  ) "camilladsp-heartbeat: dirs.system=[camilladsp] dirs.user=[]";
+
   test_camilladsp_runAsUser = assert' camillaRunAsUser "camilladsp: runAsUser=true";
   test_camillagui_runAsUser = assert' camillaGuiRunAsUser "camillagui-backend: runAsUser=true";
   test_caddy_runAsUser = assert' caddyRunAsUser "caddy: runAsUser=true";
@@ -84,6 +94,8 @@ in
     test_litellm_dirs
     test_ollama_dirs
     test_watchdog_dirs
+    test_redis_dirs
+    test_camilladsp_heartbeat_dirs
     test_camilladsp_runAsUser
     test_camillagui_runAsUser
     test_caddy_runAsUser
