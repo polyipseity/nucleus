@@ -28,7 +28,12 @@ let
   redisCfg = servicesJSON.redis.network.default;
   catalog = import ../../modules/env-catalog.nix;
   envLib = import ../../modules/lib/env-catalog.nix {
-    inherit config pkgs lib username;
+    inherit
+      config
+      pkgs
+      lib
+      username
+      ;
     hostName = "NixOS";
   };
   keyArgs = envLib.mkKeyArgs { inherit config catalog; };
@@ -45,7 +50,10 @@ in
   systemd.services.litellm = {
     description = "LiteLLM AI Gateway Proxy";
     wantedBy = [ "multi-user.target" ];
-    after = [ "network.target" "nucleus-redis.service" ];
+    after = [
+      "network.target"
+      "nucleus-redis.service"
+    ];
     wants = [ "nucleus-redis.service" ];
     path = [ pkgs.litellm ];
     serviceConfig = {
@@ -114,7 +122,10 @@ in
     bind = redisCfg.host;
     port = redisCfg.port;
     # Password from SOPS — same pipeline as API keys.
-    passwordFile = config.sops.secrets.env_redis_password.path;
+    # nixpkgs renamed passwordFile → masterAuthFile for the multi-server
+    # redis module; keep in sync with the MacBook launchd redis invocation
+    # (which passes --requirepass from the same SOPS secret).
+    masterAuthFile = config.sops.secrets.env_redis_password.path;
     # Eviction: volatile-lru for safe multi-tenant operation.
     settings = {
       maxmemory-policy = "volatile-lru";
@@ -142,9 +153,9 @@ in
   # Guard: if the env catalog declares AI keys but the resolved keyArgs is
   # empty, the LiteLLM service would start with no API-key pairs and every
   # `default` request fails with "Missing credentials". This happens when the
-    # catalog (src/modules/env-catalog.nix) is out of sync with sops.secrets
-    # (e.g. a key was added to the catalog but not to system.yml). Fail fast
-    # with a clear message naming the missing secret.
+  # catalog (src/modules/env-catalog.nix) is out of sync with sops.secrets
+  # (e.g. a key was added to the catalog but not to system.yml). Fail fast
+  # with a clear message naming the missing secret.
   assertions = [
     {
       assertion =
