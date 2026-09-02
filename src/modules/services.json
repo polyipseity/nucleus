@@ -423,8 +423,8 @@
     },
     "hosts": {
       "MacBook": {
-        "justification": "No Redis server on macOS — litellm connects to NixOS Redis via tailnet.",
-        "type": "omitted",
+        "service": "local.redis",
+        "type": "launchctl",
         "platform": "macOS"
       },
       "NixOS": {
@@ -434,8 +434,8 @@
         "platform": "NixOS"
       },
       "Windows": {
-        "justification": "No Redis server on Windows — litellm connects to NixOS Redis via tailnet.",
-        "type": "omitted",
+        "service": "nucleus-redis",
+        "type": "native",
         "platform": "Windows"
       }
     }
