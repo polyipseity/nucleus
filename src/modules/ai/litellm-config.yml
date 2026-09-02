@@ -150,7 +150,7 @@ model_list:
 
   - model_name: default
     litellm_params:
-      model: openai/xiaomi/mimo-v2.5
+      model: openai/cline-pass/mimo-v2.5
       api_base: https://api.cline.bot/api/v1
       api_key: os.environ/KEY_AI_CLINE
       order: 2
