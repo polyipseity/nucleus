@@ -13,4 +13,7 @@ foreach ($spec in $keySpecs) {
   }
 }
 [System.Environment]::SetEnvironmentVariable('LITELLM_LOG', $LITELLM_LOG, 'Process')
+# Redis env vars for LiteLLM coordination + response cache.
+[System.Environment]::SetEnvironmentVariable('REDIS_HOST', '__REDIS_HOST__', 'Process')
+[System.Environment]::SetEnvironmentVariable('REDIS_PORT', '__REDIS_PORT__', 'Process')
 & '__LITELLM_BIN__' --config '__CONFIG_LINK__' --port __PORT__ --host '__HOST__' --drop_params *>> '__LOGFILE__'

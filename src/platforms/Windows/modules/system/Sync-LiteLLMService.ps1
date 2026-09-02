@@ -128,13 +128,19 @@ function Sync-LiteLLMService {
   $wrapperScript = Join-Path -Path $programDataDir -ChildPath "run-litellm.ps1"
   $wrapperContent = Get-Content -Raw (Join-Path -Path $PSScriptRoot -ChildPath "..\scripts\LiteLLM-run.ps1")
   $keySpecsJson = $keySpecs | ConvertTo-Json -Compress
+  # Redis env vars for LiteLLM coordination + response cache.
+  # REDIS_PASSWORD is already exported by the KEYFILE:ENVVAR loop in the wrapper.
+  $redisHost = '127.0.0.1'
+  $redisPort = '6379'
   $wrapperContent = $wrapperContent `
     -replace '__LITELLM_BIN__', $litellmBin `
     -replace '__CONFIG_LINK__', $configLink `
     -replace '__LOGFILE__', $logFile `
     -replace '__HOST__', $($litellmEndpoint.host) `
     -replace '__PORT__', $($litellmEndpoint.port) `
-    -replace "'__KEY_SPECS__'", $keySpecsJson
+    -replace "'__KEY_SPECS__'", $keySpecsJson `
+    -replace "'__REDIS_HOST__'", $redisHost `
+    -replace "'__REDIS_PORT__'", $redisPort
   [System.IO.File]::WriteAllText($wrapperScript, $wrapperContent, [System.Text.UTF8Encoding]::new($false))
 
   # check-suppress:suppression_doc: probe whether service already exists; Get-Service throws when absent.
