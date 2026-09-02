@@ -103,7 +103,9 @@
     "logging": {
       "capture": "all",
       "dirs": {
-        "system": [ "camilladsp" ],
+        "system": [
+          "camilladsp"
+        ],
         "user": []
       }
     },
@@ -431,7 +433,9 @@
     "logging": {
       "capture": "all",
       "dirs": {
-        "system": [ "redis" ],
+        "system": [
+          "redis"
+        ],
         "user": []
       }
     },
