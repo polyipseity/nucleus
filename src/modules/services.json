@@ -104,7 +104,7 @@
       "capture": "all",
       "dirs": {
         "system": [
-          "camilladsp"
+          "camilladsp-heartbeat"
         ],
         "user": []
       }
