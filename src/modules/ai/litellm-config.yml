@@ -3,8 +3,20 @@
 #
 # AI gateway on 127.0.0.1:4000 routing to:
 #   - Local Ollama daemon (127.0.0.1:11434) for offline models
-#   - A single generic `default` model backed by remote providers, selected
-#     by `order` tier (primary → paid → fallback).  API keys from SOPS secrets.
+#   - A single generic `default` model backed by remote providers, using
+#     usage-based routing v2 with order-based failover.  API keys from
+#     SOPS secrets.
+#
+# Routing: usage-based-routing-v2 selects the endpoint with the lowest
+# utilization ratio relative to its tpm/rpm ceiling within each order
+# tier.  On failure, the v2 cooldown mechanism excludes the failed
+# endpoint and re-picks from remaining healthy ones.  After exhausting
+# retries within a tier, the next order tier is tried (tier 1 → 2 → 3).
+#
+# Redis: required for utilization tracking, cooldown state, prompt-cache
+# affinity, and response caching.  REDIS_HOST/REDIS_PORT are non-secret
+# env vars from the env-catalog.nix registry.  REDIS_PASSWORD is a SOPS
+# secret via the KEYFILE:ENVVAR pipeline.
 #
 # Env var lifecycle
 # ────────────────
@@ -32,6 +44,17 @@
 litellm_settings:
   # Drop unsupported client params (e.g. max_tokens) per-endpoint.
   drop_params: true
+  # Redis-backed response cache.  Also required for prompt-cache affinity
+  # and usage-based routing state coordination.
+  cache: true
+  cache_params:
+    type: redis
+    host: os.environ/REDIS_HOST
+    port: os.environ/REDIS_PORT
+    password: os.environ/REDIS_PASSWORD
+    # Namespace prefix for all LiteLLM Redis keys.  Prevents collisions
+    # with other services sharing the same Redis instance.
+    namespace: "litellm"
 
 # WARNING suppresses per-request INFO chatter while still capturing
 # errors, warnings, and startup diagnostics.
@@ -40,19 +63,31 @@ general_settings:
     LITELLM_LOG: WARNING
 
 router_settings:
-  # Enables pre-flight checks (cooldown status, context limits); mandatory for `order` prioritization.
+  # Pre-flight checks: cooldown status, context limits, prompt-cache
+  # affinity.  Mandatory for `order` prioritization.
   enable_pre_call_checks: true
-  # Selection algorithm for endpoints within the same order tier (random healthy pick).
-  routing_strategy: simple-shuffle
-  # Total request-level retry budget across all endpoints and priority tiers combined.
-  num_retries: 7
-  # Delay (in seconds) to wait before executing the next retry attempt.
+  # Prompt-cache stickiness: routes requests with cached context
+  # prefixes to the endpoint that holds the warm cache entry,
+  # bypassing load balancing.
+  optional_pre_call_checks:
+    - prompt_caching
+  # Selects the endpoint with the lowest utilization ratio relative
+  # to its tpm/rpm ceiling within each order tier.
+  routing_strategy: usage-based-routing-v2
+  # Redis — shared state for utilization tracking, cooldowns, and
+  # prompt-cache affinity mappings.
+  redis_host: os.environ/REDIS_HOST
+  redis_port: os.environ/REDIS_PORT
+  redis_password: os.environ/REDIS_PASSWORD
+  # Request-level retry budget across all order tiers.
+  num_retries: 3
+  # Minimum delay (seconds) between retry attempts.
   retry_after: 2
-  # Cumulative failure threshold per endpoint required to bench it into temporary cooldown.
-  allowed_fails: 3
-  # Duration (in seconds) a benched endpoint is excluded from routing before resetting.
+  # Failures per endpoint before temporary cooldown.
+  allowed_fails: 2
+  # Cooldown duration (seconds).
   cooldown_time: 300
-  # Per-request HTTP timeout (in seconds) before marking an attempt as failed.
+  # Per-request HTTP timeout (seconds).
   timeout: 30
 
 model_list:
@@ -82,44 +117,56 @@ model_list:
         max_output_tokens: 16384
 
   # ---- Default model (generic, remote-backed) ----
-  # Single public `default` model.  `order` tiers primary → paid → fallback.
-  # Highest thinking via reasoning_effort: high (drop_params drops it on any
-  # upstream that rejects it).  Public name never exposes the upstream model.
+  # Usage-based routing v2: picks the endpoint with lowest utilization
+  # within each order tier.  Order provides failover: tier 1 → 2 → 3.
+  # tpm/rpm ceilings drive the utilization ratio.
+
   - model_name: default
     litellm_params:
       model: openai/mimo-v2.5-free
       api_base: https://opencode.ai/zen/v1
       api_key: os.environ/KEY_AI_OPENCODE_ZEN_1
       order: 1
+      tpm: 128000
+      rpm: 30
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
         max_output_tokens: 16384
+
   - model_name: default
     litellm_params:
       model: openai/deepseek/deepseek-v4-flash
       api_base: https://api.commandcode.ai/provider/v1
       api_key: os.environ/KEY_AI_COMMAND_CODE
       order: 2
+      tpm: 128000
+      rpm: 30
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
         max_output_tokens: 16384
+
   - model_name: default
     litellm_params:
       model: openai/mimo-v2.5
       api_base: https://opencode.ai/zen/go/v1
       api_key: os.environ/KEY_AI_OPENCODE_GO_1
-      order: 3
+      order: 2
+      tpm: 128000
+      rpm: 30
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
         max_output_tokens: 16384
+
   - model_name: default
     litellm_params:
       model: openrouter/xiaomi/mimo-v2.5
       api_key: os.environ/KEY_AI_OPENROUTER
-      order: 4
+      order: 3
+      tpm: 128000
+      rpm: 30
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
