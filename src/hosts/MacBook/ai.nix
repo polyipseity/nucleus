@@ -21,7 +21,12 @@ let
   litellmConfig = "${userHome}/Library/Application Support/nucleus/litellm-config.yml";
   catalog = import ../../modules/env-catalog.nix;
   envLib = import ../../modules/lib/env-catalog.nix {
-    inherit config pkgs lib username;
+    inherit
+      config
+      pkgs
+      lib
+      username
+      ;
     hostName = "MacBook";
   };
   keyArgs = envLib.mkKeyArgs { inherit config catalog; };
@@ -62,8 +67,37 @@ let
     runtimeInputs = [ pkgs.litellm ];
     scriptName = "src/scripts/services/litellm-daemon";
   };
+
+  # Centralized service registry — single source of truth for network config.
+  servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
+  redisCfg = servicesJSON.redis.network.default;
 in
 {
+  # Local Redis instance for LiteLLM coordination (utilization tracking,
+  # cooldowns, prompt-cache affinity) and response caching. Runs on loopback
+  # only, password-protected via the SOPS `env_redis_password` secret (same
+  # pipeline as the NixOS nucleus-redis server). nix-darwin has no
+  # services.redis module, so we run redis-server directly via launchd.
+  launchd.daemons."redis" = {
+    serviceConfig = {
+      # Explicit label to match services.json (which expects local.redis).
+      Label = "local.redis";
+      # macOS 26+ SIP blocks unsigned Nix store binaries for system daemons
+      # with non-root UserName (EX_CONFIG 78). /bin/sh is Apple-signed and
+      # ref: macos-service-hardening.instructions.md -- SIP /bin/sh wrapper
+      ProgramArguments = [
+        "/bin/sh"
+        "-c"
+        "exec ${pkgs.redis}/bin/redis-server --bind ${redisCfg.host} --port ${toString redisCfg.port} --requirepass \"$(cat ${config.sops.secrets.env_redis_password.path})\" --maxmemory-policy volatile-lru --save '' --appendonly no"
+      ];
+      KeepAlive = true;
+      RunAtLoad = true;
+      UserName = username;
+      StandardOutPath = "${config.nucleus.logging.systemLogDir}/redis/stdout.log";
+      StandardErrorPath = "${config.nucleus.logging.systemLogDir}/redis/stderr.log";
+    };
+  };
+
   # Keys without a dot become `local.<key>` in launchd; keys with a dot become
   # `org.nixos.<key>`. Keep keys dot-free so the generated label matches
   # `services.json` (which expects `local.litellm`/`local.ollama`).
@@ -85,7 +119,15 @@ in
       KeepAlive = true;
       RunAtLoad = true;
       UserName = username;
-      EnvironmentVariables = litellmEnv;
+      # launchd has no native ordering primitive, so the litellm daemon waits
+      # for the local Redis server to accept connections before starting
+      # (opt-in via LITELLM_REDIS_POLL_TICKS; set here to match the keyfile
+      # poll timeout so boot-time races with local.redis are covered).
+      EnvironmentVariables = litellmEnv // {
+        LITELLM_REDIS_POLL_TICKS = "60";
+        LITELLM_REDIS_HOST = redisCfg.host;
+        LITELLM_REDIS_PORT = toString redisCfg.port;
+      };
       StandardOutPath = "${config.nucleus.logging.systemLogDir}/litellm/stdout.log";
       StandardErrorPath = "${config.nucleus.logging.systemLogDir}/litellm/stderr.log";
     };

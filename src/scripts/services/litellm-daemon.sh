@@ -62,6 +62,31 @@ for _spec in "$@"; do
   fi
 done
 
+# Opt-in Redis readiness gate. launchd has no native ordering primitive, so
+# when LITELLM_REDIS_POLL_TICKS is set we wait for the local Redis server to
+# accept a TCP connection before starting litellm. This covers the boot-time
+# race between local.redis and local.litellm on macOS (systemd on NixOS orders
+# via After=/Wants= instead). The gate is a no-op when the var is unset.
+_redis_ticks="${LITELLM_REDIS_POLL_TICKS:-0}"
+if [ "${_redis_ticks}" -gt 0 ]; then
+  _redis_host="${LITELLM_REDIS_HOST:-127.0.0.1}"
+  _redis_port="${LITELLM_REDIS_PORT:-6379}"
+  _redis_up=0
+  while [ "$_redis_ticks" -gt 0 ] && [ "$_redis_up" -eq 0 ]; do
+    if (exec 3<>"/dev/tcp/${_redis_host}/${_redis_port}") 2>/dev/null; then
+      _redis_up=1
+      exec 3>&- 3<&-
+    else
+      warn "waiting for Redis at ${_redis_host}:${_redis_port} ..."
+      sleep 5
+      _redis_ticks=$((_redis_ticks - 1))
+    fi
+  done
+  if [ "$_redis_up" -eq 0 ]; then
+    warn "WARNING Redis not reachable at ${_redis_host}:${_redis_port} after timeout, starting litellm anyway (it will reconnect)"
+  fi
+fi
+
 exec litellm \
   --config "$config" \
   --port 4000 \
