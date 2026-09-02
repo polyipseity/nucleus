@@ -412,7 +412,7 @@
     }
   },
   "redis": {
-    "description": "In-memory data store for LiteLLM coordination and caching",
+    "description": "Local loopback in-memory data store (Redis) for cross-service coordination and caching",
     "displayName": "Redis",
     "network": {
       "default": {
