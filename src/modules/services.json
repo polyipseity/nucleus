@@ -421,6 +421,13 @@
         "protocol": "tcp"
       }
     },
+    "logging": {
+      "capture": "all",
+      "dirs": {
+        "system": [ "redis" ],
+        "user": []
+      }
+    },
     "hosts": {
       "MacBook": {
         "service": "local.redis",
