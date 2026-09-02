@@ -129,9 +129,13 @@ function Sync-LiteLLMService {
   $wrapperContent = Get-Content -Raw (Join-Path -Path $PSScriptRoot -ChildPath "..\scripts\LiteLLM-run.ps1")
   $keySpecsJson = $keySpecs | ConvertTo-Json -Compress
   # Redis env vars for LiteLLM coordination + response cache.
-  # REDIS_PASSWORD is already exported by the KEYFILE:ENVVAR loop in the wrapper.
-  $redisHost = '127.0.0.1'
-  $redisPort = '6379'
+  $redisConfig = & {
+    # check-suppress:suppression_doc: probe -- services.json may not exist yet; $null check handles absence.
+    $svc = Get-Content -Raw (Join-Path $RepoRoot 'src/modules/services.json') -ErrorAction SilentlyContinue | ConvertFrom-Json
+    if ($svc.redis.network.default) { $svc.redis.network.default } else { @{ host = '127.0.0.1'; port = 6379 } }
+  }
+  $redisHost = $redisConfig.host
+  $redisPort = [string]$redisConfig.port
   $wrapperContent = $wrapperContent `
     -replace '__LITELLM_BIN__', $litellmBin `
     -replace '__CONFIG_LINK__', $configLink `
