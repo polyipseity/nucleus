@@ -11,17 +11,19 @@ let
   lib = import <nixpkgs/lib>;
 
   aiNix = builtins.readFile ../../../src/hosts/MacBook/ai.nix;
+  redisNix = builtins.readFile ../../../src/modules/redis.nix;
   daemonSh = builtins.readFile ../../../src/scripts/services/litellm-daemon.sh;
   servicesJson = builtins.fromJSON (builtins.readFile ../../../src/modules/services.json);
   redisHost = servicesJson.redis.network.default.host;
   redisPort = servicesJson.redis.network.default.port;
 
-  redisBlock = lib.head (lib.splitString "launchd.daemons.\"litellm\"" aiNix);
+  # The redis launchd daemon is owned by the shared redis.nix module.
+  redisBlock = redisNix;
 in
 
 # === launchd.daemons."redis" present ===
 
-assert lib.hasInfix "launchd.daemons.\"redis\"" aiNix;
+assert lib.hasInfix "launchd.daemons.\"redis\"" redisNix;
 assert lib.hasInfix "Label = \"local.redis\";" redisBlock;
 
 # === binds loopback + requires SOPS password ===
