@@ -26,11 +26,12 @@ let
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   ollamaCfg = servicesJSON.ollama.network.default;
   redisCfg = servicesJSON.redis.network.default;
-    # Data-driven key args: read env catalog to build KEYFILE:ENVVAR pairs.
-    # The catalog is emitted as a Nix expression by ensure_env_catalog so it is
-    # importable under pure evaluation (an absolute user-path JSON is not).
-    catalog = import ../../modules/ai/env-catalog.generated.nix;
-  keyArgs = map (entry: "${config.sops.secrets.${entry.name}.path}:${entry.envVar}") catalog.keys;
+  catalog = import ../../modules/env-catalog.nix;
+  envLib = import ../../modules/lib/env-catalog.nix {
+    inherit config pkgs lib username;
+    hostName = "NixOS";
+  };
+  keyArgs = envLib.mkKeyArgs { inherit config catalog; };
 in
 {
   # LiteLLM AI gateway — systemd service on 127.0.0.1:4000.
@@ -149,7 +150,7 @@ in
       assertion =
         (builtins.length catalog.keys == 0) || (builtins.length keyArgs == builtins.length catalog.keys);
       message =
-        "litellm: env catalog declares ${toString (builtins.length catalog.keys)} AI key(s) but only ${toString (builtins.length keyArgs)} KEYFILE:ENVVAR pair(s) resolved. Run nucleus-apply to regenerate src/modules/ai/env-catalog.generated.nix from the decrypted secrets. Missing: "
+        "litellm: env catalog declares ${toString (builtins.length catalog.keys)} secret(s) but only ${toString (builtins.length keyArgs)} KEYFILE:ENVVAR pair(s) resolved.  Check src/modules/env-catalog.nix and sops.secrets. Missing: "
         + lib.concatStringsSep ", " (
           map (e: e.name) (builtins.filter (e: !(config.sops.secrets ? ${e.name})) catalog.keys)
         );
