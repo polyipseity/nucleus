@@ -1,0 +1,39 @@
+# Static secret-to-env-var catalog.  Every entry maps a SOPS secret name
+# (from src/secrets/system.yml) to the environment variable it should be
+# exported as.  Add new secrets here when they are added to system.yml.
+{
+  keys = [
+    {
+      name = "env_key_ai_cline";
+      envVar = "KEY_AI_CLINE";
+    }
+    {
+      name = "env_key_ai_command_code";
+      envVar = "KEY_AI_COMMAND_CODE";
+    }
+    {
+      name = "env_key_ai_opencode_go";
+      envVar = "KEY_AI_OPENCODE_GO";
+    }
+    {
+      name = "env_key_ai_opencode_go_1";
+      envVar = "KEY_AI_OPENCODE_GO_1";
+    }
+    {
+      name = "env_key_ai_opencode_zen";
+      envVar = "KEY_AI_OPENCODE_ZEN";
+    }
+    {
+      name = "env_key_ai_opencode_zen_1";
+      envVar = "KEY_AI_OPENCODE_ZEN_1";
+    }
+    {
+      name = "env_key_ai_openrouter";
+      envVar = "KEY_AI_OPENROUTER";
+    }
+    {
+      name = "env_redis_password";
+      envVar = "REDIS_PASSWORD";
+    }
+  ];
+}
