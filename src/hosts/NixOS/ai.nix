@@ -40,7 +40,8 @@ in
   systemd.services.litellm = {
     description = "LiteLLM AI Gateway Proxy";
     wantedBy = [ "multi-user.target" ];
-    after = [ "network.target" ];
+    after = [ "network.target" "nucleus-redis.service" ];
+    wants = [ "nucleus-redis.service" ];
     path = [ pkgs.litellm ];
     serviceConfig = {
       Type = "simple";
@@ -98,6 +99,21 @@ in
         OLLAMA_CONTEXT_LENGTH = resolveValue' "OLLAMA_CONTEXT_LENGTH";
         OLLAMA_KV_CACHE_TYPE = resolveValue' "OLLAMA_KV_CACHE_TYPE";
       };
+  };
+
+  # System-wide Redis instance for LiteLLM coordination (utilization
+  # tracking, cooldowns, prompt-cache affinity) and response caching.
+  # Runs on localhost only; password-protected via SOPS secret.
+  services.redis.servers.nucleus = {
+    enable = true;
+    bind = "127.0.0.1";
+    port = 6379;
+    # Password from SOPS — same pipeline as API keys.
+    passwordFile = config.sops.secrets.env_redis_password.path;
+    # Eviction: volatile-lru for safe multi-tenant operation.
+    settings = {
+      maxmemory-policy = "volatile-lru";
+    };
   };
 
   # Cap the Ollama systemd service at 16 GB RSS so an oversized model pull
