@@ -27,6 +27,7 @@
     ./camilladsp.nix
     ./camillagui-backend.nix
     ../../modules/camillagui-backend.nix
+    ../../modules/redis.nix
     ./defaults.nix
     ./filesystem-scope.nix
     ./homebrew.nix

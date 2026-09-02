@@ -25,7 +25,6 @@ let
   # Centralized service registry — single source of truth for network config.
   servicesJSON = builtins.fromJSON (builtins.readFile ../../modules/services.json);
   ollamaCfg = servicesJSON.ollama.network.default;
-  redisCfg = servicesJSON.redis.network.default;
   catalog = import ../../modules/env-catalog.nix;
   envLib = import ../../modules/lib/env-catalog.nix {
     inherit
@@ -114,23 +113,10 @@ in
       };
   };
 
-  # System-wide Redis instance for LiteLLM coordination (utilization
-  # tracking, cooldowns, prompt-cache affinity) and response caching.
-  # Runs on localhost only; password-protected via SOPS secret.
-  services.redis.servers.nucleus = {
-    enable = true;
-    bind = redisCfg.host;
-    port = redisCfg.port;
-    # Password from SOPS — same pipeline as API keys.
-    # nixpkgs renamed passwordFile → masterAuthFile for the multi-server
-    # redis module; keep in sync with the MacBook launchd redis invocation
-    # (which passes --requirepass from the same SOPS secret).
-    masterAuthFile = config.sops.secrets.env_redis_password.path;
-    # Eviction: volatile-lru for safe multi-tenant operation.
-    settings = {
-      maxmemory-policy = "volatile-lru";
-    };
-  };
+  # System-wide Redis instance for LiteLLM coordination and response caching is
+  # provided by the shared src/modules/redis.nix module
+  # (services.redis.servers.nucleus). The LiteLLM service above orders after
+  # nucleus-redis.service, which that module defines.
 
   # Cap the Ollama systemd service at 16 GB RSS so an oversized model pull
   # or runaway inference session cannot exhaust RAM and cause OOM kills of

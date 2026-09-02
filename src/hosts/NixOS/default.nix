@@ -18,6 +18,7 @@
     ./camilladsp.nix
     ./camillagui-backend.nix
     ../../modules/camillagui-backend.nix
+    ../../modules/redis.nix
     ./desktop.nix
     ./filesystems.nix
     ./hardware/cpu.nix
