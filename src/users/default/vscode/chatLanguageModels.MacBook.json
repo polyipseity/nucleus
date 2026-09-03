@@ -5,7 +5,7 @@
       {
         "id": "ollama_chat/devstral-small-2:24b",
         "maxInputTokens": 32768,
-        "maxOutputTokens": 16384,
+        "maxOutputTokens": 16000,
         "name": "Devstral Small 2 24B",
         "toolCalling": true,
         "url": "http://127.0.0.1:4000/v1",
@@ -14,7 +14,7 @@
       {
         "id": "ollama_chat/qwen2.5:1.5b",
         "maxInputTokens": 32768,
-        "maxOutputTokens": 16384,
+        "maxOutputTokens": 16000,
         "name": "Qwen 2.5 1.5B",
         "toolCalling": false,
         "url": "http://127.0.0.1:4000/v1",
@@ -23,7 +23,7 @@
       {
         "id": "default",
         "maxInputTokens": 128000,
-        "maxOutputTokens": 16384,
+        "maxOutputTokens": 16000,
         "name": "LiteLLM Default",
         "toolCalling": true,
         "url": "http://127.0.0.1:4000/v1",
