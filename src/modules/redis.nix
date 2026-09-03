@@ -6,10 +6,17 @@
 # Windows provisions the equivalent native SCM service via
 # src/platforms/Windows/modules/system/Sync-RedisService.ps1.
 #
+# Authentication uses Redis ACL files (runtime-generated from decrypted SOPS
+# secrets, not in the Nix store). Two users are defined:
+#   - default: admin user, full access (password from env_redis_password)
+#   - litellm: scoped user for the LiteLLM proxy (password from
+#     env_redis_user_litellm_password), with key/channel access limited to
+#     ~litellm:* / &litellm:* and all commands except @admin.
+#
 # The endpoint (host/port) comes from the centralized service registry
-# (src/modules/services.json). The password comes from the SOPS
-# env_redis_password secret, exposed to consumers as REDIS_PASSWORD by the
-# shared env catalog (src/modules/env-catalog.nix).
+# (src/modules/services.json). Passwords are exposed to consumers as
+# REDIS_PASSWORD and REDIS_USER_LITELLM_PASSWORD by the shared env catalog
+# (src/modules/env-catalog.nix).
 {
   config,
   lib,
@@ -48,7 +55,21 @@ in
           ProgramArguments = [
             "/bin/sh"
             "-c"
-            "exec ${pkgs.redis}/bin/redis-server --bind ${redisCfg.host} --port ${toString redisCfg.port} --requirepass \"$(cat ${config.sops.secrets.env_redis_password.path})\" --maxmemory-policy volatile-lru --save '' --appendonly no"
+            ''
+              _acl_dir="/Library/Application Support/nucleus/redis"
+              mkdir -p "$_acl_dir"
+              _acl_file="$_acl_dir/users.acl"
+              _default_pw=$(cat ${config.sops.secrets.env_redis_password.path})
+              _litellm_pw=$(cat ${config.sops.secrets.env_redis_user_litellm_password.path})
+              cat > "$_acl_file" <<ACL_EOF
+              # Managed by nucleus. Do not edit by hand.
+              # Generated from SOPS secrets at service-start time.
+              user default on >$_default_pw ~* &* +@all
+              user litellm on >$_litellm_pw ~litellm:* &litellm:* +@all -@admin
+              ACL_EOF
+              chmod 0640 "$_acl_file"
+              exec ${pkgs.redis}/bin/redis-server --bind ${redisCfg.host} --port ${toString redisCfg.port} --aclfile "$_acl_file" --maxmemory-policy volatile-lru --save "" --appendonly no
+            ''
           ];
           KeepAlive = true;
           RunAtLoad = true;
@@ -65,16 +86,26 @@ in
         enable = true;
         bind = redisCfg.host;
         port = redisCfg.port;
-        # Password from SOPS — same pipeline as API keys.
-        # nixpkgs renamed passwordFile → masterAuthFile for the multi-server
-        # redis module; keep in sync with the MacBook launchd redis invocation
-        # (which passes --requirepass from the same SOPS secret).
-        masterAuthFile = config.sops.secrets.env_redis_password.path;
         # Eviction: volatile-lru for safe multi-tenant operation.
         settings = {
           maxmemory-policy = "volatile-lru";
+          aclfile = "/var/lib/redis-nucleus/users.acl";
         };
       };
+      # Generate ACL file at service-start from decrypted SOPS secrets.
+      # The redis module creates StateDirectory=redis-nucleus (/var/lib/redis-nucleus)
+      # owned by the service user; preStart runs as that user before redis-server.
+      systemd.services.redis-nucleus.preStart = lib.mkAfter ''
+        _default_pw=$(cat ${config.sops.secrets.env_redis_password.path})
+        _litellm_pw=$(cat ${config.sops.secrets.env_redis_user_litellm_password.path})
+        cat > /var/lib/redis-nucleus/users.acl <<ACL_EOF
+        # Managed by nucleus. Do not edit by hand.
+        # Generated from SOPS secrets at service-start time.
+        user default on >$_default_pw ~* &* +@all
+        user litellm on >$_litellm_pw ~litellm:* &litellm:* +@all -@admin
+        ACL_EOF
+        chmod 0640 /var/lib/redis-nucleus/users.acl
+      '';
     })
   ];
 }
