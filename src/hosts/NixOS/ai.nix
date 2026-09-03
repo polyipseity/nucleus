@@ -3,7 +3,7 @@
 # Provides:
 #   • Ollama — local LLM inference server on 127.0.0.1:11434
 #   • LiteLLM — AI gateway proxy on 127.0.0.1:4000 that routes client requests
-#     to Ollama and OpenRouter.
+#     to multiple remote providers with order-based failover.
 #
 # The Home Manager module modules/ai/default.nix provides the ollama CLI binary,
 # OLLAMA_HOST session variable, and the oterm client on all POSIX hosts
@@ -40,9 +40,10 @@ in
 {
   # LiteLLM AI gateway — systemd service on 127.0.0.1:4000.
   # Since nixpkgs has no services.litellm module yet, we define the service
-  # manually.  ExecStart uses a shell wrapper that reads the SOPS-decrypted
-  # OpenRouter key and exports it before launching LiteLLM — systemd's
-  # EnvironmentFile expects KEY=VALUE format, but sops-nix writes the raw value.
+  # manually.  ExecStart uses a shell wrapper that reads SOPS-decrypted API key
+  # files and exports them as environment variables before launching LiteLLM —
+  # systemd's EnvironmentFile expects KEY=VALUE format, but sops-nix writes the
+  # raw value.
   # systemd captures service stdout/stderr to journald by default; access
   # logs with: journalctl -u litellm.  The log level is set to WARNING by
   # general_settings.environment_variables.LITELLM_LOG in the shared config.
