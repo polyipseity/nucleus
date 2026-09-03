@@ -8,9 +8,10 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # Arguments: replica_id
 replica_id="${1:?replica id required}"
 
-NUCLEUS_REPO_ROOT="${NUCLEUS_REPO_ROOT:?NUCLEUS_REPO_ROOT not set — set in launchd/service environment}"
+REPO_ROOT="${NUCLEUS_REPO_ROOT:-$(derive_repo_root)}"
+export NUCLEUS_REPO_ROOT="$REPO_ROOT"
 
-_cloud_sync_script="$NUCLEUS_REPO_ROOT/scripts/cloud.sh"
+_cloud_sync_script="$REPO_ROOT/scripts/cloud.sh"
 if [ ! -x "$_cloud_sync_script" ]; then
   die -l cloud-drives "cloud sync script not found at $_cloud_sync_script; run nucleus apply to materialize scripts/cloud.sh before scheduled replica syncs run."
 fi
