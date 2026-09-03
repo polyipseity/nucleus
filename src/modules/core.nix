@@ -145,6 +145,15 @@ let
       nixpkgs = "czkawka";
       winget = "qarmin.czkawka.cli";
     };
+    exiftool = {
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "exiftool";
+      };
+      nixpkgs = "perlPackages.ImageExifTool";
+      winget = "ExifTool.ExifTool";
+    };
     cursor = {
       # Single source of truth for Cursor enable/disable across all hosts.
       # `enable` is the per-host provisioning map; every host is explicitly disabled,

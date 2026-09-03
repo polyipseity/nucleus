@@ -503,7 +503,10 @@
           };
           nucleus-utils = nucleusApp {
             name = "utils";
-            runtimeInputs = [ pkgs.ghostscript ];
+            runtimeInputs = [
+              pkgs.ghostscript
+              pkgs.perlPackages.ImageExifTool
+            ];
           };
           nucleus-gc = nucleusApp {
             name = "gc";

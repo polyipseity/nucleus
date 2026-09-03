@@ -46,6 +46,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure ExifTool is installed to provide metadata read/write CLI for cross-host parity with macOS and NixOS
+      settings:
+        id: ExifTool.ExifTool
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: >-
           Ensure HashiCorp Packer is installed for automated VM image building
           (scripts\VM-build.ps1; cross-host parity with pkgs.packer on macOS/NixOS).
