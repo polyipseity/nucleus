@@ -506,6 +506,7 @@
             runtimeInputs = [
               pkgs.ghostscript
               pkgs.perlPackages.ImageExifTool
+              pkgs.python3
             ];
           };
           nucleus-gc = nucleusApp {
