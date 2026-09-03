@@ -106,29 +106,29 @@ router_settings:
 
 model_list:
   # ---- Ollama models ----
-  - model_name: ollama_chat/devstral-small-2:24b
-    litellm_params:
-      model: ollama_chat/devstral-small-2:24b
-      api_base: http://127.0.0.1:11434
-      model_info:
-        max_input_tokens: 32768
-        max_output_tokens: 16384
+  # - model_name: ollama_chat/devstral-small-2:24b
+  #   litellm_params:
+  #     model: ollama_chat/devstral-small-2:24b
+  #     api_base: http://127.0.0.1:11434
+  #     model_info:
+  #       max_input_tokens: 32768
+  #       max_output_tokens: 16384
 
-  - model_name: ollama_chat/qwen2.5:1.5b
-    litellm_params:
-      model: ollama_chat/qwen2.5:1.5b
-      api_base: http://127.0.0.1:11434
-      model_info:
-        max_input_tokens: 32768
-        max_output_tokens: 16384
+  # - model_name: ollama_chat/qwen2.5:1.5b
+  #   litellm_params:
+  #     model: ollama_chat/qwen2.5:1.5b
+  #     api_base: http://127.0.0.1:11434
+  #     model_info:
+  #       max_input_tokens: 32768
+  #       max_output_tokens: 16384
 
-  - model_name: ollama_chat/qwen3:8b
-    litellm_params:
-      model: ollama_chat/qwen3:8b
-      api_base: http://127.0.0.1:11434
-      model_info:
-        max_input_tokens: 32768
-        max_output_tokens: 16384
+  # - model_name: ollama_chat/qwen3:8b
+  #   litellm_params:
+  #     model: ollama_chat/qwen3:8b
+  #     api_base: http://127.0.0.1:11434
+  #     model_info:
+  #       max_input_tokens: 32768
+  #       max_output_tokens: 16384
 
   # ---- Default model (generic, remote-backed) ----
   # Usage-based routing v2: picks the endpoint with lowest utilization
