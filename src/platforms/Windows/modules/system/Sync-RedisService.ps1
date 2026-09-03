@@ -8,10 +8,9 @@
   cross-service coordination and caching.
 
   Redis is installed via WinGet (Redis.Redis) when not already present.
-  The server is configured with requirepass from the SOPS-decrypted
-  env_redis_password secret (materialised by apply.ps1 into
-  %ProgramData%\nucleus\secrets\env_redis_password), matching the POSIX
-  REDIS_PASSWORD pipeline.
+  The server uses Redis ACL files (runtime-generated from decrypted SOPS
+  secrets) with two users: default (admin, full access) and litellm
+  (scoped for the LiteLLM proxy).
 
   On disable the function removes the SCM service.
 
@@ -129,18 +128,38 @@ function Sync-RedisService {
   $null = New-Item -Path $programDataDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
   $null = New-Item -Path $serviceLogDir -ItemType Directory -Force  # check-suppress:suppression_doc: New-Item returns DirectoryInfo, discarded
 
-  # Read the SOPS-decrypted requirepass secret (materialised by apply.ps1).
+  # Read the SOPS-decrypted default user password (materialised by apply.ps1).
   $passwordFile = Join-Path -Path $secretsDir -ChildPath "env_redis_password"
   $requirePass = $null
   if (Test-Path -Path $passwordFile -PathType Leaf) {
     $requirePass = (Get-Content -Path $passwordFile -Raw -Encoding UTF8).Trim()
   }
   if ([string]::IsNullOrWhiteSpace($requirePass)) {
-    throw "Redis requirepass secret not found at $passwordFile; ensure apply.ps1 has materialised system.yml secrets."
+    throw "Redis default user password secret not found at $passwordFile; ensure apply.ps1 has materialised system.yml secrets."
   }
 
-  # Write a redis.conf so the server binds loopback, requires the SOPS
-  # password, and evicts volatile keys LRU (matching the NixOS nucleus-redis
+  # Read the SOPS-decrypted LiteLLM ACL password (materialised by apply.ps1).
+  $litellmPasswordFile = Join-Path -Path $secretsDir -ChildPath "env_redis_user_litellm_password"
+  $litellmPassword = $null
+  if (Test-Path -Path $litellmPasswordFile -PathType Leaf) {
+    $litellmPassword = (Get-Content -Path $litellmPasswordFile -Raw -Encoding UTF8).Trim()
+  }
+  if ([string]::IsNullOrWhiteSpace($litellmPassword)) {
+    throw "Redis LiteLLM ACL secret not found at $litellmPasswordFile; ensure apply.ps1 has materialised system.yml secrets."
+  }
+
+  # Write Redis ACL file with user credentials (generated from SOPS secrets).
+  $redisAcl = Join-Path -Path $programDataDir -ChildPath "users.acl"
+  $aclLines = @(
+    "# Managed by nucleus Sync-RedisService. Do not edit by hand."
+    "# Generated from SOPS secrets at service-start time."
+    "user default on >$requirePass ~* &* +@all"
+    "user litellm on >$litellmPassword ~litellm:* &litellm:* +@all -@admin"
+  )
+  [System.IO.File]::WriteAllText($redisAcl, ($aclLines -join "`n") + "`n", [System.Text.UTF8Encoding]::new($false))
+
+  # Write a redis.conf so the server binds loopback, uses the ACL file for
+  # authentication, and evicts volatile keys LRU (matching the NixOS nucleus-redis
   # server). Using a config file avoids nested-quoting problems in sc.exe
   # binPath and lets source edits take effect on restart.
   $redisConf = Join-Path -Path $programDataDir -ChildPath "redis.conf"
@@ -148,7 +167,7 @@ function Sync-RedisService {
     "# Managed by nucleus Sync-RedisService. Do not edit by hand."
     "bind $redisHost"
     "port $redisPort"
-    "requirepass $requirePass"
+    "aclfile $redisAcl"
     "maxmemory-policy volatile-lru"
     "save ''"
     "appendonly no"
