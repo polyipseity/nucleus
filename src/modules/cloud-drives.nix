@@ -221,7 +221,7 @@ let
         NUCLEUS_RCLONE_REMOTE_NAME = mount.remoteName;
         NUCLEUS_RCLONE_REMOTE = rcloneRemote;
         NUCLEUS_RCLONE_MOUNT_POINT = mountPoint;
-        NUCLEUS_RCLONE_ARGS = lib.escapeShellArgs fullArgsList;
+        NUCLEUS_RCLONE_ARGS = lib.concatStringsSep "\n" fullArgsList;
       };
     };
 

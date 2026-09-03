@@ -9,13 +9,15 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 #   NUCLEUS_RCLONE_REMOTE_NAME  — rclone remote name (used for existence check)
 #   NUCLEUS_RCLONE_REMOTE       — full remote path (e.g. "gdrive:backups")
 #   NUCLEUS_RCLONE_MOUNT_POINT  — local mount point directory
-#   NUCLEUS_RCLONE_ARGS         — additional rclone flags (space-separated)
+#   NUCLEUS_RCLONE_ARGS         — additional rclone flags (newline-separated)
 remote_name="${NUCLEUS_RCLONE_REMOTE_NAME:?NUCLEUS_RCLONE_REMOTE_NAME required}"
 remote="${NUCLEUS_RCLONE_REMOTE:?NUCLEUS_RCLONE_REMOTE required}"
 mount_point="${NUCLEUS_RCLONE_MOUNT_POINT:?NUCLEUS_RCLONE_MOUNT_POINT required}"
 
-# shellcheck disable=SC2206 # reason: word splitting intentional — space-separated args string → array
-extra_args=(${NUCLEUS_RCLONE_ARGS-})
+extra_args=()
+while IFS= read -r _arg; do
+  [[ -n "$_arg" ]] && extra_args+=("$_arg")
+done <<<"${NUCLEUS_RCLONE_ARGS-}"
 
 # Verify the rclone remote is configured; exit 0 (no restart) if not.
 if ! rclone_remotes="$(rclone listremotes)"; then
