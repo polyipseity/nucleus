@@ -183,7 +183,7 @@ The Apple SDK is enhanced with symlinks for Xcode toolchain shims that nixpkgs d
 
 ## macOS platform policy
 
-macOS-specific defaults sync, nix-darwin activation hooks, launchd service management, pmset power policy, and sops-nix LaunchAgent async behaviour are documented in `macos-service-hardening.instructions.md`. Nix authors editing MacBook host modules should consult that file for launchd label naming, EX_CONFIG recovery, `macos-ensure-launchagents`, and sops polling barriers.
+macOS-specific defaults sync, nix-darwin activation hooks, launchd service management, pmset power policy, and sops-nix LaunchAgent async behaviour are documented in `macos-service-hardening.instructions.md`. Nix authors editing MacBook host modules should consult that file for launchd label naming, EX_CONFIG recovery, and sops polling barriers.
 
 ## Machine age key auto-registration
 

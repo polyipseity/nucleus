@@ -151,10 +151,6 @@ Root launchd processes cannot read iCloud Drive paths. Bundle files into the nix
 
 When running as root without `UserName`, `HOME` is unset — use `${HOME:-}` in scripts with `set -u`.
 
-### Home Manager launchd activation verification
-
-The `macos-ensure-launchagents` block in `src/platforms/macOS/modules/default.nix` re-verifies HM-managed agents after `setupLaunchAgents` (bootout → sleep → bootstrap → kickstart). Any step that must run after agent registration uses `entryAfter [ "setupLaunchAgents" ]`.
-
 ## macOS pmset power policy
 
 `src/hosts/MacBook/activation.nix` (`postActivation`) is the SSOT for managed `pmset` writes. Preserve: `womp` on both `-c` and `-b`; `disksleep` equal to `sleep`; per-source `lowpowermode` before timer values; global `lidwake` (`-a`). Do not write `Sleep On Power Button` or `SleepServices` via `pmset` on Apple Silicon/macOS 15+.
