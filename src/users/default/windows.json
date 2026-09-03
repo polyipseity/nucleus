@@ -4,6 +4,7 @@
   "dscConfigFiles": [
     "context-manual.dsc.yml",
     "context-optimize-pdf.dsc.yml",
+    "context-strip-office-metadata.dsc.yml",
     "env.dsc.yml",
     "wallpaper.dsc.yml",
     "screen-saver.dsc.yml",
