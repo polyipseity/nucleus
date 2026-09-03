@@ -600,6 +600,15 @@ let
       platforms = [ "darwin" ];
       nixpkgs = "pinentry_mac";
     };
+    pass = {
+      category = "cli";
+      homebrew = {
+        kind = "formula";
+        name = "pass";
+      };
+      nixpkgs = "pass";
+      winget = "GnuPG.pass";
+    };
     powershell = {
       category = "cli";
       homebrew = {
