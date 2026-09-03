@@ -74,12 +74,6 @@ router_settings:
   # Selects the endpoint with the lowest utilization ratio relative
   # to its tpm/rpm ceiling within each order tier.
   routing_strategy: simple-shuffle
-  # Redis — shared state for utilization tracking, cooldowns, and
-  # prompt-cache affinity mappings.
-  redis_host: os.environ/REDIS_HOST
-  redis_port: os.environ/REDIS_PORT
-  redis_password: os.environ/REDIS_USER_LITELLM_PASSWORD
-  redis_username: os.environ/REDIS_USERNAME
   # Request-level retry budget across all order tiers.
   num_retries: 10
   # Minimum delay (seconds) between retry attempts.
