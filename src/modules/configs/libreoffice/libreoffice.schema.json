@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "LibreOffice managed settings",
+  "description": "Per-user LibreOffice metadata-stripping settings. Applied via XCU merge at activation time.",
+  "type": "object",
+  "properties": {
+    "$schema": { "type": "string" },
+    "removePersonalInfoOnSave": {
+      "type": "boolean",
+      "default": true,
+      "description": "Strip author name, timestamps, editing duration, and other personal metadata from document properties when saving."
+    },
+    "clearUserProfileData": {
+      "type": "boolean",
+      "default": true,
+      "description": "Clear all user identity fields (name, email, company, etc.) from LibreOffice's user profile so metadata is never embedded."
+    },
+    "extraSettings": {
+      "type": "array",
+      "default": [],
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "XCU item oor:path attribute (e.g. /org.openoffice.Office.Common/Security/Scripting)."
+          },
+          "name": {
+            "type": "string",
+            "description": "XCU prop oor:name attribute (e.g. RemovePersonalInfoOnSave)."
+          },
+          "value": {
+            "type": "string",
+            "description": "XCU value text content."
+          }
+        },
+        "required": ["path", "name", "value"]
+      },
+      "description": "Additional XCU entries to merge, beyond the built-in metadata-stripping defaults."
+    }
+  },
+  "additionalProperties": false
+}
