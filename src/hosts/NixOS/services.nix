@@ -63,6 +63,17 @@ let
       value = "${mkOptimizePdfNautilus p}/bin/nucleus-optimize-pdf-nautilus-${p}";
     }) optimizePdfPresets
   );
+
+  # Office document MIME types for metadata stripping.
+  # Used for Nautilus MIME guard only; the shell script handles all six types.
+
+  stripOfficeMetadataNautilusScript = pkgs.writeNucleusShellApplication {
+    name = "strip-office-metadata-nautilus";
+    runtimeInputs = [ pkgs.file ];
+    text = ''
+      exec '${../../scripts/integrations/configure-file-manager-strip-office-metadata.sh}' "$@"
+    '';
+  };
 in
 lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
   home.file = {
@@ -95,6 +106,13 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       executable = true;
     };
 
+    # Nautilus: right-click → Scripts → strip office metadata
+    # MIME guard handled inside the script (6 Office MIME types).
+    ".local/share/nautilus/scripts/strip office metadata" = {
+      source = "${stripOfficeMetadataNautilusScript}/bin/nucleus-strip-office-metadata-nautilus";
+      executable = true;
+    };
+
   };
 
   # Method-1 (writable) symlinks to the live repo, created at activation time against the
@@ -124,6 +142,14 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
         "${config.home.homeDirectory}/.local/share/kio/servicemenus/nucleus-optimize-pdf.desktop" \
         "${overlay.toRepoRelPath (overlay.selectFile "plasma" "desktop/nucleus-optimize-pdf.desktop")}" \
+    '';
+
+    # Dolphin: right-click → strip office metadata (all Office formats).
+    # check-suppress:config-method: method 1 (writable symlink) -- the desktop file can be updated in-place; no rebuild needed.
+    seed-nucleus-strip-office-metadata-desktop = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+      "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
+        "${config.home.homeDirectory}/.local/share/kio/servicemenus/nucleus-strip-office-metadata.desktop" \
+        "${overlay.toRepoRelPath (overlay.selectFile "plasma" "desktop/nucleus-strip-office-metadata.desktop")}" \
     '';
   };
 }
