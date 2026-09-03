@@ -1,17 +1,16 @@
 ---
 # LiteLLM proxy configuration — shared across all hosts.
 #
-# AI gateway on 127.0.0.1:4000 routing to:
-#   - Local Ollama daemon (127.0.0.1:11434) for offline models
-#   - A single generic `default` model backed by remote providers, using
-#     usage-based routing v2 with order-based failover.  API keys from
-#     SOPS secrets.
+# AI gateway on 127.0.0.1:4000.  Routes all requests through a single
+# generic `default` model backed by multiple remote providers, using
+# usage-based routing v2 with order-based failover.  API keys from
+# SOPS secrets.
 #
 # Routing: usage-based-routing-v2 selects the endpoint with the lowest
 # utilization ratio relative to its tpm/rpm ceiling within each order
 # tier.  On failure, the v2 cooldown mechanism excludes the failed
 # endpoint and re-picks from remaining healthy ones.  After exhausting
-# retries within a tier, the next order tier is tried (tier 1 → 2 → 3).
+# retries within a tier, the next order tier is tried (tier 1 → 2).
 #
 # Redis: required for utilization tracking, cooldown state, prompt-cache
 # affinity, and response caching.  REDIS_HOST/REDIS_PORT/REDIS_USERNAME
@@ -121,7 +120,7 @@ model_list:
 
   # ---- Default model (generic, remote-backed) ----
   # Usage-based routing v2: picks the endpoint with lowest utilization
-  # within each order tier.  Order provides failover: tier 1 → 2 → 3.
+  # within each order tier.  Order provides failover: tier 1 → 2.
   # tpm/rpm ceilings drive the utilization ratio.
 
   - model_name: default
