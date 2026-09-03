@@ -4,7 +4,9 @@
   "description": "Per-user LibreOffice metadata-stripping settings. Applied via XCU merge at activation time.",
   "type": "object",
   "properties": {
-    "$schema": { "type": "string" },
+    "$schema": {
+      "type": "string"
+    },
     "removePersonalInfoOnSave": {
       "type": "boolean",
       "default": true,
@@ -34,7 +36,11 @@
             "description": "XCU value text content."
           }
         },
-        "required": ["path", "name", "value"]
+        "required": [
+          "path",
+          "name",
+          "value"
+        ]
       },
       "description": "Additional XCU entries to merge, beyond the built-in metadata-stripping defaults."
     }
