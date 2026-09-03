@@ -81,7 +81,7 @@ router_settings:
   # Request-level retry budget across all order tiers.
   num_retries: 10
   # Minimum delay (seconds) between retry attempts.
-  retry_after: 2
+  retry_after: 5
   # Failures per endpoint before temporary cooldown.
   allowed_fails: 2
   # Cooldown duration (seconds).
@@ -91,29 +91,30 @@ router_settings:
 
 model_list:
   # ---- Ollama models ----
+
   # - model_name: ollama_chat/devstral-small-2:24b
   #   litellm_params:
   #     model: ollama_chat/devstral-small-2:24b
   #     api_base: http://127.0.0.1:11434
   #     model_info:
-  #       max_input_tokens: 32768
-  #       max_output_tokens: 16384
+  #       max_input_tokens: 32000
+  #       max_output_tokens: 16000
 
   # - model_name: ollama_chat/qwen2.5:1.5b
   #   litellm_params:
   #     model: ollama_chat/qwen2.5:1.5b
   #     api_base: http://127.0.0.1:11434
   #     model_info:
-  #       max_input_tokens: 32768
-  #       max_output_tokens: 16384
+  #       max_input_tokens: 32000
+  #       max_output_tokens: 16000
 
   # - model_name: ollama_chat/qwen3:8b
   #   litellm_params:
   #     model: ollama_chat/qwen3:8b
   #     api_base: http://127.0.0.1:11434
   #     model_info:
-  #       max_input_tokens: 32768
-  #       max_output_tokens: 16384
+  #       max_input_tokens: 32000
+  #       max_output_tokens: 16000
 
   # ---- Default model (generic, remote-backed) ----
   # Usage-based routing v2: picks the endpoint with lowest utilization
@@ -129,7 +130,7 @@ model_list:
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
-        max_output_tokens: 16384
+        max_output_tokens: 16000
 
   - model_name: default
     litellm_params:
@@ -140,7 +141,7 @@ model_list:
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
-        max_output_tokens: 16384
+        max_output_tokens: 16000
 
   - model_name: default
     litellm_params:
@@ -151,7 +152,7 @@ model_list:
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
-        max_output_tokens: 16384
+        max_output_tokens: 16000
 
   - model_name: default
     litellm_params:
@@ -162,14 +163,14 @@ model_list:
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
-        max_output_tokens: 16384
+        max_output_tokens: 16000
 
-  # - model_name: default
-  #   litellm_params:
-  #     model: openrouter/xiaomi/mimo-v2.5
-  #     api_key: os.environ/KEY_AI_OPENROUTER
-  #     order: 3
-  #     reasoning_effort: high
-  #     model_info:
-  #       max_input_tokens: 128000
-  #       max_output_tokens: 16384
+  - model_name: default
+    litellm_params:
+      model: openrouter/xiaomi/mimo-v2.5
+      api_key: os.environ/KEY_AI_OPENROUTER
+      order: 3
+      reasoning_effort: high
+      model_info:
+        max_input_tokens: 128000
+        max_output_tokens: 16000
