@@ -494,14 +494,6 @@ lib.mkIf pkgs.stdenv.hostPlatform.isDarwin {
     };
   };
 
-  # Verify ALL home-manager-managed launchd agents are registered with launchd
-  # after setupLaunchAgents runs.  On macOS 26, launchctl bootstrap can
-  # spuriously return "Bootstrap failed: 5: Input/output error" — HM detects
-  # this but never retries, and subsequent activations skip unchanged agents.
-  home.activation.macos-ensure-launchagents = lib.hm.dag.entryAfter [ "setupLaunchAgents" ] ''
-    "${activationBundle}/src/platforms/macOS/scripts/macos-ensure-launchagents.sh" "$newGenPath"
-  '';
-
   # --------------------------------------------------------------------------
   # gui-env-path
   # Single activation-time mechanism for macOS GUI environment variables.
