@@ -54,6 +54,18 @@ done
 # ── All other GUI env vars (user and non-user) ──
 eval "$_mge_all_vars_block"
 
+# ── NUCLEUS_REPO_ROOT from system repo-root file ──
+# WHY: NUCLEUS_REPO_ROOT was removed from the env catalog to prevent Nix store
+# path poisoning, but some scripts still read it directly.  Set it here from
+# the authoritative system repo-root file so GUI processes always see the
+# correct live checkout path.
+_mge_repo_root_file="/Library/Application Support/nucleus/repo-root"
+if [ -f "$_mge_repo_root_file" ] && IFS= read -r _mge_repo_root_val <"$_mge_repo_root_file" 2>/dev/null; then
+  case "$_mge_repo_root_val" in
+  /*) /bin/launchctl setenv NUCLEUS_REPO_ROOT "$_mge_repo_root_val" ;;
+  esac
+fi
+
 # Set persistent per-user launchd PATH for LaunchServices .app bundles.
 # Uses user.plist (not system.plist) because the PATH contains user-specific
 # directories.

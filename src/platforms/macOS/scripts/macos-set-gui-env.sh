@@ -47,3 +47,15 @@ done
 
 # ── All other GUI env vars (user and non-user) ──
 eval "$__all_vars"
+
+# ── NUCLEUS_REPO_ROOT from system repo-root file ──
+# WHY: NUCLEUS_REPO_ROOT was removed from the env catalog to prevent Nix store
+# path poisoning, but some scripts still read it directly.  Set it here from
+# the authoritative system repo-root file so GUI processes always see the
+# correct live checkout path.
+__nucleus_repo_root_file="/Library/Application Support/nucleus/repo-root"
+if [ -f "$__nucleus_repo_root_file" ] && IFS= read -r __nucleus_repo_root_val <"$__nucleus_repo_root_file" 2>/dev/null; then
+  case "$__nucleus_repo_root_val" in
+  /*) "$__nucleus_launchctl" setenv NUCLEUS_REPO_ROOT "$__nucleus_repo_root_val" ;;
+  esac
+fi
