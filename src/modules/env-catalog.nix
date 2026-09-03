@@ -35,5 +35,9 @@
       name = "env_redis_password";
       envVar = "REDIS_PASSWORD";
     }
+    {
+      name = "env_redis_user_litellm_password";
+      envVar = "REDIS_USER_LITELLM_PASSWORD";
+    }
   ];
 }

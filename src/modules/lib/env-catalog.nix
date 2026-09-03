@@ -229,6 +229,12 @@ let
       };
       why = "LiteLLM Redis coordination + response cache endpoint. Shared across all hosts.";
     };
+    REDIS_USERNAME = {
+      values = {
+        default = "litellm";
+      };
+      why = "Redis ACL username for LiteLLM proxy. Non-secret; set on all hosts.";
+    };
 
     # Ollama runtime tunables (all hosts).
     # Set on all OSes for consistent inference behaviour.
