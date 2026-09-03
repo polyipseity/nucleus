@@ -21,7 +21,7 @@
 # Env var lifecycle
 # ────────────────
 # Each api_key entry below references an environment variable (e.g.
-# os.environ/KEY_AI_OPENCODE_ZEN_1).  These env vars are populated at
+# os.environ/KEY_AI_OPENCODE_ZEN).  These env vars are populated at
 # runtime by the platform-specific daemon scripts before litellm starts:
 #
 #   POSIX (NixOS/macOS):
@@ -125,7 +125,7 @@ model_list:
     litellm_params:
       model: openai/mimo-v2.5-free
       api_base: https://opencode.ai/zen/v1
-      api_key: os.environ/KEY_AI_OPENCODE_ZEN_1
+      api_key: os.environ/KEY_AI_OPENCODE_ZEN
       order: 1
       reasoning_effort: high
       model_info:
@@ -158,7 +158,7 @@ model_list:
     litellm_params:
       model: openai/mimo-v2.5
       api_base: https://opencode.ai/zen/go/v1
-      api_key: os.environ/KEY_AI_OPENCODE_GO_1
+      api_key: os.environ/KEY_AI_OPENCODE_GO
       order: 2
       reasoning_effort: high
       model_info:
