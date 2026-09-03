@@ -9,6 +9,10 @@
 #   for any file or folder selection — the action ignores input anyway).
 # - All "optimize PDF - *.workflow" use "com.adobe.pdf" so the context menu
 #   only appears for PDF files.
+# - All "strip office metadata - *.workflow" use per-format UTIs:
+#   com.microsoft.word.docx, com.microsoft.excel.xlsx,
+#   com.microsoft.powerpoint.pptx, com.microsoft.word.doc,
+#   com.microsoft.excel.xls, com.microsoft.powerpoint.ppt.
 #
 # WARNING about UTI choice: The UTI "public.pdf" has NEVER existed on macOS.
 # Apple's UTI hierarchy defines "public.png", "public.jpeg", "public.html" etc.,
@@ -69,10 +73,13 @@ let
   #   - source: path to copy from
   #   - presentationModes: dict for NSServicesStatus enablement
   #
-  # Sorting policy: primary sort is alphabetical by entry name. Exception:
-  # the 5 Optimize PDF presets are grouped as a single block and internally
-  # sorted quality-descending (default → prepress → printer → ebook → screen).
-  # The block is positioned by "optimize PDF" alphabetically. This is the
+  # Sorting policy: primary sort is alphabetical by entry name. Exceptions:
+  # - the 5 Optimize PDF presets are grouped as a single block and internally
+  #   sorted quality-descending (default → prepress → printer → ebook → screen).
+  # - the 6 Strip Office Metadata presets are grouped as a single block and
+  #   internally sorted alphabetically (excel → excel-legacy → powerpoint →
+  #   powerpoint-legacy → word → word-legacy).
+  # Each block is positioned by its primary name alphabetically. This is the
   # cross-platform convention (same on NixOS and Windows).
   # Deployment order always follows the declared order below. No automatic sorting.
   currentNucleusWorkflows = [
@@ -81,6 +88,73 @@ let
       dir = "open nucleus manual.workflow";
       enablementKey = "com.nucleus.OpenNucleusManual - open nucleus manual - runWorkflowAsService";
       source = "${workflowsDir}/open nucleus manual.workflow";
+      presentationModes = {
+        ContextMenu = true;
+        ServicesMenu = true;
+        FinderPreview = true;
+        TouchBar = true;
+      };
+    }
+    # Alphabetical between "open" and "optimize" — strip office metadata (6 UTI variants)
+    {
+      dir = "strip office metadata - excel.workflow";
+      enablementKey = "com.nucleus.StripOfficeMetadata.excel - strip office metadata - excel - runWorkflowAsService";
+      source = "${workflowsDir}/strip office metadata - excel.workflow";
+      presentationModes = {
+        ContextMenu = true;
+        ServicesMenu = true;
+        FinderPreview = true;
+        TouchBar = true;
+      };
+    }
+    {
+      dir = "strip office metadata - excel-legacy.workflow";
+      enablementKey = "com.nucleus.StripOfficeMetadata.excel-legacy - strip office metadata - excel-legacy - runWorkflowAsService";
+      source = "${workflowsDir}/strip office metadata - excel-legacy.workflow";
+      presentationModes = {
+        ContextMenu = true;
+        ServicesMenu = true;
+        FinderPreview = true;
+        TouchBar = true;
+      };
+    }
+    {
+      dir = "strip office metadata - powerpoint.workflow";
+      enablementKey = "com.nucleus.StripOfficeMetadata.powerpoint - strip office metadata - powerpoint - runWorkflowAsService";
+      source = "${workflowsDir}/strip office metadata - powerpoint.workflow";
+      presentationModes = {
+        ContextMenu = true;
+        ServicesMenu = true;
+        FinderPreview = true;
+        TouchBar = true;
+      };
+    }
+    {
+      dir = "strip office metadata - powerpoint-legacy.workflow";
+      enablementKey = "com.nucleus.StripOfficeMetadata.powerpoint-legacy - strip office metadata - powerpoint-legacy - runWorkflowAsService";
+      source = "${workflowsDir}/strip office metadata - powerpoint-legacy.workflow";
+      presentationModes = {
+        ContextMenu = true;
+        ServicesMenu = true;
+        FinderPreview = true;
+        TouchBar = true;
+      };
+    }
+    {
+      dir = "strip office metadata - word.workflow";
+      enablementKey = "com.nucleus.StripOfficeMetadata.word - strip office metadata - word - runWorkflowAsService";
+      source = "${workflowsDir}/strip office metadata - word.workflow";
+      presentationModes = {
+        ContextMenu = true;
+        ServicesMenu = true;
+        FinderPreview = true;
+        TouchBar = true;
+      };
+    }
+    {
+      dir = "strip office metadata - word-legacy.workflow";
+      enablementKey = "com.nucleus.StripOfficeMetadata.word-legacy - strip office metadata - word-legacy - runWorkflowAsService";
+      source = "${workflowsDir}/strip office metadata - word-legacy.workflow";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
