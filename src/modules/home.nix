@@ -66,6 +66,19 @@ let
     );
   };
 
+  # LibreOffice manages registrymodifications.xcu and overwrites it on close.
+  # Load the per-user overlay settings and derive managed XCU entries for
+  # metadata stripping (RemovePersonalInfoOnSave) and user data clearing.
+  # check-suppress:config-method: method 3 (merge) -- LibreOffice owns registrymodifications.xcu and
+  # overwrites it on exit. A symlink would be replaced. Merge injects managed
+  # entries while preserving user-configured settings outside managed keys.
+  libreOfficeModule = import ./configs/libreoffice/libreoffice.nix {
+    inherit lib;
+    libreOfficeDefaultSettings = builtins.fromJSON (
+      builtins.readFile (selectUserAppConfigFile "libreoffice" "libreoffice.json")
+    );
+  };
+
   # Obsidian reads its global app settings directly from obsidian.json, but the
   # file also contains dynamic vault metadata written by the app itself. Load
   # the managed settings from a declarative config file so they are versioned
@@ -211,6 +224,25 @@ in
         ${lib.escapeShellArg qtpassModule.qtPassDarwinCommands} \
         ${lib.escapeShellArg qtpassModule.qtPassPrimaryIniCommands} \
         ${lib.escapeShellArg qtpassModule.qtPassSecondaryIniCommands}
+    '';
+
+    # LibreOffice manages registrymodifications.xcu (XML settings store) and
+    # overwrites it on every close. Merge the metadata-stripping entries at
+    # activation so personal info removal and user data clearing stay converged.
+    #
+    # - macOS: ~/Library/Application Support/LibreOffice/4/user/registrymodifications.xcu
+    # - Linux: ~/.config/libreoffice/4/user/registrymodifications.xcu
+    # The merge script handles both paths via the file argument.
+    # Windows uses an equivalent PowerShell module (Sync-LibreOfficeXcu.ps1).
+    # check-suppress:config-method: method 3 (merge) -- cannot use Method 1 (symlink) because
+    # LibreOffice owns registrymodifications.xcu and overwrites it on exit.
+    # Merge applies managed metadata-stripping defaults while preserving
+    # any user-configured settings outside managed keys.
+    home.activation.merge-libreoffice-xcu = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      "${activationBundle}/src/scripts/configs/merge-libreoffice-xcu.sh" \
+        "${pkgs.python3}/bin/python3" \
+        ${libreOfficeModule.libreOfficeLinuxXcuPath} \
+        ${libreOfficeModule.libreOfficeMergeArgs}
     '';
 
     # Picard reads native INI settings from ~/.config/MusicBrainz/Picard.ini
