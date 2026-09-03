@@ -72,7 +72,7 @@ router_settings:
     - prompt_caching
   # Selects the endpoint with the lowest utilization ratio relative
   # to its tpm/rpm ceiling within each order tier.
-  routing_strategy: usage-based-routing-v2
+  routing_strategy: simple-shuffle
   # Redis — shared state for utilization tracking, cooldowns, and
   # prompt-cache affinity mappings.
   redis_host: os.environ/REDIS_HOST
@@ -88,21 +88,6 @@ router_settings:
   cooldown_time: 300
   # Per-request HTTP timeout (seconds).
   timeout: 30
-  # Per-model-group retry policy.  Retried against other healthy
-  # deployments within and across `order` tiers, so a transient or
-  # 400 failure on one endpoint fails over instead of surfacing.
-  # Keyed by model_group (the `model_name` in `model_list`).
-  # NOTE: litellm 1.89.0 keys this by exception type, not status
-  # code — there is no field for 402.  OpenRouter raises a plain
-  # `OpenRouterException` on 402 (insufficient credits), which is
-  # not retryable here; it is excluded by `allowed_fails` cooldown
-  # instead.  400 maps to `BadRequestError` and IS retryable.
-  model_group_retry_policy:
-    default:
-      BadRequestErrorRetries: 3
-      RateLimitErrorRetries: 3
-      InternalServerErrorRetries: 3
-      TimeoutErrorRetries: 3
 
 model_list:
   # ---- Ollama models ----
@@ -179,12 +164,12 @@ model_list:
         max_input_tokens: 128000
         max_output_tokens: 16384
 
-  - model_name: default
-    litellm_params:
-      model: openrouter/xiaomi/mimo-v2.5
-      api_key: os.environ/KEY_AI_OPENROUTER
-      order: 3
-      reasoning_effort: high
-      model_info:
-        max_input_tokens: 128000
-        max_output_tokens: 16384
+  # - model_name: default
+  #   litellm_params:
+  #     model: openrouter/xiaomi/mimo-v2.5
+  #     api_key: os.environ/KEY_AI_OPENROUTER
+  #     order: 3
+  #     reasoning_effort: high
+  #     model_info:
+  #       max_input_tokens: 128000
+  #       max_output_tokens: 16384
