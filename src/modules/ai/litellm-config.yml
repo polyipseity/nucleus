@@ -79,7 +79,7 @@ router_settings:
   redis_port: os.environ/REDIS_PORT
   redis_password: os.environ/REDIS_PASSWORD
   # Request-level retry budget across all order tiers.
-  num_retries: 3
+  num_retries: 10
   # Minimum delay (seconds) between retry attempts.
   retry_after: 2
   # Failures per endpoint before temporary cooldown.
