@@ -174,6 +174,23 @@ in
       cd /
     '';
 
+    # Initialize the pass password store on first activation.  The .password-store
+    # directory may already exist (created by earlier provisioning) but without a
+    # .gpg-id file pass cannot encrypt or decrypt entries.  Run pass init once
+    # with the primary GPG key so QtPass and the pass CLI have a usable store.
+    #
+    # WHY: managed-gpg-keys tracks imported keys by fingerprint; the primary RSA
+    # key (978C2F10BDD68D5A7E2B12FA5E029A4348667405) is the canonical signing
+    # key with ultimate ownertrust.  The PQC subkey (F4509882...) is for SOPS
+    # encryption only and cannot be used by pass.
+    home.activation.init-pass-store = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      if [ ! -f "${passwordStoreDir}/.gpg-id" ]; then
+        "${pkgs.pass}/bin/pass" init "978C2F10BDD68D5A7E2B12FA5E029A4348667405" \
+          --path "${passwordStoreDir}" 2>/dev/null \
+          || true  # check-suppress:suppression_doc: pass init may fail if GPG agent is unavailable during non-interactive activation; store initializes on first use
+      fi
+    '';
+
     # QtPass keeps its own persisted settings store, which can override
     # PASSWORD_STORE_DIR and GUI behavior when launched outside the shell.
     #
