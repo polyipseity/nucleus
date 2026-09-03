@@ -141,8 +141,6 @@ model_list:
       api_base: https://opencode.ai/zen/v1
       api_key: os.environ/KEY_AI_OPENCODE_ZEN_1
       order: 1
-      tpm: 128000
-      rpm: 30
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
@@ -154,8 +152,6 @@ model_list:
       api_base: https://api.cline.bot/api/v1
       api_key: os.environ/KEY_AI_CLINE
       order: 2
-      tpm: 128000
-      rpm: 30
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
@@ -167,8 +163,6 @@ model_list:
       api_base: https://api.commandcode.ai/provider/v1
       api_key: os.environ/KEY_AI_COMMAND_CODE
       order: 2
-      tpm: 128000
-      rpm: 30
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
@@ -180,8 +174,6 @@ model_list:
       api_base: https://opencode.ai/zen/go/v1
       api_key: os.environ/KEY_AI_OPENCODE_GO_1
       order: 2
-      tpm: 128000
-      rpm: 30
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
@@ -192,8 +184,6 @@ model_list:
       model: openrouter/xiaomi/mimo-v2.5
       api_key: os.environ/KEY_AI_OPENROUTER
       order: 3
-      tpm: 128000
-      rpm: 30
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
