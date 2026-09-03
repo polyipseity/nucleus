@@ -222,7 +222,7 @@ done
 		<key>serviceProcessesInput</key>
 		<false/>
 		<key>systemImageName</key>
-		<string>doc.richtext</string>
+			<string>doc.badge.gearshape</string>
 		<key>useAutomaticInputType</key>
 		<false/>
 		<key>workflowTypeIdentifier</key>
