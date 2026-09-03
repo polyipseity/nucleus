@@ -5,12 +5,17 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
 
-# Arguments: remote_name remote mount_point [additional rclone args...]
-# rclone is resolved from PATH (provided via writeShellApplication runtimeInputs).
-remote_name="${1:?remote name required}"
-remote="${2:?remote required}"
-mount_point="${3:?mount point required}"
-shift 3
+# Configuration via environment variables (set by writeNucleusShellApplication extraEnv):
+#   NUCLEUS_RCLONE_REMOTE_NAME  — rclone remote name (used for existence check)
+#   NUCLEUS_RCLONE_REMOTE       — full remote path (e.g. "gdrive:backups")
+#   NUCLEUS_RCLONE_MOUNT_POINT  — local mount point directory
+#   NUCLEUS_RCLONE_ARGS         — additional rclone flags (space-separated)
+remote_name="${NUCLEUS_RCLONE_REMOTE_NAME:?NUCLEUS_RCLONE_REMOTE_NAME required}"
+remote="${NUCLEUS_RCLONE_REMOTE:?NUCLEUS_RCLONE_REMOTE required}"
+mount_point="${NUCLEUS_RCLONE_MOUNT_POINT:?NUCLEUS_RCLONE_MOUNT_POINT required}"
+
+# shellcheck disable=SC2206 # reason: word splitting intentional — space-separated args string → array
+extra_args=(${NUCLEUS_RCLONE_ARGS-})
 
 # Verify the rclone remote is configured; exit 0 (no restart) if not.
 if ! rclone_remotes="$(rclone listremotes)"; then
@@ -30,4 +35,5 @@ esac
 exec rclone mount \
   "$remote" \
   "$mount_point" \
+  "${extra_args[@]}" \
   "$@"

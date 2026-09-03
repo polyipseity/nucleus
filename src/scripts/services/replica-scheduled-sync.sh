@@ -5,8 +5,10 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)"
 # shellcheck source=../lib/lib.sh
 . "$SCRIPT_DIR/../lib/lib.sh"
 
-# Arguments: replica_id
-replica_id="${1:?replica id required}"
+# Configuration via environment variables (set by writeNucleusShellApplication extraEnv):
+#   NUCLEUS_REPLICA_ID  — replica identifier for the sync operation
+#   NUCLEUS_USER_HOME   — user home directory path
+replica_id="${NUCLEUS_REPLICA_ID:?NUCLEUS_REPLICA_ID required}"
 
 REPO_ROOT="${NUCLEUS_REPO_ROOT:-$(derive_repo_root)}"
 export NUCLEUS_REPO_ROOT="$REPO_ROOT"

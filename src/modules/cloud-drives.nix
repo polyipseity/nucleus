@@ -215,15 +215,14 @@ let
     in
     pkgs.writeNucleusShellApplication {
       name = "cloud-mount-${mount.id}";
+      scriptName = "src/scripts/services/rclone-mount";
       runtimeInputs = [ pkgs.rclone ];
-      text = ''
-        exec ${../scripts/services/rclone-mount.sh} \
-          "${mount.remoteName}" \
-          "${lib.escapeShellArg rcloneRemote}" \
-          "${lib.escapeShellArg mountPoint}" \
-          ${lib.escapeShellArgs fullArgsList} \
-          "$@"
-      '';
+      extraEnv = {
+        NUCLEUS_RCLONE_REMOTE_NAME = mount.remoteName;
+        NUCLEUS_RCLONE_REMOTE = rcloneRemote;
+        NUCLEUS_RCLONE_MOUNT_POINT = mountPoint;
+        NUCLEUS_RCLONE_ARGS = lib.escapeShellArgs fullArgsList;
+      };
     };
 
   # Build a systemd ExecStop unmount command (NixOS only).
@@ -232,20 +231,18 @@ let
     mountPoint: "/bin/sh -c 'fusermount3 -u ${lib.escapeShellArg mountPoint} || true'";
 
   # Build a scheduled replica-sync runner that invokes
-  # scripts/cloud.sh sync for one replica id. NUCLEUS_REPO_ROOT is set by
-  # the launchd/systemd service environment. replica_id and user_home are
-  # passed as positional args.
+  # scripts/cloud.sh sync for one replica id. replica_id and user_home are
+  # passed as environment variables via extraEnv.
   mkReplicaScheduledSyncScript =
     replica:
     pkgs.writeNucleusShellApplication {
       name = "cloud-replica-scheduled-sync-${replica.id}";
+      scriptName = "src/scripts/services/replica-scheduled-sync";
       runtimeInputs = [ ];
-      text = ''
-        exec ${../scripts/services/replica-scheduled-sync.sh} \
-          "${lib.escapeShellArg replica.id}" \
-          "${currentUserHome}" \
-          "$@"
-      '';
+      extraEnv = {
+        NUCLEUS_REPLICA_ID = replica.id;
+        NUCLEUS_USER_HOME = currentUserHome;
+      };
     };
 
   # Canonical scheduled-sync timer mapping. Repository policy mandates 12:00 slots.
