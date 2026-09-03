@@ -10,7 +10,7 @@
 			<key>NSBackgroundColorName</key>
 			<string>background</string>
 			<key>NSIconName</key>
-			<string>generic slides</string>
+				<string>eraser.line.dashed</string>
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
