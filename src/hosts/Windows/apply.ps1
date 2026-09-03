@@ -115,6 +115,10 @@
 .PARAMETER EnableQtPassParity
   Enable managed QtPass Settings/Template tab parity convergence and cleanup fallback.
 
+.PARAMETER EnableLibreOfficeParity
+  Enable managed LibreOffice metadata-stripping XCU merge on Windows.
+  Strips personal info on save and clears user profile data fields.
+
 .PARAMETER EnableRdpParity
   Enable managed Windows built-in RDP convergence and cleanup fallback.
 
@@ -351,6 +355,7 @@ $EnableGitSshParity = -not $noUserStateParity
 $EnablePicardParity = -not $noUserStateParity
 $EnableObsidianParity = -not $noUserStateParity
 $EnableQtPassParity = -not $noUserStateParity
+$EnableLibreOfficeParity = -not $noUserStateParity
 $EnableShellParity = -not $noUserStateParity
 $EnableDevDirectoryParity = -not $noUserStateParity
 $EnableDiscordMusicRPCParity = -not $noUserStateParity
@@ -495,6 +500,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ShellProfile.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-NextestConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-DirenvConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-LibreOfficeXcu.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-StarshipConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-UserPath.ps1")
 # editors/: VS Code configuration and workspace management.
@@ -903,6 +909,10 @@ Sync-CursorExtensions -Enabled:$EnableVsCodeExtensionsParity
 Initialize-DevDirectory -Enabled:$EnableDevDirectoryParity
 Set-VSCodeWorkspaceTrust -Enabled:$EnableVsCodeWorkspaceTrustParity
 Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
+# check-suppress:config-method: method 3 (merge) -- LibreOffice owns registrymodifications.xcu and
+# overwrites it on exit. A symlink would be replaced. Merge injects managed
+# entries while preserving user-configured settings outside managed keys.
+Sync-LibreOfficeXcu -Enabled:$EnableLibreOfficeParity -Users $selectedUserRecords -RepoRoot $repoRoot
 Sync-ObsidianConfig -Enabled:$EnableObsidianParity -Users $selectedUserRecords -RepoRoot $repoRoot
 # check-suppress:config-method: method 3 (merge) -- Picard defaults INI merged via Sync-PicardConfig on Windows
 Sync-PicardConfig -Enabled:$EnablePicardParity -Users $selectedUserRecords -RepoRoot $repoRoot
