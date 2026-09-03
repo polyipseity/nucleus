@@ -48,6 +48,7 @@ let
     NUCLEUS_HOST = resolveValue "NUCLEUS_HOST";
     REDIS_HOST = resolveValue "REDIS_HOST";
     REDIS_PORT = resolveValue "REDIS_PORT";
+    REDIS_USERNAME = resolveValue "REDIS_USERNAME";
   };
   # Ollama daemon env vars: OLLAMA_* runtime tunables excluding OLLAMA_HOST.
   # OLLAMA_HOST is excluded because the ollama server must bind to the default

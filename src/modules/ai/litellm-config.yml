@@ -14,9 +14,10 @@
 # retries within a tier, the next order tier is tried (tier 1 → 2 → 3).
 #
 # Redis: required for utilization tracking, cooldown state, prompt-cache
-# affinity, and response caching.  REDIS_HOST/REDIS_PORT are non-secret
-# env vars from the env-catalog.nix registry.  REDIS_PASSWORD is a SOPS
-# secret via the KEYFILE:ENVVAR pipeline.
+# affinity, and response caching.  REDIS_HOST/REDIS_PORT/REDIS_USERNAME
+# are non-secret env vars from the env-catalog.nix registry.
+# REDIS_PASSWORD and REDIS_USER_LITELLM_PASSWORD are SOPS secrets via
+# the KEYFILE:ENVVAR pipeline.
 #
 # Env var lifecycle
 # ────────────────
@@ -51,6 +52,7 @@ litellm_settings:
     host: os.environ/REDIS_HOST
     port: os.environ/REDIS_PORT
     password: os.environ/REDIS_PASSWORD
+    username: os.environ/REDIS_USERNAME
     # Namespace prefix for all LiteLLM Redis keys.  Prevents collisions
     # with other services sharing the same Redis instance.
     namespace: "litellm"
@@ -78,6 +80,7 @@ router_settings:
   redis_host: os.environ/REDIS_HOST
   redis_port: os.environ/REDIS_PORT
   redis_password: os.environ/REDIS_PASSWORD
+  redis_username: os.environ/REDIS_USERNAME
   # Request-level retry budget across all order tiers.
   num_retries: 10
   # Minimum delay (seconds) between retry attempts.
