@@ -111,6 +111,8 @@
     "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook -dNOPAUSE -dQUIET -dBATCH";
   "-optimize-pdf-screen" =
     "gs -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen -dNOPAUSE -dQUIET -dBATCH";
+  # --- ExifTool metadata stripping ---
+  "-strip-office-metadata" = "exiftool -all=";
   # --- Non-git aliases ---
   "-la" = "eza --long --all";
   "-ll" = "eza --long --all";

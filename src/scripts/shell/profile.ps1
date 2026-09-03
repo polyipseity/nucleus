@@ -347,6 +347,9 @@ Add-ShellAlias '-optimize-pdf-printer' { Invoke-NucleusGhostscript -sDEVICE=pdfw
 Add-ShellAlias '-optimize-pdf-ebook' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/ebook    -dNOPAUSE -dQUIET -dBATCH @Args }
 Add-ShellAlias '-optimize-pdf-screen' { Invoke-NucleusGhostscript -sDEVICE=pdfwrite -dCompatibilityLevel=2.0 -dPDFSETTINGS=/screen   -dNOPAUSE -dQUIET -dBATCH @Args }
 
+# ExifTool metadata stripping.
+Add-ShellAlias '-strip-office-metadata' { Invoke-NucleusExifTool -all= @Args }
+
 # la/ll: prefer eza for colour, icons, and extended metadata; fall back to
 # Get-ChildItem when eza is absent so the profile loads on unmanaged machines.
 # check-suppress:suppression_doc: tool-availability guard -- eza may not be installed

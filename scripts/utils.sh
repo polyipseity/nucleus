@@ -3,17 +3,19 @@
 #
 # Currently provides the optimize-pdf subcommand: optimize PDF files with
 # Ghostscript, keeping a .bak backup that is restored automatically if
-# optimization fails.
+# optimization fails. Also provides strip-office-metadata: remove personal
+# metadata from Office files using exiftool.
 #
 # Usage: nucleus-utils <subcommand> [args...]
 #   Subcommand: optimize-pdf [--preset <name>] [--rm-bak] <file>...
+#   Subcommand: strip-office-metadata [--rm-bak] <file>...
 #   Presets: default, ebook, prepress, printer, screen (default: default).
 #
 # Env vars: TMPDIR — ghostscript scratch space; falls back to a per-user
 # cache dir when unset (macOS Services sandbox omits it).
 #
 # Exit conditions: refuses when a .bak already exists; restores the original
-# and exits 1 if gs fails; exits 0 on success.
+# and exits 1 if gs/exiftool fails; exits 0 on success.
 set -euo pipefail
 
 # Resolve symlinks so SCRIPT_DIR works from Nix wrapper symlinks.
@@ -33,13 +35,17 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # subcommand, flag, and preset the parsers accept, so it stays in sync with
 # the dispatch and case branches below.
 usage() {
-  usage_std "$(basename "$0")" "optimize-pdf [--preset <name>] [--rm-bak] <file>..." \
-    "Grouped nucleus user utilities. Currently: optimize-pdf (optimize PDFs with Ghostscript)."
+  usage_std "$(basename "$0")" "optimize-pdf [--preset <name>] [--rm-bak] <file>... | strip-office-metadata [--rm-bak] <file>..." \
+    "Grouped nucleus user utilities. Currently: optimize-pdf (optimize PDFs with Ghostscript), strip-office-metadata (strip Office metadata with exiftool)."
   cat <<'EOF'
 
 Subcommands:
   optimize-pdf [--preset <name>] [--rm-bak] <file>...
               Optimize PDF files using Ghostscript. Keeps a .bak backup by default.
+
+  strip-office-metadata [--rm-bak] <file>...
+              Strip personal metadata from Office files using exiftool.
+              Supports: .docx, .xlsx, .pptx, .doc, .xls, .ppt.
 
   optimize-pdf presets (default: default):
     default   - high quality
@@ -48,7 +54,7 @@ Subcommands:
     printer   - medium quality for printing
     screen    - low quality (smallest file)
 
-  gs-pdf-opt options:
+  Common options:
     --rm-bak  Remove the .bak backup on success (kept by default).
 
   If a .bak file already exists for any input, the command refuses and exits.
@@ -156,6 +162,75 @@ do_optimize_pdf() {
   done
 }
 
+# do_strip_office_metadata — Strip personal metadata from each input Office file via exiftool.
+# Args: $@ — option/flag pairs followed by input file paths.
+# Side effects: renames each input to <file>.bak and writes the stripped
+# file back to <file>; removes the .bak only with --rm-bak.
+# Preconditions: exiftool on PATH; no pre-existing .bak for any input.
+do_strip_office_metadata() {
+  local rm_bak=false
+  local files=()
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+    -h | --help)
+      usage
+      return 0
+      ;;
+    --rm-bak)
+      rm_bak=true
+      shift
+      ;;
+    -*)
+      warn "unknown option: $1"
+      return 1
+      ;;
+    *)
+      files+=("$1")
+      shift
+      ;;
+    esac
+  done
+
+  if [[ ${#files[@]} -eq 0 ]]; then
+    usage >&2
+    return 1
+  fi
+
+  local et_cmd
+  et_cmd="$(command -v exiftool)" || {
+    error "exiftool not found in PATH"
+    return 1
+  }
+
+  local f bak
+  for f in "${files[@]}"; do
+    if [[ ! -f "$f" ]]; then
+      warn "skipping non-file: $f"
+      continue
+    fi
+
+    bak="${f}.bak"
+    if [[ -e "$bak" ]]; then
+      error "backup already exists, refusing to overwrite: $bak"
+      return 1
+    fi
+
+    # WHY: move-then-strip gives an atomic recovery point — exiftool reads the
+    # .bak and writes the original path, so an interrupt leaves either the
+    # untouched original or the stripped file, never a half-written one.
+    mv "$f" "$bak"
+    if "$et_cmd" -all= -overwrite_original -o "$f" "$bak"; then
+      "$rm_bak" && rm -f "$bak"
+      say "stripped metadata: $f"
+    else
+      mv "$bak" "$f"
+      error "metadata stripping failed, restored original: $f"
+      return 1
+    fi
+  done
+}
+
 # main — Entry point: dispatch on the first argument as subcommand.
 # WHY: a bare invocation or -h/--help shows help with exit 0 (not an error)
 # so the first run is discoverable and harmless.
@@ -171,6 +246,9 @@ main() {
   case "$subcommand" in
   optimize-pdf)
     do_optimize_pdf "$@"
+    ;;
+  strip-office-metadata)
+    do_strip_office_metadata "$@"
     ;;
   *)
     error "unknown subcommand: $subcommand"

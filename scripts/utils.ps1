@@ -3,30 +3,29 @@
 .SYNOPSIS
   Grouped nucleus user utilities.
 .DESCRIPTION
-  Currently provides the optimize-pdf subcommand: optimize PDF files using
-  Ghostscript with backup/restore. The optimize-pdf subcommand's --preset and
-  --rm-bak options map to the -Preset and -RemoveBackup PowerShell parameters
-  below; input files map to -File.
+  Currently provides two subcommands:
+  - optimize-pdf: optimize PDF files using Ghostscript with backup/restore.
+  - strip-office-metadata: strip personal metadata from Office files using exiftool.
 .PARAMETER Action
-  The subcommand to run: optimize-pdf.
+  The subcommand to run: optimize-pdf, strip-office-metadata.
 .PARAMETER Preset
   Ghostscript PDF settings preset: default, ebook, prepress, printer, screen.
   Default: default. Maps to the optimize-pdf --preset option.
 .PARAMETER RemoveBackup
   Switch. Remove the .bak backup file on success (kept by default). Maps to
-  the optimize-pdf --rm-bak option.
+  the optimize-pdf --rm-bak and strip-office-metadata --rm-bak options.
 .PARAMETER File
-  One or more PDF file paths to optimize.
+  One or more file paths to process.
 .PARAMETER Help
   Show detailed help.
 .EXAMPLE
   .\utils.ps1 optimize-pdf document.pdf
-  .\utils.ps1 optimize-pdf -Preset screen doc1.pdf doc2.pdf
+  .\utils.ps1 strip-office-metadata report.docx
 #>
 [CmdletBinding()]
 param(
   [Parameter(Position = 0)]
-  [ValidateSet('optimize-pdf')]
+  [ValidateSet('optimize-pdf', 'strip-office-metadata')]
   [string]$Action,
 
   [Parameter()]
@@ -48,7 +47,7 @@ $modulePath = Join-Path $PSScriptRoot '..\src\platforms\Windows\modules\Format-N
 Import-Module $modulePath -Force -DisableNameChecking
 
 if ($Help -or -not $Action) {
-  if (-not $Action) { Write-NucleusError "missing subcommand (optimize-pdf)" }
+  if (-not $Action) { Write-NucleusError "missing subcommand (optimize-pdf or strip-office-metadata)" }
   Get-Help $PSCommandPath -Detailed
   exit 0
 }
@@ -65,6 +64,16 @@ if (-not (Get-Command Invoke-NucleusGhostscript -ErrorAction SilentlyContinue)) 
     # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
     if (Get-Command gswin32c -ErrorAction SilentlyContinue) { & gswin32c @Args; return }
     throw "Ghostscript CLI not found. Expected one of: gs, gswin64c, gswin32c"
+  }
+}
+
+# Import exiftool invocation helper.
+# check-suppress:suppression_doc: probe whether function is already defined; Get-Command throws when absent.
+if (-not (Get-Command Invoke-NucleusExifTool -ErrorAction SilentlyContinue)) {
+  function Invoke-NucleusExifTool {
+    # check-suppress:suppression_doc: probe whether tool is installed; Get-Command throws when absent.
+    if (Get-Command exiftool -ErrorAction SilentlyContinue) { & exiftool @Args; return }
+    throw "ExifTool CLI not found. Expected: exiftool"
   }
 }
 
@@ -110,6 +119,42 @@ switch ($Action) {
       } catch {
         Move-Item -LiteralPath $bak -Destination $f -Force
         Write-NucleusError "optimization failed, restored: $f"
+        exit 1
+      }
+    }
+  }
+
+  'strip-office-metadata' {
+    if ($File.Count -eq 0) {
+      Write-NucleusInfo "usage: $(Split-Path -Leaf $PSCommandPath) strip-office-metadata [[-RemoveBackup]] [-File] <path>..."
+      exit 1
+    }
+
+    foreach ($f in $File) {
+      if (-not (Test-Path -LiteralPath $f -PathType Leaf)) {
+        Write-NucleusWarning "skipping non-file: $f"
+        continue
+      }
+
+      $bak = "$f.bak"
+      if (Test-Path -LiteralPath $bak) {
+        Write-NucleusError "backup already exists, refusing to overwrite: $bak"
+        exit 1
+      }
+
+      Move-Item -LiteralPath $f -Destination $bak -Force
+      try {
+        Invoke-NucleusExifTool @(
+          "-all=",
+          "-overwrite_original",
+          "-o", (Resolve-Path $f -Relative),
+          "$bak"
+        )
+        if ($RemoveBackup) { Remove-Item -LiteralPath $bak -Force }
+        Write-NucleusInfo "stripped metadata: $f"
+      } catch {
+        Move-Item -LiteralPath $bak -Destination $f -Force
+        Write-NucleusError "metadata stripping failed, restored: $f"
         exit 1
       }
     }
