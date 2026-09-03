@@ -174,7 +174,7 @@ restart_cloud_mount_services() {
       fi
 
       _rcms_label="local.cloud-mount.${mount_id}"
-      _rcms_target="gui/${_rcms_uid}/${_rcms_label}"
+      _rcms_target="user/${_rcms_uid}/${_rcms_label}"
 
       # Both missing-service and launchctl parse failures are benign here;
       # if the service is absent we emit a targeted hint and continue.
