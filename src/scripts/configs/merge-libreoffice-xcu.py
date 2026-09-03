@@ -20,6 +20,11 @@ from pathlib import Path
 NS = {"oor": "http://openoffice.org/2001/registry",
       "xlink": "http://www.w3.org/1999/xlink"}
 
+# Register namespace prefixes so ElementTree writes "oor:" and "xlink:"
+# instead of auto-generated "ns0:" and "ns1:" prefixes.
+ET.register_namespace("oor", NS["oor"])
+ET.register_namespace("xlink", NS["xlink"])
+
 XCU_HEADER = '''\
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE oor:items PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "items.dtd">
