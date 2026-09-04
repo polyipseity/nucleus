@@ -152,7 +152,7 @@ switch ($Action) {
         }
         Copy-Item -LiteralPath $f -Destination $bak -Force
         try {
-          & mat2 -o $f $bak
+          & mat2 --inplace $f
           if ($LASTEXITCODE -ne 0) {
             Move-Item -LiteralPath $bak -Destination $f -Force
             Write-NucleusError "metadata stripping failed, restored: $f"

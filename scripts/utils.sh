@@ -228,11 +228,11 @@ do_strip_metadata() {
         warn "mat2 not found in PATH, cannot strip OOXML metadata: $f"
         continue
       fi
-      # WHY: copy-then-mat2 gives an atomic recovery point — the .bak holds the
+      # WHY: backup first, then mat2 --inplace on the original — .bak holds the
       # untouched original, so an interrupt leaves either the original or the
       # stripped file, never a half-written one.
       cp -- "$f" "$bak"
-      if "$mat2_cmd" -o "$f" "$bak" 2>/dev/null; then
+      if "$mat2_cmd" --inplace "$f" 2>/dev/null; then
         "$rm_bak" && rm -f "$bak"
         say "stripped metadata: $f"
       else
