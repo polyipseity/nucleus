@@ -33,38 +33,36 @@ XCU_HEADER = '''\
 </oor:items>'''
 
 
-def _find_item(items_elem, item_path):
-    """Find an <item> element by oor:path."""
-    for item in items_elem.findall("oor:item", NS):
+def _find_prop_in_items(items_elem, item_path, prop_name):
+    """Find a <prop> by oor:name within any <item> matching oor:path.
+
+    LibreOffice stores one prop per <item>, so multiple <item> elements share
+    the same oor:path.  We must search across all of them.
+    """
+    for item in items_elem.findall("item"):
         if item.get(f'{{{NS["oor"]}}}path') == item_path:
-            return item
-    return None
-
-
-def _find_prop(item_elem, prop_name):
-    """Find a <prop> element by oor:name within an <item>."""
-    for prop in item_elem.findall("oor:prop", NS):
-        if prop.get(f'{{{NS["oor"]}}}name') == prop_name:
-            return prop
+            for prop in item.findall("prop"):
+                if prop.get(f'{{{NS["oor"]}}}name') == prop_name:
+                    return prop
     return None
 
 
 def _set_value(prop_elem, value):
     """Set or replace the <value> text within a <prop>."""
-    value_elem = prop_elem.find("oor:value", NS)
+    value_elem = prop_elem.find("value")
     if value_elem is not None:
         value_elem.text = value
     else:
-        value_elem = ET.SubElement(prop_elem, f'{{{NS["oor"]}}}value')
+        value_elem = ET.SubElement(prop_elem, "value")
         value_elem.text = value
 
 
 def _ensure_item(items_elem, item_path):
-    """Return existing <item> or create a new one appended to items_elem."""
-    item = _find_item(items_elem, item_path)
-    if item is not None:
-        return item
-    item = ET.SubElement(items_elem, f'{{{NS["oor"]}}}item')
+    """Return an existing <item> for item_path, or create a new one."""
+    for item in items_elem.findall("item"):
+        if item.get(f'{{{NS["oor"]}}}path') == item_path:
+            return item
+    item = ET.SubElement(items_elem, "item")
     item.set(f'{{{NS["oor"]}}}path', item_path)
     return item
 
@@ -89,12 +87,12 @@ def merge_entries(xcu_path, entries):
         tree = ET.ElementTree(root)
 
     for item_path, prop_name, value in entries:
-        item = _ensure_item(items_elem, item_path)
-        prop = _find_prop(item, prop_name)
+        prop = _find_prop_in_items(items_elem, item_path, prop_name)
         if prop is not None:
             _set_value(prop, value)
         else:
-            prop = ET.SubElement(item, f'{{{NS["oor"]}}}prop')
+            item = _ensure_item(items_elem, item_path)
+            prop = ET.SubElement(item, "prop")
             prop.set(f'{{{NS["oor"]}}}name', prop_name)
             _set_value(prop, value)
 
