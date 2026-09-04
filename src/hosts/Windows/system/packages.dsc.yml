@@ -494,6 +494,13 @@ properties:
 
     - resource: Microsoft.WinGet.Client/Package
       directives:
+        description: Ensure RimSort is installed as the RimWorld mod manager for mod management parity with macOS and NixOS
+      settings:
+        id: RimSort.RimSort
+        source: winget
+
+    - resource: Microsoft.WinGet.Client/Package
+      directives:
         description: Ensure actionlint is installed for cross-host GitHub Actions workflow lint parity with macOS and NixOS
       settings:
         id: rhysd.actionlint

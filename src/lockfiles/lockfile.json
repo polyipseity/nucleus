@@ -304,6 +304,7 @@
     "Parsec.Parsec": "150.101.0.0",
     "PeterVerbeek.PeaceEqualizerAPO": "1.6.10",
     "Rclone.Rclone": "1.74.3",
+    "RimSort.RimSort": "1.12.0",
     "Redis.Redis": "3.0.504",
     "Rustlang.Rustup": "1.29.0",
     "SST.opencode": "1.16.2",
