@@ -142,6 +142,9 @@
               lcevcdec = prev.lcevcdec.overrideAttrs (_: {
                 doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
+              mat2 = prev.mat2.overrideAttrs (_: {
+                doCheck = !prev.stdenv.hostPlatform.isDarwin;
+              });
               openapv = prev.openapv.overrideAttrs (_: {
                 doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
