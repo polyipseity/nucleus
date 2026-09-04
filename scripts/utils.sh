@@ -36,18 +36,18 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # subcommand, flag, and preset the parsers accept, so it stays in sync with
 # the dispatch and case branches below.
 usage() {
-  usage_std "$(basename "$$0")" "optimize-pdf [--preset <name>] [--rm-bak] <file>... | strip-office-metadata [--rm-bak] [--deep] <file>..." \
-    "Grouped nucleus user utilities. Currently: optimize-pdf (optimize PDFs with Ghostscript), strip-office-metadata (strip Office metadata with exiftool)."
+  usage_std "$(basename "$$0")" "optimize-pdf [--preset <name>] [--rm-bak] <file>... | strip-metadata [--rm-bak] <file>..." \
+    "Grouped nucleus user utilities. Currently: optimize-pdf (optimize PDFs with Ghostscript), strip-metadata (strip file metadata with mat2/exiftool)."
   cat <<'EOF'
 
 Subcommands:
   optimize-pdf [--preset <name>] [--rm-bak] <file>...
               Optimize PDF files using Ghostscript. Keeps a .bak backup by default.
 
-  strip-office-metadata [--rm-bak] [--deep] <file>...
-              Strip personal metadata from Office files using exiftool.
-              --deep also strips embedded image metadata from OOXML archives.
-              Supports: .docx, .xlsx, .pptx, .doc, .xls, .ppt.
+  strip-metadata [--rm-bak] <file>...
+              Strip personal metadata from files. Uses mat2 for OOXML
+              (.docx/.xlsx/.pptx) and exiftool for other formats.
+              Legacy OLE2 files (.doc/.xls/.ppt) are skipped with a warning.
 
   optimize-pdf presets (default: default):
     default   - high quality
@@ -164,16 +164,17 @@ do_optimize_pdf() {
   done
 }
 
-# do_strip_office_metadata — Strip personal metadata from each input Office file via exiftool.
-# When --deep is passed, also strips embedded image metadata from OOXML
-# archives (.docx/.xlsx/.pptx) using the Python helper script.
+# do_strip_metadata — Strip personal metadata from each input file.
+# OOXML files (.docx/.xlsx/.pptx) are handled by mat2, which also cleans
+# embedded media metadata recursively. Legacy OLE2 files are skipped
+# (neither mat2 nor exiftool can write them). Other formats use exiftool.
 # Args: $@ — option/flag pairs followed by input file paths.
 # Side effects: renames each input to <file>.bak and writes the stripped
 # file back to <file>; removes the .bak only with --rm-bak.
-# Preconditions: exiftool on PATH; no pre-existing .bak for any input.
-do_strip_office_metadata() {
+# Preconditions: mat2 or exiftool on PATH (depending on file type);
+#   no pre-existing .bak for any input.
+do_strip_metadata() {
   local rm_bak=false
-  local deep=false
   local files=()
 
   while [[ $# -gt 0 ]]; do
@@ -184,10 +185,6 @@ do_strip_office_metadata() {
       ;;
     --rm-bak)
       rm_bak=true
-      shift
-      ;;
-    --deep)
-      deep=true
       shift
       ;;
     -*)
@@ -206,33 +203,12 @@ do_strip_office_metadata() {
     return 1
   fi
 
+  local mat2_cmd
+  # check-suppress:suppression_doc: mat2 is optional — OOXML files fall through to warning when absent.
+  mat2_cmd="$(command -v mat2 2>/dev/null || true)"
   local et_cmd
-  et_cmd="$(command -v exiftool)" || {
-    error "exiftool not found in PATH"
-    return 1
-  }
-
-  # Resolve the Python helper for --deep mode.
-  local py_helper=""
-  if $deep; then
-    # Resolve through symlinks so SCRIPT_DIR lands on the real script directory.
-    local _resolved="$0"
-    if [ -h "$_resolved" ]; then
-      local _target
-      _target="$(readlink "$_resolved")"
-      case "$_target" in
-      /*) _resolved="$_target" ;;
-      *) _resolved="$(dirname "$_resolved")/$_target" ;;
-      esac
-    fi
-    local _real_dir
-    _real_dir="$(CDPATH='' cd -- "$(dirname -- "$_resolved")" && pwd)"
-    py_helper="$_real_dir/../src/scripts/lib/strip-embedded-metadata.py"
-    if [[ ! -f "$py_helper" ]]; then
-      error "--deep requires strip-embedded-metadata.py"
-      return 1
-    fi
-  fi
+  # check-suppress:suppression_doc: exiftool is optional — non-Office files fall through to warning when absent.
+  et_cmd="$(command -v exiftool 2>/dev/null || true)"
 
   local f bak
   for f in "${files[@]}"; do
@@ -247,30 +223,44 @@ do_strip_office_metadata() {
       return 1
     fi
 
-    # WHY: move-then-strip gives an atomic recovery point — exiftool reads the
-    # .bak and writes the original path, so an interrupt leaves either the
-    # untouched original or the stripped file, never a half-written one.
-    mv "$f" "$bak"
-    if "$et_cmd" -all= -overwrite_original -o "$f" "$bak"; then
-      # --deep: strip embedded image metadata from OOXML ZIP archives.
-      if $deep; then
-        case "$f" in
-        *.docx | *.xlsx | *.pptx)
-          if python3 "$py_helper" "$bak" "$f" "$et_cmd"; then
-            say "stripped embedded media metadata: $f"
-          else
-            warn "embedded metadata stripping failed for: $f"
-          fi
-          ;;
-        esac
+    case "$f" in
+    *.docx | *.xlsx | *.pptx)
+      if [[ -z "$mat2_cmd" ]]; then
+        warn "mat2 not found in PATH, cannot strip OOXML metadata: $f"
+        continue
       fi
-      "$rm_bak" && rm -f "$bak"
-      say "stripped metadata: $f"
-    else
-      mv "$bak" "$f"
-      error "metadata stripping failed, restored original: $f"
-      return 1
-    fi
+      # WHY: copy-then-mat2 gives an atomic recovery point — the .bak holds the
+      # untouched original, so an interrupt leaves either the original or the
+      # stripped file, never a half-written one.
+      cp -- "$f" "$bak"
+      if "$mat2_cmd" -o "$f" "$bak" 2>/dev/null; then
+        "$rm_bak" && rm -f "$bak"
+        say "stripped metadata: $f"
+      else
+        mv -f -- "$bak" "$f"
+        error "metadata stripping failed, restored original: $f"
+        return 1
+      fi
+      ;;
+    *.doc | *.xls | *.ppt)
+      warn "skipping legacy OLE2 (no CLI tool can write this format): $f"
+      ;;
+    *)
+      if [[ -z "$et_cmd" ]]; then
+        warn "exiftool not found in PATH, cannot strip metadata: $f"
+        continue
+      fi
+      mv "$f" "$bak"
+      if "$et_cmd" -all= -overwrite_original -o "$f" "$bak"; then
+        "$rm_bak" && rm -f "$bak"
+        say "stripped metadata: $f"
+      else
+        mv "$bak" "$f"
+        error "metadata stripping failed, restored original: $f"
+        return 1
+      fi
+      ;;
+    esac
   done
 }
 
@@ -290,8 +280,8 @@ main() {
   optimize-pdf)
     do_optimize_pdf "$@"
     ;;
-  strip-office-metadata)
-    do_strip_office_metadata "$@"
+  strip-metadata)
+    do_strip_metadata "$@"
     ;;
   *)
     error "unknown subcommand: $subcommand"
