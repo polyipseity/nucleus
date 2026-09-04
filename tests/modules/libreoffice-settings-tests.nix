@@ -20,7 +20,11 @@ let
       removePersonalInfoOnSave = true;
       clearUserProfileData = true;
       extraSettings = [
-        { path = "/org.openoffice.Office.Common/Security/Scripting"; name = "Foo"; value = "bar"; }
+        {
+          path = "/org.openoffice.Office.Common/Security/Scripting";
+          name = "Foo";
+          value = "bar";
+        }
       ];
     };
   };
@@ -31,7 +35,7 @@ let
     libreOfficeDefaultSettings = {
       removePersonalInfoOnSave = true;
       clearUserProfileData = false;
-      extraSettings = [];
+      extraSettings = [ ];
     };
   };
 
@@ -41,7 +45,7 @@ let
     libreOfficeDefaultSettings = {
       removePersonalInfoOnSave = false;
       clearUserProfileData = false;
-      extraSettings = [];
+      extraSettings = [ ];
     };
   };
 
@@ -53,15 +57,26 @@ let
   # 1 RemovePersonalInfoOnSave + 19 profile fields + 1 extra = 21
   test_full_entry_count = builtins.length fullEntries == 21;
   test_full_has_remove_personal = builtins.any (e: e.name == "RemovePersonalInfoOnSave") fullEntries;
-  test_full_scripting_path = builtins.any (e: e.path == "/org.openoffice.Office.Common/Security/Scripting" && e.name == "RemovePersonalInfoOnSave" && e.value == "true") fullEntries;
-  test_full_profile_path = builtins.all (e: e.path == "/org.openoffice.UserProfile/Data") (builtins.filter (e: e.name != "RemovePersonalInfoOnSave" && e.name != "Foo") fullEntries);
+  test_full_scripting_path = builtins.any (
+    e:
+    e.path == "/org.openoffice.Office.Common/Security/Scripting"
+    && e.name == "RemovePersonalInfoOnSave"
+    && e.value == "true"
+  ) fullEntries;
+  test_full_profile_path = builtins.all (e: e.path == "/org.openoffice.UserProfile/Data") (
+    builtins.filter (e: e.name != "RemovePersonalInfoOnSave" && e.name != "Foo") fullEntries
+  );
   test_full_extra_appended = builtins.any (e: e.name == "Foo" && e.value == "bar") fullEntries;
 
   # ── Partial module tests ───────────────────────────────────────────
   # 1 RemovePersonalInfoOnSave + 0 profile fields + 0 extra = 1
   test_partial_entry_count = builtins.length partialEntries == 1;
-  test_partial_has_remove_personal = builtins.any (e: e.name == "RemovePersonalInfoOnSave") partialEntries;
-  test_partial_no_profile_fields = builtins.length (builtins.filter (e: e.path == "/org.openoffice.UserProfile/Data") partialEntries) == 0;
+  test_partial_has_remove_personal = builtins.any (
+    e: e.name == "RemovePersonalInfoOnSave"
+  ) partialEntries;
+  test_partial_no_profile_fields =
+    builtins.length (builtins.filter (e: e.path == "/org.openoffice.UserProfile/Data") partialEntries)
+    == 0;
 
   # ── Disabled module tests ──────────────────────────────────────────
   test_disabled_no_entries = builtins.length disabledEntries == 0;
@@ -72,8 +87,11 @@ let
   test_full_merge_args_has_extra = lib.hasInfix "bar" fullModule.libreOfficeMergeArgs;
 
   # ── XCU path tests ────────────────────────────────────────────────
-  test_darwin_path = fullModule.libreOfficeDarwinXcuPath == "~/Library/Application Support/LibreOffice/4/user/registrymodifications.xcu";
-  test_linux_path = fullModule.libreOfficeLinuxXcuPath == "~/.config/libreoffice/4/user/registrymodifications.xcu";
+  test_darwin_path =
+    fullModule.libreOfficeDarwinXcuPath
+    == "~/Library/Application Support/LibreOffice/4/user/registrymodifications.xcu";
+  test_linux_path =
+    fullModule.libreOfficeLinuxXcuPath == "~/.config/libreoffice/4/user/registrymodifications.xcu";
 
   allTests = {
     inherit
