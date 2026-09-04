@@ -269,9 +269,9 @@
             (
               _final: prev:
               prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
-                # RimSort tarballs contain RimSort.app/Contents/... at the
-                # top level.  Set sourceRoot into RimSort.app so the
-                # installPhase can copy Contents directly.
+                # RimSort tarballs extract to a bare Contents/ directory (the
+                # interior of a .app bundle).  Re-wrap it into RimSort.app so
+                # Spotlight and launch services can discover it.
                 rimsort = prev.stdenv.mkDerivation rec {
                   pname = "rimsort";
                   version = "1.12.0";
@@ -279,16 +279,16 @@
                   src =
                     if prev.stdenv.hostPlatform.isAarch64 then
                       prev.fetchurl {
-                        url = "https://github.com/RimSort/RimSort/releases/download/v${version}/RimSort-v${version}-Darwin_arm64.tar.gz";
-                        hash = "sha256-O7rJULzSvzaoO6sfSTYF4EQhBsvcmm86+UsKR6luMfM=";
+                        url = "https://github.com/RimSort/RimSort/releases/download/v${version}/RimSort-${version}-Darwin_arm64.tar.gz";
+                        hash = "sha256-Zy3cuGDC2ymukT8XOp3PDi8Az53ifG8IEhNYRwbM9BM=";
                       }
                     else
                       prev.fetchurl {
-                        url = "https://github.com/RimSort/RimSort/releases/download/v${version}/RimSort-v${version}-Darwin_x86_64.tar.gz";
-                        hash = "sha256-QlMupXTqSgV084ZA3IrX7bM+Sv96PTxnJUICW/kSwvk=";
+                        url = "https://github.com/RimSort/RimSort/releases/download/v${version}/RimSort-${version}-Darwin_x86_64.tar.gz";
+                        hash = "sha256-KoXw4gDA2/ttN8CbfOwlKb24ODPL6eQS72ouV3pZrPY=";
                       };
 
-                  sourceRoot = "./RimSort.app";
+                  sourceRoot = ".";
 
                   installPhase = ''
                     mkdir -p $out/Applications/RimSort.app

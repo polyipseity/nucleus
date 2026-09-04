@@ -97,6 +97,29 @@ let
   );
   obsidianManagedSettingsJson = builtins.toJSON obsidianManagedSettings;
 
+  # RimSort stores per-instance paths and Steam integration flags in
+  # settings.json alongside dynamic theme, sorting, and window-state
+  # settings written by the app.  Merge only the managed keys (game
+  # folder, config folder, local mods, workshop, Steam integration)
+  # into instances.Default so declarative paths converge without
+  # clobbering app-owned UI state.
+  #
+  # WHY: Steam integration is configured here (not left to autodetect)
+  # because autodetect only runs on empty fields and may silently
+  # disable integration when the workshop path validation fails.
+  # Pre-populating the fields ensures the autodetect button preserves
+  # them on future clicks.
+  #
+  # check-suppress:config-method: method 3 (merge) -- cannot use Method 1 (symlink) because RimSort owns
+  # settings.json and writes theme, sorting, and window state into it.
+  # A symlink would let those app-owned writes reach the repo file,
+  # mixing managed settings with runtime state that does not belong
+  # in the repo.  Merge preserves both managed and app-owned keys.
+  rimsortManagedSettings = builtins.fromJSON (
+    builtins.readFile (selectUserAppConfigFile "rimsort" "rimsort.json")
+  );
+  rimsortManagedSettingsJson = builtins.toJSON rimsortManagedSettings;
+
   # Out-of-store symlink paths protected across activation cycles.
   # Expanded from $HOME to resolvedHomeDirectory at eval time so the JSON
   # token carries absolute paths and no shell expansion is needed at runtime.
@@ -280,6 +303,22 @@ in
       "${activationBundle}/src/scripts/configs/merge-obsidian-json.sh" \
         "${pkgs.python3}/bin/python3" \
         ${lib.escapeShellArg obsidianManagedSettingsJson}
+    '';
+
+    # RimSort settings.json contains per-instance paths, Steam integration
+    # flags, and app-owned theme/UI state.  Merge managed keys into
+    # instances.Default so declarative paths converge without clobbering
+    # runtime settings.
+    #
+    # check-suppress:config-method: method 3 (merge) -- cannot use Method 1 (symlink) because RimSort owns
+    # settings.json and writes theme, sorting, and window state into it.
+    # A symlink would let those app-owned writes reach the repo file,
+    # mixing managed settings with runtime state that does not belong
+    # in the repo.  Merge preserves both managed and app-owned keys.
+    home.activation.merge-rimsort-json = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      "${activationBundle}/src/scripts/configs/merge-rimsort-json.sh" \
+        "${pkgs.python3}/bin/python3" \
+        ${lib.escapeShellArg rimsortManagedSettingsJson}
     '';
 
     # Protect out-of-store symlinks (mkOutOfStoreSymlink) against accidental

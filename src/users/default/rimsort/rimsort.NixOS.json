@@ -1,0 +1,10 @@
+{
+  "instances": {
+    "Default": {
+      "game_folder": "~/.steam/steam/steamapps/common/RimWorld/RimWorld",
+      "config_folder": "~/.config/unity3d/Ludeon Studios/RimWorld by Ludeon Studios/Config",
+      "local_folder": "~/.steam/steam/steamapps/common/RimWorld/RimWorld/Mods",
+      "workshop_folder": "~/.steam/steam/steamapps/workshop/content/294100"
+    }
+  }
+}

@@ -112,6 +112,10 @@
   Enable managed Obsidian advanced-settings parity convergence and cleanup
   fallback while preserving unmanaged vault metadata in the live app config.
 
+.PARAMETER EnableRimSortParity
+  Enable managed RimSort instance-paths and Steam-integration parity convergence
+  and cleanup fallback while preserving unmanaged theme and UI settings.
+
 .PARAMETER EnableQtPassParity
   Enable managed QtPass Settings/Template tab parity convergence and cleanup fallback.
 
@@ -354,6 +358,7 @@ $EnableSymlinkParity = -not $noUserStateParity
 $EnableGitSshParity = -not $noUserStateParity
 $EnablePicardParity = -not $noUserStateParity
 $EnableObsidianParity = -not $noUserStateParity
+$EnableRimSortParity = -not $noUserStateParity
 $EnableQtPassParity = -not $noUserStateParity
 $EnableLibreOfficeParity = -not $noUserStateParity
 $EnableShellParity = -not $noUserStateParity
@@ -493,6 +498,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-MenuBar.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-GitAndSshConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-ObsidianConfig.ps1")
+. (Join-Path -Path $userModuleDir -ChildPath "Sync-RimSortConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-PicardConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-QtPassConfig.ps1")
 . (Join-Path -Path $userModuleDir -ChildPath "Sync-BunConfig.ps1")
@@ -914,6 +920,10 @@ Sync-GitAndSshConfig -Enabled:$EnableGitSshParity -Users $Users
 # entries while preserving user-configured settings outside managed keys.
 Sync-LibreOfficeXcu -Enabled:$EnableLibreOfficeParity -Users $selectedUserRecords -RepoRoot $repoRoot
 Sync-ObsidianConfig -Enabled:$EnableObsidianParity -Users $selectedUserRecords -RepoRoot $repoRoot
+# check-suppress:config-method: method 3 (merge) -- RimSort owns settings.json and writes theme, sorting,
+# and window state into it. A symlink would let app-owned writes reach the
+# repo file. Merge preserves both managed and app-owned keys.
+Sync-RimSortConfig -Enabled:$EnableRimSortParity -Users $selectedUserRecords -RepoRoot $repoRoot
 # check-suppress:config-method: method 3 (merge) -- Picard defaults INI merged via Sync-PicardConfig on Windows
 Sync-PicardConfig -Enabled:$EnablePicardParity -Users $selectedUserRecords -RepoRoot $repoRoot
 # WHY: QtPass stores settings in platform-native stores (registry on Windows), so Method 1 (symlink) does not apply.

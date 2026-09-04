@@ -13,6 +13,7 @@ function Skip-SchemaFile([string]$FilePath) {
     $f -like '*users\*\iterm2\DynamicProfiles\*.json' -or $f -like '*users/*/iterm2/DynamicProfiles/*.json' -or
     $f -like '*users\*\obsidian\*.json' -or $f -like '*users/*/obsidian/*.json' -or
     $f -like '*users\*\qtpass\*.json' -or $f -like '*users/*/qtpass/*.json' -or
+    $f -like '*users\*\rimsort\*.json' -or $f -like '*users/*/rimsort/*.json' -or
     $f -like '*configs\camilladsp\*' -or $f -like '*configs/camilladsp/*' -or
     $f -like '*configs\camillagui-backend\*' -or $f -like '*configs/camillagui-backend/*' -or
     $f -like '*users\*\discord-music-rpc\*' -or $f -like '*users/*/discord-music-rpc/*' -or

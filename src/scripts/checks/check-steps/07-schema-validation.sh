@@ -30,7 +30,7 @@ run_schema_validation() {
     *.schema.json | */vendor/* | */secrets/* | */.github/workflows/* | */.github/dependabot.yml)
       return 0
       ;;
-    */users/*/vscode/*.json | */users/*/cursor/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */ai/litellm-config.yml | */.sops.yaml | */.vscode/* | */.agents/skills/*)
+    */users/*/vscode/*.json | */users/*/cursor/*.json | */users/*/iterm2/DynamicProfiles/*.json | */users/*/obsidian/*.json | */users/*/qtpass/*.json | */users/*/rimsort/*.json | */configs/camilladsp/* | */configs/camillagui-backend/* | */users/*/discord-music-rpc/* | */users/*/agents/hooks/*.json | */users/*/agents/skills/*/_meta.json | */ai/litellm-config.yml | */.sops.yaml | */.vscode/* | */.agents/skills/*)
       return 0
       ;;
     esac
