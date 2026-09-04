@@ -102,7 +102,7 @@ function Sync-LibreOfficeXcu {
     if ($settings.removePersonalInfoOnSave -eq $true) {
       $entries.Add([pscustomobject]@{
           Path  = '/org.openoffice.Office.Common/Security/Scripting'
-          Name  = 'RemovePersonalInfoOnSave'
+          Name  = 'RemovePersonalInfoOnSaving'
           Value = 'true'
         })
     }

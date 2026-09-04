@@ -29,7 +29,7 @@
           },
           "name": {
             "type": "string",
-            "description": "XCU prop oor:name attribute (e.g. RemovePersonalInfoOnSave)."
+            "description": "XCU prop oor:name attribute (e.g. RemovePersonalInfoOnSaving)."
           },
           "value": {
             "type": "string",

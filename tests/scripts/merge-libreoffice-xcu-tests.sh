@@ -61,13 +61,13 @@ test_update_existing_value() {
   local xcu="$TMPDIR_TEST/update.xcu"
   # Create initial file.
   "$PYTHON3" "$MERGE_SCRIPT" "$xcu" \
-    "/org.openoffice.Office.Common/Security/Scripting|RemovePersonalInfoOnSave|false" 2>&1
+    "/org.openoffice.Office.Common/Security/Scripting|RemovePersonalInfoOnSaving|false" 2>&1
   # Update the value.
   "$PYTHON3" "$MERGE_SCRIPT" "$xcu" \
-    "/org.openoffice.Office.Common/Security/Scripting|RemovePersonalInfoOnSave|true" 2>&1
+    "/org.openoffice.Office.Common/Security/Scripting|RemovePersonalInfoOnSaving|true" 2>&1
 
   local count
-  count=$(grep -c 'RemovePersonalInfoOnSave' "$xcu" 2>/dev/null || echo 0)
+  count=$(grep -c 'RemovePersonalInfoOnSaving' "$xcu" 2>/dev/null || echo 0)
   if [ "$count" -eq 1 ]; then
     assert_pass "update_existing_value: no duplicate entry"
   else
@@ -106,7 +106,7 @@ test_create_new_item() {
     "/org.openoffice.UserProfile/Data|givenname|Alice" 2>&1
   # Add a different item.
   "$PYTHON3" "$MERGE_SCRIPT" "$xcu" \
-    "/org.openoffice.Office.Common/Security/Scripting|RemovePersonalInfoOnSave|true" 2>&1
+    "/org.openoffice.Office.Common/Security/Scripting|RemovePersonalInfoOnSaving|true" 2>&1
 
   local item_count
   item_count=$(grep -o 'oor:path=' "$xcu" | wc -l)

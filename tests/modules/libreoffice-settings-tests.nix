@@ -56,15 +56,17 @@ let
   # ── Full module tests ──────────────────────────────────────────────
   # 1 RemovePersonalInfoOnSave + 19 profile fields + 1 extra = 21
   test_full_entry_count = builtins.length fullEntries == 21;
-  test_full_has_remove_personal = builtins.any (e: e.name == "RemovePersonalInfoOnSave") fullEntries;
+  test_full_has_remove_personal = builtins.any (
+    e: e.name == "RemovePersonalInfoOnSaving"
+  ) fullEntries;
   test_full_scripting_path = builtins.any (
     e:
     e.path == "/org.openoffice.Office.Common/Security/Scripting"
-    && e.name == "RemovePersonalInfoOnSave"
+    && e.name == "RemovePersonalInfoOnSaving"
     && e.value == "true"
   ) fullEntries;
   test_full_profile_path = builtins.all (e: e.path == "/org.openoffice.UserProfile/Data") (
-    builtins.filter (e: e.name != "RemovePersonalInfoOnSave" && e.name != "Foo") fullEntries
+    builtins.filter (e: e.name != "RemovePersonalInfoOnSaving" && e.name != "Foo") fullEntries
   );
   test_full_extra_appended = builtins.any (e: e.name == "Foo" && e.value == "bar") fullEntries;
 
@@ -72,7 +74,7 @@ let
   # 1 RemovePersonalInfoOnSave + 0 profile fields + 0 extra = 1
   test_partial_entry_count = builtins.length partialEntries == 1;
   test_partial_has_remove_personal = builtins.any (
-    e: e.name == "RemovePersonalInfoOnSave"
+    e: e.name == "RemovePersonalInfoOnSaving"
   ) partialEntries;
   test_partial_no_profile_fields =
     builtins.length (builtins.filter (e: e.path == "/org.openoffice.UserProfile/Data") partialEntries)
@@ -83,7 +85,7 @@ let
 
   # ── Merge args tests ──────────────────────────────────────────────
   test_full_merge_args_nonempty = fullModule.libreOfficeMergeArgs != "";
-  test_full_merge_args_has_remove = lib.hasInfix "RemovePersonalInfoOnSave" fullModule.libreOfficeMergeArgs;
+  test_full_merge_args_has_remove = lib.hasInfix "RemovePersonalInfoOnSaving" fullModule.libreOfficeMergeArgs;
   test_full_merge_args_has_extra = lib.hasInfix "bar" fullModule.libreOfficeMergeArgs;
 
   # ── XCU path tests ────────────────────────────────────────────────

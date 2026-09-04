@@ -2,7 +2,7 @@
 # by merging managed entries into registrymodifications.xcu.
 #
 # Two managed settings:
-#   1. RemovePersonalInfoOnSave — strips author, timestamps, editing duration
+#   1. RemovePersonalInfoOnSaving — strips author, timestamps, editing duration
 #      from document properties on save.
 #   2. UserProfile/Data cleared — removes identity fields (name, email, company)
 #      so metadata is never embedded in the first place.
@@ -51,7 +51,7 @@ let
       [
         {
           path = scriptingPath;
-          name = "RemovePersonalInfoOnSave";
+          name = "RemovePersonalInfoOnSaving";
           value = "true";
         }
       ]
