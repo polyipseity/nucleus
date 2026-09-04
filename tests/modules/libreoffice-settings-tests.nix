@@ -89,9 +89,9 @@ let
   # ── XCU path tests ────────────────────────────────────────────────
   test_darwin_path =
     fullModule.libreOfficeDarwinXcuPath
-    == "~/Library/Application Support/LibreOffice/4/user/registrymodifications.xcu";
+    == "$HOME/Library/Application Support/LibreOffice/4/user/registrymodifications.xcu";
   test_linux_path =
-    fullModule.libreOfficeLinuxXcuPath == "~/.config/libreoffice/4/user/registrymodifications.xcu";
+    fullModule.libreOfficeLinuxXcuPath == "$HOME/.config/libreoffice/4/user/registrymodifications.xcu";
 
   allTests = {
     inherit

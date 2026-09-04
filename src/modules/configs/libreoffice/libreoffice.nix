@@ -82,8 +82,8 @@ let
   );
 
   # Platform-specific XCU file paths.
-  libreOfficeDarwinXcuPath = "~/Library/Application Support/LibreOffice/4/user/registrymodifications.xcu";
-  libreOfficeLinuxXcuPath = "~/.config/libreoffice/4/user/registrymodifications.xcu";
+  libreOfficeDarwinXcuPath = "$HOME/Library/Application Support/LibreOffice/4/user/registrymodifications.xcu";
+  libreOfficeLinuxXcuPath = "$HOME/.config/libreoffice/4/user/registrymodifications.xcu";
 in
 {
   inherit

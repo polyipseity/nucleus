@@ -241,7 +241,12 @@ in
     home.activation.merge-libreoffice-xcu = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
       "${activationBundle}/src/scripts/configs/merge-libreoffice-xcu.sh" \
         "${pkgs.python3}/bin/python3" \
-        ${libreOfficeModule.libreOfficeLinuxXcuPath} \
+        "${
+          if pkgs.stdenv.hostPlatform.isDarwin then
+            libreOfficeModule.libreOfficeDarwinXcuPath
+          else
+            libreOfficeModule.libreOfficeLinuxXcuPath
+        }" \
         ${libreOfficeModule.libreOfficeMergeArgs}
     '';
 
