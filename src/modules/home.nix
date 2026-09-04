@@ -118,7 +118,18 @@ let
   rimsortManagedSettings = builtins.fromJSON (
     builtins.readFile (selectUserAppConfigFile "rimsort" "rimsort.json")
   );
-  rimsortManagedSettingsJson = builtins.toJSON rimsortManagedSettings;
+  rimsortHostSettings = builtins.fromJSON (
+    builtins.readFile (
+      let
+        perUser = "${repoRoot}/src/users/${effectiveUsername}/rimsort/rimsort.${hostName}.json";
+        default = "${repoRoot}/src/users/default/rimsort/rimsort.${hostName}.json";
+      in
+      if builtins.pathExists perUser then perUser else default
+    )
+  );
+  rimsortManagedSettingsJson = builtins.toJSON (
+    lib.recursiveUpdate rimsortManagedSettings rimsortHostSettings
+  );
 
   # Out-of-store symlink paths protected across activation cycles.
   # Expanded from $HOME to resolvedHomeDirectory at eval time so the JSON
