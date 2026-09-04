@@ -143,7 +143,9 @@
                 doCheck = !prev.stdenv.hostPlatform.isDarwin;
               });
               mat2 = prev.mat2.overrideAttrs (_: {
-                doCheck = !prev.stdenv.hostPlatform.isDarwin;
+                # pytest-check-hook registers pytestCheckPhase in preDistPhases,
+                # not checkPhase, so doCheck has no effect. Disable it explicitly.
+                dontUsePytestCheck = true;
               });
               openapv = prev.openapv.overrideAttrs (_: {
                 doCheck = !prev.stdenv.hostPlatform.isDarwin;
