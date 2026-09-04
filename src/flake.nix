@@ -266,6 +266,47 @@
                 };
               };
             })
+            (
+              _final: prev:
+              prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
+                # RimSort tarballs extract to a bare Contents/ directory (the
+                # interior of a .app bundle).  Re-wrap it into RimSort.app so
+                # Spotlight and launch services can discover it.
+                rimsort = prev.stdenv.mkDerivation rec {
+                  pname = "rimsort";
+                  version = "1.12.0";
+
+                  src =
+                    if prev.stdenv.hostPlatform.isAarch64 then
+                      prev.fetchurl {
+                        url = "https://github.com/RimSort/RimSort/releases/download/v${version}/RimSort-${version}-Darwin_arm64.tar.gz";
+                        hash = "sha256-Zy3cuGDC2ymukT8XOp3PDi8Az53ifG8IEhNYRwbM9BM=";
+                      }
+                    else
+                      prev.fetchurl {
+                        url = "https://github.com/RimSort/RimSort/releases/download/v${version}/RimSort-${version}-Darwin_x86_64.tar.gz";
+                        hash = "sha256-KoXw4gDA2/ttN8CbfOwlKb24ODPL6eQS72ouV3pZrPY=";
+                      };
+
+                  sourceRoot = ".";
+
+                  installPhase = ''
+                    mkdir -p $out/Applications/RimSort.app
+                    cp -r Contents $out/Applications/RimSort.app/
+                  '';
+
+                  meta = {
+                    description = "RimWorld mod manager for sorting, filtering, and managing mod load order";
+                    homepage = "https://github.com/RimSort/RimSort";
+                    license = prev.lib.licenses.gpl3Only;
+                    platforms = [
+                      "aarch64-darwin"
+                      "x86_64-darwin"
+                    ];
+                  };
+                };
+              }
+            )
             (_final: prev: {
               # Darwin fixup runs strip -S over all of $out/lib (including
               # site-packages). cctools/llvm-strip mis-handles .ico COFF data and
