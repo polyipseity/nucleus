@@ -249,12 +249,15 @@ do_strip_metadata() {
         warn "exiftool not found in PATH, cannot strip metadata: $f"
         continue
       fi
-      mv "$f" "$bak"
-      if "$et_cmd" -all= -overwrite_original -o "$f" "$bak"; then
+      # WHY: backup first, then in-place strip on the original — .bak holds the
+      # untouched original, so an interrupt leaves either the original or the
+      # stripped file, never a half-written one.
+      cp -- "$f" "$bak"
+      if "$et_cmd" -all= -overwrite_original "$f"; then
         "$rm_bak" && rm -f "$bak"
         say "stripped metadata: $f"
       else
-        mv "$bak" "$f"
+        mv -f -- "$bak" "$f"
         error "metadata stripping failed, restored original: $f"
         return 1
       fi

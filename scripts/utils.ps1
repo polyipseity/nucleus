@@ -170,13 +170,15 @@ switch ($Action) {
         Write-NucleusWarning "skipping legacy OLE2 (no CLI tool can write this format): $f"
       } else {
         # Other formats: use exiftool.
-        Move-Item -LiteralPath $f -Destination $bak -Force
+        # WHY: backup first, then in-place strip on the original — .bak holds
+        # the untouched original, so an interrupt leaves either the original or
+        # the stripped file, never a half-written one.
+        Copy-Item -LiteralPath $f -Destination $bak -Force
         try {
           Invoke-NucleusExifTool @(
             "-all=",
             "-overwrite_original",
-            "-o", (Resolve-Path $f -Relative),
-            "$bak"
+            $f
           )
           if ($RemoveBackup) { Remove-Item -LiteralPath $bak -Force }
           Write-NucleusInfo "stripped metadata: $f"
