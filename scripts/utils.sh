@@ -4,11 +4,12 @@
 # Currently provides the optimize-pdf subcommand: optimize PDF files with
 # Ghostscript, keeping a .bak backup that is restored automatically if
 # optimization fails. Also provides strip-office-metadata: remove personal
-# metadata from Office files using exiftool.
+# metadata from Office files using exiftool. The --deep flag additionally
+# strips embedded image metadata from OOXML archives.
 #
 # Usage: nucleus-utils <subcommand> [args...]
 #   Subcommand: optimize-pdf [--preset <name>] [--rm-bak] <file>...
-#   Subcommand: strip-office-metadata [--rm-bak] <file>...
+#   Subcommand: strip-office-metadata [--rm-bak] [--deep] <file>...
 #   Presets: default, ebook, prepress, printer, screen (default: default).
 #
 # Env vars: TMPDIR — ghostscript scratch space; falls back to a per-user
@@ -35,7 +36,7 @@ SCRIPT_DIR="$(CDPATH='' cd -- "$(dirname -- "$_self")" && pwd)"
 # subcommand, flag, and preset the parsers accept, so it stays in sync with
 # the dispatch and case branches below.
 usage() {
-  usage_std "$(basename "$0")" "optimize-pdf [--preset <name>] [--rm-bak] <file>... | strip-office-metadata [--rm-bak] <file>..." \
+  usage_std "$(basename "$$0")" "optimize-pdf [--preset <name>] [--rm-bak] <file>... | strip-office-metadata [--rm-bak] [--deep] <file>..." \
     "Grouped nucleus user utilities. Currently: optimize-pdf (optimize PDFs with Ghostscript), strip-office-metadata (strip Office metadata with exiftool)."
   cat <<'EOF'
 
@@ -43,8 +44,9 @@ Subcommands:
   optimize-pdf [--preset <name>] [--rm-bak] <file>...
               Optimize PDF files using Ghostscript. Keeps a .bak backup by default.
 
-  strip-office-metadata [--rm-bak] <file>...
+  strip-office-metadata [--rm-bak] [--deep] <file>...
               Strip personal metadata from Office files using exiftool.
+              --deep also strips embedded image metadata from OOXML archives.
               Supports: .docx, .xlsx, .pptx, .doc, .xls, .ppt.
 
   optimize-pdf presets (default: default):
@@ -163,12 +165,15 @@ do_optimize_pdf() {
 }
 
 # do_strip_office_metadata — Strip personal metadata from each input Office file via exiftool.
+# When --deep is passed, also strips embedded image metadata from OOXML
+# archives (.docx/.xlsx/.pptx) using the Python helper script.
 # Args: $@ — option/flag pairs followed by input file paths.
 # Side effects: renames each input to <file>.bak and writes the stripped
 # file back to <file>; removes the .bak only with --rm-bak.
 # Preconditions: exiftool on PATH; no pre-existing .bak for any input.
 do_strip_office_metadata() {
   local rm_bak=false
+  local deep=false
   local files=()
 
   while [[ $# -gt 0 ]]; do
@@ -179,6 +184,10 @@ do_strip_office_metadata() {
       ;;
     --rm-bak)
       rm_bak=true
+      shift
+      ;;
+    --deep)
+      deep=true
       shift
       ;;
     -*)
@@ -203,6 +212,28 @@ do_strip_office_metadata() {
     return 1
   }
 
+  # Resolve the Python helper for --deep mode.
+  local py_helper=""
+  if $deep; then
+    # Resolve through symlinks so SCRIPT_DIR lands on the real script directory.
+    local _resolved="$0"
+    if [ -h "$_resolved" ]; then
+      local _target
+      _target="$(readlink "$_resolved")"
+      case "$_target" in
+      /*) _resolved="$_target" ;;
+      *) _resolved="$(dirname "$_resolved")/$_target" ;;
+      esac
+    fi
+    local _real_dir
+    _real_dir="$(CDPATH='' cd -- "$(dirname -- "$_resolved")" && pwd)"
+    py_helper="$_real_dir/../src/scripts/lib/strip-embedded-metadata.py"
+    if [[ ! -f "$py_helper" ]]; then
+      error "--deep requires strip-embedded-metadata.py"
+      return 1
+    fi
+  fi
+
   local f bak
   for f in "${files[@]}"; do
     if [[ ! -f "$f" ]]; then
@@ -221,6 +252,18 @@ do_strip_office_metadata() {
     # untouched original or the stripped file, never a half-written one.
     mv "$f" "$bak"
     if "$et_cmd" -all= -overwrite_original -o "$f" "$bak"; then
+      # --deep: strip embedded image metadata from OOXML ZIP archives.
+      if $deep; then
+        case "$f" in
+        *.docx | *.xlsx | *.pptx)
+          if python3 "$py_helper" "$bak" "$f" "$et_cmd"; then
+            say "stripped embedded media metadata: $f"
+          else
+            warn "embedded metadata stripping failed for: $f"
+          fi
+          ;;
+        esac
+      fi
       "$rm_bak" && rm -f "$bak"
       say "stripped metadata: $f"
     else

@@ -23,7 +23,7 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.docx\shell\strip office metadata\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils strip-office-metadata '%1'"
+          "nucleus-utils strip-office-metadata --deep '%1'"
         valueType: String
 
     # .xls — Excel (legacy binary)
@@ -43,7 +43,7 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.xls\shell\strip office metadata\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils strip-office-metadata '%1'"
+          "nucleus-utils strip-office-metadata --deep '%1'"
         valueType: String
 
     # .xlsx — Excel (OOXML)
@@ -63,7 +63,7 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.xlsx\shell\strip office metadata\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils strip-office-metadata '%1'"
+          "nucleus-utils strip-office-metadata --deep '%1'"
         valueType: String
 
     # .ppt — PowerPoint (legacy binary)
@@ -83,7 +83,7 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.ppt\shell\strip office metadata\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils strip-office-metadata '%1'"
+          "nucleus-utils strip-office-metadata --deep '%1'"
         valueType: String
 
     # .pptx — PowerPoint (OOXML)
@@ -103,7 +103,7 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.pptx\shell\strip office metadata\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils strip-office-metadata '%1'"
+          "nucleus-utils strip-office-metadata --deep '%1'"
         valueType: String
 
     # .doc — Word (legacy binary)
@@ -123,5 +123,5 @@ properties:
         keyPath: HKCU\Software\Classes\SystemFileAssociations\.doc\shell\strip office metadata\command
         valueData: >-
           powershell.exe -NoProfile -WindowStyle Hidden -Command
-          "nucleus-utils strip-office-metadata '%1'"
+          "nucleus-utils strip-office-metadata --deep '%1'"
         valueType: String

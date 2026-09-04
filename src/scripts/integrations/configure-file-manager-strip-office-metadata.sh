@@ -22,5 +22,5 @@ for f in "$@"; do
   done
 done
 if [ ${#files[@]} -gt 0 ]; then
-  exec nucleus-utils strip-office-metadata "${files[@]}"
+  exec nucleus-utils strip-office-metadata --deep "${files[@]}"
 fi

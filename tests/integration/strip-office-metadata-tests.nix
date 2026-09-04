@@ -43,6 +43,9 @@ let
   # Check that all 6 variant names appear in a file.
   allExtensionsPresent = fileText: builtins.all (ext: lib.hasInfix ext fileText) extensions;
 
+  # Check that context menu entries include the --deep flag.
+  hasDeepFlag = text: lib.hasInfix "strip-office-metadata --deep" text;
+
   # === macOS tests ===
 
   test_all_6_variants_in_macos = assert' (
@@ -156,6 +159,26 @@ let
 
   test_windows_has_strip_office_metadata_label = assert' (lib.hasInfix "strip office metadata" windowsDscText) "Windows DSC must use the 'strip office metadata' label";
 
+  # === --deep flag tests ===
+
+  test_macos_workflows_have_deep_flag = builtins.all (
+    ext:
+    let
+      wflow = builtins.readFile (
+        builtins.toPath (
+          toString macWorkflowsDir + "/strip office metadata - ${ext}.workflow/Contents/document.wflow"
+        )
+      );
+    in
+    hasDeepFlag wflow
+  ) extensions;
+
+  test_plasma_desktop_has_deep_flag = assert' (hasDeepFlag plasmaDesktopText) "Plasma desktop entry must pass --deep to nucleus-utils";
+
+  test_nautilus_script_has_deep_flag = assert' (hasDeepFlag nautilusScriptText) "Nautilus script must pass --deep to nucleus-utils";
+
+  test_windows_dsc_has_deep_flag = assert' (hasDeepFlag windowsDscText) "Windows DSC must pass --deep to nucleus-utils in all command entries";
+
   allTests = [
     test_all_6_variants_in_macos
     test_macos_workflow_ordering
@@ -166,6 +189,10 @@ let
     test_windows_has_all_6_extensions
     test_windows_scoped_to_system_file_associations
     test_windows_has_strip_office_metadata_label
+    test_macos_workflows_have_deep_flag
+    test_plasma_desktop_has_deep_flag
+    test_nautilus_script_has_deep_flag
+    test_windows_dsc_has_deep_flag
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {

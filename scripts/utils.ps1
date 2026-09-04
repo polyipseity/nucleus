@@ -14,6 +14,9 @@
 .PARAMETER RemoveBackup
   Switch. Remove the .bak backup file on success (kept by default). Maps to
   the optimize-pdf --rm-bak and strip-office-metadata --rm-bak options.
+.PARAMETER Deep
+  Switch. Strip embedded image metadata from OOXML archives (.docx/.xlsx/.pptx).
+  Maps to the strip-office-metadata --deep option.
 .PARAMETER File
   One or more file paths to process.
 .PARAMETER Help
@@ -33,6 +36,8 @@ param(
 
   [Parameter()]
   [switch]$RemoveBackup,
+
+  [switch]$Deep,
 
   [Parameter(Position = 1, ValueFromRemainingArguments)]
   [string[]]$File,
@@ -126,8 +131,18 @@ switch ($Action) {
 
   'strip-office-metadata' {
     if ($File.Count -eq 0) {
-      Write-NucleusInfo "usage: $(Split-Path -Leaf $PSCommandPath) strip-office-metadata [[-RemoveBackup]] [-File] <path>..."
+      Write-NucleusInfo "usage: $(Split-Path -Leaf $PSCommandPath) strip-office-metadata [[-RemoveBackup]] [[-Deep]] [-File] <path>..."
       exit 1
+    }
+
+    # Resolve the Python helper for -Deep mode.
+    $pyHelper = $null
+    if ($Deep) {
+      $pyHelper = Join-Path $PSScriptRoot '..\src\scripts\lib\strip-embedded-metadata.py'
+      if (-not (Test-Path -LiteralPath $pyHelper)) {
+        Write-NucleusError "-Deep requires strip-embedded-metadata.py"
+        exit 1
+      }
     }
 
     foreach ($f in $File) {
@@ -150,6 +165,18 @@ switch ($Action) {
           "-o", (Resolve-Path $f -Relative),
           "$bak"
         )
+        # -Deep: strip embedded image metadata from OOXML ZIP archives.
+        if ($Deep) {
+          $ext = [System.IO.Path]::GetExtension($f).ToLower()
+          if ($ext -in @('.docx', '.xlsx', '.pptx')) {
+            & python3 $pyHelper $bak $f (Get-Command exiftool).Source
+            if ($LASTEXITCODE -ne 0) {
+              Write-NucleusWarning "embedded metadata stripping failed for: $f"
+            } else {
+              Write-NucleusInfo "stripped embedded media metadata: $f"
+            }
+          }
+        }
         if ($RemoveBackup) { Remove-Item -LiteralPath $bak -Force }
         Write-NucleusInfo "stripped metadata: $f"
       } catch {

@@ -4,6 +4,7 @@
 
 _arguments \
   '(-h --help)'{--help,-h}'[Show usage]' \
-  '1:subcommand:((optimize-pdf ".."))' \
+  '1:subcommand:((optimize-pdf ".." strip-office-metadata ".."))' \
+  '--deep[deep]' \
   '--preset[preset]' \
   '--rm-bak[rm bak]'
