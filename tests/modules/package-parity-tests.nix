@@ -540,6 +540,10 @@ let
       name = "yq-go";
       nixpkgs = "yq-go";
     }
+    {
+      name = "rimsort";
+      nixpkgs = "rimsort";
+    }
   ];
 
   # Darwin-only managedPackages entries (attrs exist on Linux nixpkgs but
