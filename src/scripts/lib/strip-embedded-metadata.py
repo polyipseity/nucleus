@@ -79,7 +79,7 @@ def main() -> int:
                     )
                     out_info.compress_type = info.compress_type
                     zout.writestr(out_info, data, compress_type=info.compress_type)
-        except Exception:
+        except (OSError, zipfile.BadZipFile):
             if destination.exists():
                 destination.unlink()
             print("Error: failed to write output ZIP.", file=sys.stderr)
