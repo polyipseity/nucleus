@@ -336,6 +336,48 @@
       }
     }
   },
+  "RimSort": {
+    "displayName": "RimSort",
+    "description": "RimWorld mod manager for sorting, filtering, and managing mod load order",
+    "hosts": {
+      "MacBook": {
+        "platform": "macOS",
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
+        "kind": "login-item",
+        "path": "/Applications/RimSort.app",
+        "menuBarIcon": {
+          "kind": "manual",
+          "provisioned": false,
+          "iconVisible": false
+        }
+      },
+      "NixOS": {
+        "platform": "NixOS",
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
+        "kind": "xdg-desktop",
+        "path": "/run/current-system/sw/bin/rimsort",
+        "menuBarIcon": {
+          "kind": "manual",
+          "provisioned": false,
+          "iconVisible": false
+        }
+      },
+      "Windows": {
+        "platform": "Windows",
+        "autostartEnabled": false,
+        "autostartDisableNative": true,
+        "kind": "run-key",
+        "path": "C:\\Program Files\\RimSort\\RimSort.exe",
+        "menuBarIcon": {
+          "kind": "manual",
+          "provisioned": false,
+          "iconVisible": false
+        }
+      }
+    }
+  },
   "Telegram": {
     "displayName": "Telegram",
     "description": "Messaging client (beta channel)",
