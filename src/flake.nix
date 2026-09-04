@@ -279,13 +279,13 @@
                   src =
                     if prev.stdenv.hostPlatform.isAarch64 then
                       prev.fetchurl {
-                        url = "https://github.com/RimSort/RimSort/releases/download/v${version}/RimSort-${version}-Darwin_arm64.tar.gz";
-                        hash = "sha256-Zy3cuGDC2ymukT8XOp3PDi8Az53ifG8IEhNYRwbM9BM=";
+                        url = "https://github.com/RimSort/RimSort/releases/download/v${version}/RimSort-v${version}-Darwin_arm64.tar.gz";
+                        hash = "sha256-O7rJULzSvzaoO6sfSTYF4EQhBsvcmm86+UsKR6luMfM=";
                       }
                     else
                       prev.fetchurl {
-                        url = "https://github.com/RimSort/RimSort/releases/download/v${version}/RimSort-${version}-Darwin_x86_64.tar.gz";
-                        hash = "sha256-KoXw4gDA2/ttN8CbfOwlKb24ODPL6eQS72ouV3pZrPY=";
+                        url = "https://github.com/RimSort/RimSort/releases/download/v${version}/RimSort-v${version}-Darwin_x86_64.tar.gz";
+                        hash = "sha256-QlMupXTqSgV084ZA3IrX7bM+Sv96PTxnJUICW/kSwvk=";
                       };
 
                   sourceRoot = ".";
