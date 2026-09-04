@@ -269,8 +269,8 @@
             (
               _final: prev:
               prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
-                # RimSort tarballs extract to a bare Contents/ directory (the
-                # interior of a .app bundle).  Re-wrap it into RimSort.app so
+                # RimSort tarballs now extract to a RimSort.app/ directory (a
+                # complete .app bundle).  Copy it into $out/Applications so
                 # Spotlight and launch services can discover it.
                 rimsort = prev.stdenv.mkDerivation rec {
                   pname = "rimsort";
@@ -291,8 +291,8 @@
                   sourceRoot = ".";
 
                   installPhase = ''
-                    mkdir -p $out/Applications/RimSort.app
-                    cp -r Contents $out/Applications/RimSort.app/
+                    mkdir -p $out/Applications
+                    cp -r RimSort.app $out/Applications/
                   '';
 
                   meta = {
