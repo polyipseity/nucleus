@@ -707,6 +707,11 @@ let
       category = "cli";
       nixpkgs = "redis";
     };
+    rimsort = {
+      category = "gui";
+      nixpkgs = "rimsort";
+      winget = "RimSort.RimSort";
+    };
     ripgrep = {
       category = "cli";
       homebrew = {
@@ -1164,6 +1169,7 @@ let
     # evaluations like the nixos-generators guest build use plain nixpkgs, so
     # append it only when the evaluating package set actually provides it.
     ++ (lib.optionals (pkgs ? camillagui-backend) [ pkgs.camillagui-backend ])
+    ++ (lib.optionals (pkgs ? rimsort) [ pkgs.rimsort ])
     ++ lib.optional (treefmtPackage != null) treefmtPackage
     ++ config.nucleus.packages.selection.extraSystemPackages;
 in
