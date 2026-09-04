@@ -67,11 +67,11 @@ let
   # Office document MIME types for metadata stripping.
   # Used for Nautilus MIME guard only; the shell script handles all six types.
 
-  stripOfficeMetadataNautilusScript = pkgs.writeNucleusShellApplication {
-    name = "strip-office-metadata-nautilus";
+  stripMetadataNautilusScript = pkgs.writeNucleusShellApplication {
+    name = "strip-metadata-nautilus";
     runtimeInputs = [ pkgs.file ];
     text = ''
-      exec '${../../scripts/integrations/configure-file-manager-strip-office-metadata.sh}' "$@"
+      exec '${../../scripts/integrations/configure-file-manager-strip-metadata.sh}' "$@"
     '';
   };
 in
@@ -106,10 +106,10 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
       executable = true;
     };
 
-    # Nautilus: right-click → Scripts → strip office metadata
+    # Nautilus: right-click → Scripts → strip metadata
     # MIME guard handled inside the script (6 Office MIME types).
-    ".local/share/nautilus/scripts/strip office metadata" = {
-      source = "${stripOfficeMetadataNautilusScript}/bin/nucleus-strip-office-metadata-nautilus";
+    ".local/share/nautilus/scripts/strip metadata" = {
+      source = "${stripMetadataNautilusScript}/bin/nucleus-strip-metadata-nautilus";
       executable = true;
     };
 
@@ -144,12 +144,12 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
         "${overlay.toRepoRelPath (overlay.selectFile "plasma" "desktop/nucleus-optimize-pdf.desktop")}" \
     '';
 
-    # Dolphin: right-click → strip office metadata (all Office formats).
+    # Dolphin: right-click → strip metadata (all Office formats).
     # check-suppress:config-method: method 1 (writable symlink) -- the desktop file can be updated in-place; no rebuild needed.
-    seed-nucleus-strip-office-metadata-desktop = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
+    seed-nucleus-strip-metadata-desktop = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
-        "${config.home.homeDirectory}/.local/share/kio/servicemenus/nucleus-strip-office-metadata.desktop" \
-        "${overlay.toRepoRelPath (overlay.selectFile "plasma" "desktop/nucleus-strip-office-metadata.desktop")}" \
+        "${config.home.homeDirectory}/.local/share/kio/servicemenus/nucleus-strip-metadata.desktop" \
+        "${overlay.toRepoRelPath (overlay.selectFile "plasma" "desktop/nucleus-strip-metadata.desktop")}" \
     '';
   };
 }

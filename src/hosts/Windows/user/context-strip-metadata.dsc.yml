@@ -1,0 +1,127 @@
+---
+# WinGet DSC v3 - user-level "strip metadata" context menu entries
+# One entry per Office extension (docx/xlsx/pptx + doc/xls/ppt).
+# Sorting policy: alphabetical by extension. No automatic sorting.
+$schema: https://aka.ms/configuration-dsc-schema/0.2
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    # .docx — Word (OOXML)
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: stripMetadataVerbDocx
+      directives:
+        description: Add "strip metadata" to the right-click context menu for .docx files
+      settings:
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.docx\shell\strip metadata
+        valueData: "strip metadata"
+        valueType: String
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: stripMetadataCmdDocx
+      directives:
+        description: Command for the strip metadata context menu entry on .docx files
+      settings:
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.docx\shell\strip metadata\command
+        valueData: >-
+          powershell.exe -NoProfile -WindowStyle Hidden -Command
+          "nucleus-utils strip-metadata '%1'"
+        valueType: String
+
+    # .xls — Excel (legacy binary)
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: stripMetadataVerbXls
+      directives:
+        description: Add "strip metadata" to the right-click context menu for .xls files
+      settings:
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.xls\shell\strip metadata
+        valueData: "strip metadata"
+        valueType: String
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: stripMetadataCmdXls
+      directives:
+        description: Command for the strip metadata context menu entry on .xls files
+      settings:
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.xls\shell\strip metadata\command
+        valueData: >-
+          powershell.exe -NoProfile -WindowStyle Hidden -Command
+          "nucleus-utils strip-metadata '%1'"
+        valueType: String
+
+    # .xlsx — Excel (OOXML)
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: stripMetadataVerbXlsx
+      directives:
+        description: Add "strip metadata" to the right-click context menu for .xlsx files
+      settings:
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.xlsx\shell\strip metadata
+        valueData: "strip metadata"
+        valueType: String
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: stripMetadataCmdXlsx
+      directives:
+        description: Command for the strip metadata context menu entry on .xlsx files
+      settings:
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.xlsx\shell\strip metadata\command
+        valueData: >-
+          powershell.exe -NoProfile -WindowStyle Hidden -Command
+          "nucleus-utils strip-metadata '%1'"
+        valueType: String
+
+    # .ppt — PowerPoint (legacy binary)
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: stripMetadataVerbPpt
+      directives:
+        description: Add "strip metadata" to the right-click context menu for .ppt files
+      settings:
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.ppt\shell\strip metadata
+        valueData: "strip metadata"
+        valueType: String
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: stripMetadataCmdPpt
+      directives:
+        description: Command for the strip metadata context menu entry on .ppt files
+      settings:
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.ppt\shell\strip metadata\command
+        valueData: >-
+          powershell.exe -NoProfile -WindowStyle Hidden -Command
+          "nucleus-utils strip-metadata '%1'"
+        valueType: String
+
+    # .pptx — PowerPoint (OOXML)
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: stripMetadataVerbPptx
+      directives:
+        description: Add "strip metadata" to the right-click context menu for .pptx files
+      settings:
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pptx\shell\strip metadata
+        valueData: "strip metadata"
+        valueType: String
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: stripMetadataCmdPptx
+      directives:
+        description: Command for the strip metadata context menu entry on .pptx files
+      settings:
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.pptx\shell\strip metadata\command
+        valueData: >-
+          powershell.exe -NoProfile -WindowStyle Hidden -Command
+          "nucleus-utils strip-metadata '%1'"
+        valueType: String
+
+    # .doc — Word (legacy binary)
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: stripMetadataVerbDoc
+      directives:
+        description: Add "strip metadata" to the right-click context menu for .doc files
+      settings:
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.doc\shell\strip metadata
+        valueData: "strip metadata"
+        valueType: String
+    - resource: Microsoft.Windows.Registry/RegistryValue
+      id: stripMetadataCmdDoc
+      directives:
+        description: Command for the strip metadata context menu entry on .doc files
+      settings:
+        keyPath: HKCU\Software\Classes\SystemFileAssociations\.doc\shell\strip metadata\command
+        valueData: >-
+          powershell.exe -NoProfile -WindowStyle Hidden -Command
+          "nucleus-utils strip-metadata '%1'"
+        valueType: String

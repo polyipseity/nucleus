@@ -2,9 +2,9 @@
 Type=Service
 ServiceTypes=KonqPopupMenu/Plugin
 MimeType=application/vnd.openxmlformats-officedocument.wordprocessingml.document;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;application/vnd.openxmlformats-officedocument.presentationml.presentation;application/msword;application/vnd.ms-excel;application/vnd.ms-powerpoint;
-Actions=stripOfficeMetadata
+Actions=stripMetadata
 
-[Desktop Action stripOfficeMetadata]
-Name=strip office metadata
-Exec=nucleus-utils strip-office-metadata --deep %f
+[Desktop Action stripMetadata]
+Name=strip metadata
+Exec=nucleus-utils strip-metadata %f
 Icon=x-office-document

@@ -3,13 +3,12 @@
 #
 # Currently provides the optimize-pdf subcommand: optimize PDF files with
 # Ghostscript, keeping a .bak backup that is restored automatically if
-# optimization fails. Also provides strip-office-metadata: remove personal
-# metadata from Office files using exiftool. The --deep flag additionally
-# strips embedded image metadata from OOXML archives.
+# optimization fails. Also provides strip-metadata: remove personal
+# metadata from Office files using mat2 (OOXML) and exiftool (other formats).
 #
 # Usage: nucleus-utils <subcommand> [args...]
 #   Subcommand: optimize-pdf [--preset <name>] [--rm-bak] <file>...
-#   Subcommand: strip-office-metadata [--rm-bak] [--deep] <file>...
+#   Subcommand: strip-metadata [--rm-bak] <file>...
 #   Presets: default, ebook, prepress, printer, screen (default: default).
 #
 # Env vars: TMPDIR — ghostscript scratch space; falls back to a per-user

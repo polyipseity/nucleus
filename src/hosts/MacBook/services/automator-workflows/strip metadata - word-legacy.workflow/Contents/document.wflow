@@ -61,7 +61,7 @@
 					<key>COMMAND_STRING</key>
 					<string>export PATH="/etc/profiles/per-user/$USER/bin:$PATH"
 for f in "$@"; do
-    nucleus-utils strip-office-metadata --deep "$f"
+    nucleus-utils strip-metadata "$f"
 done
 </string>
 					<key>CheckedForUserDefaultShell</key>

@@ -1,12 +1,12 @@
-# tests/integration/strip-office-metadata-tests.nix — Verify cross-platform parity for Office metadata stripping across all 6 Office extensions.
+# tests/integration/strip-metadata-tests.nix — Verify cross-platform parity for Office metadata stripping across all 6 Office extensions.
 
 let
   lib = import <nixpkgs/lib>;
   macAutomatorWorkflowsText = builtins.readFile ../../src/hosts/MacBook/services/automator-workflows.nix;
   nixosServicesText = builtins.readFile ../../src/hosts/NixOS/services.nix;
-  windowsDscText = builtins.readFile ../../src/hosts/Windows/user/context-strip-office-metadata.dsc.yml;
-  nautilusScriptText = builtins.readFile ../../src/scripts/integrations/configure-file-manager-strip-office-metadata.sh;
-  plasmaDesktopText = builtins.readFile ../../src/users/default/plasma/desktop/nucleus-strip-office-metadata.desktop;
+  windowsDscText = builtins.readFile ../../src/hosts/Windows/user/context-strip-metadata.dsc.yml;
+  nautilusScriptText = builtins.readFile ../../src/scripts/integrations/configure-file-manager-strip-metadata.sh;
+  plasmaDesktopText = builtins.readFile ../../src/users/default/plasma/desktop/nucleus-strip-metadata.desktop;
 
   inherit (import ../lib.nix) assert';
 
@@ -43,73 +43,64 @@ let
   # Check that all 6 variant names appear in a file.
   allExtensionsPresent = fileText: builtins.all (ext: lib.hasInfix ext fileText) extensions;
 
-  # Check that context menu entries include the --deep flag.
-  hasDeepFlag = text: lib.hasInfix "strip-office-metadata --deep" text;
+  # Check that context menu entries invoke strip-metadata.
+  hasStripMetadataCommand = text: lib.hasInfix "strip-metadata" text;
 
   # === macOS tests ===
 
   test_all_6_variants_in_macos = assert' (
     allExtensionsPresent macAutomatorWorkflowsText
-    && lib.hasInfix "strip office metadata - word" macAutomatorWorkflowsText
-    && lib.hasInfix "strip office metadata - excel" macAutomatorWorkflowsText
-    && lib.hasInfix "strip office metadata - powerpoint" macAutomatorWorkflowsText
-    && lib.hasInfix "strip office metadata - word-legacy" macAutomatorWorkflowsText
-    && lib.hasInfix "strip office metadata - excel-legacy" macAutomatorWorkflowsText
-    && lib.hasInfix "strip office metadata - powerpoint-legacy" macAutomatorWorkflowsText
-  ) "macOS automator-workflows.nix must define all 6 strip-office-metadata variants";
+    && lib.hasInfix "strip metadata - word" macAutomatorWorkflowsText
+    && lib.hasInfix "strip metadata - excel" macAutomatorWorkflowsText
+    && lib.hasInfix "strip metadata - powerpoint" macAutomatorWorkflowsText
+    && lib.hasInfix "strip metadata - word-legacy" macAutomatorWorkflowsText
+    && lib.hasInfix "strip metadata - excel-legacy" macAutomatorWorkflowsText
+    && lib.hasInfix "strip metadata - powerpoint-legacy" macAutomatorWorkflowsText
+  ) "macOS automator-workflows.nix must define all 6 strip-metadata variants";
 
-  test_macos_workflow_ordering =
-    assert'
-      (
-        let
-          posOpenManual = builtins.stringLength (
-            builtins.head (builtins.split "\"open nucleus manual.workflow\"" macAutomatorWorkflowsText)
-          );
-          posExcel = builtins.stringLength (
-            builtins.head (
-              builtins.split "\"strip office metadata - excel.workflow\"" macAutomatorWorkflowsText
-            )
-          );
-          posWord = builtins.stringLength (
-            builtins.head (builtins.split "\"strip office metadata - word.workflow\"" macAutomatorWorkflowsText)
-          );
-          posOptDefault = builtins.stringLength (
-            builtins.head (builtins.split "\"optimize PDF - default.workflow\"" macAutomatorWorkflowsText)
-          );
-        in
-        posOpenManual < posExcel && posExcel < posWord && posWord < posOptDefault
-      )
-      "macOS strip-office-metadata block must be between 'open nucleus manual' and 'optimize PDF' blocks";
+  test_macos_workflow_ordering = assert' (
+    let
+      posOpenManual = builtins.stringLength (
+        builtins.head (builtins.split "\"open nucleus manual.workflow\"" macAutomatorWorkflowsText)
+      );
+      posExcel = builtins.stringLength (
+        builtins.head (builtins.split "\"strip metadata - excel.workflow\"" macAutomatorWorkflowsText)
+      );
+      posWord = builtins.stringLength (
+        builtins.head (builtins.split "\"strip metadata - word.workflow\"" macAutomatorWorkflowsText)
+      );
+      posOptDefault = builtins.stringLength (
+        builtins.head (builtins.split "\"optimize PDF - default.workflow\"" macAutomatorWorkflowsText)
+      );
+    in
+    posOpenManual < posExcel && posExcel < posWord && posWord < posOptDefault
+  ) "macOS strip-metadata block must be between 'open nucleus manual' and 'optimize PDF' blocks";
 
   macWorkflowsDir = ../../src/hosts/MacBook/services/automator-workflows;
   macWorkflowWordPlist = builtins.readFile (
-    builtins.toPath (
-      toString macWorkflowsDir + "/strip office metadata - word.workflow/Contents/Info.plist"
-    )
+    builtins.toPath (toString macWorkflowsDir + "/strip metadata - word.workflow/Contents/Info.plist")
   );
   macWorkflowExcelPlist = builtins.readFile (
-    builtins.toPath (
-      toString macWorkflowsDir + "/strip office metadata - excel.workflow/Contents/Info.plist"
-    )
+    builtins.toPath (toString macWorkflowsDir + "/strip metadata - excel.workflow/Contents/Info.plist")
   );
   macWorkflowPptPlist = builtins.readFile (
     builtins.toPath (
-      toString macWorkflowsDir + "/strip office metadata - powerpoint.workflow/Contents/Info.plist"
+      toString macWorkflowsDir + "/strip metadata - powerpoint.workflow/Contents/Info.plist"
     )
   );
   macWorkflowWordLegacyPlist = builtins.readFile (
     builtins.toPath (
-      toString macWorkflowsDir + "/strip office metadata - word-legacy.workflow/Contents/Info.plist"
+      toString macWorkflowsDir + "/strip metadata - word-legacy.workflow/Contents/Info.plist"
     )
   );
   macWorkflowExcelLegacyPlist = builtins.readFile (
     builtins.toPath (
-      toString macWorkflowsDir + "/strip office metadata - excel-legacy.workflow/Contents/Info.plist"
+      toString macWorkflowsDir + "/strip metadata - excel-legacy.workflow/Contents/Info.plist"
     )
   );
   macWorkflowPptLegacyPlist = builtins.readFile (
     builtins.toPath (
-      toString macWorkflowsDir + "/strip office metadata - powerpoint-legacy.workflow/Contents/Info.plist"
+      toString macWorkflowsDir + "/strip metadata - powerpoint-legacy.workflow/Contents/Info.plist"
     )
   );
 
@@ -129,14 +120,14 @@ let
     && !lib.hasInfix "public.item" macWorkflowWordLegacyPlist
     && !lib.hasInfix "public.item" macWorkflowExcelLegacyPlist
     && !lib.hasInfix "public.item" macWorkflowPptLegacyPlist
-  ) "All macOS strip-office-metadata Info.plist files must use per-format UTIs (not public.item)";
+  ) "All macOS strip-metadata Info.plist files must use per-format UTIs (not public.item)";
 
   # === NixOS tests ===
 
-  test_nixos_has_strip_office_metadata = assert' (
-    lib.hasInfix "strip office metadata" nixosServicesText
-    && lib.hasInfix "strip-office-metadata-nautilus" nixosServicesText
-  ) "NixOS services.nix must define strip-office-metadata Nautilus script and Dolphin entry";
+  test_nixos_has_strip_metadata = assert' (
+    lib.hasInfix "strip metadata" nixosServicesText
+    && lib.hasInfix "strip-metadata-nautilus" nixosServicesText
+  ) "NixOS services.nix must define strip-metadata Nautilus script and Dolphin entry";
 
   test_nixos_nautilus_has_mime_guard = assert' (
     lib.hasInfix "file --mime-type" nautilusScriptText
@@ -157,46 +148,46 @@ let
     ext: lib.hasInfix "SystemFileAssociations\\${ext}" windowsDscText
   ) fileExtensions) "Windows DSC must scope each entry to its extension via SystemFileAssociations";
 
-  test_windows_has_strip_office_metadata_label = assert' (lib.hasInfix "strip office metadata" windowsDscText) "Windows DSC must use the 'strip office metadata' label";
+  test_windows_has_strip_metadata_label = assert' (lib.hasInfix "strip metadata" windowsDscText) "Windows DSC must use the 'strip metadata' label";
 
-  # === --deep flag tests ===
+  # === strip-metadata command integration tests ===
 
-  test_macos_workflows_have_deep_flag = builtins.all (
+  test_macos_workflows_have_strip_metadata_command = builtins.all (
     ext:
     let
       wflow = builtins.readFile (
         builtins.toPath (
-          toString macWorkflowsDir + "/strip office metadata - ${ext}.workflow/Contents/document.wflow"
+          toString macWorkflowsDir + "/strip metadata - ${ext}.workflow/Contents/document.wflow"
         )
       );
     in
-    hasDeepFlag wflow
+    hasStripMetadataCommand wflow
   ) extensions;
 
-  test_plasma_desktop_has_deep_flag = assert' (hasDeepFlag plasmaDesktopText) "Plasma desktop entry must pass --deep to nucleus-utils";
+  test_plasma_desktop_has_strip_metadata_command = assert' (hasStripMetadataCommand plasmaDesktopText) "Plasma desktop entry must invoke strip-metadata";
 
-  test_nautilus_script_has_deep_flag = assert' (hasDeepFlag nautilusScriptText) "Nautilus script must pass --deep to nucleus-utils";
+  test_nautilus_script_has_strip_metadata_command = assert' (hasStripMetadataCommand nautilusScriptText) "Nautilus script must invoke strip-metadata";
 
-  test_windows_dsc_has_deep_flag = assert' (hasDeepFlag windowsDscText) "Windows DSC must pass --deep to nucleus-utils in all command entries";
+  test_windows_dsc_has_strip_metadata_command = assert' (hasStripMetadataCommand windowsDscText) "Windows DSC must invoke strip-metadata in all command entries";
 
   allTests = [
     test_all_6_variants_in_macos
     test_macos_workflow_ordering
     test_macos_workflows_scoped_to_office_utis
-    test_nixos_has_strip_office_metadata
+    test_nixos_has_strip_metadata
     test_nixos_nautilus_has_mime_guard
     test_nixos_dolphin_scoped_to_office
     test_windows_has_all_6_extensions
     test_windows_scoped_to_system_file_associations
-    test_windows_has_strip_office_metadata_label
-    test_macos_workflows_have_deep_flag
-    test_plasma_desktop_has_deep_flag
-    test_nautilus_script_has_deep_flag
-    test_windows_dsc_has_deep_flag
+    test_windows_has_strip_metadata_label
+    test_macos_workflows_have_strip_metadata_command
+    test_plasma_desktop_has_strip_metadata_command
+    test_nautilus_script_has_strip_metadata_command
+    test_windows_dsc_has_strip_metadata_command
   ];
 in
 builtins.seq (builtins.deepSeq allTests null) {
   success = true;
   testCount = builtins.length allTests;
-  message = "strip-office-metadata cross-platform parity tests passed";
+  message = "strip-metadata cross-platform parity tests passed";
 }

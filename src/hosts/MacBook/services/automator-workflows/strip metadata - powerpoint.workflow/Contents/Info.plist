@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
 	<key>CFBundleIdentifier</key>
-	<string>com.nucleus.StripOfficeMetadata.excelLegacy</string>
+	<string>com.nucleus.StripMetadata.powerpoint</string>
 	<key>NSServices</key>
 	<array>
 		<dict>
@@ -14,7 +14,7 @@
 			<key>NSMenuItem</key>
 			<dict>
 				<key>default</key>
-				<string>strip office metadata - excel-legacy</string>
+				<string>strip metadata - powerpoint</string>
 			</dict>
 			<key>NSMessage</key>
 			<string>runWorkflowAsService</string>
@@ -25,7 +25,7 @@
 			</dict>
 			<key>NSSendFileTypes</key>
 			<array>
-				<string>com.microsoft.excel.xls</string>
+				<string>org.openxmlformats.presentationml.presentation</string>
 			</array>
 		</dict>
 	</array>

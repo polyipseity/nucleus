@@ -61,7 +61,7 @@
 					<key>COMMAND_STRING</key>
 					<string>export PATH="/etc/profiles/per-user/$USER/bin:$PATH"
 for f in "$@"; do
-    nucleus-utils strip-office-metadata --deep "$f"
+    nucleus-utils strip-metadata "$f"
 done
 </string>
 					<key>CheckedForUserDefaultShell</key>
@@ -88,7 +88,7 @@ done
 				<key>Class Name</key>
 				<string>RunShellScriptAction</string>
 				<key>InputUUID</key>
-				<string>E5F6A7B8-C9D0-1234-EFAB-345678900001</string>
+				<string>C3D4E5F6-A7B8-9012-CDEF-123456780001</string>
 				<key>Keywords</key>
 				<array>
 					<string>Shell</string>
@@ -98,9 +98,9 @@ done
 					<string>Unix</string>
 				</array>
 				<key>OutputUUID</key>
-				<string>E5F6A7B8-C9D0-1234-EFAB-345678900002</string>
+				<string>C3D4E5F6-A7B8-9012-CDEF-123456780002</string>
 				<key>UUID</key>
-				<string>E5F6A7B8-C9D0-1234-EFAB-345678900003</string>
+				<string>C3D4E5F6-A7B8-9012-CDEF-123456780003</string>
 				<key>UnlocalizedApplications</key>
 				<array>
 					<string>Automator</string>
