@@ -82,7 +82,7 @@ def main() -> int:
         except Exception:
             if destination.exists():
                 destination.unlink()
-            print(f"Error: failed to write output ZIP.", file=sys.stderr)
+            print("Error: failed to write output ZIP.", file=sys.stderr)
             return 1
 
     print(
