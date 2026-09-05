@@ -42,8 +42,10 @@
 #   - No custom TIFF icons: SF Symbols are resolution-independent and
 #     handle dark/light mode natively.
 #   - NSBackgroundColorName only affects the Touch Bar — set to "background".
-#   - QuickLook/Thumbnail.png is optional and only affects Finder bundle
-#     browsing; not used for the action icon anywhere.
+#   - QuickLook/Thumbnail.png is the Get Info window icon (256×256 SF Symbol
+#     render), generated at Nix build time via an Objective-C program using
+#     AppKit. The `thumbnailSymbol` field below drives generation. Regenerate
+#     when changing the symbol name for a workflow.
 #   - macOS version floor: check the symbol's introduction year in the
 #     framework's name_availability.plist against the host's minimum version.
 #   - Known issue: NSIconName can prevent a Quick Action from appearing
@@ -68,7 +70,8 @@ let
   # Each entry has:
   #   - dir: workflow directory name in ~/Library/Services/
   #   - enablementKey: key for NSServicesStatus enablement
-  #   - source: path to copy from
+  #   - source: path to copy from (before thumbnail overlay)
+  #   - thumbnailSymbol: SF Symbol name for QuickLook/Thumbnail.png
   #   - presentationModes: dict for NSServicesStatus enablement
   #
   # Sorting policy: primary sort is alphabetical by entry name. Exceptions:
@@ -83,6 +86,7 @@ let
       dir = "open nucleus manual.workflow";
       enablementKey = "com.nucleus.OpenNucleusManual - open nucleus manual - runWorkflowAsService";
       source = "${workflowsDir}/open nucleus manual.workflow";
+      thumbnailSymbol = "text.book.closed";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -95,6 +99,7 @@ let
       dir = "strip metadata.workflow";
       enablementKey = "com.nucleus.StripMetadata - strip metadata - runWorkflowAsService";
       source = "${workflowsDir}/strip metadata.workflow";
+      thumbnailSymbol = "eraser.line.dashed";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -107,6 +112,7 @@ let
       dir = "optimize PDF - default.workflow";
       enablementKey = "com.nucleus.OptimizePDF.default - optimize PDF - default - runWorkflowAsService";
       source = "${workflowsDir}/optimize PDF - default.workflow";
+      thumbnailSymbol = "doc.badge.gearshape";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -118,6 +124,7 @@ let
       dir = "optimize PDF - prepress.workflow";
       enablementKey = "com.nucleus.OptimizePDF.prepress - optimize PDF - prepress - runWorkflowAsService";
       source = "${workflowsDir}/optimize PDF - prepress.workflow";
+      thumbnailSymbol = "doc.badge.gearshape";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -129,6 +136,7 @@ let
       dir = "optimize PDF - printer.workflow";
       enablementKey = "com.nucleus.OptimizePDF.printer - optimize PDF - printer - runWorkflowAsService";
       source = "${workflowsDir}/optimize PDF - printer.workflow";
+      thumbnailSymbol = "doc.badge.gearshape";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -140,6 +148,7 @@ let
       dir = "optimize PDF - ebook.workflow";
       enablementKey = "com.nucleus.OptimizePDF.ebook - optimize PDF - ebook - runWorkflowAsService";
       source = "${workflowsDir}/optimize PDF - ebook.workflow";
+      thumbnailSymbol = "doc.badge.gearshape";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
@@ -151,6 +160,7 @@ let
       dir = "optimize PDF - screen.workflow";
       enablementKey = "com.nucleus.OptimizePDF.screen - optimize PDF - screen - runWorkflowAsService";
       source = "${workflowsDir}/optimize PDF - screen.workflow";
+      thumbnailSymbol = "doc.badge.gearshape";
       presentationModes = {
         ContextMenu = true;
         ServicesMenu = true;
