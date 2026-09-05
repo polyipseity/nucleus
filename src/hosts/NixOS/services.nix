@@ -107,7 +107,6 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
     };
 
     # Nautilus: right-click → Scripts → strip metadata
-    # MIME guard handled inside the script (6 Office MIME types).
     ".local/share/nautilus/scripts/strip metadata" = {
       source = "${stripMetadataNautilusScript}/bin/nucleus-strip-metadata-nautilus";
       executable = true;
@@ -144,7 +143,7 @@ lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
         "${overlay.toRepoRelPath (overlay.selectFile "plasma" "desktop/nucleus-optimize-pdf.desktop")}" \
     '';
 
-    # Dolphin: right-click → strip metadata (all Office formats).
+    # Dolphin: right-click → strip metadata (all metadata-supportable formats).
     # check-suppress:config-method: method 1 (writable symlink) -- the desktop file can be updated in-place; no rebuild needed.
     seed-nucleus-strip-metadata-desktop = lib.hm.dag.entryAfter [ "linkGeneration" ] ''
       "${activationBundle}/src/scripts/configs/seed-writable-symlink.sh" \
