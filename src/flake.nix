@@ -312,6 +312,48 @@
                 };
               }
             )
+            (
+              _final: prev:
+              prev.lib.optionalAttrs prev.stdenv.hostPlatform.isDarwin {
+                # SteamCMD is a macOS-only derivation; nixpkgs only provides the
+                # Linux variant (x86_64-linux).  Download Valve's macOS tarball
+                # and install the native binary so RimSort can find it at its
+                # expected steamcmd_install_path without downloading it at runtime.
+                steamcmd = prev.stdenv.mkDerivation rec {
+                  pname = "steamcmd";
+                  version = "20180104";
+
+                  src = prev.fetchurl {
+                    url = "https://steamcdn-a.akamaihd.net/client/installer/steamcmd_osx.tar.gz";
+                    hash = "sha256-jswXyJiOWsrcx45jHEhJD3YVDy36ps+Ne0tnsJe9dTs=";
+                  };
+
+                  # The tarball extracts files flat (no top-level directory).
+                  preUnpack = ''
+                    mkdir $name
+                    cd $name
+                    sourceRoot=.
+                  '';
+
+                  dontBuild = true;
+
+                  installPhase = ''
+                    mkdir -p $out/share/steamcmd
+                    find . -type f -exec install -Dm 755 "{}" "$out/share/steamcmd/{}" \;
+                  '';
+
+                  meta = {
+                    description = "Steam command-line tools";
+                    homepage = "https://developer.valvesoftware.com/wiki/SteamCMD";
+                    license = prev.lib.licenses.unfreeRedistributable;
+                    platforms = [
+                      "aarch64-darwin"
+                      "x86_64-darwin"
+                    ];
+                  };
+                };
+              }
+            )
             (_final: prev: {
               # Darwin fixup runs strip -S over all of $out/lib (including
               # site-packages). cctools/llvm-strip mis-handles .ico COFF data and

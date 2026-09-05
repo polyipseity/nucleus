@@ -820,6 +820,11 @@ let
       nixpkgs = "steam";
       winget = "Valve.Steam";
     };
+    steamcmd = {
+      category = "cli";
+      nixpkgs = "steamcmd";
+      winget = "Valve.SteamCMD";
+    };
     scoop = {
       category = "cli";
       platforms = [ "linux" ];
