@@ -1,9 +1,9 @@
 {
   "instances": {
     "Default": {
-      "game_folder": "C:/Program Files (x86)/Steam/steamapps/common/RimWorld/RimWorldWin.exe",
+      "game_folder": "C:/Program Files (x86)/Steam/steamapps/common/RimWorld",
       "config_folder": "~/AppData/LocalLow/Ludeon Studios/RimWorld by Ludeon Studios/Config",
-      "local_folder": "C:/Program Files (x86)/Steam/steamapps/common/RimWorld/RimWorldWin.exe/Mods",
+      "local_folder": "C:/Program Files (x86)/Steam/steamapps/common/RimWorld/Mods",
       "workshop_folder": "C:/Program Files (x86)/Steam/steamapps/workshop/content/294100",
       "steamcmd_install_path": "~/AppData/Local/RimSort/instances/Default"
     }
