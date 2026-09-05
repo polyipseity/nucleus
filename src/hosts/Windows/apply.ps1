@@ -455,6 +455,7 @@ if (-not $Elevated) {
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-ReplicaSync.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-VMSetup.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-AgentHostShellSetup.ps1")
+. (Join-Path -Path $systemModuleDir -ChildPath "Invoke-SteamCMDSetup.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-EnsureLogDir.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "ConvertFrom-WingetLockfileToDsc.ps1")
 . (Join-Path -Path $systemModuleDir -ChildPath "Invoke-WingetConfiguration.ps1")
@@ -924,6 +925,7 @@ Sync-ObsidianConfig -Enabled:$EnableObsidianParity -Users $selectedUserRecords -
 # and window state into it. A symlink would let app-owned writes reach the
 # repo file. Merge preserves both managed and app-owned keys.
 Sync-RimSortConfig -Enabled:$EnableRimSortParity -Users $selectedUserRecords -RepoRoot $repoRoot
+Invoke-SteamCMDSetup -Enabled:$EnableRimSortParity -Users $selectedUserRecords -RepoRoot $repoRoot
 # check-suppress:config-method: method 3 (merge) -- Picard defaults INI merged via Sync-PicardConfig on Windows
 Sync-PicardConfig -Enabled:$EnablePicardParity -Users $selectedUserRecords -RepoRoot $repoRoot
 # WHY: QtPass stores settings in platform-native stores (registry on Windows), so Method 1 (symlink) does not apply.
