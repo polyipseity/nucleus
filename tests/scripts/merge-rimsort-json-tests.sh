@@ -230,21 +230,24 @@ test_steamcmd_install_path() {
 
   run_merge "$settings" "$managed"
 
+  # Tilde must be expanded to absolute path at convergence time.
+  local expected
+  expected="$HOME/.local/share/RimSort/instances/Default"
   local steamcmd
   steamcmd=$(json_get "$settings" "d['instances']['Default']['steamcmd_install_path']")
-  if [ "$steamcmd" = '"~/.local/share/RimSort/instances/Default"' ]; then
-    assert_pass "steamcmd: steamcmd_install_path set"
+  if [ "$steamcmd" = "\"$expected\"" ]; then
+    assert_pass "steamcmd: steamcmd_install_path expanded"
   else
-    assert_fail "steamcmd: steamcmd_install_path set" "expected default path, got $steamcmd"
+    assert_fail "steamcmd: steamcmd_install_path expanded" "expected $expected, got $steamcmd"
   fi
 
-  # Verify idempotent
+  # Verify idempotent — tilde expands to same absolute path on re-merge.
   run_merge "$settings" "$managed"
   steamcmd=$(json_get "$settings" "d['instances']['Default']['steamcmd_install_path']")
-  if [ "$steamcmd" = '"~/.local/share/RimSort/instances/Default"' ]; then
+  if [ "$steamcmd" = "\"$expected\"" ]; then
     assert_pass "steamcmd: stable after double merge"
   else
-    assert_fail "steamcmd: stable after double merge" "expected default path, got $steamcmd"
+    assert_fail "steamcmd: stable after double merge" "expected $expected, got $steamcmd"
   fi
 }
 
@@ -273,6 +276,45 @@ test_current_instance_top_level() {
   fi
 }
 
+# ── Test: tilde expansion in instance paths ──────────────────────
+test_tilde_expansion() {
+  local settings="$TMPDIR_TEST/tilde.json"
+  local managed='{"instances":{"Default":{"steamcmd_install_path":"~/RimSort/data","config_folder":"~/AppData/LocalLow/Test"}}}'
+
+  run_merge "$settings" "$managed"
+
+  local steamcmd
+  steamcmd=$(json_get "$settings" "d['instances']['Default']['steamcmd_install_path']")
+  local expected_steamcmd="$HOME/RimSort/data"
+  if [ "$steamcmd" = "\"$expected_steamcmd\"" ]; then
+    assert_pass "tilde_expansion: steamcmd_install_path expanded"
+  else
+    assert_fail "tilde_expansion: steamcmd_install_path expanded" "expected $expected_steamcmd, got $steamcmd"
+  fi
+
+  local config
+  config=$(json_get "$settings" "d['instances']['Default']['config_folder']")
+  local expected_config="$HOME/AppData/LocalLow/Test"
+  if [ "$config" = "\"$expected_config\"" ]; then
+    assert_pass "tilde_expansion: config_folder expanded"
+  else
+    assert_fail "tilde_expansion: config_folder expanded" "expected $expected_config, got $config"
+  fi
+
+  # Absolute paths must not be modified.
+  local settings2="$TMPDIR_TEST/tilde_absolute.json"
+  local managed2='{"instances":{"Default":{"steamcmd_install_path":"/opt/steamcmd"}}}'
+  run_merge "$settings2" "$managed2"
+
+  local steamcmd2
+  steamcmd2=$(json_get "$settings2" "d['instances']['Default']['steamcmd_install_path']")
+  if [ "$steamcmd2" = '"/opt/steamcmd"' ]; then
+    assert_pass "tilde_expansion: absolute path unchanged"
+  else
+    assert_fail "tilde_expansion: absolute path unchanged" "expected /opt/steamcmd, got $steamcmd2"
+  fi
+}
+
 # ── Run all tests ───────────────────────────────────────────────────
 test_create_new_file
 test_preserves_unmanaged_keys
@@ -282,6 +324,7 @@ test_empty_existing_file
 test_idempotent_merge
 test_steamcmd_install_path
 test_current_instance_top_level
+test_tilde_expansion
 
 if [ "$TESTS_FAILED" -gt 0 ]; then
   printf '%d failed, %d passed\n' "$TESTS_FAILED" "$TESTS_PASSED"
