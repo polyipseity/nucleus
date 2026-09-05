@@ -229,6 +229,7 @@ in
     # -----------------------------------------------------------------------
     clone-superpowers-plugin = lib.hm.dag.entryAfter [ "install-bun-packages" ] ''
       "${activationBundle}/src/scripts/agents/clone-superpowers-plugin.sh" \
+        "${pkgs.git}/bin/git" \
         "${managedPaths.toShellPrependGuard}" \
         "${managedPaths.toShellAppendGuard}" \
         "$HOME/.local/share/nucleus/plugins/superpowers" \
