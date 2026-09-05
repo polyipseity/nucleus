@@ -144,8 +144,7 @@ model_list:
       model_info:
         max_input_tokens: 128000
         max_output_tokens: 16000
-    model_info:
-      health_check_max_tokens: 500
+        health_check_max_tokens: 500
 
   - model_name: default
     litellm_params:
