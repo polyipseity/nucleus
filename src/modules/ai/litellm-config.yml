@@ -143,7 +143,7 @@ model_list:
       reasoning_effort: high
       model_info:
         max_input_tokens: 128000
-        health_check_max_tokens_reasoning: 500
+        health_check_max_tokens: 500
         max_output_tokens: 16000
 
   - model_name: default
