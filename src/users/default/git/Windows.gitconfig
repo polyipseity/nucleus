@@ -42,16 +42,16 @@
     # default.
     ff = true
     rebase = false
-[rerere]
-    # Record and replay merge-conflict resolutions automatically so
-    # repeated conflicts across rebases and cherry-picks resolve themselves.
-    enabled = true
 [push]
     # `push.autoSetupRemote` makes `git push` on a branch without an upstream
     # automatically configure the upstream to the same-named remote branch.
     autoSetupRemote = true
     # `push.followTags` keeps release/signing tags in sync with branch pushes.
     followTags = true
+[rerere]
+    # Record and replay merge-conflict resolutions automatically so
+    # repeated conflicts across rebases and cherry-picks resolve themselves.
+    enabled = true
 [tag]
     # WHY: signing is required by default so unsigned tags are rejected.
     gpgsign = true
