@@ -18,7 +18,7 @@ while IFS= read -r _vsd_entry; do
   _vsd_wf_dir="$_vsd_services_dir/$_vsd_dir"
   mkdir -p "$_vsd_services_dir"
   rm -rf "$_vsd_wf_dir"
-  cp -R "$_vsd_store_path" "$_vsd_services_dir/"
+  cp -R "$_vsd_store_path" "$_vsd_wf_dir"
   chmod -R u+w "$_vsd_wf_dir"
 
   # Register Thumbnail.png with IconServices so Finder shows the custom SF Symbol icon.
