@@ -4,7 +4,8 @@
 # Currently provides the optimize-pdf subcommand: optimize PDF files with
 # Ghostscript, keeping a .bak backup that is restored automatically if
 # optimization fails. Also provides strip-metadata: remove personal
-# metadata from Office files using mat2 (OOXML) and exiftool (other formats).
+# metadata from Office files using mat2 (OOXML) and exiftool (other
+# formats). ICC color profiles are preserved for correct color rendering.
 #
 # Usage: nucleus-utils <subcommand> [args...]
 #   Subcommand: optimize-pdf [--preset <name>] [--rm-bak] <file>...
@@ -46,6 +47,7 @@ Subcommands:
   strip-metadata [--rm-bak] <file>...
               Strip personal metadata from files. Uses mat2 for OOXML
               (.docx/.xlsx/.pptx) and exiftool for other formats.
+              ICC color profiles are preserved for correct color rendering.
               Legacy OLE2 files (.doc/.xls/.ppt) are skipped with a warning.
 
   optimize-pdf presets (default: default):
@@ -167,6 +169,7 @@ do_optimize_pdf() {
 # OOXML files (.docx/.xlsx/.pptx) are handled by mat2, which also cleans
 # embedded media metadata recursively. Legacy OLE2 files are skipped
 # (neither mat2 nor exiftool can write them). Other formats use exiftool.
+# ICC color profiles are preserved for correct color rendering.
 # Args: $@ — option/flag pairs followed by input file paths.
 # Side effects: renames each input to <file>.bak and writes the stripped
 # file back to <file>; removes the .bak only with --rm-bak.
@@ -253,7 +256,7 @@ do_strip_metadata() {
       # untouched original, so an interrupt leaves either the original or the
       # stripped file, never a half-written one.
       cp -- "$f" "$bak"
-      if "$et_cmd" -all= -overwrite_original "$f"; then
+      if "$et_cmd" -all= --icc_profile:all -overwrite_original "$f"; then
         "$rm_bak" && rm -f "$bak"
         say "stripped metadata: $f"
       else
