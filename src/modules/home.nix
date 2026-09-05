@@ -332,6 +332,17 @@ in
         ${lib.escapeShellArg rimsortManagedSettingsJson}
     '';
 
+    # Provision SteamCMD at RimSort's expected steamcmd_install_path so the
+    # app does not need to download it at runtime.  On macOS the Nix store's
+    # native binary is symlinked; on NixOS the store's steamcmd wrapper
+    # (which invokes steam-run) is linked.
+    home.activation.provision-steamcmd = lib.hm.dag.entryAfter [ "merge-rimsort-json" ] ''
+      "${activationBundle}/src/scripts/configs/provision-steamcmd.sh" \
+        "${pkgs.python3}/bin/python3" \
+        "${pkgs.steamcmd}" \
+        ${lib.escapeShellArg rimsortManagedSettingsJson}
+    '';
+
     # Protect out-of-store symlinks (mkOutOfStoreSymlink) against accidental
     # deletion between rebuilds.
     home.activation.unprotect-out-of-store-symlinks = lib.hm.dag.entryBefore [ "linkGeneration" ] ''
