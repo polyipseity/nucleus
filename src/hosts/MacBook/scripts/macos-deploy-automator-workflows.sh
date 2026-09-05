@@ -16,9 +16,9 @@ while IFS= read -r _vsd_entry; do
 
   _vsd_wf_dir="$_vsd_services_dir/$_vsd_dir"
   mkdir -p "$_vsd_services_dir"
-  chmod -R +w "$_vsd_wf_dir" 2>/dev/null || true # check-suppress:suppression_doc: dir may not exist on first apply
   rm -rf "$_vsd_wf_dir"
   cp -R "$_vsd_store_path" "$_vsd_services_dir/"
+  chmod -R u+w "$_vsd_wf_dir"
 
   # Enable in presentation_modes format (macOS 14+).
   # CFBundleIdentifier is set in each workflow's Info.plist.
